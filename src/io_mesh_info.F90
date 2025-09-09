@@ -527,7 +527,8 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   allocate(rbuffer(elem2D))
   do i=1, 3
      call gather_elem(gradient_sca(i, 1:myDim_elem2D), rbuffer, partit)
-     call my_put_vara(ncid, gradient_sca_x_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit) ! (4-i), NETCDF will permute otherwise
+     ! call my_put_vara(ncid, gradient_sca_x_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit) ! (4-i), NETCDF will permute otherwise; bug fix writing fesom.mesh.diag
+     call my_put_vara(ncid, gradient_sca_x_id, (/1, i/), (/elem2D, 1/), rbuffer, partit) 
   end do
   deallocate(rbuffer)
 
@@ -536,7 +537,8 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   allocate(rbuffer(elem2D))
   do i=1, 3
      call gather_elem(gradient_sca(i+3, 1:myDim_elem2D), rbuffer, partit)
-     call my_put_vara(ncid, gradient_sca_y_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit)! (4-i), NETCDF will permute otherwise
+     ! call my_put_vara(ncid, gradient_sca_y_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit)! (4-i), NETCDF will permute otherwise; bug fix writing fesom.mesh.diag
+     call my_put_vara(ncid, gradient_sca_y_id, (/1, i/), (/elem2D, 1/), rbuffer, partit)
   end do
   deallocate(rbuffer)
 

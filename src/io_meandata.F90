@@ -499,6 +499,11 @@ CASE ('aFe       ')
     call def_stream(nod2D,  myDim_nod2D,   'aFe','Atmospheric iron input','umolFe/m2/s', AtmFeInput(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 
+CASE ('sedFe     ')
+    if (use_REcoM) then
+    call def_stream(nod2D,  myDim_nod2D,   'sedFe','sediment iron input','umolFe/m2/s', sedFeInput(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
 CASE ('aN        ')
     if (use_REcoM) then
     call def_stream(nod2D,  myDim_nod2D,   'aN','Atmospheric DIN input','mmolN/m2/s', AtmNInput(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit,  mesh)
@@ -636,6 +641,31 @@ CASE ('Chldegp  ')
 !    call def_stream(nod2D,  myDim_nod2D,   'GNAp','Gross N-assimilation phaeocystis','mmolN/(m2*d)', diags2D(:,12), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh) ! NEW
     call def_stream(nod2D,  myDim_nod2D,   'ChlDegp','Chlorophyll degradation phaeocystis','1/d', Chldegp, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
     endif
+
+CASE ('NPPdiaH     ')
+    if (use_REcoM) then
+!    call def_stream(nod2D,  myDim_nod2D,   'NPPdiaH','Mean NPP heavily silicifying diatoms','mmolC/(m2*d)', diags2D(:,13), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)     ! NEW
+    call def_stream(nod2D,  myDim_nod2D,   'NPPdiaH','Mean NPP heavily silicifying diatoms','mmolC/(m2*d)', NPPdiaH, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)     ! heavily silicified diatoms
+    end if
+
+CASE ('GPPdiaH     ')
+    if (use_REcoM) then
+!    call def_stream(nod2D,  myDim_nod2D,   'GPPdiaH','Mean GPP heavily silicifying diatoms','mmolC/(m2*d)', diags2D(:,14), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)    ! NEW
+    call def_stream(nod2D,  myDim_nod2D,   'GPPdiaH','Mean GPP heavily silicifying diatoms','mmolC/(m2*d)', GPPdiaH, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)    ! heavily silicified diatoms
+    end if
+
+CASE ('NNAdiaH     ')
+    if (use_REcoM) then
+!    call def_stream(nod2D,  myDim_nod2D,   'NNAdiaH','Net N-assimilation heavily silicifying diatoms','mmolN/(m2*d)', diags2D(:,15), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)   ! NEW
+    call def_stream(nod2D,  myDim_nod2D,   'NNAdiaH','Net N-assimilation heavily silicifying diatoms','mmolN/(m2*d)', NNAdiaH, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)   !heavily silicified diatoms
+    endif
+
+CASE ('ChldegdiaH  ')
+    if (use_REcoM) then
+!    call def_stream(nod2D,  myDim_nod2D,   'GNAdiaH','Gross N-assimilation heavily silicifying diatoms','mmolN/(m2*d)', diags2D(:,16), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh) ! NEW
+    call def_stream(nod2D,  myDim_nod2D,   'ChlDegdiaH','Chlorophyll degradation heavily silicifying diatoms','1/d', ChldegdiaH, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! heavily silicified diatoms
+    endif
+
 #endif
     
 !___________________________________________________________________________________________________________________________________    
@@ -702,6 +732,11 @@ CASE ('aggp           ')
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'aggp','Aggregation of phaeocystis', 'mmolC/(m2*d)', aggp(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
    endif
 
+CASE ('aggdiaH           ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'aggdiaH','Aggregation of heavilfy silicifying diatoms', 'mmolC/(m2*d)', aggdiaH(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! heavily silicified diatoms
+   endif
+
 CASE ('docexn         ')
    if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'docexn','DOC excretion by small phytoplankton', 'mmolC/m2/d', docexn(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -720,6 +755,11 @@ CASE ('docexc         ')
 CASE ('docexp         ')
    if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'docexp','DOC excretion by phaeocystis', 'mmolC/(m2*d)', docexp(:,:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
+   endif
+
+CASE ('docexdiaH         ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'docexdiaH','DOC excretion by heavilfy silicifying diatoms', 'mmolC/(m2*d)', docexdiaH(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! heavily silicified diatoms
    endif
 
 CASE ('respn          ')
@@ -742,6 +782,11 @@ CASE ('respp          ')
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'respp','Respiration by phaeocystis', 'mmolC/(m2*d)', respp(:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
    endif
 
+CASE ('respdiaH          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'respdiaH','Respiration by heavily silicifying diatoms', 'mmolC/(m2*d)', respdiaH(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! heavily silicified diatoms
+   endif
+
 CASE ('NPPn3D         ')
    if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPn3D','Net primary production of small phytoplankton', 'mmolC/m2/d', NPPn3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -760,6 +805,11 @@ CASE ('NPPc3D         ')
 CASE ('NPPp3D         ')
    if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPp3D','Net primary production of phaeocystis', 'mmolC/(m2*d)', NPPp3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
+   endif
+
+CASE ('NPPdiaH3D         ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPdiaH3D','Net primary production of heavily silicifying diatoms', 'mmolC/(m2*d)', NPPdiaH3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! heavily silicified diatoms
    endif
 
 CASE ('TTemp_diatoms          ')
@@ -1084,6 +1134,27 @@ CASE ('otracers  ')
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Zoo3C', 'Zoo3C', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
+
+      else if (tracers%data(j)%ID==1037) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DiaH_N', 'DiaH_N', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! heavily silicified diatoms
+         endif
+
+      else if (tracers%data(j)%ID==1038) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DiaH_C', 'DiaH_C', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! heavily silicified diatoms
+         endif
+
+      else if (tracers%data(j)%ID==1039) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DiaH_Chl', 'DiaH_Chl', '[mg/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! heavily silicified diatoms
+         endif
+
+      else if (tracers%data(j)%ID==1040) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DiaH_Si', 'DiaH_Si', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! heavily silicified diatoms
+         endif
+
       else
 #endif
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'tra_'//id_string, 'passive tracer ID='//id_string, 'n/a', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)

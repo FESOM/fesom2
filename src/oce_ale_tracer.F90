@@ -693,7 +693,7 @@ subroutine diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
             rdata =  Tsurf(n)
             rlx   =  surf_relax_T
         elseif (tracers%data(tr_num)%ID==2) then
-            flux  =  virtual_salt(n)+relax_salt(n)- real_salt_flux(n)*is_nonlinfs
+            flux  =  virtual_salt(n)+relax_salt(n) + real_salt_flux(n)*is_nonlinfs
         else
             flux  = 0._WP
             rdata = 0._WP
@@ -1644,7 +1644,7 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
         ! --> real_salt_flux(:): salt flux due to containment/releasing of salt
         !     by forming/melting of sea ice
         bc_surface= dt*(virtual_salt(n) & !--> is zeros for zlevel/zstar
-                    + relax_salt(n) - real_salt_flux(n)*is_nonlinfs)
+                    + relax_salt(n) + real_salt_flux(n)*is_nonlinfs)
 #if defined(__recom)
     CASE (1001) ! DIN
         if (use_MEDUSA .and. add_loopback) then  ! OG: add is_MEDUSA_loopback flag is_MEDUSA_loopback flag * lb_flux(n,1)
@@ -1704,8 +1704,8 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
     CASE (1022) ! OXY
         bc_surface= dt*GloO2flux_seaicemask(n)
 !        bc_surface=0.0_WP
-    CASE (1023:1036)
-        bc_surface=0.0_WP  ! OG added bc for recom fields
+    CASE (1023:1040)
+        bc_surface=0.0_WP  ! OG added bc for recom fields, increased to 1040 with DiaH
     CASE (1302) ! Before (1037) ! DIC_13
 
 #if defined (__ciso)
@@ -1739,7 +1739,7 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
          bc_surface=0.0_WP ! organic 14C
 #endif
     CASE (101) ! apply boundary conditions to tracer ID=101
-        bc_surface= dt*(prec_rain(n))! - real_salt_flux(n)*is_nonlinfs)
+        bc_surface= dt*(prec_rain(n))! + real_salt_flux(n)*is_nonlinfs)
 !---Transient tracers (case ##6,12,14,39) need additional input parameters 
 !   and are considered in the separate function transit_bc_surface
 !---wiso-code

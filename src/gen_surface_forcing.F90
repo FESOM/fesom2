@@ -103,8 +103,8 @@ MODULE g_sbf
    real(wp),                save   :: chl_const            = 0.1
 
 #if defined (__recom)
-   character(10),           save   :: fe_data_source       ='Albani'
-   character(len=MAX_PATH), save   :: nm_fe_data_file      ='DustClimMonthlyAlbani.nc'
+   character(10),           save   :: fe_data_source       ='Myrio'    
+   character(len=MAX_PATH), save   :: nm_fe_data_file      ='DustClimMonthlyMyrio_core2.nc' 
 
    character(len=MAX_PATH), save   :: nm_aen_data_file     ='AeolianNitrogenDep.nc '
 
@@ -1755,7 +1755,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
 
 
 ! ******** Fe deposition *********
-    if (fe_data_source=='Albani') then
+    if (fe_data_source=='Myrio') then
         if (update_monthly_flag) then
             i=month
             if (mstep > 1) i=i+1 
@@ -1765,7 +1765,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
             call read_2ddata_on_grid_NetCDF(filename,'DustClim', i, GloFeDust, partit, mesh)
         end if
     else
-        if (mype==0) write(*,*) 'Albani is switched off --> Check namelist.recom'     
+        if (mype==0) write(*,*) 'Myrio is switched off --> Check namelist.recom'     
     end if
 
 ! ******** N deposition *********
