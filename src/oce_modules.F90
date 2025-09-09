@@ -190,7 +190,7 @@ character(20)                  :: which_pgf='shchepetkin'
                     N2smth_v, N2smth_h, N2smth_hidx, &
                     visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, alpha, theta, use_density_ref, &
                     Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, K_GM_cm, K_GM_cmin, K_GM_Ktaper, &
-                    Redi, Redi_Ktaper, Redi_Kmax, Redi_Kmin,use_global_tides &
+                    Redi, Redi_Ktaper, Redi_Kmax, Redi_Kmin, use_global_tides, &
                     scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, &
                     scaling_ODM95, ODM95_Scr, ODM95_Sd, &
                     scaling_LDD97, LDD97_c, LDD97_rmin, LDD97_rmax, &
