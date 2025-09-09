@@ -1,5 +1,10 @@
 name: FESOM2 CTest Framework (Native Runner)
 
+# This workflow tests FESOM2 core functionality using local meshes only.
+# It skips remote mesh tests to avoid external dependencies in CI.
+# For full testing including remote meshes, run locally with:
+# ./configure.sh ubuntu -DBUILD_TESTING=ON -DBUILD_MESHDIAG=ON -DBUILD_MESHPARTITIONER=ON
+
 # Controls when the action will run
 on:
   # Triggers the workflow on push or pull request events
@@ -128,7 +133,8 @@ jobs:
           cmake \
             -DCMAKE_BUILD_TYPE=${{ github.event.inputs.build_type || 'Release' }} \
             -DBUILD_TESTING=ON \
-            -DENABLE_INTEGRATION_TESTS=ON \
+            -DBUILD_MESHDIAG=ON \
+            -DBUILD_MESHPARTITIONER=ON \
             -DENABLE_MPI_TESTS=ON \
             -DTEST_TIMEOUT=${{ github.event.inputs.test_timeout || '600' }} \
             -DCMAKE_C_COMPILER=gcc \
@@ -154,7 +160,7 @@ jobs:
           
           echo "Build completed successfully"
           
-          # Verify executable exists
+          # Verify executables exist
           if [ -f "bin/fesom.x" ]; then
             echo "✅ FESOM2 executable created successfully"
             ls -la bin/fesom.x
@@ -162,6 +168,20 @@ jobs:
             echo "❌ FESOM2 executable not found"
             find . -name "fesom.x" -type f || echo "No fesom.x found anywhere"
             exit 1
+          fi
+          
+          if [ -f "bin/fesom_meshdiag" ]; then
+            echo "✅ FESOM2 meshdiag executable created successfully"
+            ls -la bin/fesom_meshdiag
+          else
+            echo "⚠️ FESOM2 meshdiag executable not found"
+          fi
+          
+          if [ -f "bin/fesom_meshpart" ]; then
+            echo "✅ FESOM2 mesh partitioner executable created successfully" 
+            ls -la bin/fesom_meshpart
+          else
+            echo "⚠️ FESOM2 mesh partitioner executable not found"
           fi
             
       - name: List available tests
@@ -205,14 +225,15 @@ jobs:
             echo "Running tests matching pattern: $TEST_PATTERN"
             ctest $CTEST_ARGS -R "$TEST_PATTERN"
           else
-            echo "Running selected integration tests:"
-            echo "- integration_full_run_mpi2"
-            echo "- integration_full_run_mpi8" 
+            echo "Running core integration tests:"
+            echo "- integration_pi_mpi2"
+            echo "- integration_pi_mpi8" 
             echo "- integration_pi_cavity_mpi2"
-            echo "- integration_test_data_check"
+            echo "- integration_meshdiag_pi_mpi2"
+            echo "- meshpartitioner_partition_local_pi_mesh_4"
             
-            # Run only the specified tests using regex pattern
-            ctest $CTEST_ARGS -R "(integration_full_run_mpi2|integration_full_run_mpi8|integration_pi_cavity_mpi2|integration_test_data_check)"
+            # Run only the core local tests (skip remote tests in CI to avoid external dependencies)
+            ctest $CTEST_ARGS -R "(integration_pi_mpi2|integration_pi_mpi8|integration_pi_cavity_mpi2|integration_meshdiag_pi_mpi2|meshpartitioner_partition_local_pi_mesh_4)"
           fi
           
           # Capture exit code

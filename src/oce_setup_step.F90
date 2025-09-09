@@ -1025,7 +1025,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     use recom_ciso
 #endif
     ! for additional (transient) tracers:
-    use mod_transit, only: id_r14c, id_r39ar, id_f12, id_sf6
+    use mod_transit, only: id_r14c, id_r39ar, id_f11, id_f12, id_sf6
     implicit none
     type(t_tracer), intent(inout), target :: tracers
     type(t_partit), intent(inout), target :: partit
