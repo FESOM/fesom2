@@ -1448,8 +1448,18 @@ end subroutine stiff_mat_ini
 ! Setup of communication arrays
 subroutine communication_ini(partit, mesh)
   use MOD_PARTIT
+  use mod_gen_comm, only: communication_nodn, communication_elemn
   use omp_lib
   implicit none
+  
+  interface
+    subroutine save_dist_mesh(partit, mesh)
+      use MOD_MESH
+      use MOD_PARTIT
+      type(t_mesh), intent(in), target :: mesh
+      type(t_partit), intent(in), target :: partit
+    end subroutine save_dist_mesh
+  end interface
 
   integer        :: n
   character*10   :: npes_string
