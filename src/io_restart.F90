@@ -1008,7 +1008,7 @@ subroutine read_restart(path, filegroup, mpicomm, mype)
         write(*,*) 'Reading restart: timestamps in restart and in clock files do not match for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
         write(*,*) 'restart/ times are:', ctime, rtime
         write(*,*) 'the model will stop!'
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        call par_ex(mpicomm, mype, 1)
       end if
     end if
   end do
