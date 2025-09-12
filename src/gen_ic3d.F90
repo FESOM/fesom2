@@ -16,18 +16,19 @@ MODULE g_ic3d
    USE MOD_PARTIT
    USE MOD_PARSUP
    USE MOD_TRACER
-   USE o_PARAM
+   USE o_PARAM, only: mstep
    USE g_comm_auto
    USE g_support
    USE g_config, only: dummy, ClimateDataPath, use_cavity
+   USE g_clock, only: r_restart
    
    IMPLICIT NONE
 
    include 'netcdf.inc'
 
-   public  do_ic3d, &                                       ! read and apply 3D initial conditions
-           n_ic3d, idlist, filelist, varlist, tracer_init3d, & ! to be read from the namelist
-           t_insitu
+   public  do_ic3d, &
+           n_ic3d, idlist, filelist, varlist, tracer_init3d, &
+           t_insitu, oce_perturb, lperturb, perturb_mode, perturb_method, perturb_seed, temp_perturb, salt_perturb
    private
 
 ! namelists
@@ -42,6 +43,20 @@ MODULE g_ic3d
    character(50),  save,  dimension(ic_max)     :: varlist
 
    namelist / tracer_init3d / n_ic3d, idlist, filelist, varlist, t_insitu
+
+!============= perturbation to IC variables ================
+   logical                                      :: lperturb = .false.
+   character(20)                                :: perturb_mode = 'initial_only'  ! 'initial_only', 'first_step'
+   character(20)                                :: perturb_method = 'uniform'     ! 'uniform', 'gaussian'
+   integer                                      :: perturb_seed = -1              ! Random seed (-1 = use system time)
+   type perturb_entry
+   real(WP)                 :: min_val          ! For uniform: min value
+   real(WP)                 :: max_val          ! For uniform: max value / For gaussian: std deviation
+   end type
+   type(perturb_entry),save   :: temp_perturb = perturb_entry(0.0,0.0)
+   type(perturb_entry),save   :: salt_perturb = perturb_entry(0.0,0.0)
+   namelist / oce_perturb / lperturb, perturb_mode, perturb_method, perturb_seed, temp_perturb, salt_perturb
+!==========================================================
 
    character(MAX_PATH), save                    :: filename
    character(50),  save                         :: varname
@@ -641,7 +656,191 @@ CONTAINS
       call MPI_AllREDUCE(locO2min , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  `-> gobal min init. O2. =', glo
 #endif
+      
+      ! Apply perturbations based on selected mode
+      if (lperturb) then 
+         select case (trim(perturb_mode))
+         case ('initial_only')
+            if (.not. r_restart) then 
+               if (partit%mype==0) then
+                   write(*,*) ''
+                   write(*,*) '*** FESOM2 PERTURBATION TRIGGER ***'
+                   write(*,*) 'Mode: INITIAL_ONLY - Applying perturbations (initial run detected)'
+                   write(*,*) ''
+               end if
+               call do_perturb(tracers, partit, mesh)
+            else
+               if (partit%mype==0) then
+                   write(*,*) ''
+                   write(*,*) '*** FESOM2 PERTURBATION SKIP ***'
+                   write(*,*) 'Mode: INITIAL_ONLY - Skipping perturbations (restart run detected)'
+                   write(*,*) ''
+               end if
+            end if
+         case ('first_step')
+            ! For first_step mode, apply perturbations during initialization (mstep=0) 
+            ! or during the actual first time step (mstep=1)
+            if (mstep <= 1) then
+               if (partit%mype==0) then
+                   write(*,*) ''
+                   write(*,*) '*** FESOM2 PERTURBATION TRIGGER ***'
+                   if (mstep == 0) then
+                       write(*,*) 'Mode: FIRST_STEP - Applying perturbations (initialization phase, mstep=0)'
+                   else
+                       write(*,*) 'Mode: FIRST_STEP - Applying perturbations (first time step, mstep=1)'
+                   end if
+                   write(*,*) ''
+               end if
+               call do_perturb(tracers, partit, mesh)
+            else
+               if (partit%mype==0) then
+                   write(*,*) ''
+                   write(*,*) '*** FESOM2 PERTURBATION SKIP ***'
+                   write(*,*) 'Mode: FIRST_STEP - Skipping perturbations (not first time step, mstep=', mstep, ')'
+                   write(*,*) ''
+               end if
+            end if
+         case default
+            if (partit%mype==0) then
+                write(*,*) ''
+                write(*,*) '*** FESOM2 PERTURBATION WARNING ***'
+                write(*,*) 'Unknown perturb_mode: ', trim(perturb_mode), ' - defaulting to INITIAL_ONLY'
+                write(*,*) ''
+            end if
+            if (.not. r_restart) then 
+               if (partit%mype==0) then
+                   write(*,*) '*** FESOM2 PERTURBATION TRIGGER ***'
+                   write(*,*) 'Mode: DEFAULT (initial_only) - Applying perturbations (initial run detected)'
+                   write(*,*) ''
+               end if
+               call do_perturb(tracers, partit, mesh)
+            end if
+         end select
+      else
+         if (partit%mype==0) then
+             write(*,*) ''
+             write(*,*) '*** FESOM2 PERTURBATION DISABLED ***'
+             write(*,*) 'lperturb = .false. - No perturbations will be applied'
+             write(*,*) ''
+         end if
+      end if
    END SUBROUTINE do_ic3d
+   
+   SUBROUTINE do_perturb(tracers, partit, mesh)
+        IMPLICIT NONE
+        type(t_tracer), intent(inout), target :: tracers
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh), intent(in), target :: mesh
+        integer                          :: n,ii,i
+        real(WP)                         :: rnum, min_val, max_val
+        integer                          :: seed_size, clock_time
+        integer, allocatable             :: seed_array(:)
+
+        ! Initialize random seed for reproducible perturbations
+        call random_seed(size=seed_size)
+        allocate(seed_array(seed_size))
+        
+        if (perturb_seed == -1) then
+            ! Use system time for random seed (different each run)
+            call system_clock(clock_time)
+            do i = 1, seed_size
+                seed_array(i) = clock_time + 37 * i
+            end do
+            if (partit%mype==0) write(*,*) 'Using system time-based random seed for perturbations'
+        else
+            ! Use specified seed for reproducible perturbations
+            do i = 1, seed_size
+                seed_array(i) = perturb_seed + partit%mype + 37 * i
+            end do
+            if (partit%mype==0) write(*,*) 'Using specified random seed for perturbations: ', perturb_seed
+        end if
+        
+        call random_seed(put=seed_array)
+        deallocate(seed_array)
+
+        ! ================================================================
+        ! PERTURBATION REPORTING - START
+        ! ================================================================
+        if (partit%mype==0) then
+            write(*,*) ''
+            write(*,*) '========================================================'
+            write(*,*) 'FESOM2 INITIAL CONDITION PERTURBATION REPORT'
+            write(*,*) '========================================================'
+            write(*,*) 'Perturbation Status    : ENABLED (lperturb = .true.)'
+            write(*,*) 'Perturbation Mode      : ', trim(perturb_mode)
+            write(*,*) 'Perturbation Method    : ', trim(perturb_method)
+            if (perturb_seed == -1) then
+                write(*,*) 'Random Seed            : SYSTEM TIME (non-reproducible)'
+            else
+                write(*,*) 'Random Seed            : ', perturb_seed, ' (reproducible)'
+            end if
+            write(*,*) '--------------------------------------------------------'
+        end if
+        
+        if (trim(perturb_method) == 'uniform') then
+            if (partit%mype==0) then
+                write(*,*) 'UNIFORM DISTRIBUTION PARAMETERS:'
+                write(*,'(A,E15.8,A,E15.8,A)') '  Temperature Range    : [', temp_perturb%min_val, ', ', temp_perturb%max_val, '] K'
+                write(*,'(A,E15.8,A,E15.8,A)') '  Salinity Range       : [', salt_perturb%min_val, ', ', salt_perturb%max_val, '] PSU'
+                write(*,*) '  Distribution Type    : Flat (equal probability)'
+            end if
+        else if (trim(perturb_method) == 'gaussian') then
+            if (partit%mype==0) then
+                write(*,*) 'GAUSSIAN DISTRIBUTION PARAMETERS:'
+                write(*,'(A,E15.8,A,E15.8,A)') '  Temperature          : mean=', temp_perturb%min_val, ', σ=', temp_perturb%max_val, ' K'
+                write(*,'(A,E15.8,A,E15.8,A)') '  Salinity             : mean=', salt_perturb%min_val, ', σ=', salt_perturb%max_val, ' PSU'
+                write(*,*) '  Distribution Type    : Bell curve (68% within ±1σ, 95% within ±2σ)'
+            end if
+        else
+            if (partit%mype==0) then
+                write(*,*) 'WARNING: Unknown perturbation method: ', trim(perturb_method)
+                write(*,*) 'DEFAULTING TO UNIFORM DISTRIBUTION:'
+                write(*,'(A,E15.8,A,E15.8,A)') '  Temperature Range    : [', temp_perturb%min_val, ', ', temp_perturb%max_val, '] K'
+                write(*,'(A,E15.8,A,E15.8,A)') '  Salinity Range       : [', salt_perturb%min_val, ', ', salt_perturb%max_val, '] PSU'
+            end if
+        end if
+        
+        if (partit%mype==0) then
+            write(*,*) '--------------------------------------------------------'
+            write(*,*) 'APPLYING PERTURBATIONS TO ALL VERTICAL LEVELS...'
+        end if
+
+        do ii=1, 2
+          do n=1,partit%myDim_nod2d
+            if (ii==1) then
+              min_val = temp_perturb%min_val
+              max_val = temp_perturb%max_val
+            else
+              if (ii==2) then
+               min_val = salt_perturb%min_val
+               max_val = salt_perturb%max_val
+              end if
+            end if
+            call gen_perturbation(rnum, perturb_method, min_val, max_val)
+            tracers%data(ii)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n) = &
+                                                tracers%data(ii)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n) + rnum
+          end do
+        end do
+        ! sync halos
+        !call exchange_nod3D(tracers%data(1)%values, partit)
+        !call exchange_nod3D(tracers%data(2)%values, partit)
+
+        ! ================================================================
+        ! PERTURBATION REPORTING - COMPLETION
+        ! ================================================================
+        if (partit%mype==0) then
+            write(*,*) 'PERTURBATION APPLICATION COMPLETED SUCCESSFULLY'
+            write(*,*) '--------------------------------------------------------'
+            write(*,'(A,I0,A)') '  Horizontal nodes processed : ', partit%myDim_nod2d, ' (per MPI process)'
+            write(*,*) '  Vertical levels            : ALL active levels per node'
+            write(*,*) '  Tracers perturbed          : Temperature and Salinity'
+            write(*,*) '  Perturbation applied to    : Initial field values'
+            write(*,*) '========================================================'
+            write(*,*) 'PERTURBATION REPORT COMPLETE'
+            write(*,*) '========================================================'
+            write(*,*) ''
+        end if
+   END SUBROUTINE do_perturb
     
    SUBROUTINE nc_end
 
@@ -701,4 +900,44 @@ CONTAINS
       ind = right
 
    END SUBROUTINE binarysearch
+
+   SUBROUTINE gen_perturbation(rnum, method, param1, param2)
+     real(WP), intent(out)     :: rnum
+     character(*), intent(in)  :: method
+     real(WP), intent(in)      :: param1, param2
+     real(WP)                  :: rtemp1, rtemp2
+     
+     select case (trim(method))
+     case ('uniform')
+         ! Uniform distribution: param1=min_val, param2=max_val
+         call random_number(rtemp1)
+         rnum = (param2 - param1) * rtemp1 + param1
+         
+     case ('gaussian')
+         ! Gaussian distribution: param1=mean (always 0), param2=std_dev
+         ! Box-Muller transformation for Gaussian random numbers
+         call random_number(rtemp1)
+         call random_number(rtemp2)
+         
+         ! Avoid log(0) by ensuring rtemp1 > 0
+         if (rtemp1 < 1.0e-10_WP) rtemp1 = 1.0e-10_WP
+         
+         ! Box-Muller: generate standard normal, then scale by std_dev
+         rnum = param2 * sqrt(-2.0_WP * log(rtemp1)) * cos(2.0_WP * 3.14159265359_WP * rtemp2)
+         
+     case default
+         ! Default to uniform if unknown method
+         call random_number(rtemp1)
+         rnum = (param2 - param1) * rtemp1 + param1
+     end select
+     
+   END SUBROUTINE gen_perturbation
+
+   ! Keep old gen_uniform for backward compatibility
+   SUBROUTINE gen_uniform(rnum, min_val, max_val )
+     real(WP), intent(out) :: rnum
+     real(WP), intent(in)  :: min_val, max_val
+     call gen_perturbation(rnum, 'uniform', min_val, max_val)
+   END SUBROUTINE gen_uniform
+
 END MODULE g_ic3d
