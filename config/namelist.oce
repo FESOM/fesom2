@@ -24,3 +24,69 @@ mix_scheme='KPP'           ! vertical mixing scheme: KPP, PP
 Ricr   = 0.3               ! critical bulk Richardson Number
 concv  = 1.6               ! constant for pure convection (eqn. 23) (Large 1.5-1.6; MOM default 1.8)
 /
+
+! ===================================================================
+! Initial conditions for tracers
+! ===================================================================
+&tracer_init3d
+n_ic3d    = 2
+idlist    = 1, 0
+filelist  = 'phc3.0_winter.nc', 'phc3.0_winter.nc'
+varlist   = 'salt', 'temp'
+t_insitu  = .true.
+/
+
+! ===================================================================
+! Initial condition perturbation settings
+! ===================================================================
+! This section controls random perturbation of initial temperature
+! and salinity fields. Useful for ensemble modeling and uncertainty
+! quantification.
+!
+! lperturb       : Enable/disable perturbation (.true./.false.)
+! perturb_mode   : When to apply perturbations
+!                  'initial_only' - Apply only during initial runs (not restarts)
+!                  'first_step'   - Apply during first time step (initial or restart)
+! perturb_method : Type of random distribution
+!                  'uniform'   - Uniform distribution between [min_val, max_val]
+!                  'gaussian'  - Gaussian distribution with mean=min_val, std_dev=max_val
+! perturb_seed   : Random seed for reproducible perturbations
+!                  -1 = use system time (different each run)
+!                  >0 = use specified seed (reproducible)
+! temp_perturb   : Temperature perturbation parameters
+!                  For uniform: [min_val, max_val] in Kelvin
+!                  For gaussian: [mean(=0.0), std_dev] in Kelvin
+! salt_perturb   : Salinity perturbation parameters
+!                  For uniform: [min_val, max_val] in PSU
+!                  For gaussian: [mean(=0.0), std_dev] in PSU
+!
+! Example for ensemble forecasting with Gaussian perturbations:
+!&oce_perturb
+!lperturb       = .true.
+!perturb_mode   = 'first_step'
+!perturb_method = 'gaussian'
+!perturb_seed   = 12345
+!temp_perturb   = 0.0, 1.D-13
+!salt_perturb   = 0.0, 2.D-13
+!/
+!
+! Example for sensitivity study with uniform perturbations:
+!&oce_perturb
+!lperturb       = .true.
+!perturb_mode   = 'initial_only'
+!perturb_method = 'uniform'
+!perturb_seed   = -1
+!temp_perturb   = -1.D-12, 1.D-12
+!salt_perturb   = -2.D-12, 2.D-12
+!/
+
+! Default behavior (no perturbations):
+!&oce_perturb
+!lperturb       = .false.
+!perturb_mode   = 'initial_only'
+!perturb_method = 'uniform'
+!perturb_seed   = -1
+!temp_perturb   = 0.0, 0.0
+!salt_perturb   = 0.0, 0.0
+!/
+
