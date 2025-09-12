@@ -90,6 +90,16 @@ subroutine setup_model(partit)
   endif
   read (fileunit, NML=oce_dyn, iostat=istat)
   if (istat /= 0) call check_namelist_read(fileunit, 'oce_dyn', nmlfile, partit)
+  
+  read (fileunit, NML=tracer_init3d, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'tracer_init3d', nmlfile, partit)
+  
+  ! Optional reading of oce_perturb namelist for backward compatibility
+  read (fileunit, NML=oce_perturb, iostat=istat)
+  if (istat /= 0) then
+    if (partit%mype==0) write(*,*) 'INFO: oce_perturb namelist not found, using defaults (no perturbations)'
+  end if
+  
   close (fileunit)
 
   nmlfile ='namelist.tra'    ! name of ocean namelist file
