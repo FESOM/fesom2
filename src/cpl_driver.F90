@@ -14,7 +14,7 @@ module cpl_driver
   !
   use mod_oasis                    ! oasis module
   use g_config, only : dt, use_icebergs, lwiso, compute_oasis_corners
-  use o_param,  only : rad
+  use o_param,  only : rad, WP
   USE MOD_PARTIT
   use mpi
   implicit none

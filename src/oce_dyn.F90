@@ -1,3 +1,20 @@
+module oce_dyn_module
+    use mod_mesh
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_DYN
+    USE o_PARAM
+    USE g_CONFIG
+    use g_comm_auto
+    
+    implicit none
+    
+    private
+    public :: update_vel, compute_vel_nodes, viscosity_filter, visc_filt_bcksct, &
+              visc_filt_bilapl, visc_filt_bidiff, compute_ke_wrho, compute_apegen, &
+              check_viscopt, check_validviscopt_5
+
+contains
 
 ! A set of routines for computing the horizonlal viscosity
 ! the control parameters (their default values) are:
@@ -9,76 +26,12 @@
 !    We however, try to keep dynamics%visc_gamma1<0.1
 ! 3. dynamics%visc_gamma2 is dimensional (1/velocity). If it is 10, then the respective term dominates starting from |u|=0.1 m/s an so on. It is only used in: 
 !    (5) visc_filt_bcksct, (6) visc_filt_bilapl, (7) visc_filt_bidiff
-module visc_filt_bcksct_interface
-  interface
-    subroutine visc_filt_bcksct(dynamics, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_DYN
-      type(t_dyn)   , intent(inout), target :: dynamics
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh)  , intent(in)   , target :: mesh
-      
-    end subroutine visc_filt_bcksct
-  end interface
-end module visc_filt_bcksct_interface
-
-module visc_filt_bilapl_interface
-  interface
-    subroutine visc_filt_bilapl(dynamics, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_DYN
-      type(t_dyn)   , intent(inout), target :: dynamics
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh)  , intent(in)   , target :: mesh
-      
-    end subroutine visc_filt_bilapl
-  end interface
-end module visc_filt_bilapl_interface
-
-module visc_filt_bidiff_interface
-  interface
-    subroutine visc_filt_bidiff(dynamics, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_DYN
-      type(t_dyn)   , intent(inout), target :: dynamics
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh)  , intent(in)   , target :: mesh
-      
-    end subroutine visc_filt_bidiff
-  end interface
-end module visc_filt_bidiff_interface
-
-module check_validviscopt_interface
-    interface
-        subroutine check_validviscopt_5(partit, mesh)
-            USE MOD_MESH
-            USE MOD_PARTIT
-            USE MOD_PARSUP
-            type(t_partit), intent(inout), target :: partit
-            type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine check_validviscopt_5    
-    end interface
-end module check_validviscopt_interface 
 
 ! 
 ! Contains routines needed for computations of dynamics.
 ! includes: update_vel, compute_vel_nodes
 !_______________________________________________________________________________
 SUBROUTINE update_vel(dynamics, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    USE o_PARAM
-    USE g_CONFIG
-    use g_comm_auto
-    IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
@@ -175,13 +128,6 @@ end subroutine update_vel
 !
 !_______________________________________________________________________________
 subroutine compute_vel_nodes(dynamics, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    USE o_PARAM
-    use g_comm_auto
-    IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
@@ -233,9 +179,7 @@ subroutine viscosity_filter(option, dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     use MOD_DYN
-    use visc_filt_bcksct_interface
-    use visc_filt_bilapl_interface
-    use visc_filt_bidiff_interface
+    ! visc_filt subroutines are now in the same module
     use g_backscatter
     IMPLICIT NONE 
     integer                               :: option
@@ -859,7 +803,7 @@ subroutine check_viscopt(dynamics, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_MESH
-    USE check_validviscopt_interface
+    ! check_validviscopt_5 is now in the same module
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -991,3 +935,5 @@ subroutine check_validviscopt_5(partit, mesh)
     end if     
     
 end subroutine check_validviscopt_5
+
+end module oce_dyn_module
