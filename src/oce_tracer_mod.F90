@@ -47,7 +47,7 @@ end do
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
 #else
-!ACC PARALLEL LOOP DEFAULT(PRESENT)
+!$ACC PARALLEL LOOP DEFAULT(PRESENT)
 #endif
        do n=1, partit%myDim_nod2D+partit%eDim_nod2D
            tracers%data(tr_num)%valuesAB(:, n)  =-(0.5_WP+epsilon)*tracers%data(tr_num)%valuesold(1, :, n)+(1.5_WP+epsilon)*tracers%data(tr_num)%values(:, n)
@@ -55,13 +55,13 @@ end do
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!ACC END PARALLEL LOOP
+!$ACC END PARALLEL LOOP
 #endif
     elseif (tracers%data(tr_num)%AB_order==3) then
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
 #else
-!ACC PARALLEL LOOP DEFAULT(PRESENT)
+!$ACC PARALLEL LOOP DEFAULT(PRESENT)
 #endif
        do n=1, partit%myDim_nod2D+partit%eDim_nod2D
            tracers%data(tr_num)%valuesAB(:, n)  =5.0_WP*tracers%data(tr_num)%valuesold(2, :, n)-16.0_WP*tracers%data(tr_num)%valuesold(1, :, n)+23.0_WP*tracers%data(tr_num)%values(:, n)
@@ -70,7 +70,7 @@ end do
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!ACC END PARALLEL LOOP
+!$ACC END PARALLEL LOOP
 #endif
     else
        write(*,*)
@@ -95,7 +95,7 @@ end do
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
 #else
-!ACC PARALLEL LOOP DEFAULT(PRESENT)
+!$ACC PARALLEL LOOP DEFAULT(PRESENT)
 #endif
        do n=1, partit%myDim_nod2d+partit%eDim_nod2D
           tracers%data(tr_num)%valuesold(1, :, n)=tracers%data(tr_num)%values(:, n)
@@ -103,13 +103,13 @@ end do
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!ACC END PARALLEL LOOP
+!$ACC END PARALLEL LOOP
 #endif
     elseif (tracers%data(tr_num)%AB_order==3) then
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO
 #else
-!ACC PARALLEL LOOP DEFAULT(PRESENT)
+!$ACC PARALLEL LOOP DEFAULT(PRESENT)
 #endif
        do n=1, partit%myDim_nod2d+partit%eDim_nod2D
           tracers%data(tr_num)%valuesold(2, :, n)=tracers%data(tr_num)%valuesold(1, :, n)
@@ -118,7 +118,7 @@ end do
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!ACC END PARALLEL LOOP
+!$ACC END PARALLEL LOOP
 #endif
     end if
 
@@ -170,7 +170,7 @@ SUBROUTINE tracer_gradient_elements(ttf, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax)
 #else
-!ACC PARALLEL LOOP DEFAULT(PRESENT) PRIVATE(elnodes)
+!$ACC PARALLEL LOOP DEFAULT(PRESENT) PRIVATE(elnodes)
 #endif
     DO elem=1, myDim_elem2D
         elnodes=elem2D_nodes(:,elem)
@@ -185,7 +185,7 @@ SUBROUTINE tracer_gradient_elements(ttf, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!ACC END PARALLEL LOOP
+!$ACC END PARALLEL LOOP
 #endif
 END SUBROUTINE tracer_gradient_elements
 !
@@ -214,7 +214,7 @@ SUBROUTINE tracer_gradient_z(ttf, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, dz)
 #else
-!ACC PARALLEL LOOP DEFAULT(PRESENT)
+!$ACC PARALLEL LOOP DEFAULT(PRESENT)
 #endif
     DO n=1, myDim_nod2D+eDim_nod2D
         nzmax=nlevels_nod2D(n)
@@ -229,7 +229,7 @@ SUBROUTINE tracer_gradient_z(ttf, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!ACC END PARALLEL LOOP
+!$ACC END PARALLEL LOOP
 #endif
 END SUBROUTINE tracer_gradient_z
 !
@@ -261,8 +261,8 @@ SUBROUTINE relax_to_clim(tr_num, tracers, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nzmin, nzmax)
 #else
-!ACC UPDATE DEVICE(relax2clim, Tclim)
-!ACC PARALLEL LOOP DEFAULT(PRESENT)
+!$ACC UPDATE DEVICE(relax2clim, Tclim)
+!$ACC PARALLEL LOOP DEFAULT(PRESENT)
 #endif
         DO n=1, myDim_nod2D
             nzmin = ulevels_nod2D(n)    
@@ -275,15 +275,15 @@ SUBROUTINE relax_to_clim(tr_num, tracers, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!ACC END PARALLEL LOOP
+!$ACC END PARALLEL LOOP
 #endif
     END if
     if ((clim_relax>1.0e-8_WP).and.(tracers%data(tr_num)%ID==2)) then
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nzmin, nzmax)
 #else
-!ACC UPDATE DEVICE(Sclim)
-!ACC PARALLEL LOOP DEFAULT(PRESENT)
+!$ACC UPDATE DEVICE(Sclim)
+!$ACC PARALLEL LOOP DEFAULT(PRESENT)
 #endif
         DO n=1, myDim_nod2D
             nzmin = ulevels_nod2D(n)    
@@ -294,7 +294,7 @@ SUBROUTINE relax_to_clim(tr_num, tracers, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
-!ACC END PARALLEL LOOP
+!$ACC END PARALLEL LOOP
 #endif
     END IF 
 END SUBROUTINE relax_to_clim
