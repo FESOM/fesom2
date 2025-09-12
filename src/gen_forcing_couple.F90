@@ -34,7 +34,7 @@ module integrate_2D_interface
       USE MOD_PARTIT
       USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
+      type(t_partit), intent(in), target :: partit
       real(kind=WP), intent (out) :: flux_global(2), flux_local(2)
       real(kind=WP), intent (out) :: eff_vol(2)
       real(kind=WP), intent (in)  :: field2d(partit%myDim_nod2D+partit%eDim_nod2D)
