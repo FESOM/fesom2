@@ -57,8 +57,8 @@ TYPE T_ICE_THERMO
 !     real(kind=WP) :: cc=rhowat*4190.0  ! Volumetr. heat cap. of water [J/m**3/K](cc = rhowat*cp_water)
 !     real(kind=WP) :: cl=rhoice*3.34e5  ! Volumetr. latent heat of ice fusion [J/m**3](cl=rhoice*Lf)
 ! --> cl and cc are setted in subroutine ice_init(...)
-    real(kind=WP) :: cc=1025.*4190.0  ! Volumetr. heat cap. of water [J/m**3/K](cc = rhowat*cp_water)
-    real(kind=WP) :: cl=910.*3.34e5  ! Volumetr. latent heat of ice fusion [J/m**3](cl=rhoice*Lf)
+    real(kind=WP) :: cc=1025.*4190.0   ! Volumetr. heat cap. of water [J/m**3/K](cc = rhowat*cp_water)
+    real(kind=WP) :: cl=910.*3.34e5    ! Volumetr. latent heat of ice fusion [J/m**3](cl=rhoice*Lf)
     real(kind=WP) :: clhw=2.501e6      ! Specific latent heat [J/kg]: water	-> water vapor
     real(kind=WP) :: clhi=2.835e6      !                              sea ice-> water vapor
     real(kind=WP) :: tmelt=273.15      ! 0 deg C expressed in K
@@ -71,7 +71,7 @@ TYPE T_ICE_THERMO
     real(kind=WP) :: con= 2.1656, consn = 0.31 ! Thermal conductivities: ice & snow; W/m/K
     real(kind=WP) :: Sice = 4.0        ! Ice salinity 3.2--5.0 ppt.
     real(kind=WP) :: h0=0.5	           ! Lead closing parameter [m] for Nothern Hemisphere! 0.5
-    real(kind=WP) :: h0_s=0.5	           ! Lead closing parameter [m] for Southern Hemisphere! 0.5
+    real(kind=WP) :: h0_s=0.5	       ! Lead closing parameter [m] for Southern Hemisphere! 0.5
     real(kind=WP) :: emiss_ice=0.97    ! Emissivity of Snow/Ice,
     real(kind=WP) :: emiss_wat=0.97    ! Emissivity of open water
     real(kind=WP) :: albsn = 0.81      ! Albedo: frozen snow
@@ -79,7 +79,7 @@ TYPE T_ICE_THERMO
     real(kind=WP) :: albi  = 0.70      !         frozen ice
     real(kind=WP) :: albim = 0.68      !         melting ice
     real(kind=WP) :: albw  = 0.066     !         open water, LY2004
-
+    real(kind=WP) :: h_ml  = 2.5_WP    ! thickness of uppermost layer deacides how much heat is available
 
     ! --- additional namelist parameters (Frank.Kauker(at)awi.de 2023/04/04)
     logical       :: snowdist=.true.   ! distribution of snow depth according to ice distribution
@@ -564,17 +564,62 @@ subroutine ice_init(ice, partit, mesh)
     logical        :: snowdist, new_iclasses
     integer        :: open_water_albedo, iclasses
     real(kind=WP)  :: Sice, h0, h0_s, emiss_ice, emiss_wat, albsn, albsnm, albi, &
-                      albim, albw, con, consn, hmin, armin, c_melt, h_cutoff
+                      albim, albw, con, consn, hmin, armin, c_melt, h_cutoff, h_ml
     namelist /ice_therm/ Sice, iclasses, h0, h0_s, hmin, armin,  emiss_ice, emiss_wat, albsn, albsnm, albi, &
-                         albim, albw, con, consn,  snowdist, new_iclasses, open_water_albedo, c_melt, h_cutoff
+                         albim, albw, con, consn,  snowdist, new_iclasses, open_water_albedo, c_melt, h_cutoff, h_ml
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+    
+    !___________________________________________________________________________
+    ! pre initialise namelist parameters with the defaults, for the case they are not 
+    ! mentioned in the namelist.ice, because otherwise they would be overwritten 
+    ! with garbage
+    whichEVP         = ice%whichEVP
+    Pstar            = ice%pstar
+    ellipse          = ice%ellipse
+    c_pressure       = ice%c_pressure
+    delta_min        = ice%delta_min
+    evp_rheol_steps  = ice%evp_rheol_steps
+    Cd_oce_ice       = ice%cd_oce_ice
+    ice_gamma_fct    = ice%ice_gamma_fct
+    ice_diff         = ice%ice_diff
+    theta_io         = ice%theta_io
+    ice_ave_steps    = ice%ice_ave_steps
+    alpha_evp        = ice%alpha_evp
+    beta_evp         = ice%beta_evp
+    c_aevp           = ice%c_aevp
+    con              = ice%thermo%con
+    consn            = ice%thermo%consn
+    Sice             = ice%thermo%Sice
+    iclasses         = ice%thermo%iclasses
+    h0               = ice%thermo%h0
+    h0_s             = ice%thermo%h0_s
+    hmin             = ice%thermo%hmin
+    armin            = ice%thermo%armin
+    emiss_ice        = ice%thermo%emiss_ice
+    emiss_wat        = ice%thermo%emiss_wat
+    albsn            = ice%thermo%albsn
+    albsnm           = ice%thermo%albsnm
+    albi             = ice%thermo%albi
+    albim            = ice%thermo%albim
+    albw             = ice%thermo%albw
+    h_ml             = ice%thermo%h_ml
+    snowdist         = ice%thermo%snowdist
+    new_iclasses     = ice%thermo%new_iclasses
+    open_water_albedo= ice%thermo%open_water_albedo
+    c_melt           = ice%thermo%c_melt
+    h_cutoff         = ice%thermo%h_cutoff
+    ! cc and cl are computed internally, not read from namelist:
+    ! ice%thermo%cc = ice%thermo%rhowat*4190.0
+    ! ice%thermo%cl = ice%thermo%rhoice*3.34e5
 
     !___________________________________________________________________________
+    ! now parameters from derived types are overwriiten by the parameters
+    ! in namelist.ice
     ! open and read namelist.ice for I/O
         open(unit=nm_unit, file='namelist.ice', form='formatted', access='sequential', status='old', iostat=iost )
     if (iost == 0) then
@@ -590,6 +635,7 @@ subroutine ice_init(ice, partit, mesh)
 
     !___________________________________________________________________________
     ! set parameters in ice derived type from namelist.ice --> namelist /ice_dyn/
+    ! now they get written back into the derived types
     ice%whichEVP        = whichEVP
     ice%pstar           = Pstar
     ice%ellipse         = ellipse
@@ -621,6 +667,7 @@ subroutine ice_init(ice, partit, mesh)
     ice%thermo%albi     = albi
     ice%thermo%albim    = albim
     ice%thermo%albw     = albw
+    ice%thermo%h_ml     = h_ml
     ice%thermo%snowdist = snowdist
     ice%thermo%new_iclasses=new_iclasses
     ice%thermo%open_water_albedo=open_water_albedo

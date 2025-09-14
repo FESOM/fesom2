@@ -53,6 +53,7 @@ end subroutine cal_rejected_salt
 !
 subroutine app_rejected_salt(ttf, partit, mesh)
   use o_arrays
+  use o_param,  only: SPP_dep_N, SPP_dep_S, SPP_drhodz_cr_N, SPP_drhodz_cr_S, SPP_expon
   use mod_mesh
   USE MOD_PARTIT
   USE MOD_PARSUP
@@ -61,13 +62,14 @@ subroutine app_rejected_salt(ttf, partit, mesh)
   implicit none
 
   integer         :: row, k, nod, nup, nlo, kml, nzmin, nzmax
-  real(kind=WP)    :: zsurf, rhosurf, drhodz, spar(100)=0.0_WP
+  real(kind=WP)    :: zsurf, rhosurf, drhodz, spar(100)=0., spp_dep, SPP_drhodz_cr
 
   integer         :: n_distr
-  real(kind=WP)    :: drhodz_cri, rho_cri
-  data drhodz_cri /0.01_WP/  !kg/m3/m  !NH   !Nguyen2011
   data n_distr /5/
-  data rho_cri /0.4_WP/      !kg/m3    !SH   !Duffy1999
+  
+!PS   real(kind=WP)    :: drhodz_cri, rho_cri
+!PS   data drhodz_cri /0.01_WP/  !kg/m3/m  !NH   !Nguyen2009
+!PS   data rho_cri /0.4_WP/      !kg/m3    !SH   !Duffy1999
 
   type(t_mesh),   intent(in), target :: mesh
   type(t_partit), intent(in), target :: partit
@@ -84,6 +86,17 @@ subroutine app_rejected_salt(ttf, partit, mesh)
      ! do not parameterize brine rejection in regions with low salinity
      ! 1. it leads to further decrease of SSS
      ! 2. in case of non zero salinity of ice (the well accepted value is 5psu) the SSS might become negative
+     
+     ! set different salt prine rejection depth and critical density slope for 
+     ! northern and southern hemisphere
+     if (geo_coord_nod2D(2,row)>0.0_WP) then
+        spp_dep       = SPP_dep_N
+        SPP_drhodz_cr = SPP_drhodz_cr_N
+     else
+        spp_dep       = SPP_dep_S
+        SPP_drhodz_cr = SPP_drhodz_cr_S
+     end if 
+     
      nzmin = ulevels_nod2D(row)
      nzmax = nlevels_nod2D(row)
      if (ttf(nzmin,row) < 10.0_WP) cycle
@@ -92,9 +105,9 @@ subroutine app_rejected_salt(ttf, partit, mesh)
         spar(nzmin)=0.0_WP
         do k=nzmin, nzmax-1
            drhodz=bvfreq(k, row)*density_0/g
-           if (drhodz>=drhodz_cri .or. Z_3d_n(k,row)<-80.0_WP) exit
+           if (drhodz>=SPP_drhodz_cr .or. Z_3d_n(k,row)<-abs(spp_dep)) exit
            kml=kml+1
-           spar(k+1)=area(k+1,row)*hnode(k+1,row)*(Z_3d_n(1,row)-Z_3d_n(k+1,row))**n_distr
+           spar(k+1)=area(k+1,row)*hnode(k+1,row)*(Z_3d_n(1,row)-Z_3d_n(k+1,row))**SPP_expon
         end do
         
         !_______________________________________________________________________
@@ -106,6 +119,11 @@ subroutine app_rejected_salt(ttf, partit, mesh)
         
         !_______________________________________________________________________
         if (kml>nzmin) then
+            !PS salt is first placed by the real_salt_flux boundary condition in 
+            !PS the surface layer. 
+            !PS substract than ice_rejected_salt(row)... which is the amount of salt 
+            !PS to take away by salt plum from the first layer that than is 
+            !PS distributed by spar in the subsequent layers ... !
             ttf(nzmin,row)=ttf(nzmin,row)-ice_rejected_salt(row)/areasvol(1,row)/hnode(1,row)
             spar(nzmin+1:kml)=spar(nzmin+1:kml)/sum(spar(nzmin+1:kml))
             do k=nzmin+1,kml
