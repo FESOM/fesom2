@@ -685,6 +685,10 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
           MAX(MAXVAL(cpl_send_collection_size), MAXVAL(cpl_recv_collection_size))))
      exchange = 0
   end if
+!  if (.NOT. ALLOCATED(mask)) then
+!     ALLOCATE(mask(myDim_nod2D))
+!     mask = 1.
+!  end if
   do i=1,nsend
      exchange  =0.
      if (i.eq.1) then
@@ -730,16 +734,21 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
         call exchange_nod(prec_rain, partit)
         prec_snow(1:myDim_nod2d)    =  exchange(:,2)/1000                    ! snowfall ! kg m^(-2) s^(-1) -> m/s
         call exchange_nod(prec_snow, partit)
-        evap_no_ifrac(1:myDim_nod2d)     =  -exchange(:,3)/1000               ! tot_evap ! kg m^(-2) s^(-1) -> m/s; change sign
+        evap_no_ifrac(1:myDim_nod2d)     =  exchange(:,3)/1000               ! tot_evap ! kg m^(-2) s^(-1) -> m/s; change sign
         call exchange_nod(evap_no_ifrac, partit)
      elseif (i.eq.4) then
-        oce_heat_flux(1:myDim_nod2d)     =  exchange(:,2) + exchange(:,3) + exchange(:,4)     ! heat_oce
+        oce_heat_flux(1:myDim_nod2d)     = exchange(:,2) + exchange(:,3) + exchange(:,4) ! heat_oce
         call exchange_nod(oce_heat_flux, partit)
-        shortwave(1:myDim_nod2d)         =  exchange(:,1)       ! heat_swr
+        shortwave(1:myDim_nod2d)         =  exchange(:,1)                ! heat_swr
         call exchange_nod(shortwave, partit)
      elseif (i.eq.5) then
-        ice_heat_flux(1:myDim_nod2d)     =  exchange(:,1) + exchange(:,2) ! heat_ice
+        ice_heat_flux(1:myDim_nod2d)     = (exchange(:,2) + exchange(:,1)) ! heat_ice
         call exchange_nod(ice_heat_flux, partit)
+!SL-- add river runoff ------------------------------
+!     elseif (i.eq.6) then
+!        runoff(1:myDim_nod2d)     = (exchange(:,1))/1000 ! river_runoff
+!        call exchange_nod(runoff, partit)
+!SL--------------------------------------------------
      endif
   end do
 

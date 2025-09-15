@@ -74,10 +74,10 @@ TYPE T_ICE_THERMO
     real(kind=WP) :: h0_s=0.5	           ! Lead closing parameter [m] for Southern Hemisphere! 0.5
     real(kind=WP) :: emiss_ice=0.97    ! Emissivity of Snow/Ice,
     real(kind=WP) :: emiss_wat=0.97    ! Emissivity of open water
-    real(kind=WP) :: albsn = 0.81      ! Albedo: frozen snow
-    real(kind=WP) :: albsnm= 0.77      !         melting snow
-    real(kind=WP) :: albi  = 0.70      !         frozen ice
-    real(kind=WP) :: albim = 0.68      !         melting ice
+    real(kind=WP) :: albsn = 0.83      ! Albedo: frozen snow 0.81  0.83
+    real(kind=WP) :: albsnm= 0.77      !         melting snow 0.77 0.79
+    real(kind=WP) :: albi  = 0.70      !         frozen ice 0.70   0.75
+    real(kind=WP) :: albim = 0.68      !         melting ice 0.68  0.72
     real(kind=WP) :: albw  = 0.066     !         open water, LY2004
 
 
@@ -194,7 +194,7 @@ TYPE T_ICE
     real(kind=WP)             :: c_aevp=0.15               ! 0.1--0.2, but should be adjusted experimentally
     ! --- Ice forcing averaging ---
     integer                   :: ice_ave_steps=1           !ice step=ice_ave_steps*oce_step
-    real(kind=WP)             :: cd_oce_ice = 5.5e-3       ! drag coef. oce - ice
+    real(kind=WP)             :: cd_oce_ice = 4.5e-3       ! 5.5e-3drag coef. oce - ice 
     logical                   :: ice_free_slip=.false.
     integer                   :: whichEVP=0                ! 0=standart; 1=mEVP; 2=aEVP
 
@@ -778,7 +778,7 @@ subroutine ice_init(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     allocate(ice%atmcoupl%ice_alb(       node_size))
     allocate(ice%atmcoupl%enthalpyoffuse(node_size))
-    ice%atmcoupl%ice_alb       = 0.6_WP
+    ice%atmcoupl%ice_alb       = 0.72_WP !sl 0.6_WP
     ice%atmcoupl%enthalpyoffuse= 0.0_WP
     allocate(ice%atmcoupl%flx_qres(node_size))
     allocate(ice%atmcoupl%flx_qcon(node_size))
