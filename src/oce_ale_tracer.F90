@@ -1488,7 +1488,7 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
         ! --> real_salt_flux(:): salt flux due to containment/releasing of salt
         !     by forming/melting of sea ice
         bc_surface= dt*(virtual_salt(n) & !--> is zeros for zlevel/zstar
-                    + relax_salt(n) - real_salt_flux(n)*is_nonlinfs)
+                    + relax_salt(n) + real_salt_flux(n)*is_nonlinfs)
 #if defined(__recom)
     CASE (1001) ! DIN
             bc_surface= dt*(AtmNInput(n) + RiverDIN2D(n)   * is_riverinput                &

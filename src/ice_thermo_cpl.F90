@@ -1,4 +1,7 @@
 #if defined (__coupled) || defined (__ifsinterface)
+!SL should it be
+!#if defined (__coupled) || defined (__ifsinterface) || defined (__oifs)
+!SL what is about || (__oasis)
 subroutine thermodynamics(ice, partit, mesh)
 
   !===================================================================
