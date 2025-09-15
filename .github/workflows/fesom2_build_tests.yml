@@ -8,11 +8,24 @@ on:
       - synchronize
       - reopened
     branches:
-      - main, add_automated_multiple_builds
-
+      - main
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   build_tests:
+    # Use matrix strategy to build all configurations in parallel
+    strategy:
+      matrix:
+        preset: [default, coupled, recom, ifs_interface]
+        include:
+          - preset: default
+            display_name: "Default Configuration"
+          - preset: coupled
+            display_name: "Coupled Configuration"
+          - preset: recom
+            display_name: "REcoM3 Configuration"
+          - preset: ifs_interface
+            display_name: "IFS Interface Configuration"
+    
     # Containers must run in Linux based operating systems
     runs-on: ubuntu-latest
     # Docker Hub image that `container-job` executes in
@@ -38,32 +51,21 @@ jobs:
         echo "Available test presets:"
         ctest --list-presets
 
-    - name: Configure and build default configuration
+    - name: Configure and build ${{ matrix.display_name }}
       run: |
-        cmake --preset default
-        cmake --build --preset default
-
-    - name: Configure and build coupled configuration
-      run: |
-        cmake --preset coupled
-        cmake --build --preset coupled
-
-    - name: Configure and build REcoM3 configuration
-      run: |
-        cmake --preset recom
-        cmake --build --preset recom
-
-    - name: Configure and build IFS interface configuration
-      run: |
-        cmake --preset ifs_interface
-        cmake --build --preset ifs_interface
+        echo "Building ${{ matrix.display_name }} (preset: ${{ matrix.preset }})"
+        cmake --preset ${{ matrix.preset }}
+        cmake --build --preset ${{ matrix.preset }} --parallel $(nproc)
         
-    - name: Verify build artifacts
+    - name: Run integration tests for ${{ matrix.display_name }}
       run: |
-        echo "Checking build artifacts for all configurations:"
-        ls -la build/default/
-        ls -la build/coupled/
-        ls -la build/recom/
-        ls -la build/ifs_interface/
+        echo "Running integration tests for ${{ matrix.display_name }}..."
+        ctest --preset ${{ matrix.preset }} --output-on-failure
+      continue-on-error: ${{ matrix.preset == 'recom' }}  # REcoM3 tests may fail as noted in documentation
+        
+    - name: Verify build artifacts for ${{ matrix.display_name }}
+      run: |
+        echo "Checking build artifacts for ${{ matrix.display_name }}:"
+        ls -la build/${{ matrix.preset }}/
         echo ""
-        echo "Build completed successfully for all configurations!"
+        echo "Build completed successfully for ${{ matrix.display_name }}!"
