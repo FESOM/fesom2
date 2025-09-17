@@ -1469,7 +1469,7 @@ subroutine communication_ini(partit, mesh)
   type(t_partit), intent(inout), target :: partit
 #include "associate_part_def.h"
 #include "associate_mesh_ini.h"
-#include "associate_part_ass.h" !only my
+#include "associate_part_ass.h" 
 
   print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
   print *, achar(27)//'[7;1m' //' -->: compute communication arrays                          '//achar(27)//'[0m'
@@ -1603,7 +1603,8 @@ subroutine check_partitioning(partit, mesh)
   integer, allocatable :: ne_part(:), ne_part_num(:), ne_part_load(:,:)
 #include "associate_part_def.h"
 #include "associate_mesh_ini.h"
-#include "associate_part_ass.h" !just for partit%part
+#include "associate_part_ass.h" 
+!just for partit%part
 
   if (mype==0) then
         print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'

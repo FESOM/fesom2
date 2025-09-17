@@ -31,7 +31,8 @@ subroutine communication_nodn(partit, mesh)
   integer                  :: IERR
 #include "associate_part_def.h"
 #include "associate_mesh_ini.h"
-#include "associate_part_ass.h" !part only
+#include "associate_part_ass.h" 
+  !part only
   ! Assume we have 2D partitioning vector in part. Find communication rules
   ! Reduce allocation: find all neighboring PE
   nd_count = count(part(1:nod2d) == mype)
@@ -245,7 +246,8 @@ subroutine communication_elemn(partit, mesh)
   integer                  :: IERR
 #include "associate_part_def.h"
 #include "associate_mesh_ini.h"
-#include "associate_part_ass.h" !part only
+#include "associate_part_ass.h" 
+  !part only
   ! Assume we have 2D partitioning vector in part. Find communication
   ! rules. An elem is external to element n if neither of its nodes 
   ! belongs to PE, but it is among the neighbors. Element n belongs to PE if 
