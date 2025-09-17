@@ -1,0 +1,183 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Default FESOM2 Build",
+      "description": "Standard FESOM2 build with default options",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/default",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_TESTING": "ON",
+        "FESOM_COUPLED": "OFF",
+        "OIFS_COUPLED": "OFF",
+        "RECOM_COUPLED": "OFF",
+        "USE_ICEPACK": "OFF",
+        "ENABLE_IFS_INTERFACE": "OFF",
+        "ENABLE_OPENMP": "OFF",
+        "ENABLE_MULTIO": "OFF",
+        "ASYNC_ICEBERGS": "ON",
+        "VERBOSE": "OFF",
+        "FESOM_PROFILING": "OFF",
+        "BUILD_MESHPARTITIONER": "OFF",
+        "BUILD_MESHDIAG": "OFF"
+      },
+      "environment": {
+        "FESOM_PLATFORM_STRATEGY": "ubuntu"
+      }
+    },
+    {
+      "name": "coupled",
+      "displayName": "Coupled FESOM2 Build",
+      "description": "FESOM2 build with OASIS coupling and OpenIFS support",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/coupled",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_TESTING": "ON",
+        "FESOM_COUPLED": "ON",
+        "OIFS_COUPLED": "ON",
+        "RECOM_COUPLED": "OFF",
+        "USE_ICEPACK": "OFF",
+        "ENABLE_IFS_INTERFACE": "OFF",
+        "ENABLE_OPENMP": "OFF",
+        "ENABLE_MULTIO": "OFF",
+        "ASYNC_ICEBERGS": "ON",
+        "VERBOSE": "OFF",
+        "FESOM_PROFILING": "OFF",
+        "BUILD_MESHPARTITIONER": "OFF",
+        "BUILD_MESHDIAG": "OFF",
+        "OASIS_WITH_YAC": "OFF"
+      },
+      "environment": {
+        "FESOM_PLATFORM_STRATEGY": "ubuntu"
+      }
+    },
+    {
+      "name": "recom",
+      "displayName": "REcoM3 Coupled FESOM2 Build",
+      "description": "FESOM2 build with REcoM3 biogeochemistry coupling",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/recom",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_TESTING": "ON",
+        "FESOM_COUPLED": "OFF",
+        "OIFS_COUPLED": "OFF",
+        "RECOM_COUPLED": "ON",
+        "CISO_COUPLED": "OFF",
+        "USE_ICEPACK": "OFF",
+        "ENABLE_IFS_INTERFACE": "OFF",
+        "ENABLE_OPENMP": "OFF",
+        "ENABLE_MULTIO": "OFF",
+        "ASYNC_ICEBERGS": "ON",
+        "VERBOSE": "OFF",
+        "FESOM_PROFILING": "OFF",
+        "BUILD_MESHPARTITIONER": "OFF",
+        "BUILD_MESHDIAG": "OFF"
+      },
+      "environment": {
+        "FESOM_PLATFORM_STRATEGY": "ubuntu"
+      }
+    },
+    {
+      "name": "ifs_interface",
+      "displayName": "IFS Interface FESOM2 Build",
+      "description": "FESOM2 build with IFS interface support for ECMWF coupling",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/ifs_interface",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_TESTING": "ON",
+        "FESOM_COUPLED": "OFF",
+        "OIFS_COUPLED": "OFF",
+        "RECOM_COUPLED": "OFF",
+        "USE_ICEPACK": "OFF",
+        "ENABLE_IFS_INTERFACE": "ON",
+        "ENABLE_OPENMP": "OFF",
+        "ENABLE_MULTIO": "OFF",
+        "ASYNC_ICEBERGS": "ON",
+        "VERBOSE": "OFF",
+        "FESOM_PROFILING": "OFF",
+        "BUILD_MESHPARTITIONER": "OFF",
+        "BUILD_MESHDIAG": "OFF"
+      },
+      "environment": {
+        "FESOM_PLATFORM_STRATEGY": "ubuntu"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default",
+      "displayName": "Build Default Configuration",
+      "description": "Build the default FESOM2 configuration"
+    },
+    {
+      "name": "coupled",
+      "configurePreset": "coupled",
+      "displayName": "Build Coupled Configuration",
+      "description": "Build the coupled FESOM2 configuration"
+    },
+    {
+      "name": "recom",
+      "configurePreset": "recom",
+      "displayName": "Build REcoM3 Configuration",
+      "description": "Build the REcoM3 coupled FESOM2 configuration"
+    },
+    {
+      "name": "ifs_interface",
+      "configurePreset": "ifs_interface",
+      "displayName": "Build IFS Interface Configuration",
+      "description": "Build the IFS interface FESOM2 configuration"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default",
+      "displayName": "Test Default Configuration",
+      "description": "Run integration tests for the default FESOM2 configuration",
+      "filter": {
+        "include": {
+          "name": "integration_.*"
+        }
+      }
+    },
+    {
+      "name": "coupled",
+      "configurePreset": "coupled",
+      "displayName": "Test Coupled Configuration",
+      "description": "Run integration tests for the coupled FESOM2 configuration",
+      "filter": {
+        "include": {
+          "name": "integration_.*"
+        }
+      }
+    },
+    {
+      "name": "recom",
+      "configurePreset": "recom",
+      "displayName": "Test REcoM3 Configuration",
+      "description": "Run integration tests for the REcoM3 coupled FESOM2 configuration",
+      "filter": {
+        "include": {
+          "name": "integration_.*"
+        }
+      }
+    },
+    {
+      "name": "ifs_interface",
+      "configurePreset": "ifs_interface",
+      "displayName": "Test IFS Interface Configuration",
+      "description": "Run integration tests for the IFS interface FESOM2 configuration",
+      "filter": {
+        "include": {
+          "name": "integration_.*"
+        }
+      }
+    }
+  ]
+}
