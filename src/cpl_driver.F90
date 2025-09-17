@@ -16,6 +16,7 @@ module cpl_driver
   use g_config, only : dt, use_icebergs, lwiso, compute_oasis_corners
   use o_param,  only : rad, WP
   USE MOD_PARTIT
+  use oce_mesh_module, only : elem_center, edge_center
   use mpi
   implicit none
   save   
