@@ -36,8 +36,8 @@ jobs:
     # Modern checkout action with v5
     - uses: actions/checkout@v5
       with:
-        # Fetch all history for all tags and branches to ensure we have the latest presets
-        fetch-depth: 0
+        # Don't Fetch all history for all tags and branches to ensure we have the latest presets
+        fetch-depth: 1
 
     - name: Git safe directory
       run: |
