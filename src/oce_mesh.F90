@@ -1986,7 +1986,7 @@ USE g_CONFIG
 implicit none
 integer                        :: n1, n2   ! nodes of the edge
 real(kind=WP),  intent(inout)  :: x, y
-type(t_mesh),   intent(inout), target :: mesh
+type(t_mesh),   intent(in), target :: mesh
 real(kind=WP)                  :: a(2), b(2)
 
 a=mesh%coord_nod2D(:,n1)
@@ -2004,7 +2004,7 @@ USE o_PARAM
 USE g_CONFIG  
 implicit none
 real(kind=WP), intent(inout) :: x, y
-type(t_mesh),  intent(inout), target :: mesh
+type(t_mesh),  intent(in), target :: mesh
 integer                      :: elem, elnodes(3), k    
 real(kind=WP)                ::  ax(3), amin
 

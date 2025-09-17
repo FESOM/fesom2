@@ -1419,7 +1419,7 @@ USE g_CONFIG
 implicit none
 integer       :: n1, n2   ! nodes of the edge
 real(kind=WP) :: x, y, a(2), b(2)
-type(t_mesh), intent(inout), target :: mesh
+type(t_mesh), intent(in), target :: mesh
 #include "associate_mesh_ini.h"
 
 a=coord_nod2D(:,n1)

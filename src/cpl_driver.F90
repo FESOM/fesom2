@@ -111,7 +111,7 @@ contains
         use g_rotate_grid
 
         IMPLICIT NONE
-        type(t_mesh),   intent(inout), target :: mesh
+        type(t_mesh),   intent(in), target :: mesh
         type(t_partit), intent(inout), target :: partit
         real(kind=WP), allocatable, intent(inout) :: my_x_corners(:,:)     ! longitude node corners
         real(kind=WP), allocatable, intent(inout) :: my_y_corners(:,:)     ! latitude node corners    
@@ -394,7 +394,7 @@ include "node_contour_boundary.h"
     use mod_oasis, only: oasis_write_area, oasis_write_mask
     implicit none
     save
-    type(t_mesh),   intent(inout), target :: mesh
+    type(t_mesh),   intent(in), target :: mesh
     type(t_partit), intent(inout), target :: partit
     !-------------------------------------------------------------------
     ! Definition of grid and field information for ocean
