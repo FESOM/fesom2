@@ -43,6 +43,10 @@ jobs:
       run: |
         git config --global --add safe.directory ${PWD}
 
+    - name: Copy OASIS directory
+      run: |
+        cp -rf /oasis ../
+
     - name: List available CMake presets
       run: |
         echo "Available CMake presets:"
