@@ -175,7 +175,7 @@ subroutine thermodynamics(ice, partit, mesh)
         ! Freezing temp of saltwater in K
         ice_temp(inod) = -0.0575_WP*S_oc_array(inod) + 1.7105e-3_WP*sqrt(S_oc_array(inod)**3) -2.155e-4_WP*(S_oc_array(inod)**2)+273.15_WP        
      endif
-     call ice_albedo(ice%thermo, h, hsn, t, alb)
+     call ice_albedo(ice%thermo, h, hsn, t, apnd(inod), ipnd(inod), alb)
      ice_alb(inod)       = alb
      ice_heat_qres(inod) = qres
      ice_heat_qcon(inod) = qcon
@@ -578,11 +578,13 @@ contains
 ! t=min(273.15_WP,t)
  end subroutine ice_surftemp
 
- subroutine ice_albedo(ithermp, h, hsn, t, alb)
+ subroutine ice_albedo(ithermp, h, hsn, t, apnd_node, ipnd_node, alb)
   ! INPUT:
   ! h      - ice thickness [m]
   ! hsn    - snow thickness [m]
   ! t      - temperature of snow/ice surface [C]
+  ! apnd_node - melt pond area fraction at this node
+  ! ipnd_node - pond ice lid thickness at this node
   ! 
   ! OUTPUT:
   ! alb    - selected broadband albedo (modified for melt ponds)
@@ -591,6 +593,7 @@ contains
   real(kind=WP) :: h
   real(kind=WP) :: hsn    
   real(kind=WP) :: t    
+  real(kind=WP) :: apnd_node, ipnd_node
   real(kind=WP) :: alb
   real(kind=WP) :: geolat
   real(kind=WP), pointer :: albsn, albi, albsnm, albim
@@ -621,8 +624,8 @@ contains
    endif
    
    ! Apply melt pond albedo modification if enabled
-   if (ice%thermo%use_meltponds .and. h > 0.0_WP) then
-       call meltpond_albedo(1.0_WP, hsn, apnd(inod), ipnd(inod), t, &
+   if (ithermp%use_meltponds .and. h > 0.0_WP) then
+       call meltpond_albedo(1.0_WP, hsn, apnd_node, ipnd_node, t, &
                            alb_noponds, alb_noponds, alb)
    else
        alb = alb_noponds

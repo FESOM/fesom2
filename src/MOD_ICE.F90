@@ -769,11 +769,19 @@ subroutine ice_init(ice, partit, mesh)
     allocate(ice%thermo%thdgr(         node_size))
     allocate(ice%thermo%thdgrsn(       node_size))
     allocate(ice%thermo%thdgr_old(     node_size))
+    ! melt pond arrays
+    allocate(ice%thermo%apnd(          node_size))
+    allocate(ice%thermo%hpnd(          node_size))
+    allocate(ice%thermo%ipnd(          node_size))
     ice%thermo%ustar     = 0.0_WP
     ice%thermo%t_skin    = 0.0_WP
     ice%thermo%thdgr     = 0.0_WP
     ice%thermo%thdgrsn   = 0.0_WP
     ice%thermo%thdgr_old = 0.0_WP
+    ! initialize melt pond arrays
+    ice%thermo%apnd      = 0.0_WP
+    ice%thermo%hpnd      = 0.0_WP
+    ice%thermo%ipnd      = 0.0_WP
 
     !___________________________________________________________________________
     ! initialse coupling array of ice derived type
