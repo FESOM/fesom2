@@ -37,9 +37,10 @@ io_list =  'sst       ',1, 'm', 4,
            'a_ice     ',1, 'm', 4,
            'm_ice     ',1, 'm', 4,
            'm_snow    ',1, 'm', 4,
-           'apnd      ',1, 'm', 4, ! melt pond area fraction (requires use_meltponds=.true.)
-           'hpnd      ',1, 'm', 4, ! melt pond depth (requires use_meltponds=.true.)
-           'ipnd      ',1, 'm', 4, ! pond ice lid thickness (requires use_meltponds=.true.)
+           'apnd      ',1, 'm', 4, ! melt pond area fraction (only active for use_meltponds=.true.)
+           'hpnd      ',1, 'm', 4, ! melt pond depth (only active for use_meltponds=.true.)
+           'ipnd      ',1, 'm', 4, ! pond ice lid thickness (only active for use_meltponds=.true.)
+           'alb       ',1, 'm', 4, ! ice albedo (only active for oifs and ifs coupled)
            'MLD1      ',1, 'm', 4,
            'MLD2      ',1, 'm', 4,
            'MLD3      ',1, 'm', 4,

@@ -573,12 +573,12 @@ subroutine ice_init(ice, partit, mesh)
     namelist /ice_dyn/ whichEVP, Pstar, ellipse, c_pressure, delta_min, evp_rheol_steps, &
                        Cd_oce_ice, ice_gamma_fct, ice_diff, theta_io, ice_ave_steps, &
                        alpha_evp, beta_evp, c_aevp
-    logical        :: snowdist, new_iclasses
+    logical        :: snowdist, new_iclasses, use_meltponds
     integer        :: open_water_albedo, iclasses
     real(kind=WP)  :: Sice, h0, h0_s, emiss_ice, emiss_wat, albsn, albsnm, albi, &
                       albim, albw, con, consn, hmin, armin, c_melt, h_cutoff
     namelist /ice_therm/ Sice, iclasses, h0, h0_s, hmin, armin,  emiss_ice, emiss_wat, albsn, albsnm, albi, &
-                         albim, albw, con, consn,  snowdist, new_iclasses, open_water_albedo, c_melt, h_cutoff
+                         albim, albw, con, consn,  snowdist, new_iclasses, open_water_albedo, use_meltponds, c_melt, h_cutoff
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -636,6 +636,7 @@ subroutine ice_init(ice, partit, mesh)
     ice%thermo%snowdist = snowdist
     ice%thermo%new_iclasses=new_iclasses
     ice%thermo%open_water_albedo=open_water_albedo
+    ice%thermo%use_meltponds = use_meltponds
     ice%thermo%c_melt   = c_melt
     ice%thermo%h_cutoff = h_cutoff    
     ice%thermo%cc       =ice%thermo%rhowat*4190.0  ! Volumetr. heat cap. of water [J/m**3/K](cc = rhowat*cp_water)
