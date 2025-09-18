@@ -460,15 +460,34 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${YAXT_Fortran_LIBRARIES} ${YAXTC_
 #target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C ${YAXT_Fortran_LIBRARIES} ${YAXTC_Fortran_LIBRARIES})
 
    
-# fesom.x executable
+# fesom.x executable
 add_executable(${PROJECT_NAME}.x ${src_home}/fesom_main.F90)
 target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
+
+# fesom_meshdiag executable (optional)
+if(BUILD_MESHDIAG)
+    add_executable(fesom_meshdiag ${src_home}/fesom_meshdiag.F90)
+    target_link_libraries(fesom_meshdiag PUBLIC ${PROJECT_NAME})
+    target_link_libraries(fesom_meshdiag PRIVATE MPI::MPI_Fortran)
+    
+    # Install the mesh diagnostics utility
+    install(TARGETS fesom_meshdiag
+            RUNTIME DESTINATION bin
+            COMPONENT tools)
+    
+    message(STATUS "Mesh diagnostics utility will be built as fesom_meshdiag")
+endif()
 
 
 get_target_property(FLAGS ${PROJECT_NAME} COMPILE_OPTIONS)
 message(STATUS " --> Final Compile options for ${PROJECT_NAME}: ${FLAGS}")
 
 
-### Export and installation
+### Export and installation
+
+# Add meshdiag to additional targets if built
+if(BUILD_MESHDIAG)
+    set(additional_targets ${additional_targets} fesom_meshdiag)
+endif()
 
 fesom_export(TARGETS ${PROJECT_NAME} fesom.x ${additional_targets})

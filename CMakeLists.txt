@@ -30,6 +30,7 @@ option(BUILD_TESTING "Build tests" OFF)
 
 # Tools
 option(BUILD_MESHPARTITIONER "Build mesh partitioning tools (fesom_meshpart executable)" OFF)
+option(BUILD_MESHDIAG "Build mesh diagnostics utility (fesom_meshdiag executable)" OFF)
 
 #add_subdirectory(oasis3-mct/lib/psmile)
 add_subdirectory(src)
