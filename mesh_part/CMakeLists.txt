@@ -46,6 +46,7 @@ set(sources_Fortran
     ${src_home}/gen_modules_config.F90 
     ${src_home}/gen_modules_partitioning.F90 
     ${src_home}/gen_modules_rotate_grid.F90 
+    ${src_home}/mod_mesh_utils.F90
     ${src_home}/fvom_init.F90 
     ${src_home}/oce_local.F90 
     ${src_home}/gen_comm.F90 

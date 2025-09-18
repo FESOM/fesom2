@@ -177,7 +177,7 @@ add_custom_target(fesom_version_info-generated.F90 ALL
 #if(FESOM_STANDALONE)
 #   list(REMOVE_ITEM sources_Fortran ${src_home}/cpl_driver.F90)
 #endif()
-list(REMOVE_ITEM sources_Fortran ${src_home}/fvom_init.F90 ${src_home}/oce_local.F90 ${src_home}/gen_comm.F90)
+list(REMOVE_ITEM sources_Fortran ${src_home}/fvom_init.F90 ${src_home}/mod_mesh_utils.F90 ${src_home}/oce_local.F90 ${src_home}/gen_comm.F90)
 list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_main.F90)
 
 find_package( NETCDF REQUIRED COMPONENTS C Fortran )
