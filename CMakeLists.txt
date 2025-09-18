@@ -23,12 +23,14 @@ set(USE_MULTIO OFF CACHE BOOL "Use MULTIO for IO, either grib or binary for now.
 set(OASIS_WITH_YAC OFF CACHE BOOL "Useing a version of OASIS compiled with YAC instead of SCRIP for interpolation?")
 set(ASYNC_ICEBERGS ON CACHE BOOL "compile fesom with or without support for asynchronous iceberg computations")
 set(VERBOSE OFF CACHE BOOL "toggle debug output")
+set(FESOM_PROFILING OFF CACHE BOOL "Enable enhanced profiling system")
 
 # Testing options
 option(BUILD_TESTING "Build tests" OFF)
 
 # Tools
 option(BUILD_MESHPARTITIONER "Build mesh partitioning tools (fesom_meshpart executable)" OFF)
+option(BUILD_MESHDIAG "Build mesh diagnostics utility (fesom_meshdiag executable)" OFF)
 
 # NetCDF build option
 option(BUILD_NETCDF "Download and build NetCDF libraries when system libraries are incompatible" OFF)
