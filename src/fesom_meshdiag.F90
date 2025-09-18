@@ -19,6 +19,8 @@ program fesom_meshdiag
   use g_config
   use g_comm_auto
   use io_mesh_info
+  use oce_setup_step_module, only: tracer_init, ocean_setup, dynamics_init, arrays_init
+  use oce_mesh_module, only: mesh_setup, check_mesh_consistency
   use, intrinsic :: iso_fortran_env, only : real32
 
   implicit none

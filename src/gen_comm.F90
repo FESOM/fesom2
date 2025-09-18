@@ -1,14 +1,26 @@
-! Cell-vertex finite-volume version
-! Contains: Routines that support parallelization
-! set_par_support_ini run in the initialization phase.
-! The communication rules are saved. 
-! set_par_support in the main phase just allocates memory for buffer 
-! arrays, the rest is read together with mesh from saved files.
+!> @file mod_gen_comm.F90
+!! @brief Communication routines for FESOM mesh partitioner
+!! @details Cell-vertex finite-volume version
+!! Contains: Routines that support parallelization
+!! set_par_support_ini run in the initialization phase.
+!! The communication rules are saved. 
+!! set_par_support in the main phase just allocates memory for buffer 
+!! arrays, the rest is read together with mesh from saved files.
+
+module mod_gen_comm
+
+    use MOD_MESH
+    use MOD_PARTIT
+    use MOD_PARSUP
+    
+    implicit none
+    
+    public :: communication_nodn, communication_elemn, mymesh
+
+contains
+
 !=======================================================================
 subroutine communication_nodn(partit, mesh)
-  use MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
   implicit none
   type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit
@@ -19,7 +31,8 @@ subroutine communication_nodn(partit, mesh)
   integer                  :: IERR
 #include "associate_part_def.h"
 #include "associate_mesh_ini.h"
-#include "associate_part_ass.h" !part only
+#include "associate_part_ass.h" 
+  !part only
   ! Assume we have 2D partitioning vector in part. Find communication rules
   ! Reduce allocation: find all neighboring PE
   nd_count = count(part(1:nod2d) == mype)
@@ -221,9 +234,6 @@ end subroutine communication_nodn
 
 !==========================================================================
 subroutine communication_elemn(partit, mesh)
-  use MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
   implicit none
 
   type(t_mesh),   intent(in),    target :: mesh
@@ -236,7 +246,8 @@ subroutine communication_elemn(partit, mesh)
   integer                  :: IERR
 #include "associate_part_def.h"
 #include "associate_mesh_ini.h"
-#include "associate_part_ass.h" !part only
+#include "associate_part_ass.h" 
+  !part only
   ! Assume we have 2D partitioning vector in part. Find communication
   ! rules. An elem is external to element n if neither of its nodes 
   ! belongs to PE, but it is among the neighbors. Element n belongs to PE if 
@@ -527,9 +538,6 @@ subroutine communication_elemn(partit, mesh)
 end subroutine communication_elemn
 !==========================================================================
 subroutine mymesh(partit, mesh)
-  use MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
   implicit none
 
   type(t_mesh),   intent(in),    target :: mesh
@@ -656,4 +664,5 @@ subroutine mymesh(partit, mesh)
   ! myList_edge2D(1:myDim_edge2D) contains owned edges +
   ! shared edges which mype updates
 end subroutine mymesh
-!=================================================================
+
+end module mod_gen_comm

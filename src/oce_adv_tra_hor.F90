@@ -63,6 +63,7 @@ end module oce_adv_tra_hor_interfaces
 !===============================================================================
 subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
     use MOD_MESH
+    use O_PARAM, only: r_earth
     USE MOD_PARTIT
     USE MOD_PARSUP
     use g_comm_auto

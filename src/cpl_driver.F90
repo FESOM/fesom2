@@ -14,8 +14,9 @@ module cpl_driver
   !
   use mod_oasis                    ! oasis module
   use g_config, only : dt, use_icebergs, lwiso, compute_oasis_corners
-  use o_param,  only : rad
+  use o_param,  only : rad, WP
   USE MOD_PARTIT
+  use oce_mesh_module, only : elem_center, edge_center
   use mpi
   implicit none
   save   
@@ -393,7 +394,7 @@ include "node_contour_boundary.h"
     use mod_oasis, only: oasis_write_area, oasis_write_mask
     implicit none
     save
-    type(t_mesh),   intent(in),    target :: mesh
+    type(t_mesh),   intent(in), target :: mesh
     type(t_partit), intent(inout), target :: partit
     !-------------------------------------------------------------------
     ! Definition of grid and field information for ocean
