@@ -40,11 +40,6 @@ jobs:
         echo "Configuring FESOM2 with Intel compiler..."
         ./configure.sh ubuntu+intel -DBUILD_TESTING=ON -DBUILD_NETCDF=ON
 
-    - name: Build FESOM2
-      run: |
-        echo "Building FESOM2..."
-        make
-
     - name: Run integration tests
       run: |
         echo "Running integration tests with Intel compiler..."
