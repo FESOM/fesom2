@@ -2510,7 +2510,7 @@ t0=MPI_Wtime()
  center_x(n)=ax
  center_y(n)=ay
  mesh%elem_cos(n)=cos(ay)
- mesh%metric_factor=tan(ay)/r_earth
+ mesh%metric_factor(n)=tan(ay)/r_earth
  END DO
 
  call exchange_elem(mesh%metric_factor, partit)
