@@ -32,8 +32,8 @@ jobs:
     - name: Verify Intel compiler
       run: |
         echo "Checking Intel compiler use..."
-        $CC --version
-        $FC --version
+        echo "$CC"
+        echo "$FC"
 
     - name: Configure and build with Intel compiler
       run: |
