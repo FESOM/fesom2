@@ -80,10 +80,12 @@ use o_param
   integer, allocatable, dimension(:)               :: age_tracer_loc_index
   !---age-code-end
 
-#if defined (__coupled) || defined (__ifsinterface) /* todo: use a single shared definition */
+!SL#if defined (__coupled) || defined (__ifsinterface) /* todo: use a single shared definition */
+#if defined (__oasis) || defined (__ifsinterface) || defined (__yac) /* todo:use a single shared definition  */
   real(kind=WP), target, allocatable, dimension(:) :: sublimation, evap_no_ifrac
 #endif
-#if defined (__coupled)
+!SL#if defined (__coupled)
+#if defined (__oasis) || defined (__yac)
   real(kind=WP), target, allocatable, dimension(:) :: tmp_sublimation, tmp_evap_no_ifrac !temporary flux fields
   real(kind=WP), target, allocatable, dimension(:) :: tmp_shortwave 			!(for flux correction) 
   real(kind=WP), allocatable, dimension(:)         :: atm_net_fluxes_north, atm_net_fluxes_south
