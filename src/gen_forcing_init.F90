@@ -42,7 +42,6 @@ type(t_partit), intent(inout), target :: partit
   if (partit%mype==0) write(*,*) '****************************************************'
   if (use_ice) then
      call forcing_array_setup(partit, mesh)
-!SL#ifndef __coupled
 #if !defined(__oasis) && !defined(__yac)
      call sbc_ini(partit, mesh)         ! initialize forcing fields
 #endif
@@ -144,13 +143,11 @@ subroutine forcing_array_setup(partit, mesh)
   runoff=0.0_WP
   evaporation = 0.0_WP
   ice_sublimation = 0.0_WP
-!SL#if defined (__coupled) || defined (__ifsinterface)
 #if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
   allocate(sublimation(n2), evap_no_ifrac(n2))
   sublimation=0.0_WP
   evap_no_ifrac=0.0_WP
 #endif
-!SL#if defined (__coupled) 
 #if defined (__oasis) || defined (__yac)
   allocate(tmp_sublimation(n2),tmp_evap_no_ifrac(n2), tmp_shortwave(n2))
   allocate(atm_net_fluxes_north(nrecv), atm_net_fluxes_south(nrecv))

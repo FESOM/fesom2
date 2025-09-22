@@ -348,7 +348,6 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   
   !_____________________________________________________________________________
   t1=MPI_Wtime()
-!SL#if defined (__coupled)
 #if defined (__oasis)
      if (firstcall) then
         allocate(exchange(myDim_nod2D+eDim_nod2D), mask(myDim_nod2D+eDim_nod2D))
@@ -452,9 +451,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
       mask=1.
       do i=1,nrecv
          exchange =0.0
-!SL#if defined (__oasis)
          call cpl_oasis3mct_recv (i, exchange, action, partit)
-!SL#endif
 	 !if (.not. action) cycle
 	 !Do not apply a correction at first time step!
     if (i==1 .and. action .and. istep/=1) call net_rec_from_atm(action, partit)

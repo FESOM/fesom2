@@ -52,7 +52,6 @@ subroutine par_init(partit)    ! initializes MPI
   integer                               :: i
   integer                               :: provided_mpi_thread_support_level
   character(:), allocatable             :: provided_mpi_thread_support_level_name
-!SL#if defined __coupled || defined  __ifsinterface
 #if defined __oasis || defined  __ifsinterface || defined  __yac
   ! use comm from coupler or ifs
 #else
@@ -114,7 +113,6 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
 ! in all other cases model will be finalized here, call the MPI_barrier and MPI_finalize
 !---------------------------------------------------------------
 !TODO: logic is convoluted here, not defined oasis and model needs to abort doesn't happen using par_ex 
-!SL#ifndef __coupled
 #if !defined(__oasis) && !defined(__yac)
   if (present(abort)) then
      if (mype==0) write(*,*) 'Run finished unexpectedly!'
@@ -140,7 +138,6 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
   if (present(abort)) then
     if (mype==0) write(*,*) 'Run finished unexpectedly!'
     !SLcall MPI_ABORT(COMM, 1 )
-    !SL should it be 
     call MPI_ABORT(MPI_COMM_WORLD, 1, error)
   else
 #ifdef __oasis

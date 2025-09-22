@@ -2742,7 +2742,6 @@ deallocate(center_y, center_x)
      !   end do
      !end if
 
-!SL#if defined (__coupled)
 #if defined (__oasis) || defined (__yac)
   nn=0
   ns=0  

@@ -1,5 +1,4 @@
 #if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
-!SL#if defined (__coupled) || defined (__ifsinterface)
 subroutine thermodynamics(ice, partit, mesh)
 
   !===================================================================
