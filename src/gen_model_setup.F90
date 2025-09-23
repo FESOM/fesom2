@@ -43,6 +43,27 @@ subroutine setup_model(partit)
   read (fileunit, NML=paths, iostat=istat)
   if (istat /= 0) call check_namelist_read(fileunit, 'paths', nmlfile, partit)
 
+  ! Set defaults for restart paths if not specified (backward compatibility)
+  if (len_trim(RestartInPath) == 0) RestartInPath = ResultPath
+  if (len_trim(RestartOutPath) == 0) RestartOutPath = ResultPath
+  
+  ! Ensure paths have trailing slash for consistent concatenation
+  call ensure_trailing_slash(RestartInPath)
+  call ensure_trailing_slash(RestartOutPath)
+  call ensure_trailing_slash(ResultPath)
+  
+  ! Report the configuration to user
+  if(partit%mype==0) then
+    write(*,*) 'Restart path configuration:'
+    write(*,*) '  Input path:  ', trim(RestartInPath)
+    write(*,*) '  Output path: ', trim(RestartOutPath)
+    if (trim(RestartInPath) == trim(RestartOutPath)) then
+      write(*,*) '  Note: Using same directory for input and output (legacy mode)'
+    else
+      write(*,*) '  Note: Separate input/output directories configured for reproducibility'
+    end if
+  end if
+
   read (fileunit, NML=restart_log, iostat=istat)
   if (istat /= 0) call check_namelist_read(fileunit, 'restart_log', nmlfile, partit)
 
@@ -382,3 +403,16 @@ subroutine check_namelist_read(fileunit, nml_name, nmlfile, partit)
     endif
     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
 end subroutine check_namelist_read
+
+! ==============================================================
+! Helper subroutine to ensure paths have trailing slash
+subroutine ensure_trailing_slash(path)
+    implicit none
+    character(len=*), intent(inout) :: path
+    integer :: path_len
+    
+    path_len = len_trim(path)
+    if (path_len > 0 .and. path(path_len:path_len) /= '/') then
+        path = trim(path) // '/'
+    end if
+end subroutine ensure_trailing_slash
