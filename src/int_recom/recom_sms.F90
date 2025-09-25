@@ -663,20 +663,23 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 if (pMax .lt. tiny .OR. PARave /= PARave .OR. CHL2C_plast /= CHL2C_plast) then
                     KOchl = deg_Chl*0.1d0
                 else
-                   !KOchl = deg_Chl*(real(one) - exp(-alfa * CHL2C_plast * PARave / pMax))
-                    KOchl = deg_Chl * CHL2C_plast * PARave
+!< Saturation model for chlorophyll degradation
+                    KOchl = deg_Chl*(real(one) - exp(-alfa * CHL2C_plast * PARave / pMax))
+!< Linear model for chlorophyll degradation is directly proportional to light intensity
+                    !KOchl = deg_Chl * CHL2C_plast * PARave
                     KOchl = max((deg_Chl*0.1d0), KOchl)
-                    KOchl = min(KOChl, 0.3d0)
+!< Safety constraint that caps the chlorophyll degradation rate at a maximum of 0.3
+                    !KOchl = min(KOChl, 0.3d0)
                 end if
 !< *** Diatoms Chla loss ***                                                                                                                                
 !< *************************
                 if (pMax_dia .lt. tiny .OR. PARave /= PARave .OR. CHL2C_plast_dia /= CHL2C_plast_dia) then
                     KOchl_dia = deg_Chl_d*0.1d0
                 else
-                   !KOchl_dia = deg_Chl_d * (real(one) - exp(-alfa_d * CHL2C_plast_dia * PARave / pMax_dia ))
-                    KOchl_dia = deg_Chl_d * CHL2C_plast_dia * PARave
+                    KOchl_dia = deg_Chl_d * (real(one) - exp(-alfa_d * CHL2C_plast_dia * PARave / pMax_dia ))
+                    !KOchl_dia = deg_Chl_d * CHL2C_plast_dia * PARave
                     KOchl_dia = max((deg_Chl_d*0.1d0), KOchl_dia)
-                    KOchl_dia = min(KOChl_dia, 0.3d0)
+                    !KOchl_dia = min(KOChl_dia, 0.3d0)
                 end if
 !< *** Coccolithophores chla loss ***
 !< **********************************
@@ -684,10 +687,10 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 if (pMax_cocco .lt. tiny .OR. PARave /= Parave .OR. CHL2C_plast_cocco /= CHL2C_plast_cocco) then 
                     KOchl_cocco = deg_Chl_c*0.1d0 
                 else 
-                   !KOchl_cocco = deg_Chl_c * (real(one) - exp( -alfa_c * CHL2C_plast_cocco * PARave / pMax_cocco ))
-                    KOchl_cocco = deg_Chl_c * CHL2C_plast_cocco * PARave
+                    KOchl_cocco = deg_Chl_c * (real(one) - exp( -alfa_c * CHL2C_plast_cocco * PARave / pMax_cocco ))
+                    !KOchl_cocco = deg_Chl_c * CHL2C_plast_cocco * PARave
                     KOchl_cocco = max((deg_Chl_c*0.1d0), KOchl_cocco)
-                    KOchl_cocco = min(KOChl_cocco, 0.3d0)
+                    !KOchl_cocco = min(KOChl_cocco, 0.3d0)
                 end if
 
 !< *** Phaeocystis chla loss ***
@@ -695,10 +698,10 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 if (pMax_phaeo .lt. tiny .OR. PARave /= PARave .OR. CHL2C_plast_phaeo /= CHL2C_plast_phaeo) then
                     KOchl_phaeo = deg_Chl_p*0.1d0
                 else
-                   !KOchl_phaeo = deg_Chl_p*(real(one) - exp(-alfa_p * CHL2C_plast_phaeo * PARave / pMax_phaeo))
-                    KOchl_phaeo = deg_Chl_p * CHL2C_plast_phaeo * PARave
+                    KOchl_phaeo = deg_Chl_p*(real(one) - exp(-alfa_p * CHL2C_plast_phaeo * PARave / pMax_phaeo))
+                    !KOchl_phaeo = deg_Chl_p * CHL2C_plast_phaeo * PARave
                     KOchl_phaeo = max((deg_Chl_p*0.1d0), KOchl_phaeo)
-                    KOchl_phaeo = min(KOChl_phaeo, 0.3d0)
+                    !KOchl_phaeo = min(KOChl_phaeo, 0.3d0)
                 end if
 #endif
                 if (KOchl /= KOchl) then
@@ -968,7 +971,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !< pzCocco2: Maximum coccolithophore preference
 !< pzPhaeo2: Maximum phaeocystis preference 
 !< pzDet2: Maximum slow-sinking detritus prefence by macrozooplankton
-!< pzDetZ22: Maximum fast-sinking detritus preference  by macrozooplankton
+!< pzDetZ22: Maximum fast-sinking detritus preference by macrozooplankton
 !< pzHet: Maximum mesozooplankton preference
 !< pzMicZoo2: Maximum microzooplankton preference
 
