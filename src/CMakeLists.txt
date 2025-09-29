@@ -155,7 +155,18 @@ elseif(ENABLE_IFS_INTERFACE) # ICEPACK + IFS_INTERFACE NOT SUPPORTED (YET)
                                ${src_home}/ifs_interface/ifs_notused.F90
                                ${src_home}/ifs_interface/mpp_io.F90)
 endif()
+# CVMix selection and wrapper sources
+# Always exclude legacy src/cvmix_*.F90
+file(GLOB cvmix_legacy_sources ${src_home}/cvmix_*.F90)
+if(cvmix_legacy_sources)
+  list(REMOVE_ITEM sources_Fortran ${cvmix_legacy_sources})
+endif()
 
+# Conditionally add relocated wrappers from src/cvmix_driver when USE_CVMIX is ON
+if(USE_CVMIX)
+  file(GLOB cvmix_wrappers_new ${src_home}/cvmix_driver/gen_modules_cvmix_*.F90)
+  list(APPEND sources_Fortran ${cvmix_wrappers_new})
+endif()
 if(${RECOM_COUPLED})  # ADD RECOM FILES
    file(GLOB sources_Fortran ${src_home}/*.F90
                              ${src_home}/int_recom/*.F90
@@ -183,6 +194,9 @@ list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_main.F90)
 find_package( NETCDF REQUIRED COMPONENTS C Fortran )
 find_package( MPI REQUIRED COMPONENTS C Fortran )
 
+# External CVMix integration
+option(USE_CVMIX "Enable CVMix parameterizations (wrappers in src/cvmix_driver)" ON)
+
 # depends on the metis library
 #add_subdirectory(../lib/metis-5.1.0 ${PROJECT_BINARY_DIR}/metis)
 #include_directories(../lib/metis-5.1.0/include)
@@ -197,6 +211,14 @@ add_dependencies(${PROJECT_NAME} fesom_version_info-generated.F90)
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_Fortran_MODULE_DIRECTORY}>)
 target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:module/fesom>)
 target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
+
+# Link external CVMix if enabled
+if(USE_EXTERNAL_CVMIX)
+   if(_CVMIX_MOD_DIR)
+      target_include_directories(${PROJECT_NAME} PRIVATE ${_CVMIX_MOD_DIR})
+   endif()
+   target_link_libraries(${PROJECT_NAME} PRIVATE ${CVMIX_LIB})
+endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
 if(${ENABLE_OPENMP})
