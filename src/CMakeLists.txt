@@ -195,7 +195,8 @@ find_package( NETCDF REQUIRED COMPONENTS C Fortran )
 find_package( MPI REQUIRED COMPONENTS C Fortran )
 
 # External CVMix integration
-option(USE_CVMIX "Enable CVMix parameterizations (wrappers in src/cvmix_driver)" ON)
+option(ENABLE_CVMIX "Enable CVMix parameterizations (wrappers in src/cvmix_driver)" ON)
+set(CVMIX_ROOT "${src_home}/cvmix_driver/CVMix-install" CACHE PATH "Install prefix for CVMix (auto-built when USE_CVMIX=ON)")
 
 # depends on the metis library
 #add_subdirectory(../lib/metis-5.1.0 ${PROJECT_BINARY_DIR}/metis)
@@ -211,12 +212,39 @@ add_dependencies(${PROJECT_NAME} fesom_version_info-generated.F90)
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_Fortran_MODULE_DIRECTORY}>)
 target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:module/fesom>)
 target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
+# Auto-manage CVMix when ENABLE_CVMIX=ON
+if(ENABLE_CVMIX)
+  # Always exclude legacy bundled cvmix sources
+  file(GLOB cvmix_legacy_sources ${src_home}/cvmix_*.F90)
+  if(cvmix_legacy_sources)
+    list(REMOVE_ITEM sources_Fortran ${cvmix_legacy_sources})
+  endif()
 
-# Link external CVMix if enabled
-if(USE_EXTERNAL_CVMIX)
-   if(_CVMIX_MOD_DIR)
-      target_include_directories(${PROJECT_NAME} PRIVATE ${_CVMIX_MOD_DIR})
-   endif()
+  # Add relocated wrapper sources
+  file(GLOB cvmix_wrappers_new ${src_home}/cvmix_driver/gen_modules_cvmix_*.F90)
+  list(APPEND sources_Fortran ${cvmix_wrappers_new})
+
+  # Ensure CVMix is available at CVMIX_ROOT (auto-build if missing)
+  if(NOT (EXISTS "${CVMIX_ROOT}/lib/libcvmix.a" OR EXISTS "${CVMIX_ROOT}/lib/libcvmix.so"))
+    add_custom_target(cvmix_autobuild
+      COMMAND bash ${src_home}/cvmix_driver/get_cvmix.sh --prefix ${CVMIX_ROOT}
+      WORKING_DIRECTORY ${src_home}/cvmix_driver
+      COMMENT "Auto-building CVMix to ${CVMIX_ROOT}"
+    )
+    add_dependencies(${PROJECT_NAME} cvmix_autobuild)
+  endif()
+
+  # Include .mod path and link libcvmix
+  if(EXISTS "${CVMIX_ROOT}/include")
+    target_include_directories(${PROJECT_NAME} PRIVATE ${CVMIX_ROOT}/include)
+  endif()
+  find_library(CVMIX_LIB NAMES cvmix PATHS ${CVMIX_ROOT}/lib NO_DEFAULT_PATH)
+  if(NOT CVMIX_LIB)
+    message(FATAL_ERROR "ENABLE_CVMIX=ON: CVMix library not found at ${CVMIX_ROOT}/lib after auto-build. Set CVMIX_ROOT or run get_cvmix.sh.")
+  endif()
+  target_link_libraries(${PROJECT_NAME} PRIVATE ${CVMIX_LIB})
+endif()
+
    target_link_libraries(${PROJECT_NAME} PRIVATE ${CVMIX_LIB})
 endif()
 
