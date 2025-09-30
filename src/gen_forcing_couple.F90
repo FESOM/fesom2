@@ -772,6 +772,7 @@ end subroutine update_atm_forcing
 !
 !------------------------------------------------------------------------------------
 !
+#if defined (__oasis) || defined (__yac)
 !
 !=================================================================
 !
@@ -1054,3 +1055,4 @@ SUBROUTINE net_rec_from_atm(action, partit)
   atm_net_fluxes_south=aux
   end if
 END SUBROUTINE net_rec_from_atm
+#endif
