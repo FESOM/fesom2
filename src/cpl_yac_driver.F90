@@ -1,5 +1,5 @@
-#if defined(__yac)
 module cpl_yac_driver
+#if defined(__yac)
 
   use mo_yac_finterface
   USE o_PARAM
@@ -23,6 +23,7 @@ module cpl_yac_driver
   public cpl_send, cpl_recv
   public source_root, target_root, commRank
   public a2o_fcorr_stat
+
 
 contains
 
@@ -311,5 +312,5 @@ contains
     CALL yac_ffinalize()
   end subroutine cpl_yac_finalize
 
-end module cpl_yac_driver
 #endif
+end module cpl_yac_driver
