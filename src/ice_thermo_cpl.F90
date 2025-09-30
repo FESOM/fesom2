@@ -25,7 +25,7 @@ subroutine thermodynamics(ice, partit, mesh)
   use g_forcing_arrays
   use g_comm_auto
   use g_rotate_grid
-  use ice_meltponds
+  use ice_meltponds, only: meltpond_area, meltpond_albedo
   implicit none
   type(t_ice)   , intent(inout), target :: ice
   type(t_partit), intent(inout), target :: partit
