@@ -46,10 +46,17 @@ subroutine interp_2d_field_v2(num_lon_reg, num_lat_reg, lon_reg, lat_reg, data_r
   real(kind=WP), intent(out)  	:: data_mod(num_mod)
   !
   if(lon_reg(1)<0.0 .or. lon_reg(num_lon_reg)>360.) then
-     write(*,*) 'Error in 2D interpolation!'
-     write(*,*) 'The regular grid is not in the proper longitude range.'
-     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
-     stop
+    if (partit%mype==0) then 
+        write(*,*)
+        print *, achar(27)//'[33m'
+        write(*,*) ' ERROR: in 2D interpolation found either lon_reg<0.0 or lon_reg>360'
+        write(*,*) '        The regular grid is not in the proper longitude range.'
+        write(*,*) '        The range should be from [0...360-dlon] '
+        write(*,*) '        --> something like: np.arange(0,360,dlon) '
+        print *, achar(27)//'[0m'
+        write(*,*)
+    end if 
+    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
   end if
 
   do n=1,num_mod
