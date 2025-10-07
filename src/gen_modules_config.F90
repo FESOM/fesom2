@@ -94,11 +94,13 @@ module g_config
   logical                :: use_depthonelem =.false.
   character(len=10)      :: use_depthfile='aux3d'   ! 'aux3d', 'depth@'        
   logical                :: use_cavityonelem=.false.
+  logical                :: metric_factor_zero=.false. ! if true, set metric_factor to zero
   
   namelist /geometry/   cartesian, fplane, &
                         cyclic_length, rotated_grid, force_rotation, &
                         alphaEuler, betaEuler, gammaEuler, &
-                        which_depth_n2e, use_depthonelem, use_cavityonelem, use_depthfile
+                        which_depth_n2e, use_depthonelem, use_cavityonelem, use_depthfile, &
+                        metric_factor_zero
 
   !_____________________________________________________________________________
   ! *** fleap_year ***
