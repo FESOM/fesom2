@@ -1,0 +1,108 @@
+&diag_list
+ldiag_solver     =.false.
+lcurt_stress_surf=.false.
+ldiag_curl_vel3  =.false.
+ldiag_Ri         =.false.
+ldiag_turbflux   =.false.
+ldiag_salt3D     =.false.
+ldiag_dMOC       =.false.
+ldiag_DVD        =.false.
+ldiag_forc       =.false.
+ldiag_extflds    =.false.
+/
+
+&nml_general
+io_listsize    =100 !number of streams to allocate. shallbe large or equal to the number of streams in &nml_list
+vec_autorotate =.false.
+/
+
+! for sea ice related variables use_ice should be true, otherewise there will be no output
+! for 'curl_surf' to work lcurt_stress_surf must be .true. otherwise no output
+! for 'fer_C', 'bolus_u', 'bolus_v', 'bolus_w', 'fer_K' to work Fer_GM must be .true. otherwise no output
+! 'otracers' - all other tracers if applicable
+! for 'dMOC' to work ldiag_dMOC must be .true. otherwise no output
+&nml_list
+io_list =  'sst       ',1, 'd', 4,
+!           'sss       ',1, 'd', 4,
+!    	   'ssh       ',1, 'd', 4,
+!           'uice      ',1, 'd', 4,
+!           'vice      ',1, 'd', 4,
+!           'a_ice     ',1, 'd', 4,
+!           'd_ice     ',1, 'm', 4,
+!           'd_snow    ',1, 'm', 4,
+!           'MLD1      ',1, 'm', 4,
+!           'MLD2      ',1, 'm', 4,
+!           'MLD3      ',1, 'm', 4,
+!           'tx_sur    ',1, 'm', 4,
+!           'ty_sur    ',1, 'm', 4,
+           'temp      ',1, 'd', 4,
+           'salt      ',1, 'd', 8,
+           'otracers  ',1, 'd', 4,
+!           'N2        ',1, 'm', 4,
+!           'Kv        ',1, 'm', 4,
+!           'u         ',1, 'm', 4,
+!           'v         ',1, 'm', 4,
+!           'unod      ',1, 'm', 4,
+!           'vnod      ',1, 'm', 4,
+!           'w         ',1, 'm', 4,
+!           'Av        ',1, 'm', 4,
+!           'bolus_u   ',1, 'm', 4,
+!           'bolus_v   ',1, 'm', 4,
+!           'bolus_w   ',1, 'm', 4,
+!           'dpCO2s    ',1, 'm', 4,
+!           'pCO2s     ',1, 'm', 4,
+!           'CO2f      ',1, 'm', 4,
+!           'Hp        ',1, 'm', 4,
+!           'aFe       ',1, 'm', 4,
+!           'aN        ',1, 'm', 4,
+!           'denb      ',1, 'm', 4,
+!           'benN      ',1, 'm', 4,
+!           'benC      ',1, 'm', 4,
+!           'benSi     ',1, 'm', 4,
+!           'benCalc   ',1, 'm', 4,
+!           'Chldegd   ',1, 'm', 4,
+!           'Chldegn   ',1, 'm', 4,
+!           'NNAd      ',1, 'm', 4,
+!           'NNAn      ',1, 'm', 4,
+!           'GPPd      ',1, 'm', 4,
+!           'GPPn      ',1, 'm', 4,
+!           'NPPd      ',1, 'm', 4,
+!           'NPPn      ',1, 'm', 4,
+!          'NPPc      ',1, 'm', 4,
+!          'GPPc      ',1, 'm', 4,
+!          'NNAc      ',1, 'm', 4,
+!          'Chldegc   ',1, 'm', 4,
+!          'sinkPON   ',1, 'y', 4,
+!          'sinkPOC   ',1, 'y', 4,
+!          'sinkOpal  ',1, 'y', 4,
+!          'sinkCalc  ',1, 'y', 4, 
+!           'PAR       ',1, 'm', 4,
+!           'CO2       ',1, 'm', 4,
+!           'pH        ',1, 'm', 4,
+!           'pCO2      ',1, 'm', 4,
+!           'HCO3      ',1, 'm', 4,
+!           'CO3       ',1, 'm', 4,
+!           'OdegaC    ',1, 'm', 4,
+!           'kspc      ',1, 'm', 4,
+!           'rhoSW     ',1, 'm', 4,
+!           'wsink_det1',1, 'm', 8,
+!           'wsink_det2',1, 'm', 8,
+!           'grazmeso_tot',1, 'm', 4,
+!           'grazmeso_n',1, 'm', 4,
+!           'grazmeso_d',1, 'm', 4,
+!           'grazmeso_c',1, 'm', 4,
+!           'respmeso',1, 'm', 4,
+!           'respmacro',1, 'm', 4,
+!           'respmicro',1, 'm', 4,
+!           'calcdiss',1, 'm', 4,
+!           'calcif',1, 'm', 4,
+!           'aggn',1, 'm', 4,
+!           'aggd',1, 'm', 4,
+!           'aggc',1, 'm', 4,
+!           'docexn',1, 'm', 4,
+!           'docexd',1, 'm', 4,
+!           'docexc',1, 'm', 4,
+!           'respn',1, 'm', 4,
+!           'respd',1, 'm', 4,
+!           'respc',1, 'm', 4,
+/
