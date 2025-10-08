@@ -155,18 +155,23 @@ elseif(ENABLE_IFS_INTERFACE) # ICEPACK + IFS_INTERFACE NOT SUPPORTED (YET)
                                ${src_home}/ifs_interface/ifs_notused.F90
                                ${src_home}/ifs_interface/mpp_io.F90)
 endif()
-# CVMix selection and wrapper sources
-# Always exclude legacy src/cvmix_*.F90
-file(GLOB cvmix_legacy_sources ${src_home}/cvmix_*.F90)
-if(cvmix_legacy_sources)
-  list(REMOVE_ITEM sources_Fortran ${cvmix_legacy_sources})
+
+# link custom CVMix files and FESOM2 wrapper-interface files for CVMix 
+if(USE_CVMIX)
+   file(GLOB cvmix_source_custom ${src_home}/cvmix_driver/cvmix_utils_addon.F90
+                                 ${src_home}/cvmix_driver/cvmix_kinds_and_types_addon.F90
+                                 ${src_home}/cvmix_driver/cvmix_tke.F90
+                                 ${src_home}/cvmix_driver/cvmix_idemix.F90)                                 
+   
+   file(GLOB cvmix_wrappers ${src_home}/cvmix_driver/gen_modules_cvmix_kpp.F90
+                            ${src_home}/cvmix_driver/gen_modules_cvmix_pp.F90
+                            ${src_home}/cvmix_driver/gen_modules_cvmix_tidal.F90
+                            ${src_home}/cvmix_driver/gen_modules_cvmix_tke.F90
+                            ${src_home}/cvmix_driver/gen_modules_cvmix_idemix.F90)
+
+   list(APPEND sources_Fortran ${cvmix_source_custom} ${cvmix_wrappers})
 endif()
 
-# Conditionally add relocated wrappers from src/cvmix_driver when USE_CVMIX is ON
-if(USE_CVMIX)
-  file(GLOB cvmix_wrappers_new ${src_home}/cvmix_driver/gen_modules_cvmix_*.F90)
-  list(APPEND sources_Fortran ${cvmix_wrappers_new})
-endif()
 if(${RECOM_COUPLED})  # ADD RECOM FILES
    file(GLOB sources_Fortran ${src_home}/*.F90
                              ${src_home}/int_recom/*.F90
@@ -212,40 +217,57 @@ add_dependencies(${PROJECT_NAME} fesom_version_info-generated.F90)
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_Fortran_MODULE_DIRECTORY}>)
 target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:module/fesom>)
 target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
-# Auto-manage CVMix when ENABLE_CVMIX=ON
-if(ENABLE_CVMIX)
-  # Always exclude legacy bundled cvmix sources
-  file(GLOB cvmix_legacy_sources ${src_home}/cvmix_*.F90)
-  if(cvmix_legacy_sources)
-    list(REMOVE_ITEM sources_Fortran ${cvmix_legacy_sources})
-  endif()
 
-  # Add relocated wrapper sources
-  file(GLOB cvmix_wrappers_new ${src_home}/cvmix_driver/gen_modules_cvmix_*.F90)
-  list(APPEND sources_Fortran ${cvmix_wrappers_new})
+# build CVMix library if USE_CVMIX is ON
+if (${USE_CVMIX})
+   message(STATUS "USE_CVMIX: ${USE_CVMIX}")
+      
+   if (NOT CVMIX_ROOT)
+      set(CVMIX_ROOT ${src_home}/cvmix_driver/CVMix-install) 
+      message(STATUS "set default CVMIX_ROOT=${CVMIX_ROOT}")
+   endif()
 
-  # Ensure CVMix is available at CVMIX_ROOT (auto-build if missing)
-  if(NOT (EXISTS "${CVMIX_ROOT}/lib/libcvmix.a" OR EXISTS "${CVMIX_ROOT}/lib/libcvmix.so"))
-    add_custom_target(cvmix_autobuild
-      COMMAND bash ${src_home}/cvmix_driver/get_cvmix.sh --prefix ${CVMIX_ROOT}
-      WORKING_DIRECTORY ${src_home}/cvmix_driver
-      COMMENT "Auto-building CVMix to ${CVMIX_ROOT}"
-    )
-    add_dependencies(${PROJECT_NAME} cvmix_autobuild)
-  endif()
+   # use static library --> Your final executable is self-contained 
+   # (no dependency on the library file at runtime)
+   set(CVMIX_LIB ${CVMIX_ROOT}/lib/libcvmix.a)
 
-  # Include .mod path and link libcvmix
-  if(EXISTS "${CVMIX_ROOT}/include")
-    target_include_directories(${PROJECT_NAME} PRIVATE ${CVMIX_ROOT}/include)
-  endif()
-  find_library(CVMIX_LIB NAMES cvmix PATHS ${CVMIX_ROOT}/lib NO_DEFAULT_PATH)
-  if(NOT CVMIX_LIB)
-    message(FATAL_ERROR "ENABLE_CVMIX=ON: CVMix library not found at ${CVMIX_ROOT}/lib after auto-build. Set CVMIX_ROOT or run get_cvmix.sh.")
-  endif()
-  target_link_libraries(${PROJECT_NAME} PRIVATE ${CVMIX_LIB})
-endif()
+   # create cvmix build stamp file 
+   set(CVMIX_STAMP ${CVMIX_ROOT}/.cvmix_built)
 
-   target_link_libraries(${PROJECT_NAME} PRIVATE ${CVMIX_LIB})
+   # Custom command: build CVMix if the stamp file doesn't exist
+   add_custom_command(
+        OUTPUT ${CVMIX_STAMP}
+        COMMAND bash ${src_home}/cvmix_driver/get_cvmix.sh --prefix ${CVMIX_ROOT}
+        COMMAND ${CMAKE_COMMAND} -E touch ${CVMIX_STAMP}
+        WORKING_DIRECTORY ${src_home}/cvmix_driver
+        COMMENT "Downloading and building CVMix to ${CVMIX_ROOT}"
+        VERBATIM)
+
+   # Target that depends on the stamp file (build happens only once)
+   add_custom_target(cvmix_autobuild DEPENDS ${CVMIX_STAMP})
+
+   # Ensure your code depends on CVMix
+   add_library(cvmix_external STATIC IMPORTED)
+   set_target_properties(cvmix_external PROPERTIES
+                        IMPORTED_LOCATION ${CVMIX_LIB})
+
+   add_dependencies(cvmix_external cvmix_autobuild)
+   add_dependencies(${PROJECT_NAME} cvmix_autobuild)
+
+   # Link and include CVMix
+   target_link_libraries(${PROJECT_NAME} PRIVATE cvmix_external)
+   
+   # Include dirs added directly (they can appear later — CMake doesn’t care)
+   target_include_directories(${PROJECT_NAME} PRIVATE
+                              ${CVMIX_ROOT}/include
+                              ${CVMIX_ROOT}/include/cvmix
+                              )
+
+   ## Optional: include intermediate build .mod files if they exist
+   #set(CVMIX_BUILD_MODULES "${src_home}/cvmix_driver/CVMix-build/modules")
+   #if(EXISTS "${CVMIX_BUILD_MODULES}")
+   #   target_include_directories(${PROJECT_NAME} PRIVATE ${CVMIX_BUILD_MODULES})
+   #endif()
 endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
@@ -282,6 +304,10 @@ endif()
 
 if(USE_ICEPACK)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __icepack)
+endif()
+
+if(USE_CVMIX)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __cvmix)
 endif()
 
 if(ENABLE_IFS_INTERFACE)
