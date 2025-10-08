@@ -566,7 +566,9 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     use g_CONFIG
     use g_forcing_arrays
     use o_mixing_KPP_mod !for ghats _GO_
+#if defined (__cvmix)       
     use g_cvmix_kpp, only: kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc
+#endif    
     use bc_surface_interface
     use mod_ice
     use iceberg_params
@@ -932,6 +934,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
                                -( MIN(ghats(nz  ,n)*blmc(nz  ,n,3), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
                                 ) * rsss * water_flux(n) * dt
                 end if
+#if defined (__cvmix)                   
             !___________________________________________________________________
             ! use cvmix KPP
             elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
@@ -973,6 +976,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
                                -( MIN(kpp_nonlcltranspS(nz  ,n)*kpp_oblmixc(nz  ,n,3), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
                                 ) * rsss * water_flux(n) * dt
                 end if
+#endif                
             end if
         end if ! --> if (use_kpp_nonlclflx) then
         
