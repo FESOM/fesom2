@@ -24,7 +24,7 @@ set(OASIS_WITH_YAC      OFF CACHE BOOL "Useing a version of OASIS compiled with 
 set(ASYNC_ICEBERGS      ON  CACHE BOOL "compile fesom with or without support for asynchronous iceberg computations")
 set(VERBOSE             OFF CACHE BOOL "toggle debug output")
 set(FESOM_PROFILING     OFF CACHE BOOL "Enable enhanced profiling system")
-set(USE_CVMIX           ON  CACHE BOOL "Download Compile CVMix libray")
+set(USE_CVMIX           ON  CACHE BOOL "Download/Compile/Install/Link CVMix libray")
 
 # Testing options
 option(BUILD_TESTING "Build tests" OFF)
