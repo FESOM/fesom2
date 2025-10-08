@@ -226,30 +226,47 @@ if (${USE_CVMIX})
       set(CVMIX_ROOT ${src_home}/cvmix_driver/CVMix-install) 
       message(STATUS "set default CVMIX_ROOT=${CVMIX_ROOT}")
    endif()
-
-   # use static library --> Your final executable is self-contained 
-   # (no dependency on the library file at runtime)
-   set(CVMIX_LIB ${CVMIX_ROOT}/lib/libcvmix.a)
-
-   # create cvmix build stamp file 
+   
    set(CVMIX_STAMP ${CVMIX_ROOT}/.cvmix_built)
+   set(CVMIX_LIB "")
+   set(CVMIX_LIB_DIR "")
 
-   # Custom command: build CVMix if the stamp file doesn't exist
+   # Create parent directory early so CMake does not fail on missing include paths
+   file(MAKE_DIRECTORY ${CVMIX_ROOT})
+   file(MAKE_DIRECTORY ${CVMIX_ROOT}/include)
+   file(MAKE_DIRECTORY ${CVMIX_ROOT}/include/cvmix)
+   file(MAKE_DIRECTORY ${CVMIX_ROOT}/lib)
+   file(MAKE_DIRECTORY ${CVMIX_ROOT}/lib64)
+   
+   # Custom command: build CVMix if not yet built
    add_custom_command(
         OUTPUT ${CVMIX_STAMP}
         COMMAND bash ${src_home}/cvmix_driver/get_cvmix.sh --prefix ${CVMIX_ROOT}
         COMMAND ${CMAKE_COMMAND} -E touch ${CVMIX_STAMP}
         WORKING_DIRECTORY ${src_home}/cvmix_driver
-        COMMENT "Downloading and building CVMix to ${CVMIX_ROOT}"
+        COMMENT "Downloading and building CVMix into ${CVMIX_ROOT}"
         VERBATIM)
 
-   # Target that depends on the stamp file (build happens only once)
    add_custom_target(cvmix_autobuild DEPENDS ${CVMIX_STAMP})
+ 
+   # Detect where library is located (lib or lib64) depending on  compiler and 
+   # maschine its either installed in lib or lib64
+   if (EXISTS "${CVMIX_ROOT}/lib/libcvmix.a")
+      set(CVMIX_LIB_DIR "${CVMIX_ROOT}/lib")
+   elseif(EXISTS "${CVMIX_ROOT}/lib64/libcvmix.a")
+      set(CVMIX_LIB_DIR "${CVMIX_ROOT}/lib64")
+   else()
+      # Fallback: assume lib64 (Intel often does this)
+      set(CVMIX_LIB_DIR "${CVMIX_ROOT}/lib64")
+   endif()
+   set(CVMIX_LIB ${CVMIX_LIB_DIR}/libcvmix.a)
 
-   # Ensure your code depends on CVMix
-   add_library(cvmix_external STATIC IMPORTED)
+
+   add_library(cvmix_external STATIC IMPORTED GLOBAL)
    set_target_properties(cvmix_external PROPERTIES
-                        IMPORTED_LOCATION ${CVMIX_LIB})
+      IMPORTED_LOCATION ${CVMIX_LIB}
+      INTERFACE_INCLUDE_DIRECTORIES "${CVMIX_ROOT}/include;${CVMIX_ROOT}/include/cvmix"
+                        )
 
    add_dependencies(cvmix_external cvmix_autobuild)
    add_dependencies(${PROJECT_NAME} cvmix_autobuild)
@@ -260,8 +277,7 @@ if (${USE_CVMIX})
    # Include dirs added directly (they can appear later — CMake doesn’t care)
    target_include_directories(${PROJECT_NAME} PRIVATE
                               ${CVMIX_ROOT}/include
-                              ${CVMIX_ROOT}/include/cvmix
-                              )
+                              ${CVMIX_ROOT}/include/cvmix)
 
    ## Optional: include intermediate build .mod files if they exist
    #set(CVMIX_BUILD_MODULES "${src_home}/cvmix_driver/CVMix-build/modules")
