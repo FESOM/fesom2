@@ -53,6 +53,7 @@ cd "$BUILD_DIR"
 cmake -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_Fortran_MODULE_DIRECTORY="$PREFIX/include" \
       -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+      -DCMAKE_INSTALL_LIBDIR=lib \
       "$SRC_DIR"
 
 cmake --build . --config Release -- -j
