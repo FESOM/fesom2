@@ -251,17 +251,14 @@ if (${USE_CVMIX})
  
    # Detect where library is located (lib or lib64) depending on  compiler and 
    # maschine its either installed in lib or lib64
-   if (EXISTS "${CVMIX_ROOT}/lib/libcvmix.a")
+   if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
       set(CVMIX_LIB_DIR "${CVMIX_ROOT}/lib")
-   elseif(EXISTS "${CVMIX_ROOT}/lib64/libcvmix.a")
-      set(CVMIX_LIB_DIR "${CVMIX_ROOT}/lib64")
    else()
-      # Fallback: assume lib64 (Intel often does this)
       set(CVMIX_LIB_DIR "${CVMIX_ROOT}/lib64")
    endif()
    set(CVMIX_LIB ${CVMIX_LIB_DIR}/libcvmix.a)
 
-
+   # build cvmix external libray
    add_library(cvmix_external STATIC IMPORTED GLOBAL)
    set_target_properties(cvmix_external PROPERTIES
       IMPORTED_LOCATION ${CVMIX_LIB}
@@ -271,7 +268,7 @@ if (${USE_CVMIX})
    add_dependencies(cvmix_external cvmix_autobuild)
    add_dependencies(${PROJECT_NAME} cvmix_autobuild)
 
-   # Link and include CVMix
+   # Link CVMix library to fesom
    target_link_libraries(${PROJECT_NAME} PRIVATE cvmix_external)
    
    # Include dirs added directly (they can appear later — CMake doesn’t care)
