@@ -221,10 +221,12 @@ target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
 # build CVMix library if USE_CVMIX is ON
 if (${USE_CVMIX})
    message(STATUS "USE_CVMIX: ${USE_CVMIX}")
+   set(CVMIX_DIR_src     "CVMix-src")
+   set(CVMIX_DIR_install "CVMix-install")
    
    # set default CVMix installation path
    if (NOT CVMIX_ROOT)
-      set(CVMIX_ROOT ${src_home}/cvmix_driver/CVMix-install) 
+      set(CVMIX_ROOT ${src_home}/cvmix_driver/${CVMIX_DIR_install}) 
       message(STATUS "set default CVMIX_ROOT=${CVMIX_ROOT}")
    endif()
    
@@ -236,11 +238,21 @@ if (${USE_CVMIX})
    file(MAKE_DIRECTORY ${CVMIX_ROOT})
    file(MAKE_DIRECTORY ${CVMIX_ROOT}/include/cvmix)
    
-   # Custom command: build CVMix if not yet built
+   # Collect CVMix source files so that CMake knows what changes triggers a 
+   # possible rebuild of the CVMix library
+   file(GLOB_RECURSE CVMIX_SOURCES
+        "${src_home}/cvmix_driver/${CVMIX_DIR_src}/src/*.F90"
+        "${src_home}/cvmix_driver/${CVMIX_DIR_src}/src/*/*.F90")
+        
+   # Add script dependency (rebuild if script changes)
+   set(CVMIX_DOWNLOAD "${src_home}/cvmix_driver/download_cvmix.sh")
+
+   # Custom command: build CVMix if not yet built or if source changed
    add_custom_command(
          OUTPUT ${CVMIX_LIB}
          COMMAND bash ${src_home}/cvmix_driver/download_cvmix.sh --prefix ${CVMIX_ROOT}
          WORKING_DIRECTORY ${src_home}/cvmix_driver
+         DEPENDS ${CVMIX_SOURCES} ${CVMIX_DOWNLOAD} # trigger rebuild if source or download script change
          COMMENT "Downloading and building CVMix into ${CVMIX_ROOT}"
          VERBATIM)
    
@@ -259,7 +271,7 @@ if (${USE_CVMIX})
    # doesn’t build it — it just points to an existing file (libcvmix.a).
    add_dependencies(cvmix_external  cvmix_autobuild)
    
-   # Link CVMix library to fesom, build chain beccomes: fesom → cvmix_external → cvmix_autobuild
+   # Link CVMix library to fesom, build chain becomes: fesom → cvmix_external → cvmix_autobuild
    target_link_libraries(${PROJECT_NAME} PRIVATE cvmix_external)
    
 endif()
