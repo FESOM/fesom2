@@ -254,14 +254,14 @@ if (${USE_CVMIX})
          IMPORTED_LOCATION ${CVMIX_LIB}
          INTERFACE_INCLUDE_DIRECTORIES "${CVMIX_ROOT}/include/cvmix")
 
+   # cvmix_autobuild is a custom target that runs your download_cvmix.sh script 
+   # and produces libcvmix.a. cvmix_external is an imported library, meaning CMake 
+   # doesn’t build it — it just points to an existing file (libcvmix.a).
    add_dependencies(cvmix_external  cvmix_autobuild)
-   add_dependencies(${PROJECT_NAME} cvmix_autobuild)
-
-   # Link CVMix library to fesom
+   
+   # Link CVMix library to fesom, build chain beccomes: fesom → cvmix_external → cvmix_autobuild
    target_link_libraries(${PROJECT_NAME} PRIVATE cvmix_external)
    
-   # Include dirs added directly (they can appear later — CMake doesn’t care)
-   target_include_directories(${PROJECT_NAME} PRIVATE ${CVMIX_ROOT}/include/cvmix)
 endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
