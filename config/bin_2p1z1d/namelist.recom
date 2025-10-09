@@ -9,6 +9,11 @@ nm_erosion_data_file  ='/albedo/work/projects/p_pool_recom/input/mesh_CORE2_fina
 nm_co2_data_file      ='/albedo/work/projects/p_pool_recom/input/mesh_CORE2_finaltopo_mean/MonthlyAtmCO2_gcb2023.nc'
 /
 
+&parecomsetup
+enable_3zoo2det = .true.
+enable_coccos = .false.
+/
+
 &pavariables
 use_REcoM             =.true.
 REcoM_restart         =.true.
@@ -32,7 +37,7 @@ O2dep_remin           = .true.    ! O2remin Add option for O2 dependency of orga
 use_ballasting        = .true.    
 use_density_scaling   = .true.   
 use_viscosity_scaling = .true.    
-OmegaC_diss           = .true.    ! Use OmegaC from Mocsy to compute calcite dissolution (after Aumont et al. 2015 and Gehlen et al. 2007) -> set calc_diss_guts to zero if this is false!!!!
+OmegaC_diss           = .false.    ! Use OmegaC from Mocsy to compute calcite dissolution (after Aumont et al. 2015 and Gehlen et al. 2007) -> set calc_diss_guts to zero if this is false!!!!
 CO2lim                = .true.    ! CO2 dependence of growth and calcification
 Diags                 = .true.
 constant_CO2          = .true.
@@ -298,7 +303,7 @@ RiverFeConc           = 100
 
 &pacalc
 calc_prod_ratio       = 0.02
-calc_diss_guts        = 0.5d0       ! set to zero if OmegaC_diss is set to false
+calc_diss_guts        = 0.0d0       ! set to zero if OmegaC_diss is set to false
 calc_diss_rate        = 0.005714d0  ! 20.d0/3500.d0
 calc_diss_rate2       = 0.005714d0
 calc_diss_omegac      = 0.197d0     ! Value from Aumont et al. 2015, is used with OmegaC_diss flag
@@ -333,7 +338,7 @@ rho_opal             = 2090.d0   ! kg m-3; density of Opal (see Table 1 in Cram 
 rho_ref_part         = 1230.d0   ! kg m-3; reference particle density (see Cram et al., 2018)
 rho_ref_water        = 1027.d0   ! kg m-3; reference seawater density (see Cram et al., 2018)
 visc_ref_water       = 0.00158d0 ! kg m-1 s-1; reference seawater viscosity, at Temp=4 degC (see Cram et al., 2018)
-w_ref1               = 10.d0     ! m s-1; reference sinking velocity of small detritus
+w_ref1               = 5.d0     ! m s-1; reference sinking velocity of small detritus
 w_ref2               = 200.d0    ! m s-1; reference sinking velocity of large detritus
 depth_scaling1       = 0.01d0   ! s-1; factor to increase sinking speed of det1 with depth, set to 0 if not wanted
 depth_scaling2       = 0.d0      ! s-1; factor to increase sinking speed of det2 with depth, set to 0 if not wanted

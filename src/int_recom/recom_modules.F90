@@ -30,41 +30,25 @@ module recom_config
              isi   = 18, ife    = 19, iphycal = 20, idetcal = 21,            &
              ioxy  = 22
 
-#if defined (__3Zoo2Det)
-! *******************
-! CASE 2phy 2zoo 2det
-! *******************
   Integer :: izoo2n  = 23, izoo2c   = 24, idetz2n    = 25,                   &
              idetz2c = 26, idetz2si = 27, idetz2calc = 28
-#endif
 
-#if defined (__coccos) & defined (__3Zoo2Det)
-! *******************
-! CASE 4phy 2zoo 2det
-! *******************
-  Integer :: icocn = 29, icocc = 30, icchl = 31
-  Integer :: iphan = 32, iphac = 33, iphachl = 34
+  ! Microzooplankton (third zooplankton group)
+  integer :: imiczoon = 0   ! Microzooplankton Nitrogen (set below)
+  integer :: imiczooc = 0   ! Microzooplankton Carbon (set below)
 
-#elif defined (__coccos) & !defined (__3Zoo2Det)
-! *******************
-! CASE 4phy 1zoo 1det
-! *******************
-  Integer :: icocn = 23, icocc = 24, icchl = 25 
-  Integer :: iphan = 26, iphac = 27, iphachl = 28
-#endif
+  ! ---------------------------------------------------------------------------
+  ! PHYTOPLANKTON GROUPS (coccos configuration)
+  ! ---------------------------------------------------------------------------
+  ! Coccolithophores and Phaeocystis when enable_coccos = .true.
 
-#if defined (__coccos) & defined (__3Zoo2Det)
-! *******************
-! CASE 4phy 3zoo 2det
-! *******************
-  Integer :: imiczoon = 35, imiczooc = 36
+  integer :: icocn = 0      ! Coccolithophore Nitrogen (set below)
+  integer :: icocc = 0      ! Coccolithophore Carbon (set below)
+  integer :: icchl = 0      ! Coccolithophore Chlorophyll (set below)
 
-#elif !defined (__coccos) & defined (__3Zoo2Det) 
-! *******************
-! CASE 2phy 3zoo 2det
-! *******************
-  Integer :: imiczoon = 29, imiczooc = 30
-#endif
+  integer :: iphan   = 0    ! Phaeocystis Nitrogen (set below)
+  integer :: iphac   = 0    ! Phaeocystis Carbon (set below)
+  integer :: iphachl = 0    ! Phaeocystis Chlorophyll (set below)
 
 !=============================================================================
 
@@ -86,19 +70,10 @@ module recom_config
   integer, dimension(8)  :: recom_phy_tracer_id     = (/1004, 1005, 1020, 1305, 1320, 1405, 1420, 1006/)
   integer, dimension(6)  :: recom_dia_tracer_id     = (/1013, 1014, 1314, 1414, 1016, 1015/)
 
-#if defined (__coccos) & defined (__3Zoo2Det)
-  integer, dimension(3)  :: recom_cocco_tracer_id   = (/1029, 1030, 1031/)
-  integer, dimension(3)  :: recom_phaeo_tracer_id   = (/1032, 1033, 1034/)
-
-
-#elif defined (__coccos) & !defined (__3Zoo2Det)
-  integer, dimension(3)  :: recom_cocco_tracer_id   = (/1023, 1024, 1025/)
-  integer, dimension(3)  :: recom_phaeo_tracer_id   = (/1026, 1027, 1028/)
-#endif
-
-#if defined (__3Zoo2Det)
-  integer, dimension(4)  :: recom_det2_tracer_id    = (/1025, 1026, 1027, 1028/)
-#endif
+  ! Configuration-dependent tracer arrays (allocated during initialization)
+  integer, dimension(3)  :: recom_cocco_tracer_id
+  integer, dimension(3)  :: recom_phaeo_tracer_id
+  integer, dimension(4)  :: recom_det2_tracer_id
 
 !=============================================================================
 
@@ -109,6 +84,11 @@ module recom_config
   Real(kind=8)                 :: SecondsPerDay  = 86400.d0     ! [s/day]
   Real(kind=8)                 :: Pa2atm         = 101325.d0    ! [Pa/atm] 
   Real(kind=8)                 :: redO2C         = 1.453        ! O2:C ratio Anderson and Sarmiento, 1994
+
+!! *** REcoM setup ***
+  Logical                :: enable_3zoo2det = .false.   ! Control extended zooplankton variables
+  Logical                :: enable_coccos = .false.      ! Control coccolithophore variables
+  namelist /parecomsetup/ enable_3zoo2det, enable_coccos
 
 !! *** General configuration ***
 
@@ -527,6 +507,600 @@ module recom_config
   namelist /paballasting/ rho_POC, rho_PON, rho_CaCO3, rho_opal, rho_ref_part, &
                           rho_ref_water, visc_ref_water, w_ref1, w_ref2, depth_scaling1,   &
                           depth_scaling2, max_sinking_velocity
+
+contains
+
+  ! ---------------------------------------------------------------------------
+  ! SUBROUTINE: initialize_tracer_indices
+  ! ---------------------------------------------------------------------------
+  ! Purpose: Set up tracer indices based on model configuration
+  ! ---------------------------------------------------------------------------
+  subroutine initialize_tracer_indices()
+    implicit none
+
+    if (enable_3zoo2det .and. enable_coccos) then
+        ! =======================================================================
+        ! CASE: 4 phytoplankton + 3 zooplankton + 2 detritus
+        ! =======================================================================
+        ! Phytoplankton: small phyto, diatoms, coccolithophores, phaeocystis
+        ! Zooplankton: mesozoo, macrozoo, microzoo
+        ! Detritus: det1, det2
+
+        icocn    = 29
+        icocc    = 30
+        icchl    = 31
+        iphan    = 32
+        iphac    = 33
+        iphachl  = 34
+        imiczoon = 35
+        imiczooc = 36
+
+!        allocate(recom_cocco_tracer_id(3))
+        recom_cocco_tracer_id = (/1029, 1030, 1031/)
+
+!        allocate(recom_phaeo_tracer_id(3))
+        recom_phaeo_tracer_id = (/1032, 1033, 1034/)
+
+!        allocate(recom_det2_tracer_id(4))
+        recom_det2_tracer_id = (/1025, 1026, 1027, 1028/)
+
+    else if (enable_coccos .and. .not. enable_3zoo2det) then
+        ! =======================================================================
+        ! CASE: 4 phytoplankton + 1 zooplankton + 1 detritus
+        ! =======================================================================
+        ! Phytoplankton: small phyto, diatoms, coccolithophores, phaeocystis
+        ! Zooplankton: mesozoo only
+        ! Detritus: det1 only
+
+        icocn   = 23
+        icocc   = 24
+        icchl   = 25
+        iphan   = 26
+        iphac   = 27
+        iphachl = 28
+
+!        allocate(recom_cocco_tracer_id(3))
+        recom_cocco_tracer_id = (/1023, 1024, 1025/)
+
+!        allocate(recom_phaeo_tracer_id(3))
+        recom_phaeo_tracer_id = (/1026, 1027, 1028/)
+
+    else if (enable_3zoo2det .and. .not. enable_coccos) then
+        ! =======================================================================
+        ! CASE: 2 phytoplankton + 3 zooplankton + 2 detritus
+        ! =======================================================================
+        ! Phytoplankton: small phyto, diatoms only
+        ! Zooplankton: mesozoo, macrozoo, microzoo
+        ! Detritus: det1, det2
+
+        imiczoon = 29
+        imiczooc = 30
+
+!        allocate(recom_det2_tracer_id(4))
+        recom_det2_tracer_id = (/1025, 1026, 1027, 1028/)
+    else
+        ! =======================================================================
+        ! CASE: 2 phytoplankton + 1 zooplankton + 1 detritus (BASE CONFIGURATION)
+        ! =======================================================================
+        ! Phytoplankton: small phyto, diatoms only
+        ! Zooplankton: mesozoo only
+        ! Detritus: det1 only
+        ! (All indices already set to default values)
+    endif
+  end subroutine initialize_tracer_indices
+
+! ==============================================================================
+! SUBROUTINE: validate_recom_tracers
+! ==============================================================================
+! Purpose: Validate consistency between namelist tracer configuration and
+!          biogeochemical model setup (enable_3zoo2det, enable_coccos)
+! ==============================================================================
+subroutine validate_recom_tracers(num_tracers, mype)
+  implicit none
+
+  ! Arguments
+  integer, intent(in) :: num_tracers  ! Total number of tracers from namelist
+  integer, intent(in) :: mype         ! MPI rank
+
+  ! Local variables
+  integer :: expected_bgc_num
+  integer :: actual_bgc_num
+  integer :: expected_total_tracers
+  integer :: num_physical_tracers
+  logical :: config_error
+  character(len=200) :: error_msg
+
+  ! For tracer ID validation
+  integer :: i, tracer_id
+  integer, dimension(:), allocatable :: expected_tracer_ids
+  logical, dimension(:), allocatable :: tracer_found
+  integer :: num_expected_tracers
+  logical :: id_error
+
+  ! Physical tracers (temperature, salinity, etc.) - typically first 2
+  num_physical_tracers = 2
+
+  ! Calculate actual BGC tracer count from namelist
+  actual_bgc_num = num_tracers - num_physical_tracers
+
+  ! ===========================================================================
+  ! Determine expected BGC tracer count based on configuration
+  ! ===========================================================================
+  config_error = .false.
+
+  if (enable_3zoo2det .and. enable_coccos) then
+    ! ---------------------------------------------------------------------------
+    ! Configuration 4: Full model (4 phyto + 3 zoo + 2 detritus)
+    ! ---------------------------------------------------------------------------
+    ! Base: 22 tracers (1001-1022)
+    ! Additional 3zoo2det: 4 tracers for det2 (1025-1028)
+    ! Additional coccos: 6 tracers for coccos (1029-1031)
+    ! Additional phaeocystis: 3 tracers (1032-1034)
+    ! Additional microzoo: 2 tracers (1035-1036)
+    ! Total: 22 + 4 + 6 + 3 + 2 = 36 (actually 22 + 14 = 36)
+    expected_bgc_num = 36
+
+  else if (enable_coccos .and. .not. enable_3zoo2det) then
+    ! ---------------------------------------------------------------------------
+    ! Configuration 3: Coccos only (4 phyto + 1 zoo + 1 detritus)
+    ! ---------------------------------------------------------------------------
+    ! Base: 22 tracers (1001-1022)
+    ! Additional coccos: 3 tracers (1023-1025)
+    ! Additional phaeocystis: 3 tracers (1026-1028)
+    ! Total: 22 + 6 = 28
+    expected_bgc_num = 28
+
+  else if (enable_3zoo2det .and. .not. enable_coccos) then
+    ! ---------------------------------------------------------------------------
+    ! Configuration 2: 3Zoo2Det only (2 phyto + 3 zoo + 2 detritus)
+    ! ---------------------------------------------------------------------------
+    ! Base: 22 tracers (1001-1022)
+    ! Additional zoo2: 2 tracers (1023-1024)
+    ! Additional det2: 4 tracers (1025-1028)
+    ! Additional microzoo: 2 tracers (1029-1030)
+    ! Total: 22 + 8 = 30
+    expected_bgc_num = 30
+
+  else
+    ! ---------------------------------------------------------------------------
+    ! Configuration 1: Base model (2 phyto + 1 zoo + 1 detritus)
+    ! ---------------------------------------------------------------------------
+    ! Base: 22 tracers (1001-1022)
+    expected_bgc_num = 22
+
+  end if
+
+  expected_total_tracers = num_physical_tracers + expected_bgc_num
+
+  ! ===========================================================================
+  ! Build expected tracer ID list for current configuration
+  ! ===========================================================================
+
+  ! Determine total expected tracers
+  num_expected_tracers = expected_total_tracers
+  allocate(expected_tracer_ids(num_expected_tracers))
+  allocate(tracer_found(num_expected_tracers))
+  tracer_found = .false.
+
+  ! Physical tracers (always present)
+  expected_tracer_ids(1) = 1    ! Temperature
+  expected_tracer_ids(2) = 2    ! Salinity
+
+  ! Base BGC tracers (always present for all configurations)
+  do i = 1, 22
+    expected_tracer_ids(num_physical_tracers + i) = 1000 + i
+  end do
+
+  ! Configuration-specific tracers
+  if (enable_3zoo2det .and. enable_coccos) then
+    ! Full model: 1001-1022 (base) + 1023-1024 (zoo2) + 1025-1028 (det2) + 1029-1036 (coccos+phaeo+zoo3)
+    expected_tracer_ids(25) = 1023  ! Zoo2N
+    expected_tracer_ids(26) = 1024  ! Zoo2C
+    expected_tracer_ids(27) = 1025  ! DetZ2N
+    expected_tracer_ids(28) = 1026  ! DetZ2C
+    expected_tracer_ids(29) = 1027  ! DetZ2Si
+    expected_tracer_ids(30) = 1028  ! DetZ2Calc
+    expected_tracer_ids(31) = 1029  ! CoccoN
+    expected_tracer_ids(32) = 1030  ! CoccoC
+    expected_tracer_ids(33) = 1031  ! CoccoChl
+    expected_tracer_ids(34) = 1032  ! PhaeoN
+    expected_tracer_ids(35) = 1033  ! PhaeoC
+    expected_tracer_ids(36) = 1034  ! PhaeoChl
+    expected_tracer_ids(37) = 1035  ! Zoo3N
+    expected_tracer_ids(38) = 1036  ! Zoo3C
+
+  else if (enable_coccos .and. .not. enable_3zoo2det) then
+    ! Coccos only: 1001-1022 (base) + 1023-1028 (coccos+phaeo)
+    expected_tracer_ids(25) = 1023  ! CoccoN
+    expected_tracer_ids(26) = 1024  ! CoccoC
+    expected_tracer_ids(27) = 1025  ! CoccoChl
+    expected_tracer_ids(28) = 1026  ! PhaeoN
+    expected_tracer_ids(29) = 1027  ! PhaeoC
+    expected_tracer_ids(30) = 1028  ! PhaeoChl
+
+  else if (enable_3zoo2det .and. .not. enable_coccos) then
+    ! 3Zoo2Det only: 1001-1022 (base) + 1023-1030 (zoo2+det2+zoo3)
+    expected_tracer_ids(25) = 1023  ! Zoo2N
+    expected_tracer_ids(26) = 1024  ! Zoo2C
+    expected_tracer_ids(27) = 1025  ! DetZ2N
+    expected_tracer_ids(28) = 1026  ! DetZ2C
+    expected_tracer_ids(29) = 1027  ! DetZ2Si
+    expected_tracer_ids(30) = 1028  ! DetZ2Calc
+    expected_tracer_ids(31) = 1029  ! Zoo3N
+    expected_tracer_ids(32) = 1030  ! Zoo3C
+  end if
+  ! else: base configuration only needs tracers 1, 2, 1001-1022
+
+  ! ===========================================================================
+  ! Perform validation checks
+  ! ===========================================================================
+
+  if (mype == 0) then
+    write(*,*) ''
+    write(*,*) '=========================================================================='
+    write(*,*) 'REcoM TRACER CONFIGURATION VALIDATION'
+    write(*,*) '=========================================================================='
+    write(*,*) 'Model configuration:'
+    write(*,*) '  enable_3zoo2det = ', enable_3zoo2det
+    write(*,*) '  enable_coccos   = ', enable_coccos
+    write(*,*) ''
+    write(*,*) 'Tracer counts:'
+    write(*,*) '  Physical tracers (T, S, ...)      = ', num_physical_tracers
+    write(*,*) '  Expected BGC tracers              = ', expected_bgc_num
+    write(*,*) '  Expected TOTAL tracers            = ', expected_total_tracers
+    write(*,*) '  Actual tracers from namelist      = ', num_tracers
+    write(*,*) '  Actual BGC tracers from namelist  = ', actual_bgc_num
+    write(*,*) ''
+  end if
+
+  ! Check for inconsistencies
+  if (actual_bgc_num /= expected_bgc_num) then
+    config_error = .true.
+    if (mype == 0) then
+      write(*,*) '=========================================================================='
+      write(*,*) 'ERROR: TRACER COUNT MISMATCH!'
+      write(*,*) '=========================================================================='
+      write(*,*) 'The number of BGC tracers in the namelist does not match'
+      write(*,*) 'the expected count for the current configuration.'
+      write(*,*) ''
+      write(*,*) '  Expected BGC tracers: ', expected_bgc_num
+      write(*,*) '  Actual BGC tracers:   ', actual_bgc_num
+      write(*,*) '  Difference:           ', actual_bgc_num - expected_bgc_num
+      write(*,*) ''
+      write(*,*) 'Required tracer IDs for current configuration:'
+      write(*,*) '  Base tracers (always):  1001-1022 (22 tracers)'
+
+      if (enable_3zoo2det .and. .not. enable_coccos) then
+        write(*,*) '  3Zoo2Det extension:     1023-1030 (8 tracers)'
+        write(*,*) '    - Zoo2N, Zoo2C:       1023-1024'
+        write(*,*) '    - DetZ2 pool:         1025-1028'
+        write(*,*) '    - MicZooN, MicZooC:   1029-1030'
+      else if (enable_coccos .and. .not. enable_3zoo2det) then
+        write(*,*) '  Coccos extension:       1023-1028 (6 tracers)'
+        write(*,*) '    - CoccoN, C, Chl:     1023-1025'
+        write(*,*) '    - PhaeoN, C, Chl:     1026-1028'
+      else if (enable_3zoo2det .and. enable_coccos) then
+        write(*,*) '    - Zoo2N, Zoo2C:       1023-1024'
+        write(*,*) '  3Zoo2Det extension:     1025-1028 (4 tracers for det2)'
+        write(*,*) '  Coccos extension:       1029-1034 (6 tracers)'
+        write(*,*) '    - CoccoN, C, Chl:     1029-1031'
+        write(*,*) '    - PhaeoN, C, Chl:     1032-1034'
+        write(*,*) '  MicroZoo extension:     1035-1036 (2 tracers)'
+      end if
+
+      write(*,*) ''
+      write(*,*) 'ACTION REQUIRED:'
+      write(*,*) '  1. Check your namelist.config tracer_list section'
+      write(*,*) '  2. Ensure enable_3zoo2det and enable_coccos match your setup'
+      write(*,*) '  3. Add/remove tracers to match the expected configuration'
+      write(*,*) '=========================================================================='
+      write(*,*) ''
+    end if
+  else
+    ! Validation passed
+    if (mype == 0) then
+      write(*,*) '=========================================================================='
+      write(*,*) 'VALIDATION PASSED: Tracer configuration is consistent!'
+      write(*,*) '=========================================================================='
+      write(*,*) ''
+    end if
+  end if
+
+  ! ===========================================================================
+  ! Additional sanity check: verify bgc_num variable matches
+  ! ===========================================================================
+  if (bgc_num /= expected_bgc_num) then
+    if (mype == 0) then
+      write(*,*) '=========================================================================='
+      write(*,*) 'WARNING: bgc_num variable inconsistency!'
+      write(*,*) '=========================================================================='
+      write(*,*) 'The bgc_num parameter does not match the expected value.'
+      write(*,*) '  Current bgc_num value: ', bgc_num
+      write(*,*) '  Expected value:        ', expected_bgc_num
+      write(*,*) ''
+      write(*,*) 'This may indicate that bgc_num was not updated after changing'
+      write(*,*) 'enable_3zoo2det or enable_coccos flags.'
+      write(*,*) '=========================================================================='
+      write(*,*) ''
+    end if
+    config_error = .true.
+  end if
+
+  ! ===========================================================================
+  ! Validate tracer IDs: Check for correct IDs and detect clashes
+  ! ===========================================================================
+  id_error = .false.
+
+  ! This check requires access to the actual tracer IDs from the namelist
+  ! We'll validate against the expected list
+  if (mype == 0) then
+    write(*,*) '=========================================================================='
+    write(*,*) 'VALIDATING TRACER IDs'
+    write(*,*) '=========================================================================='
+    write(*,*) 'Expected tracer ID sequence:'
+    write(*,*) ''
+
+    ! Display expected IDs in a readable format
+    write(*,*) 'Physical tracers:'
+    write(*,*) '  ', expected_tracer_ids(1:num_physical_tracers)
+    write(*,*) ''
+    write(*,*) 'Base BGC tracers (1001-1022):'
+    write(*,*) '  ', expected_tracer_ids(3:24)
+    write(*,*) ''
+
+    if (expected_bgc_num > 22) then
+      write(*,*) 'Extended configuration tracers:'
+      write(*,*) '  ', expected_tracer_ids(25:num_expected_tracers)
+      write(*,*) ''
+    end if
+
+    write(*,*) 'CRITICAL: The tracer IDs in your namelist MUST match this sequence'
+    write(*,*) '          exactly, in the same order!'
+    write(*,*) ''
+    write(*,*) 'Common errors to avoid:'
+    write(*,*) '  - Using wrong tracer ID numbers (e.g., 1023 instead of 1025)'
+    write(*,*) '  - Tracer ID clashes between configurations'
+    write(*,*) '  - Incorrect order of tracer IDs in namelist'
+    write(*,*) '  - Missing or duplicate tracer IDs'
+    write(*,*) ''
+
+    ! Configuration-specific warnings
+    if (enable_3zoo2det .and. enable_coccos) then
+      write(*,*) 'IMPORTANT for FULL MODEL (3zoo2det + coccos):'
+    !  write(*,*) '  - Tracers 1023-1024 are NOT used (reserved for other configs)'
+      write(*,*) '  - Zoo2 uses:         1023-1024'
+      write(*,*) '  - Det2 pool uses:    1025-1028'
+      write(*,*) '  - Coccos uses:       1029-1031'
+      write(*,*) '  - Phaeocystis uses:  1032-1034'
+      write(*,*) '  - Microzooplankton:  1035-1036'
+      write(*,*) ''
+    else if (enable_coccos .and. .not. enable_3zoo2det) then
+      write(*,*) 'IMPORTANT for COCCOS-ONLY configuration:'
+      write(*,*) '  - Coccos uses:       1023-1025 (NOT 1029-1031)'
+      write(*,*) '  - Phaeocystis uses:  1026-1028 (NOT 1032-1034)'
+      write(*,*) '  - Tracers 1029+ are NOT used in this configuration'
+      write(*,*) ''
+    else if (enable_3zoo2det .and. .not. enable_coccos) then
+      write(*,*) 'IMPORTANT for 3ZOO2DET-ONLY configuration:'
+      write(*,*) '  - Zoo2 uses:         1023-1024'
+      write(*,*) '  - Det2 pool uses:    1025-1028'
+      write(*,*) '  - Microzoo uses:     1029-1030 (NOT 1035-1036)'
+      write(*,*) '  - Tracers 1031+ are NOT used in this configuration'
+      write(*,*) ''
+    else
+      write(*,*) 'IMPORTANT for BASE configuration:'
+      write(*,*) '  - Only tracers 1-2, 1001-1022 should be present'
+      write(*,*) '  - Tracers 1023+ are NOT used in base configuration'
+      write(*,*) ''
+    end if
+
+    write(*,*) '=========================================================================='
+    write(*,*) ''
+  end if
+
+  ! ===========================================================================
+  ! Check for tracer ID clashes based on configuration
+  ! ===========================================================================
+  if (mype == 0) then
+    write(*,*) '=========================================================================='
+    write(*,*) 'CHECKING FOR TRACER ID CONFLICTS'
+    write(*,*) '=========================================================================='
+
+    ! Warn about potential clashes between configurations
+    if (enable_3zoo2det .and. enable_coccos) then
+      write(*,*) 'Full model configuration active.'
+    !  write(*,*) 'Ensure you are NOT using tracer IDs 1023-1024 in your namelist!'
+    !  write(*,*) 'These are reserved for configurations WITHOUT full model.'
+    else if (enable_coccos) then
+      write(*,*) 'Coccos-only configuration active.'
+      write(*,*) 'Coccos MUST use IDs 1023-1025 (NOT 1029-1031).'
+      write(*,*) 'Phaeocystis MUST use IDs 1026-1028 (NOT 1032-1034).'
+    else if (enable_3zoo2det) then
+      write(*,*) '3Zoo2Det-only configuration active.'
+      write(*,*) 'Microzoo MUST use IDs 1029-1030 (NOT 1035-1036).'
+    end if
+
+    write(*,*) ''
+   ! write(*,*) 'No automated clash detection available without tracer array access.'
+    write(*,*) 'Please manually verify your namelist tracer_list against the'
+    write(*,*) 'expected sequence shown above.'
+    write(*,*) '=========================================================================='
+    write(*,*) ''
+  end if
+
+  ! ===========================================================================
+  ! Stop execution if configuration error detected
+  ! ===========================================================================
+  if (config_error) then
+    if (mype == 0) then
+      write(*,*) ''
+      write(*,*) '******************************************************************'
+      write(*,*) '***  FATAL ERROR: MODEL CONFIGURATION INCONSISTENCY DETECTED   ***'
+      write(*,*) '***  MODEL EXECUTION STOPPED                                   ***'
+      write(*,*) '******************************************************************'
+      write(*,*) ''
+    end if
+    deallocate(expected_tracer_ids, tracer_found)
+    call par_ex(0)  ! Stop execution (use appropriate stop routine for your model)
+    stop
+  end if
+
+  ! Clean up
+  deallocate(expected_tracer_ids, tracer_found)
+
+end subroutine validate_recom_tracers
+
+! ==============================================================================
+! SUBROUTINE: validate_tracer_id_sequence
+! ==============================================================================
+! Purpose: Validate that actual tracer IDs from namelist match expected sequence
+!          Call this after reading the tracer namelist
+! ==============================================================================
+subroutine validate_tracer_id_sequence(tracer_ids, num_tracers, mype)
+  implicit none
+
+  ! Arguments
+  integer, dimension(:), intent(in) :: tracer_ids   ! Actual IDs from namelist
+  integer, intent(in) :: num_tracers                ! Number of tracers
+  integer, intent(in) :: mype                        ! MPI rank
+
+  ! Local variables
+  integer :: i, j
+  integer, dimension(:), allocatable :: expected_ids
+  integer :: num_expected
+  logical :: error_found
+  logical :: duplicate_found
+  integer :: num_physical_tracers
+
+  error_found = .false.
+  duplicate_found = .false.
+  num_physical_tracers = 2
+
+  ! Allocate expected IDs array
+  allocate(expected_ids(num_tracers))
+
+  ! Build expected ID sequence
+  expected_ids(1) = 1
+  expected_ids(2) = 2
+
+  do i = 1, 22
+    expected_ids(num_physical_tracers + i) = 1000 + i
+  end do
+
+  if (enable_3zoo2det .and. enable_coccos) then
+    ! Full model configuration
+    expected_ids(25:30) = (/1023, 1024, 1025, 1026, 1027, 1028/)
+    expected_ids(31:36) = (/1029, 1030, 1031, 1032, 1033, 1034/)
+    expected_ids(37:38) = (/1035, 1036/)
+
+  else if (enable_coccos .and. .not. enable_3zoo2det) then
+    expected_ids(25:30) = (/1023, 1024, 1025, 1026, 1027, 1028/)
+
+  else if (enable_3zoo2det .and. .not. enable_coccos) then
+    expected_ids(25:32) = (/1023, 1024, 1025, 1026, 1027, 1028, 1029, 1030/)
+  end if
+
+  ! ===========================================================================
+  ! Check 1: Compare actual vs expected tracer IDs
+  ! ===========================================================================
+  if (mype == 0) then
+    write(*,*) ''
+    write(*,*) '=========================================================================='
+    write(*,*) 'VALIDATING TRACER ID SEQUENCE FROM NAMELIST'
+    write(*,*) '=========================================================================='
+  end if
+
+  do i = 1, num_tracers
+    if (tracer_ids(i) /= expected_ids(i)) then
+      error_found = .true.
+      if (mype == 0) then
+        write(*,*) 'ERROR at position ', i, ':'
+        write(*,*) '  Expected tracer ID: ', expected_ids(i)
+        write(*,*) '  Found tracer ID:    ', tracer_ids(i)
+        write(*,*) ''
+      end if
+    end if
+  end do
+
+  ! ===========================================================================
+  ! Check 2: Detect duplicate tracer IDs
+  ! ===========================================================================
+  do i = 1, num_tracers - 1
+    do j = i + 1, num_tracers
+      if (tracer_ids(i) == tracer_ids(j)) then
+        duplicate_found = .true.
+        if (mype == 0) then
+          write(*,*) 'ERROR: Duplicate tracer ID detected!'
+          write(*,*) '  Tracer ID ', tracer_ids(i), ' appears at positions ', i, ' and ', j
+          write(*,*) ''
+        end if
+      end if
+    end do
+  end do
+
+  ! ===========================================================================
+  ! Check 3: Detect forbidden tracer IDs for current configuration
+  ! ===========================================================================
+  !if (enable_3zoo2det .and. enable_coccos) then
+    ! Check for forbidden IDs 1023-1024 in full model
+    !do i = 1, num_tracers
+      !if (tracer_ids(i) == 1023 .or. tracer_ids(i) == 1024) then
+        !error_found = .true.
+        !if (mype == 0) then
+          !write(*,*) 'ERROR: Forbidden tracer ID in full model configuration!'
+          !write(*,*) '  Tracer ID ', tracer_ids(i), ' at position ', i
+          !write(*,*) '  IDs 1023-1024 are NOT used when both flags are enabled'
+          !write(*,*) ''
+        !end if
+      !end if
+    !end do
+  !end if
+
+  ! ===========================================================================
+  ! Report results
+  ! ===========================================================================
+  if (error_found .or. duplicate_found) then
+    if (mype == 0) then
+      write(*,*) '=========================================================================='
+      write(*,*) 'TRACER ID VALIDATION FAILED!'
+      write(*,*) '=========================================================================='
+      write(*,*) ''
+      write(*,*) 'Expected tracer ID sequence for current configuration:'
+      write(*,*) expected_ids
+      write(*,*) ''
+      write(*,*) 'Actual tracer ID sequence from namelist:'
+      write(*,*) tracer_ids
+      write(*,*) ''
+      write(*,*) 'ACTION REQUIRED:'
+      write(*,*) '  Correct the tracer IDs in your namelist.config file'
+      write(*,*) '  Ensure the sequence matches exactly as expected'
+      write(*,*) '=========================================================================='
+      write(*,*) ''
+      write(*,*) '******************************************************************'
+      write(*,*) '***  FATAL ERROR: INVALID TRACER ID SEQUENCE                   ***'
+      write(*,*) '***  MODEL EXECUTION STOPPED                                   ***'
+      write(*,*) '******************************************************************'
+      write(*,*) ''
+    end if
+    deallocate(expected_ids)
+    call par_ex(0)
+    stop
+  else
+    if (mype == 0) then
+      write(*,*) '=========================================================================='
+      write(*,*) 'TRACER ID VALIDATION PASSED!'
+      write(*,*) 'All tracer IDs match expected sequence - no clashes detected.'
+      write(*,*) '=========================================================================='
+      write(*,*) ''
+    end if
+  end if
+
+  deallocate(expected_ids)
+
+end subroutine validate_tracer_id_sequence
+
+
+
 end module recom_config
 !
 !===============================================================================
@@ -751,6 +1325,9 @@ Module REcoM_declarations
 
 real(kind=8)                               :: is_riverinput
 real(kind=8)                               :: is_erosioninput
+
+real(kind=8)                               :: is_3zoo2det
+real(kind=8)                               :: is_coccos
 
 end module REcoM_declarations
 

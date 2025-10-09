@@ -270,11 +270,11 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             allocate(vertrespmeso(nl-1))
             vertrespmeso  = 0.d0
 
-#if defined (__3Zoo2Det)
+if (enable_3zoo2det) then
             allocate(vertrespmacro(nl-1), vertrespmicro(nl-1))
             vertrespmacro = 0.d0
             vertrespmicro = 0.d0
-#endif
+endif
             allocate(vertcalcdiss(nl-1), vertcalcif(nl-1))
             vertcalcdiss = 0.d0
             vertcalcif   = 0.d0
@@ -314,7 +314,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             allocate(VTSi_assimDia(nl-1))
             VTSi_assimDia = 0.d0
 
-#if defined (__coccos)
+if (enable_coccos) then
             allocate(vertaggc(nl-1), vertdocexc(nl-1), vertrespc(nl-1))
             vertaggc = 0.d0
             vertdocexc = 0.d0
@@ -346,7 +346,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             VTCphot_phaeo  = 0.d0
 
 
-#endif
+endif
 
             !! * Allocate 2D diagnostics *
             allocate(vertNPPn(nl-1), vertGPPn(nl-1), vertNNAn(nl-1), vertChldegn(nl-1)) 
@@ -361,7 +361,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             vertNNAd = 0.d0
             vertChldegd  = 0.d0
 
-#if defined (__coccos)
+if (enable_coccos) then
             allocate(vertNPPc(nl-1), vertGPPc(nl-1), vertNNAc(nl-1), vertChldegc(nl-1)) 
             vertNPPc = 0.d0
             vertGPPc = 0.d0
@@ -373,7 +373,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             vertGPPp = 0.d0
             vertNNAp = 0.d0
             vertChldegp = 0.d0
-#endif
+endif
         end if
 
         if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forcing'//achar(27)//'[0m'
@@ -421,7 +421,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             Chldegn(n) = locChldegn
             Chldegd(n) = locChldegd
 
-#if defined (__coccos)
+if (enable_coccos) then
             NPPc(n) = locNPPc
             GPPc(n) = locGPPc
             NNAc(n) = locNNAc
@@ -430,14 +430,14 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             GPPp(n) = locGPPp
             NNAp(n) = locNNAp
             Chldegp(n) = locChldegp
-#endif
+endif
 
             !! * Update 3D diagnostics *
             respmeso     (1:nzmax,n) = vertrespmeso     (1:nzmax)
-#if defined (__3Zoo2Det)
+if (enable_3zoo2det) then
             respmacro    (1:nzmax,n) = vertrespmacro    (1:nzmax)
             respmicro    (1:nzmax,n) = vertrespmicro    (1:nzmax)
-#endif
+endif
             calcdiss     (1:nzmax,n) = vertcalcdiss     (1:nzmax)
             calcif       (1:nzmax,n) = vertcalcif       (1:nzmax)
 
@@ -465,7 +465,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
 
             TSi_assimDia        (1:nzmax,n) = VTSi_assimDia             (1:nzmax)
 
-#if defined (__coccos)
+if (enable_coccos) then
             aggc         (1:nzmax,n) = vertaggc         (1:nzmax)
             docexc       (1:nzmax,n) = vertdocexc       (1:nzmax)
             respc        (1:nzmax,n) = vertrespc        (1:nzmax)
@@ -488,23 +488,23 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             TCphotLigLim_phaeo  (1:nzmax,n) = VTCphotLigLim_phaeo       (1:nzmax)
             TCphot_phaeo        (1:nzmax,n) = VTCphot_phaeo             (1:nzmax)
 
-#endif
+endif
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
 
             !! * Deallocating 2D diagnostics *
             deallocate(vertNPPn, vertGPPn, vertNNAn, vertChldegn) 
             deallocate(vertNPPd, vertGPPd, vertNNAd, vertChldegd)
-#if defined (__coccos)
+if (enable_coccos) then
             deallocate(vertNPPc,vertGPPc,vertNNAc,vertChldegc)
             deallocate(vertNPPp,vertGPPp,vertNNAp,vertChldegp)
-#endif
+endif
 
             !! * Deallocating 3D Diagnostics *
             deallocate(vertrespmeso)
-#if defined (__3Zoo2Det)
+if (enable_3zoo2det) then
             deallocate(vertrespmacro, vertrespmicro)
-#endif
+endif
             deallocate(vertcalcdiss, vertcalcif)
             deallocate(vertaggn, vertdocexn, vertrespn)
             deallocate(vertaggd, vertdocexd, vertrespd)
@@ -514,14 +514,14 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
 
             deallocate(VTSi_assimDia)
 
-#if defined (__coccos)
+if (enable_coccos) then
             deallocate(vertaggc, vertdocexc, vertrespc)
             deallocate(vertaggp, vertdocexp, vertrespp)
 
             deallocate(VTTemp_cocco, VTCoccoCO2, VTqlimitFac_cocco, VTCphotLigLim_cocco, VTCphot_cocco)
             deallocate(VTTemp_phaeo, VTPhaeoCO2, VTqlimitFac_phaeo, VTCphotLigLim_phaeo, VTCphot_phaeo)
 
-#endif
+endif
 
         end if 
 
@@ -593,7 +593,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
         call exchange_nod(NNAd, partit)
         call exchange_nod(Chldegn, partit)
         call exchange_nod(Chldegd, partit)
-#if defined (__coccos)
+if (enable_coccos) then
         call exchange_nod(NPPc, partit)
         call exchange_nod(GPPc, partit)
         call exchange_nod(NNAc, partit)
@@ -602,7 +602,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
         call exchange_nod(GPPp, partit)
         call exchange_nod(NNAp, partit)
         call exchange_nod(Chldegp, partit)
-#endif
+endif
     endif
 
     do n=1, benthos_num

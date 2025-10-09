@@ -110,13 +110,13 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
 
     tiny_Si  = tiny_C_d/SiCmax      ! SiCmax = 0.8d0
 
-#if defined (__coccos)
+if (enable_coccos) then
     tiny_N_c = tiny_chl/chl2N_max_c ! 0.00001/ 3.5d0
     tiny_C_c = tiny_N_c/NCmax_c     ! NCmax_c = 0.15d0
 
     tiny_N_p = tiny_chl/chl2N_max_p ! 0.00001/ 3.5d0 
     tiny_C_p = tiny_N_p/NCmax_p     ! NCmax_c = 0.15d0
-#endif
+endif
 
     call Cobeta(partit, mesh)      
     call Depth_calculations(n, Nn,SinkVel,zF,thick,recipthick, partit, mesh)
@@ -262,7 +262,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
   state(1:nn,idiac)  = max(tiny_C_d,state(1:nn,idiac))
   state(1:nn,idiasi) = max(tiny_Si, state(1:nn,idiasi))
 
-#if defined (__coccos)
+if (enable_coccos) then
   state(1:nn,icchl)  = max(tiny_chl,state(1:nn,icchl))
   state(1:nn,icocn)  = max(tiny_N_c,state(1:nn,icocn))
   state(1:nn,icocc)  = max(tiny_C_c,state(1:nn,icocc))
@@ -270,12 +270,12 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
   state(1:nn,iphachl)  = max(tiny_chl,state(1:nn,iphachl))
   state(1:nn,iphan)  = max(tiny_N_p,state(1:nn,iphan))
   state(1:nn,iphac)  = max(tiny_C_p,state(1:nn,iphac))
-#endif
+endif
 
-#if defined (__3Zoo2Det)
+if (enable_3zoo2det) then
   state(1:nn,imiczoon)  = max(tiny,state(1:nn,imiczoon))
   state(1:nn,imiczooc)  = max(tiny,state(1:nn,imiczooc))
-#endif
+endif
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
 
@@ -346,7 +346,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
      locNNAd = sum(vertNNAd(1:nn) * thick(1:nn))
      locChldegd = sum(vertChldegd(1:nn) * thick(1:nn))
 
-#if defined (__coccos)
+if (enable_coccos) then
      locNPPc = sum(vertNPPc(1:nn) * thick(1:nn))
      locGPPc = sum(vertGPPc(1:nn) * thick(1:nn))
      locNNAc = sum(vertNNAc(1:nn) * thick(1:nn))
@@ -356,7 +356,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
      locGPPp = sum(vertGPPp(1:nn) * thick(1:nn))
      locNNAp = sum(vertNNAp(1:nn) * thick(1:nn))
      locChldegp = sum(vertChldegp(1:nn) * thick(1:nn))
-#endif
+endif
 
   end if
 end subroutine REcoM_Forcing

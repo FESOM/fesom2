@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --account=nwg_maresys.maresys
+#SBATCH --account=biogeo_model.biogeo_model
 #SBATCH --job-name=2p3z2d
 #SBATCH --partition=mpp
 #SBATCH -N 9
@@ -22,7 +22,7 @@ ulimit -s unlimited
 # determine JOBID
 JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
 
-ln -s ../bin/fesom.x .           # cp -n ../bin/fesom.x
+#ln -s ../bin/fesom.x .           # cp -n ../bin/fesom.x
 #cp -n ../config/namelist.config  .
 #cp -n ../config/namelist.forcing .
 #cp -n ../config/namelist.oce     .
@@ -47,8 +47,8 @@ date
 #sbatch job_albedo
 #fi
 
-Resultpath='/albedo/work/user/...'
-test -e $Resultpath/fesom.2019.oce.restart && exit
+Resultpath='/albedo/work/user/xxx'
+test -e $Resultpath/fesom.xxx.oce.restart && exit
 
 IsInFile=$( tail -3 fesom2.0.out | grep -c timesteps)
 if (( IsInFile > 0 )); then

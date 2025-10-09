@@ -45,6 +45,9 @@ subroutine recom_init(tracers, partit, mesh)
     type(t_partit), intent(inout), target   :: partit
     type(t_mesh),   intent(in) ,   target   :: mesh
 
+    ! After reading tracer namelist - validate actual IDs
+    integer, dimension(tracers%num_tracers) :: tracer_id_array
+
 #include "../associate_part_def.h"
 #include "../associate_mesh_def.h"
 #include "../associate_part_ass.h"
@@ -338,155 +341,224 @@ subroutine recom_init(tracers, partit, mesh)
         lb_flux(:,:)      = 0.d0
     end if
 
+    ! After reading parecomsetup namelist
+    call initialize_tracer_indices
+
+    ! Validation check here
+    call validate_recom_tracers(num_tracers, mype)
+
+    ! ... populate tracer_id_array from namelist ...
+    tracer_id_array = tracers%data(1:tracers%num_tracers)%ID
+    call validate_tracer_id_sequence(tracer_id_array, num_tracers, mype)
+
+    !===============================================================================
+    ! Model Configuration Summary
+    !===============================================================================
+    ! Configuration 1: Base model (enable_3zoo2det=F, enable_coccos=F)
+    !   - 2 Phytoplankton: General Phy, Diatoms
+    !   - 1 Zooplankton: Heterotrophs
+    !   - 1 Detritus pool
+    !
+    ! Configuration 2: 3Zoo2Det (enable_3zoo2det=T, enable_coccos=F)
+    !   - 2 Phytoplankton: General Phy, Diatoms
+    !   - 3 Zooplankton: Het, Zoo2, Zoo3
+    !   - 2 Detritus pools
+    !
+    ! Configuration 3: Coccos (enable_3zoo2det=F, enable_coccos=T)
+    !   - 4 Phytoplankton: General Phy, Diatoms, Coccos, Phaeo
+    !   - 1 Zooplankton: Heterotrophs
+    !   - 1 Detritus pool
+    !
+    ! Configuration 4: Full model (enable_3zoo2det=T, enable_coccos=T)
+    !   - 4 Phytoplankton: General Phy, Diatoms, Coccos, Phaeo
+    !   - 3 Zooplankton: Het, Zoo2, Zoo3
+    !   - 2 Detritus pools
+    !===============================================================================
+
     DO i=num_tracers-bgc_num+1, num_tracers
         id=tracers%data(i)%ID
 
         SELECT CASE (id)
 
-! *******************
-! CASE 2phy 1zoo 1det
-! *******************
-! Skip: DIN, DIC, Alk, DSi and O2 are read from files
-! Fe [mol/L] => [umol/m3] Check the units again!
+        !---------------------------------------------------------------------------
+        ! Base Model: 2 Phytoplankton + 1 Zooplankton + 1 Detritus
+        !---------------------------------------------------------------------------
+        ! Skip: DIN, DIC, Alk, DSi and O2 are read from files
+        ! Fe [mol/L] => [umol/m3] Check the units again!
 
-        CASE (1004)
-            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max       ! PhyN
+        ! --- Small Phytoplankton
+        CASE (1004)  ! PhyN - Phytoplankton Nitrogen
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max
 
-        CASE (1005)
-            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max/NCmax ! PhyC
+        CASE (1005)  ! PhyC - Phytoplankton Carbon
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max/NCmax
 
-        CASE (1006)
-            tracers%data(i)%values(:,:) = tiny_chl                 ! PhyChl
+        CASE (1006)  ! PhyChl - Phytoplankton Chlorophyll
+            tracers%data(i)%values(:,:) = tiny_chl
 
-        CASE (1007)
-            tracers%data(i)%values(:,:) = tiny                     ! DetN
+        ! --- Detritus (Non-living organic matter) ---
+        CASE (1007)  ! DetN - Detrital Nitrogen
+            tracers%data(i)%values(:,:) = tiny
 
-        CASE (1008)
-            tracers%data(i)%values(:,:) = tiny                     ! DetC
+        CASE (1008)  ! DetC - Detrital Carbon
+            tracers%data(i)%values(:,:) = tiny
 
-        CASE (1009)
-            tracers%data(i)%values(:,:) = tiny                     ! HetN
+        ! --- Mesozooplankton (Heterotrophs) ---
+        CASE (1009)! HetN - Heterotroph Nitrogen
+            tracers%data(i)%values(:,:) = tiny
 
-        CASE (1010)
-            tracers%data(i)%values(:,:) = tiny * Redfield          ! HetC
+        CASE (1010)  ! HetC - Heterotroph Carbon (using Redfield ratio)
+            tracers%data(i)%values(:,:) = tiny * Redfield
 
-        CASE (1011)
-            tracers%data(i)%values(:,:) = tiny                     ! DON
+        ! --- Dissolved Organic Matter ---
+        CASE (1011)  ! DON - Dissolved Organic Nitrogen
+            tracers%data(i)%values(:,:) = tiny
 
-        CASE (1012)
-            tracers%data(i)%values(:,:) = tiny                     ! DOC
+        CASE (1012)  ! DOC - Dissolved Organic Carbon
+            tracers%data(i)%values(:,:) = tiny
 
-        CASE (1013)
-            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max       ! DiaN
+        ! --- Diatoms ---
+        CASE (1013)  ! DiaN - Diatom Nitrogen
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max
 
-        CASE (1014)
-            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max/NCmax ! DiaC
+        CASE (1014)  ! DiaC - Diatom Carbon
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max/NCmax
 
-        CASE (1015)
-            tracers%data(i)%values(:,:) = tiny_chl                 ! DiaChl
+        CASE (1015)  ! DiaChl - Diatom Chlorophyll
+            tracers%data(i)%values(:,:) = tiny_chl
 
-        CASE (1016)
-            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max_d/NCmax_d/SiCmax ! DiaSi
+        CASE (1016)  ! DiaSi - Diatom Silica
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max_d/NCmax_d/SiCmax
 
-        CASE (1017)
-            tracers%data(i)%values(:,:) = tiny                     ! DetSi
+        CASE (1017)  ! DetSi - Detrital Silica
+            tracers%data(i)%values(:,:) = tiny
 
-        CASE (1019)
-            tracers%data(i)%values(:,:) = tracers%data(i)%values(:,:)* 1.e9 ! Fe [mol/L] => [umol/m3] Check the units again!
+        ! --- Iron (micronutrient) ---
+        CASE (1019)  ! Fe - Iron (unit conversion: mol/L => umol/m3)
+            tracers%data(i)%values(:,:) = tracers%data(i)%values(:,:)* 1.e9
 
-        CASE (1020)
-            tracers%data(i)%values(:,:) = tiny * Redfield          ! PhyCalc
+        ! --- Calcium Carbonate (Calcite) ---
+        CASE (1020)  ! PhyCalc - Phytoplankton Calcite
+            tracers%data(i)%values(:,:) = tiny * Redfield
 
-        CASE (1021)
-            tracers%data(i)%values(:,:) = tiny                     ! DetCalc
+        CASE (1021)  ! DetCalc - Detrital Calcite
+            tracers%data(i)%values(:,:) = tiny
 
-! *******************
-! CASE 2phy 3zoo 2det
-! *******************
-#if defined (__3Zoo2Det)
+        !---------------------------------------------------------------------------
+        ! Extended Model: Additional Zooplankton and Detritus (enable_3zoo2det)
+        !---------------------------------------------------------------------------
+
         CASE (1023)
-            tracers%data(i)%values(:,:) = tiny                     ! Zoo2N
-        CASE (1024)
-            tracers%data(i)%values(:,:) = tiny * Redfield          ! Zoo2C
-        CASE (1025)
-            tracers%data(i)%values(:,:) = tiny                     ! DetZ2N 
-        CASE (1026)
-            tracers%data(i)%values(:,:) = tiny                     ! DetZ2C
-        CASE (1027)
-            tracers%data(i)%values(:,:) = tiny                     ! DetZ2Si
-        CASE (1028)
-            tracers%data(i)%values(:,:) = tiny                     ! DetZ2Calc
-#endif
+            IF (enable_3zoo2det .AND. .NOT. enable_coccos) THEN
+                ! Zoo2N - Macrozooplankton Nitrogen
+                tracers%data(i)%values(:,:) = tiny
+            ELSE IF (enable_coccos .AND. .NOT. enable_3zoo2det) THEN
+                ! CoccoN - Coccolithophore Nitrogen
+                tracers%data(i)%values(:,:) = tiny_chl / chl2N_max
+            END IF
 
-! *******************
-! CASE 4phy 3zoo 2det
-! *******************
-#if defined (__coccos) & defined (__3Zoo2Det)
+        CASE (1024)
+            IF (enable_3zoo2det .AND. .NOT. enable_coccos) THEN
+                ! Zoo2C - Macrozooplankton Carbon
+                tracers%data(i)%values(:,:) = tiny * Redfield
+            ELSE IF (enable_coccos .AND. .NOT. enable_3zoo2det) THEN
+                ! CoccoC - Coccolithophore Carbon
+                tracers%data(i)%values(:,:) = tiny_chl / chl2N_max / NCmax
+            END IF
+
+        CASE (1025)
+            IF (enable_3zoo2det .AND. .NOT. enable_coccos) THEN
+                ! DetZ2N - Macrozooplankton Detrital Nitrogen
+                tracers%data(i)%values(:,:) = tiny
+            ELSE IF (enable_coccos .AND. .NOT. enable_3zoo2det) THEN
+                ! CoccoChl - Coccolithophore Chlorophyll
+                tracers%data(i)%values(:,:) = tiny_chl
+            END IF
+
+        CASE (1026)
+            IF (enable_3zoo2det .AND. .NOT. enable_coccos) THEN
+                ! DetZ2C - Macrozooplankton Detrital Carbon
+                tracers%data(i)%values(:,:) = tiny
+            ELSE IF (enable_coccos .AND. .NOT. enable_3zoo2det) THEN
+                ! PhaeoN - Phaeocystis Nitrogen
+                tracers%data(i)%values(:,:) = tiny_chl / chl2N_max
+            END IF
+
+        CASE (1027)
+            IF (enable_3zoo2det .AND. .NOT. enable_coccos) THEN
+                ! DetZ2Si - Zooplankton 2 Detrital Silica
+                tracers%data(i)%values(:,:) = tiny
+            ELSE IF (enable_coccos .AND. .NOT. enable_3zoo2det) THEN
+                ! PhaeoC - Phaeocystis Carbon
+                tracers%data(i)%values(:,:) = tiny_chl / chl2N_max / NCmax
+            END IF
+
+        CASE (1028)
+            IF (enable_3zoo2det .AND. .NOT. enable_coccos) THEN
+                ! DetZ2Calc - Macrozooplankton Detrital Calcite
+                tracers%data(i)%values(:,:) = tiny
+            ELSE IF (enable_coccos .AND. .NOT. enable_3zoo2det) THEN
+                ! PhaeoChl - Phaeocystis Chlorophyll
+                tracers%data(i)%values(:,:) = tiny_chl
+            END IF
+
+        !---------------------------------------------------------------------------
+        ! Extended Model: Coccolithophores with 3Zoo2Det
+        !---------------------------------------------------------------------------
+
         CASE (1029)
-            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max       ! CoccoN
+            IF (enable_coccos .AND. enable_3zoo2det) THEN
+                ! CoccoN - Coccolithophore Nitrogen
+                tracers%data(i)%values(:,:) = tiny_chl / chl2N_max
+            ELSE IF (enable_3zoo2det .AND. .NOT. enable_coccos) THEN
+                ! Zoo3N - Microzooplankton Nitrogen
+                tracers%data(i)%values(:,:) = tiny
+            END IF
 
         CASE (1030)
-            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max/NCmax ! CoccoC
+            IF (enable_coccos .AND. enable_3zoo2det) THEN
+                ! CoccoC - Coccolithophore Carbon
+                tracers%data(i)%values(:,:) = tiny_chl / chl2N_max / NCmax
+            ELSE IF (enable_3zoo2det .AND. .NOT. enable_coccos) THEN
+                ! Zoo3C - Microzooplankton Carbon
+                tracers%data(i)%values(:,:) = tiny * Redfield
+            END IF
 
         CASE (1031)
-            tracers%data(i)%values(:,:) = tiny_chl                 ! CoccoChl
+            IF (enable_coccos .AND. enable_3zoo2det) THEN
+                ! CoccoChl - Coccolithophore Chlorophyll
+                tracers%data(i)%values(:,:) = tiny_chl
+            END IF
 
         CASE (1032)
-            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max       ! PhaeoN
+            IF (enable_coccos .AND. enable_3zoo2det) THEN
+                ! PhaeoN - Phaeocystis Nitrogen
+                tracers%data(i)%values(:,:) = tiny_chl / chl2N_max
+            END IF
 
         CASE (1033)
-            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max/NCmax ! PhaeoC
+            IF (enable_coccos .AND. enable_3zoo2det) THEN
+                ! PhaeoC - Phaeocystis Carbon
+                tracers%data(i)%values(:,:) = tiny_chl / chl2N_max / NCmax
+            END IF
 
         CASE (1034)
-            tracers%data(i)%values(:,:) = tiny_chl                 ! PhaeoChl
+            IF (enable_coccos .AND. enable_3zoo2det) THEN
+                ! PhaeoChl - Phaeocystis Chlorophyll
+                tracers%data(i)%values(:,:) = tiny_chl
+            END IF
 
-
-
-! *******************
-! CASE 4phy 1zoo 1det
-! *******************
-#elif defined (__coccos) & !defined (__3Zoo2Det)
-        CASE (1023)
-            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max       ! CoccoN
-
-        CASE (1024)
-            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max/NCmax ! CoccoC
-
-        CASE (1025)
-            tracers%data(i)%values(:,:) = tiny_chl                 ! CoccoChl
-
-        CASE (1026)
-            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max       ! PhaeoN
-
-        CASE (1027)
-            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max/NCmax ! PhaeoC
-
-        CASE (1028)
-            tracers%data(i)%values(:,:) = tiny_chl                 ! PhaeoChl
-
-#endif
-
-! *******************
-! CASE 4phy 3zoo 2det
-! *******************
-#if defined (__coccos) & defined (__3Zoo2Det)
         CASE (1035)
-            tracers%data(i)%values(:,:) = tiny                     ! Zoo3N
+            IF (enable_coccos .AND. enable_3zoo2det) THEN
+                ! Zoo3N - Zooplankton 3 Nitrogen
+                tracers%data(i)%values(:,:) = tiny
+            END IF
 
         CASE (1036)
-            tracers%data(i)%values(:,:) = tiny * Redfield          ! Zoo3C
-
-#elif !defined (__coccos) & defined (__3Zoo2Det)
-! *******************
-! CASE 2phy 3zoo 2det
-! *******************
-        CASE (1029)
-            tracers%data(i)%values(:,:) = tiny                     ! Zoo3N
-
-        CASE (1030)
-            tracers%data(i)%values(:,:) = tiny * Redfield          ! Zoo3C
-
-#endif
+            IF (enable_coccos .AND. enable_3zoo2det) THEN
+                ! Zoo3C - Zooplankton 3 Carbon
+                tracers%data(i)%values(:,:) = tiny * Redfield
+            END IF
 
         END SELECT
     END DO
@@ -567,5 +639,16 @@ subroutine recom_init(tracers, partit, mesh)
         call MPI_AllREDUCE(locO2min , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
         if (mype==0) write(*,*) '  `-> gobal min init. O2. =', glo
 
+        if (enable_3zoo2det) then
+            is_3zoo2det=1.0_WP
+        else
+            is_3zoo2det=0.0_WP
+        endif
+
+        if (enable_coccos) then
+            is_coccos=1.0_WP
+        else
+            is_coccos=0.0_WP
+        endif
     end subroutine recom_init
 

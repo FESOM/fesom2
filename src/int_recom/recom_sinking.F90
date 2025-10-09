@@ -109,14 +109,16 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
 ! Constant vertical sinking for the second detritus class
 ! *******************************************************
 
-#if defined(__3Zoo2Det)
+    if (enable_3zoo2det) then
+
           if(tracers%data(tr_num)%ID==1025 .or. &  !idetz2n
              tracers%data(tr_num)%ID==1026 .or. &  !idetz2c
              tracers%data(tr_num)%ID==1027 .or. &  !idetz2si
              tracers%data(tr_num)%ID==1028 ) then  !idetz2calc
              Vben = VDet_zoo2
           endif
-#endif
+
+    endif
 
         Vben= Vben/SecondsPerDay ! conversion [m/d] --> [m/s] (vertical velocity, note that it is positive here)
 
@@ -500,58 +502,62 @@ subroutine ver_sinking_recom(tr_num, tracers, partit, mesh)
 
     Vsink=0.0_WP
 
-    if (tracers%data(tr_num)%ID ==1007 .or.    &  !idetn
-        tracers%data(tr_num)%ID ==1008 .or.    &  !idetc
-        tracers%data(tr_num)%ID ==1017 .or.    &  !idetsi
-        tracers%data(tr_num)%ID ==1021 ) then     !idetcal
+!< Assign sinking velocities based on tracer ID
+!< Groups tracers by functional type and assigns corresponding velocity
 
-            Vsink = VDet
+! Detritus tracers (nitrogen, carbon, silicate, calcite)
+if (tracers%data(tr_num)%ID == 1007 .or. &  ! idetn
+    tracers%data(tr_num)%ID == 1008 .or. &  ! idetc
+    tracers%data(tr_num)%ID == 1017 .or. &  ! idetsi
+    tracers%data(tr_num)%ID == 1021) then    ! idetcal
+    Vsink = VDet
 
-    elseif(tracers%data(tr_num)%ID ==1004 .or. &  !iphyn
-        tracers%data(tr_num)%ID ==1005 .or.    &  !iphyc
-        tracers%data(tr_num)%ID==1006 ) then     !ipchl
+! Phytoplankton tracers (nitrogen, carbon, chlorophyll)
+elseif (tracers%data(tr_num)%ID == 1004 .or. &  ! iphyn
+        tracers%data(tr_num)%ID == 1005 .or. &  ! iphyc
+        tracers%data(tr_num)%ID == 1006) then    ! ipchl
+    Vsink = VPhy
 
-            Vsink = VPhy
+! Diatom tracers (nitrogen, carbon, silicate, chlorophyll)
+elseif (tracers%data(tr_num)%ID == 1013 .or. &  ! idian
+        tracers%data(tr_num)%ID == 1014 .or. &  ! idiac
+        tracers%data(tr_num)%ID == 1016 .or. &  ! idiasi
+        tracers%data(tr_num)%ID == 1015) then    ! idchl
+    Vsink = VDia
 
-    elseif(tracers%data(tr_num)%ID==1013 .or. &  !idian
-        tracers%data(tr_num)%ID==1014 .or.    &  !idiac
-        tracers%data(tr_num)%ID==1016 .or.    &  !idiasi
-        tracers%data(tr_num)%ID==1015 ) then     !idchl
+! Coccolithophore tracers (nitrogen, carbon, chlorophyll)
+elseif (enable_coccos .and. &
+        (tracers%data(tr_num)%ID == 1029 .or. &  ! icocn
+         tracers%data(tr_num)%ID == 1030 .or. &  ! icocc
+         tracers%data(tr_num)%ID == 1031)) then  ! icchl
+    Vsink = VCocco
 
-            Vsink = VDia
+! Phaeocystis tracers (nitrogen, carbon, chlorophyll)
+elseif (enable_coccos .and. &
+        (tracers%data(tr_num)%ID == 1032 .or. &  ! iphan
+         tracers%data(tr_num)%ID == 1033 .or. &  ! iphac
+         tracers%data(tr_num)%ID == 1034)) then  ! iphachl
+    Vsink = VPhaeo
 
-#if defined (__coccos)
-    elseif(tracers%data(tr_num)%ID == 1029 .or. &  !icocn
-        tracers%data(tr_num)%ID == 1030 .or.    &  !icocc
-        tracers%data(tr_num)%ID == 1031 ) then     !icchl
 
-            Vsink = VCocco
-
-    elseif(tracers%data(tr_num)%ID == 1032 .or. &  !iphan
-        tracers%data(tr_num)%ID == 1033 .or.    &  !iphac
-        tracers%data(tr_num)%ID == 1034 ) then     !iphachl
-
-           Vsink = VPhaeo
-        
-#endif
-
-    elseif(tracers%data(tr_num)%ID == 1020) then   !iphycal
-       
-#if defined (__coccos)
-            Vsink = VCocco
-#else
-            Vsink = VPhy
-#endif
-            
-#if defined (__3Zoo2Det)
-    elseif(tracers%data(tr_num)%ID==1025 .or. &  !idetz2n
-           tracers%data(tr_num)%ID==1026 .or. &  !idetz2c
-           tracers%data(tr_num)%ID==1027 .or. &  !idetz2si
-           tracers%data(tr_num)%ID==1028 ) then  !idetz2calc 
-            
-            Vsink = VDet_zoo2
-#endif
+! Phytoplankton calcite tracer (special case)
+elseif (tracers%data(tr_num)%ID == 1020) then  ! iphycal
+    if (enable_coccos) then
+        Vsink = VCocco
+    else
+        Vsink = VPhy
     end if
+
+! Zooplankton-2 detritus tracers (nitrogen, carbon, silicate, calcite)
+elseif (enable_3zoo2det .and. &
+        (tracers%data(tr_num)%ID == 1025 .or. &  ! idetz2n
+         tracers%data(tr_num)%ID == 1026 .or. &  ! idetz2c
+         tracers%data(tr_num)%ID == 1027 .or. &  ! idetz2si
+         tracers%data(tr_num)%ID == 1028)) then  ! idetz2calc
+    Vsink = VDet_zoo2
+
+end if
+
 
 !! ---- No sinking if Vsink < 0.1 m/day
 if (Vsink .gt. 0.1) then 
@@ -588,10 +594,9 @@ if (Vsink .gt. 0.1) then
             endif
          end if
 
-#if defined (__3Zoo2Det)
-
          !! ---- We assume *constant* sinking for second detritus
-         if(tracers%data(tr_num)%ID ==1025 .or. &  !idetz2n
+         if(enable_3zoo2det .and. &
+            tracers%data(tr_num)%ID ==1025 .or. &  !idetz2n
             tracers%data(tr_num)%ID ==1026 .or. &  !idetz2c
             tracers%data(tr_num)%ID ==1027 .or. &  !idetz2si
             tracers%data(tr_num)%ID ==1028 ) then  !idetz2calc
@@ -610,12 +615,10 @@ if (Vsink .gt. 0.1) then
                end if
 
          endif
-#endif
 
          if (tracers%data(tr_num)%ID == 1021) Sinkvel1_tr(nz,n,tr_num) = Wvel_flux(nz) !-1.0d0/SecondsPerDay  !idetcal
-#if defined (__3Zoo2Det)
-         if (tracers%data(tr_num)%ID == 1028) Sinkvel2_tr(nz,n,tr_num) = Wvel_flux(nz)  !idetz2calc
-#endif
+         if (enable_3zoo2det .and. &
+             tracers%data(tr_num)%ID == 1028) Sinkvel2_tr(nz,n,tr_num) = Wvel_flux(nz)  !idetz2calc
 
 
       end do
@@ -768,21 +771,19 @@ subroutine ballast(tr_num, tracers, partit, mesh)
            scaling_density1_3D(k,row)=1.0
            scaling_density2_3D(k,row)=1.0
 
-              if (use_density_scaling) then
-                 if (tracers%data(tr_num)%ID ==1008)then !idetc
-                    if (tracers%data(tr_num)%values(k,row)>0.001) then ! only apply ballasting above a certain biomass (OG Todo: remove) 
-                       scaling_density1_3D(k,row) = (rho_particle1(k,row)-rho_seawater(1))/(rho_ref_part-rho_ref_water)
-                    endif
+           if (use_density_scaling) then
+              if (tracers%data(tr_num)%ID ==1008)then !idetc
+                 if (tracers%data(tr_num)%values(k,row)>0.001) then ! only apply ballasting above a certain biomass (OG Todo: remove)
+                    scaling_density1_3D(k,row) = (rho_particle1(k,row)-rho_seawater(1))/(rho_ref_part-rho_ref_water)
                  endif
-#if defined (__3Zoo2Det)
-
-                    if (tracers%data(tr_num)%ID ==1026)then ! idetz2c
-                       if (tracers%data(tr_num)%values(k,row)>0.001) then ! only apply ballasting above a certain biomass (OG Todo: remove) 
-                          scaling_density2_3D(k,row) = (rho_particle2(k,row)-rho_seawater(1))/(rho_ref_part-rho_ref_water)
-                       endif
-                    endif
-#endif
               endif
+              if (enable_3zoo2det .and. &
+                 tracers%data(tr_num)%ID ==1026)then ! idetz2c
+                 if (tracers%data(tr_num)%values(k,row)>0.001) then ! only apply ballasting above a certain biomass (OG Todo: remove)
+                    scaling_density2_3D(k,row) = (rho_particle2(k,row)-rho_seawater(1))/(rho_ref_part-rho_ref_water)
+                 endif
+              endif
+            endif
 
             scaling_visc_3D(k,row)=1.0
 
@@ -802,9 +803,11 @@ subroutine ballast(tr_num, tracers, partit, mesh)
     ! in the unlikely (if possible at all...) case that rho_particle(k)-rho_seawater(1)<0, prevent the scaling factor from being negative
 
     if (any(scaling_density1_3D(:,:) <= tiny)) scaling_density1_3D(:,:) = 1.0_WP      ! tiny = 2.23D-16
-#if defined (__3Zoo2Det)
-    if (any(scaling_density2_3D(:,:) <= tiny)) scaling_density2_3D(:,:) = 1.0_WP      ! tiny = 2.23D-16
-#endif
+
+    if (enable_3zoo2det) then
+        if (any(scaling_density2_3D(:,:) <= tiny)) scaling_density2_3D(:,:) = 1.0_WP      ! tiny = 2.23D-16
+    endif
+
 end subroutine ballast
 !-------------------------------------------------------------------------------
 ! Subroutine calculate density of particle
@@ -876,7 +879,7 @@ subroutine get_particle_density(tracers, partit, mesh)
         rho_particle1(nzmin:nzmax,row) = rho_CaCO3*a4(nzmin:nzmax,row) + rho_opal*a3(nzmin:nzmax,row) + rho_POC*a1(nzmin:nzmax,row) + rho_PON*a2(nzmin:nzmax,row)
     end do
 
-#if defined (__3Zoo2Det)
+    if (enable_3zoo2det) then
     rho_particle2 = 0.0
     b1 = 0.0
     b2 = 0.0
@@ -901,7 +904,7 @@ subroutine get_particle_density(tracers, partit, mesh)
         a4(nzmin:nzmax,row)  = b4(nzmin:nzmax,row)/aux(nzmin:nzmax,row)
         rho_particle2(nzmin:nzmax,row) = rho_CaCO3*a4(nzmin:nzmax,row) + rho_opal*a3(nzmin:nzmax,row) + rho_POC*a1(nzmin:nzmax,row) + rho_PON*a2(nzmin:nzmax,row)
     end do
-#endif
+    endif
 
 end subroutine get_particle_density
 !-------------------------------------------------------------------------------
