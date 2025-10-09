@@ -483,7 +483,7 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
 #endif        
     end if     
 #if defined(__recom)
-    if (use_REcoM) call ini_bio_io(yearnew, tracers, partit, mesh)
+    if (use_REcoM) call ini_bio_io(tracers, partit, mesh)
 #endif
   end if
   
