@@ -241,8 +241,8 @@ if (${USE_CVMIX})
    # Collect CVMix source files so that CMake knows what changes triggers a 
    # possible rebuild of the CVMix library
    file(GLOB_RECURSE CVMIX_SOURCES
-        "${src_home}/cvmix_driver/${CVMIX_DIR_src}/src/*.F90"
-        "${src_home}/cvmix_driver/${CVMIX_DIR_src}/src/*/*.F90")
+         "${src_home}/cvmix_driver/${CVMIX_DIR_src}/src/*.F90"
+         "${src_home}/cvmix_driver/${CVMIX_DIR_src}/src/*/*.F90")
         
    # Add script dependency (rebuild if script changes)
    set(CVMIX_DOWNLOAD "${src_home}/cvmix_driver/download_cvmix.sh")
