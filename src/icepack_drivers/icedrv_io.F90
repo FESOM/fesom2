@@ -297,7 +297,7 @@
         use mod_partit
         use mod_parsup
         use g_config,     only: runid, ResultPath, RestartOutPath
-        use io_restart,   only: icepack_files, icepack_path, nc_restart_path
+        use io_restart,   only: icepack_files 
     
         implicit none
     
@@ -353,10 +353,6 @@
         !if (icepack_warnings_aborted()) call abort_ice(error_message=subname,       &
         !    file=__FILE__, line=__LINE__)
       
-        write(cyear,'(i4)') year
-        ! Create an icepack restart file
-        ! Only serial output implemented so far
-        icepack_path = nc_restart_path('icepack', year, RestartOutPath)
         
         if(has_been_called) return
         has_been_called = .true.
