@@ -384,16 +384,16 @@ subroutine read_initial_conditions(which_readr, ice, dynamics, tracers, partit, 
     
     ! Read OCEAN restart
     if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: ocean'//achar(27)//'[0m'
-    call read_restart(read_oce_path, oce_files, partit%MPI_COMM_FESOM, partit%mype)
+    call read_netcdf_restarts(read_oce_path, oce_files, partit%MPI_COMM_FESOM, partit%mype)
     
     ! Read ICE/ICEPACK restart
     if (use_ice) then
 #if defined(__icepack)   
         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: icepack'//achar(27)//'[0m'
-        call read_restart(nc_restart_path('icepack', yearold, RestartInPath), icepack_files, partit%MPI_COMM_FESOM, partit%mype)
+        call read_netcdf_restarts(nc_restart_path('icepack', yearold, RestartInPath), icepack_files, partit%MPI_COMM_FESOM, partit%mype)
 #else            
         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: ice'//achar(27)//'[0m'
-        call read_restart(read_ice_path, ice_files, partit%MPI_COMM_FESOM, partit%mype)            
+        call read_netcdf_restarts(read_ice_path, ice_files, partit%MPI_COMM_FESOM, partit%mype)            
 #endif
     end if 
 
@@ -401,7 +401,7 @@ subroutine read_initial_conditions(which_readr, ice, dynamics, tracers, partit, 
     ! Read RECOM restarts
     if (REcoM_restart) then
         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: bio'//achar(27)//'[0m'
-        call read_restart(read_bio_path, bio_files, partit%MPI_COMM_FESOM, partit%mype)
+        call read_netcdf_restarts(read_bio_path, bio_files, partit%MPI_COMM_FESOM, partit%mype)
     end if
 #endif
 
@@ -515,16 +515,16 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
   if(is_portable_restart_write) then
     ! Write OCEAN restart
     if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: ocean'//achar(27)//'[0m'
-    call write_restart(write_oce_path, oce_files, istep)
+    call write_netcdf_restarts(write_oce_path, oce_files, istep)
     
     ! Write ICE/ICEPACK restart
     if(use_ice) then
 #if defined(__icepack)        
         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: icepack'//achar(27)//'[0m'
-        call write_restart(write_icepack_path, icepack_files, istep)
+        call write_netcdf_restarts(write_icepack_path, icepack_files, istep)
 #else
         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: ice'//achar(27)//'[0m'
-        call write_restart(write_ice_path, ice_files, istep)
+        call write_netcdf_restarts(write_ice_path, ice_files, istep)
 #endif 
     end if
 
@@ -532,7 +532,7 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
     ! Write RECOM restart
     if (REcoM_restart .or. use_REcoM) then
         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: bio'//achar(27)//'[0m'
-        call write_restart(write_bio_path, bio_files, istep)
+        call write_netcdf_restarts(write_bio_path, bio_files, istep)
     end if
 #endif
   end if
@@ -566,7 +566,7 @@ end subroutine write_initial_conditions
 !
 !
 !_______________________________________________________________________________
-subroutine write_restart(path, filegroup, istep)
+subroutine write_netcdf_restarts(path, filegroup, istep)
   use fortran_utils
   character(len=*), intent(in) :: path
   type(restart_file_group), intent(inout) :: filegroup
@@ -590,7 +590,7 @@ subroutine write_restart(path, filegroup, istep)
       filepath = dirpath//"/"//filegroup%files(i)%varname//".nc"
 
       if(filegroup%files(i)%path == "" .or. (.not. filegroup%files(i)%must_exist_on_read)) then
-        ! the path to an existing restart file is not set in read_restart if we had a restart from a raw restart
+        ! the path to an existing restart file is not set in read_netcdf_restarts if we had a restart from a raw restart
         ! OR we might have skipped the file when reading restarts and it does not exist at all
         inquire(file=filepath, exist=file_exists)
         if(file_exists) then
@@ -617,7 +617,7 @@ subroutine write_restart(path, filegroup, istep)
     call filegroup%files(i)%async_gather_and_write_variables()
   end do
   
-end subroutine write_restart
+end subroutine write_netcdf_restarts
 !
 !
 !_______________________________________________________________________________
@@ -768,7 +768,7 @@ end subroutine finalize_restart
 !
 !
 !_______________________________________________________________________________
-subroutine read_restart(path, filegroup, mpicomm, mype)
+subroutine read_netcdf_restarts(path, filegroup, mpicomm, mype)
   character(len=*), intent(in) :: path
   type(restart_file_group), intent(inout) :: filegroup
   integer, intent(in) :: mpicomm
@@ -870,7 +870,7 @@ subroutine read_restart(path, filegroup, mpicomm, mype)
       call MPI_Recv(globalstep, 1, MPI_INTEGER, MPI_ANY_SOURCE, 42, mpicomm, mpistatus, mpierr)
     end if
   end if
-end subroutine read_restart
+end subroutine read_netcdf_restarts
 !
 !
 !_______________________________________________________________________________
