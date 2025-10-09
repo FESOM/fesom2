@@ -221,8 +221,12 @@ target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
 # build CVMix library if USE_CVMIX is ON
 if (${USE_CVMIX})
    message(STATUS "USE_CVMIX: ${USE_CVMIX}")
-   set(CVMIX_DIR_src     "CVMix-src")
-   set(CVMIX_DIR_install "CVMix-install")
+   # make sure that src and installation path are always synchronized with the 
+   # download_cvmix.sh script
+   execute_process(COMMAND bash ${src_home}/cvmix_driver/download_cvmix.sh --print-src_dir
+                   OUTPUT_VARIABLE CVMIX_DIR_src)
+   execute_process(COMMAND bash ${src_home}/cvmix_driver/download_cvmix.sh --print-prefix
+                   OUTPUT_VARIABLE CVMIX_DIR_install)                
    
    # set default CVMix installation path
    if (NOT CVMIX_ROOT)

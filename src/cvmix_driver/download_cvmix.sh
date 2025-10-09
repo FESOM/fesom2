@@ -17,12 +17,30 @@ set -euo pipefail
 #   -DCVMIX_ROOT=<prefix>
 # or
 #   -DCVMIX_LIB_DIR=<prefix>/lib -DCVMIX_MOD_DIR=<prefix>/include
-
-BRANCH="master"
-PREFIX="$(pwd)/CVMix-install"
 REPO_URL="https://github.com/CVMix/CVMix-src.git"
-SRC_DIR="$(pwd)/CVMix-src"
-BUILD_DIR="$(pwd)/CVMix-build"
+BRANCH="master"
+PREFIX="CVMix-install"
+SRC_DIR="CVMix-src"
+BUILD_DIR="CVMix-build"
+
+# to extract the proper src and install dir for cmake, so the are always 
+# synchronized with the download script
+[[ "${1:-}" == "--print-prefix" ]] && {
+  echo "$PREFIX"
+  exit 0
+}
+[[ "${1:-}" == "--print-src_dir" ]] && {
+  echo "$PREFIX"
+  exit 0
+}
+[[ "${1:-}" == "--print-build_dir" ]] && {
+  echo "$PREFIX"
+  exit 0
+}
+PREFIX=$(pwd)/${PREFIX}
+SRC_DIR=$(pwd)/${SRC_DIR}
+BUILD_DIR=$(pwd)/${BUILD_DIR}
+
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
