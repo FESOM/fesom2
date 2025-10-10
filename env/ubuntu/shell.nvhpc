@@ -1,0 +1,26 @@
+# NVIDIA HPC SDK Compilers environment for Ubuntu local development
+# This environment uses NVIDIA HPC SDK compilers installed at /opt/nvidia/hpc_sdk
+
+# Set NVIDIA HPC SDK paths
+export NVHPC_ROOT=/opt/nvidia/hpc_sdk
+export NVARCH=Linux_x86_64
+export NVCOMPILERS=${NVHPC_ROOT}/${NVARCH}/25.7
+export NVMPI=${NVCOMPILERS}/comm_libs/12.9/openmpi4/openmpi-4.1.5
+
+# Add NVIDIA compilers and MPI to PATH
+export PATH=${NVCOMPILERS}/compilers/bin:${NVMPI}/bin:${PATH}
+export LD_LIBRARY_PATH=${NVCOMPILERS}/compilers/lib:${NVMPI}/lib:${LD_LIBRARY_PATH}
+
+# Set compilers to NVIDIA HPC SDK with bundled OpenMPI
+export FC=mpifort CC=mpicc CXX=mpicxx
+
+# Tell OpenMPI wrappers to use NVIDIA compilers
+export OMPI_FC=nvfortran
+export OMPI_CC=nvc
+export OMPI_CXX=nvc++
+
+# LAPACK using system libraries
+if [[ -f "/usr/lib/x86_64-linux-gnu/liblapack.so.3" ]]; then
+  export LAPACK_LIBRARIES=/usr/lib/x86_64-linux-gnu/liblapack.so.3
+  export CMAKE_ARGS=-DLAPACK_LIBRARIES=${LAPACK_LIBRARIES}
+fi
