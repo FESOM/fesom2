@@ -317,18 +317,32 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} 
       target_compile_options(${PROJECT_NAME} PRIVATE -xHost)
    endif()
    
-   # # debugging related compiler flags
-   # target_compile_options(${PROJECT_NAME} PRIVATE -qopenmp -g -traceback -check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
-   # target_compile_options(${PROJECT_NAME} PRIVATE -g -traceback -check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
+   # debugging related compiler flags (activated for Debug build type)
+   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+      if(ENABLE_OPENMP)
+         target_compile_options(${PROJECT_NAME} PRIVATE -qopenmp -g -traceback -check all,noarg_temp_created,bounds,uninit) #-ftrapuv ) #-init=zero)
+      else()
+         target_compile_options(${PROJECT_NAME} PRIVATE -g -traceback -check all,noarg_temp_created,bounds,uninit) #-ftrapuv ) #-init=zero)
+      endif()
+   endif()
 
 
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 #    target_compile_options(${PROJECT_NAME} PRIVATE -O3 -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
    if(${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu )
       message(STATUS "Allowing type mismatches on Ubuntu for CI Testing" )  # NOTE(PG): Would be nicer to grab the CI=True from the env variable
-      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch -cpp)
+      if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+         target_compile_options(${PROJECT_NAME} PRIVATE -O0 -g -fbacktrace -ffloat-store -finit-local-zero -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch -cpp)
+      else()
+         target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch -cpp)
+      endif()
    else()
-      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -cpp)
+      if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+         target_compile_options(${PROJECT_NAME} PRIVATE -O0 -ffloat-store -finit-local-zero -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -cpp)
+      else()
+         target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -cpp)
+      endif()
+
    endif()
    if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10 )
       target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
@@ -362,29 +376,34 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
       # |             | -mno-fma4 -mavx2 -mfma                                            |      |
       # | GCC/openMPI | -O3 -march=znver3 -mtune=znver3 -ftree-vectorize -flto            | 280s | chatgpt recomendation
       # |             | -mcpu=znver3                                                      |      |
-      target_compile_options(${PROJECT_NAME} PRIVATE -march=znver3 -mtune=znver3 -ftree-vectorize -flto)      
+      if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+         target_compile_options(${PROJECT_NAME} PRIVATE -march=znver3 -mtune=znver3)
+      else()
+         target_compile_options(${PROJECT_NAME} PRIVATE -march=znver3 -mtune=znver3 -ftree-vectorize -flto)
+      endif()      
    else()
       #[[if(NOT (${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu))
          target_compile_options(${PROJECT_NAME} PRIVATE -native)
       endif()  ]]  
    endif()
    
-   # # debugging related compiler flags
-   #target_compile_options(${PROJECT_NAME} PRIVATE 
-                           #-fallow-argument-mismatch 
-                           #-fno-fast-math -fno-signed-zeros 
-                           #-freciprocal-math 
-                           #-mveclibabi=svml 
-                           #-flto
-                           #-pg 
-                           #-fbacktrace 
-                           #-fcheck=all,bounds 
-                           #-finit-real=snan 
-                           #-finit-integer=-9999 
-                           #-fsanitize=undefined,address
-                        #)
-   ## if use -fsanitize=undefined,address you also need ... PRIVATE -lubsan)           
-   #target_link_libraries(${PROJECT_NAME} PRIVATE -lubsan)
+   # debugging related compiler flags (activated for Debug build type)
+   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+      target_compile_options(${PROJECT_NAME} PRIVATE
+                           -fallow-argument-mismatch
+                           -fno-fast-math -fno-signed-zeros
+                           -freciprocal-math
+                           -mveclibabi=svml
+                           -flto
+                           -pg
+                           -fbacktrace
+                           -fcheck=all,bounds
+                           -finit-real=snan
+                           -finit-integer=-9999
+                           -fsanitize=undefined,address
+                           )
+      target_link_libraries(${PROJECT_NAME} PRIVATE -lubsan)
+   endif()
                      
 
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
