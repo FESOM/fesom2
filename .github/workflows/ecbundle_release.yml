@@ -145,7 +145,6 @@ jobs:
           cmake \
             -DCMAKE_BUILD_TYPE=${{ github.event.inputs.build_type || 'Release' }} \
             -DBUILD_TESTING=ON \
-            -DENABLE_INTEGRATION_TESTS=ON \
             -DENABLE_MPI_TESTS=ON \
             -DTEST_TIMEOUT=${{ github.event.inputs.test_timeout || '600' }} \
             -DCMAKE_C_COMPILER=gcc \
