@@ -1,137 +1,19 @@
-module read_mesh_interface
-  interface
-    subroutine read_mesh(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine read_mesh
-  end interface
-end module read_mesh_interface
-module find_levels_interface
-  interface
-    subroutine find_levels(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine find_levels
-  end interface
-end module find_levels_interface
-module find_levels_cavity_interface
-  interface
-    subroutine find_levels_cavity(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine find_levels_cavity
-  end interface
-end module find_levels_cavity_interface
-module test_tri_interface
-  interface
-    subroutine test_tri(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine test_tri
-  end interface
-end module test_tri_interface
-module load_edges_interface
-  interface
-    subroutine load_edges(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine load_edges
-  end interface
-end module load_edges_interface
-module find_neighbors_interface
-  interface
-    subroutine find_neighbors(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine find_neighbors
-  end interface
-end module find_neighbors_interface
-module mesh_areas_interface
-  interface
-    subroutine mesh_areas(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine mesh_areas
-  end interface
-end module mesh_areas_interface
-module elem_center_interface
-  interface
-    subroutine elem_center(elem, x, y, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      integer       :: elem    
-      real(kind=WP), intent(inout) :: x, y
-      type(t_mesh),  intent(inout), target :: mesh
-    end subroutine elem_center
-  end interface
-end module elem_center_interface
-module edge_center_interface
-  interface
-    subroutine edge_center(n1, n2, x, y, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      integer                     :: n1, n2
-      real(kind=WP), intent(inout):: x, y
-      type(t_mesh),  intent(inout), target :: mesh
-    end subroutine edge_center
-  end interface
-end module edge_center_interface
-module mesh_auxiliary_arrays_interface
-  interface
-    subroutine mesh_auxiliary_arrays(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine mesh_auxiliary_arrays
-  end interface
-end module mesh_auxiliary_arrays_interface
-module find_levels_min_e2n_interface
-  interface
-    subroutine find_levels_min_e2n(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine find_levels_min_e2n
-  end interface
-end module find_levels_min_e2n_interface
-module check_total_volume_interface
-  interface
-    subroutine check_total_volume(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine check_total_volume
-  end interface
-end module check_total_volume_interface
+module oce_mesh_module
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE g_config, only: flag_debug
+    USE g_ROTATE_grid
+    use par_support_interfaces
+    
+    implicit none
+    
+    private
+    public :: mesh_setup, read_mesh, find_levels, find_levels_cavity, test_tri, load_edges, &
+              find_neighbors, mesh_areas, elem_center, edge_center, mesh_auxiliary_arrays, &
+              find_levels_min_e2n, check_total_volume, check_mesh_consistency
+
+contains
 
 ! Driving routine. The distributed mesh information and mesh proper 
 ! are read from files.
@@ -140,22 +22,6 @@ end module check_total_volume_interface
 ! Array sizes vary (sometimes we need only myDim, yet sometimes more)! 
 ! S. Danilov, 2012
 SUBROUTINE mesh_setup(partit, mesh)
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP
-USE g_config, only: flag_debug
-USE g_ROTATE_grid
-use read_mesh_interface
-use find_levels_interface
-use find_levels_cavity_interface
-use mesh_auxiliary_arrays_interface
-use test_tri_interface
-use load_edges_interface
-use find_levels_min_e2n_interface
-use find_neighbors_interface
-use mesh_areas_interface
-use par_support_interfaces
-IMPLICIT NONE
       type(t_mesh),   intent(inout)         :: mesh
       type(t_partit), intent(inout), target :: partit
       
@@ -1976,7 +1842,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 USE g_ROTATE_grid
 use g_comm_auto
-use elem_center_interface
+! elem_center is now in the same module
 implicit none
 type(t_mesh),   intent(inout), target :: mesh
 type(t_partit), intent(inout), target :: partit
@@ -2120,7 +1986,7 @@ USE g_CONFIG
 implicit none
 integer                        :: n1, n2   ! nodes of the edge
 real(kind=WP),  intent(inout)  :: x, y
-type(t_mesh),   intent(inout), target :: mesh
+type(t_mesh),   intent(in), target :: mesh
 real(kind=WP)                  :: a(2), b(2)
 
 a=mesh%coord_nod2D(:,n1)
@@ -2138,7 +2004,7 @@ USE o_PARAM
 USE g_CONFIG  
 implicit none
 real(kind=WP), intent(inout) :: x, y
-type(t_mesh),  intent(inout), target :: mesh
+type(t_mesh),  intent(in), target :: mesh
 integer                      :: elem, elnodes(3), k    
 real(kind=WP)                ::  ax(3), amin
 
@@ -2438,8 +2304,7 @@ USE o_ARRAYS
 USE g_CONFIG, only: rotated_grid, force_rotation, metric_factor_zero
 USE g_ROTATE_grid
 use g_comm_auto
-use elem_center_interface
-use edge_center_interface
+! elem_center and edge_center are now in the same module
 IMPLICIT NONE
 
 integer              :: n,j,q, elnodes(3), ed(2), elem, el(2), elnodes_(3),node
@@ -2897,6 +2762,5 @@ subroutine check_total_volume(partit, mesh)
     end if
 
 end subroutine check_total_volume
-!
-!
-!_______________________________________________________________________________
+
+end module oce_mesh_module

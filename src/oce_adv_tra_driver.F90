@@ -1,45 +1,22 @@
-module oce_adv_tra_driver_interfaces
-  interface
-   subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit, mesh)
-      use MOD_MESH
-      use MOD_TRACER
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_DYN
-      real(kind=WP),  intent(in),    target :: dt
-      integer,        intent(in)            :: tr_num
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh)  , intent(in)   , target :: mesh
-      type(t_tracer), intent(inout), target :: tracers
-      type(t_dyn)   , intent(inout), target :: dynamics
-      real(kind=WP),  intent(in)            :: vel(2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
-      real(kind=WP),  intent(in), target    :: W(mesh%nl,    partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP),  intent(in), target    :: WI(mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP),  intent(in), target    :: WE(mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
-    end subroutine do_oce_adv_tra
-  end interface
-end module oce_adv_tra_driver_interfaces
+module oce_adv_tra_driver_module
+    use MOD_MESH
+    use MOD_TRACER
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_DYN
+    use g_comm_auto
+    use diagnostics
+    use oce_adv_tra_hor_interfaces
+    use oce_adv_tra_ver_interfaces
+    use oce_adv_tra_fct_module, only: oce_tra_adv_fct
+    
+    implicit none
+    
+    private
+    public :: do_oce_adv_tra, oce_tra_adv_flux2dtracer
 
-module oce_tra_adv_flux2dtracer_interface
-  interface
-    subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, mesh, use_lo, ttf, lo)
-      !update the solution for vertical and horizontal flux contributions
-      use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      real(kind=WP), intent(in),    target :: dt
-      type(t_partit),intent(inout), target :: partit
-      type(t_mesh),  intent(in),    target :: mesh
-      real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(inout)      :: dttf_v(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(inout)      :: flux_h(mesh%nl-1, partit%myDim_edge2D)
-      real(kind=WP), intent(inout)      :: flux_v(mesh%nl,   partit%myDim_nod2D)
-      logical,       optional           :: use_lo
-      real(kind=WP), optional           :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), optional           :: lo (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-    end subroutine oce_tra_adv_flux2dtracer
-  end interface
-end module oce_tra_adv_flux2dtracer_interface
+contains
+
 !
 !
 !===============================================================================
@@ -53,8 +30,8 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     use diagnostics, only: ldiag_DVD
     use oce_adv_tra_hor_interfaces
     use oce_adv_tra_ver_interfaces
-    use oce_adv_tra_fct_interfaces
-    use oce_tra_adv_flux2dtracer_interface
+    use oce_adv_tra_fct_module, only: oce_tra_adv_fct
+    ! oce_tra_adv_flux2dtracer is now in the same module
     implicit none
     real(kind=WP),  intent(in),    target :: dt
     integer,        intent(in)            :: tr_num
@@ -573,3 +550,5 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 #endif
 
 end subroutine oce_tra_adv_flux2dtracer
+
+end module oce_adv_tra_driver_module

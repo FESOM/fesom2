@@ -1,133 +1,28 @@
-module diff_part_hor_redi_interface
-    interface
-        subroutine diff_part_hor_redi(tracer, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        type(t_tracer), intent(inout), target :: tracer
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine diff_part_hor_redi
-    end interface
-end module diff_part_hor_redi_interface
+module oce_ale_tracer_module
+    use mod_mesh
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    use mod_tracer
+    USE MOD_DYN
+    use mod_ice
+    USE o_PARAM
+    USE o_ARRAYS
+    USE g_CONFIG
+    use g_comm_auto
+    use g_forcing_arrays
+    use g_forcing_param
+    use diagnostics
+    use mod_transit
+    
+    implicit none
+    
+    private
+    public :: solve_tracers_ale, diff_tracers_ale, diff_ver_part_expl_ale, &
+              diff_ver_part_impl_ale, diff_ver_part_redi_expl, diff_part_hor_redi, &
+              diff_part_bh, bc_surface
 
-module diff_ver_part_expl_ale_interface
-    interface
-        subroutine diff_ver_part_expl_ale(tr_num, tracer, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        integer       , intent(in)   , target :: tr_num
-        type(t_tracer), intent(inout), target :: tracer
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine diff_ver_part_expl_ale
-    end interface
-end module diff_ver_part_expl_ale_interface
+contains
 
-module diff_ver_part_redi_expl_interface
-    interface
-        subroutine diff_ver_part_redi_expl(tracer, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        type(t_tracer), intent(inout), target :: tracer
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine diff_ver_part_redi_expl
-    end interface
-end module diff_ver_part_redi_expl_interface
-
-module diff_ver_part_impl_ale_interface
-    interface
-        subroutine diff_ver_part_impl_ale(tr_num, dynamics,  tracer, ice, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        use MOD_DYN
-        use mod_ice
-        integer       , intent(in)   , target :: tr_num
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_tracer), intent(inout), target :: tracer
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        type(t_ice)   , intent(in)   , target :: ice
-        end subroutine diff_ver_part_impl_ale
-    end interface
-end module diff_ver_part_impl_ale_interface
-
-module diff_tracers_ale_interface
-    interface
-        subroutine diff_tracers_ale(tr_num, dynamics, tracer, ice, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        use mod_ice
-        use MOD_DYN
-        integer       , intent(in),    target :: tr_num
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_tracer), intent(inout), target :: tracer
-        type(t_ice),    intent(in),    target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine diff_tracers_ale
-    end interface
-end module diff_tracers_ale_interface
-
-module bc_surface_interface
-    interface
-        function bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, a_ice)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        integer , intent(in)                  :: n, id, nzmin
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh), intent(in), target      :: mesh
-        real(kind=WP)                         :: bc_surface
-        real(kind=WP), intent(in)             :: sval, sst, sss, a_ice
-        end function bc_surface
-    end interface
-end module bc_surface_interface
-
-module diff_part_bh_interface
-    interface
-        subroutine diff_part_bh(tr_num, dynamics, tracer, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        use MOD_DYN
-        integer       , intent(in)   , target :: tr_num
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_tracer), intent(inout), target :: tracer
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine diff_part_bh
-    end interface
-end module diff_part_bh_interface
-
-module solve_tracers_ale_interface
-    interface
-        subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        use MOD_DYN
-        USE MOD_ICE
-        type(t_ice)   , intent(in),    target :: ice
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_tracer), intent(inout), target :: tracers
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine solve_tracers_ale
-    end interface
-end module solve_tracers_ale_interface
 !
 !
 !===============================================================================
@@ -147,8 +42,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     use Toy_Channel_Dbgyre
     use o_ARRAYS, only: heat_flux
     use g_forcing_arrays, only: sw_3d
-    use diff_tracers_ale_interface
-    use oce_adv_tra_driver_interfaces
+    ! diff_tracers_ale is now in the same module
+    use oce_adv_tra_driver_module, only: do_oce_adv_tra
 #if defined(__recom)
     use recom_glovar
     use recom_config
@@ -334,11 +229,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     use MOD_DYN
     use o_arrays
     use o_tracers
-    use diff_part_hor_redi_interface
-    use diff_ver_part_expl_ale_interface
-    use diff_ver_part_redi_expl_interface
-    use diff_ver_part_impl_ale_interface
-    use diff_part_bh_interface
+    ! All these subroutines are now in the same module
 #if defined(__recom)
     use ver_sinking_recom_interface
     use diff_ver_recom_expl_interface
@@ -567,7 +458,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     use g_forcing_arrays
     use o_mixing_KPP_mod !for ghats _GO_
     use g_cvmix_kpp, only: kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc
-    use bc_surface_interface
+    ! bc_surface is now in the same module
     use mod_ice
     use iceberg_params
     implicit none
@@ -1668,3 +1559,4 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
   RETURN
 
 end function bc_surface
+end module oce_ale_tracer_module

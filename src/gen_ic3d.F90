@@ -20,6 +20,7 @@ MODULE g_ic3d
    USE g_comm_auto
    USE g_support
    USE g_config, only: dummy, ClimateDataPath, use_cavity
+   use oce_ale_pressure_bv_module, only: insitu2pot
    
    IMPLICIT NONE
 
@@ -496,7 +497,6 @@ CONTAINS
       !!              
       !! ** Purpose : read 3D initial conditions for tracers from netcdf and interpolate on model grid
       !!----------------------------------------------------------------------
-      USE insitu2pot_interface
       IMPLICIT NONE
       type(t_mesh),   intent(in),    target   :: mesh
       type(t_partit), intent(inout), target   :: partit 

@@ -1,7 +1,6 @@
 !==========================================================
 ! Variables to organize parallel work
 module MOD_PARTIT
-USE O_PARAM
 USE, intrinsic :: ISO_FORTRAN_ENV, only : int32
 USE MOD_WRITE_BINARY_ARRAYS
 USE MOD_READ_BINARY_ARRAYS

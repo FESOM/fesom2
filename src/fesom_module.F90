@@ -19,15 +19,15 @@ module fesom_main_storage_module
   use io_mesh_info
   use diagnostics
   use mo_tidal
-  use tracer_init_interface
-  use ocean_setup_interface
+  use oce_setup_step_module, only: tracer_init, ocean_setup, dynamics_init, arrays_init
   use ice_setup_interface
   use ocean2ice_interface
   use oce_fluxes_interface
-  use update_atm_forcing_interface
-  use before_oce_step_interface
-  use oce_timestep_ale_interface
-  use read_mesh_interface
+  use forcing_coupling_interfaces, only: update_atm_forcing
+  use oce_setup_step_module, only: before_oce_step
+  use oce_ale_module, only: oce_timestep_ale, restart_thickness_ale
+  use oce_mesh_module, only: mesh_setup, check_mesh_consistency
+  use oce_dyn_module, only: compute_vel_nodes
   use fesom_version_info_module
   use command_line_options_module
   use, intrinsic :: iso_fortran_env, only : real32
