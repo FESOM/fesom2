@@ -60,11 +60,11 @@ module cpl_driver
   integer                    :: commRank
   integer                    :: comp_id        ! id returned by oasis_init_comp
 
-  logical, save              :: oasis_was_initialized
-  logical, save              :: oasis_was_terminated
-  integer, save              :: write_grid
+  logical                    :: oasis_was_initialized
+  logical                    :: oasis_was_terminated
+  integer                    :: write_grid
 
-  integer, save              :: seconds_til_now=0
+  integer                    :: seconds_til_now=0
   integer                    :: ierror              ! return error code
   logical                    :: rootexchg   =.true. ! logical switch 
 
@@ -893,7 +893,7 @@ include "associate_mesh_ass.h"
     !
     integer                :: info
     integer                :: j
-    integer, save          :: ncount = 0
+    integer                :: ncount = 0
     real (kind=WP)         :: t1, t2, t3        
     !
     !--------------------------------------------------------------------
