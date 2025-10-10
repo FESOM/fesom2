@@ -33,6 +33,15 @@ option(BUILD_TESTING "Build tests" OFF)
 option(BUILD_MESHPARTITIONER "Build mesh partitioning tools (fesom_meshpart executable)" OFF)
 option(BUILD_MESHDIAG "Build mesh diagnostics utility (fesom_meshdiag executable)" OFF)
 
+# NetCDF build option
+option(BUILD_NETCDF "Download and build NetCDF libraries when system libraries are incompatible" OFF)
+
+# Include ExternalProject module for building NetCDF if requested
+if(BUILD_NETCDF)
+    include(ExternalProject)
+    include(cmake/BuildNetCDF.cmake)
+endif()
+
 #add_subdirectory(oasis3-mct/lib/psmile)
 add_subdirectory(src)
 

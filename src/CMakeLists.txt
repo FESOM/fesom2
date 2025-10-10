@@ -180,8 +180,8 @@ add_custom_target(fesom_version_info-generated.F90 ALL
 list(REMOVE_ITEM sources_Fortran ${src_home}/fvom_init.F90 ${src_home}/oce_local.F90 ${src_home}/gen_comm.F90)
 list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_main.F90)
 
-find_package( NETCDF REQUIRED COMPONENTS C Fortran )
 find_package( MPI REQUIRED COMPONENTS C Fortran )
+find_package( NETCDF REQUIRED COMPONENTS C Fortran )
 
 # depends on the metis library
 #add_subdirectory(../lib/metis-5.1.0 ${PROJECT_BINARY_DIR}/metis)
@@ -193,6 +193,11 @@ add_subdirectory(async_threads_cpp)
 # fesom library
 add_library(${PROJECT_NAME} ${sources_Fortran} $<TARGET_OBJECTS:async_threads_cpp>)
 add_dependencies(${PROJECT_NAME} fesom_version_info-generated.F90)
+
+# Add dependency on external NetCDF if BUILD_NETCDF is enabled
+if(BUILD_NETCDF)
+    add_dependencies(${PROJECT_NAME} build_netcdf)
+endif()
 
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_Fortran_MODULE_DIRECTORY}>)
 target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:module/fesom>)
@@ -319,18 +324,32 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} 
       target_compile_options(${PROJECT_NAME} PRIVATE -xHost)
    endif()
    
-   # # debugging related compiler flags
-   # target_compile_options(${PROJECT_NAME} PRIVATE -qopenmp -g -traceback -check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
-   # target_compile_options(${PROJECT_NAME} PRIVATE -g -traceback -check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
+   # debugging related compiler flags (activated for Debug build type)
+   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+      if(ENABLE_OPENMP)
+         target_compile_options(${PROJECT_NAME} PRIVATE -qopenmp -g -traceback -check all,noarg_temp_created,bounds,uninit) #-ftrapuv ) #-init=zero)
+      else()
+         target_compile_options(${PROJECT_NAME} PRIVATE -g -traceback -check all,noarg_temp_created,bounds,uninit) #-ftrapuv ) #-init=zero)
+      endif()
+   endif()
 
 
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 #    target_compile_options(${PROJECT_NAME} PRIVATE -O3 -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
    if(${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu )
       message(STATUS "Allowing type mismatches on Ubuntu for CI Testing" )  # NOTE(PG): Would be nicer to grab the CI=True from the env variable
-      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch -cpp)
+      if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+         target_compile_options(${PROJECT_NAME} PRIVATE -O0 -g -fbacktrace -ffloat-store -finit-local-zero -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch -cpp)
+      else()
+         target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch -cpp)
+      endif()
    else()
-      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -cpp)
+      if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+         target_compile_options(${PROJECT_NAME} PRIVATE -O0 -ffloat-store -finit-local-zero -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -cpp)
+      else()
+         target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -cpp)
+      endif()
+
    endif()
    if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10 )
       target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
@@ -364,29 +383,34 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
       # |             | -mno-fma4 -mavx2 -mfma                                            |      |
       # | GCC/openMPI | -O3 -march=znver3 -mtune=znver3 -ftree-vectorize -flto            | 280s | chatgpt recomendation
       # |             | -mcpu=znver3                                                      |      |
-      target_compile_options(${PROJECT_NAME} PRIVATE -march=znver3 -mtune=znver3 -ftree-vectorize -flto)      
+      if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+         target_compile_options(${PROJECT_NAME} PRIVATE -march=znver3 -mtune=znver3)
+      else()
+         target_compile_options(${PROJECT_NAME} PRIVATE -march=znver3 -mtune=znver3 -ftree-vectorize -flto)
+      endif()      
    else()
       #[[if(NOT (${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu))
          target_compile_options(${PROJECT_NAME} PRIVATE -native)
       endif()  ]]  
    endif()
    
-   # # debugging related compiler flags
-   #target_compile_options(${PROJECT_NAME} PRIVATE 
-                           #-fallow-argument-mismatch 
-                           #-fno-fast-math -fno-signed-zeros 
-                           #-freciprocal-math 
-                           #-mveclibabi=svml 
-                           #-flto
-                           #-pg 
-                           #-fbacktrace 
-                           #-fcheck=all,bounds 
-                           #-finit-real=snan 
-                           #-finit-integer=-9999 
-                           #-fsanitize=undefined,address
-                        #)
-   ## if use -fsanitize=undefined,address you also need ... PRIVATE -lubsan)           
-   #target_link_libraries(${PROJECT_NAME} PRIVATE -lubsan)
+   # debugging related compiler flags (activated for Debug build type)
+   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+      target_compile_options(${PROJECT_NAME} PRIVATE
+                           -fallow-argument-mismatch
+                           -fno-fast-math -fno-signed-zeros
+                           -freciprocal-math
+                           -mveclibabi=svml
+                           -flto
+                           -pg
+                           -fbacktrace
+                           -fcheck=all,bounds
+                           -finit-real=snan
+                           -finit-integer=-9999
+                           -fsanitize=undefined,address
+                           )
+      target_link_libraries(${PROJECT_NAME} PRIVATE -lubsan)
+   endif()
                      
 
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
@@ -452,6 +476,18 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${YAC_Fortran_LIBRARIES})
 # fesom.x executable
 add_executable(${PROJECT_NAME}.x ${src_home}/fesom_main.F90)
 target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
+
+# When BUILD_NETCDF is enabled, explicitly link NetCDF libraries to the executable
+# This ensures proper dependency propagation from the shared library
+if(BUILD_NETCDF)
+    target_link_libraries(${PROJECT_NAME}.x PRIVATE ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES})
+    # Set RPATH so the executable can find both FESOM and NetCDF libraries at runtime
+    set_target_properties(${PROJECT_NAME}.x PROPERTIES
+        INSTALL_RPATH "${CMAKE_BINARY_DIR}/external/netcdf/lib:${CMAKE_BINARY_DIR}/../lib"
+        BUILD_RPATH "${CMAKE_BINARY_DIR}/external/netcdf/lib:${CMAKE_BINARY_DIR}/../lib"
+    )
+    message(STATUS "NetCDF4 will be downloaded, built and used with fesom2")
+endif()
 
 # fesom_meshdiag executable (optional)
 if(BUILD_MESHDIAG)
