@@ -2435,7 +2435,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 USE o_PARAM
 USE o_ARRAYS
-USE g_CONFIG, only: rotated_grid, force_rotation
+USE g_CONFIG, only: rotated_grid, force_rotation, metric_factor_zero
 USE g_ROTATE_grid
 use g_comm_auto
 use elem_center_interface
@@ -2510,7 +2510,12 @@ t0=MPI_Wtime()
  center_x(n)=ax
  center_y(n)=ay
  mesh%elem_cos(n)=cos(ay)
- mesh%metric_factor(n)=tan(ay)/r_earth
+ if (metric_factor_zero) then
+    mesh%metric_factor(n)=0.0_WP
+ else
+    mesh%metric_factor(n)=tan(ay)/r_earth
+ end if
+
  END DO
 
  call exchange_elem(mesh%metric_factor, partit)
