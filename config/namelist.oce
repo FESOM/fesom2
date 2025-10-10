@@ -23,4 +23,5 @@ visc_sh_limit=5.0e-3       ! for KPP, max visc due to shear instability
 mix_scheme='KPP'           ! vertical mixing scheme: KPP, PP 
 Ricr   = 0.3               ! critical bulk Richardson Number
 concv  = 1.6               ! constant for pure convection (eqn. 23) (Large 1.5-1.6; MOM default 1.8)
+use_global_tides=.false.   ! add global tidal potential
 /

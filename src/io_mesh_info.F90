@@ -6,8 +6,8 @@ use g_config
 use g_comm_auto
 use o_PARAM
 
+use netcdf
 implicit none
-#include "netcdf.inc"
 private
 public :: write_mesh_info
 INTERFACE my_put_vara
@@ -62,8 +62,8 @@ implicit none
 
   call MPI_AllREDUCE(maxval(nod_in_elem2D_num), N_max, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_FESOM, MPIerr)
 
-  filename=trim(ResultPath)//runid//'.mesh.diag.nc'
-  call my_create(filename, IOR(NF_CLOBBER,IOR(NF_NETCDF4,NF_CLASSIC_MODEL)), ncid, partit)
+  filename=trim(ResultPath)//trim(runid)//'.mesh.diag.nc'
+  call my_create(filename, IOR(NF90_CLOBBER,IOR(NF90_NETCDF4,NF90_CLASSIC_MODEL)), ncid, partit)
 
   ! NOTE(PG): For naming conventions of node, edge, face, please see here:
   ! https://tinyurl.com/43z4m6cd
@@ -85,7 +85,7 @@ implicit none
   ! 1D
   call my_def_var(ncid,                                &  ! NetCDF Variable File Handle ID
     'nz',                                              &  ! Short Name
-    NF_DOUBLE,                                         &  ! Variable Type
+    NF90_DOUBLE,                                         &  ! Variable Type
     1,                                                 &  ! Variable Dimensionality
     (/nl_id /),                                        &  ! Dimension IDs
     zbar_id,                                           &  ! ID
@@ -99,12 +99,12 @@ implicit none
   !
   ! Note that the sign (negative in normal FESOM code) is inverted during the saving process.
   if (partit%mype==0) then
-    status = nf_put_att_text(ncid, zbar_id, 'positive', len_trim("down"), trim("down"));
+    status = nf90_put_att(ncid, zbar_id, 'positive', "down");
   end if
 
   call my_def_var(ncid,                                &  ! NetCDF Variable File Handle ID
     'nz1',                                             &  ! Short Name
-    NF_DOUBLE,                                         &  ! Variable Type
+    NF90_DOUBLE,                                         &  ! Variable Type
     1,                                                 &  ! Variable Dimensionality
     (/nl1_id/),                                        &  ! Dimension IDs
     z_id,                                              &  ! ID
@@ -116,12 +116,12 @@ implicit none
   !
   ! Note that the sign (negative in normal FESOM code) is inverted during the saving process.
   if (partit%mype==0) then
-    status = nf_put_att_text(ncid, z_id, 'positive', len_trim("down"), trim("down"));
+    status = nf90_put_att(ncid, z_id, 'positive', "down");
   end if
 
   call my_def_var(ncid,                                       &  ! NetCDF Variable File Handle ID
     'elem_area',                                              &  ! Short Name
-    NF_DOUBLE,                                                &  ! Variable Type
+    NF90_DOUBLE,                                                &  ! Variable Type
     1,                                                        &  ! Variable Dimensionality
     (/elem_n_id/),                                            &  ! Dimension IDs
     elem_area_id,                                             &  ! ID
@@ -131,7 +131,7 @@ implicit none
 
   call my_def_var(ncid,                                       &  ! NetCDF Variable File Handle ID
     'nlevels_nod2D',                                          &  ! Short Name
-    NF_INT,                                                   &  ! Variable Type
+    NF90_INT,                                                   &  ! Variable Type
     1,                                                        &  ! Variable Dimensionality
     (/nod_n_id/),                                             &  ! Dimension IDs
     nlevels_nod2D_id,                                         &  ! ID
@@ -141,7 +141,7 @@ implicit none
 
   call my_def_var(ncid,                                       &  ! NetCDF Variable File Handle ID
     'nlevels',                                                &  ! Short Name
-    NF_INT,                                                   &  ! Variable Type
+    NF90_INT,                                                   &  ! Variable Type
     1,                                                        &  ! Variable Dimensionality
     (/elem_n_id/),                                            &  ! Dimension IDs
     nlevels_id,                                               &  ! ID
@@ -151,7 +151,7 @@ implicit none
 
   call my_def_var(ncid,                                       &  ! NetCDF Variable File Handle ID
     'nod_in_elem2D_num',                                      &  ! Short Name
-    NF_INT,                                                   &  ! Variable Type
+    NF90_INT,                                                   &  ! Variable Type
     1,                                                        &  ! Variable Dimensionality
     (/nod_n_id/),                                             &  ! Dimension IDs
     nod_in_elem2D_num_id,                                     &  ! ID
@@ -161,7 +161,7 @@ implicit none
 
   call my_def_var(ncid,                                       &  ! NetCDF Variable File Handle ID
     'nod_part',                                               &  ! Short Name
-    NF_INT,                                                   &  ! Variable Type
+    NF90_INT,                                                   &  ! Variable Type
     1,                                                        &  ! Variable Dimensionality
     (/nod_n_id/),                                             &  ! Dimension IDs
     nod_part_id,                                              &  ! ID
@@ -171,7 +171,7 @@ implicit none
 
   call my_def_var(ncid,                                       &  ! NetCDF Variable File Handle ID
     'elem_part',                                              &  ! Short Name
-    NF_INT,                                                   &  ! Variable Type
+    NF90_INT,                                                   &  ! Variable Type
     1,                                                        &  ! Variable Dimensionality
     (/elem_n_id/),                                            &  ! Dimension IDs
     elem_part_id,                                             &  ! ID
@@ -181,7 +181,7 @@ implicit none
 
   call my_def_var(ncid,                                       &  ! NetCDF Variable File Handle ID
     'zbar_e_bottom',                                          &  ! Short Name
-    NF_DOUBLE,                                                &  ! Variable Type
+    NF90_DOUBLE,                                                &  ! Variable Type
     1,                                                        &  ! Variable Dimensionality
     (/elem_n_id/),                                            &  ! Dimension IDs
     zbar_e_bot_id,                                            &  ! ID
@@ -191,7 +191,7 @@ implicit none
 
   call my_def_var(ncid,                                       &  ! NetCDF Variable File Handle ID
     'zbar_n_bottom',                                          &  ! Short Name
-    NF_DOUBLE,                                                &  ! Variable Type
+    NF90_DOUBLE,                                                &  ! Variable Type
     1,                                                        &  ! Variable Dimensionality
     (/nod_n_id/),                                             &  ! Dimension IDs
     zbar_n_bot_id,                                            &  ! ID
@@ -201,7 +201,7 @@ implicit none
 
   call my_def_var(ncid,                                       &  ! NetCDF Variable File Handle ID
     'lon',                                                    &  ! Short Name
-    NF_DOUBLE,                                                &  ! Variable Type
+    NF90_DOUBLE,                                                &  ! Variable Type
     1,                                                        &  ! Variable Dimensionality
     (/nod_n_id/),                                             &  ! Dimension IDs
     lon_id,                                                   &  ! ID
@@ -214,7 +214,7 @@ implicit none
 
   call my_def_var(ncid,                                       &  ! NetCDF Variable File Handle ID
     'lat',                                                    &  ! Short Name
-    NF_DOUBLE,                                                &  ! Variable Type
+    NF90_DOUBLE,                                                &  ! Variable Type
     1,                                                        &  ! Variable Dimensionality
     (/nod_n_id/),                                             &  ! Dimension IDs
     lat_id,                                                   &  ! ID
@@ -225,16 +225,16 @@ implicit none
     "degrees_north"                                           &
   )
   if (use_cavity) then
-    call my_def_var(ncid, 'ulevels_nod2D',     NF_INT,    1, (/nod_n_id/),  ulevels_nod2D_id,     'number of levels above nodes',           partit)
-    call my_def_var(ncid, 'ulevels',           NF_INT,    1, (/elem_n_id/), ulevels_id,           'number of levels above elements',        partit)
-    call my_def_var(ncid, 'zbar_e_surface',    NF_DOUBLE, 1, (/elem_n_id/), zbar_e_srf_id,        'element surface depth',                  partit)
-    call my_def_var(ncid, 'zbar_n_surface',    NF_DOUBLE, 1, (/nod_n_id/) , zbar_n_srf_id,        'nodal surface depth',                    partit)
+    call my_def_var(ncid, 'ulevels_nod2D',     NF90_INT,    1, (/nod_n_id/),  ulevels_nod2D_id,     'number of levels above nodes',           partit)
+    call my_def_var(ncid, 'ulevels',           NF90_INT,    1, (/elem_n_id/), ulevels_id,           'number of levels above elements',        partit)
+    call my_def_var(ncid, 'zbar_e_surface',    NF90_DOUBLE, 1, (/elem_n_id/), zbar_e_srf_id,        'element surface depth',                  partit)
+    call my_def_var(ncid, 'zbar_n_surface',    NF90_DOUBLE, 1, (/nod_n_id/) , zbar_n_srf_id,        'nodal surface depth',                    partit)
   endif
 
   ! 2D
   call my_def_var(ncid,                                       &  ! NetCDF Variable File Handle ID
     'nod_area',                                               &  ! Short Name
-    NF_DOUBLE,                                                &  ! Variable Type
+    NF90_DOUBLE,                                                &  ! Variable Type
     2,                                                        &  ! Variable Dimensionality
     (/nod_n_id, nl_id/),                                      &  ! Dimension IDs
     nod_area_id,                                              &  ! ID
@@ -244,7 +244,7 @@ implicit none
 
   call my_def_var(ncid,                                       &  ! NetCDF Variable File Handle ID
     'face_nodes',                                             &  ! Short Name
-    NF_INT,                                                   &  ! Variable Type
+    NF90_INT,                                                   &  ! Variable Type
     2,                                                        &  ! Variable Dimensionality
     (/elem_n_id, id_3/),                                      &  ! Dimension IDs
     face_node_id,                                             &  ! ID
@@ -257,12 +257,12 @@ implicit none
     start_index = 1                                           &  ! Start index
   )
   if (partit%mype==0) then
-    status = nf_put_att_text(ncid, face_node_id, 'location', len_trim("face"), trim("face"));
+    status = nf90_put_att(ncid, face_node_id, 'location', "face");
   end if
 
   call my_def_var(ncid,                                       &  ! NetCDF Variable File Handle ID
   "edge_nodes",                                               &  ! Short Name
-  NF_INT,                                                     &  ! Variable Type
+  NF90_INT,                                                     &  ! Variable Type
   2,                                                          &  ! Variable Dimensionality
   (/edge_n_id, id_2/),                                        &  ! Dimension IDs
   edge_nodes_id,                                              &  ! ID
@@ -277,7 +277,7 @@ implicit none
 
   call my_def_var(ncid,                                       &  ! NetCDF Variable File Handle ID
   'face_edges',                                               &  ! Short Name
-  NF_INT,                                                     &  ! Variable Type
+  NF90_INT,                                                     &  ! Variable Type
   2,                                                          &  ! Variable Dimensionality
   (/elem_n_id, id_3/),                                        &  ! Dimension IDs
   face_edges_id,                                              &  ! ID
@@ -291,7 +291,7 @@ implicit none
 
 call my_def_var(ncid,                                         &  ! NetCDF Variable File Handle ID
   "face_links",                                               &  ! Short Name
-  NF_INT,                                                     &  ! Variable Type
+  NF90_INT,                                                     &  ! Variable Type
   2,                                                          &  ! Variable Dimensionality
   (/elem_n_id, id_3/),                                        &  ! Dimension IDs
   face_links_id,                                              &  ! ID
@@ -307,7 +307,7 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
 
 call my_def_var(ncid,                                         &  ! NetCDF Variable File Handle ID
   "edge_face_links",                                          &  ! Short Name
-  NF_INT,                                                     &  ! Variable Type
+  NF90_INT,                                                     &  ! Variable Type
   2,                                                          &  ! Variable Dimensionality
   (/edge_n_id,  id_2/),                                       &  ! Dimension IDs
   edge_face_links_id,                                         &  ! ID
@@ -321,13 +321,13 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   1                                                           &  ! Start index
   )
 
-  call my_def_var(ncid, 'nod_in_elem2D',     NF_INT,    2, (/nod_n_id, id_N/),  nod_in_elem2D_id,   'elements containing the node', partit)
-  call my_def_var(ncid, 'edge_cross_dxdy',   NF_DOUBLE, 2, (/edge_n_id, id_4/), edge_cross_dxdy_id, 'edge cross distancess',        partit)
-  call my_def_var(ncid, 'gradient_sca_x',    NF_DOUBLE, 2, (/elem_n_id, id_3/), gradient_sca_x_id,  'x component of a gradient at nodes of an element', partit)
-  call my_def_var(ncid, 'gradient_sca_y',    NF_DOUBLE, 2, (/elem_n_id, id_3/), gradient_sca_y_id,  'y component of a gradient at nodes of an element', partit)
-  call my_def_var(ncid, 'gradient_vec_x',    NF_DOUBLE, 2, (/elem_n_id, id_3/), gradient_vec_x_id,  'x component of a gradient at elements of an element', partit)
-  call my_def_var(ncid, 'gradient_vec_y',    NF_DOUBLE, 2, (/elem_n_id, id_3/), gradient_vec_y_id,  'y component of a gradient at elements of an element', partit)
-  call my_nf_enddef(ncid, partit)
+  call my_def_var(ncid, 'nod_in_elem2D',     NF90_INT,    2, (/nod_n_id, id_N/),  nod_in_elem2D_id,   'elements containing the node', partit)
+  call my_def_var(ncid, 'edge_cross_dxdy',   NF90_DOUBLE, 2, (/edge_n_id, id_4/), edge_cross_dxdy_id, 'edge cross distancess',        partit)
+  call my_def_var(ncid, 'gradient_sca_x',    NF90_DOUBLE, 2, (/elem_n_id, id_3/), gradient_sca_x_id,  'x component of a gradient at nodes of an element', partit)
+  call my_def_var(ncid, 'gradient_sca_y',    NF90_DOUBLE, 2, (/elem_n_id, id_3/), gradient_sca_y_id,  'y component of a gradient at nodes of an element', partit)
+  call my_def_var(ncid, 'gradient_vec_x',    NF90_DOUBLE, 2, (/elem_n_id, id_3/), gradient_vec_x_id,  'x component of a gradient at elements of an element', partit)
+  call my_def_var(ncid, 'gradient_vec_y',    NF90_DOUBLE, 2, (/elem_n_id, id_3/), gradient_vec_y_id,  'y component of a gradient at elements of an element', partit)
+  call my_nf90_enddef(ncid, partit)
 
   ! NOTE(PG): Same order as definition!
   ! NOTE(PG): We invert the sign of ``zbar`` here to conform with CF-Conventions
@@ -530,7 +530,8 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   allocate(rbuffer(elem2D))
   do i=1, 3
      call gather_elem(gradient_sca(i, 1:myDim_elem2D), rbuffer, partit)
-     call my_put_vara(ncid, gradient_sca_x_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit) ! (4-i), NETCDF will permute otherwise
+     !!PS call my_put_vara(ncid, gradient_sca_x_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit) ! (4-i), NETCDF will permute otherwise
+     call my_put_vara(ncid, gradient_sca_x_id, (/1, i/), (/elem2D, 1/), rbuffer, partit) 
   end do
   deallocate(rbuffer)
 
@@ -539,7 +540,8 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   allocate(rbuffer(elem2D))
   do i=1, 3
      call gather_elem(gradient_sca(i+3, 1:myDim_elem2D), rbuffer, partit)
-     call my_put_vara(ncid, gradient_sca_y_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit)! (4-i), NETCDF will permute otherwise
+     !!PS call my_put_vara(ncid, gradient_sca_y_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit)! (4-i), NETCDF will permute otherwise
+     call my_put_vara(ncid, gradient_sca_y_id, (/1, i/), (/elem2D, 1/), rbuffer, partit)
   end do
   deallocate(rbuffer)
 
@@ -548,7 +550,8 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   allocate(rbuffer(elem2D))
   do i=1, 3
      call gather_elem(gradient_vec(i, 1:myDim_elem2D), rbuffer, partit)
-     call my_put_vara(ncid, gradient_vec_x_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit) ! (4-i), NETCDF will permute otherwise
+     !!PS call my_put_vara(ncid, gradient_vec_x_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit) ! (4-i), NETCDF will permute otherwise
+     call my_put_vara(ncid, gradient_vec_x_id, (/1, i/), (/elem2D, 1/), rbuffer, partit) ! (4-i), NETCDF will permute otherwise
   end do
   deallocate(rbuffer)
 
@@ -557,7 +560,8 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   allocate(rbuffer(elem2D))
   do i=1, 3
      call gather_elem(gradient_vec(i+3, 1:myDim_elem2D), rbuffer, partit)
-     call my_put_vara(ncid, gradient_vec_y_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit)! (4-i), NETCDF will permute otherwise
+     !!PS call my_put_vara(ncid, gradient_vec_y_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit)! (4-i), NETCDF will permute otherwise
+     call my_put_vara(ncid, gradient_vec_y_id, (/1, i/), (/elem2D, 1/), rbuffer, partit)! (4-i), NETCDF will permute otherwise
   end do
   deallocate(rbuffer)
 
@@ -609,11 +613,11 @@ integer,        intent(inout) :: id
 integer                       :: ierror, status
 
 if (partit%mype==0) then
-   status =  nf_def_dim(ncid, trim(short_name), value, id)
+   status =  nf90_def_dim(ncid, trim(short_name), value, id)
 end if
 
 call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-if (status .ne. nf_noerr) call handle_err(status, partit)
+if (status .ne. nf90_noerr) call handle_err(status, partit)
 
 end subroutine my_def_dim
 !
@@ -633,10 +637,10 @@ integer                       :: ierror, status
 
 ! NOTE(PG): Adds global Conventions attribute
 if (partit%mype==0) then
-   status = nf_put_att_text(ncid, NF_GLOBAL, 'Conventions', len_trim('UGRID-1.0'), 'UGRID-1.0')
+   status = nf90_put_att(ncid, NF90_GLOBAL, 'Conventions', 'UGRID-1.0')
 end if
 call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-if (status .ne. nf_noerr) call handle_err(status, partit)
+if (status .ne. nf90_noerr) call handle_err(status, partit)
 
 
 
@@ -644,80 +648,80 @@ if (status .ne. nf_noerr) call handle_err(status, partit)
 
 call my_def_dim(ncid, "info", 1, info_id, partit)
 if (partit%mype==0) then
-   status = nf_def_var(ncid, 'fesom_mesh', NF_INT, 0, info_id, fesom_mesh_id)
+   status = nf90_def_var(ncid, 'fesom_mesh', NF90_INT, varid=fesom_mesh_id)
 end if
 call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-if (status .ne. nf_noerr) call handle_err(status, partit)
+if (status .ne. nf90_noerr) call handle_err(status, partit)
 
 if (partit%mype==0) then
-  status = nf_put_att_text(ncid, fesom_mesh_id, 'cf_role', len_trim('mesh_topology'), trim('mesh_topology'));
+  status = nf90_put_att(ncid, fesom_mesh_id, 'cf_role', "mesh_topology");
 end if
 call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-if (status .ne. nf_noerr) call handle_err(status, partit)
+if (status .ne. nf90_noerr) call handle_err(status, partit)
 
 if (partit%mype==0) then
-  status = nf_put_att_text(ncid, fesom_mesh_id, 'long_name', len_trim('Topology data of 2D unstructured mesh'), trim('Topology data of 2D unstructured mesh'));
+  status = nf90_put_att(ncid, fesom_mesh_id, 'long_name', "Topology data of 2D unstructured mesh");
 end if
 call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-if (status .ne. nf_noerr) call handle_err(status, partit)
+if (status .ne. nf90_noerr) call handle_err(status, partit)
 
 if (partit%mype==0) then
-  status = nf_put_att_int(ncid, fesom_mesh_id, 'topology_dimension', NF_INT, 1, 2);
+  status = nf90_put_att(ncid, fesom_mesh_id, 'topology_dimension', 2);
 end if
 call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-if (status .ne. nf_noerr) call handle_err(status, partit)
+if (status .ne. nf90_noerr) call handle_err(status, partit)
 
 if (partit%mype==0) then
-  status = nf_put_att_text(ncid, fesom_mesh_id, 'node_coordinates', len_trim('lon lat'), trim('lon lat'));
+  status = nf90_put_att(ncid, fesom_mesh_id, 'node_coordinates', "lon lat");
 end if
 call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-if (status .ne. nf_noerr) call handle_err(status, partit)
+if (status .ne. nf90_noerr) call handle_err(status, partit)
 
 if (partit%mype==0) then
-  status = nf_put_att_text(ncid, fesom_mesh_id, 'face_node_connectivity', len_trim('face_nodes'), trim('face_nodes'));
+  status = nf90_put_att(ncid, fesom_mesh_id, 'face_node_connectivity', "face_nodes");
 end if
 call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-if (status .ne. nf_noerr) call handle_err(status, partit)
+if (status .ne. nf90_noerr) call handle_err(status, partit)
 
 if (partit%mype==0) then
-  status = nf_put_att_text(ncid, fesom_mesh_id, 'face_dimension', len_trim('elem') , trim('elem'));
+  status = nf90_put_att(ncid, fesom_mesh_id, 'face_dimension', 'elem');
 end if
 call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-if (status .ne. nf_noerr) call handle_err(status, partit)
+if (status .ne. nf90_noerr) call handle_err(status, partit)
 
 if (partit%mype==0) then
-  status = nf_put_att_text(ncid, fesom_mesh_id, 'edge_node_connectivity', len_trim('edge_nodes'), trim('edge_nodes'));
+  status = nf90_put_att(ncid, fesom_mesh_id, 'edge_node_connectivity', 'edge_nodes');
 end if
 call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-if (status .ne. nf_noerr) call handle_err(status, partit)
+if (status .ne. nf90_noerr) call handle_err(status, partit)
 
 if (partit%mype==0) then
-  status = nf_put_att_text(ncid, fesom_mesh_id, 'edge_dimension', len_trim('edg_n'), trim('edg_n'));
+  status = nf90_put_att(ncid, fesom_mesh_id, 'edge_dimension', 'edg_n');
 end if
 call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-if (status .ne. nf_noerr) call handle_err(status, partit)
+if (status .ne. nf90_noerr) call handle_err(status, partit)
 
 !FIXME(PG): edge coordinates missing
 !Mesh2:edge_coordinates = "Mesh2_edge_x Mesh2_edge_y" ; // optional attribute (requires edge_node_connectivity)
 !FIXME(PG): face coordinates missing
 !Mesh2:face_coordinates = "Mesh2_face_x Mesh2_face_y" ; // optional attribute
 if (partit%mype==0) then
-  status = nf_put_att_text(ncid, fesom_mesh_id, 'face_edge_connectivity', len_trim('face_edges'), trim('face_edges'));
+  status = nf90_put_att(ncid, fesom_mesh_id, 'face_edge_connectivity', 'face_edges');
 end if
 call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-if (status .ne. nf_noerr) call handle_err(status, partit)
+if (status .ne. nf90_noerr) call handle_err(status, partit)
 
 if (partit%mype==0) then
-  status = nf_put_att_text(ncid, fesom_mesh_id, 'face_face_connectivity', len_trim('face_links'), trim('face_links'));
+  status = nf90_put_att(ncid, fesom_mesh_id, 'face_face_connectivity', 'face_links');
 end if
 call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-if (status .ne. nf_noerr) call handle_err(status, partit)
+if (status .ne. nf90_noerr) call handle_err(status, partit)
 
 if (partit%mype==0) then
-  status = nf_put_att_text(ncid, fesom_mesh_id, 'edge_face_connectivity', len_trim('edge_face_links'), trim('edge_face_links'));
+  status = nf90_put_att(ncid, fesom_mesh_id, 'edge_face_connectivity', 'edge_face_links');
 end if
 call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-if (status .ne. nf_noerr) call handle_err(status, partit)
+if (status .ne. nf90_noerr) call handle_err(status, partit)
 
 end subroutine add_fesom_ugrid_info
 !============================================================================
@@ -741,54 +745,54 @@ integer,      intent(in), optional :: start_index
 
 
 if (partit%mype==0) then
-   status = nf_def_var(ncid, trim(short_name), vtype, dsize, dids, id)
+   status = nf90_def_var(ncid, trim(short_name), vtype, dimids=dids, varid=id)
 end if
 
 if (partit%mype==0) then
-   status = nf_put_att_text(ncid, id, 'long_name', len_trim(att_text), trim(att_text));
+   status = nf90_put_att(ncid, id, 'long_name', trim(att_text))
 end if
 
 if (partit%mype==0) then
   if (present(standard_name)) then
-      status = nf_put_att_text(ncid, id, 'standard_name', len_trim(standard_name), trim(standard_name))
+      status = nf90_put_att(ncid, id, 'standard_name', trim(standard_name))
     endif
 endif
 
 if (partit%mype==0) then
   if (present(units)) then
-     status = nf_put_att_text(ncid, id, 'units', len_trim(units), trim(units));
+     status = nf90_put_att(ncid, id, 'units', trim(units));
   endif
 endif
 
 if (partit%mype==0) then
   if (present(cf_role)) then
-     status = nf_put_att_text(ncid, id, 'cf_role', len_trim(cf_role), trim(cf_role));
+     status = nf90_put_att(ncid, id, 'cf_role', trim(cf_role));
   endif
 endif
 
 if (partit%mype==0) then
   if (present(comment)) then
-      status = nf_put_att_text(ncid, id, 'comment', len_trim(comment), trim(comment));
+      status = nf90_put_att(ncid, id, 'comment', trim(comment));
   endif
 endif
 
 
 if (partit%mype==0) then
   if (present(missing_value)) then
-      status = nf_put_att_int(ncid, id, '_FillValue', NF_INT, 1, missing_value);
+      status = nf90_put_att(ncid, id, '_FillValue', missing_value);
   endif
 endif
 
 if (partit%mype==0) then
   if (present(start_index)) then
-    status = nf_put_att_int(ncid, id, 'start_index', NF_INT, 1, start_index);
+    status = nf90_put_att(ncid, id, 'start_index', start_index);
   endif
 end if
 call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-if (status .ne. nf_noerr) call handle_err(status, partit)
+if (status .ne. nf90_noerr) call handle_err(status, partit)
 
 call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-if (status .ne. nf_noerr) call handle_err(status, partit)
+if (status .ne. nf90_noerr) call handle_err(status, partit)
 
 
 
@@ -798,19 +802,19 @@ end subroutine my_def_var
 !
 !============================================================================
 !
-subroutine my_nf_enddef(ncid, partit)
+subroutine my_nf90_enddef(ncid, partit)
 IMPLICIT NONE
 type(t_partit), intent(inout) :: partit
 integer, intent(in)           :: ncid
 integer                       :: ierror, status
 
 if (partit%mype==0) then
-   status = nf_enddef(ncid)
+   status = nf90_enddef(ncid)
 end if
 
 call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-if (status .ne. nf_noerr) call handle_err(status, partit)
-end subroutine my_nf_enddef
+if (status .ne. nf90_noerr) call handle_err(status, partit)
+end subroutine my_nf90_enddef
 !
 !============================================================================
 !
@@ -821,9 +825,9 @@ integer, intent(in)           :: ncid, varid, start, N
 real(kind=WP)                 :: var(:)
 integer                       :: ierror, status
 
-  if (partit%mype==0) status=nf_put_vara_double(ncid, varid, start, N, var)
+  if (partit%mype==0) status=nf90_put_var(ncid, varid, var, start=(/start/), count=(/N/))
   call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-  if (status .ne. nf_noerr) call handle_err(status, partit)
+  if (status .ne. nf90_noerr) call handle_err(status, partit)
 
 end subroutine my_put_vara_double_1D
 !
@@ -836,9 +840,9 @@ integer, intent(in)           :: ncid, varid, start(:), N(:)
 real(kind=WP)                 :: var(:)
 integer                       :: ierror, status
 
-  if (partit%mype==0) status=nf_put_vara_double(ncid, varid, start, N, var)
+  if (partit%mype==0) status=nf90_put_var(ncid, varid, var, start=start, count=N)
   call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-  if (status .ne. nf_noerr) call handle_err(status, partit)
+  if (status .ne. nf90_noerr) call handle_err(status, partit)
 
 end subroutine my_put_vara_double_2D
 !
@@ -851,9 +855,9 @@ integer,        intent(in)    :: ncid, varid, start, N
 integer                       :: var(:)
 integer                       :: ierror, status
 
-  if (partit%mype==0) status=nf_put_vara_int(ncid, varid, start, N, var)
+  if (partit%mype==0) status=nf90_put_var(ncid, varid, var, start=(/start/), count=(/N/))
   call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-  if (status .ne. nf_noerr) call handle_err(status, partit)
+  if (status .ne. nf90_noerr) call handle_err(status, partit)
 
 end subroutine my_put_vara_int_1D
 !
@@ -867,9 +871,9 @@ integer,        intent(in)    :: ncid, varid, start(:), N(:)
 integer                       :: var(:)
 integer                       :: ierror, status
 
-  if (partit%mype==0) status=nf_put_vara_int(ncid, varid, start, N, var)
+  if (partit%mype==0) status=nf90_put_var(ncid, varid, var, start=start, count=N)
   call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-  if (status .ne. nf_noerr) call handle_err(status, partit)
+  if (status .ne. nf90_noerr) call handle_err(status, partit)
 
 end subroutine my_put_vara_int_2D
 !
@@ -878,16 +882,17 @@ end subroutine my_put_vara_int_2D
 subroutine my_create(filename, opt, ncid, partit)
 IMPLICIT NONE
 type(t_partit), intent(inout):: partit
-integer,        intent(in)   :: opt, ncid
+integer,        intent(in)   :: opt
+integer,        intent(out)  :: ncid
 character(*),   intent(in)   :: filename
 integer                      :: ierror, status
   if (partit%mype==0) then  ! create a file
      ! create a file
-     status = nf_create(filename, opt, ncid)
-     if (status.ne.nf_noerr) call handle_err(status, partit)
+     status = nf90_create(filename, opt, ncid)
+     if (status.ne.nf90_noerr) call handle_err(status, partit)
   end if
   call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-  if (status .ne. nf_noerr) call handle_err(status, partit)
+  if (status .ne. nf90_noerr) call handle_err(status, partit)
 end subroutine my_create
 !
 !============================================================================
@@ -898,9 +903,9 @@ type(t_partit), intent(inout) :: partit
 integer,        intent(in)    :: ncid
 integer                       :: ierror, status
 
-if (partit%mype==0) status = nf_close(ncid)
+if (partit%mype==0) status = nf90_close(ncid)
 
 call MPI_BCast(status, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
-if (status .ne. nf_noerr) call handle_err(status, partit)
+if (status .ne. nf90_noerr) call handle_err(status, partit)
 end subroutine my_close
 end module io_mesh_info
