@@ -41,10 +41,13 @@ module g_config
   character(3)           :: raw_restart_length_unit='m'
   integer                :: bin_restart_length=1
   character(3)           :: bin_restart_length_unit='m'
-  
+  logical                :: raw_restart_overwrite=.TRUE. ! true: read and write from same dir; false: write in unique dirs 
+  logical                :: bin_restart_overwrite=.TRUE. ! true: read and write from same dir; false: write in unique dirs
+
   namelist /restart_log/   restart_length    , restart_length_unit, & 
                            raw_restart_length, raw_restart_length_unit, &
                            bin_restart_length, bin_restart_length_unit, &
+                           raw_restart_overwrite, bin_restart_overwrite, &
                            logfile_outfreq
   !_____________________________________________________________________________
   ! *** ale_def ***

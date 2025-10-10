@@ -46,10 +46,7 @@ MODULE io_RESTART
   character(:), allocatable, save :: bio_path
 #endif
 
-  character(:), allocatable, save :: raw_restart_dirpath
-  character(:), allocatable, save :: raw_restart_infopath
-  character(:), allocatable, save :: bin_restart_dirpath
-  character(:), allocatable, save :: bin_restart_infopath
+
   integer, parameter :: RAW_RESTART_METADATA_RANK = 0
 
 
@@ -294,21 +291,43 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
   ! 2 ... read derived type restart (binary) 
   integer, intent(out):: which_readr
   
+  ! For storing restarts in unique dirs
+  character(:), allocatable :: raw_rst_w_path, &
+                               bin_rst_w_path
+  character(:), allocatable :: raw_rst_r_path, &
+                               bin_rst_r_path
+
+  ! Root dirs for fesom restarts
+  character(:), allocatable, save :: raw_rst_root
+  character(:), allocatable, save :: bin_rst_root
+  ! Log files holding current fesom step number used to tag restart_dir and restart_info
+  character(:), allocatable, save :: raw_rst_log
+  character(:), allocatable, save :: bin_rst_log
+
+  character(:), allocatable, save :: rst_dir, rst_info
+
+  logical, save :: bin_rstdir_exist = .false.,  &
+                   raw_rstdir_exist = .false.
+
+
   integer             :: cstep
-  
+
+  if ( .not. allocated(rst_dir) ) rst_dir = "np"//int_to_txt(partit%npes)
+  if ( .not. allocated(rst_info) ) rst_info = "np"//int_to_txt(partit%npes)//".info"
+
+
   !_____________________________________________________________________________
   ! initialize directory for core dump restart 
   if(.not. initialized_raw) then
     initialized_raw = .true.
-    raw_restart_dirpath  = trim(ResultPath)//trim(runid)//"_raw_restart/np"//int_to_txt(partit%npes)
-    raw_restart_infopath = trim(ResultPath)//trim(runid)//"_raw_restart/np"//int_to_txt(partit%npes)//".info"
+    raw_rst_root = trim(ResultPath)//trim(runid)//"_raw_restart/"
+    raw_rst_log = trim(runid)//"_raw_restart_latest.log"
     if(raw_restart_length_unit /= "off") then
-      if(partit%mype == RAW_RESTART_METADATA_RANK) then
-        ! execute_command_line with mkdir sometimes fails, use a custom implementation around mkdir from C instead
-        call mkdir(trim(ResultPath)//trim(runid)//"_raw_restart") ! we have no mkdir -p, create the intermediate dirs separately
-        call mkdir(raw_restart_dirpath)
-      end if
-      call MPI_Barrier(partit%MPI_COMM_FESOM, mpierr) ! make sure the dir has been created before we continue...
+        if(partit%mype == RAW_RESTART_METADATA_RANK) then
+            ! execute_command_line with mkdir sometimes fails, use a custom implementation around mkdir from C instead
+            call mkdir(trim(raw_rst_root)) ! we have no mkdir -p, create the intermediate dirs separately
+        end if
+        call MPI_Barrier(partit%MPI_COMM_FESOM, mpierr) ! make sure the dir has been created before we continue...
     end if
   end if
 
@@ -316,13 +335,12 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
   ! initialize directory for derived type binary restart
   if(.not. initialized_bin) then
     initialized_bin = .true.
-    bin_restart_dirpath  = trim(ResultPath)//trim(runid)//"_bin_restart/np"//int_to_txt(partit%npes)
-    bin_restart_infopath = trim(ResultPath)//trim(runid)//"_bin_restart/np"//int_to_txt(partit%npes)//".info"
+    bin_rst_root = trim(ResultPath)//trim(runid)//"_bin_restart/"
+    bin_rst_log = trim(runid)//"_bin_restart_latest.log"
     if(bin_restart_length_unit /= "off") then
         if(partit%mype == RAW_RESTART_METADATA_RANK) then
             ! execute_command_line with mkdir sometimes fails, use a custom implementation around mkdir from C instead
-            call mkdir(trim(ResultPath)//trim(runid)//"_bin_restart") ! we have no mkdir -p, create the intermediate dirs separately
-            call mkdir(bin_restart_dirpath)
+            call mkdir(trim(bin_rst_root)) ! we have no mkdir -p, create the intermediate dirs separately
         end if
         call MPI_Barrier(partit%MPI_COMM_FESOM, mpierr) ! make sure the dir has been created before we continue...
     end if
@@ -365,39 +383,34 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
   !___READING OF RESTART________________________________________________________
   ! should restart files be readed --> see r_restart in gen_modules_clock.F90
   if (l_read) then
-    ! determine if we can load raw restart dump files --> check if *.info file for 
-    ! raw restarts exist --> if info file exist also the rest must exist --> so 
-    ! core dump restart is readable
-    if(partit%mype == RAW_RESTART_METADATA_RANK) then
-      inquire(file=raw_restart_infopath, exist=rawfiles_exist)
-    end if
-    call MPI_Bcast(rawfiles_exist, 1, MPI_LOGICAL, RAW_RESTART_METADATA_RANK, partit%MPI_COMM_FESOM, mpierr)
-    
-    ! check if folder for derived type binary restarts exist
-    if(partit%mype == RAW_RESTART_METADATA_RANK) then
-      inquire(file=bin_restart_infopath, exist=binfiles_exist)
-    end if
-    call MPI_Bcast(binfiles_exist, 1, MPI_LOGICAL, RAW_RESTART_METADATA_RANK, partit%MPI_COMM_FESOM, mpierr)
-    
+
+    !! Will handle both the common and separate read/write dir apporaches internally
+    call prepare_core_restart_read( raw_rst_log, rst_info, raw_rst_root, partit%mype, partit%MPI_COMM_FESOM,  &
+                                    raw_restart_overwrite, rawfiles_exist, raw_rst_r_path                     )
+
+    call prepare_core_restart_read( bin_rst_log, rst_info, bin_rst_root, partit%mype, partit%MPI_COMM_FESOM, &
+                                    bin_restart_overwrite, binfiles_exist, bin_rst_r_path                    )
+
+ 
     !___________________________________________________________________________
     ! read core dump file restart
     if(rawfiles_exist) then
         which_readr = 1
-        call read_all_raw_restarts(partit%MPI_COMM_FESOM, partit%mype)
+        call read_all_raw_restarts(partit%MPI_COMM_FESOM, partit%mype, raw_rst_r_path, rst_info, rst_dir)
  
     !___________________________________________________________________________
     ! read derived type binary file restart
     elseif(binfiles_exist .and. bin_restart_length_unit /= "off") then
         which_readr = 2
         if (use_ice) then 
-            call read_all_bin_restarts(bin_restart_dirpath, &
+            call read_all_bin_restarts(trim(bin_rst_r_path)//trim(rst_dir),  &
                                        partit   = partit,   &
                                        mesh     = mesh,     &
                                        ice      = ice,      &
                                        dynamics = dynamics, &
                                        tracers  = tracers   )
         else
-            call read_all_bin_restarts(bin_restart_dirpath, &
+            call read_all_bin_restarts(trim(bin_rst_r_path)//trim(rst_dir),  &
                                        partit   = partit,   &
                                        mesh     = mesh,     &                    
                                        dynamics = dynamics, &
@@ -436,20 +449,29 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
         !_______________________________________________________________________
         ! immediately create a raw core dump restart
         if(raw_restart_length_unit /= "off") then
-            call write_all_raw_restarts(istep, partit%MPI_COMM_FESOM, partit%mype)
+            call prepare_core_restart_write(istep, rst_dir, raw_rst_root, partit%mype, partit%MPI_COMM_FESOM, &
+                                            raw_restart_overwrite, raw_rstdir_exist, raw_rst_w_path           )
+            call write_all_raw_restarts(istep, partit%MPI_COMM_FESOM, partit%mype, raw_rst_w_path, rst_dir, rst_info)
+            call save_core_restart_latest(raw_rst_root, raw_rst_log, partit%mype, raw_restart_overwrite, istep)  !! Could call this directly in the prepare-call, 
+                                                                                                                 !! similar to the case of restart read, but this 
+                                                                                                                 !! ensures the restart write process was succesful
+                                                                                                                 !! first. Just make sure istep stays consistent here.
         end if
         
         ! immediately create a derived type binary restart
         if(bin_restart_length_unit /= "off") then
+            call prepare_core_restart_write(istep, rst_dir, bin_rst_root, partit%mype, partit%MPI_COMM_FESOM, &
+                                            bin_restart_overwrite, bin_rstdir_exist, bin_rst_w_path           )
             ! current (total) model step --> cstep = globalstep+istep
-            call write_all_bin_restarts((/globalstep+istep, int(ctime), yearnew/),      &
-                                        bin_restart_dirpath,                 &
-                                        bin_restart_infopath,                &
+            call write_all_bin_restarts((/globalstep+istep, int(ctime), yearnew/),  &
+                                        trim(bin_rst_w_path)//trim(rst_dir),        &
+                                        trim(bin_rst_w_path)//trim(rst_info),       &
                                         partit,                              &
                                         mesh,                                &                                        
                                         ice,                                 &
                                         dynamics,                            &
                                         tracers                              )
+            call save_core_restart_latest(bin_rst_root, bin_rst_log, partit%mype, bin_restart_overwrite, istep)
         end if
     end if
   end if
@@ -513,20 +535,26 @@ subroutine restart(istep, nstart, ntotal, l_read, which_readr, ice, dynamics, tr
 
   ! write core dump
   if(is_raw_restart_write) then
-    call write_all_raw_restarts(istep, partit%MPI_COMM_FESOM, partit%mype)
+    call prepare_core_restart_write(istep, rst_dir, raw_rst_root, partit%mype, partit%MPI_COMM_FESOM, &
+                                    raw_restart_overwrite, raw_rstdir_exist, raw_rst_w_path           )
+    call write_all_raw_restarts(istep, partit%MPI_COMM_FESOM, partit%mype, raw_rst_w_path, rst_dir, rst_info)
+    call save_core_restart_latest(raw_rst_root, raw_rst_log, partit%mype, raw_restart_overwrite, istep)
   end if
 
   ! write derived type binary
   if(is_bin_restart_write) then
+    call prepare_core_restart_write(istep, rst_dir, bin_rst_root, partit%mype, partit%MPI_COMM_FESOM, &
+                                    bin_restart_overwrite, bin_rstdir_exist, bin_rst_w_path           )
     ! current (total) model step --> cstep = globalstep+istep
     call write_all_bin_restarts((/globalstep+istep, int(ctime), yearnew/),      &
-                                bin_restart_dirpath,                 &
-                                bin_restart_infopath,                &
+                                trim(bin_rst_w_path)//trim(rst_dir),        &
+                                trim(bin_rst_w_path)//trim(rst_info),       &                               
                                 partit,                              &
                                 mesh,                                &                                
                                 ice,                                 &
                                 dynamics,                            &
                                 tracers                              )
+    call save_core_restart_latest(bin_rst_root, bin_rst_log, partit%mype, bin_restart_overwrite, istep)
   end if
 
   ! actualize clock file to latest restart point
@@ -595,15 +623,17 @@ end subroutine write_restart
 !
 !
 !_______________________________________________________________________________
-subroutine write_all_raw_restarts(istep, mpicomm, mype)
+subroutine write_all_raw_restarts(istep, mpicomm, mype, raw_rst_w_path, rstdir, rstinfo)
   integer,  intent(in):: istep
   integer, intent(in) :: mpicomm
   integer, intent(in) :: mype
+  character(len=*), intent(in) :: raw_rst_w_path, rstdir, rstinfo
   ! EO parameters
   integer cstep
   integer fileunit
 
-  open(newunit = fileunit, file = raw_restart_dirpath//'/'//mpirank_to_txt(mpicomm)//'.dump', form = 'unformatted')
+  open( newunit = fileunit, form = 'unformatted',                                         &
+        file = trim(raw_rst_w_path)//trim(rstdir)//'/'//mpirank_to_txt(mpicomm)//'.dump' )
   call write_raw_restart_group(oce_files, fileunit)
   if(use_ice) call write_raw_restart_group(ice_files, fileunit)
 #if defined(__recom)
@@ -612,10 +642,11 @@ subroutine write_all_raw_restarts(istep, mpicomm, mype)
   close(fileunit)
 
   if(mype == RAW_RESTART_METADATA_RANK) then
-    print *,"writing raw restart to "//raw_restart_dirpath
+    print *,"writing raw restart to "//trim(raw_rst_w_path)//trim(rstdir)
     ! store metadata about the raw restart
     cstep = globalstep+istep
-    open(newunit = fileunit, file = raw_restart_infopath)
+    open(newunit = fileunit, file = trim(raw_rst_w_path)//trim(rstinfo))
+    !file = raw_restart_infopath)
     write(fileunit, '(g0)') cstep
     write(fileunit, '(g0)') ctime
     write(fileunit, '(2(g0))') "! year: ",yearnew
@@ -830,9 +861,10 @@ end subroutine write_raw_restart_group
 !
 !
 !_______________________________________________________________________________
-subroutine read_all_raw_restarts(mpicomm, mype)
+subroutine read_all_raw_restarts(mpicomm, mype, raw_rst_r_path, rstinfo, rstdir)
   integer, intent(in) :: mpicomm
   integer, intent(in) :: mype
+  character(len=*), intent(in) :: raw_rst_r_path, rstinfo, rstdir
   ! EO parameters
   integer rstep
   real(kind=WP) rtime
@@ -842,13 +874,14 @@ subroutine read_all_raw_restarts(mpicomm, mype)
 
   if(mype == RAW_RESTART_METADATA_RANK) then
     ! read metadata info for the raw restart
-    open(newunit = fileunit, status = 'old', iostat = status, file = raw_restart_infopath)
+    open( newunit = fileunit, status = 'old', iostat = status,  &
+          file = trim(raw_rst_r_path)//trim(rstinfo) )
     if(status == 0) then
       read(fileunit,*) rstep
       read(fileunit,*) rtime
       close(fileunit)
     else
-      print *,"can not open ",raw_restart_infopath
+      print *,"can not open ",trim(raw_rst_r_path)//trim(rstinfo)  
       stop 1
     end if
     
@@ -858,12 +891,13 @@ subroutine read_all_raw_restarts(mpicomm, mype)
       stop 1
     end if
     globalstep = rstep
-    print *,"reading raw restart from "//raw_restart_dirpath
+    print *,"reading raw restart from "//trim(raw_rst_r_path)//trim(rstdir) 
   end if
   ! sync globalstep with the other processes to let all processes writing portable restart files know the globalstep
   call MPI_Bcast(globalstep, 1, MPI_INTEGER, RAW_RESTART_METADATA_RANK, mpicomm, mpierr)
 
-  open(newunit = fileunit, status = 'old', iostat = status, file = raw_restart_dirpath//'/'//mpirank_to_txt(mpicomm)//'.dump', form = 'unformatted')
+  open( newunit = fileunit, status = 'old', iostat = status, form = 'unformatted',                   &
+        file = trim(raw_rst_r_path)//trim(rstdir)//'/'//mpirank_to_txt(mpicomm)//'.dump'  )
   if(status == 0) then
     call read_raw_restart_group(oce_files, fileunit)
     if(use_ice) call read_raw_restart_group(ice_files, fileunit)
@@ -872,7 +906,7 @@ subroutine read_all_raw_restarts(mpicomm, mype)
 #endif
     close(fileunit)
   else
-    print *,"can not open ",raw_restart_dirpath//'/'//mpirank_to_txt(mpicomm)//'.dump'
+    print *,"can not open ", trim(raw_rst_r_path)//trim(rstdir)//'/'//mpirank_to_txt(mpicomm)//'.dump'
     stop 1
   end if
 end subroutine read_all_raw_restarts
@@ -1028,7 +1062,143 @@ subroutine read_restart(path, filegroup, mpicomm, mype)
       call MPI_Recv(globalstep, 1, MPI_INTEGER, MPI_ANY_SOURCE, 42, mpicomm, mpistatus, mpierr)
     end if
   end if
-end subroutine read_restart
+end subroutine
+!
+!
+!_______________________________________________________________________________
+subroutine prepare_core_restart_write(istep, rstdir, rstroot, mype, mpicomm, rstoverwrite, dir_exist, rst_w_path)
+    use fortran_utils
+    integer, intent(in) :: istep !! fesom step
+    character(len=*), intent(in) :: rstroot             ! restart root
+    character(len=*), intent(in) :: rstdir
+    integer, intent(in) :: mype, mpicomm                 ! MPI stuff
+    logical, intent(in) :: rstoverwrite       ! pass raw_restart_overwrite OR bin_restart_overwrite here
+    logical, intent(inout) :: dir_exist         ! Track if the restart dir has been created
+    character(:), allocatable, intent(out) :: rst_w_path ! Main path for restart write
+    integer :: cstep, mpierr
+    character(len=20) :: c_cstep
+
+
+    !! EI TÄÄ TOIMI KUN SE TEKEE PERAKKAIN RAW JA BIN...
+    !!logical, save :: common_created = .false. !!! Not sure if this is really necessary...
+
+    if (rstoverwrite) then
+        !! Make sure the common read/write dir exists and then we're done. 
+        !! For the common grid only needs to be done once.
+        rst_w_path = rstroot 
+        if (.not. dir_exist) then
+            if (mype == RAW_RESTART_METADATA_RANK) then
+                !! rstroot is already created in initialization so:
+                call mkdir( trim(rst_w_path)//trim(rstdir) )
+            end if
+            dir_exist = .true.
+        end if
+
+    else
+        !! Unique restart write dirs: 
+        ! Prepare the directory for writing the restart files, tagged with current step number
+        cstep = globalstep + istep
+        write(c_cstep,'(I0)') cstep
+        rst_w_path = trim(rstroot)//"step_"//trim(c_cstep)//"/"
+    
+        if (mype == RAW_RESTART_METADATA_RANK) then
+            ! Create the restart dir for current step
+            call mkdir( trim(rst_w_path) )
+            ! Create necessary subdirs
+            call mkdir( trim(rst_w_path)//trim(rstdir) )  ! rst_dir is global   
+        end if
+        dir_exist = .true.
+    end if
+    call MPI_Barrier(mpicomm,mpierr) !!! CHECK THIS ! make sure the folder have been created before continue
+end subroutine prepare_core_restart_write
+!
+subroutine prepare_core_restart_read(rstlog, rstinfo, rstroot, mype, mpicomm, rstoverwrite, rstexist, rst_r_path)
+    character(len=*), intent(in) :: rstlog,  & ! restart log file for raw/bin_restart_overwrite==TRUE, otherwise rstinfo is used 
+                                    rstinfo, & ! The restart .info file, always used
+                                    rstroot   ! restart root location
+    integer, intent(in) :: mype, mpicomm       ! MPI stuff
+    logical, intent(in) :: rstoverwrite       ! pass raw_restart_overwrite OR bin_restart_overwrite here
+    logical, intent(out) :: rstexist           ! if restarts exist
+
+    ! Required only if bin/raw_restart_overwrite==FALSE
+    character(:), allocatable, intent(out) :: rst_r_path ! Main path for restart read 
+                                                         ! remains unallocated if rstexist=false
+    integer :: lstep, mpierr
+    character(len=20) :: c_lstep
+
+    !! Prepare to read restarts if they exist: if the restart log file / info file exist -> some restart files exist
+    lstep = 0
+    rstexist = .false.
+    if (mype == RAW_RESTART_METADATA_RANK) then
+        !! If the latest restart log exists, the restart files exist 
+        if (rstoverwrite) then
+            inquire(file=trim(rstroot)//trim(rstinfo), exist=rstexist)
+        else
+            inquire(file=trim(rstroot)//trim(rstlog), exist=rstexist)
+            if (rstexist) then
+                ! Get the tag for the correct restart file dir
+                call fetch_core_restart_latest(rstroot, rstlog, lstep)
+            end if
+        end if
+    end if
+    call MPI_BCAST(rstexist, 1, MPI_LOGICAL, RAW_RESTART_METADATA_RANK, mpicomm, mpierr)
+
+    !! Reconstruct the restart file dir for all PEs if flagged to exist
+    if (rstexist) then
+        if (rstoverwrite) then
+            rst_r_path = trim(rstroot)
+        else
+            call MPI_BCAST(lstep, 1, MPI_INTEGER, RAW_RESTART_METADATA_RANK, mpicomm, mpierr)
+            write(c_lstep,'(I0)') lstep
+            rst_r_path = trim(rstroot)//"step_"//trim(c_lstep)//"/"
+        end if
+    
+
+    end if
+
+end subroutine prepare_core_restart_read
+!
+!
+!_______________________________________________________________________________
+subroutine fetch_core_restart_latest(rstroot, rstlog, latest_tag)
+    character(len=*), intent(in) :: rstroot
+    character(len=*), intent(in) :: rstlog
+    integer, intent(out) :: latest_tag
+    integer :: fileunit, stat
+    !! Read the latest fesom step tag from the restart log file to find the correct restart file dir
+    open(newunit=fileunit, status='old', iostat=stat, file=trim(rstroot)//trim(rstlog))
+    if (stat == 0) then
+        read(fileunit,*) latest_tag
+    else
+        write(*,*) "ERROR; Could not read the file ", trim(rstroot)//trim(rstlog)
+        stop 1
+    end if
+    close(fileunit)    
+end subroutine fetch_core_restart_latest
+!
+subroutine save_core_restart_latest(rstroot, rstlog, mype, rstoverwrite, istep)
+    character(len=*), intent(in) :: rstroot
+    character(len=*), intent(in) :: rstlog
+    logical, intent(in) :: rstoverwrite
+    integer, intent(in) :: mype, istep
+    integer :: cstep, fileunit, stat
+
+    if (rstoverwrite) return  ! If using common read/write dir we can skip this entirely
+
+    !! Instead of the full dir, just save the current step number used to tag the directory
+    cstep = globalstep + istep
+    if (mype == RAW_RESTART_METADATA_RANK) then
+        open(newunit=fileunit, status='replace', iostat=stat, file=trim(rstroot)//trim(rstlog))
+        if (stat == 0) then
+            write(fileunit,*) cstep
+        else
+            write(*,*) "ERROR; Could not write to file ", trim(rstroot)//trim(rstlog)
+            stop 1
+        end if
+        close(fileunit)
+    end if
+end subroutine save_core_restart_latest
+
 !
 !
 !_______________________________________________________________________________
