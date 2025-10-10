@@ -1,0 +1,65 @@
+# NVIDIA HPC SDK Compilers environment for Ubuntu local development
+# This environment uses NVIDIA nvfortran with system GCC for C/C++
+
+# NVIDIA HPC SDK path detection - check common installation locations
+if [ -d "/opt/nvidia/hpc_sdk" ]; then
+    export NVHPC_ROOT="/opt/nvidia/hpc_sdk"
+elif [ -d "${HOME}/nvidia/hpc_sdk" ]; then
+    export NVHPC_ROOT="${HOME}/nvidia/hpc_sdk"
+elif [ -d "/usr/local/nvidia/hpc_sdk" ]; then
+    export NVHPC_ROOT="/usr/local/nvidia/hpc_sdk"
+else
+    echo "ERROR: NVIDIA HPC SDK not found in common locations"
+    echo "Please set NVHPC_ROOT environment variable or install NVIDIA HPC SDK"
+    return 1
+fi
+
+# Auto-detect the latest version if not specified
+if [ -z "${NVHPC_VERSION}" ]; then
+    NVHPC_VERSION=$(ls -1 ${NVHPC_ROOT}/Linux_x86_64/ | grep -E '^[0-9]+\.[0-9]+$' | sort -V | tail -1)
+    if [ -z "${NVHPC_VERSION}" ]; then
+        echo "ERROR: Could not auto-detect NVIDIA HPC SDK version"
+        return 1
+    fi
+    echo "Auto-detected NVIDIA HPC SDK version: ${NVHPC_VERSION}"
+fi
+
+# Use NVIDIA HPC SDK bundled MPI - prefer openmpi4 for compatibility
+if [ -d "${NVHPC_ROOT}/Linux_x86_64/${NVHPC_VERSION}/comm_libs/openmpi4" ]; then
+    export NVMPI_DIR="${NVHPC_ROOT}/Linux_x86_64/${NVHPC_VERSION}/comm_libs/openmpi4"
+    export PATH="${NVMPI_DIR}/bin:${NVHPC_ROOT}/Linux_x86_64/${NVHPC_VERSION}/compilers/bin:${PATH}"
+    export LD_LIBRARY_PATH="${NVMPI_DIR}/lib:${NVHPC_ROOT}/Linux_x86_64/${NVHPC_VERSION}/compilers/lib:${LD_LIBRARY_PATH}"
+    # Use NVIDIA Fortran with bundled OpenMPI
+    export FC=mpifort CC=mpicc CXX=mpicxx
+    # Tell OpenMPI wrappers to use NVIDIA compilers
+    export OMPI_FC=nvfortran
+    export OMPI_CC=nvc  
+    export OMPI_CXX=nvc++
+    echo "Using NVIDIA HPC SDK bundled OpenMPI: ${NVMPI_DIR}"
+else
+    # Add NVIDIA compilers to PATH
+    export PATH="${NVHPC_ROOT}/Linux_x86_64/${NVHPC_VERSION}/compilers/bin:${PATH}"
+    # Use NVIDIA Fortran with system MPI (may not work reliably)
+    export FC=nvfortran CC=mpicc CXX=mpicxx
+    echo "NVIDIA HPC SDK MPI not found, using system MPI"
+fi
+
+# NVIDIA-specific libraries and runtime
+export LD_LIBRARY_PATH="${NVHPC_ROOT}/Linux_x86_64/${NVHPC_VERSION}/compilers/lib:${LD_LIBRARY_PATH}"
+
+# Use system LAPACK/BLAS (NVIDIA can link with standard libraries)  
+export LAPACK_LIBRARIES="-llapack;-lblas"
+export CMAKE_ARGS="-DLAPACK_LIBRARIES=${LAPACK_LIBRARIES}"
+
+# Math library paths for NetCDF build (NVIDIA-compatible)
+export MATH_LIBRARY_PATHS="/usr/lib/x86_64-linux-gnu:/usr/lib:/lib/x86_64-linux-gnu:/lib:/usr/lib64:/lib64"
+
+# Additional CMake args for NetCDF build with NVIDIA compilers
+export NETCDF_CMAKE_ARGS="-DCMAKE_Fortran_FLAGS=-w"
+
+# CUDA support (if needed for GPU acceleration)
+if [ -d "/usr/local/cuda" ]; then
+    export CUDA_ROOT="/usr/local/cuda"
+    export PATH="${CUDA_ROOT}/bin:${PATH}"
+    export LD_LIBRARY_PATH="${CUDA_ROOT}/lib64:${LD_LIBRARY_PATH}"
+fi

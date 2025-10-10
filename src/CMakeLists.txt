@@ -180,8 +180,8 @@ add_custom_target(fesom_version_info-generated.F90 ALL
 list(REMOVE_ITEM sources_Fortran ${src_home}/fvom_init.F90 ${src_home}/oce_local.F90 ${src_home}/gen_comm.F90)
 list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_main.F90)
 
-find_package( NETCDF REQUIRED COMPONENTS C Fortran )
 find_package( MPI REQUIRED COMPONENTS C Fortran )
+find_package( NETCDF REQUIRED COMPONENTS C Fortran )
 
 # depends on the metis library
 #add_subdirectory(../lib/metis-5.1.0 ${PROJECT_BINARY_DIR}/metis)
@@ -193,6 +193,11 @@ add_subdirectory(async_threads_cpp)
 # fesom library
 add_library(${PROJECT_NAME} ${sources_Fortran} $<TARGET_OBJECTS:async_threads_cpp>)
 add_dependencies(${PROJECT_NAME} fesom_version_info-generated.F90)
+
+# Add dependency on external NetCDF if BUILD_NETCDF is enabled
+if(BUILD_NETCDF)
+    add_dependencies(${PROJECT_NAME} build_netcdf)
+endif()
 
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_Fortran_MODULE_DIRECTORY}>)
 target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:module/fesom>)
@@ -463,6 +468,18 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${YAXT_Fortran_LIBRARIES} ${YAXTC_
 # fesom.x executable
 add_executable(${PROJECT_NAME}.x ${src_home}/fesom_main.F90)
 target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
+
+# When BUILD_NETCDF is enabled, explicitly link NetCDF libraries to the executable
+# This ensures proper dependency propagation from the shared library
+if(BUILD_NETCDF)
+    target_link_libraries(${PROJECT_NAME}.x PRIVATE ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES})
+    # Set RPATH so the executable can find both FESOM and NetCDF libraries at runtime
+    set_target_properties(${PROJECT_NAME}.x PROPERTIES
+        INSTALL_RPATH "${CMAKE_BINARY_DIR}/external/netcdf/lib:${CMAKE_BINARY_DIR}/../lib"
+        BUILD_RPATH "${CMAKE_BINARY_DIR}/external/netcdf/lib:${CMAKE_BINARY_DIR}/../lib"
+    )
+    message(STATUS "NetCDF4 will be downloaded, built and used with fesom2")
+endif()
 
 # fesom_meshdiag executable (optional)
 if(BUILD_MESHDIAG)
