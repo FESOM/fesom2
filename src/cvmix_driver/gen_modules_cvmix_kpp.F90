@@ -67,12 +67,18 @@ module g_cvmix_kpp
     logical           :: kpp_use_LMDws = .true.
     
     ! If true, add enhanced diffusivity at base of boundary layer (in the original
-    ! cvmix_kpp.F90 there is a bug in the enhancement --> i fixed that in the file 
-    ! cvmix_kpp_fix.F90)
     logical           :: kpp_use_enhanceKv = .true. 
     
     ! If true, compute Ekman depth limit for OBLdepth 
     logical           :: kpp_use_compEkman = .true.  
+    
+    ! If true, use Stokes Similarty package (i.e. include wave‐related / Stokes drift 
+    ! effects in the surface layer). Triggers usage of additional routines 
+    ! that alter the shape functions, or mixing formulations, incorporating wave / 
+    ! Stokes drift effects consistent with Monin–Obukhov similarity theory 
+    ! (MOST). The code logic probably augments or replaces parts of the standard boundary 
+    ! (layer similarity (or nonlocal mixing) using a Stokes‐drift‐aware correction.
+    logical           :: kpp_use_StokesMOST= .true.
     
     ! If true, compute Monin-Obukhov limit for OBLdepth
     logical           :: kpp_use_monob     = .true.
@@ -144,6 +150,24 @@ module g_cvmix_kpp
     ! mpiom not tested yet
     logical           :: kpp_reduce_tauuice = .false. 
     
+    !___Langmuir option____________________________________________________
+    !Option of Langmuir enhanced mixing apply an enhancement factor to the
+    ! turbulent velocity scale
+    ! LWF16     - MixingCoefEnhancement = Langmuir_EFactor
+    ! RWHGK16   - MixingCoefEnhancement = cvmix_one + ShapeNoMatchAtS/NMshapeMax * &
+    !                                     (Langmuir_EFactor - cvmix_one)
+    ! NONE      - Langmuir switched off, MixingCoefEnhancement=1 
+    ! !!!ATTENTION!!! the options LWF16, RWHGK16 do not seem to work here 
+    ! there is a bug, so only "NONE" works here
+    character(len=20) :: kpp_langmuir_mixing= "NONE"
+    
+    ! Option of Langmuir turbulence enhanced entrainment - modify the unresolved shear
+    ! LWF16     -
+    ! LF17      -  Li and Fox-Kemper, 2017, JPO 
+    ! RWHGK16   -  
+    ! NONE      -  
+    character(len=20) :: kpp_langmuir_entrainment= "LWF16"
+    
     !___Mixing below OBL________________________________________________________
     ! Parameters to run shear-dependent LM94 scheme below the mixed layer
     ! leading coefficient of shear mixing formula, units: m^2/s: default= 5e-3  
@@ -182,6 +206,7 @@ module g_cvmix_kpp
                          kpp_use_nonconstKvb, kpp_pp_alpha, kpp_pp_loc_exp,      &
                          kpp_reduce_tauuice, kpp_use_smoothblmc,                 &
                          kpp_smoothblmc_nmb, kpp_use_fesomkpp, kpp_deepOBLoffset,&
+                         kpp_langmuir_mixing, kpp_langmuir_entrainment,          &
                          kpp_use_LMDws, kpp_sw_method,kpp_nlt_shape
     
     !___________________________________________________________________________
@@ -250,18 +275,21 @@ module g_cvmix_kpp
         allocate(kpp_dvsurf2(nl-1))
         allocate(kpp_dbsurf(nl-1))
         allocate(kpp_ws_cntr(nl-1))
+        allocate(kpp_stokesXI(nl-1))
         kpp_bulkRi        = 0.0_WP
         kpp_shearRi       = 0.0_WP
         kpp_dvsurf2       = 0.0_WP
         kpp_dbsurf        = 0.0_WP
         kpp_ws_cntr       = 0.0_WP
+        kpp_stokesXI      = 0.0_WP ! Stokes similarity parameter given OBL_depth
         
         ! allocate horizontal 2D variable 
         allocate(kpp_obldepth(node_size),kpp_nzobldepth(node_size))
-        allocate(kpp_sbuoyflx(node_size))
+        allocate(kpp_sbuoyflx(node_size), kpp_sbuoyflx_nonsolar(node_size))
         kpp_obldepth      = 0.0_WP
         kpp_nzobldepth    = 0.0_WP
-        kpp_sbuoyflx      = 0.0_WP
+        kpp_sbuoyflx      = 0.0_WP          ! total surface buoyancy flux (includes solar + non-solar)
+        kpp_sbuoyflx_nonsolar = 0.0_WP      ! non-solar part (only sensible, latent heat ... , used for direct surface TKE production)
         
         ! allocate 3D variable 
         allocate(kpp_Av(nl,node_size),kpp_Kv(nl,node_size))
@@ -310,6 +338,8 @@ module g_cvmix_kpp
             write(*,*) "     kpp_matchtechc      = ", kpp_matchtechc
             write(*,*) "     kpp_internalmix     = ", kpp_internalmix
             write(*,*) "     kpp_reduce_tauuice  = ", kpp_reduce_tauuice
+            write(*,*) "     kpp_langmuir_mixing = ", kpp_langmuir_mixing
+            write(*,*) "     kpp_langmuir_entrainment = ", kpp_langmuir_entrainment
             if (kpp_internalmix .eq. 'KPP') then 
                 write(*,*) "     kpp_Av0             = ", kpp_Av0
                 write(*,*) "     kpp_Kv0             = ", kpp_Kv0
@@ -330,19 +360,24 @@ module g_cvmix_kpp
         !_______________________________________________________________________
         ! Initialise CVMIX
          ! call the cvmix subroutine to initialise all required namelists
-        call cvmix_init_kpp(Ri_crit        = kpp_Rib_crit,             & 
-                            minOBLdepth    = kpp_minOBLdepth,         & 
-                            minVtsqr       = kpp_minVtsqr,            &
-                            vonKarman      = kpp_vonKarman,           & 
-                            surf_layer_ext = kpp_surf_layer_ext,      &
-                            interp_type    = kpp_interptype_ri,       &
-                            interp_type2   = kpp_interptype_atobl,    &
-                            lEkman         = kpp_use_compEkman,       &
-                            lMonOb         = kpp_use_monob,           &
-                            MatchTechnique = kpp_matchtechc,          &
-                            lenhanced_diff = kpp_use_enhanceKv,       &
-                            l_LMD_ws       = kpp_use_LMDws,           & 
-                            lnonzero_surf_nonlocal = kpp_cs_is_one)
+        call cvmix_init_kpp(Ri_crit                  = kpp_Rib_crit,            & 
+                            minOBLdepth              = kpp_minOBLdepth,         & 
+                            minVtsqr                 = kpp_minVtsqr,            &
+                            vonKarman                = kpp_vonKarman,           & 
+                            surf_layer_ext           = kpp_surf_layer_ext,      &
+                            interp_type              = kpp_interptype_ri,       &
+                            interp_type2             = kpp_interptype_atobl,    &
+                            lEkman                   = kpp_use_compEkman,       &
+                            lStokesMOST              = kpp_use_StokesMOST,      &
+                            lMonOb                   = kpp_use_monob,           &
+                            MatchTechnique           = kpp_matchtechc,          &
+                            lenhanced_diff           = kpp_use_enhanceKv,       &
+                            lnonzero_surf_nonlocal   = kpp_cs_is_one,           &
+                            Langmuir_mixing_str      = kpp_langmuir_mixing,     &
+                            Langmuir_entrainment_str = kpp_langmuir_entrainment,&
+                            l_LMD_ws                 = kpp_use_LMDws            & 
+                            )
+        
     end subroutine init_cvmix_kpp
     !
     !
@@ -356,7 +391,7 @@ module g_cvmix_kpp
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in),    target :: mesh
         !_______________________________________________________________________
-        integer       :: node, elem, nz, nln, nun,  elnodes(3), aux_nz
+        integer       :: node, elem, nz, nln, nun,  elnodes(3), aux_nz. sld_nz
         real(kind=WP) :: vshear2, dz2, aux, aux_wm(mesh%nl), aux_ws(mesh%nl)
         real(kind=WP) :: aux_coeff, sigma, stable
         real(kind=WP) :: aux_ustar, aux_surfbuoyflx_nl(mesh%nl)
@@ -514,13 +549,14 @@ module g_cvmix_kpp
             !___2D Quantities___________________________________________________
             ! calculate surface bouyancy flux after eq. A2c & A2d & A3b & A3d 
             ! in Large et al. 1994
-            !!PS if (flag_debug .and. mype==0)  print *, achar(27)//'[35m'//'         --> call surface buyflux[0m'
-            !!PS kpp_sbuoyflx(node) = -g * &
-            !!PS                         (sw_alpha(1,node)*heat_flux( node) / vcpw + &   !heat_flux & water_flux: positive up
-            !!PS                          sw_beta( 1,node)*water_flux(node)*salt(1,node,2))
             kpp_sbuoyflx(node) = -g * &
                                     (sw_alpha(nun,node)*heat_flux( node) / vcpw + &   !heat_flux & water_flux: positive up
                                      sw_beta( nun,node)*water_flux(node)*salt(nun,node))
+            
+            ! compute non-solar surface buoyancy flux, the non-solar part acts 
+            ! only at the surface and drives buoyancy flux through the surface boundary.
+            
+            
             
             
             ! calculate friction velocity (ustar) at surface (m/s)
@@ -653,12 +689,12 @@ module g_cvmix_kpp
             !!PS     surf_fric_vel   = aux_ustar,                 & ! (in)  turbulent friction velocity at surface (m/s)
             !!PS     w_s             = kpp_ws_cntr(1:nln)    & ! (out) Turbulent velocity scale profile (m/s) for skalars
             !!PS    ) 
-            call cvmix_kpp_compute_turbulent_scales(         &
-                sigma_coord     = sigma             ,        & ! (in)  sigma: Normalized surface layer depth
+            call cvmix_kpp_compute_turbulent_scales(           &
+                sigma_coord     = sigma             ,          & ! (in)  sigma: Normalized surface layer depth
                 OBL_depth       = abs(Z_3d_n(nun:nln,node)),   & ! (in)  Assume OBL depth (m) =  mid-depth level
                 surf_buoy_force = aux_surfbuoyflx_nl(nun:nln), & ! (in)  surfce buoyancy flux (m2/s3) consider sw_pene
-                surf_fric_vel   = aux_ustar,                 & ! (in)  turbulent friction velocity at surface (m/s)
-                w_s             = kpp_ws_cntr(nun:nln)    & ! (out) Turbulent velocity scale profile (m/s) for skalars
+                surf_fric_vel   = aux_ustar,                   & ! (in)  turbulent friction velocity at surface (m/s)
+                w_s             = kpp_ws_cntr(nun:nln)         & ! (out) Turbulent velocity scale profile (m/s) for skalars
                 )     
             
             !___________________________________________________________________
@@ -751,12 +787,65 @@ module g_cvmix_kpp
                                                                kpp_obldepth(node) )
             
             ! safety for kOBL
-            !!PS if (kpp_nzobldepth(node) > nlevels_nod2D(node)) then
-            !!PS     kpp_nzobldepth(node) = nlevels_nod2D(node)
-            !!PS end if 
             if (kpp_nzobldepth(node) > nln+1) then
                 kpp_nzobldepth(node) = nln+1
             end if 
+            
+            
+            !___________________________________________________________________
+            ! compute surface layer depth (SLDEPTH)
+            ! In the Large et al. (1994) K-Profile Parameterization (KPP), the 
+            ! surface layer depth! hs (often called the surface layer thickness) 
+            ! is a single scalar quantity per column, defined as:
+            !
+            !                           h_s = ϵ*h_b
+            !
+            ! where:
+            ! hb ... boundary layer depth (OBL depth)
+            ! ϵ  ... a constant fraction, typically 0.1
+            !
+            ! It is used to compute the averaged surface layer quantities 
+            ! (mean T, S, U, V, etc.) for the bulk Richardson number test.
+            ! The surface layer in KPP is the thin top region where fluxes are 
+            ! applied and where surface averages are taken — not something that 
+            ! varies with depth.
+            sldepth = kpp_surf_layer_ext*max(kpp_obldepth, kpp_minOBLdepth)
+            sld_nz = nz
+            do nztmp = nun, nln
+                if (abs(zbar_3d_n(nztmp+1,node))>=sldepth) then
+                    sld_nz = nztmp
+                    exit
+                end if                        
+            end do
+            
+            !___________________________________________________________________
+            call cvmix_kpp_compute_StokesXi (
+                zbar_3d_n(nun:nln+1,node),   &! full depth levels
+                Z_3d_n(nun:nln,node),        &! mid depth levels
+                sld_nz,                      &! cell index of Surface Layer Depth
+                sldepth,                     &! surface layer depth > 0
+                aux_surfbuoyflx_nl(nun:nln), &! surfce buoyancy flux (m2/s3) consider sw_pene  
+                surfBuoy_NS,    
+                aux_ustar,                   & ! (in)  turbulent friction velocity at surface (m/s), 
+                mesh%coriolis_node(node),    & ! (in) Coriolis parameter (1/s) dim=1 
+                uE, 
+                vE, 
+                uS, 
+                vS, 
+                uSbar, 
+                vSbar, 
+                uS_SL, 
+                vS_SL, 
+                uSb_SL, 
+                vSb_SL,                                          &
+                StokesXI,
+                BEdE_ER,
+                PU_TKE,
+                PS_TKE,
+                PB_TKE,
+                )
+           
+            
             
             !___________________________________________________________________
             ! 7) Call CVMix/KPP to obtain OBL diffusivities, viscosities and non-
