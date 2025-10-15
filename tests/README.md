@@ -11,6 +11,7 @@ This directory contains the comprehensive testing framework for FESOM2, organize
 - [Custom Test Targets](#custom-test-targets)
 - [Test Configuration](#test-configuration)
 - [Test Data](#test-data)
+- [CMake Presets](#cmake-presets)
 - [Troubleshooting](#troubleshooting)
 
 ## Quick Start
@@ -169,6 +170,22 @@ ctest -R meshpartitioner_partition_local_pi_mesh_4 # Single partition test
 ctest --output-on-failure   # Run all available tests
 ```
 
+### Automated Testing with CMake Presets
+
+**For automated testing and CI/CD pipelines**, consider using [CMake Presets](#cmake-presets) which provide standardized build configurations and automatic test filtering:
+
+```bash
+# Automated workflow with presets
+cmake --preset default
+cmake --build --preset default
+ctest --preset default
+```
+
+This approach is particularly useful for:
+- **CI/CD pipelines**: Consistent builds across environments
+- **Multiple configurations**: Testing different FESOM2 setups
+- **Automated workflows**: Pre-configured build and test settings
+
 ## Custom Test Targets
 
 Convenient make targets for common test workflows:
@@ -258,6 +275,110 @@ Each test creates detailed logs:
 - `test_output.log` - Standard output from FESOM/meshdiag
 - `test_error.log` - Error output (usually empty for successful tests)
 - `namelist.*` - Configured namelists used by the test
+
+## CMake Presets
+
+**CMake presets provide a standardized way to build and test FESOM2 with different configurations** without manually specifying complex CMake options. This is particularly useful for automated CI/CD pipelines, development workflows, and testing different FESOM2 configurations.
+
+### What CMake Presets Accomplish
+
+- **Automated Builds**: Pre-configured build settings for different FESOM2 configurations
+- **Isolated Environments**: Each preset uses its own build directory to avoid conflicts
+- **Reproducible Results**: Consistent builds across different environments and developers
+- **CI/CD Integration**: Easy integration with automated testing pipelines
+- **Test Filtering**: Automatic filtering to run only relevant tests for each configuration
+
+### Available Presets
+
+FESOM2 provides 4 pre-configured presets:
+
+| Preset | Description | Use Case |
+|--------|-------------|----------|
+| `default` | Standard FESOM2 build | Research and development |
+| `coupled` | OASIS coupling + OpenIFS | Atmosphere-ocean coupled simulations |
+| `recom` | REcoM3 biogeochemistry | Ocean biogeochemistry studies |
+| `ifs_interface` | ECMWF IFS interface | High-resolution coupled simulations |
+
+### Using CMake Presets
+
+#### List Available Presets
+```bash
+cmake --list-presets
+```
+
+#### Configure and Build
+```bash
+# Configure using a preset
+cmake --preset <preset_name>
+
+# Build using a preset  
+cmake --build --preset <preset_name>
+
+# Examples:
+cmake --preset default
+cmake --build --preset default
+```
+
+#### Run Tests with Presets
+```bash
+# Run integration tests only (filtered automatically)
+ctest --preset <preset_name>
+
+# Examples:
+ctest --preset default
+ctest --preset coupled
+ctest --preset ifs_interface
+```
+
+#### Complete Workflow Example
+```bash
+# 1. Configure, build, and test default configuration
+cmake --preset default
+cmake --build --preset default
+ctest --preset default
+
+# 2. Configure, build, and test coupled configuration
+cmake --preset coupled
+cmake --build --preset coupled
+ctest --preset coupled
+```
+
+### Preset vs Traditional Build
+
+| Method | Command | Advantages |
+|--------|---------|------------|
+| **Traditional** | `./configure.sh ubuntu -DBUILD_TESTING=ON` | Full control over options |
+| **Presets** | `cmake --preset default` | Standardized, reproducible, CI/CD ready |
+
+### Test Results by Preset
+
+| Preset | Integration Tests | Status |
+|--------|------------------|---------|
+| `default` | ✅ Pass | All 3 tests pass |
+| `coupled` | ✅ Pass | All 3 tests pass |
+| `recom` | ⚠️ Fail | Tests fail (expected) |
+| `ifs_interface` | ✅ Pass | All 3 tests pass |
+
+**Note**: Presets automatically filter tests to run only `integration_*` tests, excluding mesh partitioning and remote download tests that may not be applicable to all configurations.
+
+### Advanced Usage
+
+#### Override Preset Options
+```bash
+# Override build type
+cmake --preset default -DCMAKE_BUILD_TYPE=Debug
+
+# Enable additional features
+cmake --preset default -DBUILD_MESHPARTITIONER=ON
+```
+
+#### Parallel Builds
+```bash
+# Build with multiple cores
+cmake --build --preset default --parallel 8
+```
+
+For detailed documentation on CMake presets, see [`CMakePresets_README.md`](../CMakePresets_README.md).
 
 ## Troubleshooting
 
