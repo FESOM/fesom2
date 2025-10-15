@@ -140,7 +140,7 @@ contains
       integer             :: processes_per_group
       integer             :: npes_check
       integer             :: mype_check
-
+      integer             :: i
 ! get current value for num_fesom_groups
       call read_namelist_run_config
 #endif
@@ -507,11 +507,10 @@ contains
 
 #if defined(__recom) && defined(__usetp)
     call MPI_Barrier(f%MPI_COMM_FESOM_WORLD, f%MPIERR)
+    
     if(num_fesom_groups > 1) then
-
-        call MPI_Bcast(cpl_send, sizeof(cpl_send), MPI_CHARACTER, 0, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIerr)
-        call MPI_Bcast(cpl_recv, sizeof(cpl_recv), MPI_CHARACTER, 0, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIerr)
-
+        call MPI_Bcast(cpl_send, nsend, MPI_CHARACTER, 0, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIerr)
+        call MPI_Bcast(cpl_recv, nrecv, MPI_CHARACTER, 0, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIerr)
 !  needed in SUBROUTINE net_rec_from_atm(action)
         call MPI_Bcast(target_root,             1, MPI_INTEGER,   0, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIerr)
     end if
@@ -1062,7 +1061,7 @@ contains
     ! EO parameters
     real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
     integer           :: tr_num
-    integer :: i !YY
+    integer           :: i 
     
     ! Start finalization profiling
 #if defined (FESOM_PROFILING)
