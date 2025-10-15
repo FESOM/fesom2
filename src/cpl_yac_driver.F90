@@ -1,7 +1,7 @@
 module cpl_yac_driver
 #if defined(__yac)
 
-  use mo_yac_finterface
+  USE yac
   USE o_PARAM
   USE g_clock
 
