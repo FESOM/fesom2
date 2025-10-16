@@ -87,11 +87,11 @@ contains
     yearstart=yearnew
 
     ! init clock for this run
-    open(newunit=file_unit, file=trim(ResultPath)//trim(runid)//'.clock', action='read', &
+    open(newunit=file_unit, file=trim(RestartInPath)//trim(runid)//'.clock', action='read', &
         status='old', iostat=ierr, iomsg=errmsg)
     if (ierr /= 0) then
       write (unit=error_unit, fmt='(3A)') &
-        '### error: can not open file ', trim(ResultPath)//trim(runid)//'.clock', &
+        '### error: can not open file ', trim(RestartInPath)//trim(runid)//'.clock', &
         ', error: ' // trim(errmsg)
       call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
     end if
@@ -181,11 +181,11 @@ contains
        dum_yearnew=yearold+1
     endif
 
-    open(newunit=file_unit, file=trim(ResultPath)//trim(runid)//'.clock', action='write', &
+    open(newunit=file_unit, file=trim(RestartOutPath)//trim(runid)//'.clock', action='write', &
         status='unknown', iostat=ierr, iomsg=errmsg)
     if (ierr /= 0) then
       write (unit=error_unit, fmt='(3A)') &
-        '### error: can not open file ', trim(ResultPath)//trim(runid)//'.clock', &
+        '### error: can not open file ', trim(RestartOutPath)//trim(runid)//'.clock', &
         ', error: ' // trim(errmsg)
       call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
     end if
