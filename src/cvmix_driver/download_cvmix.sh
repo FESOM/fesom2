@@ -18,7 +18,8 @@ set -euo pipefail
 # or
 #   -DCVMIX_LIB_DIR=<prefix>/lib -DCVMIX_MOD_DIR=<prefix>/include
 REPO_URL="https://github.com/CVMix/CVMix-src.git"
-BRANCH="master"
+BRANCH="" #"master"
+TAG="v1.0.0"
 PREFIX="CVMix-install"
 SRC_DIR="CVMix-src"
 BUILD_DIR="CVMix-build"
@@ -45,7 +46,9 @@ BUILD_DIR=$(pwd)/${BUILD_DIR}
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --branch)
-      BRANCH="$2"; shift 2;;
+      BRANCH="$2"; TAG=""; shift 2;;
+    --tag)
+      TAG="$2"; BRANCH=""; shift 2;;
     --prefix)
       PREFIX="$2"; shift 2;;
     *) echo "Unknown arg: $1"; exit 1;;
@@ -55,13 +58,24 @@ done
 mkdir -p "$(dirname "$PREFIX")"
 
 if [[ ! -d "$SRC_DIR/.git" ]]; then
-  echo "Cloning CVMix-src ($BRANCH) ..."
-  git clone --branch "$BRANCH" --depth 1 "$REPO_URL" "$SRC_DIR"
+  if [[ -n "$TAG" ]]; then
+    echo "Cloning CVMix-src at tag $TAG ..."
+    git clone --branch "$TAG" --depth 1 "$REPO_URL" "$SRC_DIR"
+  else
+    echo "Cloning CVMix-src at branch $BRANCH ..."
+    git clone --branch "$BRANCH" --depth 1 "$REPO_URL" "$SRC_DIR"
+  fi  
 else
-  echo "Updating existing CVMix-src ..."
-  git -C "$SRC_DIR" fetch --depth 1 origin "$BRANCH"
-  git -C "$SRC_DIR" checkout -q "$BRANCH"
-  git -C "$SRC_DIR" reset --hard "origin/$BRANCH"
+  echo "Updating existing CVMix-src ..."  
+  
+  if [[ -n "$TAG" ]]; then
+    git -C "$SRC_DIR" fetch --tags
+    git -C "$SRC_DIR" checkout -q "tags/$TAG"
+  else
+    git -C "$SRC_DIR" fetch --depth 1 origin "$BRANCH" 
+    git -C "$SRC_DIR" checkout -q "$BRANCH" 
+    git -C "$SRC_DIR" reset --hard "origin/$BRANCH"
+  fi
 fi
 
 rm -rf "$BUILD_DIR"
