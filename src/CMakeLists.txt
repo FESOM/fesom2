@@ -164,15 +164,15 @@ endif()
 
 # Link custom CVMix files and fesom2cvmix wrapper-interface files
 if(USE_CVMIX)
-   file(GLOB cvmix_source ${src_home}/cvmix_driver/*.F90)
-   list(APPEND sources_Fortran ${cvmix_source})
+   file(GLOB source_cvmix ${src_home}/cvmix_driver/*.F90)
+   list(APPEND sources_Fortran ${source_cmix})
 endif()
 
 # Link RECOM code
-if(RECOM_COUPLED) 
-   file(GLOB recom_sources ${src_home}/int_recom/*.F90
+if(RECOM_COUPLED)
+   file(GLOB sources_recom ${src_home}/int_recom/*.F90
                            ${src_home}/int_recom/recom/*.F90)
-   list(APPEND sources_Fortran ${recom_sources})
+   list(APPEND sources_Fortran ${sources_recom})
 endif()                             
 
 # generate a custom file from fesom_version_info.F90 which includes the current git SHA
