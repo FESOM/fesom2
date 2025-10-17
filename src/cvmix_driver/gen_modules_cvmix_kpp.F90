@@ -928,7 +928,7 @@ module g_cvmix_kpp
                 ! varies with depth.
                 sldepth = kpp_surf_layer_ext*max(kpp_obldepth(node), kpp_minOBLdepth)
                 nzsfc = kpp_obldepth(node)
-                do nztmp = nun, kpp_obldepth(node)
+                do nztmp = nun, int(kpp_obldepth(node))
                     if (-zbar_3d_n(nztmp+1,node)>=sldepth) then
                         nzsfc = nztmp
                         exit
@@ -939,9 +939,9 @@ module g_cvmix_kpp
                     zbar_3d_n(nzsfc,node),       &
                     sldepth,                     &
                     kpp_A_stokes,                &
-                    u_wind(node), v_wind(node),   &
-                    uS_sld_t, vS_sld_t , &
-                    uS_sld_c, vS_sld_c , &
+                    u_wind(node), v_wind(node),  &
+                    uS_sld_t, vS_sld_t ,         &
+                    uS_sld_c, vS_sld_c ,         &
                     uS_sld_m, vS_sld_m) 
                         
                 call cvmix_kpp_compute_StokesXi (&
@@ -1225,8 +1225,9 @@ module g_cvmix_kpp
     !     |uS0| = C * UV10^2
     !
     ! where C ~ 0.01 (tunable between 0.005–0.02), following Ardhuin et al. (2009).
-    subroutine compute_stokes_velocities_MOM6style(ztop, zbot   , &
-                                                   Astokes, uwind  , vwind  , &
+    subroutine compute_stokes_velocities_MOM6style(ztop   , zbot   , &
+                                                   Astokes,          &
+                                                   uwind  , vwind  , &
                                                    uS_top , vS_top , &
                                                    uS_mid , vS_mid , &     
                                                    uS_mean, vS_mean)
@@ -1271,7 +1272,6 @@ module g_cvmix_kpp
         vS_mean = 0.5 * vS0 * fexp / (kp * abs(ztop - zbot))
         
     end subroutine compute_stokes_velocities_MOM6style
-    
     
     
     !
