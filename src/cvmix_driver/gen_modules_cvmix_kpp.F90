@@ -17,7 +17,6 @@ module g_cvmix_kpp
                           cvmix_kpp_compute_turbulent_scales,                &   
                           cvmix_kpp_compute_bulk_Richardson,                 & 
                           cvmix_kpp_compute_unresolved_shear,                & 
-                          !cvmix_kpp_params_type,                             & 
                           cvmix_kpp_compute_kOBL_depth,                      &
                           cvmix_kpp_compute_StokesXi,                        &
                           cvmix_kpp_ustokes_SL_model
