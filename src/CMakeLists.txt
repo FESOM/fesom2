@@ -141,16 +141,22 @@ set(FESOM_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/../.." CACHE FILEPATH "dir
 # get our source files
 set(src_home ${CMAKE_CURRENT_SOURCE_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
 
-# Link FESOM code
+# Link FESOM2 fortran code
 file(GLOB sources_Fortran ${src_home}/*.F90)
 
-# Link ICEPACK
+# Link custom CVMix files and fesom2cvmix wrapper-interface files
+if(USE_CVMIX)
+   file(GLOB sources_cvmix_addon ${src_home}/cvmix_driver/*.F90)
+   list(APPEND sources_Fortran ${sources_cvmix_addon})
+endif()
+
+# Link ICEPACK code
 if(USE_ICEPACK)
    file(GLOB sources_ice_pack ${src_home}/icepack_drivers/*.F90
                               ${src_home}/icepack_drivers/Icepack/columnphysics/*.F90)
    list(APPEND sources_Fortran ${sources_ice_pack})
-
-# Link IFS-Interface   
+   
+# Link IFS-Interface code   
 elseif(ENABLE_IFS_INTERFACE) # ICEPACK + IFS_INTERFACE NOT SUPPORTED (YET)
    if(ENABLE_MULTIO)
       list(APPEND sources_Fortran ${src_home}/ifs_interface/iom.F90)
@@ -162,17 +168,11 @@ elseif(ENABLE_IFS_INTERFACE) # ICEPACK + IFS_INTERFACE NOT SUPPORTED (YET)
                                ${src_home}/ifs_interface/mpp_io.F90)
 endif()
 
-# Link custom CVMix files and fesom2cvmix wrapper-interface files
-if(USE_CVMIX)
-   file(GLOB source_cvmix ${src_home}/cvmix_driver/*.F90)
-   list(APPEND sources_Fortran ${source_cmix})
-endif()
-
 # Link RECOM code
-if(RECOM_COUPLED)
+if(RECOM_COUPLED)  # ADD RECOM FILES
    file(GLOB sources_recom ${src_home}/int_recom/*.F90
                            ${src_home}/int_recom/recom/*.F90)
-   list(APPEND sources_Fortran ${sources_recom})
+   list(APPEND sources_Fortran ${sources_recom})                           
 endif()                             
 
 # generate a custom file from fesom_version_info.F90 which includes the current git SHA
@@ -196,10 +196,6 @@ list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_main.F90)
 find_package( NETCDF REQUIRED COMPONENTS C Fortran )
 find_package( MPI REQUIRED COMPONENTS C Fortran )
 
-# External CVMix integration
-option(ENABLE_CVMIX "Enable CVMix parameterizations (wrappers in src/cvmix_driver)" ON)
-set(CVMIX_ROOT "${src_home}/cvmix_driver/CVMix-install" CACHE PATH "Install prefix for CVMix (auto-built when USE_CVMIX=ON)")
-
 # depends on the metis library
 #add_subdirectory(../lib/metis-5.1.0 ${PROJECT_BINARY_DIR}/metis)
 #include_directories(../lib/metis-5.1.0/include)
@@ -216,24 +212,24 @@ target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:module/fes
 target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
 
 # build CVMix library if USE_CVMIX is ON
-if (${USE_CVMIX})
+if (USE_CVMIX)
    message(STATUS "USE_CVMIX: ${USE_CVMIX}")
-   # make sure that src and installation path are always synchronized with the 
-   # download_cvmix.sh script
    execute_process(COMMAND bash ${src_home}/cvmix_driver/download_cvmix.sh --print-src_dir
-                   OUTPUT_VARIABLE CVMIX_DIR_src)
+                   OUTPUT_VARIABLE aux)
+   set(CVMIX_DIR_src "${aux}")
    execute_process(COMMAND bash ${src_home}/cvmix_driver/download_cvmix.sh --print-prefix
-                   OUTPUT_VARIABLE CVMIX_DIR_install)                
+                   OUTPUT_VARIABLE aux)                
+   set(CVMIX_DIR_src "${aux}")
+   #set(CVMIX_DIR_src "CVMix-src")
+   #set(CVMIX_DIR_install "CVMix-install")
    
    # set default CVMix installation path
-   if (NOT CVMIX_ROOT)
-      set(CVMIX_ROOT ${src_home}/cvmix_driver/${CVMIX_DIR_install}) 
-      message(STATUS "set default CVMIX_ROOT=${CVMIX_ROOT}")
-   endif()
+   set(CVMIX_ROOT "${src_home}/cvmix_driver/${CVMIX_DIR_install}") 
+   message(STATUS "set default CVMIX_ROOT=${CVMIX_ROOT}")
    
    # Where library is located --> fix in get_cvmix.sh that it as always installed 
    # in /lib and nopt in /lib64
-   set(CVMIX_LIB ${CVMIX_ROOT}/lib/libcvmix.a)
+   set(CVMIX_LIB "${CVMIX_ROOT}/lib/libcvmix.a")
    
    # Create parent directory early so CMake does not fail on missing include paths
    file(MAKE_DIRECTORY ${CVMIX_ROOT})
@@ -247,8 +243,8 @@ if (${USE_CVMIX})
         
    # Add script dependency (rebuild if script changes)
    set(CVMIX_DOWNLOAD "${src_home}/cvmix_driver/download_cvmix.sh")
-
-   # Custom command: build CVMix if not yet built or if source changed
+   
+   # Custom command: build CVMix if not yet built
    add_custom_command(
          OUTPUT ${CVMIX_LIB}
          COMMAND bash ${src_home}/cvmix_driver/download_cvmix.sh --prefix ${CVMIX_ROOT}
@@ -395,32 +391,18 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} 
       target_compile_options(${PROJECT_NAME} PRIVATE -xHost)
    endif()
    
-   # debugging related compiler flags (activated for Debug build type)
-   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-      if(ENABLE_OPENMP)
-         target_compile_options(${PROJECT_NAME} PRIVATE -qopenmp -g -traceback -check all,noarg_temp_created,bounds,uninit) #-ftrapuv ) #-init=zero)
-      else()
-         target_compile_options(${PROJECT_NAME} PRIVATE -g -traceback -check all,noarg_temp_created,bounds,uninit) #-ftrapuv ) #-init=zero)
-      endif()
-   endif()
+   # # debugging related compiler flags
+   # target_compile_options(${PROJECT_NAME} PRIVATE -qopenmp -g -traceback -check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
+   # target_compile_options(${PROJECT_NAME} PRIVATE -g -traceback -check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
 
 
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 #    target_compile_options(${PROJECT_NAME} PRIVATE -O3 -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
    if(${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu )
       message(STATUS "Allowing type mismatches on Ubuntu for CI Testing" )  # NOTE(PG): Would be nicer to grab the CI=True from the env variable
-      if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-         target_compile_options(${PROJECT_NAME} PRIVATE -O0 -g -fbacktrace -ffloat-store -finit-local-zero -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch -cpp)
-      else()
-         target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch -cpp)
-      endif()
+      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch -cpp)
    else()
-      if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-         target_compile_options(${PROJECT_NAME} PRIVATE -O0 -ffloat-store -finit-local-zero -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -cpp)
-      else()
-         target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -cpp)
-      endif()
-
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -cpp)
    endif()
    if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10 )
       target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
@@ -454,34 +436,29 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
       # |             | -mno-fma4 -mavx2 -mfma                                            |      |
       # | GCC/openMPI | -O3 -march=znver3 -mtune=znver3 -ftree-vectorize -flto            | 280s | chatgpt recomendation
       # |             | -mcpu=znver3                                                      |      |
-      if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-         target_compile_options(${PROJECT_NAME} PRIVATE -march=znver3 -mtune=znver3)
-      else()
-         target_compile_options(${PROJECT_NAME} PRIVATE -march=znver3 -mtune=znver3 -ftree-vectorize -flto)
-      endif()      
+      target_compile_options(${PROJECT_NAME} PRIVATE -march=znver3 -mtune=znver3 -ftree-vectorize -flto)      
    else()
       #[[if(NOT (${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu))
          target_compile_options(${PROJECT_NAME} PRIVATE -native)
       endif()  ]]  
    endif()
    
-   # debugging related compiler flags (activated for Debug build type)
-   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-      target_compile_options(${PROJECT_NAME} PRIVATE
-                           -fallow-argument-mismatch
-                           -fno-fast-math -fno-signed-zeros
-                           -freciprocal-math
-                           -mveclibabi=svml
-                           -flto
-                           -pg
-                           -fbacktrace
-                           -fcheck=all,bounds
-                           -finit-real=snan
-                           -finit-integer=-9999
-                           -fsanitize=undefined,address
-                           )
-      target_link_libraries(${PROJECT_NAME} PRIVATE -lubsan)
-   endif()
+   # # debugging related compiler flags
+   #target_compile_options(${PROJECT_NAME} PRIVATE 
+                           #-fallow-argument-mismatch 
+                           #-fno-fast-math -fno-signed-zeros 
+                           #-freciprocal-math 
+                           #-mveclibabi=svml 
+                           #-flto
+                           #-pg 
+                           #-fbacktrace 
+                           #-fcheck=all,bounds 
+                           #-finit-real=snan 
+                           #-finit-integer=-9999 
+                           #-fsanitize=undefined,address
+                        #)
+   ## if use -fsanitize=undefined,address you also need ... PRIVATE -lubsan)           
+   #target_link_libraries(${PROJECT_NAME} PRIVATE -lubsan)
                      
 
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
