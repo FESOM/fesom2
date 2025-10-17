@@ -145,7 +145,7 @@ set(src_home ${CMAKE_CURRENT_SOURCE_DIR}) # path to src directory starting from 
 file(GLOB sources_Fortran ${src_home}/*.F90)
 
 # Link custom CVMix files and fesom2cvmix wrapper-interface files
-if(USE_CVMIX)
+if(WITH_CVMIX)
    file(GLOB sources_cvmix_addon ${src_home}/cvmix_driver/*.F90)
    list(APPEND sources_Fortran ${sources_cvmix_addon})
 endif()
@@ -211,9 +211,9 @@ target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_Fort
 target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:module/fesom>)
 target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
 
-# build CVMix library if USE_CVMIX is ON
-if (USE_CVMIX)
-   message(STATUS "USE_CVMIX: ${USE_CVMIX}")
+# build CVMix library if WITH_CVMIX is ON
+if (WITH_CVMIX)
+   message(STATUS "WITH_CVMIX: ${WITH_CVMIX}")
    
    # read CVMix install and src directories from the download script, so that there
    # is only one place where they are defined
@@ -308,7 +308,7 @@ if(USE_ICEPACK)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __icepack)
 endif()
 
-if(USE_CVMIX)
+if(WITH_CVMIX)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __cvmix)
 endif()
 
