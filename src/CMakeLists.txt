@@ -140,11 +140,17 @@ set(FESOM_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/../.." CACHE FILEPATH "dir
 
 # get our source files
 set(src_home ${CMAKE_CURRENT_SOURCE_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
+
+# Link FESOM code
 file(GLOB sources_Fortran ${src_home}/*.F90)
+
+# Link ICEPACK
 if(USE_ICEPACK)
    file(GLOB sources_ice_pack ${src_home}/icepack_drivers/*.F90
                               ${src_home}/icepack_drivers/Icepack/columnphysics/*.F90)
    list(APPEND sources_Fortran ${sources_ice_pack})
+
+# Link IFS-Interface   
 elseif(ENABLE_IFS_INTERFACE) # ICEPACK + IFS_INTERFACE NOT SUPPORTED (YET)
    if(ENABLE_MULTIO)
       list(APPEND sources_Fortran ${src_home}/ifs_interface/iom.F90)
@@ -156,26 +162,17 @@ elseif(ENABLE_IFS_INTERFACE) # ICEPACK + IFS_INTERFACE NOT SUPPORTED (YET)
                                ${src_home}/ifs_interface/mpp_io.F90)
 endif()
 
-# link custom CVMix files and FESOM2 wrapper-interface files for CVMix 
+# Link custom CVMix files and fesom2cvmix wrapper-interface files
 if(USE_CVMIX)
-   file(GLOB cvmix_source_custom ${src_home}/cvmix_driver/cvmix_utils_addon.F90
-                                 ${src_home}/cvmix_driver/cvmix_kinds_and_types_addon.F90
-                                 ${src_home}/cvmix_driver/cvmix_tke.F90
-                                 ${src_home}/cvmix_driver/cvmix_idemix.F90)                                 
-   
-   file(GLOB cvmix_wrappers ${src_home}/cvmix_driver/gen_modules_cvmix_kpp.F90
-                            ${src_home}/cvmix_driver/gen_modules_cvmix_pp.F90
-                            ${src_home}/cvmix_driver/gen_modules_cvmix_tidal.F90
-                            ${src_home}/cvmix_driver/gen_modules_cvmix_tke.F90
-                            ${src_home}/cvmix_driver/gen_modules_cvmix_idemix.F90)
-
-   list(APPEND sources_Fortran ${cvmix_source_custom} ${cvmix_wrappers})
+   file(GLOB cvmix_source ${src_home}/cvmix_driver/*.F90)
+   list(APPEND sources_Fortran ${cvmix_source})
 endif()
 
-if(${RECOM_COUPLED})  # ADD RECOM FILES
-   file(GLOB sources_Fortran ${src_home}/*.F90
-                             ${src_home}/int_recom/*.F90
-                             ${src_home}/int_recom/recom/*.F90)
+# Link RECOM code
+if(RECOM_COUPLED) 
+   file(GLOB recom_sources ${src_home}/int_recom/*.F90
+                           ${src_home}/int_recom/recom/*.F90)
+   list(APPEND sources_Fortran ${recom_sources})
 endif()                             
 
 # generate a custom file from fesom_version_info.F90 which includes the current git SHA
