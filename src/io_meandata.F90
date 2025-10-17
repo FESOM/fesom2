@@ -280,6 +280,19 @@ CASE ('h_ice ')
 CASE ('h_snow    ')
     if (use_ice) then
     call def_stream(nod2D, myDim_nod2D, 'h_snow',   'snow thickness over ice-covered fraction',  'm',     ice%h_snow(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+! Melt pond variables
+CASE ('apnd      ')
+    if (use_ice .and. ice%thermo%use_meltponds) then
+    call def_stream(nod2D, myDim_nod2D, 'apnd',     'melt pond area fraction',                  'frac',  ice%thermo%apnd(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('hpnd      ')
+    if (use_ice .and. ice%thermo%use_meltponds) then
+    call def_stream(nod2D, myDim_nod2D, 'hpnd',     'melt pond depth',                          'm',     ice%thermo%hpnd(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('ipnd      ')
+    if (use_ice .and. ice%thermo%use_meltponds) then
+    call def_stream(nod2D, myDim_nod2D, 'ipnd',     'melt pond ice lid thickness',              'm',     ice%thermo%ipnd(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if    
 ! Debug ice variables    
 CASE ('strength_ice')
