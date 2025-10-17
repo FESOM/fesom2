@@ -1,16 +1,7 @@
-!BOI
-
-! !TITLE: In-code documentation for CVMix
-! !AUTHORS: Many contributors from GFDL, LANL, and NCAR
-! !AFFILIATION: GFDL, LANL, and NCAR
-! !DATE: \today
-
-!EOI
-
-module cvmix_kinds_and_types
+module cvmix_kinds_and_types_addon
 
 !BOP
-! !MODULE:  cvmix_kinds_and_types
+! !MODULE:  cvmix_kinds_and_types_addon
 !
 ! !AUTHOR:
 !  Michael Levy, NCAR (mlevy@ucar.edu)
@@ -36,8 +27,9 @@ module cvmix_kinds_and_types
 
   ! Kind Types:
   ! The cvmix package uses double precision for floating point computations.
-  integer, parameter, public :: cvmix_r8     = selected_real_kind(15, 307),   &
-                                cvmix_strlen = 1024
+  integer, parameter, public :: cvmix_r8       = selected_real_kind(15, 307), &
+                                cvmix_log_kind = kind(.true.),                &
+                                cvmix_strlen   = 256
 
   ! Parameters to allow CVMix to store integers instead of strings
   integer, parameter, public :: CVMIX_OVERWRITE_OLD_VAL    = 1
@@ -54,11 +46,11 @@ module cvmix_kinds_and_types
 
 ! !PUBLIC TYPES:
 
-  ! cvmix_data_type contains variables for time-dependent and column-specific
+  ! cvmix_data_type_addon contains variables for time-dependent and column-specific
   ! mixing. Time-independent physical parameters should be stored in
   ! cvmix_global_params_type and *-mixing specific parameters should be
   ! stored in cvmix_*_params_type (found in the cvmix_* module).
-  type, public :: cvmix_data_type
+  type, public :: cvmix_data_type_addon
     integer        :: nlev = -1      ! Number of active levels in column
     integer        :: max_nlev = -1  ! Number of levels in column
                                      ! Setting defaults to -1 might be F95...
@@ -82,25 +74,28 @@ module cvmix_kinds_and_types
                     ! units: m^2 s^-3
     ! latitude of column
     real(cvmix_r8) :: lat
-                    ! units: can be degrees or radians (there are no internal
-                    !        computations based on this term)
+                    ! units: degrees
     ! longitude of column
     real(cvmix_r8) :: lon
-                    ! units: can be degrees or radians (there are no internal
-                    !        computations based on this term)
+                    ! units: degrees
     ! Coriolis parameter
     real(cvmix_r8) :: Coriolis
                     ! units: s^-1
     ! Index of cell containing OBL (fraction > .5 => below cell center)
     real(cvmix_r8) :: kOBL_depth
                     ! units: unitless
-    ! QL, 150610
     ! Langmuir mixing induced enhancement factor to turbulent velocity scale
     real(cvmix_r8) :: LangmuirEnhancementFactor
                     ! units: unitless
-    ! Surface Stokes drift magnitude
-    real(cvmix_r8) :: SurfaceStokesDrift
-                    ! units: m/s
+    ! Langmuir number
+    real(cvmix_r8) :: LangmuirNumber
+                    ! units: unitless
+    ! Stokes Similarity Parameter
+    real(cvmix_r8) :: StokesMostXi
+                    ! units: unitless
+    ! Numerical limit of Ocean Boundary Layer Depth
+    real(cvmix_r8) :: zBottomOceanNumerics
+                    ! units: m
     ! A time-invariant coefficient needed for Simmons, et al. tidal mixing
     real(cvmix_r8) :: SimmonsCoeff
 
@@ -160,6 +155,17 @@ module cvmix_kinds_and_types
     real(cvmix_r8), dimension(:), pointer :: VertDep_iface => NULL()
                                            ! units: unitless
 
+    ! A time-dependent coefficient needed for Schmittner 2014
+    real(cvmix_r8), dimension(:), pointer   :: SchmittnerCoeff => NULL()
+
+    ! A time-invariant coefficient needed in Schmittner tidal mixing
+    real(cvmix_r8), dimension(:), pointer   :: SchmittnerSouthernOcean => NULL()
+
+    ! Another time-invariant coefficient needed in Schmittner tidal mixing
+    real(cvmix_r8), dimension(:,:), pointer :: exp_hab_zetar => NULL()
+
+
+
     ! For KPP, need to store non-local transport term
     real(cvmix_r8), dimension(:), pointer :: kpp_Tnonlocal_iface => NULL()
     real(cvmix_r8), dimension(:), pointer :: kpp_Snonlocal_iface => NULL()
@@ -173,10 +179,7 @@ module cvmix_kinds_and_types
     ! (would be 2D for x- and y-, respectively) but current implementation
     ! assumes momentum term is 0 everywhere.
 
-    ! FIXME:
-    ! G(sigma)
-    !real(cvmix_r8), dimension(:), pointer ::  G    => NULL() 
-
+    
     ! TKE / IDEMIX  
     ! diffusivity coefficients at interfaces
     ! different coefficients for momentum (KappaM), temperature and
@@ -199,6 +202,7 @@ module cvmix_kinds_and_types
     real(cvmix_r8), dimension(:), pointer :: Ssqr_iface => NULL()
     ! squared buoyancy frequency (s^-2) 
     real(cvmix_r8), dimension(:), pointer :: Nsqr_iface => NULL()
+
 
 
     ! Values at tracer points (dimsize = nlev)
@@ -234,33 +238,8 @@ module cvmix_kinds_and_types
     real(cvmix_r8), dimension(:), pointer :: Vx_cntr => NULL()
     real(cvmix_r8), dimension(:), pointer :: Vy_cntr => NULL()
                                            ! units: m/s
+  end type cvmix_data_type_addon
 
-  end type cvmix_data_type
 
-  ! cvmix_global_params_type contains global parameters used by multiple
-  ! mixing methods.
-  type, public :: cvmix_global_params_type
-    ! maximum number of levels for any column
-    integer :: max_nlev
-             ! units: unitless
-
-    ! QL, 160708, gravity, m s^-2
-    real(cvmix_r8) :: Gravity = 9.80616_cvmix_r8
-
-    ! Prandtl number
-    !FIXME: set prandtl number
-    !real(cvmix_r8) :: prandtl
-    real(cvmix_r8) :: prandtl = 1.0
-                    ! units: unitless
-
-    ! Fresh water and salt water densities
-    real(cvmix_r8) :: FreshWaterDensity
-    real(cvmix_r8) :: SaltWaterDensity
-                    ! units: kg m^-3
-
-  end type cvmix_global_params_type
-
-!EOP
-
-end module cvmix_kinds_and_types
+end module cvmix_kinds_and_types_addon
 

@@ -126,10 +126,10 @@ module g_cvmix_idemix
 
         type(t_mesh),   intent(in),    target :: mesh
         type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
+#include "../associate_part_def.h"
+#include "../associate_mesh_def.h"
+#include "../associate_part_ass.h"
+#include "../associate_mesh_ass.h"
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
@@ -335,10 +335,10 @@ module g_cvmix_idemix
         real(kind=WP) :: tsum1, tsum2, tsum3, tsum4, tvol
         logical       :: debug=.false.
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+#include "../associate_part_def.h"
+#include "../associate_mesh_def.h"
+#include "../associate_part_ass.h"
+#include "../associate_mesh_ass.h"
         ! nils
         tstep_count = tstep_count + 1
         node_size = myDim_nod2D

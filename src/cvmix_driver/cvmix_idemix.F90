@@ -22,7 +22,8 @@ use cvmix_kinds_and_types,    only : cvmix_r8,                     &
                                       cvmix_PI,                    & 
                                       cvmix_global_params_type
 
-use cvmix_utils,              only : cvmix_update_tke, solve_tridiag
+use cvmix_kinds_and_types_addon,    only : cvmix_data_type_addon
+use cvmix_utils_addon,              only : cvmix_update_tke, solve_tridiag
 
 
 implicit none
@@ -175,7 +176,7 @@ subroutine idemix_wrap(Vmix_vars, idemix_userdef_constants)
 
 type(idemix_type), intent(in), optional, target :: idemix_userdef_constants
 
-type(cvmix_data_type), intent(inout) :: Vmix_vars
+type(cvmix_data_type_addon), intent(inout) :: Vmix_vars
 
 real(cvmix_r8), dimension(Vmix_vars%nlev+1) ::       & 
   new_E_iw                                          ,& 

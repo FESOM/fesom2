@@ -524,6 +524,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
             u_wind(i)   = 0.0_WP
             v_wind(i)   = 0.0_WP
             shum(i)     = 0.0_WP
+            shortwave(i)= 0.0_WP
             longwave(i) = 0.0_WP
             Tair(i)     = 0.0_WP
             prec_rain(i)= 0.0_WP
