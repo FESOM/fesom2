@@ -161,18 +161,26 @@ module g_cvmix_kpp
     !___Langmuir option____________________________________________________
     ! Option of Langmuir enhanced mixing apply an enhancement factor to the
     ! turbulent velocity scale
-    ! LWF16     - MixingCoefEnhancement = Langmuir_EFactor
-    ! RWHGK16   - MixingCoefEnhancement = cvmix_one + ShapeNoMatchAtS/NMshapeMax * &
-    !                                     (Langmuir_EFactor - cvmix_one)
-    ! NONE      - Langmuir switched off, MixingCoefEnhancement=1 
+    ! LWF16     -  MixingCoefEnhancement = Langmuir_EFactor
+    ! RWHGK16   -  MixingCoefEnhancement = cvmix_one + ShapeNoMatchAtS/NMshapeMax * &
+    !                                      (Langmuir_EFactor - cvmix_one)
+    ! NONE      -  Langmuir switched off, MixingCoefEnhancement=1 
     character(len=20) :: kpp_langmuir_mixing= "LWF16"
-    
+        
     ! Option of Langmuir turbulence enhanced entrainment - modify the unresolved shear
-    ! LWF16     -  Li et al. 2016
-    ! LF17      -  Li et al. 2017
-    ! RWHGK16   -  
+    ! LWF16     -  Li Q., Webb A., Fox-Kemper B., Craig A., Danabasoglu G., 
+    !              Large W., Vertenstein M., 2016, Langmuir mixing effects on 
+    !              global climate: WAVEWATCH III in CESM, Ocean Modelling 103 (2016) 145–160
+    !              
+    ! LF17      -  Li Q., Fox-Kemper B., Breivik O., Webb A., 2017, Statistical 
+    !              models of global Langmuir mixing, Ocean Modelling 113 (2017) 95–114
+    !              
+    ! RWHGK16   -  Reichl B., Wang D., Hara T., Ginis I. and Kukulka T, 2016, Impact 
+    !              of Sea-State-Dependent Langmuir Turbulence on the Ocean
+    !              Response to a Tropical Cyclone, Mon. Wea. Rev., 144
+    !              
     ! NONE      -  
-    character(len=20) :: kpp_langmuir_entrainment= "LWF17"
+    character(len=20) :: kpp_langmuir_entrainment= "LF17"
     
     !___Mixing below OBL________________________________________________________
     ! Parameters to run shear-dependent LM94 scheme below the mixed layer
@@ -213,6 +221,7 @@ module g_cvmix_kpp
                          kpp_reduce_tauuice, kpp_use_smoothblmc,                 &
                          kpp_smoothblmc_nmb, kpp_use_fesomkpp, kpp_deepOBLoffset,&
                          kpp_langmuir_mixing, kpp_langmuir_entrainment,          &
+                         kpp_use_StokesMOST, kpp_A_stokes,                       &
                          kpp_use_LMDws, kpp_sw_method, kpp_nlt_shape
     
     !___________________________________________________________________________
@@ -873,9 +882,10 @@ module g_cvmix_kpp
                 OBL_depth  = kpp_obldepth(node),         & ! (out) OBL depth (m) dim=1
                 kOBL_depth = kpp_nzobldepth(node),       & ! (out) level (+fraction) of OBL extent dim=1
                 zt_cntr    = Z_3d_n(    nun:nln  ,node), & ! (in) Height of cell centers (m) dim=(ke)
-                surf_fric  = ustar,                  & ! (in) Turbulent friction velocity at surface (m/s) dim=1
+                surf_fric  = ustar,                      & ! (in) Turbulent friction velocity at surface (m/s) dim=1
                 surf_buoy  = aux_surfbuoyflx_nl(nun:nln),& ! (in) Buoyancy flux at surface (m2/s3) dim=1
-                Coriolis   = mesh%coriolis_node(node)    & ! (in) Coriolis parameter (1/s) dim=1
+                Coriolis   = mesh%coriolis_node(node),   & ! (in) Coriolis parameter (1/s) dim=1
+                Xi         = kpp_stokesXi_z(nun:nln)     &
                 )    
             kpp_nzobldepth(node) = kpp_nzobldepth(node) + nun - 1
             
