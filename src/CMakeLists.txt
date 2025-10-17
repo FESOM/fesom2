@@ -214,21 +214,20 @@ target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
 # build CVMix library if USE_CVMIX is ON
 if (USE_CVMIX)
    message(STATUS "USE_CVMIX: ${USE_CVMIX}")
+   
+   # read CVMix install and src directories from the download script, so that there
+   # is only one place where they are defined
    execute_process(COMMAND bash ${src_home}/cvmix_driver/download_cvmix.sh --print-src_dir
-                   OUTPUT_VARIABLE aux)
-   set(CVMIX_DIR_src "${aux}")
+                   OUTPUT_VARIABLE CVMIX_DIR_src OUTPUT_STRIP_TRAILING_WHITESPACE)
    execute_process(COMMAND bash ${src_home}/cvmix_driver/download_cvmix.sh --print-prefix
-                   OUTPUT_VARIABLE aux)                
-   set(CVMIX_DIR_src "${aux}")
-   #set(CVMIX_DIR_src "CVMix-src")
-   #set(CVMIX_DIR_install "CVMix-install")
+                   OUTPUT_VARIABLE CVMIX_DIR_install OUTPUT_STRIP_TRAILING_WHITESPACE)  
    
    # set default CVMix installation path
    set(CVMIX_ROOT "${src_home}/cvmix_driver/${CVMIX_DIR_install}") 
    message(STATUS "set default CVMIX_ROOT=${CVMIX_ROOT}")
    
-   # Where library is located --> fix in get_cvmix.sh that it as always installed 
-   # in /lib and nopt in /lib64
+   # Where library is located --> fix in download_cvmix.sh that it as always installed 
+   # in /lib and not in /lib64
    set(CVMIX_LIB "${CVMIX_ROOT}/lib/libcvmix.a")
    
    # Create parent directory early so CMake does not fail on missing include paths
