@@ -134,25 +134,28 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     !------------------------------------------
     use MOD_MESH
     use MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    USE MOD_ICE
+    use MOD_PARTIT
+    use MOD_PARSUP
+    use MOD_DYN
+    use MOD_ICE
+    use o_ARRAYS       
+    use o_mixing_KPP_mod
+    use g_backscatter
+    use diagnostics
+    use g_forcing_arrays
+#if defined (__cvmix)    
     use g_cvmix_tke
     use g_cvmix_idemix
     use g_cvmix_kpp
     use g_cvmix_tidal
-    use g_backscatter
-    use diagnostics
-    use g_config,        only: use_cavity
-    use g_forcing_param, only: use_virt_salt
+#endif    
 #if defined(__recom)
-  use recom_glovar
-  use recom_config
-  use recom_ciso
+    use recom_glovar
+    use recom_config
+    use recom_ciso
 #endif
     use g_forcing_param, only: use_virt_salt, use_landice_water, use_age_tracer !---fwf-code, age-code
-    use g_config, only : lwiso !---wiso-code
+    use g_config, only : use_cavity, lwiso !---wiso-code
     use mod_transit, only : index_transit_r14c, index_transit_r39ar, index_transit_f11, index_transit_f12, index_transit_sf6
 
     implicit none
@@ -251,7 +254,7 @@ CASE ('vice      ')
     end if
 CASE ('a_ice     ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'a_ice',    'ice concentration',              '%',      ice%data(1)%values(1:myDim_nod2D),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'a_ice',    'ice concentration',              'fraction',      ice%data(1)%values(1:myDim_nod2D),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('m_ice     ')
     if (use_ice) then
@@ -412,9 +415,23 @@ CASE ('age       ')
 !_______________________________________________________________________________
 ! output surface forcing
 CASE ('fh        ')
-    call def_stream(nod2D, myDim_nod2D, 'fh',       'heat flux',                       'W/m2',      heat_flux_in(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'fh'       , 'heat flux',                             'W/m2', heat_flux_in(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('fh_sen    ')
+    call def_stream(nod2D, myDim_nod2D, 'fh_sen'   , 'sensible heat flux',                    'W/m2', heat_flux_in(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('fh_lat    ')
+    call def_stream(nod2D, myDim_nod2D, 'fh_lat'   , 'latent heat flux',                      'W/m2', heat_flux_in(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('fh_radtot ')
+    call def_stream(nod2D, myDim_nod2D, 'fh_radtot', 'total radiation heat flux',             'W/m2', heat_flux_in(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('fh_swr    ')
+    call def_stream(nod2D, myDim_nod2D, 'fh_swr'   , 'shortwave radiation heat flux',         'W/m2', heat_flux_in(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('fh_lwr    ')
+    call def_stream(nod2D, myDim_nod2D, 'fh_lwr'   , 'longwave radiation heat flux',          'W/m2', heat_flux_in(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('fh_lwrout ')
+    call def_stream(nod2D, myDim_nod2D, 'fh_lwrout', 'outgoing longwave radiation heat flux', 'W/m2', heat_flux_in(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
 CASE ('fw        ')
     call def_stream(nod2D, myDim_nod2D, 'fw',       'fresh water flux',                'm/s',    water_flux(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
 CASE ('atmice_x  ')
     call def_stream(nod2D, myDim_nod2D, 'atmice_x', 'stress atmice x',                 'N/m2',   ice%stress_atmice_x(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('atmice_y  ')
@@ -480,14 +497,18 @@ CASE ('realsalt  ')
 CASE ('kpp_obldepth   ')
     if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then! fesom KPP
         call def_stream(nod2D, myDim_nod2D,    'kpp_obldepth',    'KPP ocean boundary layer depth', 'm',   hbl(:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+#if defined (__cvmix)    
     elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then ! cvmix KPP
         call def_stream(nod2D, myDim_nod2D,    'kpp_obldepth',    'KPP ocean boundary layer depth', 'm',   kpp_obldepth(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+#endif        
     end if
 CASE ('kpp_sbuoyflx')
     if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then ! fesom KPP
         call def_stream(nod2D, myDim_nod2D,    'kpp_sbuoyflx',    'surface buoyancy flux',   'm2/s3',  Bo(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+#if defined (__cvmix)            
     elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then ! cvmix KPP
         call def_stream(nod2D, myDim_nod2D,    'kpp_sbuoyflx',    'surface buoyancy flux',   'm2/s3',  kpp_sbuoyflx(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+#endif        
     end if
 CASE ('tx_sur    ')
     sel_forcvar(11) = 1
@@ -1096,7 +1117,8 @@ CASE ('icb       ')
     call def_stream(nod2D, myDim_nod2D, 'ibfwe',   'iceberg erosion',                  'm/s',    ibfwe(:),         1, 'm', i_real4, partit, mesh)
     call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'ibhf',    'heat flux from iceberg melting',   'W/m2',    ibhf_n(:,:),      1, 'm', i_real4, partit, mesh)
   end if
-!------------------------------------------
+
+#if defined (__cvmix)    
 !_______________________________________________________________________________
 ! TKE mixing diagnostic 
 CASE ('TKE       ')
@@ -1132,8 +1154,8 @@ CASE ('IDEMIX    ')
         call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_v0'  , 'IWE horizontal group velocity'             , 'm/s'    , iwe_c0(:,:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream(elem2D       , myDim_elem2D       , 'iwe_fbot', 'IDEMIX bottom forcing'                     , 'm^3/s^3', iwe_fbot(:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream(elem2D       , myDim_elem2D       , 'iwe_fsrf', 'IDEMIX surface forcing'                    , 'm^3/s^3', iwe_fsrf(:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-    end if
-    
+    end if    
+
 !_______________________________________________________________________________
 ! TIDAL mixing diagnostics
 CASE ('TIDAL     ')
@@ -1142,7 +1164,8 @@ CASE ('TIDAL     ')
         call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'tidal_Kv'  , 'tidal diffusivity'                       , 'm^2/s'  , tidal_Kv(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'tidal_Av'  , 'tidal viscosity'                         , 'm^2/s'  , tidal_Av(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream(elem2D       , myDim_elem2D       , 'tidal_fbot', 'near tidal bottom forcing'               , 'W/m^2'  , tidal_fbot   , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-    end if 
+    end if
+#endif     
 
 !_______________________________________________________________________________
 ! TIDAL mixing diagnostics

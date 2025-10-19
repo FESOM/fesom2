@@ -256,9 +256,11 @@ contains
           nrecv = nrecv + 6
         END IF
         !---wiso-code-end
+#if !defined (__oifs)
         IF (use_icebergs) THEN
           nrecv = nrecv + 2
         END IF
+#endif
 #endif
 
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call check_mesh_consistency'//achar(27)//'[0m'
@@ -364,8 +366,10 @@ contains
 #endif
         call clock_newyear                        ! check if it is a new year
         if (f%mype==0) f%t6=MPI_Wtime()
-        !___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
-        call restart(0, 0, 0, r_restart, f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        !___READ INITIAL CONDITIONS IF THIS IS A RESTART RUN________________________
+        if (r_restart) then
+            call read_initial_conditions(f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        end if
         if (f%mype==0) f%t7=MPI_Wtime()
         
         ! recompute zonal profiles of temp and velocity, with the data from the restart
@@ -745,7 +749,7 @@ contains
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("restart")
 #endif
-        call restart(n, nstart, f%total_nsteps, .false., f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        call write_initial_conditions(n, nstart, f%total_nsteps, f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("restart")
 #endif
