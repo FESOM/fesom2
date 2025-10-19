@@ -3321,11 +3321,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     use g_comm_auto
     use io_RESTART !PS
     use o_mixing_KPP_mod
+#if defined (__cvmix)       
     use g_cvmix_tke
     use g_cvmix_idemix
     use g_cvmix_pp
     use g_cvmix_kpp
     use g_cvmix_tidal
+#endif    
     use Toy_Channel_Soufflet
     use oce_ale_interfaces
     use compute_vert_vel_transpv_interface
@@ -3425,10 +3427,12 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! (mix_scheme='cvmix_IDEMIX') --> If idemix is used together with tke it needs 
     ! to be called prior to tke
     ! for debugging
+#if defined (__cvmix)       
     if  (mod(mix_scheme_nmb,10)==6) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_idemix'//achar(27)//'[0m'
         call calc_cvmix_idemix(partit, mesh)
     end if 
+#endif    
 
     !___MAIN MIXING SCHEMES_____________________________________________________
     ! use FESOM2.0 tuned k-profile parameterization for vertical mixing 
@@ -3449,7 +3453,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_PP'//achar(27)//'[0m' 
         call oce_mixing_PP(dynamics, partit, mesh)
         call mo_convect(ice, partit, mesh)
-        
+#if defined (__cvmix)           
     ! use CVMIX KPP (Large at al. 1994) 
     else if(mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_kpp'//achar(27)//'[0m'
@@ -3472,9 +3476,10 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_tke'//achar(27)//'[0m'
         call calc_cvmix_tke(dynamics, partit, mesh)
         call mo_convect(ice, partit, mesh)
-    
+#endif    
     end if   
 
+#if defined (__cvmix)       
     !___EXTENSION OF MIXING SCHEMES_____________________________________________
     ! add CVMIX TIDAL mixing scheme of Simmons et al. 2004 "Tidally driven mixing 
     ! in a numerical model of the ocean general circulation", ocean modelling to 
@@ -3486,6 +3491,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         call calc_cvmix_tidal(partit, mesh)
         
     end if
+#endif    
     t1=MPI_Wtime()
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("oce_mix_pres")
