@@ -302,13 +302,11 @@ module g_cvmix_kpp
         allocate(kpp_dvsurf2(nl-1))
         allocate(kpp_dbsurf(nl-1))
         allocate(kpp_ws_cntr(nl-1))
-        !!PS allocate(kpp_w_cntr(nl-1))
         kpp_bulkRi        = 0.0_WP
         kpp_shearRi       = 0.0_WP
         kpp_dvsurf2       = 0.0_WP
         kpp_dbsurf        = 0.0_WP
         kpp_ws_cntr       = 0.0_WP
-        !!PS kpp_wm_cntr       = 0.0_WP
         
         ! allocate horizontal 2D variable 
         allocate(kpp_obldepth(node_size),kpp_nzobldepth(node_size))
@@ -318,9 +316,8 @@ module g_cvmix_kpp
         kpp_sbuoyflx      = 0.0_WP          ! total surface buoyancy flux (includes solar + non-solar)
         
         allocate(kpp_buoyflx_nl(nl))
-        kpp_buoyflx_nl    =0.0_WP
-        
-        
+        kpp_buoyflx_nl    = 0.0_WP
+                
         ! allocate 3D variable 
         allocate(kpp_Av(nl,node_size),kpp_Kv(nl,node_size))
         allocate(kpp_nonlcltranspT(nl,node_size),kpp_nonlcltranspS(nl,node_size))
@@ -335,24 +332,24 @@ module g_cvmix_kpp
         allocate(kpp_uS_t(nl-1), kpp_vS_t(nl-1)) ! top
         allocate(kpp_uS_c(nl-1), kpp_vS_c(nl-1)) ! center   
         allocate(kpp_uS_m(nl-1), kpp_vS_m(nl-1)) ! mean
-        kpp_uS_t         = 0.0_WP
-        kpp_vS_t         = 0.0_WP
-        kpp_uS_c         = 0.0_WP
-        kpp_vS_c         = 0.0_WP
-        kpp_uS_m         = 0.0_WP
-        kpp_vS_m         = 0.0_WP
+        kpp_uS_t          = 0.0_WP
+        kpp_vS_t          = 0.0_WP
+        kpp_uS_c          = 0.0_WP
+        kpp_vS_c          = 0.0_WP
+        kpp_uS_m          = 0.0_WP
+        kpp_vS_m          = 0.0_WP
 
         allocate(kpp_stokesXi_z(nl-1))
         allocate(kpp_stokesVt_z(nl-1))
-        kpp_stokesXi_z = 0.0_WP
-        kpp_stokesVt_z = 0.0_WP
+        kpp_stokesXi_z    = 0.0_WP
+        kpp_stokesVt_z    = 0.0_WP
         
         allocate(kpp_EFactor(node_size))
         allocate(kpp_LaSL(node_size))
         allocate(kpp_stokesXi(node_size))
         kpp_EFactor       = 0.0_WP ! Langmuir enhancement factor for entrainment 
         kpp_LaSL          = 0.0_WP ! surface layer averaged Langmuir number (units: none)
-        kpp_stokesXi   = 0.0_WP
+        kpp_stokesXi      = 0.0_WP
         
         
         !_______________________________________________________________________
@@ -391,6 +388,8 @@ module g_cvmix_kpp
             write(*,*) "     kpp_matchtechc      = ", kpp_matchtechc
             write(*,*) "     kpp_internalmix     = ", kpp_internalmix
             write(*,*) "     kpp_reduce_tauuice  = ", kpp_reduce_tauuice
+            write(*,*) "     kpp_use_StokesMOST  = ", kpp_use_StokesMOST
+            write(*,*) "     kpp_A_stokes        = ", kpp_A_stokes
             write(*,*) "     kpp_langmuir_mixing = ", kpp_langmuir_mixing
             write(*,*) "     kpp_langmuir_entrainment = ", kpp_langmuir_entrainment
             if (kpp_internalmix .eq. 'KPP') then 
@@ -714,7 +713,6 @@ module g_cvmix_kpp
                     kpp_dbsurf(nz) = -g * density_0_r *(rho_sfc-rho_nz)
                 end do ! --> do nz=1, nln   
                 
-                !!PS do nz=2, nln 
                 do nz=nun+1, nln 
                     !___________________________________________________________
                     ! calculate shear Richardson number Ri = N^2/(du/dz)^2 for 
@@ -830,8 +828,7 @@ module g_cvmix_kpp
                 uv_SLmean,                      & ! 
                 kpp_LaSL(node),                 & ! Surface Layer Langmuir Number
                 kpp_EFactor(node)               & ! Langmuir Entrainment Enhancement Factor
-                )             
-            
+                )    
             
             
             !___________________________________________________________________
@@ -900,11 +897,9 @@ module g_cvmix_kpp
             end if 
             
             ! no shallower than top layer
-            !!PS kpp_obldepth(node)  = max( kpp_obldepth(node), abs(zbar_3d_n(2, node)) )
             kpp_obldepth(node)  = max( kpp_obldepth(node), abs(zbar_3d_n(nun+1, node)) )
             
             ! no deeper than bottom layer 
-            !!PS kpp_obldepth(node)  = min( kpp_obldepth(node), abs(zbar_3d_n(nlevels_nod2D(node),node)) )
             kpp_obldepth(node)  = min( kpp_obldepth(node), abs(zbar_3d_n(nln+1,node)) )
             
             ! safety for kOBL
