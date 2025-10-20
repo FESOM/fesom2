@@ -256,9 +256,11 @@ contains
           nrecv = nrecv + 6
         END IF
         !---wiso-code-end
+#if !defined (__oifs)
         IF (use_icebergs) THEN
           nrecv = nrecv + 2
         END IF
+#endif
 #endif
 
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call check_mesh_consistency'//achar(27)//'[0m'
