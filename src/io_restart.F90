@@ -699,8 +699,7 @@ subroutine read_all_raw_restarts(dirpath, infopath, mpicomm, mype)
     
     ! compare the restart time with our actual time
     if(int(ctime) /= int(rtime)) then
-      print *, "raw restart time ",rtime,"does not match current clock time",ctime
-      stop 1
+      print *, "WARNING: raw restart time ",rtime,"does not match current clock time",ctime
     end if
     globalstep = rstep
     print *,"reading raw restart from " // dirpath
