@@ -697,9 +697,20 @@ subroutine read_all_raw_restarts(dirpath, infopath, mpicomm, mype)
       stop 1
     end if
     
+    
     ! compare the restart time with our actual time
     if(int(ctime) /= int(rtime)) then
-      print *, "WARNING: raw restart time ",rtime,"does not match current clock time",ctime
+        write(*,*)
+        print *, achar(27)//'[5,33m'  
+        write(*,*) '____________________________________________________________________'
+        write(*,*) "WARNING: raw restart time ",rtime," does not match current clock time",ctime
+        write(*,*) "         If you restart with a different time step this might be ok!"
+        write(*,*) "         If that is not the case, check your fesom.clock file and"
+        write(*,*) "         the time information of your restart file, make sure they "
+        write(*,*) "         are not messed up!!!"
+        write(*,*) '____________________________________________________________________'
+        print *, achar(27)//'[0m'
+        write(*,*)
     end if
     globalstep = rstep
     print *,"reading raw restart from " // dirpath
