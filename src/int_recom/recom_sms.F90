@@ -258,6 +258,50 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             if (Grazing_detritus) recipDet2 = DetZ2C / DetZ2N
 #endif
 
+            if (ciso) then
+!<       additional variables are declared in module REcoM_ciso
+                DIC_13      = max(tiny,state(k,idic_13)    + sms(k,idic_13  ))
+                PhyC_13     = max(tiny_C,state(k,iphyc_13) + sms(k,iphyc_13 ))
+                DetC_13     = max(tiny,state(k,idetc_13)   + sms(k,idetc_13 ))
+                HetC_13     = max(tiny,state(k,ihetc_13)   + sms(k,ihetc_13 ))
+                EOC_13      = max(tiny,state(k,idoc_13)    + sms(k,idoc_13  ))
+                DiaC_13     = max(tiny_C,state(k,idiac_13) + sms(k,idiac_13 ))
+                PhyCalc_13  = max(tiny,state(k,iphycal_13) + sms(k,iphycal_13))
+                DetCalc_13  = max(tiny,state(k,idetcal_13) + sms(k,idetcal_13))
+
+                calc_diss_13      = alpha_dcal_13 * calc_diss
+
+                quota_13          = PhyN / PhyC_13
+                recipQuota_13     = real(one) / quota_13
+
+                quota_dia_13      = DiaN / DiaC_13
+                recipQuota_dia_13 = real(one) / quota_dia_13
+
+                recipQZoo_13      = HetC_13 / HetN
+
+                if (ciso_14) then
+                    DIC_14            = max(tiny,state(k,idic_14)    + sms(k,idic_14  ))
+                    if (ciso_organic_14) then
+                        PhyC_14           = max(tiny_C,state(k,iphyc_14) + sms(k,iphyc_14 ))
+                        DetC_14           = max(tiny,state(k,idetc_14)   + sms(k,idetc_14 ))
+                        HetC_14           = max(tiny,state(k,ihetc_14)   + sms(k,ihetc_14 ))
+                        EOC_14            = max(tiny,state(k,idoc_14)    + sms(k,idoc_14  ))
+                        DiaC_14           = max(tiny_C,state(k,idiac_14) + sms(k,idiac_14 ))
+                        PhyCalc_14        = max(tiny,state(k,iphycal_14) + sms(k,iphycal_14))
+                        DetCalc_14        = max(tiny,state(k,idetcal_14) + sms(k,idetcal_14))
+
+                        calc_diss_14      = alpha_dcal_14 * calc_diss
+
+                        quota_14          = PhyN / PhyC_14
+                        recipQuota_14     = real(one) / quota_14
+
+                        quota_dia_14      = DiaN / DiaC_14
+                        recipQuota_dia_14 = real(one) / quota_dia_14
+                        recipQZoo_14      = HetC_14 / HetN
+                    end if ! ciso_organic_14 
+                end if   ! ciso_14
+            end if     ! ciso
+
 !-------------------------------------------------------------------------------
 !> Temperature dependence of rates
 !------------------------------------------------------------------------------- 
@@ -939,6 +983,18 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 HetRespFlux = max(zero, HetRespFlux)  !!!!!!!! CHECK Judith Valid for het_resp_noredfield case as well ???????? Then move it below
             endif
 
+            if (ciso) then
+!MB    set HetRespFlux_plus = .true. in namelist.recom
+!      HetRespFlux_13   = max(zero, recip_res_het * arrFunc * (hetC_13 * recip_hetN_plus - redfield) * HetC_13)
+!      Numerically safer parametrization avoiding instable results which may result from different cutoff values -- CHECK
+                HetRespFlux_13     = HetRespFlux * HetC_13 / HetC 
+!!     HetRespFlux_13     = HetRespFlux * (HetC_13 / HetC) **2
+                if (ciso_14 .and. ciso_organic_14) then
+!        HetRespFlux_14 = max(zero, recip_res_het * arrFunc * (hetC_14 * recip_hetN_plus - redfield) * HetC_14)
+                    HetRespFlux_14   = HetRespFlux * HetC_14 / HetC
+!!       HetRespFlux_14   = HetRespFlux * (HetC_14 / HetC) **2
+                end if
+            end if
 
 !-------------------------------------------------------------------------------
 !< Zooplanton mortality (Quadratic)
@@ -1059,6 +1115,19 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             calc_loss_gra3 = grazingFlux_phy3 * aux ! 3Zoo
 #endif
 #endif
+
+            if (ciso) then
+                calcification_13 = calc_prod_ratio * Cphot * PhyC_13 * alpha_calc_13
+                calcification_13 = calcification   * alpha_calc_13
+                calc_loss_agg_13 = aggregationRate * PhyCalc_13
+                calc_loss_gra_13 = grazingFlux_phy * recipQuota_13/(PhyC_13 + tiny) * PhyCalc_13
+                if (ciso_14 .and. ciso_organic_14) then
+                    calcification_14 = calc_prod_ratio * Cphot * PhyC_14 * alpha_calc_14
+                    calc_loss_agg_14 = aggregationRate * PhyCalc_14
+                    calc_loss_gra_14 = grazingFlux_phy * recipQuota_14/(PhyC_14 + tiny) * PhyCalc_14
+                end if
+            end if
+
 !-------------------------------------------------------------------------------
 ! Sources minus sinks (SMS)
 !-------------------------------------------------------------------------------
@@ -1219,25 +1288,25 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     if (Grazing_detritus) then
 #if defined (__3Zoo2Det)
         sms(k,idetn)       = (                             &
-            + grazingFlux_phy3                             &
-            - grazingFlux_phy3   * grazEff3                &
-            + grazingFlux_dia3                             &
-            - grazingFlux_dia3   * grazEff3                &
+            + grazingFlux_phy3                             & ! --> grazing on small phytoplankton by third zooplankton
+            - grazingFlux_phy3   * grazEff3                & ! --> fraction of grazingFlux_phy3 into microzooplankton pool
+            + grazingFlux_dia3                             & ! --> grazing on diatoms by third zooplankton
+            - grazingFlux_dia3   * grazEff3                & ! --> fraction of grazingFlux_dia3 into microzooplankton pool
 #if defined (__coccos)
-            + grazingFlux_Cocco3                           &
-            - grazingFlux_Cocco3 * grazEff3                &
+            + grazingFlux_Cocco3                           & ! --> grazing on coccolithophores by third zooplankton
+            - grazingFlux_Cocco3 * grazEff3                & ! --> fraction of grazingFlux_Cocco3 into microzooplankton pool
             + aggregationRate               * CoccoN       & 
 #endif
-            - grazingFlux_Det    * grazEff                 &
-            - grazingFlux_Det2   * grazEff2                &   ! --> okay, grazing of second zoo on first detritus
+            - grazingFlux_Det    * grazEff                 & ! --> grazing of first zoo (meso) on first detritus class
+            - grazingFlux_Det2   * grazEff2                & ! --> grazing of second zoo (macro) on first detritus class
             + aggregationRate               * PhyN         &
             + aggregationRate               * DiaN         &
-            + miczooLossFlux                               &
-            - reminN * arrFunc * O2Func     * DetN         & ! O2remin
+            + miczooLossFlux                               & !  --> microzooplankton, mortality
+            - reminN * arrFunc * O2Func     * DetN         & !  --> O2remin
                                                           ) * dt_b + sms(k,idetn)
 #else
         sms(k,idetn)       = (                             &
-	    + grazingFlux_phy                              &
+	    + grazingFlux_phy                              & ! Technically it is mesooooooooooooooooo
             - grazingFlux_phy   * grazEff                  &
             + grazingFlux_dia                              &
             - grazingFlux_dia   * grazEff                  &
@@ -1301,7 +1370,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             + aggregationRate                       * CoccoC   &
 #endif
             - grazingFlux_Det  * recipDet  * grazEff           &
-            - grazingFlux_Det2 * recipDet2 * grazEff2          &
+            - grazingFlux_Det2 * recipDet  * grazEff2          & ! corrected recipDet2 -> recipDet
             + aggregationRate                         * PhyC   &
             + aggregationRate                         * DiaC   &
             + miczooLossFlux   * recipQZoo3                    &
@@ -1319,7 +1388,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             + aggregationRate                      * CoccoC    &
 #endif
             - grazingFlux_Det  * recipDet  * grazEff           &
-            - grazingFlux_Det2 * recipDet2 * grazEff           & !!!!!! CHECK
+           ! - grazingFlux_Det2 * recipDet2 * grazEff           & !!!!!! CHECK
             + aggregationRate              * phyC              &
             + aggregationRate              * DiaC              &
             + hetLossFlux      * recipQZoo                     &
@@ -2001,6 +2070,180 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #endif
                                            ) * redO2C * dt_b + sms(k,ioxy)  
 !   
+    if (ciso) then
+!-------------------------------------------------------------------------------
+! DIC_13
+      sms(k,idic_13) =        (                           &
+            - Cphot                         * PhyC_13       &
+            + phyRespRate                   * PhyC_13       &
+            - Cphot_Dia                     * DiaC_13       &
+            + phyRespRate_Dia               * DiaC_13       &
+            + rho_C1 * arrFunc              * EOC_13        &
+            + HetRespFlux_13                                &
+            + calc_diss_13                  * DetCalc_13    &
+            + calc_loss_gra_13 * calc_diss_guts             &
+            - calcification_13                              &
+                                ) * dt_b + sms(k,idic_13)
+!-------------------------------------------------------------------------------
+! Phytoplankton C_13
+      sms(k,iphyc_13)      =  (                           &
+                + Cphot                        * PhyC_13        &
+                - lossC * limitFacN            * PhyC_13        &
+                - phyRespRate                  * PhyC_13        &
+                - aggregationRate              * PhyC_13        &
+                - grazingFlux_phy * recipQuota_13               &
+                                    ) * dt_b + sms(k,iphyc_13)
+!-------------------------------------------------------------------------------
+! Detritus C_13
+      sms(k,idetc_13)       = (                           &
+                + grazingFlux_phy * recipQuota_13               &
+                - grazingFlux_phy * recipQuota_13 * grazEff     &
+                + grazingFlux_Dia * recipQuota_dia_13           &
+                - grazingFlux_Dia * recipQuota_dia_13 * grazEff &
+                + aggregationRate              * phyC_13        &
+                + aggregationRate              * DiaC_13        &
+                + hetLossFlux * recipQZoo_13                    &
+                - reminC * arrFunc             * DetC_13        &
+                                                   )   * dt_b + sms(k,idetc_13)
+!-------------------------------------------------------------------------------
+! Heterotrophic C_13
+      sms(k,ihetc_13)      = (                            &
+            + grazingFlux_phy * recipQuota_13 * grazEff     &
+            + grazingFlux_Dia * recipQuota_dia_13 * grazEff &
+            - hetLossFlux * recipQZoo_13                    &
+            - lossC_z                      * HetC_13        &
+            - hetRespFlux_13                                &
+                                                 ) * dt_b + sms(k,ihetc_13)
+!-------------------------------------------------------------------------------
+! EOC_13
+      sms(k,idoc_13)       = (                            &
+                + lossC * limitFacN              * phyC_13      &
+                + lossC_d * limitFacN_dia        * DiaC_13      &
+                + reminC * arrFunc               * DetC_13      &
+                + lossC_z                        * HetC_13      &
+                - rho_c1 * arrFunc               * EOC_13       &
+                + LocRiverDOC * r_iorg_13                       &
+                                                    ) * dt_b + sms(k,idoc_13)
+!-------------------------------------------------------------------------------
+! Diatom C_13
+      sms(k,idiac_13)      = (                            &
+                + Cphot_dia                      * DiaC_13      &
+                - lossC_d * limitFacN_dia        * DiaC_13      &
+                - phyRespRate_dia                * DiaC_13      &
+                - aggregationRate                * DiaC_13      &
+                - grazingFlux_dia * recipQuota_dia_13           &
+                                                   ) * dt_b + sms(k,idiac_13)
+!-------------------------------------------------------------------------------
+! Small phytoplankton calcite_13
+      sms(k,iphycal_13)    = (                            &
+            + calcification_13                              &
+            - lossC * limitFacN * phyCalc_13                &
+            - phyRespRate       * phyCalc_13                &
+            - calc_loss_agg_13                              &
+            - calc_loss_gra_13                              &
+                                              ) * dt_b + sms(k,iphycal_13)
+!-------------------------------------------------------------------------------
+! Detritus calcite_13
+      sms(k,idetcal_13)   = (                             &
+            + lossC * limitFacN * phyCalc_13                &
+            + phyRespRate       * phyCalc_13                &
+            + calc_loss_agg_13                              &
+            + calc_loss_gra_13                              &
+            - calc_loss_gra_13 * calc_diss_guts             &
+            - calc_diss_13     * DetCalc_13                 &
+                                             ) * dt_b + sms(k,idetcal_13)
+!-------------------------------------------------------------------------------
+      if (ciso_14) then
+!-------------------------------------------------------------------------------
+        if (ciso_organic_14) then
+! DIC_14
+          sms(k,idic_14) =        (                         &
+            - Cphot                         * PhyC_14       &
+            + phyRespRate                   * PhyC_14       &
+            - Cphot_Dia                     * DiaC_14       &
+            + phyRespRate_Dia               * DiaC_14       &
+            + rho_C1 * arrFunc              * EOC_14        &
+            + HetRespFlux_14                                &
+            + calc_diss_14                  * DetCalc_14    &
+            + calc_loss_gra_14 * calc_diss_guts             &
+            - calcification_14                              &
+                                ) * dt_b + sms(k,idic_14)
+!-------------------------------------------------------------------------------
+! Phytoplankton C_14
+          sms(k,iphyc_14)      =  (                           &
+            + Cphot                        * PhyC_14        &
+            - lossC * limitFacN            * PhyC_14        &
+            - phyRespRate                  * PhyC_14        &
+            - aggregationRate              * PhyC_14        &
+            - grazingFlux_phy * recipQuota_14               &
+                                    ) * dt_b + sms(k,iphyc_14)
+!-------------------------------------------------------------------------------
+! Detritus C_14
+          sms(k,idetc_14)       = (                           &
+            + grazingFlux_phy * recipQuota_14               &
+            - grazingFlux_phy * recipQuota_14 * grazEff     &
+            + grazingFlux_Dia * recipQuota_dia_14           &
+            - grazingFlux_Dia * recipQuota_dia_14 * grazEff &
+            + aggregationRate              * phyC_14        &
+            + aggregationRate              * DiaC_14        &
+            + hetLossFlux * recipQZoo_14                    &
+            - reminC * arrFunc             * DetC_14        &
+                                                   )   * dt_b + sms(k,idetc_14)
+!-------------------------------------------------------------------------------
+! Heterotrophic C_14
+          sms(k,ihetc_14)      = (                            &
+            + grazingFlux_phy * recipQuota_14 * grazEff     &
+            + grazingFlux_Dia * recipQuota_dia_14 * grazEff &
+            - hetLossFlux * recipQZoo_14                    &
+            - lossC_z                      * HetC_14        &
+            - hetRespFlux_14                                &
+                                                 ) * dt_b + sms(k,ihetc_14)
+!-------------------------------------------------------------------------------
+! EOC_14
+          sms(k,idoc_14)       = (                            &
+            + lossC * limitFacN              * phyC_14      &
+            + lossC_d * limitFacN_dia        * DiaC_14      &
+            + reminC * arrFunc               * DetC_14      &
+            + lossC_z                        * HetC_14      &
+            - rho_c1 * arrFunc               * EOC_14       &
+            + LocRiverDOC * r_iorg_14                       &
+                                                    ) * dt_b + sms(k,idoc_14)
+!-------------------------------------------------------------------------------
+! Diatom C_14
+          sms(k,idiac_14)      = (                            &
+            + Cphot_dia                      * DiaC_14      &
+            - lossC_d * limitFacN_dia        * DiaC_14      &
+            - phyRespRate_dia                * DiaC_14      &
+            - aggregationRate                * DiaC_14      &
+            - grazingFlux_dia * recipQuota_dia_14           &
+                                                   ) * dt_b + sms(k,idiac_14)
+!-------------------------------------------------------------------------------
+! Small phytoplankton calcite_14
+          sms(k,iphycal_14)    = (                            &
+            + calcification_14                              &
+            - lossC * limitFacN * phyCalc_14                &
+            - phyRespRate       * phyCalc_14                &
+            - calc_loss_agg_14                              &
+            - calc_loss_gra_14                              &
+                                              ) * dt_b + sms(k,iphycal_14)
+!-------------------------------------------------------------------------------
+! Detritus calcite_14
+          sms(k,idetcal_14)   = (                             &
+            + lossC * limitFacN * phyCalc_14                &
+            + phyRespRate       * phyCalc_14                &
+            + calc_loss_agg_14                              &
+            + calc_loss_gra_14                              &
+            - calc_loss_gra_14 * calc_diss_guts             &
+            - calc_diss_14     * DetCalc_14                 &
+                                             ) * dt_b + sms(k,idetcal_14)
+!-------------------------------------------------------------------------------
+        else
+!         "Abiotic" DIC_14, identical to DIC except for radioactive decay (->
+!         recom_forcing)
+          sms(k,idic_14) = sms(k,idic)
+        end if ! ciso_organic_14
+      end if   ! ciso_14
+    end if     ! ciso
 !-------------------------------------------------------------------------------
 ! Diagnostics: Averaged rates
 	
@@ -2153,6 +2396,13 @@ endif
 
 !-------------------------------------------------------------------------------
 ! Remineralization from the sediments into the bottom layer
+
+  if (use_MEDUSA .and. (sedflx_num .ne. 0)) then
+   if (mype==0) then !OG
+      write(*,*) ' --> Sedimentary input of nutrients through MEDUSA'
+   endif
+
+  else ! not use_MEDUSA or sedflx_num = 0
 !*** DIN ***
 !< decayRateBenN: Remineralization rate for benthic N [day^-1]
 !< LocBenthos(1): Vertically integrated N concentration in benthos (1 layer) [mmolN/m^2]
@@ -2174,6 +2424,29 @@ endif
 !*** Calc: DIC, Alk ***  ! OG calc_diss_ben is taken from the deepest level 
   decayBenthos(4) = calc_diss_ben * LocBenthos(4)    ! NEW DISS changed calc_diss to calc_diss_ben to not make the dissolution omega dependent when using the switch OmegaC_diss
   LocBenthos(4)      = LocBenthos(4)   - decayBenthos(4) * dt_b
+
+    if (ciso) then
+!*** DIC_13 ***  We ignore isotopic fractionation during remineralization.
+        decayBenthos(5) = alpha_dcal_13   * decayRateBenC   * LocBenthos(5)
+        LocBenthos(5)   = LocBenthos(5)   - decayBenthos(5) * dt_b
+!*** Calc: DIC_13 ***
+        decayBenthos(6) = calc_diss_13    * LocBenthos(6)
+        LocBenthos(6)   = LocBenthos(6)   - decayBenthos(6) * dt_b ! / depth of benthos
+      if (ciso_14) then
+        if (ciso_organic_14) then
+!*** DIC_14 ***  We ignore isotopic fractionation during remineralization.
+          decayBenthos(7) = alpha_dcal_14   * decayRateBenC   * LocBenthos(7)
+          LocBenthos(7)   = LocBenthos(7)   - decayBenthos(7) * dt_b
+!*** Calc: DIC_14 ***
+          decayBenthos(8) = calc_diss_14    * LocBenthos(8)
+          LocBenthos(8)   = LocBenthos(8)   - decayBenthos(8) * dt_b ! / depth of benthos
+        else
+!         Do nothing here because sms(idic_14) is defined as sms(idic) further
+!         above
+        end if ! ciso_organic_14
+      end if   ! ciso_14
+    end if ! ciso
+  endif ! use_MEDUSA
 
   end do ! Main time loop ends
 
