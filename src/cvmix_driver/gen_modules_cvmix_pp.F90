@@ -73,10 +73,10 @@ module g_cvmix_pp
         logical                          :: nmlfile_exist=.False.
         integer                          :: node_size
         integer fileunit
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
+#include "../associate_part_def.h"
+#include "../associate_mesh_def.h"
+#include "../associate_part_ass.h"
+#include "../associate_mesh_ass.h"
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
@@ -172,10 +172,10 @@ module g_cvmix_pp
         integer       :: node, elem, nz, nln, nun, elnodes(3), windnl=2, node_size
         real(kind=WP) :: vshear2, dz2, Kvb
         real(kind=WP), dimension(:,:,:), pointer :: UVnode
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
+#include "../associate_part_def.h"
+#include "../associate_mesh_def.h"
+#include "../associate_part_ass.h"
+#include "../associate_mesh_ass.h"
         UVnode=>dynamics%uvnode(:,:,:)
         node_size = myDim_nod2D
         !_______________________________________________________________________

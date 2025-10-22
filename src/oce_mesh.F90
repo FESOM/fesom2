@@ -489,12 +489,12 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
      write(*,*) 'reading '// trim(file_name)   
   end if
   call MPI_BCast(mesh%elem2d, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-  allocate(mesh%elem2D_nodes(3, myDim_elem2D+eDim_elem2D+eXDim_elem2D))
+  allocate(mesh%elem2D_nodes(3, myDim_elem2D)) !+eDim_elem2D+eXDim_elem2D
 
   ! 0 proc reads the data in chunks and distributes it between other procs
   do nchunk=0, (mesh%elem2D-1)/chunk_size
      mapping(1:chunk_size)=0
-     do n=1, myDim_elem2D+eDim_elem2D+eXDim_elem2D
+     do n=1, myDim_elem2D!+eDim_elem2D+eXDim_elem2D
         ipos=(myList_elem2D(n)-1)/chunk_size
         if (ipos==nchunk) then
            iofs=myList_elem2D(n)-nchunk*chunk_size
@@ -532,7 +532,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
            mapping(iofs)=n
         end if
      end do
-     do n=1, myDim_elem2D+eDim_elem2D+eXDim_elem2D
+     do n=1, myDim_elem2D!+eDim_elem2D+eXDim_elem2D
         do m=1,3
            nn=mesh%elem2D_nodes(m, n)
            ipos=(nn-1)/chunk_size
@@ -2435,7 +2435,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 USE o_PARAM
 USE o_ARRAYS
-USE g_CONFIG, only: rotated_grid, force_rotation
+USE g_CONFIG, only: rotated_grid, force_rotation, metric_factor_zero
 USE g_ROTATE_grid
 use g_comm_auto
 use elem_center_interface
@@ -2510,7 +2510,12 @@ t0=MPI_Wtime()
  center_x(n)=ax
  center_y(n)=ay
  mesh%elem_cos(n)=cos(ay)
- mesh%metric_factor(n)=tan(ay)/r_earth
+ if (metric_factor_zero) then
+    mesh%metric_factor(n)=0.0_WP
+ else
+    mesh%metric_factor(n)=tan(ay)/r_earth
+ end if
+
  END DO
 
  call exchange_elem(mesh%metric_factor, partit)

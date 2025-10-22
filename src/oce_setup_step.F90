@@ -84,11 +84,14 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     USE o_ARRAYS
     USE g_config
     USE g_forcing_param, only: use_virt_salt
+    use o_mixing_KPP_mod
+#if defined (__cvmix)       
     use g_cvmix_tke
     use g_cvmix_idemix
     use g_cvmix_pp
     use g_cvmix_kpp
     use g_cvmix_tidal
+#endif    
     use g_backscatter
     use Toy_Channel_Soufflet
     use Toy_Channel_Dbgyre
@@ -141,6 +144,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     select case (trim(mix_scheme))
         case ('KPP'                   ) ; mix_scheme_nmb = 1
         case ('PP'                    ) ; mix_scheme_nmb = 2
+#if defined (__cvmix)           
         case ('cvmix_KPP'             ) ; mix_scheme_nmb = 3
         case ('cvmix_PP'              ) ; mix_scheme_nmb = 4
         case ('cvmix_TKE'             ) ; mix_scheme_nmb = 5
@@ -151,6 +155,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
         case ('cvmix_KPP+cvmix_TIDAL' ) ; mix_scheme_nmb = 37
         case ('cvmix_PP+cvmix_TIDAL'  ) ; mix_scheme_nmb = 47
         case ('cvmix_TKE+cvmix_IDEMIX') ; mix_scheme_nmb = 56
+#endif        
         case default 
             stop "!not existing mixing scheme!"
             call par_ex(partit%MPI_COMM_FESOM, partit%mype)
@@ -160,9 +165,10 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_kpp_init'//achar(27)//'[0m'
         call oce_mixing_kpp_init(partit, mesh)
+        
     ! initialise fesom1.4 like PP
     elseif (mix_scheme_nmb==2 .or. mix_scheme_nmb==27) then
-    
+#if defined (__cvmix)       
     ! initialise cvmix_KPP
     elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_kpp'//achar(27)//'[0m'
@@ -177,9 +183,10 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     elseif (mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_tke'//achar(27)//'[0m'
         call init_cvmix_tke(partit, mesh)
-        
+#endif        
     endif
-  
+
+#if defined (__cvmix)       
     ! initialise additional mixing cvmix_IDEMIX --> only in combination with 
     ! cvmix_TKE+cvmix_IDEMIX or stand alone for debbuging as cvmix_TKE
     if     (mod(mix_scheme_nmb,10)==6) then
@@ -193,7 +200,8 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_tidal'//achar(27)//'[0m'
         call init_cvmix_tidal(partit, mesh)
     end if         
-    
+#endif
+
     !___________________________________________________________________________
     ! set use_density_ref .true. when cavity is used and initialse cavity boundary 
     ! line for the extrapolation of the initialisation
