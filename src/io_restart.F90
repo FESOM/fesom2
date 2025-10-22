@@ -449,6 +449,8 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
   logical :: is_portable_restart_write, is_raw_restart_write, is_bin_restart_write
   logical, save :: initialized_raw = .false.
   logical, save :: initialized_bin = .false.
+  logical, save :: initialized_io = .false.
+  integer :: mpierr
 
 #if defined(__recom) && defined(__usetp)
   integer :: tr_arr_slice_count_fix_1
@@ -460,14 +462,6 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
   integer :: num_tracers
 #endif
 
-  !which_readr = ...
-  ! 0 ... read netcdf restart
-  ! 1 ... read dump file restart (binary)
-  ! 2 ... read derived type restart (binary) 
-  integer, intent(out):: which_readr
-  
-  integer             :: cstep
-
 #if defined(__recom) && defined(__usetp)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -476,9 +470,6 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
 
     num_tracers = tracers%num_tracers
 #endif
-
-  logical, save :: initialized_io = .false.
-  integer :: mpierr
 
   character(:), allocatable :: write_raw_dirpath, write_raw_infopath
   character(:), allocatable :: write_bin_dirpath, write_bin_infopath
