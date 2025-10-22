@@ -44,15 +44,19 @@ pp_use_nonconstKvb = .true.     ! use lat and depth dependent background diffusi
 
 ! namelist for KPP
 &param_kpp
-kpp_use_fesomkpp   = .false.     ! if true use cvmix MOM5 like kpp if false use cvmix MOM6 like kpp
+kpp_use_fesomkpp   = .false.    ! if true use cvmix MOM5 like kpp if false use cvmix MOM6 like kpp
 kpp_use_enhanceKv  = .true.     ! If true, add enhanced diffusivity at base of boundary layer
 kpp_use_compEkman  = .true.     ! If true, compute Ekman depth limit for OBLdepth 
 kpp_use_monob      = .true.     ! If true, compute Monin-Obukhov limit for OBLdepth
-kpp_interptype_ri  = "linear"    ! Type of interpolation in determining OBL depth: linear,quadratic,cubic
+kpp_interptype_ri  = "linear"   ! Type of interpolation in determining OBL depth: linear,quadratic,cubic
 kpp_interptype_atobl= "LMD94"   ! Type of interpolation of visc and diff at obl depth: linear,quadratic,cubic,LMD94
 kpp_matchtechc     = "ParabolicNonLocal" ! Setting diffusivity and NLT profile functions:SimpleShapes, MatchGradient, MatchBoth, ParabolicNonLocal
 kpp_internalmix    = "KPP"      ! Ri-number dependet mixing scheme below the OBL: 'PP' or 'KPP'
 kpp_reduce_tauuice = .false.    ! If True, reduce the wind stress (ustar) under sea ice.
+kpp_use_StokesMOST = .true.     ! use Stokes Similarty package
+kpp_A_stokes       = 0.005      ! proportionality factor between surface wind velocity and stokes velocity
+kpp_langmuir_mixing= 'LWF16'    ! option for  Langmuir enhanced mixing: 'LWF16', 'RWHGK16', 'None
+kpp_langmuir_entrainment = 'LF17'! Langmuir turbulence enhanced entrainment method: 'LWF16', 'LF17', 'RWHGK16', 'NONE'
 kpp_Av0            = 5.0e-3     ! leading coefficient of shear mixing formula, units: m^2/s: default= 5e-3  
 kpp_Kv0            = 5.0e-3 
 kpp_Ri0            = 0.7        ! critical Richardson number value, units: unitless (0.7 in LMD94)

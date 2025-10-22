@@ -8,11 +8,21 @@ This chapter describes several ways of getting started with FESOM2. First we sho
 TL;DR version for supported HPC systems
 =======================================
 
-Supported systems are: generic ``ubuntu``, ``albedo`` at AWI, ``levante`` at DKRZ, ``JURECA`` at JSC, ``HLRN``, ``Hazel Hen``, ``MareNostrum 4`` at BSC. During configuration the system will be recognised and apropriate environment variables and compiler options should be used.
+Supported systems are: generic ``ubuntu``, ``albedo`` at AWI, ``levante`` at
+DKRZ, ``JURECA`` at JSC, ``HLRN``, ``Hazel Hen``, ``MareNostrum 4`` at BSC.
+During configuration the system will be recognised and apropriate environment
+variables and compiler options should be used.
+
+FESOM uses a rolling release approach where the main branch always contains the
+latest changes. Usually, you want to get a stable version, so you need to clone
+a specific tag. See https://github.com/FESOM/fesom2/releases for releases and
+changes.
+
+Example for release 2.6.12:
 
 ::
 
-    git clone https://github.com/FESOM/fesom2.git
+    git clone https://github.com/FESOM/fesom2.git -b 2.6.12
     cd fesom2
     bash -l ./configure.sh
 
@@ -47,7 +57,7 @@ Clone the GitHub repository with a git command:
 
 ::
 
-    git clone https://github.com/FESOM/fesom2.git
+    git clone https://github.com/FESOM/fesom2.git -b <release>
 
 
 The repository contains model code and two additional libraries: `Metis` (domain partitioner) and `Parms` (solver), necessary to run FESOM2. To build FESOM2 executable one have to compile Parms library and the code of the model (`src` folder). In order to build executable that is used for model domain partitioning (distribution of the model mesh between CPUs) one have to compile `Metis` library and also some code located in the src directory (see :ref:`partitioning`). Building of the model executable and the partitioner is usually done automatically with the use of CMake. If you going to build the code not on one of the supported platforms (ollie, DKRZ, HLRN, HAZELHEN, and BSC, general Ubuntu), you might need to do some (usually small) modifications described in `Adding new platform for compilation`_ section.

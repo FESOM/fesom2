@@ -136,10 +136,10 @@ module g_cvmix_tke
         integer                               :: node_size
         integer fileunit
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+#include "../associate_part_def.h"
+#include "../associate_mesh_def.h"
+#include "../associate_part_ass.h"
+#include "../associate_mesh_ass.h"
 
         !_______________________________________________________________________
         if(mype==0) then
@@ -287,10 +287,10 @@ module g_cvmix_tke
         real(kind=WP) :: tke_Av_old(mesh%nl), tke_Kv_old(mesh%nl), tke_old(mesh%nl)
         real(kind=WP), dimension(:,:,:), pointer :: UVnode
     
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+#include "../associate_part_def.h"
+#include "../associate_mesh_def.h"
+#include "../associate_part_ass.h"
+#include "../associate_mesh_ass.h"
         UVnode=>dynamics%uvnode(:,:,:)
         
         node_size = myDim_nod2D

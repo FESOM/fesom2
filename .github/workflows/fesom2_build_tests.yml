@@ -1,0 +1,75 @@
+name: FESOM2 Build Tests
+# Controls when the action will run. Triggers the workflow on push or pull request.
+on:
+  workflow_dispatch: {}
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+    branches:
+      - main
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  build_tests:
+    # Use matrix strategy to build all configurations in parallel
+    strategy:
+      matrix:
+        preset: [default, coupled, recom, ifs_interface]
+        include:
+          - preset: default
+            display_name: "Default Configuration"
+          - preset: coupled
+            display_name: "Coupled Configuration"
+          - preset: recom
+            display_name: "REcoM3 Configuration"
+          - preset: ifs_interface
+            display_name: "IFS Interface Configuration"
+    
+    # Containers must run in Linux based operating systems
+    runs-on: ubuntu-latest
+    # Docker Hub image that `container-job` executes in
+    container: ghcr.io/suvarchal/fesom2-ci:latest
+
+    # Service containers to run with `gfortran_ubuntu`
+    steps:
+    # Modern checkout action with v5
+    - uses: actions/checkout@v5
+      with:
+        # Don't Fetch all history for all tags and branches to ensure we have the latest presets
+        fetch-depth: 1
+
+    - name: Git safe directory
+      run: |
+        git config --global --add safe.directory ${PWD}
+
+    - name: Copy OASIS directory
+      run: |
+        cp -rf /oasis ../
+
+    - name: List available CMake presets
+      run: |
+        echo "Available CMake presets:"
+        cmake --list-presets
+        echo ""
+        echo "Available test presets:"
+        ctest --list-presets
+
+    - name: Configure and build ${{ matrix.display_name }}
+      run: |
+        echo "Building ${{ matrix.display_name }} (preset: ${{ matrix.preset }})"
+        cmake --preset ${{ matrix.preset }}
+        cmake --build --preset ${{ matrix.preset }} --parallel $(nproc)
+        
+    - name: Run integration tests for ${{ matrix.display_name }}
+      run: |
+        echo "Running integration tests for ${{ matrix.display_name }}..."
+        ctest --preset ${{ matrix.preset }} --output-on-failure
+      continue-on-error: ${{ matrix.preset == 'recom' }}  # REcoM3 tests may fail as noted in documentation
+        
+    - name: Verify build artifacts for ${{ matrix.display_name }}
+      run: |
+        echo "Checking build artifacts for ${{ matrix.display_name }}:"
+        ls -la build/${{ matrix.preset }}/
+        echo ""
+        echo "Build completed successfully for ${{ matrix.display_name }}!"

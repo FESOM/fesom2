@@ -26,7 +26,8 @@ use cvmix_kinds_and_types,    only : cvmix_r8,                     &
                                       cvmix_data_type,             &
                                       cvmix_global_params_type
 
-use cvmix_utils,              only : cvmix_update_tke, solve_tridiag
+use cvmix_kinds_and_types_addon,    only : cvmix_data_type_addon
+use cvmix_utils_addon,              only : cvmix_update_tke, solve_tridiag
 
 
 implicit none
@@ -289,7 +290,7 @@ subroutine tke_wrap(Vmix_vars, Vmix_params, tke_userdef_constants)
 type(tke_type), intent(in), optional, target ::  &
   tke_userdef_constants                            !
 
-type(cvmix_data_type), intent(inout)         ::  & 
+type(cvmix_data_type_addon), intent(inout)         ::  & 
   Vmix_vars                                        ! 
 
 type(cvmix_global_params_type), intent(in)   ::  &

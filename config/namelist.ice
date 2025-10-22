@@ -37,4 +37,5 @@ new_iclasses=.false.    ! default=.false.; ice thickness distribution based on E
 open_water_albedo=0    ! 0=default; 1=taylor; 2=briegleb
 c_melt=0.5             ! constant in concentration equation for melting conditions - default=0.5
 h_cutoff=3.0           ! only used for new_iclasses=.true.
+use_meltponds=.false.  ! enable melt pond parameterization - default=.false.
 /

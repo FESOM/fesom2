@@ -1,0 +1,47 @@
+name: FESOM2 Intel Compiler Tests
+
+# Controls when the action will run. Triggers the workflow on push or pull request.
+on:
+  workflow_dispatch: {}
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+    branches:
+      - main
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  intel_test:
+    # Containers must run in Linux based operating systems
+    runs-on: ubuntu-latest
+    # Intel compiler container
+    container: ghcr.io/suvarchal/fesom2-ci-intel
+
+    steps:
+    # Checkout repository with latest git action
+    - uses: actions/checkout@v5
+      with:
+        fetch-depth: 1
+
+    - name: Git safe directory
+      run: |
+        git config --global --add safe.directory ${PWD}
+
+    - name: Verify Intel compiler
+      run: |
+        echo "Checking Intel compiler use..."
+        echo "$CC"
+        echo "$FC"
+
+    - name: Configure and build with Intel compiler
+      run: |
+        echo "Configuring FESOM2 with Intel compiler..."
+        ./configure.sh ubuntu+intel -DBUILD_TESTING=ON -DBUILD_NETCDF=ON
+
+    - name: Run integration tests
+      run: |
+        echo "Running integration tests with Intel compiler..."
+        cd build
+        ctest -R "integration_*" --output-on-failure --verbose

@@ -494,13 +494,15 @@ subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, o_init_zero)
 
         ! tracer at surface level
         tv(nzmin)=ttf(nzmin,n)
-        ! tracer at surface+1 level
-!       tv(2)=-ttf(1,n)*min(sign(1.0, W(2,n)), 0._WP)+ttf(2,n)*max(sign(1.0, W(2,n)), 0._WP)
-!       tv(3)=-ttf(2,n)*min(sign(1.0, W(3,n)), 0._WP)+ttf(3,n)*max(sign(1.0, W(3,n)), 0._WP)
-        tv(nzmin+1)=0.5*(ttf(nzmin,  n)+ttf(nzmin+1,n))
-        ! tacer at bottom-1 level
-        tv(nzmax-1)=-ttf(nzmax-2,n)*min(sign(1.0_wp, W(nzmax-1,n)), 0._WP)+ttf(nzmax-1,n)*max(sign(1.0_wp, W(nzmax-1,n)), 0._WP)
-!       tv(nzmax-1)=0.5_WP*(ttf(nzmax-2,n)+ttf(nzmax-1,n))
+
+        ! tracer at surface+1 level --> 2nd order central differnce 
+        !!PS tv(nzmin+1)=-ttf(nzmin  ,n)*min(sign(1.0_wp, W(nzmin+1,n)), 0._WP)+ttf(nzmin+1,n)*max(sign(1.0_wp, W(nzmin+1,n)), 0._WP)
+        tv(nzmin+1)=0.5_WP*(ttf(nzmin,  n)+ttf(nzmin+1,n))
+        
+        ! tacer at bottom-1 level --> 2nd order central differnce 
+        !!PS tv(nzmax-1)=-ttf(nzmax-2,n)*min(sign(1.0_wp, W(nzmax-1,n)), 0._WP)+ttf(nzmax-1,n)*max(sign(1.0_wp, W(nzmax-1,n)), 0._WP)
+        tv(nzmax-1)=0.5_WP*(ttf(nzmax-2,n)+ttf(nzmax-1,n))
+        
         ! tracer at bottom level
         tv(nzmax)=ttf(nzmax-1,n)
 

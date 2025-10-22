@@ -104,7 +104,7 @@ use o_param
 
 !   real(kind=WP), allocatable, dimension(:)         :: thdgr, thdgrsn
   real(kind=WP), allocatable, dimension(:)         :: flice
-  real(kind=WP), allocatable, dimension(:)         :: olat_heat, osen_heat, olwout
+  real(kind=WP), allocatable, dimension(:)         :: hf_Qlat, hf_Qsen, hf_Qradtot, hf_Qswr, hf_Qlwr, hf_Qlwrout
   real(kind=WP), allocatable, dimension(:)         :: real_salt_flux !PS
 
   ! drag coefficient Cd_atm_oce and transfer coefficients for evaporation

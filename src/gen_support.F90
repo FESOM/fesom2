@@ -439,7 +439,7 @@ subroutine extrap_nod3D(arr, partit, mesh)
                 
                 !_______________________________________________________________
                 ! loop over local vertices n 
-                do n=1, myDim_nod2D+eDim_nod2D
+                do n=1, myDim_nod2D!+eDim_nod2D
                     ! found node n that has to be extrapolated
                     if ( (work_array(n)>0.99_WP*dummy) .and.  (nlevels_nod2D(n)>nz)) then
                         cnt=0

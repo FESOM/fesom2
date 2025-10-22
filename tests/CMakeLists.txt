@@ -16,7 +16,6 @@ if(NOT TARGET fesom)
 endif()
 
 # Testing configuration options
-option(ENABLE_INTEGRATION_TESTS "Enable integration tests that run FESOM" ON)
 option(ENABLE_MPI_TESTS "Enable MPI tests (requires mpiexec/mpirun)" ON)
 set(TEST_TIMEOUT 600 CACHE STRING "Default timeout for tests in seconds")
 
@@ -56,26 +55,28 @@ endif()
 
 # Print test configuration
 message(STATUS "FESOM2 Testing Configuration:")
-message(STATUS "  Integration tests: ${ENABLE_INTEGRATION_TESTS}")
 message(STATUS "  MPI tests: ${ENABLE_MPI_TESTS}")
 message(STATUS "  Test timeout: ${TEST_TIMEOUT}s")
 message(STATUS "  Test data directory: ${TEST_DATA_DIR}")
 message(STATUS "  MPI executable: ${MPIEXEC_EXECUTABLE}")
 
-# Add integration tests if enabled
-if(ENABLE_INTEGRATION_TESTS)
-    add_subdirectory(integration)
-endif()
+# Add integration tests
+add_subdirectory(integration)
+
+# Add mesh partitioner tests
+add_subdirectory(meshpartitioner)
+
+
+# Add remote mesh pipeline tests
+add_subdirectory(remote)
 
 # Add unit tests (for future expansion)
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/unit/CMakeLists.txt")
     add_subdirectory(unit)
 endif()
 
-# Add ecbundle tests if ecbundle is available
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/ecbundle/CMakeLists.txt")
-    add_subdirectory(ecbundle)
-endif()
+# Add ecbundle tests
+add_subdirectory(ecbundle)
 
 # Create a convenience target to run all tests
 add_custom_target(run_tests
@@ -106,9 +107,19 @@ endif()
 # Create target to run only meshdiag tests (if BUILD_MESHDIAG is enabled)
 if(BUILD_MESHDIAG)
     add_custom_target(run_meshdiag_tests
-        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "meshdiag_"
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -R "(meshdiag_|generate_meshdiag_)"
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
         COMMENT "Running FESOM2 meshdiag tests"
+        VERBATIM
+    )
+endif()
+
+# Create target to run only mesh partitioner tests (if BUILD_MESHPARTITIONER is enabled)
+if(BUILD_MESHPARTITIONER)
+    add_custom_target(run_meshpartitioner_tests
+        COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure -L "meshpartitioner"
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Running FESOM2 mesh partitioner tests"
         VERBATIM
     )
 endif()
