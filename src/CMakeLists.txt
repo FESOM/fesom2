@@ -250,7 +250,7 @@ if(OPENMP_REPRODUCIBLE)
 endif()
 
 if(${RECOM_COUPLED})
-   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2) #__usetp) __3Zoo2Det __coccos)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2 __usetp) #__3Zoo2Det __coccos)
 endif()
 
 if(${CISO_COUPLED})
@@ -265,7 +265,7 @@ endif()
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} STREQUAL  IntelLLVM )
    
    # Base compiler flags
-   target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0 -fpp)
+   target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0 -fpp -fPIC)
    
    # compiler flags not supported by IntelLLVM
    if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
@@ -360,7 +360,7 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
       # |             | -mno-fma4 -mavx2 -mfma                                            |      |
       # | GCC/openMPI | -O3 -march=znver3 -mtune=znver3 -ftree-vectorize -flto            | 280s | chatgpt recomendation
       # |             | -mcpu=znver3                                                      |      |
-      target_compile_options(${PROJECT_NAME} PRIVATE -march=znver3 -mtune=znver3 -ftree-vectorize -flto)      
+      target_compile_options(${PROJECT_NAME} PRIVATE -march=znver3 -mtune=znver3 -ftree-vectorize -flto -fPIC)      
    else()
       #[[if(NOT (${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu))
          target_compile_options(${PROJECT_NAME} PRIVATE -native)
