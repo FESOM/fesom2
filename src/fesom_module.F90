@@ -141,8 +141,6 @@ contains
       integer             :: npes_check
       integer             :: mype_check
       integer             :: i
-! get current value for num_fesom_groups
-      call read_namelist_run_config
 #endif
 
 #if !defined  __ifsinterface
