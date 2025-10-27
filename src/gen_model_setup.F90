@@ -310,33 +310,6 @@ subroutine setup_model(partit)
 ! if ((output_length_unit=='s').or.(int(real(step_per_day)/24.0)<=1)) use_means=.false.
 end subroutine setup_model
 
-
-#if defined(__recom) && defined(__usetp)
-! read num_fesom_groups for multi FESOM group loop parallelization
-! =================================================================
-subroutine read_namelist_run_config(partit)
-  ! Reads run_config namelist and overwrite default parameters.
-  !
-  ! Copied by Kai Himstedt (based on read_namelist)
-  !--------------------------------------------------------------
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use g_config
-  implicit none
-  type(t_partit), intent(inout), target :: partit
-
-  character(len=100)   :: nmlfile
-  integer fileunit
-
-  nmlfile ='namelist.config'    ! name of general configuration namelist file
-  open (newunit=fileunit, file=nmlfile)
-
-  open (fileunit,file=nmlfile)
-!  read (fileunit,NML=run_config)
-  read (fileunit,NML=run_config_tp)
-  close (fileunit)
-end subroutine read_namelist_run_config
-#endif
 ! =================================================================
 subroutine get_run_steps(nsteps, partit)
   ! Coded by Qiang Wang
