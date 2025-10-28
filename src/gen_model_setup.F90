@@ -89,6 +89,7 @@ subroutine setup_model(partit)
 #if defined (__recom)
   nmlfile ='namelist.recom'    ! name of recom namelist file
   open (newunit=fileunit, file=nmlfile)
+  read (fileunit, NML=parecomsetup)
   read (fileunit, NML=pavariables)
   read (fileunit, NML=pasinking)
   read (fileunit, NML=painitialization_N)

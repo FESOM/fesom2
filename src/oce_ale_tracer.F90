@@ -238,7 +238,9 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         if(use_MEDUSA) then
             SinkFlx = 0.0d0
         endif
-#endif    
+        SinkingVel1 = 0.0d0 ! OG 16.03.23
+        SinkingVel2 = 0.0d0 ! OG 16.03.23
+#endif
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
         ! needed
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
@@ -326,6 +328,17 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     end do
 !!!        !$ACC UPDATE HOST (tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus) &
 !!!        !$ACC HOST  (tracers%work%edge_up_dn_grad)
+
+#if defined(__recom)
+    do tr_num = 1, tracers%num_tracers
+        if (use_MEDUSA) then
+            SinkFlx = SinkFlx + SinkFlx_tr(:, :, tr_num)
+        endif
+!        Benthos = Benthos + Benthos_tr(:, :, tr_num)
+        Sinkingvel1(:,:) = Sinkingvel1(:,:) + Sinkvel1_tr(:, :, tr_num)
+        Sinkingvel2(:,:) = Sinkingvel2(:,:) + Sinkvel2_tr(:, :, tr_num)
+    end do
+#endif
 
     !___________________________________________________________________________
     ! 3D restoring for "passive" tracers
@@ -680,7 +693,7 @@ subroutine diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
             rdata =  Tsurf(n)
             rlx   =  surf_relax_T
         elseif (tracers%data(tr_num)%ID==2) then
-            flux  =  virtual_salt(n)+relax_salt(n)- real_salt_flux(n)*is_nonlinfs
+            flux  =  virtual_salt(n)+relax_salt(n)+ real_salt_flux(n)*is_nonlinfs !Bugfix: sign of real salt flux, https://github.com/FESOM/fesom2/issues/721
         else
             flux  = 0._WP
             rdata = 0._WP
@@ -1631,7 +1644,7 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
         ! --> real_salt_flux(:): salt flux due to containment/releasing of salt
         !     by forming/melting of sea ice
         bc_surface= dt*(virtual_salt(n) & !--> is zeros for zlevel/zstar
-                    + relax_salt(n) - real_salt_flux(n)*is_nonlinfs)
+                    + relax_salt(n) + real_salt_flux(n)*is_nonlinfs) !Bugfix: sign of real salt flux, https://github.com/FESOM/fesom2/issues/721
 #if defined(__recom)
     CASE (1001) ! DIN
         if (use_MEDUSA .and. add_loopback) then  ! OG: add is_MEDUSA_loopback flag is_MEDUSA_loopback flag * lb_flux(n,1)
@@ -1691,9 +1704,9 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
     CASE (1022) ! OXY
         bc_surface= dt*GloO2flux_seaicemask(n)
 !        bc_surface=0.0_WP
-    CASE (1023:1033)
+    CASE (1023:1036)
         bc_surface=0.0_WP  ! OG added bc for recom fields
-    CASE (1302) ! Before (1033) ! DIC_13
+    CASE (1302) ! Before (1037) ! DIC_13
 
 #if defined (__ciso)
          if (ciso) then
