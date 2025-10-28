@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --account=biogeo_model.biogeo_model
-#SBATCH --job-name=2p3z2d
+#SBATCH --job-name=4p3z2d
 #SBATCH --partition=mpp
 #SBATCH -N 9
 #SBATCH --cpus-per-task=1
@@ -48,7 +48,7 @@ date
 #fi
 
 Resultpath='/albedo/work/user/xxx'
-test -e $Resultpath/fesom.xxx.oce.restart && exit
+test -e $Resultpath/fesom.xxxx.oce.restart && exit
 
 IsInFile=$( tail -3 fesom2.0.out | grep -c timesteps)
 if (( IsInFile > 0 )); then
