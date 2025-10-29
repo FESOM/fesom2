@@ -77,26 +77,6 @@ contains
 #else
       print '(g0)', 'VERBOSE is OFF'
 #endif  
-#ifdef DISABLE_PARALLEL_RESTART_READ
-      print '(g0)', 'DISABLE_PARALLEL_RESTART_READ is ON'
-#else
-      print '(g0)', 'DISABLE_PARALLEL_RESTART_READ is OFF'
-#endif  
-#ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
-      print '(g0)', 'ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS is ON'
-#else
-      print '(g0)', 'ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS is OFF'
-#endif  
-#ifdef ENABLE_ALBEDO_INTELMPI_WORKAROUNDS
-      print '(g0)', 'ENABLE_ALBEDO_INTELMPI_WORKAROUNDS is ON'
-#else
-      print '(g0)', 'ENABLE_ALBEDO_INTELMPI_WORKAROUNDS is OFF'
-#endif 
-#ifdef ENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS
-      print '(g0)', 'ENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS is ON'
-#else
-      print '(g0)', 'ENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS is OFF'
-#endif  
 #ifdef ENABLE_NVHPC_WORKAROUNDS
       print '(g0)', 'ENABLE_NVHPC_WORKAROUNDS is ON'
 #else

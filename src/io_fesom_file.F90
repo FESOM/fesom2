@@ -220,14 +220,6 @@ contains
       end if
 
       do lvl=1, nlvl
-#ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
-        ! aleph cray-mpich workaround
-        call MPI_Barrier(this%comm, mpierr)
-#elif ENABLE_ALBEDO_INTELMPI_WORKAROUNDS
-        call MPI_Barrier(this%comm, mpierr)
-#elif ENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS     
-        call MPI_Barrier(this%comm, mpierr)             
-#endif
         if(this%is_iorank()) then
           if(is_2d) then
             call this%read_var(var%var_index, [1,last_rec_idx], [size(var%global_level_data),1], var%global_level_data)
@@ -314,14 +306,6 @@ contains
       end if
 
       do lvl=1, nlvl
-#ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
-        ! aleph cray-mpich workaround
-        call MPI_Barrier(this%comm, mpierr)
-#elif ENABLE_ALBEDO_INTELMPI_WORKAROUNDS
-        call MPI_Barrier(this%comm, mpierr)
-#elif ENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS     
-        call MPI_Barrier(this%comm, mpierr)
-#endif
         ! the data from our pointer is not contiguous (if it is 3D data), so we can not pass the pointer directly to MPI
         laux = var%local_data_copy(lvl,:) ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
 

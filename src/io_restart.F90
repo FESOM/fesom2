@@ -816,17 +816,9 @@ subroutine read_netcdf_restarts(path, filegroup, mpicomm, mype)
         end if
 
         if(.not. skip_file(i)) then
-#ifndef DISABLE_PARALLEL_RESTART_READ
-          write(*,*) 'reading restart PARALLEL for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
-#else
-          write(*,*) 'reading restart SEQUENTIAL for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
-#endif
+          write(*,*) 'reading restart for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
         else
-#ifndef DISABLE_PARALLEL_RESTART_READ
-          write(*,*) 'skipping reading restart PARALLEL for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
-#else
-          write(*,*) 'skipping reading restart SEQUENTIAL for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
-#endif
+          write(*,*) 'skipping reading restart for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
         end if
         
         if(.not. skip_file(i)) call filegroup%files(i)%open_read(filegroup%files(i)%path) ! do we need to bother with read-only access?
@@ -840,24 +832,46 @@ subroutine read_netcdf_restarts(path, filegroup, mpicomm, mype)
       call MPI_Bcast(skip_file(i), 1, MPI_LOGICAL, current_iorank_rcv, mpicomm, mpierr)
     end if      
 
+    ! ========================================================================!
+    !                           _____________________                         !
+    !                          /                     \                        !
+    !                         /                       \                       !
+    !                        |      .-----------.      |                      !
+    !                        |     /             \     |                      !
+    !                        |    |               |    |                      !
+    !                        |    |    R.I.P.     |    |                      !
+    !                        |    |               |    |                      !
+    !                        |    | MULTITHREADED |    |                      !
+    !                        |    |    RESTART    |    |                      !
+    !                        |    |    READING    |    |                      !
+    !                        |    |               |    |                      !
+    !                        |    |  2021 - 2025  |    |                      !
+    !                        |    |               |    |                      !
+    !                        |    | "You had to   |    |                      !
+    !                        |    |  be worked    |    |                      !
+    !                        |    |  around on    |    |                      !
+    !                        |    |  every        |    |                      !
+    !                        |    |  machine"     |    |                      !
+    !                        |    |               |    |                      !
+    !                        |     \             /     |                      !
+    !                        |      '-----------'      |                      !
+    !                        |                         |                      !
+    !                        |_________________________|                      !
+    !                                                                         !
+    !  Cause of death: MPI threading issues, deadlocks, and performance       !
+    !                  degradation on Levante, Albedo, Aleph, Juwels          !
+    !                                                                         !
+    !  Survived by: Sequential file reading (simple, reliable, boring)        !
+    !                                                                         !
+    !  For more info and a possible resurrection see:                         !
+    !  https://github.com/FESOM/fesom2/pull/801                               !
+    ! ========================================================================!
+
     if(.not. skip_file(i)) then
-#ifdef DISABLE_PARALLEL_RESTART_READ
-      ! Call synchronously (no thread spawning) to avoid MPI threading issues
       call filegroup%files(i)%read_and_scatter_variables()
-#else
-      ! Call asynchronously (spawn thread for each file)
-      call filegroup%files(i)%async_read_and_scatter_variables()
-#endif
     end if
-#ifndef DISABLE_PARALLEL_RESTART_READ
-  end do
-  
-  do i=1, filegroup%nfiles
-#endif
+
     if(skip_file(i)) cycle
-#ifndef DISABLE_PARALLEL_RESTART_READ
-    call filegroup%files(i)%join()
-#endif
 
     if(filegroup%files(i)%is_iorank()) then
       write(*,*) 'restart from record ', filegroup%files(i)%rec_count(), ' of ', filegroup%files(i)%rec_count(), filegroup%files(i)%path
