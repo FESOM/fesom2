@@ -14,6 +14,17 @@ else()
    set(FESOM_PLATFORM_STRATEGY "notset" CACHE STRING "switch to platform specific compile settings, this is usually determined via the env.sh script")
 endif()
 
+# Cray compiler specific optimizations
+if(CMAKE_Fortran_COMPILER_ID MATCHES "Cray")
+   # Use alternative cray-mpich library, about 5% faster with cray-mpich/7.7.3
+   # Not available for modules cray-mpich > 7.7.3
+   add_compile_options(-craympich-mt)
+   # Make sure to also set these variables in the runtime environment:
+   #    MPICH_MAX_THREAD_SAFETY=multiple # allows highest MPI thread level (i.e. MPI_THREAD_MULTIPLE)
+   #    MPICH_CRAY_OPT_THREAD_SYNC=0 # the Cray MPICH library falls back to using the pthread_mutex-based thread-synchronization implementation
+   #    MPICH_OPT_THREAD_SYNC=0 # seems to be a duplicate variable which also appears in some documentation instead of MPICH_CRAY_OPT_THREAD_SYNC (but this one brings a huge speed gain on aleph)
+endif()
+
 #TODO: these machine specific block can easyly go in cmake toolchain.
 if    (${FESOM_PLATFORM_STRATEGY} STREQUAL levante.dkrz.de )
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
