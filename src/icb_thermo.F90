@@ -1,4 +1,24 @@
-!==============================================================================
+module iceberg_thermodynamics
+ USE MOD_MESH
+ use MOD_PARTIT
+ use MOD_ICE
+ USE MOD_DYN
+ use iceberg_params
+ !use iceberg_element
+ !use iceberg_step
+ use iceberg_ocean_coupling
+
+ implicit none
+
+ public ::  iceberg_meltrates
+ public ::  iceberg_newdimensions
+ public ::  iceberg_heat_water_fluxes_3eq
+ public ::  potit_ib
+ public ::  fcn_density
+
+ contains 
+
+!!=============================================================================
 ! calculates the empirical melt rates of the iceberg as in 
 ! Martin: 'Parameterizing the fresh-water flux from land ice to ocean
 !          with interactive icebergs in a coupled climate model'(2010)
@@ -16,51 +36,114 @@
 !				use 3D information for T,S and velocities
 !				instead of SSTs; M_v depends on 'thermal driving')
 !==============================================================================
-subroutine iceberg_meltrates(   M_b, M_v, M_e, M_bv, &
-				u_ib,v_ib, uo_ib,vo_ib, ua_ib,va_ib, &
+subroutine iceberg_meltrates(partit, mesh, M_b, M_v, M_e, M_bv, &
+				u_ib,v_ib, arr_uo_ib,arr_vo_ib, ua_ib,va_ib, &
 				sst_ib, length_ib, conci_ib, &
-				uo_keel_ib, vo_keel_ib, T_keel_ib, S_keel_ib, depth_ib, &
-				T_ave_ib, S_ave_ib, ib)
+				uo_keel_ib, vo_keel_ib, T_keel_ib, S_keel_ib, depth_ib, height_ib, &
+				arr_T_ave_ib, arr_S_ave_ib, ib, rho_icb,uo_ib,vo_ib, ib_n_lvls, elem, n_lvls)
   
   use o_param
+  use MOD_PARTIT
+  use MOD_MESH
   use g_clock
   use g_forcing_arrays
   use g_rotate_grid
 
-  use iceberg_params, only: fwe_flux_ib, fwl_flux_ib, fwb_flux_ib, fwbv_flux_ib, heat_flux_ib
-  
+  use iceberg_params, only: fwe_flux_ib, fwl_flux_ib, fwb_flux_ib, fwbv_flux_ib, hfb_flux_ib, hfbv_flux_ib, hfe_flux_ib, hfl_flux_ib, scaling, wave_erosion_potential, linit_wave_erosion_pot
   implicit none
   
-  real, intent(IN)	:: u_ib,v_ib, uo_ib,vo_ib, ua_ib,va_ib	!iceberg velo, (int.) ocean & atm velo
-  real, intent(IN)	:: uo_keel_ib, vo_keel_ib		!ocean velo at iceberg's draft
-  real, intent(IN)	:: sst_ib, length_ib, conci_ib 		!SST, length and sea ice conc.
-  real, intent(IN)	:: T_keel_ib, S_keel_ib, depth_ib	!T & S at depth 'depth_ib'
-  real, intent(IN)	:: T_ave_ib, S_ave_ib			!T & S averaged, i.e. at 'depth_ib/2'
-  integer, intent(IN)	:: ib					!iceberg ID
-  real, intent(OUT)	:: M_b, M_v, M_e, M_bv			!melt rates [m (ice) per s]	
-  	
+  ! LA: include latent heat 2023-04-04
+  real(kind=8),parameter ::  L                  = 334000.                   ! [J/Kg]
   
+  real, intent(IN)	:: u_ib,v_ib, uo_ib,vo_ib,ua_ib,va_ib	!iceberg velo, (int.) ocean & atm velo
+  real, intent(IN)	:: uo_keel_ib, vo_keel_ib		!ocean velo at iceberg's draft
+  real, intent(IN)	:: sst_ib, length_ib, conci_ib, rho_icb 		!SST, length and sea ice conc.
+  real, intent(IN)	:: T_keel_ib, S_keel_ib, depth_ib, height_ib !T & S at depth 'depth_ib'
+  integer, intent(IN)	:: ib, n_lvls, ib_n_lvls					!iceberg ID
+  real, intent(IN), dimension(n_lvls)	:: arr_T_ave_ib, arr_S_ave_ib			!T & S averaged, i.e. at 'depth_ib/2'
+  real, intent(IN), dimension(n_lvls)	:: arr_uo_ib, arr_vo_ib	!iceberg velo, (int.) ocean & atm velo
+  real, intent(OUT)	:: M_b, M_v, M_e, M_bv			!melt rates [m (ice) per s]	
+  real 	            :: H_b, H_v, H_e, H_bv			!melt rates [m (ice) per s]	
+  real              :: M_bv_dz, M_v_dz, dz_acc
+  	
+  integer           :: n, n2
+  integer, intent(IN)   :: elem
+  real              :: lev_up, lev_low, dz
   real			:: absamino, damping, sea_state, v_ibmino
   real			:: tf, T_d 				!freezing temp. and 'thermal driving'
+  real          :: ib_wave_erosion_pot
+type(t_mesh), intent(in) , target :: mesh
+type(t_partit), intent(inout), target :: partit
+!==================== MODULES & DECLARATIONS ==========================!= 
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+  
 
   !3-eq. formulation for bottom melting [m/s]    
   v_ibmino  = sqrt( (u_ib - uo_keel_ib)**2 + (v_ib - vo_keel_ib)**2 )
-  call iceberg_heat_water_fluxes_3eq(ib, M_b, T_keel_ib,S_keel_ib,v_ibmino, depth_ib, tf)
+  call iceberg_heat_water_fluxes_3eq(partit, ib, M_b, H_b, T_keel_ib,S_keel_ib,v_ibmino, depth_ib, tf)
+  hfb_flux_ib(ib) = H_b * length_ib*length_ib*scaling(ib)
 
-  !3-eq. formulation for lateral 'basal' melting [m/s]
-  v_ibmino  = sqrt( (u_ib - uo_ib)**2 + (v_ib - vo_ib)**2 ) ! depth-average rel. velocity
-  call iceberg_heat_water_fluxes_3eq(ib, M_bv, T_ave_ib,S_ave_ib,v_ibmino, depth_ib/2.0, tf)
+  M_bv_dz = 0.0
+  M_v_dz = 0.0
+  dz_acc = 0.0
+
+
+  n2=elem2D_nodes(1,elem)
   
-  !'thermal driving', defined as the elevation of ambient water 
-  !temperature above freezing point' (Neshyba and Josberger, 1979).
-  T_d = T_ave_ib - tf
-  if(T_d < 0.) T_d = 0.
-  !write(*,*) 'thermal driving:',T_d,'; Tf:',tf,'T_ave:',T_ave_ib
+  ! iterate over all layers that contain the iceberg
+  do n=1,ib_n_lvls
+    
+    ! 3-eq. formulation for lateral 'basal' melting [m/s]
+    lev_up  = mesh%zbar_3d_n(n, n2)                 ! upper level
+    if( n==nlevels_nod2D(n2) ) then                 ! if level is lowest level ...
+        lev_low = mesh%zbar_n_bot(n2)               ! ... lower level is bottom topography
+    else
+        lev_low = mesh%zbar_3d_n(n+1, n2)           ! ... otherwise, lower level is one level below upper level
+    end if
+   
+    ! assign dz for vertical integration
+    if( abs(lev_low)>=abs(depth_ib) ) then          ! if lower level below iceberg base ...
+        dz = abs(lev_up - depth_ib)                 ! ... dz is equal to difference between upper level and iceberg base
+    elseif(lev_low == lev_up) then                  ! if lower level equal to upper level ... (why should this happen?)
+        exit                                        ! ... exit
+    else
+        dz = abs(lev_low - lev_up)                  ! ... otherwise, dz is equal to difference between lower level and upper level
+    end if
+    dz_acc = dz_acc + dz                            ! sum up dz along iceberg depth
+    
+    v_ibmino  = sqrt( (u_ib - arr_uo_ib(n))**2 + (v_ib - arr_vo_ib(n))**2 )         ! depth-average rel. velocity
 
-  !lateral melt (buoyant convection)
-  !M_v is a function of the 'thermal driving', NOT just sst! Cf. Neshyba and Josberger (1979)
-  M_v = 0.00762 * T_d + 0.00129 * T_d**2
-  M_v = M_v/86400.
+    ! calculate freshwater and heat flux densities ...
+    ! why dz_acc+dz/2.0? why not dz_acc-dz/2.0?
+    call iceberg_heat_water_fluxes_3eq(partit, ib, M_bv, H_bv, arr_T_ave_ib(n), arr_S_ave_ib(n), v_ibmino, dz_acc-dz/2.0, tf)
+    M_bv_dz = M_bv_dz + M_bv*dz                     ! ... integrating freshwater flux along iceberg depth
+    hfbv_flux_ib(ib,n) = H_bv * (2*length_ib*dz  + 2*length_ib*dz ) * scaling(ib)   ! ... assign heat flux bv on for layer n 
+  
+    !'thermal driving', defined as the elevation of ambient water 
+    !temperature above freezing point' (Neshyba and Josberger, 1979).
+    T_d = arr_T_ave_ib(n) - tf
+    if(T_d < 0.) T_d = 0.
+ 
+    if (linit_wave_erosion_pot(elem)) then 
+        wave_erosion_potential(elem) = vcpw * T_d * elem_area(elem) * helem(1,elem)
+        linit_wave_erosion_pot(elem) = .false.
+    end if
+    !lateral melt (buoyant convection)
+    !M_v = 0.00762 * sst_ib + 0.00129 * sst_ib**2
+    !M_v = M_v/86400.
+    !M_v is a function of the 'thermal driving', NOT just sst! Cf. Neshyba and Josberger (1979)
+    M_v = 0.00762 * T_d + 0.00129 * T_d**2
+    M_v = M_v/86400.
+    H_v = M_v * rho_icb * L
+    M_v_dz = M_v_dz + M_v*dz
+    hfl_flux_ib(ib,n) = H_v * (2*length_ib*dz  + 2*length_ib*dz ) * scaling(ib)
+    !fwl_flux_ib = M_v
+  end do
+  M_bv  = M_bv_dz / abs(depth_ib)
+  M_v   = M_v_dz / abs(depth_ib)
 
   !wave erosion
   absamino = sqrt( (ua_ib - uo_ib)**2 + (va_ib - vo_ib)**2 )
@@ -68,9 +151,25 @@ subroutine iceberg_meltrates(   M_b, M_v, M_e, M_bv, &
   damping = 0.5 * (1.0 + cos(conci_ib**3 * Pi))
   M_e = 1./6. * sea_state * (sst_ib + 2.0) * damping
   M_e = M_e/86400.
-  !fwe_flux_ib = M_e  
+  H_e = M_e * rho_icb * L
+  
+  ! check wave erosion potential
+  ib_wave_erosion_pot = abs(H_e * dt * REAL(steps_per_ib_step) * 2 * length_ib * abs(height_ib) * scaling(ib))
+  if (ib_wave_erosion_pot .le. wave_erosion_potential(elem)) then
+    !if (lverbose_icb) write(*,*) " * wave erosion for ib ", ib, "; wave_erosion_potential=",wave_erosion_potential(elem), "; ib_wave_erosion_pot=",ib_wave_erosion_pot,"; elem=",elem
+    wave_erosion_potential(elem) = wave_erosion_potential(elem) - ib_wave_erosion_pot
+  else
+    !if (lverbose_icb) write(*,*) " * no wave erosion for ib ", ib, "; wave_erosion_potential=",wave_erosion_potential(elem), "; ib_wave_erosion_pot=",ib_wave_erosion_pot,"; elem=",elem
+    H_e = H_e * abs(wave_erosion_potential(elem) / ib_wave_erosion_pot)
+    M_e = M_e * abs(wave_erosion_potential(elem) / ib_wave_erosion_pot)
+    wave_erosion_potential(elem) = 0.0
+!  else
+!    if (lverbose_icb) write(*,*) " * no wave erosion for ib ", ib, "; wave_erosion_potential=",wave_erosion_potential(elem), "; ib_wave_erosion_pot=",ib_wave_erosion_pot
+!    H_e = 0.0
+!    M_e = 0.0
+  end if
+  hfe_flux_ib(ib) = H_e * (length_ib*abs(height_ib) + length_ib*abs(height_ib) ) * scaling(ib)
 end subroutine iceberg_meltrates
-
 
  !***************************************************************************************************************************
  !***************************************************************************************************************************
@@ -90,7 +189,7 @@ subroutine iceberg_newdimensions(partit, ib, depth_ib,height_ib,length_ib,width_
   use g_clock
   use g_forcing_arrays
   use g_rotate_grid
-  use iceberg_params, only: l_weeksmellor, ascii_out, icb_outfreq, vl_block, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, smallestvol_icb, fwb_flux_ib, fwe_flux_ib, fwbv_flux_ib, fwl_flux_ib, scaling, heat_flux_ib, lheat_flux_ib
+  use iceberg_params, only: l_weeksmellor, ascii_out, icb_outfreq, vl_block, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, smallestvol_icb, fwb_flux_ib, fwe_flux_ib, fwbv_flux_ib, fwl_flux_ib, scaling, hfb_flux_ib, hfbv_flux_ib, hfe_flux_ib, hfl_flux_ib, lhfb_flux_ib
   use g_config, only: steps_per_ib_step
 
   implicit none  
@@ -98,6 +197,7 @@ subroutine iceberg_newdimensions(partit, ib, depth_ib,height_ib,length_ib,width_
   integer, intent(IN)	:: ib
   real, intent(INOUT)	:: depth_ib, height_ib, length_ib, width_ib
   real, intent(IN)	:: M_b, M_v, M_e, M_bv, rho_h2o, rho_icb
+  real              :: hf_tot_tmp
   character, intent(IN)	:: file_meltrates*80
   
   real			:: dh_b, dh_v, dh_e, dh_bv, bvl, lvl_b, lvl_v, lvl_e, tvl, volume_before, volume_after
@@ -140,7 +240,7 @@ type(t_partit), intent(inout), target :: partit
 
     if((tvl .ge. volume_before) .OR. (volume_before .le. smallestvol_icb)) then
     	volume_after=0.0    	
-	depth_ib = 0.0
+	    depth_ib = 0.0
     	height_ib= 0.0
     	length_ib= 0.0
     	width_ib = 0.0
@@ -170,7 +270,7 @@ type(t_partit), intent(inout), target :: partit
         !iceberg smaller than critical value after melting?
         if (volume_after .le. smallestvol_icb) then
             volume_after=0.0    	
-	    depth_ib = 0.0
+	        depth_ib = 0.0
     	    height_ib= 0.0
     	    length_ib= 0.0
     	    width_ib = 0.0
@@ -223,14 +323,23 @@ type(t_partit), intent(inout), target :: partit
     !save in larger array	  
     vl_block((ib-1)*4+1 : ib*4)=arr
 
-    ! -----------------------
-    ! LA: set iceberg heatflux at least to latent heat 2023-04-04
-    ! Latent heat flux at base and sides also changes lines 475/476
-    lheat_flux_ib(ib) = rho_icb*L*tvl*scaling(ib)/dt/REAL(steps_per_ib_step)
-    if( (heat_flux_ib(ib).gt.0.0) .and. (heat_flux_ib(ib).lt.lheat_flux_ib(ib))) then
-        heat_flux_ib(ib)=lheat_flux_ib(ib)
-    end if
-    ! -----------------------
+    !! -----------------------
+    !! LA: set iceberg heatflux at least to latent heat 2023-04-04
+    !! Latent heat flux at base and sides also changes lines 475/476
+    !! Lateral heat flux set to latent heat and basal heat flux set to zero
+    !if( lmin_latent_hf ) then
+    !    lhfb_flux_ib(ib) = rho_icb*L*tvl*scaling(ib)/dt/REAL(steps_per_ib_step)
+
+    !    hf_tot_tmp = hfb_flux_ib(ib)+hfbv_flux_ib(ib)+hfl_flux_ib(ib)+hfe_flux_ib(ib)
+
+    !    if( (hf_tot_tmp >= 0.0) .and. (abs(hf_tot_tmp) < abs(lhfb_flux_ib(ib)))) then
+    !        hfe_flux_ib(ib)=-lhfb_flux_ib(ib) * abs(hfe_flux_ib(ib)/hf_tot_tmp)
+    !        hfl_flux_ib(ib)=-lhfb_flux_ib(ib) * abs(hfl_flux_ib(ib)/hf_tot_tmp)
+    !        hfb_flux_ib(ib)=-lhfb_flux_ib(ib) * abs(hfb_flux_ib(ib)/hf_tot_tmp)
+    !        hfbv_flux_ib(ib)=-lhfb_flux_ib(ib) * abs(hfbv_flux_ib(ib)/hf_tot_tmp)
+    !    end if
+    !end if
+    !! -----------------------
 end subroutine iceberg_newdimensions
 
 
@@ -263,7 +372,7 @@ end subroutine weeksmellor
  !***************************************************************************************************************************
  !***************************************************************************************************************************
 
-subroutine iceberg_heat_water_fluxes_3eq(ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_freeze)
+subroutine iceberg_heat_water_fluxes_3eq(partit, ib, M_b, H_b, T_ib,S_ib,v_rel, depth_ib, t_freeze)
   ! The three-equation model of ice-shelf ocean interaction (Hellmer et al., 1997)
   ! Code derived from BRIOS subroutine iceshelf (which goes back to H.Hellmer's 2D ice shelf model code)
   ! adjusted for use in FESOM by Ralph Timmermann, 16.02.2011
@@ -276,7 +385,7 @@ subroutine iceberg_heat_water_fluxes_3eq(ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_f
   implicit none
 
   integer, INTENT(IN)	  :: ib
-  real(kind=8),INTENT(OUT) :: M_b, t_freeze
+  real(kind=8),INTENT(OUT) :: M_b, H_b, t_freeze
   real(kind=8),INTENT(IN) :: T_ib, S_ib 	! ocean temperature & salinity (at depth 'depth_ib')
   real(kind=8),INTENT(IN) :: v_rel, depth_ib 	! relative velocity iceberg-ocean (at depth 'depth_ib')
 
@@ -312,6 +421,10 @@ subroutine iceberg_heat_water_fluxes_3eq(ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_f
   real(kind=8),parameter ::  cpi =  152.5+7.122*(atk+tob)     !Paterson:"The Physics of Glaciers"
 
   real(kind=8),parameter ::  L    = 334000.                   ! [J/Kg]
+type(t_partit), intent(inout), target :: partit
+!==================== MODULES & DECLARATIONS ==========================!= 
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
 
      temp = T_ib
      sal = S_ib
@@ -334,9 +447,6 @@ subroutine iceberg_heat_water_fluxes_3eq(ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_f
      gat  = gats1/(gats2+12.5*pr1)
      gas  = gats1/(gats2+12.5*sc1)
 
-     !RG3417 gat  = 1.00e-4   ![m/s]  RT: to be replaced by velocity-dependent equations later
-     !RG3417 gas  = 5.05e-7   ![m/s]  RT: to be replaced by velocity-dependent equations later
-
      ! Calculate
      ! density in the boundary layer: rhow
      ! and interface pressure pg [dbar],
@@ -356,13 +466,6 @@ subroutine iceberg_heat_water_fluxes_3eq(ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_f
      ep31 = -rhor*cpi*tdif/zice   !RG4190 / RG44027
      ep4 = b+c*zice
      ep5 = gas/rhor
-
-
-!rt RG4190     ! negative heat flux term in the ice (due to -kappa/D)
-!rt RG4190     ex1 = a*(ep1-ep2)
-!rt RG4190     ex2 = ep1*(ep4-tin)+ep2*(tob+a*sal-ep4)-ep3
-!rt RG4190     ex3 = sal*(ep2*(ep4-tob)+ep3)
-
 
 !RT RG4190/RG44027:
 !    In case of melting ice account for changing temperature gradient, i.e. switch from heat conduction to heat capacity approach
@@ -403,41 +506,16 @@ subroutine iceberg_heat_water_fluxes_3eq(ib, M_b, T_ib,S_ib,v_rel, depth_ib, t_f
         sf = sf2
      endif
 
-     t_freeze = tf ! output of freezing temperature
+     t_freeze = tf                                      ! output of freezing temperature
+     
+     H_b = rhow*cpw*gat*(tin-tf)                        ! heat flux [W] positive for upward
+     M_b = gas*(sf-sal)/sf                              ! freshwater flux [m/s] freshwater per second
+     M_b = - (rhow / rhoi) * M_b 		                ! freshwater flux [m (ice) per second], NOW positive for melting
 
-     ! Calculate the melting/freezing rate [m/s]
-     ! seta = ep5*(1.0-sal/sf)     !rt thinks this is not needed; TR: Why different to M_b? LIQUID vs. ICE
-
-     !rt  t_surf_flux(i,j)=gat*(tf-tin)
-     !rt  s_surf_flux(i,j)=gas*(sf-(s(i,j,N,lrhs)+35.0))
-
-     !heat_flux_ib(ib)  = rhow*cpw*gat*(tin-tf)*scaling(ib)      ! [W/m2]  ! positive for upward
-     heat_flux_ib(ib)  = rhow*cpw*gat*(tin-tf)*length_ib(ib)*width_ib(ib)*scaling(ib)      ! [W]  ! positive for upward
-     !fw_flux_ib(ib) =          gas*(sf-sal)/sf   ! [m/s]   !
-      M_b 	    =          gas*(sf-sal)/sf   ! [m/s]   ! m freshwater per second
-     !fw_flux_ib(ib) = M_b
-     !fw = -M_b
-     M_b = - (rhow / rhoi) * M_b 		 ! [m (ice) per second], positive for melting? NOW positive for melting
-
-     !LA avoid basal freezing for grounded icebergs
-     if(M_b.lt.0.) then
+     ! avoid basal freezing for grounded icebergs
+     if(grounded(ib) .and. (M_b.lt.0.)) then
          M_b = 0.0
      endif
-
-     !      qo=-rhor*seta*oofw
-     !      if(seta.le.0.) then
-     !         qc=rhor*seta*hemw
-     !         qo=rhor*seta*oomw
-     !      endif
-
-     ! write(*,'(a10,i10,9f10.3)') 'ice shelf',n,zice,rhow,temp,sal,tin,tf,sf,heat_flux(n),water_flux(n)*86400.*365.
-
-     !for saving to output:
-     !net_heat_flux(n)=-heat_flux(n)      ! positive down
-     !fresh_wa_flux(n)=-water_flux(n)     ! m freshwater per second
-
-  !enddo
-
 end subroutine iceberg_heat_water_fluxes_3eq
 
 subroutine potit_ib(ib,salz,pt,pres,rfpres,tin)
@@ -467,112 +545,6 @@ subroutine potit_ib(ib,salz,pt,pres,rfpres,tin)
   stop
   return
 end subroutine potit_ib
-
-! if the underlying FESOM is run without cavities, the following routines might be 
-! missing, so put them here:
-!if (.not. use_cavity) then
-!
-!-------------------------------------------------------------------------------------
-!
-!subroutine potit(salz,pt,pres,rfpres,tin)
-!  ! Berechnet aus dem Salzgehalt[psu] (SALZ), der pot. Temperatur[oC]
-!  ! (PT) und dem Referenzdruck[dbar] (REFPRES) die in-situ Temperatur
-!  ! [oC] (TIN) bezogen auf den in-situ Druck[dbar] (PRES) mit Hilfe
-!  ! eines Iterationsverfahrens aus.
-!
-!  integer iter
-!  real salz,pt,pres,rfpres,tin
-!  real epsi,tpmd,pt1,ptd,pttmpr
-!
-!  data tpmd / 0.001 /
-!
-!  epsi = 0.
-!  do iter=1,100
-!     tin  = pt+epsi
-!     pt1  = pttmpr(salz,tin,pres,rfpres)
-!     ptd  = pt1-pt
-!     if(abs(ptd).lt.tpmd) return
-!     epsi = epsi-ptd
-!  enddo
-!  write(6,*) ' WARNING!'
-!  write(6,*) ' in-situ temperature calculation has not converged.'
-!  stop
-!  return
-!end subroutine potit
-!
-!-------------------------------------------------------------------------------------
-!
-!real function pttmpr(salz,temp,pres,rfpres)
-!  ! Berechnet aus dem Salzgehalt/psu (SALZ), der in-situ Temperatur/degC
-!  ! (TEMP) und dem in-situ Druck/dbar (PRES) die potentielle Temperatur/
-!  ! degC (PTTMPR) bezogen auf den Referenzdruck/dbar (RFPRES). Es wird
-!  ! ein Runge-Kutta Verfahren vierter Ordnung verwendet.
-!  ! Checkwert: PTTMPR = 36.89073 DegC
-!  !       fuer SALZ   =    40.0 psu
-!  !            TEMP   =    40.0 DegC
-!  !            PRES   = 10000.000 dbar
-!  !            RFPRES =     0.000 dbar
-!
-!  data ct2 ,ct3  /0.29289322 ,  1.707106781/
-!  data cq2a,cq2b /0.58578644 ,  0.121320344/
-!  data cq3a,cq3b /3.414213562, -4.121320344/
-!
-!  real salz,temp,pres,rfpres
-!  real p,t,dp,dt,q,ct2,ct3,cq2a,cq2b,cq3a,cq3b
-!  real adlprt
-!
-!  p  = pres
-!  t  = temp
-!  dp = rfpres-pres
-!  dt = dp*adlprt(salz,t,p)
-!  t  = t +0.5*dt
-!  q = dt
-!  p  = p +0.5*dp
-!  dt = dp*adlprt(salz,t,p)
-!  t  = t + ct2*(dt-q)
-!  q  = cq2a*dt + cq2b*q
-!  dt = dp*adlprt(salz,t,p)
-!  t  = t + ct3*(dt-q)
-!  q  = cq3a*dt + cq3b*q
-!  p  = rfpres
-!  dt = dp*adlprt(salz,t,p)
-!
-!  pttmpr = t + (dt-q-q)/6.0
-!
-!end function pttmpr
-!
-!-------------------------------------------------------------------------------------
-!
-!real function adlprt(salz,temp,pres)
-!  ! Berechnet aus dem Salzgehalt/psu (SALZ), der in-situ Temperatur/degC
-!  ! (TEMP) und dem in-situ Druck/dbar (PRES) den adiabatischen Temperatur-
-!  ! gradienten/(K Dbar^-1) ADLPRT.
-!  ! Checkwert: ADLPRT =     3.255976E-4 K dbar^-1
-!  !       fuer SALZ   =    40.0 psu
-!  !            TEMP   =    40.0 DegC
-!  !            PRES   = 10000.000 dbar
-!
-!  real salz,temp,pres
-!  real s0,a0,a1,a2,a3,b0,b1,c0,c1,c2,c3,d0,d1,e0,e1,e2,ds
-!
-!  data s0 /35.0/
-!  data a0,a1,a2,a3 /3.5803E-5, 8.5258E-6, -6.8360E-8, 6.6228E-10/
-!  data b0,b1       /1.8932E-6, -4.2393E-8/
-!  data c0,c1,c2,c3 /1.8741E-8, -6.7795E-10, 8.7330E-12, -5.4481E-14/
-!  data d0,d1       /-1.1351E-10, 2.7759E-12/
-!  data e0,e1,e2    /-4.6206E-13,  1.8676E-14, -2.1687E-16/
-!
-!  ds = salz-s0
-!  adlprt = ( ( (e2*temp + e1)*temp + e0 )*pres                     &
-!       + ( (d1*temp + d0)*ds                                  &
-!       + ( (c3*temp + c2)*temp + c1 )*temp + c0 ) )*pres   &
-!       + (b1*temp + b0)*ds +  ( (a3*temp + a2)*temp + a1 )*temp + a0
-!
-!END function adlprt
-!
-!----------------------------------------------------------------------------------------
-!
-!endif
 
 
 ! LA from oce_dens_press for iceberg coupling
@@ -633,3 +605,4 @@ subroutine fcn_density(t,s,z,rho)
       + 4.8314e-4*s**2)
  rho = rhopot / (1.0 + 0.1*z/bulk)
 end subroutine fcn_density
+end module iceberg_thermodynamics

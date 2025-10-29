@@ -11,9 +11,9 @@ module compute_vel_rhs_interface
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine compute_vel_rhs
     end interface
-end module
+end module compute_vel_rhs_interface
 
 module momentum_adv_scalar_interface
     interface
@@ -25,9 +25,9 @@ module momentum_adv_scalar_interface
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine momentum_adv_scalar
     end interface
-end module
+end module momentum_adv_scalar_interface
 
 !
 !
@@ -183,7 +183,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         ! to velocity rhs
         pre = -(p_eta+p_ice+p_air)
         if (use_global_tides) then
-           pre=pre-ssh_gp(elnodes)
+           pre=pre-ssh_gp(elnodes)+0.1*p_eta
         end if
         Fx  = sum(gradient_sca(1:3, elem)*pre)
         Fy  = sum(gradient_sca(4:6, elem)*pre)

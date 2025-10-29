@@ -8,7 +8,7 @@ module info_module
   type :: info_type
   contains
     procedure, nopass :: print_definitions
-  end type
+  end type info_type
   type(info_type) info
 
 contains
@@ -91,12 +91,17 @@ contains
       print '(g0)', 'ENABLE_ALBEDO_INTELMPI_WORKAROUNDS is ON'
 #else
       print '(g0)', 'ENABLE_ALBEDO_INTELMPI_WORKAROUNDS is OFF'
+#endif 
+#ifdef ENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS
+      print '(g0)', 'ENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS is ON'
+#else
+      print '(g0)', 'ENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS is OFF'
 #endif  
 #ifdef ENABLE_NVHPC_WORKAROUNDS
       print '(g0)', 'ENABLE_NVHPC_WORKAROUNDS is ON'
 #else
       print '(g0)', 'ENABLE_NVHPC_WORKAROUNDS is OFF'
 #endif  
-  end subroutine
+  end subroutine print_definitions
 
-end module
+end module info_module

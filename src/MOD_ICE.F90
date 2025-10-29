@@ -46,6 +46,8 @@ END TYPE T_ICE_WORK
 TYPE T_ICE_THERMO
     !___________________________________________________________________________
     real(kind=WP), allocatable, dimension(:)    :: t_skin, thdgr, thdgrsn, thdgr_old, ustar
+    ! melt pond variables
+    real(kind=WP), allocatable, dimension(:)    :: apnd, hpnd, ipnd  ! pond area fraction, depth, ice thickness
     !___________________________________________________________________________
     real(kind=WP) :: rhoair=1.3  , inv_rhoair=1./1.3  ! Air density & inverse ,  LY2004 !1.3 AOMIP
     real(kind=WP) :: rhowat=1025., inv_rhowat=1./1025.! Water density & inverse
@@ -70,7 +72,8 @@ TYPE T_ICE_THERMO
     ! --- namelist parameter /ice_therm/
     real(kind=WP) :: con= 2.1656, consn = 0.31 ! Thermal conductivities: ice & snow; W/m/K
     real(kind=WP) :: Sice = 4.0        ! Ice salinity 3.2--5.0 ppt.
-    real(kind=WP) :: h0=1.0	           ! Lead closing parameter [m] ! 0.5
+    real(kind=WP) :: h0=0.5	           ! Lead closing parameter [m] for Nothern Hemisphere! 0.5
+    real(kind=WP) :: h0_s=0.5	           ! Lead closing parameter [m] for Southern Hemisphere! 0.5
     real(kind=WP) :: emiss_ice=0.97    ! Emissivity of Snow/Ice,
     real(kind=WP) :: emiss_wat=0.97    ! Emissivity of open water
     real(kind=WP) :: albsn = 0.81      ! Albedo: frozen snow
@@ -78,6 +81,19 @@ TYPE T_ICE_THERMO
     real(kind=WP) :: albi  = 0.70      !         frozen ice
     real(kind=WP) :: albim = 0.68      !         melting ice
     real(kind=WP) :: albw  = 0.066     !         open water, LY2004
+
+
+    ! --- additional namelist parameters (Frank.Kauker(at)awi.de 2023/04/04)
+    logical       :: snowdist=.true.   ! distribution of snow depth according to ice distribution
+    logical       :: new_iclasses=.false. ! ice thickness distribution based on EM observations (Castro-Morales et al., JGR, 2013)
+    integer       :: open_water_albedo=0  ! 0=standard; 1=taylor; 2=briegleb        
+    REAL(kind=WP) :: c_melt=0.5        ! constant in concentration equation for melting conditions
+    ! --- melt pond parameters
+    logical       :: use_meltponds=.false. ! enable melt pond parameterization
+    REAL(kind=WP) :: h_cutoff=3.0      ! cutoff thickness of thickness pdf
+    REAL(kind=WP), DIMENSION(15) :: hpdf = (/ 0.066745491, 0.1462317, 0.17769822, 0.13131106, &
+         0.11518432, 0.08514193, 0.06871303, 0.05592151, 0.04428673, 0.03584652, 0.02970195, 0.02469673, &
+         0.02001543, 0.01653681, 0.0141026 /)  ! pdf of ice thickness based on EM observations
     contains
         procedure WRITE_T_ICE_THERMO
         procedure READ_T_ICE_THERMO
@@ -129,6 +145,8 @@ TYPE T_ICE
 
     ! maEVP variables
     real(kind=WP), allocatable, dimension(:)    :: alpha_evp_array, beta_evp_array
+    ! ice/snow thicknesses in the ice-covered area
+    real(kind=WP), allocatable, dimension(:)    :: h_ice, h_snow    
 
     !___________________________________________________________________________
     ! total number of ice tracers (default=3, 1=area, 2=mice, 3=msnow, (4=ice_temp)
@@ -302,6 +320,10 @@ subroutine WRITE_T_ICE_THERMO(ttherm, unit)
     call write_bin_array(ttherm%thdgrsn,      unit, iostat, iomsg)
     call write_bin_array(ttherm%thdgr_old,    unit, iostat, iomsg)
     call write_bin_array(ttherm%ustar,        unit, iostat, iomsg)
+    ! melt pond variables
+    call write_bin_array(ttherm%apnd,         unit, iostat, iomsg)
+    call write_bin_array(ttherm%hpnd,         unit, iostat, iomsg)
+    call write_bin_array(ttherm%ipnd,         unit, iostat, iomsg)
 end subroutine WRITE_T_ICE_THERMO
 
 ! Unformatted reading for T_ICE_WORK
@@ -316,6 +338,10 @@ subroutine READ_T_ICE_THERMO(ttherm, unit)
     call read_bin_array(ttherm%thdgrsn,      unit, iostat, iomsg)
     call read_bin_array(ttherm%thdgr_old,    unit, iostat, iomsg)
     call read_bin_array(ttherm%ustar,        unit, iostat, iomsg)
+    ! melt pond variables
+    call read_bin_array(ttherm%apnd,         unit, iostat, iomsg)
+    call read_bin_array(ttherm%hpnd,         unit, iostat, iomsg)
+    call read_bin_array(ttherm%ipnd,         unit, iostat, iomsg)
 end subroutine READ_T_ICE_THERMO
 !
 !
@@ -518,9 +544,9 @@ module ice_init_interface
         type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
+        end subroutine ice_init
     end interface
-end module
+end module ice_init_interface
 !
 !
 !_______________________________________________________________________________
@@ -547,11 +573,12 @@ subroutine ice_init(ice, partit, mesh)
     namelist /ice_dyn/ whichEVP, Pstar, ellipse, c_pressure, delta_min, evp_rheol_steps, &
                        Cd_oce_ice, ice_gamma_fct, ice_diff, theta_io, ice_ave_steps, &
                        alpha_evp, beta_evp, c_aevp
-
-    real(kind=WP)  :: Sice, h0, emiss_ice, emiss_wat, albsn, albsnm, albi, &
-                      albim, albw, con, consn
-    namelist /ice_therm/ Sice, h0, emiss_ice, emiss_wat, albsn, albsnm, albi, &
-                         albim, albw, con, consn
+    logical        :: snowdist, new_iclasses, use_meltponds
+    integer        :: open_water_albedo, iclasses
+    real(kind=WP)  :: Sice, h0, h0_s, emiss_ice, emiss_wat, albsn, albsnm, albi, &
+                      albim, albw, con, consn, hmin, armin, c_melt, h_cutoff
+    namelist /ice_therm/ Sice, iclasses, h0, h0_s, hmin, armin,  emiss_ice, emiss_wat, albsn, albsnm, albi, &
+                         albim, albw, con, consn,  snowdist, new_iclasses, open_water_albedo, use_meltponds, c_melt, h_cutoff
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -594,7 +621,11 @@ subroutine ice_init(ice, partit, mesh)
     ice%thermo%con      = con
     ice%thermo%consn    = consn
     ice%thermo%Sice     = Sice
+    ice%thermo%iclasses = iclasses
     ice%thermo%h0       = h0
+    ice%thermo%h0_s     = h0_s
+    ice%thermo%hmin     = hmin
+    ice%thermo%armin    = armin
     ice%thermo%emiss_ice= emiss_ice
     ice%thermo%emiss_wat= emiss_wat
     ice%thermo%albsn    = albsn
@@ -602,9 +633,14 @@ subroutine ice_init(ice, partit, mesh)
     ice%thermo%albi     = albi
     ice%thermo%albim    = albim
     ice%thermo%albw     = albw
-
-    ice%thermo%cc=ice%thermo%rhowat*4190.0  ! Volumetr. heat cap. of water [J/m**3/K](cc = rhowat*cp_water)
-    ice%thermo%cl=ice%thermo%rhoice*3.34e5  ! Volumetr. latent heat of ice fusion [J/m**3](cl=rhoice*Lf)
+    ice%thermo%snowdist = snowdist
+    ice%thermo%new_iclasses=new_iclasses
+    ice%thermo%open_water_albedo=open_water_albedo
+    ice%thermo%use_meltponds = use_meltponds
+    ice%thermo%c_melt   = c_melt
+    ice%thermo%h_cutoff = h_cutoff    
+    ice%thermo%cc       =ice%thermo%rhowat*4190.0  ! Volumetr. heat cap. of water [J/m**3/K](cc = rhowat*cp_water)
+    ice%thermo%cl       =ice%thermo%rhoice*3.34e5  ! Volumetr. latent heat of ice fusion [J/m**3](cl=rhoice*Lf)
 
     !___________________________________________________________________________
     ! define local vertice & elem array size
@@ -624,6 +660,8 @@ subroutine ice_init(ice, partit, mesh)
     allocate(ice%stress_iceoce_x(      node_size))
     allocate(ice%stress_atmice_y(      node_size))
     allocate(ice%stress_iceoce_y(      node_size))
+    allocate(ice%h_ice          (      node_size))
+    allocate(ice%h_snow         (      node_size))    
     ice%uice            = 0.0_WP
     ice%uice_rhs        = 0.0_WP
     ice%uice_old        = 0.0_WP
@@ -634,6 +672,8 @@ subroutine ice_init(ice, partit, mesh)
     ice%vice_old        = 0.0_WP
     ice%stress_atmice_y = 0.0_WP
     ice%stress_iceoce_y = 0.0_WP
+    ice%h_ice           = 0.0_WP
+    ice%h_snow          = 0.0_WP    
     if (ice%whichEVP /= 0) then
         allocate(ice%uice_aux(         node_size))
         allocate(ice%vice_aux(         node_size))
@@ -730,11 +770,19 @@ subroutine ice_init(ice, partit, mesh)
     allocate(ice%thermo%thdgr(         node_size))
     allocate(ice%thermo%thdgrsn(       node_size))
     allocate(ice%thermo%thdgr_old(     node_size))
+    ! melt pond arrays
+    allocate(ice%thermo%apnd(          node_size))
+    allocate(ice%thermo%hpnd(          node_size))
+    allocate(ice%thermo%ipnd(          node_size))
     ice%thermo%ustar     = 0.0_WP
     ice%thermo%t_skin    = 0.0_WP
     ice%thermo%thdgr     = 0.0_WP
     ice%thermo%thdgrsn   = 0.0_WP
     ice%thermo%thdgr_old = 0.0_WP
+    ! initialize melt pond arrays
+    ice%thermo%apnd      = 0.0_WP
+    ice%thermo%hpnd      = 0.0_WP
+    ice%thermo%ipnd      = 0.0_WP
 
     !___________________________________________________________________________
     ! initialse coupling array of ice derived type

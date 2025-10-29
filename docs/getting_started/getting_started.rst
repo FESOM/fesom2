@@ -8,11 +8,21 @@ This chapter describes several ways of getting started with FESOM2. First we sho
 TL;DR version for supported HPC systems
 =======================================
 
-Supported systems are: generic ``ubuntu``, ``albedo`` at AWI, ``levante`` at DKRZ, ``JURECA`` at JSC, ``HLRN``, ``Hazel Hen``, ``MareNostrum 4`` at BSC. During configuration the system will be recognised and apropriate environment variables and compiler options should be used.
+Supported systems are: generic ``ubuntu``, ``albedo`` at AWI, ``levante`` at
+DKRZ, ``JURECA`` at JSC, ``HLRN``, ``Hazel Hen``, ``MareNostrum 4`` at BSC.
+During configuration the system will be recognised and apropriate environment
+variables and compiler options should be used.
+
+FESOM uses a rolling release approach where the main branch always contains the
+latest changes. Usually, you want to get a stable version, so you need to clone
+a specific tag. See https://github.com/FESOM/fesom2/releases for releases and
+changes.
+
+Example for release 2.6.12:
 
 ::
 
-    git clone https://github.com/FESOM/fesom2.git
+    git clone https://github.com/FESOM/fesom2.git -b 2.6.12
     cd fesom2
     bash -l ./configure.sh
 
@@ -47,7 +57,7 @@ Clone the GitHub repository with a git command:
 
 ::
 
-    git clone https://github.com/FESOM/fesom2.git
+    git clone https://github.com/FESOM/fesom2.git -b <release>
 
 
 The repository contains model code and two additional libraries: `Metis` (domain partitioner) and `Parms` (solver), necessary to run FESOM2. To build FESOM2 executable one have to compile Parms library and the code of the model (`src` folder). In order to build executable that is used for model domain partitioning (distribution of the model mesh between CPUs) one have to compile `Metis` library and also some code located in the src directory (see :ref:`partitioning`). Building of the model executable and the partitioner is usually done automatically with the use of CMake. If you going to build the code not on one of the supported platforms (ollie, DKRZ, HLRN, HAZELHEN, and BSC, general Ubuntu), you might need to do some (usually small) modifications described in `Adding new platform for compilation`_ section.
@@ -57,13 +67,12 @@ Change to the `fesom2` folder and execute:
 ::
 
     cd fesom2
-    git checkout refactoring
 
-As a good practice, if one wants to make modifications to the source code or any of the files, it is advisable to create a branch from refactoring:
+As a good practice, if one wants to make modifications to the source code or any of the files, it is advisable to create a branch from main:
 
 ::
 
-    git checkout -b <my branch> refactoring
+    git checkout -b <my branch> main
 
 After confirming that the right FESOM2 branch is being used, compile the model with:
 
@@ -460,12 +469,16 @@ The best way to run the model locally is to use Docker container. You obviously 
 
 - Get the image::
     
-    docker pull koldunovn/fesom2_test:refactoring2
+    docker pull ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master
+    # if you use Mac Silicon (M1 M2 etc) use:
+    docker pull --platform linux/amd64 ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master
 
 - Go to the folder with your version of fesom2 folder (NOT inside fesom2 folder, one up, the one you run ``git clone https://github.com/FESOM/fesom2.git`` in).
 - Run::
 
-    docker run -it -v "$(pwd)"/fesom2:/fesom/fesom2 koldunovn/fesom2_test:refactoring2 /bin/bash
+    docker run -it -v "$(pwd)"/fesom2:/fesom/fesom2 ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master /bin/bash
+    # if you use Mac Silicon (M1 M2 etc) use:
+    docker run --platform linux/amd64 -it -v "$(pwd)"/fesom2:/fesom/fesom2 ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master /bin/bash
 
 - This should get you inside the container. You now can edit the files in your fesom2 folder (on host system), but run compule and run the model inside the container.
 - When inside the container, to compile do:
@@ -473,7 +486,6 @@ The best way to run the model locally is to use Docker container. You obviously 
   ::
 
     cd fesom2
-    git checkout refactoring
     bash -l configure.sh ubuntu
 
 - To prepare the run (this will do the test with pi mesh)::

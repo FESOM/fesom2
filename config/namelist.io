@@ -9,6 +9,7 @@ ldiag_dMOC       =.false.
 ldiag_DVD        =.false.
 ldiag_forc       =.false.
 ldiag_extflds    =.false.
+ldiag_destine    =.false. ! enables computation of heatcontent. (hc300m, hc700m, hc) in io_list
 ldiag_trflx      =.false.
 ldiag_uvw_sqr    =.false.
 ldiag_trgrd_xyz  =.false.
@@ -36,13 +37,17 @@ io_list =  'sst       ',1, 'm', 4,
            'a_ice     ',1, 'm', 4,
            'm_ice     ',1, 'm', 4,
            'm_snow    ',1, 'm', 4,
+           !'apnd      ',1, 'm', 4, ! melt pond area fraction (only active for use_meltponds=.true.)
+           !'hpnd      ',1, 'm', 4, ! melt pond depth (only active for use_meltponds=.true.)
+           !'ipnd      ',1, 'm', 4, ! pond ice lid thickness (only active for use_meltponds=.true.)
+           !'alb       ',1, 'm', 4, ! ice albedo (only active for oifs and ifs coupled)
            'MLD1      ',1, 'm', 4,
            'MLD2      ',1, 'm', 4,
            'MLD3      ',1, 'm', 4,
            'tx_sur    ',1, 'm', 4,
            'ty_sur    ',1, 'm', 4,
-           'temp      ',1, 'y', 4,
-           'salt      ',1, 'y', 8,
+           'temp      ',1, 'm', 4,
+           'salt      ',1, 'm', 8,
            'N2        ',1, 'y', 4,
            'Kv        ',1, 'y', 4,
            'u         ',1, 'y', 4,
@@ -56,4 +61,5 @@ io_list =  'sst       ',1, 'm', 4,
            'bolus_w   ',1, 'y', 4,
            'fw        ',1, 'm', 4,
            'fh        ',1, 'm', 4,
+           'otracers  ',1, 'y', 4,
 /

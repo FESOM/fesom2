@@ -313,7 +313,10 @@ submodule (icedrv_main) icedrv_step
     
           logical (kind=log_kind) :: &
              tr_fsd  ! floe size distribution tracers
-    
+             
+          logical (kind=log_kind) :: &
+             update_ocn_f  ! floe size distribution tracers   
+          
           character(len=*), parameter :: subname='(step_therm2)'
     
           !-----------------------------------------------------------------
@@ -322,6 +325,7 @@ submodule (icedrv_main) icedrv_step
     
           call icepack_query_tracer_sizes(ntrcr_out=ntrcr, nbtrcr_out=nbtrcr)
           call icepack_query_tracer_flags(tr_fsd_out=tr_fsd)
+          call icepack_query_parameters(update_ocn_f_out=update_ocn_f)
           call icepack_warnings_flush(ice_stderr)
           if (icepack_warnings_aborted()) call icedrv_system_abort(string=subname, &
               file=__FILE__,line= __LINE__)
@@ -772,12 +776,15 @@ submodule (icedrv_main) icedrv_step
 ! Allows heat storage in ocean for uncoupled runs.
 !
 
-      subroutine ocean_mixed_layer (dt)
+      subroutine ocean_mixed_layer (ice, dt)
 
           use icepack_intfc, only: icepack_ocn_mixed_layer, icepack_atm_boundary
-    
+          use mod_ice
+          
           implicit none
 
+          type(t_ice), target, intent(inout) :: ice
+          
           real (kind=dbl_kind), intent(in) :: &
              dt      ! time step
     
@@ -852,7 +859,8 @@ submodule (icedrv_main) icedrv_step
           !-----------------------------------------------------------------
     
           do i = 1, nx
-             call ocn_mixed_layer_icepack( alvdr_ocn=alvdr_ocn(i),  swvdr=swvdr(i),         & 
+             call ocn_mixed_layer_icepack( ice,                                             &
+                                           alvdr_ocn=alvdr_ocn(i),  swvdr=swvdr(i),         & 
                                            alidr_ocn=alidr_ocn(i),  swidr=swidr(i),         &
                                            alvdf_ocn=alvdf_ocn(i),  swvdf=swvdf(i),         &
                                            alidf_ocn=alidf_ocn(i),  swidf=swidf(i),         &
@@ -878,7 +886,7 @@ submodule (icedrv_main) icedrv_step
 
 !=======================================================================
 
-      subroutine ocn_mixed_layer_icepack(                       &
+      subroutine ocn_mixed_layer_icepack(ice,                   &
                                          alvdr_ocn, swvdr,      &
                                          alidr_ocn, swidr,      &
                                          alvdf_ocn, swvdf,      &
@@ -896,11 +904,11 @@ submodule (icedrv_main) icedrv_step
                                          frzmlt,    fsalt,      &
                                          sss)
 
-          use i_therm_param,    only: emiss_wat
           use g_forcing_param,  only: use_virt_salt
-
+          use mod_ice
+          
           implicit none
-
+          
           real (kind=dbl_kind), intent(in) :: &
              alvdr_ocn , & ! visible, direct   (fraction)
              alidr_ocn , & ! near-ir, direct   (fraction)
@@ -935,7 +943,6 @@ submodule (icedrv_main) icedrv_step
              frzmlt    , & ! freezing/melting potential (W/m^2)
              fhocn_tot , & ! net total heat flux to ocean (W/m^2)
              fresh_tot     ! fresh total water flux to ocean (kg/m^2/s)
-             
 
           real (kind=dbl_kind), parameter :: &
              frzmlt_max = c1000   ! max magnitude of frzmlt (W/m^2)
@@ -951,6 +958,10 @@ submodule (icedrv_main) icedrv_step
              ice_ref_salinity
 
           character(len=*),parameter :: subname='(icepack_ocn_mixed_layer)'
+          
+          type(t_ice), target, intent(inout) :: ice  
+          real(kind=WP), pointer  :: emiss_wat
+          emiss_wat => ice%thermo%emiss_wat
 
           call icepack_query_parameters( Tffresh_out=Tffresh, Lfresh_out=Lfresh, &
                                          stefan_boltzmann_out=stefan_boltzmann,  &
@@ -986,17 +997,39 @@ submodule (icedrv_main) icedrv_step
              fresh = fresh - lfs_corr * ice_ref_salinity / sss
           endif
 
-          fresh_tot = fresh + (-evap_ocn + frain + fsnow)*(c1-aice)
+          !PS fresh_tot = fresh + (-evap_ocn + frain + fsnow)*(c1-aice)
+          fresh_tot = fresh + frain + (-evap_ocn + fsnow)*(c1-aice)
+          !            |         |         |        |--> depending on ice concentration eiter snow adds to the                  
+          !            |         |         |             freshwater in the ocean or accumulates on the ice as snoe layer
+          !            |         |         |
+          !            |         |         |--> evaporation ocean-->atmosphere
+          !            |         |
+          !            |         |--> add here the total rain, at the end all the rain
+          !            |              drains through the ice, therefor comment the line
+          !            |              in ice_pack_therm_itd.F90, subroutine icepack_step_therm2()
+          !            |              Line: 1999
+          !            |              !!! If i dont do this here im not able to balance
+          !            |              the ocean volume under zstar to maschine precision !!!
+          !            | 
+          !            |--> at that point fresh contains the freshwater flux contributions
+          !                 from the thermodynamic growth rates of ice and snow but also 
+          !                 the contributions from the sublimation of ice-->atmos (see.
+          !                 icepack_therm_vertical.F90-->subroutine thermo_vertical(...)
+          !                 Line: 453 --> freshn = freshn + evapn - (rhoi*dhi + rhos*dhs) / dt
+          !                 evapn == evaporative water flux (kg/m^2/s)  from sublimation
 
       end subroutine ocn_mixed_layer_icepack
 
 !=======================================================================
 
-      subroutine coupling_prep(dt)
-
+      subroutine coupling_prep(ice, dt)
+            
+          use mod_ice  
           ! local variables
 
           implicit none
+          
+          type(t_ice), target, intent(inout) :: ice
     
           real (kind=dbl_kind), intent(in) :: &
              dt      ! time step
@@ -1029,7 +1062,7 @@ submodule (icedrv_main) icedrv_step
                 frzmlt_init  (i) = frzmlt(i)
              enddo
     
-             call ocean_mixed_layer (dt) ! ocean surface fluxes and sst
+             call ocean_mixed_layer (ice, dt) ! ocean surface fluxes and sst
     
           !-----------------------------------------------------------------
           ! Aggregate albedos
@@ -1179,8 +1212,8 @@ submodule (icedrv_main) icedrv_step
           ! tendencies needed by fesom
           !-----------------------------------------------------------------
 
-          dhi_dt(:) = vice(:)
-          dhs_dt(:) = vsno(:)
+          dhi_t_dt(:) = vice(:)
+          dhs_t_dt(:) = vsno(:)
 
           !-----------------------------------------------------------------
           ! initialize diagnostics
@@ -1203,17 +1236,18 @@ submodule (icedrv_main) icedrv_step
           call step_therm2     (dt) ! ice thickness distribution thermo
     
           !-----------------------------------------------------------------
+          ! clean up, update tendency diagnostics
+          !-----------------------------------------------------------------
+          offset = dt
+          call update_state (dt, daidtt, dvidtt, dagedtt, offset)
+          
+          !-----------------------------------------------------------------
           ! tendencies needed by fesom
           !-----------------------------------------------------------------
 
-          dhi_dt(:) = ( vice(:) - dhi_dt(:) ) / dt
-          dhs_dt(:) = ( vsno(:) - dhi_dt(:) ) / dt
+          dhi_t_dt(:) = ( vice(:) - dhi_t_dt(:) ) / dt
+          dhs_t_dt(:) = ( vsno(:) - dhs_t_dt(:) ) / dt
          
-          ! clean up, update tendency diagnostics
-    
-          offset = dt
-          call update_state (dt, daidtt, dvidtt, dagedtt, offset)
-    
           !-----------------------------------------------------------------
           ! dynamics, transport, ridging
           !-----------------------------------------------------------------
@@ -1271,19 +1305,39 @@ submodule (icedrv_main) icedrv_step
 
              t3 = MPI_Wtime()
              time_advec = t3 - t2
-
+             
+             !-----------------------------------------------------------------
+             ! initialize tendencies needed by fesom
+             !-----------------------------------------------------------------
+             dhi_r_dt(:) = vice(:)
+             dhs_r_dt(:) = vsno(:)
+             
              !-----------------------------------------------------------------
              ! ridging
              !-----------------------------------------------------------------
-
              call step_dyn_ridge (dt_dyn, ndtd)
      
              ! clean up, update tendency diagnostics
              offset = c0
              call update_state (dt_dyn, daidtd, dvidtd, dagedtd, offset)
-    
+             
+             !-----------------------------------------------------------------
+             ! tendencies needed by fesom
+             !-----------------------------------------------------------------
+             ! --> ridging adds fresh water need to know for compensation of thermodynamic
+             !     growth rate of ice and snow in fesom
+             dhi_r_dt(:) = ( vice(:) - dhi_r_dt(:) ) / dt
+             dhs_r_dt(:) = ( vsno(:) - dhs_r_dt(:) ) / dt
+             
           enddo
-    
+          
+          !-----------------------------------------------------------------
+          ! total tendencies of thermodynamic and ridging needed by fesom
+          !-----------------------------------------------------------------
+          ! --> needed for total compenstion of fresh of thgr and thgrsn
+          dhi_dt(:) = dhi_r_dt(:) + dhi_t_dt(:) 
+          dhs_dt(:) = dhs_r_dt(:) + dhs_t_dt(:)
+          
           !-----------------------------------------------------------------
           ! albedo, shortwave radiation
           !-----------------------------------------------------------------
@@ -1294,7 +1348,7 @@ submodule (icedrv_main) icedrv_step
           ! get ready for coupling and the next time step
           !-----------------------------------------------------------------
     
-          call coupling_prep (dt)
+          call coupling_prep (ice, dt)
 
           !-----------------------------------------------------------------
           ! icepack timing

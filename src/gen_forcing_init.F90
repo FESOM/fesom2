@@ -6,9 +6,22 @@ module forcing_array_setup_interfaces
       USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine forcing_array_setup
   end interface
-end module
+end module forcing_array_setup_interfaces
+
+
+module forcing_array_setup_dbgyre_interfaces
+  interface
+    subroutine forcing_array_setup_dbgyre(partit, mesh)
+      use mod_mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
+    end subroutine forcing_array_setup_dbgyre
+  end interface
+end module forcing_array_setup_dbgyre_interfaces
 
 ! Adapted from FESOM code by Q. Wang. 
 ! Added the driving routine forcing_setup.
@@ -21,6 +34,7 @@ use mod_mesh
 USE MOD_PARTIT
 USE MOD_PARSUP
 use forcing_array_setup_interfaces
+use forcing_array_setup_dbgyre_interfaces
 implicit none
 type(t_mesh),   intent(in),    target :: mesh
 type(t_partit), intent(inout), target :: partit
@@ -32,7 +46,34 @@ type(t_partit), intent(inout), target :: partit
      call sbc_ini(partit, mesh)         ! initialize forcing fields
 #endif
   endif 
+  if ((toy_ocean) .AND. TRIM(which_toy)=="dbgyre" .AND. (use_sw_pene)) then
+     call forcing_array_setup_dbgyre(partit, mesh)
+  endif
 end subroutine forcing_setup
+
+! ==========================================================
+subroutine forcing_array_setup_dbgyre(partit, mesh)
+  use g_forcing_arrays
+  use mod_mesh
+  USE MOD_PARTIT
+  implicit none
+  type(t_mesh),   intent(in),    target :: mesh
+  type(t_partit), intent(inout), target :: partit
+  integer    :: n2
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
+  n2=myDim_nod2D+eDim_nod2D 
+
+  allocate(chl(n2))
+  allocate(sw_3d(nl,n2))
+  chl=0.1_WP
+
+end subroutine forcing_array_setup_dbgyre
+
 ! ==========================================================
 subroutine forcing_array_setup(partit, mesh)
   !inializing forcing fields 
@@ -100,6 +141,7 @@ subroutine forcing_array_setup(partit, mesh)
   runoff=0.0_WP
   evaporation = 0.0_WP
   ice_sublimation = 0.0_WP
+
 
 #if defined (__oasis) || defined (__ifsinterface)
   allocate(sublimation(n2), evap_no_ifrac(n2))
@@ -196,15 +238,15 @@ subroutine forcing_array_setup(partit, mesh)
 
   !for ice diagnose
   if(use_ice) then
-!     allocate(thdgr(n2), thdgrsn(n2))
     allocate(flice(n2))
-    allocate(olat_heat(n2), osen_heat(n2), olwout(n2))
-!     thdgr=0.0_WP
-!     thdgrsn=0.0_WP
-    flice=0.0_WP
-    olat_heat=0.0_WP
-    osen_heat=0.0_WP
-    olwout=0.0_WP
+    allocate(hf_Qlat(n2), hf_Qsen(n2), hf_Qradtot(n2), hf_Qswr(n2), hf_Qlwr(n2), hf_Qlwrout(n2))
+    flice     = 0.0_WP
+    hf_Qlat   = 0.0_WP
+    hf_Qsen   = 0.0_WP
+    hf_Qradtot= 0.0_WP
+    hf_Qswr   = 0.0_WP
+    hf_Qlwr   = 0.0_WP
+    hf_Qlwrout= 0.0_WP
   endif 
 
   ! drag coefficient and transfer coefficients for latent and sensible heat

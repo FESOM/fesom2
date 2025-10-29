@@ -11,7 +11,7 @@ module g_config
   save
   !_____________________________________________________________________________
   ! *** Modelname ***
-  character(5)           :: runid='test1'       ! a model/setup name
+  character(10)           :: runid='test1'       ! a model/setup name
   namelist /modelname/ runid
   
   !_____________________________________________________________________________
@@ -28,9 +28,12 @@ module g_config
   character(MAX_PATH)        :: ClimateDataPath='./hydrography/'
   character(MAX_PATH)        :: TideForcingPath='./tide_forcing/'
   character(MAX_PATH)        :: ResultPath='./result/'
+  character(MAX_PATH)        :: RestartInPath=''
+  character(MAX_PATH)        :: RestartOutPath=''
   character(20)              :: MeshId='NONE'
   namelist /paths/  MeshPath, ClimateDataPath, &
-       TideForcingPath, ResultPath, MeshId
+       TideForcingPath, ResultPath, MeshId, &
+       RestartInPath, RestartOutPath
        
   !_____________________________________________________________________________
   ! *** restart_log ***
@@ -94,11 +97,13 @@ module g_config
   logical                :: use_depthonelem =.false.
   character(len=10)      :: use_depthfile='aux3d'   ! 'aux3d', 'depth@'        
   logical                :: use_cavityonelem=.false.
+  logical                :: metric_factor_zero=.false. ! if true, set metric_factor to zero
   
   namelist /geometry/   cartesian, fplane, &
                         cyclic_length, rotated_grid, force_rotation, &
                         alphaEuler, betaEuler, gammaEuler, &
-                        which_depth_n2e, use_depthonelem, use_cavityonelem, use_depthfile
+                        which_depth_n2e, use_depthonelem, use_cavityonelem, use_depthfile, &
+                        metric_factor_zero
 
   !_____________________________________________________________________________
   ! *** fleap_year ***
@@ -122,6 +127,10 @@ module g_config
   logical                       :: turn_off_hf=.false.
   logical                       :: turn_off_fw=.false.
   logical                       :: use_icesheet_coupling=.false.  
+  logical                       :: lbalance_fw=.true.
+  integer                       :: cell_saturation=2 ! 0=no cell saturation, 1=one additional iceberg allowed, 2=no daddtional iceberg allowed
+  logical                       :: lmin_latent_hf=.true.
+  logical                       :: lverbose_icb=.false.  
   integer                       :: ib_num=0
   integer                       :: steps_per_ib_step=8
 
@@ -132,7 +141,8 @@ module g_config
   integer                       :: ib_async_mode=0
   integer                       :: thread_support_level_required=3 ! 2 = MPI_THREAD_SERIALIZED, 3 = MPI_THREAD_MULTIPLE
 
-  namelist /icebergs/ use_icebergs, turn_off_hf, turn_off_fw, use_icesheet_coupling, ib_num, steps_per_ib_step, ib_async_mode, thread_support_level_required
+  namelist /icebergs/   use_icebergs, turn_off_hf, turn_off_fw, use_icesheet_coupling, lbalance_fw, cell_saturation, lmin_latent_hf, &
+                        ib_num, steps_per_ib_step, ib_async_mode, thread_support_level_required, lverbose_icb
 
 !wiso-code!!!
   logical                       :: lwiso  =.false.  ! enable isotope?
@@ -147,10 +157,11 @@ module g_config
   logical                       :: flag_debug=.false.    ! prints name of actual subroutine he is in 
   logical                       :: flag_warn_cflz=.true. ! switches off cflz warning
   logical                       :: use_transit=.false.    ! switches off transient tracers
+  logical                       :: compute_oasis_corners=.false. ! switches on corner calculation for 1st order conserv remapping 
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
                         use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
-                        use_transit
+                        use_transit, compute_oasis_corners
   
   !_____________________________________________________________________________
   ! *** others ***
