@@ -22,7 +22,7 @@ integer                                       :: AB_order=2
 integer                                       :: ID
 !___________________________________________________________________________
 ! TODO: Make it as a part of namelist.tra
-logical                                      :: ltra_diag       = .true. ! OG - tra_diag
+logical                                      :: ltra_diag       = .true.
 
 contains
 procedure WRITE_T_TRACER_DATA
@@ -44,7 +44,7 @@ real(kind=WP), allocatable         :: del_ttf_advhoriz(:,:), del_ttf_advvert(:,:
 !                              compute Tstar = 0.5*( T^(n+1) + T^n)
 real(kind=WP), allocatable, dimension(:,:,:)  :: dvd_trflx_hor, dvd_trflx_ver
 
-! in case ltra_diag=.true. --> calculate tracer diags ! OG - tra_diag
+! in case ltra_diag=.true. --> calculate tracer diags
 real(kind=WP), allocatable                    :: tra_advhoriz(:,:,:), tra_advvert(:,:,:)
 real(kind=WP), allocatable                    :: tra_diff_part_hor_redi(:,:,:)
 real(kind=WP), allocatable                    :: tra_diff_part_ver_expl(:,:,:)

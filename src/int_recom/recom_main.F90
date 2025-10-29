@@ -115,7 +115,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     real(kind=8),  allocatable :: OmegaC_watercolumn(:)
     real(kind=8),  allocatable :: kspc_watercolumn(:)
     real(kind=8),  allocatable :: rhoSW_watercolumn(:)
-    real(kind=WP)              :: ttf_rhs_bak (mesh%nl-1, tracers%num_tracers) ! local variable ! OG - tra_diag
+    real(kind=WP)              :: ttf_rhs_bak (mesh%nl-1, tracers%num_tracers) ! local variable
 
 #include "../associate_part_def.h"
 #include "../associate_mesh_def.h"
@@ -245,11 +245,11 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             C(1:nzmax, tr_num-2) = tracers%data(tr_num)%values(1:nzmax, n)
         end do
 
-        ttf_rhs_bak = 0.0 ! OG - tra_diag
+        ttf_rhs_bak = 0.0
 
 
            do tr_num=1, num_tracers
-        if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+        if (tracers%data(tr_num)%ltra_diag) then
               ttf_rhs_bak(1:nzmax,tr_num) = tracers%data(tr_num)%values(1:nzmax, n)
         end if
            end do
@@ -398,7 +398,7 @@ endif
         ! recom_sms
 
            do tr_num=1, num_tracers
-        if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+        if (tracers%data(tr_num)%ltra_diag) then
              tracers%work%tra_recom_sms(1:nzmax,n,tr_num) = tracers%data(tr_num)%values(1:nzmax, n) - ttf_rhs_bak(1:nzmax,tr_num)
              !if (mype==0)  print *,  tra_recom_sms(:,:,tr_num)
         end if

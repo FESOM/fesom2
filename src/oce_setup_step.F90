@@ -302,12 +302,12 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     !___________________________________________________________________________
     ! define tracer namelist parameter
     integer        :: num_tracers
-    logical        :: i_vert_diff, smooth_bh_tra , ltra_diag  ! OG - tra_diag
+    logical        :: i_vert_diff, smooth_bh_tra , ltra_diag
     real(kind=WP)  :: gamma0_tra, gamma1_tra, gamma2_tra
     integer        :: AB_order = 2
     namelist /tracer_listsize/ num_tracers
     namelist /tracer_list    / nml_tracer_list
-    namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff, AB_order, ltra_diag ! OG - tra_diag
+    namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff, AB_order, ltra_diag
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -465,7 +465,7 @@ nl => mesh%nl
         tracers%data(n)%valuesAB      = 0.
         tracers%data(n)%valuesold     = 0.
         tracers%data(n)%i_vert_diff   = i_vert_diff
-        tracers%data(n)%ltra_diag   = ltra_diag ! OG - tra_diag
+        tracers%data(n)%ltra_diag   = ltra_diag
     end do
     allocate(tracers%work%del_ttf(nl-1,node_size))
     allocate(tracers%work%del_ttf_advhoriz(nl-1,node_size),tracers%work%del_ttf_advvert(nl-1,node_size))
@@ -478,7 +478,7 @@ nl => mesh%nl
         tracers%work%dvd_trflx_hor = 0.0_WP
         tracers%work%dvd_trflx_ver = 0.0_WP
     end if
-    if (ltra_diag) then  ! OG - tra_diag
+    if (ltra_diag) then
         allocate(tracers%work%tra_advhoriz(nl-1,node_size,num_tracers),tracers%work%tra_advvert(nl-1,node_size,num_tracers))
         tracers%work%tra_advhoriz = 0.0_WP
         tracers%work%tra_advvert  = 0.0_WP

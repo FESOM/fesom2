@@ -164,8 +164,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     type(t_mesh)  , intent(in)   , target    :: mesh
     !___________________________________________________________________________
     integer                                  :: i, tr_num, node, elem, nzmax, nzmin
-    real(kind=WP)                            :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_elem2D) ! local variable ! OG - tra_diag
-    integer                                  :: nz, n, nu1, nl1 ! OG - tra_diag
+    real(kind=WP)                            :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_elem2D) ! local variable
+    integer                                  :: nz, n, nu1, nl1
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
@@ -398,8 +398,8 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
     integer                               :: n, nzmax, nzmin
-    real(kind=WP)                         :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D) ! OG - tra_diag
-    integer                               :: nz, nu1, nl1 ! OG - tra_diag
+    real(kind=WP)                         :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    integer                               :: nz, nu1, nl1
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), pointer                :: del_ttf(:,:)
@@ -414,9 +414,9 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     vert_sink      = 0.0_WP
 #endif
 
-    ttf_rhs_bak = 0.0 ! OG - tra_diag
+    ttf_rhs_bak = 0.0
 
-    if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+    if (tracers%data(tr_num)%ltra_diag) then
           do n=1, myDim_nod2D+eDim_nod2D
           nu1 = ulevels_nod2D(n)
           nl1 = nlevels_nod2D(n)
@@ -432,7 +432,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     ! includes Redi diffusivity if Redi=.true.
     call diff_part_hor_redi(tracers, partit, mesh)  ! seems to be ~9% faster than diff_part_hor
 
-    if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+    if (tracers%data(tr_num)%ltra_diag) then
        do n=1, myDim_nod2D+eDim_nod2D
           nu1 = ulevels_nod2D(n)
           nl1 = nlevels_nod2D(n)
@@ -444,7 +444,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
        end do
     end if
 
-    if ((.not. tracers%data(tr_num)%i_vert_diff) .and. tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+    if ((.not. tracers%data(tr_num)%i_vert_diff) .and. tracers%data(tr_num)%ltra_diag) then
        do n=1, myDim_nod2D+eDim_nod2D
           nu1 = ulevels_nod2D(n)
           nl1 = nlevels_nod2D(n)
@@ -459,7 +459,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 
     ! OG i_vert_diff = TRUE so, we dont call explicit scheme
     ! If we use this, check surface forcing for recom variables (They are not updated)
-    if ((.not. tracers%data(tr_num)%i_vert_diff) .and. tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag 
+    if ((.not. tracers%data(tr_num)%i_vert_diff) .and. tracers%data(tr_num)%ltra_diag) then 
        do n=1, myDim_nod2D+eDim_nod2D
           nu1 = ulevels_nod2D(n)
           nl1 = nlevels_nod2D(n)
@@ -474,7 +474,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     ! A projection of horizontal Redi diffussivity onto vertical. This par contains horizontal
     ! derivatives and has to be computed explicitly!
 
-    if (tracers%data(tr_num)%ltra_diag .and. Redi) then ! OG - tra_diag
+    if (tracers%data(tr_num)%ltra_diag .and. Redi) then
        do n=1, myDim_nod2D+eDim_nod2D
           nu1 = ulevels_nod2D(n)
           nl1 = nlevels_nod2D(n)
@@ -486,7 +486,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 
     if (Redi) call diff_ver_part_redi_expl(tracers, partit, mesh)
 
-    if (tracers%data(tr_num)%ltra_diag .and. Redi) then ! OG - tra_diag
+    if (tracers%data(tr_num)%ltra_diag .and. Redi) then
        do n=1, myDim_nod2D+eDim_nod2D
           nu1 = ulevels_nod2D(n)
           nl1 = nlevels_nod2D(n)
@@ -585,7 +585,7 @@ endif
     if (tracers%data(tr_num)%i_vert_diff) then
         ! do vertical diffusion: implicite
 
-        if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+        if (tracers%data(tr_num)%ltra_diag) then
            do n=1, myDim_nod2D+eDim_nod2D
               nu1 = ulevels_nod2D(n)
               nl1 = nlevels_nod2D(n)
@@ -599,7 +599,7 @@ endif
         call diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 
         ! vertical diffusion: implicit
-        if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+        if (tracers%data(tr_num)%ltra_diag) then
            do n=1, myDim_nod2D+eDim_nod2D
               nu1 = ulevels_nod2D(n)
               nl1 = nlevels_nod2D(n)
