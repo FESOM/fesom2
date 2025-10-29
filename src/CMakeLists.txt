@@ -286,6 +286,10 @@ if(DISABLE_MULTITHREADING)
    target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_MULTITHREADING)
 endif()
 
+# Workaround for MPI threading issues in restart reading
+# Serializes restart file reading while keeping async I/O for output
+target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_PARALLEL_RESTART_READ)
+
 if(${FESOM_COUPLED})
    message(STATUS "FESOM is coupled")
    if(${OASIS_WITH_YAC})

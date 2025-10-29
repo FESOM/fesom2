@@ -44,11 +44,12 @@ module io_fesom_file_module
     procedure, public :: async_read_and_scatter_variables, async_gather_and_write_variables, join, init, is_iorank, rec_count, time_varindex, time_dimindex
     procedure, public :: read_variables_raw, write_variables_raw
     procedure, public :: close_file ! inherited procedures we overwrite
+    procedure, public :: read_and_scatter_variables
     generic, public :: specify_node_var => specify_node_var_2d, specify_node_var_2dicepack, specify_node_var_3d 
     generic, public :: specify_elem_var => specify_elem_var_2d, specify_elem_var_3d
     procedure, private :: specify_node_var_2d, specify_node_var_2dicepack, specify_node_var_3d
     procedure, private :: specify_elem_var_2d, specify_elem_var_3d
-    procedure, private :: read_and_scatter_variables, gather_and_write_variables
+    procedure, private :: gather_and_write_variables
   end type fesom_file_type
   
   
@@ -186,6 +187,12 @@ contains
     type(var_info), pointer :: var
     real(kind=8), allocatable :: laux(:)
     integer mpierr
+    real(kind=8) :: total_netcdf_time, total_scatter_time, total_barrier_time
+
+    ! Initialize timing variables
+    total_netcdf_time = 0.0d0
+    total_scatter_time = 0.0d0
+    total_barrier_time = 0.0d0
 
     last_rec_idx = this%rec_count()
     
@@ -260,6 +267,23 @@ contains
       end do
       deallocate(laux)
     end do
+    
+    ! Print timing breakdown for restart reading (rank 0 only)
+    if(this%partit%mype == 0 .and. this%nvar_infos > 0) then
+      write(*,'(A)') '=================================='
+      if(allocated(this%var_infos(1)%varname)) then
+        write(*,'(A,A)') 'RESTART READ TIMING for file: ', trim(this%var_infos(1)%varname)
+      else
+        write(*,'(A)') 'RESTART READ TIMING BREAKDOWN'
+      end if
+      write(*,'(A,F10.3,A)') '  NetCDF read time:  ', total_netcdf_time, ' seconds'
+      write(*,'(A,F10.3,A)') '  MPI scatter time:  ', total_scatter_time, ' seconds'
+      if(total_barrier_time > 0.0d0) then
+        write(*,'(A,F10.3,A)') '  MPI barrier time:  ', total_barrier_time, ' seconds'
+      end if
+      write(*,'(A,F10.3,A)') '  TOTAL time:        ', total_netcdf_time + total_scatter_time + total_barrier_time, ' seconds'
+      write(*,'(A)') '=================================='
+    end if
   end subroutine
 
 
