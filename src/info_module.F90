@@ -37,10 +37,10 @@ contains
 #else
       print '(g0)', 'DEBUG is OFF'
 #endif  
-#ifdef DISABLE_MULTITHREADING
-      print '(g0)', 'DISABLE_MULTITHREADING is ON'
+#ifdef ASYNCHRONOUS_IO_THREADS
+      print '(g0)', 'ASYNCHRONOUS_IO_THREADS is ON'
 #else
-      print '(g0)', 'DISABLE_MULTITHREADING is OFF'
+      print '(g0)', 'ASYNCHRONOUS_IO_THREADS is OFF'
 #endif  
 #ifdef false
       print '(g0)', 'false is ON'
