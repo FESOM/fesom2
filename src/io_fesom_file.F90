@@ -188,6 +188,7 @@ contains
     real(kind=8), allocatable :: laux(:)
     integer mpierr
     real(kind=8) :: total_netcdf_time, total_scatter_time, total_barrier_time
+    real(kind=8) :: t_start, t_end
 
     ! Initialize timing variables
     total_netcdf_time = 0.0d0
@@ -221,18 +222,24 @@ contains
 
       do lvl=1, nlvl
         if(this%is_iorank()) then
+          t_start = MPI_Wtime()
           if(is_2d) then
             call this%read_var(var%var_index, [1,last_rec_idx], [size(var%global_level_data),1], var%global_level_data)
           else
             call this%read_var(var%var_index, [1,lvl,last_rec_idx], [size(var%global_level_data),1,1], var%global_level_data)
           end if
+          t_end = MPI_Wtime()
+          total_netcdf_time = total_netcdf_time + (t_end - t_start)
         end if
 
+        t_start = MPI_Wtime()
         if(var%is_elem_based) then
           call scatter_elem2D(var%global_level_data, laux, this%iorank, this%comm, this%partit)
         else
           call scatter_nod2D(var%global_level_data, laux, this%iorank, this%comm, this%partit)
         end if
+        t_end = MPI_Wtime()
+        total_scatter_time = total_scatter_time + (t_end - t_start)
 #ifdef ENABLE_NVHPC_WORKAROUNDS
   if(var%varname=='u') then
     dynamics_workaround%uv(1,lvl,:) = laux
