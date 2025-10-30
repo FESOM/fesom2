@@ -176,6 +176,9 @@ subroutine setup_model(partit)
     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
   endif
   read (fileunit, NML=pavariables, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'parecomsetup', nmlfile, partit)
+  
+  read (fileunit, NML=pavariables, iostat=istat)
   if (istat /= 0) call check_namelist_read(fileunit, 'pavariables', nmlfile, partit)
 
   read (fileunit, NML=pasinking, iostat=istat)
