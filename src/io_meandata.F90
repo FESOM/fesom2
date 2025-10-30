@@ -21,6 +21,10 @@ module io_MEANDATA
 !
   integer, parameter  :: i_real8=8, i_real4=4
 
+  ! NetCDF standard fill values for missing/invalid data
+  real(real32), parameter :: NC_FILL_FLOAT  = 9.9692099683868690e+36_real32
+  real(real64), parameter :: NC_FILL_DOUBLE = 9.9692099683868690e+36_real64
+
   type Meandata
     private
     type(t_partit), pointer                            :: p_partit
@@ -1656,6 +1660,13 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     call assert_nf( nf90_put_att(entry%ncid, entry%varID, 'location', entry%defined_on), __LINE__)
     call assert_nf( nf90_put_att(entry%ncid, entry%varID, 'mesh', entry%mesh), __LINE__)
 
+    ! Add _FillValue attribute for missing/invalid data (CF-compliant)
+    if (entry%accuracy == i_real8) then
+        call assert_nf( nf90_put_att(entry%ncid, entry%varID, '_FillValue', NC_FILL_DOUBLE), __LINE__)
+    elseif (entry%accuracy == i_real4) then
+        call assert_nf( nf90_put_att(entry%ncid, entry%varID, '_FillValue', NC_FILL_FLOAT), __LINE__)
+    end if
+
 
   !___Global attributes________  
     call assert_nf( nf90_put_att(entry%ncid, nf90_global, 'title', 'FESOM2 output'), __LINE__)
@@ -2080,8 +2091,14 @@ ctime=timeold+(dayold-1.)*86400
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
                 DO J=1, size(entry%local_values_r8,dim=2)
                     DO I=1, size(entry%local_values_r8,dim=1)
-                        entry%local_values_r8_copy(I,J) = entry%local_values_r8(I,J) /real(entry%addcounter,real64)  ! compute_means
-                        entry%local_values_r8(I,J) = 0._real64 ! clean_meanarrays
+                        ! Check if point has valid data (non-zero accumulated value)
+                        ! Use small epsilon to account for floating point precision
+                        if (abs(entry%local_values_r8(I,J)) < 1.0e-30_real64) then
+                            entry%local_values_r8_copy(I,J) = NC_FILL_DOUBLE  ! No data - set to fill value
+                        else
+                            entry%local_values_r8_copy(I,J) = entry%local_values_r8(I,J) /real(entry%addcounter,real64)  ! compute_means
+                        end if
+                        entry%local_values_r8(I,J) = 0._real64 ! clean_meanarrays - reset to 0 for next accumulation
                     END DO ! --> DO I=1, size(entry%local_values_r8,dim=1)
                 END DO ! --> DO J=1, size(entry%local_values_r8,dim=2)
 !$OMP END PARALLEL DO
@@ -2092,8 +2109,14 @@ ctime=timeold+(dayold-1.)*86400
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
                 DO J=1, size(entry%local_values_r4,dim=2)
                     DO I=1, size(entry%local_values_r4,dim=1)
-                        entry%local_values_r4_copy(I,J) = entry%local_values_r4(I,J) /real(entry%addcounter,real32)  ! compute_means
-                        entry%local_values_r4(I,J) = 0._real32 ! clean_meanarrays
+                        ! Check if point has valid data (non-zero accumulated value)
+                        ! Use small epsilon to account for floating point precision
+                        if (abs(entry%local_values_r4(I,J)) < 1.0e-30_real32) then
+                            entry%local_values_r4_copy(I,J) = NC_FILL_FLOAT  ! No data - set to fill value
+                        else
+                            entry%local_values_r4_copy(I,J) = entry%local_values_r4(I,J) /real(entry%addcounter,real32)  ! compute_means
+                        end if
+                        entry%local_values_r4(I,J) = 0._real32 ! clean_meanarrays - reset to 0 for next accumulation
                     END DO ! --> DO I=1, size(entry%local_values_r4,dim=1)
                 END DO ! --> DO J=1, size(entry%local_values_r4,dim=2)
 !$OMP END PARALLEL DO
