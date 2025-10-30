@@ -2003,9 +2003,9 @@ ctime=timeold+(dayold-1.)*86400
         !check whether output will be written based on event frequency
         do_output=.false.
         if (entry%freq_unit.eq.'y') then
-            call annual_event(do_output)
+            call annual_event(do_output, entry%freq)
         else if (entry%freq_unit == 'm') then 
-            call monthly_event(do_output) 
+            call monthly_event(do_output, entry%freq) 
         else if (entry%freq_unit == 'd') then
             call daily_event(do_output, entry%freq)
         else if (entry%freq_unit == 'h') then
