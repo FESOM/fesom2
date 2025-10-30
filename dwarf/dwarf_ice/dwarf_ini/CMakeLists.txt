@@ -12,7 +12,7 @@ option(ENABLE_OPENACC "compile with OpenACC support" ON)
 option(DISABLE_OPENACC_ATOMICS "disable kernels using atomic statement for reproducible results" ON)
 option(ENABLE_NVTX "enable use of nvtx tools" ON)
 
-option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
+option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
 
 # get our source files
 set(src_home ${CMAKE_CURRENT_LIST_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
@@ -56,8 +56,8 @@ file(GLOB sources_Fortran ${src_home}/*.F90)
 # create our binary (set its name to name of this project)
 add_executable(${PROJECT_NAME} ${sources_Fortran})
 #target_compile_definitions(${PROJECT_NAME} PRIVATE -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243)
-#if(${DISABLE_MULTITHREADING})
-#   target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_MULTITHREADING)
+#if(ASYNCHRONOUS_IO_THREADS)
+#   target_compile_definitions(${PROJECT_NAME} PRIVATE ASYNCHRONOUS_IO_THREADS)
 #endif()
 #if(${FESOM_COUPLED})
 #   include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindOASIS.cmake)
