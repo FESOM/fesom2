@@ -4,8 +4,6 @@ MODULE io_RESTART
   use g_clock
   use g_config
   use o_arrays
-  use g_cvmix_tke
-  use g_cvmix_idemix
   use g_backscatter
   use MOD_TRACER
   use MOD_ICE
@@ -18,6 +16,10 @@ MODULE io_RESTART
 #if defined(__icepack)
   use icedrv_main
 #endif 
+#if defined (__cvmix)
+  use g_cvmix_tke
+  use g_cvmix_idemix
+#endif  
 #if defined(__recom)
   use recom_glovar
   use recom_config
@@ -147,13 +149,14 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
   
 !___Save restart variables for TKE and IDEMIX_________________________________
 !   if (trim(mix_scheme)=='cvmix_TKE' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
+#if defined (__cvmix)
   if (mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then
         call oce_files%def_node_var_optional('tke', 'Turbulent Kinetic Energy', 'm2/s2', tke(:,:), mesh, partit)
   endif
-!   if (trim(mix_scheme)=='cvmix_IDEMIX' .or. trim(mix_scheme)=='cvmix_TKE+IDEMIX') then
   if (mix_scheme_nmb==6 .or. mix_scheme_nmb==56) then
         call oce_files%def_elem_var_optional('iwe', 'Internal Wave Energy'    , 'm2/s2', iwe(:,:), mesh, partit)
   endif 
+#endif  
   if (dynamics%opt_visc==8) then
         call oce_files%def_elem_var_optional('uke', 'unresolved kinetic energy', 'm2/s2', uke(:,:), mesh, partit)
         call oce_files%def_elem_var_optional('uke_rhs', 'unresolved kinetic energy rhs', 'm2/s2', uke_rhs(:,:), mesh, partit)
@@ -694,10 +697,20 @@ subroutine read_all_raw_restarts(dirpath, infopath, mpicomm, mype)
       stop 1
     end if
     
+    
     ! compare the restart time with our actual time
     if(int(ctime) /= int(rtime)) then
-      print *, "raw restart time ",rtime,"does not match current clock time",ctime
-      stop 1
+        write(*,*)
+        print *, achar(27)//'[5,33m'  
+        write(*,*) '____________________________________________________________________'
+        write(*,*) "WARNING: raw restart time ",rtime," does not match current clock time",ctime
+        write(*,*) "         If you restart with a different time step this might be ok!"
+        write(*,*) "         If that is not the case, check your fesom.clock file and"
+        write(*,*) "         the time information of your restart file, make sure they "
+        write(*,*) "         are not messed up!!!"
+        write(*,*) '____________________________________________________________________'
+        print *, achar(27)//'[0m'
+        write(*,*)
     end if
     globalstep = rstep
     print *,"reading raw restart from " // dirpath

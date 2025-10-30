@@ -21,6 +21,10 @@ module io_MEANDATA
 !
   integer, parameter  :: i_real8=8, i_real4=4
 
+  ! NetCDF standard fill values for missing/invalid data
+  real(real32), parameter :: NC_FILL_FLOAT  = 9.9692099683868690e+36_real32
+  real(real64), parameter :: NC_FILL_DOUBLE = 9.9692099683868690e+36_real64
+
   type Meandata
     private
     type(t_partit), pointer                            :: p_partit
@@ -134,25 +138,28 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     !------------------------------------------
     use MOD_MESH
     use MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    USE MOD_ICE
+    use MOD_PARTIT
+    use MOD_PARSUP
+    use MOD_DYN
+    use MOD_ICE
+    use o_ARRAYS       
+    use o_mixing_KPP_mod
+    use g_backscatter
+    use diagnostics
+    use g_forcing_arrays
+#if defined (__cvmix)    
     use g_cvmix_tke
     use g_cvmix_idemix
     use g_cvmix_kpp
     use g_cvmix_tidal
-    use g_backscatter
-    use diagnostics
-    use g_config,        only: use_cavity
-    use g_forcing_param, only: use_virt_salt
+#endif    
 #if defined(__recom)
-  use recom_glovar
-  use recom_config
-  use recom_ciso
+    use recom_glovar
+    use recom_config
+    use recom_ciso
 #endif
     use g_forcing_param, only: use_virt_salt, use_landice_water, use_age_tracer !---fwf-code, age-code
-    use g_config, only : lwiso !---wiso-code
+    use g_config, only : use_cavity, lwiso !---wiso-code
     use mod_transit, only : index_transit_r14c, index_transit_r39ar, index_transit_f11, index_transit_f12, index_transit_sf6
 
     implicit none
@@ -280,6 +287,19 @@ CASE ('h_ice ')
 CASE ('h_snow    ')
     if (use_ice) then
     call def_stream(nod2D, myDim_nod2D, 'h_snow',   'snow thickness over ice-covered fraction',  'm',     ice%h_snow(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+! Melt pond variables
+CASE ('apnd      ')
+    if (use_ice .and. ice%thermo%use_meltponds) then
+    call def_stream(nod2D, myDim_nod2D, 'apnd',     'melt pond area fraction',                  'frac',  ice%thermo%apnd(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('hpnd      ')
+    if (use_ice .and. ice%thermo%use_meltponds) then
+    call def_stream(nod2D, myDim_nod2D, 'hpnd',     'melt pond depth',                          'm',     ice%thermo%hpnd(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('ipnd      ')
+    if (use_ice .and. ice%thermo%use_meltponds) then
+    call def_stream(nod2D, myDim_nod2D, 'ipnd',     'melt pond ice lid thickness',              'm',     ice%thermo%ipnd(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if    
 ! Debug ice variables    
 CASE ('strength_ice')
@@ -412,9 +432,23 @@ CASE ('age       ')
 !_______________________________________________________________________________
 ! output surface forcing
 CASE ('fh        ')
-    call def_stream(nod2D, myDim_nod2D, 'fh',       'heat flux',                       'W/m2',      heat_flux_in(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'fh'       , 'heat flux',                             'W/m2', heat_flux_in(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('fh_sen    ')
+    call def_stream(nod2D, myDim_nod2D, 'fh_sen'   , 'sensible heat flux',                    'W/m2', heat_flux_in(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('fh_lat    ')
+    call def_stream(nod2D, myDim_nod2D, 'fh_lat'   , 'latent heat flux',                      'W/m2', heat_flux_in(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('fh_radtot ')
+    call def_stream(nod2D, myDim_nod2D, 'fh_radtot', 'total radiation heat flux',             'W/m2', heat_flux_in(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('fh_swr    ')
+    call def_stream(nod2D, myDim_nod2D, 'fh_swr'   , 'shortwave radiation heat flux',         'W/m2', heat_flux_in(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('fh_lwr    ')
+    call def_stream(nod2D, myDim_nod2D, 'fh_lwr'   , 'longwave radiation heat flux',          'W/m2', heat_flux_in(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('fh_lwrout ')
+    call def_stream(nod2D, myDim_nod2D, 'fh_lwrout', 'outgoing longwave radiation heat flux', 'W/m2', heat_flux_in(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
 CASE ('fw        ')
     call def_stream(nod2D, myDim_nod2D, 'fw',       'fresh water flux',                'm/s',    water_flux(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
 CASE ('atmice_x  ')
     call def_stream(nod2D, myDim_nod2D, 'atmice_x', 'stress atmice x',                 'N/m2',   ice%stress_atmice_x(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('atmice_y  ')
@@ -480,14 +514,18 @@ CASE ('realsalt  ')
 CASE ('kpp_obldepth   ')
     if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then! fesom KPP
         call def_stream(nod2D, myDim_nod2D,    'kpp_obldepth',    'KPP ocean boundary layer depth', 'm',   hbl(:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+#if defined (__cvmix)    
     elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then ! cvmix KPP
         call def_stream(nod2D, myDim_nod2D,    'kpp_obldepth',    'KPP ocean boundary layer depth', 'm',   kpp_obldepth(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+#endif        
     end if
 CASE ('kpp_sbuoyflx')
     if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then ! fesom KPP
         call def_stream(nod2D, myDim_nod2D,    'kpp_sbuoyflx',    'surface buoyancy flux',   'm2/s3',  Bo(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+#if defined (__cvmix)            
     elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then ! cvmix KPP
         call def_stream(nod2D, myDim_nod2D,    'kpp_sbuoyflx',    'surface buoyancy flux',   'm2/s3',  kpp_sbuoyflx(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+#endif        
     end if
 CASE ('tx_sur    ')
     sel_forcvar(11) = 1
@@ -1096,7 +1134,8 @@ CASE ('icb       ')
     call def_stream(nod2D, myDim_nod2D, 'ibfwe',   'iceberg erosion',                  'm/s',    ibfwe(:),         1, 'm', i_real4, partit, mesh)
     call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'ibhf',    'heat flux from iceberg melting',   'W/m2',    ibhf_n(:,:),      1, 'm', i_real4, partit, mesh)
   end if
-!------------------------------------------
+
+#if defined (__cvmix)    
 !_______________________________________________________________________________
 ! TKE mixing diagnostic 
 CASE ('TKE       ')
@@ -1132,8 +1171,8 @@ CASE ('IDEMIX    ')
         call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_v0'  , 'IWE horizontal group velocity'             , 'm/s'    , iwe_c0(:,:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream(elem2D       , myDim_elem2D       , 'iwe_fbot', 'IDEMIX bottom forcing'                     , 'm^3/s^3', iwe_fbot(:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream(elem2D       , myDim_elem2D       , 'iwe_fsrf', 'IDEMIX surface forcing'                    , 'm^3/s^3', iwe_fsrf(:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-    end if
-    
+    end if    
+
 !_______________________________________________________________________________
 ! TIDAL mixing diagnostics
 CASE ('TIDAL     ')
@@ -1142,7 +1181,8 @@ CASE ('TIDAL     ')
         call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'tidal_Kv'  , 'tidal diffusivity'                       , 'm^2/s'  , tidal_Kv(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'tidal_Av'  , 'tidal viscosity'                         , 'm^2/s'  , tidal_Av(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream(elem2D       , myDim_elem2D       , 'tidal_fbot', 'near tidal bottom forcing'               , 'W/m^2'  , tidal_fbot   , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-    end if 
+    end if
+#endif     
 
 !_______________________________________________________________________________
 ! TIDAL mixing diagnostics
@@ -1620,6 +1660,13 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     call assert_nf( nf90_put_att(entry%ncid, entry%varID, 'location', entry%defined_on), __LINE__)
     call assert_nf( nf90_put_att(entry%ncid, entry%varID, 'mesh', entry%mesh), __LINE__)
 
+    ! Add _FillValue attribute for missing/invalid data (CF-compliant)
+    if (entry%accuracy == i_real8) then
+        call assert_nf( nf90_put_att(entry%ncid, entry%varID, '_FillValue', NC_FILL_DOUBLE), __LINE__)
+    elseif (entry%accuracy == i_real4) then
+        call assert_nf( nf90_put_att(entry%ncid, entry%varID, '_FillValue', NC_FILL_FLOAT), __LINE__)
+    end if
+
 
   !___Global attributes________  
     call assert_nf( nf90_put_att(entry%ncid, nf90_global, 'title', 'FESOM2 output'), __LINE__)
@@ -2044,8 +2091,14 @@ ctime=timeold+(dayold-1.)*86400
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
                 DO J=1, size(entry%local_values_r8,dim=2)
                     DO I=1, size(entry%local_values_r8,dim=1)
-                        entry%local_values_r8_copy(I,J) = entry%local_values_r8(I,J) /real(entry%addcounter,real64)  ! compute_means
-                        entry%local_values_r8(I,J) = 0._real64 ! clean_meanarrays
+                        ! Check if point has valid data (non-zero accumulated value)
+                        ! Use small epsilon to account for floating point precision
+                        if (abs(entry%local_values_r8(I,J)) < 1.0e-30_real64) then
+                            entry%local_values_r8_copy(I,J) = NC_FILL_DOUBLE  ! No data - set to fill value
+                        else
+                            entry%local_values_r8_copy(I,J) = entry%local_values_r8(I,J) /real(entry%addcounter,real64)  ! compute_means
+                        end if
+                        entry%local_values_r8(I,J) = 0._real64 ! clean_meanarrays - reset to 0 for next accumulation
                     END DO ! --> DO I=1, size(entry%local_values_r8,dim=1)
                 END DO ! --> DO J=1, size(entry%local_values_r8,dim=2)
 !$OMP END PARALLEL DO
@@ -2056,8 +2109,14 @@ ctime=timeold+(dayold-1.)*86400
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
                 DO J=1, size(entry%local_values_r4,dim=2)
                     DO I=1, size(entry%local_values_r4,dim=1)
-                        entry%local_values_r4_copy(I,J) = entry%local_values_r4(I,J) /real(entry%addcounter,real32)  ! compute_means
-                        entry%local_values_r4(I,J) = 0._real32 ! clean_meanarrays
+                        ! Check if point has valid data (non-zero accumulated value)
+                        ! Use small epsilon to account for floating point precision
+                        if (abs(entry%local_values_r4(I,J)) < 1.0e-30_real32) then
+                            entry%local_values_r4_copy(I,J) = NC_FILL_FLOAT  ! No data - set to fill value
+                        else
+                            entry%local_values_r4_copy(I,J) = entry%local_values_r4(I,J) /real(entry%addcounter,real32)  ! compute_means
+                        end if
+                        entry%local_values_r4(I,J) = 0._real32 ! clean_meanarrays - reset to 0 for next accumulation
                     END DO ! --> DO I=1, size(entry%local_values_r4,dim=1)
                 END DO ! --> DO J=1, size(entry%local_values_r4,dim=2)
 !$OMP END PARALLEL DO
