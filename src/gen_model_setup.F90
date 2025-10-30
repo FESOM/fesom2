@@ -315,9 +315,10 @@ end subroutine setup_model
 ! read num_fesom_groups for multi FESOM group loop parallelization
 ! =================================================================
 subroutine read_namelist_run_config(partit)
+
   ! Reads run_config namelist and overwrite default parameters.
-  !
   ! Copied by Kai Himstedt (based on read_namelist)
+
   !--------------------------------------------------------------
   USE MOD_PARTIT
   USE MOD_PARSUP
@@ -332,11 +333,13 @@ subroutine read_namelist_run_config(partit)
   open (newunit=fileunit, file=nmlfile)
 
   open (fileunit,file=nmlfile)
-!  read (fileunit,NML=run_config)
-  read (fileunit,NML=run_config_tp)
+  read (fileunit,NML=run_config)
   close (fileunit)
+
 end subroutine read_namelist_run_config
+
 #endif
+
 ! =================================================================
 subroutine get_run_steps(nsteps, partit)
   ! Coded by Qiang Wang

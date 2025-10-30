@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.16)
 
 project(fesom LANGUAGES C CXX Fortran VERSION 2.0.0)
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/../cmake ${CMAKE_MODULE_PATH})
@@ -75,12 +75,14 @@ endif()
 
 option(ENABLE_OPENACC "compile with OpenACC support" OFF)
 message(STATUS "ENABLE_OPENACC: ${ENABLE_OPENACC}")
-
-set(NV_GPU_ARCH "cc80" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
+option(DISABLE_OPENACC_ATOMICS "disable kernels using atomic statement for reproducible results" ON)
+set(GPU_COMPUTE_CAPABILITY "cc80" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
+# set(GPU_FLAGS "${GPU_COMPUTE_CAPABILITY}" CACHE STRING "GPU arch for nvfortran compiler")
+set(GPU_FLAGS "cuda12.2,${GPU_COMPUTE_CAPABILITY}" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
 
 option(ENABLE_OPENMP "build FESOM with OpenMP" OFF)
 message(STATUS "ENABLE_OPENMP: ${ENABLE_OPENMP}")
-if(ENABLE_OPENMP)
+if(${ENABLE_OPENMP})
    find_package(OpenMP REQUIRED COMPONENTS Fortran)
 endif()
 
@@ -89,10 +91,6 @@ message(STATUS "RECOM_COUPLED: ${RECOM_COUPLED}")
 
 option(USE_ICEPACK "Use ICEPACK" OFF)
 message(STATUS "USE_ICEPACK: ${USE_ICEPACK}")
-
-
-option(BUILD_MESHPARTITIONER "build mesh partitioner" OFF)
-message(STATUS "BUILD_MESHPARTITIONER: ${BUILD_MESHPARTITIONER}")
 
 
 # option to trigger building a library version of FESOM
@@ -198,14 +196,13 @@ add_subdirectory(async_threads_cpp)
 # fesom library
 add_library(${PROJECT_NAME} ${sources_Fortran} $<TARGET_OBJECTS:async_threads_cpp>)
 add_dependencies(${PROJECT_NAME} fesom_version_info-generated.F90)
-target_compile_definitions(${PROJECT_NAME} PRIVATE -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243)
 
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_Fortran_MODULE_DIRECTORY}>)
 target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:module/fesom>)
 target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
-if(ENABLE_OPENMP)
+if(${ENABLE_OPENMP})
    target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_Fortran)
 endif()
 
@@ -253,20 +250,22 @@ if(OPENMP_REPRODUCIBLE)
 endif()
 
 if(${RECOM_COUPLED})
-#   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2 __usetp)
-   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2)
-#   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2 __3Zoo2Det __coccos __usetp)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2 __usetp) #__3Zoo2Det __coccos)
 endif()
 
 if(${CISO_COUPLED})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __ciso)
 endif()
 
+if(${FESOM_PROFILING})
+   target_compile_definitions(${PROJECT_NAME} PRIVATE FESOM_PROFILING)
+endif()
+
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} STREQUAL  IntelLLVM )
    
    # Base compiler flags
-   target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0)
+   target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0 -fpp -fPIC)
    
    # compiler flags not supported by IntelLLVM
    if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
@@ -325,9 +324,9 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 #    target_compile_options(${PROJECT_NAME} PRIVATE -O3 -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
    if(${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu )
       message(STATUS "Allowing type mismatches on Ubuntu for CI Testing" )  # NOTE(PG): Would be nicer to grab the CI=True from the env variable
-      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch)
+      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch -cpp)
    else()
-      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none)
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -cpp)
    endif()
    if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10 )
       target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
@@ -361,7 +360,7 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
       # |             | -mno-fma4 -mavx2 -mfma                                            |      |
       # | GCC/openMPI | -O3 -march=znver3 -mtune=znver3 -ftree-vectorize -flto            | 280s | chatgpt recomendation
       # |             | -mcpu=znver3                                                      |      |
-      target_compile_options(${PROJECT_NAME} PRIVATE -march=znver3 -mtune=znver3 -ftree-vectorize -flto)      
+      target_compile_options(${PROJECT_NAME} PRIVATE -march=znver3 -mtune=znver3 -ftree-vectorize -flto -fPIC)      
    else()
       #[[if(NOT (${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu))
          target_compile_options(${PROJECT_NAME} PRIVATE -native)
@@ -389,7 +388,7 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
 	#target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -N 1023 -g -G2 -O3)
    target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -N 1023 -g -G2 -O2 -hnoacc -M878)  #-hnoacc is a workaround for cray automatically activate -hacc, -M878 is to suppress ftn-878 warning
-   if(ENABLE_OPENMP)
+   if(${ENABLE_OPENMP})
       target_compile_options(${PROJECT_NAME} PRIVATE -homp)
    else()
       target_compile_options(${PROJECT_NAME} PRIVATE -hnoomp)
@@ -402,16 +401,19 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
    endif()
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
    target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_NVHPC_WORKAROUNDS)
-   target_compile_options(${PROJECT_NAME} PRIVATE -fast -fastsse -O3 -Mallocatable=95 -Mr8 -pgf90libs)
-   if(ENABLE_OPENACC)
-      # additional compiler settings
-      target_compile_options(${PROJECT_NAME} PRIVATE -acc -ta=tesla:${NV_GPU_ARCH} -Minfo=accel)
-      set(CMAKE_EXE_LINKER_FLAGS "-acc -ta=tesla:${NV_GPU_ARCH}")
-   endif()
-   if(ENABLE_OPENMP)
-      target_compile_options(${PROJECT_NAME} PRIVATE -Mipa=fast)
+   if(${ENABLE_OPENACC})
+      target_compile_options(${PROJECT_NAME} PRIVATE
+      $<$<CONFIG:DEBUG>:-Mallocatable=95 -Mr8 -pgf90libs -Mnofma -Minfo=all -acc=verystrict -gpu=math_uniform,cuda12.2,cc80>
+      $<$<CONFIG:RELEASE>:-Mallocatable=95 -Mr8 -pgf90libs -Minfo=all -acc=verystrict -gpu=cc80>)
+      set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-acc=verystrict -Mnofma -gpu=math_uniform,cuda12.2,cc80")
+      set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-acc=verystrict -gpu=cc80")
+      if(${DISABLE_OPENACC_ATOMICS})
+         target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_OPENACC_ATOMICS)
+      endif()
    else()
-      target_compile_options(${PROJECT_NAME} PRIVATE -Mipa=fast,inline)
+      target_compile_options(${PROJECT_NAME} PRIVATE 
+      $<$<CONFIG:DEBUG>:-Mallocatable=95 -Mr8 -pgf90libs -Mnofma>
+      $<$<CONFIG:RELEASE>:-Mallocatable=95 -Mr8 -pgf90libs>)
    endif()
 endif()
 
@@ -442,53 +444,34 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${YAXT_Fortran_LIBRARIES} ${YAXTC_
 #target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C ${YAXT_Fortran_LIBRARIES} ${YAXTC_Fortran_LIBRARIES})
 
    
-# fesom.x executable
+# fesom.x executable
 add_executable(${PROJECT_NAME}.x ${src_home}/fesom_main.F90)
 target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
+
+# fesom_meshdiag executable (optional)
+if(BUILD_MESHDIAG)
+    add_executable(fesom_meshdiag ${src_home}/fesom_meshdiag.F90)
+    target_link_libraries(fesom_meshdiag PUBLIC ${PROJECT_NAME})
+    target_link_libraries(fesom_meshdiag PRIVATE MPI::MPI_Fortran)
+    
+    # Install the mesh diagnostics utility
+    install(TARGETS fesom_meshdiag
+            RUNTIME DESTINATION bin
+            COMPONENT tools)
+    
+    message(STATUS "Mesh diagnostics utility will be built as fesom_meshdiag")
+endif()
 
 
 get_target_property(FLAGS ${PROJECT_NAME} COMPILE_OPTIONS)
 message(STATUS " --> Final Compile options for ${PROJECT_NAME}: ${FLAGS}")
 
 
+### Export and installation
 
-set(additional_targets)
-# mesh partitioner
-
-if(BUILD_MESHPARTITIONER)
-  if(NOT (${CMAKE_Fortran_COMPILER_ID} STREQUAL GNU OR ${CMAKE_Fortran_COMPILER_ID} STREQUAL Intel OR ${CMAKE_Fortran_COMPILER_ID} STREQUAL IntelLLVM))
-    message(WARNING "Mesh partitioner is only supported for GNU and Intel compilers. Please use -DBUILD_MESHPARTITIONER=OFF when configuring with ${CMAKE_Fortran_COMPILER_ID} compiler.")
-  endif()
-  message(STATUS "Building mesh partitioner...")
-block()
-set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/module/fesom_meshpart)
-  set(fesom_meshpart_sources_Fortran ${src_home}/MOD_MESH.F90 ${src_home}/oce_modules.F90 ${src_home}/gen_modules_config.F90 ${src_home}/gen_modules_partitioning.F90 ${src_home}/gen_modules_rotate_grid.F90 ${src_home}/fvom_init.F90 ${src_home}/oce_local.F90 ${src_home}/gen_comm.F90 ${src_home}/MOD_READ_BINARY_ARRAYS.F90 ${src_home}/MOD_WRITE_BINARY_ARRAYS.F90 ${src_home}/MOD_PARTIT.F90)
-  set(fesom_meshpart_sources_C ${src_home}/fort_part.c)
-  
-  add_subdirectory(${src_home}/../lib/metis-5.1.0 ${PROJECT_BINARY_DIR}/metis)
-  include_directories(${src_home}/../lib/metis-5.1.0/include)
-  
-  add_library(fesom_meshpart_C ${fesom_meshpart_sources_C})
-  target_compile_definitions(fesom_meshpart_C PRIVATE USE_MPI REAL=double DBL HAS_BLAS FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 SGI LINUX UNDER_ MPI2)
-  target_link_libraries(fesom_meshpart_C metis)
-  
-  add_executable(fesom_meshpart ${fesom_meshpart_sources_Fortran})
-  # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
-  if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
-  	target_compile_options(fesom_meshpart PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip)
-  #	target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip -g -traceback -check all,noarg_temp_created,bounds,uninit) 
-  elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
-  	target_compile_options(fesom_meshpart PRIVATE -fdefault-real-8 -ffree-line-length-none)
-    if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10 )
-        target_compile_options(fesom_meshpart PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
-     endif()
-  endif()
-  target_link_libraries(fesom_meshpart fesom_meshpart_C MPI::MPI_Fortran)
-  set_target_properties(fesom_meshpart PROPERTIES LINKER_LANGUAGE Fortran)
-  list(APPEND additional_targets fesom_meshpart)
-endblock()
+# Add meshdiag to additional targets if built
+if(BUILD_MESHDIAG)
+    set(additional_targets ${additional_targets} fesom_meshdiag)
 endif()
-
-### Export and installation
 
 fesom_export(TARGETS ${PROJECT_NAME} fesom.x ${additional_targets})
