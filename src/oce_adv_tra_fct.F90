@@ -384,9 +384,9 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
         nl1=nlevels_nod2D(n)
         !$ACC LOOP VECTOR
         do nz=nu1,nl1-1
-            flux=fct_plus(nz,n)*dt/areasvol(nz,n)+flux_eps
+            flux=fct_plus(nz,n)*dt/areasvol(nz,n)/hnode(nz,n)+flux_eps
             fct_plus(nz,n)=min(1.0_WP,fct_ttf_max(nz,n)/flux)
-            flux=fct_minus(nz,n)*dt/areasvol(nz,n)-flux_eps
+            flux=fct_minus(nz,n)*dt/areasvol(nz,n)/hnode(nz,n)-flux_eps
             fct_minus(nz,n)=min(1.0_WP,fct_ttf_min(nz,n)/flux)
         end do
         !$ACC END LOOP
