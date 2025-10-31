@@ -1,7 +1,5 @@
-!DEC$ IF DEFINED(__recom) .AND. DEFINED(__usetp)
 MPI_COMM_FESOM_WORLD                => partit%MPI_COMM_FESOM_WORLD
 MPI_COMM_FESOM_SAME_RANK_IN_GROUPS  => partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS
-!DEC$ ENDIF
 MPI_COMM_FESOM  => partit%MPI_COMM_FESOM
 MPI_COMM_FESOM_IB       => partit%MPI_COMM_FESOM_IB
 com_nod2D       => partit%com_nod2D
@@ -20,9 +18,7 @@ MPIERR          => partit%MPIERR
 MPIERR_IB       => partit%MPIERR_IB
 npes            => partit%npes
 mype            => partit%mype
-!DEC$ IF DEFINED(__recom) .AND. DEFINED(__usetp)
-my_fesom_group  => my_fesom_group
-!DEC$ ENDIF
+my_fesom_group  => partit%my_fesom_group
 maxPEnum        => partit%maxPEnum
 part            => partit%part
 

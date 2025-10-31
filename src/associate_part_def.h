@@ -1,7 +1,5 @@
-!DEC$ IF DEFINED(__recom) .AND. DEFINED(__usetp)
   integer,          pointer     :: MPI_COMM_FESOM_WORLD
   integer,          pointer     :: MPI_COMM_FESOM_SAME_RANK_IN_GROUPS
-!DEC$ ENDIF
   integer,          pointer     :: MPI_COMM_FESOM       ! FESOM communicator (for ocean only runs if often a copy of MPI_COMM_WORLD)
   integer,          pointer     :: MPI_COMM_FESOM_IB    ! FESOM communicator copy for icebergs LA: 2023-05-22
   type(com_struct), pointer     :: com_nod2D
@@ -24,9 +22,7 @@
   integer, pointer   :: MPIERR_IB       ! copy for icebergs LA: 2023-05-22
   integer, pointer   :: npes
   integer, pointer   :: mype
-!DEC$ IF DEFINED(__recom) .AND. DEFINED(__usetp)
   integer, pointer   :: my_fesom_group
-!DEC$ ENDIF
   integer, pointer   :: maxPEnum
 
   integer, dimension(:), pointer     :: part
