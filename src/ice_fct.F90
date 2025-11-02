@@ -1180,7 +1180,7 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
     mass_matrix => ice%work%fct_massmatrix(:)
     !
     ! a)
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, row, elem, elnodes, q, offset, ipos, aa)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, row, elem, elnodes, q, offset, ipos, aa, flag, iflag)
 #if defined(__openmp_reproducible)
 !$OMP DO ORDERED
 #else
