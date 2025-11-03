@@ -673,32 +673,9 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
         call write_step_info(istep, 1, ice, dynamics, tracers, partit, mesh)
         if (mype==0) then
             call sleep(1)
-            write(*,*)
-            write(*,*) '                      ,-*                 ,-*             '
-            write(*,*) '                     (_)  MODEL BLOW UP  (_)              '
-            write(*,*) '                              ____                        '
-            write(*,*) '                       __,-~~/~   `---.                   '
-            write(*,*) '                     _/_,---(      ,   )                  '
-            write(*,*) '                 __ /        <   /   )   \___             '
-            write(*,*) ' - -- ----===;;;`====------------------===;;;===---- -- - '
-            write(*,*) '                    \/  ~"~"~"~"~"~\~"~)~"/               '
-            write(*,*) '                    (_ (   \  (     >    \)               '
-            write(*,*) '                     \_( _ <         >_>`                 '
-            write(*,*) '                        ~ `-i` ::>|--"                    '
-            write(*,*) '                            I;|.|.|                       '
-            write(*,*) '                           <|i::|i|`                      '
-            write(*,*) '                          (` ^`"`- ")                     '
-            write(*,*) ' _______________________.,-#%&$@%#&#~,.__________________ '
-            write(*,*) '                                                          '
-            write(*,*) '            (`- ́)  _ (`- ́).->          <-. (`- ́)          ' 
-            write(*,*) '   <-.      ( OO).-/ ( OO)_      .->      \(OO )_         '
-            write(*,*) '(`- ́)-----.(,------.(_)--\_)(`- ́)----. ,--./  ,-.) .----. '
-            write(*,*) '(OO|(_\--- ́ |  .--- ́/    _ /( OO).-.  `|   `. ́   |\_,-.  |'
-            write(*,*) ' / |  `--. (|  `--. \_..`--.( _) | |  ||  |`. ́|  |   . ́ . ́'
-            write(*,*) ' \_)  .-- ́  |  .-- ́ .-._)   \\|  |)|  ||  |   |  | . ́  /_ '
-            write(*,*) '  `|  |_)   |  `---.\       / `  `- ́   ́|  |   |  ||      |'
-            write(*,*) '   `-- ́     `------ ́ `----- ́   `----- ́ `-- ́   `-- ́`------ ́'
-            write(*,*)
+            call plot_fesomlogo_expl()
+            call plot_fesomlogo_lildevil()
+
         end if
         call blowup(istep, ice, dynamics, tracers, partit, mesh)
         if (mype==0) write(*,*) ' --> finished writing blow up file'
@@ -759,3 +736,114 @@ subroutine write_enegry_info(dynamics, partit, mesh)
    if (mype==0) write(*,"(A, ES14.7, A, ES14.7, A, ES14.7)") 'ke. drag=', budget(1), ' | ', budget(2), ' | ', sum(budget)
    if (mype==0) write(*,*) '***********************************'   
 end subroutine write_enegry_info
+
+!
+!
+!_______________________________________________________________________________
+subroutine plot_fesomlogo()
+    implicit none 
+    character(len=*), parameter :: r = char(27)//'[31m' ! red
+    character(len=*), parameter :: c = char(27)//'[36m' ! cyan
+    character(len=*), parameter :: z = char(27)//'[0m'    ! reset
+    write(*,*)
+    write(*,*) c//' .------. ------. ------.  .-----. ,--.   ,-.  .----.  '//z
+    write(*,*) c//' |  .--- ́|  .--- ́/    _ / ´  .-.  `|   `. ́   |\_,-.  | '//z
+    write(*,*) c//' |  `--. |  `--. \_..`--. |  | |  ||  |`. ́|  |   . ́ . ́ '//z
+    write(*,*) c//' |  .-- ́ |  .-- ́ .-._)   \|  | |  ||  |   |  | . ́  /_  '//z
+    write(*,*) c//' |  |    |  `---.\       /`  `- ́   ́|  |   |  ||      | '//z
+    write(*,*) c//' `-- ́    `------ ́ `----- ́  `----- ́ `-- ́   `-- ́`------ ́ '//z
+    write(*,*) '                                          _____           '
+    write(*,*) '      ___________                     ,-:` \;´,``-,       '
+    write(*,*) '     | .-------. |                  .´-;_,;  `:-;_,`.     '
+    write(*,*) '     | |       | |                 /;   `/    ,  _`.-\    ' 
+    write(*,*) '     | |       | |                | ´`. (`     /` ` \`|   '
+    write(*,*) '     | |__   __| |            ,-C=|:.  `\`-.   \_   / |   '
+    write(*,*) '      `---|-|---´          ,-´    |     (   `,  .`\ ;`|   ' 
+    write(*,*) '       [====  O]--,    ,--´        \     | .´     `-´/    '
+    write(*,*) '     /:::::::::::\ \_,-             `.   ;/        .´     '
+    write(*,*) '    /:::::===:::::\                   ``-._____.-´`       '
+    write(*,*) '   ´---------------`                                      '
+    write(*,*)
+end subroutine plot_fesomlogo
+
+!
+!
+!_______________________________________________________________________________
+subroutine plot_fesomlogo_lildevil()
+    implicit none 
+    character(len=*), parameter :: r = char(27)//'[31m' ! red
+    character(len=*), parameter :: c = char(27)//'[36m' ! cyan
+    character(len=*), parameter :: z = char(27)//'[0m'    ! reset
+    ! character(len=*), parameter :: g = char(27)//'[32m' ! green
+    ! character(len=*), parameter :: o = char(27)//'[33m' ! orange
+    ! character(len=*), parameter :: b = char(27)//'[34m' ! blue
+    ! character(len=*), parameter :: p = char(27)//'[35m' ! purple
+    ! write(*,*) '            (`- ́)  _ (`- ́).->          <-. (`- ́)          ' 
+    ! write(*,*) '   <-.      ( OO).-/ ( OO)_      .->      \(OO )_         '
+    ! write(*,*) '(`- ́)-----.(,------.(_)--\_)(`- ́)----. ,--./  ,-.) .----. '
+    ! write(*,*) '(OO|(_\--- ́ |  .--- ́/    _ /( OO).-.  `|   `. ́   |\_,-.  |'
+    ! write(*,*) ' / |  `--. (|  `--. \_..`--.( _) | |  ||  |`. ́|  |   . ́ . ́'
+    ! write(*,*) ' \_)  .-- ́  |  .-- ́ .-._)   \\|  |)|  ||  |   |  | . ́  /_ '
+    ! write(*,*) '  `|  |_)   |  `---.\       / `  `- ́   ́|  |   |  ||      |'
+    ! write(*,*) '   `-- ́     `------ ́ `----- ́   `----- ́ `-- ́   `-- ́`------ ́'
+    ! write(*,*)
+    write(*,*) '                                                          '
+    write(*,*) '            '//r//'(`- ́)  _ (`- ́).->          <-. (`- ́)'//z//'          ' 
+    write(*,*) '   '//r//'<-.      ( OO).-/ ( OO)_      .->      \(OO )_'//z//'         '
+    write(*,*) r//'(`- ́)'//c//'-----.'//r//'('//c//',------.'//r//'(_)'//c//'--'//r//'\_)(`- ́)'//c//'----. ,--.'//r//'/'//c//'  ,-.'//r//')'//c//' .----. '//z
+    write(*,*) r//'(OO'//c//'|'//r//'(_\'//c//'--- ́ |  .--- ́/    _ /'//r//'( OO)'//c//'.-.  `|   `. ́   |\_,-.  |'//z
+    write(*,*) r//' / '//c//'|  `--. '//r//'('//c//'|  `--. \_..`--.'//r//'( _)'//c//' | |  ||  |`. ́|  |   . ́ . ́'//z
+    write(*,*) r//' \_)'//c//'  .-- ́  |  .-- ́ .-._)   \'//r//'\'//c//'|  |'//r//')'//c//'|  ||  |   |  | . ́  /_ '//z
+    write(*,*) r//'  `'//c//'|  |'//r//'_)'//c//'   |  `---.\       / `  `- ́   ́|  |   |  ||      |'//z
+    write(*,*) c//'   `-- ́     `------ ́ `----- ́   `----- ́ `-- ́   `-- ́`------ ́'//z
+    write(*,*)
+end subroutine plot_fesomlogo_lildevil 
+
+!
+!
+!_______________________________________________________________________________
+subroutine plot_fesomlogo_expl()
+    implicit none 
+    character(len=*), parameter :: r = char(27)//'[31m' ! red
+    character(len=*), parameter :: g = char(27)//'[32m' ! green
+    character(len=*), parameter :: o = char(27)//'[33m' ! orange
+    character(len=*), parameter :: b = char(27)//'[34m' ! blue
+    character(len=*), parameter :: p = char(27)//'[35m' ! purple
+    character(len=*), parameter :: c = char(27)//'[36m' ! cyan
+    character(len=*), parameter :: z = char(27)//'[0m'  ! reset
+    ! write(*,*)
+    ! write(*,*) '                                                          '
+    ! write(*,*) '                        MODEL BLOW UP !                   '
+    ! write(*,*) '                              ____                        '
+    ! write(*,*) '                       __,-~~/~   `---.                   '
+    ! write(*,*) '                     _/_,---(      ,   )                  '
+    ! write(*,*) '                 __ /        <   /   )   \___             '
+    ! write(*,*) ' - -- ----===;;;`====------------------===;;;===---- -- - '
+    ! write(*,*) '                    \/  ~"~"~"~"~"~\~"~)~"/               '
+    ! write(*,*) '                    (_ (   \  (     >    \)               '
+    ! write(*,*) '                     \_( _ <         >_>`                 '
+    ! write(*,*) '                        ~ `-i` ::>|--"                    '
+    ! write(*,*) '   (`-´)                    I;|.|.|                       '
+    ! write(*,*) '   ( OO)_  __T__           <|i::|i|`                      '
+    ! write(*,*) '  C_ ´`__B |TNT|          (` ^`,-* ")                     '
+    ! write(*,*) '<-´()^()   |___|\_______.,-#%&(_)%#&#~,.                  '
+    ! write(*,*)
+    write(*,*)
+    write(*,*) '                                                          '
+    write(*,*) '                        MODEL BLOW UP !                   '
+    write(*,*) '                              ____                        '
+    write(*,*) '                       __,-~~/~   `---.                   '
+    write(*,*) '                     _/_,---(      ,   )                  '
+    write(*,*) '                 __ /        <   /   )   \___             '
+    write(*,*) o//' - -- ----===;;;`====------------------===;;;===---- -- - '
+    write(*,*) o//'                    \/  ~"~"~"~"~"~\~"~)~"/               '
+    write(*,*) o//'                    (_ (   \  (     >    \)               '
+    write(*,*) o//'                     \_( _ <         >_>`                 '
+    write(*,*) r//'                        ~ `-i` ::>|--"                    '
+    write(*,*) r//'   (`-´)  '//z//'              '//r//'    I;|.|.|                       '//z
+    write(*,*) r//'   ( OO)_ '//z//' __T__        '//r//'   <|i::|i|`                      '//z
+    write(*,*) r//'  C_ ´`__B'//z//' |TNT|        '//p//'  (` ^`'//z//',-*'//p//' ")                     '//z
+    write(*,*) r//'<-´()^()  '//z//' |___|\_______'//p//'.,-#%&'//z//'(_)'//p//'%#&#~,.                  '//z
+    write(*,*)
+end subroutine plot_fesomlogo_expl
+ 
