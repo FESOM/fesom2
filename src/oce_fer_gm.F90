@@ -403,6 +403,18 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
         end if
         
         !_______________________________________________________________________
+        ! Apply vertical downscaling of GM parameter with exp(-z/z_Ref)
+        if (scaling_GMzexp) then
+            !___________________________________________________________________
+            ! compute scaling with respect to reference buoyancy
+            !!PS do nz=1, nzmax
+            do nz=nzmin, nzmax
+                zscaling(nz)=exp(-abs(zbar_3d_n(nz, n)/GMzexp_zref))
+                zscaling(nz)=max(min(zscaling(nz), 1.0_WP), 1.0e-2)
+            end do
+        end if 
+        
+        !_______________________________________________________________________
         ! Switch off GM and Redi within a BL in NH (a strategy following FESOM 1.4)
         if (scaling_FESOM14) then
             !zscaling(1:MLD1_ind(n)+1)=0.0_WP
