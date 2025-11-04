@@ -115,17 +115,27 @@ endfunction()
 
 # Function to update namelist.tra for test_pi
 function(update_namelist_tra NAMELIST_IN NAMELIST_OUT TEST_DATA_DIR)
+    set(NAMELIST_PROFILE "")
+    if(ARGC GREATER 3)
+        set(NAMELIST_PROFILE "${ARGV3}")
+    endif()
+
     file(READ "${NAMELIST_IN}" CONTENT)
-    
-    # Set filelist for test_global climate data with correct path
-    # Replace the complete line including the comment
-    string(REGEX REPLACE "filelist[ \t]*=[ \t]*'[^']*'[ \t]*,[ \t]*'[^']*'" "filelist = 'INITIAL/WOA18/woa18_netcdf_5deg.nc', 'INITIAL/WOA18/woa18_netcdf_5deg.nc'" CONTENT "${CONTENT}")
-    
-    # Update any other hardcoded paths in the tracers section
-    string(REGEX REPLACE "/pool/data/AWICM/FESOM2/FORCING/[^']*" "${TEST_DATA_DIR}/initial" CONTENT "${CONTENT}")
-    string(REGEX REPLACE "phc3.0_winter\\.nc" "woa18_netcdf_5deg.nc" CONTENT "${CONTENT}")
-    
-    file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
+    set(MODIFIED_CONTENT "${CONTENT}")
+
+    if(NAMELIST_PROFILE STREQUAL "toy_soufflet")
+        string(REGEX REPLACE "filelist[ \t]*=[ \t]*'[^']*'[ \t]*,[ \t]*'[^']*'" "filelist = 'INITIAL/phc3.0/phc3.0_winter.nc', 'INITIAL/phc3.0/phc3.0_winter.nc'" MODIFIED_CONTENT "${MODIFIED_CONTENT}")
+    else()
+        # Set filelist for test_global climate data with correct path
+        # Replace the complete line including the comment
+        string(REGEX REPLACE "filelist[ \t]*=[ \t]*'[^']*'[ \t]*,[ \t]*'[^']*'" "filelist = 'INITIAL/WOA18/woa18_netcdf_5deg.nc', 'INITIAL/WOA18/woa18_netcdf_5deg.nc'" MODIFIED_CONTENT "${MODIFIED_CONTENT}")
+
+        # Update any other hardcoded paths in the tracers section
+        string(REGEX REPLACE "/pool/data/AWICM/FESOM2/FORCING/[^']*" "${TEST_DATA_DIR}/initial" MODIFIED_CONTENT "${MODIFIED_CONTENT}")
+        string(REGEX REPLACE "phc3.0_winter\\.nc" "woa18_netcdf_5deg.nc" MODIFIED_CONTENT "${MODIFIED_CONTENT}")
+    endif()
+
+    file(WRITE "${NAMELIST_OUT}" "${MODIFIED_CONTENT}")
 endfunction()
 
 # Function to update tracer_init3d filelist specifically (as requested)
@@ -277,6 +287,11 @@ endfunction()
 
 # Function to configure namelists with custom options
 function(configure_fesom_namelists_with_options TARGET_DIR TEST_DATA_DIR RESULT_DIR MESH_NAME STEP_PER_DAY RUN_LENGTH RUN_LENGTH_UNIT RESTART_LENGTH RESTART_LENGTH_UNIT LOGFILE_OUTFREQ FORCE_ROTATION USE_CAVITY)
+    set(NAMELIST_PROFILE "")
+    if(ARGC GREATER 12)
+        set(NAMELIST_PROFILE "${ARGV12}")
+    endif()
+
     # List of namelists that need to be copied and configured
     set(NAMELISTS
         namelist.config
@@ -290,14 +305,29 @@ function(configure_fesom_namelists_with_options TARGET_DIR TEST_DATA_DIR RESULT_
     )
     
     foreach(NAMELIST ${NAMELISTS})
-        if(EXISTS "${CMAKE_SOURCE_DIR}/config/${NAMELIST}")
-            # Copy the namelist to target directory first
+        set(NAMELIST_SOURCE "")
+
+        if(NAMELIST_PROFILE)
+            set(NAMELIST_PROFILE_SOURCE "${CMAKE_SOURCE_DIR}/config/${NAMELIST}.${NAMELIST_PROFILE}")
+            if(EXISTS "${NAMELIST_PROFILE_SOURCE}")
+                set(NAMELIST_SOURCE "${NAMELIST_PROFILE_SOURCE}")
+            endif()
+        endif()
+
+        if(NOT NAMELIST_SOURCE)
+            set(NAMELIST_DEFAULT_SOURCE "${CMAKE_SOURCE_DIR}/config/${NAMELIST}")
+            if(EXISTS "${NAMELIST_DEFAULT_SOURCE}")
+                set(NAMELIST_SOURCE "${NAMELIST_DEFAULT_SOURCE}")
+            endif()
+        endif()
+
+        if(NAMELIST_SOURCE)
             configure_file(
-                "${CMAKE_SOURCE_DIR}/config/${NAMELIST}"
+                "${NAMELIST_SOURCE}"
                 "${TARGET_DIR}/${NAMELIST}"
                 COPYONLY
             )
-            
+
             # Apply namelist-specific updates
             if("${NAMELIST}" STREQUAL "namelist.config")
                 # Apply common path updates only to namelist.config with specific mesh
@@ -308,7 +338,7 @@ function(configure_fesom_namelists_with_options TARGET_DIR TEST_DATA_DIR RESULT_
             elseif("${NAMELIST}" STREQUAL "namelist.ice")
                 update_namelist_ice("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}")
             elseif("${NAMELIST}" STREQUAL "namelist.tra")
-                update_namelist_tra("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}" "${TEST_DATA_DIR}")
+                update_namelist_tra("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}" "${TEST_DATA_DIR}" "${NAMELIST_PROFILE}")
             elseif("${NAMELIST}" STREQUAL "namelist.forcing")
                 update_namelist_forcing("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}" "${TEST_DATA_DIR}")
             elseif("${NAMELIST}" STREQUAL "namelist.oce")
@@ -317,7 +347,7 @@ function(configure_fesom_namelists_with_options TARGET_DIR TEST_DATA_DIR RESULT_
                 update_namelist_io("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}")
             elseif("${NAMELIST}" STREQUAL "namelist.cvmix")
                 update_namelist_cvmix("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}")
-                endif()
+            endif()
         endif()
     endforeach()
 endfunction()
@@ -339,7 +369,7 @@ endfunction()
 # Function to add a FESOM integration test with custom options
 function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH RUN_LENGTH_UNIT RESTART_LENGTH RESTART_LENGTH_UNIT LOGFILE_OUTFREQ FORCE_ROTATION USE_CAVITY)
     set(options MPI_TEST)
-    set(oneValueArgs NP TIMEOUT)
+    set(oneValueArgs NP TIMEOUT NAMELIST_PROFILE)
     set(multiValueArgs COMMAND_ARGS)
     cmake_parse_arguments(FESOM_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
     
@@ -349,6 +379,9 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
     endif()
     if(NOT DEFINED FESOM_TEST_TIMEOUT)
         set(FESOM_TEST_TIMEOUT 300)  # 5 minutes default
+    endif()
+    if(NOT DEFINED FESOM_TEST_NAMELIST_PROFILE)
+        set(FESOM_TEST_NAMELIST_PROFILE "")
     endif()
     
     # Create test run directory
@@ -421,7 +454,11 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
     endif()
     
     # Configure namelists for this test with custom options
-    configure_fesom_namelists_with_options("${TEST_RUN_DIR}" "${TEST_DATA_DIR}" "${RESULT_DIR}" "${MESH_NAME}" "${STEP_PER_DAY}" "${RUN_LENGTH}" "${RUN_LENGTH_UNIT}" "${RESTART_LENGTH}" "${RESTART_LENGTH_UNIT}" "${LOGFILE_OUTFREQ}" "${FORCE_ROTATION}" "${USE_CAVITY}")
+    if(FESOM_TEST_NAMELIST_PROFILE)
+        configure_fesom_namelists_with_options("${TEST_RUN_DIR}" "${TEST_DATA_DIR}" "${RESULT_DIR}" "${MESH_NAME}" "${STEP_PER_DAY}" "${RUN_LENGTH}" "${RUN_LENGTH_UNIT}" "${RESTART_LENGTH}" "${RESTART_LENGTH_UNIT}" "${LOGFILE_OUTFREQ}" "${FORCE_ROTATION}" "${USE_CAVITY}" "${FESOM_TEST_NAMELIST_PROFILE}")
+    else()
+        configure_fesom_namelists_with_options("${TEST_RUN_DIR}" "${TEST_DATA_DIR}" "${RESULT_DIR}" "${MESH_NAME}" "${STEP_PER_DAY}" "${RUN_LENGTH}" "${RUN_LENGTH_UNIT}" "${RESTART_LENGTH}" "${RESTART_LENGTH_UNIT}" "${LOGFILE_OUTFREQ}" "${FORCE_ROTATION}" "${USE_CAVITY}")
+    endif()
     
     # Add the test
     add_test(
@@ -443,7 +480,11 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
         )
     endif()
     
-    message(STATUS "Added FESOM test: ${TEST_NAME} with mesh: ${MESH_NAME}, cavity: ${USE_CAVITY}")
+    if(FESOM_TEST_NAMELIST_PROFILE)
+        message(STATUS "Added FESOM test: ${TEST_NAME} with mesh: ${MESH_NAME}, cavity: ${USE_CAVITY}, profile: ${FESOM_TEST_NAMELIST_PROFILE}")
+    else()
+        message(STATUS "Added FESOM test: ${TEST_NAME} with mesh: ${MESH_NAME}, cavity: ${USE_CAVITY}")
+    endif()
 endfunction()
 
 # Function to find and validate MPI for testing
