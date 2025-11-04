@@ -669,6 +669,7 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
     ! case CPU mype==0 needs to write out the stuff. Write out occurs in 
     ! moment only over CPU mype==0
     call MPI_AllREDUCE(found_blowup_loc  , found_blowup  , 1, MPI_INTEGER, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+    found_blowup=1
     if (found_blowup==1) then
         call write_step_info(istep, 1, ice, dynamics, tracers, partit, mesh)
         if (mype==0) then
@@ -789,13 +790,14 @@ subroutine plot_fesomlogo_lildevil()
     ! write(*,*)
     write(*,*) '                                                          '
     write(*,*) '            '//r//'(`- ́)  _ (`- ́).->          <-. (`- ́)'//z//'          ' 
-    write(*,*) '   '//r//'<-.      ( OO).-/ ( OO)_      .->      \(OO )_'//z//'         '
+    write(*,*) '   '//r//'<-.      ( oo).-/ ( oo)_      .->      \(oo )_'//z//'         '
     write(*,*) r//'(`- ́)'//c//'-----.'//r//'('//c//',------.'//r//'(_)'//c//'--'//r//'\_)(`- ́)'//c//'----. ,--.'//r//'/'//c//'  ,-.'//r//')'//c//' .----. '//z
-    write(*,*) r//'(OO'//c//'|'//r//'(_\'//c//'--- ́ |  .--- ́/    _ /'//r//'( OO)'//c//'.-.  `|   `. ́   |\_,-.  |'//z
+    write(*,*) r//'(oo'//c//'|'//r//'(_\'//c//'--- ́ |  .--- ́/    _ /'//r//'( oo)'//c//'.-.  `|   `. ́   |\_,-.  |'//z
     write(*,*) r//' / '//c//'|  `--. '//r//'('//c//'|  `--. \_..`--.'//r//'( _)'//c//' | |  ||  |`. ́|  |   . ́ . ́'//z
     write(*,*) r//' \_)'//c//'  .-- ́  |  .-- ́ .-._)   \'//r//'\'//c//'|  |'//r//')'//c//'|  ||  |   |  | . ́  /_ '//z
     write(*,*) r//'  `'//c//'|  |'//r//'_)'//c//'   |  `---.\       / `  `- ́   ́|  |   |  ||      |'//z
     write(*,*) c//'   `-- ́     `------ ́ `----- ́   `----- ́ `-- ́   `-- ́`------ ́'//z
+    write(*,*) '                                                          '
     write(*,*)
 end subroutine plot_fesomlogo_lildevil 
 
@@ -813,37 +815,51 @@ subroutine plot_fesomlogo_expl()
     character(len=*), parameter :: z = char(27)//'[0m'  ! reset
     ! write(*,*)
     ! write(*,*) '                                                          '
-    ! write(*,*) '                        MODEL BLOW UP !                   '
+    ! write(*,*) '        YOUR MODEL BLOW UP, CODE GREMLIN IN ACTION !!!    '
     ! write(*,*) '                              ____                        '
     ! write(*,*) '                       __,-~~/~   `---.                   '
     ! write(*,*) '                     _/_,---(      ,   )                  '
     ! write(*,*) '                 __ /        <   /   )   \___             '
     ! write(*,*) ' - -- ----===;;;`====------------------===;;;===---- -- - '
-    ! write(*,*) '                    \/  ~"~"~"~"~"~\~"~)~"/               '
-    ! write(*,*) '                    (_ (   \  (     >    \)               '
-    ! write(*,*) '                     \_( _ <         >_>`                 '
-    ! write(*,*) '                        ~ `-i` ::>|--"                    '
+    ! write(*,*) '.____________.      \/  ~"~"~"~"~"~\~"~)~"/               '
+    ! write(*,*) '|Code Gremlin|      (_ (   \  (     >    \)               '
+    ! write(*,*) '`----+-------´        \_( _ <         >_>`                 '
+    ! write(*,*) '     v                  ~ `-i` ::>|--"                    '
     ! write(*,*) '   (`-´)                    I;|.|.|                       '
-    ! write(*,*) '   ( OO)_  __T__           <|i::|i|`                      '
-    ! write(*,*) '  C_ ´`__B |TNT|          (` ^`,-* ")                     '
+    ! write(*,*) '  _( o<)_  __T__           <|i::|i|`                      '
+    ! write(*,*) ' (,_ w _,) |TNT|          (` ^`,-* ")                     '
     ! write(*,*) '<-´()^()   |___|\_______.,-#%&(_)%#&#~,.                  '
     ! write(*,*)
     write(*,*)
-    write(*,*) '                                                          '
-    write(*,*) '                        MODEL BLOW UP !                   '
-    write(*,*) '                              ____                        '
-    write(*,*) '                       __,-~~/~   `---.                   '
-    write(*,*) '                     _/_,---(      ,   )                  '
-    write(*,*) '                 __ /        <   /   )   \___             '
-    write(*,*) o//' - -- ----===;;;`====------------------===;;;===---- -- - '
-    write(*,*) o//'                    \/  ~"~"~"~"~"~\~"~)~"/               '
-    write(*,*) o//'                    (_ (   \  (     >    \)               '
-    write(*,*) o//'                     \_( _ <         >_>`                 '
-    write(*,*) r//'                        ~ `-i` ::>|--"                    '
-    write(*,*) r//'   (`-´)  '//z//'              '//r//'    I;|.|.|                       '//z
-    write(*,*) r//'   ( OO)_ '//z//' __T__        '//r//'   <|i::|i|`                      '//z
-    write(*,*) r//'  C_ ´`__B'//z//' |TNT|        '//p//'  (` ^`'//z//',-*'//p//' ")                     '//z
+    write(*,*)
+    write(*,*)    '                                                          '
+    write(*,*)    '        YOUR MODEL BLOW UP, CODE GREMLIN IN ACTION !!!    '
+    write(*,*) b//'                              ____                        '//z
+    write(*,*) b//'                       __,-~~/~   `---.                   '//z
+    write(*,*) b//'                     _/_,---(      ,   )                  '//z
+    write(*,*) b//'                 __ /        <   /   )   \___             '//z
+    write(*,*) z//' - -- ----===;;;`====------------------===;;;===---- -- - '//z
+    write(*,*) z//'.____________.      \/  ~"~"~"~"~"~\~"~)~"/               '//z
+    write(*,*) z//'|Code Gremlin|      (_ (   \  (     >    \)               '//z
+    write(*,*) z//'`----+-------´'//o//'        \_( _ <         >_>`                 '//z
+    write(*,*) z//'     v        '//o//'           ~ `-i` ::>|--"                    '//z
+    write(*,*) r//'   (`-´)  '//z//'              '//o//'    I;|.|.|                       '//z
+    write(*,*) r//'  _( o<)_ '//z//' __T__        '//r//'   <|i::|i|`                      '//z
+    write(*,*) r//' (,_ w _,)'//z//' |TNT|        '//r//'  (` ^`'//z//',-*'//r//' ")                     '//z
     write(*,*) r//'<-´()^()  '//z//' |___|\_______'//p//'.,-#%&'//z//'(_)'//p//'%#&#~,.                  '//z
+    write(*,*)
+    write(*,*)
+    write(*,*)    ' Things to try (if you havent changed anything in the code)'
+    write(*,*)    '     - 1st. increase the step_per_day (namelist.config,    '
+    write(*,*)    '       steps_per_day=32(45min),36(40min)...,48(30min)...'
+    write(*,*)    '       ...,60(24min)...,72(20min)...,96(15min)...,144(10min)'
+    write(*,*)    '       ...,160(9min),180(8min)...,240(6min)...,288(5min)'
+    write(*,*)    '       ...,360(4min)...,480(3min)...,720(2min)...,1440(1min))'
+    write(*,*)    '     - 2nd. increase slowly background viscosity visc_gamma0 within'
+    write(*,*)    '       its bounds (namelist.dyn)'
+    write(*,*)    '     - 3nd. increase slowly flow aware viscosity visc_gamma1 within'
+    write(*,*)    '       its bounds (namelist.dyn)'
+    write(*,*)    '     - 4th. contact developers :-D'  
     write(*,*)
 end subroutine plot_fesomlogo_expl
  
