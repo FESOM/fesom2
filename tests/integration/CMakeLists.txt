@@ -25,6 +25,24 @@ if(ENABLE_MPI_TESTS)
         NP 2
         TIMEOUT ${TEST_TIMEOUT}
     )
+
+    # Toy soufflet configuration with 2 processes
+    add_fesom_test_with_options(integration_soufflet_mpi2
+        "soufflet" "72" "1" "d" "1" "d" "72" ".false." ".false."
+        MPI_TEST
+        NP 2
+        TIMEOUT ${TEST_TIMEOUT}
+        NAMELIST_PROFILE toy_soufflet
+    )
+
+    # Toy soufflet configuration with 8 processes
+    add_fesom_test_with_options(integration_soufflet_mpi8
+        "soufflet" "72" "1" "d" "1" "d" "72" ".false." ".false."
+        MPI_TEST
+        NP 8
+        TIMEOUT ${TEST_TIMEOUT}
+        NAMELIST_PROFILE toy_soufflet
+    )
     
     # Additional MPI test configurations can be added here
     # For example, testing different domain decompositions
