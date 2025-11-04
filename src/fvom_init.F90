@@ -1164,8 +1164,8 @@ subroutine find_levels_cavity(mesh)
                             ! compute shallowest neighbouring cavity level
                             val = nl
                             do j = 1, 3
-                                if (elems(j)>0) then
-                                    val = min(nl,ulevels(elems(j)))
+                                if ((elems(j)>0) .and. (ulevels(elems(j))>1)) then
+                                    val = min(val,ulevels(elems(j)))
                                 end if 
                             end do ! --> do i = 1, nneighb
                             
