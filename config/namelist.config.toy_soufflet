@@ -14,7 +14,7 @@ run_length_unit='d' ! y, m, d, s
 &clockinit              ! the model starts at
 timenew=0.0
 daynew=1
-yearnew=1958
+yearnew=1948
 /
 
 &paths
@@ -59,11 +59,15 @@ use_cavity=.false.              !
 use_cavity_partial_cell=.false. 
 use_floatice = .false.
 use_sw_pene=.false.
+use_cavity_fw2press=.true.
+cavity_partial_cell_thresh=0.0
 flag_debug=.false.
 flag_warn_cflz=.false.
 toy_ocean=.true.
-which_toy="soufflet"
-flag_debug=.false.
+which_toy='soufflet'
+lwiso=.false.
+use_transit=.false.
+compute_oasis_corners=.false.
 
 /
 
@@ -75,9 +79,16 @@ n_part= 128 !6096          ! 432 number of partitions on each hierarchy level
 /
 
 &icebergs
-use_icesheet_coupling=.false.
-ib_num=1
 use_icebergs=.false.
+turn_off_hf=.false.
+turn_off_fw=.false.
+use_icesheet_coupling=.false.
+lbalance_fw=.true.
+cell_saturation=2
+lmin_latent_hf=.true.
+ib_num=1
 steps_per_ib_step=8
 ib_async_mode=0
+thread_support_level_required=3
+lverbose_icb=.false.
 /
