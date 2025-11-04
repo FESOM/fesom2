@@ -669,7 +669,6 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
     ! case CPU mype==0 needs to write out the stuff. Write out occurs in 
     ! moment only over CPU mype==0
     call MPI_AllREDUCE(found_blowup_loc  , found_blowup  , 1, MPI_INTEGER, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    found_blowup=1
     if (found_blowup==1) then
         call write_step_info(istep, 1, ice, dynamics, tracers, partit, mesh)
         if (mype==0) then
