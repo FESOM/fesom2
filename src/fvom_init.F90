@@ -1187,6 +1187,9 @@ subroutine find_levels_cavity(mesh)
                                         end if 
                                     end if 
                                 end do ! --> do i = 1, nneighb
+                                if (nz == 1) then
+                                    write(*,*) 'WARNING: nz = 1 for element ', elem, ' — Cavity element becomes ocean element!'
+                                end if
                                 ulevels(      elems(idx)) = ulevels(elem)
                                 elemreducelvl(elems(idx)) = .True.
                             end if     
