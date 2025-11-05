@@ -32,6 +32,7 @@ option(BUILD_TESTING "Build tests" OFF)
 # Tools
 option(BUILD_MESHPARTITIONER "Build mesh partitioning tools (fesom_meshpart executable)" OFF)
 option(BUILD_MESHDIAG "Build mesh diagnostics utility (fesom_meshdiag executable)" OFF)
+option(BUILD_TOY "Build minimal toy ocean model (fesom_toy executable)" OFF)
 
 # NetCDF build option
 option(BUILD_NETCDF "Download and build NetCDF libraries when system libraries are incompatible" OFF)
