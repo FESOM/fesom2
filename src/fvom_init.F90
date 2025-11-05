@@ -1101,6 +1101,7 @@ subroutine find_levels_cavity(mesh)
                 !_______________________________________________________________
                 ! loop over triangles
                 do elem=1,elem2D
+                
                     ! nneighb = 3 --> tri mesh, nneighb = 4 --> quad mesh
                     nneighb = merge(3,4,elem2D_nodes(1,elem) == elem2D_nodes(4,elem))
                     elems   = elem_neighbors(1:3,elem)
@@ -1128,7 +1129,7 @@ subroutine find_levels_cavity(mesh)
                             if (elems(j)>0) then ! if its a valid boundary triangle, 0=missing value
                                 ! check for isolated cell
                                 if ( ulevels(elems(j))<= nz .and. & 
-                                     nlevels(elems(j))> nz ) then
+                                    nlevels(elems(j))> nz ) then
                                     !count the open faces to neighboring cells 
                                     count_neighb_open=count_neighb_open+1
                                 endif
@@ -1172,9 +1173,9 @@ subroutine find_levels_cavity(mesh)
                             ! still there must be at least three valid ocean layers between
                             ! cavity and bottom interface
                             if ( (nlevels(elem)-val)>=3            .and. &
-                                 (elemreducelvl(elem) .eqv. .False.) .and. &
-                                 (elemfixlvl(   elem) .eqv. .False.)       &
-                               ) then 
+                                (elemreducelvl(elem) .eqv. .False.) .and. &
+                                (elemfixlvl(   elem) .eqv. .False.)       &
+                            ) then 
                                 ulevels(elem) = val
                                 
                             else
@@ -1212,8 +1213,8 @@ subroutine find_levels_cavity(mesh)
                             ! bottom levels --> in case make the levels of one sorounding
                             ! triangles shallower
                             if ( (nlevels(elem)-(nz+1))>=3           .and. &
-                                 (elemreducelvl(elem) .eqv. .False.) .and. &
-                                 (elemfixlvl(   elem) .eqv. .False.)       &
+                                (elemreducelvl(elem) .eqv. .False.) .and. &
+                                (elemfixlvl(   elem) .eqv. .False.)       &
                                 ) then 
                                 ulevels(elem)=nz+1
                                 
@@ -1225,13 +1226,16 @@ subroutine find_levels_cavity(mesh)
                             else 
                                 val=nl
                                 do j = 1, 3
-                                    if (elems(j)>0) then ! if its a valid boundary triangle, 0=missing value
+                                    if (elems(j)>0) then ! if its a valid boundary triangle, 0=missing value, must be cavity triangle!
                                         if (ulevels(elems(j))-nz>0 .and. ulevels(elems(j))-nz<val) then
                                             val=ulevels(elems(j))-nz
                                             idx=j
                                         end if 
                                     end if 
                                 end do ! --> do i = 1, nneighb
+                                if (nz == 1) then
+                                    write(*,*) 'WARNING: nz = 1 for element ', elem, ' — Cavity element becomes ocean element!'
+                                end if
                                 ulevels(      elems(idx)) = nz
                                 elemreducelvl(elems(idx)) = .True.
                             end if    
