@@ -8,7 +8,46 @@ message(STATUS "====================================================")
 
 # Get paths
 set(toy_src_home ${CMAKE_CURRENT_SOURCE_DIR})
-set(fesom_src_home ${CMAKE_CURRENT_SOURCE_DIR}/..)
+set(fesom_src_home ${CMAKE_CURRENT_SOURCE_DIR}/../../../src)
+
+message(STATUS "toy_src_home: ${toy_src_home}")
+message(STATUS "fesom_src_home: ${fesom_src_home}")
+message(STATUS "cmake path will be: ${fesom_src_home}/../cmake")
+
+# ============================================================================
+# FIND DEPENDENCIES (for standalone build)
+# ============================================================================
+# Check if we're building standalone or as part of main FESOM
+if(NOT TARGET fesom)
+    message(STATUS "Standalone build detected - finding dependencies")
+
+    # Add cmake modules from main FESOM repository
+    # Use fesom_src_home which is already set correctly for both standalone and integrated builds
+    set(CMAKE_MODULE_PATH ${fesom_src_home}/../cmake ${CMAKE_MODULE_PATH})
+
+    # Get platform strategy from environment (set by env.sh)
+    if(DEFINED ENV{FESOM_PLATFORM_STRATEGY})
+        set(FESOM_PLATFORM_STRATEGY $ENV{FESOM_PLATFORM_STRATEGY})
+    else()
+        set(FESOM_PLATFORM_STRATEGY "notset")
+    endif()
+
+    # Find MPI
+    find_package(MPI REQUIRED)
+
+    # Find NetCDF (note: FindNETCDF.cmake uses all caps)
+    find_package(NETCDF REQUIRED)
+    if(NetCDF_FOUND)
+        set(NETCDF_C_LIBRARIES ${NetCDF_C_LIBRARIES})
+        set(NETCDF_Fortran_LIBRARIES ${NetCDF_Fortran_LIBRARIES})
+        set(NETCDF_Fortran_INCLUDE_DIRECTORIES ${NetCDF_Fortran_INCLUDE_DIRS})
+    endif()
+
+    # OpenMP (optional)
+    if(ENABLE_OPENMP)
+        find_package(OpenMP)
+    endif()
+endif()
 
 # ============================================================================
 # COLLECT MINIMAL FESOM SOURCE FILES
@@ -195,7 +234,8 @@ set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_Fortran_MODULE_DIRECTORY_BACKUP})
 if(TARGET async_threads_cpp)
     target_sources(fesom_toy_lib PRIVATE $<TARGET_OBJECTS:async_threads_cpp>)
 else()
-    # If building standalone, compile async_threads_cpp
+    # If building standalone, compile async_threads_cpp with -fPIC for shared library
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
     add_subdirectory(${fesom_src_home}/async_threads_cpp ${CMAKE_CURRENT_BINARY_DIR}/async_threads_cpp)
     target_sources(fesom_toy_lib PRIVATE $<TARGET_OBJECTS:async_threads_cpp>)
 endif()
@@ -238,8 +278,9 @@ if(ENABLE_OPENMP AND TARGET OpenMP::OpenMP_Fortran)
     target_link_libraries(fesom_toy_lib PRIVATE OpenMP::OpenMP_Fortran)
 endif()
 
-# Inherit compile flags and definitions from parent fesom target
+# Set compiler flags (inherit from fesom or set directly for standalone)
 if(TARGET fesom)
+    # Building as part of main FESOM - inherit flags
     get_target_property(FESOM_COMPILE_OPTIONS fesom COMPILE_OPTIONS)
     if(FESOM_COMPILE_OPTIONS)
         target_compile_options(fesom_toy_lib PRIVATE ${FESOM_COMPILE_OPTIONS})
@@ -248,6 +289,26 @@ if(TARGET fesom)
     get_target_property(FESOM_COMPILE_DEFINITIONS fesom COMPILE_DEFINITIONS)
     if(FESOM_COMPILE_DEFINITIONS)
         target_compile_definitions(fesom_toy_lib PRIVATE ${FESOM_COMPILE_DEFINITIONS})
+    endif()
+else()
+    # Standalone build - use same compiler flags as main FESOM (from src/CMakeLists.txt)
+    if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+        if(FESOM_PLATFORM_STRATEGY STREQUAL "ubuntu")
+            message(STATUS "Allowing type mismatches on Ubuntu for CI Testing")
+            target_compile_options(fesom_toy_lib PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero -finline-functions -fimplicit-none -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch -cpp)
+        else()
+            target_compile_options(fesom_toy_lib PRIVATE -O3 -ffloat-store -finit-local-zero -finline-functions -fimplicit-none -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -cpp)
+        endif()
+        if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
+            target_compile_options(fesom_toy_lib PRIVATE -fallow-argument-mismatch)
+        endif()
+    elseif(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
+        target_compile_options(fesom_toy_lib PRIVATE -O3 -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0 -fpp)
+        if(CMAKE_Fortran_COMPILER_ID STREQUAL "Intel")
+            target_compile_options(fesom_toy_lib PRIVATE -no-prec-sqrt -ip)
+        endif()
+    elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+        target_compile_options(fesom_toy_lib PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -N 1023 -g -G2 -O2 -hnoacc -M878)
     endif()
 endif()
 
@@ -278,6 +339,8 @@ target_include_directories(fesom_toy_lib PRIVATE ${NETCDF_Fortran_INCLUDE_DIRECT
 add_executable(fesom_toy ${toy_src_home}/fesom_toy_main.F90)
 target_link_libraries(fesom_toy PUBLIC fesom_toy_lib)
 target_link_libraries(fesom_toy PRIVATE MPI::MPI_Fortran)
+# Link against C++ standard library (needed for async_threads_cpp)
+target_link_libraries(fesom_toy PRIVATE stdc++)
 
 # ============================================================================
 # INSTALLATION
@@ -301,7 +364,7 @@ install(DIRECTORY ${TOY_MODULE_DIR}/
 )
 
 # Install documentation
-install(FILES ${toy_src_home}/README.md
+install(FILES ${toy_src_home}/../README.md
         DESTINATION share/doc/fesom_toy
         COMPONENT toy
 )

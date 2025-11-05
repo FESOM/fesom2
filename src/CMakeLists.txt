@@ -539,8 +539,8 @@ endif()
 
 # fesom_toy executable and library (optional - minimal toy ocean model)
 if(BUILD_TOY)
-    message(STATUS "Building FESOM2 Toy Ocean Model from src/toy/")
-    add_subdirectory(toy)
+    message(STATUS "Building FESOM2 Toy Ocean Model from dwarf/toy_ocean/")
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../dwarf/toy_ocean/dwarf_ini ${CMAKE_CURRENT_BINARY_DIR}/toy_ocean)
 endif()
 
 
@@ -555,7 +555,7 @@ if(BUILD_MESHDIAG)
     set(additional_targets ${additional_targets} fesom_meshdiag)
 endif()
 
-# Note: toy model exports itself via src/toy/CMakeLists.txt
+# Note: toy model exports itself via dwarf/toy_ocean/dwarf_ini/CMakeLists.txt
 # No need to add it to the main FESOM export
 
 fesom_export(TARGETS ${PROJECT_NAME} fesom.x ${additional_targets})
