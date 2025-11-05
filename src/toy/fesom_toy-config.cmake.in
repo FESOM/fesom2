@@ -1,0 +1,16 @@
+# fesom_toy-config.cmake
+# Configuration file for the FESOM2 Toy Ocean Model
+
+@PACKAGE_INIT@
+
+# Find dependencies
+find_package(MPI REQUIRED COMPONENTS Fortran)
+
+# Include the targets file
+include("${CMAKE_CURRENT_LIST_DIR}/fesom_toy-targets.cmake")
+
+# Define variables for external projects
+set(FESOM_TOY_LIBRARIES fesom_toy::fesom_toy_lib)
+set(FESOM_TOY_EXECUTABLE fesom_toy::fesom_toy)
+
+check_required_components(fesom_toy)

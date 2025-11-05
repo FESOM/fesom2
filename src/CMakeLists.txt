@@ -537,18 +537,10 @@ if(BUILD_MESHDIAG)
     message(STATUS "Mesh diagnostics utility will be built as fesom_meshdiag")
 endif()
 
-# fesom_toy executable (optional - minimal toy ocean model)
+# fesom_toy executable and library (optional - minimal toy ocean model)
 if(BUILD_TOY)
-    add_executable(fesom_toy ${src_home}/toy/fesom_toy_main.F90 ${src_home}/toy/fesom_toy_module.F90)
-    target_link_libraries(fesom_toy PUBLIC ${PROJECT_NAME})
-    target_link_libraries(fesom_toy PRIVATE MPI::MPI_Fortran)
-
-    # Install the toy ocean model
-    install(TARGETS fesom_toy
-            RUNTIME DESTINATION bin
-            COMPONENT tools)
-
-    message(STATUS "Minimal toy ocean model will be built as fesom_toy")
+    message(STATUS "Building FESOM2 Toy Ocean Model from src/toy/")
+    add_subdirectory(toy)
 endif()
 
 
@@ -563,9 +555,7 @@ if(BUILD_MESHDIAG)
     set(additional_targets ${additional_targets} fesom_meshdiag)
 endif()
 
-# Add toy model to additional targets if built
-if(BUILD_TOY)
-    set(additional_targets ${additional_targets} fesom_toy)
-endif()
+# Note: toy model exports itself via src/toy/CMakeLists.txt
+# No need to add it to the main FESOM export
 
 fesom_export(TARGETS ${PROJECT_NAME} fesom.x ${additional_targets})
