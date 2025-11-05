@@ -1,27 +1,55 @@
-! The namelist file for the finite-volume ocean model
+! ============================================================================
+! ============ Namelist file for FESOM2 ocean dynamics ======================
+! ============================================================================
+! This file contains configuration for ocean dynamics and parameterizations:
+! - Bottom drag and vertical viscosity
+! - Gent-McWilliams (GM) eddy parameterization
+! - Redi isopycnal diffusion
+! - Vertical mixing schemes (KPP, PP)
+! - Convection parameters
+! - Tidal forcing
+! ============================================================================
 
+! ============================================================================
+! OCEAN DYNAMICS AND PARAMETERIZATIONS
+! ============================================================================
 &oce_dyn
-C_d=0.0025             ! Bottom drag, nondimensional
-A_ver= 1.e-4	       ! Vertical viscosity, m^2/s
-scale_area=5.8e9       ! Visc. and diffus. are for an element with scale_area
-SPP=.false.                 ! Salt Plume Parameterization
-Fer_GM=.true.               ! to swith on/off GM after Ferrari et al. 2010
-K_GM_max     = 2000.0       ! max. GM thickness diffusivity (m2/s)
-K_GM_min     = 2.0          ! max. GM thickness diffusivity (m2/s)
-K_GM_bvref   = 2            ! def of bvref in ferreira scaling 0=srf,1=bot mld,2=mean over mld,3=weighted mean over mld
-K_GM_rampmax = -1.0         ! Resol >K_GM_rampmax[km] GM on
-K_GM_rampmin = -1.0         ! Resol <K_GM_rampmin[km] GM off, in between linear scaled down
-K_GM_resscalorder = 1
+! --- Basic ocean dynamics parameters ---
+C_d          = 0.0025       ! bottom drag coefficient (dimensionless, typical: 0.0025)
+A_ver        = 1.e-4        ! background vertical viscosity [m²/s]
+scale_area   = 5.8e9        ! reference element area for viscosity/diffusivity scaling [m²]
 
-scaling_Ferreira   =.false.  ! GM vertical scaling after Ferreira et al.(2005) (as also implemented by Qiang in FESOM 1.4)
-scaling_Rossby     =.false. ! GM is smoothly switched off according to Rossby radius (from 1. in coarse areas to 0. where resolution reaches 2 points/Rossby radius)
-scaling_resolution =.true.  ! GM is spatially scaled with resolution; A value of K_GM corresponds then to a resolution of 100km
-scaling_FESOM14    =.false.  ! special treatment of GM in the NH (as also implemented by Qiang in FESOM 1.4; it is zero within the boundary layer)
+! --- Salt Plume Parameterization ---
+SPP          = .false.      ! enable Salt Plume Parameterization (for brine rejection under sea ice)
 
-Redi  =.true.
-visc_sh_limit=5.0e-3       ! for KPP, max visc due to shear instability
-mix_scheme='KPP'           ! vertical mixing scheme: KPP, PP 
-Ricr   = 0.3               ! critical bulk Richardson Number
-concv  = 1.6               ! constant for pure convection (eqn. 23) (Large 1.5-1.6; MOM default 1.8)
-use_global_tides=.false.   ! add global tidal potential
+! --- Gent-McWilliams (GM) Eddy Parameterization ---
+Fer_GM       = .true.       ! enable GM parameterization (Ferrari et al. 2010)
+K_GM_max     = 2000.0       ! maximum GM thickness diffusivity [m²/s]
+K_GM_min     = 2.0          ! minimum GM thickness diffusivity [m²/s]
+K_GM_bvref   = 2            ! definition of reference buoyancy frequency for Ferreira scaling:
+                            !   0 = surface, 1 = bottom of MLD, 2 = mean over MLD, 3 = weighted mean over MLD
+K_GM_rampmax      = -1.0    ! resolution threshold for GM activation [km] (>K_GM_rampmax: GM on; -1.0 = disabled)
+K_GM_rampmin      = -1.0    ! resolution threshold for GM deactivation [km] (<K_GM_rampmin: GM off; -1.0 = disabled)
+K_GM_resscalorder = 1       ! order of resolution scaling for GM
+
+! --- GM Scaling Options ---
+scaling_Ferreira   = .false.  ! enable GM vertical scaling (Ferreira et al. 2005, as in FESOM 1.4)
+scaling_Rossby     = .false.  ! scale GM with Rossby radius (1.0 in coarse regions, 0.0 at 2 points/Rossby radius)
+scaling_resolution = .true.   ! scale GM with horizontal resolution (K_GM corresponds to 100km resolution)
+scaling_FESOM14    = .false.  ! use FESOM 1.4 GM treatment in Northern Hemisphere (zero within boundary layer)
+
+! --- Redi Isopycnal Diffusion ---
+Redi          = .true.       ! enable Redi isopycnal diffusion
+
+! --- Vertical Mixing Scheme ---
+visc_sh_limit = 5.0e-3       ! maximum viscosity due to shear instability [m²/s] (for KPP)
+mix_scheme    = 'KPP'        ! vertical mixing scheme: 'KPP' (K-Profile Parameterization), 'PP' (Pacanowski-Philander), or 'TKE' (Turbulent Kinetic Energy)
+
+! --- Convection Parameters ---
+Ricr          = 0.3          ! critical bulk Richardson number (for convection onset)
+concv         = 1.6          ! constant for pure convection (eq. 23 in Large et al.)
+                             ! typical values: Large 1.5-1.6, MOM default 1.8
+
+! --- Tidal Forcing ---
+use_global_tides = .false.   ! enable global tidal potential forcing
 /
