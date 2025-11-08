@@ -19,7 +19,7 @@ find_package(MPI REQUIRED)
 # YAXT uses autotools build system
 # Need to run autoreconf before configure since git clone doesn't include configure script
 set(YAXT_CONFIGURE_COMMAND
-    bash -c "cd <SOURCE_DIR> && autoreconf -iv && CC=${CMAKE_C_COMPILER} FC=${CMAKE_Fortran_COMPILER} CFLAGS=-fPIC FCFLAGS=-fPIC ./configure --prefix=${YAXT_INSTALL_PREFIX} --enable-shared --disable-static"
+    bash -c "cd <SOURCE_DIR> && autoreconf -iv && CC=${CMAKE_C_COMPILER} FC=${CMAKE_Fortran_COMPILER} CFLAGS=-fPIC FCFLAGS=-fPIC ./configure --prefix=${YAXT_INSTALL_PREFIX} --enable-shared --disable-static --without-regard-for-quality"
 )
 
 # Determine number of parallel jobs
