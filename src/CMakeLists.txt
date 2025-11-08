@@ -510,7 +510,13 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${MCT_Fortran_LIBRARIES} ${MPEU_Fo
 # OASIS-YAK
 target_link_libraries(${PROJECT_NAME} PRIVATE ${YACUTILS_Fortran_LIBRARIES} ${YACCORE_Fortran_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} PRIVATE ${YAXT_Fortran_LIBRARIES} ${YAXTC_Fortran_LIBRARIES})
-target_link_libraries(${PROJECT_NAME} PRIVATE ${YAC_Fortran_LIBRARIES})
+# Use PUBLIC linkage for YAC when building from source (BUILD_YAC=ON)
+# This ensures transitive shared library dependencies (like libfyaml) are propagated to fesom.x
+if(BUILD_YAC)
+    target_link_libraries(${PROJECT_NAME} PUBLIC ${YAC_Fortran_LIBRARIES})
+else()
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${YAC_Fortran_LIBRARIES})
+endif()
 
 
 #set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
