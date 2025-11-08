@@ -15,12 +15,14 @@ jobs:
     # Use matrix strategy to build all configurations in parallel
     strategy:
       matrix:
-        preset: [default, coupled, recom, ifs_interface]
+        preset: [default, coupled, coupled_yac, recom, ifs_interface]
         include:
           - preset: default
             display_name: "Default Configuration"
           - preset: coupled
             display_name: "Coupled Configuration"
+          - preset: coupled_yac
+            display_name: "YAC Coupled Configuration"
           - preset: recom
             display_name: "REcoM3 Configuration"
           - preset: ifs_interface
