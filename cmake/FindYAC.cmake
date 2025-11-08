@@ -1,3 +1,17 @@
+# Check for conflict between BUILD_YAC and yac_DIR environment variable
+if(BUILD_YAC AND DEFINED ENV{yac_DIR})
+    message(FATAL_ERROR
+        "Cannot use both BUILD_YAC=ON and yac_DIR environment variable.\n"
+        "Please choose one approach:\n"
+        "  - Use BUILD_YAC=ON to automatically build YAC from source, OR\n"
+        "  - Set yac_DIR environment variable to use existing YAC installation")
+endif()
+
+# If BUILD_YAC is enabled, BuildYAC.cmake will set all necessary variables
+if(BUILD_YAC)
+    return()
+endif()
+
 IF( DEFINED ENV{yac_DIR} )
   SET( yac_DIR "$ENV{yac_DIR}" )
 ENDIF()

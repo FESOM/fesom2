@@ -6,7 +6,7 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build, options are: None(CMAKE_CXX_FLAGS or CMAKE_C_FLAGS used) Debug Release RelWithDebInfo MinSizeRel.")
 endif()
 
-project(FESOM2.0)
+project(FESOM2.0 LANGUAGES C CXX Fortran)
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake ${CMAKE_MODULE_PATH})
 
@@ -37,10 +37,19 @@ option(BUILD_MESHDIAG "Build mesh diagnostics utility (fesom_meshdiag executable
 # NetCDF build option
 option(BUILD_NETCDF "Download and build NetCDF libraries when system libraries are incompatible" OFF)
 
+# YAC build option
+option(BUILD_YAC "Download and build YAC, YAXT, and libfyaml libraries from source" OFF)
+
 # Include ExternalProject module for building NetCDF if requested
 if(BUILD_NETCDF)
     include(ExternalProject)
     include(cmake/BuildNetCDF.cmake)
+endif()
+
+# Include ExternalProject module for building YAC if requested
+if(BUILD_YAC)
+    include(ExternalProject)
+    include(cmake/BuildYAC.cmake)
 endif()
 
 #add_subdirectory(oasis3-mct/lib/psmile)
