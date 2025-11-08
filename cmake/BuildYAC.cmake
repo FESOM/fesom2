@@ -49,7 +49,7 @@ endif()
 # YAC uses autotools build system and provides autogen.sh to run autoreconf
 # Note: YAC only builds static libraries (.a), does not support --enable-shared
 set(YAC_CONFIGURE_COMMAND
-    bash -c "cd <SOURCE_DIR> && ./autogen.sh && CC=${CMAKE_C_COMPILER} FC=${CMAKE_Fortran_COMPILER} CFLAGS='-fPIC -I${YAXT_INSTALL_PREFIX}/include -I${LIBFYAML_INSTALL_PREFIX}/include -I${YAC_NETCDF_C_ROOT}/include' FCFLAGS='-fPIC -I${YAXT_INSTALL_PREFIX}/include -I${YAC_NETCDF_Fortran_ROOT}/include' LDFLAGS='-L${YAXT_INSTALL_PREFIX}/lib -L${LIBFYAML_INSTALL_PREFIX}/lib -L${YAC_NETCDF_C_ROOT}/lib -L${YAC_NETCDF_Fortran_ROOT}/lib' LIBS='-lyaxt -lyaxt_c -lfyaml -lnetcdf -lnetcdff' ./configure --prefix=${YAC_INSTALL_PREFIX} --with-yaxt-root=${YAXT_INSTALL_PREFIX} --with-fyaml-root=${LIBFYAML_INSTALL_PREFIX}"
+    bash -c "cd <SOURCE_DIR> && ./autogen.sh && CC=${MPI_C_COMPILER} FC=${MPI_Fortran_COMPILER} CFLAGS='-fPIC -I${YAXT_INSTALL_PREFIX}/include -I${LIBFYAML_INSTALL_PREFIX}/include -I${YAC_NETCDF_C_ROOT}/include' FCFLAGS='-fPIC -I${YAXT_INSTALL_PREFIX}/include -I${YAC_NETCDF_Fortran_ROOT}/include' LDFLAGS='-L${YAXT_INSTALL_PREFIX}/lib -L${LIBFYAML_INSTALL_PREFIX}/lib -L${YAC_NETCDF_C_ROOT}/lib -L${YAC_NETCDF_Fortran_ROOT}/lib' LIBS='-lyaxt -lyaxt_c -lfyaml -lnetcdf -lnetcdff' ./configure --prefix=${YAC_INSTALL_PREFIX} --with-yaxt-root=${YAXT_INSTALL_PREFIX} --with-fyaml-root=${LIBFYAML_INSTALL_PREFIX}"
 )
 
 # Determine number of parallel jobs
@@ -168,3 +168,10 @@ message(STATUS "  YAXT from:     ${YAXT_INSTALL_PREFIX}")
 message(STATUS "  libfyaml from: ${LIBFYAML_INSTALL_PREFIX}")
 message(STATUS "  NetCDF from:   ${YAC_NETCDF_C_ROOT}")
 message(STATUS "NOTE: YAC build will start after YAXT and libfyaml complete...")
+
+# Add YAXT and libfyaml library directories to RPATH
+# This is necessary because they are shared libraries built from source
+# Without this, executables will fail at runtime with "cannot open shared object file"
+list(APPEND CMAKE_INSTALL_RPATH "${YAXT_INSTALL_PREFIX}/lib")
+list(APPEND CMAKE_INSTALL_RPATH "${LIBFYAML_INSTALL_PREFIX}/lib")
+set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_RPATH}" PARENT_SCOPE)
