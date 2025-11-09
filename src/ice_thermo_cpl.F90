@@ -21,7 +21,7 @@ subroutine thermodynamics(ice, partit, mesh)
   USE MOD_PARSUP
   USE MOD_MESH
   use o_arrays, only: fw_ice, fw_snw
-  use g_configthdgrsn(inod)        = dhsngrowth
+  use g_config
   use g_forcing_param
   use g_forcing_arrays
   use g_comm_auto
