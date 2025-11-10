@@ -45,7 +45,8 @@ END TYPE T_ICE_WORK
 ! set work array derived type for ice
 TYPE T_ICE_THERMO
     !___________________________________________________________________________
-    real(kind=WP), allocatable, dimension(:)    :: t_skin, thdgr, thdgrsn, thdgr_old, ustar
+    real(kind=WP), allocatable, dimension(:)    :: t_skin, thdgr, thdgrsn, thdgra, thdgr_old, ustar
+    real(kind=WP), allocatable, dimension(:)    :: dyngr, dyngrsn, dyngra ! dynamic growth of: ice, snow, area (cmip6 variable for letti!)
     ! melt pond variables
     real(kind=WP), allocatable, dimension(:)    :: apnd, hpnd, ipnd  ! pond area fraction, depth, ice thickness
     !___________________________________________________________________________
@@ -320,10 +321,17 @@ subroutine WRITE_T_ICE_THERMO(ttherm, unit)
     call write_bin_array(ttherm%thdgrsn,      unit, iostat, iomsg)
     call write_bin_array(ttherm%thdgr_old,    unit, iostat, iomsg)
     call write_bin_array(ttherm%ustar,        unit, iostat, iomsg)
+    
     ! melt pond variables
     call write_bin_array(ttherm%apnd,         unit, iostat, iomsg)
     call write_bin_array(ttherm%hpnd,         unit, iostat, iomsg)
     call write_bin_array(ttherm%ipnd,         unit, iostat, iomsg)
+    
+    ! dynamic growth of: ice, snow, area (cmip6 variable for letti!)
+    call write_bin_array(ttherm%dyngr,        unit, iostat, iomsg)
+    call write_bin_array(ttherm%dyngrsn,      unit, iostat, iomsg)
+    call write_bin_array(ttherm%dyngra,       unit, iostat, iomsg)
+    
 end subroutine WRITE_T_ICE_THERMO
 
 ! Unformatted reading for T_ICE_WORK
@@ -342,6 +350,11 @@ subroutine READ_T_ICE_THERMO(ttherm, unit)
     call read_bin_array(ttherm%apnd,         unit, iostat, iomsg)
     call read_bin_array(ttherm%hpnd,         unit, iostat, iomsg)
     call read_bin_array(ttherm%ipnd,         unit, iostat, iomsg)
+    
+    ! dynamic growth of: ice, snow, area (cmip6 variable for letti!)
+    call read_bin_array(ttherm%dyngr,        unit, iostat, iomsg)
+    call read_bin_array(ttherm%dyngrsn,      unit, iostat, iomsg)
+    call read_bin_array(ttherm%dyngra,       unit, iostat, iomsg)
 end subroutine READ_T_ICE_THERMO
 !
 !
@@ -769,6 +782,7 @@ subroutine ice_init(ice, partit, mesh)
     allocate(ice%thermo%t_skin(        node_size))
     allocate(ice%thermo%thdgr(         node_size))
     allocate(ice%thermo%thdgrsn(       node_size))
+    allocate(ice%thermo%thdgra(        node_size))
     allocate(ice%thermo%thdgr_old(     node_size))
     ! melt pond arrays
     allocate(ice%thermo%apnd(          node_size))
@@ -778,6 +792,7 @@ subroutine ice_init(ice, partit, mesh)
     ice%thermo%t_skin    = 0.0_WP
     ice%thermo%thdgr     = 0.0_WP
     ice%thermo%thdgrsn   = 0.0_WP
+    ice%thermo%thdgra    = 0.0_WP
     ice%thermo%thdgr_old = 0.0_WP
     ! initialize melt pond arrays
     ice%thermo%apnd      = 0.0_WP
@@ -821,6 +836,15 @@ subroutine ice_init(ice, partit, mesh)
             if (myList_edge2D(n) <= mesh%edge2D_in) cycle
             mesh%bc_index_nod2D(ed)=0._WP
         end do
+        
+    !___________________________________________________________________________
+    ! initialise Lettis sea-ice cmip6 paramters! Idealy i would add them to the 
+    ! ice derived type. but when i do this now i will mess up previous created raw/bin
+    ! restart files. We should add this at a latter point 
+    allocate(ice%thermo%dyngr(node_size), ice%thermo%dyngrsn(node_size), ice%thermo%dyngra(node_size))
+    ice%thermo%dyngr   = 0.0_WP
+    ice%thermo%dyngrsn = 0.0_WP
+    ice%thermo%dyngra  = 0.0_WP
     
 end subroutine ice_init  
 !
