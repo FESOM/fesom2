@@ -18,7 +18,11 @@ ice_ave_steps=1        ! ice step=ice_ave_steps*oce_step
 
 &ice_therm
 Sice=4.0               ! Ice salinity 3.2--5.0 ppt.
-h0=.5                  ! Lead closing parameter [m] 
+iclasses=7            ! default = 7; in case of EM distribution ('new_iceclasses=.true.') must be set to 15
+h0=0.5                 ! Lead closing parameter for Nothern Hemisphere [m], default 0.5
+h0_s=0.5               ! Lead closing parameter [m] for Southern Hemisphere, default 0.5
+hmin=0.01              ! default=0.01
+armin=0.01             ! default=0.01
 emiss_ice=0.97         ! Emissivity of Snow/Ice,
 emiss_wat=0.97         ! Emissivity of open water
 albsn=0.81             ! Albedo: frozen snow
@@ -28,4 +32,10 @@ albim=0.68             !         melting ice
 albw=0.1               !         open water
 con=2.1656             ! Thermal conductivities: ice; W/m/K
 consn=0.31             !                         snow
+snowdist=.true.       ! distribution of snow depth according to ice distribution - default: .true.
+new_iclasses=.false.    ! default=.false.; ice thickness distribution based on EM observations (Castro-Morales et al., JGR, 2013)
+open_water_albedo=0    ! 0=default; 1=taylor; 2=briegleb
+c_melt=0.5             ! constant in concentration equation for melting conditions - default=0.5
+h_cutoff=3.0           ! only used for new_iclasses=.true.
+use_meltponds=.false.  ! enable melt pond parameterization - default=.false.
 /

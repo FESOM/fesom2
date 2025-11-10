@@ -92,29 +92,35 @@ type(t_partit), intent(inout), target :: partit
 
 
   n2=elem2D_nodes(1,elem)
+  
+  ! iterate over all layers that contain the iceberg
   do n=1,ib_n_lvls
-  !3-eq. formulation for lateral 'basal' melting [m/s]
-    lev_up  = mesh%zbar_3d_n(n, n2)
-    if( n==nlevels_nod2D(n2) ) then
-        lev_low = mesh%zbar_n_bot(n2)
+    
+    ! 3-eq. formulation for lateral 'basal' melting [m/s]
+    lev_up  = mesh%zbar_3d_n(n, n2)                 ! upper level
+    if( n==nlevels_nod2D(n2) ) then                 ! if level is lowest level ...
+        lev_low = mesh%zbar_n_bot(n2)               ! ... lower level is bottom topography
     else
-        lev_low = mesh%zbar_3d_n(n+1, n2)
+        lev_low = mesh%zbar_3d_n(n+1, n2)           ! ... otherwise, lower level is one level below upper level
     end if
-    
-    if( abs(lev_low)>=abs(depth_ib) ) then !.AND. (abs(lev_up)<=abs(depth_ib)) ) then
-        dz = abs(lev_up - depth_ib)
-    elseif(lev_low == lev_up) then
-        exit
+   
+    ! assign dz for vertical integration
+    if( abs(lev_low)>=abs(depth_ib) ) then          ! if lower level below iceberg base ...
+        dz = abs(lev_up - depth_ib)                 ! ... dz is equal to difference between upper level and iceberg base
+    elseif(lev_low == lev_up) then                  ! if lower level equal to upper level ... (why should this happen?)
+        exit                                        ! ... exit
     else
-        dz = abs(lev_low - lev_up)
+        dz = abs(lev_low - lev_up)                  ! ... otherwise, dz is equal to difference between lower level and upper level
     end if
-    dz_acc = dz_acc + dz
+    dz_acc = dz_acc + dz                            ! sum up dz along iceberg depth
     
-    v_ibmino  = sqrt( (u_ib - arr_uo_ib(n))**2 + (v_ib - arr_vo_ib(n))**2 ) ! depth-average rel. velocity
-    call iceberg_heat_water_fluxes_3eq(partit, ib, M_bv, H_bv, arr_T_ave_ib(n), arr_S_ave_ib(n),v_ibmino, dz_acc+dz/2.0, tf)
-    M_bv_dz = M_bv_dz + M_bv*dz
-    
-    hfbv_flux_ib(ib,n) = H_bv * (2*length_ib*dz  + 2*length_ib*dz ) * scaling(ib)
+    v_ibmino  = sqrt( (u_ib - arr_uo_ib(n))**2 + (v_ib - arr_vo_ib(n))**2 )         ! depth-average rel. velocity
+
+    ! calculate freshwater and heat flux densities ...
+    ! why dz_acc+dz/2.0? why not dz_acc-dz/2.0?
+    call iceberg_heat_water_fluxes_3eq(partit, ib, M_bv, H_bv, arr_T_ave_ib(n), arr_S_ave_ib(n), v_ibmino, dz_acc-dz/2.0, tf)
+    M_bv_dz = M_bv_dz + M_bv*dz                     ! ... integrating freshwater flux along iceberg depth
+    hfbv_flux_ib(ib,n) = H_bv * (2*length_ib*dz  + 2*length_ib*dz ) * scaling(ib)   ! ... assign heat flux bv on for layer n 
   
     !'thermal driving', defined as the elevation of ambient water 
     !temperature above freezing point' (Neshyba and Josberger, 1979).
@@ -441,9 +447,6 @@ type(t_partit), intent(inout), target :: partit
      gat  = gats1/(gats2+12.5*pr1)
      gas  = gats1/(gats2+12.5*sc1)
 
-     !RG3417 gat  = 1.00e-4   ![m/s]  RT: to be replaced by velocity-dependent equations later
-     !RG3417 gas  = 5.05e-7   ![m/s]  RT: to be replaced by velocity-dependent equations later
-
      ! Calculate
      ! density in the boundary layer: rhow
      ! and interface pressure pg [dbar],
@@ -463,13 +466,6 @@ type(t_partit), intent(inout), target :: partit
      ep31 = -rhor*cpi*tdif/zice   !RG4190 / RG44027
      ep4 = b+c*zice
      ep5 = gas/rhor
-
-
-!rt RG4190     ! negative heat flux term in the ice (due to -kappa/D)
-!rt RG4190     ex1 = a*(ep1-ep2)
-!rt RG4190     ex2 = ep1*(ep4-tin)+ep2*(tob+a*sal-ep4)-ep3
-!rt RG4190     ex3 = sal*(ep2*(ep4-tob)+ep3)
-
 
 !RT RG4190/RG44027:
 !    In case of melting ice account for changing temperature gradient, i.e. switch from heat conduction to heat capacity approach
@@ -510,42 +506,16 @@ type(t_partit), intent(inout), target :: partit
         sf = sf2
      endif
 
-     t_freeze = tf ! output of freezing temperature
-     ! Calculate the melting/freezing rate [m/s]
-     ! seta = ep5*(1.0-sal/sf)     !rt thinks this is not needed; TR: Why different to M_b? LIQUID vs. ICE
+     t_freeze = tf                                      ! output of freezing temperature
+     
+     H_b = rhow*cpw*gat*(tin-tf)                        ! heat flux [W] positive for upward
+     M_b = gas*(sf-sal)/sf                              ! freshwater flux [m/s] freshwater per second
+     M_b = - (rhow / rhoi) * M_b 		                ! freshwater flux [m (ice) per second], NOW positive for melting
 
-     !rt  t_surf_flux(i,j)=gat*(tf-tin)
-     !rt  s_surf_flux(i,j)=gas*(sf-(s(i,j,N,lrhs)+35.0))
-
-     !hfb_flux_ib(ib)  = rhow*cpw*gat*(tin-tf)*scaling(ib)      ! [W/m2]  ! positive for upward
-     !hfb_flux_ib(ib)  = rhow*cpw*gat*(tin-tf)*length_ib(ib)*width_ib(ib)*scaling(ib)      ! [W]  ! positive for upward
-     H_b  = rhow*cpw*gat*(tin-tf) !*length_ib(ib)*width_ib(ib)*scaling(ib)      ! [W]  ! positive for upward
-
-     !fw_flux_ib(ib) =          gas*(sf-sal)/sf   ! [m/s]   !
-     M_b 	    =          gas*(sf-sal)/sf   ! [m/s]   ! m freshwater per second
-     !fw_flux_ib(ib) = M_b
-     !fw = -M_b
-     M_b = - (rhow / rhoi) * M_b 		 ! [m (ice) per second], positive for melting? NOW positive for melting
-
-     !LA avoid basal freezing for grounded icebergs
+     ! avoid basal freezing for grounded icebergs
      if(grounded(ib) .and. (M_b.lt.0.)) then
          M_b = 0.0
      endif
-
-     !      qo=-rhor*seta*oofw
-     !      if(seta.le.0.) then
-     !         qc=rhor*seta*hemw
-     !         qo=rhor*seta*oomw
-     !      endif
-
-     ! write(*,'(a10,i10,9f10.3)') 'ice shelf',n,zice,rhow,temp,sal,tin,tf,sf,heat_flux(n),water_flux(n)*86400.*365.
-
-     !for saving to output:
-     !net_heat_flux(n)=-heat_flux(n)      ! positive down
-     !fresh_wa_flux(n)=-water_flux(n)     ! m freshwater per second
-
-  !enddo
-
 end subroutine iceberg_heat_water_fluxes_3eq
 
 subroutine potit_ib(ib,salz,pt,pres,rfpres,tin)
@@ -635,4 +605,4 @@ subroutine fcn_density(t,s,z,rho)
       + 4.8314e-4*s**2)
  rho = rhopot / (1.0 + 0.1*z/bulk)
 end subroutine fcn_density
-end module
+end module iceberg_thermodynamics

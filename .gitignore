@@ -15,3 +15,4 @@ lib/*.so
 Makefile.in
 mesh_part/build
 test/output_pi 
+src/cvmix_driver/CVMix-*

@@ -6,9 +6,9 @@ module read_mesh_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine read_mesh
   end interface
-end module
+end module read_mesh_interface
 module find_levels_interface
   interface
     subroutine find_levels(partit, mesh)
@@ -17,9 +17,9 @@ module find_levels_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine find_levels
   end interface
-end module
+end module find_levels_interface
 module find_levels_cavity_interface
   interface
     subroutine find_levels_cavity(partit, mesh)
@@ -28,9 +28,9 @@ module find_levels_cavity_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine find_levels_cavity
   end interface
-end module
+end module find_levels_cavity_interface
 module test_tri_interface
   interface
     subroutine test_tri(partit, mesh)
@@ -39,9 +39,9 @@ module test_tri_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine test_tri
   end interface
-end module
+end module test_tri_interface
 module load_edges_interface
   interface
     subroutine load_edges(partit, mesh)
@@ -50,9 +50,9 @@ module load_edges_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine load_edges
   end interface
-end module
+end module load_edges_interface
 module find_neighbors_interface
   interface
     subroutine find_neighbors(partit, mesh)
@@ -61,9 +61,9 @@ module find_neighbors_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine find_neighbors
   end interface
-end module
+end module find_neighbors_interface
 module mesh_areas_interface
   interface
     subroutine mesh_areas(partit, mesh)
@@ -72,9 +72,9 @@ module mesh_areas_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine mesh_areas
   end interface
-end module
+end module mesh_areas_interface
 module elem_center_interface
   interface
     subroutine elem_center(elem, x, y, mesh)
@@ -84,9 +84,9 @@ module elem_center_interface
       integer       :: elem    
       real(kind=WP), intent(inout) :: x, y
       type(t_mesh),  intent(inout), target :: mesh
-    end subroutine
+    end subroutine elem_center
   end interface
-end module
+end module elem_center_interface
 module edge_center_interface
   interface
     subroutine edge_center(n1, n2, x, y, mesh)
@@ -96,9 +96,9 @@ module edge_center_interface
       integer                     :: n1, n2
       real(kind=WP), intent(inout):: x, y
       type(t_mesh),  intent(inout), target :: mesh
-    end subroutine
+    end subroutine edge_center
   end interface
-end module
+end module edge_center_interface
 module mesh_auxiliary_arrays_interface
   interface
     subroutine mesh_auxiliary_arrays(partit, mesh)
@@ -107,9 +107,9 @@ module mesh_auxiliary_arrays_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine mesh_auxiliary_arrays
   end interface
-end module
+end module mesh_auxiliary_arrays_interface
 module find_levels_min_e2n_interface
   interface
     subroutine find_levels_min_e2n(partit, mesh)
@@ -118,9 +118,9 @@ module find_levels_min_e2n_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine find_levels_min_e2n
   end interface
-end module
+end module find_levels_min_e2n_interface
 module check_total_volume_interface
   interface
     subroutine check_total_volume(partit, mesh)
@@ -129,9 +129,9 @@ module check_total_volume_interface
       USE MOD_PARSUP
       type(t_mesh),   intent(inout), target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine check_total_volume
   end interface
-end module
+end module check_total_volume_interface
 
 ! Driving routine. The distributed mesh information and mesh proper 
 ! are read from files.
@@ -143,6 +143,7 @@ SUBROUTINE mesh_setup(partit, mesh)
 USE MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
+USE g_config, only: flag_debug
 USE g_ROTATE_grid
 use read_mesh_interface
 use find_levels_interface
@@ -157,21 +158,46 @@ use par_support_interfaces
 IMPLICIT NONE
       type(t_mesh),   intent(inout)         :: mesh
       type(t_partit), intent(inout), target :: partit
-
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call set_mesh_transform_matrix'//achar(27)//'[0m'
       call set_mesh_transform_matrix  !(rotated grid)
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call read_mesh'//achar(27)//'[0m'
       call read_mesh(partit, mesh)
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_mpi_types'//achar(27)//'[0m'
       call init_mpi_types(partit, mesh)
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_gatherLists'//achar(27)//'[0m'
       call init_gatherLists(partit)
+      
+      
       if(partit%mype==0) write(*,*) 'Communication arrays are set' 
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call test_tri'//achar(27)//'[0m'
       call test_tri(partit, mesh)
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call load_edges'//achar(27)//'[0m'
       call load_edges(partit, mesh)
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call find_neighbors'//achar(27)//'[0m'
       call find_neighbors(partit, mesh)
       
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call find_levels'//achar(27)//'[0m'
       call find_levels(partit, mesh)
-      if (use_cavity) call find_levels_cavity(partit, mesh)
       
+      
+      if (use_cavity) then
+        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call find_levels_cavity'//achar(27)//'[0m'
+        call find_levels_cavity(partit, mesh)
+      end if 
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call find_levels_min_e2n'//achar(27)//'[0m'
       call find_levels_min_e2n(partit, mesh)
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call mesh_areas'//achar(27)//'[0m'
       call mesh_areas(partit, mesh)
+      
+      if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call mesh_auxiliary_arrays'//achar(27)//'[0m'
       call mesh_auxiliary_arrays(partit, mesh)
            
 END SUBROUTINE mesh_setup
@@ -300,7 +326,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
 
   close(fileID)
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+
   if (mype==0) write(*,*) 'myLists are read'
 
   !==============================
@@ -463,12 +489,12 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
      write(*,*) 'reading '// trim(file_name)   
   end if
   call MPI_BCast(mesh%elem2d, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
-  allocate(mesh%elem2D_nodes(3, myDim_elem2D+eDim_elem2D+eXDim_elem2D))
+  allocate(mesh%elem2D_nodes(3, myDim_elem2D)) !+eDim_elem2D+eXDim_elem2D
 
   ! 0 proc reads the data in chunks and distributes it between other procs
   do nchunk=0, (mesh%elem2D-1)/chunk_size
      mapping(1:chunk_size)=0
-     do n=1, myDim_elem2D+eDim_elem2D+eXDim_elem2D
+     do n=1, myDim_elem2D!+eDim_elem2D+eXDim_elem2D
         ipos=(myList_elem2D(n)-1)/chunk_size
         if (ipos==nchunk) then
            iofs=myList_elem2D(n)-nchunk*chunk_size
@@ -506,7 +532,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
            mapping(iofs)=n
         end if
      end do
-     do n=1, myDim_elem2D+eDim_elem2D+eXDim_elem2D
+     do n=1, myDim_elem2D!+eDim_elem2D+eXDim_elem2D
         do m=1,3
            nn=mesh%elem2D_nodes(m, n)
            ipos=(nn-1)/chunk_size
@@ -883,6 +909,7 @@ CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
     write(*,*) '2D mesh info : ', 'nod2D=', mesh%nod2D,' elem2D=', mesh%elem2D,'checksum= ',mesh%representative_checksum
     write(*,*) '========================='
  endif
+
 
  END subroutine  read_mesh
 !
@@ -2408,6 +2435,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 USE o_PARAM
 USE o_ARRAYS
+USE g_CONFIG, only: rotated_grid, force_rotation, metric_factor_zero
 USE g_ROTATE_grid
 use g_comm_auto
 use elem_center_interface
@@ -2450,7 +2478,12 @@ t0=MPI_Wtime()
  END DO
 
  DO n=1,myDim_nod2D+eDim_nod2D 
-    call r2g(lon, lat, mesh%coord_nod2D(1,n), mesh%coord_nod2D(2,n))
+    if ((.not. rotated_grid)  .and. (.not. force_rotation)) then
+         lon =  mesh%coord_nod2D(1,n)
+         lat  =  mesh%coord_nod2D(2,n)
+    else
+          call r2g(lon, lat, mesh%coord_nod2D(1,n), mesh%coord_nod2D(2,n))
+    end if
     ! in case of numerical noise at the boundaries
     if (lon > 2._WP*pi) lon=lon-2._WP*pi
     if (lon <-2._WP*pi) lon=lon+2._WP*pi
@@ -2477,7 +2510,12 @@ t0=MPI_Wtime()
  center_x(n)=ax
  center_y(n)=ay
  mesh%elem_cos(n)=cos(ay)
- mesh%metric_factor=tan(ay)/r_earth
+ if (metric_factor_zero) then
+    mesh%metric_factor(n)=0.0_WP
+ else
+    mesh%metric_factor(n)=tan(ay)/r_earth
+ end if
+
  END DO
 
  call exchange_elem(mesh%metric_factor, partit)
@@ -2698,16 +2736,16 @@ DO elem=1,myDim_elem2D
 END DO
 deallocate(center_y, center_x)
 
-!     !array of 2D boundary conditions is used in ice_maEVP
-!     if (whichEVP > 0) then
-!        allocate(mesh%bc_index_nod2D(myDim_nod2D+eDim_nod2D))
-!        mesh%bc_index_nod2D=1._WP
-!        do n=1, myDim_edge2D
-!           ed=mesh%edges(:, n)
-!           if (myList_edge2D(n) <= mesh%edge2D_in) cycle
-!           mesh%bc_index_nod2D(ed)=0._WP
-!        end do
-!     end if
+     !!array of 2D boundary conditions is used in ice_maEVP
+     !if (ice%whichEVP > 0) then
+     !   allocate(mesh%bc_index_nod2D(myDim_nod2D+eDim_nod2D))
+     !   mesh%bc_index_nod2D=1._WP
+     !   do n=1, myDim_edge2D
+     !      ed=mesh%edges(:, n)
+     !      if (myList_edge2D(n) <= mesh%edge2D_in) cycle
+     !      mesh%bc_index_nod2D(ed)=0._WP
+     !   end do
+     !end if
 
 #if defined (__oasis)
   nn=0

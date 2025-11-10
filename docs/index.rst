@@ -43,6 +43,8 @@ Authors
    isoneutral_diffusion_triangular_prisms
    zreferences
    code_documentation/io_mesh_info
+   developer_documentation/github_actions_test_suite
+   developer_documentation/running_the_test_suite_offline
    
 
 Proposed structure:

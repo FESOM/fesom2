@@ -439,7 +439,7 @@ subroutine extrap_nod3D(arr, partit, mesh)
                 
                 !_______________________________________________________________
                 ! loop over local vertices n 
-                do n=1, myDim_nod2D+eDim_nod2D
+                do n=1, myDim_nod2D!+eDim_nod2D
                     ! found node n that has to be extrapolated
                     if ( (work_array(n)>0.99_WP*dummy) .and.  (nlevels_nod2D(n)>nz)) then
                         cnt=0
@@ -564,7 +564,7 @@ FUNCTION omp_min_max_sum1(arr, pos1, pos2, what, partit, nan)
   END SELECT
 
   omp_min_max_sum1=val
-END FUNCTION
+end function omp_min_max_sum1
 !
 !--------------------------------------------------------------------------------------------
 ! returns min/max/sum of a two dimentional array (same as minval) but with the support of OpenMP
@@ -638,7 +638,7 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
    END SELECT
 
 omp_min_max_sum2=val
-END FUNCTION
+end function omp_min_max_sum2
 !
 !--------------------------------------------------------------------------------------------
 !

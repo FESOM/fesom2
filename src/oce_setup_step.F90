@@ -8,9 +8,9 @@ module oce_initial_state_interface
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in)  ,  target :: mesh
-        end subroutine
+        end subroutine oce_initial_state
     end interface
-end module
+end module oce_initial_state_interface
 
 module tracer_init_interface
     interface
@@ -22,9 +22,9 @@ module tracer_init_interface
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in)  ,  target :: mesh
-        end subroutine
+        end subroutine tracer_init
     end interface
-end module
+end module tracer_init_interface
 
 module dynamics_init_interface
     interface
@@ -36,9 +36,9 @@ module dynamics_init_interface
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine dynamics_init
     end interface
-end module
+end module dynamics_init_interface
 
 module ocean_setup_interface
     interface
@@ -52,9 +52,9 @@ module ocean_setup_interface
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout)   , target :: mesh
-        end subroutine
+        end subroutine ocean_setup
     end interface
-end module
+end module ocean_setup_interface
 
 module before_oce_step_interface
     interface
@@ -68,9 +68,9 @@ module before_oce_step_interface
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine before_oce_step
     end interface
-end module
+end module before_oce_step_interface
 !
 !
 !_______________________________________________________________________________
@@ -84,11 +84,14 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     USE o_ARRAYS
     USE g_config
     USE g_forcing_param, only: use_virt_salt
+    use o_mixing_KPP_mod
+#if defined (__cvmix)       
     use g_cvmix_tke
     use g_cvmix_idemix
     use g_cvmix_pp
     use g_cvmix_kpp
     use g_cvmix_tidal
+#endif    
     use g_backscatter
     use Toy_Channel_Soufflet
     use Toy_Channel_Dbgyre
@@ -141,6 +144,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     select case (trim(mix_scheme))
         case ('KPP'                   ) ; mix_scheme_nmb = 1
         case ('PP'                    ) ; mix_scheme_nmb = 2
+#if defined (__cvmix)           
         case ('cvmix_KPP'             ) ; mix_scheme_nmb = 3
         case ('cvmix_PP'              ) ; mix_scheme_nmb = 4
         case ('cvmix_TKE'             ) ; mix_scheme_nmb = 5
@@ -151,6 +155,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
         case ('cvmix_KPP+cvmix_TIDAL' ) ; mix_scheme_nmb = 37
         case ('cvmix_PP+cvmix_TIDAL'  ) ; mix_scheme_nmb = 47
         case ('cvmix_TKE+cvmix_IDEMIX') ; mix_scheme_nmb = 56
+#endif        
         case default 
             stop "!not existing mixing scheme!"
             call par_ex(partit%MPI_COMM_FESOM, partit%mype)
@@ -160,9 +165,10 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_kpp_init'//achar(27)//'[0m'
         call oce_mixing_kpp_init(partit, mesh)
+        
     ! initialise fesom1.4 like PP
     elseif (mix_scheme_nmb==2 .or. mix_scheme_nmb==27) then
-    
+#if defined (__cvmix)       
     ! initialise cvmix_KPP
     elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_kpp'//achar(27)//'[0m'
@@ -177,9 +183,10 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     elseif (mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_tke'//achar(27)//'[0m'
         call init_cvmix_tke(partit, mesh)
-        
+#endif        
     endif
-  
+
+#if defined (__cvmix)       
     ! initialise additional mixing cvmix_IDEMIX --> only in combination with 
     ! cvmix_TKE+cvmix_IDEMIX or stand alone for debbuging as cvmix_TKE
     if     (mod(mix_scheme_nmb,10)==6) then
@@ -193,7 +200,8 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_tidal'//achar(27)//'[0m'
         call init_cvmix_tidal(partit, mesh)
     end if         
-    
+#endif
+
     !___________________________________________________________________________
     ! set use_density_ref .true. when cavity is used and initialse cavity boundary 
     ! line for the extrapolation of the initialisation
@@ -255,7 +263,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     ! initialise arrays that are needed for backscatter_coef
-    if(dynamics%opt_visc==8) call init_backscatter(partit, mesh)
+    if(dynamics%opt_visc==8) call init_backscatter(dynamics, partit, mesh)
         
     
     !___________________________________________________________________________
@@ -305,7 +313,8 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+! #include "associate_mesh_ass.h"
+nl => mesh%nl
     
     !___________________________________________________________________________
     ! OPEN and read namelist for I/O
@@ -492,6 +501,15 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     real(kind=WP)  :: visc_gamma0, visc_gamma1, visc_gamma2
     real(kind=WP)  :: visc_easybsreturn
     logical        :: use_ivertvisc=.true.
+    logical        :: uke_scaling=.true.
+    real(kind=WP)  :: uke_scaling_factor=1._WP
+    logical        :: uke_advection=.false.
+    real(kind=WP)  :: rosb_dis=1._WP
+    integer        :: smooth_back=2
+    integer        :: smooth_dis=2
+    integer        :: smooth_back_tend=4
+    real(kind=WP)  :: K_back=600._WP
+    real(kind=WP)  :: c_back=0.1_8
     integer        :: momadv_opt
     logical        :: use_freeslip =.false.
     logical        :: use_wsplit   =.false.
@@ -506,7 +524,9 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     real(kind=WP)  :: se_visc_gamma0, se_visc_gamma1, se_visc_gamma2
     
     namelist /dynamics_visc   / opt_visc, check_opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
-                                use_ivertvisc, visc_easybsreturn
+                                use_ivertvisc, visc_easybsreturn, &
+                                uke_scaling, uke_scaling_factor, uke_advection, &
+                                rosb_dis, smooth_back, smooth_dis, smooth_back_tend, K_back, c_back
 
     namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, & 
                                 ldiag_KE, AB_order,                                  &
@@ -519,7 +539,8 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h"   
+! #include "associate_mesh_ass.h"   
+nl => mesh%nl
     
     !___________________________________________________________________________
     ! open and read namelist for I/O
@@ -543,6 +564,15 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     dynamics%visc_gamma1         = visc_gamma1
     dynamics%visc_gamma2         = visc_gamma2
     dynamics%visc_easybsreturn   = visc_easybsreturn
+    dynamics%uke_scaling         = uke_scaling
+    dynamics%uke_scaling_factor  = uke_scaling_factor
+    dynamics%uke_advection       = uke_advection
+    dynamics%rosb_dis            = rosb_dis
+    dynamics%smooth_back         = smooth_back
+    dynamics%smooth_dis          = smooth_dis
+    dynamics%smooth_back_tend    = smooth_back_tend
+    dynamics%K_back              = K_back
+    dynamics%c_back              = c_back
     dynamics%use_ivertvisc       = use_ivertvisc
     dynamics%momadv_opt          = momadv_opt
     dynamics%use_freeslip        = use_freeslip
@@ -768,7 +798,8 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
+! #include "associate_mesh_ass.h"
+nl              => mesh%nl
 
     !___________________________________________________________________________
     elem_size=myDim_elem2D+eDim_elem2D
@@ -809,6 +840,7 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     allocate(relax2clim(node_size)) 
     allocate(heat_flux(node_size), Tsurf(node_size))
     allocate(water_flux(node_size), Ssurf(node_size))
+    allocate(fw_ice(node_size), fw_snw(node_size))
     allocate(relax_salt(node_size))
     allocate(virtual_salt(node_size))
 
@@ -854,8 +886,8 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     allocate(Ki(nl-1, node_size))
 
     do n=1, node_size
-    !  Ki(n)=K_hor*area(1,n)/scale_area
-    Ki(:,n)=K_hor*(mesh_resolution(n)/100000.0_WP)**2
+        !  Ki(n)=K_hor*area(1,n)/scale_area
+        Ki(:,n)=K_hor*(mesh%mesh_resolution(n)/100000.0_WP)**2
     end do
     call exchange_nod(Ki, partit)
 
@@ -902,6 +934,8 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     Tsurf=0.0_WP
 
     water_flux=0.0_WP
+    fw_ice    =0.0_WP
+    fw_snw    =0.0_WP
     relax_salt=0.0_WP
     virtual_salt=0.0_WP
 
@@ -1005,7 +1039,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     use recom_ciso
 #endif
     ! for additional (transient) tracers:
-    use mod_transit, only: id_r14c, id_r39ar, id_f12, id_sf6
+    use mod_transit, only: id_r14c, id_r39ar, id_f11, id_f12, id_sf6
     implicit none
     type(t_tracer), intent(inout), target :: tracers
     type(t_partit), intent(inout), target :: partit
