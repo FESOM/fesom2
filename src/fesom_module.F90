@@ -183,8 +183,9 @@ contains
 
         f%npes          =>f%partit%npes
 
-
+        
         if(f%mype==0) then
+            call plot_fesomlogo()
             write(*,*)
             print *,"FESOM2 git SHA: "//fesom_git_sha()
             call MPI_Get_library_version(f%mpi_version_txt, f%mpi_version_len, f%MPIERR)

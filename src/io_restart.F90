@@ -934,9 +934,9 @@ end subroutine read_netcdf_restarts
     d = .false.
     
     if(unit.eq.'y') then
-      call annual_event(d)
+      call annual_event(d, frequency)
     else if(unit.eq.'m') then 
-      call monthly_event(d) 
+      call monthly_event(d, frequency) 
     else if(unit.eq.'d') then
       call daily_event(d, frequency)
     else if(unit.eq.'h') then
