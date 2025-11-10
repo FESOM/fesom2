@@ -364,72 +364,98 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
 !1910, doi:10.1175/jpo2785.1, 2005.
 !$OMP DO
     do n=1,myDim_nod2D
-        nzmax=nlevels_nod2D(n)
-        nzmin=ulevels_nod2D(n)
         !_______________________________________________________________________
-        ! Allpy vertical scaling after Ferreira et al.(2005)
-        if (scaling_Ferreira) then
+        if (Redi .or. Fer_GM) then
+            nzmax=nlevels_nod2D(n)
+            nzmin=ulevels_nod2D(n)
+            zscaling=1.0_WP
             !___________________________________________________________________
-            ! choose reference buoyancy
-            if (K_GM_bvref==0) then
-                ! ferreira bvref value surface (original Ferreira)
-                !!PS bvref=max(bvfreq(1, n), 1.e-6_WP)
-                bvref=max(bvfreq(nzmin, n), 1.e-6_WP)
-            elseif (K_GM_bvref==1) then
-                ! ferreira bvref value bottom mixed layer (Dima)
-                bvref=max(bvfreq(MLD1_ind(n)+1, n), 1.e-6_WP)
-            elseif (K_GM_bvref==2) then
-                ! ferreira bvref value mean over mixed layer
-                !!PS bvref=max(sum(bvfreq(1:MLD1_ind(n), n))/(MLD1_ind(n)), 1.e-6_WP)
-                bvref=max(sum(bvfreq(nzmin:MLD1_ind(n), n))/(MLD1_ind(n)), 1.e-6_WP)
-            elseif (K_GM_bvref==3) then
-                ! ferreira bvref value depth weighted mean over mixed layer
-                aux_zz=0.0_WP
-                !!PS aux_zz(1:MLD1_ind(n)-1) = Z_3d_n(2:MLD1_ind(n),n)-Z_3d_n(1:MLD1_ind(n)-1,n)
-                !!PS bvref=max(sum(bvfreq(2:MLD1_ind(n),n)*aux_zz(1:MLD1_ind(n)-1))/sum(aux_zz(1:MLD1_ind(n)-1)), 1.e-6_WP)
-                aux_zz(nzmin:MLD1_ind(n)-1) = Z_3d_n(nzmin+1:MLD1_ind(n),n)-Z_3d_n(nzmin:MLD1_ind(n)-1,n)
-                bvref=max(sum(bvfreq(nzmin+1:MLD1_ind(n),n)*aux_zz(nzmin:MLD1_ind(n)-1))/sum(aux_zz(nzmin:MLD1_ind(n)-1)), 1.e-6_WP)    
+            if (scaling_Ferreira .and. scaling_GMzexp) then 
+                if (mype==0) then 
+                print *, achar(27)//'[33m'
+                write(*,*) 
+                write(*,*) '____________________________________________________________________'
+                write(*,*) ' WARNING: You cant activate both scaling_Ferreira and scaling_GMzexp'
+                write(*,*) '          together. Only either one of them can be used!!! '
+                write(*,*) '____________________________________________________________________'
+                print *, achar(27)//'[0m'
+                write(*,*)
+                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                end if 
+            !___________________________________________________________________
+            ! Allpy vertical scaling after Ferreira et al.(2005)
+            elseif (scaling_Ferreira) then
+                !_______________________________________________________________
+                ! choose reference buoyancy
+                if (K_GM_bvref==0) then
+                    ! ferreira bvref value surface (original Ferreira)
+                    !!PS bvref=max(bvfreq(1, n), 1.e-6_WP)
+                    bvref=max(bvfreq(nzmin, n), 1.e-6_WP)
+                elseif (K_GM_bvref==1) then
+                    ! ferreira bvref value bottom mixed layer (Dima)
+                    bvref=max(bvfreq(MLD1_ind(n)+1, n), 1.e-6_WP)
+                elseif (K_GM_bvref==2) then
+                    ! ferreira bvref value mean over mixed layer
+                    !!PS bvref=max(sum(bvfreq(1:MLD1_ind(n), n))/(MLD1_ind(n)), 1.e-6_WP)
+                    bvref=max(sum(bvfreq(nzmin:MLD1_ind(n), n))/(MLD1_ind(n)), 1.e-6_WP)
+                elseif (K_GM_bvref==3) then
+                    ! ferreira bvref value depth weighted mean over mixed layer
+                    aux_zz=0.0_WP
+                    !!PS aux_zz(1:MLD1_ind(n)-1) = Z_3d_n(2:MLD1_ind(n),n)-Z_3d_n(1:MLD1_ind(n)-1,n)
+                    !!PS bvref=max(sum(bvfreq(2:MLD1_ind(n),n)*aux_zz(1:MLD1_ind(n)-1))/sum(aux_zz(1:MLD1_ind(n)-1)), 1.e-6_WP)
+                    aux_zz(nzmin:MLD1_ind(n)-1) = Z_3d_n(nzmin+1:MLD1_ind(n),n)-Z_3d_n(nzmin:MLD1_ind(n)-1,n)
+                    bvref=max(sum(bvfreq(nzmin+1:MLD1_ind(n),n)*aux_zz(nzmin:MLD1_ind(n)-1))/sum(aux_zz(nzmin:MLD1_ind(n)-1)), 1.e-6_WP)    
+                end if 
+                
+                !_______________________________________________________________
+                ! compute scaling with respect to reference buoyancy
+                do nz=nzmin, nzmax
+                    zscaling(nz)=max(bvfreq(nz, n)/bvref, 0.2_WP)
+                    zscaling(nz)=min(zscaling(nz), 1.0_WP)
+                end do
+            
+            !___________________________________________________________________
+            ! Apply vertical downscaling of GM parameter with exp(-z/z_Ref)
+            elseif (scaling_GMzexp) then
+                !_______________________________________________________________
+                ! compute scaling with respect to reference depth zref
+                !    0  smin               1
+                !   -+---+-----------------+-------> scaling
+                !    |   !          ...--´´
+                !    |   !       .-´
+                !    |   !     ,´ 
+                !    |   !    ,
+                !    |   !   / 
+                !    |   !  :  
+                !    |   ! : 
+                !    |   ! : 
+                !    |   !:
+                !    v
+                !  depth 
+                !  
+                ! --> if smin=0.0 model tends to be unstable an prone to blowups!!!
+                !  
+                do nz=nzmin, nzmax
+                    zscaling(nz)=GMzexp_smin + (1.0-GMzexp_smin)*exp(-abs(zbar_3d_n(nz, n)/GMzexp_zref))
+                    zscaling(nz)=max(min(zscaling(nz), 1.0_WP), GMzexp_smin)
+                end do
             end if 
             
             !___________________________________________________________________
-            ! compute scaling with respect to reference buoyancy
-            !!PS do nz=1, nzmax
-            do nz=nzmin, nzmax
-                zscaling(nz)=max(bvfreq(nz, n)/bvref, 0.2_WP)
-                zscaling(nz)=min(zscaling(nz), 1.0_WP)
-            end do
-        else
-            zscaling=1.0_WP
-        end if
+            ! Switch off GM and Redi within a BL in NH (a strategy following FESOM 1.4)
+            if (scaling_FESOM14) then
+                !zscaling(1:MLD1_ind(n)+1)=0.0_WP
+                do nz=nzmin, nzmax
+                    if (neutral_slope(3, min(nz, nl-1), n) > 5.e-3_WP) zscaling(nz)=0.0_WP
+                end do
+            end if
+        end if ! --> if (Redi .or. Fer_GM) then
         
-        !_______________________________________________________________________
-        ! Apply vertical downscaling of GM parameter with exp(-z/z_Ref)
-        if (scaling_GMzexp) then
-            !___________________________________________________________________
-            ! compute scaling with respect to reference buoyancy
-            !!PS do nz=1, nzmax
-            do nz=nzmin, nzmax
-                zscaling(nz)=exp(-abs(zbar_3d_n(nz, n)/GMzexp_zref))
-                zscaling(nz)=max(min(zscaling(nz), 1.0_WP), 1.0e-2)
-            end do
-        end if 
-        
-        !_______________________________________________________________________
-        ! Switch off GM and Redi within a BL in NH (a strategy following FESOM 1.4)
-        if (scaling_FESOM14) then
-            !zscaling(1:MLD1_ind(n)+1)=0.0_WP
-            !!PS do nz=1, nzmax
-            do nz=nzmin, nzmax
-                if (neutral_slope(3, min(nz, nl-1), n) > 5.e-3_WP) zscaling(nz)=0.0_WP
-            end do
-        end if
-      
         !_______________________________________________________________________
         ! do vertical Ferreira scaling and limiting for GM diffusivity
         if (Fer_GM) then
             ! start with index 2 to not alternate fer_k(1,n) which contains here 
             ! the surface template for the scaling 
-            !!PS do nz=2, nzmax
             do nz=nzmin+1, nzmax
                 fer_k(nz,n)=fer_k(nzmin,n)*zscaling(nz)
             end do 
@@ -443,7 +469,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
                 ! slope 
                 do nz=nzmin, nzmax-1
                     fer_k(nz, n)=fer_k(nz, n)*sqrt(fer_tapfac(nz, n)) + K_GM_min*abs(sqrt(fer_tapfac(nz, n))-1)
-!PS                     fer_k(nz, n)=fer_k(nz, n)*(fer_tapfac(nz, n))
+                    !PS fer_k(nz, n)=fer_k(nz, n)*(fer_tapfac(nz, n))
                 end do
             end if 
         end if
@@ -453,13 +479,11 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
         if (Redi) then
             ! start with index 2 to not alternate fer_k(1,n) which contains here 
             ! the surface template for the scaling 
-            !!PS do nz=2, nzmax-1
             do nz=nzmin+1, nzmax-1
                 !!PS Ki(nz,n)= Ki(1,n)*0.5_WP*(zscaling(nz)+zscaling(nz+1))
                 Ki(nz,n)= Ki(nzmin,n)*0.5_WP*(zscaling(nz)+zscaling(nz+1))
             end do
             ! after vertical Ferreira scaling is done also scale surface template
-            !!PS Ki(1,n)=Ki(1,n)*0.5_WP*(zscaling(1)+zscaling(2))
             Ki(nzmin,n)=Ki(nzmin,n)*0.5_WP*(zscaling(nzmin)+zscaling(nzmin+1))
             
             ! aplly tapering to Ki, not just to the tapered neutral slope 

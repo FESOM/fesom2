@@ -53,6 +53,8 @@ logical                       :: scaling_FESOM14    =.false.
 
 logical                       :: scaling_GMzexp     =.false. ! do downscaling of GM & Redi over depth by exp(-z/z_ref)
 real(kind=WP)                 :: GMzexp_zref        = 500.0  ! reference for vertical exp GM scaling 
+real(kind=WP)                 :: GMzexp_smin        = 0.1    ! minimum scaling factor
+
 
 logical                       :: scaling_GINsea     =.false. ! do upsaling of GINsea via polygon 
 real(kind=WP)                 :: GINsea_fac         = 2.0    ! increase K_GM_max in Gin sea by factor 
@@ -197,7 +199,7 @@ character(20)                  :: which_pgf='shchepetkin'
                     scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, &
                     scaling_ODM95, ODM95_Scr, ODM95_Sd, &
                     scaling_LDD97, LDD97_c, LDD97_rmin, LDD97_rmax, &
-                    scaling_GINsea, GINsea_fac, &
+                    scaling_GINsea, GINsea_fac, GMzexp_smin, &
                     scaling_GMzexp, GMzexp_zref
 
  NAMELIST /tracer_phys/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, &
