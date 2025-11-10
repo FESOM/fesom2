@@ -24,15 +24,15 @@ end module ice_thermodynamics_interfaces
 
 module ice_therm_interface
     interface
-        subroutine therm_ice(ithermp, h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
-        ug,ustar,T_oc,S_oc,H_ML,t,ice_dt,ch,ce,ch_i,ce_i,evap_in,fw,ehf,evap, &
-        rsf, dhgrowth, dhsngrowth, iflice, hflatow, hfsenow, hflwrdout, hfswrow, &
-        hflwrow, hfradow, lid_clo,geolon, geolat, subli)
+        subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rsss, &
+        ug, ustar, T_oc, S_oc, H_ML, t, ice_dt, ch, ce, ch_i, ce_i, evap_in, fw,  fwice, fwsnw, ehf, evap, &
+        rsf, dhgrowth, dhsngrowth, dAgrowth, iflice, hflatow, hfsenow, hflwrdout, hfswrow, &
+        hflwrow, hfradow, lid_clo, geolon, geolat, subli)
         USE MOD_ICE
         type(t_ice_thermo), intent(in), target :: ithermp
         real(kind=WP)   h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rsss, &
-                        ug, ustar, T_oc, S_oc, H_ML, t, ice_dt, ch, ce, ch_i, ce_i, evap_in, fw, ehf, &
-                        dhgrowth, dhsngrowth, ahf, prec, subli, subli_i, rsf, &
+                        ug, ustar, T_oc, S_oc, H_ML, t, ice_dt, ch, ce, ch_i, ce_i, evap_in, fw, fwice, fwsnw, ehf, &
+                        dhgrowth, dhsngrowth, dAgrowth, ahf, prec, subli, subli_i, rsf, &
                         rhow, show, rhice, shice, sh, thick, thact, lat, &
                         rh, rA, qhst, sn, hsntmp, o2ihf, evap, iflice, hflatow, &
                         hfsenow, hflwrdout, hfswrow, hflwrow, hfradow, lid_clo, geolon, geolat
@@ -158,6 +158,7 @@ subroutine thermodynamics(ice, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     use o_param
+    use o_arrays, only: fw_ice, fw_snw
     use g_config
     use g_forcing_param
     use g_forcing_arrays
@@ -171,8 +172,8 @@ subroutine thermodynamics(ice, partit, mesh)
     !_____________________________________________________________________________
     integer        :: i, j, elem
     real(kind=WP)  :: h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss,rsf,evap_in
-    real(kind=WP)  :: ug,ustar,T_oc,S_oc,h_ml,t,ch,ce,ch_i,ce_i,fw,ehf,evap
-    real(kind=WP)  :: ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout, subli, hfswrow, hflwrow, hfradow
+    real(kind=WP)  :: ug,ustar,T_oc,S_oc,h_ml,t,ch,ce,ch_i,ce_i,fw,fwice,fwsnw,ehf,evap
+    real(kind=WP)  :: ithdgr, ithdgrsn, ithdgra, iflice, hflatow, hfsenow, hflwrdout, subli, hfswrow, hflwrow, hfradow
     real(kind=WP)  :: lid_clo, o2ihf
     real(kind=WP)  :: lat
     real(kind=WP)  :: geolon, geolat
@@ -185,7 +186,7 @@ subroutine thermodynamics(ice, partit, mesh)
     real(kind=WP), dimension(:)  , pointer :: u_ice, v_ice
     real(kind=WP), dimension(:)  , pointer :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:)  , pointer :: a_ice_old, m_ice_old, m_snow_old
-    real(kind=WP), dimension(:)  , pointer :: thdgr, thdgrsn, thdgr_old, t_skin, ustar_aux
+    real(kind=WP), dimension(:)  , pointer :: thdgr, thdgrsn, thdgra, thdgr_old, t_skin, ustar_aux
     real(kind=WP), dimension(:)  , pointer :: S_oc_array, T_oc_array, u_w, v_w
     real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
     real(kind=WP), external  :: TFrez  ! Sea water freeze temperature
@@ -203,6 +204,7 @@ subroutine thermodynamics(ice, partit, mesh)
     m_snow_old    => ice%data(3)%values_old(:)
     thdgr         => ice%thermo%thdgr
     thdgrsn       => ice%thermo%thdgrsn
+    thdgra        => ice%thermo%thdgra
     thdgr_old     => ice%thermo%thdgr_old
     t_skin        => ice%thermo%t_skin
     ustar_aux     => ice%thermo%ustar
@@ -282,6 +284,9 @@ subroutine thermodynamics(ice, partit, mesh)
         ce_i    = Ce_atm_ice
         h_ml    = ice%thermo%h_ml               ! 10.0 or 30. used previously
         fw      = 0.0_WP
+        fwice   = 0.0_WP
+        fwsnw   = 0.0_WP
+        ithdgra = 0.0_WP
         ehf     = 0.0_WP
         geolon = geo_coord_nod2D(1, i)
         geolat = geo_coord_nod2D(2, i)
@@ -295,10 +300,10 @@ subroutine thermodynamics(ice, partit, mesh)
 
         !_______________________________________________________________________
         ! do ice thermodynamics
-        call therm_ice(ice%thermo,h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
-            ug,ustar,T_oc,S_oc,h_ml,t,ice%ice_dt,ch,ce,ch_i,ce_i,evap_in,fw,ehf,evap, &
-            rsf, ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout, hfswrow, & 
-            hflwrow, hfradow, lid_clo, geolon, geolat, subli)
+        call therm_ice(ice%thermo, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rsss, &
+                      ug, ustar, T_oc, S_oc, h_ml, t, ice%ice_dt, ch, ce, ch_i, ce_i, &
+                      evap_in, fw, fwice, fwsnw, ehf, evap, rsf, ithdgr, ithdgrsn, ithdgra, iflice, &
+                      hflatow, hfsenow, hflwrdout, hfswrow, hflwrow, hfradow, lid_clo, geolon, geolat, subli)
         
         !_______________________________________________________________________
         ! write ice thermodyn. results into arrays
@@ -321,6 +326,7 @@ subroutine thermodynamics(ice, partit, mesh)
         
         thdgr(i)          = ithdgr
         thdgrsn(i)        = ithdgrsn
+        thdgra(i)         = ithdgrA
         flice(i)          = iflice
         
         
@@ -330,6 +336,9 @@ subroutine thermodynamics(ice, partit, mesh)
         ! ~~~|~~~~~~|~~~    to      ~~~|~~~~~~|~~~
         !    |      |                  |      | 
         !    v(+)                      v(-)   
+        fw_ice(i)         = - fwice    ! freshwater flux from ice
+        fw_snw(i)         = - fwsnw    ! freshwater flux from snow 
+        
         hf_Qlat(i)        = - hflatow  ! latent heat flux
         hf_Qsen(i)        = - hfsenow  ! sensible heat flux 
         hf_Qradtot(i)     = - hfradow  ! total radiation heat flux
@@ -357,7 +366,7 @@ end subroutine thermodynamics
 !_______________________________________________________________________________
 subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rsss, &
                     ug, ustar, T_oc, S_oc, H_ML, t, ice_dt, ch, ce, ch_i, ce_i,    &
-                    evap_in, fw, ehf, evap, rsf, dhgrowth, dhsngrowth, iflice,     &
+                    evap_in, fw, fwice, fwsnw, ehf, evap, rsf, dhgrowth, dhsngrowth, dAgrowth, iflice,     &
                     hflatow, hfsenow, hflwrdout, hfswrow, hflwrow, hfradow, lid_clo, geolon, geolat, subli)
     ! Ice Thermodynamic growth model     
     !
@@ -392,8 +401,16 @@ subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rss
     ! hsn - snow mass
     ! A - ice compactness
     ! t - temperature of snow/ice top surface
-    ! fw - freshwater flux due to ice melting [m water/ice_dt]
-    ! ehf - net heat flux at the ocean surface [W/m2]        !RTnew
+    ! fw    - total freshwater flux precip+evap+runoff+ice+snw [m water/ice_dt]
+    ! fwice - freshwater flux due to ice melting [m water/ice_dt]
+    ! fwsnw - freshwater flux due to snow melting [m water/ice_dt]
+    ! ehf   - net heat flux at the ocean surface [W/m2]        !RTnew
+    ! hflatow   - latent heat flux 
+    ! hfsenow   - sensible heat flux 
+    ! hflwrdout - outgoing radiation 
+    ! hfswrow   - short wave radiation   
+    ! hflwrow   - long wave radiation 
+    ! hfradow   - total radiation 
     ! subli - sublimatione over ice
     ! o2ihf - ocean to ice heat flux [W/m2] 
 
@@ -404,9 +421,9 @@ subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rss
     implicit none
     type(t_ice_thermo), intent(in), target :: ithermp
     integer k
-    real(kind=WP)  h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss,evap_in
-    real(kind=WP)  ug,ustar,T_oc,S_oc,H_ML,t,ice_dt,ch,ce,ch_i,ce_i,fw,ehf
-    real(kind=WP)  dhgrowth,dhsngrowth,ahf,prec,subli,subli_i,rsf
+    real(kind=WP)  h,hsn,A,Aold,fsh,flo,Ta,qa,rain,snow,runo,rsss,evap_in
+    real(kind=WP)  ug,ustar,T_oc,S_oc,H_ML,t,ice_dt,ch,ce,ch_i,ce_i,fw,fwice,fwsnw,ehf
+    real(kind=WP)  dhgrowth,dhsngrowth,dAgrowth,ahf,prec,subli,subli_i,rsf
     real(kind=WP)  rhow,show,rhice,shice,sh,snthick,thick,thact,lat
     real(kind=WP)  rh,rA,qhst,sn,hsntmp,o2ihf,evap
     real(kind=WP)  iflice, hflatow, hfsenow, hflwrdout, hfswrow, hflwrow, hfradow
@@ -594,10 +611,14 @@ subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rss
         
     ! (prec+runoff)+evap - freezing(+melting) ice&snow
     if (.not. use_virt_salt) then
-        fw= prec+evap - dhgrowth*rhoice*inv_rhowat - dhsngrowth*rhosno*inv_rhowat
-        rsf= -dhgrowth*rhoice*inv_rhowat*Sice
+        fwice = - dhgrowth*rhoice*inv_rhowat
+        fwsnw = - dhsngrowth*rhosno*inv_rhowat
+        fw= prec + evap + fwice + fwsnw
+        rsf= fwice*Sice
     else
-        fw= prec+evap - dhgrowth*rhoice*inv_rhowat*(rsss-Sice)/rsss - dhsngrowth*rhosno*inv_rhowat 
+        fwice = - dhgrowth*rhoice*inv_rhowat*(rsss-Sice)/rsss
+        fwsnw = - dhsngrowth*rhosno*inv_rhowat  
+        fw= prec + evap + fwice + fwsnw
         rsf = 0.0_WP
     end if
     
@@ -605,12 +626,15 @@ subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rss
     rh=-min(h,-rh)   ! Make sure we do not try to melt more ice than is available
     rA= rhow - o2ihf*ice_dt/cl !Qiang: it was -(T_oc-TFrez(S_oc))*H_ML*cc/cl, changed in June 2010
     !rA= rhow - (T_oc-TFrez(S_oc))*H_ML*cc/cl*(1.0-A)
+    Aold = A
     A=A + c_melt*min(rh,0.0_WP)*A/max(h,hmin) + max(rA,0.0_WP)*(1._WP-A)/lid_clo  !/h0   
     !meaning:           melting                         freezing
     
     A=min(A,h*1.e6_WP)     ! A -> 0 for h -> 0
     A=min(max(A,0.0_WP),1._WP) ! A >= 0, A <= 1
-
+    dAgrowth = (A-Aold)/ice_dt
+    
+    
     ! Flooding (snow to ice conversion)
     iflice=h
     call flooding(ithermp, h, hsn)     
