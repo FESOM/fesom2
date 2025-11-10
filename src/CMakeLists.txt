@@ -223,7 +223,7 @@ if (CVMIX)
                    OUTPUT_VARIABLE CVMIX_DIR_install OUTPUT_STRIP_TRAILING_WHITESPACE)  
    
    # set default CVMix installation path
-   set(CVMIX_ROOT "${src_home}/cvmix_driver/${CVMIX_DIR_install}") 
+   set(CVMIX_ROOT "${src_home}/cvmix_driver/${CVMIX_DIR_install}_${CMAKE_Fortran_COMPILER_ID}") 
    message(STATUS "set default CVMIX_ROOT=${CVMIX_ROOT}")
    
    # Where library is located --> fix in download_cvmix.sh that it as always installed 
