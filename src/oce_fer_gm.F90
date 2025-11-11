@@ -243,7 +243,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
 
     ! fill arrays for 3D Redi and GM coefficients: F1(xy)*F2(z)
     !******************************* F1(x,y) ***********************************
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, nz, nzmax, nzmin, reso, c1, rosb, scaling, rr_ratio, aux, aux_zz, zscaling, bvref)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, nz, nzmax, nzmin, reso, c1, cm, rosb, scaling, rr_ratio, aux, aux_zz, zscaling, bvref)
 !$OMP DO
     do n=1, myDim_nod2D
        !nzmax=minval(nlevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)

@@ -2973,7 +2973,7 @@ subroutine compute_neutral_slope(partit, mesh)
     eps=5.0e-6_WP
 !PS     S_cr=1.0e-2_WP
 !PS     S_d=1.0e-3_WP
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, n, nz, nl1, ul1, el, elnodes, enodes, c, ro_z_inv)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, n, nz, nl1, ul1, el, elnodes, enodes, c, ro_z_inv, f_min, dep_scale, rssby, c1, c2)
 !$OMP DO
     do n=1, myDim_nod2D
         slope_tapered(: , :, n)=0._WP
