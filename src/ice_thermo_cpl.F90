@@ -67,7 +67,7 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP), dimension(:)  , pointer :: S_oc_array, T_oc_array, u_w, v_w
   real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
 #if defined (__oifs) || defined (__ifsinterface)
-  real(kind=WP), dimension(:) , pointer  :: ice_temp, ice_alb, enthalpyoffuse, ice_heat_qres, ice_heat_qcon
+  real(kind=WP), dimension(:) , pointer  :: ice_temp, ice_alb, enthalpyoffuse, ice_heat_qres, ice_heat_qcon, runoff_liquid, runoff_solid
 #endif
 #if defined (__oasis) || defined (__ifsinterface)
   real(kind=WP), dimension(:)  , pointer ::  oce_heat_flux, ice_heat_flux 
@@ -98,6 +98,8 @@ subroutine thermodynamics(ice, partit, mesh)
   ice_temp      => ice%data(4)%values(:)
   ice_alb       => ice%atmcoupl%ice_alb(:)
   enthalpyoffuse=> ice%atmcoupl%enthalpyoffuse(:)
+  runoff_liquid => ice%atmcoupl%runoff_liquid(:)
+  runoff_solid  => ice%atmcoupl%runoff_solid(:)
   ice_heat_qres => ice%atmcoupl%flx_qres(:)
   ice_heat_qcon => ice%atmcoupl%flx_qcon(:)
 #endif 
