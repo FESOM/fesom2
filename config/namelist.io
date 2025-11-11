@@ -52,7 +52,7 @@ compression_level = 1        ! compression level for netCDF output (1=fastest, 9
 !   precision  = 4 (single precision) or 8 (double precision)
 ! ============================================================================
 &nml_list
-io_list = 'sst       ',1, 'm', 4,
+io_list =  'sst       ',1, 'm', 4,
           'sss       ',1, 'm', 4,
           'ssh       ',1, 'm', 4,
           'uice      ',1, 'd', 4,
