@@ -511,9 +511,22 @@ contains
     call MPI_Barrier(f%MPI_COMM_FESOM_WORLD, f%MPIERR)
     
     if(num_fesom_groups > 1) then
+!        call MPI_Bcast(cpl_send, 1, MPI_CHARACTER, 0, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIerr)
+!        call MPI_Bcast(cpl_recv, 1, MPI_CHARACTER, 0, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIerr)
+
+        if(f%my_fesom_group > 0) then
+            ALLOCATE(cpl_send(nsend))
+            ALLOCATE(cpl_recv(nrecv))
+        end if        
+
         call MPI_Bcast(cpl_send, nsend, MPI_CHARACTER, 0, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIerr)
         call MPI_Bcast(cpl_recv, nrecv, MPI_CHARACTER, 0, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIerr)
-!  needed in SUBROUTINE net_rec_from_atm(action)
+       
+! kh 10.11.25 it is assumed here that both nsend and nrecv are >= 1
+!        call MPI_Bcast(cpl_send, len(cpl_send(1)) * nsend, MPI_CHARACTER, 0, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIerr)
+!        call MPI_Bcast(cpl_recv, len(cpl_recv(1)) * nrecv, MPI_CHARACTER, 0, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIerr)
+ 
+        !  needed in SUBROUTINE net_rec_from_atm(action)
         call MPI_Bcast(target_root,             1, MPI_INTEGER,   0, f%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, f%MPIerr)
     end if
 #endif
@@ -1211,7 +1224,9 @@ contains
     if(f%fesom_did_mpi_init) call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype) ! finalize MPI before FESOM prints its stats block, otherwise there is sometimes output from other processes from an earlier time in the programm AFTER the starts block (with parastationMPI)
 
 #if defined(__recom) && defined(__usetp)
+! kh 07.11.25 produce output currently for all groups
         if (f%my_fesom_group==0) then
+!        if (f%my_fesom_group==0 .or. .true.) then
 #endif
 
     if (f%mype==0) then
