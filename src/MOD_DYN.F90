@@ -159,7 +159,8 @@ TYPE T_DYN
     real(kind=WP), allocatable, dimension(:,:,:,:) :: ke_adv_AB, ke_cor_AB
     real(kind=WP), allocatable, dimension(:,:,:)   :: ke_rhs_bak
     ! surface fields to compute APE generation
-    real(kind=WP), allocatable, dimension(:)     :: ke_J, ke_D, ke_G, ke_D2, ke_n0, ke_JD, ke_GD, ke_swA, ke_swB
+    real(kind=WP), allocatable, dimension(:)     :: ke_J, ke_D, ke_G, ke_D2, ke_JD, ke_GD, ke_swA, ke_swB
+    real(kind=WP), allocatable, dimension(:,:)   :: ke_n0, ke_Dx, ke_Dy, ke_DU, ke_DV, ke_elemD, ke_elemD2
 
     !___________________________________________________________________________
     contains

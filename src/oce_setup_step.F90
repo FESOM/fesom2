@@ -718,9 +718,11 @@ nl => mesh%nl
        allocate(dynamics%ke_wind_xVEL(2, elem_size))
        allocate(dynamics%ke_drag_xVEL(2, elem_size))
        allocate(dynamics%ke_J(node_size),  dynamics%ke_D(node_size),   dynamics%ke_G(node_size),  &
-                dynamics%ke_D2(node_size), dynamics%ke_n0(node_size),  dynamics%ke_JD(node_size), &
+                dynamics%ke_D2(node_size), dynamics%ke_JD(node_size), &
                 dynamics%ke_GD(node_size), dynamics%ke_swA(node_size), dynamics%ke_swB(node_size))
-
+       allocate(dynamics%ke_n0(nl-1, node_size))
+       allocate(dynamics%ke_Dx(nl-1, elem_size), dynamics%ke_Dy(nl-1, elem_size), dynamics%ke_DU(nl-1, elem_size),& 
+         dynamics%ke_DV(nl-1, elem_size), dynamics%ke_elemD(nl-1, elem_size), dynamics%ke_elemD2(nl-1, elem_size))
        dynamics%ke_adv      =0.0_WP
        dynamics%ke_cor      =0.0_WP
        dynamics%ke_pre      =0.0_WP
@@ -753,6 +755,14 @@ nl => mesh%nl
        dynamics%ke_GD       =0.0_WP
        dynamics%ke_swA      =0.0_WP
        dynamics%ke_swB      =0.0_WP
+       dynamics%ke_Dx       =0.0_WP
+       dynamics%ke_Dy       =0.0_WP
+       dynamics%ke_DU       =0.0_WP
+       dynamics%ke_DV       =0.0_WP
+       dynamics%ke_elemD    =0.0_WP
+       dynamics%ke_elemD2   =0.0_WP
+
+
     end if
 END SUBROUTINE dynamics_init
 !
