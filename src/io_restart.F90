@@ -493,6 +493,9 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
   ! Skip writing on step 0
   if (istep==0) return
   
+  ! Calculate current time from clock (seconds from beginning of year)
+  ctime = timeold + (dayold - 1.0_WP) * 86400.0_WP
+  
   ! Check whether restart will be written
   is_portable_restart_write = is_due(trim(restart_length_unit), restart_length, istep)
   
@@ -582,6 +585,9 @@ subroutine write_netcdf_restarts(path, filegroup, istep)
   logical file_exists
   
   cstep = globalstep+istep
+  
+  ! Calculate current time from clock (seconds from beginning of year)
+  ctime = timeold + (dayold - 1.0_WP) * 86400.0_WP
   
   do i=1, filegroup%nfiles
     call filegroup%files(i)%join() ! join the previous write (if required)
@@ -797,6 +803,9 @@ subroutine read_netcdf_restarts(path, filegroup, mpicomm, mype)
   integer max_globalstep
   integer mpierr
   
+  ! Calculate current time from clock (seconds from beginning of year)
+  ctime = timeold + (dayold - 1.0_WP) * 86400.0_WP
+  
   allocate(skip_file(filegroup%nfiles))
   skip_file = .false.
   
@@ -816,17 +825,9 @@ subroutine read_netcdf_restarts(path, filegroup, mpicomm, mype)
         end if
 
         if(.not. skip_file(i)) then
-#ifndef DISABLE_PARALLEL_RESTART_READ
-          write(*,*) 'reading restart PARALLEL for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
-#else
-          write(*,*) 'reading restart SEQUENTIAL for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
-#endif
+          write(*,*) 'reading restart for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
         else
-#ifndef DISABLE_PARALLEL_RESTART_READ
-          write(*,*) 'skipping reading restart PARALLEL for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
-#else
-          write(*,*) 'skipping reading restart SEQUENTIAL for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
-#endif
+          write(*,*) 'skipping reading restart for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
         end if
         
         if(.not. skip_file(i)) call filegroup%files(i)%open_read(filegroup%files(i)%path) ! do we need to bother with read-only access?
@@ -840,14 +841,46 @@ subroutine read_netcdf_restarts(path, filegroup, mpicomm, mype)
       call MPI_Bcast(skip_file(i), 1, MPI_LOGICAL, current_iorank_rcv, mpicomm, mpierr)
     end if      
 
-    if(.not. skip_file(i)) call filegroup%files(i)%async_read_and_scatter_variables()
-#ifndef DISABLE_PARALLEL_RESTART_READ
-  end do
-  
-  do i=1, filegroup%nfiles
-#endif
+    ! ========================================================================!
+    !                           _____________________                         !
+    !                          /                     \                        !
+    !                         /                       \                       !
+    !                        |      .-----------.      |                      !
+    !                        |     /             \     |                      !
+    !                        |    |               |    |                      !
+    !                        |    |    R.I.P.     |    |                      !
+    !                        |    |               |    |                      !
+    !                        |    | MULTITHREADED |    |                      !
+    !                        |    |    RESTART    |    |                      !
+    !                        |    |    READING    |    |                      !
+    !                        |    |               |    |                      !
+    !                        |    |  2021 - 2025  |    |                      !
+    !                        |    |               |    |                      !
+    !                        |    | "You had to   |    |                      !
+    !                        |    |  be worked    |    |                      !
+    !                        |    |  around on    |    |                      !
+    !                        |    |  every        |    |                      !
+    !                        |    |  machine"     |    |                      !
+    !                        |    |               |    |                      !
+    !                        |     \             /     |                      !
+    !                        |      '-----------'      |                      !
+    !                        |                         |                      !
+    !                        |_________________________|                      !
+    !                                                                         !
+    !  Cause of death: MPI threading issues, deadlocks, and performance       !
+    !                  degradation on Levante, Albedo, Aleph, Juwels          !
+    !                                                                         !
+    !  Survived by: Sequential file reading (simple, reliable, boring)        !
+    !                                                                         !
+    !  For more info and a possible resurrection see:                         !
+    !  https://github.com/FESOM/fesom2/pull/801                               !
+    ! ========================================================================!
+
+    if(.not. skip_file(i)) then
+      call filegroup%files(i)%read_and_scatter_variables()
+    end if
+
     if(skip_file(i)) cycle
-    call filegroup%files(i)%join()
 
     if(filegroup%files(i)%is_iorank()) then
       write(*,*) 'restart from record ', filegroup%files(i)%rec_count(), ' of ', filegroup%files(i)%rec_count(), filegroup%files(i)%path
@@ -860,10 +893,15 @@ subroutine read_netcdf_restarts(path, filegroup, mpicomm, mype)
       call filegroup%files(i)%close_file()
 
      if (int(ctime)/=int(rtime)) then
-        write(*,*) 'Reading restart: timestamps in restart and in clock files do not match for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
-        write(*,*) 'restart/ times are:', ctime, rtime
-        write(*,*) 'the model will stop!'
-        call par_ex(mpicomm, mype, 1)
+        print *, achar(27)//'[33m'    //'____________________________________________________________'//achar(27)//'[0m'
+        print *, achar(27)//'[5;33m'  //' --> WARNING: RESTART TIMESTAMP MISMATCH !!!               '//achar(27)//'[0m'
+        write(*,*) 'WARNING: timestamps in restart and in clock files do not match for ', filegroup%files(i)%varname
+        write(*,*) '         at path: ', trim(filegroup%files(i)%path)
+        write(*,*) '         clock time  =', ctime
+        write(*,*) '         restart time=', rtime
+        write(*,*) 'WARNING: This mismatch will be ignored and the model will continue running.'
+        write(*,*) 'WARNING: Please verify that this is the intended behavior for your simulation.'
+        print *, achar(27)//'[33m'    //'____________________________________________________________'//achar(27)//'[0m'
       end if
     end if
   end do
