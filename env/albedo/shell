@@ -19,5 +19,3 @@ export UCX_HANDLE_ERRORS=bt
 export HDF5_USE_FILE_LOCKING=FALSE
 export I_MPI_PMI=pmi2
 export I_MPI_PMI_LIBRARY=/usr/lib64/libpmi2.so
-
-export ENABLE_ALBEDO_INTELMPI_WORKAROUNDS=''
