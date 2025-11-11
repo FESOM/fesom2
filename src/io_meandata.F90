@@ -167,7 +167,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     integer, save             :: nm_io_unit  = 103       ! unit to open namelist file, skip 100-102 for cray
     integer                   :: iost
     integer,dimension(15)     :: sel_forcvar=0
-    integer                   :: sel_dmoc=0, sel_trgrd_xyz=0, sel_dvd=0
+    integer                   :: sel_dmoc=0, sel_trgrd_xyz=0, sel_dvd=0, sel_redi=0
     character(len=10)         :: id_string
 
     type(t_mesh), intent(in) , target :: mesh
@@ -533,7 +533,10 @@ CASE ('relaxsalt ')
 CASE ('realsalt  ')
     sel_forcvar(15) = 1
     call def_stream(nod2D , myDim_nod2D , 'realsalt' , 'real salt flux from sea ice', 'm/s*psu', real_salt_flux(:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-        
+
+CASE ('ice_rejectsalt')
+    if (SPP) call def_stream(nod2D , myDim_nod2D , 'ice_rejectsalt' , 'salt flux from plum parameterisation ', 'm/s*psu', ice_rejected_salt(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    
 !___________________________________________________________________________________________________________________________________
 ! output KPP vertical mixing schemes
 CASE ('kpp_obldepth   ')
@@ -1088,13 +1091,41 @@ CASE ('fer_scal  ')
     if (Fer_GM) then
     call def_stream(        nod2D   ,         myDim_nod2D   , 'fer_scal',  'GM surface scaling','',  fer_scal(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
+!PS CASE ('fer_GINsea')
+!PS     if (Fer_GM .and. scaling_GINsea) then
+!PS     call def_stream(        nod2D   ,         myDim_nod2D   , 'fer_GINsea',  'GM surface muliplicator','',  fer_GINsea_mask(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+!PS     end if
 CASE ('fer_C     ')
     if (Fer_GM) then
     call def_stream(        nod2D   ,         myDim_nod2D   , 'fer_C',     'GM,   depth independent speed',  'm/s' ,   fer_c(:),                  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
+CASE ('fer_gammax')
+    if (Fer_GM) then
+    call def_stream((/nl  , nod2D /), (/nl,   myDim_nod2D /), 'fer_gammax','GM, transport gamma_x',  'm^2/s^2', fer_gamma(1,:,:),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('fer_gammay')
+    if (Fer_GM) then
+    call def_stream((/nl  , nod2D /), (/nl,   myDim_nod2D /), 'fer_gammay','GM, transport gamma_y',  'm^2/s^2', fer_gamma(2,:,:),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('sigma_x   ')
+    if (Fer_GM) then
+    call def_stream((/nl-1, nod2D /), (/nl-1, myDim_nod2D /), 'sigma_x',   'zonal density gradient ', 'kg/m^4' , sigma_xy(1,:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('sigma_y   ')
+    if (Fer_GM) then
+    call def_stream((/nl-1, nod2D /), (/nl-1, myDim_nod2D /), 'sigma_y',   'meridional density gradient ',  'kg/m^4' , sigma_xy(2,:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if     
 CASE ('cfl_z         ')
     call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'cfl_z',         'vertical CFL criteria',  '?',           dynamics%cfl_z(:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
+CASE ('fer_tapfac')
+    if (Fer_GM) then
+    call def_stream((/nl-1  , nod2D /), (/nl-1,   myDim_nod2D /), 'fer_tapfac','tapering factor',  '', fer_tapfac(:,:),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if    
+CASE ('redi_K        ')    
+    sel_redi=1
+    if (Redi) then
+        call def_stream((/nl-1  , nod2D /), (/nl-1,   myDim_nod2D /), 'redi_K',   'Redi diffusion coefficient', 'm2/s', Ki(:,:),   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
 !_______________________________________________________________________________
 ! Density MOC diagnostics
 CASE ('dMOC      ')
@@ -1458,7 +1489,9 @@ END DO ! --> DO i=1, io_listsize
     ! output Redi parameterisation
 #if !defined(__MULTIO)
     if (Redi) then
-        call def_stream((/nl-1  , nod2D /), (/nl-1,   myDim_nod2D /), 'Redi_K',   'Redi diffusion coefficient', 'm2/s', Ki(:,:),    1, 'y', i_real4, partit, mesh)
+        if (sel_redi==0) then 
+            call def_stream((/nl-1  , nod2D /), (/nl-1,   myDim_nod2D /), 'redi_K',   'Redi diffusion coefficient', 'm2/s', Ki(:,:),    1, 'y', i_real4, partit, mesh)
+        endif     
     end if
 #endif
 

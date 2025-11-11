@@ -267,6 +267,12 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
         
     
     !___________________________________________________________________________
+    ! precompute mask for GM/Redi upscalling in the GINsea
+    if ((Fer_GM .or. Redi) .and. scaling_GINsea) then 
+        call init_RediGM_GINsea_mask(partit, mesh)
+    end if 
+    
+    !___________________________________________________________________________
     if(partit%mype==0) write(*,*) 'Initial state'
     if (dynamics%use_wsplit .and. partit%mype==0) then
         write(*,*) '******************************************************************************'
@@ -912,11 +918,12 @@ nl              => mesh%nl
     dens_flux=0.0_WP
 
     if (Fer_GM) then
-    allocate(fer_c(node_size),fer_scal(node_size), fer_gamma(2, nl, node_size), fer_K(nl, node_size))
-    fer_gamma=0.0_WP
-    fer_K=500._WP
-    fer_c=1._WP
-    fer_scal = 0.0_WP
+    allocate(fer_c(node_size),fer_scal(node_size), fer_gamma(2, nl, node_size), fer_K(nl, node_size), fer_tapfac(nl, node_size))
+    fer_gamma = 0.0_WP
+    fer_K     = 500._WP
+    fer_c     = 1._WP
+    fer_scal  = 0.0_WP
+    fer_tapfac= 1._WP
     end if
 
     if (SPP) then

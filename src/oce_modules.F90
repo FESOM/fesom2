@@ -42,11 +42,36 @@ integer                       :: K_GM_bvref = 2 ! 0...surface, 1...bottom mixlay
 real(kind=WP)                 :: K_GM_resscalorder = 2.0
 real(kind=WP)                 :: K_GM_rampmax = 40.0 ! Resol >K_GM_rampmax[km] GM full
 real(kind=WP)                 :: K_GM_rampmin = 30.0 ! Resol <K_GM_rampmin[km] GM off
+real(kind=WP)                 :: K_GM_cm = 1.0    ! =1.0 ...first baroclini wave speed, =2.0...2nd, =3.0...3rd, ...
+real(kind=WP)                 :: K_GM_cmin = 0.5 ! lower cutoff of baroclinic wave speed
+logical                       :: K_GM_Ktaper = .false.
+
 logical                       :: scaling_Ferreira   =.true.
 logical                       :: scaling_Rossby     =.false.
 logical                       :: scaling_resolution =.true.
 logical                       :: scaling_FESOM14    =.false.
-logical                       :: Redi               =.false.  !flag for Redi scheme
+
+logical                       :: scaling_GMzexp     =.false. ! do downscaling of GM & Redi over depth by exp(-z/z_ref)
+real(kind=WP)                 :: GMzexp_zref        = 500.0  ! reference for vertical exp GM scaling 
+real(kind=WP)                 :: GMzexp_smin        = 0.1    ! minimum scaling factor
+
+
+logical                       :: scaling_GINsea     =.false. ! do upsaling of GINsea via polygon 
+real(kind=WP)                 :: GINsea_fac         = 2.0    ! increase K_GM_max in Gin sea by factor 
+
+logical                       :: Redi        = .false.  !flag for Redi scheme
+logical                       :: Redi_Ktaper = .false.
+real(kind=WP)                 :: Redi_Kmax   = 3000.0
+real(kind=WP)                 :: Redi_Kmin   = 2.0
+
+logical                       :: scaling_ODM95 =.true.    ! tapering based on critical slope
+real(kind=WP)                 :: ODM95_Scr = 1.0e-2   ! Critical slope for tapering
+real(kind=WP)                 :: ODM95_Sd = 1.0e-3   ! slope width of tapering smoothing zone
+
+logical                       :: scaling_LDD97 =.false.   ! tapering in surface
+real(kind=WP)                 :: LDD97_c = 2.0      ! [m/s] is the first baroclinic wave speed
+real(kind=WP)                 :: LDD97_rmin = 15.0e3   ! rossby radius min cutoff [m]
+real(kind=WP)                 :: LDD97_rmax = 100.0e3  ! rossby radius max cutoff [m]
 
 real(kind=WP)                 :: visc_sh_limit=5.0e-3      !for KPP, max visc due to shear instability
 real(kind=WP)                 :: diff_sh_limit=5.0e-3      !for KPP, max diff due to shear instability
@@ -67,7 +92,19 @@ real(kind=WP)                 :: alpha=1.0_WP, theta=1.0_WP ! implicitness for
 real(kind=WP)                 :: epsilon=0.1_WP  ! AB2 offset
 ! Tracers
 
-logical                       :: SPP=.false.
+! Salt Prine Parameterisation
+logical                       :: SPP            = .false.
+real(kind=WP)                 :: SPP_dep_N      = -80.0_WP   ! salt prine max rejection depth Northern hemisphere
+real(kind=WP)                 :: SPP_dep_S      = -80.0_WP   ! salt prine max rejection depth Southern hemisphere
+real(kind=WP)                 :: SPP_drhodz_cr_N= 0.01_WP    ! salt prine critical slope Northern hemispher
+real(kind=WP)                 :: SPP_drhodz_cr_S= 0.01_WP    ! salt prine critical slope Southern hemispher
+integer                       :: SPP_expon      = 5          ! exponent for salt prine vertical distribution 
+
+! Smoothing of N2 buoyancy frequency
+logical                       :: N2smth_v       = .false.  ! do vertical N2 smoothing 
+logical                       :: N2smth_h       = .true.   ! do horizontal N2 smoothing 
+integer                       :: N2smth_hidx    = 1        ! how many horizontal smoothing cycles should be applied
+
 
 integer                       :: acc_vl = 64
 
@@ -152,12 +189,18 @@ real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s
 ! > 'easypgf'      ... interpolate pressure on elemental depth
 character(20)                  :: which_pgf='shchepetkin'
 
-
  NAMELIST /oce_dyn/ state_equation, C_d, A_ver, &
-                    scale_area, use_global_tides, SPP,&
-                    Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, &
+                    scale_area, &
+                    SPP, SPP_dep_N, SPP_dep_S, SPP_drhodz_cr_N, SPP_drhodz_cr_S, SPP_expon,  &
+                    N2smth_v, N2smth_h, N2smth_hidx, &
+                    visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, alpha, theta, use_density_ref, &
+                    Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, K_GM_cm, K_GM_cmin, K_GM_Ktaper, &
+                    Redi, Redi_Ktaper, Redi_Kmax, Redi_Kmin, use_global_tides, &
                     scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, &
-                    Redi, visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, alpha, theta, use_density_ref
+                    scaling_ODM95, ODM95_Scr, ODM95_Sd, &
+                    scaling_LDD97, LDD97_c, LDD97_rmin, LDD97_rmax, &
+                    scaling_GINsea, GINsea_fac, GMzexp_smin, &
+                    scaling_GMzexp, GMzexp_zref
 
  NAMELIST /tracer_phys/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, &
             balance_salt_water, clim_relax, ref_sss_local, ref_sss, &
@@ -250,7 +293,7 @@ real(kind=WP),allocatable :: mo(:,:),mixlength(:)
 !GM_stuff
 real(kind=WP),allocatable :: bvfreq(:,:),mixlay_dep(:),bv_ref(:)
 
-real(kind=WP), target, allocatable    :: fer_c(:), fer_scal(:), fer_K(:,:), fer_gamma(:,:,:)
+real(kind=WP), target, allocatable    :: fer_c(:), fer_scal(:), fer_GINsea_mask(:), fer_K(:,:), fer_gamma(:,:,:), fer_tapfac(:,:)
 
 real(kind=WP),         allocatable    :: ice_rejected_salt(:)
 
