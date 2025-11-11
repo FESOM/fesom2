@@ -55,8 +55,8 @@ compression_level = 1        ! compression level for netCDF output (1=fastest, 9
 io_list =  'sst       ',1, 'm', 4,
            'sss       ',1, 'm', 4,
            'ssh       ',1, 'm', 4,
-           'uice      ',1, 'd', 4,
-           'vice      ',1, 'd', 4,
+           'uice      ',1, 'm', 4,
+           'vice      ',1, 'm', 4,
            'a_ice     ',1, 'm', 4,
            'm_ice     ',1, 'm', 4,
            'm_snow    ',1, 'm', 4,
@@ -67,20 +67,20 @@ io_list =  'sst       ',1, 'm', 4,
            'ty_sur    ',1, 'm', 4,
            'temp      ',1, 'm', 4,
            'salt      ',1, 'm', 8,
-           'N2        ',1, 'y', 4,
-           'Kv        ',1, 'y', 4,
-           'u         ',1, 'y', 4,
-           'v         ',1, 'y', 4,
-           'unod      ',1, 'y', 4,
-           'vnod      ',1, 'y', 4,
-           'w         ',1, 'y', 4,
-           'Av        ',1, 'y', 4,
-           'bolus_u   ',1, 'y', 4,
-           'bolus_v   ',1, 'y', 4,
-           'bolus_w   ',1, 'y', 4,
+           'N2        ',1, 'm', 4,
+           'Kv        ',1, 'm', 4,
+           'u         ',1, 'm', 4,
+           'v         ',1, 'm', 4,
+           'unod      ',1, 'm', 4,
+           'vnod      ',1, 'm', 4,
+           'w         ',1, 'm', 4,
+           'Av        ',1, 'm', 4,
+           'bolus_u   ',1, 'm', 4,
+           'bolus_v   ',1, 'm', 4,
+           'bolus_w   ',1, 'm', 4,
            'fw        ',1, 'm', 4,
            'fh        ',1, 'm', 4,
-           'otracers  ',1, 'y', 4,
+           'otracers  ',1, 'm', 4,
 /
 
 ! ============================================================================
@@ -103,12 +103,12 @@ io_list =  'sst       ',1, 'm', 4,
 ! 'temp      ',1, 'm', 4,  ! temperature [C]
 ! 'salt      ',1, 'm', 8,  ! salinity [psu]
 ! 'sigma0    ',1, 'm', 4,  ! potential density [kg/m3]
-! 'u         ',1, 'y', 4,  ! zonal velocity [m/s]
-! 'v         ',1, 'y', 4,  ! meridional velocity [m/s]
-! 'unod      ',1, 'y', 4,  ! zonal velocity at nodes [m/s]
-! 'vnod      ',1, 'y', 4,  ! meridional velocity at nodes [m/s]
-! 'w         ',1, 'y', 4,  ! vertical velocity [m/s]
-! 'otracers  ',1, 'y', 4,  ! all other tracers if applicable
+! 'u         ',1, 'm', 4,  ! zonal velocity [m/s]
+! 'v         ',1, 'm', 4,  ! meridional velocity [m/s]
+! 'unod      ',1, 'm', 4,  ! zonal velocity at nodes [m/s]
+! 'vnod      ',1, 'm', 4,  ! meridional velocity at nodes [m/s]
+! 'w         ',1, 'm', 4,  ! vertical velocity [m/s]
+! 'otracers  ',1, 'm', 4,  ! all other tracers if applicable
 ! 'age       ',1, 'm', 4,  ! water age tracer [year] (require use_age_tracer=.true.)
 
 ! --- 2D SSH DIAGNOSTIC VARIABLES ---
@@ -120,8 +120,8 @@ io_list =  'sst       ',1, 'm', 4,
 ! 'dhe       ',1, 'm', 4,  ! dhbar @ elem [m]
 
 ! --- SEA ICE FIELDS (require use_ice=.true.) ---
-! 'uice      ',1, 'd', 4,  ! ice velocity x [m/s]
-! 'vice      ',1, 'd', 4,  ! ice velocity y [m/s]
+! 'uice      ',1, 'm', 4,  ! ice velocity x [m/s]
+! 'vice      ',1, 'm', 4,  ! ice velocity y [m/s]
 ! 'a_ice     ',1, 'm', 4,  ! ice concentration [%]
 ! 'm_ice     ',1, 'm', 4,  ! ice height per unit area [m]
 ! 'thdgr     ',1, 'm', 4,  ! thermodynamic growth rate ice [m/s]
@@ -253,46 +253,46 @@ io_list =  'sst       ',1, 'm', 4,
 ! 'h2o16     ',1, 'm', 4,  ! h2o16 concentration [kmol/m**3]
 
 ! --- NEUTRAL SLOPES ---
-! 'slopetap_x',1, 'y', 4,  ! neutral slope tapered X [none]
-! 'slopetap_y',1, 'y', 4,  ! neutral slope tapered Y [none]
-! 'slopetap_z',1, 'y', 4,  ! neutral slope tapered Z [none]
-! 'slope_x   ',1, 'y', 4,  ! neutral slope X [none]
-! 'slope_y   ',1, 'y', 4,  ! neutral slope Y [none]
-! 'slope_z   ',1, 'y', 4,  ! neutral slope Z [none]
+! 'slopetap_x',1, 'm', 4,  ! neutral slope tapered X [none]
+! 'slopetap_y',1, 'm', 4,  ! neutral slope tapered Y [none]
+! 'slopetap_z',1, 'm', 4,  ! neutral slope tapered Z [none]
+! 'slope_x   ',1, 'm', 4,  ! neutral slope X [none]
+! 'slope_y   ',1, 'm', 4,  ! neutral slope Y [none]
+! 'slope_z   ',1, 'm', 4,  ! neutral slope Z [none]
 
 ! --- MIXING AND DYNAMICS ---
-! 'N2        ',1, 'y', 4,  ! brunt väisälä [1/s2]
-! 'Kv        ',1, 'y', 4,  ! vertical diffusivity Kv [m2/s]
-! 'Av        ',1, 'y', 4,  ! vertical viscosity Av [m2/s]
+! 'N2        ',1, 'm', 4,  ! brunt väisälä [1/s2]
+! 'Kv        ',1, 'm', 4,  ! vertical diffusivity Kv [m2/s]
+! 'Av        ',1, 'm', 4,  ! vertical viscosity Av [m2/s]
 
 ! --- VISCOSITY TENDENCIES (require dynamics%opt_visc==8) ---
-! 'u_dis_tend',1, 'y', 4,  ! horizontal velocity viscosity tendency [m/s]
-! 'v_dis_tend',1, 'y', 4,  ! meridional velocity viscosity tendency [m/s]
-! 'u_back_tend',1, 'y', 4, ! horizontal velocity backscatter tendency [m2/s2]
-! 'v_back_tend',1, 'y', 4, ! meridional velocity backscatter tendency [m2/s2]
-! 'u_total_tend',1, 'y', 4,! horizontal velocity total viscosity tendency [m/s]
-! 'v_total_tend',1, 'y', 4,! meridional velocity total viscosity tendency [m/s]
+! 'u_dis_tend',1, 'm', 4,  ! horizontal velocity viscosity tendency [m/s]
+! 'v_dis_tend',1, 'm', 4,  ! meridional velocity viscosity tendency [m/s]
+! 'u_back_tend',1, 'm', 4, ! horizontal velocity backscatter tendency [m2/s2]
+! 'v_back_tend',1, 'm', 4, ! meridional velocity backscatter tendency [m2/s2]
+! 'u_total_tend',1, 'm', 4,! horizontal velocity total viscosity tendency [m/s]
+! 'v_total_tend',1, 'm', 4,! meridional velocity total viscosity tendency [m/s]
 
 ! --- FERRARI/GM PARAMETERISATION (require Fer_GM=.true.) ---
-! 'bolus_u   ',1, 'y', 4,  ! GM bolus velocity U [m/s]
-! 'bolus_v   ',1, 'y', 4,  ! GM bolus velocity V [m/s]
-! 'bolus_w   ',1, 'y', 4,  ! GM bolus velocity W [m/s]
-! 'fer_K     ',1, 'y', 4,  ! GM, stirring diff. [m2/s]
-! 'fer_scal  ',1, 'y', 4,  ! GM surface scaling []
-! 'fer_C     ',1, 'y', 4,  ! GM, depth independent speed [m/s]
-! 'cfl_z     ',1, 'y', 4,  ! vertical CFL criteria [?]
+! 'bolus_u   ',1, 'm', 4,  ! GM bolus velocity U [m/s]
+! 'bolus_v   ',1, 'm', 4,  ! GM bolus velocity V [m/s]
+! 'bolus_w   ',1, 'm', 4,  ! GM bolus velocity W [m/s]
+! 'fer_K     ',1, 'm', 4,  ! GM, stirring diff. [m2/s]
+! 'fer_scal  ',1, 'm', 4,  ! GM surface scaling []
+! 'fer_C     ',1, 'm', 4,  ! GM, depth independent speed [m/s]
+! 'cfl_z     ',1, 'm', 4,  ! vertical CFL criteria [?]
 
 ! --- DENSITY MOC DIAGNOSTICS (require ldiag_dMOC=.true.) ---
-! 'dMOC      ',1, 'y', 4,  ! fluxes for density MOC (multiple variables)
+! 'dMOC      ',1, 'm', 4,  ! fluxes for density MOC (multiple variables)
 
 ! --- PRESSURE GRADIENT FORCE ---
-! 'pgf_x     ',1, 'y', 4,  ! zonal pressure gradient force [m/s^2]
-! 'pgf_y     ',1, 'y', 4,  ! meridional pressure gradient force [m/s^2]
+! 'pgf_x     ',1, 'm', 4,  ! zonal pressure gradient force [m/s^2]
+! 'pgf_y     ',1, 'm', 4,  ! meridional pressure gradient force [m/s^2]
 
 ! --- ALE LAYER THICKNESS ---
-! 'hnode     ',1, 'y', 4,  ! vertice layer thickness [m]
-! 'hnode_new ',1, 'y', 4,  ! hnode_new [m]
-! 'helem     ',1, 'y', 4,  ! elemental layer thickness [m]
+! 'hnode     ',1, 'm', 4,  ! vertice layer thickness [m]
+! 'hnode_new ',1, 'm', 4,  ! hnode_new [m]
+! 'helem     ',1, 'm', 4,  ! elemental layer thickness [m]
 
 ! --- OIFS/IFS INTERFACE (require __oifs or __ifsinterface) ---
 ! 'alb       ',1, 'm', 4,  ! ice albedo [none]
@@ -319,7 +319,7 @@ io_list =  'sst       ',1, 'm', 4,
 ! 'FORC      ',1, 'm', 4,  ! forcing diagnostics (multiple variables)
 
 ! --- DISCRETE VARIANCE DECAY (require ldiag_DVD=.true.) ---
-! 'DVD       ',1, 'y', 4,  ! DVD diagnostics (multiple variables)
+! 'DVD       ',1, 'm', 4,  ! DVD diagnostics (multiple variables)
 
 ! --- SPLIT-EXPLICIT SUBCYCLING (require dynamics%use_ssh_se_subcycl=.true.) ---
 ! 'SPLIT-EXPL',1, 'm', 4,  ! split-explicit diagnostics (multiple variables)
