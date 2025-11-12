@@ -73,19 +73,6 @@ age_start_year    = 2000     ! year to start age tracer (tracer age = 0 at this 
 /
 
 ! ============================================================================
-! ICEBERG INITIAL FILES CONFIGURATION
-! ============================================================================
-! Configure the directory containing the initial iceberg input files
-! expected by the iceberg module (e.g., icb_longitude.dat, icb_latitude.dat,
-! icb_length.dat, icb_height.dat, icb_scaling.dat). If a relative path is
-! given, it is interpreted relative to the model run directory.
-! It is recommended to end the path with a trailing slash.
-! ============================================================================
-&forcing_icb
-icb_path = '<add path>'  ! base path for iceberg input files (e.g., './iceberg_inputs/')
-/
-
-! ============================================================================
 ! SURFACE BOUNDARY CONDITION (FORCING DATA)
 ! ============================================================================
 ! Specification of atmospheric forcing data files and variables.
