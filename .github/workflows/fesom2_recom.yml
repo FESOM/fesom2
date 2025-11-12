@@ -1,11 +1,8 @@
 
 name: "FESOM2: REcoM Biogeochemistry"
-# Controls when the action will run. Triggers the workflow on push or pull request.
+# Controls when the action will run. Triggers the workflow on pull request only.
 on:
   workflow_dispatch: {}
-  push:
-    branches:
-      - fesom2.6_recom_tra_diags
   pull_request:
     types:
       - opened
