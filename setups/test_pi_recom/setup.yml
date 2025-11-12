@@ -23,6 +23,8 @@ namelist.config:
         step_per_day: 32
         run_length: 1
         run_length_unit: "d"
+    clockinit:
+        yearnew: 1948
     geometry:
         force_rotation: True
     restart_log:
@@ -88,8 +90,8 @@ namelist.recom:
         useErosion: False
         NitrogenSS: False
         useAeolianN: False
-        firstyearoffesomcycle: 1958
-        lastyearoffesomcycle: 2024
+        firstyearoffesomcycle: 1948
+        lastyearoffesomcycle: 1948
         numofCO2cycles: 1
         currentCO2cycle: 1
         DIC_PI: True
