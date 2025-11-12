@@ -31,6 +31,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     use mvars
     use mdepth2press                                   
     use gsw_mod_toolbox, only: gsw_sa_from_sp,gsw_ct_from_pt,gsw_rho
+    use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
 
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -410,9 +411,27 @@ real(kind=8) :: &
             !   O2  : Dissolved oxygen [mmolO2 m-3]
             !-----------------------------------------------------------------------
 
+            ! DEBUG: Check for NaN before DIC calculation
+            if (ieee_is_nan(state(k, idic))) then
+                print *, 'DEBUG: state(idic) is NaN at node=', n, 'depth=', k, 'lon=', Lond, 'lat=', Latd
+                print *, '  state(k,idic)=', state(k, idic)
+            end if
+            if (ieee_is_nan(sms(k, idic))) then
+                print *, 'DEBUG: sms(idic) is NaN at node=', n, 'depth=', k, 'lon=', Lond, 'lat=', Latd
+                print *, '  sms(k,idic)=', sms(k, idic)
+            end if
+
             DIC = max(tiny, state(k, idic) + sms(k, idic))
             ALK = max(tiny, state(k, ialk) + sms(k, ialk))
             O2  = max(tiny, state(k, ioxy) + sms(k, ioxy))
+
+            ! DEBUG: Check if DIC became NaN
+            if (ieee_is_nan(DIC)) then
+                print *, 'DEBUG: DIC is NaN after calculation at node=', n, 'depth=', k, 'lon=', Lond, 'lat=', Latd
+                print *, '  state(k,idic)=', state(k, idic), 'sms(k,idic)=', sms(k, idic), 'DIC=', DIC
+                print *, 'STOPPING: NaN detected in DIC calculation'
+                stop 'NaN in DIC'
+            end if
 
             !-----------------------------------------------------------------------
             ! DISSOLVED ORGANIC MATTER
