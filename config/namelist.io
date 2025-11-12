@@ -308,6 +308,8 @@ io_list =  'sst       ',1, 'm', 4,
 ! 'enthalpy  ',1, 'm', 4,  ! enthalpy of fusion [W/m^2]
 ! 'qcon      ',1, 'm', 4,  ! conductive heat flux [W/m^2]
 ! 'qres      ',1, 'm', 4,  ! residual heat flux [W/m^2]
+! 'runoff_liquid',1, 'm', 4, ! liquid water runoff [m/s]
+! 'runoff_solid',1, 'm', 4, ! solid water runoff [m/s]
 
 ! --- ICEBERG OUTPUTS (require use_icebergs=.true.) ---
 ! 'icb       ',1, 'm', 4,  ! iceberg outputs (multiple variables)
