@@ -1869,7 +1869,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
    else
 
 !-Checking if files need to be opened---------------------------------------------
-     call monthly_event(do_read)
+     call monthly_event(do_read, 1)
      if(do_read) then ! file is opened and read every year
       i=month
       if (i > 12) i=1
