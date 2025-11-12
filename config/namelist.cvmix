@@ -132,7 +132,47 @@ kpp_Kvbckg      = 1.0e-5        ! constant background diffusivity [m²/s]
 
 ! --- Sea Ice Effects ---
 kpp_reduce_tauuice = .false.    ! reduce wind stress (u*) under sea ice
+
+! --- Langmuir Options in cvmix KPP ---
+
+! Stokes Similarty package
+! If true, use Stokes Similarty package (i.e. include wave‐related / Stokes drift 
+! effects in the surface layer). Triggers usage of additional routines 
+! that alter the shape functions, or mixing formulations, incorporating wave / 
+! Stokes drift effects consistent with Monin–Obukhov similarity theory 
+! (MOST). The code logic probably augments or replaces parts of the standard boundary 
+! (layer similarity (or nonlocal mixing) using a Stokes‐drift‐aware correction.
+kpp_use_StokesMOST= .false. !.true.
+    
+! approximate proportionality between surface wind velocity and stokes velocity
+! U_stokes ~ kpp_A_stokes * U_wind
+kpp_A_stokes      = 0.005 ! a
+    
+! Langmuir option
+! Option of Langmuir enhanced mixing apply an enhancement factor to the
+! turbulent velocity scale
+! LWF16     -  MixingCoefEnhancement = Langmuir_EFactor
+! RWHGK16   -  MixingCoefEnhancement = cvmix_one + ShapeNoMatchAtS/NMshapeMax * &
+!                                      (Langmuir_EFactor - cvmix_one)
+! NONE      -  Langmuir switched off, MixingCoefEnhancement=1 
+kpp_langmuir_mixing= "NONE" !"LWF16"
+        
+! Option of Langmuir turbulence enhanced entrainment - modify the unresolved shear
+! LWF16     -  Li Q., Webb A., Fox-Kemper B., Craig A., Danabasoglu G., 
+!              Large W., Vertenstein M., 2016, Langmuir mixing effects on 
+!              global climate: WAVEWATCH III in CESM, Ocean Modelling 103 (2016) 145–160
+!              
+! LF17      -  Li Q., Fox-Kemper B., Breivik O., Webb A., 2017, Statistical 
+!              models of global Langmuir mixing, Ocean Modelling 113 (2017) 95–114
+!              
+! RWHGK16   -  Reichl B., Wang D., Hara T., Ginis I. and Kukulka T, 2016, Impact 
+!              of Sea-State-Dependent Langmuir Turbulence on the Ocean
+!              Response to a Tropical Cyclone, Mon. Wea. Rev., 144
+!              
+! NONE      -  
+kpp_langmuir_entrainment= "NONE" !"LF17"
 /
+
 
 ! ============================================================================
 ! TIDAL MIXING PARAMETERIZATION
