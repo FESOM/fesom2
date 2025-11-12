@@ -746,7 +746,6 @@ CONTAINS
       real(4), dimension(:,:), pointer :: sbcdata1, sbcdata2
       logical sbcdata1_from_cache, sbcdata2_from_cache
       integer rootrank
-
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -1039,6 +1038,7 @@ CONTAINS
       real(wp)           :: tx, ty
       type(t_mesh),   intent(in)   , target :: mesh
       type(t_partit), intent(inout), target :: partit
+      logical            :: file_exist=.false.
 
       namelist /nam_sbc/ nm_xwind_file, nm_ywind_file, nm_xstre_file, nm_ystre_file, nm_humi_file, nm_qsr_file, &
                         nm_qlw_file, nm_tair_file, nm_prec_file, nm_snow_file, &
@@ -1203,26 +1203,229 @@ CONTAINS
       
       !==========================================================================
 #endif
-      ! runoff
-      if (runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
-         ! runoff in CORE is constant in time
-         ! Warning: For a global mesh, conservative scheme is to be updated!!
-         call read_other_NetCDF(make_full_path(nm_runoff_file), 'Foxx_o_roff', 1, runoff, .false., .true., partit, mesh) 
-         runoff=runoff/1000.0_WP  ! Kg/s/m2 --> m/s
-      end if
-
-      if (use_sw_pene) then
-         if (chl_data_source == 'Sweeney') then
-            if (mype==0) write(*,*) trim(chl_data_source) //' chlorophyll climatology will be used'
-            if (mype==0) write(*,*) 'nm_chl_data_file=', trim(nm_chl_data_file)
-         else
-            if (mype==0) write(*,*) 'using constant chlorophyll concentration: ', chl_const
+    
+    !___________________________________________________________________________
+    ! check sea surface salinity for restoring --> only check here if the files do 
+    ! realy exist
+    if (surf_relax_S > 0._WP) then
+        if (sss_data_source=='CORE1' .or. sss_data_source=='CORE2') then
+            if (mype==0) then 
+                write(*,*)
+                write(*,*) ' --> using total monthly SSS climatology for restoring'
+                write(*,*) '     sss_data_source  = ', sss_data_source
+                write(*,*) '     nm_sss_data_file = ', trim(make_full_path(nm_sss_data_file))
+                write(*,*)
+            end if     
+            
+            file_exist=.false.
+            inquire(file=make_full_path(nm_sss_data_file), exist=file_exist) 
+            if ( .not. file_exist) then   
+                if (mype==0) then
+                    write(*,*)
+                    print *, achar(27)//'[33m'
+                    write(*,*) '____________________________________________________________________'
+                    write(*,*) ' ERROR: file not found: ', trim(make_full_path(nm_sss_data_file))
+                    write(*,*) '        --> check your namelist.focing'
+                    write(*,*) '            ...'
+                    write(*,*) '            nm_sss_data_file    =...'
+                    write(*,*) '            ...'
+                    write(*,*) '____________________________________________________________________'
+                    print *, achar(27)//'[0m'
+                    write(*,*)
+                end if
+                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+            end if
+            
+        else
+            if (mype==0) then
+            write(*,*)
+                print *, achar(27)//'[33m'
+                write(*,*) '____________________________________________________________________'
+                write(*,*) ' ERROR: you choose an unknown sss_data_source ! '
+                write(*,*) '        currently supported is only sss_data_soure=:'
+                write(*,*) '        - ''CORE1'' or ''CORE2'': for monthly SSS climatology'
+                write(*,*) ''
+                write(*,*) '        --> please check your namelist.forcing'
+                write(*,*) '            ...'
+                write(*,*) '            sss_data_source=...'
+                write(*,*) '            nm_sss_file    =...'
+                write(*,*) '            ...'
+                write(*,*) '____________________________________________________________________'
+                print *, achar(27)//'[0m'
+                write(*,*)
+            end if
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+        
+        end if 
+    end if     
+    
+    !___________________________________________________________________________
+    ! check river runoff
+    ! when used runoff_data_source='CORE1' or 'CORE2' we use a total climatological 
+    ! runoff, so only one runoff time slice for the entire simulation is used. 
+    ! This part is only read ones when the forcing is first time initialized
+    if (runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
+        if (mype==0) then 
+            write(*,*) ' --> using total longterm runoff climatology (only 1 time slice) '
+            write(*,*) '     runoff_data_source = ', runoff_data_source
+            write(*,*) '     nm_runoff_file     = ', trim(make_full_path(nm_runoff_file))
+            write(*,*)
+        end if     
+            
+        ! runoff in CORE is constant in time
+        ! Warning: For a global mesh, conservative scheme is to be updated!!
+        file_exist=.false.
+        inquire(file=make_full_path(nm_runoff_file), exist=file_exist) 
+        if (file_exist) then   
+            call read_other_NetCDF(make_full_path(nm_runoff_file), 'Foxx_o_roff', 1, runoff, .false., .true., partit, mesh) 
+            runoff=runoff/1000.0_WP  ! Kg/s/m2 --> m/s
+            
+        else
+            if (mype==0) then
+                write(*,*)
+                print *, achar(27)//'[31m'
+                write(*,*) '____________________________________________________________________'
+                write(*,*) ' ERROR: file not found: ', trim(make_full_path(nm_runoff_file))
+                write(*,*) '        --> check your namelist.focing'
+                write(*,*) '            ...'
+                write(*,*) '            nm_runoff_file    =...'
+                write(*,*) '            ...'
+                write(*,*) '____________________________________________________________________'
+                print *, achar(27)//'[0m'
+                write(*,*)
+            end if
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                            
+        end if
+        
+    elseif (runoff_data_source=='Dai09' .or. runoff_data_source=='JRA55') then 
+        if (mype==0) then 
+            write(*,*) ' --> using monthly runoff climatology (12 time slices) '
+            write(*,*) '     runoff_data_source = ', runoff_data_source
+            write(*,*) '     nm_runoff_file     = ', trim(make_full_path(nm_runoff_file))
+            write(*,*)
+        end if     
+            
+        ! nothing happens here, for this option things happen in subroutine sbc_do(...)
+        ! since they need to be dynamically updated depending on the model time step
+        ! only check if monthly climatology file exist
+        
+        file_exist=.false.
+        inquire(file=make_full_path(nm_runoff_file), exist=file_exist) 
+        if ( .not. file_exist .and. runoff_climatology) then   
+            if (mype==0) then
+                write(*,*)
+                print *, achar(27)//'[31m'
+                write(*,*) '____________________________________________________________________'
+                write(*,*) ' ERROR: file not found: ', trim(make_full_path(nm_runoff_file))
+                write(*,*) '        --> check your namelist.focing'
+                write(*,*) '            ...'
+                write(*,*) '            nm_runoff_file    =...'
+                write(*,*) '            ...'
+                write(*,*) '____________________________________________________________________'
+                print *, achar(27)//'[0m'
+                write(*,*)
+            end if
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                            
+        end if
+        
+    else
+        if (mype==0) then
+            write(*,*)
+            print *, achar(27)//'[31m'
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: you choose an unknown runoff_data_source ! '
+            write(*,*) '        supported is only runoff_data_soure=:'
+            write(*,*) '        - ''CORE1'' or ''CORE2'': for longterm climatology (only one timeslice for the entire simulation)  '
+            write(*,*) '        - ''JRA55'' or ''Dai09'': for monthly climatology (each month has a different runoff timeslice,    ' 
+            write(*,*) '                                  this can be done as a monthly climatology (runoff_climatology=.true.) or '
+            write(*,*) '                                  as a transient monthly climatology (runoff_climatology=.false.) than each'
+            write(*,*) '                                  month and each year have differnt runoff'
+            write(*,*) ''
+            write(*,*) '        --> please check your namelist.forcing'
+            write(*,*) '            ...'
+            write(*,*) '            runoff_data_source=...'
+            write(*,*) '            nm_runoff_file    =...'
+            write(*,*) '            ...'
+            write(*,*) '____________________________________________________________________'
+            print *, achar(27)//'[0m'
+            write(*,*)
+        end if
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+        
+    end if   
+    
+    !___________________________________________________________________________
+    ! check Sweeney chlorophyl climatology or just constant value
+    if (use_sw_pene) then
+        if (chl_data_source == 'Sweeney') then
+            file_exist=.false.
+            inquire(file=make_full_path(nm_chl_data_file), exist=file_exist) 
+            if (file_exist) then 
+                if (mype==0) then 
+                    ! print *, achar(27)//'[30m'
+                    write(*,*) ' --> you will use short-wave penetration with the Sweeny chlorophyll climatology: '
+                    write(*,*) '     chl_data_source  =', trim(chl_data_source)
+                    write(*,*) '     nm_chl_data_file =', trim(nm_chl_data_file)
+                    write(*,*)
+                    !print *, achar(27)//'[0m'
+                end if    
+            else 
+                if (mype==0) then
+                    write(*,*)
+                    print *, achar(27)//'[31m'
+                    write(*,*) '____________________________________________________________________'
+                    write(*,*) ' ERROR: file not found: ', make_full_path(nm_chl_data_file)
+                    write(*,*) '        --> check your namelist.focing'
+                    write(*,*) '            ...'
+                    write(*,*) '            chl_data_source  =...'
+                    write(*,*) '            nm_chl_data_file =...'
+                    write(*,*) '            ...'
+                    write(*,*) '____________________________________________________________________'
+                    print *, achar(27)//'[0m'
+                    write(*,*)
+                end if
+                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                
+            end if 
+        elseif (chl_data_source == 'Const.' .or. chl_data_source == 'None') then
+            if (mype==0) then 
+                print *, achar(27)//'[33m'
+                write(*,*) ' --> you will use short-wave penetration with constant chlorophyll concentration: ', chl_const
+                write(*,*) '     Are you sure about this??? Usually the shortwave penetration will run better with Sweeney'
+                write(*,*) '     heterogenous chlorophyl climatology. So set chl_data_source=''Sweeney'' and nm_chl_data_file=... '
+                write(*,*) '     chl_data_source =', trim(chl_data_source)
+                print *, achar(27)//'[0m'
+            end if     
             chl=chl_const
-         end if
-      end if
+            
+        else
+            if (mype==0) then
+                write(*,*)
+                print *, achar(27)//'[31m'
+                write(*,*) '____________________________________________________________________'
+                write(*,*) ' ERROR: you choose an unknown chl_data_source ! '
+                write(*,*) '        supported is only chl_data_source=:'
+                write(*,*) '        - ''Sweeney''            : use Sweeney chlorophyl climatology'
+                write(*,*) '        - ''Const.'' or ''None'' : use constant chlorophyl value of chl_const=',chl_const
+                write(*,*) ''
+                write(*,*) '        --> please check your namelist.forcing'
+                write(*,*) '            ...'
+                write(*,*) '            chl_data_source=...'
+                write(*,*) '            ...'
+                write(*,*) '____________________________________________________________________'
+                print *, achar(27)//'[0m'
+                write(*,*)
+            end if
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+            
+        end if ! --> if (chl_data_source == 'Sweeney') then
+    end if ! --> if (use_sw_pene) then
 
-      if (mype==0) write(*,*) "DONE:  Ocean forcing initialization."
-      if (mype==0) write(*,*) 'Parts of forcing data (only constant in time fields) are read'
+    !___________________________________________________________________________
+    if (mype==0) write(*,*) "DONE:  Ocean forcing initialization."
+    if (mype==0) write(*,*) 'Parts of forcing data (only constant in time fields) are read'
 
 #if defined(__recom)
         ! OPEN and read namelist for SBC REcoM
@@ -1265,6 +1468,7 @@ CONTAINS
       integer,   pointer   :: nc_Ntime, t_indx, t_indx_p1
       real(wp),  pointer   :: nc_time(:)
       character(len=MAX_PATH)               :: filename
+      logical                               :: file_exist=.false.
 #if defined (__recom)
       character(15)             :: CO2vari, Nvari
       integer                   :: firstyearofcurrentCO2cycle, totnumyear, currentCO2year
@@ -1364,69 +1568,95 @@ CONTAINS
 !$OMP END PARALLEL DO
       end if
       
-      !==========================================================================
+    !===========================================================================
 
-      ! prepare a flag which checks whether to update monthly data (SSS, river runoff)
-      update_monthly_flag=( (day_in_month==num_day_in_month(fleapyear,month) .AND. timenew==86400._WP) .OR. mstep==1  )
+    ! prepare a flag which checks whether to update monthly data (SSS, river runoff)
+     update_monthly_flag=( (day_in_month==num_day_in_month(fleapyear,month) .AND. timenew==86400._WP) .OR. mstep==1  )
 
-      ! read in SSS for applying SSS restoring
-      if (surf_relax_S > 0._WP) then
-         if (sss_data_source=='CORE1' .or. sss_data_source=='CORE2') then
+    !___________________________________________________________________________ 
+    ! read in SSS for applying SSS restoring
+    if (surf_relax_S > 0._WP) then
+        if (sss_data_source=='CORE1' .or. sss_data_source=='CORE2') then
             if (update_monthly_flag) then
-               i=month
-               if (mstep > 1) i=i+1 
-               if (i > 12) i=1
-               if (mype==0) write(*,*) 'Updating SSS restoring data for month     ', i 
-               call read_other_NetCDF(make_full_path(nm_sss_data_file), 'SALT', i, Ssurf, .true., .true., partit, mesh) 
+                i=month
+                if (mstep > 1) i=i+1 
+                if (i > 12) i=1
+                if (mype==0) write(*,*) 'Updating SSS restoring data for month     ', i 
+                call read_other_NetCDF(make_full_path(nm_sss_data_file), 'SALT', i, Ssurf, .true., .true., partit, mesh) 
             end if
-         end if
-      end if
+        end if
+    end if
 
-      ! read in CHL for applying shortwave penetration
-      if (use_sw_pene) then
-         if (chl_data_source=='Sweeney') then
+    !___________________________________________________________________________
+    ! read inCHL for applying shortwave penetration
+    if (use_sw_pene) then
+        if (chl_data_source=='Sweeney') then
             if (update_monthly_flag) then
-               i=month
-               if (mstep > 1) i=i+1 
-               if (i > 12) i=1
-               if (mype==0) write(*,*) 'Updating chlorophyll climatology for month ', i 
-               call read_other_NetCDF(make_full_path(nm_chl_data_file), 'chl', i, chl, .true., .true., partit, mesh) 
+                i=month
+                if (mstep > 1) i=i+1 
+                if (i > 12) i=1
+                if (mype==0) write(*,*) 'Updating chlorophyll climatology for month ', i 
+                call read_other_NetCDF(make_full_path(nm_chl_data_file), 'chl', i, chl, .true., .true., partit, mesh) 
             end if
-         end if
-      end if
-
-     ! runoff  
-     if(runoff_data_source=='Dai09' .or. runoff_data_source=='JRA55') then
-       
-       if(update_monthly_flag) then
-         if(runoff_climatology) then
-           !climatology monthly mean
-           i=month
-           if (mstep > 1) i=i+1 
-           if (i > 12) i=1
-           if (mype==0) write(*,*) 'Updating monthly climatology runoff for month ', i 
-           filename=trim(make_full_path(nm_runoff_file))
-           call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, partit, mesh)
-
-           !kg/m2/s -> m/s
-           runoff=runoff/1000.0_WP
-
-         else
-           !monthly data
-           i=month
-           if (mstep > 1) i=i+1 
-           if (i > 12) i=1
-           if (mype==0) write(*,*) 'Updating monthly runoff for month             ', i 
-           filename=trim(make_full_path(nm_runoff_file))//cyearnew//'.nc' 
-           call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, partit, mesh)
-
-           !kg/m2/s -> m/s
-           runoff=runoff/1000.0_WP
-
-         end if
-       end if
-
-     end if
+        end if
+    end if
+     
+    !___________________________________________________________________________
+    ! runoff --> depends on simulated month
+    if(runoff_data_source=='Dai09' .or. runoff_data_source=='JRA55') then
+        ! its the time point for reading the runoff, always at the beginning of 
+        ! a new month
+        if(update_monthly_flag) then
+        
+            ! runnoff can be a monthly climatology
+            if(runoff_climatology) then
+                !climatology monthly mean
+                i=month
+                if (mstep > 1) i=i+1 
+                if (i > 12) i=1
+                if (mype==0) write(*,*) 'Updating monthly climatology runoff for month ', i 
+                filename=trim(make_full_path(nm_runoff_file))
+                
+                ! file existence has here been already checked in sbc_ini
+                
+            ! runnoff can be a monthly transient field over years
+            else
+                !monthly data
+                i=month
+                if (mstep > 1) i=i+1 
+                if (i > 12) i=1
+                if (mype==0) write(*,*) 'Updating monthly runoff for month             ', i 
+                filename=trim(make_full_path(nm_runoff_file))//cyearnew//'.nc' 
+                
+                ! check here if transient climatology file exists, quit model if 
+                ! not 
+                file_exist=.false.
+                inquire(file=filename, exist=file_exist) 
+                if (.not. file_exist) then   
+                    if (mype==0) then
+                        write(*,*)
+                        print *, achar(27)//'[31m'
+                        write(*,*) '____________________________________________________________________'
+                        write(*,*) ' ERROR: file not found: ',trim(filename)
+                        write(*,*) '        --> check your namelist.focing'
+                        write(*,*) '            ...'
+                        write(*,*) '            nm_runoff_file    =...'
+                        write(*,*) '            ...'
+                        write(*,*) '____________________________________________________________________'
+                        print *, achar(27)//'[0m'
+                        write(*,*)
+                    end if 
+                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                end if 
+            
+            end if ! --> if(runoff_climatology) then
+            
+            call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, partit, mesh)
+            !kg/m2/s -> m/s
+            runoff=runoff/1000.0_WP
+            
+        end if ! --> if(update_monthly_flag) then
+    end if ! --> if(runoff_data_source=='Dai09' .or. ... 
 
 #if defined (__recom)
 !<  read surface atmospheric deposition for Fe, N, CO2

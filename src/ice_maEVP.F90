@@ -744,9 +744,10 @@ subroutine EVPdynamics_m(ice, partit, mesh)
 !$OMP ORDERED
 #endif
                     u_rhs_ice(elnodes(1)) = u_rhs_ice(elnodes(1)) - elem_area(el)* &
-                            (sigma11(el)*dx(1)+sigma12(el)*(dy(1) + meancos))                         !metrics
+                            (sigma11(el)*dx(1)+sigma12(el)*dy(1)  + sigma12(el)*meancos)
+                            !metrics
                     v_rhs_ice(elnodes(1)) = v_rhs_ice(elnodes(1)) - elem_area(el)* &
-                            (sigma12(el)*dx(1)+sigma22(el)*dy(1) - sigma11(el)*meancos)               !metrics
+                            (sigma12(el)*dx(1)+sigma22(el)*dy(1)  - sigma11(el)*meancos)               !metrics
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
                     call omp_unset_lock(partit%plock(elnodes(1)))
 #else
@@ -761,9 +762,9 @@ subroutine EVPdynamics_m(ice, partit, mesh)
 !$OMP ORDERED
 #endif
                     u_rhs_ice(elnodes(2)) = u_rhs_ice(elnodes(2)) - elem_area(el)* &
-                            (sigma11(el)*dx(2)+sigma12(el)*(dy(2) + meancos))                         !metrics
+                            (sigma11(el)*dx(2)+sigma12(el)*dy(2)  + sigma12(el)*meancos)                         !metrics
                     v_rhs_ice(elnodes(2)) = v_rhs_ice(elnodes(2)) - elem_area(el)* &
-                            (sigma12(el)*dx(2)+sigma22(el)*dy(2) - sigma11(el)*meancos)               !metrics
+                            (sigma12(el)*dx(2)+sigma22(el)*dy(2)  - sigma11(el)*meancos)               !metrics
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
                 call omp_unset_lock(partit%plock(elnodes(2)))
 #else
@@ -778,9 +779,9 @@ subroutine EVPdynamics_m(ice, partit, mesh)
 !$OMP ORDERED
 #endif
                     u_rhs_ice(elnodes(3)) = u_rhs_ice(elnodes(3)) - elem_area(el)* &
-                            (sigma11(el)*dx(3)+sigma12(el)*(dy(3) + meancos))                         !metrics
+                            (sigma11(el)*dx(3)+sigma12(el)*dy(3)  + sigma12(el)*meancos)                         !metrics
                     v_rhs_ice(elnodes(3)) = v_rhs_ice(elnodes(3)) - elem_area(el)* &
-                            (sigma12(el)*dx(3)+sigma22(el)*dy(3) - sigma11(el)*meancos)               !metrics
+                            (sigma12(el)*dx(3)+sigma22(el)*dy(3)  - sigma11(el)*meancos)               !metrics
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
                    call omp_unset_lock(partit%plock(elnodes(3)))
 #else

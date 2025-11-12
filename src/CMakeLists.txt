@@ -14,62 +14,47 @@ else()
    set(FESOM_PLATFORM_STRATEGY "notset" CACHE STRING "switch to platform specific compile settings, this is usually determined via the env.sh script")
 endif()
 
-if(DEFINED ENV{ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS}) # be able to set the initial cache value from our env settings for aleph, not only via cmake command
-   option(ALEPH_CRAYMPICH_WORKAROUNDS "workaround for performance issues on aleph" ON)
-else()
-   option(ALEPH_CRAYMPICH_WORKAROUNDS "workaround for performance issues on aleph" OFF)
-endif()
-if(DEFINED ENV{ENABLE_ALBEDO_INTELMPI_WORKAROUNDS}) # be able to set the initial cache value from our env settings for aleph, not only via cmake command
-   option(ALBEDO_INTELMPI_WORKAROUNDS "workaround for performance issues on albedo" ON)
-else()
-   option(ALBEDO_INTELMPI_WORKAROUNDS "workaround for performance issues on albedo" OFF)
-endif()
-if(DEFINED ENV{ENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS}) # be able to set the initial cache value from our env settings for aleph, not only via cmake command
-   option(JUWELS_GNUOPENMPI_WORKAROUNDS "workaround for performance issues on juwels" ON)
-else()
-   option(JUWELS_GNUOPENMPI_WORKAROUNDS "workaround for performance issues on juwels" OFF)
-endif()
-
-#TODO: these machine specific changes must be done using cmake toolchain then here otherwise will make cmake another raps. 
-
-if(ALEPH_CRAYMPICH_WORKAROUNDS)
-   # todo: enable these options only for our targets
-   add_compile_options(-craympich-mt) # alternative cray-mpich library, about 5 % faster with cray-mpich/7.7.3 on aleph, not available for modules cray-mpich > 7.7.3; todo: test compiling and performance with cray-mpich > 7.7.3
-   # make sure to also set these variables in the runtime environment:
+# Cray compiler specific optimizations
+if(CMAKE_Fortran_COMPILER_ID MATCHES "Cray")
+   # Use alternative cray-mpich library, about 5% faster with cray-mpich/7.7.3
+   # Not available for modules cray-mpich > 7.7.3
+   add_compile_options(-craympich-mt)
+   # Make sure to also set these variables in the runtime environment:
    #    MPICH_MAX_THREAD_SAFETY=multiple # allows highest MPI thread level (i.e. MPI_THREAD_MULTIPLE)
    #    MPICH_CRAY_OPT_THREAD_SYNC=0 # the Cray MPICH library falls back to using the pthread_mutex-based thread-synchronization implementation
    #    MPICH_OPT_THREAD_SYNC=0 # seems to be a duplicate variable which also appears in some documentation instead of MPICH_CRAY_OPT_THREAD_SYNC (but this one brings a huge speed gain on aleph)
-   #add_compile_options(-DDISABLE_PARALLEL_RESTART_READ) # reading restarts is slow when doing it on parallel on aleph, switch it off for now
-   add_compile_options(-DENABLE_ALEPH_CRAYMPICH_WORKAROUNDS)
-endif()
-if(ALBEDO_INTELMPI_WORKAROUNDS)
-   add_compile_options(-DENABLE_ALBEDO_INTELMPI_WORKAROUNDS)
-   add_compile_options(-DDISABLE_PARALLEL_RESTART_READ)
-endif()
-if(JUWELS_GNUOPENMPI_WORKAROUNDS)
-   add_compile_options(-DENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS)
 endif()
 
-#TODO: this machine specific block can easyly go in  cmake toolchain.
-if    (${FESOM_PLATFORM_STRATEGY} STREQUAL levante.dkrz.de )
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL mn5-gpp )
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL albedo )
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL atosecmwf )
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL juwels )
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)   
-else()
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
+# Backward compatibility: convert old DISABLE_MULTITHREADING to new ASYNCHRONOUS_IO_THREADS
+if(DEFINED DISABLE_MULTITHREADING)
+   if(DISABLE_MULTITHREADING)
+      set(ASYNCHRONOUS_IO_THREADS OFF CACHE BOOL "enable asynchronous I/O threads" FORCE)
+   else()
+      set(ASYNCHRONOUS_IO_THREADS ON CACHE BOOL "enable asynchronous I/O threads" FORCE)
+   endif()
+   message(STATUS "Converted legacy DISABLE_MULTITHREADING=${DISABLE_MULTITHREADING} to ASYNCHRONOUS_IO_THREADS=${ASYNCHRONOUS_IO_THREADS}")
 endif()
-if (DISABLE_MULTITHREADING)
-   message(STATUS "MULTITHREADING @ ${FESOM_PLATFORM_STRATEGY}: OFF")
+
+#TODO: these machine specific block can easyly go in cmake toolchain.
+if    (${FESOM_PLATFORM_STRATEGY} STREQUAL levante.dkrz.de )
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL mn5-gpp )
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL albedo )
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL atosecmwf )
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL juwels )
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)   
 else()
-   message(STATUS "MULTITHREADING @ ${FESOM_PLATFORM_STRATEGY}: ON")
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
+endif()
+if (ASYNCHRONOUS_IO_THREADS)
+   message(STATUS "ASYNCHRONOUS I/O THREADS @ ${FESOM_PLATFORM_STRATEGY}: ON")
+else()
+   message(STATUS "ASYNCHRONOUS I/O THREADS @ ${FESOM_PLATFORM_STRATEGY}: OFF")
 endif()
 
 
@@ -143,11 +128,23 @@ set(FESOM_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/../.." CACHE FILEPATH "dir
 
 # get our source files
 set(src_home ${CMAKE_CURRENT_SOURCE_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
+
+# Link FESOM2 fortran code
 file(GLOB sources_Fortran ${src_home}/*.F90)
+
+# Link custom CVMix files and fesom2cvmix wrapper-interface files
+if(CVMIX)
+   file(GLOB sources_cvmix_addon ${src_home}/cvmix_driver/*.F90)
+   list(APPEND sources_Fortran ${sources_cvmix_addon})
+endif()
+
+# Link ICEPACK code
 if(USE_ICEPACK)
    file(GLOB sources_ice_pack ${src_home}/icepack_drivers/*.F90
                               ${src_home}/icepack_drivers/Icepack/columnphysics/*.F90)
    list(APPEND sources_Fortran ${sources_ice_pack})
+   
+# Link IFS-Interface code   
 elseif(ENABLE_IFS_INTERFACE) # ICEPACK + IFS_INTERFACE NOT SUPPORTED (YET)
    if(ENABLE_MULTIO)
       list(APPEND sources_Fortran ${src_home}/ifs_interface/iom.F90)
@@ -159,10 +156,11 @@ elseif(ENABLE_IFS_INTERFACE) # ICEPACK + IFS_INTERFACE NOT SUPPORTED (YET)
                                ${src_home}/ifs_interface/mpp_io.F90)
 endif()
 
-if(${RECOM_COUPLED})  # ADD RECOM FILES
-   file(GLOB sources_Fortran ${src_home}/*.F90
-                             ${src_home}/int_recom/*.F90
-                             ${src_home}/int_recom/recom/*.F90)
+# Link RECOM code
+if(RECOM_COUPLED)  # ADD RECOM FILES
+   file(GLOB sources_recom ${src_home}/int_recom/*.F90
+                           ${src_home}/int_recom/recom/*.F90)
+   list(APPEND sources_Fortran ${sources_recom})                           
 endif()                             
 
 # generate a custom file from fesom_version_info.F90 which includes the current git SHA
@@ -201,6 +199,67 @@ target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_Fort
 target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:module/fesom>)
 target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
 
+# build CVMix library if CVMIX is ON
+if (CVMIX)
+   message(STATUS "CVMIX: ${CVMIX}")
+   
+   # read CVMix install and src directories from the download script, so that there
+   # is only one place where they are defined
+   execute_process(COMMAND bash ${src_home}/cvmix_driver/download_cvmix.sh --print-src_dir
+                   OUTPUT_VARIABLE CVMIX_DIR_src OUTPUT_STRIP_TRAILING_WHITESPACE)
+   execute_process(COMMAND bash ${src_home}/cvmix_driver/download_cvmix.sh --print-prefix
+                   OUTPUT_VARIABLE CVMIX_DIR_install OUTPUT_STRIP_TRAILING_WHITESPACE)  
+   
+   # set default CVMix installation path
+   set(CVMIX_ROOT "${src_home}/cvmix_driver/${CVMIX_DIR_install}_${CMAKE_Fortran_COMPILER_ID}") 
+   message(STATUS "set default CVMIX_ROOT=${CVMIX_ROOT}")
+   
+   # Where library is located --> fix in download_cvmix.sh that it as always installed 
+   # in /lib and not in /lib64
+   set(CVMIX_LIB "${CVMIX_ROOT}/lib/libcvmix.a")
+   
+   # Create parent directory early so CMake does not fail on missing include paths
+   file(MAKE_DIRECTORY ${CVMIX_ROOT})
+   file(MAKE_DIRECTORY ${CVMIX_ROOT}/include/cvmix)
+   
+   # Collect CVMix source files so that CMake knows what changes triggers a 
+   # possible rebuild of the CVMix library
+   file(GLOB_RECURSE CVMIX_SOURCES
+         "${src_home}/cvmix_driver/${CVMIX_DIR_src}/src/*.F90"
+         "${src_home}/cvmix_driver/${CVMIX_DIR_src}/src/*/*.F90")
+        
+   # Add script dependency (rebuild if script changes)
+   set(CVMIX_DOWNLOAD "${src_home}/cvmix_driver/download_cvmix.sh")
+   
+   # Custom command: build CVMix if not yet built
+   add_custom_command(
+         OUTPUT ${CVMIX_LIB}
+         COMMAND bash ${src_home}/cvmix_driver/download_cvmix.sh --prefix ${CVMIX_ROOT}
+         WORKING_DIRECTORY ${src_home}/cvmix_driver
+         DEPENDS ${CVMIX_SOURCES} ${CVMIX_DOWNLOAD} # trigger rebuild if source or download script change
+         COMMENT "Downloading and building CVMix into ${CVMIX_ROOT}"
+         VERBATIM)
+   
+   # check if ${CVMIX_ROOT}/lib/libcvmix.a exist or not, only if it does not 
+   # exist build library
+   add_custom_target(cvmix_autobuild DEPENDS ${CVMIX_LIB})
+ 
+   # build cvmix external libray
+   add_library(cvmix_external STATIC IMPORTED GLOBAL)
+   set_target_properties(cvmix_external PROPERTIES
+         IMPORTED_LOCATION ${CVMIX_LIB}
+         INTERFACE_INCLUDE_DIRECTORIES "${CVMIX_ROOT}/include/cvmix")
+
+   # cvmix_autobuild is a custom target that runs your download_cvmix.sh script 
+   # and produces libcvmix.a. cvmix_external is an imported library, meaning CMake 
+   # doesn’t build it — it just points to an existing file (libcvmix.a).
+   add_dependencies(cvmix_external  cvmix_autobuild)
+   
+   # Link CVMix library to fesom, build chain becomes: fesom → cvmix_external → cvmix_autobuild
+   target_link_libraries(${PROJECT_NAME} PRIVATE cvmix_external)
+   
+endif()
+
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
 if(${ENABLE_OPENMP})
    target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_Fortran)
@@ -211,8 +270,8 @@ if(ENABLE_MULTIO)
    target_link_libraries(${PROJECT_NAME} PRIVATE multio-fapi)
 endif()
 
-if(DISABLE_MULTITHREADING)
-   target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_MULTITHREADING)
+if(ASYNCHRONOUS_IO_THREADS)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE ASYNCHRONOUS_IO_THREADS)
 endif()
 
 if(${FESOM_COUPLED})
@@ -237,6 +296,10 @@ if(USE_ICEPACK)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __icepack)
 endif()
 
+if(CVMIX)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __cvmix)
+endif()
+
 if(ENABLE_IFS_INTERFACE)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __ifsinterface)
 endif()
@@ -257,11 +320,15 @@ if(${CISO_COUPLED})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __ciso)
 endif()
 
+if(${FESOM_PROFILING})
+   target_compile_definitions(${PROJECT_NAME} PRIVATE FESOM_PROFILING)
+endif()
+
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} STREQUAL  IntelLLVM )
    
    # Base compiler flags
-   target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0)
+   target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0 -fpp)
    
    # compiler flags not supported by IntelLLVM
    if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
@@ -311,31 +378,18 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} 
       target_compile_options(${PROJECT_NAME} PRIVATE -xHost)
    endif()
    
-   # debugging related compiler flags (activated for Debug build type)
-   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-      if(ENABLE_OPENMP)
-         target_compile_options(${PROJECT_NAME} PRIVATE -qopenmp -g -traceback -check all,noarg_temp_created,bounds,uninit) #-ftrapuv ) #-init=zero)
-      else()
-         target_compile_options(${PROJECT_NAME} PRIVATE -g -traceback -check all,noarg_temp_created,bounds,uninit) #-ftrapuv ) #-init=zero)
-      endif()
-   endif()
+   # # debugging related compiler flags
+   # target_compile_options(${PROJECT_NAME} PRIVATE -qopenmp -g -traceback -check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
+   # target_compile_options(${PROJECT_NAME} PRIVATE -g -traceback -check all,noarg_temp_created,bounds,uninit ) #-ftrapuv ) #-init=zero)
 
 
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 #    target_compile_options(${PROJECT_NAME} PRIVATE -O3 -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
    if(${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu )
       message(STATUS "Allowing type mismatches on Ubuntu for CI Testing" )  # NOTE(PG): Would be nicer to grab the CI=True from the env variable
-      if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-         target_compile_options(${PROJECT_NAME} PRIVATE -O0 -g -fbacktrace -ffloat-store -finit-local-zero -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch)
-      else()
-         target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch)
-      endif()
+      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch -cpp)
    else()
-      if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-         target_compile_options(${PROJECT_NAME} PRIVATE -O0 -ffloat-store -finit-local-zero -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none)
-      else()
-         target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none)
-      endif()
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -cpp)
    endif()
    if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10 )
       target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
@@ -369,33 +423,29 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
       # |             | -mno-fma4 -mavx2 -mfma                                            |      |
       # | GCC/openMPI | -O3 -march=znver3 -mtune=znver3 -ftree-vectorize -flto            | 280s | chatgpt recomendation
       # |             | -mcpu=znver3                                                      |      |
-      if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-         target_compile_options(${PROJECT_NAME} PRIVATE -march=znver3 -mtune=znver3)
-      else()
-         target_compile_options(${PROJECT_NAME} PRIVATE -march=znver3 -mtune=znver3 -ftree-vectorize -flto)
-      endif()      
+      target_compile_options(${PROJECT_NAME} PRIVATE -march=znver3 -mtune=znver3 -ftree-vectorize -flto)      
    else()
       #[[if(NOT (${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu))
          target_compile_options(${PROJECT_NAME} PRIVATE -native)
       endif()  ]]  
    endif()
    
-   # debugging related compiler flags (activated for Debug build type)
-   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-      target_compile_options(${PROJECT_NAME} PRIVATE 
-                              -fno-fast-math 
-                              -fno-signed-zeros 
-                              -freciprocal-math 
-                              -fcheck=all,bounds 
-                              -finit-real=snan 
-                              -finit-integer=-9999 
-                              -fsanitize=undefined,address
-                           )
-      target_link_libraries(${PROJECT_NAME} PRIVATE -lasan -lubsan)
-      
-      # Uncomment the following line if you need profiling
-      #target_compile_options(${PROJECT_NAME} PRIVATE -pg)
-   endif()
+   # # debugging related compiler flags
+   #target_compile_options(${PROJECT_NAME} PRIVATE 
+                           #-fallow-argument-mismatch 
+                           #-fno-fast-math -fno-signed-zeros 
+                           #-freciprocal-math 
+                           #-mveclibabi=svml 
+                           #-flto
+                           #-pg 
+                           #-fbacktrace 
+                           #-fcheck=all,bounds 
+                           #-finit-real=snan 
+                           #-finit-integer=-9999 
+                           #-fsanitize=undefined,address
+                        #)
+   ## if use -fsanitize=undefined,address you also need ... PRIVATE -lubsan)           
+   #target_link_libraries(${PROJECT_NAME} PRIVATE -lubsan)
                      
 
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
@@ -457,15 +507,34 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${YAXT_Fortran_LIBRARIES} ${YAXTC_
 #target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C ${YAXT_Fortran_LIBRARIES} ${YAXTC_Fortran_LIBRARIES})
 
    
-# fesom.x executable
+# fesom.x executable
 add_executable(${PROJECT_NAME}.x ${src_home}/fesom_main.F90)
 target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
+
+# fesom_meshdiag executable (optional)
+if(BUILD_MESHDIAG)
+    add_executable(fesom_meshdiag ${src_home}/fesom_meshdiag.F90)
+    target_link_libraries(fesom_meshdiag PUBLIC ${PROJECT_NAME})
+    target_link_libraries(fesom_meshdiag PRIVATE MPI::MPI_Fortran)
+    
+    # Install the mesh diagnostics utility
+    install(TARGETS fesom_meshdiag
+            RUNTIME DESTINATION bin
+            COMPONENT tools)
+    
+    message(STATUS "Mesh diagnostics utility will be built as fesom_meshdiag")
+endif()
 
 
 get_target_property(FLAGS ${PROJECT_NAME} COMPILE_OPTIONS)
 message(STATUS " --> Final Compile options for ${PROJECT_NAME}: ${FLAGS}")
 
 
-### Export and installation
+### Export and installation
+
+# Add meshdiag to additional targets if built
+if(BUILD_MESHDIAG)
+    set(additional_targets ${additional_targets} fesom_meshdiag)
+endif()
 
 fesom_export(TARGETS ${PROJECT_NAME} fesom.x ${additional_targets})

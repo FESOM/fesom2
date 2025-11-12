@@ -34,7 +34,7 @@ module integrate_2D_interface
       USE MOD_PARTIT
       USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
+      type(t_partit), intent(in), target :: partit
       real(kind=WP), intent (out) :: flux_global(2), flux_local(2)
       real(kind=WP), intent (out) :: eff_vol(2)
       real(kind=WP), intent (in)  :: field2d(partit%myDim_nod2D+partit%eDim_nod2D)
@@ -144,7 +144,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   real(kind=WP), dimension(:), pointer  ::  tmp_oce_heat_flux, tmp_ice_heat_flux 
 #endif 
 #if defined (__oifs) || defined (__ifsinterface)
-  real(kind=WP), dimension(:), pointer  :: ice_temp, ice_alb, enthalpyoffuse
+  real(kind=WP), dimension(:), pointer  :: ice_temp, ice_alb, enthalpyoffuse, runoff_liquid, runoff_solid
   real(kind=WP),               pointer  :: tmelt
   real(kind=WP), dimension(:,:,:), pointer :: UVnode
 #endif
@@ -166,6 +166,8 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   ice_temp         => ice%data(4)%values(:)
   ice_alb          => ice%atmcoupl%ice_alb(:)
   enthalpyoffuse   => ice%atmcoupl%enthalpyoffuse(:)
+  runoff_liquid    => ice%atmcoupl%runoff_liquid(:)
+  runoff_solid     => ice%atmcoupl%runoff_solid(:)
   tmelt            => ice%thermo%tmelt
   UVnode           => dynamics%uvnode(:,:,:)
 #endif      
@@ -221,7 +223,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 #endif
             else    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
-#else   ! oifs
+#else
             ! AWI-CM2 outgoing state vectors
             do n=1,myDim_nod2D+eDim_nod2D
             exchange(n)=tracers%data(1)%values(1, n)                     ! sea surface temperature [°C]
@@ -277,7 +279,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 !---wiso-code-end
             else	    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
-#endif  ! oifs
+#endif
          endif
          call cpl_oasis3mct_send(i, exchange, action, partit)
       end do
@@ -379,11 +381,15 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 
          elseif (i.eq.13) then
              if (action) then
-                enthalpyoffuse(:)            =  exchange(:)*333.55*1000000.0        ! enthalpy of fusion via solid water discharge from glaciers
+                runoff_solid(:)      =  exchange(:)        ! solid water discharge (excess snow --> calving)
+                enthalpyoffuse(:)            =  runoff_solid(:)*333.55*1000000.0        ! enthalpy of fusion of the solid water discharge from glaciers
                 enthalpyoffuse = -min(enthalpyoffuse, 1000.0)
-                runoff(:)            = runoff(:) + exchange(:)                      ! Add calving massflux to the liquid runoff. Heatflux goes into enthalpyoffuse.
+                runoff_liquid(:) = runoff(:)                     ! store previous liquid runoff
+                runoff(:)            = runoff_liquid(:) + runoff_solid(:)                      ! Add solid runoff to the liquid runoff. Heatflux goes into enthalpyoffuse.
 
                 mask=1.
+                call force_flux_consv(runoff_liquid, mask, i, 0, action, partit, mesh)
+                call force_flux_consv(runoff_solid, mask, i, 0, action, partit, mesh)
                 call force_flux_consv(enthalpyoffuse, mask, i, 0, action, partit, mesh)
              end if
          elseif (i.eq.14) then
@@ -403,7 +409,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
                 x_co2atm(:) = exchange(:) * ((28.9647_WP/44.0095_WP)*1e6_WP)  ! [mole fraction]
              end if
 #endif
-#else ! oifs
+#else
          elseif (i.eq.13) then
             if (action) then
                  if (lwiso) then         
@@ -493,7 +499,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
              if (use_icebergs.and.lwiso) then    
                  call force_flux_consv(v_wind, mask, i, 0, action, partit, mesh)
              end if
-#endif !   oifs
+#endif
          end if
 
 #ifdef VERBOSE
@@ -543,6 +549,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
             u_wind(i)   = 0.0_WP
             v_wind(i)   = 0.0_WP
             shum(i)     = 0.0_WP
+            shortwave(i)= 0.0_WP
             longwave(i) = 0.0_WP
             Tair(i)     = 0.0_WP
             prec_rain(i)= 0.0_WP

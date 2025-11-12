@@ -30,6 +30,5 @@ export MPICH_MAX_THREAD_SAFETY=multiple # to also switch to an alternative (prob
 export MPICH_CRAY_OPT_THREAD_SYNC=0 # the Cray MPICH library falls back to using the pthread_mutex-based thread-synchronization implementation
 export MPICH_OPT_THREAD_SYNC=0 # seems to be a duplicate variable which also appears in some documentation instead of MPICH_CRAY_OPT_THREAD_SYNC (but this one brings a huge speed gain on aleph)
 
-export ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS=''
 
 export FC=ftn CC=cc CXX=CC

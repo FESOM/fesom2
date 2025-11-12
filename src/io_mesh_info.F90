@@ -391,13 +391,13 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
 
   ! WRITE(*,*) "zbar_e_bottom"
   allocate(rbuffer(elem2D))
-  call gather_elem(zbar_e_bot(1:myDim_elem2D), rbuffer, partit)
+  call gather_elem(-zbar_e_bot(1:myDim_elem2D), rbuffer, partit)
   call my_put_vara(ncid, zbar_e_bot_id, 1, elem2D, rbuffer, partit)
   deallocate(rbuffer)
 
   ! WRITE(*,*) "zbar_n_bottom"
   allocate(rbuffer(nod2D))
-  call gather_nod(zbar_n_bot(1:myDim_nod2D), rbuffer, partit)
+  call gather_nod(-zbar_n_bot(1:myDim_nod2D), rbuffer, partit)
   call my_put_vara(ncid, zbar_n_bot_id, 1, nod2D, rbuffer, partit)
   deallocate(rbuffer)
 
@@ -530,7 +530,8 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   allocate(rbuffer(elem2D))
   do i=1, 3
      call gather_elem(gradient_sca(i, 1:myDim_elem2D), rbuffer, partit)
-     call my_put_vara(ncid, gradient_sca_x_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit) ! (4-i), NETCDF will permute otherwise
+     !!PS call my_put_vara(ncid, gradient_sca_x_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit) ! (4-i), NETCDF will permute otherwise
+     call my_put_vara(ncid, gradient_sca_x_id, (/1, i/), (/elem2D, 1/), rbuffer, partit) 
   end do
   deallocate(rbuffer)
 
@@ -539,7 +540,8 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   allocate(rbuffer(elem2D))
   do i=1, 3
      call gather_elem(gradient_sca(i+3, 1:myDim_elem2D), rbuffer, partit)
-     call my_put_vara(ncid, gradient_sca_y_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit)! (4-i), NETCDF will permute otherwise
+     !!PS call my_put_vara(ncid, gradient_sca_y_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit)! (4-i), NETCDF will permute otherwise
+     call my_put_vara(ncid, gradient_sca_y_id, (/1, i/), (/elem2D, 1/), rbuffer, partit)
   end do
   deallocate(rbuffer)
 
@@ -548,7 +550,8 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   allocate(rbuffer(elem2D))
   do i=1, 3
      call gather_elem(gradient_vec(i, 1:myDim_elem2D), rbuffer, partit)
-     call my_put_vara(ncid, gradient_vec_x_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit) ! (4-i), NETCDF will permute otherwise
+     !!PS call my_put_vara(ncid, gradient_vec_x_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit) ! (4-i), NETCDF will permute otherwise
+     call my_put_vara(ncid, gradient_vec_x_id, (/1, i/), (/elem2D, 1/), rbuffer, partit) ! (4-i), NETCDF will permute otherwise
   end do
   deallocate(rbuffer)
 
@@ -557,14 +560,9 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   allocate(rbuffer(elem2D))
   do i=1, 3
      call gather_elem(gradient_vec(i+3, 1:myDim_elem2D), rbuffer, partit)
-     call my_put_vara(ncid, gradient_vec_y_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit)! (4-i), NETCDF will permute otherwise
+     !!PS call my_put_vara(ncid, gradient_vec_y_id, (/1, 4-i/), (/elem2D, 1/), rbuffer, partit)! (4-i), NETCDF will permute otherwise
+     call my_put_vara(ncid, gradient_vec_y_id, (/1, i/), (/elem2D, 1/), rbuffer, partit)! (4-i), NETCDF will permute otherwise
   end do
-  deallocate(rbuffer)
-
-  ! element bottom depth (take into account partial cells if used)
-  allocate(rbuffer(elem2D))
-  call gather_elem(zbar_e_bot(1:myDim_elem2D), rbuffer, partit)
-  call my_put_vara(ncid, zbar_e_bot_id, 1, elem2D, rbuffer, partit)
   deallocate(rbuffer)
 
   if (use_cavity) then
@@ -582,13 +580,13 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
 
     ! nodal surface depth (take into account partial cells if used)
     allocate(rbuffer(nod2D))
-    call gather_nod(zbar_n_srf(1:myDim_nod2D), rbuffer, partit)
+    call gather_nod(-zbar_n_srf(1:myDim_nod2D), rbuffer, partit)
     call my_put_vara(ncid, zbar_n_srf_id, 1, nod2D, rbuffer, partit)
     deallocate(rbuffer)
 
     ! element surface depth (take into account partial cells if used)
     allocate(rbuffer(elem2D))
-    call gather_elem(zbar_e_srf(1:myDim_elem2D), rbuffer, partit)
+    call gather_elem(-zbar_e_srf(1:myDim_elem2D), rbuffer, partit)
     call my_put_vara(ncid, zbar_e_srf_id, 1, elem2D, rbuffer, partit)
     deallocate(rbuffer)
   endif
