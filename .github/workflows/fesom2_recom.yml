@@ -91,6 +91,8 @@ jobs:
           cat namelist.recom || echo "namelist.recom not found"
           echo "--- namelist.tra ---"
           cat namelist.tra || echo "namelist.tra not found"
+          echo "--- namelist.forcing (l_mslp check) ---"
+          grep "l_mslp\|l_xwind" namelist.forcing || echo "namelist.forcing not found"
           chmod +x job_docker_new
           ./job_docker_new
       
