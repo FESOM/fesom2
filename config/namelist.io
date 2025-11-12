@@ -158,9 +158,9 @@ io_list =  'sst       ',1, 'm', 4,
 ! 'swice     ',1, 'm', 4,  ! swice [?]
 
 ! --- MIXED LAYER DEPTH ---
-! 'MLD1      ',1, 'm', 4,  ! Mixed Layer Depth [m]
-! 'MLD2      ',1, 'm', 4,  ! Mixed Layer Depth [m]
-! 'MLD3      ',1, 'm', 4,  ! Mixed Layer Depth [m]
+! 'MLD1      ',1, 'm', 4,  ! Mixed Layer Depth [m] Large et al. 1997, bvfreq(nz, node) > db_max
+! 'MLD2      ',1, 'm', 4,  ! Mixed Layer Depth [m] Levitus treshold, rhopot(nz)-rhopot(1) > 0.125_WP kg/m
+! 'MLD3      ',1, 'm', 4,  ! Mixed Layer Depth [m] Griffies 2016 , rhopot(nz)-rhopot(1) > 0.03_WP kg/m
 
 ! --- HEAT CONTENT (require ldiag_destine=.true.) ---
 ! 'hc300m    ',1, 'm', 4,  ! Vertically integrated heat content upper 300m [J m**-2]
