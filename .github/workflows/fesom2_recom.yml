@@ -40,27 +40,27 @@ jobs:
       
       - name: Add REcoM namelists and input files
         run: |
-          # Copy default REcoM namelists from config (using simpler 2p1z1d for faster CI)
+          # Copy and patch namelists directly with multiple simple replacements
           cp config/bin_2p1z1d/namelist.recom work_recom/
           cp config/bin_2p1z1d/namelist.tra work_recom/
           
-          # Patch file paths in namelists to use local files
           cd work_recom
-          sed -i "s|nm_fe_data_file.*=.*'.*'|nm_fe_data_file       ='DustClimMonthlyAlbani_pimesh.nc'|" namelist.recom
-          sed -i "s|nm_aen_data_file.*=.*'.*'|nm_aen_data_file      =''|" namelist.recom
-          sed -i "s|nm_river_data_file.*=.*'.*'|nm_river_data_file    =''|" namelist.recom
-          sed -i "s|nm_erosion_data_file.*=.*'.*'|nm_erosion_data_file  =''|" namelist.recom
-          sed -i "s|nm_co2_data_file.*=.*'.*'|nm_co2_data_file      ='MonthlyAtmCO2_gcb2024.nc'|" namelist.recom
-          sed -i "s|^REcoM_restart.*=.*\.true\.|REcoM_restart         =.false.|" namelist.recom
-          sed -i "s|REcoMDataPath.*=.*'.*'|REcoMDataPath         = './'|" namelist.recom
           
-          # Patch tracer initialization files in namelist.tra to use our test files
-          sed -i "s|filelist.*=.*'fe_pisces.*|filelist = 'fe5deg.nc', 'oxy5deg.nc', 'si5deg.nc', 'talk5deg.nc', 'tco2_5deg.nc', 'din5deg.nc', 'woa18_netcdf_5deg.nc', 'woa18_netcdf_5deg.nc'  ! list of files in ClimateDataPath to read (one file per tracer), same order as idlist|" namelist.tra
+          # Patch namelist.recom file paths - each on separate line
+          sed -i "s|'.*DustClim.*\.nc'|'DustClimMonthlyAlbani_pimesh.nc'|" namelist.recom
+          sed -i "s|'.*AeolianNitrogen.*\.nc'|''|" namelist.recom  
+          sed -i "s|'.*RiverineInput.*\.nc'|''|" namelist.recom
+          sed -i "s|'.*ErosionInput.*\.nc'|''|" namelist.recom
+          sed -i "s|'.*MonthlyAtmCO2.*\.nc'|'MonthlyAtmCO2_gcb2024.nc'|" namelist.recom
+          sed -i "s|REcoM_restart.*=.*\.true\.|REcoM_restart         =.false.|" namelist.recom
+          sed -i "s|REcoMDataPath.*= '.*'|REcoMDataPath         = './'|" namelist.recom
           
-          echo "--- Patched file paths in namelist.recom ---"
-          head -60 namelist.recom
-          echo "--- Patched tracer init in namelist.tra ---"
-          grep -A 3 "tracer_init3d" namelist.tra | head -10
+          # Patch namelist.tra - replace the whole filelist line
+          sed -i "/filelist.*fe_pisces/c\filelist = 'fe5deg.nc', 'oxy5deg.nc', 'si5deg.nc', 'talk5deg.nc', 'tco2_5deg.nc', 'din5deg.nc', 'woa18_netcdf_5deg.nc', 'woa18_netcdf_5deg.nc' ! CI test files" namelist.tra
+          
+          echo "--- Checking patched namelists ---"
+          grep "nm_fe_data_file\|nm_co2_data_file\|REcoM_restart\|REcoMDataPath" namelist.recom
+          grep "filelist" namelist.tra | head -1
           cd ..
           
           # Copy REcoM input data files
