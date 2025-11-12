@@ -141,7 +141,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   real(kind=WP), dimension(:), pointer  ::  tmp_oce_heat_flux, tmp_ice_heat_flux 
 #endif 
 #if defined (__oifs) || defined (__ifsinterface)
-  real(kind=WP), dimension(:), pointer  :: ice_temp, ice_alb, enthalpyoffuse
+  real(kind=WP), dimension(:), pointer  :: ice_temp, ice_alb, enthalpyoffuse, runoff_liquid, runoff_solid
   real(kind=WP),               pointer  :: tmelt
   real(kind=WP), dimension(:,:,:), pointer :: UVnode
 #endif
@@ -163,6 +163,8 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   ice_temp         => ice%data(4)%values(:)
   ice_alb          => ice%atmcoupl%ice_alb(:)
   enthalpyoffuse   => ice%atmcoupl%enthalpyoffuse(:)
+  runoff_liquid    => ice%atmcoupl%runoff_liquid(:)
+  runoff_solid     => ice%atmcoupl%runoff_solid(:)
   tmelt            => ice%thermo%tmelt
   UVnode           => dynamics%uvnode(:,:,:)
 #endif      
@@ -369,11 +371,15 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 
          elseif (i.eq.13) then
              if (action) then
-                enthalpyoffuse(:)            =  exchange(:)*333.55*1000000.0        ! enthalpy of fusion via solid water discharge from glaciers
+                runoff_solid(:)      =  exchange(:)        ! solid water discharge (excess snow --> calving)
+                enthalpyoffuse(:)            =  runoff_solid(:)*333.55*1000000.0        ! enthalpy of fusion of the solid water discharge from glaciers
                 enthalpyoffuse = -min(enthalpyoffuse, 1000.0)
-                runoff(:)            = runoff(:) + exchange(:)                      ! Add calving massflux to the liquid runoff. Heatflux goes into enthalpyoffuse.
+                runoff_liquid(:) = runoff(:)                     ! store previous liquid runoff
+                runoff(:)            = runoff_liquid(:) + runoff_solid(:)                      ! Add solid runoff to the liquid runoff. Heatflux goes into enthalpyoffuse.
 
                 mask=1.
+                call force_flux_consv(runoff_liquid, mask, i, 0, action, partit, mesh)
+                call force_flux_consv(runoff_solid, mask, i, 0, action, partit, mesh)
                 call force_flux_consv(enthalpyoffuse, mask, i, 0, action, partit, mesh)
              end if
          elseif (i.eq.14) then
