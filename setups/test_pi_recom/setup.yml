@@ -25,6 +25,8 @@ namelist.config:
         run_length_unit: "d"
     clockinit:
         yearnew: 1948
+    calendar:
+        include_fleapyear: False
     geometry:
         force_rotation: True
     restart_log:
