@@ -15,41 +15,62 @@
 ! ============================================================================
 &oce_dyn
 ! --- Basic ocean dynamics parameters ---
-C_d          = 0.0025       ! bottom drag coefficient (dimensionless, typical: 0.0025)
-A_ver        = 1.e-4        ! background vertical viscosity [m²/s]
-scale_area   = 5.8e9        ! reference element area for viscosity/diffusivity scaling [m²]
+C_d                = 0.0025  ! bottom drag coefficient (dimensionless, typical: 0.0025)
+A_ver              = 1.e-4   ! background vertical viscosity [m²/s]
+scale_area         = 5.8e9   ! reference element area for viscosity/diffusivity scaling [m²]
 
 ! --- Salt Plume Parameterization ---
-SPP          = .false.      ! enable Salt Plume Parameterization (for brine rejection under sea ice)
+SPP                = .false. ! enable Salt Plume Parameterization (for brine rejection under sea ice)
 
 ! --- Gent-McWilliams (GM) Eddy Parameterization ---
-Fer_GM       = .true.       ! enable GM parameterization (Ferrari et al. 2010)
-K_GM_max     = 2000.0       ! maximum GM thickness diffusivity [m²/s]
-K_GM_min     = 2.0          ! minimum GM thickness diffusivity [m²/s]
-K_GM_bvref   = 2            ! definition of reference buoyancy frequency for Ferreira scaling:
-                            !   0 = surface, 1 = bottom of MLD, 2 = mean over MLD, 3 = weighted mean over MLD
-K_GM_rampmax      = -1.0    ! resolution threshold for GM activation [km] (>K_GM_rampmax: GM on; -1.0 = disabled)
-K_GM_rampmin      = -1.0    ! resolution threshold for GM deactivation [km] (<K_GM_rampmin: GM off; -1.0 = disabled)
-K_GM_resscalorder = 1       ! order of resolution scaling for GM
+Fer_GM             = .true.  ! to swith on/off GM after Ferrari et al. 2010
+K_GM_max           = 1000.0  ! max. GM thickness diffusivity (m2/s)
+K_GM_min           = 2.0     ! max. GM thickness diffusivity (m2/s)
+K_GM_bvref         = 1       ! def of bvref in ferreira scaling 0=srf,1=bot mld,2=mean over mld,3=weighted mean over mld
+K_GM_rampmax       = -1.0    ! Resol >K_GM_rampmax[km] GM on
+K_GM_rampmin       = -1.0    ! Resol <K_GM_rampmin[km] GM off, in between linear scaled down
+K_GM_resscalorder  = 2       ! scaling order 1: resol scaling, 2: area scaling 
+K_GM_cm            = 3.0     ! which baroclinic velocity used for GM ferrari method 1st, 2nd, 3rd, ...   
+K_GM_cmin          = 0.1     ! cutoff for near coastal minimum velocity
+K_GM_Ktaper        = .false. ! apply neutral slope tapering function also to the GM coefficient
 
 ! --- GM Scaling Options ---
-scaling_Ferreira   = .false.  ! enable GM vertical scaling (Ferreira et al. 2005, as in FESOM 1.4)
-scaling_Rossby     = .false.  ! scale GM with Rossby radius (1.0 in coarse regions, 0.0 at 2 points/Rossby radius)
-scaling_resolution = .true.   ! scale GM with horizontal resolution (K_GM corresponds to 100km resolution)
-scaling_FESOM14    = .false.  ! use FESOM 1.4 GM treatment in Northern Hemisphere (zero within boundary layer)
+scaling_Ferreira   = .false. ! enable GM vertical scaling (Ferreira et al. 2005, as in FESOM 1.4)
+scaling_Rossby     = .false. ! scale GM with Rossby radius (1.0 in coarse regions, 0.0 at 2 points/Rossby radius)
+scaling_resolution = .true.  ! scale GM with horizontal resolution (K_GM corresponds to 100km resolution)
+scaling_FESOM14    = .false. ! use FESOM 1.4 GM treatment in Northern Hemisphere (zero within boundary layer)
+
+scaling_GMzexp     = .false. ! do downscaling of GM & Redi over depth by exp(-z/z_ref)
+GMzexp_zref        = 1000.0  ! reference for vertical exp GM scaling 
+GMzexp_smin        = 0.1     ! minimum scaling factor
+
+scaling_GINsea     = .false. ! Increase K_GM resolution scaling only in the GIN sea by factor 
+GINsea_fac         = 2.0     ! GIN sea K_GM upscaling factor 
+
+scaling_ODM95      = .true.  ! tapering based on critical slope, Danabasoglu and McWilliams, 1995
+ODM95_Scr          = 0.2e-2  ! Critical slope for tapering
+ODM95_Sd           = 1.0e-3  ! slope width of tapering smoothing zone
+
+scaling_LDD97      = .false. ! tapering in surface, William G. Large, Gokhan Danabasoglu, Scott C. Doney, 1997
+LDD97_c            = 2.0     ! [m/s] is the first baroclinic wave speed
+LDD97_rmin         = 15.0e3  ! rossby radius min cutoff [m]
+LDD97_rmax         = 100.0e3 ! rossby radius max cutoff [m]
 
 ! --- Redi Isopycnal Diffusion ---
-Redi          = .true.       ! enable Redi isopycnal diffusion
+Redi               = .true.  ! enable Redi isopycnal diffusion
+Redi_Ktaper        = .false. ! apply neutral slope tapering function also to the Redi coefficient
+Redi_Kmax          = 0.0	 ! Redi Diffusivity can be different from K_GM_max but recomment to be the same, if Redi_Kmax<=0 its synchronised with Redi_Kmax=K_GM_max 
+Redi_Kmin          = 100.0   ! minimum Redi difusivity thats left when Redi_Ktaper= .true.
 
 ! --- Vertical Mixing Scheme ---
-visc_sh_limit = 5.0e-3       ! maximum viscosity due to shear instability [m²/s] (for KPP)
-mix_scheme    = 'KPP'        ! vertical mixing scheme: 'KPP' (K-Profile Parameterization), 'PP' (Pacanowski-Philander), or 'TKE' (Turbulent Kinetic Energy)
+visc_sh_limit      = 5.0e-3  ! maximum viscosity due to shear instability [m²/s] (for KPP)
+mix_scheme         = 'KPP'   ! vertical mixing scheme: 'KPP' (K-Profile Parameterization), 'PP' (Pacanowski-Philander), or 'TKE' (Turbulent Kinetic Energy)
 
 ! --- Convection Parameters ---
-Ricr          = 0.3          ! critical bulk Richardson number (for convection onset)
-concv         = 1.6          ! constant for pure convection (eq. 23 in Large et al.)
+Ricr               = 0.3     ! critical bulk Richardson number (for convection onset)
+concv              = 1.6     ! constant for pure convection (eq. 23 in Large et al.)
                              ! typical values: Large 1.5-1.6, MOM default 1.8
 
 ! --- Tidal Forcing ---
-use_global_tides = .false.   ! enable global tidal potential forcing
+use_global_tides   = .false. ! enable global tidal potential forcing
 /

@@ -78,7 +78,7 @@ AB_order      = 2             ! Adams-Bashforth time stepping order (2 or 3)
 ! ============================================================================
 &tracer_phys
 ! --- Monin-Obukhov Mixing (TB04) ---
-use_momix          = .true.            ! enable Monin-Obukhov mixing (Timmermann & Beckmann 2004)
+use_momix          = .false.           ! enable Monin-Obukhov mixing (Timmermann & Beckmann 2004)
 momix_lat          = -50.0             ! latitude threshold for TB04 [degrees] (90 = global, -50 = south of 50°S)
 momix_kv           = 0.01              ! mixing coefficient within MO length [m²/s]
 
@@ -97,7 +97,7 @@ diff_sh_limit      = 5.0e-3            ! maximum diffusivity due to shear instab
 ! --- Background Diffusivity ---
 Kv0_const          = .true.            ! use constant background vertical diffusivity
 K_ver              = 1.0e-5            ! background vertical diffusivity [m²/s]
-K_hor              = 3000.             ! background horizontal diffusivity [m²/s]
+K_hor              = 0.                ! background horizontal diffusivity [m²/s]
 
 ! --- Double Diffusion (KPP) ---
 double_diffusion   = .false.           ! enable double diffusion parameterization (for KPP)
