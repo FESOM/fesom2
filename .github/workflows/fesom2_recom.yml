@@ -75,6 +75,8 @@ jobs:
           
           # Copy forcing data files (from 1948)
           cp test/input/global/*.1948.nc work_recom/
+          cp test/input/global/runoff.nc work_recom/
+          cp test/input/global/PHC2_salx.nc work_recom/
       
       - name: FESOM2 REcoM test run
         run: |
