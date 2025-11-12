@@ -67,6 +67,11 @@ jobs:
           # Copy REcoM input data files
           cp test/input/recom/*.nc work_recom/
           
+          # Create dust file with expected name (code defaults to DustClimMonthlyAlbani.nc)
+          cd work_recom
+          ln -s DustClimMonthlyAlbani_pimesh.nc DustClimMonthlyAlbani.nc
+          cd ..
+          
           # Copy forcing data files (from 1948)
           cp test/input/global/*.1948.nc work_recom/
       
