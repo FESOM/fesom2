@@ -38,25 +38,37 @@ jobs:
         run: |
           mkrun recom test_pi_recom -m docker
       
-      - name: Check what mkrun created
+      - name: Add REcoM namelists
         run: |
-          echo "--- Files created by mkrun ---"
-          ls -la work_recom/
-          echo "--- Does mkrun create namelist.recom? ---"
-          if [ -f work_recom/namelist.recom ]; then
-            echo "YES - namelist.recom exists"
-            head -20 work_recom/namelist.recom
-          else
-            echo "NO - namelist.recom NOT created by mkrun"
-            echo "Copying from config..."
-            cp config/bin_2p1z1d/namelist.recom work_recom/
-            cp config/bin_2p1z1d/namelist.tra work_recom/
-          fi
+          # mkrun doesn't create namelist.recom, so copy from config and patch
+          cp config/bin_2p1z1d/namelist.recom work_recom/
+          cp config/bin_2p1z1d/namelist.tra work_recom/
+          
+          # Patch file paths in namelist.recom
+          cd work_recom
+          sed -i "s|nm_fe_data_file.*'.*'|nm_fe_data_file       ='DustClimMonthlyAlbani_pimesh.nc'|" namelist.recom
+          sed -i "s|nm_aen_data_file.*'.*'|nm_aen_data_file      =''|" namelist.recom  
+          sed -i "s|nm_river_data_file.*'.*'|nm_river_data_file    =''|" namelist.recom
+          sed -i "s|nm_erosion_data_file.*'.*'|nm_erosion_data_file  =''|" namelist.recom
+          sed -i "s|nm_co2_data_file.*'.*'|nm_co2_data_file      ='MonthlyAtmCO2_gcb2024.nc'|" namelist.recom
+          sed -i "s|REcoMDataPath.*'.*'|REcoMDataPath         = './'|" namelist.recom
+          sed -i "s|REcoM_restart.*=.*\.true\.|REcoM_restart         =.false.|" namelist.recom
+          
+          # Patch tracer file list in namelist.tra  
+          sed -i "s|fe_pisces_opa_eq_init_3D_changed_name\.nc|fe5deg.nc|" namelist.tra
+          sed -i "s|woa18_all_o00_01_mmol_fesom2\.nc|oxy5deg.nc|" namelist.tra
+          sed -i "s|woa13_all_i00_01_fesom2\.nc|si5deg.nc|" namelist.tra
+          sed -i "s|GLODAPv2\.2016b\.TAlk_fesom2_mmol_fix_z_Fillvalue\.nc|talk5deg.nc|" namelist.tra
+          sed -i "s|GLODAPv2\.2016b\.TCO2_fesom2_mmol_fix_z_Fillvalue\.nc|tco2_5deg.nc|" namelist.tra
+          sed -i "s|woa13_all_n00_01_fesom2\.nc|din5deg.nc|" namelist.tra
+          sed -i "s|phc3\.0_winter\.nc|woa18_netcdf_5deg.nc|g" namelist.tra
+          
+          echo "--- Patched namelists ---"
+          grep "nm_fe_data_file\|REcoMDataPath\|REcoM_restart" namelist.recom
+          cd ..
           
           # Copy REcoM input data files
-          ls -la test/input/recom/
           cp test/input/recom/*.nc work_recom/
-          ls -la work_recom/*.nc
       
       - name: FESOM2 REcoM test run
         run: |
