@@ -63,13 +63,11 @@ idemix_sforcusage = 0.2         ! fraction of surface forcing used [dimensionles
 idemix_n_hor_iwe_prop_iter = 5  ! iterations for horizontal wave propagation
 
 ! --- Surface Forcing (Wind-Generated Internal Waves) ---
-idemix_surforc_file  = '<add path>'   ! path to surface forcing file, e.g. 
-                                     ! fourier_smooth_2005_cfsr_inert_rgrid.nc
+idemix_surforc_file  = '/pool/data/AWICM/FESOM2/FORCING/IDEMIX/fourier_smooth_2005_cfsr_inert_rgrid.nc'   ! path to surface forcing file
 idemix_surforc_vname = 'var706'      ! variable name in surface forcing file
 
 ! --- Bottom Forcing (Tidal Internal Waves) ---
-idemix_botforc_file  = '<add path>'         ! path to bottom forcing file,
-                                           ! e.g. tidal_energy_gx1v6_20090205_rgrid.nc
+idemix_botforc_file  = '/pool/data/AWICM/FESOM2/FORCING/IDEMIX/tidal_energy_gx1v6_20090205_rgrid.nc'         ! path to bottom forcing file,
 idemix_botforc_vname = 'wave_dissipation'  ! variable name in bottom forcing file
 /
 
@@ -85,13 +83,13 @@ pp_use_fesompp = .true.         ! use FESOM flavor of PP (true) or original PP (
 ! --- Mixing Coefficients ---
 pp_Av0         = 0.01           ! reference mixing coefficient [m²/s]
 pp_alpha       = 5.0            ! Richardson number dependency parameter [dimensionless]
-                                 ! (alpha in eq. 1 of Pacanowski & Philander 1981)
+                                ! (alpha in eq. 1 of Pacanowski & Philander 1981)
 pp_exp         = 2.0            ! Richardson number exponent [dimensionless]
-                                 ! (n in eq. 1 of Pacanowski & Philander 1981)
+                                ! (n in eq. 1 of Pacanowski & Philander 1981)
 
 ! --- Background Mixing ---
-pp_Avbckg          = 1.0e-4         ! constant background viscosity [m²/s]
-pp_Kvbckg          = 1.0e-5         ! constant background diffusivity [m²/s]
+pp_Avbckg          = 1.0e-4     ! constant background viscosity [m²/s]
+pp_Kvbckg          = 1.0e-5     ! constant background diffusivity [m²/s]
 pp_use_nonconstKvb = .true.     ! use latitude and depth dependent background diffusivity
 /
 
@@ -110,16 +108,16 @@ kpp_use_compEkman = .true.      ! compute Ekman depth limit for OBL depth
 kpp_use_monob     = .true.      ! compute Monin-Obukhov limit for OBL depth
 
 ! --- Interpolation Methods ---
-kpp_interptype_ri = "linear"    ! interpolation type for OBL depth determination:
-                                 !   'linear', 'quadratic', 'cubic'
-kpp_interptype_atobl = "LMD94"  ! interpolation of viscosity/diffusivity at OBL depth:
-                                 !   'linear', 'quadratic', 'cubic', 'LMD94'
-kpp_matchtechc = "ParabolicNonLocal"  ! diffusivity and non-local transport profile:
-                                       !   'SimpleShapes', 'MatchGradient', 'MatchBoth', 'ParabolicNonLocal'
+kpp_interptype_ri = "linear"         ! interpolation type for OBL depth determination:
+                                     !   'linear', 'quadratic', 'cubic'
+kpp_interptype_atobl = "LMD94"       ! interpolation of viscosity/diffusivity at OBL depth:
+                                     !   'linear', 'quadratic', 'cubic', 'LMD94'
+kpp_matchtechc = "ParabolicNonLocal" ! diffusivity and non-local transport profile:
+                                     !   'SimpleShapes', 'MatchGradient', 'MatchBoth', 'ParabolicNonLocal'
 
 ! --- Mixing Below OBL ---
 kpp_internalmix = "KPP"         ! Richardson number dependent mixing below OBL:
-                                 !   'KPP' or 'PP'
+                                !   'KPP' or 'PP'
 kpp_pp_Av0      = 0.01          ! mixing coefficient for PP scheme below OBL [m²/s]
 
 ! --- Shear Mixing Parameters ---
@@ -147,24 +145,24 @@ tidal_mixscheme = "Simmons"     ! tidal mixing scheme (currently only 'Simmons' 
 
 ! --- Energy Dissipation Parameters ---
 tidal_efficiency   = 0.2        ! mixing efficiency [dimensionless, 0-1]
-                                 ! (Gamma in Simmons et al. 2004)
+                                ! (Gamma in Simmons et al. 2004)
 tidal_lcl_mixfrac  = 0.33       ! local dissipation fraction [dimensionless]
-                                 ! (q in Simmons et al. 2004)
-                                 ! fraction of tidal energy dissipated locally vs radiated away
+                                ! (q in Simmons et al. 2004)
+                                ! fraction of tidal energy dissipated locally vs radiated away
 
 ! --- Vertical Structure ---
 tidal_vert_decayscale = 500.0   ! vertical decay scale [m]
-                                 ! (zeta in Simmons et al. 2004)
-                                 ! controls vertical distribution of tidal mixing
+                                ! (zeta in Simmons et al. 2004)
+                                ! controls vertical distribution of tidal mixing
 
 ! --- Diffusivity Limits ---
 tidal_max_coeff = 50e-4         ! maximum tidal diffusivity [m²/s]
 
 ! --- Spatial Limits ---
 tidal_depth_cutoff = 0.0        ! minimum depth for tidal mixing [m, positive downward]
-                                 ! (0.0 = compute everywhere)
+                                ! (0.0 = compute everywhere)
 
 ! --- Bottom Forcing (Tidal Energy Input) ---
-tidal_botforc_file = '/albedo/work/projects/p_pool_fesom1/fesom2.0/forcing/idemix/tidal_energy_gx1v6_20090205_rgrid.nc'
+tidal_botforc_file = '/pool/data/AWICM/FESOM2/FORCING/IDEMIX/tidal_energy_gx1v6_20090205_rgrid.nc'
 /
 
