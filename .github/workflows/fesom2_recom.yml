@@ -63,9 +63,9 @@ jobs:
           # Enable atmospheric pressure forcing for REcoM CO2 flux calculation
           sed -i "s|l_mslp *= *\.false\.|l_mslp=.true.|" namelist.forcing
           
-          echo "--- Patched namelists ---"
-          grep "nm_fe_data_file\|REcoMDataPath\|REcoM_restart" namelist.recom
-          grep "l_mslp" namelist.forcing
+          echo "--- Verifying patches ---"
+          echo "REcoM restart: $(grep 'REcoM_restart' namelist.recom)"
+          echo "Atmospheric pressure: $(grep 'l_mslp' namelist.forcing)"
           cd ..
           
           # Copy REcoM input data files
@@ -85,14 +85,7 @@ jobs:
       - name: FESOM2 REcoM test run
         run: |
           cd work_recom
-          ls -ratl
-          cat namelist.config
-          echo "--- namelist.recom ---"
-          cat namelist.recom || echo "namelist.recom not found"
-          echo "--- namelist.tra ---"
-          cat namelist.tra || echo "namelist.tra not found"
-          echo "--- namelist.forcing (l_mslp check) ---"
-          grep "l_mslp\|l_xwind" namelist.forcing || echo "namelist.forcing not found"
+          echo "--- Running REcoM test (32 timesteps, 1 day) ---"
           chmod +x job_docker_new
           ./job_docker_new
       
