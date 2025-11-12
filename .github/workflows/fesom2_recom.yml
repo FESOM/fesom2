@@ -46,10 +46,16 @@ jobs:
           
           # Patch file paths in namelists to use local files
           cd work_recom
-          sed -i "s|/albedo/work/.*/DustClim.*\.nc|DustClimMonthlyAlbani_pimesh.nc|g" namelist.recom
-          sed -i "s|/albedo/work/.*/MonthlyAtmCO2.*\.nc|MonthlyAtmCO2_gcb2024.nc|g" namelist.recom
-          sed -i "s|REcoM_restart.*=.*true|REcoM_restart = .false.|g" namelist.recom
-          sed -i "s|REcoMDataPath.*=.*'/.*'|REcoMDataPath = './'|g" namelist.recom
+          sed -i "s|nm_fe_data_file.*=.*'.*'|nm_fe_data_file       ='DustClimMonthlyAlbani_pimesh.nc'|" namelist.recom
+          sed -i "s|nm_aen_data_file.*=.*'.*'|nm_aen_data_file      =''|" namelist.recom
+          sed -i "s|nm_river_data_file.*=.*'.*'|nm_river_data_file    =''|" namelist.recom
+          sed -i "s|nm_erosion_data_file.*=.*'.*'|nm_erosion_data_file  =''|" namelist.recom
+          sed -i "s|nm_co2_data_file.*=.*'.*'|nm_co2_data_file      ='MonthlyAtmCO2_gcb2024.nc'|" namelist.recom
+          sed -i "s|^REcoM_restart.*=.*\.true\.|REcoM_restart         =.false.|" namelist.recom
+          sed -i "s|REcoMDataPath.*=.*'.*'|REcoMDataPath         = './'|" namelist.recom
+          
+          echo "--- Patched file paths in namelist.recom ---"
+          head -60 namelist.recom
           cd ..
           
           # Copy REcoM input data files
