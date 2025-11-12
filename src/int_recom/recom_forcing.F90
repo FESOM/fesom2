@@ -34,6 +34,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
     use g_forcing_arrays
     use g_comm_auto
     use g_support
+    use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
     implicit none
 
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -124,9 +125,28 @@ endif
     !! *** Mocsy ***
 
     !!---- convert from mmol/m3 to mol/m3
+    ! DEBUG: Check state before conversion
+    if (ieee_is_nan(state(one, idic))) then
+        print *, 'DEBUG FORCING: state(one,idic) is NaN at node=', n
+        print *, '  state(one,idic)=', state(one, idic)
+        print *, '  state(one,ialk)=', state(one, ialk)
+        print *, '  Temp(1)=', Temp(1), 'Sali(1)=', Sali(1)
+        print *, '  lon=', geo_coord_nod2D(1,n)/rad, 'lat=', geo_coord_nod2D(2,n)/rad
+        print *, 'STOPPING: NaN detected in state before CO2 flux'
+        stop 'NaN in state(idic)'
+    end if
+    
     REcoM_DIC  = max(tiny*1e-3, state(one,idic)*1e-3)
     REcoM_Alk  = max(tiny*1e-3, state(one,ialk)*1e-3)
     REcoM_Si   = max(tiny*1e-3, state(one,isi) *1e-3)
+    
+    ! DEBUG: Check REcoM_DIC after conversion
+    if (ieee_is_nan(REcoM_DIC(1))) then
+        print *, 'DEBUG FORCING: REcoM_DIC is NaN after conversion at node=', n
+        print *, '  state(one,idic)=', state(one, idic), 'REcoM_DIC=', REcoM_DIC(1)
+        print *, 'STOPPING: NaN detected in REcoM_DIC'
+        stop 'NaN in REcoM_DIC'
+    end if
 
     !!---- convert N to P with Redfield ratio
     REcoM_Phos = max(tiny*1e-3, state(one,idin)*1e-3) /16.
