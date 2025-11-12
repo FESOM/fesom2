@@ -41,8 +41,9 @@ jobs:
       - name: Add REcoM namelists
         run: |
           # mkrun doesn't create namelist.recom, so copy from config and patch
-          cp config/bin_2p1z1d/namelist.recom work_recom/
-          cp config/bin_2p1z1d/namelist.tra work_recom/
+          # Using 2p3z2d (30 tracers) - more complete/tested than 2p1z1d
+          cp config/bin_2p3z2d/namelist.recom work_recom/
+          cp config/bin_2p3z2d/namelist.tra work_recom/
           
           # Patch namelist.recom
           cd work_recom

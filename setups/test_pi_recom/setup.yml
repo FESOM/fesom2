@@ -60,7 +60,7 @@ namelist.recom:
     pavariables:
         use_REcoM: True
         REcoM_restart: False
-        bgc_num: 22
+        bgc_num: 30
         diags3d_num: 28
         bgc_base_num: 22
         biostep: 1
