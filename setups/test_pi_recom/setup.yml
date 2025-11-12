@@ -1,5 +1,5 @@
 mesh: test_global
-forcing: test_global
+forcing: test_recom
 clim:
     type: test_recom
     filelist: 

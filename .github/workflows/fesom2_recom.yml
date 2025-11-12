@@ -3,6 +3,9 @@ name: "FESOM2: REcoM Biogeochemistry"
 # Controls when the action will run. Triggers the workflow on push or pull request.
 on:
   workflow_dispatch: {}
+  push:
+    branches:
+      - fesom2.6_recom_tra_diags
   pull_request:
     types:
       - opened
@@ -34,25 +37,25 @@ jobs:
       - name: Create REcoM test run
         run: |
           mkrun recom test_pi_recom -m docker
-          # Add REcoM input files
-          cp test/input/recom/DustClimMonthlyAlbani_pimesh.nc work_recom/
-          cp test/input/recom/MonthlyAtmCO2_gcb2024.nc work_recom/
-          cp test/input/recom/fe5deg.nc work_recom/
-          cp test/input/recom/oxy5deg.nc work_recom/
-          cp test/input/recom/si5deg.nc work_recom/
-          cp test/input/recom/talk5deg.nc work_recom/
-          cp test/input/recom/tco2_5deg.nc work_recom/
-          cp test/input/recom/din5deg.nc work_recom/
-          cp test/input/recom/woa18_netcdf_5deg.nc work_recom/
-          cp test/input/recom/GLODAPv2.2016b.PI_TCO2_fesom2_mmol_fix_z_Fillvalue.nc work_recom/
-
+      
+      - name: Add REcoM input files
+        run: |
+          ls -la test/input/recom/
+          cp test/input/recom/*.nc work_recom/
+          ls -la work_recom/*.nc
+      
       - name: FESOM2 REcoM test run
         run: |
           cd work_recom
           ls -ratl
           cat namelist.config
+          echo "--- namelist.recom ---"
+          cat namelist.recom || echo "namelist.recom not found"
+          echo "--- namelist.tra ---"
+          cat namelist.tra || echo "namelist.tra not found"
           chmod +x job_docker_new
           ./job_docker_new
+      
       - name: Check REcoM results
         run: |-
           cd work_recom
