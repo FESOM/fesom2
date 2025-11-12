@@ -54,8 +54,13 @@ jobs:
           sed -i "s|^REcoM_restart.*=.*\.true\.|REcoM_restart         =.false.|" namelist.recom
           sed -i "s|REcoMDataPath.*=.*'.*'|REcoMDataPath         = './'|" namelist.recom
           
+          # Patch tracer initialization files in namelist.tra to use our test files
+          sed -i "s|filelist.*=.*'fe_pisces.*|filelist = 'fe5deg.nc', 'oxy5deg.nc', 'si5deg.nc', 'talk5deg.nc', 'tco2_5deg.nc', 'din5deg.nc', 'woa18_netcdf_5deg.nc', 'woa18_netcdf_5deg.nc'  ! list of files in ClimateDataPath to read (one file per tracer), same order as idlist|" namelist.tra
+          
           echo "--- Patched file paths in namelist.recom ---"
           head -60 namelist.recom
+          echo "--- Patched tracer init in namelist.tra ---"
+          grep -A 3 "tracer_init3d" namelist.tra | head -10
           cd ..
           
           # Copy REcoM input data files
