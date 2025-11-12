@@ -67,20 +67,6 @@ jobs:
           # Copy REcoM input data files
           cp test/input/recom/*.nc work_recom/
           
-          # Fix NetCDF files with missing _FillValue attributes
-          # This ensures proper land masking and interpolation
-          echo "Processing NetCDF files to add proper fill values..."
-          cd work_recom
-          for file in oxy5deg.nc si5deg.nc talk5deg.nc din5deg.nc GLODAPv2.2016b.PI_TCO2_fesom2_mmol_fix_z_Fillvalue.nc; do
-            if [ -f "$file" ]; then
-              echo "Processing $file"
-              mv "$file" "${file}.tmp"
-              cdo copy "${file}.tmp" "$file" || ncks -O "${file}.tmp" "$file"
-              rm -f "${file}.tmp"
-            fi
-          done
-          cd ..
-          
           # Create dust file with expected name in the source directory
           # (code reads from ClimateDataPath, not work directory)
           cd test/input/recom
