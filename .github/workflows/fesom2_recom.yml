@@ -40,9 +40,9 @@ jobs:
       
       - name: Add REcoM namelists and input files
         run: |
-          # Copy default REcoM namelists from config
-          cp config/bin_2p3z2d/namelist.recom work_recom/
-          cp config/bin_2p3z2d/namelist.tra work_recom/
+          # Copy default REcoM namelists from config (using simpler 2p1z1d for faster CI)
+          cp config/bin_2p1z1d/namelist.recom work_recom/
+          cp config/bin_2p1z1d/namelist.tra work_recom/
           
           # Patch file paths in namelists to use local files
           cd work_recom
