@@ -61,6 +61,14 @@ jobs:
           echo "--- Checking patched namelists ---"
           grep "nm_fe_data_file\|nm_co2_data_file\|REcoM_restart\|REcoMDataPath" namelist.recom
           grep "filelist" namelist.tra | head -1
+          
+          echo "--- Validating namelist.recom structure ---"
+          # Check if all namelist sections are properly closed
+          grep -c "^&" namelist.recom
+          grep -c "^/" namelist.recom
+          # Show any lines that might have issues (very long lines)
+          awk 'length($0) > 200 {print "Long line " NR ": " substr($0,1,100) "..."}' namelist.recom
+          
           cd ..
           
           # Copy REcoM input data files
