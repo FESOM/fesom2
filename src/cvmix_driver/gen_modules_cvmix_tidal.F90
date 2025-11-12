@@ -7,7 +7,7 @@ module g_cvmix_tidal
     
     !___________________________________________________________________________
     ! module calls from cvmix library
-    use cvmix_tidal,  only :  cvmix_init_tidal, cvmix_coeffs_tidal_low, cvmix_compute_Simmons_invariant_low                 
+    use cvmix_tidal,  only :  cvmix_init_tidal, cvmix_coeffs_tidal, cvmix_compute_Simmons_invariant                 
     use cvmix_kinds_and_types, only: cvmix_data_type, cvmix_global_params_type
     
     !___________________________________________________________________________
@@ -89,10 +89,10 @@ module g_cvmix_tidal
         type(t_partit), intent(inout), target :: partit
         integer fileunit
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
+#include "../associate_part_def.h"
+#include "../associate_mesh_def.h"
+#include "../associate_part_ass.h"
+#include "../associate_mesh_ass.h" 
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
@@ -226,10 +226,10 @@ module g_cvmix_tidal
         real(kind=WP)                         :: simmonscoeff, vertdep(mesh%nl)
         real(kind=WP)                         :: zbar_e(mesh%nl), Z_e(mesh%nl-1), bvfreq2(mesh%nl)
         real(kind=WP)                         :: tsum1, tvol
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
+#include "../associate_part_def.h"
+#include "../associate_mesh_def.h"
+#include "../associate_part_ass.h"
+#include "../associate_mesh_ass.h"
         node_size = myDim_nod2D
         elem_size = myDim_elem2D
         
@@ -263,7 +263,7 @@ module g_cvmix_tidal
             !___________________________________________________________________
             ! Compute the time-invariant portion of the tidal mixing coefficient
             ! using the Simmons et al.(2004) scheme.
-            call cvmix_compute_Simmons_invariant_low(         &
+            call cvmix_compute_Simmons_invariant(         &
                  nlev            = nln-uln+1 ,                &
                  energy_flux     = tidal_fbot(elem),          & !in W m-2  
                  rho             = density_0,                 &
@@ -275,7 +275,7 @@ module g_cvmix_tidal
             !___________________________________________________________________
             ! Computes vertical diffusion coefficients for tidal mixing 
             ! parameterizations.
-            call cvmix_coeffs_tidal_low(                      &
+            call cvmix_coeffs_tidal(                      &
                  Mdiff_out       = tidal_Av(uln:nln,elem),    &
                  Tdiff_out       = tidal_Kv(uln:nln,elem),    &
                  Nsqr            = bvfreq2(uln:nln),          & !FIXME: limit to N2 > 10^-8 ? as in Simmons et al.
