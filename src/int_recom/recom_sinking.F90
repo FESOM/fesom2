@@ -109,14 +109,16 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
 ! Constant vertical sinking for the second detritus class
 ! *******************************************************
 
-#if defined(__3Zoo2Det)
+    if (enable_3zoo2det) then
+
           if(tracers%data(tr_num)%ID==1025 .or. &  !idetz2n
              tracers%data(tr_num)%ID==1026 .or. &  !idetz2c
              tracers%data(tr_num)%ID==1027 .or. &  !idetz2si
              tracers%data(tr_num)%ID==1028 ) then  !idetz2calc
              Vben = VDet_zoo2
           endif
-#endif
+
+    endif
 
         Vben= Vben/SecondsPerDay ! conversion [m/d] --> [m/s] (vertical velocity, note that it is positive here)
 
@@ -141,6 +143,18 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
             tracers%data(tr_num)%ID==1013 .or. &  !idian
             tracers%data(tr_num)%ID==1025 ) then  !idetz2n
             Benthos(n,1)= Benthos(n,1) +  add_benthos_2d(n) ![mmol]
+
+            if (use_MEDUSA) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+               SinkFlx_tr(n,1,tr_num) = SinkFlx_tr(n,1,tr_num) + add_benthos_2d(n) / area(1,n)/dt ![mmol/m2]
+        ! now SinkFlx hat the unit mmol/time step 
+        ! but mmol/m2/time is needed for MEDUSA: thus /area
+            endif
+            if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then  
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+               Benthos_tr(n,1,tr_num)= Benthos_tr(n,1,tr_num) +  add_benthos_2d(n) ![mmol]
+            endif
+
         endif
 
         !! * Particulate Organic Carbon *
@@ -149,6 +163,16 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
             tracers%data(tr_num)%ID==1014 .or. &  !idiac
             tracers%data(tr_num)%ID==1026 ) then  !idetz2c
             Benthos(n,2)= Benthos(n,2) + add_benthos_2d(n)
+
+            if (use_MEDUSA) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+               SinkFlx_tr(n,2,tr_num) = SinkFlx_tr(n,2,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+            endif
+            if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+               Benthos_tr(n,2,tr_num)= Benthos_tr(n,2,tr_num) + add_benthos_2d(n)
+            endif
+
         endif
 
         !! *Particulate Organic Silicon *
@@ -156,6 +180,16 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
             tracers%data(tr_num)%ID==1017 .or. &  !idetsi
             tracers%data(tr_num)%ID==1027 ) then  !idetz2si
             Benthos(n,3)= Benthos(n,3) + add_benthos_2d(n)
+
+            if (use_MEDUSA) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+               SinkFlx_tr(n,3,tr_num) = SinkFlx_tr(n,3,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+            endif
+            if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+               Benthos_tr(n,3,tr_num)= Benthos_tr(n,3,tr_num) + add_benthos_2d(n)
+            endif
+
         endif
 
         !! * Cal *
@@ -163,9 +197,96 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
             tracers%data(tr_num)%ID==1021 .or. &  !idetcal
             tracers%data(tr_num)%ID==1028 ) then  !idetz2cal
             Benthos(n,4)= Benthos(n,4) + add_benthos_2d(n)
+
+            if (use_MEDUSA) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+               SinkFlx_tr(n,4,tr_num) = SinkFlx_tr(n,4,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+            endif
+            if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+               Benthos_tr(n,4,tr_num)= Benthos_tr(n,4,tr_num) + add_benthos_2d(n)
+            endif
+
         endif
+
+        ! flux of 13C into the sediment
+        if (ciso) then             
+            if( tracers%data(tr_num)%ID==1305 .or. & !iphyc_13
+                tracers%data(tr_num)%ID==1308 .or. & !idetc_13
+                tracers%data(tr_num)%ID==1314 ) then !idiac_14
+
+                if (use_MEDUSA) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                   SinkFlx_tr(n,5,tr_num) = SinkFlx_tr(n,5,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+                endif
+                if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                   Benthos_tr(n,5,tr_num)= Benthos_tr(n,5,tr_num) + add_benthos_2d(n)
+                endif
+
+            endif
+
+           if( tracers%data(tr_num)%ID==1320 .or. &  !iphycal
+               tracers%data(tr_num)%ID==1321 ) then  !idetcal
+
+               if (use_MEDUSA) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                  SinkFlx_tr(n,6,tr_num) = SinkFlx_tr(n,6,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+               endif
+               if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                  Benthos_tr(n,6,tr_num)= Benthos_tr(n,6,tr_num) + add_benthos_2d(n)
+               endif
+
+           endif
+
+        endif
+        
+        ! flux of 14C into the sediment
+        if (ciso .and. ciso_organic_14) then             
+           if( tracers%data(tr_num)%ID==1405 .or. & !iphyc_13
+               tracers%data(tr_num)%ID==1408 .or. & !idetc_13
+               tracers%data(tr_num)%ID==1414 ) then !idiac_14
+
+               if (use_MEDUSA) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                  SinkFlx_tr(n,7,tr_num) = SinkFlx_tr(n,7,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+               endif
+               if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                  Benthos_tr(n,7,tr_num)= Benthos_tr(n,7,tr_num) + add_benthos_2d(n)
+               endif
+
+           endif
+
+           if( tracers%data(tr_num)%ID==1420 .or. &  !iphycal
+               tracers%data(tr_num)%ID==1421 ) then  !idetcal
+               if (use_MEDUSA) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                  SinkFlx_tr(n,8,tr_num) = SinkFlx_tr(n,8,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+               endif
+               if ((.not.use_MEDUSA).or.(sedflx_num.eq.0)) then
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+                  Benthos_tr(n,8,tr_num)= Benthos_tr(n,8,tr_num) + add_benthos_2d(n)
+               endif
+           endif
+
+        endif
+
    end do
+
+   if(use_MEDUSA) then
+        do n=1, bottflx_num
+!           SinkFlx(:,n) = Sinkflx(:,n)/dt
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+           call exchange_nod(SinkFlx_tr(:,n,tr_num), partit)
+        end do
+   end if ! use_MEDUSA
+
    do n=1, benthos_num
+! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+      call exchange_nod(Benthos_tr(:,n,tr_num), partit)
+
       call exchange_nod(Benthos(:,n), partit)
    end do
 
@@ -223,6 +344,43 @@ subroutine diff_ver_recom_expl(tr_num, tracers, partit, mesh)
     bottom_flux = 0._WP
     id = tracers%data(tr_num)%ID
 
+#if defined(__recom)
+if (use_MEDUSA .and. (sedflx_num .ne. 0)) then
+   !CV update: the calculation later has been changed by Ozgur in such
+   !a way  that now the  variable bottom_flux is in  (mol/time) units,
+   !rather than  a flux in  (mol/time/area). I therefore  multiply the
+   !Medusa fluxes by the area to get the same unit.
+
+   SELECT CASE (id)
+    CASE (1001)
+      bottom_flux = GloSed(:,1) * area(1,:) ! DIN
+    CASE (1002)
+      bottom_flux = GloSed(:,2) * area(1,:) ! DIC
+    CASE (1003)
+      bottom_flux = GloSed(:,3) * area(1,:) ! Alk
+    CASE (1018)
+      bottom_flux = GloSed(:,4) * area(1,:) ! Si
+    CASE (1019)
+      bottom_flux = GloSed(:,1) * Fe2N_benthos * area(1,:)
+    CASE (1022)
+      bottom_flux = GloSed(:,5) * area(1,:) ! Oxy
+    CASE (1302)
+      if (ciso) then
+        bottom_flux = GloSed(:,6) * area(1,:) ! DIC_13 and Calc: DIC_13
+      end if
+    CASE (1402)
+      if (ciso) then
+        bottom_flux = GloSed(:,7) * area(1,:) ! DIC_14 and Calc: DIC_14
+      end if
+    CASE DEFAULT
+      if (partit%mype==0) then
+        write(*,*) 'check specified in boundary conditions'
+        write(*,*) 'the model will stop!'
+      end if
+      call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+      stop
+  END SELECT
+else
     SELECT CASE (id)
        CASE (1001)
           bottom_flux = GlodecayBenthos(:,1) !*** DIN [mmolN/m^2/s] ***
@@ -236,6 +394,14 @@ subroutine diff_ver_recom_expl(tr_num, tracers, partit, mesh)
           bottom_flux = GlodecayBenthos(:,1) * Fe2N_benthos !*** DFe ***
        CASE (1022)
           bottom_flux = -GlodecayBenthos(:,2) * redO2C !*** O2 ***
+       CASE (1302)
+         if (ciso) then
+           bottom_flux = GlodecayBenthos(:,5) + GlodecayBenthos(:,6) !*** DIC_13 and Calc: DIC_13 ***
+         end if
+       CASE (1402)
+         if (ciso) then
+           bottom_flux = GlodecayBenthos(:,7) + GlodecayBenthos(:,8) !*** DIC_14 and Calc: DIC_14 ***
+         end if
        CASE DEFAULT
           if (partit%mype==0) then
              write(*,*) 'check specified in boundary conditions'
@@ -244,6 +410,8 @@ subroutine diff_ver_recom_expl(tr_num, tracers, partit, mesh)
           call par_ex(partit%MPI_COMM_FESOM, partit%mype)
           stop
     END SELECT
+endif ! (use_MEDUSA .and. (sedflux_num .gt. 0))  
+#endif
 
     do n=1, myDim_nod2D
 
@@ -309,7 +477,7 @@ subroutine ver_sinking_recom(tr_num, tracers, partit, mesh)
     real(kind=8)                           :: Rjp,Rj,Rjm
 
     real(kind=8)                           :: cfl, d0, d1, thetaP, thetaM, psiP, psiM
-    real(kind=8)                           :: onesixth	= 1.d0/6.d0
+    real(kind=8)                           :: onesixth  = 1.d0/6.d0
     real(kind=8)                           :: dt_sink, c1, c2
     real(kind=8)                           :: Vsink, tv
     real(kind=8),dimension(mesh%nl)        :: Wvel_flux
@@ -334,51 +502,62 @@ subroutine ver_sinking_recom(tr_num, tracers, partit, mesh)
 
     Vsink=0.0_WP
 
-    if (tracers%data(tr_num)%ID ==1007 .or.    &  !idetn
-        tracers%data(tr_num)%ID ==1008 .or.    &  !idetc
-        tracers%data(tr_num)%ID ==1017 .or.    &  !idetsi
-        tracers%data(tr_num)%ID ==1021 ) then     !idetcal
+!< Assign sinking velocities based on tracer ID
+!< Groups tracers by functional type and assigns corresponding velocity
 
-            Vsink = VDet
+! Detritus tracers (nitrogen, carbon, silicate, calcite)
+if (tracers%data(tr_num)%ID == 1007 .or. &  ! idetn
+    tracers%data(tr_num)%ID == 1008 .or. &  ! idetc
+    tracers%data(tr_num)%ID == 1017 .or. &  ! idetsi
+    tracers%data(tr_num)%ID == 1021) then    ! idetcal
+    Vsink = VDet
 
-    elseif(tracers%data(tr_num)%ID ==1004 .or. &  !iphyn
-        tracers%data(tr_num)%ID ==1005 .or.    &  !iphyc
-        tracers%data(tr_num)%ID==1006 ) then     !ipchl
+! Phytoplankton tracers (nitrogen, carbon, chlorophyll)
+elseif (tracers%data(tr_num)%ID == 1004 .or. &  ! iphyn
+        tracers%data(tr_num)%ID == 1005 .or. &  ! iphyc
+        tracers%data(tr_num)%ID == 1006) then    ! ipchl
+    Vsink = VPhy
 
-            Vsink = VPhy
+! Diatom tracers (nitrogen, carbon, silicate, chlorophyll)
+elseif (tracers%data(tr_num)%ID == 1013 .or. &  ! idian
+        tracers%data(tr_num)%ID == 1014 .or. &  ! idiac
+        tracers%data(tr_num)%ID == 1016 .or. &  ! idiasi
+        tracers%data(tr_num)%ID == 1015) then    ! idchl
+    Vsink = VDia
 
-    elseif(tracers%data(tr_num)%ID==1013 .or. &  !idian
-        tracers%data(tr_num)%ID==1014 .or.    &  !idiac
-        tracers%data(tr_num)%ID==1016 .or.    &  !idiasi
-        tracers%data(tr_num)%ID==1015 ) then     !idchl
+! Coccolithophore tracers (nitrogen, carbon, chlorophyll)
+elseif (enable_coccos .and. &
+        (tracers%data(tr_num)%ID == 1029 .or. &  ! icocn
+         tracers%data(tr_num)%ID == 1030 .or. &  ! icocc
+         tracers%data(tr_num)%ID == 1031)) then  ! icchl
+    Vsink = VCocco
 
-            Vsink = VDia
+! Phaeocystis tracers (nitrogen, carbon, chlorophyll)
+elseif (enable_coccos .and. &
+        (tracers%data(tr_num)%ID == 1032 .or. &  ! iphan
+         tracers%data(tr_num)%ID == 1033 .or. &  ! iphac
+         tracers%data(tr_num)%ID == 1034)) then  ! iphachl
+    Vsink = VPhaeo
 
-#if defined (__coccos)
-    elseif(tracers%data(tr_num)%ID == 1029 .or. &  !icocn
-        tracers%data(tr_num)%ID == 1030 .or.    &  !icocc
-        tracers%data(tr_num)%ID == 1031 ) then     !icchl
 
-            Vsink = VCocco
-#endif
-
-    elseif(tracers%data(tr_num)%ID == 1020) then   !iphycal
-       
-#if defined (__coccos)
-            Vsink = VCocco
-#else
-            Vsink = VPhy
-#endif
-            
-#if defined (__3Zoo2Det)
-    elseif(tracers%data(tr_num)%ID==1025 .or. &  !idetz2n
-           tracers%data(tr_num)%ID==1026 .or. &  !idetz2c
-           tracers%data(tr_num)%ID==1027 .or. &  !idetz2si
-           tracers%data(tr_num)%ID==1028 ) then  !idetz2calc 
-            
-            Vsink = VDet_zoo2
-#endif
+! Phytoplankton calcite tracer (special case)
+elseif (tracers%data(tr_num)%ID == 1020) then  ! iphycal
+    if (enable_coccos) then
+        Vsink = VCocco
+    else
+        Vsink = VPhy
     end if
+
+! Zooplankton-2 detritus tracers (nitrogen, carbon, silicate, calcite)
+elseif (enable_3zoo2det .and. &
+        (tracers%data(tr_num)%ID == 1025 .or. &  ! idetz2n
+         tracers%data(tr_num)%ID == 1026 .or. &  ! idetz2c
+         tracers%data(tr_num)%ID == 1027 .or. &  ! idetz2si
+         tracers%data(tr_num)%ID == 1028)) then  ! idetz2calc
+    Vsink = VDet_zoo2
+
+end if
+
 
 !! ---- No sinking if Vsink < 0.1 m/day
 if (Vsink .gt. 0.1) then 
@@ -415,10 +594,9 @@ if (Vsink .gt. 0.1) then
             endif
          end if
 
-#if defined (__3Zoo2Det)
-
          !! ---- We assume *constant* sinking for second detritus
-         if(tracers%data(tr_num)%ID ==1025 .or. &  !idetz2n
+         if(enable_3zoo2det .and. &
+            tracers%data(tr_num)%ID ==1025 .or. &  !idetz2n
             tracers%data(tr_num)%ID ==1026 .or. &  !idetz2c
             tracers%data(tr_num)%ID ==1027 .or. &  !idetz2si
             tracers%data(tr_num)%ID ==1028 ) then  !idetz2calc
@@ -437,7 +615,12 @@ if (Vsink .gt. 0.1) then
                end if
 
          endif
-#endif
+
+         if (tracers%data(tr_num)%ID == 1021) Sinkvel1_tr(nz,n,tr_num) = Wvel_flux(nz) !-1.0d0/SecondsPerDay  !idetcal
+         if (enable_3zoo2det .and. &
+             tracers%data(tr_num)%ID == 1028) Sinkvel2_tr(nz,n,tr_num) = Wvel_flux(nz)  !idetz2calc
+
+
       end do
 
       dt_sink = dt
@@ -477,7 +660,7 @@ if (.TRUE.) then ! 3rd Order DST Sceheme with flux limiting. This code comes fro
             (1.d0-cfl)/(1.d-20-cfl)*thetaM))
 
          tv= (0.5 * wPs * (trarr(nz,n)              + psiM * Rj)+ &
-	      0.5 * wM  * (trarr(max(nzmin,nz-1),n) + psiP * Rj))
+              0.5 * wM  * (trarr(max(nzmin,nz-1),n) + psiP * Rj))
          vd_flux(nz)= - tv*area(nz,n)
       end do
 end if ! 3rd Order DST Sceheme with flux limiting
@@ -588,21 +771,19 @@ subroutine ballast(tr_num, tracers, partit, mesh)
            scaling_density1_3D(k,row)=1.0
            scaling_density2_3D(k,row)=1.0
 
-              if (use_density_scaling) then
-                 if (tracers%data(tr_num)%ID ==1008)then !idetc
-                    if (tracers%data(tr_num)%values(k,row)>0.001) then ! only apply ballasting above a certain biomass (OG Todo: remove) 
-                       scaling_density1_3D(k,row) = (rho_particle1(k,row)-rho_seawater(1))/(rho_ref_part-rho_ref_water)
-                    endif
+           if (use_density_scaling) then
+              if (tracers%data(tr_num)%ID ==1008)then !idetc
+                 if (tracers%data(tr_num)%values(k,row)>0.001) then ! only apply ballasting above a certain biomass (OG Todo: remove)
+                    scaling_density1_3D(k,row) = (rho_particle1(k,row)-rho_seawater(1))/(rho_ref_part-rho_ref_water)
                  endif
-#if defined (__3Zoo2Det)
-
-                    if (tracers%data(tr_num)%ID ==1026)then ! idetz2c
-                       if (tracers%data(tr_num)%values(k,row)>0.001) then ! only apply ballasting above a certain biomass (OG Todo: remove) 
-                          scaling_density2_3D(k,row) = (rho_particle2(k,row)-rho_seawater(1))/(rho_ref_part-rho_ref_water)
-                       endif
-                    endif
-#endif
               endif
+              if (enable_3zoo2det .and. &
+                 tracers%data(tr_num)%ID ==1026)then ! idetz2c
+                 if (tracers%data(tr_num)%values(k,row)>0.001) then ! only apply ballasting above a certain biomass (OG Todo: remove)
+                    scaling_density2_3D(k,row) = (rho_particle2(k,row)-rho_seawater(1))/(rho_ref_part-rho_ref_water)
+                 endif
+              endif
+            endif
 
             scaling_visc_3D(k,row)=1.0
 
@@ -622,9 +803,11 @@ subroutine ballast(tr_num, tracers, partit, mesh)
     ! in the unlikely (if possible at all...) case that rho_particle(k)-rho_seawater(1)<0, prevent the scaling factor from being negative
 
     if (any(scaling_density1_3D(:,:) <= tiny)) scaling_density1_3D(:,:) = 1.0_WP      ! tiny = 2.23D-16
-#if defined (__3Zoo2Det)
-    if (any(scaling_density2_3D(:,:) <= tiny)) scaling_density2_3D(:,:) = 1.0_WP      ! tiny = 2.23D-16
-#endif
+
+    if (enable_3zoo2det) then
+        if (any(scaling_density2_3D(:,:) <= tiny)) scaling_density2_3D(:,:) = 1.0_WP      ! tiny = 2.23D-16
+    endif
+
 end subroutine ballast
 !-------------------------------------------------------------------------------
 ! Subroutine calculate density of particle
@@ -696,7 +879,7 @@ subroutine get_particle_density(tracers, partit, mesh)
         rho_particle1(nzmin:nzmax,row) = rho_CaCO3*a4(nzmin:nzmax,row) + rho_opal*a3(nzmin:nzmax,row) + rho_POC*a1(nzmin:nzmax,row) + rho_PON*a2(nzmin:nzmax,row)
     end do
 
-#if defined (__3Zoo2Det)
+    if (enable_3zoo2det) then
     rho_particle2 = 0.0
     b1 = 0.0
     b2 = 0.0
@@ -721,7 +904,7 @@ subroutine get_particle_density(tracers, partit, mesh)
         a4(nzmin:nzmax,row)  = b4(nzmin:nzmax,row)/aux(nzmin:nzmax,row)
         rho_particle2(nzmin:nzmax,row) = rho_CaCO3*a4(nzmin:nzmax,row) + rho_opal*a3(nzmin:nzmax,row) + rho_POC*a1(nzmin:nzmax,row) + rho_PON*a2(nzmin:nzmax,row)
     end do
-#endif
+    endif
 
 end subroutine get_particle_density
 !-------------------------------------------------------------------------------
