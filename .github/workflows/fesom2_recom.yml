@@ -1,0 +1,59 @@
+
+name: "FESOM2: REcoM Biogeochemistry"
+# Controls when the action will run. Triggers the workflow on push or pull request.
+on:
+  workflow_dispatch: {}
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+    branches:
+      - main
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  general_test:
+    # Containers must run in Linux based operating systems
+    runs-on: ubuntu-latest
+    # Docker Hub image that `container-job` executes in
+    container: ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master
+
+    # Service containers to run with `gfortran_ubuntu`
+    steps:
+      # NK: this changes working directory to fesom2
+      - uses: actions/checkout@v2
+
+      - name: Git safe directory
+        run: |
+          git config --global --add safe.directory ${PWD}
+
+      - name: Compile model with REcoM
+        run: |
+          ./configure.sh ubuntu -DRECOM_COUPLED=ON
+
+      - name: Create REcoM test run
+        run: |
+          mkrun recom test_pi_recom -m docker
+          # Add REcoM input files
+          cp test/input/recom/DustClimMonthlyAlbani_pimesh.nc work_recom/
+          cp test/input/recom/MonthlyAtmCO2_gcb2024.nc work_recom/
+          cp test/input/recom/fe5deg.nc work_recom/
+          cp test/input/recom/oxy5deg.nc work_recom/
+          cp test/input/recom/si5deg.nc work_recom/
+          cp test/input/recom/talk5deg.nc work_recom/
+          cp test/input/recom/tco2_5deg.nc work_recom/
+          cp test/input/recom/din5deg.nc work_recom/
+          cp test/input/recom/woa18_netcdf_5deg.nc work_recom/
+          cp test/input/recom/GLODAPv2.2016b.PI_TCO2_fesom2_mmol_fix_z_Fillvalue.nc work_recom/
+
+      - name: FESOM2 REcoM test run
+        run: |
+          cd work_recom
+          ls -ratl
+          cat namelist.config
+          chmod +x job_docker_new
+          ./job_docker_new
+      - name: Check REcoM results
+        run: |-
+          cd work_recom
+          fcheck .
