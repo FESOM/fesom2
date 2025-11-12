@@ -73,6 +73,7 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(RiverDSi2D            ( node_size ))
     allocate(RiverDIC2D            ( node_size ))
     allocate(RiverAlk2D            ( node_size ))
+    allocate(RiverFe               ( node_size ))
 
     !! * Erosion nutrients as surface boundary condition *
     allocate(ErosionTON2D          ( node_size ))
@@ -122,6 +123,7 @@ subroutine recom_init(tracers, partit, mesh)
     RiverDSi2D            = 0.d0
     RiverDIC2D            = 0.d0
     RiverAlk2D            = 0.d0
+    RiverFe               = 0.d0
 
     ErosionTON2D          = 0.d0
     ErosionTON2D          = 0.d0
