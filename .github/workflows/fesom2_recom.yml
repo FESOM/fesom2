@@ -38,38 +38,20 @@ jobs:
         run: |
           mkrun recom test_pi_recom -m docker
       
-      - name: Add REcoM namelists and input files
+      - name: Check what mkrun created
         run: |
-          # Copy and patch namelists directly with multiple simple replacements
-          cp config/bin_2p1z1d/namelist.recom work_recom/
-          cp config/bin_2p1z1d/namelist.tra work_recom/
-          
-          cd work_recom
-          
-          # Patch namelist.recom file paths - each on separate line
-          sed -i "s|'.*DustClim.*\.nc'|'DustClimMonthlyAlbani_pimesh.nc'|" namelist.recom
-          sed -i "s|'.*AeolianNitrogen.*\.nc'|''|" namelist.recom  
-          sed -i "s|'.*RiverineInput.*\.nc'|''|" namelist.recom
-          sed -i "s|'.*ErosionInput.*\.nc'|''|" namelist.recom
-          sed -i "s|'.*MonthlyAtmCO2.*\.nc'|'MonthlyAtmCO2_gcb2024.nc'|" namelist.recom
-          sed -i "s|REcoM_restart.*=.*\.true\.|REcoM_restart         =.false.|" namelist.recom
-          sed -i "s|REcoMDataPath.*= '.*'|REcoMDataPath         = './'|" namelist.recom
-          
-          # Patch namelist.tra - replace the whole filelist line
-          sed -i "/filelist.*fe_pisces/c\filelist = 'fe5deg.nc', 'oxy5deg.nc', 'si5deg.nc', 'talk5deg.nc', 'tco2_5deg.nc', 'din5deg.nc', 'woa18_netcdf_5deg.nc', 'woa18_netcdf_5deg.nc' ! CI test files" namelist.tra
-          
-          echo "--- Checking patched namelists ---"
-          grep "nm_fe_data_file\|nm_co2_data_file\|REcoM_restart\|REcoMDataPath" namelist.recom
-          grep "filelist" namelist.tra | head -1
-          
-          echo "--- Validating namelist.recom structure ---"
-          # Check if all namelist sections are properly closed
-          grep -c "^&" namelist.recom
-          grep -c "^/" namelist.recom
-          # Show any lines that might have issues (very long lines)
-          awk 'length($0) > 200 {print "Long line " NR ": " substr($0,1,100) "..."}' namelist.recom
-          
-          cd ..
+          echo "--- Files created by mkrun ---"
+          ls -la work_recom/
+          echo "--- Does mkrun create namelist.recom? ---"
+          if [ -f work_recom/namelist.recom ]; then
+            echo "YES - namelist.recom exists"
+            head -20 work_recom/namelist.recom
+          else
+            echo "NO - namelist.recom NOT created by mkrun"
+            echo "Copying from config..."
+            cp config/bin_2p1z1d/namelist.recom work_recom/
+            cp config/bin_2p1z1d/namelist.tra work_recom/
+          fi
           
           # Copy REcoM input data files
           ls -la test/input/recom/
