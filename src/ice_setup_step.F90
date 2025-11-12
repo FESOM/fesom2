@@ -195,9 +195,17 @@ subroutine ice_timestep(step, ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     !$ACC UPDATE DEVICE (ice%data(4)%values, ice%data(4)%valuesl, ice%data(4)%dvalues, ice%data(4)%values_rhs, ice%data(4)%values_div_rhs)
 #endif
+
+    !___________________________________________________________________________
+    ! start compute dynamical growth rates of ice, snow and area. store variables before the 
+    ! dynamical step. Letti wanted these CMIP6 
+    ! variables 
+    ice%thermo%dyngra(:)  = ice%data(1)%values(:) 
+    ice%thermo%dyngr(:)   = ice%data(2)%values(:)
+    ice%thermo%dyngrsn(:) = ice%data(3)%values(:)
+ 
     !___________________________________________________________________________
     ! ===== Dynamics
-
     SELECT CASE (ice%whichEVP)
     CASE (0)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'
@@ -293,6 +301,13 @@ subroutine ice_timestep(step, ice, partit, mesh)
     call fesom_profiler_start("ice_thermodynamics")
 #endif
 
+
+    ! compute dynamical growth rates of ice, snow and area based on values between 
+    ! before and after the dynamical step. Letti wanted these CMIP6 variables 
+    ice%thermo%dyngra(:)  = (ice%data(1)%values(:) - ice%thermo%dyngra(  :)) / ice%ice_dt
+    ice%thermo%dyngr(:)   = (ice%data(2)%values(:) - ice%thermo%dyngr(   :)) / ice%ice_dt
+    ice%thermo%dyngrsn(:) = (ice%data(3)%values(:) - ice%thermo%dyngrsn( :)) / ice%ice_dt
+    
     !___________________________________________________________________________
     ! ===== Thermodynamic part
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call thermodynamics...'//achar(27)//'[0m'

@@ -267,6 +267,12 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
         
     
     !___________________________________________________________________________
+    ! precompute mask for GM/Redi upscalling in the GINsea
+    if ((Fer_GM .or. Redi) .and. scaling_GINsea) then 
+        call init_RediGM_GINsea_mask(partit, mesh)
+    end if 
+    
+    !___________________________________________________________________________
     if(partit%mype==0) write(*,*) 'Initial state'
     if (dynamics%use_wsplit .and. partit%mype==0) then
         write(*,*) '******************************************************************************'
@@ -718,9 +724,11 @@ nl => mesh%nl
        allocate(dynamics%ke_wind_xVEL(2, elem_size))
        allocate(dynamics%ke_drag_xVEL(2, elem_size))
        allocate(dynamics%ke_J(node_size),  dynamics%ke_D(node_size),   dynamics%ke_G(node_size),  &
-                dynamics%ke_D2(node_size), dynamics%ke_n0(node_size),  dynamics%ke_JD(node_size), &
+                dynamics%ke_D2(node_size), dynamics%ke_JD(node_size), &
                 dynamics%ke_GD(node_size), dynamics%ke_swA(node_size), dynamics%ke_swB(node_size))
-
+       allocate(dynamics%ke_n0(nl-1, node_size))
+       allocate(dynamics%ke_Dx(nl-1, elem_size), dynamics%ke_Dy(nl-1, elem_size), dynamics%ke_DU(nl-1, elem_size),& 
+         dynamics%ke_DV(nl-1, elem_size), dynamics%ke_elemD(nl-1, elem_size), dynamics%ke_elemD2(nl-1, elem_size))
        dynamics%ke_adv      =0.0_WP
        dynamics%ke_cor      =0.0_WP
        dynamics%ke_pre      =0.0_WP
@@ -753,6 +761,14 @@ nl => mesh%nl
        dynamics%ke_GD       =0.0_WP
        dynamics%ke_swA      =0.0_WP
        dynamics%ke_swB      =0.0_WP
+       dynamics%ke_Dx       =0.0_WP
+       dynamics%ke_Dy       =0.0_WP
+       dynamics%ke_DU       =0.0_WP
+       dynamics%ke_DV       =0.0_WP
+       dynamics%ke_elemD    =0.0_WP
+       dynamics%ke_elemD2   =0.0_WP
+
+
     end if
 END SUBROUTINE dynamics_init
 !
@@ -830,6 +846,7 @@ nl              => mesh%nl
     allocate(relax2clim(node_size)) 
     allocate(heat_flux(node_size), Tsurf(node_size))
     allocate(water_flux(node_size), Ssurf(node_size))
+    allocate(fw_ice(node_size), fw_snw(node_size))
     allocate(relax_salt(node_size))
     allocate(virtual_salt(node_size))
 
@@ -901,11 +918,12 @@ nl              => mesh%nl
     dens_flux=0.0_WP
 
     if (Fer_GM) then
-    allocate(fer_c(node_size),fer_scal(node_size), fer_gamma(2, nl, node_size), fer_K(nl, node_size))
-    fer_gamma=0.0_WP
-    fer_K=500._WP
-    fer_c=1._WP
-    fer_scal = 0.0_WP
+    allocate(fer_c(node_size),fer_scal(node_size), fer_gamma(2, nl, node_size), fer_K(nl, node_size), fer_tapfac(nl, node_size))
+    fer_gamma = 0.0_WP
+    fer_K     = 500._WP
+    fer_c     = 1._WP
+    fer_scal  = 0.0_WP
+    fer_tapfac= 1._WP
     end if
 
     if (SPP) then
@@ -923,6 +941,8 @@ nl              => mesh%nl
     Tsurf=0.0_WP
 
     water_flux=0.0_WP
+    fw_ice    =0.0_WP
+    fw_snw    =0.0_WP
     relax_salt=0.0_WP
     virtual_salt=0.0_WP
 

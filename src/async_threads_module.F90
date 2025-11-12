@@ -56,10 +56,10 @@ contains
     this%run_ptr => thread_callback_procedure
     this%run_arg = procedure_argument
     
-#ifdef DISABLE_MULTITHREADING
-    call this%disable_async()
-#else
+#ifdef ASYNCHRONOUS_IO_THREADS
     if(this%with_real_threads) call init_ccall(this%idx)
+#else
+    call this%disable_async()
 #endif
   end subroutine initialize
 
@@ -68,7 +68,7 @@ contains
     class(thread_type) this
     ! EO args
     if(this%with_real_threads) then
-#ifndef DISABLE_MULTITHREADING
+#ifdef ASYNCHRONOUS_IO_THREADS
       call begin_ccall(this%idx)
 #endif
     else
@@ -80,7 +80,7 @@ contains
   subroutine join(this)
     class(thread_type) this
     ! EO args    
-#ifndef DISABLE_MULTITHREADING
+#ifdef ASYNCHRONOUS_IO_THREADS
     if(this%with_real_threads) call end_ccall(this%idx)
 #endif
   end subroutine join

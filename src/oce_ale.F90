@@ -3780,6 +3780,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     if (dynamics%ldiag_ke) then
        call compute_ke_wrho(dynamics, partit, mesh)
        call compute_apegen (dynamics, tracers, partit, mesh)
+       call compute_PePm   (dynamics, tracers, partit, mesh)
     end if
  
     !___________________________________________________________________________

@@ -215,7 +215,7 @@ end subroutine fer_gamma2vel
 subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
     USE MOD_MESH
     USE o_PARAM
-    USE o_ARRAYS, ONLY: fer_c, fer_k, fer_scal, Ki, bvfreq, MLD1_ind, neutral_slope
+    USE o_ARRAYS, ONLY: fer_c, fer_k, fer_scal, Ki, bvfreq, MLD1_ind, neutral_slope, fer_tapfac, fer_GINsea_mask
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE g_CONFIG
@@ -224,20 +224,26 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
     integer                  :: n, k, nz, nzmax, nzmin
-    real(kind=WP)            :: reso, c1, rosb, scaling, rr_ratio, aux, aux_zz(mesh%nl)
+    real(kind=WP)            :: reso, c1, cm, rosb, scaling, rr_ratio, aux, aux_zz(mesh%nl)
     real(kind=WP)            :: x0=1.5_WP, sigma=.15_WP ! Fermi function parameters to cut off GM where Rossby radius is resolved
     real(kind=WP)            :: c_min=0.5_WP, f_min=1.e-6_WP, r_max=200000._WP
     real(kind=WP)            :: zscaling(mesh%nl)
     real(kind=WP)            :: bvref
+    real(kind=WP)            :: refscalresol = 100000._WP ! 100km 
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
+    ! automatically synchronise Redi and GM coefficient when Redi_Kmax<=0
+    if (Redi .and. Redi_Kmax<=0) then 
+        Redi_Kmax = K_GM_max
+    end if 
+
     ! fill arrays for 3D Redi and GM coefficients: F1(xy)*F2(z)
     !******************************* F1(x,y) ***********************************
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, nz, nzmax, nzmin, reso, c1, rosb, scaling, rr_ratio, aux, aux_zz, zscaling, bvref)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, nz, nzmax, nzmin, reso, c1, cm, rosb, scaling, rr_ratio, aux, aux_zz, zscaling, bvref)
 !$OMP DO
     do n=1, myDim_nod2D
        !nzmax=minval(nlevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
@@ -251,14 +257,16 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
         end do
         reso=mesh_resolution(n)
         if (Fer_GM) then
+            !___________________________________________________________________
+            ! compute baroklionic gravity wave speed
             c1=0._wp
-            
-            !!PS do nz=1, nzmax-1
+            cm=0._wp
             do nz=nzmin, nzmax-1
                 !!PS c1=c1+hnode_new(nz,n)*(sqrt(max(bvfreq(nz,n), 0._WP))+sqrt(max(bvfreq(nz+1,n), 0._WP)))/2._WP
-                c1=c1+hnode_new(nz,n)*(sqrt(abs(max(bvfreq(nz,n), 0._WP)))+sqrt(abs(max(bvfreq(nz+1,n), 0._WP))))/2._WP ! add abs() for -0 case, cray
+                cm=cm+hnode_new(nz,n)*(sqrt(abs(max(bvfreq(nz,n), 0._WP)))+sqrt(abs(max(bvfreq(nz+1,n), 0._WP))))/2._WP ! add abs() for -0 case, cray
             end do
-            c1=max(c_min, c1/pi) !ca. first baroclinic gravity wave speed limited from below by c_min
+            c1=max(K_GM_cmin, cm/pi)         !ca. first baroclinic gravity wave speed limited from below by c_min --> need for rosbyradius
+            cm=max(K_GM_cmin, cm/pi/K_GM_cm) !ca. mth baroclinic gravity wave speed limited from below by c_min   --> needed for ferrari GM
             scaling=1._WP
             
             !___________________________________________________________________
@@ -271,8 +279,13 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
             
             !___________________________________________________________________
             ! Scale K_GM with resolution (referenced to 100,000m)
-            if (scaling_resolution) then
-                scaling=scaling*(reso/100000._WP)**K_GM_resscalorder !put to repo
+            if     (scaling_resolution .and. K_GM_resscalorder==1) then
+                scaling=scaling*(reso/refscalresol)**K_GM_resscalorder 
+                
+            elseif (scaling_resolution .and. K_GM_resscalorder==2) then    
+                scaling=scaling*(area(1,n)/(refscalresol**2)*2)**(1/K_GM_resscalorder) 
+                !                           |--> scalvolume: for 100km resolution: (100km^2)*0.5
+                !
             end if
             
             !___________________________________________________________________
@@ -296,16 +309,26 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
             end if
             
             !___________________________________________________________________
+            ! apply upscaling of GM coefficient in the GIN sea
+            if (scaling_GINsea) then 
+                ! --> create scaling multiplacator: (fer_GINsea_mask(n)*scaling_GINsea_fac-1.0)+1.0) 
+                scaling = scaling * (fer_GINsea_mask(n)*(GINsea_fac-1.0)+1.0)
+            end if 
+            
+            !___________________________________________________________________
             ! apply KGM scaling paramter (K_GM_scal)
             fer_scal(n) = min(scaling,1.0_WP)
              ! set maximum amplitude to K_GM_max
             !!PS fer_k(1,n)  = fer_scal(n)*K_GM_max
             !!PS ! limit lower values to K_GM_min
             !!PS fer_k(1,n)  = max(fer_k(1,n),K_GM_min)
+            
+            !___________________________________________________________________
+            ! finaly scale GM coefficient K_GM_max --> fer_K
             fer_k(nzmin,n)  = fer_scal(n)*K_GM_max
             ! limit lower values to K_GM_min
             fer_k(nzmin,n)  = max(fer_k(nzmin,n),K_GM_min)
-            fer_c(n)    = c1*c1                          !put to repo
+            fer_c(n)    = cm*cm                          !put to repo
         end if
         
         !_______________________________________________________________________
@@ -313,7 +336,13 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
         ! if both are used it will be reset below
         if (Redi) then
             !!PS Ki(1,n)=K_hor*(reso/100000.0_WP)**2
-            Ki(nzmin,n)=K_hor*(reso/100000.0_WP)**2
+            !!PS Ki(nzmin,n)=K_hor*(reso/100000.0_WP)**2
+            if     (K_GM_resscalorder==1) then
+                Ki(nzmin,n)=K_hor*(reso/refscalresol)**K_GM_resscalorder 
+            elseif (K_GM_resscalorder==2) then
+                Ki(nzmin,n)=K_hor**(area(1,n)/(refscalresol**2)*2)**(1/K_GM_resscalorder) 
+            end if 
+
         end if
     end do
 !$OMP END DO
@@ -322,7 +351,9 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
     if (Redi .and. Fer_GM) then
 !$OMP DO
         do n=1, myDim_nod2D
-           Ki(nzmin, n)=fer_k(nzmin, n)
+            !PS Ki(nzmin, n)=fer_k(nzmin, n)
+            Ki(nzmin, n)=max(fer_scal(n)*Redi_Kmax, K_GM_min)
+!PS             Ki(nzmin, n)=fer_scal(n)*K_Redi_max
         end do
 !$OMP END DO
     end if
@@ -333,66 +364,114 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
 !1910, doi:10.1175/jpo2785.1, 2005.
 !$OMP DO
     do n=1,myDim_nod2D
-        nzmax=nlevels_nod2D(n)
-        nzmin=ulevels_nod2D(n)
         !_______________________________________________________________________
-        ! Allpy vertical scaling after Ferreira et al.(2005)
-        if (scaling_Ferreira) then
+        if (Redi .or. Fer_GM) then
+            nzmax=nlevels_nod2D(n)
+            nzmin=ulevels_nod2D(n)
+            zscaling=1.0_WP
             !___________________________________________________________________
-            ! choose reference buoyancy
-            if (K_GM_bvref==0) then
-                ! ferreira bvref value surface (original Ferreira)
-                !!PS bvref=max(bvfreq(1, n), 1.e-6_WP)
-                bvref=max(bvfreq(nzmin, n), 1.e-6_WP)
-            elseif (K_GM_bvref==1) then
-                ! ferreira bvref value bottom mixed layer (Dima)
-                bvref=max(bvfreq(MLD1_ind(n)+1, n), 1.e-6_WP)
-            elseif (K_GM_bvref==2) then
-                ! ferreira bvref value mean over mixed layer
-                !!PS bvref=max(sum(bvfreq(1:MLD1_ind(n), n))/(MLD1_ind(n)), 1.e-6_WP)
-                bvref=max(sum(bvfreq(nzmin:MLD1_ind(n), n))/(MLD1_ind(n)), 1.e-6_WP)
-            elseif (K_GM_bvref==3) then
-                ! ferreira bvref value depth weighted mean over mixed layer
-                aux_zz=0.0_WP
-                !!PS aux_zz(1:MLD1_ind(n)-1) = Z_3d_n(2:MLD1_ind(n),n)-Z_3d_n(1:MLD1_ind(n)-1,n)
-                !!PS bvref=max(sum(bvfreq(2:MLD1_ind(n),n)*aux_zz(1:MLD1_ind(n)-1))/sum(aux_zz(1:MLD1_ind(n)-1)), 1.e-6_WP)
-                aux_zz(nzmin:MLD1_ind(n)-1) = Z_3d_n(nzmin+1:MLD1_ind(n),n)-Z_3d_n(nzmin:MLD1_ind(n)-1,n)
-                bvref=max(sum(bvfreq(nzmin+1:MLD1_ind(n),n)*aux_zz(nzmin:MLD1_ind(n)-1))/sum(aux_zz(nzmin:MLD1_ind(n)-1)), 1.e-6_WP)    
+            if (scaling_Ferreira .and. scaling_GMzexp) then 
+                if (mype==0) then 
+                print *, achar(27)//'[33m'
+                write(*,*) 
+                write(*,*) '____________________________________________________________________'
+                write(*,*) ' WARNING: You cant activate both scaling_Ferreira and scaling_GMzexp'
+                write(*,*) '          together. Only either one of them can be used!!! '
+                write(*,*) '____________________________________________________________________'
+                print *, achar(27)//'[0m'
+                write(*,*)
+                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                end if 
+            !___________________________________________________________________
+            ! Allpy vertical scaling after Ferreira et al.(2005)
+            elseif (scaling_Ferreira) then
+                !_______________________________________________________________
+                ! choose reference buoyancy
+                if (K_GM_bvref==0) then
+                    ! ferreira bvref value surface (original Ferreira)
+                    !!PS bvref=max(bvfreq(1, n), 1.e-6_WP)
+                    bvref=max(bvfreq(nzmin, n), 1.e-6_WP)
+                elseif (K_GM_bvref==1) then
+                    ! ferreira bvref value bottom mixed layer (Dima)
+                    bvref=max(bvfreq(MLD1_ind(n)+1, n), 1.e-6_WP)
+                elseif (K_GM_bvref==2) then
+                    ! ferreira bvref value mean over mixed layer
+                    !!PS bvref=max(sum(bvfreq(1:MLD1_ind(n), n))/(MLD1_ind(n)), 1.e-6_WP)
+                    bvref=max(sum(bvfreq(nzmin:MLD1_ind(n), n))/(MLD1_ind(n)), 1.e-6_WP)
+                elseif (K_GM_bvref==3) then
+                    ! ferreira bvref value depth weighted mean over mixed layer
+                    aux_zz=0.0_WP
+                    !!PS aux_zz(1:MLD1_ind(n)-1) = Z_3d_n(2:MLD1_ind(n),n)-Z_3d_n(1:MLD1_ind(n)-1,n)
+                    !!PS bvref=max(sum(bvfreq(2:MLD1_ind(n),n)*aux_zz(1:MLD1_ind(n)-1))/sum(aux_zz(1:MLD1_ind(n)-1)), 1.e-6_WP)
+                    aux_zz(nzmin:MLD1_ind(n)-1) = Z_3d_n(nzmin+1:MLD1_ind(n),n)-Z_3d_n(nzmin:MLD1_ind(n)-1,n)
+                    bvref=max(sum(bvfreq(nzmin+1:MLD1_ind(n),n)*aux_zz(nzmin:MLD1_ind(n)-1))/sum(aux_zz(nzmin:MLD1_ind(n)-1)), 1.e-6_WP)    
+                end if 
+                
+                !_______________________________________________________________
+                ! compute scaling with respect to reference buoyancy
+                do nz=nzmin, nzmax
+                    zscaling(nz)=max(bvfreq(nz, n)/bvref, 0.2_WP)
+                    zscaling(nz)=min(zscaling(nz), 1.0_WP)
+                end do
+            
+            !___________________________________________________________________
+            ! Apply vertical downscaling of GM parameter with exp(-z/z_Ref)
+            elseif (scaling_GMzexp) then
+                !_______________________________________________________________
+                ! compute scaling with respect to reference depth zref
+                !    0  smin               1
+                !   -+---+-----------------+-------> scaling
+                !    |   !          ...--´´
+                !    |   !       .-´
+                !    |   !     ,´ 
+                !    |   !    ,
+                !    |   !   / 
+                !    |   !  :  
+                !    |   ! : 
+                !    |   ! : 
+                !    |   !:
+                !    v
+                !  depth 
+                !  
+                ! --> if smin=0.0 model tends to be unstable an prone to blowups!!!
+                !  
+                do nz=nzmin, nzmax
+                    zscaling(nz)=GMzexp_smin + (1.0-GMzexp_smin)*exp(-abs(zbar_3d_n(nz, n)/GMzexp_zref))
+                    zscaling(nz)=max(min(zscaling(nz), 1.0_WP), GMzexp_smin)
+                end do
             end if 
             
             !___________________________________________________________________
-            ! compute scaling with respect to reference buoyancy
-            !!PS do nz=1, nzmax
-            do nz=nzmin, nzmax
-                zscaling(nz)=max(bvfreq(nz, n)/bvref, 0.2_WP)
-                zscaling(nz)=min(zscaling(nz), 1.0_WP)
-            end do
-        else
-            zscaling=1.0_WP
-        end if
+            ! Switch off GM and Redi within a BL in NH (a strategy following FESOM 1.4)
+            if (scaling_FESOM14) then
+                !zscaling(1:MLD1_ind(n)+1)=0.0_WP
+                do nz=nzmin, nzmax
+                    if (neutral_slope(3, min(nz, nl-1), n) > 5.e-3_WP) zscaling(nz)=0.0_WP
+                end do
+            end if
+        end if ! --> if (Redi .or. Fer_GM) then
         
-        !_______________________________________________________________________
-        ! Switch off GM and Redi within a BL in NH (a strategy following FESOM 1.4)
-        if (scaling_FESOM14) then
-            !zscaling(1:MLD1_ind(n)+1)=0.0_WP
-            !!PS do nz=1, nzmax
-            do nz=nzmin, nzmax
-                if (neutral_slope(3, min(nz, nl-1), n) > 5.e-3_WP) zscaling(nz)=0.0_WP
-            end do
-        end if
-      
         !_______________________________________________________________________
         ! do vertical Ferreira scaling and limiting for GM diffusivity
         if (Fer_GM) then
             ! start with index 2 to not alternate fer_k(1,n) which contains here 
             ! the surface template for the scaling 
-            !!PS do nz=2, nzmax
             do nz=nzmin+1, nzmax
                 fer_k(nz,n)=fer_k(nzmin,n)*zscaling(nz)
             end do 
             ! after vertical Ferreira scaling is done also scale surface template
             !!PS fer_k(1,n)=fer_k(1,n)*zscaling(1)
             fer_k(nzmin,n)=fer_k(nzmin,n)*zscaling(nzmin)
+            
+            ! aplly tapering to Kgm, not just to the tapered neutral slope 
+            if (K_GM_Ktaper) then 
+                ! do tapering of redi diffusion coefficient instead of tapering neutral
+                ! slope 
+                do nz=nzmin, nzmax-1
+                    fer_k(nz, n)=fer_k(nz, n)*sqrt(fer_tapfac(nz, n)) + K_GM_min*abs(sqrt(fer_tapfac(nz, n))-1)
+                    !PS fer_k(nz, n)=fer_k(nz, n)*(fer_tapfac(nz, n))
+                end do
+            end if 
         end if
         
         !_______________________________________________________________________
@@ -400,14 +479,22 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
         if (Redi) then
             ! start with index 2 to not alternate fer_k(1,n) which contains here 
             ! the surface template for the scaling 
-            !!PS do nz=2, nzmax-1
             do nz=nzmin+1, nzmax-1
                 !!PS Ki(nz,n)= Ki(1,n)*0.5_WP*(zscaling(nz)+zscaling(nz+1))
                 Ki(nz,n)= Ki(nzmin,n)*0.5_WP*(zscaling(nz)+zscaling(nz+1))
             end do
             ! after vertical Ferreira scaling is done also scale surface template
-            !!PS Ki(1,n)=Ki(1,n)*0.5_WP*(zscaling(1)+zscaling(2))
             Ki(nzmin,n)=Ki(nzmin,n)*0.5_WP*(zscaling(nzmin)+zscaling(nzmin+1))
+            
+            ! aplly tapering to Ki, not just to the tapered neutral slope 
+            if (Redi_Ktaper) then 
+                ! do tapering of redi diffusion coefficient instead of tapering neutral
+                ! slope 
+                do nz=nzmin, nzmax-1
+                    !PS  Ki(nz, n)=min(K_Redi_min, Ki(nz, n)) + (Ki(nz, n)-min(K_Redi_min, Ki(nz, n)))*fer_tapfac(nz, n)
+                    Ki(nz, n)=Ki(nz, n)*sqrt(fer_tapfac(nz, n)) + Redi_Kmin*abs(sqrt(fer_tapfac(nz, n))-1)
+                end do
+            end if 
         end if
    end do
 !$OMP END DO
@@ -417,4 +504,49 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
    if (Fer_GM) call exchange_nod(fer_k, partit)
    if (Redi)   call exchange_nod(Ki, partit)
 end subroutine init_Redi_GM
-!====================================================================
+
+!
+!
+!_______________________________________________________________________________
+! initialise GINsea mask 
+subroutine init_RediGM_GINsea_mask(partit, mesh)
+    use MOD_MESH
+    use MOD_PARTIT
+    use MOD_PARSUP
+    use o_PARAM
+    use o_ARRAYS, only: fer_GINsea_mask
+    use g_support
+    implicit none 
+    
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    integer                               :: node, npts
+    real(kind=WP)                         :: lon, lat
+    real(kind=WP), allocatable            :: poly_lon(:), poly_lat(:)
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    
+    ! define GINsea Polygon: 
+    npts=9
+    allocate(poly_lon(npts), poly_lat(npts))
+    poly_lon = (/ -4.5,  8.0, 25.0, 25.0, -25.0, -32.0, -22.0, -14.5,  -6.6/)
+    poly_lat = (/ 58.0, 61.0, 69.0, 80.0,  80.0,  69.0,  65.5,  65.2,  62.1/)
+    
+    ! initialise GINSea mask 
+    allocate(fer_GINsea_mask(partit%myDim_nod2D+partit%eDim_nod2D))
+    fer_GINsea_mask = 0.0
+    
+    ! decide which point is in/out of the polygon
+    do node=1, myDim_nod2D+eDim_nod2D
+        lon = geo_coord_nod2D(1, node)/rad
+        lat = geo_coord_nod2D(2, node)/rad
+        fer_GINsea_mask(node) = point_in_polygon(lon, lat, poly_lon, poly_lat)
+    end do
+    
+    ! smooth out boundaries of mask to ensure smooth transition between inside
+    ! and outside of polygon 
+    call smooth_nod(fer_GINsea_mask, 5, partit, mesh)
+    
+end subroutine init_RediGM_GINsea_mask 
