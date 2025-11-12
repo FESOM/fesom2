@@ -24,11 +24,15 @@ num_tracers = 100         ! number of tracers to allocate (must be ≥ actual nu
 ! Advection schemes: 'MFCT' (Multidimensional FCT), 'UPW1' (1st-order upwind), 'QR4C' (4th-order)
 ! Diffusion schemes: 'FCT' (Flux-Corrected Transport), 'NON' (none)
 ! ============================================================================
+! nml_tracer_list =
+! 1  , 'MFCT', 'QR4C', 'FCT ', 1., 1.,   ! temperature
+! 2  , 'MFCT', 'QR4C', 'FCT ', 1., 1.,   ! salinity
+!101 , 'UPW1', 'UPW1', 'NON ', 0., 0.    ! example passive tracer
 &tracer_list
 nml_tracer_list =
-1  , 'MFCT', 'QR4C', 'FCT ', 1., 1.,   ! temperature
-2  , 'MFCT', 'QR4C', 'FCT ', 1., 1.,   ! salinity
-!101, 'UPW1', 'UPW1', 'NON ', 0., 0.    ! example passive tracer
+1  , 'MFCT', 'QR4C', 'FCT ', 1., 1.,
+2  , 'MFCT', 'QR4C', 'FCT ', 1., 1.,
+!101, 'UPW1', 'UPW1', 'NON ', 0., 0.
 /
 
 ! ============================================================================
