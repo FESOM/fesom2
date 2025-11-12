@@ -98,6 +98,16 @@ subroutine recom_init(tracers, partit, mesh)
 
     allocate(LocBenthos            ( benthos_num ))
     allocate(decayBenthos          ( benthos_num ))     ! [1/day] Decay rate of detritus in the benthic layer
+    allocate(wFluxDet              ( node_size ))
+    allocate(wFluxPhy              ( node_size ))
+    allocate(wFluxDia              ( node_size ))
+    allocate(wFluxCocco            ( node_size ))
+    allocate(wFluxPhaeo            ( node_size ))
+    allocate(GlowFluxDet           ( node_size, num_tracers ))
+    allocate(GlowFluxPhy           ( node_size, num_tracers ))
+    allocate(GlowFluxDia           ( node_size, num_tracers ))
+    allocate(GlowFluxCocco         ( node_size, num_tracers ))
+    allocate(GlowFluxPhaeo         ( node_size, num_tracers ))
     allocate(PAR3D                 ( nl-1, node_size ))
 
 
@@ -134,8 +144,16 @@ subroutine recom_init(tracers, partit, mesh)
 
     LocBenthos            = 0.d0
     decayBenthos          = 0.d0
+    wFluxDet              = 0.d0
     wFluxPhy              = 0.d0
     wFluxDia              = 0.d0
+    wFluxCocco            = 0.d0
+    wFluxPhaeo            = 0.d0
+    GlowFluxDet           = 0.d0
+    GlowFluxPhy           = 0.d0
+    GlowFluxDia           = 0.d0
+    GlowFluxCocco         = 0.d0
+    GlowFluxPhaeo         = 0.d0
     PAR3D                 = 0.d0
 
 !    pco2surf           = 0.d0
