@@ -44,14 +44,13 @@ jobs:
           cp config/bin_2p1z1d/namelist.recom work_recom/
           cp config/bin_2p1z1d/namelist.tra work_recom/
           
-          # Patch file paths in namelist.recom
+          # Patch namelist.recom
           cd work_recom
-          sed -i "s|nm_fe_data_file.*'.*'|nm_fe_data_file       ='DustClimMonthlyAlbani_pimesh.nc'|" namelist.recom
-          sed -i "s|nm_aen_data_file.*'.*'|nm_aen_data_file      =''|" namelist.recom  
-          sed -i "s|nm_river_data_file.*'.*'|nm_river_data_file    =''|" namelist.recom
-          sed -i "s|nm_erosion_data_file.*'.*'|nm_erosion_data_file  =''|" namelist.recom
-          sed -i "s|nm_co2_data_file.*'.*'|nm_co2_data_file      ='MonthlyAtmCO2_gcb2024.nc'|" namelist.recom
-          sed -i "s|REcoMDataPath.*'.*'|REcoMDataPath         = './'|" namelist.recom
+          
+          # Remove nam_rsbc section (not used by code, causes parsing errors)
+          sed -i '/^&nam_rsbc/,/^\//d' namelist.recom
+          
+          # Set REcoM_restart to false for initialization from climatology
           sed -i "s|REcoM_restart.*=.*\.true\.|REcoM_restart         =.false.|" namelist.recom
           
           # Patch tracer file list in namelist.tra  
