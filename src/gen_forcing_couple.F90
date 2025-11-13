@@ -98,6 +98,9 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 #endif
   use gen_bulk
   use force_flux_consv_interface
+#if defined (__recom)
+  use REcoM_GloVar, only: x_co2atm, GloCO2flux_seaicemask
+#endif
 
   implicit none
   integer,        intent(in)            :: istep
@@ -211,6 +214,13 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
               do n=1,myDim_nod2D+eDim_nod2D
                 exchange(n) = UVnode(2,1,n)
               end do
+#if defined (__recom)
+            elseif (i.eq.8) then
+              ! GloCO2flux_seaicemask is in [mmol/m2/s], need [kg/m2/s]
+              ! Conversion: 1.0e-3_WP -> mol/s -> kg/s
+              ! 1 mol CO2 = 44.0095 g/mol = 0.0440095 kg/mol (NIST 2018)
+              exchange(:) = GloCO2flux_seaicemask(:) * 1.0e-3_WP * 0.0440095_WP  ! [kg m⁻² s⁻¹]
+#endif
             else    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
 #else
@@ -390,6 +400,15 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
              if (action) then
                 v_wind(:)                     = exchange(:)        ! meridional wind
              end if
+#if defined (__recom)
+         elseif (i.eq.16) then
+             if (action) then
+                ! Convert mass mixing ratio (kg/kg) to mole fraction (dimensionless)
+                ! MW_CO2 = 44.0095 g/mol (NIST 2018)
+                ! MW_dry_air = 28.9647 g/mol (standard atmosphere composition)
+                x_co2atm(:) = exchange(:) * ((28.9647_WP/44.0095_WP)*1e6_WP)  ! [mole fraction]
+             end if
+#endif
 #else
          elseif (i.eq.13) then
             if (action) then
