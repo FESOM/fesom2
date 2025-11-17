@@ -40,9 +40,9 @@ scaling_Rossby     = .false. ! scale GM with Rossby radius (1.0 in coarse region
 scaling_resolution = .true.  ! scale GM with horizontal resolution (K_GM corresponds to 100km resolution)
 scaling_FESOM14    = .false. ! use FESOM 1.4 GM treatment in Northern Hemisphere (zero within boundary layer)
 
-scaling_GMzexp     = .false. ! do downscaling of GM & Redi over depth by exp(-z/z_ref)
-GMzexp_zref        = 1000.0  ! reference for vertical exp GM scaling 
-GMzexp_smin        = 0.1     ! minimum scaling factor
+scaling_GMzexp     = .true.  ! do downscaling of GM & Redi over depth by exp(-z/z_ref)
+GMzexp_zref        = 500.0   ! reference for vertical exp GM scaling 
+GMzexp_smin        = 0.6     ! minimum scaling factor
 
 scaling_GINsea     = .false. ! Increase K_GM resolution scaling only in the GIN sea by factor 
 GINsea_fac         = 2.0     ! GIN sea K_GM upscaling factor 
@@ -58,7 +58,7 @@ LDD97_rmax         = 100.0e3 ! rossby radius max cutoff [m]
 
 ! --- Redi Isopycnal Diffusion ---
 Redi               = .true.  ! enable Redi isopycnal diffusion
-Redi_Ktaper        = .false. ! apply neutral slope tapering function also to the Redi coefficient
+Redi_Ktaper        = .true.  ! apply neutral slope tapering function also to the Redi coefficient
 Redi_Kmax          = 0.0	 ! Redi Diffusivity can be different from K_GM_max but recomment to be the same, if Redi_Kmax<=0 its synchronised with Redi_Kmax=K_GM_max 
 Redi_Kmin          = 100.0   ! minimum Redi difusivity thats left when Redi_Ktaper= .true.
 

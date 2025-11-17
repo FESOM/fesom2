@@ -133,7 +133,7 @@ age_start_year    = 2000     ! year to start age tracer (tracer age = 0 at this 
    nm_sss_data_file = '/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/PHC2_salx.nc'  ! path to SSS restoring data file, e.g. PHC2_salx.nc
 
    ! --- Chlorophyll data for shortwave penetration ---
-   chl_data_source  = 'None'   ! chlorophyll data source: 'Sweeney' (monthly climatology) or 'None' (constant)
+   chl_data_source  = 'Sweeney'   ! chlorophyll data source: 'Sweeney' (monthly climatology) or 'None' (constant)
                                ! requires use_sw_pene=.true. in namelist.config
    nm_chl_data_file = '/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/Sweeney/Sweeney_2005.nc'  ! chlorophyll data file (if Sweeney)
    chl_const        = 0.1      ! constant chlorophyll concentration [mg/m³] (if chl_data_source='None')
