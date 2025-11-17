@@ -20,7 +20,6 @@ namelist.config:
       use_cavity: False
       use_cavity_partial_cell: False
     timestep:
-        step_per_day: 96
         run_length: 1
         run_length_unit: "d"
     geometry:
