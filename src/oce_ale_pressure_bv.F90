@@ -3046,7 +3046,7 @@ subroutine compute_neutral_slope(partit, mesh)
         end if
         
         ! now taper slope with c1 and c2
-        if (Redi_Ktaper) then 
+        if (Fer_GM .and. Redi .and. Redi_Ktaper) then 
             do nz = ul1, nl1
                 fer_tapfac(nz, n) = c1(nz) * c2(nz)
                 !PS slope_tapered(:, nz, n)=neutral_slope(:, nz, n) * c1(nz) * c2(nz)
