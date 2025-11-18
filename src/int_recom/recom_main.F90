@@ -6,8 +6,8 @@ module recom_interface
     interface
         subroutine recom(ice, dynamics, tracers, partit, mesh)
             use mod_mesh
-            USE MOD_PARTIT
-            USE MOD_PARSUP
+            use MOD_PARTIT
+            use MOD_PARSUP
             use mod_tracer
             use MOD_DYN
             use MOD_ICE
@@ -29,8 +29,8 @@ module bio_fluxes_interface
             use recom_config
 
             use mod_mesh
-            USE MOD_PARTIT
-            USE MOD_PARSUP
+            use MOD_PARTIT
+            use MOD_PARSUP
             use mod_tracer
 
             use g_config
@@ -52,11 +52,12 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     use MOD_MESH
     use MOD_TRACER
     use MOD_DYN
-    USE MOD_ICE
+    use MOD_ICE
     use o_ARRAYS
     use o_PARAM
-    USE MOD_PARTIT
-    USE MOD_PARSUP
+    use MOD_PARTIT
+    use MOD_PARSUP
+    use ieee_arithmetic
 
     use recom_declarations
     use bio_fluxes_interface
@@ -67,7 +68,8 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     use g_clock
     use g_forcing_arrays, only: press_air, u_wind, v_wind, shortwave
     use g_comm_auto
-    IMPLICIT NONE
+
+    implicit none
 
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_tracer), intent(inout), target :: tracers
@@ -98,6 +100,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     integer                    :: idiags
 
     real(kind=8)               :: Sali
+    logical                    :: do_update = .false. 
 
     real(kind=8),  allocatable :: Temp(:), Sali_depth(:), zr(:), PAR(:)
     real(kind=8),  allocatable :: C(:,:)
@@ -113,6 +116,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     real(kind=8),  allocatable :: OmegaC_watercolumn(:)
     real(kind=8),  allocatable :: kspc_watercolumn(:)
     real(kind=8),  allocatable :: rhoSW_watercolumn(:)
+    real(kind=WP)              :: ttf_rhs_bak (mesh%nl-1, tracers%num_tracers) ! local variable ! OG - tra_diag
 
 #include "../associate_part_def.h"
 #include "../associate_mesh_def.h"
@@ -135,11 +139,23 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     if (restore_alkalinity) call bio_fluxes(tracers, partit, mesh)
     if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> bio_fluxes'//achar(27)//'[0m'
 
+  if (use_atbox) then    ! MERGE
+! Prognostic atmospheric isoCO2
+    call recom_atbox(partit,mesh)
+!   optional I/O of isoCO2 and inferred cosmogenic 14C production; this may cost some CPU time
+    if (ciso .and. ciso_14) then
+      call annual_event(do_update)
+      if (do_update .and. mype==0) write (*, fmt = '(a50,2x,i6,4(2x,f6.2))') &
+                                         'Year, xCO2 (ppm), cosmic 14C flux (at / cm² / s):', &
+                                          yearold, x_co2atm(1), x_co2atm_13(1), x_co2atm_14(1), cosmic_14(1) * production_rate_to_flux_14
+    end if
+  end if
 ! ======================================================================================
 !********************************* LOOP STARTS *****************************************
 
     do n=1, myDim_nod2D  ! needs exchange_nod in the end
-!     if (ulevels_nod2D(n)>1) cycle
+        !!---- Skip cavity nodes - REcoM not supported in ice shelf cavities
+        if (ulevels_nod2D(n)>1) cycle
 !       nzmin = ulevels_nod2D(n)
 
         !!---- Number of vertical layers
@@ -176,6 +192,32 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
         !!---- Atmospheric CO2 in LocVar
         LocAtmCO2 = AtmCO2(month)
 
+! Update of prognostic atmospheric CO2 values
+     if (use_atbox) then
+       LocAtmCO2                   = x_co2atm(1)
+       if (ciso) then
+         LocAtmCO2_13              = x_co2atm_13(1)
+         if (ciso_14) LocAtmCO2_14 = x_co2atm_14(1)
+       end if
+     else
+! Consider prescribed atmospheric CO2 values
+       if (ciso) then
+         LocAtmCO2_13              = AtmCO2_13(month)
+         if (ciso_14) then
+!          Latitude of nodal point n 
+           lat_val = geo_coord_nod2D(2,n) / rad
+!          Zonally binned NH / SH / TZ 14CO2 input values
+           LocAtmCO2_14 = AtmCO2_14(lat_zone(lat_val), month)
+         end if
+       end if
+       LocAtmCO2                   = x_co2atm(n) ! from oifs
+     end if  ! use_atbox
+
+     if (ciso) then
+       r_atm_13                    = LocAtmCO2_13(1) / LocAtmCO2(1)
+       if (ciso_14) r_atm_14       = LocAtmCO2_14(1) / LocAtmCO2(1)
+     end if
+
         !!---- Shortwave penetration
         SW = parFrac * shortwave(n)
         SW = SW * (1.d0 - a_ice(n))
@@ -206,6 +248,15 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             C(1:nzmax, tr_num-2) = tracers%data(tr_num)%values(1:nzmax, n)
         end do
 
+        ttf_rhs_bak = 0.0 ! OG - tra_diag
+
+
+           do tr_num=1, num_tracers
+        if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+              ttf_rhs_bak(1:nzmax,tr_num) = tracers%data(tr_num)%values(1:nzmax, n)
+        end if
+           end do
+
         !!---- Depth of the nodes in the water column
         zr(1:nzmax) = Z_3d_n(1:nzmax, n)
 
@@ -219,29 +270,86 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
         if (Diags) then
 
         !! * Allocate 3D diagnostics *
-            allocate(vertrespmeso(nl-1), vertrespmacro(nl-1), vertrespmicro(nl-1))
+            allocate(vertrespmeso(nl-1))
             vertrespmeso  = 0.d0
+
+#if defined (__3Zoo2Det)
+            allocate(vertrespmacro(nl-1), vertrespmicro(nl-1))
             vertrespmacro = 0.d0
             vertrespmicro = 0.d0
-
+#endif
             allocate(vertcalcdiss(nl-1), vertcalcif(nl-1))
             vertcalcdiss = 0.d0
             vertcalcif   = 0.d0
 
-            allocate(vertaggn(nl-1), vertaggd(nl-1), vertaggc(nl-1))
+            allocate(vertaggn(nl-1), vertaggd(nl-1))
             vertaggn = 0.d0
             vertaggd = 0.d0
-            vertaggc = 0.d0
 
-            allocate(vertdocexn(nl-1), vertdocexd(nl-1), vertdocexc(nl-1))
+            allocate(vertdocexn(nl-1), vertdocexd(nl-1))
             vertdocexn = 0.d0
             vertdocexd = 0.d0
-            vertdocexc = 0.d0
 
-            allocate(vertrespn(nl-1), vertrespd(nl-1), vertrespc(nl-1))
+            allocate(vertrespn(nl-1), vertrespd(nl-1))
             vertrespn = 0.d0
             vertrespd = 0.d0
+
+            allocate(VTTemp_diatoms(nl-1), VTTemp_phyto(nl-1))
+            VTTemp_diatoms = 0.d0
+            VTTemp_phyto = 0.d0
+
+            allocate(VTPhyCO2(nl-1), VTDiaCO2(nl-1))
+            VTPhyCO2 = 0.d0
+            VTDiaCO2 = 0.d0
+
+            allocate(VTqlimitFac_phyto(nl-1), VTqlimitFac_diatoms(nl-1))
+            VTqlimitFac_phyto = 0.d0
+            VTqlimitFac_diatoms = 0.d0
+
+            allocate(VTCphotLigLim_phyto(nl-1), VTCphotLigLim_diatoms(nl-1))
+            VTCphotLigLim_phyto = 0.d0
+            VTCphotLigLim_diatoms = 0.d0
+
+            allocate(VTCphot_phyto(nl-1), VTCphot_diatoms(nl-1))
+            VTCphot_phyto = 0.d0
+            VTCphot_diatoms = 0.d0
+
+            allocate(VTSi_assimDia(nl-1))
+            VTSi_assimDia = 0.d0
+
+#if defined (__coccos)
+            allocate(vertaggc(nl-1), vertdocexc(nl-1), vertrespc(nl-1))
+            vertaggc = 0.d0
+            vertdocexc = 0.d0
             vertrespc = 0.d0
+
+            allocate(vertaggp(nl-1), vertdocexp(nl-1), vertrespp(nl-1)) ! Phaeocystis
+            vertaggp = 0.d0
+            vertdocexp = 0.d0
+            vertrespp = 0.d0
+
+            allocate(VTTemp_cocco(nl-1), VTTemp_phaeo(nl-1))
+            VTTemp_cocco = 0.d0
+            VTTemp_phaeo = 0.d0
+
+            allocate(VTCoccoCO2(nl-1), VTPhaeoCO2(nl-1))
+            VTCoccoCO2 = 0.d0
+            VTPhaeoCO2 = 0.d0
+
+            allocate(VTqlimitFac_cocco(nl-1), VTqlimitFac_phaeo(nl-1))
+            VTqlimitFac_cocco  = 0.d0
+            VTqlimitFac_phaeo  = 0.d0
+
+            allocate(VTCphotLigLim_cocco(nl-1), VTCphotLigLim_phaeo(nl-1))
+            VTCphotLigLim_cocco  = 0.d0
+            VTCphotLigLim_phaeo  = 0.d0
+
+            allocate(VTCphot_cocco(nl-1), VTCphot_phaeo(nl-1))
+            VTCphot_cocco  = 0.d0
+            VTCphot_phaeo  = 0.d0
+
+
+#endif
 
             !! * Allocate 2D diagnostics *
             allocate(vertNPPn(nl-1), vertGPPn(nl-1), vertNNAn(nl-1), vertChldegn(nl-1)) 
@@ -256,18 +364,26 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             vertNNAd = 0.d0
             vertChldegd  = 0.d0
 
+#if defined (__coccos)
             allocate(vertNPPc(nl-1), vertGPPc(nl-1), vertNNAc(nl-1), vertChldegc(nl-1)) 
             vertNPPc = 0.d0
             vertGPPc = 0.d0
             vertNNAc = 0.d0
-            vertChldegc  = 0.d0
+            vertChldegc = 0.d0
+
+            allocate(vertNPPp(nl-1), vertGPPp(nl-1), vertNNAp(nl-1), vertChldegp(nl-1))
+            vertNPPp = 0.d0
+            vertGPPp = 0.d0
+            vertNNAp = 0.d0
+            vertChldegp = 0.d0
+#endif
         end if
 
         if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forcing'//achar(27)//'[0m'
 
 ! ======================================================================================
 !******************************** RECOM FORCING ****************************************
-        call REcoM_Forcing(zr, n, nzmax, C, SW, Loc_slp , Temp, Sali, Sali_depth &
+        call REcoM_Forcing(zr, n, nzmax, C, SW, Loc_slp, Temp, Sali, Sali_depth &
            , CO2_watercolumn                                     & ! NEW MOCSY CO2 for the whole watercolumn
            , pH_watercolumn                                      & ! NEW MOCSY pH for the whole watercolumn
            , pCO2_watercolumn                                    & ! NEW MOCSY pCO2 for the whole watercolumn
@@ -282,6 +398,16 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             tracers%data(tr_num)%values(1:nzmax, n) = C(1:nzmax, tr_num-2)
         end do
 
+        ! recom_sms
+
+           do tr_num=1, num_tracers
+        if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+             tracers%work%tra_recom_sms(1:nzmax,n,tr_num) = tracers%data(tr_num)%values(1:nzmax, n) - ttf_rhs_bak(1:nzmax,tr_num)
+             !if (mype==0)  print *,  tra_recom_sms(:,:,tr_num)
+        end if
+
+           end do
+
         !!---- Local variables that have been changed during the time-step are stored so they can be saved
         Benthos(n,1:benthos_num) = LocBenthos(1:benthos_num)
         GlodecayBenthos(n, 1:benthos_num) = decayBenthos(1:benthos_num)/SecondsPerDay ! convert from [mmol/m2/d] to [mmol/m2/s]
@@ -291,48 +417,114 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             !! * Update 2D diagnostics *
             NPPn(n) = locNPPn
             NPPd(n) = locNPPd
-            NPPc(n) = locNPPc
             GPPn(n) = locGPPn
             GPPd(n) = locGPPd
-            GPPc(n) = locGPPc
             NNAn(n) = locNNAn
             NNAd(n) = locNNAd
-            NNAc(n) = locNNAc
             Chldegn(n) = locChldegn
             Chldegd(n) = locChldegd
+
+#if defined (__coccos)
+            NPPc(n) = locNPPc
+            GPPc(n) = locGPPc
+            NNAc(n) = locNNAc
             Chldegc(n) = locChldegc
+            NPPp(n) = locNPPp
+            GPPp(n) = locGPPp
+            NNAp(n) = locNNAp
+            Chldegp(n) = locChldegp
+#endif
 
             !! * Update 3D diagnostics *
             respmeso     (1:nzmax,n) = vertrespmeso     (1:nzmax)
+#if defined (__3Zoo2Det)
             respmacro    (1:nzmax,n) = vertrespmacro    (1:nzmax)
             respmicro    (1:nzmax,n) = vertrespmicro    (1:nzmax)
+#endif
             calcdiss     (1:nzmax,n) = vertcalcdiss     (1:nzmax)
             calcif       (1:nzmax,n) = vertcalcif       (1:nzmax)
+
             aggn         (1:nzmax,n) = vertaggn         (1:nzmax)
-            aggd         (1:nzmax,n) = vertaggd         (1:nzmax)
-            aggc         (1:nzmax,n) = vertaggc         (1:nzmax)
             docexn       (1:nzmax,n) = vertdocexn       (1:nzmax)
-            docexd       (1:nzmax,n) = vertdocexd       (1:nzmax)
-            docexc       (1:nzmax,n) = vertdocexc       (1:nzmax)
             respn        (1:nzmax,n) = vertrespn        (1:nzmax)
-            respd        (1:nzmax,n) = vertrespd        (1:nzmax)
-            respc        (1:nzmax,n) = vertrespc        (1:nzmax)
             NPPn3D       (1:nzmax,n) = vertNPPn         (1:nzmax)
+
+            aggd         (1:nzmax,n) = vertaggd         (1:nzmax)
+            docexd       (1:nzmax,n) = vertdocexd       (1:nzmax)
+            respd        (1:nzmax,n) = vertrespd        (1:nzmax)
             NPPd3D       (1:nzmax,n) = vertNPPd         (1:nzmax)
+
+            TTemp_phyto         (1:nzmax,n) = VTTemp_phyto              (1:nzmax)
+            TPhyCO2             (1:nzmax,n) = VTPhyCO2                  (1:nzmax)
+            TqlimitFac_phyto    (1:nzmax,n) = VTqlimitFac_phyto         (1:nzmax)
+            TCphotLigLim_phyto  (1:nzmax,n) = VTCphotLigLim_phyto       (1:nzmax)
+            TCphot_phyto        (1:nzmax,n) = VTCphot_phyto             (1:nzmax)
+
+            TTemp_diatoms       (1:nzmax,n) = VTTemp_diatoms            (1:nzmax) !! NEW from here tracking vars
+            TDiaCO2             (1:nzmax,n) = VTDiaCO2                  (1:nzmax)
+            TqlimitFac_diatoms  (1:nzmax,n) = VTqlimitFac_diatoms       (1:nzmax)
+            TCphotLigLim_diatoms(1:nzmax,n) = VTCphotLigLim_diatoms     (1:nzmax)
+            TCphot_diatoms      (1:nzmax,n) = VTCphot_diatoms           (1:nzmax)
+
+            TSi_assimDia        (1:nzmax,n) = VTSi_assimDia             (1:nzmax)
+
+#if defined (__coccos)
+            aggc         (1:nzmax,n) = vertaggc         (1:nzmax)
+            docexc       (1:nzmax,n) = vertdocexc       (1:nzmax)
+            respc        (1:nzmax,n) = vertrespc        (1:nzmax)
             NPPc3D       (1:nzmax,n) = vertNPPc         (1:nzmax)
+
+            aggp         (1:nzmax,n) = vertaggp         (1:nzmax)
+            docexp       (1:nzmax,n) = vertdocexp       (1:nzmax)
+            respp        (1:nzmax,n) = vertrespp        (1:nzmax)
+            NPPp3D       (1:nzmax,n) = vertNPPp         (1:nzmax)
+
+            TTemp_cocco         (1:nzmax,n) = VTTemp_cocco              (1:nzmax)
+            TCoccoCO2           (1:nzmax,n) = VTCoccoCO2                (1:nzmax)
+            TqlimitFac_cocco    (1:nzmax,n) = VTqlimitFac_cocco         (1:nzmax)
+            TCphotLigLim_cocco  (1:nzmax,n) = VTCphotLigLim_cocco       (1:nzmax)
+            TCphot_cocco        (1:nzmax,n) = VTCphot_cocco             (1:nzmax)
+
+            TTemp_phaeo         (1:nzmax,n) = VTTemp_phaeo              (1:nzmax)
+            TPhaeoCO2           (1:nzmax,n) = VTPhaeoCO2                (1:nzmax)
+            TqlimitFac_phaeo    (1:nzmax,n) = VTqlimitFac_phaeo         (1:nzmax)
+            TCphotLigLim_phaeo  (1:nzmax,n) = VTCphotLigLim_phaeo       (1:nzmax)
+            TCphot_phaeo        (1:nzmax,n) = VTCphot_phaeo             (1:nzmax)
+
+#endif
+
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
 
             !! * Deallocating 2D diagnostics *
             deallocate(vertNPPn, vertGPPn, vertNNAn, vertChldegn) 
             deallocate(vertNPPd, vertGPPd, vertNNAd, vertChldegd)
-            deallocate(vertNPPc, vertGPPc, vertNNAc, vertChldegc) 
+#if defined (__coccos)
+            deallocate(vertNPPc,vertGPPc,vertNNAc,vertChldegc)
+            deallocate(vertNPPp,vertGPPp,vertNNAp,vertChldegp)
+#endif
 
             !! * Deallocating 3D Diagnostics *
-            deallocate(vertrespmeso,     vertrespmacro,  vertrespmicro                 )
-            deallocate(vertcalcdiss,     vertcalcif                                    )
-            deallocate(vertaggn,         vertaggd,       vertaggc                      )
-            deallocate(vertdocexn,       vertdocexd,     vertdocexc                    )
-            deallocate(vertrespn,        vertrespd,      vertrespc                     )
+            deallocate(vertrespmeso)
+#if defined (__3Zoo2Det)
+            deallocate(vertrespmacro, vertrespmicro)
+#endif
+            deallocate(vertcalcdiss, vertcalcif)
+            deallocate(vertaggn, vertdocexn, vertrespn)
+            deallocate(vertaggd, vertdocexd, vertrespd)
+
+            deallocate(VTTemp_phyto, VTPhyCO2, VTqlimitFac_phyto, VTCphotLigLim_phyto, VTCphot_phyto) ! NEW
+            deallocate(VTTemp_diatoms, VTDiaCO2, VTqlimitFac_diatoms, VTCphotLigLim_diatoms, VTCphot_diatoms)
+
+            deallocate(VTSi_assimDia)
+
+#if defined (__coccos)
+            deallocate(vertaggc, vertdocexc, vertrespc)
+            deallocate(vertaggp, vertdocexp, vertrespp)
+
+            deallocate(VTTemp_cocco, VTCoccoCO2, VTqlimitFac_cocco, VTCphotLigLim_cocco, VTCphot_cocco)
+            deallocate(VTTemp_phaeo, VTPhaeoCO2, VTqlimitFac_phaeo, VTCphotLigLim_phaeo, VTCphot_phaeo)
+
+#endif
 
         end if 
 
@@ -345,6 +537,12 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
         GloCO2flux(n)            = dflux(1)                   !  [mmol/m2/d]
         GloCO2flux_seaicemask(n) = co2flux_seaicemask(1)      !  [mmol/m2/s]
         GloO2flux_seaicemask(n)  = o2flux_seaicemask(1)       !  [mmol/m2/s]
+    if (ciso) then
+        GloCO2flux_seaicemask_13(n)     = co2flux_seaicemask_13(1)        !  [mmol/m2/s]
+        if (ciso_14) then
+            GloCO2flux_seaicemask_14(n) = co2flux_seaicemask_14(1)        !  [mmol/m2/s]
+        end if
+     end if
         GloO2flux(n)             = oflux(1)                   !  [mmol/m2/d]
 
         PAR3D(1:nzmax,n)         = PAR(1:nzmax)
@@ -375,6 +573,16 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
     call exchange_nod(GloCO2flux_seaicemask, partit)
 
     call exchange_nod(GloO2flux_seaicemask, partit)
+    if (ciso) then
+        call exchange_nod(GloPCO2surf_13, partit)
+        call exchange_nod(GloCO2flux_13, partit)
+        call exchange_nod(GloCO2flux_seaicemask_13, partit)
+        if (ciso_14) then
+            call exchange_nod(GloPCO2surf_14, partit)
+            call exchange_nod(GloCO2flux_14, partit)
+            call exchange_nod(GloCO2flux_seaicemask_14, partit)
+        end if 
+    end if
     do n=1, benthos_num
         call exchange_nod(Benthos(:,n), partit)
     end do
@@ -388,10 +596,16 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
         call exchange_nod(NNAd, partit)
         call exchange_nod(Chldegn, partit)
         call exchange_nod(Chldegd, partit)
+#if defined (__coccos)
         call exchange_nod(NPPc, partit)
         call exchange_nod(GPPc, partit)
         call exchange_nod(NNAc, partit)
         call exchange_nod(Chldegc, partit)
+        call exchange_nod(NPPp, partit)
+        call exchange_nod(GPPp, partit)
+        call exchange_nod(NNAp, partit)
+        call exchange_nod(Chldegp, partit)
+#endif
     endif
 
     do n=1, benthos_num
@@ -412,6 +626,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
     call exchange_nod(OmegaC3D, partit)
     call exchange_nod(kspc3D, partit)
     call exchange_nod(rhoSW3D, partit)
+
 end subroutine recom
 
 ! ======================================================================================
@@ -423,10 +638,11 @@ subroutine bio_fluxes(tracers, partit, mesh)
     use recom_locvar
     use recom_glovar
     use recom_config
-
+    use o_PARAM
+    use ieee_arithmetic
     use mod_mesh
-    USE MOD_PARTIT
-    USE MOD_PARSUP
+    use MOD_PARTIT
+    use MOD_PARSUP
     use mod_tracer
 
     use g_config

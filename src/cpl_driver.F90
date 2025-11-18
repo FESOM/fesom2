@@ -17,6 +17,8 @@ module cpl_driver
   use o_param,  only : rad
   USE MOD_PARTIT
   use mpi
+
+
   implicit none
   save   
   !
@@ -28,8 +30,15 @@ module cpl_driver
   ! (final number of fields depends now on lwiso switch and is set in subroutine cpl_oasis3mct_define_unstr)
 
 #if defined (__oifs)
+#if defined(__recom)
+  integer                    :: nsend = 8
+  integer                    :: nrecv = 16
+!With oifs, without recom:
+#else
   integer                    :: nsend = 7
   integer                    :: nrecv = 15
+#endif
+!Without oifs
 #else
   integer                    :: nsend = 4
   integer                    :: nrecv = 12
@@ -658,6 +667,9 @@ include "associate_mesh_ass.h"
     cpl_send( 5)='sia_feom' ! 5. sea ice albedo [%-100]            ->
     cpl_send( 6)='u_feom'   ! 6. eastward  surface velocity [m/s]  ->
     cpl_send( 7)='v_feom'   ! 7. northward surface velocity [m/s]  ->
+#if defined (__recom)
+    cpl_send( 8)='FCO2_feom'! 8. CO2 flux [kgCO2 m-2 s-1]             ->
+#endif
 #else
     cpl_send( 1)='sst_feom' ! 1. sea surface temperature [°C]      ->
     cpl_send( 2)='sit_feom' ! 2. sea ice thickness [m]             ->
@@ -698,6 +710,10 @@ include "associate_mesh_ass.h"
     cpl_recv(13) = 'calv_oce'
     cpl_recv(14) = 'u10w_oce'
     cpl_recv(15) = 'v10w_oce'
+#if defined (__recom)
+    cpl_recv(16) = 'XCO2_oce'
+#endif
+!Not oifs
 #else
     cpl_recv(1)  = 'taux_oce'
     cpl_recv(2)  = 'tauy_oce'
