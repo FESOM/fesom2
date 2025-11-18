@@ -2747,7 +2747,7 @@ deallocate(center_y, center_x)
      !   end do
      !end if
 
-#if defined (__oasis)
+#if defined (__oasis) || defined (__yac)
   nn=0
   ns=0  
   allocate(mesh%lump2d_north(myDim_nod2D), mesh%lump2d_south(myDim_nod2D))
