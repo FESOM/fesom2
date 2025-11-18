@@ -185,15 +185,38 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
         stop
     endif
 
-    call flxco2(co2flux, co2ex, dpco2surf,                                                   &
-                ph, pco2surf, fco2, co2, hco3, co3, OmegaA, OmegaC, BetaD, rhoSW, p, tempis, K0, &
-                REcoM_T, REcoM_S, REcoM_Alk, REcoM_DIC, REcoM_Si, REcoM_Phos, kw660, LocAtmCO2, Patm, thick(One), Nmocsy, Lond,Latd, &
-                optCON='mol/m3',optT='Tpot   ',optP='m ',optB='u74',optK1K2='l  ',optKf='dg',optGAS='Pinsitu',optS='Sprc')
+    !!---- Skip CO2 flux calculation in ice shelf cavities (ulevels_nod2d > 1)
+    !!---- Cavity nodes have uninitialized biogeochemical tracers
+    !!---- NOTE: ulevels_nod2d is already indexed by local node numbers
+    if (mesh%ulevels_nod2d(n) > 1) then
+        !! Set CO2 flux to zero in cavity regions
+        co2flux(1) = 0.0d0
+        co2ex(1) = 0.0d0
+        dpco2surf(1) = 0.0d0
+        ph(1) = 8.0d0
+        pco2surf(1) = 0.0d0
+        fco2(1) = 0.0d0
+        co2(1) = 0.0d0
+        hco3(1) = 0.0d0
+        co3(1) = 0.0d0
+        OmegaA(1) = 0.0d0
+        OmegaC(1) = 0.0d0
+        BetaD(1) = 0.0d0
+        rhoSW(1) = 1027.0d0
+    else
+        !! Calculate CO2 flux for non-cavity nodes
+        call flxco2(co2flux, co2ex, dpco2surf,                                                   &
+                    ph, pco2surf, fco2, co2, hco3, co3, OmegaA, OmegaC, BetaD, rhoSW, p, tempis, K0, &
+                    REcoM_T, REcoM_S, REcoM_Alk, REcoM_DIC, REcoM_Si, REcoM_Phos, kw660, LocAtmCO2, Patm, thick(One), Nmocsy, Lond,Latd, &
+                    optCON='mol/m3',optT='Tpot   ',optP='m ',optB='u74',optK1K2='l  ',optKf='dg',optGAS='Pinsitu',optS='Sprc')
+    endif
 
 ! changed optK1K2='l  ' to 'm10'
   if((co2flux(1)>1.e10) .or. (co2flux(1)<-1.e10)) then
 !     co2flux(1)=0.0  
       print*, 'ERROR: co2 flux !'
+      print*, 'ulevels_nod2d(n): ',mesh%ulevels_nod2d(n)
+      print*, 'node n (local): ',n
       print*, 'pco2surf: ',pco2surf
       print*, 'co2: ',co2
       print*, 'rhoSW: ', rhoSW
@@ -230,9 +253,16 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
    ppo = Loc_slp/Pa2atm !1 !slp divided by 1 atm
    REcoM_O2 = max(tiny*1e-3,state(one,ioxy)*1e-3) ! convert from mmol/m3 to mol/m3 for mocsy
 
-   call  o2flux(REcoM_T, REcoM_S, kw660, ppo, REcoM_O2, Nmocsy, o2ex)
-   oflux     = o2ex * 1.e3 *SecondsPerDay  !* (1.d0 - Loc_ice_conc) [mmol/m2/d]
-   o2flux_seaicemask = o2ex * 1.e3 ! back to mmol here [mmol/m2/s] 
+   !!---- Skip O2 flux calculation in ice shelf cavities
+   if (mesh%ulevels_nod2d(n) > 1) then
+       o2ex(1) = 0.0d0
+       oflux = 0.0d0
+       o2flux_seaicemask = 0.0d0
+   else
+       call  o2flux(REcoM_T, REcoM_S, kw660, ppo, REcoM_O2, Nmocsy, o2ex)
+       oflux     = o2ex * 1.e3 *SecondsPerDay  !* (1.d0 - Loc_ice_conc) [mmol/m2/d]
+       o2flux_seaicemask = o2ex * 1.e3 ! back to mmol here [mmol/m2/s]
+   endif 
 
 ! Source-Minus-Sinks
 

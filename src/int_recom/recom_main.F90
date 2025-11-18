@@ -57,6 +57,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     use o_PARAM
     use MOD_PARTIT
     use MOD_PARSUP
+    use ieee_arithmetic
 
     use recom_declarations
     use bio_fluxes_interface
@@ -153,7 +154,8 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
 !********************************* LOOP STARTS *****************************************
 
     do n=1, myDim_nod2D  ! needs exchange_nod in the end
-!     if (ulevels_nod2D(n)>1) cycle
+        !!---- Skip cavity nodes - REcoM not supported in ice shelf cavities
+        if (ulevels_nod2D(n)>1) cycle
 !       nzmin = ulevels_nod2D(n)
 
         !!---- Number of vertical layers
@@ -636,7 +638,8 @@ subroutine bio_fluxes(tracers, partit, mesh)
     use recom_locvar
     use recom_glovar
     use recom_config
-
+    use o_PARAM
+    use ieee_arithmetic
     use mod_mesh
     use MOD_PARTIT
     use MOD_PARSUP
