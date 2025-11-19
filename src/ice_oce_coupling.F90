@@ -300,6 +300,9 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     real(kind=WP), allocatable :: wiso_delta_rain(:,:),wiso_delta_snow(:,:),wiso_delta_ocean(:,:),wiso_delta_seaice(:,:)
     !---wiso-code-end
 
+    real(kind=WP) :: runoff_global_wf,runoff_global_f,runoff_south_wf,runoff_south_f
+    real(kind=WP), allocatable :: runoff_masked(:)
+
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -320,6 +323,8 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     allocate(flux(myDim_nod2D+eDim_nod2D))
+
+    allocate(runoff_masked(size(runoff)))
 
 !$OMP PARALLEL DO
     do n=1, myDim_nod2d+eDim_nod2d  
@@ -368,6 +373,17 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
                            dhi_dt_out    = thdgr,                    &
                            evap_ocn_out  = evaporation,              &
                            evap_out      = ice_sublimation           )
+
+    ! GH runoff check
+    call integrate_nod(runoff, runoff_global_wf, partit, mesh)
+    if (mype==0) write (*,*) "global runoff into water_flux: ", runoff_global_wf
+
+    runoff_masked = 0.0_WP
+    where (geo_coord_nod2D(2, :) < -60.0_WP * rad)
+        runoff_masked = runoff
+    end where
+    call integrate_nod(runoff_masked, runoff_south_wf, partit, mesh)
+    if (mype==0) write(*,*) "SO runoff into water_flux:      ", runoff_south_wf
 
 !$OMP PARALLEL DO
     do n=1, myDim_nod2d+eDim_nod2d  
@@ -540,7 +556,18 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     !          -Ice-Sublimation is not added to evap in icepack, therefor we dont need
     !           to compensate for it the ice2atmos subplimation does not contribute 
     !           to the freshwater flux into the ocean
-                   
+    
+    ! GH runoff check
+    call integrate_nod(runoff, runoff_global_f, partit, mesh)
+    if (mype==0) write (*,*) "global runoff into flux:       ", runoff_global_f
+
+    runoff_masked = 0.0_WP
+    where (geo_coord_nod2D(2, :) < -60.0_WP * rad)
+        runoff_masked = runoff
+    end where
+    call integrate_nod(runoff_masked, runoff_south_f, partit, mesh)
+    if (mype==0) write(*,*) "SO runoff into flux:            ", runoff_south_f
+
 !$OMP PARALLEL DO
     do n=1, myDim_nod2D+eDim_nod2D
         flux(n) = evaporation(n)                     &

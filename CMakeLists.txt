@@ -10,7 +10,7 @@ project(FESOM2.0)
 
 set(BUILD_SHARED_LIBS ON CACHE BOOL "Default to using shared libs")
 set(TOPLEVEL_DIR ${CMAKE_CURRENT_LIST_DIR})
-set(FESOM_COUPLED OFF CACHE BOOL "compile fesom standalone or with oasis support (i.e. coupled)")
+set(FESOM_COUPLED ON CACHE BOOL "compile fesom standalone or with oasis support (i.e. coupled)")
 set(OIFS_COUPLED OFF CACHE BOOL "compile fesom coupled to OpenIFS. (Also needs FESOM_COUPLED to work)")
 set(CRAY OFF CACHE BOOL "compile with cray ftn")
 set(USE_ICEPACK OFF CACHE BOOL "compile fesom with the Iceapck modules for sea ice column physics.")

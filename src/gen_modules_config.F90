@@ -147,6 +147,11 @@ module g_config
   logical                       :: use_cavity_partial_cell = .false. ! switch on/off cavity usage
   logical                       :: use_cavity_fw2press = .true. ! switch on/off cavity+zstar input of freshwater leads to increase in pressure
   real(kind=WP)                 :: cavity_partial_cell_thresh=0.0_WP ! same as partial_cell_tresh but for surface
+!runoff scaling attempt
+  logical                       :: use_runoff_factor = .false.
+  real(kind=WP)                 :: runoff_factor = 1.0_WP
+  real(kind=WP)                 :: runoff_ref = 1.0_WP
+!runoff scaling attempt
   logical                       :: toy_ocean=.false. ! Ersatz forcing has to be supplied
   character(100)                :: which_toy="soufflet" 
   logical                       :: flag_debug=.false.    ! prints name of actual subroutine he is in 
@@ -156,7 +161,7 @@ module g_config
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
                         use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
-                        use_transit, compute_oasis_corners
+                        use_transit, compute_oasis_corners, use_runoff_factor, runoff_factor, runoff_ref
   
   !_____________________________________________________________________________
   ! *** others ***
