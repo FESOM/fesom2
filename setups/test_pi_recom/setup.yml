@@ -1,0 +1,155 @@
+mesh: test_global
+forcing: test_recom
+clim:
+    type: test_recom
+    filelist: 
+      - 'fe5deg.nc'
+      - 'oxy5deg.nc'
+      - 'si5deg.nc'
+      - 'talk5deg.nc'
+      - 'tco2_5deg.nc'
+      - 'din5deg.nc'
+      - 'woa18_netcdf_5deg.nc'
+      - 'woa18_netcdf_5deg.nc'
+    varlist: ['Fe', 'oxygen_mmol', 'i_an', 'TAlk_mmol', 'TCO2_mmol', 'n_an', 'salt', 'temp']
+ntasks: 2
+time: "00:15:00"
+
+namelist.config:
+    run_config:
+      use_cavity: False
+      use_cavity_partial_cell: False
+    timestep:
+        step_per_day: 32
+        run_length: 1
+        run_length_unit: "d"
+    clockinit:
+        yearnew: 1948
+    calendar:
+        include_fleapyear: False
+    geometry:
+        force_rotation: True
+    restart_log:
+        restart_length: 1
+        restart_length_unit: "d"
+        logfile_outfreq: 10
+
+namelist.dyn:
+    dynamics_general:
+        use_wsplit: True
+
+namelist.ice:
+    ice_dyn:
+        whichEVP: 1
+        evp_rheol_steps: 120
+
+namelist.tra:
+    tracer_listsize:
+        num_tracers: 100
+    tracer_init3d:
+        n_ic3d: 8
+        idlist: [1019, 1022, 1018, 1003, 1002, 1001, 2, 1]
+        filelist: ['fe5deg.nc', 'oxy5deg.nc', 'si5deg.nc', 'talk5deg.nc', 'tco2_5deg.nc', 'din5deg.nc', 'woa18_netcdf_5deg.nc', 'woa18_netcdf_5deg.nc']
+        varlist: ['Fe', 'oxygen_mmol', 'i_an', 'TAlk_mmol', 'TCO2_mmol', 'n_an', 'salt', 'temp']
+        t_insitu: True
+
+namelist.recom:
+    nam_rsbc:
+        fe_data_source: 'Albani'
+        nm_fe_data_file: 'DustClimMonthlyAlbani_pimesh.nc'
+        nm_co2_data_file: 'MonthlyAtmCO2_gcb2024.nc'
+    parecomsetup:
+        enable_3zoo2det: True
+        enable_coccos: False
+    pavariables:
+        use_REcoM: True
+        REcoM_restart: False
+        bgc_num: 30
+        diags3d_num: 28
+        bgc_base_num: 22
+        biostep: 1
+        REcoM_Geider_limiter: False
+        REcoM_Grazing_Variable_Preference: True
+        Grazing_detritus: True
+        het_resp_noredfield: True
+        diatom_mucus: True
+        O2dep_remin: True
+        use_ballasting: True
+        use_density_scaling: True
+        use_viscosity_scaling: True
+        OmegaC_diss: False
+        CO2lim: True
+        Diags: True
+        constant_CO2: True
+        UseFeDust: True
+        UseDustClim: True
+        UseDustClimAlbani: True
+        use_photodamage: True
+        HetRespFlux_plus: True
+        restore_alkalinity: True
+        useRivers: False
+        useRivFe: False
+        useErosion: False
+        NitrogenSS: False
+        useAeolianN: False
+        firstyearoffesomcycle: 1948
+        lastyearoffesomcycle: 1948
+        numofCO2cycles: 1
+        currentCO2cycle: 1
+        DIC_PI: True
+        Nmocsy: 1
+        recom_debug: False
+        ciso: False
+        benthos_num: 4
+        use_MEDUSA: False
+        sedflx_num: 0
+        bottflx_num: 4
+        use_atbox: False
+        add_loopback: False
+        lb_tscale: 1.0
+
+namelist.io:
+    nml_list:
+        io_list:
+            "sst       ":
+                freq: 1
+                unit: d
+                prec: 8
+            "a_ice     ":
+                freq: 1
+                unit: d
+                prec: 8
+            "temp      ":
+                freq: 1
+                unit: d
+                prec: 8
+            "salt      ":
+                freq: 1
+                unit: d
+                prec: 8
+            "u         ":
+                freq: 1
+                unit: d
+                prec: 8
+            "v         ":
+                freq: 1
+                unit: d
+                prec: 8
+            "DIN       ":
+                freq: 1
+                unit: d
+                prec: 8
+            "DIC       ":
+                freq: 1
+                unit: d
+                prec: 8
+
+fcheck:
+    a_ice: 0.8751385167232245
+    salt: 34.730446281564674
+    sst: 8.553913157676204
+    temp: 2.4698052420959806
+    u: -0.0021267214031837154
+    v: 0.0002005313874256175
+    DIN: 15.0
+    DIC: 2100.0
