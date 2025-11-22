@@ -528,6 +528,10 @@ contains
     !$ACC ENTER DATA CREATE (f%tracers%work%adv_flux_hor, f%tracers%work%adv_flux_ver, f%tracers%work%fct_LO)
     !$ACC ENTER DATA CREATE (f%tracers%work%del_ttf_advvert, f%tracers%work%del_ttf_advhoriz, f%tracers%work%edge_up_dn_grad)
     !$ACC ENTER DATA CREATE (tr_xy, tr_z, relax2clim, Sclim, Tclim)
+    !$ACC ENTER DATA COPYIN (dt)
+    !$ACC ENTER DATA COPYIN (Ki, slope_tapered)
+    !$ACC ENTER DATA COPYIN (heat_flux, Tsurf, vcpw, surf_relax_T, virtual_salt, relax_salt, real_salt_flux, is_nonlinfs)
+    !$ACC ENTER DATA COPYIN (Kv, f%mesh%zbar_n_bot)
   end subroutine fesom_init
 
 
@@ -853,6 +857,10 @@ contains
     !$ACC EXIT DATA DELETE (f%tracers%work%del_ttf_advvert, f%tracers%work%del_ttf_advhoriz, f%tracers%work%edge_up_dn_grad)
     !$ACC EXIT DATA DELETE (f%tracers%work%del_ttf)
     !$ACC EXIT DATA DELETE (tr_xy, tr_z, relax2clim, Sclim, Tclim)
+    !$ACC EXIT DATA DELETE (dt)
+    !$ACC EXIT DATA DELETE (Ki, slope_tapered)
+    !$ACC EXIT DATA DELETE (heat_flux, Tsurf, vcpw, surf_relax_T, virtual_salt, relax_salt, real_salt_flux, is_nonlinfs)
+    !$ACC EXIT DATA DELETE (Kv, f%mesh%zbar_n_bot)
     !$ACC EXIT DATA DELETE (f%tracers%data, f%tracers%work)
     !$ACC EXIT DATA DELETE (f%dynamics%w, f%dynamics%w_e, f%dynamics%uv)
     !$ACC EXIT DATA DELETE (f%dynamics, f%tracers)
