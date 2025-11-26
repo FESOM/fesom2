@@ -8,7 +8,7 @@ nn_size            => mesh%nn_size
 ocean_areawithcav  => mesh%ocean_areawithcav
 coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)                  => mesh%coord_nod2D(:,:)
 geo_coord_nod2D(1:2,1:myDim_nod2D+eDim_nod2D)              => mesh%geo_coord_nod2D(:,:)
-elem2D_nodes(1:3, 1:myDim_elem2D+eDim_elem2D+eXDim_elem2D) => mesh%elem2D_nodes(:,:)
+elem2D_nodes(1:3, 1:myDim_elem2D) => mesh%elem2D_nodes(:,:)
 edges(1:2,1:myDim_edge2D+eDim_edge2D)                      => mesh%edges(:,:)
 edge_tri(1:2,1:myDim_edge2D+eDim_edge2D)                   => mesh%edge_tri(:,:)
 elem_edges(1:3,1:myDim_elem2D)                             => mesh%elem_edges(:,:)
@@ -64,9 +64,7 @@ hnode(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)               => mesh%hnode(:,:)
 hnode_new(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)           => mesh%hnode_new(:,:)
 zbar_3d_n(1:mesh%nl, 1:myDim_nod2D+eDim_nod2D)             => mesh%zbar_3d_n(:,:)
 Z_3d_n(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)              => mesh%Z_3d_n(:,:)
-#if defined(__async_icebergs)
 Z_3d_n_ib(1:mesh%nl-1, 1:myDim_nod2D+eDim_nod2D)           => mesh%Z_3d_n_ib(:,:)
-#endif
 helem(1:mesh%nl-1, 1:myDim_elem2D+eDim_elem2D)             => mesh%helem(:,:)
 bottom_elem_thickness(1:myDim_elem2D+eDim_elem2D)          => mesh%bottom_elem_thickness(:)
 bottom_node_thickness(1:myDim_nod2D+eDim_nod2D)            => mesh%bottom_node_thickness(:)

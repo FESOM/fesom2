@@ -1129,7 +1129,8 @@ subroutine compute_diagnostics(mode, dynamics, tracers, ice, partit, mesh)
   
   if (ldiag_destine)     call compute_destinE(mode, dynamics, tracers, partit, mesh)
   
-  call compute_thetao(mode, tracers, partit, mesh) 
+  ! Currently deactivated, as it is not needed
+  ! call compute_thetao(mode, tracers, partit, mesh) 
 
 end subroutine compute_diagnostics
 
@@ -2762,7 +2763,6 @@ end subroutine dvd_add_difflux_vertexplredi
 ! Xchi^(n+1) =  ...+ (2*Tr^(n+1) * Dflx[Tr^(n+1)] )/ V^(n+1) +...
 ! --> here Tr^(n+1) und Dflx[...] are reconstructed values at the interfase
 subroutine dvd_add_difflux_vertimplredi(do_SDdvd, tr_num, dvd_tot, tr, trstar, Ki, slope, partit, mesh)
-    use g_cvmix_kpp, only: kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc
     implicit none
         type(t_partit), intent(inout), target  :: partit
         type(t_mesh)  , intent(in)   , target  :: mesh
@@ -2905,7 +2905,6 @@ end subroutine dvd_add_difflux_vertimplredi
 ! Xchi^(n+1) =  ...+ (2*Tr^(n+1) * Dflx[Tr^(n+1)] )/ V^(n+1) +...
 ! --> here Tr^(n+1) und Dflx[...] are reconstructed values at the interfase
 subroutine dvd_add_difflux_vertimpl(do_SDdvd, tr_num, dvd_tot, tr, trstar, Kv, partit, mesh)
-    use g_cvmix_kpp, only: kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc
     implicit none
         type(t_partit), intent(inout), target  :: partit
         type(t_mesh)  , intent(in)   , target  :: mesh
@@ -3047,7 +3046,9 @@ end subroutine dvd_add_difflux_vertimpl
 ! Xchi^(n+1) =  ...+ (2*Tr^(n+1) * Dflx[Tr^(n+1)] )/ V^(n+1) +...
 ! --> here Tr^(n+1) und Dflx[...] are reconstructed values at the interfase
 subroutine dvd_add_difflux_sbc(do_SDdvd, tr_num, dvd_tot, tr, trstar, partit, mesh)
+#if defined (__cvmix)
     use g_cvmix_kpp, only: kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc
+#endif    
     implicit none
         type(t_partit), intent(inout), target  :: partit
         type(t_mesh)  , intent(in)   , target  :: mesh
@@ -3122,6 +3123,7 @@ subroutine dvd_add_difflux_sbc(do_SDdvd, tr_num, dvd_tot, tr, trstar, partit, me
                         Dflx(nz) = Dflx(nz) + MIN(ghats(nz, node)*blmc(nz, node, 3), 1.0_WP)*rsss*water_flux(node)*area(nz, node) 
                     end do
                 end if
+#if defined (__cvmix)                
             !___________________________________________________________________
             ! use cvmix KPP
             elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
@@ -3134,6 +3136,7 @@ subroutine dvd_add_difflux_sbc(do_SDdvd, tr_num, dvd_tot, tr, trstar, partit, me
                         Dflx(nz) = Dflx(nz) + MIN(kpp_nonlcltranspT(nz, node)*kpp_oblmixc(nz, node, 3), 1.0_WP)*rsss*water_flux(node)*area(nz, node) 
                     end do
                 end if    
+#endif                
             end if
         end if ! --> if (use_kpp_nonlclflx) then
         

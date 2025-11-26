@@ -28,9 +28,12 @@ module g_config
   character(MAX_PATH)        :: ClimateDataPath='./hydrography/'
   character(MAX_PATH)        :: TideForcingPath='./tide_forcing/'
   character(MAX_PATH)        :: ResultPath='./result/'
+  character(MAX_PATH)        :: RestartInPath=''
+  character(MAX_PATH)        :: RestartOutPath=''
   character(20)              :: MeshId='NONE'
   namelist /paths/  MeshPath, ClimateDataPath, &
-       TideForcingPath, ResultPath, MeshId
+       TideForcingPath, ResultPath, MeshId, &
+       RestartInPath, RestartOutPath
        
   !_____________________________________________________________________________
   ! *** restart_log ***
@@ -94,11 +97,13 @@ module g_config
   logical                :: use_depthonelem =.false.
   character(len=10)      :: use_depthfile='aux3d'   ! 'aux3d', 'depth@'        
   logical                :: use_cavityonelem=.false.
+  logical                :: metric_factor_zero=.false. ! if true, set metric_factor to zero
   
   namelist /geometry/   cartesian, fplane, &
                         cyclic_length, rotated_grid, force_rotation, &
                         alphaEuler, betaEuler, gammaEuler, &
-                        which_depth_n2e, use_depthonelem, use_cavityonelem, use_depthfile
+                        which_depth_n2e, use_depthonelem, use_cavityonelem, use_depthfile, &
+                        metric_factor_zero
 
   !_____________________________________________________________________________
   ! *** fleap_year ***
