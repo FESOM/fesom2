@@ -642,7 +642,7 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
 #endif
     call write_all_bin_restarts((/globalstep+istep, int(ctime), yearnew/), &
                                 write_bin_dirpath,                   &
-                                write_bin_infopath,
+                                write_bin_infopath,                  &
                                 partit,                              &
                                 mesh,                                &                                
                                 ice,                                 &
