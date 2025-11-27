@@ -283,6 +283,11 @@ contains
         if(use_landice_water) call landice_water_init(f%partit, f%mesh)
         !---fwf-code-end
 
+        !---runoff-scaling-code-begin
+        if(f%mype==0)  write(*,*) 'use_runoff_scaling', use_runoff_scaling
+        if(use_runoff_scaling) call runoff_scaling_init()
+        !---runoff-scaling-code-end
+
         !---age-code-begin
         if(f%mype==0)  write(*,*) 'use_age_tracer', use_age_tracer
         if(use_age_tracer) call age_tracer_init(f%partit, f%mesh)

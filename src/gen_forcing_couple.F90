@@ -192,9 +192,9 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   
   !_____________________________________________________________________________
   t1=MPI_Wtime()
-  if (mype == 0) then
-    write(*,*) 'DEBUG: entered update_atm_forcing with istep=', istep, ' action=', action
-  end if
+  !if (mype == 0) then
+  !  write(*,*) 'DEBUG: entered update_atm_forcing with istep=', istep, ' action=', action
+  !end if
 #if defined (__oasis)
      if (firstcall) then
         allocate(exchange(myDim_nod2D+eDim_nod2D), mask(myDim_nod2D+eDim_nod2D))
@@ -383,13 +383,6 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
                 runoff(:)            =  exchange(:)        ! AWI-CM2: runoff, AWI-CM3: runoff + excess snow on glaciers
                 mask=1.
                 
-                ! plan for runoff_ref:
-                ! - take the integrated SO value
-                ! - divide the runoff_ref by int_SO
-                ! - 
-                ! 
-
-                ! GH
                 call integrate_nod(runoff, runoff_global_before, partit, mesh)
                 if (mype==0) write (*,*) "before consv - global:               ", runoff_global_before
 
@@ -399,42 +392,46 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
                 end where
                 call integrate_nod(runoff_masked, runoff_south_before, partit, mesh)
                 if (mype==0) write(*,*) "before consv - SO:                    ", runoff_south_before
-                ! GH
 
                 call force_flux_consv(runoff, mask, i, 0,action, partit, mesh)
                 
-                ! GH 
                 call integrate_nod(runoff, runoff_global_after, partit, mesh)
                 if (mype==0) write (*,*) "after consv/before scaling - global: ", runoff_global_after
 
-                runoff_masked = 0.0_WP
-                where (geo_coord_nod2D(2, :) < -60.0_WP * rad)
-                  runoff_masked = runoff
-                end where
+                !runoff_masked = 0.0_WP
+                !where (geo_coord_nod2D(2, :) < -60.0_WP * rad)
+                !  runoff_masked = runoff
+                !end where
                 call integrate_nod(runoff_masked, runoff_south_after, partit, mesh)
                 if (mype==0) write(*,*) "after consv/before scaling - SO:      ", runoff_south_after
-                
+
+                if (runoff_south_after == 0.0_WP) then
+                  if (mype==0) write(*,*) "Warning: runoff_south_after = 0, skipping scaling"
+                else
+                  call runoff_scaling(runoff, partit, mesh)
+                end if
+
                 ! runoff_factor_ref = runoff_ref * 1.0e6_WP / runoff_south_after
                 ! if (mype==0) write(*,*) "runoff factor after reference:        ", runoff_factor_ref
 
-                if (runoff_south_after == 0.0_WP) then
-                  runoff_factor_ref = 1.0_WP
-                  if (mype==0) write(*,*) "Warning: runoff_south_after = 0, skipping scaling, setting factor to 1.0"
-                else
-                  runoff_factor_ref = runoff_ref * 1.0e6_WP / runoff_south_after
-                  if (mype==0) write(*,*) "runoff factor after reference:        ", runoff_factor_ref
-                end if
+                !if (runoff_south_after == 0.0_WP) then
+                !  runoff_factor_ref = 1.0_WP
+                !  if (mype==0) write(*,*) "Warning: runoff_south_after = 0, skipping scaling, setting factor to 1.0"
+                !else
+                !  runoff_factor_ref = runoff_ref_const * 1.0e6_WP / runoff_south_after
+                !  if (mype==0) write(*,*) "runoff factor after reference:        ", runoff_factor_ref
+                !end if
 
-                if (use_runoff_factor) then
-                  !$OMP PARALLEL DO
-                  do j = 1, myDim_nod2D + eDim_nod2D
-                    if (geo_coord_nod2D(2, j) < -60.0_WP * rad) then
-                      !runoff(j) = runoff(j) * runoff_factor
-                      runoff(j) = runoff(j) * runoff_factor_ref
-                    end if
-                  end do
-                  !$OMP END PARALLEL DO
-                end if
+                !if (use_runoff_factor) then
+                !  !$OMP PARALLEL DO
+                !  do j = 1, myDim_nod2D + eDim_nod2D
+                !    if (geo_coord_nod2D(2, j) < -60.0_WP * rad) then
+                !      !runoff(j) = runoff(j) * runoff_factor
+                !      runoff(j) = runoff(j) * runoff_factor_ref
+                !    end if
+                !  end do
+                !  !$OMP END PARALLEL DO
+                !end if
                 
                 call integrate_nod(runoff, runoff_global_after, partit, mesh)
                 if (mype==0) write (*,*) "after scaling - global:              ", runoff_global_after
@@ -446,8 +443,6 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
                 call integrate_nod(runoff_masked, runoff_south_after, partit, mesh)
                 if (mype==0) write(*,*) "after scaling - SO:                   ", runoff_south_after
                 
-                ! GH
-
             end if
 #if defined (__oifs)
 
