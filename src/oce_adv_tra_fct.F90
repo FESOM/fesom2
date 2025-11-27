@@ -267,7 +267,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 #endif
     !Vertical
 #ifndef ENABLE_OPENACC
-!$OMP DO
+!$OMP DO 
 #else
     !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #endif
@@ -288,7 +288,11 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 #endif
 
 #ifndef ENABLE_OPENACC
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
 #else
     !Horizontal
 #if !defined(DISABLE_OPENACC_ATOMICS)

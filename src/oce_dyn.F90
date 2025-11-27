@@ -323,7 +323,11 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
 
     !___________________________________________________________________________
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, nz, ed, el, nelem, k, elem, nzmin, nzmax, update_u, update_v)
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)
@@ -473,7 +477,11 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! Sum up velocity differences over edge with respect to elemtnal index
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, ed, el, nz, nzmin, nzmax)
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el    = edge_tri(:,ed)
@@ -533,7 +541,11 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
 !$OMP BARRIER
 
     !___________________________________________________________________________
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)
@@ -627,7 +639,11 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
 
     !___________________________________________________________________________
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, ed, el, nz, nzmin, nzmax, update_u, update_v)
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)
@@ -675,7 +691,11 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
 !$OMP BARRIER
 
     !___________________________________________________________________________
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)

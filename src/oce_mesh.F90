@@ -2510,6 +2510,7 @@ t0=MPI_Wtime()
  center_x(n)=ax
  center_y(n)=ay
  mesh%elem_cos(n)=cos(ay)
+
  if (metric_factor_zero) then
     mesh%metric_factor(n)=0.0_WP
  else
