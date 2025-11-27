@@ -1499,7 +1499,7 @@ subroutine dvd_add_advflux_hor(do_SDdvd, tr_num, dvd_tot, trflx_h, UV, trstar, d
             !  U = u*h
             !  Xchi_(i+0.5) = 2*[U_(i+0.5)* T^tilde_(i+0.5) * ( Tstar_i-Tstar_(i-1) ) -
             !                    U_(i+0.5)*0.5*(Tstar_i+Tstar_(i-1))*(Tstar_i-Tstar_(i-1))]
-            xchi   = 2.0_WP * -trflx_h(nz, edge)*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
+            xchi   = 2.0_WP * (-trflx_h(nz, edge))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
             !                 |-> this minus because trflx_v contains the 
             !                      negative tracer flx we need it positive
             xchi   = xchi - vflx*(trstar(nz,ednodes(1))+trstar(nz,ednodes(2)))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
@@ -1533,7 +1533,7 @@ subroutine dvd_add_advflux_hor(do_SDdvd, tr_num, dvd_tot, trflx_h, UV, trstar, d
                 !  U = u*h
                 !  Xchi_(i+0.5) = 2*[U_(i+0.5)* T^tilde_(i+0.5) * ( Tstar_i-Tstar_(i-1) ) -
                 !                    U_(i+0.5)*0.5*(Tstar_i+Tstar_(i-1))*(Tstar_i-Tstar_(i-1))]
-                xchi   = 2.0_WP * -trflx_h(nz, edge)*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
+                xchi   = 2.0_WP * (-trflx_h(nz, edge))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
                 !                 |-> this minus because trflx_v contains the 
                 !                      negative tracer flx we need it positive                         
                 xchi   = xchi - vflx*(trstar(nz,ednodes(1))+trstar(nz,ednodes(2)))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
@@ -1569,7 +1569,7 @@ subroutine dvd_add_advflux_hor(do_SDdvd, tr_num, dvd_tot, trflx_h, UV, trstar, d
             !  U = u*h
             !  Xchi_(i+0.5) = 2*[U_(i+0.5)* T^tilde_(i+0.5) * ( Tstar_i-Tstar_(i-1) ) -
             !                    U_(i+0.5)*0.5*(Tstar_i+Tstar_(i-1))*(Tstar_i-Tstar_(i-1))]
-            xchi   = 2.0_WP * -trflx_h(nz, edge)*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
+            xchi   = 2.0_WP * (-trflx_h(nz, edge))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
             !                 |-> this minus because trflx_v contains the 
             !                      negative tracer flx we need it positive
             xchi   = xchi - vflx*(trstar(nz,ednodes(1))+trstar(nz,ednodes(2)))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
@@ -1603,7 +1603,7 @@ subroutine dvd_add_advflux_hor(do_SDdvd, tr_num, dvd_tot, trflx_h, UV, trstar, d
             !  U = u*h
             !  Xchi_(i+0.5) = 2*[U_(i+0.5)* T^tilde_(i+0.5) * ( Tstar_i-Tstar_(i-1) ) -
             !                    U_(i+0.5)*0.5*(Tstar_i+Tstar_(i-1))*(Tstar_i-Tstar_(i-1))]
-            xchi   = 2.0_WP * -trflx_h(nz, edge)*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
+            xchi   = 2.0_WP * (-trflx_h(nz, edge))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
             !                 |-> this minus because trflx_v contains the 
             !                      negative tracer flx we need it positive
             xchi   = xchi - vflx*(trstar(nz,ednodes(1))+trstar(nz,ednodes(2)))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
@@ -1637,7 +1637,7 @@ subroutine dvd_add_advflux_hor(do_SDdvd, tr_num, dvd_tot, trflx_h, UV, trstar, d
             !  U = u*h
             !  Xchi_(i+0.5) = 2*[U_(i+0.5)* T^tilde_(i+0.5) * ( Tstar_i-Tstar_(i-1) ) -
             !                    U_(i+0.5)*0.5*(Tstar_i+Tstar_(i-1))*(Tstar_i-Tstar_(i-1))]
-            xchi   = 2.0_WP * -trflx_h(nz, edge)*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
+            xchi   = 2.0_WP * (-trflx_h(nz, edge))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
             !                 |-> this minus because trflx_v contains the 
             !                      negative tracer flx we need it positive
             xchi   = xchi - vflx*(trstar(nz,ednodes(1))+trstar(nz,ednodes(2)))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
@@ -1715,7 +1715,7 @@ subroutine dvd_add_advflux_ver(do_SDdvd, tr_num, dvd_tot, trflx_v, Wvel, trstar,
             ! surface xchi
             nz=nu1
             trstar_zlev = trstar(nz, node)
-            xchi(nz) = 2.0_WP*-trflx_v(nz, node)*(trstar(nz, node)-trstar(nz+1, node))
+            xchi(nz) = 2.0_WP*(-trflx_v(nz, node))*(trstar(nz, node)-trstar(nz+1, node))
             xchi(nz) = xchi(nz) - 2.0_WP*Wvel(nz, node)*area(nz, node)*trstar_zlev*(trstar(nz, node)-trstar(nz+1, node))
             
             ! surface and bulk dvd, bulk xchi 
@@ -1726,7 +1726,7 @@ subroutine dvd_add_advflux_ver(do_SDdvd, tr_num, dvd_tot, trflx_v, Wvel, trstar,
                 trstar_zlev = (trstar(nz-1, node)*hnode(nz-1, node)+trstar(nz, node)*hnode(nz, node))/(hnode(nz-1,node)+hnode(nz,node))
                 
                 ! --> here we are on full depth levels eq. 26 for small dt
-                xchi(nz) = 2.0_WP*-trflx_v(nz, node)*(trstar(nz-1, node)-trstar(nz, node))
+                xchi(nz) = 2.0_WP*(-trflx_v(nz, node))*(trstar(nz-1, node)-trstar(nz, node))
                 !                 |-> this minus because trflx_v contains the 
                 !                     negative tracer flx we need it positive
                 xchi(nz) = xchi(nz) - 2.0_WP*Wvel(nz, node)*area(nz, node)*trstar_zlev*(trstar(nz-1, node)-trstar(nz, node))
