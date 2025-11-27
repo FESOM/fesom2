@@ -8,9 +8,46 @@ Plotting code is removed as requested.
 import numpy as np
 from scipy.interpolate import CubicSpline
 import matplotlib
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.tri as mtri
+
+def find_boundary_nodes(tri):
+    if tri.shape[0] == 3: tri = tri.T
+    
+    # build edges (undirected)
+    edges = np.sort(np.vstack([tri[:,[0,1]], tri[:,[1,2]], tri[:,[2,0]]]), axis=1 )
+
+    # sort edges lexicographically
+    idx = np.lexsort((edges[:,1], edges[:,0]))
+    edges_sorted = edges[idx]
+
+    # find which edges occur only once → boundary edges
+    same = np.all(edges_sorted[1:] == edges_sorted[:-1], axis=1)
+
+    # an edge is boundary if it is not equal to the next OR previous
+    # detect all edges that appear only once
+    boundary_edge_mask = np.ones(len(edges_sorted), dtype=bool)
+    boundary_edge_mask[:-1] &= ~same
+    boundary_edge_mask[1:]  &= ~same
+
+    boundary_edges = edges_sorted[boundary_edge_mask]
+
+    # boundary nodes = all nodes appearing in those edges
+    boundary_nodes = np.unique(boundary_edges)
+    return boundary_nodes
+
+def triangles_with_3_boundary_nodes(tri):
+    boundary_nodes = find_boundary_nodes(tri)
+    
+    tri = np.asarray(tri)
+    if tri.shape[0] == 3: tri = tri.T
+
+    is_bnd = np.isin(tri, boundary_nodes)
+    # triangles where all 3 vertices are boundary nodes
+    mask_bad = is_bnd.sum(axis=1) == 3
+    return(mask_bad)
+    
+
 
 def main():
     print(" Create neverworld2 mesh.")
@@ -20,19 +57,16 @@ def main():
     Lx         = 60.0         # degrees
     Ly         = 70.0         # domain from -Ly to Ly
     Lyperiodic = [-60.0, -40.0]   # Latitude range for periodic boundary
-    
-    
-    cyclic_len = Lx
-
     meshtype   = 1            # 1 = lon/lat grid
     dxm        = 1.0          # triangle side at equator / Resolution
     zonal      = 0            # 0 = castellated in x, 1 = castellated in y
     
+    cyclic_len = Lx
+    
     # define layer thicknesses of each layer
-    hthick = np.array([25, 50, 100, 125, 150, 175, 200, 225, 250, 300, 350, 400, 500, 550, 600])        
+    hthick     = np.array([25, 50, 100, 125, 150, 175, 200, 225, 250, 300, 350, 400, 500, 550, 600])        
     max_depth  = -hthick.sum()  #-4000.0
-    
-    
+
     do_plot    = True
 
     #___________________________________________________________________________
@@ -135,7 +169,16 @@ def main():
     # Replace references in tri (still 1-based!), replace right node index with 
     # left one in elem list --> close periodicity
     for L, R in zip(idx_left, idx_right): tri[tri == R] = L
+    del(idx_left, idx_right)
 
+    ##___________________________________________________________________________
+    ## check for isolated boundary triangles and kick the out 
+    mask     = triangles_with_3_boundary_nodes(tri)
+    print(' --> number of isolated tri to eliminate: ', np.sum(mask))
+    tri      = tri[:, mask==False]
+    del(mask)
+    
+    #___________________________________________________________________________
     # Identify used vertices
     keep     = np.unique(tri.flatten())
     
@@ -146,14 +189,16 @@ def main():
     tri      = np.vectorize(mapping.get)(tri)
     xcoord   = xcoord[keep]
     ycoord   = ycoord[keep]
-    nodind   = nodind[keep]
+    nodind   = nodind[keep]    
     n2dn     = len(xcoord)
     n2de     = tri.shape[1]
     
     xc       = xcoord[tri]
     isnotpbnd= (xc.max(axis=0)-xc.min(axis=0)) <= cyclic_len/2.0
-    print(' --> number of vertices: ', n2dn )
-    print(' --> number of elements: ', n2de )
+    del(xc)
+    print(' --> number of vertices  : ', n2dn )
+    print(' --> number of elements  : ', n2de )
+    print(' --> number of pbnd elem.: ', np.sum(isnotpbnd==False) )
     # --> mesh definiiton is finished until here     
     
     #___________________________________________________________________________
@@ -256,7 +301,7 @@ def main():
         fig.colorbar(h2, )
 
         plt.tight_layout()
-        plt.savefig("mesh_neverworld2.png", dpi=150)
+        plt.savefig("mesh_neverworld2.png", dpi=300)
         
         
         from mpl_toolkits.mplot3d import Axes3D    
@@ -277,18 +322,18 @@ def main():
         ax.set_box_aspect((1, 1, 0.2))   # X:Y:Z = 1:1:0.2 → compressed Z
         ax.view_init(elev=60, azim=-90)
         plt.tight_layout()
-        plt.savefig("mesh_neverworld2_3d.png", dpi=150)
+        plt.savefig("mesh_neverworld2_3d.png", dpi=300)
     
 
     
     #___________________________________________________________________________
     # Wind stress (Cubic spline)
-    yi     = np.array([-70, -45, -15, 0, 15, 45, 70])
-    taui   = np.array([0., 0.2, -0.1, -0.02, -0.1, 0.1, 0])
-    yw     = np.arange(-70, 71)
-    spline = CubicSpline(yi, taui)
-    tauw   = spline(yw)
-    tau_node = spline(ycoord)
+    yi       = np.array([-70, -45, -15, 0, 15, 45, 70])
+    taui     = np.array([0., 0.2, -0.1, -0.02, -0.1, 0.1, 0])
+    yw       = np.arange(-70, 71)
+    spline   = CubicSpline(yi, taui)
+    tauw     = spline(yw)
+    tau_elem = spline(ycoord[tri].sum(axis=0)/3.0)
     if do_plot: 
         fig = plt.figure(figsize=(7, 14))
         ax = plt.gca()
@@ -334,7 +379,9 @@ def main():
             f.write(f"{len(zbar)}\n")
             for z in zbar:
                 f.write(f"{z}\n")        
-        
+            for d in depth:
+                f.write(f"{d:7.1f}\n")
+            
         print('    - depth_zlev.out (alternativ)')
         with open("depth_zlev.out", "w") as f:
             f.write(f"{len(zbar)}\n")
@@ -350,18 +397,25 @@ def main():
         with open("depth@elem.out", "w") as f:        
             for d in depth_elem:
                 f.write(f"{d:7.1f}\n")
-            for d in depth:
-                f.write(f"{d:7.1f}\n")
                 
         #_______________________________________________________________________        
         # write windstress information 
-        print('    - windstress@node.out')        
-        with open("windstress@node.out", "w") as f:
-            for tw in tau_node:
-                f.write(f"{tw}\n")
+        print('    - windstres.out')        
+        with open("windstress.out", "w") as f:
+            f.write(f"{len(yw)}\n")
+            for yi, ti in zip(yw, tauw):
+                f.write(f"{yi} {ti}\n")
+                
+        print('    - windstress@elem.out')        
+        with open("windstress@elem.out", "w") as f:
+            for ti in tau_elem:
+                f.write(f"{ti}\n")
 
     print(" Mesh generation completed.")
 
 
+
+
 if __name__ == "__main__":
     main()
+    
