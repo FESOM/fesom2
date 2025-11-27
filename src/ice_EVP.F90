@@ -227,19 +227,17 @@ subroutine stress2rhs(ice, partit, mesh)
 #endif
 
 #ifndef ENABLE_OPENACC
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
 #else
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #if !defined(DISABLE_OPENACC_ATOMICS)
        !$ACC ATOMIC UPDAATE
 #else
     !$ACC UPDATE SELF(u_rhs_ice, v_rhs_ice, sigma11, sigma12, sigma22)
-#endif
-#ifndef ENABLE_OPENACC
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
-!$OMP DO
 #endif
 #endif
     do el=1,myDim_elem2D
