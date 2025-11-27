@@ -8,9 +8,9 @@ module diff_part_hor_redi_interface
         type(t_tracer), intent(inout), target :: tracer
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine diff_part_hor_redi
     end interface
-end module
+end module diff_part_hor_redi_interface
 
 module diff_ver_part_expl_ale_interface
     interface
@@ -23,9 +23,9 @@ module diff_ver_part_expl_ale_interface
         type(t_tracer), intent(inout), target :: tracer
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine diff_ver_part_expl_ale
     end interface
-end module
+end module diff_ver_part_expl_ale_interface
 
 module diff_ver_part_redi_expl_interface
     interface
@@ -37,9 +37,9 @@ module diff_ver_part_redi_expl_interface
         type(t_tracer), intent(inout), target :: tracer
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine diff_ver_part_redi_expl
     end interface
-end module
+end module diff_ver_part_redi_expl_interface
 
 module diff_ver_part_impl_ale_interface
     interface
@@ -56,9 +56,9 @@ module diff_ver_part_impl_ale_interface
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
         type(t_ice)   , intent(in)   , target :: ice
-        end subroutine
+        end subroutine diff_ver_part_impl_ale
     end interface
-end module
+end module diff_ver_part_impl_ale_interface
 
 module diff_tracers_ale_interface
     interface
@@ -75,9 +75,9 @@ module diff_tracers_ale_interface
         type(t_ice),    intent(in),    target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine diff_tracers_ale
     end interface
-end module
+end module diff_tracers_ale_interface
 
 module bc_surface_interface
     interface
@@ -90,9 +90,9 @@ module bc_surface_interface
         type(t_mesh), intent(in), target      :: mesh
         real(kind=WP)                         :: bc_surface
         real(kind=WP), intent(in)             :: sval, sst, sss, a_ice
-        end function
+        end function bc_surface
     end interface
-end module
+end module bc_surface_interface
 
 module diff_part_bh_interface
     interface
@@ -107,9 +107,9 @@ module diff_part_bh_interface
         type(t_tracer), intent(inout), target :: tracer
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine diff_part_bh
     end interface
-end module
+end module diff_part_bh_interface
 
 module solve_tracers_ale_interface
     interface
@@ -125,9 +125,9 @@ module solve_tracers_ale_interface
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine solve_tracers_ale
     end interface
-end module
+end module solve_tracers_ale_interface
 !
 !
 !===============================================================================
@@ -224,8 +224,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         ! advect tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call adv_tracers_ale'//achar(27)//'[0m'
 	!here update only those initialized in the init_tracers. (values, valuesAB, edge_up_dn_grad, ...)
-        !$ACC UPDATE  DEVICE(tracers%data(tr_num)%values, tracers%data(tr_num)%valuesAB) &
-        !$ACC  DEVICE(tracers%work%edge_up_dn_grad) !!&
+        !!$ACC UPDATE  DEVICE(tracers%data(tr_num)%values, tracers%data(tr_num)%valuesAB, tracers%data(tr_num)%valuesold)
+        !$ACC  UPDATE DEVICE(tracers%work%edge_up_dn_grad) !!&
         ! it will update del_ttf with contributions from horizontal and vertical advection parts (del_ttf_advhoriz and del_ttf_advvert)
 	!$ACC wait(1)
         call do_oce_adv_tra(dt, UV, Wvel, Wvel_i, Wvel_e, tr_num, dynamics, tracers, partit, mesh)
@@ -526,7 +526,7 @@ subroutine diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
             rdata =  Tsurf(n)
             rlx   =  surf_relax_T
         elseif (tracers%data(tr_num)%ID==2) then
-            flux  =  virtual_salt(n)+relax_salt(n)- real_salt_flux(n)*is_nonlinfs
+            flux  =  virtual_salt(n)+relax_salt(n) + real_salt_flux(n)*is_nonlinfs
         else
             flux  = 0._WP
             rdata = 0._WP
@@ -566,7 +566,9 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     use g_CONFIG
     use g_forcing_arrays
     use o_mixing_KPP_mod !for ghats _GO_
+#if defined (__cvmix)       
     use g_cvmix_kpp, only: kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc
+#endif    
     use bc_surface_interface
     use mod_ice
     use iceberg_params
@@ -932,6 +934,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
                                -( MIN(ghats(nz  ,n)*blmc(nz  ,n,3), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
                                 ) * rsss * water_flux(n) * dt
                 end if
+#if defined (__cvmix)                   
             !___________________________________________________________________
             ! use cvmix KPP
             elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
@@ -973,6 +976,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
                                -( MIN(kpp_nonlcltranspS(nz  ,n)*kpp_oblmixc(nz  ,n,3), 1.0_WP)*(area(nz  ,n)/areasvol(nz,n)) &
                                 ) * rsss * water_flux(n) * dt
                 end if
+#endif                
             end if
         end if ! --> if (use_kpp_nonlclflx) then
         
@@ -1000,7 +1004,8 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
             do nz=nzmin, nzmax-1
                 zinv=1.0_WP*dt  !/(zbar(nz)-zbar(nz+1)) ale!
                 !!PS tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n) * ( area(nz+1,n)/areasvol(nz,n)) ) * zinv
-                tr(nz)=tr(nz)+(ibhf_n(nz, n)-ibhf_n(nz+1, n) * area(nz+1,n)/areasvol(nz,n)) * zinv / vcpw
+                tr(nz)=tr(nz)+(ibhf_n(nz, n)) * zinv / vcpw * area(nz+1,n)/areasvol(nz,n) !) * zinv / vcpw
+                !tr(nz)=tr(nz)+(ibhf_n(nz, n)-ibhf_n(nz+1, n)) * zinv / vcpw ! * area(nz+1,n)/areasvol(nz,n)) * zinv / vcpw
             end do
         end if
         
@@ -1507,7 +1512,7 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
     press_a = press_air(n)
     wind_2  = u_wind(n)**2 + v_wind(n)**2
 #endif
-    ! Atmospheric input of bomb-14C, CFC-12, and SF6 varies with latitude. To that effect specify
+    ! Atmospheric input of bomb-14C, CFC-11, CFC-12, and SF6 varies with latitude. To that effect specify
     y_abc = mesh%geo_coord_nod2D(2,n) / rad  ! latitude of atmospheric tracer input
     yy_nh = (10. - y_abc) * 0.05             ! interpolation weight for tropical CFC-12 and SF6 values
   end if ! use_transit
@@ -1522,9 +1527,9 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
         ! --> real_salt_flux(:): salt flux due to containment/releasing of salt
         !     by forming/melting of sea ice
         bc_surface= dt*(virtual_salt(n) & !--> is zeros for zlevel/zstar
-                    + relax_salt(n) - real_salt_flux(n)*is_nonlinfs)
+                    + relax_salt(n) + real_salt_flux(n)*is_nonlinfs)
             
-    !___Transient tracers (cases ##6,12,14,39)__________________________________
+    !___Transient tracers (cases ##6,11,12,14,39)__________________________________
     CASE (6) ! SF6
       if (anthro_transit) then
         ! Select atmospheric input values corresponding to the latitude
@@ -1553,7 +1558,7 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
            xf11_a = xf11_nh(ti_transit)
            if (ti_transit < length_transit) xf11_a = xf11_a + month * (xf11_nh(ti_transit + 1) - xf11_a) / 12.
         else if (y_abc <- 10.) then  ! Southern hemisphere
-           xf11_a = xf12_sh(ti_transit)
+           xf11_a = xf11_sh(ti_transit)
            if (ti_transit < length_transit) xf11_a = xf11_a + month * (xf11_sh(ti_transit + 1) - xf11_a) / 12.
         else                         ! Tropical zone, interpolate between NH and SH
            xf11_a = (1 - yy_nh) * xf11_nh(ti_transit) + yy_nh * xf11_sh(ti_transit)
@@ -1678,4 +1683,4 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
   END SELECT
   RETURN
 
-END FUNCTION
+end function bc_surface

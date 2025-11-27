@@ -20,9 +20,9 @@ module visc_filt_bcksct_interface
       type(t_partit), intent(inout), target :: partit
       type(t_mesh)  , intent(in)   , target :: mesh
       
-    end subroutine
+    end subroutine visc_filt_bcksct
   end interface
-end module
+end module visc_filt_bcksct_interface
 
 module visc_filt_bilapl_interface
   interface
@@ -35,9 +35,9 @@ module visc_filt_bilapl_interface
       type(t_partit), intent(inout), target :: partit
       type(t_mesh)  , intent(in)   , target :: mesh
       
-    end subroutine
+    end subroutine visc_filt_bilapl
   end interface
-end module
+end module visc_filt_bilapl_interface
 
 module visc_filt_bidiff_interface
   interface
@@ -50,9 +50,9 @@ module visc_filt_bidiff_interface
       type(t_partit), intent(inout), target :: partit
       type(t_mesh)  , intent(in)   , target :: mesh
       
-    end subroutine
+    end subroutine visc_filt_bidiff
   end interface
-end module
+end module visc_filt_bidiff_interface
 
 module check_validviscopt_interface
     interface
@@ -62,9 +62,9 @@ module check_validviscopt_interface
             USE MOD_PARSUP
             type(t_partit), intent(inout), target :: partit
             type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine    
+        end subroutine check_validviscopt_5    
     end interface
-end module 
+end module check_validviscopt_interface 
 
 ! 
 ! Contains routines needed for computations of dynamics.
@@ -823,7 +823,7 @@ SUBROUTINE compute_apegen(dynamics, tracers, partit, mesh)
     type(t_mesh)  , intent(in)   , target   :: mesh
     real(kind=WP), dimension(:,:), pointer  :: salt
     !___________________________________________________________________________
-    integer        :: n, nzmin
+    integer        :: n, k, nzmin, nzmax
     real(kind=WP)  :: JS, GS, D
     !___________________________________________________________________________
 #include "associate_part_def.h"
@@ -835,6 +835,7 @@ salt   => tracers%data(2)%values(:,:)
 
   DO n=1, myDim_nod2D
      nzmin=ulevels_nod2D(n)
+     nzmax=nlevels_nod2D(n)
      ! heat and salinity fluxes at node=n
      JS= heat_flux_in(n) / vcpw
      GS=(relax_salt(n) + water_flux(n) * salt(nzmin,n))
@@ -843,7 +844,11 @@ salt   => tracers%data(2)%values(:,:)
      dynamics%ke_G   (n)=GS
      dynamics%ke_D   (n)=D
      dynamics%ke_D2  (n)=D**2
-     dynamics%ke_n0  (n)=-bvfreq (nzmin,n)*density_0/g
+     !this we need in 3D
+     !dynamics%ke_n0  (n)=-bvfreq (nzmin,n)*density_0/g
+     DO k=nzmin, nzmax-1
+        dynamics%ke_n0(k, n)=-bvfreq (k, n)*density_0/g
+     END DO
      dynamics%ke_JD(n)  =JS*D
      dynamics%ke_GD(n)  =GS*D
      dynamics%ke_D (n)  =D
@@ -863,8 +868,52 @@ salt   => tracers%data(2)%values(:,:)
   call exchange_nod(dynamics%ke_swA, partit)
   call exchange_nod(dynamics%ke_swB, partit)
 END SUBROUTINE compute_apegen
-
-
+! compute energy conversion (Pm<->Pe), as well as Pm & Pe
+SUBROUTINE compute_PePm(dynamics, tracers, partit, mesh)
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_TRACER
+    USE MOD_PARSUP
+    use MOD_DYN
+    USE o_PARAM
+    USE g_comm_auto
+    USE o_ARRAYS
+    IMPLICIT NONE
+    type(t_dyn)   , intent(inout), target   :: dynamics
+    type(t_tracer), intent(in)   , target   :: tracers
+    type(t_partit), intent(inout), target   :: partit
+    type(t_mesh)  , intent(in)   , target   :: mesh
+   !___________________________________________________________________________
+    real(kind=WP), dimension(:,:,:), pointer :: UV
+    integer        :: elem, k, nzmin, nzmax, elnodes(3)
+    real(kind=WP)  :: dens
+    !___________________________________________________________________________
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+  UV     => dynamics%uv(:,:,:)
+  DO elem=1, myDim_elem2D
+     elnodes=elem2D_nodes(:,elem)
+     nzmin = ulevels(elem)
+     nzmax = nlevels(elem)
+     DO k=nzmin, nzmax-1
+        dynamics%ke_Dx(k,elem)=sum(gradient_sca(1:3,elem)*density_m_rho0(k,elnodes))
+        dynamics%ke_Dy(k,elem)=sum(gradient_sca(4:6,elem)*density_m_rho0(k,elnodes))
+        dens=sum(density_m_rho0(k,elnodes))/3.0_WP
+        dynamics%ke_DU(k,elem)=dens*UV(1,k,elem)
+        dynamics%ke_DV(k,elem)=dens*UV(2,k,elem)
+        dynamics%ke_elemD (k,elem)=dens
+        dynamics%ke_elemD2(k,elem)=dens**2
+     END DO
+  END DO
+  call exchange_elem(dynamics%ke_Dx,   partit)
+  call exchange_elem(dynamics%ke_Dy,   partit)
+  call exchange_elem(dynamics%ke_DU,   partit)
+  call exchange_elem(dynamics%ke_DV,   partit)
+  call exchange_elem(dynamics%ke_elemD,  partit)
+  call exchange_elem(dynamics%ke_elemD2, partit)
+END SUBROUTINE compute_PePm
 !
 !
 !_______________________________________________________________________________

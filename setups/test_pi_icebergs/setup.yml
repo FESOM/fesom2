@@ -20,7 +20,6 @@ namelist.config:
       use_cavity: False
       use_cavity_partial_cell: False
     timestep:
-        step_per_day: 96
         run_length: 1
         run_length_unit: "d"
     geometry:
@@ -68,9 +67,9 @@ namelist.io:
                 prec: 8
 
 fcheck:
-    a_ice: 0.19109711390180978
-    salt: 22.542383169719855
-    sst: 12.519779895755693
-    temp: 1.8320760001801122
-    u: -0.0017879101457798695
-    v: -0.0001532023379298892
+    a_ice: 0.8923871635993618
+    salt: 34.714305379797985
+    sst: 12.605505898664285
+    temp: 2.8244591780616988
+    u: -0.002788319785102834
+    v: -0.0002313129656984317

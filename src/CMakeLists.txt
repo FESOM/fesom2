@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.16)
 
 project(fesom LANGUAGES C CXX Fortran VERSION 2.0.0)
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/../cmake ${CMAKE_MODULE_PATH})
@@ -14,82 +14,65 @@ else()
    set(FESOM_PLATFORM_STRATEGY "notset" CACHE STRING "switch to platform specific compile settings, this is usually determined via the env.sh script")
 endif()
 
-if(DEFINED ENV{ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS}) # be able to set the initial cache value from our env settings for aleph, not only via cmake command
-   option(ALEPH_CRAYMPICH_WORKAROUNDS "workaround for performance issues on aleph" ON)
-else()
-   option(ALEPH_CRAYMPICH_WORKAROUNDS "workaround for performance issues on aleph" OFF)
-endif()
-if(DEFINED ENV{ENABLE_ALBEDO_INTELMPI_WORKAROUNDS}) # be able to set the initial cache value from our env settings for aleph, not only via cmake command
-   option(ALBEDO_INTELMPI_WORKAROUNDS "workaround for performance issues on albedo" ON)
-else()
-   option(ALBEDO_INTELMPI_WORKAROUNDS "workaround for performance issues on albedo" OFF)
-endif()
-if(DEFINED ENV{ENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS}) # be able to set the initial cache value from our env settings for aleph, not only via cmake command
-   option(JUWELS_GNUOPENMPI_WORKAROUNDS "workaround for performance issues on juwels" ON)
-else()
-   option(JUWELS_GNUOPENMPI_WORKAROUNDS "workaround for performance issues on juwels" OFF)
-endif()
-
-#TODO: these machine specific changes must be done using cmake toolchain then here otherwise will make cmake another raps. 
-
-if(ALEPH_CRAYMPICH_WORKAROUNDS)
-   # todo: enable these options only for our targets
-   add_compile_options(-craympich-mt) # alternative cray-mpich library, about 5 % faster with cray-mpich/7.7.3 on aleph, not available for modules cray-mpich > 7.7.3; todo: test compiling and performance with cray-mpich > 7.7.3
-   # make sure to also set these variables in the runtime environment:
+# Cray compiler specific optimizations
+if(CMAKE_Fortran_COMPILER_ID MATCHES "Cray")
+   # Use alternative cray-mpich library, about 5% faster with cray-mpich/7.7.3
+   # Not available for modules cray-mpich > 7.7.3
+   add_compile_options(-craympich-mt)
+   # Make sure to also set these variables in the runtime environment:
    #    MPICH_MAX_THREAD_SAFETY=multiple # allows highest MPI thread level (i.e. MPI_THREAD_MULTIPLE)
    #    MPICH_CRAY_OPT_THREAD_SYNC=0 # the Cray MPICH library falls back to using the pthread_mutex-based thread-synchronization implementation
    #    MPICH_OPT_THREAD_SYNC=0 # seems to be a duplicate variable which also appears in some documentation instead of MPICH_CRAY_OPT_THREAD_SYNC (but this one brings a huge speed gain on aleph)
-   #add_compile_options(-DDISABLE_PARALLEL_RESTART_READ) # reading restarts is slow when doing it on parallel on aleph, switch it off for now
-   add_compile_options(-DENABLE_ALEPH_CRAYMPICH_WORKAROUNDS)
-endif()
-if(ALBEDO_INTELMPI_WORKAROUNDS)
-   add_compile_options(-DENABLE_ALBEDO_INTELMPI_WORKAROUNDS)
-   add_compile_options(-DDISABLE_PARALLEL_RESTART_READ)
-endif()
-if(JUWELS_GNUOPENMPI_WORKAROUNDS)
-   add_compile_options(-DENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS)
 endif()
 
-#TODO: this machine specific block can easyly go in  cmake toolchain.
-if    (${FESOM_PLATFORM_STRATEGY} STREQUAL levante.dkrz.de )
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL mn5-gpp )
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL albedo )
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL atosecmwf )
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL juwels )
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)   
-else()
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
+# Backward compatibility: convert old DISABLE_MULTITHREADING to new ASYNCHRONOUS_IO_THREADS
+if(DEFINED DISABLE_MULTITHREADING)
+   if(DISABLE_MULTITHREADING)
+      set(ASYNCHRONOUS_IO_THREADS OFF CACHE BOOL "enable asynchronous I/O threads" FORCE)
+   else()
+      set(ASYNCHRONOUS_IO_THREADS ON CACHE BOOL "enable asynchronous I/O threads" FORCE)
+   endif()
+   message(STATUS "Converted legacy DISABLE_MULTITHREADING=${DISABLE_MULTITHREADING} to ASYNCHRONOUS_IO_THREADS=${ASYNCHRONOUS_IO_THREADS}")
 endif()
-if (DISABLE_MULTITHREADING)
-   message(STATUS "MULTITHREADING @ ${FESOM_PLATFORM_STRATEGY}: OFF")
+
+#TODO: these machine specific block can easyly go in cmake toolchain.
+if    (${FESOM_PLATFORM_STRATEGY} STREQUAL levante.dkrz.de )
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL mn5-gpp )
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL albedo )
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL atosecmwf )
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL juwels )
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)   
 else()
-   message(STATUS "MULTITHREADING @ ${FESOM_PLATFORM_STRATEGY}: ON")
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
+endif()
+if (ASYNCHRONOUS_IO_THREADS)
+   message(STATUS "ASYNCHRONOUS I/O THREADS @ ${FESOM_PLATFORM_STRATEGY}: ON")
+else()
+   message(STATUS "ASYNCHRONOUS I/O THREADS @ ${FESOM_PLATFORM_STRATEGY}: OFF")
 endif()
 
 
 option(ENABLE_OPENACC "compile with OpenACC support" OFF)
 message(STATUS "ENABLE_OPENACC: ${ENABLE_OPENACC}")
-
-set(NV_GPU_ARCH "cc80" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
+option(DISABLE_OPENACC_ATOMICS "disable kernels using atomic statement for reproducible results" ON)
+set(GPU_COMPUTE_CAPABILITY "cc80" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
+# set(GPU_FLAGS "${GPU_COMPUTE_CAPABILITY}" CACHE STRING "GPU arch for nvfortran compiler")
+set(GPU_FLAGS "cuda12.2,${GPU_COMPUTE_CAPABILITY}" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,cc60,cc70,cc80,...)")
 
 option(ENABLE_OPENMP "build FESOM with OpenMP" OFF)
 message(STATUS "ENABLE_OPENMP: ${ENABLE_OPENMP}")
-if(ENABLE_OPENMP)
+if(${ENABLE_OPENMP})
    find_package(OpenMP REQUIRED COMPONENTS Fortran)
 endif()
 
 option(USE_ICEPACK "Use ICEPACK" OFF)
 message(STATUS "USE_ICEPACK: ${USE_ICEPACK}")
-
-
-option(BUILD_MESHPARTITIONER "build mesh partitioner" OFF)
-message(STATUS "BUILD_MESHPARTITIONER: ${BUILD_MESHPARTITIONER}")
 
 
 # option to trigger building a library version of FESOM
@@ -142,11 +125,23 @@ set(FESOM_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/../.." CACHE FILEPATH "dir
 
 # get our source files
 set(src_home ${CMAKE_CURRENT_SOURCE_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
+
+# Link FESOM2 fortran code
 file(GLOB sources_Fortran ${src_home}/*.F90)
+
+# Link custom CVMix files and fesom2cvmix wrapper-interface files
+if(CVMIX)
+   file(GLOB sources_cvmix_addon ${src_home}/cvmix_driver/*.F90)
+   list(APPEND sources_Fortran ${sources_cvmix_addon})
+endif()
+
+# Link ICEPACK code
 if(USE_ICEPACK)
    file(GLOB sources_ice_pack ${src_home}/icepack_drivers/*.F90
                               ${src_home}/icepack_drivers/Icepack/columnphysics/*.F90)
    list(APPEND sources_Fortran ${sources_ice_pack})
+   
+# Link IFS-Interface code   
 elseif(ENABLE_IFS_INTERFACE) # ICEPACK + IFS_INTERFACE NOT SUPPORTED (YET)
    if(ENABLE_MULTIO)
       list(APPEND sources_Fortran ${src_home}/ifs_interface/iom.F90)
@@ -158,10 +153,11 @@ elseif(ENABLE_IFS_INTERFACE) # ICEPACK + IFS_INTERFACE NOT SUPPORTED (YET)
                                ${src_home}/ifs_interface/mpp_io.F90)
 endif()
 
-if(${RECOM_COUPLED})  # ADD RECOM FILES
-   file(GLOB sources_Fortran ${src_home}/*.F90
-                             ${src_home}/int_recom/*.F90
-                             ${src_home}/int_recom/recom/*.F90)
+# Link RECOM code
+if(RECOM_COUPLED)  # ADD RECOM FILES
+   file(GLOB sources_recom ${src_home}/int_recom/*.F90
+                           ${src_home}/int_recom/recom/*.F90)
+   list(APPEND sources_Fortran ${sources_recom})                           
 endif()                             
 
 # generate a custom file from fesom_version_info.F90 which includes the current git SHA
@@ -195,14 +191,74 @@ add_subdirectory(async_threads_cpp)
 # fesom library
 add_library(${PROJECT_NAME} ${sources_Fortran} $<TARGET_OBJECTS:async_threads_cpp>)
 add_dependencies(${PROJECT_NAME} fesom_version_info-generated.F90)
-target_compile_definitions(${PROJECT_NAME} PRIVATE -DMETIS_VERSION=5 -DPART_WEIGHTED -DMETISRANDOMSEED=35243)
 
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_Fortran_MODULE_DIRECTORY}>)
 target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:module/fesom>)
 target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
 
+# build CVMix library if CVMIX is ON
+if (CVMIX)
+   message(STATUS "CVMIX: ${CVMIX}")
+   
+   # read CVMix install and src directories from the download script, so that there
+   # is only one place where they are defined
+   execute_process(COMMAND bash ${src_home}/cvmix_driver/download_cvmix.sh --print-src_dir
+                   OUTPUT_VARIABLE CVMIX_DIR_src OUTPUT_STRIP_TRAILING_WHITESPACE)
+   execute_process(COMMAND bash ${src_home}/cvmix_driver/download_cvmix.sh --print-prefix
+                   OUTPUT_VARIABLE CVMIX_DIR_install OUTPUT_STRIP_TRAILING_WHITESPACE)  
+   
+   # set default CVMix installation path
+   set(CVMIX_ROOT "${src_home}/cvmix_driver/${CVMIX_DIR_install}_${CMAKE_Fortran_COMPILER_ID}") 
+   message(STATUS "set default CVMIX_ROOT=${CVMIX_ROOT}")
+   
+   # Where library is located --> fix in download_cvmix.sh that it as always installed 
+   # in /lib and not in /lib64
+   set(CVMIX_LIB "${CVMIX_ROOT}/lib/libcvmix.a")
+   
+   # Create parent directory early so CMake does not fail on missing include paths
+   file(MAKE_DIRECTORY ${CVMIX_ROOT})
+   file(MAKE_DIRECTORY ${CVMIX_ROOT}/include/cvmix)
+   
+   # Collect CVMix source files so that CMake knows what changes triggers a 
+   # possible rebuild of the CVMix library
+   file(GLOB_RECURSE CVMIX_SOURCES
+         "${src_home}/cvmix_driver/${CVMIX_DIR_src}/src/*.F90"
+         "${src_home}/cvmix_driver/${CVMIX_DIR_src}/src/*/*.F90")
+        
+   # Add script dependency (rebuild if script changes)
+   set(CVMIX_DOWNLOAD "${src_home}/cvmix_driver/download_cvmix.sh")
+   
+   # Custom command: build CVMix if not yet built
+   add_custom_command(
+         OUTPUT ${CVMIX_LIB}
+         COMMAND bash ${src_home}/cvmix_driver/download_cvmix.sh --prefix ${CVMIX_ROOT}
+         WORKING_DIRECTORY ${src_home}/cvmix_driver
+         DEPENDS ${CVMIX_SOURCES} ${CVMIX_DOWNLOAD} # trigger rebuild if source or download script change
+         COMMENT "Downloading and building CVMix into ${CVMIX_ROOT}"
+         VERBATIM)
+   
+   # check if ${CVMIX_ROOT}/lib/libcvmix.a exist or not, only if it does not 
+   # exist build library
+   add_custom_target(cvmix_autobuild DEPENDS ${CVMIX_LIB})
+ 
+   # build cvmix external libray
+   add_library(cvmix_external STATIC IMPORTED GLOBAL)
+   set_target_properties(cvmix_external PROPERTIES
+         IMPORTED_LOCATION ${CVMIX_LIB}
+         INTERFACE_INCLUDE_DIRECTORIES "${CVMIX_ROOT}/include/cvmix")
+
+   # cvmix_autobuild is a custom target that runs your download_cvmix.sh script 
+   # and produces libcvmix.a. cvmix_external is an imported library, meaning CMake 
+   # doesn’t build it — it just points to an existing file (libcvmix.a).
+   add_dependencies(cvmix_external  cvmix_autobuild)
+   
+   # Link CVMix library to fesom, build chain becomes: fesom → cvmix_external → cvmix_autobuild
+   target_link_libraries(${PROJECT_NAME} PRIVATE cvmix_external)
+   
+endif()
+
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
-if(ENABLE_OPENMP)
+if(${ENABLE_OPENMP})
    target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_Fortran)
 endif()
 
@@ -211,8 +267,8 @@ if(ENABLE_MULTIO)
    target_link_libraries(${PROJECT_NAME} PRIVATE multio-fapi)
 endif()
 
-if(DISABLE_MULTITHREADING)
-   target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_MULTITHREADING)
+if(ASYNCHRONOUS_IO_THREADS)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE ASYNCHRONOUS_IO_THREADS)
 endif()
 
 if(${FESOM_COUPLED})
@@ -237,6 +293,10 @@ if(USE_ICEPACK)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __icepack)
 endif()
 
+if(CVMIX)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __cvmix)
+endif()
+
 if(ENABLE_IFS_INTERFACE)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __ifsinterface)
 endif()
@@ -257,11 +317,15 @@ if(${CISO_COUPLED})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __ciso)
 endif()
 
+if(${FESOM_PROFILING})
+   target_compile_definitions(${PROJECT_NAME} PRIVATE FESOM_PROFILING)
+endif()
+
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} STREQUAL  IntelLLVM )
    
    # Base compiler flags
-   target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0)
+   target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0 -fpp)
    
    # compiler flags not supported by IntelLLVM
    if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
@@ -320,9 +384,9 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 #    target_compile_options(${PROJECT_NAME} PRIVATE -O3 -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
    if(${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu )
       message(STATUS "Allowing type mismatches on Ubuntu for CI Testing" )  # NOTE(PG): Would be nicer to grab the CI=True from the env variable
-      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch)
+      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch -cpp)
    else()
-      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none)
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -cpp)
    endif()
    if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10 )
       target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
@@ -384,7 +448,7 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
 	#target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -N 1023 -g -G2 -O3)
    target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -N 1023 -g -G2 -O2 -hnoacc -M878)  #-hnoacc is a workaround for cray automatically activate -hacc, -M878 is to suppress ftn-878 warning
-   if(ENABLE_OPENMP)
+   if(${ENABLE_OPENMP})
       target_compile_options(${PROJECT_NAME} PRIVATE -homp)
    else()
       target_compile_options(${PROJECT_NAME} PRIVATE -hnoomp)
@@ -397,16 +461,19 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
    endif()
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
    target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_NVHPC_WORKAROUNDS)
-   target_compile_options(${PROJECT_NAME} PRIVATE -fast -fastsse -O3 -Mallocatable=95 -Mr8 -pgf90libs)
-   if(ENABLE_OPENACC)
-      # additional compiler settings
-      target_compile_options(${PROJECT_NAME} PRIVATE -acc -ta=tesla:${NV_GPU_ARCH} -Minfo=accel)
-      set(CMAKE_EXE_LINKER_FLAGS "-acc -ta=tesla:${NV_GPU_ARCH}")
-   endif()
-   if(ENABLE_OPENMP)
-      target_compile_options(${PROJECT_NAME} PRIVATE -Mipa=fast)
+   if(${ENABLE_OPENACC})
+      target_compile_options(${PROJECT_NAME} PRIVATE
+      $<$<CONFIG:DEBUG>:-Mallocatable=95 -Mr8 -pgf90libs -Mnofma -Minfo=all -acc=verystrict -gpu=math_uniform,cuda12.2,cc80>
+      $<$<CONFIG:RELEASE>:-Mallocatable=95 -Mr8 -pgf90libs -Minfo=all -acc=verystrict -gpu=cc80>)
+      set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-acc=verystrict -Mnofma -gpu=math_uniform,cuda12.2,cc80")
+      set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-acc=verystrict -gpu=cc80")
+      if(${DISABLE_OPENACC_ATOMICS})
+         target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_OPENACC_ATOMICS)
+      endif()
    else()
-      target_compile_options(${PROJECT_NAME} PRIVATE -Mipa=fast,inline)
+      target_compile_options(${PROJECT_NAME} PRIVATE 
+      $<$<CONFIG:DEBUG>:-Mallocatable=95 -Mr8 -pgf90libs -Mnofma>
+      $<$<CONFIG:RELEASE>:-Mallocatable=95 -Mr8 -pgf90libs>)
    endif()
 endif()
 
@@ -437,53 +504,34 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${YAXT_Fortran_LIBRARIES} ${YAXTC_
 #target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C ${YAXT_Fortran_LIBRARIES} ${YAXTC_Fortran_LIBRARIES})
 
    
-# fesom.x executable
+# fesom.x executable
 add_executable(${PROJECT_NAME}.x ${src_home}/fesom_main.F90)
 target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
+
+# fesom_meshdiag executable (optional)
+if(BUILD_MESHDIAG)
+    add_executable(fesom_meshdiag ${src_home}/fesom_meshdiag.F90)
+    target_link_libraries(fesom_meshdiag PUBLIC ${PROJECT_NAME})
+    target_link_libraries(fesom_meshdiag PRIVATE MPI::MPI_Fortran)
+    
+    # Install the mesh diagnostics utility
+    install(TARGETS fesom_meshdiag
+            RUNTIME DESTINATION bin
+            COMPONENT tools)
+    
+    message(STATUS "Mesh diagnostics utility will be built as fesom_meshdiag")
+endif()
 
 
 get_target_property(FLAGS ${PROJECT_NAME} COMPILE_OPTIONS)
 message(STATUS " --> Final Compile options for ${PROJECT_NAME}: ${FLAGS}")
 
 
+### Export and installation
 
-set(additional_targets)
-# mesh partitioner
-
-if(BUILD_MESHPARTITIONER)
-  if(NOT (${CMAKE_Fortran_COMPILER_ID} STREQUAL GNU OR ${CMAKE_Fortran_COMPILER_ID} STREQUAL Intel OR ${CMAKE_Fortran_COMPILER_ID} STREQUAL IntelLLVM))
-    message(WARNING "Mesh partitioner is only supported for GNU and Intel compilers. Please use -DBUILD_MESHPARTITIONER=OFF when configuring with ${CMAKE_Fortran_COMPILER_ID} compiler.")
-  endif()
-  message(STATUS "Building mesh partitioner...")
-block()
-set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/module/fesom_meshpart)
-  set(fesom_meshpart_sources_Fortran ${src_home}/MOD_MESH.F90 ${src_home}/oce_modules.F90 ${src_home}/gen_modules_config.F90 ${src_home}/gen_modules_partitioning.F90 ${src_home}/gen_modules_rotate_grid.F90 ${src_home}/fvom_init.F90 ${src_home}/oce_local.F90 ${src_home}/gen_comm.F90 ${src_home}/MOD_READ_BINARY_ARRAYS.F90 ${src_home}/MOD_WRITE_BINARY_ARRAYS.F90 ${src_home}/MOD_PARTIT.F90)
-  set(fesom_meshpart_sources_C ${src_home}/fort_part.c)
-  
-  add_subdirectory(${src_home}/../lib/metis-5.1.0 ${PROJECT_BINARY_DIR}/metis)
-  include_directories(${src_home}/../lib/metis-5.1.0/include)
-  
-  add_library(fesom_meshpart_C ${fesom_meshpart_sources_C})
-  target_compile_definitions(fesom_meshpart_C PRIVATE USE_MPI REAL=double DBL HAS_BLAS FORTRAN_UNDERSCORE VOID_POINTER_SIZE_8 SGI LINUX UNDER_ MPI2)
-  target_link_libraries(fesom_meshpart_C metis)
-  
-  add_executable(fesom_meshpart ${fesom_meshpart_sources_Fortran})
-  # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
-  if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
-  	target_compile_options(fesom_meshpart PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip)
-  #	target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fast-transcendentals -xHost -ip -g -traceback -check all,noarg_temp_created,bounds,uninit) 
-  elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
-  	target_compile_options(fesom_meshpart PRIVATE -fdefault-real-8 -ffree-line-length-none)
-    if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10 )
-        target_compile_options(fesom_meshpart PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
-     endif()
-  endif()
-  target_link_libraries(fesom_meshpart fesom_meshpart_C MPI::MPI_Fortran)
-  set_target_properties(fesom_meshpart PROPERTIES LINKER_LANGUAGE Fortran)
-  list(APPEND additional_targets fesom_meshpart)
-endblock()
+# Add meshdiag to additional targets if built
+if(BUILD_MESHDIAG)
+    set(additional_targets ${additional_targets} fesom_meshdiag)
 endif()
-
-### Export and installation
 
 fesom_export(TARGETS ${PROJECT_NAME} fesom.x ${additional_targets})

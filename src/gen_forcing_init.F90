@@ -6,9 +6,9 @@ module forcing_array_setup_interfaces
       USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine forcing_array_setup
   end interface
-end module
+end module forcing_array_setup_interfaces
 
 
 module forcing_array_setup_dbgyre_interfaces
@@ -19,9 +19,9 @@ module forcing_array_setup_dbgyre_interfaces
       USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
-    end subroutine
+    end subroutine forcing_array_setup_dbgyre
   end interface
-end module
+end module forcing_array_setup_dbgyre_interfaces
 
 ! Adapted from FESOM code by Q. Wang. 
 ! Added the driving routine forcing_setup.
@@ -238,15 +238,15 @@ subroutine forcing_array_setup(partit, mesh)
 
   !for ice diagnose
   if(use_ice) then
-!     allocate(thdgr(n2), thdgrsn(n2))
     allocate(flice(n2))
-    allocate(olat_heat(n2), osen_heat(n2), olwout(n2))
-!     thdgr=0.0_WP
-!     thdgrsn=0.0_WP
-    flice=0.0_WP
-    olat_heat=0.0_WP
-    osen_heat=0.0_WP
-    olwout=0.0_WP
+    allocate(hf_Qlat(n2), hf_Qsen(n2), hf_Qradtot(n2), hf_Qswr(n2), hf_Qlwr(n2), hf_Qlwrout(n2))
+    flice     = 0.0_WP
+    hf_Qlat   = 0.0_WP
+    hf_Qsen   = 0.0_WP
+    hf_Qradtot= 0.0_WP
+    hf_Qswr   = 0.0_WP
+    hf_Qlwr   = 0.0_WP
+    hf_Qlwrout= 0.0_WP
   endif 
 
   ! drag coefficient and transfer coefficients for latent and sensible heat
