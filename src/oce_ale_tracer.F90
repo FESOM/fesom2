@@ -990,7 +990,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
             end do
         elseif (use_sw_pene .and. (tracers%data(tr_num)%ID==1) .and. toy_ocean .and. TRIM(which_toy)=="dbgyre") then
 
-         call cal_shortwave_rad_dbgyre(ice, tracers, partit, mesh)
+            call cal_shortwave_rad_dbgyre(ice, tracers, partit, mesh)
             do nz=nzmin, nzmax-1
                 zinv=1.0_WP*dt  !/(zbar(nz)-zbar(nz+1)) ale!
                 tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n)*area(nz+1,n)/area(nz,n))*zinv
