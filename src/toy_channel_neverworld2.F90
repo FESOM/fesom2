@@ -12,12 +12,15 @@ MODULE Toy_Neverworld2
   implicit none
   SAVE 
   private
-  public            :: initial_state_neverworld2
+  public            :: initial_state_neverworld2, relax_2_tsurf,  &
+                       do_wind, wind_opt, tau_inv, do_Trelax, do_Tpert
   logical           :: do_wind  = .True.    ! apply surface windstress
   integer           :: wind_opt = 2         ! 1: interpolate tau from profile data, 2: read already to elem interp profile data
   
-  logical           :: do_Trelax= .True.    ! apply surface temp relaxation
-  logical           :: do_Tpert = .False.   ! apply temp. perturbation to trigger instabilities
+  logical           :: do_Trelax= .False.   ! apply surface temp relaxation
+  logical           :: do_Tpert = .True.   ! apply temp. perturbation to trigger instabilities
+  
+  real(kind=WP)     :: tau_inv  =1.0/50.0/24.0/3600.0 
   contains
 !
 !
@@ -150,5 +153,24 @@ subroutine initial_state_neverworld2(dynamics, tracers, partit, mesh)
     end if
     
 end subroutine initial_state_neverworld2
+
+
+subroutine relax_2_tsurf(tdata, partit, mesh)
+    implicit none
+    type(t_mesh),        intent(in),    target  :: mesh
+    type(t_partit),      intent(inout), target  :: partit
+    type(t_tracer_data), intent(inout), target  :: tdata
+    integer                                     :: node
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h" 
+    if (do_Trelax) then 
+        do node=1, myDim_nod2D
+            tdata%values(1,node)  = tdata%values(1,node)+dt*tau_inv*(Tsurf(node)-tdata%values(1,node))
+        end do
+    end if 
+    
+end subroutine relax_2_tsurf
 
 END MODULE Toy_Neverworld2

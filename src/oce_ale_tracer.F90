@@ -145,6 +145,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     use o_tracers
     use Toy_Channel_Soufflet
     use Toy_Channel_Dbgyre
+    use Toy_Neverworld2
     use o_ARRAYS, only: heat_flux
     use g_forcing_arrays, only: sw_3d
     use diff_tracers_ale_interface
@@ -253,10 +254,15 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         ! relax to salt and temp climatology
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
         ! if ((toy_ocean) .AND. ((tr_num==1) .AND. (TRIM(which_toy)=="soufflet"))) then
-        if ((toy_ocean) .AND. ((TRIM(which_toy)=="soufflet"))) then
+        if     ((toy_ocean) .AND. ((TRIM(which_toy)=="soufflet"))) then
             call relax_zonal_temp(tracers%data(1), partit, mesh)
+            
+        elseif ((toy_ocean) .AND. ((TRIM(which_toy)=="neverworld2"))) then
+            call relax_2_tsurf(tracers%data(1), partit, mesh)
+            
         else
             call relax_to_clim(tr_num, tracers, partit, mesh)
+            
         end if
 
         call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
