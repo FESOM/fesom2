@@ -615,7 +615,7 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
             if(partit%my_fesom_group == 0) then
 #endif
                 if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: bio'//achar(27)//'[0m'
-                call write_netcdf_restarts(write_bio_path, ice_files, istep)
+                call write_netcdf_restarts(write_bio_path, bio_files, istep)
 #if defined(__usetp)
             endif 
 #endif 
