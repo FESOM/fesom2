@@ -89,7 +89,7 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(GlodPCO2surf          ( node_size ))
     allocate(GlodecayBenthos       ( node_size, benthos_num ))
     allocate(Benthos               ( node_size, benthos_num ))
-    allocate(Benthos_tr            ( node_size, benthos_num, num_tracers )) ! kh 25.03.22 buffer per tracer index
+    allocate(Benthos_tr            ( node_size, benthos_num, num_tracers )) ! buffer per tracer index
     allocate(GloHplus              ( node_size ))
     allocate(DenitBen              ( node_size ))
 
@@ -124,7 +124,7 @@ subroutine recom_init(tracers, partit, mesh)
     GlodPCO2surf          = 0.d0
     GlodecayBenthos       = 0.d0
     Benthos               = 0.d0
-    Benthos_tr(:,:,:)     = 0.0d0 ! kh 25.03.22
+    Benthos_tr(:,:,:)     = 0.0d0 
     GloHplus              = exp(-8.d0 * log(10.d0)) ! = 10**(-8)
     DenitBen              = 0.d0
 
@@ -246,6 +246,100 @@ subroutine recom_init(tracers, partit, mesh)
     Sinkingvel1(:,:)      = 0.d0
     Sinkingvel2(:,:)      = 0.d0
 
+    if (use_MEDUSA) then
+        allocate(GloSed(node_size,sedflx_num))
+        allocate(SinkFlx(node_size,bottflx_num))
+        allocate(SinkFlx_tr(node_size,bottflx_num,num_tracers)) ! buffer sums per tracer index
+
+        SinkFlx(:,:)      = 0.d0
+        SinkFlx_tr(:,:,:) = 0.0d0
+        GloSed(:,:)       = 0.d0
+        allocate(lb_flux(node_size,9))
+        lb_flux(:,:)      = 0.d0
+    end if
+
+    if (useRivFe) then
+        allocate(RiverFe ( node_size ))
+        RiverFe(:)   = 0.d0
+    end if
+
+! Atmospheric box model
+    if (use_atbox) then
+!      if (mype==0 .and. my_fesom_group == 0) print *, "Initializing the atmospheric isoCO2 box model ..." !OG
+        allocate(x_co2atm(node_size))
+        x_co2atm    = CO2_for_spinup
+        if (ciso) then
+            allocate(x_co2atm_13(node_size))
+            r_atm_spinup_13 = 1. + 0.001 * delta_co2_13
+            x_co2atm_13 = CO2_for_spinup * r_atm_spinup_13
+            if (ciso_14) then
+                allocate(x_co2atm_14(node_size))
+                allocate(cosmic_14(node_size))
+                if (ciso_organic_14) then
+                    delta_co2_14 = (big_delta_co2_14(1) + 2. * delta_co2_13 + 50.) / (0.95 - 0.002 * delta_co2_13)
+                else
+                    delta_co2_14 = big_delta_co2_14(1)
+                end if
+                r_atm_spinup_14 = 1. + 0.001 * delta_co2_14
+                x_co2atm_14    = CO2_for_spinup * r_atm_spinup_14
+!         Conversion of initial cosmogenic 14C production rates (mol / s) to fluxes (atoms / s / cm**2) 
+!         Since 14C values are scaled to 12C, we need to include the standard 14C / 12C ratio here:
+!         1.176e-12 (Karlen et al., 1964) * 6.0221e23 (Avogadro constant) * 1.e-4 (cm**2 / m**2) 
+!         = 7.0820e7 cm**2 / m**2
+                production_rate_to_flux_14 = 7.0820e7 / ocean_area
+                cosmic_14 = cosmic_14_init / production_rate_to_flux_14
+            end if
+        end if
+    end if  ! use_atbox
+
+    if (ciso) then
+!! Define ciso variables assigning additional ciso tracer indices
+!      idic_13    = bgc_base_num + 1
+!      iphyc_13   = bgc_base_num + 2
+!      idetc_13   = bgc_base_num + 3
+!      ihetc_13   = bgc_base_num + 4
+!      idoc_13    = bgc_base_num + 5
+!      idiac_13   = bgc_base_num + 6
+!      iphycal_13 = bgc_base_num + 7
+!      idetcal_13 = bgc_base_num + 8
+!      idic_14    = bgc_base_num + 9
+!      iphyc_14   = bgc_base_num + 10
+!      idetc_14   = bgc_base_num + 11
+!      ihetc_14   = bgc_base_num + 12
+!      idoc_14    = bgc_base_num + 13
+!      idiac_14   = bgc_base_num + 14
+!      iphycal_14 = bgc_base_num + 15
+!      idetcal_14 = bgc_base_num + 16
+
+        !< Allocate 13CO2 surface fields
+        allocate(GloPCO2surf_13           ( node_size ))
+        allocate(GloCO2flux_13            ( node_size ))
+        allocate(GloCO2flux_seaicemask_13 ( node_size ))
+
+        GloPCO2surf_13           = 0.d0
+        GloCO2flux_13            = 0.d0
+        GloCO2flux_seaicemask_13 = 0.0d0
+
+        !< Allocate auxiliary inital delta13C_DIC field
+        allocate(delta_dic_13_init (nl-1, nod2D ))
+
+        if (ciso_14) then
+            !< Allocate 14CO2 surface fields
+            allocate(GloPCO2surf_14           ( node_size ))
+            allocate(GloCO2flux_14            ( node_size ))
+            allocate(GloCO2flux_seaicemask_14 ( node_size ))
+
+            GloPCO2surf_14           = 0.d0
+            GloCO2flux_14            = 0.d0
+            GloCO2flux_seaicemask_14 = 0.0d0
+
+            !< Allocate auxiliary inital d|Delta14C_DIC fields
+            allocate(delta_dic_14_init     ( nl-1, nod2D ))
+            allocate(big_delta_dic_14_init ( nl-1, nod2D ))
+        end if ! ciso_14
+
+    end if ! ciso
+
     DO i=num_tracers-bgc_num+1, num_tracers
         id=tracers%data(i)%ID
 
@@ -332,20 +426,26 @@ subroutine recom_init(tracers, partit, mesh)
 #if defined (__coccos) & defined (__3Zoo2Det)
         CASE (1029)
             tracers%data(i)%values(:,:) = tiny_chl/chl2N_max       ! CoccoN
+
         CASE (1030)
             tracers%data(i)%values(:,:) = tiny_chl/chl2N_max/NCmax ! CoccoC
+
         CASE (1031)
             tracers%data(i)%values(:,:) = tiny_chl                 ! CoccoChl
+
 ! *******************
 ! CASE 3phy 1zoo 1det
 ! *******************
 #elif defined (__coccos) & !defined (__3Zoo2Det)
         CASE (1023)
             tracers%data(i)%values(:,:) = tiny_chl/chl2N_max       ! CoccoN
+
         CASE (1024)
             tracers%data(i)%values(:,:) = tiny_chl/chl2N_max/NCmax ! CoccoC
+
         CASE (1025)
             tracers%data(i)%values(:,:) = tiny_chl                 ! CoccoChl
+
 #endif
 
 ! *******************
@@ -354,16 +454,20 @@ subroutine recom_init(tracers, partit, mesh)
 #if defined (__coccos) & defined (__3Zoo2Det)
         CASE (1032)
             tracers%data(i)%values(:,:) = tiny                     ! Zoo3N
+
         CASE (1033)
             tracers%data(i)%values(:,:) = tiny * Redfield          ! Zoo3C
+
 #elif !defined (__coccos) & defined (__3Zoo2Det)
 ! *******************
 ! CASE 2phy 3zoo 2det
 ! *******************
         CASE (1029)
             tracers%data(i)%values(:,:) = tiny                     ! Zoo3N
+
         CASE (1030)
             tracers%data(i)%values(:,:) = tiny * Redfield          ! Zoo3C
+
 #endif
 
         END SELECT
