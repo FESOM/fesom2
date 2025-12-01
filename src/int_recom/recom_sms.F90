@@ -88,7 +88,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     real(kind=8)                                            :: mocsy_step_per_day 
 
 ! --- Biogeochemical state variables ---
-real(kind=8) :: &
+    real(kind=8) :: &
     DIN,     & ! [mmol/m3] Dissolved inorganic nitrogen
     DIC,     & ! [mmol/m3] Dissolved inorganic carbon
     Alk,     & ! [mmol/m3] Total alkalinity
@@ -257,8 +257,9 @@ real(kind=8) :: &
         !   tiny_C_c    : Minimum cocco carbon [mmolC m-3]
         !   chl2N_max_c : Maximum cocco Chl:N ratio [mgChl mmolN-1]
         !   NCmax_c     : Maximum cocco N:C quota [mmolN mmolC-1]
-            tiny_N_c = tiny_chl / chl2N_max_c
-            tiny_C_c = tiny_N_c / NCmax_c
+
+        tiny_N_c = tiny_chl / chl2N_max_c
+        tiny_C_c = tiny_N_c / NCmax_c
 
         ! Phaeocystis thresholds
         ! Variables:
@@ -266,6 +267,7 @@ real(kind=8) :: &
         !   tiny_C_p    : Minimum Phaeo carbon [mmolC m-3]
         !   chl2N_max_p : Maximum Phaeo Chl:N ratio [mgChl mmolN-1]
         !   NCmax_p     : Maximum Phaeo N:C quota [mmolN mmolC-1]
+
         tiny_N_p = tiny_chl / chl2N_max_p
         tiny_C_p = tiny_N_p / NCmax_p
 
@@ -318,16 +320,16 @@ real(kind=8) :: &
     !   dt_b = 0.25/24 = 0.0104 days
     !-------------------------------------------------------------------------------
 
-    ! Reciprocal reference temperature for Arrhenius calculations
-    ! Reference: 288.15 K (15degC) used in temperature dependence functions
-    rTref = real(one) / recom_Tref
-
     ! Convert FESOM physics time step to days
     dt_d = dt / SecondsPerDay
 
     ! Calculate biogeochemistry sub-time step
     ! Divides physics step into smaller biogeochemical steps
     dt_b = dt_d / real(biostep)
+
+    ! Reciprocal reference temperature for Arrhenius calculations
+    ! Reference: 288.15 K (15degC) used in temperature dependence functions
+    rTref = real(one) / recom_Tref
 
     !===============================================================================
     ! MAIN TIME INTEGRATION LOOP
@@ -354,7 +356,7 @@ real(kind=8) :: &
 
     do step = one, biostep
 
-        ! Reset upper light attenuation at start of each sub-step
+        ! Reset upper light attenuation (top of the cell) at start of each sub-step
         ! Light attenuation integrates downward through water column
         kdzUpper = 0.d0
 
@@ -370,14 +372,14 @@ real(kind=8) :: &
         !
         ! Variables:
         !   k  : Current vertical level index [-]
-        !   Nn : Number of vertical levels in water column [-]
+        !   nn : Number of vertical levels in water column [-]
         !
         ! Note: Alternative loop configurations commented out:
         !   - nzmin, nzmax: Min/max active levels (for dry cells)
         !   - myDim_nod2D: Horizontal dimension (for 3D unstructured grids)
         !---------------------------------------------------------------------------
 
-        do k = one, Nn
+        do k = one, nn
             ! Alternative loop structures (commented out):
             ! do n = 1, myDim_nod2D
             !     Nn = nlevels_nod2D(n) - 1
@@ -974,45 +976,45 @@ real(kind=8) :: &
 
             if (ciso) then
                 ! 13C isotope tracers
-                DIC_13     = max(tiny, state(k,idic_13) + sms(k,idic_13))
-                PhyC_13    = max(tiny_C, state(k,iphyc_13) + sms(k,iphyc_13))
-                DetC_13    = max(tiny, state(k,idetc_13) + sms(k,idetc_13))
-                HetC_13    = max(tiny, state(k,ihetc_13) + sms(k,ihetc_13))
-                EOC_13     = max(tiny, state(k,idoc_13) + sms(k,idoc_13))
-                DiaC_13    = max(tiny_C, state(k,idiac_13) + sms(k,idiac_13))
-                PhyCalc_13 = max(tiny, state(k,iphycal_13) + sms(k,iphycal_13))
-                DetCalc_13 = max(tiny, state(k,idetcal_13) + sms(k,idetcal_13))
+                DIC_13     = max(tiny, state(k, idic_13)    + sms(k, idic_13))
+                PhyC_13    = max(tiny_C, state(k, iphyc_13) + sms(k, iphyc_13))
+                DetC_13    = max(tiny, state(k, idetc_13)   + sms(k, idetc_13))
+                HetC_13    = max(tiny, state(k, ihetc_13)   + sms(k, ihetc_13))
+                EOC_13     = max(tiny, state(k, idoc_13)    + sms(k, idoc_13))
+                DiaC_13    = max(tiny_C, state(k, idiac_13) + sms(k, idiac_13))
+                PhyCalc_13 = max(tiny, state(k, iphycal_13) + sms(k, iphycal_13))
+                DetCalc_13 = max(tiny, state(k, idetcal_13) + sms(k, idetcal_13))
 
                 ! 13C calcite dissolution with fractionation
                 calc_diss_13 = alpha_dcal_13 * calc_diss
 
                 ! 13C quotas
-                quota_13         = PhyN / PhyC_13              ! Small phyto 13C quota
-                recipQuota_13    = real(one) / quota_13
-                quota_dia_13     = DiaN / DiaC_13              ! Diatom 13C quota
+                quota_13          = PhyN / PhyC_13
+                recipQuota_13     = real(one) / quota_13
+                quota_dia_13      = DiaN / DiaC_13
                 recipQuota_dia_13 = real(one) / quota_dia_13
-                recipQZoo_13     = HetC_13 / HetN              ! Heterotroph 13C quota
+                recipQZoo_13      = HetC_13 / HetN
 
                 ! 14C radiocarbon tracers (if enabled)
                 if (ciso_14) then
-                    DIC_14 = max(tiny, state(k,idic_14) + sms(k,idic_14))
+                    DIC_14 = max(tiny, state(k,idic_14) + sms(k, idic_14))
 
                     if (ciso_organic_14) then
-                        PhyC_14    = max(tiny_C, state(k,iphyc_14) + sms(k,iphyc_14))
-                        DetC_14    = max(tiny, state(k,idetc_14) + sms(k,idetc_14))
-                        HetC_14    = max(tiny, state(k,ihetc_14) + sms(k,ihetc_14))
-                        EOC_14     = max(tiny, state(k,idoc_14) + sms(k,idoc_14))
-                        DiaC_14    = max(tiny_C, state(k,idiac_14) + sms(k,idiac_14))
-                        PhyCalc_14 = max(tiny, state(k,iphycal_14) + sms(k,iphycal_14))
-                        DetCalc_14 = max(tiny, state(k,idetcal_14) + sms(k,idetcal_14))
+                        PhyC_14           = max(tiny_C, state(k,iphyc_14) + sms(k, iphyc_14))
+                        DetC_14           = max(tiny, state(k,idetc_14)   + sms(k, idetc_14))
+                        HetC_14           = max(tiny, state(k,ihetc_14)   + sms(k, ihetc_14))
+                        EOC_14            = max(tiny, state(k,idoc_14)    + sms(k, idoc_14))
+                        DiaC_14           = max(tiny_C, state(k,idiac_14) + sms(k, idiac_14))
+                        PhyCalc_14        = max(tiny, state(k,iphycal_14) + sms(k,iphycal_14))
+                        DetCalc_14        = max(tiny, state(k,idetcal_14) + sms(k,idetcal_14))
 
-                        calc_diss_14 = alpha_dcal_14 * calc_diss
+                        calc_diss_14      = alpha_dcal_14 * calc_diss
 
-                        quota_14         = PhyN / PhyC_14
-                        recipQuota_14    = real(one) / quota_14
-                        quota_dia_14     = DiaN / DiaC_14
+                        quota_14          = PhyN / PhyC_14
+                        recipQuota_14     = real(one) / quota_14
+                        quota_dia_14      = DiaN / DiaC_14
                         recipQuota_dia_14 = real(one) / quota_dia_14
-                        recipQZoo_14     = HetC_14 / HetN
+                        recipQZoo_14      = HetC_14 / HetN
                     end if ! ciso_organic_14
                 end if   ! ciso_14
             end if     ! ciso
@@ -1293,7 +1295,7 @@ real(kind=8) :: &
 
             if (k == 1) then
 
-               !===========================================================================
+                !===========================================================================
                 ! SURFACE LAYER INITIALIZATION
                 !===========================================================================
                 ! Surface layer receives full incident solar radiation
@@ -1312,7 +1314,6 @@ real(kind=8) :: &
                     ! Add coccolithophores and Phaeocystis if enabled
                     chl_upper = chl_upper + CoccoChl + PhaeoChl
                 endif
-
            else
 
                 !===========================================================================
@@ -1683,7 +1684,6 @@ real(kind=8) :: &
             !   - Aumont et al. (2015) - Saturation-state dependent dissolution
             !   - Schourup-Kristensen et al. (2013) - REcoM model description
             !===============================================================================
-
 
             !===============================================================================
             ! CO2 EFFECTS ON PHYTOPLANKTON GROWTH
@@ -2208,7 +2208,7 @@ real(kind=8) :: &
             if (use_photodamage) then
 
                 !===========================================================================
-                ! 3.2 PHOTODAMAGE-DEPENDENT DEGRADATION
+                ! PHOTODAMAGE-DEPENDENT DEGRADATION
                 !===========================================================================
                 ! Light-dependent chlorophyll degradation using saturation model
                 ! Higher light intensity increases chlorophyll turnover
@@ -2458,13 +2458,13 @@ real(kind=8) :: &
         if (PARave >= tiny .AND. PARave == PARave) then
             chlSynth = N_assim * Chl2N_max * &
                        min(real(one), Cphot/(alfa * Chl2C * PARave))
-        end if
+        endif
 
         ! --- Diatom Chlorophyll Synthesis ---
         ChlSynth_dia = zero
         if (PARave >= tiny .AND. PARave == PARave) then
             ChlSynth_dia = N_assim_dia * Chl2N_max_d * &
-                           min(real(one), Cphot_dia/(alfa_d * Chl2C_dia * PARave))
+                           min(real(one), Cphot_dia / (alfa_d * Chl2C_dia * PARave))
         end if
 
         ! --- Optional Coccolithophore and Phaeocystis Chlorophyll Synthesis ---
@@ -2473,7 +2473,7 @@ real(kind=8) :: &
             ChlSynth_cocco = zero
             if (PARave >= tiny .AND. PARave == PARave) then
                 ChlSynth_cocco = N_assim_cocco * Chl2N_max_c * &
-                                 min(real(one), Cphot_cocco/(alfa_c * Chl2C_cocco * PARave))
+                                 min(real(one), Cphot_cocco / (alfa_c * Chl2C_cocco * PARave))
             end if
 
             ! Phaeocystis chlorophyll synthesis
@@ -2854,7 +2854,7 @@ real(kind=8) :: &
                 ! Add detritus pools if detrital grazing is enabled
                 if (Grazing_detritus) then
                     aux = aux + pzDet2 * DetN + pzDetZ22 * DetZ2N
-                end if
+                endif
 
                 ! Add coccolithophores and Phaeocystis if enabled
                 if (enable_coccos) then
@@ -2943,7 +2943,7 @@ real(kind=8) :: &
 
             if (Grazing_detritus) then
                 food2 = food2 + fDetN2 + fDetZ2N2
-            end if
+            endif
 
             if (enable_coccos) then
                 food2 = food2 + fCoccoN2 + fPhaeoN2
@@ -4112,8 +4112,8 @@ real(kind=8) :: &
         !---------------------------------------------------------------------------
         ! SOURCES: Net Photosynthesis
         !---------------------------------------------------------------------------
-            + Cphot               * PhyC                                   & ! Gross photosynthesis
-            - phyRespRate         * PhyC                                   & ! Autotrophic respiration
+        + Cphot               * PhyC                                   & ! Gross photosynthesis
+        - phyRespRate         * PhyC                                   & ! Autotrophic respiration
         !---------------------------------------------------------------------------
         ! SINKS: Losses
         !---------------------------------------------------------------------------
@@ -4188,7 +4188,6 @@ real(kind=8) :: &
                     + grazingFlux_dia3   - grazingFlux_dia3   * grazEff3   & ! Diatoms
                     + (grazingFlux_Cocco3 - grazingFlux_Cocco3 * grazEff3) * is_coccos & ! Coccolithophores
                     + (grazingFlux_Phaeo3 - grazingFlux_Phaeo3 * grazEff3) * is_coccos & ! Phaeocystis
-
                     !-----------------------------------------------------------------------
                     ! SOURCES: Phytoplankton Aggregation
                     !-----------------------------------------------------------------------
@@ -4210,7 +4209,6 @@ real(kind=8) :: &
                     !-----------------------------------------------------------------------
                     - reminN * arrFunc * O2Func * DetN                     & ! Bacterial decomposition
                                                                           ) * dt_b + sms(k,idetn)
-
             !-------------------------------------------------------------------------------
             ! Configuration 2: WITH Detritus Grazing + 2 Zooplankton Types (Standard)
             !-------------------------------------------------------------------------------
@@ -4245,7 +4243,6 @@ real(kind=8) :: &
                     - reminN * arrFunc * O2Func * DetN                     &
                                                                           ) * dt_b + sms(k,idetn)
             endif
-
             !-------------------------------------------------------------------------------
             ! Configuration 3: WITHOUT Detritus Grazing + 3 Zooplankton Types
             !-------------------------------------------------------------------------------
@@ -4313,7 +4310,6 @@ real(kind=8) :: &
                     !-----------------------------------------------------------------------
                     - reminN * arrFunc * O2Func * DetN                     &
                                                                           ) * dt_b + sms(k,idetn)
-
             endif
         end if
 
@@ -4834,7 +4830,6 @@ real(kind=8) :: &
                     - reminN * arrFunc * O2Func * DetZ2N                   &
                                                                           ) * dt_b + sms(k,idetz2n)
             end if
-
             !===============================================================================
             ! 16. FAST-SINKING DETRITUS CARBON (DetZ2C)
             !===============================================================================
@@ -5263,7 +5258,7 @@ real(kind=8) :: &
                 !-----------------------------------------------------------------------
                 ! SINKS: Grazing (C-basis)
                 !-----------------------------------------------------------------------
-                - grazingFlux_cocco         * recipQuota_cocco             & ! Mesozooplankton (N->C)
+                - grazingFlux_cocco         * recipQuota_cocco               & ! Mesozooplankton (N->C)
                 - grazingFlux_Cocco2        * recipQuota_cocco * is_3zoo2det & ! Macrozooplankton
                 - grazingFlux_Cocco3        * recipQuota_cocco * is_3zoo2det & ! Microzooplankton
                                                                           ) * dt_b + sms(k,icocc)
@@ -5544,7 +5539,7 @@ real(kind=8) :: &
                 - kScavFe * DetC * FreeFe                                  & ! Slow-sinking detritus
                 - kScavFe * DetZ2C * FreeFe * is_3zoo2det                  & ! Fast-sinking detritus
                                                                           ) * dt_b + sms(k,ife)
- 
+
         !===============================================================================
         ! 34. PHYTOPLANKTON CALCITE (PhyCalc)
         !===============================================================================
@@ -6248,7 +6243,6 @@ real(kind=8) :: &
                 end if ! ciso_14
 
             end if ! ciso
-
             !-------------------------------------------------------------------------------
             ! DIAGNOSTIC ACCUMULATION INITIALIZATION
             !-------------------------------------------------------------------------------
@@ -6381,7 +6375,7 @@ real(kind=8) :: &
                     ) * recipbiostep
                 endif
 
-               !===========================================================================
+                !===========================================================================
                 ! NET NITROGEN ASSIMILATION
                 !===========================================================================
                 ! Net nitrogen uptake = Assimilation - Exudation losses
@@ -6487,7 +6481,7 @@ real(kind=8) :: &
                     ) * recipbiostep
                 endif
 
-               !===========================================================================
+                !===========================================================================
                 ! ZOOPLANKTON RESPIRATION
                 !===========================================================================
                 ! Tracks heterotrophic respiration (metabolic CO2 release)

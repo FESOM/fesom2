@@ -157,7 +157,7 @@ endif
     REcoM_T    = min(REcoM_T, 40.d0) 
 
     !!---- minimum set to 21: K1/K2 Lueker valid between 2degC-35degC and 19-43psu, else causes trouble in regions with S between 19 and 21 and ice conc above 97%
-    REcoM_S    = max(21.d0, Sali(1)) 
+    REcoM_S    = max(21.d0, Sali(1))
     !!---- maximum set to 43: K1/K2 Lueker valid between 2degC-35degC and 19-43psu, else causes trouble   REcoM_S    = min(REcoM_S, 43.d0)  !!!!!!!!
 
     !!---- convert from Pa to atm.
