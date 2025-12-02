@@ -18,7 +18,7 @@ MODULE Toy_Neverworld2
   integer           :: wind_opt = 2         ! 1: interpolate tau from profile data, 2: read already to elem interp profile data
   
   logical           :: do_Trelax= .False.   ! apply surface temp relaxation
-  logical           :: do_Tpert = .True.   ! apply temp. perturbation to trigger instabilities
+  logical           :: do_Tpert = .True.    ! apply temp. perturbation to trigger instabilities
   
   real(kind=WP)     :: tau_inv  =1.0/50.0/24.0/3600.0 
   contains

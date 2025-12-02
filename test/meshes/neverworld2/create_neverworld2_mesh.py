@@ -63,8 +63,15 @@ def main():
     
     cyclic_len = Lx
     
-    # define layer thicknesses of each layer
-    hthick     = np.array([25, 50, 100, 125, 150, 175, 200, 225, 250, 300, 350, 400, 500, 550, 600])        
+    # define layer thicknesses of each layer original neverworld2
+    hthick     = np.array([25., 50., 100., 125., 150., 175., 200., 225., 250., 300., 350., 400., 500., 550., 600.])     
+    
+    ## layer thicknesses of core2 grid until 4000m
+    #hthick     = np.array([  5.,  10.,  10.,  10.,  10.,  10.,  10.,  10.,  10.,  10.,  15.,
+                            #20.,  25.,  30.,  40.,  50.,  60.,  70.,  80.,  90., 100., 110.,
+                           #120., 130., 140., 150., 170., 200., 220., 230., 250., 250., 250.,
+                           #250., 250., 250., 350.]) 
+    
     max_depth  = -hthick.sum()  #-4000.0
 
     do_plot    = True
