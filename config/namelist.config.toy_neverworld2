@@ -81,7 +81,7 @@ use_partial_cell   = .false.     ! use partial bottom cells for better topograph
 &geometry
 cartesian       = .false.        ! use Cartesian coordinates (false = spherical Earth)
 fplane          = .false.        ! use f-plane approximation (constant Coriolis parameter)
-cyclic_length   = 90             ! length of cyclic domain [degrees] (360 = global)
+cyclic_length   = 60             ! length of cyclic domain [degrees] (360 = global)
 rotated_grid    = .false.        ! use rotated grid (typically for coupled models to avoid pole singularity)
 force_rotation  = .false.        ! force grid rotation even if not coupled
 alphaEuler      = 0.             ! first Euler angle (rotation around z-axis) [degrees]
@@ -105,7 +105,7 @@ use_ice                  = .false.       ! enable sea ice model
 use_cavity               = .false.       ! enable ice shelf cavities
 use_cavity_partial_cell  = .false.       ! use partial cells in ice shelf cavities (not recommended)
 use_floatice             = .false.       ! enable floating ice (icebergs)
-use_sw_pene              = .true.        ! enable shortwave radiation penetration into ocean
+use_sw_pene              = .false.        ! enable shortwave radiation penetration into ocean
 flag_debug               = .false.       ! enable debug output (verbose logging)
 use_transit              = .false.       ! enable transient tracer module (CFCs, SF6, etc.)
 toy_ocean                = .true.        ! enable toy configuration

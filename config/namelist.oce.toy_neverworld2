@@ -69,9 +69,13 @@ mix_scheme         = 'PP'      ! vertical mixing scheme: 'KPP' (K-Profile Parame
 ! --- Convection Parameters ---
 Ricr               = 0.3       ! critical bulk Richardson number (for convection onset)
 concv              = 1.6       ! constant for pure convection (eq. 23 in Large et al.)
-                             ! typical values: Large 1.5-1.6, MOM default 1.8
+                               ! typical values: Large 1.5-1.6, MOM default 1.8
 
 ! --- Tidal Forcing ---
 use_global_tides   = .false.   ! enable global tidal potential forcing
+
+! --- State Equation ---
+state_equation     = 0         ! 0: use linear equation of state
+
 /
 
