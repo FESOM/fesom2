@@ -1,0 +1,89 @@
+mesh: test_neverworld2
+forcing: test_global
+clim:
+    type: test_global
+    filelist: ['woa18_netcdf_5deg.nc','woa18_netcdf_5deg.nc']
+    varlist: ['salt', 'temp']
+ntasks: 8
+time: "00:10:00"
+
+namelist.config:
+    timestep:
+        run_length: 1
+        run_length_unit: "d"
+    restart_log:
+        restart_length: 1
+        restart_length_unit: 'd'
+        logfile_outfreq: 10    
+    geometry:
+        force_rotation: False
+    inout:
+        restart_length: 1
+        restart_length_unit: "y"
+    geometry:
+        cyclic_length: 60.0
+        rotated_grid: False
+        force_rotation: False
+    run_config:
+        use_ice: False
+        toy_ocean: True
+        which_toy: "neverworld2"
+        use_sw_pene: False
+    calendar:
+        include_fleapyear: False
+
+namelist.oce:
+    oce_dyn:
+        state_equation: 0
+        Fer_GM: False
+        Redi: False
+        mix_scheme: "PP"
+
+namelist.dyn:
+    dynamics_general:
+        use_wsplit: False
+
+namelist.tra:
+    tracer_phys:
+        use_momix: False
+        K_hor: 10
+        surf_relax_S: 0.0
+        balance_salt_water: False
+
+
+namelist.ice:
+    ice_dyn:
+        whichEVP: 0
+        evp_rheol_steps: 150
+
+namelist.io:
+    nml_list:
+        io_list:
+            "sst       ":
+                freq: 1
+                unit: d
+                prec: 8
+            "temp      ":
+                freq: 1
+                unit: d
+                prec: 8
+            "salt      ":
+                freq: 1
+                unit: d
+                prec: 8
+            "u         ":
+                freq: 1
+                unit: d
+                prec: 8
+            "v         ":
+                freq: 1
+                unit: d
+                prec: 8
+
+fcheck:
+    salt: 35.0
+    temp: 14.32970888593529
+    sst: 18.939700863818697
+    u: 0.027590123469330336
+    v: -0.0008576519154683742
+
