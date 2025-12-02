@@ -428,19 +428,19 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
    endif()
    
    # # debugging related compiler flags
-   #target_compile_options(${PROJECT_NAME} PRIVATE 
-                           #-fallow-argument-mismatch 
-                           #-fno-fast-math -fno-signed-zeros 
-                           #-freciprocal-math 
-                           #-mveclibabi=svml 
-                           #-flto
-                           #-pg 
-                           #-fbacktrace 
-                           #-fcheck=all,bounds 
-                           #-finit-real=snan 
-                           #-finit-integer=-9999 
-                           #-fsanitize=undefined,address
-                        #)
+   target_compile_options(${PROJECT_NAME} PRIVATE 
+                           -fallow-argument-mismatch 
+                           -fno-fast-math -fno-signed-zeros 
+                           -freciprocal-math 
+                           -mveclibabi=svml 
+                           -flto
+                           -pg 
+                           -fbacktrace 
+                           -fcheck=all,bounds 
+                           -finit-real=snan 
+                           -finit-integer=-9999 
+                           -fsanitize=undefined,address
+                        )
    ## if use -fsanitize=undefined,address you also need ... PRIVATE -lubsan)           
    #target_link_libraries(${PROJECT_NAME} PRIVATE -lubsan)
                      
