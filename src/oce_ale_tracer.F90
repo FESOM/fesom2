@@ -267,7 +267,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 
         call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
 !$OMP BARRIER
-
+!call apply_gm_fluxes(temp_fx, temp_fy, temp_fz, tracers%data(1)%values(:,:), partit, mesh)
+!call apply_gm_fluxes(salt_fx, salt_fy, salt_fz, tracers%data(2)%values(:,:), partit, mesh)
     end do
 !!!        !$ACC UPDATE HOST (tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus) &
 !!!        !$ACC HOST  (tracers%work%edge_up_dn_grad)

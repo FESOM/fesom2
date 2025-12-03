@@ -550,3 +550,151 @@ subroutine init_RediGM_GINsea_mask(partit, mesh)
     call smooth_nod(fer_GINsea_mask, 5, partit, mesh)
     
 end subroutine init_RediGM_GINsea_mask 
+
+!===============================================================================
+subroutine apply_gm_fluxes(fx, fy, fz, ttf, partit, mesh)
+    use MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE g_CONFIG
+    use g_comm_auto
+    implicit none
+    type(t_partit),intent(in), target :: partit
+    type(t_mesh),  intent(in), target :: mesh
+    real(kind=WP), intent(inout)      :: ttf(   mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(in)         :: fx(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(in)         :: fy(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(in)         :: fz(mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP)                     :: deltaX1, deltaY1, deltaX2, deltaY2
+    real(kind=WP)                     :: a, felx, fely, flux
+    integer                           :: el(2), enodes(2), nz, edge, n
+    integer                           :: nu12, nl12, nl1, nl2, nu1, nu2, nzmin, nzmax
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
+    do edge=1, myDim_edge2D
+        ! local indice of nodes that span up edge ed
+        enodes=edges(:,edge)
+        ! local index of element that contribute to edge
+        el=edge_tri(:,edge)
+        ! number of layers -1 at elem el(1)
+        nl1=nlevels(el(1))-1
+        ! index off surface layer in case of cavity !=1
+        nu1=ulevels(el(1))
+
+        ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to
+        ! center of edge --> needed to calc flux perpedicular to edge from elem el(1)
+        deltaX1=edge_cross_dxdy(1,edge)
+        deltaY1=edge_cross_dxdy(2,edge)
+        a=r_earth*elem_cos(el(1))
+        !_______________________________________________________________________
+        ! same parameter but for other element el(2) that contributes to edge ed
+        ! if el(2)==0 than edge is boundary edge
+        nl2=0
+        nu2=0
+        if(el(2)>0) then
+            deltaX2=edge_cross_dxdy(3,edge)
+            deltaY2=edge_cross_dxdy(4,edge)
+            ! number of layers -1 at elem el(2)
+            nl2=nlevels(el(2))-1
+            nu2=ulevels(el(2))
+            a=0.5_WP*(a+r_earth*elem_cos(el(2)))
+        end if
+        !_______________________________________________________________________
+        ! nl12 ... minimum number of layers -1 between element el(1) & el(2) that
+        ! contribute to edge ed
+        ! nu12 ... upper index of layers between element el(1) & el(2) that
+        ! contribute to edge ed
+        ! be carefull !!! --> if ed is a boundary edge than el(1)~=0 and el(2)==0
+        !                     that means nl1>0, nl2==0, n2=min(nl1,nl2)=0 !!!
+        nl12=min(nl1,nl2)
+        nu12=max(nu1,nu2)
+        !_______________________________________________________________________
+        ! (A) goes only into this loop when the edge has only facing element
+        ! el(1) --> so the edge is a boundary edge --> this is for ocean
+        ! surface in case of cavity
+        do nz=nu1, nu12-1
+           felx=sum(fx(nz, elem2D_nodes(:,el(1))))/3.0_WP
+           fely=sum(fy(nz, elem2D_nodes(:,el(1))))/3.0_WP
+           !____________________________________________________________________
+           ! property flux across the segments
+           flux=(-fely*deltaX1 + felx*deltaY1)*helem(nz,el(1))
+           ttf(nz,enodes(1))=ttf(nz,enodes(1))-(flux*dt)/areasvol(nz,enodes(1))/hnode_new(nz,enodes(1))
+           ttf(nz,enodes(2))=ttf(nz,enodes(2))+(flux*dt)/areasvol(nz,enodes(2))/hnode_new(nz,enodes(2))
+        end do
+
+        !_______________________________________________________________________
+        ! (B) goes only into this loop when the edge has only facing elemenmt
+        ! el(2) --> so the edge is a boundary edge --> this is for ocean
+        ! surface in case of cavity
+        if (nu2 > 0) then
+            do nz=nu2, nu12-1
+                felx=sum(fx(nz, elem2D_nodes(:,el(2))))/3.0_WP
+                fely=sum(fy(nz, elem2D_nodes(:,el(2))))/3.0_WP           
+                !___________________________________________________________
+                ! volume flux across the segments
+                flux=(fely*deltaX2 - felx*deltaY2)*helem(nz,el(2))
+                ttf(nz,enodes(1))=ttf(nz,enodes(1))-(flux*dt)/areasvol(nz,enodes(1))/hnode_new(nz,enodes(1))
+                ttf(nz,enodes(2))=ttf(nz,enodes(2))+(flux*dt)/areasvol(nz,enodes(2))/hnode_new(nz,enodes(2))
+            end do
+        end if
+
+        !_______________________________________________________________________
+        ! (C) Both segments
+        ! loop over depth layers from top (nu12) to nl12
+        ! be carefull !!! --> if ed is a boundary edge, el(2)==0 than nl12=0 so
+        !                     you wont enter in this loop
+        do nz=nu12, nl12
+           felx=sum(fx(nz, elem2D_nodes(:,el(1))))/3.0_WP
+           fely=sum(fy(nz, elem2D_nodes(:,el(1))))/3.0_WP
+           !____________________________________________________________________
+           ! property flux across the segments
+           flux=(-fely*deltaX1 + felx*deltaY1)*helem(nz,el(1))
+
+           felx=sum(fx(nz, elem2D_nodes(:,el(2))))/3.0_WP
+           fely=sum(fy(nz, elem2D_nodes(:,el(2))))/3.0_WP
+           !____________________________________________________________________
+           ! property flux across the segments
+           flux=flux+(fely*deltaX2 - felx*deltaY2)*helem(nz,el(2))
+           ttf(nz,enodes(1))=ttf(nz,enodes(1))-(flux*dt)/areasvol(nz,enodes(1))/hnode_new(nz,enodes(1))
+           ttf(nz,enodes(2))=ttf(nz,enodes(2))+(flux*dt)/areasvol(nz,enodes(2))/hnode_new(nz,enodes(2))
+        end do
+
+        !_______________________________________________________________________
+        ! (D) remaining segments on the left or on the right
+        do nz=nl12+1, nl1
+           felx=sum(fx(nz, elem2D_nodes(:,el(1))))/3.0_WP
+           fely=sum(fy(nz, elem2D_nodes(:,el(1))))/3.0_WP
+           !____________________________________________________________________
+           ! property flux across the segments
+           flux=(-fely*deltaX1 + felx*deltaY1)*helem(nz,el(1))
+           ttf(nz,enodes(1))=ttf(nz,enodes(1))-(flux*dt)/areasvol(nz,enodes(1))/hnode_new(nz,enodes(1))
+           ttf(nz,enodes(2))=ttf(nz,enodes(2))+(flux*dt)/areasvol(nz,enodes(2))/hnode_new(nz,enodes(2))
+        end do
+
+        !_______________________________________________________________________
+        ! (E) remaining segments on the left or on the right
+        do nz=nl12+1, nl2
+                felx=sum(fx(nz, elem2D_nodes(:,el(2))))/3.0_WP
+                fely=sum(fy(nz, elem2D_nodes(:,el(2))))/3.0_WP
+                !_______________________________________________________________
+                ! property flux across the segments
+                flux=(fely*deltaX2 - felx*deltaY2)*helem(nz,el(2))
+                ttf(nz,enodes(1))=ttf(nz,enodes(1))-(flux*dt)/areasvol(nz,enodes(1))/hnode_new(nz,enodes(1))
+                ttf(nz,enodes(2))=ttf(nz,enodes(2))+(flux*dt)/areasvol(nz,enodes(2))/hnode_new(nz,enodes(2))
+        end do
+    end do
+
+    ! add vertical GM flux contribution at nodes
+    do n=1, myDim_nod2D
+       nzmax=nlevels_nod2D(n)
+       nzmin=ulevels_nod2D(n)
+       do nz=nzmin, nzmax-1
+          ttf(nz,n)=ttf(nz,n)-(fz(nz+1,n)-fz(nz,n))*dt/hnode_new(nz,n)
+       end do
+    end do
+end subroutine apply_gm_fluxes
+!
