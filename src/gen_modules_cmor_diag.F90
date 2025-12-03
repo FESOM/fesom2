@@ -65,10 +65,12 @@ contains
 
     ! Compute ocean volume by summing over all levels and 2D nodes
     ! FESOM 2: loop over (level, nod2D), not nod3D
+    ! Use areasvol which accounts for ice shelf cavities (uses bottom face area
+    ! for first wet cell under cavity instead of top face)
     volo_local = 0.0_WP
     do n2 = 1, myDim_nod2D
        do k = ulevels_nod2D(n2), nlevels_nod2D(n2)-1
-          volo_local = volo_local + area(k, n2) * hnode(k, n2)
+          volo_local = volo_local + areasvol(k, n2) * hnode(k, n2)
        end do
     end do
     call MPI_AllREDUCE(volo_local, volo, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, ierr)
@@ -181,13 +183,14 @@ contains
     !=================================================================
     ! Compute global mean salinity and temperature
     ! Volume-weighted average over all levels
+    ! Use areasvol for proper cavity handling
     !=================================================================
     soga = 0.0_WP
     thetaoga = 0.0_WP
     do n2 = 1, myDim_nod2D
         do k = ulevels_nod2D(n2), nlevels_nod2D(n2)-1
-            soga = soga + salt(k, n2) * area(k, n2) * hnode(k, n2)
-            thetaoga = thetaoga + temp(k, n2) * area(k, n2) * hnode(k, n2)
+            soga = soga + salt(k, n2) * areasvol(k, n2) * hnode(k, n2)
+            thetaoga = thetaoga + temp(k, n2) * areasvol(k, n2) * hnode(k, n2)
         end do
     end do
     call MPI_AllREDUCE(MPI_IN_PLACE, soga, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, ierr)
