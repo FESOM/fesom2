@@ -56,8 +56,11 @@ subroutine ice_TG_rhs(mesh)
         rhs_a(row)=0._WP
         rhs_ms(row)=0._WP        
 #if defined (__oifs)
-        ths_temp(row)=0._WP
+        ths_temp(row)=0._WP ! should that not be rhs_temp?
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+        rhs_tr_ice(row)=0._WP
+#endif /* (__seaice_tracers) */
     END DO
     
     ! Velocities at nodes
@@ -95,6 +98,9 @@ subroutine ice_TG_rhs(mesh)
 #if defined (__oifs)
             rhs_temp(row)=rhs_temp(row)+sum(entries*ice_temp(elnodes))
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+            rhs_tr_ice(row)=rhs_tr_ice(row)+sum(entries*tr_ice(1,elnodes))
+#endif /* (__seaice_tracers) */
         END DO
     end do
 end subroutine ice_TG_rhs   
@@ -125,6 +131,10 @@ subroutine ice_fct_init(mesh)
   allocate(m_templ(n_size))  
   allocate(dm_temp(n_size))  
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+  allocate(tr_icel(n_size))
+  allocate(dtr_ice(n_size))
+#endif /* (__seaice_tracers) */
   allocate(icefluxes(myDim_elem2D,3))
   allocate(icepplus(n_size), icepminus(n_size))
   icefluxes = 0.0_WP
@@ -135,6 +145,10 @@ subroutine ice_fct_init(mesh)
   m_templ=0.0_WP
   dm_temp=0.0_WP
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+  tr_icel=0.0_WP
+  dtr_ice=0.0_WP
+#endif /* (__seaice_tracers) */
   
   allocate(dm_ice(n_size), da_ice(n_size), dm_snow(n_size))  ! increments of high
   dm_ice = 0.0_WP                                            ! order solutions
@@ -165,6 +179,9 @@ subroutine ice_fct_solve(mesh)
 #if defined (__oifs)
   call ice_fem_fct(4, mesh)    ! ice_temp
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+  call ice_fem_fct(5, mesh)    ! tr_ice
+#endif /* (__seaice_tracers) */
 
 end subroutine ice_fct_solve
 !
@@ -222,6 +239,13 @@ subroutine ice_solve_low_order(mesh)
                   ice_temp(location(1:cn))))/area(1,row) + &
                   (1.0_WP-gamma)*ice_temp(row)
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+        ! this is done at the moment for only one seaice tracer.
+        ! should be a loop or a vector-valued operation!
+        tr_icel(row)=(rhs_tr_ice(row)+gamma*sum(mass_matrix(clo:clo2)* &
+                    tr_ice(1,location(1:cn))))/area(1,row) + &
+                    (1.0_WP-gamma)*tr_ice(1,row)
+#endif /* (__seaice_tracers) */
     end do
     
     ! Low-order solution must be known to neighbours
@@ -230,7 +254,9 @@ subroutine ice_solve_low_order(mesh)
 #if defined (__oifs)
     call exchange_nod(m_templ)
 #endif /* (__oifs) */
-
+#if defined (__seaice_tracers)
+    call exchange_nod(tr_icel)
+#endif /* (__seaice_tracers) */
 
 end subroutine ice_solve_low_order     
 !
@@ -266,6 +292,9 @@ subroutine ice_solve_high_order(mesh)
 #if defined (__oifs)
      dm_temp(row)=rhs_temp(row)/area(1,row)
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+     dtr_ice(row)=rhs_tr_ice(row)/area(1,row)
+#endif /* (__seaice_tracers) */
   end do
 
   call exchange_nod(dm_ice, da_ice, dm_snow)
@@ -273,6 +302,9 @@ subroutine ice_solve_high_order(mesh)
 #if defined (__oifs)
      call exchange_nod(dm_temp)
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+     call exchange_nod(dtr_ice)
+#endif /* (__seaice_tracers) */
   !iterate 
   do n=1,num_iter_solve-1
      do row=1,myDim_nod2D
@@ -294,6 +326,10 @@ subroutine ice_solve_high_order(mesh)
         rhs_new=rhs_temp(row) - sum(mass_matrix(clo:clo2)*dm_temp(location(1:cn)))
         m_templ(row)=dm_temp(row)+rhs_new/area(1,row)
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+        rhs_new=rhs_tr_ice(1,row) - sum(mass_matrix(clo:clo2)*dtr_ice(location(1:cn)))
+        tr_icel(row)=dtr_ice(row)+rhs_new/area(1,row)
+#endif /* (__seaice_tracers) */
      end do
      do row=1,myDim_nod2D
         !_______________________________________________________________________
@@ -306,12 +342,18 @@ subroutine ice_solve_high_order(mesh)
 #if defined (__oifs)
         dm_temp(row)=m_templ(row)
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+        dtr_ice(row)=tr_icel(row)
+#endif /* (__seaice_tracers) */
      end do
      call exchange_nod(dm_ice, da_ice, dm_snow)
 
 #if defined (__oifs)
      call exchange_nod(dm_temp)
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+     call exchange_nod(dtr_ice)
+#endif /* (__seaice_tracers) */
 
   end do
 end subroutine ice_solve_high_order
@@ -405,6 +447,15 @@ subroutine ice_fem_fct(tr_array_id, mesh)
             end do
         end if
 #endif /* (__oifs) */
+        
+#if defined (__seaice_tracers)
+        if (tr_array_id==5) then
+            do q=1,3
+            icefluxes(elem,q)=-sum(icoef(:,q)*(gamma*tr_ice(1,elnodes) + &
+                            dtr_ice(elnodes)))*(vol/area(1,elnodes(q)))/12.0_WP
+            end do
+        end if
+#endif /* (__seaice_tracers) */
     end do
      
     !==========================   
@@ -467,7 +518,21 @@ subroutine ice_fem_fct(tr_array_id, mesh)
         end do
     end if
 #endif /* (__oifs) */
- 
+
+#if defined (__seaice_tracers)
+    if (tr_array_id==5) then
+        do row=1, myDim_nod2D
+            if (ulevels_nod2d(row)>1) cycle
+            n=nn_num(row)
+            tmax(row)=maxval(tr_icel(nn_pos(1:n,row)))
+            tmin(row)=minval(tr_icel(nn_pos(1:n,row)))
+                ! Admissible increments
+            tmax(row)=tmax(row)-tr_icel(row)
+            tmin(row)=tmin(row)-tr_icel(row)
+        end do
+    end if
+#endif /* (__seaice_tracers) */
+    
     !=========================
     ! Sums of positive/negative fluxes to node row
     !=========================
@@ -619,12 +684,37 @@ subroutine ice_fem_fct(tr_array_id, mesh)
         end do
     end if
 #endif /* (__oifs) */
+
+#if defined (__seaice_tracers)
+    if(tr_array_id==5) then
+        do n=1,myDim_nod2D
+            if(ulevels_nod2D(n)>1) cycle !LK89140
+            tr_ice(1,n)=tr_icel(n)
+        end do      
+        do elem=1, myDim_elem2D
+            elnodes=elem2D_nodes(:,elem)
+            
+            !___________________________________________________________________
+            ! if cavity cycle over
+            if(ulevels(elem)>1) cycle !LK89140
+            
+            do q=1,3
+                n=elnodes(q)  
+                tr_ice(1,n)=tr_ice(1,n)+icefluxes(elem,q)
+            end do
+        end do   
+    end if
+#endif /* (__seaice_tracers) */
     
     call exchange_nod(m_ice, a_ice, m_snow)
 
 #if defined (__oifs)
     call exchange_nod(ice_temp)
 #endif /* (__oifs) */    
+
+#if defined (__seaice_tracers)
+    call exchange_nod(tr_ice)
+#endif /* (__seaice_tracers) */
 
     deallocate(tmin, tmax)
 end subroutine ice_fem_fct
@@ -720,7 +810,7 @@ subroutine ice_TG_rhs_div(mesh)
   implicit none 
   real(kind=WP)            :: diff, entries(3),  um, vm, vol, dx(3), dy(3) 
   integer                  :: n, q, row, elem, elnodes(3)
-  real(kind=WP)            :: c1, c2, c3, c4, cx1, cx2, cx3, cx4, entries2(3) 
+  real(kind=WP)            :: c1, c2, c3, c4, cx1, cx2, cx3, cx4, cx5, entries2(3) 
   type(t_mesh), intent(in) , target :: mesh
 
 #include "associate_mesh.h"
@@ -737,12 +827,18 @@ subroutine ice_TG_rhs_div(mesh)
 #if defined (__oifs)
      rhs_temp(row)=0.0_WP
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+     rhs_tr_ice(row)=0.0_WP
+#endif /* (__seaice_tracers) */
      rhs_mdiv(row)=0.0_WP
      rhs_adiv(row)=0.0_WP
      rhs_msdiv(row)=0.0_WP
 #if defined (__oifs)
      rhs_tempdiv(row)=0.0_WP        
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+     rhs_tr_icediv(row)=0.0_WP        ! not yet defined/accocated!
+#endif /* (__seaice_tracers) */
   END DO
   do elem=1,myDim_elem2D          !assembling rhs over elements
      elnodes=elem2D_nodes(:,elem)
@@ -760,8 +856,8 @@ subroutine ice_TG_rhs_div(mesh)
       ! in the standard version)
      c1=(um*um+sum(u_ice(elnodes)*u_ice(elnodes)))/12.0_WP 
      c2=(vm*vm+sum(v_ice(elnodes)*v_ice(elnodes)))/12.0_WP
-     c3=(um*vm+sum(v_ice(elnodes)*u_ice(elnodes)))/12.0_WP
-     c4=sum(dx*u_ice(elnodes)+dy*v_ice(elnodes))
+     c3=(um*vm+sum(v_ice(elnodes)*u_ice(elnodes)))/12.0_WP 
+     c4=sum(dx*u_ice(elnodes)+dy*v_ice(elnodes))           
      DO n=1,3
         row=elnodes(n)
 !!PS         if(ulevels_nod2D(row)>1) cycle !LK89140
@@ -780,6 +876,9 @@ subroutine ice_TG_rhs_div(mesh)
 #if defined (__oifs)
         cx4=vol*ice_dt*c4*(sum(ice_temp(elnodes))+ice_temp(elnodes(n))+sum(entries2*ice_temp(elnodes)))/12.0_WP
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+        cx5=vol*ice_dt*c4*(sum(tr_ice(1,elnodes))+tr_ice(1,elnodes(n))+sum(entries2*tr_ice(1,elnodes)))/12.0_WP
+#endif /* (__seaice_tracers) */
 
         rhs_m(row)=rhs_m(row)+sum(entries*m_ice(elnodes))+cx1
         rhs_a(row)=rhs_a(row)+sum(entries*a_ice(elnodes))+cx2
@@ -787,6 +886,9 @@ subroutine ice_TG_rhs_div(mesh)
 #if defined (__oifs)
         rhs_temp(row)=rhs_temp(row)+sum(entries*ice_temp(elnodes))+cx4
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+        rhs_tr_ice(row)=rhs_tr_ice(row)+sum(entries*tr_ice(1,elnodes))+cx4
+#endif /* (__seaice_tracers) */
         
         rhs_mdiv(row)=rhs_mdiv(row)-cx1
         rhs_adiv(row)=rhs_adiv(row)-cx2
@@ -794,6 +896,9 @@ subroutine ice_TG_rhs_div(mesh)
 #if defined (__oifs)
         rhs_tempdiv(row)=rhs_tempdiv(row)-cx4
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+        rhs_tr_icediv(row)=rhs_tr_icediv(row)-cx4
+#endif /* (__seaice_tracers) */
 
      END DO
   end do
@@ -833,6 +938,9 @@ subroutine ice_update_for_div(mesh)
 #if defined (__oifs)
         dm_temp(row)=rhs_tempdiv(row)/area(1,row)
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+        dtr_ice(row) =rhs_tr_icediv(row) /area(1,row)
+#endif /* (__seaice_tracers) */
     end do
     call exchange_nod(dm_ice)
     call exchange_nod(da_ice)
@@ -840,6 +948,9 @@ subroutine ice_update_for_div(mesh)
 #if defined (__oifs)
     call exchange_nod(dm_temp)
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+    call exchange_nod(dtr_ice)
+#endif /* (__seaice_tracers) */
 
     !iterate 
     do n=1,num_iter_solve-1
@@ -862,6 +973,10 @@ subroutine ice_update_for_div(mesh)
             rhs_new=rhs_tempdiv(row) - sum(mass_matrix(clo:clo2)*dm_temp(location(1:cn)))
             m_templ(row)=dm_temp(row)+rhs_new/area(1,row)
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+            rhs_new=rhs_tr_icediv(row) - sum(mass_matrix(clo:clo2)*dtr_ice(location(1:cn)))
+            tr_icel(row)=dtr_ice(row)+rhs_new/area(1,row)
+#endif /* (__seaice_tracers) */
         end do
         do row=1,myDim_nod2D
             !___________________________________________________________________________
@@ -874,6 +989,9 @@ subroutine ice_update_for_div(mesh)
 #if defined (__oifs)
             dm_temp(row)=m_templ(row)
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+            dtr_ice(row)=tr_icel(row)
+#endif /* (__seaice_tracers) */
         end do
         call exchange_nod(dm_ice)
         call exchange_nod(da_ice)
@@ -881,6 +999,9 @@ subroutine ice_update_for_div(mesh)
 #if defined (__oifs)
         call exchange_nod(dm_temp)
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+        call exchange_nod(dtr_ice)
+#endif /* (__seaice_tracers) */
     end do
     m_ice=m_ice+dm_ice
     a_ice=a_ice+da_ice
@@ -888,6 +1009,9 @@ subroutine ice_update_for_div(mesh)
 #if defined (__oifs)
     ice_temp=ice_temp+dm_temp
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+    tr_ice(1,:)=tr_ice(1,:)+dtr_ice
+#endif /* (__seaice_tracers) */
 
 end subroutine ice_update_for_div
 ! =============================================================

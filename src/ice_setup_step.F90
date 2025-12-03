@@ -96,6 +96,9 @@ e_size=myDim_elem2D+eDim_elem2D
 #if defined (__seaice_tracers)
  allocate(tr_ice(ntr_ice,n_size))
  allocate(flx_iceocn(ntr_ice,n_size), flx_atmice(ntr_ice,n_size))
+ ! allocation of some auxiliary arrays is done in ice_fct.F90, of some here. not clear to me why. 
+ ! allocate(tr_icel(n_size), dtr_ice(n_size))
+ allocate(rhs_tr_ice(n_size), rhs_tr_icediv(n_size))
 #endif /* (__seaice_tracers) */
 
  m_ice_old=0.0_WP !PS
@@ -127,9 +130,11 @@ e_size=myDim_elem2D+eDim_elem2D
  rhs_msdiv=0.0_WP
  
 #if defined (__seaice_tracers)
- tr_ice = 0.0
- flx_iceocn = 0.0
- flx_atmice = 0.0
+ tr_ice = 0.0_WP
+ flx_iceocn = 0.0_WP
+ flx_atmice = 0.0_WP
+ rhs_tr_ice = 0.0_WP
+ rhs_tr_icediv = 0.0_WP
 #endif /* (__seaice_tracers) */
 
 

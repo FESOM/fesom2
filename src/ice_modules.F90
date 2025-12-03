@@ -62,7 +62,7 @@ save
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice, V_ice, m_ice, a_ice  
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_ice_old, V_ice_old, m_ice_old, a_ice_old, m_snow_old,thdgr_old !PS
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_rhs_ice, V_rhs_ice, m_snow
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_m, rhs_a, rhs_ms, ths_temp
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_m, rhs_a, rhs_ms, ths_temp ! should it not be rhs_temp?
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: U_w, V_w
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: u_ice_aux, v_ice_aux  ! of the size of u_ice, v_ice
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_mdiv, rhs_adiv, rhs_msdiv
@@ -77,7 +77,7 @@ save
   real(kind=WP),target, allocatable, dimension(:)  :: tmp_oce_heat_flux, tmp_ice_heat_flux
 							!temporary flux fields
 							!(for flux correction)
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_temp, m_templ, dm_temp, rhs_tempdiv
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_temp, m_templ, dm_temp, rhs_tempdiv ! here again rhs_temp..
 
 #if defined (__oifs)
   real(kind=WP),target, allocatable, dimension(:)  :: enthalpyoffuse
@@ -85,18 +85,21 @@ save
 #endif /* (__oasis) */
   
 #if defined (__seaice_tracers)
-  ! stuff for iron/other nutrients in seaice
+  ! stuff for iron/other nutrients/tracers in seaice
   
   ! number of concentration tracers in ice
   integer                                          :: ntr_ice = 1, ntr_ice_max = 1
-  
-  ! which sea ice tracer belongs to which ocean tracer
+    ! which sea ice tracer belongs to which ocean tracer
   integer, DIMENSION(ntr_ice_max)                  :: ice_tracer_mate
-
   ! variables for holding concentration of stuff (nutrients e.g.) in ice and fluxes
   ! between atmosphere/ice and ice/ocean
   ! the sign convention is that positive fluxes are down (atm->ice and ice->ocn)
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:,:)       :: tr_ice, flx_iceocn, flx_atmice 
+  ! additional variables for the FCT-based advection and diffusion of ice tracers
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: tr_icel
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: dtr_ice
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_tr_ice
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_tr_icediv
 #endif /* (__seaice_tracers) */
 
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: S_oc_array, T_oc_array
