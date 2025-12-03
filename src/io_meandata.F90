@@ -1672,8 +1672,96 @@ END DO ! --> DO i=1, io_listsize
        call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/) ,  'ke_DV',     'RHO*V',           'kg*s/m^2', dynamics%ke_DV(:,:),     io_list(i)%freq, 'm', 8, partit, mesh)
        call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/) ,  'ke_elemD',  'RHO*    on elem', 'kg/m^3',   dynamics%ke_elemD(:,:),  io_list(i)%freq, 'm', 8, partit, mesh)
        call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/) ,  'ke_elemD2', 'RHO*^2  on elem', 'kg2/m^6',  dynamics%ke_elemD2(:,:), io_list(i)%freq, 'm', 8, partit, mesh)
-    end if    
+    end if
+    
+    !___________________________________________________________________________
+    ! CMOR diagnostics: auto-register with defaults if lcmor_diag=.true. and 
+    ! not already defined in io_list. Default: monthly, double precision
+    if (lcmor_diag) then
+        ! 2D fields
+        if (.not. stream_already_defined('tos')) then
+            call def_stream(nod2D, myDim_nod2D, 'tos', 'sea surface temperature', 'degC', tos(:), 1, 'm', 8, partit, mesh, "Sea surface temperature (CMOR)")
+        end if
+        if (.not. stream_already_defined('sos')) then
+            call def_stream(nod2D, myDim_nod2D, 'sos', 'sea surface salinity', 'psu', sos(:), 1, 'm', 8, partit, mesh, "Sea surface salinity (CMOR)")
+        end if
+        if (.not. stream_already_defined('pbo')) then
+            call def_stream(nod2D, myDim_nod2D, 'pbo', 'sea water pressure at sea floor', 'Pa', pbo(:), 1, 'm', 8, partit, mesh, "Sea water pressure at sea floor")
+        end if
+        if (.not. stream_already_defined('opottemptend')) then
+            call def_stream(nod2D, myDim_nod2D, 'opottemptend', 'tendency of sea water potential temperature', 'W/m2', opottemptend(:), 1, 'm', 8, partit, mesh, "Tendency of sea water potential temperature")
+        end if
+        
+        ! 0D (scalar) fields
+        if (.not. stream0D_already_defined('volo')) then
+            call def_stream0D('volo', 'sea water volume', 'm3', volo, 1, 'm', 8, partit, "Total volume of liquid sea water")
+        end if
+        if (.not. stream0D_already_defined('soga')) then
+            call def_stream0D('soga', 'global mean sea water salinity', 'psu', soga, 1, 'm', 8, partit, "Global mean sea water salinity")
+        end if
+        if (.not. stream0D_already_defined('thetaoga')) then
+            call def_stream0D('thetaoga', 'global mean sea water potential temperature', 'degC', thetaoga, 1, 'm', 8, partit, "Global mean sea water potential temperature")
+        end if
+        if (.not. stream0D_already_defined('siarean')) then
+            call def_stream0D('siarean', 'sea ice area northern hemisphere', '1e12 m2', siarean, 1, 'm', 8, partit, "Total area of sea ice in the Northern hemisphere")
+        end if
+        if (.not. stream0D_already_defined('siareas')) then
+            call def_stream0D('siareas', 'sea ice area southern hemisphere', '1e12 m2', siareas, 1, 'm', 8, partit, "Total area of sea ice in the Southern hemisphere")
+        end if
+        if (.not. stream0D_already_defined('siextentn')) then
+            call def_stream0D('siextentn', 'sea ice extent northern hemisphere', '1e12 m2', siextentn, 1, 'm', 8, partit, "Total area of sea ice extent in the Northern hemisphere")
+        end if
+        if (.not. stream0D_already_defined('siextents')) then
+            call def_stream0D('siextents', 'sea ice extent southern hemisphere', '1e12 m2', siextents, 1, 'm', 8, partit, "Total area of sea ice extent in the Southern hemisphere")
+        end if
+        if (.not. stream0D_already_defined('sivoln')) then
+            call def_stream0D('sivoln', 'sea ice volume northern hemisphere', '1e9 m3', sivoln, 1, 'm', 8, partit, "Total volume of sea ice in the Northern hemisphere")
+        end if
+        if (.not. stream0D_already_defined('sivols')) then
+            call def_stream0D('sivols', 'sea ice volume southern hemisphere', '1e9 m3', sivols, 1, 'm', 8, partit, "Total volume of sea ice in the Southern hemisphere")
+        end if
+        
+        if (mype == 0) then
+            write(*,*) '    CMOR diagnostics: all variables registered with defaults (monthly, double precision)'
+            write(*,*) '    Override via io_list entries in namelist.io'
+        end if
+    end if
+    
 end subroutine
+
+
+!_______________________________________________________________________________
+! Check if a 2D/3D stream is already defined
+function stream_already_defined(name) result(found)
+    character(len=*), intent(in) :: name
+    logical :: found
+    integer :: i
+    
+    found = .false.
+    do i = 1, io_NSTREAMS
+        if (trim(io_stream(i)%name) == trim(name)) then
+            found = .true.
+            return
+        end if
+    end do
+end function stream_already_defined
+
+
+!_______________________________________________________________________________
+! Check if a 0D stream is already defined
+function stream0D_already_defined(name) result(found)
+    character(len=*), intent(in) :: name
+    logical :: found
+    integer :: i
+    
+    found = .false.
+    do i = 1, io_NSTREAMS0D
+        if (trim(io_stream0D(i)%name) == trim(name)) then
+            found = .true.
+            return
+        end if
+    end do
+end function stream0D_already_defined
 !
 !
 !_______________________________________________________________________________
