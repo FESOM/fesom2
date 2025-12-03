@@ -15,7 +15,7 @@ module io_MEANDATA
 
   implicit none
   private
-  public :: def_stream, def_stream2D, def_stream3D, output, finalize_output
+  public :: def_stream, def_stream2D, def_stream3D, def_stream0D, output, finalize_output
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -98,6 +98,29 @@ module io_MEANDATA
   type(io_entry), save, allocatable, target   :: io_list(:)
 !
 !--------------------------------------------------------------------------------------------
+! Type for 0D (scalar) output streams - global values with time dimension only
+  type Meandata0D
+    character(100)                             :: name
+    character(500)                             :: description
+    character(100)                             :: units
+    character(500)                             :: long_description=""
+    real(kind=WP), pointer                     :: ptr          ! pointer to scalar value
+    real(real64)                               :: local_value  ! accumulated value
+    integer                                    :: addcounter = 0
+    integer                                    :: accuracy
+    integer                                    :: freq = 1
+    character                                  :: freq_unit = 'm'
+    logical                                    :: is_in_use = .false.
+    ! NetCDF handles
+    integer                                    :: ncid = -1
+    integer                                    :: varid, timeid, timedimid
+    integer                                    :: rec_count = 0
+  end type Meandata0D
+
+  type(Meandata0D), save, target :: io_stream0D(50)
+  integer, save                  :: io_NSTREAMS0D = 0
+!
+!--------------------------------------------------------------------------------------------
 ! generic interface was required to associate variables of unknown rank with the pointers of the same rank
 ! this allows for automatic streaming of associated variables into the netcdf file
   INTERFACE def_stream
@@ -146,6 +169,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     use o_mixing_KPP_mod
     use g_backscatter
     use diagnostics
+    use cmor_variables_diag
     use g_forcing_arrays
 #if defined (__cvmix)    
     use g_cvmix_tke
@@ -231,6 +255,61 @@ CASE ('t_star        ')
 CASE ('qsr        ')
     call def_stream(nod2D, myDim_nod2D,'qsr'        , 'solar radiation'      , 'W/s^2'  , qsr_c(:)       , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 
+! CMOR diagnostics for CMIP6/CMIP7 (require lcmor_diag=.true.)
+CASE ('tos       ')
+    if (lcmor_diag) then
+    call def_stream(nod2D, myDim_nod2D, 'tos', 'sea surface temperature', 'degC', tos(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Sea surface temperature (CMOR)")
+    end if
+CASE ('sos       ')
+    if (lcmor_diag) then
+    call def_stream(nod2D, myDim_nod2D, 'sos', 'sea surface salinity', 'psu', sos(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Sea surface salinity (CMOR)")
+    end if
+CASE ('pbo       ')
+    if (lcmor_diag) then
+    call def_stream(nod2D, myDim_nod2D, 'pbo', 'sea water pressure at sea floor', 'Pa', pbo(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Sea water pressure at sea floor")
+    end if
+CASE ('opottemptend')
+    if (lcmor_diag) then
+    call def_stream(nod2D, myDim_nod2D, 'opottemptend', 'tendency of sea water potential temperature', 'W/m2', opottemptend(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Tendency of sea water potential temperature expressed as heat content")
+    end if
+
+! CMOR 0D (scalar) diagnostics for CMIP6/CMIP7 (require lcmor_diag=.true.)
+CASE ('volo      ')
+    if (lcmor_diag) then
+    call def_stream0D('volo', 'sea water volume', 'm3', volo, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Total volume of liquid sea water")
+    end if
+CASE ('soga      ')
+    if (lcmor_diag) then
+    call def_stream0D('soga', 'global mean sea water salinity', 'psu', soga, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Global mean sea water salinity")
+    end if
+CASE ('thetaoga  ')
+    if (lcmor_diag) then
+    call def_stream0D('thetaoga', 'global mean sea water potential temperature', 'degC', thetaoga, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Global mean sea water potential temperature")
+    end if
+CASE ('siarean   ')
+    if (lcmor_diag) then
+    call def_stream0D('siarean', 'sea ice area northern hemisphere', '1e12 m2', siarean, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Total area of sea ice in the Northern hemisphere")
+    end if
+CASE ('siareas   ')
+    if (lcmor_diag) then
+    call def_stream0D('siareas', 'sea ice area southern hemisphere', '1e12 m2', siareas, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Total area of sea ice in the Southern hemisphere")
+    end if
+CASE ('siextentn ')
+    if (lcmor_diag) then
+    call def_stream0D('siextentn', 'sea ice extent northern hemisphere', '1e12 m2', siextentn, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Total area of sea ice extent in the Northern hemisphere")
+    end if
+CASE ('siextents ')
+    if (lcmor_diag) then
+    call def_stream0D('siextents', 'sea ice extent southern hemisphere', '1e12 m2', siextents, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Total area of sea ice extent in the Southern hemisphere")
+    end if
+CASE ('sivoln    ')
+    if (lcmor_diag) then
+    call def_stream0D('sivoln', 'sea ice volume northern hemisphere', '1e9 m3', sivoln, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Total volume of sea ice in the Northern hemisphere")
+    end if
+CASE ('sivols    ')
+    if (lcmor_diag) then
+    call def_stream0D('sivols', 'sea ice volume southern hemisphere', '1e9 m3', sivols, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Total volume of sea ice in the Southern hemisphere")
+    end if
 
 ! 2d ssh diagnostic variables
 CASE ('ssh_rhs    ')
@@ -1973,6 +2052,12 @@ subroutine update_means
         
         entry%addcounter=entry%addcounter+1
     END DO ! --> DO n=1, io_NSTREAMS
+    
+    ! Update 0D (scalar) means
+    DO n=1, io_NSTREAMS0D
+        io_stream0D(n)%local_value = io_stream0D(n)%local_value + real(io_stream0D(n)%ptr, real64)
+        io_stream0D(n)%addcounter = io_stream0D(n)%addcounter + 1
+    END DO
 end subroutine
 !
 !
@@ -2191,6 +2276,11 @@ ctime=timeold+(dayold-1.)*86400
 #endif
         endif ! --> if (do_output) then
     end do ! --> do n=1, io_NSTREAMS
+    
+    !___________________________________________________________________________
+    ! Handle 0D (scalar) output streams
+    call output_0D_streams(istep, partit)
+    
     lfirst=.false.
 
 #if defined(__MULTIO)
@@ -2200,6 +2290,135 @@ ctime=timeold+(dayold-1.)*86400
 #endif
 
 end subroutine
+
+
+!_______________________________________________________________________________
+! Output routine for 0D (scalar) streams
+subroutine output_0D_streams(istep, partit)
+    use g_clock
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    implicit none
+    integer, intent(in) :: istep
+    type(t_partit), intent(inout) :: partit
+    
+    integer :: n, ierr
+    logical :: do_output
+    type(Meandata0D), pointer :: entry0D
+    character(500) :: filepath
+    real(real64) :: mean_value, rtime
+    
+    do n = 1, io_NSTREAMS0D
+        entry0D => io_stream0D(n)
+        
+        ! Check whether output will be written based on event frequency
+        do_output = .false.
+        if (entry0D%freq_unit == 'y') then
+            call annual_event(do_output, entry0D%freq)
+        else if (entry0D%freq_unit == 'm') then 
+            call monthly_event(do_output, entry0D%freq) 
+        else if (entry0D%freq_unit == 'd') then
+            call daily_event(do_output, entry0D%freq)
+        else if (entry0D%freq_unit == 'h') then
+            call hourly_event(do_output, entry0D%freq)
+        else if (entry0D%freq_unit == 's') then
+            call step_event(do_output, istep, entry0D%freq)
+        endif
+        
+        if (do_output) then
+            ! Compute mean value
+            if (entry0D%addcounter > 0) then
+                mean_value = entry0D%local_value / real(entry0D%addcounter, real64)
+            else
+                mean_value = entry0D%local_value
+            endif
+            
+            ! Only rank 0 does the output (scalar is already globally reduced)
+            if (partit%mype == 0) then
+                ! Build filepath
+                if (filesplit_freq == 'm') then
+                    filepath = trim(ResultPath)//trim(entry0D%name)//'.'//trim(runid)//'.'//cyearnew//'_'//cmonth//'.nc'
+                else
+                    filepath = trim(ResultPath)//trim(entry0D%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
+                endif
+                
+                ! Create or open file
+                if (entry0D%ncid < 0) then
+                    ! Try to open existing file
+                    ierr = nf90_open(trim(filepath), NF90_WRITE, entry0D%ncid)
+                    if (ierr /= NF90_NOERR) then
+                        ! Create new file
+                        call create_0D_file(entry0D, filepath)
+                    else
+                        ! Get existing variable and dimension IDs
+                        call assert_nf(nf90_inq_dimid(entry0D%ncid, 'time', entry0D%timedimid), __LINE__)
+                        call assert_nf(nf90_inq_varid(entry0D%ncid, 'time', entry0D%timeid), __LINE__)
+                        call assert_nf(nf90_inq_varid(entry0D%ncid, trim(entry0D%name), entry0D%varid), __LINE__)
+                        call assert_nf(nf90_inquire_dimension(entry0D%ncid, entry0D%timedimid, len=entry0D%rec_count), __LINE__)
+                    endif
+                endif
+                
+                ! Write data
+                entry0D%rec_count = entry0D%rec_count + 1
+                rtime = ctime
+                
+                call assert_nf(nf90_put_var(entry0D%ncid, entry0D%timeid, rtime, start=(/entry0D%rec_count/)), __LINE__)
+                call assert_nf(nf90_put_var(entry0D%ncid, entry0D%varid, mean_value, start=(/entry0D%rec_count/)), __LINE__)
+                call assert_nf(nf90_sync(entry0D%ncid), __LINE__)
+            endif
+            
+            ! Reset accumulator
+            entry0D%local_value = 0._real64
+            entry0D%addcounter = 0
+        endif
+    end do
+    
+end subroutine output_0D_streams
+
+
+!_______________________________________________________________________________
+! Create a new NetCDF file for 0D (scalar) output
+subroutine create_0D_file(entry0D, filepath)
+    use g_clock
+    implicit none
+    type(Meandata0D), intent(inout) :: entry0D
+    character(len=*), intent(in) :: filepath
+    
+    integer :: ierr
+    character(100) :: time_units
+    
+    ! Create file
+    call assert_nf(nf90_create(trim(filepath), IOR(NF90_CLOBBER, NF90_NETCDF4), entry0D%ncid), __LINE__)
+    
+    ! Define time dimension (unlimited)
+    call assert_nf(nf90_def_dim(entry0D%ncid, 'time', NF90_UNLIMITED, entry0D%timedimid), __LINE__)
+    
+    ! Define time variable
+    call assert_nf(nf90_def_var(entry0D%ncid, 'time', NF90_DOUBLE, (/entry0D%timedimid/), entry0D%timeid), __LINE__)
+    write(time_units, '(a,i4.4,a,i2.2,a,i2.2,a)') 'seconds since ', yearnew, '-01-01 00:00:00'
+    call assert_nf(nf90_put_att(entry0D%ncid, entry0D%timeid, 'units', trim(time_units)), __LINE__)
+    call assert_nf(nf90_put_att(entry0D%ncid, entry0D%timeid, 'calendar', 'standard'), __LINE__)
+    
+    ! Define data variable
+    if (entry0D%accuracy == i_real8) then
+        call assert_nf(nf90_def_var(entry0D%ncid, trim(entry0D%name), NF90_DOUBLE, (/entry0D%timedimid/), entry0D%varid), __LINE__)
+    else
+        call assert_nf(nf90_def_var(entry0D%ncid, trim(entry0D%name), NF90_FLOAT, (/entry0D%timedimid/), entry0D%varid), __LINE__)
+    endif
+    
+    ! Add attributes
+    call assert_nf(nf90_put_att(entry0D%ncid, entry0D%varid, 'description', trim(entry0D%description)), __LINE__)
+    call assert_nf(nf90_put_att(entry0D%ncid, entry0D%varid, 'units', trim(entry0D%units)), __LINE__)
+    if (len_trim(entry0D%long_description) > 0) then
+        call assert_nf(nf90_put_att(entry0D%ncid, entry0D%varid, 'long_name', trim(entry0D%long_description)), __LINE__)
+    endif
+    
+    ! End define mode
+    call assert_nf(nf90_enddef(entry0D%ncid), __LINE__)
+    
+    entry0D%rec_count = 0
+    
+end subroutine create_0D_file
 !
 !
 !_______________________________________________________________________________
@@ -2250,6 +2469,14 @@ subroutine finalize_output()
         entry=>io_stream(i)
         if(entry%thread_running) call entry%thread%join()
         entry%thread_running = .false.    
+    end do
+    
+    ! Close 0D stream files
+    do i=1, io_NSTREAMS0D
+        if (io_stream0D(i)%ncid >= 0) then
+            call assert_nf(nf90_close(io_stream0D(i)%ncid), __LINE__)
+            io_stream0D(i)%ncid = -1
+        end if
     end do
 end subroutine
 !
@@ -2407,6 +2634,66 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
     ! non dimension specific
     call def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh, long_description)
 end subroutine
+!
+!
+!_______________________________________________________________________________
+! build 0D (scalar) meandata streaming object for global values
+subroutine def_stream0D(name, description, units, data, freq, freq_unit, accuracy, partit, long_description)
+  USE MOD_PARTIT
+  USE MOD_PARSUP
+  implicit none
+  character(len=*),      intent(in)    :: name, description, units
+  real(kind=WP), target, intent(in)    :: data
+  integer,               intent(in)    :: freq
+  character,             intent(in)    :: freq_unit
+  integer,               intent(in)    :: accuracy
+  type(t_partit),        intent(inout) :: partit
+  character(len=*), optional, intent(in) :: long_description
+  type(Meandata0D),      pointer       :: entry
+  integer :: i
+
+    !___________________________________________________________________________
+    if (partit%mype==0) then
+        write(*,*) 'adding I/O stream 0D (scalar) for ', trim(name)
+    end if
+
+    !___________________________________________________________________________
+    ! check if we already have this variable
+    do i=1, io_NSTREAMS0D
+        if(trim(io_stream0D(i)%name) .eq. name) then
+            print *,"variable '"//name//"' already exists in 0D streams"
+            call assert(.false., __LINE__) 
+        end if
+    end do
+    
+    !___________________________________________________________________________
+    ! add this instance to io_stream0D array
+    io_NSTREAMS0D = io_NSTREAMS0D + 1
+    call assert(size(io_stream0D) >= io_NSTREAMS0D, __LINE__)
+    entry => io_stream0D(io_NSTREAMS0D)
+    
+    !___________________________________________________________________________
+    ! fill up 0D meandata streaming object
+    entry%name = name
+    entry%description = description
+    entry%units = units
+    entry%ptr => data
+    entry%local_value = 0._real64
+    entry%addcounter = 0
+    entry%accuracy = accuracy
+    entry%freq = freq
+    entry%freq_unit = freq_unit
+    entry%is_in_use = .true.
+    entry%ncid = -1
+    entry%rec_count = 0
+    
+    if (present(long_description)) then
+        entry%long_description = long_description
+    else
+        entry%long_description = description
+    end if
+    
+end subroutine def_stream0D
 !
 !
 !_______________________________________________________________________________
