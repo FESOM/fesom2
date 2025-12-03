@@ -32,7 +32,7 @@ module diagnostics
             dvd_SD_chi_dif_ve, dvd_SD_chi_dif_sbc, dvd_xdfac,                                                     &
             ldiag_uvw_sqr, uv2, wvel2,                                                                            &
             ldiag_trgrd_xyz, trgrd_x, trgrd_y, trgrd_z,                                                           &
-            lcmor_diag
+            ldiag_cmor
              
 
   ! Arrays used for diagnostics, some shall be accessible to the I/O
@@ -108,7 +108,8 @@ module diagnostics
   
   namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_Ri, & 
                        ldiag_TurbFlux, ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc, &
-                       ldiag_extflds, ldiag_destine, ldiag_trflx, ldiag_ice, ldiag_uvw_sqr, ldiag_trgrd_xyz
+                       ldiag_extflds, ldiag_destine, ldiag_trflx, ldiag_ice, ldiag_uvw_sqr, ldiag_trgrd_xyz, &
+                       ldiag_cmor
   
   contains
 
@@ -1132,7 +1133,7 @@ subroutine compute_diagnostics(mode, dynamics, tracers, ice, partit, mesh)
   if (ldiag_destine)     call compute_destinE(mode, dynamics, tracers, partit, mesh)
   
   ! 14. compute CMOR diagnostics for CMIP6/CMIP7
-  if (lcmor_diag) then
+  if (ldiag_cmor) then
      if (mode == 0) then
         call init_cmor_diag(partit, mesh)
      else

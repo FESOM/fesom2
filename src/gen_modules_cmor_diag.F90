@@ -16,14 +16,14 @@ module cmor_variables_diag
   
   implicit none
   
-  public :: init_cmor_diag, compute_cmor_diag, lcmor_diag
+  public :: init_cmor_diag, compute_cmor_diag, ldiag_cmor
   public :: volo, opottemptend, pbo, soga, thetaoga, tos, sos
   public :: siarean, siareas, siextentn, siextents, sivoln, sivols
   
   private
   
   ! Control flag for CMOR diagnostics
-  logical :: lcmor_diag = .false.
+  logical :: ldiag_cmor = .false.
   
   ! CMOR diagnostic variables
   logical, save :: initialized = .false.
@@ -42,8 +42,6 @@ module cmor_variables_diag
   ! FESOM 2 uses (level, nod2D) indexing
   real(kind=WP), save, allocatable :: previous_temp(:,:)  ! (nl-1, myDim_nod2D)
   
-  namelist /cmor_diag/ lcmor_diag
-
 contains
 
   !=================================================================

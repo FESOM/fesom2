@@ -255,59 +255,59 @@ CASE ('t_star        ')
 CASE ('qsr        ')
     call def_stream(nod2D, myDim_nod2D,'qsr'        , 'solar radiation'      , 'W/s^2'  , qsr_c(:)       , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 
-! CMOR diagnostics for CMIP6/CMIP7 (require lcmor_diag=.true.)
+! CMOR diagnostics for CMIP6/CMIP7 (require ldiag_cmor=.true.)
 CASE ('tos       ')
-    if (lcmor_diag) then
+    if (ldiag_cmor) then
     call def_stream(nod2D, myDim_nod2D, 'tos', 'sea surface temperature', 'degC', tos(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Sea surface temperature (CMOR)")
     end if
 CASE ('sos       ')
-    if (lcmor_diag) then
+    if (ldiag_cmor) then
     call def_stream(nod2D, myDim_nod2D, 'sos', 'sea surface salinity', 'psu', sos(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Sea surface salinity (CMOR)")
     end if
 CASE ('pbo       ')
-    if (lcmor_diag) then
+    if (ldiag_cmor) then
     call def_stream(nod2D, myDim_nod2D, 'pbo', 'sea water pressure at sea floor', 'Pa', pbo(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Sea water pressure at sea floor")
     end if
 CASE ('opottemptend')
-    if (lcmor_diag) then
+    if (ldiag_cmor) then
     call def_stream(nod2D, myDim_nod2D, 'opottemptend', 'tendency of sea water potential temperature', 'W/m2', opottemptend(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Tendency of sea water potential temperature expressed as heat content")
     end if
 
-! CMOR 0D (scalar) diagnostics for CMIP6/CMIP7 (require lcmor_diag=.true.)
+! CMOR 0D (scalar) diagnostics for CMIP6/CMIP7 (require ldiag_cmor=.true.)
 CASE ('volo      ')
-    if (lcmor_diag) then
+    if (ldiag_cmor) then
     call def_stream0D('volo', 'sea water volume', 'm3', volo, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Total volume of liquid sea water")
     end if
 CASE ('soga      ')
-    if (lcmor_diag) then
+    if (ldiag_cmor) then
     call def_stream0D('soga', 'global mean sea water salinity', 'psu', soga, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Global mean sea water salinity")
     end if
 CASE ('thetaoga  ')
-    if (lcmor_diag) then
+    if (ldiag_cmor) then
     call def_stream0D('thetaoga', 'global mean sea water potential temperature', 'degC', thetaoga, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Global mean sea water potential temperature")
     end if
 CASE ('siarean   ')
-    if (lcmor_diag) then
+    if (ldiag_cmor) then
     call def_stream0D('siarean', 'sea ice area northern hemisphere', '1e12 m2', siarean, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Total area of sea ice in the Northern hemisphere")
     end if
 CASE ('siareas   ')
-    if (lcmor_diag) then
+    if (ldiag_cmor) then
     call def_stream0D('siareas', 'sea ice area southern hemisphere', '1e12 m2', siareas, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Total area of sea ice in the Southern hemisphere")
     end if
 CASE ('siextentn ')
-    if (lcmor_diag) then
+    if (ldiag_cmor) then
     call def_stream0D('siextentn', 'sea ice extent northern hemisphere', '1e12 m2', siextentn, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Total area of sea ice extent in the Northern hemisphere")
     end if
 CASE ('siextents ')
-    if (lcmor_diag) then
+    if (ldiag_cmor) then
     call def_stream0D('siextents', 'sea ice extent southern hemisphere', '1e12 m2', siextents, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Total area of sea ice extent in the Southern hemisphere")
     end if
 CASE ('sivoln    ')
-    if (lcmor_diag) then
+    if (ldiag_cmor) then
     call def_stream0D('sivoln', 'sea ice volume northern hemisphere', '1e9 m3', sivoln, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Total volume of sea ice in the Northern hemisphere")
     end if
 CASE ('sivols    ')
-    if (lcmor_diag) then
+    if (ldiag_cmor) then
     call def_stream0D('sivols', 'sea ice volume southern hemisphere', '1e9 m3', sivols, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Total volume of sea ice in the Southern hemisphere")
     end if
 
@@ -1675,9 +1675,9 @@ END DO ! --> DO i=1, io_listsize
     end if
     
     !___________________________________________________________________________
-    ! CMOR diagnostics: auto-register with defaults if lcmor_diag=.true. and 
+    ! CMOR diagnostics: auto-register with defaults if ldiag_cmor=.true. and 
     ! not already defined in io_list. Default: monthly, double precision
-    if (lcmor_diag) then
+    if (ldiag_cmor) then
         ! 2D fields
         if (.not. stream_already_defined('tos')) then
             call def_stream(nod2D, myDim_nod2D, 'tos', 'sea surface temperature', 'degC', tos(:), 1, 'm', 8, partit, mesh, "Sea surface temperature (CMOR)")

@@ -32,7 +32,7 @@ ldiag_destine     = .false.  ! enables heat content computation ('hc300m', 'hc70
 ldiag_trflx       = .false.  ! enables tracer flux diagnostics ('utemp', 'vtemp', 'usalt', 'vsalt')
 ldiag_uvw_sqr     = .false.  ! enables 'UVW_SQR' output (squared velocities: u2, v2, w2)
 ldiag_trgrd_xyz   = .false.  ! enables 'TRGRD_XYZ' output (horizontal & vertical tracer gradients)
-lcmor_diag        = .false.  ! enables CMOR diagnostics for CMIP6/CMIP7 ('tos', 'sos', 'pbo', 'volo', etc.)
+ldiag_cmor        = .false.  ! enables CMOR diagnostics for CMIP6/CMIP7 ('tos', 'sos', 'pbo', 'volo', etc.)
 /
 
 ! ============================================================================
@@ -339,7 +339,7 @@ io_list =  'sst       ',1, 'm', 4,
 ! --- TRACER GRADIENTS (require ldiag_trgrd_xyz=.true.) ---
 ! 'TRGRD_XYZ ',1, 'm', 4,  ! horizontal and vertical tracer gradients
 
-! --- CMOR DIAGNOSTICS FOR CMIP6/CMIP7 (require lcmor_diag=.true.) ---
+! --- CMOR DIAGNOSTICS FOR CMIP6/CMIP7 (require ldiag_cmor=.true.) ---
 ! 'tos       ',1, 'm', 8,  ! sea surface temperature [degC] (CMOR standard)
 ! 'sos       ',1, 'm', 8,  ! sea surface salinity [psu] (CMOR standard)
 ! 'pbo       ',1, 'm', 8,  ! sea water pressure at sea floor [Pa]
