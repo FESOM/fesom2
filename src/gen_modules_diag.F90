@@ -108,8 +108,7 @@ module diagnostics
   
   namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_Ri, & 
                        ldiag_TurbFlux, ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc, &
-                       ldiag_extflds, ldiag_destine, ldiag_trflx, ldiag_ice, ldiag_uvw_sqr, ldiag_trgrd_xyz, &
-                       lcmor_diag
+                       ldiag_extflds, ldiag_destine, ldiag_trflx, ldiag_ice, ldiag_uvw_sqr, ldiag_trgrd_xyz
   
   contains
 

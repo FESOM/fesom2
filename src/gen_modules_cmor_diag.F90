@@ -1,8 +1,5 @@
 !==========================================================
-! CMOR Variables Diagnostics Module
-! Ported from FESOM 1.4 to FESOM 2 for CMIP6/CMIP7 output
-! Original author: FESOM 1.4 team
-! Adapted for FESOM 2.7: 2024
+! CMOR Variables Diagnostics Module for CMIP6/CMIP7 output
 !==========================================================
 module cmor_variables_diag
   use o_PARAM

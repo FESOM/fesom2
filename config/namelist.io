@@ -32,6 +32,7 @@ ldiag_destine     = .false.  ! enables heat content computation ('hc300m', 'hc70
 ldiag_trflx       = .false.  ! enables tracer flux diagnostics ('utemp', 'vtemp', 'usalt', 'vsalt')
 ldiag_uvw_sqr     = .false.  ! enables 'UVW_SQR' output (squared velocities: u2, v2, w2)
 ldiag_trgrd_xyz   = .false.  ! enables 'TRGRD_XYZ' output (horizontal & vertical tracer gradients)
+lcmor_diag        = .false.  ! enables CMOR diagnostics for CMIP6/CMIP7 ('tos', 'sos', 'pbo', 'volo', etc.)
 /
 
 ! ============================================================================
@@ -337,6 +338,21 @@ io_list =  'sst       ',1, 'm', 4,
 
 ! --- TRACER GRADIENTS (require ldiag_trgrd_xyz=.true.) ---
 ! 'TRGRD_XYZ ',1, 'm', 4,  ! horizontal and vertical tracer gradients
+
+! --- CMOR DIAGNOSTICS FOR CMIP6/CMIP7 (require lcmor_diag=.true.) ---
+! 'tos       ',1, 'm', 8,  ! sea surface temperature [degC] (CMOR standard)
+! 'sos       ',1, 'm', 8,  ! sea surface salinity [psu] (CMOR standard)
+! 'pbo       ',1, 'm', 8,  ! sea water pressure at sea floor [Pa]
+! 'opottemptend',1, 'm', 8,! ocean potential temperature tendency [W/m^2]
+! 'volo      ',1, 'm', 8,  ! ocean volume [m^3] (global scalar)
+! 'soga      ',1, 'm', 8,  ! global mean sea water salinity [psu] (global scalar)
+! 'thetaoga  ',1, 'm', 8,  ! global mean sea water potential temperature [degC] (global scalar)
+! 'siarean   ',1, 'm', 8,  ! sea ice area Northern hemisphere [10^12 m^2] (global scalar)
+! 'siareas   ',1, 'm', 8,  ! sea ice area Southern hemisphere [10^12 m^2] (global scalar)
+! 'siextentn ',1, 'm', 8,  ! sea ice extent Northern hemisphere [10^12 m^2] (global scalar)
+! 'siextents ',1, 'm', 8,  ! sea ice extent Southern hemisphere [10^12 m^2] (global scalar)
+! 'sivoln    ',1, 'm', 8,  ! sea ice volume Northern hemisphere [10^9 m^3] (global scalar)
+! 'sivols    ',1, 'm', 8,  ! sea ice volume Southern hemisphere [10^9 m^3] (global scalar)
 
 ! ============================================================================
 ! END OF CATALOG
