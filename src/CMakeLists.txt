@@ -43,16 +43,16 @@ if(ALBEDO_INTELMPI_WORKAROUNDS)
 endif()
 
 #TODO: this machine specific block can easyly go in  cmake toolchain.
-if(${FESOM_PLATFORM_STRATEGY} STREQUAL  levante.dkrz.de )
+if(${FESOM_PLATFORM_STRATEGY} STREQUAL levante.dkrz.de )
    message(STATUS "multithreading disabled for Levante") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  leo-dcgp )
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
    message(STATUS "multithreading disabled for Leonardo") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  mn5-gpp )
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL mn5-gpp )
    message(STATUS "multithreading disabled for MN5 GPP") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  albedo )
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL albedo )
    message(STATUS "multithreading disabled for Albedo") # multithreading suddenly produces an error, disable it until a fix is found. issue #413
    option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
 elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL atosecmwf )
@@ -69,7 +69,7 @@ set(NV_GPU_ARCH "cc80" CACHE STRING "GPU arch for nvfortran compiler (cc35,cc50,
 
 option(ENABLE_OPENMP "build FESOM with OpenMP" OFF)
 message(STATUS "ENABLE_OPENMP: ${ENABLE_OPENMP}")
-if(ENABLE_OPENMP)
+if(${ENABLE_OPENMP})
    find_package(OpenMP REQUIRED COMPONENTS Fortran)
 endif()
 
@@ -129,11 +129,17 @@ set(FESOM_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/../.." CACHE FILEPATH "dir
 
 # get our source files
 set(src_home ${CMAKE_CURRENT_SOURCE_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
+
+# Link FESOM2 fortran code
 file(GLOB sources_Fortran ${src_home}/*.F90)
+
+# Link ICEPACK code
 if(USE_ICEPACK)
    file(GLOB sources_ice_pack ${src_home}/icepack_drivers/*.F90
                               ${src_home}/icepack_drivers/Icepack/columnphysics/*.F90)
    list(APPEND sources_Fortran ${sources_ice_pack})
+
+# Link IFS-Interface code
 elseif(ENABLE_IFS_INTERFACE) # ICEPACK + IFS_INTERFACE NOT SUPPORTED (YET)
    if(ENABLE_MULTIO)
       list(APPEND sources_Fortran ${src_home}/ifs_interface/iom.F90)
@@ -145,10 +151,11 @@ elseif(ENABLE_IFS_INTERFACE) # ICEPACK + IFS_INTERFACE NOT SUPPORTED (YET)
                                ${src_home}/ifs_interface/mpp_io.F90)
 endif()
 
-if(${RECOM_COUPLED})  # ADD RECOM FILES
-   file(GLOB sources_Fortran ${src_home}/*.F90
-                             ${src_home}/int_recom/*.F90
-                             ${src_home}/int_recom/recom/*.F90)
+# Link RECOM code
+if(RECOM_COUPLED)  # ADD RECOM FILES
+   file(GLOB sources_recom ${src_home}/int_recom/*.F90
+                           ${src_home}/int_recom/recom/*.F90)
+   list(APPEND sources_Fortran ${sources_recom})
 endif()                             
 
 # generate a custom file from fesom_version_info.F90 which includes the current git SHA
@@ -189,7 +196,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:module/fes
 target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
-if(ENABLE_OPENMP)
+if(${ENABLE_OPENMP})
    target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_Fortran)
 endif()
 
@@ -237,7 +244,7 @@ if(OPENMP_REPRODUCIBLE)
 endif()
 
 if(${RECOM_COUPLED})
-   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2 __3Zoo2Det __coccos)# __usetp)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2)
 endif()
 
 if(${CISO_COUPLED})
@@ -247,13 +254,14 @@ endif()
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
    target_compile_options(${PROJECT_NAME} PRIVATE -r8 -i4 -fp-model precise -no-prec-div -no-prec-sqrt -fimf-use-svml -ip -init=zero -no-wrap-margin -fpe0) # add -fpe0 for RAPS environment
-   if(${FESOM_PLATFORM_STRATEGY} STREQUAL  levante.dkrz.de )
+   if(${FESOM_PLATFORM_STRATEGY} STREQUAL levante.dkrz.de )
       target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
       target_compile_options(${PROJECT_NAME} PRIVATE -O3 -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte -ipo)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL mn5-gpp )
       target_compile_options(${PROJECT_NAME} PRIVATE -O3 -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte -ipo)
-   elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL  albedo)
+   elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL albedo)
+      # PROCESSORS: 2x AMD Rome Epyc 7702 (64 cores each), 128 cores, 256 GB RAM
       target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -O3 -ip -fPIC -qopt-malloc-options=2 -qopt-prefetch=5 -unroll-aggressive) # -g -traceback -check) #NEC mpi option
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL atosecmwf )
       target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2)
@@ -330,7 +338,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${YAXT_Fortran_LIBRARIES} ${YAXTC_
 #target_link_libraries(${PROJECT_NAME} PRIVATE ${PROJECT_NAME}_C ${YAXT_Fortran_LIBRARIES} ${YAXTC_Fortran_LIBRARIES})
 
    
-# fesom.x executable
+# fesom.x executable
 add_executable(${PROJECT_NAME}.x ${src_home}/fesom_main.F90)
 target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
 

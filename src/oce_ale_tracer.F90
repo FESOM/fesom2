@@ -8,9 +8,9 @@ module diff_part_hor_redi_interface
         type(t_tracer), intent(inout), target :: tracer
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine diff_part_hor_redi
     end interface
-end module
+end module diff_part_hor_redi_interface
 
 module diff_ver_part_expl_ale_interface
     interface
@@ -23,9 +23,9 @@ module diff_ver_part_expl_ale_interface
         type(t_tracer), intent(inout), target :: tracer
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine diff_ver_part_expl_ale
     end interface
-end module
+end module diff_ver_part_expl_ale_interface
 
 module diff_ver_part_redi_expl_interface
     interface
@@ -37,9 +37,9 @@ module diff_ver_part_redi_expl_interface
         type(t_tracer), intent(inout), target :: tracer
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine diff_ver_part_redi_expl
     end interface
-end module
+end module diff_ver_part_redi_expl_interface
 
 module diff_ver_part_impl_ale_interface
     interface
@@ -56,9 +56,9 @@ module diff_ver_part_impl_ale_interface
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
         type(t_ice)   , intent(in)   , target :: ice
-        end subroutine
+        end subroutine diff_ver_part_impl_ale
     end interface
-end module
+end module diff_ver_part_impl_ale_interface
 
 module diff_tracers_ale_interface
     interface
@@ -75,9 +75,9 @@ module diff_tracers_ale_interface
         type(t_ice),    intent(in),    target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine diff_tracers_ale
     end interface
-end module
+end module diff_tracers_ale_interface
 
 module bc_surface_interface
     interface
@@ -89,9 +89,9 @@ module bc_surface_interface
         type(t_partit), intent(inout), target :: partit
         real(kind=WP)                         :: bc_surface
         real(kind=WP), intent(in)             :: sval
-        end function
+        end function bc_surface
     end interface
-end module
+end module bc_surface_interface
 
 module transit_bc_surface_interface
     interface
@@ -121,9 +121,9 @@ module diff_part_bh_interface
         type(t_tracer), intent(inout), target :: tracer
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine diff_part_bh
     end interface
-end module
+end module diff_part_bh_interface
 
 module solve_tracers_ale_interface
     interface
@@ -139,9 +139,9 @@ module solve_tracers_ale_interface
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine solve_tracers_ale
     end interface
-end module
+end module solve_tracers_ale_interface
 !
 !
 !===============================================================================
@@ -175,8 +175,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     type(t_mesh)  , intent(in)   , target    :: mesh
     !___________________________________________________________________________
     integer                                  :: i, tr_num, node, elem, nzmax, nzmin
-    real(kind=WP)                            :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_elem2D) ! local variable ! OG - tra_diag
-    integer                                  :: nz, n, nu1, nl1 ! OG - tra_diag
+    real(kind=WP)                            :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_elem2D) ! local variable
+    integer                                  :: nz, n, nu1, nl1
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
@@ -197,8 +197,12 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     del_ttf => tracers%work%del_ttf
 
     !___________________________________________________________________________
-    if (SPP) call cal_rejected_salt(ice, partit, mesh)
-    if (SPP) call app_rejected_salt(tracers%data(2)%values, partit, mesh)
+    if (SPP) then
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call cal_rejected_salt'//achar(27)//'[0m'
+        call cal_rejected_salt(ice, partit, mesh)
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call app_rejected_salt'//achar(27)//'[0m'
+        call app_rejected_salt(tracers%data(2)%values, partit, mesh)
+    end if
 
     !___________________________________________________________________________
     ! update 3D velocities with the bolus velocities:
@@ -238,7 +242,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         if(use_MEDUSA) then
             SinkFlx = 0.0d0
         endif
-#endif    
+#endif
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
         ! needed
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
@@ -246,15 +250,12 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 
         ! advect tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call adv_tracers_ale'//achar(27)//'[0m'
-
-
 	!here update only those initialized in the init_tracers. (values, valuesAB, edge_up_dn_grad, ...)
         !$ACC UPDATE  DEVICE(tracers%data(tr_num)%values, tracers%data(tr_num)%valuesAB) &
         !$ACC  DEVICE(tracers%work%edge_up_dn_grad) !!&
         ! it will update del_ttf with contributions from horizontal and vertical advection parts (del_ttf_advhoriz and del_ttf_advvert)
 	!$ACC wait(1)
         call do_oce_adv_tra(dt, UV, Wvel, Wvel_i, Wvel_e, tr_num, dynamics, tracers, partit, mesh)
-
 
         !$ACC UPDATE HOST(tracers%work%del_ttf, tracers%work%del_ttf_advhoriz, tracers%work%del_ttf_advvert)
         !___________________________________________________________________________
@@ -265,34 +266,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
            tracers%work%del_ttf(:, node)=tracers%work%del_ttf(:, node)+tracers%work%del_ttf_advhoriz(:, node)+tracers%work%del_ttf_advvert(:, node)
         end do
 !$OMP END PARALLEL DO
-
-! O:G
-! Save horizontal and vertical advective fluxes.
-! We have the values on the nodes
-! We do not know how much each edge contributes
-! to the nodes it connects
-! Notes from Patrick: del_ttf includes
-! Low-order solution. But, del_ttf_advhoriz and
-! del_ttf_advvert contain antidiffusive fluxes 
-! from the FCT scheme
-
-!if (.FALSE.) then
-! O:G - tra_diag
-!#if defined (__recom)
-!        if (tracers%data(tr_num)%ltra_diag) then
-!           do n=1, myDim_nod2D+eDim_nod2D
-!              nu1 = ulevels_nod2D(n)
-!              nl1 = nlevels_nod2D(n)
-!              do nz = nu1, nl1-1
-                 ! Horizontal advection part
-!                 tracers%work%tra_advhoriz(nz,n,tr_num) = tracers%work%del_ttf_advhoriz(nz,n)
-                 ! Vertical advection part
-!                 tracers%work%tra_advvert (nz,n,tr_num) = tracers%work%del_ttf_advvert(nz,n)
-!              end do
-!           end do
-!        end if
-!#endif
-!endif 
+ 
         !___________________________________________________________________________
         ! diffuse tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
@@ -321,11 +295,24 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         else
             call relax_to_clim(tr_num, tracers, partit, mesh)
         end if
+
         call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
 !$OMP BARRIER
+
     end do
 !!!        !$ACC UPDATE HOST (tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus) &
 !!!        !$ACC HOST  (tracers%work%edge_up_dn_grad)
+
+#if defined(__recom)
+    do tr_num = 1, tracers%num_tracers
+        if (use_MEDUSA) then
+            SinkFlx = SinkFlx + SinkFlx_tr(:, :, tr_num)
+        endif
+!        Benthos = Benthos + Benthos_tr(:, :, tr_num)
+        Sinkingvel1(:,:) = Sinkingvel1(:,:) + Sinkvel1_tr(:, :, tr_num)
+        Sinkingvel2(:,:) = Sinkingvel2(:,:) + Sinkvel2_tr(:, :, tr_num)
+    end do
+#endif
 
     !___________________________________________________________________________
     ! 3D restoring for "passive" tracers
@@ -419,8 +406,8 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
     integer                               :: n, nzmax, nzmin
-    real(kind=WP)                         :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D) ! OG - tra_diag
-    integer                               :: nz, nu1, nl1 ! OG - tra_diag
+    real(kind=WP)                         :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    integer                               :: nz, nu1, nl1
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), pointer                :: del_ttf(:,:)
@@ -435,9 +422,9 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     vert_sink      = 0.0_WP
 #endif
 
-    ttf_rhs_bak = 0.0 ! OG - tra_diag
+    ttf_rhs_bak = 0.0
 
-    if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+    if (tracers%data(tr_num)%ltra_diag) then
           do n=1, myDim_nod2D+eDim_nod2D
           nu1 = ulevels_nod2D(n)
           nl1 = nlevels_nod2D(n)
@@ -453,7 +440,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     ! includes Redi diffusivity if Redi=.true.
     call diff_part_hor_redi(tracers, partit, mesh)  ! seems to be ~9% faster than diff_part_hor
 
-    if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+    if (tracers%data(tr_num)%ltra_diag) then
        do n=1, myDim_nod2D+eDim_nod2D
           nu1 = ulevels_nod2D(n)
           nl1 = nlevels_nod2D(n)
@@ -465,7 +452,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
        end do
     end if
 
-    if ((.not. tracers%data(tr_num)%i_vert_diff) .and. tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+    if ((.not. tracers%data(tr_num)%i_vert_diff) .and. tracers%data(tr_num)%ltra_diag) then
        do n=1, myDim_nod2D+eDim_nod2D
           nu1 = ulevels_nod2D(n)
           nl1 = nlevels_nod2D(n)
@@ -480,7 +467,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 
     ! OG i_vert_diff = TRUE so, we dont call explicit scheme
     ! If we use this, check surface forcing for recom variables (They are not updated)
-    if ((.not. tracers%data(tr_num)%i_vert_diff) .and. tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag 
+    if ((.not. tracers%data(tr_num)%i_vert_diff) .and. tracers%data(tr_num)%ltra_diag) then 
        do n=1, myDim_nod2D+eDim_nod2D
           nu1 = ulevels_nod2D(n)
           nl1 = nlevels_nod2D(n)
@@ -495,7 +482,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     ! A projection of horizontal Redi diffussivity onto vertical. This par contains horizontal
     ! derivatives and has to be computed explicitly!
 
-    if (tracers%data(tr_num)%ltra_diag .and. Redi) then ! OG - tra_diag
+    if (tracers%data(tr_num)%ltra_diag .and. Redi) then
        do n=1, myDim_nod2D+eDim_nod2D
           nu1 = ulevels_nod2D(n)
           nl1 = nlevels_nod2D(n)
@@ -507,7 +494,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 
     if (Redi) call diff_ver_part_redi_expl(tracers, partit, mesh)
 
-    if (tracers%data(tr_num)%ltra_diag .and. Redi) then ! OG - tra_diag
+    if (tracers%data(tr_num)%ltra_diag .and. Redi) then
        do n=1, myDim_nod2D+eDim_nod2D
           nu1 = ulevels_nod2D(n)
           nl1 = nlevels_nod2D(n)
@@ -601,11 +588,12 @@ endif
         !                           del_ttf(1:nzmax,n))/hnode_new(1:nzmax,n)
     end do
 !$OMP END PARALLEL DO
+
     !___________________________________________________________________________
     if (tracers%data(tr_num)%i_vert_diff) then
         ! do vertical diffusion: implicite
 
-        if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+        if (tracers%data(tr_num)%ltra_diag) then
            do n=1, myDim_nod2D+eDim_nod2D
               nu1 = ulevels_nod2D(n)
               nl1 = nlevels_nod2D(n)
@@ -619,7 +607,7 @@ endif
         call diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 
         ! vertical diffusion: implicit
-        if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+        if (tracers%data(tr_num)%ltra_diag) then
            do n=1, myDim_nod2D+eDim_nod2D
               nu1 = ulevels_nod2D(n)
               nl1 = nlevels_nod2D(n)
@@ -631,11 +619,13 @@ endif
         end if
 
     end if
+    
     !We DO not set del_ttf to zero because it will not be used in this timestep anymore
     !init_tracers_AB will set it to zero for the next timestep
     if (tracers%data(tr_num)%smooth_bh_tra) then
        call diff_part_bh(tr_num, dynamics, tracers, partit, mesh)  ! alpply biharmonic diffusion (implemented as filter)
     end if
+        
 end subroutine diff_tracers_ale
 !
 !
@@ -680,7 +670,7 @@ subroutine diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
             rdata =  Tsurf(n)
             rlx   =  surf_relax_T
         elseif (tracers%data(tr_num)%ID==2) then
-            flux  =  virtual_salt(n)+relax_salt(n)- real_salt_flux(n)*is_nonlinfs
+            flux  =  virtual_salt(n)+relax_salt(n) + real_salt_flux(n)*is_nonlinfs
         else
             flux  = 0._WP
             rdata = 0._WP
@@ -1028,6 +1018,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         nz=nzmax-1
         dz=hnode_new(nz,n)
         tr(nz)=-a(nz)*trarr(nz-1,n)-(b(nz)-dz)*trarr(nz,n)
+
         !_______________________________________________________________________
         ! Add KPP nonlocal fluxes to the rhs (only T and S currently)
         ! use here blmc or kpp_oblmixc instead of Kv, since Kv already contains
@@ -1625,13 +1616,16 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
   real(kind=WP), dimension(:), pointer :: a_ice
 
   SELECT CASE (id)
+    !___temperature_____________________________________________________________
     CASE (1)
         bc_surface=-dt*(heat_flux(n)/vcpw + sval*water_flux(n)*is_nonlinfs)
+
+    !___salinity________________________________________________________________
     CASE (2)
         ! --> real_salt_flux(:): salt flux due to containment/releasing of salt
         !     by forming/melting of sea ice
         bc_surface= dt*(virtual_salt(n) & !--> is zeros for zlevel/zstar
-                    + relax_salt(n) - real_salt_flux(n)*is_nonlinfs)
+                    + relax_salt(n) + real_salt_flux(n)*is_nonlinfs)
 #if defined(__recom)
     CASE (1001) ! DIN
         if (use_MEDUSA .and. add_loopback) then  ! OG: add is_MEDUSA_loopback flag is_MEDUSA_loopback flag * lb_flux(n,1)
@@ -1691,9 +1685,9 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
     CASE (1022) ! OXY
         bc_surface= dt*GloO2flux_seaicemask(n)
 !        bc_surface=0.0_WP
-    CASE (1023:1033)
+    CASE (1023:1036)
         bc_surface=0.0_WP  ! OG added bc for recom fields
-    CASE (1302) ! Before (1033) ! DIC_13
+    CASE (1302) ! Before (1037) ! DIC_13
 
 #if defined (__ciso)
          if (ciso) then
@@ -1902,4 +1896,3 @@ FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit, mesh)
   RETURN
 
 END FUNCTION
-

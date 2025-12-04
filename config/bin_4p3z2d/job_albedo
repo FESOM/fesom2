@@ -2,12 +2,11 @@
 #SBATCH --account=biogeo_model.biogeo_model
 #SBATCH --job-name=recom
 #SBATCH --partition=mpp
+#SBATCH -N 9
+#SBATCH --cpus-per-task=1
 #SBATCH --time=01:30:00
-####SBATCH --constraint="[rack1|rack3]"
 #SBATCH --qos=12h
-#SBATCH --nodes=9
 #SBATCH --tasks-per-node 96  # using all 128CPus we exceed the maxload limit (>130) of many used nodes when us parallel I/O
-#SBATCH --cpus-per-task 1
 
 #SBATCH -o fesom2o.out
 #SBATCH -e fesom2e.out

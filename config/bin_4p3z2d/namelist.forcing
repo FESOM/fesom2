@@ -69,8 +69,8 @@ age_start_year=2000
    runoff_data_source ='CORE2'	!Dai09, CORE2
    !runoff_data_source ='Dai09'  !Dai09, CORE2, JRA55
    !runoff_climatology =.true.
-   nm_sss_data_file    ='/albedo/pool/FESOM/forcing/CORE2/PHC2_salx.nc'
    sss_data_source    ='CORE2'
+   nm_sss_data_file   ='/albedo/pool/FESOM/forcing/CORE2/PHC2_salx.nc'
    chl_data_source    ='None' !'Sweeney' monthly chlorophyll climatology or 'NONE' for constant chl_const (below). Make use_sw_pene=.TRUE. in namelist.config!
    nm_chl_data_file   ='/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/Sweeney/Sweeney_2005.nc'
    chl_const          = 0.1
