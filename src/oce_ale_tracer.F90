@@ -1869,6 +1869,9 @@ use REcoM_ciso
         else
             bc_surface= dt*AtmFeInput(n)
         end if
+#if defined (__seaice_tracers)
+        bc_surface = bc_surface + dt*IceFeInput
+#endif /* (__seaice_tracers) */
     CASE (1020:1021) ! Cal
         bc_surface=0.0_WP  ! OG added bc for recom fields 
     CASE (1022) ! OXY

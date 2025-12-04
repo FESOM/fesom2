@@ -56,6 +56,12 @@ subroutine recom_init(mesh)
     allocate(AtmFeInput(node_size))
     AtmFeInput = 0.d0
 
+#if defined (__seaice_tracers)
+    ! exchange of iron between ice and ocean by melting/formation of sea ice
+    allocate(IceFeInput(node_size))
+    IceFeInput = 0.d0
+#endif /* (__seaice_tracers) */
+    
     ! GloNDust AtmNInput: atm dep of nitrogen sources and sinks. 
     ! They are allocated even nitrogen sources and sinks are not used
 

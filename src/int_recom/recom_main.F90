@@ -213,6 +213,13 @@ end if ! use_MEDUSA and sedflx_num not 0
      FeDust = GloFeDust(n) * (1 - a_ice(n)) * dust_sol    
      NDust = GloNDust(n)  * (1 - a_ice(n))
 
+#if defined (__seaice_tracers)
+     !!---- calculate dust flux of iron into sea ice
+     flx_atmice(n) = GloFeDust(n) * a_ice(n) * dust_sol
+     !!---- flux of iron between sea-ice and ocean from melting/freezing of seaice
+     FeFluxIce = flx_iceocn(n)
+#endif /* (__seaice_tracers) */
+ 
 if (Diags) then
 
      !!---- Allocate 3D diagnostics    ! Comment Miriam (2/2024): changed grazing from a 3D to a 2D diagnostic while completing all grazing fluxes
@@ -489,6 +496,10 @@ endif
 
      GloHplus(n)                  = ph(1) !hplus
      AtmFeInput(n)                = FeDust
+#if defined (__seaice_tracers)
+     !!---- flux of iron between sea-ice and ocean from melting/freezing of seaice
+     IceFeInput(n) = FeFluxIce
+#endif /* (__seaice_tracers) */
      AtmNInput(n)                 = NDust 
 !     DenitBen(n)                  = LocDenit
 
