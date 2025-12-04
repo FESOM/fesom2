@@ -1040,6 +1040,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             write(*,*) 'read Nitrate     climatology from:', trim(filelist(6))
             write(*,*) 'read Salt        climatology from:', trim(filelist(7))
             write(*,*) 'read Temperature climatology from:', trim(filelist(8))
+            write(*,*) 'read DIC remineralization    from:', trim(filelist(9)) ! DIC remin (added by Sina)
     end if
     ! read ocean state
     ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
@@ -1125,13 +1126,21 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-        CASE (1023:1036)
+        CASE (1023:1037)
             tracers%data(i)%values(:,:)=0.0_WP
             if (mype==0) then
                 write (i_string,  "(I4)") i
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
+
+        !CASE (1037)    ! DICremin tracer (added by Sina) 
+        !    tracers%data(i)%values(:,:)=0.0_WP
+        !    if (mype==0) then
+        !        write (i_string,  "(I4)") i
+        !        write (id_string, "(I4)") id
+        !        write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+        !    end if
         !_______________________________________________________________________
         CASE (101)       ! initialize tracer ID=101
             tracers%data(i)%values(:,:)=0.0_WP

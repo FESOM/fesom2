@@ -169,7 +169,7 @@ endif
         print*, 'temp: ',REcoM_T
         print*, 'tempis: ',tempis
         print*, 'REcoM_S: ', REcoM_S
-        print*, 'REcoM_Alk: ', REcom_Alk
+        print*, 'REcoM_Alk: ', REcoM_Alk
         print*, 'REcoM_DIC: ', REcoM_DIC
         print*, 'REcoM_Si: ', REcoM_Si
         print*, 'REcoM_Phos: ', REcoM_Phos
@@ -276,6 +276,8 @@ if (enable_3zoo2det) then
   state(1:nn,imiczoon)  = max(tiny,state(1:nn,imiczoon))
   state(1:nn,imiczooc)  = max(tiny,state(1:nn,imiczooc))
 endif
+
+  state(1:nn,idicremin) = max(tiny,state(1:nn,idicremin)) ! for DICremin tracer (added by Sina)
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
 
