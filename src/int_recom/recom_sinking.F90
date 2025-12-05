@@ -779,19 +779,19 @@ subroutine ballast(tr_num, tracers, partit, mesh)
            scaling_density2_3D(k,row)=1.0
 
               if (use_density_scaling) then
-                 if (tracers%data(tr_num)%ID ==1008)then !idetc
-                    if (tracers%data(tr_num)%values(k,row)>0.001) then ! only apply ballasting above a certain biomass (OG Todo: remove) 
-                       scaling_density1_3D(k,row) = (rho_particle1(k,row)-rho_seawater(1))/(rho_ref_part-rho_ref_water)
-                    endif
-                 endif
-#if defined (__3Zoo2Det)
+                 !if (tracers%data(tr_num)%ID ==1008)then !idetc
+                    !if (tracers%data(tr_num)%values(k,row)>0.001) then ! only apply ballasting above a certain biomass (OG Todo: remove) 
+                       !scaling_density1_3D(k,row) = (rho_particle1(k,row)-rho_seawater(1))/(rho_ref_part-rho_ref_water)
+                    !endif
+                 !endif
+!#if defined (__3Zoo2Det)
 
-                    if (tracers%data(tr_num)%ID ==1026)then ! idetz2c
-                       if (tracers%data(tr_num)%values(k,row)>0.001) then ! only apply ballasting above a certain biomass (OG Todo: remove) 
-                          scaling_density2_3D(k,row) = (rho_particle2(k,row)-rho_seawater(1))/(rho_ref_part-rho_ref_water)
-                       endif
-                    endif
-#endif
+                    !if (tracers%data(tr_num)%ID ==1026)then ! idetz2c
+                       !if (tracers%data(tr_num)%values(k,row)>0.001) then ! only apply ballasting above a certain biomass (OG Todo: remove) 
+                          !scaling_density2_3D(k,row) = (rho_particle2(k,row)-rho_seawater(1))/(rho_ref_part-rho_ref_water)
+                       !endif
+                    !endif
+!#endif
               endif
 
             scaling_visc_3D(k,row)=1.0
