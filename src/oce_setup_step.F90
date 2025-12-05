@@ -8,9 +8,9 @@ module oce_initial_state_interface
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in)  ,  target :: mesh
-        end subroutine
+        end subroutine oce_initial_state
     end interface
-end module
+end module oce_initial_state_interface
 
 module tracer_init_interface
     interface
@@ -22,9 +22,9 @@ module tracer_init_interface
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh),   intent(in)  ,  target :: mesh
-        end subroutine
+        end subroutine tracer_init
     end interface
-end module
+end module tracer_init_interface
 
 module dynamics_init_interface
     interface
@@ -36,9 +36,9 @@ module dynamics_init_interface
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine dynamics_init
     end interface
-end module
+end module dynamics_init_interface
 
 module ocean_setup_interface
     interface
@@ -52,9 +52,9 @@ module ocean_setup_interface
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout)   , target :: mesh
-        end subroutine
+        end subroutine ocean_setup
     end interface
-end module
+end module ocean_setup_interface
 
 module before_oce_step_interface
     interface
@@ -68,9 +68,9 @@ module before_oce_step_interface
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine before_oce_step
     end interface
-end module
+end module before_oce_step_interface
 !
 !
 !_______________________________________________________________________________
@@ -159,6 +159,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_kpp_init'//achar(27)//'[0m'
         call oce_mixing_kpp_init(partit, mesh)
+        
     ! initialise fesom1.4 like PP
     elseif (mix_scheme_nmb==2 .or. mix_scheme_nmb==27) then
     
@@ -192,7 +193,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_tidal'//achar(27)//'[0m'
         call init_cvmix_tidal(partit, mesh)
     end if         
-    
+
     !___________________________________________________________________________
     ! set use_density_ref .true. when cavity is used and initialse cavity boundary 
     ! line for the extrapolation of the initialisation
@@ -291,7 +292,7 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     !___________________________________________________________________________
     ! define tracer namelist parameter
     integer        :: num_tracers
-    logical        :: i_vert_diff, smooth_bh_tra , ltra_diag  ! OG - tra_diag
+    logical        :: i_vert_diff, smooth_bh_tra , ltra_diag
     real(kind=WP)  :: gamma0_tra, gamma1_tra, gamma2_tra
     integer        :: AB_order = 2
     namelist /tracer_listsize/ num_tracers
@@ -435,7 +436,7 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
         tracers%data(n)%valuesAB      = 0.
         tracers%data(n)%valuesold     = 0.
         tracers%data(n)%i_vert_diff   = i_vert_diff
-        tracers%data(n)%ltra_diag   = ltra_diag ! OG - tra_diag
+        tracers%data(n)%ltra_diag   = ltra_diag
     end do
     allocate(tracers%work%del_ttf(nl-1,node_size))
     allocate(tracers%work%del_ttf_advhoriz(nl-1,node_size),tracers%work%del_ttf_advvert(nl-1,node_size))
@@ -448,7 +449,7 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
         tracers%work%dvd_trflx_hor = 0.0_WP
         tracers%work%dvd_trflx_ver = 0.0_WP
     end if
-    if (ltra_diag) then  ! OG - tra_diag
+    if (ltra_diag) then
         allocate(tracers%work%tra_advhoriz(nl-1,node_size,num_tracers),tracers%work%tra_advvert(nl-1,node_size,num_tracers))
         tracers%work%tra_advhoriz = 0.0_WP
         tracers%work%tra_advvert  = 0.0_WP
@@ -836,8 +837,8 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     allocate(Ki(nl-1, node_size))
 
     do n=1, node_size
-    !  Ki(n)=K_hor*area(1,n)/scale_area
-    Ki(:,n)=K_hor*(mesh_resolution(n)/100000.0_WP)**2
+        !  Ki(n)=K_hor*area(1,n)/scale_area
+        Ki(:,n)=K_hor*(mesh_resolution(n)/100000.0_WP)**2
     end do
     call exchange_nod(Ki, partit)
 
@@ -863,10 +864,10 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
 
     if (Fer_GM) then
     allocate(fer_c(node_size),fer_scal(node_size), fer_gamma(2, nl, node_size), fer_K(nl, node_size))
-    fer_gamma=0.0_WP
-    fer_K=500._WP
-    fer_c=1._WP
-    fer_scal = 0.0_WP
+    fer_gamma = 0.0_WP
+    fer_K     = 500._WP
+    fer_c     = 1._WP
+    fer_scal  = 0.0_WP
     end if
 
     if (SPP) then
