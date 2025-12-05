@@ -80,7 +80,9 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     Real(kind=8)                                            :: REcoM_Phos_depth(1)  
     Real(kind=8),                      intent(in)           :: Latd(1)              ! latitude in degree
     Real(kind=8),                      intent(in)           :: Lond(1)              ! longitude in degree 
-    Real(kind=8)                                            :: mocsy_step_per_day 
+    Real(kind=8)                                            :: mocsy_step_per_day
+    REAL(kind=8)                                            :: fecal_rate_c_regulated, & 
+            fecal_rate_c_mes_regulated ! auxiliary terms for stochiometric regulation of zoo1, zoo2
     real(kind=8)                                            :: & 
         DIN,     & !< Dissolved Inorganic Nitrogen 				[mmol/m3] 
         DIC,     & !< Dissolved Inorganic Carbon				[mmol/m3]
@@ -1020,15 +1022,22 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 
 !-------------------------------------------------------------------------------
 !< Second zooplankton fecal pellets
+            qmin_zoo2 = 4.0 ! minimum C:N ratio of mesozooplankton
+            qopt_zoo2 = 6.0 ! optimum C:N ratio of mesozooplankton
+            fecal_rate_c_regulated = fecal_rate_n + (fecal_rate_c - fecal_rate_n) * &
+                   max( min( (recipQZoo2 - qmin_zoo2)/(qopt_zoo2 - qmin_zoo2), 0.0 ), 1.0 )
 
             Zoo2fecalloss_n = fecal_rate_n * grazingFlux2
-            Zoo2fecalloss_c = fecal_rate_c * grazingFluxcarbonzoo2
+            Zoo2fecalloss_c = fecal_rate_c_regulated * grazingFluxcarbonzoo2
 
 !-------------------------------------------------------------------------------
 !< Mesozooplankton fecal pellets
-
+            qmin_zoo1 = 4.0 ! minimum C:N ratio of mesozooplankton
+            qopt_zoo1 = 6.0 ! optimum C:N ratio of mesozooplankton
+            fecal_rate_c_mes_regulated = fecal_rate_n_mes + (fecal_rate_c_mes - fecal_rate_n_mes) * &
+                   max( min( (recipQzoo - qmin_zoo1)/(qopt_zoo1 - qmin_zoo1), 0.0 ), 1.0 )
             mesfecalloss_n = fecal_rate_n_mes * grazingFlux
-            mesfecalloss_c = fecal_rate_c_mes * grazingFluxcarbon_mes
+            mesfecalloss_c = fecal_rate_c_mes_regulated * grazingFluxcarbon_mes
 !------------------------------------------------------------------------------- 
 ! Third zooplankton, microzooplankton, respiration ! 3Zoo
 

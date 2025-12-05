@@ -565,6 +565,8 @@ Module REcoM_declarations
      Real(kind=8)  :: Mesfecalloss_n                     ! NEW Zoo3
      Real(kind=8)  :: Mesfecalloss_c                     ! NEW Zoo3                          
      Real(kind=8)  :: recip_res_zoo22 
+     REAL(kind=8)  :: qmin_zoo1, qopt_zoo1, qmin_zoo2, qopt_zoo2 ! stochiometric regulation of zoo1, zoo2
+
 !!------------------------------------------------------------------------------
 !! *** Grazing Detritus  *** 
   Real(kind=8)  :: DetNsq, DetZ2Nsq, DetNsq2, DetZ2Nsq2  
