@@ -355,6 +355,9 @@ if (UseDustClimMyrio) dust_sol=1.0 !Solubulity set to one, because it is already
             vertdocexdiaH = 0.d0
             vertrespdiaH  = 0.d0
 
+            allocate(VTTemp_diaH(nl-1))
+            VTTemp_diaH = 0.d0
+
             allocate(VTCphotLigLim_diaH(nl-1), VTCphot_diaH(nl-1), VTSi_assimDiaH(nl-1))
             VTCphotLigLim_diaH  = 0.d0
             VTCphot_diaH        = 0.d0
@@ -487,6 +490,7 @@ if (UseDustClimMyrio) dust_sol=1.0 !Solubulity set to one, because it is already
             TCphot_phyto        (1:nzmax,n) = VTCphot_phyto             (1:nzmax)
 
             TTemp_diatoms       (1:nzmax,n) = VTTemp_diatoms            (1:nzmax) !! NEW from here tracking vars
+            TTemp_diaH          (1:nzmax,n) = VTTemp_diaH               (1:nzmax) !! NEW from here tracking vars
             TDiaCO2             (1:nzmax,n) = VTDiaCO2                  (1:nzmax)
             TqlimitFac_diatoms  (1:nzmax,n) = VTqlimitFac_diatoms       (1:nzmax)
             TCphotLigLim_diatoms(1:nzmax,n) = VTCphotLigLim_diatoms     (1:nzmax)
@@ -569,7 +573,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
 
 #if defined (__diaH)
             deallocate(vertaggdiaH, vertdocexdiaH, vertrespdiaH)
-            deallocate(VTCphotLigLim_diaH, VTCphot_diaH, VTSi_assimDiaH)
+            deallocate(VTTemp_diaH, VTCphotLigLim_diaH, VTCphot_diaH, VTSi_assimDiaH)
 #endif
 
         end if 

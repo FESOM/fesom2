@@ -234,6 +234,8 @@ module recom_config
 ! NEW MODIFIED parameters
   Real(kind=8)                 :: ord_d          = -0.2216d0 ! parameters for diatom temperature function
   Real(kind=8)                 :: expon_d        = 0.0406d0 ! diatom exponent
+  Real(kind=8)                 :: ord_diaH          = -0.2216d0 ! parameters for diaH temperature function
+  Real(kind=8)                 :: expon_diaH        = 0.0406d0 ! diaH exponent
   Real(kind=8)                 :: ord_phy        = -1.2154d0 ! small phyto ordonnee
   Real(kind=8)                 :: expon_phy      = 0.0599d0 ! small phyto exponent
   Real(kind=8)                 :: ord_cocco      = -0.2310d0 ! coccolith ordonnee
@@ -243,7 +245,7 @@ module recom_config
 
   Real(kind=8)                 :: reminSi        = 0.02d0
   Real(kind=8)                 :: k_o2_remin     = 15.d0          ! NEW O2remin mmol m-3; Table 1 in Cram 2018 cites DeVries & Weber 2017 for a range of 0-30 mmol m-3
-  namelist /paArrhenius/ recom_Tref, C2K, Ae, Tmax_phaeo, Topt_phaeo, uopt_phaeo, beta_phaeo, ord_d, expon_d, ord_phy, expon_phy, ord_cocco, expon_cocco, ord_phaeo, expon_phaeo, reminSi, k_o2_remin
+  namelist /paArrhenius/ recom_Tref, C2K, Ae, Tmax_phaeo, Topt_phaeo, uopt_phaeo, beta_phaeo, ord_d, expon_d, ord_diaH, expon_diaH, ord_phy, expon_phy, ord_cocco, expon_cocco, ord_phaeo, expon_phaeo, reminSi, k_o2_remin
 
 !!------------------------------------------------------------------------------
 !! *** For limiter function ***
@@ -586,6 +588,7 @@ Module REcoM_declarations
   Real(kind=8)  :: arrFunc                ! []    Temp dependence of rates (also for Phaeocystis)
   Real(kind=8)  :: CoccoTFunc
   Real(kind=8)  :: Temp_diatoms           ! []    Temp dependence of diatoms
+  Real(kind=8)  :: Temp_diaH              ! []    Temp dependence of diatoms
   Real(kind=8)  :: Temp_phyto             ! []    Temp dependence of small phyto
   Real(kind=8)  :: Temp_cocco             ! []    Temp dependence of coccolithophores
   Real(kind=8)  :: Temp_phaeo             ! []    Temp dependence of phaeocystis
@@ -655,7 +658,7 @@ Module REcoM_declarations
   Real(kind=8)  :: KOchl, KOchl_dia, KOchl_diaH, KOchl_cocco, KOchl_phaeo                         ! coefficient for damage to the photosynthetic apparatus
 !!------------------------------------------------------------------------------
 !! *** Vertical only Decomposition of phytoplankton growth components ***
-  Real(kind=8),allocatable,dimension(:)  :: VTTemp_diatoms, VTTemp_phyto, VTTemp_cocco, VTTemp_phaeo            ! Vertical 1D  temperature effect on phytoplankton photosynthesis
+  Real(kind=8),allocatable,dimension(:)  :: VTTemp_diatoms, VTTemp_diaH, VTTemp_phyto, VTTemp_cocco, VTTemp_phaeo            ! Vertical 1D  temperature effect on phytoplankton photosynthesis
   Real(kind=8),allocatable,dimension(:)  :: VTPhyCO2, VTDiaCO2, VTCoccoCO2, VTPhaeoCO2                        ! CO2 effect
   Real(kind=8),allocatable,dimension(:)  :: VTqlimitFac_phyto, VTqlimitFac_diatoms, VTqlimitFac_cocco, VTqlimitFac_phaeo  ! nutrient effect
   Real(kind=8),allocatable,dimension(:)  :: VTCphotLigLim_phyto, VTCphotLigLim_diatoms, VTCphotLigLim_diaH, VTCphotLigLim_cocco, VTCphotLigLim_phaeo ! light limitation
@@ -894,6 +897,7 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:,:)   :: NPPc3D
   Real(kind=8),allocatable,dimension(:,:)   :: NPPp3D           ! Phaeocystis
   Real(kind=8),allocatable,dimension(:,:)   :: TTemp_diatoms ! my new variables to track
+  Real(kind=8),allocatable,dimension(:,:)   :: TTemp_diaH ! my new variables to track
   Real(kind=8),allocatable,dimension(:,:)   :: TTemp_phyto ! new Temperature effect
   Real(kind=8),allocatable,dimension(:,:)   :: TTemp_cocco ! new
   Real(kind=8),allocatable,dimension(:,:)   :: TTemp_phaeo ! new

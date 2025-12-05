@@ -367,7 +367,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #if defined (__coccos)
 
             ! Small Phytoplankton:
-            Temp_phyto = exp(ord_phy + expon_phy * Temp(k)) ! NEW MODIFIED
+            Temp_phyto = exp(ord_phy + expon_phy * Temp(k)) ! NEW MODIFIED, Anderson et al. 2023
             VTTemp_phyto(k) = Temp_phyto
 
             ! Diatoms:
@@ -389,6 +389,12 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             Temp_phaeo = max(Temp_phaeo, tiny)
             VTTemp_phaeo(k) = Temp_phaeo
 #endif
+
+#if defined (__diaH)
+            Temp_diaH = exp(ord_diaH + expon_diaH * Temp(k)) ! added for diaH to adapt ord_diaH for lower growth rates
+            VTTemp_diaH(k) = Temp_diaH ! track the output here 
+#endif            
+
 
 #if defined (__3Zoo2Det)
             arrFuncZoo2 = exp(t1_zoo2/t2_zoo2 - t1_zoo2*rTloc)/(1 + exp(t3_zoo2/t4_zoo2 - t3_zoo2*rTloc)) ! 2Zoo
@@ -611,7 +617,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             feLimitFac   = Fe/(k_Fe_d_H + Fe)
             qlimitFac    = min(qlimitFac, feLimitFac)
 !           pMax_diaH     = P_cm_d_H * qlimitFac * arrFunc ! old T function
-            pMax_diaH     = qlimitFac * Temp_diatoms ! Hannah's NEW T func
+            pMax_diaH     = qlimitFac * Temp_diaH ! Hannah's NEW T func
 #endif
 
 !< *** Coccolithophores ***
@@ -869,7 +875,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #if defined (__diaH)
             limitFacSi_diaH = recom_limiter(SiMaxSlope, qSiC_H, SiCmax_d_H)  &
                               * limitFacN_diaH
-            Si_assim_diaH   = V_cm_fact_d_H * Temp_diatoms * SiCUptakeRatio_diaH &  !Hannah's new T fucntion, thus far not splitted for diaH
+            Si_assim_diaH   = V_cm_fact_d_H * Temp_diaH * SiCUptakeRatio_diaH &  !Hannah's new T fucntion, thus far not splitted for diaH
                               * limitFacSi_diaH * Si/(Si + k_si_d_H)
             VTSi_assimDiaH(k) = Si_assim_diaH
 #endif

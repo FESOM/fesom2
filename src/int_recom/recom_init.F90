@@ -247,11 +247,13 @@ subroutine recom_init(tracers, partit, mesh)
 !! From Hannahs new temperature function (not sure if needed as diagnostic):
 
   allocate(TTemp_diatoms  (nl-1,node_size))
+  allocate(TTemp_diaH     (nl-1,node_size))
   allocate(TTemp_phyto    (nl-1,node_size))
   allocate(TTemp_cocco    (nl-1,node_size))
   allocate(TTemp_phaeo    (nl-1,node_size))
 
   TTemp_diatoms  (:,:) = 0.d0
+  TTemp_diaH     (:,:) = 0.d0
   TTemp_phyto    (:,:) = 0.d0
   TTemp_cocco    (:,:) = 0.d0
   TTemp_phaeo    (:,:) = 0.d0

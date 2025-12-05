@@ -817,6 +817,11 @@ CASE ('TTemp_diatoms          ')
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TTemp_diatoms','Temperature dependence of diatoms PS', 'per day',TTemp_diatoms(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
 
+CASE ('TTemp_diaH          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TTemp_diaH','Temperature dependence of diaH PS', 'per day',TTemp_diaH(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
 CASE ('TTemp_phyto          ')
    if (use_REcoM) then 
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TTemp_phyto','Temperature dependence of small phytoplankton PS', 'per day',TTemp_phyto(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
