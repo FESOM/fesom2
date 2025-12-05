@@ -114,6 +114,11 @@ subroutine thermodynamics(mesh)
 #else
      a2ohf   = oce_heat_flux(inod) + shortwave(inod)
 #endif
+
+#if defined (__seaice_tracers)
+     a2i_flx = flx_atmice(1,inod)
+#endif /* (__seaice_tracers) */
+     
      a2ihf   = ice_heat_flux(inod)
      evap    = evap_no_ifrac(inod)
      subli   = sublimation(inod)

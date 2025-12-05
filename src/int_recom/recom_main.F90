@@ -215,9 +215,9 @@ end if ! use_MEDUSA and sedflx_num not 0
 
 #if defined (__seaice_tracers)
      !!---- calculate dust flux of iron into sea ice
-     flx_atmice(n) = GloFeDust(n) * a_ice(n) * dust_sol
+     flx_atmice(1,n) = GloFeDust(n) * a_ice(n) * dust_sol_ice
      !!---- flux of iron between sea-ice and ocean from melting/freezing of seaice
-     FeFluxIce = flx_iceocn(n)
+     FeFluxIce = flx_iceocn(1,n)
 #endif /* (__seaice_tracers) */
  
 if (Diags) then

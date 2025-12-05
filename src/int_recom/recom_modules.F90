@@ -444,6 +444,13 @@ module recom_config
   namelist /paballasting/ rho_POC, rho_PON, rho_CaCO3, rho_opal, rho_ref_part, &
                           rho_ref_water, visc_ref_water, w_ref1, w_ref2, depth_scaling1,   &
                           depth_scaling2, max_sinking_velocity
+#if defined (__seaice_tracers)
+  REAL(kind=WP)  :: dust_sol_ice = 1.0            ! solubility of iron fro dust when moved through ice
+  REAL(kind=WP)  :: sitr_frac_from_freezing = 1.0 ! fraction of iron concentration built into fresh seaice when formed by freezing
+  REAL(kind=WP)  :: sitr_frac_from_flooding = 1.0 ! fraction of iron concentration built into fresh seaice when formed by flooding
+  namelist /pa_seaiceiron/ dust_sol_ice, sitr_frac_from_freezing, sitr_frac_from_flooding
+#endif /* (__seaice_tracers) */
+
 end module recom_config
 !
 !===============================================================================
