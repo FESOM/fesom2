@@ -423,7 +423,11 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! 2nd. compute horizontal advection component: u*du/dx, u*dv/dx & v*du/dy, v*dv/dy
     ! loop over triangle edges
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     do ed=1, myDim_edge2D
         nod = edges(:,ed)   
         el1 = edge_tri(1,ed)   
@@ -454,6 +458,9 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
         ! compute horizontal normal velocity with respect to the edge from triangle 
         ! centroid towards triangel edge mid-pointe for element el2 when it is valid
         ! --> if its a boundary triangle el2 will be not valid
+#if defined(__openmp_reproducible)
+!$OMP ORDERED
+#endif      
         if (el2>0) then ! --> el2 is valid element
             nl2 = nlevels(el2)-1
             ul2 = ulevels(el2)
@@ -469,10 +476,6 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
             un1(1:ul1-1)            = 0._WP
             un2(1:ul2-1)            = 0._WP
 
-#if defined(__openmp_reproducible)
-!$OMP ORDERED
-#endif
-            
             ! first edge node
             ! Do not calculate on Halo nodes, as the result will not be used. 
             ! The "if" is cheaper than the avoided computiations.

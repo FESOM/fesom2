@@ -1204,7 +1204,11 @@ subroutine diff_part_hor_redi(tracers, partit, mesh)
 !$OMP                   nl1, ul1, nl2, ul2, nl12, ul12, nz, el, elnodes, enodes, &
 !$OMP                             c, Fx, Fy, Tx, Ty, Tx_z, Ty_z, SxTz, SyTz, Tz, &
 !$OMP                                                          rhs1, rhs2, Kh, dz)
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     do edge=1, myDim_edge2D
         rhs1=0.0_WP
         rhs2=0.0_WP
@@ -1377,7 +1381,11 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, ed, el, en, k, elem, nzmin, nzmax, u1, v1, len, vi, tt, ww, &
 !$OMP elnodes1, elnodes2)
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     DO ed=1, myDim_edge2D!+eDim_edge2D
        if (myList_edge2D(ed) > edge2D_in) cycle
        el=edge_tri(:,ed)
@@ -1423,7 +1431,11 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
     ! ===========
     ! Second round:
     ! ===========
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     DO ed=1, myDim_edge2D!+eDim_edge2D
        if (myList_edge2D(ed)>edge2D_in) cycle
           el=edge_tri(:,ed)

@@ -3266,7 +3266,11 @@ subroutine dvd_add_difflux_bhvisc(do_SDdvd, tr_num, dvd_tot, tr, trstar, gamma0_
     ! first round 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, nz, ednodes, edelem, elnodes_l, elnodes_r, &
 !$OMP nu1, nl1, du, dv, dt, len, vi)
-!$OMP DO    
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
+!$OMP DO
+#endif
     do edge=1, myDim_edge2D!+eDim_edge2D
         ! skip boundary edges only consider inner edges 
         if (myList_edge2D(edge) > edge2D_in) cycle
@@ -3313,7 +3317,11 @@ subroutine dvd_add_difflux_bhvisc(do_SDdvd, tr_num, dvd_tot, tr, trstar, gamma0_
 
     !___________________________________________________________________________
     ! second round:
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     do edge=1, myDim_edge2D!+eDim_edge2D
         ! skip boundary edges only consider inner edges 
         if (myList_edge2D(edge) > edge2D_in) cycle

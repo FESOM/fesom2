@@ -245,7 +245,11 @@ subroutine ssh2rhs(ice, partit, mesh)
     !_____________________________________________________________________________
     ! use floating sea ice for zlevel and zstar
     if (use_floatice .and.  .not. trim(which_ale)=='linfs') then
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
         do elem=1,myDim_elem2d
             elnodes=elem2D_nodes(:,elem)
             !_______________________________________________________________________
@@ -285,7 +289,11 @@ subroutine ssh2rhs(ice, partit, mesh)
         end do
 !$OMP END DO
     else
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
         do elem=1,myDim_elem2d
             elnodes=elem2D_nodes(:,elem)
             !_______________________________________________________________________
@@ -371,7 +379,11 @@ subroutine stress2rhs_m(ice, partit, mesh)
 !$OMP END PARALLEL DO
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, k, row, dx, dy, vol, mf, aa, bb, mass, cluster_area, elevation_elem)
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     do elem=1,myDim_elem2d
         elnodes=elem2D_nodes(:,elem)
         !_______________________________________________________________________
@@ -545,7 +557,11 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     ! use floating sea ice for zlevel and zstar
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(el, elnodes, vol, dx, dy, p_ice, n, bb, aa)
     if (use_floatice .and.  .not. trim(which_ale)=='linfs') then
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
         do el=1,myDim_elem2d
             elnodes=elem2D_nodes(:,el)
 
@@ -588,7 +604,11 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     !_____________________________________________________________________________
     ! use levitating sea ice for linfs, zlevel and zstar
     else
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
         do el=1,myDim_elem2d
             elnodes=elem2D_nodes(:,el)
             !_______________________________________________________________________
@@ -685,7 +705,11 @@ subroutine EVPdynamics_m(ice, partit, mesh)
         ! SD, 30.07.2014
         !_______________________________________________________________________
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(el, i, ed, row, elnodes, dx, dy, meancos, eps1, eps2, delta, pressure, umod, drag, rhsu, rhsv, det, n)
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
         do el=1,myDim_elem2D
             if (ulevels(el)>1) cycle
 

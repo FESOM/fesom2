@@ -252,7 +252,7 @@ sprod(1:2)=0.0_WP
 !$OMP END PARALLEL DO
 #else
     sprod(1) = sum(rr(1:myDim_nod2D) * zz(1:myDim_nod2D))
-    sprod(1) = sum(rr(1:myDim_nod2D) * rr(1:myDim_nod2D))
+    sprod(2) = sum(rr(1:myDim_nod2D) * rr(1:myDim_nod2D))
 #endif
   
   call MPI_Allreduce(MPI_IN_PLACE, sprod, 2, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
