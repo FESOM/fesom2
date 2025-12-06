@@ -1,71 +1,144 @@
-! This is the namelist file for forcing
+! ============================================================================
+! ============= Namelist file for FESOM2 atmospheric forcing ================
+! ============================================================================
+! This file contains configuration for atmospheric forcing and surface boundary
+! conditions, including:
+! - Bulk formulae exchange coefficients (heat, momentum, moisture)
+! - Bulk formulae options and reference heights
+! - Land ice freshwater forcing
+! - Age tracer configuration
+! - Surface forcing data files and variables
+! - Runoff and salinity restoring
+! - Chlorophyll data for shortwave penetration
+! ============================================================================
 
+! ============================================================================
+! BULK FORMULAE EXCHANGE COEFFICIENTS
+! ============================================================================
+! These coefficients control the turbulent exchange of heat, moisture, and
+! momentum between the atmosphere and ocean/ice surfaces.
+! ============================================================================
 &forcing_exchange_coeff
-Ce_atm_oce=1.75e-3 ! exchange coeff. of latent heat over open water
-Ch_atm_oce=1.75e-3 ! exchange coeff. of sensible heat over open water
-Cd_atm_oce=1.0e-3  ! drag coefficient between atmosphere and water
-Ce_atm_ice=1.75e-3 ! exchange coeff. of latent heat over ice
-Ch_atm_ice=1.75e-3 ! exchange coeff. of sensible heat over ice
-Cd_atm_ice=1.2e-3  ! drag coefficient between atmosphere and ice 
-Swind     =0.0     ! parameterization for coupled current feedback
+Ce_atm_oce = 0.00175    ! exchange coefficient of latent heat over open water (dimensionless)
+Ch_atm_oce = 0.00175    ! exchange coefficient of sensible heat over open water (dimensionless)
+Cd_atm_oce = 0.001      ! drag coefficient between atmosphere and water (dimensionless)
+Ce_atm_ice = 0.00175    ! exchange coefficient of latent heat over ice (dimensionless)
+Ch_atm_ice = 0.00175    ! exchange coefficient of sensible heat over ice (dimensionless)
+Cd_atm_ice = 0.0012     ! drag coefficient between atmosphere and ice (dimensionless)
+Swind       = 0.0       ! parameterization for coupled current feedback (0.0 = disabled)
+                        ! non-zero values reduce wind stress based on ocean surface currents
 /
 
+! ============================================================================
+! BULK FORMULAE OPTIONS
+! ============================================================================
+! Configuration for bulk formulae calculations (turbulent fluxes).
+! Reference heights must match the forcing data specifications.
+! ============================================================================
 &forcing_bulk
-AOMIP_drag_coeff=.false.
-ncar_bulk_formulae=.true.
-ncar_bulk_z_wind=10.0 ! height at which wind forcing is located (CORE:10m, JRA:2m)
-ncar_bulk_z_tair=10.0 ! height at which temp forcing is located (CORE:10m, JRA:2m)
-ncar_bulk_z_shum=10.0 ! height at which humi forcing is located (CORE:10m, JRA:2m)
-
+AOMIP_drag_coeff  = .false.  ! use AOMIP drag coefficient formulation (false = use standard)
+ncar_bulk_formulae = .true.  ! use NCAR bulk formulae (Large & Yeager 2004, 2009)
+ncar_bulk_z_wind   = 10.0    ! reference height for wind forcing [m]
+                             ! CORE2, JRA55-do: 10m; JRA55, NCEP: 2m
+ncar_bulk_z_tair   = 10.0    ! reference height for air temperature forcing [m]
+                             ! CORE2, JRA55-do: 10m; JRA55, NCEP: 2m
+ncar_bulk_z_shum   = 10.0    ! reference height for specific humidity forcing [m]
+                             ! CORE2, JRA55-do: 10m; JRA55, NCEP: 2m
 /
 
+! ============================================================================
+! LAND ICE FRESHWATER FORCING
+! ============================================================================
+! Configuration for freshwater input from land ice (glaciers, ice sheets).
+! Requires use_landice_water=.true. in namelist.config to enable output.
+! ============================================================================
 &land_ice
-use_landice_water=.false.
-landice_start_mon=5
-landice_end_mon=10
+use_landice_water = .false.  ! enable land ice freshwater forcing
+landice_start_mon = 5        ! start month for land ice forcing (1-12)
+landice_end_mon   = 10       ! end month for land ice forcing (1-12)
+fwf_path          = '<add path>' ! path to land ice freshwater flux data files
 /
 
+! ============================================================================
+! AGE TRACER CONFIGURATION
+! ============================================================================
+! Configuration for passive age tracer (tracks water mass age).
+! Requires use_age_tracer=.true. in namelist.config to enable output.
+! ============================================================================
 &age_tracer
-use_age_tracer=.false.
-use_age_mask=.false.
-age_tracer_path='./mesh/'
-age_start_year=2000
+use_age_tracer    = .false.  ! enable age tracer computation
+use_age_mask      = .false.  ! use spatial mask for age tracer initialization
+age_tracer_path   = '<add path>' ! path to age tracer mask file (if use_age_mask=.true.)
+age_start_year    = 2000     ! year to start age tracer (tracer age = 0 at this year)
 /
 
+! ============================================================================
+! SURFACE BOUNDARY CONDITION (FORCING DATA)
+! ============================================================================
+! Specification of atmospheric forcing data files and variables.
+! File paths are relative to the run directory.
+! ============================================================================
 &nam_sbc
-   nm_xwind_file = '/home/a/a270105/fesom_standalone_forcing/CYNF_v2/u_10.15JUNE2009'        ! name of file with winds, if nm_sbc=2
-   nm_ywind_file = '/home/a/a270105/fesom_standalone_forcing/CYNF_v2/v_10.15JUNE2009'        ! name of file with winds, if nm_sbc=2
-   nm_humi_file  = '/home/a/a270105/fesom_standalone_forcing/CYNF_v2/q_10.15JUNE2009'        ! name of file with humidity
-   nm_qsr_file   = '/home/a/a270105/fesom_standalone_forcing/CYNF_v2/ncar_rad.15JUNE2009'    ! name of file with solar heat
-   nm_qlw_file   = '/home/a/a270105/fesom_standalone_forcing/CYNF_v2/ncar_rad.15JUNE2009'    ! name of file with Long wave
-   nm_tair_file  = '/home/a/a270105/fesom_standalone_forcing/CYNF_v2/t_10.15JUNE2009'        ! name of file with 2m air temperature
-   nm_prec_file  = '/home/a/a270105/fesom_standalone_forcing/CYNF_v2/ncar_precip.15JUNE2009' ! name of file with total precipitation
-   nm_snow_file  = '/home/a/a270105/fesom_standalone_forcing/CYNF_v2/ncar_precip.15JUNE2009' ! name of file with snow  precipitation
-   nm_mslp_file  = '/home/a/a270105/fesom_standalone_forcing/CYNF_v2/slp.15JUNE2009'         ! air_pressure_at_sea_level
-   nm_xwind_var  = 'U_10_MOD'   ! name of variable in file with wind
-   nm_ywind_var  = 'V_10_MOD'   ! name of variable in file with wind
-   nm_humi_var   = 'Q_10_MOD'   ! name of variable in file with humidity
-   nm_qsr_var    = 'SWDN_MOD'   ! name of variable in file with solar heat
-   nm_qlw_var    = 'LWDN_MOD'   ! name of variable in file with Long wave
-   nm_tair_var   = 'T_10_MOD'   ! name of variable in file with 2m air temperature
-   nm_prec_var   = 'RAIN'       ! name of variable in file with total precipitation
-   nm_snow_var   = 'SNOW'       ! name of variable in file with total precipitation
-   nm_mslp_var   = 'SLP'        ! name of variable in file with air_pressure_at_sea_level
-   nm_nc_iyear   = 1948
-   nm_nc_imm     = 1            ! initial month of time axis in netCDF 
-   nm_nc_idd     = 1            ! initial day of time axis in netCDF
-   nm_nc_freq    = 1            ! data points per day (i.e. 86400 if the time axis is in seconds)
-   nm_nc_tmid    = 1            ! 1 if the time stamps are given at the mid points of the netcdf file, 0 otherwise (i.e. 1 in CORE1, CORE2; 0 in JRA55)
-   y_perpetual   = .true.
-   l_xwind=.true., l_ywind=.true., l_humi=.true., l_qsr=.true., l_qlw=.true., l_tair=.true., l_prec=.true., l_mslp=.true., l_cloud=.false., l_snow=.true.
-   nm_runoff_file     ='/home/a/a270105/fesom_standalone_forcing/CYNF_v2/runoff.15JUNE2009.nc'
-   runoff_data_source ='CORE2'	!Dai09, CORE2
-   nm_sss_data_file   ='/home/a/a270105/fesom_standalone_forcing/CYNF_v2/PHC2_salx.2004_08_03.nc'
-   sss_data_source    ='CORE2'
-   chl_data_source    ='None' !'Sweeney' monthly chlorophyll climatology or 'NONE' for constant chl_const (below). Make use_sw_pene=.TRUE. in namelist.config!
-   nm_chl_data_file   ='FORCING/Sweeney/Sweeney_2005.nc'
-   chl_const          = 0.1
-   use_runoff_mapper  = .FALSE.
-   runoff_basins_file = 'FORCING/CORE2/runoff_maps_regular.nc'
-   runoff_radius      = 500000.
+   ! --- Forcing file paths ---
+   nm_xwind_file = '/albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/uas.clim61'        ! name of file with zonal wind speeds
+   nm_ywind_file = '/albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/vas.clim61'        ! name of file with meridional wind speeds
+   nm_xstre_file = '/albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/huss.clim61'        ! name of file with zonal wind stress
+   nm_humi_file  = '/albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/huss.clim61'        ! name of file with humidity
+   nm_qsr_file   = '/albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/rsds.clim61'    ! name of file with solar heat
+   nm_qlw_file   = '/albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/rlds.clim61'    ! name of file with Long wave
+   nm_tair_file  = '/albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/tas.clim61'        ! name of file with 2m air temperature
+   nm_prec_file  = '/albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/prra.clim61' ! name of file with total precipitation
+   nm_snow_file  = '/albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/prsn.clim61' ! name of file with snow  precipitation
+   nm_mslp_file  = '/albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/psl.clim61'  
+   ! --- Variable names in netCDF forcing files ---
+   nm_xwind_var  = 'uas'      ! name of variable in file with wind
+   nm_ywind_var  = 'vas'      ! name of variable in file with wind
+   nm_xstre_var  = 'uas'      ! name of variable in file with wind
+   nm_ystre_var  = 'vas'      ! name of variable in file with wind
+   nm_humi_var   = 'huss'     ! name of variable in file with humidity
+   nm_qsr_var    = 'rsds'     ! name of variable in file with solar heat
+   nm_qlw_var    = 'rlds'     ! name of variable in file with long wave
+   nm_tair_var   = 'tas'      ! name of variable in file with 2m air temperature
+   nm_prec_var   = 'prra'     ! name of variable in file with total precipitation
+   nm_snow_var   = 'prsn'     ! name of variable in file with total precipitation
+   nm_mslp_var   = 'psl'      ! name of variable in file with air_pressure_at_sea_level
+
+   ! --- Time axis configuration in forcing files ---
+   nm_nc_iyear   = 1948       ! initial year of forcing data time axis
+   nm_nc_imm     = 1          ! initial month of forcing data time axis (1-12)
+   nm_nc_idd     = 1          ! initial day of forcing data time axis (1-31)
+   nm_nc_freq    = 1          ! number of data points per day (1=daily, 4=6-hourly, etc.)
+   nm_nc_tmid    = 0          ! time stamp position: 1=mid-point, 0=start of interval
+   y_perpetual   = .true.    ! use perpetual year forcing (repeat single year)
+
+   ! --- Enable/disable individual forcing fields ---
+   l_xwind       = .true.     ! use zonal wind forcing
+   l_ywind       = .true.     ! use meridional wind forcing
+   l_humi        = .true.     ! use specific humidity forcing
+   l_qsr         = .true.     ! use shortwave radiation forcing
+   l_qlw         = .true.     ! use longwave radiation forcing
+   l_tair        = .true.     ! use air temperature forcing
+   l_prec        = .true.     ! use precipitation forcing
+   l_mslp        = .true.    ! use mean sea level pressure forcing
+   l_cloud       = .false.    ! use cloud cover forcing
+   l_snow        = .true.     ! use snow precipitation forcing
+
+   ! --- Runoff configuration ---
+   runoff_data_source = 'CORE2'       ! runoff data source: 'Dai09', 'JRA55, 'CORE2', or 'NONE'
+   nm_runoff_file     = '/albedo/pool/FESOM/forcing/CORE2/runoff.nc'  ! path to runoff data
+
+   ! --- Sea surface salinity restoring ---
+   sss_data_source  = 'CORE2'  ! SSS restoring data source: 'CORE2', 'WOA', or 'NONE'
+   nm_sss_data_file = '/albedo/pool/FESOM/forcing/CORE2/PHC2_salx.nc'  ! path to SSS restoring data file, e.g. PHC2_salx.nc
+
+   ! --- Chlorophyll data for shortwave penetration ---
+   chl_data_source  = 'Sweeney'   ! chlorophyll data source: 'Sweeney' (monthly climatology) or 'None' (constant)
+                               ! requires use_sw_pene=.true. in namelist.config
+   nm_chl_data_file = '/pool/data/AWICM/FESOM2/FORCING/Sweeney/Sweeney_2005.nc'  ! chlorophyll data file (if Sweeney)
+   chl_const        = 0.1      ! constant chlorophyll concentration [mg/m³] (if chl_data_source='None')
+
+   ! --- Runoff mapper (distributes runoff over coastal area) ---
+   use_runoff_mapper  = .false.  ! enable runoff mapper (spreads runoff spatially)
+   runoff_basins_file = '<add path>'  ! runoff basin mapping file
+   runoff_radius      = 500000.  ! radius for runoff spreading [m] (if use_runoff_mapper=.true.)
 /

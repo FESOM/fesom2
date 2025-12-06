@@ -63,6 +63,8 @@ bottflx_num           = 4           ! if ciso&ciso_14: =8; if .not.ciso_14: =6; 
 use_atbox             = .false.
 add_loopback          = .false.     ! add loopback fluxes through rivers to the surface
 lb_tscale             = 1.0         ! /year: fraction of loopback fluxes yearly added to the surface
+fe_2ligands	      = .true.      ! switch to consider 2 ligand classes
+fe_compl_nica         = .true.      ! switch for pH/DOC dependent Fe-ligand binding
 /
 
 &pasinking
