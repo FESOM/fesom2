@@ -180,6 +180,7 @@ module recom_config
 
   Logical                :: fe_2ligands           = .false.    ! consider Fe-ligand binding with two ligands
   Logical                :: fe_compl_nica         = .false.    ! use Fe-ligand parameterisation dependent on DOC and pH (Ye2020)
+  Logical                :: arr_Temp              = .true.     ! If true, it uses old/arrhenius Temperature functions, test for differences in 5PFT version 
 
   namelist /pavariables/ use_REcoM,                       REcoM_restart,                                  &
                        bgc_num,                           diags3d_num,           bgc_base_num,            &
@@ -204,7 +205,7 @@ module recom_config
                        recom_debug,                       ciso,                  benthos_num,             &
                        use_MEDUSA,                        sedflx_num,            bottflx_num,             &
                        add_loopback,                      lb_tscale,             use_atbox,               &
-                       fe_2ligands,                       fe_compl_nica
+                       fe_2ligands,                       fe_compl_nica,         arr_Temp
 
 !!------------------------------------------------------------------------------
 !! *** Sinking ***

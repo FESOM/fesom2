@@ -600,6 +600,10 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !           pMax         = P_cm * qlimitFac * arrFunc             ! old T function
             pMax         = qlimitFac * Temp_phyto                 ! Maximum value of C-specific rate of photosynthesis, Hannah's NEW T func
 
+If (arr_Temp) then
+    pMax = P_cm * qlimitFac * arrFunc
+endif
+
 !< *** Diatoms ***
 !< ***************
             qlimitFac    = recom_limiter(NMinSlope, NCmin_d, quota_dia)
@@ -609,6 +613,10 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             qlimitFac    = min(qlimitFac, feLimitFac)
 !           pMax_dia     = P_cm_d * qlimitFac * arrFunc ! old T function
             pMax_dia     = qlimitFac * Temp_diatoms ! Hannah's NEW T func
+
+If (arr_Temp) then
+    pMax_dia = P_cm_d * qlimitFac * arrFunc
+endif
 
 #if defined (__diaH)            
             qlimitFac    = recom_limiter(NMinSlope, NCmin_d_H, quota_diaH)
@@ -620,6 +628,10 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             pMax_diaH     = qlimitFac * Temp_diaH ! Hannah's NEW T func
 #endif
 
+If (arr_Temp) then
+    pMax_diaH     = P_cm_d_H * qlimitFac * arrFunc
+endif
+
 !< *** Coccolithophores ***
 !< ************************
 #if defined (__coccos) 
@@ -629,12 +641,22 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !           pMax_cocco = P_cm_c * qlimitFac * CoccoTFunc                ! Here the T dependency is changed
             pMax_cocco = qlimitFac * Temp_cocco               ! Here the T dependency is changed
 
+If (arr_Temp) then
+    CoccoTFunc = max(0.1419d0 * Temp(k)**0.8151d0,tiny)
+    pMax_cocco = P_cm_c * qlimitFac * CoccoTFunc
+endif
+
 !< *** Phaeocystis ***
 !< *******************
             qlimitFac  = recom_limiter(NMinSlope, NCmin_p, quota_phaeo)
             feLimitFac = Fe/(k_Fe_p + Fe)
             qlimitFac  = min(qlimitFac, feLimitFac)
             pMax_phaeo = qlimitFac * Temp_phaeo                         ! Here the T dependency is changed
+
+If (arr_Temp) then
+    pMax_phaeo = P_cm_p * qlimitFac * arrFunc
+endif
+
 #endif
 !-------------------------------------------------------------------------------
 !< *** Small phytoplankton photosynthesis rate ***
