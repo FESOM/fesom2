@@ -2701,7 +2701,7 @@ subroutine oce_timestep_ale(n, mesh)
     
     ! Take updated ssh matrix and solve --> new ssh!
     t30=MPI_Wtime() 
-    call solve_ssh_ale(mesh)
+    call solve_ssh_ale(mesh)  !SH --> bis hier geschaut
     
     if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) call relax_zonal_vel(mesh)
     t3=MPI_Wtime() 
@@ -2716,7 +2716,7 @@ subroutine oce_timestep_ale(n, mesh)
     
     ! Update to hbar(n+3/2) and compute dhe to be used on the next step
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_hbar_ale'//achar(27)//'[0m'
-    call compute_hbar_ale(mesh)
+    call compute_hbar_ale(mesh)   !SH F 1.3 ms FR 0.9ms
     
     !___________________________________________________________________________
     ! Current dynamic elevation alpha*hbar(n+1/2)+(1-alpha)*hbar(n-1/2)
@@ -2746,13 +2746,13 @@ subroutine oce_timestep_ale(n, mesh)
     ! The main step of ALE procedure --> this is were the magic happens --> here 
     ! is decided how change in hbar is distributed over the vertical layers
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call vert_vel_ale'//achar(27)//'[0m'
-    call vert_vel_ale(mesh)
+    call vert_vel_ale(mesh)  !SH F 4.3ms  FR 4.1ms
     t7=MPI_Wtime() 
     
     !___________________________________________________________________________
     ! solve tracer equation
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call solve_tracers_ale'//achar(27)//'[0m'
-    call solve_tracers_ale(mesh)
+    call solve_tracers_ale(mesh) !SH F 68.3ms FR 978ms <-!!!!
     t8=MPI_Wtime() 
     
     !___________________________________________________________________________

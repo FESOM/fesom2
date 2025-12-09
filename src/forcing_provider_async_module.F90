@@ -47,11 +47,13 @@ module forcing_provider_async_module
     ! init our all_readers array if not already done
     ! dynamically increasing this array did not work because somehow the move_alloc messes with our pointer assignments (maybe it would work with a manual deep-copy instead?)
     ! as a workaround, we allocate the array once to a fixed size
+print *,'SIND WIR HIER?'
     if(.not. allocated(all_readers)) then
       allocate(all_readers(varcount))
     else
       call assert(size(all_readers) == varcount, __LINE__)
     end if
+print *,'Hier noch1?'
     
     if( all_readers(varindex)%netcdf_timestep_size == -1 ) then ! reader has never been initialized
       all_readers(varindex)%netcdf_timestep_size = 0
@@ -77,7 +79,7 @@ module forcing_provider_async_module
 
       call all_readers(varindex)%initialize_async_reader(filepath, fileyear, varname)
     end if
-
+print *,'Hier noch2?'
     call assert(size(all_readers)>=varindex, __LINE__)
     
     ! join thread
@@ -85,21 +87,26 @@ module forcing_provider_async_module
       call all_readers(varindex)%thread%join()
       all_readers(varindex)%thread_timeindex = -1
     end if
-
+print *,'Hier noch3?'
     call all_readers(varindex)%reader_current%yield_data(time_index, forcingdata)
+print *,'Hier noch4?'
 
     ! todo: kick off the thread before we fill the forcingdata array
     if(all_readers(varindex)%thread_timeindex == -1) then ! we did not already kick off a thread
       if(.not. all_readers(varindex)%reader_next%timeindex_in_cache_bounds(time_index+PREFETCH_SIZE)) then
         if(all_readers(varindex)%netcdf_timestep_size >= time_index+PREFETCH_SIZE) then
+print *,'WAS IST LOS? ',varindex,all_readers(varindex)%netcdf_timestep_size,time_index
           ! prefetch the next timestep asynchronously
           call assert(all_readers(varindex)%thread_timeindex == -1, __LINE__)
+print *,'Hier das problem1?'
           all_readers(varindex)%thread_timeindex = time_index+PREFETCH_SIZE
+print *,'Hier das problem2?'
           call all_readers(varindex)%thread%run()
+print *,'Hier das problem3?'
         end if
       end if
     end if
-    
+  print *,'Hier noch5?'
   end subroutine
 
 

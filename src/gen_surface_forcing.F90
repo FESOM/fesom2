@@ -825,8 +825,11 @@ CONTAINS
          !write(*,*) 'check: ', trim(file_name)
       end if
 
+if (mype==rootrank) print *,'HUHUU'
+
       !read data from file
       if (mype==rootrank) then
+         print *,'JETZT GEHTS LOS'
          nf_start(1)=1
          nf_edges(1)=nc_Nlon-2
          nf_start(2)=1
@@ -837,7 +840,9 @@ CONTAINS
            call forcing_provider%get_forcingdata(i_totfl, fld_idx, sbc_flfi(fld_idx)%async_netcdf_allowed, trim(file_name), yearnew, trim(var_name), t_indx, sbcdata1(2:nc_Nlon-1,1:nc_Nlat))
          end if
          iost = 0
+         print *,'UND DAS WARS'
       end if
+
 
       if(mype == rootrank) then
         if(.not. sbcdata1_from_cache) then

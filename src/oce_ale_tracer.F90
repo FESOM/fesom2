@@ -227,6 +227,8 @@ subroutine solve_tracers_ale(mesh)
 ! kh 22.11.21
     request_count = 0
 
+    !SH=================================================================
+    !SH Loop over tracers
     do tr_num = tr_num_start, tr_num_end
     !do tr_num=1,num_tracers
 
@@ -304,7 +306,8 @@ subroutine solve_tracers_ale(mesh)
             end do
         end if ! (num_fesom_groups > 1) then
     end do ! tr_num = tr_num_start, tr_num_end
-
+    !SH END Loop over tracers
+    !=================================================================
 
 ! kh 19.11.21 if tracer in group was added to compensate for fragmentation its broadcast of the last index is handled here
     if(num_fesom_groups > 1) then
@@ -359,7 +362,7 @@ subroutine solve_tracers_ale(mesh)
         completed = .false.
         do while (.not. completed)
             call MPI_TESTALL(request_count, Benthos_tr_requests(:), completed, MPI_STATUSES_IGNORE, MPIerr)
-        end do
+        end do12
 
         completed = .false.
         do while (.not. completed)
