@@ -247,7 +247,7 @@ subroutine thermodynamics(mesh)
      !   it is different from the initial tr_ice(1,i)
      tr_ice(1,i) = tr_in_ice + tr_flx_atmice * ice_dt / max(h, hmin) ! prevent overflow
      ! transfer local ice-ocean flux of tracer from melting/freezing into global array
-     flx_atmice(1,i) = tr_flux_iceocn
+     flx_iceocn(1,i) = tr_flux_iceocn
 #endif /* (__seaice_tracers) */
 
   end do
@@ -323,8 +323,9 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   real(kind=WP), external  :: TFrez  ! Sea water freeze temperature.
   real(kind=WP)  lid_clo
 #if defined (__seaice_tracers)
-  real(kind=WP)  tr_in_ice, tr_in_oce, tr_flx_atmice, tr_flux_iceocn
+  real(kind=WP)  tr_in_ice, tr_flx_atmice, tr_flux_iceocn
   real(kind=WP)  sitr_from_freezing, sitr_from_flooding
+  real(kind=WP)  growfac, meltpart   ! auxiliary variables
 #endif /* (__seaice_tracers) */
   ! Store ice thickness at start of growth routine
   dhgrowth=h
@@ -457,6 +458,21 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   ! heat and fresh water fluxes
   dhgrowth=h-dhgrowth        ! Change in ice thickness due to thermodynamic effects
   dhsngrowth=hsn-dhsngrowth  ! Change in snow thickness due to thermodynamic melting
+
+#if defined (__seaice_tracers)
+  ! the formulation here is taken from MITgcm
+  growfac = 1.0_WP
+  meltpart = 0.0_WP
+  if (dhgrowth.gt.0.0_WP) growfac = (h - dhgrowth) / h ! h=0 cannot happen, since dhgrowth>0
+  if (dhgrowth.lt.0.0_WP) meltpart = -dhgrowth
+  ! change of tracer concentration due to addition of new-formed ice
+  ! melting of ice does not change the concentration, only formation
+  tr_in_ice = tr_in_ice * growfac + sitr_from_freezing * (1.0_WP - growfac)  
+  ! tracer flux between ice and ocean; one contribution from melting
+  ! and one from formation of sea ice
+  tr_flux_iceocn = tr_flux_iceocn + meltpart * tr_in_ice & 
+                   - sitr_from_freezing * (1.0_WP - growfac) * h
+#endif /* (__seaice_tracers) */
 
   ! (without snow fall). This is a negative value (MINUS snow melt)
 
