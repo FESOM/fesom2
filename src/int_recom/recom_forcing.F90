@@ -1,7 +1,7 @@
 !===============================================================================
 ! REcoM_Forcing
 !===============================================================================
-subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sali_depth &
+subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali_depth &
             , CO2_watercolumn                                          &
             , pH_watercolumn                                           &
             , pCO2_watercolumn                                         &
@@ -66,7 +66,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sal
     !!---- Subroutine Depth
 
     real(kind=8),dimension(mesh%nl)           :: zF                   ! [m] Depth of fluxes
-    real(kind=8),dimension(mesh%nl,5)         :: SinkVel              ! [m/day]
+    real(kind=8),dimension(mesh%nl,6)         :: SinkVel              ! [m/day]
     real(kind=8),dimension(mesh%nl-1)         :: thick                ! [m] Vertical distance between two nodes = Thickness 
     real(kind=8),dimension(mesh%nl-1)         :: recipthick           ! [1/m] reciprocal of thick
 
@@ -110,10 +110,13 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sal
 
     tiny_Si  = tiny_C_d/SiCmax      ! SiCmax = 0.8d0
 
-#if defined (__coccos)
-    tiny_N_c = tiny_chl/chl2N_max_c ! 0.00001/ 3.5d0 
+if (enable_coccos) then
+    tiny_N_c = tiny_chl/chl2N_max_c ! 0.00001/ 3.5d0
     tiny_C_c = tiny_N_c/NCmax_c     ! NCmax_c = 0.15d0
-#endif
+
+    tiny_N_p = tiny_chl/chl2N_max_p ! 0.00001/ 3.5d0 
+    tiny_C_p = tiny_N_p/NCmax_p     ! NCmax_c = 0.15d0
+endif
 
     call Cobeta(partit, mesh)      
     call Depth_calculations(n, Nn,SinkVel,zF,thick,recipthick, partit, mesh)
@@ -134,7 +137,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sal
     REcoM_T    = min(REcoM_T, 40.d0) 
 
     !!---- minimum set to 21: K1/K2 Lueker valid between 2degC-35degC and 19-43psu, else causes trouble in regions with S between 19 and 21 and ice conc above 97%
-    REcoM_S    = max(21.d0, Sali(1)) 
+    REcoM_S    = max(21.d0, Sali(1))
     !!---- maximum set to 43: K1/K2 Lueker valid between 2degC-35degC and 19-43psu, else causes trouble   REcoM_S    = min(REcoM_S, 43.d0)  !!!!!!!!
 
     !!---- convert from Pa to atm.
@@ -183,7 +186,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sal
     endif
 
     call flxco2(co2flux, co2ex, dpco2surf,                                                   &
-                ph, pco2surf, fco2, co2, hco3, co3, OmegaA, OmegaC, BetaD, rhoSW, p, tempis, &
+                ph, pco2surf, fco2, co2, hco3, co3, OmegaA, OmegaC, BetaD, rhoSW, p, tempis, K0, &
                 REcoM_T, REcoM_S, REcoM_Alk, REcoM_DIC, REcoM_Si, REcoM_Phos, kw660, LocAtmCO2, Patm, thick(One), Nmocsy, Lond,Latd, &
                 optCON='mol/m3',optT='Tpot   ',optP='m ',optB='u74',optK1K2='l  ',optKf='dg',optGAS='Pinsitu',optS='Sprc')
 
@@ -259,18 +262,70 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
   state(1:nn,idiac)  = max(tiny_C_d,state(1:nn,idiac))
   state(1:nn,idiasi) = max(tiny_Si, state(1:nn,idiasi))
 
-#if defined (__coccos)
+if (enable_coccos) then
   state(1:nn,icchl)  = max(tiny_chl,state(1:nn,icchl))
   state(1:nn,icocn)  = max(tiny_N_c,state(1:nn,icocn))
   state(1:nn,icocc)  = max(tiny_C_c,state(1:nn,icocc))
-#endif
 
-#if defined (__3Zoo2Det)
+  state(1:nn,iphachl)  = max(tiny_chl,state(1:nn,iphachl))
+  state(1:nn,iphan)  = max(tiny_N_p,state(1:nn,iphan))
+  state(1:nn,iphac)  = max(tiny_C_p,state(1:nn,iphac))
+endif
+
+if (enable_3zoo2det) then
   state(1:nn,imiczoon)  = max(tiny,state(1:nn,imiczoon))
   state(1:nn,imiczooc)  = max(tiny,state(1:nn,imiczooc))
-#endif
+endif
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
+
+  if (ciso) then
+!   Calculate carbon-isotopic fractionation, radioactive decay is calculated in oce_ale_tracer.F90
+
+!   Fractionation due to air-sea exchange and chemical speciation of CO2
+    call recom_ciso_airsea(recom_t(1), co3(1), recom_dic(1)) ! -> alpha_aq, alpha_dic. CO3 is taken from mocsy
+
+!   Isotopic ratios of dissolved CO2, also needed to calculate biogenic fractionation
+    r_dic_13     = max(tiny*1e-3,state(1,idic_13)*1e-3) / recom_dic(1)
+    r_co2s_13    = alpha_aq_13 / alpha_dic_13 * r_dic_13
+!   Calculate air-sea fluxes of 13|14CO2 in mmol / m**2 / s
+    kwco2  = kw660(1) * (660/scco2(REcoM_T(1)))**0.5  ! Piston velocity (via mocsy)
+    co2sat = co2flux(1) / (kwco2 + tiny) + co2(1)     ! Saturation concentration of CO2 (via mocsy)
+!   co2flux_13   = kwco2 * alpha_k_13 * (alpha_aq_13 * r_atm_13 * co2sat - r_co2s_13 * co2(1))
+!   co2flux_13   = alpha_k_13 * alpha_aq_13 * kwco2 * (r_atm_13 * co2sat - r_dic_13 * co2(1) / alpha_dic_13)
+!   Fractionation factors were determined for freshwater, include a correction for enhanced fractionation in seawater
+    co2flux_13   = (alpha_k_13 * alpha_aq_13 - 0.0002) * kwco2 * (r_atm_13 * co2sat - r_dic_13 * co2(1) / alpha_dic_13)
+    co2flux_seaicemask_13 = co2flux_13 * 1.e3
+
+!   Biogenic fractionation due to photosynthesis of plankton
+!   phyc_13|14 and diac_13|14 are only used in REcoM_sms to calculate DIC_13|14, DOC_13|14 and DetC_13|14
+
+    call recom_ciso_photo(co2(1)) ! -> alpha_p
+    r_phyc_13 = r_co2s_13 / alpha_p_13
+    r_diac_13 = r_co2s_13 / alpha_p_dia_13
+    state(1:nn,iphyc_13)   = max((tiny_C   * r_phyc_13), (state(1:nn,iphyc) * r_phyc_13))
+    state(1:nn,idiac_13)   = max((tiny_C_d * r_diac_13), (state(1:nn,idiac) * r_diac_13))
+
+!   The same for radiocarbon, fractionation factors have been already derived above
+    if (ciso_14) then
+!   Air-sea exchange
+      r_dic_14   = max(tiny*1e-3,state(1,idic_14)*1e-3) / recom_dic(1)
+      r_co2s_14  = alpha_aq_14 / alpha_dic_14 * r_dic_14
+!     co2flux_14 = kwco2 * alpha_k_14 * (alpha_aq_14 * r_atm_14 * co2sat - r_co2s_14 * co2(1))
+!     Fractionation factors were determined for freshwater, include a correction for enhanced fractionation seawater
+      co2flux_14 = (alpha_k_14 * alpha_aq_14 - 0.0004) * kwco2 * (r_atm_14 * co2sat - r_dic_14 * co2(1) / alpha_dic_14)
+      co2flux_seaicemask_14 = co2flux_14 * 1.e3
+!   Biogenic fractionation
+      if (ciso_organic_14) then
+        r_phyc_14 = r_co2s_14 / alpha_p_14
+        r_diac_14 = r_co2s_14 / alpha_p_dia_14
+        state(1:nn,iphyc_14) = max((tiny_C   * r_phyc_14), (state(1:nn,iphyc) * r_phyc_14))
+        state(1:nn,idiac_14) = max((tiny_C_d * r_diac_14), (state(1:nn,idiac) * r_diac_14))
+      end if
+    end if
+!   Radiocarbon
+  end if
+! ciso
 
 !-------------------------------------------------------------------------------
 ! Diagnostics
@@ -291,10 +346,58 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
      locNNAd = sum(vertNNAd(1:nn) * thick(1:nn))
      locChldegd = sum(vertChldegd(1:nn) * thick(1:nn))
 
+if (enable_coccos) then
      locNPPc = sum(vertNPPc(1:nn) * thick(1:nn))
      locGPPc = sum(vertGPPc(1:nn) * thick(1:nn))
      locNNAc = sum(vertNNAc(1:nn) * thick(1:nn))
      locChldegc = sum(vertChldegc(1:nn) * thick(1:nn))
+
+     locNPPp = sum(vertNPPp(1:nn) * thick(1:nn))
+     locGPPp = sum(vertGPPp(1:nn) * thick(1:nn))
+     locNNAp = sum(vertNNAp(1:nn) * thick(1:nn))
+     locChldegp = sum(vertChldegp(1:nn) * thick(1:nn))
+endif
+
+     if (Grazing_detritus) then    ! only for the case if grazing detritus is used, as probably only needed for tuning which uses detritus grazing
+        ! Mesozooplankton
+        locgrazmeso_tot = sum(vertgrazmeso_tot(1:nn) * thick(1:nn))
+        locgrazmeso_n   = sum(vertgrazmeso_n(1:nn) * thick(1:nn))
+        locgrazmeso_d 	= sum(vertgrazmeso_d(1:nn) * thick(1:nn))
+        if (enable_coccos) then
+            locgrazmeso_c   = sum(vertgrazmeso_c(1:nn) * thick(1:nn))
+            locgrazmeso_p   = sum(vertgrazmeso_p(1:nn) * thick(1:nn))
+        endif
+        locgrazmeso_det = sum(vertgrazmeso_det(1:nn) * thick(1:nn))
+        if (enable_3zoo2det) then
+            locgrazmeso_mic = sum(vertgrazmeso_mic(1:nn) * thick(1:nn))
+            locgrazmeso_det2= sum(vertgrazmeso_det2(1:nn) * thick(1:nn))
+        endif
+
+        if (enable_3zoo2det) then
+            ! Macrozooplankton
+            locgrazmacro_tot = sum(vertgrazmacro_tot(1:nn) * thick(1:nn))
+            locgrazmacro_n   = sum(vertgrazmacro_n(1:nn) * thick(1:nn))
+            locgrazmacro_d	 = sum(vertgrazmacro_d(1:nn) * thick(1:nn))
+            if (enable_coccos) then
+                locgrazmacro_c   = sum(vertgrazmacro_c(1:nn) * thick(1:nn))
+                locgrazmacro_p   = sum(vertgrazmacro_p(1:nn) * thick(1:nn))
+            endif
+            locgrazmacro_mes = sum(vertgrazmacro_mes(1:nn) * thick(1:nn))
+            locgrazmacro_det = sum(vertgrazmacro_det(1:nn) * thick(1:nn))
+            locgrazmacro_mic = sum(vertgrazmacro_mic(1:nn) * thick(1:nn))
+            locgrazmacro_det2= sum(vertgrazmacro_det2(1:nn) * thick(1:nn))
+
+            ! Microzooplankton
+            locgrazmicro_tot = sum(vertgrazmicro_tot(1:nn) * thick(1:nn))
+            locgrazmicro_n   = sum(vertgrazmicro_n(1:nn) * thick(1:nn))
+            locgrazmicro_d   = sum(vertgrazmicro_d(1:nn) * thick(1:nn))
+            if (enable_coccos) then
+                locgrazmicro_c   = sum(vertgrazmicro_c(1:nn) * thick(1:nn))
+                locgrazmicro_p   = sum(vertgrazmicro_p(1:nn) * thick(1:nn))
+            endif
+        
+        endif        
+     endif
 
   end if
 end subroutine REcoM_Forcing

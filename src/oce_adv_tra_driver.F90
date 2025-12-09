@@ -209,6 +209,27 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 #endif
 #endif
 
+
+! O:G - tra_diag
+! LO solution
+! fct_LO is zero before adv_flux_hor
+! Up to now only horizontal
+! contribution
+ 
+
+!#if defined (__recom)
+        if (tracers%data(tr_num)%ltra_diag) then
+           do n=1, myDim_nod2D+eDim_nod2D
+              nu1 = ulevels_nod2D(n)
+              nl1 = nlevels_nod2D(n)
+              do nz = nu1, nl1-1
+                 ! Horizontal advection part for LO (FCT is .TRUE.)
+                 tracers%work%tra_advhoriz(nz,n,tr_num) = fct_LO(nz,n) * dt/areasvol(nz,n)/hnode_new(nz,n)
+              end do
+           end do
+        end if
+!#endif
+
         ! compute the low order upwind vertical flux (explicit part only)
         ! zero the input/output flux before computation
         call adv_tra_ver_upw1(we, ttf, partit, mesh, adv_flux_ver, o_init_zero=.true.)
@@ -301,7 +322,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     ! do horizontal tracer advection, in case of FCT high order solution
     SELECT CASE(trim(tracers%data(tr_num)%tra_adv_hor))
         CASE('MUSCL')
-            ! compute the untidiffusive horizontal flux (o_init_zero=.false.: input is the LO horizontal flux computed above)
+            ! compute the antidiffusive horizontal flux (o_init_zero=.false.: input is the LO horizontal flux computed above)
             call adv_tra_hor_muscl(vel, ttfAB, partit, mesh, opth,  adv_flux_hor, edge_up_dn_grad, nboundary_lay, o_init_zero=do_zero_flux)
         CASE('MFCT')
              call adv_tra_hor_mfct(vel, ttfAB, partit, mesh, opth,  adv_flux_hor, edge_up_dn_grad,                o_init_zero=do_zero_flux)
@@ -416,6 +437,36 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         end if
     end if !-->if ((ldiag_DVD) .and. (tr_num<=2)) then 
     
+
+
+! O:G - tra_diag
+!#if defined (__recom)
+        if (tracers%data(tr_num)%ltra_diag) then
+        !_______________________________________________________________________
+           if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
+              do n=1, myDim_nod2D+eDim_nod2D
+                 nu1 = ulevels_nod2D(n)
+                 nl1 = nlevels_nod2D(n)
+                 do nz = nu1, nl1-1
+                    ! part for LO + antidiffusive (FCT is .TRUE.)
+                    tracers%work%tra_advhoriz(nz,n,tr_num) = tracers%work%tra_advhoriz(nz,n,tr_num) + dttf_h(nz,n)/hnode_new(nz,n)
+                    tracers%work%tra_advvert(nz,n,tr_num)  = tracers%work%tra_advvert(nz,n,tr_num)  + dttf_v(nz,n)/hnode_new(nz,n)
+                 end do
+              end do
+           else
+              do n=1, myDim_nod2D+eDim_nod2D
+                 nu1 = ulevels_nod2D(n)
+                 nl1 = nlevels_nod2D(n)
+                 do nz = nu1, nl1-1
+                    ! (FCT .FALSE.)
+                    tracers%work%tra_advhoriz(nz,n,tr_num) = dttf_h(nz,n)/hnode_new(nz,n)
+                    tracers%work%tra_advvert (nz,n,tr_num) = dttf_v(nz,n)/hnode_new(nz,n)
+                 end do
+              end do
+           end if
+        end if
+!#endif
+
 end subroutine do_oce_adv_tra
 !
 !

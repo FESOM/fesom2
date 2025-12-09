@@ -1457,6 +1457,7 @@ CONTAINS
 #if defined (__recom)
       use recom_config
       use recom_glovar
+      use REcoM_ciso
 #endif
       IMPLICIT NONE
 
@@ -1659,10 +1660,40 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
 ! ******** Atmospheric CO2 *********
     if (mstep == 1) then ! The year has changed
 
+    if (use_atbox) then  
+!     Atmospheric box model CO2 values
+      AtmCO2(:)                   = x_co2atm(1)
+      if (ciso) then 
+        AtmCO2_13(:)              = x_co2atm_13(1)
+        if (ciso_14) AtmCO2_14(:,1) = x_co2atm_14(1)
+      end if
+    else 
+!     Prescribed atmospheric CO2 values
+
         if (constant_CO2) then
             AtmCO2(:) = CO2_for_spinup
             if (mype==0) write(*,*) 'Constant_CO2 = ', CO2_for_spinup 
-            if (mype==0) write(*,*),'Atm CO2=', AtmCO2               
+            if (mype==0) write(*,*),'Atm CO2=', AtmCO2     
+            if (ciso) then
+                AtmCO2_13          = CO2_for_spinup * (1. + 0.001 * delta_co2_13)
+                if (ciso_14) then
+!               Atmospheric 14C varies with latitude
+                    do i=1, myDim_nod2D
+!                       Latitude of atmospheric input data
+                        lat_val = geo_coord_nod2D(2,i) / rad
+!                       Binning to latitude zones
+                        if (ciso_organic_14) then
+!                           Convert Delta_14C to delta_14C
+                            delta_co2_14 = (big_delta_co2_14(lat_zone(lat_val)) + 2. * delta_co2_13 + 50.) / &
+                                         (0.95 - 0.002 * delta_co2_13)
+                        else
+!                           "Inorganic" 14C approximation: delta_14C := Delta_14C 
+                            delta_co2_14 = big_delta_co2_14(lat_zone(lat_val))
+                        end if
+                        AtmCO2_14(lat_zone(lat_val),:) = CO2_for_spinup * (1. + 0.001 * delta_co2_14)
+                    end do
+                end if
+            end if          
         else
             filename=trim(make_full_path(nm_co2_data_file))
             if (mype==0) write(*,*) 'Updating CO2 climatology for month       ', i,' from ', trim(filename)
@@ -1696,8 +1727,18 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
             if (mype==0) write(*,*),'Atm CO2=', AtmCO2
             status=nf90_close(ncid)
         end if
-    end if
+    end if   ! atmospheric box model or prescribed CO2 values   
 
+!   Control output of atmospheric CO2 values
+    if (mype==0) then !OG
+      print *,                "In atm_input: AtmCO2    = ", AtmCO2(1)
+      if (ciso) then
+        print *,              "              AtmCO2_13 = ", AtmCO2_13(1)
+        if (ciso_14) print *, "              AtmCO2_14 = ", AtmCO2_14(:,1)
+      end if
+      if (use_atbox) print *, "              use_atbox = .true."
+    end if
+    end if
 ! ******** Fe deposition *********
     if (fe_data_source=='Albani') then
         if (update_monthly_flag) then
