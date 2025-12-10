@@ -104,6 +104,12 @@ namelist.recom:
         add_loopback: False
         lb_tscale: 1.0
 
+namelist.forcing:
+    nam_sbc:
+        l_mslp: True
+        nm_mslp_file: 'slp.'
+        nm_mslp_var: 'slp'
+
 namelist.io:
     nml_list:
         io_list:
