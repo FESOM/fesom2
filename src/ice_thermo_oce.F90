@@ -88,6 +88,9 @@ subroutine thermodynamics(mesh)
   !------------------------------------------------------------------------
   
   use o_param
+#if defined (__seaice_tracers)
+  use o_arrays, only: tr_arr
+#endif /* (__seaice_tracers) */ 
   use mod_mesh
   use i_therm_param
   use i_param
@@ -113,6 +116,7 @@ subroutine thermodynamics(mesh)
   
 #if defined (__seaice_tracers)
   real(kind=WP)  :: tr_in_ice, tr_in_oce, tr_flx_atmice, tr_flux_iceocn
+  real(kind=WP)  :: sitr_from_freezing, sitr_from_flooding
 #endif /* (__seaice_tracers) */
 
   type(t_mesh), intent(in)   , target :: mesh  
@@ -204,8 +208,6 @@ subroutine thermodynamics(mesh)
      ! si ice tracer concentration in freshly formed ice from either freezing or flooding
      sitr_from_freezing = tr_in_oce * sitr_frac_from_freezing
      sitr_from_flooding = tr_in_oce * sitr_frac_from_flooding
-#endif /* (__seaice_tracers) */
-
 #endif /* (__seaice_tracers) */
      
      call therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &

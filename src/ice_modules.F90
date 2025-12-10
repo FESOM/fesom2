@@ -88,8 +88,8 @@ save
   ! stuff for iron/other nutrients/tracers in seaice
   
   ! number of concentration tracers in ice
-  integer                                          :: ntr_ice = 1
-  integer                                          :: ntr_ice_max = 1
+  integer                                          :: ntr_ice=1 !
+  integer, PARAMETER                               :: ntr_ice_max=1 !
     ! which sea ice tracer belongs to which ocean tracer
   integer, DIMENSION(ntr_ice_max)                  :: ice_tracer_mate
   ! variables for holding concentration of stuff (nutrients e.g.) in ice and fluxes

@@ -327,7 +327,7 @@ subroutine ice_solve_high_order(mesh)
         m_templ(row)=dm_temp(row)+rhs_new/area(1,row)
 #endif /* (__oifs) */
 #if defined (__seaice_tracers)
-        rhs_new=rhs_tr_ice(1,row) - sum(mass_matrix(clo:clo2)*dtr_ice(location(1:cn)))
+        rhs_new=rhs_tr_ice(row) - sum(mass_matrix(clo:clo2)*dtr_ice(location(1:cn)))
         tr_icel(row)=dtr_ice(row)+rhs_new/area(1,row)
 #endif /* (__seaice_tracers) */
      end do
