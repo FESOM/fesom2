@@ -31,7 +31,10 @@ program fesom_restart_converter
   use o_ARRAYS
   use g_config
   use g_clock
+  use g_comm_auto
   use io_RESTART
+  use ice_setup_interface
+  use ice_init_interface
 #if defined(__recom)
   use recom_glovar
   use recom_config
@@ -39,6 +42,24 @@ program fesom_restart_converter
   use, intrinsic :: iso_fortran_env, only : real32
 
   implicit none
+  
+  interface
+    subroutine ice_init_toyocean_dummy(ice, partit, mesh)
+      USE MOD_ICE
+      USE MOD_PARTIT
+      USE MOD_MESH
+      type(t_ice)   , intent(inout), target :: ice
+      type(t_partit), intent(inout), target :: partit
+      type(t_mesh)  , intent(in)   , target :: mesh
+    end subroutine ice_init_toyocean_dummy
+    
+    subroutine forcing_setup(partit, mesh)
+      use mod_mesh
+      USE MOD_PARTIT
+      type(t_mesh),   intent(in),    target :: mesh
+      type(t_partit), intent(inout), target :: partit
+    end subroutine forcing_setup
+  end interface
   
   integer           :: provided, MPIerr
   logical           :: mpi_is_initialized
@@ -128,7 +149,10 @@ program fesom_restart_converter
     write(*,*) ''
   endif
   
-  ! Initialize dynamics and tracers
+  ! Check mesh consistency
+  call check_mesh_consistency(partit, mesh)
+  
+  ! Initialize dynamics and tracers (following fesom_module.F90 sequence)
   if (partit%mype == 0) then
     write(*,*) 'Step 4: Initializing data structures...'
     t1 = MPI_Wtime()
@@ -138,18 +162,24 @@ program fesom_restart_converter
   call tracer_init(tracers, partit, mesh)
   call arrays_init(tracers%num_tracers, partit, mesh)
   
-  if (use_ice) then
-    call ice_init(ice, partit, mesh)
-  endif
+  ! Complete ocean setup to ensure all arrays are properly initialized
+  call ocean_setup(dynamics, tracers, partit, mesh)
   
 #if defined(__recom)
   if (REcoM_restart .or. use_REcoM) then
     call recom_init(tracers, partit, mesh)
   endif
 #endif
-  
-  ! Complete ocean setup to ensure all arrays are properly initialized
-  call ocean_setup(dynamics, tracers, partit, mesh)
+
+  ! Initialize forcing arrays (needed by ice_setup)
+  call forcing_setup(partit, mesh)
+
+  ! Initialize ice (using ice_setup which handles full initialization)
+  if (use_ice) then
+    call ice_setup(ice, tracers, partit, mesh)
+  else
+    call ice_init_toyocean_dummy(ice, partit, mesh)
+  endif
   
   if (partit%mype == 0) then
     t2 = MPI_Wtime()
