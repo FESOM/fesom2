@@ -32,6 +32,7 @@ option(BUILD_TESTING "Build tests" OFF)
 # Tools
 option(BUILD_MESHPARTITIONER "Build mesh partitioning tools (fesom_meshpart executable)" OFF)
 option(BUILD_MESHDIAG "Build mesh diagnostics utility (fesom_meshdiag executable)" OFF)
+option(BUILD_RESTART_CONVERTER "Build restart converter utility (fesom_restart_converter executable)" OFF)
 
 # NetCDF build option
 option(BUILD_NETCDF "Download and build NetCDF libraries when system libraries are incompatible" OFF)

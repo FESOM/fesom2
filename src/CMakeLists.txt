@@ -177,6 +177,7 @@ add_custom_target(fesom_version_info-generated.F90 ALL
 #endif()
 list(REMOVE_ITEM sources_Fortran ${src_home}/fvom_init.F90 ${src_home}/oce_local.F90 ${src_home}/gen_comm.F90)
 list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_main.F90)
+list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_restart_converter.F90)
 
 find_package( NETCDF REQUIRED COMPONENTS C Fortran )
 find_package( MPI REQUIRED COMPONENTS C Fortran )
@@ -520,6 +521,20 @@ if(BUILD_MESHDIAG)
             COMPONENT tools)
     
     message(STATUS "Mesh diagnostics utility will be built as fesom_meshdiag")
+endif()
+
+# fesom_restart_converter executable (optional)
+if(BUILD_RESTART_CONVERTER)
+    add_executable(fesom_restart_converter ${src_home}/fesom_restart_converter.F90)
+    target_link_libraries(fesom_restart_converter PUBLIC ${PROJECT_NAME})
+    target_link_libraries(fesom_restart_converter PRIVATE MPI::MPI_Fortran)
+    
+    # Install the restart converter utility
+    install(TARGETS fesom_restart_converter
+            RUNTIME DESTINATION bin
+            COMPONENT tools)
+    
+    message(STATUS "Restart converter utility will be built as fesom_restart_converter")
 endif()
 
 
