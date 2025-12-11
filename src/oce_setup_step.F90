@@ -808,6 +808,7 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     ! ================
 #if defined(__recom)
     allocate(dtr_bf    ( nl-1, node_size ))
+!    allocate(dtr_bf_dic( nl-1, node_size ))     ! ROp on 30.09.2025
     allocate(str_bf    ( nl-1, node_size ))
     allocate(vert_sink ( nl-1, node_size ))
     allocate(Alk_surf  (       node_size ))
@@ -917,6 +918,7 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
 ! ================
 #if defined(__recom)
     dtr_bf              = 0.0_WP
+!    dtr_bf_dic          = 0.0_WP        ! RP on 30.09.2025
     str_bf              = 0.0_WP
     vert_sink           = 0.0_WP
     Alk_surf            = 0.0_WP

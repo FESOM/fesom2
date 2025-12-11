@@ -8,6 +8,7 @@
 #*.out
 *~
 *.swp
+bin_core2_clim61_budget/
 src/icepack_drivers/Icepack
 lib/*.a
 lib/*.so

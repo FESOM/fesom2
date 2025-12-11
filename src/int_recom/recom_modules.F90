@@ -648,10 +648,17 @@ Module REcoM_declarations
   Real(kind=8),allocatable,dimension(:) :: vertNPPc, vertGPPc, vertNNAc, vertChldegc
   Real(kind=8),allocatable,dimension(:) :: vertgrazmeso_tot, vertgrazmeso_n, vertgrazmeso_d, vertgrazmeso_c
   Real(kind=8),allocatable,dimension(:) :: vertrespmeso, vertrespmacro, vertrespmicro
-  Real(kind=8),allocatable,dimension(:) :: vertcalcdiss, vertcalcif
+  Real(kind=8),allocatable,dimension(:) :: vertcalcdiss, vertcalcif, vertfastcdis
   Real(kind=8),allocatable,dimension(:) :: vertaggn, vertaggd, vertaggc
   Real(kind=8),allocatable,dimension(:) :: vertdocexn, vertdocexd, vertdocexc
   Real(kind=8),allocatable,dimension(:) :: vertrespn, vertrespd, vertrespc
+  Real(kind=8),allocatable,dimension(:) :: vertphotn, vertphotd, vertphotc      !Phytoplankton photosynthesis terms ! RP 14.07.2025
+  Real(kind=8),allocatable,dimension(:) :: vertmesocdis, vertmicrocdis, vertmacrocdis      !Additional zooplankton calcium dissolution terms ! RP 14.07.2025
+  Real(kind=8),allocatable,dimension(:) :: vertNassimn, vertNassimd, vertNassimc      !N assimilation by phytoplanktons ! RP 14.07.2025
+  Real(kind=8),allocatable,dimension(:) :: vertDONremin      !DON remineralization term ! RP 14.07.2025
+  Real(kind=8),allocatable,dimension(:) :: vertDOCremin      !DOC remineralization term ! RP 15.07.2025
+  Real(kind=8),allocatable,dimension(:,:,:)   :: dtr_bf_dic      ! Diagnostics for DIC bottom flux RP on 26.09.2025
+
 !!------------------------------------------------------------------------------                                                                                
 !! *** Benthos  ***
   Real(kind=8),allocatable,dimension(:) :: decayBenthos ! [1/day] Decay rate of detritus in the benthic layer
@@ -762,6 +769,20 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:,:)   :: NPPd3D
   Real(kind=8),allocatable,dimension(:,:)   :: NPPc3D
 
+  Real(kind=8),allocatable,dimension(:,:)   :: photn            !RP 21.07.2025
+  Real(kind=8),allocatable,dimension(:,:)   :: photd            !RP 21.07.2025
+  Real(kind=8),allocatable,dimension(:,:)   :: photc            !RP 21.07.2025
+  Real(kind=8),allocatable,dimension(:,:)   :: DOCremin         !RP 21.07.2025
+  Real(kind=8),allocatable,dimension(:,:)   :: Nassimn          !RP 21.07.2025
+  Real(kind=8),allocatable,dimension(:,:)   :: Nassimd          !RP 21.07.2025
+  Real(kind=8),allocatable,dimension(:,:)   :: Nassimc          !RP 21.07.2025
+  Real(kind=8),allocatable,dimension(:,:)   :: DONremin         !RP 21.07.2025
+  Real(kind=8),allocatable,dimension(:,:)   :: fastcdis         !RP 21.07.2025
+  Real(kind=8),allocatable,dimension(:,:)   :: mesocdis         !RP 21.07.2025
+  Real(kind=8),allocatable,dimension(:,:)   :: microcdis        !RP 21.07.2025
+  Real(kind=8),allocatable,dimension(:,:)   :: macrocdis        !RP 21.07.2025
+
+
   Real(kind=8),allocatable,dimension(:)     :: DenitBen         ! Benthic denitrification Field in 2D [n2d 1]
 
 !  for using MEDUSA
@@ -770,7 +791,8 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:,:)   :: Sinkingvel1     ! Diagnostics for vertical sinking
   Real(kind=8),allocatable,dimension(:,:)   :: Sinkingvel2     ! Diagnostics for vertical sinking  
   Real(kind=8),allocatable,dimension(:,:,:) :: Sinkvel1_tr     ! Sinking speed of particle class 1 OG 16.03.23 
-  Real(kind=8),allocatable,dimension(:,:,:) :: Sinkvel2_tr     ! Sinking speed of particle class 2 OG 16.03.23 
+  Real(kind=8),allocatable,dimension(:,:,:) :: Sinkvel2_tr     ! Sinking speed of particle class 2 OG 16.03.23
+  Real(kind=8),allocatable,dimension(:,:)   :: dtr_bflux_dic   ! Diagnostics for DIC bottom flux RP on 30.09.2025 
 
   Real(kind=8),allocatable,dimension(:,:)   :: GloSed           ! Yearly input into bottom water from sediments [n2d 5] or [n2d 7] with ciso
   Real(kind=8),allocatable,dimension(:,:)   :: lb_flux          ! Yearly burial from medusa: [n2d 5] or [n2d 9] with ciso_14 

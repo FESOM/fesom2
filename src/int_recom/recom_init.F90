@@ -190,6 +190,19 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(NPPd3D       ( nl-1, node_size ))
     allocate(NPPc3D       ( nl-1, node_size ))
 
+    allocate(photn        ( nl-1, node_size ))
+    allocate(photd        ( nl-1, node_size ))
+    allocate(photc        ( nl-1, node_size ))
+    allocate(DOCremin     ( nl-1, node_size ))
+    allocate(Nassimn      ( nl-1, node_size ))
+    allocate(Nassimd      ( nl-1, node_size ))
+    allocate(Nassimc      ( nl-1, node_size ))
+    allocate(DONremin     ( nl-1, node_size ))
+    allocate(fastcdis     ( nl-1, node_size ))
+    allocate(mesocdis     ( nl-1, node_size ))
+    allocate(microcdis    ( nl-1, node_size ))
+    allocate(macrocdis    ( nl-1, node_size ))
+
     respmeso     = 0.d0
     respmacro    = 0.d0
     respmicro    = 0.d0
@@ -207,6 +220,19 @@ subroutine recom_init(tracers, partit, mesh)
     NPPn3D       = 0.d0
     NPPd3D       = 0.d0
     NPPc3D       = 0.d0
+
+    photn       = 0.d0
+    photd       = 0.d0
+    photc       = 0.d0
+    DOCremin    = 0.d0
+    Nassimn     = 0.d0
+    Nassimd     = 0.d0
+    Nassimc     = 0.d0
+    DONremin    = 0.d0
+    fastcdis    = 0.d0
+    mesocdis    = 0.d0
+    microcdis   = 0.d0
+    macrocdis   = 0.d0
     end if
 
 !! *** Allocate 3D mocsy ***
@@ -245,6 +271,14 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(Sinkingvel1(nl,node_size), Sinkingvel2(nl,node_size))
     Sinkingvel1(:,:)      = 0.d0
     Sinkingvel2(:,:)      = 0.d0
+
+    allocate(Sinkvel1_tr(nl,node_size,num_tracers), Sinkvel2_tr(nl,node_size,num_tracers))  ! OG 16.03.23
+    Sinkvel1_tr(:,:,:)    = 0.0d0 ! OG 16.03.23
+    Sinkvel2_tr(:,:,:)    = 0.0d0 ! OG 16.03.23
+
+    allocate(dtr_bf_dic(nl,node_size,num_tracers),dtr_bflux_dic(nl,node_size))   ! RP on 26.09.2025
+    dtr_bflux_dic(:,:)    = 0.0d0 !RP on 26.09.2025
+    dtr_bf_dic(:,:,:)     = 0.0d0 !RP on 26.09.2025
 
     if (use_MEDUSA) then
         allocate(GloSed(node_size,sedflx_num))

@@ -375,7 +375,7 @@ fer_UV => dynamics%fer_uv(:,:,:)
   end do
 end subroutine diag_trflx
 ! ==============================================================
-! 
+!
 subroutine diag_Ri(mode, dynamics, partit, mesh)
   implicit none
   type(t_dyn)   , intent(inout), target :: dynamics

@@ -22,14 +22,17 @@ end module
 
 module oce_tra_adv_flux2dtracer_interface
   interface
-    subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, mesh, use_lo, ttf, lo)
+    subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, mesh, use_lo, ttf, lo, tr_num, tracers)
       !update the solution for vertical and horizontal flux contributions
       use MOD_MESH
+      use MOD_TRACER
       USE MOD_PARTIT
       USE MOD_PARSUP
       real(kind=WP), intent(in),    target :: dt
+      integer,        intent(in)            :: tr_num   !RP
       type(t_partit),intent(inout), target :: partit
       type(t_mesh),  intent(in),    target :: mesh
+      type(t_tracer), intent(inout), target :: tracers   !RP
       real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP), intent(inout)      :: dttf_v(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP), intent(inout)      :: flux_h(mesh%nl-1, partit%myDim_edge2D)
@@ -216,8 +219,8 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 ! Up to now only horizontal
 ! contribution
  
-
-!#if defined (__recom)
+if (.false.) then
+!#if !defined (__recom)
         if (tracers%data(tr_num)%ltra_diag) then
            do n=1, myDim_nod2D+eDim_nod2D
               nu1 = ulevels_nod2D(n)
@@ -229,7 +232,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
            end do
         end if
 !#endif
-
+endif
         ! compute the low order upwind vertical flux (explicit part only)
         ! zero the input/output flux before computation
         call adv_tra_ver_upw1(we, ttf, partit, mesh, adv_flux_ver, o_init_zero=.true.)
@@ -298,8 +301,8 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 ! LO solution
 ! fct_LO is zero before adv_flux_ver
 ! vertical contribution  
-
-!#if defined (__recom)
+if (.false.) then
+#if !defined (__recom)
         if (tracers%data(tr_num)%ltra_diag) then
            do n=1, myDim_nod2D+eDim_nod2D
               nu1 = ulevels_nod2D(n)
@@ -310,8 +313,8 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
               end do
            end do
         end if
-!#endif
-
+#endif
+endif
         !_______________________________________________________________________
 
         if (dynamics%use_wsplit) then !wvel/=wvel_e
@@ -376,9 +379,9 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
        !edge_up_dn_grad will be used as an auxuary array here
        call oce_tra_adv_fct(dt, ttf, fct_LO, adv_flux_hor, adv_flux_ver, fct_ttf_min, fct_ttf_max, fct_plus, fct_minus, edge_up_dn_grad, partit, mesh)
-       call oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, partit, mesh, use_lo=.TRUE., ttf=ttf, lo=fct_LO)
+       call oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, partit, mesh, use_lo=.TRUE., ttf=ttf,lo=fct_LO, tr_num=tr_num, tracers=tracers)
     else
-       call oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, partit, mesh)
+       call oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, adv_flux_hor, adv_flux_ver, partit, mesh,tr_num=tr_num, tracers=tracers)
     end if
 
     !___________________________________________________________________________
@@ -452,49 +455,24 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     end if !-->if ((ldiag_DVD) .and. (tr_num<=2)) then 
     
 
-
-! O:G - tra_diag
-!#if defined (__recom)
-        if (tracers%data(tr_num)%ltra_diag) then
-        !_______________________________________________________________________
-           if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
-              do n=1, myDim_nod2D+eDim_nod2D
-                 nu1 = ulevels_nod2D(n)
-                 nl1 = nlevels_nod2D(n)
-                 do nz = nu1, nl1-1
-                    ! part for LO + antidiffusive (FCT is .TRUE.)
-                    tracers%work%tra_advhoriz(nz,n,tr_num) = tracers%work%tra_advhoriz(nz,n,tr_num) + dttf_h(nz,n)/hnode_new(nz,n)
-                    tracers%work%tra_advvert(nz,n,tr_num)  = tracers%work%tra_advvert(nz,n,tr_num)  + dttf_v(nz,n)/hnode_new(nz,n)
-                 end do
-              end do
-           else
-              do n=1, myDim_nod2D+eDim_nod2D
-                 nu1 = ulevels_nod2D(n)
-                 nl1 = nlevels_nod2D(n)
-                 do nz = nu1, nl1-1
-                    ! (FCT .FALSE.)
-                    tracers%work%tra_advhoriz(nz,n,tr_num) = dttf_h(nz,n)/hnode_new(nz,n)
-                    tracers%work%tra_advvert (nz,n,tr_num) = dttf_v(nz,n)/hnode_new(nz,n)
-                 end do
-              end do
-           end if
-        end if
-!#endif
-
 end subroutine do_oce_adv_tra
 !
 !
 !===============================================================================
-subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, mesh, use_lo, ttf, lo)
+subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, mesh, use_lo, ttf, lo,tr_num, tracers)
     use MOD_MESH
+    use MOD_TRACER
     use o_ARRAYS
     USE MOD_PARTIT
     USE MOD_PARSUP
     use g_comm_auto
+    use diagnostics, only: ldiag_DVD
     implicit none
     real(kind=WP), intent(in),    target :: dt
     type(t_partit),intent(inout), target :: partit
     type(t_mesh),  intent(in),    target :: mesh
+    integer,        intent(in)            :: tr_num   !RP
+    type(t_tracer), intent(inout), target :: tracers   !RP
     real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP), intent(inout)      :: dttf_v(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP), intent(inout)      :: flux_h(mesh%nl-1, partit%myDim_edge2D)
@@ -551,6 +529,17 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
         end do
         !$ACC END LOOP
     end do
+#if defined (__recom)
+    if (tracers%data(tr_num)%ltra_diag) then
+       do n=1, myDim_nod2d
+          nu1 = ulevels_nod2D(n)
+          nl1 = nlevels_nod2D(n)
+          do nz=nu1,nl1-1
+             tracers%work%tra_advvert(nz,n,tr_num)  =  dttf_v(nz,n)
+          end do
+        end do
+     end if
+#endif
 #ifndef ENABLE_OPENACC
 !$OMP END DO
 #else
@@ -602,6 +591,13 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
         end do
+!#if defined (__recom)
+!    if (tracers%data(tr_num)%ltra_diag) then
+!       do nz=nu12, nl12
+!       tracers%work%tra_advhoriz(nz,enodes(1),tr_num) =  dttf_h(nz,enodes(1))/hnode_new(nz,n)
+!       end do
+!    end if
+!#endif
         call omp_unset_lock(partit%plock(enodes(1)))
         call omp_set_lock  (partit%plock(enodes(2)))
         do nz=nu12, nl12
@@ -613,6 +609,18 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 #endif
             dttf_h(nz,enodes(2))=dttf_h(nz,enodes(2))-flux_h(nz,edge)*dt/areasvol(nz,enodes(2))
         end do
+#if defined (__recom)
+    if (tracers%data(tr_num)%ltra_diag) then
+       do n=1, myDim_nod2d
+          nu1 = ulevels_nod2D(n)
+          nl1 = nlevels_nod2D(n)
+          do nz=nu1,nl1-1
+             tracers%work%tra_advhoriz(nz,n,tr_num) =  dttf_h(nz,n)
+          end do
+       end do
+    end if
+#endif
+
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_unset_lock(partit%plock(enodes(2)))

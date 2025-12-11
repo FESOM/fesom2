@@ -174,7 +174,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !       nzmin = ulevels_nod2D(row)
 !       nzmax = nlevels_nod2D(row)
             DIN    = max(tiny,state(k,idin)  	     + sms(k,idin  )) !< Avoids division by zero
-            DIC    = max(tiny,state(k,idic)   	     + sms(k,idic  )) !! and updates Conc between
+            DIC    = max(tiny,state(k,idic)   	     + sms(k,idic  )*0.0_WP) !! and updates Conc between
             ALK    = max(tiny,state(k,ialk)   	     + sms(k,ialk  )) !! local steps in REcoM when
             PhyN   = max(tiny_N,state(k,iphyn)       + sms(k,iphyn )) !! biostep > 1
             PhyC   = max(tiny_C,state(k,iphyc) 	     + sms(k,iphyc ))
@@ -1185,7 +1185,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         + calc_diss2                      * DetZ2Calc & ! --> Calcite dissolution from fast-sinking detritus
 #endif
         - calcification                               & ! --> Calcification
-                                                     ) * dt_b + sms(k,idic)
+                                                     ) * dt_b*0.0_WP + sms(k,idic)*0.0_WP
 
 !  if((Latd(1)<-45.0) .and. ((state(k,idic)+sms(k,idic))>2500)) then
 !     !co2flux(1)=0.0  
@@ -2319,6 +2319,12 @@ if (Diags) then
         vertrespmeso(k) = vertrespmeso(k) + (     &
         + HetRespFlux                             &
         ) * recipbiostep
+
+!*** meso-zooplankton dissolution                                               !RP 14.07.2025
+        vertmesocdis(k) = vertmesocdis(k) + (  &
+        + calc_loss_gra  * calc_diss_guts                         &
+        ) * recipbiostep
+
 #if defined (__3Zoo2Det)
 !*** zooplankton2 respiration
         vertrespmacro(k) = vertrespmacro(k) + (   &
@@ -2329,10 +2335,26 @@ if (Diags) then
         vertrespmicro(k) = vertrespmicro(k) + (  &
         + MicZooRespFlux                         &
         ) * recipbiostep
+
+!*** micro-zooplankton dissolution                                              !RP 14.07.2025
+        vertmicrocdis(k) = vertmicrocdis(k) + (  &
+        + calc_loss_gra2  * calc_diss_guts                         &
+        ) * recipbiostep
+
+!*** macro-zooplankton dissolution                                              !RP 14.07.2025
+        vertmacrocdis(k) = vertmacrocdis(k) + (  &
+        + calc_loss_gra3  * calc_diss_guts                         &
+        ) * recipbiostep
+
 #endif
 !*** calc_diss
         vertcalcdiss(k) = vertcalcdiss(k) + (     &
         + calc_diss * DetCalc                     &
+        ) * recipbiostep
+
+!*** calc_diss by fast-sinking detritus                                         !RP 14.07.2025
+        vertfastcdis(k) = vertfastcdis(k) + (     &
+        + calc_diss2 * DetZ2Calc                     &
         ) * recipbiostep
 
 !***    aggregation by  small phytoplankton
@@ -2345,10 +2367,34 @@ if (Diags) then
         + aggregationrate * DiaC                  &
         ) * recipbiostep  
 
+!***    N assim by small phytoplankton                                          !RP 15.07.2025
+        vertNassimn(k) = vertNassimn(k) + (             &
+        + N_assim * PhyC                                &
+        ) * recipbiostep
+
+!***    N assim by diatoms                                                      !RP 15.07.2025
+        vertNassimd(k) = vertNassimd(k) + (             &
+        + N_assim_Dia           * DiaC                  &
+        ) * recipbiostep
+
+!***    DON remineralization                                                    !RP 15.07.2025
+        vertDONremin(k) = vertDONremin(k) + (             &
+        + rho_N * arrFunc * O2Func   * DON       &
+        ) * recipbiostep
+
+!***    DOC remineralization                                                    !RP 15.07.2025
+        vertDOCremin(k) = vertDOCremin(k) + (             &
+        + rho_C1 * arrFunc * O2Func   * EOC       &
+        ) * recipbiostep
 #if defined (__coccos)
 !***    aggregation by coccolithophores
         vertaggc(k) = vertaggc(k) + (             &
         + aggregationrate * CoccoC                &    
+        ) * recipbiostep
+
+!***    N assim by coccolithophores                                             !RP 15.07.2025
+        vertNassimc(k) = vertNassimc(k) + (             &
+        + N_assim_Cocco  * CoccoC                       &
         ) * recipbiostep
 #endif                                
 
@@ -2384,12 +2430,26 @@ if (Diags) then
         + PhyRespRate_dia         * DiaC          &
      	) * recipbiostep
 
+! phy photosynthesis                                           !RP 14.07.2025
+        vertphotn(k) = vertphotn(k) + (           &
+        + Cphot             * PhyC          &
+        ) * recipbiostep
+
+! dia photosynthesis                                           !RP 14.07.2025
+        vertphotd(k) = vertphotd(k) + (           &
+        + Cphot_Dia         * DiaC          &
+        ) * recipbiostep
+
 #if defined (__coccos)
 ! cocco resipration
         vertrespc(k) = vertrespc(k) + (           &
         + PhyRespRate_cocco       * CoccoC        &
         ) * recipbiostep
 
+! cocco photosynthesis                                          !RP 14.07.2025
+        vertphotc(k) = vertphotc(k) + (           &
+        + Cphot_Cocco       * CoccoC        &
+        ) * recipbiostep
 #endif
 endif
   end do ! Main vertikal loop ends

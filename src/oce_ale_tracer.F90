@@ -233,11 +233,14 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         !$ACC UPDATE DEVICE (mesh%helem, mesh%hnode, mesh%hnode_new, mesh%zbar_3d_n, mesh%z_3d_n)
     do tr_num=1, tracers%num_tracers
 
+#if defined(__recom)
 !YY: sinkflx needs to be reset at each time step
         if(use_MEDUSA) then
             SinkFlx = 0.0d0
         endif
-    
+        SinkingVel1 = 0.0d0 ! OG 16.03.23 
+        SinkingVel2 = 0.0d0 ! OG 16.03.23 
+#endif 
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
         ! needed
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
@@ -260,9 +263,16 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         ! update array for total tracer flux del_ttf with the fluxes from horizontal
         ! and vertical advection
 !$OMP PARALLEL DO
+SELECT CASE (tracers%data(tr_num)%ID)
+        CASE (1002) ! DIC
         do node=1, myDim_nod2d
-           tracers%work%del_ttf(:, node)=tracers%work%del_ttf(:, node)+tracers%work%del_ttf_advhoriz(:, node)+tracers%work%del_ttf_advvert(:, node)
+           tracers%work%del_ttf(:, node)=tracers%work%del_ttf(:, node)+tracers%work%del_ttf_advhoriz(:,node)+tracers%work%del_ttf_advvert(:, node)
         end do
+CASE DEFAULT
+        do node=1, myDim_nod2d
+           tracers%work%del_ttf(:, node)=tracers%work%del_ttf(:, node)+tracers%work%del_ttf_advhoriz(:,node)+tracers%work%del_ttf_advvert(:, node)
+        end do
+end SELECT
 !$OMP END PARALLEL DO
 
 ! O:G
@@ -325,6 +335,17 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     end do
 !!!        !$ACC UPDATE HOST (tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus) &
 !!!        !$ACC HOST  (tracers%work%edge_up_dn_grad)
+
+#if defined(__recom)
+    do tr_num = 1, tracers%num_tracers
+        if (use_MEDUSA) then
+            SinkFlx = SinkFlx + SinkFlx_tr(:, :, tr_num)
+        endif
+!        Benthos = Benthos + Benthos_tr(:, :, tr_num)
+        Sinkingvel1(:,:) = Sinkingvel1(:,:) + Sinkvel1_tr(:, :, tr_num)
+        Sinkingvel2(:,:) = Sinkingvel2(:,:) + Sinkvel2_tr(:, :, tr_num)
+    end do
+#endif
 
     !___________________________________________________________________________
     ! 3D restoring for "passive" tracers
@@ -432,6 +453,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     dtr_bf         = 0.0_WP
     str_bf         = 0.0_WP
     vert_sink      = 0.0_WP
+!    dtr_bf_dic     = 0.0_WP     ! RP on 30.09.2025
 #endif
 
     ttf_rhs_bak = 0.0 ! OG - tra_diag
@@ -453,15 +475,29 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     call diff_part_hor_redi(tracers, partit, mesh)  ! seems to be ~9% faster than diff_part_hor
 
     if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+        SELECT CASE (tracers%data(tr_num)%ID)
+        CASE (1002) ! DIC
        do n=1, myDim_nod2D+eDim_nod2D
           nu1 = ulevels_nod2D(n)
           nl1 = nlevels_nod2D(n)
           do nz = nu1, nl1-1
-             ! horizontal diffusion (w/out Redi)           
+             ! horizontal diffusion (w/out Redi)
+!             del_ttf(nz,n) = del_ttf(nz,n)*0.0_WP           
              tracers%work%tra_diff_part_hor_redi(nz,n,tr_num) = (del_ttf(nz,n) - ttf_rhs_bak(nz,n)) / hnode_new(nz,n) ! Unit [Conc]
              !if (mype==0)  print *, tracers%work%tra_diff_part_hor_redi(nz,n,tr_num)
           end do
        end do
+       CASE DEFAULT
+                do n=1, myDim_nod2D+eDim_nod2D
+          nu1 = ulevels_nod2D(n)
+          nl1 = nlevels_nod2D(n)
+          do nz = nu1, nl1-1
+             ! horizontal diffusion (w/out Redi)
+             tracers%work%tra_diff_part_hor_redi(nz,n,tr_num) = (del_ttf(nz,n) - ttf_rhs_bak(nz,n)) / hnode_new(nz,n) ! Unit [Conc]
+             !if (mype==0)  print *, tracers%work%tra_diff_part_hor_redi(nz,n,tr_num)
+          end do
+       end do
+       END SELECT
     end if
 
     if ((.not. tracers%data(tr_num)%i_vert_diff) .and. tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
@@ -476,7 +512,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     !___________________________________________________________________________
     ! do vertical diffusion: explicit
     if (.not. tracers%data(tr_num)%i_vert_diff) call diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
-
+!print*, 'Calling diff_ver_part_expl_ale and tr_num is:',tracers%data(tr_num)%ID
     ! OG i_vert_diff = TRUE so, we dont call explicit scheme
     ! If we use this, check surface forcing for recom variables (They are not updated)
     if ((.not. tracers%data(tr_num)%i_vert_diff) .and. tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag 
@@ -507,6 +543,20 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     if (Redi) call diff_ver_part_redi_expl(tracers, partit, mesh)
 
     if (tracers%data(tr_num)%ltra_diag .and. Redi) then ! OG - tra_diag
+        SELECT CASE (tracers%data(tr_num)%ID)
+        CASE (1002) ! DIC
+       !print*, 'Calling diff_ver_part_redi_expl and tr_num is:',tracers%data(tr_num)%ID
+          do n=1, myDim_nod2D+eDim_nod2D
+          nu1 = ulevels_nod2D(n)
+          nl1 = nlevels_nod2D(n)
+          do nz = nu1, nl1-1
+             ! Redi diffussivity onto vertical: explicit
+!                del_ttf(nz,n) = del_ttf(nz,n)*0.0_WP
+             tracers%work%tra_diff_part_ver_redi_expl(nz,n,tr_num) = (del_ttf(nz,n) - ttf_rhs_bak(nz,n)) / hnode_new(nz,n) ! Unit [Conc]
+             !if (mype==0)  print *,  tra_diff_part_ver_redi_expl(:,:,tr_num)
+          end do
+       end do
+       CASE DEFAULT
        do n=1, myDim_nod2D+eDim_nod2D
           nu1 = ulevels_nod2D(n)
           nl1 = nlevels_nod2D(n)
@@ -516,6 +566,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
              !if (mype==0)  print *,  tra_diff_part_ver_redi_expl(:,:,tr_num)
           end do
        end do
+       END SELECT       
     end if
 
 !        if (recom_debug .and. mype==0)  print *, tracers%data(tr_num)%ID
@@ -524,20 +575,33 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 ! 1) Remineralization from the benthos
 !    Nutrient fluxes come from the bottom boundary
 !    Unit [mmol/m2/s]
-
 if (any(recom_remin_tracer_id == tracers%data(tr_num)%ID)) then
-
 ! call bottom boundary
         call diff_ver_recom_expl(tr_num, tracers, partit, mesh)
+!        print*, 'Calling diff_ver_recom_expl and tr_num is:',tracers%data(tr_num)%ID
+        SELECT CASE (tracers%data(tr_num)%ID)
+        CASE (1002) ! DIC
+!                write(*,*) 'Now reading DIC bflux'
+        dtr_bflux_dic(:,:) = tracers%data(tr_num)%values(:,:)*0.0d0
+        END SELECT
 ! update tracer fields
         do n=1, myDim_nod2D
             nzmax=nlevels_nod2D(n)-1
             nzmin=ulevels_nod2D(n)
 !            tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
 !                                                dtr_bf(nzmin:nzmax,n)
+        SELECT CASE (tracers%data(tr_num)%ID)
+        CASE (1002) ! DIC
+!                tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)!+ &
+!                                                dtr_bf(nzmin:nzmax,n)
+                dtr_bflux_dic(nzmin:nzmax,n) = dtr_bflux_dic(nzmin:nzmax,n) + dtr_bf(nzmin:nzmax,n)
+!                print*,'maxval of dtr_bflux_dic(:,:): ', maxval(dtr_bflux_dic)
+        CASE DEFAULT
         tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
                                                 dtr_bf(nzmin:nzmax,n)
+        END SELECT
         end do
+!       print*,'maxval of dtr_bflux_dic(:,:): ', maxval(dtr_bflux_dic)
 end if
 
 ! 2) Sinking in water column
@@ -568,7 +632,7 @@ if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
         call ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)  !--- str_bf ---
 
 ! update tracer fields
-
+!print*, 'Calling ver_sinking_recom_benthos and tr_num is:',tracers%data(tr_num)%ID
         do n=1, myDim_nod2D
             nzmax=nlevels_nod2D(n)-1
             nzmin=ulevels_nod2D(n)
@@ -587,7 +651,9 @@ endif
     ! Update tracers --> calculate T* see Danilov et al. (2017)
     ! T* =  (dt*R_T^n + h^(n-0.5)*T^(n-0.5))/h^(n+0.5)
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nzmin, nzmax)
-    do n=1, myDim_nod2D
+   SELECT CASE (tracers%data(tr_num)%ID)
+        CASE (1002) ! DIC 
+   do n=1, myDim_nod2D
         nzmax=nlevels_nod2D(n)-1
         nzmin=ulevels_nod2D(n)
         del_ttf(nzmin:nzmax,n)=del_ttf(nzmin:nzmax,n)+tracers%data(tr_num)%values(nzmin:nzmax,n)* &
@@ -599,6 +665,20 @@ endif
         ! tr_arr(1:nzmax,n,tr_num)=(hnode(1:nzmax,n)*tr_arr(1:nzmax,n,tr_num)+ &
         !                           del_ttf(1:nzmax,n))/hnode_new(1:nzmax,n)
     end do
+    CASE DEFAULT
+            do n=1, myDim_nod2D
+        nzmax=nlevels_nod2D(n)-1
+        nzmin=ulevels_nod2D(n)
+        del_ttf(nzmin:nzmax,n)=del_ttf(nzmin:nzmax,n)+tracers%data(tr_num)%values(nzmin:nzmax,n)* &
+                                    (hnode(nzmin:nzmax,n)-hnode_new(nzmin:nzmax,n))
+        tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
+                                    del_ttf(nzmin:nzmax,n)/hnode_new(nzmin:nzmax,n)
+        ! WHY NOT ??? --> whats advantage of above --> tested it --> the upper
+        ! equation has a 30% smaller nummerical drift
+        ! tr_arr(1:nzmax,n,tr_num)=(hnode(1:nzmax,n)*tr_arr(1:nzmax,n,tr_num)+ &
+        !                           del_ttf(1:nzmax,n))/hnode_new(1:nzmax,n)
+    end do
+    END SELECT
 !$OMP END PARALLEL DO
     !___________________________________________________________________________
     if (tracers%data(tr_num)%i_vert_diff) then
@@ -679,7 +759,7 @@ subroutine diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
             rdata =  Tsurf(n)
             rlx   =  surf_relax_T
         elseif (tracers%data(tr_num)%ID==2) then
-            flux  =  virtual_salt(n)+relax_salt(n)- real_salt_flux(n)*is_nonlinfs
+            flux  =  virtual_salt(n)+relax_salt(n)+ real_salt_flux(n)*is_nonlinfs !Bugfix: sign of real salt flux, https://github.com/FESOM/fesom2/issues/721
         else
             flux  = 0._WP
             rdata = 0._WP
@@ -1198,11 +1278,18 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         !_______________________________________________________________________
         ! update tracer
         ! tr ... dTnew = T^(n+0.5) - T*
+        SELECT CASE (tracers%data(tr_num)%ID)
+        CASE (1002) ! DIC
         do nz=nzmin,nzmax-1
             ! trarr - before ... T*
             trarr(nz,n)=trarr(nz,n)+tr(nz)
         end do
-
+CASE DEFAULT
+do nz=nzmin,nzmax-1
+            ! trarr - before ... T*
+            trarr(nz,n)=trarr(nz,n)+tr(nz)
+        end do
+END SELECT
     end do ! --> do n=1,myDim_nod2D
 !$OMP END DO
 !$OMP END PARALLEL
@@ -1287,9 +1374,16 @@ subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
                         (zbar_n(nz)-z_n(nz))  *(slope_tapered(1,nz,n)  *tr_xynodes(1,nz,n)  +slope_tapered(2,nz,n)  *tr_xynodes(2,nz,n))  *Ki(nz,n)
             vd_flux(nz)=vd_flux(nz)/(z_n(nz-1)-z_n(nz))*area(nz,n)
         enddo
-        do nz=ul1,nl1
+        !SELECT CASE (tracers%data(tr_num)%ID)
+        !CASE (1002) ! DIC
+       ! do nz=ul1,nl1
+ !           del_ttf(nz,n) = del_ttf(nz,n)! + (vd_flux(nz)-vd_flux(nz+1)) * dt/areasvol(nz,n)
+        !enddo
+        !CASE DEFAULT
+do nz=ul1,nl1
             del_ttf(nz,n) = del_ttf(nz,n) + (vd_flux(nz)-vd_flux(nz+1)) * dt/areasvol(nz,n)
         enddo
+!END SELECT
     end do
 !$OMP END DO
 !$OMP END PARALLEL
@@ -1630,7 +1724,7 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
         ! --> real_salt_flux(:): salt flux due to containment/releasing of salt
         !     by forming/melting of sea ice
         bc_surface= dt*(virtual_salt(n) & !--> is zeros for zlevel/zstar
-                    + relax_salt(n) - real_salt_flux(n)*is_nonlinfs)
+                    + relax_salt(n) + real_salt_flux(n)*is_nonlinfs) !Bugfix: sign of real salt flux, https://github.com/FESOM/fesom2/issues/721
 #if defined(__recom)
     CASE (1001) ! DIN
         if (use_MEDUSA .and. add_loopback) then  ! OG: add is_MEDUSA_loopback flag is_MEDUSA_loopback flag * lb_flux(n,1)

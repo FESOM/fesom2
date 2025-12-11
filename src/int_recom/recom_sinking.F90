@@ -325,9 +325,10 @@ subroutine diff_ver_recom_expl(tr_num, tracers, partit, mesh)
 
     integer                                :: elem,k
     integer                                :: n2,nl1,nl2,nz,n,id,ul1
-    real(kind=WP)                          :: vd_flux(mesh%nl)
+    real(kind=WP)                          :: vd_flux(mesh%nl)!,vd_flux_dic(mesh%nl),vd_flux_calcif(mesh%nl)   ! last two variable added by RP on 26.09.2025
     integer                                :: nlevels_nod2D_minimum
-    real(kind=WP)                          :: bottom_flux(partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP)                          :: bottom_flux(partit%myDim_nod2D+partit%eDim_nod2D)   
+    !,bottom_flux_dic(partit%myDim_nod2D+partit%eDim_nod2D),bottom_flux_calcif(partit%myDim_nod2D+partit%eDim_nod2D)
 
     real(kind=WP), dimension(:,:), pointer :: trarr
 
@@ -383,7 +384,10 @@ else
        CASE (1001)
           bottom_flux = GlodecayBenthos(:,1) !*** DIN [mmolN/m^2/s] ***
        CASE (1002)
+              ! write(*,*) 'Now reading the bottom flux of DIC'
           bottom_flux = GlodecayBenthos(:,2) + GlodecayBenthos(:,4) !*** DIC + calcification ***
+         ! bottom_flux_dic = GlodecayBenthos(:,4)                ! RP on 26.09.2025
+         ! bottom_flux_calcif = GlodecayBenthos(:,2)             ! RP on 26.09.2025
        CASE (1003)
           bottom_flux = GlodecayBenthos(:,4) * 2.0_WP - 1.0625_WP * GlodecayBenthos(:,1) !*** Alk ***
        CASE (1018)
@@ -417,6 +421,8 @@ endif ! (use_MEDUSA .and. (sedflux_num .gt. 0))
         ul1=ulevels_nod2D(n)
 
         vd_flux=0._WP
+       ! vd_flux_dic=0._WP
+       ! vd_flux_calcif=0._WP
 
         k=nod_in_elem2D_num(n)
         ! Screening minimum depth in neigbouring nodes around node n
@@ -426,16 +432,32 @@ endif ! (use_MEDUSA .and. (sedflux_num .gt. 0))
         ! Bottom flux
         do nz=nlevels_nod2D_minimum, nl1
             vd_flux(nz)=(area(nz,n)-area(nz+1,n))* bottom_flux(n)/(area(1,n))  !!!!!!!!
+        !    vd_flux_dic(nz)=(area(nz,n)-area(nz+1,n))* bottom_flux_dic(n)/(area(1,n))  !!!!!!!! RP on 26.09.2025
+        !   vd_flux_calcif(nz)=(area(nz,n)-area(nz+1,n))* bottom_flux_calcif(n)/(area(1,n))  !!!!!!!! RP on 26.09.2025
         end do
         nz=nl1
         vd_flux(nz+1)= (area(nz+1,n))* bottom_flux(n)/(area(1,n))
+        !vd_flux_dic(nz+1)= (area(nz+1,n))* bottom_flux_dic(n)/(area(1,n))       ! RP on 26.09.2025
+        !vd_flux_calcif(nz+1)= (area(nz+1,n))* bottom_flux_calcif(n)/(area(1,n)) ! RP on 26.09.2025
         !_______________________________________________________________________
         ! writing flux into rhs
         do nz=ul1,nl1
             ! flux contribute only the cell through its bottom !!!
 !            dtr_bf(nz,n) = dtr_bf(nz,n) + vd_flux(nz+1)*dt/area(nz,n)/(zbar_3d_n(nz,n)-zbar_3d_n(nz+1,n))
             dtr_bf(nz,n) = dtr_bf(nz,n) + vd_flux(nz+1)*dt/areasvol(nz,n)/hnode_new(nz,n)
+!            write(*,*) 'bottom_flux now written to dtr_bf'
+!             print*,'dtr_bf(nz,n): ', maxval(tr_bf(nz,n))
+!            dtr_bf_dic(nz,n) = dtr_bf(nz,n) ! RP on 29.09.2025
+            if (tracers%data(tr_num)%ID == 1002) dtr_bf_dic(nz,n,tr_num) = dtr_bf(nz,n)
+!            SELECT CASE (id)
+!            CASE (1002)
+!                dtr_bf_dic(nz,n) = dtr_bf(nz,n) ! RP on 29.09.2025
+!            END SELECT
+            !dtr_bf_dic(nz,n) = dtr_bf(nz,n) + vd_flux_dic(nz+1)*dt/areasvol(nz,n)/hnode_new(nz,n)
+            !dtr_bf_calcif(nz,n) = dtr_bf(nz,n) + vd_flux_calcif(nz+1)*dt/areasvol(nz,n)/hnode_new(nz,n)
         end do
+!        if (tracers%data(tr_num)%ID == 1002) dtr_bf_dic(:,n) = dtr_bf(:,n) ! RP on 29.09.2025
+!        print*,'maxval of dtr_bf(:,:): ', maxval(dtr_bf)
     end do
 end subroutine diff_ver_recom_expl
 
@@ -604,6 +626,13 @@ if (Vsink .gt. 0.1) then
 
          endif
 #endif
+
+         if (tracers%data(tr_num)%ID == 1021) Sinkvel1_tr(nz,n,tr_num) = Wvel_flux(nz) !-1.0d0/SecondsPerDay  !idetcal  
+#if defined (__3Zoo2Det) 
+         if (tracers%data(tr_num)%ID == 1028) Sinkvel2_tr(nz,n,tr_num) = Wvel_flux(nz)  !idetz2calc
+#endif
+
+
       end do
 
       dt_sink = dt

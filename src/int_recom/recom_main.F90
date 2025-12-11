@@ -246,11 +246,12 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
 
         ttf_rhs_bak = 0.0 ! OG - tra_diag
 
-        if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
-           do tr_num=1, num_tracers
+
+        do tr_num=1, num_tracers
+           if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
               ttf_rhs_bak(1:nzmax,tr_num) = tracers%data(tr_num)%values(1:nzmax, n)
-           end do
-        end if
+           end if
+        end do
 
         !!---- Depth of the nodes in the water column
         zr(1:nzmax) = Z_3d_n(1:nzmax, n)
@@ -265,16 +266,22 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
         if (Diags) then
 
         !! * Allocate 3D diagnostics *
-            allocate(vertrespmeso(nl-1))
+            allocate(vertrespmeso(nl-1), vertmesocdis(nl-1))
             vertrespmeso  = 0.d0
+            vertmesocdis = 0.d0
 
 #if defined (__3Zoo2Det)
             allocate(vertrespmacro(nl-1), vertrespmicro(nl-1))
             vertrespmacro = 0.d0
             vertrespmicro = 0.d0
+
+            allocate( vertmicrocdis(nl-1), vertmacrocdis(nl-1))  !RP 14.07.2025
+            vertmicrocdis   = 0.d0
+            vertmacrocdis = 0.d0
 #endif
-            allocate(vertcalcdiss(nl-1), vertcalcif(nl-1))
+            allocate(vertcalcdiss(nl-1),vertfastcdis(nl-1), vertcalcif(nl-1))
             vertcalcdiss = 0.d0
+            vertfastcdis = 0.d0     !RP 14.07.2025
             vertcalcif   = 0.d0
 
             allocate(vertaggn(nl-1), vertaggd(nl-1))
@@ -289,11 +296,24 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
             vertrespn = 0.d0
             vertrespd = 0.d0
 
+            allocate(vertphotn(nl-1), vertphotd(nl-1))          !RP 14.07.2025
+            vertphotn = 0.d0
+            vertphotd = 0.d0
+
+            allocate(vertNassimn(nl-1), vertNassimd(nl-1))          !RP 14.07.2025
+            vertNassimn = 0.d0
+            vertNassimd = 0.d0
+            allocate(vertDONremin(nl-1), vertDOCremin(nl-1))                            !RP 15.07.2025
+            vertDONremin = 0.d0
+            vertDOCremin = 0.d0
+
 #if defined (__coccos)
-            allocate(vertaggc(nl-1), vertdocexc(nl-1), vertrespc(nl-1))
+            allocate(vertaggc(nl-1), vertdocexc(nl-1), vertrespc(nl-1), vertphotc(nl-1), vertNassimc(nl-1))
             vertaggc = 0.d0
             vertdocexc = 0.d0
             vertrespc = 0.d0
+            vertphotc = 0.d0            !RP 14.07.2025
+            vertNassimc = 0.d0          !RP 14.07.2025
 #endif
 
             !! * Allocate 2D diagnostics *
@@ -338,12 +358,14 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
         end do
 
         ! recom_sms
-        if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+       
            do tr_num=1, num_tracers
+       if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
              tracers%work%tra_recom_sms(1:nzmax,n,tr_num) = tracers%data(tr_num)%values(1:nzmax, n) - ttf_rhs_bak(1:nzmax,tr_num)
              !if (mype==0)  print *,  tra_recom_sms(:,:,tr_num)
-           end do
-        end if
+     end if
+
+     end do
 
         !!---- Local variables that have been changed during the time-step are stored so they can be saved
         Benthos(n,1:benthos_num) = LocBenthos(1:benthos_num)
@@ -367,28 +389,41 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
 
             !! * Update 3D diagnostics *
             respmeso     (1:nzmax,n) = vertrespmeso     (1:nzmax)
+            mesocdis     (1:nzmax,n) = vertmesocdis     (1:nzmax)
 #if defined (__3Zoo2Det)
             respmacro    (1:nzmax,n) = vertrespmacro    (1:nzmax)
             respmicro    (1:nzmax,n) = vertrespmicro    (1:nzmax)
+            
+            microcdis    (1:nzmax,n) = vertmicrocdis    (1:nzmax)     !RP 14.07.2025
+            macrocdis    (1:nzmax,n) = vertmacrocdis    (1:nzmax)     !RP 14.07.2025            
 #endif
             calcdiss     (1:nzmax,n) = vertcalcdiss     (1:nzmax)
+            fastcdis     (1:nzmax,n) = vertfastcdis      (1:nzmax)       !RP 14.07.2025
             calcif       (1:nzmax,n) = vertcalcif       (1:nzmax)
 
             aggn         (1:nzmax,n) = vertaggn         (1:nzmax)
             docexn       (1:nzmax,n) = vertdocexn       (1:nzmax)
             respn        (1:nzmax,n) = vertrespn        (1:nzmax)
+            photn        (1:nzmax,n) = vertphotn        (1:nzmax)       !RP 14.07.2025
             NPPn3D       (1:nzmax,n) = vertNPPn         (1:nzmax)
 
             aggd         (1:nzmax,n) = vertaggd         (1:nzmax)
             docexd       (1:nzmax,n) = vertdocexd       (1:nzmax)
             respd        (1:nzmax,n) = vertrespd        (1:nzmax)
+            photd        (1:nzmax,n) = vertphotd        (1:nzmax)       !RP 14.07.2025
             NPPd3D       (1:nzmax,n) = vertNPPd         (1:nzmax)
+            Nassimn      (1:nzmax,n) = vertNassimn      (1:nzmax)       !RP 14.07.2025
+            Nassimd      (1:nzmax,n) = vertNassimd      (1:nzmax)       !RP 14.07.2025
+            DONremin     (1:nzmax,n) = vertDONremin     (1:nzmax)       !RP 14.07.2025
+            DOCremin     (1:nzmax,n) = vertDOCremin     (1:nzmax)       !RP 15.07.2025
 
 #if defined (__coccos)
             aggc         (1:nzmax,n) = vertaggc         (1:nzmax)
             docexc       (1:nzmax,n) = vertdocexc       (1:nzmax)
             respc        (1:nzmax,n) = vertrespc        (1:nzmax)
+            photc        (1:nzmax,n) = vertphotc        (1:nzmax)       !RP 14.07.2025
             NPPc3D       (1:nzmax,n) = vertNPPc         (1:nzmax)
+            Nassimc       (1:nzmax,n) = vertNassimc    (1:nzmax)       !RP 14.07.2025
 #endif
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
@@ -396,19 +431,26 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
             !! * Deallocating 2D diagnostics *
             deallocate(vertNPPn, vertGPPn, vertNNAn, vertChldegn) 
             deallocate(vertNPPd, vertGPPd, vertNNAd, vertChldegd)
+#if defined (__coccos)
             deallocate(vertNPPc, vertGPPc, vertNNAc, vertChldegc) 
+#endif
 
             !! * Deallocating 3D Diagnostics *
-            deallocate(vertrespmeso)
+            deallocate(vertrespmeso,vertmesocdis)
 #if defined (__3Zoo2Det)
             deallocate(vertrespmacro, vertrespmicro)
+            deallocate(vertmicrocdis,vertmacrocdis)    ! RP 14.07.2025
 #endif
-            deallocate(vertcalcdiss, vertcalcif)
+            deallocate(vertcalcdiss,vertfastcdis, vertcalcif)
             deallocate(vertaggn, vertdocexn, vertrespn)
+            deallocate(vertphotn, vertphotd)                    !RP 14.07.2025
+            deallocate(vertNassimn,vertNassimd)
+            deallocate(vertDONremin, vertDOCremin)              !RP 15.07.2025
             deallocate(vertaggd, vertdocexd, vertrespd)
 #if defined (__coccos)
 !           deallocate(vertgrazmeso_c)
             deallocate(vertaggc, vertdocexc, vertrespc)
+            deallocate(vertphotc, vertNassimc)                               !RP 14.07.2025
 #endif
 
         end if 
