@@ -9,6 +9,11 @@ nm_erosion_data_file  ='/albedo/work/projects/p_pool_recom/input/mesh_CORE2_fina
 nm_co2_data_file      ='/albedo/work/projects/p_pool_recom/input/mesh_CORE2_finaltopo_mean/MonthlyAtmCO2_gcb2023.nc'
 /
 
+&parecomsetup
+enable_3zoo2det = .true.
+enable_coccos = .false.
+/
+
 &pavariables
 use_REcoM             =.true.
 REcoM_restart         =.true.
