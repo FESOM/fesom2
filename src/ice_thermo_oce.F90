@@ -473,7 +473,8 @@ subroutine therm_ice(h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
   ! tracer flux between ice and ocean; one contribution from melting
   ! and one from formation of sea ice
   tr_flux_iceocn = tr_flux_iceocn + meltpart * tr_in_ice & 
-                   - sitr_from_freezing * (1.0_WP - growfac) * h
+       - sitr_from_freezing * (1.0_WP - growfac) * h
+  tr_flux_iceocn = tr_flux_iceocn / ice_dt  ! Conversion: 'per time step' -> 'per second'
 #endif /* (__seaice_tracers) */
 
   ! (without snow fall). This is a negative value (MINUS snow melt)

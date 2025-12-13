@@ -202,6 +202,12 @@ CASE ('m_snow    ')
     if (use_ice) then
     call def_stream(nod2D, myDim_nod2D, 'm_snow',   'snow height',                     'm',      m_snow(1:myDim_nod2D),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
     end if
+#if defined (__seaice_tracers)
+CASE ('tr_ice    ')
+    if (use_ice) then
+    call def_stream(nod2D, myDim_nod2D, 'tr_ice',   'ice_tracer',                     'm',      tr_ice(1,1:myDim_nod2D),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    end if
+#endif /* (__seaice_tracers) */
     
 !___________________________________________________________________________________________________________________________________
 ! output mixed layer depth    
