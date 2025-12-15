@@ -105,7 +105,7 @@ age_start_year    = 2000     ! year to start age tracer (tracer age = 0 at this 
    nm_mslp_var   = 'psl'      ! name of variable in file with air_pressure_at_sea_level
 
    ! --- Time axis configuration in forcing files ---
-   nm_nc_iyear   = 1900       ! initial year of forcing data time axis
+   nm_nc_iyear   = 1900       ! initial year of forcing data time axis (note, not the first year in the file!)
    nm_nc_imm     = 1          ! initial month of forcing data time axis (1-12)
    nm_nc_idd     = 1          ! initial day of forcing data time axis (1-31)
    nm_nc_freq    = 1          ! do not touch! (number of data points per day (1=daily, 4=6-hourly, etc.))
