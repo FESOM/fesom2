@@ -349,7 +349,7 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} 
       # | Intel/MPI | -O3                                                                 | 144s |
       # |*Intel/MPI | -03 -march=core-avx2 -mtune=core-avx2 -qopt-zmm-usage=low           | 140.95s |
       # |           | -align array64byte -unroll-aggressive -qopt-malloc-options=2        |         |
-      #target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2 -qopt-zmm-usage=low -align array64byte -unroll-aggressive -qopt-malloc-options=2)
+      #     target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2 -qopt-zmm-usage=low -align array64byte -unroll-aggressive -qopt-malloc-options=2 -g -traceback -check)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
       target_compile_options(${PROJECT_NAME} PRIVATE -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte -ipo)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL mn5-gpp )
