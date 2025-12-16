@@ -441,7 +441,7 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
                            #-finit-integer=-9999 
                            #-fsanitize=undefined,address
                         #)
-   ## if use -fsanitize=undefined,address you also need ... PRIVATE -lubsan)           
+   # if use -fsanitize=undefined,address you also need ... PRIVATE -lubsan)           
    #target_link_libraries(${PROJECT_NAME} PRIVATE -lubsan)
                      
 
