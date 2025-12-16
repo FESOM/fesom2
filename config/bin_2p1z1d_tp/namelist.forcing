@@ -109,7 +109,7 @@ age_start_year    = 2000     ! year to start age tracer (tracer age = 0 at this 
    nm_nc_idd     = 1          ! initial day of forcing data time axis (1-31)
    nm_nc_freq    = 1          ! number of data points per day (1=daily, 4=6-hourly, etc.)
    nm_nc_tmid    = 0          ! time stamp position: 1=mid-point, 0=start of interval
-   y_perpetual   = .true.    ! use perpetual year forcing (repeat single year)
+   y_perpetual   = .false.    ! use perpetual year forcing (repeat single year)
 
    ! --- Enable/disable individual forcing fields ---
    l_xwind       = .true.     ! use zonal wind forcing
