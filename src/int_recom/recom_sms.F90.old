@@ -459,9 +459,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !------------------------------------------------------------------------------
 ! Calcite dissolution dependent on OmegaC ! DISS
 !------------------------------------------------------------------------------
-!Ying 26.12.2025: calcite dissolution applied a different depth dependence relative to sinking
-            Sink_Vel    = Vcalc * abs(zF(k)) + Vdet
-!            Sink_Vel    = Vdet_a* abs(zF(k)) + Vdet
+            Sink_Vel    = Vdet_a* abs(zF(k)) + Vdet
 
             if (OmegaC_diss) then    ! Calcdiss dependent on carbonate saturation
                 Ca        = (0.02128d0/40.078d0) * Sali_depth(k)/1.80655d0 ! Calcium ion concentration [mol/kg], function from varsolver.f90
@@ -665,19 +663,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !< *** Iron chemistry ***
 !< ********************** 
 ! select the method to calculate freeFe
-           if (fe_2ligands) then
-               if (fe_compl_nica) then
-                   logK1 = max(tiny, 24.36 - 1.67 * pH_watercolumn(k)  &
-                           + EOC * (-2.e-4 * EOC + 0.034))
-                   logK2 =  logK1 + 2.67
-                   Klig1 = 10 ** (logK1 - 9)
-                   Klig2 = 10 ** (logK2 - 9)
-                   freeFe = iron_chemistry_2ligands(Fe,1.7,0.6,Klig1,Klig2)
-               endif
-            else
-                   freeFe = iron_chemistry(Fe,totalligand,ligandStabConst)
-            endif
-
+               freeFe = iron_chemistry(Fe,totalligand,ligandStabConst)
 !-------------------------------------------------------------------------------
 !< *** Chlorophyll synthesis ***
 !< *****************************
@@ -2558,5 +2544,5 @@ function iron_chemistry(Fe, totalLigand, ligandStabConst)
   iron_chemistry = freeFe
 
   return
-  end function iron_chemistry
+  end
 
