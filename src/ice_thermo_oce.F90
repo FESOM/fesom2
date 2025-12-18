@@ -23,7 +23,7 @@ subroutine cut_off(mesh)
         ice_temp=273.15_WP
 #endif /* (__oifs) */
 #if defined (__seaice_tracers)
-        tr_ice(1,:)=0.0_WP
+        tr_ice(:,1)=0.0_WP
 #endif /* (__seaice_tracers) */
     end where
 
@@ -37,7 +37,7 @@ subroutine cut_off(mesh)
         ice_temp=273.15_WP
 #endif /* (__oifs) */
 #if defined (__seaice_tracers)
-        tr_ice(1,:)=0.0_WP
+        tr_ice(:,1)=0.0_WP
 #endif /* (__seaice_tracers) */
     end where
     
@@ -198,11 +198,11 @@ subroutine thermodynamics(mesh)
 
 #if defined (__seaice_tracers)
      ! local value of tracer concentration in sea ice
-     tr_in_ice = tr_ice(1,i)
+     tr_in_ice = tr_ice(i,1)
      ! local value of tracer concentration in seawater
      tr_in_oce = tr_arr(1,i,ife + 2) ! ife=19 from recom_config
      ! local value of tracer flux from atmosphere to ice 
-     tr_flx_atmice = flx_atmice(1,i)
+     tr_flx_atmice = flx_atmice(i,1)
      ! initialize ice-ocean flux of tracer to zero before thermodynamics
      tr_flux_iceocn = 0.0_WP
      ! si ice tracer concentration in freshly formed ice from either freezing or flooding
@@ -249,7 +249,7 @@ subroutine thermodynamics(mesh)
      !   it is different from the initial tr_ice(1,i)
      tr_ice(1,i) = tr_in_ice + tr_flx_atmice * ice_dt / max(h, hmin) ! prevent overflow
      ! transfer local ice-ocean flux of tracer from melting/freezing into global array
-     flx_iceocn(1,i) = tr_flux_iceocn
+     flx_iceocn(i,1) = tr_flux_iceocn
 #endif /* (__seaice_tracers) */
 
   end do

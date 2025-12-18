@@ -211,7 +211,7 @@ subroutine ini_ice_io(year, mesh)
 #endif /* (__oifs) */
   
 #if defined (__seaice_tracers)
-  call def_variable(iid, 'ice_tracer',(/ntr_ice, nod2D/), 'ice tracer content', 'mmol/m^3', tr_ice);
+  call def_variable(iid, 'ice_tracer',(/nod2D, ntr_ice/), 'ice tracer content', 'mmol/m^3', tr_ice);
 #endif /* (__seaice_tracers) */
 
 end subroutine ini_ice_io
