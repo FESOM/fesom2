@@ -156,7 +156,9 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-  allocate(runoff_masked(size(runoff)))
+  if (use_runoff_scaling) then
+    allocate(runoff_masked(size(runoff)))
+  end if
 
   u_ice            => ice%uice(:)
   v_ice            => ice%vice(:)
@@ -375,20 +377,21 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
                 mask=1.
                 call force_flux_consv(runoff, mask, i, 0,action, partit, mesh)
                 
-                runoff_masked = 0.0_WP
-                where (geo_coord_nod2D(2, :) < -60.0_WP * rad)
-                  runoff_masked = runoff
-                end where
+                  if (use_runoff_scaling) then
+                    runoff_masked = 0.0_WP
+                    where (geo_coord_nod2D(2, :) < -60.0_WP * rad)
+                      runoff_masked = runoff
+                    end where
 
-                call integrate_nod(runoff_masked, runoff_south, partit, mesh)
-                if (mype==0) write(*,*) "runoff southern ocean: ", runoff_south
+                    call integrate_nod(runoff_masked, runoff_south, partit, mesh)
+                    if (mype==0) write(*,*) "runoff southern ocean: ", runoff_south
 
-                if (runoff_south == 0.0_WP) then
-                  if (mype==0) write(*,*) "Warning: runoff_south = 0, skipping scaling"
-                else
-                  call runoff_scaling(runoff, partit, mesh)
-                end if
-
+                    if (runoff_south == 0.0_WP) then
+                      if (mype==0) write(*,*) "Warning: runoff_south = 0, skipping scaling"
+                    else
+                      call runoff_scaling(runoff, partit, mesh)
+                    end if
+                  end if
             end if
 #if defined (__oifs)
 
@@ -614,6 +617,14 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   ! heat and fresh water fluxes are treated in i_therm and ice2ocean
 #endif /* skip all in case of __ifsinterface */
 #endif /* (__oasis) */
+
+  if (use_cavity .and. .not. use_runoff_scaling) then
+     do i=1, myDim_nod2D+eDim_nod2D
+        if (geo_coord_nod2D(2,i) < -60.0*rad) then
+           runoff(i) = 0.0_WP
+        end if
+     end do
+  end if
 
   t2=MPI_Wtime()
 

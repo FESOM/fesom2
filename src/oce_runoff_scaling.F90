@@ -14,6 +14,17 @@ module runoff_scaling_interface
   end interface
 end module runoff_scaling_interface
 
+!=============================================
+!
+! Module to set antarctic surface runoff to reference or constant values,
+! or to multiply runoff by any factor.
+! 
+! Intended purpose is to use this for sets of experiments, where the net freshwater flux from surface runoff
+! stays consistent. For runs with different cavities/icebergs setup, these modules add freshwater that would
+! be counted double if runoff remains unchanged/unmasked. This module does both, depending on runscript parameters.
+!
+!=============================================
+
 module runoff_scaling_state
   use o_PARAM , only: WP
   implicit none
@@ -80,6 +91,9 @@ subroutine runoff_scaling_init()
   
     write(*,*) "Case mult"
     ! runoff_ref = runoff_mult_factor
+
+  ! could add additional case for constant addition - alternative to fwflandice hosing
+  ! would apply evenly spread flux on all SO runoff nodes
 
   case default
   
@@ -206,15 +220,4 @@ subroutine runoff_scaling(runoff_in, partit, mesh)
     
   deallocate(runoff_mask)
 end subroutine runoff_scaling
-
-! To Do:
-! - how does file read?
-! - check how month from g_clock actually works
-! - check runoff scaling
-! - 
-!
-! Additional ideas/later to dos:
-! - set the scalling to daily/monthly/yearly
-! - allow for constant fwf addition -> set hosing value to be applied only on runoff nodes
-!
 

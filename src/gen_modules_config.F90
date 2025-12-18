@@ -153,8 +153,10 @@ module g_config
   logical                       :: use_cavity_fw2press = .true. ! switch on/off cavity+zstar input of freshwater leads to increase in pressure
   real(kind=WP)                 :: cavity_partial_cell_thresh=0.0_WP ! same as partial_cell_tresh but for surface
 !runoff scaling 
-  logical                       :: use_runoff_scaling = .false.
-  character(len=10)             :: runoff_scaling_method = 'ref' ! ref / const / mult
+  logical                       :: use_runoff_scaling = .false. ! switch on/off runoff scaling module to adjust antarctic surface runoff
+  character(len=10)             :: runoff_scaling_method = 'ref' ! set scaling to values from reference file: 'ref'
+                                                                 ! or constant value for SO: 'const'
+                                                                 ! or multiply existing runoff by facotr: 'mult'
   character(MAX_PATH)           :: runoff_dir = './ref_runoff' ! path to reference files
   character(len=3)              :: runoff_scaling_time = 'm' ! time resulotion of reference data
   real(kind=WP)                 :: runoff_mult_factor = 1.0_WP ! multiplicative factor when using mult
