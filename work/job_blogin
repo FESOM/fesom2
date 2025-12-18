@@ -1,0 +1,27 @@
+#!/bin/bash	
+#SBATCH --job-name=fesom2.7
+#SBATCH --partition=cpu-clx:test
+#SBATCH --ntasks=96      ######2304
+#SBATCH --ntasks-per-node=96
+#SBATCH --time=01:00:00
+#SBATCH -o slurm-out.out
+#SBATCH -e slurm-err.out
+#SBATCH --account=hbk00099 
+
+read -r USED_SHELL < ../bin/current_shell_path
+source $USED_SHELL
+echo "using environment from" $USED_SHELL
+
+# Set stack size to unlimited
+ulimit -s unlimited
+
+# determine JOBID
+JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
+
+ln -s ../bin/fesom.x .           # cp -n ../bin/fesom.x
+
+date
+
+srun ./fesom.x > "fesom2.7.out"
+
+date
