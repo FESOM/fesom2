@@ -2008,7 +2008,17 @@ subroutine allocate_and_init_diags(nl)
     ! Zooplankton Grazing (if enabled)
     ! --------------------------------------------------------------------------
     if (Grazing_detritus) then
-        
+
+        ! Mesozooplankton
+        allocate(vertgrazmeso_tot(nl-1), vertgrazmeso_n(nl-1), vertgrazmeso_d(nl-1))
+        allocate(vertgrazmeso_det(nl-1))
+        allocate(vertrespmeso(nl-1))
+        vertgrazmeso_tot  = 0.d0
+        vertgrazmeso_n    = 0.d0
+        vertgrazmeso_d    = 0.d0
+        vertgrazmeso_det  = 0.d0
+        vertrespmeso      = 0.d0
+
         if (enable_3zoo2det) then
             ! Microzooplankton
             allocate(vertgrazmicro_tot(nl-1), vertgrazmicro_n(nl-1), vertgrazmicro_d(nl-1))
@@ -2020,17 +2030,10 @@ subroutine allocate_and_init_diags(nl)
             vertrespmicro     = 0.d0
             
             ! Mesozooplankton
-            allocate(vertgrazmeso_tot(nl-1), vertgrazmeso_n(nl-1), vertgrazmeso_d(nl-1))
-            allocate(vertgrazmeso_det(nl-1), vertgrazmeso_mic(nl-1), vertgrazmeso_det2(nl-1))
-            allocate(vertrespmeso(nl-1))
-            
-            vertgrazmeso_tot  = 0.d0
-            vertgrazmeso_n    = 0.d0
-            vertgrazmeso_d    = 0.d0
-            vertgrazmeso_det  = 0.d0
+
+            allocate(vertgrazmeso_mic(nl-1), vertgrazmeso_det2(nl-1))
             vertgrazmeso_mic  = 0.d0
             vertgrazmeso_det2 = 0.d0
-            vertrespmeso      = 0.d0
             
             if (enable_coccos) then
                 allocate(vertgrazmicro_c(nl-1), vertgrazmicro_p(nl-1))
@@ -2041,27 +2044,27 @@ subroutine allocate_and_init_diags(nl)
                 vertgrazmeso_c  = 0.d0
                 vertgrazmeso_p  = 0.d0
             endif
-        endif
+
+            ! Macrozooplankton
+            allocate(vertgrazmacro_tot(nl-1), vertgrazmacro_n(nl-1), vertgrazmacro_d(nl-1))
+            allocate(vertgrazmacro_mes(nl-1), vertgrazmacro_det(nl-1))
+            allocate(vertgrazmacro_mic(nl-1), vertgrazmacro_det2(nl-1))
+            allocate(vertrespmacro(nl-1))
         
-        ! Macrozooplankton
-        allocate(vertgrazmacro_tot(nl-1), vertgrazmacro_n(nl-1), vertgrazmacro_d(nl-1))
-        allocate(vertgrazmacro_mes(nl-1), vertgrazmacro_det(nl-1))
-        allocate(vertgrazmacro_mic(nl-1), vertgrazmacro_det2(nl-1))
-        allocate(vertrespmacro(nl-1))
+            vertgrazmacro_tot  = 0.d0
+            vertgrazmacro_n    = 0.d0
+            vertgrazmacro_d    = 0.d0
+            vertgrazmacro_mes  = 0.d0
+            vertgrazmacro_det  = 0.d0
+            vertgrazmacro_mic  = 0.d0
+            vertgrazmacro_det2 = 0.d0
+            vertrespmacro      = 0.d0
         
-        vertgrazmacro_tot  = 0.d0
-        vertgrazmacro_n    = 0.d0
-        vertgrazmacro_d    = 0.d0
-        vertgrazmacro_mes  = 0.d0
-        vertgrazmacro_det  = 0.d0
-        vertgrazmacro_mic  = 0.d0
-        vertgrazmacro_det2 = 0.d0
-        vertrespmacro      = 0.d0
-        
-        if (enable_coccos) then
-            allocate(vertgrazmacro_c(nl-1), vertgrazmacro_p(nl-1))
-            vertgrazmacro_c = 0.d0
-            vertgrazmacro_p = 0.d0
+            if (enable_coccos) then
+                allocate(vertgrazmacro_c(nl-1), vertgrazmacro_p(nl-1))
+                vertgrazmacro_c = 0.d0
+                vertgrazmacro_p = 0.d0
+            endif
         endif
     endif
 
