@@ -240,8 +240,8 @@ subroutine ice_solve_low_order(mesh)
                   (1.0_WP-gamma)*ice_temp(row)
 #endif /* (__oifs) */
 #if defined (__seaice_tracers)
-        ! this is done at the moment for only one seaice tracer.
-        ! should be a loop or a vector-valued operation!
+       ! this is done at the moment for only one seaice tracer.
+       ! should be a loop or a vector-valued operation!
         tr_icel(row)=(rhs_tr_ice(row)+gamma*sum(mass_matrix(clo:clo2)* &
                     tr_ice(location(1:cn),1)))/area(1,row) + &
                     (1.0_WP-gamma)*tr_ice(row,1)
@@ -713,7 +713,7 @@ subroutine ice_fem_fct(tr_array_id, mesh)
 #endif /* (__oifs) */    
 
 #if defined (__seaice_tracers)
-    call exchange_nod(tr_ice)
+    call exchange_nod(tr_ice(:,1))
 #endif /* (__seaice_tracers) */
 
     deallocate(tmin, tmax)
@@ -887,7 +887,7 @@ subroutine ice_TG_rhs_div(mesh)
         rhs_temp(row)=rhs_temp(row)+sum(entries*ice_temp(elnodes))+cx4
 #endif /* (__oifs) */
 #if defined (__seaice_tracers)
-        rhs_tr_ice(row)=rhs_tr_ice(row)+sum(entries*tr_ice(elnodes,1))+cx4
+        rhs_tr_ice(row)=rhs_tr_ice(row)+sum(entries*tr_ice(elnodes,1))+cx5
 #endif /* (__seaice_tracers) */
         
         rhs_mdiv(row)=rhs_mdiv(row)-cx1
@@ -897,7 +897,7 @@ subroutine ice_TG_rhs_div(mesh)
         rhs_tempdiv(row)=rhs_tempdiv(row)-cx4
 #endif /* (__oifs) */
 #if defined (__seaice_tracers)
-        rhs_tr_icediv(row)=rhs_tr_icediv(row)-cx4
+        rhs_tr_icediv(row)=rhs_tr_icediv(row)-cx5
 #endif /* (__seaice_tracers) */
 
      END DO
