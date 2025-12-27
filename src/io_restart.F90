@@ -211,7 +211,13 @@ subroutine ini_ice_io(year, mesh)
 #endif /* (__oifs) */
   
 #if defined (__seaice_tracers)
-  call def_variable(iid, 'ice_tracer',(/nod2D, ntr_ice/), 'ice tracer content', 'mmol/m^3', tr_ice);
+  do j=1,ntr_ice
+     write(trname,'(A7,i4.4)') 'tr_ice_', j		 ! OG i1 -> i4
+     write(longname,'(A15,i4.4)') 'sea ice tracer ', j
+     units='none'
+     call def_variable(iid, trim(trname),  (/nod2D/), trim(longname), trim(units), tr_ice(:,j))
+     !  call def_variable(iid, 'ice_tracer',(/nod2D/), 'ice tracer content', 'mmol/m^3', tr_ice(:,1));
+  enddo
 #endif /* (__seaice_tracers) */
 
 end subroutine ini_ice_io
