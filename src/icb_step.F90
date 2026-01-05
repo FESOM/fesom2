@@ -567,7 +567,7 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
      case(2) 
       area_ib_tot = length_ib_single*width_ib_single*scaling(ib)
     end select
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(idx, area_ib_tot)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(idx) REDUCTION(+:area_ib_tot)
 !$OMP DO
     do idx = 1, size(elem_block)
         if (elem_block(idx) == iceberg_elem) then
@@ -790,7 +790,7 @@ type(t_partit), intent(inout), target :: partit
       case(2) 
        area_ib_tot = length_ib_single*width_ib_single*scaling(ib)
      end select
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(idx, area_ib_tot)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(idx) REDUCTION(+:area_ib_tot)
 !$OMP DO
      do idx = 1, size(elem_block_red)
          if (elem_block_red(idx) == iceberg_elem) then
