@@ -142,6 +142,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 #endif 
 #if defined (__oifs) || defined (__ifsinterface)
   real(kind=WP), dimension(:), pointer  :: ice_temp, ice_alb, enthalpyoffuse, runoff_liquid, runoff_solid
+  real(kind=WP), dimension(:), pointer  :: enthalpyoffuse_ori, runoff_solid_ori
   real(kind=WP),               pointer  :: tmelt
   real(kind=WP), dimension(:,:,:), pointer :: UVnode
 #endif
@@ -165,6 +166,8 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   enthalpyoffuse   => ice%atmcoupl%enthalpyoffuse(:)
   runoff_liquid    => ice%atmcoupl%runoff_liquid(:)
   runoff_solid     => ice%atmcoupl%runoff_solid(:)
+  enthalpyoffuse_ori=> ice%atmcoupl%enthalpyoffuse_ori(:)
+  runoff_solid_ori => ice%atmcoupl%runoff_solid_ori(:)
   tmelt            => ice%thermo%tmelt
   UVnode           => dynamics%uvnode(:,:,:)
 #endif      
@@ -376,7 +379,14 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
                 enthalpyoffuse = -min(enthalpyoffuse, 1000.0)
                 runoff_liquid(:) = runoff(:)                     ! store previous liquid runoff
                 runoff(:)            = runoff_liquid(:) + runoff_solid(:)                      ! Add solid runoff to the liquid runoff. Heatflux goes into enthalpyoffuse.
-
+                ! Store unmodified originals
+                runoff_solid_ori(:) = runoff_solid(:)
+                enthalpyoffuse_ori(:) = enthalpyoffuse(:)
+                ! Zero out in Southern Hemisphere before applying as freshwater flux
+                where (geo_coord_nod2D(2, :) < 0.0_WP)
+                  runoff_solid(:) = 0.0_WP
+                  enthalpyoffuse(:) = 0.0_WP
+                end where
                 mask=1.
                 call force_flux_consv(runoff_liquid, mask, i, 0, action, partit, mesh)
                 call force_flux_consv(runoff_solid, mask, i, 0, action, partit, mesh)

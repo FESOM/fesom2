@@ -111,6 +111,7 @@ TYPE T_ICE_ATMCOUPL
 #if defined (__oifs) || defined (__ifsinterface)
     !___________________________________________________________________________
     real(kind=WP), allocatable, dimension(:)    :: ice_alb, enthalpyoffuse, runoff_liquid, runoff_solid, flx_qres, flx_qcon
+    real(kind=WP), allocatable, dimension(:)    :: enthalpyoffuse_ori, runoff_solid_ori
     ! !!! DONT FORGET ice_temp rhs_tempdiv rhs_temp is advected for oifs !!! --> becomes additional ice
     ! tracer in ice%data(4)%values
 #endif /* (__oifs)  */
@@ -376,6 +377,8 @@ subroutine WRITE_T_ICE_ATMCOUPL(tcoupl, unit)
     call write_bin_array(tcoupl%enthalpyoffuse, unit, iostat, iomsg)
     call write_bin_array(tcoupl%runoff_liquid, unit, iostat, iomsg)
     call write_bin_array(tcoupl%runoff_solid, unit, iostat, iomsg)
+    call write_bin_array(tcoupl%enthalpyoffuse_ori, unit, iostat, iomsg)
+    call write_bin_array(tcoupl%runoff_solid_ori, unit, iostat, iomsg)
 #endif /* (__oifs) */
 end subroutine WRITE_T_ICE_ATMCOUPL
 #endif /* (__oasis) */
@@ -397,6 +400,8 @@ subroutine READ_T_ICE_ATMCOUPL(tcoupl, unit)
     call read_bin_array(tcoupl%enthalpyoffuse, unit, iostat, iomsg)
     call read_bin_array(tcoupl%runoff_liquid, unit, iostat, iomsg)
     call read_bin_array(tcoupl%runoff_solid, unit, iostat, iomsg)
+    call read_bin_array(tcoupl%enthalpyoffuse_ori, unit, iostat, iomsg)
+    call read_bin_array(tcoupl%runoff_solid_ori, unit, iostat, iomsg)
 #endif /* (__oifs) */
 end subroutine READ_T_ICE_ATMCOUPL
 #endif /* (__oasis) */
@@ -867,10 +872,14 @@ subroutine ice_init(ice, partit, mesh)
     allocate(ice%atmcoupl%enthalpyoffuse(node_size))
     allocate(ice%atmcoupl%runoff_liquid(node_size))
     allocate(ice%atmcoupl%runoff_solid(node_size))
+    allocate(ice%atmcoupl%enthalpyoffuse_ori(node_size))
+    allocate(ice%atmcoupl%runoff_solid_ori(node_size))
     ice%atmcoupl%ice_alb       = 0.6_WP
     ice%atmcoupl%enthalpyoffuse= 0.0_WP
     ice%atmcoupl%runoff_liquid= 0.0_WP
     ice%atmcoupl%runoff_solid= 0.0_WP
+    ice%atmcoupl%enthalpyoffuse_ori= 0.0_WP
+    ice%atmcoupl%runoff_solid_ori= 0.0_WP
     allocate(ice%atmcoupl%flx_qres(node_size))
     allocate(ice%atmcoupl%flx_qcon(node_size))
     ice%atmcoupl%flx_qres      = 0.0_WP    
