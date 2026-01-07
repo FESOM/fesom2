@@ -2973,7 +2973,7 @@ subroutine compute_neutral_slope(partit, mesh)
     eps=5.0e-6_WP
 !PS     S_cr=1.0e-2_WP
 !PS     S_d=1.0e-3_WP
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, n, nz, nl1, ul1, el, elnodes, enodes, c, ro_z_inv, f_min, dep_scale, rssby, c1, c2)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, n, nz, nl1, ul1, el, elnodes, enodes, c, ro_z_inv, dep_scale, rssby, c1, c2) FIRSTPRIVATE(f_min)
 !$OMP DO
     do n=1, myDim_nod2D
         slope_tapered(: , :, n)=0._WP
@@ -3140,8 +3140,13 @@ IMPLICIT NONE
 
   IF((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) THEN
       rho_out  = density_0 - 0.00025_WP*(t - 10.0_WP)*density_0
+      
   ELSE IF((toy_ocean) .AND. (TRIM(which_toy)=="dbgyre")) THEN
       rho_out  = density_0 - density_0*0.0002052_WP*(t - 10.0_WP) + density_0*0.00079_WP*(s - 35.0_WP)
+      
+  ELSE IF((toy_ocean) .AND. (TRIM(which_toy)=="neverworld2")) THEN    
+      rho_out  = density_0 - 0.0002_WP*(t - 10.0_WP)*density_0
+      
   ELSE
       rho_out  = density_0 + 0.8_WP*(s - 34.0_WP) - 0.2*(t - 20.0_WP)
   END IF
