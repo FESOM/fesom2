@@ -2,27 +2,34 @@
 
 &nam_rsbc
 fe_data_source        ='Albani'
-nm_fe_data_file       ='/home/a/a270105/initial_files/pi_init/dust_coremesh/DustClimMonthlyAlbani.nc'
-nm_aen_data_file      ='/albedo/work/projects/MarESys/ogurses/input/mesh_CORE2_finaltopo_mean/AeolianNitrogenDep.nc'
-nm_river_data_file    ='/albedo/work/projects/MarESys/ogurses/input/mesh_CORE2_finaltopo_mean/RiverineInput.nc'
-nm_erosion_data_file  ='/albedo/work/projects/MarESys/ogurses/input/mesh_CORE2_finaltopo_mean/ErosionInput.nc'
-nm_co2_data_file      ='/albedo/work/projects/MarESys/ogurses/input/mesh_CORE2_finaltopo_mean/MonthlyAtmCO2_gcb2021.nc'
+nm_fe_data_file       ='/albedo/work/projects/p_pool_recom/input/mesh_CORE2_finaltopo_mean/DustClimMonthlyAlbani.nc'
+nm_aen_data_file      ='/albedo/work/projects/p_pool_recom/input/mesh_CORE2_finaltopo_mean/AeolianNitrogenDep.nc'
+nm_river_data_file    ='/albedo/work/projects/p_pool_recom/input/mesh_CORE2_finaltopo_mean/RiverineInput.nc'
+nm_erosion_data_file  ='/albedo/work/projects/p_pool_recom/input/mesh_CORE2_finaltopo_mean/ErosionInput.nc'
+nm_co2_data_file      ='/albedo/work/projects/p_pool_recom/input/mesh_CORE2_finaltopo_mean/MonthlyAtmCO2_gcb2024.nc'
 /
 
 &pavariables
 use_REcoM             =.true.
 REcoM_restart         =.true.
+recom_debug           =.false.
 
-bgc_num               = 22 !33 !24 !38
+bgc_num               = 22
 diags3d_num           = 28          ! Number of diagnostic 3d tracers to be saved
 bgc_base_num          = 22          ! standard tracers
+benthos_num           = 4            ! Number of benthic BGC tracers (8 if ciso=.true., else 4)
+sedflx_num            = 0            ! Sediment fluxes from MEDUSA (0 = use defaults)
+bottflx_num           = 4            ! Bottom fluxes (8 if ciso & ciso_14, 6 if not ciso_14, 4 otherwise)
+
 VDet                  = 20.d0       ! Sinking velocity, constant through the water column and positive downwards
 VDet_zoo2             = 200.d0      ! Sinking velocity, constant through the water column
 VPhy                  = 0.d0        !!! If the number of sinking velocities are different from 3, code needs to be changed !!!
 VDia                  = 0.d0
 VCocco	       	      = 0.d0       
 allow_var_sinking     = .true.   
+
 biostep               = 1           ! Number of times biology should be stepped forward for each time step 
+
 REcoM_Geider_limiter  = .false.     ! Decides what routine should be used to calculate limiters in sms
 REcoM_Grazing_Variable_Preference = .true. ! Decides if grazing should have preference for phyN or DiaN 
 Grazing_detritus      = .false.
@@ -34,42 +41,43 @@ use_density_scaling   = .false.    ! BALL
 use_viscosity_scaling = .false.    ! BALL
 OmegaC_diss           = .false.    ! DISS Use OmegaC from Mocsy to compute calcite dissolution (after Aumont et al. 2015 and Gehlen et al. 2007)
 CO2lim                = .false.    ! CO2 dependence of growth and calcification
+use_photodamage       = .false.      ! use Alvarez et al (2018) for chlorophyll degradation
+HetRespFlux_plus      = .true.      !MB More stable computation of zooplankton respiration fluxes adding a small number to HetN
 Diags                 = .true.
+
 constant_CO2          = .true.
 UseFeDust             = .true.      ! Turns dust input of iron off when set to.false.
 UseDustClim           = .true.
 UseDustClimAlbani     = .true.     ! Use Albani dustclim field (If it is false Mahowald will be used)
-use_photodamage       = .false.      ! use Alvarez et al (2018) for chlorophyll degradation
-HetRespFlux_plus      = .true.      !MB More stable computation of zooplankton respiration fluxes adding a small number to HetN
-REcoMDataPath         = '/home/a/a270105/initial_files/pi_init/dust_coremesh/'
-restore_alkalinity    = .true.
 useRivers             = .false.
 useRivFe              = .false.      ! When set to true, riverine Fe source is activated
 useErosion            = .false.
 NitrogenSS            = .false.     ! When set to true, external sources and sinks of nitrogen are activated (Riverine, aeolian and denitrification)
 useAeolianN           = .false.      ! When set to true, aeolian nitrogen deposition is activated
+
+REcoMDataPath         = '/albedo/work/projects/p_pool_recom/input/mesh_CORE2_finaltopo_mean/'
+
 firstyearoffesomcycle = 1958        ! The first year of the actual physical forcing (e.g. JRA-55) used
-lastyearoffesomcycle  = 2022        ! Last year of the actual physical forcing used
+lastyearoffesomcycle  = 2024        ! Last year of the actual physical forcing used
 numofCO2cycles        = 1           ! Number of cycles of the forcing planned 
 currentCO2cycle       = 1           ! Which CO2 cycle we are currently running
+
 DIC_PI                = .false.
+restore_alkalinity    = .true.
 Nmocsy                = 1           ! Length of the vector that is passed to mocsy (always one for recom)
-recom_debug           =.false.
+
 ciso                  =.false.     ! Main switch to enable/disable carbon isotopes (13|14C)
-benthos_num           = 4          ! number of benthic BGC tracers -> 8 if (ciso == .true.) otherwise -> 4
+
 use_MEDUSA            = .false.      ! Main switch for the sediment model MEDUSA
-sedflx_num            = 0           ! if 0: no file from MEDUSA is read but default sediment
-bottflx_num           = 4           ! if ciso&ciso_14: =8; if .not.ciso_14: =6; no ciso: =4
-use_atbox             = .false.
 add_loopback          = .false.     ! add loopback fluxes through rivers to the surface
 lb_tscale             = 1.0         ! /year: fraction of loopback fluxes yearly added to the surface
-fe_2ligands	      = .true.      ! switch to consider 2 ligand classes
-fe_compl_nica         = .true.      ! switch for pH/DOC dependent Fe-ligand binding
+
+use_atbox             = .false.
 /
 
 &pasinking
 Vdet_a                = 0.0288      ! [1/day]
-Vcalc                 = 0.0144      ! [1/day]
+Vcalc                 = 0.0144      ! [1/day] depth dependence of calc_diss]
 /
 
 &painitialization_N
@@ -144,6 +152,8 @@ biosynthSi            = 0.d0
 &pairon_chem
 totalligand           = 1.d0        ! [mumol/m3] order 1. Total free ligand
 ligandStabConst       = 100.d0      ! [m3/mumol] order 100. Ligand-free iron stability constant
+fe_2ligands           = .true.      ! switch to consider 2 ligand classes
+fe_compl_nica         = .true.      ! switch for pH/DOC dependent Fe-ligand binding
 /
 
 &pazooplankton
@@ -152,6 +162,7 @@ epsilonr              = 0.09d0      ! [(mmol N)2 /m6] Half saturation constant f
 res_het               = 0.028d0      ! [1/day] Respiration by heterotrophs and mortality (loss to detritus)
 Redfield              = 6.625       ! [mmol C/mmol N] Redfield ratio of C:N = 106:16
 loss_het              = 0.04d0      ! [1/day] Temperature dependent N degradation of extracellular organic N (EON)
+tiny_het              = 1.d-5       ! for more stable computation of HetRespFlux (_plus). Value can be > tiny because HetRespFlux ~ hetC**2.
 pzDia                 = 1.0d0 !0.5d0       ! Maximum diatom preference
 sDiaNsq               = 0.d0
 pzPhy                 = 0.5d0 !0.25d0 !1.0d0       ! Maximum nano-phytoplankton preference (NEW: 3/12)
@@ -160,29 +171,29 @@ pzCocco		      = 0.666d0     ! NEW (8/12)
 sCoccoNsq	      = 0.d0        ! NEW
 pzMicZoo              = 1.0d0       ! NEW 3Zoo Maximum nano-phytoplankton preference
 sMicZooNsq            = 0.d0        ! NEW 3Zoo
-tiny_het              = 1.d-5       ! for more stable computation of HetRespFlux (_plus). Value can be > tiny because HetRespFlux ~ hetC**2.
 /
 
 &pasecondzooplankton
-graz_max2      = 0.1d0              ! [mmol N/(m3 * day)] Maximum grazing loss parameter                                                                                        
-epsilon2       = 0.0144d0           ! [(mmol N)2 /m6] Half saturation constant for grazing loss                                                                              
-res_zoo2       = 0.0107d0           ! [1/day] Respiration by heterotrophs and mortality (loss to detritus)                                                            
+graz_max2      = 0.1d0              ! [mmol N/(m3 * day)] Maximum grazing loss parameter                                          
+epsilon2       = 0.0144d0           ! [(mmol N)2 /m6] Half saturation constant for grazing loss                                   res_zoo2       = 0.0107d0           ! [1/day] Respiration by heterotrophs and mortality (loss to detritus)
 loss_zoo2      = 0.003d0            ! [1/day] Temperature dependent N degradation of extracellular organic N (EON)
+
 fecal_rate_n      = 0.104d0         ! [1/day] Temperature dependent N degradation of \
 fecal_rate_c      = 0.236d0  
 fecal_rate_n_mes = 0.25d0           ! NEW 3Zoo
 fecal_rate_c_mes = 0.32d0           ! NEW 3Zoo                                                          
-pzDia2         = 1.5d0 !1.d0        ! Maximum diatom preference                                                                                                                 
-sDiaNsq2       = 0.d0
-pzPhy2         = 0.5d0              ! Maximum diatom preference                                                                                                                
+
+pzDia2         = 1.5d0 !1.d0        ! Maximum diatom preference                                                                   sDiaNsq2       = 0.d0
+pzPhy2         = 0.5d0              ! Maximum diatom preference                                             
 sPhyNsq2       = 0.d0
 pzCocco2       = 0.5d0              ! NEW
 sCoccoNsq2     = 0.d0		    ! NEW
-pzHet          = 1.5d0 !0.8d0              ! Maximum diatom preference                                                                                                               
+pzHet          = 1.5d0 !0.8d0       ! Maximum diatom preference 
 sHetNsq        = 0.d0
-t1_zoo2        = 28145.d0           ! Krill temp. function constant1                                                                                                       
-t2_zoo2        = 272.5d0            ! Krill temp. function constant2                                                                                                         
-t3_zoo2        = 105234.d0          ! Krill temp. function constant3                                                                                                      
+
+t1_zoo2        = 28145.d0           ! Krill temp. function constant1
+t2_zoo2        = 272.5d0            ! Krill temp. function constant2
+t3_zoo2        = 105234.d0          ! Krill temp. function constant3
 t4_zoo2        = 274.15d0           ! Krill temp. function constant3
 /
 

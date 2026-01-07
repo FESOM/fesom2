@@ -184,8 +184,7 @@ module recom_config
                        currentCO2cycle,                   DIC_PI,                Nmocsy,                  &
                        recom_debug,                       ciso,                  benthos_num,             &
                        use_MEDUSA,                        sedflx_num,            bottflx_num,             &
-                       add_loopback,                      lb_tscale,             use_atbox,               &
-                       fe_2ligands,                       fe_compl_nica
+                       add_loopback,                      lb_tscale,             use_atbox
 
 !!------------------------------------------------------------------------------
 !! *** Sinking ***
@@ -269,7 +268,7 @@ module recom_config
 !! *** Iron chemistry ***
   Real(kind=8)                 :: totalligand     = 1.d0        ! [mumol/m3] order 1. Total free ligand
   Real(kind=8)                 :: ligandStabConst = 100.d0      ! [m3/mumol] order 100. Ligand-free iron stability constant
-  namelist /pairon_chem/ totalligand, ligandStabConst
+  namelist /pairon_chem/ totalligand, ligandStabConst, fe_2ligands, fe_compl_nica
 !!------------------------------------------------------------------------------
 !! *** Zooplankton ***
   Real(kind=8)                 :: graz_max      = 2.4d0           ! [mmol N/(m3 * day)] Maximum grazing loss parameter 
