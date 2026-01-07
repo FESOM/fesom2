@@ -746,7 +746,6 @@ contains
 
     ! --------------
     ! LA icebergs: 2023-05-17 
-!YY: only when using icebergs?
     if (use_icebergs) then
     f%MPI_COMM_FESOM_IB = f%MPI_COMM_FESOM
     if (f%mype==0) then
