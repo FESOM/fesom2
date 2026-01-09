@@ -174,8 +174,9 @@ sMicZooNsq            = 0.d0        ! NEW 3Zoo
 /
 
 &pasecondzooplankton
-graz_max2      = 0.1d0              ! [mmol N/(m3 * day)] Maximum grazing loss parameter                                          
-epsilon2       = 0.0144d0           ! [(mmol N)2 /m6] Half saturation constant for grazing loss                                   res_zoo2       = 0.0107d0           ! [1/day] Respiration by heterotrophs and mortality (loss to detritus)
+graz_max2      = 0.1d0              ! [mmol N/(m3 * day)] Maximum grazing loss parameter           
+epsilon2       = 0.0144d0           ! [(mmol N)2 /m6] Half saturation constant for grazing loss    
+res_zoo2       = 0.0107d0           ! [1/day] Respiration by heterotrophs and mortality (loss to detritus)
 loss_zoo2      = 0.003d0            ! [1/day] Temperature dependent N degradation of extracellular organic N (EON)
 
 fecal_rate_n      = 0.104d0         ! [1/day] Temperature dependent N degradation of \
@@ -183,7 +184,8 @@ fecal_rate_c      = 0.236d0
 fecal_rate_n_mes = 0.25d0           ! NEW 3Zoo
 fecal_rate_c_mes = 0.32d0           ! NEW 3Zoo                                                          
 
-pzDia2         = 1.5d0 !1.d0        ! Maximum diatom preference                                                                   sDiaNsq2       = 0.d0
+pzDia2         = 1.5d0 !1.d0        ! Maximum diatom preference
+sDiaNsq2       = 0.d0
 pzPhy2         = 0.5d0              ! Maximum diatom preference                                             
 sPhyNsq2       = 0.d0
 pzCocco2       = 0.5d0              ! NEW
