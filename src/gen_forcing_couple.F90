@@ -271,7 +271,14 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
 #endif
          endif
+
+#if defined(__recom) && defined(__usetp)
+         if(partit%my_fesom_group == 0) then
+#endif
          call cpl_oasis3mct_send(i, exchange, action, partit)
+#if defined(__recom) && defined(__usetp)
+         endif
+#endif
       end do
 #ifdef VERBOSE
       do i=1, nsend 
@@ -852,11 +859,19 @@ SUBROUTINE net_rec_from_atm(action, partit)
   use o_PARAM, only: WP
   USE MOD_PARTIT
   USE MOD_PARSUP
+
+#if defined(__recom) && defined(__usetp)
+  use g_config, only: num_fesom_groups
+#endif
+
   IMPLICIT NONE
 
   LOGICAL,        INTENT (IN)   		  :: action
   type(t_partit), intent(inout), target           :: partit
   INTEGER                                         :: my_global_rank, ierror
+#if defined(__recom) && defined(__usetp)
+  INTEGER                                         :: my_global_rank_test
+#endif
   INTEGER                                         :: n  
   INTEGER 					  :: status(MPI_STATUS_SIZE,partit%npes) 
   INTEGER                                         :: request(2)
@@ -869,11 +884,29 @@ SUBROUTINE net_rec_from_atm(action, partit)
      CALL MPI_COMM_RANK(MPI_COMM_WORLD, my_global_rank, ierror)
      atm_net_fluxes_north=0.
      atm_net_fluxes_south=0.
+#if defined(__recom) && defined(__usetp)
+     my_global_rank_test = my_global_rank - (partit%my_fesom_group * partit%npes)
+#endif
+
+#if defined(__recom) && defined(__usetp)
+! check for is root in group
+     if (my_global_rank_test==target_root) then
+        if(partit%my_fesom_group == 0) then
+#else
      if (my_global_rank==target_root) then
-	CALL MPI_IRecv(atm_net_fluxes_north(1), nrecv, MPI_DOUBLE_PRECISION, source_root, 111, MPI_COMM_WORLD, request(1), partit%MPIerr)
+#endif
+        CALL MPI_IRecv(atm_net_fluxes_north(1), nrecv, MPI_DOUBLE_PRECISION, source_root, 111, MPI_COMM_WORLD, request(1), partit%MPIerr)
         CALL MPI_IRecv(atm_net_fluxes_south(1), nrecv, MPI_DOUBLE_PRECISION, source_root, 112, MPI_COMM_WORLD, request(2), partit%MPIerr)
         CALL MPI_Waitall(2, request, status, partit%MPIerr)
      end if
+
+#if defined(__recom) && defined(__usetp)
+        if(num_fesom_groups > 1) then
+           call MPI_Bcast(atm_net_fluxes_north(1), nrecv, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
+           call MPI_Bcast(atm_net_fluxes_south(1), nrecv, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
+        end if
+     end if ! (my_global_rank_test==target_root) then
+#endif
   call MPI_Barrier(partit%MPI_COMM_FESOM, partit%MPIerr)     
   call MPI_AllREDUCE(atm_net_fluxes_north(1), aux, nrecv, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
   atm_net_fluxes_north=aux
