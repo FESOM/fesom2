@@ -32,6 +32,7 @@ ldiag_destine     = .false.  ! enables heat content computation ('hc300m', 'hc70
 ldiag_trflx       = .false.  ! enables tracer flux diagnostics ('utemp', 'vtemp', 'usalt', 'vsalt')
 ldiag_uvw_sqr     = .false.  ! enables 'UVW_SQR' output (squared velocities: u2, v2, w2)
 ldiag_trgrd_xyz   = .false.  ! enables 'TRGRD_XYZ' output (horizontal & vertical tracer gradients)
+ldiag_cmor        = .false.  ! enables CMOR diagnostics for CMIP6/CMIP7 ('tos', 'sos', 'pbo', 'volo', etc.)
 /
 
 ! ============================================================================
@@ -52,35 +53,35 @@ compression_level = 1        ! compression level for netCDF output (1=fastest, 9
 !   precision  = 4 (single precision) or 8 (double precision)
 ! ============================================================================
 &nml_list
-io_list =  'sst       ',1, 'm', 4,
-           'sss       ',1, 'm', 4,
-!           'ssh       ',1, 'm', 4,
-!           'uice      ',1, 'm', 4,
-!           'vice      ',1, 'm', 4,
+io_list =  'sst       ',1, 'y', 4,
+           'sss       ',1, 'y', 4,
+!           'ssh       ',1, 'y', 4,
+!           'uice      ',1, 'y', 4,
+!           'vice      ',1, 'y', 4,
            'a_ice     ',1, 'm', 4,
-!           'm_ice     ',1, 'm', 4,
-!           'm_snow    ',1, 'm', 4,
+!           'm_ice     ',1, 'y', 4,
+!           'm_snow    ',1, 'y', 4,
            'MLD1      ',1, 'm', 4,
            'MLD2      ',1, 'm', 4,
            'MLD3      ',1, 'm', 4,
-!           'tx_sur    ',1, 'm', 4,
-!           'ty_sur    ',1, 'm', 4,
-           'temp      ',1, 'm', 4,
-           'salt      ',1, 'm', 8,
-!           'N2        ',1, 'm', 4,
-!           'Kv        ',1, 'm', 4,
-           'u         ',1, 'm', 4,
-           'v         ',1, 'm', 4,
-!           'unod      ',1, 'm', 4,
-!           'vnod      ',1, 'm', 4,
-           'w         ',1, 'm', 4,
-!           'Av        ',1, 'm', 4,
-           'bolus_u   ',1, 'm', 4,
-           'bolus_v   ',1, 'm', 4,
-           'bolus_w   ',1, 'm', 4,
-!           'fw        ',1, 'm', 4,
-!           'fh        ',1, 'm', 4,
-           'otracers  ',1, 'm', 4,
+!           'tx_sur    ',1, 'y', 4,
+!           'ty_sur    ',1, 'y', 4,
+           'temp      ',1, 'y', 4,
+           'salt      ',1, 'y', 8,
+!           'N2        ',1, 'y', 4,
+!           'Kv        ',1, 'y', 4,
+           'u         ',1, 'y', 4,
+           'v         ',1, 'y', 4,
+!           'unod      ',1, 'y', 4,
+!           'vnod      ',1, 'y', 4,
+           'w         ',1, 'y', 4,
+!           'Av        ',1, 'y', 4,
+           'bolus_u   ',1, 'y', 4,
+           'bolus_v   ',1, 'y', 4,
+           'bolus_w   ',1, 'y', 4,
+!           'fw        ',1, 'y', 4,
+!           'fh        ',1, 'y', 4,
+           'otracers  ',1, 'y', 4,
 /
 
 ! ============================================================================
@@ -337,6 +338,21 @@ io_list =  'sst       ',1, 'm', 4,
 
 ! --- TRACER GRADIENTS (require ldiag_trgrd_xyz=.true.) ---
 ! 'TRGRD_XYZ ',1, 'm', 4,  ! horizontal and vertical tracer gradients
+
+! --- CMOR DIAGNOSTICS FOR CMIP6/CMIP7 (require ldiag_cmor=.true.) ---
+! 'tos       ',1, 'm', 8,  ! sea surface temperature [degC] (CMOR standard)
+! 'sos       ',1, 'm', 8,  ! sea surface salinity [psu] (CMOR standard)
+! 'pbo       ',1, 'm', 8,  ! sea water pressure at sea floor [Pa]
+! 'opottemptend',1, 'm', 8,! ocean potential temperature tendency [W/m^2]
+! 'volo      ',1, 'm', 8,  ! ocean volume [m^3] (global scalar)
+! 'soga      ',1, 'm', 8,  ! global mean sea water salinity [psu] (global scalar)
+! 'thetaoga  ',1, 'm', 8,  ! global mean sea water potential temperature [degC] (global scalar)
+! 'siarean   ',1, 'm', 8,  ! sea ice area Northern hemisphere [10^12 m^2] (global scalar)
+! 'siareas   ',1, 'm', 8,  ! sea ice area Southern hemisphere [10^12 m^2] (global scalar)
+! 'siextentn ',1, 'm', 8,  ! sea ice extent Northern hemisphere [10^12 m^2] (global scalar)
+! 'siextents ',1, 'm', 8,  ! sea ice extent Southern hemisphere [10^12 m^2] (global scalar)
+! 'sivoln    ',1, 'm', 8,  ! sea ice volume Northern hemisphere [10^9 m^3] (global scalar)
+! 'sivols    ',1, 'm', 8,  ! sea ice volume Southern hemisphere [10^9 m^3] (global scalar)
 
 ! ============================================================================
 ! END OF CATALOG
