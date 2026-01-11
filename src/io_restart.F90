@@ -444,7 +444,7 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
   type(t_dyn)   , intent(inout), target :: dynamics
   type(t_ice)   , intent(inout), target :: ice
   integer, intent(in) :: which_readr
-  
+
   ! Local variables
   logical :: is_portable_restart_write, is_raw_restart_write, is_bin_restart_write
   logical, save :: initialized_raw = .false.
@@ -464,6 +464,7 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
   integer :: tr_num_in_group
   logical :: has_one_added_tracer
   integer :: num_tracers
+  integer :: tr_num
 #endif
 
 #if defined(__recom) && defined(__usetp)
@@ -471,7 +472,6 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-
   num_tracers = tracers%num_tracers
 #else
   integer :: mpierr
@@ -568,13 +568,26 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
     is_bin_restart_write = is_due(trim(bin_restart_length_unit), bin_restart_length, istep)
   end if
  
-  ! --> synchronizes tracer data within one fesom group
+  ! --> synchronizes tracer data within fesom groups
+
+! kh 09.01.26 merging of valuesold and valuesAB between all fesom groups is only necessary here, immediately before writing the corresponding restart files
+! this will give better performance than merging valuesold and valuesAB in each simulation step in the main loop over all tracers in solve_tracers_ale in oce_ale_tracers.F90
+
 #if defined(__recom) && defined(__usetp)
     if(num_fesom_groups > 1) then
         tr_arr_slice_count_fix_1 = 1 * (nl - 1) * (myDim_nod2D + eDim_nod2D)
 
         do group_i = 0, num_fesom_groups - 1
             call calc_slice(num_tracers, num_fesom_groups, group_i, tr_num_start, tr_num_end, tr_num_in_group, has_one_added_tracer)
+
+! kh 09.01.26 tracers%data(:)%valuesold(:,:,:) is not contigous in memory, so an explicit inner loop over the tracers of each group is required
+            do tr_num = tr_num_start, tr_num_end
+
+! kh 09.01.26 also handle additional dimension of valuesold for AB_order
+                call MPI_Bcast(tracers%data(tr_num)%valuesold(:,:,:), tr_arr_slice_count_fix_1 * (tracers%data(tr_num)%AB_order - 1), MPI_DOUBLE_PRECISION, group_i, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%mpierr)
+
+                call MPI_Bcast(tracers%data(tr_num)%valuesAB(:,:), tr_arr_slice_count_fix_1, MPI_DOUBLE_PRECISION, group_i, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%mpierr)
+            end do
         end do
     end if
 #endif

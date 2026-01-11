@@ -729,6 +729,71 @@ CASE ('benCalc_14')
       end if
     end if
 !ciso
+! output of sinking fluxes for MEDUSA
+CASE ('sinkPON  ')
+    if (use_REcoM)  then
+      if (use_MEDUSA) then
+        call def_stream(nod2D,  myDim_nod2D,   'sinkPON','sinking flux of particulate organic nitrogen','mmolN/(m2*s)', SinkFlx(:,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit,mesh)
+      end if
+    end if
+
+CASE ('sinkPOC  ')
+    if (use_REcoM)  then
+      if (use_MEDUSA) then
+        call def_stream(nod2D,  myDim_nod2D,   'sinkPOC','sinking flux of particulate organic carbon','mmolC/(m2*s)', SinkFlx(:,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      end if
+    end if
+
+CASE ('sinkOpal ')
+    if (use_REcoM)  then
+      if (use_MEDUSA) then
+        call def_stream(nod2D,  myDim_nod2D,   'sinkOpal','sinking flux of opal','mmol/(m2*s)', SinkFlx(:,3), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      end if
+    end if
+
+CASE ('sinkCalc ')
+    if (use_REcoM)  then
+      if (use_MEDUSA) then
+        call def_stream(nod2D,  myDim_nod2D,   'sinkCalc','sinking flux of CaCO3','mmol/(m2*s)', SinkFlx(:,4), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      end if
+    end if
+
+CASE ('sinkC13  ')
+    if (use_REcoM)  then
+      if (use_MEDUSA) then
+        if (ciso) then
+          call def_stream(nod2D,  myDim_nod2D,   'sinkC13','sinking flux of particulate organic carbon-13','mmol/(m2*s)', SinkFlx(:,5), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        end if
+      end if
+    end if
+
+CASE ('sinkCal13')
+    if (use_REcoM)  then
+      if (use_MEDUSA) then
+        if (ciso) then
+          call def_stream(nod2D,  myDim_nod2D,   'sinkCal13','sinking flux of CaCO3-13','mmol/(m2*s)', SinkFlx(:,6), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        end if
+      end if
+    end if
+
+CASE ('sinkC14  ')
+    if (use_REcoM)  then
+      if (use_MEDUSA) then
+        if (ciso .and. ciso_14) then
+          call def_stream(nod2D,  myDim_nod2D,   'sinkC14','sinking flux of particulate organic carbon-14','mmol/(m2*s)', SinkFlx(:,7), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        end if
+      end if
+    end if
+
+CASE ('sinkCal14')
+    if (use_REcoM)  then
+      if (use_MEDUSA) then
+        if (ciso .and. ciso_14) then
+          call def_stream(nod2D,  myDim_nod2D,   'sinkCal14','sinking flux of CaCO3-14','mmol/(m2*s)', SinkFlx(:,8), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        end if
+      end if
+    end if
+
 CASE ('NPPn      ')
     if (use_REcoM) then
     call def_stream(nod2D,  myDim_nod2D,   'NPPn','Mean NPP nanophytoplankton','mmolC/m2/d', NPPn, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)

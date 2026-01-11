@@ -134,7 +134,7 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
         if( tracers%data(tr_num)%ID==1004 .or. &  !iphyn
             tracers%data(tr_num)%ID==1007 .or. &  !idetn
             tracers%data(tr_num)%ID==1013 ) then  !idian
-            Benthos(n,1)= Benthos(n,1) +  add_benthos_2d(n) ![mmol]
+!            Benthos(n,1)= Benthos(n,1) +  add_benthos_2d(n) ![mmol]
 
 #if defined(__usetp)
 ! buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
@@ -145,6 +145,11 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
         ! now SinkFlx hat the unit mmol/time step 
         ! but mmol/m2/time is needed for MEDUSA: thus /area
             endif
+#else
+            Benthos(n,1)= Benthos(n,1) +  add_benthos_2d(n) ![mmol]
+            if (use_MEDUSA) then
+               SinkFlx(n,1) = SinkFlx(n,1) + add_benthos_2d(n) / area(1,n)/dt ![mmol/m2]
+            endif
 #endif
         endif
 
@@ -152,7 +157,7 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
         if( tracers%data(tr_num)%ID==1005 .or. &  !iphyc
             tracers%data(tr_num)%ID==1008 .or. &  !idetc
             tracers%data(tr_num)%ID==1014 ) then
-            Benthos(n,2)= Benthos(n,2) + add_benthos_2d(n)
+!            Benthos(n,2)= Benthos(n,2) + add_benthos_2d(n)
 
 #if defined(__usetp)
                Benthos_tr(n,2,tr_num)= Benthos_tr(n,2,tr_num) + add_benthos_2d(n)
@@ -160,13 +165,19 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
             if (use_MEDUSA) then
                SinkFlx_tr(n,2,tr_num) = SinkFlx_tr(n,2,tr_num) + add_benthos_2d(n) / area(1,n)/dt
             endif
+#else
+            Benthos(n,2)= Benthos(n,2) + add_benthos_2d(n)
+            if (use_MEDUSA) then
+               SinkFlx(n,2) = SinkFlx(n,2) + add_benthos_2d(n) / area(1,n)/dt
+            endif
+
 #endif
         endif
 
         !! *Particulate Organic Silicon *
         if( tracers%data(tr_num)%ID==1016 .or. &  !idiasi
             tracers%data(tr_num)%ID==1017 ) then
-            Benthos(n,3)= Benthos(n,3) + add_benthos_2d(n)
+!            Benthos(n,3)= Benthos(n,3) + add_benthos_2d(n)
 
 #if defined(__usetp)
                Benthos_tr(n,3,tr_num)= Benthos_tr(n,3,tr_num) + add_benthos_2d(n)
@@ -174,19 +185,29 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
             if (use_MEDUSA) then
                SinkFlx_tr(n,3,tr_num) = SinkFlx_tr(n,3,tr_num) + add_benthos_2d(n) / area(1,n)/dt
             endif
+#else
+            Benthos(n,3)= Benthos(n,3) + add_benthos_2d(n)
+            if (use_MEDUSA) then
+               SinkFlx(n,3) = SinkFlx(n,3) + add_benthos_2d(n) / area(1,n)/dt
+            endif
 #endif
         endif
 
         !! * Cal *
         if( tracers%data(tr_num)%ID==1020 .or. &  !iphycal
             tracers%data(tr_num)%ID==1021 ) then   !idetcal
-            Benthos(n,4)= Benthos(n,4) + add_benthos_2d(n)
+!            Benthos(n,4)= Benthos(n,4) + add_benthos_2d(n)
 
 #if defined(__usetp)
                Benthos_tr(n,4,tr_num)= Benthos_tr(n,4,tr_num) + add_benthos_2d(n)
 
             if (use_MEDUSA) then
                SinkFlx_tr(n,4,tr_num) = SinkFlx_tr(n,4,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+            endif
+#else
+            Benthos(n,4)= Benthos(n,4) + add_benthos_2d(n)
+            if (use_MEDUSA) then
+               SinkFlx(n,4) = SinkFlx(n,4) + add_benthos_2d(n) / area(1,n)/dt
             endif
 #endif
         endif
@@ -196,24 +217,36 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
             if( tracers%data(tr_num)%ID==1305 .or. & !iphyc_13
                 tracers%data(tr_num)%ID==1308 .or. & !idetc_13
                 tracers%data(tr_num)%ID==1314 ) then !idiac_13
-                Benthos(n,5)= Benthos(n,5) + add_benthos_2d(n)
+!                Benthos(n,5)= Benthos(n,5) + add_benthos_2d(n)
+
 #if defined(__usetp)
                    Benthos_tr(n,5,tr_num)= Benthos_tr(n,5,tr_num) + add_benthos_2d(n)
 
                 if (use_MEDUSA) then
                    SinkFlx_tr(n,5,tr_num) = SinkFlx_tr(n,5,tr_num) + add_benthos_2d(n) / area(1,n)/dt
                 endif
+#else
+                Benthos(n,5)= Benthos(n,5) + add_benthos_2d(n)
+                if (use_MEDUSA) then
+                   SinkFlx(n,5) = SinkFlx(n,5) + add_benthos_2d(n) / area(1,n)/dt
+                endif
 #endif
             endif
 
            if( tracers%data(tr_num)%ID==1320 .or. &  !iphycal_13
                tracers%data(tr_num)%ID==1321 ) then  !idetcal_13
-               Benthos(n,6)= Benthos(n,6) + add_benthos_2d(n)
+!               Benthos(n,6)= Benthos(n,6) + add_benthos_2d(n)
+
 #if defined(__usetp) 
                   Benthos_tr(n,6,tr_num)= Benthos_tr(n,6,tr_num) + add_benthos_2d(n)
 
                if (use_MEDUSA) then
                   SinkFlx_tr(n,6,tr_num) = SinkFlx_tr(n,6,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+               endif
+#else
+               Benthos(n,6)= Benthos(n,6) + add_benthos_2d(n)
+               if (use_MEDUSA) then
+                  SinkFlx(n,6) = SinkFlx(n,6) + add_benthos_2d(n) / area(1,n)/dt
                endif
 #endif
            endif
@@ -225,23 +258,35 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
            if( tracers%data(tr_num)%ID==1405 .or. & !iphyc_14
                tracers%data(tr_num)%ID==1408 .or. & !idetc_14
                tracers%data(tr_num)%ID==1414 ) then !idiac_14
-               Benthos(n,7)= Benthos(n,7) + add_benthos_2d(n)
+!               Benthos(n,7)= Benthos(n,7) + add_benthos_2d(n)
+
 #if defined(__usetp) 
                   Benthos_tr(n,7,tr_num)= Benthos_tr(n,7,tr_num) + add_benthos_2d(n)
 
                if (use_MEDUSA) then
                   SinkFlx_tr(n,7,tr_num) = SinkFlx_tr(n,7,tr_num) + add_benthos_2d(n) / area(1,n)/dt
                endif
+#else
+               Benthos(n,7)= Benthos(n,7) + add_benthos_2d(n)
+               if (use_MEDUSA) then
+                  SinkFlx(n,7) = SinkFlx(n,7) + add_benthos_2d(n) / area(1,n)/dt
+               endif
 #endif
            endif
 
            if( tracers%data(tr_num)%ID==1420 .or. &  !iphycal_14
                tracers%data(tr_num)%ID==1421 ) then  !idetcal_14
-               Benthos(n,8)= Benthos(n,8) + add_benthos_2d(n)
+!               Benthos(n,8)= Benthos(n,8) + add_benthos_2d(n)
+
 #if defined(__usetp) 
                   Benthos_tr(n,8,tr_num)= Benthos_tr(n,8,tr_num) + add_benthos_2d(n)
                if (use_MEDUSA) then
                   SinkFlx_tr(n,8,tr_num) = SinkFlx_tr(n,8,tr_num) + add_benthos_2d(n) / area(1,n)/dt
+               endif
+#else
+               Benthos(n,8)= Benthos(n,8) + add_benthos_2d(n)
+               if (use_MEDUSA) then
+                  SinkFlx(n,8) = SinkFlx(n,8) + add_benthos_2d(n) / area(1,n)/dt
                endif
 #endif
            endif
@@ -249,19 +294,22 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
 
    end do
 
-#if defined(__usetp)
    if(use_MEDUSA) then
         do n=1, bottflx_num
-           call exchange_nod(SinkFlx_tr(:,n,tr_num), partit)
+#if defined(__usetp)
+          call exchange_nod(SinkFlx_tr(:,n,tr_num), partit)
+#else
+          call exchange_nod(SinkFlx(:,n), partit)
+#endif
         end do
    end if ! use_MEDUSA
-#endif
 
    do n=1, benthos_num
 #if defined(__usetp)
       call exchange_nod(Benthos_tr(:,n,tr_num), partit)
-#endif
+#else
       call exchange_nod(Benthos(:,n), partit)
+#endif
    end do
 
 end subroutine ver_sinking_recom_benthos
