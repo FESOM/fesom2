@@ -76,6 +76,9 @@ endif()
 option(RECOM_COUPLED "Use RECOM" OFF)
 message(STATUS "RECOM_COUPLED: ${RECOM_COUPLED}")
 
+option(RECOM_WAVEBANDS "Use SPECTRAL in RECOM" OFF)
+message(STATUS "RECOM_SPECTRAL: ${RECOM_WAVEBANDS}")
+
 option(USE_ICEPACK "Use ICEPACK" OFF)
 message(STATUS "USE_ICEPACK: ${USE_ICEPACK}")
 
@@ -237,7 +240,8 @@ if(OPENMP_REPRODUCIBLE)
 endif()
 
 if(${RECOM_COUPLED})
-   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2) # __3Zoo2Det __coccos)# __usetp)
+#   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2) # __3Zoo2Det __coccos)# __usetp)
+  target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2 __RECOM_WAVEBANDS)
 endif()
 
 if(${CISO_COUPLED})

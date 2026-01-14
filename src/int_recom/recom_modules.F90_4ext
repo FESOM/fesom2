@@ -3543,6 +3543,161 @@ endif !/* RECOM_RADTRANS */
       return
       end subroutine MONOD_RADTRANS_DIRECT
 !BOP
+! !ROUTINE: MONOD_RADTRANS
+
+! !INTERFACE: ==========================================================
+      subroutine MONOD_RADTRANS(                                     &
+                         Nn,                                         &
+                         H,rmud,Ed,Es,a_k,bt_k,bb_k,                 &
+                         Edz,Esz,Euz,Eutop,                          &
+                         tirrq,tirrwq,                               &
+                         myThid)
+
+! !DESCRIPTION:
+! MODIFIED VERSION OF WG's edeu.F
+!
+!
+!  Model of irradiance in the water column.  Accounts for three
+!  irradiance streams:
+!
+!
+!  Edz = direct downwelling irradiance in W/m2 per waveband
+!  Esz = diffuse downwelling irradiance in W/m2 per waveband
+!  Euz = diffuse upwelling irradiance in W/m2 per waveband
+!
+!  Propagation is done in energy units, tests are done in quanta,
+!  final is quanta for phytoplankton growth.
+!
+! !USES: ===============================================================
+      IMPLICIT NONE
+!#include "SIZE.h"              /* Nr */  SL Nn consider use again Nr
+!#include "SPECTRAL_SIZE.h"     /* tlam */
+!#include "SPECTRAL.h"          /* WtouEin */
+!#include "WAVEBANDS_PARAMS.h"  /* darwin_PAR_ilamLo/Hi
+
+! !INPUT PARAMETERS: ===================================================
+!     H      :: layer thickness (should include hFacC!)
+!     rmud   :: inv.cosine of direct (underwater solar) zenith angle
+!     Ed     :: direct downwelling irradiance below surface per waveband
+!     Es     :: diffuse downwelling irradiance below surface per waveband
+!     a_k    :: absorption coefficient per level and waveband (1/m)
+!     bt_k   :: total scattering coefficient per level and waveband (1/m)
+!               = forward + back scattering coefficient
+!     bb_k   :: backscattering coefficient per level and waveband (1/m)
+      integer                                :: Nn
+      Real(kind=8),dimension(Nn)             :: H
+      Real(kind=8)                           :: rmud
+      Real(kind=8),dimension(tlam)           :: Ed
+      Real(kind=8),dimension(tlam)           :: Es
+      Real(kind=8),dimension(Nn,tlam)        :: a_k
+      Real(kind=8),dimension(Nn,tlam)        :: bt_k
+      Real(kind=8),dimension(Nn,tlam)        :: bb_k
+      INTEGER myThid
+! !OUTPUT PARAMETERS: ==================================================
+!     Edz    :: direct downwelling irradiance at bottom of layer
+!     Esz    :: diffuse downwelling irradiance at bottom of layer
+!     Euz    :: diffuse upwelling irradiance at bottom of layer
+!     tirrq  :: total scalar irradiance at cell center (uEin/m2/s)
+!     tirrwq :: total scalar irradiance at cell center per waveband
+      Real(kind=8),dimension(tlam,Nn)        :: Edz
+      Real(kind=8),dimension(tlam,Nn)        :: Esz
+      Real(kind=8),dimension(tlam,Nn)        :: Euz
+      Real(kind=8),dimension(tlam,Nn)        :: Eutop
+      Real(kind=8),dimension(Nn)             :: tirrq
+      Real(kind=8),dimension(tlam,Nn)        :: tirrwq
+
+!sl if (RECOM_RADTRANS) then
+! !LOCAL VARIABLES: ====================================================
+      INTEGER                                :: k, np, nl
+      Real(kind=8)                           :: Etopq,Ebotq
+      Real(kind=8),dimension(tlam)           :: Etopwq 
+      Real(kind=8),dimension(tlam)           :: Ebotwq
+      Real(kind=8)                           :: zd,zirrq
+      Real(kind=8)                           :: Emidq,Emidwq
+      Real(kind=8),dimension(tlam)           :: Edtop
+      Real(kind=8),dimension(tlam)           :: Estop
+!sl endif
+!EOP
+if (RECOM_RADTRANS) then
+!     Ebot = 0.0
+      do nl = 1,tlam
+! initialize state variables
+        Edtop(nl) = Ed(nl)
+        Estop(nl) = Es(nl)
+!       Ebot = Ebot + (Ed(nl)+Es(nl))
+      enddo
+!  Convert to quanta: divide by Avos # to get moles quanta; then mult by
+!  1E6 to get uM or uEin
+      do nl = 1,tlam
+!  don't include upwelling at surface
+        Ebotwq(nl) = (Edtop(nl)+Estop(nl))*WtouEins(nl)
+      enddo
+!  sum PAR range
+      Ebotq = 0.0
+      do nl = darwin_PAR_ilamLo,darwin_PAR_ilamHi
+        Ebotq = Ebotq + Ebotwq(nl)
+      enddo
+      do k = 1,Nn
+!       Etop = Ebot
+        Etopq = Ebotq
+        zd = min(darwin_Dmax,H(k))
+!       zirr = 0.0
+        do nl = 1,tlam
+          Edz(nl,k) = 0.0
+          Esz(nl,k) = 0.0
+          Euz(nl,k) = 0.0
+          Eutop(nl,k) = 0.0
+          if (Edtop(nl) .ge. darwin_radmodThresh .or.                    &
+            Estop(nl) .ge. darwin_radmodThresh) then
+if (DAR_RADTRANS_DECREASING) then
+!      truncation to decreasing modes a la Aas
+            call radtrans_radmod_decr(                                   &
+                    zd,Edtop(nl),Estop(nl),                              &
+                    rmud,darwin_rmus,darwin_rmuu,                        &
+                    a_k(k,nl),bt_k(k,nl),bb_k(k,nl),darwin_Dmax,         &
+                    Edz(nl,k),Esz(nl,k),Euz(nl,k),Eutop(nl,k))
+else
+!      Watson Gregg's original
+            call radtrans_radmod(                                        &
+                    zd,Edtop(nl),Estop(nl),                              &
+                    rmud,darwin_rmus,darwin_rmuu,                        &
+                    a_k(k,nl),bt_k(k,nl),bb_k(k,nl),darwin_Dmax,         &
+                    Edz(nl,k),Esz(nl,k),Euz(nl,k),Eutop(nl,k))
+endif
+!           print*,'radmod',Edz(nl,k),Esz(nl,k),Euz(nl,k)
+          endif
+!  cycle
+          Edtop(nl) = Edz(nl,k)
+          Estop(nl) = Esz(nl,k)
+!         zirr = zirr + (Edz(nl,k)+Esz(nl,k)+Euz(nl,k))
+!-      enddo nl
+        enddo
+!       Ebot = zirr
+! ANNA  SPEC retrieve and pass spectral irrq
+        do nl = 1,tlam
+          Etopwq(nl) = Ebotwq(nl)
+! add vertical components, ...
+          Ebotwq(nl)=(Edz(nl,k)+Esz(nl,k)+Euz(nl,k))*WtouEins(nl)
+! ... interpolate ...
+          Emidwq = sqrt(Etopwq(nl)*Ebotwq(nl))
+! ... and convert using rmus !?
+          tirrwq(nl,k) = Emidwq*darwin_rmus
+        enddo
+!  sum PAR range
+        zirrq = 0.0
+        do nl = darwin_PAR_ilamLo,darwin_PAR_ilamHi
+         zirrq = zirrq + Ebotwq(nl)
+        enddo
+        Ebotq = zirrq
+! interpolate nonspectral PAR separately !?
+        Emidq = sqrt(Etopq*Ebotq)
+        tirrq(k) = Emidq*darwin_rmus    !scalar irradiance
+!-    enddo k
+      enddo
+!
+endif !/* RECOM_RADTRANS */
+      return
+      end subroutine MONOD_RADTRANS 
 
 !!-----------------------------------------------------------------------------
 !$Header: /u/gcmpack/MITgcm_contrib/darwin2/pkg/monod/solve_tridiagonal_pivot.F,v 1.1 2012/08/23 21:53:00 jahn Exp $

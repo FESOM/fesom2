@@ -555,19 +555,19 @@ endif
                     tirrwq(1:tlam,1:Nr),                         &
                     amp1(1:tlam,1:Nr),amp2(1:tlam,1:Nr),         &
                     myThid)
-         ELSEIF (darwin_radtrans_niter.EQ.-1) THEN
-           call MONOD_RADTRANS(                                  &
-                    Nr,                                          &
-                    thick(1:Nr),rmud,                            &
-                    Edwsf(1:tlam),Eswsf(1:tlam),                 &
-                    a_k(1:Nr,1:tlam),                            &
-                    bt_k(1:Nr,1:tlam),                           &
-                    bb_k(1:Nr,1:tlam),                           &
-                    Edz(1:tlam,1:Nr),Esz(1:tlam,1:Nr),           &
-                    Euz(1:tlam,1:Nr),Eutop(1:tlam,1:Nr),         &
-                    tirrq(1:Nr),                                 &
-                    tirrwq(1:tlam,1:Nr),                         &
-                    myThid)
+!sl         ELSEIF (darwin_radtrans_niter.EQ.-1) THEN
+!sl           call MONOD_RADTRANS(                                  &
+!sl                    Nr,                                          &
+!sl                    thick(1:Nr),rmud,                            &
+!sl                    Edwsf(1:tlam),Eswsf(1:tlam),                 &
+!sl                    a_k(1:Nr,1:tlam),                            &
+!sl                    bt_k(1:Nr,1:tlam),                           &
+!sl                    bb_k(1:Nr,1:tlam),                           &
+!sl                    Edz(1:tlam,1:Nr),Esz(1:tlam,1:Nr),           &
+!sl                    Euz(1:tlam,1:Nr),Eutop(1:tlam,1:Nr),         &
+!sl                    tirrq(1:Nr),                                 &
+!sl                    tirrwq(1:tlam,1:Nr),                         &
+!sl                    myThid)
          ELSE
             call MONOD_RADTRANS_DIRECT(                          &
                     Nr,                                          &

@@ -68,6 +68,10 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     use g_forcing_arrays, only: press_air, u_wind, v_wind, shortwave
     use g_comm_auto
 
+#if defined (__RECOM_WAVEBANDS)   
+    use REcoM_spectral
+#endif
+
     implicit none
 
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -203,7 +207,9 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
          LocAtmCO2_13              = AtmCO2_13(month)
          if (ciso_14) then
 !          Latitude of nodal point n 
-           lat_val = geo_coord_nod2D(2,n) / rad
+!SL double check w.r.t rad !!
+!           lat_val = geo_coord_nod2D(2,n) / rad
+           lat_val = geo_coord_nod2D(2,n) / 57.29
 !          Zonally binned NH / SH / TZ 14CO2 input values
            LocAtmCO2_14 = AtmCO2_14(lat_zone(lat_val), month)
          end if
