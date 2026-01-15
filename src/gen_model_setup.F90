@@ -122,6 +122,9 @@ subroutine read_namelist
   read (20,NML=paco2_flux_param)
   read (20,NML=paalkalinity_restoring)
   read (20,NML=paballasting)             ! NEW BALL
+#if defined (__seaice_tracers)
+  read (20,NML=pa_seaiceiron)             ! NEW BALL
+#endif
   read (20,NML=paciso)
   close (20)
 #endif
