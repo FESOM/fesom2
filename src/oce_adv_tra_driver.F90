@@ -55,7 +55,20 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     use oce_adv_tra_ver_interfaces
     use oce_adv_tra_fct_interfaces
     use oce_tra_adv_flux2dtracer_interface
-    implicit none
+
+#ifdef use_PDAF
+    use cfluxes_diags_pdaf
+    use fesom_pdaf, only: nlmax
+    use parallel_pdaf_mod, only: writepe
+#endif
+
+    implicit none 
+
+#ifdef use_PDAF
+    integer :: idcf
+    logical :: thistracer
+#endif
+
     real(kind=WP),  intent(in),    target :: dt
     integer,        intent(in)            :: tr_num
     type(t_mesh)  , intent(in)   , target :: mesh
@@ -256,6 +269,38 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         !$ACC END PARALLEL LOOP
 #endif
 
+#ifdef use_PDAF
+                ! select tracer ID for SMS diagnostics
+                thistracer = .true.
+                IF      (tr_num== 5) THEN
+                        idcf = id_s_verLO_alk
+                ELSEIF  (tr_num== 4) THEN
+                        idcf = id_s_verLO_dic
+                ELSEIF ((tr_num== 7) .or. &           ! PhyC
+                        (tr_num==12) .or. &           ! HetC
+                        (tr_num==22) .or. &           ! PhyCalc
+                        (tr_num==16) .or. &           ! DiaC
+                        (tr_num==26)        ) THEN    ! Zoo2C
+                        idcf = id_s_verLO_livingmatter
+                ELSEIF ((tr_num==28) .or. &           ! Det Zoo2C
+                        (tr_num==30) .or. &           ! Det Zoo2Calc
+                        (tr_num==10) .or. &           ! Det C
+                        (tr_num==23) .or. &           ! Det Calc
+                        (tr_num==14)        ) THEN    ! DOC
+                        idcf = id_s_verLO_deadmatter
+                ELSE
+                   thistracer = .false.
+                   idcf       = cfnfields+1
+                ENDIF
+
+                ! add LO part to vertical advection for SMS diagnostics
+                IF (thistracer) THEN
+                   ! concentration
+                   cffields(idcf)%instantconc(nz,n) = cffields(idcf)%instantconc(nz,n) + (adv_flux_ver(nz,n)-adv_flux_ver(nz+1,n)) / (areasvol(nz,n)*hnode_new(nz,n))
+                   ! mass
+                   cffields(idcf)%instantmass(nz,n) = cffields(idcf)%instantmass(nz,n) + (adv_flux_ver(nz,n)-adv_flux_ver(nz+1,n))
+                ENDIF
+#endif
 
         !_______________________________________________________________________
         ! DVD diagostic: store low order horizontal and vertical tracer fluxes through mid 
@@ -491,6 +536,18 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
     USE MOD_PARTIT
     USE MOD_PARSUP
     use g_comm_auto
+
+#ifdef use_PDAF
+    use cfluxes_diags_pdaf
+    use fesom_pdaf, only: nlmax
+    use parallel_pdaf_mod, only: writepe
+#endif
+    implicit none
+#ifdef use_PDAF
+    integer :: idcf
+    logical :: thistracer
+#endif
+
     implicit none
     real(kind=WP), intent(in),    target :: dt
     type(t_partit),intent(inout), target :: partit
@@ -527,6 +584,41 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
              !$ACC LOOP VECTOR
              do nz=nu1, nl1-1
                 dttf_v(nz,n)=dttf_v(nz,n)-ttf(nz,n)*hnode(nz,n)+LO(nz,n)*hnode_new(nz,n)
+
+#ifdef use_PDAF        
+                ! select tracer ID for SMS diagnostics
+                thistracer = .true.
+                IF      (tr_num== 5) THEN
+                        idcf = id_s_verAD_alk
+                ELSEIF  (tr_num== 4) THEN
+                        idcf = id_s_verAD_dic
+                ELSEIF ((tr_num== 7) .or. &           ! PhyC
+                        (tr_num==12) .or. &           ! HetC
+                        (tr_num==22) .or. &           ! PhyCalc
+                        (tr_num==16) .or. &           ! DiaC
+                        (tr_num==26)        ) THEN    ! Zoo2C
+                        idcf = id_s_verAD_livingmatter
+                ELSEIF ((tr_num==28) .or. &           ! Det Zoo2C
+                        (tr_num==30) .or. &           ! Det Zoo2Calc
+                        (tr_num==10) .or. &           ! Det C
+                        (tr_num==23) .or. &           ! Det Calc
+                        (tr_num==14)        ) THEN    ! DOC
+                        idcf = id_s_verAD_deadmatter
+                ELSE
+                   thistracer = .false.
+                   idcf       = cfnfields+1
+                ENDIF
+
+                ! add antidiffusive part to vertical advection for SMS diagnostics
+                IF (thistracer) THEN
+                   ! concentration
+                   cffields(idcf)%instantconc(nz,n) = cffields(idcf)%instantconc(nz,n) + (flux_v(nz,n)-flux_v(nz+1,n)) / (areasvol(nz,n)*hnode_new(nz,n))
+                   ! mass
+                   cffields(idcf)%instantmass(nz,n) = cffields(idcf)%instantmass(nz,n) + (flux_v(nz,n)-flux_v(nz+1,n))
+                ENDIF
+#endif
+
+
              end do
              !$ACC END LOOP
           end do

@@ -82,6 +82,9 @@ message(STATUS "RECOM_SPECTRAL: ${RECOM_WAVEBANDS}")
 option(USE_ICEPACK "Use ICEPACK" OFF)
 message(STATUS "USE_ICEPACK: ${USE_ICEPACK}")
 
+option(PDAF_ACTIVE "Use PDAF" OFF)
+message(STATUS "PDAF: ${PDAF_ACTIVE}")
+
 # option to trigger building a library version of FESOM
 # we do not always build the library along with the executable to avoid having two targets here in the CMakeLists.txt
 # two targets would allow e.g. setting different compiler options or preprocessor definition, which would be error prone.
@@ -149,9 +152,16 @@ elseif(ENABLE_IFS_INTERFACE) # ICEPACK + IFS_INTERFACE NOT SUPPORTED (YET)
 endif()
 
 if(${RECOM_COUPLED})  # ADD RECOM FILES
-   file(GLOB sources_Fortran ${src_home}/*.F90
-                             ${src_home}/int_recom/*.F90
-                             ${src_home}/int_recom/recom/*.F90)
+	if(NOT ${PDAF_ACTIVE})
+                file(GLOB sources_Fortran ${src_home}/*.F90 
+                                          ${src_home}/int_recom/*.F90 
+                                          ${src_home}/int_recom/recom/*.F90)
+        elseif(${PDAF_ACTIVE})
+                        file(GLOB sources_Fortran ${src_home}/*.F90 
+                                          ${src_home}/int_recom/*.F90 
+                                          ${src_home}/int_recom/recom/*.F90
+					  ${src_home}/../PDAF/src/*.F90)
+        endif()
 endif()                             
 
 # generate a custom file from fesom_version_info.F90 which includes the current git SHA
@@ -247,6 +257,10 @@ endif()
 if(${CISO_COUPLED})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __ciso)
 endif()
+# Define use_PDAF to implement PDAF.
+if(${PDAF_ACTIVE})
+         target_compile_definitions(${PROJECT_NAME} PRIVATE use_PDAF)
+ endif()
 
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
@@ -314,6 +328,25 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${SCRIP_Fortran_INCLUDE_DIREC
 target_include_directories(${PROJECT_NAME} PRIVATE ${YAC_Fortran_INCLUDE_DIRECTORIES} ${YAXT_Fortran_INCLUDE_DIRECTORIES})
 target_link_libraries(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES} ${OASIS_Fortran_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} PRIVATE ${MCT_Fortran_LIBRARIES} ${MPEU_Fortran_LIBRARIES} ${SCRIP_Fortran_LIBRARIES})
+
+# Link PDAF library.
+# Before compiling FESOM-REcoM with PDAF the first time, make sure that
+# either: libpdaf-d.a is compiled already. The libpdaf-d.a file should
+# be located in your PDAF_DIR/lib/ directory.
+# Else, libpdaf-d needs to be compiled first:
+# (1) Go to your PDAF_DIR
+# (2) Create empty directories /lib and /include
+# (3) Go to PDAF_DIR/src
+# (4) Include machine-specific definitions in the Makefile
+# (5) Type "make" (or "make ../lib/libpdaf-d.a") to compile the library
+# (6) Now, you find your .mod files in the include directory!
+
+ if(${PDAF_ACTIVE})
+         set(ENV{PDAF_DIR} "${CMAKE_CURRENT_LIST_DIR}/../PDAF/") # path to PDAF directory starting from the dir containing our CMakeLists.txt
+   message("Linking libpdaf from: $ENV{PDAF_DIR}")
+   target_include_directories(${PROJECT_NAME} PRIVATE $ENV{PDAF_DIR}/include)
+   target_link_libraries(${PROJECT_NAME} $ENV{PDAF_DIR}/lib/libpdaf-d.a)
+ endif()
 
 
 # OASIS-YAK
