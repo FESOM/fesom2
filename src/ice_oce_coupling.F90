@@ -271,6 +271,8 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     use g_clock
     !---fwf-code-end
 
+    use runoff_scaling_interface
+
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_dyn)   , intent(in)   , target :: dynamics
@@ -300,8 +302,9 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     real(kind=WP), allocatable :: wiso_delta_rain(:,:),wiso_delta_snow(:,:),wiso_delta_ocean(:,:),wiso_delta_seaice(:,:)
     !---wiso-code-end
 
-    real(kind=WP) :: runoff_global_wf,runoff_global_f,runoff_south_wf,runoff_south_f
-    real(kind=WP), allocatable :: runoff_masked(:)
+    !---runoff scaling---
+    real(kind=WP)              :: runoff_global, runoff_south, ibfw_net, cavfw_net
+    real(kind=WP), allocatable :: runoff_masked(:), runoff_cav_mask(:)
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -325,6 +328,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     allocate(flux(myDim_nod2D+eDim_nod2D))
 
     allocate(runoff_masked(size(runoff)))
+    allocate(runoff_cav_mask(size(runoff)))
 
 !$OMP PARALLEL DO
     do n=1, myDim_nod2d+eDim_nod2d  
@@ -374,17 +378,6 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
                            evap_ocn_out  = evaporation,              &
                            evap_out      = ice_sublimation           )
 
-    ! GH runoff check
-    call integrate_nod(runoff, runoff_global_wf, partit, mesh)
-    if (mype==0) write (*,*) "global runoff into water_flux: ", runoff_global_wf
-
-    runoff_masked = 0.0_WP
-    where (geo_coord_nod2D(2, :) < -60.0_WP * rad)
-        runoff_masked = runoff
-    end where
-    call integrate_nod(runoff_masked, runoff_south_wf, partit, mesh)
-    if (mype==0) write(*,*) "SO runoff into water_flux:      ", runoff_south_wf
-
 !$OMP PARALLEL DO
     do n=1, myDim_nod2d+eDim_nod2d  
         ! Heat flux 
@@ -425,7 +418,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
         call exchange_nod(heat_flux, water_flux, partit)
 !$OMP BARRIER
     end if 
-    
+
     !___________________________________________________________________________
     ! save total heat flux (heat_flux_in) since heat_flux will be alternated by 
     ! sw_pene
@@ -557,16 +550,73 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     !           to compensate for it the ice2atmos subplimation does not contribute 
     !           to the freshwater flux into the ocean
     
+    ! ==========================================================================
     ! GH runoff check
-    call integrate_nod(runoff, runoff_global_f, partit, mesh)
-    if (mype==0) write (*,*) "global runoff into flux:       ", runoff_global_f
+    !call integrate_nod(runoff, runoff_global_f, partit, mesh)
+    !if (mype==0) write (*,*) "global runoff into flux:       ", runoff_global_f
 
-    runoff_masked = 0.0_WP
-    where (geo_coord_nod2D(2, :) < -60.0_WP * rad)
-        runoff_masked = runoff
-    end where
-    call integrate_nod(runoff_masked, runoff_south_f, partit, mesh)
-    if (mype==0) write(*,*) "SO runoff into flux:            ", runoff_south_f
+    !runoff_masked = 0.0_WP
+    !where (geo_coord_nod2D(2, :) < -60.0_WP * rad)
+    !    runoff_masked = runoff
+    !end where
+    !call integrate_nod(runoff_masked, runoff_south_f, partit, mesh)
+    !if (mype==0) write(*,*) "SO runoff into flux:            ", runoff_south_f
+
+    !if (mype==0) write(*,*) "I am sitting in front of the use_runoff scaling if in ice_oce_coupling"
+    if (use_runoff_scaling) then
+        !if (mype==0) write(*,*) "I am inside the if"
+        runoff_masked = 0.0_WP
+        where (geo_coord_nod2D(2, :) < -60.0_WP * rad)
+            runoff_masked = runoff
+        end where
+    
+        call integrate_nod(runoff_masked, runoff_south, partit, mesh)
+        if (mype==0) write(*,*) "runoff southern ocean: ", runoff_south
+    
+        if (runoff_south == 0.0_WP) then
+            if (mype==0) write(*,*) "Warning: runoff_south = 0, skipping scaling"
+            !return
+        !end if
+        else
+        ! What do I do when cavfw_net/ibfw_net is larger then ref_runoff?
+
+            if (use_icebergs .and. .not. use_cavity) then
+                if (mype==0) write(*,*) " Adjusting runoff - icb Y; cav N"
+        
+                call integrate_nod(ibfwb + ibfwe + ibfwl + ibfwbv, ibfw_net, partit, mesh)
+                if (mype==0) write(*,*) " Reducing ref runoff by iceberg fw flux: ", ibfw_net
+                call runoff_scaling(runoff, partit, mesh, ibfw_net) !need extra parameter here
+ 
+            elseif (.not. use_icebergs .and. use_cavity) then
+                if (mype==0) write(*,*) " Adjusting runoff - icb N; cav Y"
+            
+                runoff_cav_mask = 0.0_WP
+             
+                do n=1, myDim_nod2D+eDim_nod2D
+                    if (ulevels_nod2d(n) == 1) cycle
+                    runoff_cav_mask(n)=water_flux(n)
+                end do
+
+                call integrate_nod(runoff_cav_mask, cavfw_net, partit, mesh)
+                if (mype==0) write(*,*) " Reducing ref runoff by cav fw flux: ", cavfw_net 
+                call runoff_scaling(runoff, partit, mesh, cavfw_net) !need extra parameter here
+
+            elseif (.not. use_icebergs .and. .not. use_cavity) then 
+                if (mype==0) write(*,*) " Adjusting runoff - icb/cav N"
+                if (mype==0) write (*,*) "size of runoff in ice_oce:   ", size(runoff)
+                call runoff_scaling(runoff, partit, mesh)
+            end if
+        
+            ! adjustment check after
+            where (geo_coord_nod2D(2, :) < -60.0_WP * rad)
+                runoff_masked = runoff
+            end where
+
+            call integrate_nod(runoff_masked, runoff_south, partit, mesh)
+            if (mype==0) write(*,*) "runoff southern ocean after scaling: ", runoff_south
+
+        end if
+    end if
 
 !$OMP PARALLEL DO
     do n=1, myDim_nod2D+eDim_nod2D

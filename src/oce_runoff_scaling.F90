@@ -3,15 +3,28 @@ module runoff_scaling_interface
     subroutine runoff_scaling_init()
     end subroutine runoff_scaling_init
 
-    subroutine runoff_scaling(runoff_in, partit, mesh)
+    subroutine runoff_scaling(runoff_in, partit, mesh, opt_in)
       use MOD_PARTIT
       use MOD_MESH
-      real(WP), intent(inout) :: runoff_in(:)
-      type(t_partit), intent(in), target :: partit
+      use o_PARAM, only: WP
+      real(kind=WP), intent(inout) :: runoff_in(:)
+      type(t_partit), intent(inout), target :: partit
       type(t_mesh),   intent(in), target :: mesh
+      real(kind=WP), intent(in), optional   :: opt_in ! only cav or only icb integrated flux
     end subroutine runoff_scaling
   end interface
 end module runoff_scaling_interface
+
+!=============================================
+!
+! Module to set antarctic surface runoff to reference or constant values,
+! or to multiply runoff by any factor.
+! 
+! Intended purpose is to use this for sets of experiments, where the net freshwater flux from surface runoff
+! stays consistent. For runs with different cavities/icebergs setup, these modules add freshwater that would
+! be counted double if runoff remains unchanged/unmasked. This module does both, depending on runscript parameters.
+!
+!=============================================
 
 module runoff_scaling_state
   use o_PARAM , only: WP
@@ -68,7 +81,7 @@ subroutine runoff_scaling_init()
 
     loaded = .true.
     write(*,*) "Runoff scaling: Loaded ", trim(filename)
-    if (mype==0) write (*,*) "Reference runoff: ", runoff_ref
+    write (*,*) "Reference runoff: ", runoff_ref
 
   case ('const')
 
@@ -79,6 +92,9 @@ subroutine runoff_scaling_init()
   
     write(*,*) "Case mult"
     ! runoff_ref = runoff_mult_factor
+
+  ! could add additional case for constant addition - alternative to fwflandice hosing
+  ! would apply evenly spread flux on all SO runoff nodes
 
   case default
   
@@ -94,7 +110,7 @@ end subroutine runoff_scaling_init
 !
 ! For now just monthly reference
 
-subroutine runoff_scaling(runoff_in, partit, mesh)
+subroutine runoff_scaling(runoff_in, partit, mesh, opt_in)
   use MOD_PARTIT
   use MOD_MESH
   use g_support
@@ -112,24 +128,37 @@ subroutine runoff_scaling(runoff_in, partit, mesh)
   real(kind=WP)                         :: runoff_factor
   type(t_partit), intent(inout), target :: partit
   type(t_mesh),   intent(in), target    :: mesh
+  real(kind=WP), intent(in), optional   :: opt_in ! only cav or only icb integrated flux
   !logical                               :: loaded
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-  if (mype==0) write (*,*) "In runoff_scaling()"
-  
+  !if (mype==0) write (*,*) "In runoff_scaling()"
+  !if (mype==0) write (*,*) "size of runoff_in:   ", size(runoff_in)
+
   allocate(runoff_mask(size(runoff_in)))
+  
+  !if (mype==0) write (*,*) "allocated runoff_mask"
+  !if (mype==0) write (*,*) "size of runoff_mask: ", size(runoff_mask)
 
   runoff_mask = 0.0_WP
+  !if (mype==0) write (*,*) "size of runoff_mask: ", size(runoff_mask)
+  !if (mype==0) write (*,*) "set runoff_mask to 0"
 
   where (geo_coord_nod2D(2, :) < -60.0_WP * rad)
     runoff_mask = runoff_in
   end where
+
+  !if (mype==0) write (*,*) "size of geo_coord_nod2D: ", size(geo_coord_nod2D(2, :))
+  !if (mype==0) write (*,*) "size of runoff_mask: ", size(runoff_mask)
+  !if (mype==0) write (*,*) "size of runoff_in:   ", size(runoff_in)
+  !if (mype==0) write (*,*) "set runoff_mask to runoff_in fuer < -60"
+
   call integrate_nod(runoff_mask, runoff_south, partit, mesh)
  
-  if (mype==0) write (*,*) "runoff south: ", runoff_south
+  !if (mype==0) write (*,*) "runoff south (in ORS): ", runoff_south
 
   select case (trim(runoff_scaling_method))
 
@@ -144,10 +173,28 @@ subroutine runoff_scaling(runoff_in, partit, mesh)
       runoff_factor = 1.0_WP
       if (mype==0) write(*,*) "Warning: runoff_south = 0, skipping scaling, setting factor to 1.0"
     else
-      runoff_factor = runoff_ref(month) * 1.0e6_WP / runoff_south
-      if (mype==0) write(*,*) "runoff factor:", runoff_factor
+      ! subtract ib/cav flux first
+      if (present(opt_in)) then
+        if (mype==0) write(*,*) "runoff_ref(month):", runoff_ref(month)
+        if (mype==0) write(*,*) "opt_in:", opt_in
+        if (mype==0) write(*,*) "runoff_ref - opt_in", runoff_ref(month) * 1.0e6_WP - opt_in
+        runoff_factor = (runoff_ref(month) * 1.0e6_WP - abs(opt_in)) / runoff_south
+        if (mype==0) write(*,*) "factor with reduction:", runoff_factor
+      else
+        runoff_factor = runoff_ref(month) * 1.0e6_WP / runoff_south
+        if (mype==0) write(*,*) "runoff_ref(month)", runoff_ref(month)
+        if (mype==0) write(*,*) "factor without reduction:", runoff_factor
+      end if
     end if
-  
+    
+    if (runoff_factor < 0) then
+      if (mype==0) write(*,*) "Warning: runoff factor < 0 !"
+    end if
+
+    ! if runoff_factor < 0 ?
+    ! lets see what happens first
+    ! otherwise I probably need to leave it as is...
+
     !$OMP PARALLEL DO
     do i = 1, myDim_nod2D + eDim_nod2D
       if (geo_coord_nod2D(2, i) < -60.0_WP * rad) then
@@ -192,15 +239,4 @@ subroutine runoff_scaling(runoff_in, partit, mesh)
     
   deallocate(runoff_mask)
 end subroutine runoff_scaling
-
-! To Do:
-! - how does file read?
-! - check how month from g_clock actually works
-! - check runoff scaling
-! - 
-!
-! Additional ideas/later to dos:
-! - set the scalling to daily/monthly/yearly
-! - allow for constant fwf addition -> set hosing value to be applied only on runoff nodes
-!
 

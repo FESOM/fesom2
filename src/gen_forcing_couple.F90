@@ -34,7 +34,7 @@ module integrate_2D_interface
       USE MOD_PARTIT
       USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
+      type(t_partit), intent(in), target :: partit
       real(kind=WP), intent (out) :: flux_global(2), flux_local(2)
       real(kind=WP), intent (out) :: eff_vol(2)
       real(kind=WP), intent (in)  :: field2d(partit%myDim_nod2D+partit%eDim_nod2D)
@@ -99,9 +99,9 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   use gen_bulk
   use force_flux_consv_interface
 
-  ! GH only for the runoff scaling checks
   use g_support
-  ! GH only for the runoff scaling checks
+  use runoff_scaling_interface
+
   implicit none
   integer,        intent(in)            :: istep
   type(t_ice)   , intent(inout), target :: ice
@@ -110,7 +110,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   type(t_mesh),   intent(in),    target :: mesh
   type(t_dyn)   , intent(in), target :: dynamics
   !_____________________________________________________________________________
-  integer		   :: i, itime,n2,n,nz,k,elem,j
+  integer		   :: i, itime,n2,n,nz,k,elem
   real(kind=WP)            :: i_coef, aux
   real(kind=WP)	           :: dux, dvy,tx,ty,tvol
   real(kind=WP)            :: t1, t2
@@ -144,27 +144,21 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   real(kind=WP), dimension(:), pointer  ::  tmp_oce_heat_flux, tmp_ice_heat_flux 
 #endif 
 #if defined (__oifs) || defined (__ifsinterface)
-  real(kind=WP), dimension(:), pointer  :: ice_temp, ice_alb, enthalpyoffuse
+  real(kind=WP), dimension(:), pointer  :: ice_temp, ice_alb, enthalpyoffuse, runoff_liquid, runoff_solid
   real(kind=WP),               pointer  :: tmelt
   real(kind=WP), dimension(:,:,:), pointer :: UVnode
 #endif
   real(kind=WP)              , pointer  :: rhoair
-  
-  ! GH only for the runoff scaling checks
-  real(kind=WP) :: runoff_global_before,runoff_global_after
-  real(kind=WP) :: runoff_south_before, runoff_south_after
+  real(kind=WP) :: runoff_south
   real(kind=WP), allocatable :: runoff_masked(:)
-  real(kind=WP) :: runoff_factor_ref
-  ! GH only for the runoff scaling checks
-
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-  
-  !GH
-  allocate(runoff_masked(size(runoff)))
-  !GH
+
+  if (use_runoff_scaling) then
+    allocate(runoff_masked(size(runoff)))
+  end if
 
   u_ice            => ice%uice(:)
   v_ice            => ice%vice(:)
@@ -179,6 +173,8 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   ice_temp         => ice%data(4)%values(:)
   ice_alb          => ice%atmcoupl%ice_alb(:)
   enthalpyoffuse   => ice%atmcoupl%enthalpyoffuse(:)
+  runoff_liquid    => ice%atmcoupl%runoff_liquid(:)
+  runoff_solid     => ice%atmcoupl%runoff_solid(:)
   tmelt            => ice%thermo%tmelt
   UVnode           => dynamics%uvnode(:,:,:)
 #endif      
@@ -192,9 +188,6 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   
   !_____________________________________________________________________________
   t1=MPI_Wtime()
-  !if (mype == 0) then
-  !  write(*,*) 'DEBUG: entered update_atm_forcing with istep=', istep, ' action=', action
-  !end if
 #if defined (__oasis)
      if (firstcall) then
         allocate(exchange(myDim_nod2D+eDim_nod2D), mask(myDim_nod2D+eDim_nod2D))
@@ -230,7 +223,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
               end do
             else    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
-#else   ! oifs
+#else
             ! AWI-CM2 outgoing state vectors
             do n=1,myDim_nod2D+eDim_nod2D
             exchange(n)=tracers%data(1)%values(1, n)                     ! sea surface temperature [°C]
@@ -286,7 +279,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 !---wiso-code-end
             else	    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
-#endif  ! oifs
+#endif
          endif
          call cpl_oasis3mct_send(i, exchange, action, partit)
       end do
@@ -382,77 +375,38 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
             if (action) then
                 runoff(:)            =  exchange(:)        ! AWI-CM2: runoff, AWI-CM3: runoff + excess snow on glaciers
                 mask=1.
-                
-                call integrate_nod(runoff, runoff_global_before, partit, mesh)
-                if (mype==0) write (*,*) "before consv - global:               ", runoff_global_before
-
-                runoff_masked = 0.0_WP
-                where (geo_coord_nod2D(2, :) < -60.0_WP * rad)
-                  runoff_masked = runoff
-                end where
-                call integrate_nod(runoff_masked, runoff_south_before, partit, mesh)
-                if (mype==0) write(*,*) "before consv - SO:                    ", runoff_south_before
-
                 call force_flux_consv(runoff, mask, i, 0,action, partit, mesh)
-                
-                call integrate_nod(runoff, runoff_global_after, partit, mesh)
-                if (mype==0) write (*,*) "after consv/before scaling - global: ", runoff_global_after
+                  
+                  ! comment this block out later
+                  !if (use_runoff_scaling) then
+                  !  runoff_masked = 0.0_WP
+                  !  where (geo_coord_nod2D(2, :) < -60.0_WP * rad)
+                  !    runoff_masked = runoff
+                  !  end where
 
-                !runoff_masked = 0.0_WP
-                !where (geo_coord_nod2D(2, :) < -60.0_WP * rad)
-                !  runoff_masked = runoff
-                !end where
-                call integrate_nod(runoff_masked, runoff_south_after, partit, mesh)
-                if (mype==0) write(*,*) "after consv/before scaling - SO:      ", runoff_south_after
+                  !  call integrate_nod(runoff_masked, runoff_south, partit, mesh)
+                  !  if (mype==0) write(*,*) "runoff southern ocean: ", runoff_south
 
-                if (runoff_south_after == 0.0_WP) then
-                  if (mype==0) write(*,*) "Warning: runoff_south_after = 0, skipping scaling"
-                else
-                  call runoff_scaling(runoff, partit, mesh)
-                end if
-
-                ! runoff_factor_ref = runoff_ref * 1.0e6_WP / runoff_south_after
-                ! if (mype==0) write(*,*) "runoff factor after reference:        ", runoff_factor_ref
-
-                !if (runoff_south_after == 0.0_WP) then
-                !  runoff_factor_ref = 1.0_WP
-                !  if (mype==0) write(*,*) "Warning: runoff_south_after = 0, skipping scaling, setting factor to 1.0"
-                !else
-                !  runoff_factor_ref = runoff_ref_const * 1.0e6_WP / runoff_south_after
-                !  if (mype==0) write(*,*) "runoff factor after reference:        ", runoff_factor_ref
-                !end if
-
-                !if (use_runoff_factor) then
-                !  !$OMP PARALLEL DO
-                !  do j = 1, myDim_nod2D + eDim_nod2D
-                !    if (geo_coord_nod2D(2, j) < -60.0_WP * rad) then
-                !      !runoff(j) = runoff(j) * runoff_factor
-                !      runoff(j) = runoff(j) * runoff_factor_ref
-                !    end if
-                !  end do
-                !  !$OMP END PARALLEL DO
-                !end if
-                
-                call integrate_nod(runoff, runoff_global_after, partit, mesh)
-                if (mype==0) write (*,*) "after scaling - global:              ", runoff_global_after
-
-                runoff_masked = 0.0_WP
-                where (geo_coord_nod2D(2, :) < -60.0_WP * rad)
-                  runoff_masked = runoff
-                end where
-                call integrate_nod(runoff_masked, runoff_south_after, partit, mesh)
-                if (mype==0) write(*,*) "after scaling - SO:                   ", runoff_south_after
-                
+                  !  if (runoff_south == 0.0_WP) then
+                  !    if (mype==0) write(*,*) "Warning: runoff_south = 0, skipping scaling"
+                  !  else
+                  !    call runoff_scaling(runoff, partit, mesh)
+                  !  end if
+                  !end if
             end if
 #if defined (__oifs)
 
          elseif (i.eq.13) then
              if (action) then
-                enthalpyoffuse(:)            =  exchange(:)*333.55*1000000.0        ! enthalpy of fusion via solid water discharge from glaciers
+                runoff_solid(:)      =  exchange(:)        ! solid water discharge (excess snow --> calving)
+                enthalpyoffuse(:)            =  runoff_solid(:)*333.55*1000000.0        ! enthalpy of fusion of the solid water discharge from glaciers
                 enthalpyoffuse = -min(enthalpyoffuse, 1000.0)
-                runoff(:)            = runoff(:) + exchange(:)                      ! Add calving massflux to the liquid runoff. Heatflux goes into enthalpyoffuse.
+                runoff_liquid(:) = runoff(:)                     ! store previous liquid runoff
+                runoff(:)            = runoff_liquid(:) + runoff_solid(:)                      ! Add solid runoff to the liquid runoff. Heatflux goes into enthalpyoffuse.
 
                 mask=1.
+                call force_flux_consv(runoff_liquid, mask, i, 0, action, partit, mesh)
+                call force_flux_consv(runoff_solid, mask, i, 0, action, partit, mesh)
                 call force_flux_consv(enthalpyoffuse, mask, i, 0, action, partit, mesh)
              end if
          elseif (i.eq.14) then
@@ -463,7 +417,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
              if (action) then
                 v_wind(:)                     = exchange(:)        ! meridional wind
              end if
-#else ! oifs
+#else
          elseif (i.eq.13) then
             if (action) then
                  if (lwiso) then         
@@ -553,7 +507,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
              if (use_icebergs.and.lwiso) then    
                  call force_flux_consv(v_wind, mask, i, 0, action, partit, mesh)
              end if
-#endif !   oifs
+#endif
          end if
 
 #ifdef VERBOSE
@@ -603,6 +557,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
             u_wind(i)   = 0.0_WP
             v_wind(i)   = 0.0_WP
             shum(i)     = 0.0_WP
+            shortwave(i)= 0.0_WP
             longwave(i) = 0.0_WP
             Tair(i)     = 0.0_WP
             prec_rain(i)= 0.0_WP
@@ -664,47 +619,14 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 #endif /* skip all in case of __ifsinterface */
 #endif /* (__oasis) */
 
-  !! PSong: Antarctica runoff masked (lat<-60)
-  !if (use_cavity) then
-  !   do i=1, myDim_nod2D+eDim_nod2D
-  !      if (geo_coord_nod2D(2,i) < -60.0*rad) then
-  !         runoff(i) = 0.0_WP
-  !      end if
-  !   end do
-  !end if
-
-  !! GH: budgeting tool diagnostics
-  !call integrate_nod(runoff, runoff_global_before, partit, mesh)
-  !if (mype==0) write (*,*) "before scaling - global: ", runoff_global_before
-  
-  !runoff_masked = 0.0_WP
-  !where (geo_coord_nod2D(2, :) < -60.0_WP * rad)
-  !  runoff_masked = runoff
-  !end where
-  !call integrate_nod(runoff_masked, runoff_south_before, partit, mesh)
-  !if (mype==0) write(*,*) "before scaling - SO:      ", runoff_south_before
-
-  !! Apply optional scaling factor to runoff
-  !if (use_runoff_factor) then
-  !   !$OMP PARALLEL DO
-  !   do i = 1, myDim_nod2D + eDim_nod2D
-  !      if (geo_coord_nod2D(2, i) < -60.0_WP * rad) then
-  !         runoff(i) = runoff(i) * runoff_factor
-  !      end if
-  !   end do
-  !   !$OMP END PARALLEL DO
-  !end if
-
-  !call integrate_nod(runoff, runoff_global_after, partit, mesh)
-  !if (mype==0) write (*,*) "after scaling - global:  ", runoff_global_after
-  
-  !runoff_masked = 0.0_WP
-  !where (geo_coord_nod2D(2, :) < -60.0_WP * rad)
-  !  runoff_masked = runoff
-  !end where
-  !call integrate_nod(runoff_masked, runoff_south_after, partit, mesh)
-  !if (mype==0) write(*,*) "after scaling - SO:       ", runoff_south_after
-
+  ! I think this can stay like this
+  if (use_cavity .and. .not. use_runoff_scaling) then
+     do i=1, myDim_nod2D+eDim_nod2D
+        if (geo_coord_nod2D(2,i) < -60.0*rad) then
+           runoff(i) = 0.0_WP
+        end if
+     end do
+  end if
 
   t2=MPI_Wtime()
 
@@ -822,7 +744,7 @@ SUBROUTINE force_flux_consv(field2d, mask, n, h, do_stats, partit, mesh)
   else
     !should rarely happen
     weight=1.0_WP / sum(eff_vol)
-    write(*,*) 'Warning: Constant redistribution for flux ', trim(cpl_recv(n))
+    !write(*,*) 'Warning: Constant redistribution for flux ', trim(cpl_recv(n))
   end if
   
   !weight is still global 2D field, just keep NH or SH part

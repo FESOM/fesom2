@@ -1895,9 +1895,6 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
 #if defined (__icepack)
     use icedrv_main,    only: ini_mean_icepack_io
 #endif
-    use g_forcing_arrays, only: runoff
-    use g_support
-    
     implicit none
     integer       :: istep
     logical, save :: lfirst=.true.
@@ -1916,12 +1913,6 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     logical       :: output_done
     logical       :: trigger_flush
 #endif
-    
-    real(kind=WP) :: runoff_south
-    real(kind=WP), allocatable :: runoff_mask(:)    
-    real(kind=WP), pointer :: lat(:)
-    lat => mesh%geo_coord_nod2D(2,:)
-    allocate(runoff_mask(size(runoff)))
 
 ctime=timeold+(dayold-1.)*86400
     
@@ -1939,27 +1930,11 @@ ctime=timeold+(dayold-1.)*86400
         call init_io_gather(partit)
 
     end if ! --> if (lfirst) then
-   
-    ! --- check before update_means ---
-    runoff_mask = 0.0_WP
-    where (lat < -60.0_WP * rad)
-        runoff_mask = runoff
-    end where
-    call integrate_nod(runoff_mask, runoff_south, partit, mesh)
-    if (partit%mype==0) write(*,*) 'BEFORE update_means, step=', istep, ' Runoff south of 60S:', runoff_south
-
+    
     !___________________________________________________________________________
     !PS if (partit%flag_debug .and. partit%mype==0)  print *, achar(27)//'[33m'//' -I/O-> call update_means'//achar(27)//'[0m'  
     call update_means
 
-    ! --- check after update_means ---
-    runoff_mask = 0.0_WP
-    where (lat < -60.0_WP * rad)
-        runoff_mask = runoff
-    end where
-    call integrate_nod(runoff_mask, runoff_south, partit, mesh)
-    if (partit%mype==0) write(*,*) 'AFTER update_means, step=', istep, ' Runoff south of 60S:', runoff_south
-    
 #if defined(__MULTIO)
     output_done = .false.
 #endif
@@ -2106,14 +2081,6 @@ ctime=timeold+(dayold-1.)*86400
         endif ! --> if (do_output) then
     end do ! --> do n=1, io_NSTREAMS
     lfirst=.false.
-   
-    ! --- check after writing output ---
-    runoff_mask = 0.0_WP
-    where (lat < -60.0_WP * rad)
-        runoff_mask = runoff
-    end where
-    call integrate_nod(runoff_mask, runoff_south, partit, mesh)
-    if (partit%mype==0) write(*,*) 'AFTER do_output, step=', istep, ' Runoff south of 60S:', runoff_south
 
 #if defined(__MULTIO)
     if (output_done) then
