@@ -55,6 +55,30 @@ subroutine prepare_icb2fesom(mesh, partit, ib,i_have_element,localelement,depth_
     real                    :: iceberg_area      ! horizontal area of iceberg [m^2]
     integer                 :: i, j, k, ib
     integer, dimension(3)   :: idx_d
+
+    ! -----------------------------------------------------------------------
+    ! Variables for multi-element iceberg support (large icebergs)
+    ! -----------------------------------------------------------------------
+    integer, parameter      :: max_icb_elems = 100              ! maximum number of elements for one iceberg
+    integer                 :: selected_elems(max_icb_elems)    ! list of selected element indices
+    integer                 :: num_selected                     ! number of selected elements
+    real(kind=WP)           :: total_elem_area                  ! cumulative area of selected elements [m^2]
+    real(kind=WP)           :: total_nodal_area                 ! cumulative nodal area for flux distribution [m^2]
+    
+    ! Variables for neighbor search
+    integer                 :: candidate_elems(max_icb_elems*3) ! candidate neighbor elements
+    integer                 :: num_candidates                   ! number of candidate neighbors
+    integer                 :: closest_idx                      ! index of closest candidate
+    real(kind=WP)           :: min_dist, dist                   ! distances [m]
+    
+    ! Variables for element center calculation
+    real(kind=WP)           :: host_center_lon, host_center_lat ! host element center in radians
+    real(kind=WP)           :: cand_center_lon, cand_center_lat ! candidate element center in radians
+    integer                 :: n1, n2, n3                       ! node indices
+    integer                 :: neighbor_elem                    ! neighbor element index
+    integer                 :: ii, jj                           ! loop counters
+    logical                 :: already_selected                 ! flag for duplicate check
+    
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
 #include "associate_part_def.h"
@@ -68,15 +92,168 @@ type(t_partit), intent(inout), target :: partit
 
         ! -----------------------------------------------------------------------
         ! Check if iceberg horizontal area exceeds host element area.
-        ! This is relevant for future development where icebergs may be larger
-        ! than the smallest grid cell and fluxes need to be distributed across
-        ! multiple elements.
+        ! If so, iteratively add neighboring elements until total area >= iceberg area.
+        ! Neighbors are selected based on distance from their center to host cell center.
         ! -----------------------------------------------------------------------
         iceberg_area = length_ib_single * width_ib_single
+        
         if (iceberg_area > elem_area(localelement)) then
-            write(*,'(A,I8,A,E12.5,A,E12.5,A)') &
-                ' [ICB WARNING] Iceberg larger than host element: elem_id=', localelement, &
-                ', elem_area=', elem_area(localelement), ' m^2, iceberg_area=', iceberg_area, ' m^2'
+            ! ---------------------------------------------------------------
+            ! Initialize selection with host element
+            ! ---------------------------------------------------------------
+            num_selected = 1
+            selected_elems(1) = localelement
+            total_elem_area = elem_area(localelement)
+            
+            ! Calculate host element center (average of 3 node coordinates)
+            n1 = elem2D_nodes(1, localelement)
+            n2 = elem2D_nodes(2, localelement)
+            n3 = elem2D_nodes(3, localelement)
+            host_center_lon = (geo_coord_nod2D(1, n1) + geo_coord_nod2D(1, n2) + geo_coord_nod2D(1, n3)) / 3.0_WP
+            host_center_lat = (geo_coord_nod2D(2, n1) + geo_coord_nod2D(2, n2) + geo_coord_nod2D(2, n3)) / 3.0_WP
+            
+            ! Log header for multi-element iceberg
+            write(*,'(A)') ' '
+            write(*,'(A)') ' [ICB INFO] ======== Large iceberg detected - collecting neighboring elements ========'
+            write(*,'(A,E12.5,A)') ' [ICB INFO] Iceberg area: ', iceberg_area, ' m^2'
+            write(*,'(A,I8,A,E12.5,A)') ' [ICB INFO] Host element: elem_id=', localelement, &
+                ', area=', elem_area(localelement), ' m^2'
+            write(*,'(A,I8,A,I8,A,I8)') ' [ICB INFO]   Node IDs: ', n1, ', ', n2, ', ', n3
+            write(*,'(A,F10.4,A,F10.4,A)') ' [ICB INFO]   Center (lon,lat): (', &
+                host_center_lon/rad, ', ', host_center_lat/rad, ') deg'
+            
+            ! Initialize candidate list with neighbors of host element
+            num_candidates = 0
+            do ii = 1, 3
+                neighbor_elem = elem_neighbors(ii, localelement)
+                if (neighbor_elem > 0) then
+                    num_candidates = num_candidates + 1
+                    candidate_elems(num_candidates) = neighbor_elem
+                end if
+            end do
+            
+            ! ---------------------------------------------------------------
+            ! Iteratively add closest neighbor until total area >= iceberg area
+            ! ---------------------------------------------------------------
+            do while (total_elem_area < iceberg_area .and. num_candidates > 0 .and. num_selected < max_icb_elems)
+                
+                ! Find closest candidate to host element center
+                min_dist = 1.0e30_WP
+                closest_idx = 0
+                
+                do ii = 1, num_candidates
+                    neighbor_elem = candidate_elems(ii)
+                    if (neighbor_elem <= 0) cycle
+                    
+                    ! Calculate candidate element center
+                    n1 = elem2D_nodes(1, neighbor_elem)
+                    n2 = elem2D_nodes(2, neighbor_elem)
+                    n3 = elem2D_nodes(3, neighbor_elem)
+                    cand_center_lon = (geo_coord_nod2D(1, n1) + geo_coord_nod2D(1, n2) + geo_coord_nod2D(1, n3)) / 3.0_WP
+                    cand_center_lat = (geo_coord_nod2D(2, n1) + geo_coord_nod2D(2, n2) + geo_coord_nod2D(2, n3)) / 3.0_WP
+                    
+                    ! Calculate great-circle distance to host center [m]
+                    ! Using spherical law of cosines: d = R * acos(sin(lat1)*sin(lat2) + cos(lat1)*cos(lat2)*cos(dlon))
+                    dist = r_earth * acos( min(1.0_WP, max(-1.0_WP, &
+                           sin(host_center_lat) * sin(cand_center_lat) + &
+                           cos(host_center_lat) * cos(cand_center_lat) * cos(cand_center_lon - host_center_lon) )) )
+                    
+                    if (dist < min_dist) then
+                        min_dist = dist
+                        closest_idx = ii
+                    end if
+                end do
+                
+                ! If no valid candidate found, exit loop
+                if (closest_idx == 0) exit
+                
+                ! Add closest candidate to selected elements
+                neighbor_elem = candidate_elems(closest_idx)
+                num_selected = num_selected + 1
+                selected_elems(num_selected) = neighbor_elem
+                total_elem_area = total_elem_area + elem_area(neighbor_elem)
+                
+                ! Get node info for logging
+                n1 = elem2D_nodes(1, neighbor_elem)
+                n2 = elem2D_nodes(2, neighbor_elem)
+                n3 = elem2D_nodes(3, neighbor_elem)
+                cand_center_lon = (geo_coord_nod2D(1, n1) + geo_coord_nod2D(1, n2) + geo_coord_nod2D(1, n3)) / 3.0_WP
+                cand_center_lat = (geo_coord_nod2D(2, n1) + geo_coord_nod2D(2, n2) + geo_coord_nod2D(2, n3)) / 3.0_WP
+                
+                ! Log selected element information
+                write(*,'(A,I3,A,I8,A,E12.5,A)') ' [ICB INFO] Added element #', num_selected, &
+                    ': elem_id=', neighbor_elem, ', area=', elem_area(neighbor_elem), ' m^2'
+                write(*,'(A,I8,A,I8,A,I8)') ' [ICB INFO]   Node IDs: ', n1, ', ', n2, ', ', n3
+                write(*,'(A,F10.4,A,F10.4,A)') ' [ICB INFO]   Center (lon,lat): (', &
+                    cand_center_lon/rad, ', ', cand_center_lat/rad, ') deg'
+                write(*,'(A,F10.2,A)') ' [ICB INFO]   Distance to host: ', min_dist/1000.0_WP, ' km'
+                
+                ! Remove selected element from candidates by shifting
+                do jj = closest_idx, num_candidates - 1
+                    candidate_elems(jj) = candidate_elems(jj + 1)
+                end do
+                num_candidates = num_candidates - 1
+                
+                ! Add neighbors of newly selected element to candidate list (if not already selected)
+                do ii = 1, 3
+                    neighbor_elem = elem_neighbors(ii, selected_elems(num_selected))
+                    if (neighbor_elem <= 0) cycle
+                    
+                    ! Check if already selected
+                    already_selected = .false.
+                    do jj = 1, num_selected
+                        if (selected_elems(jj) == neighbor_elem) then
+                            already_selected = .true.
+                            exit
+                        end if
+                    end do
+                    
+                    ! Check if already in candidate list
+                    if (.not. already_selected) then
+                        do jj = 1, num_candidates
+                            if (candidate_elems(jj) == neighbor_elem) then
+                                already_selected = .true.
+                                exit
+                            end if
+                        end do
+                    end if
+                    
+                    ! Add to candidates if not already present
+                    if (.not. already_selected .and. num_candidates < max_icb_elems*3) then
+                        num_candidates = num_candidates + 1
+                        candidate_elems(num_candidates) = neighbor_elem
+                    end if
+                end do
+            end do
+            
+            ! ---------------------------------------------------------------
+            ! Calculate total nodal area from all unique nodes of selected elements
+            ! ---------------------------------------------------------------
+            total_nodal_area = 0.0_WP
+            do ii = 1, num_selected
+                do jj = 1, 3
+                    iceberg_node = elem2D_nodes(jj, selected_elems(ii))
+                    ! Only count nodes owned by this PE (to avoid double counting in parallel)
+                    if (iceberg_node <= myDim_nod2D) then
+                        ! Note: This is a simplification - proper implementation would track unique nodes
+                        total_nodal_area = total_nodal_area + mesh%area(1, iceberg_node) / 3.0_WP
+                    end if
+                end do
+            end do
+            
+            ! Log summary
+            write(*,'(A)') ' [ICB INFO] --------------------------------------------------------'
+            write(*,'(A,I4,A)') ' [ICB INFO] Total elements selected: ', num_selected, ' elements'
+            write(*,'(A,E12.5,A)') ' [ICB INFO] Total element area: ', total_elem_area, ' m^2'
+            write(*,'(A,E12.5,A)') ' [ICB INFO] Iceberg area: ', iceberg_area, ' m^2'
+            write(*,'(A,E12.5,A)') ' [ICB INFO] Approx. nodal area for fluxes: ', total_nodal_area, ' m^2'
+            if (total_elem_area >= iceberg_area) then
+                write(*,'(A)') ' [ICB INFO] Status: SUFFICIENT area collected'
+            else
+                write(*,'(A)') ' [ICB INFO] Status: WARNING - insufficient area (max elements reached)'
+            end if
+            write(*,'(A)') ' [ICB INFO] ========================================================'
+            write(*,'(A)') ' '
         end if
 
         num_ib_nods_in_ib_elem=0                                ! number of nodes in this element ???
