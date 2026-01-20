@@ -607,7 +607,7 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
   pe_block(ib)=mype
 
   volume_ib=height_ib_single*length_ib_single*width_ib_single
-  call prepare_icb2fesom(mesh,partit,ib,i_have_element,local_idx_of(iceberg_elem),depth_ib,height_ib_single)
+  call prepare_icb2fesom(mesh,partit,ib,i_have_element,local_idx_of(iceberg_elem),depth_ib,height_ib_single,length_ib_single,width_ib_single)
  end if !processor has element?
 end if !... and first node belongs to processor?
 

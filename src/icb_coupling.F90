@@ -30,7 +30,7 @@ subroutine reset_ib_fluxes()
 end subroutine reset_ib_fluxes
 
 
-subroutine prepare_icb2fesom(mesh, partit, ib,i_have_element,localelement,depth_ib,height_ib_single)
+subroutine prepare_icb2fesom(mesh, partit, ib,i_have_element,localelement,depth_ib,height_ib_single,length_ib_single,width_ib_single)
     !transmits the relevant fields from the iceberg to the ocean model
     !Lars Ackermann, 17.03.2020
 
@@ -44,6 +44,7 @@ subroutine prepare_icb2fesom(mesh, partit, ib,i_have_element,localelement,depth_
 
     logical                 :: i_have_element
     real, intent(in)        :: depth_ib, height_ib_single
+    real, intent(in)        :: length_ib_single, width_ib_single  ! iceberg horizontal dimensions [m]
     real                    :: lev_low, lev_up
     integer                 :: localelement
     integer                 :: iceberg_node  
@@ -51,6 +52,7 @@ subroutine prepare_icb2fesom(mesh, partit, ib,i_have_element,localelement,depth_
     integer                 :: num_ib_nods_in_ib_elem
     real                    :: dz
     real, dimension(:), allocatable      :: tot_area_nods_in_ib_elem
+    real                    :: iceberg_area      ! horizontal area of iceberg [m^2]
     integer                 :: i, j, k, ib
     integer, dimension(3)   :: idx_d
 type(t_mesh), intent(in) , target :: mesh
@@ -63,6 +65,19 @@ type(t_partit), intent(inout), target :: partit
     if(i_have_element) then                                     ! PE has iceberg
         dz = 0.0                                                ! vertical distance over which heat flux is applied 
         allocate(tot_area_nods_in_ib_elem(mesh%nl))
+
+        ! -----------------------------------------------------------------------
+        ! Check if iceberg horizontal area exceeds host element area.
+        ! This is relevant for future development where icebergs may be larger
+        ! than the smallest grid cell and fluxes need to be distributed across
+        ! multiple elements.
+        ! -----------------------------------------------------------------------
+        iceberg_area = length_ib_single * width_ib_single
+        if (iceberg_area > elem_area(localelement)) then
+            write(*,'(A,I8,A,E12.5,A,E12.5,A)') &
+                ' [ICB WARNING] Iceberg larger than host element: elem_id=', localelement, &
+                ', elem_area=', elem_area(localelement), ' m^2, iceberg_area=', iceberg_area, ' m^2'
+        end if
 
         num_ib_nods_in_ib_elem=0                                ! number of nodes in this element ???
         tot_area_nods_in_ib_elem=0.0                            ! total area associated to nodes of iceberg element
