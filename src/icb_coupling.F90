@@ -58,21 +58,20 @@ subroutine prepare_icb2fesom(mesh, partit, ib,i_have_element,localelement,depth_
 
     ! -----------------------------------------------------------------------
     ! Variables for multi-element iceberg support (large icebergs)
+    ! Note: Persistent arrays are in iceberg_params module (icb_selected_elems, etc.)
     ! -----------------------------------------------------------------------
-    integer, parameter      :: max_icb_elems = 100              ! maximum number of elements for one iceberg
-    integer                 :: selected_elems(max_icb_elems)    ! list of selected element indices
-    integer                 :: num_selected                     ! number of selected elements
     real(kind=WP)           :: total_elem_area                  ! cumulative area of selected elements [m^2]
     real(kind=WP)           :: total_nodal_area                 ! cumulative nodal area for flux distribution [m^2]
+    logical                 :: need_full_recalc                 ! flag: need full neighbor recalculation
+    logical                 :: host_changed                     ! flag: host element changed
+    integer                 :: num_removed, num_added           ! counters for logging
+    integer                 :: prev_num_selected                ! previous count for change detection
     
     ! Variables for neighbor search
-    integer                 :: candidate_elems(max_icb_elems*3) ! candidate neighbor elements
-    integer                 :: num_candidates                   ! number of candidate neighbors
     integer                 :: closest_idx                      ! index of closest candidate
     real(kind=WP)           :: min_dist, dist                   ! distances [m]
     
     ! Variables for element center calculation
-    real(kind=WP)           :: host_center_lon, host_center_lat ! host element center in radians
     real(kind=WP)           :: cand_center_lon, cand_center_lat ! candidate element center in radians
     integer                 :: n1, n2, n3                       ! node indices
     integer                 :: neighbor_elem                    ! neighbor element index
@@ -91,58 +90,133 @@ type(t_partit), intent(inout), target :: partit
         allocate(tot_area_nods_in_ib_elem(mesh%nl))
 
         ! -----------------------------------------------------------------------
-        ! Check if iceberg horizontal area exceeds host element area.
-        ! If so, iteratively add neighboring elements until total area >= iceberg area.
-        ! Neighbors are selected based on distance from their center to host cell center.
+        ! OPTIMIZED Multi-element iceberg support with persistent storage.
+        ! Avoids full recalculation each timestep by:
+        !   1. Detecting host cell change → recalculate from scratch
+        !   2. Shrinking iceberg → remove last-added elements
+        !   3. Growing iceberg → add from cached candidates
         ! -----------------------------------------------------------------------
         iceberg_area = length_ib_single * width_ib_single
         
         if (iceberg_area > elem_area(localelement)) then
+            
             ! ---------------------------------------------------------------
-            ! Initialize selection with host element
+            ! Check if we need full recalculation (host element changed)
             ! ---------------------------------------------------------------
-            num_selected = 1
-            selected_elems(1) = localelement
-            total_elem_area = elem_area(localelement)
+            host_changed = (icb_cached_host_elem(ib) /= localelement)
+            need_full_recalc = host_changed .or. (icb_num_selected(ib) == 0)
+            num_removed = 0
+            num_added = 0
+            prev_num_selected = icb_num_selected(ib)
             
-            ! Calculate host element center (average of 3 node coordinates)
-            n1 = elem2D_nodes(1, localelement)
-            n2 = elem2D_nodes(2, localelement)
-            n3 = elem2D_nodes(3, localelement)
-            host_center_lon = (geo_coord_nod2D(1, n1) + geo_coord_nod2D(1, n2) + geo_coord_nod2D(1, n3)) / 3.0_WP
-            host_center_lat = (geo_coord_nod2D(2, n1) + geo_coord_nod2D(2, n2) + geo_coord_nod2D(2, n3)) / 3.0_WP
-            
-            ! Log header for multi-element iceberg
-            write(*,'(A)') ' '
-            write(*,'(A)') ' [ICB INFO] ======== Large iceberg detected - collecting neighboring elements ========'
-            write(*,'(A,E12.5,A)') ' [ICB INFO] Iceberg area: ', iceberg_area, ' m^2'
-            write(*,'(A,I8,A,E12.5,A)') ' [ICB INFO] Host element: elem_id=', localelement, &
-                ', area=', elem_area(localelement), ' m^2'
-            write(*,'(A,I8,A,I8,A,I8)') ' [ICB INFO]   Node IDs: ', n1, ', ', n2, ', ', n3
-            write(*,'(A,F10.4,A,F10.4,A)') ' [ICB INFO]   Center (lon,lat): (', &
-                host_center_lon/rad, ', ', host_center_lat/rad, ') deg'
-            
-            ! Initialize candidate list with neighbors of host element
-            num_candidates = 0
-            do ii = 1, 3
-                neighbor_elem = elem_neighbors(ii, localelement)
-                if (neighbor_elem > 0) then
-                    num_candidates = num_candidates + 1
-                    candidate_elems(num_candidates) = neighbor_elem
+            if (need_full_recalc) then
+                ! ---------------------------------------------------------------
+                ! CASE 3: Host cell changed or first time - full recalculation
+                ! ---------------------------------------------------------------
+                write(*,'(A)') ' '
+                write(*,'(A,I8)') ' [ICB INFO] === CASE 3: Full (re-)calculation for iceberg ', ib
+                if (icb_num_selected(ib) == 0) then
+                    write(*,'(A)') ' [ICB INFO]   Reason: First time initialization (no previous selection)'
+                else if (host_changed) then
+                    write(*,'(A,I8,A,I8)') ' [ICB INFO]   Reason: Host element changed from ', &
+                        icb_cached_host_elem(ib), ' to ', localelement
                 end if
-            end do
+                
+                icb_num_selected(ib) = 1
+                icb_selected_elems(1, ib) = localelement
+                icb_elem_area_cumsum(1, ib) = elem_area(localelement)
+                icb_cached_host_elem(ib) = localelement
+                
+                ! Calculate and cache host element center
+                n1 = elem2D_nodes(1, localelement)
+                n2 = elem2D_nodes(2, localelement)
+                n3 = elem2D_nodes(3, localelement)
+                icb_host_center_lon(ib) = (geo_coord_nod2D(1, n1) + geo_coord_nod2D(1, n2) + geo_coord_nod2D(1, n3)) / 3.0_WP
+                icb_host_center_lat(ib) = (geo_coord_nod2D(2, n1) + geo_coord_nod2D(2, n2) + geo_coord_nod2D(2, n3)) / 3.0_WP
+                
+                ! Log header for new multi-element iceberg calculation
+                write(*,'(A)') ' '
+                if (host_changed .and. icb_cached_host_elem(ib) > 0) then
+                    write(*,'(A)') ' [ICB INFO] ======== Host cell changed - recalculating neighbors ========'
+                else
+                    write(*,'(A)') ' [ICB INFO] ======== Large iceberg detected - collecting neighboring elements ========'
+                end if
+                write(*,'(A,E12.5,A)') ' [ICB INFO] Iceberg area: ', iceberg_area, ' m^2'
+                write(*,'(A,I8,A,E12.5,A)') ' [ICB INFO] Host element: elem_id=', localelement, &
+                    ', area=', elem_area(localelement), ' m^2'
+                write(*,'(A,I8,A,I8,A,I8)') ' [ICB INFO]   Node IDs: ', n1, ', ', n2, ', ', n3
+                write(*,'(A,F10.4,A,F10.4,A)') ' [ICB INFO]   Center (lon,lat): (', &
+                    icb_host_center_lon(ib)/rad, ', ', icb_host_center_lat(ib)/rad, ') deg'
+                
+                ! Initialize candidate list with neighbors of host element
+                icb_num_candidates(ib) = 0
+                do ii = 1, 3
+                    neighbor_elem = elem_neighbors(ii, localelement)
+                    if (neighbor_elem > 0) then
+                        icb_num_candidates(ib) = icb_num_candidates(ib) + 1
+                        icb_candidate_elems(icb_num_candidates(ib), ib) = neighbor_elem
+                    end if
+                end do
+                
+            else
+                ! ---------------------------------------------------------------
+                ! Host cell unchanged - check if we need to shrink or grow
+                ! ---------------------------------------------------------------
+                total_elem_area = icb_elem_area_cumsum(icb_num_selected(ib), ib)
+                
+                ! CASE 1: Iceberg shrunk - remove elements from the end
+                if (icb_num_selected(ib) > 1 .and. &
+                    icb_elem_area_cumsum(icb_num_selected(ib) - 1, ib) >= iceberg_area) then
+                    write(*,'(A)') ' '
+                    write(*,'(A,I8)') ' [ICB INFO] === CASE 1: Iceberg shrunk for iceberg ', ib
+                    write(*,'(A,E12.5,A,E12.5,A)') ' [ICB INFO]   Reason: iceberg_area=', iceberg_area, &
+                        ' m^2 <= cumsum[n-1]=', icb_elem_area_cumsum(icb_num_selected(ib) - 1, ib), ' m^2'
+                end if
+                
+                do while (icb_num_selected(ib) > 1)
+                    ! Check if we can remove the last element
+                    ! (i.e., cumsum without last element still >= iceberg area)
+                    if (icb_elem_area_cumsum(icb_num_selected(ib) - 1, ib) >= iceberg_area) then
+                        ! Remove last element - add it back to candidates
+                        neighbor_elem = icb_selected_elems(icb_num_selected(ib), ib)
+                        if (icb_num_candidates(ib) < max_icb_elems*3) then
+                            icb_num_candidates(ib) = icb_num_candidates(ib) + 1
+                            icb_candidate_elems(icb_num_candidates(ib), ib) = neighbor_elem
+                        end if
+                        icb_num_selected(ib) = icb_num_selected(ib) - 1
+                        num_removed = num_removed + 1
+                        write(*,'(A,I3,A,I8,A,E12.5,A)') ' [ICB INFO]   Removed element #', &
+                            icb_num_selected(ib) + 1, ', elem_id=', neighbor_elem, &
+                            ', new cumsum=', icb_elem_area_cumsum(icb_num_selected(ib), ib), ' m^2'
+                    else
+                        exit
+                    end if
+                end do
+            end if
             
             ! ---------------------------------------------------------------
-            ! Iteratively add closest neighbor until total area >= iceberg area
+            ! CASE 2 (or continuation of CASE 3): Add more neighbors if needed
             ! ---------------------------------------------------------------
-            do while (total_elem_area < iceberg_area .and. num_candidates > 0 .and. num_selected < max_icb_elems)
+            total_elem_area = icb_elem_area_cumsum(icb_num_selected(ib), ib)
+            
+            ! Log CASE 2 header if growing (and not already doing full recalc)
+            if (.not. need_full_recalc .and. total_elem_area < iceberg_area) then
+                write(*,'(A)') ' '
+                write(*,'(A,I8)') ' [ICB INFO] === CASE 2: Iceberg needs more elements for iceberg ', ib
+                write(*,'(A,E12.5,A,E12.5,A)') ' [ICB INFO]   Reason: cumsum=', total_elem_area, &
+                    ' m^2 < iceberg_area=', iceberg_area, ' m^2'
+                write(*,'(A,I4)') ' [ICB INFO]   Available candidates: ', icb_num_candidates(ib)
+            end if
+            
+            do while (total_elem_area < iceberg_area .and. icb_num_candidates(ib) > 0 &
+                      .and. icb_num_selected(ib) < max_icb_elems)
                 
                 ! Find closest candidate to host element center
                 min_dist = 1.0e30_WP
                 closest_idx = 0
                 
-                do ii = 1, num_candidates
-                    neighbor_elem = candidate_elems(ii)
+                do ii = 1, icb_num_candidates(ib)
+                    neighbor_elem = icb_candidate_elems(ii, ib)
                     if (neighbor_elem <= 0) cycle
                     
                     ! Calculate candidate element center
@@ -153,10 +227,10 @@ type(t_partit), intent(inout), target :: partit
                     cand_center_lat = (geo_coord_nod2D(2, n1) + geo_coord_nod2D(2, n2) + geo_coord_nod2D(2, n3)) / 3.0_WP
                     
                     ! Calculate great-circle distance to host center [m]
-                    ! Using spherical law of cosines: d = R * acos(sin(lat1)*sin(lat2) + cos(lat1)*cos(lat2)*cos(dlon))
                     dist = r_earth * acos( min(1.0_WP, max(-1.0_WP, &
-                           sin(host_center_lat) * sin(cand_center_lat) + &
-                           cos(host_center_lat) * cos(cand_center_lat) * cos(cand_center_lon - host_center_lon) )) )
+                           sin(icb_host_center_lat(ib)) * sin(cand_center_lat) + &
+                           cos(icb_host_center_lat(ib)) * cos(cand_center_lat) * &
+                           cos(cand_center_lon - icb_host_center_lon(ib)) )) )
                     
                     if (dist < min_dist) then
                         min_dist = dist
@@ -168,10 +242,11 @@ type(t_partit), intent(inout), target :: partit
                 if (closest_idx == 0) exit
                 
                 ! Add closest candidate to selected elements
-                neighbor_elem = candidate_elems(closest_idx)
-                num_selected = num_selected + 1
-                selected_elems(num_selected) = neighbor_elem
+                neighbor_elem = icb_candidate_elems(closest_idx, ib)
+                icb_num_selected(ib) = icb_num_selected(ib) + 1
+                icb_selected_elems(icb_num_selected(ib), ib) = neighbor_elem
                 total_elem_area = total_elem_area + elem_area(neighbor_elem)
+                icb_elem_area_cumsum(icb_num_selected(ib), ib) = total_elem_area
                 
                 ! Get node info for logging
                 n1 = elem2D_nodes(1, neighbor_elem)
@@ -180,29 +255,32 @@ type(t_partit), intent(inout), target :: partit
                 cand_center_lon = (geo_coord_nod2D(1, n1) + geo_coord_nod2D(1, n2) + geo_coord_nod2D(1, n3)) / 3.0_WP
                 cand_center_lat = (geo_coord_nod2D(2, n1) + geo_coord_nod2D(2, n2) + geo_coord_nod2D(2, n3)) / 3.0_WP
                 
+                num_added = num_added + 1
+                
                 ! Log selected element information
-                write(*,'(A,I3,A,I8,A,E12.5,A)') ' [ICB INFO] Added element #', num_selected, &
+                write(*,'(A,I3,A,I8,A,E12.5,A)') ' [ICB INFO]   Added element #', icb_num_selected(ib), &
                     ': elem_id=', neighbor_elem, ', area=', elem_area(neighbor_elem), ' m^2'
-                write(*,'(A,I8,A,I8,A,I8)') ' [ICB INFO]   Node IDs: ', n1, ', ', n2, ', ', n3
-                write(*,'(A,F10.4,A,F10.4,A)') ' [ICB INFO]   Center (lon,lat): (', &
+                write(*,'(A,I8,A,I8,A,I8)') ' [ICB INFO]     Node IDs: ', n1, ', ', n2, ', ', n3
+                write(*,'(A,F10.4,A,F10.4,A)') ' [ICB INFO]     Center (lon,lat): (', &
                     cand_center_lon/rad, ', ', cand_center_lat/rad, ') deg'
-                write(*,'(A,F10.2,A)') ' [ICB INFO]   Distance to host: ', min_dist/1000.0_WP, ' km'
+                write(*,'(A,F10.2,A,E12.5,A)') ' [ICB INFO]     Distance to host: ', min_dist/1000.0_WP, &
+                    ' km, new cumsum=', total_elem_area, ' m^2'
                 
                 ! Remove selected element from candidates by shifting
-                do jj = closest_idx, num_candidates - 1
-                    candidate_elems(jj) = candidate_elems(jj + 1)
+                do jj = closest_idx, icb_num_candidates(ib) - 1
+                    icb_candidate_elems(jj, ib) = icb_candidate_elems(jj + 1, ib)
                 end do
-                num_candidates = num_candidates - 1
+                icb_num_candidates(ib) = icb_num_candidates(ib) - 1
                 
-                ! Add neighbors of newly selected element to candidate list (if not already selected)
+                ! Add neighbors of newly selected element to candidate list
                 do ii = 1, 3
-                    neighbor_elem = elem_neighbors(ii, selected_elems(num_selected))
+                    neighbor_elem = elem_neighbors(ii, icb_selected_elems(icb_num_selected(ib), ib))
                     if (neighbor_elem <= 0) cycle
                     
                     ! Check if already selected
                     already_selected = .false.
-                    do jj = 1, num_selected
-                        if (selected_elems(jj) == neighbor_elem) then
+                    do jj = 1, icb_num_selected(ib)
+                        if (icb_selected_elems(jj, ib) == neighbor_elem) then
                             already_selected = .true.
                             exit
                         end if
@@ -210,8 +288,8 @@ type(t_partit), intent(inout), target :: partit
                     
                     ! Check if already in candidate list
                     if (.not. already_selected) then
-                        do jj = 1, num_candidates
-                            if (candidate_elems(jj) == neighbor_elem) then
+                        do jj = 1, icb_num_candidates(ib)
+                            if (icb_candidate_elems(jj, ib) == neighbor_elem) then
                                 already_selected = .true.
                                 exit
                             end if
@@ -219,9 +297,9 @@ type(t_partit), intent(inout), target :: partit
                     end if
                     
                     ! Add to candidates if not already present
-                    if (.not. already_selected .and. num_candidates < max_icb_elems*3) then
-                        num_candidates = num_candidates + 1
-                        candidate_elems(num_candidates) = neighbor_elem
+                    if (.not. already_selected .and. icb_num_candidates(ib) < max_icb_elems*3) then
+                        icb_num_candidates(ib) = icb_num_candidates(ib) + 1
+                        icb_candidate_elems(icb_num_candidates(ib), ib) = neighbor_elem
                     end if
                 end do
             end do
@@ -230,30 +308,46 @@ type(t_partit), intent(inout), target :: partit
             ! Calculate total nodal area from all unique nodes of selected elements
             ! ---------------------------------------------------------------
             total_nodal_area = 0.0_WP
-            do ii = 1, num_selected
+            do ii = 1, icb_num_selected(ib)
                 do jj = 1, 3
-                    iceberg_node = elem2D_nodes(jj, selected_elems(ii))
-                    ! Only count nodes owned by this PE (to avoid double counting in parallel)
+                    iceberg_node = elem2D_nodes(jj, icb_selected_elems(ii, ib))
                     if (iceberg_node <= myDim_nod2D) then
-                        ! Note: This is a simplification - proper implementation would track unique nodes
                         total_nodal_area = total_nodal_area + mesh%area(1, iceberg_node) / 3.0_WP
                     end if
                 end do
             end do
             
-            ! Log summary
-            write(*,'(A)') ' [ICB INFO] --------------------------------------------------------'
-            write(*,'(A,I4,A)') ' [ICB INFO] Total elements selected: ', num_selected, ' elements'
-            write(*,'(A,E12.5,A)') ' [ICB INFO] Total element area: ', total_elem_area, ' m^2'
-            write(*,'(A,E12.5,A)') ' [ICB INFO] Iceberg area: ', iceberg_area, ' m^2'
-            write(*,'(A,E12.5,A)') ' [ICB INFO] Approx. nodal area for fluxes: ', total_nodal_area, ' m^2'
-            if (total_elem_area >= iceberg_area) then
-                write(*,'(A)') ' [ICB INFO] Status: SUFFICIENT area collected'
+            ! Log summary (only when changes occurred)
+            if (need_full_recalc .or. num_removed > 0 .or. num_added > 0) then
+                write(*,'(A)') ' [ICB INFO] --------------------------------------------------------'
+                write(*,'(A,I4,A,I4,A,I4,A)') ' [ICB INFO] Summary: ', icb_num_selected(ib), &
+                    ' elements (was ', prev_num_selected, ', removed ', num_removed, ')'
+                write(*,'(A,I4,A)') ' [ICB INFO]   Added: ', num_added, ' elements'
+                write(*,'(A,E12.5,A)') ' [ICB INFO]   Total element area: ', &
+                    icb_elem_area_cumsum(icb_num_selected(ib), ib), ' m^2'
+                write(*,'(A,E12.5,A)') ' [ICB INFO]   Iceberg area: ', iceberg_area, ' m^2'
+                write(*,'(A,E12.5,A)') ' [ICB INFO]   Approx. nodal area for fluxes: ', total_nodal_area, ' m^2'
+                if (icb_elem_area_cumsum(icb_num_selected(ib), ib) >= iceberg_area) then
+                    write(*,'(A)') ' [ICB INFO]   Status: SUFFICIENT area collected'
+                else
+                    write(*,'(A)') ' [ICB INFO]   Status: WARNING - insufficient area (max elements reached)'
+                end if
+                write(*,'(A)') ' [ICB INFO] ========================================================'
+                write(*,'(A)') ' '
             else
-                write(*,'(A)') ' [ICB INFO] Status: WARNING - insufficient area (max elements reached)'
+                ! No changes - optionally log that we're reusing cached selection
+                ! Uncomment below for verbose logging:
+                ! write(*,'(A,I8,A,I4,A)') ' [ICB INFO] Iceberg ', ib, ': reusing cached selection (', &
+                !     icb_num_selected(ib), ' elements, no change)'
             end if
-            write(*,'(A)') ' [ICB INFO] ========================================================'
-            write(*,'(A)') ' '
+            
+        else
+            ! Iceberg fits in single element - clear multi-element state if previously set
+            if (icb_num_selected(ib) > 1) then
+                write(*,'(A,I8,A)') ' [ICB INFO] Iceberg ', ib, ' now fits in single element - clearing multi-element state'
+                icb_num_selected(ib) = 0
+                icb_cached_host_elem(ib) = -1
+            end if
         end if
 
         num_ib_nods_in_ib_elem=0                                ! number of nodes in this element ???

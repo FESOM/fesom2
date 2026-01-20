@@ -124,6 +124,17 @@ save
   integer:: save_count_buoys
   real:: prev_sec_in_year
 
+  ! ===== MULTI-ELEMENT ICEBERG SUPPORT (persistent storage across timesteps) =====
+  integer, parameter :: max_icb_elems = 100                ! max elements per iceberg
+  integer, dimension(:,:), allocatable :: icb_selected_elems    ! (max_icb_elems, ib_num) selected element indices
+  integer, dimension(:), allocatable   :: icb_num_selected      ! (ib_num) number of selected elements
+  real(kind=WP), dimension(:,:), allocatable :: icb_elem_area_cumsum  ! (max_icb_elems, ib_num) cumulative areas
+  integer, dimension(:,:), allocatable :: icb_candidate_elems   ! (max_icb_elems*3, ib_num) candidate neighbors
+  integer, dimension(:), allocatable   :: icb_num_candidates    ! (ib_num) number of candidates
+  integer, dimension(:), allocatable   :: icb_cached_host_elem  ! (ib_num) cached host element for change detection
+  real(kind=WP), dimension(:), allocatable :: icb_host_center_lon ! (ib_num) cached host center longitude [rad]
+  real(kind=WP), dimension(:), allocatable :: icb_host_center_lat ! (ib_num) cached host center latitude [rad]
+
 !****************************************************************************************************************************
 !****************************************************************************************************************************
  contains

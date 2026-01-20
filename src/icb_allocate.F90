@@ -146,4 +146,22 @@ type(t_mesh), intent(in), target :: mesh
   grounded = .false.
   allocate(scaling(ib_num))
   scaling = 1
+
+  ! Allocate multi-element iceberg support arrays
+  allocate(icb_selected_elems(max_icb_elems, ib_num))
+  allocate(icb_num_selected(ib_num))
+  allocate(icb_elem_area_cumsum(max_icb_elems, ib_num))
+  allocate(icb_candidate_elems(max_icb_elems*3, ib_num))
+  allocate(icb_num_candidates(ib_num))
+  allocate(icb_cached_host_elem(ib_num))
+  allocate(icb_host_center_lon(ib_num))
+  allocate(icb_host_center_lat(ib_num))
+  icb_selected_elems = 0
+  icb_num_selected = 0
+  icb_elem_area_cumsum = 0.0_WP
+  icb_candidate_elems = 0
+  icb_num_candidates = 0
+  icb_cached_host_elem = -1  ! -1 indicates not yet initialized
+  icb_host_center_lon = 0.0_WP
+  icb_host_center_lat = 0.0_WP
 end subroutine allocate_icb
