@@ -16,7 +16,7 @@ Section &modelname
 Section &timestep
 """""""""""""""""
 
-- **step_per_day=36** number of baroclinic steps per day. The code enforces that ``86400 mod step_per_day == 0`` and prints the supported values when the check fails. It sets the fundamental time step ``dt = 86400/step_per_day`` seconds that is shared by ocean and ice components.
+- **step_per_day=36** number of baroclinic steps per day. The code enforces that ``86400 mod step_per_day == 0`` and prints the supported values when the check fails. It sets the fundamental time step ``dt = 86400/step_per_day`` seconds that is shared by ocean and ice components. Valid values are, for example: 32(45min), 36(40min), 48(30min), 60(24min), 72(20min), 144(10min), 288(5min), 1440(1min).
 - **run_length=1** length of the submitted integration segment.
 - **run_length_unit='y'** unit for ``run_length``; one of ``'y'`` (years), ``'m'`` (months), ``'d'`` (days), or ``'s'`` (time steps). The calendar in :ref:`Section &calendar<chap_general_configuration_calendar>` determines how months/years are counted.
 
