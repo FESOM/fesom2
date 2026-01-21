@@ -2936,7 +2936,7 @@ subroutine compute_CFLz(dynamics, partit, mesh)
     ! calc vertical CFL criteria for debugging purpose and vertical Wvel splitting
 !$OMP PARALLEL DO
     do node=1, myDim_nod2D+eDim_nod2D
-       CFL_z(1,node)=0._WP
+       CFL_z(:,node)=0._WP
     end do
 !$OMP END PARALLEL DO
 
