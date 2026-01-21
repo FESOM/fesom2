@@ -3342,6 +3342,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     use solve_tracers_ale_interface
     use write_step_info_interface
     use check_blowup_interface
+    use ieee_arithmetic
     use fer_solve_interface
     use impl_vert_visc_ale_vtransp_interface
 #if defined (FESOM_PROFILING)
@@ -3359,6 +3360,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, loc, glo
     integer           :: node
     integer           :: nz, elem, nzmin, nzmax !for KE diagnostic
+    integer           :: tr_num  ! for cavity NaN cleanup
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer :: eta_n
@@ -3795,6 +3797,22 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     call fesom_profiler_end("oce_tracer_solve")
     call fesom_profiler_start("oce_thickness_update")
 #endif 
+#if defined (__recom)
+    ! CAVITY FIX: Clean up NaN created by tracer advection/diffusion at cavity nodes
+    ! Cavity nodes can create NaN during numerical operations with zero/near-zero thickness
+    if (use_cavity) then
+        do node=1, partit%myDim_nod2D+partit%eDim_nod2D
+            if (mesh%ulevels_nod2D(node) > 1) then
+                ! Clean NaN in ALL levels for cavity nodes (not just cavity layers)
+                do tr_num=1, tracers%num_tracers
+                    where (.not. ieee_is_finite(tracers%data(tr_num)%values(:, node)))
+                        tracers%data(tr_num)%values(:, node) = 0.0_WP
+                    end where
+                enddo
+            endif
+        enddo
+    endif
+#endif
      
     !___________________________________________________________________________
     ! Update hnode=hnode_new, helem

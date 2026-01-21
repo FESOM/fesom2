@@ -8,8 +8,10 @@ subroutine annual_event(do_output, N)
 
   logical, intent(inout)        :: do_output
   integer, intent(in)           :: N
+  integer                       :: elapsed_years
 
-  if (mod(yearnew, N)==0 .and. (daynew == ndpyr) .and. (timenew==86400.)) then
+  elapsed_years = yearnew - yearstart + 1
+  if (mod(elapsed_years, N)==0 .and. (daynew == ndpyr) .and. (timenew==86400.)) then
     do_output=.true.
   else
     do_output=.false.

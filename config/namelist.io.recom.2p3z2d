@@ -9,11 +9,16 @@ ldiag_dMOC       =.false.
 ldiag_DVD        =.false.
 ldiag_forc       =.false.
 ldiag_extflds    =.false.
+ldiag_destine    =.false.
+ldiag_trflx      =.false.
+ldiag_uvw_sqr    =.false.
+ldiag_trgrd_xyz  =.false.
 /
 
 &nml_general
 io_listsize    =150 !number of streams to allocate. shallbe large or equal to the number of streams in &nml_list
 vec_autorotate =.false.
+compression_level = 1
 /
 
 ! for sea ice related variables use_ice should be true, otherewise there will be no output
@@ -35,6 +40,10 @@ io_list =  'sst       ',1, 'm', 4,
            'MLD3      ',1, 'm', 4,
            'tx_sur    ',1, 'm', 4,
            'ty_sur    ',1, 'm', 4,
+           'prec      ',1, 'm', 4,
+           'snow      ',1, 'm', 4,
+           'evap      ',1, 'm', 4,
+           'runoff    ',1, 'm', 4,
            'temp      ',1, 'm', 4,
            'salt      ',1, 'm', 8,
            'otracers  ',1, 'm', 4,
@@ -49,9 +58,12 @@ io_list =  'sst       ',1, 'm', 4,
            'bolus_u   ',1, 'y', 4,
            'bolus_v   ',1, 'y', 4,
            'bolus_w   ',1, 'y', 4,
+           'fw        ',1, 'm', 4,
+           'fh        ',1, 'm', 4,
            'dpCO2s    ',1, 'm', 4,
            'pCO2s     ',1, 'm', 4,
            'CO2f      ',1, 'm', 4,
+           'xCO2atm   ',4, 's', 4,
            'Hp        ',1, 'm', 4,
            'aFe       ',1, 'm', 4,
            'aN        ',1, 'm', 4,

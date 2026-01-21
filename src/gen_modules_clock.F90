@@ -9,6 +9,7 @@ module g_clock
   real(kind=WP)            :: timeold, timenew     !time in a day, unit: sec
   integer                  :: dayold, daynew       !day in a year
   integer                  :: yearold, yearnew     !year before and after time step
+  integer                  :: yearstart            !year when simulation started
   integer                  :: month, day_in_month  !month and day in a month
   integer                  :: fleapyear            !1 fleapyear, 0 not 
   integer                  :: ndpyr                !number of days in yearnew 
@@ -75,7 +76,7 @@ contains
     use mod_transit, only: ti_transit, ti_start_transit
     implicit none
     type(t_partit), intent(in), target    :: partit
-    integer                               :: i, daystart, yearstart
+    integer                               :: i, daystart
     real(kind=WP)                         :: aux1, aux2, timestart
     integer                               :: ierr
     integer                               :: file_unit

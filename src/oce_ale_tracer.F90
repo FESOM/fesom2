@@ -165,6 +165,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     type(t_mesh)  , intent(in)   , target    :: mesh
     !___________________________________________________________________________
     integer                                  :: i, tr_num, node, elem, nzmax, nzmin
+    real(kind=WP)                            :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_elem2D) ! local variable ! OG - tra_diag
+    integer                                  :: nz, n, nu1, nl1 ! OG - tra_diag
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
@@ -210,6 +212,14 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
     end if
 
+    ! Set advective and diffusive components of total tracer fluxes to zero
+    ! Before tr_num loop
+!#if defined (__recom)           ! not necessarily should belong to recom case
+!    tracers%work%tra_advhoriz = 0.0 ! O:G - tra_diag
+!    tracers%work%tra_advvert  = 0.0
+    ttf_rhs_bak = 0.0
+!#endif
+    
     !___________________________________________________________________________
     ! loop over all tracers
         !$ACC UPDATE DEVICE(dynamics%w, dynamics%w_e, dynamics%uv) !!! async(1) 
@@ -217,6 +227,14 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         !$ACC UPDATE DEVICE (mesh%helem, mesh%hnode, mesh%hnode_new, mesh%zbar_3d_n, mesh%z_3d_n)
     do tr_num=1, tracers%num_tracers
 
+#if defined(__recom)
+!YY: sinkflx needs to be reset at each time step
+        if(use_MEDUSA) then
+            SinkFlx = 0.0d0
+        endif
+        SinkingVel1 = 0.0d0 ! OG 16.03.23
+        SinkingVel2 = 0.0d0 ! OG 16.03.23
+#endif    
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
         ! needed
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
@@ -240,16 +258,53 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
            tracers%work%del_ttf(:, node)=tracers%work%del_ttf(:, node)+tracers%work%del_ttf_advhoriz(:, node)+tracers%work%del_ttf_advvert(:, node)
         end do
 !$OMP END PARALLEL DO
- 
+
+! O:G
+! Save horizontal and vertical advective fluxes.
+! We have the values on the nodes
+! We do not know how much each edge contributes
+! to the nodes it connects
+! Notes from Patrick: del_ttf includes
+! Low-order solution. But, del_ttf_advhoriz and
+! del_ttf_advvert contain antidiffusive fluxes 
+! from the FCT scheme
+
+!if (.FALSE.) then
+! O:G - tra_diag
+!#if defined (__recom)
+!        if (tracers%data(tr_num)%ltra_diag) then
+!           do n=1, myDim_nod2D+eDim_nod2D
+!              nu1 = ulevels_nod2D(n)
+!              nl1 = nlevels_nod2D(n)
+!              do nz = nu1, nl1-1
+                 ! Horizontal advection part
+!                 tracers%work%tra_advhoriz(nz,n,tr_num) = tracers%work%del_ttf_advhoriz(nz,n)
+                 ! Vertical advection part
+!                 tracers%work%tra_advvert (nz,n,tr_num) = tracers%work%del_ttf_advvert(nz,n)
+!              end do
+!           end do
+!        end if
+!#endif
+!endif 
         !___________________________________________________________________________
         ! diffuse tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
         call diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 
+        !___________________________________________________________________________
         ! Radioactive decay of 14C and 39Ar
         if (tracers%data(tr_num)%ID == 14) tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * exp(-decay14 * dt)
         if (tracers%data(tr_num)%ID == 39) tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * exp(-decay39 * dt)
- 
+
+!YY: C14 seems to be calculated both in fesom and recom
+!YY: decay differently calculated???
+#if defined(__ciso)
+        ! radioactive decay of 14C
+        if (ciso_14 .and. any(c14_tracer_id == tracers%data(tr_num)%ID)) then
+          tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * (1 - lambda_14 * dt)
+        end if    ! ciso & ciso_14
+#endif
+
         !___________________________________________________________________________
         ! relax to salt and temp climatology
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
@@ -271,6 +326,17 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     end do
 !!!        !$ACC UPDATE HOST (tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus) &
 !!!        !$ACC HOST  (tracers%work%edge_up_dn_grad)
+
+#if defined(__recom)
+    do tr_num = 1, tracers%num_tracers
+        if (use_MEDUSA) then
+            SinkFlx = SinkFlx + SinkFlx_tr(:, :, tr_num)
+        endif
+!        Benthos = Benthos + Benthos_tr(:, :, tr_num)
+        Sinkingvel1(:,:) = Sinkingvel1(:,:) + Sinkvel1_tr(:, :, tr_num)
+        Sinkingvel2(:,:) = Sinkingvel2(:,:) + Sinkvel2_tr(:, :, tr_num)
+    end do
+#endif
 
     !___________________________________________________________________________
     ! 3D restoring for "passive" tracers
@@ -364,6 +430,8 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
     integer                               :: n, nzmax, nzmin
+    real(kind=WP)                         :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D) ! OG - tra_diag
+    integer                               :: nz, nu1, nl1 ! OG - tra_diag
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), pointer                :: del_ttf(:,:)
@@ -378,20 +446,89 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     vert_sink      = 0.0_WP
 #endif
 
+    ttf_rhs_bak = 0.0 ! OG - tra_diag
+
+    if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+          do n=1, myDim_nod2D+eDim_nod2D
+          nu1 = ulevels_nod2D(n)
+          nl1 = nlevels_nod2D(n)
+          do nz = nu1, nl1-1
+             ttf_rhs_bak(nz,n) = del_ttf(nz,n)
+          end do
+       end do
+    end if
     !___________________________________________________________________________
-    ! do horizontal diffusiion
+    ! do horizontal diffusion
     ! write there also horizontal diffusion rhs to del_ttf which is equal the R_T^n
     ! in danilovs srcipt
     ! includes Redi diffusivity if Redi=.true.
     call diff_part_hor_redi(tracers, partit, mesh)  ! seems to be ~9% faster than diff_part_hor
-        
+
+    if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+       do n=1, myDim_nod2D+eDim_nod2D
+          nu1 = ulevels_nod2D(n)
+          nl1 = nlevels_nod2D(n)
+          do nz = nu1, nl1-1
+             ! horizontal diffusion (w/out Redi)           
+             tracers%work%tra_diff_part_hor_redi(nz,n,tr_num) = (del_ttf(nz,n) - ttf_rhs_bak(nz,n)) / hnode_new(nz,n) ! Unit [Conc]
+             !if (mype==0)  print *, tracers%work%tra_diff_part_hor_redi(nz,n,tr_num)
+          end do
+       end do
+    end if
+
+    if ((.not. tracers%data(tr_num)%i_vert_diff) .and. tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+       do n=1, myDim_nod2D+eDim_nod2D
+          nu1 = ulevels_nod2D(n)
+          nl1 = nlevels_nod2D(n)
+          do nz = nu1, nl1-1
+             ttf_rhs_bak(nz,n) = del_ttf(nz,n)
+          end do
+       end do
+    end if
     !___________________________________________________________________________
     ! do vertical diffusion: explicit
     if (.not. tracers%data(tr_num)%i_vert_diff) call diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
-    
+
+    ! OG i_vert_diff = TRUE so, we dont call explicit scheme
+    ! If we use this, check surface forcing for recom variables (They are not updated)
+    if ((.not. tracers%data(tr_num)%i_vert_diff) .and. tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag 
+       do n=1, myDim_nod2D+eDim_nod2D
+          nu1 = ulevels_nod2D(n)
+          nl1 = nlevels_nod2D(n)
+          do nz = nu1, nl1-1
+             ! vertical diffusion: explicit
+             tracers%work%tra_diff_part_ver_expl(nz,n,tr_num) = (del_ttf(nz,n) - ttf_rhs_bak(nz,n)) / hnode_new(nz,n) ! Unit [Conc]
+             !if (mype==0)  print *,  tra_diff_part_ver_expl(:,:,tr_num)
+          end do
+       end do
+    end if
+
     ! A projection of horizontal Redi diffussivity onto vertical. This par contains horizontal
     ! derivatives and has to be computed explicitly!
+
+    if (tracers%data(tr_num)%ltra_diag .and. Redi) then ! OG - tra_diag
+       do n=1, myDim_nod2D+eDim_nod2D
+          nu1 = ulevels_nod2D(n)
+          nl1 = nlevels_nod2D(n)
+          do nz = nu1, nl1-1
+             ttf_rhs_bak(nz,n) = del_ttf(nz,n)
+          end do
+       end do
+    end if
+
     if (Redi) call diff_ver_part_redi_expl(tracers, partit, mesh)
+
+    if (tracers%data(tr_num)%ltra_diag .and. Redi) then ! OG - tra_diag
+       do n=1, myDim_nod2D+eDim_nod2D
+          nu1 = ulevels_nod2D(n)
+          nl1 = nlevels_nod2D(n)
+          do nz = nu1, nl1-1
+             ! Redi diffussivity onto vertical: explicit
+             tracers%work%tra_diff_part_ver_redi_expl(nz,n,tr_num) = (del_ttf(nz,n) - ttf_rhs_bak(nz,n)) / hnode_new(nz,n) ! Unit [Conc]
+             !if (mype==0)  print *,  tra_diff_part_ver_redi_expl(:,:,tr_num)
+          end do
+       end do
+    end if
 
 !        if (recom_debug .and. mype==0)  print *, tracers%data(tr_num)%ID
 
@@ -479,7 +616,32 @@ endif
     !___________________________________________________________________________
     if (tracers%data(tr_num)%i_vert_diff) then
         ! do vertical diffusion: implicite
+
+        if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+           do n=1, myDim_nod2D+eDim_nod2D
+              nu1 = ulevels_nod2D(n)
+              nl1 = nlevels_nod2D(n)
+              do nz = nu1, nl1-1
+                 ttf_rhs_bak(nz,n) = tracers%data(tr_num)%values(nz,n)
+              end do
+           end do
+        end if
+
+        ! (w/out Redi)
         call diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
+
+        ! vertical diffusion: implicit
+        if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+           do n=1, myDim_nod2D+eDim_nod2D
+              nu1 = ulevels_nod2D(n)
+              nl1 = nlevels_nod2D(n)
+              do nz = nu1, nl1-1
+                 tracers%work%tra_diff_part_ver_impl(nz,n,tr_num) = tracers%data(tr_num)%values(nz,n) - ttf_rhs_bak(nz,n)
+                 !if (mype==0)  print *,  tra_diff_part_ver_impl(:,:,tr_num)
+              end do
+           end do
+        end if
+
     end if
     
     !We DO not set del_ttf to zero because it will not be used in this timestep anymore
@@ -1482,6 +1644,10 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
 #if defined (__recom)
    use recoM_declarations
    use recom_glovar
+   use recom_config
+#endif
+#if defined (__ciso)
+   use recom_ciso
 #endif
   use mod_transit
   use g_clock
@@ -1609,16 +1775,35 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
 !---  Done with boundary conditions for transient tracers.
 #if defined(__recom)
     CASE (1001) ! DIN
+        if (use_MEDUSA .and. add_loopback) then  ! OG: add is_MEDUSA_loopback flag is_MEDUSA_loopback flag * lb_flux(n,1)
+            bc_surface= dt*(AtmNInput(n) + RiverDIN2D(n)   * is_riverinput                &
+                                         + ErosionTON2D(n) * is_erosioninput + lb_flux(n,1))
+        else
             bc_surface= dt*(AtmNInput(n) + RiverDIN2D(n)   * is_riverinput                &
                                          + ErosionTON2D(n) * is_erosioninput)
+        end if
+
     CASE (1002) ! DIC
+        if (use_MEDUSA .and. add_loopback) then
+            bc_surface= dt*(GloCO2flux_seaicemask(n)                &
+                                + RiverDIC2D(n)   * is_riverinput   &
+                                + ErosionTOC2D(n) * is_erosioninput &
+                                + lb_flux(n,2) + lb_flux(n,5))
+        else
             bc_surface= dt*(GloCO2flux_seaicemask(n)                &
                                 + RiverDIC2D(n)   * is_riverinput   &
                                 + ErosionTOC2D(n) * is_erosioninput)
+       end if
+
     CASE (1003) ! Alk
+        if (use_MEDUSA .and. add_loopback) then
+            bc_surface= dt*(virtual_alk(n) + relax_alk(n)       &
+                            + RiverAlk2D(n) * is_riverinput     &
+                            + lb_flux(n,3) + lb_flux(n,5)*2) !CaCO3:Alk burial=1:2
+        else
             bc_surface= dt*(virtual_alk(n) + relax_alk(n)       &
                             + RiverAlk2D(n) * is_riverinput)
-        !bc_surface=0.0_WP
+        end if
     CASE (1004:1010)
         bc_surface=0.0_WP
     CASE (1011) ! DON
@@ -1628,16 +1813,58 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
     CASE (1013:1017)
         bc_surface=0.0_WP
     CASE (1018) ! DSi
-           bc_surface=dt*(RiverDSi2D(n) * is_riverinput + ErosionTSi2D(n) * is_erosioninput)
+        if (use_MEDUSA .and. add_loopback) then
+           bc_surface=dt*(RiverDSi2D(n)   * is_riverinput        &
+                        + ErosionTSi2D(n) * is_erosioninput      &
+                        + lb_flux(n,4))
+        else
+            bc_surface=dt*(RiverDSi2D(n) * is_riverinput + ErosionTSi2D(n) * is_erosioninput)
+        end if
+
     CASE (1019) ! Fe
+        if (useRivFe) then
+            bc_surface= dt*(AtmFeInput(n) + RiverFe(n))
+        else
            bc_surface= dt*AtmFeInput(n)
+        end if
     CASE (1020:1021) ! Cal
         bc_surface=0.0_WP
     CASE (1022) ! OXY
         bc_surface= dt*GloO2flux_seaicemask(n)
 !        bc_surface=0.0_WP
-    CASE (1023:1035)
+    CASE (1023:1036)
         bc_surface=0.0_WP  ! OG added bc for recom fields
+    CASE (1302) ! Before (1037) ! DIC_13
+
+#if defined (__ciso)
+         if (ciso) then
+            if (use_MEDUSA .and. add_loopback) then
+               bc_surface= dt*(GloCO2flux_seaicemask_13(n) &
+                           + lb_flux(n,6) + lb_flux(n,7))
+            else
+               bc_surface= dt*(GloCO2flux_seaicemask_13(n))
+            end if
+         else
+            bc_surface=0.0_WP
+         end if
+#endif
+    CASE (1305:1321)
+         bc_surface=0.0_WP ! organic 13C
+    CASE (1402) ! Before (1034) ! DIC_14
+#if defined (__ciso)
+         if (ciso .and. ciso_14) then
+             if (use_MEDUSA .and. add_loopback .and. ciso_organic_14) then
+                 bc_surface= dt*(GloCO2flux_seaicemask_14(n) &
+                             + lb_flux(n,8) + lb_flux(n,9))
+             else
+                 bc_surface= dt*GloCO2flux_seaicemask_14(n)
+             end if
+         else
+             bc_surface=0.0_WP
+         end if
+#endif
+    CASE (1405:1421)
+         bc_surface=0.0_WP ! organic 14C
 #endif
     CASE (101) ! apply boundary conditions to tracer ID=101
         bc_surface= dt*(prec_rain(n))! - real_salt_flux(n)*is_nonlinfs)

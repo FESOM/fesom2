@@ -17,7 +17,7 @@ module restart_file_group_module
 
   type restart_file_group
     private
-    type(restart_file_type), public :: files(112)
+    type(restart_file_type), public :: files(200) ! .OG. 112 Before
 
     integer, public :: nfiles = 0 ! todo: allow dynamically allocated size without messing with shallow copied pointers
   contains

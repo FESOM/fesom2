@@ -1,7 +1,7 @@
 !===============================================================================
 ! REcoM_Forcing
 !===============================================================================
-subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sali_depth &
+subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali_depth &
             , CO2_watercolumn                                          &
             , pH_watercolumn                                           &
             , pCO2_watercolumn                                         &
@@ -66,7 +66,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sal
     !!---- Subroutine Depth
 
     real(kind=8),dimension(mesh%nl)           :: zF                   ! [m] Depth of fluxes
-    real(kind=8),dimension(mesh%nl,5)         :: SinkVel              ! [m/day]
+    real(kind=8),dimension(mesh%nl,6)         :: SinkVel              ! [m/day]
     real(kind=8),dimension(mesh%nl-1)         :: thick                ! [m] Vertical distance between two nodes = Thickness 
     real(kind=8),dimension(mesh%nl-1)         :: recipthick           ! [1/m] reciprocal of thick
 
@@ -111,8 +111,11 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sal
     tiny_Si  = tiny_C_d/SiCmax      ! SiCmax = 0.8d0
 
 #if defined (__coccos)
-    tiny_N_c = tiny_chl/chl2N_max_c ! 0.00001/ 3.5d0 
+    tiny_N_c = tiny_chl/chl2N_max_c ! 0.00001/ 3.5d0
     tiny_C_c = tiny_N_c/NCmax_c     ! NCmax_c = 0.15d0
+
+    tiny_N_p = tiny_chl/chl2N_max_p ! 0.00001/ 3.5d0 
+    tiny_C_p = tiny_N_p/NCmax_p     ! NCmax_c = 0.15d0
 #endif
 
     call Cobeta(partit, mesh)      
@@ -182,15 +185,38 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sal
         stop
     endif
 
-    call flxco2(co2flux, co2ex, dpco2surf,                                                   &
-                ph, pco2surf, fco2, co2, hco3, co3, OmegaA, OmegaC, BetaD, rhoSW, p, tempis, &
-                REcoM_T, REcoM_S, REcoM_Alk, REcoM_DIC, REcoM_Si, REcoM_Phos, kw660, LocAtmCO2, Patm, thick(One), Nmocsy, Lond,Latd, &
-                optCON='mol/m3',optT='Tpot   ',optP='m ',optB='u74',optK1K2='l  ',optKf='dg',optGAS='Pinsitu',optS='Sprc')
+    !!---- Skip CO2 flux calculation in ice shelf cavities (ulevels_nod2d > 1)
+    !!---- Cavity nodes have uninitialized biogeochemical tracers
+    !!---- NOTE: ulevels_nod2d is already indexed by local node numbers
+    if (mesh%ulevels_nod2d(n) > 1) then
+        !! Set CO2 flux to zero in cavity regions
+        co2flux(1) = 0.0d0
+        co2ex(1) = 0.0d0
+        dpco2surf(1) = 0.0d0
+        ph(1) = 8.0d0
+        pco2surf(1) = 0.0d0
+        fco2(1) = 0.0d0
+        co2(1) = 0.0d0
+        hco3(1) = 0.0d0
+        co3(1) = 0.0d0
+        OmegaA(1) = 0.0d0
+        OmegaC(1) = 0.0d0
+        BetaD(1) = 0.0d0
+        rhoSW(1) = 1027.0d0
+    else
+        !! Calculate CO2 flux for non-cavity nodes
+        call flxco2(co2flux, co2ex, dpco2surf,                                                   &
+                    ph, pco2surf, fco2, co2, hco3, co3, OmegaA, OmegaC, BetaD, rhoSW, p, tempis, K0, &
+                    REcoM_T, REcoM_S, REcoM_Alk, REcoM_DIC, REcoM_Si, REcoM_Phos, kw660, LocAtmCO2, Patm, thick(One), Nmocsy, Lond,Latd, &
+                    optCON='mol/m3',optT='Tpot   ',optP='m ',optB='u74',optK1K2='l  ',optKf='dg',optGAS='Pinsitu',optS='Sprc')
+    endif
 
 ! changed optK1K2='l  ' to 'm10'
   if((co2flux(1)>1.e10) .or. (co2flux(1)<-1.e10)) then
 !     co2flux(1)=0.0  
       print*, 'ERROR: co2 flux !'
+      print*, 'ulevels_nod2d(n): ',mesh%ulevels_nod2d(n)
+      print*, 'node n (local): ',n
       print*, 'pco2surf: ',pco2surf
       print*, 'co2: ',co2
       print*, 'rhoSW: ', rhoSW
@@ -227,9 +253,16 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp , Temp, Sali, Sal
    ppo = Loc_slp/Pa2atm !1 !slp divided by 1 atm
    REcoM_O2 = max(tiny*1e-3,state(one,ioxy)*1e-3) ! convert from mmol/m3 to mol/m3 for mocsy
 
-   call  o2flux(REcoM_T, REcoM_S, kw660, ppo, REcoM_O2, Nmocsy, o2ex)
-   oflux     = o2ex * 1.e3 *SecondsPerDay  !* (1.d0 - Loc_ice_conc) [mmol/m2/d]
-   o2flux_seaicemask = o2ex * 1.e3 ! back to mmol here [mmol/m2/s] 
+   !!---- Skip O2 flux calculation in ice shelf cavities
+   if (mesh%ulevels_nod2d(n) > 1) then
+       o2ex(1) = 0.0d0
+       oflux = 0.0d0
+       o2flux_seaicemask = 0.0d0
+   else
+       call  o2flux(REcoM_T, REcoM_S, kw660, ppo, REcoM_O2, Nmocsy, o2ex)
+       oflux     = o2ex * 1.e3 *SecondsPerDay  !* (1.d0 - Loc_ice_conc) [mmol/m2/d]
+       o2flux_seaicemask = o2ex * 1.e3 ! back to mmol here [mmol/m2/s]
+   endif 
 
 ! Source-Minus-Sinks
 
@@ -263,6 +296,10 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
   state(1:nn,icchl)  = max(tiny_chl,state(1:nn,icchl))
   state(1:nn,icocn)  = max(tiny_N_c,state(1:nn,icocn))
   state(1:nn,icocc)  = max(tiny_C_c,state(1:nn,icocc))
+
+  state(1:nn,iphachl)  = max(tiny_chl,state(1:nn,iphachl))
+  state(1:nn,iphan)  = max(tiny_N_p,state(1:nn,iphan))
+  state(1:nn,iphac)  = max(tiny_C_p,state(1:nn,iphac))
 #endif
 
 #if defined (__3Zoo2Det)
@@ -271,6 +308,54 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
 #endif
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
+
+  if (ciso) then
+!   Calculate carbon-isotopic fractionation, radioactive decay is calculated in oce_ale_tracer.F90
+
+!   Fractionation due to air-sea exchange and chemical speciation of CO2
+    call recom_ciso_airsea(recom_t(1), co3(1), recom_dic(1)) ! -> alpha_aq, alpha_dic. CO3 is taken from mocsy
+
+!   Isotopic ratios of dissolved CO2, also needed to calculate biogenic fractionation
+    r_dic_13     = max(tiny*1e-3,state(1,idic_13)*1e-3) / recom_dic(1)
+    r_co2s_13    = alpha_aq_13 / alpha_dic_13 * r_dic_13
+!   Calculate air-sea fluxes of 13|14CO2 in mmol / m**2 / s
+    kwco2  = kw660(1) * (660/scco2(REcoM_T(1)))**0.5  ! Piston velocity (via mocsy)
+    co2sat = co2flux(1) / (kwco2 + tiny) + co2(1)     ! Saturation concentration of CO2 (via mocsy)
+!   co2flux_13   = kwco2 * alpha_k_13 * (alpha_aq_13 * r_atm_13 * co2sat - r_co2s_13 * co2(1))
+!   co2flux_13   = alpha_k_13 * alpha_aq_13 * kwco2 * (r_atm_13 * co2sat - r_dic_13 * co2(1) / alpha_dic_13)
+!   Fractionation factors were determined for freshwater, include a correction for enhanced fractionation in seawater
+    co2flux_13   = (alpha_k_13 * alpha_aq_13 - 0.0002) * kwco2 * (r_atm_13 * co2sat - r_dic_13 * co2(1) / alpha_dic_13)
+    co2flux_seaicemask_13 = co2flux_13 * 1.e3
+
+!   Biogenic fractionation due to photosynthesis of plankton
+!   phyc_13|14 and diac_13|14 are only used in REcoM_sms to calculate DIC_13|14, DOC_13|14 and DetC_13|14
+
+    call recom_ciso_photo(co2(1)) ! -> alpha_p
+    r_phyc_13 = r_co2s_13 / alpha_p_13
+    r_diac_13 = r_co2s_13 / alpha_p_dia_13
+    state(1:nn,iphyc_13)   = max((tiny_C   * r_phyc_13), (state(1:nn,iphyc) * r_phyc_13))
+    state(1:nn,idiac_13)   = max((tiny_C_d * r_diac_13), (state(1:nn,idiac) * r_diac_13))
+
+!   The same for radiocarbon, fractionation factors have been already derived above
+    if (ciso_14) then
+!   Air-sea exchange
+      r_dic_14   = max(tiny*1e-3,state(1,idic_14)*1e-3) / recom_dic(1)
+      r_co2s_14  = alpha_aq_14 / alpha_dic_14 * r_dic_14
+!     co2flux_14 = kwco2 * alpha_k_14 * (alpha_aq_14 * r_atm_14 * co2sat - r_co2s_14 * co2(1))
+!     Fractionation factors were determined for freshwater, include a correction for enhanced fractionation seawater
+      co2flux_14 = (alpha_k_14 * alpha_aq_14 - 0.0004) * kwco2 * (r_atm_14 * co2sat - r_dic_14 * co2(1) / alpha_dic_14)
+      co2flux_seaicemask_14 = co2flux_14 * 1.e3
+!   Biogenic fractionation
+      if (ciso_organic_14) then
+        r_phyc_14 = r_co2s_14 / alpha_p_14
+        r_diac_14 = r_co2s_14 / alpha_p_dia_14
+        state(1:nn,iphyc_14) = max((tiny_C   * r_phyc_14), (state(1:nn,iphyc) * r_phyc_14))
+        state(1:nn,idiac_14) = max((tiny_C_d * r_diac_14), (state(1:nn,idiac) * r_diac_14))
+      end if
+    end if
+!   Radiocarbon
+  end if
+! ciso
 
 !-------------------------------------------------------------------------------
 ! Diagnostics
@@ -291,10 +376,17 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
      locNNAd = sum(vertNNAd(1:nn) * thick(1:nn))
      locChldegd = sum(vertChldegd(1:nn) * thick(1:nn))
 
+#if defined (__coccos)
      locNPPc = sum(vertNPPc(1:nn) * thick(1:nn))
      locGPPc = sum(vertGPPc(1:nn) * thick(1:nn))
      locNNAc = sum(vertNNAc(1:nn) * thick(1:nn))
      locChldegc = sum(vertChldegc(1:nn) * thick(1:nn))
+
+     locNPPp = sum(vertNPPp(1:nn) * thick(1:nn))
+     locGPPp = sum(vertGPPp(1:nn) * thick(1:nn))
+     locNNAp = sum(vertNNAp(1:nn) * thick(1:nn))
+     locChldegp = sum(vertChldegp(1:nn) * thick(1:nn))
+#endif
 
   end if
 end subroutine REcoM_Forcing
