@@ -296,8 +296,8 @@
         use mod_mesh
         use mod_partit
         use mod_parsup
-        use g_config,     only: runid, ResultPath
-        use io_restart,   only: icepack_files, icepack_path
+        use g_config,     only: runid, ResultPath, RestartOutPath
+        use io_restart,   only: icepack_files, icepack_path, nc_restart_path
     
         implicit none
     
@@ -356,7 +356,7 @@
         write(cyear,'(i4)') year
         ! Create an icepack restart file
         ! Only serial output implemented so far
-        icepack_path=trim(ResultPath)//trim(runid)//'.'//cyear//'.icepack.restart.nc'
+        icepack_path = nc_restart_path('icepack', year, RestartOutPath)
         
         if(has_been_called) return
         has_been_called = .true.
