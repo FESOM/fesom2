@@ -1519,7 +1519,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             + aggregationRate                       * PhaeoC   &
 #endif
             - grazingFlux_Det  * recipDet  * grazEff           &
-            - grazingFlux_Det2 * recipDet2 * grazEff2          &
+            - grazingFlux_Det2 * recipDet  * grazEff2          &
             + aggregationRate                         * PhyC   &
             + aggregationRate                         * DiaC   &
             + miczooLossFlux   * recipQZoo3                    &
@@ -1540,7 +1540,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             + aggregationRate                      * PhaeoC    &
 #endif
             - grazingFlux_Det  * recipDet  * grazEff           &
-            - grazingFlux_Det2 * recipDet2 * grazEff           &
+            - grazingFlux_Det2 * recipDet  * grazEff           &
             + aggregationRate              * phyC              &
             + aggregationRate              * DiaC              &
             + hetLossFlux      * recipQZoo                     &

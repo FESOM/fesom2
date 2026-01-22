@@ -1,0 +1,61 @@
+#!/bin/bash
+#SBATCH --job-name=F21R3P4
+#SBATCH --account=XXXX
+#SBATCH --partition=mpp
+#SBATCH -N 9
+#SBATCH --cpus-per-task=1
+#SBATCH --time=08:00:00
+#SBATCH --qos=12h
+#SBATCH --tasks-per-node 96  # using all 128CPus we exceed the maxload limit (>130) of many used nodes when us parallel I/O
+
+#SBATCH -o slurm-out.out
+#SBATCH -e slurm-err.out
+
+# disable hyperthreading
+#SBATCH --hint=nomultithread
+
+module purge 
+source ../env/albedo/shell
+export OMP_NUM_THREADS=1
+ulimit -s unlimited
+
+
+# determine JOBID
+JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
+
+ln -s ../bin/fesom.x .           # cp -n ../bin/fesom.x
+#cp -n ../../config/namelist.config  .
+#cp -n ../../config/namelist.forcing .
+#cp -n ../../config/namelist.oce     .
+#cp -n ../../config/namelist.ice     .
+#cp -n ../../config/namelist.io      .
+#cp -n ../../config/namelist.icepack .
+
+#___DETERMINE SLURM JOBID+OUTPUTFILE____________________________________________
+jobid=$(echo $SLURM_JOB_ID | cut -d"." -f1)
+fname="fesom2.0.out"
+
+date
+srun --mpi=pmi2 ./fesom.x  > fesom2.0.out #${fname}
+date
+
+#qstat -f $PBS_JOBID
+#export EXITSTATUS=$?
+#if [ ${EXITSTATUS} -eq 0 ] || [ ${EXITSTATUS} -eq 127 ] ; then
+#sbatch job_albedo
+#fi
+
+Resultpath='/albedo/scratch/user/.../'
+test -e $Resultpath/fesom.XXXX.oce.restart.nc && exit
+
+IsInFile=$( tail -1 fesom2.0.out | grep -c should)
+if (( IsInFile > 0 )); then
+# submit next #job                                                                                                     \
+ echo "submitting next job"
+ cp fesom2.0.out fesom.out.done
+ sbatch job_albedo
+else
+ echo "something is wrong, last line of fesom.out reads"
+ echo $( tail -1 fesom2.0.out)
+ echo "abnormal termination of job script"
+fi
