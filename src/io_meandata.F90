@@ -161,6 +161,7 @@ endif
   end do
   
 DO i=1, io_listsize
+if (mype==0) write(*,*) 'initializing io stream ',io_list(i)%id
 SELECT CASE (trim(io_list(i)%id))
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!2D streams!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 CASE ('sst       ')
@@ -202,12 +203,13 @@ CASE ('m_snow    ')
     if (use_ice) then
     call def_stream(nod2D, myDim_nod2D, 'm_snow',   'snow height',                     'm',      m_snow(1:myDim_nod2D),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
     end if
-#if defined (__seaice_tracers)
+!#if defined (__seaice_tracers)
 CASE ('tr_ice    ')
     if (use_ice) then
+    if (mype==0) write(*,*) 'ice tracer!'
     call def_stream(nod2D, myDim_nod2D, 'tr_ice',   'ice_tracer',                     'm',      tr_ice(1:myDim_nod2D,1),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
     end if
-#endif /* (__seaice_tracers) */
+!#endif /* (__seaice_tracers) */
     
 !___________________________________________________________________________________________________________________________________
 ! output mixed layer depth    

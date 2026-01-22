@@ -88,8 +88,8 @@ save
   ! stuff for iron/other nutrients/tracers in seaice
   
   ! number of concentration tracers in ice
-  integer                                          :: ntr_ice=1 !
-  integer, PARAMETER                               :: ntr_ice_max=1 !
+  integer                                          :: ntr_ice=1 ! can be adjusted in namelist
+  integer, PARAMETER                               :: ntr_ice_max=1 ! fixed number, set at compilation
     ! which sea ice tracer belongs to which ocean tracer
   integer, DIMENSION(ntr_ice_max)                  :: ice_tracer_mate
   ! variables for holding concentration of stuff (nutrients e.g.) in ice and fluxes
@@ -97,10 +97,10 @@ save
   ! the sign convention is that positive fluxes are down (atm->ice and ice->ocn)
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:,:)       :: tr_ice, flx_iceocn, flx_atmice 
   ! additional variables for the FCT-based advection and diffusion of ice tracers
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: tr_icel
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: dtr_ice
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_tr_ice
-  REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: rhs_tr_icediv
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:,:)       :: tr_icel
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:,:)       :: dtr_ice
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:,:)       :: rhs_tr_ice
+  REAL(kind=WP), ALLOCATABLE, DIMENSION(:,:)       :: rhs_tr_icediv
 #endif /* (__seaice_tracers) */
 
   REAL(kind=WP), ALLOCATABLE, DIMENSION(:)         :: S_oc_array, T_oc_array
