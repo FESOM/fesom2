@@ -2955,7 +2955,7 @@ subroutine compute_CFLz(dynamics, partit, mesh)
     ! calc vertical CFL criteria for debugging purpose and vertical Wvel splitting
 !$OMP PARALLEL DO
     do node=1, myDim_nod2D+eDim_nod2D
-       CFL_z(1,node)=0._WP
+       CFL_z(:,node)=0._WP
     end do
 !$OMP END PARALLEL DO
 
@@ -3248,8 +3248,11 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
         !!PS friction=-C_d*sqrt(UV(1,nlevels(elem)-1,elem)**2+ &
         !!PS             UV(2,nlevels(elem)-1,elem)**2)
         
-        if ((toy_ocean) .AND. (TRIM(which_toy)=="dbgyre")) then
+        if      ((toy_ocean) .AND. (TRIM(which_toy)=="dbgyre")) then
            friction=-C_d
+           
+        else if ((toy_ocean) .AND. (TRIM(which_toy)=="neverworld2")) then
+           friction=-C_d   
 
         else if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) then
            friction=-C_d

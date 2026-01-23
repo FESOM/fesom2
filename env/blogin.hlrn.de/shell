@@ -1,15 +1,30 @@
-# make the contents as shell agnostic as possible so we can include them with bash, zsh and others
+#!/bin/bash
 
-module load gcc/4.9.3
-module load intel/17.0.4.196
+module load intel/2024.2
+module load impi/2021.13
+module load hdf5-parallel/impi/intel/1.14.4
+module load netcdf-parallel/impi/intel/4.9.2
 
-module swap PrgEnv-cray PrgEnv-intel
-module swap cray-mpich cray-mpich
-module unload cray-hdf5
-module load cray-netcdf
-module load cray-hdf5
-
-export CRAYPE_LINK_TYPE=dynamic
-export PATH=/gfs1/work/hbxeeeee/sw/cmake/bin:$PATH
-
-export FC=ftn CC=cc CXX=g++
+export LC_ALL=en_US.UTF-8
+export FC=mpiifx
+export F77=mpiifx
+export MPIFC=mpiifx
+export CC=mpiicx
+export CXX=mpiicpx
+export FCFLAGS=-free
+export MPIROOT="$(mpiifx -show | perl -lne 'm{ -I(.*?)/include } and print $1')"
+export MPI_LIB="$(mpiifx -show |sed -e 's/^[^ ]*//' -e 's/-[I][^ ]*//g')"
+export NETCDFROOT=/sw/dataformats/netcdf/4.9.2/clx.el9/impi/intel
+export NETCDFFROOT=$NETCDFROOT
+export NETCDF_C_INCLUDE_DIRECTORIES=$NETCDFROOT/include
+export NETCDF_Fortran_INCLUDE_DIRECTORIES=$NETCDFFROOT/include
+export LD_LIBRARY_PATH=$NETCDFROOT/lib:$NETCDFFROOT/lib:$LD_LIBRARY_PATH
+export IO_LIB_ROOT=/home/shkjocke/sw/HPC_libraries/intel2024.2_impi2021.13_systemnetcdf_20240801
+export SZIPROOT=/sw/dataformats/aec/1.1.3/clx.el9/
+export HDF5ROOT=$HDF5_ROOT
+export ECCODESROOT=$IO_LIB_ROOT
+export HDF5_C_INCLUDE_DIRECTORIES=$HDF5_ROOT/include
+export OASIS3MCT_FC_LIB="-L$NETCDFFROOT/lib -lnetcdff"
+export OASIS_NETCDF=$NETCDFROOT
+export OASIS_NETCDFF=$NETCDFFROOT
+export ENVIRONMENT_SET_BY_ESMTOOLS=TRUE
