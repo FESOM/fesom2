@@ -1204,7 +1204,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-        CASE (1023:1036)
+        CASE (1023:1037)
             tracers%data(i)%values(:,:)=0.0_WP
             if (mype==0) then
                 write (i_string,  "(I4)") i

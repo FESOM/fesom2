@@ -1474,8 +1474,9 @@ CONTAINS
       integer                   :: firstyearofcurrentCO2cycle, totnumyear, currentCO2year
       character(4)              :: currentCO2year_char
       real(kind=8), allocatable :: ncdata(:)
-      integer                   :: CO2start, CO2count
-      integer	                :: status, ncid, varid
+      integer                   :: CO2start, CO2count, RIstart, RIcount
+      real(kind=8)              :: locmax, locmin, glo
+      integer	                :: status, ncid, varid, ierror, n
 #endif
       type(t_partit), intent(inout), target :: partit
       type(t_mesh),   intent(in),    target :: mesh
@@ -1778,44 +1779,216 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
         if (mstep==1 .and. mype==0) write(*,*) 'useAeolianN is switched off'       
     end if
 
-! ******** Riverine input (Nutrients) *********
+    !-----------------------------------------------------------------------------
+    ! Configure river nutrient inputs
+    !-----------------------------------------------------------------------------
+
     if (useRivers) then
-!<  read riverine input
+
     ! *** River inputs are in mmol/m2/s ***
-    ! add river nutrients as surface boundary condition (surface_bc function in oce_ale_tracers)
+
         if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'   --> River_input'//achar(27)//'[0m'
 
+        ! add river nutrients as surface boundary condition (surface_bc function in oce_ale_tracers)
+        ! Enable river input flag
         is_riverinput = 1.0d0
 
-        if (update_monthly_flag) then
-            i=month
-            if (mstep > 1) i=i+1 
-            if (i > 12) i=1
-            filename=trim(nm_river_data_file)
-            if (mype==0) write(*,*) 'Updating riverine restoring data for month', i,' from ', trim(filename)
-            call read_2ddata_on_grid_NetCDF(filename,'Alkalinity', i, RiverAlk2D, partit, mesh)
-            ! write(*,*) mype, 'RiverAlk2D', maxval(RiverAlk2D(:)), minval(RiverAlk2D(:))        
-            ! molar convertion of [CaCo3] * 2  -> [total Alkalinity]   
-            RiverAlk2D = RiverAlk2D * 2
-  
-            call read_2ddata_on_grid_NetCDF(filename, 'DIC', i, RiverDIC2D, partit, mesh) 
-            ! write(*,*) mype, 'RiverDIC2D', maxval(RiverDIC2D(:)), minval(RiverDIC2D(:))     
+        if (mstep == 1) then
 
-            call read_2ddata_on_grid_NetCDF(filename, 'DIN', i, RiverDIN2D, partit, mesh) 
-            ! write(*,*) mype, 'RiverDIN2D', maxval(RiverDIN2D(:)), minval(RiverDIN2D(:))     
+            ! Determine input type: constant pre-industrial or transient
+            if (mype==0) then
+                ! Use constant pre-industrial river inputs
+                if (constant_PI_Rivers) then
+                    write(*,'(A)') 'INFO: Using constant pre-industrial riverine inputs'
+                    filename = trim(REcoMDataPath) // 'Rivers_R2OMIP_PI.nc'
+                else
+                ! Use transient (year-specific) river inputs
+                    write(*,'(A,A,A,A)') 'INFO: Using transient riverine inputs - model year = ', &
+                                        trim(cyearnew), ' from ', trim(filename)
+                    ! Construct filename for current year
+                    filename = trim(REcoMDataPath) // 'Rivers_R2OMIP_' // trim(cyearnew) // '.nc'
+                endif
+                ! open file
+                write(*,*), trim(filename)
+                status=nf90_open(filename, nf90_nowrite, ncid)
+            endif
 
-            call read_2ddata_on_grid_NetCDF(filename, 'DOC', i, RiverDOC2D, partit, mesh) 
-            ! write(*,*) mype, 'RiverDOC2D', maxval(RiverDOC2D(:)), minval(RiverDOC2D(:))     
+            call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
 
-            call read_2ddata_on_grid_NetCDF(filename, 'DON', i, RiverDON2D, partit, mesh) 
-            ! write(*,*) mype, 'RiverDON2D', maxval(RiverDON2D(:)), minval(RiverDON2D(:))     
+            if (status.ne.nf90_noerr)then
+                print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
+                print*,'Error in opening netcdf file '//filename
+                call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+                stop
+            endif
 
-            RiverDSi2D = RiverDIN2D * (16/15)
-        end if
-    else
-        is_riverinput = 0.0d0
-        if (mype==0 .and. mstep==1) write(*,*) 'No riverine input' 
-    end if
+            call load_river_variable(ncid, 'DIN',  RiverDIN2D, partit, mesh)
+            locmax = -66666
+            locmin = 66666
+            locmax = max(locmax,maxval(RiverDIN2D))
+            locmin = min(locmin,minval(RiverDIN2D))
+
+            if (mype==0) write(*,*) "Sanity check for Riverine input after reading Rivers_R2OMIP file"
+            call MPI_AllREDUCE(locmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+            if (mype==0) write(*,*) '  |-> global max init. riverine DIN. =', glo
+            call MPI_AllREDUCE(locmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+            if (mype==0) write(*,*) '  |-> global min init. riverine DIN. =', glo
+
+            call load_river_variable(ncid, 'DOCl', RiverDOCl2D, partit, mesh)
+            locmax = -66666
+            locmin = 66666
+            locmax = max(locmax,maxval(RiverDOCl2D))
+            locmin = min(locmin,minval(RiverDOCl2D))
+
+            call MPI_AllREDUCE(locmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+            if (mype==0) write(*,*) '  |-> global max riverine DOCl. =', glo
+            call MPI_AllREDUCE(locmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+            if (mype==0) write(*,*) '  |-> global min riverine DOCl. =', glo
+
+            call load_river_variable(ncid, 'DOCs', RiverDOCsl2D, partit, mesh)
+            locmax = -66666
+            locmin = 66666
+            locmax = max(locmax,maxval(RiverDOCsl2D))
+            locmin = min(locmin,minval(RiverDOCsl2D))
+
+            call MPI_AllREDUCE(locmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+            if (mype==0) write(*,*) '  |-> global max riverine DOCsl. =', glo
+            call MPI_AllREDUCE(locmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+            if (mype==0) write(*,*) '  |-> global min riverine DOCsl. =', glo
+
+            call load_river_variable(ncid, 'POC',  RiverPOC2D, partit, mesh)
+            locmax = -66666
+            locmin = 66666
+            locmax = max(locmax,maxval(RiverPOC2D))
+            locmin = min(locmin,minval(RiverPOC2D))
+
+            call MPI_AllREDUCE(locmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+            if (mype==0) write(*,*) '  |-> global max riverine POC. =', glo
+            call MPI_AllREDUCE(locmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+            if (mype==0) write(*,*) '  |-> global min riverine POC. =', glo
+
+            if (mype == 0) then
+                status = nf90_close(ncid)  ! Close file once
+            endif
+
+                !allocate(ncdata(mesh%nod2D))
+                !if (mype==0) then
+                !    status=nf90_inq_varid(ncid, 'DIC', varid)
+                !    RIstart = 1
+                !    RIcount = mesh%nod2D
+                !    status=nf90_get_var(ncid, varid, ncdata, start=(/RIstart/), count=(/RIcount/))
+                !    status=nf90_close(ncid)
+                !endif
+                !call MPI_BCast(ncdata, nod2D, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+                !RiverDIC2D=ncdata(myList_nod2D) 
+                !deallocate(ncdata)
+                !write(*,*), 'here'
+
+                ! Read all nutrient fields from PI file
+                !i=1
+                !call read_2ddata_on_grid_NetCDF(filename, 'DIC', i, RiverDIC2D, partit, mesh)
+                !call read_2ddata_on_grid_NetCDF(filename, 'DIN', i, RiverDIN2D, partit, mesh)
+                !call read_2ddata_on_grid_NetCDF(filename, 'DOC_l', i, RiverDOCl2D, partit, mesh)
+                !call read_2ddata_on_grid_NetCDF(filename, 'DOC_sl', i, RiverDOCsl2D, partit, mesh)
+                !call read_2ddata_on_grid_NetCDF(filename, 'POC', i, RiverPOC2D, partit, mesh)
+
+
+
+                !if (mype==0) write(*,'(A)') 'INFO: Using constant pre-industrial riverine inputs'
+                ! Check for read errors
+                !if (i /= 0) then
+                !    if (mype==0) write(*,'(A,A)') 'ERROR: Failed to read PI river inputs from ', trim(filename)
+                !    stop
+                !endif
+            !endif
+
+        else
+
+            ! Use transient (year-specific) river inputs
+            !if (mstep == 1) then
+                !if (mype==0) write(*,'(A,A,A,A)') 'INFO: Using transient riverine inputs - model year = ', &
+                !                    trim(cyearnew), ' from ', trim(filename)
+        
+                ! Construct filename for current year
+                !filename = trim(REcoMDataPath) // 'Rivers_R2OMIP_' // trim(cyearnew) // '.nc'
+        
+                ! Read all nutrient fields for current year
+                !call read_2ddata_on_grid_NetCDF(filename, 'DIC', i, RiverDIC2D, partit, mesh)
+                !if (i /= 0) then
+                    !if (mype==0)  write(*,'(A,A,A)') 'ERROR: Failed to read DIC from ', trim(filename)
+                    !stop
+               ! endif
+        
+                !call read_2ddata_on_grid_NetCDF(filename, 'DIN', i, RiverDIN2D, partit, mesh)
+                !if (i /= 0) then
+                    !if (mype==0) write(*,'(A,A,A)') 'ERROR: Failed to read DIN from ', trim(filename)
+                    !stop
+                !endif
+        
+                !call read_2ddata_on_grid_NetCDF(filename, 'DOC_l', i, RiverDOCl2D, partit, mesh)
+                !if (i /= 0) then
+                    !if (mype==0) write(*,'(A,A,A)') 'ERROR: Failed to read DOC_l from ', trim(filename)
+                    !stop
+                !endif
+        
+                !call read_2ddata_on_grid_NetCDF(filename, 'DOC_sl', i, RiverDOCsl2D, partit, mesh)
+                !if (i /= 0) then
+                    !if (mype==0) write(*,'(A,A,A)') 'ERROR: Failed to read DOC_sl from ', trim(filename)
+                    !stop
+                !endif
+        
+                !call read_2ddata_on_grid_NetCDF(filename, 'POC', i, RiverPOC2D, partit, mesh)
+                !if (i /= 0) then
+                    !if (mype==0) write(*,'(A,A,A)') 'ERROR: Failed to read POC from ', trim(filename)
+                    !stop
+                !endif
+            !endif
+      
+        endif
+
+  else
+
+    ! Rivers disabled: set all inputs to zero
+    is_riverinput = 0.0d0
+    RiverDIC2D    = 0.0d0
+    RiverDIN2D    = 0.0d0
+    RiverDOCl2D   = 0.0d0
+    RiverDOCsl2D  = 0.0d0
+    RiverPOC2D    = 0.0d0
+    
+  endif
+
+!IF (.FALSE.) THEN ! CHECK OG
+!        if (update_monthly_flag) then
+!            i=month
+!            if (mstep > 1) i=i+1 
+!            if (i > 12) i=1
+!            filename=trim(nm_river_data_file)
+!            if (mype==0) write(*,*) 'Updating riverine restoring data for month', i,' from ', trim(filename)
+!            call read_2ddata_on_grid_NetCDF(filename,'Alkalinity', i, RiverAlk2D, partit, mesh)
+!            ! write(*,*) mype, 'RiverAlk2D', maxval(RiverAlk2D(:)), minval(RiverAlk2D(:))        
+!            ! molar convertion of [CaCo3] * 2  -> [total Alkalinity]   
+!            RiverAlk2D = RiverAlk2D * 2
+!  
+!            call read_2ddata_on_grid_NetCDF(filename, 'DIC', i, RiverDIC2D, partit, mesh) 
+!            ! write(*,*) mype, 'RiverDIC2D', maxval(RiverDIC2D(:)), minval(RiverDIC2D(:))     
+!
+!            call read_2ddata_on_grid_NetCDF(filename, 'DIN', i, RiverDIN2D, partit, mesh) 
+!            ! write(*,*) mype, 'RiverDIN2D', maxval(RiverDIN2D(:)), minval(RiverDIN2D(:))     
+!
+!            call read_2ddata_on_grid_NetCDF(filename, 'DOC', i, RiverDOC2D, partit, mesh) 
+!            ! write(*,*) mype, 'RiverDOC2D', maxval(RiverDOC2D(:)), minval(RiverDOC2D(:))     
+!
+!            call read_2ddata_on_grid_NetCDF(filename, 'DON', i, RiverDON2D, partit, mesh) 
+!            ! write(*,*) mype, 'RiverDON2D', maxval(RiverDON2D(:)), minval(RiverDON2D(:))     
+!
+!            RiverDSi2D = RiverDIN2D * (16/15)
+!        end if
+!    else
+!        is_riverinput = 0.0d0
+!        if (mype==0 .and. mstep==1) write(*,*) 'No riverine input' 
+!    end if
+!ENDIF
 
 ! ******** Riverine input of iron *********
     if (useRivFe) then

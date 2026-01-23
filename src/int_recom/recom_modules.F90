@@ -50,6 +50,9 @@ module recom_config
   integer :: iphac   = 0    ! Phaeocystis Carbon (set below)
   integer :: iphachl = 0    ! Phaeocystis Chlorophyll (set below)
 
+  ! Terrestrial DOC input (when useRivers is enabled)
+  integer :: idoct = 0 
+
 !=============================================================================
 
   Integer :: ivphy = 1, ivdia = 2, ivdet = 3, ivdetsc = 4, ivcoc = 5, ivpha = 6
@@ -128,6 +131,7 @@ module recom_config
   character(100)         :: REcoMDataPath         = '/albedo/work/projects/MarESys/ogurses/input/mesh_CORE2_finaltopo_mean/'
   logical                :: restore_alkalinity    = .true.
   logical                :: useRivers             = .false.
+  logical                :: constant_PI_Rivers    = .true.
   logical                :: useRivFe              = .false.    ! river input of Fe
   logical                :: useErosion            = .false.
   logical                :: NitrogenSS            = .false.    ! This one only activates rivers! And in principle denitrification, but denitrification is commented out. When set to true, external sources and sinks of nitrogen are activated (Riverine, aeolian and denitrification)
@@ -166,7 +170,8 @@ module recom_config
                        Diags      ,                       constant_CO2,                                   &
                        UseFeDust,                         UseDustClim,           UseDustClimAlbani,       &
                        use_photodamage,                   HetRespFlux_plus,      REcoMDataPath,           &
-                       restore_alkalinity,                useRivers,             useRivFe,                &
+                       restore_alkalinity,                useRivers,             constant_PI_Rivers,      &
+                       useRivFe,                &
                        useErosion,                        NitrogenSS,            useAeolianN,             &
                        firstyearoffesomcycle,             lastyearoffesomcycle,  numofCO2cycles,          &
                        currentCO2cycle,                   DIC_PI,                Nmocsy,                  &
@@ -373,11 +378,13 @@ module recom_config
 !!------------------------------------------------------------------------------
 !! *** DIN ***
   Real(kind=8)                 :: rho_N         = 0.11d0          ! [1/day] Temperature dependent N degradation of extracellular organic N (EON) (Remineralization of DON)
-  namelist /padin_rho_N/ rho_N
+  Real(kind=8)                 :: rho_Nt        = 0.67d0          ! [1/day] terrestrial N degradation of extracellular organic N (DONt) (Remineralization of terrestrial DON) ~ scale of 1.5 years ! R2OMIP
+  namelist /padin_rho_N/ rho_N, rho_Nt
 !!------------------------------------------------------------------------------
 !! *** DIC ***
   Real(kind=8)                 :: rho_C1        = 0.1d0           ! [1/day] Temperature dependent C degradation of extracellular organic C (EOC)
-  namelist /padic_rho_C1/ rho_C1
+  Real(kind=8)                 :: rho_C1t       = 0.0018d0        ! [1/day] terrestrial C degradation of extracellular organic C (EOC)
+  namelist /padic_rho_C1/ rho_C1, rho_C1t
 !!------------------------------------------------------------------------------
 !! *** Phytoplankton N ***
   Real(kind=8)                 :: lossN         = 0.05d0          ! [1/day] Phytoplankton loss of organic N compounds
@@ -535,6 +542,11 @@ contains
         imiczoon = 35
         imiczooc = 36
 
+        ! Terrestrial DOC input (when useRivers is enabled)
+        if (useRivers) then
+            idoct = 37
+        end if
+
 !        allocate(recom_cocco_tracer_id(3))
         recom_cocco_tracer_id = (/1029, 1030, 1031/)
 
@@ -559,6 +571,11 @@ contains
         iphac   = 27
         iphachl = 28
 
+        ! Terrestrial DOC input (when useRivers is enabled)
+        if (useRivers) then
+            idoct = 29
+        end if
+
 !        allocate(recom_cocco_tracer_id(3))
         recom_cocco_tracer_id = (/1023, 1024, 1025/)
 
@@ -576,6 +593,11 @@ contains
         imiczoon = 29
         imiczooc = 30
 
+        ! Terrestrial DOC input (when useRivers is enabled)
+        if (useRivers) then
+            idoct = 31
+        end if
+
 !        allocate(recom_det2_tracer_id(4))
         recom_det2_tracer_id = (/1025, 1026, 1027, 1028/)
     else
@@ -586,6 +608,11 @@ contains
         ! Zooplankton: mesozoo only
         ! Detritus: det1 only
         ! (All indices already set to default values)
+
+        ! Terrestrial DOC input (when useRivers is enabled)
+        if (useRivers) then
+            idoct = 23
+        end if
     endif
   end subroutine initialize_tracer_indices
 
@@ -607,6 +634,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
   integer :: actual_bgc_num
   integer :: expected_total_tracers
   integer :: num_physical_tracers
+  integer :: doc_tracers
   logical :: config_error
   character(len=200) :: error_msg
 
@@ -619,6 +647,13 @@ subroutine validate_recom_tracers(num_tracers, mype)
 
   ! Physical tracers (temperature, salinity, etc.) - typically first 2
   num_physical_tracers = 2
+
+  ! DOC tracers count
+  if (useRivers) then
+    doc_tracers = 1
+  else
+    doc_tracers = 0
+  end if
 
   ! Calculate actual BGC tracer count from namelist
   actual_bgc_num = num_tracers - num_physical_tracers
@@ -638,7 +673,8 @@ subroutine validate_recom_tracers(num_tracers, mype)
     ! Additional phaeocystis: 3 tracers (1032-1034)
     ! Additional microzoo: 2 tracers (1035-1036)
     ! Total: 22 + 4 + 6 + 3 + 2 = 36 (actually 22 + 14 = 36)
-    expected_bgc_num = 36
+    ! Plus DOC: +1 if useRivers
+    expected_bgc_num = 36 + doc_tracers
 
   else if (enable_coccos .and. .not. enable_3zoo2det) then
     ! ---------------------------------------------------------------------------
@@ -648,7 +684,8 @@ subroutine validate_recom_tracers(num_tracers, mype)
     ! Additional coccos: 3 tracers (1023-1025)
     ! Additional phaeocystis: 3 tracers (1026-1028)
     ! Total: 22 + 6 = 28
-    expected_bgc_num = 28
+    ! Plus DOC: +1 if useRivers
+    expected_bgc_num = 28 + doc_tracers
 
   else if (enable_3zoo2det .and. .not. enable_coccos) then
     ! ---------------------------------------------------------------------------
@@ -659,14 +696,16 @@ subroutine validate_recom_tracers(num_tracers, mype)
     ! Additional det2: 4 tracers (1025-1028)
     ! Additional microzoo: 2 tracers (1029-1030)
     ! Total: 22 + 8 = 30
-    expected_bgc_num = 30
+    ! Plus DOC: +1 if useRivers
+    expected_bgc_num = 30 + doc_tracers
 
   else
     ! ---------------------------------------------------------------------------
     ! Configuration 1: Base model (2 phyto + 1 zoo + 1 detritus)
     ! ---------------------------------------------------------------------------
     ! Base: 22 tracers (1001-1022)
-    expected_bgc_num = 22
+    ! Plus DOC: +1 if useRivers
+    expected_bgc_num = 22 + doc_tracers
 
   end if
 
@@ -708,6 +747,9 @@ subroutine validate_recom_tracers(num_tracers, mype)
     expected_tracer_ids(36) = 1034  ! PhaeoChl
     expected_tracer_ids(37) = 1035  ! Zoo3N
     expected_tracer_ids(38) = 1036  ! Zoo3C
+    if (useRivers) then
+      expected_tracer_ids(39) = 1037  ! DOCt (terrestrial DOC)
+    end if
 
   else if (enable_coccos .and. .not. enable_3zoo2det) then
     ! Coccos only: 1001-1022 (base) + 1023-1028 (coccos+phaeo)
@@ -717,6 +759,9 @@ subroutine validate_recom_tracers(num_tracers, mype)
     expected_tracer_ids(28) = 1026  ! PhaeoN
     expected_tracer_ids(29) = 1027  ! PhaeoC
     expected_tracer_ids(30) = 1028  ! PhaeoChl
+    if (useRivers) then
+      expected_tracer_ids(31) = 1029  ! DOCt (terrestrial DOC)
+    end if
 
   else if (enable_3zoo2det .and. .not. enable_coccos) then
     ! 3Zoo2Det only: 1001-1022 (base) + 1023-1030 (zoo2+det2+zoo3)
@@ -728,6 +773,15 @@ subroutine validate_recom_tracers(num_tracers, mype)
     expected_tracer_ids(30) = 1028  ! DetZ2Calc
     expected_tracer_ids(31) = 1029  ! Zoo3N
     expected_tracer_ids(32) = 1030  ! Zoo3C
+    if (useRivers) then
+      expected_tracer_ids(33) = 1031  ! DOCt (terrestrial DOC)
+    end if
+
+  else
+    ! Base configuration: only tracers 1, 2, 1001-1022
+    if (useRivers) then
+      expected_tracer_ids(25) = 1023  ! DOCt (terrestrial DOC)
+    end if
   end if
   ! else: base configuration only needs tracers 1, 2, 1001-1022
 
@@ -743,9 +797,11 @@ subroutine validate_recom_tracers(num_tracers, mype)
     write(*,*) 'Model configuration:'
     write(*,*) '  enable_3zoo2det = ', enable_3zoo2det
     write(*,*) '  enable_coccos   = ', enable_coccos
+    write(*,*) '  useRivers       = ', useRivers
     write(*,*) ''
     write(*,*) 'Tracer counts:'
     write(*,*) '  Physical tracers (T, S, ...)      = ', num_physical_tracers
+    write(*,*) '  DOC tracers (terrestrial input)   = ', doc_tracers
     write(*,*) '  Expected BGC tracers              = ', expected_bgc_num
     write(*,*) '  Expected TOTAL tracers            = ', expected_total_tracers
     write(*,*) '  Actual tracers from namelist      = ', num_tracers
@@ -775,10 +831,16 @@ subroutine validate_recom_tracers(num_tracers, mype)
         write(*,*) '    - Zoo2N, Zoo2C:       1023-1024'
         write(*,*) '    - DetZ2 pool:         1025-1028'
         write(*,*) '    - MicZooN, MicZooC:   1029-1030'
+        if (useRivers) then
+          write(*,*) '  Terrestrial DOC:        1031 (1 tracer)'
+        end if
       else if (enable_coccos .and. .not. enable_3zoo2det) then
         write(*,*) '  Coccos extension:       1023-1028 (6 tracers)'
         write(*,*) '    - CoccoN, C, Chl:     1023-1025'
         write(*,*) '    - PhaeoN, C, Chl:     1026-1028'
+        if (useRivers) then
+          write(*,*) '  Terrestrial DOC:        1029 (1 tracer)'
+        end if
       else if (enable_3zoo2det .and. enable_coccos) then
         write(*,*) '    - Zoo2N, Zoo2C:       1023-1024'
         write(*,*) '  3Zoo2Det extension:     1025-1028 (4 tracers for det2)'
@@ -786,12 +848,19 @@ subroutine validate_recom_tracers(num_tracers, mype)
         write(*,*) '    - CoccoN, C, Chl:     1029-1031'
         write(*,*) '    - PhaeoN, C, Chl:     1032-1034'
         write(*,*) '  MicroZoo extension:     1035-1036 (2 tracers)'
+        if (useRivers) then
+          write(*,*) '  Terrestrial DOC:        1037 (1 tracer)'
+        end if
+      else
+        if (useRivers) then
+          write(*,*) '  Terrestrial DOC:        1023 (1 tracer)'
+        end if
       end if
 
       write(*,*) ''
       write(*,*) 'ACTION REQUIRED:'
       write(*,*) '  1. Check your namelist.config tracer_list section'
-      write(*,*) '  2. Ensure enable_3zoo2det and enable_coccos match your setup'
+      write(*,*) '  2. Ensure enable_3zoo2det, enable_coccos, and useRivers match your setup'
       write(*,*) '  3. Add/remove tracers to match the expected configuration'
       write(*,*) '=========================================================================='
       write(*,*) ''
@@ -819,7 +888,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
       write(*,*) '  Expected value:        ', expected_bgc_num
       write(*,*) ''
       write(*,*) 'This may indicate that bgc_num was not updated after changing'
-      write(*,*) 'enable_3zoo2det or enable_coccos flags.'
+      write(*,*) 'enable_3zoo2det, enable_coccos flags, or useRivers flags.'
       write(*,*) '=========================================================================='
       write(*,*) ''
     end if
@@ -862,6 +931,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
     write(*,*) '  - Tracer ID clashes between configurations'
     write(*,*) '  - Incorrect order of tracer IDs in namelist'
     write(*,*) '  - Missing or duplicate tracer IDs'
+    write(*,*) '  - Forgetting to add DOCt tracer when useRivers is enabled'
     write(*,*) ''
 
     ! Configuration-specific warnings
@@ -873,27 +943,44 @@ subroutine validate_recom_tracers(num_tracers, mype)
       write(*,*) '  - Coccos uses:       1029-1031'
       write(*,*) '  - Phaeocystis uses:  1032-1034'
       write(*,*) '  - Microzooplankton:  1035-1036'
+      if (useRivers) then
+        write(*,*) '  - Terrestrial DOC:   1037'
+      end if
       write(*,*) ''
     else if (enable_coccos .and. .not. enable_3zoo2det) then
       write(*,*) 'IMPORTANT for COCCOS-ONLY configuration:'
       write(*,*) '  - Coccos uses:       1023-1025 (NOT 1029-1031)'
       write(*,*) '  - Phaeocystis uses:  1026-1028 (NOT 1032-1034)'
-      write(*,*) '  - Tracers 1029+ are NOT used in this configuration'
+      if (useRivers) then
+        write(*,*) '  - Terrestrial DOC:   1029'
+        write(*,*) '  - Tracers 1030+ are NOT used in this configuration'
+      else
+        write(*,*) '  - Tracers 1029+ are NOT used in this configuration'
+      end if
       write(*,*) ''
     else if (enable_3zoo2det .and. .not. enable_coccos) then
       write(*,*) 'IMPORTANT for 3ZOO2DET-ONLY configuration:'
       write(*,*) '  - Zoo2 uses:         1023-1024'
       write(*,*) '  - Det2 pool uses:    1025-1028'
       write(*,*) '  - Microzoo uses:     1029-1030 (NOT 1035-1036)'
-      write(*,*) '  - Tracers 1031+ are NOT used in this configuration'
+      if (useRivers) then
+        write(*,*) '  - Terrestrial DOC:   1031'
+        write(*,*) '  - Tracers 1032+ are NOT used in this configuration'
+      else
+        write(*,*) '  - Tracers 1031+ are NOT used in this configuration'
+      end if
       write(*,*) ''
     else
       write(*,*) 'IMPORTANT for BASE configuration:'
       write(*,*) '  - Only tracers 1-2, 1001-1022 should be present'
-      write(*,*) '  - Tracers 1023+ are NOT used in base configuration'
-      write(*,*) ''
+      if (useRivers) then
+        write(*,*) '  - Plus terrestrial DOC: 1023'
+        write(*,*) '  - Tracers 1024+ are NOT used in base configuration'
+      else
+        write(*,*) '  - Tracers 1023+ are NOT used in base configuration'
+      endif
     end if
-
+    write(*,*) ''
     write(*,*) '=========================================================================='
     write(*,*) ''
   end if
@@ -918,6 +1005,12 @@ subroutine validate_recom_tracers(num_tracers, mype)
     else if (enable_3zoo2det) then
       write(*,*) '3Zoo2Det-only configuration active.'
       write(*,*) 'Microzoo MUST use IDs 1029-1030 (NOT 1035-1036).'
+    end if
+
+    if (useRivers) then
+      write(*,*) ''
+      write(*,*) 'Rivers enabled (useRivers = .true.)'
+      write(*,*) 'Terrestrial DOC tracer is REQUIRED as the last BGC tracer.'
     end if
 
     write(*,*) ''
@@ -971,10 +1064,18 @@ subroutine validate_tracer_id_sequence(tracer_ids, num_tracers, mype)
   logical :: error_found
   logical :: duplicate_found
   integer :: num_physical_tracers
+  integer :: doc_tracers
 
   error_found = .false.
   duplicate_found = .false.
   num_physical_tracers = 2
+
+  ! DOC tracers count
+  if (useRivers) then
+    doc_tracers = 1
+  else
+    doc_tracers = 0
+  end if
 
   ! Allocate expected IDs array
   allocate(expected_ids(num_tracers))
@@ -992,12 +1093,27 @@ subroutine validate_tracer_id_sequence(tracer_ids, num_tracers, mype)
     expected_ids(25:30) = (/1023, 1024, 1025, 1026, 1027, 1028/)
     expected_ids(31:36) = (/1029, 1030, 1031, 1032, 1033, 1034/)
     expected_ids(37:38) = (/1035, 1036/)
+    if (useRivers) then
+      expected_ids(39) = 1037  ! DOCt
+    end if
 
   else if (enable_coccos .and. .not. enable_3zoo2det) then
     expected_ids(25:30) = (/1023, 1024, 1025, 1026, 1027, 1028/)
+    if (useRivers) then
+      expected_ids(31) = 1029  ! DOCt
+    end if
 
   else if (enable_3zoo2det .and. .not. enable_coccos) then
     expected_ids(25:32) = (/1023, 1024, 1025, 1026, 1027, 1028, 1029, 1030/)
+    if (useRivers) then
+      expected_ids(33) = 1031  ! DOCt
+    end if
+    
+  else
+    ! Base configuration
+    if (useRivers) then
+      expected_ids(25) = 1023  ! DOCt
+    end if
   end if
 
   ! ===========================================================================
@@ -1536,7 +1652,8 @@ Module REcoM_GloVar
 
   real(kind=8), allocatable,dimension(:,:)  :: PAR3D            ! Light in the water column [nl-1 n2d]
   real(kind=8), allocatable,dimension(:)    :: RiverineLonOrig, RiverineLatOrig, RiverineDINOrig, RiverineDONOrig, RiverineDOCOrig, RiverineDSiOrig ! Variables to save original values for riverine nutrients
-  real(kind=8), allocatable,dimension(:)    :: RiverDIN2D, RiverDON2D, RiverDOC2D, RiverDSi2D, RiverAlk2D, RiverDIC2D, RiverFe
+  real(kind=8), allocatable,dimension(:)    :: RiverDIC2D, RiverDIN2D, RiverDOCl2D, RiverDOCsl2D, RiverPOC2D, RiverFe
+!  real(kind=8), allocatable,dimension(:)    :: RiverDIN2D, RiverDON2D, RiverDOC2D, RiverDSi2D, RiverAlk2D, RiverDIC2D, RiverFe
   real(kind=8), allocatable,dimension(:)    :: ErosionTSi2D, ErosionTON2D, ErosionTOC2D
 !! Cobeta, Cos(Angle of incidence)
   Real(kind=8), allocatable,dimension(:)    ::  cosAI

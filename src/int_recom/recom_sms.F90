@@ -100,6 +100,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     HetC,    & ! [mmol/m3] Heterotroph carbon
     DON,     & ! [mmol/m3] Dissolved organic nitrogen
     EOC,     & ! [mmol/m3] Extracellular organic carbon
+    DOCt,    & ! [mmol/m3] terrestrial DOC	! R2OMIP
     DiaN,    & ! [mmol/m3] Diatom nitrogen
     DiaC,    & ! [mmol/m3] Diatom carbon
     DiaChl,  & ! [mg/m3] Diatom chlorophyll
@@ -428,6 +429,7 @@ real(kind=8) :: &
 
             DON = max(tiny, state(k, idon) + sms(k, idon))
             EOC = max(tiny, state(k, idoc) + sms(k, idoc))
+            DOCt= max(tiny, state(k,idoct) + sms(k, idoct)) ! R2OMIP
 
             !-----------------------------------------------------------------------
             ! SMALL PHYTOPLANKTON
@@ -3969,6 +3971,7 @@ real(kind=8) :: &
             !---------------------------------------------------------------------------
             ! Microbial degradation of dissolved organic carbon
             + rho_C1 * arrFunc * O2Func * EOC                     & ! Temperature and O2 dependent
+            + rho_C1t                   * DOCt                    & ! --> Remineralization of terrestrial DOC ! R2OMIP
             !---------------------------------------------------------------------------
             ! SOURCES: Zooplankton Respiration (increases DIC)
             !---------------------------------------------------------------------------
@@ -5034,6 +5037,11 @@ real(kind=8) :: &
             - rho_c1 * arrFunc * O2Func * EOC                              & ! Bacterial respiration
                                                                           ) * dt_b + sms(k,idoc)
 
+        ! R2OMIP - terrestrial DOC
+        sms(k,idoct) = (                                                   &
+            - rho_C1t                        * DOCt                        &
+                                                                          ) * dt_b + sms(k,idoct)
+
         !===============================================================================
         ! 21. DIATOM NITROGEN (DiaN)
         !===============================================================================
@@ -5700,6 +5708,7 @@ real(kind=8) :: &
             ! SINKS: Heterotrophic Respiration and Remineralization
             !---------------------------------------------------------------------------
             - rho_C1 * arrFunc * O2Func * EOC                              & ! DOC remineralization
+            - rho_C1t                   * DOCt                             &
             - hetRespFlux                                                  & ! Mesozooplankton
             - Zoo2RespFlux * is_3zoo2det                                   & ! Macrozooplankton
             - MicZooRespFlux * is_3zoo2det                                 & ! Microzooplankton

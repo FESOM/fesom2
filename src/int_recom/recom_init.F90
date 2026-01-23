@@ -67,13 +67,20 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(AtmNInput             ( node_size ))
 
     !! * River nutrients as surface boundary condition *
-    allocate(RiverDIN2D            ( node_size ))
-    allocate(RiverDON2D            ( node_size ))
-    allocate(RiverDOC2D            ( node_size ))
-    allocate(RiverDSi2D            ( node_size ))
-    allocate(RiverDIC2D            ( node_size ))
-    allocate(RiverAlk2D            ( node_size ))
+!    allocate(RiverDIN2D            ( node_size ))
+!    allocate(RiverDON2D            ( node_size ))
+!    allocate(RiverDOC2D            ( node_size ))
+!    allocate(RiverDSi2D            ( node_size ))
+!    allocate(RiverDIC2D            ( node_size ))
+!    allocate(RiverAlk2D            ( node_size ))
+
+    allocate(RiverDIC2D            ( node_size ))  ! R2OMIP
+    allocate(RiverDIN2D            ( node_size ))  ! R2OMIP
+    allocate(RiverDOCl2D           ( node_size ))  ! R2OMIP
+    allocate(RiverDOCsl2D          ( node_size ))  ! R2OMIP
+    allocate(RiverPOC2D            ( node_size ))  ! R2OMIP
     allocate(RiverFe               ( node_size ))
+
 
     !! * Erosion nutrients as surface boundary condition *
     allocate(ErosionTON2D          ( node_size ))
@@ -110,12 +117,19 @@ subroutine recom_init(tracers, partit, mesh)
     GloNDust              = 0.d0
     AtmNInput             = 0.d0
 
-    RiverDIN2D            = 0.d0
-    RiverDON2D            = 0.d0
-    RiverDOC2D            = 0.d0
-    RiverDSi2D            = 0.d0
-    RiverDIC2D            = 0.d0
-    RiverAlk2D            = 0.d0
+!    RiverDIN2D            = 0.d0
+!    RiverDON2D            = 0.d0
+!    RiverDOC2D            = 0.d0
+!    RiverDSi2D            = 0.d0
+!    RiverDIC2D            = 0.d0
+!    RiverAlk2D            = 0.d0
+
+    RiverDIC2D             = 0.d0
+    RiverDIN2D             = 0.d0
+    RiverDOCl2D            = 0.d0
+    RiverDOCsl2D           = 0.d0
+    RiverPOC2D             = 0.d0
+
     RiverFe               = 0.d0
 
     ErosionTON2D          = 0.d0
@@ -583,6 +597,8 @@ subroutine recom_init(tracers, partit, mesh)
             IF (enable_coccos .AND. enable_3zoo2det) THEN
                 ! CoccoChl - Coccolithophore Chlorophyll
                 tracers%data(i)%values(:,:) = tiny_chl
+            ELSE IF (useRivers) THEN
+                tracers%data(i)%values(:,:) = 0.0_WP !tiny  !R2OMIP
             END IF
 
         CASE (1032)
