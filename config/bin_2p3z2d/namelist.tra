@@ -36,6 +36,7 @@ nml_tracer_list =
 1028,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
 1029,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
 1030,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
+1031,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
 !1031, 'MFCT',       'QR4C',       'FCT ',        1.,          1.,
 !1032, 'MFCT',       'QR4C',       'FCT ',        1.,          1.,
 !1033, 'MFCT',       'QR4C',       'FCT ',        1.,          1.,

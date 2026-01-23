@@ -41,7 +41,7 @@ REcoM_restart         = .true.
 recom_debug           = .false.
 
 ! --- Tracer Configuration ---
-bgc_num               = 22           ! Total number of BGC tracers
+bgc_num               = 22 !idoct !23           ! Total number of BGC tracers
 diags3d_num           = 28           ! Number of diagnostic 3D tracers
 bgc_base_num          = 22           ! Number of standard tracers
 benthos_num           = 4            ! Number of benthic BGC tracers (8 if ciso=.true., else 4)
@@ -65,12 +65,12 @@ REcoM_Grazing_Variable_Preference = .true.     ! Variable grazing preference (Ph
 Grazing_detritus                  = .true.     ! Enable zooplankton grazing on detritus
 het_resp_noredfield               = .true.     ! Non-Redfield respiration for copepods
 diatom_mucus                      = .true.     ! Nutrient-limited diatom aggregation
-O2dep_remin                       = .false.     ! O2-dependent organic matter remineralization
-use_ballasting                    = .false.     ! Ballast effect on sinking
-use_density_scaling               = .false.     ! Density-dependent sinking
-use_viscosity_scaling             = .false.     ! Viscosity-dependent sinking
+O2dep_remin                       = .true.     ! O2-dependent organic matter remineralization
+use_ballasting                    = .true.     ! Ballast effect on sinking
+use_density_scaling               = .true.     ! Density-dependent sinking
+use_viscosity_scaling             = .true.     ! Viscosity-dependent sinking
 OmegaC_diss                       = .false.    ! OmegaC-dependent calcite dissolution (set calc_diss_guts=0 if false)
-CO2lim                            = .false.     ! CO2 effects on growth and calcification
+CO2lim                            = .true.     ! CO2 effects on growth and calcification
 use_photodamage                   = .true.     ! Chlorophyll photodamage (Alvarez et al. 2018)
 HetRespFlux_plus                  = .true.     ! Stabilized zooplankton respiration computation
 Diags                             = .true.     ! Enable diagnostics output
@@ -80,7 +80,8 @@ constant_CO2          = .true.
 UseFeDust             = .true.       ! Enable iron input from dust
 UseDustClim           = .true.       ! Use dust climatology
 UseDustClimAlbani     = .true.       ! Use Albani dust fields (false = Mahowald)
-useRivers             = .false.      ! Enable riverine inputs
+useRivers             = .true.       ! Enable riverine inputs
+constant_PI_Rivers    = .true.
 useRivFe              = .false.      ! Enable riverine iron source
 useErosion            = .false.      ! Enable erosion inputs
 NitrogenSS            = .false.      ! Enable nitrogen sources/sinks (rivers, aeolian, denitrification)
@@ -98,7 +99,7 @@ restore_alkalinity    = .true.       ! Restore surface alkalinity
 Nmocsy                = 1            ! Vector length for mocsy (always 1 for REcoM)
 
 ! --- Data Path ---
-REcoMDataPath         = '/albedo/work/projects/p_pool_recom/input/mesh_CORE2_finaltopo_mean/'
+REcoMDataPath         = '/albedo/work/projects/p_bio/input/mesh_CORE2_finaltopo_mean/'
 
 ! --- Carbon Isotopes ---
 ciso                  = .false.      ! Enable carbon isotopes (13C, 14C)
@@ -334,10 +335,12 @@ agg_PP                = 0.015d0      ! Plankton aggregation rate [m³/(mmol N·d
 ! ============================================================================
 &padin_rho_N
 rho_N                 = 0.11d0       ! DON remineralization rate [1/day]
+rho_Nt                = 0.67d0       ! [1/day] terrestrial N degradation of extracellular organic N (DONt) (Remineralization of terrestrial DON) ~ scale of 1.5 years ! R2OMIP
 /
 
 &padic_rho_C1
 rho_C1                = 0.1d0        ! DOC remineralization rate [1/day]
+rho_C1t               = 0.0018d0     !terrestrial C degradation of extracellular organic C (EOC) ! R2OMIP
 /
 
 ! ============================================================================

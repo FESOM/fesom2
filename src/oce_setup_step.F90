@@ -888,6 +888,8 @@ nl              => mesh%nl
     allocate(str_bf    ( nl-1, node_size ))
     allocate(vert_sink ( nl-1, node_size ))
     allocate(Alk_surf  (       node_size ))
+    allocate(nss       ( nl-1, node_size )) !R2OMIP (Burial)
+    allocate(bur       ( 1:benthos_num, nl-1, node_size )) ! LO !R2OMIP (Burial)
 #endif
     ! =================
     ! Visc and Diff coefs
@@ -1000,6 +1002,8 @@ nl              => mesh%nl
     str_bf              = 0.0_WP
     vert_sink           = 0.0_WP
     Alk_surf            = 0.0_WP
+    nss                 = 0.0_WP !R2OMIP (Burial)
+    bur                 = 0.0_WP !R2OMIP (Burial)
 #endif
     
     ! init field for pressure force 
@@ -1204,7 +1208,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-        CASE (1023:1036)
+        CASE (1023:1037)
             tracers%data(i)%values(:,:)=0.0_WP
             if (mype==0) then
                 write (i_string,  "(I4)") i

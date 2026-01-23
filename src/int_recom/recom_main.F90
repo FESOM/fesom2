@@ -175,6 +175,9 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
         !!---- Benthic layers
         LocBenthos(1:benthos_num) = Benthos(n,1:benthos_num)
 
+        !!---- Burial in Benthic layers
+        BurialBen(1:benthos_num) = Burial(1:benthos_num,n) ! R2OMIP
+
         !!---- Local conc of [H+]-ions from last time step. Decleared and saved in LocVar.
         !!---- used as first guess for H+ conc. in subroutine CO2flux (provided by recom_init)
         Hplus = GloHplus(n)
@@ -648,6 +651,10 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
 
     do n=1, benthos_num
         call exchange_nod(GlodecayBenthos(:,n), partit)
+    end do
+
+    do n=1, 6
+        call exchange_nod(Sed_2_Ocean_Flux(:,n), partit) ! Diagnose the flux back from Sediment to Ocean - R2OMIP
     end do
 
     call exchange_nod(GloHplus, partit)
