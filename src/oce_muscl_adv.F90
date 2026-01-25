@@ -58,6 +58,7 @@ subroutine muscl_adv_init(twork, partit, mesh)
     !___________________________________________________________________________
     nn_size=0
     k=0
+#if !defined(__openmp_reproducible)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n)
 !$OMP DO REDUCTION(max: k)
     do n=1, myDim_nod2D
@@ -73,6 +74,10 @@ subroutine muscl_adv_init(twork, partit, mesh)
     end do
 !$OMP END DO    
 !$OMP END PARALLEL
+#else
+    ! Reproducible sequential maxval
+    k = maxval(SSH_stiff%rowptr(2:myDim_nod2D+1) - SSH_stiff%rowptr(1:myDim_nod2D))
+#endif
     nn_size=k
     !___________________________________________________________________________
     allocate(mesh%nn_num(myDim_nod2D), mesh%nn_pos(nn_size,myDim_nod2D))
