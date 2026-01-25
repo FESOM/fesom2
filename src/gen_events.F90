@@ -9,12 +9,25 @@ subroutine annual_event(do_output, N)
   logical, intent(inout)        :: do_output
   integer, intent(in)           :: N
   integer                       :: elapsed_years
+  logical, save                 :: debug_printed = .false.
 
   elapsed_years = yearnew - yearstart + 1
   if (mod(elapsed_years, N)==0 .and. (daynew == ndpyr) .and. (timenew==86400.)) then
     do_output=.true.
+    ! Debug output when restart event triggers
+    write(*,'(A,I5,A,I5,A,I4,A,I4,A,L1)') &
+      ' annual_event TRIGGERED: yearstart=', yearstart, ' yearnew=', yearnew, &
+      ' elapsed=', elapsed_years, ' N=', N, ' do_output=', do_output
   else
     do_output=.false.
+    ! Debug: print once per year at end of year to show why event didn't trigger
+    if ((daynew == ndpyr) .and. (timenew==86400.) .and. .not. debug_printed) then
+      write(*,'(A,I5,A,I5,A,I4,A,I4,A,I4,A,L1)') &
+        ' annual_event NOT triggered: yearstart=', yearstart, ' yearnew=', yearnew, &
+        ' elapsed=', elapsed_years, ' mod=', mod(elapsed_years,N), ' N=', N, ' do_output=', do_output
+      debug_printed = .true.
+    endif
+    if (daynew == 1) debug_printed = .false.  ! Reset at start of new year
   endif
   
 end subroutine annual_event
