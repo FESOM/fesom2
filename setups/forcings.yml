@@ -310,6 +310,7 @@ test_recom:
         runoff_data_source: CORE2
         nm_sss_data_file: PHC2_salx.nc
         sss_data_source: CORE2
+        chl_data_source: None
     namelist.config:
         clockinit:
             yearnew: 1958
