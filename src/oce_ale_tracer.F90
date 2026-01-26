@@ -145,6 +145,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     use o_tracers
     use Toy_Channel_Soufflet
     use Toy_Channel_Dbgyre
+    use Toy_Neverworld2
     use o_ARRAYS, only: heat_flux
     use g_forcing_arrays, only: sw_3d
     use diff_tracers_ale_interface
@@ -282,10 +283,15 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         ! relax to salt and temp climatology
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
         ! if ((toy_ocean) .AND. ((tr_num==1) .AND. (TRIM(which_toy)=="soufflet"))) then
-        if ((toy_ocean) .AND. ((TRIM(which_toy)=="soufflet"))) then
+        if     ((toy_ocean) .AND. ((TRIM(which_toy)=="soufflet"))) then
             call relax_zonal_temp(tracers%data(1), partit, mesh)
+            
+        elseif ((toy_ocean) .AND. ((TRIM(which_toy)=="neverworld2"))) then
+            call relax_2_tsurf(tracers%data(1), partit, mesh)
+            
         else
             call relax_to_clim(tr_num, tracers, partit, mesh)
+            
         end if
 
         call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
@@ -1126,7 +1132,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
             end do
         elseif (use_sw_pene .and. (tracers%data(tr_num)%ID==1) .and. toy_ocean .and. TRIM(which_toy)=="dbgyre") then
 
-         call cal_shortwave_rad_dbgyre(ice, tracers, partit, mesh)
+            call cal_shortwave_rad_dbgyre(ice, tracers, partit, mesh)
             do nz=nzmin, nzmax-1
                 zinv=1.0_WP*dt  !/(zbar(nz)-zbar(nz+1)) ale!
                 tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n)*area(nz+1,n)/area(nz,n))*zinv
