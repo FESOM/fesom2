@@ -337,13 +337,16 @@ lval=0.0_WP
 #if !defined(__openmp_reproducible)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row)
 !$OMP DO REDUCTION (+: lval)
-#endif
   do row=1, myDim_nod2D
      lval=lval+data(row)*areasvol(ulevels_nod2D(row),row)
   end do
-#if !defined(__openmp_reproducible) 
 !$OMP END DO
 !$OMP END PARALLEL
+#else
+  ! Use serial computation for reproducible results
+  do row=1, myDim_nod2D
+     lval=lval+data(row)*areasvol(ulevels_nod2D(row),row)
+  end do
 #endif
   int2D=0.0_WP
   call MPI_AllREDUCE(lval, int2D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
@@ -374,7 +377,12 @@ subroutine integrate_nod_3D(data, int3D, partit, mesh)
 #include "associate_mesh_ass.h" 
 
   lval=0.0_WP
+#if defined(__openmp_reproducible)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row, k, lval_row)
+!$OMP DO ORDERED
+#else
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row, k, lval_row) REDUCTION(+: lval)
+#endif
   do row=1, myDim_nod2D
      lval_row = 0.
      do k=ulevels_nod2D(row), nlevels_nod2D(row)-1
@@ -382,13 +390,19 @@ subroutine integrate_nod_3D(data, int3D, partit, mesh)
      end do
 #if defined(__openmp_reproducible)
 !$OMP ORDERED
-#endif
+!$OMP ATOMIC UPDATE
      lval = lval + lval_row
-#if defined(__openmp_reproducible)
 !$OMP END ORDERED
+#else
+     lval = lval + lval_row
 #endif
   end do
+#if defined(__openmp_reproducible)
+!$OMP END DO
+!$OMP END PARALLEL
+#else
 !$OMP END PARALLEL DO
+#endif
 
   int3D=0.0_WP
   call MPI_AllREDUCE(lval, int3D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
@@ -539,6 +553,7 @@ FUNCTION omp_min_max_sum1(arr, pos1, pos2, what, partit, nan)
 
     CASE ('min')
        val=arr(1)
+#if !defined(__openmp_reproducible)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n)
 !$OMP DO REDUCTION(min: val)
        do n=pos1, pos2
@@ -546,9 +561,13 @@ FUNCTION omp_min_max_sum1(arr, pos1, pos2, what, partit, nan)
        end do
 !$OMP END DO
 !$OMP END PARALLEL
+#else
+       val = minval(arr(pos1:pos2))
+#endif
 
     CASE ('max')
        val=arr(1)
+#if !defined(__openmp_reproducible)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n)
 !$OMP DO REDUCTION(max: val)
        do n=pos1, pos2
@@ -556,6 +575,9 @@ FUNCTION omp_min_max_sum1(arr, pos1, pos2, what, partit, nan)
        end do
 !$OMP END DO
 !$OMP END PARALLEL
+#else
+       val = maxval(arr(pos1:pos2))
+#endif
 
     CASE DEFAULT
        if (partit%mype==0) write(*,*) trim(what), ' is not implemented in omp_min_max_sum case!'
@@ -575,7 +597,7 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
   character(3),  intent(in)   :: what
   real(kind=WP), optional     :: nan !to be implemented upon the need (for masked arrays)
   real(kind=WP)               :: omp_min_max_sum2
-  real(kind=WP)               :: val, vmasked, val_part(pos11:pos12)
+  real(kind=WP)               :: val, vmasked, val_part(pos21:pos22)
   integer                     :: i, j
   
 
@@ -588,6 +610,7 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
     CASE ('min')
       if (.not. present(nan)) vmasked=huge(vmasked) !just some crazy number
       val=arr(1,1)
+#if !defined(__openmp_reproducible)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j)
 !$OMP DO REDUCTION(min: val)
       do j=pos21, pos22
@@ -597,10 +620,14 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
       end do
 !$OMP END DO
 !$OMP END PARALLEL
+#else
+      val = minval(arr(pos11:pos12,pos21:pos22), mask=(arr(pos11:pos12,pos21:pos22)/=vmasked))
+#endif
 
     CASE ('max')
       if (.not. present(nan)) vmasked=tiny(vmasked) !just some crazy number
       val=arr(1,1)
+#if !defined(__openmp_reproducible)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j)
 !$OMP DO REDUCTION(max: val)
       do j=pos21, pos22
@@ -610,6 +637,9 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
       end do
 !$OMP END DO
 !$OMP END PARALLEL
+#else
+      val = maxval(arr(pos11:pos12,pos21:pos22), mask=(arr(pos11:pos12,pos21:pos22)/=vmasked))
+#endif
 
     CASE ('sum')
       if (.not. present(nan)) vmasked=huge(vmasked) !just some crazy number
@@ -663,7 +693,12 @@ subroutine integrate_elem_3D(data, int3D, partit, mesh)
 #include "associate_mesh_ass.h" 
 
   lval=0.0_WP
+#if defined(__openmp_reproducible)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row, k, lval_row)
+!$OMP DO ORDERED
+#else
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row, k, lval_row) REDUCTION(+: lval)
+#endif
   do row=1, myDim_elem2D
      if(elem2D_nodes(1, row) > myDim_nod2D) cycle
      lval_row = 0.
@@ -672,13 +707,19 @@ subroutine integrate_elem_3D(data, int3D, partit, mesh)
      end do
 #if defined(__openmp_reproducible)
 !$OMP ORDERED
-#endif
+!$OMP ATOMIC UPDATE
      lval = lval + lval_row
-#if defined(__openmp_reproducible)
 !$OMP END ORDERED
+#else
+     lval = lval + lval_row
 #endif
   end do
+#if defined(__openmp_reproducible)
+!$OMP END DO
+!$OMP END PARALLEL
+#else
 !$OMP END PARALLEL DO
+#endif
 
   int3D=0.0_WP
   call MPI_AllREDUCE(lval, int3D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
@@ -707,7 +748,12 @@ subroutine integrate_elem_2D(data, int2D, partit, mesh)
 #include "associate_mesh_ass.h" 
 
   lval=0.0_WP
+#if defined(__openmp_reproducible)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row)
+!$OMP DO ORDERED
+#else
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) REDUCTION(+: lval)
+#endif
   do row=1, myDim_elem2D
      if(elem2D_nodes(1, row) > myDim_nod2D) cycle
 #if defined(__openmp_reproducible)
@@ -718,7 +764,12 @@ subroutine integrate_elem_2D(data, int2D, partit, mesh)
 !$OMP END ORDERED
 #endif
   end do
+#if defined(__openmp_reproducible)
+!$OMP END DO
+!$OMP END PARALLEL
+#else
 !$OMP END PARALLEL DO
+#endif
 
   int2D=0.0_WP
   call MPI_AllREDUCE(lval, int2D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &

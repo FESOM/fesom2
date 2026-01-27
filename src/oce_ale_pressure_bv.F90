@@ -232,6 +232,7 @@ subroutine pressure_bv(tracers, partit, mesh)
     !___________________________________________________________________________
     ! Screen salinity
     a    =0.0_WP
+#if !defined(__openmp_reproducible)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax)
 !$OMP DO REDUCTION(min: a)
     do node=1, myDim_nod2D+eDim_nod2D
@@ -243,6 +244,10 @@ subroutine pressure_bv(tracers, partit, mesh)
     enddo
 !$OMP END DO
 !$OMP END PARALLEL
+#else
+    ! Reproducible sequential minval
+    a = minval(salt(1:nl-1, 1:myDim_nod2D+eDim_nod2D))
+#endif
 
     !___________________________________________________________________________
     ! model explodes, no OpenMP parallelization !
@@ -3238,6 +3243,7 @@ salt=>tracers%data(2)%values(:,:)
 vol1D=0.0_WP
 ref_temp1D=0.0_WP
 ref_salt1D=0.0_WP
+#if !defined(__openmp_reproducible)
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax) REDUCTION(+:vol1D)
 do node=1,myDim_nod2d
     x=geo_coord_nod2D(1,node)/rad
@@ -3253,6 +3259,22 @@ do node=1,myDim_nod2d
     end do
 end do
 !$OMP END PARALLEL DO
+#else
+! Reproducible sequential summation
+do node=1,myDim_nod2d
+    x=geo_coord_nod2D(1,node)/rad
+    y=geo_coord_nod2D(1,node)/rad
+    if ((x>=-6.) .AND. (x<=42) .AND. (y>=30.15) .AND. (y<=42)) CYCLE
+    if ((x>= 2.) .AND. (x<=42) .AND. (y>=41)    .AND. (y<=48)) CYCLE
+    nzmin = 1
+    nzmax = nlevels_nod2d(node)-1
+    do nz=nzmin,nzmax
+       ref_temp1D(nz)=ref_temp1D(nz)+areasvol(nz,node)*temp(nz,node)
+       ref_salt1D(nz)=ref_salt1D(nz)+areasvol(nz,node)*salt(nz,node)
+       vol1D(nz)=vol1D(nz)+areasvol(nz,node)
+    end do
+end do
+#endif
 call MPI_Allreduce(MPI_IN_PLACE, ref_temp1D, mesh%nl-1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 call MPI_Allreduce(MPI_IN_PLACE, ref_salt1D, mesh%nl-1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 call MPI_Allreduce(MPI_IN_PLACE,      vol1D, mesh%nl-1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)

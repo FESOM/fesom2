@@ -227,7 +227,11 @@ subroutine stress2rhs(ice, partit, mesh)
 #endif
 
 #ifndef ENABLE_OPENACC
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
 #else
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #if !defined(DISABLE_OPENACC_ATOMICS)
@@ -716,7 +720,11 @@ subroutine EVPdynamics(ice, partit, mesh)
         ! apply sea ice velocity boundary condition
 
 #ifndef ENABLE_OPENACC
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
 #else
         ! With the binary data of np2 goes only inside the first if
         !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
