@@ -189,7 +189,7 @@ subroutine recom_nitrogenss(tracers, partit, mesh)
 !  end if
 
   ! Progress indicator (printed every 100 time steps on master process)
-  if (mype == 0) then !.and. mod(mstep, 100) == 0) then
+  if (mype == 0 .and. mod(mstep, 3600) == 0) then
       print *, achar(27)//'[37m'//'         --> recom_nitrogenss'//achar(27)//'[0m'
   end if
 
@@ -252,8 +252,8 @@ subroutine recom_nitrogenss(tracers, partit, mesh)
                   area_diff = area_nz - area_nz_plus1
               else
                   ! Bottom layer: use bottom area directly
-                  area_diff = area_nz_plus1
-                  area_nz = area_nz_plus1
+                  area_diff = area_nz !area_nz_plus1
+                  area_nz = area_nz !area_nz_plus1
               end if
               
               ! Calculate layer thickness and normalization factors
