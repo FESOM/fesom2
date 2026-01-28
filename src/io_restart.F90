@@ -179,6 +179,16 @@ subroutine ini_ice_io(year, ice, partit, mesh)
   call ice_files%def_node_var_optional('ice_albedo', 'ice albedo',    '-',   ice%atmcoupl%ice_alb, mesh, partit)
   call ice_files%def_node_var_optional('ice_temp', 'ice surface temperature',  'K',   ice%data(4)%values, mesh, partit)
 #endif /* (__oifs) */
+
+#if defined (__seaice_tracers)
+  do j=1,ntr_ice
+     write(trname,'(A7,i4.4)') 'tr_ice_', j		 ! OG i1 -> i4
+     write(longname,'(A15,i4.4)') 'sea ice tracer ', j
+     units='none'
+     call ice_files%def_node_var(trname, longname, 'units', ice%tr_ice(:,j), mesh, partit)     
+  enddo
+#endif /* (__seaice_tracers) */
+
 #if defined (__oasis)
   !---wiso-code
   if (lwiso) then

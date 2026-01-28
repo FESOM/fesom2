@@ -561,6 +561,12 @@ module recom_config
   namelist /paballasting/ rho_POC, rho_PON, rho_CaCO3, rho_opal, rho_ref_part, &
                           rho_ref_water, visc_ref_water, w_ref1, w_ref2, depth_scaling1,   &
                           depth_scaling2, max_sinking_velocity
+#if defined (__seaice_tracers)
+  REAL(kind=8)  :: dust_sol_ice = 1.0            ! solubility of iron fro dust when moved through ice
+  REAL(kind=8)  :: sitr_frac_from_freezing = 1.0 ! fraction of iron concentration built into fresh seaice when formed by freezing
+  namelist /pa_seaiceiron/ dust_sol_ice, sitr_frac_from_freezing
+#endif /* (__seaice_tracers) */
+
 end module recom_config
 !
 !===============================================================================
@@ -811,6 +817,9 @@ Module REcoM_GloVar
   Real(kind=8),dimension(12)              :: AtmCO2           ! [uatm] Atmospheric CO2 partial pressure. One value for the whole planet for each month
 
   Real(kind=8),allocatable,dimension(:)   :: AtmFeInput       ! [umol/m2/s] Includes ice, but is, other than that identlical to GloFeDust
+#if defined (__seaice_tracers)
+  Real(kind=8),allocatable,dimension(:)   :: IceFeInput       ! [umol/m2/s] Input/loss of Fe into ocean from melting/formation of ice.
+#endif /* (__seaice_tracers) */  
   Real(kind=8),allocatable,dimension(:)   :: SedFeInput       ! [umol/m2/s] sedimentary iron input variable
   Real(kind=8),allocatable,dimension(:)   :: AtmNInput        ! [umol/m2/s] Includes ice, but is, other than that identlical to GloNDust
   Real(kind=8),allocatable,dimension(:)   :: GloPCO2surf      ! [uatm] Surface ocean CO2 partial pressure
@@ -1010,6 +1019,9 @@ Module REcoM_locVar
   Real(kind=8) :: bt, dic_molal, talk_molal    ! Common block: Species
   Real(kind=8) :: k1, k2, kw, kb, ff           ! Common block: Equilibrium_constants
   Real(kind=8) :: FeDust                       ! [umol/m2/s]
+#if defined (__seaice_tracers)
+  Real(kind=8) :: FeFluxIce                    ! [umol/m2/s]: Flux of dissolved iron seaice/ocean
+#endif /* (__seaice_tracers) */
   Real(kind=8) :: NDust                        ! [mmol/m2/s]
   Real(kind=8) :: Loc_ice_conc(1)              ! Used to calculate flux of DIC in REcoM 0 -> 1
   Real(kind=8) :: LocAtmCO2(1)                 ! [uatm]

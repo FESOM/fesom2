@@ -260,6 +260,22 @@ CASE ('m_snow    ')
     call def_stream(nod2D, myDim_nod2D, 'm_snow',   'snow height',                     'm',      ice%data(3)%values(1:myDim_nod2D),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 
+!#if defined (__seaice_tracers)
+CASE ('tr_ice    ')
+    if (use_ice) then
+    if (mype==0) write(*,*) 'ice tracer!'
+    call def_stream(nod2D, myDim_nod2D, 'tr_ice',   'ice_tracer',                     'm',      tr_ice(1:myDim_nod2D,1),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    end if
+CASE ('flx_iceocn')
+    if (use_ice) then
+    call def_stream(nod2D, myDim_nod2D, 'flx_iceown', 'ice-ocean tracer flux', 'm',  flx_iceocn(1:myDim_nod2D,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    end if
+CASE ('flx_atmice')
+    if (use_ice) then
+    call def_stream(nod2D, myDim_nod2D, 'flx_atmice', 'atm-ice tracer flux', 'm', flx_atmice(1:myDim_nod2D,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    end if
+!#endif /* (__seaice_tracers) */  
+
 ! Debug ice variables    
 CASE ('strength_ice')
     if (use_ice) then

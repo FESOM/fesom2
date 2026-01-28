@@ -265,6 +265,13 @@ if (UseDustClimMyrio) dust_sol=1.0 !Solubulity set to one, because it is already
         FeDust = GloFeDust(n) * (1.d0 - a_ice(n)) * dust_sol
         NDust  = GloNDust(n)  * (1.d0 - a_ice(n))
 
+#if defined (__seaice_tracers)
+     !!---- calculate dust flux of iron into sea ice
+     flx_atmice(n,1) = GloFeDust(n) * a_ice(n) * dust_sol_ice
+     !!---- flux of iron between sea-ice and ocean from melting/freezing of seaice
+     FeFluxIce = flx_iceocn(n,1)
+#endif /* (__seaice_tracers) */
+
         if (Diags) then
 
         !! * Allocate 3D diagnostics *
@@ -582,6 +589,11 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
         AtmNInput(n)             = NDust
         GloHplus(n)              = ph(1)
 
+#if defined (__seaice_tracers)
+     !!---- flux of iron between sea-ice and ocean from melting/freezing of seaice
+     IceFeInput(n) = FeFluxIce
+#endif /* (__seaice_tracers) */
+
         GloPCO2surf(n)           = pco2surf(1)
         GlodPCO2surf(n)          = dpco2surf(1)
         GloCO2flux(n)            = dflux(1)                   !  [mmol/m2/d]
@@ -672,6 +684,9 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
 
     call exchange_nod(GloHplus, partit)
     call exchange_nod(AtmFeInput, partit)
+#if defined (__seaice_tracers)
+    call exchange_nod(IceFeInput, partit)
+#endif
     call exchange_nod(AtmNInput, partit)
     call exchange_nod(SedFeInput, partit)
 

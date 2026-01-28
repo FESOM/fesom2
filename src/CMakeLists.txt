@@ -238,6 +238,7 @@ endif()
 
 if(${RECOM_COUPLED})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2 __3Zoo2Det __coccos __diaH)# __usetp)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __seaice_tracers USE_PRECISION=2)
 endif()
 
 if(${CISO_COUPLED})

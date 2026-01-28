@@ -120,6 +120,9 @@ subroutine setup_model(partit)
   read (fileunit, NML=paco2_flux_param)
   read (fileunit, NML=paalkalinity_restoring)
   read (fileunit, NML=paballasting)
+#if defined (__seaice_tracers)
+  read (20,NML=pa_seaiceiron)             ! NEW BALL
+#endif
   read (fileunit, NML=paciso)
   close (fileunit)
 #endif

@@ -57,6 +57,12 @@ subroutine recom_init(tracers, partit, mesh)
 
 !! *** Allocate and initialize ***
 
+#if defined (__seaice_tracers)
+    ! exchange of iron between ice and ocean by melting/formation of sea ice
+    allocate(IceFeInput(node_size))
+    IceFeInput = 0.d0
+#endif /* (__seaice_tracers) */
+
     !! * Fe and N deposition as surface boundary condition *
     allocate(GloFeDust             ( node_size ))
     allocate(AtmFeInput            ( node_size ))
