@@ -613,7 +613,9 @@ CONTAINS
       call MPI_AllREDUCE(locSmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  `-> gobal min init. salt. =', glo      
 #if defined(__recom)
-
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
       if (partit%mype==0) write(*,*) "Sanity check for REcoM variables"
       call MPI_AllREDUCE(locDINmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal max init. DIN. =', glo
@@ -640,6 +642,9 @@ CONTAINS
       if (partit%mype==0) write(*,*) '  |-> gobal max init. O2. =', glo
       call MPI_AllREDUCE(locO2min , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  `-> gobal min init. O2. =', glo
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
 #endif
    END SUBROUTINE do_ic3d
     

@@ -110,7 +110,7 @@ module recom_config
   Logical                :: REcoM_restart        = .false.
 
   Integer                :: bgc_num               = 33      ! NEW increased the number from 28 to 34 (added coccos and respiration) ! NEW 3Zoo changed from 31 to 33
-  integer                :: bgc_base_num          = 22      ! standard tracers
+  integer                :: bgc_base_num          = 22      ! tracer number for case 2phy 1zoo 1det
   Integer                :: diags3d_num           = 28      ! Number of diagnostic 3d tracers to be saved
   Real(kind=8)           :: VDet                  = 20.d0   ! Sinking velocity, constant through the water column and positive downwards
   Real(kind=8)           :: VDet_zoo2             = 200.d0  ! Sinking velocity, constant through the water column 
@@ -184,8 +184,7 @@ module recom_config
                        currentCO2cycle,                   DIC_PI,                Nmocsy,                  &
                        recom_debug,                       ciso,                  benthos_num,             &
                        use_MEDUSA,                        sedflx_num,            bottflx_num,             &
-                       add_loopback,                      lb_tscale,             use_atbox,               &
-                       fe_2ligands,                       fe_compl_nica
+                       add_loopback,                      lb_tscale,             use_atbox
 
 !!------------------------------------------------------------------------------
 !! *** Sinking ***
@@ -269,7 +268,7 @@ module recom_config
 !! *** Iron chemistry ***
   Real(kind=8)                 :: totalligand     = 1.d0        ! [mumol/m3] order 1. Total free ligand
   Real(kind=8)                 :: ligandStabConst = 100.d0      ! [m3/mumol] order 100. Ligand-free iron stability constant
-  namelist /pairon_chem/ totalligand, ligandStabConst
+  namelist /pairon_chem/ totalligand, ligandStabConst, fe_2ligands, fe_compl_nica
 !!------------------------------------------------------------------------------
 !! *** Zooplankton ***
   Real(kind=8)                 :: graz_max      = 2.4d0           ! [mmol N/(m3 * day)] Maximum grazing loss parameter 
@@ -688,7 +687,7 @@ Module REcoM_GloVar
   save
 	
   Real(kind=8),allocatable,dimension(:,:) :: Benthos          ! 4 types of benthos-tracers with size [4 n2d]
-  Real(kind=8),allocatable,dimension(:,:,:) :: Benthos_tr     ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+  Real(kind=8),allocatable,dimension(:,:,:) :: Benthos_tr     ! buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
 
   Real(kind=8),allocatable,dimension(:)   :: GloFeDust        ! [umol/m2/s] Monthly 2D field of iron soluted in surface water from dust
   Real(kind=8),allocatable,dimension(:)   :: GloNDust         ! [mmol/m2/s] 10-year mean 2D fields of nitrogen soluted in surface water from dust
@@ -766,7 +765,7 @@ Module REcoM_GloVar
 
 !  for using MEDUSA
   Real(kind=8),allocatable,dimension(:,:)   :: SinkFlx         ! Diagnostics in 2D [4 n2d] or [6 n2d] with ciso
-  Real(kind=8),allocatable,dimension(:,:,:) :: SinkFlx_tr      ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
+  Real(kind=8),allocatable,dimension(:,:,:) :: SinkFlx_tr      ! buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
   Real(kind=8),allocatable,dimension(:,:)   :: Sinkingvel1     ! Diagnostics for vertical sinking
   Real(kind=8),allocatable,dimension(:,:)   :: Sinkingvel2     ! Diagnostics for vertical sinking  
   Real(kind=8),allocatable,dimension(:,:,:) :: Sinkvel1_tr     ! Sinking speed of particle class 1 OG 16.03.23 
