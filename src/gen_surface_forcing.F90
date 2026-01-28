@@ -1481,7 +1481,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
                 call par_ex(MPI_COMM_FESOM, mype)
                 stop
             endif
-	
+
             ! data
             allocate(ncdata(12))
             status=nf_inq_varid(ncid, CO2vari, varid)
@@ -1542,6 +1542,8 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
 !        if (mype==0) write(*,*) mype, 'sediment DIC14 flux:', maxval(GloSed(:,7)), minval(GloSed(:,7))
                 end if ! ciso_14
             end if ! ciso
+          
+            call read_2ddata_on_grid_NetCDF(sedfilename, 'df_dicremin', 1, GloSed(:,2), partit, mesh) ! DICremin. gets same input as DIC; added by Sina
 
 ! unit conversion
       GloSed(:,:)=GloSed(:,:)/86400
@@ -1660,6 +1662,8 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
 !          if (mype==0) write(*,*) mype, 'sediment DIC14 flux:', maxval(GloSed(:,7)), minval(GloSed(:,7))
         end if ! ciso_14
       end if ! ciso
+
+      call read_2ddata_on_grid_NetCDF(sedfilename, 'df_dicremin', 1, GloSed(:,2), partit, mesh)
 
 !to mmol/m2/s
       GloSed(:,:)=GloSed(:,:)/86400

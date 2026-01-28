@@ -58,7 +58,7 @@ module recom_config
 
 !=============================================================================
 
-  integer, dimension(9)  :: recom_remin_tracer_id   = (/1001, 1002, 1003, 1018, 1019, 1022, 1037, 1302, 1402/) ! added 1037 for idicremin ID and change dimension to 9 (by Sina)
+  integer, dimension(8)  :: recom_remin_tracer_id   = (/1001, 1002, 1003, 1018, 1019, 1022, 1302, 1402/) ! added 1037 for idicremin ID and change dimension to 9 (by Sina)
 
 ! OG
 ! Todo:  Make recom_sinking_tracer_id case sensitive
@@ -598,6 +598,8 @@ contains
 !          biogeochemical model setup (enable_3zoo2det, enable_coccos)
 ! ==============================================================================
 subroutine validate_recom_tracers(num_tracers, mype)
+  use g_forcing_param, only: use_age_tracer
+    
   implicit none
 
   ! Arguments
@@ -618,7 +620,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
   logical, dimension(:), allocatable :: tracer_found
   integer :: num_expected_tracers
   logical :: id_error
-
+  
   ! Physical tracers (temperature, salinity, etc.) - typically first 2
   num_physical_tracers = 2
 
@@ -640,8 +642,8 @@ subroutine validate_recom_tracers(num_tracers, mype)
     ! Additional phaeocystis: 3 tracers (1032-1034)
     ! Additional microzoo: 2 tracers (1035-1036)
     ! Additional DICremin: 1 tracer (1037) (added by Sina)
-    ! Total: 22 + 4 + 6 + 3 + 2 + 1 = 37 (actually 22 + 14 = 36)
-    expected_bgc_num = 37 
+    ! Total: 22 + 4 + 6 + 3 + 2 + 1 = 38 (actually 22 + 14 = 36)
+    expected_bgc_num = 37 ! changed to 38 
 
   else if (enable_coccos .and. .not. enable_3zoo2det) then
     ! ---------------------------------------------------------------------------
@@ -651,7 +653,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
     ! Additional coccos: 3 tracers (1023-1025)
     ! Additional phaeocystis: 3 tracers (1026-1028)
     ! Additional DICremin: 1 tracer (1037) (added by Sina)
-    ! Total: 22 + 6 + 1 = 28
+    ! Total: 22 + 6 + 1 = 29
     expected_bgc_num = 29
 
   else if (enable_3zoo2det .and. .not. enable_coccos) then
@@ -663,7 +665,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
     ! Additional det2: 4 tracers (1025-1028)
     ! Additional microzoo: 2 tracers (1029-1030)
     ! Additional DICremin: 1 tracer (1037) (added by Sina)
-    ! Total: 22 + 8 + 1 = 30
+    ! Total: 22 + 8 + 1 = 31
     expected_bgc_num = 31
 
   else
@@ -675,6 +677,10 @@ subroutine validate_recom_tracers(num_tracers, mype)
     expected_bgc_num = 23
 
   end if
+  
+  if (use_age_tracer) then 
+    expected_bgc_num = expected_bgc_num + 1 
+  end if 
 
   expected_total_tracers = num_physical_tracers + expected_bgc_num
 
@@ -714,7 +720,10 @@ subroutine validate_recom_tracers(num_tracers, mype)
     expected_tracer_ids(36) = 1034  ! PhaeoChl
     expected_tracer_ids(37) = 1035  ! Zoo3N
     expected_tracer_ids(38) = 1036  ! Zoo3C
-    expected_tracer_ids(39) = 1037  ! DIC remin (added by Sina) 
+    expected_tracer_ids(39) = 1037  ! DIC remin (added by Sina)
+!    if (use_age_tracer) then
+!      expected_tracer_ids(40) = 100
+ !   end if 
 
   else if (enable_coccos .and. .not. enable_3zoo2det) then
     ! Coccos only: 1001-1022 (base) + 1023-1028 (coccos+phaeo)
@@ -725,6 +734,9 @@ subroutine validate_recom_tracers(num_tracers, mype)
     expected_tracer_ids(29) = 1027  ! PhaeoC
     expected_tracer_ids(30) = 1028  ! PhaeoChl
     expected_tracer_ids(31) = 1037  ! DIC remin (added by Sina)
+!    if (use_age_tracer) then
+!      expected_tracer_ids(32) = 100
+!    end if
 
   else if (enable_3zoo2det .and. .not. enable_coccos) then
     ! 3Zoo2Det only: 1001-1022 (base) + 1023-1030 (zoo2+det2+zoo3)
@@ -737,10 +749,16 @@ subroutine validate_recom_tracers(num_tracers, mype)
     expected_tracer_ids(31) = 1029  ! Zoo3N
     expected_tracer_ids(32) = 1030  ! Zoo3C
     expected_tracer_ids(33) = 1037  ! DIC remin (added by Sina)
-  
+!    if (use_age_tracer) then
+!      expected_tracer_ids(34) = 100
+!    end if
+
   else 
     expected_tracer_ids(25) = 1037 ! add DIC remin tracer to base BGC tracers (added by Sina)
-  
+!    if (use_age_tracer) then
+!      expected_tracer_ids(26) = 100
+!    end if
+
   end if
   ! else: base configuration only needs tracers 1, 2, 1001-1022
 
@@ -862,12 +880,15 @@ subroutine validate_recom_tracers(num_tracers, mype)
     write(*,*) ''
     write(*,*) 'Base BGC tracers (1001-1022, 1037):'
     write(*,*) '  ', expected_tracer_ids(3:24)
-    write(*,*) '  ', expected_tracer_ids(25) ! added by Sina
+    write(*,*) '  ', expected_tracer_ids(39) ! added by Sina
     write(*,*) ''
 
     if (expected_bgc_num > 23) then ! Sina: increased to 23
       write(*,*) 'Extended configuration tracers:'
-      write(*,*) '  ', expected_tracer_ids(25:num_expected_tracers) ! Sina: No change here for DICremin tracer as it is added at the end) 
+      write(*,*) '  ', expected_tracer_ids(25:(num_expected_tracers-1)) ! Sina: -1 here for DICremin tracer as it is added at the end))
+      if (use_age_tracer) then 
+        write (*,*) '  ', expected_tracer_ids(25:(num_expected_tracers-2)), expected_tracer_ids(num_expected_tracers)
+      end if 
       write(*,*) ''
     end if
 

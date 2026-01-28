@@ -409,11 +409,13 @@ subroutine extrap_nod3D(arr, partit, mesh)
     logical                        :: success
     real(kind=WP)                  :: loc_max, glob_max
     integer                        :: loc_sum, glob_sum, glob_sum_old
+    integer                        :: ierr, iter_h, iter_g, max_iter_h, max_iter_g
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
+
     !___________________________________________________________________________
     allocate(work_array(myDim_nod2D+eDim_nod2D))
     call exchange_nod(arr, partit)
@@ -423,18 +425,37 @@ subroutine extrap_nod3D(arr, partit, mesh)
     glob_max=0._WP
     call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
     glob_sum=-1
-
+    
     !___________________________________________________________________________
+    ! iter_g = 0
+    ! max_iter_g = nl
     do while (glob_max>0.99_WP*dummy)  
+      !  if (partit%mype==0) then
+      !      iter_g = iter_g + 1
+      !      if (iter_g > max_iter_g) then
+      !         write (*,*) 'iter_g=', iter_g, "- extrap_nod3D: global loop stuck"
+      !         call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
+      !      end if
+      !  end if 
         !_______________________________________________________________________
         ! extrapolate in horizontal direction
         do nz=1, nl-1
             work_array=arr(nz,:)
+
+            ! iter_h = 0
+            ! max_iter_h = nl-1
             success=.true.
-            
             !___________________________________________________________________
             ! horizontal extrapolation 
             do while (success) ! --> do while runs as long as success==.true.
+                ! if (partit%mype == 0) then 
+                !      iter_h = iter_h + 1
+                !      if (iter_h > max_iter_h) then
+                !          write (*,*) 'iter_h=', iter_h, "- extrap_nod3D: horizontal loop stuck"
+                !          call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
+                !      end if
+                ! end if 
+
                 success=.false.
                 
                 !_______________________________________________________________
@@ -470,24 +491,27 @@ subroutine extrap_nod3D(arr, partit, mesh)
                             work_array(n)=val/real(cnt,WP)
                             success=.true. ! --> reason to stay in while loop
                         end if
-                        
                     end if ! --> if ( (work_array(n)>0.99_WP*dummy) ....
                     
                 end do ! --> do n=1, myDim_nod2D
                 
             end do ! --> do while (success)
             arr(nz,:)=work_array
-            
+        
         end do ! --> do nz=1, nl-1
+        
+       ! if (partit%mype == 0) write (*,*) "Horizontal loop iterations =", iter_h
         
         !_______________________________________________________________________
         call exchange_nod(arr, partit)
-        
+        ! write (*,*) "call exchange_nod done"    
         !_______________________________________________________________________
         loc_max=maxval(arr(1,:))
         call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)   
-        
+        ! write (*,*) "call MPI_ALLREDUCE done"
     END DO ! -->  DO WHILE (glob_max>0.99_WP*dummy)  
+    
+    ! if (partit%mype == 0)  write (*,*) "Global loop iterations =", iter_g
     
     !___________________________________________________________________________
     ! extrapolate in vertical direction
@@ -499,11 +523,14 @@ subroutine extrap_nod3D(arr, partit, mesh)
             if (arr(nz,n)>0.99_WP*dummy) arr(nz,n)=arr(nz-1,n)
         end do
     end do
+
+    ! write (*,*) "Vertical extrapolation done"
+
     call exchange_nod(arr, partit)
     
     !___________________________________________________________________________
     deallocate(work_array)
-    
+    ! write (*,*) "subroutine extrapo_nod3D will end"
 end subroutine extrap_nod3D
 !
 !--------------------------------------------------------------------------------------------

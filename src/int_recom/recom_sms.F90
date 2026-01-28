@@ -7063,7 +7063,7 @@ real(kind=8) :: &
         !===============================================================================
         !   idicremin       : Tracer for remineralization diagnostics (added by Sina)
         sms(k,idicremin) = (                  &                                 
-            + rho_N * arrFunc * O2Func  * DON &                              ! DIC remineralization
+            + rho_c1 * arrFunc * O2Func * EOC &
             ) * dt_b + sms(k,idicremin) 
 
 

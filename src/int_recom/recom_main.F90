@@ -150,6 +150,14 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
                                           yearold, x_co2atm(1), x_co2atm_13(1), x_co2atm_14(1), cosmic_14(1) * production_rate_to_flux_14
     end if
   end if
+
+! Resetting DICremin tracer to zero when reaching surface (added by Sina) 
+do tr_num=1,num_tracers
+   if (tracers%data(tr_num)%ID==1037) then
+      tracers%data(tr_num)%values(1, : ) = 0
+   end if 
+end do
+
 ! ======================================================================================
 !********************************* LOOP STARTS *****************************************
 

@@ -370,6 +370,7 @@ if (use_MEDUSA .and. (sedflx_num .ne. 0)) then
       if (ciso) then
         bottom_flux = GloSed(:,7) * area(1,:) ! DIC_14 and Calc: DIC_14
       end if
+
     CASE DEFAULT
       if (partit%mype==0) then
         write(*,*) 'check specified in boundary conditions'
@@ -400,6 +401,9 @@ else
          if (ciso) then
            bottom_flux = GlodecayBenthos(:,7) + GlodecayBenthos(:,8) !*** DIC_14 and Calc: DIC_14 ***
          end if
+         ! or only: 
+         ! bottom_flux = GlodecayBenthos(:,2) ! (like DIC but without calcification)
+       
        CASE DEFAULT
           if (partit%mype==0) then
              write(*,*) 'check specified in boundary conditions'

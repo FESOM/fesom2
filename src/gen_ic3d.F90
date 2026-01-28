@@ -329,8 +329,8 @@ CONTAINS
       real(wp), allocatable, dimension(:)     :: data1d      
       integer                                 :: elnodes(3)
       integer                                 :: ierror              ! return error code
-      integer				      :: NO_FILL	     ! 0=no fillval, 1=fillval
-      real(wp)				      :: FILL_VALUE
+      integer                                 :: NO_FILL             ! 0=no fillval, 1=fillval
+      real(wp)                                :: FILL_VALUE
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -350,6 +350,9 @@ CONTAINS
       if (mype==0) then
          iost = nf_inq_varid(ncid, varname, id_data)
          iost = nf_inq_var_fill(ncid, id_data, NO_FILL, FILL_VALUE) ! FillValue defined?
+         
+         write (*,*) "ncid=", ncid, "id_data=", id_data, "NO_FILL=", NO_FILL, "FILL_VALUE=", FILL_VALUE
+
          if (NO_FILL==1) then
             print *, 'No _FillValue is set in ', trim(filename), ', trying dummy =', dummy, FILL_VALUE
          else
@@ -496,7 +499,8 @@ CONTAINS
       !!              
       !! ** Purpose : read 3D initial conditions for tracers from netcdf and interpolate on model grid
       !!----------------------------------------------------------------------
-      USE insitu2pot_interface
+      USE insitu2pot_interface 
+
       IMPLICIT NONE
       type(t_mesh),   intent(in),    target   :: mesh
       type(t_partit), intent(inout), target   :: partit 
@@ -506,6 +510,7 @@ CONTAINS
       real(kind=WP)                           :: locDINmax, locDINmin, locDICmax, locDICmin, locAlkmax !OG
       real(kind=WP)                           :: locAlkmin, locDSimax, locDSimin, locDFemax, locDFemin
       real(kind=WP)                           :: locO2min,  locO2max
+      real(kind=WP)                           :: locDICremax, locDICremin ! DICremin tracer (added by Sina)
 
 
       if (partit%mype==0) write(*,*) "Start: Initial conditions  for tracers"
@@ -526,7 +531,7 @@ CONTAINS
          elseif (current_tracer==tracers%num_tracers) then
             if (partit%mype==0) write(*,*) "idlist contains tracer which is not listed in tracer_id!"
             if (partit%mype==0) write(*,*) "check your namelists!"
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype) 
             stop
          end if
       END DO
@@ -539,7 +544,6 @@ CONTAINS
          where (tracers%data(current_tracer)%values > 0.9_WP*dummy)
                tracers%data(current_tracer)%values=0.0_WP
          end where
-
          !_________________________________________________________________________
          ! eliminate values within cavity that result from the extrapolation of 
          ! initialisation
@@ -576,6 +580,8 @@ CONTAINS
         locDICmin = locDINmin
         locAlkmax = locDINmax
         locAlkmin = locDINmin
+        locDICremax = locDINmax ! DICremin tracer (added by Sina)
+        locDICremin = locDINmin
         locDSimax = locDINmax
         locDSimin = locDINmin
         locDFemax = locDINmax
@@ -596,6 +602,8 @@ CONTAINS
         locDICmin = min(locDICmin,minval(tracers%data(4)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
         locAlkmax = max(locAlkmax,maxval(tracers%data(5)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
         locAlkmin = min(locAlkmin,minval(tracers%data(5)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+        locDICremax = max(locDICremax,maxval(tracers%data(9)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) ) ! DICremin tracer (added by Sina)
+        locDICremin = min(locDICremin,minval(tracers%data(9)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
         locDSimax = max(locDSimax,maxval(tracers%data(20)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
         locDSimin = min(locDSimin,minval(tracers%data(20)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
         locDFemax = max(locDFemax,maxval(tracers%data(21)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
@@ -628,6 +636,10 @@ CONTAINS
       if (partit%mype==0) write(*,*) '  |-> gobal max init. Alk. =', glo
       call MPI_AllREDUCE(locAlkmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal min init. Alk. =', glo
+      call MPI_AllREDUCE(locDICremax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+      if (partit%mype==0) write(*,*) '  |-> gobal max init. DICremin. =', glo
+      call MPI_AllREDUCE(locDICremin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+      if (partit%mype==0) write(*,*) '  |-> gobal min init. DICremin. =', glo
       call MPI_AllREDUCE(locDSimax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal max init. DSi. =', glo
       call MPI_AllREDUCE(locDSimin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
