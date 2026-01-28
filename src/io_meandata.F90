@@ -174,6 +174,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
 #if defined (__cvmix)    
     use g_cvmix_tke
     use g_cvmix_idemix
+    use g_cvmix_idemix2
     use g_cvmix_kpp
     use g_cvmix_tidal
 #endif    

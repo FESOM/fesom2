@@ -19,6 +19,7 @@ MODULE io_RESTART
 #if defined (__cvmix)
   use g_cvmix_tke
   use g_cvmix_idemix
+  use g_cvmix_idemix2
 #endif  
 #if defined(__recom)
   use recom_glovar

@@ -20,6 +20,7 @@ module g_cvmix_tke
     use cvmix_put_get,     only: cvmix_put
     use cvmix_kinds_and_types
     use g_cvmix_idemix,    only: iwe_n, iwe_Tdis_n, iwe_alpha_c_n
+    use g_cvmix_idemix2,   only: iwe2_n, iwe2_Tdis_n, iwe2_alpha_c_n
     
     !___________________________________________________________________________
     ! module calls from FESOM
