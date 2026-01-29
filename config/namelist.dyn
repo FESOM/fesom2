@@ -26,8 +26,8 @@ visc_easybsreturn  = 1.5         ! energy return parameter for easy backscatter 
 ! --- Harmonic (Laplacian) Viscosity Coefficients (for opt_visc=7) ---
 ! When both are 0, opt_visc=7 is pure biharmonic viscosity.
 ! When > 0, harmonic viscosity is added to biharmonic (combined mode).
-visc_gamma0_h      = 0.0         ! background harmonic viscosity coefficient [m/s]
-visc_gamma1_h      = 0.0         ! flow-aware harmonic viscosity coefficient [dimensionless]
+visc_gamma0_h      = 0.0         ! < 0.003 background harmonic viscosity coefficient [m/s]
+visc_gamma1_h      = 0.0         ! < 0.05  flow-aware harmonic viscosity coefficient [dimensionless]
 
 ! --- Viscosity Scheme Selection ---
 opt_visc           = 5           ! horizontal viscosity scheme:
