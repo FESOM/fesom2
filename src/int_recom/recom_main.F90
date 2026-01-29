@@ -599,7 +599,10 @@ endif
  
   call exchange_nod(GloO2flux_seaicemask)	
   call exchange_nod(GloHplus)	
-  call exchange_nod(AtmFeInput)	
+  call exchange_nod(AtmFeInput)
+#if defined (__seaice_tracers)
+  call exchange_nod(IceFeInput)
+#endif
   call exchange_nod(AtmNInput)	
 !  call exchange_nod(DenitBen)	
 
