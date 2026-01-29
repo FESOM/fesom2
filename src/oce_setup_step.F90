@@ -511,6 +511,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     ! define dynamics namelist parameter
     integer        :: opt_visc
     real(kind=WP)  :: visc_gamma0, visc_gamma1, visc_gamma2
+    real(kind=WP)  :: visc_gamma0_h, visc_gamma1_h
     real(kind=WP)  :: visc_easybsreturn
     logical        :: use_ivertvisc=.true.
     logical        :: uke_scaling=.true.
@@ -536,6 +537,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     real(kind=WP)  :: se_visc_gamma0, se_visc_gamma1, se_visc_gamma2
     
     namelist /dynamics_visc   / opt_visc, check_opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
+                                visc_gamma0_h, visc_gamma1_h,                                     &
                                 use_ivertvisc, visc_easybsreturn, &
                                 uke_scaling, uke_scaling_factor, uke_advection, &
                                 rosb_dis, smooth_back, smooth_dis, smooth_back_tend, K_back, c_back
@@ -575,6 +577,8 @@ nl => mesh%nl
     dynamics%visc_gamma0         = visc_gamma0
     dynamics%visc_gamma1         = visc_gamma1
     dynamics%visc_gamma2         = visc_gamma2
+    dynamics%visc_gamma0_h       = visc_gamma0_h
+    dynamics%visc_gamma1_h       = visc_gamma1_h
     dynamics%visc_easybsreturn   = visc_easybsreturn
     dynamics%uke_scaling         = uke_scaling
     dynamics%uke_scaling_factor  = uke_scaling_factor
