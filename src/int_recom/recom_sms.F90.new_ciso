@@ -459,7 +459,9 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !------------------------------------------------------------------------------
 ! Calcite dissolution dependent on OmegaC ! DISS
 !------------------------------------------------------------------------------
-            Sink_Vel    = Vdet_a* abs(zF(k)) + Vdet
+!Ying 26.12.2025: calcite dissolution applied a different depth dependence relative to sinking
+            Sink_Vel    = Vcalc * abs(zF(k)) + Vdet
+!            Sink_Vel    = Vdet_a* abs(zF(k)) + Vdet
 
             if (OmegaC_diss) then    ! Calcdiss dependent on carbonate saturation
                 Ca        = (0.02128d0/40.078d0) * Sali_depth(k)/1.80655d0 ! Calcium ion concentration [mol/kg], function from varsolver.f90
@@ -663,7 +665,19 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !< *** Iron chemistry ***
 !< ********************** 
 ! select the method to calculate freeFe
-               freeFe = iron_chemistry(Fe,totalligand,ligandStabConst)
+           if (fe_2ligands) then
+               if (fe_compl_nica) then
+                   logK1 = max(tiny, 24.36 - 1.67 * pH_watercolumn(k)  &
+                           + EOC * (-2.e-4 * EOC + 0.034))
+                   logK2 =  logK1 + 2.67
+                   Klig1 = 10 ** (logK1 - 9)
+                   Klig2 = 10 ** (logK2 - 9)
+                   freeFe = iron_chemistry_2ligands(Fe,1.7,0.6,Klig1,Klig2)
+               endif
+            else
+                   freeFe = iron_chemistry(Fe,totalligand,ligandStabConst)
+            endif
+
 !-------------------------------------------------------------------------------
 !< *** Chlorophyll synthesis ***
 !< *****************************
@@ -2074,9 +2088,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !-------------------------------------------------------------------------------
 ! DIC_13
       sms(k,idic_13) =        (                           &
-            - Cphot                         * PhyC_13       &
+!            - Cphot                         * PhyC_13       &
+            - Cphot * r_phyc_13             * PhyC          &              
             + phyRespRate                   * PhyC_13       &
-            - Cphot_Dia                     * DiaC_13       &
+!            - Cphot_Dia                     * DiaC_13       &
+            - Cphot_Dia * r_diac_13         * DiaC          &
             + phyRespRate_Dia               * DiaC_13       &
             + rho_C1 * arrFunc              * EOC_13        &
             + HetRespFlux_13                                &
@@ -2087,7 +2103,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !-------------------------------------------------------------------------------
 ! Phytoplankton C_13
       sms(k,iphyc_13)      =  (                           &
-                + Cphot                        * PhyC_13        &
+!                + Cphot                        * PhyC_13        &
+                + Cphot * r_phyc_13            * PhyC           &
                 - lossC * limitFacN            * PhyC_13        &
                 - phyRespRate                  * PhyC_13        &
                 - aggregationRate              * PhyC_13        &
@@ -2127,7 +2144,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !-------------------------------------------------------------------------------
 ! Diatom C_13
       sms(k,idiac_13)      = (                            &
-                + Cphot_dia                      * DiaC_13      &
+!                + Cphot_dia                      * DiaC_13      &
+                + Cphot_dia * r_diac_13          * DiaC         &
                 - lossC_d * limitFacN_dia        * DiaC_13      &
                 - phyRespRate_dia                * DiaC_13      &
                 - aggregationRate                * DiaC_13      &
@@ -2158,9 +2176,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         if (ciso_organic_14) then
 ! DIC_14
           sms(k,idic_14) =        (                         &
-            - Cphot                         * PhyC_14       &
+!            - Cphot                         * PhyC_14       &
+            - Cphot * r_phyc_14             * PhyC          &
             + phyRespRate                   * PhyC_14       &
-            - Cphot_Dia                     * DiaC_14       &
+!            - Cphot_Dia                     * DiaC_14       &
+            - Cphot_Dia * r_diac_14         * DiaC          &
             + phyRespRate_Dia               * DiaC_14       &
             + rho_C1 * arrFunc              * EOC_14        &
             + HetRespFlux_14                                &
@@ -2171,7 +2191,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !-------------------------------------------------------------------------------
 ! Phytoplankton C_14
           sms(k,iphyc_14)      =  (                           &
-            + Cphot                        * PhyC_14        &
+!            + Cphot                        * PhyC_14        &
+            + Cphot * r_phyc_14            * PhyC           &
             - lossC * limitFacN            * PhyC_14        &
             - phyRespRate                  * PhyC_14        &
             - aggregationRate              * PhyC_14        &
@@ -2211,7 +2232,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !-------------------------------------------------------------------------------
 ! Diatom C_14
           sms(k,idiac_14)      = (                            &
-            + Cphot_dia                      * DiaC_14      &
+!            + Cphot_dia                      * DiaC_14      &
+            + Cphot_dia * r_diac_14          * DiaC         &
             - lossC_d * limitFacN_dia        * DiaC_14      &
             - phyRespRate_dia                * DiaC_14      &
             - aggregationRate                * DiaC_14      &
@@ -2240,6 +2262,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         else
 !         "Abiotic" DIC_14, identical to DIC except for radioactive decay (->
 !         recom_forcing)
+!YY: change of DIC14 equal to that of DIC, why?
           sms(k,idic_14) = sms(k,idic)
         end if ! ciso_organic_14
       end if   ! ciso_14
@@ -2544,5 +2567,5 @@ function iron_chemistry(Fe, totalLigand, ligandStabConst)
   iron_chemistry = freeFe
 
   return
-  end
+  end function iron_chemistry
 
