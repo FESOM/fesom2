@@ -2088,9 +2088,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !-------------------------------------------------------------------------------
 ! DIC_13
       sms(k,idic_13) =        (                           &
-            - Cphot                         * PhyC_13       &
+!            - Cphot                         * PhyC_13       &
+            - Cphot * r_phyc_13             * PhyC          &              
             + phyRespRate                   * PhyC_13       &
-            - Cphot_Dia                     * DiaC_13       &
+!            - Cphot_Dia                     * DiaC_13       &
+            - Cphot_Dia * r_diac_13         * DiaC          &
             + phyRespRate_Dia               * DiaC_13       &
             + rho_C1 * arrFunc              * EOC_13        &
             + HetRespFlux_13                                &
@@ -2101,7 +2103,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !-------------------------------------------------------------------------------
 ! Phytoplankton C_13
       sms(k,iphyc_13)      =  (                           &
-                + Cphot                        * PhyC_13        &
+!                + Cphot                        * PhyC_13        &
+                + Cphot * r_phyc_13            * PhyC           &
                 - lossC * limitFacN            * PhyC_13        &
                 - phyRespRate                  * PhyC_13        &
                 - aggregationRate              * PhyC_13        &
@@ -2141,7 +2144,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !-------------------------------------------------------------------------------
 ! Diatom C_13
       sms(k,idiac_13)      = (                            &
-                + Cphot_dia                      * DiaC_13      &
+!                + Cphot_dia                      * DiaC_13      &
+                + Cphot_dia * r_diac_13          * DiaC         &
                 - lossC_d * limitFacN_dia        * DiaC_13      &
                 - phyRespRate_dia                * DiaC_13      &
                 - aggregationRate                * DiaC_13      &
@@ -2172,9 +2176,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         if (ciso_organic_14) then
 ! DIC_14
           sms(k,idic_14) =        (                         &
-            - Cphot                         * PhyC_14       &
+!            - Cphot                         * PhyC_14       &
+            - Cphot * r_phyc_14             * PhyC          &
             + phyRespRate                   * PhyC_14       &
-            - Cphot_Dia                     * DiaC_14       &
+!            - Cphot_Dia                     * DiaC_14       &
+            - Cphot_Dia * r_diac_14         * DiaC          &
             + phyRespRate_Dia               * DiaC_14       &
             + rho_C1 * arrFunc              * EOC_14        &
             + HetRespFlux_14                                &
@@ -2185,7 +2191,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !-------------------------------------------------------------------------------
 ! Phytoplankton C_14
           sms(k,iphyc_14)      =  (                           &
-            + Cphot                        * PhyC_14        &
+!            + Cphot                        * PhyC_14        &
+            + Cphot * r_phyc_14            * PhyC           &
             - lossC * limitFacN            * PhyC_14        &
             - phyRespRate                  * PhyC_14        &
             - aggregationRate              * PhyC_14        &
@@ -2225,7 +2232,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !-------------------------------------------------------------------------------
 ! Diatom C_14
           sms(k,idiac_14)      = (                            &
-            + Cphot_dia                      * DiaC_14      &
+!            + Cphot_dia                      * DiaC_14      &
+            + Cphot_dia * r_diac_14          * DiaC         &
             - lossC_d * limitFacN_dia        * DiaC_14      &
             - phyRespRate_dia                * DiaC_14      &
             - aggregationRate                * DiaC_14      &
@@ -2254,6 +2262,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         else
 !         "Abiotic" DIC_14, identical to DIC except for radioactive decay (->
 !         recom_forcing)
+!YY: change of DIC14 equal to that of DIC, why?
           sms(k,idic_14) = sms(k,idic)
         end if ! ciso_organic_14
       end if   ! ciso_14
