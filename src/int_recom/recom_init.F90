@@ -248,6 +248,18 @@ subroutine recom_init(mesh)
   respmacro(:,:) = 0.d0
   allocate(respmicro(nl-1,node_size))
   respmicro(:,:) = 0.d0
+  allocate(grazmeso_totc(nl-1,node_size))
+  grazmeso_totc(:,:) = 0.d0
+  allocate(grazmeso_totn(nl-1,node_size))
+  grazmeso_totn(:,:) = 0.d0
+  allocate(grazmicro_totc(nl-1,node_size))
+  grazmicro_totc(:,:) = 0.d0
+  allocate(grazmicro_totn(nl-1,node_size))
+  grazmicro_totn(:,:) = 0.d0
+  allocate(grazmacro_totc(nl-1,node_size))
+  grazmacro_totc(:,:) = 0.d0
+  allocate(grazmacro_totn(nl-1,node_size))
+  grazmacro_totn(:,:) = 0.d0
   allocate(calcdiss(nl-1,node_size))
   calcdiss(:,:) = 0.d0
   allocate(calcif(nl-1,node_size))

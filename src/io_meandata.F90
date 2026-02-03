@@ -602,7 +602,31 @@ CASE ('respmacro      ')
 CASE ('respmicro      ')
    if (use_REcoM) then ! .and. three_zoo_two_det) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'respmicro','Respiration rate of microzooplankton', 'mmolC/(m2*d)', respmicro(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
-   endif 
+endif
+CASE ('grazmicro_totC')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), 'grazmicro_totC', 'C grazing of microzoo', 'mmolC/(m3*d)', grazmicro_totc(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
+CASE ('grazmicro_totN')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), 'grazmicro_totN', 'N grazing of microzoo', 'mmolN/(m3*d)', grazmicro_totn(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
+CASE ('grazmacro_totC')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), 'grazmacro_totC', 'C grazing of macrozoo', 'mmolC/(m3*d)', grazmacro_totc(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
+CASE ('grazmacro_totN')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), 'grazmacro_totN', 'N grazing of macrozoo', 'mmolN/(m3*d)', grazmacro_totn(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
+CASE ('grazmeso_totC ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), 'grazmeso_totC', 'C grazing of mesozoo', 'mmolC/(m3*d)', grazmeso_totc(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
+CASE ('grazmeso_totN ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), 'grazmeso_totC', 'N grazing of mesozoo', 'mmolN/(m3*d)', grazmeso_totc(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+   endif
 CASE ('calcdiss       ')
    if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'calcdiss','Calcite dissolution', 'mmolC/(m2*d)', calcdiss(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
