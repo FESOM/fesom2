@@ -12,12 +12,12 @@ module restart_file_group_module
     character(:), allocatable :: varname
     character(:), allocatable :: path
     logical must_exist_on_read
-  end type
+  end type restart_file_type
 
 
   type restart_file_group
     private
-    type(restart_file_type), public :: files(200) ! .OG. 112 Before
+    type(restart_file_type), public :: files(200)  ! was (112) before OG
 
     integer, public :: nfiles = 0 ! todo: allow dynamically allocated size without messing with shallow copied pointers
   contains
@@ -30,7 +30,7 @@ module restart_file_group_module
     generic, public :: def_elem_var_optional => def_elem_var_2d_optional, def_elem_var_3d_optional
     procedure, private :: def_node_var_2d_optional, def_node_var_3d_optional
     procedure, private :: def_elem_var_2d_optional, def_elem_var_3d_optional
-  end type
+  end type restart_file_group
   
 contains
 

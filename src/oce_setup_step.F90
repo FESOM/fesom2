@@ -292,7 +292,7 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     !___________________________________________________________________________
     ! define tracer namelist parameter
     integer        :: num_tracers
-    logical        :: i_vert_diff, smooth_bh_tra , ltra_diag  ! OG - tra_diag
+    logical        :: i_vert_diff, smooth_bh_tra , ltra_diag
     real(kind=WP)  :: gamma0_tra, gamma1_tra, gamma2_tra
     integer        :: AB_order = 2
     namelist /tracer_listsize/ num_tracers
@@ -456,11 +456,15 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
         allocate(tracers%work%tra_diff_part_hor_redi(nl-1,node_size,num_tracers),tracers%work%tra_diff_part_ver_expl(nl-1,node_size,num_tracers))
         allocate(tracers%work%tra_diff_part_ver_redi_expl(nl-1,node_size,num_tracers),tracers%work%tra_diff_part_ver_impl(nl-1,node_size,num_tracers))
         allocate(tracers%work%tra_recom_sms(nl-1,node_size,num_tracers))
+        allocate(tracers%work%tra_advhoriz_LO(nl-1,node_size,num_tracers))
+        allocate(tracers%work%tra_advvert_LO(nl-1,node_size,num_tracers))
         tracers%work%tra_diff_part_hor_redi = 0.0_WP
         tracers%work%tra_diff_part_ver_expl = 0.0_WP
         tracers%work%tra_diff_part_ver_redi_expl = 0.0_WP
         tracers%work%tra_diff_part_ver_impl = 0.0_WP
         tracers%work%tra_recom_sms = 0.0_WP
+        tracers%work%tra_advhoriz_LO = 0.0_WP
+        tracers%work%tra_advvert_LO = 0.0_WP
 
     end if
 END SUBROUTINE tracer_init
@@ -837,8 +841,8 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     allocate(Ki(nl-1, node_size))
 
     do n=1, node_size
-    !  Ki(n)=K_hor*area(1,n)/scale_area
-    Ki(:,n)=K_hor*(mesh_resolution(n)/100000.0_WP)**2
+        !  Ki(n)=K_hor*area(1,n)/scale_area
+        Ki(:,n)=K_hor*(mesh_resolution(n)/100000.0_WP)**2
     end do
     call exchange_nod(Ki, partit)
 
@@ -864,10 +868,10 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
 
     if (Fer_GM) then
     allocate(fer_c(node_size),fer_scal(node_size), fer_gamma(2, nl, node_size), fer_K(nl, node_size))
-    fer_gamma=0.0_WP
-    fer_K=500._WP
-    fer_c=1._WP
-    fer_scal = 0.0_WP
+    fer_gamma = 0.0_WP
+    fer_K     = 500._WP
+    fer_c     = 1._WP
+    fer_scal  = 0.0_WP
     end if
 
     if (SPP) then
@@ -1125,7 +1129,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-        CASE (1023:1036)
+        CASE (1023:1037)
             tracers%data(i)%values(:,:)=0.0_WP
             if (mype==0) then
                 write (i_string,  "(I4)") i

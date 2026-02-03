@@ -6833,6 +6833,28 @@ real(kind=8) :: &
                     + calc_diss * DetCalc &       ! Dissolution flux
                 ) * recipbiostep
 
+                !*** meso-zooplankton dissolution                                               !RP 14.07.2025
+                vertmesocdis(k) = vertmesocdis(k) + (  &
+                    + calc_loss_gra  * calc_diss_guts                         &
+                ) * recipbiostep
+
+                if (enable_3zoo2det) then
+                    !*** micro-zooplankton dissolution                                          !RP 14.07.2025
+                    vertmicrocdis(k) = vertmicrocdis(k) + (  &
+                        + calc_loss_gra2  * calc_diss_guts                    &
+                    ) * recipbiostep
+
+                    !*** macro-zooplankton dissolution                                          !RP 14.07.2025
+                    vertmacrocdis(k) = vertmacrocdis(k) + (  &
+                       + calc_loss_gra3  * calc_diss_guts                     &
+                    ) * recipbiostep
+
+                    !*** calc_diss by fast-sinking detritus                                     !RP 14.07.2025
+                    vertfastcdis(k) = vertfastcdis(k) + (     &
+                        + calc_diss2 * DetZ2Calc                              &
+                    ) * recipbiostep
+
+                endif
                 !===========================================================================
                 ! PARTICLE AGGREGATION
                 !===========================================================================
@@ -6889,6 +6911,42 @@ real(kind=8) :: &
                         + aggregationrate * PhaeoC &
                     ) * recipbiostep
                 endif
+
+                !===========================================================================
+                ! N ASSIMILATION and REMINERALIZATION
+                !===========================================================================
+
+                !***    N assim by small phytoplankton                                          !RP 15.07.2025
+                vertNassimn(k) = vertNassimn(k) + (             &
+                    + N_assim * PhyC                            &
+                ) * recipbiostep
+
+                !***    N assim by diatoms                                                      !RP 15.07.2025
+                vertNassimd(k) = vertNassimd(k) + (             &
+                    + N_assim_Dia           * DiaC              &
+                ) * recipbiostep
+
+                if (enable_coccos) then
+                    !***    N assim by coccolithophores                                         !RP 15.07.2025
+                    vertNassimc(k) = vertNassimc(k) + (         &
+                        + N_assim_Cocco  * CoccoC               &
+                    ) * recipbiostep
+
+                    !***    N assim by phaeocystis                                              !OG 08.01.2026
+                    vertNassimp(k) = vertNassimp(k) + (         &
+                        + N_assim_Phaeo  * PhaeoC               &
+                    ) * recipbiostep
+                endif
+
+                !***    DON remineralization                                                    !RP 15.07.2025
+                vertDONremin(k) = vertDONremin(k) + (             &
+                    + rho_N * arrFunc * O2Func   * DON       &
+                ) * recipbiostep
+
+                !***    DOC remineralization                                                    !RP 15.07.2025
+                vertDOCremin(k) = vertDOCremin(k) + (             &
+                    + rho_C1 * arrFunc * O2Func   * EOC       &
+                ) * recipbiostep
 
                 !===========================================================================
                 ! DOC EXCRETION
@@ -6992,6 +7050,32 @@ real(kind=8) :: &
                     + calcification &             ! CaCO3 precipitation
                 ) * recipbiostep
 
+                !===========================================================================
+                ! PHYTOPLANKTON PHOTOSYNTHESIS
+                !===========================================================================
+ 
+                ! phy photosynthesis                                           !RP 14.07.2025
+                vertphotn(k) = vertphotn(k) + (           &
+                    + Cphot             * PhyC          &
+                ) * recipbiostep
+
+                ! dia photosynthesis                                           !RP 14.07.2025
+                vertphotd(k) = vertphotd(k) + (           &
+                    + Cphot_Dia         * DiaC          &
+                ) * recipbiostep
+
+                if (enable_coccos) then
+                ! cocco photosynthesis                                          !RP 14.07.2025
+                vertphotc(k) = vertphotc(k) + (           &
+                    + Cphot_Cocco       * CoccoC        &
+                ) * recipbiostep
+
+                ! phaeocystis photosynthesis                                          !OG 08.01.2026
+                vertphotp(k) = vertphotp(k) + (           &
+                    + Cphot_Phaeo       * PhaeoC        &
+                ) * recipbiostep
+
+                endif
                 !===========================================================================
                 ! PHYTOPLANKTON RESPIRATION
                 !===========================================================================

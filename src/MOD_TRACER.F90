@@ -51,6 +51,7 @@ real(kind=WP), allocatable                    :: tra_diff_part_ver_expl(:,:,:)
 real(kind=WP), allocatable                    :: tra_diff_part_ver_redi_expl(:,:,:)
 real(kind=WP), allocatable                    :: tra_diff_part_ver_impl(:,:,:)
 real(kind=WP), allocatable                    :: tra_recom_sms(:,:,:)
+real(kind=WP), allocatable                    :: tra_advvert_LO(:,:,:), tra_advhoriz_LO(:,:,:)
 
 ! The fct part
 real(kind=WP),allocatable,dimension(:,:)      :: fct_LO          ! Low-order solution

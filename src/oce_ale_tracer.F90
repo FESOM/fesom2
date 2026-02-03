@@ -176,6 +176,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     integer                                  :: i, tr_num, node, elem, nzmax, nzmin
     real(kind=WP)                            :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_elem2D) ! local variable
+    real(kind=WP)                            :: ttf_rhs_bak_tend (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D) ! RP on 12.12.25
     integer                                  :: nz, n, nu1, nl1
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -228,6 +229,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 !    tracers%work%tra_advhoriz = 0.0 ! O:G - tra_diag
 !    tracers%work%tra_advvert  = 0.0
     ttf_rhs_bak = 0.0
+    ttf_rhs_bak_tend = 0.0
 !#endif
     
     !___________________________________________________________________________
@@ -242,6 +244,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         if(use_MEDUSA) then
             SinkFlx = 0.0d0
         endif
+        SinkingVel1 = 0.0d0
+        SinkingVel2 = 0.0d0
 #endif
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
         ! needed
@@ -250,6 +254,19 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 
         ! advect tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call adv_tracers_ale'//achar(27)//'[0m'
+
+   !============================================================     
+
+   if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+          do n=1, myDim_nod2D+eDim_nod2D
+          nu1 = ulevels_nod2D(n)
+          nl1 = nlevels_nod2D(n)
+          do nz = nu1, nl1-1
+             ttf_rhs_bak_tend(nz,n) = tracers%data(tr_num)%values(nz,n)
+          end do
+       end do
+    end if
+   !============================================================
 	!here update only those initialized in the init_tracers. (values, valuesAB, edge_up_dn_grad, ...)
         !$ACC UPDATE  DEVICE(tracers%data(tr_num)%values, tracers%data(tr_num)%valuesAB) &
         !$ACC  DEVICE(tracers%work%edge_up_dn_grad) !!&
@@ -294,6 +311,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
             call relax_zonal_temp(tracers%data(1), partit, mesh)
         else
             call relax_to_clim(tr_num, tracers, partit, mesh)
+            
         end if
 
         call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
@@ -445,8 +463,8 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
           nu1 = ulevels_nod2D(n)
           nl1 = nlevels_nod2D(n)
           do nz = nu1, nl1-1
-             ! horizontal diffusion (w/out Redi)           
-             tracers%work%tra_diff_part_hor_redi(nz,n,tr_num) = (del_ttf(nz,n) - ttf_rhs_bak(nz,n)) / hnode_new(nz,n) ! Unit [Conc]
+             ! horizontal diffusion (w/out Redi)
+             tracers%work%tra_diff_part_hor_redi(nz,n,tr_num) = (del_ttf(nz,n) - ttf_rhs_bak(nz,n)) ! Unit [Conc]
              !if (mype==0)  print *, tracers%work%tra_diff_part_hor_redi(nz,n,tr_num)
           end do
        end do
@@ -473,7 +491,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
           nl1 = nlevels_nod2D(n)
           do nz = nu1, nl1-1
              ! vertical diffusion: explicit
-             tracers%work%tra_diff_part_ver_expl(nz,n,tr_num) = (del_ttf(nz,n) - ttf_rhs_bak(nz,n)) / hnode_new(nz,n) ! Unit [Conc]
+             tracers%work%tra_diff_part_ver_expl(nz,n,tr_num) = (del_ttf(nz,n) - ttf_rhs_bak(nz,n))  ! Unit [Conc]
              !if (mype==0)  print *,  tra_diff_part_ver_expl(:,:,tr_num)
           end do
        end do
@@ -500,7 +518,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
           nl1 = nlevels_nod2D(n)
           do nz = nu1, nl1-1
              ! Redi diffussivity onto vertical: explicit
-             tracers%work%tra_diff_part_ver_redi_expl(nz,n,tr_num) = (del_ttf(nz,n) - ttf_rhs_bak(nz,n)) / hnode_new(nz,n) ! Unit [Conc]
+             tracers%work%tra_diff_part_ver_redi_expl(nz,n,tr_num) = (del_ttf(nz,n) - ttf_rhs_bak(nz,n)) ! Unit [Conc]
              !if (mype==0)  print *,  tra_diff_part_ver_redi_expl(:,:,tr_num)
           end do
        end do
@@ -517,14 +535,43 @@ if (any(recom_remin_tracer_id == tracers%data(tr_num)%ID)) then
 
 ! call bottom boundary
         call diff_ver_recom_expl(tr_num, tracers, partit, mesh)
+!        print*, 'Calling diff_ver_recom_expl and tr_num is:',tracers%data(tr_num)%ID
+        SELECT CASE (tracers%data(tr_num)%ID)
+            CASE (1001) ! DIN
+                dtr_bflux_din(:,:) = tracers%data(tr_num)%values(:,:)*0.0d0
+            CASE (1002) ! DIC
+                dtr_bflux_dic(:,:) = tracers%data(tr_num)%values(:,:)*0.0d0
+            CASE (1003) ! Alk
+                dtr_bflux_alk(:,:) = tracers%data(tr_num)%values(:,:)*0.0d0
+            CASE (1018) ! DSi
+                dtr_bflux_dsi(:,:) = tracers%data(tr_num)%values(:,:)*0.0d0
+        END SELECT
 ! update tracer fields
         do n=1, myDim_nod2D
             nzmax=nlevels_nod2D(n)-1
             nzmin=ulevels_nod2D(n)
-!            tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
-!                                                dtr_bf(nzmin:nzmax,n)
-        tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
+            SELECT CASE (tracers%data(tr_num)%ID)
+               CASE (1001) ! DIN
+                   tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
                                                 dtr_bf(nzmin:nzmax,n)
+                   dtr_bflux_din(nzmin:nzmax,n) = dtr_bflux_din(nzmin:nzmax,n) + dtr_bf(nzmin:nzmax,n)
+               CASE (1002) ! DIC
+                   tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
+                                                dtr_bf(nzmin:nzmax,n)
+                   dtr_bflux_dic(nzmin:nzmax,n) = dtr_bflux_dic(nzmin:nzmax,n) + dtr_bf(nzmin:nzmax,n)
+               CASE (1003) ! Alk
+                   tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
+                                                dtr_bf(nzmin:nzmax,n)
+                   dtr_bflux_alk(nzmin:nzmax,n) = dtr_bflux_alk(nzmin:nzmax,n) + dtr_bf(nzmin:nzmax,n)
+               CASE (1018) ! DSi
+                   tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
+                                                dtr_bf(nzmin:nzmax,n)
+                   dtr_bflux_dsi(nzmin:nzmax,n) = dtr_bflux_dsi(nzmin:nzmax,n) + dtr_bf(nzmin:nzmax,n)
+
+               CASE DEFAULT
+                   tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
+                                                dtr_bf(nzmin:nzmax,n)
+            END SELECT
         end do
 end if
 
@@ -556,7 +603,7 @@ if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
         call ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)  !--- str_bf ---
 
 ! update tracer fields
-
+!print*, 'Calling ver_sinking_recom_benthos and tr_num is:',tracers%data(tr_num)%ID
         do n=1, myDim_nod2D
             nzmax=nlevels_nod2D(n)-1
             nzmin=ulevels_nod2D(n)
@@ -619,13 +666,13 @@ endif
         end if
 
     end if
-    
+
     !We DO not set del_ttf to zero because it will not be used in this timestep anymore
     !init_tracers_AB will set it to zero for the next timestep
     if (tracers%data(tr_num)%smooth_bh_tra) then
        call diff_part_bh(tr_num, dynamics, tracers, partit, mesh)  ! alpply biharmonic diffusion (implemented as filter)
     end if
-        
+
 end subroutine diff_tracers_ale
 !
 !
@@ -1685,7 +1732,7 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
     CASE (1022) ! OXY
         bc_surface= dt*GloO2flux_seaicemask(n)
 !        bc_surface=0.0_WP
-    CASE (1023:1036)
+    CASE (1023:1037)
         bc_surface=0.0_WP  ! OG added bc for recom fields
     CASE (1302) ! Before (1037) ! DIC_13
 
