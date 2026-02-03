@@ -570,6 +570,16 @@ CASE ('curl_surf ')
 ! output RECOM 2D
 #if defined(__recom)
 
+CASE ('alphaCO2  ')
+    if (use_REcoM) then
+    call def_stream(nod2D,  myDim_nod2D,   'alphaCO2',    'CO2 solubility',  'mol/kg/atm', alphaCO2(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('Kw        ')
+    if (use_REcoM) then
+    call def_stream(nod2D,  myDim_nod2D,   'Kw',    'Air-sea piston velocity',  'm/s', PistonVelocity(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
 CASE ('dpCO2s    ')
     if (use_REcoM) then
     call def_stream(nod2D,  myDim_nod2D,   'dpCO2s',    'Difference of oceanic pCO2 minus atmospheric pCO2',  'uatm', GlodPCO2surf(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -686,9 +696,102 @@ CASE ('Chldegc  ')
     if (use_REcoM) then
 !    call def_stream(nod2D,  myDim_nod2D,   'GNAc','Gross N-assimilation coccolithophores','mmolN/(m2*d)', diags2D(:,12), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh) ! NEW
     call def_stream(nod2D,  myDim_nod2D,   'ChlDegc','Chlorophyll degradation coccolithophores','1/d', Chldegc, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! NEW
+    endif 
+
+CASE ('NPPp     ')
+    if (use_REcoM) then
+!    call def_stream(nod2D,  myDim_nod2D,   'NPPp','Mean NPP phaeocystis','mmolC/(m2*d)', diags2D(:,9), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)     ! NEW
+    call def_stream(nod2D,  myDim_nod2D,   'NPPp','Mean NPP phaeocystis','mmolC/(m2*d)', NPPp, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)     ! Phaeocystis
+    end if
+
+CASE ('GPPp     ')
+    if (use_REcoM) then
+!    call def_stream(nod2D,  myDim_nod2D,   'GPPp','Mean GPP phaeocystis','mmolC/(m2*d)', diags2D(:,10), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)    ! NEW
+    call def_stream(nod2D,  myDim_nod2D,   'GPPp','Mean GPP phaeocystis','mmolC/(m2*d)', GPPp, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)    ! Phaeocystis
+    end if
+
+CASE ('NNAp     ')
+    if (use_REcoM) then
+!    call def_stream(nod2D,  myDim_nod2D,   'NNAp','Net N-assimilation phaeocystis','mmolN/(m2*d)', diags2D(:,11), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)   ! NEW
+    call def_stream(nod2D,  myDim_nod2D,   'NNAp','Net N-assimilation phaeocystis','mmolN/(m2*d)', NNAp, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)   ! Phaeocystis
     endif
+
+CASE ('Chldegp  ')
+    if (use_REcoM) then
+!    call def_stream(nod2D,  myDim_nod2D,   'GNAp','Gross N-assimilation phaeocystis','mmolN/(m2*d)', diags2D(:,12), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh) ! NEW
+    call def_stream(nod2D,  myDim_nod2D,   'ChlDegp','Chlorophyll degradation phaeocystis','1/d', Chldegp, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
+    endif
+
+! Mesozooplankton
+CASE ('grazmeso_tot')
+    call def_stream(nod2D,  myDim_nod2D,   'grazmeso_tot','Total grazing flux of mesozooplankton, dependent on grazing efficiency','mmolC/(m2d)', grazmeso_tot, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+CASE ('grazmeso_n')
+    call def_stream(nod2D,  myDim_nod2D,   'grazmeso_n','Grazing flux of mesozooplankton on small phytoplankton without grazing efficiency (i.e., = loss small phytoplankton)','mmolC/(m2d)', grazmeso_n, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+CASE ('grazmeso_d')
+    call def_stream(nod2D,  myDim_nod2D,   'grazmeso_d','Grazing flux of mesozooplankton on diatoms without grazing efficiency (i.e., = loss diatoms)','mmolC/(m2d)', grazmeso_d, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+CASE ('grazmeso_c')
+    call def_stream(nod2D,  myDim_nod2D,   'grazmeso_c','Grazing flux of mesozooplankton on coccolithophores without grazing efficiency (i.e., = loss coccolithophores)','mmolC/(m2d)', grazmeso_c, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+CASE ('grazmeso_p')
+    call def_stream(nod2D,  myDim_nod2D,   'grazmeso_p','Grazing flux of mesozooplankton on phaeocystis without grazing efficiency (i.e., = loss phaeocystis)','mmolC/(m2*d)', grazmeso_p, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('grazmeso_det')
+    call def_stream(nod2D,  myDim_nod2D,   'grazmeso_det','Grazing flux of mesozooplankton on first detritus group without grazing efficiency (i.e., = loss first detritus group)','mmolC/(m2d)', grazmeso_det, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+CASE ('grazmeso_mic')
+    call def_stream(nod2D,  myDim_nod2D,   'grazmeso_mic','Grazing flux of mesozooplankton on microzooplankton without grazing efficiency (i.e., = loss microzooplankton)','mmolC/(m2d)', grazmeso_mic, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+CASE ('grazmeso_det2')
+    call def_stream(nod2D,  myDim_nod2D,   'grazmeso_det2','Grazing flux of mesozooplankton on first detritus group without grazing efficiency (i.e., = loss second detritus group)','mmolC/(m2*d)', grazmeso_det2, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+! Macrozooplankton
+CASE ('grazmacro_tot')
+    call def_stream(nod2D,  myDim_nod2D,   'grazmacro_tot','Total grazing flux of macrozooplankton, dependent on grazing efficiency','mmolC/(m2d)', grazmacro_tot, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+CASE ('grazmacro_n')
+    call def_stream(nod2D,  myDim_nod2D,   'grazmacro_n','Grazing flux of macrozooplankton on small phytoplankton without grazing efficiency (i.e., = loss small phytoplankton)','mmolC/(m2d)', grazmacro_n, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+CASE ('grazmacro_d')
+    call def_stream(nod2D,  myDim_nod2D,   'grazmacro_d','Grazing flux of macrozooplankton on diatoms without grazing efficiency (i.e., = loss diatoms)','mmolC/(m2d)', grazmacro_d, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+CASE ('grazmacro_c')
+    call def_stream(nod2D,  myDim_nod2D,   'grazmacro_c','Grazing flux of macrozooplankton on coccolithophores without grazing efficiency (i.e., = loss coccolithophores)','mmolC/(m2d)', grazmacro_c, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+CASE ('grazmacro_p')
+    call def_stream(nod2D,  myDim_nod2D,   'grazmacro_p','Grazing flux of macrozooplankton on phaeocystis without grazing efficiency (i.e., = loss phaeocystis)','mmolC/(m2*d)', grazmacro_p, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+CASE ('grazmacro_mes')
+    call def_stream(nod2D,  myDim_nod2D,   'grazmacro_mes','Grazing flux of mesozooplankton on macrozooplankton without grazing efficiency (i.e., = loss mesozooplankton)','mmolC/(m2d)', grazmacro_mes, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+CASE ('grazmacro_det')
+    call def_stream(nod2D,  myDim_nod2D,   'grazmacro_det','Grazing flux of macrozooplankton on first detritus group without grazing efficiency (i.e., = loss first detritus group)','mmolC/(m2d)', grazmacro_det, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+CASE ('grazmacro_mic')
+    call def_stream(nod2D,  myDim_nod2D,   'grazmacro_mic','Grazing flux of macrozooplankton on microzooplankton without grazing efficiency (i.e., = loss microzooplankton)','mmolC/(m2d)', grazmacro_mic, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+CASE ('grazmacro_det2')
+    call def_stream(nod2D,  myDim_nod2D,   'grazmacro_det2','Grazing flux of macrozooplankton on first detritus group without grazing efficiency (i.e., = loss second detritus group)','mmolC/(m2d)', grazmacro_det2, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+! Microzooplankton
+CASE ('grazmicro_tot')
+    call def_stream(nod2D,  myDim_nod2D,   'grazmicro_tot','Total grazing flux of microzooplankton, dependent on grazing efficiency','mmolC/(m2d)', grazmicro_tot, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+CASE ('grazmicro_n')
+    call def_stream(nod2D,  myDim_nod2D,   'grazmicro_n','Grazing flux of microzooplankton on small phytoplankton without grazing efficiency (i.e., = loss small phytoplankton)','mmolC/(m2d)', grazmicro_n, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+CASE ('grazmicro_d')
+    call def_stream(nod2D,  myDim_nod2D,   'grazmicro_d','Grazing flux of microzooplankton on diatoms without grazing efficiency (i.e., = loss diatoms)','mmolC/(m2d)', grazmicro_d, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+CASE ('grazmicro_c')
+    call def_stream(nod2D,  myDim_nod2D,   'grazmicro_c','Grazing flux of microzooplankton on coccolithophores without grazing efficiency (i.e., = loss coccolithophores)','mmolC/(m2d)', grazmicro_c, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+CASE ('grazmicro_p')
+    call def_stream(nod2D,  myDim_nod2D,   'grazmicro_p','Grazing flux of microzooplankton on phaeocystis without grazing efficiency (i.e., = loss phaeocystis)','mmolC/(m2*d)', grazmicro_p, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
 #endif
-    
+
 !___________________________________________________________________________________________________________________________________    
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>   3D streams   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 !___________________________________________________________________________________________________________________________________
@@ -703,6 +806,26 @@ CASE ('PAR       ')
     if (use_REcoM) then
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'PAR', 'PAR', 'W/m2',      PAR3D(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
+CASE ('wsink_det1')
+   call def_stream((/nl, nod2D/),  (/nl, myDim_nod2D/),  'wsink_det1', 'sinking speed of particles in class 1', 'm s-1',  Sinkingvel1(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('wsink_det2')
+   call def_stream((/nl, nod2D/),  (/nl, myDim_nod2D/),  'wsink_det2', 'sinking speed of particles in class 2', 'm s-1',  Sinkingvel2(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+   !!! DIC Bottom flux
+CASE ('DIC_bf')
+    call def_stream((/nl, nod2D/),  (/nl, myDim_nod2D/),  'DIC_bf', 'DIC bottom flux', 'mmolC/m3',  dtr_bflux_dic(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+   !!! DIN Bottom flux
+CASE ('DIN_bf')
+    call def_stream((/nl, nod2D/),  (/nl, myDim_nod2D/),  'DIN_bf', 'DIN bottom flux', 'mmolC/m3',  dtr_bflux_din(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+   !!! Alk Bottom flux
+CASE ('Alk_bf')
+    call def_stream((/nl, nod2D/),  (/nl, myDim_nod2D/),  'Alk_bf', 'Alk bottom flux', 'mmolC/m3',  dtr_bflux_alk(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+   !!! DSi Bottom flux
+CASE ('DSi_bf')
+    call def_stream((/nl, nod2D/),  (/nl, myDim_nod2D/),  'DSi_bf', 'DSi bottom flux', 'mmolC/m3',  dtr_bflux_dsi(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 
 CASE ('respmeso       ')
    if (use_REcoM) then
@@ -744,6 +867,11 @@ CASE ('aggc           ')
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'aggc','Aggregation of coccolithophores', 'mmolC/m2/d', aggc(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
 
+CASE ('aggp           ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'aggp','Aggregation of phaeocystis', 'mmolC/(m2*d)', aggp(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
+   endif
+
 CASE ('docexn         ')
    if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'docexn','DOC excretion by small phytoplankton', 'mmolC/m2/d', docexn(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -757,6 +885,11 @@ CASE ('docexd         ')
 CASE ('docexc         ')
    if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'docexc','DOC excretion by coccolithophores', 'mmolC/m2/d', docexc(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('docexp         ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'docexp','DOC excretion by phaeocystis', 'mmolC/(m2*d)', docexp(:,:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
    endif
 
 CASE ('respn          ')
@@ -774,6 +907,11 @@ CASE ('respc          ')
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'respc','Respiration by coccolithophores', 'mmolC/(m2*d)', respc(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
 
+CASE ('respp          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'respp','Respiration by phaeocystis', 'mmolC/(m2*d)', respp(:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
+   endif
+
 CASE ('NPPn3D         ')
    if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPn3D','Net primary production of small phytoplankton', 'mmolC/m2/d', NPPn3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -788,6 +926,117 @@ CASE ('NPPc3D         ')
    if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPc3D','Net primary production of coccolithophores', 'mmolC/m2/d', NPPc3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
+
+CASE ('NPPp3D         ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPp3D','Net primary production of phaeocystis', 'mmolC/(m2*d)', NPPp3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
+   endif
+
+CASE ('TTemp_diatoms          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TTemp_diatoms','Temperature dependence of diatoms PS', 'per day',TTemp_diatoms(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TTemp_phyto          ')
+   if (use_REcoM) then 
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TTemp_phyto','Temperature dependence of small phytoplankton PS', 'per day',TTemp_phyto(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TTemp_cocco          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TTemp_cocco','Temperature dependence of coccolithophores PS', 'per day',TTemp_cocco(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TTemp_phaeo          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TTemp_phaeo','Temperature dependence of phaeocystis PS', 'per day',TTemp_phaeo(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TPhyCO2          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TPhyCO2','Effect of CO2 of phyto growth/PS', 'per day',TPhyCO2(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TDiaCO2          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TDiaCO2','Effect of CO2 of phyto growth/PS', 'per day',TDiaCO2(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TCoccoCO2          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCoccoCO2','Effect of CO2 of phyto growth/PS', 'per day',TCoccoCO2(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TPhaeoCO2          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TPhaeoCO2','Effect of CO2 of phyto growth/PS', 'per day',TPhaeoCO2(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TqLF_phyto          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TqLF_phyto','Nutrient limitation effect of phyto PS', 'per day',TqlimitFac_phyto(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TqLF_diatoms          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TqLF_diatoms','Nutrient limitation effect of diatoms PS', 'per day',TqlimitFac_diatoms(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TqLF_cocco          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TqLF_cocco','Nutrient limitation effect of diatoms PS', 'per day',TqlimitFac_cocco(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TqLF_phaeo          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TqLF_phaeo','Nutrient limitation effect of diatoms PS', 'per day', TqlimitFac_phaeo(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TCphotLL_phyto         ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCphotLL_phyto','Light limitation on phyto PS', 'per day', TCphotLigLim_phyto(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TCphotLL_dia         ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCphotLL_dia','Light limitation on diatoms PS', 'per day', TCphotLigLim_diatoms(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TCphotLL_cocco          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCphotLL_cocco','Light limitation on phyto PS', 'per day',TCphotLigLim_cocco(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TCphotLL_phaeo          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCphotLL_phaeo','Light limitation on phyto PS', 'per day',TCphotLigLim_phaeo(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TCphot_phyto          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCphot_phyto','Light limitation on phyto PS', 'per day',TCphot_phyto(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TCphot_diatoms          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCphot_diatoms','Light limitation on phyto PS', 'per day',TCphot_diatoms(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif   
+
+CASE ('TCphot_cocco          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCphot_cocco','Light limitation on phyto PS', 'per day',TCphot_cocco(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TCphot_phaeo          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCphot_phaeo','Light limitation on phyto PS', 'per day',TCphot_phaeo(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TSi_assimDia          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TSi_assimDia','Silicate assimilation', 'per day',TSi_assimDia(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
 #endif
 
 !CASE ('otracers  ')
@@ -809,14 +1058,111 @@ CASE ('otracers  ')
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN', 'Dissolved Inorganic Nitrogen', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
 
+
+
+            if (tracers%data(j)%ltra_diag) then
+               ! horizontal advection
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_hor_adv', 'Horizontal advection part of dissolved Inorganic N', '[mmol/m3]', tracers%work%tra_advhoriz(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                ! horizontal advection LO
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_lo_hor_adv', 'LO Horizontal advection part of dissolved Inorganic N', '[mmol/m3]', tracers%work%tra_advhoriz_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! vertical advection
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_ver_adv', 'Vertical advection part of dissolved Inorganic N', '[mmol/m3]', tracers%work%tra_advvert(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! vertical advection LO
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_lo_ver_adv', 'LO Vertical advection part of dissolved Inorganic N', '[mmol/m3]', tracers%work%tra_advvert_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! horizontal diffusion
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_tra_diff_part_hor_redi', 'Horizontal diffusion of dissolved Inorganic N (includes Redi diffusivity if Redi=.true.)', '[mmol/m3]', tracers%work%tra_diff_part_hor_redi(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               if (tracers%data(j)%i_vert_diff) then
+               ! vertical diffusion (Explicit)
+                   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_tra_diff_part_ver_expl', 'Vertical diffusion of dissolved Inorganic N (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+               end if
+
+               ! projection of horizontal Redi diffussivity onto vertical
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_tra_diff_part_ver_redi_expl', 'Projection of horizontal Redi diffussivity onto vertical for dissolved Inorganic N (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_redi_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! vertical diffusion (Implicit)
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_tra_diff_part_ver_impl', 'Vertical diffusion of dissolved Inorganic N (Implicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_impl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! recom_sms
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_recom_sms', 'Recom SMS', '[mmol/m3]', tracers%work%tra_recom_sms(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            end if
+
+
+
+
+
+
+
+
       else if (tracers%data(j)%ID==1002) then
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC', 'Dissolved Inorganic C', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+            if (tracers%data(j)%ltra_diag) then
+               ! horizontal advection
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_hor_adv', 'Horizontal advection part of dissolved Inorganic C', '[mmol/m3]', tracers%work%tra_advhoriz(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                ! horizontal advection LO
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_lo_hor_adv', 'LO Horizontal advection part of dissolved Inorganic C', '[mmol/m3]', tracers%work%tra_advhoriz_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! vertical advection
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_ver_adv', 'Vertical advection part of dissolved Inorganic C', '[mmol/m3]', tracers%work%tra_advvert(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! vertical advection LO
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_lo_ver_adv', 'LO Vertical advection part of dissolved Inorganic C', '[mmol/m3]', tracers%work%tra_advvert_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! horizontal diffusion
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_hor_redi', 'Horizontal diffusion of dissolved Inorganic C (includes Redi diffusivity if Redi=.true.)', '[mmol/m3]', tracers%work%tra_diff_part_hor_redi(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               if (tracers%data(j)%i_vert_diff) then
+               ! vertical diffusion (Explicit)
+                   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_ver_expl', 'Vertical diffusion of dissolved Inorganic C (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+               end if
+
+               ! projection of horizontal Redi diffussivity onto vertical
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_ver_redi_expl', 'Projection of horizontal Redi diffussivity onto vertical for dissolved Inorganic C (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_redi_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! vertical diffusion (Implicit)
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_ver_impl', 'Vertical diffusion of dissolved Inorganic C (Implicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_impl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! recom_sms
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_recom_sms', 'Recom SMS', '[mmol/m3]', tracers%work%tra_recom_sms(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            end if
+
          endif
 
       else if (tracers%data(j)%ID==1003) then
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk', 'Total Alkalinity', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+!!!!24.06.2025
+            if (tracers%data(j)%ltra_diag) then ! OG - tra_diag
+               ! horizontal advection
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_hor_adv', 'Horizontal advection part of Total Alkalinity', '[mmol/m3]', tracers%work%tra_advhoriz(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                ! horizontal advection LO
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_lo_hor_adv', 'LO Horizontal advection part of Total Alkalinity', '[mmol/m3]', tracers%work%tra_advhoriz_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+               ! vertical advection
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_ver_adv', 'Vertical advection part of Total Alkalinity', '[mmol/m3]', tracers%work%tra_advvert(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! horizontal diffusion
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_tra_diff_part_hor_redi', 'Horizontal diffusion of Total Alkalinity (includes Redi diffusivity if Redi=.true.)', '[mmol/m3]', tracers%work%tra_diff_part_hor_redi(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               if (.not. tracers%data(j)%i_vert_diff) then
+               ! vertical diffusion (Explicit)
+                   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_tra_diff_part_ver_expl', 'Vertical diffusion of Total Alkalinity (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+               end if
+
+               ! projection of horizontal Redi diffussivity onto vertical
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_tra_diff_part_ver_redi_expl', 'Projection of horizontal Redi diffussivity onto vertical for Total Alkalinity (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_redi_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! vertical diffusion (Implicit)
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_tra_diff_part_ver_impl', 'Vertical diffusion of Total Alkalinity (Implicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_impl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! recom_sms
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_recom_sms', 'Recom SMS', '[mmol/m3]', tracers%work%tra_recom_sms(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+            end if
          endif
 
       ! =====================================================================
@@ -913,6 +1259,43 @@ CASE ('otracers  ')
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi', 'DSi', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
+
+
+            if (tracers%data(j)%ltra_diag) then
+               ! horizontal advection
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_hor_adv', 'Horizontal advection part of dissolved Silicic Acid', '[mmol/m3]', tracers%work%tra_advhoriz(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                ! horizontal advection LO
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_lo_hor_adv', 'LO Horizontal advection part of dissolved Silicic Acid', '[mmol/m3]', tracers%work%tra_advhoriz_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! vertical advection
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_ver_adv', 'Vertical advection part of dissolved Silicic Acid', '[mmol/m3]', tracers%work%tra_advvert(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! vertical advection LO
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_lo_ver_adv', 'LO Vertical advection part of dissolved Silicic Acid', '[mmol/m3]', tracers%work%tra_advvert_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! horizontal diffusion
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_tra_diff_part_hor_redi', 'Horizontal diffusion of dissolved Silicic Acid (includes Redi diffusivity if Redi=.true.)', '[mmol/m3]', tracers%work%tra_diff_part_hor_redi(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               if (tracers%data(j)%i_vert_diff) then
+               ! vertical diffusion (Explicit)
+                   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_tra_diff_part_ver_expl', 'Vertical diffusion of dissolved Silicic Acid (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+               end if
+
+               ! projection of horizontal Redi diffussivity onto vertical
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_tra_diff_part_ver_redi_expl', 'Projection of horizontal Redi diffussivity onto vertical for dissolved Silicic Acid (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_redi_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! vertical diffusion (Implicit)
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_tra_diff_part_ver_impl', 'Vertical diffusion of dissolved Silicic Acid (Implicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_impl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! recom_sms
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi_recom_sms', 'Recom SMS', '[mmol/m3]', tracers%work%tra_recom_sms(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            end if
+
+
+
+
+
+
 
       else if (tracers%data(j)%ID==1019) then
          if (use_REcoM) then
