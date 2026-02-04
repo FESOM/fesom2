@@ -64,6 +64,7 @@ subroutine prepare_icb2fesom(mesh, partit, ib,i_have_element,localelement,depth_
     real(kind=WP)           :: total_nodal_area                 ! cumulative nodal area for flux distribution [m^2]
     logical                 :: need_full_recalc                 ! flag: need full neighbor recalculation
     logical                 :: host_changed                     ! flag: host element changed
+    logical                 :: new_host_in_footprint            ! flag: new host is in existing footprint
     integer                 :: num_removed, num_added           ! counters for logging
     integer                 :: prev_num_selected                ! previous count for change detection
     
@@ -92,7 +93,7 @@ type(t_partit), intent(inout), target :: partit
         ! -----------------------------------------------------------------------
         ! OPTIMIZED Multi-element iceberg support with persistent storage.
         ! Avoids full recalculation each timestep by:
-        !   1. Detecting host cell change → recalculate from scratch
+        !   1. Detecting host cell change → only recalculate if new host is NOT in footprint
         !   2. Shrinking iceberg → remove last-added elements
         !   3. Growing iceberg → add from cached candidates
         ! -----------------------------------------------------------------------
@@ -102,16 +103,39 @@ type(t_partit), intent(inout), target :: partit
             
             ! ---------------------------------------------------------------
             ! Check if we need full recalculation (host element changed)
+            ! OPTIMIZATION: Keep footprint if new host is already in cached footprint
+            ! Only recalculate when new host is outside the existing footprint
             ! ---------------------------------------------------------------
             host_changed = (icb_cached_host_elem(ib) /= localelement)
-            need_full_recalc = host_changed .or. (icb_num_selected(ib) == 0)
             num_removed = 0
             num_added = 0
             prev_num_selected = icb_num_selected(ib)
             
+            ! Check if new host element is already in the cached footprint
+            new_host_in_footprint = .false.
+            if (host_changed .and. icb_num_selected(ib) > 0) then
+                do ii = 1, icb_num_selected(ib)
+                    if (icb_selected_elems(ii, ib) == localelement) then
+                        new_host_in_footprint = .true.
+                        exit
+                    end if
+                end do
+            end if
+            
+            ! Only need full recalc if: (1) first time, OR (2) host changed AND new host is NOT in footprint
+            need_full_recalc = (icb_num_selected(ib) == 0) .or. (host_changed .and. .not. new_host_in_footprint)
+            
+            ! If host changed but new host IS in footprint, just update the cached host (no recalc needed)
+            if (host_changed .and. new_host_in_footprint) then
+                icb_cached_host_elem(ib) = localelement
+                ! Optionally log that we're reusing footprint with new host
+                ! write(*,'(A,I8,A,I8,A)') ' [ICB INFO] Iceberg ', ib, &
+                !     ': host moved to elem ', localelement, ' (already in footprint - reusing)'
+            end if
+            
             if (need_full_recalc) then
                 ! ---------------------------------------------------------------
-                ! CASE 3: Host cell changed or first time - full recalculation
+                ! CASE 3: Host cell changed to element outside footprint, or first time - full recalculation
                 ! ---------------------------------------------------------------
                 write(*,'(A)') ' '
                 write(*,'(A,I8)') ' [ICB INFO] === CASE 3: Full (re-)calculation for iceberg ', ib
@@ -120,6 +144,7 @@ type(t_partit), intent(inout), target :: partit
                 else if (host_changed) then
                     write(*,'(A,I8,A,I8)') ' [ICB INFO]   Reason: Host element changed from ', &
                         icb_cached_host_elem(ib), ' to ', localelement
+                    write(*,'(A)') ' [ICB INFO]   New host is NOT in existing footprint - must recalculate'
                 end if
                 
                 icb_num_selected(ib) = 1
