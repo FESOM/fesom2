@@ -79,6 +79,14 @@ subroutine prepare_icb2fesom(mesh, partit, ib,i_have_element,localelement,depth_
     integer                 :: ii, jj                           ! loop counters
     logical                 :: already_selected                 ! flag for duplicate check
     
+    ! Variables for multi-element flux distribution
+    integer, parameter              :: max_footprint_nodes = 300       ! max unique nodes in footprint
+    integer, dimension(max_footprint_nodes) :: footprint_nodes         ! unique node indices
+    integer                         :: num_footprint_nodes             ! count of unique nodes
+    integer                         :: current_elem                    ! current element in footprint loop
+    logical                         :: node_already_in_list            ! flag for duplicate node check
+    integer, dimension(max_footprint_nodes) :: footprint_idx_d         ! depth index for each footprint node
+    
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
 #include "associate_part_def.h"
@@ -375,122 +383,246 @@ type(t_partit), intent(inout), target :: partit
             end if
         end if
 
-        num_ib_nods_in_ib_elem=0                                ! number of nodes in this element ???
+        num_ib_nods_in_ib_elem=0                                ! number of nodes in this element
         tot_area_nods_in_ib_elem=0.0                            ! total area associated to nodes of iceberg element
         idx_d = 0                                               ! index of level directly below or at iceberg base
 
-        ! loop over all three nodes of element
-        do i=1,3
+        ! -----------------------------------------------------------------------
+        ! MULTI-ELEMENT FLUX DISTRIBUTION
+        ! For large icebergs (icb_num_selected > 1), collect all unique nodes from
+        ! all elements in the footprint and distribute fluxes to all of them.
+        ! For single-element icebergs, use only the 3 nodes of the host element.
+        ! -----------------------------------------------------------------------
+        
+        if (icb_num_selected(ib) > 1) then
+            ! ---------------------------------------------------------------
+            ! MULTI-ELEMENT CASE: Collect unique nodes from all footprint elements
+            ! ---------------------------------------------------------------
+            num_footprint_nodes = 0
+            footprint_nodes = 0
+            footprint_idx_d = 0
             
-            ! assign node to iceberg_node
-            iceberg_node=elem2d_nodes(i,localelement)
-
-            ! loop over all levels of iceberg_node
-            do k=1, nlevels_nod2D(iceberg_node)
+            ! Loop over all selected elements in the footprint
+            do ii = 1, icb_num_selected(ib)
+                current_elem = icb_selected_elems(ii, ib)
                 
-                idx_d(i) = k                                    ! idx_d holds current level index until ...
-                                                                ! ... end of iceberg or bottom topography is reached
-                lev_up  = mesh%zbar_3d_n(k, iceberg_node)       ! upper level
-
-                if( k==nlevels_nod2D(iceberg_node) ) then       ! if lower most level is reached ...
-                    lev_low = mesh%zbar_n_bot(iceberg_node)     ! ... lower level is equal to bottom topography
-                else
-                    lev_low = mesh%zbar_3d_n(k+1, iceberg_node) ! ... otherwise, lower level is one level below upper one
-                end if
-
-                if( abs(lev_low)==abs(lev_up) ) then            ! if upper level is equal to lower level - when should this happen?
-                    idx_d(i) = idx_d(i) - 1                     ! level index is set back by one and exit loop
-                    exit
-                else if( abs(lev_low)>=abs(depth_ib) ) then     ! if lower level is below iceberg ...
-                                                                ! ... i.e. end of iceberg is reached, exit loop
-                    exit
-                else
-                    cycle
-                end if
+                ! Loop over the 3 nodes of this element
+                do jj = 1, 3
+                    iceberg_node = elem2D_nodes(jj, current_elem)
+                    
+                    ! Skip halo nodes (not owned by this PE)
+                    if (iceberg_node > myDim_nod2D) cycle
+                    
+                    ! Check if this node is already in the list (avoid duplicates)
+                    node_already_in_list = .false.
+                    do i = 1, num_footprint_nodes
+                        if (footprint_nodes(i) == iceberg_node) then
+                            node_already_in_list = .true.
+                            exit
+                        end if
+                    end do
+                    
+                    ! Add node if not already in list
+                    if (.not. node_already_in_list .and. num_footprint_nodes < max_footprint_nodes) then
+                        num_footprint_nodes = num_footprint_nodes + 1
+                        footprint_nodes(num_footprint_nodes) = iceberg_node
+                        
+                        ! Calculate depth index for this node (same logic as single-element case)
+                        do k = 1, nlevels_nod2D(iceberg_node)
+                            footprint_idx_d(num_footprint_nodes) = k
+                            lev_up = mesh%zbar_3d_n(k, iceberg_node)
+                            
+                            if (k == nlevels_nod2D(iceberg_node)) then
+                                lev_low = mesh%zbar_n_bot(iceberg_node)
+                            else
+                                lev_low = mesh%zbar_3d_n(k+1, iceberg_node)
+                            end if
+                            
+                            if (abs(lev_low) == abs(lev_up)) then
+                                footprint_idx_d(num_footprint_nodes) = footprint_idx_d(num_footprint_nodes) - 1
+                                exit
+                            else if (abs(lev_low) >= abs(depth_ib)) then
+                                exit
+                            end if
+                        end do
+                        
+                        ! Accumulate nodal area
+                        tot_area_nods_in_ib_elem = tot_area_nods_in_ib_elem + mesh%area(:, iceberg_node)
+                    end if
+                end do
             end do
-            ! at the end of the loop, idx_n holds the index of the level ...
-            ! ... directly below the iceberg or at iceberg base
-            ! -------------------------------------------------------------------
-
-            if (iceberg_node<=mydim_nod2d) then                                 ! if iceberg node on PE ...
-                ib_nods_in_ib_elem(i)           = iceberg_node                  ! ... add to list ib_nods_in_ib_elem
-                num_ib_nods_in_ib_elem          = num_ib_nods_in_ib_elem + 1    ! ... increase num_ib_nods_in_ib_elem by one
-                tot_area_nods_in_ib_elem        = tot_area_nods_in_ib_elem + mesh%area(:,iceberg_node)  ! increase tot_area_nods_in_ib_elem
-            else
-                ib_nods_in_ib_elem(i)           = 0                             ! ... otherwise, add zero to list ib_nods_in_ib_elem
-            end if
-        end do
-        ! at the then of the loop, ib_nods_in_ib_elem holds the nodes of the iceberg elemen - why so complicated?
-        ! ... num_ib_nods_in_ib_elem holds the number of nodes assigned to PE
-        ! ... tot_area_nods_in_ib_elem holds the total area of the (up to three) nodes assigned to iceberg_elem
-        ! -------------------------------------------------------------------
-
-        ! loop over (up to three) nodes of iceberg_elem
-        do i=1, 3
-            iceberg_node=ib_nods_in_ib_elem(i)
-
-            ! check if iceberg_nod is in cavity, cycle of .true.
-            if ((ulevels_nod2d(iceberg_node) == 0 ) .or. (use_cavity .and. ulevels_nod2d(iceberg_node) > 1)) cycle
-
-            ! if iceberg_node in PE, convert freshwater flux to flux density by dividing with tot_area_nods_in_ib_elem ...
-            ! ... of upper most level. The total iceberg flux is distributed among up to three nodes and only applied to the ...
-            ! ... surface layer.
-            if (iceberg_node>0) then
+            
+            ! Now distribute fluxes to all unique footprint nodes
+            do i = 1, num_footprint_nodes
+                iceberg_node = footprint_nodes(i)
+                
+                ! Skip cavity nodes
+                if ((ulevels_nod2d(iceberg_node) == 0) .or. &
+                    (use_cavity .and. ulevels_nod2d(iceberg_node) > 1)) cycle
+                
+                ! Apply freshwater fluxes (surface layer)
                 ibfwbv(iceberg_node) = ibfwbv(iceberg_node) - fwbv_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
                 ibfwb(iceberg_node) = ibfwb(iceberg_node) - fwb_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
                 ibfwl(iceberg_node) = ibfwl(iceberg_node) - fwl_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
                 ibfwe(iceberg_node) = ibfwe(iceberg_node) - fwe_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
-
-                ! loop from surface to level below or at iceberg base
-                do j=1,idx_d(i)
-                    lev_up  = mesh%zbar_3d_n(j, iceberg_node)           ! upper level
-                    if( j==nlevels_nod2D(iceberg_node) ) then           ! if bottom level is reached ...
-                        lev_low = mesh%zbar_n_bot(iceberg_node)         ! ... lower level is set to bottom topography
+                
+                ! Apply lateral heat fluxes from surface to iceberg base
+                do j = 1, footprint_idx_d(i)
+                    lev_up = mesh%zbar_3d_n(j, iceberg_node)
+                    if (j == nlevels_nod2D(iceberg_node)) then
+                        lev_low = mesh%zbar_n_bot(iceberg_node)
                     else
-                        lev_low = mesh%zbar_3d_n(j+1, iceberg_node)     ! ... otherwise, lower level is one level below upper one
+                        lev_low = mesh%zbar_3d_n(j+1, iceberg_node)
                     end if
-                    dz = abs( lev_low - lev_up )                        ! distance between lower and upper level
+                    dz = abs(lev_low - lev_up)
                     
-                    ! check if lower level is below iceberg base and upper level is above iceberg base ...
-                    if( (abs(lev_low)>=abs(depth_ib)) .and. (abs(lev_up)<abs(depth_ib)) ) then 
-                        dz = abs(abs(lev_up) - abs(depth_ib))           ! ... if so, distance dz is calculated as difference ...
-                                                                        ! ... between upper level and iceberg base
-                    end if              
-                  
-                    ! check if iceberg is not yet melted away ...
-                    if( abs(depth_ib) > 0.0 ) then
-
-                        ! ... if so, heat flxues due to iceberg melting applied to layer interface (level) j ...
-                        ! ... is calculated nby weighting the lateral heat fluxes (hfl & hfbv) with the ratio dz/depth_ib ...
-                        ! ... and divided by the tot_area_nods_in_ib_elem of level j.
-                        ibhf_n(j,iceberg_node) = ibhf_n(j,iceberg_node) & 
-                                                    - ((hfbv_flux_ib(ib,j)+hfl_flux_ib(ib,j)) * (dz / abs(depth_ib))) & 
-                                                    / tot_area_nods_in_ib_elem(j)
+                    if ((abs(lev_low) >= abs(depth_ib)) .and. (abs(lev_up) < abs(depth_ib))) then
+                        dz = abs(abs(lev_up) - abs(depth_ib))
+                    end if
+                    
+                    if (abs(depth_ib) > 0.0) then
+                        ibhf_n(j, iceberg_node) = ibhf_n(j, iceberg_node) &
+                            - ((hfbv_flux_ib(ib, j) + hfl_flux_ib(ib, j)) * (dz / abs(depth_ib))) &
+                            / tot_area_nods_in_ib_elem(j)
                     end if
                 end do
                 
-                ! if idx_d is not only upper most level ...
-                if( idx_d(i) > 1 ) then
-
-                    ! ... assign 50% of basal heat flux to level idx_d, i.e. the level below iceberg base ...
-                    ibhf_n(idx_d(i),iceberg_node) = ibhf_n(idx_d(i),iceberg_node) - 0.5 * hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i))
-                    ! ... and 50% to idx_d-1, i.e. the level above iceberg base
-                    ibhf_n(idx_d(i)-1,iceberg_node) = ibhf_n(idx_d(i)-1,iceberg_node) - 0.5 * hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i)-1)
+                ! Apply basal heat flux
+                if (footprint_idx_d(i) > 1) then
+                    ibhf_n(footprint_idx_d(i), iceberg_node) = ibhf_n(footprint_idx_d(i), iceberg_node) &
+                        - 0.5 * hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(footprint_idx_d(i))
+                    ibhf_n(footprint_idx_d(i)-1, iceberg_node) = ibhf_n(footprint_idx_d(i)-1, iceberg_node) &
+                        - 0.5 * hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(footprint_idx_d(i)-1)
                 else
-                    
-                    ! ... otherwise (should not happen), assign 100% of basal heat flux to level idx_n, i.e. the surface level
-                    ibhf_n(idx_d(i),iceberg_node) = ibhf_n(idx_d(i),iceberg_node) - hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i))
+                    ibhf_n(footprint_idx_d(i), iceberg_node) = ibhf_n(footprint_idx_d(i), iceberg_node) &
+                        - hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(footprint_idx_d(i))
                 end if
-               
-                ! if iceberg not yet melted away ...
-                if( height_ib_single .ne. 0.0 ) then
-                    
-                    ! ... assign heat flux due to wave erosion to surface level
-                    ibhf_n(1,iceberg_node) = ibhf_n(1,iceberg_node) - hfe_flux_ib(ib) & 
-                            / tot_area_nods_in_ib_elem(1)
+                
+                ! Apply wave erosion heat flux (surface)
+                if (height_ib_single .ne. 0.0) then
+                    ibhf_n(1, iceberg_node) = ibhf_n(1, iceberg_node) &
+                        - hfe_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
                 end if
-            end if
-        end do
+            end do
+            
+        else
+            ! ---------------------------------------------------------------
+            ! SINGLE-ELEMENT CASE: Original logic - only 3 nodes of host element
+            ! ---------------------------------------------------------------
+            
+            ! loop over all three nodes of element
+            do i=1,3
+                
+                ! assign node to iceberg_node
+                iceberg_node=elem2d_nodes(i,localelement)
+
+                ! loop over all levels of iceberg_node
+                do k=1, nlevels_nod2D(iceberg_node)
+                    
+                    idx_d(i) = k                                    ! idx_d holds current level index until ...
+                                                                    ! ... end of iceberg or bottom topography is reached
+                    lev_up  = mesh%zbar_3d_n(k, iceberg_node)       ! upper level
+
+                    if( k==nlevels_nod2D(iceberg_node) ) then       ! if lower most level is reached ...
+                        lev_low = mesh%zbar_n_bot(iceberg_node)     ! ... lower level is equal to bottom topography
+                    else
+                        lev_low = mesh%zbar_3d_n(k+1, iceberg_node) ! ... otherwise, lower level is one level below upper one
+                    end if
+
+                    if( abs(lev_low)==abs(lev_up) ) then            ! if upper level is equal to lower level - when should this happen?
+                        idx_d(i) = idx_d(i) - 1                     ! level index is set back by one and exit loop
+                        exit
+                    else if( abs(lev_low)>=abs(depth_ib) ) then     ! if lower level is below iceberg ...
+                                                                    ! ... i.e. end of iceberg is reached, exit loop
+                        exit
+                    else
+                        cycle
+                    end if
+                end do
+                ! at the end of the loop, idx_d holds the index of the level ...
+                ! ... directly below the iceberg or at iceberg base
+                ! -------------------------------------------------------------------
+
+                if (iceberg_node<=mydim_nod2d) then                                 ! if iceberg node on PE ...
+                    ib_nods_in_ib_elem(i)           = iceberg_node                  ! ... add to list ib_nods_in_ib_elem
+                    num_ib_nods_in_ib_elem          = num_ib_nods_in_ib_elem + 1    ! ... increase num_ib_nods_in_ib_elem by one
+                    tot_area_nods_in_ib_elem        = tot_area_nods_in_ib_elem + mesh%area(:,iceberg_node)  ! increase tot_area_nods_in_ib_elem
+                else
+                    ib_nods_in_ib_elem(i)           = 0                             ! ... otherwise, add zero to list ib_nods_in_ib_elem
+                end if
+            end do
+            ! at the end of the loop, ib_nods_in_ib_elem holds the nodes of the iceberg element
+            ! ... num_ib_nods_in_ib_elem holds the number of nodes assigned to PE
+            ! ... tot_area_nods_in_ib_elem holds the total area of the (up to three) nodes assigned to iceberg_elem
+            ! -------------------------------------------------------------------
+
+            ! loop over (up to three) nodes of iceberg_elem
+            do i=1, 3
+                iceberg_node=ib_nods_in_ib_elem(i)
+
+                ! check if iceberg_nod is in cavity, cycle of .true.
+                if ((ulevels_nod2d(iceberg_node) == 0 ) .or. (use_cavity .and. ulevels_nod2d(iceberg_node) > 1)) cycle
+
+                ! if iceberg_node in PE, convert freshwater flux to flux density by dividing with tot_area_nods_in_ib_elem ...
+                ! ... of upper most level. The total iceberg flux is distributed among up to three nodes and only applied to the ...
+                ! ... surface layer.
+                if (iceberg_node>0) then
+                    ibfwbv(iceberg_node) = ibfwbv(iceberg_node) - fwbv_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
+                    ibfwb(iceberg_node) = ibfwb(iceberg_node) - fwb_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
+                    ibfwl(iceberg_node) = ibfwl(iceberg_node) - fwl_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
+                    ibfwe(iceberg_node) = ibfwe(iceberg_node) - fwe_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
+
+                    ! loop from surface to level below or at iceberg base
+                    do j=1,idx_d(i)
+                        lev_up  = mesh%zbar_3d_n(j, iceberg_node)           ! upper level
+                        if( j==nlevels_nod2D(iceberg_node) ) then           ! if bottom level is reached ...
+                            lev_low = mesh%zbar_n_bot(iceberg_node)         ! ... lower level is set to bottom topography
+                        else
+                            lev_low = mesh%zbar_3d_n(j+1, iceberg_node)     ! ... otherwise, lower level is one level below upper one
+                        end if
+                        dz = abs( lev_low - lev_up )                        ! distance between lower and upper level
+                        
+                        ! check if lower level is below iceberg base and upper level is above iceberg base ...
+                        if( (abs(lev_low)>=abs(depth_ib)) .and. (abs(lev_up)<abs(depth_ib)) ) then 
+                            dz = abs(abs(lev_up) - abs(depth_ib))           ! ... if so, distance dz is calculated as difference ...
+                                                                            ! ... between upper level and iceberg base
+                        end if              
+                      
+                        ! check if iceberg is not yet melted away ...
+                        if( abs(depth_ib) > 0.0 ) then
+
+                            ! ... if so, heat flxues due to iceberg melting applied to layer interface (level) j ...
+                            ! ... is calculated nby weighting the lateral heat fluxes (hfl & hfbv) with the ratio dz/depth_ib ...
+                            ! ... and divided by the tot_area_nods_in_ib_elem of level j.
+                            ibhf_n(j,iceberg_node) = ibhf_n(j,iceberg_node) & 
+                                                        - ((hfbv_flux_ib(ib,j)+hfl_flux_ib(ib,j)) * (dz / abs(depth_ib))) & 
+                                                        / tot_area_nods_in_ib_elem(j)
+                        end if
+                    end do
+                    
+                    ! if idx_d is not only upper most level ...
+                    if( idx_d(i) > 1 ) then
+
+                        ! ... assign 50% of basal heat flux to level idx_d, i.e. the level below iceberg base ...
+                        ibhf_n(idx_d(i),iceberg_node) = ibhf_n(idx_d(i),iceberg_node) - 0.5 * hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i))
+                        ! ... and 50% to idx_d-1, i.e. the level above iceberg base
+                        ibhf_n(idx_d(i)-1,iceberg_node) = ibhf_n(idx_d(i)-1,iceberg_node) - 0.5 * hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i)-1)
+                    else
+                        
+                        ! ... otherwise (should not happen), assign 100% of basal heat flux to level idx_n, i.e. the surface level
+                        ibhf_n(idx_d(i),iceberg_node) = ibhf_n(idx_d(i),iceberg_node) - hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i))
+                    end if
+                   
+                    ! if iceberg not yet melted away ...
+                    if( height_ib_single .ne. 0.0 ) then
+                        
+                        ! ... assign heat flux due to wave erosion to surface level
+                        ibhf_n(1,iceberg_node) = ibhf_n(1,iceberg_node) - hfe_flux_ib(ib) & 
+                                / tot_area_nods_in_ib_elem(1)
+                    end if
+                end if
+            end do
+        end if
     end if
 end subroutine prepare_icb2fesom
 
