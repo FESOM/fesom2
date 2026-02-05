@@ -16,14 +16,16 @@ module g_cvmix_idemix2
     
     !___________________________________________________________________________
     ! module calls from cvmix library
-    use cvmix_idemix2, only : cvmix_init_idemix2, &
-                              cvmix_compute_groupvel_idemix2 !calc_idemix2_v0, cvmix_coeffs_idemix2                 
+    use cvmix_idemix2, only : cvmix_init_idemix2                    , &
+                              cvmix_compute_groupvel_idemix2        , & 
+                              cvmix_compute_interact_tscale_idemix2
+                                             
     use cvmix_put_get, only : cvmix_put
     use cvmix_kinds_and_types 
     
     !___________________________________________________________________________
     ! module calls from FESOM
-    use g_config , only: dt
+    use g_config , only: dt, flag_debug
     use o_param           
     use mod_mesh
     USE MOD_PARTIT
@@ -31,6 +33,7 @@ module g_cvmix_idemix2
     use o_arrays
     use g_comm_auto 
     use g_read_other_NetCDF
+    use g_dist2coast, only: compute_dist2coast
     implicit none
     public
     
@@ -117,13 +120,18 @@ module g_cvmix_idemix2
     character(MAX_PATH):: idemix2_hlamforc_file = './idemix2_forcing_t-scattering_1deg.nc'
     character(MAX_PATH):: idemix2_hlamforc_vname= 'LAMBDA_G10'
     
+    ! define shelf is defined as distance from coast (default 300km)
+    real(kind=WP)      :: idemix2_shelf_dist = 300.0e3 
+    
     namelist /param_idemix2/ idemix2_tau_v, idemix2_tau_h, idemix2_gamma, idemix2_jstar, idemix2_mu0, &
                              idemix2_enable_M2, idemix2_enable_niw, idemix2_fniw_usage, &
                              idemix2_enable_superbee_adv, idemix2_enable_AB_timestep, idemix2_nfbin, &
                              idemix2_enable_hor_diffusion, idemix2_hor_diffusion_niter, &
-                             idemix2_M2forc_file, idemix2_M2forc_vname, &
-                             idemix2_niwforc_file, idemix2_niwforc_file, &
-                             idemix2_botforc_file, idemix2_botforc_vname, idemix2_botforc_Etot, &
+                             idemix2_shelf_dist, &
+                             idemix2_botforc_Etot, &
+                             idemix2_M2forc_file  , idemix2_M2forc_vname  , &
+                             idemix2_niwforc_file , idemix2_niwforc_vname , &
+                             idemix2_botforc_file , idemix2_botforc_vname , &
                              idemix2_hrmsforc_file, idemix2_hrmsforc_vname, &
                              idemix2_hlamforc_file, idemix2_hlamforc_vname
     
@@ -148,8 +156,9 @@ module g_cvmix_idemix2
     real(kind=WP), allocatable, dimension(:,:) :: iwe2_c0, iwe2_v0
     
     real(kind=WP), allocatable, dimension(:,:) :: iwe2_alpha_c, iwe2_alpha_c_n
+    real(kind=WP), allocatable, dimension(:)   :: iwe2_alpha_M2_c
     
-    real(kind=WP), allocatable, dimension(:)   :: iwe2_topo_hrms, iwe2_topo_hlam
+    real(kind=WP), allocatable, dimension(:)   :: iwe2_topo_hrms, iwe2_topo_hlam, iwe2_topo_dist, iwe2_topo_shelf
     real(kind=WP), allocatable, dimension(:)   :: iwe2_M2_tau, iwe2_niw_tau
     
     real(kind=WP), allocatable, dimension(:)   :: iwe2_fbot, iwe2_fsrf
@@ -185,6 +194,7 @@ module g_cvmix_idemix2
         logical                     :: file_exist=.False.
         integer                     :: node_size, elem_size, elem, nfbin, fbin_i, elnodes(3)
         real(kind=WP)               :: loc_Etot=0.0_WP, glb_Etot=0.0_WP
+        real(kind=WP)               :: t0, t1
 #include "../associate_part_def.h"
 #include "../associate_mesh_def.h"
 #include "../associate_part_ass.h"
@@ -192,7 +202,7 @@ module g_cvmix_idemix2
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
-            write(*,*) ' --> initialise IDEMIX'
+            write(*,*) ' --> initialise IDEMIX2'
             write(*,*)
         end if
             
@@ -207,10 +217,10 @@ module g_cvmix_idemix2
         aux(:)              = 0.0_WP
         
         ! lat gradient in coriolis (is only computed @init)
-        allocate(iwe2_grady_coriol(elem_size))
+        allocate(iwe2_grady_coriol(myDim_elem2D))
         iwe2_grady_coriol(:)= 0.0_WP
         
-        allocate(iwe2_omega_niw(elem_size))
+        allocate(iwe2_omega_niw(myDim_elem2D))
         iwe2_omega_niw(:)   = 0.0_WP
         
         ! allocate 1d Spectral space coordinates
@@ -258,7 +268,7 @@ module g_cvmix_idemix2
         iwe2_niw_v(:,:)     = 0.0_WP
         iwe2_niw_w(:,:)     = 0.0_WP
         
-        ! Vertical group velocity c0, Horizontal group velocity v0
+        ! Vertical group velocity c0, Horizontal gfxaroup velocity v0
         allocate(iwe2_c0(nl,elem_size), iwe2_v0(nl,elem_size))
         iwe2_c0(:,:)        = 0.0_WP
         iwe2_v0(:,:)        = 0.0_WP
@@ -271,42 +281,45 @@ module g_cvmix_idemix2
         iwe2_cn(:)          = 0.0_WP
         
         ! Dissipation coefficient
-        allocate(iwe2_alpha_c(nl,elem_size), iwe2_alpha_c_n(nl,node_size))
+        allocate(iwe2_alpha_c(nl,elem_size), iwe2_alpha_c_n(nl,node_size), iwe2_alpha_M2_c(elem_size))
         iwe2_alpha_c(:,:)   = 0.0_WP
+        iwe2_alpha_M2_c(:)  = 0.0_WP
         iwe2_alpha_c_n(:,:) = 0.0_WP
         
-        ! Topographic height and Topographic wavelength
-        allocate(iwe2_topo_hrms(elem_size),iwe2_topo_hlam(elem_size))
-        iwe2_topo_hrms(:)   = 0.0_WP
-        iwe2_topo_hlam(:)   = 0.0_WP
-        
-        ! M2 and NIW dissipation timescale
-        allocate(iwe2_M2_tau(elem_size),iwe2_niw_tau(elem_size))
-        iwe2_M2_tau(:)      = 0.0_WP
-        iwe2_niw_tau(:)     = 0.0_WP
-        
         ! forcing fields, M2 tidal forcing (spectral) and NIW forcing (spectral)
-        allocate(iwe2_fbot(elem_size), iwe2_fsrf(elem_size))
-        allocate(iwe2_fM2(nfbin, elem_size), iwe2_fniw(nfbin, elem_size))
+        allocate(iwe2_fbot(myDim_elem2D), iwe2_fsrf(myDim_elem2D))
+        allocate(iwe2_fM2(nfbin, myDim_elem2D), iwe2_fniw(nfbin, myDim_elem2D))
         iwe2_fbot(:)        = 0.0_WP
         iwe2_fsrf(:)        = 0.0_WP
         iwe2_fM2(:,:)       = 0.0_WP
         iwe2_fniw(:,:)      = 0.0_WP
         
-        ! diagnostic 
-        allocate(iwe2_Ttot(nl,elem_size))
-        allocate(iwe2_Tdif(nl,elem_size))
-        allocate(iwe2_Thdi(nl,elem_size))
-        allocate(iwe2_Tdis(nl,elem_size), iwe2_Tdis_n(nl,node_size))
-        allocate(iwe2_Tsur(nl,elem_size))
-        allocate(iwe2_Tbot(nl,elem_size))
-        iwe2_Ttot(:,:)      = 0.0_WP
-        iwe2_Tdif(:,:)      = 0.0_WP
-        iwe2_Thdi(:,:)      = 0.0_WP
-        iwe2_Tdis(:,:)      = 0.0_WP
-        iwe2_Tsur(:,:)      = 0.0_WP
-        iwe2_Tbot(:,:)      = 0.0_WP
-        iwe2_Tdis_n(:,:)    = 0.0_WP
+        ! Topographic height and Topographic wavelength
+        allocate(iwe2_topo_hrms(myDim_elem2D), iwe2_topo_hlam(myDim_elem2D), iwe2_topo_shelf(myDim_elem2D), iwe2_topo_dist(myDim_elem2D))
+        iwe2_topo_hrms(:)   = 0.0_WP
+        iwe2_topo_hlam(:)   = 0.0_WP
+        iwe2_topo_shelf(:)  = 0.0_WP
+        iwe2_topo_dist(:)   = 0.0_WP
+        
+        ! M2 and NIW dissipation timescale
+        allocate(iwe2_M2_tau(myDim_elem2D),iwe2_niw_tau(myDim_elem2D))
+        iwe2_M2_tau(:)      = 0.0_WP
+        iwe2_niw_tau(:)     = 0.0_WP
+        
+!         ! diagnostic 
+!         allocate(iwe2_Ttot(nl,elem_size))
+!         allocate(iwe2_Tdif(nl,elem_size))
+!         allocate(iwe2_Thdi(nl,elem_size))
+!         allocate(iwe2_Tdis(nl,elem_size), iwe2_Tdis_n(nl,node_size))
+!         allocate(iwe2_Tsur(nl,elem_size))
+!         allocate(iwe2_Tbot(nl,elem_size))
+!         iwe2_Ttot(:,:)      = 0.0_WP
+!         iwe2_Tdif(:,:)      = 0.0_WP
+!         iwe2_Thdi(:,:)      = 0.0_WP
+!         iwe2_Tdis(:,:)      = 0.0_WP
+!         iwe2_Tsur(:,:)      = 0.0_WP
+!         iwe2_Tbot(:,:)      = 0.0_WP
+!         iwe2_Tdis_n(:,:)    = 0.0_WP
         
 !         allocate(cvmix_dummy_1(nl,elem_size))
 !         allocate(cvmix_dummy_2(nl,elem_size))
@@ -349,31 +362,46 @@ module g_cvmix_idemix2
         
         !_______________________________________________________________________
         if (mype==0) then
-            write(*,*) "     idemix2_tau_v        = ", idemix2_tau_v
-            write(*,*) "     idemix2_tau_h        = ", idemix2_tau_h
-            write(*,*) "     idemix2_gamma        = ", idemix2_gamma
-            write(*,*) "     idemix2_jstar        = ", idemix2_jstar
-            write(*,*) "     idemix2_mu0          = ", idemix2_mu0
-            write(*,*) "     idemix2_enable_M2    = ", idemix2_enable_M2
-            write(*,*) "     idemix2_enable_niw   = ", idemix2_enable_niw 
-            write(*,*) "     idemix2_fniw_usage   = ", idemix2_fniw_usage 
-            write(*,*) "     idemix2_superbee_adv = ", idemix2_enable_superbee_adv
-            write(*,*) "     idemix2_AB_timestep  = ", idemix2_enable_AB_timestep
-            write(*,*) "     idemix2_nfbin        = ", idemix2_nfbin
-            write(*,*) "     idemix2_M2forc_file  = ", trim(idemix2_M2forc_file)
-            write(*,*) "     idemix2_niwforc_file = ", trim(idemix2_niwforc_file)
-            write(*,*) "     idemix2_botforc_file = ", trim(idemix2_botforc_file)
-            write(*,*) "     idemix2_botforc_Etot = ", idemix2_botforc_Etot
-            
-            write(*,*) "     idemix2_hrmsforc_file= ", trim(idemix2_hrmsforc_file)
-            write(*,*) "     idemix2_hlamforc_file= ", trim(idemix2_hlamforc_file)
+            write(*,*) "     IDEMIX2 parameters:"
+            write(*,*) "     ├> idemix2_tau_v              = ", idemix2_tau_v
+            write(*,*) "     ├> idemix2_tau_h              = ", idemix2_tau_h
+            write(*,*) "     ├> idemix2_gamma              = ", idemix2_gamma
+            write(*,*) "     ├> idemix2_jstar              = ", idemix2_jstar
+            write(*,*) "     ├> idemix2_mu0                = ", idemix2_mu0
+            write(*,*) "     │                               "
+            write(*,*) "     ├> idemix2_superbee_adv       = ", idemix2_enable_superbee_adv
+            write(*,*) "     ├> idemix2_AB_timestep        = ", idemix2_enable_AB_timestep
+            write(*,*) "     ├> idemix2_nfbin              = ", idemix2_nfbin
+            write(*,*) "     │                               "
+            write(*,*) "     ├> idemix2_enable_M2          = ", idemix2_enable_M2
+            write(*,*) "     │  └> idemix2_M2forc_file     = ", trim(idemix2_M2forc_file)
+            write(*,*) "     │     └> idemix2_M2forc_vname = ", trim(idemix2_M2forc_vname)
+            write(*,*) "     │                               "
+            write(*,*) "     ├> idemix2_enable_niw         = ", idemix2_enable_niw 
+            write(*,*) "     │  ├> idemix2_fniw_usage      = ", idemix2_fniw_usage 
+            write(*,*) "     │  └> idemix2_niwforc_file    = ", trim(idemix2_niwforc_file)
+            write(*,*) "     │     └> idemix2_niwforc_vname= ", trim(idemix2_niwforc_vname)
+            write(*,*) "     │                               "
+            write(*,*) "     ├> idemix2_botforc_file       = ", trim(idemix2_botforc_file)
+            write(*,*) "     │  ├> idemix2_botforc_vname   = ", trim(idemix2_botforc_vname)
+            write(*,*) "     │  └> idemix2_botforc_Etot    = ", idemix2_botforc_Etot
+            write(*,*) "     │                               "
+            write(*,*) "     ├> idemix2_hrmsforc_file      = ", trim(idemix2_hrmsforc_file)
+            write(*,*) "     │  └> idemix2_hrmsforc_vname  = ", trim(idemix2_hrmsforc_vname)
+            write(*,*) "     │                               "
+            write(*,*) "     ├> idemix2_hlamforc_file      = ", trim(idemix2_hlamforc_file)
+            write(*,*) "     │  └> idemix2_hlamforc_vname  = ", trim(idemix2_hlamforc_vname)
+            write(*,*) "     │                               "
+            WRITE(*,*) "     └> idemix2_shelf_dist         = ", idemix2_shelf_dist
             write(*,*)
+            write(*,*) "     IDEMIX2 inputs:"
         end if
         
         
         !_______________________________________________________________________
         ! read idemix M2 forcing from cfsr data --> file 
         if (idemix2_enable_M2) then
+            t0=MPI_Wtime()
             ! omega_M2 is fixed, as the M2 tidal forcing is independent of the local inertial frequency.
             ! Physical Implication: At high latitudes where |f| > ω_M2, the M2 tide becomes evanescent 
             ! (cannot propagate as internal waves). This is handled in the code by checking ω_M2 > |f| 
@@ -383,54 +411,68 @@ module g_cvmix_idemix2
             file_exist=.False.
             inquire(file=trim(idemix2_M2forc_file),exist=file_exist) 
             if (file_exist) then
-                if (mype==0) write(*,*) ' --> read IDEMIX M2 wave forcing'
+                if (mype==0) write(*,*) '     ├> read IDEMIX2 M2 wave forcing'
                 do fbin_i =2, nfbin-1
-                    call read_other_NetCDF(idemix2_M2forc_file, idemix2_M2forc_vname, fbin_i, aux, .true., .false., partit, mesh)
-                    !                                                                                       |           
-                    !                      .false.=interpolate on element centroids instead of vertices <---+   
+                    call read_other_NetCDF(trim(idemix2_M2forc_file), trim(idemix2_M2forc_vname), fbin_i, aux, .true., .false., partit, mesh)
+                    !                                                                                                     |           
+                    !                                    .false.=interpolate on element centroids instead of vertices <---+   
                     iwe2_fM2(fbin_i, :) = aux/density_0/iwe2_dphit
-                end do    
+                end do  
+                deallocate(aux)
             else
                 if (mype==0) then
+                    print *, achar(27)//'[33m'
                     write(*,*) '____________________________________________________________________'
                     write(*,*) ' ERROR: IDEMIX2 M2 forcing file not found! Cant apply IDEMIX2'
                     write(*,*) '        vertical mixing parameterisation! '
-                    write(*,*) '        --> check your namelist.cvmix, idemix2_M2forc_file &  '
+                    write(*,*) '        ├> file: ', trim(idemix2_M2forc_file)
+                    write(*,*) '        └> check: namelist.cvmix, idemix2_M2forc_file &  '
                     write(*,*) '____________________________________________________________________'
+                    print *, achar(27)//'[0m'
+                    write(*,*)
+                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
                 end if
-                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
             end if 
+            t1=MPI_Wtime()
+            if (mype==0) write(*,*) '     |  └> elapsed time:', t1-t0
         end if ! --> if (idemix2_enable_M2) then
         
         
         !_______________________________________________________________________
         ! read idemix niw oe srf forcing from cfsr data --> file 
+        t0=MPI_Wtime()
         file_exist=.False.
         inquire(file=trim(idemix2_niwforc_file),exist=file_exist) 
         if (file_exist) then
-            if (mype==0) write(*,*) ' --> read IDEMIX niw/surface wave forcing'
-            call read_other_NetCDF(idemix2_niwforc_file, idemix2_niwforc_vname, 1, iwe2_fsrf, .true., .false., partit, mesh)
+            
+            call read_other_NetCDF(trim(idemix2_niwforc_file), trim(idemix2_niwforc_vname), 1, iwe2_fsrf, .true., .false., partit, mesh)
             ! only 20% (idemix2_fniw_usage) from the surface forcing goes into internal waves
             ! iwe2_fsrf becomes surface forcing variable when idemix2_enable_niw=.false.
             ! in this case standard idemix1 behaviour 
             iwe2_fsrf = iwe2_fsrf/density_0*idemix2_fniw_usage
             if (idemix2_enable_niw) then
+                if (mype==0) write(*,*) '     ├> read IDEMIX2 niw wave forcing'
                 do fbin_i =2, nfbin-1
                     iwe2_fniw(fbin_i, :) = iwe2_fsrf/iwe2_dphit !!!ATTENTION CHECK THIS AGAIN!!!
                 end do 
-            else
                 iwe2_fsrf(:) = 0.0_WP
+            else
+                if (mype==0) write(*,*) '     ├> read IDEMIX2 surface wave forcing'
             end if
             
         else
             if (mype==0) then
+                print *, achar(27)//'[33m'
                 write(*,*) '____________________________________________________________________'
                 write(*,*) ' ERROR: IDEMIX2 NIW forcing file not found! Cant apply IDEMIX2'
                 write(*,*) '        vertical mixing parameterisation! '
-                write(*,*) '        --> check your namelist.cvmix, idemix2_niwforc_file &  '
+                write(*,*) '        ├> file: ', trim(idemix2_niwforc_file)
+                write(*,*) '        └> check: namelist.cvmix, idemix2_niwforc_file &  '
                 write(*,*) '____________________________________________________________________'
+                print *, achar(27)//'[0m'
+                write(*,*)
+                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
             end if
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
         end if 
         
         ! NIWs are super-inertial (ω_niw > |f|), which is essential for their propagation as internal waves.
@@ -439,19 +481,23 @@ module g_cvmix_idemix2
         ! from background flows. Physical Context: NIWs are generated by wind events and have frequencies 
         ! close to f. They can only propagate as internal waves if ω > |f|.
         if (idemix2_enable_niw) then
-            do elem = 1, elem_size
+            do elem = 1, myDim_elem2D
                 iwe2_omega_niw(elem) = max(1d-8, abs( 1.05 * mesh%coriolis(elem) ) )
             end do
+            call exchange_elem(iwe2_omega_niw, partit)
         end if 
+        t1=MPI_Wtime()
+        if (mype==0) write(*,*) '     |  └> elapsed time:', t1-t0
         
         !_______________________________________________________________________
         ! read idemix bottom near tidal forcing from cesm data set --> file 
         ! from N. Brüggemann interpoalted to regular grid
+        t0=MPI_Wtime()
         file_exist=.False.
         inquire(file=trim(idemix2_botforc_file),exist=file_exist) 
         if (file_exist) then
-            if (mype==0) write(*,*) ' --> read IDEMIX near tidal bottom forcing'
-            call read_other_NetCDF(idemix2_botforc_file, idemix2_botforc_vname, 1, iwe2_fbot, .true., .false., partit, mesh)
+            if (mype==0) write(*,*) '     ├> read IDEMIX2 near tidal bottom forcing'
+            call read_other_NetCDF(trim(idemix2_botforc_file), trim(idemix2_botforc_vname), 1, iwe2_fbot, .true., .false., partit, mesh)
             !                                                                                                  |           
             !                                 .false.=interpolate on element centroids instead of vertices <---+   
             
@@ -468,7 +514,7 @@ module g_cvmix_idemix2
                 end if     
             end do
             call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-            if (mype==0) write(*,*) " --> IDEMIX2 total tidal energy Etot_bot =", glb_Etot*1.0e-12, ' TW'
+            if (mype==0) write(*,*) "     │  └> IDEMIX2 total tidal energy Etot_bot =", glb_Etot*1.0e-12, ' TW'
             
             ! normalize total tidal energy at bottom with respect to the total 
             ! tidal energy that is e.g in the original forcing files to accomodate 
@@ -487,7 +533,7 @@ module g_cvmix_idemix2
                     end if     
                 end do
                 call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-                if (mype==0) write(*,*) " --> IDEMIX2 Etot_bot after normalizing =", glb_Etot*1.0e-12, ' TW'
+                if (mype==0) write(*,*) "     │  └> IDEMIX2 Etot_bot after normalizing =", glb_Etot*1.0e-12, ' TW'
             end if 
             
             ! divide by density_0 --> convert from W/m^2 to m^3/s^3
@@ -495,36 +541,46 @@ module g_cvmix_idemix2
             
         else
             if (mype==0) then
+                print *, achar(27)//'[33m'
                 write(*,*) '____________________________________________________________________'
-                write(*,*) ' ERROR: IDEMIX bottom forcing file not found! Cant apply IDEMIX'
+                write(*,*) ' ERROR: IDEMIX2 bottom forcing file not found! Cant apply IDEMIX'
                 write(*,*) '        vertical mixing parameterisation! '
-                write(*,*) '        --> check your namelist.cvmix, idemix_surforc_file &  '
-                write(*,*) '            idemix_botforc_file'
+                write(*,*) '        ├> file: ', trim(idemix2_botforc_file)
+                write(*,*) '        └> check: namelist.cvmix, idemix2_botforc_file'
                 write(*,*) '____________________________________________________________________'
+                print *, achar(27)//'[0m'
+                write(*,*)
+                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
             end if 
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
         end if 
+        t1=MPI_Wtime()
+        if (mype==0) write(*,*) '     │  └> elapsed time:', t1-t0
         
         !_______________________________________________________________________
         ! read idemix HRMS and HLAM forcing --> file 
         if (idemix2_enable_M2 .or. idemix2_enable_niw ) then
+            t0=MPI_Wtime()
             ! topo_hrms (Root Mean Square Topographic Height), Definition: Measures the roughness or variability of seafloor topography.
             ! Units: Meters (m), Role: Represents the standard deviation of seafloor height variations. Used to calculate 
             ! energy transfer from tides/NIW to internal waves.
             ! file_exist=.False.
             inquire(file=trim(idemix2_hrmsforc_file),exist=file_exist) 
             if (file_exist) then
-                if (mype==0) write(*,*) ' --> read IDEMIX HRMS forcing'
-                call read_other_NetCDF(idemix2_hrmsforc_file, idemix2_hrmsforc_vname, 1, iwe2_topo_hrms, .true., .false., partit, mesh)
+                if (mype==0) write(*,*) '     ├> read IDEMIX2 HRMS forcing'
+                call read_other_NetCDF(trim(idemix2_hrmsforc_file), trim(idemix2_hrmsforc_vname), 1, iwe2_topo_hrms, .true., .false., partit, mesh)
             else
                 if (mype==0) then
+                    print *, achar(27)//'[33m'
                     write(*,*) '____________________________________________________________________'
                     write(*,*) ' ERROR: IDEMIX2 HRMS forcing file not found! Cant apply IDEMIX2'
                     write(*,*) '        vertical mixing parameterisation! '
-                    write(*,*) '        --> check your namelist.cvmix, idemix2_hrmsforc_file &  '
+                    write(*,*) '        ├> file: ', trim(idemix2_hrmsforc_file)
+                    write(*,*) '        └> check: namelist.cvmix, idemix2_hrmsforc_file'
                     write(*,*) '____________________________________________________________________'
+                    print *, achar(27)//'[0m'
+                    write(*,*)
+                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
                 end if
-                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
             end if 
             
             ! topo_hlam (Topographic Wavelength), Definition: Characteristic horizontal length scale of topographic features.
@@ -532,17 +588,21 @@ module g_cvmix_idemix2
             file_exist=.False.
             inquire(file=trim(idemix2_hlamforc_file),exist=file_exist) 
             if (file_exist) then
-                if (mype==0) write(*,*) ' --> read IDEMIX HLAM forcing'
-                call read_other_NetCDF(idemix2_hlamforc_file, idemix2_hlamforc_vname, 1, iwe2_topo_hlam, .true., .false., partit, mesh)
+                if (mype==0) write(*,*) '     ├> read IDEMIX2 HLAM forcing'
+                call read_other_NetCDF(trim(idemix2_hlamforc_file), trim(idemix2_hlamforc_vname), 1, iwe2_topo_hlam, .true., .false., partit, mesh)
             else
                 if (mype==0) then
+                    print *, achar(27)//'[33m'
                     write(*,*) '____________________________________________________________________'
                     write(*,*) ' ERROR: IDEMIX2 HLAM forcing file not found! Cant apply IDEMIX2'
                     write(*,*) '        vertical mixing parameterisation! '
-                    write(*,*) '        --> check your namelist.cvmix, idemix2_hlamforc_file &  '
+                    write(*,*) '        ├> file: ', trim(idemix2_hlamforc_file)
+                    write(*,*) '        └> check: namelist.cvmix, idemix2_hlamforc_file'
                     write(*,*) '____________________________________________________________________'
+                    print *, achar(27)//'[0m'
+                    write(*,*)
+                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
                 end if
-                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
             end if 
             
             ! In the M2 tidal and NIW energy calculations:
@@ -555,11 +615,22 @@ module g_cvmix_idemix2
             ! These parameters are crucial for accurately representing the conversion of barotropic tidal energy to internal 
             ! waves over rough topography.
             
+            t1=MPI_Wtime()
+            if (mype==0) write(*,*) '     |  └> elapsed time:', t1-t0
+        
         end if ! --> if (idemix2_enable_niw) then
         
         !_______________________________________________________________________
+        ! compute centroid distance from nearset coastal point together with
+        ! idemix2_shelf_dist defines what is shelf and what not  
+        t0=MPI_Wtime() 
+        call compute_dist2coast(iwe2_topo_dist, mesh, partit, 'elem')
+        t1=MPI_Wtime()
+        if (partit%mype==0) write(*,*) '        └> dist2coast elapsed time:', t1-t0
+        
+        !_______________________________________________________________________
         ! compute d/dy of coriolis 
-        do elem = 1, elem_size
+        do elem = 1, myDim_elem2D
             elnodes = elem2d_nodes(:,elem)
             iwe2_grady_coriol(elem) = sum(gradient_sca(4:6, elem)*mesh%coriolis_node(elnodes))
         end do       
@@ -571,7 +642,8 @@ module g_cvmix_idemix2
                                 gamma               = idemix2_gamma               , &
                                 jstar               = idemix2_jstar               , &
                                 mu0                 = idemix2_mu0                 , &
-                                nfbin               = idemix2_nfbin               , &    
+                                nfbin               = idemix2_nfbin               , &   
+                                shelf_dist          = idemix2_shelf_dist          , &
                                 enable_M2           = idemix2_enable_M2           , &
                                 enable_niw          = idemix2_enable_niw          , & 
                                 enable_superbee_adv = idemix2_enable_superbee_adv , &
@@ -579,7 +651,8 @@ module g_cvmix_idemix2
                                 enable_hor_diffusion= idemix2_enable_hor_diffusion, &
                                 hor_diffusion_niter = idemix2_hor_diffusion_niter   &
                                 )
-                          
+                                
+        if (partit%mype==0) write(*,*)                  
     end subroutine init_cvmix_idemix2
     
     !
@@ -595,7 +668,7 @@ module g_cvmix_idemix2
         integer       :: nz, nln, nl1, nl2, nl12, nu1, nu2, nu12, uln, niter  
         integer       :: elnodes1(3), elnodes2(3), el(2), ednodes(2) 
         real(kind=WP) :: dz_trr(mesh%nl), dz_trr2(mesh%nl), bvfreq2(mesh%nl), vflux, dz_el, aux, cflfac
-        real(kind=WP) :: grad_v0Eiw(2), deltaX1, deltaY1, deltaX2, deltaY2
+        real(kind=WP) :: grad_v0Eiw(2), lat_e_deg, deltaX1, deltaY1, deltaX2, deltaY2
         real(kind=WP) :: tsum1, tsum2, tsum3, tsum4, tvol
         real(kind=WP) :: cn, cn_e, cn_gradx_e, cn_grady_e
         logical       :: debug=.false.
@@ -632,7 +705,9 @@ module g_cvmix_idemix2
             nln = nlevels(elem)-1
             uln = ulevels(elem)
             elnodes1 = elem2d_nodes(:,elem)
-                
+            
+            lat_e_deg = sum(geo_coord_nod2D(2,elnodes1))/3.0 * 180.0/pi    
+            
             !___________________________________________________________________
             ! calculate for TKE square of Brünt-Väisälä frequency, be aware that
             ! bvfreq contains already the squared brünt Väisälä frequency ...
@@ -658,7 +733,7 @@ module g_cvmix_idemix2
             cn_grady_e = sum(gradient_sca(4:6,elem)*iwe2_cn(elnodes1))
             
             !___________________________________________________________________
-            ! compute 1st. idemix2 parameter over the vertical water column and 
+            ! 1st. compute idemix2 parameter over the vertical water column and 
             ! local horizontal parameters on elements !!!:  
             !  IN VARIABLES:
             ! --------------
@@ -720,6 +795,43 @@ module g_cvmix_idemix2
                 v_niw       = iwe2_niw_v(        :, elem) , & !OUT
                 w_niw       = iwe2_niw_w(        :, elem)   & !OUT
                 )
+                
+            !___________________________________________________________________
+            ! 2st. compute dissipation time scales and rates
+            !  IN VARIABLES:
+            ! --------------
+            ! dtime     ... time step
+            ! lat       ... elem lat coordinates
+            ! coriolis  ... coriolis parameter 
+            ! omega_M2  ... M2 frequency (fixed)
+            ! omega_niw ... NIW frequency (lat dependent)
+            ! cn        ... baroclionic gravity wave speed
+            ! zbottom   ... bottom depth at elements
+            ! topo_hrms ... root mean square topographic height
+            ! topo_hlam ... characteristic horiz. length scale of topographic features
+            ! topo_shelf... point is considered shelf
+            ! 
+            ! OUT VARIABLES:
+            ! --------------
+            ! tau_M2    ... M2 Tidal Dissipation Timescale     
+            ! tau_niw   ... NIW Dissipation Timescale
+            ! alpha_M2_cont... M2 Continuous Dissipation Rate (Background M2 tidal 
+            !                  dissipation rate
+            call cvmix_compute_interact_tscale_idemix2(     &
+                dtime       = dt                          , & !IN 
+                lat         = lat_e_deg                   , & !IN
+                coriolis    = mesh%coriolis(        elem) , & !IN 
+                omega_M2    = iwe2_omega_M2               , & !IN
+                omega_niw   = iwe2_omega_niw(       elem) , & !IN
+                cn          = cn_e                        , & !IN
+                zbottom     = zbar_e_bot(           elem) , & !IN
+                topo_hrms   = iwe2_topo_hrms(       elem) , & !IN
+                topo_hlam   = iwe2_topo_hlam(       elem) , & !IN
+                topo_shelf  = iwe2_topo_shelf(      elem) , & !IN
+                tau_M2      = iwe2_M2_tau(          elem) , & !OUT
+                tau_niw     = iwe2_niw_tau(         elem) , & !OUT
+                alpha_M2_c  = iwe2_alpha_M2_c(      elem)   & !OUT
+            )
             !___________________________________________________________________
         end do ! --> do elem = 1,elem_size    
             

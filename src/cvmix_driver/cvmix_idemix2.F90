@@ -25,6 +25,7 @@ save
 !public member functions
 public :: cvmix_init_idemix2
 public :: cvmix_compute_groupvel_idemix2
+public :: cvmix_compute_interact_tscale_idemix2
 ! public :: calc_idemix2_v0
 ! public :: cvmix_coeffs_idemix2
 public :: gofx2, hofx1, hofx2
@@ -38,12 +39,16 @@ public :: gofx2, hofx1, hofx2
 ! end interface cvmix_coeffs_idemix2
 
 interface cvmix_init_idemix2
-    module procedure init_idemix2  
+    module procedure compute_init
 end interface cvmix_init_idemix2
 
 interface cvmix_compute_groupvel_idemix2
-    module procedure compute_groupvel_idemix2  
+    module procedure compute_groupvel
 end interface cvmix_compute_groupvel_idemix2
+
+interface cvmix_compute_interact_tscale_idemix2
+    module procedure compute_interact_tscale
+end interface cvmix_compute_interact_tscale_idemix2
 
 interface idemix2_put
     module procedure vmix_tke_put_idemix2_int
@@ -60,7 +65,8 @@ type, public :: idemix2_type
     tau_h               , & ! time scale for horizontal symmetrisation, only necessary for lateral diffusion (sec)
     gamma               , & ! constant of order one derived from the shape of the spectrum in m space (dimensionless)
     jstar               , & ! spectral bandwidth in modes (dimensionless)
-    mu0                     ! dissipation parameter (dimensionless)
+    mu0                 , & ! dissipation parameter (dimensionless)
+    shelf_dist              ! shelf definition in meters from coast
     
     logical        ::     &
     enable_M2           , &
@@ -85,12 +91,13 @@ contains
 !
 !
 !_______________________________________________________________________________
-subroutine init_idemix2(tau_v               , & ! time scale for vertical symmetrisation
+subroutine compute_init(tau_v               , & ! time scale for vertical symmetrisation
                         tau_h               , & ! time scale for horizontal symmetrisation
                         gamma               , & ! const. derived from the shape of the spectrum in m spac
                         jstar               , & ! mode number scale
                         mu0                 , & ! dissipation parameter (dimensionless)
                         nfbin               , & ! number of spectral bins
+                        shelf_dist          , & ! shelf definition in meters from coast
                         enable_M2           , &
                         enable_niw          , & 
                         enable_superbee_adv , &
@@ -100,7 +107,7 @@ subroutine init_idemix2(tau_v               , & ! time scale for vertical symmet
                         handle_old_vals, idemix2_userdef_constants)
 
     ! This subroutine sets user or default values for IDEMIX parameters
-    real(cvmix_r8), optional, intent(in) :: tau_v, tau_h, gamma, jstar, mu0
+    real(cvmix_r8), optional, intent(in) :: tau_v, tau_h, gamma, jstar, mu0, shelf_dist
     logical       , optional, intent(in) :: enable_M2, enable_niw, &
                                             enable_superbee_adv, enable_AB_timestep, &
                                             enable_hor_diffusion
@@ -165,6 +172,13 @@ subroutine init_idemix2(tau_v               , & ! time scale for vertical symmet
         call idemix2_put('mu0', 4._cvmix_r8/3.0 , idemix2_userdef_constants)
     end if
     
+    !___ shelf_dist ____________________________________________________________
+    if (present(shelf_dist)) then
+        call idemix2_put('shelf_dist', shelf_dist, idemix2_userdef_constants)
+    else
+        call idemix2_put('shelf_dist', 300000._cvmix_r8, idemix2_userdef_constants)
+    end if
+    
     !___ superbee_adv __________________________________________________________
     if (present(nfbin)) then
         call idemix2_put('nfbin', nfbin, idemix2_userdef_constants)
@@ -223,7 +237,7 @@ subroutine init_idemix2(tau_v               , & ! time scale for vertical symmet
     else
         call idemix2_put('handle_old_vals', 1, idemix2_userdef_constants)
     end if
-end subroutine init_idemix2
+end subroutine compute_init
 
 
 !
@@ -231,7 +245,7 @@ end subroutine init_idemix2
 !_______________________________________________________________________________
 ! Compute idemix representative vertical (v0) and horizontal (c0) group velocites 
 ! as well as the enery dissipation coefficient alpha_c
-subroutine compute_groupvel_idemix2(nlev        , &
+subroutine compute_groupvel(nlev        , &
                                  nfbin       , &   
                                  dtime       , &
                                  coriolis    , & 
@@ -422,26 +436,120 @@ subroutine compute_groupvel_idemix2(nlev        , &
             w_niw(fbin_i) = (kdot_y_niw*cos(phiu(fbin_i)) + kdot_x_niw*sin(phiu(fbin_i)) )
         enddo
     end if
-end subroutine compute_groupvel_idemix2    
+end subroutine compute_groupvel
     
     
-! !
-! !
-! !_______________________________________________________________________________
-! subroutine set_compute_groupvel_idemix2(dzt        , &
-!                                      nlev       , &
-!                                      dtime      , &
-!                                      coriolis   , & 
-!                                      Nsqr       , &
-!                                      omega_M2   , &
-!                                      omega_niw  , &
-!                                      alpha_c    , & 
-!                                      c0         , & 
-!                                      v0         , &
-!                                      idemix2_const_userdef &
-!                                     )    
-                                    
-                                    
+
+!
+!
+!_______________________________________________________________________________
+subroutine compute_interact_tscale(dtime            , &
+                                   lat              , &
+                                   coriolis         , &
+                                   omega_M2         , &
+                                   omega_niw        , &
+                                   cn               , &
+                                   zbottom          , &
+                                   topo_hrms        , &
+                                   topo_hlam        , &
+                                   topo_shelf       , &
+                                   tau_M2           , &
+                                   tau_niw          , &
+                                   alpha_M2_c       , &
+                                   idemix2_const_userdef &
+                                   )    
+    !___Input___________________________________________________________________
+    type(idemix2_type), intent(in) , optional, target :: idemix2_const_userdef
+    real(cvmix_r8)    , intent(in)                    :: dtime          , &
+                                                         lat            , &
+                                                         coriolis       , &
+                                                         omega_M2       , &
+                                                         omega_niw      , &
+                                                         cn             , &
+                                                         zbottom        , &
+                                                         topo_hrms      , &
+                                                         topo_hlam      , &
+                                                         topo_shelf
+    !___Output__________________________________________________________________
+    real(cvmix_r8)    , intent(out)                   :: tau_M2         , &
+                                                         tau_niw        , &
+                                                         alpha_M2_c
+    !___Local___________________________________________________________________
+    integer                                           :: di, fbin_i, N0
+    real(cvmix_r8)                                    :: fxb, fxc
+    real(cvmix_r8)                                    :: mstar=0.01 ,&
+                                                         M2_f=2*cvmix_PI/(12.42*60*60)
+    type(idemix2_type), pointer                       :: idemix2_const_in
+    
+    ! do pointer into save variable or into user defined input variable 
+    idemix2_const_in => idemix2_constants_saved
+    if (present(idemix2_const_userdef)) then
+        idemix2_const_in => idemix2_const_userdef
+    end if
+    
+    !___________________________________________________________________________
+    ! compute NIW Dissipation Timescale
+    if (idemix2_const_in%enable_niw) then
+        if (zbottom>0) then
+            N0=cn*cvmix_PI/zbottom
+            if (  N0> abs(coriolis) .and. omega_niw> abs(coriolis)  ) then
+            fxc = topo_hrms**2.0 * 2.0*cvmix_PI/(1d-12+topo_hlam) 
+            fxb = 0.5* N0*( (omega_niw**2.0 + coriolis**2.0)/omega_niw**2.0 )**2.0  &
+                           *(omega_niw**2.0 - coriolis**2.0)**0.5/omega_niw
+            tau_niw = min(0.5/dtime, fxc*fxb/zbottom) 
+            endif
+        endif
+        
+        ! on shelf limitation 
+        if (topo_shelf == 1.0) tau_niw  = 1./(3.*86400.0)
+        tau_niw = max(1d0/(50.*86400.0), tau_niw )
+    end if  
+    
+    !___________________________________________________________________________
+    ! compute tau_M2 M2 Tidal Dissipation Timescale
+    if (idemix2_const_in%enable_M2) then
+        if (zbottom>0) then
+            N0=cn*cvmix_PI/zbottom
+            if (  N0> abs(coriolis) .and. omega_M2> abs(coriolis)  ) then
+            fxc = topo_hrms**2.0 * 2.0*cvmix_PI/(1d-12+topo_hlam) 
+            fxb = 0.5* N0*( (omega_M2**2.0 + coriolis**2.0)/omega_M2**2.0 )**2.0  &
+                           *(omega_M2**2.0 - coriolis**2.0)**0.5/omega_M2
+            tau_M2 = min(0.5/dtime, fxc*fxb/zbottom) 
+            endif
+        endif
+        
+        ! on shelf limitation 
+        if (topo_shelf == 1.0) tau_M2  = 1./(3.*86400.0)
+        
+        ! ensure background value
+        tau_M2 = max(1d0/(50.*86400.0), tau_M2 )
+        
+        ! compute alpha_M2_c M2 Continuous Dissipation Rate (Background M2 tidal 
+        ! dissipation rate (not topographic))
+        alpha_M2_c = 0.0
+        if (zbottom > 0.) then 
+            N0 = cn*cvmix_PI/zbottom+1D-20
+            if (abs(lat) < 28.5 ) then
+                ! lambda+/M2=15*E*mstar/N * (sin(phi-28.5)/sin(28.5))^1/2
+                alpha_M2_c=alpha_M2_c+ M2_f*15*mstar/N0* (sin( abs(abs(lat) -28.5)/180.*cvmix_PI )/sin(28.5/180.*cvmix_PI) )**0.5
+            endif
+            if (abs(lat) < 74.5 ) then
+                ! lambda-/M2 =  0.7*E*mstar/N *sin^2(phi)
+                alpha_M2_c=alpha_M2_c+ M2_f*0.7*mstar/N0* sin( abs(lat)/180.*cvmix_PI )**2
+            endif
+            alpha_M2_c=alpha_M2_c/zbottom
+        endif
+        
+        ! ensure background value
+        alpha_M2_c = max(0D0, min( 1d-5,alpha_M2_c ))
+    
+    endif
+    
+
+end subroutine compute_interact_tscale                                     
+
+
+
 !
 !
 !_______________________________________________________________________________
@@ -461,6 +569,7 @@ subroutine vmix_tke_put_idemix2_real(varname, val, idemix2_userdef_constants)
         case('jstar') ; idemix2_constants_out%jstar = val
         case('gamma') ; idemix2_constants_out%gamma = val
         case('mu0'  ) ; idemix2_constants_out%mu0   = val
+        case('shelf_dist'  ) ; idemix2_constants_out%shelf_dist   = val
         case DEFAULT
             print*, "ERROR:", trim(varname), " not a valid choice"
             stop 1
