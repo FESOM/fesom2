@@ -45,8 +45,21 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
 
 
   if (mype==0) then
-     ! open file
-     status=nf90_open(file, nf90_nowrite, ncid)
+    ! open file
+    status=nf90_open(file, nf90_nowrite, ncid)
+    if (status /= nf90_noerr) then
+        print *, achar(27)//'[33m'
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' ERROR: File not found: '
+        write(*,*) '        ├> file:', file
+        write(*,*) '        ├> status:', status
+        write(*,*) '        ├> ', nf90_strerror(status)
+        write(*,*) '        └> check: namelist.*'
+        write(*,*) '____________________________________________________________________'
+        print *, achar(27)//'[0m'
+        write(*,*)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+    end if
   end if
 
   call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
@@ -58,12 +71,39 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
   endif
 
   if (mype==0) then
-     ! lat
-     status=nf90_inq_dimid(ncid, 'lat', latid)
-     status=nf90_inquire_dimension(ncid, latid, len=latlen)
-     ! lon
-     status=nf90_inq_dimid(ncid, 'lon', lonid)
-     status=nf90_inquire_dimension(ncid, lonid, len=lonlen)
+    ! lat
+    status=nf90_inq_dimid(ncid, 'lat', latid)
+    if (status == NF90_EBADDIM) then
+        print *, achar(27)//'[33m'
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' ERROR: Dimension lat not found in file: '
+        write(*,*) '        ├> file:', file
+        write(*,*) '        ├> status:', status
+        write(*,*) '        ├> ',nf90_strerror(status)
+        write(*,*) '        └> check: Dim and CoordVariable name must be lat'
+        write(*,*) '____________________________________________________________________'
+        print *, achar(27)//'[0m'
+        write(*,*)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+    end if
+    status=nf90_inquire_dimension(ncid, latid, len=latlen)
+    
+    ! lon
+    status=nf90_inq_dimid(ncid, 'lon', lonid)
+    if (status == NF90_EBADDIM) then
+        print *, achar(27)//'[33m'
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' ERROR: Dimension lon not found in file: '
+        write(*,*) '        ├> file:', file
+        write(*,*) '        ├> status:', status
+        write(*,*) '        ├> ',nf90_strerror(status)
+        write(*,*) '        └> check: Dim and CoordVariable name must be lon'
+        write(*,*) '____________________________________________________________________'
+        print *, achar(27)//'[0m'
+        write(*,*)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+    end if
+    status=nf90_inquire_dimension(ncid, lonid, len=lonlen)
   end if
   call MPI_BCast(latlen, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
   call MPI_BCast(lonlen, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
@@ -71,16 +111,42 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
   ! lat
   allocate(lat(latlen))
   if (mype==0) then
-     status=nf90_inq_varid(ncid, 'lat', varid)
-     status=nf90_get_var(ncid, varid, lat, start=(/1/), count=(/latlen/))
+    status=nf90_inq_varid(ncid, 'lat', varid)
+    if (status == NF90_ENOTVAR) then
+        print *, achar(27)//'[33m'
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' ERROR: Variable lat not found in file: '
+        write(*,*) '        ├> file:', file
+        write(*,*) '        ├> status:', status
+        write(*,*) '        ├> ',nf90_strerror(status)
+        write(*,*) '        └> check: Dim and CoordVariable name must be lat'
+        write(*,*) '____________________________________________________________________'
+        print *, achar(27)//'[0m'
+        write(*,*)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+    end if
+    status=nf90_get_var(ncid, varid, lat, start=(/1/), count=(/latlen/))
   end if
   call MPI_BCast(lat, latlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)  
 
   ! lon
   allocate(lon(lonlen))
   if (mype==0) then
-     status=nf90_inq_varid(ncid, 'lon', varid)
-     status=nf90_get_var(ncid, varid, lon, start=(/1/), count=(/lonlen/))
+    status=nf90_inq_varid(ncid, 'lon', varid)
+    if (status == NF90_ENOTVAR) then
+        print *, achar(27)//'[33m'
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' ERROR: Variable lon not found in file: '
+        write(*,*) '        ├> file:', file
+        write(*,*) '        ├> status:', status
+        write(*,*) '        ├> ',nf90_strerror(status)
+        write(*,*) '        └> check: Dim and CoordVariable name must be lon'
+        write(*,*) '____________________________________________________________________'
+        print *, achar(27)//'[0m'
+        write(*,*)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+    end if
+    status=nf90_get_var(ncid, varid, lon, start=(/1/), count=(/lonlen/))
   end if
   call MPI_BCast(lon, lonlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)  
 
@@ -96,13 +162,26 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
   
   if (mype==0) then
     ! data
-     status=nf90_inq_varid(ncid, vari, varid)
-     istart = (/1,1,itime/)
-     icount= (/lonlen,latlen,1/)
-     status=nf90_get_var(ncid, varid, ncdata, start=istart, count=icount)
+    status=nf90_inq_varid(ncid, vari, varid)
+    if (status == NF90_ENOTVAR) then
+        print *, achar(27)//'[33m'
+        write(*,*) '____________________________________________________________________'
+        write(*,*) ' ERROR: Variable ',vari,' not found in file: '
+        write(*,*) '        ├> file:', file
+        write(*,*) '        ├> status:', status
+        write(*,*) '        ├> ',nf90_strerror(status)
+        write(*,*) '        └> check: namelist.*   '
+        write(*,*) '____________________________________________________________________'
+        print *, achar(27)//'[0m'
+        write(*,*)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+    end if
+    istart= (/1,1,itime/)
+    icount= (/lonlen,latlen,1/)
+    status=nf90_get_var(ncid, varid, ncdata, start=istart, count=icount)
 
     ! missing value
-     status= nf90_get_att(ncid, varid, 'missing_value', miss)
+    status= nf90_get_att(ncid, varid, 'missing_value', miss)
     ! close file
     status=nf90_close(ncid)
   end if
@@ -176,7 +255,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
     
     !___________________________________________________________________________
     ! do interpolation
-    flag=0
+    flag=0   
     call interp_2d_field(lonlen, latlen, lon, lat, ncdata, num, temp_x, temp_y, & 
                          model_2Darray, flag, partit) 
     deallocate(temp_y, temp_x, ncdata_temp, ncdata, lon, lat)
