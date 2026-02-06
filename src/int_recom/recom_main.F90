@@ -271,6 +271,33 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
         if (Diags) then
             ! Allocate and initialize all diagnostic arrays for a water column
             call allocate_and_init_diags(nl)
+            allocate(vertmesocdis(nl-1))
+            vertmesocdis = 0.d0
+
+if (enable_3zoo2det) then
+            allocate(vertfastcdis(nl-1))
+            vertfastcdis = 0.d0     !RP 14.07.2025
+            allocate( vertmicrocdis(nl-1), vertmacrocdis(nl-1))  !RP 14.07.2025
+            vertmicrocdis   = 0.d0
+            vertmacrocdis = 0.d0
+endif
+            allocate(vertphotn(nl-1), vertphotd(nl-1))          !RP 14.07.2025
+            vertphotn = 0.d0
+            vertphotd = 0.d0
+            allocate(vertNassimn(nl-1), vertNassimd(nl-1))          !RP 14.07.2025
+            vertNassimn = 0.d0
+            vertNassimd = 0.d0
+            allocate(vertDONremin(nl-1), vertDOCremin(nl-1))                            !RP 15.07.2025
+            vertDONremin = 0.d0
+            vertDOCremin = 0.d0
+if (enable_coccos) then
+            allocate(vertphotc(nl-1), vertphotp(nl-1))          !RP 14.07.2025
+            vertphotc = 0.d0
+            vertphotp = 0.d0
+            allocate(vertNassimc(nl-1), vertNassimp(nl-1))          !RP 14.07.2025
+            vertNassimc = 0.d0
+            vertNassimp = 0.d0
+endif
         end if
 !
 !        !! * Allocate 3D diagnostics *
@@ -419,9 +446,42 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
 
         if (Diags) then
            call update_2d_diags(n)
+            mesocdis     (1:nzmax,n) = vertmesocdis     (1:nzmax)
+if (enable_3zoo2det) then
+            microcdis    (1:nzmax,n) = vertmicrocdis    (1:nzmax)     !RP 14.07.2025
+            macrocdis    (1:nzmax,n) = vertmacrocdis    (1:nzmax)     !RP 14.07.2025
+            fastcdis     (1:nzmax,n) = vertfastcdis     (1:nzmax)       !RP 14.07.2025            
+endif
+            photn        (1:nzmax,n) = vertphotn        (1:nzmax)       !RP 14.07.2025
+            photd        (1:nzmax,n) = vertphotd        (1:nzmax)       !RP 14.07.2025
+            Nassimn      (1:nzmax,n) = vertNassimn      (1:nzmax)       !RP 14.07.2025
+            Nassimd      (1:nzmax,n) = vertNassimd      (1:nzmax)       !RP 14.07.2025
+if (enable_coccos) then
+            photc        (1:nzmax,n) = vertphotc        (1:nzmax)       !RP 14.07.2025
+            photp        (1:nzmax,n) = vertphotp        (1:nzmax)       !RP 14.07.2025
+            Nassimc      (1:nzmax,n) = vertNassimc      (1:nzmax)       !RP 14.07.2025
+            Nassimp      (1:nzmax,n) = vertNassimp      (1:nzmax)       !RP 14.07.2025
+endif
+            DONremin     (1:nzmax,n) = vertDONremin     (1:nzmax)       !RP 14.07.2025
+            DOCremin     (1:nzmax,n) = vertDOCremin     (1:nzmax)       !RP 15.07.2025
+
            call update_3d_diags(n, nzmax)
            ! Deallocate vertical tracer array
            call deallocate_diags()
+
+            deallocate(vertmesocdis)
+
+if (enable_3zoo2det) then
+            deallocate(vertfastcdis)
+            deallocate(vertmicrocdis,vertmacrocdis)    ! RP 14.07.2025
+endif
+            deallocate(vertDONremin, vertDOCremin)              !RP 15.07.2025
+            deallocate(vertphotn, vertNassimn)                               !RP 14.07.2025
+            deallocate(vertphotd, vertNassimd)                               !RP 14.07.2025
+if (enable_coccos) then
+            deallocate(vertphotc, vertNassimc)                               !RP 14.07.2025
+            deallocate(vertphotp, vertNassimp)                               !RP 08.01.2026
+endif
         endif
 !            !! * Update 2D diagnostics *
 !            NPPn(n) = locNPPn
