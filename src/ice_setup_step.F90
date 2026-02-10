@@ -129,6 +129,11 @@ subroutine ice_timestep(step, ice, partit, mesh)
     !LA 2023-03-08
     real(kind=WP), dimension(:), pointer  :: a_ice_ib
 #endif
+
+#if defined (__seaice_tracers)
+    real(kind=WP), dimension(:), pointer  :: tr_ice
+#endif
+
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -175,6 +180,12 @@ subroutine ice_timestep(step, ice, partit, mesh)
     a_ice    => ice%data(1)%values(:)
     ice_temp => ice%data(4)%values(:)
 #endif
+
+#if defined (__seaice_tracers)
+    tr_ice => ice%data(6)%values(:)
+#endif
+
+
     !___________________________________________________________________________
     t0=MPI_Wtime()
 #if defined (__icepack)
@@ -371,6 +382,11 @@ subroutine ice_initial_state(ice, tracers, partit, mesh)
     !LA 2023-03-07
     real(kind=WP), dimension(:), pointer  :: a_ice_ib, m_ice_ib
     real(kind=WP), dimension(:), pointer  :: u_ice_ib, v_ice_ib
+
+#if defined (__seaice_tracers)
+    real(kind=WP), dimension(:), pointer  :: tr_ice, tr_ice_ib
+#endif
+
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -449,6 +465,14 @@ else
 !$omp end parallel sections
   end if
 end if
+
+#if defined (__seaice_tracers)
+      tr_ice     => ice%data(6)%values(:)
+      tr_ice_ib  => ice%data(6)%values(:)
+      tr_ice     = 0._WP
+      tr_ice_ib  = 0._WP
+#endif
+
 ! LA: 2023-01-31 add asynchronous icebergs
 !---------------------------------------------
 

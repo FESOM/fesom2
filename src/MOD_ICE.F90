@@ -10,7 +10,7 @@ SAVE
 !
 !_______________________________________________________________________________
 ! set data array derived type for ice-tracers (area, mice, msnow) more tracer
-! are theretical possible
+! are theoretical possible
 TYPE T_ICE_DATA
     !___________________________________________________________________________
     real(kind=WP), allocatable, dimension(:)    :: values, values_old, values_rhs, &
@@ -131,7 +131,7 @@ TYPE T_ICE
     real(kind=WP), allocatable, dimension(:)    :: alpha_evp_array, beta_evp_array
 
     !___________________________________________________________________________
-    ! total number of ice tracers (default=3, 1=area, 2=mice, 3=msnow, (4=ice_temp)
+    ! total number of ice tracers (default=3, 1=area, 2=mice, 3=msnow, (4=ice_temp), (6=seaice_iron),
 #if defined (__oifs) || defined (__ifsinterface)
     integer                                     :: num_itracers=4
 #else
@@ -141,10 +141,15 @@ TYPE T_ICE
 #if defined(__async_icebergs)
     integer                                     :: num_itracers=5
 #else
+#if defined (__seaice_tracers)
+    integer                                     :: num_itracers=6        	
+#else
     integer                                     :: num_itracers=3
+#endif
 #endif 
     !------------------------------
 #endif 
+
 
     ! put ice tracers data arrays
     type(t_ice_data), allocatable, dimension(:) :: data

@@ -82,6 +82,11 @@ subroutine cut_off(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     real(kind=WP), dimension(:), pointer  :: ice_temp
 #endif /* (__oifs) */
+
+#if defined (__seaice_tracers)
+    real(kind=WP), dimension(:), pointer  :: tr_ice
+#endif
+
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -92,6 +97,10 @@ subroutine cut_off(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     ice_temp => ice%data(4)%values(:)
 #endif /* (__oifs) */
+
+#if defined (__seaice_tracers)
+    tr_ice => ice%data(6)%values(:)
+#endif
 
     !___________________________________________________________________________
     ! lower cutoff: a_ice
@@ -106,6 +115,12 @@ DO n=1, myDim_nod2D+eDim_nod2D
 #if defined (__oifs) || defined (__ifsinterface)
         ice_temp(n)=273.15_WP
 #endif /* (__oifs) */
+
+#if defined (__seaice_tracers)
+        tr_ice(n)  = 0.0_WP
+#endif
+
+
    end if
     !___________________________________________________________________________
     ! lower cutoff: m_ice
@@ -116,6 +131,10 @@ DO n=1, myDim_nod2D+eDim_nod2D
 #if defined (__oifs) || defined (__ifsinterface)
         ice_temp(n)=273.15_WP
 #endif /* (__oifs) */
+
+#if defined (__seaice_tracers)
+        tr_ice(n)  = 0.0_WP
+#endif
    end if
      
     !___________________________________________________________________________
@@ -183,6 +202,9 @@ subroutine thermodynamics(ice, partit, mesh)
     real(kind=WP), dimension(:)  , pointer :: thdgr, thdgrsn, thdgr_old, t_skin, ustar_aux
     real(kind=WP), dimension(:)  , pointer :: S_oc_array, T_oc_array, u_w, v_w
     real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
+#if defined (__seaice_tracers)
+    real(kind=WP), dimension(:)  , pointer :: tr_ice, tr_ice_old
+#endif
     myDim_nod2d   => partit%myDim_nod2D
     eDim_nod2D    => partit%eDim_nod2D
     ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D(:)
@@ -195,6 +217,10 @@ subroutine thermodynamics(ice, partit, mesh)
     a_ice_old     => ice%data(1)%values_old(:)
     m_ice_old     => ice%data(2)%values_old(:)
     m_snow_old    => ice%data(3)%values_old(:)
+#if defined (__seaice_tracers)
+    tr_ice        => ice%data(6)%values(:)
+    tr_ice_old    => ice%data(6)%values_old(:)
+#endif
     thdgr         => ice%thermo%thdgr
     thdgrsn       => ice%thermo%thdgrsn
     thdgr_old     => ice%thermo%thdgr_old
