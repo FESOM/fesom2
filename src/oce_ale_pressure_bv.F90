@@ -2774,13 +2774,14 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
   use o_arrays
   use o_param
   use g_comm_auto
+  use diagnostics, only: sw_alpha_diap, sw_beta_diap
   implicit none
   !
   type(t_mesh),   intent(in) ,    target :: mesh
   type(t_partit), intent(inout),  target :: partit
   integer                                :: n, nz, nzmin, nzmax
   real(kind=WP)                          :: t1, t1_2, t1_3, t1_4, p1, p1_2, p1_3, s1, s35, s35_2
-  real(kind=WP)                          :: a_over_b
+  real(kind=WP)                          :: a_over_b, a, b
   real(kind=WP)                          :: TF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D),SF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
 
 #include "associate_part_def.h"
@@ -2832,6 +2833,33 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
 
      ! calculate alpha
      sw_alpha(nz,n) = a_over_b*sw_beta(nz,n)
+
+     p1 = 2000._WP
+     ! calculate beta
+     b = 0.785567e-3_WP - 0.301985e-5_WP*t1 &
+          + 0.555579e-7_WP*t1_2 - 0.415613e-9_WP*t1_3 &
+          + s35*(-0.356603e-6_WP + 0.788212e-8_WP*t1 &
+          + 0.408195e-10_WP*p1 - 0.602281e-15_WP*p1_2) &
+          + s35_2*(0.515032e-8_WP) &
+          + p1*(-0.121555e-7_WP + 0.192867e-9_WP*t1 - 0.213127e-11_WP*t1_2) &
+          + p1_2*(0.176621e-12_WP - 0.175379e-14_WP*t1) &
+          + p1_3*(0.121551e-17_WP)
+
+     ! calculate the thermal expansion / saline contraction ratio
+     a_over_b = 0.665157e-1_WP + 0.170907e-1_WP*t1 &
+          - 0.203814e-3_WP*t1_2 + 0.298357e-5_WP*t1_3 &
+          - 0.255019e-7_WP*t1_4 &
+          + s35*(0.378110e-2_WP - 0.846960e-4_WP*t1 &
+          - 0.164759e-6_WP*p1 - 0.251520e-11_WP*p1_2) &
+          + s35_2*(-0.678662e-5_WP) &
+          + p1*(0.380374e-4_WP - 0.933746e-6_WP*t1 + 0.791325e-8_WP*t1_2) &
+          + p1_2*t1_2*(0.512857e-12_WP) &
+          - p1_3*(0.302285e-13_WP)
+
+     ! calculate alpha
+      a = a_over_b*b
+sw_alpha_diap(nz,n)=sw_alpha_diap(nz,n)+a
+sw_beta_diap(nz,n)=sw_beta_diap(nz,n)+b
    end do
  end do
 !$OMP END DO

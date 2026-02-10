@@ -135,6 +135,7 @@ end module solve_tracers_ale_interface
 subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     use g_config
     use o_PARAM, only: SPP, Fer_GM
+    use o_ARRAYS, only: density_dmoc
     use mod_mesh
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -153,7 +154,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     use recom_glovar
     use recom_config
 #endif
-    use diagnostics, only: ldiag_DVD
+    use diagnostics, only: ldiag_DVD, density_dmoc_avg, diap_avg_count
     use g_forcing_param, only: use_age_tracer !---age-code
     use mod_transit, only: decay14, decay39
     implicit none
@@ -322,6 +323,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
     end if
     !---age-code-end
+density_dmoc_avg=density_dmoc_avg+density_dmoc
+diap_avg_count  =diap_avg_count+1.0_WP
 end subroutine solve_tracers_ale
 !
 !
@@ -349,6 +352,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     use g_support
 #endif
     use mod_ice
+    use diagnostics, only: dt_diap, ds_diap, dd_diap
     implicit none
     integer       , intent(in)   , target :: tr_num
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -361,6 +365,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), pointer                :: del_ttf(:,:)
+
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -371,14 +376,13 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     str_bf         = 0.0_WP
     vert_sink      = 0.0_WP
 #endif
-
     !___________________________________________________________________________
     ! do horizontal diffusiion
     ! write there also horizontal diffusion rhs to del_ttf which is equal the R_T^n
     ! in danilovs srcipt
     ! includes Redi diffusivity if Redi=.true.
+    dd_diap=del_ttf
     call diff_part_hor_redi(tracers, partit, mesh)  ! seems to be ~9% faster than diff_part_hor
-        
     !___________________________________________________________________________
     ! do vertical diffusion: explicit
     if (.not. tracers%data(tr_num)%i_vert_diff) call diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
@@ -386,7 +390,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     ! A projection of horizontal Redi diffussivity onto vertical. This par contains horizontal
     ! derivatives and has to be computed explicitly!
     if (Redi) call diff_ver_part_redi_expl(tracers, partit, mesh)
-
+    dd_diap=del_ttf-dd_diap
 !        if (recom_debug .and. mype==0)  print *, tracers%data(tr_num)%ID
 
 #if defined(__recom)
@@ -467,13 +471,21 @@ endif
         ! equation has a 30% smaller nummerical drift
         ! tr_arr(1:nzmax,n,tr_num)=(hnode(1:nzmax,n)*tr_arr(1:nzmax,n,tr_num)+ &
         !                           del_ttf(1:nzmax,n))/hnode_new(1:nzmax,n)
+        dd_diap(nzmin:nzmax,n)=dd_diap(nzmin:nzmax,n)/hnode_new(nzmin:nzmax,n)
     end do
 !$OMP END PARALLEL DO
 
     !___________________________________________________________________________
     if (tracers%data(tr_num)%i_vert_diff) then
         ! do vertical diffusion: implicite
+
+if (tr_num==1) dd_diap=dd_diap-tracers%data(1)%values
+if (tr_num==2) dd_diap=dd_diap-tracers%data(2)%values
+
         call diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
+
+if (tr_num==1) dT_diap=dT_diap+dd_diap+tracers%data(1)%values
+if (tr_num==2) dS_diap=dS_diap+dd_diap+tracers%data(2)%values
     end if
     
     !We DO not set del_ttf to zero because it will not be used in this timestep anymore
@@ -526,7 +538,7 @@ subroutine diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
             rdata =  Tsurf(n)
             rlx   =  surf_relax_T
         elseif (tracers%data(tr_num)%ID==2) then
-            flux  =  virtual_salt(n)+relax_salt(n)- real_salt_flux(n)*is_nonlinfs
+            flux  =  virtual_salt(n)+relax_salt(n) + real_salt_flux(n)*is_nonlinfs
         else
             flux  = 0._WP
             rdata = 0._WP

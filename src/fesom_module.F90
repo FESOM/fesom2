@@ -324,7 +324,7 @@ contains
         if (f%mype==0) f%t5=MPI_Wtime()
 
         call compute_diagnostics(0, f%dynamics, f%tracers, f%ice, f%partit, f%mesh) ! allocate arrays for diagnostic
-        
+        call ts_diff2w_diap(0, f%dynamics, f%tracers, f%partit, f%mesh)
         !---fwf-code-begin
         if(f%mype==0)  write(*,*) 'use_landice_water', use_landice_water
         if(use_landice_water) then
@@ -525,11 +525,14 @@ contains
 
   subroutine fesom_runloop(current_nsteps)
     use fesom_main_storage_module
+    use g_forcing_param
+    use g_support
+    use g_clock
 !   use openacc_lib
     integer, intent(in) :: current_nsteps 
     ! EO parameters
     integer n, nstart, ntotal, tr_num
-
+    real(kind=WP)          :: net
     !=====================
     ! Time stepping
     !=====================
@@ -564,6 +567,10 @@ contains
     ntotal=f%from_nstep-1+current_nsteps
 
     do n=nstart, ntotal
+!!!
+call integrate_nod(shortwave, net, f%partit, f%mesh)
+if(f%partit%mype==0) write(*,*) 'SWCHECK:', timenew, daynew, ':', net
+!!!
         if (use_icebergs) then
                 !n_ib         = n
                 u_wind_ib    = u_wind
@@ -720,6 +727,7 @@ contains
         call fesom_profiler_start("compute_diagnostics")
 #endif
         call compute_diagnostics(1, f%dynamics, f%tracers, f%ice, f%partit, f%mesh)
+        call ts_diff2w_diap(1, f%dynamics, f%tracers, f%partit, f%mesh)
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("compute_diagnostics")
 #endif
