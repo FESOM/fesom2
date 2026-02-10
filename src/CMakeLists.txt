@@ -14,62 +14,47 @@ else()
    set(FESOM_PLATFORM_STRATEGY "notset" CACHE STRING "switch to platform specific compile settings, this is usually determined via the env.sh script")
 endif()
 
-if(DEFINED ENV{ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS}) # be able to set the initial cache value from our env settings for aleph, not only via cmake command
-   option(ALEPH_CRAYMPICH_WORKAROUNDS "workaround for performance issues on aleph" ON)
-else()
-   option(ALEPH_CRAYMPICH_WORKAROUNDS "workaround for performance issues on aleph" OFF)
-endif()
-if(DEFINED ENV{ENABLE_ALBEDO_INTELMPI_WORKAROUNDS}) # be able to set the initial cache value from our env settings for aleph, not only via cmake command
-   option(ALBEDO_INTELMPI_WORKAROUNDS "workaround for performance issues on albedo" ON)
-else()
-   option(ALBEDO_INTELMPI_WORKAROUNDS "workaround for performance issues on albedo" OFF)
-endif()
-if(DEFINED ENV{ENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS}) # be able to set the initial cache value from our env settings for aleph, not only via cmake command
-   option(JUWELS_GNUOPENMPI_WORKAROUNDS "workaround for performance issues on juwels" ON)
-else()
-   option(JUWELS_GNUOPENMPI_WORKAROUNDS "workaround for performance issues on juwels" OFF)
-endif()
-
-#TODO: these machine specific changes must be done using cmake toolchain then here otherwise will make cmake another raps. 
-
-if(ALEPH_CRAYMPICH_WORKAROUNDS)
-   # todo: enable these options only for our targets
-   add_compile_options(-craympich-mt) # alternative cray-mpich library, about 5 % faster with cray-mpich/7.7.3 on aleph, not available for modules cray-mpich > 7.7.3; todo: test compiling and performance with cray-mpich > 7.7.3
-   # make sure to also set these variables in the runtime environment:
+# Cray compiler specific optimizations
+if(CMAKE_Fortran_COMPILER_ID MATCHES "Cray")
+   # Use alternative cray-mpich library, about 5% faster with cray-mpich/7.7.3
+   # Not available for modules cray-mpich > 7.7.3
+   add_compile_options(-craympich-mt)
+   # Make sure to also set these variables in the runtime environment:
    #    MPICH_MAX_THREAD_SAFETY=multiple # allows highest MPI thread level (i.e. MPI_THREAD_MULTIPLE)
    #    MPICH_CRAY_OPT_THREAD_SYNC=0 # the Cray MPICH library falls back to using the pthread_mutex-based thread-synchronization implementation
    #    MPICH_OPT_THREAD_SYNC=0 # seems to be a duplicate variable which also appears in some documentation instead of MPICH_CRAY_OPT_THREAD_SYNC (but this one brings a huge speed gain on aleph)
-   #add_compile_options(-DDISABLE_PARALLEL_RESTART_READ) # reading restarts is slow when doing it on parallel on aleph, switch it off for now
-   add_compile_options(-DENABLE_ALEPH_CRAYMPICH_WORKAROUNDS)
-endif()
-if(ALBEDO_INTELMPI_WORKAROUNDS)
-   add_compile_options(-DENABLE_ALBEDO_INTELMPI_WORKAROUNDS)
-   add_compile_options(-DDISABLE_PARALLEL_RESTART_READ)
-endif()
-if(JUWELS_GNUOPENMPI_WORKAROUNDS)
-   add_compile_options(-DENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS)
 endif()
 
-#TODO: this machine specific block can easyly go in  cmake toolchain.
-if    (${FESOM_PLATFORM_STRATEGY} STREQUAL levante.dkrz.de )
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL mn5-gpp )
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL albedo )
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL atosecmwf )
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL juwels )
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)   
-else()
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
+# Backward compatibility: convert old DISABLE_MULTITHREADING to new ASYNCHRONOUS_IO_THREADS
+if(DEFINED DISABLE_MULTITHREADING)
+   if(DISABLE_MULTITHREADING)
+      set(ASYNCHRONOUS_IO_THREADS OFF CACHE BOOL "enable asynchronous I/O threads" FORCE)
+   else()
+      set(ASYNCHRONOUS_IO_THREADS ON CACHE BOOL "enable asynchronous I/O threads" FORCE)
+   endif()
+   message(STATUS "Converted legacy DISABLE_MULTITHREADING=${DISABLE_MULTITHREADING} to ASYNCHRONOUS_IO_THREADS=${ASYNCHRONOUS_IO_THREADS}")
 endif()
-if (DISABLE_MULTITHREADING)
-   message(STATUS "MULTITHREADING @ ${FESOM_PLATFORM_STRATEGY}: OFF")
+
+#TODO: these machine specific block can easyly go in cmake toolchain.
+if    (${FESOM_PLATFORM_STRATEGY} STREQUAL levante.dkrz.de )
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL mn5-gpp )
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL albedo )
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL atosecmwf )
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL juwels )
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)   
 else()
-   message(STATUS "MULTITHREADING @ ${FESOM_PLATFORM_STRATEGY}: ON")
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
+endif()
+if (ASYNCHRONOUS_IO_THREADS)
+   message(STATUS "ASYNCHRONOUS I/O THREADS @ ${FESOM_PLATFORM_STRATEGY}: ON")
+else()
+   message(STATUS "ASYNCHRONOUS I/O THREADS @ ${FESOM_PLATFORM_STRATEGY}: OFF")
 endif()
 
 
@@ -282,8 +267,8 @@ if(ENABLE_MULTIO)
    target_link_libraries(${PROJECT_NAME} PRIVATE multio-fapi)
 endif()
 
-if(DISABLE_MULTITHREADING)
-   target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_MULTITHREADING)
+if(ASYNCHRONOUS_IO_THREADS)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE ASYNCHRONOUS_IO_THREADS)
 endif()
 
 if(${FESOM_COUPLED})
@@ -456,7 +441,7 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
                            #-finit-integer=-9999 
                            #-fsanitize=undefined,address
                         #)
-   ## if use -fsanitize=undefined,address you also need ... PRIVATE -lubsan)           
+   # if use -fsanitize=undefined,address you also need ... PRIVATE -lubsan)           
    #target_link_libraries(${PROJECT_NAME} PRIVATE -lubsan)
                      
 

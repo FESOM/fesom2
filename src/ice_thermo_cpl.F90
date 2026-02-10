@@ -20,6 +20,7 @@ subroutine thermodynamics(ice, partit, mesh)
   USE MOD_PARTIT
   USE MOD_PARSUP
   USE MOD_MESH
+  use o_arrays, only: fw_ice, fw_snw
   use g_config
   use g_forcing_param
   use g_forcing_arrays
@@ -47,7 +48,7 @@ subroutine thermodynamics(ice, partit, mesh)
   !---- local variables (set in this subroutine)
   real(kind=WP)  :: rsss
   !---- output variables (computed in `ice_growth')
-  real(kind=WP)  :: ehf, fw, rsf, dhgrowth, dhsngrowth, dhflice
+  real(kind=WP)  :: ehf, fw, fwice, fwsnw, rsf, dhgrowth, dhsngrowth, dhflice, dAgrowth
   !---- melt pond variables
   real(kind=WP)  :: fpond, meltt_rate, melts_rate
 
@@ -65,14 +66,14 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP), dimension(:,:), pointer :: geo_coord_nod2D
   real(kind=WP), dimension(:)  , pointer :: u_ice, v_ice
   real(kind=WP), dimension(:)  , pointer :: a_ice, m_ice, m_snow
-  real(kind=WP), dimension(:)  , pointer :: thdgr, thdgrsn
+  real(kind=WP), dimension(:)  , pointer :: thdgr, thdgrsn, thdgra
   real(kind=WP), dimension(:)  , pointer :: a_ice_old, m_ice_old, m_snow_old, thdgr_old
   ! melt pond pointers
   real(kind=WP), dimension(:)  , pointer :: apnd, hpnd, ipnd 
   real(kind=WP), dimension(:)  , pointer :: S_oc_array, T_oc_array, u_w, v_w
   real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
 #if defined (__oifs) || defined (__ifsinterface)
-  real(kind=WP), dimension(:) , pointer  :: ice_temp, ice_alb, enthalpyoffuse, ice_heat_qres, ice_heat_qcon
+  real(kind=WP), dimension(:) , pointer  :: ice_temp, ice_alb, enthalpyoffuse, ice_heat_qres, ice_heat_qcon, runoff_liquid, runoff_solid
 #endif
 #if defined (__oasis) || defined (__ifsinterface)
   real(kind=WP), dimension(:)  , pointer ::  oce_heat_flux, ice_heat_flux 
@@ -89,6 +90,7 @@ subroutine thermodynamics(ice, partit, mesh)
   m_snow        => ice%data(3)%values(:)  
   thdgr         => ice%thermo%thdgr(:)
   thdgrsn       => ice%thermo%thdgrsn(:)
+  thdgra        => ice%thermo%thdgra(:)
   a_ice_old     => ice%data(1)%values_old(:)
   m_ice_old     => ice%data(2)%values_old(:)
   m_snow_old    => ice%data(3)%values_old(:)
@@ -103,6 +105,8 @@ subroutine thermodynamics(ice, partit, mesh)
   ice_temp      => ice%data(4)%values(:)
   ice_alb       => ice%atmcoupl%ice_alb(:)
   enthalpyoffuse=> ice%atmcoupl%enthalpyoffuse(:)
+  runoff_liquid => ice%atmcoupl%runoff_liquid(:)
+  runoff_solid  => ice%atmcoupl%runoff_solid(:)
   ice_heat_qres => ice%atmcoupl%flx_qres(:)
   ice_heat_qcon => ice%atmcoupl%flx_qcon(:)
 #endif 
@@ -196,11 +200,14 @@ subroutine thermodynamics(ice, partit, mesh)
      m_snow(inod)         = hsn
      net_heat_flux(inod)  = ehf
      fresh_wa_flux(inod)  = fw
+     fw_ice(inod)         = fwice
+     fw_snw(inod)         = fwsnw
      if (.not. use_virt_salt) then
         real_salt_flux(inod)= rsf
      end if
      thdgr(inod)          = dhgrowth
      thdgrsn(inod)        = dhsngrowth
+     thdgra(inod)         = dAgrowth
      flice(inod)          = dhflice
      
      !---- total evaporation (needed in oce_salt_balance.F90) = evap+subli
@@ -233,7 +240,7 @@ contains
     real(kind=WP)  :: PmEice, PmEocn
 
     !---- local variables and dummys
-    real(kind=WP)  :: hold, hsnold, htmp, hsntmp, heff, h0cur, hdraft, hflood
+    real(kind=WP)  :: hold, hsnold, Aold, htmp, hsntmp, heff, h0cur, hdraft, hflood
 
     !---- cut-off ice thickness (hcutoff) used to avoid very small ice
     !---- thicknesses as well as division by zero. NOTE: the standard
@@ -440,6 +447,7 @@ contains
     dciow = max(dhiow,0._WP)/h0cur
 
     !---- new ice concentration
+    Aold = A
     A = A + dcice + dciow
 
     !---- set a=0 for h=0
@@ -451,16 +459,21 @@ contains
     !---- change in snow and ice thickness due to thermodynamic effects [m/s]
     dhsngrowth = (hsn-hsnold)/dt
     dhgrowth = (h-hold)/dt
+    dAgrowth = (A-Aold)/dt
 
     !---- convert growth per time step dt [m] into freshwater fluxes [m/s]
     PmEocn = PmEocn/dt
 
     !---- total freshwater mass flux into the ocean [kg/m**2/s]
     if (.not. use_virt_salt) then
-       fw  = PmEocn*rhofwt - dhgrowth*rhoice - dhsngrowth*rhosno
-       rsf = -dhgrowth*rhoice*Sice/rhowat
+        fwice = - dhgrowth*rhoice
+        fwsnw = - dhsngrowth*rhosno
+        fw    = PmEocn*rhofwt + fwice + fwsnw
+        rsf   = fwice*Sice/rhowat
     else
-       fw = PmEocn*rhofwt - dhgrowth*rhoice*(rsss-Sice)/rsss - dhsngrowth*rhosno 
+        fwice = - dhgrowth*rhoice*(rsss-Sice)/rsss
+        fwsnw = - dhsngrowth*rhosno 
+        fw    = PmEocn*rhofwt + fwice + fwsnw
     end if
 
     !---- total energie flux into the ocean [W/m**2] (positive downward)
@@ -510,7 +523,10 @@ contains
     end if
 
     !---- convert freshwater mass flux [kg/m**2/s] into sea-water volume flux [m/s]
-    fw   = fw/rhowat
+    fw    = fw   /rhowat
+    fwice = fwice/rhowat
+    fwsnw = fwsnw/rhowat
+    
     ! keep in mind that for computation of FW all imposed fluxes were accounted with the ratio rhofwt/rhowat:
     !evap = evap *rhofwt/rhowat
     !rain = rain *rhofwt/rhowat

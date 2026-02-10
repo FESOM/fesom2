@@ -95,6 +95,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     use g_backscatter
     use Toy_Channel_Soufflet
     use Toy_Channel_Dbgyre
+    use Toy_Neverworld2
     use oce_initial_state_interface
     use oce_adv_tra_fct_interfaces
     use init_ale_interface
@@ -235,8 +236,13 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
               call compute_zonal_mean_ini(partit, mesh)  
               call compute_zonal_mean(dynamics, tracers, partit, mesh)
            end if
+           
          CASE("dbgyre")
              call initial_state_dbgyre(dynamics, tracers, partit, mesh)
+             
+         CASE("neverworld2")
+             call initial_state_neverworld2(dynamics, tracers, partit, mesh)
+             
        END SELECT
     else
        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call oce_initial_state'//achar(27)//'[0m' 
@@ -265,6 +271,12 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     ! initialise arrays that are needed for backscatter_coef
     if(dynamics%opt_visc==8) call init_backscatter(dynamics, partit, mesh)
         
+    
+    !___________________________________________________________________________
+    ! precompute mask for GM/Redi upscalling in the GINsea
+    if ((Fer_GM .or. Redi) .and. scaling_GINsea) then 
+        call init_RediGM_GINsea_mask(partit, mesh)
+    end if 
     
     !___________________________________________________________________________
     if(partit%mype==0) write(*,*) 'Initial state'
@@ -499,6 +511,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     ! define dynamics namelist parameter
     integer        :: opt_visc
     real(kind=WP)  :: visc_gamma0, visc_gamma1, visc_gamma2
+    real(kind=WP)  :: visc_gamma0_h, visc_gamma1_h
     real(kind=WP)  :: visc_easybsreturn
     logical        :: use_ivertvisc=.true.
     logical        :: uke_scaling=.true.
@@ -524,6 +537,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     real(kind=WP)  :: se_visc_gamma0, se_visc_gamma1, se_visc_gamma2
     
     namelist /dynamics_visc   / opt_visc, check_opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
+                                visc_gamma0_h, visc_gamma1_h,                                     &
                                 use_ivertvisc, visc_easybsreturn, &
                                 uke_scaling, uke_scaling_factor, uke_advection, &
                                 rosb_dis, smooth_back, smooth_dis, smooth_back_tend, K_back, c_back
@@ -563,6 +577,8 @@ nl => mesh%nl
     dynamics%visc_gamma0         = visc_gamma0
     dynamics%visc_gamma1         = visc_gamma1
     dynamics%visc_gamma2         = visc_gamma2
+    dynamics%visc_gamma0_h       = visc_gamma0_h
+    dynamics%visc_gamma1_h       = visc_gamma1_h
     dynamics%visc_easybsreturn   = visc_easybsreturn
     dynamics%uke_scaling         = uke_scaling
     dynamics%uke_scaling_factor  = uke_scaling_factor
@@ -718,9 +734,11 @@ nl => mesh%nl
        allocate(dynamics%ke_wind_xVEL(2, elem_size))
        allocate(dynamics%ke_drag_xVEL(2, elem_size))
        allocate(dynamics%ke_J(node_size),  dynamics%ke_D(node_size),   dynamics%ke_G(node_size),  &
-                dynamics%ke_D2(node_size), dynamics%ke_n0(node_size),  dynamics%ke_JD(node_size), &
+                dynamics%ke_D2(node_size), dynamics%ke_JD(node_size), &
                 dynamics%ke_GD(node_size), dynamics%ke_swA(node_size), dynamics%ke_swB(node_size))
-
+       allocate(dynamics%ke_n0(nl-1, node_size))
+       allocate(dynamics%ke_Dx(nl-1, elem_size), dynamics%ke_Dy(nl-1, elem_size), dynamics%ke_DU(nl-1, elem_size),& 
+         dynamics%ke_DV(nl-1, elem_size), dynamics%ke_elemD(nl-1, elem_size), dynamics%ke_elemD2(nl-1, elem_size))
        dynamics%ke_adv      =0.0_WP
        dynamics%ke_cor      =0.0_WP
        dynamics%ke_pre      =0.0_WP
@@ -753,6 +771,14 @@ nl => mesh%nl
        dynamics%ke_GD       =0.0_WP
        dynamics%ke_swA      =0.0_WP
        dynamics%ke_swB      =0.0_WP
+       dynamics%ke_Dx       =0.0_WP
+       dynamics%ke_Dy       =0.0_WP
+       dynamics%ke_DU       =0.0_WP
+       dynamics%ke_DV       =0.0_WP
+       dynamics%ke_elemD    =0.0_WP
+       dynamics%ke_elemD2   =0.0_WP
+
+
     end if
 END SUBROUTINE dynamics_init
 !
@@ -830,6 +856,7 @@ nl              => mesh%nl
     allocate(relax2clim(node_size)) 
     allocate(heat_flux(node_size), Tsurf(node_size))
     allocate(water_flux(node_size), Ssurf(node_size))
+    allocate(fw_ice(node_size), fw_snw(node_size))
     allocate(relax_salt(node_size))
     allocate(virtual_salt(node_size))
 
@@ -901,11 +928,12 @@ nl              => mesh%nl
     dens_flux=0.0_WP
 
     if (Fer_GM) then
-    allocate(fer_c(node_size),fer_scal(node_size), fer_gamma(2, nl, node_size), fer_K(nl, node_size))
-    fer_gamma=0.0_WP
-    fer_K=500._WP
-    fer_c=1._WP
-    fer_scal = 0.0_WP
+    allocate(fer_c(node_size),fer_scal(node_size), fer_gamma(2, nl, node_size), fer_K(nl, node_size), fer_tapfac(nl, node_size))
+    fer_gamma = 0.0_WP
+    fer_K     = 500._WP
+    fer_c     = 1._WP
+    fer_scal  = 0.0_WP
+    fer_tapfac= 1._WP
     end if
 
     if (SPP) then
@@ -923,6 +951,8 @@ nl              => mesh%nl
     Tsurf=0.0_WP
 
     water_flux=0.0_WP
+    fw_ice    =0.0_WP
+    fw_snw    =0.0_WP
     relax_salt=0.0_WP
     virtual_salt=0.0_WP
 

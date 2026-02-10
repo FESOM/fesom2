@@ -15,7 +15,7 @@ module io_MEANDATA
 
   implicit none
   private
-  public :: def_stream, def_stream2D, def_stream3D, output, finalize_output
+  public :: def_stream, def_stream2D, def_stream3D, def_stream0D, output, finalize_output
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -98,6 +98,29 @@ module io_MEANDATA
   type(io_entry), save, allocatable, target   :: io_list(:)
 !
 !--------------------------------------------------------------------------------------------
+! Type for 0D (scalar) output streams - global values with time dimension only
+  type Meandata0D
+    character(100)                             :: name
+    character(500)                             :: description
+    character(100)                             :: units
+    character(500)                             :: long_description=""
+    real(kind=WP), pointer                     :: ptr          ! pointer to scalar value
+    real(real64)                               :: local_value  ! accumulated value
+    integer                                    :: addcounter = 0
+    integer                                    :: accuracy
+    integer                                    :: freq = 1
+    character                                  :: freq_unit = 'm'
+    logical                                    :: is_in_use = .false.
+    ! NetCDF handles
+    integer                                    :: ncid = -1
+    integer                                    :: varid, timeid, timedimid
+    integer                                    :: rec_count = 0
+  end type Meandata0D
+
+  type(Meandata0D), save, target :: io_stream0D(50)
+  integer, save                  :: io_NSTREAMS0D = 0
+!
+!--------------------------------------------------------------------------------------------
 ! generic interface was required to associate variables of unknown rank with the pointers of the same rank
 ! this allows for automatic streaming of associated variables into the netcdf file
   INTERFACE def_stream
@@ -146,6 +169,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     use o_mixing_KPP_mod
     use g_backscatter
     use diagnostics
+    use cmor_variables_diag
     use g_forcing_arrays
 #if defined (__cvmix)    
     use g_cvmix_tke
@@ -167,7 +191,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     integer, save             :: nm_io_unit  = 103       ! unit to open namelist file, skip 100-102 for cray
     integer                   :: iost
     integer,dimension(15)     :: sel_forcvar=0
-    integer                   :: sel_dmoc=0, sel_trgrd_xyz=0, sel_dvd=0
+    integer                   :: sel_dmoc=0, sel_trgrd_xyz=0, sel_dvd=0, sel_redi=0
     character(len=10)         :: id_string
 
     type(t_mesh), intent(in) , target :: mesh
@@ -231,6 +255,61 @@ CASE ('t_star        ')
 CASE ('qsr        ')
     call def_stream(nod2D, myDim_nod2D,'qsr'        , 'solar radiation'      , 'W/s^2'  , qsr_c(:)       , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 
+! CMOR diagnostics for CMIP6/CMIP7 (require ldiag_cmor=.true.)
+CASE ('tos       ')
+    if (ldiag_cmor) then
+    call def_stream(nod2D, myDim_nod2D, 'tos', 'sea surface temperature', 'degC', tos(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Sea surface temperature (CMOR)")
+    end if
+CASE ('sos       ')
+    if (ldiag_cmor) then
+    call def_stream(nod2D, myDim_nod2D, 'sos', 'sea surface salinity', 'psu', sos(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Sea surface salinity (CMOR)")
+    end if
+CASE ('pbo       ')
+    if (ldiag_cmor) then
+    call def_stream(nod2D, myDim_nod2D, 'pbo', 'sea water pressure at sea floor', 'Pa', pbo(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Sea water pressure at sea floor")
+    end if
+CASE ('opottemptend')
+    if (ldiag_cmor) then
+    call def_stream(nod2D, myDim_nod2D, 'opottemptend', 'tendency of sea water potential temperature', 'W/m2', opottemptend(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Tendency of sea water potential temperature expressed as heat content")
+    end if
+
+! CMOR 0D (scalar) diagnostics for CMIP6/CMIP7 (require ldiag_cmor=.true.)
+CASE ('volo      ')
+    if (ldiag_cmor) then
+    call def_stream0D('volo', 'sea water volume', 'm3', volo, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Total volume of liquid sea water")
+    end if
+CASE ('soga      ')
+    if (ldiag_cmor) then
+    call def_stream0D('soga', 'global mean sea water salinity', 'psu', soga, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Global mean sea water salinity")
+    end if
+CASE ('thetaoga  ')
+    if (ldiag_cmor) then
+    call def_stream0D('thetaoga', 'global mean sea water potential temperature', 'degC', thetaoga, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Global mean sea water potential temperature")
+    end if
+CASE ('siarean   ')
+    if (ldiag_cmor) then
+    call def_stream0D('siarean', 'sea ice area northern hemisphere', '1e12 m2', siarean, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Total area of sea ice in the Northern hemisphere")
+    end if
+CASE ('siareas   ')
+    if (ldiag_cmor) then
+    call def_stream0D('siareas', 'sea ice area southern hemisphere', '1e12 m2', siareas, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Total area of sea ice in the Southern hemisphere")
+    end if
+CASE ('siextentn ')
+    if (ldiag_cmor) then
+    call def_stream0D('siextentn', 'sea ice extent northern hemisphere', '1e12 m2', siextentn, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Total area of sea ice extent in the Northern hemisphere")
+    end if
+CASE ('siextents ')
+    if (ldiag_cmor) then
+    call def_stream0D('siextents', 'sea ice extent southern hemisphere', '1e12 m2', siextents, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Total area of sea ice extent in the Southern hemisphere")
+    end if
+CASE ('sivoln    ')
+    if (ldiag_cmor) then
+    call def_stream0D('sivoln', 'sea ice volume northern hemisphere', '1e9 m3', sivoln, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Total volume of sea ice in the Northern hemisphere")
+    end if
+CASE ('sivols    ')
+    if (ldiag_cmor) then
+    call def_stream0D('sivols', 'sea ice volume southern hemisphere', '1e9 m3', sivols, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, "Total volume of sea ice in the Southern hemisphere")
+    end if
 
 ! 2d ssh diagnostic variables
 CASE ('ssh_rhs    ')
@@ -264,14 +343,35 @@ CASE ('m_ice     ')
     if (use_ice) then
     call def_stream(nod2D, myDim_nod2D, 'm_ice',    'ice height per unit area',       'm',      ice%data(2)%values(1:myDim_nod2D),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
-CASE ('thdgr     ')
+
+! ice thermodynamic growth rate: ice, snow, area    
+CASE ('thdgrice  ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'thdgr',    'thermodynamic growth rate ice',    'm/s',    ice%thermo%thdgr(1:myDim_nod2D),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'thdgrice' , 'thermodynamic growth rate ice',               'm/s', ice%thermo%thdgr(1:myDim_nod2D),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
-CASE ('thdgrsn   ')
+CASE ('thdgrsnw  ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'thdgrsn',  'thermodynamic growth rate snow',   'm/s',    ice%thermo%thdgrsn(1:myDim_nod2D),    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'thdgrsnw' , 'thermodynamic growth rate snow',              'm/s', ice%thermo%thdgrsn(1:myDim_nod2D),    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
+CASE ('thdgrarea ')
+    if (use_ice) then
+    call def_stream(nod2D, myDim_nod2D, 'thdgrarea', 'thermodynamic growth rate ice concentration', 'frac/s', ice%thermo%thdgra(1:myDim_nod2D),    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+    
+! ice dynamic growth rate: ice, snow, area    
+CASE ('dyngrice  ')
+    if (use_ice) then
+    call def_stream(nod2D, myDim_nod2D, 'dyngrice' , 'dynamic growth rate ice',               'm/s', ice%thermo%dyngr(1:myDim_nod2D),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('dyngrsnw  ')
+    if (use_ice) then
+    call def_stream(nod2D, myDim_nod2D, 'dyngrsnw' , 'dynamic growth rate snow',              'm/s', ice%thermo%dyngrsn(1:myDim_nod2D),    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('dyngrarea ')
+    if (use_ice) then
+    call def_stream(nod2D, myDim_nod2D, 'dyngrarea', 'dynamic growth rate ice concentration', 'frac/s', ice%thermo%dyngra(1:myDim_nod2D),    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
 CASE ('flice     ')
     if (use_ice) then
     call def_stream(nod2D, myDim_nod2D,  'flice',    'flooding growth rate ice',       'm/s',    flice(:),                  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -447,7 +547,11 @@ CASE ('fh_lwrout ')
     call def_stream(nod2D, myDim_nod2D, 'fh_lwrout', 'outgoing longwave radiation heat flux', 'W/m2', heat_flux_in(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 
 CASE ('fw        ')
-    call def_stream(nod2D, myDim_nod2D, 'fw',       'fresh water flux',                'm/s',    water_flux(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'fw'       , 'fresh water flux',                'm/s',    water_flux(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('fw_ice    ')
+    call def_stream(nod2D, myDim_nod2D, 'fw_ice'   , 'fresh water flux from ice',       'm/s',    fw_ice(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('fw_snw    ')
+    call def_stream(nod2D, myDim_nod2D, 'fw_snw'   , 'fresh water flux from snow',      'm/s',    fw_snw(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 
 CASE ('atmice_x  ')
     call def_stream(nod2D, myDim_nod2D, 'atmice_x', 'stress atmice x',                 'N/m2',   ice%stress_atmice_x(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -508,7 +612,10 @@ CASE ('relaxsalt ')
 CASE ('realsalt  ')
     sel_forcvar(15) = 1
     call def_stream(nod2D , myDim_nod2D , 'realsalt' , 'real salt flux from sea ice', 'm/s*psu', real_salt_flux(:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-        
+
+CASE ('ice_rejectsalt')
+    if (SPP) call def_stream(nod2D , myDim_nod2D , 'ice_rejectsalt' , 'salt flux from plum parameterisation ', 'm/s*psu', ice_rejected_salt(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    
 !___________________________________________________________________________________________________________________________________
 ! output KPP vertical mixing schemes
 CASE ('kpp_obldepth   ')
@@ -1063,13 +1170,41 @@ CASE ('fer_scal  ')
     if (Fer_GM) then
     call def_stream(        nod2D   ,         myDim_nod2D   , 'fer_scal',  'GM surface scaling','',  fer_scal(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
+!PS CASE ('fer_GINsea')
+!PS     if (Fer_GM .and. scaling_GINsea) then
+!PS     call def_stream(        nod2D   ,         myDim_nod2D   , 'fer_GINsea',  'GM surface muliplicator','',  fer_GINsea_mask(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+!PS     end if
 CASE ('fer_C     ')
     if (Fer_GM) then
     call def_stream(        nod2D   ,         myDim_nod2D   , 'fer_C',     'GM,   depth independent speed',  'm/s' ,   fer_c(:),                  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
+CASE ('fer_gammax')
+    if (Fer_GM) then
+    call def_stream((/nl  , nod2D /), (/nl,   myDim_nod2D /), 'fer_gammax','GM, transport gamma_x',  'm^2/s^2', fer_gamma(1,:,:),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('fer_gammay')
+    if (Fer_GM) then
+    call def_stream((/nl  , nod2D /), (/nl,   myDim_nod2D /), 'fer_gammay','GM, transport gamma_y',  'm^2/s^2', fer_gamma(2,:,:),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('sigma_x   ')
+    if (Fer_GM) then
+    call def_stream((/nl-1, nod2D /), (/nl-1, myDim_nod2D /), 'sigma_x',   'zonal density gradient ', 'kg/m^4' , sigma_xy(1,:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('sigma_y   ')
+    if (Fer_GM) then
+    call def_stream((/nl-1, nod2D /), (/nl-1, myDim_nod2D /), 'sigma_y',   'meridional density gradient ',  'kg/m^4' , sigma_xy(2,:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if     
 CASE ('cfl_z         ')
     call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'cfl_z',         'vertical CFL criteria',  '?',           dynamics%cfl_z(:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
+CASE ('fer_tapfac')
+    if (Fer_GM) then
+    call def_stream((/nl-1  , nod2D /), (/nl-1,   myDim_nod2D /), 'fer_tapfac','tapering factor',  '', fer_tapfac(:,:),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if    
+CASE ('redi_K        ')    
+    sel_redi=1
+    if (Redi) then
+        call def_stream((/nl-1  , nod2D /), (/nl-1,   myDim_nod2D /), 'redi_K',   'Redi diffusion coefficient', 'm2/s', Ki(:,:),   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
 !_______________________________________________________________________________
 ! Density MOC diagnostics
 CASE ('dMOC      ')
@@ -1115,9 +1250,12 @@ CASE ('qsi       ')
   call def_stream(nod2D, myDim_nod2D, 'qsi',    'ice heat flux',           'W/m^2',  ice%atmcoupl%ice_flx_h(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('qso       ')
   call def_stream(nod2D, myDim_nod2D, 'qso',    'oce heat flux',           'W/m^2',  ice%atmcoupl%oce_flx_h(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
+CASE ('runoff_liquid  ')
+  call def_stream(nod2D, myDim_nod2D, 'runoff_liquid',  'liquid water runoff',     'm/s',    ice%atmcoupl%runoff_liquid(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('runoff_solid  ')
+  call def_stream(nod2D, myDim_nod2D, 'runoff_solid',  'solid water runoff',     'm/s',    ice%atmcoupl%runoff_solid(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('enthalpy  ')
-  call def_stream(nod2D, myDim_nod2D, 'enth',  'enthalpy of fusion',     'W/m^2',    ice%atmcoupl%enthalpyoffuse(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+  call def_stream(nod2D, myDim_nod2D, 'enth',  'enthalpy of fusion of solid water runoff',     'W/m^2',    ice%atmcoupl%enthalpyoffuse(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('qcon      ')
      call def_stream(nod2D, myDim_nod2D, 'qcon',  'conductive heat flux',   'W/m^2',    ice%atmcoupl%flx_qcon(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)  
 CASE ('qres      ')
@@ -1433,7 +1571,9 @@ END DO ! --> DO i=1, io_listsize
     ! output Redi parameterisation
 #if !defined(__MULTIO)
     if (Redi) then
-        call def_stream((/nl-1  , nod2D /), (/nl-1,   myDim_nod2D /), 'Redi_K',   'Redi diffusion coefficient', 'm2/s', Ki(:,:),    1, 'y', i_real4, partit, mesh)
+        if (sel_redi==0) then 
+            call def_stream((/nl-1  , nod2D /), (/nl-1,   myDim_nod2D /), 'redi_K',   'Redi diffusion coefficient', 'm2/s', Ki(:,:),    1, 'y', i_real4, partit, mesh)
+        endif     
     end if
 #endif
 
@@ -1459,47 +1599,47 @@ END DO ! --> DO i=1, io_listsize
     
     !___________________________________________________________________________
     if (dynamics%ldiag_ke) then
-       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_adv_u_xVEL', 'work of advection   [u]',        'm2/s2', dynamics%ke_adv_xVEL(1,:,:),  io_list(i)%freq, 'y', 8, partit, mesh)
-       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_adv_v_xVEL', 'work of advection   [v]',        'm2/s2', dynamics%ke_adv_xVEL(2,:,:),  io_list(i)%freq, 'y', 8, partit, mesh)
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_adv_u_xVEL', 'work of advection   [u]',        'm2/s2', dynamics%ke_adv_xVEL(1,:,:),  io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_adv_v_xVEL', 'work of advection   [v]',        'm2/s2', dynamics%ke_adv_xVEL(2,:,:),  io_list(i)%freq, 'm', 8, partit, mesh)
+       !TODO: @sidorenko to clean up 
+       !call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_cor_u_xVEL', 'work Coriolis  :)  [u]',         'm2/s2', dynamics%ke_cor_xVEL(1,:,:),  io_list(i)%freq, 'm', 8, partit, mesh)
+       !call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_cor_v_xVEL', 'work Coriolis  :)  [v]',         'm2/s2', dynamics%ke_cor_xVEL(2,:,:),  io_list(i)%freq, 'm', 8, partit, mesh)
 
-       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_cor_u_xVEL', 'work Coriolis  :)  [u]',         'm2/s2', dynamics%ke_cor_xVEL(1,:,:),  io_list(i)%freq, 'y', 8, partit, mesh)
-       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_cor_v_xVEL', 'work Coriolis  :)  [v]',         'm2/s2', dynamics%ke_cor_xVEL(2,:,:),  io_list(i)%freq, 'y', 8, partit, mesh)
+       !call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_pre_u_xVEL', 'work of pressure gradient  [x]', 'm2/s2', dynamics%ke_pre_xVEL(1,:,:),  io_list(i)%freq, 'm', 8, partit, mesh)
+       !call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_pre_v_xVEL', 'work of pressure gradient  [y]', 'm2/s2', dynamics%ke_pre_xVEL(2,:,:),  io_list(i)%freq, 'm', 8, partit, mesh)
 
-       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_pre_u_xVEL', 'work of pressure gradient  [x]', 'm2/s2', dynamics%ke_pre_xVEL(1,:,:),  io_list(i)%freq, 'y', 8, partit, mesh)
-       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_pre_v_xVEL', 'work of pressure gradient  [y]', 'm2/s2', dynamics%ke_pre_xVEL(2,:,:),  io_list(i)%freq, 'y', 8, partit, mesh)
+       !call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_hvis_u_xVEL', 'work of hor. visc. [x]',        'm2/s2', dynamics%ke_hvis_xVEL(1,:,:), io_list(i)%freq, 'm', 8, partit, mesh)
+       !call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_hvis_v_xVEL', 'work of hor. visc. [y]',        'm2/s2', dynamics%ke_hvis_xVEL(2,:,:), io_list(i)%freq, 'm', 8, partit, mesh)
 
-       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_hvis_u_xVEL', 'work of hor. visc. [x]',        'm2/s2', dynamics%ke_hvis_xVEL(1,:,:), io_list(i)%freq, 'y', 8, partit, mesh)
-       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_hvis_v_xVEL', 'work of hor. visc. [y]',        'm2/s2', dynamics%ke_hvis_xVEL(2,:,:), io_list(i)%freq, 'y', 8, partit, mesh)
+       !call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_vvis_u_xVEL', 'work of ver. visc. [x]',        'm2/s2', dynamics%ke_vvis_xVEL(1,:,:), io_list(i)%freq, 'm', 8, partit, mesh)
+       !call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_vvis_v_xVEL', 'work of ver. visc. [y]',        'm2/s2', dynamics%ke_vvis_xVEL(2,:,:), io_list(i)%freq, 'm', 8, partit, mesh)
 
-       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_vvis_u_xVEL', 'work of ver. visc. [x]',        'm2/s2', dynamics%ke_vvis_xVEL(1,:,:), io_list(i)%freq, 'y', 8, partit, mesh)
-       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_vvis_v_xVEL', 'work of ver. visc. [y]',        'm2/s2', dynamics%ke_vvis_xVEL(2,:,:), io_list(i)%freq, 'y', 8, partit, mesh)
+       !call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_du2',    'KE change [0.5 du2]',           'm2/s2', dynamics%ke_du2(1,:,:),  io_list(i)%freq, 'm', 8, partit, mesh)
+       !call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_dv2',    'KE change [0.5 dv2]',           'm2/s2', dynamics%ke_du2(2,:,:),  io_list(i)%freq, 'm', 8, partit, mesh)
+       
+       !call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_cor_u', 'Coriolis  *dT   [X]',       'm/s', dynamics%ke_cor(1,:,:),  io_list(i)%freq, 'm', 8, partit, mesh)
+       !call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_cor_v', 'Coriolis  *dT   [Y]',       'm/s', dynamics%ke_cor(2,:,:),  io_list(i)%freq, 'm', 8, partit, mesh)
 
-       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_du2',    'KE change [0.5 du2]',           'm2/s2', dynamics%ke_du2(1,:,:),  io_list(i)%freq, 'y', 8, partit, mesh)
-       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_dv2',    'KE change [0.5 dv2]',           'm2/s2', dynamics%ke_du2(2,:,:),  io_list(i)%freq, 'y', 8, partit, mesh)
+       !call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_pre_u', 'pressure gradient *dT [x]', 'm/s', dynamics%ke_pre(1,:,:),  io_list(i)%freq, 'm', 8, partit, mesh)
+       !call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_pre_v', 'pressure gradient *dT [y]', 'm/s', dynamics%ke_pre(2,:,:),  io_list(i)%freq, 'm', 8, partit, mesh)
+
+       !call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_hvis_u', 'hor. visc. [x] *dT',       'm/s', dynamics%ke_hvis(1,:,:), io_list(i)%freq, 'm', 8, partit, mesh)
+       !call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_hvis_v', 'hor. visc. [y] *dT',       'm/s', dynamics%ke_hvis(2,:,:), io_list(i)%freq, 'm', 8, partit, mesh)
+
+       !call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_vvis_u', 'ver. visc. [x] *dT',       'm/s', dynamics%ke_vvis(1,:,:), io_list(i)%freq, 'm', 8, partit, mesh)
+       !call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_vvis_v', 'ver. visc. [y] *dT',       'm/s', dynamics%ke_vvis(2,:,:), io_list(i)%freq, 'm', 8, partit, mesh)
 
        call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'W_x_RHO',   'buoyancy work = ke_pre x VEL',  'm2/s2', dynamics%ke_wrho(:,:),   io_list(i)%freq, 'y', 8, partit, mesh)
 
        call def_stream(elem2D, myDim_elem2D,   'ke_wind_x_xVEL',  'work of wind [x]', 'm2/s2', dynamics%ke_wind_xVEL(1,:),  io_list(i)%freq, 'y', 8, partit, mesh)
        call def_stream(elem2D, myDim_elem2D,   'ke_wind_y_xVEL',  'work of wind [y]', 'm2/s2', dynamics%ke_wind_xVEL(2,:),  io_list(i)%freq, 'y', 8, partit, mesh)
 
-       call def_stream(elem2D, myDim_elem2D,   'ke_drag_x_xVEL',  'work of drag [x]', 'm2/s2', dynamics%ke_drag_xVEL(1,:),  io_list(i)%freq, 'y', 8, partit, mesh)
-       call def_stream(elem2D, myDim_elem2D,   'ke_drag_y_xVEL',  'work of drag [y]', 'm2/s2', dynamics%ke_drag_xVEL(2,:),  io_list(i)%freq, 'y', 8, partit, mesh)
-
+       !call def_stream(elem2D, myDim_elem2D,   'ke_drag_x_xVEL',  'work of drag [x]', 'm2/s2', dynamics%ke_drag_xVEL(1,:),  io_list(i)%freq, 'm', 8, partit, mesh)
+       !call def_stream(elem2D, myDim_elem2D,   'ke_drag_y_xVEL',  'work of drag [y]', 'm2/s2', dynamics%ke_drag_xVEL(2,:),  io_list(i)%freq, 'm', 8, partit, mesh)
 !      same as above but without multiplying with UMEAN (for later computation of turbulence fluxes) 
        call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_adv_u', 'advection *dT   [u]',       'm/s', dynamics%ke_adv(1,:,:),  io_list(i)%freq, 'y', 8, partit, mesh)
        call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_adv_v', 'advection *dT   [v]',       'm/s', dynamics%ke_adv(2,:,:),  io_list(i)%freq, 'y', 8, partit, mesh)
 
-       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_cor_u', 'Coriolis  *dT   [X]',       'm/s', dynamics%ke_cor(1,:,:),  io_list(i)%freq, 'y', 8, partit, mesh)
-       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_cor_v', 'Coriolis  *dT   [Y]',       'm/s', dynamics%ke_cor(2,:,:),  io_list(i)%freq, 'y', 8, partit, mesh)
-
-       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_pre_u', 'pressure gradient *dT [x]', 'm/s', dynamics%ke_pre(1,:,:),  io_list(i)%freq, 'y', 8, partit, mesh)
-       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_pre_v', 'pressure gradient *dT [y]', 'm/s', dynamics%ke_pre(2,:,:),  io_list(i)%freq, 'y', 8, partit, mesh)
-
-       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_hvis_u', 'hor. visc. [x] *dT',       'm/s', dynamics%ke_hvis(1,:,:), io_list(i)%freq, 'y', 8, partit, mesh)
-       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_hvis_v', 'hor. visc. [y] *dT',       'm/s', dynamics%ke_hvis(2,:,:), io_list(i)%freq, 'y', 8, partit, mesh)
-
-       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_vvis_u', 'ver. visc. [x] *dT',       'm/s', dynamics%ke_vvis(1,:,:), io_list(i)%freq, 'y', 8, partit, mesh)
-       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_vvis_v', 'ver. visc. [y] *dT',       'm/s', dynamics%ke_vvis(2,:,:), io_list(i)%freq, 'y', 8, partit, mesh)
 
        call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_Umean',   'mean U',                  'm/s', dynamics%ke_umean(1,:,:),  io_list(i)%freq, 'y', 8, partit, mesh)
        call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), 'ke_Vmean',   'mean V',                  'm/s', dynamics%ke_umean(2,:,:),  io_list(i)%freq, 'y', 8, partit, mesh)
@@ -1513,21 +1653,115 @@ END DO ! --> DO i=1, io_listsize
        call def_stream(elem2D, myDim_elem2D,   'ke_wind_x',      'wind [x] *dT', 'm/s', dynamics%ke_wind(1,:),  io_list(i)%freq, 'y', 8, partit, mesh)
        call def_stream(elem2D, myDim_elem2D,   'ke_wind_y',      'wind [y] *dT', 'm/s', dynamics%ke_wind(2,:),  io_list(i)%freq, 'y', 8, partit, mesh)
 
-       call def_stream(elem2D, myDim_elem2D,   'ke_drag_x',      'drag [x] *dT', 'm/s', dynamics%ke_drag(1,:),  io_list(i)%freq, 'y', 8, partit, mesh)
-       call def_stream(elem2D, myDim_elem2D,   'ke_drag_y',      'drag [y] *dT', 'm/s', dynamics%ke_drag(2,:),  io_list(i)%freq, 'y', 8, partit, mesh)
+       !call def_stream(elem2D, myDim_elem2D,   'ke_drag_x',      'drag [x] *dT', 'm/s', dynamics%ke_drag(1,:),  io_list(i)%freq, 'm', 8, partit, mesh)
+       !call def_stream(elem2D, myDim_elem2D,   'ke_drag_y',      'drag [y] *dT', 'm/s', dynamics%ke_drag(2,:),  io_list(i)%freq, 'm', 8, partit, mesh)
        ! surface fields for APE input computations...
-       call def_stream(nod2D , myDim_nod2D ,   'ke_J',           'surface temperature flux [Js]','°C/s',               dynamics%ke_J(:),   io_list(i)%freq, 'y', 8, partit, mesh)
-       call def_stream(nod2D , myDim_nod2D ,   'ke_G',           'surface salinity    flux [Gs]','PSU/s',              dynamics%ke_G(:),   io_list(i)%freq, 'y', 8, partit, mesh)
-       call def_stream(nod2D , myDim_nod2D ,   'ke_D',           'surface density',              'kg/m^3',             dynamics%ke_D(:),   io_list(i)%freq, 'y', 8, partit, mesh)
-       call def_stream(nod2D , myDim_nod2D ,   'ke_D2',          'surface density squared',      'kg^2/m^6',           dynamics%ke_D2(:),  io_list(i)%freq, 'y', 8, partit, mesh)
-       call def_stream(nod2D , myDim_nod2D ,   'ke_n0',          'dRHO/dz',                      'kg/m^4',             dynamics%ke_n0(:),  io_list(i)%freq, 'y', 8, partit, mesh)
-       call def_stream(nod2D , myDim_nod2D ,   'ke_JD',          'surface temperature flux [Js] * RHO','°C*kg/s/m^3',  dynamics%ke_JD(:),  io_list(i)%freq, 'y', 8, partit, mesh)
-       call def_stream(nod2D , myDim_nod2D ,   'ke_GD',          'surface salinity    flux [Gs] * RHO','PSU*kg/s/m^3', dynamics%ke_GD(:),  io_list(i)%freq, 'y', 8, partit, mesh)
-       call def_stream(nod2D , myDim_nod2D ,   'ke_swA',         'Thermal expansion coeff  (alpha)',   '1/°C',         dynamics%ke_swA(:), io_list(i)%freq, 'y', 8, partit, mesh)
-       call def_stream(nod2D , myDim_nod2D ,   'ke_swB',         'Taline contraction coeff (beta)',    '1/PSU',        dynamics%ke_swB(:), io_list(i)%freq, 'y', 8, partit, mesh)
+       call def_stream(nod2D , myDim_nod2D ,   'ke_J',           'surface temperature flux [Js]','°C/s',               dynamics%ke_J(:),   io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream(nod2D , myDim_nod2D ,   'ke_G',           'surface salinity    flux [Gs]','PSU/s',              dynamics%ke_G(:),   io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream(nod2D , myDim_nod2D ,   'ke_D',           'surface density',              'kg/m^3',             dynamics%ke_D(:),   io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream(nod2D , myDim_nod2D ,   'ke_D2',          'surface density squared',      'kg^2/m^6',           dynamics%ke_D2(:),  io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream(nod2D , myDim_nod2D ,   'ke_JD',          'surface temperature flux [Js] * RHO','°C*kg/s/m^3',  dynamics%ke_JD(:),  io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream(nod2D , myDim_nod2D ,   'ke_GD',          'surface salinity    flux [Gs] * RHO','PSU*kg/s/m^3', dynamics%ke_GD(:),  io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream(nod2D , myDim_nod2D ,   'ke_swA',         'Thermal expansion coeff  (alpha)',   '1/°C',         dynamics%ke_swA(:), io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream(nod2D , myDim_nod2D ,   'ke_swB',         'Taline contraction coeff (beta)',    '1/PSU',        dynamics%ke_swB(:), io_list(i)%freq, 'm', 8, partit, mesh)
+       ! fields required to compute the energy conversions between Pm<->Pe, as well as Pm & Pe
+       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/) ,   'ke_n0',     'dRHO/dz',         'kg/m^4',   dynamics%ke_n0(:,:),     io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/) ,  'ke_Dx',     'dRHO/dx',         'kg/m^4',   dynamics%ke_Dx(:,:),     io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/) ,  'ke_Dy',     'dRHO/dy',         'kg/m^4',   dynamics%ke_Dy(:,:),     io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/) ,  'ke_DU',     'RHO*U',           'kg*s/m^2', dynamics%ke_DU(:,:),     io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/) ,  'ke_DV',     'RHO*V',           'kg*s/m^2', dynamics%ke_DV(:,:),     io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/) ,  'ke_elemD',  'RHO*    on elem', 'kg/m^3',   dynamics%ke_elemD(:,:),  io_list(i)%freq, 'm', 8, partit, mesh)
+       call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/) ,  'ke_elemD2', 'RHO*^2  on elem', 'kg2/m^6',  dynamics%ke_elemD2(:,:), io_list(i)%freq, 'm', 8, partit, mesh)
+    end if
+    
+    !___________________________________________________________________________
+    ! CMOR diagnostics: auto-register with defaults if ldiag_cmor=.true. and 
+    ! not already defined in io_list. Default: monthly, double precision
+    if (ldiag_cmor) then
+        ! 2D fields
+        if (.not. stream_already_defined('tos')) then
+            call def_stream(nod2D, myDim_nod2D, 'tos', 'sea surface temperature', 'degC', tos(:), 1, 'm', 8, partit, mesh, "Sea surface temperature (CMOR)")
+        end if
+        if (.not. stream_already_defined('sos')) then
+            call def_stream(nod2D, myDim_nod2D, 'sos', 'sea surface salinity', 'psu', sos(:), 1, 'm', 8, partit, mesh, "Sea surface salinity (CMOR)")
+        end if
+        if (.not. stream_already_defined('pbo')) then
+            call def_stream(nod2D, myDim_nod2D, 'pbo', 'sea water pressure at sea floor', 'Pa', pbo(:), 1, 'm', 8, partit, mesh, "Sea water pressure at sea floor")
+        end if
+        if (.not. stream_already_defined('opottemptend')) then
+            call def_stream(nod2D, myDim_nod2D, 'opottemptend', 'tendency of sea water potential temperature', 'W/m2', opottemptend(:), 1, 'm', 8, partit, mesh, "Tendency of sea water potential temperature")
+        end if
+        
+        ! 0D (scalar) fields
+        if (.not. stream0D_already_defined('volo')) then
+            call def_stream0D('volo', 'sea water volume', 'm3', volo, 1, 'm', 8, partit, "Total volume of liquid sea water")
+        end if
+        if (.not. stream0D_already_defined('soga')) then
+            call def_stream0D('soga', 'global mean sea water salinity', 'psu', soga, 1, 'm', 8, partit, "Global mean sea water salinity")
+        end if
+        if (.not. stream0D_already_defined('thetaoga')) then
+            call def_stream0D('thetaoga', 'global mean sea water potential temperature', 'degC', thetaoga, 1, 'm', 8, partit, "Global mean sea water potential temperature")
+        end if
+        if (.not. stream0D_already_defined('siarean')) then
+            call def_stream0D('siarean', 'sea ice area northern hemisphere', '1e12 m2', siarean, 1, 'm', 8, partit, "Total area of sea ice in the Northern hemisphere")
+        end if
+        if (.not. stream0D_already_defined('siareas')) then
+            call def_stream0D('siareas', 'sea ice area southern hemisphere', '1e12 m2', siareas, 1, 'm', 8, partit, "Total area of sea ice in the Southern hemisphere")
+        end if
+        if (.not. stream0D_already_defined('siextentn')) then
+            call def_stream0D('siextentn', 'sea ice extent northern hemisphere', '1e12 m2', siextentn, 1, 'm', 8, partit, "Total area of sea ice extent in the Northern hemisphere")
+        end if
+        if (.not. stream0D_already_defined('siextents')) then
+            call def_stream0D('siextents', 'sea ice extent southern hemisphere', '1e12 m2', siextents, 1, 'm', 8, partit, "Total area of sea ice extent in the Southern hemisphere")
+        end if
+        if (.not. stream0D_already_defined('sivoln')) then
+            call def_stream0D('sivoln', 'sea ice volume northern hemisphere', '1e9 m3', sivoln, 1, 'm', 8, partit, "Total volume of sea ice in the Northern hemisphere")
+        end if
+        if (.not. stream0D_already_defined('sivols')) then
+            call def_stream0D('sivols', 'sea ice volume southern hemisphere', '1e9 m3', sivols, 1, 'm', 8, partit, "Total volume of sea ice in the Southern hemisphere")
+        end if
+        
+        if (mype == 0) then
+            write(*,*) '    CMOR diagnostics: all variables registered with defaults (monthly, double precision)'
+            write(*,*) '    Override via io_list entries in namelist.io'
+        end if
     end if
     
 end subroutine
+
+
+!_______________________________________________________________________________
+! Check if a 2D/3D stream is already defined
+function stream_already_defined(name) result(found)
+    character(len=*), intent(in) :: name
+    logical :: found
+    integer :: i
+    
+    found = .false.
+    do i = 1, io_NSTREAMS
+        if (trim(io_stream(i)%name) == trim(name)) then
+            found = .true.
+            return
+        end if
+    end do
+end function stream_already_defined
+
+
+!_______________________________________________________________________________
+! Check if a 0D stream is already defined
+function stream0D_already_defined(name) result(found)
+    character(len=*), intent(in) :: name
+    logical :: found
+    integer :: i
+    
+    found = .false.
+    do i = 1, io_NSTREAMS0D
+        if (trim(io_stream0D(i)%name) == trim(name)) then
+            found = .true.
+            return
+        end if
+    end do
+end function stream0D_already_defined
 !
 !
 !_______________________________________________________________________________
@@ -1788,14 +2022,6 @@ subroutine write_mean(entry, entry_index)
         ! loop over vertical layers --> do gather 3d variables layerwise in 2d
         ! slices
         do lev=1, size1
-#ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
-            ! aleph cray-mpich workaround
-            call MPI_Barrier(entry%comm, mpierr)
-#elif ENABLE_ALBEDO_INTELMPI_WORKAROUNDS     
-            call MPI_Barrier(entry%comm, mpierr)
-#elif ENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS     
-            call MPI_Barrier(entry%comm, mpierr)            
-#endif
             !___________________________________________________________________
             ! local output variables are gahtered in 2d shaped entry%aux_r8 
             ! either for vertices or elements
@@ -1833,14 +2059,6 @@ subroutine write_mean(entry, entry_index)
         ! slices
         do lev=1, size1
             !PS if (entry%p_partit%mype==entry%root_rank) t0=MPI_Wtime()  
-#ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
-            ! aleph cray-mpich workaround
-            call MPI_Barrier(entry%comm, mpierr)
-#elif ENABLE_ALBEDO_INTELMPI_WORKAROUNDS     
-            call MPI_Barrier(entry%comm, mpierr)
-#elif ENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS     
-            call MPI_Barrier(entry%comm, mpierr)            
-#endif
             !___________________________________________________________________
             ! local output variables are gahtered in 2d shaped entry%aux_r8 
             ! either for vertices or elements
@@ -1922,6 +2140,12 @@ subroutine update_means
         
         entry%addcounter=entry%addcounter+1
     END DO ! --> DO n=1, io_NSTREAMS
+    
+    ! Update 0D (scalar) means
+    DO n=1, io_NSTREAMS0D
+        io_stream0D(n)%local_value = io_stream0D(n)%local_value + real(io_stream0D(n)%ptr, real64)
+        io_stream0D(n)%addcounter = io_stream0D(n)%addcounter + 1
+    END DO
 end subroutine
 !
 !
@@ -2140,6 +2364,11 @@ ctime=timeold+(dayold-1.)*86400
 #endif
         endif ! --> if (do_output) then
     end do ! --> do n=1, io_NSTREAMS
+    
+    !___________________________________________________________________________
+    ! Handle 0D (scalar) output streams
+    call output_0D_streams(istep, partit)
+    
     lfirst=.false.
 
 #if defined(__MULTIO)
@@ -2149,6 +2378,135 @@ ctime=timeold+(dayold-1.)*86400
 #endif
 
 end subroutine
+
+
+!_______________________________________________________________________________
+! Output routine for 0D (scalar) streams
+subroutine output_0D_streams(istep, partit)
+    use g_clock
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    implicit none
+    integer, intent(in) :: istep
+    type(t_partit), intent(inout) :: partit
+    
+    integer :: n, ierr
+    logical :: do_output
+    type(Meandata0D), pointer :: entry0D
+    character(500) :: filepath
+    real(real64) :: mean_value, rtime
+    
+    do n = 1, io_NSTREAMS0D
+        entry0D => io_stream0D(n)
+        
+        ! Check whether output will be written based on event frequency
+        do_output = .false.
+        if (entry0D%freq_unit == 'y') then
+            call annual_event(do_output, entry0D%freq)
+        else if (entry0D%freq_unit == 'm') then 
+            call monthly_event(do_output, entry0D%freq) 
+        else if (entry0D%freq_unit == 'd') then
+            call daily_event(do_output, entry0D%freq)
+        else if (entry0D%freq_unit == 'h') then
+            call hourly_event(do_output, entry0D%freq)
+        else if (entry0D%freq_unit == 's') then
+            call step_event(do_output, istep, entry0D%freq)
+        endif
+        
+        if (do_output) then
+            ! Compute mean value
+            if (entry0D%addcounter > 0) then
+                mean_value = entry0D%local_value / real(entry0D%addcounter, real64)
+            else
+                mean_value = entry0D%local_value
+            endif
+            
+            ! Only rank 0 does the output (scalar is already globally reduced)
+            if (partit%mype == 0) then
+                ! Build filepath
+                if (filesplit_freq == 'm') then
+                    filepath = trim(ResultPath)//trim(entry0D%name)//'.'//trim(runid)//'.'//cyearnew//'_'//cmonth//'.nc'
+                else
+                    filepath = trim(ResultPath)//trim(entry0D%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
+                endif
+                
+                ! Create or open file
+                if (entry0D%ncid < 0) then
+                    ! Try to open existing file
+                    ierr = nf90_open(trim(filepath), NF90_WRITE, entry0D%ncid)
+                    if (ierr /= NF90_NOERR) then
+                        ! Create new file
+                        call create_0D_file(entry0D, filepath)
+                    else
+                        ! Get existing variable and dimension IDs
+                        call assert_nf(nf90_inq_dimid(entry0D%ncid, 'time', entry0D%timedimid), __LINE__)
+                        call assert_nf(nf90_inq_varid(entry0D%ncid, 'time', entry0D%timeid), __LINE__)
+                        call assert_nf(nf90_inq_varid(entry0D%ncid, trim(entry0D%name), entry0D%varid), __LINE__)
+                        call assert_nf(nf90_inquire_dimension(entry0D%ncid, entry0D%timedimid, len=entry0D%rec_count), __LINE__)
+                    endif
+                endif
+                
+                ! Write data
+                entry0D%rec_count = entry0D%rec_count + 1
+                rtime = ctime
+                
+                call assert_nf(nf90_put_var(entry0D%ncid, entry0D%timeid, rtime, start=(/entry0D%rec_count/)), __LINE__)
+                call assert_nf(nf90_put_var(entry0D%ncid, entry0D%varid, mean_value, start=(/entry0D%rec_count/)), __LINE__)
+                call assert_nf(nf90_sync(entry0D%ncid), __LINE__)
+            endif
+            
+            ! Reset accumulator
+            entry0D%local_value = 0._real64
+            entry0D%addcounter = 0
+        endif
+    end do
+    
+end subroutine output_0D_streams
+
+
+!_______________________________________________________________________________
+! Create a new NetCDF file for 0D (scalar) output
+subroutine create_0D_file(entry0D, filepath)
+    use g_clock
+    implicit none
+    type(Meandata0D), intent(inout) :: entry0D
+    character(len=*), intent(in) :: filepath
+    
+    integer :: ierr
+    character(100) :: time_units
+    
+    ! Create file
+    call assert_nf(nf90_create(trim(filepath), IOR(NF90_CLOBBER, NF90_NETCDF4), entry0D%ncid), __LINE__)
+    
+    ! Define time dimension (unlimited)
+    call assert_nf(nf90_def_dim(entry0D%ncid, 'time', NF90_UNLIMITED, entry0D%timedimid), __LINE__)
+    
+    ! Define time variable
+    call assert_nf(nf90_def_var(entry0D%ncid, 'time', NF90_DOUBLE, (/entry0D%timedimid/), entry0D%timeid), __LINE__)
+    write(time_units, '(a,i4.4,a,i2.2,a,i2.2,a)') 'seconds since ', yearnew, '-01-01 00:00:00'
+    call assert_nf(nf90_put_att(entry0D%ncid, entry0D%timeid, 'units', trim(time_units)), __LINE__)
+    call assert_nf(nf90_put_att(entry0D%ncid, entry0D%timeid, 'calendar', 'standard'), __LINE__)
+    
+    ! Define data variable
+    if (entry0D%accuracy == i_real8) then
+        call assert_nf(nf90_def_var(entry0D%ncid, trim(entry0D%name), NF90_DOUBLE, (/entry0D%timedimid/), entry0D%varid), __LINE__)
+    else
+        call assert_nf(nf90_def_var(entry0D%ncid, trim(entry0D%name), NF90_FLOAT, (/entry0D%timedimid/), entry0D%varid), __LINE__)
+    endif
+    
+    ! Add attributes
+    call assert_nf(nf90_put_att(entry0D%ncid, entry0D%varid, 'description', trim(entry0D%description)), __LINE__)
+    call assert_nf(nf90_put_att(entry0D%ncid, entry0D%varid, 'units', trim(entry0D%units)), __LINE__)
+    if (len_trim(entry0D%long_description) > 0) then
+        call assert_nf(nf90_put_att(entry0D%ncid, entry0D%varid, 'long_name', trim(entry0D%long_description)), __LINE__)
+    endif
+    
+    ! End define mode
+    call assert_nf(nf90_enddef(entry0D%ncid), __LINE__)
+    
+    entry0D%rec_count = 0
+    
+end subroutine create_0D_file
 !
 !
 !_______________________________________________________________________________
@@ -2199,6 +2557,14 @@ subroutine finalize_output()
         entry=>io_stream(i)
         if(entry%thread_running) call entry%thread%join()
         entry%thread_running = .false.    
+    end do
+    
+    ! Close 0D stream files
+    do i=1, io_NSTREAMS0D
+        if (io_stream0D(i)%ncid >= 0) then
+            call assert_nf(nf90_close(io_stream0D(i)%ncid), __LINE__)
+            io_stream0D(i)%ncid = -1
+        end if
     end do
 end subroutine
 !
@@ -2356,6 +2722,66 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
     ! non dimension specific
     call def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh, long_description)
 end subroutine
+!
+!
+!_______________________________________________________________________________
+! build 0D (scalar) meandata streaming object for global values
+subroutine def_stream0D(name, description, units, data, freq, freq_unit, accuracy, partit, long_description)
+  USE MOD_PARTIT
+  USE MOD_PARSUP
+  implicit none
+  character(len=*),      intent(in)    :: name, description, units
+  real(kind=WP), target, intent(in)    :: data
+  integer,               intent(in)    :: freq
+  character,             intent(in)    :: freq_unit
+  integer,               intent(in)    :: accuracy
+  type(t_partit),        intent(inout) :: partit
+  character(len=*), optional, intent(in) :: long_description
+  type(Meandata0D),      pointer       :: entry
+  integer :: i
+
+    !___________________________________________________________________________
+    if (partit%mype==0) then
+        write(*,*) 'adding I/O stream 0D (scalar) for ', trim(name)
+    end if
+
+    !___________________________________________________________________________
+    ! check if we already have this variable
+    do i=1, io_NSTREAMS0D
+        if(trim(io_stream0D(i)%name) .eq. name) then
+            print *,"variable '"//name//"' already exists in 0D streams"
+            call assert(.false., __LINE__) 
+        end if
+    end do
+    
+    !___________________________________________________________________________
+    ! add this instance to io_stream0D array
+    io_NSTREAMS0D = io_NSTREAMS0D + 1
+    call assert(size(io_stream0D) >= io_NSTREAMS0D, __LINE__)
+    entry => io_stream0D(io_NSTREAMS0D)
+    
+    !___________________________________________________________________________
+    ! fill up 0D meandata streaming object
+    entry%name = name
+    entry%description = description
+    entry%units = units
+    entry%ptr => data
+    entry%local_value = 0._real64
+    entry%addcounter = 0
+    entry%accuracy = accuracy
+    entry%freq = freq
+    entry%freq_unit = freq_unit
+    entry%is_in_use = .true.
+    entry%ncid = -1
+    entry%rec_count = 0
+    
+    if (present(long_description)) then
+        entry%long_description = long_description
+    else
+        entry%long_description = description
+    end if
+    
+end subroutine def_stream0D
 !
 !
 !_______________________________________________________________________________
