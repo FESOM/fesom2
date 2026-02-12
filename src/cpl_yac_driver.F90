@@ -13,7 +13,7 @@ module cpl_yac_driver
   integer :: send_field_id(4), recv_field_id(12)
   real(kind=WP), dimension(:,:),   allocatable   :: a2o_fcorr_stat  !flux correction statistics for the output
   integer, parameter         :: nsend = 2
-  integer, parameter         :: nrecv = 5 !SL 5 +1 add river_runoff
+  integer, parameter         :: nrecv = 6 !SL 5 +1 add river_runoff
   character(len=32)          :: cpl_send(nsend), cpl_recv(nrecv)
   integer                    :: cpl_send_collection_size(nsend), cpl_recv_collection_size(nrecv)
   integer                    :: source_root, target_root   !this root/source in MPI_COMM_WORLD
@@ -229,7 +229,7 @@ contains
          grid_id)
 
     CALL yac_fset_global_index( &
-         partit%myList_nod2D,   &
+         partit%myList_nod2D - 1,   &
          YAC_LOCATION_CELL,     &
          grid_id )
 
@@ -262,8 +262,8 @@ contains
     cpl_recv(5) = 'atmosphere_sea_ice_bundle'
     cpl_recv_collection_size(5) = 2
 !SL add river_runoff ----------------
-!    cpl_recv(6) = 'river_runoff'
-!    cpl_recv_collection_size(6) = 1
+    cpl_recv(6) = 'river_runoff'
+    cpl_recv_collection_size(6) = 1
 !SL----------------------------------
 
     DO i=1,nrecv

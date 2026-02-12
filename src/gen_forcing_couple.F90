@@ -97,6 +97,7 @@ subroutine update_atm_forcing_yac(istep, ice, tracers, dynamics, partit, mesh)
   use cpl_yac_driver
   use gen_bulk
   use force_flux_consv_interface
+  USE g_support, only: integrate_nod
 
   implicit none
   integer,        intent(in)            :: istep
@@ -109,7 +110,7 @@ subroutine update_atm_forcing_yac(istep, ice, tracers, dynamics, partit, mesh)
   integer                  :: i, itime,n2,n,nz,k,elem
   real(kind=WP)            :: i_coef, aux
   real(kind=WP)            :: dux, dvy,tx,ty,tvol
-  real(kind=WP)            :: t1, t2
+  real(kind=WP)            :: t1, t2, net
   real(kind=WP)                                    :: flux_global(2), flux_local(2), eff_vol(2)
   real(kind=WP), dimension(:,:), allocatable , save  :: exchange
   real(kind=WP), dimension(:), allocatable , save  :: mask !, weight
@@ -218,9 +219,11 @@ subroutine update_atm_forcing_yac(istep, ice, tracers, dynamics, partit, mesh)
         ice_heat_flux(1:myDim_nod2d)     = (exchange(:,2) + exchange(:,1)) ! heat_ice
         call exchange_nod(ice_heat_flux, partit)
 !SL-- add river runoff ------------------------------
-!     elseif (i.eq.6) then
-!        runoff(1:myDim_nod2d)     = (exchange(:,1))/1000 ! river_runoff
-!        call exchange_nod(runoff, partit)
+     elseif (i.eq.6) then
+        runoff(1:myDim_nod2D) = exchange(:,1) * mesh%area_inv(1,1:myDim_nod2D)
+        call exchange_nod(runoff, partit)
+        call integrate_nod(runoff, net, partit, mesh)
+        if(mype==0) write(*,*) 'RUNOFF CHECK:', net
 !SL--------------------------------------------------
      endif
   end do
@@ -1036,7 +1039,8 @@ SUBROUTINE net_rec_from_atm(action, partit)
   INTEGER 					  :: status(MPI_STATUS_SIZE,partit%npes) 
   INTEGER                                         :: request(2)
   real(kind=WP)                 		  :: aux(nrecv)
-#if defined (__oifs) || defined(__yac)
+!#if defined (__oifs) || defined(__yac)
+#if defined (__oifs)
   return  !OIFS-FESOM2 coupling uses OASIS3MCT conservative remapping and recieves no net fluxes here.
 #endif
 
