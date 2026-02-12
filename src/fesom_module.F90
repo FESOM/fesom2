@@ -505,6 +505,8 @@ contains
         ! LA - this causes the blowup !
         !        f%ice%data(size(f%ice%data))      = f%ice%data(2)
         !        f%ice%data(size(f%ice%data)-1)    = f%ice%data(1)
+                f%ice%data(size(f%ice%data))%values   = f%ice%data(2)%values   ! m_ice -> m_ice_ib
+                f%ice%data(size(f%ice%data)-1)%values = f%ice%data(1)%values   ! a_ice -> a_ice_ib
         !!!!!!!!!!!!!!!!!!
         
         

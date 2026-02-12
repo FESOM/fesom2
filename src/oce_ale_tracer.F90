@@ -999,8 +999,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         if (use_icebergs .and. (.not. turn_off_hf) .and. tracers%data(tr_num)%ID==1) then
             do nz=nzmin, nzmax-1
                 zinv=1.0_WP*dt  !/(zbar(nz)-zbar(nz+1)) ale!
-                !!PS tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n) * ( area(nz+1,n)/areasvol(nz,n)) ) * zinv
-                tr(nz)=tr(nz)+(ibhf_n(nz, n)-ibhf_n(nz+1, n) * area(nz+1,n)/areasvol(nz,n)) * zinv / vcpw
+                tr(nz)=tr(nz) + ibhf_n(nz, n) * zinv / vcpw
             end do
         end if
         

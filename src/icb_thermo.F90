@@ -108,10 +108,10 @@ type(t_partit), intent(inout), target :: partit
     else
         dz = abs(lev_low - lev_up)
     end if
-    dz_acc = dz_acc + dz
     
     v_ibmino  = sqrt( (u_ib - arr_uo_ib(n))**2 + (v_ib - arr_vo_ib(n))**2 ) ! depth-average rel. velocity
-    call iceberg_heat_water_fluxes_3eq(partit, ib, M_bv, H_bv, arr_T_ave_ib(n), arr_S_ave_ib(n),v_ibmino, dz_acc+dz/2.0, tf)
+    call iceberg_heat_water_fluxes_3eq(partit, ib, M_bv, H_bv, arr_T_ave_ib(n), arr_S_ave_ib(n),v_ibmino, -(dz_acc+dz/2.0), tf)
+    dz_acc = dz_acc + dz
     M_bv_dz = M_bv_dz + M_bv*dz
     
     hfbv_flux_ib(ib,n) = H_bv * (2*length_ib*dz  + 2*length_ib*dz ) * scaling(ib)

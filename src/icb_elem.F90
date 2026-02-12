@@ -111,25 +111,23 @@ type(t_dyn)   , intent(inout), target :: dynamics
   return !not my node
  end if 
 
- do node=1,myDim_nod2D
-   do k=1, nod_in_elem2D_num(node) 
-     elem  = nod_in_elem2D(k,node) 
+ do k=1, nod_in_elem2D_num(local_idx)
+   elem  = nod_in_elem2D(k,local_idx)
 
-     !do idx_elem = 1,  nod_in_elem2D(local_idx)%nmb
-     !elem = nod_in_elem2D(local_idx)%addresses(idx_elem)
-     !area_ = voltriangle(elem)
-     area_ = elem_area(elem)
-     patch= patch + area_
-     
-     !gradientx = gradientx + area * sum( ssh(elem2D_nodes(:,elem)) * bafux_2D(:,elem) )
-     !gradienty = gradienty + area * sum( ssh(elem2D_nodes(:,elem)) * bafuy_2D(:,elem) )
+   !do idx_elem = 1,  nod_in_elem2D(local_idx)%nmb
+   !elem = nod_in_elem2D(local_idx)%addresses(idx_elem)
+   !area_ = voltriangle(elem)
+   area_ = elem_area(elem)
+   patch= patch + area_
 
-!LA 2023-03-07
+   !gradientx = gradientx + area * sum( ssh(elem2D_nodes(:,elem)) * bafux_2D(:,elem) )
+   !gradienty = gradienty + area * sum( ssh(elem2D_nodes(:,elem)) * bafuy_2D(:,elem) )
+
+! 2023-03-07
 eta_n_ib => dynamics%eta_n_ib(:)
-! kh 18.03.21 use eta_n_ib buffered values here
-     gradientx = gradientx + area_ * sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(1:3, elem)) 
-     gradienty = gradienty + area_ * sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(4:6, elem)) 
-   end do
+!h 18.03.21 use eta_n_ib buffered values here
+   gradientx = gradientx + area_ * sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(1:3, elem))
+   gradienty = gradienty + area_ * sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(4:6, elem))
  end do
  
  gradientx = gradientx / patch

@@ -565,15 +565,13 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
      case(2) 
       area_ib_tot = length_ib_single*width_ib_single*scaling(ib)
     end select
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(idx, area_ib_tot)
-!$OMP DO
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(idx) REDUCTION(+:area_ib_tot)
     do idx = 1, size(elem_block)
         if (elem_block(idx) == iceberg_elem) then
             area_ib_tot = area_ib_tot + length_ib(idx) * width_ib(idx) * scaling(idx)
         end if
     end do
-!$OMP END DO
-!$OMP END PARALLEL
+!$OMP END PARALLEL DO
   !-----------------------------
 
     if ((area_ib_tot > elem_area_glob(iceberg_elem)) .and. (old_element.ne.0)) then ! .and. (left_mype == 0)) then 
@@ -788,16 +786,14 @@ type(t_partit), intent(inout), target :: partit
       case(2) 
        area_ib_tot = length_ib_single*width_ib_single*scaling(ib)
      end select
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(idx, area_ib_tot)
-!$OMP DO
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(idx) REDUCTION(+:area_ib_tot)
      do idx = 1, size(elem_block_red)
          if (elem_block_red(idx) == iceberg_elem) then
      !        write(*,*) " * Found element ",elem_block_red(idx), " for ib ",idx, ", elem_area=",elem_area_tmp
              area_ib_tot = area_ib_tot + length_ib(idx) * width_ib(idx) * scaling(idx)
          end if
      end do
-!$OMP END DO
-!$OMP END PARALLEL
+!$OMP END PARALLEL DO
      if((area_ib_tot > elem_area_tmp) .and. (elem_area_tmp > 0.0) .and. (old_element.ne.0)) then
          if(mype==pe_block_red(ib) .and. lverbose_icb) then
             write(*,*) " *******************************************************"
@@ -814,9 +810,10 @@ type(t_partit), intent(inout), target :: partit
          u_ib    = 0.
          v_ib    = 0.
 
-         i_have_element= (local_idx_of(iceberg_elem) .ne. 0) 
+         iceberg_elem = old_element
+         i_have_element= (local_idx_of(old_element) .ne. 0)
          if(i_have_element) then
-            i_have_element= mesh%elem2D_nodes(1,local_idx_of(iceberg_elem)) <= partit%myDim_nod2D !1 PE still .true.
+            i_have_element= mesh%elem2D_nodes(1,local_idx_of(old_element)) <= partit%myDim_nod2D !1 PE still .true.
          end if
      end if
    else 
