@@ -112,15 +112,13 @@ type(t_partit), intent(inout), target :: partit
     else
         dz = abs(lev_low - lev_up)                  ! ... otherwise, dz is equal to difference between lower level and upper level
     end if
-    dz_acc = dz_acc + dz                            ! sum up dz along iceberg depth
     
-    v_ibmino  = sqrt( (u_ib - arr_uo_ib(n))**2 + (v_ib - arr_vo_ib(n))**2 )         ! depth-average rel. velocity
-
-    ! calculate freshwater and heat flux densities ...
-    ! why dz_acc+dz/2.0? why not dz_acc-dz/2.0?
-    call iceberg_heat_water_fluxes_3eq(partit, ib, M_bv, H_bv, arr_T_ave_ib(n), arr_S_ave_ib(n), v_ibmino, dz_acc-dz/2.0, tf)
-    M_bv_dz = M_bv_dz + M_bv*dz                     ! ... integrating freshwater flux along iceberg depth
-    hfbv_flux_ib(ib,n) = H_bv * (2*length_ib*dz  + 2*length_ib*dz ) * scaling(ib)   ! ... assign heat flux bv on for layer n 
+    v_ibmino  = sqrt( (u_ib - arr_uo_ib(n))**2 + (v_ib - arr_vo_ib(n))**2 ) ! depth-average rel. velocity
+    call iceberg_heat_water_fluxes_3eq(partit, ib, M_bv, H_bv, arr_T_ave_ib(n), arr_S_ave_ib(n),v_ibmino, -(dz_acc+dz/2.0), tf)
+    dz_acc = dz_acc + dz
+    M_bv_dz = M_bv_dz + M_bv*dz
+    
+    hfbv_flux_ib(ib,n) = H_bv * (2*length_ib*dz  + 2*length_ib*dz ) * scaling(ib)
   
     !'thermal driving', defined as the elevation of ambient water 
     !temperature above freezing point' (Neshyba and Josberger, 1979).

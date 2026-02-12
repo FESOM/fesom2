@@ -355,9 +355,15 @@ type(t_dyn)   , intent(inout), target :: dynamics
  vel_atm = sqrt(ua_ib**2 + va_ib**2)
  wave_amplitude = 0.5 * 0.02025 * vel_atm**2
  
- !assume that waves have same direction as the winds
- direction_u = ua_ib / vel_atm
- direction_v = va_ib / vel_atm
+ !assume that waves have same direction as the winds;
+ !guard against zero wind speed to avoid division by zero
+ if(vel_atm > 0.) then
+   direction_u = ua_ib / vel_atm
+   direction_v = va_ib / vel_atm
+ else
+   direction_u = 0.
+   direction_v = 0.
+ end if
   
  !absolute values of relative velocities 
  abs_omib = sqrt( (uo_ib - u_ib)**2 + (vo_ib - v_ib)**2 )
@@ -1037,7 +1043,13 @@ else !# comp cav flag
     
     else	
       if( k==1 ) then
-          cycle
+        ! Fix: Add first layer contribution before continuing to deeper layers
+        ! Previously this layer was skipped entirely, causing incorrect depth averages
+        uo_dz(m)=uo_dz(m)+ UV_ib(1,k,n2)*dz
+        vo_dz(m)=vo_dz(m)+ UV_ib(2,k,n2)*dz
+        T_dz(m)=T_dz(m)+ Tclim_ib(k,n2)*dz
+        S_dz(m)=S_dz(m)+ Sclim_ib(k,n2)*dz
+        cycle
       end if
 
 
@@ -1193,10 +1205,11 @@ type(t_partit), intent(inout), target :: partit
 	 
     else	
       if( k==1 ) then
+        uo_dz(m)=uo_dz(m)+ UV_ib(1,k,n2)*dz
+        vo_dz(m)=vo_dz(m)+ UV_ib(2,k,n2)*dz
         cycle
       end if
       ! .. and sum up the layer-integrated velocities:
-! kh 08.03.21 use UV_ib buffered values here
       uo_dz(m)=uo_dz(m)+0.5*(UV_ib(1,k-1,n2)+UV_ib(1,k,n2))*dz
       vo_dz(m)=vo_dz(m)+0.5*(UV_ib(2,k-1,n2)+UV_ib(2,k,n2))*dz
 	 
