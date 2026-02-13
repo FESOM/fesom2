@@ -601,7 +601,7 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
-    real(kind=8)  :: u1, v1, len, vi
+    real(kind=8)  :: u1, v1, len, vi, viLapl
     integer       :: ed, el(2), nz, nzmin, nzmax, elem
     real(kind=8)  :: update_u(mesh%nl-1), update_v(mesh%nl-1)
     !___________________________________________________________________________
@@ -626,7 +626,7 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
 !$OMP END PARALLEL DO
 
     !___________________________________________________________________________
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, ed, el, nz, nzmin, nzmax, update_u, update_v)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, viLapl, ed, el, nz, nzmin, nzmax, update_u, update_v)
 !$OMP DO
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
@@ -695,10 +695,12 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
                             dynamics%visc_gamma2*vi)            &
                         )*len)
                 ! vi=-dt*sqrt(max(dynamics%visc_gamma0, dynamics%visc_gamma1*max(sqrt(vi), dynamics%visc_gamma2*vi))*len)
+                ! Optional Laplacian viscosity (active when visc_gamma0_h or visc_gamma1_h > 0)
+                viLapl=dt*max(dynamics%visc_gamma0_h, dynamics%visc_gamma1_h*sqrt(u1*u1+v1*v1))*len
                 !PS update_u(nz)=vi*(U_c(nz,el(1))-U_c(nz,el(2)))*(zbar(nz)-zbar(nz+1)) 
                 !PS update_v(nz)=vi*(V_c(nz,el(1))-V_c(nz,el(2)))*(zbar(nz)-zbar(nz+1)) 
-                update_u(nz)=vi*(U_c(nz,el(1))-U_c(nz,el(2)))*(helem(nz, el(1))+helem(nz, el(2)))*0.5_WP
-                update_v(nz)=vi*(V_c(nz,el(1))-V_c(nz,el(2)))*(helem(nz, el(1))+helem(nz, el(2)))*0.5_WP
+                update_u(nz)=(vi*(U_c(nz,el(1))-U_c(nz,el(2)))+viLapl*u1)*(helem(nz, el(1))+helem(nz, el(2)))*0.5_WP
+                update_v(nz)=(vi*(V_c(nz,el(1))-V_c(nz,el(2)))+viLapl*v1)*(helem(nz, el(1))+helem(nz, el(2)))*0.5_WP
             end do
         else
             do nz=nzmin,nzmax-1
@@ -710,8 +712,10 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
                             dynamics%visc_gamma2*vi)            &
                         )*len)
                 ! vi=-dt*sqrt(max(dynamics%visc_gamma0, dynamics%visc_gamma1*max(sqrt(vi), dynamics%visc_gamma2*vi))*len)
-                update_u(nz)=vi*(U_c(nz,el(1))-U_c(nz,el(2)))
-                update_v(nz)=vi*(V_c(nz,el(1))-V_c(nz,el(2)))
+                ! Optional Laplacian viscosity (active when visc_gamma0_h or visc_gamma1_h > 0)
+                viLapl=dt*max(dynamics%visc_gamma0_h, dynamics%visc_gamma1_h*sqrt(u1*u1+v1*v1))*len
+                update_u(nz)=vi*(U_c(nz,el(1))-U_c(nz,el(2)))+viLapl*u1
+                update_v(nz)=vi*(V_c(nz,el(1))-V_c(nz,el(2)))+viLapl*v1
             end do
         end if 
         
