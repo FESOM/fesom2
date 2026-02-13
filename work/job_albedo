@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --account=clidyn.p_fesom # edit your account
+#SBATCH --account=clidyn.p_clidyn_work # edit your account
 #SBATCH --job-name=run
 #SBATCH --partition=mpp
-#SBATCH --time=01:00:00
-#SBATCH --qos=12h
-#SBATCH --nodes=48            # Number of tasks (MPI) tasks to be launched
-#SBATCH --tasks-per-node 128  # using all 128CPus we exceed the maxload limit (>130) of many used nodes when us parallel I/O
+#SBATCH --time=00:30:00
+#SBATCH --qos=30min
+#SBATCH --nodes=1            # Number of tasks (MPI) tasks to be launched
+#SBATCH --tasks-per-node 12  # using all 128CPus we exceed the maxload limit (>130) of many used nodes when us parallel I/O
 #SBATCH --cpus-per-task 1
 
 #SBATCH -o fesom2_%x_%j.out

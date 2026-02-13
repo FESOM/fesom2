@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --account=clidyn.p_fesom # edit your account
+#SBATCH --account=clidyn.p_clidyn_work # edit your account
 #SBATCH --job-name=ini
 #SBATCH --partition=mpp
 #SBATCH --time=00:30:00
