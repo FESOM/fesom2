@@ -732,12 +732,12 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:,:)   :: respmeso
   Real(kind=8),allocatable,dimension(:,:)   :: respmacro
   Real(kind=8),allocatable,dimension(:,:)   :: respmicro
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmicro_totc
   Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_totc
   Real(kind=8),allocatable,dimension(:,:)   :: grazmacro_totc
-  Real(kind=8),allocatable,dimension(:,:)   :: grazmicro_totc
+  Real(kind=8),allocatable,dimension(:,:)   :: grazmicro_totn
   Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_totn
   Real(kind=8),allocatable,dimension(:,:)   :: grazmacro_totn
-  Real(kind=8),allocatable,dimension(:,:)   :: grazmicro_totn
   Real(kind=8),allocatable,dimension(:,:)   :: calcdiss
   Real(kind=8),allocatable,dimension(:,:)   :: calcif
   Real(kind=8),allocatable,dimension(:,:)   :: aggn
