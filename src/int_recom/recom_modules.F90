@@ -297,6 +297,17 @@ module recom_config
   Real(kind=8)                 :: sCoccoNsq3    = 0.d0            ! NEW 3Zoo
   namelist /pathirdzooplankton/ graz_max3, epsilon3, loss_miczoo, res_miczoo, pzDia3, sDiaNsq3, pzPhy3, sPhyNsq3, pzCocco3, sCoccoNsq3 
 
+!-------------------------------------------------------------------------------
+  !! *** Zooplankton stoichiometric regulation
+  logical                      :: recom_grazing_regulate = .False.
+  logical                      :: recom_respiration_regulate = .False.
+  logical                      :: recom_fecal_regulate = .False.
+  Real(kind=8)                 :: C2Nopt_meso    = 5.5         ! Mesozooplankton optimal C:N
+  Real(kind=8)                 :: C2Nmin_meso    = 4.0         ! Mesozooplankton minimal C:N
+  Real(kind=8)                 :: C2Nopt_macro    = 4.5        ! Macrozooplankton optimal C:N
+  Real(kind=8)                 :: C2Nmin_macro    = 3.0        ! Macrozooplankton minimal C:N
+  namelist /pa_zoo_tochiometric/ recom_grazing_regulate, recom_respiration_regulate, recom_fecal_regulate, C2Nopt_meso, C2Nmin_meso, C2Nopt_macro, C2Nmin_macro
+
 !-------------------------------------------------------------------------------                                                                                                                          
 !! *** Detritus Grazing Params ***                                                                                                                                                                        
   Real(kind=8)                 :: pzDet         = 1.d0           ! Maximum small detritus prefence by first zooplankton 

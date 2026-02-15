@@ -120,6 +120,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #endif
         FreeFe,  &
         O2
+    Real(kind=8) :: rampfun ! auximiary variable for zooplankton stoichiometric regulation
      
 #include "../associate_mesh.h"
 
@@ -778,6 +779,16 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 #if defined (__3Zoo2Det)
             grazingFlux       = (Graz_max * foodsq)/(epsilonr + foodsq) * HetN * q10_mes
 #endif
+            
+! stoichiometric regulation of mesozooplankton grazing            
+! ******************************************************************************
+            if (recom_grazing_regulate) then
+               rampfun = (C2Nopt_meso - recipQZoo) / (C2Nopt_meso - C2Nmin_meso)
+               rampfun = max(min(rampfun,1.0d0),0.0)
+               grazingFlux = 2.0*grazingFlux*(1.0-rampfun) + grazingFlux*rampfun
+            endif
+
+            
             grazingFlux_phy   = grazingFlux * fphyN / food
             grazingFlux_Dia   = grazingFlux * fDiaN / food
             if (Grazing_detritus) grazingFlux_Det   = grazingFlux * fDetN / food
@@ -885,6 +896,14 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             foodsq2 = food2**2
             grazingFlux2 = (Graz_max2 * foodsq2)/(epsilon2 + foodsq2) * Zoo2N * arrFuncZoo2
 
+! stoichiometric regulation of macrozooplankton grazing            
+! ******************************************************************************
+            if (recom_grazing_regulate) then
+               rampfun = (C2Nopt_macro - recipQZoo2) / (C2Nopt_macro - C2Nmin_macro)
+               rampfun = max(min(rampfun,1.0d0),0.0)
+               grazingFlux2 = 2.0*grazingFlux2*(1.0-rampfun) + grazingFlux2*rampfun
+            endif
+
             grazingFlux_phy2 = (grazingFlux2 * fphyN2)/food2
             grazingFlux_Dia2 = (grazingFlux2 * fDiaN2)/food2
             grazingFlux_miczoo2 = (grazingFlux2 * fMicZooN2)/food2 ! 3Zoo
@@ -982,6 +1001,15 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                 HetRespFlux = max(zero, HetRespFlux)  !!!!!!!! CHECK Judith Valid for het_resp_noredfield case as well ???????? Then move it below
             endif
 
+! stoichiometric regulation of mesozooplankton respiration           
+! ******************************************************************************
+            if (recom_respiration_regulate) then
+               rampfun = (C2Nopt_meso - recipQZoo) / (C2Nopt_meso - C2Nmin_meso)
+               rampfun = max(min(rampfun,1.0d0),0.0)
+               HetRespFlux = 0.25*HetRespFlux*(1.0-rampfun) + HetRespFlux*rampfun
+            endif
+            
+            
             if (ciso) then
 !MB    set HetRespFlux_plus = .true. in namelist.recom
 !      HetRespFlux_13   = max(zero, recip_res_het * arrFunc * (hetC_13 * recip_hetN_plus - redfield) * HetC_13)
@@ -1013,6 +1041,15 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             end if
             recip_res_zoo22 = res_zoo2*(1.+ res_zoo2_f + res_zoo2_a)
             Zoo2RespFlux = recip_res_zoo22 * Zoo2C                   
+
+! stoichiometric regulation of mesozooplankton respiration           
+! ******************************************************************************
+            if (recom_respiration_regulate) then
+               rampfun = (C2Nopt_macro - recipQZoo2) / (C2Nopt_macro - C2Nmin_macro)
+               rampfun = max(min(rampfun,1.0d0),0.0)
+               Zoo2RespFlux = 0.25*Zoo2RespFlux*(1.0-rampfun) + Zoo2RespFlux*rampfun
+            endif
+            
 !-------------------------------------------------------------------------------
 !< Second zooplankton mortality (Quadratic)
 
@@ -1022,13 +1059,31 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !< Second zooplankton fecal pellets
 
             Zoo2fecalloss_n = fecal_rate_n * grazingFlux2
+            
             Zoo2fecalloss_c = fecal_rate_c * grazingFluxcarbonzoo2
 
+! stoichiometric regulation of mesozooplankton respiration           
+! ******************************************************************************
+            if (recom_fecal_regulate) then
+               rampfun = (C2Nopt_macro - recipQZoo2) / (C2Nopt_macro - C2Nmin_macro)
+               rampfun = max(min(rampfun,1.0d0),0.0)
+               Zoo2fecalloss_n = Zoo2fecalloss_n * rampfun
+            endif
+            
 !-------------------------------------------------------------------------------
 !< Mesozooplankton fecal pellets
 
             mesfecalloss_n = fecal_rate_n_mes * grazingFlux
             mesfecalloss_c = fecal_rate_c_mes * grazingFluxcarbon_mes
+            
+! stoichiometric regulation of mesozooplankton respiration           
+! ******************************************************************************
+            if (recom_fecal_regulate) then
+               rampfun = (C2Nopt_meso - recipQZoo) / (C2Nopt_meso - C2Nmin_meso)
+               rampfun = max(min(rampfun,1.0d0),0.0)
+               mesfecalloss_n = mesfecalloss_n * rampfun
+            endif
+
 !------------------------------------------------------------------------------- 
 ! Third zooplankton, microzooplankton, respiration ! 3Zoo
 
