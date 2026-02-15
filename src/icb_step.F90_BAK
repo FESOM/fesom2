@@ -144,7 +144,14 @@ type(t_dyn)   , intent(inout), target :: dynamics
  arr_block_red = 0.0
  elem_block_red= 0
  pe_block_red= 0
+ !grounded_int_red = 0
 
+ !! Convert grounded logical to integer for MPI communication
+ !where(grounded)
+ ! grounded_int = 1
+ !elsewhere
+ ! grounded_int = 0
+ !end where
  vl_block_red = 0.0
 
 !$omp critical 
@@ -203,6 +210,19 @@ completed = .false.
 !$omp end critical
  end do
 
+!!$omp critical
+! call MPI_IAllREDUCE(grounded_int, grounded_int_red, ib_num, MPI_INTEGER, MPI_MAX, partit%MPI_COMM_FESOM_IB, req, partit%MPIERR_IB)
+!!$omp end critical
+!
+! completed = .false.
+! do while (.not. completed)
+!!$omp critical
+!  CALL MPI_TEST(req, completed, status, partit%MPIERR_IB)
+!!$omp end critical
+! end do
+!
+! grounded = (grounded_int_red > 0)
+!
  buoy_props=0.
 
  t2=MPI_Wtime()   
@@ -525,6 +545,9 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
  t0=MPI_Wtime()
   call trajectory( lon_rad,lat_rad, u_ib,v_ib, new_u_ib,new_v_ib, &
 		   lon_deg,lat_deg,old_lon,old_lat, dt*REAL(steps_per_ib_step))
+ if ((ib>=60) .and. (ib<=75)) then
+    write(*,*) "LA DEBUG 4: ib: ",ib,", new_u_ib=",new_u_ib,", u_ib=",u_ib
+ end if
   	   
  t1=MPI_Wtime()
   iceberg_elem=local_idx_of(iceberg_elem)  	!local
@@ -542,6 +565,9 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
  t5=MPI_Wtime()
    call trajectory( lon_rad,lat_rad, new_u_ib,new_v_ib, new_u_ib,new_v_ib, &
 		   lon_deg,lat_deg,old_lon,old_lat, dt*REAL(steps_per_ib_step))
+ if ((ib>=60) .and. (ib<=75)) then
+    write(*,*) "LA DEBUG 5: ib: ",ib,", new_u_ib=",new_u_ib,", u_ib=",u_ib
+ end if
  t6=MPI_Wtime()
    u_ib = new_u_ib
    v_ib = new_v_ib
@@ -598,6 +624,7 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
   !###########################################
  
   !values for communication
+    write(*,*) "LA DEBUG 5b: ib: ",ib,", u_ib=",u_ib
   arr= (/ height_ib_single,length_ib_single,width_ib_single, u_ib,v_ib, lon_rad,lat_rad, &
           left_mype, old_lon,old_lat, frozen_in, dudt, dvdt, P_ib, conci_ib, grounded_ib /) 
 
@@ -888,9 +915,11 @@ type(t_partit), intent(inout), target :: partit
   buoy_props(ib,11) = length_ib_single
   buoy_props(ib,12) = width_ib_single
   buoy_props(ib,13) = iceberg_elem
-  buoy_props(ib,14) = arr(16)
 
 ! end if
+ if ((ib>=60) .and. (ib<=75)) then
+    write(*,*) "LA DEBUG 6: ib: ",ib,", u_ib_out=",u_ib_out,", u_ib=",u_ib
+ end if
 
  end if 
  
@@ -904,7 +933,7 @@ end subroutine iceberg_step2
 subroutine initialize_velo(mesh,partit,dynamics, i_have_element, ib, u_ib, v_ib, lon_rad, lat_rad, depth_ib, localelem)			
 
  use g_rotate_grid,  only: vector_g2r
-! use iceberg_params, only: l_initial, l_iniuser, ini_u, ini_v
+ use iceberg_params, only: l_initial, l_iniuser, ini_u, ini_v
 implicit none
  
  logical, intent(in)	:: i_have_element
@@ -1614,7 +1643,7 @@ subroutine init_buoy_output(partit)
   integer                   :: frozen_id, dudt_id, dvdt_id
   integer                   :: uib_id, vib_id
   integer                   :: height_id, length_id, width_id
-  integer                   :: bvl_id, lvlv_id, lvle_id, lvlb_id, felem_id, grounded_id
+  integer                   :: bvl_id, lvlv_id, lvle_id, lvlb_id, felem_id
   character(100)            :: longname, att_text, description
 type(t_partit), intent(inout), target :: partit
 #include "associate_part_def.h"
@@ -1704,9 +1733,6 @@ type(t_partit), intent(inout), target :: partit
   status = nf_def_var(ncid, 'felem', NF_DOUBLE, 2, dimids, felem_id)
   if (status .ne. nf_noerr) call handle_err(status, partit)
 
-  status = nf_def_var(ncid, 'grounded', NF_DOUBLE, 2, dimids, grounded_id)
-  if (status .ne. nf_noerr) call handle_err(status, partit)
-  
   ! Assign long_name and units attributes to variables.
   longname='time' ! use NetCDF Climate and Forecast (CF) Metadata Convention
   status = nf_PUT_ATT_TEXT(ncid, time_varid, 'long_name', len_trim(longname), trim(longname)) 
@@ -1915,17 +1941,6 @@ type(t_partit), intent(inout), target :: partit
   if (status .ne. nf_noerr) call handle_err(status, partit)
   status = nf_PUT_ATT_TEXT(ncid, felem_id, 'Coordinates', 23, 'pos_lon_deg pos_lat_deg') ! arcGIS 
   if (status .ne. nf_noerr) call handle_err(status, partit)
-
-  longname='grounded'
-  status = nf_PUT_ATT_TEXT(ncid, grounded_id, 'long_name', len_trim(longname), trim(longname)) 
-  if (status .ne. nf_noerr) call handle_err(status, partit)
-  status = nf_put_att_text(ncid, grounded_id, 'units', 18, '')
-  if (status .ne. nf_noerr) call handle_err(status, partit)
-  description=''
-  status = nf_put_att_text(ncid, grounded_id, 'description', len_trim(description), trim(description)) 
-  if (status .ne. nf_noerr) call handle_err(status, partit)
-  status = nf_PUT_ATT_TEXT(ncid, grounded_id, 'Coordinates', 23, 'pos_lon_deg pos_lat_deg') ! arcGIS 
-  if (status .ne. nf_noerr) call handle_err(status, partit)
   
   status = nf_enddef(ncid)
   if (status .ne. nf_noerr) call handle_err(status, partit)
@@ -1965,7 +1980,7 @@ subroutine write_buoy_props_netcdf(partit)
   integer                   :: frozen_id, dudt_id, dvdt_id
   integer                   :: uib_id, vib_id  
   integer                   :: height_id, length_id, width_id
-  integer                   :: bvl_id, lvlv_id, lvle_id, lvlb_id, felem_id, grounded_id
+  integer                   :: bvl_id, lvlv_id, lvle_id, lvlb_id, felem_id
   integer                   :: start(2), count(2)
   real(kind=8)              :: sec_in_year
 type(t_partit), intent(inout), target :: partit
@@ -2049,8 +2064,23 @@ type(t_partit), intent(inout), target :: partit
      status = nf_inq_varid(ncid, 'felem', felem_id)
      if (status .ne. nf_noerr) call handle_err(status, partit) 
 
-     status = nf_inq_varid(ncid, 'grounded', grounded_id)
-     if (status .ne. nf_noerr) call handle_err(status, partit) 
+     !buoy_props(ib, 1) = lon_rad_out
+     !buoy_props(ib, 2) = lat_rad_out
+     !buoy_props(ib, 3) = lon_deg_out
+     !buoy_props(ib, 4) = lat_deg_out
+     !buoy_props(ib, 5) = frozen_in
+     !buoy_props(ib, 6) = dudt_out
+     !buoy_props(ib, 7) = dvdt_out
+     !buoy_props(ib, 8) = u_ib_out
+     !buoy_props(ib, 9) = v_ib_out
+     !buoy_props(ib,10) = height_ib
+     !buoy_props(ib,11) = length_ib 
+     !buoy_props(ib,12) = width_ib
+
+     !bvl_mean(ib)*step_per_day
+     !lvlv_mean(ib)*step_per_day
+     !lvle_mean(ib)*step_per_day
+     !lvlb_mean(ib)*step_per_day
 
      ! time and iteration
      status=nf_put_vara_double(ncid, time_varid, save_count_buoys, 1, prev_sec_in_year+sec_in_year) 
@@ -2117,9 +2147,6 @@ type(t_partit), intent(inout), target :: partit
      status=nf_put_vara_double(ncid, felem_id, start, count, buoy_props(:,13)) 
      if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf_put_vara_double(ncid, grounded_id, start, count, buoy_props(:,14)) 
-     if (status .ne. nf_noerr) call handle_err(status, partit)
-     
      !close file
      status=nf_close(ncid)
      if (status .ne. nf_noerr) call handle_err(status, partit)
