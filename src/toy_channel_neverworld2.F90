@@ -206,6 +206,9 @@ MODULE Toy_Neverworld2
             nzmax = nlevels_nod2d(node)
             nzmin = ulevels_nod2d(node)
             do nz=nzmin+1, nzmax-1
+                ! set vertical background diffusivity
+                Kv(nz,node) = K_ver
+                
                 ! force on convection if unstable 
                 if (bvfreq(nz, node) < 0._WP)  Kv(nz,node)=max(Kv(nz,node),instabmix_kv)
             end do
@@ -220,6 +223,9 @@ MODULE Toy_Neverworld2
             nzmax = nlevels(elem)
             nzmin = ulevels(elem)
             do nz=nzmin+1,nzmax-1
+                 ! set vertical background viscosity
+                Av(nz,elem) = A_ver
+                
                 ! force on convection if unstable 
                 if (any(bvfreq(nz, elnodes) < 0._WP)) Av(nz,elem)=max(Av(nz,elem),instabmix_kv)
             end do
