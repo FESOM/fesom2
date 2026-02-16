@@ -693,11 +693,11 @@ subroutine recom_init(tracers, partit, mesh)
         call MPI_AllREDUCE(locDFemax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
         if (mype==0) write(*,*) '  |-> gobal max init. DFe. =', glo
         call MPI_AllREDUCE(locDFemin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-        if (mype==0) write(*,*) '  `-> gobal min init. DFe. =', glo
+        if (mype==0) write(*,*) '  |-> gobal min init. DFe. =', glo
         call MPI_AllREDUCE(locO2max , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
         if (mype==0) write(*,*) '  |-> gobal max init. O2. =', glo
         call MPI_AllREDUCE(locO2min , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-        if (mype==0) write(*,*) '  `-> gobal min init. O2. =', glo
+        if (mype==0) write(*,*) '  |-> gobal min init. O2. =', glo
         call MPI_AllREDUCE(locDICremax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
         if (mype==0) write(*,*) '  |-> gobal max init. DICremin =', glo
         call MPI_AllREDUCE(locDICremin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)

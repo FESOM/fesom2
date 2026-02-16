@@ -636,10 +636,6 @@ CONTAINS
       if (partit%mype==0) write(*,*) '  |-> gobal max init. Alk. =', glo
       call MPI_AllREDUCE(locAlkmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal min init. Alk. =', glo
-      call MPI_AllREDUCE(locDICremax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
-      if (partit%mype==0) write(*,*) '  |-> gobal max init. DICremin. =', glo
-      call MPI_AllREDUCE(locDICremin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
-      if (partit%mype==0) write(*,*) '  |-> gobal min init. DICremin. =', glo
       call MPI_AllREDUCE(locDSimax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal max init. DSi. =', glo
       call MPI_AllREDUCE(locDSimin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
@@ -652,6 +648,11 @@ CONTAINS
       if (partit%mype==0) write(*,*) '  |-> gobal max init. O2. =', glo
       call MPI_AllREDUCE(locO2min , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  `-> gobal min init. O2. =', glo
+      call MPI_AllREDUCE(locDICremax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+      if (partit%mype==0) write(*,*) '  |-> gobal max init. DICremin. =', glo
+      call MPI_AllREDUCE(locDICremin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+      if (partit%mype==0) write(*,*) '  |-> gobal min init. DICremin. =', glo
+
 #endif
    END SUBROUTINE do_ic3d
     

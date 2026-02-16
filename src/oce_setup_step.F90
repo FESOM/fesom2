@@ -994,7 +994,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(in) ,   target :: mesh
     !___________________________________________________________________________
-    integer                  :: i, k, counter, rcounter3, id
+    integer                  :: i, k, counter, rcounter3, id, tr_num
     character(len=10)        :: i_string, id_string
     real(kind=WP)            :: loc, max_temp, min_temp, max_salt, min_salt
     !___________________________________________________________________________
@@ -1076,6 +1076,13 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     relax2clim=0.0_WP
 
 #if defined(__recom)
+    ! set DICremin to zero at surface after initialization
+    do tr_num=1,tracers%num_tracers
+      if (tracers%data(tr_num)%ID==1037) then
+        tracers%data(tr_num)%values(1, : ) = 0
+      end if 
+    end do
+
     if (restore_alkalinity) then
         if (mype==0) write(*,*)
         if (mype==0) print *, achar(27)//'[46;1m'//' --> Set surface field for alkalinity restoring'//achar(27)//'[0m'
