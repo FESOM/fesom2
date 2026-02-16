@@ -103,6 +103,10 @@ subroutine read_namelist
   read (20,NML=pazooplankton)
   read (20,NML=pasecondzooplankton)
   read (20,NML=pathirdzooplankton)       ! NEW 3Zoo
+  read (20,NML=pa_zoo_stochiometric)     ! stoichiometric regulation zooplankton
+  if(mype==0) write(*,*) 'Stoichiometric regulation grazing:', recom_grazing_regulate
+  if(mype==0) write(*,*) 'Stoichiometric regulation respiration:', recom_respiration_regulate
+  if(mype==0) write(*,*) 'Stoichiometric regulation fecal loss:', recom_fecal_regulate
   read (20,NML=pagrazingdetritus)
   read (20,NML=paaggregation)
   read (20,NML=padin_rho_N)

@@ -299,14 +299,19 @@ module recom_config
 
 !-------------------------------------------------------------------------------
   !! *** Zooplankton stoichiometric regulation
-  logical                      :: recom_grazing_regulate = .False.
-  logical                      :: recom_respiration_regulate = .False.
-  logical                      :: recom_fecal_regulate = .False.
+  Logical                      :: recom_grazing_regulate = .false.
+  Logical                      :: recom_respiration_regulate = .false.
+  Logical                      :: recom_fecal_regulate = .false.
   Real(kind=8)                 :: C2Nopt_meso    = 5.5         ! Mesozooplankton optimal C:N
   Real(kind=8)                 :: C2Nmin_meso    = 4.0         ! Mesozooplankton minimal C:N
   Real(kind=8)                 :: C2Nopt_macro    = 4.5        ! Macrozooplankton optimal C:N
   Real(kind=8)                 :: C2Nmin_macro    = 3.0        ! Macrozooplankton minimal C:N
-  namelist /pa_zoo_tochiometric/ recom_grazing_regulate, recom_respiration_regulate, recom_fecal_regulate, C2Nopt_meso, C2Nmin_meso, C2Nopt_macro, C2Nmin_macro
+  Real(kind=8)                 :: grazreg_fac = 1.25           ! factor by which grazing is multiplied at low C:N
+  Real(kind=8)                 :: respreg_fac = 0.75           ! factor by which respiration is multiplied at low C:N
+  Real(kind=8)                 :: fecalreg_fac = 0.75           ! factor by which C excretion is multiplied at low C:N
+  namelist /pa_zoo_stochiometric/ recom_grazing_regulate, recom_respiration_regulate, & 
+                                  recom_fecal_regulate, C2Nopt_meso, C2Nmin_meso, & 
+                                  C2Nopt_macro, C2Nmin_macro, grazreg_fac, respreg_fac, fecalreg_fac
 
 !-------------------------------------------------------------------------------                                                                                                                          
 !! *** Detritus Grazing Params ***                                                                                                                                                                        

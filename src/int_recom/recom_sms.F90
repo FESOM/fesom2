@@ -783,9 +783,9 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 ! stoichiometric regulation of mesozooplankton grazing            
 ! ******************************************************************************
             if (recom_grazing_regulate) then
-               rampfun = (C2Nopt_meso - recipQZoo) / (C2Nopt_meso - C2Nmin_meso)
-               rampfun = max(min(rampfun,1.0d0),0.0)
-               grazingFlux = 2.0*grazingFlux*(1.0-rampfun) + grazingFlux*rampfun
+               rampfun = (recipQZoo - C2Nmin_meso) / (C2Nopt_meso - C2Nmin_meso)
+               rampfun = max( min( rampfun,1.0d0 ),0.0 )
+               grazingFlux = grazreg_fac*grazingFlux*(1.0-rampfun) + grazingFlux*rampfun
             endif
 
             
@@ -899,9 +899,9 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 ! stoichiometric regulation of macrozooplankton grazing            
 ! ******************************************************************************
             if (recom_grazing_regulate) then
-               rampfun = (C2Nopt_macro - recipQZoo2) / (C2Nopt_macro - C2Nmin_macro)
+               rampfun = (recipQZoo2 - C2Nmin_macro) / (C2Nopt_macro - C2Nmin_macro)
                rampfun = max(min(rampfun,1.0d0),0.0)
-               grazingFlux2 = 2.0*grazingFlux2*(1.0-rampfun) + grazingFlux2*rampfun
+               grazingFlux2 = grazreg_fac*grazingFlux2*(1.0-rampfun) + grazingFlux2*rampfun
             endif
 
             grazingFlux_phy2 = (grazingFlux2 * fphyN2)/food2
@@ -1004,9 +1004,9 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 ! stoichiometric regulation of mesozooplankton respiration           
 ! ******************************************************************************
             if (recom_respiration_regulate) then
-               rampfun = (C2Nopt_meso - recipQZoo) / (C2Nopt_meso - C2Nmin_meso)
+               rampfun = (recipQZoo - C2Nmin_meso) / (C2Nopt_meso - C2Nmin_meso)
                rampfun = max(min(rampfun,1.0d0),0.0)
-               HetRespFlux = 0.25*HetRespFlux*(1.0-rampfun) + HetRespFlux*rampfun
+               HetRespFlux = respreg_fac*HetRespFlux*(1.0-rampfun) + HetRespFlux*rampfun
             endif
             
             
@@ -1042,12 +1042,12 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             recip_res_zoo22 = res_zoo2*(1.+ res_zoo2_f + res_zoo2_a)
             Zoo2RespFlux = recip_res_zoo22 * Zoo2C                   
 
-! stoichiometric regulation of mesozooplankton respiration           
+! stoichiometric regulation of macrozooplankton respiration           
 ! ******************************************************************************
             if (recom_respiration_regulate) then
-               rampfun = (C2Nopt_macro - recipQZoo2) / (C2Nopt_macro - C2Nmin_macro)
+               rampfun = (recipQZoo2 - C2Nmin_macro) / (C2Nopt_macro - C2Nmin_macro)
                rampfun = max(min(rampfun,1.0d0),0.0)
-               Zoo2RespFlux = 0.25*Zoo2RespFlux*(1.0-rampfun) + Zoo2RespFlux*rampfun
+               Zoo2RespFlux = respreg_fac*Zoo2RespFlux*(1.0-rampfun) + Zoo2RespFlux*rampfun
             endif
             
 !-------------------------------------------------------------------------------
@@ -1062,12 +1062,12 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             
             Zoo2fecalloss_c = fecal_rate_c * grazingFluxcarbonzoo2
 
-! stoichiometric regulation of mesozooplankton respiration           
+! stoichiometric regulation of macrozooplankton C excretion           
 ! ******************************************************************************
             if (recom_fecal_regulate) then
-               rampfun = (C2Nopt_macro - recipQZoo2) / (C2Nopt_macro - C2Nmin_macro)
+               rampfun = (recipQZoo2 - C2Nmin_macro) / (C2Nopt_macro - C2Nmin_macro)
                rampfun = max(min(rampfun,1.0d0),0.0)
-               Zoo2fecalloss_n = Zoo2fecalloss_n * rampfun
+               Zoo2fecalloss_c = fecalreg_fac*Zoo2fecalloss_c*(1.0-rampfun) + Zoo2fecalloss_c * rampfun
             endif
             
 !-------------------------------------------------------------------------------
@@ -1076,12 +1076,12 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             mesfecalloss_n = fecal_rate_n_mes * grazingFlux
             mesfecalloss_c = fecal_rate_c_mes * grazingFluxcarbon_mes
             
-! stoichiometric regulation of mesozooplankton respiration           
+! stoichiometric regulation of mesozooplankton C excretion           
 ! ******************************************************************************
             if (recom_fecal_regulate) then
-               rampfun = (C2Nopt_meso - recipQZoo) / (C2Nopt_meso - C2Nmin_meso)
+               rampfun = (recipQZoo - C2Nmin_meso) / (C2Nopt_meso - C2Nmin_meso)
                rampfun = max(min(rampfun,1.0d0),0.0)
-               mesfecalloss_n = mesfecalloss_n * rampfun
+               mesfecalloss_c = fecalreg_fac*mesfecalloss_c*(1.0-rampfun) + mesfecalloss_c * rampfun
             endif
 
 !------------------------------------------------------------------------------- 
