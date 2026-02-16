@@ -598,10 +598,11 @@ contains
 !          biogeochemical model setup (enable_3zoo2det, enable_coccos)
 ! ==============================================================================
 subroutine validate_recom_tracers(num_tracers, mype)
-  use g_forcing_param, only: use_age_tracer
-    
+  
+  use g_forcing_param, only: use_age_tracer !---age-code
+  
   implicit none
-
+  
   ! Arguments
   integer, intent(in) :: num_tracers  ! Total number of tracers from namelist
   integer, intent(in) :: mype         ! MPI rank
@@ -680,7 +681,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
   
   if (use_age_tracer) then 
     expected_bgc_num = expected_bgc_num + 1 
-  end if 
+  end if
 
   expected_total_tracers = num_physical_tracers + expected_bgc_num
 
@@ -721,9 +722,6 @@ subroutine validate_recom_tracers(num_tracers, mype)
     expected_tracer_ids(37) = 1035  ! Zoo3N
     expected_tracer_ids(38) = 1036  ! Zoo3C
     expected_tracer_ids(39) = 1037  ! DIC remin (added by Sina)
-!    if (use_age_tracer) then
-!      expected_tracer_ids(40) = 100
- !   end if 
 
   else if (enable_coccos .and. .not. enable_3zoo2det) then
     ! Coccos only: 1001-1022 (base) + 1023-1028 (coccos+phaeo)
@@ -734,9 +732,6 @@ subroutine validate_recom_tracers(num_tracers, mype)
     expected_tracer_ids(29) = 1027  ! PhaeoC
     expected_tracer_ids(30) = 1028  ! PhaeoChl
     expected_tracer_ids(31) = 1037  ! DIC remin (added by Sina)
-!    if (use_age_tracer) then
-!      expected_tracer_ids(32) = 100
-!    end if
 
   else if (enable_3zoo2det .and. .not. enable_coccos) then
     ! 3Zoo2Det only: 1001-1022 (base) + 1023-1030 (zoo2+det2+zoo3)
@@ -749,17 +744,16 @@ subroutine validate_recom_tracers(num_tracers, mype)
     expected_tracer_ids(31) = 1029  ! Zoo3N
     expected_tracer_ids(32) = 1030  ! Zoo3C
     expected_tracer_ids(33) = 1037  ! DIC remin (added by Sina)
-!    if (use_age_tracer) then
-!      expected_tracer_ids(34) = 100
-!    end if
 
   else 
     expected_tracer_ids(25) = 1037 ! add DIC remin tracer to base BGC tracers (added by Sina)
-!    if (use_age_tracer) then
-!      expected_tracer_ids(26) = 100
-!    end if
 
   end if
+
+  if (use_age_tracer) then 
+    expected_tracer_ids(num_expected_tracers) = 100
+  end if
+
   ! else: base configuration only needs tracers 1, 2, 1001-1022
 
   ! ===========================================================================
@@ -843,13 +837,13 @@ subroutine validate_recom_tracers(num_tracers, mype)
   ! ===========================================================================
   ! Additional sanity check: verify bgc_num variable matches
   ! ===========================================================================
-  if (bgc_num /= expected_bgc_num) then
+  if (actual_bgc_num /= expected_bgc_num) then
     if (mype == 0) then
       write(*,*) '=========================================================================='
       write(*,*) 'WARNING: bgc_num variable inconsistency!'
       write(*,*) '=========================================================================='
       write(*,*) 'The bgc_num parameter does not match the expected value.'
-      write(*,*) '  Current bgc_num value: ', bgc_num
+      write(*,*) '  Current bgc_num value: ', actual_bgc_num
       write(*,*) '  Expected value:        ', expected_bgc_num
       write(*,*) ''
       write(*,*) 'This may indicate that bgc_num was not updated after changing'
@@ -887,7 +881,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
       write(*,*) 'Extended configuration tracers:'
       write(*,*) '  ', expected_tracer_ids(25:(num_expected_tracers-1)) ! Sina: -1 here for DICremin tracer as it is added at the end))
       if (use_age_tracer) then 
-        write (*,*) '  ', expected_tracer_ids(25:(num_expected_tracers-2)), expected_tracer_ids(num_expected_tracers)
+        write (*,*) '  ', expected_tracer_ids(25:(num_expected_tracers-1)), expected_tracer_ids(num_expected_tracers)
       end if 
       write(*,*) ''
     end if
@@ -998,6 +992,9 @@ end subroutine validate_recom_tracers
 !          Call this after reading the tracer namelist
 ! ==============================================================================
 subroutine validate_tracer_id_sequence(tracer_ids, num_tracers, mype)
+  
+  use g_forcing_param, only: use_age_tracer !---age-code
+
   implicit none
 
   ! Arguments
@@ -1045,6 +1042,10 @@ subroutine validate_tracer_id_sequence(tracer_ids, num_tracers, mype)
   else 
     expected_ids(25) = 1037    ! DICremin, added by Sina 
   end if
+
+  if (use_age_tracer) then 
+    expected_ids(num_tracers) = 100
+  end if 
 
   ! ===========================================================================
   ! Check 1: Compare actual vs expected tracer IDs
