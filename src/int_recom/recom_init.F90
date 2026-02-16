@@ -646,15 +646,15 @@ subroutine recom_init(tracers, partit, mesh)
         locDICmin = locDINmin
         locAlkmax = locDINmax
         locAlkmin = locDINmin
-        locDICremax = locDICremax ! init DIC remin (added by Sina)
-        locDICremin = locDICremin ! init DIC remin (added by Sina)
         locDSimax = locDINmax
         locDSimin = locDINmin
         locDFemax = locDINmax
         locDFemin = locDINmin
         locO2max  = locDINmax
         locO2min  = locDINmin
-        
+        locDICremax = locDICremax ! init DIC remin (added by Sina)
+        locDICremin = locDICremin ! init DIC remin (added by Sina)
+
         do n=1, myDim_nod2d
             locDINmax = max(locDINmax,maxval(tracers%data(3)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
             locDINmin = min(locDINmin,minval(tracers%data(3)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
@@ -662,14 +662,14 @@ subroutine recom_init(tracers, partit, mesh)
             locDICmin = min(locDICmin,minval(tracers%data(4)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
             locAlkmax = max(locAlkmax,maxval(tracers%data(5)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
             locAlkmin = min(locAlkmin,minval(tracers%data(5)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
-            locDICremax  = min(locDICremax,minval(tracers%data(9)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) ) ! init DIC remin (added by Sina)
-            locDICremin  = min(locDICremin,minval(tracers%data(9)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) ) ! init DIC remin (added by Sina)
             locDSimax = max(locDSimax,maxval(tracers%data(20)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
             locDSimin = min(locDSimin,minval(tracers%data(20)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
             locDFemax = max(locDFemax,maxval(tracers%data(21)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
             locDFemin = min(locDFemin,minval(tracers%data(21)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
             locO2max  = max(locO2max,maxval(tracers%data(24)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
             locO2min  = min(locO2min,minval(tracers%data(24)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
+            locDICremax  = min(locDICremax,minval(tracers%data(39)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) ) ! init DIC remin (added by Sina)
+            locDICremin  = min(locDICremin,minval(tracers%data(39)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) ) ! init DIC remin (added by Sina)
         end do
 
         if (mype==0) write(*,*) "Sanity check for REcoM variables after recom_init call"
