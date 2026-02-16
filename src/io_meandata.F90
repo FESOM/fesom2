@@ -1220,8 +1220,8 @@ CASE ('dMOC      ')
        if (Fer_GM) call def_stream((/std_dens_N, nod2D /),  (/std_dens_N,  myDim_nod2D/), 'std_dens_DIVbolus',   'm3/s',  'm3/s'   ,std_dens_DIV_fer(:,:),  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
        call def_stream((/std_dens_N, elem2D/),  (/std_dens_N, myDim_elem2D/), 'std_dens_Z',     'm',                      'm'      ,std_dens_Z(:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
        call def_stream((/std_dens_N, elem2D/),  (/std_dens_N, myDim_elem2D/), 'std_dens_H'    , 'density thickness'     , 'm'     , std_dens_H(:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-       call def_stream((/nl-1,       nod2D /),  (/nl-1,       myDim_nod2D /), 'density_dMOC',   'density'               , 'm',      density_dmoc(:,:),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-       call def_stream(elem2D,                                myDim_elem2D  , 'density_flux_e', 'density flux at elems ', 'm',      dens_flux_e(:),         io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+       call def_stream((/nl-1,       nod2D /),  (/nl-1,       myDim_nod2D /), 'density_dMOC',   'density'               , 'kg/m3',      density_dmoc(:,:),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+       call def_stream(elem2D,                                myDim_elem2D  , 'density_flux_e', 'density flux at elems ', 'm/s',      dens_flux_e(:),         io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
     
 !_______________________________________________________________________________
