@@ -3332,6 +3332,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     use g_cvmix_tidal
 #endif    
     use Toy_Channel_Soufflet
+    use Toy_Neverworld2
     use oce_ale_interfaces
     use compute_vert_vel_transpv_interface
     use compute_ssh_split_explicit_interface
@@ -3479,7 +3480,10 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_tke'//achar(27)//'[0m'
         call calc_cvmix_tke(dynamics, partit, mesh)
         call mo_convect(ice, partit, mesh)
-#endif    
+#endif  
+    else if(mix_scheme_nmb==8) then
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_TOY'//achar(27)//'[0m' 
+        call oce_mixing_TOY(partit, mesh)
     end if   
 
 #if defined (__cvmix)       
