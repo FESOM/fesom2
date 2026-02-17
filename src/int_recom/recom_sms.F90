@@ -1948,7 +1948,10 @@ real(kind=8) :: &
 
             ! Apply Liebig's law: most limiting nutrient controls photosynthesis
             qlimitFac = min(qlimitFac, feLimitFac)
-
+            
+            ! tracking qlimitFac
+            VTqlimitFac_phyto(k) = qlimitFac 
+            
             ! Calculate maximum photosynthesis rate with temperature correction
             if (enable_coccos) then
                 ! Use species-specific temperature function (when cocco module active)
@@ -1976,6 +1979,9 @@ real(kind=8) :: &
             feLimitFac = Fe / (k_Fe_d + Fe)
             qlimitFac = min(qlimitFac, feLimitFac)
 
+            ! tracking qlimitFac
+            VTqlimitFac_diatoms(k) = qlimitFac
+
             ! Calculate maximum photosynthesis rate
             if (enable_coccos) then
                 pMax_dia = qlimitFac * Temp_diatoms
@@ -1998,6 +2004,9 @@ real(kind=8) :: &
                 feLimitFac = Fe / (k_Fe_c + Fe)
                 qlimitFac = min(qlimitFac, feLimitFac)
 
+                ! tracking qlimitFac
+                VTqlimitFac_cocco(k) = qlimitFac
+
                 ! Calculate maximum photosynthesis rate
                 pMax_cocco = qlimitFac * Temp_cocco
 
@@ -2013,6 +2022,9 @@ real(kind=8) :: &
                 ! Iron limitation
                 feLimitFac = Fe / (k_Fe_p + Fe)
                 qlimitFac = min(qlimitFac, feLimitFac)
+                
+                ! tracking qlimitFac
+                VTqlimitFac_phaeo(k) = qlimitFac
 
                 ! Calculate maximum photosynthesis rate
                 pMax_phaeo = qlimitFac * Temp_phaeo
