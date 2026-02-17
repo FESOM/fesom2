@@ -649,7 +649,7 @@ subroutine iceberg_levelwise_andkeel(mesh, partit, dynamics, uo_dz,vo_dz, uo_kee
   REAL, dimension(:,:,:), pointer :: UV_ib
 
   real           :: lev_up, lev_low
-  integer        :: m, k, n2, n_up, n_low, cavity_count, max_node_level_count
+  integer        :: m, k, n2, max_node_level_count
   ! depth over which is integrated (layer and sum)
   real           :: dz, ufkeel1, ufkeel2, Temkeel, Salkeel
 
@@ -662,7 +662,6 @@ type(t_partit), intent(inout), target :: partit
 #include "associate_mesh_ass.h"
 
   UV_IB     => dynamics%uv_ib(:,:,:)
-  cavity_count=0
 
   do m=1,3
     if(m==1) then
@@ -738,6 +737,12 @@ type(t_partit), intent(inout), target :: partit
         ufkeel2 = UV_ib(2,1,n2)
         Temkeel = Tclim_ib(1,n2)
         Salkeel = Sclim_ib(1,n2)
+      else if( k > nlevels_nod2D(n2)-1 ) then
+        ! Last half-layer to bottom: no UV_ib(k), use piecewise constant
+        ufkeel1 = UV_ib(1,k-1,n2)
+        ufkeel2 = UV_ib(2,k-1,n2)
+        Temkeel = Tclim_ib(k-1,n2)
+        Salkeel = Sclim_ib(k-1,n2)
       else
         ! Interpolate keel values between mid-levels k-1 and k
         ufkeel1 = interpol1D(abs(lev_up),UV_ib(1,k-1,n2),abs(lev_low),UV_ib(1,k,n2),abs(depth_ib))
@@ -761,16 +766,28 @@ type(t_partit), intent(inout), target :: partit
 
     ! Regular layer: iceberg extends deeper
     else
-      ! Store per-level value (UV_ib(k) lives at Z_3d_n_ib(k))
-      uo_dz(m,k)=UV_ib(1,k,n2)
-      vo_dz(m,k)=UV_ib(2,k,n2)
-      T_dz(m,k)=Tclim_ib(k,n2)
-      S_dz(m,k)=Sclim_ib(k,n2)
-      ! Update keel to deepest level so far
-      uo_keel(m)=UV_ib(1,k,n2)
-      vo_keel(m)=UV_ib(2,k,n2)
-      T_keel(m)=Tclim_ib(k,n2)
-      S_keel(m)=Sclim_ib(k,n2)
+      if( k > nlevels_nod2D(n2)-1 ) then
+        ! Last half-layer to bottom: no UV_ib(k), use piecewise constant
+        uo_dz(m,k)=UV_ib(1,k-1,n2)
+        vo_dz(m,k)=UV_ib(2,k-1,n2)
+        T_dz(m,k)=Tclim_ib(k-1,n2)
+        S_dz(m,k)=Sclim_ib(k-1,n2)
+        uo_keel(m)=UV_ib(1,k-1,n2)
+        vo_keel(m)=UV_ib(2,k-1,n2)
+        T_keel(m)=Tclim_ib(k-1,n2)
+        S_keel(m)=Sclim_ib(k-1,n2)
+      else
+        ! Store per-level value (UV_ib(k) lives at Z_3d_n_ib(k))
+        uo_dz(m,k)=UV_ib(1,k,n2)
+        vo_dz(m,k)=UV_ib(2,k,n2)
+        T_dz(m,k)=Tclim_ib(k,n2)
+        S_dz(m,k)=Sclim_ib(k,n2)
+        ! Update keel to deepest level so far
+        uo_keel(m)=UV_ib(1,k,n2)
+        vo_keel(m)=UV_ib(2,k,n2)
+        T_keel(m)=Tclim_ib(k,n2)
+        S_keel(m)=Sclim_ib(k,n2)
+      end if
     end if
 
    end do innerloop
@@ -834,7 +851,7 @@ subroutine iceberg_average_andkeel(mesh, partit, dynamics, uo_dz,vo_dz, uo_keel,
   REAL, dimension(:,:,:), pointer :: UV_ib
 
   real           :: lev_up, lev_low
-  integer        :: m, k, n2, n_up, n_low, cavity_count
+  integer        :: m, k, n2
   ! depth over which is integrated (layer and sum)
   real           :: dz, ufkeel1, ufkeel2, Temkeel, Salkeel
 
@@ -847,7 +864,6 @@ type(t_partit), intent(inout), target :: partit
 #include "associate_mesh_ass.h"
 
   UV_IB     => dynamics%uv_ib(:,:,:)
-  cavity_count=0
 
   !LOOP: over all nodes of the iceberg element
   nodeloop: do m=1, 3
@@ -864,14 +880,18 @@ type(t_partit), intent(inout), target :: partit
    S_keel(m)=0.0
 
    ! LOOP over mid-levels: Z_3d_n_ib(k) gives depth where UV_ib(k) lives
-   innerloop: do k=1, nlevels_nod2D(n2)-1
+   innerloop: do k=1, nlevels_nod2D(n2)
     if( k==1 ) then
         lev_up = 0.0
     else
         lev_up = mesh%Z_3d_n_ib(k-1, n2)
     end if
 
-    lev_low = mesh%Z_3d_n_ib(k, n2)
+    if( k <= nlevels_nod2D(n2)-1 ) then
+        lev_low = mesh%Z_3d_n_ib(k, n2)
+    else
+        lev_low = mesh%zbar_n_bot(n2)          ! bottom boundary
+    end if
 
     if (lev_up==lev_low) then
       exit innerloop
@@ -908,6 +928,16 @@ type(t_partit), intent(inout), target :: partit
         vo_dz(m)=ufkeel2*dz
         T_dz(m)=Temkeel*dz
         S_dz(m)=Salkeel*dz
+      else if( k > nlevels_nod2D(n2)-1 ) then
+        ! Last half-layer to bottom: no UV_ib(k), use piecewise constant
+        ufkeel1 = UV_ib(1,k-1,n2)
+        ufkeel2 = UV_ib(2,k-1,n2)
+        Temkeel = Tclim_ib(k-1,n2)
+        Salkeel = Sclim_ib(k-1,n2)
+        uo_dz(m)=uo_dz(m)+ ufkeel1*dz
+        vo_dz(m)=vo_dz(m)+ ufkeel2*dz
+        T_dz(m)=T_dz(m)+ Temkeel*dz
+        S_dz(m)=S_dz(m)+ Salkeel*dz
       else
         ! Interpolate keel values between mid-levels k-1 and k
         ufkeel1 = interpol1D(abs(lev_up),UV_ib(1,k-1,n2),abs(lev_low),UV_ib(1,k,n2),abs(depth_ib))
@@ -939,16 +969,28 @@ type(t_partit), intent(inout), target :: partit
         cycle
       end if
 
-      ! Trapezoidal integration between consecutive mid-levels
-      uo_dz(m)=uo_dz(m)+ 0.5*(UV_ib(1,k-1,n2)+UV_ib(1,k,n2))*dz
-      vo_dz(m)=vo_dz(m)+ 0.5*(UV_ib(2,k-1,n2)+UV_ib(2,k,n2))*dz
-      T_dz(m)=T_dz(m)+ 0.5*(Tclim_ib(k-1,n2)+Tclim_ib(k,n2))*dz
-      S_dz(m)=S_dz(m)+ 0.5*(Sclim_ib(k-1,n2)+Sclim_ib(k,n2))*dz
-      ! Update keel to deepest level so far
-      uo_keel(m)=UV_ib(1,k,n2)
-      vo_keel(m)=UV_ib(2,k,n2)
-      T_keel(m)=Tclim_ib(k,n2)
-      S_keel(m)=Sclim_ib(k,n2)
+      if( k > nlevels_nod2D(n2)-1 ) then
+        ! Last half-layer to bottom: no UV_ib(k), use piecewise constant
+        uo_dz(m)=uo_dz(m)+ UV_ib(1,k-1,n2)*dz
+        vo_dz(m)=vo_dz(m)+ UV_ib(2,k-1,n2)*dz
+        T_dz(m)=T_dz(m)+ Tclim_ib(k-1,n2)*dz
+        S_dz(m)=S_dz(m)+ Sclim_ib(k-1,n2)*dz
+        uo_keel(m)=UV_ib(1,k-1,n2)
+        vo_keel(m)=UV_ib(2,k-1,n2)
+        T_keel(m)=Tclim_ib(k-1,n2)
+        S_keel(m)=Sclim_ib(k-1,n2)
+      else
+        ! Trapezoidal integration between consecutive mid-levels
+        uo_dz(m)=uo_dz(m)+ 0.5*(UV_ib(1,k-1,n2)+UV_ib(1,k,n2))*dz
+        vo_dz(m)=vo_dz(m)+ 0.5*(UV_ib(2,k-1,n2)+UV_ib(2,k,n2))*dz
+        T_dz(m)=T_dz(m)+ 0.5*(Tclim_ib(k-1,n2)+Tclim_ib(k,n2))*dz
+        S_dz(m)=S_dz(m)+ 0.5*(Sclim_ib(k-1,n2)+Sclim_ib(k,n2))*dz
+        ! Update keel to deepest level so far
+        uo_keel(m)=UV_ib(1,k,n2)
+        vo_keel(m)=UV_ib(2,k,n2)
+        T_keel(m)=Tclim_ib(k,n2)
+        S_keel(m)=Sclim_ib(k,n2)
+      end if
     end if
  
    end do innerloop
