@@ -115,6 +115,7 @@ module io_MEANDATA
     integer                                    :: ncid = -1
     integer                                    :: varid, timeid, timedimid
     integer                                    :: rec_count = 0
+    character(500)                             :: filename = ""  ! current output file path
   end type Meandata0D
 
   type(Meandata0D), save, target :: io_stream0D(50)
@@ -2428,6 +2429,15 @@ subroutine output_0D_streams(istep, partit)
                     filepath = trim(ResultPath)//trim(entry0D%name)//'.'//trim(runid)//'.'//cyearnew//'_'//cmonth//'.nc'
                 else
                     filepath = trim(ResultPath)//trim(entry0D%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
+                endif
+                
+                ! Close old file and reset if year/month has changed
+                if (filepath /= trim(entry0D%filename)) then
+                    if (trim(entry0D%filename) /= "" .and. entry0D%ncid >= 0) then
+                        call assert_nf(nf90_close(entry0D%ncid), __LINE__)
+                    endif
+                    entry0D%ncid = -1
+                    entry0D%filename = filepath
                 endif
                 
                 ! Create or open file
