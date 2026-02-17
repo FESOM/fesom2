@@ -1075,63 +1075,33 @@ type(t_partit), intent(inout), target :: partit
     
    CASE (1) !...coastal point
    n = 0
-   i = 1
+   i = 2
    velocity = [ u, v ]
+    ! Classify element nodes: n(1) = barrier node, n(2),n(3) = non-barrier nodes
     do m = 1, 3
       node = mesh%elem2D_nodes(m,elem)
-      !write(*,*) 'index ', m, ':', index_nod2D(node)
       if( use_cavity ) then
-        !if( mesh%bc_index_nod2D(node)==1 .OR. cavity_flag_nod2d(node)==1 ) then
         if( mesh%bc_index_nod2D(node)==0.0 .OR.  (mesh%cavity_depth(node)/=0.0) ) then
-         n(i) = node
-         exit
-        end if 
+          n(1) = node
+        else
+          n(i) = node
+          i = i + 1
+        end if
       else
         if( mesh%bc_index_nod2D(node)==1 ) then
-         n(i) = node
-         exit
-        end if 
+          n(1) = node
+        else
+          n(i) = node
+          i = i + 1
+        end if
       end if
-    end do 
-    
-   !write(*,*) 'one coastal node ', n(1)
-  
-  !LA comment for testing
-   !i = 2 
-   !if ( n(1) <= myDim_nod2D ) then	!all neighbours known
+    end do
 
-   ! do m = 1, nghbr_nod2D(n(1))%nmb
-   !   node = nghbr_nod2D(n(1))%addresses(m) 
-!#ifdef use_cavity
-   !   if ( (node /= n(1)) .and. ( (bc_index_nod2D(node)==1) .OR. (cavity_flag_nod2d(node)==1) ) ) then   
-!#else
-   !   if ( (node /= n(1)) .and. (bc_index_nod2D(node)==1)) then
-!#endif
-   !    n(i) = node
-   !    i = i+1
-   !    if(i==4) exit
-   !   end if
-   ! end do
-    
-    !write(*,*) 'nodes n(i) ', n
-    
-    d1 = sqrt( (lon - coord_nod2D(1, n(2)))**2 + (lat - coord_nod2D(2, n(2)))**2 )
-    d2 = sqrt( (lon - coord_nod2D(1, n(3)))**2 + (lat - coord_nod2D(2, n(3)))**2 )
-    !write(*,*) 'distances :' , d1, d2
-    !write(*,*) 'velocity vor :' , velocity
-    if (d1 < d2) then
-      call projection(mesh,partit,  velocity, n(2), n(1))
-    else
-      call projection(mesh,partit,  velocity, n(3), n(1))
+    ! Project velocity along edge between the two non-barrier nodes
+    ! (the open-ocean face opposite the barrier node)
+    if (n(2) /= 0 .AND. n(3) /= 0) then
+      call projection(mesh,partit,  velocity, n(2), n(3))
     end if
-    !write(*,*) 'velocity nach:', velocity
-    !call projection(velocity, n(3), n(2))
-      
-   !else
-   ! !if coastal point is not first node of element, the coastal point could be in eDim_nod2D,
-   ! !so not all neighbours of this node are known to PE. WHAT SHOULD BE DONE?
-   !end if    
-    
     
    CASE (2) !...coastal points
     n = 0
