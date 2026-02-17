@@ -195,6 +195,7 @@ subroutine iceberg_newdimensions(partit, ib, depth_ib,height_ib,length_ib,width_
   character, intent(IN)	:: file_meltrates*80
   
   real			:: dh_b, dh_v, dh_e, dh_bv, bvl, lvl_b, lvl_v, lvl_e, tvl, volume_before, volume_after
+  real			:: hf_scale
   integer		:: icbID
   logical		:: force_last_output
   real, dimension(4)	:: arr
@@ -233,6 +234,12 @@ type(t_partit), intent(inout), target :: partit
     volume_before=height_ib*length_ib*width_ib
 
     if((tvl .ge. volume_before) .OR. (volume_before .le. smallestvol_icb)) then
+        ! Scale heat fluxes when melt exceeds remaining volume
+        hf_scale = volume_before / max(tvl, 1.0e-30)
+        hfb_flux_ib(ib)    = hfb_flux_ib(ib)    * hf_scale
+        hfe_flux_ib(ib)    = hfe_flux_ib(ib)    * hf_scale
+        hfbv_flux_ib(ib,:) = hfbv_flux_ib(ib,:) * hf_scale
+        hfl_flux_ib(ib,:)  = hfl_flux_ib(ib,:)  * hf_scale
     	volume_after=0.0    	
 	    depth_ib = 0.0
     	height_ib= 0.0
@@ -263,6 +270,8 @@ type(t_partit), intent(inout), target :: partit
 
         !iceberg smaller than critical value after melting?
         if (volume_after .le. smallestvol_icb) then
+            ! Add latent heat for remnant volume to erosion heat flux (bug 5)
+            hfe_flux_ib(ib) = hfe_flux_ib(ib) + (volume_before - tvl) * rho_icb * L / dt / REAL(steps_per_ib_step) * scaling(ib)
             volume_after=0.0    	
 	        depth_ib = 0.0
     	    height_ib= 0.0
@@ -530,6 +539,7 @@ type(t_partit), intent(inout), target :: partit
      !LA avoid basal freezing for grounded icebergs
      if(grounded(ib) .and. (M_b.lt.0.)) then
          M_b = 0.0
+         H_b = 0.0
      endif
 
      !      qo=-rhor*seta*oofw

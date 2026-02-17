@@ -127,13 +127,8 @@ type(t_partit), intent(inout), target :: partit
                     end if              
                    
                     if( abs(depth_ib) > 0.0 ) then
-                    !    ibhf_n(j,iceberg_node) = ibhf_n(j,iceberg_node) & 
-                    !                                - (hfbv_flux_ib(ib,j)+hfl_flux_ib(ib,j)) &
-                    !                                / tot_area_nods_in_ib_elem(j)
-                    !else
                         ibhf_n(j,iceberg_node) = ibhf_n(j,iceberg_node) & 
-                                                    - ((hfbv_flux_ib(ib,j)+hfl_flux_ib(ib,j)) * (dz / abs(depth_ib))) & 
-                                                    !+ hfe_flux_ib(ib) * (dz / abs(height_ib_single))) &
+                                                    - (hfbv_flux_ib(ib,j)+hfl_flux_ib(ib,j)) & 
                                                     / tot_area_nods_in_ib_elem(j)
                     end if
                 end do

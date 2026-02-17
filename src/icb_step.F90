@@ -322,6 +322,7 @@ use iceberg_params, only: length_ib, width_ib, scaling, elem_block, elem_area_gl
  
  integer, dimension(:), save, allocatable :: local_idx_of
  real      			:: depth_ib, volume_ib, mass_ib
+ real      			:: depth_ib_premelt, height_ib_premelt
  real				:: lon_rad, lat_rad, new_u_ib, new_v_ib
  real	   			:: old_lon,old_lat, frozen_in, P_ib, conci_ib, grounded_ib
  real				:: lon_rad_out, lat_rad_out  !for unrotated output
@@ -479,6 +480,9 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
   
   !===========================DYNAMICS===============================
   
+  ! Save pre-melt geometry for heat flux distribution (bug 4)
+  depth_ib_premelt  = depth_ib
+  height_ib_premelt = height_ib_single
 
   call iceberg_dyn(mesh, partit, ice, dynamics, ib, new_u_ib, new_v_ib, u_ib, v_ib, lon_rad,lat_rad, depth_ib, &
                    height_ib_single, length_ib_single, width_ib_single, local_idx_of(iceberg_elem), &
@@ -607,7 +611,7 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
   pe_block(ib)=mype
 
   volume_ib=height_ib_single*length_ib_single*width_ib_single
-  call prepare_icb2fesom(mesh,partit,ib,i_have_element,local_idx_of(iceberg_elem),depth_ib,height_ib_single)
+  call prepare_icb2fesom(mesh,partit,ib,i_have_element,local_idx_of(iceberg_elem),depth_ib_premelt,height_ib_premelt)
  end if !processor has element?
 end if !... and first node belongs to processor?
 
