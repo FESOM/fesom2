@@ -1395,6 +1395,16 @@ Module REcoM_declarations
   Real(kind=8),allocatable,dimension(:) :: vertgrazmacro_mes, vertgrazmacro_det, vertgrazmacro_mic, vertgrazmacro_det2
   Real(kind=8),allocatable,dimension(:) :: vertrespmacro
 
+  Real(kind=8),allocatable,dimension(:) :: vertfastcdis
+  Real(kind=8),allocatable,dimension(:) :: vertphotn, vertphotd, vertphotc, vertphotp          !Phytoplankton photosynthesis terms ! RP 14.07.2025 OG 08.01.2026
+  Real(kind=8),allocatable,dimension(:) :: vertmesocdis, vertmicrocdis, vertmacrocdis          !Additional zooplankton calcium dissolution terms ! RP 14.07.2025
+  Real(kind=8),allocatable,dimension(:) :: vertNassimn, vertNassimd, vertNassimc, vertNassimp  !N assimilation by phytoplanktons ! RP 14.07.2025 OG 08.01.2026
+  Real(kind=8),allocatable,dimension(:) :: vertDONremin      !DON remineralization term ! RP 14.07.2025
+  Real(kind=8),allocatable,dimension(:) :: vertDOCremin      !DOC remineralization term ! RP 15.07.2025
+  Real(kind=8),allocatable,dimension(:,:,:)   :: dtr_bf_din  ! Diagnostics for DIN bottom flux RP on 26.09.2025
+  Real(kind=8),allocatable,dimension(:,:,:)   :: dtr_bf_dic  ! Diagnostics for DIC bottom flux
+  Real(kind=8),allocatable,dimension(:,:,:)   :: dtr_bf_alk  ! Diagnostics for Alk bottom flux
+  Real(kind=8),allocatable,dimension(:,:,:)   :: dtr_bf_dsi  ! Diagnostics for DSi bottom flux
 
 !!------------------------------------------------------------------------------                                                                                
 !! *** Benthos  ***
@@ -1539,6 +1549,22 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:,:)   :: NPPd3D
   Real(kind=8),allocatable,dimension(:,:)   :: NPPc3D
   Real(kind=8),allocatable,dimension(:,:)   :: NPPp3D           ! Phaeocystis
+
+  Real(kind=8),allocatable,dimension(:,:)   :: photn            !RP 21.07.2025
+  Real(kind=8),allocatable,dimension(:,:)   :: photd            !RP 21.07.2025
+  Real(kind=8),allocatable,dimension(:,:)   :: photc            !RP 21.07.2025
+  Real(kind=8),allocatable,dimension(:,:)   :: photp            !RP 08.01.2026
+  Real(kind=8),allocatable,dimension(:,:)   :: DOCremin         !RP 21.07.2025
+  Real(kind=8),allocatable,dimension(:,:)   :: Nassimn          !RP 21.07.2025
+  Real(kind=8),allocatable,dimension(:,:)   :: Nassimd          !RP 21.07.2025
+  Real(kind=8),allocatable,dimension(:,:)   :: Nassimc          !RP 21.07.2025
+  Real(kind=8),allocatable,dimension(:,:)   :: Nassimp          !OG 08.01.2026  
+  Real(kind=8),allocatable,dimension(:,:)   :: DONremin         !RP 21.07.2025
+  Real(kind=8),allocatable,dimension(:,:)   :: fastcdis         !RP 21.07.2025
+  Real(kind=8),allocatable,dimension(:,:)   :: mesocdis         !RP 21.07.2025
+  Real(kind=8),allocatable,dimension(:,:)   :: microcdis        !RP 21.07.2025
+  Real(kind=8),allocatable,dimension(:,:)   :: macrocdis        !RP 21.07.2025
+
   Real(kind=8),allocatable,dimension(:,:)   :: TTemp_diatoms ! my new variables to track
   Real(kind=8),allocatable,dimension(:,:)   :: TTemp_phyto ! new Temperature effect
   Real(kind=8),allocatable,dimension(:,:)   :: TTemp_cocco ! new
@@ -1569,7 +1595,11 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:,:)   :: Sinkingvel1     ! Diagnostics for vertical sinking
   Real(kind=8),allocatable,dimension(:,:)   :: Sinkingvel2     ! Diagnostics for vertical sinking  
   Real(kind=8),allocatable,dimension(:,:,:) :: Sinkvel1_tr     ! Sinking speed of particle class 1 OG 16.03.23 
-  Real(kind=8),allocatable,dimension(:,:,:) :: Sinkvel2_tr     ! Sinking speed of particle class 2 OG 16.03.23 
+  Real(kind=8),allocatable,dimension(:,:,:) :: Sinkvel2_tr     ! Sinking speed of particle class 2 OG 16.03.23
+  Real(kind=8),allocatable,dimension(:,:)   :: dtr_bflux_din   ! Diagnostics for DIN bottom flux RP on 30.09.2025 
+  Real(kind=8),allocatable,dimension(:,:)   :: dtr_bflux_dic   ! Diagnostics for DIC bottom flux
+  Real(kind=8),allocatable,dimension(:,:)   :: dtr_bflux_alk   ! Diagnostics for Alk bottom flux
+  Real(kind=8),allocatable,dimension(:,:)   :: dtr_bflux_dsi   ! Diagnostics for DSi bottom flux
 
   Real(kind=8),allocatable,dimension(:,:)   :: GloSed           ! Yearly input into bottom water from sediments [n2d 5] or [n2d 7] with ciso
   Real(kind=8),allocatable,dimension(:,:)   :: lb_flux          ! Yearly burial from medusa: [n2d 5] or [n2d 9] with ciso_14 
@@ -2055,7 +2085,17 @@ subroutine allocate_and_init_diags(nl)
     ! Zooplankton Grazing (if enabled)
     ! --------------------------------------------------------------------------
     if (Grazing_detritus) then
-        
+
+        ! Mesozooplankton
+        allocate(vertgrazmeso_tot(nl-1), vertgrazmeso_n(nl-1), vertgrazmeso_d(nl-1))
+        allocate(vertgrazmeso_det(nl-1))
+        allocate(vertrespmeso(nl-1))
+        vertgrazmeso_tot  = 0.d0
+        vertgrazmeso_n    = 0.d0
+        vertgrazmeso_d    = 0.d0
+        vertgrazmeso_det  = 0.d0
+        vertrespmeso      = 0.d0
+
         if (enable_3zoo2det) then
             ! Microzooplankton
             allocate(vertgrazmicro_tot(nl-1), vertgrazmicro_n(nl-1), vertgrazmicro_d(nl-1))
@@ -2065,19 +2105,12 @@ subroutine allocate_and_init_diags(nl)
             vertgrazmicro_n   = 0.d0
             vertgrazmicro_d   = 0.d0
             vertrespmicro     = 0.d0
-            
+
             ! Mesozooplankton
-            allocate(vertgrazmeso_tot(nl-1), vertgrazmeso_n(nl-1), vertgrazmeso_d(nl-1))
-            allocate(vertgrazmeso_det(nl-1), vertgrazmeso_mic(nl-1), vertgrazmeso_det2(nl-1))
-            allocate(vertrespmeso(nl-1))
-            
-            vertgrazmeso_tot  = 0.d0
-            vertgrazmeso_n    = 0.d0
-            vertgrazmeso_d    = 0.d0
-            vertgrazmeso_det  = 0.d0
+
+            allocate(vertgrazmeso_mic(nl-1), vertgrazmeso_det2(nl-1))
             vertgrazmeso_mic  = 0.d0
             vertgrazmeso_det2 = 0.d0
-            vertrespmeso      = 0.d0
             
             if (enable_coccos) then
                 allocate(vertgrazmicro_c(nl-1), vertgrazmicro_p(nl-1))
@@ -2088,27 +2121,27 @@ subroutine allocate_and_init_diags(nl)
                 vertgrazmeso_c  = 0.d0
                 vertgrazmeso_p  = 0.d0
             endif
-        endif
+
+            ! Macrozooplankton
+            allocate(vertgrazmacro_tot(nl-1), vertgrazmacro_n(nl-1), vertgrazmacro_d(nl-1))
+            allocate(vertgrazmacro_mes(nl-1), vertgrazmacro_det(nl-1))
+            allocate(vertgrazmacro_mic(nl-1), vertgrazmacro_det2(nl-1))
+            allocate(vertrespmacro(nl-1))
+
+            vertgrazmacro_tot  = 0.d0
+            vertgrazmacro_n    = 0.d0
+            vertgrazmacro_d    = 0.d0
+            vertgrazmacro_mes  = 0.d0
+            vertgrazmacro_det  = 0.d0
+            vertgrazmacro_mic  = 0.d0
+            vertgrazmacro_det2 = 0.d0
+            vertrespmacro      = 0.d0
         
-        ! Macrozooplankton
-        allocate(vertgrazmacro_tot(nl-1), vertgrazmacro_n(nl-1), vertgrazmacro_d(nl-1))
-        allocate(vertgrazmacro_mes(nl-1), vertgrazmacro_det(nl-1))
-        allocate(vertgrazmacro_mic(nl-1), vertgrazmacro_det2(nl-1))
-        allocate(vertrespmacro(nl-1))
-        
-        vertgrazmacro_tot  = 0.d0
-        vertgrazmacro_n    = 0.d0
-        vertgrazmacro_d    = 0.d0
-        vertgrazmacro_mes  = 0.d0
-        vertgrazmacro_det  = 0.d0
-        vertgrazmacro_mic  = 0.d0
-        vertgrazmacro_det2 = 0.d0
-        vertrespmacro      = 0.d0
-        
-        if (enable_coccos) then
-            allocate(vertgrazmacro_c(nl-1), vertgrazmacro_p(nl-1))
-            vertgrazmacro_c = 0.d0
-            vertgrazmacro_p = 0.d0
+            if (enable_coccos) then
+                allocate(vertgrazmacro_c(nl-1), vertgrazmacro_p(nl-1))
+                vertgrazmacro_c = 0.d0
+                vertgrazmacro_p = 0.d0
+            endif
         endif
     endif
 

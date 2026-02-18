@@ -8,7 +8,7 @@ module oce_adv_tra_fct_interfaces
       type(t_mesh),  intent(in),    target        :: mesh
       type(t_partit),intent(inout), target        :: partit
       type(t_tracer_work), intent(inout), target  :: twork
-    end subroutine
+    end subroutine oce_adv_tra_fct_init
 
     subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, fct_plus, fct_minus, AUX, partit, mesh)
       use MOD_MESH
@@ -26,9 +26,9 @@ module oce_adv_tra_fct_interfaces
       real(kind=WP), intent(inout)      :: fct_plus(mesh%nl-1, partit%myDim_nod2D)
       real(kind=WP), intent(inout)      :: fct_minus(mesh%nl,  partit%myDim_nod2D)
       real(kind=WP), intent(inout)      :: AUX(:,:,:) !a large auxuary array
-    end subroutine
+    end subroutine oce_tra_adv_fct
  end interface
-end module
+end module oce_adv_tra_fct_interfaces
 !
 !
 !===============================================================================
@@ -384,9 +384,9 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
         nl1=nlevels_nod2D(n)
         !$ACC LOOP VECTOR
         do nz=nu1,nl1-1
-            flux=fct_plus(nz,n)*dt/areasvol(nz,n)+flux_eps
+            flux=fct_plus(nz,n)*dt/areasvol(nz,n)/hnode(nz,n)+flux_eps
             fct_plus(nz,n)=min(1.0_WP,fct_ttf_max(nz,n)/flux)
-            flux=fct_minus(nz,n)*dt/areasvol(nz,n)-flux_eps
+            flux=fct_minus(nz,n)*dt/areasvol(nz,n)/hnode(nz,n)-flux_eps
             fct_minus(nz,n)=min(1.0_WP,fct_ttf_min(nz,n)/flux)
         end do
         !$ACC END LOOP
