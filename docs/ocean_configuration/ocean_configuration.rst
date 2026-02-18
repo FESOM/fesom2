@@ -49,7 +49,8 @@ Section &dynamics_visc
 ----------------------
 
 - **opt_visc=5**, **check_opt_visc=.true.** selects the horizontal viscosity/backscatter scheme. Options: ``5`` kinematic (easy) backscatter, ``6/7`` biharmonic flow-aware flavours, ``8`` dynamic backscatter. ``check_opt_visc`` aborts if option 5 is used outside its intended resolution/Rossby-radius range.
-- **visc_gamma0=0.003**, **visc_gamma1=0.1**, **visc_gamma2=0.285** baseline, flow-aware and auxiliary viscosity coefficients. ``visc_gamma2`` is only used by easy/dynamic backscatter.
+- **visc_gamma0=0.003**, **visc_gamma1=0.1**, **visc_gamma2=0.285** baseline, flow-aware and auxiliary viscosity coefficients for biharmonic viscosity. ``visc_gamma2`` is only used by easy/dynamic backscatter.
+- **visc_gamma0_h=0.0**, **visc_gamma1_h=0.0** harmonic (Laplacian) viscosity coefficients for ``opt_visc=7``. When both are zero, option 7 applies pure biharmonic viscosity. When either is non-zero, a harmonic viscosity term is added: ``viLapl = dt * max(visc_gamma0_h, visc_gamma1_h * sqrt(u1^2+v1^2)) * len``. This combined biharmonic + harmonic approach suppresses spurious oscillations near sharp gradients while preserving mesoscale variability. Typical values for combined mode: ``visc_gamma0_h=0.005``, ``visc_gamma1_h=0.05``.
 - **visc_easybsreturn=1.5** fraction of subgrid energy returned to the flow when ``opt_visc=5``.
 - **uke_scaling=.true.**, **uke_scaling_factor=1.0**, **uke_advection=.false.**, **rosb_dis=1.0** controls for the dynamic backscatter option. ``uke_scaling`` scales dissipation with the local Rossby radius vs grid spacing (factor in the denominator); ``rosb_dis`` shifts the Rossby-radius cutoff; ``uke_advection`` adds an explicit advection step of the backscatter energy.
 - **smooth_back=2**, **smooth_dis=2**, **smooth_back_tend=4** Laplacian smoothing passes applied to the backscatter fields and their tendencies (opt. 8).

@@ -1,0 +1,16 @@
+
+module load cesga/2020 intel/2021.3.0 impi/2021.3.0 imkl/2021.3.0 netcdf/4.8.1 netcdf-fortran/4.5.3
+
+export FC=mpiifort CC=mpiicc CXX=mpiicpc
+
+export NETCDF_ROOT=/opt/cesga/2020/software/MPI/intel/2021.3.0/impi/2021.3.0/netcdf/4.8.1
+export NETCDF_Fortran_INCLUDE_DIR=$NETCDF_ROOT/include
+export NETCDF_C_INCLUDE_DIR=$NETCDF_ROOT/include
+export NETCDF_Fortran_LIBRARY=$NETCDF_ROOT/lib64/libnetcdff.so
+export NETCDF_C_LIBRARY=$NETCDF_ROOT/lib64/libnetcdf.so
+
+export NETCDF_ROOT=/opt/cesga/2020/software/MPI/intel/2021.3.0/impi/2021.3.0/netcdf-fortran/4.5.3
+export NETCDF_Fortran_INCLUDE_DIR=$NETCDF_ROOT/include
+export NETCDF_Fortran_LIBRARY=$NETCDF_ROOT/lib/libnetcdff.so
+export NETCDF_C_INCLUDE_DIR=$NETCDF_ROOT/../netcdf/4.8.1/include
+export NETCDF_C_LIBRARY=$NETCDF_ROOT/../netcdf/4.8.1/lib64/libnetcdf.so
