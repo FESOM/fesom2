@@ -1359,6 +1359,11 @@ Module REcoM_declarations
   Real(kind=8),allocatable,dimension(:,:,:)   :: dtr_bf_alk  ! Diagnostics for Alk bottom flux
   Real(kind=8),allocatable,dimension(:,:,:)   :: dtr_bf_dsi  ! Diagnostics for DSi bottom flux
 
+  !===================================================================
+  ! DISSOLUTION AND REMINERALIZATION ! R2OMIP
+  !===================================================================
+  Real(kind=8)                          :: locDISSOC, locDISSON, locDISSOSi, locREMOC, locREMOCt, locREMON
+  Real(kind=8),allocatable,dimension(:) :: vertDISSOC, vertDISSON, vertDISSOSi, vertREMOC, vertREMOCt, vertREMON
 !!------------------------------------------------------------------------------                                                                                
 !! *** Benthos  ***
   Real(kind=8),allocatable,dimension(:) :: decayBenthos ! [1/day] Decay rate of detritus in the benthic layer
@@ -1481,6 +1486,12 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:)     :: grazmicro_d
   Real(kind=8),allocatable,dimension(:)     :: grazmicro_c
   Real(kind=8),allocatable,dimension(:)     :: grazmicro_p
+  Real(kind=8),allocatable,dimension(:)     :: DISSOC
+  Real(kind=8),allocatable,dimension(:)     :: DISSON
+  Real(kind=8),allocatable,dimension(:)     :: DISSOSi
+  Real(kind=8),allocatable,dimension(:)     :: REMOC
+  Real(kind=8),allocatable,dimension(:)     :: REMOCt
+  Real(kind=8),allocatable,dimension(:)     :: REMON
   Real(kind=8),allocatable,dimension(:,:)   :: respmeso
   Real(kind=8),allocatable,dimension(:,:)   :: respmacro
   Real(kind=8),allocatable,dimension(:,:)   :: respmicro
@@ -2098,6 +2109,15 @@ subroutine allocate_and_init_diags(nl)
         endif
     endif
 
+    ! Dissolution and remineralization ! R2OMIP
+    allocate(vertDISSOC(nl-1), vertDISSON(nl-1), vertDISSOSi(nl-1), vertREMOC(nl-1), vertREMOCt(nl-1), vertREMON(nl-1))
+    vertDISSOC  = 0.d0
+    vertDISSON  = 0.d0
+    vertDISSOSi = 0.d0
+    vertREMOC   = 0.d0
+    vertREMOCt  = 0.d0
+    vertREMON   = 0.d0
+
         ! --------------------------------------------------------------------------
         ! Temperature and Photosynthesis Tracking Variables
         ! --------------------------------------------------------------------------
@@ -2114,8 +2134,6 @@ subroutine allocate_and_init_diags(nl)
         VTCphot_phyto   = 0.d0
         VTCphot_diatoms = 0.d0
 
-    if (enable_coccos) then    
-
         allocate(VTTemp_diatoms(nl-1), VTTemp_phyto(nl-1))
         VTTemp_diatoms = 0.d0
         VTTemp_phyto   = 0.d0
@@ -2127,6 +2145,7 @@ subroutine allocate_and_init_diags(nl)
         allocate(VTSi_assimDia(nl-1))
         VTSi_assimDia = 0.d0
 
+    if (enable_coccos) then    
         ! --------------------------------------------------------------------------
         ! Coccolithophores and Phaeocystis Tracking (if enabled)
         ! --------------------------------------------------------------------------
@@ -2242,6 +2261,14 @@ subroutine update_2d_diags(n)
             endif
         endif
     endif
+
+    ! Dissolution and remineralization ! R2OMIP
+     DISSOC(n)  = locDISSOC
+     DISSON(n)  = locDISSON
+     DISSOSi(n) = locDISSOSi
+     REMOC(n)   = locREMOC
+     REMOCt(n)  = locREMOCt
+     REMON(n)   = locREMON
     
 end subroutine update_2d_diags
 
@@ -2368,26 +2395,24 @@ subroutine deallocate_diags()
         deallocate(vertaggd, vertdocexd, vertrespd)
         deallocate(VTDiaCO2, VTCphotLigLim_diatoms, VTCphot_diatoms)
 
-    if (enable_coccos) then
         deallocate(VTTemp_phyto, VTqlimitFac_phyto)
         deallocate(VTTemp_diatoms, VTqlimitFac_diatoms)
         deallocate(VTSi_assimDia)
+        deallocate(vertcalcdiss, vertcalcif)
 
+    if (enable_coccos) then
         ! --------------------------------------------------------------------------
         ! Coccolithophores and Phaeocystis (if enabled)
         ! --------------------------------------------------------------------------
         deallocate(vertNPPc, vertGPPc, vertNNAc, vertChldegc)
         deallocate(vertaggc, vertdocexc, vertrespc)
-        deallocate(vertcalcdiss, vertcalcif)
         deallocate(VTTemp_cocco, VTCoccoCO2, VTqlimitFac_cocco)
         deallocate(VTCphotLigLim_cocco, VTCphot_cocco)
-        
+
         deallocate(vertNPPp, vertGPPp, vertNNAp, vertChldegp)
         deallocate(vertaggp, vertdocexp, vertrespp)
         deallocate(VTTemp_phaeo, VTPhaeoCO2, VTqlimitFac_phaeo)
         deallocate(VTCphotLigLim_phaeo, VTCphot_phaeo)
-    else
-        deallocate(vertcalcdiss, vertcalcif)
     endif
     
     ! --------------------------------------------------------------------------
@@ -2421,6 +2446,9 @@ subroutine deallocate_diags()
             endif
         endif
     endif
+
+    ! Dissolution and remineralization ! R2OMIP
+    deallocate(vertDISSOC, vertDISSON, vertDISSOSi, vertREMOC, vertREMOCt, vertREMON)
     
 end subroutine deallocate_diags
 
