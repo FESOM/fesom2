@@ -379,27 +379,35 @@ endif
             ! Macrozooplankton
             locgrazmacro_tot = sum(vertgrazmacro_tot(1:nn) * thick(1:nn))
             locgrazmacro_n   = sum(vertgrazmacro_n(1:nn) * thick(1:nn))
-            locgrazmacro_d	 = sum(vertgrazmacro_d(1:nn) * thick(1:nn))
+            locgrazmacro_d   = sum(vertgrazmacro_d(1:nn) * thick(1:nn))
             if (enable_coccos) then
-                locgrazmacro_c   = sum(vertgrazmacro_c(1:nn) * thick(1:nn))
-                locgrazmacro_p   = sum(vertgrazmacro_p(1:nn) * thick(1:nn))
+                locgrazmacro_c = sum(vertgrazmacro_c(1:nn) * thick(1:nn))
+                locgrazmacro_p = sum(vertgrazmacro_p(1:nn) * thick(1:nn))
             endif
-            locgrazmacro_mes = sum(vertgrazmacro_mes(1:nn) * thick(1:nn))
-            locgrazmacro_det = sum(vertgrazmacro_det(1:nn) * thick(1:nn))
-            locgrazmacro_mic = sum(vertgrazmacro_mic(1:nn) * thick(1:nn))
-            locgrazmacro_det2= sum(vertgrazmacro_det2(1:nn) * thick(1:nn))
+            locgrazmacro_mes  = sum(vertgrazmacro_mes(1:nn) * thick(1:nn))
+            locgrazmacro_det  = sum(vertgrazmacro_det(1:nn) * thick(1:nn))
+            locgrazmacro_mic  = sum(vertgrazmacro_mic(1:nn) * thick(1:nn))
+            locgrazmacro_det2 = sum(vertgrazmacro_det2(1:nn) * thick(1:nn))
 
             ! Microzooplankton
             locgrazmicro_tot = sum(vertgrazmicro_tot(1:nn) * thick(1:nn))
             locgrazmicro_n   = sum(vertgrazmicro_n(1:nn) * thick(1:nn))
             locgrazmicro_d   = sum(vertgrazmicro_d(1:nn) * thick(1:nn))
             if (enable_coccos) then
-                locgrazmicro_c   = sum(vertgrazmicro_c(1:nn) * thick(1:nn))
-                locgrazmicro_p   = sum(vertgrazmicro_p(1:nn) * thick(1:nn))
+                locgrazmicro_c = sum(vertgrazmicro_c(1:nn) * thick(1:nn))
+                locgrazmicro_p = sum(vertgrazmicro_p(1:nn) * thick(1:nn))
             endif
         
         endif        
      endif
+
+    ! Dissolution and remineralization ! R2OMIP
+     locDISSOC  = sum(vertDISSOC(1:nn) * thick(1:nn))
+     locDISSON  = sum(vertDISSON(1:nn) * thick(1:nn)) 
+     locDISSOSi = sum(vertDISSOSi(1:nn) * thick(1:nn))
+     locREMOC   = sum(vertREMOC(1:nn) * thick(1:nn)) 
+     locREMOCt  = sum(vertREMOCt(1:nn) * thick(1:nn)) 
+     locREMON   = sum(vertREMON(1:nn) * thick(1:nn))
 
   end if
 end subroutine REcoM_Forcing

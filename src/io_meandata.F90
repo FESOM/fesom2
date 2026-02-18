@@ -716,6 +716,39 @@ CASE ('grazmicro_c')
 CASE ('grazmicro_p')
     call def_stream(nod2D,  myDim_nod2D,   'grazmicro_p','Grazing flux of microzooplankton on phaeocystis without grazing efficiency (i.e., = loss phaeocystis)','mmolC/(m2*d)', grazmicro_p, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 
+! Remineralization adn Dissolution
+CASE ('REMOC     ')
+    if (use_REcoM) then
+    call def_stream(nod2D,  myDim_nod2D,   'REMOC','Total remineralization of DOC','mmolN/(m2*d)', REMOC, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('REMOCt     ')
+    if (use_REcoM) then
+    call def_stream(nod2D,  myDim_nod2D,   'REMOCt','Remineralization of terrigenous DOC','mmolC/(m2*d)', REMOCt, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+    
+CASE ('REMON     ')
+    if (use_REcoM) then
+    call def_stream(nod2D,  myDim_nod2D,   'REMON','Total remineralization of DON','mmolC/(m2*d)', REMON, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('DISSOSi     ')
+    if (use_REcoM) then
+    call def_stream(nod2D,  myDim_nod2D,   'DISSOSi','Dissolution of Si','mmolSi/(m2*d)', DISSOSi, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('DISSOC     ')
+    if (use_REcoM) then
+    call def_stream(nod2D,  myDim_nod2D,   'DISSOC','Dissolution of POC','mmolC/(m2*d)', DISSOC, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('DISSON     ')
+    if (use_REcoM) then
+    call def_stream(nod2D,  myDim_nod2D,   'DISSON','Dissolution of PON','mmolN/(m2*d)', DISSON, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+
+
 
 ! For rivers end erosions: 
 
@@ -785,6 +818,47 @@ CASE ('PAR       ')
     if (use_REcoM) then
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'PAR', 'PAR', 'W/m2',      PAR3D(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
+
+CASE ('CO2       ')
+    if (use_REcoM) then
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'CO2', 'Aqueous CO2 concentration', 'mol/m3',     CO23D(:,:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('pH        ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'pH',  'pH',  'total scale',                      pH3D(:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   end if
+CASE ('pCO2      ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'pCO2','CO2 partial pressure', 'uatm',            pCO23D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   end if
+CASE ('HCO3      ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'HCO3','Bicarbonate ion concentration', 'mol/m3', HCO33D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   end if
+CASE ('CO3       ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'CO3', 'Carbonate ion concentration', 'mol/m3',   CO33D(:,:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   end if
+CASE ('OmegaC    ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'OmegaC','calcite saturation state', 'NN',        OmegaC3D(:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   end if
+CASE ('kspc      ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'kspc', 'calcite solubility product', 'mol^2/kg^2',kspc3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   end if
+CASE ('rhoSW     ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'rhoSW','in-situ density of seawater', 'mol/m3',  rhoSW3D(:,:),         io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   end if
+CASE ('rho_det1       ')
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'rho_det1', 'rho of particles in class 1', 'kg/m3',  rho_particle1(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('rho_det2       ')
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'rho_det2', 'rho of particles in class 2', 'kg/m3',  rho_particle2(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+CASE ('scaling_visc   ')
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'scaling_visc', 'scaling factor of particle sinking speed', 'n.d.',  scaling_visc_3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
 CASE ('wsink_det1')
    call def_stream((/nl, nod2D/),  (/nl, myDim_nod2D/),  'wsink_det1', 'sinking speed of particles in class 1', 'm s-1',  Sinkingvel1(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('wsink_det2')

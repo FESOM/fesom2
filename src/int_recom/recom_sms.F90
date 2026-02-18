@@ -1954,7 +1954,7 @@ real(kind=8) :: &
             ! Apply Liebig's law: most limiting nutrient controls photosynthesis
             qlimitFac = min(qlimitFac, feLimitFac)
 
-            ! tracking qlimitFac
+            ! Track limitation
             VTqlimitFac_phyto(k) = qlimitFac
 
             ! Calculate maximum photosynthesis rate with temperature correction
@@ -1984,7 +1984,7 @@ real(kind=8) :: &
             feLimitFac = Fe / (k_Fe_d + Fe)
             qlimitFac = min(qlimitFac, feLimitFac)
 
-            ! tracking qlimitFac
+            ! Track limitation
             VTqlimitFac_diatoms(k) = qlimitFac
 
             ! Calculate maximum photosynthesis rate
@@ -2009,7 +2009,7 @@ real(kind=8) :: &
                 feLimitFac = Fe / (k_Fe_c + Fe)
                 qlimitFac = min(qlimitFac, feLimitFac)
 
-                ! tracking qlimitFac
+                ! Track limitation
                 VTqlimitFac_cocco(k) = qlimitFac
 
                 ! Calculate maximum photosynthesis rate
@@ -2028,7 +2028,7 @@ real(kind=8) :: &
                 feLimitFac = Fe / (k_Fe_p + Fe)
                 qlimitFac = min(qlimitFac, feLimitFac)
 
-                ! tracking qlimitFac
+                ! Track limitation
                 VTqlimitFac_phaeo(k) = qlimitFac
 
                 ! Calculate maximum photosynthesis rate
@@ -6776,6 +6776,37 @@ real(kind=8) :: &
         
     end if ! Grazing_detritus
 
+!===========================================================================
+! DISSOLUTION AND REMINERALIZATION ! R2OMIP
+!===========================================================================
+
+    vertDISSOC(k) = vertDISSOC(k) + ( &
+    + reminC * arrFunc * O2Func * DetC                 & ! Slow-sinking detritus dissolution
+    + reminC * arrFunc * O2Func * DetZ2C * is_3zoo2det & ! Fast-sinking detritus dissolution
+    ) * recipbiostep
+
+    vertDISSON(k) = vertDISSON(k) + ( &
+    + reminN * arrFunc * O2Func * DetN                 & ! Slow-sinking detritus dissolution
+    + reminN * arrFunc * O2Func * DetZ2N * is_3zoo2det & ! Fast-sinking detritus dissolution
+    ) * recipbiostep
+
+    vertDISSOSi(k) = vertDISSOSi(k) + ( &
+    + reminSiT * DetSi                                 & ! Slow-sinking detritus dissolution
+    ) * recipbiostep
+
+    vertREMOC(k) = vertREMOC(k) + ( &
+    + rho_c1 * arrFunc * O2Func * EOC                  & ! Bacterial respiration / remineralization of oceanic DOC
+!    + rho_C1t                   * DOCt                 & ! Bacterial respiration / remineralization of terrestriel DOC 
+    ) * recipbiostep
+
+!    vertREMOCt(k) = vertREMOCt(k) + ( &
+!    + rho_C1t                   * DOCt                 & ! Bacterial respiration / remineralization of terrestriel DOC 
+!    ) * recipbiostep
+
+    vertREMON(k) = vertREMON(k) + ( &
+    + rho_N * arrFunc * O2Func * DON                   & ! Bacterial respiration / remineralization
+    ) * recipbiostep
+
                 !===========================================================================
                 ! ZOOPLANKTON RESPIRATION
                 !===========================================================================
@@ -7070,7 +7101,7 @@ real(kind=8) :: &
                 !===========================================================================
                 ! PHYTOPLANKTON PHOTOSYNTHESIS
                 !===========================================================================
- 
+
                 ! phy photosynthesis                                           !RP 14.07.2025
                 vertphotn(k) = vertphotn(k) + (           &
                     + Cphot             * PhyC          &

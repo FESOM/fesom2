@@ -239,6 +239,20 @@ subroutine recom_init(tracers, partit, mesh)
   grazmicro_c = 0.d0
   grazmicro_p = 0.d0
 
+  ! Dissolution and remineralization ! R2OMIP
+  allocate(DISSOC(node_size))
+  allocate(DISSON(node_size))
+  allocate(DISSOSi(node_size))
+  allocate(REMOC(node_size))
+  allocate(REMOCt(node_size))
+  allocate(REMON(node_size))
+  DISSOC = 0.d0
+  DISSON = 0.d0
+  DISSOSi = 0.d0
+  REMOC = 0.d0
+  REMOCt = 0.d0
+  REMON = 0.d0
+
 !! *** Allocate 3D diagnostics ***
     allocate(respmeso     ( nl-1, node_size ))
     allocate(respmacro    ( nl-1, node_size ))
