@@ -40,6 +40,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     type(t_ice)   , intent(inout), target :: ice
 
     integer, intent(in)                                     :: Nn                   !< Total number of nodes in the vertical
+    integer                                                 :: nzmax, nzmin, k_bottom, nlevels_nod2D_minimum  !R2OMIP (OmegaC)
     real(kind=8),dimension(mesh%nl-1,bgc_num),intent(inout) :: state                !< ChlA conc in phytoplankton [mg/m3]
                                                                                     !! should be in instead of inout
 
@@ -1623,6 +1624,25 @@ real(kind=8) :: &
 
             endif
 
+            if (NitrogenSS) then
+                ! This part has been developpes for R2OMIP for calculating bottom ocean OmegaC
+                nzmax=nlevels_nod2D(n)-1
+                nzmin=ulevels_nod2D(n)
+                k_bottom=nod_in_elem2D_num(n)
+            
+                ! Screening minimum depth in neigbouring nodes around node n
+                nlevels_nod2D_minimum=minval(nlevels(nod_in_elem2D(1:k_bottom, n))-1)
+                    
+                if (k >= nlevels_nod2D_minimum .and. k < nzmax) then
+                    OmegaC_bottom(n) =  (OmegaC_depth(1) * (area(k,n)-area(k+1,n)) / area(k,n))
+
+                else if (k == nzmax) then
+                    OmegaC_bottom(n) =  (OmegaC_depth(1) * (area(k+1,n) / area(k,n)))
+                else
+                    OmegaC_bottom(n) =  0.0_WP
+                end if
+            endif
+
             !===============================================================================
             ! CO2 EFFECTS AND CALCITE DISSOLUTION
             !===============================================================================
@@ -1953,6 +1973,9 @@ real(kind=8) :: &
             ! Apply Liebig's law: most limiting nutrient controls photosynthesis
             qlimitFac = min(qlimitFac, feLimitFac)
 
+            ! Track limitation
+            VTqlimitFac_phyto(k) = qlimitFac
+
             ! Calculate maximum photosynthesis rate with temperature correction
             if (enable_coccos) then
                 ! Use species-specific temperature function (when cocco module active)
@@ -1980,6 +2003,9 @@ real(kind=8) :: &
             feLimitFac = Fe / (k_Fe_d + Fe)
             qlimitFac = min(qlimitFac, feLimitFac)
 
+            ! Track limitation
+            VTqlimitFac_diatoms(k) = qlimitFac
+
             ! Calculate maximum photosynthesis rate
             if (enable_coccos) then
                 pMax_dia = qlimitFac * Temp_diatoms
@@ -2002,6 +2028,9 @@ real(kind=8) :: &
                 feLimitFac = Fe / (k_Fe_c + Fe)
                 qlimitFac = min(qlimitFac, feLimitFac)
 
+                ! Track limitation
+                VTqlimitFac_cocco(k) = qlimitFac
+
                 ! Calculate maximum photosynthesis rate
                 pMax_cocco = qlimitFac * Temp_cocco
 
@@ -2017,6 +2046,9 @@ real(kind=8) :: &
                 ! Iron limitation
                 feLimitFac = Fe / (k_Fe_p + Fe)
                 qlimitFac = min(qlimitFac, feLimitFac)
+
+                ! Track limitation
+                VTqlimitFac_phaeo(k) = qlimitFac
 
                 ! Calculate maximum photosynthesis rate
                 pMax_phaeo = qlimitFac * Temp_phaeo
@@ -6770,6 +6802,37 @@ real(kind=8) :: &
         
     end if ! Grazing_detritus
 
+!===========================================================================
+! DISSOLUTION AND REMINERALIZATION ! R2OMIP
+!===========================================================================
+
+    vertDISSOC(k) = vertDISSOC(k) + ( &
+    + reminC * arrFunc * O2Func * DetC                 & ! Slow-sinking detritus dissolution
+    + reminC * arrFunc * O2Func * DetZ2C * is_3zoo2det & ! Fast-sinking detritus dissolution
+    ) * recipbiostep
+
+    vertDISSON(k) = vertDISSON(k) + ( &
+    + reminN * arrFunc * O2Func * DetN                 & ! Slow-sinking detritus dissolution
+    + reminN * arrFunc * O2Func * DetZ2N * is_3zoo2det & ! Fast-sinking detritus dissolution
+    ) * recipbiostep
+
+    vertDISSOSi(k) = vertDISSOSi(k) + ( &
+    + reminSiT * DetSi                                 & ! Slow-sinking detritus dissolution
+    ) * recipbiostep
+
+    vertREMOC(k) = vertREMOC(k) + ( &
+    + rho_c1 * arrFunc * O2Func * EOC                  & ! Bacterial respiration / remineralization of oceanic DOC
+!    + rho_C1t                   * DOCt                 & ! Bacterial respiration / remineralization of terrestriel DOC 
+    ) * recipbiostep
+
+!    vertREMOCt(k) = vertREMOCt(k) + ( &
+!    + rho_C1t                   * DOCt                 & ! Bacterial respiration / remineralization of terrestriel DOC 
+!    ) * recipbiostep
+
+    vertREMON(k) = vertREMON(k) + ( &
+    + rho_N * arrFunc * O2Func * DON                   & ! Bacterial respiration / remineralization
+    ) * recipbiostep
+
                 !===========================================================================
                 ! ZOOPLANKTON RESPIRATION
                 !===========================================================================
@@ -7252,6 +7315,7 @@ real(kind=8) :: &
             !===========================================================================
             ! Aerobic remineralization of organic nitrogen in sediments releases
             ! bioavailable nitrogen (NH4+ and NO3-) back to the water column.
+            ! Burial for R2OMIP
             !
             ! Variables:
             !   decayBenthos(1) : N remineralization flux [mmolN m-2 day-1]
@@ -7276,13 +7340,14 @@ real(kind=8) :: &
             decayBenthos(1) = decayRateBenN * LocBenthos(1)
 
             ! Update benthic N pool (remove remineralized N)
-            LocBenthos(1) = LocBenthos(1) - decayBenthos(1) * dt_b
+            LocBenthos(1) = LocBenthos(1) - decayBenthos(1) * dt_b - BurialBen(1) !R2OMIP (Burial) remove from benthos (flux) 
 
             !===========================================================================
             ! DISSOLVED INORGANIC CARBON (DIC) REMINERALIZATION
             !===========================================================================
             ! Aerobic respiration of organic carbon releases CO2 to bottom water.
             ! Affects carbonate system (pH, pCO2, saturation state).
+            ! Burial for R2OMIP
             !
             ! Variables:
             !   decayBenthos(2) : C remineralization flux [mmolC m-2 day-1]
@@ -7306,13 +7371,14 @@ real(kind=8) :: &
             decayBenthos(2) = decayRateBenC * LocBenthos(2)
 
             ! Update benthic C pool
-            LocBenthos(2) = LocBenthos(2) - decayBenthos(2) * dt_b
+            LocBenthos(2) = LocBenthos(2) - decayBenthos(2) * dt_b - BurialBen(2) !R2OMIP (Burial)
 
             !===========================================================================
             ! SILICATE (Si) DISSOLUTION
             !===========================================================================
             ! Dissolution of biogenic silica (diatom frustules) releases Si(OH)4.
             ! Temperature-dependent process (faster in warm water).
+            ! Burial for R2OMIP
             !
             ! Variables:
             !   decayBenthos(3) : Si dissolution flux [mmolSi m-2 day-1]
@@ -7338,13 +7404,14 @@ real(kind=8) :: &
             decayBenthos(3) = decayRateBenSi * LocBenthos(3)
 
             ! Update benthic Si pool
-            LocBenthos(3) = LocBenthos(3) - decayBenthos(3) * dt_b
+            LocBenthos(3) = LocBenthos(3) - decayBenthos(3) * dt_b - BurialBen(3) !R2OMIP (Burial)
 
             !===========================================================================
             ! CALCITE (CaCO3) DISSOLUTION
             !===========================================================================
             ! Dissolution of calcium carbonate affects both DIC and alkalinity.
             ! Rate depends on saturation state (calculated in deepest water layer).
+            ! Burial for R2OMIP
             !
             ! Variables:
             !   decayBenthos(4) : Calcite dissolution flux [mmolC m-2 day-1]
@@ -7373,7 +7440,7 @@ real(kind=8) :: &
             decayBenthos(4) = calc_diss_ben * LocBenthos(4)
 
             ! Update benthic calcite pool
-            LocBenthos(4) = LocBenthos(4) - decayBenthos(4) * dt_b
+            LocBenthos(4) = LocBenthos(4) - decayBenthos(4) * dt_b - BurialBen(4) !R2OMIP (Burial)
 
             if (ciso) then
 

@@ -1822,6 +1822,18 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
                 stop
             endif
 
+            call load_river_variable(ncid, 'DIC',  RiverDIC2D, partit, mesh)
+            locmax = -66666
+            locmin = 66666
+            locmax = max(locmax,maxval(RiverDIC2D))
+            locmin = min(locmin,minval(RiverDIC2D))
+
+            if (mype==0) write(*,*) "Sanity check for Riverine input after reading Rivers_R2OMIP file"
+            call MPI_AllREDUCE(locmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+            if (mype==0) write(*,*) '  |-> global max init. riverine DIC. =', glo
+            call MPI_AllREDUCE(locmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+            if (mype==0) write(*,*) '  |-> global min init. riverine DIC. =', glo
+            
             call load_river_variable(ncid, 'DIN',  RiverDIN2D, partit, mesh)
             locmax = -66666
             locmin = 66666
@@ -1834,7 +1846,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
             call MPI_AllREDUCE(locmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
             if (mype==0) write(*,*) '  |-> global min init. riverine DIN. =', glo
 
-            call load_river_variable(ncid, 'DOCl', RiverDOCl2D, partit, mesh)
+            call load_river_variable(ncid, 'DOC_l', RiverDOCl2D, partit, mesh)
             locmax = -66666
             locmin = 66666
             locmax = max(locmax,maxval(RiverDOCl2D))
@@ -1845,7 +1857,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
             call MPI_AllREDUCE(locmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
             if (mype==0) write(*,*) '  |-> global min riverine DOCl. =', glo
 
-            call load_river_variable(ncid, 'DOCs', RiverDOCsl2D, partit, mesh)
+            call load_river_variable(ncid, 'DOC_sl', RiverDOCsl2D, partit, mesh)
             locmax = -66666
             locmin = 66666
             locmax = max(locmax,maxval(RiverDOCsl2D))

@@ -394,6 +394,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     use ver_sinking_recom_interface
     use diff_ver_recom_expl_interface
     use ver_sinking_recom_benthos_interface
+    use recom_nitrogenss_interface
     use recom_glovar
     use recom_config
     use g_comm_auto
@@ -523,13 +524,13 @@ if (any(recom_remin_tracer_id == tracers%data(tr_num)%ID)) then
 !        print*, 'Calling diff_ver_recom_expl and tr_num is:',tracers%data(tr_num)%ID
         SELECT CASE (tracers%data(tr_num)%ID)
             CASE (1001) ! DIN
-                dtr_bflux_din(:,:) = tracers%data(tr_num)%values(:,:)*0.0d0
+                dtr_bflux_din(:,:) = 0.0d0 !tracers%data(tr_num)%values(:,:)*0.0d0
             CASE (1002) ! DIC
-                dtr_bflux_dic(:,:) = tracers%data(tr_num)%values(:,:)*0.0d0
+                dtr_bflux_dic(:,:) = 0.0d0 !tracers%data(tr_num)%values(:,:)*0.0d0
             CASE (1003) ! Alk
-                dtr_bflux_alk(:,:) = tracers%data(tr_num)%values(:,:)*0.0d0
+                dtr_bflux_alk(:,:) = 0.0d0 !tracers%data(tr_num)%values(:,:)*0.0d0
             CASE (1018) ! DSi
-                dtr_bflux_dsi(:,:) = tracers%data(tr_num)%values(:,:)*0.0d0
+                dtr_bflux_dsi(:,:) = 0.0d0 !tracers%data(tr_num)%values(:,:)*0.0d0
         END SELECT
 ! update tracer fields
         do n=1, myDim_nod2D
@@ -602,6 +603,18 @@ if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
                                                 str_bf(nzmin:nzmax,n)
         end do
 endif
+
+! 3) Nitrogen SS
+    if (NitrogenSS .and. tracers%data(tr_num)%ID==1008) then ! idetc
+        call recom_nitrogenss(tracers, partit, mesh) !--- nss for idetc ---
+        do n=1, myDim_nod2D
+            nzmax=nlevels_nod2D(n)-1
+            nzmin=ulevels_nod2D(n)
+        tracers%data(3)%values(nzmin:nzmax,n)=tracers%data(3)%values(nzmin:nzmax,n)+ &   ! tracer_id(tr_num)==1001 !idin
+                                           nss(nzmin:nzmax,n)
+        end do
+    end if
+
 #endif
     !___________________________________________________________________________
     ! Update tracers --> calculate T* see Danilov et al. (2017)
@@ -1807,11 +1820,11 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
     CASE (1003) ! Alk
         if (use_MEDUSA .and. add_loopback) then
             bc_surface= dt*(virtual_alk(n) + relax_alk(n)       &
-                           ! + RiverAlk2D(n) * is_riverinput     &
+                            + RiverDIC2D(n) * is_riverinput     &
                             + lb_flux(n,3) + lb_flux(n,5)*2) !CaCO3:Alk burial=1:2
         else
-            bc_surface= dt*(virtual_alk(n) + relax_alk(n)) !       &
-                          !  + RiverAlk2D(n) * is_riverinput)
+            bc_surface= dt*(virtual_alk(n) + relax_alk(n)  & !       &
+                            + RiverDIC2D(n) * is_riverinput)
         end if
     CASE (1004:1006)
         bc_surface=0.0_WP

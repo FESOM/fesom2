@@ -892,6 +892,8 @@ nl              => mesh%nl
     allocate(str_bf    ( nl-1, node_size ))
     allocate(vert_sink ( nl-1, node_size ))
     allocate(Alk_surf  (       node_size ))
+    allocate(nss       ( nl-1, node_size )) !R2OMIP (Burial)
+    allocate(bur       ( 1:benthos_num, nl-1, node_size )) ! LO !R2OMIP (Burial)
 #endif
     ! =================
     ! Visc and Diff coefs
@@ -1004,6 +1006,8 @@ nl              => mesh%nl
     str_bf              = 0.0_WP
     vert_sink           = 0.0_WP
     Alk_surf            = 0.0_WP
+    nss                 = 0.0_WP !R2OMIP (Burial)
+    bur                 = 0.0_WP !R2OMIP (Burial)
 #endif
     
     ! init field for pressure force 

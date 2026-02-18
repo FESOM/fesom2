@@ -623,6 +623,9 @@ contains
 !          biogeochemical model setup (enable_3zoo2det, enable_coccos)
 ! ==============================================================================
 subroutine validate_recom_tracers(num_tracers, mype)
+  
+  use g_forcing_param, only: use_age_tracer !---age-code
+  
   implicit none
 
   ! Arguments
@@ -709,6 +712,10 @@ subroutine validate_recom_tracers(num_tracers, mype)
 
   end if
 
+  if (use_age_tracer) then 
+    expected_bgc_num = expected_bgc_num + 1 
+  end if
+
   expected_total_tracers = num_physical_tracers + expected_bgc_num
 
   ! ===========================================================================
@@ -783,6 +790,11 @@ subroutine validate_recom_tracers(num_tracers, mype)
       expected_tracer_ids(25) = 1023  ! DOCt (terrestrial DOC)
     end if
   end if
+
+  if (use_age_tracer) then 
+    expected_tracer_ids(num_expected_tracers) = 100
+  end if
+
   ! else: base configuration only needs tracers 1, 2, 1001-1022
 
   ! ===========================================================================
@@ -1050,6 +1062,9 @@ end subroutine validate_recom_tracers
 !          Call this after reading the tracer namelist
 ! ==============================================================================
 subroutine validate_tracer_id_sequence(tracer_ids, num_tracers, mype)
+  
+  use g_forcing_param, only: use_age_tracer !---age-code
+
   implicit none
 
   ! Arguments
@@ -1115,6 +1130,10 @@ subroutine validate_tracer_id_sequence(tracer_ids, num_tracers, mype)
       expected_ids(25) = 1023  ! DOCt
     end if
   end if
+
+  if (use_age_tracer) then 
+    expected_ids(num_tracers) = 100
+  end if 
 
   ! ===========================================================================
   ! Check 1: Compare actual vs expected tracer IDs
@@ -1475,6 +1494,11 @@ Module REcoM_declarations
   Real(kind=8),allocatable,dimension(:,:,:)   :: dtr_bf_alk  ! Diagnostics for Alk bottom flux
   Real(kind=8),allocatable,dimension(:,:,:)   :: dtr_bf_dsi  ! Diagnostics for DSi bottom flux
 
+  !===================================================================
+  ! DISSOLUTION AND REMINERALIZATION ! R2OMIP
+  !===================================================================
+  Real(kind=8)                          :: locDISSOC, locDISSON, locDISSOSi, locREMOC, locREMOCt, locREMON
+  Real(kind=8),allocatable,dimension(:) :: vertDISSOC, vertDISSON, vertDISSOSi, vertREMOC, vertREMOCt, vertREMON
 !!------------------------------------------------------------------------------                                                                                
 !! *** Benthos  ***
   Real(kind=8),allocatable,dimension(:) :: decayBenthos ! [1/day] Decay rate of detritus in the benthic layer
@@ -1521,6 +1545,7 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:)   :: GloFeDust        ! [umol/m2/s] Monthly 2D field of iron soluted in surface water from dust
   Real(kind=8),allocatable,dimension(:)   :: GloNDust         ! [mmol/m2/s] 10-year mean 2D fields of nitrogen soluted in surface water from dust
   Real(kind=8),dimension(12)              :: AtmCO2           ! [uatm] Atmospheric CO2 partial pressure. One value for the whole planet for each month
+  Real(kind=8),allocatable,dimension(:)   :: OmegaC_bottom    !< calcite saturation state at the ocean bottom !R2OMIP
 
   Real(kind=8),allocatable,dimension(:)   :: AtmFeInput       ! [umol/m2/s] Includes ice, but is, other than that identlical to GloFeDust
   Real(kind=8),allocatable,dimension(:)   :: AtmNInput        ! [umol/m2/s] Includes ice, but is, other than that identlical to GloNDust
@@ -1549,6 +1574,9 @@ Module REcoM_GloVar
 
   Real(kind=8),allocatable,dimension(:)     :: GlodPCO2surf       ! [mmol/m2/day] ocean-atmosphere  
   Real(kind=8),allocatable,dimension(:,:)   :: GlodecayBenthos  ! [1/day] Decay rate of detritus in the benthic layer saved for oce_ale_tracer.F90
+  Real(kind=8),allocatable,dimension(:,:)   :: Sed_2_Ocean_Flux ! Flux from the sediment back to the bottom ocean ! R2OMIP
+  Real(kind=8),allocatable,dimension(:,:)   :: Ocean_2_Sed_Flux ! Flux from the bottom ocean to the sediment ! R2OMIP
+  Real(kind=8),allocatable,dimension(:,:)   :: Burial         ! Benthic permanent burial Field in 2D [n2d 1] ! R2OMIP
   Real(kind=8),allocatable,dimension(:)     :: PistonVelocity   ! [m s-1]
   Real(kind=8),allocatable,dimension(:)     :: alphaCO2         ! [mol L-1 atm-1]
 
@@ -1597,6 +1625,12 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:)     :: grazmicro_d
   Real(kind=8),allocatable,dimension(:)     :: grazmicro_c
   Real(kind=8),allocatable,dimension(:)     :: grazmicro_p
+  Real(kind=8),allocatable,dimension(:)     :: DISSOC
+  Real(kind=8),allocatable,dimension(:)     :: DISSON
+  Real(kind=8),allocatable,dimension(:)     :: DISSOSi
+  Real(kind=8),allocatable,dimension(:)     :: REMOC
+  Real(kind=8),allocatable,dimension(:)     :: REMOCt
+  Real(kind=8),allocatable,dimension(:)     :: REMON
   Real(kind=8),allocatable,dimension(:,:)   :: respmeso
   Real(kind=8),allocatable,dimension(:,:)   :: respmacro
   Real(kind=8),allocatable,dimension(:,:)   :: respmicro
@@ -1683,7 +1717,11 @@ Module REcoM_GloVar
   real(kind=8), allocatable,dimension(:,:)  :: PAR3D            ! Light in the water column [nl-1 n2d]
   real(kind=8), allocatable,dimension(:)    :: RiverineLonOrig, RiverineLatOrig, RiverineDINOrig, RiverineDONOrig, RiverineDOCOrig, RiverineDSiOrig ! Variables to save original values for riverine nutrients
   real(kind=8), allocatable,dimension(:)    :: RiverDIC2D, RiverDIN2D, RiverDOCl2D, RiverDOCsl2D, RiverPOC2D, RiverFe
-!  real(kind=8), allocatable,dimension(:)    :: RiverDIN2D, RiverDON2D, RiverDOC2D, RiverDSi2D, RiverAlk2D, RiverDIC2D, RiverFe
+  real(kind=8), allocatable,dimension(:)    :: RiverDON2D, RiverDSi2D, RiverAlk2D ! RiverDOC2D
+  Real(kind=8),allocatable,dimension(:)     :: LocDenit
+  Real(kind=8),allocatable,dimension(:,:)   :: LocBurial ! R2OMIP
+  Real(kind=8),allocatable,dimension(:)     :: BurialBen ! R2OMIP
+
   real(kind=8), allocatable,dimension(:)    :: ErosionTSi2D, ErosionTON2D, ErosionTOC2D
 !! Cobeta, Cos(Angle of incidence)
   Real(kind=8), allocatable,dimension(:)    ::  cosAI
@@ -2215,6 +2253,15 @@ subroutine allocate_and_init_diags(nl)
         endif
     endif
 
+    ! Dissolution and remineralization ! R2OMIP
+    allocate(vertDISSOC(nl-1), vertDISSON(nl-1), vertDISSOSi(nl-1), vertREMOC(nl-1), vertREMOCt(nl-1), vertREMON(nl-1))
+    vertDISSOC  = 0.d0
+    vertDISSON  = 0.d0
+    vertDISSOSi = 0.d0
+    vertREMOC   = 0.d0
+    vertREMOCt  = 0.d0
+    vertREMON   = 0.d0
+
         ! --------------------------------------------------------------------------
         ! Temperature and Photosynthesis Tracking Variables
         ! --------------------------------------------------------------------------
@@ -2231,8 +2278,6 @@ subroutine allocate_and_init_diags(nl)
         VTCphot_phyto   = 0.d0
         VTCphot_diatoms = 0.d0
 
-    if (enable_coccos) then    
-
         allocate(VTTemp_diatoms(nl-1), VTTemp_phyto(nl-1))
         VTTemp_diatoms = 0.d0
         VTTemp_phyto   = 0.d0
@@ -2244,6 +2289,7 @@ subroutine allocate_and_init_diags(nl)
         allocate(VTSi_assimDia(nl-1))
         VTSi_assimDia = 0.d0
 
+    if (enable_coccos) then    
         ! --------------------------------------------------------------------------
         ! Coccolithophores and Phaeocystis Tracking (if enabled)
         ! --------------------------------------------------------------------------
@@ -2359,6 +2405,14 @@ subroutine update_2d_diags(n)
             endif
         endif
     endif
+
+    ! Dissolution and remineralization ! R2OMIP
+     DISSOC(n)  = locDISSOC
+     DISSON(n)  = locDISSON
+     DISSOSi(n) = locDISSOSi
+     REMOC(n)   = locREMOC
+     REMOCt(n)  = locREMOCt
+     REMON(n)   = locREMON
     
 end subroutine update_2d_diags
 
@@ -2485,26 +2539,24 @@ subroutine deallocate_diags()
         deallocate(vertaggd, vertdocexd, vertrespd)
         deallocate(VTDiaCO2, VTCphotLigLim_diatoms, VTCphot_diatoms)
 
-    if (enable_coccos) then
         deallocate(VTTemp_phyto, VTqlimitFac_phyto)
         deallocate(VTTemp_diatoms, VTqlimitFac_diatoms)
         deallocate(VTSi_assimDia)
+        deallocate(vertcalcdiss, vertcalcif)
 
+    if (enable_coccos) then
         ! --------------------------------------------------------------------------
         ! Coccolithophores and Phaeocystis (if enabled)
         ! --------------------------------------------------------------------------
         deallocate(vertNPPc, vertGPPc, vertNNAc, vertChldegc)
         deallocate(vertaggc, vertdocexc, vertrespc)
-        deallocate(vertcalcdiss, vertcalcif)
         deallocate(VTTemp_cocco, VTCoccoCO2, VTqlimitFac_cocco)
         deallocate(VTCphotLigLim_cocco, VTCphot_cocco)
-        
+
         deallocate(vertNPPp, vertGPPp, vertNNAp, vertChldegp)
         deallocate(vertaggp, vertdocexp, vertrespp)
         deallocate(VTTemp_phaeo, VTPhaeoCO2, VTqlimitFac_phaeo)
         deallocate(VTCphotLigLim_phaeo, VTCphot_phaeo)
-    else
-        deallocate(vertcalcdiss, vertcalcif)
     endif
     
     ! --------------------------------------------------------------------------
@@ -2538,6 +2590,9 @@ subroutine deallocate_diags()
             endif
         endif
     endif
+
+    ! Dissolution and remineralization ! R2OMIP
+    deallocate(vertDISSOC, vertDISSON, vertDISSOSi, vertREMOC, vertREMOCt, vertREMON)
     
 end subroutine deallocate_diags
 

@@ -66,13 +66,16 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(GloNDust              ( node_size ))
     allocate(AtmNInput             ( node_size ))
 
+    ! calcite dissolution at the ocean bottom
+    allocate(OmegaC_bottom(node_size)) !R2OMIP
+
     !! * River nutrients as surface boundary condition *
 !    allocate(RiverDIN2D            ( node_size ))
-!    allocate(RiverDON2D            ( node_size ))
+    allocate(RiverDON2D            ( node_size ))
 !    allocate(RiverDOC2D            ( node_size ))
-!    allocate(RiverDSi2D            ( node_size ))
+    allocate(RiverDSi2D            ( node_size ))
 !    allocate(RiverDIC2D            ( node_size ))
-!    allocate(RiverAlk2D            ( node_size ))
+    allocate(RiverAlk2D            ( node_size ))
 
     allocate(RiverDIC2D            ( node_size ))  ! R2OMIP
     allocate(RiverDIN2D            ( node_size ))  ! R2OMIP
@@ -80,7 +83,6 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(RiverDOCsl2D          ( node_size ))  ! R2OMIP
     allocate(RiverPOC2D            ( node_size ))  ! R2OMIP
     allocate(RiverFe               ( node_size ))
-
 
     !! * Erosion nutrients as surface boundary condition *
     allocate(ErosionTON2D          ( node_size ))
@@ -101,6 +103,14 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(GlodecayBenthos       ( node_size, benthos_num ))
     allocate(Benthos               ( node_size, benthos_num ))
     allocate(Benthos_tr            ( node_size, benthos_num, num_tracers )) ! kh 25.03.22 buffer per tracer index
+
+    allocate(LocDenit              ( node_size ))
+    allocate(LocBurial             ( benthos_num, node_size )) ! R2OMIP
+    allocate(Burial                ( benthos_num, node_size )) ! R2OMIP
+    allocate(BurialBen             ( benthos_num )) ! R2OMIP
+    allocate(Sed_2_Ocean_Flux      ( node_size, 6 )) ! DIN, DIC, Alk, DSi, DFe, O2 ! R2OMIP
+    allocate(Ocean_2_Sed_Flux      ( node_size, benthos_num )) ! C, Si, N, Calc ! R2OMIP
+
     allocate(GloHplus              ( node_size ))
     allocate(DenitBen              ( node_size ))
     allocate(PistonVelocity        ( node_size ))
@@ -117,12 +127,15 @@ subroutine recom_init(tracers, partit, mesh)
     GloNDust              = 0.d0
     AtmNInput             = 0.d0
 
+    ! calcite dissolution at the ocean bottom !R2OMIP
+    OmegaC_bottom         = 0.d0
+
 !    RiverDIN2D            = 0.d0
-!    RiverDON2D            = 0.d0
+    RiverDON2D            = 0.d0
 !    RiverDOC2D            = 0.d0
-!    RiverDSi2D            = 0.d0
+    RiverDSi2D            = 0.d0
 !    RiverDIC2D            = 0.d0
-!    RiverAlk2D            = 0.d0
+    RiverAlk2D            = 0.d0
 
     RiverDIC2D             = 0.d0
     RiverDIN2D             = 0.d0
@@ -132,7 +145,7 @@ subroutine recom_init(tracers, partit, mesh)
 
     RiverFe               = 0.d0
 
-    ErosionTON2D          = 0.d0
+    ErosionTOC2D          = 0.d0
     ErosionTON2D          = 0.d0
     ErosionTSi2D          = 0.d0
 
@@ -152,6 +165,10 @@ subroutine recom_init(tracers, partit, mesh)
     DenitBen              = 0.d0
     PistonVelocity        = 0.d0
     alphaCO2              = 0.d0
+
+    Burial                = 0.d0 ! R2OMIP
+    Sed_2_Ocean_Flux      = 0.0d0 ! R2OMIP
+    Ocean_2_Sed_Flux      = 0.0d0 ! R2OMIP
 
     LocBenthos            = 0.d0
     decayBenthos          = 0.d0
@@ -251,6 +268,20 @@ subroutine recom_init(tracers, partit, mesh)
   grazmicro_d = 0.d0
   grazmicro_c = 0.d0
   grazmicro_p = 0.d0
+
+  ! Dissolution and remineralization ! R2OMIP
+  allocate(DISSOC(node_size))
+  allocate(DISSON(node_size))
+  allocate(DISSOSi(node_size))
+  allocate(REMOC(node_size))
+  allocate(REMOCt(node_size))
+  allocate(REMON(node_size))
+  DISSOC = 0.d0
+  DISSON = 0.d0
+  DISSOSi = 0.d0
+  REMOC = 0.d0
+  REMOCt = 0.d0
+  REMON = 0.d0
 
 !! *** Allocate 3D diagnostics ***
     allocate(respmeso     ( nl-1, node_size ))
