@@ -459,7 +459,7 @@ do m=1, 3
    old_iceberg_elem=elem_containing_n2
    if (use_cavity) then 
       !if( reject_elem(mesh, partit, old_iceberg_elem) ) then
-+      reject_tmp = all( (mesh%cavity_depth(elem2D_nodes(:,elem_containing_n2))/=0.0) .OR. (mesh%bc_index_nod2D(elem2D_nodes(:,elem_containing_n2))==0.0) )
+      reject_tmp = all( (mesh%cavity_depth(elem2D_nodes(:,elem_containing_n2))/=0.0) .OR. (mesh%bc_index_nod2D(elem2D_nodes(:,elem_containing_n2))==0.0) )
       if(reject_tmp) then
          left_mype=1.0
          !write(*,*) 'iceberg found in shelf region: left_mype = 1'

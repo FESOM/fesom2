@@ -105,7 +105,8 @@ type(t_partit), intent(inout), target :: partit
 
         do i=1, 3
             iceberg_node=ib_nods_in_ib_elem(i)
-            if ((ulevels_nod2d(iceberg_node) == 0 ) .or. (use_cavity .and. ulevels_nod2d(iceberg_node) > 1)) cycle
+            ! Skip nodes with no ocean column; do NOT skip valid cavity nodes
+            if (iceberg_node <= 0 .or. ulevels_nod2d(iceberg_node) == 0) cycle
 
             if (iceberg_node>0) then
                 ibfwbv(iceberg_node) = ibfwbv(iceberg_node) - fwbv_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
@@ -113,6 +114,9 @@ type(t_partit), intent(inout), target :: partit
                 ibfwl(iceberg_node) = ibfwl(iceberg_node) - fwl_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
                 ibfwe(iceberg_node) = ibfwe(iceberg_node) - fwe_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
                 !ibhf(iceberg_node) = ibhf(iceberg_node) - hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
+
+                ! Guard against idx_d=0 (can happen if nlevels_nod2D is 0 or loop didn't execute)
+                if (idx_d(i) <= 0) cycle
 
                 do j=1,idx_d(i)
                     lev_up  = mesh%zbar_3d_n(j, iceberg_node)

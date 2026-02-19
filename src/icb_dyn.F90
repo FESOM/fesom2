@@ -76,6 +76,7 @@ subroutine iceberg_dyn(mesh, partit, ice, dynamics, ib, new_u_ib, new_v_ib, u_ib
  real			:: T_ave_ib, S_ave_ib, T_keel_ib, S_keel_ib
  character,  intent(IN)	:: file3*80
  real, intent(IN)	:: rho_icb
+ integer                :: max_nlev_alloc
  
 type(t_ice)   , intent(inout), target :: ice
 type(t_mesh), intent(in) , target :: mesh
@@ -87,19 +88,26 @@ type(t_dyn)   , intent(inout), target :: dynamics
 #include "associate_mesh_ass.h"
   
 n2=elem2D_nodes(1,iceberg_elem)
-allocate(arr_uo_dz(3,nlevels_nod2D(n2)))
-allocate(arr_vo_dz(3,nlevels_nod2D(n2)))
-allocate(arr_T_dz(3,nlevels_nod2D(n2)))
-allocate(arr_S_dz(3,nlevels_nod2D(n2)))
+! Use max nlevels across all 3 element nodes for allocation (cavity-safe)
+max_nlev_alloc = nlevels_nod2D(elem2D_nodes(1,iceberg_elem))
+do n=2,3
+  max_nlev_alloc = max(max_nlev_alloc, nlevels_nod2D(elem2D_nodes(n,iceberg_elem)))
+end do
+
+n2=elem2D_nodes(1,iceberg_elem)
+allocate(arr_uo_dz(3,max_nlev_alloc))
+allocate(arr_vo_dz(3,max_nlev_alloc))
+allocate(arr_T_dz(3,max_nlev_alloc))
+allocate(arr_S_dz(3,max_nlev_alloc))
 arr_uo_dz = 0.0
 arr_vo_dz = 0.0
 arr_T_dz = 0.0
 arr_S_dz = 0.0
 
-allocate(arr_uo_ib(nlevels_nod2D(n2)))
-allocate(arr_vo_ib(nlevels_nod2D(n2)))
-allocate(arr_T_ave_ib(nlevels_nod2D(n2)))
-allocate(arr_S_ave_ib(nlevels_nod2D(n2)))
+allocate(arr_uo_ib(max_nlev_alloc))
+allocate(arr_vo_ib(max_nlev_alloc))
+allocate(arr_T_ave_ib(max_nlev_alloc))
+allocate(arr_S_ave_ib(max_nlev_alloc))
 arr_uo_ib = 0.0
 arr_vo_ib = 0.0
 arr_T_ave_ib = 0.0
@@ -717,16 +725,26 @@ type(t_partit), intent(inout), target :: partit
     if (use_cavity .AND. mesh%cavity_depth(elem2D_nodes(m,iceberg_elem)) /= 0.0 &
         .AND. abs(depth_ib) < abs(mesh%zbar_3d_n(k, n2))) then
       ! Iceberg draft is above the ocean surface at this cavity node
-      uo_keel(m)=UV_ib(1,k-1,n2)
-      vo_keel(m)=UV_ib(2,k-1,n2)
-
-      T_keel(m)=Tclim_ib(k-1,n2)
-      S_keel(m)=Sclim_ib(k-1,n2) ! check those choices with RT: OK
-
-      uo_dz(m,k)=UV_ib(1,k-1,n2)
-      vo_dz(m,k)=UV_ib(2,k-1,n2)
-      T_dz(m,k)=Tclim_ib(k-1,n2)
-      S_dz(m,k)=Sclim_ib(k-1,n2)
+      if (k > 1) then
+        uo_keel(m)=UV_ib(1,k-1,n2)
+        vo_keel(m)=UV_ib(2,k-1,n2)
+        T_keel(m)=Tclim_ib(k-1,n2)
+        S_keel(m)=Sclim_ib(k-1,n2)
+        uo_dz(m,k)=UV_ib(1,k-1,n2)
+        vo_dz(m,k)=UV_ib(2,k-1,n2)
+        T_dz(m,k)=Tclim_ib(k-1,n2)
+        S_dz(m,k)=Sclim_ib(k-1,n2)
+      else
+        ! k==1: no level above, use surface (first) values
+        uo_keel(m)=UV_ib(1,1,n2)
+        vo_keel(m)=UV_ib(2,1,n2)
+        T_keel(m)=Tclim_ib(1,n2)
+        S_keel(m)=Sclim_ib(1,n2)
+        uo_dz(m,k)=UV_ib(1,1,n2)
+        vo_dz(m,k)=UV_ib(2,1,n2)
+        T_dz(m,k)=Tclim_ib(1,n2)
+        S_dz(m,k)=Sclim_ib(1,n2)
+      end if
       exit innerloop
 
     ! Keel layer: mid-level k is at or below the iceberg draft
@@ -902,16 +920,26 @@ type(t_partit), intent(inout), target :: partit
     if (use_cavity .AND. mesh%cavity_depth(elem2D_nodes(m,iceberg_elem)) /= 0.0 &
         .AND. abs(depth_ib) < abs(mesh%zbar_3d_n(k, n2))) then
       ! Iceberg draft is above the ocean surface at this cavity node
-      uo_dz(m)=UV_ib(1,k-1,n2)*abs(depth_ib)
-      vo_dz(m)=UV_ib(2,k-1,n2)*abs(depth_ib)
-      uo_keel(m)=UV_ib(1,k-1,n2)
-      vo_keel(m)=UV_ib(2,k-1,n2)
-
-      T_dz(m)=Tclim_ib(k-1,n2)*abs(depth_ib)
-      S_dz(m)=Sclim_ib(k-1,n2)*abs(depth_ib)
-      T_keel(m)=Tclim_ib(k-1,n2)
-      S_keel(m)=Sclim_ib(k-1,n2) ! check those choices with RT: OK
-
+      if (k > 1) then
+        uo_dz(m)=UV_ib(1,k-1,n2)*abs(depth_ib)
+        vo_dz(m)=UV_ib(2,k-1,n2)*abs(depth_ib)
+        uo_keel(m)=UV_ib(1,k-1,n2)
+        vo_keel(m)=UV_ib(2,k-1,n2)
+        T_dz(m)=Tclim_ib(k-1,n2)*abs(depth_ib)
+        S_dz(m)=Sclim_ib(k-1,n2)*abs(depth_ib)
+        T_keel(m)=Tclim_ib(k-1,n2)
+        S_keel(m)=Sclim_ib(k-1,n2)
+      else
+        ! k==1: no level above, use surface (first) values
+        uo_dz(m)=UV_ib(1,1,n2)*abs(depth_ib)
+        vo_dz(m)=UV_ib(2,1,n2)*abs(depth_ib)
+        uo_keel(m)=UV_ib(1,1,n2)
+        vo_keel(m)=UV_ib(2,1,n2)
+        T_dz(m)=Tclim_ib(1,n2)*abs(depth_ib)
+        S_dz(m)=Sclim_ib(1,n2)*abs(depth_ib)
+        T_keel(m)=Tclim_ib(1,n2)
+        S_keel(m)=Sclim_ib(1,n2)
+      end if
       exit innerloop
 
     ! Keel layer: mid-level k is at or below the iceberg draft
