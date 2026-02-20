@@ -145,6 +145,11 @@ type(t_partit), intent(inout), target :: partit
   damping = 0.5 * (1.0 + cos(conci_ib**3 * Pi))
   M_e = 1./6. * sea_state * (sst_ib + 2.0) * damping
   M_e = M_e/86400.
+  ! The Bigg/Silva wave erosion formula is only defined for SST > -2 degC.
+  ! When SST < -2 degC the formula produces M_e < 0 (nonphysical regrowth),
+  ! which reverses the sign of the FW and heat flux delivered to the ocean,
+  ! creating a runaway cooling feedback via the ALE bc_surface term. Clamp here.
+  if (M_e < 0.0) M_e = 0.0
   H_e = M_e * rho_icb * L
   
   ! check wave erosion potential

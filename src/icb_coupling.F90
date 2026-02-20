@@ -162,7 +162,7 @@ subroutine icb2fesom(mesh, partit, ice)
     use o_param
 
 ! kh 18.03.21 specification of structure used
-    use o_arrays, only: water_flux, heat_flux, wiso_flux_oce
+    use o_arrays, only: water_flux, heat_flux, wiso_flux_oce, Tclim_ib, is_nonlinfs
     use MOD_MESH
     use g_config
     use MOD_PARTIT
@@ -196,6 +196,30 @@ type(t_partit), intent(inout), target :: partit
     end do
 !$OMP END PARALLEL DO
   end if
+
+!---enthalpy-correction-begin
+! The ALE kinematic boundary condition in oce_ale_tracer.F90:
+!   bc_surface = -dt*(heat_flux(n)/vcpw + sval*water_flux(n)*is_nonlinfs)
+! uses sval=T_ocean for the entire water_flux, including the iceberg FW
+! contribution. Iceberg meltwater enters at T_melt~=0 degC, not T_ocean.
+! When T_ocean < 0 degC the wrong sign of the kinematic FW term creates
+! spurious cooling: d(T*h)/dt includes T_ocean*dh instead of T_melt*dh=0.
+!
+! Fix: add vcpw*T_ocean*fw_iceberg to heat_flux. This cancels the erroneous
+! T_ocean*fw_ib term in bc_surface, leaving a net contribution of zero
+! (correct for T_melt=0 degC). The sign ensures warming for T_ocean<0 and
+! cooling for T_ocean>0, matching the physics of mixing with 0-degC water.
+  if (.not. (turn_off_hf .or. turn_off_fw)) then
+!$OMP PARALLEL DO
+    do n=1, myDim_nod2d+eDim_nod2D
+        if (use_cavity .and. ulevels_nod2d(n) > 1) cycle
+        heat_flux(n) = heat_flux(n) + vcpw * is_nonlinfs * Tclim_ib(1, n) &
+                       * (ibfwb(n) + ibfwl(n) + ibfwe(n) + ibfwbv(n))
+    end do
+!$OMP END PARALLEL DO
+  end if
+!---enthalpy-correction-end
+
 !---wiso-code-begin
     if(lwiso) then
       do n=1, myDim_nod2D+eDim_nod2D
