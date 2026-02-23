@@ -11,7 +11,7 @@ module oce_adv_tra_ver_interfaces
       type(t_mesh),  intent(in), target  :: mesh
       real(kind=WP), intent(inout)       :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP), intent(in)          :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
-    end subroutine
+    end subroutine adv_tra_vert_impl
 !===============================================================================
 ! 1st order upwind (explicit)
 ! returns flux given at vertical interfaces of scalar volumes
@@ -28,7 +28,7 @@ module oce_adv_tra_ver_interfaces
       real(kind=WP), intent(in)         :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP), intent(inout)      :: flux(mesh%nl,  partit%myDim_nod2D)
       logical, optional                 :: o_init_zero
-    end subroutine
+    end subroutine adv_tra_ver_upw1
 !===============================================================================
 ! QR (4th order centerd)
 ! returns flux given at vertical interfaces of scalar volumes
@@ -46,7 +46,7 @@ module oce_adv_tra_ver_interfaces
       real(kind=WP), intent(in)         :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP), intent(inout)      :: flux(mesh%nl,  partit%myDim_nod2D)
       logical, optional                 :: o_init_zero
-    end subroutine
+    end subroutine adv_tra_ver_qr4c
 !===============================================================================
 ! Vertical advection with PPM reconstruction (5th order)
 ! returns flux given at vertical interfaces of scalar volumes
@@ -65,7 +65,7 @@ module oce_adv_tra_ver_interfaces
       real(kind=WP), intent(in)         :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP), intent(inout)      :: flux(mesh%nl,  partit%myDim_nod2D)
       logical, optional                 :: o_init_zero
-    end subroutine
+    end subroutine adv_tra_vert_ppm
 ! central difference reconstruction (2nd order, use only with FCT)
 ! returns flux given at vertical interfaces of scalar volumes
 ! IF o_init_zero=.TRUE.  : flux will be set to zero before computation
@@ -83,9 +83,9 @@ module oce_adv_tra_ver_interfaces
       real(kind=WP), intent(in)         :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP), intent(inout)      :: flux(mesh%nl,  partit%myDim_nod2D)
       logical, optional                 :: o_init_zero
-    end subroutine
+    end subroutine adv_tra_ver_cdiff
   end interface
-end module
+end module oce_adv_tra_ver_interfaces
 !===============================================================================
 subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh)
     use MOD_MESH
@@ -494,13 +494,15 @@ subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, o_init_zero)
 
         ! tracer at surface level
         tv(nzmin)=ttf(nzmin,n)
-        ! tracer at surface+1 level
-!       tv(2)=-ttf(1,n)*min(sign(1.0, W(2,n)), 0._WP)+ttf(2,n)*max(sign(1.0, W(2,n)), 0._WP)
-!       tv(3)=-ttf(2,n)*min(sign(1.0, W(3,n)), 0._WP)+ttf(3,n)*max(sign(1.0, W(3,n)), 0._WP)
-        tv(nzmin+1)=0.5*(ttf(nzmin,  n)+ttf(nzmin+1,n))
-        ! tacer at bottom-1 level
-        tv(nzmax-1)=-ttf(nzmax-2,n)*min(sign(1.0_wp, W(nzmax-1,n)), 0._WP)+ttf(nzmax-1,n)*max(sign(1.0_wp, W(nzmax-1,n)), 0._WP)
-!       tv(nzmax-1)=0.5_WP*(ttf(nzmax-2,n)+ttf(nzmax-1,n))
+
+        ! tracer at surface+1 level --> 2nd order central differnce 
+        !!PS tv(nzmin+1)=-ttf(nzmin  ,n)*min(sign(1.0_wp, W(nzmin+1,n)), 0._WP)+ttf(nzmin+1,n)*max(sign(1.0_wp, W(nzmin+1,n)), 0._WP)
+        tv(nzmin+1)=0.5_WP*(ttf(nzmin,  n)+ttf(nzmin+1,n))
+        
+        ! tacer at bottom-1 level --> 2nd order central differnce 
+        !!PS tv(nzmax-1)=-ttf(nzmax-2,n)*min(sign(1.0_wp, W(nzmax-1,n)), 0._WP)+ttf(nzmax-1,n)*max(sign(1.0_wp, W(nzmax-1,n)), 0._WP)
+        tv(nzmax-1)=0.5_WP*(ttf(nzmax-2,n)+ttf(nzmax-1,n))
+        
         ! tracer at bottom level
         tv(nzmax)=ttf(nzmax-1,n)
 

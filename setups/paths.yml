@@ -5,6 +5,7 @@ ollie:
     meshes:
         test_global: ./test/meshes/pi/
         test_souf: ./test/meshes/soufflet/
+        test_neverworld2: ./test/meshes/neverworld2/
         pi: /work/ollie/clidyn/FESOM2/meshes/pi/
         core2: /work/ollie/clidyn/FESOM2/meshes/core2/
         mr: /work/ollie/clidyn/FESOM2/meshes/mr/
@@ -32,6 +33,7 @@ levante:
     meshes:
         test_global: ./test/meshes/pi/
         test_souf: ./test/meshes/soufflet/
+        test_neverworld2: ./test/meshes/neverworld2/
         pi: /pool/data/AWICM/FESOM2/MESHES_FESOM2.1/pi/
         core2: /pool/data/AWICM/FESOM2/MESHES_FESOM2.1/core2/
         mr: /pool/data/AWICM/FESOM2/MESHES_FESOM2.1/mr/
@@ -55,10 +57,14 @@ docker:
     meshes:
         test_souf: ./test/meshes/soufflet/
         test_global: ./test/meshes/pi/
+        test_cavity: ./test/meshes/pi_cavity/
+        test_neverworld2: ./test/meshes/neverworld2/
     forcing:
         test_global: ./test/input/global/
+        test_icebergs: ./test/input/icebergs/
     clim:
         test_global: ./test/input/global/
+        test_icebergs: ./test/input/icebergs/
     opath:
         opath: ./test/
 
@@ -83,4 +89,3 @@ juwels:
         phc: /p/project/chhb19/hhb192/meshes/POOL/FESOM2/hydrography/phc3.0/
     opath:
         opath: /p/scratch/chhb19/${USER}/
-

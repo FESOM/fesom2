@@ -29,7 +29,7 @@ module cpl_driver
 
 #if defined (__oifs)
   integer                    :: nsend = 7
-  integer                    :: nrecv = 13
+  integer                    :: nrecv = 15
 #else
   integer                    :: nsend = 4
   integer                    :: nrecv = 12
@@ -60,11 +60,11 @@ module cpl_driver
   integer                    :: commRank
   integer                    :: comp_id        ! id returned by oasis_init_comp
 
-  logical, save              :: oasis_was_initialized
-  logical, save              :: oasis_was_terminated
-  integer, save              :: write_grid
+  logical                    :: oasis_was_initialized
+  logical                    :: oasis_was_terminated
+  integer                    :: write_grid
 
-  integer, save              :: seconds_til_now=0
+  integer                    :: seconds_til_now=0
   integer                    :: ierror              ! return error code
   logical                    :: rootexchg   =.true. ! logical switch 
 
@@ -695,7 +695,9 @@ include "associate_mesh_ass.h"
     cpl_recv(10) = 'heat_ico'
     cpl_recv(11) = 'heat_swo'    
     cpl_recv(12) = 'hydr_oce'
-    cpl_recv(13) = 'enth_oce'
+    cpl_recv(13) = 'calv_oce'
+    cpl_recv(14) = 'u10w_oce'
+    cpl_recv(15) = 'v10w_oce'
 #else
     cpl_recv(1)  = 'taux_oce'
     cpl_recv(2)  = 'tauy_oce'
@@ -891,7 +893,7 @@ include "associate_mesh_ass.h"
     !
     integer                :: info
     integer                :: j
-    integer, save          :: ncount = 0
+    integer                :: ncount = 0
     real (kind=WP)         :: t1, t2, t3        
     !
     !--------------------------------------------------------------------

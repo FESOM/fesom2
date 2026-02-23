@@ -397,12 +397,13 @@ type(t_partit), intent(inout), target :: partit
   if(i_have_element) then
    i_have_element= elem2D_nodes(1,elem) <= myDim_nod2D !1 PE still .true.
    if (use_cavity) then 
-      reject_tmp = all( (mesh%cavity_depth(elem2D_nodes(:,elem))/=0.0) .OR. (mesh%bc_index_nod2D(elem2D_nodes(:,elem))==0.0) )
+      !reject_tmp = all( (mesh%cavity_depth(elem2D_nodes(:,elem))/=0.0) .OR. (mesh%bc_index_nod2D(elem2D_nodes(:,elem))==0.0) )
+      reject_tmp = any(mesh%cavity_depth(elem2D_nodes(:,elem))/=0.0) .OR. all(mesh%bc_index_nod2D(elem2D_nodes(:,elem))==0.0)
       if(reject_tmp) then
       !if( reject_elem(mesh, partit, elem) ) then
        elem=0 !reject element
        i_have_element=.false.
-       !write(*,*) 'elem4all: iceberg found in shelf region: elem = 0'
+       write(*,*) 'elem4all: iceberg found in shelf region: elem = 0'
       else 
        elem=myList_elem2D(elem) !global now
       end if 
@@ -462,7 +463,7 @@ do m=1, 3
       reject_tmp = all( (mesh%cavity_depth(elem2D_nodes(:,elem_containing_n2))/=0.0) .OR. (mesh%bc_index_nod2D(elem2D_nodes(:,elem_containing_n2))==0.0) )
       if(reject_tmp) then
          left_mype=1.0
-         !write(*,*) 'iceberg found in shelf region: left_mype = 1'
+         write(*,*) 'iceberg found in shelf region: left_mype = 1'
          old_iceberg_elem=ibelem_tmp
       end if
    endif

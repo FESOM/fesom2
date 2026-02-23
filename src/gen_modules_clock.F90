@@ -9,6 +9,7 @@ module g_clock
   real(kind=WP)            :: timeold, timenew     !time in a day, unit: sec
   integer                  :: dayold, daynew       !day in a year
   integer                  :: yearold, yearnew     !year before and after time step
+  integer                  :: yearstart            !year when simulation started
   integer                  :: month, day_in_month  !month and day in a month
   integer                  :: fleapyear            !1 fleapyear, 0 not 
   integer                  :: ndpyr                !number of days in yearnew 
@@ -75,23 +76,18 @@ contains
     use mod_transit, only: ti_transit, ti_start_transit
     implicit none
     type(t_partit), intent(in), target    :: partit
-    integer                               :: i, daystart, yearstart
+    integer                               :: i, daystart
     real(kind=WP)                         :: aux1, aux2, timestart
     integer                               :: ierr
     integer                               :: file_unit
     character(512)                        :: errmsg
  
-    ! the model initialized at
-    timestart=timenew
-    daystart=daynew
-    yearstart=yearnew
-
-    ! init clock for this run
-    open(newunit=file_unit, file=trim(ResultPath)//trim(runid)//'.clock', action='read', &
+    ! init clock for this run - read clock file FIRST
+    open(newunit=file_unit, file=trim(RestartInPath)//trim(runid)//'.clock', action='read', &
         status='old', iostat=ierr, iomsg=errmsg)
     if (ierr /= 0) then
       write (unit=error_unit, fmt='(3A)') &
-        '### error: can not open file ', trim(ResultPath)//trim(runid)//'.clock', &
+        '### error: can not open file ', trim(RestartInPath)//trim(runid)//'.clock', &
         ', error: ' // trim(errmsg)
       call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
     end if
@@ -100,8 +96,15 @@ contains
     close(unit=file_unit)
     if(daynew==0) daynew=1
     
+    ! the model initialized at - set AFTER reading clock file
+    timestart=timenew
+    daystart=daynew
+    yearstart=yearnew
+    
     ! check if this is a restart or not
-    if(yearnew==yearstart .and. daynew==daystart .and. timenew==timestart) then
+    ! For initial run: clock file has same values on both lines (old=new)
+    ! For restart: clock file has different old/new values
+    if(yearnew==yearold .and. daynew==dayold .and. timenew==timeold) then
        r_restart=.false.
        yearold=yearnew-1 !required for checking if create new output files
     else
@@ -148,12 +151,14 @@ contains
             print *, achar(27)//'[31m'    //'____________________________________________________________'//achar(27)//'[0m'
             print *, achar(27)//'[5;7;31m'//' --> THIS IS A RESTART RUN !!!                              '//achar(27)//'[0m'
             write(*,"(A, F8.2, I4, I5)") '     > clock restarted at time:', timenew, daynew, yearnew
+            write(*,"(A, I5)") '     > yearstart for annual_event:', yearstart
             write(*,*)
         else
             write(*,*)
             print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
             print *, achar(27)//'[7;32m'//' --> THIS IS A INITIALISATION RUN !!!                       '//achar(27)//'[0m'
             write(*,"(A, F8.2, I4, I5)")'     > clock initialized at time:', timenew, daynew, yearnew
+            write(*,"(A, I5)") '     > yearstart for annual_event:', yearstart
             write(*,*)
         end if
     end if
@@ -181,11 +186,11 @@ contains
        dum_yearnew=yearold+1
     endif
 
-    open(newunit=file_unit, file=trim(ResultPath)//trim(runid)//'.clock', action='write', &
+    open(newunit=file_unit, file=trim(RestartOutPath)//trim(runid)//'.clock', action='write', &
         status='unknown', iostat=ierr, iomsg=errmsg)
     if (ierr /= 0) then
       write (unit=error_unit, fmt='(3A)') &
-        '### error: can not open file ', trim(ResultPath)//trim(runid)//'.clock', &
+        '### error: can not open file ', trim(RestartOutPath)//trim(runid)//'.clock', &
         ', error: ' // trim(errmsg)
       call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
     end if

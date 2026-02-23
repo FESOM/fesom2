@@ -1,37 +1,53 @@
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine annual_event(do_output)
+subroutine annual_event(do_output, N)
   !decides whether it's time to do output
   use g_clock
   implicit none
 
-  logical :: do_output
+  logical, intent(inout)        :: do_output
+  integer, intent(in)           :: N
+  integer                       :: elapsed_years
+  logical, save                 :: debug_printed = .false.
 
-  if ((daynew == ndpyr) .and. (timenew==86400.)) then
-     do_output=.true.
+  elapsed_years = yearnew - yearstart + 1
+  if (mod(elapsed_years, N)==0 .and. (daynew == ndpyr) .and. (timenew==86400.)) then
+    do_output=.true.
+    ! Debug output when restart event triggers
+    write(*,'(A,I5,A,I5,A,I4,A,I4,A,L1)') &
+      ' annual_event TRIGGERED: yearstart=', yearstart, ' yearnew=', yearnew, &
+      ' elapsed=', elapsed_years, ' N=', N, ' do_output=', do_output
   else
-     do_output=.false.
+    do_output=.false.
+    ! Debug: print once per year at end of year to show why event didn't trigger
+    if ((daynew == ndpyr) .and. (timenew==86400.) .and. .not. debug_printed) then
+      write(*,'(A,I5,A,I5,A,I4,A,I4,A,I4,A,L1)') &
+        ' annual_event NOT triggered: yearstart=', yearstart, ' yearnew=', yearnew, &
+        ' elapsed=', elapsed_years, ' mod=', mod(elapsed_years,N), ' N=', N, ' do_output=', do_output
+      debug_printed = .true.
+    endif
+    if (daynew == 1) debug_printed = .false.  ! Reset at start of new year
   endif
-
+  
 end subroutine annual_event
 !
 !--------------------------------------------------------------------------------------------
 !
-subroutine monthly_event(do_output)
+subroutine monthly_event(do_output, N)
   !decides whether it's time to do output
   use g_clock
   implicit none
 
-  logical :: do_output
-
-  if (day_in_month==num_day_in_month(fleapyear,month) .and. &
-       timenew==86400.) then
-     do_output=.true.
+  logical, intent(inout)         :: do_output
+  integer, intent(in)            :: N
+  
+  if (mod(month, N)==0 .and. day_in_month==num_day_in_month(fleapyear,month) .and. timenew==86400.) then
+    do_output=.true.
   else
-     do_output=.false.
-  end if
-
+    do_output=.false.
+  end if 
+  
 end subroutine monthly_event
 !
 !--------------------------------------------------------------------------------------------
@@ -41,8 +57,8 @@ subroutine daily_event(do_output, N)
   use g_clock
   implicit none
 
-  logical             :: do_output
-  integer, intent(in) :: N
+  logical, intent(inout)        :: do_output
+  integer, intent(in)           :: N
   if (mod(daynew, N)==0 .and. timenew==86400.) then
      do_output=.true.
   else
@@ -58,8 +74,8 @@ subroutine hourly_event(do_output, N)
   use g_clock
   implicit none
 
-  logical             :: do_output
-  integer, intent(in) :: N
+  logical, intent(inout)        :: do_output
+  integer, intent(in)           :: N
 
   if (mod(timenew, 3600.*N)==0) then
      do_output=.true.
@@ -76,9 +92,9 @@ subroutine step_event(do_output,istep, N)
   use g_config
   implicit none
 
-  logical             :: do_output
-  integer             :: istep
-  integer, intent(in) :: N
+  logical, intent(inout)        :: do_output
+  integer                       :: istep
+  integer, intent(in)           :: N
 
   if (mod(istep, N)==0) then
      do_output=.true.

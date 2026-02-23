@@ -10,9 +10,9 @@ module ice_initial_state_interface
         type(t_tracer), intent(in)   , target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine ice_initial_state
     end interface
-end module
+end module ice_initial_state_interface
 
 module ice_setup_interface
     interface
@@ -26,9 +26,9 @@ module ice_setup_interface
         type(t_tracer), intent(in)   , target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine ice_setup
     end interface
-end module
+end module ice_setup_interface
 
 module ice_timestep_interface
     interface
@@ -41,9 +41,9 @@ module ice_timestep_interface
         type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine ice_timestep
     end interface
-end module
+end module ice_timestep_interface
 
 !
 !_______________________________________________________________________________
@@ -108,6 +108,9 @@ subroutine ice_timestep(step, ice, partit, mesh)
 #if defined (__icepack)
     use icedrv_main,   only: step_icepack
 #endif
+#if defined (FESOM_PROFILING)
+    use fesom_profiler
+#endif
     implicit none
     integer       , intent(in)            :: step
     type(t_ice)   , intent(inout), target :: ice
@@ -166,6 +169,9 @@ subroutine ice_timestep(step, ice, partit, mesh)
 #endif
     !___________________________________________________________________________
     t0=MPI_Wtime()
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_start("ice_dynamics")
+#endif
 #if defined (__icepack)
     call step_icepack(ice, mesh, time_evp, time_advec, time_therm) ! EVP, advection and thermodynamic parts
 #else
@@ -189,9 +195,17 @@ subroutine ice_timestep(step, ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     !$ACC UPDATE DEVICE (ice%data(4)%values, ice%data(4)%valuesl, ice%data(4)%dvalues, ice%data(4)%values_rhs, ice%data(4)%values_div_rhs)
 #endif
+
+    !___________________________________________________________________________
+    ! start compute dynamical growth rates of ice, snow and area. store variables before the 
+    ! dynamical step. Letti wanted these CMIP6 
+    ! variables 
+    ice%thermo%dyngra(:)  = ice%data(1)%values(:) 
+    ice%thermo%dyngr(:)   = ice%data(2)%values(:)
+    ice%thermo%dyngrsn(:) = ice%data(3)%values(:)
+ 
     !___________________________________________________________________________
     ! ===== Dynamics
-
     SELECT CASE (ice%whichEVP)
     CASE (0)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call EVPdynamics...'//achar(27)//'[0m'
@@ -213,6 +227,10 @@ subroutine ice_timestep(step, ice, partit, mesh)
 
     if (use_cavity) call cavity_ice_clean_vel(ice, partit, mesh)
     t1=MPI_Wtime()
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("ice_dynamics")
+    call fesom_profiler_start("ice_advection")
+#endif
 
     !___________________________________________________________________________
     ! ===== Advection part
@@ -278,7 +296,18 @@ subroutine ice_timestep(step, ice, partit, mesh)
 
     if (use_cavity) call cavity_ice_clean_ma(ice, partit, mesh)
     t2=MPI_Wtime()
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("ice_advection")
+    call fesom_profiler_start("ice_thermodynamics")
+#endif
 
+
+    ! compute dynamical growth rates of ice, snow and area based on values between 
+    ! before and after the dynamical step. Letti wanted these CMIP6 variables 
+    ice%thermo%dyngra(:)  = (ice%data(1)%values(:) - ice%thermo%dyngra(  :)) / ice%ice_dt
+    ice%thermo%dyngr(:)   = (ice%data(2)%values(:) - ice%thermo%dyngr(   :)) / ice%ice_dt
+    ice%thermo%dyngrsn(:) = (ice%data(3)%values(:) - ice%thermo%dyngrsn( :)) / ice%ice_dt
+    
     !___________________________________________________________________________
     ! ===== Thermodynamic part
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call thermodynamics...'//achar(27)//'[0m'
@@ -301,6 +330,9 @@ subroutine ice_timestep(step, ice, partit, mesh)
     end do
 !$OMP END PARALLEL DO
     t3=MPI_Wtime()
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("ice_thermodynamics")
+#endif
     rtime_ice = rtime_ice + (t3-t0)
     rtime_tot = rtime_tot + (t3-t0)
     if(mod(step,logfile_outfreq)==0 .and. mype==0) then
@@ -350,7 +382,7 @@ subroutine ice_initial_state(ice, tracers, partit, mesh)
    integer,             save                    :: n_ic2d
    integer,             save, dimension(ic_max) :: idlist
    character(MAX_PATH), save, dimension(ic_max) :: filelist
-   logical                                      :: ini_ice_from_file=.false.
+   logical                                      :: ini_ice_from_file=.false., file_exist=.false.
    character(50),       save, dimension(ic_max) :: varlist
    integer                                      :: current_tracer
    namelist / tracer_init2d / n_ic2d, idlist, filelist, varlist, ini_ice_from_file
@@ -459,45 +491,73 @@ end if
     end if
     read(nm_ic_unit, nml=tracer_init2d,   iostat=iost)
     close(nm_ic_unit)
-
-    if (.not. ini_ice_from_file) then
-    if(mype==0) write(*,*) 'initialize the sea ice: cold start'
+    
+    !
+    !
     !___________________________________________________________________________
-    do i=1,myDim_nod2D+eDim_nod2D
-        !_______________________________________________________________________
-        if (ulevels_nod2d(i)>1) then
-            !!PS m_ice(i)  = 1.0e15_WP
-            !!PS m_snow(i) = 0.1e15_WP
-            cycle ! --> if cavity, no sea ice, no initial state
-        endif
-
-        !_______________________________________________________________________
-        if (tracers%data(1)%values(1,i)< 0.0_WP) then
-            if (geo_coord_nod2D(2,i)>0._WP) then
-                m_ice(i) = 1.0_WP
-                m_snow(i)= 0.1_WP
-            else
-                m_ice(i) = 2.0_WP
-                m_snow(i)= 0.5_WP
-            end if
-            a_ice(i) = 0.9_WP
-            u_ice(i) = 0.0_WP
-            v_ice(i) = 0.0_WP
-        endif
-    enddo
-    else
-    if (mype==0) write(*,*) 'initialize the sea ice: from file'
-       DO i=1, n_ic2d
-          DO current_tracer=1, ice%num_itracers
-             IF (ice%data(current_tracer)%ID==idlist(i)) then
-                IF (mype==0) then
-                   write(*,*) 'reading 2D variable  : ', trim(varlist(i)), ' into 2D tracer ID=', current_tracer
-                   write(*,*) 'from ',                   trim(filelist(i))
-                END IF
-             call read_other_NetCDF(trim(ClimateDataPath)//trim(filelist(i)), varlist(i),  1, ice%data(current_tracer)%values(:), .false., .true., partit, mesh)
-             EXIT
-             END IF
-          END DO
-       END DO
-    end if
+    ! switch for making sea-ice initialisation from regular gridded files and 
+    ! do interpolation to fesom grid or to initialise them with a constant value
+    if (.not. ini_ice_from_file) then
+        if(mype==0) write(*,*) 'initialize the sea ice: cold start'
+        !___________________________________________________________________________
+        do i=1,myDim_nod2D+eDim_nod2D
+            !_______________________________________________________________________
+            ! if cavity, no sea ice, no initial state
+            if (ulevels_nod2d(i)>1) cycle 
+            
+            !_______________________________________________________________________
+            if (tracers%data(1)%values(1,i)< 0.0_WP) then
+                if (geo_coord_nod2D(2,i)>0._WP) then
+                    m_ice(i) = 1.0_WP
+                    m_snow(i)= 0.1_WP
+                else
+                    m_ice(i) = 2.0_WP
+                    m_snow(i)= 0.5_WP
+                end if
+                a_ice(i) = 0.9_WP
+                u_ice(i) = 0.0_WP
+                v_ice(i) = 0.0_WP
+            endif
+        enddo
+        
+    else ! --> if (.not. ini_ice_from_file) then
+        if (mype==0) write(*,*) 'initialize the sea ice: from file'
+        do i=1, n_ic2d
+            do current_tracer=1, ice%num_itracers
+                if (ice%data(current_tracer)%ID==idlist(i)) then
+                    
+                    !___________________________________________________________
+                    ! check if regular gridded sea-ice initialisation file exists
+                    ! if not throw error message
+                    file_exist=.False.
+                    inquire(file=trim(trim(ClimateDataPath)//trim(filelist(i))), exist=file_exist) 
+                    if (file_exist) then   
+                        if (mype==0) then
+                            write(*,*) ' --> reading 2D variable: ', trim(varlist(i)), ' into 2D tracer ID=', current_tracer
+                            write(*,*) '     from file ',trim(ClimateDataPath)//trim(filelist(i))
+                        end if 
+                        ! read 2d sea ice variable from file and interpoalte it to 
+                        ! fesom grid 
+                        call read_other_NetCDF(trim(ClimateDataPath)//trim(filelist(i)), varlist(i),  1, ice%data(current_tracer)%values(:), .false., .true., partit, mesh)
+                    
+                    else    
+                        if (mype==0) then
+                            write(*,*) '____________________________________________________________________'
+                            write(*,*) ' ERROR: sea-ice initialisation file not found! '
+                            write(*,*) '        ', trim(ClimateDataPath)//trim(filelist(i))
+                            write(*,*) '        --> check your namelist.config (ClimateDataPath=...) and namelist.tra'
+                            write(*,*) '            (&tracer_init2d'
+                            write(*,*) '            ....'
+                            write(*,*) '            filelist= ...'
+                            write(*,*) '            ....'
+                            write(*,*) '            /)'
+                            write(*,*) '____________________________________________________________________'
+                        end if
+                        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                        
+                    end if ! --> if (file_exist) then       
+                end if ! --> IF (ice%data(current_tracer)%ID==idlist(i)) then
+            end do ! --> DO current_tracer=1, ice%num_itracers
+        end do ! --> DO i=1, n_ic2d
+    end if ! --> if (.not. ini_ice_from_file) then
 end subroutine ice_initial_state

@@ -8,7 +8,7 @@ module async_threads_module
   abstract interface
     subroutine callback_interface(index_argument)
       integer, intent(in) :: index_argument
-    end subroutine
+    end subroutine callback_interface
   end interface
 
   
@@ -23,12 +23,12 @@ module async_threads_module
     procedure run
     procedure join
     procedure disable_async
-  end type
+  end type thread_type
 
 
   type wrapper_type
     class(thread_type), pointer :: ptr => null()
-  end type
+  end type wrapper_type
   type(wrapper_type), save, allocatable :: threads(:)
 
 
@@ -56,41 +56,41 @@ contains
     this%run_ptr => thread_callback_procedure
     this%run_arg = procedure_argument
     
-#ifdef DISABLE_MULTITHREADING
-    call this%disable_async()
-#else
+#ifdef ASYNCHRONOUS_IO_THREADS
     if(this%with_real_threads) call init_ccall(this%idx)
+#else
+    call this%disable_async()
 #endif
-  end subroutine
+  end subroutine initialize
 
 
   subroutine run(this)
     class(thread_type) this
     ! EO args
     if(this%with_real_threads) then
-#ifndef DISABLE_MULTITHREADING
+#ifdef ASYNCHRONOUS_IO_THREADS
       call begin_ccall(this%idx)
 #endif
     else
       call async_threads_execute_fcall(this%idx)
     end if
-  end subroutine
+  end subroutine run
 
 
   subroutine join(this)
     class(thread_type) this
     ! EO args    
-#ifndef DISABLE_MULTITHREADING
+#ifdef ASYNCHRONOUS_IO_THREADS
     if(this%with_real_threads) call end_ccall(this%idx)
 #endif
-  end subroutine
+  end subroutine join
   
   
   subroutine disable_async(this)
     class(thread_type) this
     ! EO args
     this%with_real_threads = .false.  
-  end subroutine
+  end subroutine disable_async
 
 
   subroutine async_threads_execute_fcall(thread_idx) bind (C, name="async_threads_execute_fcall")
@@ -103,7 +103,7 @@ contains
     t => threads(thread_idx)%ptr
     
     call t%run_ptr( t%run_arg )
-  end subroutine
+  end subroutine async_threads_execute_fcall
 
 
   subroutine assert(val, line)
@@ -114,6 +114,6 @@ contains
       print *, "error in line ",line, __FILENAME__
       stop 1
     end if
-  end subroutine
+  end subroutine assert
 
-end module
+end module async_threads_module
