@@ -97,7 +97,12 @@ type(t_partit), intent(inout), target :: partit
             if (iceberg_node<=mydim_nod2d) then
                 ib_nods_in_ib_elem(i)           = iceberg_node
                 num_ib_nods_in_ib_elem          = num_ib_nods_in_ib_elem + 1
-                tot_area_nods_in_ib_elem        = tot_area_nods_in_ib_elem + mesh%area(:,iceberg_node)
+                ! Only include area for nodes that will actually receive flux
+                ! (idx_d>0).  Cavity nodes (idx_d=0) are skipped in the flux
+                ! loop below; including their area in the denominator would
+                ! under-apply the heat flux by ~N_cavity/N_total per element.
+                if (idx_d(i) > 0) &
+                    tot_area_nods_in_ib_elem = tot_area_nods_in_ib_elem + mesh%area(:,iceberg_node)
             else
                 ib_nods_in_ib_elem(i)           = 0
             end if
@@ -105,8 +110,15 @@ type(t_partit), intent(inout), target :: partit
 
         do i=1, 3
             iceberg_node=ib_nods_in_ib_elem(i)
-            ! Skip nodes with no ocean column; do NOT skip valid cavity nodes
-            if (iceberg_node <= 0 .or. ulevels_nod2d(iceberg_node) == 0) cycle
+            ! Skip land nodes (ulevels==0) and cavity nodes (ulevels>1).
+            ! Surface FW and heat fluxes must only go to open-ocean nodes
+            ! (ulevels==1).  In oce_mesh.F90, mesh%area(k,n) is only filled
+            ! for k >= ulevels(elem), so mesh%area(1,n)==0 for cavity nodes.
+            ! Dividing by tot_area_nods_in_ib_elem(1)==0 gives NaN that
+            ! propagates into integrate_nod -> "total iceberg fw flux: NaN".
+            if (iceberg_node <= 0 .or. ulevels_nod2d(iceberg_node) /= 1) cycle
+            ! Belt-and-suspenders: skip if no surface area was accumulated
+            if (tot_area_nods_in_ib_elem(1) <= 0.0) cycle
 
             if (iceberg_node>0) then
                 ibfwbv(iceberg_node) = ibfwbv(iceberg_node) - fwbv_flux_ib(ib) / tot_area_nods_in_ib_elem(1)

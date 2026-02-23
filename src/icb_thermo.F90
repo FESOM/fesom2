@@ -69,6 +69,7 @@ subroutine iceberg_meltrates(partit, mesh, M_b, M_v, M_e, M_bv, &
   integer           :: n, n2
   integer, intent(IN)   :: elem
   real              :: lev_up, lev_low, dz
+  integer           :: nn    ! temporary loop counter for non-cavity node selection
   real			:: absamino, damping, sea_state, v_ibmino
   real			:: tf, T_d 				!freezing temp. and 'thermal driving'
   real          :: ib_wave_erosion_pot
@@ -92,6 +93,17 @@ type(t_partit), intent(inout), target :: partit
 
 
   n2=elem2D_nodes(1,elem)
+  ! Prefer a non-cavity node as geometry reference for the level loop so
+  ! that hfbv_flux_ib(ib,n) level indices align with real ocean levels.
+  ! When n2 is a cavity node its level 1 maps to the ice-shelf interior
+  ! (not the ocean surface), causing a depth/magnitude mismatch in the
+  ! flux applied by prepare_icb2fesom.
+  do nn=1,3
+    if (ulevels_nod2D(elem2D_nodes(nn,elem)) <= 1) then
+      n2 = elem2D_nodes(nn,elem)
+      exit
+    end if
+  end do
   do n=1,ib_n_lvls
   !3-eq. formulation for lateral 'basal' melting [m/s]
     lev_up  = mesh%zbar_3d_n(n, n2)
@@ -474,7 +486,15 @@ type(t_partit), intent(inout), target :: partit
      ep1 = cpw*gat
      ep2 = cpi*gas
      ep3 = lhf*gas
-     ep31 = -rhor*cpi*tdif/zice   !RG4190 / RG44027
+     ! Guard against zice==0: this can happen in the per-level call from
+     ! iceberg_meltrates when lev_up==depth_ib at the first layer, causing
+     ! depth=-(0+0/2)=0 to be passed.  Division by zero gives ep31=Inf,
+     ! which leads to ex4=Inf/Inf=NaN and then NaN in M_b/M_bv.
+     if (abs(zice) > 0.0d0) then                               !RG4190 / RG44027
+         ep31 = -rhor*cpi*tdif/zice
+     else
+         ep31 = 0.0d0
+     end if
      ep4 = b+c*zice
      ep5 = gas/rhor
 
@@ -508,7 +528,10 @@ type(t_partit), intent(inout), target :: partit
      ex4 = ex2/ex1
      ex5 = ex3/ex1
 
-     sr1 = 0.25*ex4*ex4-ex5
+     ! Clamp discriminant: sr1 can become slightly negative with unusual
+     ! (e.g. sub-ice-shelf) T/S values due to floating-point rounding,
+     ! causing sqrt(NaN) -> NaN in M_b/M_bv -> NaN in fwb/fwbv flux arrays.
+     sr1 = max(0.0d0, 0.25*ex4*ex4-ex5)
      sr2 = ex6*ex4               ! modified for RG4190 / RG44027
      sf1 = sr2+sqrt(sr1)
      tf1 = a*sf1+ep4

@@ -717,6 +717,22 @@ type(t_partit), intent(inout), target :: partit
 
     if (lev_up==lev_low) then
       arr_ib_n_lvls(m) = k
+      ! For cavity nodes (ulevels>1) with collapsed ice-shelf levels, fill all
+      ! levels with the first ocean-level T/S/UV to avoid 0 degC contamination
+      ! that would corrupt arr_T_ave_ib and T_keel_ib.  Also reset
+      ! arr_ib_n_lvls to 0 so this node does not restrict ib_n_lvls for the
+      ! whole element (there is no real ocean overlap here).
+      if (ulevels_nod2D(n2) > 1) then
+        arr_ib_n_lvls(m) = 0
+        T_dz(m,:)  = Tclim_ib(ulevels_nod2D(n2), n2)
+        S_dz(m,:)  = Sclim_ib(ulevels_nod2D(n2), n2)
+        uo_dz(m,:) = UV_ib(1, ulevels_nod2D(n2), n2)
+        vo_dz(m,:) = UV_ib(2, ulevels_nod2D(n2), n2)
+        T_keel(m)  = Tclim_ib(ulevels_nod2D(n2), n2)
+        S_keel(m)  = Sclim_ib(ulevels_nod2D(n2), n2)
+        uo_keel(m) = UV_ib(1, ulevels_nod2D(n2), n2)
+        vo_keel(m) = UV_ib(2, ulevels_nod2D(n2), n2)
+      end if
       exit innerloop
     end if
     dz = abs( lev_low - lev_up )
@@ -724,27 +740,17 @@ type(t_partit), intent(inout), target :: partit
     ! Cavity check: use zbar_3d_n for geometric comparison
     if (use_cavity .AND. mesh%cavity_depth(elem2D_nodes(m,iceberg_elem)) /= 0.0 &
         .AND. abs(depth_ib) < abs(mesh%zbar_3d_n(k, n2))) then
-      ! Iceberg draft is above the ocean surface at this cavity node
-      if (k > 1) then
-        uo_keel(m)=UV_ib(1,k-1,n2)
-        vo_keel(m)=UV_ib(2,k-1,n2)
-        T_keel(m)=Tclim_ib(k-1,n2)
-        S_keel(m)=Sclim_ib(k-1,n2)
-        uo_dz(m,k)=UV_ib(1,k-1,n2)
-        vo_dz(m,k)=UV_ib(2,k-1,n2)
-        T_dz(m,k)=Tclim_ib(k-1,n2)
-        S_dz(m,k)=Sclim_ib(k-1,n2)
-      else
-        ! k==1: no level above, use surface (first) values
-        uo_keel(m)=UV_ib(1,1,n2)
-        vo_keel(m)=UV_ib(2,1,n2)
-        T_keel(m)=Tclim_ib(1,n2)
-        S_keel(m)=Sclim_ib(1,n2)
-        uo_dz(m,k)=UV_ib(1,1,n2)
-        vo_dz(m,k)=UV_ib(2,1,n2)
-        T_dz(m,k)=Tclim_ib(1,n2)
-        S_dz(m,k)=Sclim_ib(1,n2)
-      end if
+      ! Iceberg draft is above the ocean surface at this cavity node.
+      ! Use first ocean level (ulevels_nod2D) to avoid ice-shelf level 0 degC
+      ! contamination; indices k-1 or 1 may point to ice-shelf levels.
+      uo_keel(m) = UV_ib(1, ulevels_nod2D(n2), n2)
+      vo_keel(m) = UV_ib(2, ulevels_nod2D(n2), n2)
+      T_keel(m)  = Tclim_ib(ulevels_nod2D(n2), n2)
+      S_keel(m)  = Sclim_ib(ulevels_nod2D(n2), n2)
+      uo_dz(m,k) = UV_ib(1, ulevels_nod2D(n2), n2)
+      vo_dz(m,k) = UV_ib(2, ulevels_nod2D(n2), n2)
+      T_dz(m,k)  = Tclim_ib(ulevels_nod2D(n2), n2)
+      S_dz(m,k)  = Sclim_ib(ulevels_nod2D(n2), n2)
       exit innerloop
 
     ! Keel layer: mid-level k is at or below the iceberg draft
@@ -912,6 +918,19 @@ type(t_partit), intent(inout), target :: partit
     end if
 
     if (lev_up==lev_low) then
+      ! For cavity nodes (ulevels>1) with collapsed ice-shelf levels, fill T/S/UV
+      ! with first ocean-level values to avoid 0 degC contamination of T_keel
+      ! and uo_ib (depth-averaged velocity used in wave erosion and dynamics).
+      if (ulevels_nod2D(n2) > 1) then
+        T_dz(m)    = Tclim_ib(ulevels_nod2D(n2), n2) * abs(depth_ib)
+        S_dz(m)    = Sclim_ib(ulevels_nod2D(n2), n2) * abs(depth_ib)
+        uo_dz(m)   = UV_ib(1, ulevels_nod2D(n2), n2)  * abs(depth_ib)
+        vo_dz(m)   = UV_ib(2, ulevels_nod2D(n2), n2)  * abs(depth_ib)
+        T_keel(m)  = Tclim_ib(ulevels_nod2D(n2), n2)
+        S_keel(m)  = Sclim_ib(ulevels_nod2D(n2), n2)
+        uo_keel(m) = UV_ib(1, ulevels_nod2D(n2), n2)
+        vo_keel(m) = UV_ib(2, ulevels_nod2D(n2), n2)
+      end if
       exit innerloop
     end if
     dz = abs( lev_low - lev_up )
@@ -919,27 +938,17 @@ type(t_partit), intent(inout), target :: partit
     ! Cavity check: use zbar_3d_n for geometric comparison
     if (use_cavity .AND. mesh%cavity_depth(elem2D_nodes(m,iceberg_elem)) /= 0.0 &
         .AND. abs(depth_ib) < abs(mesh%zbar_3d_n(k, n2))) then
-      ! Iceberg draft is above the ocean surface at this cavity node
-      if (k > 1) then
-        uo_dz(m)=UV_ib(1,k-1,n2)*abs(depth_ib)
-        vo_dz(m)=UV_ib(2,k-1,n2)*abs(depth_ib)
-        uo_keel(m)=UV_ib(1,k-1,n2)
-        vo_keel(m)=UV_ib(2,k-1,n2)
-        T_dz(m)=Tclim_ib(k-1,n2)*abs(depth_ib)
-        S_dz(m)=Sclim_ib(k-1,n2)*abs(depth_ib)
-        T_keel(m)=Tclim_ib(k-1,n2)
-        S_keel(m)=Sclim_ib(k-1,n2)
-      else
-        ! k==1: no level above, use surface (first) values
-        uo_dz(m)=UV_ib(1,1,n2)*abs(depth_ib)
-        vo_dz(m)=UV_ib(2,1,n2)*abs(depth_ib)
-        uo_keel(m)=UV_ib(1,1,n2)
-        vo_keel(m)=UV_ib(2,1,n2)
-        T_dz(m)=Tclim_ib(1,n2)*abs(depth_ib)
-        S_dz(m)=Sclim_ib(1,n2)*abs(depth_ib)
-        T_keel(m)=Tclim_ib(1,n2)
-        S_keel(m)=Sclim_ib(1,n2)
-      end if
+      ! Iceberg draft is above the ocean surface at this cavity node.
+      ! Use first ocean level (ulevels_nod2D) to avoid ice-shelf level 0 degC
+      ! contamination; indices k-1 or 1 may point to ice-shelf levels.
+      uo_dz(m)   = UV_ib(1, ulevels_nod2D(n2), n2) * abs(depth_ib)
+      vo_dz(m)   = UV_ib(2, ulevels_nod2D(n2), n2) * abs(depth_ib)
+      uo_keel(m) = UV_ib(1, ulevels_nod2D(n2), n2)
+      vo_keel(m) = UV_ib(2, ulevels_nod2D(n2), n2)
+      T_dz(m)    = Tclim_ib(ulevels_nod2D(n2), n2) * abs(depth_ib)
+      S_dz(m)    = Sclim_ib(ulevels_nod2D(n2), n2) * abs(depth_ib)
+      T_keel(m)  = Tclim_ib(ulevels_nod2D(n2), n2)
+      S_keel(m)  = Sclim_ib(ulevels_nod2D(n2), n2)
       exit innerloop
 
     ! Keel layer: mid-level k is at or below the iceberg draft
