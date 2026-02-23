@@ -166,7 +166,11 @@ arr_S_ave_ib = 0.0
 
 
  !========================THERMODYNAMICS============================
- if(l_melt) then
+ ! Skip thermodynamics entirely when all element nodes are cavity nodes
+ ! (ib_n_lvls==0).  prepare_icb2fesom applies no flux in that case
+ ! (all nodes fail the ulevels_nod2d==1 check), so melting the iceberg
+ ! would violate FW/heat conservation.
+ if(l_melt .and. ib_n_lvls > 0) then
   call FEM_eval(mesh, partit, sst_ib,sss_ib,lon,lat,Tsurf_ib,Ssurf_ib,iceberg_elem)
 
   call iceberg_meltrates(partit, mesh, M_b, M_v, M_e, M_bv, &

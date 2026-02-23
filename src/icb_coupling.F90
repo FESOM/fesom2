@@ -27,6 +27,13 @@ subroutine reset_ib_fluxes()
     ibfwe   = 0.0
     ibhf    = 0.0
     ibhf_n  = 0.0_WP
+    ! Zero per-iceberg per-level heat flux arrays.  These are only initialised
+    ! to 0 at allocation time; without an explicit reset here, stale values
+    ! persist whenever ib_n_lvls shrinks (e.g. when an iceberg drifts into a
+    ! cavity element and ib_n_lvls drops to 0).  prepare_icb2fesom may then
+    ! divide those stale values by a zero node area -> Inf/NaN in ibhf_n.
+    hfbv_flux_ib = 0.0
+    hfl_flux_ib  = 0.0
 end subroutine
 
 
@@ -142,7 +149,10 @@ type(t_partit), intent(inout), target :: partit
                         dz = abs(abs(lev_up) - abs(depth_ib))
                     end if              
                    
-                    if( abs(depth_ib) > 0.0 ) then
+                    ! Guard against zero node area at level j (can occur in
+                    ! mixed cavity/open-ocean elements where not all nodes
+                    ! reach depth j, leaving tot_area_nods_in_ib_elem(j)==0).
+                    if( abs(depth_ib) > 0.0 .and. tot_area_nods_in_ib_elem(j) > 0.0 ) then
                         ibhf_n(j,iceberg_node) = ibhf_n(j,iceberg_node) & 
                                                     - (hfbv_flux_ib(ib,j)+hfl_flux_ib(ib,j)) & 
                                                     / tot_area_nods_in_ib_elem(j)
@@ -150,8 +160,10 @@ type(t_partit), intent(inout), target :: partit
                 end do
                 
                 if( idx_d(i) > 1 ) then
-                    ibhf_n(idx_d(i),iceberg_node) = ibhf_n(idx_d(i),iceberg_node) - 0.5 * hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i))
-                    ibhf_n(idx_d(i)-1,iceberg_node) = ibhf_n(idx_d(i)-1,iceberg_node) - 0.5 * hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i)-1)
+                    if (tot_area_nods_in_ib_elem(idx_d(i)) > 0.0) &
+                        ibhf_n(idx_d(i),iceberg_node) = ibhf_n(idx_d(i),iceberg_node) - 0.5 * hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i))
+                    if (tot_area_nods_in_ib_elem(idx_d(i)-1) > 0.0) &
+                        ibhf_n(idx_d(i)-1,iceberg_node) = ibhf_n(idx_d(i)-1,iceberg_node) - 0.5 * hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i)-1)
                 else
                     ibhf_n(idx_d(i),iceberg_node) = ibhf_n(idx_d(i),iceberg_node) - hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i))
                 end if
