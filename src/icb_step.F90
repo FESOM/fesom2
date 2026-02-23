@@ -415,8 +415,8 @@ type(t_dyn)   , intent(inout), target :: dynamics
    
    
    if (use_cavity) then
-      reject_tmp = any(mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0) .OR. all(mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==0.0) 
-      !reject_tmp = all( (mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==0.0) )
+      !reject_tmp = any(mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0) .OR. all(mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==0.0) 
+      reject_tmp = all( (mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==0.0) )
       if(reject_tmp) then
        write(*,*) " * set IB elem ",iceberg_elem,"to zero for IB=",ib
        write(*,*) " cavity: ",all((mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0))
@@ -1007,7 +1007,7 @@ subroutine depth_bathy(mesh, partit,Zdepth3, elem)
   
   real, dimension(3), intent(OUT) 	:: Zdepth3 !depth in column below element
   integer, intent(IN)			:: elem	  !local element
-  integer				:: m, n2, k, n_low
+  integer				:: m, n2
   
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
@@ -1023,18 +1023,7 @@ type(t_partit), intent(inout), target :: partit
    !for each 2D node of the iceberg element..
    n2=mesh%elem2D_nodes(m,elem)
 
-   !k=num_layers_below_nod2d(n2)+1
-   !n_low= nod3d_below_nod2d(k,   n2)	!deepest node below n2
-   k=mesh%nlevels_nod2D(n2)
-
-   !..compute depth below this node: 
-   !Zdepth3(m) = abs(coord_nod3D(3, n_low))
-   !Zdepth3(m) = abs(mesh%Z_3d_n_ib(k, n2))
    Zdepth3(m) = abs(mesh%zbar_n_bot(n2))
-   !Zdepth3(m) = abs(mesh%zbar(k))
-   !if (!Zdepth3(m)<0.0) then
-   !    Zdepth3(m) = -Zdepth3(m)
-   !end if
  end do
   
 end subroutine depth_bathy
@@ -1056,7 +1045,7 @@ subroutine parallel2coast(mesh, partit,u, v, lon,lat, elem, ib, elem_global)
  integer :: fld_tmp
  integer, dimension(3) :: n
  integer :: node, m, i
- real, dimension(2) :: velocity, velocity1, velocity2
+ real, dimension(2) :: velocity
  real :: d1, d2
  
 type(t_mesh), intent(in) , target :: mesh
@@ -1097,7 +1086,7 @@ type(t_partit), intent(inout), target :: partit
           i = i + 1
         end if
       else
-        if( mesh%bc_index_nod2D(node)==1 ) then
+        if( mesh%bc_index_nod2D(node)==0 ) then
           n(1) = node
         else
           n(i) = node
@@ -1119,7 +1108,6 @@ type(t_partit), intent(inout), target :: partit
     do m = 1, 3
       node = mesh%elem2D_nodes(m,elem) 
       if( use_cavity ) then
-        !if( (mesh%bc_index_nod2D(node)==1) .OR. (cavity_flag_nod2d(node)==1)) then
         if( mesh%bc_index_nod2D(node)==0.0 .OR.  (mesh%cavity_depth(node)/=0.0) ) then
          n(i) = node
          i = i+1
@@ -1600,7 +1588,7 @@ subroutine init_buoy_output(partit)
   integer                   :: uib_id, vib_id
   integer                   :: height_id, length_id, width_id
   integer                   :: bvl_id, lvlv_id, lvle_id, lvlb_id, felem_id, grounded_id
-  character(100)            :: longname, att_text, description
+  character(100)            :: longname, att_text, description, units
 type(t_partit), intent(inout), target :: partit
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
@@ -1685,12 +1673,11 @@ type(t_partit), intent(inout), target :: partit
   status = nf90_def_var(ncid, 'lvlb', nf90_double, dimids=dimids, varid=lvlb_id)
   if (status .ne. nf90_noerr) call handle_err(status, partit)
 
-  ! LA: add felem
   status = nf90_def_var(ncid, 'felem', nf90_double, dimids=dimids, varid=felem_id)
   if (status .ne. nf90_noerr) call handle_err(status, partit)
 
-  status = nf_def_var(ncid, 'grounded', NF_DOUBLE, 2, dimids, grounded_id)
-  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf90_def_var(ncid, 'grounded', nf90_double, dimids=dimids, varid=grounded_id)
+  if (status .ne. nf90_noerr) call handle_err(status, partit)
   
   ! Assign long_name and units attributes to variables.
   longname='time' ! use NetCDF Climate and Forecast (CF) Metadata Convention
@@ -1902,18 +1889,18 @@ type(t_partit), intent(inout), target :: partit
   if (status .ne. nf90_noerr) call handle_err(status, partit)
 
   longname='grounded'
-  status = nf_PUT_ATT_TEXT(ncid, grounded_id, 'long_name', len_trim(longname), trim(longname)) 
-  if (status .ne. nf_noerr) call handle_err(status, partit)
-  status = nf_put_att_text(ncid, grounded_id, 'units', 18, '')
-  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf90_put_att(ncid, grounded_id, 'long_name', trim(longname))
+  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf90_put_att(ncid, grounded_id, 'units', '')
+  if (status .ne. nf90_noerr) call handle_err(status, partit)
   description=''
-  status = nf_put_att_text(ncid, grounded_id, 'description', len_trim(description), trim(description)) 
-  if (status .ne. nf_noerr) call handle_err(status, partit)
-  status = nf_PUT_ATT_TEXT(ncid, grounded_id, 'Coordinates', 23, 'pos_lon_deg pos_lat_deg') ! arcGIS 
-  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf90_put_att(ncid, grounded_id, 'description', trim(description))
+  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf90_put_att(ncid, grounded_id, 'Coordinates', 'pos_lon_deg pos_lat_deg') ! arcGIS
+  if (status .ne. nf90_noerr) call handle_err(status, partit)
   
-  status = nf_enddef(ncid)
-  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf90_enddef(ncid)
+  if (status .ne. nf90_noerr) call handle_err(status, partit)
 
   status = nf90_close(ncid)
   if (status .ne. nf90_noerr) call handle_err(status, partit) 
@@ -2030,12 +2017,11 @@ type(t_partit), intent(inout), target :: partit
      status = nf90_inq_varid(ncid, 'lvlb',  lvlb_id)
      if (status .ne. nf90_noerr) call handle_err(status, partit) 
 
-     ! * LA: include fesom elemt in output
      status = nf90_inq_varid(ncid, 'felem', felem_id)
      if (status .ne. nf90_noerr) call handle_err(status, partit) 
 
-     status = nf_inq_varid(ncid, 'grounded', grounded_id)
-     if (status .ne. nf_noerr) call handle_err(status, partit) 
+     status = nf90_inq_varid(ncid, 'grounded', grounded_id)
+     if (status .ne. nf90_noerr) call handle_err(status, partit)
 
       ! time and iteration
       status=nf90_put_var(ncid, time_varid, prev_sec_in_year+sec_in_year) 
@@ -2098,12 +2084,11 @@ type(t_partit), intent(inout), target :: partit
      status=nf90_put_var(ncid, lvlb_id, lvlb_mean(:)*step_per_day, start=start, count=count) 
      if (status .ne. nf90_noerr) call handle_err(status, partit)
 
-     ! LA: add felem
      status=nf90_put_var(ncid, felem_id, buoy_props(:,13), start=start, count=count) 
      if (status .ne. nf90_noerr) call handle_err(status, partit)
 
-     status=nf_put_vara_double(ncid, grounded_id, start, count, buoy_props(:,14)) 
-     if (status .ne. nf_noerr) call handle_err(status, partit)
+     status=nf90_put_var(ncid, grounded_id, buoy_props(:,14), start=start, count=count)
+     if (status .ne. nf90_noerr) call handle_err(status, partit)
      
      !close file
      status=nf90_close(ncid)
