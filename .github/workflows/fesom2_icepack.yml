@@ -32,7 +32,7 @@ jobs:
       - name: Create global test run with ICEPACK
         run: |
           mkrun pi test_pi_icepack -m docker
-      - name: FESOM2 global test run with IEPACK
+      - name: FESOM2 global test run with ICEPACK
         run: |    
           cd work_pi
           chmod +x job_docker_new

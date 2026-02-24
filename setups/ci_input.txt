@@ -1,0 +1,17 @@
+
+Run cd work_pi
+Traceback (most recent call last):
+Variable: a_ice, current_value: 0.7342713917324206, master_value: 0.3059954439055828
+  File "/opt/miniconda3/bin/fcheck", line 33, in <module>
+    sys.exit(load_entry_point('mkfesom', 'console_scripts', 'fcheck')())
+  File "/fesom/mkfesom/mkfesom/fcheck.py", line 66, in fcheck
+    raise AssertionError("One or several tests have failed.")
+AssertionError: One or several tests have failed.
+FAIL!!!: a_ice DIFFERENCE: 0.4282759478268378.
+
+Variable: aicen, current_value: 0.14963770060211143, master_value: 0.1496377006021114
+Variable: salt, current_value: 34.72907250369024, master_value: 34.72907250369024
+Variable: sst, current_value: 8.82781788569422, master_value: 8.82781788569422
+Variable: temp, current_value: 2.4794607969603955, master_value: 2.4794607969603955
+Variable: u, current_value: -0.0021068982998579183, master_value: -0.0021068982998579
+Variable: v, current_value: 0.00021513911122768571, master_value: 0.0002151391112276
