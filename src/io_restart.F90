@@ -633,7 +633,8 @@ subroutine write_restart(path, filegroup, istep)
   logical file_exists
   
   cstep = globalstep+istep
-  
+  ctime = timeold + (dayold-1._WP)*86400._WP
+
   do i=1, filegroup%nfiles
     call filegroup%files(i)%join() ! join the previous write (if required)
 
@@ -689,6 +690,8 @@ subroutine write_all_raw_restarts(istep, mpicomm, mype)
   call write_raw_restart_group(bio_files, fileunit)
 #endif
   close(fileunit)
+
+  ctime = timeold + (dayold-1._WP)*86400._WP
 
   if(mype == RAW_RESTART_METADATA_RANK) then
     print *,"writing raw restart to "//raw_restart_dirpath
@@ -919,6 +922,8 @@ subroutine read_all_raw_restarts(mpicomm, mype)
   integer status
   integer mpierr
 
+  ctime = timeold + (dayold-1._WP)*86400._WP
+
   if(mype == RAW_RESTART_METADATA_RANK) then
     ! read metadata info for the raw restart
     open(newunit = fileunit, status = 'old', iostat = status, file = raw_restart_infopath)
@@ -1021,9 +1026,11 @@ subroutine read_restart(path, filegroup, mpicomm, mype)
   integer max_globalstep
   integer mpierr
   
+  ctime = timeold + (dayold-1._WP)*86400._WP
+
   allocate(skip_file(filegroup%nfiles))
   skip_file = .false.
-  
+
   do i=1, filegroup%nfiles
     current_iorank_snd = 0
     current_iorank_rcv = 0
