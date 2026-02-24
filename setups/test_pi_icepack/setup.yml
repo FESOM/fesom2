@@ -40,8 +40,6 @@ namelist.icepack:
                 prec: 8
 
 namelist.io:
-    diag_list:
-        ldiag_energy: False
     nml_list:
         io_list:
             "sst       ":
