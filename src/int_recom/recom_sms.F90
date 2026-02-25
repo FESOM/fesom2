@@ -6900,10 +6900,7 @@ real(kind=8) :: &
             !---------------------------------------------------------------------------
 
             ! Calculate N remineralization flux [mmolN m-2 day-1]
-            decayBenthos(1) = decayRateBenN * LocBenthos(1)
-
-            ! Update benthic N pool (remove remineralized N)
-            LocBenthos(1) = LocBenthos(1) - decayBenthos(1) * dt_b
+            call update_benthos_decay(decayRateBenN, 1)
 
             !===========================================================================
             ! DISSOLVED INORGANIC CARBON (DIC) REMINERALIZATION
@@ -6930,10 +6927,7 @@ real(kind=8) :: &
             !---------------------------------------------------------------------------
 
             ! Calculate C remineralization flux [mmolC m-2 day-1]
-            decayBenthos(2) = decayRateBenC * LocBenthos(2)
-
-            ! Update benthic C pool
-            LocBenthos(2) = LocBenthos(2) - decayBenthos(2) * dt_b
+            call update_benthos_decay(decayRateBenC, 2)
 
             !===========================================================================
             ! SILICATE (Si) DISSOLUTION
@@ -6962,10 +6956,7 @@ real(kind=8) :: &
             !---------------------------------------------------------------------------
 
             ! Calculate Si dissolution flux [mmolSi m-2 day-1]
-            decayBenthos(3) = decayRateBenSi * LocBenthos(3)
-
-            ! Update benthic Si pool
-            LocBenthos(3) = LocBenthos(3) - decayBenthos(3) * dt_b
+            call update_benthos_decay(decayRateBenSi, 3)
 
             !===========================================================================
             ! CALCITE (CaCO3) DISSOLUTION
@@ -6997,10 +6988,7 @@ real(kind=8) :: &
             !---------------------------------------------------------------------------
 
             ! Calculate calcite dissolution flux [mmolC m-2 day-1]
-            decayBenthos(4) = calc_diss_ben * LocBenthos(4)
-
-            ! Update benthic calcite pool
-            LocBenthos(4) = LocBenthos(4) - decayBenthos(4) * dt_b
+            call update_benthos_decay(calc_diss_ben, 4)
 
             if (ciso) then
 
@@ -7027,10 +7015,7 @@ real(kind=8) :: &
 
                 ! Calculate 13C remineralization flux
                 ! Ignores isotopic fractionation during remineralization (alpha ≈ 1)
-                decayBenthos(5) = alpha_dcal_13 * decayRateBenC * LocBenthos(5)
-
-                ! Update benthic 13C pool
-                LocBenthos(5) = LocBenthos(5) - decayBenthos(5) * dt_b
+                call update_benthos_decay(alpha_dcal_13 * decayRateBenC, 5)
 
                 !=======================================================================
                 ! Carbon-13 Calcite Dissolution
@@ -7044,10 +7029,7 @@ real(kind=8) :: &
                 !-----------------------------------------------------------------------
 
                 ! Calculate 13C calcite dissolution flux
-                decayBenthos(6) = calc_diss_13 * LocBenthos(6)
-
-                ! Update benthic 13C-calcite pool
-                LocBenthos(6) = LocBenthos(6) - decayBenthos(6) * dt_b
+                call update_benthos_decay(calc_diss_13, 6)
 
                 if (ciso_14) then
 
@@ -7069,10 +7051,7 @@ real(kind=8) :: &
 
                         ! Calculate 14C remineralization flux
                         ! Ignores isotopic fractionation during remineralization
-                        decayBenthos(7) = alpha_dcal_14 * decayRateBenC * LocBenthos(7)
-
-                        ! Update benthic 14C pool
-                        LocBenthos(7) = LocBenthos(7) - decayBenthos(7) * dt_b
+                        call update_benthos_decay(alpha_dcal_14 * decayRateBenC, 7)
 
                         !===============================================================
                         ! 3.4 Carbon-14 Calcite Dissolution
@@ -7086,10 +7065,7 @@ real(kind=8) :: &
                         !---------------------------------------------------------------
 
                         ! Calculate 14C calcite dissolution flux
-                        decayBenthos(8) = calc_diss_14 * LocBenthos(8)
-
-                        ! Update benthic 14C-calcite pool
-                        LocBenthos(8) = LocBenthos(8) - decayBenthos(8) * dt_b
+                        call update_benthos_decay(calc_diss_14, 8)
 
                     else
                         !---------------------------------------------------------------
@@ -7110,6 +7086,16 @@ real(kind=8) :: &
         endif ! use_MEDUSA
 
     end do ! Main time loop ends
+
+contains
+
+subroutine update_benthos_decay(rate, idx)
+    real(kind=8), intent(in) :: rate
+    integer     , intent(in) :: idx
+
+    decayBenthos(idx) = rate * LocBenthos(idx)
+    LocBenthos(idx) = LocBenthos(idx) - decayBenthos(idx) * dt_b
+end subroutine update_benthos_decay
 
 end subroutine REcoM_sms
 
