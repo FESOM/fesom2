@@ -1,4 +1,4 @@
-#if defined (__oasis) || defined (__ifsinterface)
+#if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
 subroutine thermodynamics(ice, partit, mesh)
 
   !===================================================================
@@ -75,7 +75,7 @@ subroutine thermodynamics(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
   real(kind=WP), dimension(:) , pointer  :: ice_temp, ice_alb, enthalpyoffuse, ice_heat_qres, ice_heat_qcon, runoff_liquid, runoff_solid
 #endif
-#if defined (__oasis) || defined (__ifsinterface)
+#if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
   real(kind=WP), dimension(:)  , pointer ::  oce_heat_flux, ice_heat_flux 
 #endif 
   real(kind=WP)                , pointer :: rhoice, rhosno, rhowat, rhofwt, Sice, cl, cc, cpice, consn, con 
@@ -110,7 +110,7 @@ subroutine thermodynamics(ice, partit, mesh)
   ice_heat_qres => ice%atmcoupl%flx_qres(:)
   ice_heat_qcon => ice%atmcoupl%flx_qcon(:)
 #endif 
-#if defined (__oasis) || defined (__ifsinterface)
+#if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
   oce_heat_flux => ice%atmcoupl%oce_flx_h(:)
   ice_heat_flux => ice%atmcoupl%ice_flx_h(:)
 #endif

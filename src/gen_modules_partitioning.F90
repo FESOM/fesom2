@@ -52,10 +52,10 @@ subroutine par_init(partit)    ! initializes MPI
   integer                               :: i
   integer                               :: provided_mpi_thread_support_level
   character(:), allocatable             :: provided_mpi_thread_support_level_name
-#if defined __oasis || defined  __ifsinterface
+#if defined __oasis || defined  __ifsinterface || defined  __yac
   ! use comm from coupler or ifs
 #else
-  partit%MPI_COMM_FESOM=MPI_COMM_WORLD ! use global comm if not coupled (e.g. no __oasis or __ifsinterface)
+  partit%MPI_COMM_FESOM=MPI_COMM_WORLD ! use global comm if not coupled (e.g. no __coupled or __ifsinterface)
 #endif
   call MPI_Comm_Size(partit%MPI_COMM_FESOM,partit%npes,i)
   call MPI_Comm_Rank(partit%MPI_COMM_FESOM,partit%mype,i) 
@@ -112,7 +112,8 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
 ! when there is error par_ex should be called with abort argument to abort abruptly,
 ! in all other cases model will be finalized here, call the MPI_barrier and MPI_finalize
 !---------------------------------------------------------------
-#ifndef __oasis
+!TODO: logic is convoluted here, not defined oasis and model needs to abort doesn't happen using par_ex 
+#if !defined(__oasis) && !defined(__yac)
   if (present(abort)) then
      if (mype==0) write(*,*) 'Run finished unexpectedly!'
      call MPI_ABORT(COMM, 1, error)
@@ -136,10 +137,19 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
   !For OpenIFS coupled runs we use the new OASIS nameing scheme (oasis)
   if (present(abort)) then
     if (mype==0) write(*,*) 'Run finished unexpectedly!'
+    !SLcall MPI_ABORT(COMM, 1 )
     call MPI_ABORT(MPI_COMM_WORLD, 1, error)
   else
+#ifdef __oasis
     call oasis_terminate
-  endif
+#elif __yac
+    CALL yac_ffinalize()
+    CALL MPI_Finalize(error)
+#endif
+ endif
+#elif defined(__yac)
+ CALL yac_ffinalize()
+ CALL MPI_Finalize(error)
 #else
   !For ECHAM coupled runs we use the old OASIS nameing scheme (prism / prism_proto)
   if (.not. present(abort)) then
@@ -152,10 +162,8 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
   
   if (mype==0) print *, 'FESOM calls MPI_Finalize'
   call MPI_Finalize(error)
-#endif
-         ! oifs/echam
-#endif
-         ! oasis
+#endif /* oifs or echam */
+#endif /* coupled: oasis&yac */
 
 ! Regardless of standalone, OpenIFS oder ECHAM coupling, if we reach to this point
 ! we should be fine shutting the whole model down
