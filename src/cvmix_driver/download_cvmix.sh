@@ -1,6 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+#==============================================================================
+# DEPRECATED: This script is no longer used by the CMake build system
+#==============================================================================
+# CVMix is now built using CMake ExternalProject (see cmake/BuildCVMix.cmake)
+# This file is kept for reference and manual builds only.
+#
+# The new CMake-based approach:
+# - Builds CVMix in ${CMAKE_BINARY_DIR}/external/cvmix/ (not in source tree)
+# - Uses modern CMake ExternalProject pattern (consistent with BuildNetCDF.cmake)
+# - Properly passes FESOM2's Fortran compiler flags to CVMix
+# - Supports incremental builds (no forced clean rebuilds)
+# - Works on all platforms (Linux, macOS, Windows with proper toolchain)
+#
+# If you need to build CVMix manually outside of the CMake system,
+# you can still use this script, but it will NOT be invoked automatically.
+#==============================================================================
+
 # Clone and build CVMix-src locally for FESOM2
 # Usage:
 #   ./get_cvmix.sh [--branch <branch_or_tag>] [--prefix <install_prefix>]
