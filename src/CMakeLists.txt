@@ -387,12 +387,16 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 #    target_compile_options(${PROJECT_NAME} PRIVATE -O3 -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
    if(${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu )
       message(STATUS "Allowing type mismatches on Ubuntu for CI Testing" )  # NOTE(PG): Would be nicer to grab the CI=True from the env variable
-      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch -cpp)
+      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -cpp)
    else()
       target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -cpp)
    endif()
-   if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10 )
-      target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
+   if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+      if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
+         target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
+      else()
+         target_compile_options(${PROJECT_NAME} PRIVATE -Wno-argument-mismatch)
+      endif()
    endif()
    
    # platform specific compiler flags
