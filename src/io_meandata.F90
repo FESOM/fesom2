@@ -704,6 +704,97 @@ CASE ('benCalc   ')
     if (use_REcoM) then
     call def_stream(nod2D,  myDim_nod2D,   'benCalc','Benthos calcite','mmol', Benthos(:,4), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
+! ciso 
+CASE ('benC_13   ')
+    if (use_REcoM) then
+      if (ciso) then
+         call def_stream(nod2D,  myDim_nod2D,   'benC_13','Benthos Carbon-13','mmol/m2', Benthos(:,5), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      end if
+    end if
+CASE ('benC_14   ')
+    if (use_REcoM) then
+      if (ciso) then
+        call def_stream(nod2D,  myDim_nod2D,   'benC_14','Benthos Carbon-14','mmol/m2', Benthos(:,6), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      end if
+    end if
+CASE ('benCalc_13')
+    if (use_REcoM) then
+      if (ciso) then
+        call def_stream(nod2D,  myDim_nod2D,   'benCalc_13','Benthos calcite-13','mmol/m2', Benthos(:,7), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      end if
+    end if
+CASE ('benCalc_14')
+    if (use_REcoM) then
+      if (ciso) then
+        call def_stream(nod2D,  myDim_nod2D,   'benCalc_14','Benthos calcite-14','mmol/m2', Benthos(:,8), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      end if
+    end if
+!ciso
+! output of sinking fluxes for MEDUSA
+CASE ('sinkPON  ')
+    if (use_REcoM)  then
+      if (use_MEDUSA) then
+        call def_stream(nod2D,  myDim_nod2D,   'sinkPON','sinking flux of particulate organic nitrogen','mmolN/(m2*s)', SinkFlx(:,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit,mesh)
+      end if
+    end if
+
+CASE ('sinkPOC  ')
+    if (use_REcoM)  then
+      if (use_MEDUSA) then
+        call def_stream(nod2D,  myDim_nod2D,   'sinkPOC','sinking flux of particulate organic carbon','mmolC/(m2*s)', SinkFlx(:,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      end if
+    end if
+
+CASE ('sinkOpal ')
+    if (use_REcoM)  then
+      if (use_MEDUSA) then
+        call def_stream(nod2D,  myDim_nod2D,   'sinkOpal','sinking flux of opal','mmol/(m2*s)', SinkFlx(:,3), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      end if
+    end if
+
+CASE ('sinkCalc ')
+    if (use_REcoM)  then
+      if (use_MEDUSA) then
+        call def_stream(nod2D,  myDim_nod2D,   'sinkCalc','sinking flux of CaCO3','mmol/(m2*s)', SinkFlx(:,4), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      end if
+    end if
+
+CASE ('sinkC13  ')
+    if (use_REcoM)  then
+      if (use_MEDUSA) then
+        if (ciso) then
+          call def_stream(nod2D,  myDim_nod2D,   'sinkC13','sinking flux of particulate organic carbon-13','mmol/(m2*s)', SinkFlx(:,5), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        end if
+      end if
+    end if
+
+CASE ('sinkCal13')
+    if (use_REcoM)  then
+      if (use_MEDUSA) then
+        if (ciso) then
+          call def_stream(nod2D,  myDim_nod2D,   'sinkCal13','sinking flux of CaCO3-13','mmol/(m2*s)', SinkFlx(:,6), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        end if
+      end if
+    end if
+
+CASE ('sinkC14  ')
+    if (use_REcoM)  then
+      if (use_MEDUSA) then
+        if (ciso .and. ciso_14) then
+          call def_stream(nod2D,  myDim_nod2D,   'sinkC14','sinking flux of particulate organic carbon-14','mmol/(m2*s)', SinkFlx(:,7), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        end if
+      end if
+    end if
+
+CASE ('sinkCal14')
+    if (use_REcoM)  then
+      if (use_MEDUSA) then
+        if (ciso .and. ciso_14) then
+          call def_stream(nod2D,  myDim_nod2D,   'sinkCal14','sinking flux of CaCO3-14','mmol/(m2*s)', SinkFlx(:,8), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        end if
+      end if
+    end if
+
 CASE ('NPPn      ')
     if (use_REcoM) then
     call def_stream(nod2D,  myDim_nod2D,   'NPPn','Mean NPP nanophytoplankton','mmolC/m2/d', NPPn, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -888,6 +979,32 @@ CASE ('otracers  ')
       else if (tracers%data(j)%ID==1002) then
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC', 'Dissolved Inorganic C', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+            if (tracers%data(j)%ltra_diag) then ! OG - tra_diag
+               ! horizontal advection
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_hor_adv', 'Horizontal advection part of dissolved Inorganic C', '[mmol/m3]', tracers%work%tra_advhoriz(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! vertical advection
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_ver_adv', 'Vertical advection part of dissolved Inorganic C', '[mmol/m3]', tracers%work%tra_advvert(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! horizontal diffusion
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_hor_redi', 'Horizontal diffusion of dissolved Inorganic C (includes Redi diffusivity if Redi=.true.)', '[mmol/m3]', tracers%work%tra_diff_part_hor_redi(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               if (.not. tracers%data(j)%i_vert_diff) then
+               ! vertical diffusion (Explicit)
+                   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_ver_expl', 'Vertical diffusion of dissolved Inorganic C (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+               end if
+
+               ! projection of horizontal Redi diffussivity onto vertical
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_ver_redi_expl', 'Projection of horizontal Redi diffussivity onto vertical for dissolved Inorganic C (Explicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_redi_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! vertical diffusion (Implicit)
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_ver_impl', 'Vertical diffusion of dissolved Inorganic C (Implicit)', '[mmol/m3]', tracers%work%tra_diff_part_ver_impl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! recom_sms
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_recom_sms', 'Recom SMS', '[mmol/m3]', tracers%work%tra_recom_sms(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            end if
+
          endif
 
       else if (tracers%data(j)%ID==1003) then

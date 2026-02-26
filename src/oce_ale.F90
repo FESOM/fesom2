@@ -3819,6 +3819,10 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     ! write out global fields for debugging
+#if defined(__recom) && defined(__usetp)
+    if(partit%my_fesom_group == 0) then
+#endif
+
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call write_step_info'//achar(27)//'[0m'
     call write_step_info(n,logfile_outfreq, ice, dynamics, tracers, partit, mesh)
     
@@ -3832,6 +3836,11 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! togeather around 2.5% of model runtime
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call check_blowup'//achar(27)//'[0m'
     call check_blowup(n, ice, dynamics, tracers, partit, mesh)
+
+#if defined(__recom) && defined(__usetp)
+    endif
+#endif
+
     t10=MPI_Wtime()
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("oce_blowup_check")
@@ -3847,6 +3856,10 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     rtime_oce_GMRedi   = rtime_oce_GMRedi + (t6-t5)
     rtime_oce_solvetra = rtime_oce_solvetra + (t8-t7)
     rtime_tot          = rtime_tot + (t10-t0)-(t10-t9)
+
+#if defined(__recom) && defined(__usetp)
+    if(partit%my_fesom_group == 0) then
+#endif    
     if(mod(n,logfile_outfreq)==0 .and. mype==0) then  
         write(*,*) '___ALE OCEAN STEP EXECUTION TIMES______________________'
         write(*,"(A, ES10.3)") '     Oce. Mix,Press.. :', t1-t0
@@ -3865,6 +3878,10 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         write(*,"(A, ES10.3)") '     Oce. TOTAL       :', t10-t0
         write(*,*)
         write(*,*)
-    end if    
+    end if 
+#if defined(__recom) && defined(__usetp)
+    endif
+#endif
+
 end subroutine oce_timestep_ale
 

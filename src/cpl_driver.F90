@@ -14,6 +14,10 @@ module cpl_driver
   !
   use mod_oasis                    ! oasis module
   use g_config, only : dt, use_icebergs, lwiso, compute_oasis_corners
+#if defined(__recom) && defined(__usetp)
+  use g_config, only : num_fesom_groups 
+#endif
+
   use o_param,  only : rad
   USE MOD_PARTIT
   use mpi
@@ -311,7 +315,12 @@ include "node_contour_boundary.h"
     my_y_corners=my_y_corners/rad
     end subroutine node_contours
 
-  subroutine cpl_oasis3mct_init(partit, localCommunicator )
+#if defined(__recom) && defined(__usetp)
+  subroutine cpl_oasis3mct_init(partit, localCommunicator, num_fesom_groups)
+#else
+  subroutine cpl_oasis3mct_init(partit, localCommunicator)
+#endif
+
     USE MOD_PARTIT
     implicit none   
     save
@@ -325,6 +334,9 @@ include "node_contour_boundary.h"
     !
     integer, intent(OUT)       :: localCommunicator
     type(t_partit), intent(inout), target :: partit
+#if defined(__recom) && defined(__usetp)
+    integer, intent(inout)     :: num_fesom_groups
+#endif
     !
     ! Local declarations
     !
@@ -346,7 +358,11 @@ include "node_contour_boundary.h"
     !------------------------------------------------------------------
     ! 1st Initialize the OASIS3-MCT coupling system for the application
     !------------------------------------------------------------------
+#if defined(__recom) && defined(__usetp)
+    CALL oasis_init_comp(comp_id, comp_name, ierror, num_program_groups = num_fesom_groups)
+#else
     CALL oasis_init_comp(comp_id, comp_name, ierror )
+#endif
     IF (ierror /= 0) THEN
         CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'Init_comp failed.')
     ENDIF
@@ -357,7 +373,11 @@ include "node_contour_boundary.h"
         CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'comm_rank failed.')
     ENDIF
 
+#if defined(__recom) && defined(__usetp)
+    CALL oasis_get_localcomm_all_groups( localCommunicator, ierror )
+#else
     CALL oasis_get_localcomm( localCommunicator, ierror )
+#endif
     IF (ierror /= 0) THEN
         CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'get_local_comm failed.')
     ENDIF
@@ -611,6 +631,10 @@ include "associate_mesh_ass.h"
       print *, 'FESOM after Barrier'
     endif
 
+#if defined(__recom) && defined(__usetp)
+    if(partit%my_fesom_group == 0) then
+#endif
+
     if (mype .eq. localroot) then
       print *, 'FESOM before grid writing to oasis grid files'
        CALL oasis_start_grids_writing(il_flag)
@@ -639,6 +663,9 @@ include "associate_mesh_ass.h"
       print *, 'FESOM after terminate_grids_writing'
     endif !localroot
      
+#if defined(__recom) && defined(__usetp)
+    end if !(partit%my_fesom_group == 0) then     
+#endif
 
 
     DEALLOCATE(all_x_coords, all_y_coords, my_x_coords, my_y_coords, displs_from_all_pes, counts_from_all_pes)
@@ -909,15 +936,49 @@ include "associate_mesh_ass.h"
     endif    
 #endif
 
+#if defined(__recom) && defined(__usetp)
+! the coupling is in principle as it was before, i.e. the fesom processes - in group 0 - receive their data from echam
+    if(partit%my_fesom_group == 0) then
+#endif
+
     call oasis_get(recv_id(ind), seconds_til_now, exfld,info)
+
+#if defined(__recom) && defined(__usetp)
+    else
+
+! defensive: assignment statement "action=(info==3 ..." below is "don't care" in this case, because the actual value for action
+! is received via MPI_Bcast anyway
+        info = 0
+
+    end if
+#endif
+
     t2=MPI_Wtime()
  !
  ! FESOM's interpolation routine interpolates structured
  ! VarStrLoc coming from OASIS3MCT to local unstructured data_array
  ! and delivered back to FESOM.
    action=(info==3 .OR. info==10 .OR. info==11 .OR. info==12 .OR. info==13)
+
+#if defined(__recom) && defined(__usetp)
+   if(num_fesom_groups > 1) then
+      call MPI_Bcast(action, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
+   end if
+#endif 
+
    if (action) then
+#if defined(__recom) && defined(__usetp)
+      if(partit%my_fesom_group == 0) then
+#endif
       data_array(1:partit%myDim_nod2d) = exfld
+#if defined(__recom) && defined(__usetp)
+      end if
+
+      if(num_fesom_groups > 1) then
+          call MPI_Bcast(data_array, partit%myDim_nod2d, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
+      end if
+#endif
+
       call exchange_nod(data_array, partit)
    end if   
    t3=MPI_Wtime()
