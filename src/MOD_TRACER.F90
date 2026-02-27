@@ -20,6 +20,9 @@ real(kind=WP)                                 :: tra_adv_ph  = 1.  ! a parameter
 real(kind=WP)                                 :: tra_adv_pv  = 1.  ! a parameter to be used in horizontal advection (for QR4C  it is the fraction of fourth-order contribution in the solution)
 integer                                       :: AB_order=2
 integer                                       :: ID
+!___________________________________________________________________________
+! TODO: Make it as a part of namelist.tra
+logical                                      :: ltra_diag       = .true. ! OG - tra_diag
 
 contains
 procedure WRITE_T_TRACER_DATA
@@ -41,7 +44,15 @@ real(kind=WP), allocatable         :: del_ttf_advhoriz(:,:), del_ttf_advvert(:,:
 !                              compute Tstar = 0.5*( T^(n+1) + T^n)
 real(kind=WP), allocatable, dimension(:,:,:)  :: dvd_trflx_hor, dvd_trflx_ver
 
-!_______________________________________________________________________________
+! in case ltra_diag=.true. --> calculate tracer diags ! OG - tra_diag
+real(kind=WP), allocatable                    :: tra_advhoriz(:,:,:), tra_advvert(:,:,:)
+real(kind=WP), allocatable                    :: tra_diff_part_hor_redi(:,:,:)
+real(kind=WP), allocatable                    :: tra_diff_part_ver_expl(:,:,:)
+real(kind=WP), allocatable                    :: tra_diff_part_ver_redi_expl(:,:,:)
+real(kind=WP), allocatable                    :: tra_diff_part_ver_impl(:,:,:)
+real(kind=WP), allocatable                    :: tra_recom_sms(:,:,:)
+real(kind=WP), allocatable                    :: tra_advvert_LO(:,:,:), tra_advhoriz_LO(:,:,:)
+
 ! The fct part
 real(kind=WP),allocatable,dimension(:,:)      :: fct_LO          ! Low-order solution
 real(kind=WP),allocatable,dimension(:,:)      :: adv_flux_hor    ! Antidif. horiz. contrib. from edges / backup for iterafive fct scheme

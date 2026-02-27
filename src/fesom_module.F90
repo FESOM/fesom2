@@ -183,7 +183,7 @@ contains
 
         f%npes          =>f%partit%npes
 
-        
+
         if(f%mype==0) then
             call plot_fesomlogo()
             write(*,*)
@@ -206,10 +206,10 @@ contains
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("setup_model")
 #endif
-        
+
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call clock_init'//achar(27)//'[0m'
         call clock_init(f%partit)   ! read the clock file
-        
+
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call get_run_steps'//achar(27)//'[0m'
         call get_run_steps(fesom_total_nsteps, f%partit)
         f%total_nsteps=fesom_total_nsteps
