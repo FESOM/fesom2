@@ -248,11 +248,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
         ttf_rhs_bak = 0.0
 
 
-           do tr_num=1, num_tracers
-        if (tracers%data(tr_num)%ltra_diag) then
-              ttf_rhs_bak(1:nzmax,tr_num) = tracers%data(tr_num)%values(1:nzmax, n)
-        end if
-           end do
+        call recom_diag_backup(tracers, n, nzmax, num_tracers, ttf_rhs_bak)
 
         !!---- Depth of the nodes in the water column
         zr(1:nzmax) = Z_3d_n(1:nzmax, n)
@@ -395,15 +391,7 @@ endif
             tracers%data(tr_num)%values(1:nzmax, n) = C(1:nzmax, tr_num-2)
         end do
 
-        ! recom_sms
-
-           do tr_num=1, num_tracers
-        if (tracers%data(tr_num)%ltra_diag) then
-             tracers%work%tra_recom_sms(1:nzmax,n,tr_num) = tracers%data(tr_num)%values(1:nzmax, n) - ttf_rhs_bak(1:nzmax,tr_num)
-             !if (mype==0)  print *,  tra_recom_sms(:,:,tr_num)
-        end if
-
-           end do
+        call recom_diag_store_delta(tracers, n, nzmax, num_tracers, ttf_rhs_bak)
 
         !!---- Local variables that have been changed during the time-step are stored so they can be saved
         Benthos(n,1:benthos_num) = LocBenthos(1:benthos_num)
@@ -625,6 +613,34 @@ endif
     call exchange_nod(OmegaC3D, partit)
     call exchange_nod(kspc3D, partit)
     call exchange_nod(rhoSW3D, partit)
+
+contains
+
+subroutine recom_diag_backup(tracers, n, nzmax, num_tracers, ttf_rhs_bak)
+    type(t_tracer), intent(in)    :: tracers
+    integer       , intent(in)    :: n, nzmax, num_tracers
+    real(kind=WP) , intent(inout) :: ttf_rhs_bak(:,:)
+    integer                      :: tr_num
+
+    do tr_num=1, num_tracers
+        if (tracers%data(tr_num)%ltra_diag) then
+            ttf_rhs_bak(1:nzmax,tr_num) = tracers%data(tr_num)%values(1:nzmax, n)
+        end if
+    end do
+end subroutine recom_diag_backup
+
+subroutine recom_diag_store_delta(tracers, n, nzmax, num_tracers, ttf_rhs_bak)
+    type(t_tracer), intent(inout) :: tracers
+    integer       , intent(in)    :: n, nzmax, num_tracers
+    real(kind=WP) , intent(in)    :: ttf_rhs_bak(:,:)
+    integer                      :: tr_num
+
+    do tr_num=1, num_tracers
+        if (tracers%data(tr_num)%ltra_diag) then
+            tracers%work%tra_recom_sms(1:nzmax,n,tr_num) = tracers%data(tr_num)%values(1:nzmax, n) - ttf_rhs_bak(1:nzmax,tr_num)
+        end if
+    end do
+end subroutine recom_diag_store_delta
 
 end subroutine recom
 
