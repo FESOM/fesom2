@@ -315,12 +315,12 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     !___________________________________________________________________________
     ! define tracer namelist parameter
     integer        :: num_tracers
-    logical        :: i_vert_diff, smooth_bh_tra
+    logical        :: i_vert_diff, smooth_bh_tra , ltra_diag
     real(kind=WP)  :: gamma0_tra, gamma1_tra, gamma2_tra
     integer        :: AB_order = 2
     namelist /tracer_listsize/ num_tracers
     namelist /tracer_list    / nml_tracer_list
-    namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff, AB_order
+    namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff, AB_order, ltra_diag
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -478,6 +478,7 @@ nl => mesh%nl
         tracers%data(n)%valuesAB      = 0.
         tracers%data(n)%valuesold     = 0.
         tracers%data(n)%i_vert_diff   = i_vert_diff
+        tracers%data(n)%ltra_diag   = ltra_diag
     end do
     allocate(tracers%work%del_ttf(nl-1,node_size))
     allocate(tracers%work%del_ttf_advhoriz(nl-1,node_size),tracers%work%del_ttf_advvert(nl-1,node_size))
@@ -489,6 +490,20 @@ nl => mesh%nl
         allocate(tracers%work%dvd_trflx_ver(nl  , myDim_nod2D , 2))
         tracers%work%dvd_trflx_hor = 0.0_WP
         tracers%work%dvd_trflx_ver = 0.0_WP
+    end if
+    if (ltra_diag) then
+        allocate(tracers%work%tra_advhoriz(nl-1,node_size,num_tracers),tracers%work%tra_advvert(nl-1,node_size,num_tracers))
+        tracers%work%tra_advhoriz = 0.0_WP
+        tracers%work%tra_advvert  = 0.0_WP
+        allocate(tracers%work%tra_diff_part_hor_redi(nl-1,node_size,num_tracers),tracers%work%tra_diff_part_ver_expl(nl-1,node_size,num_tracers))
+        allocate(tracers%work%tra_diff_part_ver_redi_expl(nl-1,node_size,num_tracers),tracers%work%tra_diff_part_ver_impl(nl-1,node_size,num_tracers))
+        allocate(tracers%work%tra_recom_sms(nl-1,node_size,num_tracers))
+        tracers%work%tra_diff_part_hor_redi = 0.0_WP
+        tracers%work%tra_diff_part_ver_expl = 0.0_WP
+        tracers%work%tra_diff_part_ver_redi_expl = 0.0_WP
+        tracers%work%tra_diff_part_ver_impl = 0.0_WP
+        tracers%work%tra_recom_sms = 0.0_WP
+
     end if
 END SUBROUTINE tracer_init
 !
@@ -1194,7 +1209,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-        CASE (1023:1033)
+        CASE (1023:1036)
             tracers%data(i)%values(:,:)=0.0_WP
             if (mype==0) then
                 write (i_string,  "(I4)") i
