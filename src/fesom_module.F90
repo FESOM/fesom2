@@ -534,7 +534,8 @@ contains
   subroutine fesom_runloop(current_nsteps)
     use fesom_main_storage_module
 !   use openacc_lib
-    integer, intent(in) :: current_nsteps 
+    integer, intent(in) :: current_nsteps
+    real(kind=WP)                            :: hSv
     ! EO parameters
     integer n, nstart, ntotal, tr_num
 
@@ -690,6 +691,12 @@ contains
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
             call oce_fluxes_mom(f%ice, f%dynamics, f%partit, f%mesh) ! momentum only
             call oce_fluxes(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+            
+            !___freshwater depth hosing routine_______________________________________
+            !
+            hSv=0.1 !define freshwater anomaly magnitude
+            call fw_depth_anomaly(f%tracers%data(2)%values, f%tracers%data(1)%values,  hSv, f%partit, f%mesh)
+            
         end if
         call before_oce_step(f%dynamics, f%tracers, f%partit, f%mesh) ! prepare the things if required
         f%t2 = MPI_Wtime()
