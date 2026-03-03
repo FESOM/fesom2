@@ -189,8 +189,9 @@ contains
 
         f%npes          =>f%partit%npes
 
-
+        
         if(f%mype==0) then
+            call plot_fesomlogo()
             write(*,*)
             print *,"FESOM2 git SHA: "//fesom_git_sha()
             call MPI_Get_library_version(f%mpi_version_txt, f%mpi_version_len, f%MPIERR)
@@ -401,6 +402,9 @@ contains
         if (r_restart .and. .not. f%which_readr==2) then
             call restart_thickness_ale(f%partit, f%mesh)
         end if
+        ! for KE diagnostic we need to compute an exact profile of reference density
+        ! it will be used to compute RHO*
+        if (f%dynamics%ldiag_ke) call init_ref_density_advanced(f%tracers, f%partit, f%mesh)
         if (f%mype==0) then
            f%t8=MPI_Wtime()
     
