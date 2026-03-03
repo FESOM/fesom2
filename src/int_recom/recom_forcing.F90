@@ -296,8 +296,10 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
     call recom_ciso_photo(co2(1)) ! -> alpha_p
     r_phyc_13 = r_co2s_13 / alpha_p_13
     r_diac_13 = r_co2s_13 / alpha_p_dia_13
-    state(1:nn,iphyc_13)   = max((tiny_C   * r_phyc_13), (state(1:nn,iphyc) * r_phyc_13))
-    state(1:nn,idiac_13)   = max((tiny_C_d * r_diac_13), (state(1:nn,idiac) * r_diac_13))
+!    state(1:nn,iphyc_13)   = max((tiny_C   * r_phyc_13), (state(1:nn,iphyc) * r_phyc_13))
+!    state(1:nn,idiac_13)   = max((tiny_C_d * r_diac_13), (state(1:nn,idiac) * r_diac_13))
+    state(1:nn,iphyc_13)   = max((tiny_C   * r_phyc_13), state(1:nn,iphyc_13))
+    state(1:nn,idiac_13)   = max((tiny_C_d * r_diac_13), state(1:nn,idiac_13))
 
 !   The same for radiocarbon, fractionation factors have been already derived above
     if (ciso_14) then
@@ -312,8 +314,10 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
       if (ciso_organic_14) then
         r_phyc_14 = r_co2s_14 / alpha_p_14
         r_diac_14 = r_co2s_14 / alpha_p_dia_14
-        state(1:nn,iphyc_14) = max((tiny_C   * r_phyc_14), (state(1:nn,iphyc) * r_phyc_14))
-        state(1:nn,idiac_14) = max((tiny_C_d * r_diac_14), (state(1:nn,idiac) * r_diac_14))
+!        state(1:nn,iphyc_14) = max((tiny_C   * r_phyc_14), (state(1:nn,iphyc) * r_phyc_14))
+!        state(1:nn,idiac_14) = max((tiny_C_d * r_diac_14), (state(1:nn,idiac) * r_diac_14))
+        state(1:nn,iphyc_14) = max((tiny_C   * r_phyc_14), state(1:nn,iphyc_14))
+        state(1:nn,idiac_14) = max((tiny_C_d * r_diac_14), state(1:nn,idiac_14))
       end if
     end if
 !   Radiocarbon

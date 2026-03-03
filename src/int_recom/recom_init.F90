@@ -294,22 +294,22 @@ subroutine recom_init(tracers, partit, mesh)
 
     if (ciso) then
 !! Define ciso variables assigning additional ciso tracer indices
-!      idic_13    = bgc_base_num + 1
-!      iphyc_13   = bgc_base_num + 2
-!      idetc_13   = bgc_base_num + 3
-!      ihetc_13   = bgc_base_num + 4
-!      idoc_13    = bgc_base_num + 5
-!      idiac_13   = bgc_base_num + 6
-!      iphycal_13 = bgc_base_num + 7
-!      idetcal_13 = bgc_base_num + 8
-!      idic_14    = bgc_base_num + 9
-!      iphyc_14   = bgc_base_num + 10
-!      idetc_14   = bgc_base_num + 11
-!      ihetc_14   = bgc_base_num + 12
-!      idoc_14    = bgc_base_num + 13
-!      idiac_14   = bgc_base_num + 14
-!      iphycal_14 = bgc_base_num + 15
-!      idetcal_14 = bgc_base_num + 16
+      idic_13    = bgc_base_num + 1
+      iphyc_13   = bgc_base_num + 2
+      idetc_13   = bgc_base_num + 3
+      ihetc_13   = bgc_base_num + 4
+      idoc_13    = bgc_base_num + 5
+      idiac_13   = bgc_base_num + 6
+      iphycal_13 = bgc_base_num + 7
+      idetcal_13 = bgc_base_num + 8
+      idic_14    = bgc_base_num + 9
+      iphyc_14   = bgc_base_num + 10
+      idetc_14   = bgc_base_num + 11
+      ihetc_14   = bgc_base_num + 12
+      idoc_14    = bgc_base_num + 13
+      idiac_14   = bgc_base_num + 14
+      iphycal_14 = bgc_base_num + 15
+      idetcal_14 = bgc_base_num + 16
 
         !< Allocate 13CO2 surface fields
         allocate(GloPCO2surf_13           ( node_size ))
@@ -401,6 +401,9 @@ subroutine recom_init(tracers, partit, mesh)
 
         CASE (1021)
             tracers%data(i)%values(:,:) = tiny                     ! DetCalc
+
+        CASE (1022)
+            tracers%data(i)%values(:,:) = tiny                     ! O2
 
 ! *******************
 ! CASE 2phy 2zoo 2det

@@ -142,7 +142,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     call recom_atbox(partit,mesh)
 !   optional I/O of isoCO2 and inferred cosmogenic 14C production; this may cost some CPU time
     if (ciso .and. ciso_14) then
-      call annual_event(do_update)
+      call annual_event(do_update,1)
       if (do_update .and. mype==0) write (*, fmt = '(a50,2x,i6,4(2x,f6.2))') &
                                          'Year, xCO2 (ppm), cosmic 14C flux (at / cm² / s):', &
                                           yearold, x_co2atm(1), x_co2atm_13(1), x_co2atm_14(1), cosmic_14(1) * production_rate_to_flux_14
