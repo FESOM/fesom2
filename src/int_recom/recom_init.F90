@@ -45,6 +45,9 @@ subroutine recom_init(tracers, partit, mesh)
     type(t_partit), intent(inout), target   :: partit
     type(t_mesh),   intent(in) ,   target   :: mesh
 
+    ! After reading tracer namelist - validate actual IDs
+    integer, dimension(tracers%num_tracers) :: tracer_id_array
+
 #include "../associate_part_def.h"
 #include "../associate_mesh_def.h"
 #include "../associate_part_ass.h"
@@ -70,6 +73,7 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(RiverDSi2D            ( node_size ))
     allocate(RiverDIC2D            ( node_size ))
     allocate(RiverAlk2D            ( node_size ))
+    allocate(RiverFe               ( node_size ))
 
     !! * Erosion nutrients as surface boundary condition *
     allocate(ErosionTON2D          ( node_size ))
@@ -97,6 +101,7 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(decayBenthos          ( benthos_num ))     ! [1/day] Decay rate of detritus in the benthic layer
     allocate(PAR3D                 ( nl-1, node_size ))
 
+
     GloFeDust             = 0.d0
     AtmFeInput            = 0.d0
     GloNDust              = 0.d0
@@ -108,6 +113,7 @@ subroutine recom_init(tracers, partit, mesh)
     RiverDSi2D            = 0.d0
     RiverDIC2D            = 0.d0
     RiverAlk2D            = 0.d0
+    RiverFe               = 0.d0
 
     ErosionTON2D          = 0.d0
     ErosionTON2D          = 0.d0
@@ -130,8 +136,6 @@ subroutine recom_init(tracers, partit, mesh)
 
     LocBenthos            = 0.d0
     decayBenthos          = 0.d0
-    wFluxPhy              = 0.d0
-    wFluxDia              = 0.d0
     PAR3D                 = 0.d0
 
 !    pco2surf           = 0.d0
@@ -148,28 +152,36 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(NPPn    ( node_size ))
     allocate(NPPd    ( node_size ))
     allocate(NPPc    ( node_size ))
+    allocate(NPPp    ( node_size ))
     allocate(GPPn    ( node_size ))
     allocate(GPPd    ( node_size ))
     allocate(GPPc    ( node_size ))
+    allocate(GPPp    ( node_size ))
     allocate(NNAn    ( node_size ))
     allocate(NNAd    ( node_size ))
     allocate(NNAc    ( node_size ))
+    allocate(NNAp    ( node_size ))
     allocate(Chldegn ( node_size ))
     allocate(Chldegd ( node_size ))
     allocate(Chldegc ( node_size ))
+    allocate(Chldegp ( node_size ))
 
     NPPn    = 0.d0
     NPPd    = 0.d0
     NPPc    = 0.d0
+    NPPp    = 0.d0
     GPPn    = 0.d0
     GPPd    = 0.d0
     GPPc    = 0.d0
+    GPPp    = 0.d0
     NNAn    = 0.d0
     NNAd    = 0.d0
     NNAc    = 0.d0
+    NNAp    = 0.d0
     Chldegn = 0.d0
     Chldegd = 0.d0
     Chldegc = 0.d0
+    Chldegp = 0.d0
 
 !! *** Allocate 3D diagnostics ***
     allocate(respmeso     ( nl-1, node_size ))
@@ -180,15 +192,19 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(aggn         ( nl-1, node_size ))
     allocate(aggd         ( nl-1, node_size ))
     allocate(aggc         ( nl-1, node_size ))
+    allocate(aggp         ( nl-1, node_size ))
     allocate(docexn       ( nl-1, node_size ))
     allocate(docexd       ( nl-1, node_size ))
     allocate(docexc       ( nl-1, node_size ))
+    allocate(docexp       ( nl-1, node_size ))
     allocate(respn        ( nl-1, node_size ))
     allocate(respd        ( nl-1, node_size ))
     allocate(respc        ( nl-1, node_size ))
+    allocate(respp        ( nl-1, node_size ))
     allocate(NPPn3D       ( nl-1, node_size ))
     allocate(NPPd3D       ( nl-1, node_size ))
     allocate(NPPc3D       ( nl-1, node_size ))
+    allocate(NPPp3D       ( nl-1, node_size ))
 
     respmeso     = 0.d0
     respmacro    = 0.d0
@@ -198,15 +214,78 @@ subroutine recom_init(tracers, partit, mesh)
     aggn         = 0.d0
     aggd         = 0.d0
     aggc         = 0.d0
+    aggp         = 0.d0
     docexn       = 0.d0
     docexd       = 0.d0
     docexc       = 0.d0
+    docexp       = 0.d0
     respn        = 0.d0
     respd        = 0.d0
     respc        = 0.d0
+    respp        = 0.d0
     NPPn3D       = 0.d0
     NPPd3D       = 0.d0
     NPPc3D       = 0.d0
+    NPPp3D       = 0.d0
+
+!! From Hannahs new temperature function (not sure if needed as diagnostic):
+
+  allocate(TTemp_diatoms  (nl-1,node_size))
+  allocate(TTemp_phyto    (nl-1,node_size))
+  allocate(TTemp_cocco    (nl-1,node_size))
+  allocate(TTemp_phaeo    (nl-1,node_size))
+
+  TTemp_diatoms  (:,:) = 0.d0
+  TTemp_phyto    (:,:) = 0.d0
+  TTemp_cocco    (:,:) = 0.d0
+  TTemp_phaeo    (:,:) = 0.d0
+
+  allocate(TPhyCO2        (nl-1,node_size))
+  allocate(TDiaCO2        (nl-1,node_size))
+  allocate(TCoccoCO2      (nl-1,node_size))
+  allocate(TPhaeoCO2      (nl-1,node_size))
+
+  TPhyCO2        (:,:) = 0.d0
+  TDiaCO2        (:,:) = 0.d0
+  TCoccoCO2      (:,:) = 0.d0
+  TPhaeoCO2      (:,:) = 0.d0
+
+  allocate(TqlimitFac_phyto     (nl-1,node_size))
+  allocate(TqlimitFac_diatoms   (nl-1,node_size))
+  allocate(TqlimitFac_cocco     (nl-1,node_size))
+  allocate(TqlimitFac_phaeo     (nl-1,node_size))
+
+  TqlimitFac_phyto      (:,:) = 0.d0
+  TqlimitFac_diatoms    (:,:) = 0.d0
+  TqlimitFac_cocco      (:,:) = 0.d0
+  TqlimitFac_phaeo      (:,:) = 0.d0
+
+
+  allocate(TCphotLigLim_diatoms    (nl-1,node_size))
+  allocate(TCphotLigLim_phyto      (nl-1,node_size))
+  allocate(TCphotLigLim_cocco      (nl-1,node_size))
+  allocate(TCphotLigLim_phaeo      (nl-1,node_size))
+
+
+  TCphotLigLim_diatoms  (:,:) = 0.d0
+  TCphotLigLim_phyto    (:,:) = 0.d0
+  TCphotLigLim_cocco    (:,:) = 0.d0
+  TCphotLigLim_phaeo    (:,:) = 0.d0
+
+  allocate(TCphot_diatoms       (nl-1,node_size))
+  allocate(TCphot_phyto         (nl-1,node_size))
+  allocate(TCphot_cocco         (nl-1,node_size))
+  allocate(TCphot_phaeo         (nl-1,node_size))
+
+  TCphot_diatoms        (:,:) = 0.d0
+  TCphot_phyto          (:,:) = 0.d0
+  TCphot_cocco          (:,:) = 0.d0
+  TCphot_phaeo          (:,:) = 0.d0
+
+  allocate(TSi_assimDia         (nl-1,node_size))
+
+  TSi_assimDia          (:,:) = 0.d0
+
     end if
 
 !! *** Allocate 3D mocsy ***
@@ -246,125 +325,240 @@ subroutine recom_init(tracers, partit, mesh)
     Sinkingvel1(:,:)      = 0.d0
     Sinkingvel2(:,:)      = 0.d0
 
+    allocate(Sinkvel1_tr(nl,node_size,num_tracers), Sinkvel2_tr(nl,node_size,num_tracers))  ! OG 16.03.23
+    Sinkvel1_tr(:,:,:)    = 0.0d0 ! OG 16.03.23
+    Sinkvel2_tr(:,:,:)    = 0.0d0 ! OG 16.03.23
+
+    if (use_MEDUSA) then
+        allocate(GloSed(node_size,sedflx_num))
+        allocate(SinkFlx(node_size,bottflx_num))
+        allocate(SinkFlx_tr(node_size,bottflx_num,num_tracers)) ! kh 25.03.22 buffer sums per tracer index
+
+        SinkFlx(:,:)      = 0.d0
+        SinkFlx_tr(:,:,:) = 0.0d0 ! kh 25.03.22
+        GloSed(:,:)       = 0.d0
+        allocate(lb_flux(node_size,9))
+        lb_flux(:,:)      = 0.d0
+    end if
+
+    ! After reading parecomsetup namelist
+    call initialize_tracer_indices
+
+    ! Validation check here
+    call validate_recom_tracers(num_tracers, mype)
+
+    ! ... populate tracer_id_array from namelist ...
+    tracer_id_array = tracers%data(1:tracers%num_tracers)%ID
+    call validate_tracer_id_sequence(tracer_id_array, num_tracers, mype)
+
+    !===============================================================================
+    ! Model Configuration Summary
+    !===============================================================================
+    ! Configuration 1: Base model (enable_3zoo2det=F, enable_coccos=F)
+    !   - 2 Phytoplankton: General Phy, Diatoms
+    !   - 1 Zooplankton: Heterotrophs
+    !   - 1 Detritus pool
+    !
+    ! Configuration 2: 3Zoo2Det (enable_3zoo2det=T, enable_coccos=F)
+    !   - 2 Phytoplankton: General Phy, Diatoms
+    !   - 3 Zooplankton: Het, Zoo2, Zoo3
+    !   - 2 Detritus pools
+    !
+    ! Configuration 3: Coccos (enable_3zoo2det=F, enable_coccos=T)
+    !   - 4 Phytoplankton: General Phy, Diatoms, Coccos, Phaeo
+    !   - 1 Zooplankton: Heterotrophs
+    !   - 1 Detritus pool
+    !
+    ! Configuration 4: Full model (enable_3zoo2det=T, enable_coccos=T)
+    !   - 4 Phytoplankton: General Phy, Diatoms, Coccos, Phaeo
+    !   - 3 Zooplankton: Het, Zoo2, Zoo3
+    !   - 2 Detritus pools
+    !===============================================================================
+
     DO i=num_tracers-bgc_num+1, num_tracers
         id=tracers%data(i)%ID
 
         SELECT CASE (id)
 
-! *******************
-! CASE 2phy 1zoo 1det
-! *******************
-! Skip: DIN, DIC, Alk, DSi and O2 are read from files
-! Fe [mol/L] => [umol/m3] Check the units again!
+        !---------------------------------------------------------------------------
+        ! Base Model: 2 Phytoplankton + 1 Zooplankton + 1 Detritus
+        !---------------------------------------------------------------------------
+        ! Skip: DIN, DIC, Alk, DSi and O2 are read from files
+        ! Fe [mol/L] => [umol/m3] Check the units again!
 
-        CASE (1004)
-            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max       ! PhyN
+        ! --- Small Phytoplankton
+        CASE (1004)  ! PhyN - Phytoplankton Nitrogen
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max
 
-        CASE (1005)
-            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max/NCmax ! PhyC
+        CASE (1005)  ! PhyC - Phytoplankton Carbon
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max/NCmax
 
-        CASE (1006)
-            tracers%data(i)%values(:,:) = tiny_chl                 ! PhyChl
+        CASE (1006)  ! PhyChl - Phytoplankton Chlorophyll
+            tracers%data(i)%values(:,:) = tiny_chl
 
-        CASE (1007)
-            tracers%data(i)%values(:,:) = tiny                     ! DetN
+        ! --- Detritus (Non-living organic matter) ---
+        CASE (1007)  ! DetN - Detrital Nitrogen
+            tracers%data(i)%values(:,:) = tiny
 
-        CASE (1008)
-            tracers%data(i)%values(:,:) = tiny                     ! DetC
+        CASE (1008)  ! DetC - Detrital Carbon
+            tracers%data(i)%values(:,:) = tiny
 
-        CASE (1009)
-            tracers%data(i)%values(:,:) = tiny                     ! HetN
+        ! --- Mesozooplankton (Heterotrophs) ---
+        CASE (1009)  ! HetN - Heterotroph Nitrogen
+            tracers%data(i)%values(:,:) = tiny
 
-        CASE (1010)
-            tracers%data(i)%values(:,:) = tiny * Redfield          ! HetC
+        CASE (1010)  ! HetC - Heterotroph Carbon (using Redfield ratio)
+            tracers%data(i)%values(:,:) = tiny * Redfield
 
-        CASE (1011)
-            tracers%data(i)%values(:,:) = tiny                     ! DON
+        ! --- Dissolved Organic Matter ---
+        CASE (1011)  ! DON - Dissolved Organic Nitrogen
+            tracers%data(i)%values(:,:) = tiny
 
-        CASE (1012)
-            tracers%data(i)%values(:,:) = tiny                     ! DOC
+        CASE (1012)  ! DOC - Dissolved Organic Carbon
+            tracers%data(i)%values(:,:) = tiny
 
-        CASE (1013)
-            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max       ! DiaN
+        ! --- Diatoms ---
+        CASE (1013)  ! DiaN - Diatom Nitrogen
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max
 
-        CASE (1014)
-            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max/NCmax ! DiaC
+        CASE (1014)  ! DiaC - Diatom Carbon
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max/NCmax
 
-        CASE (1015)
-            tracers%data(i)%values(:,:) = tiny_chl                 ! DiaChl
+        CASE (1015)  ! DiaChl - Diatom Chlorophyll
+            tracers%data(i)%values(:,:) = tiny_chl
 
-        CASE (1016)
-            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max_d/NCmax_d/SiCmax ! DiaSi
+        CASE (1016)  ! DiaSi - Diatom Silica
+            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max_d/NCmax_d/SiCmax
 
-        CASE (1017)
-            tracers%data(i)%values(:,:) = tiny                     ! DetSi
+        CASE (1017)  ! DetSi - Detrital Silica
+            tracers%data(i)%values(:,:) = tiny
 
-        CASE (1019)
-            tracers%data(i)%values(:,:) = tracers%data(i)%values(:,:)* 1.e9 ! Fe [mol/L] => [umol/m3] Check the units again!
+        ! --- Iron (micronutrient) ---
+        CASE (1019)  ! Fe - Iron (unit conversion: mol/L => umol/m3)
+            tracers%data(i)%values(:,:) = tracers%data(i)%values(:,:)* 1.e9
 
-        CASE (1020)
-            tracers%data(i)%values(:,:) = tiny * Redfield          ! PhyCalc
+        ! --- Calcium Carbonate (Calcite) ---
+        CASE (1020)  ! PhyCalc - Phytoplankton Calcite
+            tracers%data(i)%values(:,:) = tiny * Redfield
 
-        CASE (1021)
-            tracers%data(i)%values(:,:) = tiny                     ! DetCalc
+        CASE (1021)  ! DetCalc - Detrital Calcite
+            tracers%data(i)%values(:,:) = tiny
 
-! *******************
-! CASE 2phy 2zoo 2det
-! *******************
-#if defined (__3Zoo2Det)
+        !---------------------------------------------------------------------------
+        ! Extended Model: Additional Zooplankton and Detritus (enable_3zoo2det)
+        !---------------------------------------------------------------------------
+
         CASE (1023)
-            tracers%data(i)%values(:,:) = tiny                     ! Zoo2N
+            IF (enable_3zoo2det .AND. .NOT. enable_coccos) THEN
+                ! Zoo2N - Macrozooplankton Nitrogen
+                tracers%data(i)%values(:,:) = tiny
+            ELSE IF (enable_coccos .AND. .NOT. enable_3zoo2det) THEN
+                ! CoccoN - Coccolithophore Nitrogen
+                tracers%data(i)%values(:,:) = tiny_chl / chl2N_max
+            END IF
+
         CASE (1024)
-            tracers%data(i)%values(:,:) = tiny * Redfield          ! Zoo2C
+            IF (enable_3zoo2det .AND. .NOT. enable_coccos) THEN
+                ! Zoo2C - Macrozooplankton Carbon
+                tracers%data(i)%values(:,:) = tiny * Redfield
+            ELSE IF (enable_coccos .AND. .NOT. enable_3zoo2det) THEN
+                ! CoccoC - Coccolithophore Carbon
+                tracers%data(i)%values(:,:) = tiny_chl / chl2N_max / NCmax
+            END IF
+
         CASE (1025)
-            tracers%data(i)%values(:,:) = tiny                     ! DetZ2N 
+            IF (enable_3zoo2det .AND. .NOT. enable_coccos) THEN
+                ! DetZ2N - Macrozooplankton Detrital Nitrogen
+                tracers%data(i)%values(:,:) = tiny
+            ELSE IF (enable_coccos .AND. .NOT. enable_3zoo2det) THEN
+                ! CoccoChl - Coccolithophore Chlorophyll
+                tracers%data(i)%values(:,:) = tiny_chl
+            END IF
+
         CASE (1026)
-            tracers%data(i)%values(:,:) = tiny                     ! DetZ2C
+            IF (enable_3zoo2det .AND. .NOT. enable_coccos) THEN
+                ! DetZ2C - Macrozooplankton Detrital Carbon
+                tracers%data(i)%values(:,:) = tiny
+            ELSE IF (enable_coccos .AND. .NOT. enable_3zoo2det) THEN
+                ! PhaeoN - Phaeocystis Nitrogen
+                tracers%data(i)%values(:,:) = tiny_chl / chl2N_max
+            END IF
+
         CASE (1027)
-            tracers%data(i)%values(:,:) = tiny                     ! DetZ2Si
+            IF (enable_3zoo2det .AND. .NOT. enable_coccos) THEN
+                ! DetZ2Si - Zooplankton 2 Detrital Silica
+                tracers%data(i)%values(:,:) = tiny
+            ELSE IF (enable_coccos .AND. .NOT. enable_3zoo2det) THEN
+                ! PhaeoC - Phaeocystis Carbon
+                tracers%data(i)%values(:,:) = tiny_chl / chl2N_max / NCmax
+            END IF
+
         CASE (1028)
-            tracers%data(i)%values(:,:) = tiny                     ! DetZ2Calc
-#endif
+            IF (enable_3zoo2det .AND. .NOT. enable_coccos) THEN
+                ! DetZ2Calc - Macrozooplankton Detrital Calcite
+                tracers%data(i)%values(:,:) = tiny
+            ELSE IF (enable_coccos .AND. .NOT. enable_3zoo2det) THEN
+                ! PhaeoChl - Phaeocystis Chlorophyll
+                tracers%data(i)%values(:,:) = tiny_chl
+            END IF
 
-! *******************
-! CASE 3phy 2zoo 2det
-! *******************
-#if defined (__coccos) & defined (__3Zoo2Det)
+        !---------------------------------------------------------------------------
+        ! Extended Model: Coccolithophores with 3Zoo2Det
+        !---------------------------------------------------------------------------
+
         CASE (1029)
-            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max       ! CoccoN
+            IF (enable_coccos .AND. enable_3zoo2det) THEN
+                ! CoccoN - Coccolithophore Nitrogen
+                tracers%data(i)%values(:,:) = tiny_chl / chl2N_max
+            ELSE IF (enable_3zoo2det .AND. .NOT. enable_coccos) THEN
+                ! Zoo3N - Microzooplankton Nitrogen
+                tracers%data(i)%values(:,:) = tiny
+            END IF
+
         CASE (1030)
-            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max/NCmax ! CoccoC
+            IF (enable_coccos .AND. enable_3zoo2det) THEN
+                ! CoccoC - Coccolithophore Carbon
+                tracers%data(i)%values(:,:) = tiny_chl / chl2N_max / NCmax
+            ELSE IF (enable_3zoo2det .AND. .NOT. enable_coccos) THEN
+                ! Zoo3C - Microzooplankton Carbon
+                tracers%data(i)%values(:,:) = tiny * Redfield
+            END IF
+
         CASE (1031)
-            tracers%data(i)%values(:,:) = tiny_chl                 ! CoccoChl
-! *******************
-! CASE 3phy 1zoo 1det
-! *******************
-#elif defined (__coccos) & !defined (__3Zoo2Det)
-        CASE (1023)
-            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max       ! CoccoN
-        CASE (1024)
-            tracers%data(i)%values(:,:) = tiny_chl/chl2N_max/NCmax ! CoccoC
-        CASE (1025)
-            tracers%data(i)%values(:,:) = tiny_chl                 ! CoccoChl
-#endif
+            IF (enable_coccos .AND. enable_3zoo2det) THEN
+                ! CoccoChl - Coccolithophore Chlorophyll
+                tracers%data(i)%values(:,:) = tiny_chl
+            END IF
 
-! *******************
-! CASE 3phy 3zoo 2det
-! *******************
-#if defined (__coccos) & defined (__3Zoo2Det)
         CASE (1032)
-            tracers%data(i)%values(:,:) = tiny                     ! Zoo3N
+            IF (enable_coccos .AND. enable_3zoo2det) THEN
+                ! PhaeoN - Phaeocystis Nitrogen
+                tracers%data(i)%values(:,:) = tiny_chl / chl2N_max
+            END IF
+
         CASE (1033)
-            tracers%data(i)%values(:,:) = tiny * Redfield          ! Zoo3C
-#elif !defined (__coccos) & defined (__3Zoo2Det)
-! *******************
-! CASE 2phy 3zoo 2det
-! *******************
-        CASE (1029)
-            tracers%data(i)%values(:,:) = tiny                     ! Zoo3N
-        CASE (1030)
-            tracers%data(i)%values(:,:) = tiny * Redfield          ! Zoo3C
-#endif
+            IF (enable_coccos .AND. enable_3zoo2det) THEN
+                ! PhaeoC - Phaeocystis Carbon
+                tracers%data(i)%values(:,:) = tiny_chl / chl2N_max / NCmax
+            END IF
+
+        CASE (1034)
+            IF (enable_coccos .AND. enable_3zoo2det) THEN
+                ! PhaeoChl - Phaeocystis Chlorophyll
+                tracers%data(i)%values(:,:) = tiny_chl
+            END IF
+
+        CASE (1035)
+            IF (enable_coccos .AND. enable_3zoo2det) THEN
+                ! Zoo3N - Zooplankton 3 Nitrogen
+                tracers%data(i)%values(:,:) = tiny
+            END IF
+
+        CASE (1036)
+            IF (enable_coccos .AND. enable_3zoo2det) THEN
+                ! Zoo3C - Zooplankton 3 Carbon
+                tracers%data(i)%values(:,:) = tiny * Redfield
+            END IF
 
         END SELECT
     END DO
@@ -419,31 +613,46 @@ subroutine recom_init(tracers, partit, mesh)
         end do
 
         if (mype==0) write(*,*) "Sanity check for REcoM variables after recom_init call"
-        call MPI_AllREDUCE(locDINmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-        if (mype==0) write(*,*) '  |-> gobal max init. DIN. =', glo
-        call MPI_AllREDUCE(locDINmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-        if (mype==0) write(*,*) '  |-> gobal min init. DIN. =', glo
+        call print_global_minmax('DIN', locDINmin, locDINmax, .true.)
+        call print_global_minmax('DIC', locDICmin, locDICmax, .true.)
+        call print_global_minmax('Alk', locAlkmin, locAlkmax, .true.)
+        call print_global_minmax('DSi', locDSimin, locDSimax, .true.)
+        call print_global_minmax('DFe', locDFemin, locDFemax, .false.)
+        call print_global_minmax('O2',  locO2min,  locO2max,  .false.)
 
-        call MPI_AllREDUCE(locDICmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-        if (mype==0) write(*,*) '  |-> gobal max init. DIC. =', glo
-        call MPI_AllREDUCE(locDICmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-        if (mype==0) write(*,*) '  |-> gobal min init. DIC. =', glo
-        call MPI_AllREDUCE(locAlkmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-        if (mype==0) write(*,*) '  |-> gobal max init. Alk. =', glo
-        call MPI_AllREDUCE(locAlkmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-        if (mype==0) write(*,*) '  |-> gobal min init. Alk. =', glo
-        call MPI_AllREDUCE(locDSimax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-        if (mype==0) write(*,*) '  |-> gobal max init. DSi. =', glo
-        call MPI_AllREDUCE(locDSimin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-        if (mype==0) write(*,*) '  |-> gobal min init. DSi. =', glo
-        call MPI_AllREDUCE(locDFemax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-        if (mype==0) write(*,*) '  |-> gobal max init. DFe. =', glo
-        call MPI_AllREDUCE(locDFemin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-        if (mype==0) write(*,*) '  `-> gobal min init. DFe. =', glo
-        call MPI_AllREDUCE(locO2max , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-        if (mype==0) write(*,*) '  |-> gobal max init. O2. =', glo
-        call MPI_AllREDUCE(locO2min , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-        if (mype==0) write(*,*) '  `-> gobal min init. O2. =', glo
+        if (enable_3zoo2det) then
+            is_3zoo2det=1.0_WP
+        else
+            is_3zoo2det=0.0_WP
+        endif
 
+        if (enable_coccos) then
+            is_coccos=1.0_WP
+        else
+            is_coccos=0.0_WP
+        endif
+
+contains
+
+subroutine print_global_minmax(label, loc_min, loc_max, use_pipe)
+    character(len=*), intent(in) :: label
+    real(kind=8)    , intent(in) :: loc_min, loc_max
+    logical         , intent(in) :: use_pipe
+
+    real(kind=8)                 :: glo_min, glo_max
+    character(len=3)             :: prefix_min, prefix_max
+
+    if (use_pipe) then
+        prefix_max = '  |'
+        prefix_min = '  |'
+    else
+        prefix_max = '  |'
+        prefix_min = '  `'
+    end if
+
+    call MPI_AllREDUCE(loc_max , glo_max  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+    if (mype==0) write(*,*) prefix_max//'-> gobal max init. '//trim(label)//' =', glo_max
+    call MPI_AllREDUCE(loc_min , glo_min  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+    if (mype==0) write(*,*) prefix_min//'-> gobal min init. '//trim(label)//' =', glo_min
+end subroutine print_global_minmax
     end subroutine recom_init
-

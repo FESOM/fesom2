@@ -351,11 +351,20 @@ CONTAINS
          iost = nf_inq_varid(ncid, varname, id_data)
          iost = nf_inq_var_fill(ncid, id_data, NO_FILL, FILL_VALUE) ! FillValue defined?
          if (NO_FILL==1) then
-            print *, 'No _FillValue is set in ', trim(filename), ', trying dummy =', dummy, FILL_VALUE
+            ! No _FillValue attribute found, try missing_value attribute
+            iost = nf_get_att_double(ncid, id_data, 'missing_value', FILL_VALUE)
+            if (iost /= NF_NOERR) then
+               ! Neither _FillValue nor missing_value found, use NetCDF default fill value
+               FILL_VALUE = NF_FILL_DOUBLE  ! 9.9692099683868690e+36
+               print *, 'No _FillValue or missing_value in ', trim(filename), ', using NetCDF default:', FILL_VALUE
+            else
+               print *, 'Using missing_value from ', trim(filename), ':', FILL_VALUE
+            end if
          else
-            print *, 'The FillValue in ', trim(filename), ' is set to ', FILL_VALUE ! should set dummy accordingly
+            print *, 'Using _FillValue from ', trim(filename), ':', FILL_VALUE
          end if
       end if
+      call MPI_BCast(FILL_VALUE, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename,partit)   
       !read data from file
