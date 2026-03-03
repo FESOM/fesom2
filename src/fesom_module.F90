@@ -143,7 +143,7 @@ contains
       integer             :: i
 
 ! get current value for num_fesom_groups
-      call read_namelist_run_config(partit)
+      call read_namelist_run_config
 
 #endif
 

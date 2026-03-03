@@ -335,7 +335,7 @@ end subroutine setup_model
 #if defined(__recom) && defined(__usetp)
 ! read num_fesom_groups for multi FESOM group loop parallelization
 ! =================================================================
-subroutine read_namelist_run_config(partit)
+subroutine read_namelist_run_config
 
   ! Reads run_config namelist and overwrite default parameters.
   ! Copied by Kai Himstedt (based on read_namelist)
@@ -345,7 +345,6 @@ subroutine read_namelist_run_config(partit)
   USE MOD_PARSUP
   use g_config
   implicit none
-  type(t_partit), intent(inout), target :: partit
 
   character(len=100)   :: nmlfile
   integer fileunit
