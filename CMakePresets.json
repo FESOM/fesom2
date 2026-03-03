@@ -55,6 +55,34 @@
       }
     },
     {
+      "name": "coupled_yac",
+      "displayName": "YAC Coupled FESOM2 Build",
+      "description": "FESOM2 build with YAC coupling (automatically builds YAC, YAXT, and libfyaml)",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/coupled_yac",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_TESTING": "ON",
+        "USE_YAC": "ON",
+        "BUILD_YAC": "ON",
+        "FESOM_COUPLED": "OFF",
+        "OIFS_COUPLED": "OFF",
+        "RECOM_COUPLED": "OFF",
+        "USE_ICEPACK": "OFF",
+        "ENABLE_IFS_INTERFACE": "OFF",
+        "ENABLE_OPENMP": "OFF",
+        "ENABLE_MULTIO": "OFF",
+        "ASYNC_ICEBERGS": "ON",
+        "VERBOSE": "OFF",
+        "FESOM_PROFILING": "OFF",
+        "BUILD_MESHPARTITIONER": "OFF",
+        "BUILD_MESHDIAG": "OFF"
+      },
+      "environment": {
+        "FESOM_PLATFORM_STRATEGY": "ubuntu"
+      }
+    },
+    {
       "name": "recom",
       "displayName": "REcoM3 Coupled FESOM2 Build",
       "description": "FESOM2 build with REcoM3 biogeochemistry coupling",
@@ -122,6 +150,12 @@
       "description": "Build the coupled FESOM2 configuration"
     },
     {
+      "name": "coupled_yac",
+      "configurePreset": "coupled_yac",
+      "displayName": "Build YAC Coupled Configuration",
+      "description": "Build the YAC coupled FESOM2 configuration"
+    },
+    {
       "name": "recom",
       "configurePreset": "recom",
       "displayName": "Build REcoM3 Configuration",
@@ -151,6 +185,17 @@
       "configurePreset": "coupled",
       "displayName": "Test Coupled Configuration",
       "description": "Run integration tests for the coupled FESOM2 configuration",
+      "filter": {
+        "include": {
+          "name": "integration_.*"
+        }
+      }
+    },
+    {
+      "name": "coupled_yac",
+      "configurePreset": "coupled_yac",
+      "displayName": "Test YAC Coupled Configuration",
+      "description": "Run integration tests for the YAC coupled FESOM2 configuration",
       "filter": {
         "include": {
           "name": "integration_.*"
