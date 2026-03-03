@@ -496,7 +496,7 @@ subroutine recom_init(tracers, partit, mesh)
     tracers%data(21)%values(:,:) = max(tiny, tracers%data(21)%values(:,:))
 !------------------------------------------
 
-    if(mype==0) write(*,*),'Tracers have been initialized as spinup from WOA/glodap netcdf files'
+    if(mype==0) write(*,*) 'Tracers have been initialized as spinup from WOA/glodap netcdf files'
         locDINmax = -66666
         locDINmin = 66666
         locDICmax = locDINmax

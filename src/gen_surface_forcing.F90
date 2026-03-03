@@ -1693,7 +1693,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
         if (partit%my_fesom_group==0) then
 #endif
             if (mype==0) write(*,*) 'Constant_CO2 = ', CO2_for_spinup 
-            if (mype==0) write(*,*),'Atm CO2=', AtmCO2     
+            if (mype==0) write(*,*) 'Atm CO2=', AtmCO2     
 #if defined(__usetp)
         endif !(partit%my_fesom_group==0) then
 #endif
@@ -1734,7 +1734,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
             firstyearofcurrentCO2cycle = lastyearoffesomcycle-numofCO2cycles*totnumyear+(currentCO2cycle-1)*totnumyear
     
             currentCO2year = firstyearofcurrentCO2cycle + (yearnew-firstyearoffesomcycle)+1
-            if(mype==0) write(*,*),currentCO2year, firstyearofcurrentCO2cycle, yearnew, firstyearoffesomcycle
+            if(mype==0) write(*,*) currentCO2year, firstyearofcurrentCO2cycle, yearnew, firstyearoffesomcycle
             write(currentCO2year_char,'(i4)') currentCO2year
             CO2vari     = 'AtmCO2_'//currentCO2year_char
 
@@ -1758,8 +1758,8 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
-            if (mype==0) write(*,*),'Current carbon year=',currentCO2year
-            if (mype==0) write(*,*),'Atm CO2=', AtmCO2
+            if (mype==0) write(*,*) 'Current carbon year=',currentCO2year
+            if (mype==0) write(*,*) 'Atm CO2=', AtmCO2
 #if defined(__usetp)
         endif !(partit%my_fesom_group==0) then
 #endif

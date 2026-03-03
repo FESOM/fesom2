@@ -1184,7 +1184,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 #endif
         if (mype==0) write(*,*)
         if (mype==0) print *, achar(27)//'[46;1m'//' --> Set surface field for alkalinity restoring'//achar(27)//'[0m'
-        if (mype==0) write(*,*),'Alkalinity restoring = true. Field is read.'
+        if (mype==0) write(*,*) 'Alkalinity restoring = true. Field is read.'
 #if defined(__usetp)
         endif !(partit%my_fesom_group==0) then
 #endif
