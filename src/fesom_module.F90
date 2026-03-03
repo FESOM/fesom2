@@ -180,15 +180,18 @@ contains
         end if
 #endif
 
+
 #if defined (__oasis)
 
-! pass num_fesom_groups to coupler
 #if defined(__recom) && defined(__usetp)
+! pass num_fesom_groups to coupler
         call cpl_oasis3mct_init(f%partit, f%partit%MPI_COMM_FESOM, num_fesom_groups)
-#elif defined (__yac)
-        call cpl_yac_init(f%partit%MPI_COMM_FESOM)
 #else
         call cpl_oasis3mct_init(f%partit, f%partit%MPI_COMM_FESOM)
+#endif
+
+#elif defined (__yac)
+        call cpl_yac_init(f%partit%MPI_COMM_FESOM)
 #endif
 
         f%t1 = MPI_Wtime()
