@@ -49,6 +49,9 @@ module fesom_main_storage_module
 #if defined (__oasis)
   use cpl_driver
 #endif
+#if defined (__yac)
+use cpl_yac_driver
+#endif
 
 ! define recom module
 #if defined (__recom)
@@ -182,11 +185,12 @@ contains
 ! pass num_fesom_groups to coupler
 #if defined(__recom) && defined(__usetp)
         call cpl_oasis3mct_init(f%partit, f%partit%MPI_COMM_FESOM, num_fesom_groups)
+#elif defined (__yac)
+        call cpl_yac_init(f%partit%MPI_COMM_FESOM)
 #else
         call cpl_oasis3mct_init(f%partit, f%partit%MPI_COMM_FESOM)
 #endif
 
-#endif
         f%t1 = MPI_Wtime()
 
         ! Initialize enhanced profiler
@@ -539,6 +543,11 @@ contains
             call allocate_icb(f%partit, f%mesh)
         endif
         ! --------------
+
+#if defined (__yac)
+        call cpl_yac_define_unstr(f%partit, f%mesh)
+        if(f%mype==0)  write(*,*) 'FESOM ---->     cpl_yac_define_unstr nsend, nrecv:',nsend, nrecv
+#endif
 
 #if defined (__icepack)
         !=====================
@@ -911,7 +920,11 @@ contains
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("update_atm_forcing")
 #endif
+#if defined (__yac)
+            call update_atm_forcing_yac(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
+#else
             call update_atm_forcing(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
+#endif 
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("update_atm_forcing")
 #endif
@@ -1093,6 +1106,7 @@ contains
          call iceberg_out(f%partit)
     end if
     ! --------------
+
 #if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
 #endif 
