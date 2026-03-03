@@ -67,8 +67,11 @@ idemix_surforc_file  = '/pool/data/AWICM/FESOM2/FORCING/IDEMIX/fourier_smooth_20
 idemix_surforc_vname = 'var706'      ! variable name in surface forcing file
 
 ! --- Bottom Forcing (Tidal Internal Waves) ---
-idemix_botforc_file  = '/pool/data/AWICM/FESOM2/FORCING/IDEMIX/tidal_energy_gx1v6_20090205_rgrid.nc'         ! path to bottom forcing file,
-idemix_botforc_vname = 'wave_dissipation'  ! variable name in bottom forcing file
+!idemix_botforc_file  = '/albedo/pool/FESOM/fesom2.0/forcing/idemix/forcing_idemix_final_bin/FIN_tidal_energy_gx1v6_20090205_CESMJayne_remapnn_0.40deg.nc'  ! path to bottom forcing !file
+!idemix_botforc_vname = 'wave_dissipation'  ! variable name in bottom forcing file
+idemix_botforc_file  = '/albedo/pool/FESOM/fesom2.0/forcing/idemix/forcing_idemix_final_bin/FIN_STORMTIDE2_M2_plus_NYCANDER_CnoM2_bin_0.40deg.nc'         ! path to bottom forcing file,
+idemix_botforc_vname = 'stormt_M2_plus_nycand_CnoM2'  ! variable name in bottom forcing file
+
 /
 
 ! ============================================================================

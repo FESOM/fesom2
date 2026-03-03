@@ -2936,7 +2936,7 @@ subroutine compute_CFLz(dynamics, partit, mesh)
     ! calc vertical CFL criteria for debugging purpose and vertical Wvel splitting
 !$OMP PARALLEL DO
     do node=1, myDim_nod2D+eDim_nod2D
-       CFL_z(1,node)=0._WP
+       CFL_z(:,node)=0._WP
     end do
 !$OMP END PARALLEL DO
 
@@ -3229,8 +3229,11 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
         !!PS friction=-C_d*sqrt(UV(1,nlevels(elem)-1,elem)**2+ &
         !!PS             UV(2,nlevels(elem)-1,elem)**2)
         
-        if ((toy_ocean) .AND. (TRIM(which_toy)=="dbgyre")) then
+        if      ((toy_ocean) .AND. (TRIM(which_toy)=="dbgyre")) then
            friction=-C_d
+           
+        else if ((toy_ocean) .AND. (TRIM(which_toy)=="neverworld2")) then
+           friction=-C_d   
 
         else if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) then
            friction=-C_d
@@ -3329,6 +3332,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     use g_cvmix_tidal
 #endif    
     use Toy_Channel_Soufflet
+    use Toy_Neverworld2
     use oce_ale_interfaces
     use compute_vert_vel_transpv_interface
     use compute_ssh_split_explicit_interface
@@ -3476,7 +3480,10 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_tke'//achar(27)//'[0m'
         call calc_cvmix_tke(dynamics, partit, mesh)
         call mo_convect(ice, partit, mesh)
-#endif    
+#endif  
+    else if(mix_scheme_nmb==8) then
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_TOY'//achar(27)//'[0m' 
+        call oce_mixing_TOY(partit, mesh)
     end if   
 
 #if defined (__cvmix)       

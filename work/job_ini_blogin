@@ -1,0 +1,25 @@
+#!/bin/bash	
+#SBATCH --job-name=fesom2.6_nhrzib
+#SBATCH --partition=cpu-clx:test
+#SBATCH --ntasks=1      ######2304
+#SBATCH --ntasks-per-node=1
+#SBATCH --time=01:00:00
+#SBATCH -o slurm-out.out
+#SBATCH -e slurm-err.out
+#SBATCH --account=hbk00099 
+
+read -r USED_SHELL < ../bin/current_shell_path
+source $USED_SHELL
+echo "using environment from" $USED_SHELL
+
+ln -s ../bin/fesom_meshpart      .
+cp -n ../config/namelist.config  .
+
+#___DETERMINE SLURM JOBID+OUTPUTFILE____________________________________________
+jobid=$(echo $SLURM_JOB_ID | cut -d"." -f1)
+fname="fesom2.7_${SLURM_JOB_NAME}_${jobid}.out"
+
+#___PUT JOB IN QUEUE____________________________________________________________
+date
+srun ./fesom_meshpart >> ${fname}
+date

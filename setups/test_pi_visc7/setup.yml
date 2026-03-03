@@ -9,7 +9,6 @@ time: "00:10:00"
 
 namelist.config:
     timestep:
-        step_per_day: 96
         run_length: 1
         run_length_unit: "d"
     geometry:

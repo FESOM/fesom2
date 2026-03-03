@@ -303,10 +303,10 @@ subroutine pressure_bv(tracers, partit, mesh)
             !!PS do nz=1, nl1
             do nz=nzmin, nzmax-1
                 rho(nz)              = bulk_0(nz) - 2000._WP*(bulk_pz(nz)   -2000._WP*bulk_pz2(nz))
-                density_dmoc(nz,node)= rho(nz)*rhopot(nz)/(rho(nz)-200._WP)
+                density_dmoc(nz,node)= rho(nz)*rhopot(nz)/(rho(nz)-200._WP*real(state_equation))
                         !           density_dmoc(nz,node)   = rhopot(nz)
             end do
-        end if
+        end if 
 
         !_______________________________________________________________________
         ! compute density for PGF
@@ -2973,7 +2973,7 @@ subroutine compute_neutral_slope(partit, mesh)
     eps=5.0e-6_WP
 !PS     S_cr=1.0e-2_WP
 !PS     S_d=1.0e-3_WP
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, n, nz, nl1, ul1, el, elnodes, enodes, c, ro_z_inv, f_min, dep_scale, rssby, c1, c2)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, n, nz, nl1, ul1, el, elnodes, enodes, c, ro_z_inv, dep_scale, rssby, c1, c2) FIRSTPRIVATE(f_min)
 !$OMP DO
     do n=1, myDim_nod2D
         slope_tapered(: , :, n)=0._WP
@@ -3046,7 +3046,7 @@ subroutine compute_neutral_slope(partit, mesh)
         end if
         
         ! now taper slope with c1 and c2
-        if (Redi_Ktaper) then 
+        if (Fer_GM .and. Redi .and. Redi_Ktaper) then 
             do nz = ul1, nl1
                 fer_tapfac(nz, n) = c1(nz) * c2(nz)
                 !PS slope_tapered(:, nz, n)=neutral_slope(:, nz, n) * c1(nz) * c2(nz)
@@ -3140,8 +3140,13 @@ IMPLICIT NONE
 
   IF((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) THEN
       rho_out  = density_0 - 0.00025_WP*(t - 10.0_WP)*density_0
+      
   ELSE IF((toy_ocean) .AND. (TRIM(which_toy)=="dbgyre")) THEN
       rho_out  = density_0 - density_0*0.0002052_WP*(t - 10.0_WP) + density_0*0.00079_WP*(s - 35.0_WP)
+      
+  ELSE IF((toy_ocean) .AND. (TRIM(which_toy)=="neverworld2")) THEN    
+      rho_out  = density_0 - 0.0002_WP*(t - 10.0_WP)*density_0
+      
   ELSE
       rho_out  = density_0 + 0.8_WP*(s - 34.0_WP) - 0.2*(t - 20.0_WP)
   END IF
@@ -3184,15 +3189,23 @@ subroutine init_ref_density(partit, mesh)
         auxz=min(0.0,Z_3d_n(nzmin,node))
 
         !_______________________________________________________________________
-        call densityJM_components(density_ref_T, density_ref_S, bulk_0, bulk_pz, bulk_pz2, rhopot)
-        rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
-        density_ref(nzmin, node) = rho*rhopot/(rho+0.1_WP*auxz)
+        select case(state_equation)
+            case(0)
+                call density_linear(density_ref_T, density_ref_S, bulk_0, bulk_pz, bulk_pz2, rhopot)
+            case(1)
+                call densityJM_components(density_ref_T, density_ref_S, bulk_0, bulk_pz, bulk_pz2, rhopot)
+            case default !unknown
+                if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        end select
+        rho = bulk_0 + auxz*bulk_pz + auxz*bulk_pz2
+        density_ref(nzmin, node) = rho*rhopot/(rho+0.1_WP*auxz*real(state_equation))
 
         !_______________________________________________________________________
         do nz=nzmin+1,nzmax
             auxz=Z_3d_n(nz,node)
-            rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
-            density_ref(nz,node) = rho*rhopot/(rho+0.1_WP*auxz)
+            rho = bulk_0 + auxz*bulk_pz + auxz*bulk_pz2
+            density_ref(nz,node) = rho*rhopot/(rho+0.1_WP*auxz*real(state_equation))
         end do
     end do
 !$OMP END PARALLEL DO
@@ -3265,20 +3278,36 @@ end where
         nzmax = nlevels_nod2d(node)-1
         auxz=min(0.0,Z_3d_n(nzmin,node))
         do nz=nzmin,nzmax
-            call densityJM_components(ref_temp1D(nz), ref_salt1D(nz), bulk_0, bulk_pz, bulk_pz2, rhopot)
+            select case(state_equation)
+            case(0)
+                call density_linear(ref_temp1D(nz), ref_salt1D(nz), bulk_0, bulk_pz, bulk_pz2, rhopot)
+            case(1)
+                call densityJM_components(ref_temp1D(nz), ref_salt1D(nz), bulk_0, bulk_pz, bulk_pz2, rhopot)
+            case default !unknown
+                if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            end select    
             auxz=Z_3d_n(nz,node)
             rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
-            density_ref(nz,node) = rho*rhopot/(rho+0.1_WP*auxz)
+            density_ref(nz,node) = rho*rhopot/(rho+0.1_WP*auxz*real(state_equation))
         end do
     end do
 !$OMP END PARALLEL DO
 if(mype==0) write(*,*) ' --> compute reference density'
 if(mype==0) then
 do nz=1,68
- call densityJM_components(ref_temp1D(nz), ref_salt1D(nz), bulk_0, bulk_pz, bulk_pz2, rhopot)
+    select case(state_equation)
+    case(0)
+        call density_linear(ref_temp1D(nz), ref_salt1D(nz), bulk_0, bulk_pz, bulk_pz2, rhopot)
+    case(1) 
+        call densityJM_components(ref_temp1D(nz), ref_salt1D(nz), bulk_0, bulk_pz, bulk_pz2, rhopot)
+    case default !unknown
+        if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    end select    
  auxz=Z(nz)
  rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
- rho = rho*rhopot/(rho+0.1_WP*auxz)
+ rho = rho*rhopot/(rho+0.1_WP*auxz*real(state_equation))
  write(*,*) "mytest:", ref_temp1D(nz), ref_salt1D(nz), auxz, rho
 end do
 end if

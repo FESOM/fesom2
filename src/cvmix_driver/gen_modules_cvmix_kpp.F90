@@ -448,7 +448,7 @@ module g_cvmix_kpp
         real(kind=WP) :: aux_coeff, sigma, stable
         real(kind=WP) :: ustar, aux_surfbuoyflx_nl(mesh%nl), wind_norm
         
-        integer       :: nzsfc, nztmp
+        integer       :: nzsfc, nztmp, nz_buoyflx_idx
         real(kind=WP) :: sldepth, sfc_temp, sfc_salt, sfc_u, sfc_v, htot, delh, rho_sfc, rho_nz, oblguess
         real(kind=WP) :: rhopot, bulk_0, bulk_pz, bulk_pz2
         real(kind=WP) :: sfc_rhopot, sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2
@@ -558,9 +558,9 @@ module g_cvmix_kpp
                     ! buoyancy difference with respect to the surface --> computed in
                     ! oce_ale_pressure_bf.F90 --> subroutine pressure_bv 
                     ! --> dbsfc(nz,node)
-                    !!PS call densityJM_components(temp(1,node), salt(1,node), sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot, mesh)
-                    call densityJM_components(temp(nun,node), salt(nun,node), sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot, mesh)
-                    call densityJM_components(temp(nz, node), salt(nz, node), bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)                    
+                    !!PS call densityJM_components(temp(1,node), salt(1,node), sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot)
+                    call densityJM_components(temp(nun,node), salt(nun,node), sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot)
+                    call densityJM_components(temp(nz, node), salt(nz, node), bulk_0, bulk_pz, bulk_pz2, rhopot)                    
                     rho_nz  = bulk_0   + Z_3d_n(nz,node)*(bulk_pz   + Z_3d_n(nz,node)*bulk_pz2)
                     rho_nz  = rho_nz*rhopot/(rho_nz+0.1_WP*Z_3d_n(nz,node))-density_0
                     rho_sfc = sfc_bulk_0   + Z_3d_n(nz,node)*(sfc_bulk_pz   + Z_3d_n(nz,node)*sfc_bulk_pz2)
@@ -704,8 +704,8 @@ module g_cvmix_kpp
                     ! --> bring density of surface point adiabatically to the same 
                     !     depth level as the deep point --> than calculate bouyancy 
                     !     difference
-                    call densityJM_components(sfc_temp, sfc_salt, sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot, mesh)
-                    call densityJM_components(temp(nz,node), salt(nz,node), bulk_0, bulk_pz, bulk_pz2, rhopot, mesh)                    
+                    call densityJM_components(sfc_temp, sfc_salt, sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot)
+                    call densityJM_components(temp(nz,node), salt(nz,node), bulk_0, bulk_pz, bulk_pz2, rhopot)                    
                     rho_nz  = bulk_0   + Z_3d_n(nz,node)*(bulk_pz   + Z_3d_n(nz,node)*bulk_pz2)
                     rho_nz  = rho_nz*rhopot/(rho_nz+0.1_WP*Z_3d_n(nz,node))-density_0
                     rho_sfc = sfc_bulk_0   + Z_3d_n(nz,node)*(sfc_bulk_pz   + Z_3d_n(nz,node)*sfc_bulk_pz2)
@@ -947,13 +947,16 @@ module g_cvmix_kpp
                     uS_sld_t, vS_sld_t ,         &
                     uS_sld_c, vS_sld_c ,         &
                     uS_sld_m, vS_sld_m) 
+                
+                ! Cray compiler workaround: store subscript as scalar integer
+                nz_buoyflx_idx = kpp_nzobldepth(node)
                         
                 call cvmix_kpp_compute_StokesXi (&
                     zbar_3d_n(nun:nln+1,node),   & ! full depth levels
                     Z_3d_n(nun:nln,node),        & ! mid depth levels
                     nzsfc,                       & ! cell index of Surface Layer Depth
                     sldepth,                     & ! surface layer depth > 0
-                    kpp_buoyflx_nl(kpp_nzobldepth(node)),          & ! surfce buoyancy flux (m2/s3) total
+                    kpp_buoyflx_nl(nz_buoyflx_idx),          & ! surfce buoyancy flux (m2/s3) total
                     ustar,                       & ! turbulent friction velocity at surface (m/s), 
                     mesh%coriolis_node(node),    & ! Coriolis parameter (1/s) dim=1 
                     UVnode(1,nun:nln,node),      & ! zonal Eulerian mean horizontal velocity components

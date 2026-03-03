@@ -252,7 +252,7 @@ subroutine ini_ice_io(ice, partit, mesh)
   call ice_files%def_node_var('hsnow', 'effective snow thickness',  'm',   ice%data(3)%values(:), mesh, partit)
   call ice_files%def_node_var('uice', 'zonal velocity',             'm/s', ice%uice, mesh, partit)
   call ice_files%def_node_var('vice', 'meridional velocity',        'm',   ice%vice, mesh, partit)
-#if defined (__oifs)
+#if defined (__oifs) || defined (__ifsinterface)
   call ice_files%def_node_var_optional('ice_albedo', 'ice albedo',    '-',   ice%atmcoupl%ice_alb, mesh, partit)
   call ice_files%def_node_var_optional('ice_temp', 'ice surface temperature',  'K',   ice%data(4)%values, mesh, partit)
 #endif /* (__oifs) */
@@ -335,7 +335,7 @@ subroutine read_initial_conditions(which_readr, ice, dynamics, tracers, partit, 
   call ini_ocean_io(dynamics, tracers, partit, mesh)
   if (use_ice) then
 #if defined(__icepack)    
-      call ini_icepack_io(partit, mesh)
+      call ini_icepack_io(yearold, partit, mesh)
 #else
       call ini_ice_io  (ice, partit, mesh)
 #endif        

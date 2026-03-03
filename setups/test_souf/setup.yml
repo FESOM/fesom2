@@ -9,7 +9,6 @@ time: "00:10:00"
 
 namelist.config:
     timestep:
-        step_per_day: 72
         run_length: 1
         run_length_unit: "d"
     restart_log:
@@ -83,8 +82,8 @@ namelist.io:
 
 fcheck:
     salt: 35.0
-    temp: 14.329710714197722
-    sst: 18.93970701056078
-    u: 0.027586976111991932
-    v: -0.000862214263604525
+    temp: 14.32970888593529
+    sst: 18.939700863818697
+    u: 0.027590123469330336
+    v: -0.0008576519154683742
 

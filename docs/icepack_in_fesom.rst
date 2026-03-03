@@ -58,6 +58,15 @@ Namelist section &tracer_nml
 
 Logical parameters to specify parameterizations and passive tracers. Only **tr_pond_cesm** has been tested extensively.  
 
+Additional Icepack namelists
+""""""""""""""""""""""""""""
+
+- **&thermo_nml** controls the thermodynamics solver and conductivity options (``kitd``, ``ktherm``, ``conduct``, mushy-layer parameters such as ``phi_i_mushy`` and ``ksno``). Use these to switch between 0-layer/1-layer/BL99 thermodynamics and to tune conductivity/enthalpy handling.
+- **&shortwave_nml** sets the radiative transfer and albedo scheme (``shortwave``, ``albedo_type``) along with visible/infrared albedo values for ice, snow and ocean (``albicev``, ``albsnowv``, ``albocn``, etc.) and optical tuning parameters (``R_ice``, ``dT_mlt``, ``rsnw_mlt``).
+- **&ponds_nml** collects melt-pond evolution parameters (``hp1``, ``hs0``, ``dpscale``, ``frzpnd``, ``rfracmin/max``, ``pndaspect``) that shape pond depth, refreezing behaviour and fractional coverage.
+- **&forcing_nml** includes surface-exchange and driver options such as form drag (``formdrag``), how stress and surface temperature are calculated (``calc_strair``, ``calc_Tsfc``), minimum friction velocity (``ustar_min``), and freezing-point formulation (``tfrz_option``). ``oceanmixed_ice`` controls whether a thin ocean mixed layer under ice is assumed in flux calculations.
+- **&dynamics_nml** provides additional ice-strength tuning (``kstrength``, ``krdg_partic``, ``krdg_redist``, ``mu_rdg``, ``Cf``, ``P_star``, ``C_star``) that can be adjusted when using Icepack thermodynamics with the standard EVP dynamics.
+
 Namelist section &nml_list_icepack
 """"""""""""""""""""""""""""""""""
 

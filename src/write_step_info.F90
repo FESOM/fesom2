@@ -114,7 +114,7 @@ subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
     
     !_______________________________________________________________________
 #if !defined(__openmp_reproducible)
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n) REDUCTION(+:loc_eta, loc_hbar, loc_deta, loc_dhbar, loc_wflux)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n) REDUCTION(+:loc_eta, loc_hbar, loc_dhbar, loc_wflux)
 #endif
     do n=1, myDim_nod2D
        loc_eta   = loc_eta   + areasvol(ulevels_nod2D(n), n)*eta_n(n)
@@ -679,7 +679,7 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
         end if
         call blowup(istep, ice, dynamics, tracers, partit, mesh)
         if (mype==0) write(*,*) ' --> finished writing blow up file'
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, abort=1)
     endif 
 end subroutine check_blowup
 !===============================================================================

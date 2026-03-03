@@ -6,8 +6,8 @@
 
 # disable hyperthreading
 #SBATCH --hint=nomultithread
-#SBATCH --nodes=4                  # Number of tasks (MPI) tasks to be launched
-#SBATCH --tasks-per-node 128        # using all 128CPus we exceed the maxload limit (>130) of many used nodes
+#SBATCH --nodes=1                  # Number of tasks (MPI) tasks to be launched
+#SBATCH --tasks-per-node 8        # using all 128CPus we exceed the maxload limit (>130) of many used nodes
 #SBATCH --cpus-per-task 1
 
 #SBATCH --time=12:00:00
@@ -41,6 +41,46 @@ fedit=1
 account=clidyn.p_fesom # default account
 allowed_accounts="clidyn.clidyn,clidyn.p_fesom,clidyn.p_trr181"
 sel_bestaccount=1
+
+
+# Read variables from namelist, ignore variable spaces, ignore comment strings
+function get_nml_var {
+    local file="$1"
+    local key="$2"
+     grep -E "^[[:space:]]*$key[[:space:]]*=" "$file" \
+      | grep -v '^[[:space:]]*!' \
+      | sed -E 's/!.*$//' \
+      | sed -E "s/.*=[[:space:]]*['\"]?([^'\"]*)['\"]?/\1/"
+}
+# write variables back to namelist being string and number aware
+function set_nml_var {
+    local file="$1"
+    local key="$2"
+    local newval="$3"
+
+    # Determine if newval is numeric (integer or float)
+    if [[ "$newval" =~ ^-?[0-9]+([.][0-9]+)?$ ]]; then
+        # numeric → no quotes
+        local replacement="$newval"
+    else
+        # string → single quotes around
+        local replacement="'$newval'"
+    fi
+
+    # Escape special chars for sed
+    local esc_repl
+    esc_repl=$(printf "%s" "$replacement" | sed -e 's/[\/&]/\\&/g')
+
+    # Perform replacement, preserving indentation and comments
+    sed -i -E "
+        /^[[:space:]]*$key[[:space:]]*=/ {
+            # remove any existing quoted/unquoted value
+            s/^([[:space:]]*$key[[:space:]]*=[[:space:]]*)['\"]?[^'\"]*['\"]?/\1$esc_repl/
+        }
+    " "$file"
+}
+
+
 
 #___HELP OUTPUT_________________________________________________________________
 script_name=job_albedo_chain
@@ -130,9 +170,9 @@ chmnod u+w namelist.config
 #___CREATE SAVE DIR INFRASTRUCTURE______________________________________________
 # extract resultpath from namelist.config
 dname_current=$(pwd)
-dname_result_link_orig=$(grep "ResultPath=" namelist.config | grep -v '^!' | \
-                         cut -d "=" -f 2 | \
-                         cut -d "'" -f 2)
+
+dname_result_link_orig=$(get_nml_var  namelist.config "ResultPath")
+
 dname_result_link=$(echo ${dname_result_link_orig::-1})
 
 # identify higher directory --> ResultPath 
@@ -152,7 +192,8 @@ fi
 if [ $fedit -eq 1 ] && [ ${dname_link} != "chain" ]; then
     echo -e "\033[33m --> replace in namelist.config ResultPath with chain path \033[0m"
     dname_result_link="${dname_result}chain"
-    sed -i "s|${dname_result_link_orig}|${dname_result_link}/|g" namelist.config
+    #sed -i "s|${dname_result_link_orig}|${dname_result_link}/|g" namelist.config
+    set_nml_var namelist.config "ResultPath" ${dname_result_link}
 fi
 
 # identify real path in case a link is used
@@ -199,11 +240,13 @@ if [ -f "$dname_result_link/fesom.clock" ] ; then
     if [ $fedit -eq 1 ] ; then
         if [ $is_newsimul -eq 0 ] ; then
             year_d=$(( $year_e - $aux_yr_clock + 1 ))
-            rlen=$(grep "run_length=" namelist.config | cut -d "=" -f 2 | cut -d " " -f 1)
+            # rlen=$(grep "run_length=" namelist.config | cut -d "=" -f 2 | cut -d " " -f 1)
+            rlen=$(get_nml_var  namelist.config "run_length")
             # do not prescribe run length in job fle
             if  [ $prescribe_rlen -eq 0 ] ; then 
                 if  [ $rlen -ne $year_d ] ; then 
-                    sed -i " s/run_length=$rlen/run_length=$year_d/" namelist.config
+                    #sed -i " s/run_length=$rlen/run_length=$year_d/" namelist.config
+                    set_nml_var namelist.config "run_length" $year_d
                     echo -e "\033[1;33m --> change run_length to: $year_d \033[0m"
                 fi
             # prescribe run length in job fle    
@@ -211,7 +254,8 @@ if [ -f "$dname_result_link/fesom.clock" ] ; then
                 aux_year_d=$prescribe_rlen
                 if  [ $year_d -lt $aux_year_d ] ; then aux_year_d=$year_d ; fi
                 if  [ $rlen -ne $year_d ] ; then 
-                    sed -i " s/run_length=$rlen/run_length=$aux_year_d/" namelist.config
+                    # sed -i " s/run_length=$rlen/run_length=$aux_year_d/" namelist.config
+                    set_nml_var namelist.config "run_length" $aux_year_d
                     echo -e "\033[1;33m --> change run_length to: $aux_year_d \033[0m"
                 fi    
             fi
@@ -223,11 +267,13 @@ else
     # to match
     if [ $fedit -eq 1 ] ; then
         year_d=$(( $year_e - $year_s + 1 ))
-        rlen=$(grep "run_length=" namelist.config | cut -d "=" -f 2 | cut -d " " -f 1)
+        # rlen=$(grep "run_length=" namelist.config | cut -d "=" -f 2 | cut -d " " -f 1)
+        rlen=$(get_nml_var  namelist.config "run_length")
         # do not prescribe run length in job fle
         if  [ $prescribe_rlen -eq 0 ] ; then
             if  [ $rlen -ne $year_d ] ; then 
-                sed -i " s/run_length=$rlen/run_length=$year_d/" namelist.config
+                # sed -i " s/run_length=$rlen/run_length=$year_d/" namelist.config
+                set_nml_var namelist.config "run_length" $year_d
                 echo -e "\033[1;33m --> change run_length to: $year_d \033[0m"
             fi
         # prescribe run length in job file       
@@ -235,7 +281,8 @@ else
             aux_year_d=$prescribe_rlen
             if  [ $year_d -lt $aux_year_d ] ; then aux_year_d=$year_d ; fi
             if  [ $rlen -ne $year_d ] ; then 
-                sed -i " s/run_length=$rlen/run_length=$aux_year_d/" namelist.config
+                # sed -i " s/run_length=$rlen/run_length=$aux_year_d/" namelist.config
+                set_nml_var namelist.config "run_length" $aux_year_d
                 echo -e "\033[1;33m --> change run_length to: $aux_year_d \033[0m"
             fi
         fi
@@ -256,9 +303,11 @@ if [ $is_newsimul -eq 1 ] ; then
             
         #_______________________________________________________________________
         # in case yearnew in namelist.config was changed from 1948
-        yearnew=$(grep "yearnew=" namelist.config | cut -d "=" -f 2)
+        # yearnew=$(grep "yearnew=" namelist.config | cut -d "=" -f 2)
+        yearnew=$(get_nml_var  namelist.config "yearnew")
         if [ $yearnew -ne $year_s ]; then 
-            sed -i " s/yearnew=$yearnew/yearnew=$year_s/" namelist.config
+            #sed -i " s/yearnew=$yearnew/yearnew=$year_s/" namelist.config
+            set_nml_var namelist.config "yearnew" $year_s
         fi
         
         #___BACKUP NAMELIST.* FILES INTO RESULT DIRECTORY_______________________
@@ -274,7 +323,8 @@ if [ $is_newsimul -eq 1 ] ; then
     else
         #_______________________________________________________________________
         # create warm start clock file 
-        stepperday=$(grep "step_per_day=" namelist.config | cut -d "=" -f 2 | cut -d " " -f 1 )
+        # stepperday=$(grep "step_per_day=" namelist.config | cut -d "=" -f 2 | cut -d " " -f 1 )
+        stepperday=$(get_nml_var  namelist.config "step_per_day")
         aux_sec=$(( 86400 - 86400 / $stepperday )) 
         aux_day=365
         aux_yr=$(( $year_s - 1 )) 
@@ -311,8 +361,10 @@ if [ $is_newsimul -eq 1 ] ; then
         #_______________________________________________________________________
         # adapt year new in namelist.config otherwise fesom is not doing a 
         # restart
-        aux=$(grep "yearnew=" namelist.config | cut -d "=" -f 2 | cut -d " " -f 1 )
-        sed -i " s/yearnew=$aux/yearnew=$aux_yr/" namelist.config
+        # aux=$(grep "yearnew=" namelist.config | cut -d "=" -f 2 | cut -d " " -f 1 )
+        aux=$(get_nml_var  namelist.config "yearnew")
+        # sed -i " s/yearnew=$aux/yearnew=$aux_yr/" namelist.config
+        set_nml_var namelist.config "yearnew" $aux_yr
         
         #_______________________________________________________________________
         # backup namelist.* & fesom.x in case they dont exist
