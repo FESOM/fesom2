@@ -12,7 +12,7 @@ ldiag_extflds    =.false.
 /
 
 &nml_general
-io_listsize    =250 !number of streams to allocate. shallbe large or equal to the number of streams in &nml_list
+io_listsize    =200 !number of streams to allocate. shallbe large or equal to the number of streams in &nml_list
 vec_autorotate =.false.
 /
 
@@ -164,7 +164,7 @@ io_list =  'sst       ',1, 'm', 4,
            'TCphot_phaeo   ',1, 'm', 4,                                                                 
            'TSi_assimDia   ',1, 'm', 4,               
            'RiverDIN2D     ',1, 'm', 4,
-           'RiverDON2D     ',1, 'm', 4, 
+           'RiverDON2D     ',1, 'm', 4,
            'RiverDSi2D     ',1, 'm', 4,
            'RiverDIC2D     ',1, 'm', 4,
            'RiverDOC2D     ',1, 'm', 4,
@@ -173,6 +173,6 @@ io_list =  'sst       ',1, 'm', 4,
            'ErosionTSi2D   ',1, 'm', 4,
            'ErosionTON2D   ',1, 'm', 4,
            'ErosionTOC2D   ',1, 'm', 4,
-           'DICremin       ',1, 'm', 4,  ! DICremin tracer
+!           'DICremin       ',1, 'm', 4, 
 !           'age            ',1, 'y', 4, ! water age tracer
 /

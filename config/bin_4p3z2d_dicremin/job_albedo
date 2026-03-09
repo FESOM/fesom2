@@ -8,8 +8,8 @@
 #SBATCH --qos=12h
 #SBATCH --tasks-per-node 96  # using all 128CPus we exceed the maxload limit (>130) of many used nodes when us parallel I/O
 
-#SBATCH -o slurm-out.out
-#SBATCH -e slurm-err.out
+#SBATCH -o fesom2o.out 
+#SBATCH -e fesom2e.out
 
 # disable hyperthreading
 #SBATCH --hint=nomultithread

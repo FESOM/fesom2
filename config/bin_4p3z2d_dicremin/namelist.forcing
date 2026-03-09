@@ -28,7 +28,7 @@ fwf_path='./mesh/'
 /
 
 &age_tracer
-use_age_tracer=.false.
+use_age_tracer=.true.
 use_age_mask=.false.
 age_tracer_path='./mesh/'
 age_start_year=2000

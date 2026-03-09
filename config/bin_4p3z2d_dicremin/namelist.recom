@@ -18,7 +18,7 @@ enable_coccos = .true.
 use_REcoM             =.true.
 REcoM_restart         =.true.
 
-bgc_num               = 37 !33 !30 !22 !33 !24 !38
+bgc_num               = 38 !33 !30 !22 !33 !24 !38
 diags3d_num           = 32          ! Number of diagnostic 3d tracers to be saved
 bgc_base_num          = 23          ! standard tracers
 VDet                  = 20.d0       ! Sinking velocity, constant through the water column and positive downwards
@@ -334,7 +334,7 @@ Fe2N                  = 0.033d0     ! Fe2C * 6.625
 Fe2N_benthos          = 0.15d0      ! test, default was 0.14 Fe2C_benthos * 6.625 - will have to be tuned. [umol/m2/day]
 kScavFe               = 0.07d0
 dust_sol              = 0.02d0      ! Dissolution of Dust for bioavaliable
-RiverFeConc           = 100
+RiverFeConc           = 200
 /
 
 &pacalc

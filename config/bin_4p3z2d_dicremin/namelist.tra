@@ -1,5 +1,5 @@
 &tracer_listsize
-num_tracers=200 !number of tracers to allocate. shallbe large or equal to the number of streams in &nml_list
+num_tracers=100 !number of tracers to allocate. shallbe large or equal to the number of streams in &nml_list
 /
 
 &tracer_list
@@ -42,13 +42,12 @@ nml_tracer_list =
 1034,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
 1035,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
 1036,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1037,  'MFCT',       'QR4C',       'FCT ',        1.,          1., ! DICremin tracer (added by Sina) 
-!100,   'MFCT',       'QR4C',       'FCT ',        1.,          1., ! water age tracer 
+1037,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
 !101, 'UPW1',       'UPW1',       'NON ',        0.,          0.
 /
 
 &tracer_init3d                            ! initial conditions for tracers
-n_ic3d   = 9                              ! number of tracers to initialize; increased to 9 for DICremin (by Sina)
+n_ic3d   = 9                              ! number of tracers to initialize
 idlist   = 1019, 1022, 1018, 1003, 1002, 1001, 2, 1, 1037 ! their IDs (0 is temperature, 1 is salinity, etc.). The reading order is defined here!
 filelist = 'fe_pisces_opa_eq_init_3D_changed_name.nc', 'woa18_all_o00_01_mmol_fesom2.nc', 'woa13_all_i00_01_fesom2.nc', 'GLODAPv2.2016b.TAlk_fesom2_mmol_fix_z_Fillvalue.nc', 'GLODAPv2.2016b.TCO2_fesom2_mmol_fix_z_Fillvalue.nc', 'woa13_all_n00_01_fesom2.nc', 'phc3.0_winter.nc', 'phc3.0_winter.nc', 'dicremin_fromAnnualAOU_WOA2023_noneg.nc' ! list of files in ClimateDataPath to read (one file per tracer), same order as idlist
 varlist  = 'Fe', 'oxygen_mmol', 'i_an', 'TAlk_mmol', 'TCO2_mmol', 'n_an', 'salt', 'temp', 'DICremin'                 ! variables to read from specified files
