@@ -760,7 +760,7 @@ subroutine compute_vdiff_vdiss_Eiw( &
     ! 
     ! dEiw/dt  = d/dz(c0*tau_v * d/dz(c0*Eiw)) - alpha_c*Eiw + forcing
     !            |___________________________|         |           
-    !                diffusion of E_iw              dissipation           
+    !             vertical diffusion of E_iw       dissipation           
     !                
     !   ~~~~~~~o zlev=1~~~~~~~
     !          |
