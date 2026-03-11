@@ -1251,9 +1251,9 @@ subroutine compute_dvd(mode, dynamics, tracers, partit, mesh)
         
         !_______________________________________________________________________
         ! need to recompute tracer gradients 
-        call tracer_gradient_elements(trold, partit, mesh)
+        call tracer_gradient_elements(trold, tr_xy, partit, mesh)
         call exchange_elem(tr_xy, partit)
-        call tracer_gradient_z(trold, partit, mesh)
+        call tracer_gradient_z(trold, tr_z, partit, mesh)
         call exchange_nod(tr_z, partit)
         
         !=== DVD Knut Klingbeil et al. 2014 ====================================
