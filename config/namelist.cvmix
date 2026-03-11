@@ -80,7 +80,7 @@ idemix_botforc_vname = 'stormt_M2_plus_nycand_CnoM2'  ! variable name in bottom 
 ! internal tide generation and propagation in the consistent internal wave mixing 
 ! closure IDEMIX
 ! ============================================================================
-&param_idemix
+&param_idemix2
 ! --- Time Scales ---
 idemix2_tau_v         = 172800.0     ! vertical symmetrization time scale [s] (2 days)
 idemix2_tau_h         = 1296000.0    ! horizontal symmetrization time scale [s] (15 days)
@@ -90,41 +90,50 @@ idemix2_gamma         = 1.570        ! spectral shape constant [dimensionless] (
 idemix2_jstar         = 5.0          ! spectral bandwidth in vertical modes [dimensionless]
 idemix2_mu0           = 0.33333333   ! dissipation parameter [dimensionless]
 
-! --- M2 and Near Inertial Wave components
-idemix2_enable_M2     = .true.
-idemix2_enable_niw    = .false.
-idemix2_fniw_usage    = 0.2          ! fraction of surface forcing used [dimensionless]
-
 ! --- superbee-spectral advection scheme and Adams-Bashfort timestepping ---
-idemix2_superbee_adv  = .true.
-idemix2_AB_timestep   = .true.
+! idemix2_enable_superbee_adv= .false.
+idemix2_enable_AB_timestep   = .false.
 
 ! --- Number of used spectral frequency bins
 idemix2_nfbin         = 52 
 
 ! ensures idemix1 functionality
 idemix2_enable_hor_diffusion = .false.
-idemix2_n_hor_iwe_prop_iter = 5   ! from Pollman et al. (2017)
+idemix2_enable_hor_diff_iter = .false.   ! from Pollman et al. (2017)
+idemix2_hor_diff_niter       = 5
+
+! --- shelf definition as distance from coast in meters
+idemix2_shelf_dist    = 300.e3
 
 ! --- M2 Forcing (Summed anisotropic M2-tide generation modes 1-2 (W/m2)) ---
-idemix2_M2forc_file   = './idemix2_IT_forc_M2modes1+2_aniso.nc'
-idemix_M2forc_vname   = 'Flux_to2.nc'   ! variable name in surface forcing file
+idemix2_enable_M2     = .false.
+idemix2_M2forc_file   = '/albedo/work/user/pscholz/forcing/IDEMIX2/idemix2_IT_forc_M2modes1-2_aniso.nc'
+idemix2_M2forc_vname  = 'Flux_to2'   ! variable name in surface forcing file
+idemix2_M2forc_zname  = 'phi'        ! zdim variable name in surface forcing file
 
 ! --- NIW Forcing (Summed anisotropic M2-tide generation modes 1-2 (W/m2)) ---
-idemix2_niwforc_file  = './dummy.nc'
-idemix_niwforc_vname  = 'dummy'
+idemix2_enable_niw    = .false.
+idemix2_fniw_usage    = 0.2          ! fraction of surface forcing used [dimensionless]
+idemix2_niwforc_file  = '/albedo/work/user/pscholz/forcing/IDEMIX/fourier_smooth_2005_cfsr_inert_rgrid.nc'
+idemix2_niwforc_vname = 'var706'
 
 ! --- Bottom Forcing (Tidal Internal Waves) ---
+idemix2_enable_bot    = .true.
 idemix2_botforc_file  = '/albedo/pool/FESOM/fesom2.0/forcing/idemix/forcing_idemix_final_bin/FIN_STORMTIDE2_M2_plus_NYCANDER_CnoM2_bin_0.40deg.nc'         ! path to bottom forcing file,
 idemix2_botforc_vname = 'stormt_M2_plus_nycand_CnoM2'  ! variable name in bottom forcing file
 
+! --- Lee-Wave Forcing ---
+idemix2_enable_leew   = .false.
+idemix2_leewforc_file = '/albedo/work/user/pscholz/forcing/IDEMIX2/idemix2_lee_forc_Eden.nc'
+idemix2_leewforc_vname= 'C_lee'
+
 ! --- Root Mean Square Topographic Height forcing ---
-idemix2_hrmsforc_file  = 'idemix2_forcing_t-scattering_Goff2023_1deg.nc'
-idemix2_hrmsforc_vname = 'HRMS'
+idemix2_hrmsforc_file = '/albedo/work/user/pscholz/forcing/IDEMIX2/idemix2_hrms_Goff2023.nc'
+idemix2_hrmsforc_vname= 'HRMS'
 
 ! --- Characteristic horizontal length scale of topographic feature ---
-idemix2_hlamforc_file  = 'idemix2_forcing_t-scattering_1deg.nc'
-idemix2_hlamforc_vname = 'LAMBDA_G10'
+idemix2_hlamforc_file = '/albedo/work/user/pscholz/forcing/IDEMIX2/idemix2_lambda_Goff2010.nc'
+idemix2_hlamforc_vname= 'LAMBDA'
 /
 
 ! ============================================================================

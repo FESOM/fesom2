@@ -3432,9 +3432,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! to be called prior to tke
     ! for debugging
 #if defined (__cvmix)       
-    if  (mod(mix_scheme_nmb,10)==6) then
+    if     (mod(mix_scheme_nmb,10)==6) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_idemix'//achar(27)//'[0m'
         call calc_cvmix_idemix(partit, mesh)
+    elseif (mod(mix_scheme_nmb,10)==7) then
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_idemix2'//achar(27)//'[0m'
+        ! if (flag_debug .and. mype==0)  print *, achar(27)//'[31m'//'     --> call calc_cvmix_idemix2'//achar(27)//'[0m'
+        call calc_cvmix_idemix2(partit, mesh)
     end if 
 #endif    
 
@@ -3500,7 +3504,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("oce_mix_pres")
     call fesom_profiler_start("oce_dyn_momentum")
-#endif    
+#endif
     
     !___________________________________________________________________________
     ! add contribution from momentum advection, coriolis and pressure gradient |
