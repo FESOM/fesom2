@@ -20,7 +20,7 @@ module g_cvmix_tke
     use cvmix_put_get,     only: cvmix_put
     use cvmix_kinds_and_types
     use g_cvmix_idemix,    only: iwe_n, iwe_Tdis_n, iwe_alpha_c_n
-    use g_cvmix_idemix2,   only: iwe2_n, iwe2_Tdis_n, iwe2_alpha_c_n
+    use g_cvmix_idemix2,   only: iwe2_E_iw, iwe2_E_iw_diss, iwe2_alpha_c, taup1
     
     !___________________________________________________________________________
     ! module calls from FESOM
@@ -224,7 +224,7 @@ module g_cvmix_tke
         end if
         
         !_______________________________________________________________________
-        if(mix_scheme_nmb==56) tke_only=.False.
+        if(mix_scheme_nmb==56 .or. mix_scheme_nmb==57) tke_only=.False.
         
         if (mype==0) then
             write(*,*) "     tke_only       = ", tke_only
@@ -303,9 +303,15 @@ module g_cvmix_tke
         
         ! load things from idemix when selected
         if (.not. tke_only) then
-            tke_in3d_iwe       = iwe_n
-            tke_in3d_iwdis     = -iwe_Tdis_n
-            tke_in3d_iwealphac = iwe_alpha_c_n
+            if      (mod(mix_scheme_nmb,10)==6) then
+                tke_in3d_iwe       =  iwe_n
+                tke_in3d_iwdis     = -iwe_Tdis_n
+                tke_in3d_iwealphac =  iwe_alpha_c_n
+            else if (mod(mix_scheme_nmb,10)==7) then
+                tke_in3d_iwe       =  iwe2_E_iw(taup1,:,:)
+                tke_in3d_iwdis     = -iwe2_E_iw_diss
+                tke_in3d_iwealphac =  iwe2_alpha_c
+            end if 
         endif
         
         !_______________________________________________________________________
