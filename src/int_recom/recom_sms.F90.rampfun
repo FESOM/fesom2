@@ -783,15 +783,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 ! stoichiometric regulation of mesozooplankton grazing            
 ! ******************************************************************************
             if (recom_grazing_regulate) then
-               !rampfun = (recipQZoo - C2Nmin_meso) / (C2Nopt_meso - C2Nmin_meso)
-               !rampfun = max( min( rampfun,1.0d0 ),0.0 )
-               if (recipQZoo .lt. C2Nmin_meso) then
-                       rampfun=0.0d0
-               elseif (recipQZoo .ge. C2Nopt_meso) then
-                       rampfun=1.0
-               else
-                       rampfun = (recipQZoo - C2Nmin_meso) / (C2Nopt_meso - C2Nmin_meso)
-               endif          
+               rampfun = (recipQZoo - C2Nmin_meso) / (C2Nopt_meso - C2Nmin_meso)
+               rampfun = max( min( rampfun,1.0d0 ),0.0 )
                grazingFlux = grazreg_fac*grazingFlux*(1.0-rampfun) + grazingFlux*rampfun
             endif
 
@@ -906,15 +899,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 ! stoichiometric regulation of macrozooplankton grazing            
 ! ******************************************************************************
             if (recom_grazing_regulate) then
-!               rampfun = (recipQZoo2 - C2Nmin_macro) / (C2Nopt_macro - C2Nmin_macro)
-!               rampfun = max(min(rampfun,1.0d0),0.0)
-               if (recipQZoo .lt. C2Nmin_macro) then
-                       rampfun=0.0d0
-               elseif (recipQZoo .ge. C2Nopt_macro) then
-                       rampfun=1.0
-               else    
-                       rampfun = (recipQZoo - C2Nmin_macro) / (C2Nopt_macro - C2Nmin_macro)
-               endif      
+               rampfun = (recipQZoo2 - C2Nmin_macro) / (C2Nopt_macro - C2Nmin_macro)
+               rampfun = max(min(rampfun,1.0d0),0.0)
                grazingFlux2 = grazreg_fac*grazingFlux2*(1.0-rampfun) + grazingFlux2*rampfun
             endif
 
@@ -1018,15 +1004,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 ! stoichiometric regulation of mesozooplankton respiration           
 ! ******************************************************************************
             if (recom_respiration_regulate) then
-!               rampfun = (recipQZoo - C2Nmin_meso) / (C2Nopt_meso - C2Nmin_meso)
-!               rampfun = max(min(rampfun,1.0d0),0.0)
-               if (recipQZoo .lt. C2Nmin_meso) then
-                       rampfun=0.0d0
-               elseif (recipQZoo .ge. C2Nopt_meso) then
-                       rampfun=1.0
-               else    
-                       rampfun = (recipQZoo - C2Nmin_meso) / (C2Nopt_meso - C2Nmin_meso)
-               endif      
+               rampfun = (recipQZoo - C2Nmin_meso) / (C2Nopt_meso - C2Nmin_meso)
+               rampfun = max(min(rampfun,1.0d0),0.0)
                HetRespFlux = respreg_fac*HetRespFlux*(1.0-rampfun) + HetRespFlux*rampfun
             endif
             
@@ -1066,15 +1045,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 ! stoichiometric regulation of macrozooplankton respiration           
 ! ******************************************************************************
             if (recom_respiration_regulate) then
-!               rampfun = (recipQZoo2 - C2Nmin_macro) / (C2Nopt_macro - C2Nmin_macro)
-!               rampfun = max(min(rampfun,1.0d0),0.0)
-               if (recipQZoo .lt. C2Nmin_macro) then
-                       rampfun=0.0d0
-               elseif (recipQZoo .ge. C2Nopt_macro) then
-                       rampfun=1.0
-               else    
-                       rampfun = (recipQZoo - C2Nmin_macro) / (C2Nopt_macro - C2Nmin_macro)
-               endif      
+               rampfun = (recipQZoo2 - C2Nmin_macro) / (C2Nopt_macro - C2Nmin_macro)
+               rampfun = max(min(rampfun,1.0d0),0.0)
                Zoo2RespFlux = respreg_fac*Zoo2RespFlux*(1.0-rampfun) + Zoo2RespFlux*rampfun
             endif
             
@@ -1093,15 +1065,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 ! stoichiometric regulation of macrozooplankton C excretion           
 ! ******************************************************************************
             if (recom_fecal_regulate) then
-!               rampfun = (recipQZoo2 - C2Nmin_macro) / (C2Nopt_macro - C2Nmin_macro)
-!               rampfun = max(min(rampfun,1.0d0),0.0)
-               if (recipQZoo .lt. C2Nmin_macro) then
-                       rampfun=0.0d0
-               elseif (recipQZoo .ge. C2Nopt_macro) then
-                       rampfun=1.0
-               else    
-                       rampfun = (recipQZoo - C2Nmin_macro) / (C2Nopt_macro - C2Nmin_macro)
-               endif      
+               rampfun = (recipQZoo2 - C2Nmin_macro) / (C2Nopt_macro - C2Nmin_macro)
+               rampfun = max(min(rampfun,1.0d0),0.0)
                Zoo2fecalloss_c = fecalreg_fac*Zoo2fecalloss_c*(1.0-rampfun) + Zoo2fecalloss_c * rampfun
             endif
             
@@ -1114,15 +1079,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 ! stoichiometric regulation of mesozooplankton C excretion           
 ! ******************************************************************************
             if (recom_fecal_regulate) then
-!               rampfun = (recipQZoo - C2Nmin_meso) / (C2Nopt_meso - C2Nmin_meso)
-!               rampfun = max(min(rampfun,1.0d0),0.0)
-               if (recipQZoo .lt. C2Nmin_meso) then
-                       rampfun=0.0d0
-               elseif (recipQZoo .ge. C2Nopt_meso) then
-                       rampfun=1.0
-               else    
-                       rampfun = (recipQZoo - C2Nmin_meso) / (C2Nopt_meso - C2Nmin_meso)
-               endif      
+               rampfun = (recipQZoo - C2Nmin_meso) / (C2Nopt_meso - C2Nmin_meso)
+               rampfun = max(min(rampfun,1.0d0),0.0)
                mesfecalloss_c = fecalreg_fac*mesfecalloss_c*(1.0-rampfun) + mesfecalloss_c * rampfun
             endif
 

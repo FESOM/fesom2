@@ -787,10 +787,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
                !rampfun = max( min( rampfun,1.0d0 ),0.0 )
                if (recipQZoo .lt. C2Nmin_meso) then
                        rampfun=0.0d0
-               elseif (recipQZoo .ge. C2Nopt_meso) then
-                       rampfun=1.0
                else
-                       rampfun = (recipQZoo - C2Nmin_meso) / (C2Nopt_meso - C2Nmin_meso)
+                       rampfun=1.0d0
                endif          
                grazingFlux = grazreg_fac*grazingFlux*(1.0-rampfun) + grazingFlux*rampfun
             endif
@@ -910,10 +908,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !               rampfun = max(min(rampfun,1.0d0),0.0)
                if (recipQZoo .lt. C2Nmin_macro) then
                        rampfun=0.0d0
-               elseif (recipQZoo .ge. C2Nopt_macro) then
+               else
                        rampfun=1.0
-               else    
-                       rampfun = (recipQZoo - C2Nmin_macro) / (C2Nopt_macro - C2Nmin_macro)
                endif      
                grazingFlux2 = grazreg_fac*grazingFlux2*(1.0-rampfun) + grazingFlux2*rampfun
             endif
@@ -1022,10 +1018,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !               rampfun = max(min(rampfun,1.0d0),0.0)
                if (recipQZoo .lt. C2Nmin_meso) then
                        rampfun=0.0d0
-               elseif (recipQZoo .ge. C2Nopt_meso) then
+               else
                        rampfun=1.0
-               else    
-                       rampfun = (recipQZoo - C2Nmin_meso) / (C2Nopt_meso - C2Nmin_meso)
                endif      
                HetRespFlux = respreg_fac*HetRespFlux*(1.0-rampfun) + HetRespFlux*rampfun
             endif
@@ -1070,10 +1064,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !               rampfun = max(min(rampfun,1.0d0),0.0)
                if (recipQZoo .lt. C2Nmin_macro) then
                        rampfun=0.0d0
-               elseif (recipQZoo .ge. C2Nopt_macro) then
+               else
                        rampfun=1.0
-               else    
-                       rampfun = (recipQZoo - C2Nmin_macro) / (C2Nopt_macro - C2Nmin_macro)
                endif      
                Zoo2RespFlux = respreg_fac*Zoo2RespFlux*(1.0-rampfun) + Zoo2RespFlux*rampfun
             endif
@@ -1097,10 +1089,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !               rampfun = max(min(rampfun,1.0d0),0.0)
                if (recipQZoo .lt. C2Nmin_macro) then
                        rampfun=0.0d0
-               elseif (recipQZoo .ge. C2Nopt_macro) then
+               else 
                        rampfun=1.0
-               else    
-                       rampfun = (recipQZoo - C2Nmin_macro) / (C2Nopt_macro - C2Nmin_macro)
                endif      
                Zoo2fecalloss_c = fecalreg_fac*Zoo2fecalloss_c*(1.0-rampfun) + Zoo2fecalloss_c * rampfun
             endif
@@ -1118,10 +1108,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !               rampfun = max(min(rampfun,1.0d0),0.0)
                if (recipQZoo .lt. C2Nmin_meso) then
                        rampfun=0.0d0
-               elseif (recipQZoo .ge. C2Nopt_meso) then
+               else
                        rampfun=1.0
-               else    
-                       rampfun = (recipQZoo - C2Nmin_meso) / (C2Nopt_meso - C2Nmin_meso)
                endif      
                mesfecalloss_c = fecalreg_fac*mesfecalloss_c*(1.0-rampfun) + mesfecalloss_c * rampfun
             endif
