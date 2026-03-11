@@ -121,7 +121,7 @@ subroutine setup_model(partit)
   read (fileunit, NML=paalkalinity_restoring)
   read (fileunit, NML=paballasting)
 #if defined (__seaice_tracers)
-  read (20,NML=pa_seaiceiron)             ! NEW BALL
+  read (fileunit, NML=pa_seaiceiron)             ! paremeters for sea ice iron
 #endif
   read (fileunit, NML=paciso)
   close (fileunit)

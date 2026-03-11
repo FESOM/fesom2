@@ -182,10 +182,10 @@ subroutine ini_ice_io(year, ice, partit, mesh)
 
 #if defined (__seaice_tracers)
   do j=1,ntr_ice
-     write(trname,'(A7,i4.4)') 'tr_ice_', j		 ! OG i1 -> i4
+     write(trname,'(A7,i4.4)') 'tr_ice_', j ! OG i1 -> i4
      write(longname,'(A15,i4.4)') 'sea ice tracer ', j
      units='none'
-     call ice_files%def_node_var(trname, longname, 'units', ice%tr_ice(:,j), mesh, partit)     
+     call ice_files%def_node_var(trname, longname, 'units', ice%data(6)%values(:), mesh, partit)     
   enddo
 #endif /* (__seaice_tracers) */
 
