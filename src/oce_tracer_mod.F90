@@ -124,11 +124,11 @@ end do
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
 !PS     call tracer_gradient_elements(tracers%data(tr_num)%valuesAB, partit, mesh)
-    call tracer_gradient_elements(tracers%data(tr_num)%values, partit, mesh)
+    call tracer_gradient_elements(tracers%data(tr_num)%values, tr_xy, partit, mesh)
     call exchange_elem_begin(tr_xy, partit)
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_z'//achar(27)//'[0m'
-    call tracer_gradient_z(tracers%data(tr_num)%values, partit, mesh)    !WHY NOT AB HERE? DSIDOREN!
+    call tracer_gradient_z(tracers%data(tr_num)%values, tr_z, partit, mesh)    !WHY NOT AB HERE? DSIDOREN!
     call exchange_elem_end(partit)      ! tr_xy used in fill_up_dn_grad
 !$OMP BARRIER
 
@@ -139,14 +139,14 @@ end do
     call exchange_nod_end(partit)       ! tr_z halos should have arrived by now.
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
-    call tracer_gradient_elements(tracers%data(tr_num)%values, partit, mesh) !redefine tr_arr to the current timestep
+    call tracer_gradient_elements(tracers%data(tr_num)%values, tr_xy, partit, mesh) !redefine tr_arr to the current timestep
     call exchange_elem(tr_xy, partit)
 
 END SUBROUTINE init_tracers_AB
 !
 !
 !=======================================================================
-SUBROUTINE tracer_gradient_elements(ttf, partit, mesh)
+SUBROUTINE tracer_gradient_elements(ttf, ttf_grad, partit, mesh, do_overz_in)
     !computes elemental gradient of tracer
     USE MOD_MESH
     USE MOD_PARTIT
@@ -156,42 +156,76 @@ SUBROUTINE tracer_gradient_elements(ttf, partit, mesh)
     USE o_ARRAYS
     IMPLICIT NONE
 
-    type(t_mesh),   intent(in),    target :: mesh
-    type(t_partit), intent(inout), target :: partit
-    real(kind=WP)                         :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-    integer                               :: elem,  elnodes(3)
-    integer                               :: nz, nzmin, nzmax
+    real(kind=WP) , intent(in)   , dimension(:,:)   :: ttf !(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP) , intent(inout), dimension(:,:,:) :: ttf_grad
+    type(t_mesh)  , intent(in)   , target           :: mesh
+    type(t_partit), intent(inout), target           :: partit
+    logical       , intent(in)   , optional         :: do_overz_in
+    integer                                         :: elem,  elnodes(3)
+    integer                                         :: nz, nzmin, nzmax
+    logical                                         :: do_overz
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
+    
+    !
+    !___________________________________________________________________________
+    do_overz = .True.
+    if (present(do_overz_in)) do_overz = do_overz_in
 
+    !
+    !___________________________________________________________________________
+    if (do_overz) then 
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax)
 #else
 !ACC PARALLEL LOOP DEFAULT(PRESENT) PRIVATE(elnodes)
 #endif
-    DO elem=1, myDim_elem2D
-        elnodes=elem2D_nodes(:,elem)
-        nzmin = ulevels(elem)
-        nzmax = nlevels(elem)
-        !!PS DO nz=1, nlevels(elem)-1
-        DO nz=nzmin, nzmax-1   
-            tr_xy(1,nz, elem)=sum(gradient_sca(1:3,elem)*ttf(nz,elnodes))
-            tr_xy(2,nz, elem)=sum(gradient_sca(4:6,elem)*ttf(nz,elnodes))
-        END DO
-    END DO
+        do elem=1, myDim_elem2D
+            elnodes=elem2D_nodes(:,elem)
+            nzmin = ulevels(elem)
+            nzmax = nlevels(elem)
+            do nz=nzmin, nzmax-1   
+                ttf_grad(1,nz, elem)=sum(gradient_sca(1:3,elem)*ttf(nz,elnodes))
+                ttf_grad(2,nz, elem)=sum(gradient_sca(4:6,elem)*ttf(nz,elnodes))
+            end do
+        end do
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
 #else
 !ACC END PARALLEL LOOP
 #endif
+
+    !
+    !___________________________________________________________________________
+    else ! (do_overz==.False.) 
+#ifndef ENABLE_OPENACC
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax)
+#else
+!ACC PARALLEL LOOP DEFAULT(PRESENT) PRIVATE(elnodes)
+#endif    
+        nzmin = 1
+        nzmax = size(ttf, 1)
+        do elem=1, myDim_elem2D
+            elnodes=elem2D_nodes(:,elem)
+            do nz=nzmin+1, nzmax-1   
+                ttf_grad(1,nz, elem)=sum(gradient_sca(1:3,elem)*ttf(nz,elnodes))
+                ttf_grad(2,nz, elem)=sum(gradient_sca(4:6,elem)*ttf(nz,elnodes))
+            end do
+        end do
+#ifndef ENABLE_OPENACC
+!$OMP END PARALLEL DO
+#else
+!ACC END PARALLEL LOOP
+#endif        
+    end if
 END SUBROUTINE tracer_gradient_elements
 !
 !
 !========================================================================================
-SUBROUTINE tracer_gradient_z(ttf, partit, mesh)
+SUBROUTINE tracer_gradient_z(ttf, ttf_grad, partit, mesh)
     !computes vertical gradient of tracer
     USE MOD_MESH
     USE MOD_PARTIT
@@ -201,9 +235,12 @@ SUBROUTINE tracer_gradient_z(ttf, partit, mesh)
     USE o_ARRAYS
     USE g_CONFIG
     IMPLICIT NONE
-    type(t_mesh),   intent(in),    target :: mesh
-    type(t_partit), intent(inout), target :: partit
-    real(kind=WP)            :: ttf(mesh%nl-1,partit%myDim_nod2D+partit%eDim_nod2D)
+    
+    real(kind=WP),  intent(in   ), dimension(:,:) :: ttf !(mesh%nl-1,partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP),  intent(inout), dimension(:,:) :: ttf_grad !(mesh%nl-1,partit%myDim_nod2D+partit%eDim_nod2D)
+    type(t_partit), intent(inout), target         :: partit
+    type(t_mesh),   intent(in),    target         :: mesh
+    
     real(kind=WP)            :: dz
     integer                  :: n, nz, nzmin, nzmax
 
@@ -221,10 +258,10 @@ SUBROUTINE tracer_gradient_z(ttf, partit, mesh)
         nzmin=ulevels_nod2D(n)
         DO nz=nzmin+1,  nzmax-1
             dz=0.5_WP*(hnode(nz-1,n)+hnode(nz,n))
-            tr_z(nz, n)=(ttf(nz-1,n)-ttf(nz,n))/dz
+            ttf_grad(nz, n)=(ttf(nz-1,n)-ttf(nz,n))/dz
         END DO
-        tr_z(nzmin, n)=0.0_WP
-        tr_z(nzmax, n)=0.0_WP
+        ttf_grad(nzmin, n)=0.0_WP
+        ttf_grad(nzmax, n)=0.0_WP
     END DO
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
