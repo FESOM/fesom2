@@ -568,8 +568,11 @@ contains
                 f%ice%ice_steps_since_upd=f%ice%ice_steps_since_upd+1
             endif
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ice_timestep(n)'//achar(27)//'[0m'
+#if defined (__seaice_tracers)
+            if (f%ice%ice_update) call ice_timestep(n, f%ice, f%partit, f%mesh, f%tracers)  
+#else
             if (f%ice%ice_update) call ice_timestep(n, f%ice, f%partit, f%mesh)  
-
+#endif
             
             ! LA commented for debugging
             ! --------------

@@ -32,7 +32,11 @@ end module
 
 module ice_timestep_interface
     interface
+#if defined (__seaice_tracers)
+        subroutine ice_timestep(istep, ice, partit, mesh, tracers)
+#else
         subroutine ice_timestep(istep, ice, partit, mesh)
+#endif
         USE MOD_ICE
         USE MOD_PARTIT
         USE MOD_PARSUP
@@ -41,6 +45,9 @@ module ice_timestep_interface
         type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
+#if defined (__seaice_tracers)
+        type(t_tracer), intent(in)   , target :: tracers
+#endif  
         end subroutine
     end interface
 end module
@@ -93,7 +100,11 @@ end subroutine ice_setup
 !
 !_______________________________________________________________________________
 ! Sea ice model step
+#if defined (__seaice_tracers)
+subroutine ice_timestep(istep, ice, partit, mesh, tracers)
+#else
 subroutine ice_timestep(step, ice, partit, mesh)
+#endif
     USE MOD_ICE
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -113,6 +124,9 @@ subroutine ice_timestep(step, ice, partit, mesh)
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
+#if defined (__seaice_tracers)
+    type(t_tracer), intent(in)   , target :: tracers
+#endif  
     !___________________________________________________________________________
     integer                               :: i
     REAL(kind=WP)                         :: t0,t1, t2, t3
@@ -304,7 +318,11 @@ subroutine ice_timestep(step, ice, partit, mesh)
     !___________________________________________________________________________
     ! ===== Thermodynamic part
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call thermodynamics...'//achar(27)//'[0m'
+#if defined (__seaice_tracers)
+    call thermodynamics(ice, partit, mesh, tracers)
+#else
     call thermodynamics(ice, partit, mesh)
+#endif
 #endif /* (__icepack) */
 
 
