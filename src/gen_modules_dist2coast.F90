@@ -198,8 +198,8 @@ module g_dist2coast
             if (partit%myList_edge2D(edge) <= mesh%edge2D_in) cycle  ! boundary edge
             ednodes = mesh%edges(:, edge)
             ! Check if this is a boundary edge
-            if (ednodes(1)<=partit%myDim_nod2D) lcl_coast_isT(ednodes(1)) = .true.
-            if (ednodes(2)<=partit%myDim_nod2D) lcl_coast_isT(ednodes(2)) = .true.
+            if (ednodes(1) >= 1 .and. ednodes(1)<=partit%myDim_nod2D) lcl_coast_isT(ednodes(1)) = .true.
+            if (ednodes(2) >= 1 .and. ednodes(2)<=partit%myDim_nod2D) lcl_coast_isT(ednodes(2)) = .true.
         end do
         
         ! How many coastal boundary point are in this partition
@@ -216,7 +216,7 @@ module g_dist2coast
                 if (lcl_coast_isT(p)) then
                     lcl_coast_lon(cnt)=mesh%geo_coord_nod2D(1,p) ! is in radian
                     lcl_coast_lat(cnt)=mesh%geo_coord_nod2D(2,p) ! is in radian
-                cnt=cnt+1
+                    cnt=cnt+1
                 end if
             end do
         else
