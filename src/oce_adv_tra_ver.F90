@@ -2,7 +2,7 @@ module oce_adv_tra_ver_interfaces
   interface
 ! implicit 1st order upwind vertical advection with to solve for fct_LO
 ! updates the input tracer ttf
-    subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh)
+    subroutine adv_tra_ver_impl(dt, w, ttf, partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
@@ -11,7 +11,7 @@ module oce_adv_tra_ver_interfaces
       type(t_mesh),  intent(in), target  :: mesh
       real(kind=WP), intent(inout)       :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP), intent(in)          :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
-    end subroutine adv_tra_vert_impl
+    end subroutine adv_tra_ver_impl
 !===============================================================================
 ! 1st order upwind (explicit)
 ! returns flux given at vertical interfaces of scalar volumes
@@ -53,7 +53,7 @@ module oce_adv_tra_ver_interfaces
 ! IF o_init_zero=.TRUE.  : flux will be set to zero before computation
 ! IF o_init_zero=.FALSE. : flux=flux-input flux
 ! flux is not multiplied with dt
-   subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, o_init_zero)
+   subroutine adv_tra_ver_ppm(dt, w, ttf, partit, mesh, flux, o_init_zero)
       use MOD_MESH
       USE MOD_PARTIT
       USE MOD_PARSUP
@@ -65,7 +65,7 @@ module oce_adv_tra_ver_interfaces
       real(kind=WP), intent(in)         :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP), intent(inout)      :: flux(mesh%nl,  partit%myDim_nod2D)
       logical, optional                 :: o_init_zero
-    end subroutine adv_tra_vert_ppm
+    end subroutine adv_tra_ver_ppm
 ! central difference reconstruction (2nd order, use only with FCT)
 ! returns flux given at vertical interfaces of scalar volumes
 ! IF o_init_zero=.TRUE.  : flux will be set to zero before computation
@@ -84,6 +84,25 @@ module oce_adv_tra_ver_interfaces
       real(kind=WP), intent(inout)      :: flux(mesh%nl,  partit%myDim_nod2D)
       logical, optional                 :: o_init_zero
     end subroutine adv_tra_ver_cdiff
+! superbee, slope limited reconstruction (2nd order in space and time )
+! returns flux given at vertical interfaces of scalar volumes
+! IF o_init_zero=.TRUE.  : flux will be set to zero before computation
+! IF o_init_zero=.FALSE. : flux=flux-input flux
+! flux is not multiplied with dt    
+    subroutine adv_tra_ver_spbee(w, ttf, partit, mesh, flux, flag_2ndord_time, flag_posdef, o_init_zero)
+      use MOD_MESH
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_partit),intent(in), target :: partit
+      type(t_mesh),  intent(in), target :: mesh
+      real(kind=WP)                     :: tvert(mesh%nl), tv
+      real(kind=WP), intent(in)         :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+      real(kind=WP), intent(in)         :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
+      real(kind=WP), intent(inout)      :: flux(mesh%nl,  partit%myDim_nod2D)
+      logical      , intent(in)         :: flag_2ndord_time
+      logical      , intent(in)         :: flag_posdef
+      logical, optional                 :: o_init_zero
+    end subroutine adv_tra_ver_spbee
   end interface
 end module oce_adv_tra_ver_interfaces
 !===============================================================================
@@ -435,7 +454,7 @@ end subroutine adv_tra_ver_qr4c
 !
 !
 !===============================================================================
-subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, o_init_zero)
+subroutine adv_tra_ver_ppm(dt, w, ttf, partit, mesh, flux, o_init_zero)
     use MOD_MESH
     use MOD_TRACER
     USE MOD_PARTIT
@@ -628,7 +647,7 @@ subroutine adv_tra_vert_ppm(dt, w, ttf, partit, mesh, flux, o_init_zero)
 !       if (mype==0) write(*,*) 'PPM overshoot statistics:', real(overshoot_counter)/real(counter)
 !$OMP END DO
 !$OMP END PARALLEL
-end subroutine adv_tra_vert_ppm
+end subroutine adv_tra_ver_ppm
 !
 !
 !===============================================================================
@@ -693,3 +712,173 @@ subroutine adv_tra_ver_cdiff(w, ttf, partit, mesh, flux, o_init_zero)
 !$OMP END DO
 !$OMP END PARALLEL
 end subroutine adv_tra_ver_cdiff
+
+
+!
+!
+!_______________________________________________________________________________
+! vertical advection 2nd order in space (and time) using  superbee slope limiter
+subroutine adv_tra_ver_spbee(                 &
+            W                               , &
+            ttf                             , &
+            partit                          , &
+            mesh                            , &
+            flux                            , &
+            flag_2ndord_time                , &
+            flag_posdef                     , &
+            o_init_zero                       &
+            )
+    use MOD_MESH
+    use MOD_TRACER
+    use MOD_PARTIT
+    use MOD_PARSUP
+    use g_config, only: dt
+    use g_comm_auto        
+    implicit none
+    !___INPUT/OUTPUT VARIABLES__________________________________________________
+    type(t_partit),intent(inout), target :: partit
+    type(t_mesh),  intent(in)   , target :: mesh
+    real(kind=WP), intent(in)            :: W  ( mesh%nl  , partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(in)            :: ttf( mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(inout)         :: flux(mesh%nl  , partit%myDim_nod2D)
+    logical      , intent(in)            :: flag_2ndord_time
+    logical      , intent(in)            :: flag_posdef
+    logical      , optional              :: o_init_zero
+    !___LOCAL VARIABLES_________________________________________________________
+    logical                              :: l_init_zero
+    integer                              :: node, nz, nzmin, nzmax
+    real(kind=WP)                        :: R, ttf0, ttfp1, dttf0p1, Tmean1, Tmean2, Cr, vflux, vfabs
+    real(kind=WP)                        :: cfl
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
+    !___________________________________________________________________________
+    l_init_zero=.true.
+    if (present(o_init_zero)) then
+       l_init_zero=o_init_zero
+    end if
+    if (l_init_zero) then
+!$OMP PARALLEL DO
+       do node=1, myDim_nod2D
+          flux(:, node)=0.0_WP
+       end do
+!$OMP END PARALLEL DO
+    end if
+    
+    !___________________________________________________________________________
+#ifndef ENABLE_OPENACC
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, tff0, tffp1, dttf0p1, &
+!$OMP                                  R, Cr, Tmean2, Tmean1, cfl, vflux, vfabs)
+!$OMP DO
+#else
+!$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+#endif
+    !___________________________________________________________________________
+    ! this advection does !!! NOT !!! go over the vertical dimension it goes 
+    ! over the domain of the spectral bins 
+    do node = 1, myDim_nod2D
+        nzmax=nlevels_nod2D(node)
+        nzmin=ulevels_nod2D(node)
+        
+        !_______________________________________________________________________
+        ! vert. flux at surface layer
+        nz=nzmin
+        flux(nz,node)=-W(nz,node)*ttf(nz,node)*area(nz,node)-flux(nz,node)
+        
+        !_______________________________________________________________________
+        ! vert. flux at bottom - 1 layer --> centered differences
+        nz=nzmax-1
+        flux(nz,node)=-0.5_WP*(ttf(nz-1,node)+ttf(nz,node))*W(nz,node)*area(nz,node)-flux(nz,node)
+
+        !_______________________________________________________________________
+        ! vert. flux at bottom layer --> zero bottom flux
+        nz=nzmax
+        flux(nz,node)= 0.0_WP-flux(nz,node)
+       
+        !_______________________________________________________________________
+        !loop over spectral bins 
+!$ACC LOOP VECTOR               
+        do nz = nzmin+1, nzmax-2
+            !___________________________________________________________________
+            cfl     = abs(W(nz, node)) * dt * 2.0_WP / (hnode(nz-1,node)+hnode(nz,node))
+            
+            !___________________________________________________________________
+            ! compute tracer difference 
+            ttf0    = ttf(nz  , node)
+            ttfp1   = ttf(nz+1, node)
+            dttf0p1 = ttfp1 - ttf0
+            
+            !___________________________________________________________________
+            ! tracer Slope Ratio Calculation for upwind point
+            ! compute tracer slope 
+            R      = (ttfp1-ttf(nz+2,node))/(-dttf0p1+small)
+                
+            ! apply superbee limiter
+            Cr     = spbee_limiter(R)     
+            
+            ! construct edge centered tracer value
+            ! T_(i+0.5) = T_i+1 - [ (T_i+1 - T_i)/dz ]_Limited * dz/2
+            !  --> this is seconds order in space, but first order in time 
+            !  
+            ! T_(i+0.5) = T_i+1 - [ (T_i+1 - T_i)/dz ]_Limited * (dz/2 -|W|*dt/2)
+            ! T_(i+0.5) = T_i+1 - [ (T_i+1 - T_i)/dz ]_Limited * dz/2 *(1 - CFL)
+            !  --> CFL = W*dt/dx
+            Tmean2 = ttfp1 + 0.5_WP*Cr*(-dttf0p1) * (1.0_WP-merge(cfl, 0.0_WP, flag_2ndord_time))
+            
+            ! make sure tracer are enforced to be positive definite e.g for 
+            ! internal wave energy 
+            Tmean2 = merge(max(0.0_WP, Tmean2), Tmean2, flag_posdef)
+            
+            !___________________________________________________________________
+            ! tracer Slope Ratio Calculation for downwind point
+            ! compute tracer slope 
+            R      = (ttf0-ttf(nz-1,node))/(dttf0p1+small)
+            
+            ! apply superbee limiter
+            Cr     = spbee_limiter(R)     
+            
+            ! construct edge centered tracer value
+            ! T_(i+0.5) = T_i + [ (T_i+1 - T_i)/dz ]_Limited * dz/2
+            !  --> this is seconds order in space, but first order in time 
+            !  
+            ! T_(i+0.5) = T_i + [ (T_i+1 - T_i)/dz ]_Limited * (dz/2 -|W|*dt/2)
+            ! T_(i+0.5) = T_i + [ (T_i+1 - T_i)/dz ]_Limited * dz/2 *(1 - CFL)
+            !  --> CFL = W*dt/dx
+            Tmean1 = ttf0 + 0.5_WP*Cr*(dttf0p1) * (1.0_WP-merge(cfl, 0.0_WP, flag_2ndord_time))
+            
+            ! make sure tracer are enforced to be positive definite e.g for 
+            ! internal wave energy 
+            Tmean1 = merge(max(0.0_WP, Tmean1), Tmean1, flag_posdef)
+            !___________________________________________________________________
+            ! cross spectral exchange rate is related to spectral width dphi 
+            vflux = W(nz, node)
+            vfabs = abs(vflux)
+            flux(nz, node)=-0.5_WP*((vflux+vfabs)*Tmean1 + (vflux-vfabs)*Tmean2  &
+                                    )*area(nz,node) - flux(nz, node)
+            
+            end do !--> do nz = nzmin+1, nzmax-2
+!$ACC END LOOP
+    end do ! --> do node = 1, myDim_nod2D
+#ifndef ENABLE_OPENACC
+!$OMP END DO
+!$OMP END PARALLEL
+#else
+    !$ACC END PARALLEL LOOP
+#endif
+
+    contains
+    
+    !
+    !
+    !___________________________________________________________________________
+    ! superbee slope limiter
+    pure elemental real(kind=WP) function spbee_limiter(R) result(Cr)
+        real(kind=WP), intent(in) :: R
+        Cr = max(0._WP, min( min(2._WP*R, 0.5_WP+R/2._WP), 2._WP ))
+    end function spbee_limiter
+    
+end subroutine adv_tra_ver_spbee
+    
+    

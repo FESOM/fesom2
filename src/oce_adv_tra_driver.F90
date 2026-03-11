@@ -326,7 +326,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         CASE('CDIFF')
             call adv_tra_ver_cdiff(   pwvel, ttfAB, partit, mesh,       adv_flux_ver, o_init_zero=do_zero_flux)
         CASE('PPM')
-            call adv_tra_vert_ppm(dt, pwvel, ttfAB, partit, mesh,       adv_flux_ver, o_init_zero=do_zero_flux)
+            call adv_tra_ver_ppm(dt, pwvel, ttfAB, partit, mesh,       adv_flux_ver, o_init_zero=do_zero_flux)
         CASE('UPW1')
             call adv_tra_ver_upw1 (   pwvel, ttfAB, partit, mesh,       adv_flux_ver, o_init_zero=do_zero_flux)
         CASE DEFAULT !unknown
