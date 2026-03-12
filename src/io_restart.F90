@@ -159,7 +159,11 @@ subroutine ini_ice_io(year, ice, partit, mesh)
   type(t_partit), intent(inout), target :: partit
   type(t_ice), target :: ice
   logical, save :: has_been_called = .false.
-
+#if defined (__seaice_tracers)
+! defining a loop variable for more than one tracer, although so far we do not need it
+  integer :: j
+  character(500) trname, longname, units
+#endif /* (__seaice_tracers) */
   write(cyear,'(i4)') year
   ice_path = trim(ResultPath)//trim(runid)//'.'//cyear//'.ice.restart.nc'
 
@@ -187,7 +191,7 @@ subroutine ini_ice_io(year, ice, partit, mesh)
   write(trname,'(A7,i4.4)') 'tr_ice_', j ! OG i1 -> i4
   write(longname,'(A15,i4.4)') 'sea ice tracer ', j
   units='none'
-  call ice_files%def_node_var(trname, longname, 'units', ice%data(6)%values(:), mesh, partit)     
+  call ice_files%def_node_var(trname, longname, units, ice%data(6)%values(:), mesh, partit)     
 !  enddo
 #endif /* (__seaice_tracers) */
 

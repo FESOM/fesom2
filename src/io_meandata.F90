@@ -264,15 +264,15 @@ CASE ('m_snow    ')
 CASE ('tr_ice    ')
     if (use_ice) then
     ! if (mype==0) write(*,*) 'ice tracer!'
-    call def_stream(nod2D, myDim_nod2D, 'tr_ice',   'ice_tracer',                     'm',       ice%data(6)%values(1:myDim_nod2D),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'tr_ice', 'ice_tracer', 'm', ice%data(6)%values(1:myDim_nod2D),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('flx_iceocn')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'flx_iceocn', 'ice-ocean tracer flux', 'm',  ice%tr_flx_iceocn(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'flx_iceocn', 'ice-ocean tracer flux', 'm', ice%tr_flx_iceocn(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('flx_atmice')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'flx_atmice', 'atm-ice tracer flux', 'm', ice%tr_flx_atmice(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'flx_atmice', 'atm-ice tracer flux', 'm', ice%tr_flx_atmice(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 #endif /* (__seaice_tracers) */  
 

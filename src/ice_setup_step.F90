@@ -36,11 +36,14 @@ module ice_timestep_interface
         subroutine ice_timestep(istep, ice, partit, mesh, tracers)
 #else
         subroutine ice_timestep(istep, ice, partit, mesh)
-#endif
+#endif /* (__seaice_tracers) */
         USE MOD_ICE
         USE MOD_PARTIT
         USE MOD_PARSUP
         USE MOD_MESH
+#if defined (__seaice_tracers)
+        USE MOD_TRACER
+#endif /* (__seaice_tracers) */ 
         integer       , intent(in)            :: istep
         type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
@@ -101,7 +104,7 @@ end subroutine ice_setup
 !_______________________________________________________________________________
 ! Sea ice model step
 #if defined (__seaice_tracers)
-subroutine ice_timestep(istep, ice, partit, mesh, tracers)
+subroutine ice_timestep(step, ice, partit, mesh, tracers)
 #else
 subroutine ice_timestep(step, ice, partit, mesh)
 #endif
@@ -109,6 +112,9 @@ subroutine ice_timestep(step, ice, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_MESH
+#if defined (__seaice_tracers)
+    USE MOD_TRACER
+#endif /* (__seaice_tracers) */
     use o_param
     use g_CONFIG
     use ice_EVPdynamics_interface

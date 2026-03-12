@@ -9,12 +9,15 @@ module ice_thermodynamics_interfaces
         USE MOD_PARTIT
         USE MOD_PARSUP
         USE MOD_MESH
+#if defined (__seaice_tracers)
+        USE MOD_TRACER
+#endif /* (__seaice_tracers) */ 
         type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
 #if defined (__seaice_tracers)
         type(t_tracer), intent(in)   , target :: tracers
-#endif  
+#endif /* (__seaice_tracers) */  
         end subroutine
         
         subroutine cut_off(ice, partit, mesh)
@@ -33,7 +36,11 @@ module ice_therm_interface
     interface
         subroutine therm_ice(ithermp, h,hsn,A,fsh,flo,Ta,qa,rain,snow,runo,rsss, &
         ug,ustar,T_oc,S_oc,H_ML,t,ice_dt,ch,ce,ch_i,ce_i,evap_in,fw,ehf,evap, &
-        rsf, dhgrowth, dhsngrowth, iflice, hflatow, hfsenow, hflwrdout,lid_clo,subli)
+        rsf, dhgrowth, dhsngrowth, iflice, hflatow, hfsenow, hflwrdout,lid_clo,subli &
+#if defined (__seaice_tracers)
+            ,tr_in_ice, sitr_from_freezing, tr_flx_iceocn &
+#endif /* (__seaice_tracers) */
+        )
         USE MOD_ICE
         type(t_ice_thermo), intent(in), target :: ithermp
         real(kind=WP)  h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rsss, evap_in, &
@@ -42,6 +49,9 @@ module ice_therm_interface
                        rhow, show, rhice, shice, sh, thick, thact, lat, &
                        rh, rA, qhst, sn, hsntmp, o2ihf, evap, iflice, hflatow, &
                        hfsenow, hflwrdout, lid_clo
+#if defined (__seaice_tracers)
+        real(kind=WP)  tr_in_ice, sitr_from_freezing, tr_flx_iceocn
+#endif /* (__seaice_tracers) */
         end subroutine
     end interface
 end module
@@ -184,6 +194,10 @@ subroutine thermodynamics(ice, partit, mesh)
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_MESH
+#if defined (__seaice_tracers)
+    USE MOD_TRACER
+    use recom_config ! needed for defining ife
+#endif  
     use o_param
     use g_config
     use g_forcing_param
@@ -338,7 +352,7 @@ subroutine thermodynamics(ice, partit, mesh)
         ! local value of tracer concentration in sea ice
         tr_in_ice = tr_ice(i)
         ! local value of tracer concentration in seawater
-        tr_in_oce = tracers%data(ife+2)%value(1,i) ! ife=19 from recom_config
+        tr_in_oce = tracers%data(ife+2)%values(1,i) ! ife=19 from recom_config
         ! local value of tracer flux from atmosphere to ice 
         tr_flx_atmice = flx_atmice(i)
         ! initialize ice-ocean flux of tracer to zero before thermodynamics

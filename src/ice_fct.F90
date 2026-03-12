@@ -403,7 +403,7 @@ subroutine ice_solve_high_order(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: rhs_temp, m_templ, dm_temp
 #endif
 #if defined (__seaice_tracers)
-    real(kind=WP), dimension(:), pointer  :: tr_ice, tr_icel, dtr_ice
+    real(kind=WP), dimension(:), pointer  :: tr_ice, rhs_tr_ice, tr_icel, dtr_ice
 #endif
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -426,6 +426,7 @@ subroutine ice_solve_high_order(ice, partit, mesh)
 #endif
 #if defined (__seaice_tracers)
     tr_ice       => ice%data(6)%values(:)
+    rhs_tr_ice   => ice%data(6)%values_rhs(:)
     tr_icel      => ice%data(6)%valuesl(:)
     dtr_ice      => ice%data(6)%dvalues(:)
 #endif
