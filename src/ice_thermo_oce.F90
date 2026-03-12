@@ -122,10 +122,9 @@ DO n=1, myDim_nod2D+eDim_nod2D
 #if defined (__oifs) || defined (__ifsinterface)
         ice_temp(n)=273.15_WP
 #endif /* (__oifs) */
-
 #if defined (__seaice_tracers)
         tr_ice(n)  = 0.0_WP
-#endif
+#endif /* (__seaice_tracers) */ 
 
 
    end if
@@ -138,10 +137,9 @@ DO n=1, myDim_nod2D+eDim_nod2D
 #if defined (__oifs) || defined (__ifsinterface)
         ice_temp(n)=273.15_WP
 #endif /* (__oifs) */
-
 #if defined (__seaice_tracers)
         tr_ice(n)  = 0.0_WP
-#endif
+#endif /* (__seaice_tracers) */ 
    end if
      
     !___________________________________________________________________________
@@ -208,7 +206,7 @@ subroutine thermodynamics(ice, partit, mesh)
     real(kind=WP)  :: lid_clo
     real(kind=WP)  :: lat
 #if defined (__seaice_tracers)
-    real(kind=WP)  :: tr_in_ice, tr_in_oce, tr_flx_atmice, tr_flux_iceocn
+    real(kind=WP)  :: tr_in_ice, tr_in_oce, tr_flx_atmice, tr_flx_iceocn
     real(kind=WP)  :: sitr_from_freezing
 #endif /* (__seaice_tracers) */
     
@@ -225,6 +223,7 @@ subroutine thermodynamics(ice, partit, mesh)
     real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
 #if defined (__seaice_tracers)
     real(kind=WP), dimension(:)  , pointer :: tr_ice, tr_ice_old
+    real(kind=WP), dimension(:)  , pointer :: flx_atmice, flx_iceocn
 #endif
     myDim_nod2d   => partit%myDim_nod2D
     eDim_nod2D    => partit%eDim_nod2D
@@ -241,6 +240,8 @@ subroutine thermodynamics(ice, partit, mesh)
 #if defined (__seaice_tracers)
     tr_ice        => ice%data(6)%values(:)
     tr_ice_old    => ice%data(6)%values_old(:)
+    flx_atmice    => ice%tr_flx_atmice(:)
+    flx_iceocn    => ice%tr_flx_iceocn(:)
 #endif
     thdgr         => ice%thermo%thdgr
     thdgrsn       => ice%thermo%thdgrsn
@@ -341,7 +342,7 @@ subroutine thermodynamics(ice, partit, mesh)
         ! local value of tracer flux from atmosphere to ice 
         tr_flx_atmice = flx_atmice(i)
         ! initialize ice-ocean flux of tracer to zero before thermodynamics
-        tr_flux_iceocn = 0.0_WP
+        tr_flx_iceocn = 0.0_WP
         ! si ice tracer concentration in freshly formed ice from either freezing or flooding
         sitr_from_freezing = tr_in_oce * sitr_frac_from_freezing
 !       sitr_from_flooding = tr_in_oce * sitr_frac_from_flooding
@@ -353,7 +354,7 @@ subroutine thermodynamics(ice, partit, mesh)
             ug,ustar,T_oc,S_oc,h_ml,t,ice%ice_dt,ch,ce,ch_i,ce_i,evap_in,fw,ehf,evap, &
             rsf, ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout,lid_clo,subli &
 #if defined (__seaice_tracers)
-            ,tr_in_ice, sitr_from_freezing, tr_flux_iceocn &
+            ,tr_in_ice, sitr_from_freezing, tr_flx_iceocn &
 #endif /* (__seaice_tracers) */
             )
         
@@ -400,7 +401,7 @@ subroutine thermodynamics(ice, partit, mesh)
         tr_ice_old(i) = tr_ice(i)
         tr_ice(i) = tr_in_ice + tr_flx_atmice * ice%ice_dt / max(h, ice%thermo%hmin) ! prevent overflow
         ! transfer local ice-ocean flux of tracer from melting/freezing into global array
-        flx_iceocn(i) = tr_flux_iceocn
+        flx_iceocn(i) = tr_flx_iceocn
 #endif /* (__seaice_tracers) */
 
     end do
@@ -415,7 +416,7 @@ subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rss
                     evap_in, fw, ehf, evap, rsf, dhgrowth, dhsngrowth, iflice,     &
                     hflatow, hfsenow, hflwrdout, lid_clo, subli                    &
 #if defined (__seaice_tracers)
-                    ,tr_in_ice, sitr_from_freezing, tr_flux_iceocn                 &
+                    ,tr_in_ice, sitr_from_freezing, tr_flx_iceocn                 &
 #endif /* (__seaice_tracers) */
                     )
     ! Ice Thermodynamic growth model     
@@ -460,7 +461,7 @@ subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rss
     ! ehf - net heat flux at the ocean surface [W/m2]        !RTnew
 #if defined (__seaice_tracers)
     ! tr_in_ice - tracer concentraion in ice after taking into account melting and freezing
-    ! tr_flux_iceocn - ice-ocean flux of tracer from melting and freezing 
+    ! tr_flx_iceocn - ice-ocean flux of tracer from melting and freezing 
 #endif /* (__seaice_tracers) */
 
     USE MOD_ICE
@@ -479,7 +480,7 @@ subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rss
     real(kind=WP), external  :: TFrez  ! Sea water freeze temperature.
     real(kind=WP)  lid_clo
 #if defined (__seaice_tracers)
-    real(kind=WP)  tr_in_ice, tr_flx_atmice, tr_flux_iceocn
+    real(kind=WP)  tr_in_ice, tr_flx_atmice, tr_flx_iceocn
     real(kind=WP)  sitr_from_freezing
     real(kind=WP)  growfac, meltpart   ! auxiliary variables
 #endif /* (__seaice_tracers) */
@@ -644,9 +645,9 @@ subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rss
     tr_in_ice = tr_in_ice * growfac + sitr_from_freezing * (1.0_WP - growfac)  
     ! tracer flux between ice and ocean; one contribution from melting
     ! and one from formation of sea ice
-    tr_flux_iceocn = tr_flux_iceocn + meltpart * tr_in_ice & 
+    tr_flx_iceocn = tr_flx_iceocn + meltpart * tr_in_ice & 
        - sitr_from_freezing * (1.0_WP - growfac) * h
-    tr_flux_iceocn = tr_flux_iceocn / ice_dt  ! Conversion: 'per time step' -> 'per second'
+    tr_flx_iceocn = tr_flx_iceocn / ice_dt  ! Conversion: 'per time step' -> 'per second'
 #endif /* (__seaice_tracers) */
 
 

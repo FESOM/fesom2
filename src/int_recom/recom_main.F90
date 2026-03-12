@@ -79,7 +79,9 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
 
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: a_ice
-
+#if defined (__seaice_tracers)
+    real(kind=WP), dimension(:), pointer  :: flx_atmice, flx_iceocn
+#endif /* (__seaice_tracers) */ 
 ! ======================================================================================
 !! Depth information
 
@@ -130,6 +132,11 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     !< ice concentration [0 to 1]
 
     a_ice       => ice%data(1)%values(:)
+#if defined (__seaice_tracers)
+    !< tracer fluxes between atmosphere and ice and between ice and ocean
+    flx_atmice  => ice%tr_flx_atmice(:)
+    flx_iceocn  => ice%tr_flx_iceocn(:)    
+#endif
     num_tracers = tracers%num_tracers
 
     !< alkalinity restoring to climatology
@@ -266,10 +273,11 @@ if (UseDustClimMyrio) dust_sol=1.0 !Solubulity set to one, because it is already
         NDust  = GloNDust(n)  * (1.d0 - a_ice(n))
 
 #if defined (__seaice_tracers)
-     !!---- calculate dust flux of iron into sea ice
-     flx_atmice(n,1) = GloFeDust(n) * a_ice(n) * dust_sol_ice
-     !!---- flux of iron between sea-ice and ocean from melting/freezing of seaice
-     FeFluxIce = flx_iceocn(n,1)
+        !!---- calculate dust flux of iron into sea ice
+        flx_atmice(n) = GloFeDust(n) * a_ice(n) * dust_sol_ice
+        !!---- flux of iron between sea-ice and ocean from melting/freezing of seaice
+        !!     has been calculated in ice_thermo_oce.F90
+        FeFluxIce = flx_iceocn(n)
 #endif /* (__seaice_tracers) */
 
         if (Diags) then

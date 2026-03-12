@@ -119,6 +119,10 @@ TYPE T_ICE
     real(kind=WP), allocatable, dimension(:)    :: stress_atmice_x, stress_iceoce_x
     real(kind=WP), allocatable, dimension(:)    :: stress_atmice_y, stress_iceoce_y
 
+#if defined (__seaice_tracers)    
+    real(kind=WP), allocatable, dimension(:)    :: tr_flx_atmice, tr_flx_iceocn
+#endif /* (__seaice_tracers) */
+
     ! oce temp, salt, ssh, and uv at surface
     real(kind=WP), allocatable, dimension(:)    :: srfoce_temp, srfoce_salt, srfoce_ssh
 !     real(kind=WP), allocatable, dimension(:,:)  :: srfoce_uv
@@ -422,6 +426,10 @@ subroutine WRITE_T_ICE(ice, unit, iostat, iomsg)
     call write_bin_array(ice%stress_iceoce_x, unit, iostat, iomsg)
     call write_bin_array(ice%stress_atmice_y, unit, iostat, iomsg)
     call write_bin_array(ice%stress_iceoce_y, unit, iostat, iomsg)
+#if defined (__seaice_tracers)
+    call write_bin_array(ice%tr_flx_atmice  , unit, iostat, iomsg)
+    call write_bin_array(ice%tr_flx_iceocn  , unit, iostat, iomsg)
+#endif /* (__seaice_tracers) */
     call write_bin_array(ice%srfoce_u       , unit, iostat, iomsg)
     call write_bin_array(ice%srfoce_v       , unit, iostat, iomsg)
     call write_bin_array(ice%srfoce_temp    , unit, iostat, iomsg)
@@ -495,6 +503,10 @@ subroutine READ_T_ICE(ice, unit, iostat, iomsg)
     call read_bin_array(ice%stress_iceoce_x , unit, iostat, iomsg)
     call read_bin_array(ice%stress_atmice_y , unit, iostat, iomsg)
     call read_bin_array(ice%stress_iceoce_y , unit, iostat, iomsg)
+#if defined (__seaice_tracers)
+    call read_bin_array(ice%tr_flx_atmice   , unit, iostat, iomsg)
+    call read_bin_array(ice%tr_flx_iceocn   , unit, iostat, iomsg)
+#endif /* (__seaice_tracers) */
     call read_bin_array(ice%srfoce_u        , unit, iostat, iomsg)
     call read_bin_array(ice%srfoce_v        , unit, iostat, iomsg)
     call read_bin_array(ice%srfoce_temp     , unit, iostat, iomsg)
@@ -629,6 +641,10 @@ subroutine ice_init(ice, partit, mesh)
     allocate(ice%stress_iceoce_x(      node_size))
     allocate(ice%stress_atmice_y(      node_size))
     allocate(ice%stress_iceoce_y(      node_size))
+#if defined (__seaice_tracers)
+    allocate(ice%tr_flx_atmice(        node_size))
+    allocate(ice%tr_flx_iceocn(        node_size))
+#endif /* (__seaice_tracers) */
     ice%uice            = 0.0_WP
     ice%uice_rhs        = 0.0_WP
     ice%uice_old        = 0.0_WP
@@ -639,6 +655,11 @@ subroutine ice_init(ice, partit, mesh)
     ice%vice_old        = 0.0_WP
     ice%stress_atmice_y = 0.0_WP
     ice%stress_iceoce_y = 0.0_WP
+#if defined (__seaice_tracers)
+    ice%tr_flx_atmice   = 0.0_WP
+    ice%tr_flx_iceocn   = 0.0_WP
+#endif /* (__seaice_tracers) */
+
     if (ice%whichEVP /= 0) then
         allocate(ice%uice_aux(         node_size))
         allocate(ice%vice_aux(         node_size))
