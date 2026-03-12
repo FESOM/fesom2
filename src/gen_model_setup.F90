@@ -122,7 +122,7 @@ subroutine setup_model(partit)
   read (fileunit, NML=paballasting)
 #if defined (__seaice_tracers)
   read (fileunit, NML=pa_seaiceiron)             ! paremeters for sea ice iron
-#endif
+#endif /* (__seaice_tracers) */ 
   read (fileunit, NML=paciso)
   close (fileunit)
 #endif

@@ -572,7 +572,7 @@ contains
             if (f%ice%ice_update) call ice_timestep(n, f%ice, f%partit, f%mesh, f%tracers)  
 #else
             if (f%ice%ice_update) call ice_timestep(n, f%ice, f%partit, f%mesh)  
-#endif
+#endif /* (__seaice_tracers) */ 
             
             ! LA commented for debugging
             ! --------------
