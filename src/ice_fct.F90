@@ -148,6 +148,9 @@ subroutine ice_TG_rhs(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
         rhs_temp(row)=0._WP
 #endif
+#if defined (__seaice_tracers)
+        rhs_tr_ice(row)=0._WP
+#endif /* (__seaice_tracers) */
     END DO
 
 #ifndef ENABLE_OPENACC
@@ -200,6 +203,9 @@ subroutine ice_TG_rhs(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
             rhs_temp(row)=rhs_temp(row)+sum(entries*ice_temp(elnodes))
 #endif
+#if defined (__seaice_tracers)
+            rhs_tr_ice(row)=rhs_tr_ice(row)+sum(entries*tr_ice(elnodes))
+#endif /* (__seaice_tracers) */
         END DO
 	!$ACC END LOOP
     end do
@@ -242,6 +248,9 @@ subroutine ice_fct_solve(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
   call ice_fem_fct(4, ice, partit, mesh)    ! ice_temp
 #endif
+#if defined (__seaice_tracers)
+  call ice_fem_fct(5, ice, partit, mesh)    ! tr_ice
+#endif /* (__seaice_tracers) */
 
 end subroutine ice_fct_solve
 !
@@ -340,6 +349,12 @@ subroutine ice_solve_low_order(ice, partit, mesh)
                   ice_temp(location(1:cn))))/area(1,row) + &
                   (1.0_WP-gamma)*ice_temp(row)
 #endif
+#if defined (__seaice_tracers)
+        tr_icel(row)=(rhs_tr_ice(row)+gamma*sum(mass_matrix(clo:clo2)* &
+                  tr_ice(location(1:cn))))/area(1,row) + &
+                  (1.0_WP-gamma)*tr_ice(row)
+#endif /* (__seaice_tracers) */
+
     end do
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
@@ -351,6 +366,9 @@ subroutine ice_solve_low_order(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     call exchange_nod(m_templ, partit, luse_g2g = .true.)
 #endif
+#if defined (__seaice_tracers)
+    call exchange_nod(tr_icel, partit, luse_g2g = .true.)
+#endif /* (__seaice_tracers) */
 
 #ifndef ENABLE_OPENACC
 !$OMP BARRIER
@@ -430,6 +448,9 @@ subroutine ice_solve_high_order(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
         dm_temp(row)=rhs_temp(row)/area(1,row)
 #endif
+#if defined (__seaice_tracers)
+        dtr_ice(row)=rhs_tr_ice(row)/area(1,row)
+#endif /* (__seaice_tracers) */
     end do
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
@@ -440,6 +461,9 @@ subroutine ice_solve_high_order(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     call exchange_nod(dm_temp, partit, luse_g2g = .true.)
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+    call exchange_nod(dtr_ice, partit, luse_g2g = .true.)
+#endif /* (__seaice_tracers) */
 #ifndef ENABLE_OPENACC
 !$OMP BARRIER
 #endif
@@ -472,6 +496,10 @@ subroutine ice_solve_high_order(ice, partit, mesh)
             rhs_new     = rhs_temp(row) - sum(mass_matrix(clo:clo2)*dm_temp(location(1:cn)))
             m_templ(row)= dm_temp(row)+rhs_new/area(1,row)
 #endif
+#if defined (__seaice_tracers)
+            rhs_new     = rhs_tr_ice(row) - sum(mass_matrix(clo:clo2)*dtr_ice(location(1:cn)))
+            tr_icel(row)= dtr_ice(row)+rhs_new/area(1,row)
+#endif /* (__seaice_tracers) */
         end do
 #ifndef ENABLE_OPENACC
 !$OMP END DO
@@ -493,6 +521,9 @@ subroutine ice_solve_high_order(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
             dm_temp(row)=m_templ(row)
 #endif
+#if defined (__seaice_tracers)
+            dtr_ice(row)=tr_icel(row)
+#endif /* (__seaice_tracers) */
         end do
 #ifndef ENABLE_OPENACC
 !$OMP END DO
@@ -505,6 +536,9 @@ subroutine ice_solve_high_order(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
         call exchange_nod(dm_temp, partit, luse_g2g = .true.)
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+        call exchange_nod(dtr_ice, partit, luse_g2g = .true.)
+#endif /* (__seaice_tracers) */
 #ifndef ENABLE_OPENACC
 !$OMP BARRIER
 #endif
@@ -657,6 +691,15 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
             end do
         end if
 #endif
+
+#if defined (__seaice_tracers)
+        if (tr_array_id==5) then
+           do q=1,3
+              icefluxes(elem,q)=-sum(icoef(:,q)*(gamma*tr_ice(elnodes) + &
+                            dtr_ice(elnodes)))*(vol/area(1,elnodes(q)))/12.0_WP
+           end do
+        end if
+#endif /* (__seaice_tracers) */
     end do
 #ifndef ENABLE_OPENACC
 !$OMP END DO
@@ -759,6 +802,30 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
             ! Admissible increments
             tmax(row)=tmax(row)-m_templ(row)
             tmin(row)=tmin(row)-m_templ(row)
+        end do
+#ifndef ENABLE_OPENACC
+!$OMP END DO
+#else
+        !$ACC END PARALLEL LOOP
+#endif
+    end if
+#endif
+
+#if defined (__seaice_tracers)
+    if (tr_array_id==5) then
+#ifndef ENABLE_OPENACC
+!$OMP DO
+#else
+        !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
+#endif
+        do row=1, myDim_nod2D
+            if (ulevels_nod2d(row)>1) cycle
+            n=nn_num(row)
+            tmax(row)=max(maxval(tr_icel(nn_pos(1:n,row))), maxval(tr_ice(nn_pos(1:n,row))))
+            tmin(row)=min(minval(tr_icel(nn_pos(1:n,row))), minval(tr_ice(nn_pos(1:n,row))))
+            ! Admissible increments
+            tmax(row)=tmax(row)-tr_icel(row)
+            tmin(row)=tmin(row)-tr_icel(row)
         end do
 #ifndef ENABLE_OPENACC
 !$OMP END DO
@@ -1151,6 +1218,67 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #endif
     end if
 #endif
+
+#if defined (__seaice_tracers)
+    if(tr_array_id==5) then
+#ifndef ENABLE_OPENACC
+!$OMP DO
+#else
+        !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
+#endif
+        do n=1,myDim_nod2D
+            if(ulevels_nod2D(n)>1) cycle !LK89140
+            tr_ice(n)=tr_icel(n)
+        end do
+#ifndef ENABLE_OPENACC
+!$OMP END DO
+!$OMP DO
+#else
+        !$ACC END PARALLEL LOOP
+#endif
+#if !defined(DISABLE_OPENACC_ATOMICS)
+        !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(elnodes) DEFAULT(PRESENT)
+#else
+        !$ACC UPDATE SELF(ice_temp, icefluxes)
+#endif
+        do elem=1, myDim_elem2D
+            ! if cavity cycle over
+            if(ulevels(elem)>1) cycle !LK89140
+
+            elnodes=elem2D_nodes(:,elem)
+            do q=1,3
+                n=elnodes(q)
+#ifndef ENABLE_OPENACC
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+                call omp_set_lock  (partit%plock(n))
+#else
+!$OMP ORDERED
+#endif
+#endif
+#if !defined(DISABLE_OPENACC_ATOMICS)
+                !$ACC ATOMIC UPDATE
+#endif
+                tr_ice(n)=tr_ice(n)+icefluxes(elem,q)
+#ifndef ENABLE_OPENACC
+#if defined(_OPENMP)  && !defined(__openmp_reproducible)
+                call omp_unset_lock(partit%plock(n))
+#else
+!$OMP END ORDERED
+#endif
+#endif
+            end do
+        end do
+#if !defined(DISABLE_OPENACC_ATOMICS)
+        !$ACC END PARALLEL LOOP
+#else
+        !$ACC UPDATE DEVICE(ice_temp)
+#endif
+#ifndef ENABLE_OPENACC
+!$OMP END DO
+#endif
+    end if
+#endif  /* (__seaice_tracers) */
+
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL
 #endif
@@ -1158,6 +1286,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     call exchange_nod(ice_temp, partit, luse_g2g = .true.)
 #endif
+#if defined (__seaice_tracers)
+    call exchange_nod(tr_ice, partit, luse_g2g = .true.)
+#endif /* (__seaice_tracers) */
 
 !$ACC END DATA
 
@@ -1289,7 +1420,7 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
     !___________________________________________________________________________
     real(kind=WP)            :: diff, entries(3),  um, vm, vol, dx(3), dy(3), tmp_sum
     integer                  :: n, q, row, elem, elnodes(3)
-    real(kind=WP)            :: c1, c2, c3, c4, cx1, cx2, cx3, cx4, entries2(3)
+    real(kind=WP)            :: c1, c2, c3, c4, cx1, cx2, cx3, cx4, cx5, entries2(3)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
@@ -1344,12 +1475,18 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
         rhs_temp(row)=0.0_WP
 #endif
+#if defined (__seaice_tracers)
+        rhs_tr_ice(row)=0.0_WP
+#endif /* (__seaice_tracers) */
         rhs_mdiv(row)=0.0_WP
         rhs_adiv(row)=0.0_WP
         rhs_msdiv(row)=0.0_WP
 #if defined (__oifs) || defined (__ifsinterface)
         rhs_tempdiv(row)=0.0_WP
 #endif
+#if defined (__seaice_tracers)
+        rhs_tr_icediv(row)=0.0_WP
+#endif /* (__seaice_tracers) */
     end do
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
@@ -1405,6 +1542,9 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
             cx4=vol*ice%ice_dt*c4*(sum(ice_temp(elnodes))+ice_temp(elnodes(n))+sum(entries2*ice_temp(elnodes)))/12.0_WP
 #endif
+#if defined (__oifs) || defined (__ifsinterface)
+            cx5=vol*ice%ice_dt*c4*(sum(tr_ice(elnodes))+tr_ice(elnodes(n))+sum(entries2*tr_ice(elnodes)))/12.0_WP
+#endif
 
             !___________________________________________________________________
 #ifndef ENABLE_OPENACC
@@ -1440,6 +1580,14 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
             rhs_temp(row)=rhs_temp(row)+tmp_sum+cx4
 #endif
 
+#if defined (__seaice_tracers)
+            tmp_sum = sum(entries*tr_ice(elnodes))
+#if !defined(DISABLE_OPENACC_ATOMICS)
+            !$ACC ATOMIC UPDATE
+#endif
+            rhs_tr_ice(row)=rhs_tr_ice(row)+tmp_sum+cx4
+#endif /* (__seaice_tracers) */
+
             !___________________________________________________________________
 #if !defined(DISABLE_OPENACC_ATOMICS)
             !$ACC ATOMIC UPDATE
@@ -1459,6 +1607,14 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
 #endif
             rhs_tempdiv(row)=rhs_tempdiv(row)-cx4
 #endif /* (__oifs) */
+
+#if defined (__seaice_tracers)
+#if !defined(DISABLE_OPENACC_ATOMICS)
+            !$ACC ATOMIC UPDATE
+#endif
+            rhs_tr_icediv(row)=rhs_tr_icediv(row)-cx5
+#endif /* (__seaice_tracers) */
+
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
                 call omp_unset_lock(partit%plock(row))
@@ -1559,6 +1715,9 @@ subroutine ice_update_for_div(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
         dm_temp(row)=rhs_tempdiv(row)/area(1,row)
 #endif
+#if defined (__seaice_tracers)
+        dtr_ice(row) =rhs_tr_icediv(row) /area(1,row)
+#endif /* (__seaice_tracers) */
     end do
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
@@ -1571,6 +1730,9 @@ subroutine ice_update_for_div(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     call exchange_nod(dm_temp, partit, luse_g2g = .true.)
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+    call exchange_nod(dtr_ice, partit, luse_g2g = .true.)
+#endif /* (__seaice_tracers) */
 #ifndef ENABLE_OPENACC
 !$OMP BARRIER
 #endif
@@ -1606,6 +1768,10 @@ subroutine ice_update_for_div(ice, partit, mesh)
             rhs_new     = rhs_tempdiv(row) - sum(mass_matrix(clo:clo2)*dm_temp(location(1:cn)))
             m_templ(row)= dm_temp(row)+rhs_new/area(1,row)
 #endif
+#if defined (__seaice_tracers)
+            rhs_new=rhs_tr_icediv(row) - sum(mass_matrix(clo:clo2)*dtr_ice(location(1:cn)))
+            tr_icel(row)=dtr_ice(row)+rhs_new/area(1,row)
+#endif /* (__seaice_tracers) */
         end do
 #ifndef ENABLE_OPENACC
 !$OMP END DO
@@ -1627,6 +1793,9 @@ subroutine ice_update_for_div(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
             dm_temp(row) = m_templ(row)
 #endif
+#if defined (__seaice_tracers)
+            dtr_ice(row)=tr_icel(row)
+#endif /* (__seaice_tracers) */
         end do
 #ifndef ENABLE_OPENACC
 !$OMP END DO
@@ -1640,6 +1809,9 @@ subroutine ice_update_for_div(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
         call exchange_nod(dm_temp, partit, luse_g2g = .true.)
 #endif /* (__oifs) */
+#if defined (__seaice_tracers)
+        call exchange_nod(dtr_ice, partit, luse_g2g = .true.)
+#endif /* (__seaice_tracers) */
 #ifndef ENABLE_OPENACC
 !$OMP BARRIER
 #endif
@@ -1657,6 +1829,10 @@ subroutine ice_update_for_div(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
        ice_temp(row)= ice_temp(row)+dm_temp(row)
 #endif
+#if defined (__seaice_tracers)
+       tr_ice(row)= tr_ice(row)+dtr_ice(row)
+#endif /* (__seaice_tracers) */
+
     end do
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
