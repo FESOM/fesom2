@@ -110,6 +110,9 @@ subroutine ice_TG_rhs(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     real(kind=WP), dimension(:), pointer  :: ice_temp, rhs_temp
 #endif
+#if defined (__seaice_tracers)
+    real(kind=WP), dimension(:), pointer  :: tr_ice, rhs_tr_ice
+#endif
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -125,6 +128,10 @@ subroutine ice_TG_rhs(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     ice_temp => ice%data(4)%values(:)
     rhs_temp => ice%data(4)%values_rhs(:)
+#endif
+#if defined (__seaice_tracers)
+    tr_ice     => ice%data(6)%values(:)
+    rhs_tr_ice => ice%data(6)%values_rhs(:)
 #endif
     !___________________________________________________________________________
     ! Taylor-Galerkin (Lax-Wendroff) rhs
@@ -273,6 +280,9 @@ subroutine ice_solve_low_order(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     real(kind=WP), dimension(:), pointer  :: ice_temp, rhs_temp, m_templ
 #endif
+#if defined (__seaice_tracers)
+    real(kind=WP), dimension(:), pointer  :: tr_ice, rhs_tr_ice, tr_icel
+#endif
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -291,6 +301,11 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     ice_temp     => ice%data(4)%values(:)
     rhs_temp     => ice%data(4)%values_rhs(:)
     m_templ      => ice%data(4)%valuesl(:)
+#endif
+#if defined (__seaice_tracers)
+    tr_ice       => ice%data(6)%values(:)
+    rhs_tr_ice   => ice%data(6)%values_rhs(:)
+    tr_icel      => ice%data(6)%valuesl(:)
 #endif
     !___________________________________________________________________________
     gamma=ice%ice_gamma_fct         ! Added diffusivity parameter
@@ -369,6 +384,9 @@ subroutine ice_solve_high_order(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     real(kind=WP), dimension(:), pointer  :: rhs_temp, m_templ, dm_temp
 #endif
+#if defined (__seaice_tracers)
+    real(kind=WP), dimension(:), pointer  :: tr_ice, tr_icel, dtr_ice
+#endif
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -387,6 +405,11 @@ subroutine ice_solve_high_order(ice, partit, mesh)
     rhs_temp     => ice%data(4)%values_rhs(:)
     m_templ      => ice%data(4)%valuesl(:)
     dm_temp      => ice%data(4)%dvalues(:)
+#endif
+#if defined (__seaice_tracers)
+    tr_ice       => ice%data(6)%values(:)
+    tr_icel      => ice%data(6)%valuesl(:)
+    dtr_ice      => ice%data(6)%dvalues(:)
 #endif
     !___________________________________________________________________________
     ! Does Taylor-Galerkin solution
@@ -520,6 +543,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     real(kind=WP), dimension(:)  , pointer  :: ice_temp, m_templ, dm_temp
 #endif
+#if defined (__seaice_tracers)
+    real(kind=WP), dimension(:), pointer  :: tr_ice, tr_icel, dtr_ice
+#endif
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -542,6 +568,11 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     ice_temp  => ice%data(4)%values(:)
     m_templ   => ice%data(4)%valuesl(:)
     dm_temp   => ice%data(4)%dvalues(:)
+#endif
+#if defined (__seaice_tracers)
+    tr_ice    => ice%data(6)%values(:)
+    tr_icel   => ice%data(6)%valuesl(:)
+    dtr_ice   => ice%data(6)%dvalues(:)
 #endif
     !___________________________________________________________________________
     ! It should coinside with gamma in ts_solve_low_order
@@ -1268,6 +1299,9 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     real(kind=WP), dimension(:), pointer  :: ice_temp, rhs_temp, rhs_tempdiv
 #endif
+#if defined (__seaice_tracers)
+    real(kind=WP), dimension(:), pointer  :: tr_ice, rhs_tr_ice, rhs_tr_icediv
+#endif
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -1287,6 +1321,11 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
     ice_temp    => ice%data(4)%values(:)
     rhs_temp    => ice%data(4)%values_rhs(:)
     rhs_tempdiv => ice%data(4)%values_div_rhs(:)
+#endif
+#if defined (__seaice_tracers)
+    tr_ice        => ice%data(6)%values(:)
+    rhs_tr_ice    => ice%data(6)%values_rhs(:)
+    rhs_tr_icediv => ice%data(6)%values_div_rhs(:)
 #endif
     !___________________________________________________________________________
     ! Computes the rhs in a Taylor-Galerkin way (with upwind type of
@@ -1469,6 +1508,9 @@ subroutine ice_update_for_div(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     real(kind=WP), dimension(:), pointer  :: ice_temp, m_templ, dm_temp, rhs_tempdiv
 #endif
+#if defined (__seaice_tracers)
+    real(kind=WP), dimension(:), pointer  :: tr_ice, tr_icel, dtr_ice, rhs_tr_icediv
+#endif
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -1491,6 +1533,12 @@ subroutine ice_update_for_div(ice, partit, mesh)
     m_templ      => ice%data(4)%valuesl(:)
     dm_temp      => ice%data(4)%dvalues(:)
     rhs_tempdiv  => ice%data(4)%values_div_rhs(:)
+#endif
+#if defined (__seaice_tracers)
+    tr_ice        => ice%data(6)%values(:)
+    tr_icel       => ice%data(6)%valuesl(:)
+    dtr_ice       => ice%data(6)%dvalues(:)
+    rhs_tr_icediv => ice%data(6)%values_div_rhs(:)
 #endif
     !___________________________________________________________________________
     ! Does Taylor-Galerkin solution
