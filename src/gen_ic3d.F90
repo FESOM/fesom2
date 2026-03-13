@@ -506,6 +506,7 @@ CONTAINS
       real(kind=WP)                           :: locDINmax, locDINmin, locDICmax, locDICmin, locAlkmax !OG
       real(kind=WP)                           :: locAlkmin, locDSimax, locDSimin, locDFemax, locDFemin
       real(kind=WP)                           :: locO2min,  locO2max
+      real(kind=WP)                           :: locDICremax, locDICremin ! DICremin tracer (added by Sina)
 
 
       if (partit%mype==0) write(*,*) "Start: Initial conditions  for tracers"
@@ -582,6 +583,8 @@ CONTAINS
         locDFemin = locDINmin
         locO2max  = locDINmax
         locO2min  = locDINmin
+        locDICremax = locDINmax ! DICremin tracer (added by Sina)
+        locDICremin = locDINmin
 #endif
       do n=1, partit%myDim_nod2d
         locTmax = max(locTmax,maxval(tracers%data(1)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
@@ -602,6 +605,8 @@ CONTAINS
         locDFemin = min(locDFemin,minval(tracers%data(21)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
         locO2max  = max(locO2max,maxval(tracers%data(24)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
         locO2min  = min(locO2min,minval(tracers%data(24)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+        locDICremax = max(locDICremax,maxval(tracers%data(39)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) ) ! DICremin tracer (added by Sina)
+        locDICremin = min(locDICremin,minval(tracers%data(39)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
 #endif
       end do
       call MPI_AllREDUCE(locTmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
@@ -640,6 +645,11 @@ CONTAINS
       if (partit%mype==0) write(*,*) '  |-> gobal max init. O2. =', glo
       call MPI_AllREDUCE(locO2min , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  `-> gobal min init. O2. =', glo
+      call MPI_AllREDUCE(locDICremax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+      if (partit%mype==0) write(*,*) '  |-> gobal max init. DICremin. =', glo
+      call MPI_AllREDUCE(locDICremin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+      if (partit%mype==0) write(*,*) '  |-> gobal min init. DICremin. =', glo
+
 #endif
    END SUBROUTINE do_ic3d
     

@@ -3076,7 +3076,7 @@ CASE ('otracers  ')
          endif
 
       ! =====================================================================
-      ! Tracer IDs 1035-1036: Only in FULL model configuration
+      ! Tracer IDs 1035-1037: Only in FULL model configuration
       ! These are Microzooplankton tracers
       ! =====================================================================
       else if (tracers%data(j)%ID==1035) then
@@ -3090,15 +3090,22 @@ CASE ('otracers  ')
          ! Full model: This is Microzooplankton Carbon
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Zoo3C', 'Microzooplankton Carbon', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
+
+      else if (tracers%data(j)%ID==1037) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DICremin', 'DICremin', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)     ! DICremin tracer (added by Sina)
+         endif
+
       ! =====================================================================
-      ! Tracer ID 1037: Only in FULL model configuration with rivers
+      ! Tracer ID 1038: Only in FULL model configuration with rivers ! Sina: ID increased from 1037 to 1038
       ! This is Terrestrial DOC
       ! =====================================================================
-      else if (tracers%data(j)%ID==1037) then
+      else if (tracers%data(j)%ID==1038) then
          if (use_REcoM .and. enable_coccos .and. enable_3zoo2det .and. useRivers) then
          ! Full model with rivers: This is Terrestrial DOC
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DOCt', 'Terrestrial Dissolved Organic Carbon', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         endif
+
       else
 #endif
 

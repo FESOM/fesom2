@@ -112,7 +112,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     PhyCalc, & ! [mmol/m3] Phytoplankton calcite
     DetCalc, & ! [mmol/m3] Detrital calcite
     FreeFe,  & ! [mmol/m3] Free iron
-    O2         ! [mmol/m3] Dissolved oxygen
+    O2,      & ! [mmol/m3] Dissolved oxygen
+    DICremin   ! tracer for DIC remineralization (for tracking as diagnostic (added by Sina)
 
 ! Coccolithophore variables (conditionally used based on namelist)
 real(kind=8) :: &
@@ -412,11 +413,13 @@ real(kind=8) :: &
             !   DIC : Dissolved inorganic carbon (CO2 + HCO3- + CO3--) [mmolC m-3]
             !   ALK : Total alkalinity [meq m-3]
             !   O2  : Dissolved oxygen [mmolO2 m-3]
+            !   DICremin : Tracer for DIC remineralization (added by Sina)
             !-----------------------------------------------------------------------
 
             DIC = max(tiny, state(k, idic) + sms(k, idic))
             ALK = max(tiny, state(k, ialk) + sms(k, ialk))
             O2  = max(tiny, state(k, ioxy) + sms(k, ioxy))
+            DICremin = max(tiny, state(k, idicremin) + sms(k, idicremin))
 
             !-----------------------------------------------------------------------
             ! DISSOLVED ORGANIC MATTER
@@ -671,7 +674,7 @@ real(kind=8) :: &
             ! Small Phytoplankton Quotas
             !===============================================================================
             ! Calculates stoichiometric ratios for the small phytoplankton functional type.
-            ! Represents diverse group of small flagellates and picophytoplankton.
+
             !
             ! Variables:
             !   quota           : Nitrogen:Carbon quota [mmolN mmolC-1]
@@ -7209,6 +7212,16 @@ real(kind=8) :: &
             endif ! Diags
 
         end do ! Main vertikal loop ends
+
+
+        !===============================================================================
+        ! 37. DIC remineralzation tracer to track remineralization as an diagnostics
+        !===============================================================================
+        !   idicremin       : Tracer for remineralization diagnostics (added by Sina)
+        sms(k,idicremin) = (                  &
+            + rho_c1 * arrFunc * O2Func * EOC &
+            ) * dt_b + sms(k,idicremin)
+
 
         !===============================================================================
         ! BENTHIC REMINERALIZATION
