@@ -806,7 +806,11 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 
 !< *** Grazing efficiency ***
 !< **************************
-            grazEff = gfin + 1/(0.2*food + 2)
+            if (REcoM_Grazing_Variable_Efficiency) then
+                    grazEff = gfin + 1/(0.2*food + 2)
+            else
+                    grazEff = gfin
+            end if
 
             grazingFluxcarbon_mes = (grazingFlux_phy   * recipQuota       * grazEff)   &
                                   + (grazingFlux_Dia   * recipQuota_Dia   * grazEff)   

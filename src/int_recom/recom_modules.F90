@@ -121,6 +121,7 @@ module recom_config
   Integer                :: biostep               = 1          ! Number of times biology should be stepped forward for each time step		 
   Logical                :: REcoM_Geider_limiter  = .false.              ! Decides what routine should be used to calculate limiters in sms
   Logical                :: REcoM_Grazing_Variable_Preference = .true.  ! Decides if grazing should have preference for phyN or DiaN
+  Logical                :: REcoM_Grazing_Variable_Efficiency = .true.  ! allowes grazing efficiency to vary with food availability 
   Logical                :: Grazing_detritus      = .false.    ! Decides grazing on detritus                            
   Logical                :: het_resp_noredfield   = .true.     ! Decides respiratation of copepods              
   Logical                :: diatom_mucus          = .true.           ! Effect of nutrient limitation on the aggregation
@@ -169,7 +170,7 @@ module recom_config
                        VDet,                              VDet_zoo2,                                      &
                        VPhy,                              VDia,                  VCocco,                  &
                        allow_var_sinking,                 biostep,               REcoM_Geider_limiter,    &
-                       REcoM_Grazing_Variable_Preference,                                                 &
+                       REcoM_Grazing_Variable_Preference, REcoM_Grazing_Variable_Efficiency,              &
                        Grazing_detritus,        &
                                                                                  het_resp_noredfield,     &
                        diatom_mucus,                                                                      &
