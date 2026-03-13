@@ -806,11 +806,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 
 !< *** Grazing efficiency ***
 !< **************************
-            if (REcoM_Grazing_Variable_Efficiency) then
-                    grazEff = gfin + 1/(0.2*food + 2)
-            else
-                    grazEff = gfin
-            end if
+            grazEff = gfin + 1/(0.2*food + 2)
 
             grazingFluxcarbon_mes = (grazingFlux_phy   * recipQuota       * grazEff)   &
                                   + (grazingFlux_Dia   * recipQuota_Dia   * grazEff)   
@@ -2266,6 +2262,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         else
 !         "Abiotic" DIC_14, identical to DIC except for radioactive decay (->
 !         recom_forcing)
+!YY: change of DIC14 equal to that of DIC, why?
           sms(k,idic_14) = sms(k,idic)
         end if ! ciso_organic_14
       end if   ! ciso_14
