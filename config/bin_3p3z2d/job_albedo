@@ -1,16 +1,15 @@
 #!/bin/bash
-#SBATCH --account=nwg_hauck.maresys # edit your account
-#SBATCH --job-name=recom
+#SBATCH --account=nwg_maresys.maresys
+#SBATCH --job-name=3p3z2d
 #SBATCH --partition=mpp
-#SBATCH --time=01:30:00
-####SBATCH --constraint="[rack1|rack3]"
+#SBATCH -N 9
+#SBATCH --cpus-per-task=1
+#SBATCH --time=08:00:00
 #SBATCH --qos=12h
-#SBATCH --nodes=9            # Number of tasks (MPI) tasks to be launched
-#SBATCH --tasks-per-node 96 #8 #4  # using all 128CPus we exceed the maxload limit (>130) of many used nodes when us parallel I/O
-#SBATCH --cpus-per-task 1
+#SBATCH --tasks-per-node 96  # using all 128CPus we exceed the maxload limit (>130) of many used nodes when us parallel I/O
 
-#SBATCH -o fesom2o.out
-#SBATCH -e fesom2e.out
+#SBATCH -o slurm-out.out
+#SBATCH -e slurm-err.out
 
 # disable hyperthreading
 #SBATCH --hint=nomultithread
@@ -24,34 +23,32 @@ ulimit -s unlimited
 JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
 
 ln -s ../bin/fesom.x .           # cp -n ../bin/fesom.x
-cp -n ../config/namelist.config  .
-cp -n ../config/namelist.forcing .
-cp -n ../config/namelist.oce     .
-cp -n ../config/namelist.dyn     .
-cp -n ../config/namelist.tra     .
-cp -n ../config/namelist.ice     .
-cp -n ../config/namelist.io      .
-cp -n ../config/namelist.icepack .
+#cp -n ../config/namelist.config  .
+#cp -n ../config/namelist.forcing .
+#cp -n ../config/namelist.oce     .
+#cp -n ../config/namelist.dyn     .
+#cp -n ../config/namelist.tra     .
+#cp -n ../config/namelist.ice     .
+#cp -n ../config/namelist.io      .
+#cp -n ../config/namelist.icepack .
 
 #___DETERMINE SLURM JOBID+OUTPUTFILE____________________________________________
 jobid=$(echo $SLURM_JOB_ID | cut -d"." -f1)
-fname="fesom2_${SLURM_JOB_NAME}_${jobid}.out"
+fname="fesom2.0.out"
 
 #___PUT JOB IN QUEUE____________________________________________________________
 date
-####srun --mpi=pmi2 ./fesom.x >> ${fname}
 srun --mpi=pmi2 ./fesom.x > fesom2.0.out
 date
 
 #qstat -f $PBS_JOBID
 #export EXITSTATUS=$?
 #if [ ${EXITSTATUS} -eq 0 ] || [ ${EXITSTATUS} -eq 127 ] ; then
-#sbatch job_ollie
+#sbatch job_albedo
 #fi
 
-#Resultpath='/albedo/scratch/user/ogurses/ocean_only/'
-Resultpath='/albedo/scratch/user/ogurses/fesom2.5_recom_st1_vsink_vben_diags_3Zoo2Det_coccos/'
-test -d $Resultpath/fesom.2019.oce.restart && exit
+Resultpath='/albedo/work/user/...'
+test -e $Resultpath/fesom.2019.oce.restart && exit
 
 IsInFile=$( tail -3 fesom2.0.out | grep -c timesteps)
 if (( IsInFile > 0 )); then
