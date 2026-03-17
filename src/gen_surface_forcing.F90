@@ -1715,7 +1715,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
                 call par_ex(MPI_COMM_FESOM, mype)
                 stop
             endif
-	
+        
             ! data
             allocate(ncdata(12))
             status=nf90_inq_varid(ncid, CO2vari, varid)
