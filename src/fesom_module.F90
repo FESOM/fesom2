@@ -805,7 +805,7 @@ contains
     use mpp_io
 #endif
     ! EO parameters
-    real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
+    real(kind=real32) :: mean_rtime(16), max_rtime(16), min_rtime(16)
     integer           :: tr_num
     
     ! Start finalization profiling
@@ -876,37 +876,38 @@ contains
     endif
 
     mean_rtime(1)  = rtime_oce         
-    mean_rtime(2)  = rtime_oce_mixpres 
-    mean_rtime(3)  = rtime_oce_dyn     
-    mean_rtime(4)  = rtime_oce_dynssh  
-    mean_rtime(5)  = rtime_oce_solvessh
-    mean_rtime(6)  = rtime_oce_GMRedi  
-    mean_rtime(7)  = rtime_oce_solvetra
-    mean_rtime(8)  = rtime_ice         
-    mean_rtime(9)  = rtime_tot  
-    mean_rtime(10) = f%rtime_fullice - f%rtime_read_forcing 
-    mean_rtime(11) = f%rtime_compute_diag
-    mean_rtime(12) = f%rtime_write_means
-    mean_rtime(13) = f%rtime_write_restart
-    mean_rtime(14) = f%rtime_read_forcing
+    mean_rtime(2)  = rtime_oce_presdens 
+    mean_rtime(3)  = rtime_oce_mixing 
+    mean_rtime(4)  = rtime_oce_dyn     
+    mean_rtime(5)  = rtime_oce_dynssh  
+    mean_rtime(6)  = rtime_oce_solvessh
+    mean_rtime(7)  = rtime_oce_GMRedi  
+    mean_rtime(8)  = rtime_oce_solvetra
+    mean_rtime(9)  = rtime_ice         
+    mean_rtime(10)  = rtime_tot  
+    mean_rtime(11) = f%rtime_fullice - f%rtime_read_forcing 
+    mean_rtime(12) = f%rtime_compute_diag
+    mean_rtime(13) = f%rtime_write_means
+    mean_rtime(14) = f%rtime_write_restart
+    mean_rtime(15) = f%rtime_read_forcing
 #if defined (__recom)
-    mean_rtime(15) = f%rtime_compute_recom
+    mean_rtime(16) = f%rtime_compute_recom
 #endif
-    max_rtime(1:14) = mean_rtime(1:14)
-    min_rtime(1:14) = mean_rtime(1:14)
+    max_rtime(1:15) = mean_rtime(1:15)
+    min_rtime(1:15) = mean_rtime(1:15)
 #if defined (__recom)
-    max_rtime(15) = mean_rtime(15)
-    min_rtime(15) = mean_rtime(15)
-    call MPI_AllREDUCE(MPI_IN_PLACE, mean_rtime(15), 1, MPI_REAL, MPI_SUM, f%MPI_COMM_FESOM, f%MPIerr)
-    mean_rtime(15) = mean_rtime(15) / real(f%npes,real32)
-    call MPI_AllREDUCE(MPI_IN_PLACE, max_rtime(15),  1, MPI_REAL, MPI_MAX, f%MPI_COMM_FESOM, f%MPIerr)
-    call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime(15),  1, MPI_REAL, MPI_MIN, f%MPI_COMM_FESOM, f%MPIerr)
+    max_rtime(16) = mean_rtime(16)
+    min_rtime(16) = mean_rtime(16)
+    call MPI_AllREDUCE(MPI_IN_PLACE, mean_rtime(16), 1, MPI_REAL, MPI_SUM, f%MPI_COMM_FESOM, f%MPIerr)
+    mean_rtime(16) = mean_rtime(16) / real(f%npes,real32)
+    call MPI_AllREDUCE(MPI_IN_PLACE, max_rtime(16),  1, MPI_REAL, MPI_MAX, f%MPI_COMM_FESOM, f%MPIerr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime(16),  1, MPI_REAL, MPI_MIN, f%MPI_COMM_FESOM, f%MPIerr)
 #endif
 
-    call MPI_AllREDUCE(MPI_IN_PLACE, mean_rtime, 14, MPI_REAL, MPI_SUM, f%MPI_COMM_FESOM, f%MPIerr)
-    mean_rtime(1:14) = mean_rtime(1:14) / real(f%npes,real32)
-    call MPI_AllREDUCE(MPI_IN_PLACE, max_rtime,  14, MPI_REAL, MPI_MAX, f%MPI_COMM_FESOM, f%MPIerr)
-    call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime,  14, MPI_REAL, MPI_MIN, f%MPI_COMM_FESOM, f%MPIerr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, mean_rtime, 15, MPI_REAL, MPI_SUM, f%MPI_COMM_FESOM, f%MPIerr)
+    mean_rtime(1:15) = mean_rtime(1:15) / real(f%npes,real32)
+    call MPI_AllREDUCE(MPI_IN_PLACE, max_rtime,  15, MPI_REAL, MPI_MAX, f%MPI_COMM_FESOM, f%MPIerr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime,  15, MPI_REAL, MPI_MIN, f%MPI_COMM_FESOM, f%MPIerr)
     
 #if defined (__oifs) 
     ! OpenIFS coupled version has to call oasis_terminate through par_ex
@@ -930,21 +931,22 @@ contains
 
         print 41, '___MODEL RUNTIME per task [seconds]','_____mean_','___________min_', '___________max_'
         print 42, '  runtime ocean:              ',    mean_rtime(1),     min_rtime(1),      max_rtime(1)
-        print 42, '    > runtime oce. mix,pres. :',    mean_rtime(2),     min_rtime(2),      max_rtime(2)
-        print 42, '    > runtime oce. dyn. u,v,w:',    mean_rtime(3),     min_rtime(3),      max_rtime(3)
-        print 42, '    > runtime oce. dyn. ssh  :',    mean_rtime(4),     min_rtime(4),      max_rtime(4)
-        print 42, '    > runtime oce. solve ssh :',    mean_rtime(5),     min_rtime(5),      max_rtime(5)
-        print 42, '    > runtime oce. GM/Redi   :',    mean_rtime(6),     min_rtime(6),      max_rtime(6)
-        print 42, '    > runtime oce. tracer    :',    mean_rtime(7),     min_rtime(7),      max_rtime(7)
-        print 42, '  runtime ice  :              ',    mean_rtime(10),    min_rtime(10),     max_rtime(10)
-        print 42, '    > runtime ice step :      ',    mean_rtime(8),     min_rtime(8),      max_rtime(8)
-        print 42, '  runtime diag:               ',    mean_rtime(11),    min_rtime(11),     max_rtime(11)
-        print 42, '  runtime output:             ',    mean_rtime(12),    min_rtime(12),     max_rtime(12)
-        print 42, '  runtime restart:            ',    mean_rtime(13),    min_rtime(13),     max_rtime(13)
-        print 42, '  runtime forcing:            ',    mean_rtime(14),    min_rtime(14),     max_rtime(14)
-        print 42, '  runtime total (ice+oce):    ',    mean_rtime(9),     min_rtime(9),      max_rtime(9)
+        print 42, '    > runtime oce. pres.,dens:',    mean_rtime(2),     min_rtime(2),      max_rtime(2)
+        print 42, '    > runtime oce. mixing    :',    mean_rtime(3),     min_rtime(3),      max_rtime(3)
+        print 42, '    > runtime oce. dyn. u,v,w:',    mean_rtime(4),     min_rtime(4),      max_rtime(4)
+        print 42, '    > runtime oce. dyn. ssh  :',    mean_rtime(5),     min_rtime(5),      max_rtime(5)
+        print 42, '    > runtime oce. solve ssh :',    mean_rtime(6),     min_rtime(6),      max_rtime(6)
+        print 42, '    > runtime oce. GM/Redi   :',    mean_rtime(7),     min_rtime(7),      max_rtime(7)
+        print 42, '    > runtime oce. tracer    :',    mean_rtime(8),     min_rtime(8),      max_rtime(8)
+        print 42, '  runtime ice  :              ',    mean_rtime(11),    min_rtime(11),     max_rtime(11)
+        print 42, '    > runtime ice step :      ',    mean_rtime(9),     min_rtime(9),      max_rtime(9)
+        print 42, '  runtime diag:               ',    mean_rtime(12),    min_rtime(12),     max_rtime(12)
+        print 42, '  runtime output:             ',    mean_rtime(13),    min_rtime(13),     max_rtime(13)
+        print 42, '  runtime restart:            ',    mean_rtime(14),    min_rtime(14),     max_rtime(14)
+        print 42, '  runtime forcing:            ',    mean_rtime(15),    min_rtime(15),     max_rtime(15)
+        print 42, '  runtime total (ice+oce):    ',    mean_rtime(10),    min_rtime(10),      max_rtime(10)
 #if defined (__recom)
-        print 42, '  runtime recom:              ',    mean_rtime(15),    min_rtime(15),     max_rtime(15)
+        print 42, '  runtime recom:              ',    mean_rtime(16),    min_rtime(16),     max_rtime(16)
 #endif
 
         43 format (a33,i15)        !Format Ncores

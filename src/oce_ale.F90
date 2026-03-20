@@ -3357,7 +3357,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     type(t_mesh)  , intent(inout), target :: mesh
     type(t_ice)   , intent(inout), target :: ice
     !___________________________________________________________________________
-    real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, loc, glo
+    real(kind=8)      :: t0, t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, t11, loc, glo
     integer           :: node
     integer           :: nz, elem, nzmin, nzmax !for KE diagnostic
     !___________________________________________________________________________
@@ -3368,17 +3368,16 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     eta_n => dynamics%eta_n(:)
-    
-    !___________________________________________________________________________
-    t0=MPI_Wtime()
 !PS     water_flux = 0.0_WP
 !PS     heat_flux  = 0.0_WP
 !PS     stress_surf= 0.0_WP
 !PS     stress_node_surf= 0.0_WP
-
+    !___________________________________________________________________________
+    t0=MPI_Wtime()
 #if defined (FESOM_PROFILING)
-    call fesom_profiler_start("oce_mix_pres")
+    call fesom_profiler_start("oce_pressure_density")
 #endif
+
     !___________________________________________________________________________
     ! calculate equation of state, density, pressure and mixed layer depths
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call pressure_bv'//achar(27)//'[0m'
@@ -3413,6 +3412,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
  
     !___________________________________________________________________________
     call status_check(partit)
+    
+    t1 = MPI_Wtime()
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("oce_pressure_density")
+    call fesom_profiler_start("oce_mixing_scheme")
+#endif
+    
     !___________________________________________________________________________
     ! >>>>>>                                                             <<<<<<
     ! >>>>>>    calculate vertical mixing coefficients for tracer (Kv)   <<<<<<
@@ -3500,9 +3506,10 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         
     end if
 #endif    
-    t1=MPI_Wtime()
+    
+    t2=MPI_Wtime()
 #if defined (FESOM_PROFILING)
-    call fesom_profiler_end("oce_mix_pres")
+    call fesom_profiler_end("oce_mixing_scheme")
     call fesom_profiler_start("oce_dyn_momentum")
 #endif
     
@@ -3632,7 +3639,8 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
             end do
         end if 
     end if
-    t2=MPI_Wtime()
+    
+    t3=MPI_Wtime()
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("oce_dyn_momentum")
     call fesom_profiler_start("oce_ssh_solve")
@@ -3660,10 +3668,10 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
             if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call relax_zonal_vel'//achar(27)//'[0m'
             call relax_zonal_vel(dynamics, partit, mesh)
         end if     
-        t3=MPI_Wtime()
+        t4=MPI_Wtime()
 #if defined (FESOM_PROFILING)
-    call fesom_profiler_end("oce_ssh_solve")
-    call fesom_profiler_start("oce_vel_update")
+        call fesom_profiler_end("oce_ssh_solve")
+        call fesom_profiler_start("oce_vel_update")
 #endif 
 
         ! estimate new horizontal velocity u^(n+1)
@@ -3673,10 +3681,10 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         call update_vel(dynamics, partit, mesh)
         
         ! --> eta_(n) --> eta_(n+1) = eta_(n) + deta = eta_(n) + (eta_(n+1) + eta_(n))
-        t4=MPI_Wtime()
+        t5=MPI_Wtime()
 #if defined (FESOM_PROFILING)
-    call fesom_profiler_end("oce_vel_update")
-    call fesom_profiler_start("oce_hbar_calc")
+        call fesom_profiler_end("oce_vel_update")
+        call fesom_profiler_start("oce_hbar_calc")
 #endif 
         
         ! Update to hbar(n+3/2) and compute dhe to be used on the next step
@@ -3701,10 +3709,10 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
         ! --> eta_(n)
         ! call zero_dynamics !DS, zeros several dynamical variables; to be used for testing new implementations!
-        t5=MPI_Wtime()
+        t6=MPI_Wtime()
 #if defined (FESOM_PROFILING)
-    call fesom_profiler_end("oce_hbar_calc")
-    call fesom_profiler_start("oce_gm_redi")
+        call fesom_profiler_end("oce_hbar_calc")
+        call fesom_profiler_start("oce_gm_redi")
 #endif 
     
     !___________________________________________________________________________
@@ -3717,20 +3725,21 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         
         ! Do barotropic step, get eta_{n+1} and BT transport 
         call compute_BT_step_SE_ale(dynamics, partit, mesh)
-        t3=MPI_Wtime()
+        t4=MPI_Wtime()
 #if defined (FESOM_PROFILING)
-    call fesom_profiler_end("oce_ssh_solve")
-    call fesom_profiler_start("oce_vel_update")
-#endif        
+        call fesom_profiler_end("oce_ssh_solve")
+        call fesom_profiler_start("oce_vel_update")
+#endif   
+
         ! Trim U to be consistent with BT transport
         call update_trim_vel_ale_vtransp(1, dynamics, partit, mesh) 
-        t4=MPI_Wtime()
-        t5=t4
+        t5=MPI_Wtime()
+        t6=t5
 #if defined (FESOM_PROFILING)
-    call fesom_profiler_end("oce_vel_update")
-    call fesom_profiler_start("oce_hbar_calc")
-    call fesom_profiler_end("oce_hbar_calc")
-    call fesom_profiler_start("oce_gm_redi")
+        call fesom_profiler_end("oce_vel_update")
+        call fesom_profiler_start("oce_hbar_calc")
+        call fesom_profiler_end("oce_hbar_calc")
+        call fesom_profiler_start("oce_gm_redi")
 #endif
     end if ! --> if (.not. dynamics%use_ssh_se_subcycl) then
     
@@ -3747,7 +3756,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         call fer_solve_Gamma(partit, mesh)
         call fer_gamma2vel(dynamics, partit, mesh)
     end if
-    t6=MPI_Wtime()
+    t7=MPI_Wtime()
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("oce_gm_redi")
     call fesom_profiler_start("oce_vert_vel")
@@ -3777,7 +3786,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         end if 
         call compute_vert_vel_transpv(dynamics, partit, mesh)
     end if    
-    t7=MPI_Wtime()
+    t8=MPI_Wtime()
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("oce_vert_vel")
     call fesom_profiler_start("oce_tracer_solve")
@@ -3795,7 +3804,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! solve tracer equation
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call solve_tracers_ale'//achar(27)//'[0m'
     call solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
-    t8=MPI_Wtime()
+    t9=MPI_Wtime()
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("oce_tracer_solve")
     call fesom_profiler_start("oce_thickness_update")
@@ -3805,7 +3814,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! Update hnode=hnode_new, helem
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call update_thickness_ale'//achar(27)//'[0m'
     call update_thickness_ale(partit, mesh)
-    t9=MPI_Wtime()
+    t10=MPI_Wtime()
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("oce_thickness_update")
     call fesom_profiler_start("oce_blowup_check")
@@ -3833,37 +3842,39 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! togeather around 2.5% of model runtime
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call check_blowup'//achar(27)//'[0m'
     call check_blowup(n, ice, dynamics, tracers, partit, mesh)
-    t10=MPI_Wtime()
+    t11=MPI_Wtime()
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("oce_blowup_check")
 #endif
 
     !___________________________________________________________________________
     ! write out execution times for ocean step parts
-    rtime_oce          = rtime_oce + (t10-t0)-(t10-t9)
-    rtime_oce_mixpres  = rtime_oce_mixpres + (t1-t0)
-    rtime_oce_dyn      = rtime_oce_dyn + (t2-t1)+(t7-t6)+(t4-t3)
-    rtime_oce_dynssh   = rtime_oce_dynssh + (t3-t2)+(t5-t4)
-    rtime_oce_solvessh = rtime_oce_solvessh + (t3-t30)
-    rtime_oce_GMRedi   = rtime_oce_GMRedi + (t6-t5)
-    rtime_oce_solvetra = rtime_oce_solvetra + (t8-t7)
-    rtime_tot          = rtime_tot + (t10-t0)-(t10-t9)
+    rtime_oce          = rtime_oce          + (t11-t0)-(t11-t10)
+    rtime_oce_presdens = rtime_oce_presdens + (t1-t0)
+    rtime_oce_mixing   = rtime_oce_mixing   + (t2-t1)
+    rtime_oce_dyn      = rtime_oce_dyn      + (t3-t2)+(t8-t7)+(t5-t4)
+    rtime_oce_dynssh   = rtime_oce_dynssh   + (t4-t3)+(t6-t5)
+    rtime_oce_solvessh = rtime_oce_solvessh + (t4-t30)
+    rtime_oce_GMRedi   = rtime_oce_GMRedi   + (t7-t6)
+    rtime_oce_solvetra = rtime_oce_solvetra + (t9-t8)
+    rtime_tot          = rtime_tot          + (t11-t0)-(t11-t10)
     if(mod(n,logfile_outfreq)==0 .and. mype==0) then  
         write(*,*) '___ALE OCEAN STEP EXECUTION TIMES______________________'
-        write(*,"(A, ES10.3)") '     Oce. Mix,Press.. :', t1-t0
-        write(*,"(A, ES10.3)") '     Oce. Dynamics    :', t2-t1
-        write(*,"(A, ES10.3)") '     Oce. Update Vel. :', t4-t3
-        write(*,"(A, ES10.3)") '     Oce. Fer-GM.     :', t6-t5
+        write(*,"(A, ES10.3)") '     Oce. Press, Dens.:', t1-t0
+        write(*,"(A, ES10.3)") '     Oce. Mixing      :', t2-t1
+        write(*,"(A, ES10.3)") '     Oce. Dynamics    :', t3-t2
+        write(*,"(A, ES10.3)") '     Oce. Update Vel. :', t5-t4
+        write(*,"(A, ES10.3)") '     Oce. Fer-GM.     :', t7-t6
         write(*,*) '    _______________________________'
-        write(*,"(A, ES10.3)") '     ALE-Solve SSH    :', t3-t2
-        write(*,"(A, ES10.3)") '     ALE-Calc. hbar   :', t5-t4
-        write(*,"(A, ES10.3)") '     ALE-Update+W     :', t7-t6
-        write(*,"(A, ES10.3)") '     ALE-Solve Tracer :', t8-t7
-        write(*,"(A, ES10.3)") '     ALE-Update hnode :', t9-t8
+        write(*,"(A, ES10.3)") '     ALE-Solve SSH    :', t4-t3
+        write(*,"(A, ES10.3)") '     ALE-Calc. hbar   :', t6-t5
+        write(*,"(A, ES10.3)") '     ALE-Update+W     :', t8-t7
+        write(*,"(A, ES10.3)") '     ALE-Solve Tracer :', t9-t8
+        write(*,"(A, ES10.3)") '     ALE-Update hnode :', t10-t9
         write(*,*) '    _______________________________'
-        write(*,"(A, ES10.3)") '     check for blowup :', t10-t9
+        write(*,"(A, ES10.3)") '     check for blowup :', t11-t10
         write(*,*) '    _______________________________'
-        write(*,"(A, ES10.3)") '     Oce. TOTAL       :', t10-t0
+        write(*,"(A, ES10.3)") '     Oce. TOTAL       :', t11-t0
         write(*,*)
         write(*,*)
     end if    
