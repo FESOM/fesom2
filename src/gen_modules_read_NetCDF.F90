@@ -261,7 +261,8 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
     ! create interpolation coordinates
     ! do data interpolation on vertices
     if (do_onvert) then
-        num=myDim_nod2d+eDim_nod2d
+        !PSnum=myDim_nod2d+eDim_nod2d
+        num=size(model_2Darray,1)
         allocate(temp_x(num), temp_y(num))  
         do n=1, num
             temp_x(n)=geo_coord_nod2d(1,n)/rad              

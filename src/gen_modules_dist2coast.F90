@@ -37,7 +37,7 @@ module g_dist2coast
         real(kind=WP)                              :: bin_dlon=10.0*rad, bin_dlat=10.0*rad
         integer       , allocatable                :: bin_head(:,:), bin_next(:)
         integer                                    :: bin_nlon, bin_nlat
-        integer                                    :: elem, node, elnodes(3) 
+        integer                                    :: elem, node, elnodes(3), node_size, elem_size 
         real(kind=WP)                              :: lon_e, lat_e, lonr(3), xmin
         character(len=10)                          :: mode
         real(kind=WP)                              :: t0, t1, t2, t3
@@ -85,12 +85,14 @@ module g_dist2coast
                     write(*,*) '____________________________________________________________________'
                     print *, achar(27)//'[0m'
                     write(*,*)
-                end if 
+                end if
+            else 
+                elem_size = size(dist)
             end if 
             
             !___________________________________________________________________
             if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'          --> call nearest_coast_dist'//achar(27)//'[0m'
-            do elem = 1, partit%myDim_elem2D
+            do elem = 1, elem_size
                 elnodes = mesh%elem2d_nodes(:,elem)
                 lat_e = sum(mesh%geo_coord_nod2D(2,elnodes))/3.0_WP
                 
@@ -124,11 +126,13 @@ module g_dist2coast
                     print *, achar(27)//'[0m'
                     write(*,*)
                 end if 
+            else    
+                node_size = size(dist)
             end if 
             
             !___________________________________________________________________
             if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'          --> call nearest_coast_dist'//achar(27)//'[0m'
-            do node = 1, partit%myDim_nod2D
+            do node = 1, node_size
                 lat_e = mesh%geo_coord_nod2D(2,node) ! convert in degree
                 
                 ! do properly computing of elem centroid lon position across 
