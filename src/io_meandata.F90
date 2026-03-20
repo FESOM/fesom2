@@ -72,7 +72,7 @@ module io_MEANDATA
 !
 !--------------------------------------------------------------------------------------------
 !
-  type(Meandata), save, target   :: io_stream(200) ! todo: find a way to increase the array withhout move_alloc to keep the derived types in Meandata intact
+  type(Meandata), save, target   :: io_stream(250) ! todo: find a way to increase the array withhout move_alloc to keep the derived types in Meandata intact
   integer, save                  :: io_NSTREAMS=0
   real(kind=WP)                  :: ctime !current time in seconds from the beginning of the year
 !
@@ -533,6 +533,18 @@ CASE ('benCalc   ')
     if (use_REcoM) then
     call def_stream(nod2D,  myDim_nod2D,   'benCalc','Benthos calcite','mmol', Benthos(:,4), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
+
+!CASE ('denb      ')
+    ! Variable: denb
+    ! Description: Benthic denitrification rate
+    ! Function: Conversion of nitrate to N₂ gas in anoxic sediments
+    ! Process: NO₃⁻ → NO₂⁻ → NO → N₂O → N₂ (anaerobic respiration pathway)
+    ! Role: Permanent nitrogen loss from ocean; regulates ocean N inventory
+    ! Units: mmol/m² (millimoles per square meter)
+!    if (use_REcoM) then
+!    call def_stream(nod2D, myDim_nod2D, 'denb','Benthic denitrification rate', 'mmol/m2', DenitBen(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+!    end if
+
 ! ciso 
 CASE ('benC_13   ')
     if (use_REcoM) then
@@ -1111,6 +1123,37 @@ CASE ('otracers  ')
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN', 'Dissolved Inorganic Nitrogen', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
 
+         if (tracers%data(j)%ltra_diag) then
+               ! horizontal advection
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_hor_adv', 'Horizontal advection part of dissolved Inorganic N', '[mmol/m3/s]', tracers%work%tra_advhoriz(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! horizontal advection LO
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_lo_hor_adv', 'LO Horizontal advection part of dissolved Inorganic N', '[mmol/m3]', tracers%work%tra_advhoriz_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! vertical advection
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_ver_adv', 'Vertical advection part of dissolved Inorganic N', '[mmol/m3/s]', tracers%work%tra_advvert(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! vertical advection LO
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_lo_ver_adv', 'LO Vertical advection part of dissolved Inorganic N', '[mmol/m3]', tracers%work%tra_advvert_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! horizontal diffusion
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_tra_diff_part_hor_redi', 'Horizontal diffusion of dissolved Inorganic N (includes Redi diffusivity if Redi=.true.)', '[mmol/m3/s]', tracers%work%tra_diff_part_hor_redi(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               if (.not. tracers%data(j)%i_vert_diff) then
+               ! vertical diffusion (Explicit)
+                   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_tra_diff_part_ver_expl', 'Vertical diffusion of dissolved Inorganic N (Explicit)', '[mmol/m3/s]', tracers%work%tra_diff_part_ver_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+               end if
+
+               ! projection of horizontal Redi diffussivity onto vertical
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_tra_diff_part_ver_redi_expl', 'Projection of horizontal Redi diffussivity onto vertical for dissolved Inorganic N (Explicit)', '[mmol/m3/s]', tracers%work%tra_diff_part_ver_redi_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! vertical diffusion (Implicit)
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_tra_diff_part_ver_impl', 'Vertical diffusion of dissolved Inorganic N (Implicit)', '[mmol/m3/s]', tracers%work%tra_diff_part_ver_impl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! recom_sms
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN_recom_sms', 'Recom SMS', '[mmol/m3/s]', tracers%work%tra_recom_sms(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        endif
+
       else if (tracers%data(j)%ID==1002) then
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC', 'Dissolved Inorganic C', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -1119,8 +1162,14 @@ CASE ('otracers  ')
                ! horizontal advection
                call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_hor_adv', 'Horizontal advection part of dissolved Inorganic C', '[mmol/m3/s]', tracers%work%tra_advhoriz(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 
+               ! horizontal advection LO
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_lo_hor_adv', 'LO Horizontal advection part of dissolved Inorganic C', '[mmol/m3]', tracers%work%tra_advhoriz_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+               
                ! vertical advection
                call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_ver_adv', 'Vertical advection part of dissolved Inorganic C', '[mmol/m3/s]', tracers%work%tra_advvert(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! vertical advection LO
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_lo_ver_adv', 'LO Vertical advection part of dissolved Inorganic C', '[mmol/m3]', tracers%work%tra_advvert_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 
                ! horizontal diffusion
                call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_hor_redi', 'Horizontal diffusion of dissolved Inorganic C (includes Redi diffusivity if Redi=.true.)', '[mmol/m3/s]', tracers%work%tra_diff_part_hor_redi(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -1139,7 +1188,6 @@ CASE ('otracers  ')
                ! recom_sms
                call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_recom_sms', 'Recom SMS', '[mmol/m3/s]', tracers%work%tra_recom_sms(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
             end if
-
          endif
 
       else if (tracers%data(j)%ID==1003) then
@@ -1149,8 +1197,10 @@ CASE ('otracers  ')
             if (tracers%data(j)%ltra_diag) then ! OG - tra_diag
                ! horizontal advection
                call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_hor_adv', 'Horizontal advection part of Total Alkalinity', '[mmol/m3]', tracers%work%tra_advhoriz(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-                ! horizontal advection LO
+               
+               ! horizontal advection LO
                call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_lo_hor_adv', 'LO Horizontal advection part of Total Alkalinity', '[mmol/m3]', tracers%work%tra_advhoriz_LO(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+               
                ! vertical advection
                call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Alk_ver_adv', 'Vertical advection part of Total Alkalinity', '[mmol/m3]', tracers%work%tra_advvert(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 
@@ -1546,7 +1596,7 @@ CASE ('otracers  ')
          endif
 
       ! =====================================================================
-      ! Tracer IDs 1035-1036: Only in FULL model configuration
+      ! Tracer IDs 1035-1037: Only in FULL model configuration
       ! These are Microzooplankton tracers
       ! =====================================================================
       else if (tracers%data(j)%ID==1035) then
@@ -1567,14 +1617,14 @@ CASE ('otracers  ')
          endif
 
       ! =====================================================================
-      ! Tracer ID 1037: Only in FULL model configuration with rivers
+      ! Tracer ID 1038: Only in FULL model configuration with rivers
       ! This is Terrestrial DOC
       ! =====================================================================
-      else if (tracers%data(j)%ID==1037) then
+      else if (tracers%data(j)%ID==1038) then
          if (use_REcoM .and. enable_coccos .and. enable_3zoo2det .and. useRivers) then
          ! Full model with rivers: This is Terrestrial DOC
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DOCt', 'Terrestrial Dissolved Organic Carbon', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-        endif
+         endif
 
       else
 #endif

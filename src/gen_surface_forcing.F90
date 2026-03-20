@@ -551,18 +551,18 @@ CONTAINS
       !! ** Purpose : Fill names of sbc_flfi array (file names and variable names)
 
       !prepare proper nc file (add year and .nc to the end of the file name from namelist
-      if (l_xwind) write(sbc_flfi(i_xwind)%file_name, *) trim(nm_xwind_file),trim(yyear),'.nc'
-      if (l_ywind) write(sbc_flfi(i_ywind)%file_name, *) trim(nm_ywind_file),trim(yyear),'.nc'
-      if (l_xstre) write(sbc_flfi(i_xstre)%file_name, *) trim(nm_xstre_file),trim(yyear),'.nc'
-      if (l_ystre) write(sbc_flfi(i_ystre)%file_name, *) trim(nm_ystre_file),trim(yyear),'.nc'
-      if (l_humi)  write(sbc_flfi(i_humi)%file_name,  *) trim(nm_humi_file), trim(yyear),'.nc'
-      if (l_qsr)   write(sbc_flfi(i_qsr)%file_name,   *) trim(nm_qsr_file),  trim(yyear),'.nc'
-      if (l_qlw)   write(sbc_flfi(i_qlw)%file_name,   *) trim(nm_qlw_file),  trim(yyear),'.nc'
-      if (l_tair)  write(sbc_flfi(i_tair)%file_name,  *) trim(nm_tair_file), trim(yyear),'.nc'
-      if (l_prec)  write(sbc_flfi(i_prec)%file_name,  *) trim(nm_prec_file), trim(yyear),'.nc'
-      if (l_snow)  write(sbc_flfi(i_snow)%file_name,  *) trim(nm_snow_file), trim(yyear),'.nc'
-      if (l_mslp)  write(sbc_flfi(i_mslp)%file_name,  *) trim(nm_mslp_file), trim(yyear),'.nc'
-      if (l_cloud) write(sbc_flfi(i_cloud)%file_name, *) trim(nm_cloud_file),trim(yyear),'.nc'
+      if (l_xwind) write(sbc_flfi(i_xwind)%file_name, *) trim(nm_xwind_file),trim(yyear),'01_reduced.nc'
+      if (l_ywind) write(sbc_flfi(i_ywind)%file_name, *) trim(nm_ywind_file),trim(yyear),'01_reduced.nc'
+      if (l_xstre) write(sbc_flfi(i_xstre)%file_name, *) trim(nm_xstre_file),trim(yyear),'01_reduced.nc'
+      if (l_ystre) write(sbc_flfi(i_ystre)%file_name, *) trim(nm_ystre_file),trim(yyear),'01_reduced.nc'
+      if (l_humi)  write(sbc_flfi(i_humi)%file_name,  *) trim(nm_humi_file), trim(yyear),'01_reduced.nc'
+      if (l_qsr)   write(sbc_flfi(i_qsr)%file_name,   *) trim(nm_qsr_file),  trim(yyear),'01_reduced.nc'
+      if (l_qlw)   write(sbc_flfi(i_qlw)%file_name,   *) trim(nm_qlw_file),  trim(yyear),'01_reduced.nc'
+      if (l_tair)  write(sbc_flfi(i_tair)%file_name,  *) trim(nm_tair_file), trim(yyear),'01_reduced.nc'
+      if (l_prec)  write(sbc_flfi(i_prec)%file_name,  *) trim(nm_prec_file), trim(yyear),'01_reduced.nc'
+      if (l_snow)  write(sbc_flfi(i_snow)%file_name,  *) trim(nm_snow_file), trim(yyear),'01_reduced.nc'
+      if (l_mslp)  write(sbc_flfi(i_mslp)%file_name,  *) trim(nm_mslp_file), trim(yyear),'01_reduced.nc'
+      if (l_cloud) write(sbc_flfi(i_cloud)%file_name, *) trim(nm_cloud_file),trim(yyear),'01_reduced.nc'
 
       if (l_xwind) sbc_flfi(i_xwind)%file_name=ADJUSTL(trim(sbc_flfi(i_xwind)%file_name))
       if (l_ywind) sbc_flfi(i_ywind)%file_name=ADJUSTL(trim(sbc_flfi(i_ywind)%file_name))
@@ -1201,7 +1201,8 @@ CONTAINS
          ! Warning: For a global mesh, conservative scheme is to be updated!!
          call read_other_NetCDF(nm_runoff_file, 'Foxx_o_roff', 1, runoff, .false., .true., partit, mesh) 
          runoff=runoff/1000.0_WP  ! Kg/s/m2 --> m/s
-      end if
+      endif
+
 
       if (use_sw_pene) then
          if (chl_data_source == 'Sweeney') then

@@ -580,14 +580,14 @@ CONTAINS
         locDICmin = locDINmin
         locAlkmax = locDINmax
         locAlkmin = locDINmin
-        locDICremax = locDINmax ! DICremin tracer (added by Sina)
-        locDICremin = locDINmin
         locDSimax = locDINmax
         locDSimin = locDINmin
         locDFemax = locDINmax
         locDFemin = locDINmin
         locO2max  = locDINmax
         locO2min  = locDINmin
+        locDICremax = locDINmax ! DICremin tracer (added by Sina)
+        locDICremin = locDINmin
 #endif
       do n=1, partit%myDim_nod2d
         locTmax = max(locTmax,maxval(tracers%data(1)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )

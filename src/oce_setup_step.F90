@@ -436,7 +436,7 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
         tracers%data(n)%valuesAB      = 0.
         tracers%data(n)%valuesold     = 0.
         tracers%data(n)%i_vert_diff   = i_vert_diff
-        tracers%data(n)%ltra_diag   = ltra_diag
+        tracers%data(n)%ltra_diag     = ltra_diag
     end do
     allocate(tracers%work%del_ttf(nl-1,node_size))
     allocate(tracers%work%del_ttf_advhoriz(nl-1,node_size),tracers%work%del_ttf_advvert(nl-1,node_size))
@@ -998,7 +998,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(in) ,   target :: mesh
     !___________________________________________________________________________
-    integer                  :: i, k, counter, rcounter3, id, tr_num
+    integer                  :: i, k, counter, rcounter3, id, tr_num ! tr_num used for DICremin (added by Sina)
     character(len=10)        :: i_string, id_string
     real(kind=WP)            :: loc, max_temp, min_temp, max_salt, min_salt
     !___________________________________________________________________________
@@ -1044,7 +1044,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             write(*,*) 'read Nitrate     climatology from:', trim(filelist(6))
             write(*,*) 'read Salt        climatology from:', trim(filelist(7))
             write(*,*) 'read Temperature climatology from:', trim(filelist(8))
-            write(*,*) 'read DIC remineralization    from:', trim(filelist(9)) ! DIC remin (added by Sina)
+            write(*,*) 'read DIC remineralization    from:', trim(filelist(9)) ! DICremin (added by Sina)
     end if
     ! read ocean state
     ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.

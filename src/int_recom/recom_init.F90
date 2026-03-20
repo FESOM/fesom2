@@ -728,7 +728,7 @@ subroutine recom_init(tracers, partit, mesh)
             locDFemin = min(locDFemin,minval(tracers%data(21)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
             locO2max  = max(locO2max,maxval(tracers%data(24)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
             locO2min  = min(locO2min,minval(tracers%data(24)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
-            locDICremax  = min(locDICremax,minval(tracers%data(39)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) ) ! init DIC remin (added by Sina)
+            locDICremax  = max(locDICremax,maxval(tracers%data(39)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) ) ! init DIC remin (added by Sina)
             locDICremin  = min(locDICremin,minval(tracers%data(39)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) ) ! init DIC remin (added by Sina)
         end do
 
