@@ -170,7 +170,7 @@ module g_config
   logical                       :: r_restart
   real(kind=WP)                 :: rtime_ice=0.0, rtime_tot=0.0
   real(kind=WP)                 :: rtime_oce=0.0, rtime_oce_dyn=0.0, rtime_oce_dynssh=0.0,  rtime_oce_solvessh=0.0
-  real(kind=WP)                 :: rtime_oce_solvetra=0.0, rtime_oce_GMRedi=0.0, rtime_oce_mixpres=0.0
+  real(kind=WP)                 :: rtime_oce_solvetra=0.0, rtime_oce_GMRedi=0.0, rtime_oce_presdens=0.0, rtime_oce_mixing=0.0
   real(kind=WP)                 :: dummy=1.e10
   
   
