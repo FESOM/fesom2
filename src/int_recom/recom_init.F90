@@ -40,6 +40,7 @@ subroutine recom_init(tracers, partit, mesh)
     real(kind=WP)                           :: locDINmax, locDINmin, locDICmax, locDICmin, locAlkmax, glo
     real(kind=WP)                           :: locAlkmin, locDSimax, locDSimin, locDFemax, locDFemin
     real(kind=WP)                           :: locO2max, locO2min
+    real(kind=WP)                           :: locDICremin, locDICremax ! initialization of DIC remin (added by Sina)
 
     type(t_tracer), intent(inout), target   :: tracers
     type(t_partit), intent(inout), target   :: partit
@@ -66,13 +67,22 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(GloNDust              ( node_size ))
     allocate(AtmNInput             ( node_size ))
 
+    ! calcite dissolution at the ocean bottom
+    allocate(OmegaC_bottom(node_size)) !R2OMIP
+
     !! * River nutrients as surface boundary condition *
-    allocate(RiverDIN2D            ( node_size ))
+!    allocate(RiverDIN2D            ( node_size ))
     allocate(RiverDON2D            ( node_size ))
-    allocate(RiverDOC2D            ( node_size ))
+!    allocate(RiverDOC2D            ( node_size ))
     allocate(RiverDSi2D            ( node_size ))
-    allocate(RiverDIC2D            ( node_size ))
+!    allocate(RiverDIC2D            ( node_size ))
     allocate(RiverAlk2D            ( node_size ))
+
+    allocate(RiverDIC2D            ( node_size ))  ! R2OMIP
+    allocate(RiverDIN2D            ( node_size ))  ! R2OMIP
+    allocate(RiverDOCl2D           ( node_size ))  ! R2OMIP
+    allocate(RiverDOCsl2D          ( node_size ))  ! R2OMIP
+    allocate(RiverPOC2D            ( node_size ))  ! R2OMIP
     allocate(RiverFe               ( node_size ))
 
     !! * Erosion nutrients as surface boundary condition *
@@ -94,6 +104,14 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(GlodecayBenthos       ( node_size, benthos_num ))
     allocate(Benthos               ( node_size, benthos_num ))
     allocate(Benthos_tr            ( node_size, benthos_num, num_tracers )) ! kh 25.03.22 buffer per tracer index
+
+    allocate(LocDenit              ( node_size ))
+    allocate(LocBurial             ( benthos_num, node_size )) ! R2OMIP
+    allocate(Burial                ( benthos_num, node_size )) ! R2OMIP
+    allocate(BurialBen             ( benthos_num )) ! R2OMIP
+    allocate(Sed_2_Ocean_Flux      ( node_size, 6 )) ! DIN, DIC, Alk, DSi, DFe, O2 ! R2OMIP
+    allocate(Ocean_2_Sed_Flux      ( node_size, benthos_num )) ! C, Si, N, Calc ! R2OMIP
+
     allocate(GloHplus              ( node_size ))
     allocate(DenitBen              ( node_size ))
     allocate(PistonVelocity        ( node_size ))
@@ -110,15 +128,25 @@ subroutine recom_init(tracers, partit, mesh)
     GloNDust              = 0.d0
     AtmNInput             = 0.d0
 
-    RiverDIN2D            = 0.d0
+    ! calcite dissolution at the ocean bottom !R2OMIP
+    OmegaC_bottom         = 0.d0
+
+!    RiverDIN2D            = 0.d0
     RiverDON2D            = 0.d0
-    RiverDOC2D            = 0.d0
+!    RiverDOC2D            = 0.d0
     RiverDSi2D            = 0.d0
-    RiverDIC2D            = 0.d0
+!    RiverDIC2D            = 0.d0
     RiverAlk2D            = 0.d0
+
+    RiverDIC2D             = 0.d0
+    RiverDIN2D             = 0.d0
+    RiverDOCl2D            = 0.d0
+    RiverDOCsl2D           = 0.d0
+    RiverPOC2D             = 0.d0
+
     RiverFe               = 0.d0
 
-    ErosionTON2D          = 0.d0
+    ErosionTOC2D          = 0.d0
     ErosionTON2D          = 0.d0
     ErosionTSi2D          = 0.d0
 
@@ -138,6 +166,10 @@ subroutine recom_init(tracers, partit, mesh)
     DenitBen              = 0.d0
     PistonVelocity        = 0.d0
     alphaCO2              = 0.d0
+
+    Burial                = 0.d0 ! R2OMIP
+    Sed_2_Ocean_Flux      = 0.0d0 ! R2OMIP
+    Ocean_2_Sed_Flux      = 0.0d0 ! R2OMIP
 
     LocBenthos            = 0.d0
     decayBenthos          = 0.d0
@@ -643,6 +675,8 @@ subroutine recom_init(tracers, partit, mesh)
             IF (enable_coccos .AND. enable_3zoo2det) THEN
                 ! CoccoChl - Coccolithophore Chlorophyll
                 tracers%data(i)%values(:,:) = tiny_chl
+            ELSE IF (useRivers) THEN
+                tracers%data(i)%values(:,:) = 0.0_WP !tiny  !R2OMIP
             END IF
 
         CASE (1032)
@@ -711,6 +745,8 @@ subroutine recom_init(tracers, partit, mesh)
         locDFemin = locDINmin
         locO2max  = locDINmax
         locO2min  = locDINmin
+        locDICremax = locDICremax ! init DIC remin (added by Sina)
+        locDICremin = locDICremin ! init DIC remin (added by Sina)
 
         do n=1, myDim_nod2d
             locDINmax = max(locDINmax,maxval(tracers%data(3)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
@@ -725,6 +761,9 @@ subroutine recom_init(tracers, partit, mesh)
             locDFemin = min(locDFemin,minval(tracers%data(21)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
             locO2max  = max(locO2max,maxval(tracers%data(24)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
             locO2min  = min(locO2min,minval(tracers%data(24)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
+            locDICremax  = max(locDICremax,maxval(tracers%data(33)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) ) ! init DIC remin (added by Sina) !!!!
+            locDICremin  = min(locDICremin,minval(tracers%data(33)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) ) ! init DIC remin (added by Sina) !!!!
+
         end do
 
         if (mype==0) write(*,*) "Sanity check for REcoM variables after recom_init call"
@@ -753,7 +792,11 @@ subroutine recom_init(tracers, partit, mesh)
         if (mype==0) write(*,*) '  |-> gobal max init. O2. =', glo
         call MPI_AllREDUCE(locO2min , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
         if (mype==0) write(*,*) '  `-> gobal min init. O2. =', glo
-
+        call MPI_AllREDUCE(locDICremax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal max init. DICremin =', glo
+        call MPI_AllREDUCE(locDICremin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal min init. DICremin =', glo
+        
         if (enable_3zoo2det) then
             is_3zoo2det=1.0_WP
         else

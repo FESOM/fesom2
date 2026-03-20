@@ -203,3 +203,63 @@ end subroutine Cobeta
       end if
    endif
  end subroutine krill_resp
+
+
+! Load river biogeochemical variables from NetCDF file R2OMIP
+! Variables: DIN, DOCl, DOCs, POC
+
+! Subroutine to read and broadcast a single variable
+
+subroutine load_river_variable(ncid, vari, model_2Darray, partit, mesh)  
+
+  use, intrinsic :: ISO_FORTRAN_ENV, only: real64
+
+  use g_config
+  use o_param
+  USE MOD_MESH
+  USE MOD_PARTIT
+  USE MOD_PARSUP
+  use g_rotate_grid
+  use netcdf
+  implicit none
+
+  type(t_mesh),   intent(in)   , target :: mesh
+  type(t_partit), intent(inout), target :: partit
+  integer                       :: n
+  integer                       :: status, ncid, varid
+  integer                       :: RIstart, RIcount
+
+  real(real64), allocatable :: ncdata(:)
+
+  real(real64),  intent(out)	:: model_2Darray(partit%myDim_nod2D+partit%eDim_nod2D)
+
+  character(*),  intent(in)     :: vari
+  integer                       :: ierror
+
+#include "../associate_part_def.h"
+#include "../associate_mesh_def.h"
+#include "../associate_part_ass.h"
+#include "../associate_mesh_ass.h"
+
+    ! Allocate temporary array for full domain
+    allocate(ncdata(mesh%nod2D))
+
+    if (mype == 0) then
+        status = nf90_inq_varid(ncid, trim(vari), varid)
+        RIstart = 1
+        RIcount = nod2D
+        status = nf90_get_var(ncid, varid, ncdata, start=(/RIstart/), count=(/RIcount/))
+    endif
+
+    ! Broadcast to all processes
+    call MPI_BCast(ncdata, nod2D, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+
+    ! Extract local partition
+    model_2Darray=ncdata(myList_nod2D)
+
+    ! Clean up
+    deallocate(ncdata)
+
+end subroutine load_river_variable
+
+

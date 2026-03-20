@@ -40,6 +40,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     type(t_ice)   , intent(inout), target :: ice
 
     integer, intent(in)                                     :: Nn                   !< Total number of nodes in the vertical
+    integer                                                 :: nzmax, nzmin, k_bottom, nlevels_nod2D_minimum  !R2OMIP (OmegaC)
     real(kind=8),dimension(mesh%nl-1,bgc_num),intent(inout) :: state                !< ChlA conc in phytoplankton [mg/m3]
                                                                                     !! should be in instead of inout
 
@@ -100,6 +101,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     HetC,    & ! [mmol/m3] Heterotroph carbon
     DON,     & ! [mmol/m3] Dissolved organic nitrogen
     EOC,     & ! [mmol/m3] Extracellular organic carbon
+    DOCt,    & ! [mmol/m3] terrestrial DOC	! R2OMIP
     DiaN,    & ! [mmol/m3] Diatom nitrogen
     DiaC,    & ! [mmol/m3] Diatom carbon
     DiaChl,  & ! [mg/m3] Diatom chlorophyll
@@ -110,7 +112,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     PhyCalc, & ! [mmol/m3] Phytoplankton calcite
     DetCalc, & ! [mmol/m3] Detrital calcite
     FreeFe,  & ! [mmol/m3] Free iron
-    O2         ! [mmol/m3] Dissolved oxygen
+    O2,      & ! [mmol/m3] Dissolved oxygen
+    DICremin   ! tracer for DIC remineralization (for tracking as diagnostic (added by Sina)
 
 ! Coccolithophore variables (conditionally used based on namelist)
 real(kind=8) :: &
@@ -410,11 +413,13 @@ real(kind=8) :: &
             !   DIC : Dissolved inorganic carbon (CO2 + HCO3- + CO3--) [mmolC m-3]
             !   ALK : Total alkalinity [meq m-3]
             !   O2  : Dissolved oxygen [mmolO2 m-3]
+            !   DICremin : Tracer for DIC remineralization (added by Sina)
             !-----------------------------------------------------------------------
 
             DIC = max(tiny, state(k, idic) + sms(k, idic))
             ALK = max(tiny, state(k, ialk) + sms(k, ialk))
             O2  = max(tiny, state(k, ioxy) + sms(k, ioxy))
+            DICremin = max(tiny, state(k, idicremin) + sms(k, idicremin))
 
             !-----------------------------------------------------------------------
             ! DISSOLVED ORGANIC MATTER
@@ -429,6 +434,9 @@ real(kind=8) :: &
             DON = max(tiny, state(k, idon) + sms(k, idon))
             EOC = max(tiny, state(k, idoc) + sms(k, idoc))
 
+            if (useRivers) then
+                DOCt= max(tiny, state(k,idoct) + sms(k, idoct)) ! R2OMIP
+            end if 
             !-----------------------------------------------------------------------
             ! SMALL PHYTOPLANKTON
             !-----------------------------------------------------------------------
@@ -1617,6 +1625,25 @@ real(kind=8) :: &
                 kspc_watercolumn(k)   = kspc_depth(1)
                 rhoSW_watercolumn(k)  = rhoSW_depth(1)
 
+            endif
+
+            if (NitrogenSS) then
+                ! This part has been developpes for R2OMIP for calculating bottom ocean OmegaC
+                nzmax=nlevels_nod2D(n)-1
+                nzmin=ulevels_nod2D(n)
+                k_bottom=nod_in_elem2D_num(n)
+            
+                ! Screening minimum depth in neigbouring nodes around node n
+                nlevels_nod2D_minimum=minval(nlevels(nod_in_elem2D(1:k_bottom, n))-1)
+                    
+                if (k >= nlevels_nod2D_minimum .and. k < nzmax) then
+                    OmegaC_bottom(n) =  (OmegaC_depth(1) * (area(k,n)-area(k+1,n)) / area(k,n))
+
+                else if (k == nzmax) then
+                    OmegaC_bottom(n) =  (OmegaC_depth(1) * (area(k+1,n) / area(k,n)))
+                else
+                    OmegaC_bottom(n) =  0.0_WP
+                end if
             endif
 
             !===============================================================================
@@ -3981,6 +4008,7 @@ real(kind=8) :: &
             !---------------------------------------------------------------------------
             ! Microbial degradation of dissolved organic carbon
             + rho_C1 * arrFunc * O2Func * EOC                     & ! Temperature and O2 dependent
+            + rho_C1t                   * DOCt * is_riverinput    & ! --> Remineralization of terrestrial DOC ! R2OMIP
             !---------------------------------------------------------------------------
             ! SOURCES: Zooplankton Respiration (increases DIC)
             !---------------------------------------------------------------------------
@@ -5045,7 +5073,12 @@ real(kind=8) :: &
             !---------------------------------------------------------------------------
             - rho_c1 * arrFunc * O2Func * EOC                              & ! Bacterial respiration
                                                                           ) * dt_b + sms(k,idoc)
-
+        if (useRivers) then
+            ! R2OMIP - terrestrial DOC
+            sms(k,idoct) = (                                                   &
+                - rho_C1t                        * DOCt                        &
+                                                                          ) * dt_b + sms(k,idoct)
+        end if
         !===============================================================================
         ! 21. DIATOM NITROGEN (DiaN)
         !===============================================================================
@@ -5712,6 +5745,7 @@ real(kind=8) :: &
             ! SINKS: Heterotrophic Respiration and Remineralization
             !---------------------------------------------------------------------------
             - rho_C1 * arrFunc * O2Func * EOC                              & ! DOC remineralization
+            - rho_C1t                   * DOCt * is_riverinput             &
             - hetRespFlux                                                  & ! Mesozooplankton
             - Zoo2RespFlux * is_3zoo2det                                   & ! Macrozooplankton
             - MicZooRespFlux * is_3zoo2det                                 & ! Microzooplankton
@@ -7179,6 +7213,16 @@ real(kind=8) :: &
 
         end do ! Main vertikal loop ends
 
+
+        !===============================================================================
+        ! 37. DIC remineralzation tracer to track remineralization as an diagnostics
+        !===============================================================================
+        !   idicremin       : Tracer for remineralization diagnostics (added by Sina)
+        sms(k,idicremin) = (                  &
+            + rho_c1 * arrFunc * O2Func * EOC &
+            ) * dt_b + sms(k,idicremin)
+
+
         !===============================================================================
         ! BENTHIC REMINERALIZATION
         !===============================================================================
@@ -7284,6 +7328,7 @@ real(kind=8) :: &
             !===========================================================================
             ! Aerobic remineralization of organic nitrogen in sediments releases
             ! bioavailable nitrogen (NH4+ and NO3-) back to the water column.
+            ! Burial for R2OMIP
             !
             ! Variables:
             !   decayBenthos(1) : N remineralization flux [mmolN m-2 day-1]
@@ -7308,13 +7353,14 @@ real(kind=8) :: &
             decayBenthos(1) = decayRateBenN * LocBenthos(1)
 
             ! Update benthic N pool (remove remineralized N)
-            LocBenthos(1) = LocBenthos(1) - decayBenthos(1) * dt_b
+            LocBenthos(1) = LocBenthos(1) - decayBenthos(1) * dt_b - BurialBen(1) !R2OMIP (Burial) remove from benthos (flux) 
 
             !===========================================================================
             ! DISSOLVED INORGANIC CARBON (DIC) REMINERALIZATION
             !===========================================================================
             ! Aerobic respiration of organic carbon releases CO2 to bottom water.
             ! Affects carbonate system (pH, pCO2, saturation state).
+            ! Burial for R2OMIP
             !
             ! Variables:
             !   decayBenthos(2) : C remineralization flux [mmolC m-2 day-1]
@@ -7338,13 +7384,14 @@ real(kind=8) :: &
             decayBenthos(2) = decayRateBenC * LocBenthos(2)
 
             ! Update benthic C pool
-            LocBenthos(2) = LocBenthos(2) - decayBenthos(2) * dt_b
+            LocBenthos(2) = LocBenthos(2) - decayBenthos(2) * dt_b - BurialBen(2) !R2OMIP (Burial)
 
             !===========================================================================
             ! SILICATE (Si) DISSOLUTION
             !===========================================================================
             ! Dissolution of biogenic silica (diatom frustules) releases Si(OH)4.
             ! Temperature-dependent process (faster in warm water).
+            ! Burial for R2OMIP
             !
             ! Variables:
             !   decayBenthos(3) : Si dissolution flux [mmolSi m-2 day-1]
@@ -7370,13 +7417,14 @@ real(kind=8) :: &
             decayBenthos(3) = decayRateBenSi * LocBenthos(3)
 
             ! Update benthic Si pool
-            LocBenthos(3) = LocBenthos(3) - decayBenthos(3) * dt_b
+            LocBenthos(3) = LocBenthos(3) - decayBenthos(3) * dt_b - BurialBen(3) !R2OMIP (Burial)
 
             !===========================================================================
             ! CALCITE (CaCO3) DISSOLUTION
             !===========================================================================
             ! Dissolution of calcium carbonate affects both DIC and alkalinity.
             ! Rate depends on saturation state (calculated in deepest water layer).
+            ! Burial for R2OMIP
             !
             ! Variables:
             !   decayBenthos(4) : Calcite dissolution flux [mmolC m-2 day-1]
@@ -7405,7 +7453,7 @@ real(kind=8) :: &
             decayBenthos(4) = calc_diss_ben * LocBenthos(4)
 
             ! Update benthic calcite pool
-            LocBenthos(4) = LocBenthos(4) - decayBenthos(4) * dt_b
+            LocBenthos(4) = LocBenthos(4) - decayBenthos(4) * dt_b - BurialBen(4) !R2OMIP (Burial)
 
             if (ciso) then
 

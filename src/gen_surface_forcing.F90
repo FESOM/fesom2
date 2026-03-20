@@ -51,7 +51,7 @@ MODULE g_sbf
    USE g_read_other_NetCDF, only: read_other_NetCDF, read_2ddata_on_grid_netcdf
 
    IMPLICIT NONE
-
+   
    include 'netcdf.inc'
 
    public  sbc_ini  ! routine called before 1st time step (open files, read namelist,...)
@@ -250,30 +250,30 @@ CONTAINS
 
       ! get dimensions
       if (partit%mype==0) then
-         iost = nf_inq_dimid(ncid,    "LAT",      id_latd)
+         iost = nf_inq_dimid(ncid, "LAT", id_latd)
          if (iost .ne. NF_NOERR) then
-            iost = nf_inq_dimid(ncid, "lat",      id_latd)
+            iost = nf_inq_dimid(ncid, "lat", id_latd)
          end if
          if (iost .ne. NF_NOERR) then
             iost = nf_inq_dimid(ncid, "latitude", id_latd)
          end if
          if (iost .ne. NF_NOERR) then
-            iost = nf_inq_dimid(ncid, "LAT1",     id_latd)
+            iost = nf_inq_dimid(ncid, "LAT1", id_latd)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name,partit)  
 
       if (partit%mype==0) then 
-         iost = nf_inq_dimid(ncid,    "LON",       id_lond)
+         iost = nf_inq_dimid(ncid, "LON", id_lond)
          if (iost .ne. NF_NOERR) then
-            iost = nf_inq_dimid(ncid, "lon",       id_lond)
+            iost = nf_inq_dimid(ncid, "lon", id_lond)
          end if
          if (iost .ne. NF_NOERR) then
             iost = nf_inq_dimid(ncid, "longitude", id_lond)
          end if
          if (iost .ne. NF_NOERR) then
-            iost = nf_inq_dimid(ncid, "LON1",      id_lond)
+            iost = nf_inq_dimid(ncid, "LON1", id_lond)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
@@ -281,11 +281,11 @@ CONTAINS
 
       if (partit%mype==0) then   
          iost = nf_inq_dimid(ncid, "TIME", id_timed)
-         if      (iost .ne. NF_NOERR) then
-                 iost = nf_inq_dimid(ncid, "time",  id_timed)
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_dimid(ncid, "time", id_timed)
          end if
-         if      (iost .ne. NF_NOERR) then
-                 iost = nf_inq_dimid(ncid, "TIME1", id_timed)
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_dimid(ncid, "TIME1", id_timed)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
@@ -293,29 +293,29 @@ CONTAINS
 
       ! get variable id
       if (partit%mype==0) then
-         iost = nf_inq_varid(ncid,    "LAT",      id_lat)
+         iost = nf_inq_varid(ncid, "LAT", id_lat)
          if (iost .ne. NF_NOERR) then
-            iost = nf_inq_varid(ncid, "lat",      id_lat)
+            iost = nf_inq_varid(ncid, "lat", id_lat)
          end if
          if (iost .ne. NF_NOERR) then
             iost = nf_inq_varid(ncid, "latitude", id_lat)
          end if
          if (iost .ne. NF_NOERR) then
-            iost = nf_inq_varid(ncid, "LAT1",     id_lat)
+            iost = nf_inq_varid(ncid, "LAT1", id_lat)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
       call check_nferr(iost,flf%file_name,partit)
       if (partit%mype==0) then
-         iost = nf_inq_varid(ncid,    "LON",       id_lon)
-         if      (iost .ne. NF_NOERR) then
+         iost = nf_inq_varid(ncid, "LON", id_lon)
+         if (iost .ne. NF_NOERR) then
             iost = nf_inq_varid(ncid, "longitude", id_lon)
          end if
          if (iost .ne. NF_NOERR) then
-            iost = nf_inq_varid(ncid, "lon",       id_lon)
+            iost = nf_inq_varid(ncid, "lon", id_lon)
          end if
          if (iost .ne. NF_NOERR) then
-            iost = nf_inq_varid(ncid, "LON1",      id_lon)
+            iost = nf_inq_varid(ncid, "LON1", id_lon)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
@@ -323,11 +323,11 @@ CONTAINS
 
       if (partit%mype==0) then
          iost = nf_inq_varid(ncid, "TIME", id_time)
-         if      (iost .ne. NF_NOERR) then
-                 iost = nf_inq_varid(ncid, "time", id_time)
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_varid(ncid, "time", id_time)
          end if
-         if      (iost .ne. NF_NOERR) then
-                 iost = nf_inq_varid(ncid, "TIME1",id_time)
+         if (iost .ne. NF_NOERR) then
+            iost = nf_inq_varid(ncid, "TIME1",id_time)
          end if
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
@@ -390,14 +390,14 @@ CONTAINS
         iost = nf_get_vara_double(ncid, id_time, nf_start, nf_edges, flf%nc_time)
         ! digg for calendar attribute in time axis variable         
     end if
-    call MPI_BCast(flf%nc_time, flf%nc_Ntime,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+    call MPI_BCast(flf%nc_time, flf%nc_Ntime, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
     call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
     call check_nferr(iost,flf%file_name,partit)
       
     ! digg for calendar attribute in time axis variable
     if (partit%mype==0) then
-        iost         = nf_inq_attlen(ncid, id_time,'calendar',aux_len)
-        iost         = nf_get_att(ncid, id_time,'calendar',aux_calendar)
+        iost = nf_inq_attlen(ncid, id_time, 'calendar', aux_len)
+        iost = nf_get_att(ncid, id_time, 'calendar', aux_calendar)
         aux_calendar = aux_calendar(1:aux_len)
         if (iost .ne. NF_NOERR) then
             flf%calendar='none'
@@ -551,6 +551,7 @@ CONTAINS
       !! ** Purpose : Fill names of sbc_flfi array (file names and variable names)
 
       !prepare proper nc file (add year and .nc to the end of the file name from namelist
+if (.NOT. enable_AWICM) then
       if (l_xwind) write(sbc_flfi(i_xwind)%file_name, *) trim(nm_xwind_file),trim(yyear),'.nc'
       if (l_ywind) write(sbc_flfi(i_ywind)%file_name, *) trim(nm_ywind_file),trim(yyear),'.nc'
       if (l_xstre) write(sbc_flfi(i_xstre)%file_name, *) trim(nm_xstre_file),trim(yyear),'.nc'
@@ -563,7 +564,21 @@ CONTAINS
       if (l_snow)  write(sbc_flfi(i_snow)%file_name,  *) trim(nm_snow_file), trim(yyear),'.nc'
       if (l_mslp)  write(sbc_flfi(i_mslp)%file_name,  *) trim(nm_mslp_file), trim(yyear),'.nc'
       if (l_cloud) write(sbc_flfi(i_cloud)%file_name, *) trim(nm_cloud_file),trim(yyear),'.nc'
-
+else
+      ! AWICM forcing
+      if (l_xwind) write(sbc_flfi(i_xwind)%file_name, *) trim(nm_xwind_file),trim(yyear),'01_reduced.nc'
+      if (l_ywind) write(sbc_flfi(i_ywind)%file_name, *) trim(nm_ywind_file),trim(yyear),'01_reduced.nc'
+      if (l_xstre) write(sbc_flfi(i_xstre)%file_name, *) trim(nm_xstre_file),trim(yyear),'01_reduced.nc'
+      if (l_ystre) write(sbc_flfi(i_ystre)%file_name, *) trim(nm_ystre_file),trim(yyear),'01_reduced.nc'
+      if (l_humi) write(sbc_flfi(i_humi)%file_name, *) trim(nm_humi_file), trim(yyear),'01_reduced.nc'
+      if (l_qsr) write(sbc_flfi(i_qsr)%file_name, *) trim(nm_qsr_file), trim(yyear),'01_reduced.nc'
+      if (l_qlw) write(sbc_flfi(i_qlw)%file_name, *) trim(nm_qlw_file), trim(yyear),'01_reduced.nc'
+      if (l_tair) write(sbc_flfi(i_tair)%file_name, *) trim(nm_tair_file), trim(yyear),'01_reduced.nc'
+      if (l_prec) write(sbc_flfi(i_prec)%file_name, *) trim(nm_prec_file), trim(yyear),'01_reduced.nc'
+      if (l_snow) write(sbc_flfi(i_snow)%file_name, *) trim(nm_snow_file), trim(yyear),'01_reduced.nc'
+      if (l_mslp) write(sbc_flfi(i_mslp)%file_name, *) trim(nm_mslp_file), trim(yyear),'01_reduced.nc'
+      if (l_cloud) write(sbc_flfi(i_cloud)%file_name, *) trim(nm_cloud_file), trim(yyear),'01_reduced.nc'
+endif
       if (l_xwind) sbc_flfi(i_xwind)%file_name=ADJUSTL(trim(sbc_flfi(i_xwind)%file_name))
       if (l_ywind) sbc_flfi(i_ywind)%file_name=ADJUSTL(trim(sbc_flfi(i_ywind)%file_name))
       if (l_xstre) sbc_flfi(i_xstre)%file_name=ADJUSTL(trim(sbc_flfi(i_xstre)%file_name))
@@ -737,7 +752,6 @@ CONTAINS
       real(4), dimension(:,:), pointer :: sbcdata1, sbcdata2
       logical sbcdata1_from_cache, sbcdata2_from_cache
       integer rootrank
-
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -1050,7 +1064,7 @@ CONTAINS
 #include "associate_mesh_ass.h"
 
       ! OPEN and read namelist for SBC
-      open( unit=nm_sbc_unit, file='namelist.forcing', form='formatted', access='sequential', status='old', iostat=iost )
+      open(unit=nm_sbc_unit, file='namelist.forcing', form='formatted', access='sequential', status='old', iostat=iost )
       if (iost == 0) then
          if (mype==0) WRITE(*,*) '     file   : ', 'namelist_bc.nml',' open ok'
       else
@@ -1253,6 +1267,7 @@ CONTAINS
       real(wp)     :: rdate ! date
       integer      :: fld_idx, i
       logical      :: do_rotation_wind, do_rotation_stre, force_newcoeff, update_monthly_flag
+      logical      :: update_daily_flag ! enable_AWICM = .true.
       integer      :: yyyy, dd, mm, flag_flpyr=0
       integer,   pointer   :: nc_Ntime, t_indx, t_indx_p1
       real(wp),  pointer   :: nc_time(:)
@@ -1263,7 +1278,8 @@ CONTAINS
       character(4)              :: currentCO2year_char
       real(kind=8), allocatable :: ncdata(:)
       integer                   :: CO2start, CO2count
-      integer	                :: status, ncid, varid
+      real(kind=8)              :: locmax, locmin, glo
+      integer	                :: status, ncid, varid, ierror
       character(300)            :: sedfilename
       logical                   :: do_read=.false.
       integer                   :: n_lb
@@ -1356,69 +1372,78 @@ CONTAINS
 !$OMP END PARALLEL DO
       end if
       
-      !==========================================================================
+    !===========================================================================
 
-      ! prepare a flag which checks whether to update monthly data (SSS, river runoff)
-      update_monthly_flag=( (day_in_month==num_day_in_month(fleapyear,month) .AND. timenew==86400._WP) .OR. mstep==1  )
+    ! prepare a flag which checks whether to update monthly data (SSS, river runoff)
+     update_monthly_flag=( (day_in_month==num_day_in_month(fleapyear,month) .AND. timenew==86400._WP) .OR. mstep==1)
+     !AWICM
+     if (enable_AWICM) then
+         update_daily_flag = ( (timenew==86400._WP) .OR. mstep==1)
+     endif
 
-      ! read in SSS for applying SSS restoring
-      if (surf_relax_S > 0._WP) then
-         if (sss_data_source=='CORE1' .or. sss_data_source=='CORE2') then
+    !___________________________________________________________________________ 
+    ! read in SSS for applying SSS restoring
+    if (surf_relax_S > 0._WP) then
+        if (sss_data_source=='CORE1' .or. sss_data_source=='CORE2') then
             if (update_monthly_flag) then
-               i=month
-               if (mstep > 1) i=i+1 
-               if (i > 12) i=1
-               if (mype==0) write(*,*) 'Updating SSS restoring data for month     ', i 
-               call read_other_NetCDF(nm_sss_data_file, 'SALT', i, Ssurf, .true., .true., partit, mesh) 
+                i=month
+                if (mstep > 1) i=i+1 
+                if (i > 12) i=1
+                if (mype==0) write(*,*) 'Updating SSS restoring data for month     ', i 
+                call read_other_NetCDF(nm_sss_data_file, 'SALT', i, Ssurf, .true., .true., partit, mesh) 
             end if
-         end if
-      end if
+        end if
+    end if
 
-      ! read in CHL for applying shortwave penetration
-      if (use_sw_pene) then
-         if (chl_data_source=='Sweeney') then
+    !___________________________________________________________________________
+    ! read inCHL for applying shortwave penetration
+    if (use_sw_pene) then
+        if (chl_data_source=='Sweeney') then
             if (update_monthly_flag) then
-               i=month
-               if (mstep > 1) i=i+1 
-               if (i > 12) i=1
-               if (mype==0) write(*,*) 'Updating chlorophyll climatology for month ', i 
-               call read_other_NetCDF(nm_chl_data_file, 'chl', i, chl, .true., .true., partit, mesh) 
+                i=month
+                if (mstep > 1) i=i+1 
+                if (i > 12) i=1
+                if (mype==0) write(*,*) 'Updating chlorophyll climatology for month ', i 
+                call read_other_NetCDF(nm_chl_data_file, 'chl', i, chl, .true., .true., partit, mesh) 
             end if
-         end if
-      end if
+        end if
+    end if
 
-     ! runoff  
-     if(runoff_data_source=='Dai09' .or. runoff_data_source=='JRA55') then
-       
-       if(update_monthly_flag) then
-         if(runoff_climatology) then
-           !climatology monthly mean
-           i=month
-           if (mstep > 1) i=i+1 
-           if (i > 12) i=1
-           if (mype==0) write(*,*) 'Updating monthly climatology runoff for month ', i 
-           filename=trim(nm_runoff_file)
-           call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, partit, mesh)
+    !___________________________________________________________________________
+    ! runoff --> depends on simulated month
+    if(runoff_data_source=='Dai09' .or. runoff_data_source=='JRA55') then
+        ! its the time point for reading the runoff, always at the beginning of 
+        ! a new month
+        if(update_monthly_flag) then
+        
+            ! runnoff can be a monthly climatology
+            if(runoff_climatology) then
+                !climatology monthly mean
+                i=month
+                if (mstep > 1) i=i+1 
+                if (i > 12) i=1
+                if (mype==0) write(*,*) 'Updating monthly climatology runoff for month ', i 
+                filename=trim(nm_runoff_file)
+                call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, partit, mesh)
 
            !kg/m2/s -> m/s
            runoff=runoff/1000.0_WP
 
-         else
-           !monthly data
-           i=month
-           if (mstep > 1) i=i+1 
-           if (i > 12) i=1
-           if (mype==0) write(*,*) 'Updating monthly runoff for month             ', i 
-           filename=trim(nm_runoff_file)//cyearnew//'.nc' 
-           call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, partit, mesh)
+            else
+                !monthly data
+                i=month
+                if (mstep > 1) i=i+1 
+                if (i > 12) i=1
+                if (mype==0) write(*,*) 'Updating monthly runoff for month             ', i 
+                filename=trim(nm_runoff_file)//cyearnew//'.nc' 
+                call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, partit, mesh)
 
            !kg/m2/s -> m/s
            runoff=runoff/1000.0_WP
 
          end if
-       end if
-
-     end if
+            end if
+    end if
 
 #if defined (__recom)
 !<  read surface atmospheric deposition for Fe, N, CO2
@@ -1793,44 +1818,228 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
         if (mstep==1 .and. mype==0) write(*,*) 'useAeolianN is switched off'       
     end if
 
-! ******** Riverine input (Nutrients) *********
+    !-----------------------------------------------------------------------------
+    ! Configure river nutrient inputs
+    !-----------------------------------------------------------------------------
+
     if (useRivers) then
-!<  read riverine input
+
     ! *** River inputs are in mmol/m2/s ***
-    ! add river nutrients as surface boundary condition (surface_bc function in oce_ale_tracers)
+
         if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'   --> River_input'//achar(27)//'[0m'
 
+        ! add river nutrients as surface boundary condition (surface_bc function in oce_ale_tracers)
+        ! Enable river input flag
         is_riverinput = 1.0d0
 
-        if (update_monthly_flag) then
-            i=month
-            if (mstep > 1) i=i+1 
-            if (i > 12) i=1
-            filename=trim(nm_river_data_file)
-            if (mype==0) write(*,*) 'Updating riverine restoring data for month', i,' from ', trim(filename)
-            call read_2ddata_on_grid_NetCDF(filename,'Alkalinity', i, RiverAlk2D, partit, mesh)
-            ! write(*,*) mype, 'RiverAlk2D', maxval(RiverAlk2D(:)), minval(RiverAlk2D(:))        
-            ! molar convertion of [CaCo3] * 2  -> [total Alkalinity]   
-            RiverAlk2D = RiverAlk2D * 2
-  
-            call read_2ddata_on_grid_NetCDF(filename, 'DIC', i, RiverDIC2D, partit, mesh) 
-            ! write(*,*) mype, 'RiverDIC2D', maxval(RiverDIC2D(:)), minval(RiverDIC2D(:))     
+        if (mstep == 1) then
 
-            call read_2ddata_on_grid_NetCDF(filename, 'DIN', i, RiverDIN2D, partit, mesh) 
-            ! write(*,*) mype, 'RiverDIN2D', maxval(RiverDIN2D(:)), minval(RiverDIN2D(:))     
+            ! Determine input type: constant pre-industrial or transient
+            if (mype==0) then
+                ! Use constant pre-industrial river inputs
+                if (constant_PI_Rivers) then
+                    write(*,'(A)') 'INFO: Using constant pre-industrial riverine inputs'
+                    filename = trim(REcoMDataPath) // 'Rivers_R2OMIP_PI.nc'
+                else
+                ! Use transient (year-specific) river inputs
+                    write(*,'(A,A,A,A)') 'INFO: Using transient riverine inputs - model year = ', &
+                                        trim(cyearnew), ' from ', trim(filename)
+                    ! Construct filename for current year
+                    filename = trim(REcoMDataPath) // 'Rivers_R2OMIP_' // trim(cyearnew) // '.nc'
+                endif
+                ! open file
+                write(*,*), trim(filename)
+                status=nf_open(filename, nf_nowrite, ncid)
+            endif
 
-            call read_2ddata_on_grid_NetCDF(filename, 'DOC', i, RiverDOC2D, partit, mesh) 
-            ! write(*,*) mype, 'RiverDOC2D', maxval(RiverDOC2D(:)), minval(RiverDOC2D(:))     
+            call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
 
-            call read_2ddata_on_grid_NetCDF(filename, 'DON', i, RiverDON2D, partit, mesh) 
-            ! write(*,*) mype, 'RiverDON2D', maxval(RiverDON2D(:)), minval(RiverDON2D(:))     
+            if (status.ne.nf_noerr)then
+                print*,'ERROR: CANNOT READ runoff FILE CORRECTLY !!!!!'
+                print*,'Error in opening netcdf file '//filename
+                call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+                stop
+            endif
 
-            RiverDSi2D = RiverDIN2D * (16/15)
-        end if
-    else
-        is_riverinput = 0.0d0
-        if (mype==0 .and. mstep==1) write(*,*) 'No riverine input' 
-    end if
+            call load_river_variable(ncid, 'DIC',  RiverDIC2D, partit, mesh)
+            locmax = -66666
+            locmin = 66666
+            locmax = max(locmax,maxval(RiverDIC2D))
+            locmin = min(locmin,minval(RiverDIC2D))
+
+            if (mype==0) write(*,*) "Sanity check for Riverine input after reading Rivers_R2OMIP file"
+            call MPI_AllREDUCE(locmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+            if (mype==0) write(*,*) '  |-> global max init. riverine DIC. =', glo
+            call MPI_AllREDUCE(locmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+            if (mype==0) write(*,*) '  |-> global min init. riverine DIC. =', glo
+            
+            call load_river_variable(ncid, 'DIN',  RiverDIN2D, partit, mesh)
+            locmax = -66666
+            locmin = 66666
+            locmax = max(locmax,maxval(RiverDIN2D))
+            locmin = min(locmin,minval(RiverDIN2D))
+
+            if (mype==0) write(*,*) "Sanity check for Riverine input after reading Rivers_R2OMIP file"
+            call MPI_AllREDUCE(locmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+            if (mype==0) write(*,*) '  |-> global max init. riverine DIN. =', glo
+            call MPI_AllREDUCE(locmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+            if (mype==0) write(*,*) '  |-> global min init. riverine DIN. =', glo
+
+            call load_river_variable(ncid, 'DOC_l', RiverDOCl2D, partit, mesh)
+            locmax = -66666
+            locmin = 66666
+            locmax = max(locmax,maxval(RiverDOCl2D))
+            locmin = min(locmin,minval(RiverDOCl2D))
+
+            call MPI_AllREDUCE(locmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+            if (mype==0) write(*,*) '  |-> global max riverine DOCl. =', glo
+            call MPI_AllREDUCE(locmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+            if (mype==0) write(*,*) '  |-> global min riverine DOCl. =', glo
+
+            call load_river_variable(ncid, 'DOC_sl', RiverDOCsl2D, partit, mesh)
+            locmax = -66666
+            locmin = 66666
+            locmax = max(locmax,maxval(RiverDOCsl2D))
+            locmin = min(locmin,minval(RiverDOCsl2D))
+
+            call MPI_AllREDUCE(locmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+            if (mype==0) write(*,*) '  |-> global max riverine DOCsl. =', glo
+            call MPI_AllREDUCE(locmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+            if (mype==0) write(*,*) '  |-> global min riverine DOCsl. =', glo
+
+            call load_river_variable(ncid, 'POC',  RiverPOC2D, partit, mesh)
+            locmax = -66666
+            locmin = 66666
+            locmax = max(locmax,maxval(RiverPOC2D))
+            locmin = min(locmin,minval(RiverPOC2D))
+
+            call MPI_AllREDUCE(locmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+            if (mype==0) write(*,*) '  |-> global max riverine POC. =', glo
+            call MPI_AllREDUCE(locmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+            if (mype==0) write(*,*) '  |-> global min riverine POC. =', glo
+
+            if (mype == 0) then
+                status = nf_close(ncid)  ! Close file once
+            endif
+
+                !allocate(ncdata(mesh%nod2D))
+                !if (mype==0) then
+                !    status=nf_inq_varid(ncid, 'DIC', varid)
+                !    RIstart = 1
+                !    RIcount = mesh%nod2D
+                !    status=nf_get_var(ncid, varid, ncdata, start=(/RIstart/), count=(/RIcount/))
+                !    status=nf_close(ncid)
+                !endif
+                !call MPI_BCast(ncdata, nod2D, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+                !RiverDIC2D=ncdata(myList_nod2D) 
+                !deallocate(ncdata)
+                !write(*,*), 'here'
+
+                ! Read all nutrient fields from PI file
+                !i=1
+                !call read_2ddata_on_grid_NetCDF(filename, 'DIC', i, RiverDIC2D, partit, mesh)
+                !call read_2ddata_on_grid_NetCDF(filename, 'DIN', i, RiverDIN2D, partit, mesh)
+                !call read_2ddata_on_grid_NetCDF(filename, 'DOC_l', i, RiverDOCl2D, partit, mesh)
+                !call read_2ddata_on_grid_NetCDF(filename, 'DOC_sl', i, RiverDOCsl2D, partit, mesh)
+                !call read_2ddata_on_grid_NetCDF(filename, 'POC', i, RiverPOC2D, partit, mesh)
+
+
+
+                !if (mype==0) write(*,'(A)') 'INFO: Using constant pre-industrial riverine inputs'
+                ! Check for read errors
+                !if (i /= 0) then
+                !    if (mype==0) write(*,'(A,A)') 'ERROR: Failed to read PI river inputs from ', trim(filename)
+                !    stop
+                !endif
+            !endif
+
+        else
+
+            ! Use transient (year-specific) river inputs
+            !if (mstep == 1) then
+                !if (mype==0) write(*,'(A,A,A,A)') 'INFO: Using transient riverine inputs - model year = ', &
+                !                    trim(cyearnew), ' from ', trim(filename)
+        
+                ! Construct filename for current year
+                !filename = trim(REcoMDataPath) // 'Rivers_R2OMIP_' // trim(cyearnew) // '.nc'
+        
+                ! Read all nutrient fields for current year
+                !call read_2ddata_on_grid_NetCDF(filename, 'DIC', i, RiverDIC2D, partit, mesh)
+                !if (i /= 0) then
+                    !if (mype==0)  write(*,'(A,A,A)') 'ERROR: Failed to read DIC from ', trim(filename)
+                    !stop
+               ! endif
+        
+                !call read_2ddata_on_grid_NetCDF(filename, 'DIN', i, RiverDIN2D, partit, mesh)
+                !if (i /= 0) then
+                    !if (mype==0) write(*,'(A,A,A)') 'ERROR: Failed to read DIN from ', trim(filename)
+                    !stop
+                !endif
+        
+                !call read_2ddata_on_grid_NetCDF(filename, 'DOC_l', i, RiverDOCl2D, partit, mesh)
+                !if (i /= 0) then
+                    !if (mype==0) write(*,'(A,A,A)') 'ERROR: Failed to read DOC_l from ', trim(filename)
+                    !stop
+                !endif
+        
+                !call read_2ddata_on_grid_NetCDF(filename, 'DOC_sl', i, RiverDOCsl2D, partit, mesh)
+                !if (i /= 0) then
+                    !if (mype==0) write(*,'(A,A,A)') 'ERROR: Failed to read DOC_sl from ', trim(filename)
+                    !stop
+                !endif
+        
+                !call read_2ddata_on_grid_NetCDF(filename, 'POC', i, RiverPOC2D, partit, mesh)
+                !if (i /= 0) then
+                    !if (mype==0) write(*,'(A,A,A)') 'ERROR: Failed to read POC from ', trim(filename)
+                    !stop
+                !endif
+            !endif
+      
+        endif
+
+  else
+
+    ! Rivers disabled: set all inputs to zero
+    is_riverinput = 0.0d0
+    RiverDIC2D    = 0.0d0
+    RiverDIN2D    = 0.0d0
+    RiverDOCl2D   = 0.0d0
+    RiverDOCsl2D  = 0.0d0
+    RiverPOC2D    = 0.0d0
+    
+  endif
+
+!IF (.FALSE.) THEN ! CHECK OG
+!        if (update_monthly_flag) then
+!            i=month
+!            if (mstep > 1) i=i+1 
+!            if (i > 12) i=1
+!            filename=trim(nm_river_data_file)
+!            if (mype==0) write(*,*) 'Updating riverine restoring data for month', i,' from ', trim(filename)
+!            call read_2ddata_on_grid_NetCDF(filename,'Alkalinity', i, RiverAlk2D, partit, mesh)
+!            ! write(*,*) mype, 'RiverAlk2D', maxval(RiverAlk2D(:)), minval(RiverAlk2D(:))        
+!            ! molar convertion of [CaCo3] * 2  -> [total Alkalinity]   
+!            RiverAlk2D = RiverAlk2D * 2
+!  
+!            call read_2ddata_on_grid_NetCDF(filename, 'DIC', i, RiverDIC2D, partit, mesh) 
+!            ! write(*,*) mype, 'RiverDIC2D', maxval(RiverDIC2D(:)), minval(RiverDIC2D(:))     
+!
+!            call read_2ddata_on_grid_NetCDF(filename, 'DIN', i, RiverDIN2D, partit, mesh) 
+!            ! write(*,*) mype, 'RiverDIN2D', maxval(RiverDIN2D(:)), minval(RiverDIN2D(:))     
+!
+!            call read_2ddata_on_grid_NetCDF(filename, 'DOC', i, RiverDOC2D, partit, mesh) 
+!            ! write(*,*) mype, 'RiverDOC2D', maxval(RiverDOC2D(:)), minval(RiverDOC2D(:))     
+!
+!            call read_2ddata_on_grid_NetCDF(filename, 'DON', i, RiverDON2D, partit, mesh) 
+!            ! write(*,*) mype, 'RiverDON2D', maxval(RiverDON2D(:)), minval(RiverDON2D(:))     
+!
+!            RiverDSi2D = RiverDIN2D * (16/15)
+!        end if
+!    else
+!        is_riverinput = 0.0d0
+!        if (mype==0 .and. mstep==1) write(*,*) 'No riverine input' 
+!    end if
+!ENDIF
 
 ! ******** Riverine input of iron *********
     if (useRivFe) then

@@ -276,6 +276,8 @@ if (enable_3zoo2det) then
   state(1:nn,imiczoon)  = max(tiny,state(1:nn,imiczoon))
   state(1:nn,imiczooc)  = max(tiny,state(1:nn,imiczooc))
 endif
+  
+  state(1:nn,idicremin) = max(tiny,state(1:nn,idicremin)) ! for DICremin tracer (added by Sina)
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
 
@@ -401,10 +403,10 @@ endif
 
     ! Dissolution and remineralization ! R2OMIP
      locDISSOC  = sum(vertDISSOC(1:nn) * thick(1:nn))
-     locDISSON  = sum(vertDISSON(1:nn) * thick(1:nn)) 
+     locDISSON  = sum(vertDISSON(1:nn) * thick(1:nn))
      locDISSOSi = sum(vertDISSOSi(1:nn) * thick(1:nn))
-     locREMOC   = sum(vertREMOC(1:nn) * thick(1:nn)) 
-     locREMOCt  = sum(vertREMOCt(1:nn) * thick(1:nn)) 
+     locREMOC   = sum(vertREMOC(1:nn) * thick(1:nn))
+     locREMOCt  = sum(vertREMOCt(1:nn) * thick(1:nn))
      locREMON   = sum(vertREMON(1:nn) * thick(1:nn))
 
   end if

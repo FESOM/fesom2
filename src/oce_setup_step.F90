@@ -816,6 +816,8 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     allocate(str_bf    ( nl-1, node_size ))
     allocate(vert_sink ( nl-1, node_size ))
     allocate(Alk_surf  (       node_size ))
+    allocate(nss       ( nl-1, node_size )) !R2OMIP (Burial)
+    allocate(bur       ( 1:benthos_num, nl-1, node_size )) ! LO !R2OMIP (Burial)
 #endif
     ! =================
     ! Visc and Diff coefs
@@ -925,6 +927,8 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     str_bf              = 0.0_WP
     vert_sink           = 0.0_WP
     Alk_surf            = 0.0_WP
+    nss                 = 0.0_WP !R2OMIP (Burial)
+    bur                 = 0.0_WP !R2OMIP (Burial)
 #endif
     
     ! init field for pressure force 
@@ -1044,6 +1048,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             write(*,*) 'read Nitrate     climatology from:', trim(filelist(6))
             write(*,*) 'read Salt        climatology from:', trim(filelist(7))
             write(*,*) 'read Temperature climatology from:', trim(filelist(8))
+            write(*,*) 'read DIC remineralization    from:', trim(filelist(9)) ! DICremin (added by Sina)
     end if
     ! read ocean state
     ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.

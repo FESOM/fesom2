@@ -382,16 +382,22 @@ else
     SELECT CASE (id)
        CASE (1001)
           bottom_flux = GlodecayBenthos(:,1) !*** DIN [mmolN/m^2/s] ***
+          Sed_2_Ocean_Flux(:,1) = bottom_flux !*** DIN [mmolN/m^2/s] ***  R2OMIP
        CASE (1002)
           bottom_flux = GlodecayBenthos(:,2) + GlodecayBenthos(:,4) !*** DIC + calcification ***
+          Sed_2_Ocean_Flux(:,2) = bottom_flux !*** DIC + calcification *** R2OMIP
        CASE (1003)
           bottom_flux = GlodecayBenthos(:,4) * 2.0_WP - 1.0625_WP * GlodecayBenthos(:,1) !*** Alk ***
+          Sed_2_Ocean_Flux(:,3) = bottom_flux !*** Alk *** R2OMIP
        CASE (1018)
           bottom_flux = GlodecayBenthos(:,3) !*** Si ***
+          Sed_2_Ocean_Flux(:,4) = bottom_flux !*** Si *** R2OMIP
        CASE (1019)
           bottom_flux = GlodecayBenthos(:,1) * Fe2N_benthos !*** DFe ***
+          Sed_2_Ocean_Flux(:,5) = bottom_flux !*** DFe *** R2OMIP
        CASE (1022)
           bottom_flux = -GlodecayBenthos(:,2) * redO2C !*** O2 ***
+          Sed_2_Ocean_Flux(:,6) = bottom_flux !*** O2 *** R2OMIP
        CASE (1302)
          if (ciso) then
            bottom_flux = GlodecayBenthos(:,5) + GlodecayBenthos(:,6) !*** DIC_13 and Calc: DIC_13 ***

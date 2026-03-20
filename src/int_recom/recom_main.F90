@@ -150,6 +150,14 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
                                           yearold, x_co2atm(1), x_co2atm_13(1), x_co2atm_14(1), cosmic_14(1) * production_rate_to_flux_14
     end if
   end if
+
+! Resetting DICremin tracer to zero when reaching surface (added by Sina) 
+do tr_num=1,num_tracers
+   if (tracers%data(tr_num)%ID==1037) then
+      tracers%data(tr_num)%values(1, : ) = 0
+   end if
+end do
+
 ! ======================================================================================
 !********************************* LOOP STARTS *****************************************
 
@@ -174,6 +182,9 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
 
         !!---- Benthic layers
         LocBenthos(1:benthos_num) = Benthos(n,1:benthos_num)
+
+        !!---- Burial in Benthic layers
+        BurialBen(1:benthos_num) = Burial(1:benthos_num,n) ! R2OMIP
 
         !!---- Local conc of [H+]-ions from last time step. Decleared and saved in LocVar.
         !!---- used as first guess for H+ conc. in subroutine CO2flux (provided by recom_init)
@@ -708,6 +719,10 @@ endif
 
     do n=1, benthos_num
         call exchange_nod(GlodecayBenthos(:,n), partit)
+    end do
+
+    do n=1, 6
+        call exchange_nod(Sed_2_Ocean_Flux(:,n), partit) ! Diagnose the flux back from Sediment to Ocean - R2OMIP
     end do
 
     call exchange_nod(GloHplus, partit)
