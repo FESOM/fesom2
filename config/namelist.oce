@@ -18,7 +18,6 @@
 C_d                = 0.0025  ! bottom drag coefficient (dimensionless, typical: 0.0025)
 A_ver              = 1.e-4   ! background vertical viscosity [m²/s]
 scale_area         = 5.8e9   ! reference element area for viscosity/diffusivity scaling [m²]
-
 ! --- Salt Plume Parameterization ---
 SPP                = .false. ! enable Salt Plume Parameterization (for brine rejection under sea ice)
 

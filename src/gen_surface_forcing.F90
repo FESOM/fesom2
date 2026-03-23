@@ -547,6 +547,7 @@ CONTAINS
       !! ** Purpose : Fill names of sbc_flfi array (file names and variable names)
 
       !prepare proper nc file (add year and .nc to the end of the file name from namelist
+if (.NOT. enable_AWICM) then
       if (l_xwind) write(sbc_flfi(i_xwind)%file_name, *) trim(make_full_path(nm_xwind_file)),trim(yyear),'.nc'
       if (l_ywind) write(sbc_flfi(i_ywind)%file_name, *) trim(make_full_path(nm_ywind_file)),trim(yyear),'.nc'
       if (l_xstre) write(sbc_flfi(i_xstre)%file_name, *) trim(make_full_path(nm_xstre_file)),trim(yyear),'.nc'
@@ -559,7 +560,21 @@ CONTAINS
       if (l_snow)  write(sbc_flfi(i_snow)%file_name,  *) trim(make_full_path(nm_snow_file)), trim(yyear),'.nc'
       if (l_mslp)  write(sbc_flfi(i_mslp)%file_name,  *) trim(make_full_path(nm_mslp_file)), trim(yyear),'.nc'
       if (l_cloud) write(sbc_flfi(i_cloud)%file_name, *) trim(make_full_path(nm_cloud_file)),trim(yyear),'.nc'
-
+else
+      ! AWICM forcing
+      if (l_xwind) write(sbc_flfi(i_xwind)%file_name, *) trim(make_full_path(nm_xwind_file)),trim(yyear),'01_reduced.nc'
+      if (l_ywind) write(sbc_flfi(i_ywind)%file_name, *) trim(make_full_path(nm_ywind_file)),trim(yyear),'01_reduced.nc'
+      if (l_xstre) write(sbc_flfi(i_xstre)%file_name, *) trim(make_full_path(nm_xstre_file)),trim(yyear),'01_reduced.nc'
+      if (l_ystre) write(sbc_flfi(i_ystre)%file_name, *) trim(make_full_path(nm_ystre_file)),trim(yyear),'01_reduced.nc'
+      if (l_humi) write(sbc_flfi(i_humi)%file_name, *) trim(make_full_path(nm_humi_file)), trim(yyear),'01_reduced.nc'
+      if (l_qsr) write(sbc_flfi(i_qsr)%file_name, *) trim(make_full_path(nm_qsr_file)), trim(yyear),'01_reduced.nc'
+      if (l_qlw) write(sbc_flfi(i_qlw)%file_name, *) trim(make_full_path(nm_qlw_file)), trim(yyear),'01_reduced.nc'
+      if (l_tair) write(sbc_flfi(i_tair)%file_name, *) trim(make_full_path(nm_tair_file)), trim(yyear),'01_reduced.nc'
+      if (l_prec) write(sbc_flfi(i_prec)%file_name, *) trim(make_full_path(nm_prec_file)), trim(yyear),'01_reduced.nc'
+      if (l_snow) write(sbc_flfi(i_snow)%file_name, *) trim(make_full_path(nm_snow_file)), trim(yyear),'01_reduced.nc'
+      if (l_mslp) write(sbc_flfi(i_mslp)%file_name, *) trim(make_full_path(nm_mslp_file)), trim(yyear),'01_reduced.nc'
+      if (l_cloud) write(sbc_flfi(i_cloud)%file_name, *) trim(make_full_path(nm_cloud_file)), trim(yyear),'01_reduced.nc'
+endif
       if (l_xwind) sbc_flfi(i_xwind)%file_name=ADJUSTL(trim(sbc_flfi(i_xwind)%file_name))
       if (l_ywind) sbc_flfi(i_ywind)%file_name=ADJUSTL(trim(sbc_flfi(i_ywind)%file_name))
       if (l_xstre) sbc_flfi(i_xstre)%file_name=ADJUSTL(trim(sbc_flfi(i_xstre)%file_name))
@@ -1464,6 +1479,7 @@ CONTAINS
       real(wp)     :: rdate ! date
       integer      :: fld_idx, i
       logical      :: do_rotation_wind, do_rotation_stre, force_newcoeff, update_monthly_flag
+      logical      :: update_daily_flag ! enable_AWICM = .true.
       integer      :: yyyy, dd, mm, flag_flpyr=0
       integer,   pointer   :: nc_Ntime, t_indx, t_indx_p1
       real(wp),  pointer   :: nc_time(:)
@@ -1567,7 +1583,11 @@ CONTAINS
     !===========================================================================
 
     ! prepare a flag which checks whether to update monthly data (SSS, river runoff)
-     update_monthly_flag=( (day_in_month==num_day_in_month(fleapyear,month) .AND. timenew==86400._WP) .OR. mstep==1  )
+     update_monthly_flag=( (day_in_month==num_day_in_month(fleapyear,month) .AND. timenew==86400._WP) .OR. mstep==1)
+     !AWICM
+     if (enable_AWICM) then
+         update_daily_flag = ( (timenew==86400._WP) .OR. mstep==1)
+     endif
 
     !___________________________________________________________________________ 
     ! read in SSS for applying SSS restoring
@@ -1596,7 +1616,7 @@ CONTAINS
             end if
         end if
     end if
-     
+
     !___________________________________________________________________________
     ! runoff --> depends on simulated month
     if(runoff_data_source=='Dai09' .or. runoff_data_source=='JRA55') then
@@ -1653,6 +1673,16 @@ CONTAINS
             
         end if ! --> if(update_monthly_flag) then
     end if ! --> if(runoff_data_source=='Dai09' .or. ... 
+
+    !river runoff AWICM
+    if(runoff_data_source == 'AWICM') then
+            if(update_daily_flag) then
+                    !daily data already in m/s
+                    i = daynew
+                    filename=trim(make_full_path(nm_runoff_file))//cyearnew//'0101_redistributed.nc'
+                    call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, partit, mesh)
+            end if
+    end if
 
 #if defined (__recom)
 !<  read surface atmospheric deposition for Fe, N, CO2
@@ -2507,7 +2537,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
 
          end if ! ier >0
       end if ! Ri < 0.25
-      end if  !delw != 0.0
+   end if  !delw != 0.0
 
    return
    end subroutine fairall

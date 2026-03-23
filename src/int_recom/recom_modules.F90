@@ -90,8 +90,9 @@ module recom_config
 
 !! *** REcoM setup ***
   Logical                :: enable_3zoo2det = .false.   ! Control extended zooplankton variables
-  Logical                :: enable_coccos = .false.      ! Control coccolithophore variables
-  namelist /parecomsetup/ enable_3zoo2det, enable_coccos
+  Logical                :: enable_coccos = .false.     ! Control coccolithophore variables
+  Logical                :: enable_AWICM = .false.      ! Control AWICM
+  namelist /parecomsetup/ enable_3zoo2det, enable_coccos, enable_AWICM
 
 !! *** General configuration ***
 
@@ -809,6 +810,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
     write(*,*) 'Model configuration:'
     write(*,*) '  enable_3zoo2det = ', enable_3zoo2det
     write(*,*) '  enable_coccos   = ', enable_coccos
+    write(*,*) '  enable_AWICM    = ', enable_AWICM
     write(*,*) '  useRivers       = ', useRivers
     write(*,*) ''
     write(*,*) 'Tracer counts:'

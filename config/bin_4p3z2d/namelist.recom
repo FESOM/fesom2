@@ -29,6 +29,7 @@ nm_co2_data_file      ='/albedo/work/projects/p_pool_recom/input/mesh_CORE2_fina
 &parecomsetup
 enable_3zoo2det = .true.    ! Enable 3 zooplankton + 2 detritus configuration
 enable_coccos   = .true.    ! Enable coccolithophores
+enable_AWICM    = .false.   ! Enable AWICM
 /
 
 ! ============================================================================
