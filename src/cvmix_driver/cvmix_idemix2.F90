@@ -365,7 +365,7 @@ end subroutine compute_param
 subroutine compute_compart_groupvel(          &
                 nfbin               , &   
                 coriolis            , & 
-                grady_coriol        , &
+                coriol_grady        , &
                 coslat              , &
                 cn                  , &
                 cn_gradx            , &
@@ -383,7 +383,7 @@ subroutine compute_compart_groupvel(          &
     type(idemix2_type), intent(in) , optional, target :: idemix2_const_userdef
     integer           , intent(in)                    :: nfbin
     real(cvmix_r8)    , intent(in)                    :: coriolis       , &
-                                                         grady_coriol   , &
+                                                         coriol_grady   , &
                                                          coslat         , &
                                                          cn             , &
                                                          cn_gradx       , &
@@ -398,7 +398,7 @@ subroutine compute_compart_groupvel(          &
     !___Local___________________________________________________________________
     integer                                           :: di, fbin_i
     real(cvmix_r8)                                    :: fxa, intNz, cstar, &
-                                                         kdot_x, kdot_y, cg
+                                                         kdot_x, kdot_y, cg_compart
     type(idemix2_type), pointer                       :: idemix2_const_in
     
     ! do pointer into save variable or into user defined input variable 
@@ -409,7 +409,7 @@ subroutine compute_compart_groupvel(          &
     
     !___________________________________________________________________________
     ! compute group velocity of M2 internal tidal waves
-    cg=sqrt( max(0d0, omega_compart**2 - coriolis**2 )  ) * cn/omega_compart
+    cg_compart=sqrt( max(0d0, omega_compart**2 - coriolis**2 )  ) * cn/omega_compart
     
     !___________________________________________________________________________
     ! eq4 in EdenOlbers2014:
@@ -424,27 +424,25 @@ subroutine compute_compart_groupvel(          &
     ! kdot_M2 = (kdot_x_M2, kdot_y_M2)
     
     ! compute: sqrt(omega²-f²)
-    fxa = max(1d-10,omega_compart**2 - coriolis**2 )
+    fxa = max(1d-10, omega_compart**2 - coriolis**2 )
         
     ! 1st part coriolis contribution
     ! compute: c_n/omega/sqrt(omega²-f²)) * f * grad_f 
-    kdot_y = -cn/sqrt(fxa)*coriolis/omega_compart*grady_coriol
-    !           |
-    !           +-> this minus sign is from the -cos(phi)
-    !
     ! 2nd part topographic/buoyancy driven contribution
     ! compute: sqrt(omega²-f²)/omega * grad_cn
-    kdot_y = kdot_y - sqrt(fxa)/omega_compart*cn_grady
-    !                     |
-    !                     +-> this minus sign is from the -cos(phi)
-    kdot_x = sqrt(fxa)/omega_compart*cn_gradx
+    kdot_y = -cn/sqrt(fxa)*coriolis/omega_compart*coriol_grady &
+             -sqrt(fxa)/omega_compart*cn_grady
+    !        |
+    !        +-> this minus sign is from the -cos(phi)
+    !
     
+    kdot_x = sqrt(fxa)/omega_compart*cn_gradx
     
     !___________________________________________________________________________
     !zonal, meridional and cross-spectral component of M2 internal tide group velocity
     do fbin_i=2,nfbin-1
-        u_compart(fbin_i) = cg*cos( phit(fbin_i) )
-        v_compart(fbin_i) = cg*sin( phit(fbin_i) ) * coslat 
+        u_compart(fbin_i) = cg_compart*cos( phit(fbin_i) )
+        v_compart(fbin_i) = cg_compart*sin( phit(fbin_i) ) * coslat 
         w_compart(fbin_i) = (kdot_y*cos(phiu(fbin_i)) + kdot_x*sin(phiu(fbin_i)) )
     end do
     
@@ -482,7 +480,7 @@ subroutine compute_compart_interact_tscale(   &
     !___Output__________________________________________________________________
     real(cvmix_r8)    , intent(out)                   :: tau_compart
     !___Local___________________________________________________________________
-    real(cvmix_r8)                                    :: fxb, fxc, N0
+    real(cvmix_r8)                                    :: fxb, fxc, N0, small=1.0e-12_cvmix_r8
     type(idemix2_type), pointer                       :: idemix2_const_in
     
     ! do pointer into save variable or into user defined input variable 
@@ -495,10 +493,10 @@ subroutine compute_compart_interact_tscale(   &
     ! compute NIW Dissipation Timescale
     if (zbottom>0) then
         N0=cn*cvmix_PI/zbottom
-        if (  N0> abs(coriolis) .and. omega_compart> abs(coriolis)  ) then
-            fxc = topo_hrms**2.0 * 2.0*cvmix_PI/(1d-12+topo_hlam) 
+        if (  N0 > abs(coriolis) .and. omega_compart > abs(coriolis)  ) then
+            fxc = topo_hrms**2.0 * 2.0*cvmix_PI/(small+topo_hlam) 
             fxb = 0.5* N0*( (omega_compart**2.0 + coriolis**2.0)/omega_compart**2.0 )**2.0  &
-                            *(omega_compart**2.0 - coriolis**2.0)**0.5/omega_compart
+                           *(omega_compart**2.0 - coriolis**2.0)**0.5/omega_compart
             tau_compart = min(0.5/dtime, fxc*fxb/zbottom) 
         endif
     endif
@@ -578,10 +576,10 @@ subroutine compute_vert_struct_fct(   &
                 nlev                , &
                 dzw                 , &
                 coriolis            , &
-                omega_M2            , &
-                omega_niw           , &
                 cn                  , &
                 Nsqr                , &
+                omega_M2            , &
+                omega_niw           , &
                 E_struct_M2         , &
                 E_struct_niw        , &
                 idemix2_const_userdef &
@@ -590,20 +588,17 @@ subroutine compute_vert_struct_fct(   &
     type(idemix2_type), intent(in) , optional, target :: idemix2_const_userdef
     integer           , intent(in)                    :: nlev           
     real(cvmix_r8)    , intent(in)                    :: dzw(:)         
-    real(cvmix_r8)    , intent(in)                    :: coriolis       , &
-                                                         omega_M2       , &
-                                                         omega_niw      , &
-                                                         cn             
+    real(cvmix_r8)    , intent(in)                    :: coriolis, cn             
     real(cvmix_r8)    , intent(in)                    :: Nsqr(:) 
-    
+    real(cvmix_r8)    , intent(in), optional          :: omega_M2, omega_niw      
+                                                         
     !___Output__________________________________________________________________
-    real(cvmix_r8)    , intent(inout), optional       :: E_struct_M2(:)    , &
-                                                         E_struct_niw(:)   
+    real(cvmix_r8)    , intent(inout), optional       :: E_struct_M2(:), E_struct_niw(:)   
                                                          
     !___Local___________________________________________________________________
     integer                                           :: di
-    real(cvmix_r8)                                    :: fxa, norm, phin_dim1
-    real(cvmix_r8), dimension(:)                      :: Nzw(nlev), phin(nlev), dphindz(nlev)
+    real(cvmix_r8)                                    :: fxa, norm, phin_dim1, small=1.0e-12_cvmix_r8, mask
+    real(cvmix_r8), dimension(:)                      :: Nzw(nlev), phin(nlev), dphindz(nlev), dzt(nlev)
     type(idemix2_type), pointer                       :: idemix2_const_in            
                 
     ! do pointer into save variable or into user defined input variable 
@@ -615,33 +610,44 @@ subroutine compute_vert_struct_fct(   &
     !___________________________________________________________________________
     ! calculate int_(-h)^z N dz
     phin(:)    = 0.0_cvmix_r8
-    Nzw(1)     = max(0.0_cvmix_r8, (Nsqr(1)+Nsqr(2)) * 0.5_cvmix_r8)
-    phin(1)    = sqrt(Nzw(1))*dzw(1)
+    Nzw(1)     = max(small, Nsqr(1))
+    dzt(1)     = dzw(1) * 0.5_cvmix_r8
+    phin(1)    = sqrt(Nzw(1))*dzt(1)
     phin_dim1  = phin(1)
-    fxa        = phin(1)/cn
+    fxa        = phin(1)/(small+cn)
     dphindz(1) = sin(fxa)/Nzw(1)**0.25_cvmix_r8 
     phin(1)    = cos(fxa)*Nzw(1)**0.25_cvmix_r8
     
-    do di = 2, nlev
+    do di = 2, nlev-1
         ! interpolate N² onto tracer levels and cumulative integrate
-        Nzw(di)     = max(0.0_cvmix_r8, (Nsqr(di)+Nsqr(di+1)) * 0.5_cvmix_r8)
+        Nzw(di)     = max(small, Nsqr(di))
+        dzt(di)     = (dzw(di-1)+dzw(di)) * 0.5_cvmix_r8
         
         ! calculate int_(-h)^z N dz
-        phin(di)    = phin_dim1 + sqrt(Nzw(di))*dzw(di)
+        phin(di)    = phin_dim1 + sqrt(Nzw(di))*dzt(di)
         phin_dim1   = phin(di)
         
         ! calculate phi_n    =    cos( int_(-h)^z N/c_n dz )*N^0.5
         !    and   dphi_n/dz =    sin( int_(-h)^z N/c_n dz )/N^0.5
-        fxa         = phin(di)/cn
+        fxa         = phin(di)/(small+cn)
         dphindz(di) = sin(fxa)/Nzw(di)**0.25_cvmix_r8 
         phin(di)    = cos(fxa)*Nzw(di)**0.25_cvmix_r8
     enddo
+    
+    di = nlev
+    ! interpolate N² onto tracer levels and cumulative integrate
+    Nzw(di)     = max(small, Nsqr(di))
+    dzt(di)     = dzw(di-1) * 0.5_cvmix_r8
+    phin(di)    = phin_dim1 + sqrt(Nzw(di))*dzt(di)
+    fxa         = phin(di)/(small+cn)
+    dphindz(di) = sin(fxa)/Nzw(di)**0.25_cvmix_r8 
+    phin(di)    = cos(fxa)*Nzw(di)**0.25_cvmix_r8
     
     
     ! normalisation with int_(-h)^0 dz (dphi_n/dz )^2 /N^2  = 1
     norm = 0.0_cvmix_r8
     do di = 1,nlev
-        norm = norm + dphindz(di)**2/Nzw(di)*dzw(di)
+        norm = norm + dphindz(di)**2/Nzw(di)*dzt(di)
     enddo
     do di = 1,nlev   
         if (norm>0.0_cvmix_r8) dphindz(di) = dphindz(di)/norm**0.5
@@ -650,25 +656,82 @@ subroutine compute_vert_struct_fct(   &
     ! normalisation with int_(-h)^0 dz phi_n^2 /c_n^2  = 1
     norm=0.0_cvmix_r8
     do di = 1,nlev
-        norm = norm + phin(di)**2/(cn**2)*dzw(di)
+        norm = norm + phin(di)**2/(small+cn**2)*dzt(di)
     enddo
     do di = 1,nlev   
         if (norm>0.0_cvmix_r8) phin(di) = phin(di)/norm**0.5
     enddo
     
     if (present(E_struct_M2)) then
+        ! ATTENTION (this is not part of pyOM2): 
+        ! M2 internal waves can only propagate where their frequency 
+        ! (ω_M2 ≈ 1.405×10⁻⁴ s⁻¹) exceeds the local Coriolis parameter (f = 2Ω sin φ). 
+        ! (Poleward of the critical latitude (~74.5°), where |f| > ω_M2, the dispersion 
+        ! (relation becomes invalid and the vertical structure function E_struct_M2 turns 
+        ! (negative—physically meaningless for wave energy. The condition 
+        ! (abs(coriolis_t) < omega_M2 ensures M2 energy is only computed in regions where 
+        ! (these waves can exist as propagating solutions. Without this check, high-latitude 
+        ! (grid points produce unphysical negative energies that contaminate the solution and 
+        ! (violate energy conservation principles
+        if ( abs(coriolis) < omega_M2 ) then 
+            mask = 1.0_cvmix_r8
+        else
+            mask = 0.0_cvmix_r8
+        end if 
+    
         ! calculate structure function for energy: 
         ! E(z) = E_0 0.5( (1+f^2/om^2) phi_n^2/c_n^2 + (1-f^2/om^2) (dphi_n/dz)^2/N^2)
         do di = 1,nlev   
-            E_struct_M2(di) = 0.5_cvmix_r8*( (1.0_cvmix_r8+coriolis**2/omega_M2**2)*phin(   di)**2 /(cn**2) &
-                                            +(1.0_cvmix_r8-coriolis**2/omega_M2**2)*dphindz(di)**2 /Nzw(di) )
+            E_struct_M2(di) = mask * 0.5_cvmix_r8*( (1.0_cvmix_r8+coriolis**2/omega_M2**2)*phin(   di)**2 /(small+cn**2) &
+                                                   +(1.0_cvmix_r8-coriolis**2/omega_M2**2)*dphindz(di)**2 /Nzw(di) )
+                                             
+            if (E_struct_M2(di)/=E_struct_M2(di) .or. E_struct_M2(di)<0.0_cvmix_r8) then 
+                write(*,*) " }-))))°> found negative/NaN E_struct_M2", E_struct_M2(di)
+                write(*,*) "di              = ", di
+                write(*,*) "mask            = ", mask
+                write(*,*) "coriolis        = ", coriolis
+                write(*,*) "omega_M2        = ", omega_M2
+                write(*,*) "phin(   di)     = ", phin(   di)
+                write(*,*) "dphindz(di)     = ", dphindz(di)
+                write(*,*) "Nzw(di)         = ", Nzw(di)
+                write(*,*) "cn              = ", cn
+                write(*,*) "coriolis**2/omega_M2**2 = ", coriolis**2/omega_M2**2
+                write(*,*) "(1.0_cvmix_r8+coriolis**2/omega_M2**2) = ", (1.0_cvmix_r8+coriolis**2/omega_M2**2)
+                write(*,*) "(1.0_cvmix_r8-coriolis**2/omega_M2**2) = ", (1.0_cvmix_r8-coriolis**2/omega_M2**2)
+            end if   
+            
         enddo
     endif
 
     if (present(E_struct_niw)) then
+        ! ATTENTION (this is not part of pyOM2): 
+        ! here its a safety switch in theory it should be imposed by definition that 
+        ! abs(coriolis) < omega_niw 
+        if ( abs(coriolis) < omega_niw ) then 
+            mask = 1.0_cvmix_r8
+        else
+            mask = 0.0_cvmix_r8
+        end if
+        
+        ! calculate structure function for energy: 
+        ! E(z) = E_0 0.5( (1+f^2/om^2) phi_n^2/c_n^2 + (1-f^2/om^2) (dphi_n/dz)^2/N^2)
         do di = 1,nlev   
-            E_struct_niw(di) = 0.5_cvmix_r8*( (1.0_cvmix_r8+coriolis**2/omega_niw**2)*phin(   di)**2/(cn**2) &
-                                             +(1.0_cvmix_r8-coriolis**2/omega_niw**2)*dphindz(di)**2/Nzw(di) )
+            E_struct_niw(di) = mask * 0.5_cvmix_r8*( (1.0_cvmix_r8+coriolis**2/(small+omega_niw**2))*phin(   di)**2/(small+cn**2) &
+                                                    +(1.0_cvmix_r8-coriolis**2/(small+omega_niw**2))*dphindz(di)**2/Nzw(di) )
+                                             
+            if (E_struct_niw(di)/=E_struct_niw(di) .or. E_struct_niw(di)<0.0_cvmix_r8) then 
+                write(*,*) " }-))))°> found negative/NaN E_struct_niw", E_struct_niw(di)
+                write(*,*) "di              = ", di
+                write(*,*) "mask            = ", mask
+                write(*,*) "coriolis        = ", coriolis
+                write(*,*) "omega_niw       = ", omega_niw
+                write(*,*) "phin(   di)     = ", phin(   di)
+                write(*,*) "dphindz(di)     = ", dphindz(di)
+                write(*,*) "Nzw(di)         = ", Nzw(di)
+                write(*,*) "cn              = ", cn
+                write(*,*) "(1.0_cvmix_r8+coriolis**2/omega_M2**2) = ", (1.0_cvmix_r8+coriolis**2/omega_M2**2)
+                write(*,*) "(1.0_cvmix_r8-coriolis**2/omega_M2**2) = ", (1.0_cvmix_r8-coriolis**2/omega_M2**2)
+            end if 
         enddo
     endif
     
@@ -691,9 +754,9 @@ subroutine compute_vdiff_vdiss_Eiw( &
                 fbot             , &
                 Eiw_old          , &
                 Eiw_new          , &
+                Eiw_diss         , &
                 Eiw_dt           , &
                 Eiw_vdif         , &
-                Eiw_diss         , &
                 Eiw_srf          , &
                 Eiw_bot          , &
                 idemix2_const_userdef &
@@ -711,11 +774,11 @@ subroutine compute_vdiff_vdiss_Eiw( &
     real(cvmix_r8)    , intent(in), dimension(nlev)   :: Eiw_old
     !___Output_________________________________________________________________
     real(cvmix_r8)    , intent(out), dimension(nlev)  :: Eiw_new
-    real(cvmix_r8)    , intent(out), dimension(nlev)  :: Eiw_dt
-    real(cvmix_r8)    , intent(out), dimension(nlev)  :: Eiw_vdif
     real(cvmix_r8)    , intent(out), dimension(nlev)  :: Eiw_diss
-    real(cvmix_r8)    , intent(out), dimension(nlev)  :: Eiw_bot
-    real(cvmix_r8)    , intent(out)                   :: Eiw_srf
+    real(cvmix_r8)    , intent(out), optional         :: Eiw_dt(nlev)
+    real(cvmix_r8)    , intent(out), optional         :: Eiw_vdif(nlev)
+    real(cvmix_r8)    , intent(out), optional         :: Eiw_bot(nlev)
+    real(cvmix_r8)    , intent(out), optional         :: Eiw_srf
     !___Local___________________________________________________________________
     integer                                           :: nz 
     real(cvmix_r8), dimension(nlev)                   :: Eiw_max
@@ -817,11 +880,14 @@ subroutine compute_vdiff_vdiss_Eiw( &
     ! |   0   0   0 a_k b_k | (Eiw_k) = (d_k)
     ! 
     !___________________________________________________________________________ 
+    nz = 1
+    dzmid(nz)      = dzw(nz)*0.5_cvmix_r8
+    
     do nz = 2, nlev-1
         c0_zmid(nz-1) = dt * idemix2_const_in%tau_v * (c0(nz)+c0(nz-1))*0.5_cvmix_r8 / dzw(nz-1)
         dzmid(nz)     = (dzw(nz) + dzw(nz-1))*0.5_cvmix_r8
     end do
-    dzmid(1)      = dzw(1)*0.5_cvmix_r8
+    
     nz=nlev
     dzmid(nz)     = dzw(nz-1)*0.5_cvmix_r8
     c0_zmid(nz-1) = idemix2_const_in%tau_v * (c0(nz)+c0(nz-1))*0.5_cvmix_r8 / dzw(nz-1)
@@ -855,6 +921,7 @@ subroutine compute_vdiff_vdiss_Eiw( &
     b_tri(nz)     = 1.0_cvmix_r8                    &
                     + dt * b_dif(nz)
     c_tri(nz)     =  -dt * c_dif(nz)
+    
     do nz=2,nlev-1
         a_tri(nz) =  -dt * a_dif(nz)
         b_tri(nz) = 1.0_cvmix_r8                    &
@@ -862,6 +929,7 @@ subroutine compute_vdiff_vdiss_Eiw( &
                     + dt * alpha_c(nz)*Eiw_max(nz)
         c_tri(nz) =  -dt * c_dif(nz)
     end do
+    
     nz = nlev
     a_tri(nz)     =  -dt * a_dif(nz)
     b_tri(nz)     = 1.0_cvmix_r8                    &
@@ -870,15 +938,12 @@ subroutine compute_vdiff_vdiss_Eiw( &
     
     ! -- d ---
     do nz=1,nlev
-        ! bottom production term
-        Eiw_bot(nz) = fbot(nz)/dzmid(nz)
         ! --> fbot(nz) must be here an array overf depth since we want this 
         !     in FESOM2 to operate on nodes, but our bottom topography is on elements
         !     so bottom forcing is injected over the water column where elements 
         !     that participate to the scalar control volume turn into bottom over the 
         !     vertical depth
-        
-        d_tri(nz) = Eiw_old(nz) + dt*fadd(nz) + dt*Eiw_bot(nz)
+        d_tri(nz) = Eiw_old(nz) + dt*fadd(nz) + dt*fbot(nz)/dzmid(nz)
         
     end do
     d_tri(1)   = d_tri(1) + dt*fsrf/dzmid(1)
@@ -887,32 +952,43 @@ subroutine compute_vdiff_vdiss_Eiw( &
     ! solve tridiagonal matrix
     call solve_tridiag(a_tri, b_tri, c_tri, d_tri, Eiw_new, nlev)
     
-    !___________________________________________________________________________
-    ! diagnose implicite tendencies (only for diagnostics)
-    ! production of Eiw from vertical diffusion
-    nz = 1
-    Eiw_vdif(nz) = - b_dif(nz)*Eiw_new(nz) + c_dif(nz)*Eiw_new(nz+1)
-    do nz=2,nlev-1
-        Eiw_vdif(nz) = a_dif(nz)*Eiw_new(nz-1) - b_dif(nz)*Eiw_new(nz) + c_dif(nz)*Eiw_new(nz+1)
-    enddo
-    nz = nlev
-    Eiw_vdif(nz) = a_dif(nz)*Eiw_new(nz-1) - b_dif(nz)*Eiw_new(nz)
-  
+    do nz=1,nlev
+        ! if (any(Eiw_new<0.0_cvmix_r8)) then
+        if (Eiw_new(nz)/=Eiw_new(nz) .or. Eiw_new(nz)<0.0_cvmix_r8) then 
+            write(*,*) " }-))))°> found negative/NaN Eiw_new in vdiff", Eiw_new(nz)
+            write(*,*) " Eiw_old(nz)=", Eiw_old(nz)
+            write(*,*) " fsrf       =", fsrf
+            write(*,*) " fbot(nz)   =", fbot(nz)
+            write(*,*) " alpha_c(nz)=", alpha_c(nz)
+            write(*,*) " Eiw_max(nz)=", Eiw_max(nz)
+        end if 
+    end do
+    
     !___________________________________________________________________________
     ! dissipation of E_iw
     Eiw_diss(:) = -alpha_c(: )*Eiw_max(:)*Eiw_new(:)
-!     write(*,*) "min/max Eiw_diss: ", minval(Eiw_diss), maxval(Eiw_diss)
-!     write(*,*) "min/max alpha_c : ", minval(alpha_c) , maxval(alpha_c)
-!     write(*,*) "min/max Eiw_max : ", minval(Eiw_max) , maxval(Eiw_max)
-!     write(*,*) "min/max Eiw_new : ", minval(Eiw_new) , maxval(Eiw_new)
-!     write(*,*) "min/max Eiw_old : ", minval(Eiw_old) , maxval(Eiw_old)
-!     write(*,*)
+    
+    !___________________________________________________________________________
+    ! debuggin diagnostics: 
+    ! production of Eiw from vertical diffusion
+    if (present(Eiw_vdif)) then 
+        nz = 1
+        Eiw_vdif(nz) = - b_dif(nz)*Eiw_new(nz) + c_dif(nz)*Eiw_new(nz+1)
+        do nz=2,nlev-1
+            Eiw_vdif(nz) = a_dif(nz)*Eiw_new(nz-1) - b_dif(nz)*Eiw_new(nz) + c_dif(nz)*Eiw_new(nz+1)
+        enddo
+        nz = nlev
+        Eiw_vdif(nz) = a_dif(nz)*Eiw_new(nz-1) - b_dif(nz)*Eiw_new(nz)
+    end if 
     
     ! total production of Eiw
-    Eiw_dt(:)   = (Eiw_new(:) - Eiw_old(:))/dt
+    if (present(Eiw_dt )) Eiw_dt(:) = (Eiw_new(:) - Eiw_old(:))/dt
     
     ! surface production term
-    Eiw_srf     =  fsrf/dzmid(1)
+    if (present(Eiw_srf)) Eiw_srf   = fsrf/dzmid(1)
+    
+    ! bottom production term
+    if (present(Eiw_bot)) Eiw_bot(:)= fbot(:)/dzmid(:)
     
 end subroutine compute_vdiff_vdiss_Eiw
 
@@ -923,23 +999,23 @@ end subroutine compute_vdiff_vdiss_Eiw
 ! Integrate vertical part of internal wave energy idemix equation, solve vertical 
 ! diffusion an dissipation implicitly over the water column. Keep in mind Eiw lives 
 ! on the full depth levels
-subroutine compute_Eiw_waveinteract( &
-                nlev               , & 
-                nfbin              , &
-                dzw                , &
-                dphi               , &
-                dt                 , &
-                E_iw_old           , &
-                E_iw_new           , &
-                E_M2_old           , &
-                E_M2_new           , &
-                E_M2_struct        , &
-                alpha_M2_c         , &
-                tau_M2             , &
-                E_niw_old          , &
-                E_niw_new          , &
-                E_niw_struct       , &
-                tau_niw            , &
+subroutine compute_Eiw_waveinteract(  &
+                nlev                , & 
+                nfbin               , &
+                dzw                 , &
+                dphi                , &
+                dt                  , &
+                E_iw_old            , &
+                E_iw_new            , &
+                E_M2_old            , &
+                E_M2_new            , &
+                E_M2_struct         , &
+                alpha_M2_c          , &
+                tau_M2              , &
+                E_niw_old           , &
+                E_niw_new           , &
+                E_niw_struct        , &
+                tau_niw             , &
                 idemix2_const_userdef &
                 )
     !___Input/Output____________________________________________________________
@@ -963,7 +1039,7 @@ subroutine compute_Eiw_waveinteract( &
     
     !___Local___________________________________________________________________
     integer                                             :: nz, fbini 
-    real(cvmix_r8)                                      :: vint, sint, aM2c, M2_diss, fmin 
+    real(cvmix_r8)                                      :: vint, sint, aM2c, M2_diss, fmin, vint_dbg, small=1.0e-12_cvmix_r8 
     type(idemix2_type), pointer                         :: idemix2_const_in     
     
     ! do pointer into save variable or into user defined input variable 
@@ -993,18 +1069,45 @@ subroutine compute_Eiw_waveinteract( &
         
         ! update M2 energy: interaction of M2 and continuum
         aM2c = alpha_M2_c
-        aM2c = max(0.0_cvmix_r8,min(aM2c,1./max(1d-12,dt*vint))) ! FP 2020
-        aM2c = max(0.0_cvmix_r8,min(aM2c,1./max(1d-12,dt*sint)))
+        aM2c = max(0.0_cvmix_r8,min(aM2c,1./max(small,dt*vint))) ! FP 2020
+        aM2c = max(0.0_cvmix_r8,min(aM2c,1./max(small,dt*sint)))
         do fbini = 2, nfbin-1
-            M2_diss = aM2c*vint*E_M2_old(fbini)
-            E_M2_new(fbini)= E_M2_new(fbini)-dt*M2_diss 
-            
-            ! update E_iw from E_M2
+            M2_diss         = aM2c*vint*E_M2_old(fbini)
+            M2_diss         = min(M2_diss, E_M2_new(fbini)/max(small,dt))
+            E_M2_new(fbini) = E_M2_new(fbini)-dt*M2_diss 
+            if (E_M2_new(fbini)/=E_M2_new(fbini) .or. E_M2_new(fbini)<0.0_cvmix_r8) then 
+                write(*,*) " }-))))°> found negative/NaN E_M2_new from WWI M2", E_M2_new(fbini)
+                write(*,*) "fbini           = ", fbini
+                write(*,*) "E_M2_new(fbini) = ", E_M2_new(fbini)
+                write(*,*) "E_M2_old(fbini) = ", E_M2_old(fbini)
+                write(*,*) "M2_diss         = ", -dt*M2_diss
+                write(*,*) "aM2c            = ", aM2c
+                write(*,*) "vint            = ", vint
+            end if
+        end do     
+        
+        ! update E_iw from E_M2
+        do nz = 1, nlev
             fmin = min( 0.5_cvmix_r8/dt,aM2c*vint ) ! flux limiter
-            E_iw_new(fbini) =   E_iw_new(fbini) &
-                              + dt * tau_M2* sint * E_M2_struct(fbini) &
-                              + dt * fmin  * sint * E_M2_struct(fbini)
             
+            vint_dbg = E_iw_new(nz)
+            
+            E_iw_new(nz) =   E_iw_new(nz) &
+                              + dt * tau_M2* sint * E_M2_struct(nz) &
+                              + dt * fmin  * sint * E_M2_struct(nz)
+                              
+            if (E_iw_new(nz)/=E_iw_new(nz) .or. E_iw_new(nz)<0.0_cvmix_r8) then 
+                write(*,*) " }-))))°> found negative/NaN Eiw_new from WWI M2", E_iw_new(nz)
+                write(*,*) "nz              = ", nz
+                write(*,*) "E_iw_new(nz)    = ", E_iw_new(nz)
+                write(*,*) "E_iw_bf(nz)     = ", vint_dbg
+                write(*,*) "E_M2_new        = ", minval(E_M2_new), maxval(E_M2_new)
+                write(*,*) "E_M2_old        = ", minval(E_M2_old), maxval(E_M2_old)
+                write(*,*) "tau_M2          = ", tau_M2
+                write(*,*) "fmin            = ", fmin
+                write(*,*) "sint            = ", sint
+                write(*,*) "E_M2_struct(nz) = ", E_M2_struct(nz)
+            end if                   
         end do
     end if
     
@@ -1017,13 +1120,20 @@ subroutine compute_Eiw_waveinteract( &
         end do
         
         ! update E_iw from E_niw
-        do fbini = 2, nfbin-1
-            E_iw_new(fbini) =   E_iw_new(fbini) &
-                              + dt * tau_niw * sint * E_niw_struct(fbini)
+        do nz = 1, nlev
+            E_iw_new(nz) =   E_iw_new(nz) &
+                              + dt * tau_niw * sint * E_niw_struct(nz)
+                              
+            if (E_iw_new(nz)/=E_iw_new(nz) .or. E_iw_new(nz)<0.0_cvmix_r8 ) then 
+                write(*,*) " }-))))°> found negative/NaN Eiw_new from WWI NIW", E_iw_new(nz)
+                write(*,*) "nz              = ", nz
+                write(*,*) "E_iw_new(nz)    = ", E_iw_new(nz)
+                write(*,*) "tau_niw         = ", tau_niw
+                write(*,*) "sint            = ", sint
+                write(*,*) "E_niw_struct(nz)= ", E_niw_struct(nz)
+            end if 
         end do
     end if
-    
-    
 end subroutine compute_Eiw_waveinteract
 
 
