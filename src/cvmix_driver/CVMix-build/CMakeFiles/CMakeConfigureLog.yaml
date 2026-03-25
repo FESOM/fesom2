@@ -1,0 +1,322 @@
+
+---
+events:
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/usr/share/cmake/Modules/CMakeDetermineSystem.cmake:204 (message)"
+      - "CMakeLists.txt:3 (project)"
+    message: |
+      The system is: Linux - 4.18.0-553.74.1.el8_10.x86_64 - x86_64
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/usr/share/cmake/Modules/CMakeDetermineCompilerId.cmake:17 (message)"
+      - "/usr/share/cmake/Modules/CMakeDetermineCompilerId.cmake:64 (__determine_compiler_id_test)"
+      - "/usr/share/cmake/Modules/CMakeDetermineFortranCompiler.cmake:179 (CMAKE_DETERMINE_COMPILER_ID)"
+      - "CMakeLists.txt:3 (project)"
+    message: |
+      Compiling the Fortran compiler identification source file "CMakeFortranCompilerId.F" succeeded.
+      Compiler: /sw/spack-levante/openmpi-4.1.2-yfwe6t/bin/mpif90 
+      Build flags: 
+      Id flags: -v 
+      
+      The output was:
+      0
+      ifort version 2021.5.0
+      /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../bin/intel64/fpp    -D__INTEL_COMPILER=2021 -D__INTEL_COMPILER_UPDATE=5 -D__unix__ -D__unix -D__linux__ -D__linux -D__gnu_linux__ -Dunix -Dlinux -D__ELF__ -D__x86_64 -D__x86_64__ -D__amd64 -D__amd64__ -D__INTEL_COMPILER_BUILD_DATE=20211109 -D__INTEL_OFFLOAD -D__MMX__ -D__SSE__ -D__SSE_MATH__ -D__SSE2__ -D__SSE2_MATH__ -D__pentium4 -D__pentium4__ -D__tune_pentium4__ -I. -I/sw/spack-levante/openmpi-4.1.2-yfwe6t/include -I/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib -I/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/intel64 -I/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/icc -I/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include -I/usr/local/include -I/usr/lib/gcc/x86_64-redhat-linux/8/include -I/usr/include/ -I/usr/include -fixed -4Ycpp -4Ncvf -f_com=yes -MX CMakeFortranCompilerId.F /tmp/ifortNh4Omd.i
+      #include "..." search starts here:
+      #include <...> search starts here:
+       .
+       /sw/spack-levante/openmpi-4.1.2-yfwe6t/include
+       /sw/spack-levante/openmpi-4.1.2-yfwe6t/lib
+       /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/intel64
+       /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/icc
+       /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include
+       /usr/local/include
+       /usr/lib/gcc/x86_64-redhat-linux/8/include
+       /usr/include/
+       /usr/include
+      End of search list.
+      /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../bin/intel64/fortcom    -D__INTEL_COMPILER=2021 -D__INTEL_COMPILER_UPDATE=5 -D__unix__ -D__unix -D__linux__ -D__linux -D__gnu_linux__ -Dunix -Dlinux -D__ELF__ -D__x86_64 -D__x86_64__ -D__amd64 -D__amd64__ -D__INTEL_COMPILER_BUILD_DATE=20211109 -D__INTEL_OFFLOAD -D__MMX__ -D__SSE__ -D__SSE_MATH__ -D__SSE2__ -D__SSE2_MATH__ -D__pentium4 -D__pentium4__ -D__tune_pentium4__ -I. -I/sw/spack-levante/openmpi-4.1.2-yfwe6t/include -I/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib -I/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/intel64 -I/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/icc -I/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include -I/usr/local/include -I/usr/lib/gcc/x86_64-redhat-linux/8/include -I/usr/include/ -I/usr/include -omp_simd -O2 "-reentrancy threaded" -simd -offload_host -mGLOB_em64t=TRUE -mP1OPT_version=2021.5.0-intel64 -mGLOB_diag_file=/tmp/ifortODTDKd.diag -mGLOB_long_size_64 -mGLOB_routine_pointer_size_64 -mGLOB_source_language=GLOB_SOURCE_LANGUAGE_F90 -mP2OPT_static_promotion -mGLOB_pack_sort_init_list -mP1OPT_print_version=FALSE -mCG_use_gas_got_workaround=F -mP2OPT_align_option_used=TRUE -mGLOB_gcc_version=850 "-mGLOB_options_string=-I/sw/spack-levante/openmpi-4.1.2-yfwe6t/include -I/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib -Wl,--disable-new-dtags,-rpath,/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/lib/intel64_lin -v -L/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib -L/sw/spack-levante/ucx-1.12.0-nlas56/lib -L/sw/spack-levante/libevent-2.1.8-mjzu6s/lib -L/sw/spack-levante/pmix-3.2.1-xut2g3/lib -L/usr/lib64 -Wl,-rpath,/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/lib/intel64_lin -Wl,-rpath -Wl,/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib -Wl,-rpath -Wl,/sw/spack-levante/ucx-1.12.0-nlas56/lib -Wl,-rpath -Wl,/sw/spack-levante/libevent-2.1.8-mjzu6s/lib -Wl,-rpath -Wl,/sw/spack-levante/pmix-3.2.1-xut2g3/lib -Wl,-rpath -Wl,/usr/lib64 -lmpi_usempif08 -lmpi_usempi_ignore_tkr -lmpi_mpifh -lmpi" -mGLOB_cxx_limited_range=FALSE -mCG_extend_parms=FALSE -mGLOB_compiler_bin_directory=/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../bin/intel64 -mGLOB_as_output_backup_file_name=/tmp/ifortsJIrmpas_.s -mGLOB_dashboard_use_source_name -mIPOPT_activate -mIPOPT_lite -mGLOB_uarch_tuning=0x0 -mGLOB_product_id_code=0x22006d91 -mCG_bnl_movbe=T -mP3OPT_use_mspp_call_convention -mP2OPT_subs_out_of_bound=FALSE -mP2OPT_disam_type_based_disam=2 -mGLOB_ansi_alias -mPGOPTI_value_profile_use=T -mGLOB_opt_report_use_source_name -mGLOB_offload_mode=1 -mGLOB_offload_no_openmp=TRUE -mP2OPT_offload_unique_var_string=ifort1231454539vnOTfj -mP2OPT_hlo_level=2 -mP2OPT_hlo -mP2OPT_hpo_rtt_control=0 -mIPOPT_args_in_regs=0 -mP2OPT_disam_assume_nonstd_intent_in=FALSE -mGLOB_imf_mapping_library=/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../bin/intel64/libiml_attr.so -mIPOPT_single_file_compile_and_link=TRUE -mPGOPTI_gen_threadsafe_level=0 -mIPOPT_lto_object_enabled -mIPOPT_lto_object_value=1 -mIPOPT_obj_output_file_name=/tmp/ifortODTDKd.o -mIPOPT_whole_archive_fixup_file_name=/tmp/ifortwarchQB2yGb -mGLOB_linker_version=2.30 -mGLOB_linker=ld -mGLOB_driver_tempfile_name=/tmp/iforttempfileWq8BIp -mP3OPT_asm_target=P3OPT_ASM_TARGET_GAS -mGLOB_async_unwind_tables=TRUE -mGLOB_obj_output_file=/tmp/ifortODTDKd.o -mGLOB_source_dialect=GLOB_SOURCE_DIALECT_FORTRAN -mP1OPT_source_file_name=CMakeFortranCompilerId.F -mP1OPT_full_source_file_name=/work/ab0246/a270124/model_codes/testing_and_debugging/awiesm-2.6.1/fesom-2.6/src/cvmix_driver/CVMix-build/CMakeFiles/3.26.5/CompilerIdFortran/CMakeFortranCompilerId.F -mP2OPT_symtab_type_copy=true /tmp/ifortNh4Omd.i
+      #include "..." search starts here:
+      #include <...> search starts here:
+       .
+       /sw/spack-levante/openmpi-4.1.2-yfwe6t/include
+       /sw/spack-levante/openmpi-4.1.2-yfwe6t/lib
+       /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/intel64
+       /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/icc
+       /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include
+       /usr/local/include
+       /usr/lib/gcc/x86_64-redhat-linux/8/include
+       /usr/include/
+       /usr/include
+      End of search list.
+      ld    /usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/8/crtbegin.o --eh-frame-hdr --build-id -dynamic-linker /lib64/ld-linux-x86-64.so.2 -m elf_x86_64 -L/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib -L/sw/spack-levante/ucx-1.12.0-nlas56/lib -L/sw/spack-levante/libevent-2.1.8-mjzu6s/lib -L/sw/spack-levante/pmix-3.2.1-xut2g3/lib -L/usr/lib64 -plugin /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../bin/intel64/../../lib/icx-lto.so -o a.out /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/lib/intel64_lin/for_main.o -L/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/lib/intel64_lin -L/usr/lib/gcc/x86_64-redhat-linux/8/ -L/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/ -L/lib/../lib64 -L/lib/../lib64/ -L/usr/lib/../lib64 -L/usr/lib/../lib64/ -L/usr/lib/gcc/x86_64-redhat-linux/8/../../../ -L/lib64 -L/lib/ -L/usr/lib64 -L/usr/lib --disable-new-dtags -rpath /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/lib/intel64_lin /tmp/ifortODTDKd.o -rpath /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/lib/intel64_lin -rpath /sw/spack-levante/openmpi-4.1.2-yfwe6t/lib -rpath /sw/spack-levante/ucx-1.12.0-nlas56/lib -rpath /sw/spack-levante/libevent-2.1.8-mjzu6s/lib -rpath /sw/spack-levante/pmix-3.2.1-xut2g3/lib -rpath /usr/lib64 -lmpi_usempif08 -lmpi_usempi_ignore_tkr -lmpi_mpifh -lmpi -Bdynamic -Bstatic -lifport -lifcoremt -limf -lsvml -Bdynamic -lm -Bstatic -lipgo -lirc -Bdynamic -lpthread -Bstatic -lsvml -Bdynamic -lc -lgcc -lgcc_s -Bstatic -lirc_s -Bdynamic -ldl -lc /usr/lib/gcc/x86_64-redhat-linux/8/crtend.o /usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crtn.o
+      
+      
+      Compilation of the Fortran compiler identification source "CMakeFortranCompilerId.F" produced "a.out"
+      
+      The Fortran compiler identification is Intel, found in:
+        /work/ab0246/a270124/model_codes/testing_and_debugging/awiesm-2.6.1/fesom-2.6/src/cvmix_driver/CVMix-build/CMakeFiles/3.26.5/CompilerIdFortran/a.out
+      
+  -
+    kind: "try_compile-v1"
+    backtrace:
+      - "/usr/share/cmake/Modules/CMakeDetermineCompilerABI.cmake:57 (try_compile)"
+      - "/usr/share/cmake/Modules/CMakeTestFortranCompiler.cmake:20 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "CMakeLists.txt:3 (project)"
+    checks:
+      - "Detecting Fortran compiler ABI info"
+    directories:
+      source: "/work/ab0246/a270124/model_codes/testing_and_debugging/awiesm-2.6.1/fesom-2.6/src/cvmix_driver/CVMix-build/CMakeFiles/CMakeScratch/TryCompile-Rtbarp"
+      binary: "/work/ab0246/a270124/model_codes/testing_and_debugging/awiesm-2.6.1/fesom-2.6/src/cvmix_driver/CVMix-build/CMakeFiles/CMakeScratch/TryCompile-Rtbarp"
+    cmakeVariables:
+      CMAKE_EXE_LINKER_FLAGS: ""
+      CMAKE_Fortran_FLAGS: ""
+      CMAKE_Fortran_FLAGS_DEBUG: "-g"
+    buildResult:
+      variable: "CMAKE_Fortran_ABI_COMPILED"
+      cached: true
+      stdout: |
+        Change Dir: /work/ab0246/a270124/model_codes/testing_and_debugging/awiesm-2.6.1/fesom-2.6/src/cvmix_driver/CVMix-build/CMakeFiles/CMakeScratch/TryCompile-Rtbarp
+        
+        Run Build Command(s):/usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_9796b/fast && gmake[3]: Entering directory '/work/ab0246/a270124/model_codes/testing_and_debugging/awiesm-2.6.1/fesom-2.6/src/cvmix_driver/CVMix-build/CMakeFiles/CMakeScratch/TryCompile-Rtbarp'
+        /usr/bin/gmake  -f CMakeFiles/cmTC_9796b.dir/build.make CMakeFiles/cmTC_9796b.dir/build
+        gmake[4]: Entering directory '/work/ab0246/a270124/model_codes/testing_and_debugging/awiesm-2.6.1/fesom-2.6/src/cvmix_driver/CVMix-build/CMakeFiles/CMakeScratch/TryCompile-Rtbarp'
+        Building Fortran object CMakeFiles/cmTC_9796b.dir/CMakeFortranCompilerABI.F90.o
+        /sw/spack-levante/openmpi-4.1.2-yfwe6t/bin/mpif90   -v -c /usr/share/cmake/Modules/CMakeFortranCompilerABI.F90 -o CMakeFiles/cmTC_9796b.dir/CMakeFortranCompilerABI.F90.o
+        ifort version 2021.5.0
+        /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../bin/intel64/fpp    -D__INTEL_COMPILER=2021 -D__INTEL_COMPILER_UPDATE=5 -D__unix__ -D__unix -D__linux__ -D__linux -D__gnu_linux__ -Dunix -Dlinux -D__ELF__ -D__x86_64 -D__x86_64__ -D__amd64 -D__amd64__ -D__INTEL_COMPILER_BUILD_DATE=20211109 -D__INTEL_OFFLOAD -D__MMX__ -D__SSE__ -D__SSE_MATH__ -D__SSE2__ -D__SSE2_MATH__ -D__pentium4 -D__pentium4__ -D__tune_pentium4__ -I. -I/sw/spack-levante/openmpi-4.1.2-yfwe6t/include -I/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib -I/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/intel64 -I/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/icc -I/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include -I/usr/local/include -I/usr/lib/gcc/x86_64-redhat-linux/8/include -I/usr/include/ -I/usr/include -4Ycpp -4Ncvf -f_com=yes -MX /usr/share/cmake/Modules/CMakeFortranCompilerABI.F90 /tmp/ifortIB6uhI.i90
+        #include "..." search starts here:
+        #include <...> search starts here:
+         .
+         /sw/spack-levante/openmpi-4.1.2-yfwe6t/include
+         /sw/spack-levante/openmpi-4.1.2-yfwe6t/lib
+         /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/intel64
+         /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/icc
+         /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include
+         /usr/local/include
+         /usr/lib/gcc/x86_64-redhat-linux/8/include
+         /usr/include/
+         /usr/include
+        End of search list.
+        /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../bin/intel64/fortcom    -D__INTEL_COMPILER=2021 -D__INTEL_COMPILER_UPDATE=5 -D__unix__ -D__unix -D__linux__ -D__linux -D__gnu_linux__ -Dunix -Dlinux -D__ELF__ -D__x86_64 -D__x86_64__ -D__amd64 -D__amd64__ -D__INTEL_COMPILER_BUILD_DATE=20211109 -D__INTEL_OFFLOAD -D__MMX__ -D__SSE__ -D__SSE_MATH__ -D__SSE2__ -D__SSE2_MATH__ -D__pentium4 -D__pentium4__ -D__tune_pentium4__ -I/usr/share/cmake/Modules -I. -I/sw/spack-levante/openmpi-4.1.2-yfwe6t/include -I/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib -I/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/intel64 -I/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/icc -I/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include -I/usr/local/include -I/usr/lib/gcc/x86_64-redhat-linux/8/include -I/usr/include/ -I/usr/include -omp_simd -O2 "-reentrancy threaded" -simd -offload_host -mGLOB_em64t=TRUE -mP1OPT_version=2021.5.0-intel64 -mGLOB_diag_file=CMakeFiles/cmTC_9796b.dir/CMakeFortranCompilerABI.F90.diag -mGLOB_long_size_64 -mGLOB_routine_pointer_size_64 -mGLOB_source_language=GLOB_SOURCE_LANGUAGE_F90 -mP2OPT_static_promotion -mGLOB_pack_sort_init_list -mP1OPT_print_version=FALSE -mCG_use_gas_got_workaround=F -mP2OPT_align_option_used=TRUE -mGLOB_gcc_version=850 "-mGLOB_options_string=-I/sw/spack-levante/openmpi-4.1.2-yfwe6t/include -I/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib -Wl,--disable-new-dtags,-rpath,/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/lib/intel64_lin -v -c -o CMakeFiles/cmTC_9796b.dir/CMakeFortranCompilerABI.F90.o" -mGLOB_cxx_limited_range=FALSE -mCG_extend_parms=FALSE -mGLOB_compiler_bin_directory=/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../bin/intel64 -mGLOB_as_output_backup_file_name=/tmp/ifort0545UCas_.s -mIPOPT_activate -mIPOPT_lite -mGLOB_uarch_tuning=0x0 -mGLOB_product_id_code=0x22006d91 -mCG_bnl_movbe=T -mP3OPT_use_mspp_call_convention -mP2OPT_subs_out_of_bound=FALSE -mP2OPT_disam_type_based_disam=2 -mGLOB_ansi_alias -mPGOPTI_value_profile_use=T -mGLOB_offload_mode=1 -mGLOB_offload_no_openmp=TRUE -mP2OPT_offload_unique_var_string=ifort1799070964vP24zW -mP2OPT_hlo_level=2 -mP2OPT_hlo -mP2OPT_hpo_rtt_control=0 -mIPOPT_args_in_regs=0 -mP2OPT_disam_assume_nonstd_intent_in=FALSE -mGLOB_imf_mapping_library=/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../bin/intel64/libiml_attr.so -mPGOPTI_gen_threadsafe_level=0 -mIPOPT_lto_object_enabled -mIPOPT_lto_object_value=1 -mIPOPT_obj_output_file_name=CMakeFiles/cmTC_9796b.dir/CMakeFortranCompilerABI.F90.o -mIPOPT_whole_archive_fixup_file_name=/tmp/ifortwarchvvzskk -mGLOB_linker_version=2.30 -mGLOB_linker=ld -mGLOB_driver_tempfile_name=/tmp/iforttempfileeO4l6X -mP3OPT_asm_target=P3OPT_ASM_TARGET_GAS -mGLOB_async_unwind_tables=TRUE -mGLOB_obj_output_file=CMakeFiles/cmTC_9796b.dir/CMakeFortranCompilerABI.F90.o -mGLOB_source_dialect=GLOB_SOURCE_DIALECT_FORTRAN -mP1OPT_source_file_name=/usr/share/cmake/Modules/CMakeFortranCompilerABI.F90 -mP1OPT_full_source_file_name=/usr/share/cmake/Modules/CMakeFortranCompilerABI.F90 -mP2OPT_symtab_type_copy=true /tmp/ifortIB6uhI.i90
+        #include "..." search starts here:
+        #include <...> search starts here:
+         /usr/share/cmake/Modules
+         .
+         /sw/spack-levante/openmpi-4.1.2-yfwe6t/include
+         /sw/spack-levante/openmpi-4.1.2-yfwe6t/lib
+         /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/intel64
+         /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/icc
+         /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include
+         /usr/local/include
+         /usr/lib/gcc/x86_64-redhat-linux/8/include
+         /usr/include/
+         /usr/include
+        End of search list.
+        Linking Fortran executable cmTC_9796b
+        /usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_9796b.dir/link.txt --verbose=1
+        /sw/spack-levante/openmpi-4.1.2-yfwe6t/bin/mpif90  -v CMakeFiles/cmTC_9796b.dir/CMakeFortranCompilerABI.F90.o -o cmTC_9796b 
+        ifort version 2021.5.0
+        /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../bin/intel64/fortcom    -mGLOB_em64t=TRUE -mP1OPT_version=2021.5.0-intel64 -mGLOB_diag_file=CMakeFiles/cmTC_9796b.dir/CMakeFortranCompilerABI.F90.diag -mGLOB_long_size_64 -mGLOB_routine_pointer_size_64 -mGLOB_source_language=GLOB_SOURCE_LANGUAGE_F90 -mP2OPT_static_promotion -mGLOB_pack_sort_init_list -mP1OPT_print_version=FALSE -mCG_use_gas_got_workaround=F -mP2OPT_align_option_used=TRUE -mGLOB_gcc_version=850 "-mGLOB_options_string=-I/sw/spack-levante/openmpi-4.1.2-yfwe6t/include -I/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib -Wl,--disable-new-dtags,-rpath,/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/lib/intel64_lin -v -o cmTC_9796b -L/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib -L/sw/spack-levante/ucx-1.12.0-nlas56/lib -L/sw/spack-levante/libevent-2.1.8-mjzu6s/lib -L/sw/spack-levante/pmix-3.2.1-xut2g3/lib -L/usr/lib64 -Wl,-rpath,/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/lib/intel64_lin -Wl,-rpath -Wl,/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib -Wl,-rpath -Wl,/sw/spack-levante/ucx-1.12.0-nlas56/lib -Wl,-rpath -Wl,/sw/spack-levante/libevent-2.1.8-mjzu6s/lib -Wl,-rpath -Wl,/sw/spack-levante/pmix-3.2.1-xut2g3/lib -Wl,-rpath -Wl,/usr/lib64 -lmpi_usempif08 -lmpi_usempi_ignore_tkr -lmpi_mpifh -lmpi" -mGLOB_cxx_limited_range=FALSE -mCG_extend_parms=FALSE -mGLOB_compiler_bin_directory=/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../bin/intel64 -mGLOB_as_output_backup_file_name=/tmp/ifort0hrkzkas_.s -mGLOB_dashboard_use_source_name -mIPOPT_activate -mGLOB_product_id_code=0x22006d91 -mP3OPT_use_mspp_call_convention -mP2OPT_subs_out_of_bound=FALSE -mP2OPT_disam_type_based_disam=2 -mGLOB_ansi_alias -mPGOPTI_value_profile_use=T -mGLOB_opt_report_use_source_name -mGLOB_offload_mode=1 -mGLOB_offload_no_openmp=TRUE -mP2OPT_offload_unique_var_string=ifort1701052386aZarLG -mP2OPT_hlo -mP2OPT_hpo_rtt_control=0 -mIPOPT_args_in_regs=0 -mP2OPT_disam_assume_nonstd_intent_in=FALSE -mGLOB_imf_mapping_library=/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../bin/intel64/libiml_attr.so -mPGOPTI_gen_threadsafe_level=0 -mIPOPT_link -mIPOPT_ipo_activate -mIPOPT_mo_activate -mIPOPT_source_files_list=/tmp/ifortslis1LBDxa -mIPOPT_mo_global_data -mIPOPT_link_script_file=/tmp/ifortscriptzLfsnN "-mIPOPT_cmdline_link="/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crt1.o" "/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crti.o" "/usr/lib/gcc/x86_64-redhat-linux/8/crtbegin.o" "--eh-frame-hdr" "--build-id" "-dynamic-linker" "/lib64/ld-linux-x86-64.so.2" "-m" "elf_x86_64" "-L/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib" "-L/sw/spack-levante/ucx-1.12.0-nlas56/lib" "-L/sw/spack-levante/libevent-2.1.8-mjzu6s/lib" "-L/sw/spack-levante/pmix-3.2.1-xut2g3/lib" "-L/usr/lib64" "-plugin" "/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../bin/intel64/../../lib/icx-lto.so" "-o" "cmTC_9796b" "/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/lib/intel64_lin/for_main.o" "-L/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/lib/intel64_lin" "-L/usr/lib/gcc/x86_64-redhat-linux/8/" "-L/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64" "-L/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/" "-L/lib/../lib64" "-L/lib/../lib64/" "-L/usr/lib/../lib64" "-L/usr/lib/../lib64/" "-L/usr/lib/gcc/x86_64-redhat-linux/8/../../../" "-L/lib64" "-L/lib/" "-L/usr/lib64" "-L/usr/lib" "--disable-new-dtags" "-rpath" "/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/lib/intel64_lin" "CMakeFiles/cmTC_9796b.dir/CMakeFortranCompilerABI.F90.o" "-rpath" "/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/lib/intel64_lin" "-rpath" "/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib" "-rpath" "/sw/spack-levante/ucx-1.12.0-nlas56/lib" "-rpath" "/sw/spack-levante/libevent-2.1.8-mjzu6s/lib" "-rpath" "/sw/spack-levante/pmix-3.2.1-xut2g3/lib" "-rpath" "/usr/lib64" "-lmpi_usempif08" "-lmpi_usempi_ignore_tkr" "-lmpi_mpifh" "-lmpi" "-Bdynamic" "-Bstatic" "-lifport" "-lifcoremt" "-limf" "-lsvml" "-Bdynamic" "-lm" "-Bstatic" "-lipgo" "-lirc" "-Bdynamic" "-lpthread" "-Bstatic" "-lsvml" "-Bdynamic" "-lc" "-lgcc" "-lgcc_s" "-Bstatic" "-lirc_s" "-Bdynamic" "-ldl" "-lc" "/usr/lib/gcc/x86_64-redhat-linux/8/crtend.o" "/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crtn.o"" -mIPOPT_il_in_obj -mIPOPT_ipo_activate_warn=FALSE -mIPOPT_obj_output_file_name=/tmp/ipo_ifortcBZ0Jr.o -mIPOPT_whole_archive_fixup_file_name=/tmp/ifortwarchpc1URj -mGLOB_linker_version=2.30 -mGLOB_linker=ld -mGLOB_driver_tempfile_name=/tmp/iforttempfile2H1oJz -mP3OPT_asm_target=P3OPT_ASM_TARGET_GAS -mGLOB_async_unwind_tables=TRUE -mGLOB_obj_output_file=/tmp/ipo_ifortcBZ0Jr.o -mGLOB_source_dialect=GLOB_SOURCE_DIALECT_NONE -mP1OPT_source_file_name=ipo_out.f -mP2OPT_symtab_type_copy=true CMakeFiles/cmTC_9796b.dir/CMakeFortranCompilerABI.F90.o -mIPOPT_object_files=T -mIPOPT_assembly_files=/tmp/ifortalis07GtXA -mIPOPT_generated_tempfiles=/tmp/ifortelisomtA8J -mIPOPT_embedded_object_base_name=/tmp/iforteobjQYkhZR -mIPOPT_cmdline_link_new_name=/tmp/ifortllisjvB0rF
+        ld    /usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/8/crtbegin.o --eh-frame-hdr --build-id -dynamic-linker /lib64/ld-linux-x86-64.so.2 -m elf_x86_64 -L/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib -L/sw/spack-levante/ucx-1.12.0-nlas56/lib -L/sw/spack-levante/libevent-2.1.8-mjzu6s/lib -L/sw/spack-levante/pmix-3.2.1-xut2g3/lib -L/usr/lib64 -plugin /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../bin/intel64/../../lib/icx-lto.so -o cmTC_9796b /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/lib/intel64_lin/for_main.o -L/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/lib/intel64_lin -L/usr/lib/gcc/x86_64-redhat-linux/8/ -L/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/ -L/lib/../lib64 -L/lib/../lib64/ -L/usr/lib/../lib64 -L/usr/lib/../lib64/ -L/usr/lib/gcc/x86_64-redhat-linux/8/../../../ -L/lib64 -L/lib/ -L/usr/lib64 -L/usr/lib --disable-new-dtags -rpath /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/lib/intel64_lin CMakeFiles/cmTC_9796b.dir/CMakeFortranCompilerABI.F90.o -rpath /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/lib/intel64_lin -rpath /sw/spack-levante/openmpi-4.1.2-yfwe6t/lib -rpath /sw/spack-levante/ucx-1.12.0-nlas56/lib -rpath /sw/spack-levante/libevent-2.1.8-mjzu6s/lib -rpath /sw/spack-levante/pmix-3.2.1-xut2g3/lib -rpath /usr/lib64 -lmpi_usempif08 -lmpi_usempi_ignore_tkr -lmpi_mpifh -lmpi -Bdynamic -Bstatic -lifport -lifcoremt -limf -lsvml -Bdynamic -lm -Bstatic -lipgo -lirc -Bdynamic -lpthread -Bstatic -lsvml -Bdynamic -lc -lgcc -lgcc_s -Bstatic -lirc_s -Bdynamic -ldl -lc /usr/lib/gcc/x86_64-redhat-linux/8/crtend.o /usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crtn.o
+        gmake[4]: Leaving directory '/work/ab0246/a270124/model_codes/testing_and_debugging/awiesm-2.6.1/fesom-2.6/src/cvmix_driver/CVMix-build/CMakeFiles/CMakeScratch/TryCompile-Rtbarp'
+        gmake[3]: Leaving directory '/work/ab0246/a270124/model_codes/testing_and_debugging/awiesm-2.6.1/fesom-2.6/src/cvmix_driver/CVMix-build/CMakeFiles/CMakeScratch/TryCompile-Rtbarp'
+        
+      exitCode: 0
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/usr/share/cmake/Modules/CMakeDetermineCompilerABI.cmake:127 (message)"
+      - "/usr/share/cmake/Modules/CMakeTestFortranCompiler.cmake:20 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "CMakeLists.txt:3 (project)"
+    message: |
+      Parsed Fortran implicit include dir info: rv=done
+        found start of include info
+        found start of implicit include info
+          add: [.]
+          add: [/sw/spack-levante/openmpi-4.1.2-yfwe6t/include]
+          add: [/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib]
+          add: [/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/intel64]
+          add: [/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/icc]
+          add: [/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include]
+          add: [/usr/local/include]
+          add: [/usr/lib/gcc/x86_64-redhat-linux/8/include]
+          add: [/usr/include/]
+          add: [/usr/include]
+        end of search list found
+        skipping relative include dir [.]
+        collapse include dir [/sw/spack-levante/openmpi-4.1.2-yfwe6t/include] ==> [/sw/spack-levante/openmpi-4.1.2-yfwe6t/include]
+        collapse include dir [/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib] ==> [/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib]
+        collapse include dir [/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/intel64] ==> [/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/include/intel64]
+        collapse include dir [/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/icc] ==> [/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/include/icc]
+        collapse include dir [/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include] ==> [/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/include]
+        collapse include dir [/usr/local/include] ==> [/usr/local/include]
+        collapse include dir [/usr/lib/gcc/x86_64-redhat-linux/8/include] ==> [/usr/lib/gcc/x86_64-redhat-linux/8/include]
+        collapse include dir [/usr/include/] ==> [/usr/include]
+        collapse include dir [/usr/include] ==> [/usr/include]
+        implicit include dirs: [/sw/spack-levante/openmpi-4.1.2-yfwe6t/include;/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib;/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/include/intel64;/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/include/icc;/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/include;/usr/local/include;/usr/lib/gcc/x86_64-redhat-linux/8/include;/usr/include]
+      
+      
+  -
+    kind: "message-v1"
+    backtrace:
+      - "/usr/share/cmake/Modules/CMakeDetermineCompilerABI.cmake:152 (message)"
+      - "/usr/share/cmake/Modules/CMakeTestFortranCompiler.cmake:20 (CMAKE_DETERMINE_COMPILER_ABI)"
+      - "CMakeLists.txt:3 (project)"
+    message: |
+      Parsed Fortran implicit link information:
+        link line regex: [^( *|.*[/\\])(ld|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\\]+-)?ld|collect2)[^/\\]*( |$)]
+        ignore line: [Change Dir: /work/ab0246/a270124/model_codes/testing_and_debugging/awiesm-2.6.1/fesom-2.6/src/cvmix_driver/CVMix-build/CMakeFiles/CMakeScratch/TryCompile-Rtbarp]
+        ignore line: []
+        ignore line: [Run Build Command(s):/usr/bin/cmake -E env VERBOSE=1 /usr/bin/gmake -f Makefile cmTC_9796b/fast && gmake[3]: Entering directory '/work/ab0246/a270124/model_codes/testing_and_debugging/awiesm-2.6.1/fesom-2.6/src/cvmix_driver/CVMix-build/CMakeFiles/CMakeScratch/TryCompile-Rtbarp']
+        ignore line: [/usr/bin/gmake  -f CMakeFiles/cmTC_9796b.dir/build.make CMakeFiles/cmTC_9796b.dir/build]
+        ignore line: [gmake[4]: Entering directory '/work/ab0246/a270124/model_codes/testing_and_debugging/awiesm-2.6.1/fesom-2.6/src/cvmix_driver/CVMix-build/CMakeFiles/CMakeScratch/TryCompile-Rtbarp']
+        ignore line: [Building Fortran object CMakeFiles/cmTC_9796b.dir/CMakeFortranCompilerABI.F90.o]
+        ignore line: [/sw/spack-levante/openmpi-4.1.2-yfwe6t/bin/mpif90   -v -c /usr/share/cmake/Modules/CMakeFortranCompilerABI.F90 -o CMakeFiles/cmTC_9796b.dir/CMakeFortranCompilerABI.F90.o]
+        ignore line: [ifort version 2021.5.0]
+        ignore line: [/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../bin/intel64/fpp    -D__INTEL_COMPILER=2021 -D__INTEL_COMPILER_UPDATE=5 -D__unix__ -D__unix -D__linux__ -D__linux -D__gnu_linux__ -Dunix -Dlinux -D__ELF__ -D__x86_64 -D__x86_64__ -D__amd64 -D__amd64__ -D__INTEL_COMPILER_BUILD_DATE=20211109 -D__INTEL_OFFLOAD -D__MMX__ -D__SSE__ -D__SSE_MATH__ -D__SSE2__ -D__SSE2_MATH__ -D__pentium4 -D__pentium4__ -D__tune_pentium4__ -I. -I/sw/spack-levante/openmpi-4.1.2-yfwe6t/include -I/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib -I/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/intel64 -I/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/icc -I/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include -I/usr/local/include -I/usr/lib/gcc/x86_64-redhat-linux/8/include -I/usr/include/ -I/usr/include -4Ycpp -4Ncvf -f_com=yes -MX /usr/share/cmake/Modules/CMakeFortranCompilerABI.F90 /tmp/ifortIB6uhI.i90]
+        ignore line: [#include "..." search starts here:]
+        ignore line: [#include <...> search starts here:]
+        ignore line: [ .]
+        ignore line: [ /sw/spack-levante/openmpi-4.1.2-yfwe6t/include]
+        ignore line: [ /sw/spack-levante/openmpi-4.1.2-yfwe6t/lib]
+        ignore line: [ /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/intel64]
+        ignore line: [ /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/icc]
+        ignore line: [ /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include]
+        ignore line: [ /usr/local/include]
+        ignore line: [ /usr/lib/gcc/x86_64-redhat-linux/8/include]
+        ignore line: [ /usr/include/]
+        ignore line: [ /usr/include]
+        ignore line: [End of search list.]
+        ignore line: [/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../bin/intel64/fortcom    -D__INTEL_COMPILER=2021 -D__INTEL_COMPILER_UPDATE=5 -D__unix__ -D__unix -D__linux__ -D__linux -D__gnu_linux__ -Dunix -Dlinux -D__ELF__ -D__x86_64 -D__x86_64__ -D__amd64 -D__amd64__ -D__INTEL_COMPILER_BUILD_DATE=20211109 -D__INTEL_OFFLOAD -D__MMX__ -D__SSE__ -D__SSE_MATH__ -D__SSE2__ -D__SSE2_MATH__ -D__pentium4 -D__pentium4__ -D__tune_pentium4__ -I/usr/share/cmake/Modules -I. -I/sw/spack-levante/openmpi-4.1.2-yfwe6t/include -I/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib -I/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/intel64 -I/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/icc -I/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include -I/usr/local/include -I/usr/lib/gcc/x86_64-redhat-linux/8/include -I/usr/include/ -I/usr/include -omp_simd -O2 "-reentrancy threaded" -simd -offload_host -mGLOB_em64t=TRUE -mP1OPT_version=2021.5.0-intel64 -mGLOB_diag_file=CMakeFiles/cmTC_9796b.dir/CMakeFortranCompilerABI.F90.diag -mGLOB_long_size_64 -mGLOB_routine_pointer_size_64 -mGLOB_source_language=GLOB_SOURCE_LANGUAGE_F90 -mP2OPT_static_promotion -mGLOB_pack_sort_init_list -mP1OPT_print_version=FALSE -mCG_use_gas_got_workaround=F -mP2OPT_align_option_used=TRUE -mGLOB_gcc_version=850 "-mGLOB_options_string=-I/sw/spack-levante/openmpi-4.1.2-yfwe6t/include -I/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib -Wl --disable-new-dtags -rpath /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/lib/intel64_lin -v -c -o CMakeFiles/cmTC_9796b.dir/CMakeFortranCompilerABI.F90.o" -mGLOB_cxx_limited_range=FALSE -mCG_extend_parms=FALSE -mGLOB_compiler_bin_directory=/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../bin/intel64 -mGLOB_as_output_backup_file_name=/tmp/ifort0545UCas_.s -mIPOPT_activate -mIPOPT_lite -mGLOB_uarch_tuning=0x0 -mGLOB_product_id_code=0x22006d91 -mCG_bnl_movbe=T -mP3OPT_use_mspp_call_convention -mP2OPT_subs_out_of_bound=FALSE -mP2OPT_disam_type_based_disam=2 -mGLOB_ansi_alias -mPGOPTI_value_profile_use=T -mGLOB_offload_mode=1 -mGLOB_offload_no_openmp=TRUE -mP2OPT_offload_unique_var_string=ifort1799070964vP24zW -mP2OPT_hlo_level=2 -mP2OPT_hlo -mP2OPT_hpo_rtt_control=0 -mIPOPT_args_in_regs=0 -mP2OPT_disam_assume_nonstd_intent_in=FALSE -mGLOB_imf_mapping_library=/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../bin/intel64/libiml_attr.so -mPGOPTI_gen_threadsafe_level=0 -mIPOPT_lto_object_enabled -mIPOPT_lto_object_value=1 -mIPOPT_obj_output_file_name=CMakeFiles/cmTC_9796b.dir/CMakeFortranCompilerABI.F90.o -mIPOPT_whole_archive_fixup_file_name=/tmp/ifortwarchvvzskk -mGLOB_linker_version=2.30 -mGLOB_linker=ld -mGLOB_driver_tempfile_name=/tmp/iforttempfileeO4l6X -mP3OPT_asm_target=P3OPT_ASM_TARGET_GAS -mGLOB_async_unwind_tables=TRUE -mGLOB_obj_output_file=CMakeFiles/cmTC_9796b.dir/CMakeFortranCompilerABI.F90.o -mGLOB_source_dialect=GLOB_SOURCE_DIALECT_FORTRAN -mP1OPT_source_file_name=/usr/share/cmake/Modules/CMakeFortranCompilerABI.F90 -mP1OPT_full_source_file_name=/usr/share/cmake/Modules/CMakeFortranCompilerABI.F90 -mP2OPT_symtab_type_copy=true /tmp/ifortIB6uhI.i90]
+        ignore line: [#include "..." search starts here:]
+        ignore line: [#include <...> search starts here:]
+        ignore line: [ /usr/share/cmake/Modules]
+        ignore line: [ .]
+        ignore line: [ /sw/spack-levante/openmpi-4.1.2-yfwe6t/include]
+        ignore line: [ /sw/spack-levante/openmpi-4.1.2-yfwe6t/lib]
+        ignore line: [ /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/intel64]
+        ignore line: [ /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include/icc]
+        ignore line: [ /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/include]
+        ignore line: [ /usr/local/include]
+        ignore line: [ /usr/lib/gcc/x86_64-redhat-linux/8/include]
+        ignore line: [ /usr/include/]
+        ignore line: [ /usr/include]
+        ignore line: [End of search list.]
+        ignore line: [Linking Fortran executable cmTC_9796b]
+        ignore line: [/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_9796b.dir/link.txt --verbose=1]
+        ignore line: [/sw/spack-levante/openmpi-4.1.2-yfwe6t/bin/mpif90  -v CMakeFiles/cmTC_9796b.dir/CMakeFortranCompilerABI.F90.o -o cmTC_9796b ]
+        ignore line: [ifort version 2021.5.0]
+        ignore line: [/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../bin/intel64/fortcom    -mGLOB_em64t=TRUE -mP1OPT_version=2021.5.0-intel64 -mGLOB_diag_file=CMakeFiles/cmTC_9796b.dir/CMakeFortranCompilerABI.F90.diag -mGLOB_long_size_64 -mGLOB_routine_pointer_size_64 -mGLOB_source_language=GLOB_SOURCE_LANGUAGE_F90 -mP2OPT_static_promotion -mGLOB_pack_sort_init_list -mP1OPT_print_version=FALSE -mCG_use_gas_got_workaround=F -mP2OPT_align_option_used=TRUE -mGLOB_gcc_version=850 "-mGLOB_options_string=-I/sw/spack-levante/openmpi-4.1.2-yfwe6t/include -I/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib -Wl,--disable-new-dtags,-rpath,/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/lib/intel64_lin -v -o cmTC_9796b -L/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib -L/sw/spack-levante/ucx-1.12.0-nlas56/lib -L/sw/spack-levante/libevent-2.1.8-mjzu6s/lib -L/sw/spack-levante/pmix-3.2.1-xut2g3/lib -L/usr/lib64 -Wl,-rpath,/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/lib/intel64_lin -Wl,-rpath -Wl,/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib -Wl,-rpath -Wl,/sw/spack-levante/ucx-1.12.0-nlas56/lib -Wl,-rpath -Wl,/sw/spack-levante/libevent-2.1.8-mjzu6s/lib -Wl,-rpath -Wl,/sw/spack-levante/pmix-3.2.1-xut2g3/lib -Wl,-rpath -Wl,/usr/lib64 -lmpi_usempif08 -lmpi_usempi_ignore_tkr -lmpi_mpifh -lmpi" -mGLOB_cxx_limited_range=FALSE -mCG_extend_parms=FALSE -mGLOB_compiler_bin_directory=/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../bin/intel64 -mGLOB_as_output_backup_file_name=/tmp/ifort0hrkzkas_.s -mGLOB_dashboard_use_source_name -mIPOPT_activate -mGLOB_product_id_code=0x22006d91 -mP3OPT_use_mspp_call_convention -mP2OPT_subs_out_of_bound=FALSE -mP2OPT_disam_type_based_disam=2 -mGLOB_ansi_alias -mPGOPTI_value_profile_use=T -mGLOB_opt_report_use_source_name -mGLOB_offload_mode=1 -mGLOB_offload_no_openmp=TRUE -mP2OPT_offload_unique_var_string=ifort1701052386aZarLG -mP2OPT_hlo -mP2OPT_hpo_rtt_control=0 -mIPOPT_args_in_regs=0 -mP2OPT_disam_assume_nonstd_intent_in=FALSE -mGLOB_imf_mapping_library=/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../bin/intel64/libiml_attr.so -mPGOPTI_gen_threadsafe_level=0 -mIPOPT_link -mIPOPT_ipo_activate -mIPOPT_mo_activate -mIPOPT_source_files_list=/tmp/ifortslis1LBDxa -mIPOPT_mo_global_data -mIPOPT_link_script_file=/tmp/ifortscriptzLfsnN "-mIPOPT_cmdline_link="/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crt1.o" "/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crti.o" "/usr/lib/gcc/x86_64-redhat-linux/8/crtbegin.o" "--eh-frame-hdr" "--build-id" "-dynamic-linker" "/lib64/ld-linux-x86-64.so.2" "-m" "elf_x86_64" "-L/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib" "-L/sw/spack-levante/ucx-1.12.0-nlas56/lib" "-L/sw/spack-levante/libevent-2.1.8-mjzu6s/lib" "-L/sw/spack-levante/pmix-3.2.1-xut2g3/lib" "-L/usr/lib64" "-plugin" "/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../bin/intel64/../../lib/icx-lto.so" "-o" "cmTC_9796b" "/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/lib/intel64_lin/for_main.o" "-L/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/lib/intel64_lin" "-L/usr/lib/gcc/x86_64-redhat-linux/8/" "-L/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64" "-L/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/" "-L/lib/../lib64" "-L/lib/../lib64/" "-L/usr/lib/../lib64" "-L/usr/lib/../lib64/" "-L/usr/lib/gcc/x86_64-redhat-linux/8/../../../" "-L/lib64" "-L/lib/" "-L/usr/lib64" "-L/usr/lib" "--disable-new-dtags" "-rpath" "/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/lib/intel64_lin" "CMakeFiles/cmTC_9796b.dir/CMakeFortranCompilerABI.F90.o" "-rpath" "/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/lib/intel64_lin" "-rpath" "/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib" "-rpath" "/sw/spack-levante/ucx-1.12.0-nlas56/lib" "-rpath" "/sw/spack-levante/libevent-2.1.8-mjzu6s/lib" "-rpath" "/sw/spack-levante/pmix-3.2.1-xut2g3/lib" "-rpath" "/usr/lib64" "-lmpi_usempif08" "-lmpi_usempi_ignore_tkr" "-lmpi_mpifh" "-lmpi" "-Bdynamic" "-Bstatic" "-lifport" "-lifcoremt" "-limf" "-lsvml" "-Bdynamic" "-lm" "-Bstatic" "-lipgo" "-lirc" "-Bdynamic" "-lpthread" "-Bstatic" "-lsvml" "-Bdynamic" "-lc" "-lgcc" "-lgcc_s" "-Bstatic" "-lirc_s" "-Bdynamic" "-ldl" "-lc" "/usr/lib/gcc/x86_64-redhat-linux/8/crtend.o" "/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crtn.o"" -mIPOPT_il_in_obj -mIPOPT_ipo_activate_warn=FALSE -mIPOPT_obj_output_file_name=/tmp/ipo_ifortcBZ0Jr.o -mIPOPT_whole_archive_fixup_file_name=/tmp/ifortwarchpc1URj -mGLOB_linker_version=2.30 -mGLOB_linker=ld -mGLOB_driver_tempfile_name=/tmp/iforttempfile2H1oJz -mP3OPT_asm_target=P3OPT_ASM_TARGET_GAS -mGLOB_async_unwind_tables=TRUE -mGLOB_obj_output_file=/tmp/ipo_ifortcBZ0Jr.o -mGLOB_source_dialect=GLOB_SOURCE_DIALECT_NONE -mP1OPT_source_file_name=ipo_out.f -mP2OPT_symtab_type_copy=true CMakeFiles/cmTC_9796b.dir/CMakeFortranCompilerABI.F90.o -mIPOPT_object_files=T -mIPOPT_assembly_files=/tmp/ifortalis07GtXA -mIPOPT_generated_tempfiles=/tmp/ifortelisomtA8J -mIPOPT_embedded_object_base_name=/tmp/iforteobjQYkhZR -mIPOPT_cmdline_link_new_name=/tmp/ifortllisjvB0rF]
+        link line: [ld    /usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/8/crtbegin.o --eh-frame-hdr --build-id -dynamic-linker /lib64/ld-linux-x86-64.so.2 -m elf_x86_64 -L/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib -L/sw/spack-levante/ucx-1.12.0-nlas56/lib -L/sw/spack-levante/libevent-2.1.8-mjzu6s/lib -L/sw/spack-levante/pmix-3.2.1-xut2g3/lib -L/usr/lib64 -plugin /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../bin/intel64/../../lib/icx-lto.so -o cmTC_9796b /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/lib/intel64_lin/for_main.o -L/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/lib/intel64_lin -L/usr/lib/gcc/x86_64-redhat-linux/8/ -L/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/ -L/lib/../lib64 -L/lib/../lib64/ -L/usr/lib/../lib64 -L/usr/lib/../lib64/ -L/usr/lib/gcc/x86_64-redhat-linux/8/../../../ -L/lib64 -L/lib/ -L/usr/lib64 -L/usr/lib --disable-new-dtags -rpath /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/lib/intel64_lin CMakeFiles/cmTC_9796b.dir/CMakeFortranCompilerABI.F90.o -rpath /sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/lib/intel64_lin -rpath /sw/spack-levante/openmpi-4.1.2-yfwe6t/lib -rpath /sw/spack-levante/ucx-1.12.0-nlas56/lib -rpath /sw/spack-levante/libevent-2.1.8-mjzu6s/lib -rpath /sw/spack-levante/pmix-3.2.1-xut2g3/lib -rpath /usr/lib64 -lmpi_usempif08 -lmpi_usempi_ignore_tkr -lmpi_mpifh -lmpi -Bdynamic -Bstatic -lifport -lifcoremt -limf -lsvml -Bdynamic -lm -Bstatic -lipgo -lirc -Bdynamic -lpthread -Bstatic -lsvml -Bdynamic -lc -lgcc -lgcc_s -Bstatic -lirc_s -Bdynamic -ldl -lc /usr/lib/gcc/x86_64-redhat-linux/8/crtend.o /usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crtn.o]
+          arg [ld] ==> ignore
+          arg [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crt1.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crt1.o]
+          arg [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crti.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crti.o]
+          arg [/usr/lib/gcc/x86_64-redhat-linux/8/crtbegin.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/8/crtbegin.o]
+          arg [--eh-frame-hdr] ==> ignore
+          arg [--build-id] ==> ignore
+          arg [-dynamic-linker] ==> ignore
+          arg [/lib64/ld-linux-x86-64.so.2] ==> ignore
+          arg [-m] ==> ignore
+          arg [elf_x86_64] ==> ignore
+          arg [-L/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib] ==> dir [/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib]
+          arg [-L/sw/spack-levante/ucx-1.12.0-nlas56/lib] ==> dir [/sw/spack-levante/ucx-1.12.0-nlas56/lib]
+          arg [-L/sw/spack-levante/libevent-2.1.8-mjzu6s/lib] ==> dir [/sw/spack-levante/libevent-2.1.8-mjzu6s/lib]
+          arg [-L/sw/spack-levante/pmix-3.2.1-xut2g3/lib] ==> dir [/sw/spack-levante/pmix-3.2.1-xut2g3/lib]
+          arg [-L/usr/lib64] ==> dir [/usr/lib64]
+          arg [-plugin] ==> ignore
+          arg [/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../bin/intel64/../../lib/icx-lto.so] ==> ignore
+          arg [-o] ==> ignore
+          arg [cmTC_9796b] ==> ignore
+          arg [/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/lib/intel64_lin/for_main.o] ==> obj [/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/lib/intel64_lin/for_main.o]
+          arg [-L/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/lib/intel64_lin] ==> dir [/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/lib/intel64_lin]
+          arg [-L/usr/lib/gcc/x86_64-redhat-linux/8/] ==> dir [/usr/lib/gcc/x86_64-redhat-linux/8/]
+          arg [-L/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64] ==> dir [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64]
+          arg [-L/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/] ==> dir [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/]
+          arg [-L/lib/../lib64] ==> dir [/lib/../lib64]
+          arg [-L/lib/../lib64/] ==> dir [/lib/../lib64/]
+          arg [-L/usr/lib/../lib64] ==> dir [/usr/lib/../lib64]
+          arg [-L/usr/lib/../lib64/] ==> dir [/usr/lib/../lib64/]
+          arg [-L/usr/lib/gcc/x86_64-redhat-linux/8/../../../] ==> dir [/usr/lib/gcc/x86_64-redhat-linux/8/../../../]
+          arg [-L/lib64] ==> dir [/lib64]
+          arg [-L/lib/] ==> dir [/lib/]
+          arg [-L/usr/lib64] ==> dir [/usr/lib64]
+          arg [-L/usr/lib] ==> dir [/usr/lib]
+          arg [--disable-new-dtags] ==> ignore
+          arg [-rpath] ==> ignore
+          arg [/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/lib/intel64_lin] ==> ignore
+          arg [CMakeFiles/cmTC_9796b.dir/CMakeFortranCompilerABI.F90.o] ==> ignore
+          arg [-rpath] ==> ignore
+          arg [/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/lib/intel64_lin] ==> ignore
+          arg [-rpath] ==> ignore
+          arg [/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib] ==> ignore
+          arg [-rpath] ==> ignore
+          arg [/sw/spack-levante/ucx-1.12.0-nlas56/lib] ==> ignore
+          arg [-rpath] ==> ignore
+          arg [/sw/spack-levante/libevent-2.1.8-mjzu6s/lib] ==> ignore
+          arg [-rpath] ==> ignore
+          arg [/sw/spack-levante/pmix-3.2.1-xut2g3/lib] ==> ignore
+          arg [-rpath] ==> ignore
+          arg [/usr/lib64] ==> ignore
+          arg [-lmpi_usempif08] ==> lib [mpi_usempif08]
+          arg [-lmpi_usempi_ignore_tkr] ==> lib [mpi_usempi_ignore_tkr]
+          arg [-lmpi_mpifh] ==> lib [mpi_mpifh]
+          arg [-lmpi] ==> lib [mpi]
+          arg [-Bdynamic] ==> search dynamic
+          arg [-Bstatic] ==> search static
+          arg [-lifport] ==> lib [ifport]
+          arg [-lifcoremt] ==> lib [ifcoremt]
+          arg [-limf] ==> lib [imf]
+          arg [-lsvml] ==> lib [svml]
+          arg [-Bdynamic] ==> search dynamic
+          arg [-lm] ==> lib [m]
+          arg [-Bstatic] ==> search static
+          arg [-lipgo] ==> lib [ipgo]
+          arg [-lirc] ==> lib [irc]
+          arg [-Bdynamic] ==> search dynamic
+          arg [-lpthread] ==> lib [pthread]
+          arg [-Bstatic] ==> search static
+          arg [-lsvml] ==> lib [svml]
+          arg [-Bdynamic] ==> search dynamic
+          arg [-lc] ==> lib [c]
+          arg [-lgcc] ==> lib [gcc]
+          arg [-lgcc_s] ==> lib [gcc_s]
+          arg [-Bstatic] ==> search static
+          arg [-lirc_s] ==> lib [irc_s]
+          arg [-Bdynamic] ==> search dynamic
+          arg [-ldl] ==> lib [dl]
+          arg [-lc] ==> lib [c]
+          arg [/usr/lib/gcc/x86_64-redhat-linux/8/crtend.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/8/crtend.o]
+          arg [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crtn.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crtn.o]
+        collapse obj [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crt1.o] ==> [/usr/lib64/crt1.o]
+        collapse obj [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crti.o] ==> [/usr/lib64/crti.o]
+        collapse obj [/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/lib/intel64_lin/for_main.o] ==> [/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/lib/intel64_lin/for_main.o]
+        collapse obj [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crtn.o] ==> [/usr/lib64/crtn.o]
+        collapse library dir [/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib] ==> [/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib]
+        collapse library dir [/sw/spack-levante/ucx-1.12.0-nlas56/lib] ==> [/sw/spack-levante/ucx-1.12.0-nlas56/lib]
+        collapse library dir [/sw/spack-levante/libevent-2.1.8-mjzu6s/lib] ==> [/sw/spack-levante/libevent-2.1.8-mjzu6s/lib]
+        collapse library dir [/sw/spack-levante/pmix-3.2.1-xut2g3/lib] ==> [/sw/spack-levante/pmix-3.2.1-xut2g3/lib]
+        collapse library dir [/usr/lib64] ==> [/usr/lib64]
+        collapse library dir [/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/bin/intel64/../../compiler/lib/intel64_lin] ==> [/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/lib/intel64_lin]
+        collapse library dir [/usr/lib/gcc/x86_64-redhat-linux/8/] ==> [/usr/lib/gcc/x86_64-redhat-linux/8]
+        collapse library dir [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64] ==> [/usr/lib64]
+        collapse library dir [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/] ==> [/usr/lib64]
+        collapse library dir [/lib/../lib64] ==> [/lib64]
+        collapse library dir [/lib/../lib64/] ==> [/lib64]
+        collapse library dir [/usr/lib/../lib64] ==> [/usr/lib64]
+        collapse library dir [/usr/lib/../lib64/] ==> [/usr/lib64]
+        collapse library dir [/usr/lib/gcc/x86_64-redhat-linux/8/../../../] ==> [/usr/lib]
+        collapse library dir [/lib64] ==> [/lib64]
+        collapse library dir [/lib/] ==> [/lib]
+        collapse library dir [/usr/lib64] ==> [/usr/lib64]
+        collapse library dir [/usr/lib] ==> [/usr/lib]
+        implicit libs: [mpi_usempif08;mpi_usempi_ignore_tkr;mpi_mpifh;mpi;ifport;ifcoremt;imf;svml;m;ipgo;irc;pthread;svml;c;gcc;gcc_s;irc_s;dl;c]
+        implicit objs: [/usr/lib64/crt1.o;/usr/lib64/crti.o;/usr/lib/gcc/x86_64-redhat-linux/8/crtbegin.o;/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/lib/intel64_lin/for_main.o;/usr/lib/gcc/x86_64-redhat-linux/8/crtend.o;/usr/lib64/crtn.o]
+        implicit dirs: [/sw/spack-levante/openmpi-4.1.2-yfwe6t/lib;/sw/spack-levante/ucx-1.12.0-nlas56/lib;/sw/spack-levante/libevent-2.1.8-mjzu6s/lib;/sw/spack-levante/pmix-3.2.1-xut2g3/lib;/usr/lib64;/sw/spack-levante/intel-oneapi-compilers-2022.0.1-an2cbq/compiler/2022.0.1/linux/compiler/lib/intel64_lin;/usr/lib/gcc/x86_64-redhat-linux/8;/lib64;/usr/lib;/lib]
+        implicit fwks: []
+      
+      
+...

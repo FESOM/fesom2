@@ -657,7 +657,7 @@ subroutine iceberg_levelwise_andkeel(mesh, partit, dynamics, uo_dz,vo_dz, uo_kee
   REAL, dimension(:,:,:), pointer :: UV_ib
 
   real           :: lev_up, lev_low
-  integer        :: m, k, n2, max_node_level_count
+  integer        :: m, k, n2, max_node_level_count, safe_lev
   ! depth over which is integrated (layer and sum)
   real           :: dz, ufkeel1, ufkeel2, Temkeel, Salkeel
 
@@ -724,27 +724,19 @@ type(t_partit), intent(inout), target :: partit
     ! Cavity check: use zbar_3d_n for geometric comparison
     if (use_cavity .AND. mesh%cavity_depth(elem2D_nodes(m,iceberg_elem)) /= 0.0 &
         .AND. abs(depth_ib) < abs(mesh%zbar_3d_n(k, n2))) then
-      ! Iceberg draft is above the ocean surface at this cavity node
-      if (k > 1) then
-        uo_keel(m)=UV_ib(1,k-1,n2)
-        vo_keel(m)=UV_ib(2,k-1,n2)
-        T_keel(m)=Tclim_ib(k-1,n2)
-        S_keel(m)=Sclim_ib(k-1,n2)
-        uo_dz(m,k)=UV_ib(1,k-1,n2)
-        vo_dz(m,k)=UV_ib(2,k-1,n2)
-        T_dz(m,k)=Tclim_ib(k-1,n2)
-        S_dz(m,k)=Sclim_ib(k-1,n2)
-      else
-        ! k==1: no level above, use surface (first) values
-        uo_keel(m)=UV_ib(1,1,n2)
-        vo_keel(m)=UV_ib(2,1,n2)
-        T_keel(m)=Tclim_ib(1,n2)
-        S_keel(m)=Sclim_ib(1,n2)
-        uo_dz(m,k)=UV_ib(1,1,n2)
-        vo_dz(m,k)=UV_ib(2,1,n2)
-        T_dz(m,k)=Tclim_ib(1,n2)
-        S_dz(m,k)=Sclim_ib(1,n2)
-      end if
+      ! Iceberg draft is above the ocean surface at this cavity node.
+      ! Clamp to shallowest valid ocean level (ulevels_nod2d) to avoid
+      ! reading ice-shelf level T/S which are never initialised by the
+      ! tracer solver and may be garbage / NaN.
+      safe_lev = max(k-1, ulevels_nod2d(n2))
+      uo_keel(m)=UV_ib(1,safe_lev,n2)
+      vo_keel(m)=UV_ib(2,safe_lev,n2)
+      T_keel(m)=Tclim_ib(safe_lev,n2)
+      S_keel(m)=Sclim_ib(safe_lev,n2)
+      uo_dz(m,k)=UV_ib(1,safe_lev,n2)
+      vo_dz(m,k)=UV_ib(2,safe_lev,n2)
+      T_dz(m,k)=Tclim_ib(safe_lev,n2)
+      S_dz(m,k)=Sclim_ib(safe_lev,n2)
       exit innerloop
 
     ! Keel layer: mid-level k is at or below the iceberg draft
@@ -828,6 +820,12 @@ type(t_partit), intent(inout), target :: partit
    real, intent(IN) :: x0,f0,x1,f1,x
    real :: frac
    
+   ! Guard against near-zero denominator (thin ALE layer).
+   ! An exact-zero check is insufficient; 0*Inf = NaN when x≈x0 too.
+   if (abs(x1-x0) < 1.0e-6) then
+     interpol1D = 0.5*(f0+f1)
+     return
+   end if
    frac = (f1 - f0)/(x1 - x0)
    interpol1D = f0 + frac * (x - x0)
   	
@@ -869,7 +867,7 @@ subroutine iceberg_average_andkeel(mesh, partit, dynamics, uo_dz,vo_dz, uo_keel,
   REAL, dimension(:,:,:), pointer :: UV_ib
 
   real           :: lev_up, lev_low
-  integer        :: m, k, n2
+  integer        :: m, k, n2, safe_lev
   ! depth over which is integrated (layer and sum)
   real           :: dz, ufkeel1, ufkeel2, Temkeel, Salkeel
 
@@ -919,27 +917,19 @@ type(t_partit), intent(inout), target :: partit
     ! Cavity check: use zbar_3d_n for geometric comparison
     if (use_cavity .AND. mesh%cavity_depth(elem2D_nodes(m,iceberg_elem)) /= 0.0 &
         .AND. abs(depth_ib) < abs(mesh%zbar_3d_n(k, n2))) then
-      ! Iceberg draft is above the ocean surface at this cavity node
-      if (k > 1) then
-        uo_dz(m)=UV_ib(1,k-1,n2)*abs(depth_ib)
-        vo_dz(m)=UV_ib(2,k-1,n2)*abs(depth_ib)
-        uo_keel(m)=UV_ib(1,k-1,n2)
-        vo_keel(m)=UV_ib(2,k-1,n2)
-        T_dz(m)=Tclim_ib(k-1,n2)*abs(depth_ib)
-        S_dz(m)=Sclim_ib(k-1,n2)*abs(depth_ib)
-        T_keel(m)=Tclim_ib(k-1,n2)
-        S_keel(m)=Sclim_ib(k-1,n2)
-      else
-        ! k==1: no level above, use surface (first) values
-        uo_dz(m)=UV_ib(1,1,n2)*abs(depth_ib)
-        vo_dz(m)=UV_ib(2,1,n2)*abs(depth_ib)
-        uo_keel(m)=UV_ib(1,1,n2)
-        vo_keel(m)=UV_ib(2,1,n2)
-        T_dz(m)=Tclim_ib(1,n2)*abs(depth_ib)
-        S_dz(m)=Sclim_ib(1,n2)*abs(depth_ib)
-        T_keel(m)=Tclim_ib(1,n2)
-        S_keel(m)=Sclim_ib(1,n2)
-      end if
+      ! Iceberg draft is above the ocean surface at this cavity node.
+      ! Clamp to shallowest valid ocean level (ulevels_nod2d) to avoid
+      ! reading ice-shelf level T/S which are never initialised by the
+      ! tracer solver and may be garbage / NaN.
+      safe_lev = max(k-1, ulevels_nod2d(n2))
+      uo_dz(m)=UV_ib(1,safe_lev,n2)*abs(depth_ib)
+      vo_dz(m)=UV_ib(2,safe_lev,n2)*abs(depth_ib)
+      uo_keel(m)=UV_ib(1,safe_lev,n2)
+      vo_keel(m)=UV_ib(2,safe_lev,n2)
+      T_dz(m)=Tclim_ib(safe_lev,n2)*abs(depth_ib)
+      S_dz(m)=Sclim_ib(safe_lev,n2)*abs(depth_ib)
+      T_keel(m)=Tclim_ib(safe_lev,n2)
+      S_keel(m)=Sclim_ib(safe_lev,n2)
       exit innerloop
 
     ! Keel layer: mid-level k is at or below the iceberg draft
@@ -1024,10 +1014,12 @@ type(t_partit), intent(inout), target :: partit
    end do innerloop
 
    ! divide by depth over which was integrated
-   uo_dz(m)=uo_dz(m)/abs(depth_ib)
-   vo_dz(m)=vo_dz(m)/abs(depth_ib)
-   T_dz(m)=T_dz(m)/abs(depth_ib)
-   S_dz(m)=S_dz(m)/abs(depth_ib)
+   if (abs(depth_ib) > 0.0) then
+     uo_dz(m)=uo_dz(m)/abs(depth_ib)
+     vo_dz(m)=vo_dz(m)/abs(depth_ib)
+     T_dz(m)=T_dz(m)/abs(depth_ib)
+     S_dz(m)=S_dz(m)/abs(depth_ib)
+   end if
 
  end do nodeloop !loop over all nodes of iceberg element
        
@@ -1038,6 +1030,12 @@ type(t_partit), intent(inout), target :: partit
    real, intent(IN) :: x0,f0,x1,f1,x
    real :: frac
    
+   ! Guard against near-zero denominator (thin ALE layer).
+   ! An exact-zero check is insufficient; 0*Inf = NaN when x≈x0 too.
+   if (abs(x1-x0) < 1.0e-6) then
+     interpol1D = 0.5*(f0+f1)
+     return
+   end if
    frac = (f1 - f0)/(x1 - x0)
    interpol1D = f0 + frac * (x - x0)
   	
