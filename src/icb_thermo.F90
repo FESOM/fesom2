@@ -136,8 +136,15 @@ type(t_partit), intent(inout), target :: partit
     hfl_flux_ib(ib,n) = H_v * (2*length_ib*dz  + 2*length_ib*dz ) * scaling(ib)
     !fwl_flux_ib = M_v
   end do
-  M_bv  = M_bv_dz / abs(depth_ib)
-  M_v   = M_v_dz / abs(depth_ib)
+  ! Guard against depth_ib==0 (should not happen if volume check is passed,
+  ! but fp edge cases and cavity geometry can produce near-zero depth).
+  if (abs(depth_ib) > 0.0) then
+    M_bv  = M_bv_dz / abs(depth_ib)
+    M_v   = M_v_dz / abs(depth_ib)
+  else
+    M_bv  = 0.0
+    M_v   = 0.0
+  end if
 
   !wave erosion
   absamino = sqrt( (ua_ib - uo_ib)**2 + (va_ib - vo_ib)**2 )
@@ -474,7 +481,13 @@ type(t_partit), intent(inout), target :: partit
      ep1 = cpw*gat
      ep2 = cpi*gas
      ep3 = lhf*gas
-     ep31 = -rhor*cpi*tdif/zice   !RG4190 / RG44027
+     ! ep31 = -rhor*cpi*tdif/zice is only used in the freezing branch.
+     ! Guard against zice==0 (would be Inf, giving NaN in the quadratic).
+     if (abs(zice) > 0.0) then
+       ep31 = -rhor*cpi*tdif/zice   !RG4190 / RG44027
+     else
+       ep31 = 0.0
+     end if
      ep4 = b+c*zice
      ep5 = gas/rhor
 
