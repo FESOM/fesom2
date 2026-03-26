@@ -262,4 +262,45 @@ subroutine load_river_variable(ncid, vari, model_2Darray, partit, mesh)
 
 end subroutine load_river_variable
 
+!-----------------------------------------------------------------------------
+! Subroutine: river_sanity_check
+!
+! Purpose: Compute and print global min/max of a 2D riverine input array
+!          across all MPI ranks as a quick plausibility check after reading.
+!
+! Arguments:
+!   river_var  - local 2D array of riverine input values
+!   varname    - short label printed in the diagnostic output
+!-----------------------------------------------------------------------------
+subroutine river_sanity_check(river_var, varname, partit)
+
+    use MOD_PARTIT
+    use MOD_PARSUP 
+    !use mpi
+ 
+    implicit none
+
+    ! Input parameters
+    type(t_partit), intent(inout),   target          :: partit
+
+    real(8),          intent(in) :: river_var(:)
+    character(len=*), intent(in) :: varname
+ 
+    real(8) :: locmax, locmin, glo
+    !integer :: MPIerr
+
+#include "../associate_part_def.h"
+#include "../associate_part_ass.h"
+
+    locmax = maxval(river_var)
+    locmin = minval(river_var)
+ 
+    call MPI_AllReduce(locmax, glo, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+    if (mype == 0) write(*,'(A,A,A,ES14.6)') '  |-> global max riverine ', trim(varname), '. = ', glo
+ 
+    call MPI_AllReduce(locmin, glo, 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+    if (mype == 0) write(*,'(A,A,A,ES14.6)') '  |-> global min riverine ', trim(varname), '. = ', glo
+ 
+end subroutine river_sanity_check
+
 

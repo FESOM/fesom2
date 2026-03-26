@@ -284,7 +284,6 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
    do n=1, benthos_num
 ! kh 25.03.22 buffer sums per tracer index to avoid non bit identical results regarding global sums when running the tracer loop in parallel
       call exchange_nod(Benthos_tr(:,n,tr_num), partit)
-
       call exchange_nod(Benthos(:,n), partit)
    end do
 

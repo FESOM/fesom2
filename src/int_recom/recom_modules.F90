@@ -94,7 +94,8 @@ module recom_config
   Logical                :: enable_3zoo2det = .false.   ! Control extended zooplankton variables
   Logical                :: enable_coccos = .false.     ! Control coccolithophore variables
   Logical                :: enable_AWICM = .false.      ! Control AWICM
-  namelist /parecomsetup/ enable_3zoo2det, enable_coccos, enable_AWICM
+  Logical                :: enable_R2OMIP = .false.     ! Control R2OMIP
+  namelist /parecomsetup/ enable_3zoo2det, enable_coccos, enable_AWICM, enable_R2OMIP
 
 !! *** General configuration ***
 
@@ -546,11 +547,14 @@ contains
         imiczooc = 36
 
         ! Terrestrial DOC input (when useRivers is enabled)
-        if (useRivers) then
+        if (enable_R2OMIP) then
             idoct = 37
+            idicremin = 38 ! added by Sina
+        else
+            idicremin = 37
         end if
 
-        idicremin = 38 ! added by Sina
+!        idicremin = 38 ! added by Sina
 
 !        allocate(recom_cocco_tracer_id(3))
         recom_cocco_tracer_id = (/1029, 1030, 1031/)
@@ -577,7 +581,7 @@ contains
         iphachl = 28
 
         ! Terrestrial DOC input (when useRivers is enabled)
-        if (useRivers) then
+        if (enable_R2OMIP) then
             idoct = 29
         end if
 
@@ -599,11 +603,14 @@ contains
         imiczooc = 30
 
         ! Terrestrial DOC input (when useRivers is enabled)
-        if (useRivers) then
+        if (enable_R2OMIP) then
             idoct = 31
+            idicremin = 32 ! added by Sina
+        else
+            idicremin = 31
         end if
 
-        idicremin = 32 ! added by Sina
+        !idicremin = 32 ! added by Sina
 
 !        allocate(recom_det2_tracer_id(4))
         recom_det2_tracer_id = (/1025, 1026, 1027, 1028/)
@@ -617,7 +624,7 @@ contains
         ! (All indices already set to default values)
 
         ! Terrestrial DOC input (when useRivers is enabled)
-        if (useRivers) then
+        if (enable_R2OMIP) then
             idoct = 23
         end if
     endif
@@ -766,7 +773,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
     expected_tracer_ids(37) = 1035  ! Zoo3N
     expected_tracer_ids(38) = 1036  ! Zoo3C
     expected_tracer_ids(39) = 1037  ! DIC remin (added by Sina)
-    if (useRivers) then
+    if (enable_R2OMIP) then
       expected_tracer_ids(40) = 1038  ! DOCt (terrestrial DOC) ! Sina: each number increased by 1
     end if
 
@@ -779,7 +786,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
     expected_tracer_ids(29) = 1027  ! PhaeoC
     expected_tracer_ids(30) = 1028  ! PhaeoChl
     expected_tracer_ids(31) = 1037  ! DIC remin (added by Sina)
-    if (useRivers) then
+    if (enable_R2OMIP) then
       expected_tracer_ids(32) = 1029  ! DOCt (terrestrial DOC) ! Sina: changed 31 to 32
     end if
 
@@ -794,14 +801,14 @@ subroutine validate_recom_tracers(num_tracers, mype)
     expected_tracer_ids(31) = 1029  ! Zoo3N
     expected_tracer_ids(32) = 1030  ! Zoo3C
     expected_tracer_ids(33) = 1037  ! DIC remin (added by Sina)
-    if (useRivers) then
+    if (enable_R2OMIP) then
       expected_tracer_ids(34) = 1031  ! DOCt (terrestrial DOC) ! Sina: changed 33 to 34 
     end if
 
   else
     expected_tracer_ids(25) = 1037 ! add DIC remin tracer to base BGC tracers (added by Sina)
     ! Base configuration: only tracers 1, 2, 1001-1022
-    if (useRivers) then
+    if (enable_R2OMIP) then
       expected_tracer_ids(26) = 1023  ! DOCt (terrestrial DOC) ! Sina: changed 25 to 26
     end if
   end if
@@ -1131,28 +1138,28 @@ subroutine validate_tracer_id_sequence(tracer_ids, num_tracers, mype)
     expected_ids(31:36) = (/1029, 1030, 1031, 1032, 1033, 1034/)
     expected_ids(37:38) = (/1035, 1036/)
     expected_ids(39)    = 1037 ! DICremin, added by Sina
-    if (useRivers) then
+    if (enable_R2OMIP) then
       expected_ids(40) = 1038  ! DOCt ! Sina: each number increased by 1
     end if
 
   else if (enable_coccos .and. .not. enable_3zoo2det) then
     expected_ids(25:30) = (/1023, 1024, 1025, 1026, 1027, 1028/)
     expected_ids(31)    = 1037 ! DICremin, added by Sina
-    if (useRivers) then
+    if (enable_R2OMIP) then
       expected_ids(32) = 1029  ! DOCt ! Sina: increased 31 to 32
     end if
 
   else if (enable_3zoo2det .and. .not. enable_coccos) then
     expected_ids(25:32) = (/1023, 1024, 1025, 1026, 1027, 1028, 1029, 1030/)
     expected_ids(33)    = 1037 ! DICremin, added by Sina
-    if (useRivers) then
+    if (enable_R2OMIP) then
       expected_ids(34) = 1031  ! DOCt ! Sina: increased 33 to 34
     end if
     
   else
     ! Base configuration
     expected_ids(25) = 1037    ! DICremin, added by Sina
-    if (useRivers) then
+    if (enable_R2OMIP) then
       expected_ids(26) = 1023  ! DOCt ! Sina: increased 25 to 26
     end if
   end if
@@ -1555,6 +1562,7 @@ real(kind=8)                               :: is_erosioninput
 
 real(kind=8)                               :: is_3zoo2det
 real(kind=8)                               :: is_coccos
+real(kind=8)                               :: is_R2OMIP
 
 end module REcoM_declarations
 
@@ -1743,7 +1751,7 @@ Module REcoM_GloVar
   real(kind=8), allocatable,dimension(:,:)  :: PAR3D            ! Light in the water column [nl-1 n2d]
   real(kind=8), allocatable,dimension(:)    :: RiverineLonOrig, RiverineLatOrig, RiverineDINOrig, RiverineDONOrig, RiverineDOCOrig, RiverineDSiOrig ! Variables to save original values for riverine nutrients
   real(kind=8), allocatable,dimension(:)    :: RiverDIC2D, RiverDIN2D, RiverDOCl2D, RiverDOCsl2D, RiverPOC2D, RiverFe
-  real(kind=8), allocatable,dimension(:)    :: RiverDON2D, RiverDSi2D, RiverAlk2D ! RiverDOC2D
+  real(kind=8), allocatable,dimension(:)    :: RiverDON2D, RiverDOC2D, RiverDSi2D, RiverAlk2D
   Real(kind=8),allocatable,dimension(:)     :: LocDenit
   Real(kind=8),allocatable,dimension(:,:)   :: LocBurial ! R2OMIP
   Real(kind=8),allocatable,dimension(:)     :: BurialBen ! R2OMIP
@@ -2135,7 +2143,7 @@ end module REcoM_ciso
 module recom_diags_management
     use recom_config
     implicit none
-    
+
 contains
 
 ! ==============================================================================
@@ -2154,7 +2162,7 @@ subroutine allocate_and_init_diags(nl)
     ! --------------------------------------------------------------------------
     allocate(vertNPPn(nl-1), vertGPPn(nl-1), vertNNAn(nl-1), vertChldegn(nl-1))
     allocate(vertrespn(nl-1), vertdocexn(nl-1), vertaggn(nl-1))
-    
+
     vertNPPn    = 0.d0
     vertGPPn    = 0.d0
     vertNNAn    = 0.d0
@@ -2162,13 +2170,13 @@ subroutine allocate_and_init_diags(nl)
     vertrespn   = 0.d0
     vertdocexn  = 0.d0
     vertaggn    = 0.d0
-    
+
     ! --------------------------------------------------------------------------
     ! Diatoms
     ! --------------------------------------------------------------------------
     allocate(vertNPPd(nl-1), vertGPPd(nl-1), vertNNAd(nl-1), vertChldegd(nl-1))
     allocate(vertrespd(nl-1), vertdocexd(nl-1), vertaggd(nl-1))
-    
+
     vertNPPd    = 0.d0
     vertGPPd    = 0.d0
     vertNNAd    = 0.d0
@@ -2176,7 +2184,7 @@ subroutine allocate_and_init_diags(nl)
     vertrespd   = 0.d0
     vertdocexd  = 0.d0
     vertaggd    = 0.d0
-    
+
     ! --------------------------------------------------------------------------
     ! Coccolithophores (if enabled)
     ! --------------------------------------------------------------------------

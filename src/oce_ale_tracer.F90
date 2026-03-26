@@ -1687,121 +1687,312 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
         bc_surface= dt*(virtual_salt(n) & !--> is zeros for zlevel/zstar
                     + relax_salt(n) + real_salt_flux(n)*is_nonlinfs)
 #if defined(__recom)
-    CASE (1001) ! DIN
-        if (use_MEDUSA .and. add_loopback) then  ! OG: add is_MEDUSA_loopback flag is_MEDUSA_loopback flag * lb_flux(n,1)
-            bc_surface= dt*(AtmNInput(n) + RiverDIN2D(n)   * is_riverinput                &
-                                         + ErosionTON2D(n) * is_erosioninput + lb_flux(n,1))
-        else
-            bc_surface= dt*(AtmNInput(n) + RiverDIN2D(n)   * is_riverinput                &
-                                         + ErosionTON2D(n) * is_erosioninput)
-        end if
+! =============================================================================
+! SURFACE BOUNDARY CONDITIONS FOR RECOM BIOGEOCHEMICAL TRACERS
+!
+! bc_surface is the surface flux [tracer units] applied to each tracer per
+! timestep (dt). Fluxes include atmospheric deposition, river input, erosion,
+! air-sea gas exchange, and (optionally) MEDUSA sediment loopback fluxes.
+!
+! Flags used throughout:
+!   is_riverinput   : 1 if river input is enabled, else 0
+!   is_erosioninput : 1 if erosion input is enabled, else 0
+!   use_MEDUSA      : true if MEDUSA sediment module is active
+!   add_loopback    : true if sediment loopback fluxes are included
+!   enable_R2OMIP   : true if R2OMIP river chemistry scheme is active
+!   ciso, ciso_14   : true if carbon isotope tracers (13C / 14C) are enabled
+!
+! lb_flux(n, k) : MEDUSA loopback fluxes at column n for tracer k:
+!   k=1  DIN    k=2  DIC    k=3  Alk    k=4  DSi
+!   k=5  CaCO3  k=6  DIC13  k=7  CaCO3-13C
+!   k=8  DIC14  k=9  CaCO3-14C
+! =============================================================================
 
-    CASE (1002) ! DIC
-        if (use_MEDUSA .and. add_loopback) then
-            bc_surface= dt*(GloCO2flux_seaicemask(n)                &
-                                + RiverDIC2D(n)   * is_riverinput   &
-                                + ErosionTOC2D(n) * is_erosioninput &
-                                + lb_flux(n,2) + lb_flux(n,5))
-        else
-            bc_surface= dt*(GloCO2flux_seaicemask(n)                &
-                                + RiverDIC2D(n)   * is_riverinput   &
-                                + RiverDOCl2D(n)  * is_riverinput   &    ! OG R2OMIP
-                                + ErosionTOC2D(n) * is_erosioninput)
-       end if
+    ! -------------------------------------------------------------------------
+    ! 1001 : DIN – Dissolved Inorganic Nitrogen
+    ! Sources: atmospheric N deposition + river DIN + erosion TON
+    !          + MEDUSA loopback (lb_flux k=1) when enabled
+    ! -------------------------------------------------------------------------
 
-    CASE (1003) ! Alk
-        if (use_MEDUSA .and. add_loopback) then
-            bc_surface= dt*(virtual_alk(n) + relax_alk(n)       &
-                            + RiverDIC2D(n) * is_riverinput     &
-                            + lb_flux(n,3) + lb_flux(n,5)*2) !CaCO3:Alk burial=1:2
-        else
-            bc_surface= dt*(virtual_alk(n) + relax_alk(n)  & !       &
-                            + RiverDIC2D(n) * is_riverinput)
-        end if
+    CASE (1001)
+        IF (use_MEDUSA .AND. add_loopback) THEN
+            bc_surface = dt * ( AtmNInput(n)              &
+                              + RiverDIN2D(n)   * is_riverinput   &
+                              + ErosionTON2D(n) * is_erosioninput &
+                              + lb_flux(n,1) )
+        ELSE
+            bc_surface = dt * ( AtmNInput(n)              &
+                              + RiverDIN2D(n)   * is_riverinput   &
+                              + ErosionTON2D(n) * is_erosioninput )
+        END IF
+
+    ! -------------------------------------------------------------------------
+    ! 1002 : DIC – Dissolved Inorganic Carbon
+    ! Sources: air-sea CO2 flux + river DIC + erosion TOC
+    !          + MEDUSA loopback (lb_flux k=2 DIC, k=5 CaCO3) when enabled
+    !
+    ! R2OMIP variant: also adds river labile DOC (RiverDOCl2D) to DIC;
+    !                 labile DOC is assumed to remineralise rapidly.
+    ! -------------------------------------------------------------------------
+
+    CASE (1002)
+        IF (use_MEDUSA .AND. add_loopback) THEN
+            bc_surface = dt * ( GloCO2flux_seaicemask(n)                &
+                              + RiverDIC2D(n)   * is_riverinput         &
+                              + ErosionTOC2D(n) * is_erosioninput       &
+                              + lb_flux(n,2) + lb_flux(n,5) )
+        ELSE
+            IF (enable_R2OMIP) THEN
+                bc_surface = dt * ( GloCO2flux_seaicemask(n)            &
+                                  + RiverDIC2D(n)  * is_riverinput      &
+                                  + RiverDOCl2D(n) * is_riverinput      &  ! labile DOC treated as DIC in R2OMIP
+                                  + ErosionTOC2D(n) * is_erosioninput )
+            ELSE
+                bc_surface = dt * ( GloCO2flux_seaicemask(n)            &
+                                  + RiverDIC2D(n)   * is_riverinput     &
+                                  + ErosionTOC2D(n) * is_erosioninput )
+            END IF
+        END IF
+
+    ! -------------------------------------------------------------------------
+    ! 1003 : Alk – Total Alkalinity
+    ! Sources: virtual salt flux (virtual_alk), relaxation term (relax_alk),
+    !          river Alk + MEDUSA loopback (lb_flux k=3 Alk, k=5 CaCO3)
+    !
+    ! CaCO3 dissolution releases 2 mol Alk per mol C (1:2 ratio).
+    !
+    ! R2OMIP variant: river alkalinity prescribed via RiverDIC2D (no
+    !                 explicit RiverAlk2D), loopback uses lb_flux k=5 only.
+    ! -------------------------------------------------------------------------
+
+    CASE (1003)
+        IF (use_MEDUSA .AND. add_loopback) THEN
+            IF (enable_R2OMIP) THEN
+                bc_surface = dt * ( virtual_alk(n) + relax_alk(n)      &
+                                  + lb_flux(n,3) + lb_flux(n,5)*2 )    ! CaCO3:Alk = 1:2
+            ELSE
+                bc_surface = dt * ( virtual_alk(n) + relax_alk(n)      &
+                                  + RiverAlk2D(n) * is_riverinput      &
+                                  + lb_flux(n,3) + lb_flux(n,5)*2 )    ! CaCO3:Alk = 1:2
+            END IF
+        ELSE
+            IF (enable_R2OMIP) THEN
+                bc_surface = dt * ( virtual_alk(n) + relax_alk(n)      &
+                                  + RiverDIC2D(n) * is_riverinput )    ! R2OMIP proxy for river Alk
+            ELSE
+                bc_surface = dt * ( virtual_alk(n) + relax_alk(n)      &
+                                  + RiverAlk2D(n) * is_riverinput )
+            END IF
+        END IF
+
+    ! -------------------------------------------------------------------------
+    ! 1004–1006 : No surface flux
+    ! -------------------------------------------------------------------------
+
     CASE (1004:1006)
         bc_surface=0.0_WP
-    CASE (1007) ! PON / detN ! R2OMIP
-        bc_surface= (25/276)*dt*RiverPOC2D(n) * is_riverinput
-    CASE (1008) ! POC / detC ! R2OMIP
-        bc_surface= dt*RiverPOC2D(n) * is_riverinput
+
+    ! -------------------------------------------------------------------------
+    ! 1007 : PON – Particulate Organic Nitrogen (= detN in RECOM)
+    ! R2OMIP only: derived from river POC using Redfield-like N:C ratio (25/276)
+    ! -------------------------------------------------------------------------
+
+    CASE (1007)
+        IF (enable_R2OMIP) THEN
+            bc_surface = (25.0_WP / 276.0_WP) * dt * RiverPOC2D(n) * is_riverinput
+        ELSE
+            bc_surface = 0.0_WP
+        END IF
+
+    ! -------------------------------------------------------------------------
+    ! 1008 : POC – Particulate Organic Carbon (= detC in RECOM)
+    ! R2OMIP only: river particulate organic carbon input
+    ! -------------------------------------------------------------------------
+    CASE (1008)
+        IF (enable_R2OMIP) THEN
+            bc_surface = dt * RiverPOC2D(n) * is_riverinput
+        ELSE
+            bc_surface = 0.0_WP
+        END IF
+
+    ! -------------------------------------------------------------------------
+    ! 1009–1010 : No surface flux
+    ! -------------------------------------------------------------------------
     CASE (1009:1010)
         bc_surface=0.0_WP
-    CASE (1011) ! DON ! R2OMIP
-        !bc_surface= dt*RiverDON2D(n) * is_riverinput
-        bc_surface= (103/2583)*dt*RiverDOCsl2D(n) * is_riverinput
-    CASE (1012) ! DOC
-        !bc_surface= dt*RiverDOC2D(n) * is_riverinput
-        bc_surface= 0.0_WP
+
+    ! -------------------------------------------------------------------------
+    ! 1011 : DON – Dissolved Organic Nitrogen
+    ! R2OMIP: derived from river semi-labile DOC (RiverDOCsl2D) using N:C
+    !         stoichiometry from Seitzinger et al. (103/2583 ≈ C/N ~25)
+    ! Standard: river DON directly
+    ! -------------------------------------------------------------------------
+
+    CASE (1011)
+        IF (enable_R2OMIP) THEN
+            bc_surface = (103.0_WP / 2583.0_WP) * dt * RiverDOCsl2D(n) * is_riverinput
+        ELSE
+            bc_surface = dt * RiverDON2D(n) * is_riverinput
+        END IF
+
+    ! -------------------------------------------------------------------------
+    ! 1012 : DOC – Dissolved Organic Carbon (refractory / bulk)
+    ! R2OMIP: DOC split into labile (→ DIC, see 1002) and semi-labile (→ 1031);
+    !         bulk DOC field receives no direct flux under R2OMIP.
+    ! Standard: river DOC directly
+    ! -------------------------------------------------------------------------
+    CASE (1012)
+        IF (enable_R2OMIP) THEN
+            bc_surface = 0.0_WP
+        ELSE
+            bc_surface = dt * RiverDOC2D(n) * is_riverinput
+        END IF
+ 
+    ! -------------------------------------------------------------------------
+    ! 1013–1017 : No surface flux
+    ! -------------------------------------------------------------------------
     CASE (1013:1017)
-        bc_surface=0.0_WP
-    CASE (1018) ! DSi ! From Turner et al. 2003 ! R2OMIP
-        if (use_MEDUSA .and. add_loopback) then
-           !bc_surface=dt*(RiverDSi2D(n)   * is_riverinput        &
-            !            + ErosionTSi2D(n) * is_erosioninput      &
-             !           + lb_flux(n,4))
-        bc_surface=0.0_WP
-        else
-            !bc_surface=dt*(RiverDSi2D(n) * is_riverinput + ErosionTSi2D(n) * is_erosioninput)
-            bc_surface=dt*((194/16.2)*RiverDIN2D(n) * is_riverinput + ErosionTSi2D(n) * is_erosioninput)
-        end if
+        bc_surface = 0.0_WP
 
-    CASE (1019) ! Fe
-        if (useRivFe) then
-            bc_surface= dt*(AtmFeInput(n) + RiverFe(n))
-        else
-           bc_surface= dt*AtmFeInput(n)
+    ! -------------------------------------------------------------------------
+    ! 1018 : DSi – Dissolved Silica
+    ! Sources: river DSi + erosion TSi + MEDUSA loopback (lb_flux k=4)
+    !
+    ! R2OMIP variant (no loopback): DSi estimated from river DIN using the
+    !   Si:N ratio from Turner et al. (2003): Si ≈ (194/16.2) × DIN
+    ! R2OMIP + MEDUSA loopback: currently set to zero (under review – CHECK)
+    ! -------------------------------------------------------------------------
+    CASE (1018)
+        IF (use_MEDUSA .AND. add_loopback) THEN
+            IF (enable_R2OMIP) THEN
+                bc_surface = 0.0_WP  ! TODO: R2OMIP + loopback path not yet implemented
+            ELSE
+                bc_surface = dt * ( RiverDSi2D(n)   * is_riverinput    &
+                                  + ErosionTSi2D(n) * is_erosioninput  &
+                                  + lb_flux(n,4) )
+            END IF
+        ELSE
+            IF (enable_R2OMIP) THEN
+                ! Si:N proxy ratio from Turner et al. (2003)
+                bc_surface = dt * ( (194.0_WP / 16.2_WP) * RiverDIN2D(n) * is_riverinput &
+                                  + ErosionTSi2D(n) * is_erosioninput )
+            ELSE
+                bc_surface = dt * ( RiverDSi2D(n)   * is_riverinput    &
+                                  + ErosionTSi2D(n) * is_erosioninput )
+            END IF
+        END IF
+
+    ! -------------------------------------------------------------------------
+    ! 1019 : Fe – Dissolved Iron
+    ! Sources: atmospheric dust deposition (AtmFeInput)
+    !          + river Fe (RiverFe) when useRivFe is enabled
+    !
+    ! Commented alternative (Tashiro et al. 2023 R2OMIP formula) — unstable:
+    !   bc_surface = dt*AtmFeInput + dt*(0.002*(RiverDOCsl2D**(-1.616)))
+    ! -------------------------------------------------------------------------
+    CASE (1019)
+        IF (useRivFe) THEN
+            bc_surface = dt * ( AtmFeInput(n) + RiverFe(n) )
+        ELSE
+            bc_surface = dt * AtmFeInput(n)
            !bc_surface= dt*AtmFeInput(n) + dt*(0.002*(RiverDOCsl2D(n)**(-1.616))) * is_riverinput ! From Tashiro et al. 2023 - R2OMIP (OG model explodes here)
-        end if
-    CASE (1020:1021) ! Cal
-        bc_surface=0.0_WP
+        END IF
 
-    CASE (1022) ! OXY
-        bc_surface= dt*GloO2flux_seaicemask(n)
-!        bc_surface=0.0_WP
+    ! -------------------------------------------------------------------------
+    ! 1020–1021 : CaCO3 – no surface boundary flux (internal source/sink only)
+    ! -------------------------------------------------------------------------
+    CASE (1020:1021)
+        bc_surface = 0.0_WP
+ 
+    ! -------------------------------------------------------------------------
+    ! 1022 : OXY – Dissolved Oxygen
+    ! Source: air-sea O2 flux (seaice-masked)
+    ! -------------------------------------------------------------------------
+    CASE (1022)
+        bc_surface = dt * GloO2flux_seaicemask(n)
+ 
+    ! -------------------------------------------------------------------------
+    ! 1023–1030 : No surface flux (additional RECOM fields)
+    ! -------------------------------------------------------------------------
     CASE (1023:1030)
-        bc_surface=0.0_WP  ! OG added bc for recom fields
+        bc_surface = 0.0_WP
 
-    CASE (1031) ! DOC terrigenous ! R2OMIP
-        bc_surface= dt*RiverDOCsl2D(n) * is_riverinput
-        !bc_surface=0.0_WP  ! OG added bc for recom fields
-    CASE (1032:1037) ! increased by one for DICremin (by Sina)
-        bc_surface=0.0_WP  ! OG added bc for recom fields 
+    ! -------------------------------------------------------------------------
+    ! 1031 : DOC_terr – Terrigenous (semi-labile) dissolved organic carbon
+    ! R2OMIP only: river semi-labile DOC (RiverDOCsl2D) input
+    !              Labile fraction goes to DIC (case 1002); DON to case 1011.
+    ! -------------------------------------------------------------------------
+    CASE (1031)
+        IF (enable_R2OMIP) THEN
+            bc_surface = dt * RiverDOCsl2D(n) * is_riverinput
+        ELSE
+            bc_surface = 0.0_WP
+        END IF
 
-    CASE (1302) ! Before (1037) ! DIC_13
-
+    ! -------------------------------------------------------------------------
+    ! 1032–1037 : No surface flux (additional RECOM fields)
+    ! -------------------------------------------------------------------------
+    CASE (1032:1037)
+        bc_surface = 0.0_WP
+ 
+    ! =========================================================================
+    ! CARBON ISOTOPE TRACERS (requires __ciso preprocessor flag)
+    ! =========================================================================
+ 
 #if defined (__ciso)
-         if (ciso) then
-            if (use_MEDUSA .and. add_loopback) then
-               bc_surface= dt*(GloCO2flux_seaicemask_13(n) &
-                           + lb_flux(n,6) + lb_flux(n,7))
-            else
-               bc_surface= dt*(GloCO2flux_seaicemask_13(n))
-            end if
-         else
-            bc_surface=0.0_WP
-         end if
-#endif
-
+ 
+    ! -------------------------------------------------------------------------
+    ! 1302 : DIC_13 – Dissolved 13C-labelled inorganic carbon
+    ! Source: isotopically fractionated air-sea CO2 flux
+    !         + MEDUSA loopback for 13C-DIC (k=6) and 13C-CaCO3 (k=7)
+    ! Only active when ciso = .true.
+    ! -------------------------------------------------------------------------
+    CASE (1302)
+        IF (ciso) THEN
+            IF (use_MEDUSA .AND. add_loopback) THEN
+                bc_surface = dt * ( GloCO2flux_seaicemask_13(n) &
+                                  + lb_flux(n,6) + lb_flux(n,7) )
+            ELSE
+                bc_surface = dt * GloCO2flux_seaicemask_13(n)
+            END IF
+        ELSE
+            bc_surface = 0.0_WP
+        END IF
+ 
+    ! -------------------------------------------------------------------------
+    ! 1305–1321 : Organic 13C tracers – no surface flux
+    ! -------------------------------------------------------------------------
     CASE (1305:1321)
-         bc_surface=0.0_WP ! organic 13C
-
-    CASE (1402) ! Before (1034) ! DIC_14
-#if defined (__ciso)
-         if (ciso .and. ciso_14) then
-             if (use_MEDUSA .and. add_loopback .and. ciso_organic_14) then
-                 bc_surface= dt*(GloCO2flux_seaicemask_14(n) &
-                             + lb_flux(n,8) + lb_flux(n,9))
-             else
-                 bc_surface= dt*GloCO2flux_seaicemask_14(n)
-             end if
-         else
-             bc_surface=0.0_WP
-         end if
-#endif
-
+        bc_surface = 0.0_WP
+ 
+    ! -------------------------------------------------------------------------
+    ! 1402 : DIC_14 – Dissolved 14C-labelled inorganic carbon (radiocarbon)
+    ! Source: isotopically fractionated air-sea CO2 flux
+    !         + MEDUSA loopback for 14C-DIC (k=8) and 14C-CaCO3 (k=9)
+    !           (only when ciso_organic_14 is also enabled)
+    ! Only active when ciso = .true. AND ciso_14 = .true.
+    ! -------------------------------------------------------------------------
+    CASE (1402)
+        IF (ciso .AND. ciso_14) THEN
+            IF (use_MEDUSA .AND. add_loopback .AND. ciso_organic_14) THEN
+                bc_surface = dt * ( GloCO2flux_seaicemask_14(n) &
+                                  + lb_flux(n,8) + lb_flux(n,9) )
+            ELSE
+                bc_surface = dt * GloCO2flux_seaicemask_14(n)
+            END IF
+        ELSE
+            bc_surface = 0.0_WP
+        END IF
+ 
+    ! -------------------------------------------------------------------------
+    ! 1405–1421 : Organic 14C tracers – no surface flux
+    ! -------------------------------------------------------------------------
     CASE (1405:1421)
-         bc_surface=0.0_WP ! organic 14C
-#endif
+        bc_surface = 0.0_WP
+ 
+#endif  ! __ciso
+ 
+#endif  ! __recom
 
     CASE (101) ! apply boundary conditions to tracer ID=101
         bc_surface= dt*(prec_rain(n))! - real_salt_flux(n)*is_nonlinfs)

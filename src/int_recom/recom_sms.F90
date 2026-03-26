@@ -434,8 +434,10 @@ real(kind=8) :: &
             DON = max(tiny, state(k, idon) + sms(k, idon))
             EOC = max(tiny, state(k, idoc) + sms(k, idoc))
 
-            if (useRivers) then
-                DOCt= max(tiny, state(k,idoct) + sms(k, idoct)) ! R2OMIP
+            if (enable_R2OMIP) then
+                DOCt = max(tiny, state(k,idoct) + sms(k, idoct)) ! R2OMIP
+            else 
+                DOCt = 0.0_WP
             end if 
             !-----------------------------------------------------------------------
             ! SMALL PHYTOPLANKTON
@@ -4008,7 +4010,7 @@ real(kind=8) :: &
             !---------------------------------------------------------------------------
             ! Microbial degradation of dissolved organic carbon
             + rho_C1 * arrFunc * O2Func * EOC                     & ! Temperature and O2 dependent
-            + rho_C1t                   * DOCt * is_riverinput    & ! --> Remineralization of terrestrial DOC ! R2OMIP
+            + rho_C1t                   * DOCt * is_R2OMIP        & ! --> Remineralization of terrestrial DOC ! R2OMIP
             !---------------------------------------------------------------------------
             ! SOURCES: Zooplankton Respiration (increases DIC)
             !---------------------------------------------------------------------------
@@ -5073,7 +5075,7 @@ real(kind=8) :: &
             !---------------------------------------------------------------------------
             - rho_c1 * arrFunc * O2Func * EOC                              & ! Bacterial respiration
                                                                           ) * dt_b + sms(k,idoc)
-        if (useRivers) then
+        if (enable_R2OMIP) then
             ! R2OMIP - terrestrial DOC
             sms(k,idoct) = (                                                   &
                 - rho_C1t                        * DOCt                        &
@@ -5745,7 +5747,7 @@ real(kind=8) :: &
             ! SINKS: Heterotrophic Respiration and Remineralization
             !---------------------------------------------------------------------------
             - rho_C1 * arrFunc * O2Func * EOC                              & ! DOC remineralization
-            - rho_C1t                   * DOCt * is_riverinput             &
+            - rho_C1t                   * DOCt * is_R2OMIP                 &
             - hetRespFlux                                                  & ! Mesozooplankton
             - Zoo2RespFlux * is_3zoo2det                                   & ! Macrozooplankton
             - MicZooRespFlux * is_3zoo2det                                 & ! Microzooplankton
@@ -6825,12 +6827,12 @@ real(kind=8) :: &
 
     vertREMOC(k) = vertREMOC(k) + ( &
     + rho_c1 * arrFunc * O2Func * EOC                  & ! Bacterial respiration / remineralization of oceanic DOC
-!    + rho_C1t                   * DOCt                 & ! Bacterial respiration / remineralization of terrestriel DOC 
+    + rho_C1t                   * DOCt   * is_R2OMIP              & ! Bacterial respiration / remineralization of terrestriel DOC 
     ) * recipbiostep
 
-!    vertREMOCt(k) = vertREMOCt(k) + ( &
-!    + rho_C1t                   * DOCt                 & ! Bacterial respiration / remineralization of terrestriel DOC 
-!    ) * recipbiostep
+    vertREMOCt(k) = vertREMOCt(k) + ( &
+    + rho_C1t                   * DOCt   * is_R2OMIP              & ! Bacterial respiration / remineralization of terrestriel DOC 
+    ) * recipbiostep
 
     vertREMON(k) = vertREMON(k) + ( &
     + rho_N * arrFunc * O2Func * DON                   & ! Bacterial respiration / remineralization
