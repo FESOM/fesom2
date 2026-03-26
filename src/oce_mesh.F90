@@ -132,6 +132,17 @@ module check_total_volume_interface
     end subroutine check_total_volume
   end interface
 end module check_total_volume_interface
+module check_cavity_mesh_conflict_interface
+  interface
+    subroutine check_cavity_mesh_conflict(partit, mesh)
+      use mod_mesh
+      USE MOD_PARTIT
+      USE MOD_PARSUP
+      type(t_mesh),   intent(inout), target :: mesh
+      type(t_partit), intent(inout), target :: partit
+    end subroutine check_cavity_mesh_conflict
+  end interface
+end module check_cavity_mesh_conflict_interface
 
 ! Driving routine. The distributed mesh information and mesh proper 
 ! are read from files.
@@ -147,6 +158,7 @@ USE g_config, only: flag_debug
 USE g_ROTATE_grid
 use read_mesh_interface
 use find_levels_interface
+use check_cavity_mesh_conflict_interface
 use find_levels_cavity_interface
 use mesh_auxiliary_arrays_interface
 use test_tri_interface
@@ -189,6 +201,8 @@ IMPLICIT NONE
       if (use_cavity) then
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call find_levels_cavity'//achar(27)//'[0m'
         call find_levels_cavity(partit, mesh)
+      else
+        call check_cavity_mesh_conflict(partit, mesh)
       end if 
       
       if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call find_levels_min_e2n'//achar(27)//'[0m'
@@ -2897,6 +2911,50 @@ subroutine check_total_volume(partit, mesh)
     end if
 
 end subroutine check_total_volume
+!
+!
+!_______________________________________________________________________________
+! Check if use_cavity=.false. but mesh contains cavity files
+! This would result in cavity cells being treated as open ocean which is 
+! likely unintended
+!_______________________________________________________________________________
+subroutine check_cavity_mesh_conflict(partit, mesh)
+    use MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    use g_config
+    implicit none
+    type(t_mesh),   intent(inout), target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    character(MAX_PATH)                   :: file_name
+    logical                               :: file_exist
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
+    
+    file_name=trim(meshpath)//'cavity_elvls.out'
+    inquire(file=trim(file_name), exist=file_exist)
+    
+    if (file_exist) then
+        if (mype==0) then
+            write(*,*)
+            print *, achar(27)//'[33m'
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: use_cavity=.false. but mesh contains cavity_elvls.out       '
+            write(*,*) '        This mesh was prepared for cavity-resolving simulations.    '
+            write(*,*) '        Running with use_cavity=.false. will treat cavity cells     '
+            write(*,*) '        as open ocean, which is likely unintended.                  '
+        write(*,*) '                                                                        '
+            write(*,*) '        --> Either set use_cavity=.true. in namelist.config to      '
+            write(*,*) '            enable cavities, or use a corresponding mesh            '
+            write(*,*) '            without cavity files (e.g. CORE2 instead of CORE2ice).  '
+            write(*,*) '____________________________________________________________________'
+            print *, achar(27)//'[0m'
+            write(*,*)
+        end if
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    end if
+    
+end subroutine check_cavity_mesh_conflict
 !
 !
 !_______________________________________________________________________________
