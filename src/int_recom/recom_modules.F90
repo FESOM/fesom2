@@ -549,7 +549,7 @@ contains
         ! Terrestrial DOC input (when useRivers is enabled)
         if (enable_R2OMIP) then
             idoct = 37
-            idicremin = 38 ! added by Sina
+            idicremin = 38
         else
             idicremin = 37
         end if
@@ -605,7 +605,7 @@ contains
         ! Terrestrial DOC input (when useRivers is enabled)
         if (enable_R2OMIP) then
             idoct = 31
-            idicremin = 32 ! added by Sina
+            idicremin = 32
         else
             idicremin = 31
         end if
