@@ -52,7 +52,7 @@ module recom_config
   integer :: iphac   = 0    ! Phaeocystis Carbon (set below)
   integer :: iphachl = 0    ! Phaeocystis Chlorophyll (set below)
 
-  ! Terrestrial DOC input (when useRivers is enabled)
+  ! Terrestrial DOC input (when enable_R2OMIP is enabled)
   integer :: idoct = 0 
 
 !=============================================================================
@@ -546,7 +546,7 @@ contains
         imiczoon = 35
         imiczooc = 36
 
-        ! Terrestrial DOC input (when useRivers is enabled)
+        ! Terrestrial DOC input (when enable_R2OMIP is enabled)
         if (enable_R2OMIP) then
             idoct = 37
             idicremin = 38
@@ -580,9 +580,12 @@ contains
         iphac   = 27
         iphachl = 28
 
-        ! Terrestrial DOC input (when useRivers is enabled)
+        ! Terrestrial DOC input (when enable_R2OMIP is enabled)
         if (enable_R2OMIP) then
             idoct = 29
+            idicremin = 30
+        else
+            idicremin = 29
         end if
 
 !        allocate(recom_cocco_tracer_id(3))
@@ -602,7 +605,7 @@ contains
         imiczoon = 29
         imiczooc = 30
 
-        ! Terrestrial DOC input (when useRivers is enabled)
+        ! Terrestrial DOC input (when enable_R2OMIP is enabled)
         if (enable_R2OMIP) then
             idoct = 31
             idicremin = 32
@@ -623,9 +626,12 @@ contains
         ! Detritus: det1 only
         ! (All indices already set to default values)
 
-        ! Terrestrial DOC input (when useRivers is enabled)
+        ! Terrestrial DOC input (when enable_R2OMIP is enabled)
         if (enable_R2OMIP) then
             idoct = 23
+            idicremin = 24
+        else
+            idicremin = 23
         end if
     endif
   end subroutine initialize_tracer_indices
@@ -666,7 +672,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
   num_physical_tracers = 2
 
   ! DOC tracers count
-  if (useRivers) then
+  if (enable_R2OMIP) then
     doc_tracers = 1
   else
     doc_tracers = 0
@@ -674,7 +680,9 @@ subroutine validate_recom_tracers(num_tracers, mype)
 
   ! Calculate actual BGC tracer count from namelist
   actual_bgc_num = num_tracers - num_physical_tracers
-
+    !if (use_age_tracer) then
+    !    actual_bgc_num = actual_bgc_num -1
+    !end if 
   ! ===========================================================================
   ! Determine expected BGC tracer count based on configuration
   ! ===========================================================================
@@ -691,7 +699,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
     ! Additional microzoo: 2 tracers (1035-1036)
     ! Total: 22 + 4 + 6 + 3 + 2 = 36 (actually 22 + 14 = 36)
     ! Additional DICremin: 1 tracer (1037) (added by Sina)
-    ! Plus DOC: +1 if useRivers
+    ! Plus DOC: +1 if enable_R2OMIP
     expected_bgc_num = 37 + doc_tracers ! Sina: changed from 36 to 37
 
   else if (enable_coccos .and. .not. enable_3zoo2det) then
@@ -703,7 +711,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
     ! Additional phaeocystis: 3 tracers (1026-1028)
     ! Total: 22 + 6 = 28
     ! Additional DICremin: 1 tracer (1037) (added by Sina)
-    ! Plus DOC: +1 if useRivers
+    ! Plus DOC: +1 if enable_R2OMIP
     expected_bgc_num = 29 + doc_tracers ! Sina: changed from 28 to 29
 
   else if (enable_3zoo2det .and. .not. enable_coccos) then
@@ -716,7 +724,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
     ! Additional microzoo: 2 tracers (1029-1030)
     ! Total: 22 + 8 = 30
     ! Additional DICremin: 1 tracer (1037) (added by Sina)
-    ! Plus DOC: +1 if useRivers
+    ! Plus DOC: +1 if enable_R2OMIP
     expected_bgc_num = 31 + doc_tracers ! Sina: changed from 30 to 31
 
   else
@@ -725,7 +733,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
     ! ---------------------------------------------------------------------------
     ! Base: 22 tracers (1001-1022)
     ! Additional DICremin: 1 tracer (1037) (added by Sina)
-    ! Plus DOC: +1 if useRivers
+    ! Plus DOC: +1 if enable_R2OMIP
     expected_bgc_num = 23 + doc_tracers ! Sina: changed from 22 to 23
 
   end if
@@ -832,6 +840,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
     write(*,*) '  enable_3zoo2det = ', enable_3zoo2det
     write(*,*) '  enable_coccos   = ', enable_coccos
     write(*,*) '  enable_AWICM    = ', enable_AWICM
+    write(*,*) '  enable_R2OMIP   = ', enable_R2OMIP
     write(*,*) '  useRivers       = ', useRivers
     write(*,*) ''
     write(*,*) 'Tracer counts:'
@@ -867,7 +876,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
         write(*,*) '    - DetZ2 pool:         1025-1028'
         write(*,*) '    - MicZooN, MicZooC:   1029-1030'
         write(*,*) '    - DICremin:           1037     ' ! added by Sina
-        if (useRivers) then
+        if (enable_R2OMIP) then
           write(*,*) '  Terrestrial DOC:        1031 (1 tracer)'
         end if
       else if (enable_coccos .and. .not. enable_3zoo2det) then
@@ -875,7 +884,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
         write(*,*) '    - CoccoN, C, Chl:     1023-1025'
         write(*,*) '    - PhaeoN, C, Chl:     1026-1028'
         write(*,*) '    - DICremin:           1037     ' ! added by Sina
-        if (useRivers) then
+        if (enable_R2OMIP) then
           write(*,*) '  Terrestrial DOC:        1029 (1 tracer)'
         end if
       else if (enable_3zoo2det .and. enable_coccos) then
@@ -886,11 +895,11 @@ subroutine validate_recom_tracers(num_tracers, mype)
         write(*,*) '    - PhaeoN, C, Chl:     1032-1034'
         write(*,*) '  MicroZoo extension:     1035-1036 (2 tracers)'
         write(*,*) '    - DICremin:           1037     ' ! added by Sina
-        if (useRivers) then
+        if (enable_R2OMIP) then
           write(*,*) '  Terrestrial DOC:        1038 (1 tracer)' ! Sina: increased from 1037 to 1038
         end if
       else
-        if (useRivers) then
+        if (enable_R2OMIP) then
           write(*,*) '  Terrestrial DOC:        1023 (1 tracer)'
         end if
       end if
@@ -898,7 +907,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
       write(*,*) ''
       write(*,*) 'ACTION REQUIRED:'
       write(*,*) '  1. Check your namelist.config tracer_list section'
-      write(*,*) '  2. Ensure enable_3zoo2det, enable_coccos, and useRivers match your setup'
+      write(*,*) '  2. Ensure enable_3zoo2det, enable_coccos, enable_R2OMIP, and useRivers match your setup'
       write(*,*) '  3. Add/remove tracers to match the expected configuration'
       write(*,*) '=========================================================================='
       write(*,*) ''
@@ -926,7 +935,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
       write(*,*) '  Expected value:        ', expected_bgc_num
       write(*,*) ''
       write(*,*) 'This may indicate that bgc_num was not updated after changing'
-      write(*,*) 'enable_3zoo2det, enable_coccos flags, or useRivers flags.'
+      write(*,*) 'enable_3zoo2det, enable_coccos, enable_R2OMIP, or useRivers flag.'
       write(*,*) '=========================================================================='
       write(*,*) ''
     end if
@@ -969,7 +978,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
     write(*,*) '  - Tracer ID clashes between configurations'
     write(*,*) '  - Incorrect order of tracer IDs in namelist'
     write(*,*) '  - Missing or duplicate tracer IDs'
-    write(*,*) '  - Forgetting to add DOCt tracer when useRivers is enabled'
+    write(*,*) '  - Forgetting to add DOCt tracer when enable_R2OMIP is enabled'
     write(*,*) ''
 
     ! Configuration-specific warnings
@@ -982,7 +991,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
       write(*,*) '  - Phaeocystis uses:  1032-1034'
       write(*,*) '  - Microzooplankton:  1035-1036'
       write(*,*) '  - DIC remin:         1037     ' ! added by Sina
-      if (useRivers) then
+      if (enable_R2OMIP) then
         write(*,*) '  - Terrestrial DOC:   1038'    ! Sina: increased from 1037 to 1038
       end if
       write(*,*) ''
@@ -991,7 +1000,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
       write(*,*) '  - Coccos uses:       1023-1025 (NOT 1029-1031)'
       write(*,*) '  - Phaeocystis uses:  1026-1028 (NOT 1032-1034)'
       write(*,*) '  - DIC remin:         1037     ' ! added by Sina
-      if (useRivers) then
+      if (enable_R2OMIP) then
         write(*,*) '  - Terrestrial DOC:   1029'
         write(*,*) '  - Tracers 1030+ are NOT used in this configuration'
       else
@@ -1004,7 +1013,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
       write(*,*) '  - Det2 pool uses:    1025-1028'
       write(*,*) '  - Microzoo uses:     1029-1030 (NOT 1035-1036)'
       write(*,*) '  - DIC remin:         1037     ' ! added by Sina
-      if (useRivers) then
+      if (enable_R2OMIP) then
         write(*,*) '  - Terrestrial DOC:   1031'
         write(*,*) '  - Tracers 1032+ are NOT used in this configuration'
       else
@@ -1014,7 +1023,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
     else
       write(*,*) 'IMPORTANT for BASE configuration:'
       write(*,*) '  - Only tracers 1-2, 1001-1022 and 1037 should be present' ! 1037 added by Sina
-      if (useRivers) then
+      if (enable_R2OMIP) then
         write(*,*) '  - Plus terrestrial DOC: 1023'
         write(*,*) '  - Tracers 1024+ are NOT used in base configuration'
       else
@@ -1051,6 +1060,11 @@ subroutine validate_recom_tracers(num_tracers, mype)
     if (useRivers) then
       write(*,*) ''
       write(*,*) 'Rivers enabled (useRivers = .true.)'
+    end if
+
+    if (enable_R2OMIP) then
+      write(*,*) ''
+      write(*,*) 'enable_R2OMIP enabled (enable_R2OMIP = .true.)'
       write(*,*) 'Terrestrial DOC tracer is REQUIRED as the last BGC tracer.'
     end if
 
@@ -1115,7 +1129,7 @@ subroutine validate_tracer_id_sequence(tracer_ids, num_tracers, mype)
   num_physical_tracers = 2
 
   ! DOC tracers count
-  if (useRivers) then
+  if (enable_R2OMIP) then
     doc_tracers = 1
   else
     doc_tracers = 0

@@ -479,6 +479,7 @@ subroutine recom_init(tracers, partit, mesh)
     dtr_bflux_dsi(:,:)    = 0.0d0
     dtr_bf_dsi(:,:,:)     = 0.0d0
 
+            if (partit%mype==0) write(*,*) "here2!"
     if (use_MEDUSA) then
         allocate(GloSed(node_size,sedflx_num))
         allocate(SinkFlx(node_size,bottflx_num))
@@ -764,9 +765,13 @@ subroutine recom_init(tracers, partit, mesh)
             locDFemin = min(locDFemin,minval(tracers%data(21)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
             locO2max  = max(locO2max,maxval(tracers%data(24)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
             locO2min  = min(locO2min,minval(tracers%data(24)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
-            locDICremax  = max(locDICremax,maxval(tracers%data(33)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) ) ! init DIC remin (added by Sina) !!!!
-            locDICremin  = min(locDICremin,minval(tracers%data(33)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) ) ! init DIC remin (added by Sina) !!!!
-
+            if (enable_3zoo2det .and. .not. enable_coccos) then
+                locDICremax = max(locDICremax,maxval(tracers%data(33)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) ) ! DICremin tracer (added by Sina)
+                locDICremin = min(locDICremin,minval(tracers%data(33)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+            else if (enable_3zoo2det .and. enable_coccos) then
+                locDICremax = max(locDICremax,maxval(tracers%data(39)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) ) ! DICremin tracer (added by Sina)
+                locDICremin = min(locDICremin,minval(tracers%data(39)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+            endif
         end do
 
         if (mype==0) write(*,*) "Sanity check for REcoM variables after recom_init call"
