@@ -117,23 +117,22 @@ type(t_partit), intent(inout), target :: partit
         ! loop over (up to three) nodes of iceberg_elem
         do i=1, 3
             iceberg_node=ib_nods_in_ib_elem(i)
-<<<<<<< HEAD
-
-            ! check if iceberg_nod is in cavity, cycle of .true.
-            if ((ulevels_nod2d(iceberg_node) == 0 ) .or. (use_cavity .and. ulevels_nod2d(iceberg_node) > 1)) cycle
-=======
             ! Skip nodes with no ocean column; do NOT skip valid cavity nodes
             if (iceberg_node <= 0 .or. ulevels_nod2d(iceberg_node) == 0) cycle
->>>>>>> 43a0521b (fix icb_cavity cpl)
 
             ! if iceberg_node in PE, convert freshwater flux to flux density by dividing with tot_area_nods_in_ib_elem ...
             ! ... of upper most level. The total iceberg flux is distributed among up to three nodes and only applied to the ...
             ! ... surface layer.
             if (iceberg_node>0) then
-                ibfwbv(iceberg_node) = ibfwbv(iceberg_node) - fwbv_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
-                ibfwb(iceberg_node) = ibfwb(iceberg_node) - fwb_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
-                ibfwl(iceberg_node) = ibfwl(iceberg_node) - fwl_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
-                ibfwe(iceberg_node) = ibfwe(iceberg_node) - fwe_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
+                ! Guard: tot_area at level 1 is zero when all element nodes are cavity nodes
+                ! (mesh%area(1,cavity_node)==0), which would give division by zero / NaN.
+                if (tot_area_nods_in_ib_elem(1) > 0.0) then
+                    ibfwbv(iceberg_node) = ibfwbv(iceberg_node) - fwbv_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
+                    ibfwb(iceberg_node) = ibfwb(iceberg_node) - fwb_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
+                    ibfwl(iceberg_node) = ibfwl(iceberg_node) - fwl_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
+                    ibfwe(iceberg_node) = ibfwe(iceberg_node) - fwe_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
+                end if
+                !ibhf(iceberg_node) = ibhf(iceberg_node) - hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
 
                 ! Guard against idx_d=0 (can happen if nlevels_nod2D is 0 or loop didn't execute)
                 if (idx_d(i) <= 0) cycle
@@ -152,9 +151,10 @@ type(t_partit), intent(inout), target :: partit
                         dz = abs(abs(lev_up) - abs(depth_ib))           ! ... if so, distance dz is calculated as difference ...
                                                                         ! ... between upper level and iceberg base
                     end if              
-                  
-                    ! check if iceberg is not yet melted away ...
-                    if( abs(depth_ib) > 0.0 ) then
+                   
+                    ! Also guard tot_area(j): at levels where only some nodes extend,
+                    ! the remaining nodes contribute zero area, making tot_area very small.
+                    if( abs(depth_ib) > 0.0 .and. tot_area_nods_in_ib_elem(j) > 0.0 ) then
                         ibhf_n(j,iceberg_node) = ibhf_n(j,iceberg_node) & 
                                                     - (hfbv_flux_ib(ib,j)+hfl_flux_ib(ib,j)) & 
                                                     / tot_area_nods_in_ib_elem(j)
@@ -163,22 +163,23 @@ type(t_partit), intent(inout), target :: partit
                 
                 ! if idx_d is not only upper most level ...
                 if( idx_d(i) > 1 ) then
-
-                    ! ... assign 50% of basal heat flux to level idx_d, i.e. the level below iceberg base ...
-                    ibhf_n(idx_d(i),iceberg_node) = ibhf_n(idx_d(i),iceberg_node) - 0.5 * hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i))
-                    ! ... and 50% to idx_d-1, i.e. the level above iceberg base
-                    ibhf_n(idx_d(i)-1,iceberg_node) = ibhf_n(idx_d(i)-1,iceberg_node) - 0.5 * hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i)-1)
-                else
-                    
-                    ! ... otherwise (should not happen), assign 100% of basal heat flux to level idx_n, i.e. the surface level
-                    ibhf_n(idx_d(i),iceberg_node) = ibhf_n(idx_d(i),iceberg_node) - hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i))
+                    if (tot_area_nods_in_ib_elem(idx_d(i)) > 0.0) &
+                        ibhf_n(idx_d(i),iceberg_node) = ibhf_n(idx_d(i),iceberg_node) - 0.5 * hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i))
+                    if (tot_area_nods_in_ib_elem(idx_d(i)-1) > 0.0) &
+                        ibhf_n(idx_d(i)-1,iceberg_node) = ibhf_n(idx_d(i)-1,iceberg_node) - 0.5 * hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i)-1)
+                else if( idx_d(i) == 1 ) then
+                    if (tot_area_nods_in_ib_elem(idx_d(i)) > 0.0) &
+                        ibhf_n(idx_d(i),iceberg_node) = ibhf_n(idx_d(i),iceberg_node) - hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i))
                 end if
-               
-                ! if iceberg not yet melted away ...
-                if( height_ib_single .ne. 0.0 ) then
-                    
-                    ! ... assign heat flux due to wave erosion to surface level
-                    ibhf_n(1,iceberg_node) = ibhf_n(1,iceberg_node) - hfe_flux_ib(ib) & 
+                
+                ! Wave erosion heat applied at level 1 only on open-ocean nodes (ulevels==1).
+                ! Cavity nodes (ulevels>1) skip nz=1 in oce_ale_tracer, so setting ibhf_n(1)
+                ! for them wastes the flux and overcounts the heat on the open-ocean node.
+                if( height_ib_single .ne. 0.0 .and. tot_area_nods_in_ib_elem(1) > 0.0 &
+                        .and. ulevels_nod2d(iceberg_node) == 1 ) then
+                    ibhf_n(1,iceberg_node) = ibhf_n(1,iceberg_node) - hfe_flux_ib(ib) &
+                            !* abs(height_ib_single) &
+                            !* ((abs(height_ib_single)-abs(depth_ib))/abs(height_ib_single)) &
                             / tot_area_nods_in_ib_elem(1)
                 end if
             end if
