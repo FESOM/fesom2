@@ -60,8 +60,12 @@ type(t_partit), intent(inout), target :: partit
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-    if(i_have_element) then                                     ! PE has iceberg
-        dz = 0.0                                                ! vertical distance over which heat flux is applied 
+    ! Also guard localelement: when an iceberg crosses a PE boundary during
+    ! iceberg_step1, i_have_element can remain .true. while local_idx_of()
+    ! returned 0 for the new element.  elem2d_nodes(i, 0) is an out-of-bounds
+    ! read that produces a garbage node index and may divide by zero area -> NaN.
+    if(i_have_element .and. localelement > 0) then
+        dz = 0.0
         allocate(tot_area_nods_in_ib_elem(mesh%nl))
 
         num_ib_nods_in_ib_elem=0                                ! number of nodes in this element ???
