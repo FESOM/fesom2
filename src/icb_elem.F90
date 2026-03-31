@@ -464,6 +464,12 @@ do m=1, 3
          left_mype=1.0
          !write(*,*) 'iceberg found in shelf region: left_mype = 1'
          old_iceberg_elem=ibelem_tmp
+         ! Do NOT return here.  At a cavity boundary the trajectory endpoint
+         ! can lie inside both the cavity element and an adjacent non-cavity
+         ! neighbour (shared edge).  If the cavity element is encountered
+         ! first in the search order, returning immediately would miss the
+         ! valid non-cavity alternative and trigger a spurious left_mype=1.
+         cycle
       end if
    endif
    RETURN 

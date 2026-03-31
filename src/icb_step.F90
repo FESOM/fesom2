@@ -586,7 +586,10 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
         if( lverbose_icb) then
             write(*,*) " *******************************************************"
             write(*,*) " * set iceberg ", ib, " back to elem ", old_element, " from elem ", iceberg_elem
-            write(*,*) " * area_ib_tot = ", area_ib_tot, "; elem_area = ", elem_area(local_idx_of(iceberg_elem))
+            ! elem_area is indexed by local element number.  When the new
+            ! element belongs to a different PE, local_idx_of() returns 0
+            ! and elem_area(0) is an out-of-bounds read.  Use the global array.
+            write(*,*) " * area_ib_tot = ", area_ib_tot, "; elem_area = ", elem_area_glob(iceberg_elem)
         end if
         i_have_element = .true.
         left_mype = 0.0
@@ -1125,8 +1128,13 @@ type(t_partit), intent(inout), target :: partit
     call projection(mesh,partit,  velocity, n(1), n(2))
     
    
-   CASE DEFAULT 
-    return  	!mesh element MUST NOT have 3 coastal points!
+   CASE DEFAULT
+    ! All 3 nodes flagged cavity/boundary.  This element should have been
+    ! rejected by find_new_iceberg_elem / iceberg_elem4all before reaching
+    ! here.  Velocity is not modified; step2's iceberg_elem4all will stop
+    ! the iceberg by reverting it to the previous element with zero velocity.
+    if (mype==0) write(*,*) 'WARNING: parallel2coast called with fully-cavity element', elem
+    return
 
  END SELECT
  

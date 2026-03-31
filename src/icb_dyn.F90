@@ -703,9 +703,21 @@ type(t_partit), intent(inout), target :: partit
    n2=elem2D_nodes(m,iceberg_elem)
 
    ! LOOP over mid-levels: Z_3d_n_ib(k) gives depth where UV_ib(k) lives
-   innerloop: do k=1, nlevels_nod2D(n2)
+   innerloop: do k=1, nlevels_nod2d(n2)
+    ! Skip levels inside the ice shelf for cavity nodes.  Tclim_ib/UV_ib at
+    ! k < ulevels_nod2d are never updated by the tracer solver; they hold stale
+    ! initial values (frozen at model start) that drive extreme spurious melt.
+    if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
+        .AND. k < ulevels_nod2d(n2)) cycle
+
     if( k==1 ) then
         lev_up = 0.0
+    else if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
+             .AND. k == ulevels_nod2d(n2)) then
+        ! First valid ocean level for this cavity node: the top boundary is the
+        ! ice shelf base, i.e. zbar_3d_n(ulevels_nod2d, n2) = zbar_n_srf(n2).
+        ! Using Z_3d_n_ib(k-1) here would give a dummy ice-shelf mid-depth.
+        lev_up = mesh%zbar_3d_n(k, n2)
     else
         lev_up = mesh%Z_3d_n_ib(k-1, n2)
     end if
@@ -896,9 +908,21 @@ type(t_partit), intent(inout), target :: partit
    S_keel(m)=0.0
 
    ! LOOP over mid-levels: Z_3d_n_ib(k) gives depth where UV_ib(k) lives
-   innerloop: do k=1, nlevels_nod2D(n2)
+   innerloop: do k=1, nlevels_nod2d(n2)
+    ! Skip levels inside the ice shelf for cavity nodes.  Tclim_ib/UV_ib at
+    ! k < ulevels_nod2d are never updated by the tracer solver; they hold stale
+    ! initial values (frozen at model start) that drive extreme spurious melt.
+    if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
+        .AND. k < ulevels_nod2d(n2)) cycle
+
     if( k==1 ) then
         lev_up = 0.0
+    else if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
+             .AND. k == ulevels_nod2d(n2)) then
+        ! First valid ocean level for this cavity node: the top boundary is the
+        ! ice shelf base, i.e. zbar_3d_n(ulevels_nod2d, n2) = zbar_n_srf(n2).
+        ! Using Z_3d_n_ib(k-1) here would give a dummy ice-shelf mid-depth.
+        lev_up = mesh%zbar_3d_n(k, n2)
     else
         lev_up = mesh%Z_3d_n_ib(k-1, n2)
     end if
