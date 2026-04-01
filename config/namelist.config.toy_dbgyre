@@ -1,79 +1,136 @@
-! This is the namelist file for model general configuration
+! ============================================================================
+! ============ Namelist file for FESOM2 general configuration ================
+! ============================================================================
+! This file contains the main configuration parameters for FESOM2, including:
+! - Model identification and run settings
+! - Time stepping and simulation duration
+! - Initial time/date settings
+! - File paths for mesh, forcing, and output
+! - Restart and logging configuration
+! - Vertical coordinate system (ALE)
+! - Grid geometry and rotation
+! - Calendar settings
+! - Model components (ice, cavities, etc.)
+! - Parallel decomposition
+! - Iceberg settings
+! ============================================================================
 
+! ============================================================================
+! RUN IDENTIFICATION
+! ============================================================================
 &modelname
-runid='fesom'
+runid = 'fesom'        ! run identifier (used in output filenames)
 /
 
+! ============================================================================
+! TIME STEPPING AND RUN LENGTH
+! ============================================================================
 &timestep
-step_per_day=45 !96 !96 !72 !72 !45 !72 !96
-run_length=1 !62 !62 !62 !28
-run_length_unit='d' ! y, m, d, s
+step_per_day      = 45         ! number of time steps per day (determines dt = 86400/step_per_day seconds)
+                                ! common values: 32 (45min), 48 (30min), 72 (20min), 96 (15min), 192 (7min 30sec), 
+                                ! 216 (6min 40sec), 240 (6min), 288 (5min), 360 (4min), 720 (2min), 1440 (1min), 2880 (30sec)
+run_length        = 1          ! total length of simulation run
+run_length_unit   = 'd'        ! unit for run_length: 'y' (years), 'm' (months), 'd' (days), 's' (steps)
 /
 
-&clockinit              ! the model starts at
-timenew=0.0
-daynew=1
-yearnew=1900
+! ============================================================================
+! INITIAL TIME/DATE SETTINGS
+! ============================================================================
+&clockinit
+timenew = 0.0                  ! initial time within the day [seconds] (0.0 = midnight)
+daynew  = 1                    ! initial day of the month (1-31)
+yearnew = 1900                 ! initial year
 /
 
+! ============================================================================
+! MESH, INITIALIZATION & OUTPUT PATHS
+! ============================================================================
 &paths
-MeshPath=''
-ResultPath='../results_tmp/'
+MeshPath         = ''                                           ! path to mesh files (nod2d.out, elem2d.out, etc.)
+ClimateDataPath  = '/pool/data/AWICM/FESOM2/INITIAL/phc3.0/'    ! path to initial conditions (temperature, salinity)
+ResultPath       = '../results_tmp/'                            ! path for output files and fesom.clock file
 /
 
+! ============================================================================
+! RESTART AND LOGGING CONFIGURATION
+! ============================================================================
 &restart_log
-restart_length=1           ! --> do netcdf restart ( only required for d,h,s cases, y, m take 1)
-restart_length_unit='y'     !output period: y, d, h, s, off
-raw_restart_length=1        ! --> do core dump restart
-raw_restart_length_unit='off' ! e.g. y, d, h, s, off
-bin_restart_length=1        ! --> do derived type binary restart 
-bin_restart_length_unit='off' ! e.g. y, d, h, s, off
-logfile_outfreq=72     !in logfile info. output frequency, # steps
+restart_length          = 1        ! frequency for netCDF restart files (required for d,h,s; y,m use 1)
+restart_length_unit     = 'y'      ! unit: 'y' (years), 'm' (months), 'd' (days), 'h' (hours), 's' (steps), 'off' (disabled)
+raw_restart_length      = 1        ! frequency for raw core dump restart files
+raw_restart_length_unit = 'off'    ! unit: 'y', 'm', 'd', 'h', 's', 'off'
+bin_restart_length      = 1        ! frequency for binary derived type restart files
+bin_restart_length_unit = 'off'    ! unit: 'y', 'm', 'd', 'h', 's', 'off'
+logfile_outfreq         = 72       ! log file output frequency [number of time steps]
 /
 
+! ============================================================================
+! VERTICAL COORDINATE SYSTEM (ALE - Arbitrary Lagrangian-Eulerian)
+! ============================================================================
 &ale_def
-which_ALE='linfs'       ! 'linfs','zlevel', 'zstar'
-use_partial_cell=.false.
+which_ALE          = 'linfs'     ! vertical coordinate type:
+                                 !   'linfs'  = linear free surface
+                                 !   'zlevel' = z-level (fixed depth levels)
+                                 !   'zstar'  = z-star (terrain-following with SSH scaling)
+use_partial_cell   = .false.     ! use partial bottom cells for better topography representation (not recommended)
 /
 
+! ============================================================================
+! GRID GEOMETRY AND ROTATION
+! ============================================================================
 &geometry
-cartesian=.false.
-fplane=.false.
-cyclic_length=90       ![degree]
-rotated_grid=.false.     !option only valid for coupled model case now
-force_rotation=.false.
-alphaEuler=0          ![degree] Euler angles, convention:
-betaEuler=0           ![degree] first around z, then around new x,
-gammaEuler=0         ![degree] then around new z.
+cartesian       = .false.        ! use Cartesian coordinates (false = spherical Earth)
+fplane          = .false.        ! use f-plane approximation (constant Coriolis parameter)
+cyclic_length   = 90             ! length of cyclic domain [degrees] (360 = global)
+rotated_grid    = .false.        ! use rotated grid (typically for coupled models to avoid pole singularity)
+force_rotation  = .false.        ! force grid rotation even if not coupled
+alphaEuler      = 0.             ! first Euler angle (rotation around z-axis) [degrees]
+betaEuler       = 0.             ! second Euler angle (rotation around new x-axis) [degrees]
+gammaEuler      = 0.             ! third Euler angle (rotation around new z-axis) [degrees]
+                                 ! Euler angle convention: rotate first around z, then around new x, then around new z
 /
 
+! ============================================================================
+! CALENDAR SETTINGS
+! ============================================================================
 &calendar
-include_fleapyear=.false.
+include_fleapyear = .false.       ! include leap years in calendar (false = 365-day year, true = 365/366-day year)
 /
 
+! ============================================================================
+! MODEL COMPONENTS AND FEATURES
+! ============================================================================
 &run_config
-use_ice=.false.                  ! ocean+ice
-use_cavity=.false.              !
-use_cavity_partial_cell=.false. 
-use_floatice = .false.
-use_sw_pene=.true.
-flag_debug=.false.
-flag_warn_cflz=.false.
-toy_ocean=.true.
-which_toy="dbgyre"
-flag_debug=.false.
+use_ice                  = .false.       ! enable sea ice model
+use_cavity               = .false.       ! enable ice shelf cavities
+use_cavity_partial_cell  = .false.       ! use partial cells in ice shelf cavities (not recommended)
+use_floatice             = .false.       ! enable floating ice (icebergs)
+use_sw_pene              = .true.        ! enable shortwave radiation penetration into ocean
+flag_debug               = .false.       ! enable debug output (verbose logging)
+use_transit              = .false.       ! enable transient tracer module (CFCs, SF6, etc.)
+toy_ocean                = .true.        ! enable toy configuration
+which_toy                = 'dbgyre'      ! enable toy bouble gyre experiment
 /
 
+! ============================================================================
+! PARALLEL DECOMPOSITION (DOMAIN PARTITIONING)
+! ============================================================================
 &machine
-n_levels=1
-n_part=24
+n_levels = 1             ! number of hierarchy levels for domain decomposition
+n_part   = 24            ! number of partitions at each level (total CPUs = product of n_part)
+                         ! example: 2 x 128 = 256 MPI tasks
+                         ! adjust based on mesh size and available compute resources
+                         ! maximum scaling reached at ~300 FESOM2 2D nodes per CPU (see first line in nod2d.out for number of 2D nodes)
 /
 
+! ============================================================================
+! ICEBERG SETTINGS
+! ============================================================================
 &icebergs
-use_icesheet_coupling=.false.
-ib_num=1
-use_icebergs=.false.
-steps_per_ib_step=8
-ib_async_mode=0
+use_icesheet_coupling = .false.  ! enable ice sheet model
+ib_num                = 1        ! number of iceberg classes
+use_icebergs          = .false.  ! enable iceberg module
+steps_per_ib_step     = 8        ! ocean time steps per iceberg time step (iceberg subcycling)
+ib_async_mode         = 0        ! iceberg asynchronous mode (0=synchronous, 1=asynchronous)
 /
 

@@ -275,7 +275,7 @@ MODULE mod_transit
       real(kind=8), allocatable, dimension(:) :: d14c_nh, d14c_tz, d14c_sh, d14c_ti, d13c_dummy
 
       if (anthro_transit) then
-!       Anthropogenic input for 1850 - 2015 CE
+!       Anthropogenic input for 1850 - 2023 CE
         allocate(d14c_nh(length_transit))
         allocate(d14c_tz(length_transit))
         allocate(d14c_sh(length_transit))
@@ -293,7 +293,7 @@ MODULE mod_transit
         allocate(d13c_dummy(length_transit))
 
 !       Skip header lines
-        do jj = 1,15
+        do jj = 1,22
           read (ifileunit, fmt=*)
         end do
 !       Read input values

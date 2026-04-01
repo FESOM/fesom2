@@ -30,7 +30,7 @@ Section &paths
 """"""""""""""
 
 - **Meshpath=''**, path to your mesh directory
-- **ClimateDataPath=''**, path to the location of your 3D initialisation data for temperatur and salinity. 
+- **ClimateDataPath=''**, path to the location of your 3D initialisation data for temperature and salinity. 
 - **Resultpath=''**, directory where your results should be stored
 
 

@@ -44,11 +44,12 @@ module io_fesom_file_module
     procedure, public :: async_read_and_scatter_variables, async_gather_and_write_variables, join, init, is_iorank, rec_count, time_varindex, time_dimindex
     procedure, public :: read_variables_raw, write_variables_raw
     procedure, public :: close_file ! inherited procedures we overwrite
+    procedure, public :: read_and_scatter_variables
     generic, public :: specify_node_var => specify_node_var_2d, specify_node_var_2dicepack, specify_node_var_3d 
     generic, public :: specify_elem_var => specify_elem_var_2d, specify_elem_var_3d
     procedure, private :: specify_node_var_2d, specify_node_var_2dicepack, specify_node_var_3d
     procedure, private :: specify_elem_var_2d, specify_elem_var_3d
-    procedure, private :: read_and_scatter_variables, gather_and_write_variables
+    procedure, private :: gather_and_write_variables
   end type fesom_file_type
   
   
@@ -186,6 +187,13 @@ contains
     type(var_info), pointer :: var
     real(kind=8), allocatable :: laux(:)
     integer mpierr
+    real(kind=8) :: total_netcdf_time, total_scatter_time, total_barrier_time
+    real(kind=8) :: t_start, t_end
+
+    ! Initialize timing variables
+    total_netcdf_time = 0.0d0
+    total_scatter_time = 0.0d0
+    total_barrier_time = 0.0d0
 
     last_rec_idx = this%rec_count()
     
@@ -213,27 +221,25 @@ contains
       end if
 
       do lvl=1, nlvl
-#ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
-        ! aleph cray-mpich workaround
-        call MPI_Barrier(this%comm, mpierr)
-#elif ENABLE_ALBEDO_INTELMPI_WORKAROUNDS
-        call MPI_Barrier(this%comm, mpierr)
-#elif ENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS     
-        call MPI_Barrier(this%comm, mpierr)             
-#endif
         if(this%is_iorank()) then
+          t_start = MPI_Wtime()
           if(is_2d) then
             call this%read_var(var%var_index, [1,last_rec_idx], [size(var%global_level_data),1], var%global_level_data)
           else
             call this%read_var(var%var_index, [1,lvl,last_rec_idx], [size(var%global_level_data),1,1], var%global_level_data)
           end if
+          t_end = MPI_Wtime()
+          total_netcdf_time = total_netcdf_time + (t_end - t_start)
         end if
 
+        t_start = MPI_Wtime()
         if(var%is_elem_based) then
           call scatter_elem2D(var%global_level_data, laux, this%iorank, this%comm, this%partit)
         else
           call scatter_nod2D(var%global_level_data, laux, this%iorank, this%comm, this%partit)
         end if
+        t_end = MPI_Wtime()
+        total_scatter_time = total_scatter_time + (t_end - t_start)
 #ifdef ENABLE_NVHPC_WORKAROUNDS
   if(var%varname=='u') then
     dynamics_workaround%uv(1,lvl,:) = laux
@@ -260,6 +266,23 @@ contains
       end do
       deallocate(laux)
     end do
+    
+    ! Print timing breakdown for restart reading (rank 0 only)
+    if(this%partit%mype == 0 .and. this%nvar_infos > 0) then
+      write(*,'(A)') '=================================='
+      if(allocated(this%var_infos(1)%varname)) then
+        write(*,'(A,A)') 'RESTART READ TIMING for file: ', trim(this%var_infos(1)%varname)
+      else
+        write(*,'(A)') 'RESTART READ TIMING BREAKDOWN'
+      end if
+      write(*,'(A,F10.3,A)') '  NetCDF read time:  ', total_netcdf_time, ' seconds'
+      write(*,'(A,F10.3,A)') '  MPI scatter time:  ', total_scatter_time, ' seconds'
+      if(total_barrier_time > 0.0d0) then
+        write(*,'(A,F10.3,A)') '  MPI barrier time:  ', total_barrier_time, ' seconds'
+      end if
+      write(*,'(A,F10.3,A)') '  TOTAL time:        ', total_netcdf_time + total_scatter_time + total_barrier_time, ' seconds'
+      write(*,'(A)') '=================================='
+    end if
   end subroutine
 
 
@@ -290,14 +313,6 @@ contains
       end if
 
       do lvl=1, nlvl
-#ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
-        ! aleph cray-mpich workaround
-        call MPI_Barrier(this%comm, mpierr)
-#elif ENABLE_ALBEDO_INTELMPI_WORKAROUNDS
-        call MPI_Barrier(this%comm, mpierr)
-#elif ENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS     
-        call MPI_Barrier(this%comm, mpierr)
-#endif
         ! the data from our pointer is not contiguous (if it is 3D data), so we can not pass the pointer directly to MPI
         laux = var%local_data_copy(lvl,:) ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
 

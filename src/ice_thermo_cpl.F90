@@ -20,11 +20,13 @@ subroutine thermodynamics(ice, partit, mesh)
   USE MOD_PARTIT
   USE MOD_PARSUP
   USE MOD_MESH
+  use o_arrays, only: fw_ice, fw_snw
   use g_config
   use g_forcing_param
   use g_forcing_arrays
   use g_comm_auto
   use g_rotate_grid
+  use ice_meltponds, only: meltpond_area, meltpond_albedo
   implicit none
   type(t_ice)   , intent(inout), target :: ice
   type(t_partit), intent(inout), target :: partit
@@ -46,7 +48,9 @@ subroutine thermodynamics(ice, partit, mesh)
   !---- local variables (set in this subroutine)
   real(kind=WP)  :: rsss
   !---- output variables (computed in `ice_growth')
-  real(kind=WP)  :: ehf, fw, rsf, dhgrowth, dhsngrowth, dhflice
+  real(kind=WP)  :: ehf, fw, fwice, fwsnw, rsf, dhgrowth, dhsngrowth, dhflice, dAgrowth
+  !---- melt pond variables
+  real(kind=WP)  :: fpond, meltt_rate, melts_rate
 
   !---- geographical coordinates
   real(kind=WP)  :: geolon, geolat
@@ -62,12 +66,14 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP), dimension(:,:), pointer :: geo_coord_nod2D
   real(kind=WP), dimension(:)  , pointer :: u_ice, v_ice
   real(kind=WP), dimension(:)  , pointer :: a_ice, m_ice, m_snow
-  real(kind=WP), dimension(:)  , pointer :: thdgr, thdgrsn
-  real(kind=WP), dimension(:)  , pointer :: a_ice_old, m_ice_old, m_snow_old, thdgr_old 
+  real(kind=WP), dimension(:)  , pointer :: thdgr, thdgrsn, thdgra
+  real(kind=WP), dimension(:)  , pointer :: a_ice_old, m_ice_old, m_snow_old, thdgr_old
+  ! melt pond pointers
+  real(kind=WP), dimension(:)  , pointer :: apnd, hpnd, ipnd 
   real(kind=WP), dimension(:)  , pointer :: S_oc_array, T_oc_array, u_w, v_w
   real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
 #if defined (__oifs) || defined (__ifsinterface)
-  real(kind=WP), dimension(:) , pointer  :: ice_temp, ice_alb, enthalpyoffuse, ice_heat_qres, ice_heat_qcon
+  real(kind=WP), dimension(:) , pointer  :: ice_temp, ice_alb, enthalpyoffuse, ice_heat_qres, ice_heat_qcon, runoff_liquid, runoff_solid
 #endif
 #if defined (__oasis) || defined (__ifsinterface)
   real(kind=WP), dimension(:)  , pointer ::  oce_heat_flux, ice_heat_flux 
@@ -84,6 +90,7 @@ subroutine thermodynamics(ice, partit, mesh)
   m_snow        => ice%data(3)%values(:)  
   thdgr         => ice%thermo%thdgr(:)
   thdgrsn       => ice%thermo%thdgrsn(:)
+  thdgra        => ice%thermo%thdgra(:)
   a_ice_old     => ice%data(1)%values_old(:)
   m_ice_old     => ice%data(2)%values_old(:)
   m_snow_old    => ice%data(3)%values_old(:)
@@ -98,6 +105,8 @@ subroutine thermodynamics(ice, partit, mesh)
   ice_temp      => ice%data(4)%values(:)
   ice_alb       => ice%atmcoupl%ice_alb(:)
   enthalpyoffuse=> ice%atmcoupl%enthalpyoffuse(:)
+  runoff_liquid => ice%atmcoupl%runoff_liquid(:)
+  runoff_solid  => ice%atmcoupl%runoff_solid(:)
   ice_heat_qres => ice%atmcoupl%flx_qres(:)
   ice_heat_qcon => ice%atmcoupl%flx_qcon(:)
 #endif 
@@ -116,6 +125,10 @@ subroutine thermodynamics(ice, partit, mesh)
   consn         => ice%thermo%consn
   con           => ice%thermo%con
   rhoice        => ice%thermo%rhoice
+  ! melt pond pointer assignments
+  apnd          => ice%thermo%apnd(:)
+  hpnd          => ice%thermo%hpnd(:) 
+  ipnd          => ice%thermo%ipnd(:)
   !_____________________________________________________________________________  
   rsss = ref_sss
 
@@ -166,7 +179,7 @@ subroutine thermodynamics(ice, partit, mesh)
         ! Freezing temp of saltwater in K
         ice_temp(inod) = -0.0575_WP*S_oc_array(inod) + 1.7105e-3_WP*sqrt(S_oc_array(inod)**3) -2.155e-4_WP*(S_oc_array(inod)**2)+273.15_WP        
      endif
-     call ice_albedo(ice%thermo, h, hsn, t, alb)
+     call ice_albedo(ice%thermo, h, hsn, t, apnd(inod), ipnd(inod), alb)
      ice_alb(inod)       = alb
      ice_heat_qres(inod) = qres
      ice_heat_qcon(inod) = qcon
@@ -187,11 +200,14 @@ subroutine thermodynamics(ice, partit, mesh)
      m_snow(inod)         = hsn
      net_heat_flux(inod)  = ehf
      fresh_wa_flux(inod)  = fw
+     fw_ice(inod)         = fwice
+     fw_snw(inod)         = fwsnw
      if (.not. use_virt_salt) then
         real_salt_flux(inod)= rsf
      end if
      thdgr(inod)          = dhgrowth
      thdgrsn(inod)        = dhsngrowth
+     thdgra(inod)         = dAgrowth
      flice(inod)          = dhflice
      
      !---- total evaporation (needed in oce_salt_balance.F90) = evap+subli
@@ -224,7 +240,7 @@ contains
     real(kind=WP)  :: PmEice, PmEocn
 
     !---- local variables and dummys
-    real(kind=WP)  :: hold, hsnold, htmp, hsntmp, heff, h0cur, hdraft, hflood
+    real(kind=WP)  :: hold, hsnold, Aold, htmp, hsntmp, heff, h0cur, hdraft, hflood
 
     !---- cut-off ice thickness (hcutoff) used to avoid very small ice
     !---- thicknesses as well as division by zero. NOTE: the standard
@@ -431,6 +447,7 @@ contains
     dciow = max(dhiow,0._WP)/h0cur
 
     !---- new ice concentration
+    Aold = A
     A = A + dcice + dciow
 
     !---- set a=0 for h=0
@@ -442,21 +459,42 @@ contains
     !---- change in snow and ice thickness due to thermodynamic effects [m/s]
     dhsngrowth = (hsn-hsnold)/dt
     dhgrowth = (h-hold)/dt
+    dAgrowth = (A-Aold)/dt
 
     !---- convert growth per time step dt [m] into freshwater fluxes [m/s]
     PmEocn = PmEocn/dt
 
     !---- total freshwater mass flux into the ocean [kg/m**2/s]
     if (.not. use_virt_salt) then
-       fw  = PmEocn*rhofwt - dhgrowth*rhoice - dhsngrowth*rhosno
-       rsf = -dhgrowth*rhoice*Sice/rhowat
+        fwice = - dhgrowth*rhoice
+        fwsnw = - dhsngrowth*rhosno
+        fw    = PmEocn*rhofwt + fwice + fwsnw
+        rsf   = fwice*Sice/rhowat
     else
-       fw = PmEocn*rhofwt - dhgrowth*rhoice*(rsss-Sice)/rsss - dhsngrowth*rhosno 
+        fwice = - dhgrowth*rhoice*(rsss-Sice)/rsss
+        fwsnw = - dhsngrowth*rhosno 
+        fw    = PmEocn*rhofwt + fwice + fwsnw
     end if
 
     !---- total energie flux into the ocean [W/m**2] (positive downward)
     !---- NOTE: ehf = -ohf (in case of no cut-off)
     ehf = -ahf + cl*(dhgrowth + dhsngrowth*rhosno/rhoice) 
+
+    !---- melt pond calculations (if enabled)
+    fpond = 0._WP
+    if (ice%thermo%use_meltponds .and. A > Aimin) then
+        ! Calculate melt rates for pond formation
+        meltt_rate = max(0._WP, -dhgrowth)  ! Top melt rate (negative dhgrowth is melting)
+        melts_rate = max(0._WP, -dhsngrowth) ! Snow melt rate
+        
+        ! Update melt pond area and depth
+        call meltpond_area(A, h, hsn, meltt_rate, melts_rate, dt, &
+                          apnd(inod), hpnd(inod), ipnd(inod), fpond)
+    else
+        apnd(inod) = 0._WP
+        hpnd(inod) = 0._WP
+        ipnd(inod) = 0._WP
+    endif
 
     !---- store ice thickness before flooding (snow to ice conversion)
     htmp = h
@@ -485,7 +523,10 @@ contains
     end if
 
     !---- convert freshwater mass flux [kg/m**2/s] into sea-water volume flux [m/s]
-    fw   = fw/rhowat
+    fw    = fw   /rhowat
+    fwice = fwice/rhowat
+    fwsnw = fwsnw/rhowat
+    
     ! keep in mind that for computation of FW all imposed fluxes were accounted with the ratio rhofwt/rhowat:
     !evap = evap *rhofwt/rhowat
     !rain = rain *rhofwt/rhowat
@@ -553,46 +594,59 @@ contains
 ! t=min(273.15_WP,t)
  end subroutine ice_surftemp
 
- subroutine ice_albedo(ithermp, h, hsn, t, alb)
+ subroutine ice_albedo(ithermp, h, hsn, t, apnd_node, ipnd_node, alb)
   ! INPUT:
   ! h      - ice thickness [m]
   ! hsn    - snow thickness [m]
   ! t      - temperature of snow/ice surface [C]
+  ! apnd_node - melt pond area fraction at this node
+  ! ipnd_node - pond ice lid thickness at this node
   ! 
   ! OUTPUT:
-  ! alb    - selected broadband albedo
+  ! alb    - selected broadband albedo (modified for melt ponds)
   implicit none
   type(t_ice_thermo), intent(in), target :: ithermp
   real(kind=WP) :: h
   real(kind=WP) :: hsn    
   real(kind=WP) :: t    
+  real(kind=WP) :: apnd_node, ipnd_node
   real(kind=WP) :: alb
   real(kind=WP) :: geolat
   real(kind=WP), pointer :: albsn, albi, albsnm, albim
+  real(kind=WP) :: alb_noponds  ! albedo without pond effects
+  
   albsn  => ice%thermo%albsn
   albi   => ice%thermo%albi
   albsnm => ice%thermo%albsnm
   albim  => ice%thermo%albim
   
-  ! set albedo
-  ! ice and snow, freezing and melting conditions are distinguished
+  ! Calculate standard albedo first (without pond effects)
   if (h>0.0_WP) then
      if (t<273.15_WP) then         ! freezing condition    
         if (hsn.gt.0.001_WP) then !   snow cover present  
-           alb=albsn       
+           alb_noponds=albsn       
         else                    !   no snow cover       
-           alb=albi           
+           alb_noponds=albi           
         endif
      else                               ! melting condition     
         if (hsn.gt.0.001_WP) then !   snow cover present  
-           alb=albsnm          
+           alb_noponds=albsnm          
         else                    !   no snow cover       
-           alb=albim
+           alb_noponds=albim
         endif
      endif
    else
-      alb=0.066_WP            !  ocean albedo
+      alb_noponds=0.066_WP            !  ocean albedo
    endif
+   
+   ! Apply melt pond albedo modification if enabled
+   if (ithermp%use_meltponds .and. h > 0.0_WP) then
+       call meltpond_albedo(1.0_WP, hsn, apnd_node, ipnd_node, t, &
+                           alb_noponds, alb_noponds, alb)
+   else
+       alb = alb_noponds
+   endif
+   
  end subroutine ice_albedo
 
 end subroutine thermodynamics

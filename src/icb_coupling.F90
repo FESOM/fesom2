@@ -68,50 +68,65 @@ type(t_partit), intent(inout), target :: partit
         dz = 0.0
         allocate(tot_area_nods_in_ib_elem(mesh%nl))
 
-        num_ib_nods_in_ib_elem=0
-        tot_area_nods_in_ib_elem=0.0
-        idx_d = 0
+        num_ib_nods_in_ib_elem=0                                ! number of nodes in this element ???
+        tot_area_nods_in_ib_elem=0.0                            ! total area associated to nodes of iceberg element
+        idx_d = 0                                               ! index of level directly below or at iceberg base
 
+        ! loop over all three nodes of element
         do i=1,3
+            
+            ! assign node to iceberg_node
             iceberg_node=elem2d_nodes(i,localelement)
 
-            ! LOOP: consider all neighboring pairs (n_up,n_low) of 3D nodes
-            ! below n2..
-            !innerloop: do k=1, nl+1
+            ! loop over all levels of iceberg_node
             do k=1, nlevels_nod2D(iceberg_node)
-                idx_d(i) = k
-                lev_up  = mesh%zbar_3d_n(k, iceberg_node)
+                
+                idx_d(i) = k                                    ! idx_d holds current level index until ...
+                                                                ! ... end of iceberg or bottom topography is reached
+                lev_up  = mesh%zbar_3d_n(k, iceberg_node)       ! upper level
 
-                if( k==nlevels_nod2D(iceberg_node) ) then
-                    lev_low = mesh%zbar_n_bot(iceberg_node)
+                if( k==nlevels_nod2D(iceberg_node) ) then       ! if lower most level is reached ...
+                    lev_low = mesh%zbar_n_bot(iceberg_node)     ! ... lower level is equal to bottom topography
                 else
-                    lev_low = mesh%zbar_3d_n(k+1, iceberg_node)
+                    lev_low = mesh%zbar_3d_n(k+1, iceberg_node) ! ... otherwise, lower level is one level below upper one
                 end if
 
-                if( abs(lev_low)==abs(lev_up) ) then
-                    idx_d(i) = idx_d(i) - 1
+                if( abs(lev_low)==abs(lev_up) ) then            ! if upper level is equal to lower level - when should this happen?
+                    idx_d(i) = idx_d(i) - 1                     ! level index is set back by one and exit loop
                     exit
-                else if( abs(lev_low)>=abs(depth_ib) ) then
+                else if( abs(lev_low)>=abs(depth_ib) ) then     ! if lower level is below iceberg ...
+                                                                ! ... i.e. end of iceberg is reached, exit loop
                     exit
                 else
                     cycle
                 end if
             end do
+            ! at the end of the loop, idx_n holds the index of the level ...
+            ! ... directly below the iceberg or at iceberg base
+            ! -------------------------------------------------------------------
 
-            if (iceberg_node<=mydim_nod2d) then
-                ib_nods_in_ib_elem(i)           = iceberg_node
-                num_ib_nods_in_ib_elem          = num_ib_nods_in_ib_elem + 1
-                tot_area_nods_in_ib_elem        = tot_area_nods_in_ib_elem + mesh%area(:,iceberg_node)
+            if (iceberg_node<=mydim_nod2d) then                                 ! if iceberg node on PE ...
+                ib_nods_in_ib_elem(i)           = iceberg_node                  ! ... add to list ib_nods_in_ib_elem
+                num_ib_nods_in_ib_elem          = num_ib_nods_in_ib_elem + 1    ! ... increase num_ib_nods_in_ib_elem by one
+                tot_area_nods_in_ib_elem        = tot_area_nods_in_ib_elem + mesh%area(:,iceberg_node)  ! increase tot_area_nods_in_ib_elem
             else
-                ib_nods_in_ib_elem(i)           = 0
+                ib_nods_in_ib_elem(i)           = 0                             ! ... otherwise, add zero to list ib_nods_in_ib_elem
             end if
         end do
+        ! at the then of the loop, ib_nods_in_ib_elem holds the nodes of the iceberg elemen - why so complicated?
+        ! ... num_ib_nods_in_ib_elem holds the number of nodes assigned to PE
+        ! ... tot_area_nods_in_ib_elem holds the total area of the (up to three) nodes assigned to iceberg_elem
+        ! -------------------------------------------------------------------
 
+        ! loop over (up to three) nodes of iceberg_elem
         do i=1, 3
             iceberg_node=ib_nods_in_ib_elem(i)
             ! Skip nodes with no ocean column; do NOT skip valid cavity nodes
             if (iceberg_node <= 0 .or. ulevels_nod2d(iceberg_node) == 0) cycle
 
+            ! if iceberg_node in PE, convert freshwater flux to flux density by dividing with tot_area_nods_in_ib_elem ...
+            ! ... of upper most level. The total iceberg flux is distributed among up to three nodes and only applied to the ...
+            ! ... surface layer.
             if (iceberg_node>0) then
                 ! Guard: tot_area at level 1 is zero when all element nodes are cavity nodes
                 ! (mesh%area(1,cavity_node)==0), which would give division by zero / NaN.
@@ -125,17 +140,18 @@ type(t_partit), intent(inout), target :: partit
 
                 ! Guard against idx_d=0 (can happen if nlevels_nod2D is 0 or loop didn't execute)
                 if (idx_d(i) <= 0) cycle
-
-                do j=1,idx_d(i)
-                    lev_up  = mesh%zbar_3d_n(j, iceberg_node)
-                    if( j==nlevels_nod2D(iceberg_node) ) then
-                        lev_low = mesh%zbar_n_bot(iceberg_node)
+                    lev_up  = mesh%zbar_3d_n(j, iceberg_node)           ! upper level
+                    if( j==nlevels_nod2D(iceberg_node) ) then           ! if bottom level is reached ...
+                        lev_low = mesh%zbar_n_bot(iceberg_node)         ! ... lower level is set to bottom topography
                     else
-                        lev_low = mesh%zbar_3d_n(j+1, iceberg_node)
+                        lev_low = mesh%zbar_3d_n(j+1, iceberg_node)     ! ... otherwise, lower level is one level below upper one
                     end if
-                    dz = abs( lev_low - lev_up )
+                    dz = abs( lev_low - lev_up )                        ! distance between lower and upper level
+                    
+                    ! check if lower level is below iceberg base and upper level is above iceberg base ...
                     if( (abs(lev_low)>=abs(depth_ib)) .and. (abs(lev_up)<abs(depth_ib)) ) then 
-                        dz = abs(abs(lev_up) - abs(depth_ib))
+                        dz = abs(abs(lev_up) - abs(depth_ib))           ! ... if so, distance dz is calculated as difference ...
+                                                                        ! ... between upper level and iceberg base
                     end if              
                    
                     ! Also guard tot_area(j): at levels where only some nodes extend,
@@ -145,8 +161,8 @@ type(t_partit), intent(inout), target :: partit
                                                     - (hfbv_flux_ib(ib,j)+hfl_flux_ib(ib,j)) & 
                                                     / tot_area_nods_in_ib_elem(j)
                     end if
-                end do
                 
+                ! if idx_d is not only upper most level ...
                 if( idx_d(i) > 1 ) then
                     if (tot_area_nods_in_ib_elem(idx_d(i)) > 0.0) &
                         ibhf_n(idx_d(i),iceberg_node) = ibhf_n(idx_d(i),iceberg_node) - 0.5 * hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(idx_d(i))
@@ -200,6 +216,7 @@ type(t_partit), intent(inout), target :: partit
     do n=1, myDim_nod2d+eDim_nod2D
         if (ulevels_nod2d(n) > 1) cycle
         if (.not.turn_off_fw) then
+                ! LA add heat fluxes here...
                 water_flux(n)  = water_flux(n) - (ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n)) !* steps_per_ib_step
         end if
     end do

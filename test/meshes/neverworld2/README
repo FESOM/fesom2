@@ -1,0 +1,8 @@
+To create the neverworld2 mesh, or to change its resolution, bottom topography, 
+periodic boundary opening execute the file create_neverworld2_mesh.py
+(make sure you choose the proper python executable of your conda environment e.g. 
+> which python
+~/.conda/envs/py39_new/bin/python
+)
+
+python create_neverworld2_mesh.py
