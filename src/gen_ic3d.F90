@@ -242,7 +242,7 @@ CONTAINS
       
       call nc_readGrid(partit)
 
-      ! prepare nearest coordinates in INfile , save to bilin_indx_i/j
+      ! prepare nearest coordinates in INfile, save to bilin_indx_i/j
       !_________________________________________________________________________
       ! cavity case
       if (use_cavity) then

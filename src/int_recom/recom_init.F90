@@ -70,19 +70,21 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(OmegaC_bottom(node_size)) !R2OMIP
 
     !! * River nutrients as surface boundary condition *
-!    allocate(RiverDIN2D            ( node_size ))
-    allocate(RiverDON2D            ( node_size ))
-!    allocate(RiverDOC2D            ( node_size ))
-    allocate(RiverDSi2D            ( node_size ))
-!    allocate(RiverDIC2D            ( node_size ))
-    allocate(RiverAlk2D            ( node_size ))
-
-    allocate(RiverDIC2D            ( node_size ))  ! R2OMIP
-    allocate(RiverDIN2D            ( node_size ))  ! R2OMIP
-    allocate(RiverDOCl2D           ( node_size ))  ! R2OMIP
-    allocate(RiverDOCsl2D          ( node_size ))  ! R2OMIP
-    allocate(RiverPOC2D            ( node_size ))  ! R2OMIP
-    allocate(RiverFe               ( node_size ))
+    if (enable_R2OMIP) then
+        allocate(RiverDIC2D            ( node_size ))
+        allocate(RiverDIN2D            ( node_size ))
+        allocate(RiverDOCl2D           ( node_size ))
+        allocate(RiverDOCsl2D          ( node_size ))
+        allocate(RiverPOC2D            ( node_size ))
+    else
+        allocate(RiverDIN2D            ( node_size ))
+        allocate(RiverDON2D            ( node_size ))
+        allocate(RiverDOC2D            ( node_size ))
+        allocate(RiverDSi2D            ( node_size ))
+        allocate(RiverDIC2D            ( node_size ))
+        allocate(RiverAlk2D            ( node_size ))
+    endif
+        allocate(RiverFe               ( node_size ))
 
     !! * Erosion nutrients as surface boundary condition *
     allocate(ErosionTON2D          ( node_size ))
@@ -130,19 +132,20 @@ subroutine recom_init(tracers, partit, mesh)
     ! calcite dissolution at the ocean bottom !R2OMIP
     OmegaC_bottom         = 0.d0
 
-!    RiverDIN2D            = 0.d0
-    RiverDON2D            = 0.d0
-!    RiverDOC2D            = 0.d0
-    RiverDSi2D            = 0.d0
-!    RiverDIC2D            = 0.d0
-    RiverAlk2D            = 0.d0
-
-    RiverDIC2D             = 0.d0
-    RiverDIN2D             = 0.d0
-    RiverDOCl2D            = 0.d0
-    RiverDOCsl2D           = 0.d0
-    RiverPOC2D             = 0.d0
-
+    if (enable_R2OMIP) then
+        RiverDIC2D             = 0.d0
+        RiverDIN2D             = 0.d0
+        RiverDOCl2D            = 0.d0
+        RiverDOCsl2D           = 0.d0
+        RiverPOC2D             = 0.d0
+    else
+        RiverDIN2D            = 0.d0
+        RiverDON2D            = 0.d0
+        RiverDOC2D            = 0.d0
+        RiverDSi2D            = 0.d0
+        RiverDIC2D            = 0.d0
+        RiverAlk2D            = 0.d0
+    end if
     RiverFe               = 0.d0
 
     ErosionTOC2D          = 0.d0
