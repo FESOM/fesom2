@@ -1209,13 +1209,24 @@ endif
       
       !==========================================================================
 #endif
-      ! runoff
-      if (runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
-         ! runoff in CORE is constant in time
-         ! Warning: For a global mesh, conservative scheme is to be updated!!
-         call read_other_NetCDF(nm_runoff_file, 'Foxx_o_roff', 1, runoff, .false., .true., partit, mesh) 
-         runoff=runoff/1000.0_WP  ! Kg/s/m2 --> m/s
-      end if
+    
+    !___________________________________________________________________________
+    ! check river runoff
+    ! when used runoff_data_source='CORE1' or 'CORE2' we use a total climatological 
+    ! runoff, so only one runoff time slice for the entire simulation is used. 
+    ! This part is only read ones when the forcing is first time initialized
+    if (runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
+        if (mype==0) then 
+            write(*,*) ' --> using total longterm runoff climatology (only 1 time slice) '
+            write(*,*) '     runoff_data_source = ', runoff_data_source
+            write(*,*) '     nm_runoff_file     = ', trim(nm_runoff_file)
+            write(*,*)
+        end if     
+        ! runoff in CORE is constant in time
+        ! Warning: For a global mesh, conservative scheme is to be updated!!
+        call read_other_NetCDF(nm_runoff_file, 'Foxx_o_roff', 1, runoff, .false., .true., partit, mesh) 
+        runoff=runoff/1000.0_WP  ! Kg/s/m2 --> m/s
+    end if
 
       if (use_sw_pene) then
          if (chl_data_source == 'Sweeney') then
@@ -1227,8 +1238,9 @@ endif
          end if
       end if
 
-      if (mype==0) write(*,*) "DONE:  Ocean forcing initialization."
-      if (mype==0) write(*,*) 'Parts of forcing data (only constant in time fields) are read'
+    !___________________________________________________________________________
+    if (mype==0) write(*,*) "DONE:  Ocean forcing initialization."
+    if (mype==0) write(*,*) 'Parts of forcing data (only constant in time fields) are read'
 
 #if defined(__recom)
         ! OPEN and read namelist for SBC REcoM
@@ -1381,7 +1393,8 @@ endif
      update_monthly_flag=( (day_in_month==num_day_in_month(fleapyear,month) .AND. timenew==86400._WP) .OR. mstep==1)
      !AWICM
      if (enable_AWICM) then
-         update_daily_flag = ( (timenew==86400._WP) .OR. mstep==1)
+         !update_daily_flag = ( (timenew==86400._WP) .OR. mstep==1)
+         update_daily_flag = ( MOD(timenew, 86400._WP) == 0._WP ) .OR. (mstep == 1)
      endif
 
     !___________________________________________________________________________ 
@@ -1429,8 +1442,8 @@ endif
                 filename=trim(nm_runoff_file)
                 call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, partit, mesh)
 
-           !kg/m2/s -> m/s
-           runoff=runoff/1000.0_WP
+                !kg/m2/s -> m/s
+                runoff=runoff/1000.0_WP
 
             else
                 !monthly data
@@ -1440,11 +1453,19 @@ endif
                 if (mype==0) write(*,*) 'Updating monthly runoff for month             ', i 
                 filename=trim(nm_runoff_file)//cyearnew//'.nc' 
                 call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, partit, mesh)
+                !kg/m2/s -> m/s
+                runoff=runoff/1000.0_WP
+            end if ! --> if(runoff_climatology) then
+            end if ! --> if(update_monthly_flag) then
+    end if ! --> if(runoff_data_source=='Dai09' .or. ... 
 
-           !kg/m2/s -> m/s
-           runoff=runoff/1000.0_WP
-
-         end if
+    !river runoff AWICM
+    if(runoff_data_source == 'AWICM') then
+            if(update_daily_flag) then
+                    !daily data already in m/s
+                    i = daynew
+                    filename=trim(nm_runoff_file)//cyearnew//'0101_redistributed.nc'
+                    call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, partit, mesh)
             end if
     end if
 
@@ -1927,7 +1948,7 @@ endif
                 !--- Broadcast open status to all MPI ranks ---
                 call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
 
-                if (status.ne.nf_noerr)then
+                if (status /= nf_noerr)then
                     if (mype == 0) then
                         write(*,'(A)') 'ERROR: Failed to open river input file: ' // trim(filename)
                     end if
