@@ -8,9 +8,9 @@ module find_up_downwind_triangles_interface
       type(t_mesh),        intent(in)  ,  target :: mesh
       type(t_partit),      intent(inout), target :: partit
       type(t_tracer_work), intent(inout), target :: twork
-    end subroutine
+    end subroutine find_up_downwind_triangles
   end interface
-end module
+end module find_up_downwind_triangles_interface
 
 ! A set of routines to implement MUSCL-type of advection
 ! For description, see Abalakin, I., Dervieux, A., Kozubskaya, T., 2002. A

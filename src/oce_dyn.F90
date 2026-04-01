@@ -20,9 +20,9 @@ module visc_filt_bcksct_interface
       type(t_partit), intent(inout), target :: partit
       type(t_mesh)  , intent(in)   , target :: mesh
       
-    end subroutine
+    end subroutine visc_filt_bcksct
   end interface
-end module
+end module visc_filt_bcksct_interface
 
 module visc_filt_bilapl_interface
   interface
@@ -35,9 +35,9 @@ module visc_filt_bilapl_interface
       type(t_partit), intent(inout), target :: partit
       type(t_mesh)  , intent(in)   , target :: mesh
       
-    end subroutine
+    end subroutine visc_filt_bilapl
   end interface
-end module
+end module visc_filt_bilapl_interface
 
 module visc_filt_bidiff_interface
   interface
@@ -50,9 +50,9 @@ module visc_filt_bidiff_interface
       type(t_partit), intent(inout), target :: partit
       type(t_mesh)  , intent(in)   , target :: mesh
       
-    end subroutine
+    end subroutine visc_filt_bidiff
   end interface
-end module
+end module visc_filt_bidiff_interface
 
 module check_validviscopt_interface
     interface
@@ -62,9 +62,9 @@ module check_validviscopt_interface
             USE MOD_PARSUP
             type(t_partit), intent(inout), target :: partit
             type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine    
+        end subroutine check_validviscopt_5    
     end interface
-end module 
+end module check_validviscopt_interface 
 
 ! 
 ! Contains routines needed for computations of dynamics.
@@ -263,7 +263,7 @@ subroutine viscosity_filter(option, dynamics, partit, mesh)
             call visc_filt_bidiff(dynamics, partit, mesh)
         CASE (8)
             if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call backscatter_coef'//achar(27)//'[0m'
-            call backscatter_coef(partit, mesh)
+            call backscatter_coef(dynamics, partit, mesh)
             if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[37m'//'         --> call visc_filt_dbcksc'//achar(27)//'[0m'
             call visc_filt_dbcksc(dynamics, partit, mesh) 
         CASE DEFAULT

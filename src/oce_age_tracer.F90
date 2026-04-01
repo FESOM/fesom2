@@ -5,9 +5,9 @@ module age_tracer_init_interface
       use mod_mesh
       type(t_partit), intent(in), target :: partit
       type(t_mesh),   intent(in), target :: mesh
-    end subroutine
+    end subroutine age_tracer_init
   end interface
-end module
+end module age_tracer_init_interface
 
 subroutine age_tracer_init(partit, mesh)
   use MOD_PARTIT

@@ -8,7 +8,7 @@ module ice_maEVP_interfaces
         type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine ssh2rhs
 
         subroutine stress_tensor_a(ice, partit, mesh)
         USE MOD_ICE
@@ -18,7 +18,7 @@ module ice_maEVP_interfaces
         type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine stress_tensor_a
 
         subroutine stress2rhs_m(ice, partit, mesh)
         USE MOD_ICE
@@ -28,7 +28,7 @@ module ice_maEVP_interfaces
         type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine stress2rhs_m
 
         subroutine find_alpha_field_a(ice, partit, mesh)
         USE MOD_ICE
@@ -38,7 +38,7 @@ module ice_maEVP_interfaces
         type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine find_alpha_field_a
 
         subroutine find_beta_field_a(ice, partit, mesh)
         USE MOD_ICE
@@ -48,9 +48,9 @@ module ice_maEVP_interfaces
         type(t_ice)   , intent(inout), target :: ice
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine find_beta_field_a
    end interface
-end module
+end module ice_maEVP_interfaces
 
 module ice_maEVPdynamics_interface
     interface
@@ -62,7 +62,7 @@ module ice_maEVPdynamics_interface
         type(t_mesh)  , intent(in)   , target :: mesh
         type(t_partit), intent(inout), target :: partit
         type(t_ice)   , intent(inout), target :: ice
-        end subroutine
+        end subroutine EVPdynamics_a
 
         subroutine EVPdynamics_m(ice, partit, mesh)
         USE MOD_ICE
@@ -72,9 +72,9 @@ module ice_maEVPdynamics_interface
         type(t_mesh)  , intent(in)   , target :: mesh
         type(t_partit), intent(inout), target :: partit
         type(t_ice)   , intent(inout), target :: ice
-        end subroutine
+        end subroutine EVPdynamics_m
    end interface
-end module
+end module ice_maEVPdynamics_interface
 !
 !
 !_______________________________________________________________________________

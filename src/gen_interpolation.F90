@@ -1,5 +1,4 @@
 ! routines doing 3D, 2D and 1D interpolation
-
 subroutine interp_2d_field_v2(num_lon_reg, num_lat_reg, lon_reg, lat_reg, data_reg, missvalue, &
      num_mod, lon_mod, lat_mod, data_mod, partit)
   !-------------------------------------------------------------------------------------
@@ -154,7 +153,7 @@ subroutine interp_2d_field(num_lon_reg, num_lat_reg, lon_reg, lat_reg, data_reg,
   ! lon_mod(num_mod)			longitude of interpolation nodes
   ! lat_mod(num_mod)			latitude of interpolation nodes
   ! data_mod(num_mod)			output data on interpolation nodes
-  ! phase_flag                          1: interpolate phase angle (0-360°); 0: otherwise
+  ! phase_flag                          1: interpolate phase angle (0-360Â°); 0: otherwise
   ! Unit of lon_reg, lat_reg, lon_mod, lat_mod: degree
   ! Order of lon_reg: monotonically increasing in the range [0 360]  
   !                   (range [180,360] is associated with longitude [-180, 0])

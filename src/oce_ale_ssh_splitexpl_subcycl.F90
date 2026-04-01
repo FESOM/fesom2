@@ -11,9 +11,9 @@ module momentum_adv_scalar_transpv_interface
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine momentum_adv_scalar_transpv
     end interface
-end module
+end module momentum_adv_scalar_transpv_interface
 !
 !
 !_______________________________________________________________________________
@@ -27,9 +27,9 @@ module impl_vert_visc_ale_vtransp_interface
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
+        end subroutine impl_vert_visc_ale_vtransp
     end interface
-end module
+end module impl_vert_visc_ale_vtransp_interface
 !
 !
 !_______________________________________________________________________________
@@ -43,7 +43,7 @@ module compute_ssh_split_explicit_interface
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
+        end subroutine compute_BT_rhs_SE_vtransp
 
         subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
         USE MOD_MESH
@@ -53,7 +53,7 @@ module compute_ssh_split_explicit_interface
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
+        end subroutine compute_BT_step_SE_ale
         
         subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
         USE MOD_MESH
@@ -64,10 +64,10 @@ module compute_ssh_split_explicit_interface
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine
+        end subroutine update_trim_vel_ale_vtransp
         
     end interface
-end module
+end module compute_ssh_split_explicit_interface
 !
 !
 !_______________________________________________________________________________

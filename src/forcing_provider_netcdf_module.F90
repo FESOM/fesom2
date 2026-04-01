@@ -15,7 +15,7 @@ module forcing_provider_netcdf_module
     contains
     procedure, public :: initialize, finalize, read_netcdf_timesteps, read_netcdf_timestep_2d, timestep_size
     procedure open_netcdf_variable
-  end type
+  end type netcdf_reader_handle
     
 
   contains
@@ -33,14 +33,14 @@ module forcing_provider_netcdf_module
     call assert(.not. allocated(this%varshape), __LINE__)
     
     call this%open_netcdf_variable()
-  end subroutine
+  end subroutine initialize
   
   
   function timestep_size(this) result(t)
     class(netcdf_reader_handle), intent(in) :: this
     integer t
     t = this%varshape(TIMEDIM_INDEX)
-  end function
+  end function timestep_size
 
 
   subroutine read_netcdf_timesteps(this, timeindex_first, timeindex_last, values)
@@ -78,7 +78,7 @@ module forcing_provider_netcdf_module
     call assert(allocated(values), __LINE__)
     
     call assert_nc(nf_get_vara_real(this%fileid, this%varid, starts, sizes, values), __LINE__)  
-  end subroutine
+  end subroutine read_netcdf_timesteps
 
 
   subroutine read_netcdf_timestep_2d(this, timeindex, values)
@@ -115,7 +115,7 @@ module forcing_provider_netcdf_module
     call assert(allocated(values), __LINE__)
     
     call assert_nc(nf_get_vara_real(this%fileid, this%varid, starts, sizes, values), __LINE__)  
-  end subroutine
+  end subroutine read_netcdf_timestep_2d
     
 
   subroutine open_netcdf_variable(this) !, fileid, varid, varshape)
@@ -137,7 +137,7 @@ module forcing_provider_netcdf_module
     do i=1, var_dim_size
       call assert_nc( nf_inq_dimlen(this%fileid, dimids(i), this%varshape(i)) , __LINE__)
     end do
-  end subroutine  
+  end subroutine open_netcdf_variable  
 
 
   ! do not implicitly close the file (e.g. upon deallocation via destructor), as we might have a copy of this object with access to the same fileid
@@ -148,7 +148,7 @@ module forcing_provider_netcdf_module
     if(allocated(this%varshape)) then
       call assert_nc( nf_close(this%fileid) , __LINE__)
     end if
-  end subroutine
+  end subroutine finalize
 
 
   subroutine assert_nc(status, line)
@@ -160,7 +160,7 @@ module forcing_provider_netcdf_module
       print *, "error in line ",line, __FILE__, ' ', trim(nf_strerror(status))
       stop 1
     endif   
-  end subroutine
+  end subroutine assert_nc
 
 
   subroutine assert(val, line)
@@ -171,6 +171,6 @@ module forcing_provider_netcdf_module
       print *, "error in line ",line, __FILE__
       stop 1
     end if
-  end subroutine
+  end subroutine assert
 
-end module
+end module forcing_provider_netcdf_module

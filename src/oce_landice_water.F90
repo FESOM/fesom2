@@ -5,9 +5,9 @@ module landice_water_init_interface
       use mod_mesh
       type(t_partit), intent(in), target :: partit
       type(t_mesh),   intent(in), target :: mesh
-    end subroutine
+    end subroutine landice_water_init
   end interface
-end module
+end module landice_water_init_interface
 
 subroutine landice_water_init(partit, mesh)
   ! init land ice melting rate

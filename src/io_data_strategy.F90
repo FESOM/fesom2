@@ -13,21 +13,21 @@ module io_data_strategy_module
     procedure(initialize), deferred, nopass :: initialize
     procedure(netcdf_type), deferred, nopass :: netcdf_type
     procedure(add_values), deferred :: add_values
-  end type
+  end type data_strategy_type
   interface
     subroutine initialize()
-    end subroutine
+    end subroutine initialize
     
     function netcdf_type()
       integer netcdf_type
-    end function
+    end function netcdf_type
 
     subroutine add_values(this, values)
       use o_PARAM, only : WP
       import data_strategy_type
       class(data_strategy_type) this
       real(kind=WP), dimension(:,:) :: values
-    end subroutine
+    end subroutine add_values
   end interface
 
 
@@ -38,7 +38,7 @@ module io_data_strategy_module
     procedure, nopass :: initialize => initialize_float
     procedure, nopass :: netcdf_type => netcdf_type_float
     procedure :: add_values => add_values_float
-  end type
+  end type data_strategy_nf_float_type
 
 
   type, extends(data_strategy_type) :: data_strategy_nf_double_type
@@ -48,32 +48,32 @@ module io_data_strategy_module
     procedure, nopass :: initialize => initialize_double
     procedure, nopass :: netcdf_type => netcdf_type_double
     procedure :: add_values => add_values_double
-  end type
+  end type data_strategy_nf_double_type
 
 
 contains
 
 
   subroutine initialize_float()
-  end subroutine
+  end subroutine initialize_float
 
 
   subroutine initialize_double()
-  end subroutine
+  end subroutine initialize_double
 
 
   function netcdf_type_float()
     include "netcdf.inc"
     integer netcdf_type_float
     netcdf_type_float = nf_float
-  end function
+  end function netcdf_type_float
 
 
   function netcdf_type_double()
     include "netcdf.inc"
     integer netcdf_type_double
     netcdf_type_double = nf_double
-  end function
+  end function netcdf_type_double
 
 
   subroutine add_values_float(this, values)
@@ -82,7 +82,7 @@ contains
     real(kind=WP), dimension(:,:) :: values
     ! EO args
     this%local_values = this%local_values + real(values) ! todo: check if casting the array to real here creates a copy of the array
-  end subroutine
+  end subroutine add_values_float
 
 
   subroutine add_values_double(this, values)
@@ -91,6 +91,6 @@ contains
     real(kind=WP), dimension(:,:) :: values
     ! EO args
     this%local_values = this%local_values + values
-  end subroutine
+  end subroutine add_values_double
 
-end module
+end module io_data_strategy_module

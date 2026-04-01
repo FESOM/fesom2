@@ -15,7 +15,7 @@ module io_netcdf_module
     procedure, public :: initialize, finalize, number_of_timesteps, number_of_dims, dimsize_at
     generic, public :: read_values => read_values_r4,read_values_r8
     procedure, private :: open_netcdf_variable, read_values_r4, read_values_r8
-  end type
+  end type netcdf_variable_handle
 
 
   contains
@@ -39,7 +39,7 @@ module io_netcdf_module
     ! assume the last dimension for this variable is the time dimension (i.e. first in ncdump)
     call assert(size(this%varshape) > 0, __LINE__)
     this%timedim_index = size(this%varshape)
-  end subroutine
+  end subroutine initialize
 
 
   subroutine open_netcdf_variable(this, mode)
@@ -61,7 +61,7 @@ module io_netcdf_module
     do i=1, var_dim_size
       call assert_nc( nf_inq_dimlen(this%fileid, dimids(i), this%varshape(i)) , __LINE__)
     end do
-  end subroutine  
+  end subroutine open_netcdf_variable  
 
 
   subroutine finalize(this)
@@ -72,7 +72,7 @@ module io_netcdf_module
     if(allocated(this%varshape)) then
       call assert_nc( nf_close(this%fileid) , __LINE__)
     end if
-  end subroutine
+  end subroutine finalize
 
   
   function number_of_timesteps(this) result(t)
@@ -80,7 +80,7 @@ module io_netcdf_module
     integer t
     ! EO args
     t = this%varshape(this%timedim_index)
-  end function
+  end function number_of_timesteps
 
   
   function number_of_dims(this) result(d)
@@ -88,7 +88,7 @@ module io_netcdf_module
     integer d
     ! EO args
     d = size(this%varshape)
-  end function
+  end function number_of_dims
 
   
   function dimsize_at(this,index) result(s)
@@ -98,7 +98,7 @@ module io_netcdf_module
     ! EO args
     call assert(index <= size(this%varshape), __LINE__)
     s = this%varshape(index)
-  end function
+  end function dimsize_at
 
 
   subroutine read_values_r8(this, timeindex, values)
@@ -117,7 +117,7 @@ module io_netcdf_module
 
     call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
     call assert_nc(nf_get_vara_x(this%fileid, this%varid, starts, sizes, values_ptr), __LINE__)
-  end subroutine
+  end subroutine read_values_r8
   
   
   subroutine read_values_r4(this, timeindex, values)
@@ -136,7 +136,7 @@ module io_netcdf_module
 
     call c_f_pointer(c_loc(values), values_ptr, [product(shape(values))])
     call assert_nc(nf_get_vara_x(this%fileid, this%varid, starts, sizes, values_ptr), __LINE__)
-  end subroutine
+  end subroutine read_values_r4
 
 
   subroutine read_values_preflight(this, timeindex, starts, sizes)
@@ -158,7 +158,7 @@ module io_netcdf_module
     sizes = this%varshape
     starts(this%timedim_index) = timeindex
     sizes(this%timedim_index) = 1 !timeindex_last-timeindex_first+1
-  end subroutine
+  end subroutine read_values_preflight
 
 
   subroutine assert_nc(status, line)
@@ -170,7 +170,7 @@ module io_netcdf_module
       print *, "error in line ",line, __FILE__, ' ', trim(nf_strerror(status))
       stop 1
     endif   
-  end subroutine
+  end subroutine assert_nc
 
 
   subroutine assert(val, line)
@@ -181,6 +181,6 @@ module io_netcdf_module
       print *, "error in line ",line, __FILE__
       stop 1
     end if
-  end subroutine
+  end subroutine assert
 
-end module
+end module io_netcdf_module

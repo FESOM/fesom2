@@ -20,7 +20,7 @@ module g_backscatter
     !___________________________________________________________________________
     ! allocate backscatter arrays
     real(kind=WP), allocatable, dimension(:,:)  :: v_back
-    real(kind=WP), allocatable, dimension(:,:)  :: uke, uke_back, uke_dis, uke_dif
+    real(kind=WP), allocatable, dimension(:,:)  :: uke, uke_back, uke_dis, uke_dif, uke_adv
     real(kind=WP), allocatable, dimension(:,:)  :: uke_rhs, uke_rhs_old
     real(kind=WP), allocatable, dimension(:,:)  :: UV_dis_posdef_b2, UV_dis_posdef, UV_back_posdef                                                
     real(kind=WP), allocatable, dimension(:,:,:):: UV_back, UV_dis
@@ -31,9 +31,10 @@ module g_backscatter
     !
     !___________________________________________________________________________
     ! allocate/initialise backscatter arrays
-    subroutine init_backscatter(partit, mesh)
+    subroutine init_backscatter(dynamics, partit, mesh)
         implicit none 
         integer                               :: elem_size
+        type(t_dyn)   , intent(inout), target :: dynamics
         type(t_mesh),   intent(in),    target :: mesh
         type(t_partit), intent(inout), target :: partit
 #include "associate_part_def.h"
@@ -67,6 +68,11 @@ module g_backscatter
         UV_back_tend  = 0.0_WP
         UV_total_tend = 0.0_WP
         
+        if (dynamics%uke_advection) then
+            allocate(uke_adv(    nl-1, elem_size))
+            uke_adv     = 0.0_WP
+        endif
+
     end subroutine init_backscatter
 
     !
@@ -75,7 +81,7 @@ module g_backscatter
     subroutine visc_filt_dbcksc(dynamics, partit, mesh)
         IMPLICIT NONE
         
-        real(kind=WP)  :: u1, v1, le(2), len, crosslen, vi, uke1 
+        real(kind=WP)  :: u1, v1, le(2), len, len2, crosslen, vi, uke1 
         integer       :: nz, ed, el(2)
         real(kind=WP)  , allocatable  :: uke_d(:,:)
         !!PS real(kind=WP)  , allocatable  :: UV_back(:,:,:), UV_dis(:,:,:)
@@ -113,9 +119,16 @@ module g_backscatter
         DO ed=1, myDim_edge2D+eDim_edge2D
             if(myList_edge2D(ed)>edge2D_in) cycle
             el=edge_tri(:,ed)
+            !New viscosity lines
+            len=sqrt(sum(elem_area(el)))
             DO  nz=1,minval(nlevels(el))-1
                 u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
                 v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
+                ! New viscosity lines
+                vi=u1*u1+v1*v1
+                vi=sqrt(max(dynamics%visc_gamma0, max(dynamics%visc_gamma1*sqrt(vi), dynamics%visc_gamma2*vi))*len)
+                u1=u1*vi
+                v1=v1*vi
                 
                 U_c(nz,el(1))=U_c(nz,el(1))-u1
                 U_c(nz,el(2))=U_c(nz,el(2))+u1
@@ -124,20 +137,6 @@ module g_backscatter
             END DO 
         END DO
         
-        Do ed=1,myDim_elem2D
-            len=sqrt(elem_area(ed))                     
-            len=dt*len/30.0_WP
-            Do nz=1,nlevels(ed)-1
-                ! vi has the sense of harmonic viscosity coefficient because of 
-                ! the division by area in the end 
-                ! ====
-                ! Case 1 -- an analog to the third-order upwind (vi=|u|l/12)
-                ! ====
-                vi=max(0.2_WP,sqrt(UV(1,nz,ed)**2+UV(2,nz,ed)**2))*len 
-                U_c(nz,ed)=-U_c(nz,ed)*vi                             
-                V_c(nz,ed)=-V_c(nz,ed)*vi
-            END DO
-        end do
         call exchange_elem(U_c, partit)
         call exchange_elem(V_c, partit) 
         
@@ -147,6 +146,8 @@ module g_backscatter
             le=edge_dxdy(:,ed)
             le(1)=le(1)*sum(elem_cos(el))*0.25_WP
             len=sqrt(le(1)**2+le(2)**2)*r_earth
+            !Weighting new viscosity 
+            len2=sqrt(sum(elem_area(el)))
             le(1)=edge_cross_dxdy(1,ed)-edge_cross_dxdy(3,ed)
             le(2)=edge_cross_dxdy(2,ed)-edge_cross_dxdy(4,ed)
             crosslen=sqrt(le(1)**2+le(2)**2) 
@@ -162,7 +163,7 @@ module g_backscatter
                 v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))*vi
                 
                 !UKE diffusion
-                vi=dt*len*(K_back*sqrt(elem_area(el(1))/scale_area)+K_back*sqrt(elem_area(el(2))/scale_area))/crosslen
+                vi=dt*len*(dynamics%K_back*sqrt(elem_area(el(1))/scale_area)+dynamics%K_back*sqrt(elem_area(el(2))/scale_area))/crosslen
                 uke1=(uke(nz,el(1))-uke(nz,el(2)))*vi
                 
                 UV_back(1,nz,el(1))=UV_back(1,nz,el(1))-u1/elem_area(el(1))
@@ -174,9 +175,13 @@ module g_backscatter
                 uke_d(nz,el(1))=uke_d(nz,el(1))-uke1/elem_area(el(1))
                 uke_d(nz,el(2))=uke_d(nz,el(2))+uke1/elem_area(el(2))
                 
-                !Biharmonic contribution
-                u1=(U_c(nz,el(1))-U_c(nz,el(2)))
-                v1=(V_c(nz,el(1))-V_c(nz,el(2)))
+                !New viscosity param part
+                u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
+                v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
+                vi=u1*u1+v1*v1
+                vi=-dt*sqrt(max(dynamics%visc_gamma0, max(dynamics%visc_gamma1*sqrt(vi), dynamics%visc_gamma2*vi))*len2)
+                u1=vi*(U_c(nz,el(1))-U_c(nz,el(2)))
+                v1=vi*(V_c(nz,el(1))-V_c(nz,el(2)))
                 
                 UV_dis(1,nz,el(1))=UV_dis(1,nz,el(1))-u1/elem_area(el(1))
                 UV_dis(1,nz,el(2))=UV_dis(1,nz,el(2))+u1/elem_area(el(2))
@@ -190,11 +195,11 @@ module g_backscatter
         DO  nz=1, nl-1
             uuu=0.0_WP
             uuu=UV_back(1,nz,:)
-            call smooth_elem(uuu,smooth_back_tend, partit, mesh)
+            call smooth_elem(uuu,dynamics%smooth_back_tend, partit, mesh)
             UV_back(1,nz,:)=uuu
             uuu=0.0_WP
             uuu=UV_back(2,nz,:)
-            call smooth_elem(uuu,smooth_back_tend, partit, mesh)
+            call smooth_elem(uuu,dynamics%smooth_back_tend, partit, mesh)
             UV_back(2,nz,:)=uuu 
         END DO
         
@@ -216,12 +221,146 @@ module g_backscatter
         deallocate(uke_d)
         deallocate(uuu)
     end subroutine visc_filt_dbcksc
-    
+
+
+    subroutine backscatter_adv(dynamics, partit, mesh)
+        IMPLICIT NONE
+        type(t_dyn)   , intent(inout), target :: dynamics
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
+        integer                               :: n, nz, el1, el2, ul1
+        integer                               :: nl1, nl2, nod(2), el, ed, k, nle
+        real(kind=WP), dimension(:,:,:), pointer :: UV
+        real(kind=WP), dimension(:,:),   pointer :: Wvel_e
+        real(kind=WP), allocatable, dimension(:) :: contr1, contr2, wuke
+        real(kind=WP), allocatable, dimension(:,:)  :: advnode
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+        Wvel_e    =>dynamics%w_e(:,:)
+        UV        =>dynamics%UV(:,:,:)
+        
+        allocate(contr1(1:nl-1))
+        allocate(contr2(1:nl-1))
+        allocate(wuke(1:nl-1))
+        allocate(advnode(nl-1, myDim_nod2d+eDim_nod2D))
+
+        advnode=0.0_WP
+        contr1=0.0_WP
+        contr2=0.0_WP
+        wuke=0.0_WP
+         
+        !vertical advection
+        do n=1,myDim_nod2d
+           nl1 = nlevels_nod2D(n)-1
+           
+           !find average of uke between vertical layers
+           do k=1,nod_in_elem2D_num(n)
+               el = nod_in_elem2D(k,n)
+               nle = nlevels(el)-1
+           
+               wuke(1) = wuke(1) + uke(1,el)*elem_area(el)
+               wuke(2:nle) = wuke(2:nle) + 0.5_WP*(uke(2:nle,el)+uke(1:nle-1,el))*elem_area(el)      
+
+           end do
+
+           wuke(1:nl) = wuke(1:nl1)*Wvel_e(1:nl1,n)
+
+           do nz=1,nl1
+              ! Here 1/3 because 1/3 of the area is related to the node
+              advnode(nz,n) = - (wuke(nz) - wuke(nz+1) ) / (3._WP*hnode(nz,n)) 
+           end do
+           
+           advnode(nl1+1:nl-1,n) = 0._WP
+
+        end do
+
+        !horizontal advection
+        DO ed=1, myDim_edge2D
+           nod = edges(:,ed) 
+           el1  = edge_tri(1,ed)   
+           el2  = edge_tri(2,ed)
+           nl1 = nlevels(el1)-1
+
+           !calculate fluxes throught the each edge 
+           !for the edges that are on the boundary and have only one element 
+           contr1(1:nl1) = UV(2,1:nl1,el1)*edge_cross_dxdy(1,ed) - UV(1,1:nl1,el1)*edge_cross_dxdy(2,ed)  
+           
+           ! if we have the other element as well
+           if (el2>0) then
+              nl2 = nlevels(el2)-1
+              
+              contr2(1:nl2) = - UV(2,1:nl2,el2)*edge_cross_dxdy(3,ed) + UV(1,1:nl2,el2)*edge_cross_dxdy(4,ed)
+              
+              contr1(nl1+1:max(nl1,nl2)) = 0._WP
+              contr2(nl2+1:max(nl1,nl2)) = 0._WP
+              
+              if (nod(1) <= myDim_nod2d) then
+                 do nz=1, max(nl1,nl2)
+                    advnode(nz,nod(1)) = advnode(nz,nod(1)) + contr1(nz)*uke(nz,el1) + contr2(nz)*uke(nz,el2)             
+                 end do
+              endif
+              
+              if (nod(2) <= myDim_nod2d) then
+                 do nz=1, max(nl1,nl2)
+                    advnode(nz,nod(2)) = advnode(nz,nod(2)) - contr1(nz)*uke(nz,el1) - contr2(nz)*uke(nz,el2)
+                 end do
+              endif
+           
+           else  ! ed is a boundary edge, there is only the contribution from el1
+              if (nod(1) <= myDim_nod2d) then
+                 do nz=1, nl1
+                    advnode(nz,nod(1)) = advnode(nz,nod(1)) + contr1(nz)*uke(nz,el1)
+                 end do
+              endif
+              ! second edge node
+              if  (nod(2) <= myDim_nod2d) then
+                 do nz=1, nl1
+                    advnode(nz,nod(2)) = advnode(nz,nod(2)) - contr1(nz)*uke(nz,el1)
+                 end do
+              endif
+           endif
+        end do
+
+        ! Multiply by the segment area
+        do n=1,myDim_nod2d
+           nl1 = nlevels_nod2D(n)-1
+           advnode(1:nl1,n) = advnode(1:nl1,n) * area_inv(1:nl1,n)
+        end do
+
+        call exchange_nod(advnode, partit)
+
+        !Calculate advection as an average across the nodes
+        do n=1,myDim_nod2d
+           nl1 = nlevels_nod2D(n)-1
+           advnode(1:nl1,n) = advnode(1:nl1,n) *areasvol_inv(1:nl1,n)
+        end do
+
+        do el=1, myDim_elem2D
+           nl1 = nlevels(el)-1
+           uke_adv(1:nl1,el) = uke_adv(1:nl1,el) &
+                + elem_area(el)*(advnode(1:nl1,elem2D_nodes(1,el)) &
+                + advnode(1:nl1,elem2D_nodes(2,el)) & 
+                + advnode(1:nl1,elem2D_nodes(3,el)))/ 3.0_WP
+
+            do nz=1,nlevels(el)-1   
+                uke_adv(nz,el)=dt*uke_adv(nz,el)/elem_area(el)
+            end do
+        end do
+
+        deallocate(contr1)
+        deallocate(contr2)
+        deallocate(wuke)
+        deallocate(advnode)
+    end subroutine backscatter_adv
+
     !
     !
     !_______________________________________________________________________________
-    subroutine backscatter_coef(partit, mesh)
+    subroutine backscatter_coef(dynamics, partit, mesh)
         IMPLICIT NONE
+        type(t_dyn)   , intent(inout), target :: dynamics
         type(t_mesh),   intent(in),    target :: mesh
         type(t_partit), intent(inout), target :: partit
         integer                               :: elem, nz
@@ -237,8 +376,8 @@ module g_backscatter
         DO  elem=1, myDim_elem2D 
             DO  nz=1,nlevels(elem)-1
                 !v_back(1,ed)=c_back*sqrt(2.0_WP*elem_area(ed))*sqrt(max(2.0_WP*uke(1,ed),0.0_WP))*(3600.0_WP*24.0_WP/tau_c)*4.0_WP/sqrt(2.0_WP*elem_area(ed))**2 !*sqrt(max(2.0_WP*uke(1,ed),0.0_WP))
-                !v_back(nz,elem)=-c_back*sqrt(4._8/sqrt(3.0_8)*elem_area(elem))*sqrt(max(2.0_8*uke(nz,elem),0.0_8)) !Is the scaling correct
-                v_back(nz,elem)=min(-c_back*sqrt(elem_area(elem))*sqrt(max(2.0_8*uke(nz,elem),0.0_8)),0.2*elem_area(elem)/dt) !Is the scaling correct
+                !v_back(nz,elem)=-c_back*sqrt(4._WP/sqrt(3.0_WP)*elem_area(elem))*sqrt(max(2.0_WP*uke(nz,elem),0.0_WP)) !Is the scaling correct
+                v_back(nz,elem)=min(-dynamics%c_back*sqrt(elem_area(elem))*sqrt(max(2.0_WP*uke(nz,elem),0.0_WP)),0.2*elem_area(elem)/dt) !Is the scaling correct
                 !Scaling by sqrt(2*elem_area) or sqrt(elem_area)?
             END DO
         END DO
@@ -270,7 +409,7 @@ module g_backscatter
 #include "associate_mesh_ass.h" 
         UV => dynamics%uv(:,:,:)
         
-        !rosb_dis=1._8 !Should be variable to control how much of the dissipated energy is backscattered
+        !rosb_dis=1._WP !Should be variable to control how much of the dissipated energy is backscattered
         !rossby_num=2
         
         ed=myDim_elem2D+eDim_elem2D
@@ -286,9 +425,9 @@ module g_backscatter
         END DO
         
         DO  nz=1,nl-1
-            uuu=0.0_8
+            uuu=0.0_WP
             uuu=uke_back(nz,:)
-            call smooth_elem(uuu,smooth_back, partit, mesh) !3) ?
+            call smooth_elem(uuu,dynamics%smooth_back, partit, mesh) !3) ?
             uke_back(nz,:)=uuu
         END DO
         
@@ -337,7 +476,7 @@ module g_backscatter
         
         DO ed=1, myDim_elem2D
             scaling=1._WP
-            IF(uke_scaling) then
+            IF(dynamics%uke_scaling) then
                 reso=sqrt(elem_area(ed)*4._wp/sqrt(3._wp))
                 rosb=0._wp
                 elnodes=elem2D_nodes(:, ed)   
@@ -353,35 +492,13 @@ module g_backscatter
                     rosb=rosb+min(c1/max(abs(mesh%coriolis_node(elnodes(kk))), f_min), r_max)
                 END DO
                 rosb=rosb/3._WP
-                scaling=1._WP/(1._WP+(uke_scaling_factor*reso/rosb))!(4._wp*reso/rosb))
+                scaling=1._WP/(1._WP+(dynamics%uke_scaling_factor*reso/rosb))!(4._wp*reso/rosb))
             END IF
             
             DO nz=1, nlevels(ed)-1  
                 elnodes=elem2D_nodes(:,ed)
-                
-                !Taking out that one place where it is always weird (Pacific Southern Ocean)
-                !Should not really be used later on, once we fix the issue with the 1/4 degree grid
-                if(.not. (TRIM(which_toy)=="soufflet") .AND. .not. (TRIM(which_toy)=="dbgyre") ) then
-                call elem_center(ed, ex, ey)
-                !a1=-104.*rad
-                !a2=-49.*rad
-                call g2r(-104.*rad, -49.*rad, a1, a2)
-                dist_reg(1)=ex-a1
-                dist_reg(2)=ey-a2
-                call trim_cyclic(dist_reg(1))
-                dist_reg(1)=dist_reg(1)*elem_cos(ed)
-                dist_reg=dist_reg*r_earth
-                len_reg=sqrt(dist_reg(1)**2+dist_reg(2)**2)
-                
-                !if(mype==0) write(*,*) 'len_reg ', len_reg , ' and dist_reg' , dist_reg, ' and ex, ey', ex, ey, ' and a ', a1, a2
                 rosb_array(nz,ed)=rosb_array(nz,ed)/max(abs(sum(mesh%coriolis_node(elnodes(:)))), f_min)
-                !uke_dif(nz, ed)=scaling*(1-exp(-len_reg/300000))*1._8/(1._8+rosb_array(nz,ed)/rosb_dis)!UV_dif(1,ed)
-                uke_dis(nz,ed)=scaling*(1-exp(-len_reg/300000))*1._WP/(1._WP+rosb_array(nz,ed)/rosb_dis)*uke_dis(nz,ed)
-                else
-                rosb_array(nz,ed)=rosb_array(nz,ed)/max(abs(sum(mesh%coriolis_node(elnodes(:)))), f_min)
-                !uke_dif(nz, ed)=scaling*1._8/(1._8+rosb_array(nz,ed)/rosb_dis)!UV_dif(1,ed)
-                uke_dis(nz,ed)=scaling*1._WP/(1._WP+rosb_array(nz,ed)/rosb_dis)*uke_dis(nz,ed)
-                end if
+                uke_dis(nz,ed)=scaling*1._WP/(1._WP+rosb_array(nz,ed)/dynamics%rosb_dis)*uke_dis(nz,ed)
             END DO
         END DO
         
@@ -392,16 +509,30 @@ module g_backscatter
         call exchange_elem(uke_dis, partit)
         DO nz=1, nl-1  
             uuu=uke_dis(nz,:)
-            call smooth_elem(uuu,smooth_dis, partit, mesh)
+            call smooth_elem(uuu,dynamics%smooth_dis, partit, mesh)
             uke_dis(nz,:)=uuu
         END DO
-        DO ed=1, myDim_elem2D
-            DO  nz=1,nlevels(ed)-1
-            uke_rhs_old(nz,ed)=uke_rhs(nz,ed)
-            uke_rhs(nz,ed)=-uke_dis(nz,ed)-uke_back(nz,ed)+uke_dif(nz,ed)
-            uke(nz,ed)=uke(nz,ed)+1.5_8*uke_rhs(nz,ed)-0.5_8*uke_rhs_old(nz,ed)
+
+        if (dynamics%uke_advection) then
+            call backscatter_adv(dynamics, partit, mesh)
+            call exchange_elem(uke_adv, partit)
+
+            DO ed=1, myDim_elem2D
+                DO  nz=1,nlevels(ed)-1
+                uke_rhs_old(nz,ed)=uke_rhs(nz,ed)
+                uke_rhs(nz,ed)=-uke_dis(nz,ed)-uke_back(nz,ed)+uke_dif(nz,ed)-uke_adv(nz, ed)
+                uke(nz,ed)=uke(nz,ed)+1.5_WP*uke_rhs(nz,ed)-0.5_WP*uke_rhs_old(nz,ed)
+                END DO
             END DO
-        END DO
+        else
+            DO ed=1, myDim_elem2D
+                DO  nz=1,nlevels(ed)-1
+                uke_rhs_old(nz,ed)=uke_rhs(nz,ed)
+                uke_rhs(nz,ed)=-uke_dis(nz,ed)-uke_back(nz,ed)+uke_dif(nz,ed)
+                uke(nz,ed)=uke(nz,ed)+1.5_WP*uke_rhs(nz,ed)-0.5_WP*uke_rhs_old(nz,ed)
+                END DO
+            END DO
+        end if
         
         call exchange_elem(uke, partit)
         deallocate(uuu)

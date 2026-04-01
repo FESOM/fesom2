@@ -17,13 +17,13 @@ module io_fesom_file_module
     logical is_elem_based
     logical :: is_icepackvar2=.false.
     character(:), allocatable :: varname ! todo: maybe use a getter in netcdf_file_type to get the name
-  end type
+  end type var_info
   
   
   type dim_info
     integer idx
     integer len ! better query the len from the netcdf_file_type ?
-  end type
+  end type dim_info
 
   
   type, extends(netcdf_file_type) :: fesom_file_type ! todo maybe: do not inherit but use composition to have different implementations for the iorank and non-io ranks
@@ -49,7 +49,7 @@ module io_fesom_file_module
     procedure, private :: specify_node_var_2d, specify_node_var_2dicepack, specify_node_var_3d
     procedure, private :: specify_elem_var_2d, specify_elem_var_3d
     procedure, private :: read_and_scatter_variables, gather_and_write_variables
-  end type
+  end type fesom_file_type
   
   
   integer, save :: m_nod2d
@@ -60,7 +60,7 @@ module io_fesom_file_module
 
   type fesom_file_type_ptr
     class(fesom_file_type), pointer :: ptr
-  end type
+  end type fesom_file_type_ptr
   type(fesom_file_type_ptr), allocatable, save :: all_fesom_files(:)
 
 
@@ -71,7 +71,7 @@ contains
     class(fesom_file_type), intent(in) :: this
     logical x
     x = (this%partit%mype == this%iorank)
-  end function
+  end function is_iorank
 
 
   ! return the number of timesteps of the file if a file is attached or return the default value of -1
@@ -88,21 +88,21 @@ contains
     end if
     
     x = this%rec_cnt
-  end function
+  end function rec_count
 
 
   function time_varindex(this) result(x)
     class(fesom_file_type), intent(in) :: this
     integer x
     x = this%time_varidx
-  end function
+  end function time_varindex
 
 
   function time_dimindex(this) result(x)
     class(fesom_file_type), intent(in) :: this
     integer x
     x = this%time_dimidx
-  end function
+  end function time_dimindex
   
   
   subroutine init(this, mesh_nod2d, mesh_elem2d, mesh_nl, partit, mesh_ncat) ! todo: would like to call it initialize but Fortran is rather cluncky with overwriting base type procedures
@@ -170,7 +170,7 @@ contains
     ! on cray-mpich we only get level 'MPI_THREAD_MULTIPLE' if 'MPICH_MAX_THREAD_SAFETY=multiple' is set in the environment
     call MPI_Query_thread(provided_mpi_thread_support_level, err)
     if(provided_mpi_thread_support_level < MPI_THREAD_MULTIPLE) call this%thread%disable_async()    
-  end subroutine
+  end subroutine init
   
   
   subroutine read_and_scatter_variables(this)

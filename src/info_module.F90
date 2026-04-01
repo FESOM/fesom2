@@ -8,7 +8,7 @@ module info_module
   type :: info_type
   contains
     procedure, nopass :: print_definitions
-  end type
+  end type info_type
   type(info_type) info
 
 contains
@@ -102,6 +102,6 @@ contains
 #else
       print '(g0)', 'ENABLE_NVHPC_WORKAROUNDS is OFF'
 #endif  
-  end subroutine
+  end subroutine print_definitions
 
-end module
+end module info_module

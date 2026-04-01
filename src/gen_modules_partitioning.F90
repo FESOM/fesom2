@@ -6,7 +6,7 @@ module mod_parsup
      integer,           intent(in)   :: COMM
      integer,           intent(in)   :: mype
      integer, optional, intent(in)   :: abort
-  end subroutine
+  end subroutine par_ex
   end interface
 end module mod_parsup
 
@@ -18,7 +18,7 @@ module par_support_interfaces
      USE MOD_PARSUP
      implicit none
      type(t_partit), intent(inout), target :: partit
-  end subroutine
+  end subroutine par_init
 
   subroutine init_mpi_types(partit, mesh)
      use MOD_MESH
@@ -27,16 +27,16 @@ module par_support_interfaces
      implicit none
      type(t_partit), intent(inout), target :: partit
      type(t_mesh),   intent(in), target :: mesh
-  end subroutine
+  end subroutine init_mpi_types
 
   subroutine init_gatherLists(partit)
      USE MOD_PARTIT
      USE MOD_PARSUP
      implicit none
      type(t_partit), intent(inout), target :: partit    
-  end subroutine
+  end subroutine init_gatherLists
   end interface
-end module
+end module par_support_interfaces
 
 subroutine par_init(partit)    ! initializes MPI
   USE o_PARAM
@@ -127,7 +127,7 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
      call  MPI_Finalize(error)
   endif
 
-#else ! 
+#else 
 ! TODO logic below is convoluted, COMM that is passed should be used for MPI_ABORT
 ! changes are easy but need to be tested with coupled configurations 
 ! From here on the two coupled options

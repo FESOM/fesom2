@@ -11,9 +11,9 @@ module compute_vel_rhs_interface
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine compute_vel_rhs
     end interface
-end module
+end module compute_vel_rhs_interface
 
 module momentum_adv_scalar_interface
     interface
@@ -25,9 +25,9 @@ module momentum_adv_scalar_interface
         type(t_dyn)   , intent(inout), target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine momentum_adv_scalar
     end interface
-end module
+end module momentum_adv_scalar_interface
 
 !
 !

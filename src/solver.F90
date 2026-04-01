@@ -8,9 +8,9 @@ module ssh_solve_preconditioner_interface
         type(t_solverinfo),  intent(inout), target :: solverinfo
         type(t_partit),      intent(inout), target :: partit
         type(t_mesh),        intent(inout), target :: mesh
-        end subroutine
+        end subroutine ssh_solve_preconditioner
     end interface
-end module
+end module ssh_solve_preconditioner_interface
 
 module ssh_solve_cg_interface
     interface
@@ -24,9 +24,9 @@ module ssh_solve_cg_interface
         type(t_mesh),        intent(inout), target :: mesh
         real(kind=WP),       intent(inout) :: x(partit%myDim_nod2D+partit%eDim_nod2D)
         real(kind=WP),       intent(in)    :: rhs(partit%myDim_nod2D+partit%eDim_nod2D)
-        end subroutine
+        end subroutine ssh_solve_cg
     end interface
-end module
+end module ssh_solve_cg_interface
 !=========================================================================
 subroutine ssh_solve_preconditioner(solverinfo, partit, mesh)
   ! Preconditioner follows MITgcm (JGR, 102,5753-5766, 1997)

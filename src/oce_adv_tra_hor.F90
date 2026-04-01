@@ -19,7 +19,7 @@ module oce_adv_tra_hor_interfaces
       real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
       real(kind=WP), intent(inout)      :: flux(  mesh%nl-1, partit%myDim_edge2D)
       logical, optional                 :: o_init_zero
-    end subroutine
+    end subroutine adv_tra_hor_upw1
 !===============================================================================
 ! MUSCL
 ! returns flux given at edges which contributes with
@@ -40,7 +40,7 @@ module oce_adv_tra_hor_interfaces
       integer,       intent(in)         :: nboundary_lay(partit%myDim_nod2D+partit%eDim_nod2D)
       real(kind=WP), intent(in)         :: edge_up_dn_grad(4, mesh%nl-1, partit%myDim_edge2D)
       logical, optional                 :: o_init_zero
-    end subroutine
+    end subroutine adv_tra_hor_muscl
 ! a not stable version of MUSCL (reconstruction in the vicinity of bottom topography is not upwind)
 ! it runs with FCT option only
     subroutine adv_tra_hor_mfct(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad,                 o_init_zero)
@@ -55,9 +55,9 @@ module oce_adv_tra_hor_interfaces
       real(kind=WP), intent(inout)      :: flux(  mesh%nl-1, partit%myDim_edge2D)
       real(kind=WP), intent(in)         :: edge_up_dn_grad(4, mesh%nl-1, partit%myDim_edge2D)
       logical, optional                 :: o_init_zero
-    end subroutine
+    end subroutine adv_tra_hor_mfct
   end interface
-end module
+end module oce_adv_tra_hor_interfaces
 !
 !
 !===============================================================================

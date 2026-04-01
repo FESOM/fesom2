@@ -6,7 +6,7 @@ module fer_solve_interface
         USE MOD_PARSUP
         type(t_mesh)  , intent(in)   , target :: mesh
         type(t_partit), intent(inout), target :: partit
-        end subroutine
+        end subroutine fer_solve_Gamma
         
         subroutine fer_gamma2vel(dynamics, partit, mesh)
         use mod_mesh
@@ -16,7 +16,7 @@ module fer_solve_interface
         type(t_mesh)  , intent(in)   , target :: mesh
         type(t_partit), intent(inout), target :: partit
         type(t_dyn)   , intent(inout), target :: dynamics
-        end subroutine
+        end subroutine fer_gamma2vel
 
         subroutine init_Redi_GM(partit, mesh)
         use mod_mesh
@@ -24,9 +24,9 @@ module fer_solve_interface
         USE MOD_PARSUP
         type(t_mesh)  , intent(in)   , target :: mesh
         type(t_partit), intent(inout), target :: partit
-        end subroutine
+        end subroutine init_Redi_GM
     end interface
-end module
+end module fer_solve_interface
 
 
 

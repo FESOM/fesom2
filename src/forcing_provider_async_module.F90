@@ -10,7 +10,7 @@ module forcing_provider_async_module
     private
     contains
     procedure, public, nopass :: get_forcingdata
-  end type
+  end type forcing_provider_type
   type(forcing_provider_type), save :: forcing_provider ! handle to singleton instance
 
   
@@ -25,7 +25,7 @@ module forcing_provider_async_module
     integer thread_timeindex
     contains
     procedure initialize_async_reader
-  end type
+  end type forcing_async_reader_type
   type(forcing_async_reader_type), allocatable, save, target :: all_readers(:) ! we can not put this inside of the forcing_provider_type as we must have it as a target to assign the current/next pointers (:sic:)
   
   
@@ -100,14 +100,14 @@ module forcing_provider_async_module
       end if
     end if
     
-  end subroutine
+  end subroutine get_forcingdata
 
 
   subroutine thread_callback(index)
     integer, intent(in) :: index
     ! EO args
     call all_readers(index)%reader_next%timeindex_hint(all_readers(index)%thread_timeindex)
-  end subroutine
+  end subroutine thread_callback
 
 
   subroutine initialize_async_reader(this, filepath, fileyear, varname)
@@ -129,7 +129,7 @@ module forcing_provider_async_module
     this%reader_next => this%reader_b
     
     ! todo: this%thread%init should be called here, but we can not call it multiple times for the same forcing field
-  end subroutine
+  end subroutine initialize_async_reader
 
   
   subroutine assert(val, line)
@@ -140,5 +140,5 @@ module forcing_provider_async_module
       print *, "error in line ",line, __FILE__
       stop 1
     end if
-  end subroutine
-end module
+  end subroutine assert
+end module forcing_provider_async_module

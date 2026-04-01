@@ -12,9 +12,9 @@ module ocean2ice_interface
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine ocean2ice
     end interface
-end module
+end module ocean2ice_interface
 
 module oce_fluxes_interface
     interface
@@ -30,7 +30,7 @@ module oce_fluxes_interface
         type(t_tracer), intent(inout), target :: tracers
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine oce_fluxes
         
         subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
         USE MOD_ICE
@@ -42,9 +42,9 @@ module oce_fluxes_interface
         type(t_dyn)   , intent(in)   , target :: dynamics
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine
+        end subroutine oce_fluxes_mom
     end interface
-end module
+end module oce_fluxes_interface
 
 !
 !
