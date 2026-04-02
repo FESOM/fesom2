@@ -362,7 +362,7 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
         !rt  s_surf_flux(i,j)=gas*(sf-(s(i,j,N,lrhs)+35.0))
         
         heat_flux(node)  = rhow*cpw*gat*(tin-tf)      ! [W/m2]  ! positive for upward
-        water_flux(node) =          gas*(sf-sal)/sf   ! [m/s]   !
+        water_flux(node) =          ep5*(sf-sal)/sf   ! [m/s]   !
         
         !      qo=-rhor*seta*oofw
         !      if(seta.le.0.) then

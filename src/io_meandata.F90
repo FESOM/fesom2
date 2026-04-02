@@ -115,6 +115,7 @@ module io_MEANDATA
     integer                                    :: ncid = -1
     integer                                    :: varid, timeid, timedimid
     integer                                    :: rec_count = 0
+    character(500)                             :: filename = ""  ! current output file path
   end type Meandata0D
 
   type(Meandata0D), save, target :: io_stream0D(50)
@@ -1220,8 +1221,8 @@ CASE ('dMOC      ')
        if (Fer_GM) call def_stream((/std_dens_N, nod2D /),  (/std_dens_N,  myDim_nod2D/), 'std_dens_DIVbolus',   'm3/s',  'm3/s'   ,std_dens_DIV_fer(:,:),  io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
        call def_stream((/std_dens_N, elem2D/),  (/std_dens_N, myDim_elem2D/), 'std_dens_Z',     'm',                      'm'      ,std_dens_Z(:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
        call def_stream((/std_dens_N, elem2D/),  (/std_dens_N, myDim_elem2D/), 'std_dens_H'    , 'density thickness'     , 'm'     , std_dens_H(:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-       call def_stream((/nl-1,       nod2D /),  (/nl-1,       myDim_nod2D /), 'density_dMOC',   'density'               , 'm',      density_dmoc(:,:),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-       call def_stream(elem2D,                                myDim_elem2D  , 'density_flux_e', 'density flux at elems ', 'm',      dens_flux_e(:),         io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+       call def_stream((/nl-1,       nod2D /),  (/nl-1,       myDim_nod2D /), 'density_dMOC',   'density'               , 'kg/m3',      density_dmoc(:,:),      io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+       call def_stream(elem2D,                                myDim_elem2D  , 'density_flux_e', 'density flux at elems ', 'm/s',      dens_flux_e(:),         io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
     
 !_______________________________________________________________________________
@@ -1342,13 +1343,13 @@ CASE ('FORC      ')
         call def_stream(nod2D , myDim_nod2D , 'cd',    'wind drag coef. '             , '',     cd_atm_oce_arr(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream(nod2D , myDim_nod2D , 'ch',    'transfer coeff. sensible heat', '',     ch_atm_oce_arr(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream(nod2D , myDim_nod2D , 'ce',    'transfer coeff. evaporation ' , '',     ce_atm_oce_arr(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-#if defined (__oasis)
+#if defined (__oasis) || defined (__yac)
         call def_stream(nod2D,  myDim_nod2D,  'subli', 'sublimation',                   'm/s',  sublimation(:)   , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 #endif
         if ((use_virt_salt) .or. ( (.not. use_virt_salt) .and. (use_cavity) )) then
             if (sel_forcvar(13)==0) call def_stream(nod2D , myDim_nod2D , 'virtsalt', 'virtual salt flux'        , 'm/s*psu', virtual_salt(:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         end if     
-#if !defined (__oasis)        
+#if !defined (__oasis) && !defined (__yac)
         if (sel_forcvar(14)==0) call def_stream(nod2D , myDim_nod2D , 'relaxsalt', 'relaxation salt flux'        , 'm/s*psu', relax_salt(:)    , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 #endif  
         if (sel_forcvar(15)==0) call def_stream(nod2D , myDim_nod2D , 'realsalt' , 'real salt flux from sea ice' , 'm/s*psu', real_salt_flux(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -2428,6 +2429,15 @@ subroutine output_0D_streams(istep, partit)
                     filepath = trim(ResultPath)//trim(entry0D%name)//'.'//trim(runid)//'.'//cyearnew//'_'//cmonth//'.nc'
                 else
                     filepath = trim(ResultPath)//trim(entry0D%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
+                endif
+                
+                ! Close old file and reset if year/month has changed
+                if (filepath /= trim(entry0D%filename)) then
+                    if (trim(entry0D%filename) /= "" .and. entry0D%ncid >= 0) then
+                        call assert_nf(nf90_close(entry0D%ncid), __LINE__)
+                    endif
+                    entry0D%ncid = -1
+                    entry0D%filename = filepath
                 endif
                 
                 ! Create or open file
