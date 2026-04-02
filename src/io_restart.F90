@@ -335,7 +335,7 @@ subroutine read_initial_conditions(which_readr, ice, dynamics, tracers, partit, 
   call ini_ocean_io(dynamics, tracers, partit, mesh)
   if (use_ice) then
 #if defined(__icepack)    
-      call ini_icepack_io(partit, mesh)
+      call ini_icepack_io(yearold, partit, mesh)
 #else
       call ini_ice_io  (ice, partit, mesh)
 #endif        
