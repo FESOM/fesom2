@@ -303,10 +303,10 @@ subroutine pressure_bv(tracers, partit, mesh)
             !!PS do nz=1, nl1
             do nz=nzmin, nzmax-1
                 rho(nz)              = bulk_0(nz) - 2000._WP*(bulk_pz(nz)   -2000._WP*bulk_pz2(nz))
-                density_dmoc(nz,node)= rho(nz)*rhopot(nz)/(rho(nz)-200._WP)
+                density_dmoc(nz,node)= rho(nz)*rhopot(nz)/(rho(nz)-200._WP*real(state_equation))
                         !           density_dmoc(nz,node)   = rhopot(nz)
             end do
-        end if
+        end if 
 
         !_______________________________________________________________________
         ! compute density for PGF
@@ -3189,15 +3189,23 @@ subroutine init_ref_density(partit, mesh)
         auxz=min(0.0,Z_3d_n(nzmin,node))
 
         !_______________________________________________________________________
-        call densityJM_components(density_ref_T, density_ref_S, bulk_0, bulk_pz, bulk_pz2, rhopot)
-        rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
-        density_ref(nzmin, node) = rho*rhopot/(rho+0.1_WP*auxz)
+        select case(state_equation)
+            case(0)
+                call density_linear(density_ref_T, density_ref_S, bulk_0, bulk_pz, bulk_pz2, rhopot)
+            case(1)
+                call densityJM_components(density_ref_T, density_ref_S, bulk_0, bulk_pz, bulk_pz2, rhopot)
+            case default !unknown
+                if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        end select
+        rho = bulk_0 + auxz*bulk_pz + auxz*bulk_pz2
+        density_ref(nzmin, node) = rho*rhopot/(rho+0.1_WP*auxz*real(state_equation))
 
         !_______________________________________________________________________
         do nz=nzmin+1,nzmax
             auxz=Z_3d_n(nz,node)
-            rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
-            density_ref(nz,node) = rho*rhopot/(rho+0.1_WP*auxz)
+            rho = bulk_0 + auxz*bulk_pz + auxz*bulk_pz2
+            density_ref(nz,node) = rho*rhopot/(rho+0.1_WP*auxz*real(state_equation))
         end do
     end do
 !$OMP END PARALLEL DO
@@ -3270,20 +3278,36 @@ end where
         nzmax = nlevels_nod2d(node)-1
         auxz=min(0.0,Z_3d_n(nzmin,node))
         do nz=nzmin,nzmax
-            call densityJM_components(ref_temp1D(nz), ref_salt1D(nz), bulk_0, bulk_pz, bulk_pz2, rhopot)
+            select case(state_equation)
+            case(0)
+                call density_linear(ref_temp1D(nz), ref_salt1D(nz), bulk_0, bulk_pz, bulk_pz2, rhopot)
+            case(1)
+                call densityJM_components(ref_temp1D(nz), ref_salt1D(nz), bulk_0, bulk_pz, bulk_pz2, rhopot)
+            case default !unknown
+                if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            end select    
             auxz=Z_3d_n(nz,node)
             rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
-            density_ref(nz,node) = rho*rhopot/(rho+0.1_WP*auxz)
+            density_ref(nz,node) = rho*rhopot/(rho+0.1_WP*auxz*real(state_equation))
         end do
     end do
 !$OMP END PARALLEL DO
 if(mype==0) write(*,*) ' --> compute reference density'
 if(mype==0) then
 do nz=1,68
- call densityJM_components(ref_temp1D(nz), ref_salt1D(nz), bulk_0, bulk_pz, bulk_pz2, rhopot)
+    select case(state_equation)
+    case(0)
+        call density_linear(ref_temp1D(nz), ref_salt1D(nz), bulk_0, bulk_pz, bulk_pz2, rhopot)
+    case(1) 
+        call densityJM_components(ref_temp1D(nz), ref_salt1D(nz), bulk_0, bulk_pz, bulk_pz2, rhopot)
+    case default !unknown
+        if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    end select    
  auxz=Z(nz)
  rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
- rho = rho*rhopot/(rho+0.1_WP*auxz)
+ rho = rho*rhopot/(rho+0.1_WP*auxz*real(state_equation))
  write(*,*) "mytest:", ref_temp1D(nz), ref_salt1D(nz), auxz, rho
 end do
 end if

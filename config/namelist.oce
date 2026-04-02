@@ -64,7 +64,7 @@ Redi_Kmin          = 100.0   ! minimum Redi difusivity thats left when Redi_Ktap
 
 ! --- Vertical Mixing Scheme ---
 visc_sh_limit      = 5.0e-3  ! maximum viscosity due to shear instability [m²/s] (for KPP)
-mix_scheme         = 'KPP'   ! vertical mixing scheme: 'KPP' (K-Profile Parameterization), 'PP' (Pacanowski-Philander), or 'TKE' (Turbulent Kinetic Energy)
+mix_scheme         = 'KPP'   ! vertical mixing scheme: 'KPP' (K-Profile Parameterization), 'PP' (Pacanowski-Philander), or 'cvmix_TKE' (Turbulent Kinetic Energy). For complete list of available shemes look at the oce_setup_step.F90. 
 
 ! --- Convection Parameters ---
 Ricr               = 0.3     ! critical bulk Richardson number (for convection onset)
