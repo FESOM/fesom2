@@ -1128,7 +1128,7 @@ type(t_partit), intent(inout), target :: partit
          i = i+1
         end if
       else
-        if( mesh%bc_index_nod2D(node)==0.0 ) then
+        if( mesh%bc_index_nod2D(node)==1 ) then
          n(i) = node
          i = i+1
         end if

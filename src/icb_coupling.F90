@@ -140,6 +140,7 @@ type(t_partit), intent(inout), target :: partit
 
                 ! Guard against idx_d=0 (can happen if nlevels_nod2D is 0 or loop didn't execute)
                 if (idx_d(i) <= 0) cycle
+                do j=1,idx_d(i)
                     lev_up  = mesh%zbar_3d_n(j, iceberg_node)           ! upper level
                     if( j==nlevels_nod2D(iceberg_node) ) then           ! if bottom level is reached ...
                         lev_low = mesh%zbar_n_bot(iceberg_node)         ! ... lower level is set to bottom topography
@@ -161,6 +162,7 @@ type(t_partit), intent(inout), target :: partit
                                                     - (hfbv_flux_ib(ib,j)+hfl_flux_ib(ib,j)) & 
                                                     / tot_area_nods_in_ib_elem(j)
                     end if
+                end do
                 
                 ! if idx_d is not only upper most level ...
                 if( idx_d(i) > 1 ) then
