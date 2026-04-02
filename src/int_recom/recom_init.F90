@@ -479,7 +479,6 @@ subroutine recom_init(tracers, partit, mesh)
     dtr_bflux_dsi(:,:)    = 0.0d0
     dtr_bf_dsi(:,:,:)     = 0.0d0
 
-            if (partit%mype==0) write(*,*) "here2!"
     if (use_MEDUSA) then
         allocate(GloSed(node_size,sedflx_num))
         allocate(SinkFlx(node_size,bottflx_num))
