@@ -272,7 +272,6 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
 
-  if (ciso) then
 !   Calculate carbon-isotopic fractionation, radioactive decay is calculated in oce_ale_tracer.F90
 
 !   Fractionation due to air-sea exchange and chemical speciation of CO2
