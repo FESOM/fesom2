@@ -273,6 +273,30 @@ CASE ('opottemptend')
     if (ldiag_cmor) then
     call def_stream(nod2D, myDim_nod2D, 'opottemptend', 'tendency of sea water potential temperature', 'W/m2', opottemptend(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Tendency of sea water potential temperature expressed as heat content")
     end if
+CASE ('osalttend ')
+    if (ldiag_cmor) then
+    call def_stream(nod2D, myDim_nod2D, 'osalttend', 'tendency of sea water salinity', 'psu m/s', osalttend(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Tendency of sea water salinity expressed as salt content")
+    end if
+CASE ('opottemprmadvect')
+    if (ldiag_cmor) then
+    call def_stream(nod2D, myDim_nod2D, 'opottemprmadvect', 'temperature tendency due to advection', 'W/m2', opottemprmadvect(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Tendency of sea water potential temperature expressed as heat content due to residual mean advection")
+    end if
+CASE ('opottempdiff')
+    if (ldiag_cmor) then
+    call def_stream(nod2D, myDim_nod2D, 'opottempdiff', 'temperature tendency due to diffusion', 'W/m2', opottempdiff(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Tendency of sea water potential temperature expressed as heat content due to parameterized dianeutral mixing")
+    end if
+CASE ('osaltrmadvect')
+    if (ldiag_cmor) then
+    call def_stream(nod2D, myDim_nod2D, 'osaltrmadvect', 'salinity tendency due to advection', 'psu m/s', osaltrmadvect(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Tendency of sea water salinity expressed as salt content due to residual mean advection")
+    end if
+CASE ('osaltdiff ')
+    if (ldiag_cmor) then
+    call def_stream(nod2D, myDim_nod2D, 'osaltdiff', 'salinity tendency due to diffusion', 'psu m/s', osaltdiff(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Tendency of sea water salinity expressed as salt content due to parameterized dianeutral mixing")
+    end if
+CASE ('rsdoabsorb')
+    if (ldiag_cmor) then
+    call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'rsdoabsorb', 'shortwave flux absorbed in ocean layer', 'W/m2', rsdoabsorb(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
 
 ! CMOR 0D (scalar) diagnostics for CMIP6/CMIP7 (require ldiag_cmor=.true.)
 CASE ('volo      ')
