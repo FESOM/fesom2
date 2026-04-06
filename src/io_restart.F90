@@ -357,8 +357,7 @@ subroutine read_initial_conditions(which_readr, ice, dynamics, tracers, partit, 
   if(rawfiles_exist) then
     ! Read raw/core dump restart
     which_readr = 1
-    ! Note: This will need to be updated once we have read functions that accept paths
-    call read_all_raw_restarts(partit%MPI_COMM_FESOM, partit%mype)
+    call read_all_raw_restarts(read_raw_dirpath, read_raw_infopath, partit%MPI_COMM_FESOM, partit%mype)
     
   elseif(binfiles_exist .and. bin_restart_length_unit /= "off") then
     ! Read binary restart
@@ -407,7 +406,7 @@ subroutine read_initial_conditions(which_readr, ice, dynamics, tracers, partit, 
 
     ! Immediately create raw and binary restarts after NetCDF read for backup
     if(raw_restart_length_unit /= "off") then
-        call write_all_raw_restarts(0, partit%MPI_COMM_FESOM, partit%mype)
+        call write_all_raw_restarts(raw_restart_dirpath, raw_restart_infopath, 0, partit%MPI_COMM_FESOM, partit%mype)
     end if
     
     if(bin_restart_length_unit /= "off") then
@@ -494,7 +493,7 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
 
   ! Write core dump
   if(is_raw_restart_write) then
-    call write_all_raw_restarts(istep, partit%MPI_COMM_FESOM, partit%mype)
+    call write_all_raw_restarts(raw_restart_dirpath, raw_restart_infopath, istep, partit%MPI_COMM_FESOM, partit%mype)
   end if
 
   ! Write derived type binary
@@ -675,7 +674,9 @@ end subroutine
 !
 !
 !_______________________________________________________________________________
-subroutine write_all_raw_restarts(istep, mpicomm, mype)
+subroutine write_all_raw_restarts(write_dirpath, write_infopath, istep, mpicomm, mype)
+  character(len=*), intent(in) :: write_dirpath
+  character(len=*), intent(in) :: write_infopath
   integer,  intent(in):: istep
   integer, intent(in) :: mpicomm
   integer, intent(in) :: mype
@@ -683,7 +684,7 @@ subroutine write_all_raw_restarts(istep, mpicomm, mype)
   integer cstep
   integer fileunit
 
-  open(newunit = fileunit, file = raw_restart_dirpath//'/'//mpirank_to_txt(mpicomm)//'.dump', form = 'unformatted')
+  open(newunit = fileunit, file = write_dirpath//'/'//mpirank_to_txt(mpicomm)//'.dump', form = 'unformatted')
   call write_raw_restart_group(oce_files, fileunit)
   if(use_ice) call write_raw_restart_group(ice_files, fileunit)
 #if defined(__recom)
@@ -694,10 +695,10 @@ subroutine write_all_raw_restarts(istep, mpicomm, mype)
   ctime = timeold + (dayold-1._WP)*86400._WP
 
   if(mype == RAW_RESTART_METADATA_RANK) then
-    print *,"writing raw restart to "//raw_restart_dirpath
+    print *,"writing raw restart to "//write_dirpath
     ! store metadata about the raw restart
     cstep = globalstep+istep
-    open(newunit = fileunit, file = raw_restart_infopath)
+    open(newunit = fileunit, file = write_infopath)
     write(fileunit, '(g0)') cstep
     write(fileunit, '(g0)') ctime
     write(fileunit, '(2(g0))') "! year: ",yearnew
@@ -912,7 +913,9 @@ end subroutine
 !
 !
 !_______________________________________________________________________________
-subroutine read_all_raw_restarts(mpicomm, mype)
+subroutine read_all_raw_restarts(read_dirpath, read_infopath, mpicomm, mype)
+  character(len=*), intent(in) :: read_dirpath
+  character(len=*), intent(in) :: read_infopath
   integer, intent(in) :: mpicomm
   integer, intent(in) :: mype
   ! EO parameters
@@ -926,28 +929,28 @@ subroutine read_all_raw_restarts(mpicomm, mype)
 
   if(mype == RAW_RESTART_METADATA_RANK) then
     ! read metadata info for the raw restart
-    open(newunit = fileunit, status = 'old', iostat = status, file = raw_restart_infopath)
+    open(newunit = fileunit, status = 'old', iostat = status, file = read_infopath)
     if(status == 0) then
       read(fileunit,*) rstep
       read(fileunit,*) rtime
       close(fileunit)
     else
-      print *,"can not open ",raw_restart_infopath
+      print *,"can not open ",read_infopath
       stop 1
     end if
-    
+
     ! compare the restart time with our actual time
     if(int(ctime) /= int(rtime)) then
       print *, "raw restart time ",rtime,"does not match current clock time",ctime
       stop 1
     end if
     globalstep = rstep
-    print *,"reading raw restart from "//raw_restart_dirpath
+    print *,"reading raw restart from "//read_dirpath
   end if
   ! sync globalstep with the other processes to let all processes writing portable restart files know the globalstep
   call MPI_Bcast(globalstep, 1, MPI_INTEGER, RAW_RESTART_METADATA_RANK, mpicomm, mpierr)
 
-  open(newunit = fileunit, status = 'old', iostat = status, file = raw_restart_dirpath//'/'//mpirank_to_txt(mpicomm)//'.dump', form = 'unformatted')
+  open(newunit = fileunit, status = 'old', iostat = status, file = read_dirpath//'/'//mpirank_to_txt(mpicomm)//'.dump', form = 'unformatted')
   if(status == 0) then
     call read_raw_restart_group(oce_files, fileunit)
     if(use_ice) call read_raw_restart_group(ice_files, fileunit)
@@ -956,7 +959,7 @@ subroutine read_all_raw_restarts(mpicomm, mype)
 #endif
     close(fileunit)
   else
-    print *,"can not open ",raw_restart_dirpath//'/'//mpirank_to_txt(mpicomm)//'.dump'
+    print *,"can not open ",read_dirpath//'/'//mpirank_to_txt(mpicomm)//'.dump'
     stop 1
   end if
 end subroutine
