@@ -61,8 +61,9 @@ module recom_config
 
   integer, dimension(8)  :: recom_remin_tracer_id   = (/1001, 1002, 1003, 1018, 1019, 1022, 1302, 1402/)
 
-! OG
-! Todo:  Make recom_sinking_tracer_id case sensitive
+! The static declaration integer, dimension(32) :: recom_sinking_tracer_id 
+! must remain size 32 (the full-model case uses all 32 slots), and the = 0 
+! reset before partial fills ensures unused slots are inert.
   integer, dimension(32) :: recom_sinking_tracer_id = (/1007, 1008, 1017, 1021, 1004, 1005, 1020, 1006, &
                                                         1013, 1014, 1016, 1015, 1025, 1026, 1027, 1028, &
                                                         1029, 1030, 1031, &
@@ -527,6 +528,13 @@ contains
   subroutine initialize_tracer_indices()
     implicit none
 
+    ! ---------------------------------------------------------------------------
+    ! Base sinking tracers (always present in all configurations):
+    !   Det1:  DetN(1007), DetC(1008), DetSi(1017), DetCalc(1021)
+    !   Phy:   PhyN(1004), PhyC(1005), PhyCalc(1020), PhyChl(1006)
+    !   Dia:   DiaN(1013), DiaC(1014), DiaSi(1016), DiaChl(1015)
+    ! ---------------------------------------------------------------------------
+
     if (enable_3zoo2det .and. enable_coccos) then
         ! =======================================================================
         ! CASE: 4 phytoplankton + 3 zooplankton + 2 detritus
@@ -549,14 +557,38 @@ contains
             idoct = 37
         end if
 
-!        allocate(recom_cocco_tracer_id(3))
         recom_cocco_tracer_id = (/1029, 1030, 1031/)
-
-!        allocate(recom_phaeo_tracer_id(3))
         recom_phaeo_tracer_id = (/1032, 1033, 1034/)
+        recom_det2_tracer_id  = (/1025, 1026, 1027, 1028/)
 
-!        allocate(recom_det2_tracer_id(4))
-        recom_det2_tracer_id = (/1025, 1026, 1027, 1028/)
+        ! Base(12) + Det2(4) + Zoo2Det2(4) + Cocco(3) + Phaeo(3) + CoccoCalc(2)
+        ! Det1 sinking: 1007,1008,1017,1021
+        ! Phy  sinking: 1004,1005,1020,1006
+        ! Dia  sinking: 1013,1014,1016,1015
+        ! Det2 sinking: 1025,1026,1027,1028  (DetZ2N,DetZ2C,DetZ2Si,DetZ2Calc)
+        ! Zoo2 det:     1308,1321            (via zoo2 sinking tracer IDs)
+        ! Phy  cal:     1305,1320
+        ! Dia  cal:     1314
+        ! Cocco sinking:1029,1030,1031 -> mapped as 1308..? 
+        ! 
+        ! Reconstructing from original array for full model:
+        ! Original: 1007,1008,1017,1021, 1004,1005,1020,1006,
+        !           1013,1014,1016,1015, 1025,1026,1027,1028,
+        !           1029,1030,1031,
+        !           1032,1033,1034,
+        !           1308,1321,1305,1320,
+        !           1314,1408,1421,1405,1420,1414
+
+        recom_sinking_tracer_id      = 0
+        recom_sinking_tracer_id(1:22) = &
+            (/1007, 1008, 1017, 1021, 1004, 1005, 1020, 1006, &
+              1013, 1014, 1016, 1015, 1025, 1026, 1027, 1028, &
+              1029, 1030, 1031, 1032, 1033, 1034/)
+        if (ciso) then
+            recom_sinking_tracer_id(23:32) = &
+                (/1308, 1321, 1305, 1320, &
+                  1314, 1408, 1421, 1405, 1420, 1414/)
+        end if
 
     else if (enable_coccos .and. .not. enable_3zoo2det) then
         ! =======================================================================
@@ -578,11 +610,26 @@ contains
             idoct = 29
         end if
 
-!        allocate(recom_cocco_tracer_id(3))
         recom_cocco_tracer_id = (/1023, 1024, 1025/)
-
-!        allocate(recom_phaeo_tracer_id(3))
         recom_phaeo_tracer_id = (/1026, 1027, 1028/)
+
+        ! Det1 sinking: 1007,1008,1017,1021
+        ! Phy  sinking: 1004,1005,1020,1006
+        ! Dia  sinking: 1013,1014,1016,1015
+        ! Cocco sinking:1023,1024,1025
+        ! Phaeo sinking:1026,1027,1028
+        ! Ciso-style:   1308,1321,1305,1320,1314,1408,1421,1405,1420,1414
+        ! No Det2, no Zoo2 sinking
+        recom_sinking_tracer_id      = 0
+        recom_sinking_tracer_id(1:18) = &
+            (/1007, 1008, 1017, 1021, 1004, 1005, 1020, 1006, &
+              1013, 1014, 1016, 1015, 1023, 1024, 1025,        &
+              1026, 1027, 1028/)
+        if (ciso) then
+            recom_sinking_tracer_id(19:28) = &
+                (/1308, 1321, 1305, 1320, &
+                  1314, 1408, 1421, 1405, 1420, 1414/)
+        end if
 
     else if (enable_3zoo2det .and. .not. enable_coccos) then
         ! =======================================================================
@@ -600,8 +647,24 @@ contains
             idoct = 31
         end if
 
-!        allocate(recom_det2_tracer_id(4))
         recom_det2_tracer_id = (/1025, 1026, 1027, 1028/)
+
+        ! Det1 sinking: 1007,1008,1017,1021
+        ! Phy  sinking: 1004,1005,1020,1006
+        ! Dia  sinking: 1013,1014,1016,1015
+        ! Det2 sinking: 1025,1026,1027,1028
+        ! Ciso-style:   1308,1321,1305,1320,1314,1408,1421,1405,1420,1414
+        ! No Cocco/Phaeo sinking
+        recom_sinking_tracer_id      = 0
+        recom_sinking_tracer_id(1:16) = &
+            (/1007, 1008, 1017, 1021, 1004, 1005, 1020, 1006, &
+              1013, 1014, 1016, 1015, 1025, 1026, 1027, 1028/)
+        if (ciso) then
+            recom_sinking_tracer_id(17:26) = &
+                (/1308, 1321, 1305, 1320, &
+                  1314, 1408, 1421, 1405, 1420, 1414/)
+        end if
+
     else
         ! =======================================================================
         ! CASE: 2 phytoplankton + 1 zooplankton + 1 detritus (BASE CONFIGURATION)
@@ -615,6 +678,22 @@ contains
         if (useRivers) then
             idoct = 23
         end if
+
+        ! Det1 sinking: 1007,1008,1017,1021
+        ! Phy  sinking: 1004,1005,1020,1006
+        ! Dia  sinking: 1013,1014,1016,1015
+        ! Ciso-style:   1308,1321,1305,1320,1314,1408,1421,1405,1420,1414
+        ! No Det2, no Cocco/Phaeo sinking
+        recom_sinking_tracer_id      = 0
+        recom_sinking_tracer_id(1:12) = &
+            (/1007, 1008, 1017, 1021, 1004, 1005, 1020, 1006, &
+              1013, 1014, 1016, 1015/)
+        if (ciso) then
+            recom_sinking_tracer_id(13:22) = &
+                (/1308, 1321, 1305, 1320, &
+                  1314, 1408, 1421, 1405, 1420, 1414/)
+        end if
+
     endif
   end subroutine initialize_tracer_indices
 
@@ -1237,7 +1316,134 @@ subroutine validate_tracer_id_sequence(tracer_ids, num_tracers, mype)
 
 end subroutine validate_tracer_id_sequence
 
+! ==============================================================================
+! SUBROUTINE: print_sinking_config
+! Purpose: Print the sinking tracer configuration for the current model setup
+! ==============================================================================
+subroutine print_sinking_config(mype)
+    implicit none
 
+    integer, intent(in) :: mype
+    integer :: i, n_sinking
+
+    if (mype /= 0) return
+
+    ! Count active sinking tracers (non-zero entries)
+    n_sinking = count(recom_sinking_tracer_id /= 0)
+
+    write(*,*)
+    write(*,*) '=========================================================================='
+    write(*,*) 'REcoM SINKING TRACER CONFIGURATION'
+    write(*,*) '=========================================================================='
+    write(*,*) 'Model flags:'
+    write(*,'(A,L1)') '  enable_3zoo2det : ', enable_3zoo2det
+    write(*,'(A,L1)') '  enable_coccos   : ', enable_coccos
+    write(*,'(A,L1)') '  useRivers       : ', useRivers
+    write(*,*)
+    write(*,'(A,I3)') '  Active sinking tracers: ', n_sinking
+    write(*,*)
+
+    write(*,*) '----------------------------------------------------------'
+    write(*,*) '  Slot | Tracer ID | Description'
+    write(*,*) '----------------------------------------------------------'
+    do i = 1, 32
+        if (recom_sinking_tracer_id(i) == 0) cycle
+        write(*,'(A,I4,A,I6,A,A)') '  ', i, '   | ', &
+            recom_sinking_tracer_id(i), '    | ', &
+            trim(sinking_tracer_name(recom_sinking_tracer_id(i)))
+    end do
+    write(*,*) '----------------------------------------------------------'
+
+    write(*,*)
+    write(*,*) 'Sinking velocity assignments:'
+    write(*,'(A,F8.3,A)') '  VDet  (Det1)  : ', VDet,      ' m/day'
+    write(*,'(A,F8.3,A)') '  VDet_zoo2     : ', VDet_zoo2, ' m/day'
+    write(*,'(A,F8.3,A)') '  VPhy          : ', VPhy,      ' m/day'
+    write(*,'(A,F8.3,A)') '  VDia          : ', VDia,      ' m/day'
+    if (enable_coccos) then
+        write(*,'(A,F8.3,A)') '  VCocco        : ', VCocco,   ' m/day'
+        write(*,'(A,F8.3,A)') '  VPhaeo        : ', VPhaeo,   ' m/day'
+    end if
+    write(*,'(A,L1)')     '  allow_var_sinking : ', allow_var_sinking
+    write(*,*)
+    write(*,*) '=========================================================================='
+    write(*,*)
+
+end subroutine print_sinking_config
+
+! ==============================================================================
+! FUNCTION: sinking_tracer_name
+! Purpose: Return a human-readable name for a given tracer ID
+! ==============================================================================
+function sinking_tracer_name(id) result(name)
+    implicit none
+
+    integer, intent(in)  :: id
+    character(len=24)    :: name
+
+    select case (id)
+        ! ------------------------------------------------------------------
+        ! Detritus pool 1
+        ! ------------------------------------------------------------------
+        case (1007); name = 'DetN'
+        case (1008); name = 'DetC'
+        case (1017); name = 'DetSi'
+        case (1021); name = 'DetCalc'
+        ! ------------------------------------------------------------------
+        ! Small phytoplankton
+        ! ------------------------------------------------------------------
+        case (1004); name = 'PhyN'
+        case (1005); name = 'PhyC'
+        case (1020); name = 'PhyCalc'
+        case (1006); name = 'PhyChl'
+        ! ------------------------------------------------------------------
+        ! Diatoms
+        ! ------------------------------------------------------------------
+        case (1013); name = 'DiaN'
+        case (1014); name = 'DiaC'
+        case (1016); name = 'DiaSi'
+        case (1015); name = 'DiaChl'
+        ! ------------------------------------------------------------------
+        ! Detritus pool 2 (3zoo2det)
+        ! ------------------------------------------------------------------
+        case (1025); name = 'DetZ2N'
+        case (1026); name = 'DetZ2C'
+        case (1027); name = 'DetZ2Si'
+        case (1028); name = 'DetZ2Calc'
+        ! ------------------------------------------------------------------
+        ! Coccolithophores (coccos)
+        ! ------------------------------------------------------------------
+        case (1029); name = 'CoccoN'
+        case (1030); name = 'CoccoC'
+        case (1031); name = 'CoccoChl'
+        ! ------------------------------------------------------------------
+        ! Phaeocystis (coccos)
+        ! ------------------------------------------------------------------
+        case (1032); name = 'PhaeoN'
+        case (1033); name = 'PhaeoC'
+        case (1034); name = 'PhaeoChl'
+        ! ------------------------------------------------------------------
+        ! C-isotope (13C) counterparts
+        ! ------------------------------------------------------------------
+        case (1305); name = 'PhyCalc_13C'
+        case (1308); name = 'DetN_13C'
+        case (1314); name = 'DiaSi_13C'
+        case (1320); name = 'PhyChl_13C'
+        case (1321); name = 'DetC_13C'
+        ! ------------------------------------------------------------------
+        ! C-isotope (14C) counterparts
+        ! ------------------------------------------------------------------
+        case (1405); name = 'PhyCalc_14C'
+        case (1408); name = 'DetN_14C'
+        case (1414); name = 'DiaSi_14C'
+        case (1420); name = 'PhyChl_14C'
+        case (1421); name = 'DetC_14C'
+        ! ------------------------------------------------------------------
+        case default
+            write(name,'(A,I6)') 'Unknown ID: ', id
+    end select
+
+end function sinking_tracer_name
 
 end module recom_config
 !

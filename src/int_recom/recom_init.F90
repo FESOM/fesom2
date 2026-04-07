@@ -492,6 +492,7 @@ subroutine recom_init(tracers, partit, mesh)
 
     ! After reading parecomsetup namelist
     call initialize_tracer_indices
+    call print_sinking_config(mype)
 
     ! Validation check here
     call validate_recom_tracers(num_tracers, mype)
