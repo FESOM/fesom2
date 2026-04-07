@@ -30,6 +30,7 @@ nm_co2_data_file      ='/albedo/work/projects/p_pool_recom/input/mesh_CORE2_fina
 enable_3zoo2det = .true.    ! Enable 3 zooplankton + 2 detritus configuration
 enable_coccos   = .true.    ! Enable coccolithophores
 enable_AWICM    = .false.   ! Enable AWICM
+enable_R2OMIP   = .false.   ! Enable R2OMIP
 /
 
 ! ============================================================================
@@ -262,9 +263,9 @@ ligandStabConst       = 100.0        ! Ligand-Fe stability constant [m³/µmol]
 &pazooplankton
 graz_max              = 0.31         ! Maximum grazing rate [1/day]
 epsilonr              = 0.09         ! Half-saturation constant [(mmol N)²/m⁶]
-res_het               = 0.028        ! Respiration + mortality [1/day]
+res_het               = 0.028        ! Respiration [1/day]
 Redfield              = 6.625        ! C:N Redfield ratio [mmol C/mmol N]
-loss_het              = 0.04         ! Extracellular N degradation [1/day]
+loss_het              = 0.04         ! The quadratic mortality rate (loss to detritus) [m3/(mmolN*day)]
 tiny_het              = 1.d-5        ! Small number for stable computation
 
 ! --- Grazing Preferences ---

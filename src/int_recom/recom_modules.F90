@@ -112,11 +112,11 @@ module recom_config
   Real(kind=8)           :: VPhaeo                = 0.d0    ! Phaeocystis
   Logical                :: allow_var_sinking     = .true.   
   Integer                :: biostep               = 1          ! Number of times biology should be stepped forward for each time step		 
-  Logical                :: REcoM_Geider_limiter  = .false.              ! Decides what routine should be used to calculate limiters in sms
-  Logical                :: REcoM_Grazing_Variable_Preference = .true.  ! Decides if grazing should have preference for phyN or DiaN
+  Logical                :: REcoM_Geider_limiter  = .false.    ! Decides what routine should be used to calculate limiters in sms
+  Logical                :: REcoM_Grazing_Variable_Preference = .true. ! Allow grazing preference to vary with food availability
   Logical                :: Grazing_detritus      = .false.    ! Decides grazing on detritus                            
   Logical                :: het_resp_noredfield   = .true.     ! Decides respiratation of copepods              
-  Logical                :: diatom_mucus          = .true.           ! Effect of nutrient limitation on the aggregation
+  Logical                :: diatom_mucus          = .true.     ! Effect of nutrient limitation on the aggregation
   Logical                :: O2dep_remin           = .true.     ! NEW O2remin Add option for O2 dependency of organic matter remineralization
   Logical                :: use_ballasting        = .true.     ! NEW BALL
   Logical                :: use_density_scaling   = .true.     ! NEW BALL
@@ -124,13 +124,13 @@ module recom_config
   Logical                :: OmegaC_diss           = .true.     ! NEW DISS Use mocsy calcite omega to compute calcite dissolution
   Logical                :: CO2lim                = .true.     ! NEW Use CO2 dependence of growth and calcification
   !Logical                :: inter_CT_CL           = .true.    ! NEW inter use interaction between CO2 and both, temperature and light
-  Logical                :: Diags                 = .true.    !!!!!!!!!!!!!!!!!!!!!!Change in recom.F90 Diagnostics -> Diags
+  Logical                :: Diags                 = .true.     !!!!!!!!!!!!!!!!!!!!!!Change in recom.F90 Diagnostics -> Diags
   Logical                :: constant_CO2          = .true.
   Logical                :: UseFeDust             = .true.     ! Turns dust input of iron off when set to.false.
   Logical                :: UseDustClim           = .true.
-  Logical                :: UseDustClimAlbani     = .true.    ! Use Albani dustclim field (If it is false Mahowald will be used)
+  Logical                :: UseDustClimAlbani     = .true.     ! Use Albani dustclim field (If it is false Mahowald will be used)
   Logical                :: use_photodamage       = .false.    ! use Alvarez et al (2018) for chlorophyll degradation
-  logical                :: HetRespFlux_plus      = .true.     !MB More stable computation of zooplankton respiration fluxes adding a small number to HetN
+  logical                :: HetRespFlux_plus      = .true.     ! MB More stable computation of zooplankton respiration fluxes adding a small number to HetN
   character(100)         :: REcoMDataPath         = '/albedo/work/projects/MarESys/ogurses/input/mesh_CORE2_finaltopo_mean/'
   logical                :: restore_alkalinity    = .true.
   logical                :: useRivers             = .false.
@@ -299,9 +299,9 @@ module recom_config
 !! *** Zooplankton ***
   Real(kind=8)                 :: graz_max      = 2.4d0           ! [mmol N/(m3 * day)] Maximum grazing loss parameter 
   Real(kind=8)                 :: epsilonr      = 0.35d0          ! [(mmol N)2 /m6] Half saturation constant for grazing loss 
-  Real(kind=8)                 :: res_het       = 0.01d0          ! [1/day] Respiration by heterotrophs and mortality (loss to detritus)
+  Real(kind=8)                 :: res_het       = 0.01d0          ! [1/day] Respiration by heterotrophs (loss to DIC)
   Real(kind=8)                 :: Redfield      = 6.625           ! [mmol C/mmol N] Redfield ratio of C:N = 106:16
-  Real(kind=8)                 :: loss_het      = 0.05d0          ! [1/day] Temperature dependent N degradation of extracellular organic N (EON)
+  Real(kind=8)                 :: loss_het      = 0.05d0          ! [m3/(mmolN*day)] The quadratic mortality rate (loss to detritus)
   Real(kind=8)                 :: pzDia         = 0.5d0           ! Maximum diatom preference
   Real(kind=8)                 :: sDiaNsq       = 0.d0
   Real(kind=8)                 :: pzPhy         = 1.0d0           ! Maximum nano-phytoplankton preference 
