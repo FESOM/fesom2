@@ -506,6 +506,7 @@ CONTAINS
       !! ** Purpose : read 3D initial conditions for tracers from netcdf and interpolate on model grid
       !!----------------------------------------------------------------------
       USE insitu2pot_interface
+      USE ieee_arithmetic
       IMPLICIT NONE
       type(t_mesh),   intent(in),    target   :: mesh
       type(t_partit), intent(inout), target   :: partit 
@@ -544,15 +545,14 @@ CONTAINS
 
       do current_tracer=1, tracers%num_tracers
          !_________________________________________________________________________
-         ! set remaining dummy values from bottom topography to 0.0_WP
-         where (tracers%data(current_tracer)%values > 0.9_WP*dummy)
-               tracers%data(current_tracer)%values=0.0_WP
-         end where
-
-         !_________________________________________________________________________
-         ! eliminate values within cavity that result from the extrapolation of 
-         ! initialisation
+         ! set remaining dummy values and NaN from interpolation to 0.0_WP
          do n=1,partit%myDim_nod2d + partit%eDim_nod2D
+            do i=1, mesh%nl-1
+               if (tracers%data(current_tracer)%values(i,n) > 0.9_WP*dummy .or. &
+                   ieee_is_nan(tracers%data(current_tracer)%values(i,n))) then
+                  tracers%data(current_tracer)%values(i,n) = 0.0_WP
+               end if
+            end do
             ! ensure cavity is zero
             if (use_cavity) tracers%data(current_tracer)%values(1:mesh%ulevels_nod2D(n)-1,n)=0.0_WP
             ! ensure bottom is zero
@@ -570,7 +570,7 @@ CONTAINS
          if (partit%mype==0) write(*,*) "converting insitu temperature to potential..."
          call insitu2pot(tracers, partit, mesh)
       end if
-      if (partit%mype==0) write(*,*) "DONE:  Initial conditions for tracers"             
+      if (partit%mype==0) write(*,*) "DONE:  Initial conditions for tracers"
       !_________________________________________________________________________
       ! check initial fields
       locTmax = -6666

@@ -158,6 +158,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
 
         !!---- Number of vertical layers
         nzmax = nlevels_nod2D(n)-1
+        if (nzmax < 1) cycle
 
         !!---- This is needed for piston velocity
         Loc_ice_conc = a_ice(n)

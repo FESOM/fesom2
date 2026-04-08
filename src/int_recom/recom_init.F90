@@ -30,6 +30,7 @@ subroutine recom_init(tracers, partit, mesh)
     use REcoM_locVar
     use recom_config
     use REcoM_ciso
+
     implicit none
 #include "netcdf.inc"
     !___________________________________________________________________________
@@ -116,7 +117,7 @@ subroutine recom_init(tracers, partit, mesh)
     RiverFe               = 0.d0
 
     ErosionTON2D          = 0.d0
-    ErosionTON2D          = 0.d0
+    ErosionTOC2D          = 0.d0
     ErosionTSi2D          = 0.d0
 
     relax_alk             = 0.d0
@@ -655,4 +656,5 @@ subroutine print_global_minmax(label, loc_min, loc_max, use_pipe)
     call MPI_AllREDUCE(loc_min , glo_min  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
     if (mype==0) write(*,*) prefix_min//'-> gobal min init. '//trim(label)//' =', glo_min
 end subroutine print_global_minmax
+
     end subroutine recom_init
