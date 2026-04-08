@@ -27,8 +27,10 @@ nm_co2_data_file      ='/albedo/work/projects/p_pool_recom/input/mesh_CORE2_fina
 ! GENERAL MODEL CONFIGURATION
 ! ============================================================================
 &parecomsetup
-enable_3zoo2det = .true.     ! Enable 3 zooplankton + 2 detritus configuration
-enable_coccos   = .false.    ! Enable coccolithophores (currently disabled)
+enable_3zoo2det = .true.    ! Enable 3 zooplankton + 2 detritus configuration
+enable_coccos   = .false.   ! Enable coccolithophores (currently disabled)
+enable_AWICM    = .false.   ! Enable AWICM
+enable_R2OMIP   = .false.   ! Enable R2OMIP
 /
 
 ! ============================================================================
@@ -49,11 +51,11 @@ sedflx_num            = 0            ! Sediment fluxes from MEDUSA (0 = use defa
 bottflx_num           = 4            ! Bottom fluxes (8 if ciso & ciso_14, 6 if not ciso_14, 4 otherwise)
 
 ! --- Sinking Velocities [m/day] ---
-VDet                  = 20.0         ! Small detritus sinking velocity (constant, positive down)
-VDet_zoo2             = 200.0        ! Large detritus sinking velocity
-VPhy                  = 0.0          ! Small phytoplankton (non-sinking)
-VDia                  = 0.0          ! Diatoms (variable sinking if allow_var_sinking=.true.)
-VCocco                = 0.0          ! Coccolithophores
+VDet                  = 20.0        ! Small detritus sinking velocity (constant, positive down)
+VDet_zoo2             = 200.0       ! Large detritus sinking velocity
+VPhy                  = 0.0         ! Small phytoplankton (non-sinking)
+VDia                  = 0.0         ! Diatoms (variable sinking if allow_var_sinking=.true.)
+VCocco                = 0.0         ! Coccolithophores
 allow_var_sinking     = .true.       ! Enable variable sinking velocity
 
 ! --- Time Stepping ---
@@ -238,9 +240,9 @@ ligandStabConst       = 100.0        ! Ligand-Fe stability constant [m³/µmol]
 &pazooplankton
 graz_max              = 0.31         ! Maximum grazing rate [1/day]
 epsilonr              = 0.09         ! Half-saturation constant [(mmol N)²/m⁶]
-res_het               = 0.028        ! Respiration + mortality [1/day]
+res_het               = 0.028        ! Respiration [1/day]
 Redfield              = 6.625        ! C:N Redfield ratio [mmol C/mmol N]
-loss_het              = 0.04         ! Extracellular N degradation [1/day]
+loss_het              = 0.04         ! The quadratic mortality rate (loss to detritus) [m3/(mmolN*day)]
 tiny_het              = 1.d-5        ! Small number for stable computation
 
 ! --- Grazing Preferences ---

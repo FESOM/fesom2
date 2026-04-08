@@ -20,7 +20,8 @@ MODULE g_ic3d
    USE g_comm_auto
    USE g_support
    USE g_config, only: dummy, ClimateDataPath, use_cavity
-   
+   USE recom_config, only: enable_3zoo2det, enable_coccos
+
    IMPLICIT NONE
 
    include 'netcdf.inc'
@@ -242,7 +243,7 @@ CONTAINS
       
       call nc_readGrid(partit)
 
-      ! prepare nearest coordinates in INfile , save to bilin_indx_i/j
+      ! prepare nearest coordinates in INfile, save to bilin_indx_i/j
       !_________________________________________________________________________
       ! cavity case
       if (use_cavity) then
@@ -606,13 +607,13 @@ CONTAINS
         locO2max  = max(locO2max,maxval(tracers%data(24)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
         locO2min  = min(locO2min,minval(tracers%data(24)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
     ! DICremin tracer (added by Sina)
-    if (use_REcoM .and. enable_3zoo2det .and. enable_coccos) then
+    if (enable_3zoo2det .and. enable_coccos) then
         locDICremax = max(locDICremax,maxval(tracers%data(39)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
         locDICremin = min(locDICremin,minval(tracers%data(39)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-    else if (use_REcoM .and. enable_coccos .and. .not. enable_3zoo2det) then
+    else if (enable_coccos .and. .not. enable_3zoo2det) then
         locDICremax = max(locDICremax,maxval(tracers%data(31)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
         locDICremin = min(locDICremin,minval(tracers%data(31)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-    else if (use_REcoM .and. enable_3zoo2det .and. .not. enable_coccos) then
+    else if (enable_3zoo2det .and. .not. enable_coccos) then
         locDICremax = max(locDICremax,maxval(tracers%data(33)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
         locDICremin = min(locDICremin,minval(tracers%data(33)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
     else 
