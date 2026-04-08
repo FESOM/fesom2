@@ -1875,6 +1875,9 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
     CASE (1032:1037) ! increased by one for DICremin (by Sina)
         bc_surface=0.0_WP  ! OG added bc for recom fields 
 
+    CASE (1038)
+        bc_surface=0.0_WP
+
     CASE (1302) ! Before (1037) ! DIC_13
 
 #if defined (__ciso)

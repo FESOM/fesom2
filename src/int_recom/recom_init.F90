@@ -761,8 +761,20 @@ subroutine recom_init(tracers, partit, mesh)
             locDFemin = min(locDFemin,minval(tracers%data(21)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
             locO2max  = max(locO2max,maxval(tracers%data(24)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
             locO2min  = min(locO2min,minval(tracers%data(24)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
-            locDICremax  = max(locDICremax,maxval(tracers%data(39)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) ) ! init DIC remin (added by Sina)
-            locDICremin  = min(locDICremin,minval(tracers%data(39)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) ) ! init DIC remin (added by Sina)
+        ! DICremin tracer (added by Sina)
+        if (enable_3zoo2det .and. enable_coccos) then
+            locDICremax = max(locDICremax,maxval(tracers%data(39)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) ) 
+            locDICremin = min(locDICremin,minval(tracers%data(39)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+        else if (enable_coccos .and. .not. enable_3zoo2det) then
+            locDICremax = max(locDICremax,maxval(tracers%data(31)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) ) 
+            locDICremin = min(locDICremin,minval(tracers%data(31)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+        else if (enable_3zoo2det .and. .not. enable_coccos) then
+            locDICremax = max(locDICremax,maxval(tracers%data(33)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+            locDICremin = min(locDICremin,minval(tracers%data(33)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+        else
+            locDICremax = max(locDICremax,maxval(tracers%data(25)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+            locDICremin = min(locDICremin,minval(tracers%data(25)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )    
+        end if
 
         end do
 

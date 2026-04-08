@@ -605,8 +605,20 @@ CONTAINS
         locDFemin = min(locDFemin,minval(tracers%data(21)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
         locO2max  = max(locO2max,maxval(tracers%data(24)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
         locO2min  = min(locO2min,minval(tracers%data(24)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-        locDICremax = max(locDICremax,maxval(tracers%data(39)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) ) ! DICremin tracer (added by Sina)
+    ! DICremin tracer (added by Sina)
+    if (use_REcoM .and. enable_3zoo2det .and. enable_coccos) then
+        locDICremax = max(locDICremax,maxval(tracers%data(39)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
         locDICremin = min(locDICremin,minval(tracers%data(39)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+    else if (use_REcoM .and. enable_coccos .and. .not. enable_3zoo2det) then
+        locDICremax = max(locDICremax,maxval(tracers%data(31)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+        locDICremin = min(locDICremin,minval(tracers%data(31)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+    else if (use_REcoM .and. enable_3zoo2det .and. .not. enable_coccos) then
+        locDICremax = max(locDICremax,maxval(tracers%data(33)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+        locDICremin = min(locDICremin,minval(tracers%data(33)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+    else 
+        locDICremax = max(locDICremax,maxval(tracers%data(25)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+        locDICremin = min(locDICremin,minval(tracers%data(25)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+    end if
 #endif
       end do
       call MPI_AllREDUCE(locTmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
