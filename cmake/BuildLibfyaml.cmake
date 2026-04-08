@@ -46,7 +46,7 @@ ExternalProject_Add(libfyaml-external
     BUILD_COMMAND make -j${CMAKE_BUILD_PARALLEL_LEVEL} -C src libfyaml.la
     BUILD_IN_SOURCE ON
     BUILD_BYPRODUCTS ${LIBFYAML_INSTALL_PREFIX}/lib/libfyaml.so
-    INSTALL_COMMAND make -C src install-libLTLIBRARIES install-includeHEADERS && make install-pkgconfigDATA
+    INSTALL_COMMAND make -C src install-libLTLIBRARIES install-includeHEADERS install-libfyamlHEADERS && make install-pkgconfigDATA
     LOG_DOWNLOAD OFF
     LOG_CONFIGURE OFF
     LOG_BUILD OFF
