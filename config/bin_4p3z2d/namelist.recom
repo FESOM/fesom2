@@ -43,9 +43,9 @@ REcoM_restart         = .true.
 recom_debug           = .false.
 
 ! --- Tracer Configuration ---
-bgc_num               = 36           ! Total number of BGC tracers
+bgc_num               = 38           ! Total number of BGC tracers
 diags3d_num           = 31           ! Number of diagnostic 3D tracers
-bgc_base_num          = 22           ! Number of standard tracers
+bgc_base_num          = 23           ! Number of standard tracers
 benthos_num           = 4            ! Number of benthic BGC tracers (8 if ciso=.true., else 4)
 sedflx_num            = 0            ! Sediment fluxes from MEDUSA (0 = use defaults)
 bottflx_num           = 4            ! Bottom fluxes (8 if ciso & ciso_14, 6 if not ciso_14, 4 otherwise)
