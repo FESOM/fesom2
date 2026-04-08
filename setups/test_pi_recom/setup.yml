@@ -135,11 +135,7 @@ namelist.io:
                 freq: 1
                 unit: d
                 prec: 8
-            "DIN       ":
-                freq: 1
-                unit: d
-                prec: 8
-            "DIC       ":
+            "otracers  ":
                 freq: 1
                 unit: d
                 prec: 8
@@ -151,5 +147,5 @@ fcheck:
     temp: 2.470427869759253
     u: -0.0016324243978025638
     v: -5.3040445705995874e-05
-    DIN: 15.0
-    DIC: 2100.0
+    DIN: 20.250062071295385
+    DIC: 2197.053774584202
