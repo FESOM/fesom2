@@ -2009,106 +2009,160 @@ end subroutine
 ! file. In case of 3data write horizontal slices level wise.
 subroutine write_mean(entry, entry_index)
     use mod_mesh
-    use io_gather_module
+    use io_gather_module, only: rank0Dim_nod2D, rank0List_nod2D, rank0Dim_elem2D, rank0List_elem2D
     implicit none
     type(Meandata), intent(inout) :: entry
     integer, intent(in) :: entry_index
-    integer tag
-    integer                       :: i, size1, size2, size_gen, size_lev, order
-    integer                       :: c, lev
-    real(kind=8)                  :: t0,t1
-    integer mpierr
+    integer                       :: size1, size2, lev, r, sp, cnt
+    integer                       :: my_npes, my_mype, my_root
+    integer                       :: mpierr, total_recv
+    ! MPI_Gatherv parameters (built once, used for all levels)
+    integer, allocatable          :: gv_rcnt(:), gv_disp(:)
+    ! Partition index pointers (node-based or element-based)
+    integer, pointer              :: remPtr(:), remList(:), myList(:), r0List(:)
+    integer                       :: myDim, r0Dim
+    ! Gather + global accumulation buffers
+    real(real64), allocatable     :: sbuf_r8(:), rbuf_r8(:), glob_r8(:,:)
+    real(real32), allocatable     :: sbuf_r4(:), rbuf_r4(:), glob_r4(:,:)
 
-    ! Serial output implemented so far
+    my_npes = entry%p_partit%npes
+    my_mype = entry%p_partit%mype
+    my_root = entry%root_rank
+
     !___________________________________________________________________________
     ! write new time index ctime_copy to file --> expand time array in nc file
-    if (entry%p_partit%mype==entry%root_rank) then
+    if (my_mype == my_root) then
         write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count
         call assert_nf( nf90_put_var(entry%ncid, entry%Tid, entry%ctime_copy, start = (/entry%rec_count/) ), __LINE__)
     end if
-  
+
     !_______writing 2D and 3D fields____________________________________________
-    size1=entry%glsize(1)
-    size2=entry%glsize(2)
-    tag = 2 ! we can use a fixed tag here as we have an individual communicator for each output field
-    
+    size1 = entry%glsize(1)  ! number of vertical levels (1 for 2D variables)
+    size2 = entry%glsize(2)  ! global number of nodes or elements
+
+    !___________________________________________________________________________
+    ! Set up partition index arrays (node-based vs element-based)
+    if(.not. entry%is_elem_based) then
+        remPtr  => entry%p_partit%remPtr_nod2D
+        remList => entry%p_partit%remList_nod2D
+        myList  => entry%p_partit%myList_nod2D
+        myDim   =  entry%p_partit%myDim_nod2D
+        r0Dim   =  rank0Dim_nod2D
+        r0List  => rank0List_nod2D
+    else
+        remPtr  => entry%p_partit%remPtr_elem2D
+        remList => entry%p_partit%remList_elem2D
+        myList  => entry%p_partit%myList_elem2D
+        myDim   =  entry%p_partit%myDim_elem2D
+        r0Dim   =  rank0Dim_elem2D
+        r0List  => rank0List_elem2D
+    end if
+
+    !___________________________________________________________________________
+    ! Build MPI_Gatherv parameters: per-rank receive counts and displacements.
+    ! This replaces the hand-rolled MPI_Irecv/Send pattern with a single
+    ! tree-based collective per level (O(log P) instead of O(P) messages).
+    allocate(gv_rcnt(my_npes), gv_disp(my_npes))
+    gv_rcnt(1) = r0Dim  ! rank 0's node/element count
+    do r = 1, my_npes-1
+        gv_rcnt(r+1) = remPtr(r+1) - remPtr(r)
+    end do
+    gv_disp(1) = 0
+    do r = 1, my_npes-1
+        gv_disp(r+1) = gv_disp(r) + gv_rcnt(r)
+    end do
+
     !___________writing 8 byte real_____________________________________________
     if (entry%accuracy == i_real8) then
-        
-        !_______________________________________________________________________
-        ! allocate global 2d array in which local data are gathered
-        if(entry%p_partit%mype==entry%root_rank) then
-            if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(size2))
+        allocate(sbuf_r8(myDim))
+        if(my_mype == my_root) then
+            total_recv = gv_disp(my_npes) + gv_rcnt(my_npes)
+            allocate(rbuf_r8(total_recv))
+            allocate(glob_r8(size2, size1))
         else
-            if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(1))
+            allocate(rbuf_r8(1))  ! dummy, unused on non-root
         end if
-        
-        !_______________________________________________________________________
-        ! loop over vertical layers --> do gather 3d variables layerwise in 2d
-        ! slices
-        do lev=1, size1
-            !___________________________________________________________________
-            ! local output variables are gahtered in 2d shaped entry%aux_r8 
-            ! either for vertices or elements
-            if(.not. entry%is_elem_based) then
-                call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
-            else
-                call gather_elem2D(entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
-            end if
-            
-            !___________________________________________________________________
-            ! use root_rank CPU/Task to write 2d slice into netcdf file for 3d 
-            ! variables into specific layer position lev
-            if (entry%p_partit%mype==entry%root_rank) then
-                if (entry%ndim==1) then
-                    call assert_nf( nf90_put_var(entry%ncid, entry%varID, entry%aux_r8, start=(/1, entry%rec_count/), count=(/size2, 1/)), __LINE__)
-                elseif (entry%ndim==2) then
-                    call assert_nf( nf90_put_var(entry%ncid, entry%varID, entry%aux_r8, start=(/1, lev, entry%rec_count/), count=(/size2, 1, 1/)), __LINE__)
-                end if
-            end if
-        end do ! --> do lev=1, size1
 
-    !___________writing 4 byte real ____________________________________________ 
-    else if (entry%accuracy == i_real4) then
-    
-        !_______________________________________________________________________
-        ! allocate global 2d array in which local data are gathered
-        if(entry%p_partit%mype==entry%root_rank) then
-            if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(size2))
-        else
-            if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(1))
-        end if
-        
-        !_______________________________________________________________________
-        ! loop over vertical layers --> do gather 3d variables layerwise in 2d
-        ! slices
-        do lev=1, size1
-            !PS if (entry%p_partit%mype==entry%root_rank) t0=MPI_Wtime()  
-            !___________________________________________________________________
-            ! local output variables are gahtered in 2d shaped entry%aux_r8 
-            ! either for vertices or elements
-            if(.not. entry%is_elem_based) then
-                call gather_real4_nod2D (entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
+        ! Gather all levels into glob_r8 using MPI_Gatherv per level
+        do lev = 1, size1
+            sbuf_r8(1:myDim) = entry%local_values_r8_copy(lev, 1:myDim)
+            call MPI_Gatherv(sbuf_r8, myDim, MPI_DOUBLE_PRECISION, &
+                             rbuf_r8, gv_rcnt, gv_disp, MPI_DOUBLE_PRECISION, &
+                             my_root, entry%comm, mpierr)
+            ! Reorder from rank-packed receive buffer into global index order
+            if(my_mype == my_root) then
+                do r = 0, my_npes-1
+                    sp  = gv_disp(r+1) + 1
+                    cnt = gv_rcnt(r+1)
+                    if(r == my_root) then
+                        glob_r8(myList(1:cnt), lev) = rbuf_r8(sp:sp+cnt-1)
+                    else if(r == 0) then
+                        glob_r8(r0List(1:cnt), lev) = rbuf_r8(sp:sp+cnt-1)
+                    else
+                        glob_r8(remList(remPtr(r):remPtr(r+1)-1), lev) = rbuf_r8(sp:sp+cnt-1)
+                    end if
+                end do
+            end if
+        end do
+
+        ! Single batched NetCDF write for all levels
+        if(my_mype == my_root) then
+            if(entry%ndim == 1) then
+                call assert_nf( nf90_put_var(entry%ncid, entry%varID, glob_r8(:,1), &
+                    start=(/1, entry%rec_count/), count=(/size2, 1/)), __LINE__)
             else
-                call gather_real4_elem2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
+                call assert_nf( nf90_put_var(entry%ncid, entry%varID, glob_r8, &
+                    start=(/1, 1, entry%rec_count/), count=(/size2, size1, 1/)), __LINE__)
             end if
-            
-            !___________________________________________________________________
-            ! use root_rank CPU/Task to write 2d slice into netcdf file for 3d 
-            ! variables into specific layer position lev
-            if (entry%p_partit%mype==entry%root_rank) then
-                if (entry%ndim==1) then
-                    call assert_nf( nf90_put_var(entry%ncid, entry%varID, entry%aux_r4, start=(/1, entry%rec_count/), count=(/size2, 1/)), __LINE__)
-                    !PS t1=MPI_Wtime()  
-                    !PS if (entry%p_partit%flag_debug)  print *, achar(27)//'[31m'//' -I/O-> after nf90_put_var'//achar(27)//'[0m', entry%p_partit%mype, t1-t0
-                elseif (entry%ndim==2) then
-                    call assert_nf( nf90_put_var(entry%ncid, entry%varID, entry%aux_r4, start=(/1, lev, entry%rec_count/), count=(/size2, 1, 1/)), __LINE__)
-                    !PS t1=MPI_Wtime()  
-                    !PS if (entry%p_partit%flag_debug)  print *, achar(27)//'[31m'//' -I/O-> after nf90_put_var'//achar(27)//'[0m', entry%p_partit%mype, lev, t1-t0
-                end if
+        end if
+        deallocate(sbuf_r8, rbuf_r8)
+        if(allocated(glob_r8)) deallocate(glob_r8)
+
+    !___________writing 4 byte real ____________________________________________
+    else if (entry%accuracy == i_real4) then
+        allocate(sbuf_r4(myDim))
+        if(my_mype == my_root) then
+            total_recv = gv_disp(my_npes) + gv_rcnt(my_npes)
+            allocate(rbuf_r4(total_recv))
+            allocate(glob_r4(size2, size1))
+        else
+            allocate(rbuf_r4(1))
+        end if
+
+        do lev = 1, size1
+            sbuf_r4(1:myDim) = entry%local_values_r4_copy(lev, 1:myDim)
+            call MPI_Gatherv(sbuf_r4, myDim, MPI_REAL, &
+                             rbuf_r4, gv_rcnt, gv_disp, MPI_REAL, &
+                             my_root, entry%comm, mpierr)
+            if(my_mype == my_root) then
+                do r = 0, my_npes-1
+                    sp  = gv_disp(r+1) + 1
+                    cnt = gv_rcnt(r+1)
+                    if(r == my_root) then
+                        glob_r4(myList(1:cnt), lev) = rbuf_r4(sp:sp+cnt-1)
+                    else if(r == 0) then
+                        glob_r4(r0List(1:cnt), lev) = rbuf_r4(sp:sp+cnt-1)
+                    else
+                        glob_r4(remList(remPtr(r):remPtr(r+1)-1), lev) = rbuf_r4(sp:sp+cnt-1)
+                    end if
+                end do
             end if
-        end do ! --> do lev=1, size1
+        end do
+
+        if(my_mype == my_root) then
+            if(entry%ndim == 1) then
+                call assert_nf( nf90_put_var(entry%ncid, entry%varID, glob_r4(:,1), &
+                    start=(/1, entry%rec_count/), count=(/size2, 1/)), __LINE__)
+            else
+                call assert_nf( nf90_put_var(entry%ncid, entry%varID, glob_r4, &
+                    start=(/1, 1, entry%rec_count/), count=(/size2, size1, 1/)), __LINE__)
+            end if
+        end if
+        deallocate(sbuf_r4, rbuf_r4)
+        if(allocated(glob_r4)) deallocate(glob_r4)
     end if ! --> if (entry%accuracy == i_real8) then
+
+    deallocate(gv_rcnt, gv_disp)
 end subroutine
 !
 !
@@ -2573,10 +2627,8 @@ subroutine do_output_callback(entry_index)
     ! synchronize after writes:
     ! To minimize data loss in case of abnormal termination, or To make data 
     ! available to other processes for reading immediately after it is written. 
-    if(entry%p_partit%mype == entry%root_rank) then 
-        !PS if (entry%p_partit%flag_debug)  print *, achar(27)//'[31m'//' -I/O-> call nf_sync'//achar(27)//'[0m', entry%p_partit%mype
-        call assert_nf( nf90_sync(entry%ncid), __LINE__ ) ! flush the file to disk after each write
-    end if   
+    ! nf90_sync removed: redundant disk flush since nf90_close in finalize_output
+    ! already flushes all data. Removing this avoids a costly fsync per variable.
     
 end subroutine
 !
