@@ -1011,12 +1011,14 @@ nl              => mesh%nl
     allocate(density_ref(nl-1,node_size))
     density_ref = density_0
     allocate(density_m_rho0(nl-1, node_size))
+    allocate(density_sigma0(nl-1, node_size))
     allocate(density_m_rho0_slev(nl-1, node_size)) !!PS
     if (ldiag_dMOC) then
        allocate(density_dMOC       (nl-1, node_size))
     end if
     allocate(pgf_x(nl-1, elem_size),pgf_y(nl-1, elem_size)) 
     density_m_rho0=0.0_WP
+    density_sigma0=0.0_WP
     density_m_rho0_slev=0.0_WP !!PS
     if (ldiag_dMOC) then
        density_dMOC       =0.0_WP

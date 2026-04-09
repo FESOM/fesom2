@@ -300,7 +300,6 @@ subroutine pressure_bv(tracers, partit, mesh)
         !_______________________________________________________________________
         ! calculate density for MOC
         if (ldiag_dMOC) then
-            !!PS do nz=1, nl1
             do nz=nzmin, nzmax-1
                 rho(nz)              = bulk_0(nz) - 2000._WP*(bulk_pz(nz)   -2000._WP*bulk_pz2(nz))
                 density_dmoc(nz,node)= rho(nz)*rhopot(nz)/(rho(nz)-200._WP*real(state_equation))
@@ -310,14 +309,16 @@ subroutine pressure_bv(tracers, partit, mesh)
 
         !_______________________________________________________________________
         ! compute density for PGF
-        !!PS do nz=1, nl1
         do nz=nzmin, nzmax-1
             !___________________________________________________________________
+            ! compute institu-density at each depth layer (includes Temperature 
+            ! effects, Salinity effects, Pressure/compression effects 
             rho(nz) = bulk_0(nz) + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
             !!PS rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node))-density_0
             rho(nz) = rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node)*real(state_equation))-density_ref(nz,node)
             density_m_rho0(nz,node) = rho(nz)
-
+            density_sigma0(nz,node) = rhopot(nz)-density_ref(nz,node)
+            
             !___________________________________________________________________
             ! buoyancy difference between the surface and the grid points blow (adopted from FESOM 1.4)
             ! --> bring density of surface point adiabatically to the same
@@ -358,9 +359,12 @@ subroutine pressure_bv(tracers, partit, mesh)
                         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
                 end select
                 !_______________________________________________________________
+                ! compute institu-density in cavity at each depth layer (includes
+                ! Temperature effects, Salinity effects, Pressure/compression effects 
                 rho(nz)= bulk_0(nz)   + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
                 rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node)*real(state_equation))-density_ref(nz,node)
                 density_m_rho0(nz,node) = rho(nz)
+                density_sigma0(nz,node) = rhopot(nz)-density_ref(nz,node)
             end do
         end if
 
@@ -2563,6 +2567,46 @@ end subroutine pressure_force_4_zxxxx_easypgf
 !
 !
 !===============================================================================
+! Computes in-situ density anomaly at a specified pressure/depth using the 
+! Jackett-McDougall equation of state. This is a convenience wrapper that 
+! combines densityJM_components with the Taylor expansion in a single call.
+!
+! INPUT:
+!   t          - in-situ temperature (°C)
+!   s          - salinity (psu)
+!   pz         - depth (m, negative) OR pressure (dbar, positive)
+!                The sign convention depends on usage context
+!   partit     - partition structure
+!   mesh       - mesh structure
+!
+! OUTPUT:
+!   rho_out    - in-situ density anomaly: ρ_insitu - ρ₀, kg/m³
+!                where ρ₀ = 1000 kg/m³ (density_0)
+!
+! ALGORITHM:
+!   1. Call densityJM_components to get EOS components:
+!      bulk_0, bulk_pz, bulk_pz2, rhopot
+!
+!   2. Apply Taylor expansion for pressure/depth effects:
+!      bulk = bulk_0 + pz·(bulk_pz + pz·bulk_pz2)
+!
+!   3. Apply compressibility correction:
+!      ρ_insitu = bulk·rhopot / (bulk + 0.1·pz)
+!      
+!      The 0.1 factor converts depth [m] to pressure [dbar]: P ≈ 0.1·|z|
+!
+!   4. Subtract reference density (1000 kg/m³) to get anomaly:
+!      rho_out = ρ_insitu - 1000
+!
+! USE CASE:
+!   This routine is useful when you need in-situ density at a single point
+!   without storing intermediate EOS components. For bulk calculations over
+!   the entire domain, use densityJM_components directly (more efficient).
+!
+! NOTE:
+!   - Returns density ANOMALY (minus 1000 kg/m³), not absolute density
+!   - Includes full pressure/compressibility effects → in-situ density
+!   - Different from potential density (which has no pressure effects)
 SUBROUTINE densityJM_local(t, s, pz, rho_out, partit, mesh)
 USE MOD_MESH
 USE MOD_PARTIT
@@ -2602,6 +2646,51 @@ end subroutine densityJM_local
 !
 !
 !===============================================================================
+! Computes components of the Jackett-McDougall equation of state for seawater.
+! This split-form approach separates density into surface density and pressure
+! derivatives, enabling efficient computation of both potential and in-situ 
+! density from a single EOS call.
+!
+! INPUT:
+!   t          - in-situ temperature (°C)
+!   s          - salinity (psu)
+!
+! OUTPUT:
+!   bulk_0     - density at surface pressure (P=0 dbar), kg/m³
+!                This is approximately the potential density ρ₀(T,S,P=0)
+!   bulk_pz    - first derivative of density w.r.t. pressure: ∂ρ/∂P, kg/m³/dbar
+!   bulk_pz2   - second derivative of density w.r.t. pressure: ∂²ρ/∂P², kg/m³/dbar²
+!   rhopot     - potential density referenced to surface (σ₀), kg/m³
+!
+! USAGE - Computing In-Situ Density:
+!   In-situ density at depth z (negative, in meters) is computed via Taylor 
+!   expansion around surface pressure:
+!
+!   ρ_insitu(z) = bulk_0 + z·(bulk_pz + z·bulk_pz2)
+!
+!   This accounts for compressibility: water gets denser with increasing pressure.
+!   A compressibility correction is then applied:
+!
+!   ρ_insitu(z) = ρ_insitu·rhopot / (ρ_insitu + 0.1·z·state_eq)
+!
+!   The factor 0.1 is a UNIT CONVERSION from depth [m] to pressure [dbar]:
+!     P [dbar] ≈ 0.1 × |z| [m]
+!   Example: at z = -2000 m → P ≈ 200 dbar
+!   This ensures the pressure-dependent correction term has correct units, since
+!   bulk_pz and bulk_pz2 are derivatives w.r.t. pressure in decibars.
+!
+!   Finally, subtract reference density to get density anomaly:
+!
+!   density_m_rho0(z) = ρ_insitu(z) - density_ref(z)
+!
+! WHY SPLIT FORM?
+!   - Efficient: One EOS call provides both potential and in-situ density
+!   - Accurate: Taylor expansion reduces pressure gradient errors
+!   - Flexible: Can compute density at any depth without repeated EOS calls
+!
+! NOTE: 
+!   - Potential density (rhopot) has NO pressure effects → water mass properties
+!   - In-situ density includes pressure → used for dynamics and PGF calculations
 SUBROUTINE densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot)
 USE MOD_PARSUP !, only: par_ex,pe_status
 USE o_ARRAYS
@@ -2619,6 +2708,7 @@ IMPLICIT NONE
   !---------------------------------------------------------------------------
   ! N. Rakowski 2014 the split form
   !---------------------------------------------------------------------------
+  
   real(kind=WP),  intent(IN)            :: t,s
   real(kind=WP),  intent(OUT)           :: bulk_0, bulk_pz, bulk_pz2, rhopot
   real(kind=WP)                         :: s_sqrt
