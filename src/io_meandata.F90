@@ -1295,8 +1295,10 @@ CASE ('otracers  ')
 
     end do
 
-CASE ('sigma0      ')
-    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'sigma0',      'potential density',    'kg/m3',    density_m_rho0(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('dens_insitu')
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'dens_insitu',      'In-situ density anomaly',    'kg/m3',    density_m_rho0(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('dens_sigma0')
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'dens_sigma0',      'Potential density anomaly with respect to srf.',    'kg/m3',    density_sigma0(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 
 !---wiso-code
 !___________________________________________________________________________________________________________________________________
