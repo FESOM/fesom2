@@ -768,7 +768,7 @@ contains
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("restart")
 #endif
-        call write_initial_conditions(n, nstart, f%total_nsteps, f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        call write_initial_conditions(n, nstart, ntotal, f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("restart")
 #endif
