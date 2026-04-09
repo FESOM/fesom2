@@ -56,10 +56,10 @@ subroutine iceberg_calculation(ice, mesh, partit, dynamics, istep)
  logical	:: firstcall=.true. 					!=
  logical	:: lastsubstep  					!=
 
- real		:: arr_from_block(15)					!=
+ real		:: arr_from_block(17)					!=
  integer	:: elem_from_block					!=  
  real		:: vl_from_block(4)					!=	
- real,dimension(15*ib_num):: arr_block_red				!=
+ real,dimension(17*ib_num):: arr_block_red				!=
  integer,dimension(ib_num):: elem_block_red				!=
  integer,dimension(ib_num):: pe_block_red				!=
  integer    :: n
@@ -136,7 +136,7 @@ type(t_dyn)   , intent(inout), target :: dynamics
  
  !========================== COMMUNICATION =============================!
 
- !all PEs need the array arr(15) and the iceberg element
+ !all PEs need the array arr(17) and the iceberg element
  !in step2
  !ALLREDUCE: arr_block, elem_block
  
@@ -146,7 +146,7 @@ type(t_dyn)   , intent(inout), target :: dynamics
  vl_block_red = 0.0
 
 !$omp critical 
- call MPI_IAllREDUCE(arr_block, arr_block_red, 15*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM_IB, req, partit%MPIERR_IB)
+ call MPI_IAllREDUCE(arr_block, arr_block_red, 17*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM_IB, req, partit%MPIERR_IB)
 !$omp end critical
 
  completed = .false.
@@ -210,10 +210,10 @@ completed = .false.
 
  do ib=1, ib_num
 
-  !get the smaller array arr(15) and 
+  !get the smaller array arr(17) and 
   !the iceberg element for iceberg ib
   !as before
-  arr_from_block = arr_block_red( (ib-1)*15+1 : ib*15)
+  arr_from_block = arr_block_red( (ib-1)*17+1 : ib*17)
   elem_from_block= elem_block_red(ib)
   !averaged volume losses
   vl_from_block = vl_block_red( (ib-1)*4+1 : ib*4)
@@ -339,7 +339,7 @@ use iceberg_params, only: length_ib, width_ib, scaling, elem_block, elem_area_gl
  logical			:: l_output
  							
  !MPI											
- real	   			:: arr(15)						!=
+ real	   			:: arr(17)						!=
  logical   			:: i_have_element					!=
  real	   			:: left_mype						!=
  integer   			:: old_element						!=
@@ -596,11 +596,15 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
   !###########################################
  
   !values for communication
-  arr= (/ height_ib_single,length_ib_single,width_ib_single, u_ib,v_ib, lon_rad,lat_rad, &
-          left_mype, old_lon,old_lat, frozen_in, dudt, dvdt, P_ib, conci_ib/) 
+  ! DEBUG: Check what f_u_ib_old value goes into arr(16)
+  !write(*,*) 'STEP1 DEBUG: ib=', ib, ' f_u_ib_old AFTER dyn=', f_u_ib_old, ' f_v_ib_old=', f_v_ib_old
+  
+  arr= (/ height_ib_single,length_ib_single,width_ib_single, new_u_ib,new_v_ib, lon_rad,lat_rad, &
+          left_mype, old_lon,old_lat, frozen_in, dudt, dvdt, P_ib, conci_ib, &
+          f_u_ib_old, f_v_ib_old/) 
 
   !save in larger array	  
-  arr_block((ib-1)*15+1 : ib*15)=arr
+  arr_block((ib-1)*17+1 : ib*17)=arr
   elem_block(ib)=iceberg_elem
   pe_block(ib)=mype
 
@@ -647,7 +651,7 @@ use iceberg_params, only: length_ib, width_ib, scaling !smallestvol_icb, arr_blo
  												!=
  implicit none											!=
  
- real, 	  intent(in)	:: arr(15)
+ real, 	  intent(in)	:: arr(17)
  integer, intent(in)	:: elem_from_block
  integer, intent(in)	:: ib
  real,    intent(inout)	:: height_ib_single, length_ib_single, width_ib_single
@@ -746,7 +750,16 @@ type(t_partit), intent(inout), target :: partit
  dudt	  = arr(12)
  dvdt	  = arr(13)
  P_ib	  = arr(14)
- conci_ib = arr(15) 
+ conci_ib = arr(15)
+
+! DEBUG: Check what value is coming from communication
+!if (abs(arr(16)) > 1.0e-10 .or. abs(arr(17)) > 1.0e-10) then
+!  write(*,*) 'STEP2 DEBUG: ib=', ib, ' arr(16)=', arr(16), ' arr(17)=', arr(17)
+!  write(*,*) 'STEP2 DEBUG: f_u_ib_old BEFORE=', f_u_ib_old, ' f_v_ib_old BEFORE=', f_v_ib_old
+!end if
+
+f_u_ib_old = arr(16)
+f_v_ib_old = arr(17)
 
  !**** check if iceberg melted in step 1 ****! 
  volume_ib = height_ib_single * length_ib_single * width_ib_single ! * rho_icb

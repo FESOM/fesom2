@@ -232,6 +232,40 @@ arr_S_ave_ib = 0.0
       
  new_u_ib = (1-frozen_in) * new_u_ib + frozen_in * ui_ib
  new_v_ib = (1-frozen_in) * new_v_ib + frozen_in * vi_ib
+
+ ! Cap iceberg velocity to prevent unrealistic speeds
+ normnew = sqrt(new_u_ib**2 + new_v_ib**2)
+ if (normnew > maxspeed_icb) then
+   ! DIAGNOSTIC OUTPUT: Print all components when spike detected
+   !write(*,*) '======== VELOCITY SPIKE DETECTED ========'
+   !write(*,*) 'Iceberg:', ib, ' Speed:', normnew, ' m/s'
+   !write(*,*) 'Enforce maxspeed_icb:', maxspeed_icb, ' m/s'
+   !write(*,*) '--- Input velocities ---'
+   !write(*,*) '  u_ib, v_ib (iceberg):', u_ib, v_ib
+   !write(*,*) '  uo_ib, vo_ib (ocean):', uo_ib, vo_ib
+   !write(*,*) '  ua_ib, va_ib (atm)  :', ua_ib, va_ib
+   !write(*,*) '  ui_ib, vi_ib (ice)  :', ui_ib, vi_ib
+   !write(*,*) '--- Accelerations ---'
+   !write(*,*) '  au_ib, av_ib:', au_ib, av_ib
+   !write(*,*) '  dt_ib:', dt_ib
+   !write(*,*) '--- New velocity (before cap) ---'
+   !write(*,*) '  new_u_ib, new_v_ib:', new_u_ib, new_v_ib
+   !write(*,*) '--- Other parameters ---'
+   !write(*,*) '  mass_ib:', mass_ib
+   !write(*,*) '  fcoriolis:', fcoriolis
+   !write(*,*) '  f_u_ib_old, f_v_ib_old:', f_u_ib_old, f_v_ib_old
+   !write(*,*) '  frozen_in:', frozen_in
+   !write(*,*) '  conci_ib (ice conc):', conci_ib
+   !write(*,*) '  iceberg_elem:', iceberg_elem
+   
+   new_u_ib = new_u_ib * maxspeed_icb / normnew
+   new_v_ib = new_v_ib * maxspeed_icb / normnew
+
+   !write(*,*) '--- New velocity (after cap) ---'
+   !write(*,*) '  new_u_ib, new_v_ib:', new_u_ib, new_v_ib
+   !write(*,*) '  Speed:', sqrt(new_u_ib**2 + new_v_ib**2), ' m/s'
+   !write(*,*) '=========================================='
+ end if
  
 end subroutine iceberg_dyn
 
@@ -472,6 +506,10 @@ type(t_dyn)   , intent(inout), target :: dynamics
 	    + surface_slope_v  &
 	    - (1.-semiimplicit_coeff)*fcoriolis*u_ib
   end if
+  
+  !save f*velocity for A.B. scheme (needed even in semi-implicit for consistent state)
+  f_u_ib_old=fcoriolis*u_ib
+  f_v_ib_old=fcoriolis*v_ib
   
  else !USE ADAMS-BASHFORTH SCHEME for coriolis
   oneminus_AB= 1. - AB_coeff

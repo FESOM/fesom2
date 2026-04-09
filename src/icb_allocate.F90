@@ -128,7 +128,7 @@ type(t_mesh), intent(in), target :: mesh
   hfb_flux_ib = 0.0
   hfbv_flux_ib = 0.0
   lhfb_flux_ib = 0.0
-  allocate(arr_block(15*ib_num))
+  allocate(arr_block(17*ib_num))
   allocate(elem_block(ib_num))
   allocate(pe_block(ib_num))
 
