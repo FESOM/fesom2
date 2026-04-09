@@ -5755,6 +5755,14 @@ real(kind=8) :: &
             ! Note: redO2C converts carbon-based rates to oxygen equivalents
             !       using the Redfield ratio (typically ~170/122 = 1.39 mol O2/mol C)
 
+            !===============================================================================
+            ! 37. DIC remineralzation tracer to track remineralization as an diagnostics
+            !===============================================================================
+            !   idicremin       : Tracer for remineralization diagnostics (added by Sina)
+            sms(k,idicremin) = (                  &
+                + rho_c1 * arrFunc * O2Func * EOC &
+                ) * dt_b + sms(k,idicremin)
+
             if (ciso) then
 
                 !===========================================================================
@@ -7214,16 +7222,6 @@ real(kind=8) :: &
             endif ! Diags
 
         end do ! Main vertikal loop ends
-
-
-        !===============================================================================
-        ! 37. DIC remineralzation tracer to track remineralization as an diagnostics
-        !===============================================================================
-        !   idicremin       : Tracer for remineralization diagnostics (added by Sina)
-        sms(k,idicremin) = (                  &
-            + rho_c1 * arrFunc * O2Func * EOC &
-            ) * dt_b + sms(k,idicremin)
-
 
         !===============================================================================
         ! BENTHIC REMINERALIZATION
