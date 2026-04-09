@@ -1939,67 +1939,81 @@ endif
                 !if (mype == 0) write(*,*) 'Sanity-checking R2OMIP river variables...'
                 call log_river_sanity_start(mype)
 
-                call load_river_variable(ncid, 'DIC',  RiverDIN2D, partit, mesh)
-                call river_sanity_check (RiverDIN2D,   'DIC',   partit)
+                call load_river_variable(ncid, 'DIC', RiverDIC2D, partit, mesh)
+                locmax = maxval(RiverDIC2D)
+                locmin = minval(RiverDIC2D)
+                call river_sanity_check (locmax, locmin, 'DIC', partit, mesh)
+                !call river_sanity_check (RiverDIC2D,  'DIC', partit, mesh)
 
-                call load_river_variable(ncid, 'DIN',  RiverDIN2D, partit, mesh)
-                call river_sanity_check (RiverDIN2D,   'DIN',   partit)
+                call load_river_variable(ncid, 'DIN', RiverDIN2D, partit, mesh)
+                locmax = maxval(RiverDIN2D)
+                locmin = minval(RiverDIN2D)
+                call river_sanity_check (locmax, locmin, 'DIN', partit, mesh)
+                !call river_sanity_check (RiverDIN2D,  'DIN', partit, mesh)
 
-                call load_river_variable(ncid, 'DOC_l',  RiverDOCl2D,  partit, mesh)
-                call river_sanity_check (RiverDOCl2D,  'DOC_l',  partit)
+                call load_river_variable(ncid, 'DOC_l', RiverDOCl2D,  partit, mesh)
+                locmax = maxval(RiverDOCl2D)
+                locmin = minval(RiverDOCl2D)
+                call river_sanity_check (locmax, locmin, 'DOC_l', partit, mesh)
+                !call river_sanity_check (RiverDOCl2D, 'DOC_l', partit, mesh)
 
                 call load_river_variable(ncid, 'DOC_sl', RiverDOCsl2D, partit, mesh)
-                call river_sanity_check (RiverDOCsl2D, 'DOC_sl', partit)
+                locmax = maxval(RiverDOCsl2D)
+                locmin = minval(RiverDOCsl2D)
+                call river_sanity_check (locmax, locmin, 'DOC_sl', partit, mesh)
+                !call river_sanity_check (RiverDOCsl2D, 'DOC_sl', partit, mesh)
  
-                call load_river_variable(ncid, 'POC',    RiverPOC2D,   partit, mesh)
-                call river_sanity_check (RiverPOC2D,   'POC',   partit)
+                call load_river_variable(ncid, 'POC', RiverPOC2D, partit, mesh)
+                locmax = maxval(RiverPOC2D)
+                locmin = minval(RiverPOC2D)
+                call river_sanity_check (locmax, locmin, 'POC', partit, mesh)
+                !call river_sanity_check (RiverPOC2D, 'POC', partit, mesh)
 
                 !--- Close the file (rank 0 only; others never opened it) ---
                 if (mype == 0) status = nf90_close(ncid)
 
             end if ! mstep == 1
 
-            !---------------------------------------------------------------------
-            ! PATHWAY 2: Standard monthly river inputs
-            !---------------------------------------------------------------------
-            else
+        !---------------------------------------------------------------------
+        ! PATHWAY 2: Standard monthly river inputs
+        !---------------------------------------------------------------------
+        else
  
-                if (update_monthly_flag) then
+            if (update_monthly_flag) then
  
-                    !--- Compute the correct month index with year-end wrap-around ---
-                    ! At mstep == 1 the month index is used as-is; thereafter it is
-                    ! incremented by 1 to advance to the next calendar month.
-                    i = month
-                    if (mstep > 1) i = i + 1
-                    if (i > 12)    i = 1
+                !--- Compute the correct month index with year-end wrap-around ---
+                ! At mstep == 1 the month index is used as-is; thereafter it is
+                ! incremented by 1 to advance to the next calendar month.
+                i = month
+                if (mstep > 1) i = i + 1
+                if (i > 12)    i = 1
 
-                    filename = trim(nm_river_data_file)
-                    !if (mype == 0) then
-                    !    write(*,'(A,I2,2A)') 'Updating riverine data for month ', i, &
-                    !                         ' from ', trim(filename)
-                    !end if
-                    call log_river_monthly_update(mype, i, filename)
+                filename = trim(nm_river_data_file)
+                !if (mype == 0) then
+                !    write(*,'(A,I2,2A)') 'Updating riverine data for month ', i, &
+                !                         ' from ', trim(filename)
+                !end if
+                call log_river_monthly_update(mype, i, filename)
 
- 
-                    !--- Read biogeochemical tracers from the monthly climatology ---
-                    call read_2ddata_on_grid_NetCDF(filename, 'Alkalinity', i, RiverAlk2D, partit, mesh)
-                    call read_2ddata_on_grid_NetCDF(filename, 'DIC',        i, RiverDIC2D, partit, mesh)
-                    call read_2ddata_on_grid_NetCDF(filename, 'DIN',        i, RiverDIN2D, partit, mesh)
-                    call read_2ddata_on_grid_NetCDF(filename, 'DOC',        i, RiverDOC2D, partit, mesh)
-                    call read_2ddata_on_grid_NetCDF(filename, 'DON',        i, RiverDON2D, partit, mesh)
+                !--- Read biogeochemical tracers from the monthly climatology ---
+                call read_2ddata_on_grid_NetCDF(filename, 'Alkalinity', i, RiverAlk2D, partit, mesh)
+                call read_2ddata_on_grid_NetCDF(filename, 'DIC',        i, RiverDIC2D, partit, mesh)
+                call read_2ddata_on_grid_NetCDF(filename, 'DIN',        i, RiverDIN2D, partit, mesh)
+                call read_2ddata_on_grid_NetCDF(filename, 'DOC',        i, RiverDOC2D, partit, mesh)
+                call read_2ddata_on_grid_NetCDF(filename, 'DON',        i, RiverDON2D, partit, mesh)
 
-                    ! Alkalinity in the file is given as [CaCO3]; convert to
-                    ! total alkalinity by multiplying by 2 (each mol CaCO3
-                    ! releases 2 equivalents of carbonate alkalinity).
-                    RiverAlk2D = RiverAlk2D * 2.0d0
+                ! Alkalinity in the file is given as [CaCO3]; convert to
+                ! total alkalinity by multiplying by 2 (each mol CaCO3
+                ! releases 2 equivalents of carbonate alkalinity).
+                RiverAlk2D = RiverAlk2D * 2.0d0
 
-                    ! DSi is not stored in the climatology file; estimate it
-                    ! from DIN using a Redfield-like Si:N ratio of 16:15.
-                    RiverDSi2D = RiverDIN2D * (16.0d0 / 15.0d0)
+                ! DSi is not stored in the climatology file; estimate it
+                ! from DIN using a Redfield-like Si:N ratio of 16:15.
+                RiverDSi2D = RiverDIN2D * (16.0d0 / 15.0d0)
  
-                end if ! update_monthly_flag
+            end if ! update_monthly_flag
  
-            end if ! enable_R2OMIP
+        end if ! enable_R2OMIP
 
         !-------------------------------------------------------------------------
         ! RIVERS DISABLED: zero out all riverine fluxes

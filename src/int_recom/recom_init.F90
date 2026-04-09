@@ -40,6 +40,7 @@ subroutine recom_init(tracers, partit, mesh)
     real(kind=WP)                           :: locDINmax, locDINmin, locDICmax, locDICmin, locAlkmax, glo
     real(kind=WP)                           :: locAlkmin, locDSimax, locDSimin, locDFemax, locDFemin
     real(kind=WP)                           :: locO2max, locO2min
+    real(kind=WP)                           :: locDICremin, locDICremax ! initialization of DIC remin (added by Sina)
 
     type(t_tracer), intent(inout), target   :: tracers
     type(t_partit), intent(inout), target   :: partit
@@ -748,6 +749,8 @@ subroutine recom_init(tracers, partit, mesh)
         locDFemin = locDINmin
         locO2max  = locDINmax
         locO2min  = locDINmin
+        locDICremax = locDICremax ! init DIC remin (added by Sina)
+        locDICremin = locDICremin ! init DIC remin (added by Sina)
 
         do n=1, myDim_nod2d
             locDINmax = max(locDINmax,maxval(tracers%data(3)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
@@ -762,6 +765,21 @@ subroutine recom_init(tracers, partit, mesh)
             locDFemin = min(locDFemin,minval(tracers%data(21)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
             locO2max  = max(locO2max,maxval(tracers%data(24)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
             locO2min  = min(locO2min,minval(tracers%data(24)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
+        ! DICremin tracer (added by Sina)
+        if (enable_3zoo2det .and. enable_coccos) then
+            locDICremax = max(locDICremax,maxval(tracers%data(39)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) ) 
+            locDICremin = min(locDICremin,minval(tracers%data(39)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+        else if (enable_coccos .and. .not. enable_3zoo2det) then
+            locDICremax = max(locDICremax,maxval(tracers%data(31)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) ) 
+            locDICremin = min(locDICremin,minval(tracers%data(31)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+        else if (enable_3zoo2det .and. .not. enable_coccos) then
+            locDICremax = max(locDICremax,maxval(tracers%data(33)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+            locDICremin = min(locDICremin,minval(tracers%data(33)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+        else
+            locDICremax = max(locDICremax,maxval(tracers%data(25)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+            locDICremin = min(locDICremin,minval(tracers%data(25)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )    
+        end if
+
         end do
 
         if (mype==0) write(*,*) "Sanity check for REcoM variables after recom_init call"
@@ -790,7 +808,11 @@ subroutine recom_init(tracers, partit, mesh)
         if (mype==0) write(*,*) '  |-> gobal max init. O2. =', glo
         call MPI_AllREDUCE(locO2min , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
         if (mype==0) write(*,*) '  `-> gobal min init. O2. =', glo
-
+        call MPI_AllREDUCE(locDICremax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal max init. DICremin =', glo
+        call MPI_AllREDUCE(locDICremin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal min init. DICremin =', glo
+        
         if (enable_3zoo2det) then
             is_3zoo2det=1.0_WP
         else
@@ -802,5 +824,12 @@ subroutine recom_init(tracers, partit, mesh)
         else
             is_coccos=0.0_WP
         endif
+
+       if (enable_R2OMIP) then
+            is_R2OMIP=1.0_WP
+        else
+            is_R2OMIP=0.0_WP
+        endif
+
     end subroutine recom_init
 

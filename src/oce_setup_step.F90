@@ -1127,6 +1127,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             write(*,*) 'read Nitrate     climatology from:', trim(filelist(6))
             write(*,*) 'read Salt        climatology from:', trim(filelist(7))
             write(*,*) 'read Temperature climatology from:', trim(filelist(8))
+            write(*,*) 'read DIC remineralization    from:', trim(filelist(9)) ! DICremin (added by Sina)
     end if
     ! read ocean state
     ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.

@@ -112,7 +112,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     PhyCalc, & ! [mmol/m3] Phytoplankton calcite
     DetCalc, & ! [mmol/m3] Detrital calcite
     FreeFe,  & ! [mmol/m3] Free iron
-    O2         ! [mmol/m3] Dissolved oxygen
+    O2,      & ! [mmol/m3] Dissolved oxygen
+    DICremin   ! tracer for DIC remineralization (for tracking as diagnostic (added by Sina)
 
 ! Coccolithophore variables (conditionally used based on namelist)
 real(kind=8) :: &
@@ -412,11 +413,13 @@ real(kind=8) :: &
             !   DIC : Dissolved inorganic carbon (CO2 + HCO3- + CO3--) [mmolC m-3]
             !   ALK : Total alkalinity [meq m-3]
             !   O2  : Dissolved oxygen [mmolO2 m-3]
+            !   DICremin : Tracer for DIC remineralization (added by Sina)
             !-----------------------------------------------------------------------
 
             DIC = max(tiny, state(k, idic) + sms(k, idic))
             ALK = max(tiny, state(k, ialk) + sms(k, ialk))
             O2  = max(tiny, state(k, ioxy) + sms(k, ioxy))
+            DICremin = max(tiny, state(k, idicremin) + sms(k, idicremin))
 
             !-----------------------------------------------------------------------
             ! DISSOLVED ORGANIC MATTER
@@ -431,8 +434,10 @@ real(kind=8) :: &
             DON = max(tiny, state(k, idon) + sms(k, idon))
             EOC = max(tiny, state(k, idoc) + sms(k, idoc))
 
-            if (useRivers) then
-                DOCt= max(tiny, state(k,idoct) + sms(k, idoct)) ! R2OMIP
+            if (enable_R2OMIP) then
+                DOCt = max(tiny, state(k,idoct) + sms(k, idoct)) ! R2OMIP
+            else 
+                DOCt = 0.0_WP
             end if 
             !-----------------------------------------------------------------------
             ! SMALL PHYTOPLANKTON
@@ -4005,7 +4010,7 @@ real(kind=8) :: &
             !---------------------------------------------------------------------------
             ! Microbial degradation of dissolved organic carbon
             + rho_C1 * arrFunc * O2Func * EOC                     & ! Temperature and O2 dependent
-            + rho_C1t                   * DOCt * is_riverinput    & ! --> Remineralization of terrestrial DOC ! R2OMIP
+            + rho_C1t                   * DOCt * is_R2OMIP        & ! --> Remineralization of terrestrial DOC ! R2OMIP
             !---------------------------------------------------------------------------
             ! SOURCES: Zooplankton Respiration (increases DIC)
             !---------------------------------------------------------------------------
@@ -5070,7 +5075,7 @@ real(kind=8) :: &
             !---------------------------------------------------------------------------
             - rho_c1 * arrFunc * O2Func * EOC                              & ! Bacterial respiration
                                                                           ) * dt_b + sms(k,idoc)
-        if (useRivers) then
+        if (enable_R2OMIP) then
             ! R2OMIP - terrestrial DOC
             sms(k,idoct) = (                                                   &
                 - rho_C1t                        * DOCt                        &
@@ -5742,13 +5747,21 @@ real(kind=8) :: &
             ! SINKS: Heterotrophic Respiration and Remineralization
             !---------------------------------------------------------------------------
             - rho_C1 * arrFunc * O2Func * EOC                              & ! DOC remineralization
-            - rho_C1t                   * DOCt * is_riverinput             &
+            - rho_C1t                   * DOCt * is_R2OMIP                 &
             - hetRespFlux                                                  & ! Mesozooplankton
             - Zoo2RespFlux * is_3zoo2det                                   & ! Macrozooplankton
             - MicZooRespFlux * is_3zoo2det                                 & ! Microzooplankton
                                                                           ) * redO2C * dt_b + sms(k,ioxy)
             ! Note: redO2C converts carbon-based rates to oxygen equivalents
             !       using the Redfield ratio (typically ~170/122 = 1.39 mol O2/mol C)
+
+            !===============================================================================
+            ! 37. DIC remineralzation tracer to track remineralization as an diagnostics
+            !===============================================================================
+            !   idicremin       : Tracer for remineralization diagnostics (added by Sina)
+            sms(k,idicremin) = (                  &
+                + rho_c1 * arrFunc * O2Func * EOC &
+                ) * dt_b + sms(k,idicremin)
 
             if (ciso) then
 
@@ -6822,12 +6835,12 @@ real(kind=8) :: &
 
     vertREMOC(k) = vertREMOC(k) + ( &
     + rho_c1 * arrFunc * O2Func * EOC                  & ! Bacterial respiration / remineralization of oceanic DOC
-!    + rho_C1t                   * DOCt                 & ! Bacterial respiration / remineralization of terrestriel DOC 
+    + rho_C1t                   * DOCt   * is_R2OMIP              & ! Bacterial respiration / remineralization of terrestriel DOC 
     ) * recipbiostep
 
-!    vertREMOCt(k) = vertREMOCt(k) + ( &
-!    + rho_C1t                   * DOCt                 & ! Bacterial respiration / remineralization of terrestriel DOC 
-!    ) * recipbiostep
+    vertREMOCt(k) = vertREMOCt(k) + ( &
+    + rho_C1t                   * DOCt   * is_R2OMIP              & ! Bacterial respiration / remineralization of terrestriel DOC 
+    ) * recipbiostep
 
     vertREMON(k) = vertREMON(k) + ( &
     + rho_N * arrFunc * O2Func * DON                   & ! Bacterial respiration / remineralization

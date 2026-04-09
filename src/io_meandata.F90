@@ -76,7 +76,7 @@ module io_MEANDATA
 !
 !--------------------------------------------------------------------------------------------
 !
-  type(Meandata), save, target   :: io_stream(150) ! todo: find a way to increase the array withhout move_alloc to keep the derived types in Meandata intact
+  type(Meandata), save, target   :: io_stream(250) ! todo: find a way to increase the array withhout move_alloc to keep the derived types in Meandata intact
   integer, save                  :: io_NSTREAMS=0
   real(kind=WP)                  :: ctime !current time in seconds from the beginning of the year
 !
@@ -3090,11 +3090,17 @@ CASE ('otracers  ')
          ! Full model: This is Microzooplankton Carbon
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Zoo3C', 'Microzooplankton Carbon', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
+
+      else if (tracers%data(j)%ID==1037) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DICremin', 'DICremin', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)     ! DICremin tracer (added by Sina)
+         endif
+
       ! =====================================================================
-      ! Tracer ID 1037: Only in FULL model configuration with rivers
+      ! Tracer ID 1038: Only in FULL model configuration with rivers
       ! This is Terrestrial DOC
       ! =====================================================================
-      else if (tracers%data(j)%ID==1037) then
+      else if (tracers%data(j)%ID==1038) then
          if (use_REcoM .and. enable_coccos .and. enable_3zoo2det .and. useRivers) then
          ! Full model with rivers: This is Terrestrial DOC
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DOCt', 'Terrestrial Dissolved Organic Carbon', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)

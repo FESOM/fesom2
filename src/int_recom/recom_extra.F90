@@ -206,7 +206,7 @@ end subroutine Cobeta
 
 
 ! Load river biogeochemical variables from NetCDF file R2OMIP
-! Variables: DIN, DOCl, DOCs, POC
+! Variables: DIC, DIN, DOCl, DOCs, POC
 
 ! Subroutine to read and broadcast a single variable
 
@@ -272,28 +272,34 @@ end subroutine load_river_variable
 !   river_var  - local 2D array of riverine input values
 !   varname    - short label printed in the diagnostic output
 !-----------------------------------------------------------------------------
-subroutine river_sanity_check(river_var, varname, partit)
+!subroutine river_sanity_check(river_var, varname, partit, mesh)
+subroutine river_sanity_check(locmax, locmin, varname, partit, mesh)
 
     use MOD_PARTIT
-    use MOD_PARSUP 
+    use MOD_PARSUP
+    use MOD_MESH
     !use mpi
  
     implicit none
 
     ! Input parameters
     type(t_partit), intent(inout),   target          :: partit
+    type(t_mesh), intent(inout),     target          :: mesh
 
-    real(8),          intent(in) :: river_var(:)
+    !real(8),          intent(in) :: river_var(:)
     character(len=*), intent(in) :: varname
  
     real(8) :: locmax, locmin, glo
     !integer :: MPIerr
 
-#include "../associate_part_def.h"
-#include "../associate_part_ass.h"
 
-    locmax = maxval(river_var)
-    locmin = minval(river_var)
+#include "../associate_part_def.h"
+#include "../associate_mesh_def.h"
+#include "../associate_part_ass.h"
+#include "../associate_mesh_ass.h"
+
+    !locmax = maxval(river_var)
+    !locmin = minval(river_var)
  
     call MPI_AllReduce(locmax, glo, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
     if (mype == 0) write(*,'(A,A,A,ES14.6)') '  |-> global max riverine ', trim(varname), '. = ', glo
