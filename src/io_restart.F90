@@ -567,7 +567,10 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
   else
     is_bin_restart_write = is_due(trim(bin_restart_length_unit), bin_restart_length, istep)
   end if
- 
+
+  ! Write restart files
+  if(is_portable_restart_write) then
+
   ! --> synchronizes tracer data within fesom groups
 
 ! kh 09.01.26 merging of valuesold and valuesAB between all fesom groups is only necessary here, immediately before writing the corresponding restart files
@@ -592,8 +595,6 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
     end if
 #endif
 
-  ! Write restart files
-  if(is_portable_restart_write) then
     ! write OCEAN restart
 #if defined(__recom) && defined(__usetp)
     if(partit%my_fesom_group == 0) then
