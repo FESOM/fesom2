@@ -135,8 +135,6 @@ DO n=1, myDim_nod2D+eDim_nod2D
 #if defined (__seaice_tracers)
         tr_ice(n)  = 0.0_WP
 #endif /* (__seaice_tracers) */ 
-
-
    end if
     !___________________________________________________________________________
     ! lower cutoff: m_ice

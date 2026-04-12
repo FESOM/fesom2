@@ -136,24 +136,19 @@ TYPE T_ICE
 
     !___________________________________________________________________________
     ! total number of ice tracers (default=3, 1=area, 2=mice, 3=msnow, (4=ice_temp), (6=seaice_iron),
-#if defined (__oifs) || defined (__ifsinterface)
-    integer                                     :: num_itracers=4
-#else
-!    integer                                     :: num_itracers=3
-    !------------------------------
-    ! LA 2023-01-31 add icebergs
-#if defined(__async_icebergs)
-    integer                                     :: num_itracers=5
-#else
 #if defined (__seaice_tracers)
-    integer                                     :: num_itracers=6        	
+    integer                                     :: num_itracers=6
 #else
+# if defined (__async_icebergs)
+    integer                                     :: num_itracers=5
+# else
+#  if defined (__oifs) || defined (__ifsinterface)
+    integer                                     :: num_itracers=4
+#  else
     integer                                     :: num_itracers=3
-#endif
-#endif 
-    !------------------------------
-#endif 
-
+#  endif  /* (__oifs) || (__ifsinterface) */
+# endif   /* (__async_icebergs) */
+#endif    /* (__seaice_tracers) */
 
     ! put ice tracers data arrays
     type(t_ice_data), allocatable, dimension(:) :: data
