@@ -12,6 +12,8 @@ module io_MEANDATA
   use io_data_strategy_module
   use async_threads_module
   use netcdf
+  use io_xios_module, only: io_xios_is_on, io_xios_send_2d_r8, io_xios_send_2d_r4, &
+                            io_xios_send_3d_r8, io_xios_send_3d_r4
 
   implicit none
   private
@@ -2058,6 +2060,33 @@ subroutine write_mean(entry, entry_index)
     my_root = entry%root_rank
     wm_t_start = MPI_Wtime()
 
+#if defined(__XIOS)
+    ! Route node-based streams to XIOS async servers. Fields not declared in
+    ! iodef.xml are silently dropped by XIOS, so sending unconditionally is
+    ! safe. Element-based streams still go through the legacy gather+nf90 path
+    ! until an elements domain is declared in io_xios_init.
+    if (io_xios_is_on() .and. .not. entry%is_elem_based) then
+        if (entry%accuracy == i_real8) then
+            if (entry%glsize(1) == 1) then
+                call io_xios_send_2d_r8(entry%name, &
+                     entry%local_values_r8_copy(1, 1:entry%p_partit%myDim_nod2D))
+            else
+                call io_xios_send_3d_r8(entry%name, &
+                     entry%local_values_r8_copy(:, 1:entry%p_partit%myDim_nod2D))
+            end if
+        else
+            if (entry%glsize(1) == 1) then
+                call io_xios_send_2d_r4(entry%name, &
+                     entry%local_values_r4_copy(1, 1:entry%p_partit%myDim_nod2D))
+            else
+                call io_xios_send_3d_r4(entry%name, &
+                     entry%local_values_r4_copy(:, 1:entry%p_partit%myDim_nod2D))
+            end if
+        end if
+        return
+    end if
+#endif
+
     !___________________________________________________________________________
     ! write new time index ctime_copy to file --> expand time array in nc file
     if (my_mype == my_root) then
@@ -2526,6 +2555,15 @@ ctime=timeold+(dayold-1.)*86400
             ! serialize MPI_Gatherv calls. Running 76 concurrent collectives
             ! on separate communicators causes network contention and deadlock.
             ! For normal months (~11 streams), async overlap is kept.
+            ! When many streams fire, join immediately to serialise MPI_Gatherv.
+            ! Two reasons:
+            !  (a) 76 concurrent collectives at year boundary were observed to deadlock.
+            !  (b) On Levante's OpenMPI 4.1 + UCX, MPI_THREAD_MULTIPLE uses a global
+            !      progress lock. Concurrent Gatherv calls from threads serialise
+            !      inside the library AND incur lock contention overhead, so full
+            !      async is a net loss (measured: daily 17-stream output 9.55 s async
+            !      vs 9.82 s serial-joined — saved ~0.3 s but Gather times inflated
+            !      from ~1 ms to ~1.5 s each). Keep the guard.
             if(io_dbg_nfire > 15) then
                 call entry%thread%join()
                 entry%thread_running = .false.
@@ -2564,31 +2602,6 @@ ctime=timeold+(dayold-1.)*86400
         call iom_flush('N grid', istep)
     end if
 #endif
-
-    ! Debug: barrier + timing to measure how long ALL ranks take in output()
-    if(io_dbg_nfire > 15) then
-        io_dbg_t0 = MPI_Wtime()
-        ! Print pre-barrier time from a few ranks to see who is slow
-        if(partit%mype==0 .or. partit%mype==1 .or. &
-           partit%mype==partit%npes/2 .or. partit%mype==partit%npes-1) then
-            write(*,'(A,I5,A,F14.3,A,I6)') &
-                ' [IO_TIMING] rank ', partit%mype, ' pre-barrier wtime=', io_dbg_t0, ' step=', istep
-        end if
-        call MPI_Barrier(partit%MPI_COMM_FESOM, k)
-        io_dbg_t1 = MPI_Wtime()
-        if(partit%mype==0 .or. partit%mype==1 .or. &
-           partit%mype==partit%npes/2 .or. partit%mype==partit%npes-1) then
-            write(*,'(A,I5,A,F10.3,A,F14.3,A,I6)') &
-                ' [IO_TIMING] rank ', partit%mype, ' barrier wait=', io_dbg_t1-io_dbg_t0, &
-                ' post-barrier wtime=', io_dbg_t1, ' step=', istep
-        end if
-        if(partit%mype==0) then
-            write(*,'(A,F10.3,A,I6)') ' [IO_TIMING] Barrier after output loop: ', &
-                io_dbg_t1 - io_dbg_t0, ' s at step ', istep
-            write(*,'(A,F10.3,A)') ' [IO_TIMING] Total output() wall time: ', &
-                io_dbg_t1 - io_dbg_t_loop, ' s'
-        end if
-    end if
 
 end subroutine
 

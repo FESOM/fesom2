@@ -1,0 +1,21 @@
+<grid_definition>
+
+  <!-- 2D grids -->
+  <grid id="grid_2d_nod"  description="2D grid on FESOM nodes">
+    <domain domain_ref="nodes"/>
+  </grid>
+  <grid id="grid_2d_elem" description="2D grid on FESOM elements">
+    <domain domain_ref="elements"/>
+  </grid>
+
+  <!-- 3D grids (cell-centred vertical axis) -->
+  <grid id="grid_3d_nod"  description="3D grid on FESOM nodes">
+    <domain domain_ref="nodes"/>
+    <axis   axis_ref="nz"/>
+  </grid>
+  <grid id="grid_3d_elem" description="3D grid on FESOM elements">
+    <domain domain_ref="elements"/>
+    <axis   axis_ref="nz"/>
+  </grid>
+
+</grid_definition>

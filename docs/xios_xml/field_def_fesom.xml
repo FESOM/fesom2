@@ -1,0 +1,57 @@
+<field_definition level="1" prec="4" enabled="true" operation="average" default_value="1.e+20">
+
+  <!-- ============================================================
+       2D fields on NODES (scalar / tracer-like)
+       ============================================================ -->
+  <field_group id="fesom_2d_nod" grid_ref="grid_2d_nod" prec="4">
+    <field id="sst"    long_name="sea surface temperature"                    standard_name="sea_surface_temperature"            unit="degC"/>
+    <field id="sss"    long_name="sea surface salinity"                       standard_name="sea_surface_salinity"               unit="1e-3"/>
+    <field id="ssh"    long_name="sea surface height"                         standard_name="sea_surface_height_above_geoid"     unit="m"/>
+    <field id="a_ice"  long_name="sea-ice area fraction"                      standard_name="sea_ice_area_fraction"              unit="1"/>
+    <field id="m_ice"  long_name="sea-ice mass per area (thickness equiv.)"   standard_name="sea_ice_thickness"                  unit="m"/>
+    <field id="m_snow" long_name="snow on ice mass per area"                  standard_name="surface_snow_thickness"             unit="m"/>
+    <field id="MLD1"   long_name="mixed layer depth (Large 1997)"             standard_name="ocean_mixed_layer_thickness"        unit="m"/>
+    <field id="MLD2"   long_name="mixed layer depth (Levitus 0.125 kg/m3)"    standard_name="ocean_mixed_layer_thickness"        unit="m"/>
+    <field id="MLD3"   long_name="mixed layer depth (Griffies 0.03 kg/m3)"    standard_name="ocean_mixed_layer_thickness"        unit="m"/>
+    <field id="fw"     long_name="freshwater flux"                            standard_name="water_flux_into_sea_water"          unit="m s-1"/>
+    <field id="fh"     long_name="surface heat flux"                          standard_name="surface_downward_heat_flux_in_sea_water" unit="W m-2"/>
+    <field id="uice"   long_name="sea-ice zonal velocity"                     standard_name="sea_ice_x_velocity"                 unit="m s-1"/>
+    <field id="vice"   long_name="sea-ice meridional velocity"                standard_name="sea_ice_y_velocity"                 unit="m s-1"/>
+  </field_group>
+
+  <!-- ============================================================
+       2D fields on ELEMENTS (vector / velocity / stress)
+       ============================================================ -->
+  <field_group id="fesom_2d_elem" grid_ref="grid_2d_elem" prec="4">
+    <field id="tx_sur" long_name="zonal surface stress to ocean"              standard_name="surface_downward_eastward_stress"   unit="N m-2"/>
+    <field id="ty_sur" long_name="meridional surface stress to ocean"         standard_name="surface_downward_northward_stress"  unit="N m-2"/>
+  </field_group>
+
+  <!-- ============================================================
+       3D fields on NODES (tracers and node-based diagnostics)
+       ============================================================ -->
+  <field_group id="fesom_3d_nod" grid_ref="grid_3d_nod" prec="4">
+    <field id="temp"   long_name="sea water potential temperature"            standard_name="sea_water_potential_temperature"    unit="degC"/>
+    <field id="salt"   long_name="sea water salinity"                         standard_name="sea_water_salinity"                 unit="1e-3" prec="8"/>
+    <field id="N2"     long_name="Brunt-Vaisala frequency squared"            standard_name="square_of_brunt_vaisala_frequency_in_sea_water" unit="s-2"/>
+    <field id="Kv"     long_name="vertical tracer diffusivity"                standard_name="ocean_vertical_tracer_diffusivity"  unit="m2 s-1"/>
+    <field id="w"      long_name="vertical velocity"                          standard_name="upward_sea_water_velocity"          unit="m s-1"/>
+    <field id="unod"   long_name="zonal velocity interpolated to nodes"       standard_name="sea_water_x_velocity"               unit="m s-1"/>
+    <field id="vnod"   long_name="meridional velocity interpolated to nodes"  standard_name="sea_water_y_velocity"               unit="m s-1"/>
+    <field id="bolus_w" long_name="GM bolus vertical velocity"                standard_name="upward_ocean_bolus_velocity"        unit="m s-1"/>
+    <!-- 'otracers' is a placeholder group in FESOM expanded per tracer at runtime;
+         individual tracer fields would be registered dynamically. -->
+  </field_group>
+
+  <!-- ============================================================
+       3D fields on ELEMENTS (native velocity components, viscosity)
+       ============================================================ -->
+  <field_group id="fesom_3d_elem" grid_ref="grid_3d_elem" prec="4">
+    <field id="u"       long_name="zonal velocity at elements (native)"      standard_name="sea_water_x_velocity"               unit="m s-1"/>
+    <field id="v"       long_name="meridional velocity at elements (native)" standard_name="sea_water_y_velocity"               unit="m s-1"/>
+    <field id="Av"      long_name="vertical momentum viscosity"              standard_name="ocean_vertical_momentum_diffusivity" unit="m2 s-1"/>
+    <field id="bolus_u" long_name="GM bolus zonal velocity"                  standard_name="northward_ocean_bolus_velocity"     unit="m s-1"/>
+    <field id="bolus_v" long_name="GM bolus meridional velocity"             standard_name="eastward_ocean_bolus_velocity"      unit="m s-1"/>
+  </field_group>
+
+</field_definition>

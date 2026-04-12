@@ -1,0 +1,68 @@
+<?xml version="1.0"?>
+<file_definition type="one_file" format="netcdf4" par_access="collective"
+                 compression_level="1">
+
+  <!-- FESOM-2.7 XIOS file definition.
+       All active fields in namelist.io are monthly-averaged ('1, m').
+       Files are grouped by output frequency and by grid dimensionality
+       (2D nodes / 2D elements / 3D nodes / 3D elements) so that each
+       output file has homogeneous domain/axis metadata, which is the
+       XIOS-friendly way to write unstructured meshes.
+
+       Naming convention: fesom_<freq>_<dim>.nc   (+ XIOS timestamp suffix)
+  -->
+
+  <file_group id="fesom_monthly" output_freq="1d" split_freq="1mo"
+              enabled="true">
+
+    <!-- 2D fields on nodes -->
+    <file id="fesom_mon_2d_nod" name="fesom_mon_2d_nod"
+          description="FESOM monthly 2D fields on nodes">
+      <field field_ref="sst"/>
+      <field field_ref="sss"/>
+      <field field_ref="ssh"/>
+      <field field_ref="a_ice"/>
+      <field field_ref="m_ice"/>
+      <field field_ref="m_snow"/>
+      <field field_ref="MLD1"/>
+      <field field_ref="MLD2"/>
+      <field field_ref="MLD3"/>
+      <field field_ref="fw"/>
+      <field field_ref="fh"/>
+      <field field_ref="uice"/>
+      <field field_ref="vice"/>
+    </file>
+
+    <!-- 2D fields on elements -->
+    <file id="fesom_mon_2d_elem" name="fesom_mon_2d_elem"
+          description="FESOM monthly 2D fields on elements">
+      <field field_ref="tx_sur"/>
+      <field field_ref="ty_sur"/>
+    </file>
+
+    <!-- 3D fields on nodes -->
+    <file id="fesom_mon_3d_nod" name="fesom_mon_3d_nod"
+          description="FESOM monthly 3D fields on nodes">
+      <field field_ref="temp"/>
+      <field field_ref="salt"/>
+      <field field_ref="N2"/>
+      <field field_ref="Kv"/>
+      <field field_ref="w"/>
+      <field field_ref="unod"/>
+      <field field_ref="vnod"/>
+      <field field_ref="bolus_w"/>
+    </file>
+
+    <!-- 3D fields on elements -->
+    <file id="fesom_mon_3d_elem" name="fesom_mon_3d_elem"
+          description="FESOM monthly 3D fields on elements">
+      <field field_ref="u"/>
+      <field field_ref="v"/>
+      <field field_ref="Av"/>
+      <field field_ref="bolus_u"/>
+      <field field_ref="bolus_v"/>
+    </file>
+
+  </file_group>
+
+</file_definition>

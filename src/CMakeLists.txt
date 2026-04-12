@@ -271,6 +271,22 @@ if(ASYNCHRONOUS_IO_THREADS)
    target_compile_definitions(${PROJECT_NAME} PRIVATE ASYNCHRONOUS_IO_THREADS)
 endif()
 
+option(FESOM_WITH_XIOS "Route FESOM output through XIOS async server ranks" OFF)
+if(FESOM_WITH_XIOS)
+   find_path(XIOS_INCLUDE_DIR NAMES xios.mod
+             HINTS $ENV{XIOS_ROOT}/inc $ENV{XIOS_ROOT}/include)
+   find_library(XIOS_LIB NAMES xios
+                HINTS $ENV{XIOS_ROOT}/lib)
+   if(NOT XIOS_INCLUDE_DIR OR NOT XIOS_LIB)
+      message(FATAL_ERROR "FESOM_WITH_XIOS=ON but XIOS not found. Set XIOS_ROOT.")
+   endif()
+   message(STATUS "XIOS include: ${XIOS_INCLUDE_DIR}")
+   message(STATUS "XIOS lib    : ${XIOS_LIB}")
+   target_include_directories(${PROJECT_NAME} PRIVATE ${XIOS_INCLUDE_DIR})
+   target_link_libraries(${PROJECT_NAME} PRIVATE ${XIOS_LIB} stdc++)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __XIOS)
+endif()
+
 if(${FESOM_COUPLED})
    message(STATUS "FESOM is coupled")
    if(${OASIS_WITH_YAC})

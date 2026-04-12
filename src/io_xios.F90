@@ -1,0 +1,207 @@
+!> XIOS output integration for FESOM-2 in coupled AWI-ESM3 (OASIS + dedicated
+!> xios_server.exe ranks). Follows the NEMO/OIFS pattern: OASIS has already
+!> split MPI_COMM_WORLD into per-component local comms; FESOM hands its OASIS
+!> local comm (partit%MPI_COMM_FESOM) to XIOS via local_comm=, and the separate
+!> xios_server.exe binary registers with OASIS independently.
+!>
+!> Lifecycle (cf. arpifs/module/suxios.F90 in OpenIFS 48r1, NEMO 4.2 nemogcm):
+!>   xios_initialize("fesom", local_comm=parent_comm)    ! no return_comm split
+!>   xios_context_initialize("fesom", parent_comm)
+!>   xios_set_domain_attr("nodes",    ...)               ! fills XML blanks
+!>   xios_set_domain_attr("elements", ...)
+!>   xios_set_axis_attr  ("nz",       ...)
+!>   xios_close_context_definition()
+!>
+!> Ordering: OASIS3-MCT is initialised in fesom_module.F90 before par_init /
+!> mesh_setup, therefore before this routine is invoked. Matches NEMO's safe
+!> EC-Earth ordering (OASIS first, then XIOS on the OASIS local comm).
+module io_xios_module
+#if defined(__XIOS)
+  use xios
+  use mod_mesh,   only: T_MESH
+  use mod_partit, only: T_PARTIT
+  use o_param,    only: WP, rad
+  use g_config,   only: dt
+  implicit none
+  private
+
+  public :: io_xios_init, io_xios_close
+  public :: io_xios_update_calendar
+  public :: io_xios_send_2d_r8, io_xios_send_3d_r8
+  public :: io_xios_send_2d_r4, io_xios_send_3d_r4
+  public :: io_xios_is_on
+
+  type(xios_context), save :: ctx_hdl
+  logical,            save :: xios_on = .false.
+
+contains
+
+  logical function io_xios_is_on() result(r)
+    r = xios_on
+  end function
+
+
+  !> Initialise the XIOS client side.
+  !> parent_comm:  the FESOM OASIS local communicator (partit%MPI_COMM_FESOM).
+  !> client_comm:  returned equal to parent_comm (kept for API compat; OASIS
+  !>               has already done the world split, so no further split here).
+  subroutine io_xios_init(mesh, partit, parent_comm, client_comm)
+    type(T_MESH),    intent(in), target :: mesh
+    type(T_PARTIT),  intent(in), target :: partit
+    integer,         intent(in)         :: parent_comm
+    integer,         intent(out)        :: client_comm
+
+    integer                       :: i, e, n1, n2, n3, nn, ne, nz_cell
+    real(kind=8), allocatable     :: lon_n(:),  lat_n(:)
+    real(kind=8), allocatable     :: lon_e(:),  lat_e(:)
+    integer,      allocatable     :: i_index_n(:), i_index_e(:)
+    real(kind=8), allocatable     :: z_mid(:)
+    real(kind=8)                  :: xlon, ylat
+
+    nn = partit%myDim_nod2D
+    ne = partit%myDim_elem2D
+
+    ! --- 1. initialise XIOS client on the FESOM OASIS local comm ------------
+    call xios_initialize("fesom", local_comm=parent_comm)
+    client_comm = parent_comm    ! OASIS already split; keep API compat
+
+    ! --- 2. open the context on the FESOM communicator -----------------------
+    call xios_context_initialize("fesom", parent_comm)
+    call xios_get_handle("fesom", ctx_hdl)
+    call xios_set_current_context(ctx_hdl)
+
+    ! --- 3. calendar: left to XML (calendar_type on the context element) -----
+
+    ! --- 4. unstructured node-based domain "nodes" ---------------------------
+    allocate(lon_n(nn), lat_n(nn), i_index_n(nn))
+    do i = 1, nn
+       lon_n(i)    = mesh%geo_coord_nod2D(1, i) / rad   ! rad -> deg
+       lat_n(i)    = mesh%geo_coord_nod2D(2, i) / rad
+       i_index_n(i)= partit%myList_nod2D(i) - 1         ! 1-based -> 0-based
+    end do
+
+    call xios_set_domain_attr("nodes",              &
+         type        = "unstructured",              &
+         ni_glo      = mesh%nod2D,                  &
+         ni          = nn,                          &
+         ibegin      = 0,                           &
+         i_index     = i_index_n,                   &
+         lonvalue_1d = lon_n,                       &
+         latvalue_1d = lat_n,                       &
+         data_dim    = 1,                           &
+         data_ni     = nn)
+
+    deallocate(lon_n, lat_n, i_index_n)
+
+    ! --- 5. unstructured element (triangle-centre) domain "elements" --------
+    allocate(lon_e(ne), lat_e(ne), i_index_e(ne))
+    do e = 1, ne
+       n1 = mesh%elem2D_nodes(1, e)
+       n2 = mesh%elem2D_nodes(2, e)
+       n3 = mesh%elem2D_nodes(3, e)
+       ! centroid in geographic coords (degrees).
+       ! NOTE: naive average; OK away from the poles / dateline. If needed
+       !       replace with the cartesian-average-then-reproject trick.
+       xlon = ( mesh%geo_coord_nod2D(1, n1) &
+              + mesh%geo_coord_nod2D(1, n2) &
+              + mesh%geo_coord_nod2D(1, n3) ) / 3.0_WP
+       ylat = ( mesh%geo_coord_nod2D(2, n1) &
+              + mesh%geo_coord_nod2D(2, n2) &
+              + mesh%geo_coord_nod2D(2, n3) ) / 3.0_WP
+       lon_e(e)    = xlon / rad
+       lat_e(e)    = ylat / rad
+       i_index_e(e)= partit%myList_elem2D(e) - 1
+    end do
+
+    call xios_set_domain_attr("elements",           &
+         type        = "unstructured",              &
+         ni_glo      = mesh%elem2D,                 &
+         ni          = ne,                          &
+         ibegin      = 0,                           &
+         i_index     = i_index_e,                   &
+         lonvalue_1d = lon_e,                       &
+         latvalue_1d = lat_e,                       &
+         data_dim    = 1,                           &
+         data_ni     = ne)
+
+    deallocate(lon_e, lat_e, i_index_e)
+
+    ! --- 6. vertical axis "nz" (cell-centred, nl-1 layers) ------------------
+    nz_cell = mesh%nl - 1
+    allocate(z_mid(nz_cell))
+    do i = 1, nz_cell
+       z_mid(i) = 0.5_WP * (mesh%zbar(i) + mesh%zbar(i+1))
+    end do
+    call xios_set_axis_attr("nz", n_glo = nz_cell, value = z_mid)
+    deallocate(z_mid)
+
+    ! --- 7. timestep (required by XIOS before close_context_definition) -----
+    call xios_set_timestep(timestep = xios_duration(second = dt))
+
+    ! --- 8. close context definition ----------------------------------------
+    call xios_close_context_definition()
+
+    xios_on = .true.
+  end subroutine io_xios_init
+
+
+  !> Called every FESOM timestep from the main loop.
+  subroutine io_xios_update_calendar(step)
+    integer, intent(in) :: step
+    if (.not. xios_on) return
+    call xios_set_current_context(ctx_hdl)
+    call xios_update_calendar(step)
+  end subroutine
+
+
+  !> Send a 2D (node-only) field. Shape: (ni=myDim_nod2D).
+  !> Caller (io_meandata.F90) must already have sliced to owned nodes.
+  subroutine io_xios_send_2d_r8(name, buf)
+    character(len=*), intent(in) :: name
+    real(kind=8),     intent(in) :: buf(:)
+    if (.not. xios_on) return
+    call xios_send_field(trim(name), buf)
+  end subroutine
+
+  subroutine io_xios_send_2d_r4(name, buf)
+    character(len=*), intent(in) :: name
+    real(kind=4),     intent(in) :: buf(:)
+    if (.not. xios_on) return
+    call xios_send_field(trim(name), buf)
+  end subroutine
+
+
+  !> Send a 3D (node x level) field. Shape: (nz_cell, myDim_nod2D).
+  subroutine io_xios_send_3d_r8(name, buf)
+    character(len=*), intent(in) :: name
+    real(kind=8),     intent(in) :: buf(:,:)
+    if (.not. xios_on) return
+    call xios_send_field(trim(name), buf)
+  end subroutine
+
+  subroutine io_xios_send_3d_r4(name, buf)
+    character(len=*), intent(in) :: name
+    real(kind=4),     intent(in) :: buf(:,:)
+    if (.not. xios_on) return
+    call xios_send_field(trim(name), buf)
+  end subroutine
+
+
+  subroutine io_xios_close()
+    if (.not. xios_on) return
+    call xios_context_finalize()
+    call xios_finalize()
+    xios_on = .false.
+  end subroutine
+
+#else
+  ! Stub module when built without XIOS; keeps `use io_xios_module` legal.
+  implicit none
+  private
+  public :: io_xios_is_on
+contains
+  logical function io_xios_is_on() result(r)
+    r = .false.
+  end function
+#endif
+end module io_xios_module

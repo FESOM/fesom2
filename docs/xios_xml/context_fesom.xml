@@ -1,0 +1,15 @@
+<context id="fesom">
+  <calendar type="Gregorian"/>
+
+  <field_definition  src="./field_def_fesom.xml"/>
+  <file_definition   src="./file_def_fesom.xml"/>
+  <axis_definition   src="./axis_def_fesom.xml"/>
+  <domain_definition src="./domain_def_fesom.xml"/>
+  <grid_definition   src="./grid_def_fesom.xml"/>
+
+  <variable_definition>
+    <variable_group id="fesom_runtime">
+      <variable id="using_server" type="bool">true</variable>
+    </variable_group>
+  </variable_definition>
+</context>

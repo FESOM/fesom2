@@ -16,6 +16,7 @@ module fesom_main_storage_module
   use g_forcing_arrays
   use io_RESTART
   use io_MEANDATA
+  use io_xios_module
   use io_mesh_info
   use diagnostics
   use mo_tidal
@@ -229,6 +230,22 @@ contains
 #endif
 
         if (f%mype==0) write(*,*) 'FESOM mesh_setup... complete'
+
+#if defined (__XIOS)
+        ! XIOS client init (NEMO/OIFS pattern). xios_initialize is called with
+        ! local_comm=MPI_COMM_FESOM -- OASIS already split MPI_COMM_WORLD, so
+        ! no further split is needed; the FESOM comm stays valid. The separate
+        ! xios_server.exe binary registers with OASIS independently.
+        !
+        ! Ordering: OASIS3-MCT was initialised above (before par_init). This
+        ! matches the EC-Earth-proven NEMO ordering (OASIS -> XIOS on OASIS
+        ! local comm). Called here after mesh_setup so coord_nod2D /
+        ! elem2D_nodes / zbar / myList_* are populated.
+        block
+          integer :: xios_client_comm
+          call io_xios_init(f%mesh, f%partit, f%partit%MPI_COMM_FESOM, xios_client_comm)
+        end block
+#endif
 
 !       Transient tracers: control output of initial input values
         if(use_transit .and. anthro_transit .and. f%mype==0) then
@@ -572,6 +589,9 @@ contains
     ntotal=f%from_nstep-1+current_nsteps
 
     do n=nstart, ntotal
+#if defined (__XIOS)
+        call io_xios_update_calendar(n)
+#endif
         if (use_icebergs) then
                 !n_ib         = n
                 u_wind_ib    = u_wind
@@ -932,6 +952,10 @@ contains
 
 #if defined(__MULTIO) && !defined(__ifsinterface) && !defined(__oasis)
    call mpp_stop
+#endif
+
+#if defined (__XIOS)
+   call io_xios_close()
 #endif
     ! Generate enhanced profiler report BEFORE MPI finalization
 #if defined (FESOM_PROFILING)
