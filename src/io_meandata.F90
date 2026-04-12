@@ -89,7 +89,7 @@ module io_MEANDATA
   character(len=1), save         :: filesplit_freq='y'
   integer, save                  :: compression_level=0
   type io_entry
-        CHARACTER(len=15)        :: id        ='unknown   '
+        CHARACTER(len=20)        :: id        ='unknown             '
         INTEGER                  :: freq      =0
         CHARACTER                :: unit      =''
         INTEGER                  :: precision =0
@@ -1514,13 +1514,39 @@ END DO ! --> DO i=1, io_listsize
         call def_stream((/nl,  nod2D/), (/nl, myDim_nod2D/), 'KvdSdz',   'KvdSdz',           'PSU m/s',   KvdSdz(:,:), 1, 'm', i_real8, partit, mesh)
     end if
     !___________________________________________________________________________
-    ! Tracers flux diagnostics without predefined freq, freq_unit, prec, -->
-    ! default monthly output
+    ! Tracers flux diagnostics. Default monthly output, but honor io_list
+    ! entries if the user requested a different frequency.
     if (ldiag_trflx .and. sel_trgrd_xyz==0) then
-        call def_stream((/nl-1,  elem2D/), (/nl-1, myDim_elem2D/), 'utemp',   'u*temp',           'm/s*°C',     tuv(1,:,:), 1, 'm', i_real8, partit, mesh)
-        call def_stream((/nl-1,  elem2D/), (/nl-1, myDim_elem2D/), 'vtemp',   'v*temp',           'm/s*°C',     tuv(2,:,:), 1, 'm', i_real8, partit, mesh)
-        call def_stream((/nl-1,  elem2D/), (/nl-1, myDim_elem2D/), 'usalt',   'u*salt',           'm/s*psu',   suv(1,:,:), 1, 'm', i_real8, partit, mesh)
-        call def_stream((/nl-1,  elem2D/), (/nl-1, myDim_elem2D/), 'vsalt',   'v*salt',           'm/s*psu',   suv(2,:,:), 1, 'm', i_real8, partit, mesh)
+        block
+            integer :: k, tf_freq
+            character :: tf_unit
+            character(len=5) :: tf_names(4)
+            character(len=6) :: tf_long(4)
+            character(len=7) :: tf_units(4)
+            tf_names = (/ 'utemp', 'vtemp', 'usalt', 'vsalt' /)
+            tf_long  = (/ 'u*temp', 'v*temp', 'u*salt', 'v*salt' /)
+            tf_units = (/ 'm/s*°C ', 'm/s*°C ', 'm/s*psu', 'm/s*psu' /)
+            do j = 1, 4
+                tf_freq = 1; tf_unit = 'm'
+                do k = 1, io_listsize
+                    if (trim(io_list(k)%id) == trim(tf_names(j))) then
+                        tf_freq = io_list(k)%freq
+                        tf_unit = io_list(k)%unit
+                        exit
+                    end if
+                end do
+                select case (j)
+                case (1)
+                    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), trim(tf_names(j)), trim(tf_long(j)), trim(tf_units(j)), tuv(1,:,:), tf_freq, tf_unit, i_real8, partit, mesh)
+                case (2)
+                    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), trim(tf_names(j)), trim(tf_long(j)), trim(tf_units(j)), tuv(2,:,:), tf_freq, tf_unit, i_real8, partit, mesh)
+                case (3)
+                    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), trim(tf_names(j)), trim(tf_long(j)), trim(tf_units(j)), suv(1,:,:), tf_freq, tf_unit, i_real8, partit, mesh)
+                case (4)
+                    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), trim(tf_names(j)), trim(tf_long(j)), trim(tf_units(j)), suv(2,:,:), tf_freq, tf_unit, i_real8, partit, mesh)
+                end select
+            end do
+        end block
     end if
     
     !___________________________________________________________________________
@@ -2024,10 +2050,13 @@ subroutine write_mean(entry, entry_index)
     ! Gather + global accumulation buffers
     real(real64), allocatable     :: sbuf_r8(:), rbuf_r8(:), glob_r8(:,:)
     real(real32), allocatable     :: sbuf_r4(:), rbuf_r4(:), glob_r4(:,:)
+    ! Debug timing for write_mean breakdown
+    real(kind=8) :: wm_t_start, wm_t_gather, wm_t_write, wm_t_end
 
     my_npes = entry%p_partit%npes
     my_mype = entry%p_partit%mype
     my_root = entry%root_rank
+    wm_t_start = MPI_Wtime()
 
     !___________________________________________________________________________
     ! write new time index ctime_copy to file --> expand time array in nc file
@@ -2105,6 +2134,7 @@ subroutine write_mean(entry, entry_index)
             end if
         end do
 
+        wm_t_gather = MPI_Wtime()
         ! Single batched NetCDF write for all levels
         if(my_mype == my_root) then
             if(entry%ndim == 1) then
@@ -2114,6 +2144,12 @@ subroutine write_mean(entry, entry_index)
                 call assert_nf( nf90_put_var(entry%ncid, entry%varID, glob_r8, &
                     start=(/1, 1, entry%rec_count/), count=(/size2, size1, 1/)), __LINE__)
             end if
+        end if
+        wm_t_write = MPI_Wtime()
+        if(my_mype == my_root) then
+            write(*,'(A,A,A,I3,A,F8.3,A,F8.3,A)') &
+                ' [WM_TIMING] ', trim(entry%name), ' (r8, ', size1, ' lev): gather=', &
+                wm_t_gather - wm_t_start, 's  write=', wm_t_write - wm_t_gather, 's'
         end if
         deallocate(sbuf_r8, rbuf_r8)
         if(allocated(glob_r8)) deallocate(glob_r8)
@@ -2149,6 +2185,7 @@ subroutine write_mean(entry, entry_index)
             end if
         end do
 
+        wm_t_gather = MPI_Wtime()
         if(my_mype == my_root) then
             if(entry%ndim == 1) then
                 call assert_nf( nf90_put_var(entry%ncid, entry%varID, glob_r4(:,1), &
@@ -2157,6 +2194,12 @@ subroutine write_mean(entry, entry_index)
                 call assert_nf( nf90_put_var(entry%ncid, entry%varID, glob_r4, &
                     start=(/1, 1, entry%rec_count/), count=(/size2, size1, 1/)), __LINE__)
             end if
+        end if
+        wm_t_write = MPI_Wtime()
+        if(my_mype == my_root) then
+            write(*,'(A,A,A,I3,A,F8.3,A,F8.3,A)') &
+                ' [WM_TIMING] ', trim(entry%name), ' (r4, ', size1, ' lev): gather=', &
+                wm_t_gather - wm_t_start, 's  write=', wm_t_write - wm_t_gather, 's'
         end if
         deallocate(sbuf_r4, rbuf_r4)
         if(allocated(glob_r4)) deallocate(glob_r4)
@@ -2260,6 +2303,12 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     type(t_ice)   , intent(inout), target :: ice
     character(:), allocatable             :: filepath
     real(real64)                          :: rtime !timestamp of the record
+    ! Debug timing variables for I/O performance analysis
+    integer       :: io_dbg_nfire
+    logical       :: io_dbg_verbose
+    real(kind=8)  :: io_dbg_t_loop, io_dbg_t0, io_dbg_t1
+    real(kind=8)  :: io_dbg_t_join_total, io_dbg_t_file_total
+    real(kind=8)  :: io_dbg_t_copy_total, io_dbg_t_run_total
 #if defined(__MULTIO)
     logical       :: output_done
     logical       :: trigger_flush
@@ -2291,7 +2340,35 @@ ctime=timeold+(dayold-1.)*86400
 #endif
 
     !___________________________________________________________________________
-    ! loop over defined streams
+    ! loop over defined streams -- with I/O timing instrumentation
+    ! Count how many streams will fire this step (for debug output control)
+    io_dbg_nfire = 0
+    do n=1, io_NSTREAMS
+        entry=>io_stream(n)
+        do_output=.false.
+        if (entry%freq_unit.eq.'y') then
+            call annual_event(do_output, entry%freq)
+        else if (entry%freq_unit == 'm') then
+            call monthly_event(do_output, entry%freq)
+        else if (entry%freq_unit == 'd') then
+            call daily_event(do_output, entry%freq)
+        else if (entry%freq_unit == 'h') then
+            call hourly_event(do_output, entry%freq)
+        else if (entry%freq_unit == 's') then
+            call step_event(do_output, istep, entry%freq)
+        end if
+        if(do_output) io_dbg_nfire = io_dbg_nfire + 1
+    end do
+    io_dbg_verbose = (io_dbg_nfire > 15)  ! only print timing when many streams fire (year boundary)
+    if(io_dbg_verbose .and. partit%mype==0) then
+        io_dbg_t_loop = MPI_Wtime()
+        write(*,'(A,I4,A,I6)') ' [IO_TIMING] output loop start: ', io_dbg_nfire, ' streams firing at step ', istep
+        io_dbg_t_join_total = 0.0d0
+        io_dbg_t_file_total = 0.0d0
+        io_dbg_t_copy_total = 0.0d0
+        io_dbg_t_run_total  = 0.0d0
+    end if
+
     do n=1, io_NSTREAMS
         !_______________________________________________________________________
         ! make pointer for entry onto io_stream object
@@ -2307,8 +2384,8 @@ ctime=timeold+(dayold-1.)*86400
         do_output=.false.
         if (entry%freq_unit.eq.'y') then
             call annual_event(do_output, entry%freq)
-        else if (entry%freq_unit == 'm') then 
-            call monthly_event(do_output, entry%freq) 
+        else if (entry%freq_unit == 'm') then
+            call monthly_event(do_output, entry%freq)
         else if (entry%freq_unit == 'd') then
             call daily_event(do_output, entry%freq)
         else if (entry%freq_unit == 'h') then
@@ -2325,15 +2402,20 @@ ctime=timeold+(dayold-1.)*86400
 #if defined(__MULTIO)
         output_done = output_done .or. do_output
 #endif
-        
+
         !_______________________________________________________________________
         ! if its time for output --> do_output==.true.
         if (do_output) then
             if (vec_autorotate) call io_r2g(n, partit, mesh) ! automatically detect if a vector field and rotate if makes sense!
 #if !defined(__MULTIO)
+            if(io_dbg_verbose .and. partit%mype==0) io_dbg_t0 = MPI_Wtime()
             if(entry%thread_running) call entry%thread%join()
             entry%thread_running = .false.
-            
+            if(io_dbg_verbose .and. partit%mype==0) then
+                io_dbg_t1 = MPI_Wtime()
+                io_dbg_t_join_total = io_dbg_t_join_total + (io_dbg_t1 - io_dbg_t0)
+            end if
+
             ! define filepath
             if (filesplit_freq=='m') then
                 filepath = trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'_'//cmonth//'.nc'
@@ -2341,53 +2423,48 @@ ctime=timeold+(dayold-1.)*86400
                 filepath = trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
             endif
 
+            if(io_dbg_verbose .and. partit%mype==0) io_dbg_t0 = MPI_Wtime()
             !___________________________________________________________________
             ! only root rank task does output
             if(partit%mype == entry%root_rank) then
                 !_______________________________________________________________
                 ! create new output file ?!
                 if(filepath /= trim(entry%filename)) then
-                    if("" /= trim(entry%filename)) call assert_nf(nf90_close(entry%ncid), __LINE__)   
+                    if("" /= trim(entry%filename)) call assert_nf(nf90_close(entry%ncid), __LINE__)
                     entry%filename = filepath
                     !___________________________________________________________
                     ! use any existing file with this name or create a new one
                     if( nf90_open(entry%filename, nf90_write, entry%ncid) /= nf90_noerr ) then
-                        !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call create_new_file'//achar(27)//'[0m'  
                         call create_new_file(entry, ice, dynamics, partit, mesh)
-                        
-                        !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assert_nf A'//achar(27)//'[0m'//',  k=',k, ', rootpart=', entry%root_rank    
                         call assert_nf( nf90_open(entry%filename, nf90_write, entry%ncid), __LINE__)
                     end if
-                    
-                    !___________________________________________________________
-                    ! setup all dimension definition and attributes of the netcdf
-                    ! file 
-                    !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assoc_ids'//achar(27)//'[0m'  
+
                     call assoc_ids(entry)
-                    
+
                 end if ! --> if(filepath /= trim(entry%filename)) then
-                
+
                 !_______________________________________________________________
-                ! if the time rtime at the rec_count is larger than ctime we 
-                ! look for the closest record with the timestamp less than ctime
                 do k=entry%rec_count, 1, -1
-                    !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assert_nf B'//achar(27)//'[0m'//',  k=',k, ', rootpart=', entry%root_rank  
-                    ! determine rtime from exiting file
                     call assert_nf( nf90_get_var(entry%ncid, entry%tID, rtime), __LINE__)
                     if (ctime > rtime) then
                         entry%rec_count=k+1
-                        exit ! a proper rec_count detected, exit the loop
+                        exit
                     end if
                     if (k==1) then
                         write(*,*) 'I/O '//trim(entry%name)//' WARNING: the existing output file will be overwritten'//'; ', entry%rec_count, ' records in the file;'
                         entry%rec_count=1
-                        exit ! no appropriate rec_count detected
+                        exit
                     end if
                 end do
                 entry%rec_count=max(entry%rec_count, 1)
                 write(*,*) trim(entry%name)//': current mean I/O counter = ', entry%rec_count
             end if ! --> if(partit%mype == entry%root_rank) then
+            if(io_dbg_verbose .and. partit%mype==0) then
+                io_dbg_t1 = MPI_Wtime()
+                io_dbg_t_file_total = io_dbg_t_file_total + (io_dbg_t1 - io_dbg_t0)
+            end if
 #endif
+            if(io_dbg_verbose .and. partit%mype==0) io_dbg_t0 = MPI_Wtime()
             !___________________________________________________________________
             ! write double precision output
             if (entry%accuracy == i_real8) then
@@ -2433,21 +2510,53 @@ ctime=timeold+(dayold-1.)*86400
 !            if (n==1) then
             entry%rec_count = istep
             call send_data_to_multio(entry)
-!            end if            
+!            end if
 #else
+            if(io_dbg_verbose .and. partit%mype==0) then
+                io_dbg_t1 = MPI_Wtime()
+                io_dbg_t_copy_total = io_dbg_t_copy_total + (io_dbg_t1 - io_dbg_t0)
+            end if
             !___________________________________________________________________
             ! this is where the magic happens --> here do_output_callback is
             ! triggered as a method of the io_stream object --> call write_mean(...)
+            if(io_dbg_verbose .and. partit%mype==0) io_dbg_t0 = MPI_Wtime()
             call entry%thread%run()
             entry%thread_running = .true.
+            ! When many streams fire (year boundary), join immediately to
+            ! serialize MPI_Gatherv calls. Running 76 concurrent collectives
+            ! on separate communicators causes network contention and deadlock.
+            ! For normal months (~11 streams), async overlap is kept.
+            if(io_dbg_nfire > 15) then
+                call entry%thread%join()
+                entry%thread_running = .false.
+            end if
+            if(io_dbg_verbose .and. partit%mype==0) then
+                io_dbg_t1 = MPI_Wtime()
+                io_dbg_t_run_total = io_dbg_t_run_total + (io_dbg_t1 - io_dbg_t0)
+            end if
 #endif
         endif ! --> if (do_output) then
     end do ! --> do n=1, io_NSTREAMS
-    
+
+    ! Print timing summary when many streams fired (year boundary)
+    if(io_dbg_verbose .and. partit%mype==0) then
+        io_dbg_t1 = MPI_Wtime()
+        write(*,'(A)')       ' [IO_TIMING] ============================================='
+        write(*,'(A,I4)')    ' [IO_TIMING] Streams fired:       ', io_dbg_nfire
+        write(*,'(A,F10.3,A)') ' [IO_TIMING] Total loop time:     ', io_dbg_t1 - io_dbg_t_loop, ' s'
+        write(*,'(A,F10.3,A)') ' [IO_TIMING]   thread%join():     ', io_dbg_t_join_total, ' s'
+        write(*,'(A,F10.3,A)') ' [IO_TIMING]   file mgmt (root):  ', io_dbg_t_file_total, ' s'
+        write(*,'(A,F10.3,A)') ' [IO_TIMING]   data copy (OMP):   ', io_dbg_t_copy_total, ' s'
+        write(*,'(A,F10.3,A)') ' [IO_TIMING]   thread%run():      ', io_dbg_t_run_total,  ' s'
+        write(*,'(A,F10.3,A)') ' [IO_TIMING]   other/overhead:    ', &
+            (io_dbg_t1 - io_dbg_t_loop) - io_dbg_t_join_total - io_dbg_t_file_total - io_dbg_t_copy_total - io_dbg_t_run_total, ' s'
+        write(*,'(A)')       ' [IO_TIMING] ============================================='
+    end if
+
     !___________________________________________________________________________
     ! Handle 0D (scalar) output streams
     call output_0D_streams(istep, partit)
-    
+
     lfirst=.false.
 
 #if defined(__MULTIO)
@@ -2455,6 +2564,31 @@ ctime=timeold+(dayold-1.)*86400
         call iom_flush('N grid', istep)
     end if
 #endif
+
+    ! Debug: barrier + timing to measure how long ALL ranks take in output()
+    if(io_dbg_nfire > 15) then
+        io_dbg_t0 = MPI_Wtime()
+        ! Print pre-barrier time from a few ranks to see who is slow
+        if(partit%mype==0 .or. partit%mype==1 .or. &
+           partit%mype==partit%npes/2 .or. partit%mype==partit%npes-1) then
+            write(*,'(A,I5,A,F14.3,A,I6)') &
+                ' [IO_TIMING] rank ', partit%mype, ' pre-barrier wtime=', io_dbg_t0, ' step=', istep
+        end if
+        call MPI_Barrier(partit%MPI_COMM_FESOM, k)
+        io_dbg_t1 = MPI_Wtime()
+        if(partit%mype==0 .or. partit%mype==1 .or. &
+           partit%mype==partit%npes/2 .or. partit%mype==partit%npes-1) then
+            write(*,'(A,I5,A,F10.3,A,F14.3,A,I6)') &
+                ' [IO_TIMING] rank ', partit%mype, ' barrier wait=', io_dbg_t1-io_dbg_t0, &
+                ' post-barrier wtime=', io_dbg_t1, ' step=', istep
+        end if
+        if(partit%mype==0) then
+            write(*,'(A,F10.3,A,I6)') ' [IO_TIMING] Barrier after output loop: ', &
+                io_dbg_t1 - io_dbg_t0, ' s at step ', istep
+            write(*,'(A,F10.3,A)') ' [IO_TIMING] Total output() wall time: ', &
+                io_dbg_t1 - io_dbg_t_loop, ' s'
+        end if
+    end if
 
 end subroutine
 

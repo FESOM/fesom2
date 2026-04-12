@@ -750,6 +750,18 @@ contains
         !--------------------------
 
         f%t5 = MPI_Wtime()
+        ! --- STEP_TIMING: per-step phase timing at year boundary ---
+        if(f%mype==0 .and. (f%t5 - f%t4) > 5.0d0) then
+            write(*,'(A,I6,A,F14.3,A,F8.3,A,F8.3,A,F8.3,A,F8.3)') &
+                ' [STEP_TIMING] step=', n, ' wtime=', f%t5, &
+                ' forcing=', f%t1_frc - f%t0_frc, &
+                ' ice+flx=', f%t2 - f%t1_frc, &
+                ' oce_step=', f%t3 - f%t2, &
+                ' diag=', f%t4 - f%t3
+            write(*,'(A,F8.3,A,F14.3,A,F14.3)') &
+                ' [STEP_TIMING] output=', f%t5 - f%t4, &
+                ' output_enter=', f%t4, ' output_exit=', f%t5
+        end if
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("restart")
 #endif
@@ -758,7 +770,12 @@ contains
         call fesom_profiler_end("restart")
 #endif
         f%t6 = MPI_Wtime()
-        
+        if(f%mype==0 .and. (f%t5 - f%t4) > 5.0d0) then
+            write(*,'(A,I6,A,F8.3,A,F14.3)') &
+                ' [STEP_TIMING] step=', n, ' restart=', f%t6 - f%t5, &
+                ' step_done_wtime=', f%t6
+        end if
+
         f%rtime_fullice       = f%rtime_fullice       + f%t2 - f%t1
         f%rtime_compute_diag  = f%rtime_compute_diag  + f%t4 - f%t3
         f%rtime_write_means   = f%rtime_write_means   + f%t5 - f%t4

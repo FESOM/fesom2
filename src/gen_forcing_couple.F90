@@ -178,6 +178,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   
   !_____________________________________________________________________________
   t1=MPI_Wtime()
+  if(mype==0) write(*,'(A,F14.3,A,I6)') ' [CPL_TIMING] update_atm_forcing ENTER wtime=', t1, ' step=', istep
 #if defined (__oasis)
      if (firstcall) then
         allocate(exchange(myDim_nod2D+eDim_nod2D), mask(myDim_nod2D+eDim_nod2D))
@@ -187,6 +188,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
         mask          =0.
         firstcall=.false.
      end if
+     if(mype==0) write(*,'(A,F14.3)') ' [CPL_TIMING] oasis_send start wtime=', MPI_Wtime()
      do i=1,nsend
          exchange  =0.
          if (i.eq.1) then
@@ -271,17 +273,22 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
 #endif
          endif
+         if(mype==0) write(*,'(A,I3,A,F14.3)') ' [CPL_TIMING] oasis_send i=',i,' pre  wtime=', MPI_Wtime()
          call cpl_oasis3mct_send(i, exchange, action, partit)
+         if(mype==0) write(*,'(A,I3,A,F14.3,A,L1)') ' [CPL_TIMING] oasis_send i=',i,' post wtime=', MPI_Wtime(), ' action=', action
       end do
 #ifdef VERBOSE
-      do i=1, nsend 
-        if (mype==0) write(*,*) 'SEND: field ', i, ' max val:', maxval(exchange), ' . ACTION? ', action 
+      do i=1, nsend
+        if (mype==0) write(*,*) 'SEND: field ', i, ' max val:', maxval(exchange), ' . ACTION? ', action
       end do
 #endif
+      if(mype==0) write(*,'(A,F14.3)') ' [CPL_TIMING] oasis_send done, recv start wtime=', MPI_Wtime()
       mask=1.
       do i=1,nrecv
          exchange =0.0
+         if(mype==0) write(*,'(A,I3,A,F14.3)') ' [CPL_TIMING] oasis_recv i=',i,' pre  wtime=', MPI_Wtime()
          call cpl_oasis3mct_recv (i, exchange, action, partit)
+         if(mype==0) write(*,'(A,I3,A,F14.3,A,L1)') ' [CPL_TIMING] oasis_recv i=',i,' post wtime=', MPI_Wtime(), ' action=', action
          !if (.not. action) cycle
 	 !Do not apply a correction at first time step!
     if (i==1 .and. action .and. istep/=1) call net_rec_from_atm(action, partit)
@@ -489,6 +496,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 	  end if
 #endif
       end do
+      if(mype==0) write(*,'(A,F14.3)') ' [CPL_TIMING] oasis_recv done wtime=', MPI_Wtime()
 
     if ((do_rotate_oce_wind .AND. do_rotate_ice_wind) .AND. rotated_grid) then
         do n=1, myDim_nod2D+eDim_nod2D
@@ -593,6 +601,8 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 #endif /* (__oasis) */
 
   t2=MPI_Wtime()
+  if(mype==0) write(*,'(A,F14.3,A,F8.3,A,I6)') &
+    ' [CPL_TIMING] update_atm_forcing EXIT wtime=', t2, ' took=', t2-t1, 's step=', istep
 
 #ifdef VERBOSE
   if (mod(istep,logfile_outfreq)==0 .and. mype==0) then
