@@ -157,6 +157,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     use diagnostics, only: ldiag_DVD
     use g_forcing_param, only: use_age_tracer !---age-code
     use mod_transit, only: decay14, decay39
+    use cmor_variables_diag, only: ldiag_cmor, save_cmor_advection
     implicit none
     type(t_ice)   , intent(in)   , target    :: ice
     type(t_dyn)   , intent(inout), target    :: dynamics
@@ -259,7 +260,13 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
            tracers%work%del_ttf(:, node)=tracers%work%del_ttf(:, node)+tracers%work%del_ttf_advhoriz(:, node)+tracers%work%del_ttf_advvert(:, node)
         end do
 !$OMP END PARALLEL DO
- 
+
+        !___________________________________________________________________________
+        ! Save advection snapshot for CMOR tendency decomposition
+        if (ldiag_cmor .and. (tr_num <= 2)) then
+            call save_cmor_advection(tr_num, tracers%work%del_ttf(:, 1:myDim_nod2D), myDim_nod2D, nl-1)
+        end if
+
         !___________________________________________________________________________
         ! diffuse tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'

@@ -89,7 +89,7 @@ module io_MEANDATA
   character(len=1), save         :: filesplit_freq='y'
   integer, save                  :: compression_level=0
   type io_entry
-        CHARACTER(len=15)        :: id        ='unknown   '
+        CHARACTER(len=20)        :: id        ='unknown             '
         INTEGER                  :: freq      =0
         CHARACTER                :: unit      =''
         INTEGER                  :: precision =0
@@ -272,6 +272,30 @@ CASE ('pbo       ')
 CASE ('opottemptend')
     if (ldiag_cmor) then
     call def_stream(nod2D, myDim_nod2D, 'opottemptend', 'tendency of sea water potential temperature', 'W/m2', opottemptend(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Tendency of sea water potential temperature expressed as heat content")
+    end if
+CASE ('osalttend ')
+    if (ldiag_cmor) then
+    call def_stream(nod2D, myDim_nod2D, 'osalttend', 'tendency of sea water salinity', 'psu m/s', osalttend(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Tendency of sea water salinity expressed as salt content")
+    end if
+CASE ('opottemprmadvect')
+    if (ldiag_cmor) then
+    call def_stream(nod2D, myDim_nod2D, 'opottemprmadvect', 'temperature tendency due to advection', 'W/m2', opottemprmadvect(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Tendency of sea water potential temperature expressed as heat content due to residual mean advection")
+    end if
+CASE ('opottempdiff')
+    if (ldiag_cmor) then
+    call def_stream(nod2D, myDim_nod2D, 'opottempdiff', 'temperature tendency due to diffusion', 'W/m2', opottempdiff(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Tendency of sea water potential temperature expressed as heat content due to parameterized dianeutral mixing")
+    end if
+CASE ('osaltrmadvect')
+    if (ldiag_cmor) then
+    call def_stream(nod2D, myDim_nod2D, 'osaltrmadvect', 'salinity tendency due to advection', 'psu m/s', osaltrmadvect(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Tendency of sea water salinity expressed as salt content due to residual mean advection")
+    end if
+CASE ('osaltdiff ')
+    if (ldiag_cmor) then
+    call def_stream(nod2D, myDim_nod2D, 'osaltdiff', 'salinity tendency due to diffusion', 'psu m/s', osaltdiff(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Tendency of sea water salinity expressed as salt content due to parameterized dianeutral mixing")
+    end if
+CASE ('rsdoabsorb')
+    if (ldiag_cmor) then
+    call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), 'rsdoabsorb', 'shortwave flux absorbed in ocean layer', 'W/m2', rsdoabsorb(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 
 ! CMOR 0D (scalar) diagnostics for CMIP6/CMIP7 (require ldiag_cmor=.true.)
@@ -1713,13 +1737,39 @@ END DO ! --> DO i=1, io_listsize
         call def_stream((/nl,  nod2D/), (/nl, myDim_nod2D/), 'KvdSdz',   'KvdSdz',           'PSU m/s',   KvdSdz(:,:), 1, 'm', i_real8, partit, mesh)
     end if
     !___________________________________________________________________________
-    ! Tracers flux diagnostics without predefined freq, freq_unit, prec, -->
-    ! default monthly output
+    ! Tracers flux diagnostics. Default monthly output, but honor io_list
+    ! entries if the user requested a different frequency.
     if (ldiag_trflx .and. sel_trgrd_xyz==0) then
-        call def_stream((/nl-1,  elem2D/), (/nl-1, myDim_elem2D/), 'utemp',   'u*temp',           'm/s*°C',     tuv(1,:,:), 1, 'm', i_real8, partit, mesh)
-        call def_stream((/nl-1,  elem2D/), (/nl-1, myDim_elem2D/), 'vtemp',   'v*temp',           'm/s*°C',     tuv(2,:,:), 1, 'm', i_real8, partit, mesh)
-        call def_stream((/nl-1,  elem2D/), (/nl-1, myDim_elem2D/), 'usalt',   'u*salt',           'm/s*psu',   suv(1,:,:), 1, 'm', i_real8, partit, mesh)
-        call def_stream((/nl-1,  elem2D/), (/nl-1, myDim_elem2D/), 'vsalt',   'v*salt',           'm/s*psu',   suv(2,:,:), 1, 'm', i_real8, partit, mesh)
+        block
+            integer :: k, tf_freq
+            character :: tf_unit
+            character(len=5) :: tf_names(4)
+            character(len=6) :: tf_long(4)
+            character(len=8) :: tf_units(4)
+            tf_names = (/ 'utemp', 'vtemp', 'usalt', 'vsalt' /)
+            tf_long  = (/ 'u*temp', 'v*temp', 'u*salt', 'v*salt' /)
+            tf_units = (/ 'm/s*degC', 'm/s*degC', 'm/s*psu ', 'm/s*psu ' /)
+            do j = 1, 4
+                tf_freq = 1; tf_unit = 'm'
+                do k = 1, io_listsize
+                    if (trim(io_list(k)%id) == trim(tf_names(j))) then
+                        tf_freq = io_list(k)%freq
+                        tf_unit = io_list(k)%unit
+                        exit
+                    end if
+                end do
+                select case (j)
+                case (1)
+                    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), trim(tf_names(j)), trim(tf_long(j)), trim(tf_units(j)), tuv(1,:,:), tf_freq, tf_unit, i_real8, partit, mesh)
+                case (2)
+                    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), trim(tf_names(j)), trim(tf_long(j)), trim(tf_units(j)), tuv(2,:,:), tf_freq, tf_unit, i_real8, partit, mesh)
+                case (3)
+                    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), trim(tf_names(j)), trim(tf_long(j)), trim(tf_units(j)), suv(1,:,:), tf_freq, tf_unit, i_real8, partit, mesh)
+                case (4)
+                    call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/), trim(tf_names(j)), trim(tf_long(j)), trim(tf_units(j)), suv(2,:,:), tf_freq, tf_unit, i_real8, partit, mesh)
+                end select
+            end do
+        end block
     end if
     
     !___________________________________________________________________________
@@ -2452,8 +2502,8 @@ ctime=timeold+(dayold-1.)*86400
         do_output=.false.
         if (entry%freq_unit.eq.'y') then
             call annual_event(do_output, entry%freq)
-        else if (entry%freq_unit == 'm') then 
-            call monthly_event(do_output, entry%freq) 
+        else if (entry%freq_unit == 'm') then
+            call monthly_event(do_output, entry%freq)
         else if (entry%freq_unit == 'd') then
             call daily_event(do_output, entry%freq)
         else if (entry%freq_unit == 'h') then
@@ -2470,7 +2520,7 @@ ctime=timeold+(dayold-1.)*86400
 #if defined(__MULTIO)
         output_done = output_done .or. do_output
 #endif
-        
+
         !_______________________________________________________________________
         ! if its time for output --> do_output==.true.
         if (do_output) then
@@ -2478,7 +2528,7 @@ ctime=timeold+(dayold-1.)*86400
 #if !defined(__MULTIO)
             if(entry%thread_running) call entry%thread%join()
             entry%thread_running = .false.
-            
+
             ! define filepath
             if (filesplit_freq=='m') then
                 filepath = trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'_'//cmonth//'.nc'
@@ -2492,31 +2542,31 @@ ctime=timeold+(dayold-1.)*86400
                 !_______________________________________________________________
                 ! create new output file ?!
                 if(filepath /= trim(entry%filename)) then
-                    if("" /= trim(entry%filename)) call assert_nf(nf90_close(entry%ncid), __LINE__)   
+                    if("" /= trim(entry%filename)) call assert_nf(nf90_close(entry%ncid), __LINE__)
                     entry%filename = filepath
                     !___________________________________________________________
                     ! use any existing file with this name or create a new one
                     if( nf90_open(entry%filename, nf90_write, entry%ncid) /= nf90_noerr ) then
-                        !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call create_new_file'//achar(27)//'[0m'  
+                        !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call create_new_file'//achar(27)//'[0m'
                         call create_new_file(entry, ice, dynamics, partit, mesh)
-                        
-                        !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assert_nf A'//achar(27)//'[0m'//',  k=',k, ', rootpart=', entry%root_rank    
+
+                        !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assert_nf A'//achar(27)//'[0m'//',  k=',k, ', rootpart=', entry%root_rank
                         call assert_nf( nf90_open(entry%filename, nf90_write, entry%ncid), __LINE__)
                     end if
-                    
+
                     !___________________________________________________________
                     ! setup all dimension definition and attributes of the netcdf
-                    ! file 
-                    !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assoc_ids'//achar(27)//'[0m'  
+                    ! file
+                    !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assoc_ids'//achar(27)//'[0m'
                     call assoc_ids(entry)
-                    
+
                 end if ! --> if(filepath /= trim(entry%filename)) then
-                
+
                 !_______________________________________________________________
-                ! if the time rtime at the rec_count is larger than ctime we 
+                ! if the time rtime at the rec_count is larger than ctime we
                 ! look for the closest record with the timestamp less than ctime
                 do k=entry%rec_count, 1, -1
-                    !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assert_nf B'//achar(27)//'[0m'//',  k=',k, ', rootpart=', entry%root_rank  
+                    !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assert_nf B'//achar(27)//'[0m'//',  k=',k, ', rootpart=', entry%root_rank
                     ! determine rtime from exiting file
                     call assert_nf( nf90_get_var(entry%ncid, entry%tID, rtime), __LINE__)
                     if (ctime > rtime) then
@@ -2578,7 +2628,7 @@ ctime=timeold+(dayold-1.)*86400
 !            if (n==1) then
             entry%rec_count = istep
             call send_data_to_multio(entry)
-!            end if            
+!            end if
 #else
             !___________________________________________________________________
             ! this is where the magic happens --> here do_output_callback is
@@ -2588,11 +2638,11 @@ ctime=timeold+(dayold-1.)*86400
 #endif
         endif ! --> if (do_output) then
     end do ! --> do n=1, io_NSTREAMS
-    
+
     !___________________________________________________________________________
     ! Handle 0D (scalar) output streams
     call output_0D_streams(istep, partit)
-    
+
     lfirst=.false.
 
 #if defined(__MULTIO)
