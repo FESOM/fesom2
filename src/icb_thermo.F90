@@ -91,6 +91,13 @@ type(t_partit), intent(inout), target :: partit
   dz_acc = 0.0
 
 
+  ! Zero out per-level heat flux arrays before filling up to ib_n_lvls.
+  ! prepare_icb2fesom accesses these up to idx_d(i) which can exceed ib_n_lvls
+  ! for element nodes deeper than the shallowest node; stale values from the
+  ! previous iceberg step would otherwise inject spurious heat into the ocean.
+  hfl_flux_ib(ib,:)  = 0.0
+  hfbv_flux_ib(ib,:) = 0.0
+
   n2=elem2D_nodes(1,elem)
   do n=1,ib_n_lvls
   !3-eq. formulation for lateral 'basal' melting [m/s]
