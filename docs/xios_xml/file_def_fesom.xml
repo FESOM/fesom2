@@ -34,7 +34,7 @@
     </file>
 
     <!-- 2D fields on elements -->
-    <file id="fesom_mon_2d_elem" name="fesom_mon_2d_elem"
+    <file id="fesom_mon_2d_elem" name="fesom_mon_2d_elem" par_access="independent"
           description="FESOM monthly 2D fields on elements">
       <field field_ref="tx_sur"/>
       <field field_ref="ty_sur"/>
@@ -54,7 +54,7 @@
     </file>
 
     <!-- 3D fields on elements -->
-    <file id="fesom_mon_3d_elem" name="fesom_mon_3d_elem"
+    <file id="fesom_mon_3d_elem" name="fesom_mon_3d_elem" par_access="independent"
           description="FESOM monthly 3D fields on elements">
       <field field_ref="u"/>
       <field field_ref="v"/>

@@ -18,4 +18,14 @@
     <axis   axis_ref="nz"/>
   </grid>
 
+  <!-- 3D grids (interface / w-grid vertical axis, nl levels) -->
+  <grid id="grid_3d_nod_nz1"  description="3D grid on FESOM nodes, w/interface levels">
+    <domain domain_ref="nodes"/>
+    <axis   axis_ref="nz1"/>
+  </grid>
+  <grid id="grid_3d_elem_nz1" description="3D grid on FESOM elements, w/interface levels">
+    <domain domain_ref="elements"/>
+    <axis   axis_ref="nz1"/>
+  </grid>
+
 </grid_definition>

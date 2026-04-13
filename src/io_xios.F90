@@ -34,7 +34,24 @@ module io_xios_module
   type(xios_context), save :: ctx_hdl
   logical,            save :: xios_on = .false.
 
+  ! Indices (1-based, into the local myDim_elem2D list) of elements owned by
+  ! this rank — i.e. those sent to XIOS. Populated in io_xios_init.
+  integer,     allocatable, save, target :: owned_elem_local(:)
+  integer,                  save :: n_owned_elem = 0
+
+  public :: io_xios_owned_elem_local, io_xios_n_owned_elem
+
 contains
+
+  function io_xios_owned_elem_local() result(p)
+    integer, pointer :: p(:)
+    p => null()
+    if (allocated(owned_elem_local)) p => owned_elem_local
+  end function
+
+  integer function io_xios_n_owned_elem() result(n)
+    n = n_owned_elem
+  end function
 
   logical function io_xios_is_on() result(r)
     r = xios_on
@@ -51,7 +68,7 @@ contains
     integer,         intent(in)         :: parent_comm
     integer,         intent(out)        :: client_comm
 
-    integer                       :: i, e, n1, n2, n3, nn, ne, nz_cell
+    integer                       :: i, e, n1, n2, n3, nn, ne, ne_owned, nz_cell
     real(kind=8), allocatable     :: lon_n(:),  lat_n(:)
     real(kind=8), allocatable     :: lon_e(:),  lat_e(:)
     integer,      allocatable     :: i_index_n(:), i_index_e(:)
@@ -94,46 +111,67 @@ contains
     deallocate(lon_n, lat_n, i_index_n)
 
     ! --- 5. unstructured element (triangle-centre) domain "elements" --------
-    allocate(lon_e(ne), lat_e(ne), i_index_e(ne))
+    ! FESOM's myList_elem2D overlaps across ranks (any element touching a node
+    ! owned by this rank is in the list), which makes XIOS complain about
+    ! duplicated i_index. Restrict to elements STRICTLY owned by this rank,
+    ! where ownership = min(partit%part) over the element's 3 vertex nodes.
+    ! All ranks agree on the same partit%part array, so each global element
+    ! ends up claimed by exactly one rank.
+    allocate(lon_e(ne), lat_e(ne), i_index_e(ne), owned_elem_local(ne))
+    ne_owned = 0
     do e = 1, ne
        n1 = mesh%elem2D_nodes(1, e)
        n2 = mesh%elem2D_nodes(2, e)
        n3 = mesh%elem2D_nodes(3, e)
-       ! centroid in geographic coords (degrees).
-       ! NOTE: naive average; OK away from the poles / dateline. If needed
-       !       replace with the cartesian-average-then-reproject trick.
+       if (min(partit%part(n1), partit%part(n2), partit%part(n3)) &
+                                                    /= partit%mype) cycle
+       ne_owned = ne_owned + 1
+       owned_elem_local(ne_owned) = e
        xlon = ( mesh%geo_coord_nod2D(1, n1) &
               + mesh%geo_coord_nod2D(1, n2) &
               + mesh%geo_coord_nod2D(1, n3) ) / 3.0_WP
        ylat = ( mesh%geo_coord_nod2D(2, n1) &
               + mesh%geo_coord_nod2D(2, n2) &
               + mesh%geo_coord_nod2D(2, n3) ) / 3.0_WP
-       lon_e(e)    = xlon / rad
-       lat_e(e)    = ylat / rad
-       i_index_e(e)= partit%myList_elem2D(e) - 1
+       lon_e(ne_owned)     = xlon / rad
+       lat_e(ne_owned)     = ylat / rad
+       i_index_e(ne_owned) = partit%myList_elem2D(e) - 1
     end do
+    n_owned_elem = ne_owned
 
-    call xios_set_domain_attr("elements",           &
-         type        = "unstructured",              &
-         ni_glo      = mesh%elem2D,                 &
-         ni          = ne,                          &
-         ibegin      = 0,                           &
-         i_index     = i_index_e,                   &
-         lonvalue_1d = lon_e,                       &
-         latvalue_1d = lat_e,                       &
-         data_dim    = 1,                           &
-         data_ni     = ne)
+    ! Sort the strictly-owned elements by global index. XIOS server2 maps
+    ! i_index -> server rank assuming roughly monotonic indices per client;
+    ! unsorted scatter causes uneven server chunks (e.g. some servers ending
+    ! up with a tiny handful of elements while the domain global array is
+    ! redistributed as a whole -> writeDomain_ 'intern vs input' mismatch).
+    call sort_owned_by_gid(i_index_e, lon_e, lat_e, owned_elem_local, ne_owned)
+
+    ! Omit ibegin: per XIOS 2.5 domain.cpp:479-488, supplying i_index causes
+    ! XIOS to set ibegin = i_index(0). Explicitly passing ibegin=0 alongside
+    ! i_index confuses the server-side band distribution attribute check.
+    call xios_set_domain_attr("elements",                   &
+         type        = "unstructured",                      &
+         ni_glo      = mesh%elem2D,                         &
+         ni          = ne_owned,                            &
+         i_index     = i_index_e(1:ne_owned),               &
+         lonvalue_1d = lon_e(1:ne_owned),                   &
+         latvalue_1d = lat_e(1:ne_owned),                   &
+         data_dim    = 1,                                   &
+         data_ni     = ne_owned)
 
     deallocate(lon_e, lat_e, i_index_e)
 
-    ! --- 6. vertical axis "nz" (cell-centred, nl-1 layers) ------------------
+    ! --- 6. vertical axes ---------------------------------------------------
+    !   nz  : cell-centred,  nl-1 layers (for T, S, u, v, unod, vnod, ...)
+    !   nz1 : interface/w-grid, nl levels (for w, bolus_w, Kv, N2, ...)
     nz_cell = mesh%nl - 1
     allocate(z_mid(nz_cell))
     do i = 1, nz_cell
        z_mid(i) = 0.5_WP * (mesh%zbar(i) + mesh%zbar(i+1))
     end do
-    call xios_set_axis_attr("nz", n_glo = nz_cell, value = z_mid)
+    call xios_set_axis_attr("nz",  n_glo = nz_cell, value = z_mid)
     deallocate(z_mid)
+    call xios_set_axis_attr("nz1", n_glo = mesh%nl, value = mesh%zbar(1:mesh%nl))
 
     ! --- 7. timestep (required by XIOS before close_context_definition) -----
     call xios_set_timestep(timestep = xios_duration(second = dt))
@@ -159,14 +197,20 @@ contains
   subroutine io_xios_send_2d_r8(name, buf)
     character(len=*), intent(in) :: name
     real(kind=8),     intent(in) :: buf(:)
+    logical :: is_valid
     if (.not. xios_on) return
+    is_valid = xios_is_valid_field(trim(name))
+    if (.not. is_valid) return
     call xios_send_field(trim(name), buf)
   end subroutine
 
   subroutine io_xios_send_2d_r4(name, buf)
     character(len=*), intent(in) :: name
     real(kind=4),     intent(in) :: buf(:)
+    logical :: is_valid
     if (.not. xios_on) return
+    is_valid = xios_is_valid_field(trim(name))
+    if (.not. is_valid) return
     call xios_send_field(trim(name), buf)
   end subroutine
 
@@ -175,15 +219,43 @@ contains
   subroutine io_xios_send_3d_r8(name, buf)
     character(len=*), intent(in) :: name
     real(kind=8),     intent(in) :: buf(:,:)
+    logical :: is_valid
     if (.not. xios_on) return
+    is_valid = xios_is_valid_field(trim(name))
+    if (.not. is_valid) return
     call xios_send_field(trim(name), buf)
   end subroutine
 
   subroutine io_xios_send_3d_r4(name, buf)
     character(len=*), intent(in) :: name
     real(kind=4),     intent(in) :: buf(:,:)
+    logical :: is_valid
     if (.not. xios_on) return
+    is_valid = xios_is_valid_field(trim(name))
+    if (.not. is_valid) return
     call xios_send_field(trim(name), buf)
+  end subroutine
+
+
+  !> Insertion sort owned elements by global index (i_index), carrying
+  !> lon/lat/local-id in lock-step. ne_owned is typically ~1000-3000 per rank,
+  !> so O(n^2) is fine here.
+  subroutine sort_owned_by_gid(idx, lon, lat, loc, n)
+    integer, intent(inout) :: idx(:), loc(:)
+    real(kind=8), intent(inout) :: lon(:), lat(:)
+    integer, intent(in) :: n
+    integer :: i, j, k_idx, k_loc
+    real(kind=8) :: k_lon, k_lat
+    do i = 2, n
+       k_idx = idx(i); k_lon = lon(i); k_lat = lat(i); k_loc = loc(i)
+       j = i - 1
+       do while (j >= 1)
+          if (idx(j) <= k_idx) exit
+          idx(j+1) = idx(j); lon(j+1) = lon(j); lat(j+1) = lat(j); loc(j+1) = loc(j)
+          j = j - 1
+       end do
+       idx(j+1) = k_idx; lon(j+1) = k_lon; lat(j+1) = k_lat; loc(j+1) = k_loc
+    end do
   end subroutine
 
 
