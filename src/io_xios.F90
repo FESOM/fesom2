@@ -529,12 +529,75 @@ contains
 
 #else
   ! Stub module when built without XIOS; keeps `use io_xios_module` legal.
+  ! All symbols imported by io_meandata.F90 must exist here as no-ops so
+  ! the standalone (non-XIOS) build links without modification.
   implicit none
   private
   public :: io_xios_is_on
+  public :: io_xios_send_2d_r8, io_xios_send_3d_r8
+  public :: io_xios_send_2d_r4, io_xios_send_3d_r4
+  public :: io_xios_owned_elem_local, io_xios_n_owned_elem
+  public :: io_xios_set_ice_conc, io_xios_is_ice_field
+  public :: io_xios_apply_ice_mask_2d_r4, io_xios_apply_ice_mask_2d_r8
+  public :: io_xios_apply_ice_mask_2d_elem_r4, io_xios_apply_ice_mask_2d_elem_r8
 contains
   logical function io_xios_is_on() result(r)
     r = .false.
   end function
+
+  subroutine io_xios_send_2d_r8(name, buf)
+    character(len=*), intent(in) :: name
+    real(kind=8),     intent(in) :: buf(:)
+  end subroutine
+
+  subroutine io_xios_send_2d_r4(name, buf)
+    character(len=*), intent(in) :: name
+    real(kind=4),     intent(in) :: buf(:)
+  end subroutine
+
+  subroutine io_xios_send_3d_r8(name, buf)
+    character(len=*), intent(in) :: name
+    real(kind=8),     intent(in) :: buf(:,:)
+  end subroutine
+
+  subroutine io_xios_send_3d_r4(name, buf)
+    character(len=*), intent(in) :: name
+    real(kind=4),     intent(in) :: buf(:,:)
+  end subroutine
+
+  function io_xios_owned_elem_local() result(p)
+    integer, pointer :: p(:)
+    p => null()
+  end function
+
+  integer function io_xios_n_owned_elem() result(n)
+    n = 0
+  end function
+
+  subroutine io_xios_set_ice_conc(p, elem_nodes)
+    real(kind=8), target, intent(in) :: p(:)
+    integer,      target, intent(in) :: elem_nodes(:,:)
+  end subroutine
+
+  logical function io_xios_is_ice_field(name) result(r)
+    character(len=*), intent(in) :: name
+    r = .false.
+  end function
+
+  subroutine io_xios_apply_ice_mask_2d_r8(buf)
+    real(kind=8), intent(inout) :: buf(:)
+  end subroutine
+
+  subroutine io_xios_apply_ice_mask_2d_r4(buf)
+    real(kind=4), intent(inout) :: buf(:)
+  end subroutine
+
+  subroutine io_xios_apply_ice_mask_2d_elem_r8(buf)
+    real(kind=8), intent(inout) :: buf(:)
+  end subroutine
+
+  subroutine io_xios_apply_ice_mask_2d_elem_r4(buf)
+    real(kind=4), intent(inout) :: buf(:)
+  end subroutine
 #endif
 end module io_xios_module
