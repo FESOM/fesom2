@@ -773,7 +773,7 @@ contains
         call fesom_profiler_end("restart")
 #endif
         f%t6 = MPI_Wtime()
-
+        
         f%rtime_fullice       = f%rtime_fullice       + f%t2 - f%t1
         f%rtime_compute_diag  = f%rtime_compute_diag  + f%t4 - f%t3
         f%rtime_write_means   = f%rtime_write_means   + f%t5 - f%t4

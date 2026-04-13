@@ -449,8 +449,8 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
          call cpl_oasis3mct_send(i, exchange, action, partit)
       end do
 #ifdef VERBOSE
-      do i=1, nsend
-        if (mype==0) write(*,*) 'SEND: field ', i, ' max val:', maxval(exchange), ' . ACTION? ', action
+      do i=1, nsend 
+        if (mype==0) write(*,*) 'SEND: field ', i, ' max val:', maxval(exchange), ' . ACTION? ', action 
       end do
 #endif
       mask=1.
