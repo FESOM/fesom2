@@ -48,6 +48,9 @@ module fesom_main_storage_module
 #if defined (__oasis)
   use cpl_driver
 #endif
+#if defined (__yac)
+use cpl_yac_driver
+#endif
 
 ! define recom module
 #if defined (__recom)
@@ -159,7 +162,10 @@ contains
 #if defined (__oasis)
 
         call cpl_oasis3mct_init(f%partit,f%partit%MPI_COMM_FESOM)
+#elif defined (__yac)
+        call cpl_yac_init(f%partit%MPI_COMM_FESOM)
 #endif
+
         f%t1 = MPI_Wtime()
 
         ! Initialize enhanced profiler
@@ -371,6 +377,11 @@ contains
             call allocate_icb(f%partit, f%mesh)
         endif
         ! --------------
+
+#if defined (__yac)
+        call cpl_yac_define_unstr(f%partit, f%mesh)
+        if(f%mype==0)  write(*,*) 'FESOM ---->     cpl_yac_define_unstr nsend, nrecv:',nsend, nrecv
+#endif
 
 #if defined (__icepack)
         !=====================
@@ -682,7 +693,11 @@ contains
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("update_atm_forcing")
 #endif
+#if defined (__yac)
+            call update_atm_forcing_yac(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
+#else
             call update_atm_forcing(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
+#endif 
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("update_atm_forcing")
 #endif
@@ -770,18 +785,6 @@ contains
         !--------------------------
 
         f%t5 = MPI_Wtime()
-        ! --- STEP_TIMING: per-step phase timing at year boundary ---
-        if(f%mype==0 .and. (f%t5 - f%t4) > 5.0d0) then
-            write(*,'(A,I6,A,F14.3,A,F8.3,A,F8.3,A,F8.3,A,F8.3)') &
-                ' [STEP_TIMING] step=', n, ' wtime=', f%t5, &
-                ' forcing=', f%t1_frc - f%t0_frc, &
-                ' ice+flx=', f%t2 - f%t1_frc, &
-                ' oce_step=', f%t3 - f%t2, &
-                ' diag=', f%t4 - f%t3
-            write(*,'(A,F8.3,A,F14.3,A,F14.3)') &
-                ' [STEP_TIMING] output=', f%t5 - f%t4, &
-                ' output_enter=', f%t4, ' output_exit=', f%t5
-        end if
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("restart")
 #endif
@@ -790,12 +793,7 @@ contains
         call fesom_profiler_end("restart")
 #endif
         f%t6 = MPI_Wtime()
-        if(f%mype==0 .and. (f%t5 - f%t4) > 5.0d0) then
-            write(*,'(A,I6,A,F8.3,A,F14.3)') &
-                ' [STEP_TIMING] step=', n, ' restart=', f%t6 - f%t5, &
-                ' step_done_wtime=', f%t6
-        end if
-
+        
         f%rtime_fullice       = f%rtime_fullice       + f%t2 - f%t1
         f%rtime_compute_diag  = f%rtime_compute_diag  + f%t4 - f%t3
         f%rtime_write_means   = f%rtime_write_means   + f%t5 - f%t4
@@ -855,6 +853,7 @@ contains
          call iceberg_out(f%partit)
     end if
     ! --------------
+
     call finalize_output()
     call finalize_restart()
 

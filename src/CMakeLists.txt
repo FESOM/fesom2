@@ -71,6 +71,9 @@ if(${ENABLE_OPENMP})
    find_package(OpenMP REQUIRED COMPONENTS Fortran)
 endif()
 
+option(RECOM_COUPLED "Use RECOM" OFF)
+message(STATUS "RECOM_COUPLED: ${RECOM_COUPLED}")
+
 option(USE_ICEPACK "Use ICEPACK" OFF)
 message(STATUS "USE_ICEPACK: ${USE_ICEPACK}")
 
@@ -301,6 +304,13 @@ endif()
 if(${ASYNC_ICEBERGS})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __async_icebergs)
 endif()
+
+if(${USE_YAC})
+  include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindYAC.cmake)
+  target_compile_definitions(${PROJECT_NAME} PRIVATE __yac __coupled)
+  list(APPEND sources_Fortran ${src_home}/cpl_yac_driver.F90)
+endif()
+
 if(${OIFS_COUPLED})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __oifs)
 endif()
@@ -326,7 +336,7 @@ if(OPENMP_REPRODUCIBLE)
 endif()
 
 if(${RECOM_COUPLED})
-   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2 __3Zoo2Det __coccos)# __usetp)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2) # __3Zoo2Det __coccos)# __usetp)
 endif()
 
 if(${CISO_COUPLED})
@@ -400,12 +410,16 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 #    target_compile_options(${PROJECT_NAME} PRIVATE -O3 -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
    if(${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu )
       message(STATUS "Allowing type mismatches on Ubuntu for CI Testing" )  # NOTE(PG): Would be nicer to grab the CI=True from the env variable
-      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch -cpp)
+      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -cpp)
    else()
       target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -cpp)
    endif()
-   if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10 )
-      target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
+   if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+      if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
+         target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
+      else()
+         target_compile_options(${PROJECT_NAME} PRIVATE -Wno-argument-mismatch)
+      endif()
    endif()
    
    # platform specific compiler flags
@@ -504,6 +518,13 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${MCT_Fortran_LIBRARIES} ${MPEU_Fo
 # OASIS-YAK
 target_link_libraries(${PROJECT_NAME} PRIVATE ${YACUTILS_Fortran_LIBRARIES} ${YACCORE_Fortran_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} PRIVATE ${YAXT_Fortran_LIBRARIES} ${YAXTC_Fortran_LIBRARIES})
+# Use PUBLIC linkage for YAC when building from source (BUILD_YAC=ON)
+# This ensures transitive shared library dependencies (like libfyaml) are propagated to fesom.x
+if(BUILD_YAC)
+    target_link_libraries(${PROJECT_NAME} PUBLIC ${YAC_Fortran_LIBRARIES})
+else()
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${YAC_Fortran_LIBRARIES})
+endif()
 
 
 #set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
