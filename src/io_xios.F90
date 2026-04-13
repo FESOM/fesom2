@@ -18,10 +18,19 @@
 module io_xios_module
 #if defined(__XIOS)
   use xios
-  use mod_mesh,   only: T_MESH
-  use mod_partit, only: T_PARTIT
-  use o_param,    only: WP, rad
-  use g_config,   only: dt
+  use mod_mesh,    only: T_MESH
+  use mod_partit,  only: T_PARTIT
+  use o_param,     only: WP, rad
+  use g_config,    only: dt
+  use g_clock,     only: yearnew, daynew, timenew
+  use diagnostics,          only: ldiag_solver, lcurt_stress_surf,       &
+                                  ldiag_curl_vel3, ldiag_Ri,             &
+                                  ldiag_TurbFlux, ldiag_salt3D,          &
+                                  ldiag_dMOC, ldiag_DVD, ldiag_forc,     &
+                                  ldiag_extflds, ldiag_destine,          &
+                                  ldiag_ice, ldiag_trflx,                &
+                                  ldiag_uvw_sqr, ldiag_trgrd_xyz
+  use cmor_variables_diag,  only: ldiag_cmor
   implicit none
   private
 
@@ -86,6 +95,45 @@ contains
     call xios_context_initialize("fesom", parent_comm)
     call xios_get_handle("fesom", ctx_hdl)
     call xios_set_current_context(ctx_hdl)
+
+    ! --- 2b. optional XML override of FESOM diagnostic flags (OIFS pattern).
+    ! Must run before init_cmor_diag / compute_diag(mode=0) allocates arrays.
+    ! Each flag retains its namelist value if absent from the XML.
+    block
+      logical :: ov
+      ov = xios_getvar("ldiag_solver",      ldiag_solver)
+      if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_solver=',      ldiag_solver
+      ov = xios_getvar("lcurt_stress_surf", lcurt_stress_surf)
+      if (ov .and. partit%mype==0) write(*,*) '[XIOS] lcurt_stress_surf=', lcurt_stress_surf
+      ov = xios_getvar("ldiag_curl_vel3",   ldiag_curl_vel3)
+      if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_curl_vel3=',   ldiag_curl_vel3
+      ov = xios_getvar("ldiag_Ri",          ldiag_Ri)
+      if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_Ri=',          ldiag_Ri
+      ov = xios_getvar("ldiag_TurbFlux",    ldiag_TurbFlux)
+      if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_TurbFlux=',    ldiag_TurbFlux
+      ov = xios_getvar("ldiag_salt3D",      ldiag_salt3D)
+      if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_salt3D=',      ldiag_salt3D
+      ov = xios_getvar("ldiag_dMOC",        ldiag_dMOC)
+      if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_dMOC=',        ldiag_dMOC
+      ov = xios_getvar("ldiag_DVD",         ldiag_DVD)
+      if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_DVD=',         ldiag_DVD
+      ov = xios_getvar("ldiag_forc",        ldiag_forc)
+      if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_forc=',        ldiag_forc
+      ov = xios_getvar("ldiag_extflds",     ldiag_extflds)
+      if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_extflds=',     ldiag_extflds
+      ov = xios_getvar("ldiag_destine",     ldiag_destine)
+      if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_destine=',     ldiag_destine
+      ov = xios_getvar("ldiag_ice",         ldiag_ice)
+      if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_ice=',         ldiag_ice
+      ov = xios_getvar("ldiag_trflx",       ldiag_trflx)
+      if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_trflx=',       ldiag_trflx
+      ov = xios_getvar("ldiag_uvw_sqr",     ldiag_uvw_sqr)
+      if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_uvw_sqr=',     ldiag_uvw_sqr
+      ov = xios_getvar("ldiag_trgrd_xyz",   ldiag_trgrd_xyz)
+      if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_trgrd_xyz=',   ldiag_trgrd_xyz
+      ov = xios_getvar("ldiag_cmor",        ldiag_cmor)
+      if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_cmor=',        ldiag_cmor
+    end block
 
     ! --- 3. calendar: left to XML (calendar_type on the context element) -----
 
@@ -175,6 +223,17 @@ contains
 
     ! --- 7. timestep (required by XIOS before close_context_definition) -----
     call xios_set_timestep(timestep = xios_duration(second = dt))
+
+    ! --- 7b. calendar origin / start date (drives filename date suffix) -----
+    ! Without these the split suffix comes out as "0000-0000". Matches the
+    ! OIFS suxios.F90 pattern. time_origin = Jan 1 of the run's start year,
+    ! start_date = time_origin + (daynew-1) days + timenew seconds.
+    call xios_set_time_origin(time_origin = &
+         xios_date(yearnew, 1, 1, 0, 0, 0))
+    call xios_set_start_date(start_date =   &
+         xios_date(yearnew, 1, 1, 0, 0, 0) + &
+         xios_duration(day = real(daynew - 1, kind=8), &
+                       second = real(timenew, kind=8)))
 
     ! --- 8. close context definition ----------------------------------------
     call xios_close_context_definition()

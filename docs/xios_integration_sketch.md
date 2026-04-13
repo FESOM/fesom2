@@ -350,3 +350,85 @@ Suggested phasing:
 4. Week 4: integrate with AWI-ESM3 coupled config (OASIS + MULTIO + XIOS coexistence).
 
 Fallback at any stage: `FESOM_WITH_XIOS=OFF` or per-stream `use_xios=.false.` → existing path.
+
+---
+
+## Appendix: Option 1 — teaching XIOS server2 about scattered unstructured domains
+
+### Why elements break and nodes don't
+- FESOM's node partition is a contiguous prefix partition: rank r owns global IDs
+  `[part(r), part(r+1))`. XIOS server2 one_file slices by `(ibegin, ni)` and the
+  slice exactly matches the owned IDs — coherence passes.
+- FESOM's element partition is derived from nodes and is scattered: each rank's
+  `myList_elem2D` spans a wide global-index range containing IDs it doesn't own.
+  Server2 slices by `(ibegin, ni)` of each client's declared bounding range;
+  multiple clients claim overlapping ranges while `i_index` disambiguates
+  ownership, so server2's coherence check (which ignores `i_index`) aborts with
+  `input=<ni_glo> intern=<chunk_size>`.
+
+### Fix strategy
+Make server2 honor `i_index` for `type="unstructured"` instead of slicing by
+`(ibegin, ni)`. Server1 already forwards per-client chunks correctly; server2
+just needs the scattered map to rebuild its stripe.
+
+### Phase 1 — propagate `i_index` to server1
+- `xios/src/node/domain.cpp` `sendDistributionAttributes()` (≈L2313-2360):
+  when `isUnstructed_=true`, append the `i_index` array to the message.
+- `xios/src/node/domain.cpp` `recvDistributionAttributes()` (≈L2737-2753):
+  receive and store the array on server1. i_index is sent once at init, not
+  per timestep, so message-size cost is bounded.
+
+### Phase 2 — index-based server2 distribution
+- `xios/src/node/grid.cpp` `computeWrittenIndex()` (≈L2130-2169): branch on
+  `isUnstructed_`. Use the existing `CDistributionServer` constructor variant
+  at `xios/src/distribution_server.cpp` L99-150 that accepts
+  `globalIndexElements` (scattered map), instead of the contiguous-stripe
+  constructor at L47-89.
+
+### Phase 3 — relax the coherence check
+- Locate the site emitting `input=... intern=...` (prerequisite grep in the
+  XIOS tree, probably in a field/grid event handler validating server1→server2
+  chunks). Guard with `isUnstructed_`: for unstructured, verify each incoming
+  global index lies in the local `i_index` map rather than in
+  `[ibegin, ibegin+ni)`.
+
+### Phase 4 — writer path
+- `CField` / `CContextServer` writer already goes through `globalLocalIndexMap_`
+  (domain.cpp:2830), so no changes expected once Phases 1-3 land.
+
+### Risks
+- Regression on structured domains — mitigated by the `isUnstructed_` guard.
+- i_index message bloat on server1 init comms — one-shot, acceptable.
+- Single-server unstructured path must keep working (no server2 involvement, no
+  change expected).
+
+### Test surface
+- XIOS `test/` suite, particularly any test with `using_server2=true`.
+- FESOM smoke run with element-based streams (`u`, `v`, `Av`, `bolus_u/v`, etc.)
+  under `using_server2=true`, `ratio_server2=75`, `type="one_file"`.
+
+### Why not client-side Alltoallv (Option B, aborted)
+- Pushes redistribution to ~N_fesom client ranks on every send, wasting CPU we
+  want for the model. Server1 in our setup is underused; the server1↔server2
+  stage is the natural place for this work.
+- Architecturally it papers over a real XIOS limitation rather than fixing it;
+  the Option 1 patch is upstreamable.
+
+## Root-cause finding (smoke_019, instrumented XIOS)
+
+Instrumented `domain.cpp` send/recv, `grid.cpp` srvDist+accum, `nc4_data_output.cpp` ONE_FILE, and `onetcdf4.cpp` getWriteDataInfos. Smoke_019 produced the smoking gun:
+
+**First level (FESOM client → server1, 8 ranks 1161-1168):** correct.
+- elem domain (`__domain_undef_id_1/_3/_5`, ni_glo=244659): each server1 receives ni≈30583, ibegin = k*30583. 
+- node domain (`_0/_2/_4`, ni_glo=126858): each server1 receives ni≈15858.
+
+**Second level (server1 → server2):** broken.
+- All 8 server1 ranks invoke sendDistributionAttributes with `nbServer=1, targetRank=0, ni_srv=ni_glo, ibegin_srv=0`.
+- I.e. each server1 dumps the **full** ni_glo onto a single server2 target, with everyone claiming ibegin=0.
+- This applies to BOTH unstructured (FESOM elem/node) AND structured (OIFS 400×192). Not unique to FESOM.
+
+**Consequence on server2 rank 1169:** receives overlapping ibegin=0 chunks from multiple server1 senders, ends up with `cell(244659)` in netCDF dim but `caller_count=[31]` for the lat write — the 31 falls out of last-writer/coalescing logic, the "= days in January" was coincidence.
+
+**Real bug:** `client->serverSize == 1` in the secondary-pool client on every server1. The splitter (`computeBandDistribution`) has nothing to split across, so with `nbServer=1` it correctly assigns the whole domain to "rank 0" — but that "rank 0" is a different physical server2 for each server1, with no coordination.
+
+**Next:** trace where the secondary-pool `CContextClient::serverSize` is constructed (likely `CServer::initSecondaryServer` or the secondary `CContextClient` constructor in `context.cpp`) and find why it ends up as 1 instead of 24.

@@ -11,5 +11,28 @@
     <variable_group id="fesom_runtime">
       <variable id="using_server" type="bool">true</variable>
     </variable_group>
+
+    <!-- FESOM diagnostic flags. Override &diag_list namelist values from XML
+         via xios_getvar() in io_xios_init (called after setup_model/namelist
+         read, before any diag-gated allocation). If a variable is omitted
+         here the namelist value stands. -->
+    <variable_group id="fesom_diag_flags">
+      <variable id="ldiag_solver"      type="bool">false</variable>
+      <variable id="lcurt_stress_surf" type="bool">false</variable>
+      <variable id="ldiag_curl_vel3"   type="bool">false</variable>
+      <variable id="ldiag_Ri"          type="bool">false</variable>
+      <variable id="ldiag_TurbFlux"    type="bool">false</variable>
+      <variable id="ldiag_salt3D"      type="bool">false</variable>
+      <variable id="ldiag_dMOC"        type="bool">false</variable>
+      <variable id="ldiag_DVD"         type="bool">false</variable>
+      <variable id="ldiag_forc"        type="bool">false</variable>
+      <variable id="ldiag_extflds"     type="bool">false</variable>
+      <variable id="ldiag_destine"     type="bool">false</variable>
+      <variable id="ldiag_ice"         type="bool">false</variable>
+      <variable id="ldiag_trflx"       type="bool">true </variable>
+      <variable id="ldiag_uvw_sqr"     type="bool">false</variable>
+      <variable id="ldiag_trgrd_xyz"   type="bool">false</variable>
+      <variable id="ldiag_cmor"        type="bool">true </variable>
+    </variable_group>
   </variable_definition>
 </context>

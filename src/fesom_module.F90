@@ -945,17 +945,19 @@ contains
     call MPI_AllREDUCE(MPI_IN_PLACE, max_rtime,  14, MPI_REAL, MPI_MAX, f%MPI_COMM_FESOM, f%MPIerr)
     call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime,  14, MPI_REAL, MPI_MIN, f%MPI_COMM_FESOM, f%MPIerr)
     
-#if defined (__oifs) 
+#if defined (__XIOS)
+   ! Must finalize XIOS BEFORE MPI/OASIS teardown so server2 receives
+   ! the client-finalize signal on MPI_COMM_WORLD (matches NEMO/OIFS).
+   call io_xios_close()
+#endif
+
+#if defined (__oifs)
     ! OpenIFS coupled version has to call oasis_terminate through par_ex
     call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
 #endif
 
 #if defined(__MULTIO) && !defined(__ifsinterface) && !defined(__oasis)
    call mpp_stop
-#endif
-
-#if defined (__XIOS)
-   call io_xios_close()
 #endif
     ! Generate enhanced profiler report BEFORE MPI finalization
 #if defined (FESOM_PROFILING)
