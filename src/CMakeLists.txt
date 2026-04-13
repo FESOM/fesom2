@@ -270,11 +270,18 @@ if(ENABLE_MULTIO)
    target_link_libraries(${PROJECT_NAME} PRIVATE multio-fapi)
 endif()
 
+option(FESOM_WITH_XIOS "Route FESOM output through XIOS async server ranks" OFF)
+if(FESOM_WITH_XIOS AND ASYNCHRONOUS_IO_THREADS)
+   message(STATUS "FESOM_WITH_XIOS=ON forces ASYNCHRONOUS_IO_THREADS=OFF: "
+                  "XIOS requires deterministic xios_send_field order across ranks, "
+                  "which per-stream pthreads break.")
+   set(ASYNCHRONOUS_IO_THREADS OFF CACHE BOOL "enable asynchronous I/O threads" FORCE)
+endif()
+
 if(ASYNCHRONOUS_IO_THREADS)
    target_compile_definitions(${PROJECT_NAME} PRIVATE ASYNCHRONOUS_IO_THREADS)
 endif()
 
-option(FESOM_WITH_XIOS "Route FESOM output through XIOS async server ranks" OFF)
 if(FESOM_WITH_XIOS)
    find_path(XIOS_INCLUDE_DIR NAMES xios.mod
              HINTS $ENV{XIOS_ROOT}/inc $ENV{XIOS_ROOT}/include)

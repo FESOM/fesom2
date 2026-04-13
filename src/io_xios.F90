@@ -18,10 +18,11 @@
 module io_xios_module
 #if defined(__XIOS)
   use xios
+  use mpi
   use mod_mesh,    only: T_MESH
   use mod_partit,  only: T_PARTIT
   use o_param,     only: WP, rad
-  use g_config,    only: dt, use_cavity
+  use g_config,    only: dt
   use g_clock,     only: yearnew, daynew, timenew
   use diagnostics,          only: ldiag_solver, lcurt_stress_surf,       &
                                   ldiag_curl_vel3, ldiag_Ri,             &
@@ -42,6 +43,11 @@ module io_xios_module
   public :: io_xios_set_ice_conc, io_xios_is_ice_field
   public :: io_xios_apply_ice_mask_2d_r4, io_xios_apply_ice_mask_2d_r8
   public :: io_xios_apply_ice_mask_2d_elem_r4, io_xios_apply_ice_mask_2d_elem_r8
+  public :: io_xios_set_wet_ptrs
+  public :: io_xios_apply_wet_2d_r4,      io_xios_apply_wet_2d_r8
+  public :: io_xios_apply_wet_2d_elem_r4, io_xios_apply_wet_2d_elem_r8
+  public :: io_xios_apply_wet_3d_r4,      io_xios_apply_wet_3d_r8
+  public :: io_xios_apply_wet_3d_elem_r4, io_xios_apply_wet_3d_elem_r8
 
   ! NetCDF default _FillValue constants (used for sender-side ice masking;
   ! XIOS must also have detect_missing_value=true on the corresponding field
@@ -59,6 +65,17 @@ module io_xios_module
   ! vertex nodes has a_ice >= eps).
   integer, pointer, save :: p_elem2D_nodes(:,:) => null()
 
+  ! Mesh pointers registered by ini_mean_io for sender-side wet/bottom
+  ! masking. Written to NC_FILL before xios_send_field so XIOS averages
+  ! with detect_missing_value="true" exclude dry slots. Node arrays are
+  ! sized myDim_nod2D; element arrays are sized myDim_elem2D (the caller
+  ! packs via owned_elem_local).
+  integer, pointer, save :: p_ulevels_nod(:) => null()
+  integer, pointer, save :: p_nlevels_nod(:) => null()
+  integer, pointer, save :: p_ulevels_elem(:) => null()
+  integer, pointer, save :: p_nlevels_elem(:) => null()
+  integer,           save :: p_nl = 0
+
   type(xios_context), save :: ctx_hdl
   logical,            save :: xios_on = .false.
 
@@ -66,6 +83,7 @@ module io_xios_module
   ! this rank — i.e. those sent to XIOS. Populated in io_xios_init.
   integer,     allocatable, save, target :: owned_elem_local(:)
   integer,                  save :: n_owned_elem = 0
+  integer,                  save :: init_call_count = 0
 
   public :: io_xios_owned_elem_local, io_xios_n_owned_elem
 
@@ -107,6 +125,18 @@ contains
     ne = partit%myDim_elem2D
 
     ! --- 1. initialise XIOS client on the FESOM OASIS local comm ------------
+    block
+      integer :: wrank, wsize, prank, psize, ierr
+      call MPI_Comm_rank(MPI_COMM_WORLD, wrank, ierr)
+      call MPI_Comm_size(MPI_COMM_WORLD, wsize, ierr)
+      call MPI_Comm_rank(parent_comm,     prank, ierr)
+      call MPI_Comm_size(parent_comm,     psize, ierr)
+      write(*,'("IO_XIOS_COMM mype=",I5," wrank=",I5,"/",I5," prank=",I5,"/",I5," calls=",I0)') &
+            partit%mype, wrank, wsize, prank, psize, init_call_count + 1
+      flush(6)
+    end block
+    init_call_count = init_call_count + 1
+
     call xios_initialize("fesom", local_comm=parent_comm)
     client_comm = parent_comm    ! OASIS already split; keep API compat
 
@@ -184,25 +214,24 @@ contains
     ! where ownership = min(partit%part) over the element's 3 vertex nodes.
     ! All ranks agree on the same partit%part array, so each global element
     ! ends up claimed by exactly one rank.
-    allocate(lon_e(ne), lat_e(ne), i_index_e(ne), owned_elem_local(ne))
-    ne_owned = 0
-    do e = 1, ne
-       n1 = mesh%elem2D_nodes(1, e)
-       n2 = mesh%elem2D_nodes(2, e)
-       n3 = mesh%elem2D_nodes(3, e)
-       if (min(partit%part(n1), partit%part(n2), partit%part(n3)) &
-                                                    /= partit%mype) cycle
-       ne_owned = ne_owned + 1
-       owned_elem_local(ne_owned) = e
-       xlon = ( mesh%geo_coord_nod2D(1, n1) &
-              + mesh%geo_coord_nod2D(1, n2) &
-              + mesh%geo_coord_nod2D(1, n3) ) / 3.0_WP
-       ylat = ( mesh%geo_coord_nod2D(2, n1) &
-              + mesh%geo_coord_nod2D(2, n2) &
-              + mesh%geo_coord_nod2D(2, n3) ) / 3.0_WP
-       lon_e(ne_owned)     = xlon / rad
-       lat_e(ne_owned)     = ylat / rad
-       i_index_e(ne_owned) = partit%myList_elem2D(e) - 1
+    ! Use myDim_elem2D_shrinked for strictly-unique element ownership across
+    ! ranks (FESOM rule: element owned iff elem2D_nodes(1,e) <= myDim_nod2D;
+    ! sum over ranks = elem2D_glo). myInd_elem2D_shrinked maps shrinked idx
+    ! -> local element index in 1..myDim_elem2D.
+    ne_owned = partit%myDim_elem2D_shrinked
+    allocate(lon_e(ne_owned), lat_e(ne_owned), i_index_e(ne_owned), owned_elem_local(ne_owned))
+    do i = 1, ne_owned
+       e = partit%myInd_elem2D_shrinked(i)
+       owned_elem_local(i) = e
+       xlon = ( mesh%geo_coord_nod2D(1, mesh%elem2D_nodes(1, e)) &
+              + mesh%geo_coord_nod2D(1, mesh%elem2D_nodes(2, e)) &
+              + mesh%geo_coord_nod2D(1, mesh%elem2D_nodes(3, e)) ) / 3.0_WP
+       ylat = ( mesh%geo_coord_nod2D(2, mesh%elem2D_nodes(1, e)) &
+              + mesh%geo_coord_nod2D(2, mesh%elem2D_nodes(2, e)) &
+              + mesh%geo_coord_nod2D(2, mesh%elem2D_nodes(3, e)) ) / 3.0_WP
+       lon_e(i)     = xlon / rad
+       lat_e(i)     = ylat / rad
+       i_index_e(i) = partit%myList_elem2D(e) - 1
     end do
     n_owned_elem = ne_owned
 
@@ -255,20 +284,6 @@ contains
          xios_date(yearnew, 1, 1, 0, 0, 0) + &
          xios_duration(day = real(daynew - 1, kind=8), &
                        second = real(timenew, kind=8)))
-
-    ! --- 7c. masks for land / below-bottom / cavity --------------------------
-    ! XIOS averages uninitialised buffer slots as if they were valid, which
-    ! pollutes land / below-bottom / ice-shelf points with zeros or garbage.
-    ! Declare the valid-point masks here so XIOS writes _FillValue to the
-    ! invalid slots instead.
-    !
-    ! Non-cavity run:
-    !   - mesh has no land nodes/elements, so 2D masks collapse to all-true.
-    !   - 3D masks select k in [1 .. nlevels-1] (or 1 .. nlevels for interfaces).
-    ! Cavity run (use_cavity=.true.):
-    !   - ulevels_* can be > 1 → some 2D nodes/elements are DRY at surface.
-    !   - 3D mask lower bound is ulevels_*, not 1.
-    call io_xios_set_masks(mesh, partit, ne_owned)
 
     ! --- 8. close context definition ----------------------------------------
     call xios_close_context_definition()
@@ -329,88 +344,6 @@ contains
     if (.not. is_valid) return
     call xios_send_field(trim(name), buf)
   end subroutine
-
-
-  !> Build and push wet/bottom masks to the FESOM domains and grids.
-  !> Must be called between xios_set_domain_attr("nodes"/"elements") and
-  !> xios_close_context_definition().
-  subroutine io_xios_set_masks(mesh, partit, ne_owned)
-    type(T_MESH),   intent(in), target :: mesh
-    type(T_PARTIT), intent(in), target :: partit
-    integer,        intent(in)         :: ne_owned
-
-    integer              :: nn, nz_cell, nl, n, e, k, ee
-    logical, allocatable :: m1d_n(:), m1d_e(:)
-    logical, allocatable :: m3d_n_nz(:,:),   m3d_n_nz1(:,:)
-    logical, allocatable :: m3d_e_nz(:,:),   m3d_e_nz1(:,:)
-    integer              :: u_n, b_n, u_e, b_e
-
-    nn      = partit%myDim_nod2D
-    nz_cell = mesh%nl - 1
-    nl      = mesh%nl
-
-    ! -- 2D node mask --
-    allocate(m1d_n(nn))
-    if (use_cavity) then
-       do n = 1, nn
-          m1d_n(n) = (mesh%ulevels_nod2D(n) == 1)
-       end do
-    else
-       m1d_n(:) = .true.
-    end if
-    call xios_set_domain_attr("nodes", mask_1d = m1d_n)
-
-    ! -- 2D element mask (strictly-owned subset) --
-    allocate(m1d_e(ne_owned))
-    if (use_cavity) then
-       do ee = 1, ne_owned
-          e = owned_elem_local(ee)
-          m1d_e(ee) = (mesh%ulevels(e) == 1)
-       end do
-    else
-       m1d_e(:) = .true.
-    end if
-    call xios_set_domain_attr("elements", mask_1d = m1d_e)
-
-    ! -- 3D node masks, axis-first (nz, nn) to match send buffer layout --
-    allocate(m3d_n_nz (nz_cell, nn))
-    allocate(m3d_n_nz1(nl,      nn))
-    m3d_n_nz (:,:) = .false.
-    m3d_n_nz1(:,:) = .false.
-    do n = 1, nn
-       u_n = mesh%ulevels_nod2D(n)
-       b_n = mesh%nlevels_nod2D(n)
-       do k = u_n, min(b_n - 1, nz_cell)
-          m3d_n_nz(k, n) = .true.
-       end do
-       do k = u_n, min(b_n, nl)
-          m3d_n_nz1(k, n) = .true.
-       end do
-    end do
-    call xios_set_grid_attr("grid_3d_nod",     mask_2d = m3d_n_nz)
-    call xios_set_grid_attr("grid_3d_nod_nz1", mask_2d = m3d_n_nz1)
-
-    ! -- 3D element masks, axis-first (nz, ne_owned) --
-    allocate(m3d_e_nz (nz_cell, ne_owned))
-    allocate(m3d_e_nz1(nl,      ne_owned))
-    m3d_e_nz (:,:) = .false.
-    m3d_e_nz1(:,:) = .false.
-    do ee = 1, ne_owned
-       e   = owned_elem_local(ee)
-       u_e = mesh%ulevels(e)
-       b_e = mesh%nlevels(e)
-       do k = u_e, min(b_e - 1, nz_cell)
-          m3d_e_nz(k, ee) = .true.
-       end do
-       do k = u_e, min(b_e, nl)
-          m3d_e_nz1(k, ee) = .true.
-       end do
-    end do
-    call xios_set_grid_attr("grid_3d_elem",     mask_2d = m3d_e_nz)
-    call xios_set_grid_attr("grid_3d_elem_nz1", mask_2d = m3d_e_nz1)
-
-    deallocate(m1d_n, m1d_e, m3d_n_nz, m3d_n_nz1, m3d_e_nz, m3d_e_nz1)
-  end subroutine io_xios_set_masks
 
 
   !> Insertion sort owned elements by global index (i_index), carrying
@@ -520,6 +453,143 @@ contains
   end subroutine
 
 
+  !> Register mesh pointers for sender-side wet/bottom masking. Called
+  !> once from ini_mean_io (MOD_MESH is in scope there).
+  subroutine io_xios_set_wet_ptrs(ulevels_nod, nlevels_nod, &
+                                  ulevels_elem, nlevels_elem, nl)
+    integer, target, intent(in) :: ulevels_nod(:),  nlevels_nod(:)
+    integer, target, intent(in) :: ulevels_elem(:), nlevels_elem(:)
+    integer,         intent(in) :: nl
+    p_ulevels_nod  => ulevels_nod
+    p_nlevels_nod  => nlevels_nod
+    p_ulevels_elem => ulevels_elem
+    p_nlevels_elem => nlevels_elem
+    p_nl            = nl
+  end subroutine
+
+  !> 2D node field: NC_FILL where ulevels_nod2D(n) > 1 (cavity only; no-op
+  !> for non-cavity runs where all nodes are wet at surface).
+  subroutine io_xios_apply_wet_2d_r8(buf)
+    real(kind=8), intent(inout) :: buf(:)
+    integer :: n
+    if (.not. associated(p_ulevels_nod)) return
+    do n = 1, min(size(buf), size(p_ulevels_nod))
+       if (p_ulevels_nod(n) > 1) buf(n) = NC_FILL_DOUBLE
+    end do
+  end subroutine
+
+  subroutine io_xios_apply_wet_2d_r4(buf)
+    real(kind=4), intent(inout) :: buf(:)
+    integer :: n
+    if (.not. associated(p_ulevels_nod)) return
+    do n = 1, min(size(buf), size(p_ulevels_nod))
+       if (p_ulevels_nod(n) > 1) buf(n) = NC_FILL_FLOAT
+    end do
+  end subroutine
+
+  !> 2D element field (strictly-owned subset): NC_FILL where any of the
+  !> 3 vertex nodes has ulevels > 1 (cavity element).
+  subroutine io_xios_apply_wet_2d_elem_r8(buf)
+    real(kind=8), intent(inout) :: buf(:)
+    integer :: ee, e
+    if (.not. associated(p_ulevels_elem)) return
+    if (.not. allocated(owned_elem_local)) return
+    do ee = 1, min(size(buf), n_owned_elem)
+       e = owned_elem_local(ee)
+       if (p_ulevels_elem(e) > 1) buf(ee) = NC_FILL_DOUBLE
+    end do
+  end subroutine
+
+  subroutine io_xios_apply_wet_2d_elem_r4(buf)
+    real(kind=4), intent(inout) :: buf(:)
+    integer :: ee, e
+    if (.not. associated(p_ulevels_elem)) return
+    if (.not. allocated(owned_elem_local)) return
+    do ee = 1, min(size(buf), n_owned_elem)
+       e = owned_elem_local(ee)
+       if (p_ulevels_elem(e) > 1) buf(ee) = NC_FILL_FLOAT
+    end do
+  end subroutine
+
+  !> 3D node field, axis-first (nz, nn). Valid range is
+  !> ulevels_nod2D(n) <= k <= bound(n), where bound = nlevels-1 for mid-
+  !> layer axis (nz), nlevels for interface axis (nz1). Caller shape tells
+  !> us which: size(buf,1)==mesh%nl => interface, else => mid-layer.
+  subroutine io_xios_apply_wet_3d_r8(buf)
+    real(kind=8), intent(inout) :: buf(:,:)
+    integer :: n, k, nz, nn, ub, un, bn
+    logical :: is_interface
+    if (.not. associated(p_ulevels_nod) .or. .not. associated(p_nlevels_nod)) return
+    nz = size(buf, 1); nn = size(buf, 2)
+    is_interface = (p_nl > 0 .and. nz == p_nl)
+    do n = 1, min(nn, size(p_ulevels_nod))
+       un = p_ulevels_nod(n)
+       bn = p_nlevels_nod(n)
+       ub = bn; if (.not. is_interface) ub = bn - 1
+       do k = 1, nz
+          if (k < un .or. k > ub) buf(k, n) = NC_FILL_DOUBLE
+       end do
+    end do
+  end subroutine
+
+  subroutine io_xios_apply_wet_3d_r4(buf)
+    real(kind=4), intent(inout) :: buf(:,:)
+    integer :: n, k, nz, nn, ub, un, bn
+    logical :: is_interface
+    if (.not. associated(p_ulevels_nod) .or. .not. associated(p_nlevels_nod)) return
+    nz = size(buf, 1); nn = size(buf, 2)
+    is_interface = (p_nl > 0 .and. nz == p_nl)
+    do n = 1, min(nn, size(p_ulevels_nod))
+       un = p_ulevels_nod(n)
+       bn = p_nlevels_nod(n)
+       ub = bn; if (.not. is_interface) ub = bn - 1
+       do k = 1, nz
+          if (k < un .or. k > ub) buf(k, n) = NC_FILL_FLOAT
+       end do
+    end do
+  end subroutine
+
+  !> 3D element field, axis-first (nz, ne_owned). Same bound logic as
+  !> node variant, indexed via owned_elem_local.
+  subroutine io_xios_apply_wet_3d_elem_r8(buf)
+    real(kind=8), intent(inout) :: buf(:,:)
+    integer :: ee, e, k, nz, ne, ub, ue, be
+    logical :: is_interface
+    if (.not. associated(p_ulevels_elem) .or. .not. associated(p_nlevels_elem)) return
+    if (.not. allocated(owned_elem_local)) return
+    nz = size(buf, 1); ne = size(buf, 2)
+    is_interface = (p_nl > 0 .and. nz == p_nl)
+    do ee = 1, min(ne, n_owned_elem)
+       e = owned_elem_local(ee)
+       ue = p_ulevels_elem(e)
+       be = p_nlevels_elem(e)
+       ub = be; if (.not. is_interface) ub = be - 1
+       do k = 1, nz
+          if (k < ue .or. k > ub) buf(k, ee) = NC_FILL_DOUBLE
+       end do
+    end do
+  end subroutine
+
+  subroutine io_xios_apply_wet_3d_elem_r4(buf)
+    real(kind=4), intent(inout) :: buf(:,:)
+    integer :: ee, e, k, nz, ne, ub, ue, be
+    logical :: is_interface
+    if (.not. associated(p_ulevels_elem) .or. .not. associated(p_nlevels_elem)) return
+    if (.not. allocated(owned_elem_local)) return
+    nz = size(buf, 1); ne = size(buf, 2)
+    is_interface = (p_nl > 0 .and. nz == p_nl)
+    do ee = 1, min(ne, n_owned_elem)
+       e = owned_elem_local(ee)
+       ue = p_ulevels_elem(e)
+       be = p_nlevels_elem(e)
+       ub = be; if (.not. is_interface) ub = be - 1
+       do k = 1, nz
+          if (k < ue .or. k > ub) buf(k, ee) = NC_FILL_FLOAT
+       end do
+    end do
+  end subroutine
+
+
   subroutine io_xios_close()
     if (.not. xios_on) return
     call xios_context_finalize()
@@ -540,6 +610,11 @@ contains
   public :: io_xios_set_ice_conc, io_xios_is_ice_field
   public :: io_xios_apply_ice_mask_2d_r4, io_xios_apply_ice_mask_2d_r8
   public :: io_xios_apply_ice_mask_2d_elem_r4, io_xios_apply_ice_mask_2d_elem_r8
+  public :: io_xios_set_wet_ptrs
+  public :: io_xios_apply_wet_2d_r4,      io_xios_apply_wet_2d_r8
+  public :: io_xios_apply_wet_2d_elem_r4, io_xios_apply_wet_2d_elem_r8
+  public :: io_xios_apply_wet_3d_r4,      io_xios_apply_wet_3d_r8
+  public :: io_xios_apply_wet_3d_elem_r4, io_xios_apply_wet_3d_elem_r8
 contains
   logical function io_xios_is_on() result(r)
     r = .false.
@@ -598,6 +673,38 @@ contains
 
   subroutine io_xios_apply_ice_mask_2d_elem_r4(buf)
     real(kind=4), intent(inout) :: buf(:)
+  end subroutine
+
+  subroutine io_xios_set_wet_ptrs(ulevels_nod, nlevels_nod, &
+                                  ulevels_elem, nlevels_elem, nl)
+    integer, target, intent(in) :: ulevels_nod(:),  nlevels_nod(:)
+    integer, target, intent(in) :: ulevels_elem(:), nlevels_elem(:)
+    integer,         intent(in) :: nl
+  end subroutine
+
+  subroutine io_xios_apply_wet_2d_r8(buf)
+    real(kind=8), intent(inout) :: buf(:)
+  end subroutine
+  subroutine io_xios_apply_wet_2d_r4(buf)
+    real(kind=4), intent(inout) :: buf(:)
+  end subroutine
+  subroutine io_xios_apply_wet_2d_elem_r8(buf)
+    real(kind=8), intent(inout) :: buf(:)
+  end subroutine
+  subroutine io_xios_apply_wet_2d_elem_r4(buf)
+    real(kind=4), intent(inout) :: buf(:)
+  end subroutine
+  subroutine io_xios_apply_wet_3d_r8(buf)
+    real(kind=8), intent(inout) :: buf(:,:)
+  end subroutine
+  subroutine io_xios_apply_wet_3d_r4(buf)
+    real(kind=4), intent(inout) :: buf(:,:)
+  end subroutine
+  subroutine io_xios_apply_wet_3d_elem_r8(buf)
+    real(kind=8), intent(inout) :: buf(:,:)
+  end subroutine
+  subroutine io_xios_apply_wet_3d_elem_r4(buf)
+    real(kind=4), intent(inout) :: buf(:,:)
   end subroutine
 #endif
 end module io_xios_module

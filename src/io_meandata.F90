@@ -17,6 +17,11 @@ module io_MEANDATA
                             io_xios_set_ice_conc, io_xios_is_ice_field, &
                             io_xios_apply_ice_mask_2d_r4, io_xios_apply_ice_mask_2d_r8, &
                             io_xios_apply_ice_mask_2d_elem_r4, io_xios_apply_ice_mask_2d_elem_r8, &
+                            io_xios_set_wet_ptrs, &
+                            io_xios_apply_wet_2d_r4, io_xios_apply_wet_2d_r8, &
+                            io_xios_apply_wet_2d_elem_r4, io_xios_apply_wet_2d_elem_r8, &
+                            io_xios_apply_wet_3d_r4, io_xios_apply_wet_3d_r8, &
+                            io_xios_apply_wet_3d_elem_r4, io_xios_apply_wet_3d_elem_r8, &
                             io_xios_owned_elem_local, io_xios_n_owned_elem
 
   implicit none
@@ -226,6 +231,10 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
       ! Register ice-concentration pointer for sender-side masking of
       ! ice-tagged XIOS fields (see io_xios_apply_ice_mask_*).
       call io_xios_set_ice_conc(ice%data(1)%values, mesh%elem2D_nodes)
+      ! Register wet/bottom pointers for sender-side masking of ocean
+      ! fields (see io_xios_apply_wet_*).
+      call io_xios_set_wet_ptrs(mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
+                                mesh%ulevels,      mesh%nlevels, mesh%nl)
       block
         character(len=20), parameter :: xios_ids(*) = (/ character(len=20) :: &
           "aFe                 ", "age                 ", "aggc                ", &
@@ -2400,8 +2409,11 @@ subroutine write_mean(entry, entry_index)
               if (entry%glsize(1) == 1) then
                 allocate(tmp2_r8(n_own))
                 do k=1, n_own; tmp2_r8(k) = entry%local_values_r8_copy(1, own(k)); end do
-                if (io_xios_is_ice_field(entry%name)) &
-                     call io_xios_apply_ice_mask_2d_elem_r8(tmp2_r8)
+                if (io_xios_is_ice_field(entry%name)) then
+                   call io_xios_apply_ice_mask_2d_elem_r8(tmp2_r8)
+                else
+                   call io_xios_apply_wet_2d_elem_r8(tmp2_r8)
+                end if
                 call io_xios_send_2d_r8(entry%name, tmp2_r8)
                 deallocate(tmp2_r8)
               else
@@ -2410,6 +2422,7 @@ subroutine write_mean(entry, entry_index)
                 do k=1, n_own
                   do kk=1, nze; tmp3_r8(kk,k) = entry%local_values_r8_copy(kk, own(k)); end do
                 end do
+                call io_xios_apply_wet_3d_elem_r8(tmp3_r8)
                 call io_xios_send_3d_r8(entry%name, tmp3_r8)
                 deallocate(tmp3_r8)
               end if
@@ -2417,8 +2430,11 @@ subroutine write_mean(entry, entry_index)
               if (entry%glsize(1) == 1) then
                 allocate(tmp2_r4(n_own))
                 do k=1, n_own; tmp2_r4(k) = entry%local_values_r4_copy(1, own(k)); end do
-                if (io_xios_is_ice_field(entry%name)) &
-                     call io_xios_apply_ice_mask_2d_elem_r4(tmp2_r4)
+                if (io_xios_is_ice_field(entry%name)) then
+                   call io_xios_apply_ice_mask_2d_elem_r4(tmp2_r4)
+                else
+                   call io_xios_apply_wet_2d_elem_r4(tmp2_r4)
+                end if
                 call io_xios_send_2d_r4(entry%name, tmp2_r4)
                 deallocate(tmp2_r4)
               else
@@ -2427,6 +2443,7 @@ subroutine write_mean(entry, entry_index)
                 do k=1, n_own
                   do kk=1, nze; tmp3_r4(kk,k) = entry%local_values_r4_copy(kk, own(k)); end do
                 end do
+                call io_xios_apply_wet_3d_elem_r4(tmp3_r4)
                 call io_xios_send_3d_r4(entry%name, tmp3_r4)
                 deallocate(tmp3_r4)
               end if
@@ -2436,25 +2453,39 @@ subroutine write_mean(entry, entry_index)
               if (entry%glsize(1) == 1) then
                 allocate(tmp2_r8(entry%p_partit%myDim_nod2D))
                 tmp2_r8(:) = entry%local_values_r8_copy(1, 1:entry%p_partit%myDim_nod2D)
-                if (io_xios_is_ice_field(entry%name)) &
-                     call io_xios_apply_ice_mask_2d_r8(tmp2_r8)
+                if (io_xios_is_ice_field(entry%name)) then
+                   call io_xios_apply_ice_mask_2d_r8(tmp2_r8)
+                else
+                   call io_xios_apply_wet_2d_r8(tmp2_r8)
+                end if
                 call io_xios_send_2d_r8(entry%name, tmp2_r8)
                 deallocate(tmp2_r8)
               else
-                call io_xios_send_3d_r8(entry%name, &
-                     entry%local_values_r8_copy(:, 1:entry%p_partit%myDim_nod2D))
+                nze = size(entry%local_values_r8_copy, 1)
+                allocate(tmp3_r8(nze, entry%p_partit%myDim_nod2D))
+                tmp3_r8(:,:) = entry%local_values_r8_copy(:, 1:entry%p_partit%myDim_nod2D)
+                call io_xios_apply_wet_3d_r8(tmp3_r8)
+                call io_xios_send_3d_r8(entry%name, tmp3_r8)
+                deallocate(tmp3_r8)
               end if
             else
               if (entry%glsize(1) == 1) then
                 allocate(tmp2_r4(entry%p_partit%myDim_nod2D))
                 tmp2_r4(:) = entry%local_values_r4_copy(1, 1:entry%p_partit%myDim_nod2D)
-                if (io_xios_is_ice_field(entry%name)) &
-                     call io_xios_apply_ice_mask_2d_r4(tmp2_r4)
+                if (io_xios_is_ice_field(entry%name)) then
+                   call io_xios_apply_ice_mask_2d_r4(tmp2_r4)
+                else
+                   call io_xios_apply_wet_2d_r4(tmp2_r4)
+                end if
                 call io_xios_send_2d_r4(entry%name, tmp2_r4)
                 deallocate(tmp2_r4)
               else
-                call io_xios_send_3d_r4(entry%name, &
-                     entry%local_values_r4_copy(:, 1:entry%p_partit%myDim_nod2D))
+                nze = size(entry%local_values_r4_copy, 1)
+                allocate(tmp3_r4(nze, entry%p_partit%myDim_nod2D))
+                tmp3_r4(:,:) = entry%local_values_r4_copy(:, 1:entry%p_partit%myDim_nod2D)
+                call io_xios_apply_wet_3d_r4(tmp3_r4)
+                call io_xios_send_3d_r4(entry%name, tmp3_r4)
+                deallocate(tmp3_r4)
               end if
             end if
           end if
@@ -3021,10 +3052,15 @@ subroutine do_output_callback(entry_index)
     ! synchronize after writes:
     ! To minimize data loss in case of abnormal termination, or To make data 
     ! available to other processes for reading immediately after it is written. 
-    if(entry%p_partit%mype == entry%root_rank) then 
+    if(entry%p_partit%mype == entry%root_rank) then
         !PS if (entry%p_partit%flag_debug)  print *, achar(27)//'[31m'//' -I/O-> call nf_sync'//achar(27)//'[0m', entry%p_partit%mype
+#if defined(__XIOS)
+        ! When XIOS drives output no legacy netCDF file was opened; entry%ncid
+        ! is invalid. Skip the sync.
+        if (.not. io_xios_is_on()) &
+#endif
         call assert_nf( nf90_sync(entry%ncid), __LINE__ ) ! flush the file to disk after each write
-    end if   
+    end if
     
 end subroutine
 !
