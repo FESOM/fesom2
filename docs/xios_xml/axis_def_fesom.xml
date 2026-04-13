@@ -2,8 +2,8 @@
   <!-- FESOM vertical axis. n_glo and value are set at runtime from the
        Fortran side (mesh%nl-1 cell-centred depths in metres, positive down
        converted to positive up if desired). -->
-  <axis_group id="fesom_axes" unit="m" positive="down">
-    <axis id="nz"     long_name="ocean cell-centred depth"   standard_name="depth" />
-    <axis id="nz1"    long_name="ocean interface depth"      standard_name="depth" />
+  <axis_group id="fesom_axes" unit="m" positive="down" axis_type="Z">
+    <axis id="nz"     long_name="depth below sea level at layer mid-points" standard_name="depth" />
+    <axis id="nz1"    long_name="depth below sea level at layer interfaces" standard_name="depth" />
   </axis_group>
 </axis_definition>

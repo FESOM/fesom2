@@ -1,41 +1,41 @@
-<field_definition level="1" prec="4" enabled="true" operation="average" default_value="1.e+20">
+<field_definition level="1" prec="4" enabled="true" operation="average" default_value="9.969209968386869e+36">
 
   <!-- 2D fields on NODES -->
   <field_group id="fesom_2d_nod" grid_ref="grid_2d_nod" prec="4">
     <field id="sst"    long_name="sea surface temperature"                    standard_name="sea_surface_temperature"            unit="degC"/>
     <field id="sss"    long_name="sea surface salinity"                       standard_name="sea_surface_salinity"               unit="1e-3"/>
     <field id="ssh"    long_name="sea surface height"                         standard_name="sea_surface_height_above_geoid"     unit="m"/>
-    <field id="a_ice"  long_name="sea-ice area fraction"                      standard_name="sea_ice_area_fraction"              unit="1"/>
-    <field id="m_ice"  long_name="sea-ice mass per area"                      standard_name="sea_ice_thickness"                  unit="m"/>
-    <field id="m_snow" long_name="snow on ice mass per area"                  standard_name="surface_snow_thickness"             unit="m"/>
+    <field id="a_ice"  long_name="sea-ice area fraction"                      standard_name="sea_ice_area_fraction"              unit="1" detect_missing_value="true"/>
+    <field id="m_ice"  long_name="sea-ice mass per area"                      standard_name="sea_ice_thickness"                  unit="m" detect_missing_value="true"/>
+    <field id="m_snow" long_name="snow on ice mass per area"                  standard_name="surface_snow_thickness"             unit="m" detect_missing_value="true"/>
     <field id="MLD1"   long_name="mixed layer depth (Large 1997)"             unit="m"/>
     <field id="MLD2"   long_name="mixed layer depth (Levitus)"                unit="m"/>
     <field id="MLD3"   long_name="mixed layer depth (Griffies)"               unit="m"/>
     <field id="fw"     long_name="freshwater flux"                            unit="m s-1"/>
     <field id="fh"     long_name="surface heat flux"                          unit="W m-2"/>
-    <field id="uice"   long_name="sea-ice zonal velocity"                     unit="m s-1"/>
-    <field id="vice"   long_name="sea-ice meridional velocity"                unit="m s-1"/>
-    <field id="ist"              long_name="ice surface temperature"                  unit="K"/>
-    <field id="h_ice"            long_name="ice thickness over ice-covered fraction"  unit="m"/>
-    <field id="h_snow"           long_name="snow thickness over ice-covered fraction" unit="m"/>
-    <field id="thdgrice"         long_name="thermo growth rate ice"                   unit="m s-1"/>
-    <field id="thdgrsnw"         long_name="thermo growth rate snow"                  unit="m s-1"/>
-    <field id="thdgrarea"        long_name="thermo growth rate ice area"              unit="s-1"/>
-    <field id="dyngrice"         long_name="dynamic growth rate ice"                  unit="m s-1"/>
-    <field id="dyngrarea"        long_name="dynamic growth rate ice area"             unit="s-1"/>
-    <field id="atmice_x"         long_name="stress atmice x"                          unit="N m-2"/>
-    <field id="atmice_y"         long_name="stress atmice y"                          unit="N m-2"/>
-    <field id="iceoce_x"         long_name="stress iceoce x"                          unit="N m-2"/>
-    <field id="iceoce_y"         long_name="stress iceoce y"                          unit="N m-2"/>
-    <field id="fw_ice"           long_name="fresh water flux from ice"                unit="m s-1"/>
-    <field id="fw_snw"           long_name="fresh water flux from snow"               unit="m s-1"/>
+    <field id="uice"   long_name="sea-ice zonal velocity"                     unit="m s-1" detect_missing_value="true"/>
+    <field id="vice"   long_name="sea-ice meridional velocity"                unit="m s-1" detect_missing_value="true"/>
+    <field id="ist"              long_name="ice surface temperature"                  unit="K"     detect_missing_value="true"/>
+    <field id="h_ice"            long_name="ice thickness over ice-covered fraction"  unit="m"     detect_missing_value="true"/>
+    <field id="h_snow"           long_name="snow thickness over ice-covered fraction" unit="m"     detect_missing_value="true"/>
+    <field id="thdgrice"         long_name="thermo growth rate ice"                   unit="m s-1" detect_missing_value="true"/>
+    <field id="thdgrsnw"         long_name="thermo growth rate snow"                  unit="m s-1" detect_missing_value="true"/>
+    <field id="thdgrarea"        long_name="thermo growth rate ice area"              unit="s-1"   detect_missing_value="true"/>
+    <field id="dyngrice"         long_name="dynamic growth rate ice"                  unit="m s-1" detect_missing_value="true"/>
+    <field id="dyngrarea"        long_name="dynamic growth rate ice area"             unit="s-1"   detect_missing_value="true"/>
+    <field id="atmice_x"         long_name="stress atmice x"                          unit="N m-2" detect_missing_value="true"/>
+    <field id="atmice_y"         long_name="stress atmice y"                          unit="N m-2" detect_missing_value="true"/>
+    <field id="iceoce_x"         long_name="stress iceoce x"                          unit="N m-2" detect_missing_value="true"/>
+    <field id="iceoce_y"         long_name="stress iceoce y"                          unit="N m-2" detect_missing_value="true"/>
+    <field id="fw_ice"           long_name="fresh water flux from ice"                unit="m s-1" detect_missing_value="true"/>
+    <field id="fw_snw"           long_name="fresh water flux from snow"               unit="m s-1" detect_missing_value="true"/>
     <field id="virtsalt"         long_name="virtual salt flux"                        unit="m s-1 psu"/>
     <field id="realsalt"         long_name="real salt flux from sea ice"              unit="m s-1 psu"/>
     <field id="relaxsalt"        long_name="relaxation salt flux"                     unit="m s-1 psu"/>
-    <field id="qcon"             long_name="conductive heat flux"                     unit="W m-2"/>
-    <field id="apnd"             long_name="melt pond area fraction"                  unit="1"/>
-    <field id="hpnd"             long_name="melt pond depth"                          unit="m"/>
-    <field id="ipnd"             long_name="melt pond ice lid thickness"              unit="m"/>
+    <field id="qcon"             long_name="conductive heat flux"                     unit="W m-2" detect_missing_value="true"/>
+    <field id="apnd"             long_name="melt pond area fraction"                  unit="1"     detect_missing_value="true"/>
+    <field id="hpnd"             long_name="melt pond depth"                          unit="m"     detect_missing_value="true"/>
+    <field id="ipnd"             long_name="melt pond ice lid thickness"              unit="m"     detect_missing_value="true"/>
     <field id="evap"             long_name="evaporation"                              unit="m s-1"/>
     <field id="prec"             long_name="precipitation rain"                       unit="m s-1"/>
     <field id="snow"             long_name="precipitation snow"                       unit="m s-1"/>
@@ -53,10 +53,10 @@
   <field_group id="fesom_2d_elem" grid_ref="grid_2d_elem" prec="4">
     <field id="tx_sur"       long_name="zonal surface stress to ocean"           unit="N m-2"/>
     <field id="ty_sur"       long_name="meridional surface stress to ocean"      unit="N m-2"/>
-    <field id="strength_ice" long_name="ice strength"                            unit="N m-1"/>
-    <field id="sgm11"        long_name="ice stress sigma11"                      unit="N m-1"/>
-    <field id="sgm12"        long_name="ice stress sigma12"                      unit="N m-1"/>
-    <field id="sgm22"        long_name="ice stress sigma22"                      unit="N m-1"/>
+    <field id="strength_ice" long_name="ice strength"                            unit="N m-1" detect_missing_value="true"/>
+    <field id="sgm11"        long_name="ice stress sigma11"                      unit="N m-1" detect_missing_value="true"/>
+    <field id="sgm12"        long_name="ice stress sigma12"                      unit="N m-1" detect_missing_value="true"/>
+    <field id="sgm22"        long_name="ice stress sigma22"                      unit="N m-1" detect_missing_value="true"/>
   </field_group>
 
   <!-- 3D fields on NODES, cell-center / nz-1 -->

@@ -14,6 +14,9 @@ module io_MEANDATA
   use netcdf
   use io_xios_module, only: io_xios_is_on, io_xios_send_2d_r8, io_xios_send_2d_r4, &
                             io_xios_send_3d_r8, io_xios_send_3d_r4, &
+                            io_xios_set_ice_conc, io_xios_is_ice_field, &
+                            io_xios_apply_ice_mask_2d_r4, io_xios_apply_ice_mask_2d_r8, &
+                            io_xios_apply_ice_mask_2d_elem_r4, io_xios_apply_ice_mask_2d_elem_r8, &
                             io_xios_owned_elem_local, io_xios_n_owned_elem
 
   implicit none
@@ -220,6 +223,9 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     ! a superset is safe.
 #if defined(__XIOS)
     if (io_xios_is_on()) then
+      ! Register ice-concentration pointer for sender-side masking of
+      ! ice-tagged XIOS fields (see io_xios_apply_ice_mask_*).
+      call io_xios_set_ice_conc(ice%data(1)%values, mesh%elem2D_nodes)
       block
         character(len=20), parameter :: xios_ids(*) = (/ character(len=20) :: &
           "aFe                 ", "age                 ", "aggc                ", &
@@ -2394,6 +2400,8 @@ subroutine write_mean(entry, entry_index)
               if (entry%glsize(1) == 1) then
                 allocate(tmp2_r8(n_own))
                 do k=1, n_own; tmp2_r8(k) = entry%local_values_r8_copy(1, own(k)); end do
+                if (io_xios_is_ice_field(entry%name)) &
+                     call io_xios_apply_ice_mask_2d_elem_r8(tmp2_r8)
                 call io_xios_send_2d_r8(entry%name, tmp2_r8)
                 deallocate(tmp2_r8)
               else
@@ -2409,6 +2417,8 @@ subroutine write_mean(entry, entry_index)
               if (entry%glsize(1) == 1) then
                 allocate(tmp2_r4(n_own))
                 do k=1, n_own; tmp2_r4(k) = entry%local_values_r4_copy(1, own(k)); end do
+                if (io_xios_is_ice_field(entry%name)) &
+                     call io_xios_apply_ice_mask_2d_elem_r4(tmp2_r4)
                 call io_xios_send_2d_r4(entry%name, tmp2_r4)
                 deallocate(tmp2_r4)
               else
@@ -2424,16 +2434,24 @@ subroutine write_mean(entry, entry_index)
           else
             if (entry%accuracy == i_real8) then
               if (entry%glsize(1) == 1) then
-                call io_xios_send_2d_r8(entry%name, &
-                     entry%local_values_r8_copy(1, 1:entry%p_partit%myDim_nod2D))
+                allocate(tmp2_r8(entry%p_partit%myDim_nod2D))
+                tmp2_r8(:) = entry%local_values_r8_copy(1, 1:entry%p_partit%myDim_nod2D)
+                if (io_xios_is_ice_field(entry%name)) &
+                     call io_xios_apply_ice_mask_2d_r8(tmp2_r8)
+                call io_xios_send_2d_r8(entry%name, tmp2_r8)
+                deallocate(tmp2_r8)
               else
                 call io_xios_send_3d_r8(entry%name, &
                      entry%local_values_r8_copy(:, 1:entry%p_partit%myDim_nod2D))
               end if
             else
               if (entry%glsize(1) == 1) then
-                call io_xios_send_2d_r4(entry%name, &
-                     entry%local_values_r4_copy(1, 1:entry%p_partit%myDim_nod2D))
+                allocate(tmp2_r4(entry%p_partit%myDim_nod2D))
+                tmp2_r4(:) = entry%local_values_r4_copy(1, 1:entry%p_partit%myDim_nod2D)
+                if (io_xios_is_ice_field(entry%name)) &
+                     call io_xios_apply_ice_mask_2d_r4(tmp2_r4)
+                call io_xios_send_2d_r4(entry%name, tmp2_r4)
+                deallocate(tmp2_r4)
               else
                 call io_xios_send_3d_r4(entry%name, &
                      entry%local_values_r4_copy(:, 1:entry%p_partit%myDim_nod2D))

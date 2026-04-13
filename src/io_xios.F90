@@ -21,7 +21,7 @@ module io_xios_module
   use mod_mesh,    only: T_MESH
   use mod_partit,  only: T_PARTIT
   use o_param,     only: WP, rad
-  use g_config,    only: dt
+  use g_config,    only: dt, use_cavity
   use g_clock,     only: yearnew, daynew, timenew
   use diagnostics,          only: ldiag_solver, lcurt_stress_surf,       &
                                   ldiag_curl_vel3, ldiag_Ri,             &
@@ -39,6 +39,25 @@ module io_xios_module
   public :: io_xios_send_2d_r8, io_xios_send_3d_r8
   public :: io_xios_send_2d_r4, io_xios_send_3d_r4
   public :: io_xios_is_on
+  public :: io_xios_set_ice_conc, io_xios_is_ice_field
+  public :: io_xios_apply_ice_mask_2d_r4, io_xios_apply_ice_mask_2d_r8
+  public :: io_xios_apply_ice_mask_2d_elem_r4, io_xios_apply_ice_mask_2d_elem_r8
+
+  ! NetCDF default _FillValue constants (used for sender-side ice masking;
+  ! XIOS must also have detect_missing_value=true on the corresponding field
+  ! group so these slots are excluded from the running mean).
+  real(kind=8), parameter :: NC_FILL_DOUBLE = 9.9692099683868690e+36_8
+  real(kind=4), parameter :: NC_FILL_FLOAT  = 9.9692099683868690e+36_4
+  real(kind=8), parameter :: ICE_CONC_EPS   = 1.0e-6_8
+
+  ! Pointer to ice-area-fraction array (ice%data(1)%values). Registered by
+  ! ini_mean_io once MOD_ICE is in scope.
+  real(kind=WP), pointer, save :: p_ice_conc(:) => null()
+
+  ! Pointer to elem2D_nodes(1:3, 1:elem2D_local) — used to map node-based
+  ! a_ice onto element fields (element is ice-covered iff any of its 3
+  ! vertex nodes has a_ice >= eps).
+  integer, pointer, save :: p_elem2D_nodes(:,:) => null()
 
   type(xios_context), save :: ctx_hdl
   logical,            save :: xios_on = .false.
@@ -214,12 +233,14 @@ contains
     !   nz1 : interface/w-grid, nl levels (for w, bolus_w, Kv, N2, ...)
     nz_cell = mesh%nl - 1
     allocate(z_mid(nz_cell))
+    ! mesh%zbar is NEGATIVE (z up, surface=0). Legacy/CF convention expects
+    ! depths positive-down, matching axis attribute positive="down".
     do i = 1, nz_cell
-       z_mid(i) = 0.5_WP * (mesh%zbar(i) + mesh%zbar(i+1))
+       z_mid(i) = -0.5_WP * (mesh%zbar(i) + mesh%zbar(i+1))
     end do
     call xios_set_axis_attr("nz",  n_glo = nz_cell, value = z_mid)
     deallocate(z_mid)
-    call xios_set_axis_attr("nz1", n_glo = mesh%nl, value = mesh%zbar(1:mesh%nl))
+    call xios_set_axis_attr("nz1", n_glo = mesh%nl, value = -mesh%zbar(1:mesh%nl))
 
     ! --- 7. timestep (required by XIOS before close_context_definition) -----
     call xios_set_timestep(timestep = xios_duration(second = dt))
@@ -234,6 +255,20 @@ contains
          xios_date(yearnew, 1, 1, 0, 0, 0) + &
          xios_duration(day = real(daynew - 1, kind=8), &
                        second = real(timenew, kind=8)))
+
+    ! --- 7c. masks for land / below-bottom / cavity --------------------------
+    ! XIOS averages uninitialised buffer slots as if they were valid, which
+    ! pollutes land / below-bottom / ice-shelf points with zeros or garbage.
+    ! Declare the valid-point masks here so XIOS writes _FillValue to the
+    ! invalid slots instead.
+    !
+    ! Non-cavity run:
+    !   - mesh has no land nodes/elements, so 2D masks collapse to all-true.
+    !   - 3D masks select k in [1 .. nlevels-1] (or 1 .. nlevels for interfaces).
+    ! Cavity run (use_cavity=.true.):
+    !   - ulevels_* can be > 1 → some 2D nodes/elements are DRY at surface.
+    !   - 3D mask lower bound is ulevels_*, not 1.
+    call io_xios_set_masks(mesh, partit, ne_owned)
 
     ! --- 8. close context definition ----------------------------------------
     call xios_close_context_definition()
@@ -296,6 +331,88 @@ contains
   end subroutine
 
 
+  !> Build and push wet/bottom masks to the FESOM domains and grids.
+  !> Must be called between xios_set_domain_attr("nodes"/"elements") and
+  !> xios_close_context_definition().
+  subroutine io_xios_set_masks(mesh, partit, ne_owned)
+    type(T_MESH),   intent(in), target :: mesh
+    type(T_PARTIT), intent(in), target :: partit
+    integer,        intent(in)         :: ne_owned
+
+    integer              :: nn, nz_cell, nl, n, e, k, ee
+    logical, allocatable :: m1d_n(:), m1d_e(:)
+    logical, allocatable :: m3d_n_nz(:,:),   m3d_n_nz1(:,:)
+    logical, allocatable :: m3d_e_nz(:,:),   m3d_e_nz1(:,:)
+    integer              :: u_n, b_n, u_e, b_e
+
+    nn      = partit%myDim_nod2D
+    nz_cell = mesh%nl - 1
+    nl      = mesh%nl
+
+    ! -- 2D node mask --
+    allocate(m1d_n(nn))
+    if (use_cavity) then
+       do n = 1, nn
+          m1d_n(n) = (mesh%ulevels_nod2D(n) == 1)
+       end do
+    else
+       m1d_n(:) = .true.
+    end if
+    call xios_set_domain_attr("nodes", mask_1d = m1d_n)
+
+    ! -- 2D element mask (strictly-owned subset) --
+    allocate(m1d_e(ne_owned))
+    if (use_cavity) then
+       do ee = 1, ne_owned
+          e = owned_elem_local(ee)
+          m1d_e(ee) = (mesh%ulevels(e) == 1)
+       end do
+    else
+       m1d_e(:) = .true.
+    end if
+    call xios_set_domain_attr("elements", mask_1d = m1d_e)
+
+    ! -- 3D node masks, axis-first (nz, nn) to match send buffer layout --
+    allocate(m3d_n_nz (nz_cell, nn))
+    allocate(m3d_n_nz1(nl,      nn))
+    m3d_n_nz (:,:) = .false.
+    m3d_n_nz1(:,:) = .false.
+    do n = 1, nn
+       u_n = mesh%ulevels_nod2D(n)
+       b_n = mesh%nlevels_nod2D(n)
+       do k = u_n, min(b_n - 1, nz_cell)
+          m3d_n_nz(k, n) = .true.
+       end do
+       do k = u_n, min(b_n, nl)
+          m3d_n_nz1(k, n) = .true.
+       end do
+    end do
+    call xios_set_grid_attr("grid_3d_nod",     mask_2d = m3d_n_nz)
+    call xios_set_grid_attr("grid_3d_nod_nz1", mask_2d = m3d_n_nz1)
+
+    ! -- 3D element masks, axis-first (nz, ne_owned) --
+    allocate(m3d_e_nz (nz_cell, ne_owned))
+    allocate(m3d_e_nz1(nl,      ne_owned))
+    m3d_e_nz (:,:) = .false.
+    m3d_e_nz1(:,:) = .false.
+    do ee = 1, ne_owned
+       e   = owned_elem_local(ee)
+       u_e = mesh%ulevels(e)
+       b_e = mesh%nlevels(e)
+       do k = u_e, min(b_e - 1, nz_cell)
+          m3d_e_nz(k, ee) = .true.
+       end do
+       do k = u_e, min(b_e, nl)
+          m3d_e_nz1(k, ee) = .true.
+       end do
+    end do
+    call xios_set_grid_attr("grid_3d_elem",     mask_2d = m3d_e_nz)
+    call xios_set_grid_attr("grid_3d_elem_nz1", mask_2d = m3d_e_nz1)
+
+    deallocate(m1d_n, m1d_e, m3d_n_nz, m3d_n_nz1, m3d_e_nz, m3d_e_nz1)
+  end subroutine io_xios_set_masks
+
+
   !> Insertion sort owned elements by global index (i_index), carrying
   !> lon/lat/local-id in lock-step. ne_owned is typically ~1000-3000 per rank,
   !> so O(n^2) is fine here.
@@ -314,6 +431,91 @@ contains
           j = j - 1
        end do
        idx(j+1) = k_idx; lon(j+1) = k_lon; lat(j+1) = k_lat; loc(j+1) = k_loc
+    end do
+  end subroutine
+
+
+  !> Called once from ini_mean_io after MOD_ICE is in scope.
+  subroutine io_xios_set_ice_conc(p, elem_nodes)
+    real(kind=WP), target, intent(in) :: p(:)
+    integer,       target, intent(in) :: elem_nodes(:,:)
+    p_ice_conc     => p
+    p_elem2D_nodes => elem_nodes
+  end subroutine
+
+  !> Ice-tagged field names: these get sender-side masking where a_ice is
+  !> below ICE_CONC_EPS. Keep in sync with field_def_fesom.xml ice subgroups.
+  logical function io_xios_is_ice_field(name) result(r)
+    character(len=*), intent(in) :: name
+    select case (trim(name))
+    case ('a_ice', 'm_ice', 'm_snow', 'h_ice', 'h_snow', 'ist', &
+          'uice', 'vice', 'apnd', 'hpnd', 'ipnd', &
+          'thdgrice', 'thdgrsnw', 'thdgrarea', 'dyngrice', 'dyngrarea', &
+          'fw_ice', 'fw_snw', 'atmice_x', 'atmice_y', &
+          'iceoce_x', 'iceoce_y', 'strength_ice', 'sgm11', 'sgm12', 'sgm22', &
+          'qcon')
+       r = .true.
+    case default
+       r = .false.
+    end select
+  end function
+
+  subroutine io_xios_apply_ice_mask_2d_r8(buf)
+    real(kind=8), intent(inout) :: buf(:)
+    integer :: i, n
+    if (.not. associated(p_ice_conc)) return
+    n = min(size(buf), size(p_ice_conc))
+    do i = 1, n
+       if (real(p_ice_conc(i), kind=8) < ICE_CONC_EPS) buf(i) = NC_FILL_DOUBLE
+    end do
+  end subroutine
+
+  subroutine io_xios_apply_ice_mask_2d_r4(buf)
+    real(kind=4), intent(inout) :: buf(:)
+    integer :: i, n
+    if (.not. associated(p_ice_conc)) return
+    n = min(size(buf), size(p_ice_conc))
+    do i = 1, n
+       if (real(p_ice_conc(i), kind=4) < real(ICE_CONC_EPS, kind=4)) buf(i) = NC_FILL_FLOAT
+    end do
+  end subroutine
+
+  !> Element-based ice mask: element is ice-covered iff any of its 3 vertex
+  !> nodes has a_ice >= eps. buf is indexed by owned-element order; local
+  !> element indices come from owned_elem_local.
+  subroutine io_xios_apply_ice_mask_2d_elem_r8(buf)
+    real(kind=8), intent(inout) :: buf(:)
+    integer :: ee, e, n1, n2, n3
+    real(kind=8) :: amax
+    if (.not. associated(p_ice_conc) .or. .not. associated(p_elem2D_nodes)) return
+    if (.not. allocated(owned_elem_local)) return
+    do ee = 1, min(size(buf), n_owned_elem)
+       e  = owned_elem_local(ee)
+       n1 = p_elem2D_nodes(1, e)
+       n2 = p_elem2D_nodes(2, e)
+       n3 = p_elem2D_nodes(3, e)
+       amax = max(real(p_ice_conc(n1), kind=8), &
+                  real(p_ice_conc(n2), kind=8), &
+                  real(p_ice_conc(n3), kind=8))
+       if (amax < ICE_CONC_EPS) buf(ee) = NC_FILL_DOUBLE
+    end do
+  end subroutine
+
+  subroutine io_xios_apply_ice_mask_2d_elem_r4(buf)
+    real(kind=4), intent(inout) :: buf(:)
+    integer :: ee, e, n1, n2, n3
+    real(kind=4) :: amax
+    if (.not. associated(p_ice_conc) .or. .not. associated(p_elem2D_nodes)) return
+    if (.not. allocated(owned_elem_local)) return
+    do ee = 1, min(size(buf), n_owned_elem)
+       e  = owned_elem_local(ee)
+       n1 = p_elem2D_nodes(1, e)
+       n2 = p_elem2D_nodes(2, e)
+       n3 = p_elem2D_nodes(3, e)
+       amax = max(real(p_ice_conc(n1), kind=4), &
+                  real(p_ice_conc(n2), kind=4), &
+                  real(p_ice_conc(n3), kind=4))
+       if (amax < real(ICE_CONC_EPS, kind=4)) buf(ee) = NC_FILL_FLOAT
     end do
   end subroutine
 
