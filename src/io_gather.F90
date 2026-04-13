@@ -3,16 +3,15 @@ module io_gather_module
   USE MOD_PARSUP
   implicit none
   public init_io_gather, gather_nod2D, gather_real4_nod2D, gather_elem2D, gather_real4_elem2D
-  public rank0Dim_nod2D, rank0List_nod2D, rank0Dim_elem2D, rank0List_elem2D
   private
 
   logical, save :: nod2D_lists_initialized = .false.
   integer, save :: rank0Dim_nod2D
-  integer, save, allocatable, target, dimension(:) :: rank0List_nod2D
+  integer, save, allocatable, dimension(:) :: rank0List_nod2D
 
   logical, save :: elem2D_lists_initialized = .false.
   integer, save :: rank0Dim_elem2D
-  integer, save, allocatable, target, dimension(:) :: rank0List_elem2D
+  integer, save, allocatable, dimension(:) :: rank0List_elem2D
   
 contains
 

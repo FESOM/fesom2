@@ -835,6 +835,32 @@ CASE ('benCalc   ')
     if (use_REcoM) then
     call def_stream(nod2D,  myDim_nod2D,   'benCalc','Benthos calcite','mmol', Benthos(:,4), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
+! ciso 
+CASE ('benC_13   ')
+    if (use_REcoM) then
+      if (ciso) then
+         call def_stream(nod2D,  myDim_nod2D,   'benC_13','Benthos Carbon-13','mmol/m2', Benthos(:,5), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      end if
+    end if
+CASE ('benC_14   ')
+    if (use_REcoM) then
+      if (ciso) then
+        call def_stream(nod2D,  myDim_nod2D,   'benC_14','Benthos Carbon-14','mmol/m2', Benthos(:,6), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      end if
+    end if
+CASE ('benCalc_13')
+    if (use_REcoM) then
+      if (ciso) then
+        call def_stream(nod2D,  myDim_nod2D,   'benCalc_13','Benthos calcite-13','mmol/m2', Benthos(:,7), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      end if
+    end if
+CASE ('benCalc_14')
+    if (use_REcoM) then
+      if (ciso) then
+        call def_stream(nod2D,  myDim_nod2D,   'benCalc_14','Benthos calcite-14','mmol/m2', Benthos(:,8), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      end if
+    end if
+!ciso
 CASE ('NPPn      ')
     if (use_REcoM) then
     call def_stream(nod2D,  myDim_nod2D,   'NPPn','Mean NPP nanophytoplankton','mmolC/m2/d', NPPn, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -897,6 +923,30 @@ CASE ('Chldegc  ')
     if (use_REcoM) then
 !    call def_stream(nod2D,  myDim_nod2D,   'GNAc','Gross N-assimilation coccolithophores','mmolN/(m2*d)', diags2D(:,12), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh) ! NEW
     call def_stream(nod2D,  myDim_nod2D,   'ChlDegc','Chlorophyll degradation coccolithophores','1/d', Chldegc, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! NEW
+    endif 
+
+CASE ('NPPp     ')
+    if (use_REcoM) then
+!    call def_stream(nod2D,  myDim_nod2D,   'NPPp','Mean NPP phaeocystis','mmolC/(m2*d)', diags2D(:,9), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)     ! NEW
+    call def_stream(nod2D,  myDim_nod2D,   'NPPp','Mean NPP phaeocystis','mmolC/(m2*d)', NPPp, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)     ! Phaeocystis
+    end if
+
+CASE ('GPPp     ')
+    if (use_REcoM) then
+!    call def_stream(nod2D,  myDim_nod2D,   'GPPp','Mean GPP phaeocystis','mmolC/(m2*d)', diags2D(:,10), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)    ! NEW
+    call def_stream(nod2D,  myDim_nod2D,   'GPPp','Mean GPP phaeocystis','mmolC/(m2*d)', GPPp, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)    ! Phaeocystis
+    end if
+
+CASE ('NNAp     ')
+    if (use_REcoM) then
+!    call def_stream(nod2D,  myDim_nod2D,   'NNAp','Net N-assimilation phaeocystis','mmolN/(m2*d)', diags2D(:,11), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh)   ! NEW
+    call def_stream(nod2D,  myDim_nod2D,   'NNAp','Net N-assimilation phaeocystis','mmolN/(m2*d)', NNAp, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)   ! Phaeocystis
+    endif
+
+CASE ('Chldegp  ')
+    if (use_REcoM) then
+!    call def_stream(nod2D,  myDim_nod2D,   'GNAp','Gross N-assimilation phaeocystis','mmolN/(m2*d)', diags2D(:,12), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, mesh) ! NEW
+    call def_stream(nod2D,  myDim_nod2D,   'ChlDegp','Chlorophyll degradation phaeocystis','1/d', Chldegp, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
     endif
 #endif
     
@@ -914,6 +964,10 @@ CASE ('PAR       ')
     if (use_REcoM) then
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'PAR', 'PAR', 'W/m2',      PAR3D(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
+CASE ('wsink_det1')
+   call def_stream((/nl, nod2D/),  (/nl, myDim_nod2D/),  'wsink_det1', 'sinking speed of particles in class 1', 'm s-1',  Sinkingvel1(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('wsink_det2')
+   call def_stream((/nl, nod2D/),  (/nl, myDim_nod2D/),  'wsink_det2', 'sinking speed of particles in class 2', 'm s-1',  Sinkingvel2(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 
 CASE ('respmeso       ')
    if (use_REcoM) then
@@ -955,6 +1009,11 @@ CASE ('aggc           ')
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'aggc','Aggregation of coccolithophores', 'mmolC/m2/d', aggc(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
 
+CASE ('aggp           ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'aggp','Aggregation of phaeocystis', 'mmolC/(m2*d)', aggp(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
+   endif
+
 CASE ('docexn         ')
    if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'docexn','DOC excretion by small phytoplankton', 'mmolC/m2/d', docexn(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -968,6 +1027,11 @@ CASE ('docexd         ')
 CASE ('docexc         ')
    if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'docexc','DOC excretion by coccolithophores', 'mmolC/m2/d', docexc(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('docexp         ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'docexp','DOC excretion by phaeocystis', 'mmolC/(m2*d)', docexp(:,:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
    endif
 
 CASE ('respn          ')
@@ -985,6 +1049,11 @@ CASE ('respc          ')
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'respc','Respiration by coccolithophores', 'mmolC/(m2*d)', respc(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
 
+CASE ('respp          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'respp','Respiration by phaeocystis', 'mmolC/(m2*d)', respp(:,:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
+   endif
+
 CASE ('NPPn3D         ')
    if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPn3D','Net primary production of small phytoplankton', 'mmolC/m2/d', NPPn3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -999,6 +1068,117 @@ CASE ('NPPc3D         ')
    if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPc3D','Net primary production of coccolithophores', 'mmolC/m2/d', NPPc3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
+
+CASE ('NPPp3D         ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPp3D','Net primary production of phaeocystis', 'mmolC/(m2*d)', NPPp3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
+   endif
+
+CASE ('TTemp_diatoms          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TTemp_diatoms','Temperature dependence of diatoms PS', 'per day',TTemp_diatoms(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TTemp_phyto          ')
+   if (use_REcoM) then 
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TTemp_phyto','Temperature dependence of small phytoplankton PS', 'per day',TTemp_phyto(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TTemp_cocco          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TTemp_cocco','Temperature dependence of coccolithophores PS', 'per day',TTemp_cocco(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TTemp_phaeo          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TTemp_phaeo','Temperature dependence of phaeocystis PS', 'per day',TTemp_phaeo(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TPhyCO2          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TPhyCO2','Effect of CO2 of phyto growth/PS', 'per day',TPhyCO2(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TDiaCO2          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TDiaCO2','Effect of CO2 of phyto growth/PS', 'per day',TDiaCO2(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TCoccoCO2          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCoccoCO2','Effect of CO2 of phyto growth/PS', 'per day',TCoccoCO2(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TPhaeoCO2          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TPhaeoCO2','Effect of CO2 of phyto growth/PS', 'per day',TPhaeoCO2(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TqLF_phyto          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TqLF_phyto','Nutrient limitation effect of phyto PS', 'per day',TqlimitFac_phyto(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TqLF_diatoms          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TqLF_diatoms','Nutrient limitation effect of diatoms PS', 'per day',TqlimitFac_diatoms(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TqLF_cocco          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TqLF_cocco','Nutrient limitation effect of diatoms PS', 'per day',TqlimitFac_cocco(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TqLF_phaeo          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TqLF_phaeo','Nutrient limitation effect of diatoms PS', 'per day', TqlimitFac_phaeo(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TCphotLL_phyto         ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCphotLL_phyto','Light limitation on phyto PS', 'per day', TCphotLigLim_phyto(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TCphotLL_dia         ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCphotLL_dia','Light limitation on diatoms PS', 'per day', TCphotLigLim_diatoms(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TCphotLL_cocco          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCphotLL_cocco','Light limitation on phyto PS', 'per day',TCphotLigLim_cocco(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TCphotLL_phaeo          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCphotLL_phaeo','Light limitation on phyto PS', 'per day',TCphotLigLim_phaeo(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TCphot_phyto          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCphot_phyto','Light limitation on phyto PS', 'per day',TCphot_phyto(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TCphot_diatoms          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCphot_diatoms','Light limitation on phyto PS', 'per day',TCphot_diatoms(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif   
+
+CASE ('TCphot_cocco          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCphot_cocco','Light limitation on phyto PS', 'per day',TCphot_cocco(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TCphot_phaeo          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TCphot_phaeo','Light limitation on phyto PS', 'per day',TCphot_phaeo(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('TSi_assimDia          ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TSi_assimDia','Silicate assimilation', 'per day',TSi_assimDia(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
 #endif
 
 !CASE ('otracers  ')
@@ -1016,9 +1196,35 @@ CASE ('otracers  ')
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIN', 'Dissolved Inorganic Nitrogen', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
 
-      else if (tracers%data(j)%ID==1002) then
+      else if (tracers%data(j)%ID==1002) then    ! NOTE Divide tracers%work%tra_advvert(:,:,j) by dt
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC', 'Dissolved Inorganic C', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+            if (tracers%data(j)%ltra_diag) then
+               ! horizontal advection
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_hor_adv', 'Horizontal advection part of dissolved Inorganic C', '[mmol/m3/s]', tracers%work%tra_advhoriz(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! vertical advection
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_ver_adv', 'Vertical advection part of dissolved Inorganic C', '[mmol/m3/s]', tracers%work%tra_advvert(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! horizontal diffusion
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_hor_redi', 'Horizontal diffusion of dissolved Inorganic C (includes Redi diffusivity if Redi=.true.)', '[mmol/m3/s]', tracers%work%tra_diff_part_hor_redi(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               if (.not. tracers%data(j)%i_vert_diff) then
+               ! vertical diffusion (Explicit)
+                   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_ver_expl', 'Vertical diffusion of dissolved Inorganic C (Explicit)', '[mmol/m3/s]', tracers%work%tra_diff_part_ver_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+               end if
+
+               ! projection of horizontal Redi diffussivity onto vertical
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_ver_redi_expl', 'Projection of horizontal Redi diffussivity onto vertical for dissolved Inorganic C (Explicit)', '[mmol/m3/s]', tracers%work%tra_diff_part_ver_redi_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! vertical diffusion (Implicit)
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_ver_impl', 'Vertical diffusion of dissolved Inorganic C (Implicit)', '[mmol/m3/s]', tracers%work%tra_diff_part_ver_impl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+               ! recom_sms
+               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_recom_sms', 'Recom SMS', '[mmol/m3/s]', tracers%work%tra_recom_sms(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            end if
+
          endif
 
       else if (tracers%data(j)%ID==1003) then
@@ -1168,10 +1374,25 @@ CASE ('otracers  ')
 
       else if (tracers%data(j)%ID==1032) then
          if (use_REcoM) then
-         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Zoo3N', 'Zoo3N', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'PhaeoN', 'PhaeoN', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)         ! NEW
          endif
 
       else if (tracers%data(j)%ID==1033) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'PhaeoC', 'PhaeoC', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)         ! NEW
+         endif
+
+      else if (tracers%data(j)%ID==1034) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'PhaeoChl', 'PhaeoChl', '[mg/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)       ! NEW
+         endif
+
+      else if (tracers%data(j)%ID==1035) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Zoo3N', 'Zoo3N', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         endif
+
+      else if (tracers%data(j)%ID==1036) then
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Zoo3C', 'Zoo3C', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
@@ -1205,8 +1426,10 @@ CASE ('otracers  ')
 
     end do
 
-CASE ('sigma0      ')
-    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'sigma0',      'potential density',    'kg/m3',    density_m_rho0(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('dens_insitu')
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'dens_insitu',      'In-situ density anomaly',    'kg/m3',    density_m_rho0(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('dens_sigma0')
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'dens_sigma0',      'Potential density anomaly with respect to srf.',    'kg/m3',    density_sigma0(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 
 !---wiso-code
 !___________________________________________________________________________________________________________________________________
@@ -1474,13 +1697,13 @@ CASE ('FORC      ')
         call def_stream(nod2D , myDim_nod2D , 'cd',    'wind drag coef. '             , '',     cd_atm_oce_arr(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream(nod2D , myDim_nod2D , 'ch',    'transfer coeff. sensible heat', '',     ch_atm_oce_arr(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream(nod2D , myDim_nod2D , 'ce',    'transfer coeff. evaporation ' , '',     ce_atm_oce_arr(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-#if defined (__oasis)
+#if defined (__oasis) || defined (__yac)
         call def_stream(nod2D,  myDim_nod2D,  'subli', 'sublimation',                   'm/s',  sublimation(:)   , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 #endif
         if ((use_virt_salt) .or. ( (.not. use_virt_salt) .and. (use_cavity) )) then
             if (sel_forcvar(13)==0) call def_stream(nod2D , myDim_nod2D , 'virtsalt', 'virtual salt flux'        , 'm/s*psu', virtual_salt(:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         end if     
-#if !defined (__oasis)        
+#if !defined (__oasis) && !defined (__yac)
         if (sel_forcvar(14)==0) call def_stream(nod2D , myDim_nod2D , 'relaxsalt', 'relaxation salt flux'        , 'm/s*psu', relax_salt(:)    , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 #endif  
         if (sel_forcvar(15)==0) call def_stream(nod2D , myDim_nod2D , 'realsalt' , 'real salt flux from sea ice' , 'm/s*psu', real_salt_flux(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -1629,10 +1852,10 @@ END DO ! --> DO i=1, io_listsize
             character :: tf_unit
             character(len=5) :: tf_names(4)
             character(len=6) :: tf_long(4)
-            character(len=7) :: tf_units(4)
+            character(len=8) :: tf_units(4)
             tf_names = (/ 'utemp', 'vtemp', 'usalt', 'vsalt' /)
             tf_long  = (/ 'u*temp', 'v*temp', 'u*salt', 'v*salt' /)
-            tf_units = (/ 'm/s*°C ', 'm/s*°C ', 'm/s*psu', 'm/s*psu' /)
+            tf_units = (/ 'm/s*degC', 'm/s*degC', 'm/s*psu ', 'm/s*psu ' /)
             do j = 1, 4
                 tf_freq = 1; tf_unit = 'm'
                 do k = 1, io_listsize
@@ -2142,28 +2365,15 @@ end subroutine
 ! file. In case of 3data write horizontal slices level wise.
 subroutine write_mean(entry, entry_index)
     use mod_mesh
-    use io_gather_module, only: rank0Dim_nod2D, rank0List_nod2D, rank0Dim_elem2D, rank0List_elem2D
+    use io_gather_module
     implicit none
     type(Meandata), intent(inout) :: entry
     integer, intent(in) :: entry_index
-    integer                       :: size1, size2, lev, r, sp, cnt
-    integer                       :: my_npes, my_mype, my_root
-    integer                       :: mpierr, total_recv
-    ! MPI_Gatherv parameters (built once, used for all levels)
-    integer, allocatable          :: gv_rcnt(:), gv_disp(:)
-    ! Partition index pointers (node-based or element-based)
-    integer, pointer              :: remPtr(:), remList(:), myList(:), r0List(:)
-    integer                       :: myDim, r0Dim
-    ! Gather + global accumulation buffers
-    real(real64), allocatable     :: sbuf_r8(:), rbuf_r8(:), glob_r8(:,:)
-    real(real32), allocatable     :: sbuf_r4(:), rbuf_r4(:), glob_r4(:,:)
-    ! Debug timing for write_mean breakdown
-    real(kind=8) :: wm_t_start, wm_t_gather, wm_t_write, wm_t_end
-
-    my_npes = entry%p_partit%npes
-    my_mype = entry%p_partit%mype
-    my_root = entry%root_rank
-    wm_t_start = MPI_Wtime()
+    integer tag
+    integer                       :: i, size1, size2, size_gen, size_lev, order
+    integer                       :: c, lev
+    real(kind=8)                  :: t0,t1
+    integer mpierr
 
 #if defined(__XIOS)
     ! Route all streams (node- and element-based) to XIOS when enabled. Per
@@ -2235,154 +2445,96 @@ subroutine write_mean(entry, entry_index)
     end if
 #endif
 
+    ! Serial output implemented so far
     !___________________________________________________________________________
     ! write new time index ctime_copy to file --> expand time array in nc file
-    if (my_mype == my_root) then
+    if (entry%p_partit%mype==entry%root_rank) then
         write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count
         call assert_nf( nf90_put_var(entry%ncid, entry%Tid, entry%ctime_copy, start = (/entry%rec_count/) ), __LINE__)
     end if
-
+  
     !_______writing 2D and 3D fields____________________________________________
-    size1 = entry%glsize(1)  ! number of vertical levels (1 for 2D variables)
-    size2 = entry%glsize(2)  ! global number of nodes or elements
-
-    !___________________________________________________________________________
-    ! Set up partition index arrays (node-based vs element-based)
-    if(.not. entry%is_elem_based) then
-        remPtr  => entry%p_partit%remPtr_nod2D
-        remList => entry%p_partit%remList_nod2D
-        myList  => entry%p_partit%myList_nod2D
-        myDim   =  entry%p_partit%myDim_nod2D
-        r0Dim   =  rank0Dim_nod2D
-        r0List  => rank0List_nod2D
-    else
-        remPtr  => entry%p_partit%remPtr_elem2D
-        remList => entry%p_partit%remList_elem2D
-        myList  => entry%p_partit%myList_elem2D
-        myDim   =  entry%p_partit%myDim_elem2D
-        r0Dim   =  rank0Dim_elem2D
-        r0List  => rank0List_elem2D
-    end if
-
-    !___________________________________________________________________________
-    ! Build MPI_Gatherv parameters: per-rank receive counts and displacements.
-    ! This replaces the hand-rolled MPI_Irecv/Send pattern with a single
-    ! tree-based collective per level (O(log P) instead of O(P) messages).
-    allocate(gv_rcnt(my_npes), gv_disp(my_npes))
-    gv_rcnt(1) = r0Dim  ! rank 0's node/element count
-    do r = 1, my_npes-1
-        gv_rcnt(r+1) = remPtr(r+1) - remPtr(r)
-    end do
-    gv_disp(1) = 0
-    do r = 1, my_npes-1
-        gv_disp(r+1) = gv_disp(r) + gv_rcnt(r)
-    end do
-
+    size1=entry%glsize(1)
+    size2=entry%glsize(2)
+    tag = 2 ! we can use a fixed tag here as we have an individual communicator for each output field
+    
     !___________writing 8 byte real_____________________________________________
     if (entry%accuracy == i_real8) then
-        allocate(sbuf_r8(myDim))
-        if(my_mype == my_root) then
-            total_recv = gv_disp(my_npes) + gv_rcnt(my_npes)
-            allocate(rbuf_r8(total_recv))
-            allocate(glob_r8(size2, size1))
+        
+        !_______________________________________________________________________
+        ! allocate global 2d array in which local data are gathered
+        if(entry%p_partit%mype==entry%root_rank) then
+            if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(size2))
         else
-            allocate(rbuf_r8(1))  ! dummy, unused on non-root
+            if(.not. allocated(entry%aux_r8)) allocate(entry%aux_r8(1))
         end if
-
-        ! Gather all levels into glob_r8 using MPI_Gatherv per level
-        do lev = 1, size1
-            sbuf_r8(1:myDim) = entry%local_values_r8_copy(lev, 1:myDim)
-            call MPI_Gatherv(sbuf_r8, myDim, MPI_DOUBLE_PRECISION, &
-                             rbuf_r8, gv_rcnt, gv_disp, MPI_DOUBLE_PRECISION, &
-                             my_root, entry%comm, mpierr)
-            ! Reorder from rank-packed receive buffer into global index order
-            if(my_mype == my_root) then
-                do r = 0, my_npes-1
-                    sp  = gv_disp(r+1) + 1
-                    cnt = gv_rcnt(r+1)
-                    if(r == my_root) then
-                        glob_r8(myList(1:cnt), lev) = rbuf_r8(sp:sp+cnt-1)
-                    else if(r == 0) then
-                        glob_r8(r0List(1:cnt), lev) = rbuf_r8(sp:sp+cnt-1)
-                    else
-                        glob_r8(remList(remPtr(r):remPtr(r+1)-1), lev) = rbuf_r8(sp:sp+cnt-1)
-                    end if
-                end do
-            end if
-        end do
-
-        wm_t_gather = MPI_Wtime()
-        ! Single batched NetCDF write for all levels
-        if(my_mype == my_root) then
-            if(entry%ndim == 1) then
-                call assert_nf( nf90_put_var(entry%ncid, entry%varID, glob_r8(:,1), &
-                    start=(/1, entry%rec_count/), count=(/size2, 1/)), __LINE__)
+        
+        !_______________________________________________________________________
+        ! loop over vertical layers --> do gather 3d variables layerwise in 2d
+        ! slices
+        do lev=1, size1
+            !___________________________________________________________________
+            ! local output variables are gahtered in 2d shaped entry%aux_r8 
+            ! either for vertices or elements
+            if(.not. entry%is_elem_based) then
+                call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
             else
-                call assert_nf( nf90_put_var(entry%ncid, entry%varID, glob_r8, &
-                    start=(/1, 1, entry%rec_count/), count=(/size2, size1, 1/)), __LINE__)
+                call gather_elem2D(entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
             end if
-        end if
-        wm_t_write = MPI_Wtime()
-        if(my_mype == my_root) then
-            write(*,'(A,A,A,I3,A,F8.3,A,F8.3,A)') &
-                ' [WM_TIMING] ', trim(entry%name), ' (r8, ', size1, ' lev): gather=', &
-                wm_t_gather - wm_t_start, 's  write=', wm_t_write - wm_t_gather, 's'
-        end if
-        deallocate(sbuf_r8, rbuf_r8)
-        if(allocated(glob_r8)) deallocate(glob_r8)
+            
+            !___________________________________________________________________
+            ! use root_rank CPU/Task to write 2d slice into netcdf file for 3d 
+            ! variables into specific layer position lev
+            if (entry%p_partit%mype==entry%root_rank) then
+                if (entry%ndim==1) then
+                    call assert_nf( nf90_put_var(entry%ncid, entry%varID, entry%aux_r8, start=(/1, entry%rec_count/), count=(/size2, 1/)), __LINE__)
+                elseif (entry%ndim==2) then
+                    call assert_nf( nf90_put_var(entry%ncid, entry%varID, entry%aux_r8, start=(/1, lev, entry%rec_count/), count=(/size2, 1, 1/)), __LINE__)
+                end if
+            end if
+        end do ! --> do lev=1, size1
 
-    !___________writing 4 byte real ____________________________________________
+    !___________writing 4 byte real ____________________________________________ 
     else if (entry%accuracy == i_real4) then
-        allocate(sbuf_r4(myDim))
-        if(my_mype == my_root) then
-            total_recv = gv_disp(my_npes) + gv_rcnt(my_npes)
-            allocate(rbuf_r4(total_recv))
-            allocate(glob_r4(size2, size1))
+    
+        !_______________________________________________________________________
+        ! allocate global 2d array in which local data are gathered
+        if(entry%p_partit%mype==entry%root_rank) then
+            if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(size2))
         else
-            allocate(rbuf_r4(1))
+            if(.not. allocated(entry%aux_r4)) allocate(entry%aux_r4(1))
         end if
-
-        do lev = 1, size1
-            sbuf_r4(1:myDim) = entry%local_values_r4_copy(lev, 1:myDim)
-            call MPI_Gatherv(sbuf_r4, myDim, MPI_REAL, &
-                             rbuf_r4, gv_rcnt, gv_disp, MPI_REAL, &
-                             my_root, entry%comm, mpierr)
-            if(my_mype == my_root) then
-                do r = 0, my_npes-1
-                    sp  = gv_disp(r+1) + 1
-                    cnt = gv_rcnt(r+1)
-                    if(r == my_root) then
-                        glob_r4(myList(1:cnt), lev) = rbuf_r4(sp:sp+cnt-1)
-                    else if(r == 0) then
-                        glob_r4(r0List(1:cnt), lev) = rbuf_r4(sp:sp+cnt-1)
-                    else
-                        glob_r4(remList(remPtr(r):remPtr(r+1)-1), lev) = rbuf_r4(sp:sp+cnt-1)
-                    end if
-                end do
-            end if
-        end do
-
-        wm_t_gather = MPI_Wtime()
-        if(my_mype == my_root) then
-            if(entry%ndim == 1) then
-                call assert_nf( nf90_put_var(entry%ncid, entry%varID, glob_r4(:,1), &
-                    start=(/1, entry%rec_count/), count=(/size2, 1/)), __LINE__)
+        
+        !_______________________________________________________________________
+        ! loop over vertical layers --> do gather 3d variables layerwise in 2d
+        ! slices
+        do lev=1, size1
+            !PS if (entry%p_partit%mype==entry%root_rank) t0=MPI_Wtime()  
+            !___________________________________________________________________
+            ! local output variables are gahtered in 2d shaped entry%aux_r8 
+            ! either for vertices or elements
+            if(.not. entry%is_elem_based) then
+                call gather_real4_nod2D (entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
             else
-                call assert_nf( nf90_put_var(entry%ncid, entry%varID, glob_r4, &
-                    start=(/1, 1, entry%rec_count/), count=(/size2, size1, 1/)), __LINE__)
+                call gather_real4_elem2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
             end if
-        end if
-        wm_t_write = MPI_Wtime()
-        if(my_mype == my_root) then
-            write(*,'(A,A,A,I3,A,F8.3,A,F8.3,A)') &
-                ' [WM_TIMING] ', trim(entry%name), ' (r4, ', size1, ' lev): gather=', &
-                wm_t_gather - wm_t_start, 's  write=', wm_t_write - wm_t_gather, 's'
-        end if
-        deallocate(sbuf_r4, rbuf_r4)
-        if(allocated(glob_r4)) deallocate(glob_r4)
+            
+            !___________________________________________________________________
+            ! use root_rank CPU/Task to write 2d slice into netcdf file for 3d 
+            ! variables into specific layer position lev
+            if (entry%p_partit%mype==entry%root_rank) then
+                if (entry%ndim==1) then
+                    call assert_nf( nf90_put_var(entry%ncid, entry%varID, entry%aux_r4, start=(/1, entry%rec_count/), count=(/size2, 1/)), __LINE__)
+                    !PS t1=MPI_Wtime()  
+                    !PS if (entry%p_partit%flag_debug)  print *, achar(27)//'[31m'//' -I/O-> after nf90_put_var'//achar(27)//'[0m', entry%p_partit%mype, t1-t0
+                elseif (entry%ndim==2) then
+                    call assert_nf( nf90_put_var(entry%ncid, entry%varID, entry%aux_r4, start=(/1, lev, entry%rec_count/), count=(/size2, 1, 1/)), __LINE__)
+                    !PS t1=MPI_Wtime()  
+                    !PS if (entry%p_partit%flag_debug)  print *, achar(27)//'[31m'//' -I/O-> after nf90_put_var'//achar(27)//'[0m', entry%p_partit%mype, lev, t1-t0
+                end if
+            end if
+        end do ! --> do lev=1, size1
     end if ! --> if (entry%accuracy == i_real8) then
-
-    deallocate(gv_rcnt, gv_disp)
 end subroutine
 !
 !
@@ -2480,12 +2632,6 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     type(t_ice)   , intent(inout), target :: ice
     character(:), allocatable             :: filepath
     real(real64)                          :: rtime !timestamp of the record
-    ! Debug timing variables for I/O performance analysis
-    integer       :: io_dbg_nfire
-    logical       :: io_dbg_verbose
-    real(kind=8)  :: io_dbg_t_loop, io_dbg_t0, io_dbg_t1
-    real(kind=8)  :: io_dbg_t_join_total, io_dbg_t_file_total
-    real(kind=8)  :: io_dbg_t_copy_total, io_dbg_t_run_total
 #if defined(__MULTIO)
     logical       :: output_done
     logical       :: trigger_flush
@@ -2517,35 +2663,7 @@ ctime=timeold+(dayold-1.)*86400
 #endif
 
     !___________________________________________________________________________
-    ! loop over defined streams -- with I/O timing instrumentation
-    ! Count how many streams will fire this step (for debug output control)
-    io_dbg_nfire = 0
-    do n=1, io_NSTREAMS
-        entry=>io_stream(n)
-        do_output=.false.
-        if (entry%freq_unit.eq.'y') then
-            call annual_event(do_output, entry%freq)
-        else if (entry%freq_unit == 'm') then
-            call monthly_event(do_output, entry%freq)
-        else if (entry%freq_unit == 'd') then
-            call daily_event(do_output, entry%freq)
-        else if (entry%freq_unit == 'h') then
-            call hourly_event(do_output, entry%freq)
-        else if (entry%freq_unit == 's') then
-            call step_event(do_output, istep, entry%freq)
-        end if
-        if(do_output) io_dbg_nfire = io_dbg_nfire + 1
-    end do
-    io_dbg_verbose = (io_dbg_nfire > 15)  ! only print timing when many streams fire (year boundary)
-    if(io_dbg_verbose .and. partit%mype==0) then
-        io_dbg_t_loop = MPI_Wtime()
-        write(*,'(A,I4,A,I6)') ' [IO_TIMING] output loop start: ', io_dbg_nfire, ' streams firing at step ', istep
-        io_dbg_t_join_total = 0.0d0
-        io_dbg_t_file_total = 0.0d0
-        io_dbg_t_copy_total = 0.0d0
-        io_dbg_t_run_total  = 0.0d0
-    end if
-
+    ! loop over defined streams
     do n=1, io_NSTREAMS
         !_______________________________________________________________________
         ! make pointer for entry onto io_stream object
@@ -2585,13 +2703,8 @@ ctime=timeold+(dayold-1.)*86400
         if (do_output) then
             if (vec_autorotate) call io_r2g(n, partit, mesh) ! automatically detect if a vector field and rotate if makes sense!
 #if !defined(__MULTIO)
-            if(io_dbg_verbose .and. partit%mype==0) io_dbg_t0 = MPI_Wtime()
             if(entry%thread_running) call entry%thread%join()
             entry%thread_running = .false.
-            if(io_dbg_verbose .and. partit%mype==0) then
-                io_dbg_t1 = MPI_Wtime()
-                io_dbg_t_join_total = io_dbg_t_join_total + (io_dbg_t1 - io_dbg_t0)
-            end if
 
             ! define filepath
             if (filesplit_freq=='m') then
@@ -2600,7 +2713,6 @@ ctime=timeold+(dayold-1.)*86400
                 filepath = trim(ResultPath)//trim(entry%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
             endif
 
-            if(io_dbg_verbose .and. partit%mype==0) io_dbg_t0 = MPI_Wtime()
             !___________________________________________________________________
             ! only root rank task does output
 #if defined(__XIOS)
@@ -2616,36 +2728,42 @@ ctime=timeold+(dayold-1.)*86400
                     !___________________________________________________________
                     ! use any existing file with this name or create a new one
                     if( nf90_open(entry%filename, nf90_write, entry%ncid) /= nf90_noerr ) then
+                        !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call create_new_file'//achar(27)//'[0m'
                         call create_new_file(entry, ice, dynamics, partit, mesh)
+
+                        !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assert_nf A'//achar(27)//'[0m'//',  k=',k, ', rootpart=', entry%root_rank
                         call assert_nf( nf90_open(entry%filename, nf90_write, entry%ncid), __LINE__)
                     end if
 
+                    !___________________________________________________________
+                    ! setup all dimension definition and attributes of the netcdf
+                    ! file
+                    !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assoc_ids'//achar(27)//'[0m'
                     call assoc_ids(entry)
 
                 end if ! --> if(filepath /= trim(entry%filename)) then
 
                 !_______________________________________________________________
+                ! if the time rtime at the rec_count is larger than ctime we
+                ! look for the closest record with the timestamp less than ctime
                 do k=entry%rec_count, 1, -1
+                    !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assert_nf B'//achar(27)//'[0m'//',  k=',k, ', rootpart=', entry%root_rank
+                    ! determine rtime from exiting file
                     call assert_nf( nf90_get_var(entry%ncid, entry%tID, rtime), __LINE__)
                     if (ctime > rtime) then
                         entry%rec_count=k+1
-                        exit
+                        exit ! a proper rec_count detected, exit the loop
                     end if
                     if (k==1) then
                         write(*,*) 'I/O '//trim(entry%name)//' WARNING: the existing output file will be overwritten'//'; ', entry%rec_count, ' records in the file;'
                         entry%rec_count=1
-                        exit
+                        exit ! no appropriate rec_count detected
                     end if
                 end do
                 entry%rec_count=max(entry%rec_count, 1)
                 write(*,*) trim(entry%name)//': current mean I/O counter = ', entry%rec_count
             end if ! --> if(partit%mype == entry%root_rank) then
-            if(io_dbg_verbose .and. partit%mype==0) then
-                io_dbg_t1 = MPI_Wtime()
-                io_dbg_t_file_total = io_dbg_t_file_total + (io_dbg_t1 - io_dbg_t0)
-            end if
 #endif
-            if(io_dbg_verbose .and. partit%mype==0) io_dbg_t0 = MPI_Wtime()
             !___________________________________________________________________
             ! write double precision output
             if (entry%accuracy == i_real8) then
@@ -2693,14 +2811,9 @@ ctime=timeold+(dayold-1.)*86400
             call send_data_to_multio(entry)
 !            end if
 #else
-            if(io_dbg_verbose .and. partit%mype==0) then
-                io_dbg_t1 = MPI_Wtime()
-                io_dbg_t_copy_total = io_dbg_t_copy_total + (io_dbg_t1 - io_dbg_t0)
-            end if
             !___________________________________________________________________
             ! this is where the magic happens --> here do_output_callback is
             ! triggered as a method of the io_stream object --> call write_mean(...)
-            if(io_dbg_verbose .and. partit%mype==0) io_dbg_t0 = MPI_Wtime()
             call entry%thread%run()
             entry%thread_running = .true.
             ! When many streams fire (year boundary), join immediately to
@@ -2727,21 +2840,6 @@ ctime=timeold+(dayold-1.)*86400
 #endif
         endif ! --> if (do_output) then
     end do ! --> do n=1, io_NSTREAMS
-
-    ! Print timing summary when many streams fired (year boundary)
-    if(io_dbg_verbose .and. partit%mype==0) then
-        io_dbg_t1 = MPI_Wtime()
-        write(*,'(A)')       ' [IO_TIMING] ============================================='
-        write(*,'(A,I4)')    ' [IO_TIMING] Streams fired:       ', io_dbg_nfire
-        write(*,'(A,F10.3,A)') ' [IO_TIMING] Total loop time:     ', io_dbg_t1 - io_dbg_t_loop, ' s'
-        write(*,'(A,F10.3,A)') ' [IO_TIMING]   thread%join():     ', io_dbg_t_join_total, ' s'
-        write(*,'(A,F10.3,A)') ' [IO_TIMING]   file mgmt (root):  ', io_dbg_t_file_total, ' s'
-        write(*,'(A,F10.3,A)') ' [IO_TIMING]   data copy (OMP):   ', io_dbg_t_copy_total, ' s'
-        write(*,'(A,F10.3,A)') ' [IO_TIMING]   thread%run():      ', io_dbg_t_run_total,  ' s'
-        write(*,'(A,F10.3,A)') ' [IO_TIMING]   other/overhead:    ', &
-            (io_dbg_t1 - io_dbg_t_loop) - io_dbg_t_join_total - io_dbg_t_file_total - io_dbg_t_copy_total - io_dbg_t_run_total, ' s'
-        write(*,'(A)')       ' [IO_TIMING] ============================================='
-    end if
 
     !___________________________________________________________________________
     ! Handle 0D (scalar) output streams
@@ -2926,8 +3024,10 @@ subroutine do_output_callback(entry_index)
     ! synchronize after writes:
     ! To minimize data loss in case of abnormal termination, or To make data 
     ! available to other processes for reading immediately after it is written. 
-    ! nf90_sync removed: redundant disk flush since nf90_close in finalize_output
-    ! already flushes all data. Removing this avoids a costly fsync per variable.
+    if(entry%p_partit%mype == entry%root_rank) then 
+        !PS if (entry%p_partit%flag_debug)  print *, achar(27)//'[31m'//' -I/O-> call nf_sync'//achar(27)//'[0m', entry%p_partit%mype
+        call assert_nf( nf90_sync(entry%ncid), __LINE__ ) ! flush the file to disk after each write
+    end if   
     
 end subroutine
 !
