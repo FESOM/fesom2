@@ -2547,13 +2547,17 @@ ctime=timeold+(dayold-1.)*86400
                     !___________________________________________________________
                     ! use any existing file with this name or create a new one
                     if( nf90_open(entry%filename, nf90_write, entry%ncid) /= nf90_noerr ) then
+                        !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call create_new_file'//achar(27)//'[0m'
                         call create_new_file(entry, ice, dynamics, partit, mesh)
+
+                        !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assert_nf A'//achar(27)//'[0m'//',  k=',k, ', rootpart=', entry%root_rank
                         call assert_nf( nf90_open(entry%filename, nf90_write, entry%ncid), __LINE__)
                     end if
 
                     !___________________________________________________________
                     ! setup all dimension definition and attributes of the netcdf
                     ! file
+                    !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assoc_ids'//achar(27)//'[0m'
                     call assoc_ids(entry)
 
                 end if ! --> if(filepath /= trim(entry%filename)) then
@@ -2562,6 +2566,7 @@ ctime=timeold+(dayold-1.)*86400
                 ! if the time rtime at the rec_count is larger than ctime we
                 ! look for the closest record with the timestamp less than ctime
                 do k=entry%rec_count, 1, -1
+                    !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assert_nf B'//achar(27)//'[0m'//',  k=',k, ', rootpart=', entry%root_rank
                     ! determine rtime from exiting file
                     call assert_nf( nf90_get_var(entry%ncid, entry%tID, rtime), __LINE__)
                     if (ctime > rtime) then
