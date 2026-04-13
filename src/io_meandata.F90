@@ -1745,10 +1745,10 @@ END DO ! --> DO i=1, io_listsize
             character :: tf_unit
             character(len=5) :: tf_names(4)
             character(len=6) :: tf_long(4)
-            character(len=7) :: tf_units(4)
+            character(len=8) :: tf_units(4)
             tf_names = (/ 'utemp', 'vtemp', 'usalt', 'vsalt' /)
             tf_long  = (/ 'u*temp', 'v*temp', 'u*salt', 'v*salt' /)
-            tf_units = (/ 'm/s*°C ', 'm/s*°C ', 'm/s*psu', 'm/s*psu' /)
+            tf_units = (/ 'm/s*degC', 'm/s*degC', 'm/s*psu ', 'm/s*psu ' /)
             do j = 1, 4
                 tf_freq = 1; tf_unit = 'm'
                 do k = 1, io_listsize
