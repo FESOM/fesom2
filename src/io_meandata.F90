@@ -2485,6 +2485,8 @@ ctime=timeold+(dayold-1.)*86400
     output_done = .false.
 #endif
 
+    !___________________________________________________________________________
+    ! loop over defined streams
     do n=1, io_NSTREAMS
         !_______________________________________________________________________
         ! make pointer for entry onto io_stream object
@@ -2549,21 +2551,27 @@ ctime=timeold+(dayold-1.)*86400
                         call assert_nf( nf90_open(entry%filename, nf90_write, entry%ncid), __LINE__)
                     end if
 
+                    !___________________________________________________________
+                    ! setup all dimension definition and attributes of the netcdf
+                    ! file
                     call assoc_ids(entry)
 
                 end if ! --> if(filepath /= trim(entry%filename)) then
 
                 !_______________________________________________________________
+                ! if the time rtime at the rec_count is larger than ctime we
+                ! look for the closest record with the timestamp less than ctime
                 do k=entry%rec_count, 1, -1
+                    ! determine rtime from exiting file
                     call assert_nf( nf90_get_var(entry%ncid, entry%tID, rtime), __LINE__)
                     if (ctime > rtime) then
                         entry%rec_count=k+1
-                        exit
+                        exit ! a proper rec_count detected, exit the loop
                     end if
                     if (k==1) then
                         write(*,*) 'I/O '//trim(entry%name)//' WARNING: the existing output file will be overwritten'//'; ', entry%rec_count, ' records in the file;'
                         entry%rec_count=1
-                        exit
+                        exit ! no appropriate rec_count detected
                     end if
                 end do
                 entry%rec_count=max(entry%rec_count, 1)
