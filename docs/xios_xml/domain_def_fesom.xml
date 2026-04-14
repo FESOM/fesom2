@@ -10,9 +10,11 @@
   -->
 
   <domain id="nodes"    type="unstructured" nvertex="6"
+          name="nod2" dim_i_name="nod2"
           long_name="FESOM mesh nodes (vertices)" />
 
   <domain id="elements" type="unstructured" nvertex="3"
+          name="elem" dim_i_name="elem"
           long_name="FESOM mesh elements (triangle centres)" />
 
 </domain_definition>

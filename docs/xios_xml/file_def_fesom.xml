@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <file_definition type="one_file" format="netcdf4" par_access="collective"
-                 compression_level="1">
+                 compression_level="1"
+                 time_counter_name="time" time_counter="exclusive">
 
   <!-- FESOM-2.7 XIOS file definition. One file per variable, grouped by
        output frequency (3h / 1d / 1mo). All files split yearly. Filenames
