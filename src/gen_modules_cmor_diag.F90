@@ -17,14 +17,19 @@ module cmor_variables_diag
   implicit none
   
   public :: init_cmor_diag, compute_cmor_diag, ldiag_cmor
+  public :: save_cmor_advection
   public :: volo, opottemptend, pbo, soga, thetaoga, tos, sos
   public :: siarean, siareas, siextentn, siextents, sivoln, sivols
-  
+  ! New CMOR tendency and shortwave diagnostics
+  public :: osalttend, opottemprmadvect, opottempdiff
+  public :: osaltrmadvect, osaltdiff
+  public :: rsdoabsorb
+
   private
-  
+
   ! Control flag for CMOR diagnostics
   logical :: ldiag_cmor = .false.
-  
+
   ! CMOR diagnostic variables
   logical, save :: initialized = .false.
   logical, save :: first_call = .true.
@@ -37,10 +42,23 @@ module cmor_variables_diag
   real(kind=WP), save :: siarean, siareas                ! Sea ice area north/south [10^12 m^2]
   real(kind=WP), save :: siextentn, siextents            ! Sea ice extent north/south [10^12 m^2]
   real(kind=WP), save :: sivoln, sivols                  ! Sea ice volume north/south [10^9 m^3]
-  
-  ! Auxiliary arrays for temperature tendency
+
+  ! New CMOR diagnostic variables
+  real(kind=WP), save, allocatable :: osalttend(:)          ! Salinity tendency [psu*m/s] - 2D column-integrated
+  real(kind=WP), save, allocatable :: opottemprmadvect(:)   ! Temp tendency from advection [W/m^2] - 2D
+  real(kind=WP), save, allocatable :: opottempdiff(:)       ! Temp tendency from diffusion [W/m^2] - 2D
+  real(kind=WP), save, allocatable :: osaltrmadvect(:)      ! Salt tendency from advection [psu*m/s] - 2D
+  real(kind=WP), save, allocatable :: osaltdiff(:)          ! Salt tendency from diffusion [psu*m/s] - 2D
+  real(kind=WP), save, allocatable :: rsdoabsorb(:,:)       ! Shortwave absorption per layer [W/m^2] - 3D (nl-1, nod2D)
+
+  ! Auxiliary arrays for tendency tracking
   ! FESOM 2 uses (level, nod2D) indexing
   real(kind=WP), save, allocatable :: previous_temp(:,:)  ! (nl-1, myDim_nod2D)
+  real(kind=WP), save, allocatable :: previous_salt(:,:)  ! (nl-1, myDim_nod2D)
+
+  ! Snapshots of advection del_ttf saved by oce_ale_tracer.F90
+  real(kind=WP), save, allocatable :: cmor_del_ttf_adv_temp(:,:)  ! (nl-1, myDim_nod2D)
+  real(kind=WP), save, allocatable :: cmor_del_ttf_adv_salt(:,:)  ! (nl-1, myDim_nod2D)
   
 contains
 
@@ -80,15 +98,37 @@ contains
     allocate(pbo(myDim_nod2D))
     allocate(tos(myDim_nod2D))
     allocate(sos(myDim_nod2D))
-    
-    ! Allocate previous temperature array (level, nod2D)
+
+    ! Allocate new tendency and shortwave diagnostic arrays
+    allocate(osalttend(myDim_nod2D))
+    allocate(opottemprmadvect(myDim_nod2D))
+    allocate(opottempdiff(myDim_nod2D))
+    allocate(osaltrmadvect(myDim_nod2D))
+    allocate(osaltdiff(myDim_nod2D))
+    allocate(rsdoabsorb(nl-1, myDim_nod2D))
+
+    ! Allocate previous tracer arrays (level, nod2D)
     allocate(previous_temp(nl-1, myDim_nod2D))
-    
+    allocate(previous_salt(nl-1, myDim_nod2D))
+
+    ! Allocate advection snapshot arrays
+    allocate(cmor_del_ttf_adv_temp(nl-1, myDim_nod2D))
+    allocate(cmor_del_ttf_adv_salt(nl-1, myDim_nod2D))
+
     opottemptend = 0.0_WP
     pbo = 0.0_WP
     tos = 0.0_WP
     sos = 0.0_WP
+    osalttend = 0.0_WP
+    opottemprmadvect = 0.0_WP
+    opottempdiff = 0.0_WP
+    osaltrmadvect = 0.0_WP
+    osaltdiff = 0.0_WP
+    rsdoabsorb = 0.0_WP
     previous_temp = 0.0_WP
+    previous_salt = 0.0_WP
+    cmor_del_ttf_adv_temp = 0.0_WP
+    cmor_del_ttf_adv_salt = 0.0_WP
 
     initialized = .true.
     first_call = .true.
@@ -105,13 +145,14 @@ contains
   ! Compute CMOR diagnostics
   !=================================================================
   subroutine compute_cmor_diag(tracers, ice, dynamics, partit, mesh)
+    use g_forcing_arrays, only: sw_3d
     implicit none
     type(t_tracer), intent(in),    target :: tracers
     type(t_ice),    intent(in),    target :: ice
     type(t_dyn),    intent(in),    target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(in),    target :: mesh
-    
+
     integer :: n2, k, ierr, ku, kl
     real(kind=WP) :: z_up, z_lo, dens_val, dz
     real(kind=WP), dimension(:,:), pointer :: temp, salt
@@ -129,18 +170,22 @@ contains
     salt => tracers%data(2)%values(:,:)
     eta_n => dynamics%eta_n(:)
     
-    ! Initialize previous_temp on first call
+    ! Initialize previous tracer arrays on first call
     if (first_call) then
         do n2 = 1, myDim_nod2D
             do k = ulevels_nod2D(n2), nlevels_nod2D(n2)-1
                 previous_temp(k, n2) = temp(k, n2)
+                previous_salt(k, n2) = salt(k, n2)
             end do
         end do
         first_call = .false.
     end if
-    
+
     ! Initialize arrays
     opottemptend = 0.0_WP
+    osalttend = 0.0_WP
+    opottemprmadvect = 0.0_WP
+    osaltrmadvect = 0.0_WP
     pbo = 0.0_WP
     
     !=================================================================
@@ -175,8 +220,44 @@ contains
             ! Tendency is expressed as rate of change of heat content per unit area
             opottemptend(n2) = opottemptend(n2) + &
                 (temp(k, n2) - previous_temp(k, n2)) / dt * vcpw * hnode(k, n2)
-            
+
+            ! Salinity tendency: dS/dt * dz [psu*m/s]
+            osalttend(n2) = osalttend(n2) + &
+                (salt(k, n2) - previous_salt(k, n2)) / dt * hnode(k, n2)
+
+            ! Advection tendency from saved del_ttf snapshots
+            ! del_ttf_adv has units [tracer*m], divide by dt to get [tracer*m/s]
+            ! For temperature: multiply by vcpw to get W/m^2
+            opottemprmadvect(n2) = opottemprmadvect(n2) + &
+                cmor_del_ttf_adv_temp(k, n2) / dt * vcpw
+
+            ! For salinity: keep in [psu*m/s]
+            osaltrmadvect(n2) = osaltrmadvect(n2) + &
+                cmor_del_ttf_adv_salt(k, n2) / dt
+
             z_up = z_lo
+        end do
+    end do
+
+    !=================================================================
+    ! Diffusion tendency = total tendency - advection tendency
+    !=================================================================
+    do n2 = 1, myDim_nod2D
+        opottempdiff(n2) = opottemptend(n2) - opottemprmadvect(n2)
+        osaltdiff(n2) = osalttend(n2) - osaltrmadvect(n2)
+    end do
+
+    !=================================================================
+    ! Shortwave absorption per layer from sw_3d
+    ! sw_3d is temperature flux at level interfaces [K*m/s]
+    ! Absorption in layer k = (sw_3d(k) - sw_3d(k+1)) * vcpw [W/m^2]
+    !=================================================================
+    rsdoabsorb = 0.0_WP
+    do n2 = 1, myDim_nod2D
+        ku = ulevels_nod2D(n2)
+        kl = nlevels_nod2D(n2)
+        do k = ku, kl-1
+            rsdoabsorb(k, n2) = (sw_3d(k, n2) - sw_3d(k+1, n2)) * vcpw
         end do
     end do
     
@@ -255,9 +336,32 @@ contains
     do n2 = 1, myDim_nod2D
         do k = ulevels_nod2D(n2), nlevels_nod2D(n2)-1
             previous_temp(k, n2) = temp(k, n2)
+            previous_salt(k, n2) = salt(k, n2)
         end do
     end do
     
   end subroutine compute_cmor_diag
+
+
+  !=================================================================
+  ! Save advection del_ttf snapshot for tendency decomposition.
+  ! Called from oce_ale_tracer.F90 after advection, before diffusion.
+  !=================================================================
+  subroutine save_cmor_advection(tr_num, del_ttf, local_nod2D, nlev)
+    implicit none
+    integer, intent(in) :: tr_num, local_nod2D, nlev
+    real(kind=WP), intent(in) :: del_ttf(nlev, local_nod2D)
+
+    if (.not. initialized) return
+
+    if (tr_num == 1) then
+        ! Temperature (tracer 1)
+        cmor_del_ttf_adv_temp(1:nlev, 1:local_nod2D) = del_ttf(1:nlev, 1:local_nod2D)
+    else if (tr_num == 2) then
+        ! Salinity (tracer 2)
+        cmor_del_ttf_adv_salt(1:nlev, 1:local_nod2D) = del_ttf(1:nlev, 1:local_nod2D)
+    end if
+
+  end subroutine save_cmor_advection
 
 end module cmor_variables_diag

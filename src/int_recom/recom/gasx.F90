@@ -6,7 +6,7 @@ CONTAINS
 !>    Computes air-sea CO2 flux & surface-ocean carbonate system vars (pH, CO2*, HCO3- and CO32-, OmegaA, OmegaC, R)
 !!    from T, S, P, ALK, DIC, total inorganic silicon, total inorganic phosphorus, all as 1-D arrays
 SUBROUTINE flxco2(co2flux, co2ex, dpco2,                                                    &
-                  ph, pco2, fco2, co2, hco3, co3, OmegaA, OmegaC, BetaD, rhoSW, p, tempis,  &
+                  ph, pco2, fco2, co2, hco3, co3, OmegaA, OmegaC, BetaD, rhoSW, p, tempis, K0,  &
                   temp, sal, alk, dic, sil, phos, kw660, xco2, Patm, dz1, N, lon, lat,      &
                   optCON, optT, optP, optB, optK1K2, optKf, optGAS, optS          )
   !   Purpose:
@@ -127,6 +127,8 @@ SUBROUTINE flxco2(co2flux, co2ex, dpco2,                                        
   !     rhoSW  = in-situ density of seawater; rhoSW = f(s, t, p)
   !     p = pressure [decibars]; p = f(depth, latitude) if computed from depth [m] OR p = depth if [db]
   !     tempis  = in-situ temperature [degrees C]
+  !     K0 = CO2 solubility [(mol/kg) / atm]
+
 
 #if USE_PRECISION == 2
 #   define SGLE(x)    (x)
@@ -237,10 +239,12 @@ SUBROUTINE flxco2(co2flux, co2ex, dpco2,                                        
   REAL(kind=rx), INTENT(out), DIMENSION(N) :: p
   !> in-situ temperature \b <b>[degrees C]</b>
   REAL(kind=rx), INTENT(out), DIMENSION(N) :: tempis
+  !> K0, solubility of CO2  \b <b>[(mol/kg) / atm]</b>
+  REAL(kind=rx), INTENT(out), DIMENSION(N) :: K0
 
 ! Local variables
   REAL(kind=r8) :: tk, invtk, dtemp
-  REAL(kind=r8) :: tmp, K0, co2star, co2starair, kwco2
+  REAL(kind=r8) :: tmp, co2star, co2starair, kwco2 ! K0
   REAL(kind=rx), DIMENSION(N) :: pCO2atm, fCO2atm
   REAL(kind=rx), DIMENSION(N) :: depth0, lat0
  
@@ -361,7 +365,7 @@ SUBROUTINE flxco2(co2flux, co2ex, dpco2,                                        
         K0 = EXP( tmp + DBLE(salprac(i))*(0.023517d0 - 0.00023656d0*tk + 0.0047036e-4_r8*tk*tk) )
 
 !       "Atmospheric" [CO2*], air-sea CO2 flux, sfc DIC rate of change, & Delta pCO2
-        co2starair = K0 * DBLE(fco2atm(i)) * 1.0e-6_r8 * DBLE(rhoSW(i)) !Equil. [CO2*] for atm CO2 at Patm & sfc-water T,S [mol/m3]
+        co2starair = K0(i) * DBLE(fco2atm(i)) * 1.0e-6_r8 * DBLE(rhoSW(i)) !Equil. [CO2*] for atm CO2 at Patm & sfc-water T,S [mol/m3]
         co2star = DBLE(co2(i))                                          !Oceanic [CO2*] in [mol/m3] from vars.f90
         co2flux(i) = SGLE(kwco2 * (co2starair - co2star))               !Air-sea CO2 flux [mol/(m2 * s)]
 !       the conversion from co2flux to impact on dic is done in recom_forcing/recom_sms 
