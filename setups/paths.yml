@@ -62,9 +62,11 @@ docker:
     forcing:
         test_global: ./test/input/global/
         test_icebergs: ./test/input/icebergs/
+        test_recom: ./test/input/global/
     clim:
         test_global: ./test/input/global/
         test_icebergs: ./test/input/icebergs/
+        test_recom: ./test/input/recom/
     opath:
         opath: ./test/
 

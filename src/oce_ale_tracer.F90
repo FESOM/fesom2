@@ -157,6 +157,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     use diagnostics, only: ldiag_DVD
     use g_forcing_param, only: use_age_tracer !---age-code
     use mod_transit, only: decay14, decay39
+    use cmor_variables_diag, only: ldiag_cmor, save_cmor_advection
     implicit none
     type(t_ice)   , intent(in)   , target    :: ice
     type(t_dyn)   , intent(inout), target    :: dynamics
@@ -165,8 +166,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     type(t_mesh)  , intent(in)   , target    :: mesh
     !___________________________________________________________________________
     integer                                  :: i, tr_num, node, elem, nzmax, nzmin
-    real(kind=WP)                            :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_elem2D) ! local variable ! OG - tra_diag
-    integer                                  :: nz, n, nu1, nl1 ! OG - tra_diag
+    real(kind=WP)                            :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_elem2D) ! local variable
+    integer                                  :: nz, n, nu1, nl1
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
@@ -235,6 +236,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         SinkingVel1 = 0.0d0 ! OG 16.03.23
         SinkingVel2 = 0.0d0 ! OG 16.03.23
 #endif    
+
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
         ! needed
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
@@ -259,15 +261,11 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         end do
 !$OMP END PARALLEL DO
 
-! O:G
-! Save horizontal and vertical advective fluxes.
-! We have the values on the nodes
-! We do not know how much each edge contributes
-! to the nodes it connects
-! Notes from Patrick: del_ttf includes
-! Low-order solution. But, del_ttf_advhoriz and
-! del_ttf_advvert contain antidiffusive fluxes 
-! from the FCT scheme
+        !___________________________________________________________________________
+        ! Save advection snapshot for CMOR tendency decomposition
+        if (ldiag_cmor .and. (tr_num <= 2)) then
+            call save_cmor_advection(tr_num, tracers%work%del_ttf(:, 1:myDim_nod2D), myDim_nod2D, nl-1)
+        end if
 
 !if (.FALSE.) then
 ! O:G - tra_diag
@@ -285,7 +283,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 !           end do
 !        end if
 !#endif
-!endif 
+!endif
+
         !___________________________________________________________________________
         ! diffuse tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
@@ -430,8 +429,8 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
     integer                               :: n, nzmax, nzmin
-    real(kind=WP)                         :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D) ! OG - tra_diag
-    integer                               :: nz, nu1, nl1 ! OG - tra_diag
+    real(kind=WP)                         :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    integer                               :: nz, nu1, nl1
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), pointer                :: del_ttf(:,:)
@@ -446,16 +445,10 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     vert_sink      = 0.0_WP
 #endif
 
-    ttf_rhs_bak = 0.0 ! OG - tra_diag
+    ttf_rhs_bak = 0.0
 
-    if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
-          do n=1, myDim_nod2D+eDim_nod2D
-          nu1 = ulevels_nod2D(n)
-          nl1 = nlevels_nod2D(n)
-          do nz = nu1, nl1-1
-             ttf_rhs_bak(nz,n) = del_ttf(nz,n)
-          end do
-       end do
+    if (tracers%data(tr_num)%ltra_diag) then
+       call backup_ttf_rhs(del_ttf, ttf_rhs_bak, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D)
     end if
     !___________________________________________________________________________
     ! do horizontal diffusion
@@ -464,26 +457,13 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     ! includes Redi diffusivity if Redi=.true.
     call diff_part_hor_redi(tracers, partit, mesh)  ! seems to be ~9% faster than diff_part_hor
 
-    if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
-       do n=1, myDim_nod2D+eDim_nod2D
-          nu1 = ulevels_nod2D(n)
-          nl1 = nlevels_nod2D(n)
-          do nz = nu1, nl1-1
-             ! horizontal diffusion (w/out Redi)           
-             tracers%work%tra_diff_part_hor_redi(nz,n,tr_num) = (del_ttf(nz,n) - ttf_rhs_bak(nz,n)) / hnode_new(nz,n) ! Unit [Conc]
-             !if (mype==0)  print *, tracers%work%tra_diff_part_hor_redi(nz,n,tr_num)
-          end do
-       end do
+    if (tracers%data(tr_num)%ltra_diag) then
+       call store_diag_component(del_ttf, ttf_rhs_bak, hnode_new, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D, &
+                                 tracers%work%tra_diff_part_hor_redi(:,:,tr_num))
     end if
 
-    if ((.not. tracers%data(tr_num)%i_vert_diff) .and. tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
-       do n=1, myDim_nod2D+eDim_nod2D
-          nu1 = ulevels_nod2D(n)
-          nl1 = nlevels_nod2D(n)
-          do nz = nu1, nl1-1
-             ttf_rhs_bak(nz,n) = del_ttf(nz,n)
-          end do
-       end do
+    if ((.not. tracers%data(tr_num)%i_vert_diff) .and. tracers%data(tr_num)%ltra_diag) then
+       call backup_ttf_rhs(del_ttf, ttf_rhs_bak, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D)
     end if
     !___________________________________________________________________________
     ! do vertical diffusion: explicit
@@ -491,43 +471,23 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 
     ! OG i_vert_diff = TRUE so, we dont call explicit scheme
     ! If we use this, check surface forcing for recom variables (They are not updated)
-    if ((.not. tracers%data(tr_num)%i_vert_diff) .and. tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag 
-       do n=1, myDim_nod2D+eDim_nod2D
-          nu1 = ulevels_nod2D(n)
-          nl1 = nlevels_nod2D(n)
-          do nz = nu1, nl1-1
-             ! vertical diffusion: explicit
-             tracers%work%tra_diff_part_ver_expl(nz,n,tr_num) = (del_ttf(nz,n) - ttf_rhs_bak(nz,n)) / hnode_new(nz,n) ! Unit [Conc]
-             !if (mype==0)  print *,  tra_diff_part_ver_expl(:,:,tr_num)
-          end do
-       end do
+    if ((.not. tracers%data(tr_num)%i_vert_diff) .and. tracers%data(tr_num)%ltra_diag) then 
+       call store_diag_component(del_ttf, ttf_rhs_bak, hnode_new, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D, &
+                                 tracers%work%tra_diff_part_ver_expl(:,:,tr_num))
     end if
 
     ! A projection of horizontal Redi diffussivity onto vertical. This par contains horizontal
     ! derivatives and has to be computed explicitly!
 
-    if (tracers%data(tr_num)%ltra_diag .and. Redi) then ! OG - tra_diag
-       do n=1, myDim_nod2D+eDim_nod2D
-          nu1 = ulevels_nod2D(n)
-          nl1 = nlevels_nod2D(n)
-          do nz = nu1, nl1-1
-             ttf_rhs_bak(nz,n) = del_ttf(nz,n)
-          end do
-       end do
+    if (tracers%data(tr_num)%ltra_diag .and. Redi) then
+       call backup_ttf_rhs(del_ttf, ttf_rhs_bak, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D)
     end if
 
     if (Redi) call diff_ver_part_redi_expl(tracers, partit, mesh)
 
-    if (tracers%data(tr_num)%ltra_diag .and. Redi) then ! OG - tra_diag
-       do n=1, myDim_nod2D+eDim_nod2D
-          nu1 = ulevels_nod2D(n)
-          nl1 = nlevels_nod2D(n)
-          do nz = nu1, nl1-1
-             ! Redi diffussivity onto vertical: explicit
-             tracers%work%tra_diff_part_ver_redi_expl(nz,n,tr_num) = (del_ttf(nz,n) - ttf_rhs_bak(nz,n)) / hnode_new(nz,n) ! Unit [Conc]
-             !if (mype==0)  print *,  tra_diff_part_ver_redi_expl(:,:,tr_num)
-          end do
-       end do
+    if (tracers%data(tr_num)%ltra_diag .and. Redi) then
+       call store_diag_component(del_ttf, ttf_rhs_bak, hnode_new, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D, &
+                                 tracers%work%tra_diff_part_ver_redi_expl(:,:,tr_num))
     end if
 
 !        if (recom_debug .and. mype==0)  print *, tracers%data(tr_num)%ID
@@ -617,7 +577,7 @@ endif
     if (tracers%data(tr_num)%i_vert_diff) then
         ! do vertical diffusion: implicite
 
-        if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+        if (tracers%data(tr_num)%ltra_diag) then
            do n=1, myDim_nod2D+eDim_nod2D
               nu1 = ulevels_nod2D(n)
               nl1 = nlevels_nod2D(n)
@@ -631,7 +591,7 @@ endif
         call diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 
         ! vertical diffusion: implicit
-        if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+        if (tracers%data(tr_num)%ltra_diag) then
            do n=1, myDim_nod2D+eDim_nod2D
               nu1 = ulevels_nod2D(n)
               nl1 = nlevels_nod2D(n)
@@ -649,7 +609,49 @@ endif
     if (tracers%data(tr_num)%smooth_bh_tra) then
        call diff_part_bh(tr_num, dynamics, tracers, partit, mesh)  ! alpply biharmonic diffusion (implemented as filter)
     end if
-        
+
+contains
+
+subroutine backup_ttf_rhs(del_ttf, ttf_rhs_bak, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D)
+    real(kind=WP), intent(in)    :: del_ttf(:,:)
+    real(kind=WP), intent(inout) :: ttf_rhs_bak(:,:)
+    integer      , intent(in)    :: ulevels_nod2D(:)
+    integer      , intent(in)    :: nlevels_nod2D(:)
+    integer      , intent(in)    :: myDim_nod2D
+    integer      , intent(in)    :: eDim_nod2D
+
+    integer :: n, nz, nu1, nl1
+
+    do n=1, myDim_nod2D+eDim_nod2D
+        nu1 = ulevels_nod2D(n)
+        nl1 = nlevels_nod2D(n)
+        do nz = nu1, nl1-1
+            ttf_rhs_bak(nz,n) = del_ttf(nz,n)
+        end do
+    end do
+end subroutine backup_ttf_rhs
+
+subroutine store_diag_component(del_ttf, ttf_rhs_bak, hnode_new, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D, target_field)
+    real(kind=WP), intent(in)    :: del_ttf(:,:)
+    real(kind=WP), intent(in)    :: ttf_rhs_bak(:,:)
+    real(kind=WP), intent(in)    :: hnode_new(:,:)
+    integer      , intent(in)    :: ulevels_nod2D(:)
+    integer      , intent(in)    :: nlevels_nod2D(:)
+    integer      , intent(in)    :: myDim_nod2D
+    integer      , intent(in)    :: eDim_nod2D
+    real(kind=WP), intent(inout) :: target_field(:,:)
+
+    integer :: n, nz, nu1, nl1
+
+    do n=1, myDim_nod2D+eDim_nod2D
+        nu1 = ulevels_nod2D(n)
+        nl1 = nlevels_nod2D(n)
+        do nz = nu1, nl1-1
+            target_field(nz,n) = (del_ttf(nz,n) - ttf_rhs_bak(nz,n)) / hnode_new(nz,n) ! Unit [Conc]
+        end do
+    end do
+end subroutine store_diag_component
+
 end subroutine diff_tracers_ale
 !
 !

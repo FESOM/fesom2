@@ -9,6 +9,11 @@ nm_erosion_data_file  ='/albedo/work/projects/p_pool_recom/input/mesh_CORE2_fina
 nm_co2_data_file      ='/albedo/work/projects/p_pool_recom/input/mesh_CORE2_finaltopo_mean/MonthlyAtmCO2_gcb2023.nc'
 /
 
+&parecomsetup
+enable_3zoo2det = .true.
+enable_coccos = .true.
+/
+
 &pavariables
 use_REcoM             =.true.
 REcoM_restart         =.true.
@@ -377,7 +382,7 @@ rho_opal             = 2090.d0   ! kg m-3; density of Opal (see Table 1 in Cram 
 rho_ref_part         = 1230.d0   ! kg m-3; reference particle density (see Cram et al., 2018)
 rho_ref_water        = 1027.d0   ! kg m-3; reference seawater density (see Cram et al., 2018)
 visc_ref_water       = 0.00158d0 ! kg m-1 s-1; reference seawater viscosity, at Temp=4 degC (see Cram et al., 2018)
-w_ref1               = 10.d0     ! m s-1; reference sinking velocity of small detritus
+w_ref1               = 5.d0     ! m s-1; reference sinking velocity of small detritus
 w_ref2               = 200.d0    ! m s-1; reference sinking velocity of large detritus
 depth_scaling1       = 0.01d0 !5d0   ! s-1; factor to increase sinking speed of det1 with depth, set to 0 if not wanted
 depth_scaling2       = 0.d0      ! s-1; factor to increase sinking speed of det2 with depth, set to 0 if not wanted
