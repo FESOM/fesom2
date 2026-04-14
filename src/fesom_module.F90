@@ -16,6 +16,7 @@ module fesom_main_storage_module
   use g_forcing_arrays
   use io_RESTART
   use io_MEANDATA
+  use io_xios_module
   use io_mesh_info
   use diagnostics
   use mo_tidal
@@ -235,6 +236,22 @@ contains
 #endif
 
         if (f%mype==0) write(*,*) 'FESOM mesh_setup... complete'
+
+#if defined (__XIOS)
+        ! XIOS client init (NEMO/OIFS pattern). xios_initialize is called with
+        ! local_comm=MPI_COMM_FESOM -- OASIS already split MPI_COMM_WORLD, so
+        ! no further split is needed; the FESOM comm stays valid. The separate
+        ! xios_server.exe binary registers with OASIS independently.
+        !
+        ! Ordering: OASIS3-MCT was initialised above (before par_init). This
+        ! matches the EC-Earth-proven NEMO ordering (OASIS -> XIOS on OASIS
+        ! local comm). Called here after mesh_setup so coord_nod2D /
+        ! elem2D_nodes / zbar / myList_* are populated.
+        block
+          integer :: xios_client_comm
+          call io_xios_init(f%mesh, f%partit, f%partit%MPI_COMM_FESOM, xios_client_comm)
+        end block
+#endif
 
 !       Transient tracers: control output of initial input values
         if(use_transit .and. anthro_transit .and. f%mype==0) then
@@ -583,6 +600,9 @@ contains
     ntotal=f%from_nstep-1+current_nsteps
 
     do n=nstart, ntotal
+#if defined (__XIOS)
+        call io_xios_update_calendar(n)
+#endif
         if (use_icebergs) then
                 !n_ib         = n
                 u_wind_ib    = u_wind
@@ -924,7 +944,13 @@ contains
     call MPI_AllREDUCE(MPI_IN_PLACE, max_rtime,  14, MPI_REAL, MPI_MAX, f%MPI_COMM_FESOM, f%MPIerr)
     call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime,  14, MPI_REAL, MPI_MIN, f%MPI_COMM_FESOM, f%MPIerr)
     
-#if defined (__oifs) 
+#if defined (__XIOS)
+   ! Must finalize XIOS BEFORE MPI/OASIS teardown so server2 receives
+   ! the client-finalize signal on MPI_COMM_WORLD (matches NEMO/OIFS).
+   call io_xios_close()
+#endif
+
+#if defined (__oifs)
     ! OpenIFS coupled version has to call oasis_terminate through par_ex
     call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
 #endif

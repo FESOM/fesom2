@@ -12,6 +12,17 @@ module io_MEANDATA
   use io_data_strategy_module
   use async_threads_module
   use netcdf
+  use io_xios_module, only: io_xios_is_on, io_xios_send_2d_r8, io_xios_send_2d_r4, &
+                            io_xios_send_3d_r8, io_xios_send_3d_r4, &
+                            io_xios_set_ice_conc, io_xios_is_ice_field, &
+                            io_xios_apply_ice_mask_2d_r4, io_xios_apply_ice_mask_2d_r8, &
+                            io_xios_apply_ice_mask_2d_elem_r4, io_xios_apply_ice_mask_2d_elem_r8, &
+                            io_xios_set_wet_ptrs, &
+                            io_xios_apply_wet_2d_r4, io_xios_apply_wet_2d_r8, &
+                            io_xios_apply_wet_2d_elem_r4, io_xios_apply_wet_2d_elem_r8, &
+                            io_xios_apply_wet_3d_r4, io_xios_apply_wet_3d_r8, &
+                            io_xios_apply_wet_3d_elem_r4, io_xios_apply_wet_3d_elem_r8, &
+                            io_xios_owned_elem_local, io_xios_n_owned_elem
 
   implicit none
   private
@@ -209,7 +220,115 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
 #include "associate_mesh_ass.h"
 
     !___________________________________________________________________________
-    ! OPEN and read namelist for I/O
+    ! OPEN and read namelist for I/O.
+    ! When XIOS is driving output, ignore namelist.io entirely: register every
+    ! known stream id at freq=1/unit='s'/precision=4 and let XIOS's XML decide
+    ! which of those are actually written, at what cadence, with what averaging.
+    ! XIOS silently drops fields not declared in field_def_*.xml, so registering
+    ! a superset is safe.
+#if defined(__XIOS)
+    if (io_xios_is_on()) then
+      ! Register ice-concentration pointer for sender-side masking of
+      ! ice-tagged XIOS fields (see io_xios_apply_ice_mask_*).
+      call io_xios_set_ice_conc(ice%data(1)%values, mesh%elem2D_nodes)
+      ! Register wet/bottom pointers for sender-side masking of ocean
+      ! fields (see io_xios_apply_wet_*).
+      call io_xios_set_wet_ptrs(mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
+                                mesh%ulevels,      mesh%nlevels, mesh%nl)
+      block
+        character(len=20), parameter :: xios_ids(*) = (/ character(len=20) :: &
+          "aFe                 ", "age                 ", "aggc                ", &
+          "aggd                ", "aggn                ", "a_ice               ", &
+          "alb                 ", "alpha               ", "aN                  ", &
+          "apnd                ", "atmice_x            ", "atmice_y            ", &
+          "atmoce_x            ", "atmoce_y            ", "Av                  ", &
+          "benC                ", "benCalc             ", "benN                ", &
+          "benSi               ", "beta                ", "bolus_u             ", &
+          "bolus_v             ", "bolus_w             ", "calcdiss            ", &
+          "calcif              ", "cfl_z               ", "Chldegc             ", &
+          "Chldegd             ", "Chldegn             ", "CO2f                ", &
+          "curl_surf           ", "dens_flux           ", "d_eta               ", &
+          "dhe                 ", "dMOC                ", "docexc              ", &
+          "docexd              ", "docexn              ", "dpCO2s              ", &
+          "DVD                 ", "dyngrarea           ", "dyngrice            ", &
+          "dyngrsnw            ", "elevat_ice          ", "enthalpy            ", &
+          "eps11               ", "eps12               ", "eps22               ", &
+          "evap                ", "fer_C               ", "fer_gammax          ", &
+          "fer_gammay          ", "fer_K               ", "fer_scal            ", &
+          "fer_tapfac          ", "fh                  ", "fh_lat              ", &
+          "fh_lwr              ", "fh_lwrout           ", "fh_radtot           ", &
+          "fh_sen              ", "fh_swr              ", "flice               ", &
+          "FORC                ", "fw                  ", "fw_ice              ", &
+          "fw_snw              ", "GPPc                ", "GPPd                ", &
+          "GPPn                ", "h2o16               ", "h2o16_ice           ", &
+          "h2o18               ", "h2o18_ice           ", "hbar                ", &
+          "hbar_old            ", "hc                  ", "hc300m              ", &
+          "hc700m              ", "hDo16               ", "hDo16_ice           ", &
+          "helem               ", "h_ice               ", "hnode               ", &
+          "hnode_new           ", "Hp                  ", "hpnd                ", &
+          "h_snow              ", "icb                 ", "iceoce_x            ", &
+          "iceoce_y            ", "ice_rejectsalt      ", "IDEMIX              ", &
+          "inv_areamass        ", "ipnd                ", "ist                 ", &
+          "kpp_obldepth        ", "kpp_sbuoyflx        ", "Kv                  ", &
+          "landice             ", "lwr                 ", "metric_fac          ", &
+          "m_ice               ", "MLD1                ", "MLD2                ", &
+          "MLD3                ", "m_snow              ", "N2                  ", &
+          "NNAc                ", "NNAd                ", "NNAn                ", &
+          "NPPc                ", "NPPc3D              ", "NPPd                ", &
+          "NPPd3D              ", "NPPn                ", "O2f                 ", &
+          "opottempdiff        ", "opottemprmadvect    ", "opottemptend        ", &
+          "osaltdiff           ", "osaltrmadvect       ", "osalttend           ", &
+          "otracers            ", "PAR                 ", "pbo                 ", &
+          "pCO2s               ", "pgf_x               ", "pgf_y               ", &
+          "prec                ", "qcon                ", "qres                ", &
+          "qsi                 ", "qso                 ", "qsr                 ", &
+          "realsalt            ", "redi_K              ", "relaxsalt           ", &
+          "respc               ", "respd               ", "respmacro           ", &
+          "respmeso            ", "respmicro           ", "respn               ", &
+          "rhs_a               ", "rhs_m               ", "rsdoabsorb          ", &
+          "runoff              ", "runoff_liquid       ", "runoff_solid        ", &
+          "salt                ", "sgm11               ", "sgm12               ", &
+          "sgm22               ", "shum                ", "siarean             ", &
+          "siareas             ", "siextentn           ", "siextents           ", &
+          "sigma0              ", "sigma_x             ", "sigma_y             ", &
+          "sivoln              ", "sivols              ", "slopetap_x          ", &
+          "slopetap_y          ", "slopetap_z          ", "slope_x             ", &
+          "slope_y             ", "slope_z             ", "snow                ", &
+          "soga                ", "sos                 ", "SPLIT-EXPL          ", &
+          "ssh                 ", "ssh_rhs             ", "ssh_rhs_old         ", &
+          "sss                 ", "sst                 ", "strength_ice        ", &
+          "swice               ", "swr                 ", "tair                ", &
+          "temp                ", "thdgrarea           ", "thdgrice            ", &
+          "thdgrsnw            ", "thetaoga            ", "TIDAL               ", &
+          "TKE                 ", "tos                 ", "TRGRD_XYZ           ", &
+          "t_star              ", "twice               ", "tx_sur              ", &
+          "ty_sur              ", "u                   ", "u_back_tend         ", &
+          "u_dis_tend          ", "uice                ", "unod                ", &
+          "u_rhs_ice           ", "u_total_tend        ", "UVW_SQR             ", &
+          "uwice               ", "uwind               ", "v                   ", &
+          "v_back_tend         ", "v_dis_tend          ", "vice                ", &
+          "virtsalt            ", "vnod                ", "volo                ", &
+          "v_rhs_ice           ", "v_total_tend        ", "vve_5               ", &
+          "vwice               ", "vwind               ", "w                   " /)
+        integer :: k
+        if (mype==0) WRITE(*,*) 'XIOS mode: skipping namelist.io; registering all ', &
+                                 size(xios_ids), ' known streams. XML decides output.'
+        io_listsize       = size(xios_ids)
+        vec_autorotate    = .FALSE.
+        lnextGEMS         = .FALSE.
+        nlev_upper        = 1
+        filesplit_freq    = 'y'
+        compression_level = 0
+        allocate(io_list(io_listsize))
+        do k = 1, io_listsize
+          io_list(k)%id        = xios_ids(k)
+          io_list(k)%freq      = 1
+          io_list(k)%unit      = 's'
+          io_list(k)%precision = 4
+        end do
+      end block
+    else
+#endif
     open( unit=nm_io_unit, file='namelist.io', form='formatted', access='sequential', status='old', iostat=iost )
     if (iost == 0) then
       if (mype==0) WRITE(*,*) '     file   : ', 'namelist.io',' open ok'
@@ -228,6 +347,9 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     allocate(io_list(io_listsize))
     READ(nm_io_unit, nml=nml_list,     iostat=iost )
     close(nm_io_unit )
+#if defined(__XIOS)
+    end if
+#endif
 
     !___________________________________________________________________________
     ! TODO: unknown variable found then write clearly in log, saves lot of frustration.
@@ -2268,6 +2390,110 @@ subroutine write_mean(entry, entry_index)
     real(kind=8)                  :: t0,t1
     integer mpierr
 
+#if defined(__XIOS)
+    ! Route all streams (node- and element-based) to XIOS when enabled. Per
+    ! io_xios wrappers, fields not declared in field_def_*.xml are gated out
+    ! by xios_is_valid_field() so sending unconditionally is safe. For
+    ! element-based fields, pack via owned_elem_local to match the strictly-
+    ! owned element domain declared to XIOS in io_xios_init.
+    if (io_xios_is_on()) then
+        block
+          integer :: k, kk, nze, n_own
+          integer, pointer :: own(:)
+          real(real64), allocatable :: tmp2_r8(:), tmp3_r8(:,:)
+          real(real32), allocatable :: tmp2_r4(:), tmp3_r4(:,:)
+          if (entry%is_elem_based) then
+            own   => io_xios_owned_elem_local()
+            n_own =  io_xios_n_owned_elem()
+            if (entry%accuracy == i_real8) then
+              if (entry%glsize(1) == 1) then
+                allocate(tmp2_r8(n_own))
+                do k=1, n_own; tmp2_r8(k) = entry%local_values_r8_copy(1, own(k)); end do
+                if (io_xios_is_ice_field(entry%name)) then
+                   call io_xios_apply_ice_mask_2d_elem_r8(tmp2_r8)
+                else
+                   call io_xios_apply_wet_2d_elem_r8(tmp2_r8)
+                end if
+                call io_xios_send_2d_r8(entry%name, tmp2_r8)
+                deallocate(tmp2_r8)
+              else
+                nze = size(entry%local_values_r8_copy, 1)
+                allocate(tmp3_r8(nze, n_own))
+                do k=1, n_own
+                  do kk=1, nze; tmp3_r8(kk,k) = entry%local_values_r8_copy(kk, own(k)); end do
+                end do
+                call io_xios_apply_wet_3d_elem_r8(tmp3_r8)
+                call io_xios_send_3d_r8(entry%name, tmp3_r8)
+                deallocate(tmp3_r8)
+              end if
+            else
+              if (entry%glsize(1) == 1) then
+                allocate(tmp2_r4(n_own))
+                do k=1, n_own; tmp2_r4(k) = entry%local_values_r4_copy(1, own(k)); end do
+                if (io_xios_is_ice_field(entry%name)) then
+                   call io_xios_apply_ice_mask_2d_elem_r4(tmp2_r4)
+                else
+                   call io_xios_apply_wet_2d_elem_r4(tmp2_r4)
+                end if
+                call io_xios_send_2d_r4(entry%name, tmp2_r4)
+                deallocate(tmp2_r4)
+              else
+                nze = size(entry%local_values_r4_copy, 1)
+                allocate(tmp3_r4(nze, n_own))
+                do k=1, n_own
+                  do kk=1, nze; tmp3_r4(kk,k) = entry%local_values_r4_copy(kk, own(k)); end do
+                end do
+                call io_xios_apply_wet_3d_elem_r4(tmp3_r4)
+                call io_xios_send_3d_r4(entry%name, tmp3_r4)
+                deallocate(tmp3_r4)
+              end if
+            end if
+          else
+            if (entry%accuracy == i_real8) then
+              if (entry%glsize(1) == 1) then
+                allocate(tmp2_r8(entry%p_partit%myDim_nod2D))
+                tmp2_r8(:) = entry%local_values_r8_copy(1, 1:entry%p_partit%myDim_nod2D)
+                if (io_xios_is_ice_field(entry%name)) then
+                   call io_xios_apply_ice_mask_2d_r8(tmp2_r8)
+                else
+                   call io_xios_apply_wet_2d_r8(tmp2_r8)
+                end if
+                call io_xios_send_2d_r8(entry%name, tmp2_r8)
+                deallocate(tmp2_r8)
+              else
+                nze = size(entry%local_values_r8_copy, 1)
+                allocate(tmp3_r8(nze, entry%p_partit%myDim_nod2D))
+                tmp3_r8(:,:) = entry%local_values_r8_copy(:, 1:entry%p_partit%myDim_nod2D)
+                call io_xios_apply_wet_3d_r8(tmp3_r8)
+                call io_xios_send_3d_r8(entry%name, tmp3_r8)
+                deallocate(tmp3_r8)
+              end if
+            else
+              if (entry%glsize(1) == 1) then
+                allocate(tmp2_r4(entry%p_partit%myDim_nod2D))
+                tmp2_r4(:) = entry%local_values_r4_copy(1, 1:entry%p_partit%myDim_nod2D)
+                if (io_xios_is_ice_field(entry%name)) then
+                   call io_xios_apply_ice_mask_2d_r4(tmp2_r4)
+                else
+                   call io_xios_apply_wet_2d_r4(tmp2_r4)
+                end if
+                call io_xios_send_2d_r4(entry%name, tmp2_r4)
+                deallocate(tmp2_r4)
+              else
+                nze = size(entry%local_values_r4_copy, 1)
+                allocate(tmp3_r4(nze, entry%p_partit%myDim_nod2D))
+                tmp3_r4(:,:) = entry%local_values_r4_copy(:, 1:entry%p_partit%myDim_nod2D)
+                call io_xios_apply_wet_3d_r4(tmp3_r4)
+                call io_xios_send_3d_r4(entry%name, tmp3_r4)
+                deallocate(tmp3_r4)
+              end if
+            end if
+          end if
+        end block
+        return
+    end if
+#endif
+
     ! Serial output implemented so far
     !___________________________________________________________________________
     ! write new time index ctime_copy to file --> expand time array in nc file
@@ -2538,7 +2764,11 @@ ctime=timeold+(dayold-1.)*86400
 
             !___________________________________________________________________
             ! only root rank task does output
+#if defined(__XIOS)
+            if(.not. io_xios_is_on() .and. partit%mype == entry%root_rank) then
+#else
             if(partit%mype == entry%root_rank) then
+#endif
                 !_______________________________________________________________
                 ! create new output file ?!
                 if(filepath /= trim(entry%filename)) then
@@ -2822,10 +3052,15 @@ subroutine do_output_callback(entry_index)
     ! synchronize after writes:
     ! To minimize data loss in case of abnormal termination, or To make data 
     ! available to other processes for reading immediately after it is written. 
-    if(entry%p_partit%mype == entry%root_rank) then 
+    if(entry%p_partit%mype == entry%root_rank) then
         !PS if (entry%p_partit%flag_debug)  print *, achar(27)//'[31m'//' -I/O-> call nf_sync'//achar(27)//'[0m', entry%p_partit%mype
+#if defined(__XIOS)
+        ! When XIOS drives output no legacy netCDF file was opened; entry%ncid
+        ! is invalid. Skip the sync.
+        if (.not. io_xios_is_on()) &
+#endif
         call assert_nf( nf90_sync(entry%ncid), __LINE__ ) ! flush the file to disk after each write
-    end if   
+    end if
     
 end subroutine
 !

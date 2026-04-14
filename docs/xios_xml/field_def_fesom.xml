@@ -1,0 +1,93 @@
+<field_definition level="1" prec="4" enabled="true" operation="average" default_value="9.969209968386869e+36">
+
+  <!-- 2D fields on NODES -->
+  <field_group id="fesom_2d_nod" grid_ref="grid_2d_nod" prec="4">
+    <field id="sst"    long_name="sea surface temperature"                    standard_name="sea_surface_temperature"            unit="degC"/>
+    <field id="sss"    long_name="sea surface salinity"                       standard_name="sea_surface_salinity"               unit="1e-3"/>
+    <field id="ssh"    long_name="sea surface height"                         standard_name="sea_surface_height_above_geoid"     unit="m"/>
+    <field id="a_ice"  long_name="sea-ice area fraction"                      standard_name="sea_ice_area_fraction"              unit="1" detect_missing_value="true"/>
+    <field id="m_ice"  long_name="sea-ice mass per area"                      standard_name="sea_ice_thickness"                  unit="m" detect_missing_value="true"/>
+    <field id="m_snow" long_name="snow on ice mass per area"                  standard_name="surface_snow_thickness"             unit="m" detect_missing_value="true"/>
+    <field id="MLD1"   long_name="mixed layer depth (Large 1997)"             unit="m"/>
+    <field id="MLD2"   long_name="mixed layer depth (Levitus)"                unit="m"/>
+    <field id="MLD3"   long_name="mixed layer depth (Griffies)"               unit="m"/>
+    <field id="fw"     long_name="freshwater flux"                            unit="m s-1"/>
+    <field id="fh"     long_name="surface heat flux"                          unit="W m-2"/>
+    <field id="uice"   long_name="sea-ice zonal velocity"                     unit="m s-1" detect_missing_value="true"/>
+    <field id="vice"   long_name="sea-ice meridional velocity"                unit="m s-1" detect_missing_value="true"/>
+    <field id="ist"              long_name="ice surface temperature"                  unit="K"     detect_missing_value="true"/>
+    <field id="h_ice"            long_name="ice thickness over ice-covered fraction"  unit="m"     detect_missing_value="true"/>
+    <field id="h_snow"           long_name="snow thickness over ice-covered fraction" unit="m"     detect_missing_value="true"/>
+    <field id="thdgrice"         long_name="thermo growth rate ice"                   unit="m s-1" detect_missing_value="true"/>
+    <field id="thdgrsnw"         long_name="thermo growth rate snow"                  unit="m s-1" detect_missing_value="true"/>
+    <field id="thdgrarea"        long_name="thermo growth rate ice area"              unit="s-1"   detect_missing_value="true"/>
+    <field id="dyngrice"         long_name="dynamic growth rate ice"                  unit="m s-1" detect_missing_value="true"/>
+    <field id="dyngrarea"        long_name="dynamic growth rate ice area"             unit="s-1"   detect_missing_value="true"/>
+    <field id="atmice_x"         long_name="stress atmice x"                          unit="N m-2" detect_missing_value="true"/>
+    <field id="atmice_y"         long_name="stress atmice y"                          unit="N m-2" detect_missing_value="true"/>
+    <field id="iceoce_x"         long_name="stress iceoce x"                          unit="N m-2" detect_missing_value="true"/>
+    <field id="iceoce_y"         long_name="stress iceoce y"                          unit="N m-2" detect_missing_value="true"/>
+    <field id="fw_ice"           long_name="fresh water flux from ice"                unit="m s-1" detect_missing_value="true"/>
+    <field id="fw_snw"           long_name="fresh water flux from snow"               unit="m s-1" detect_missing_value="true"/>
+    <field id="virtsalt"         long_name="virtual salt flux"                        unit="m s-1 psu"/>
+    <field id="realsalt"         long_name="real salt flux from sea ice"              unit="m s-1 psu"/>
+    <field id="relaxsalt"        long_name="relaxation salt flux"                     unit="m s-1 psu"/>
+    <field id="qcon"             long_name="conductive heat flux"                     unit="W m-2" detect_missing_value="true"/>
+    <field id="apnd"             long_name="melt pond area fraction"                  unit="1"     detect_missing_value="true"/>
+    <field id="hpnd"             long_name="melt pond depth"                          unit="m"     detect_missing_value="true"/>
+    <field id="ipnd"             long_name="melt pond ice lid thickness"              unit="m"     detect_missing_value="true"/>
+    <field id="evap"             long_name="evaporation"                              unit="m s-1"/>
+    <field id="prec"             long_name="precipitation rain"                       unit="m s-1"/>
+    <field id="snow"             long_name="precipitation snow"                       unit="m s-1"/>
+    <field id="runoff"           long_name="river runoff"                             unit="m s-1"/>
+    <field id="pbo"              long_name="sea water pressure at sea floor"          unit="Pa"/>
+    <field id="opottemptend"     long_name="tendency of sea water pot. temperature"   unit="W m-2" prec="8"/>
+    <field id="opottemprmadvect" long_name="temperature tendency due to advection"    unit="W m-2" prec="8"/>
+    <field id="opottempdiff"     long_name="temperature tendency due to diffusion"    unit="W m-2" prec="8"/>
+    <field id="osalttend"        long_name="tendency of sea water salinity"           unit="psu m s-1" prec="8"/>
+    <field id="osaltrmadvect"    long_name="salinity tendency due to advection"       unit="psu m s-1" prec="8"/>
+    <field id="osaltdiff"        long_name="salinity tendency due to diffusion"       unit="psu m s-1" prec="8"/>
+  </field_group>
+
+  <!-- 2D fields on ELEMENTS -->
+  <field_group id="fesom_2d_elem" grid_ref="grid_2d_elem" prec="4">
+    <field id="tx_sur"       long_name="zonal surface stress to ocean"           unit="N m-2"/>
+    <field id="ty_sur"       long_name="meridional surface stress to ocean"      unit="N m-2"/>
+    <field id="strength_ice" long_name="ice strength"                            unit="N m-1" detect_missing_value="true"/>
+    <field id="sgm11"        long_name="ice stress sigma11"                      unit="N m-1" detect_missing_value="true"/>
+    <field id="sgm12"        long_name="ice stress sigma12"                      unit="N m-1" detect_missing_value="true"/>
+    <field id="sgm22"        long_name="ice stress sigma22"                      unit="N m-1" detect_missing_value="true"/>
+  </field_group>
+
+  <!-- 3D fields on NODES, cell-center / nz-1 -->
+  <field_group id="fesom_3d_nod" grid_ref="grid_3d_nod" prec="4">
+    <field id="temp"       long_name="sea water potential temperature" unit="degC"/>
+    <field id="salt"       long_name="sea water salinity"              unit="1e-3" prec="8"/>
+    <field id="unod"       long_name="zonal velocity at nodes"         unit="m s-1"/>
+    <field id="vnod"       long_name="meridional velocity at nodes"    unit="m s-1"/>
+    <field id="hnode"      long_name="vertex layer thickness"          unit="m"/>
+    <field id="rsdoabsorb" long_name="shortwave flux absorbed in ocean layer" unit="W m-2"/>
+  </field_group>
+
+  <!-- 3D fields on NODES, interface levels / nl -->
+  <field_group id="fesom_3d_nod_nz1" grid_ref="grid_3d_nod_nz1" prec="4">
+    <field id="w"       long_name="vertical velocity"                unit="m s-1"/>
+    <field id="bolus_w" long_name="GM bolus vertical velocity"       unit="m s-1"/>
+    <field id="N2"      long_name="Brunt-Vaisala frequency squared"  unit="s-2"/>
+    <field id="Kv"      long_name="vertical tracer diffusivity"      unit="m2 s-1"/>
+  </field_group>
+
+  <!-- 3D fields on ELEMENTS, cell-center -->
+  <field_group id="fesom_3d_elem" grid_ref="grid_3d_elem" prec="4">
+    <field id="u"       long_name="zonal velocity at elements"       unit="m s-1"/>
+    <field id="v"       long_name="meridional velocity at elements"  unit="m s-1"/>
+    <field id="bolus_u" long_name="GM bolus zonal velocity"          unit="m s-1"/>
+    <field id="bolus_v" long_name="GM bolus meridional velocity"     unit="m s-1"/>
+  </field_group>
+
+  <!-- 3D fields on ELEMENTS, interface levels -->
+  <field_group id="fesom_3d_elem_nz1" grid_ref="grid_3d_elem_nz1" prec="4">
+    <field id="Av" long_name="vertical momentum viscosity" unit="m2 s-1"/>
+  </field_group>
+
+</field_definition>
