@@ -875,6 +875,16 @@ CASE ('PAR       ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'PAR', 'PAR', 'W/m2',      PAR3D(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 
+CASE ('pH        ')
+    if (use_REcoM) then
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'pH',  'pH',  'total scale',                      pH3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('CO3       ')
+    if (use_REcoM) then
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'CO3', 'Carbonate ion concentration', 'mol/m3',   CO33D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+   
 CASE ('respmeso       ')
    if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'respmeso','Respiration rate of mesozooplankton', 'mmolC/m2/d', respmeso(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
