@@ -351,11 +351,20 @@ CONTAINS
          iost = nf_inq_varid(ncid, varname, id_data)
          iost = nf_inq_var_fill(ncid, id_data, NO_FILL, FILL_VALUE) ! FillValue defined?
          if (NO_FILL==1) then
-            print *, 'No _FillValue is set in ', trim(filename), ', trying dummy =', dummy, FILL_VALUE
+            ! No _FillValue attribute found, try missing_value attribute
+            iost = nf_get_att_double(ncid, id_data, 'missing_value', FILL_VALUE)
+            if (iost /= NF_NOERR) then
+               ! Neither _FillValue nor missing_value found, use NetCDF default fill value
+               FILL_VALUE = NF_FILL_DOUBLE  ! 9.9692099683868690e+36
+               print *, 'No _FillValue or missing_value in ', trim(filename), ', using NetCDF default:', FILL_VALUE
+            else
+               print *, 'Using missing_value from ', trim(filename), ':', FILL_VALUE
+            end if
          else
-            print *, 'The FillValue in ', trim(filename), ' is set to ', FILL_VALUE ! should set dummy accordingly
+            print *, 'Using _FillValue from ', trim(filename), ':', FILL_VALUE
          end if
       end if
+      call MPI_BCast(FILL_VALUE, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename,partit)   
       !read data from file
@@ -497,6 +506,7 @@ CONTAINS
       !! ** Purpose : read 3D initial conditions for tracers from netcdf and interpolate on model grid
       !!----------------------------------------------------------------------
       USE insitu2pot_interface
+      USE ieee_arithmetic
       IMPLICIT NONE
       type(t_mesh),   intent(in),    target   :: mesh
       type(t_partit), intent(inout), target   :: partit 
@@ -535,15 +545,14 @@ CONTAINS
 
       do current_tracer=1, tracers%num_tracers
          !_________________________________________________________________________
-         ! set remaining dummy values from bottom topography to 0.0_WP
-         where (tracers%data(current_tracer)%values > 0.9_WP*dummy)
-               tracers%data(current_tracer)%values=0.0_WP
-         end where
-
-         !_________________________________________________________________________
-         ! eliminate values within cavity that result from the extrapolation of 
-         ! initialisation
+         ! set remaining dummy values and NaN from interpolation to 0.0_WP
          do n=1,partit%myDim_nod2d + partit%eDim_nod2D
+            do i=1, mesh%nl-1
+               if (tracers%data(current_tracer)%values(i,n) > 0.9_WP*dummy .or. &
+                   ieee_is_nan(tracers%data(current_tracer)%values(i,n))) then
+                  tracers%data(current_tracer)%values(i,n) = 0.0_WP
+               end if
+            end do
             ! ensure cavity is zero
             if (use_cavity) tracers%data(current_tracer)%values(1:mesh%ulevels_nod2D(n)-1,n)=0.0_WP
             ! ensure bottom is zero
@@ -561,7 +570,7 @@ CONTAINS
          if (partit%mype==0) write(*,*) "converting insitu temperature to potential..."
          call insitu2pot(tracers, partit, mesh)
       end if
-      if (partit%mype==0) write(*,*) "DONE:  Initial conditions for tracers"             
+      if (partit%mype==0) write(*,*) "DONE:  Initial conditions for tracers"
       !_________________________________________________________________________
       ! check initial fields
       locTmax = -6666
