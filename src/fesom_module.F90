@@ -415,6 +415,9 @@ contains
 #if defined (__oifs) || defined (__ifsinterface)
     !$ACC ENTER DATA CREATE (f%ice%data(4)%values, f%ice%data(4)%valuesl, f%ice%data(4)%dvalues, f%ice%data(4)%values_rhs, f%ice%data(4)%values_div_rhs)
 #endif
+#if defined (__seaice_tracers )
+    !$ACC ENTER DATA CREATE (f%ice%data(6)%values, f%ice%data(6)%valuesl, f%ice%data(6)%dvalues, f%ice%data(6)%values_rhs, f%ice%data(6)%values_div_rhs)
+#endif
     !$ACC ENTER DATA COPYIN (f%dynamics)
     !$ACC ENTER DATA CREATE (f%dynamics%w, f%dynamics%w_e, f%dynamics%uv)
     !$ACC ENTER DATA CREATE (f%tracers%work%del_ttf)
@@ -678,6 +681,9 @@ contains
     !$ACC EXIT DATA DELETE (f%ice%data(1)%values_div_rhs, f%ice%data(2)%values_div_rhs, f%ice%data(3)%values_div_rhs)
 #if defined (__oifs) || defined (__ifsinterface)
     !$ACC EXIT DATA DELETE (f%ice%data(4)%values, f%ice%data(4)%valuesl, f%ice%data(4)%dvalues, f%ice%data(4)%values_rhs, f%ice%data(4)%values_div_rhs)
+#endif
+#if defined (__seaice_tracers)
+    !$ACC EXIT DATA DELETE (f%ice%data(6)%values, f%ice%data(6)%valuesl, f%ice%data(6)%dvalues, f%ice%data(6)%values_rhs, f%ice%data(6)%values_div_rhs)
 #endif
     !$ACC EXIT DATA DELETE (f%ice%data, f%ice%work, f%ice%work%fct_massmatrix)
     !$ACC EXIT DATA DELETE (f%ice)
