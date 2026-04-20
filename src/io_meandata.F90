@@ -764,6 +764,17 @@ CASE ('ice_rejectsalt')
     if (SPP) call def_stream(nod2D , myDim_nod2D , 'ice_rejectsalt' , 'salt flux from plum parameterisation ', 'm/s*psu', ice_rejected_salt(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     
 !___________________________________________________________________________________________________________________________________
+! output hosing experiment  
+CASE ('hfw       ')
+call def_stream(nod2D, myDim_nod2D,     'hfw',      'hosing water flux',               'm/s',    hosing_flux(:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('hfh       ')
+call def_stream(nod2D, myDim_nod2D,     'hfh',      'hosing heat flux',                'W',      hosing_heat_flux(:),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('hfw3D     ')
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'hfw3D',     'hosing water flux in 3D', 'm/s',    hosing_flux3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('hfh3D     ')
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'hfh3D',     'hosing heat flux in 3D',  'W',      hosing_heat_flux3D(:,:),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+!___________________________________________________________________________________________________________________________________
 ! output KPP vertical mixing schemes
 CASE ('kpp_obldepth   ')
     if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then! fesom KPP
