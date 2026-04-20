@@ -391,6 +391,9 @@ include "node_contour_boundary.h"
     USE MOD_PARSUP
     use g_rotate_grid
     use mod_oasis, only: oasis_write_area, oasis_write_mask
+#if defined (__XIOS)
+    use xios, only: xios_oasis_enddef
+#endif
     implicit none
     save
     type(t_mesh),   intent(in),    target :: mesh
@@ -781,6 +784,13 @@ include "associate_mesh_ass.h"
 ! 4th End of definition phase
 !------------------------------------------------------------------
 
+#if defined (__XIOS)
+   ! Tell the XIOS server we're about to call oasis_enddef; this lets
+   ! xios_server.exe also call oasis_enddef on its side (client-server
+   ! rendezvous via the XIOS event scheduler). Required when using_server=true
+   ! and call_oasis_enddef=true (XIOS default). See cpl_oasis3.F90 in NEMO.
+   call xios_oasis_enddef()
+#endif
    call oasis_enddef(ierror)
    if (ierror .eq. oasis_ok) print *, 'fesom oasis_enddef: COMPLETED'
 #ifndef __oifs
