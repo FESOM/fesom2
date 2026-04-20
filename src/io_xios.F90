@@ -35,7 +35,7 @@ module io_xios_module
   implicit none
   private
 
-  public :: io_xios_init, io_xios_close
+  public :: io_xios_init_client, io_xios_init, io_xios_close
   public :: io_xios_update_calendar
   public :: io_xios_send_2d_r8, io_xios_send_3d_r8
   public :: io_xios_send_2d_r4, io_xios_send_3d_r4
@@ -104,7 +104,27 @@ contains
   end function
 
 
-  !> Initialise the XIOS client side.
+  !> First stage of XIOS client init: just xios_initialize.
+  !> Must be called immediately after OASIS init (cpl_oasis3mct_init), before
+  !> par_init / mesh setup. Matches NEMO's nemogcm.F90 pattern:
+  !>   CALL cpl_init("oceanx", ilocal_comm)
+  !>   CALL xios_initialize("oceanx", local_comm=ilocal_comm)  ! right away
+  !>   CALL mpp_start(ilocal_comm)                             ! par_init equiv
+  !>   ... (lots of init) ...
+  !>   CALL iom_init(...)                                      ! calls xios_context_initialize
+  !> Splitting xios_initialize from xios_context_initialize (which is still in
+  !> io_xios_init below) lets the XIOS server complete its own client-side
+  !> registration before the context leader announcements. Running them
+  !> back-to-back caused a deadlock on the EC-Earth v4.1.7 XIOS snapshot.
+  subroutine io_xios_init_client(parent_comm, client_comm)
+    integer, intent(in)  :: parent_comm
+    integer, intent(out) :: client_comm
+
+    call xios_initialize("fesom", local_comm=parent_comm)
+    client_comm = parent_comm    ! OASIS already split; keep API compat
+  end subroutine io_xios_init_client
+
+  !> Second stage of XIOS client init: context + domain/axis setup.
   !> parent_comm:  the FESOM OASIS local communicator (partit%MPI_COMM_FESOM).
   !> client_comm:  returned equal to parent_comm (kept for API compat; OASIS
   !>               has already done the world split, so no further split here).
@@ -137,7 +157,13 @@ contains
     end block
     init_call_count = init_call_count + 1
 
-    call xios_initialize("fesom", local_comm=parent_comm)
+    ! xios_initialize is now done earlier via io_xios_init_client (called right
+    ! after cpl_oasis3mct_init, matching NEMO's nemogcm.F90 pattern where
+    ! xios_initialize fires immediately after cpl_init, before mpp_start /
+    ! mesh setup). Calling xios_initialize and xios_context_initialize
+    ! back-to-back here caused the XIOS server to hang in
+    ! createServerContextIntercomm on the EC-Earth v4.1.7 XIOS (dd74653e)
+    ! snapshot, which doesn't tolerate the rapid sequence.
     client_comm = parent_comm    ! OASIS already split; keep API compat
 
     ! --- 2. open the context on the FESOM communicator -----------------------
