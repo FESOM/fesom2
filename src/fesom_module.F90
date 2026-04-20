@@ -166,6 +166,16 @@ contains
         call cpl_yac_init(f%partit%MPI_COMM_FESOM)
 #endif
 
+#if defined (__XIOS)
+        ! NEMO pattern: xios_initialize immediately after OASIS init, BEFORE
+        ! par_init / mesh setup. Only xios_initialize here; xios_context_initialize
+        ! (and domain/axis defs) run later in io_xios_init once the mesh is ready.
+        block
+          integer :: xios_client_comm_early
+          call io_xios_init_client(f%partit%MPI_COMM_FESOM, xios_client_comm_early)
+        end block
+#endif
+
         f%t1 = MPI_Wtime()
 
         ! Initialize enhanced profiler
@@ -943,17 +953,6 @@ contains
     mean_rtime(1:14) = mean_rtime(1:14) / real(f%npes,real32)
     call MPI_AllREDUCE(MPI_IN_PLACE, max_rtime,  14, MPI_REAL, MPI_MAX, f%MPI_COMM_FESOM, f%MPIerr)
     call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime,  14, MPI_REAL, MPI_MIN, f%MPI_COMM_FESOM, f%MPIerr)
-    
-#if defined (__XIOS)
-   ! Must finalize XIOS BEFORE MPI/OASIS teardown so server2 receives
-   ! the client-finalize signal on MPI_COMM_WORLD (matches NEMO/OIFS).
-   call io_xios_close()
-#endif
-
-#if defined (__oifs)
-    ! OpenIFS coupled version has to call oasis_terminate through par_ex
-    call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
-#endif
 
 #if defined(__MULTIO) && !defined(__ifsinterface) && !defined(__oasis)
    call mpp_stop
@@ -965,7 +964,12 @@ contains
         ! Note: Do NOT call fesom_profiler_finalize here as it would duplicate the report
 #endif
     
-    if(f%fesom_did_mpi_init) call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype) ! finalize MPI before FESOM prints its stats block, otherwise there is sometimes output from other processes from an earlier time in the programm AFTER the starts block (with parastationMPI)
+#if !defined(__oifs)
+    ! Standalone / ECHAM coupling: finalize MPI before stats printing to avoid
+    ! interleaved output from other processes with parastationMPI. For __oifs we
+    ! defer MPI teardown to the very end (matches NEMO's cpl_finalize pattern).
+    if(f%fesom_did_mpi_init) call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
+#endif
     if (f%mype==0) then
         41 format (a35,a10,2a15) !Format for table heading
         42 format (a30,3f15.4)   !Format for table content
@@ -1003,9 +1007,24 @@ contains
         print 45, '    Runtime for all timesteps :  ',f%runtime_alltimesteps,' sec'
         write(*,*) '======================================================'
         write(*,*)
-    end if    
-!   call clock_finish  
-    
+    end if
+!   call clock_finish
+
+#if defined (__oifs)
+    ! OpenIFS coupled: tear down XIOS and OASIS/MPI as the LAST things in the
+    ! subroutine. Matches NEMO's nemogcm.F90 pattern where xios_finalize and
+    ! cpl_finalize are the final calls before STOP 0. Avoids post-MPI_Finalize
+    ! work (profiler, Fortran stats printing) from tripping over library
+    ! destructors / pmix shutdown after MPI_COMM_WORLD has been finalized
+    ! through oasis_terminate inside par_ex.
+#if defined (__XIOS)
+    ! XIOS must finalize BEFORE oasis_terminate so server2 receives the
+    ! client-finalize signal on MPI_COMM_WORLD.
+    call io_xios_close()
+#endif
+    call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
+#endif
+
     ! Enhanced profiler is already finalized above before MPI finalization
   end subroutine fesom_finalize
 
