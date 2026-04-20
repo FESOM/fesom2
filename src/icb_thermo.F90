@@ -89,38 +89,39 @@ type(t_partit), intent(inout), target :: partit
   M_bv_dz = 0.0
   M_v_dz = 0.0
   dz_acc = 0.0
-
+!
+!
+!  ! Zero out per-level heat flux arrays before filling up to ib_n_lvls.
+!  ! prepare_icb2fesom accesses these up to idx_d(i) which can exceed ib_n_lvls
+!  ! for element nodes deeper than the shallowest node; stale values from the
+!  ! previous iceberg step would otherwise inject spurious heat into the ocean.
+!  hfl_flux_ib(ib,:)  = 0.0
+!  hfbv_flux_ib(ib,:) = 0.0
 
   n2=elem2D_nodes(1,elem)
-  
-  ! iterate over all layers that contain the iceberg
   do n=1,ib_n_lvls
-    
-    ! 3-eq. formulation for lateral 'basal' melting [m/s]
-    lev_up  = mesh%zbar_3d_n(n, n2)                 ! upper level
-    if( n==nlevels_nod2D(n2) ) then                 ! if level is lowest level ...
-        lev_low = mesh%zbar_n_bot(n2)               ! ... lower level is bottom topography
+  !3-eq. formulation for lateral 'basal' melting [m/s]
+    lev_up  = mesh%zbar_3d_n(n, n2)
+    if( n==nlevels_nod2D(n2) ) then
+        lev_low = mesh%zbar_n_bot(n2)
     else
-        lev_low = mesh%zbar_3d_n(n+1, n2)           ! ... otherwise, lower level is one level below upper level
+        lev_low = mesh%zbar_3d_n(n+1, n2)
     end if
-   
-    ! assign dz for vertical integration
-    if( abs(lev_low)>=abs(depth_ib) ) then          ! if lower level below iceberg base ...
-        dz = abs(lev_up - depth_ib)                 ! ... dz is equal to difference between upper level and iceberg base
-    elseif(lev_low == lev_up) then                  ! if lower level equal to upper level ... (why should this happen?)
-        exit                                        ! ... exit
-    else
-        dz = abs(lev_low - lev_up)                  ! ... otherwise, dz is equal to difference between lower level and upper level
-    end if
-    dz_acc = dz_acc + dz                            ! sum up dz along iceberg depth
     
-    v_ibmino  = sqrt( (u_ib - arr_uo_ib(n))**2 + (v_ib - arr_vo_ib(n))**2 )         ! depth-average rel. velocity
-
-    ! calculate freshwater and heat flux densities ...
-    ! why dz_acc+dz/2.0? why not dz_acc-dz/2.0?
-    call iceberg_heat_water_fluxes_3eq(partit, ib, M_bv, H_bv, arr_T_ave_ib(n), arr_S_ave_ib(n), v_ibmino, dz_acc-dz/2.0, tf)
-    M_bv_dz = M_bv_dz + M_bv*dz                     ! ... integrating freshwater flux along iceberg depth
-    hfbv_flux_ib(ib,n) = H_bv * (2*length_ib*dz  + 2*length_ib*dz ) * scaling(ib)   ! ... assign heat flux bv on for layer n 
+    if( abs(lev_low)>=abs(depth_ib) ) then !.AND. (abs(lev_up)<=abs(depth_ib)) ) then
+        dz = abs(lev_up - depth_ib)
+    elseif(lev_low == lev_up) then
+        exit
+    else
+        dz = abs(lev_low - lev_up)
+    end if
+    
+    v_ibmino  = sqrt( (u_ib - arr_uo_ib(n))**2 + (v_ib - arr_vo_ib(n))**2 ) ! depth-average rel. velocity
+    call iceberg_heat_water_fluxes_3eq(partit, ib, M_bv, H_bv, arr_T_ave_ib(n), arr_S_ave_ib(n),v_ibmino, -(dz_acc+dz/2.0), tf)
+    dz_acc = dz_acc + dz
+    M_bv_dz = M_bv_dz + M_bv*dz
+    
+    hfbv_flux_ib(ib,n) = H_bv * (2*length_ib*dz  + 2*length_ib*dz ) * scaling(ib)
   
     !'thermal driving', defined as the elevation of ambient water 
     !temperature above freezing point' (Neshyba and Josberger, 1979).
@@ -142,8 +143,15 @@ type(t_partit), intent(inout), target :: partit
     hfl_flux_ib(ib,n) = H_v * (2*length_ib*dz  + 2*length_ib*dz ) * scaling(ib)
     !fwl_flux_ib = M_v
   end do
-  M_bv  = M_bv_dz / abs(depth_ib)
-  M_v   = M_v_dz / abs(depth_ib)
+  ! Guard against depth_ib==0 (should not happen if volume check is passed,
+  ! but fp edge cases and cavity geometry can produce near-zero depth).
+  if (abs(depth_ib) > 0.0) then
+    M_bv  = M_bv_dz / abs(depth_ib)
+    M_v   = M_v_dz / abs(depth_ib)
+  else
+    M_bv  = 0.0
+    M_v   = 0.0
+  end if
 
   !wave erosion
   absamino = sqrt( (ua_ib - uo_ib)**2 + (va_ib - vo_ib)**2 )
@@ -151,6 +159,11 @@ type(t_partit), intent(inout), target :: partit
   damping = 0.5 * (1.0 + cos(conci_ib**3 * Pi))
   M_e = 1./6. * sea_state * (sst_ib + 2.0) * damping
   M_e = M_e/86400.
+  ! The Bigg/Silva wave erosion formula is only defined for SST > -2 degC.
+  ! When SST < -2 degC the formula produces M_e < 0 (nonphysical regrowth),
+  ! which reverses the sign of the FW and heat flux delivered to the ocean,
+  ! creating a runaway cooling feedback via the ALE bc_surface term. Clamp here.
+  if (M_e < 0.0) M_e = 0.0
   H_e = M_e * rho_icb * L
   
   ! check wave erosion potential
@@ -201,6 +214,7 @@ subroutine iceberg_newdimensions(partit, ib, depth_ib,height_ib,length_ib,width_
   character, intent(IN)	:: file_meltrates*80
   
   real			:: dh_b, dh_v, dh_e, dh_bv, bvl, lvl_b, lvl_v, lvl_e, tvl, volume_before, volume_after
+  real			:: hf_scale
   integer		:: icbID
   logical		:: force_last_output
   real, dimension(4)	:: arr
@@ -239,6 +253,12 @@ type(t_partit), intent(inout), target :: partit
     volume_before=height_ib*length_ib*width_ib
 
     if((tvl .ge. volume_before) .OR. (volume_before .le. smallestvol_icb)) then
+        ! Scale heat fluxes when melt exceeds remaining volume
+        hf_scale = volume_before / max(tvl, 1.0e-30)
+        hfb_flux_ib(ib)    = hfb_flux_ib(ib)    * hf_scale
+        hfe_flux_ib(ib)    = hfe_flux_ib(ib)    * hf_scale
+        hfbv_flux_ib(ib,:) = hfbv_flux_ib(ib,:) * hf_scale
+        hfl_flux_ib(ib,:)  = hfl_flux_ib(ib,:)  * hf_scale
     	volume_after=0.0    	
 	    depth_ib = 0.0
     	height_ib= 0.0
@@ -269,6 +289,8 @@ type(t_partit), intent(inout), target :: partit
 
         !iceberg smaller than critical value after melting?
         if (volume_after .le. smallestvol_icb) then
+            ! Add latent heat for remnant volume to erosion heat flux (bug 5)
+            hfe_flux_ib(ib) = hfe_flux_ib(ib) + (volume_before - tvl) * rho_icb * L / dt / REAL(steps_per_ib_step) * scaling(ib)
             volume_after=0.0    	
 	        depth_ib = 0.0
     	    height_ib= 0.0
@@ -447,6 +469,9 @@ type(t_partit), intent(inout), target :: partit
      gat  = gats1/(gats2+12.5*pr1)
      gas  = gats1/(gats2+12.5*sc1)
 
+     !RG3417 gat  = 1.00e-4   ![m/s]  RT: to be replaced by velocity-dependent equations later
+     !RG3417 gas  = 5.05e-7   ![m/s]  RT: to be replaced by velocity-dependent equations later
+
      ! Calculate
      ! density in the boundary layer: rhow
      ! and interface pressure pg [dbar],
@@ -463,9 +488,22 @@ type(t_partit), intent(inout), target :: partit
      ep1 = cpw*gat
      ep2 = cpi*gas
      ep3 = lhf*gas
-     ep31 = -rhor*cpi*tdif/zice   !RG4190 / RG44027
+     ! ep31 = -rhor*cpi*tdif/zice is only used in the freezing branch.
+     ! Guard against zice==0 (would be Inf, giving NaN in the quadratic).
+     if (abs(zice) > 0.0) then
+       ep31 = -rhor*cpi*tdif/zice   !RG4190 / RG44027
+     else
+       ep31 = 0.0
+     end if
      ep4 = b+c*zice
      ep5 = gas/rhor
+
+
+!rt RG4190     ! negative heat flux term in the ice (due to -kappa/D)
+!rt RG4190     ex1 = a*(ep1-ep2)
+!rt RG4190     ex2 = ep1*(ep4-tin)+ep2*(tob+a*sal-ep4)-ep3
+!rt RG4190     ex3 = sal*(ep2*(ep4-tob)+ep3)
+
 
 !RT RG4190/RG44027:
 !    In case of melting ice account for changing temperature gradient, i.e. switch from heat conduction to heat capacity approach
@@ -506,16 +544,43 @@ type(t_partit), intent(inout), target :: partit
         sf = sf2
      endif
 
-     t_freeze = tf                                      ! output of freezing temperature
-     
-     H_b = rhow*cpw*gat*(tin-tf)                        ! heat flux [W] positive for upward
-     M_b = gas*(sf-sal)/sf                              ! freshwater flux [m/s] freshwater per second
-     M_b = - (rhow / rhoi) * M_b 		                ! freshwater flux [m (ice) per second], NOW positive for melting
+     t_freeze = tf ! output of freezing temperature
+     ! Calculate the melting/freezing rate [m/s]
+     ! seta = ep5*(1.0-sal/sf)     !rt thinks this is not needed; TR: Why different to M_b? LIQUID vs. ICE
 
-     ! avoid basal freezing for grounded icebergs
+     !rt  t_surf_flux(i,j)=gat*(tf-tin)
+     !rt  s_surf_flux(i,j)=gas*(sf-(s(i,j,N,lrhs)+35.0))
+
+     !hfb_flux_ib(ib)  = rhow*cpw*gat*(tin-tf)*scaling(ib)      ! [W/m2]  ! positive for upward
+     !hfb_flux_ib(ib)  = rhow*cpw*gat*(tin-tf)*length_ib(ib)*width_ib(ib)*scaling(ib)      ! [W]  ! positive for upward
+     H_b  = rhow*cpw*gat*(tin-tf) !*length_ib(ib)*width_ib(ib)*scaling(ib)      ! [W]  ! positive for upward
+
+     !fw_flux_ib(ib) =          gas*(sf-sal)/sf   ! [m/s]   !
+     M_b 	    =          gas*(sf-sal)/sf   ! [m/s]   ! m freshwater per second
+     !fw_flux_ib(ib) = M_b
+     !fw = -M_b
+     M_b = - (rhow / rhoi) * M_b 		 ! [m (ice) per second], positive for melting? NOW positive for melting
+
+     !LA avoid basal freezing for grounded icebergs
      if(grounded(ib) .and. (M_b.lt.0.)) then
          M_b = 0.0
+         H_b = 0.0
      endif
+
+     !      qo=-rhor*seta*oofw
+     !      if(seta.le.0.) then
+     !         qc=rhor*seta*hemw
+     !         qo=rhor*seta*oomw
+     !      endif
+
+     ! write(*,'(a10,i10,9f10.3)') 'ice shelf',n,zice,rhow,temp,sal,tin,tf,sf,heat_flux(n),water_flux(n)*86400.*365.
+
+     !for saving to output:
+     !net_heat_flux(n)=-heat_flux(n)      ! positive down
+     !fresh_wa_flux(n)=-water_flux(n)     ! m freshwater per second
+
+  !enddo
+
 end subroutine iceberg_heat_water_fluxes_3eq
 
 subroutine potit_ib(ib,salz,pt,pres,rfpres,tin)

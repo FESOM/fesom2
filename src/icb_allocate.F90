@@ -128,7 +128,7 @@ type(t_mesh), intent(in), target :: mesh
   hfb_flux_ib = 0.0
   hfbv_flux_ib = 0.0
   lhfb_flux_ib = 0.0
-  allocate(arr_block(15*ib_num))
+  allocate(arr_block(16*ib_num))
   allocate(elem_block(ib_num))
   allocate(pe_block(ib_num))
 
@@ -138,7 +138,7 @@ type(t_mesh), intent(in), target :: mesh
   call MPI_Bcast(elem_area_glob, elem2D, MPI_DOUBLE, 0, MPI_COMM_FESOM, MPIERR)
 
   allocate(vl_block(4*ib_num))
-  allocate(buoy_props(ib_num,13))
+  allocate(buoy_props(ib_num,14))
   buoy_props = 0.0
   allocate(melted(ib_num))
   melted = .false.
