@@ -156,7 +156,12 @@ endif()
 # Link RECOM code
 if(RECOM_COUPLED)  # ADD RECOM FILES
    file(GLOB sources_recom ${src_home}/int_recom/*.F90
-                           ${src_home}/int_recom/recom/*.F90)
+                           ${src_home}/int_recom/mocsy/*.F90
+                           ${src_home}/int_recom/config/*.F90
+                           ${src_home}/int_recom/diags/*.F90
+                           ${src_home}/int_recom/physics/*.F90
+                           ${src_home}/int_recom/forcing/*.F90
+                           ${src_home}/int_recom/bgc/*.F90)
    list(APPEND sources_Fortran ${sources_recom})                           
 endif()                             
 
