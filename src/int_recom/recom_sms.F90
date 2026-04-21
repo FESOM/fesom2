@@ -14,6 +14,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     use recom_glovar
     use recom_config
     use recoM_ciso
+    use recom_iron
     use g_clock
 
     use g_config
@@ -7570,92 +7571,92 @@ end subroutine REcoM_sms
 ! Function for calculating limiter
 !-------------------------------------------------------------------------------
 
-function recom_limiter(slope,qa,qb)
-  use recom_config
-  Implicit None
-  Real(kind=8) :: recom_limiter
-  Real(kind=8) :: slope, qa, qb
-  Real(kind=8) :: dq
+!function recom_limiter(slope,qa,qb)
+!  use recom_config
+!  Implicit None
+!  Real(kind=8) :: recom_limiter
+!  Real(kind=8) :: slope, qa, qb
+!  Real(kind=8) :: dq
 
-  dq = qa - qb
-  if (REcoM_Geider_limiter) then
-    recom_limiter = max(min( -slope*dq, 1.d0),0.d0)
-  else
-    recom_limiter = 1.d0 - exp( -slope*( abs(dq)-dq )**2)
-  endif
-  return
-  end
+!  dq = qa - qb
+!  if (REcoM_Geider_limiter) then
+!    recom_limiter = max(min( -slope*dq, 1.d0),0.d0)
+!  else
+!    recom_limiter = 1.d0 - exp( -slope*( abs(dq)-dq )**2)
+!  endif
+!  return
+!  end
 
 !-------------------------------------------------------------------------------
 ! Function for iron chemistry
 !-------------------------------------------------------------------------------
-function iron_chemistry_2ligands(fet,l1t,l2t,k1,k2)
-      implicit none
+!function iron_chemistry_2ligands(fet,l1t,l2t,k1,k2)
+!      implicit none
 
-      Real(kind=8) :: iron_chemistry_2ligands
-      Real(kind=8) :: l1t,l2t,fet,k1,k2
-      Real(kind=8) :: a3,a2,a1,a0,a,b,c,p,q,discr,rho,phi,amp,pi
-      Real(kind=8) :: one3rd, one27th
-      Real(kind=8) :: fe1,fe2,fe3
+!      Real(kind=8) :: iron_chemistry_2ligands
+!      Real(kind=8) :: l1t,l2t,fet,k1,k2
+!      Real(kind=8) :: a3,a2,a1,a0,a,b,c,p,q,discr,rho,phi,amp,pi
+!      Real(kind=8) :: one3rd, one27th
+!      Real(kind=8) :: fe1,fe2,fe3
 
 ! coefficients of the 4th-order polynomial
-      a3 = k1*k2
-      a2 = ( k1*k2*(l1t + l2t - fet) + k1 + k2 )
-      a1 = ( 1 - (k1 + k2)*fet + k1*l1t + k2*l2t )
-      a0 = -fet
+!      a3 = k1*k2
+!      a2 = ( k1*k2*(l1t + l2t - fet) + k1 + k2 )
+!      a1 = ( 1 - (k1 + k2)*fet + k1*l1t + k2*l2t )
+!      a0 = -fet
 
 ! coefficients of the normalized polynomial
-      a = a2/a3
-      b = a1/a3
-      c = a0/a3
+!      a = a2/a3
+!      b = a1/a3
+!      c = a0/a3
 
 ! some numbers that are used several times
-      one3rd = 1.0/3.0
-      one27th = 1.0/27.0
+!      one3rd = 1.0/3.0
+!      one27th = 1.0/27.0
 
 ! now solve the polynomial stepwise
-      p = b - a*a*one3rd
-      q = c - a*b*one3rd + 2.0*a*a*a*one27th
-      discr = q*q/4.0 + p*p*p*one27th
+!      p = b - a*a*one3rd
+!      q = c - a*b*one3rd + 2.0*a*a*a*one27th
+!      discr = q*q/4.0 + p*p*p*one27th
 
-      rho = sqrt(-(p*p*p*one27th))
-      phi = acos(-q/(2.0*rho))
-      amp = 2.0*rho**one3rd
-      pi = 3.1415926535897931
+!      rho = sqrt(-(p*p*p*one27th))
+!      phi = acos(-q/(2.0*rho))
+!      amp = 2.0*rho**one3rd
+!      pi = 3.1415926535897931
 
 ! the equation has three real roots
-      fe1 = amp*cos(phi*one3rd) - a*one3rd
-      fe2 = amp*cos((phi + 2.0*pi)*one3rd) - a*one3rd
-      fe3 = amp*cos((phi + 4.0*pi)*one3rd) - a*one3rd
+!      fe1 = amp*cos(phi*one3rd) - a*one3rd
+!      fe2 = amp*cos((phi + 2.0*pi)*one3rd) - a*one3rd
+!      fe3 = amp*cos((phi + 4.0*pi)*one3rd) - a*one3rd
 
-      iron_chemistry_2ligands = max(fe1,fe2,fe3)
+!      iron_chemistry_2ligands = max(fe1,fe2,fe3)
 
-end function iron_chemistry_2ligands
+!end function iron_chemistry_2ligands
 !-------------------------------------------------------------------------------
-function iron_chemistry(Fe, totalLigand, ligandStabConst)
-  implicit none
+!function iron_chemistry(Fe, totalLigand, ligandStabConst)
+!  implicit none
 
-  Real(kind=8) :: iron_chemistry
-  Real(kind=8) :: Fe, totalLigand, ligandStabConst ! Input
-  Real(kind=8) :: FreeFe                          ! Output
-  Real(kind=8) :: ligand,FeL,a,b,c,discrim
+!  Real(kind=8) :: iron_chemistry
+!  Real(kind=8) :: Fe, totalLigand, ligandStabConst ! Input
+!  Real(kind=8) :: FreeFe                          ! Output
+!  Real(kind=8) :: ligand,FeL,a,b,c,discrim
 
 ! Abbrevations
-  a = ligandstabConst
-  b = ligandstabConst * (Fe - totalLigand) + 1.d0
-  c = -totalLigand
-  discrim = b*b - 4.d0 * a * c
+!  a = ligandstabConst
+!  b = ligandstabConst * (Fe - totalLigand) + 1.d0
+!  c = -totalLigand
+!  discrim = b*b - 4.d0 * a * c
 
-  if (a .ne. 0.d0 .and. discrim .ge. 0.d0) then
-    ligand = ( -b + sqrt(discrim) ) / (2.d0 * a)
-    FeL    = totalLigand - ligand
-    freeFe = Fe - FeL
-  else ! No free iron
-    freeFe = 0.d0
-  end if
+!  if (a .ne. 0.d0 .and. discrim .ge. 0.d0) then
+!    ligand = ( -b + sqrt(discrim) ) / (2.d0 * a)
+!    FeL    = totalLigand - ligand
+!    freeFe = Fe - FeL
+!  else ! No free iron
+!    freeFe = 0.d0
+!  end if
 
-  iron_chemistry = freeFe
+!  iron_chemistry = freeFe
 
-  return
-  end
+!  return
+!  end
 

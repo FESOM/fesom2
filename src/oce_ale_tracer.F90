@@ -395,6 +395,9 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     use diff_ver_recom_expl_interface
     use ver_sinking_recom_benthos_interface
     use recom_nitrogenss_interface
+    use get_seawater_viscosity_interface
+    use get_particle_density_interface
+    use ballast_interface
     use recom_glovar
     use recom_config
     use g_comm_auto
