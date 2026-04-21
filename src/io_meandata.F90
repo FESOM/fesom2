@@ -87,7 +87,16 @@ module io_MEANDATA
 !
 !--------------------------------------------------------------------------------------------
 !
-  type(Meandata), save, target   :: io_stream(150) ! todo: find a way to increase the array withhout move_alloc to keep the derived types in Meandata intact
+  ! Wrapper holding a pointer to a heap-allocated Meandata. io_stream is an
+  ! array of these wrappers so the backing array can be grown via move_alloc
+  ! without moving the Meandata targets themselves: existing entry=>io_stream(i)%p
+  ! pointers stay valid across resizes, and the Meandata's final destructor is
+  ! not triggered (finalisation only runs on explicit deallocate of %p).
+  type :: MeandataPtr
+     type(Meandata), pointer :: p => null()
+  end type MeandataPtr
+  type(MeandataPtr), allocatable, save :: io_stream(:)
+  integer, parameter             :: IO_STREAM_INITIAL_CAPACITY = 32
   integer, save                  :: io_NSTREAMS=0
   real(kind=WP)                  :: ctime !current time in seconds from the beginning of the year
 !
@@ -2135,7 +2144,7 @@ function stream_already_defined(name) result(found)
     
     found = .false.
     do i = 1, io_NSTREAMS
-        if (trim(io_stream(i)%name) == trim(name)) then
+        if (trim(io_stream(i)%p%name) == trim(name)) then
             found = .true.
             return
         end if
@@ -2595,8 +2604,8 @@ subroutine update_means
     integer                 :: I, J
 
     DO n=1, io_NSTREAMS
-        entry=>io_stream(n)
-        
+        entry=>io_stream(n)%p
+
         !_____________ compute in 8 byte accuracy ______________________________
         IF (entry%accuracy == i_real8) then
             IF (entry%flip) then
@@ -2716,7 +2725,7 @@ ctime=timeold+(dayold-1.)*86400
     do n=1, io_NSTREAMS
         !_______________________________________________________________________
         ! make pointer for entry onto io_stream object
-        entry=>io_stream(n)
+        entry=>io_stream(n)%p
 !#if defined(__MULTIO)
 !        call mio_write_nod(mio, entry)
 !        lfirst=.false.
@@ -3038,7 +3047,7 @@ subroutine do_output_callback(entry_index)
     ! EO args
     type(Meandata), pointer :: entry
 
-    entry=>io_stream(entry_index)
+    entry=>io_stream(entry_index)%p
     entry%p_partit%mype=entry%mype_workaround ! for the thread callback, copy back the value of our mype as a workaround for errors with the cray envinronment (at least with ftn 2.5.9 and cray-mpich 7.5.3)
     !___________________________________________________________________________
     ! collect local mean output data (entry%local_values_r8_copy) into global 2d 
@@ -3072,11 +3081,11 @@ subroutine finalize_output()
     integer i
     type(Meandata), pointer :: entry
     do i=1, io_NSTREAMS
-        entry=>io_stream(i)
+        entry=>io_stream(i)%p
         if(entry%thread_running) call entry%thread%join()
-        entry%thread_running = .false.    
+        entry%thread_running = .false.
     end do
-    
+
     ! Close 0D stream files
     do i=1, io_NSTREAMS0D
         if (io_stream0D(i)%ncid >= 0) then
@@ -3314,19 +3323,20 @@ subroutine associate_new_stream(name, entry)
     !___________________________________________________________________________
     ! check if we already have this variable
     do i=1, io_NSTREAMS
-        if(trim(io_stream(i)%name) .eq. name) then
+        if(trim(io_stream(i)%p%name) .eq. name) then
             print *,"variable '"//name//"' already exists, &
                 &check if you define it multiple times, for example in namelist.io, &
                 &namelist.icepack, io_meandata.F90 or other place that add I/O stream."
-            call assert(.false., __LINE__) 
+            call assert(.false., __LINE__)
         end if
     end do
-    
+
     !___________________________________________________________________________
     ! add this instance to io_stream array
     io_NSTREAMS = io_NSTREAMS +1
-    call assert(size(io_stream) >= io_NSTREAMS, __LINE__)
-    entry=>io_stream(io_NSTREAMS)
+    call ensure_io_stream_capacity(io_NSTREAMS)
+    allocate(io_stream(io_NSTREAMS)%p)
+    entry=>io_stream(io_NSTREAMS)%p
 end subroutine
 !
 !
@@ -3452,6 +3462,31 @@ subroutine assert(val, line)
     end if
 end subroutine
 !
+!_______________________________________________________________________________
+! Grow io_stream wrapper array as needed. Only the pointer wrappers are copied;
+! the heap-allocated Meandata targets stay put, so existing pointers into
+! io_stream(i)%p remain valid and no finalisation of Meandata is triggered.
+subroutine ensure_io_stream_capacity(required)
+    integer, intent(in) :: required
+    type(MeandataPtr), allocatable :: tmp(:)
+    integer :: old_size, new_size, i
+    if (.not. allocated(io_stream)) then
+        allocate(io_stream(max(IO_STREAM_INITIAL_CAPACITY, required)))
+        return
+    end if
+    old_size = size(io_stream)
+    if (old_size >= required) return
+    new_size = old_size
+    do while (new_size < required)
+        new_size = new_size * 2
+    end do
+    allocate(tmp(new_size))
+    do i = 1, old_size
+        tmp(i)%p => io_stream(i)%p
+    end do
+    call move_alloc(tmp, io_stream)
+end subroutine
+!
 !
 !_______________________________________________________________________________
 ! do vector rotation on the fly 
@@ -3470,8 +3505,8 @@ subroutine io_r2g(n, partit, mesh)
     logical                               :: do_rotation
 
     if (n==io_NSTREAMS) RETURN
-    entry_x=>io_stream(n)
-    entry_y=>io_stream(n+1)
+    entry_x=>io_stream(n)%p
+    entry_y=>io_stream(n+1)%p
     IF (.NOT. (entry_x%freq_unit==entry_y%freq_unit) .and. ((entry_x%freq==entry_y%freq))) RETURN
     IF (entry_x%accuracy /= entry_y%accuracy) RETURN
     do_rotation=.FALSE.
