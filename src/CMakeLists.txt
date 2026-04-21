@@ -14,6 +14,12 @@ else()
    set(FESOM_PLATFORM_STRATEGY "notset" CACHE STRING "switch to platform specific compile settings, this is usually determined via the env.sh script")
 endif()
 
+if(DEFINED ENV{ENABLE_ALBEDO_INTELMPI_WORKAROUNDS}) # be able to set the initial cache value from our env settings for albedo, not only via cmake command
+   option(ALBEDO_INTELMPI_WORKAROUNDS "workaround for performance issues on albedo" ON)
+else()
+   option(ALBEDO_INTELMPI_WORKAROUNDS "workaround for performance issues on albedo" OFF)
+endif()
+
 # Cray compiler specific optimizations
 if(CMAKE_Fortran_COMPILER_ID MATCHES "Cray")
    # Use alternative cray-mpich library, about 5% faster with cray-mpich/7.7.3
@@ -36,6 +42,11 @@ if(DEFINED DISABLE_MULTITHREADING)
 endif()
 
 #TODO: these machine specific block can easyly go in cmake toolchain.
+if(ALBEDO_INTELMPI_WORKAROUNDS)
+   add_compile_options(-DENABLE_ALBEDO_INTELMPI_WORKAROUNDS)
+   #SH add_compile_options(-DDISABLE_PARALLEL_RESTART_READ)
+endif()
+
 if    (${FESOM_PLATFORM_STRATEGY} STREQUAL levante.dkrz.de )
    option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
 elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
