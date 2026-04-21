@@ -14,7 +14,13 @@
 !   RESET   [0m   — always appended after every coloured line
 !=============================================================================
 
-#if defined (__recom)
+module recom_logs
+
+   implicit none
+
+   public
+
+   contains
 
    !==========================================================================
    !  Helper: emit one coloured line from rank-0 only
@@ -298,7 +304,8 @@
            '  [ERO] Erosion input disabled  (useErosion = .false.)')
    END SUBROUTINE log_erosion_disabled
 
-#endif
+end module recom_logs
+
 !=============================================================================
 !
 !  HOW TO REPLACE CALLS IN gen_surface_forcing.F90
