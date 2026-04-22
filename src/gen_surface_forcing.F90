@@ -126,6 +126,12 @@ MODULE g_sbf
 
    logical :: runoff_climatology =.false.
 
+   ! Ocean-only forcing: use only ocean points from forcing data, extrapolate into land
+   logical                         :: use_ocean_only_forcing = .false.
+   character(len=MAX_PATH), save   :: nm_ocean_mask_file     = ''
+   character(len=34),       save   :: nm_ocean_mask_var      = 'sftof'
+   real(wp),                save   :: ocean_mask_threshold   = 90.0_WP  ! ocean where sftof > threshold (%)
+
    real(wp), allocatable, save, dimension(:), public     :: qns   ! downward non solar heat over the ocean [W/m2]
    real(wp), allocatable, save, dimension(:), public     :: qsr   ! downward solar heat over the ocean [W/m2]
    real(wp), allocatable, save, dimension(:), public     :: emp   ! evaporation minus precipitation        [kg/m2/s]
@@ -214,6 +220,8 @@ MODULE g_sbf
    type(flfi_type), allocatable, save, target :: sbc_flfi(:)  !array for information about flux files
    integer,  allocatable, dimension(:,:)     :: bilin_indx_i ! indexs i for interpolation
    integer,  allocatable, dimension(:,:)     :: bilin_indx_j ! indexs j for interpolation
+   ! Ocean-only forcing mask on the forcing grid (1=ocean, 0=land)
+   integer,  allocatable, save, dimension(:,:) :: forcing_ocean_mask
    !flip latitude from infiles (for example  NCEP-DOE Reanalysis 2 standart)
    integer, save              :: flip_lat ! 1 if we need to flip
 !============== NETCDF ==========================================
@@ -686,6 +694,12 @@ CONTAINS
       end do
       lfirst=.false.
       end if
+
+      ! Read ocean mask for ocean-only forcing (once at initialization)
+      if (use_ocean_only_forcing .and. .not. allocated(forcing_ocean_mask)) then
+         call read_forcing_ocean_mask(partit)
+      end if
+
       do fld_idx = 1, i_totfl
          ! get first coefficients for time interpolation on model grid for all data
          call getcoeffld(fld_idx, rdate, partit, mesh)
@@ -934,6 +948,13 @@ CONTAINS
 !         sbcdata1=sbcdata1(1:nc_Nlon,nc_Nlat:1:-1)
 !         sbcdata2=sbcdata2(1:nc_Nlon,nc_Nlat:1:-1)
 !      end if
+
+      ! Ocean-only forcing: fill land cells with extrapolated ocean values
+      if (use_ocean_only_forcing) then
+         call fill_land_from_ocean(sbcdata1, forcing_ocean_mask, nc_Nlon, nc_Nlat)
+         call fill_land_from_ocean(sbcdata2, forcing_ocean_mask, nc_Nlon, nc_Nlat)
+      end if
+
       ! bilinear space interpolation, and time interpolation ,
       ! data is assumed to be sampled on a regular grid
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ii, i, j, ip1, jp1, x, y, extrp, x1, x2, y1, y2, denom, data1, data2)
@@ -1047,7 +1068,8 @@ CONTAINS
                         nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_freq, nm_nc_tmid, y_perpetual, &
                         l_xwind, l_ywind, l_xstre, l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow, &
                         nm_runoff_file, runoff_data_source, runoff_climatology, nm_sss_data_file, sss_data_source, &
-                        chl_data_source, nm_chl_data_file, chl_const, use_runoff_mapper, runoff_basins_file, runoff_radius
+                        chl_data_source, nm_chl_data_file, chl_const, use_runoff_mapper, runoff_basins_file, runoff_radius, &
+                        use_ocean_only_forcing, nm_ocean_mask_file, nm_ocean_mask_var, ocean_mask_threshold
 
 #if defined(__recom)
       namelist /nam_rsbc/ fe_data_source, nm_fe_data_file, nm_aen_data_file, nm_river_data_file, nm_erosion_data_file, nm_co2_data_file
@@ -1072,6 +1094,12 @@ CONTAINS
       if (mype==0) then
          write(*,*) "Start: Ocean forcing initialization."
          write(*,*) "Surface boundary conditions parameters:"
+         if (use_ocean_only_forcing) then
+            write(*,*) "  Ocean-only forcing ENABLED"
+            write(*,*) "    nm_ocean_mask_file   = ", trim(nm_ocean_mask_file)
+            write(*,*) "    nm_ocean_mask_var    = ", trim(nm_ocean_mask_var)
+            write(*,*) "    ocean_mask_threshold = ", ocean_mask_threshold
+         end if
       end if
 
 #if !defined __ifsinterface
@@ -1936,6 +1964,164 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
          stop
       endif
    END SUBROUTINE check_nferr
+
+   !=========================================================================
+   ! Ocean-only forcing: read mask and fill land cells
+   !=========================================================================
+   SUBROUTINE read_forcing_ocean_mask(partit)
+      !! Read ocean fraction mask from a separate NetCDF file and convert
+      !! to integer mask (1=ocean, 0=land) based on ocean_mask_threshold.
+      !! The mask file must have the same lon/lat grid as the forcing files.
+      IMPLICIT NONE
+      type(t_partit), intent(inout), target :: partit
+      integer :: ncid, varid, dimid_lon, dimid_lat
+      integer :: nlon, nlat, iost, ierror
+      integer :: i, j
+      real(4), allocatable :: sftof(:,:)
+      real(4) :: miss
+      logical :: has_missing
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
+
+      ! Use grid dimensions from the first forcing field (all share the same grid)
+      nlon = sbc_flfi(1)%nc_Nlon   ! includes +2 halo
+      nlat = sbc_flfi(1)%nc_Nlat
+
+      if (.not. allocated(forcing_ocean_mask)) then
+         allocate(forcing_ocean_mask(nlon, nlat))
+      end if
+      forcing_ocean_mask = 1  ! default: all ocean (safe fallback)
+
+      allocate(sftof(nlon, nlat))
+      sftof = 0.0
+
+      if (mype == 0) then
+         write(*,*) 'Ocean-only forcing: reading mask from ', trim(nm_ocean_mask_file)
+         write(*,*) '  variable: ', trim(nm_ocean_mask_var), '  threshold: ', ocean_mask_threshold, '%'
+
+         iost = nf90_open(trim(nm_ocean_mask_file), NF90_NOWRITE, ncid)
+         if (iost /= NF90_NOERR) then
+            write(*,*) 'ERROR: cannot open ocean mask file: ', trim(nm_ocean_mask_file)
+            write(*,*) '       NetCDF error: ', trim(nf90_strerror(iost))
+         end if
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      if (iost /= NF90_NOERR) then
+         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+      end if
+
+      if (mype == 0) then
+         iost = nf90_inq_varid(ncid, trim(nm_ocean_mask_var), varid)
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      if (iost /= NF90_NOERR) then
+         if (mype == 0) write(*,*) 'ERROR: variable not found in mask file: ', trim(nm_ocean_mask_var)
+         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+      end if
+
+      ! Read the data (nlon-2 x nlat, excluding halo columns)
+      if (mype == 0) then
+         ! Note: sftof in file is (lat, lon) but nf90_get_var maps to Fortran column-major
+         ! The forcing grid reading convention in this module uses (lon, lat) with halos at columns 1 and nlon
+         iost = nf90_get_var(ncid, varid, sftof(2:nlon-1, 1:nlat), &
+                             start=(/1, 1/), count=(/nlon-2, nlat/))
+
+         ! Check for missing_value attribute
+         has_missing = (nf90_get_att(ncid, varid, 'missing_value', miss) == NF90_NOERR)
+         if (.not. has_missing) then
+            has_missing = (nf90_get_att(ncid, varid, '_FillValue', miss) == NF90_NOERR)
+         end if
+
+         ! Apply periodic boundary halos (same as nc_readTimeGrid does for lon)
+         sftof(1, 1:nlat)    = sftof(nlon-1, 1:nlat)
+         sftof(nlon, 1:nlat) = sftof(2, 1:nlat)
+
+         iost = nf90_close(ncid)
+      end if
+
+      call MPI_BCast(sftof, nlon*nlat, MPI_REAL, 0, partit%MPI_COMM_FESOM, ierror)
+      call MPI_BCast(has_missing, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM, ierror)
+      if (has_missing) then
+         call MPI_BCast(miss, 1, MPI_REAL, 0, partit%MPI_COMM_FESOM, ierror)
+      end if
+
+      ! Convert to integer mask: 1=ocean, 0=land
+      do j = 1, nlat
+         do i = 1, nlon
+            if (has_missing .and. sftof(i,j) == miss) then
+               forcing_ocean_mask(i,j) = 0
+            else if (sftof(i,j) > real(ocean_mask_threshold, 4)) then
+               forcing_ocean_mask(i,j) = 1
+            else
+               forcing_ocean_mask(i,j) = 0
+            end if
+         end do
+      end do
+
+      if (mype == 0) then
+         write(*,*) 'Ocean-only forcing: mask loaded.'
+         write(*,*) '  Grid size (with halos): ', nlon, ' x ', nlat
+         write(*,*) '  Ocean points: ', sum(forcing_ocean_mask), ' / ', nlon*nlat
+      end if
+
+      deallocate(sftof)
+   END SUBROUTINE read_forcing_ocean_mask
+
+   SUBROUTINE fill_land_from_ocean(data, mask, nlon, nlat)
+      !! Iteratively fill land cells with extrapolated ocean values.
+      !! Each iteration, unfilled land cells that border filled cells
+      !! receive the average of their filled neighbors (4-connectivity).
+      !! Repeats until all cells are filled or max iterations reached.
+      IMPLICIT NONE
+      real(4),  intent(inout) :: data(nlon, nlat)
+      integer,  intent(in)    :: mask(nlon, nlat)  ! 1=ocean, 0=land
+      integer,  intent(in)    :: nlon, nlat
+
+      integer  :: filled(nlon, nlat)
+      real(4)  :: data_new(nlon, nlat)
+      integer  :: iter, i, j, cnt, max_iter, unfilled_count
+      real(4)  :: sum_val
+
+      max_iter = max(nlon, nlat)  ! upper bound, enough to fill any grid
+      filled = mask               ! initially, ocean cells are "filled"
+
+      do iter = 1, max_iter
+         unfilled_count = 0
+         data_new = data
+         do j = 1, nlat
+            do i = 1, nlon
+               if (filled(i,j) == 1) cycle  ! already has valid data
+               sum_val = 0.0
+               cnt = 0
+               ! 4-connected neighbors
+               if (i > 1    .and. filled(i-1,j) == 1) then
+                  sum_val = sum_val + data(i-1,j)
+                  cnt = cnt + 1
+               end if
+               if (i < nlon .and. filled(i+1,j) == 1) then
+                  sum_val = sum_val + data(i+1,j)
+                  cnt = cnt + 1
+               end if
+               if (j > 1    .and. filled(i,j-1) == 1) then
+                  sum_val = sum_val + data(i,j-1)
+                  cnt = cnt + 1
+               end if
+               if (j < nlat .and. filled(i,j+1) == 1) then
+                  sum_val = sum_val + data(i,j+1)
+                  cnt = cnt + 1
+               end if
+               if (cnt > 0) then
+                  data_new(i,j) = sum_val / real(cnt)
+                  filled(i,j) = 1
+               else
+                  unfilled_count = unfilled_count + 1
+               end if
+            end do
+         end do
+         data = data_new
+         if (unfilled_count == 0) exit
+      end do
+   END SUBROUTINE fill_land_from_ocean
 
    SUBROUTINE binarysearch(length, array, value, ind)!, delta)
       ! Given an array and a value, returns the index of the element that
