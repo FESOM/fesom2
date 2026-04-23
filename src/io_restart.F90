@@ -521,17 +521,24 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
   is_portable_restart_write = is_due(trim(restart_length_unit), restart_length, istep) .OR. (istep==ntotal)
 
   ! Should write core dump restart?
+  ! Gate the segment-end fallback on the raw restart being configured at all;
+  ! otherwise we trigger a write into a directory that was never mkdir'd
+  ! (the init block is skipped when raw_restart_length_unit == "off").
   if(is_portable_restart_write .and. (raw_restart_length_unit /= "off")) then
     is_raw_restart_write = .true. ! always write a raw restart together with the portable restart
-  else
+  else if(raw_restart_length_unit /= "off") then
     is_raw_restart_write = is_due(trim(raw_restart_length_unit), raw_restart_length, istep) .OR. (istep==ntotal)
+  else
+    is_raw_restart_write = .false.
   end if
 
   ! Should write derived type binary restart?
   if(is_portable_restart_write .and. (bin_restart_length_unit /= "off")) then
     is_bin_restart_write = .true. ! always write a binary restart together with the portable restart
-  else
+  else if(bin_restart_length_unit /= "off") then
     is_bin_restart_write = is_due(trim(bin_restart_length_unit), bin_restart_length, istep) .OR. (istep==ntotal)
+  else
+    is_bin_restart_write = .false.
   end if
 
   ! Write restart files
