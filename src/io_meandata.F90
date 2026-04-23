@@ -796,6 +796,11 @@ CASE ('curl_surf ')
 ! output RECOM 2D
 #if defined(__recom)
 
+CASE ('xCO2atm    ')
+    if (use_REcoM) then
+    call def_stream(nod2D,  myDim_nod2D,   'xCO2atm',    'atmospheric CO2 mass mixing ratio',  'mole fraction', x_co2atm(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
 CASE ('dpCO2s    ')
     if (use_REcoM) then
     call def_stream(nod2D,  myDim_nod2D,   'dpCO2s',    'Difference of oceanic pCO2 minus atmospheric pCO2',  'uatm', GlodPCO2surf(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -966,7 +971,7 @@ CASE ('Chldegp  ')
 #endif
     
 !___________________________________________________________________________________________________________________________________    
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>   3D streams   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+!   3D streams
 !___________________________________________________________________________________________________________________________________
 CASE ('temp      ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp',      'temperature', 'C',      tracers%data(1)%values(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)

@@ -421,7 +421,9 @@ CONTAINS
          if (x<0.)   x=x+360.
          if (x>360.) x=x-360.
          if ( min(i,j)>0 ) then
-         if (any(ncdata(i:ip1,j:jp1,1) > dummy*0.99_WP)) cycle
+         ! CAVITY FIX: Check for NaN in climatology data which can occur near cavity regions
+         if (any(ncdata(i:ip1,j:jp1,1) > dummy*0.99_WP) .or. &
+             any(.not. ieee_is_finite(ncdata(i:ip1,j:jp1,1)))) cycle
             x1 = nc_lon(i)
             x2 = nc_lon(ip1)
             y1 = nc_lat(j)
@@ -432,7 +434,9 @@ CONTAINS
             data1d(:) = ( ncdata(i,j,:)   * (x2-x)*(y2-y)   + ncdata(ip1,j,:)     * (x-x1)*(y2-y) + &
                         ncdata(i,jp1,:) * (x2-x)*(y-y1)   + ncdata(ip1, jp1, :) * (x-x1)*(y-y1)     ) / denom
             where (ncdata(i,j,:)   > 0.99_WP*dummy .OR. ncdata(ip1,j,:)   > 0.99_WP*dummy .OR. &
-                    ncdata(i,jp1,:) > 0.99_WP*dummy .OR. ncdata(ip1,jp1,:) > 0.99_WP*dummy)
+                    ncdata(i,jp1,:) > 0.99_WP*dummy .OR. ncdata(ip1,jp1,:) > 0.99_WP*dummy .OR. &
+                    .not. ieee_is_finite(ncdata(i,j,:)) .OR. .not. ieee_is_finite(ncdata(ip1,j,:)) .OR. &
+                    .not. ieee_is_finite(ncdata(i,jp1,:)) .OR. .not. ieee_is_finite(ncdata(ip1,jp1,:)))
                 data1d(:)=dummy
             end where   
             
@@ -490,6 +494,14 @@ CONTAINS
                     end if
                 enddo
             end if ! --> if (use_cavity) then
+         else
+            ! CAVITY FIX: If bilinear interpolation fails (missing data), set fallback values
+            ! This prevents NaN tracers when climatology has dummy values near cavity regions
+            do k= ul1, nl1
+               if (.not. ieee_is_finite(tracers%data(current_tracer)%values(k,ii))) then
+                  tracers%data(current_tracer)%values(k,ii) = 0.0_WP
+               endif
+            enddo
          end if ! --> if ( min(i,j)>0 ) then
       end do !ii
       if (mype==0) then
@@ -531,7 +543,11 @@ CONTAINS
             ! get first coeficients for time inerpolation on model grid for all datas
             call getcoeffld(tracers, partit, mesh)
             call nc_end ! deallocate arrqays associated with netcdf file
-            call extrap_nod(tracers%data(current_tracer)%values(:,:), partit, mesh)
+            ! CAVITY FIX: Initialize to 0.0 before extrapolation to prevent NaN
+      where (.not. ieee_is_finite(tracers%data(current_tracer)%values(:,:)))
+         tracers%data(current_tracer)%values(:,:) = 0.0_WP
+      end where
+      call extrap_nod(tracers%data(current_tracer)%values(:,:), partit, mesh)
             exit
          elseif (current_tracer==tracers%num_tracers) then
             if (partit%mype==0) write(*,*) "idlist contains tracer which is not listed in tracer_id!"
@@ -545,6 +561,19 @@ CONTAINS
 
       do current_tracer=1, tracers%num_tracers
          !_________________________________________________________________________
+         ! CAVITY FIX: Clean up any remaining NaN values before dummy check
+         where (.not. ieee_is_finite(tracers%data(current_tracer)%values(:,:)))
+               tracers%data(current_tracer)%values(:,:) = 0.0_WP
+         end where
+         !_________________________________________________________________________
+         ! set remaining dummy values from bottom topography to 0.0_WP
+         where (tracers%data(current_tracer)%values > 0.9_WP*dummy)
+               tracers%data(current_tracer)%values=0.0_WP
+         end where
+
+         !_________________________________________________________________________
+         ! eliminate values within cavity that result from the extrapolation of 
+         ! initialisation
          ! set remaining dummy values and NaN from interpolation to 0.0_WP
          do n=1,partit%myDim_nod2d + partit%eDim_nod2D
             do i=1, mesh%nl-1
