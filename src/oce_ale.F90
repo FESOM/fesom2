@@ -1580,8 +1580,26 @@ subroutine init_stiff_mat_ale(partit, mesh)
         offset = ssh_stiff%rowptr(row)
         SSH_stiff%values(offset) = SSH_stiff%values(offset)+ areasvol(ulevels_nod2D(row),row)/dt
     end do
+
+    ! DEBUG: print stiffness diagonal range
+    block
+        integer :: dbg_neg
+        real(kind=WP) :: dbg_min, dbg_max, dbg_mmin, dbg_mmax
+        dbg_neg = 0; dbg_min = 1e30_WP; dbg_max = -1e30_WP
+        dbg_mmin = 1e30_WP; dbg_mmax = -1e30_WP
+        do row=1, myDim_nod2D
+            offset = ssh_stiff%rowptr(row)
+            if (SSH_stiff%values(offset) < 0.0_WP) dbg_neg = dbg_neg + 1
+            if (SSH_stiff%values(offset) < dbg_min) dbg_min = SSH_stiff%values(offset)
+            if (SSH_stiff%values(offset) > dbg_max) dbg_max = SSH_stiff%values(offset)
+            dbg_mmin = min(dbg_mmin, areasvol(ulevels_nod2D(row),row)/dt)
+            dbg_mmax = max(dbg_mmax, areasvol(ulevels_nod2D(row),row)/dt)
+        end do
+        write(*,*) 'FORTRAN STIFF diag: neg=', dbg_neg, ' range=[', dbg_min, ',', dbg_max, '] mass=[', dbg_mmin, ',', dbg_mmax, ']'
+    end block
+
     deallocate(n_pos,n_num)
-    
+
     !___________________________________________________________________________
     ! g) Global contiguous numbers:
     ! Now we need to exchange between PE to know their 
@@ -2060,6 +2078,13 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
         call exchange_nod(ssh_rhs_old, partit)
 !$OMP BARRIER
     end if 
+    ! DEBUG: print raw divergence stats
+    if (mype==0) then
+        write(*,*) 'FHBAR_DBG: raw_div_max=', maxval(abs(ssh_rhs_old(1:myDim_nod2D))), &
+            ' area_min=', minval(areasvol(1,1:myDim_nod2D)), &
+            ' area_max=', maxval(areasvol(1,1:myDim_nod2D))
+    end if
+
     !___________________________________________________________________________
     ! update the thickness
 !$OMP PARALLEL DO
@@ -3324,6 +3349,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     use g_comm_auto
     use io_RESTART !PS
     use o_mixing_KPP_mod
+    use fesom_dump_shim, only: dump_shim_init, dump_shim_record_node, &
+                               dump_shim_record_node_2d, &
+                               DUMP_SUBSTEP_PRESSURE_BV, DUMP_SUBSTEP_SW_AB,    &
+                               DUMP_SUBSTEP_MIXING,      DUMP_SUBSTEP_SSH_RHS,  &
+                               DUMP_SUBSTEP_SSH_SOLVE,   DUMP_SUBSTEP_HBAR,     &
+                               DUMP_SUBSTEP_ETA_N,       DUMP_SUBSTEP_ALE,      &
+                               DUMP_SUBSTEP_TRACERS,     DUMP_SUBSTEP_THICKNESS
 #if defined (__cvmix)       
     use g_cvmix_tke
     use g_cvmix_idemix
@@ -3376,6 +3408,10 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 !PS     stress_surf= 0.0_WP
 !PS     stress_node_surf= 0.0_WP
 
+    ! Reference-dump shim: opens per-rank dump file if FESOM_DUMP_FILE is set.
+    ! Cheap no-op on every call after the first; safe to keep here permanently.
+    call dump_shim_init(mype, myDim_nod2D, myList_nod2D)
+
 #if defined (FESOM_PROFILING)
     call fesom_profiler_start("oce_mix_pres")
 #endif
@@ -3383,6 +3419,40 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! calculate equation of state, density, pressure and mixed layer depths
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call pressure_bv'//achar(27)//'[0m'
     call pressure_bv(tracers, partit, mesh)            !!!!! HeRE change is made. It is linear EoS now.
+
+    ! Diagnostic: print full column at global node 1000 (for C vs Fortran comparison)
+    if (n == 1) then
+        block
+            integer :: nn_local, nz_loc, nlev_loc, target_gid
+            target_gid = 1001  ! Fortran 1-based = C global 1000
+            do nn_local = 1, myDim_nod2D
+                if (myList_nod2D(nn_local) == target_gid) then
+                    nlev_loc = nlevels_nod2D(nn_local)
+                    write(*,'(A,I6,A,I3,A,F8.1,A,F10.6,A,F10.6)') &
+                        '  NODE_CMP: global=', target_gid, &
+                        ' nlev=', nlev_loc, ' depth=', mesh%depth(nn_local), &
+                        ' x=', mesh%coord_nod2D(1,nn_local), ' y=', mesh%coord_nod2D(2,nn_local)
+                    do nz_loc = 1, min(nlev_loc - 1, 10)
+                        write(*,'(A,I3,A,F9.1,A,F8.1,A,F9.4,A,F9.4,A,F11.6,A,F13.2)') &
+                            '    nz=', nz_loc, ' zmid=', Z_3d_n(nz_loc,nn_local), &
+                            ' h=', hnode(nz_loc,nn_local), &
+                            ' T=', tracers%data(1)%values(nz_loc,nn_local), &
+                            ' S=', tracers%data(2)%values(nz_loc,nn_local), &
+                            ' rho=', density_m_rho0(nz_loc,nn_local), &
+                            ' P=', hpressure(nz_loc,nn_local)
+                    end do
+                    exit
+                end if
+            end do
+        end block
+    end if
+
+    ! Reference-dump shim: record per-substep node-column fields produced by
+    ! pressure_bv. Each call is a no-op when FESOM_DUMP_FILE is unset or the
+    ! step counter exceeds FESOM_DUMP_MAXSTEPS.
+    call dump_shim_record_node(DUMP_SUBSTEP_PRESSURE_BV, n, 'density',  density_m_rho0, nlevels_nod2D)
+    call dump_shim_record_node(DUMP_SUBSTEP_PRESSURE_BV, n, 'pressure', hpressure,      nlevels_nod2D)
+    call dump_shim_record_node(DUMP_SUBSTEP_PRESSURE_BV, n, 'bvfreq',   bvfreq,         nlevels_nod2D)
 
     !___________________________________________________________________________
     ! calculate calculate pressure gradient force
@@ -3403,6 +3473,8 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! calculate alpha and beta
     ! it will be used for KPP, Redi, GM etc. Shall we keep it on in general case?
     call sw_alpha_beta(tracers%data(1)%values, tracers%data(2)%values, partit, mesh)
+    call dump_shim_record_node(DUMP_SUBSTEP_SW_AB, n, 'sw_alpha', sw_alpha, nlevels_nod2D)
+    call dump_shim_record_node(DUMP_SUBSTEP_SW_AB, n, 'sw_beta',  sw_beta,  nlevels_nod2D)
 
     ! computes the xy gradient of a neutral surface; will be used by Redi, GM etc.
     call compute_sigma_xy(tracers%data(1)%values,tracers%data(2)%values, partit, mesh)
@@ -3482,11 +3554,14 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         call mo_convect(ice, partit, mesh)
 #endif  
     else if(mix_scheme_nmb==8) then
-        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_TOY'//achar(27)//'[0m' 
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_TOY'//achar(27)//'[0m'
         call oce_mixing_TOY(partit, mesh)
-    end if   
+    end if
 
-#if defined (__cvmix)       
+    ! Reference-dump shim: vertical mixing diffusivity at nodes (Av is at elements, defer)
+    call dump_shim_record_node(DUMP_SUBSTEP_MIXING, n, 'Kv', Kv, nlevels_nod2D)
+
+#if defined (__cvmix)
     !___EXTENSION OF MIXING SCHEMES_____________________________________________
     ! add CVMIX TIDAL mixing scheme of Simmons et al. 2004 "Tidally driven mixing 
     ! in a numerical model of the ocean general circulation", ocean modelling to 
@@ -3650,10 +3725,12 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         ! ssh_rhs=-alpha*\nabla\int(U_n+U_rhs)dz-(1-alpha)*...
         ! see "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (18) rhs
         call compute_ssh_rhs_ale(dynamics, partit, mesh)
+        call dump_shim_record_node_2d(DUMP_SUBSTEP_SSH_RHS, n, 'ssh_rhs', dynamics%ssh_rhs)
 
         ! Take updated ssh matrix and solve --> new ssh!
-        t30=MPI_Wtime() 
+        t30=MPI_Wtime()
         call solve_ssh_ale(dynamics, partit, mesh)
+        call dump_shim_record_node_2d(DUMP_SUBSTEP_SSH_SOLVE, n, 'd_eta', dynamics%d_eta)
         
         if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) then
             if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call relax_zonal_vel'//achar(27)//'[0m'
@@ -3681,6 +3758,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         ! Update to hbar(n+3/2) and compute dhe to be used on the next step
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_hbar_ale'//achar(27)//'[0m'
         call compute_hbar_ale(dynamics, partit, mesh)
+        call dump_shim_record_node_2d(DUMP_SUBSTEP_HBAR, n, 'hbar', hbar)
 
         !___________________________________________________________________________
         ! - Current dynamic elevation alpha*hbar(n+1/2)+(1-alpha)*hbar(n-1/2)
@@ -3698,6 +3776,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
             if (ulevels_nod2D(node)==1) eta_n(node)=alpha*hbar(node)+(1.0_WP-alpha)*hbar_old(node)
         end do
 !$OMP END PARALLEL DO
+        call dump_shim_record_node_2d(DUMP_SUBSTEP_ETA_N, n, 'eta_n', eta_n)
         ! --> eta_(n)
         ! call zero_dynamics !DS, zeros several dynamical variables; to be used for testing new implementations!
         t5=MPI_Wtime()
@@ -3773,9 +3852,11 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
             call compute_thickness_zstar(dynamics, partit, mesh)
         else
             hnode_new = hnode
-        end if 
+        end if
         call compute_vert_vel_transpv(dynamics, partit, mesh)
-    end if    
+    end if
+    call dump_shim_record_node(DUMP_SUBSTEP_ALE, n, 'hnode_new', hnode_new, nlevels_nod2D)
+    call dump_shim_record_node(DUMP_SUBSTEP_ALE, n, 'w',         dynamics%w, nlevels_nod2D)
     t7=MPI_Wtime()
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("oce_vert_vel")
@@ -3791,9 +3872,33 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     end if
  
     !___________________________________________________________________________
+    ! DEBUG: print max diagnostics before tracers (compare with C port)
+    if (n <= 50) then
+        block
+            real(kind=WP) :: local_uv, local_ssh, local_pgf, global_uv, global_ssh, global_pgf
+            local_uv  = maxval(abs(dynamics%uv(:,:,1:myDim_elem2D)))
+            local_ssh = maxval(abs(dynamics%eta_n(1:myDim_nod2D)))
+            local_pgf = maxval(abs(pgf_x(:,1:myDim_elem2D)))
+            local_pgf = max(local_pgf, maxval(abs(pgf_y(:,1:myDim_elem2D))))
+            call MPI_Allreduce(local_uv, global_uv, 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, MPIerr)
+            call MPI_Allreduce(local_ssh, global_ssh, 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, MPIerr)
+            call MPI_Allreduce(local_pgf, global_pgf, 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, MPIerr)
+            if (mype==0) then
+                write(*,*) 'FDBG step=', n, ' uv=', local_uv, &
+                    ' ssh=', local_ssh, &
+                    ' w=', maxval(abs(dynamics%w(:,1:myDim_nod2D))), &
+                    ' Smax=', maxval(tracers%data(2)%values(:,1:myDim_nod2D))
+                write(*,*) 'FDBG_GLOBAL step=', n, ' uv=', global_uv, &
+                    ' ssh=', global_ssh, ' pgf=', global_pgf
+            end if
+        end block
+    end if
+
     ! solve tracer equation
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call solve_tracers_ale'//achar(27)//'[0m'
     call solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
+    call dump_shim_record_node(DUMP_SUBSTEP_TRACERS, n, 'T', tracers%data(1)%values, nlevels_nod2D)
+    call dump_shim_record_node(DUMP_SUBSTEP_TRACERS, n, 'S', tracers%data(2)%values, nlevels_nod2D)
     t8=MPI_Wtime()
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("oce_tracer_solve")
@@ -3804,6 +3909,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! Update hnode=hnode_new, helem
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call update_thickness_ale'//achar(27)//'[0m'
     call update_thickness_ale(partit, mesh)
+    call dump_shim_record_node(DUMP_SUBSTEP_THICKNESS, n, 'hnode', hnode, nlevels_nod2D)
     t9=MPI_Wtime()
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("oce_thickness_update")

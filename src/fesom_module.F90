@@ -837,6 +837,12 @@ contains
     call finalize_output()
     call finalize_restart()
 
+    ! Close the reference-dump file if the shim was active. No-op otherwise.
+    block
+      use fesom_dump_shim, only: dump_shim_finalize
+      call dump_shim_finalize()
+    end block
+
     !___FINISH MODEL RUN________________________________________________________
 
     call MPI_Barrier(f%MPI_COMM_FESOM, f%MPIERR)
