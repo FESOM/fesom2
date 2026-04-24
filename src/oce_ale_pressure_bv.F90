@@ -204,7 +204,7 @@ subroutine pressure_bv(tracers, partit, mesh)
     USE o_ARRAYS
     USE g_support
     USE o_mixing_KPP_mod, only: dbsfc
-    USE diagnostics,      only: ldiag_dMOC
+    USE diagnostics,      only: ldiag_dMOC, dmoc_is_due
     use densityJM_components_interface
     use density_linear_interface
     IMPLICIT NONE
@@ -299,7 +299,7 @@ subroutine pressure_bv(tracers, partit, mesh)
         !NR and did not vectorize the full loop.
         !_______________________________________________________________________
         ! calculate density for MOC
-        if (ldiag_dMOC) then
+        if (ldiag_dMOC .and. dmoc_is_due(mstep)) then
             do nz=nzmin, nzmax-1
                 rho(nz)              = bulk_0(nz) - 2000._WP*(bulk_pz(nz)   -2000._WP*bulk_pz2(nz))
                 density_dmoc(nz,node)= rho(nz)*rhopot(nz)/(rho(nz)-200._WP*real(state_equation))
