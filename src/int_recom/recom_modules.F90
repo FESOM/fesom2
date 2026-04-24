@@ -569,25 +569,25 @@ contains
 !        allocate(recom_det2_tracer_id(4))
         recom_det2_tracer_id = (/1025, 1026, 1027, 1028/)        
 #if defined (__RECOM_WAVEBANDS)         
-if (RECOM_RADTRANS) then
-!SL to be further extend for if cases
-if (RECOM_CDOM) then
-        icdom = 37 
-        recom_cdom_tracer_id = 1037
-endif    
-if (RECOM_MARSHALL) then
-        ! MARSHALL related
-        id1 = 38
-        id1d = 39       
-        if (enable_coccos) then
-            id1c = 40
-            id1p = 41
-            recom_d1_tracer_id = (/1038, 1039, 1040, 1041/)
-        else
-            recom_d1_tracer_id = (/1038, 1039, 0, 0/)     
-        end if        
-endif
-endif          
+        if (RECOM_RADTRANS) then
+           !SL to be further extend for if cases
+           if (RECOM_CDOM) then
+              icdom = 37 
+              recom_cdom_tracer_id = 1037
+           endif
+           if (RECOM_MARSHALL) then
+              ! MARSHALL related
+              id1 = 38
+              id1d = 39       
+              if (enable_coccos) then
+                 id1c = 40
+                 id1p = 41
+                 recom_d1_tracer_id = (/1038, 1039, 1040, 1041/)
+              else
+                 recom_d1_tracer_id = (/1038, 1039, 0, 0/)     
+              end if
+           endif
+        endif
 #endif
     else if (enable_coccos .and. .not. enable_3zoo2det) then
         ! =======================================================================
@@ -685,19 +685,19 @@ subroutine validate_recom_tracers(num_tracers, mype)
     ! Total: 22 + 4 + 6 + 3 + 2 = 36 (actually 22 + 14 = 36)
     expected_bgc_num = 36
 #if defined (__RECOM_WAVEBANDS)    
-if (RECOM_RADTRANS) then
-if (RECOM_CDOM) then
+    if (RECOM_RADTRANS) then
+       if (RECOM_CDOM) then
     ! + 1 for CDOM 
-    expected_bgc_num = 37 
-endif    
-if (RECOM_MARSHALL) then
-    ! + 2(4) MARSHALL related
-    expected_bgc_num = 39 
-    if (enable_coccos) then
-       expected_bgc_num = 41
-    end if
-endif
-endif    
+          expected_bgc_num = 37 
+       endif
+       if (RECOM_MARSHALL) then
+          ! + 2(4) MARSHALL related
+          expected_bgc_num = 39 
+          if (enable_coccos) then
+             expected_bgc_num = 41
+          end if
+       endif
+    endif
 #endif
 
   else if (enable_coccos .and. .not. enable_3zoo2det) then
@@ -769,20 +769,20 @@ endif
     expected_tracer_ids(37) = 1035  ! Zoo3N
     expected_tracer_ids(38) = 1036  ! Zoo3C
 #if defined (__RECOM_WAVEBANDS)    
-if (RECOM_RADTRANS) then
-if (RECOM_CDOM) then
-    expected_tracer_ids(39) = 1037  ! CDOM
-endif    
-if (RECOM_MARSHALL)then
-    ! + 2(4) MARSHALL related
-    expected_tracer_ids(40) = 1038  ! d1
-    expected_tracer_ids(41) = 1039  ! d1d
-    if (enable_coccos) then
-       expected_tracer_ids(42) = 1040  ! d1c
-       expected_tracer_ids(43) = 1041  ! d1p
-    end if
-endif
-endif
+    if (RECOM_RADTRANS) then
+       if (RECOM_CDOM) then
+          expected_tracer_ids(39) = 1037  ! CDOM
+       endif
+       if (RECOM_MARSHALL)then
+          ! + 2(4) MARSHALL related
+          expected_tracer_ids(40) = 1038  ! d1
+          expected_tracer_ids(41) = 1039  ! d1d
+          if (enable_coccos) then
+             expected_tracer_ids(42) = 1040  ! d1c
+             expected_tracer_ids(43) = 1041  ! d1p
+          end if
+       endif
+    endif
 #endif
     
 
@@ -1071,17 +1071,17 @@ subroutine validate_tracer_id_sequence(tracer_ids, num_tracers, mype)
     expected_ids(37:38) = (/1035, 1036/)
 #if defined (__RECOM_WAVEBANDS)    
 !SL indexing should be better organised    
-if (RECOM_RADTRANS) then
-if (RECOM_CDOM) then
-    expected_ids(39:39) = (/1037/)
-endif    
-if (RECOM_MARSHALL) then
-    expected_ids(40:41) = (/1038, 1039/)
-    if (enable_coccos) then
-       expected_ids(42:43) = (/1040, 1041/)
-    end if
-endif
-endif
+    if (RECOM_RADTRANS) then
+       if (RECOM_CDOM) then
+          expected_ids(39:39) = (/1037/)
+       endif
+       if (RECOM_MARSHALL) then
+          expected_ids(40:41) = (/1038, 1039/)
+          if (enable_coccos) then
+             expected_ids(42:43) = (/1040, 1041/)
+          end if
+       endif
+    endif
 #endif
 
   else if (enable_coccos .and. .not. enable_3zoo2det) then
@@ -2011,7 +2011,7 @@ module REcoM_spectral
 ! tnabp = number of types of absorption spectra for phyto
 !         must match number of types in input data file for phyto absorption spectra
 
-         Integer, parameter                      :: tnabp = 4
+   Integer, parameter                      :: tnabp = 4
 !         PARAMETER (tnabp=2)
 ! Input and assigned data:
 ! pwaves       = actual values of wavebands (nm)
@@ -2098,64 +2098,64 @@ module REcoM_spectral
 
 ! Initially was ap_type(npmax), the number of PT
 
-         Integer,dimension(4)         :: ap_type
-         Integer,parameter            :: tlam = 13
-         Integer,dimension(tlam)      :: pwaves
+   Integer,dimension(4)         :: ap_type
+   Integer,parameter            :: tlam = 13
+   Integer,dimension(tlam)      :: pwaves
 
-         Real(kind=8),dimension(tlam) :: aphy_chl
-         Real(kind=8),dimension(tlam) :: aphy_chl_ps
-         Real(kind=8),dimension(tlam) :: aphy_chl_dia, aphy_chl_cocco
-         Real(kind=8),dimension(tlam) :: aphy_chl_ps_dia, aphy_chl_ps_cocco
-         Real(kind=8),dimension(tlam) :: aphy_chl_phaeo,aphy_chl_ps_phaeo
-         Real(kind=8),dimension(tlam) :: alphachl_nl
-         Real(kind=8),dimension(tlam) :: alphachl_nl_dia
-         Real(kind=8),dimension(tlam) :: WtouEins
-         Real(kind=8),dimension(tnabp,tlam) :: ap
-         Real(kind=8),dimension(tnabp,tlam) :: ap_ps
-         Real(kind=8),dimension(tnabp,tlam) :: bp
-         Real(kind=8),dimension(tnabp,tlam) :: bbp
-         Real(kind=8),dimension(tlam) :: aw
-         Real(kind=8),dimension(tlam) :: bw
-         Real(kind=8),dimension(tlam) :: wb_width
-         Real(kind=8)                 :: wb_totalWidth
-         Real(kind=8),dimension(tlam) :: sf
+   Real(kind=8),dimension(tlam) :: aphy_chl
+   Real(kind=8),dimension(tlam) :: aphy_chl_ps
+   Real(kind=8),dimension(tlam) :: aphy_chl_dia, aphy_chl_cocco
+   Real(kind=8),dimension(tlam) :: aphy_chl_ps_dia, aphy_chl_ps_cocco
+   Real(kind=8),dimension(tlam) :: aphy_chl_phaeo,aphy_chl_ps_phaeo
+   Real(kind=8),dimension(tlam) :: alphachl_nl
+   Real(kind=8),dimension(tlam) :: alphachl_nl_dia
+   Real(kind=8),dimension(tlam) :: WtouEins
+   Real(kind=8),dimension(tnabp,tlam) :: ap
+   Real(kind=8),dimension(tnabp,tlam) :: ap_ps
+   Real(kind=8),dimension(tnabp,tlam) :: bp
+   Real(kind=8),dimension(tnabp,tlam) :: bbp
+   Real(kind=8),dimension(tlam) :: aw
+   Real(kind=8),dimension(tlam) :: bw
+   Real(kind=8),dimension(tlam) :: wb_width
+   Real(kind=8)                 :: wb_totalWidth
+   Real(kind=8),dimension(tlam) :: sf
 !sl         Real(kind=8)                 :: QYmax
 !sl         Real(kind=8)                 :: QYmax_d
 !sl if (RECOM_CALC_ACDOM) then
-         Real(kind=8)                 :: darwin_Sdom          ! used in acdom calculations
-         Real(kind=8)                 :: darwin_lambda_aCDOM  ! wavelength where aCDOM is given
-         Real(kind=8),dimension(tlam) :: excdom               ! CDOM exponent
-         Real(kind=8)                 :: cdomcoeff            ! specific CDOM absorption
-         Integer                      :: nlaCDOM              ! nl number where aCDOM is given used in acdom calculations
+   Real(kind=8)                 :: darwin_Sdom          ! used in acdom calculations
+   Real(kind=8)                 :: darwin_lambda_aCDOM  ! wavelength where aCDOM is given
+   Real(kind=8),dimension(tlam) :: excdom               ! CDOM exponent
+   Real(kind=8)                 :: cdomcoeff            ! specific CDOM absorption
+   Integer                      :: nlaCDOM              ! nl number where aCDOM is given used in acdom calculations
 !sl if (RECOM_CDOM) then
-         Real(kind=8)                 :: darwin_aCDOM_fac     ! ratio of aCDOM to (aphy+aw) at darwin_lambda_aCDOM
+   Real(kind=8)                 :: darwin_aCDOM_fac     ! ratio of aCDOM to (aphy+aw) at darwin_lambda_aCDOM
 !sl endif
 !sl else
-         Real(kind=8),dimension(tlam) :: acdom
+   Real(kind=8),dimension(tlam) :: acdom
 !sl endif
 !sl if (RECOM_CALC_APART) then
-         Real(kind=8)                 :: darwin_Sapar          ! used in aPart calculations
-         Real(kind=8)                 :: darwin_lambda_aPart   ! wavelength where aPart is given
-         Real(kind=8),dimension(tlam) :: exapar                ! aPart exponent
-         Real(kind=8)                 :: aparcoeff             ! specific Particles absorption
-         Integer                      ::nlaAPAR                ! nl number where aPart is given used in aPart calculations
-         Real(kind=8)                 :: darwin_Sbpar          ! used in bPart calculations
-         Real(kind=8)                 :: darwin_lambda_bPart   ! wavelength where bPart is given
-         Real(kind=8),dimension(tlam) :: exbpar                ! bPart exponent
-         Real(kind=8)                 :: bparcoeff             ! specific Particles scatter
-         Integer                      :: nlaBPAR                ! nl number where bPart is given used in bPart calculations
-         Real(kind=8)                 :: bb_to_b               ! backscatter to total scatter ratio
+   Real(kind=8)                 :: darwin_Sapar          ! used in aPart calculations
+   Real(kind=8)                 :: darwin_lambda_aPart   ! wavelength where aPart is given
+   Real(kind=8),dimension(tlam) :: exapar                ! aPart exponent
+   Real(kind=8)                 :: aparcoeff             ! specific Particles absorption
+   Integer                      ::nlaAPAR                ! nl number where aPart is given used in aPart calculations
+   Real(kind=8)                 :: darwin_Sbpar          ! used in bPart calculations
+   Real(kind=8)                 :: darwin_lambda_bPart   ! wavelength where bPart is given
+   Real(kind=8),dimension(tlam) :: exbpar                ! bPart exponent
+   Real(kind=8)                 :: bparcoeff             ! specific Particles scatter
+   Integer                      :: nlaBPAR                ! nl number where bPart is given used in bPart calculations
+   Real(kind=8)                 :: bb_to_b               ! backscatter to total scatter ratio
 !sl else
-         Real(kind=8),dimension(tlam) :: apart
-         Real(kind=8),dimension(tlam) :: bpart
-         Real(kind=8),dimension(tlam) :: bbpart
-         Real(kind=8),dimension(tlam) :: apart_P
-         Real(kind=8),dimension(tlam) :: bpart_P
-         Real(kind=8),dimension(tlam) :: bbpart_P
-         Real(kind=8)                 :: darwin_part_size_P
+   Real(kind=8),dimension(tlam) :: apart
+   Real(kind=8),dimension(tlam) :: bpart
+   Real(kind=8),dimension(tlam) :: bbpart
+   Real(kind=8),dimension(tlam) :: apart_P
+   Real(kind=8),dimension(tlam) :: bpart_P
+   Real(kind=8),dimension(tlam) :: bbpart_P
+   Real(kind=8)                 :: darwin_part_size_P
 !sl endif
 !sl if (RECOM_CALC_REFLEC) then
-         Integer                      :: darwin_diag_acdom_ilam    ! waveband to write to diagnostic
+   Integer                      :: darwin_diag_acdom_ilam    ! waveband to write to diagnostic
 !sl endif
 
 !sl if (RECOM_RADTRANS) then
@@ -2184,9 +2184,9 @@ module REcoM_spectral
 !     &      ,darwin_radtrans_kmax
 !     &      ,darwin_radtrans_niter
 
-      Integer                      :: darwin_PAR_ilamLo, darwin_PAR_ilamHi
-      Integer                      :: darwin_radtrans_kmax
-      Integer, parameter           :: darwin_radtrans_niter = -2
+   Integer                      :: darwin_PAR_ilamLo, darwin_PAR_ilamHi
+   Integer                      :: darwin_radtrans_kmax
+   Integer, parameter           :: darwin_radtrans_niter = -2
 !      COMMON /DARWIN_RADTRANS_PARM_R/
 !     &       darwin_radmodThresh, darwin_Dmax,
 !     &       darwin_rmus, darwin_rmuu,
@@ -2194,12 +2194,12 @@ module REcoM_spectral
 !     &       darwin_bbphy,
 !     &       darwin_bbmin
 
-      Real(kind=8)                  :: darwin_radmodThresh
-      Real(kind=8)                  :: darwin_Dmax
-      Real(kind=8)                  :: darwin_rmus, darwin_rmuu
-      Real(kind=8)                  :: darwin_bbw
-      Real(kind=8)                  :: darwin_bbphy(tnabp)
-      Real(kind=8)                  :: darwin_bbmin
+   Real(kind=8)                  :: darwin_radmodThresh
+   Real(kind=8)                  :: darwin_Dmax
+   Real(kind=8)                  :: darwin_rmus, darwin_rmuu
+   Real(kind=8)                  :: darwin_bbw
+   Real(kind=8)                  :: darwin_bbphy(tnabp)
+   Real(kind=8)                  :: darwin_bbmin
 
 ! dependent/hardcoded parameters:
 !
@@ -2220,36 +2220,36 @@ module REcoM_spectral
 ! SOME OF THESE parameter names are the same as WAVEBANDS, but have an added k dimension....
 ! the params aw, bw are only temporary in wavebands_1d .:. CHANGE THEM in WAVEBANDS_1D to something else
 ! this list mostly from light.F
-      Real(kind=8)                  ::  pid, rad       !radias and pi - use these rather than darwin versions for simplicity.
-      Real(kind=8),dimension(tlam)  ::  bphy_chl       !scat coef for phyto
-      Real(kind=8),dimension(tlam)  ::  bbphy_chl      !backscat coef for phyto
-      Real(kind=8),dimension(tlam)  ::  bphy_chl_dia   !scat coef for diatoms
-      Real(kind=8),dimension(tlam)  ::  bbphy_chl_dia  !backscat coef for diatoms
-      Real(kind=8),dimension(tlam)  ::  bphy_chl_cocco   !scat coef for cocco
-      Real(kind=8),dimension(tlam)  ::  bbphy_chl_cocco  !backscat coef for cocco
-      Real(kind=8),dimension(tlam)  ::  bphy_chl_phaeo   !scat coef for phaeo
-      Real(kind=8),dimension(tlam)  ::  bbphy_chl_phaeo  !backscat coef for phaeo      
+   Real(kind=8)                  ::  pid, rad       !radias and pi - use these rather than darwin versions for simplicity.
+   Real(kind=8),dimension(tlam)  ::  bphy_chl       !scat coef for phyto
+   Real(kind=8),dimension(tlam)  ::  bbphy_chl      !backscat coef for phyto
+   Real(kind=8),dimension(tlam)  ::  bphy_chl_dia   !scat coef for diatoms
+   Real(kind=8),dimension(tlam)  ::  bbphy_chl_dia  !backscat coef for diatoms
+   Real(kind=8),dimension(tlam)  ::  bphy_chl_cocco   !scat coef for cocco
+   Real(kind=8),dimension(tlam)  ::  bbphy_chl_cocco  !backscat coef for cocco
+   Real(kind=8),dimension(tlam)  ::  bphy_chl_phaeo   !scat coef for phaeo
+   Real(kind=8),dimension(tlam)  ::  bbphy_chl_phaeo  !backscat coef for phaeo      
 !sl end   !/* RECOM_RADTRANS */
 
 !!-----------------------------------------------------------------------------
 !! *** CDOM ***
 !sl if (RECOM_CDOM) then
-  Real(kind=8)  :: fcdom          = 0.02  ! [1]   fraction of DOC production that is CDOM
-  Real(kind=8)  :: rho_cdom       = 0.003 ! [1/d] degradation rate of CDOM
-  Real(kind=8)  :: phot_cdom      = 0.167 ! [1/d] photochemical degradation rate CDOM
-  Real(kind=8)  :: kphot_cdom     = 13.51 ! [W/m?~F2 in PAR range], converted from
+   Real(kind=8)  :: fcdom          = 0.02  ! [1]   fraction of DOC production that is CDOM
+   Real(kind=8)  :: rho_cdom       = 0.003 ! [1/d] degradation rate of CDOM
+   Real(kind=8)  :: phot_cdom      = 0.167 ! [1/d] photochemical degradation rate CDOM
+   Real(kind=8)  :: kphot_cdom     = 13.51 ! [W/m?~F2 in PAR range], converted from
 !sl endif
 !SL  Integer       :: tlam = 13
 !find a place to specify that tlam = 13 
 ! think of whether it is the right plase to declare
-  Real(kind=8)  :: alpha_mean
-  Real(kind=8)  :: alpha_mean_dia
+   Real(kind=8)  :: alpha_mean
+   Real(kind=8)  :: alpha_mean_dia
 
 contains
 !BOP
 !     !ROUTINE: WAVEBANDS_INIT_FIXED
 !     !INTERFACE:
-       subroutine wavebands_init_fixed(myThid)
+  subroutine wavebands_init_fixed(myThid)
 
 !     !DESCRIPTION: \bv
 !     *==========================================================*
@@ -2259,7 +2259,7 @@ contains
 !     \ev
 
 !     !USES:
-       implicit none
+    implicit none
 !sl#if defined (__RECOM_WAVEBANDS)
 !     == Global variables ===
 !#include "SIZE.h"
@@ -2274,7 +2274,7 @@ contains
 !     !INPUT/OUTPUT PARAMETERS:
 !     == Routine arguments ==
 !     myThid     :: my Thread Id number
-      integer :: myThid
+    integer :: myThid
 !EOP
 
 !#ifdef RECOM_WAVEBANDS
