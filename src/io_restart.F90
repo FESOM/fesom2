@@ -514,11 +514,12 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
   ! Calculate current time from clock (seconds from beginning of year)
   ctime = timeold + (dayold - 1.0_WP) * 86400.0_WP
   
-  ! Check whether restart will be written
-  ! Always force a restart at the end of the run segment (istep==ntotal) to ensure
-  ! the clock file and restart files are up to date for the next segment, even when
-  ! short segments cross year boundaries without aligning with the restart schedule.
-  is_portable_restart_write = is_due(trim(restart_length_unit), restart_length, istep) .OR. (istep==ntotal)
+  ! Check whether portable (NetCDF) restart will be written
+  if(restart_length_unit /= "off") then
+    is_portable_restart_write = is_due(trim(restart_length_unit), restart_length, istep) .OR. (istep==ntotal)
+  else
+    is_portable_restart_write = .false.
+  end if
 
   ! Should write core dump restart?
   ! Gate the segment-end fallback on the raw restart being configured at all;
