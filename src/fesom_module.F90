@@ -788,7 +788,14 @@ contains
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("restart")
 #endif
-        call write_initial_conditions(n, nstart, ntotal, f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        ! Pass f%total_nsteps (namelist run length) as the segment-end marker
+        ! rather than the runloop-chunk end (ntotal). In standalone FESOM they
+        ! are identical (fesom_runloop is called once with all steps), so the
+        ! year-boundary fix from PR #880 still fires. Under __ifsinterface,
+        ! fesom_runloop is called per IFS coupling step with a small chunk, so
+        ! ntotal == istep on every call; using it as the segment-end marker
+        ! would force a restart every coupling timestep.
+        call write_initial_conditions(n, nstart, f%total_nsteps, f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("restart")
 #endif
