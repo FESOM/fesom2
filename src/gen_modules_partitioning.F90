@@ -85,6 +85,7 @@ subroutine par_init(partit)    ! initializes MPI
 end subroutine par_init
 !=================================================================
 subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
+  use iso_fortran_env, only: output_unit, error_unit
   use MOD_PARTIT
 
 ! In case we are letting oasis orchestrate MPI, we need to shut down through
@@ -107,7 +108,10 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
   integer, optional, intent(in)   :: abort
   integer                         :: error
 
- 
+  ! flush stdout and stderr so that error messages are visible before MPI_ABORT
+  flush(output_unit)
+  flush(error_unit)
+
 ! For standalone runs we
 ! when there is error par_ex should be called with abort argument to abort abruptly,
 ! in all other cases model will be finalized here, call the MPI_barrier and MPI_finalize
