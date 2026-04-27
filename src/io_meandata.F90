@@ -2390,6 +2390,7 @@ end subroutine
 subroutine write_mean(entry, entry_index)
     use mod_mesh
     use io_gather_module
+    use diagnostics, only: std_dens_N
     implicit none
     type(Meandata), intent(inout) :: entry
     integer, intent(in) :: entry_index
@@ -2431,7 +2432,7 @@ subroutine write_mean(entry, entry_index)
                 do k=1, n_own
                   do kk=1, nze; tmp3_r8(kk,k) = entry%local_values_r8_copy(kk, own(k)); end do
                 end do
-                call io_xios_apply_wet_3d_elem_r8(tmp3_r8)
+                if (nze /= std_dens_N) call io_xios_apply_wet_3d_elem_r8(tmp3_r8)
                 call io_xios_send_3d_r8(entry%name, tmp3_r8)
                 deallocate(tmp3_r8)
               end if
@@ -2452,7 +2453,7 @@ subroutine write_mean(entry, entry_index)
                 do k=1, n_own
                   do kk=1, nze; tmp3_r4(kk,k) = entry%local_values_r4_copy(kk, own(k)); end do
                 end do
-                call io_xios_apply_wet_3d_elem_r4(tmp3_r4)
+                if (nze /= std_dens_N) call io_xios_apply_wet_3d_elem_r4(tmp3_r4)
                 call io_xios_send_3d_r4(entry%name, tmp3_r4)
                 deallocate(tmp3_r4)
               end if
@@ -2461,7 +2462,9 @@ subroutine write_mean(entry, entry_index)
             if (entry%accuracy == i_real8) then
               if (entry%glsize(1) == 1) then
                 allocate(tmp2_r8(entry%p_partit%myDim_nod2D))
-                tmp2_r8(:) = entry%local_values_r8_copy(1, 1:entry%p_partit%myDim_nod2D)
+                do k=1, entry%p_partit%myDim_nod2D
+                  tmp2_r8(k) = entry%local_values_r8_copy(1, k)
+                end do
                 if (io_xios_is_ice_field(entry%name)) then
                    call io_xios_apply_ice_mask_2d_r8(tmp2_r8)
                 else
@@ -2472,15 +2475,19 @@ subroutine write_mean(entry, entry_index)
               else
                 nze = size(entry%local_values_r8_copy, 1)
                 allocate(tmp3_r8(nze, entry%p_partit%myDim_nod2D))
-                tmp3_r8(:,:) = entry%local_values_r8_copy(:, 1:entry%p_partit%myDim_nod2D)
-                call io_xios_apply_wet_3d_r8(tmp3_r8)
+                do k=1, entry%p_partit%myDim_nod2D
+                  do kk=1, nze; tmp3_r8(kk,k) = entry%local_values_r8_copy(kk, k); end do
+                end do
+                if (nze /= std_dens_N) call io_xios_apply_wet_3d_r8(tmp3_r8)
                 call io_xios_send_3d_r8(entry%name, tmp3_r8)
                 deallocate(tmp3_r8)
               end if
             else
               if (entry%glsize(1) == 1) then
                 allocate(tmp2_r4(entry%p_partit%myDim_nod2D))
-                tmp2_r4(:) = entry%local_values_r4_copy(1, 1:entry%p_partit%myDim_nod2D)
+                do k=1, entry%p_partit%myDim_nod2D
+                  tmp2_r4(k) = entry%local_values_r4_copy(1, k)
+                end do
                 if (io_xios_is_ice_field(entry%name)) then
                    call io_xios_apply_ice_mask_2d_r4(tmp2_r4)
                 else
@@ -2491,8 +2498,10 @@ subroutine write_mean(entry, entry_index)
               else
                 nze = size(entry%local_values_r4_copy, 1)
                 allocate(tmp3_r4(nze, entry%p_partit%myDim_nod2D))
-                tmp3_r4(:,:) = entry%local_values_r4_copy(:, 1:entry%p_partit%myDim_nod2D)
-                call io_xios_apply_wet_3d_r4(tmp3_r4)
+                do k=1, entry%p_partit%myDim_nod2D
+                  do kk=1, nze; tmp3_r4(kk,k) = entry%local_values_r4_copy(kk, k); end do
+                end do
+                if (nze /= std_dens_N) call io_xios_apply_wet_3d_r4(tmp3_r4)
                 call io_xios_send_3d_r4(entry%name, tmp3_r4)
                 deallocate(tmp3_r4)
               end if
