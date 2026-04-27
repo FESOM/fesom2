@@ -200,17 +200,19 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     ! 1. bolus velocities are computed according to GM implementation after R. Ferrari et al., 2010
     ! 2. bolus velocities are used only for advecting tracers and shall be subtracted back afterwards
     if (Fer_GM) then
-!$OMP PARALLEL DO
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, node)
+!$OMP DO
         do elem=1, myDim_elem2D+eDim_elem2D
            UV(:, :, elem)    =UV(:, :, elem) + fer_UV(:, :, elem)
         end do
-!$OMP END PARALLEL DO
-!$OMP PARALLEL DO
+!$OMP END DO
+!$OMP DO
         do node=1, myDim_nod2D+eDim_nod2D
            Wvel_e(:, node)=Wvel_e(:, node)+fer_Wvel(:, node)
            Wvel  (:, node)=Wvel  (:, node)+fer_Wvel(:, node)
         end do
-!$OMP END PARALLEL DO
+!$OMP END DO
+!$OMP END PARALLEL
     end if
 
     ! Set advective and diffusive components of total tracer fluxes to zero
@@ -329,17 +331,19 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! subtract the the bolus velocities back from 3D velocities:
     if (Fer_GM) then
-!$OMP PARALLEL DO
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, node)
+!$OMP DO
         do elem=1, myDim_elem2D+eDim_elem2D
            UV(:, :, elem)    =UV(:, :, elem) - fer_UV(:, :, elem)
         end do
-!$OMP END PARALLEL DO
-!$OMP PARALLEL DO
+!$OMP END DO
+!$OMP DO
         do node=1, myDim_nod2D+eDim_nod2D
            Wvel_e(:, node)=Wvel_e(:, node)-fer_Wvel(:, node)
            Wvel  (:, node)=Wvel  (:, node)-fer_Wvel(:, node)
         end do
-!$OMP END PARALLEL DO
+!$OMP END DO
+!$OMP END PARALLEL
     end if
     
     ! TODO: do it only when it is coupled to atmosphere 

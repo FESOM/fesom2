@@ -3348,7 +3348,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 #if defined (FESOM_PROFILING)
     use fesom_profiler
 #endif
-    
+
     IMPLICIT NONE
     integer       , intent(in)            :: n
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -3498,13 +3498,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         call calc_cvmix_tidal(partit, mesh)
         
     end if
-#endif    
+#endif
     t1=MPI_Wtime()
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("oce_mix_pres")
     call fesom_profiler_start("oce_dyn_momentum")
-#endif    
-    
+#endif
+
     !___________________________________________________________________________
     ! add contribution from momentum advection, coriolis and pressure gradient |
     ! force to UV_rhs
@@ -3603,7 +3603,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
             call impl_vert_visc_ale(dynamics,partit, mesh)
         else
             call impl_vert_visc_ale_vtransp(dynamics, partit, mesh)
-        end if 
+        end if
     end if
     
     !___________________________________________________________________________
