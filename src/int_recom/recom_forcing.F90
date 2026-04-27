@@ -281,38 +281,32 @@ endif
        if (RECOM_CALC_ACDOM) then
 !------------ COMPUTE ACDOM_k  ----------------------------------
           if (RECOM_CDOM) then
-             call MONOD_ACDOM(Nr,cdom_k(1:Nr),                       &
-                         acdom_k(1:Nr,1:tlam),                  &
-                         myThid)
+             call MONOD_ACDOM_CDOM(Nr,cdom_k(1:Nr),                       &
+                         acdom_k(1:Nr,1:tlam))
           else
              aclocal(1,1:tlam)=aphy_chl
              aclocal(2,1:tlam)=aphy_chl_dia
              aclocal(3,1:tlam)=aphy_chl_cocco
              aclocal(4,1:tlam)=aphy_chl_phaeo
-             call MONOD_ACDOM(Nr,phychl_k(4,1:Nr), aclocal, aw,     &
-                          acdom_k(1:Nr,1:tlam),                 &
-                          myThid)
+             call MONOD_ACDOM_noCDOM(Nr,phychl_k(4,1:Nr), aclocal, aw,     &
+                          acdom_k(1:Nr,1:tlam))
           endif   !/* RECOM_CDOM */
        endif      !/* RECOM_CALC_ACDOM */
 ! ------------ COMPUTE aphy_chl_k & aphy_chl_dia_k ----------------
        if (RECOM_CALC_APHYT .and. RECOM_MARSHALL) then
           call RECOM_APHYTO(Nr,phyD1_k(1:Nr),QYmax,Drel,          & 
                           aphy_chl_ps(1:tlam),aphy_chl(1:tlam), &
-                          aphy_chl_k(1:Nr, 1:tlam),             & 
-                          myThid)
+                          aphy_chl_k(1:Nr, 1:tlam))
           call RECOM_APHYTO(Nr,diaD1_k(1:Nr),QYmax_d,Drel,                &
                           aphy_chl_ps_dia(1:tlam),aphy_chl_dia(1:tlam), &
-                          aphy_chl_dia_k(1:Nr, 1:tlam),                 &
-                          myThid)
+                          aphy_chl_dia_k(1:Nr, 1:tlam))
           if (enable_coccos) then
              call RECOM_APHYTO(Nr, coccoD1_k(1:Nr),QYmax,Drel,               &
                    aphy_chl_ps_cocco(1:tlam),aphy_chl_cocco(1:tlam),    &
-                   aphy_chl_k_cocco(1:Nr, 1:tlam),                      &
-                          myThid)
+                   aphy_chl_k_cocco(1:Nr, 1:tlam))
              call RECOM_APHYTO(Nr, phaeoD1_k(1:Nr),QYmax_d,Drel,             &
                    aphy_chl_ps_phaeo(1:tlam),aphy_chl_phaeo(1:tlam),    &
-                   aphy_chl_phaeo_k(1:Mr, 1:tlam),                      &
-                          myThid)
+                   aphy_chl_phaeo_k(1:Mr, 1:tlam))
           endif
        endif      !/* RECOM_CALC_APHYT */
 ! ------------ GET PART_k FOR WAVEBANDS_3D and RADTRANS ----------------
@@ -553,8 +547,7 @@ endif
                   Eutop(1:tlam,1:Nr),                          &
                   tirrq(1:Nr),                                 &
                   tirrwq(1:tlam,1:Nr),                         &
-                  amp1(1:tlam,1:Nr),amp2(1:tlam,1:Nr),         &
-                  myThid)
+                  amp1(1:tlam,1:Nr),amp2(1:tlam,1:Nr))
 !sl         ELSEIF (darwin_radtrans_niter.EQ.-1) THEN
 !sl           call MONOD_RADTRANS(                                  &
 !sl                    Nr,                                          &
@@ -582,8 +575,7 @@ endif
                   Estop(1:tlam,1:Nr),Eutop(1:tlam,1:Nr),       &
                   tirrq(1:Nr),                                 &
                   tirrwq(1:tlam,1:Nr),                         &
-                  amp1(1:tlam,1:Nr),amp2(1:tlam,1:Nr),         &
-                  myThid)
+                  amp1(1:tlam,1:Nr),amp2(1:tlam,1:Nr))
 
           ENDIF
 !     Uses chl from prev timestep (as wavebands does) keep like this in case

@@ -76,5 +76,16 @@ recom_forcing.F90:
 - at one pooint there was an endif too many
 
 
+26.04.26:
+
+- removed argument mythid from suroutine calls; this is pure MITgcm, not needed at all
+  (affects recom_forcing.F90 and recom_modules.F90).
+
+
+  
+  
+  
+
+
 
 
