@@ -424,25 +424,28 @@ subroutine compute_compart_groupvel(          &
     ! kdot_M2 = (kdot_x_M2, kdot_y_M2)
     
     ! compute: sqrt(omega²-f²)
-    fxa = max(1d-10, omega_compart**2 - coriolis**2 )
+    fxa = sqrt(max(1d-10, omega_compart**2 - coriolis**2 ))
         
     ! 1st part coriolis contribution
     ! compute: c_n/omega/sqrt(omega²-f²)) * f * grad_f 
     ! 2nd part topographic/buoyancy driven contribution
     ! compute: sqrt(omega²-f²)/omega * grad_cn
-    kdot_y = -cn/sqrt(fxa)*coriolis/omega_compart*coriol_grady &
-             -sqrt(fxa)/omega_compart*cn_grady
+    kdot_y = -cn/fxa/omega_compart * coriolis*coriol_grady &
+             -fxa/omega_compart*cn_grady
     !        |
     !        +-> this minus sign is from the -cos(phi)
     !
     
-    kdot_x = sqrt(fxa)/omega_compart*cn_gradx
+    kdot_x = fxa/omega_compart*cn_gradx
     
     !___________________________________________________________________________
     !zonal, meridional and cross-spectral component of M2 internal tide group velocity
-    do fbin_i=2,nfbin-1
+!     do fbin_i=2,nfbin-1
+    do fbin_i=1, nfbin ! --> include ghost cells ofthe periodic boundary
         u_compart(fbin_i) = cg_compart*cos( phit(fbin_i) )
-        v_compart(fbin_i) = cg_compart*sin( phit(fbin_i) ) * coslat 
+        ! Keep coslat to match pyOM2 - need to investigate divergence normalization
+        ! v_compart(fbin_i) = cg_compart*sin( phit(fbin_i) ) * coslat
+        v_compart(fbin_i) = cg_compart*sin( phit(fbin_i) )
         w_compart(fbin_i) = (kdot_y*cos(phiu(fbin_i)) + kdot_x*sin(phiu(fbin_i)) )
     end do
     
@@ -1039,7 +1042,7 @@ subroutine compute_Eiw_waveinteract(  &
     
     !___Local___________________________________________________________________
     integer                                             :: nz, fbini 
-    real(cvmix_r8)                                      :: vint, sint, aM2c, M2_diss, fmin, vint_dbg, small=1.0e-12_cvmix_r8 
+    real(cvmix_r8)                                      :: vint, sint, aM2c, M2_diss, fmin, small=1.0e-12_cvmix_r8 
     type(idemix2_type), pointer                         :: idemix2_const_in     
     
     ! do pointer into save variable or into user defined input variable 
@@ -1075,6 +1078,7 @@ subroutine compute_Eiw_waveinteract(  &
             M2_diss         = aM2c*vint*E_M2_old(fbini)
             M2_diss         = min(M2_diss, E_M2_new(fbini)/max(small,dt))
             E_M2_new(fbini) = E_M2_new(fbini)-dt*M2_diss 
+            E_M2_new(fbini) = max(0.0_cvmix_r8, E_M2_new(fbini))
             if (E_M2_new(fbini)/=E_M2_new(fbini) .or. E_M2_new(fbini)<0.0_cvmix_r8) then 
                 write(*,*) " }-))))°> found negative/NaN E_M2_new from WWI M2", E_M2_new(fbini)
                 write(*,*) "fbini           = ", fbini
@@ -1089,9 +1093,6 @@ subroutine compute_Eiw_waveinteract(  &
         ! update E_iw from E_M2
         do nz = 1, nlev
             fmin = min( 0.5_cvmix_r8/dt,aM2c*vint ) ! flux limiter
-            
-            vint_dbg = E_iw_new(nz)
-            
             E_iw_new(nz) =   E_iw_new(nz) &
                               + dt * tau_M2* sint * E_M2_struct(nz) &
                               + dt * fmin  * sint * E_M2_struct(nz)
@@ -1100,7 +1101,6 @@ subroutine compute_Eiw_waveinteract(  &
                 write(*,*) " }-))))°> found negative/NaN Eiw_new from WWI M2", E_iw_new(nz)
                 write(*,*) "nz              = ", nz
                 write(*,*) "E_iw_new(nz)    = ", E_iw_new(nz)
-                write(*,*) "E_iw_bf(nz)     = ", vint_dbg
                 write(*,*) "E_M2_new        = ", minval(E_M2_new), maxval(E_M2_new)
                 write(*,*) "E_M2_old        = ", minval(E_M2_old), maxval(E_M2_old)
                 write(*,*) "tau_M2          = ", tau_M2
