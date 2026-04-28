@@ -34,7 +34,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
     use g_forcing_arrays
     use g_comm_auto
     use g_support
-#ifdef RECOM_WAVEBANDS    
+#if defined(__RECOM_WAVEBANDS)    
     use REcoM_spectral
 #endif /* RECOM_WAVEBANDS  */    
     implicit none
@@ -67,33 +67,43 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
     real(kind=8),dimension(mesh%nl-1)         :: PAR
 !SL following code lines are added for spectral light
 !SL could be still rearranged later
-#ifdef RECOM_WAVEBANDS
+#if defined(__RECOM_WAVEBANDS)
     !!---- Spectral Light related
     integer :: ilam, Nr
     integer :: iday,iyr,imon,isec,lp,wd,mydate(4)
     INTEGER :: idiscEs,jdiscEs,kdiscEs,ldiscEs
     INTEGER :: idiscEu,jdiscEu,kdiscEu,ldiscEu
+    INTEGER :: myThid
+    INTEGER :: kSurface, hFacC
     real(kind=8)                                  :: solz
+    real(kind=8)                                  :: PARadiation ! we have to fine fesom-recom analogue
     Real(kind=8),dimension(tlam)                  :: PARwup
     Real(kind=8),dimension(tlam)                  :: PARwdn
     Real(kind=8),dimension(tlam,mesh%nl-1)        :: PARw_k ! or (mesh%nl-1,tlam)
-    Real(kind=8),dimension(mesh%nl-1)             :: PARl
+    Real(kind=8),dimension(tlam,mesh%nl-1)        :: PARwlocal
+    Real(kind=8),dimension(mesh%nl-1)             :: PARl, PARlocal
     Real(kind=8),dimension(tlam)                  :: PARwup_diag
     Real(kind=8)                                  :: PARwup_total
     Real(kind=8),dimension(tlam)                  :: Edwsf
     Real(kind=8),dimension(tlam)                  :: Eswsf
-#ifdef RECOM_CALC_REFLEC
+!#ifdef RECOM_CALC_REFLEC
     INTEGER :: index
     Real(kind=8),dimension(mesh%nl-1)             :: PARw_kwb
-#endif /* RECOM_CALC_REFLEC */
+!#endif /* RECOM_CALC_REFLEC */
     Real(kind=8),dimension(tlam)                  :: C_phot_nl
     Real(kind=8),dimension(tlam)                  :: C_phot_nl_dia
+        Real(kind=8),dimension(tlam)              :: C_phot_nl_cocco
+    Real(kind=8),dimension(tlam)                  :: C_phot_nl_phaeo
     Real(kind=8),dimension(tlam)                  :: Ek_nl
     Real(kind=8),dimension(tlam)                  :: Ek_nl_dia
+    Real(kind=8),dimension(tlam)                  :: Ek_nl_cocco
+    Real(kind=8),dimension(tlam)                  :: Ek_nl_phaeo
     Real(kind=8),dimension(mesh%nl-1,tlam)        :: a_k
     Real(kind=8),dimension(mesh%nl-1,tlam)        :: acdom_k
     Real(kind=8),dimension(mesh%nl-1,tlam)        :: aphy_chl_k
     Real(kind=8),dimension(mesh%nl-1,tlam)        :: aphy_chl_dia_k
+    Real(kind=8),dimension(mesh%nl-1,tlam)        :: aphy_chl_cocco_k
+    Real(kind=8),dimension(mesh%nl-1,tlam)        :: aphy_chl_phaeo_k
     Real(kind=8),dimension(mesh%nl-1,tlam)        :: apart_k
     Real(kind=8),dimension(mesh%nl-1,tlam)        :: actot
 !    Real(kind=8),dimension(2,tlam)                :: aclocal
@@ -108,13 +118,15 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
 !    Real(kind=8),dimension(2,mesh%nl-1)           :: phychl_k
     Real(kind=8),dimension(4,mesh%nl-1)           :: Phy_k
     Real(kind=8),dimension(4,mesh%nl-1)           :: phychl_k
-    if (RECOM_CDOM) then
+!SLO    if (RECOM_CDOM) then
     Real(kind=8),dimension(mesh%nl-1)             :: cdom_k
-    endif  !/* RECOM_CDOM */
-    if (RECOM_CALC_APHYT=.true. .and. RECOM_MARSHALL=.true.) then
+!SLO    endif  !/* RECOM_CDOM */
+!SLO    if (RECOM_CALC_APHYT .and. RECOM_MARSHALL) then        
     Real(kind=8),dimension(mesh%nl-1)             :: phyD1_k
     Real(kind=8),dimension(mesh%nl-1)             :: diaD1_k
-    endif  !/* defined(RECOM_CALC_APHYT) && defined(RECOM_MARSHALL)*/
+    Real(kind=8),dimension(mesh%nl-1)             :: coccoD1_k
+    Real(kind=8),dimension(mesh%nl-1)             :: phaeoD1_k
+!SLO    endif  !/* (RECOM_CALC_APHYT) && (RECOM_MARSHALL)*/
 ! for diagnostics
     Real(kind=8),dimension(mesh%nl-1)             :: a_kave
     Real(kind=8),dimension(mesh%nl-1)             :: acdom_kave
@@ -125,13 +137,13 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
     Real(kind=8),dimension(tlam)                  :: acdom_ksur
     Real(kind=8),dimension(tlam)                  :: apart_ksur
     Real(kind=8),dimension(tlam)                  :: actot_sur
-    if (RECOM_CALC_REFLEC) then
+!SLO    if (RECOM_CALC_REFLEC) then
     Real(kind=8),dimension(mesh%nl-1)             :: a_kwb
     Real(kind=8),dimension(mesh%nl-1)             :: acdom_kwb
     Real(kind=8),dimension(mesh%nl-1)             :: apart_kwb
     Real(kind=8),dimension(mesh%nl-1)             :: actot_wb
-    endif   !/* RECOM_CALC_REFLEC */
-    if (RECOM_RADTRANS) then
+!SLO    endif   !/* RECOM_CALC_REFLEC */
+!SLO    if (RECOM_RADTRANS) then
     Real(kind=8),dimension(mesh%nl-1,tlam)        :: bt_k
     Real(kind=8),dimension(mesh%nl-1,tlam)        :: bb_k
     Real(kind=8),dimension(mesh%nl-1,tlam)        :: bpart_k
@@ -147,12 +159,13 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
     Real(kind=8),dimension(tlam,mesh%nl-1)     :: tirrwq   ! or (tlam, mesh%nl-1)
     Real(kind=8),dimension(tlam,mesh%nl-1)     :: amp1     ! or (tlam, mesh%nl-1)
     Real(kind=8),dimension(tlam,mesh%nl-1)     :: amp2     ! or (tlam, mesh%nl-1)
-    Real(kind=8),dimension(mesh%nl-1)             :: rmud
+!sl    Real(kind=8),dimension(mesh%nl-1)             :: rmud
+    Real(kind=8)                                  :: rmud
     Real(kind=8)                                  :: rn=1.341d0     !refractive index of seawater
     Real(kind=8)                                  :: sinszaw
     Real(kind=8)                                  :: szaw
     Real(kind=8)                                  :: rmudl
-    Real(kind=8)                                  :: rn
+!sl    Real(kind=8)                                  :: rn
 !  only for diagnostics
     Real(kind=8),dimension(mesh%nl-1)          :: bt_kave
     Real(kind=8),dimension(mesh%nl-1)          :: bpart_kave
@@ -169,7 +182,9 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
     Real(kind=8),dimension(tlam)        :: bb_ksur
     Real(kind=8),dimension(tlam)        :: bbpart_ksur
     Real(kind=8),dimension(tlam)        :: bbctot_sur
-    if (RECOM_CALC_REFLEC) then
+!oasim to futher work on (module?)
+    Real(kind=8),dimension(tlam)        :: oasim_ed, oasim_es
+!SLO    if (RECOM_CALC_REFLEC) then
     Real(kind=8),dimension(mesh%nl-1)             :: bt_kwb
     Real(kind=8),dimension(mesh%nl-1)             :: bpart_kwb
     Real(kind=8),dimension(mesh%nl-1)             :: bctot_wb
@@ -183,8 +198,8 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
     Real(kind=8),dimension(mesh%nl-1)             :: Eutop_wb
     Real(kind=8),dimension(mesh%nl-1)             :: amp1_wb
     Real(kind=8),dimension(mesh%nl-1)             :: amp2_wb
-    endif !/* RECOM_CALC_REFLEC */
-    endif !/* RADTRANS */
+!SLO    endif !/* RECOM_CALC_REFLEC */
+!SLO    endif !/* RADTRANS */
 !if (enable_coccos) then
 !! remember to introduce and declare new _cocco and _phaeo related
 !endif
@@ -251,7 +266,7 @@ endif
 
 !------------SPECTRAL LIGHT--------------------------------------------
 !======================================================================
-#ifdef RECOM_WAVEBANDS
+#if defined(__RECOM_WAVEBANDS)
        Nr = mesh%nl-1
        idiscEs = 0
        jdiscEs = 0
@@ -265,19 +280,19 @@ endif
        discEu = 0.
 ! ------ GET constant acdom_k -------
      DO k=1,Nr
-     if (RECOM_CALC_ACDOM =.false.) then
+     if (.not. RECOM_CALC_ACDOM) then
        do ilam = 1,tlam
         acdom_k(k,ilam) = acdom(ilam)
        enddo
      endif      !/* no RECOM_CALC_ACDOM */
 ! ------ GET constant aphy_chl_k & aphy_chl_dia_k -------
-     if (RECOM_CALC_APHYT =.false.) then
+     if (.not. RECOM_CALC_APHYT) then
        do ilam = 1,tlam
         aphy_chl_k(k,ilam) = aphy_chl(ilam)
         aphy_chl_dia_k(k,ilam) = aphy_chl_dia(ilam)
        enddo
-      ENDDO
       endif     !/* no RECOM_CALC_APHYT */
+     ENDDO
      if (RECOM_CALC_ACDOM) then
 !------------ COMPUTE ACDOM_k  ----------------------------------
         if (RECOM_CDOM) then
@@ -289,13 +304,13 @@ endif
         aclocal(2,1:tlam)=aphy_chl_dia
         aclocal(3,1:tlam)=aphy_chl_cocco
         aclocal(4,1:tlam)=aphy_chl_phaeo
-         call MONOD_ACDOM(Nr,phychl_k(4,1:Nr), aclocal, aw,     &
+         call MONOD_no_ACDOM(Nr,phychl_k(4,1:Nr), aclocal, aw,     &
                           acdom_k(1:Nr,1:tlam),                 &
                           myThid)
         endif   !/* RECOM_CDOM */
      endif      !/* RECOM_CALC_ACDOM */
 ! ------------ COMPUTE aphy_chl_k & aphy_chl_dia_k ----------------
-     if (RECOM_CALC_APHYT =.true. .and. RECOM_MARSHALL=.true.) then
+     if (RECOM_CALC_APHYT .and. RECOM_MARSHALL) then        
         call RECOM_APHYTO(Nr,phyD1_k(1:Nr),QYmax,Drel,          & 
                           aphy_chl_ps(1:tlam),aphy_chl(1:tlam), &
                           aphy_chl_k(1:Nr, 1:tlam),             & 
@@ -307,11 +322,11 @@ endif
 if (enable_coccos) then
         call RECOM_APHYTO(Nr, coccoD1_k(1:Nr),QYmax,Drel,               &
                    aphy_chl_ps_cocco(1:tlam),aphy_chl_cocco(1:tlam),    &
-                   aphy_chl_k_cocco(1:Nr, 1:tlam),                      &
+                   aphy_chl_cocco_k(1:Nr, 1:tlam),                      &
                           myThid)
         call RECOM_APHYTO(Nr, phaeoD1_k(1:Nr),QYmax_d,Drel,             &
                    aphy_chl_ps_phaeo(1:tlam),aphy_chl_phaeo(1:tlam),    &
-                   aphy_chl_phaeo_k(1:Mr, 1:tlam),                      &
+                   aphy_chl_phaeo_k(1:Nr, 1:tlam),                      &
                           myThid)
 endif
      endif      !/* RECOM_CALC_APHYT */
@@ -332,7 +347,7 @@ endif
          endif
       else
       apart_k(k,ilam) = part_k(k)*apart_P(ilam)
-         if (RECOM_RADTRANS)
+         if (RECOM_RADTRANS) then
          bpart_k(k,ilam) = part_k(k)*bpart_P(ilam)
          bbpart_k(k,ilam) = part_k(k)*bbpart_P(ilam)
          endif
@@ -341,13 +356,15 @@ endif
        ENDDO    !ilam
 !C ------------- GET SPECTRAL LIGHT -----------------
        do ilam = 1,tlam
-          if (OASIM)
+          if (OASIM) then
 ! add direct and diffuse, convert to uEin/m2/s/nm
           Edwsf(ilam) = oasim_ed(ilam) ! * 1000
           Eswsf(ilam) = oasim_es(ilam) ! * 1000
           PARwup(ilam) = WtouEins(ilam) * (Edwsf(ilam)                   &
                                + Eswsf(ilam))
           else
+!SL: DOUBLE CHAECK WHAT EXACTLY SHOULD IT BE                  
+           PARadiation = SurfSW      
 ! sf is per nm; convert to per waveband
           Edwsf(ilam) = wb_width(ilam) * sf(ilam)                        &
                       * PARadiation
@@ -369,17 +386,19 @@ if (RECOM_RADTRANS) then
          rmud = min(rmudl,1.5)
          rmud = max(rmud,0.0)
 end if   
-if (RECOM_RADTRANS =.false.) then
+if (.not. RECOM_RADTRANS) then
 ! ------------ WAVEBANDS W/O RADTRANS ----------------------------------
 !SL drF is thick
 !SL dz_k = drF*hFacC for now lets assume hFacC = 1;  dz_k = thick
 !SL Confirm with Sergey or Dima about the grid design
+!SL !! zNodes !!
 !SL mind kSurface
+         kSurface = one
          dz_k = thick
-         hFacC = 1.d0 
+!SL      hFacC = 1.d0 
          do k=1,Nr
            do ilam = 1,tlam
-               if (hFacC(k).gt.0. _d 0) then
+               if (zNodes(k).gt.0.d0) then
 ! get total attenuation (absorption) by phyto at each wavelength
               actot(k,ilam) = 0.
               actot(k,ilam) = actot(k,ilam)                         &
@@ -400,17 +419,18 @@ endif
            enddo !ilam
 ! find for the midpoint of the gridcell (gridcell mean)
 ! what could it be instead of hFacC dch w.r.t. drF(k)=:thick
+! zNodes ??
            do ilam = 1,tlam
-                   if (hFacC(k).gt.0. _d 0) then
+                   if (zNodes(k).gt.0.d0) then
                    PARw_k(ilam,k)=sqrt(PARwup(ilam)                 &
                           * PARwdn(ilam))
                    else
-                   PARw_k(ilam,k) = 0. _d 0
+                   PARw_k(ilam,k) = 0.d0
                    endif
            enddo
 ! cycle
            do ilam=1,tlam
-                if (hFacC(k).gt.0. _d 0) then
+                if (zNodes(k).gt.0.d0) then
                    PARwup(ilam) = PARwdn(ilam)
                 endif
            enddo   !ilam
@@ -449,7 +469,7 @@ endif
       enddo       !k
 ! iops surface for diagnostics
         DO ilam = 1,tlam
-              IF( dz_k(kSurface) .GT. 0.0 )THEN
+              IF( dz_k(kSurface) .GT. 0.d0)THEN
                 IF(Eswsf(ilam).GE.tiny .OR.            &
                    Edwsf(ilam).GE.tiny ) THEN
              a_ksur(ilam) = a_k(kSurface,ilam)
@@ -647,7 +667,7 @@ endif
              bbpart_kave(k) = bbpart_kave(k) / wb_totalWidth
              bbctot_ave(k) = bbctot_ave(k) / wb_totalWidth
 
-if (RECOM_CALC_REFLEC)
+if (RECOM_CALC_REFLEC) then
              index = darwin_diag_acdom_ilam
              PARw_kwb(k) = PARw_k(index,k)
              a_kwb(k) = a_k(k,index)
@@ -836,21 +856,23 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
         , rhoSW_watercolumn                                            & ! DISS in-situ density of seawater [kg/m3]
         , Loc_slp                                                      &
         , zF, PAR                                                      &
-#ifdef RECOM_WAVEBANDS   
-        ,PARlocal                                                            &
-        ,PARwlocal                                                           &
+#if defined(__RECOM_WAVEBANDS)   
+!sl        ,PARlocal                                                            &
+!sl        ,PARwlocal                                                           &
+        ,PARl                                                                &
+        ,PARw_k                                                              &        
         ,C_phot_nl                                                           &
         ,C_phot_nl_dia                                                       &
-if (enable_coccos) then        
+!slif (enable_coccos) then        
         ,C_phot_nl_cocco                                                     &
         ,C_phot_nl_phaeo                                                     &
-endif                                                        
+!slendif                                                        
         ,Ek_nl                                                               &
-        ,Ek_nl_dia
-if (enable_coccos) then                                                      &
+        ,Ek_nl_dia                                                           &
+!slif (enable_coccos) then                                                   
         ,Ek_nl_cocco                                                         &
-        ,Ek_nl_phaeo
-endif
+        ,Ek_nl_phaeo                                                         &
+!slendif
 #endif        
         , Lond, Latd, ice, dynamics, tracers, partit, mesh)
 
@@ -879,12 +901,12 @@ if (enable_3zoo2det) then
   state(1:nn,imiczooc)  = max(tiny,state(1:nn,imiczooc))
 endif
 
-#ifdef RECOM_WAVEBANDS
+#if defined(__RECOM_WAVEBANDS)
 !SL------CDOM and Marshal related --------------------------
 if (RECOM_CDOM) then
-  state(1:nn,idcdom)  = max(tiny,state(1:nn,idcdom))
+  state(1:nn,icdom)  = max(tiny,state(1:nn,icdom))
 endif
-if (RECOM_CALC_APHYT=.true. .and. RECOM_MARSHALL =.true.)
+if (RECOM_CALC_APHYT .and. RECOM_MARSHALL) then
   state(1:nn,id1)  = max(tiny,state(1:nn,id1)) !rel
   state(1:nn,id1d)  = max(tiny,state(1:nn,id1d)) !rel
 endif

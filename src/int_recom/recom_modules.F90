@@ -89,6 +89,8 @@ module recom_config
   Logical                :: enable_3zoo2det = .false.   ! Control extended zooplankton variables
   Logical                :: enable_coccos = .false.      ! Control coccolithophore variables
   namelist /parecomsetup/ enable_3zoo2det, enable_coccos
+!sl
+  Logical                :: FeLimit = .false.      ! ?? SL
 
 !! *** General configuration ***
 
@@ -509,12 +511,12 @@ module recom_config
                           rho_ref_water, visc_ref_water, w_ref1, w_ref2, depth_scaling1,   &
                           depth_scaling2, max_sinking_velocity
   !------------------------if RECOM_WAVEBANDS--------------------------
-#if defined (__RECOM_WAVEBANDS)  
+#if defined(__RECOM_WAVEBANDS)  
 !! *** General configuration ***
 
   Logical                :: RECOM_CDOM            = .true.
   Logical                :: RECOM_MARSHALL        = .false.
-  Logical                :: RECOM_RADTRANS        = .false.
+  Logical                :: RECOM_RADTRANS        = .true.
   Logical                :: OASIM                 = .false.
   Logical                :: RECOM_CALC_ACDOM      = .false.
   Logical                :: RECOM_CALC_APART      = .false.
@@ -568,13 +570,13 @@ contains
 
 !        allocate(recom_det2_tracer_id(4))
         recom_det2_tracer_id = (/1025, 1026, 1027, 1028/)        
-#if defined (__RECOM_WAVEBANDS)         
-if (RECOM_RADTRANS) then
+#if defined(__RECOM_WAVEBANDS)         
 !SL to be further extend for if cases
 if (RECOM_CDOM) then
         icdom = 37 
         recom_cdom_tracer_id = 1037
 endif    
+if (RECOM_RADTRANS) then
 if (RECOM_MARSHALL) then
         ! MARSHALL related
         id1 = 38
@@ -684,12 +686,12 @@ subroutine validate_recom_tracers(num_tracers, mype)
     ! Additional microzoo: 2 tracers (1035-1036)
     ! Total: 22 + 4 + 6 + 3 + 2 = 36 (actually 22 + 14 = 36)
     expected_bgc_num = 36
-#if defined (__RECOM_WAVEBANDS)    
-if (RECOM_RADTRANS) then
+#if defined(__RECOM_WAVEBANDS)    
 if (RECOM_CDOM) then
     ! + 1 for CDOM 
     expected_bgc_num = 37 
 endif    
+if (RECOM_RADTRANS) then
 if (RECOM_MARSHALL) then
     ! + 2(4) MARSHALL related
     expected_bgc_num = 39 
@@ -768,11 +770,11 @@ endif
     expected_tracer_ids(36) = 1034  ! PhaeoChl
     expected_tracer_ids(37) = 1035  ! Zoo3N
     expected_tracer_ids(38) = 1036  ! Zoo3C
-#if defined (__RECOM_WAVEBANDS)    
-if (RECOM_RADTRANS) then
+#if defined(__RECOM_WAVEBANDS)    
 if (RECOM_CDOM) then
     expected_tracer_ids(39) = 1037  ! CDOM
 endif    
+if (RECOM_RADTRANS) then
 if (RECOM_MARSHALL)then
     ! + 2(4) MARSHALL related
     expected_tracer_ids(40) = 1038  ! d1
@@ -1069,7 +1071,7 @@ subroutine validate_tracer_id_sequence(tracer_ids, num_tracers, mype)
     expected_ids(25:30) = (/1023, 1024, 1025, 1026, 1027, 1028/)
     expected_ids(31:36) = (/1029, 1030, 1031, 1032, 1033, 1034/)
     expected_ids(37:38) = (/1035, 1036/)
-#if defined (__RECOM_WAVEBANDS)    
+#if defined(__RECOM_WAVEBANDS)    
 !SL indexing should be better organised    
 if (RECOM_RADTRANS) then
 if (RECOM_CDOM) then
@@ -1943,7 +1945,7 @@ module REcoM_spectral
   use recom_config      
   implicit none
   save
-#if defined (__RECOM_WAVEBANDS)
+#if defined(__RECOM_WAVEBANDS)
 ! Module REcoM_constants: tracer indices
 !sl  integer :: icdom  ! moved to general recom_module
   Logical :: DAR_NONSPECTRAL_BACKSCATTERING_RATIO =.false.
@@ -1970,10 +1972,22 @@ module REcoM_spectral
    Real(kind=8)                :: k_deg_d              = 8.0e-7    ! Target size for photoinhibition [m^{-2} (J)^{-1}]
    Real(kind=8)                :: r_max_d              = 20.       ! Maximum repair rate [d^{-1}]
    Real(kind=8)                :: k_rep_d              = 0.5       ! half saturation constant for repair, [same as DD1]
+   !sl if cocco
+   Real(kind=8)                :: astar_cocco              = 0.007     ! chlorophyll absortion cross section [m^{-2} (mg CHL)^{-1}]
+   Real(kind=8)                :: k_deg_cocco              = 8.0e-7    ! Target size for photoinhibition [m^{-2} (J)^{-1}]
+   Real(kind=8)                :: r_max_cocco              = 20.       ! Maximum repair rate [d^{-1}]
+   Real(kind=8)                :: k_rep_cocco              = 0.5       ! half saturation constant for repair, [same as DD1]
+   Real(kind=8)                :: astar_phaeo              = 0.007     ! chlorophyll absortion cross section [m^{-2} (mg CHL)^{-1}]
+   Real(kind=8)                :: k_deg_phaeo              = 8.0e-7    ! Target size for photoinhibition [m^{-2} (J)^{-1}]
+   Real(kind=8)                :: r_max_phaeo              = 20.       ! Maximum repair rate [d^{-1}]
+   Real(kind=8)                :: k_rep_phaeo              = 0.5       ! half saturation constant for repair, [same as DD1]   
+   !sl  
 !     photoinhibition
 !#ifndef RECOM_WAVEBANDS
    Real(kind=8)                :: QYmax                = 4.8e-4    ! maximum quantum yield of photosynthesis [mmol C (J)^{-1}]
    Real(kind=8)                :: QYmax_d              = 4.8e-4    ! maximum quantum yield of photosynthesis [mmol C (J)^{-1}]
+   Real(kind=8)                :: QYmax_cocco          = 4.8e-4    ! maximum quantum yield of photosynthesis [mmol C (J)^{-1}]
+   Real(kind=8)                :: QYmax_phaeo          = 4.8e-4    ! maximum quantum yield of photosynthesis [mmol C (J)^{-1}]
 !#endif
 !slendif
 !SL TODO: introduce a related namelist file
@@ -2109,6 +2123,8 @@ module REcoM_spectral
          Real(kind=8),dimension(tlam) :: aphy_chl_phaeo,aphy_chl_ps_phaeo
          Real(kind=8),dimension(tlam) :: alphachl_nl
          Real(kind=8),dimension(tlam) :: alphachl_nl_dia
+         Real(kind=8),dimension(tlam) :: alphachl_nl_cocco
+         Real(kind=8),dimension(tlam) :: alphachl_nl_phaeo
          Real(kind=8),dimension(tlam) :: WtouEins
          Real(kind=8),dimension(tnabp,tlam) :: ap
          Real(kind=8),dimension(tnabp,tlam) :: ap_ps
@@ -2220,7 +2236,8 @@ module REcoM_spectral
 ! SOME OF THESE parameter names are the same as WAVEBANDS, but have an added k dimension....
 ! the params aw, bw are only temporary in wavebands_1d .:. CHANGE THEM in WAVEBANDS_1D to something else
 ! this list mostly from light.F
-      Real(kind=8)                  ::  pid, rad       !radias and pi - use these rather than darwin versions for simplicity.
+      Real(kind=8)                  ::  radd       !radias and pi - use these rather than darwin versions for simplicity.
+      Real(kind=8)                  ::  pid = 3.1415926535897931
       Real(kind=8),dimension(tlam)  ::  bphy_chl       !scat coef for phyto
       Real(kind=8),dimension(tlam)  ::  bbphy_chl      !backscat coef for phyto
       Real(kind=8),dimension(tlam)  ::  bphy_chl_dia   !scat coef for diatoms
@@ -2244,7 +2261,8 @@ module REcoM_spectral
 ! think of whether it is the right plase to declare
   Real(kind=8)  :: alpha_mean
   Real(kind=8)  :: alpha_mean_dia
-
+  Real(kind=8)  :: alpha_mean_cocco
+  Real(kind=8)  :: alpha_mean_phaeo
 contains
 !BOP
 !     !ROUTINE: WAVEBANDS_INIT_FIXED
@@ -2260,14 +2278,14 @@ contains
 
 !     !USES:
        implicit none
-!sl#if defined (__RECOM_WAVEBANDS)
+!sl#if defined(__RECOM_WAVEBANDS)
 !     == Global variables ===
 !#include "SIZE.h"
 !#include "EEPARAMS.h"
 !#include "PARAMS.h"
 !#include "SPECTRAL_SIZE.h"
 !#include "SPECTRAL.h"
-!#ifdef RECOM_WAVEBANDS
+!#if defined(__RECOM_WAVEBANDS)
 !#include "WAVEBANDS_PARAMS.h"
 !#include "RECOM.h"
 !#endif
@@ -2277,7 +2295,7 @@ contains
       integer :: myThid
 !EOP
 
-!#ifdef RECOM_WAVEBANDS
+!#if defined(__RECOM_WAVEBANDS)
 
 !     !LOCAL VARIABLES:
 !     == Local variables ==
@@ -2313,6 +2331,7 @@ contains
 
 !sl      _BEGIN_MASTER(myThid)
       if (myThid == 1) then
+!sl      rad = 180.0D0/pid        
 ! Quanta conversion
       planck = 6.6256d-34   !Plancks constant J sec
       c = 2.998d8                 !speed of light m/sec
@@ -2792,7 +2811,7 @@ endif
 if (RECOM_RADTRANS) then
 !     constants
       pid = DACOS(-1.0D0)
-      rad = 180.0D0/pid
+      radd = 180.0D0/pid
 endif
 
 !sl      _END_MASTER(myThid)
@@ -2809,7 +2828,7 @@ endif
 !     == Global variables ===
 !#include "SIZE.h"
 !#include "SPECTRAL_SIZE.h"
-!#ifdef RECOM_WAVEBANDS
+!#if defined(__RECOM_WAVEBANDS)
 !#include "WAVEBANDS_PARAMS.h"
 !#endif
 !     !INPUT/OUTPUT PARAMETERS:
@@ -2818,7 +2837,7 @@ endif
        INTEGER   :: myThid
 !CEOP
 
-!sl#ifdef RECOM_WAVEBANDS
+!sl#if defined(__RECOM_WAVEBANDS)
 
 !     !FUNCTIONS:
 !      LOGICAL MASTER_CPU_THREAD
@@ -2956,7 +2975,7 @@ endif
 !#include "EEPARAMS.h"
 !#include "PARAMS.h"
 !#include "SPECTRAL_SIZE.h"
-!#ifdef RECOM_WAVEBANDS
+!#if defined(__RECOM_WAVEBANDS)
 !#include "WAVEBANDS_PARAMS.h"
 !#endif
       INTEGER      :: Nn
@@ -2993,14 +3012,58 @@ if (RECOM_CALC_ACDOM) then
 !sl      INTEGER      :: k, np, ilam
 !sl      real(kind=8) ::  actot450, atot450
 
-if (RECOM_CDOM) then
 ! use cdom-like tracer
       do k = 1,Nn  !Nr
        do ilam = 1,tlam
         acdomlocal(k,ilam) = cdomcoeff*cdomlocal(k)*excdom(ilam)
        enddo
       enddo
-else
+endif  !/* RECOM_CALC_ACDOM */
+      RETURN
+  end SUBROUTINE MONOD_ACDOM
+  SUBROUTINE MONOD_no_ACDOM(                                     &
+                             Nn,                                 &
+                             P_chl, aclocal, awlocal,            &
+                             acdomlocal,                         &
+                             myThid )
+      IMPLICIT NONE
+!     === Global variables ===
+!#include "SIZE.h"
+!#include "EEPARAMS.h"
+!#include "PARAMS.h"
+!#include "SPECTRAL_SIZE.h"
+!#if defined(__RECOM_WAVEBANDS)
+!#include "WAVEBANDS_PARAMS.h"
+!#endif
+      INTEGER      :: Nn
+! !INPUT PARAMETERS: ===================================================
+!     P_chl      :: Chlorophyll per species and level
+!     ac         :: absorption spectra for each phtyo (chl normalised)
+!     awlocal    :: absoprtion spectra for water (m-1)
+!     myTime     :: Current time in simulation
+!     myIter     :: Current iteration number in simulation
+!     myThid     :: My Thread Id number
+
+! !OUTPUT PARAMETERS: ==================================================
+!     acdom      :: absortpion spectra for CDOM per level
+      real(kind=8), dimension(4,Nn)    :: P_chl
+      real(kind=8), dimension(4,tlam)  :: aclocal
+      real(kind=8), dimension(tlam  )  :: awlocal
+      real(kind=8), dimension(Nn,tlam) ::acdomlocal
+      INTEGER      :: myThid
+!     !LOCAL VARIABLES:
+!     == Local variables ==
+      INTEGER      :: npmax
+      INTEGER      :: k, np, ilam
+      real(kind=8) ::  actot450, atot450
+!EOP
+if (RECOM_CALC_ACDOM) then
+
+!sl!     !LOCAL VARIABLES:
+!sl!     == Local variables ==
+!sl      INTEGER      :: npmax
+!sl      INTEGER      :: k, np, ilam
+!sl      real(kind=8) ::  actot450, atot450
 ! ANNA moved cdom calculation from WG's light.f
 ! it's done for RADTRANS and WAVEBANDS_3D
       npmax = 2
@@ -3021,10 +3084,10 @@ else
 !    *aw(nl),ac(1,nl),acdom(1,nl)
 !      enddo
 ! ANNA cdom end
-endif  !/* RECOM_CDOM */
 endif  !/* RECOM_CALC_ACDOM */
       RETURN
-  end SUBROUTINE MONOD_ACDOM
+
+  end SUBROUTINE MONOD_no_ACDOM  
 !--------------------- MONOD_RADTRANS_ITER ---------------------------
       subroutine MONOD_RADTRANS_ITER(                                  &
                          Nn,                                           &
@@ -3653,7 +3716,7 @@ endif !/* RECOM_RADTRANS */
 !#include "EEPARAMS.h"
 !#include "PARAMS.h"
 !#include "SPECTRAL_SIZE.h"
-!#ifdef RECOM_WAVEBANDS
+!#if defined(__RECOM_WAVEBANDS)
 !#include "WAVEBANDS_PARAMS.h"
 !C#include "RECOM_PARAMS.h"
 !#endif

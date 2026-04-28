@@ -68,7 +68,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     use g_forcing_arrays, only: press_air, u_wind, v_wind, shortwave
     use g_comm_auto
 
-#if defined (__RECOM_WAVEBANDS)   
+#if defined(__RECOM_WAVEBANDS)   
     use REcoM_spectral
 #endif
 

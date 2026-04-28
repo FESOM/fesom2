@@ -8,21 +8,21 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         , kspc_watercolumn                                                   &
         , rhoSW_watercolumn                                                  &
         , Loc_slp, zF, PAR                                                   &
-#ifdef RECOM_WAVEBANDS   
+#if defined(__RECOM_WAVEBANDS)   
         , PARlocal                                                           &
         , PARwlocal                                                          &
         , C_phot_nl                                                          &
         , C_phot_nl_dia                                                      &
-if (enable_coccos) then
+!slif (enable_coccos) then
         , C_phot_nl_cocco                                                    &
         , C_phot_nl_phaeo                                                    &
-endif
+!slendif
         , Ek_nl                                                              &
         , Ek_nl_dia                                                          &
-if (enable_coccos) then
+!slif (enable_coccos) then
         , Ek_nl_cocco                                                        &
         , Ek_nl_phaeo                                                        &
-endif        
+!slendif        
 #endif        
         , Lond, Latd, ice, dynamics, tracers, partit, mesh)
 
@@ -48,7 +48,7 @@ endif
     use mvars
     use mdepth2press                                   
     use gsw_mod_toolbox, only: gsw_sa_from_sp,gsw_ct_from_pt,gsw_rho
-#ifdef RECOM_WAVEBANDS   
+#if defined(__RECOM_WAVEBANDS)   
     use REcoM_spectral
 #endif /* RECOM_WAVEBANDS  */      
 
@@ -83,10 +83,11 @@ endif
     real(kind=8),dimension(mesh%nl)          ,intent(in)    :: zF                   !< [m] Depth of fluxes
     real(kind=8),dimension(mesh%nl-1),intent(inout)         :: PAR
 
-#if defined (__RECOM_WAVEBANDS)
+#if defined(__RECOM_WAVEBANDS)
 !     spectral PAR is used to compute specral CPhot
 !     all the other variables are used in forcing and just pass to sms to be exported      
-    integer, parameter                                      :: tlam=13
+!    integer, parameter                                      :: tlam=13
+    real(kind=8),parameter                                  :: c1 = 1.0d0
     real(kind=8),dimension(mesh%nl-1)                       :: PARlocal   !average PAR at midpoint of gridcell
     real(kind=8),dimension(tlam,mesh%nl-1)                  :: PARwlocal  !PAR at midpoint of previous(in) and local(out) gridcell
     real(kind=8),dimension(tlam)                            :: C_phot_nl
@@ -97,10 +98,12 @@ endif
     real(kind=8),dimension(tlam)                            :: C_phot_nl_cocco
     real(kind=8),dimension(tlam)                            :: C_phot_nl_phaeo
     real(kind=8),dimension(tlam)                            :: Ek_nl_cocco
-    real(kind=8),dimension(tlam)                            :: Ek_nl_dia_phaeo    
+    real(kind=8),dimension(tlam)                            :: Ek_nl_phaeo    
+    real(kind=8)                                            :: alpha_I_cocco, alpha_I_phaeo
+    real(kind=8)                                            :: Ek_cocco, Ek_phaeo
 !sl endif
-    real(kind=8)                                            :: Ek
-    real(kind=8)                                            :: alpha_I
+    real(kind=8)                                            :: Ek, Ek_dia
+    real(kind=8)                                            :: alpha_I, alpha_I_dia
     integer                                                 :: ilam
     integer                                                 :: nlam
 ! ANNA for interpolation
@@ -115,7 +118,7 @@ endif
     real(kind=8)                                            :: damage   !     damage rate [d-1]
     real(kind=8)                                            :: repair   !     repair rate [d-1]
     real(kind=8)                                            :: ALPHAmar !     initial slope of the PE curve [m2 mmolC-1 mgChl-1 J-1]
-!#ifdef RECOM_WAVEBANDS
+!#if defined(__RECOM_WAVEBANDS)
 !    real(kind=8),dimension(tlam)                            :: ALPHAmar_nl(tlam)
 !#endif    
     real(kind=8)                                            :: QY_dia       !     quantum yield of photosynthesis [mmolC J-1]
@@ -123,7 +126,7 @@ endif
     real(kind=8)                                            :: damage_dia   !     damage rate [d-1]
     real(kind=8)                                            :: repair_dia   !     repair rate [d-1]
     real(kind=8)                                            :: ALPHAmar_dia !     initial slope of the PE curve [m2 mmolC-1 mgChl-1 J-1]
-!#ifdef RECOM_WAVEBANDS
+!#if defined(__RECOM_WAVEBANDS)
 !    real(kind=8),dimension(tlam)                            :: ALPHAmar_dia_nl(tlam)
 !#endif
 !sl if (enable_coccos) then
@@ -132,7 +135,7 @@ endif
     real(kind=8)                                            :: damage_cocco   !     damage rate [d-1]
     real(kind=8)                                            :: repair_cocco   !     repair rate [d-1]
     real(kind=8)                                            :: ALPHAmar_cocco !     initial slope of the PE curve [m2 mmolC-1 mgChl-1 J-1]
-!#ifdef RECOM_WAVEBANDS
+!#if defined(__RECOM_WAVEBANDS)
 !    real(kind=8),dimension(tlam)                            :: ALPHAmar_cocco_nl(tlam)
 !#endif
     real(kind=8)                                            :: QY_phaeo       !     quantum yield of photosynthesis [mmolC J-1]
@@ -140,7 +143,7 @@ endif
     real(kind=8)                                            :: damage_phaeo   !     damage rate [d-1]
     real(kind=8)                                            :: repair_phaeo   !     repair rate [d-1]
     real(kind=8)                                            :: ALPHAmar_phaeo !     initial slope of the PE curve [m2 mmolC-1 mgChl-1 J-1]
-!#ifdef RECOM_WAVEBANDS
+!#if defined(__RECOM_WAVEBANDS)
 !    real(kind=8),dimension(tlam)                            :: ALPHAmar_phaeo_nl(tlam)
 !#endif
 !sl endif        
@@ -263,7 +266,7 @@ real(kind=8) :: &
     ! Initialize source-minus-sink array
     ! Sets all biogeochemical fluxes to zero at start of time step
     sms = zero
-#ifdef RECOM_WAVEBANDS
+#if defined(__RECOM_WAVEBANDS)
            do ilam=1,tlam
             C_phot_nl(ilam)= zero 
             C_phot_nl_dia(ilam)= zero 
@@ -807,7 +810,7 @@ endif
             ! Nitrogen:Carbon quota (cellular N:C ratio)
             ! Controls growth rate via Droop limitation
             quota = PhyN / PhyC
-#ifdef RECOM_WAVEBANDS
+#if defined(__RECOM_WAVEBANDS)
             quota = max(NCmin, quota)
             quota = min(quota, NCmax)
 #endif            
@@ -866,7 +869,7 @@ endif
 
             ! Nitrogen:Carbon quota
             quota_dia = DiaN / DiaC
-#ifdef RECOM_WAVEBANDS
+#if defined(__RECOM_WAVEBANDS)
             quota_dia = max(NCmin_d, quota_dia)
             quota_dia = min(quota_dia, NCmax_d)
 #endif            
@@ -936,9 +939,9 @@ endif
 
                 ! Nitrogen:Carbon quota
                 quota_cocco = CoccoN / CoccoC
-#ifdef RECOM_WAVEBANDS
-                quota_cocco = max(NCmin_cocco, quota_cocco)
-                quota_cocco = min(quota_cocco, NCmax_cocco)
+#if defined(__RECOM_WAVEBANDS)
+                quota_cocco = max(NCmin_c, quota_cocco)
+                quota_cocco = min(quota_cocco, NCmax_c)
 #endif            
 
 
@@ -978,9 +981,9 @@ endif
 
                 ! Nitrogen:Carbon quota
                 quota_phaeo = PhaeoN / PhaeoC
-#ifdef RECOM_WAVEBANDS
-                quota_phaeo = max(NCmin_phaeo, quota_phaeo)
-                quota_phaeo = min(quota_phaeo, NCmax_phaeo)
+#if defined(__RECOM_WAVEBANDS)
+                quota_phaeo = max(NCmin_p, quota_phaeo)
+                quota_phaeo = min(quota_phaeo, NCmax_p)
 #endif            
                 
 
@@ -1404,7 +1407,7 @@ endif
             !   - Controls vertical distribution of primary production
             !   - Self-shading is key negative feedback on bloom magnitude
             !-------------------------------------------------------------------------------
-#ifdef RECOM_WAVEBANDS
+#if defined(__RECOM_WAVEBANDS)
            PARave = zero
            do nlam = 1,tlam
               PARave = PARave + (PARwlocal(nlam,k) / WtouEins(nlam))
@@ -1494,7 +1497,7 @@ endif
 
             end if
 #endif /* RECOM_WAVEBANDS */
-#ifdef RECOM_WAVEBANDS
+#if defined(__RECOM_WAVEBANDS)
 ! ANNA if wavebands then uses spectral alphachl derived from spectral alpha * I
 !     so first get value for alphachl_nl * PARwlocal (value will depend on matchup between
 !     spectra of alphachl_nl (ie. aphy_chl) and PARwlocal) and integrate alpha*PAR over
@@ -1537,7 +1540,7 @@ if (RECOM_MARSHALL) then
       endif
 
       NPQ = 1-(QY/QYmax)
-!#ifdef RECOM_WAVEBANDS
+!#if defined(__RECOM_WAVEBANDS)
         astar = 0.d0
         do nlam = 1,tlam
 !           ALPHAmar_nl(nl) =  aphy_chl_ps(nl) * (c1-NPQ) * QY * 86400
@@ -1576,7 +1579,7 @@ if (RECOM_MARSHALL) then
       endif
 
       NPQ_dia = 1-(QY_dia/QYmax_d)
-!#ifdef RECOM_WAVEBANDS
+!#if defined(__RECOM_WAVEBANDS)
         astar_d = 0.d0
         do nlam = 1,tlam
 !           ALPHAmar_dia_nl(nl) = aphy_chl_ps_dia(nl) * (c1-NPQ_dia)
@@ -1622,7 +1625,7 @@ if (enable_coccos) then
       endif
 
       NPQ_cocco = 1-(QY_cocco/QYmax_cocco)
-!#ifdef RECOM_WAVEBANDS
+!#if defined(__RECOM_WAVEBANDS)
         astar_cocco = 0.d0
         do nlam = 1,tlam
            astar_cocco = astar_cocco + (wb_width(nlam) * aphy_chl_ps_cocco(nlam))
@@ -1652,7 +1655,7 @@ if (enable_coccos) then
       endif
 
       NPQ_phaeo = 1-(QY_phaeo/QYmax_phaeo)
-!#ifdef RECOM_WAVEBANDS
+!#if defined(__RECOM_WAVEBANDS)
         astar_phaeo = 0.d0
         do nlam = 1,tlam
            astar_phaeo = astar_phaeo + (wb_width(nlam) * aphy_chl_ps_phaeo(nlam))
@@ -2381,7 +2384,7 @@ endif !/* RECOM_MARSHALL */
             !-------------------------------------------------------------------------------
             ! Small Phytoplankton Photosynthesis
             !-------------------------------------------------------------------------------
-#ifdef RECOM_WAVEBANDS
+#if defined(__RECOM_WAVEBANDS)
       if (pMax.ge.tiny .AND. alpha_I.ge.tiny                             &
                        .AND. CHL2C.ge.tiny) then                 
            Cphot = pMax * ( c1 - exp(-alpha_I * CHL2C / pMax))         
@@ -2408,7 +2411,7 @@ endif !/* RECOM_MARSHALL */
            Cphot = zero
            Ek = zero
       end if
-      alpha = alpha_mean
+!sl?      alpha = alpha_mean    ??
 #else
 
             if (pMax < tiny .OR. PARave /= PARave .OR. CHL2C /= CHL2C) then
@@ -2438,7 +2441,7 @@ endif !/* RECOM_MARSHALL */
             ! Diatom Photosynthesis
             !-------------------------------------------------------------------------------
 
-#ifdef RECOM_WAVEBANDS
+#if defined(__RECOM_WAVEBANDS)
         if (pMax_dia.ge.tiny .AND. alpha_I_dia.ge.tiny              &
                              .AND. CHL2C_dia.ge.tiny) then
            Cphot_dia = pMax_dia *                                   &
@@ -2467,7 +2470,7 @@ endif !/* RECOM_MARSHALL */
            Cphot_dia = zero
            Ek_dia = zero
         end if
-        alpha_d = alpha_mean_dia
+!sl        alpha_d = alpha_mean_dia          ??
 #else /* not RECOM_WAVEBANDS  */
 
             if (pMax_dia < tiny .OR. PARave /= PARave .OR. CHL2C_dia /= CHL2C_dia) then
@@ -2492,7 +2495,7 @@ endif !/* RECOM_MARSHALL */
             !-------------------------------------------------------------------------------
 
             if (enable_coccos) then
-#ifdef RECOM_WAVEBANDS
+#if defined(__RECOM_WAVEBANDS)
         if (pMax_cocco.ge.tiny .AND. alpha_I_cocco.ge.tiny               &
                             .AND. CHL2C_cocco.ge.tiny) then
             Cphot_cocco = pMax_cocco *                                   &
@@ -2521,7 +2524,7 @@ endif !/* RECOM_MARSHALL */
            Cphot_cocco = zero
            Ek_cocco = zero
         end if
-        alpha_cocco = alpha_mean_cocco
+!sl        alpha_cocco = alpha_mean_cocco  ??
 
 #else /* not RECOM_WAVEBANDS  */
 
@@ -2545,7 +2548,7 @@ endif !/* RECOM_MARSHALL */
                 !---------------------------------------------------------------------------
                 ! Phaeocystis Photosynthesis (Optional)
                 !---------------------------------------------------------------------------
-#ifdef RECOM_WAVEBANDS
+#if defined(__RECOM_WAVEBANDS)
         if (pMax_phaeo.ge.tiny .AND. alpha_I_phaeo.ge.tiny                        &
                              .AND. CHL2C_phaeo.ge.tiny) then
            Cphot_phaeo = pMax_phaeo *                                             &
@@ -2574,7 +2577,7 @@ endif !/* RECOM_MARSHALL */
            Cphot_phaeo = zero
            Ek_phaeo = zero
         end if
-        alpha_phaeo = alpha_mean_phaeo
+!sl?        alpha_phaeo = alpha_mean_phaeo  ??
 
 #else /* not RECOM_WAVEBANDS  */
 
@@ -2654,11 +2657,11 @@ endif !/* RECOM_MARSHALL */
                 ! Small Phytoplankton Chlorophyll Loss
                 !---------------------------------------------------------------------------
 
-#ifdef RECOM_WAVEBANDS
+#if defined(__RECOM_WAVEBANDS)
                 if (pMax.ge.tiny .AND. alpha_I.ge.tiny.AND. PARave.ge.tiny .AND. CHL2C.ge.tiny) then
-                   KOchl = deg_CHL*(c1 - exp(-alpha_I * CHL2C / pMax))
+                   KOchl = deg_Chl*(c1 - exp(-alpha_I * CHL2C / pMax))
                 else
-                   KOchl = rero
+                   KOchl = zero
                 end if
 #else /* not RECOM_WAVEBANDS  */                    
 
@@ -2685,9 +2688,9 @@ endif !/* RECOM_MARSHALL */
                 !---------------------------------------------------------------------------
                 ! Diatom Chlorophyll Loss
                 !---------------------------------------------------------------------------
-#ifdef RECOM_WAVEBANDS
+#if defined(__RECOM_WAVEBANDS)
                 if (pMax_dia.ge.tiny .AND. alpha_I_dia.ge.tiny.AND. PARave.ge.tiny .AND. CHL2C_dia.ge.tiny) then
-                   KOchl_dia = deg_CHL_d * ( c1 - exp(-alpha_I_dia * CHL2C_dia / pMax_dia ))
+                   KOchl_dia = deg_Chl_d * ( c1 - exp(-alpha_I_dia * CHL2C_dia / pMax_dia ))
                 else
                    KOchl_dia = zero
                 end if
@@ -2708,9 +2711,9 @@ endif !/* RECOM_MARSHALL */
                     !-----------------------------------------------------------------------
                     ! Coccolithophore Chlorophyll Loss
                     !-----------------------------------------------------------------------
-#ifdef RECOM_WAVEBANDS
+#if defined(__RECOM_WAVEBANDS)
                     if (pMax_cocco.ge.tiny .AND. alpha_I_cocco.ge.tiny.AND. PARave.ge.tiny .AND. CHL2C_cocco.ge.tiny) then
-                       KOchl_cocco = deg_CHL_cocco * ( c1 - exp(-alpha_I_cocco * CHL2C_cocco / pMax_cocco ))
+                       KOchl_cocco = deg_Chl_c * ( c1 - exp(-alpha_I_cocco * CHL2C_cocco / pMax_cocco ))
                     else
                         KOchl_cocco = zero
                     end if
@@ -2730,9 +2733,9 @@ endif !/* RECOM_MARSHALL */
                     !-----------------------------------------------------------------------
                     ! Phaeocystis Chlorophyll Loss
                     !-----------------------------------------------------------------------
-#ifdef RECOM_WAVEBANDS
+#if defined(__RECOM_WAVEBANDS)
                     if (pMax_phaeo.ge.tiny .AND. alpha_I_phaeo.ge.tiny.AND. PARave.ge.tiny .AND. CHL2C_phaeo.ge.tiny) then
-                       KOchl_phaeo = deg_CHL_phaeo * ( c1 - exp(-alpha_I_phaeo * CHL2C_phaeo / pMax_phaeo ))
+                       KOchl_phaeo = deg_Chl_p * ( c1 - exp(-alpha_I_phaeo * CHL2C_phaeo / pMax_phaeo ))
                     else
                         KOchl_phaeo = zero
                     end if
@@ -2917,7 +2920,7 @@ endif !/* RECOM_MARSHALL */
 
         ! --- Small phytoplankton Chlorophyll Synthesis ---
         chlSynth = zero
-#ifdef RECOM_WAVEBANDS
+#if defined(__RECOM_WAVEBANDS)
         if (PARlocal(k).ge.tiny .AND. alpha_I.ge.tiny .AND. Chl2C.ge.tiny) then
             chlSynth = N_assim  * Chl2N_max                   &
                      * min(real(one), Cphot/(alpha_I * Chl2C) )
@@ -2932,7 +2935,7 @@ endif !/* RECOM_MARSHALL */
 
         ! --- Diatom Chlorophyll Synthesis ---
         ChlSynth_dia = zero
-#ifdef RECOM_WAVEBANDS
+#if defined(__RECOM_WAVEBANDS)
         if (PARlocal(k).ge.tiny .AND. alpha_I_dia.ge.tiny .AND. Chl2C_dia.ge.tiny) then
             ChlSynth_dia = N_assim_dia  * Chl2N_max_d                         &
                          * min(real(one), Cphot_dia/(alpha_I_dia * Chl2C_dia) )
@@ -2948,9 +2951,9 @@ endif !/* RECOM_MARSHALL */
         if (enable_coccos) then
             ! Coccolithophore chlorophyll synthesis
             ChlSynth_cocco = zero
-#ifdef RECOM_WAVEBANDS
+#if defined(__RECOM_WAVEBANDS)
             if (PARlocal(k).ge.tiny .AND. alpha_I_cocco.ge.tiny .AND. Chl2C_cocco.ge.tiny) then
-               ChlSynth_cocco = N_assim_cocco  * Chl2N_max_cocco                         &
+               ChlSynth_cocco = N_assim_cocco  * Chl2N_max_c                         &
                               * min(real(one), Cphot_cocco/(alpha_I_cocco * Chl2C_cocco) )
             endif
 #else /* not RECOM_WAVEBANDS */            
@@ -2961,9 +2964,9 @@ endif !/* RECOM_MARSHALL */
 #endif /* RECOM_WAVEBANDS */ 
             ! Phaeocystis chlorophyll synthesis
             ChlSynth_phaeo = zero
-#ifdef RECOM_WAVEBANDS
+#if defined(__RECOM_WAVEBANDS)
             if (PARlocal(k).ge.tiny .AND. alpha_I_phaeo.ge.tiny .AND. Chl2C_phaeo.ge.tiny) then
-               ChlSynth_phaeo = N_assim_phaeo  * Chl2N_max_phaeo                         &
+               ChlSynth_phaeo = N_assim_phaeo  * Chl2N_max_p                         &
                               * min(real(one), Cphot_phaeo/(alpha_I_phaeo * Chl2C_phaeo) )
             endif
 #else /* not RECOM_WAVEBANDS */               
@@ -4639,7 +4642,7 @@ endif !/* RECOM_MARSHALL */
             - grazingFlux_phy2    * Chl2N    * is_3zoo2det                 & ! Macrozooplankton
             - grazingFlux_phy3    * Chl2N    * is_3zoo2det                 & ! Microzooplankton
                                                                           ) * dt_b + sms(k,ipchl)
-#if defined (__RECOM_WAVEBANDS)
+#if defined(__RECOM_WAVEBANDS)
 if (RECOM_MARSHALL) then
         !===============================================================================
         ! PHYTOPLANKTON D1 
@@ -5533,11 +5536,11 @@ endif  !/* RECOM_MARSHALL */
         !   lossC_z, lossC_z2, lossC_z3      : Zooplankton DOC excretion rates [day-1]
         !-------------------------------------------------------------------------------
         sms(k,idoc) = (                                                    &
-#ifdef RECOM_WAVEBANDS
-if (RECOM_CDOM) then
-            + (1.0 - fcdom)*(                     &
-endif !/* RECOM_CDOM */                
-#endif /* RECOM_WAVEBANDS */
+!sl#if defined(__RECOM_WAVEBANDS)
+!slif (RECOM_CDOM) then
+!sl            + (1.0 - fcdom)*(                     &
+!slendif !/* RECOM_CDOM */                
+!sl#endif /* RECOM_WAVEBANDS */
             !---------------------------------------------------------------------------
             ! SOURCES: Phytoplankton Excretion
             !---------------------------------------------------------------------------
@@ -5556,14 +5559,19 @@ endif !/* RECOM_CDOM */
             + lossC_z                   * HetC                             & ! Mesozooplankton
             + lossC_z2                  * Zoo2C   * is_3zoo2det            & ! Macrozooplankton
             + lossC_z3                  * MicZooC * is_3zoo2det            & ! Microzooplankton
-#ifdef RECOM_WAVEBANDS
+!sl the following is introduced to enable RECOM_CDOM            
+            ) * dt_b                                                         !sl
+#if defined(__RECOM_WAVEBANDS)
 if (RECOM_CDOM) then
-            )                                                              &
+!sl            )                                                              &
+            sms(k,idoc) = (1.0 - fcdom)*sms(k,idoc)        
 endif !/* RECOM_CDOM */
 #endif /* RECOM_WAVEBANDS */
             !---------------------------------------------------------------------------
             ! SINKS: Remineralization to CO2
             !---------------------------------------------------------------------------
+!sl the following is introduced to enable RECOM_CDOM
+            sms(k,idoc) = (                                                &
             - rho_c1 * arrFunc * O2Func * EOC                              & ! Bacterial respiration
                                                                           ) * dt_b + sms(k,idoc)
 
@@ -5671,7 +5679,7 @@ endif !/* RECOM_CDOM */
             - grazingFlux_dia2 * Chl2N_dia   * is_3zoo2det                 & ! Macrozooplankton
             - grazingFlux_dia3 * Chl2N_dia   * is_3zoo2det                 & ! Microzooplankton
                                                                           ) * dt_b + sms(k,idchl)
-#if defined (__RECOM_WAVEBANDS)
+#if defined(__RECOM_WAVEBANDS)
 if (RECOM_MARSHALL) then          
         !===============================================================================
         ! DIATOM D1 
@@ -6224,17 +6232,17 @@ endif
         !   rho_c1                           : DOC remineralization rate [day-1]
         !   lossC_z, lossC_z2, lossC_z3      : Zooplankton DOC excretion rates [day-1]
         !-------------------------------------------------------------------------------
-#ifdef RECOM_WAVEBANDS
+#if defined(__RECOM_WAVEBANDS)
 if (RECOM_CDOM) then
-        cdom_photo_rate = phot_cdom * MIN((PARave/kphot_CDOM), 1. _d 0)
+        cdom_photo_rate = phot_cdom * MIN((PARave/kphot_CDOM), 1.0d0)
 endif
 #endif /* RECOM_WAVEBANDS  */
         sms(k,icdom) = (                                                    &
-#ifdef RECOM_WAVEBANDS
-if (RECOM_CDOM) then
-            +  fcdom * (                     &
-endif !/* RECOM_CDOM */
-#endif /* RECOM_WAVEBANDS  */
+!sl#if defined(__RECOM_WAVEBANDS)
+!slif (RECOM_CDOM) then
+!sl            +  fcdom * (                     &
+!slendif !/* RECOM_CDOM */
+!sl#endif /* RECOM_WAVEBANDS  */
             !---------------------------------------------------------------------------
             ! SOURCES: Phytoplankton Excretion
             !---------------------------------------------------------------------------
@@ -6253,14 +6261,18 @@ endif !/* RECOM_CDOM */
             + lossC_z                   * HetC                             & ! Mesozooplankton
             + lossC_z2                  * Zoo2C   * is_3zoo2det            & ! Macrozooplankton
             + lossC_z3                  * MicZooC * is_3zoo2det            & ! Microzooplankton
-#ifdef RECOM_WAVEBANDS
+!sl the following line is introduced to allow RECOM_CDOM 
+            ) * dt_b           
+#if defined(__RECOM_WAVEBANDS)
 if (RECOM_CDOM) then
-            )                                                              &
+            sms(k,idoc) = fcdom * sms(k,idoc)                             
 endif !/* RECOM_CDOM */
 #endif /* RECOM_WAVEBANDS  */
             !---------------------------------------------------------------------------
             ! SINKS: Remineralization to CO2
             !---------------------------------------------------------------------------
+!sl the following line is introduced to allow RECOM_CDOM
+            sms(k,idoc) = (                                                &
             - rho_c1 * arrFunc          * cdomC                            & ! Bacterial respiration
             - cdom_photo_rate           * cdomC                            &        
                                                                           ) * dt_b + sms(k,idoc)
@@ -7062,7 +7074,7 @@ endif !/* RECOM_CDOM */
                         + KOchl_phaeo &
                     ) * recipbiostep
                 endif
-#if defined (__RECOM_WAVEBANDS)
+#if defined(__RECOM_WAVEBANDS)
                !===========================================================================
                 ! Extend w.r.t. spectral light diagnostic 
                 !===========================================================================
