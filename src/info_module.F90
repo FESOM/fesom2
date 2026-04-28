@@ -76,7 +76,14 @@ contains
       print '(g0)', 'VERBOSE is ON'
 #else
       print '(g0)', 'VERBOSE is OFF'
-#endif  
+#endif
+
+#ifdef ENABLE_ALBEDO_INTELMPI_WORKAROUNDS
+      print '(g0)', 'ENABLE_ALBEDO_INTELMPI_WORKAROUNDS is ON'
+#else
+      print '(g0)', 'ENABLE_ALBEDO_INTELMPI_WORKAROUNDS is OFF'
+#endif
+      
 #ifdef ENABLE_NVHPC_WORKAROUNDS
       print '(g0)', 'ENABLE_NVHPC_WORKAROUNDS is ON'
 #else

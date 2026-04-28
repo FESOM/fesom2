@@ -1,0 +1,53 @@
+! ============================================================================
+! ========== Namelist file for FESOM2 transient tracers =====================
+! ============================================================================
+! This file contains configuration for transient tracer simulations:
+! - Radioactive isotopes (14C, 39Ar)
+! - Chlorofluorocarbons (CFC-11, CFC-12)
+! - Sulfur hexafluoride (SF6)
+! - Anthropogenic vs paleoclimate simulations
+! - Atmospheric boundary conditions
+! - Decay constants
+!
+! Requires use_transit=.true. in namelist.config
+! ============================================================================
+
+! ============================================================================
+! TRANSIENT TRACER CONFIGURATION
+! ============================================================================
+&transit_param
+! --- Enable Individual Tracers ---
+l_r14c          = .false.       ! enable radiocarbon (14C/C ratio)
+l_r39ar         = .false.       ! enable 39Ar/Ar ratio
+l_f11           = .false.       ! enable CFC-11 (chlorofluorocarbon)
+l_f12           = .false.       ! enable CFC-12 (chlorofluorocarbon)
+l_sf6           = .false.       ! enable SF6 (sulfur hexafluoride)
+
+! --- Simulation Type ---
+anthro_transit  = .false.       ! anthropogenic transient tracer simulation (modern era)
+paleo_transit   = .false.       ! paleoclimate transient tracer simulation
+
+! --- Time Series Configuration ---
+length_transit   = 1            ! length of atmospheric forcing time series
+                                ! use 166 for anthro_transit=.true. (1765-2020)
+ti_start_transit = 1            ! starting time index in forcing file
+                                ! use 1 for D14C, 80 for CFC-12
+
+! --- Atmospheric Forcing File ---
+ifile_transit   = '/work/ab0246/a270108/fesom2_recom_config/input-for-awiesm/Table_CO2_isoC_CFCs1112_SF6.txt'
+                                ! path to atmospheric boundary condition file
+
+! --- Atmospheric Concentrations (Global Mean) ---
+r14c_a          = 1.0000        ! atmospheric 14C/C ratio [dimensionless]
+r39ar_a         = 1.0000        ! atmospheric 39Ar/Ar ratio [dimensionless]
+xarg_a          = 9.34e-3       ! atmospheric Argon mole fraction [dimensionless]
+xco2_a          = 284.32e-6     ! atmospheric CO2 mole fraction [dimensionless] (preindustrial: 284.32 ppm)
+
+! --- Initial Ocean Concentrations (Global Mean) ---
+dic_0           = 2.00          ! mixed layer DIC concentration [mol/m³]
+arg_0           = 0.01          ! mixed layer Argon concentration [mol/m³]
+
+! --- Radioactive Decay Constants ---
+decay14         = 3.8561e-12    ! decay constant of 14C [1/s] (half-life: 5700 years, 1 year = 365.0 days)
+decay39         = 8.1708e-11    ! decay constant of 39Ar [1/s] (half-life: 269 years, 1 year = 365.0 days)
+/

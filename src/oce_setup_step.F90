@@ -319,7 +319,7 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     integer        :: AB_order = 2
     namelist /tracer_listsize/ num_tracers
     namelist /tracer_list    / nml_tracer_list
-    namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff, AB_order
+    namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff, AB_order, ltra_diag !OG - ltra_diag
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"

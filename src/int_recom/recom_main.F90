@@ -256,9 +256,15 @@ end do
         rhoSW_watercolumn(1:nzmax)  = rhoSW3D(1:nzmax, n)
 
         !!---- Biogeochemical tracers
+        if (use_transit) then
+        do tr_num = index_transit_sf6 - bgc_num, index_transit_sf6 -1
+            C(1:nzmax, tr_num-2) = tracers%data(tr_num)%values(1:nzmax, n)
+        end do
+        else
         do tr_num = num_tracers-bgc_num+1, num_tracers
             C(1:nzmax, tr_num-2) = tracers%data(tr_num)%values(1:nzmax, n)
         end do
+        endif
 
         ttf_rhs_bak = 0.0
 
@@ -299,10 +305,16 @@ end do
            , rhoSW_watercolumn                                   &
                            , PAR, ice, dynamics, tracers, partit, mesh)
 
+       if (use_transit) then
+       do tr_num = index_transit_sf6 - bgc_num, index_transit_sf6 -1
+        tracers%data(tr_num)%values(1:nzmax, n) = C(1:nzmax, tr_num-2)
+        end do
+        else
+
         do tr_num = num_tracers-bgc_num+1, num_tracers !bgc_num+2
             tracers%data(tr_num)%values(1:nzmax, n) = C(1:nzmax, tr_num-2)
         end do
-
+       endif
         ! recom_sms
 
            do tr_num=1, num_tracers

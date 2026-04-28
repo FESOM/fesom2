@@ -15,6 +15,8 @@
 !!   2014: original implementation (V. Schourup-Kristensen)
 !
 module recom_config
+  use mod_transit
+  use g_config
   implicit none
   save
 
@@ -745,6 +747,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
 
   ! Physical tracers (temperature, salinity, etc.) - typically first 2
   num_physical_tracers = 2
+  if(use_transit) num_physical_tracers = 5
 
   ! DOC tracers count
   if (enable_R2OMIP) then
@@ -830,6 +833,11 @@ subroutine validate_recom_tracers(num_tracers, mype)
   ! Physical tracers (always present)
   expected_tracer_ids(1) = 1    ! Temperature
   expected_tracer_ids(2) = 2    ! Salinity
+  if(use_transit) then 
+          expected_tracer_ids(index_transit_sf6) = 6 
+          expected_tracer_ids(index_transit_f11) = 11
+          expected_tracer_ids(index_transit_f12) = 12
+  endif
 
   ! Base BGC tracers (always present for all configurations)
   do i = 1, 22
@@ -1214,6 +1222,11 @@ subroutine validate_tracer_id_sequence(tracer_ids, num_tracers, mype)
   ! Build expected ID sequence
   expected_ids(1) = 1
   expected_ids(2) = 2
+  if(use_transit) then
+          expected_ids(index_transit_sf6) = 6
+          expected_ids(index_transit_f11) = 11
+          expected_ids(index_transit_f12) = 12
+  endif
 
   do i = 1, 22
     expected_ids(num_physical_tracers + i) = 1000 + i

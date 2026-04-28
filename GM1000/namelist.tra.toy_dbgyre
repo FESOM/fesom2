@@ -1,0 +1,119 @@
+! ============================================================================
+! ============ Namelist file for FESOM2 tracer configuration =================
+! ============================================================================
+! This file contains configuration for ocean tracers (temperature, salinity,
+! and passive tracers):
+! - Tracer list and advection/diffusion schemes
+! - Initial conditions (3D ocean and 2D sea ice)
+! - Biharmonic diffusion options
+! - Vertical diffusion and time stepping
+! - Physical parameterizations (mixing, restoring)
+! ============================================================================
+
+! ============================================================================
+! TRACER ARRAY ALLOCATION
+! ============================================================================
+&tracer_listsize
+num_tracers = 100         ! number of tracers to allocate (must be ≥ actual number of tracers)
+/
+
+! ============================================================================
+! TRACER LIST AND ADVECTION SCHEMES
+! ============================================================================
+! Format: ID, horizontal_advection, vertical_advection, horizontal_diffusion, Kh_factor, Kv_factor
+! Advection schemes: 'MFCT' (Multidimensional FCT), 'UPW1' (1st-order upwind), 'QR4C' (4th-order)
+! Diffusion schemes: 'FCT' (Flux-Corrected Transport), 'NON' (none)
+! Order switches   : hor./vert. Ord.=1.0 --> 4th order, =0.0 --> 3rd order, =0.5 --> mixed 3rd&4th order
+! ============================================================================
+! nml_tracer_list =
+! idx, hor. Adv, vert. Adv., use FCT, hor.Ord., vert. Ord. 
+! 1  , 'MFCT'  , 'QR4C'    , 'FCT ' , 1.      , 1.        ,   ! temperature
+! 2  , 'MFCT'  , 'QR4C'    , 'FCT ' , 1.      , 1.        ,   ! salinity
+!101 , 'UPW1'  , 'UPW1'    , 'NON ' , 0.      , 0.            ! example passive tracer
+&tracer_list
+nml_tracer_list =
+1  , 'MFCT', 'QR4C', 'FCT ', 0., 1.,
+2  , 'MFCT', 'QR4C', 'FCT ', 0., 1.,
+!101, 'UPW1', 'UPW1', 'NON ', 0., 0.
+/
+
+! ============================================================================
+! 3D TRACER INITIAL CONDITIONS (OCEAN)
+! ============================================================================
+&tracer_init3d
+n_ic3d   = 2                                       ! number of 3D tracers to initialize from files
+idlist   = 2, 1                                    ! tracer IDs to initialize (1=temperature, 2=salinity)
+filelist = 'phc3.0_winter.nc', 'phc3.0_winter.nc'  ! netCDF files in ClimateDataPath (one per tracer)
+varlist  = 'salt', 'temp'                          ! variable names in the netCDF files
+t_insitu = .true.                                  ! if true, convert in-situ temperature to potential temperature
+/
+
+! ============================================================================
+! 2D TRACER INITIAL CONDITIONS (SEA ICE)
+! ============================================================================
+&tracer_init2d
+n_ic2d            = 3                                    ! number of 2D tracers to initialize from files
+idlist            = 1, 2, 3                              ! tracer IDs (1=ice concentration, 2=ice thickness, 3=snow thickness)
+filelist          = 'a_ice.nc', 'm_ice.nc', 'm_snow.nc'  ! netCDF files in ClimateDataPath
+varlist           = 'a_ice', 'm_ice', 'm_snow'           ! variable names in the netCDF files
+ini_ice_from_file = .false.                              ! enable initialization from files (false = use default values)
+/
+
+! ============================================================================
+! TRACER GENERAL SETTINGS
+! ============================================================================
+&tracer_general
+! --- Biharmonic Diffusion ---
+! Recommended for very high resolution runs (where Redi is typically disabled)
+smooth_bh_tra = .false.       ! enable biharmonic diffusion (filter implementation) for tracers
+gamma0_tra    = 0.0005        ! background biharmonic diffusion coefficient [dimensionless]
+gamma1_tra    = 0.0125        ! flow-aware biharmonic diffusion coefficient [dimensionless]
+gamma2_tra    = 0.            ! additional biharmonic diffusion coefficient [dimensionless]
+
+! --- Vertical Diffusion and Time Stepping ---
+i_vert_diff   = .true.        ! use implicit vertical diffusion (recommended for stability)
+AB_order      = 2             ! Adams-Bashforth time stepping order (2 or 3)
+/
+
+! ============================================================================
+! TRACER PHYSICS AND PARAMETERIZATIONS
+! ============================================================================
+&tracer_phys
+! --- Monin-Obukhov Mixing (TB04) ---
+use_momix          = .false.           ! enable Monin-Obukhov mixing (Timmermann & Beckmann 2004)
+momix_lat          = -50.0             ! latitude threshold for TB04 [degrees] (90 = global, -50 = south of 50°S)
+momix_kv           = 0.01              ! mixing coefficient within MO length [m²/s]
+
+! --- Convective Instability Mixing ---
+use_instabmix      = .true.            ! enhance mixing for unstable stratification (convection)
+instabmix_kv       = 0.1               ! mixing coefficient for unstable stratification [m²/s]
+
+! --- Wind Mixing (PP scheme only) ---
+use_windmix        = .false.           ! enhance near-surface mixing by wind (for PP mixing stability)
+windmix_kv         = 1.e-3             ! wind mixing coefficient [m²/s]
+windmix_nl         = 2                 ! number of surface layers for wind mixing
+
+! --- Shear Instability (KPP) ---
+diff_sh_limit      = 5.0e-3            ! maximum diffusivity due to shear instability [m²/s] (for KPP)
+
+! --- Background Diffusivity ---
+Kv0_const          = .false.           ! use constant background vertical diffusivity
+K_ver              = 1.0e-5            ! background vertical diffusivity [m²/s]
+K_hor              = 10.               ! background horizontal diffusivity [m²/s]
+
+! --- Double Diffusion (KPP) ---
+double_diffusion   = .false.           ! enable double diffusion parameterization (for KPP)
+
+! --- Surface Restoring ---
+surf_relax_T       = 0.0               ! surface temperature restoring coefficient [m/s] (0 = disabled)
+surf_relax_S       = 1.929e-06         ! surface salinity restoring coefficient [m/s]
+balance_salt_water = .false.           ! balance virtual salt flux with freshwater flux
+
+! --- Climatology Restoring ---
+clim_relax         = 0.0               ! 3D climatology restoring coefficient [1/s] (0 = disabled)
+
+! --- Reference Salinity ---
+ref_sss_local      = .true.            ! use local reference SSS (true) or global constant (false)
+ref_sss            = 34.               ! global reference salinity [psu] (if ref_sss_local=false)
+/
+

@@ -1,0 +1,1326 @@
+ln: failed to create symbolic link './fesom.x': File exists
+[prod-087:706284:0:706284] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869397:0:1869397] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303769:0:303769] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 237 (rank 237 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-087:706285:0:706285] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 704 (rank 704 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-098:482583:0:482583] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 194 (rank 194 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 19 (rank 19 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-088:1869479:0:1869479] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 584 (rank 584 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252564:0:1252564] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 705 (rank 705 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 616 (rank 616 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 20 (rank 20 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-088:1869418:0:1869418] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303793:0:303793] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 617 (rank 617 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-089:2993691:0:2993691] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482601:0:482601] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 401 (rank 401 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252592:0:1252592] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 242 (rank 242 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 31 (rank 31 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 113 (rank 113 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+srun: Job step aborted: Waiting up to 62 seconds for job step to finish.
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 714 (rank 714 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 810 (rank 810 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 619 (rank 619 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 403 (rank 403 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252545:0:1252545] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 273 (rank 273 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 118 (rank 118 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-097:303812:0:303812] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482565:0:482565] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 409 (rank 409 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252531:0:1252531] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993651:0:2993651] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 47 (rank 47 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 125 (rank 125 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-097:303814:0:303814] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 824 (rank 824 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 623 (rank 623 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 459 (rank 459 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252588:0:1252588] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706318:0:706318] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 842 (rank 842 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 468 (rank 468 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252586:0:1252586] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993702:0:2993702] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 109 (rank 109 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 735 (rank 735 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 845 (rank 845 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 637 (rank 637 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 479 (rank 479 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 60 (rank 60 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-088:1869427:0:1869427] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 847 (rank 847 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 650 (rank 650 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 423 (rank 423 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 147 (rank 147 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 736 (rank 736 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-098:482593:0:482593] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 667 (rank 667 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-092:1590520:0:1590520] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252598:0:1252598] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 192 (rank 192 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 63 (rank 63 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-088:1869458:0:1869458] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590534:0:1590534] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252587:0:1252587] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706342:0:706342] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 740 (rank 740 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 848 (rank 848 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-092:1590514:0:1590514] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252589:0:1252589] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 206 (rank 206 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-088:1869474:0:1869474] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 626 (rank 626 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-092:1590503:0:1590503] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252616:0:1252616] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993665:0:2993665] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 78 (rank 78 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-088:1869405:0:1869405] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 751 (rank 751 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-098:482588:0:482588] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 630 (rank 630 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-092:1590488:0:1590488] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252565:0:1252565] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 282 (rank 282 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-088:1869426:0:1869426] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 837 (rank 837 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 607 (rank 607 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 201 (rank 201 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 84 (rank 84 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-088:1869439:0:1869439] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 754 (rank 754 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-098:482552:0:482552] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655545:0:655545] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706356:0:706356] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303791:0:303791] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 204 (rank 204 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 633 (rank 633 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252569:0:1252569] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993722:0:2993722] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 89 (rank 89 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 728 (rank 728 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-089:2993695:0:2993695] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655470:0:655470] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993709:0:2993709] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 91 (rank 91 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-088:1869431:0:1869431] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 734 (rank 734 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 840 (rank 840 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-089:2993713:0:2993713] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706286:0:706286] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 101 (rank 101 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-097:303755:0:303755] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482605:0:482605] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655536:0:655536] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590516:0:1590516] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252602:0:1252602] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993680:0:2993680] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706330:0:706330] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869428:0:1869428] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303757:0:303757] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 816 (rank 816 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 596 (rank 596 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-092:1590525:0:1590525] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252614:0:1252614] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993663:0:2993663] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706329:0:706329] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 102 (rank 102 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 820 (rank 820 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 620 (rank 620 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 368 (rank 368 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-092:1590536:0:1590536] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 489 (rank 489 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-089:2993711:0:2993711] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706313:0:706313] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869395:0:1869395] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303790:0:303790] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 838 (rank 838 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-096:655538:0:655538] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346418:0:2346418] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590545:0:1590545] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 492 (rank 492 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-088:1869430:0:1869430] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303819:0:303819] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482595:0:482595] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655477:0:655477] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 495 (rank 495 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-089:2993661:0:2993661] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706307:0:706307] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869406:0:1869406] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303759:0:303759] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655528:0:655528] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 305 (rank 305 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 385 (rank 385 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 516 (rank 516 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 203 (rank 203 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-087:706312:0:706312] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 707 (rank 707 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-098:482516:0:482516] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346432:0:2346432] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590479:0:1590479] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 522 (rank 522 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-089:2993676:0:2993676] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869425:0:1869425] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303827:0:303827] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 843 (rank 843 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-096:655540:0:655540] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 309 (rank 309 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-092:1590483:0:1590483] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 525 (rank 525 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-089:2993727:0:2993727] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 161 (rank 161 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-097:303837:0:303837] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655555:0:655555] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346450:0:2346450] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590491:0:1590491] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 533 (rank 533 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-089:2993652:0:2993652] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 48 (rank 48 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-088:1869424:0:1869424] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 846 (rank 846 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 625 (rank 625 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-090:2346456:0:2346456] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 539 (rank 539 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-089:2993669:0:2993669] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706360:0:706360] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869447:0:1869447] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303805:0:303805] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655508:0:655508] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590546:0:1590546] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 540 (rank 540 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-089:2993743:0:2993743] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 30 (rank 30 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-088:1869401:0:1869401] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482578:0:482578] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655464:0:655464] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 334 (rank 334 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 546 (rank 546 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-089:2993696:0:2993696] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869421:0:1869421] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303848:0:303848] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482575:0:482575] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 77 (rank 77 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-088:1869387:0:1869387] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 758 (rank 758 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-092:1590489:0:1590489] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 570 (rank 570 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-089:2993671:0:2993671] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706340:0:706340] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869417:0:1869417] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303841:0:303841] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 799 (rank 799 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 337 (rank 337 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 426 (rank 426 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252617:0:1252617] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 277 (rank 277 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-087:706354:0:706354] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869438:0:1869438] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 766 (rank 766 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-098:482545:0:482545] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346470:0:2346470] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590507:0:1590507] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993723:0:2993723] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706273:0:706273] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869466:0:1869466] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303804:0:303804] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482557:0:482557] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655483:0:655483] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 461 (rank 461 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252537:0:1252537] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993736:0:2993736] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706275:0:706275] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869440:0:1869440] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303808:0:303808] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482585:0:482585] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655488:0:655488] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 347 (rank 347 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-092:1590544:0:1590544] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 560 (rank 560 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-089:2993655:0:2993655] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706301:0:706301] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655505:0:655505] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 402 (rank 402 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252582:0:1252582] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993715:0:2993715] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 49 (rank 49 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-097:303834:0:303834] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482602:0:482602] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655525:0:655525] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590518:0:1590518] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252603:0:1252603] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706276:0:706276] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 178 (rank 178 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-097:303802:0:303802] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655531:0:655531] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 350 (rank 350 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252561:0:1252561] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706320:0:706320] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 154 (rank 154 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-098:482555:0:482555] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 658 (rank 658 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-092:1590538:0:1590538] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993704:0:2993704] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869429:0:1869429] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482580:0:482580] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 662 (rank 662 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 351 (rank 351 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252536:0:1252536] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706290:0:706290] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869441:0:1869441] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 675 (rank 675 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 856 (rank 856 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-090:2346492:0:2346492] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590519:0:1590519] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 544 (rank 544 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-088:1869402:0:1869402] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303833:0:303833] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 862 (rank 862 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-092:1590485:0:1590485] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252612:0:1252612] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 218 (rank 218 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 75 (rank 75 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 732 (rank 732 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-098:482518:0:482518] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 370 (rank 370 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 197 (rank 197 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-087:706271:0:706271] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869449:0:1869449] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303779:0:303779] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482520:0:482520] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346498:0:2346498] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 439 (rank 439 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 214 (rank 214 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 29 (rank 29 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-088:1869470:0:1869470] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 739 (rank 739 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 430 (rank 430 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252574:0:1252574] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993682:0:2993682] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706319:0:706319] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869450:0:1869450] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303798:0:303798] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 778 (rank 778 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 373 (rank 373 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-092:1590459:0:1590459] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252618:0:1252618] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993664:0:2993664] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869432:0:1869432] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303811:0:303811] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 781 (rank 781 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-090:2346417:0:2346417] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 398 (rank 398 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-089:2993672:0:2993672] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706300:0:706300] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869456:0:1869456] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346427:0:2346427] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 515 (rank 515 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 236 (rank 236 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-087:706350:0:706350] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 130 (rank 130 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 749 (rank 749 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 796 (rank 796 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-090:2346433:0:2346433] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590470:0:1590470] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 517 (rank 517 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-087:706269:0:706269] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303818:0:303818] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482548:0:482548] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 400 (rank 400 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252580:0:1252580] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993668:0:2993668] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 76 (rank 76 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-088:1869398:0:1869398] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303792:0:303792] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482553:0:482553] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346451:0:2346451] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 232 (rank 232 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-087:706280:0:706280] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869446:0:1869446] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303771:0:303771] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482558:0:482558] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 507 (rank 507 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-087:706347:0:706347] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869396:0:1869396] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303825:0:303825] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 335 (rank 335 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 466 (rank 466 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252601:0:1252601] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706302:0:706302] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869400:0:1869400] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303775:0:303775] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482563:0:482563] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 348 (rank 348 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252542:0:1252542] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706355:0:706355] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869411:0:1869411] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303801:0:303801] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346475:0:2346475] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590542:0:1590542] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252606:0:1252606] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 252 (rank 252 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-087:706295:0:706295] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869453:0:1869453] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303843:0:303843] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482570:0:482570] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346487:0:2346487] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 407 (rank 407 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252615:0:1252615] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 256 (rank 256 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-087:706270:0:706270] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 175 (rank 175 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-097:303763:0:303763] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590540:0:1590540] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252547:0:1252547] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 260 (rank 260 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-087:706338:0:706338] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869457:0:1869457] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303797:0:303797] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 828 (rank 828 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 371 (rank 371 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 470 (rank 470 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 500 (rank 500 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-089:2993689:0:2993689] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706323:0:706323] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869393:0:1869393] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482574:0:482574] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590526:0:1590526] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252532:0:1252532] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993667:0:2993667] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706289:0:706289] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869435:0:1869435] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346414:0:2346414] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252549:0:1252549] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706334:0:706334] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869386:0:1869386] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 706 (rank 706 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 835 (rank 835 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-090:2346415:0:2346415] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252620:0:1252620] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993681:0:2993681] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706272:0:706272] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869469:0:1869469] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 718 (rank 718 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-098:482603:0:482603] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252579:0:1252579] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993675:0:2993675] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706279:0:706279] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869473:0:1869473] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482514:0:482514] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 304 (rank 304 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252596:0:1252596] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706281:0:706281] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869422:0:1869422] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482559:0:482559] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 310 (rank 310 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 404 (rank 404 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 198 (rank 198 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 817 (rank 817 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 327 (rank 327 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 410 (rank 410 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252585:0:1252585] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 15 (rank 15 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 729 (rank 729 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-098:482566:0:482566] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346459:0:2346459] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 464 (rank 464 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 520 (rank 520 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 262 (rank 262 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-088:1869442:0:1869442] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 742 (rank 742 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 825 (rank 825 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252583:0:1252583] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 227 (rank 227 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 23 (rank 23 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-088:1869467:0:1869467] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303828:0:303828] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482577:0:482577] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 339 (rank 339 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 393 (rank 393 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252594:0:1252594] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993700:0:2993700] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706292:0:706292] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 188 (rank 188 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-098:482594:0:482594] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 376 (rank 376 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-092:1590490:0:1590490] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252624:0:1252624] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993726:0:2993726] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706293:0:706293] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 123 (rank 123 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-097:303781:0:303781] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482596:0:482596] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346455:0:2346455] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252577:0:1252577] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993658:0:2993658] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869462:0:1869462] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 708 (rank 708 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-098:482604:0:482604] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346480:0:2346480] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 386 (rank 386 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252550:0:1252550] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993649:0:2993649] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 28 (rank 28 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-097:303806:0:303806] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482529:0:482529] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252593:0:1252593] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993666:0:2993666] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706303:0:706303] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 117 (rank 117 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-098:482533:0:482533] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 312 (rank 312 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-092:1590500:0:1590500] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252575:0:1252575] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993707:0:2993707] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706305:0:706305] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869433:0:1869433] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 750 (rank 750 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-098:482535:0:482535] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346458:0:2346458] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252578:0:1252578] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993710:0:2993710] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869476:0:1869476] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482599:0:482599] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346468:0:2346468] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252572:0:1252572] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993719:0:2993719] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 40 (rank 40 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-088:1869389:0:1869389] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 748 (rank 748 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-098:482607:0:482607] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346469:0:2346469] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252608:0:1252608] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993656:0:2993656] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706309:0:706309] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303800:0:303800] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482546:0:482546] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346424:0:2346424] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252600:0:1252600] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993678:0:2993678] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706310:0:706310] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869448:0:1869448] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346446:0:2346446] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252613:0:1252613] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993686:0:2993686] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706311:0:706311] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303770:0:303770] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482576:0:482576] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346452:0:2346452] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252539:0:1252539] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993724:0:2993724] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706321:0:706321] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 155 (rank 155 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-097:303845:0:303845] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482556:0:482556] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346478:0:2346478] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252570:0:1252570] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303764:0:303764] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 818 (rank 818 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 395 (rank 395 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252535:0:1252535] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993730:0:2993730] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 54 (rank 54 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-088:1869434:0:1869434] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 726 (rank 726 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-098:482513:0:482513] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346467:0:2346467] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 406 (rank 406 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252541:0:1252541] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993734:0:2993734] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706324:0:706324] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 165 (rank 165 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-097:303836:0:303836] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482539:0:482539] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 311 (rank 311 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-092:1590543:0:1590543] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252605:0:1252605] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993677:0:2993677] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706325:0:706325] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 119 (rank 119 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-097:303796:0:303796] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482567:0:482567] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 389 (rank 389 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252609:0:1252609] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993721:0:2993721] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706327:0:706327] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869443:0:1869443] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303826:0:303826] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482598:0:482598] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346454:0:2346454] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590528:0:1590528] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252563:0:1252563] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706335:0:706335] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869423:0:1869423] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 672 (rank 672 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-098:482537:0:482537] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346457:0:2346457] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590462:0:1590462] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252623:0:1252623] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 269 (rank 269 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-087:706336:0:706336] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303768:0:303768] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482571:0:482571] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346471:0:2346471] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590522:0:1590522] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993731:0:2993731] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706337:0:706337] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 185 (rank 185 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-098:482547:0:482547] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346472:0:2346472] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590509:0:1590509] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 574 (rank 574 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 217 (rank 217 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-087:706348:0:706348] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303803:0:303803] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482549:0:482549] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346464:0:2346464] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590524:0:1590524] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252581:0:1252581] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993706:0:2993706] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706353:0:706353] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869460:0:1869460] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 713 (rank 713 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-098:482597:0:482597] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 383 (rank 383 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-092:1590533:0:1590533] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993684:0:2993684] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706358:0:706358] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 190 (rank 190 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-098:482527:0:482527] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346442:0:2346442] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590458:0:1590458] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993685:0:2993685] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869464:0:1869464] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 697 (rank 697 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-098:482544:0:482544] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590504:0:1590504] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993720:0:2993720] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-088:1869471:0:1869471] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482521:0:482521] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590482:0:1590482] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 94 (rank 94 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-088:1869472:0:1869472] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 743 (rank 743 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-098:482536:0:482536] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 374 (rank 374 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-092:1590548:0:1590548] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 238 (rank 238 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-097:303766:0:303766] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482541:0:482541] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 318 (rank 318 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-089:2993739:0:2993739] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303773:0:303773] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346488:0:2346488] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590487:0:1590487] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993742:0:2993742] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303840:0:303840] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346491:0:2346491] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590492:0:1590492] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993679:0:2993679] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482551:0:482551] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346466:0:2346466] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 415 (rank 415 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-089:2993737:0:2993737] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303777:0:303777] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 829 (rank 829 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-090:2346486:0:2346486] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590547:0:1590547] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993741:0:2993741] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+slurmstepd: error: *** STEP 43120738.0 ON prod-087 CANCELLED AT 2026-04-24T15:00:15 ***
+slurmstepd: error: *** STEP 43120738.0 ON prod-087 CANCELLED AT 2026-04-24T15:00:15 ***
+Abort(201918725) on node 0 (rank 0 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-097:303761:0:303761] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482519:0:482519] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346462:0:2346462] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590467:0:1590467] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993735:0:2993735] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303822:0:303822] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 806 (rank 806 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-090:2346449:0:2346449] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590549:0:1590549] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993705:0:2993705] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 681 (rank 681 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-098:482526:0:482526] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346447:0:2346447] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590465:0:1590465] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993714:0:2993714] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482523:0:482523] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346490:0:2346490] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590484:0:1590484] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993717:0:2993717] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303772:0:303772] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482524:0:482524] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346448:0:2346448] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590508:0:1590508] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993728:0:2993728] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482528:0:482528] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590517:0:1590517] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993732:0:2993732] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 686 (rank 686 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-098:482515:0:482515] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 629 (rank 629 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-090:2346481:0:2346481] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590476:0:1590476] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 290 (rank 290 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-092:1590506:0:1590506] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303838:0:303838] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482517:0:482517] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346434:0:2346434] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590495:0:1590495] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 765 (rank 765 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 768 (rank 768 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-096:655523:0:655523] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346420:0:2346420] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590512:0:1590512] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303842:0:303842] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482531:0:482531] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346429:0:2346429] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303782:0:303782] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482534:0:482534] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590521:0:1590521] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655463:0:655463] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-092:1590531:0:1590531] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-097:303784:0:303784] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 440 (rank 440 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 763 (rank 763 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-092:1590498:0:1590498] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655529:0:655529] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 434 (rank 434 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-092:1590523:0:1590523] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-089:2993740:0:2993740] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 458 (rank 458 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-092:1590527:0:1590527] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655519:0:655519] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 581 (rank 581 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 583 (rank 583 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-096:655495:0:655495] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 628 (rank 628 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 643 (rank 643 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-096:655487:0:655487] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655516:0:655516] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655478:0:655478] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655460:0:655460] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655461:0:655461] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 578 (rank 578 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-096:655466:0:655466] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252559:0:1252559] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655469:0:655469] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252560:0:1252560] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 506 (rank 506 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-093:1252562:0:1252562] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 548 (rank 548 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 587 (rank 587 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-096:655472:0:655472] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 568 (rank 568 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-096:655473:0:655473] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252622:0:1252622] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252604:0:1252604] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 556 (rank 556 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-096:655474:0:655474] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-093:1252626:0:1252626] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 559 (rank 559 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-096:655475:0:655475] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655476:0:655476] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655479:0:655479] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655481:0:655481] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655482:0:655482] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655484:0:655484] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655485:0:655485] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655486:0:655486] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 605 (rank 605 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-096:655490:0:655490] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655492:0:655492] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 609 (rank 609 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-096:655494:0:655494] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655496:0:655496] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 613 (rank 613 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-096:655498:0:655498] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 615 (rank 615 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-096:655502:0:655502] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655506:0:655506] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655511:0:655511] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 631 (rank 631 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 634 (rank 634 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 636 (rank 636 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-096:655522:0:655522] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 640 (rank 640 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-096:655526:0:655526] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655530:0:655530] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655532:0:655532] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655533:0:655533] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 651 (rank 651 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-096:655537:0:655537] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 655 (rank 655 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-096:655541:0:655541] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655543:0:655543] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655544:0:655544] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655547:0:655547] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-096:655548:0:655548] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 665 (rank 665 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 666 (rank 666 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 668 (rank 668 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-096:655553:0:655553] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 670 (rank 670 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-090:2346421:0:2346421] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346440:0:2346440] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346439:0:2346439] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346425:0:2346425] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346426:0:2346426] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346482:0:2346482] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 382 (rank 382 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-090:2346504:0:2346504] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346479:0:2346479] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346495:0:2346495] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346506:0:2346506] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346484:0:2346484] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346493:0:2346493] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346505:0:2346505] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-090:2346501:0:2346501] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482538:0:482538] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482542:0:482542] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-098:482532:0:482532] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 6 (rank 6 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 9 (rank 9 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-087:706278:0:706278] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706282:0:706282] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706294:0:706294] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 36 (rank 36 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 38 (rank 38 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 46 (rank 46 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+Abort(201918725) on node 58 (rank 58 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-087:706332:0:706332] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706339:0:706339] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 93 (rank 93 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-087:706363:0:706363] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+[prod-087:706333:0:706333] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 73 (rank 73 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+[prod-087:706349:0:706349] Caught signal 11 (Segmentation fault: address not mapped to object at address (nil))
+Abort(201918725) on node 83 (rank 83 in comm 0): Fatal error in PMPI_Abort: Invalid communicator, error stack:
+PMPI_Abort(154): MPI_Abort(comm=0x0, errorcode=1) failed
+PMPI_Abort(90).: Invalid communicator
+srun: error: prod-088: task 102: Killed
+srun: launch/slurm: _step_signal: Terminating StepId=43120738.0
+srun: error: prod-092: task 384: Killed
+srun: error: prod-087: tasks 0-95: Killed
+srun: error: prod-096: tasks 576-671: Killed
+srun: error: prod-098: tasks 768-863: Killed
+srun: error: prod-089: tasks 192-287: Killed
+srun: error: prod-090: tasks 288-383: Killed
+srun: error: prod-097: tasks 672-767: Killed
+srun: error: prod-093: tasks 480-575: Killed
+srun: error: prod-088: tasks 96-101,103-191: Killed
+srun: error: prod-092: tasks 385-479: Killed

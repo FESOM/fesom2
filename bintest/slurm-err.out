@@ -1,0 +1,4 @@
+ln: failed to create symbolic link './fesom.x': File exists
+srun: Job step aborted: Waiting up to 62 seconds for job step to finish.
+slurmstepd: error: *** STEP 42714795.0 ON prod-045 CANCELLED AT 2026-04-15T17:13:28 ***
+slurmstepd: error: *** JOB 42714795 ON prod-045 CANCELLED AT 2026-04-15T17:13:28 ***
