@@ -313,10 +313,12 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
           "t_star              ", "twice               ", "tx_sur              ", &
           "ty_sur              ", "u                   ", "u_back_tend         ", &
           "u_dis_tend          ", "uice                ", "unod                ", &
-          "u_rhs_ice           ", "u_total_tend        ", "UVW_SQR             ", &
+          "unod_sfc            ", "u_rhs_ice           ", "u_total_tend        ", &
+          "UVW_SQR             ", &
           "uwice               ", "uwind               ", "v                   ", &
           "v_back_tend         ", "v_dis_tend          ", "vice                ", &
-          "virtsalt            ", "vnod                ", "volo                ", &
+          "virtsalt            ", "vnod                ", "vnod_sfc            ", &
+          "volo                ", &
           "v_rhs_ice           ", "v_total_tend        ", "vve_5               ", &
           "vwice               ", "vwind               ", "w                   " /)
         integer :: k
@@ -1498,6 +1500,10 @@ CASE ('unod      ')
     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/),'unod',      'zonal velocity at nodes', 'm/s', dynamics%uvnode(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('vnod      ')
     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/),'vnod',      'meridional velocity at nodes', 'm/s', dynamics%uvnode(2,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('unod_sfc  ')
+    call def_stream(nod2D, myDim_nod2D, 'unod_sfc', 'zonal surface velocity at nodes', 'm/s', dynamics%uvnode(1,1,1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('vnod_sfc  ')
+    call def_stream(nod2D, myDim_nod2D, 'vnod_sfc', 'meridional surface velocity at nodes', 'm/s', dynamics%uvnode(2,1,1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('w         ')
     call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'w',         'vertical velocity',  'm/s',           dynamics%w(:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('Av        ')
