@@ -30,7 +30,8 @@ module io_xios_module
                                   ldiag_dMOC, ldiag_DVD, ldiag_forc,     &
                                   ldiag_extflds, ldiag_destine,          &
                                   ldiag_ice, ldiag_trflx,                &
-                                  ldiag_uvw_sqr, ldiag_trgrd_xyz
+                                  ldiag_uvw_sqr, ldiag_trgrd_xyz,        &
+                                  std_dens_N, std_dens
   use cmor_variables_diag,  only: ldiag_cmor
   implicit none
   private
@@ -267,9 +268,10 @@ contains
     do i = 1, nz_cell
        z_mid(i) = -0.5_WP * (mesh%zbar(i) + mesh%zbar(i+1))
     end do
-    call xios_set_axis_attr("nz",  n_glo = nz_cell, value = z_mid)
+    call xios_set_axis_attr("nz",      n_glo = nz_cell,    value = z_mid)
     deallocate(z_mid)
-    call xios_set_axis_attr("nz1", n_glo = mesh%nl, value = -mesh%zbar(1:mesh%nl))
+    call xios_set_axis_attr("nz1",     n_glo = mesh%nl,    value = -mesh%zbar(1:mesh%nl))
+    call xios_set_axis_attr("std_dens", n_glo = std_dens_N, value = std_dens)
 
     ! --- 7. timestep (required by XIOS before close_context_definition) -----
     call xios_set_timestep(timestep = xios_duration(second = dt))
