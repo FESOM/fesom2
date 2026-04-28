@@ -313,10 +313,12 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
           "t_star              ", "twice               ", "tx_sur              ", &
           "ty_sur              ", "u                   ", "u_back_tend         ", &
           "u_dis_tend          ", "uice                ", "unod                ", &
-          "u_rhs_ice           ", "u_total_tend        ", "UVW_SQR             ", &
+          "unod_sfc            ", "u_rhs_ice           ", "u_total_tend        ", &
+          "UVW_SQR             ", &
           "uwice               ", "uwind               ", "v                   ", &
           "v_back_tend         ", "v_dis_tend          ", "vice                ", &
-          "virtsalt            ", "vnod                ", "volo                ", &
+          "virtsalt            ", "vnod                ", "vnod_sfc            ", &
+          "volo                ", &
           "v_rhs_ice           ", "v_total_tend        ", "vve_5               ", &
           "vwice               ", "vwind               ", "w                   " /)
         integer :: k
