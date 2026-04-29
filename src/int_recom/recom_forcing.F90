@@ -1,6 +1,7 @@
 !===============================================================================
 ! REcoM_Forcing
 !===============================================================================
+!sl we might want to consider to have a separate REcoM_Forcing_spectral subroutine
 subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali_depth &
             , CO2_watercolumn                                          &
             , pH_watercolumn                                           &
@@ -10,6 +11,9 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
             , OmegaC_watercolumn                                       &
             , kspc_watercolumn                                         &
             , rhoSW_watercolumn                                        &
+#if defined(__RECOM_WAVEBANDS)
+            , Light_watercolumn                                        &
+#endif            
             , PAR, ice, dynamics, tracers, partit, mesh)
 
     use recom_declarations
@@ -70,13 +74,14 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
 #if defined(__RECOM_WAVEBANDS)
     !!---- Spectral Light related
     integer :: ilam, Nr
-    integer :: iday,iyr,imon,isec,lp,wd,mydate(4)
+    integer :: iday,iyr,imon,isec,lp,wd,mydate(tnabp)
     INTEGER :: idiscEs,jdiscEs,kdiscEs,ldiscEs
     INTEGER :: idiscEu,jdiscEu,kdiscEu,ldiscEu
-    INTEGER :: myThid
+!sl    INTEGER :: myThid
     INTEGER :: kSurface, hFacC
+    real(kind=8),dimension(mesh%nl-1,tlam,ed_num) :: Light_watercolumn
     real(kind=8)                                  :: solz
-    real(kind=8)                                  :: PARadiation ! we have to fine fesom-recom analogue
+    real(kind=8)                                  :: PARadiation ! we have to find fesom-recom analogue
     Real(kind=8),dimension(tlam)                  :: PARwup
     Real(kind=8),dimension(tlam)                  :: PARwdn
     Real(kind=8),dimension(tlam,mesh%nl-1)        :: PARw_k ! or (mesh%nl-1,tlam)
@@ -92,7 +97,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
 !#endif /* RECOM_CALC_REFLEC */
     Real(kind=8),dimension(tlam)                  :: C_phot_nl
     Real(kind=8),dimension(tlam)                  :: C_phot_nl_dia
-        Real(kind=8),dimension(tlam)              :: C_phot_nl_cocco
+    Real(kind=8),dimension(tlam)                  :: C_phot_nl_cocco
     Real(kind=8),dimension(tlam)                  :: C_phot_nl_phaeo
     Real(kind=8),dimension(tlam)                  :: Ek_nl
     Real(kind=8),dimension(tlam)                  :: Ek_nl_dia
@@ -107,7 +112,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
     Real(kind=8),dimension(mesh%nl-1,tlam)        :: apart_k
     Real(kind=8),dimension(mesh%nl-1,tlam)        :: actot
 !    Real(kind=8),dimension(2,tlam)                :: aclocal
-    Real(kind=8),dimension(4,tlam)                :: aclocal
+    Real(kind=8),dimension(tnabp,tlam)                :: aclocal
     Real(kind=8)                                  :: atten
     Real(kind=8)                                  :: discEs
     Real(kind=8)                                  :: discEu
@@ -116,8 +121,8 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
     Real(kind=8),dimension(mesh%nl-1)             :: part_k
 !    Real(kind=8),dimension(2,mesh%nl-1)           :: Phy_k
 !    Real(kind=8),dimension(2,mesh%nl-1)           :: phychl_k
-    Real(kind=8),dimension(4,mesh%nl-1)           :: Phy_k
-    Real(kind=8),dimension(4,mesh%nl-1)           :: phychl_k
+    Real(kind=8),dimension(tnabp,mesh%nl-1)           :: Phy_k
+    Real(kind=8),dimension(tnabp,mesh%nl-1)           :: phychl_k
 !SLO    if (RECOM_CDOM) then
     Real(kind=8),dimension(mesh%nl-1)             :: cdom_k
 !SLO    endif  !/* RECOM_CDOM */
@@ -297,37 +302,39 @@ endif
 !------------ COMPUTE ACDOM_k  ----------------------------------
         if (RECOM_CDOM) then
         call MONOD_ACDOM(Nr,cdom_k(1:Nr),                       &
-                         acdom_k(1:Nr,1:tlam),                  &
-                         myThid)
+                         acdom_k(1:Nr,1:tlam)                   &
+                         , mype)
         else
         aclocal(1,1:tlam)=aphy_chl
         aclocal(2,1:tlam)=aphy_chl_dia
+if (enable_coccos) then
         aclocal(3,1:tlam)=aphy_chl_cocco
         aclocal(4,1:tlam)=aphy_chl_phaeo
-         call MONOD_no_ACDOM(Nr,phychl_k(4,1:Nr), aclocal, aw,     &
-                          acdom_k(1:Nr,1:tlam),                 &
-                          myThid)
+endif        
+         call MONOD_no_ACDOM(Nr,phychl_k(1:tnabp,1:Nr), aclocal, aw,     &
+                          acdom_k(1:Nr,1:tlam)                           &
+                          , tnabp, mype)
         endif   !/* RECOM_CDOM */
      endif      !/* RECOM_CALC_ACDOM */
 ! ------------ COMPUTE aphy_chl_k & aphy_chl_dia_k ----------------
      if (RECOM_CALC_APHYT .and. RECOM_MARSHALL) then        
         call RECOM_APHYTO(Nr,phyD1_k(1:Nr),QYmax,Drel,          & 
                           aphy_chl_ps(1:tlam),aphy_chl(1:tlam), &
-                          aphy_chl_k(1:Nr, 1:tlam),             & 
-                          myThid)
+                          aphy_chl_k(1:Nr, 1:tlam)              & 
+                          , mype)
         call RECOM_APHYTO(Nr,diaD1_k(1:Nr),QYmax_d,Drel,                &
                           aphy_chl_ps_dia(1:tlam),aphy_chl_dia(1:tlam), &
-                          aphy_chl_dia_k(1:Nr, 1:tlam),                 &
-                          myThid)
+                          aphy_chl_dia_k(1:Nr, 1:tlam)                  &
+                          , mype)
 if (enable_coccos) then
         call RECOM_APHYTO(Nr, coccoD1_k(1:Nr),QYmax,Drel,               &
                    aphy_chl_ps_cocco(1:tlam),aphy_chl_cocco(1:tlam),    &
-                   aphy_chl_cocco_k(1:Nr, 1:tlam),                      &
-                          myThid)
+                   aphy_chl_cocco_k(1:Nr, 1:tlam)                       &
+                          , mype)
         call RECOM_APHYTO(Nr, phaeoD1_k(1:Nr),QYmax_d,Drel,             &
                    aphy_chl_ps_phaeo(1:tlam),aphy_chl_phaeo(1:tlam),    &
-                   aphy_chl_phaeo_k(1:Nr, 1:tlam),                      &
-                          myThid)
+                   aphy_chl_phaeo_k(1:Nr, 1:tlam)                       &
+                          , mype)
 endif
      endif      !/* RECOM_CALC_APHYT */
 ! ------------ GET PART_k FOR WAVEBANDS_3D and RADTRANS ----------------
@@ -520,7 +527,7 @@ endif
 else
             bctot(k,ilam)  = bctot(k,ilam)                       &
                            + phychl_k(1,k) * bphy_chl(ilam)      &
-                         + phychl_k(2,k) * bphy_chl_dia(ilam)
+                           + phychl_k(2,k) * bphy_chl_dia(ilam)
 if (enable_coccos) then
             bctot(k,ilam)  = bctot(k,ilam)                       &
                          + phychl_k(3,k) * bphy_chl_cocco(ilam)  &
@@ -573,8 +580,8 @@ endif
                     Eutop(1:tlam,1:Nr),                          &
                     tirrq(1:Nr),                                 &
                     tirrwq(1:tlam,1:Nr),                         &
-                    amp1(1:tlam,1:Nr),amp2(1:tlam,1:Nr),         &
-                    myThid)
+                    amp1(1:tlam,1:Nr),amp2(1:tlam,1:Nr)          &
+                    , mype)
 !sl         ELSEIF (darwin_radtrans_niter.EQ.-1) THEN
 !sl           call MONOD_RADTRANS(                                  &
 !sl                    Nr,                                          &
@@ -586,8 +593,8 @@ endif
 !sl                    Edz(1:tlam,1:Nr),Esz(1:tlam,1:Nr),           &
 !sl                    Euz(1:tlam,1:Nr),Eutop(1:tlam,1:Nr),         &
 !sl                    tirrq(1:Nr),                                 &
-!sl                    tirrwq(1:tlam,1:Nr),                         &
-!sl                    myThid)
+!sl                    tirrwq(1:tlam,1:Nr)                          &
+!sl                    )
          ELSE
             call MONOD_RADTRANS_DIRECT(                          &
                     Nr,                                          &
@@ -602,8 +609,8 @@ endif
                     Estop(1:tlam,1:Nr),Eutop(1:tlam,1:Nr),       &
                     tirrq(1:Nr),                                 &
                     tirrwq(1:tlam,1:Nr),                         &
-                    amp1(1:tlam,1:Nr),amp2(1:tlam,1:Nr),         &
-                    myThid)
+                    amp1(1:tlam,1:Nr),amp2(1:tlam,1:Nr)          &
+                    , mype)
 
          ENDIF
 !     Uses chl from prev timestep (as wavebands does) keep like this in case

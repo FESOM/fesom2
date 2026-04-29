@@ -1951,6 +1951,7 @@ module REcoM_spectral
   Logical :: DAR_NONSPECTRAL_BACKSCATTERING_RATIO =.false.
   Logical :: DAR_RADTRANS_RMUS_PAR =.false.
   Logical :: DAR_RADTRANS_DECREASING =.false.
+  integer :: ed_num = 4   ! number of light related diagnostic 
 !sl the following lines moved to general recom_module  
 !slif (RECOM_MARSHALL) then
 !sl  integer :: id1, id1d, id1c, id1p
@@ -2112,7 +2113,7 @@ module REcoM_spectral
 
 ! Initially was ap_type(npmax), the number of PT
 
-         Integer,dimension(4)         :: ap_type
+         Integer,dimension(tnabp)         :: ap_type
          Integer,parameter            :: tlam = 13
          Integer,dimension(tlam)      :: pwaves
 
@@ -2267,7 +2268,7 @@ contains
 !BOP
 !     !ROUTINE: WAVEBANDS_INIT_FIXED
 !     !INTERFACE:
-       subroutine wavebands_init_fixed(myThid)
+       subroutine wavebands_init_fixed(mype)
 
 !     !DESCRIPTION: \bv
 !     *==========================================================*
@@ -2292,7 +2293,8 @@ contains
 !     !INPUT/OUTPUT PARAMETERS:
 !     == Routine arguments ==
 !     myThid     :: my Thread Id number
-      integer :: myThid
+!sl      integer :: myThid
+      integer, intent(in) :: mype         ! MPI rank
 !EOP
 
 !#if defined(__RECOM_WAVEBANDS)
@@ -2330,7 +2332,7 @@ contains
       integer       ::  nabp,i,ilam
 
 !sl      _BEGIN_MASTER(myThid)
-      if (myThid == 1) then
+      if (mype == 0) then
 !sl      rad = 180.0D0/pid        
 ! Quanta conversion
       planck = 6.6256d-34   !Plancks constant J sec
@@ -2823,7 +2825,7 @@ endif
       end subroutine wavebands_init_fixed
 
 
-  SUBROUTINE WAVEBANDS_INIT_VARI(myThid)
+  SUBROUTINE WAVEBANDS_INIT_VARI(mype)
        implicit none
 !     == Global variables ===
 !#include "SIZE.h"
@@ -2834,7 +2836,8 @@ endif
 !     !INPUT/OUTPUT PARAMETERS:
 !     == Routine arguments ==
 !     myThid     :: my Thread Id number
-       INTEGER   :: myThid
+!sl       INTEGER   :: myThid
+       integer, intent(in) :: mype         ! MPI rank
 !CEOP
 
 !sl#if defined(__RECOM_WAVEBANDS)
@@ -2967,8 +2970,8 @@ endif
 !else
 !                             P_chl, aclocal, awlocal,            &
 !endif
-                             acdomlocal,                         &
-                             myThid )
+                             acdomlocal                         &
+                             , mype)
       IMPLICIT NONE
 !     === Global variables ===
 !#include "SIZE.h"
@@ -2978,6 +2981,7 @@ endif
 !#if defined(__RECOM_WAVEBANDS)
 !#include "WAVEBANDS_PARAMS.h"
 !#endif
+      integer, intent(in) :: mype         ! MPI rank
       INTEGER      :: Nn
 ! !INPUT PARAMETERS: ===================================================
 !     P_chl      :: Chlorophyll per species and level
@@ -2989,18 +2993,11 @@ endif
 
 ! !OUTPUT PARAMETERS: ==================================================
 !     acdom      :: absortpion spectra for CDOM per level
-!sl if (RECOM_CDOM) then
       real(kind=8), dimension(Nn)      :: cdomlocal
-!sl else
-      real(kind=8), dimension(4,Nn)    :: P_chl
-      real(kind=8), dimension(4,tlam)  :: aclocal
-      real(kind=8), dimension(tlam  )  :: awlocal
-!sl endif
       real(kind=8), dimension(Nn,tlam) ::acdomlocal
-      INTEGER      :: myThid
+!sl      INTEGER      :: myThid
 !     !LOCAL VARIABLES:
 !     == Local variables ==
-      INTEGER      :: npmax
       INTEGER      :: k, np, ilam
       real(kind=8) ::  actot450, atot450      
 !EOP
@@ -3024,8 +3021,8 @@ endif  !/* RECOM_CALC_ACDOM */
   SUBROUTINE MONOD_no_ACDOM(                                     &
                              Nn,                                 &
                              P_chl, aclocal, awlocal,            &
-                             acdomlocal,                         &
-                             myThid )
+                             acdomlocal                          &
+                             ,npmax, mype)
       IMPLICIT NONE
 !     === Global variables ===
 !#include "SIZE.h"
@@ -3035,6 +3032,8 @@ endif  !/* RECOM_CALC_ACDOM */
 !#if defined(__RECOM_WAVEBANDS)
 !#include "WAVEBANDS_PARAMS.h"
 !#endif
+      integer, intent(in) :: mype         ! MPI rank
+      INTEGER, intent(in) :: npmax
       INTEGER      :: Nn
 ! !INPUT PARAMETERS: ===================================================
 !     P_chl      :: Chlorophyll per species and level
@@ -3046,14 +3045,12 @@ endif  !/* RECOM_CALC_ACDOM */
 
 ! !OUTPUT PARAMETERS: ==================================================
 !     acdom      :: absortpion spectra for CDOM per level
-      real(kind=8), dimension(4,Nn)    :: P_chl
-      real(kind=8), dimension(4,tlam)  :: aclocal
+      real(kind=8), dimension(npmax,Nn)    :: P_chl
+      real(kind=8), dimension(npmax,tlam)  :: aclocal
       real(kind=8), dimension(tlam  )  :: awlocal
       real(kind=8), dimension(Nn,tlam) ::acdomlocal
-      INTEGER      :: myThid
+!sl      INTEGER      :: myThid
 !     !LOCAL VARIABLES:
-!     == Local variables ==
-      INTEGER      :: npmax
       INTEGER      :: k, np, ilam
       real(kind=8) ::  actot450, atot450
 !EOP
@@ -3066,8 +3063,8 @@ if (RECOM_CALC_ACDOM) then
 !sl      real(kind=8) ::  actot450, atot450
 ! ANNA moved cdom calculation from WG's light.f
 ! it's done for RADTRANS and WAVEBANDS_3D
-      npmax = 2
-      if (enable_coccos) npmax = 4
+!sl      npmax = tnabp
+!sl      if (enable_coccos) npmax = 4
       do k = 1,Nn
        actot450 = 0.0d0
        atot450 = 0.0d0
@@ -3094,8 +3091,8 @@ endif  !/* RECOM_CALC_ACDOM */
                          H,rmud,Edsf,Essf,a_k,bt_k,bb_k,kmax,niter,    &
                          Edbot,Esbot,Eubot,Eutop,                      &
                          tirrq,tirrwq,                                 &
-                         c1out, c2out,                                 & 
-                         myThid)
+                         c1out, c2out                                  & 
+                         , mype)
 
 ! !DESCRIPTION:
 !
@@ -3139,6 +3136,7 @@ endif  !/* RECOM_CALC_ACDOM */
 !     bb_k  :: backscattering coefficient per level and waveband (1/m)
 !     kmax  :: maximum number of layers to compute
 !     niter :: number of up-down iterations after initial Aas integration
+      integer, intent(in) :: mype         ! MPI rank
       INTEGER                          :: Nn
       Real(kind=8),dimension(Nn)       :: H
       Real(kind=8)                     :: rmud
@@ -3148,7 +3146,7 @@ endif  !/* RECOM_CALC_ACDOM */
       Real(kind=8),dimension(Nn,tlam)  :: bt_k
       Real(kind=8),dimension(Nn,tlam)  :: bb_k
       INTEGER                          :: kmax,niter
-      INTEGER                          :: myThid
+!sl      INTEGER                          :: myThid
 !?                                                                                                                 62,1          18%
 ! !OUTPUT PARAMETERS: ==================================================
 !     Edbot    :: direct downwelling irradiance at bottom of layer
@@ -3359,8 +3357,8 @@ endif !/* RECOM_RADTRANS */
                          H,rmud,Edsf,Essf,a_k,bt_k,bb_k,kmax,        &
                          Edbot,Esbot,Eubot,Estop,Eutop,              &
                          tirrq,tirrwq,                               &
-                         amp1, amp2,                                 &
-                         myThid)
+                         amp1, amp2                                  &
+                         , mype)
 ! !DESCRIPTION:
 !
 !  Model of irradiance in the water column.  Accounts for three
@@ -3404,6 +3402,7 @@ endif !/* RECOM_RADTRANS */
 !              = forward + back scattering coefficient
 !     bb_k  :: backscattering coefficient per level and waveband (1/m)
 !     kmax  :: maximum number of layers to compute
+      integer, intent(in) :: mype         ! MPI rank
       Real(kind=8),dimension(Nn)       :: H
       Integer                          :: Nn
       Real(kind=8)                     :: rmud
@@ -3413,7 +3412,7 @@ endif !/* RECOM_RADTRANS */
       Real(kind=8),dimension(Nn,tlam)  :: bt_k
       Real(kind=8),dimension(Nn,tlam)  :: bb_k
       INTEGER                          :: kmax
-      INTEGER                          :: myThid
+!sl      INTEGER                          :: myThid
 
 ! !OUTPUT PARAMETERS: ==================================================
 !     Edbot  :: direct downwelling irradiance at bottom of layer
@@ -3548,7 +3547,7 @@ if (RECOM_RADTRANS) then
          c3d(2*kbot) = 0.0d0  ! not used
          y3d(2*kbot) = 0.0d0  ! = 0
 
-         CALL SOLVE_TRIDIAGONAL_PIVOT(Nn,a3d,b3d,c3d,y3d,2*kbot,myThid)
+         CALL SOLVE_TRIDIAGONAL_PIVOT(Nn,a3d,b3d,c3d,y3d,2*kbot)
 
 ! compute irradiances
          DO k=1,kbot
@@ -3613,7 +3612,7 @@ endif !/* RECOM_RADTRANS */
                            Nn,                             &                      
                            a3d, b3d, c3d,                  &
                            y3d,                            &
-                           n, myThid )                     
+                           n)                      
 !     !DESCRIPTION: \bv
 !     *==========================================================*
 !     | S/R SOLVE_TRIDIAGONAL_PIVOT
@@ -3636,12 +3635,13 @@ endif !/* RECOM_RADTRANS */
 !     b3d(1:n)   :: matrix main  diagnonal
 !     c3d(1:n-1) :: matrix upper diagnonal
 !     y3d(1:n)   :: Input = Y vector ; Output = X = solution of A*X=Y
+!sl      integer, intent(in) :: mype         ! MPI rank
       integer                             :: Nn
       Real(kind=8),dimension(2*Nn)        :: a3d
       Real(kind=8),dimension(2*Nn)        :: b3d
       Real(kind=8),dimension(2*Nn)        :: c3d
       Real(kind=8),dimension(2*Nn)        :: y3d
-      INTEGER                             :: n,myThid
+      INTEGER                             :: n       !sl ,myThid
 !EOP
 
 !     !LOCAL VARIABLES:
@@ -3703,8 +3703,8 @@ endif !/* RECOM_RADTRANS */
                              Nr,                                &   
                              D1,QYm,Drel,                       &
                              aphy_PSpigm,aphy_ALLpigm,          &
-                             aphytolocal,                       &
-                             myThid )
+                             aphytolocal                        &
+                             , mype)
 
 ! !DESCRIPTION:
 !     computes aphyto from D1 state variable
@@ -3731,6 +3731,7 @@ endif !/* RECOM_RADTRANS */
 !     myThid     :: My Thread Id number
 ! !OUTPUT PARAMETERS: ==================================================
 !     aphytolocal :: absortpion spectra for phytoplankton group per level
+      integer, intent(in) :: mype         ! MPI rank
       integer                         :: Nr
       Real(kind=8),dimension(Nr)      :: D1(Nr)
       Real(kind=8)                    :: QYm
@@ -3740,7 +3741,7 @@ endif !/* RECOM_RADTRANS */
       Real(kind=8),dimension(Nr,tlam) :: aphytolocal
 !     _RL     myTime
 !     INTEGER myIter
-      INTEGER :: myThid
+!sl      INTEGER :: myThid
 !EOP
 
 !sl if (RECOM_CALC_APHYT) then

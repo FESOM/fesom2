@@ -120,6 +120,9 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     real(kind=8),  allocatable :: kspc_watercolumn(:)
     real(kind=8),  allocatable :: rhoSW_watercolumn(:)
     real(kind=WP)              :: ttf_rhs_bak (mesh%nl-1, tracers%num_tracers) ! local variable ! OG - tra_diag
+#if defined(__RECOM_WAVEBANDS)
+    real(kind=8),  allocatable :: Light_watercolumn(:,:,:)
+#endif
 
 #include "../associate_part_def.h"
 #include "../associate_mesh_def.h"
@@ -130,6 +133,9 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     allocate(C(nl-1, bgc_num))
     allocate(CO2_watercolumn(nl-1), pH_watercolumn(nl-1), pCO2_watercolumn(nl-1) , HCO3_watercolumn(nl-1))
     allocate(CO3_watercolumn(nl-1), OmegaC_watercolumn(nl-1), kspc_watercolumn(nl-1) , rhoSW_watercolumn(nl-1))
+#if defined(__RECOM_WAVEBANDS)
+    allocate(Light_watercolumn(nl-1, ed_num, tlam))
+#endif
 
     !< ice concentration [0 to 1]
 
@@ -386,6 +392,7 @@ endif
 
 ! ======================================================================================
 !******************************** RECOM FORCING ****************************************
+!sl we might want to consider to have a separate REcoM_Forcing_spectral subroutine
         call REcoM_Forcing(zr, n, nzmax, C, SW, Loc_slp, Temp, Sali, Sali_depth &
            , CO2_watercolumn                                     & ! NEW MOCSY CO2 for the whole watercolumn
            , pH_watercolumn                                      & ! NEW MOCSY pH for the whole watercolumn
@@ -395,6 +402,9 @@ endif
            , OmegaC_watercolumn                                  & ! NEW DISS OmegaC for the whole watercolumn
            , kspc_watercolumn                                    & ! NEW DISS stoichiometric solubility product for calcite [mol^2/kg^2]
            , rhoSW_watercolumn                                   & ! NEW DISS in-situ density of seawater [mol/m^3]
+#if defined(__RECOM_WAVEBANDS)
+           , Light_watercolumn                                   & ! Light (Ed) variables
+#endif           
                            , PAR, ice, dynamics, tracers, partit, mesh)
 
         do tr_num = num_tracers-bgc_num+1, num_tracers !bgc_num+2
