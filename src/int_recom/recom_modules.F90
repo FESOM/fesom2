@@ -2264,6 +2264,8 @@ module REcoM_spectral
   Real(kind=8)  :: alpha_mean_dia
   Real(kind=8)  :: alpha_mean_cocco
   Real(kind=8)  :: alpha_mean_phaeo
+! Light diagnostics Ed3D
+  Real(kind=8), allocatable, dimension(:,:,:,:)   ::  Ed4D
 contains
 !BOP
 !     !ROUTINE: WAVEBANDS_INIT_FIXED

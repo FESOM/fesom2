@@ -30,6 +30,9 @@ subroutine recom_init(tracers, partit, mesh)
     use REcoM_locVar
     use recom_config
     use REcoM_ciso
+#if defined(__RECOM_WAVEBANDS)   
+    use REcoM_spectral
+#endif    
     implicit none
 #include "netcdf.inc"
     !___________________________________________________________________________
@@ -306,6 +309,11 @@ subroutine recom_init(tracers, partit, mesh)
     OmegaC3D(:,:)       = 0.d0
     kspc3D(:,:)         = 0.d0
     rhoSW3D(:,:)        = 0.d0
+
+#if defined(__RECOM_WAVEBANDS) 
+!! *** Allocate 4D Light
+    allocate(Ed4D      ( nl-1, node_size,tlam,ed_num ))
+#endif
 
 !! *** Allocate ballasting ***
     allocate(rho_particle1       ( nl-1, node_size ))

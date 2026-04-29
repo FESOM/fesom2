@@ -505,6 +505,10 @@ if (enable_coccos) then
             TCphot_phaeo        (1:nzmax,n) = VTCphot_phaeo             (1:nzmax)
 
 endif
+#if defined(__RECOM_WAVEBANDS)
+            Ed4D    (1:nzmax,n,1:tlam,1:ed_num) = Light_watercolumn(1:nzmax,1:tlam,1:ed_num) 
+#endif
+
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
 
@@ -538,6 +542,9 @@ if (enable_coccos) then
             deallocate(VTTemp_phaeo, VTPhaeoCO2, VTqlimitFac_phaeo, VTCphotLigLim_phaeo, VTCphot_phaeo)
 
 endif
+#if defined(__RECOM_WAVEBANDS)
+            deallocate(Light_watercolumn)
+#endif
 
         end if 
 
@@ -579,6 +586,14 @@ endif
     do tr_num=num_tracers-bgc_num+1, num_tracers
         call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
     end do
+
+#if defined(__RECOM_WAVEBANDS)
+    do n = 1, ed_num
+       do tr_num = 1, tlam
+         call exchange_nod(Ed4D(:,:,tr_num,n), partit)
+       end do
+    end do
+#endif
 
     call exchange_nod(GloPCO2surf, partit)
     call exchange_nod(GlodPCO2surf, partit)
