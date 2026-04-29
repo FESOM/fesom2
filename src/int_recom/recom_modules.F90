@@ -2264,7 +2264,7 @@ module REcoM_spectral
   Real(kind=8)  :: alpha_mean_dia
   Real(kind=8)  :: alpha_mean_cocco
   Real(kind=8)  :: alpha_mean_phaeo
-! Light diagnostics Ed3D
+  ! Light diagnostics Ed4D more work to be done
   Real(kind=8), allocatable, dimension(:,:,:,:)   ::  Ed4D
 contains
 !BOP
