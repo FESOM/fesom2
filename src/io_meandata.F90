@@ -2839,35 +2839,44 @@ ctime=timeold+(dayold-1.)*86400
 #endif
             !___________________________________________________________________
             ! write double precision output
+            !
+            ! NetCDF fill-value substitution is skipped under __MULTIO: multio
+            ! ships the array straight to GRIB and a 9.97e36 sentinel in the
+            ! data range wrecks GRIB packing precision (real ice values get
+            ! quantized to ~0). Multio gets the clean mean (zeros stay zeros).
             if (entry%accuracy == i_real8) then
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
                 DO J=1, size(entry%local_values_r8,dim=2)
                     DO I=1, size(entry%local_values_r8,dim=1)
-                        ! Check if point has valid data (non-zero accumulated value)
-                        ! Use small epsilon to account for floating point precision
+#if defined(__MULTIO)
+                        entry%local_values_r8_copy(I,J) = entry%local_values_r8(I,J) /real(entry%addcounter,real64)  ! compute_means
+#else
                         if (abs(entry%local_values_r8(I,J)) < 1.0e-30_real64) then
                             entry%local_values_r8_copy(I,J) = NC_FILL_DOUBLE  ! No data - set to fill value
                         else
                             entry%local_values_r8_copy(I,J) = entry%local_values_r8(I,J) /real(entry%addcounter,real64)  ! compute_means
                         end if
+#endif
                         entry%local_values_r8(I,J) = 0._real64 ! clean_meanarrays - reset to 0 for next accumulation
                     END DO ! --> DO I=1, size(entry%local_values_r8,dim=1)
                 END DO ! --> DO J=1, size(entry%local_values_r8,dim=2)
 !$OMP END PARALLEL DO
-                
+
             !___________________________________________________________________
             ! write single precision output
             else if (entry%accuracy == i_real4) then
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
                 DO J=1, size(entry%local_values_r4,dim=2)
                     DO I=1, size(entry%local_values_r4,dim=1)
-                        ! Check if point has valid data (non-zero accumulated value)
-                        ! Use small epsilon to account for floating point precision
+#if defined(__MULTIO)
+                        entry%local_values_r4_copy(I,J) = entry%local_values_r4(I,J) /real(entry%addcounter,real32)  ! compute_means
+#else
                         if (abs(entry%local_values_r4(I,J)) < 1.0e-30_real32) then
                             entry%local_values_r4_copy(I,J) = NC_FILL_FLOAT  ! No data - set to fill value
                         else
                             entry%local_values_r4_copy(I,J) = entry%local_values_r4(I,J) /real(entry%addcounter,real32)  ! compute_means
                         end if
+#endif
                         entry%local_values_r4(I,J) = 0._real32 ! clean_meanarrays - reset to 0 for next accumulation
                     END DO ! --> DO I=1, size(entry%local_values_r4,dim=1)
                 END DO ! --> DO J=1, size(entry%local_values_r4,dim=2)
