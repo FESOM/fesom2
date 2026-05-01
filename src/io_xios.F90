@@ -633,6 +633,7 @@ contains
   implicit none
   private
   public :: io_xios_is_on
+  public :: io_xios_field_is_active
   public :: io_xios_send_2d_r8, io_xios_send_3d_r8
   public :: io_xios_send_2d_r4, io_xios_send_3d_r4
   public :: io_xios_owned_elem_local, io_xios_n_owned_elem
@@ -646,6 +647,11 @@ contains
   public :: io_xios_apply_wet_3d_elem_r4, io_xios_apply_wet_3d_elem_r8
 contains
   logical function io_xios_is_on() result(r)
+    r = .false.
+  end function
+
+  logical function io_xios_field_is_active(name) result(r)
+    character(len=*), intent(in) :: name
     r = .false.
   end function
 
