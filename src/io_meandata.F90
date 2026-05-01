@@ -12,7 +12,8 @@ module io_MEANDATA
   use io_data_strategy_module
   use async_threads_module
   use netcdf
-  use io_xios_module, only: io_xios_is_on, io_xios_send_2d_r8, io_xios_send_2d_r4, &
+  use io_xios_module, only: io_xios_is_on, io_xios_field_is_active, &
+                            io_xios_send_2d_r8, io_xios_send_2d_r4, &
                             io_xios_send_3d_r8, io_xios_send_3d_r4, &
                             io_xios_set_ice_conc, io_xios_is_ice_field, &
                             io_xios_apply_ice_mask_2d_r4, io_xios_apply_ice_mask_2d_r8, &
@@ -2748,8 +2749,19 @@ ctime=timeold+(dayold-1.)*86400
 !#endif
 
         !_______________________________________________________________________
-        !check whether output will be written based on event frequency
+        ! Cadence dispatch:
+        !   - XIOS-driven path: ask XIOS whether this field needs a sample now.
+        !     Cadence is set in XML (field_def freq_op), so the per-event heavy
+        !     work below (mean-divide, pack, mask, write_mean dispatch) only
+        !     fires at the XML-declared cadence, not every model step.
+        !   - Native (non-XIOS) path: keep the namelist.io freq_unit-based
+        !     event check (unchanged behaviour for FESOM-standalone runs).
         do_output=.false.
+#if defined(__XIOS)
+        if (io_xios_is_on()) then
+            do_output = io_xios_field_is_active(trim(entry%name))
+        else
+#endif
         if (entry%freq_unit.eq.'y') then
             call annual_event(do_output, entry%freq)
         else if (entry%freq_unit == 'm') then
@@ -2766,6 +2778,9 @@ ctime=timeold+(dayold-1.)*86400
             call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
             stop
         endif
+#if defined(__XIOS)
+        end if
+#endif
 
 #if defined(__MULTIO)
         output_done = output_done .or. do_output

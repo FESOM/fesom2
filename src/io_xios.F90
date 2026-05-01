@@ -41,6 +41,7 @@ module io_xios_module
   public :: io_xios_send_2d_r8, io_xios_send_3d_r8
   public :: io_xios_send_2d_r4, io_xios_send_3d_r4
   public :: io_xios_is_on
+  public :: io_xios_field_is_active
   public :: io_xios_set_ice_conc, io_xios_is_ice_field
   public :: io_xios_apply_ice_mask_2d_r4, io_xios_apply_ice_mask_2d_r8
   public :: io_xios_apply_ice_mask_2d_elem_r4, io_xios_apply_ice_mask_2d_elem_r8
@@ -102,6 +103,29 @@ contains
 
   logical function io_xios_is_on() result(r)
     r = xios_on
+  end function
+
+  !> Wrapper around the XIOS Fortran binding xios_field_is_active. Returns
+  !> true only when XIOS expects a sample for this field at the current
+  !> calendar timestep. Used by io_meandata's streamloop to gate per-stream
+  !> heavy work (mean-divide, pack, mask, write_mean dispatch) on the
+  !> cadence XIOS XML declares via field_def freq_op.
+  !>
+  !> CRITICAL: xios_field_is_active is called with at_current_timestep=.TRUE..
+  !> When that argument is omitted the binding defaults it to .FALSE. and
+  !> returns "is this field registered in any output?" (= unconditionally
+  !> true), which would defeat the gate.
+  logical function io_xios_field_is_active(name) result(r)
+    character(len=*), intent(in) :: name
+    if (.not. xios_on) then
+       r = .false.
+       return
+    end if
+    if (.not. xios_is_valid_field(trim(name))) then
+       r = .false.
+       return
+    end if
+    r = xios_field_is_active(trim(name), .TRUE.)
   end function
 
 
@@ -303,25 +327,30 @@ contains
   end subroutine
 
 
+  ! All four send wrappers gate the actual xios_send_field call on
+  ! xios_field_is_active(name, .TRUE.). With field_def freq_op set per file
+  ! (e.g., 1d / 1mo to match output_freq), xios_field_is_active returns true
+  ! only at the cadence XIOS expects a sample, so xios_send_field — and its
+  ! client-side pipeline (inputField, temporal_filter, downstream MPI) —
+  ! only runs when the XML asks. xios_is_valid_field stays as a defensive
+  ! check for fields not declared in field_def (silently dropped).
   !> Send a 2D (node-only) field. Shape: (ni=myDim_nod2D).
   !> Caller (io_meandata.F90) must already have sliced to owned nodes.
   subroutine io_xios_send_2d_r8(name, buf)
     character(len=*), intent(in) :: name
     real(kind=8),     intent(in) :: buf(:)
-    logical :: is_valid
     if (.not. xios_on) return
-    is_valid = xios_is_valid_field(trim(name))
-    if (.not. is_valid) return
+    if (.not. xios_is_valid_field(trim(name))) return
+    if (.not. xios_field_is_active(trim(name), .TRUE.)) return
     call xios_send_field(trim(name), buf)
   end subroutine
 
   subroutine io_xios_send_2d_r4(name, buf)
     character(len=*), intent(in) :: name
     real(kind=4),     intent(in) :: buf(:)
-    logical :: is_valid
     if (.not. xios_on) return
-    is_valid = xios_is_valid_field(trim(name))
-    if (.not. is_valid) return
+    if (.not. xios_is_valid_field(trim(name))) return
+    if (.not. xios_field_is_active(trim(name), .TRUE.)) return
     call xios_send_field(trim(name), buf)
   end subroutine
 
@@ -330,20 +359,18 @@ contains
   subroutine io_xios_send_3d_r8(name, buf)
     character(len=*), intent(in) :: name
     real(kind=8),     intent(in) :: buf(:,:)
-    logical :: is_valid
     if (.not. xios_on) return
-    is_valid = xios_is_valid_field(trim(name))
-    if (.not. is_valid) return
+    if (.not. xios_is_valid_field(trim(name))) return
+    if (.not. xios_field_is_active(trim(name), .TRUE.)) return
     call xios_send_field(trim(name), buf)
   end subroutine
 
   subroutine io_xios_send_3d_r4(name, buf)
     character(len=*), intent(in) :: name
     real(kind=4),     intent(in) :: buf(:,:)
-    logical :: is_valid
     if (.not. xios_on) return
-    is_valid = xios_is_valid_field(trim(name))
-    if (.not. is_valid) return
+    if (.not. xios_is_valid_field(trim(name))) return
+    if (.not. xios_field_is_active(trim(name), .TRUE.)) return
     call xios_send_field(trim(name), buf)
   end subroutine
 
