@@ -134,6 +134,33 @@
       "environment": {
         "FESOM_PLATFORM_STRATEGY": "ubuntu"
       }
+    },
+    {
+      "name": "xios",
+      "displayName": "XIOS Output FESOM2 Build",
+      "description": "FESOM2 build with XIOS-async output (FESOM_WITH_XIOS=ON); requires XIOS_ROOT in env",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/xios",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_TESTING": "ON",
+        "FESOM_COUPLED": "OFF",
+        "OIFS_COUPLED": "OFF",
+        "RECOM_COUPLED": "OFF",
+        "USE_ICEPACK": "OFF",
+        "ENABLE_IFS_INTERFACE": "OFF",
+        "ENABLE_OPENMP": "OFF",
+        "ENABLE_MULTIO": "OFF",
+        "ASYNC_ICEBERGS": "ON",
+        "VERBOSE": "OFF",
+        "FESOM_PROFILING": "OFF",
+        "BUILD_MESHPARTITIONER": "OFF",
+        "BUILD_MESHDIAG": "OFF",
+        "FESOM_WITH_XIOS": "ON"
+      },
+      "environment": {
+        "FESOM_PLATFORM_STRATEGY": "ubuntu"
+      }
     }
   ],
   "buildPresets": [
@@ -166,6 +193,12 @@
       "configurePreset": "ifs_interface",
       "displayName": "Build IFS Interface Configuration",
       "description": "Build the IFS interface FESOM2 configuration"
+    },
+    {
+      "name": "xios",
+      "configurePreset": "xios",
+      "displayName": "Build XIOS Configuration",
+      "description": "Build the XIOS-async-output FESOM2 configuration"
     }
   ],
   "testPresets": [
@@ -218,6 +251,17 @@
       "configurePreset": "ifs_interface",
       "displayName": "Test IFS Interface Configuration",
       "description": "Run integration tests for the IFS interface FESOM2 configuration",
+      "filter": {
+        "include": {
+          "name": "integration_.*"
+        }
+      }
+    },
+    {
+      "name": "xios",
+      "configurePreset": "xios",
+      "displayName": "Test XIOS Configuration",
+      "description": "Run integration tests for the XIOS-async-output FESOM2 configuration",
       "filter": {
         "include": {
           "name": "integration_.*"
