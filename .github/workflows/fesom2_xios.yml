@@ -1,0 +1,81 @@
+name: "FESOM2: XIOS output"
+# Controls when the action will run. Triggers the workflow on pull request only.
+on:
+  workflow_dispatch: {}
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+    branches:
+      - main
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  general_test:
+    # Containers must run in Linux based operating systems
+    runs-on: ubuntu-latest
+    # Image with mkfesom + XIOS 2.5 prebuilt at /xios (see FESOM/FESOM2_Docker
+    # fesom2_test_refactoring/Dockerfile).
+    container: ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master
+
+    steps:
+      # NK: this changes working directory to fesom2
+      - uses: actions/checkout@v2
+
+      - name: Git safe directory
+        run: |
+          git config --global --add safe.directory ${PWD}
+
+      - name: Copy XIOS install from container
+        run: |
+          cp -rf /xios ../
+
+      - name: Compile model with XIOS
+        env:
+          XIOS_ROOT: ${{ github.workspace }}/../xios
+        run: |
+          ./configure.sh ubuntu -DFESOM_WITH_XIOS=ON
+
+      - name: Create global test run
+        run: |
+          mkrun pi test_pi -m docker
+
+      - name: Stage XIOS XMLs
+        run: |
+          # context_fesom / field_def_fesom / file_def_fesom ship in the repo;
+          # iodef.xml ships configured for AWI-ESM3 coupled (references OIFS
+          # context, sets using_server=true, using_oasis=true) so we write a
+          # minimal standalone variant here.
+          cp docs/xios_xml/context_fesom.xml   work_pi/
+          cp docs/xios_xml/field_def_fesom.xml work_pi/
+          cp docs/xios_xml/file_def_fesom.xml  work_pi/
+          cat > work_pi/iodef.xml <<'EOF'
+          <?xml version="1.0"?>
+          <simulation>
+            <context id="fesom" src="./context_fesom.xml" />
+            <context id="xios">
+              <variable_definition>
+                <variable_group id="parameters">
+                  <variable id="using_server" type="bool">false</variable>
+                  <variable id="info_level"   type="int" >0</variable>
+                  <variable id="print_file"   type="bool">true</variable>
+                </variable_group>
+              </variable_definition>
+            </context>
+          </simulation>
+          EOF
+
+      - name: FESOM2 XIOS test run
+        run: |
+          cd work_pi
+          chmod +x job_docker_new
+          ./job_docker_new
+
+      - name: Check XIOS produced output
+        run: |
+          # In attached mode XIOS writes from rank 0 of the FESOM communicator.
+          # The minimal file_def_fesom.xml has fesom_1d/fesom_1mo/fesom_3h
+          # groups; existence of any sst*.nc produced via XIOS is enough to
+          # confirm the path works.
+          ls -la work_pi/
+          ls work_pi/sst.fesom*.nc 2>/dev/null && echo "XIOS output OK" || (echo "no XIOS sst output" && exit 1)
