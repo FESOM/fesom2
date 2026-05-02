@@ -42,13 +42,12 @@ jobs:
 
       - name: Stage XIOS XMLs
         run: |
-          # context_fesom / field_def_fesom / file_def_fesom ship in the repo;
-          # iodef.xml ships configured for AWI-ESM3 coupled (references OIFS
-          # context, sets using_server=true, using_oasis=true) so we write a
-          # minimal standalone variant here.
-          cp docs/xios_xml/context_fesom.xml   work_pi/
-          cp docs/xios_xml/field_def_fesom.xml work_pi/
-          cp docs/xios_xml/file_def_fesom.xml  work_pi/
+          # All FESOM XIOS XMLs (context, field/file/axis/domain/grid_def) ship
+          # in docs/xios_xml/. Copy them all, then overwrite iodef.xml — the
+          # bundled iodef is the AWI-ESM3 coupled variant (references OIFS
+          # context, sets using_server=true, using_oasis=true), so a minimal
+          # standalone iodef is written inline below.
+          cp docs/xios_xml/*.xml work_pi/
           cat > work_pi/iodef.xml <<'EOF'
           <?xml version="1.0"?>
           <simulation>
