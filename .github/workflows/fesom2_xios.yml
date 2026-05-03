@@ -91,19 +91,46 @@ jobs:
           chmod +x job_docker_new
           ./job_docker_new
 
-      - name: Check XIOS produced output
+      - name: Check XIOS produced output (means + bit-id)
         run: |
           # In attached mode (using_server=false) XIOS writes one netcdf per
-          # rank with name <var>.fesom_<startyear>-<endyear>_<rank>.nc. Confirm
-          # all 6 fields wrote at least one file.
-          ls -la work_pi/
-          missing=0
-          for var in sst a_ice temp salt u v; do
-            if ! ls work_pi/${var}.fesom_*.nc >/dev/null 2>&1; then
-              echo "MISSING: ${var}.fesom_*.nc"
-              missing=1
-            else
-              echo "OK: $(ls work_pi/${var}.fesom_*.nc | head -1)"
-            fi
-          done
-          [ "$missing" -eq 0 ] || exit 1
+          # rank with name <var>.fesom_<startyear>-<endyear>_<rank>.nc. The
+          # standard mkfesom fcheck only handles the native single-file
+          # naming, so do the equivalent inline: per variable, concat all
+          # rank files, compute the masked mean, compare to the reference
+          # measured against fesom2_test_refactoring-master post-#6.
+          python3 - <<'PY'
+          import glob, sys
+          import numpy as np
+          from netCDF4 import Dataset
+          # Reference means measured on Levante intel + openmpi (job 24651279
+          # against fesom2_test_refactoring-master after FESOM2_Docker#6).
+          # Tolerance is loose (1e-3) to absorb intel-vs-gfortran rounding;
+          # tighten once first CI run gives gfortran-side numbers.
+          ref = {
+              "sst":   8.454588890075684,
+              "a_ice": 0.8644400634765625,
+              "temp":  2.488135939910957,
+              "salt":  34.72926110273129,
+              "u":    -0.001790326627187989,
+              "v":     0.001086981141056039,
+          }
+          tol = 1e-3
+          fail = False
+          for var, want in ref.items():
+              files = sorted(glob.glob(f"work_pi/{var}.fesom_*.nc"))
+              if not files:
+                  print(f"MISSING: {var}.fesom_*.nc")
+                  fail = True
+                  continue
+              vals = np.ma.concatenate([Dataset(f).variables[var][:].flatten()
+                                        for f in files])
+              got = float(vals.mean())
+              ok  = abs(got - want) < tol
+              tag = "OK" if ok else "FAIL"
+              print(f"{tag}: {var:6s} got={got:.16g}  want={want:.16g}  "
+                    f"|d|={abs(got-want):.3e}  tol={tol:.0e}")
+              if not ok:
+                  fail = True
+          sys.exit(1 if fail else 0)
+          PY
