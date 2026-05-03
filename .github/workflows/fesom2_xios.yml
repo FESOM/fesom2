@@ -42,12 +42,33 @@ jobs:
 
       - name: Stage XIOS XMLs
         run: |
-          # All FESOM XIOS XMLs (context, field/file/axis/domain/grid_def) ship
-          # in docs/xios_xml/. Copy them all, then overwrite iodef.xml — the
-          # bundled iodef is the AWI-ESM3 coupled variant (references OIFS
-          # context, sets using_server=true, using_oasis=true), so a minimal
-          # standalone iodef is written inline below.
+          # All FESOM XIOS XMLs (context/field/file/axis/domain/grid_def) ship
+          # in docs/xios_xml/. Copy them all, then overwrite iodef.xml and
+          # file_def_fesom.xml in-place:
+          #   - bundled iodef is the AWI-ESM3 coupled variant (references OIFS
+          #     context, using_server=true, using_oasis=true) — write a
+          #     minimal standalone variant here (attached mode, no OASIS).
+          #   - bundled file_def_fesom.xml lists ~50 fields; we write a 6-field
+          #     subset matching what the standard test_pi setup checks for
+          #     bit-identical results (sst, a_ice, temp, salt, u, v). Verified
+          #     locally on Levante that this configuration reaches
+          #     write_mean → io_xios_send_2d_r4/r8 → xios_send_field and
+          #     successfully writes per-rank netcdf files in attached mode.
           cp docs/xios_xml/*.xml work_pi/
+          cat > work_pi/file_def_fesom.xml <<'EOF'
+          <?xml version="1.0"?>
+          <file_definition type="one_file" format="netcdf4" par_access="collective"
+                           time_counter_name="time" time_counter="exclusive">
+            <file_group id="fesom_1d" output_freq="1d" split_freq="1y" enabled="true">
+              <file id="f_sst"   name="sst.fesom"  ><field field_ref="sst"  /></file>
+              <file id="f_a_ice" name="a_ice.fesom"><field field_ref="a_ice"/></file>
+              <file id="f_temp"  name="temp.fesom" ><field field_ref="temp" /></file>
+              <file id="f_salt"  name="salt.fesom" ><field field_ref="salt" /></file>
+              <file id="f_u"     name="u.fesom"    ><field field_ref="u"    /></file>
+              <file id="f_v"     name="v.fesom"    ><field field_ref="v"    /></file>
+            </file_group>
+          </file_definition>
+          EOF
           cat > work_pi/iodef.xml <<'EOF'
           <?xml version="1.0"?>
           <simulation>
@@ -72,9 +93,17 @@ jobs:
 
       - name: Check XIOS produced output
         run: |
-          # In attached mode XIOS writes from rank 0 of the FESOM communicator.
-          # The minimal file_def_fesom.xml has fesom_1d/fesom_1mo/fesom_3h
-          # groups; existence of any sst*.nc produced via XIOS is enough to
-          # confirm the path works.
+          # In attached mode (using_server=false) XIOS writes one netcdf per
+          # rank with name <var>.fesom_<startyear>-<endyear>_<rank>.nc. Confirm
+          # all 6 fields wrote at least one file.
           ls -la work_pi/
-          ls work_pi/sst.fesom*.nc 2>/dev/null && echo "XIOS output OK" || (echo "no XIOS sst output" && exit 1)
+          missing=0
+          for var in sst a_ice temp salt u v; do
+            if ! ls work_pi/${var}.fesom_*.nc >/dev/null 2>&1; then
+              echo "MISSING: ${var}.fesom_*.nc"
+              missing=1
+            else
+              echo "OK: $(ls work_pi/${var}.fesom_*.nc | head -1)"
+            fi
+          done
+          [ "$missing" -eq 0 ] || exit 1
