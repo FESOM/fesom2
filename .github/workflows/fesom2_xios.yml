@@ -103,19 +103,21 @@ jobs:
           import glob, sys
           import numpy as np
           from netCDF4 import Dataset
-          # Reference means measured on Levante intel + openmpi (job 24651279
-          # against fesom2_test_refactoring-master after FESOM2_Docker#6).
-          # Tolerance is loose (1e-3) to absorb intel-vs-gfortran rounding;
-          # tighten once first CI run gives gfortran-side numbers.
+          # Reference means measured in the CI environment (ubuntu 22.04 +
+          # gfortran + openmpi + sequential netcdf XIOS) running mkrun-defined
+          # test_pi settings (96 steps/day, 1 day, force_rotation=True). Lock
+          # to bit-identical tolerance — any future PR that perturbs these
+          # values will fail this check and either adjust the references or
+          # explain the divergence.
           ref = {
-              "sst":   8.454588890075684,
-              "a_ice": 0.8644400634765625,
-              "temp":  2.488135939910957,
-              "salt":  34.72926110273129,
-              "u":    -0.001790326627187989,
-              "v":     0.001086981141056039,
+              "sst":   8.673937797546387,
+              "a_ice": 0.8812576105565201,
+              "temp":  2.473328515513666,
+              "salt":  34.73029091319962,
+              "u":    -0.002066224489183517,
+              "v":     0.0002165362787114573,
           }
-          tol = 1e-3
+          tol = 1e-12
           fail = False
           for var, want in ref.items():
               files = sorted(glob.glob(f"work_pi/{var}.fesom_*.nc"))
