@@ -313,6 +313,7 @@ subroutine recom_init(tracers, partit, mesh)
 #if defined(__RECOM_WAVEBANDS) 
 !! *** Allocate 4D Light
     allocate(Ed4D      ( nl-1, node_size,tlam,ed_num ))
+    Ed4D(:,:,:,:)      = 0.d0
 #endif
 
 !! *** Allocate ballasting ***
