@@ -12,7 +12,8 @@ module io_MEANDATA
   use io_data_strategy_module
   use async_threads_module
   use netcdf
-  use io_xios_module, only: io_xios_is_on, io_xios_send_2d_r8, io_xios_send_2d_r4, &
+  use io_xios_module, only: io_xios_is_on, io_xios_field_is_active, &
+                            io_xios_send_2d_r8, io_xios_send_2d_r4, &
                             io_xios_send_3d_r8, io_xios_send_3d_r4, &
                             io_xios_set_ice_conc, io_xios_is_ice_field, &
                             io_xios_apply_ice_mask_2d_r4, io_xios_apply_ice_mask_2d_r8, &
@@ -27,6 +28,16 @@ module io_MEANDATA
   implicit none
   private
   public :: def_stream, def_stream2D, def_stream3D, def_stream0D, output, finalize_output
+  public :: print_per_stream_costs
+
+  ! Sub-decomposition timers for FESOM `output`. Accumulated per-rank by the
+  ! output() routine; reduced + printed once at finalize from fesom_module.
+  ! Cost is one MPI_Wtime() pair per region per call — negligible.
+  real(WP), public, save :: rtime_om_update_means = 0.0_WP   !< update_means accumulator (every step)
+  real(WP), public, save :: rtime_om_streamloop   = 0.0_WP   !< per-stream loop incl. write_mean dispatch
+  real(WP), public, save :: rtime_om_pack         = 0.0_WP   !< Fortran nested-loop pack from local_values_*_copy → tmp2/tmp3
+  real(WP), public, save :: rtime_om_mask         = 0.0_WP   !< io_xios_apply_wet_* / apply_ice_mask_* full-array scans
+  real(WP), public, save :: rtime_om_xsend        = 0.0_WP   !< pure io_xios_send_* (xios_send_field) call
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -62,6 +73,7 @@ module io_MEANDATA
     integer                                            :: dimID(2), dimvarID(2), varID
     integer                                            :: freq=1
     character                                          :: freq_unit='m'
+    real(kind=WP)                                      :: rtime_per_stream=0._WP   !< cumulative wall in this stream's write_mean dispatch over the run; printed sorted at finalize
     logical                                            :: is_in_use=.false.
     logical :: is_elem_based = .false.
     logical :: flip
@@ -2418,97 +2430,146 @@ subroutine write_mean(entry, entry_index)
           integer, pointer :: own(:)
           real(real64), allocatable :: tmp2_r8(:), tmp3_r8(:,:)
           real(real32), allocatable :: tmp2_r4(:), tmp3_r4(:,:)
+          real(WP) :: tp0, tp1, tm0, tm1, ts0, ts1
           if (entry%is_elem_based) then
             own   => io_xios_owned_elem_local()
             n_own =  io_xios_n_owned_elem()
             if (entry%accuracy == i_real8) then
               if (entry%glsize(1) == 1) then
+                tp0 = MPI_Wtime()
                 allocate(tmp2_r8(n_own))
                 do k=1, n_own; tmp2_r8(k) = entry%local_values_r8_copy(1, own(k)); end do
+                tp1 = MPI_Wtime(); rtime_om_pack = rtime_om_pack + (tp1 - tp0)
+                tm0 = MPI_Wtime()
                 if (io_xios_is_ice_field(entry%name)) then
                    call io_xios_apply_ice_mask_2d_elem_r8(tmp2_r8)
                 else
                    call io_xios_apply_wet_2d_elem_r8(tmp2_r8)
                 end if
+                tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
+                ts0 = MPI_Wtime()
                 call io_xios_send_2d_r8(entry%name, tmp2_r8)
+                ts1 = MPI_Wtime(); rtime_om_xsend = rtime_om_xsend + (ts1 - ts0)
                 deallocate(tmp2_r8)
               else
+                tp0 = MPI_Wtime()
                 nze = size(entry%local_values_r8_copy, 1)
                 allocate(tmp3_r8(nze, n_own))
                 do k=1, n_own
                   do kk=1, nze; tmp3_r8(kk,k) = entry%local_values_r8_copy(kk, own(k)); end do
                 end do
+                tp1 = MPI_Wtime(); rtime_om_pack = rtime_om_pack + (tp1 - tp0)
+                tm0 = MPI_Wtime()
                 if (nze /= std_dens_N) call io_xios_apply_wet_3d_elem_r8(tmp3_r8)
+                tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
+                ts0 = MPI_Wtime()
                 call io_xios_send_3d_r8(entry%name, tmp3_r8)
+                ts1 = MPI_Wtime(); rtime_om_xsend = rtime_om_xsend + (ts1 - ts0)
                 deallocate(tmp3_r8)
               end if
             else
               if (entry%glsize(1) == 1) then
+                tp0 = MPI_Wtime()
                 allocate(tmp2_r4(n_own))
                 do k=1, n_own; tmp2_r4(k) = entry%local_values_r4_copy(1, own(k)); end do
+                tp1 = MPI_Wtime(); rtime_om_pack = rtime_om_pack + (tp1 - tp0)
+                tm0 = MPI_Wtime()
                 if (io_xios_is_ice_field(entry%name)) then
                    call io_xios_apply_ice_mask_2d_elem_r4(tmp2_r4)
                 else
                    call io_xios_apply_wet_2d_elem_r4(tmp2_r4)
                 end if
+                tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
+                ts0 = MPI_Wtime()
                 call io_xios_send_2d_r4(entry%name, tmp2_r4)
+                ts1 = MPI_Wtime(); rtime_om_xsend = rtime_om_xsend + (ts1 - ts0)
                 deallocate(tmp2_r4)
               else
+                tp0 = MPI_Wtime()
                 nze = size(entry%local_values_r4_copy, 1)
                 allocate(tmp3_r4(nze, n_own))
                 do k=1, n_own
                   do kk=1, nze; tmp3_r4(kk,k) = entry%local_values_r4_copy(kk, own(k)); end do
                 end do
+                tp1 = MPI_Wtime(); rtime_om_pack = rtime_om_pack + (tp1 - tp0)
+                tm0 = MPI_Wtime()
                 if (nze /= std_dens_N) call io_xios_apply_wet_3d_elem_r4(tmp3_r4)
+                tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
+                ts0 = MPI_Wtime()
                 call io_xios_send_3d_r4(entry%name, tmp3_r4)
+                ts1 = MPI_Wtime(); rtime_om_xsend = rtime_om_xsend + (ts1 - ts0)
                 deallocate(tmp3_r4)
               end if
             end if
           else
             if (entry%accuracy == i_real8) then
               if (entry%glsize(1) == 1) then
+                tp0 = MPI_Wtime()
                 allocate(tmp2_r8(entry%p_partit%myDim_nod2D))
                 do k=1, entry%p_partit%myDim_nod2D
                   tmp2_r8(k) = entry%local_values_r8_copy(1, k)
                 end do
+                tp1 = MPI_Wtime(); rtime_om_pack = rtime_om_pack + (tp1 - tp0)
+                tm0 = MPI_Wtime()
                 if (io_xios_is_ice_field(entry%name)) then
                    call io_xios_apply_ice_mask_2d_r8(tmp2_r8)
                 else
                    call io_xios_apply_wet_2d_r8(tmp2_r8)
                 end if
+                tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
+                ts0 = MPI_Wtime()
                 call io_xios_send_2d_r8(entry%name, tmp2_r8)
+                ts1 = MPI_Wtime(); rtime_om_xsend = rtime_om_xsend + (ts1 - ts0)
                 deallocate(tmp2_r8)
               else
+                tp0 = MPI_Wtime()
                 nze = size(entry%local_values_r8_copy, 1)
                 allocate(tmp3_r8(nze, entry%p_partit%myDim_nod2D))
                 do k=1, entry%p_partit%myDim_nod2D
                   do kk=1, nze; tmp3_r8(kk,k) = entry%local_values_r8_copy(kk, k); end do
                 end do
+                tp1 = MPI_Wtime(); rtime_om_pack = rtime_om_pack + (tp1 - tp0)
+                tm0 = MPI_Wtime()
                 if (nze /= std_dens_N) call io_xios_apply_wet_3d_r8(tmp3_r8)
+                tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
+                ts0 = MPI_Wtime()
                 call io_xios_send_3d_r8(entry%name, tmp3_r8)
+                ts1 = MPI_Wtime(); rtime_om_xsend = rtime_om_xsend + (ts1 - ts0)
                 deallocate(tmp3_r8)
               end if
             else
               if (entry%glsize(1) == 1) then
+                tp0 = MPI_Wtime()
                 allocate(tmp2_r4(entry%p_partit%myDim_nod2D))
                 do k=1, entry%p_partit%myDim_nod2D
                   tmp2_r4(k) = entry%local_values_r4_copy(1, k)
                 end do
+                tp1 = MPI_Wtime(); rtime_om_pack = rtime_om_pack + (tp1 - tp0)
+                tm0 = MPI_Wtime()
                 if (io_xios_is_ice_field(entry%name)) then
                    call io_xios_apply_ice_mask_2d_r4(tmp2_r4)
                 else
                    call io_xios_apply_wet_2d_r4(tmp2_r4)
                 end if
+                tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
+                ts0 = MPI_Wtime()
                 call io_xios_send_2d_r4(entry%name, tmp2_r4)
+                ts1 = MPI_Wtime(); rtime_om_xsend = rtime_om_xsend + (ts1 - ts0)
                 deallocate(tmp2_r4)
               else
+                tp0 = MPI_Wtime()
                 nze = size(entry%local_values_r4_copy, 1)
                 allocate(tmp3_r4(nze, entry%p_partit%myDim_nod2D))
                 do k=1, entry%p_partit%myDim_nod2D
                   do kk=1, nze; tmp3_r4(kk,k) = entry%local_values_r4_copy(kk, k); end do
                 end do
+                tp1 = MPI_Wtime(); rtime_om_pack = rtime_om_pack + (tp1 - tp0)
+                tm0 = MPI_Wtime()
                 if (nze /= std_dens_N) call io_xios_apply_wet_3d_r4(tmp3_r4)
+                tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
+                ts0 = MPI_Wtime()
                 call io_xios_send_3d_r4(entry%name, tmp3_r4)
+                ts1 = MPI_Wtime(); rtime_om_xsend = rtime_om_xsend + (ts1 - ts0)
                 deallocate(tmp3_r4)
               end if
             end if
@@ -2728,8 +2789,14 @@ ctime=timeold+(dayold-1.)*86400
     end if ! --> if (lfirst) then
     
     !___________________________________________________________________________
-    !PS if (partit%flag_debug .and. partit%mype==0)  print *, achar(27)//'[33m'//' -I/O-> call update_means'//achar(27)//'[0m'  
-    call update_means
+    !PS if (partit%flag_debug .and. partit%mype==0)  print *, achar(27)//'[33m'//' -I/O-> call update_means'//achar(27)//'[0m'
+    block
+      real(WP) :: tum0, tum1
+      tum0 = MPI_Wtime()
+      call update_means
+      tum1 = MPI_Wtime()
+      rtime_om_update_means = rtime_om_update_means + (tum1 - tum0)
+    end block
 
 #if defined(__MULTIO)
     output_done = .false.
@@ -2737,6 +2804,9 @@ ctime=timeold+(dayold-1.)*86400
 
     !___________________________________________________________________________
     ! loop over defined streams
+    block
+    real(WP) :: tsl0, tsl1
+    tsl0 = MPI_Wtime()
     do n=1, io_NSTREAMS
         !_______________________________________________________________________
         ! make pointer for entry onto io_stream object
@@ -2748,8 +2818,19 @@ ctime=timeold+(dayold-1.)*86400
 !#endif
 
         !_______________________________________________________________________
-        !check whether output will be written based on event frequency
+        ! Cadence dispatch:
+        !   - XIOS-driven path: ask XIOS whether this field needs a sample now.
+        !     Cadence is set in XML (field_def freq_op), so the per-event heavy
+        !     work below (mean-divide, pack, mask, write_mean dispatch) only
+        !     fires at the XML-declared cadence, not every model step.
+        !   - Native (non-XIOS) path: keep the namelist.io freq_unit-based
+        !     event check (unchanged behaviour for FESOM-standalone runs).
         do_output=.false.
+#if defined(__XIOS)
+        if (io_xios_is_on()) then
+            do_output = io_xios_field_is_active(trim(entry%name))
+        else
+#endif
         if (entry%freq_unit.eq.'y') then
             call annual_event(do_output, entry%freq)
         else if (entry%freq_unit == 'm') then
@@ -2766,6 +2847,9 @@ ctime=timeold+(dayold-1.)*86400
             call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
             stop
         endif
+#if defined(__XIOS)
+        end if
+#endif
 
 #if defined(__MULTIO)
         output_done = output_done .or. do_output
@@ -2896,11 +2980,20 @@ ctime=timeold+(dayold-1.)*86400
             !___________________________________________________________________
             ! this is where the magic happens --> here do_output_callback is
             ! triggered as a method of the io_stream object --> call write_mean(...)
-            call entry%thread%run()
+            block
+              real(WP) :: tps0, tps1
+              tps0 = MPI_Wtime()
+              call entry%thread%run()
+              tps1 = MPI_Wtime()
+              entry%rtime_per_stream = entry%rtime_per_stream + (tps1 - tps0)
+            end block
             entry%thread_running = .true.
 #endif
         endif ! --> if (do_output) then
     end do ! --> do n=1, io_NSTREAMS
+    tsl1 = MPI_Wtime()
+    rtime_om_streamloop = rtime_om_streamloop + (tsl1 - tsl0)
+    end block
 
     !___________________________________________________________________________
     ! Handle 0D (scalar) output streams
@@ -3117,6 +3210,66 @@ subroutine finalize_output()
             io_stream0D(i)%ncid = -1
         end if
     end do
+end subroutine
+!
+!
+!_______________________________________________________________________________
+!> Print per-stream cumulative cost (entry%thread%run() wrap time, mean across
+!> ranks) sorted descending. Called from fesom_module's finalize block;
+!> master-rank only to keep the log readable.
+subroutine print_per_stream_costs(comm, mype, npes)
+    use mpi
+    integer, intent(in) :: comm, mype, npes
+    integer :: i, ierr, k, top_n, idx
+    real(real32) :: ttime
+    real(real32), allocatable :: per_stream(:), per_stream_max(:), sorted(:)
+    integer, allocatable :: order(:)
+
+    if (io_NSTREAMS <= 0) return
+    allocate(per_stream(io_NSTREAMS), per_stream_max(io_NSTREAMS))
+    do i = 1, io_NSTREAMS
+        per_stream(i) = real(io_stream(i)%p%rtime_per_stream, real32)
+    end do
+    per_stream_max = per_stream
+    call MPI_AllREDUCE(MPI_IN_PLACE, per_stream,     io_NSTREAMS, MPI_REAL, MPI_SUM, comm, ierr)
+    per_stream = per_stream / real(npes, real32)
+    call MPI_AllREDUCE(MPI_IN_PLACE, per_stream_max, io_NSTREAMS, MPI_REAL, MPI_MAX, comm, ierr)
+
+    if (mype /= 0) then
+        deallocate(per_stream, per_stream_max)
+        return
+    end if
+
+    ! sort by mean descending
+    allocate(order(io_NSTREAMS), sorted(io_NSTREAMS))
+    do i = 1, io_NSTREAMS; order(i) = i; end do
+    sorted = per_stream
+    do i = 1, io_NSTREAMS-1
+        do k = i+1, io_NSTREAMS
+            if (sorted(k) > sorted(i)) then
+                ttime = sorted(i); sorted(i) = sorted(k); sorted(k) = ttime
+                idx = order(i);    order(i)  = order(k);    order(k)  = idx
+            end if
+        end do
+    end do
+
+    write(*,*) '___PER-STREAM OUTPUT COST [seconds] (entry%thread%run() wrap, sorted desc)'
+    write(*,'(2x,a30,2a12,3x,a8,2x,a5)') 'stream', 'mean', 'max', 'freq', 'is_3D'
+    top_n = min(io_NSTREAMS, 30)
+    do i = 1, top_n
+        idx = order(i)
+        block
+          character(len=8) :: freq_str
+          write(freq_str,'(i0,a1)') io_stream(idx)%p%freq, io_stream(idx)%p%freq_unit
+          write(*,'(2x,a30,2f12.4,3x,a8,2x,L5)') trim(io_stream(idx)%p%name), &
+              per_stream(idx), per_stream_max(idx), &
+              adjustl(freq_str), &
+              (io_stream(idx)%p%glsize(1) > 1)
+        end block
+    end do
+    if (io_NSTREAMS > top_n) write(*,'(2x,a,i0,a)') '...', io_NSTREAMS - top_n, ' more streams below the top 30'
+
+    deallocate(per_stream, per_stream_max, order, sorted)
 end subroutine
 !
 !
