@@ -1842,8 +1842,8 @@ CASE ('UVW_SQR   ')
 !_______________________________________________________________________________
 ! compute horizontal and vertical tracer gradients
 CASE ('TRGRD_XYZ ')
-    sel_trgrd_xyz=1
     if (ldiag_trgrd_xyz) then
+        sel_trgrd_xyz = 1
         call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/),  'temp_grdx',   'zonal temperature gradient',        'K/m', trgrd_x(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/),  'temp_grdy',   'meridional temperature gradient',   'K/m', trgrd_y(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl-1,  nod2D/), (/nl-1, myDim_nod2D /),  'temp_grdz',   'vertical temperature gradient',     'K/m', trgrd_z(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
