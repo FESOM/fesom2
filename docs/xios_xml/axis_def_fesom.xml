@@ -1,0 +1,15 @@
+<axis_definition>
+  <!-- FESOM vertical axes. n_glo and value are set at runtime from the
+       Fortran side (mesh%nl-1 cell-centred depths in metres, positive down
+       converted to positive up if desired). -->
+  <axis_group id="fesom_axes" unit="m" positive="down" axis_type="Z">
+    <axis id="nz"     long_name="depth below sea level at layer mid-points" standard_name="depth" />
+    <axis id="nz1"    long_name="depth below sea level at layer interfaces" standard_name="depth" />
+  </axis_group>
+
+  <!-- dMOC density coordinate. n_glo and value populated at runtime from
+       std_dens_N / std_dens (oce_dens_MOC). io_xios_init unconditionally
+       calls xios_set_axis_attr("std_dens", ...), so the axis declaration
+       must exist even when ldiag_dMOC=false. -->
+  <axis id="std_dens" unit="kg/m^3" long_name="potential density (sigma2) for dMOC" standard_name="sea_water_potential_density" />
+</axis_definition>

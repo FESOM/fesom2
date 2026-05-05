@@ -16,6 +16,7 @@ module fesom_main_storage_module
   use g_forcing_arrays
   use io_RESTART
   use io_MEANDATA
+  use io_xios_module
   use io_mesh_info
   use diagnostics
   use mo_tidal
@@ -46,6 +47,9 @@ module fesom_main_storage_module
 
 #if defined (__oasis)
   use cpl_driver
+#endif
+#if defined (__yac)
+use cpl_yac_driver
 #endif
 
 ! define recom module
@@ -158,7 +162,10 @@ contains
 #if defined (__oasis)
 
         call cpl_oasis3mct_init(f%partit,f%partit%MPI_COMM_FESOM)
+#elif defined (__yac)
+        call cpl_yac_init(f%partit%MPI_COMM_FESOM)
 #endif
+
         f%t1 = MPI_Wtime()
 
         ! Initialize enhanced profiler
@@ -229,6 +236,22 @@ contains
 #endif
 
         if (f%mype==0) write(*,*) 'FESOM mesh_setup... complete'
+
+#if defined (__XIOS)
+        ! XIOS client init (NEMO/OIFS pattern). xios_initialize is called with
+        ! local_comm=MPI_COMM_FESOM -- OASIS already split MPI_COMM_WORLD, so
+        ! no further split is needed; the FESOM comm stays valid. The separate
+        ! xios_server.exe binary registers with OASIS independently.
+        !
+        ! Ordering: OASIS3-MCT was initialised above (before par_init). This
+        ! matches the EC-Earth-proven NEMO ordering (OASIS -> XIOS on OASIS
+        ! local comm). Called here after mesh_setup so coord_nod2D /
+        ! elem2D_nodes / zbar / myList_* are populated.
+        block
+          integer :: xios_client_comm
+          call io_xios_init(f%mesh, f%partit, f%partit%MPI_COMM_FESOM, xios_client_comm)
+        end block
+#endif
 
 !       Transient tracers: control output of initial input values
         if(use_transit .and. anthro_transit .and. f%mype==0) then
@@ -354,6 +377,11 @@ contains
             call allocate_icb(f%partit, f%mesh)
         endif
         ! --------------
+
+#if defined (__yac)
+        call cpl_yac_define_unstr(f%partit, f%mesh)
+        if(f%mype==0)  write(*,*) 'FESOM ---->     cpl_yac_define_unstr nsend, nrecv:',nsend, nrecv
+#endif
 
 #if defined (__icepack)
         !=====================
@@ -572,6 +600,9 @@ contains
     ntotal=f%from_nstep-1+current_nsteps
 
     do n=nstart, ntotal
+#if defined (__XIOS)
+        call io_xios_update_calendar(n)
+#endif
         if (use_icebergs) then
                 !n_ib         = n
                 u_wind_ib    = u_wind
@@ -662,7 +693,11 @@ contains
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("update_atm_forcing")
 #endif
+#if defined (__yac)
+            call update_atm_forcing_yac(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
+#else
             call update_atm_forcing(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
+#endif 
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("update_atm_forcing")
 #endif
@@ -753,6 +788,13 @@ contains
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("restart")
 #endif
+        ! Pass f%total_nsteps (namelist run length) as the segment-end marker
+        ! rather than the runloop-chunk end (ntotal). In standalone FESOM they
+        ! are identical (fesom_runloop is called once with all steps), so the
+        ! year-boundary fix from PR #880 still fires. Under __ifsinterface,
+        ! fesom_runloop is called per IFS coupling step with a small chunk, so
+        ! ntotal == istep on every call; using it as the segment-end marker
+        ! would force a restart every coupling timestep.
         call write_initial_conditions(n, nstart, f%total_nsteps, f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("restart")
@@ -805,7 +847,10 @@ contains
     use mpp_io
 #endif
     ! EO parameters
-    real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
+    ! 1..15 are the existing FESOM timers (ocean components, ice, output, etc.)
+    ! 16..20 are the io_meandata sub-decomposition: update_means, streamloop,
+    ! pack, mask, xsend (see rtime_om_* in io_meandata.F90).
+    real(kind=real32) :: mean_rtime(20), max_rtime(20), min_rtime(20)
     integer           :: tr_num
     
     ! Start finalization profiling
@@ -818,6 +863,7 @@ contains
          call iceberg_out(f%partit)
     end if
     ! --------------
+
     call finalize_output()
     call finalize_restart()
 
@@ -892,8 +938,21 @@ contains
 #if defined (__recom)
     mean_rtime(15) = f%rtime_compute_recom
 #endif
+    ! Sub-decomposition of rtime_write_means (= mean_rtime(12)):
+    ! (16) update_means accumulator cost (per step, every step)
+    ! (17) per-stream loop in output() (incl. write_mean dispatch)
+    ! (18) Fortran tmp2/tmp3 nested-loop pack from local_values_*_copy
+    ! (19) io_xios_apply_wet_* / apply_ice_mask_* full-array scans
+    ! (20) pure xios_send_field call wall (post-gate, the actual XIOS pipeline)
+    mean_rtime(16) = real(rtime_om_update_means, real32)
+    mean_rtime(17) = real(rtime_om_streamloop,   real32)
+    mean_rtime(18) = real(rtime_om_pack,         real32)
+    mean_rtime(19) = real(rtime_om_mask,         real32)
+    mean_rtime(20) = real(rtime_om_xsend,        real32)
     max_rtime(1:14) = mean_rtime(1:14)
     min_rtime(1:14) = mean_rtime(1:14)
+    max_rtime(16:20) = mean_rtime(16:20)
+    min_rtime(16:20) = mean_rtime(16:20)
 #if defined (__recom)
     max_rtime(15) = mean_rtime(15)
     min_rtime(15) = mean_rtime(15)
@@ -907,8 +966,22 @@ contains
     mean_rtime(1:14) = mean_rtime(1:14) / real(f%npes,real32)
     call MPI_AllREDUCE(MPI_IN_PLACE, max_rtime,  14, MPI_REAL, MPI_MAX, f%MPI_COMM_FESOM, f%MPIerr)
     call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime,  14, MPI_REAL, MPI_MIN, f%MPI_COMM_FESOM, f%MPIerr)
-    
-#if defined (__oifs) 
+    ! Sub-decomposition of write_means: indices (16)..(20)
+    call MPI_AllREDUCE(MPI_IN_PLACE, mean_rtime(16), 5, MPI_REAL, MPI_SUM, f%MPI_COMM_FESOM, f%MPIerr)
+    mean_rtime(16:20) = mean_rtime(16:20) / real(f%npes,real32)
+    call MPI_AllREDUCE(MPI_IN_PLACE, max_rtime(16),  5, MPI_REAL, MPI_MAX, f%MPI_COMM_FESOM, f%MPIerr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime(16),  5, MPI_REAL, MPI_MIN, f%MPI_COMM_FESOM, f%MPIerr)
+
+    ! Per-stream cumulative cost — printed sorted at finalize from rank 0.
+    call print_per_stream_costs(f%partit%MPI_COMM_FESOM, f%partit%mype, f%npes)
+
+#if defined (__XIOS)
+   ! Must finalize XIOS BEFORE MPI/OASIS teardown so server2 receives
+   ! the client-finalize signal on MPI_COMM_WORLD (matches NEMO/OIFS).
+   call io_xios_close()
+#endif
+
+#if defined (__oifs)
     ! OpenIFS coupled version has to call oasis_terminate through par_ex
     call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
 #endif
@@ -940,6 +1013,11 @@ contains
         print 42, '    > runtime ice step :      ',    mean_rtime(8),     min_rtime(8),      max_rtime(8)
         print 42, '  runtime diag:               ',    mean_rtime(11),    min_rtime(11),     max_rtime(11)
         print 42, '  runtime output:             ',    mean_rtime(12),    min_rtime(12),     max_rtime(12)
+        print 42, '    > out: update_means       ',    mean_rtime(16),    min_rtime(16),     max_rtime(16)
+        print 42, '    > out: streamloop         ',    mean_rtime(17),    min_rtime(17),     max_rtime(17)
+        print 42, '    > out:   pack             ',    mean_rtime(18),    min_rtime(18),     max_rtime(18)
+        print 42, '    > out:   mask             ',    mean_rtime(19),    min_rtime(19),     max_rtime(19)
+        print 42, '    > out:   xsend            ',    mean_rtime(20),    min_rtime(20),     max_rtime(20)
         print 42, '  runtime restart:            ',    mean_rtime(13),    min_rtime(13),     max_rtime(13)
         print 42, '  runtime forcing:            ',    mean_rtime(14),    min_rtime(14),     max_rtime(14)
         print 42, '  runtime total (ice+oce):    ',    mean_rtime(9),     min_rtime(9),      max_rtime(9)

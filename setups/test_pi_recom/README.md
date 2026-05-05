@@ -1,4 +1,4 @@
- REcoM Biogeochemistry CI Test
+# REcoM Biogeochemistry CI Test
 
 This test validates FESOM2 with REcoM (Regulated Ecosystem Model) biogeochemistry module.
 

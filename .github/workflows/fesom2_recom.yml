@@ -1,0 +1,95 @@
+
+name: "FESOM2: REcoM Biogeochemistry"
+# Controls when the action will run. Triggers the workflow on pull request only.
+on:
+  workflow_dispatch: {}
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+    branches:
+      - main
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  general_test:
+    # Containers must run in Linux based operating systems
+    runs-on: ubuntu-latest
+    # Docker Hub image that `container-job` executes in
+    container: ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master
+
+    # Service containers to run with `gfortran_ubuntu`
+    steps:
+      # NK: this changes working directory to fesom2
+      - uses: actions/checkout@v2
+
+      - name: Git safe directory
+        run: |
+          git config --global --add safe.directory ${PWD}
+
+      - name: Compile model with REcoM
+        run: |
+          ./configure.sh ubuntu -DRECOM_COUPLED=ON
+
+      - name: Create REcoM test run
+        run: |
+          mkrun recom test_pi_recom -m docker
+      
+      - name: Add REcoM namelists
+        run: |
+          # mkrun doesn't create namelist.recom, so copy from config and patch
+          # Using 2p3z2d (30 tracers) - more complete/tested than 2p1z1d
+          cp config/bin_2p3z2d/namelist.recom work_recom/
+          cp config/bin_2p3z2d/namelist.tra work_recom/
+          
+          # Patch namelist.recom
+          cd work_recom
+          
+          # Remove nam_rsbc section (not used by code, causes parsing errors)
+          sed -i '/^&nam_rsbc/,/^\//d' namelist.recom
+          
+          # Set REcoM_restart to false for initialization from climatology
+          sed -i "s|REcoM_restart.*=.*\.true\.|REcoM_restart         =.false.|" namelist.recom
+          
+          # Patch tracer file list in namelist.tra  
+          sed -i "s|fe_pisces_opa_eq_init_3D_changed_name\.nc|fe5deg.nc|" namelist.tra
+          sed -i "s|woa18_all_o00_01_mmol_fesom2\.nc|oxy5deg.nc|" namelist.tra
+          sed -i "s|woa13_all_i00_01_fesom2\.nc|si5deg.nc|" namelist.tra
+          sed -i "s|GLODAPv2\.2016b\.TAlk_fesom2_mmol_fix_z_Fillvalue\.nc|talk5deg.nc|" namelist.tra
+          sed -i "s|GLODAPv2\.2016b\.TCO2_fesom2_mmol_fix_z_Fillvalue\.nc|tco2_5deg.nc|" namelist.tra
+          sed -i "s|woa13_all_n00_01_fesom2\.nc|din5deg.nc|" namelist.tra
+          sed -i "s|phc3\.0_winter\.nc|woa18_netcdf_5deg.nc|g" namelist.tra
+          
+          # Enable atmospheric pressure forcing for REcoM CO2 flux calculation
+          sed -i "s|l_mslp *= *\.false\.|l_mslp=.true.|" namelist.forcing
+          
+          echo "--- Verifying patches ---"
+          echo "REcoM restart: $(grep 'REcoM_restart' namelist.recom)"
+          echo "Atmospheric pressure: $(grep 'l_mslp' namelist.forcing)"
+          cd ..
+          
+          # Copy REcoM input data files
+          cp test/input/recom/*.nc work_recom/
+          
+          # Create dust file with expected name in the source directory
+          # (code reads from ClimateDataPath, not work directory)
+          cd test/input/recom
+          ln -s DustClimMonthlyAlbani_pimesh.nc DustClimMonthlyAlbani.nc
+          cd ../../..
+          
+          # Copy forcing data files (from 1948)
+          cp test/input/global/*.1948.nc work_recom/
+          cp test/input/global/runoff.nc work_recom/
+          cp test/input/global/PHC2_salx.nc work_recom/
+      
+      - name: FESOM2 REcoM test run
+        run: |
+          cd work_recom
+          echo "--- Running REcoM test (32 timesteps, 1 day) ---"
+          chmod +x job_docker_new
+          ./job_docker_new
+      
+      - name: Check REcoM results
+        run: |-
+          cd work_recom
+          fcheck .

@@ -26,7 +26,17 @@ contains
       print '(g0)', '__oasis is ON'
 #else
       print '(g0)', '__oasis is OFF'
-#endif  
+#endif
+#ifdef __yac
+      print '(g0)', '__yac is ON'
+#else
+      print '(g0)', '__yac is OFF'
+#endif
+#ifdef __coupled
+      print '(g0)', '__coupled is ON'
+#else
+      print '(g0)', '__coupled is OFF'
+#endif
 #ifdef __oifs
       print '(g0)', '__oifs is ON'
 #else

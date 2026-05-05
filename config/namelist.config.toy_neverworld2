@@ -61,7 +61,7 @@ raw_restart_length      = 1        ! frequency for raw core dump restart files
 raw_restart_length_unit = 'off'    ! unit: 'y', 'm', 'd', 'h', 's', 'off'
 bin_restart_length      = 1        ! frequency for binary derived type restart files
 bin_restart_length_unit = 'off'    ! unit: 'y', 'm', 'd', 'h', 's', 'off'
-logfile_outfreq         = 72       ! log file output frequency [number of time steps]
+logfile_outfreq         = 450       ! log file output frequency [number of time steps]
 /
 
 ! ============================================================================

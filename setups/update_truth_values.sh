@@ -56,7 +56,8 @@ if [ ! -f "$SETUP_FILE" ]; then
 fi
 
 # Parse and update values
-declare -A updates
+updates_keys=()
+updates_vals=()
 count=0
 
 while IFS= read -r line; do
@@ -66,8 +67,9 @@ while IFS= read -r line; do
         var_name=$(echo "$var_name" | xargs)  # trim whitespace
         current_val="${BASH_REMATCH[2]}"
         current_val=$(echo "$current_val" | xargs)  # trim whitespace
-        
-        updates["$var_name"]="$current_val"
+
+        updates_keys+=("$var_name")
+        updates_vals+=("$current_val")
         ((count++))
     fi
 done <<< "$INPUT"
@@ -75,22 +77,29 @@ done <<< "$INPUT"
 if [ $count -eq 0 ]; then
     echo "Error: No variable updates found in input"
     echo "Expected format: Variable: <name>, current_value: <value>, master_value: ..."
-    rm "$BACKUP_FILE"
     exit 1
 fi
 
 echo "Found $count variable(s) to update:"
-for var in "${!updates[@]}"; do
-    echo "  $var: ${updates[$var]}"
+for i in "${!updates_keys[@]}"; do
+    echo "  ${updates_keys[$i]}: ${updates_vals[$i]}"
 done
 echo ""
 
 # Apply updates to setup.yml
-for var in "${!updates[@]}"; do
-    value="${updates[$var]}"
+uname_s=$(uname -s)
+for i in "${!updates_keys[@]}"; do
+    var="${updates_keys[$i]}"
+    value="${updates_vals[$i]}"
     # Escape special characters in value for sed
     escaped_value=$(echo "$value" | sed 's/[\/&]/\\&/g')
-    sed -i "s/^\\([ ]*${var}:\\).*/\\1 ${escaped_value}/" "$SETUP_FILE"
+
+    if [ "$uname_s" = "Darwin" ]; then
+        sed -i '' -e "s/^\\([ ]*${var}:\\).*/\\1 ${escaped_value}/" "$SETUP_FILE"
+    else
+        sed -i -e "s/^\\([ ]*${var}:\\).*/\\1 ${escaped_value}/" "$SETUP_FILE"
+    fi
 done
 
 echo "✓ Truth values updated successfully in $SETUP_FILE"
+
