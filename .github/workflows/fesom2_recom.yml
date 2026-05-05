@@ -26,31 +26,29 @@ jobs:
       - name: Git safe directory
         run: |
           git config --global --add safe.directory ${PWD}
-
       - name: Compile model with REcoM
         run: |
           ./configure.sh ubuntu -DRECOM_COUPLED=ON
-
       - name: Create REcoM test run
         run: |
           mkrun recom test_pi_recom -m docker
-      
+    
       - name: Add REcoM namelists
         run: |
           # mkrun doesn't create namelist.recom, so copy from config and patch
           # Using 2p3z2d (30 tracers) - more complete/tested than 2p1z1d
           cp config/bin_2p3z2d/namelist.recom work_recom/
           cp config/bin_2p3z2d/namelist.tra work_recom/
-          
-          # Patch namelist.recom
+
+          # Patch file paths in namelists to use local files
           cd work_recom
-          
+
           # Remove nam_rsbc section (not used by code, causes parsing errors)
           sed -i '/^&nam_rsbc/,/^\//d' namelist.recom
-          
+
           # Set REcoM_restart to false for initialization from climatology
           sed -i "s|REcoM_restart.*=.*\.true\.|REcoM_restart         =.false.|" namelist.recom
-          
+
           # Patch tracer file list in namelist.tra  
           sed -i "s|fe_pisces_opa_eq_init_3D_changed_name\.nc|fe5deg.nc|" namelist.tra
           sed -i "s|woa18_all_o00_01_mmol_fesom2\.nc|oxy5deg.nc|" namelist.tra
@@ -59,18 +57,18 @@ jobs:
           sed -i "s|GLODAPv2\.2016b\.TCO2_fesom2_mmol_fix_z_Fillvalue\.nc|tco2_5deg.nc|" namelist.tra
           sed -i "s|woa13_all_n00_01_fesom2\.nc|din5deg.nc|" namelist.tra
           sed -i "s|phc3\.0_winter\.nc|woa18_netcdf_5deg.nc|g" namelist.tra
-          
+
           # Enable atmospheric pressure forcing for REcoM CO2 flux calculation
           sed -i "s|l_mslp *= *\.false\.|l_mslp=.true.|" namelist.forcing
-          
+         
           echo "--- Verifying patches ---"
           echo "REcoM restart: $(grep 'REcoM_restart' namelist.recom)"
           echo "Atmospheric pressure: $(grep 'l_mslp' namelist.forcing)"
           cd ..
-          
+
           # Copy REcoM input data files
           cp test/input/recom/*.nc work_recom/
-          
+  
           # Create dust file with expected name in the source directory
           # (code reads from ClimateDataPath, not work directory)
           cd test/input/recom
@@ -81,14 +79,14 @@ jobs:
           cp test/input/global/*.1948.nc work_recom/
           cp test/input/global/runoff.nc work_recom/
           cp test/input/global/PHC2_salx.nc work_recom/
-      
+            
       - name: FESOM2 REcoM test run
         run: |
           cd work_recom
           echo "--- Running REcoM test (32 timesteps, 1 day) ---"
           chmod +x job_docker_new
           ./job_docker_new
-      
+
       - name: Check REcoM results
         run: |-
           cd work_recom
