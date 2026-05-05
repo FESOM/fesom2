@@ -5,7 +5,7 @@
 ! This file controls biogeochemical processes including:
 ! - Carbon, nitrogen, silicon, iron cycling
 ! - Phytoplankton (small phyto, diatoms, coccolithophores)
-! - Zooplankton (micro, meso, krill)
+! - Zooplankton (meso, macro/krill, micro)
 ! - Organic matter remineralization and sinking
 ! - Carbonate chemistry and air-sea CO2 fluxes
 ! - External nutrient inputs (dust, rivers, erosion)
@@ -106,8 +106,8 @@ Vcalc                 = 0.0144       ! Depth dependence of calcite dissolution (
 ! ============================================================================
 &painitialization_N
 cPhyN                 = 0.2d0        ! Initial small phytoplankton nitrogen [mmol N/m³]
-cHetN                 = 0.2d0        ! Initial microzooplankton nitrogen [mmol N/m³]
-cZoo2N                = 0.2d0        ! Initial mesozooplankton nitrogen [mmol N/m³]
+cHetN                 = 0.2d0        ! Initial mesozooplankton nitrogen [mmol N/m³]
+cZoo2N                = 0.2d0        ! Initial macrozooplankton nitrogen [mmol N/m³]
 /
 
 ! ============================================================================
@@ -194,7 +194,7 @@ ligandStabConst       = 100.d0       ! Ligand-Fe stability constant [m³/µmol]
 /
 
 ! ============================================================================
-! MICROZOOPLANKTON (FIRST ZOOPLANKTON)
+! MESOZOOPLANKTON (FIRST ZOOPLANKTON)
 ! ============================================================================
 &pazooplankton
 graz_max              = 0.31d0      ! [mmol N/(m3 * day)] Maximum grazing loss parameter 
@@ -214,7 +214,7 @@ tiny_het              = 1.d-5       ! for more stable computation of HetRespFlux
 /
 
 ! ============================================================================
-! MESOZOOPLANKTON (SECOND ZOOPLANKTON)
+! MACROZOOPLANKTON (SECOND ZOOPLANKTON)
 ! ============================================================================
 &pasecondzooplankton
 graz_max2      = 0.1d0              ! [mmol N/(m3 * day)] Maximum grazing loss parameter                                                                                        
@@ -261,13 +261,13 @@ sCoccoNsq3            = 0.d0         ! Coccolithophore preference slope
 ! GRAZING ON DETRITUS
 ! ============================================================================
 &pagrazingdetritus
-! --- First Zooplankton (Microzooplankton) ---
+! --- First Zooplankton (Mesozooplankton) ---
 pzDet                 = 0.5d0        ! Small detritus preference
 sDetNsq               = 0.d0         ! Small detritus preference slope
 pzDetZ2               = 0.5d0        ! Large detritus preference
 sDetZ2Nsq             = 0.d0         ! Large detritus preference slope
 
-! --- Second Zooplankton (Mesozooplankton) ---
+! --- Second Zooplankton (Macrozooplankton) ---
 pzDet2                = 0.5d0        ! Small detritus preference
 sDetNsq2              = 0.d0         ! Small detritus preference slope
 pzDetZ22              = 0.5d0        ! Large detritus preference
