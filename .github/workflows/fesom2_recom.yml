@@ -10,6 +10,9 @@ on:
       - reopened
     branches:
       - main
+# Minimal permissions for the GITHUB_TOKEN
+permissions:
+  contents: read
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   general_test:
