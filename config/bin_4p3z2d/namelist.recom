@@ -5,7 +5,7 @@
 ! This file controls biogeochemical processes including:
 ! - Carbon, nitrogen, silicon, iron cycling
 ! - Phytoplankton (small phyto, diatoms, coccolithophores)
-! - Zooplankton (micro, meso, krill)
+! - Zooplankton (meso, macro/krill, micro)
 ! - Organic matter remineralization and sinking
 ! - Carbonate chemistry and air-sea CO2 fluxes
 ! - External nutrient inputs (dust, rivers, erosion)
