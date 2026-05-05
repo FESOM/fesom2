@@ -5,7 +5,7 @@
 ! This file controls biogeochemical processes including:
 ! - Carbon, nitrogen, silicon, iron cycling
 ! - Phytoplankton (small phyto, diatoms, coccolithophores)
-! - Zooplankton (micro, meso, krill)
+! - Zooplankton (meso, macro/krill, micro)
 ! - Organic matter remineralization and sinking
 ! - Carbonate chemistry and air-sea CO2 fluxes
 ! - External nutrient inputs (dust, rivers, erosion)
@@ -235,7 +235,7 @@ ligandStabConst       = 100.0        ! Ligand-Fe stability constant [m³/µmol]
 /
 
 ! ============================================================================
-! MICROZOOPLANKTON (FIRST ZOOPLANKTON)
+! MESOZOOPLANKTON (FIRST ZOOPLANKTON)
 ! ============================================================================
 &pazooplankton
 graz_max              = 0.31         ! Maximum grazing rate [1/day]
@@ -257,7 +257,7 @@ sMicZooNsq            = 0.0          ! Microzooplankton preference slope
 /
 
 ! ============================================================================
-! MESOZOOPLANKTON (SECOND ZOOPLANKTON)
+! MACROZOOPLANKTON (SECOND ZOOPLANKTON)
 ! ============================================================================
 &pasecondzooplankton
 graz_max2             = 0.1          ! Maximum grazing rate [1/day]
@@ -310,13 +310,13 @@ sCoccoNsq3            = 0.0          ! Coccolithophore preference slope
 ! GRAZING ON DETRITUS
 ! ============================================================================
 &pagrazingdetritus
-! --- First Zooplankton (Microzooplankton) ---
+! --- First Zooplankton (Mesozooplankton) ---
 pzDet                 = 0.5          ! Small detritus preference
 sDetNsq               = 0.0          ! Small detritus preference slope
 pzDetZ2               = 0.5          ! Large detritus preference
 sDetZ2Nsq             = 0.0          ! Large detritus preference slope
 
-! --- Second Zooplankton (Mesozooplankton) ---
+! --- Second Zooplankton (Macrozooplankton) ---
 pzDet2                = 0.5          ! Small detritus preference
 sDetNsq2              = 0.0          ! Small detritus preference slope
 pzDetZ22              = 0.5          ! Large detritus preference
