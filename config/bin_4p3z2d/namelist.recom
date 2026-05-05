@@ -5,7 +5,7 @@
 ! This file controls biogeochemical processes including:
 ! - Carbon, nitrogen, silicon, iron cycling
 ! - Phytoplankton (small phyto, diatoms, coccolithophores)
-! - Zooplankton (micro, meso, krill)
+! - Zooplankton (meso, macro/krill, micro)
 ! - Organic matter remineralization and sinking
 ! - Carbonate chemistry and air-sea CO2 fluxes
 ! - External nutrient inputs (dust, rivers, erosion)
@@ -128,8 +128,8 @@ Vcalc                 = 0.0144       ! Depth dependence of calcite dissolution (
 ! ============================================================================
 &painitialization_N
 cPhyN                 = 0.2          ! Initial small phytoplankton nitrogen [mmol N/m³]
-cHetN                 = 0.2          ! Initial microzooplankton nitrogen [mmol N/m³]
-cZoo2N                = 0.2          ! Initial mesozooplankton nitrogen [mmol N/m³]
+cHetN                 = 0.2          ! Initial mesozooplankton nitrogen [mmol N/m³]
+cZoo2N                = 0.2          ! Initial macrozooplankton nitrogen [mmol N/m³]
 /
 
 ! ============================================================================
@@ -258,7 +258,7 @@ ligandStabConst       = 100.0        ! Ligand-Fe stability constant [m³/µmol]
 /
 
 ! ============================================================================
-! MICROZOOPLANKTON (FIRST ZOOPLANKTON)
+! MESOZOOPLANKTON (FIRST ZOOPLANKTON)
 ! ============================================================================
 &pazooplankton
 graz_max              = 0.31         ! Maximum grazing rate [1/day]
@@ -277,12 +277,12 @@ pzCocco               = 0.666        ! Coccolithophore preference NEW value for 
 sCoccoNsq             = 0.0          ! Coccolithophore preference slope
 pzPhaeo               = 0.5          ! Phaeocystis preference
 sPhaeoNsq             = 0.0          ! Phaeocystis preference slope
-pzMicZoo              = 1.0          ! Microzooplankton preference (self-grazing)
-sMicZooNsq            = 0.0          ! Microzooplankton preference slope
+pzMicZoo              = 1.0          ! Mesozooplankton grazing preference on microzooplankton 
+sMicZooNsq            = 0.0          ! Mesozooplankton preference slope
 /
 
 ! ============================================================================
-! MESOZOOPLANKTON (SECOND ZOOPLANKTON)
+! MACROZOOPLANKTON (SECOND ZOOPLANKTON)
 ! ============================================================================
 &pasecondzooplankton
 graz_max2             = 0.25         ! Maximum grazing rate [1/day] NEW value for Phaeocystis                                                                                     
@@ -293,8 +293,8 @@ loss_zoo2             = 0.003        ! Extracellular N degradation [1/day]
 ! --- Fecal Pellet Production ---
 fecal_rate_n          = 0.104        ! Nitrogen fecal rate [1/day]
 fecal_rate_c          = 0.236        ! Carbon fecal rate [1/day]
-fecal_rate_n_mes      = 0.25         ! Mesozooplankton N fecal rate [1/day]
-fecal_rate_c_mes      = 0.32         ! Mesozooplankton C fecal rate [1/day]
+fecal_rate_n_mes      = 0.25         ! Macrozooplankton N fecal rate [1/day]
+fecal_rate_c_mes      = 0.32         ! Macrozooplankton C fecal rate [1/day]
 
 ! --- Grazing Preferences ---
 pzDia2                = 1.5   !1.0   ! Diatom preference NEW value for Phaeocystis
@@ -305,10 +305,10 @@ pzCocco2              = 0.5   !0.7   ! Coccolithophore preference NEW value for 
 sCoccoNsq2            = 0.0          ! Coccolithophore preference slope
 pzPhaeo2              = 0.5          ! Phaeocystis preference
 sPhaeoNsq2            = 0.0          ! Phaeocystis preference slope
-pzHet                 = 1.5          ! Microzooplankton preference
-sHetNsq               = 0.0          ! Microzooplankton preference slope
-pzMicZoo2             = 1.0          ! Mesozooplankton preference
-sMicZooNsq2           = 0.0          ! Mesozooplankton preference slope
+pzHet                 = 1.5          ! Preference for grazing on mesozooplankton
+sHetNsq               = 0.0          ! preference slope
+pzMicZoo2             = 1.0          ! Preference for grazing on microzooplankton
+sMicZooNsq2           = 0.0          ! Preference slope
 
 ! --- Temperature Function (Krill-specific) ---
 t1_zoo2               = 28145.0      ! Temperature function constant 1
@@ -341,13 +341,13 @@ sPhaeoNsq3            = 0.0          ! Phaeocystis preference slope
 ! GRAZING ON DETRITUS
 ! ============================================================================
 &pagrazingdetritus
-! --- First Zooplankton (Microzooplankton) ---
+! --- First Zooplankton (Mesozooplankton) ---
 pzDet                 = 0.5          ! Small detritus preference
 sDetNsq               = 0.0          ! Small detritus preference slope
 pzDetZ2               = 0.5          ! Large detritus preference
 sDetZ2Nsq             = 0.0          ! Large detritus preference slope
 
-! --- Second Zooplankton (Mesozooplankton) ---
+! --- Second Zooplankton (Microzooplankton) ---
 pzDet2                = 0.5          ! Small detritus preference
 sDetNsq2              = 0.0          ! Small detritus preference slope
 pzDetZ22              = 0.5          ! Large detritus preference
