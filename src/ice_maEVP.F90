@@ -470,6 +470,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: elevation
     real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
     real(kind=WP), dimension(:), pointer  :: u_ice_aux, v_ice_aux
+    real(kind=WP), dimension(:), pointer  :: strength_ice
 #if defined (__icepack)
     real(kind=WP), dimension(:), pointer  :: a_ice_old, m_ice_old, m_snow_old
 #endif
@@ -500,6 +501,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     stress_atmice_y => ice%stress_atmice_y(:)
     u_ice_aux       => ice%uice_aux(:)
     v_ice_aux       => ice%vice_aux(:)
+    strength_ice    => ice%work%strength_ice(:)
 #if defined (__icepack)
     a_ice_old       => ice%data(1)%values_old(:)
     m_ice_old       => ice%data(2)%values_old(:)
@@ -520,6 +522,22 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     !___________________________________________________________________________
     u_ice_aux=u_ice    ! Initialize solver variables
     v_ice_aux=v_ice
+
+    !___________________________________________________________________________
+    ! Diagnostic-only: populate strength_ice with canonical Hibler (1979)
+    ! P = P*·h·exp(-C(1-A)) for the strength_ice output stream. Independent of
+    ! the rheology storage in pressure_fac, so mEVP results stay bit-identical.
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnodes, msum, asum)
+    do el=1,myDim_elem2D
+        strength_ice(el) = 0.0_WP
+        if (ulevels(el) > 1) cycle
+        elnodes = elem2D_nodes(:,el)
+        if (any(m_ice(elnodes) <= 0._WP) .or. any(a_ice(elnodes) <= 0._WP)) cycle
+        msum = sum(m_ice(elnodes))*val3
+        asum = sum(a_ice(elnodes))*val3
+        strength_ice(el) = ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
+    end do
+!$OMP END PARALLEL DO
 
 #if defined (__icepack)
     a_ice_old(:)  = a_ice(:)
@@ -1116,7 +1134,7 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     use g_comm_auto
     use ice_maEVP_interfaces
 #if defined (__icepack)
-    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem
+    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
 #endif
     implicit none
     type(t_ice),    intent(inout), target :: ice
@@ -1124,8 +1142,10 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     type(t_mesh),   intent(in),    target :: mesh
     !___________________________________________________________________________
     integer          :: steps, shortstep, i, ed
+    integer          :: el, elnodes(3)
     real(kind=WP)    :: rdt, drag, det, fc
     real(kind=WP)    :: thickness, inv_thickness, umod, rhsu, rhsv
+    real(kind=WP)    :: msum, asum, val3
     REAL(kind=WP)    :: t0,t1, t2, t3, t4, t5, t00, txx
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -1136,6 +1156,7 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
     real(kind=WP), dimension(:), pointer  :: u_ice_aux, v_ice_aux
     real(kind=WP), dimension(:), pointer  :: beta_evp_array
+    real(kind=WP), dimension(:), pointer  :: strength_ice
     real(kind=WP)              , pointer  :: rhoice, rhosno
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -1155,15 +1176,38 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     u_ice_aux       => ice%uice_aux(:)
     v_ice_aux       => ice%vice_aux(:)
     beta_evp_array  => ice%beta_evp_array(:)
+    strength_ice    => ice%work%strength_ice(:)
     rhoice          => ice%thermo%rhoice
     rhosno          => ice%thermo%rhosno
 
     !___________________________________________________________________________
     steps=ice%evp_rheol_steps
     rdt=ice%ice_dt
+    val3=1.0_WP/3.0_WP
     u_ice_aux=u_ice    ! Initialize solver variables
     v_ice_aux=v_ice
     call ssh2rhs(ice, partit, mesh)
+
+    !___________________________________________________________________________
+    ! Diagnostic-only: populate strength_ice with canonical Hibler (1979)
+    ! P = P*·h·exp(-C(1-A)) for the strength_ice output stream. With icepack,
+    ! use the per-node icepack strength averaged to the element, matching the
+    ! rheology branch in stress_tensor_a. aEVP rheology is untouched.
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnodes, msum, asum)
+    do el=1,myDim_elem2D
+        strength_ice(el) = 0.0_WP
+        if (ulevels(el) > 1) cycle
+        elnodes = elem2D_nodes(:,el)
+        if (any(m_ice(elnodes) <= 0._WP) .or. any(a_ice(elnodes) <= 0._WP)) cycle
+#if defined (__icepack)
+        strength_ice(el) = sum(strength(elnodes))*val3
+#else
+        msum = sum(m_ice(elnodes))*val3
+        asum = sum(a_ice(elnodes))*val3
+        strength_ice(el) = ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
+#endif
+    end do
+!$OMP END PARALLEL DO
 
 #if defined (__icepack)
     rdg_conv_elem(:)  = 0.0_WP

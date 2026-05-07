@@ -574,7 +574,7 @@ CASE ('ipnd      ')
 ! Debug ice variables    
 CASE ('strength_ice')
     if (use_ice) then
-    call def_stream(elem2D, myDim_elem2D, 'strength_ice', 'ice strength', '?', ice%work%ice_strength(1:myDim_elem2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(elem2D, myDim_elem2D, 'strength_ice', 'ice strength', 'N m-1', ice%work%strength_ice(1:myDim_elem2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('inv_areamass')
     if (use_ice) then
