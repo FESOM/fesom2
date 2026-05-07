@@ -95,6 +95,8 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     real(kind=WP), intent(inout)      :: fct_minus(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP), intent(inout)      :: AUX(:,:,:) !a large auxuary array, let us use twork%edge_up_dn_grad(1:4, 1:NL-2, 1:partit%myDim_edge2D) to save space
     integer                           :: n, nz, k, elem, enodes(3), num, el(2), nl1, nl2, nu1, nu2, nl12, nu12, edge
+    integer                           :: iel, jel
+    logical                           :: tv_found
     real(kind=WP)                     :: flux, ae, tvert_max(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D), tvert_min(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP)                     :: flux_eps=1e-16
     real(kind=WP)                     :: bignumber=1e3
@@ -105,7 +107,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, k, elem, enodes, num, el, nl1, nl2, nu1, nu2, nl12, nu12, edge, &
-!$OMP                          flux, ae)
+!$OMP                          flux, ae, iel, jel, tv_found)
     ! --------------------------------------------------------------------------
     ! ttf is the tracer field on step n
     ! del_ttf is the increment
@@ -190,14 +192,28 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
           ! vertical layer
           ! nod_in_elem2D     --> elem indices of which node n is surrounded
           ! nod_in_elem2D_num --> max number of surrounded elem
-          tvert_max(nz, n) = AUX(1,nz, nod_in_elem2D(1, n))
-          tvert_min(nz, n) = AUX(2,nz, nod_in_elem2D(1, n))
+          ! Only use AUX where layer nz exists on element jel (same range as a2).
+          ! Otherwise AUX(1:2,nz,jel) was never written and can be NaN/garbage
+          ! (wet/dry, cavity, partial columns).
+          tv_found = .false.
           !$ACC LOOP SEQ
-          do elem=2,nod_in_elem2D_num(n)
-              tvert_max(nz, n) = dmax1(tvert_max(nz, n), AUX(1,nz, nod_in_elem2D(elem,n)))
-              tvert_min(nz, n) = dmin1(tvert_min(nz, n), AUX(2,nz, nod_in_elem2D(elem,n)))
+          do iel=1,nod_in_elem2D_num(n)
+              jel=nod_in_elem2D(iel, n)
+              if (nz < ulevels(jel) .or. nz > nlevels(jel)-1) cycle
+              if (.not. tv_found) then
+                  tvert_max(nz, n) = AUX(1,nz, jel)
+                  tvert_min(nz, n) = AUX(2,nz, jel)
+                  tv_found = .true.
+              else
+                  tvert_max(nz, n) = dmax1(tvert_max(nz, n), AUX(1,nz, jel))
+                  tvert_min(nz, n) = dmin1(tvert_min(nz, n), AUX(2,nz, jel))
+              end if
           end do
           !$ACC END LOOP
+          if (.not. tv_found) then
+              tvert_max(nz, n) = max(LO(nz,n), ttf(nz,n))
+              tvert_min(nz, n) = min(LO(nz,n), ttf(nz,n))
+          end if
        end do
        !$ACC END LOOP
     end do
