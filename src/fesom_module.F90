@@ -776,14 +776,15 @@ contains
         call fesom_profiler_end("compute_diagnostics")
 #endif
 
-        ! XIOS send for CMOR 0D scalars. xios_field_is_active gates the
-        ! actual transmission to file_def freq_op (e.g. 1mo); the work
-        ! between cadence boundaries is no-op. Only rank 0 sends since
-        ! the values are MPI_AllReduced inside compute_cmor_diag. The
-        ! legacy output_0D_streams writer is gated on io_xios_is_on() so
-        ! these scalars no longer double-write at every step (was 87600
-        ! records/year for HR pre-fix).
-        if (ldiag_cmor .and. io_xios_is_on() .and. f%mype == 0) then
+        ! XIOS send for CMOR 0D scalars. xios_send_field is a collective
+        ! over the FESOM client context: ALL ranks must participate or
+        ! XIOS errors with "callers not coherent" (event_server.cpp:29).
+        ! The values are MPI_AllReduced inside compute_cmor_diag so every
+        ! rank has the same global value; XIOS-side operation="average"
+        ! over identical values reduces to that value. The legacy
+        ! output_0D_streams writer is gated on io_xios_is_on() so these
+        ! scalars no longer double-write at every step.
+        if (ldiag_cmor .and. io_xios_is_on()) then
             call io_xios_send_0d_r8('volo',      real(volo,      kind=8))
             call io_xios_send_0d_r8('soga',      real(soga,      kind=8))
             call io_xios_send_0d_r8('thetaoga',  real(thetaoga,  kind=8))
