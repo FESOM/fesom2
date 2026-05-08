@@ -65,6 +65,7 @@ use cpl_yac_driver
 #if defined (__recom)
   use recom_init_interface
   use recom_interface
+  use recom_glovar
 #endif
 
 ! Transient tracers
@@ -137,7 +138,12 @@ contains
       integer, intent(out) :: fesom_total_nsteps
       ! EO parameters
       logical mpi_is_initialized
-      integer              :: tr_num
+      integer              :: tr_num, n
+
+#if defined (__recom)
+      type(tracers_info_type)               :: tracers_info
+#endif
+
 #if !defined  __ifsinterface
       if(command_argument_count() > 0) then
         call command_line_options%parse()
@@ -328,9 +334,26 @@ contains
         ! recom setup
 #if defined (__recom)
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call recom_init'//achar(27)//'[0m'
+
+        allocate(tracers_info%ids(f%tracers%num_tracers))
+        allocate(tracers_info%data_pointers(f%tracers%num_tracers))
+
+        do n = 1, f%tracers%num_tracers
+          tracers_info%ids(n) = f%tracers%data(n)%id
+          tracers_info%data_pointers(n)%tracer_data => f%tracers%data(n)%values
+        end do
+
         f%t0_recom=MPI_Wtime()
-        call recom_init(f%tracers, f%partit, f%mesh) ! adjust values for recom tracers (derived type "t_tracer")
+        call recom_init(f%mesh%nl, f%mesh%ulevels_nod2d, f%mesh%nlevels_nod2D, &
+                        f%mesh%geo_coord_nod2D, f%mesh%z_3d_n, f%partit%myDim_nod2d,      &
+                        f%partit%eDim_nod2D, f%partit%mype, f%partit%MPI_COMM_FESOM,      &
+                        f%partit%myDim_elem2D, f%partit%eDim_elem2D, tracers_info,        &
+                        f%tracers%num_tracers, rad) ! adjust values for recom tracers (derived type "t_tracer")
         f%t1_recom=MPI_Wtime()
+
+        deallocate(tracers_info%ids)
+        deallocate(tracers_info%data_pointers)
+
         if (f%mype==0) write(*,*) 'RECOM recom_init... complete'
 #endif
 
@@ -573,7 +596,11 @@ contains
 !   use openacc_lib
     integer, intent(in) :: current_nsteps 
     ! EO parameters
-    integer n, nstart, ntotal, tr_num
+    integer n, nstart, ntotal, tr_num, tracer_index
+
+#if defined (__recom)
+    type(tracers_info_type)               :: tracers_info
+#endif
 
     !=====================
     ! Time stepping
@@ -742,9 +769,38 @@ contains
 #if defined (__recom)
         if (f%mype==0 .and. n==1)  print *, achar(27)//'[46'  //'_____________________________________________________________'//achar(27)//'[0m'
         if (f%mype==0 .and. n==1)  print *, achar(27)//'[46;1m'//'     --> call REcoM                                         '//achar(27)//'[0m'
+
+        allocate(tracers_info%ids(f%tracers%num_tracers))
+        allocate(tracers_info%ltra_diag(f%tracers%num_tracers))
+        allocate(tracers_info%data_pointers(f%tracers%num_tracers))
+
+        do tracer_index = 1, f%tracers%num_tracers
+          tracers_info%ids(tracer_index) = f%tracers%data(tracer_index)%id
+          tracers_info%ltra_diag(tracer_index) = f%tracers%data(tracer_index)%ltra_diag
+          tracers_info%data_pointers(tracer_index)%tracer_data => f%tracers%data(tracer_index)%values
+        end do
+
         f%t0_recom = MPI_Wtime()
-        call recom(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        call recom(f%ice%data(1)%values, f%mesh%nl, &
+                   f%mesh%ulevels_nod2d, f%mesh%nlevels_nod2D, f%mesh%hnode,     &
+                   f%mesh%z_3d_n, f%mesh%zbar_3d_n, f%mesh%geo_coord_nod2d,      &
+                   f%mesh%ocean_area, f%mesh%areasvol, f%partit%myDim_nod2d,     &
+                   f%partit%eDim_nod2D, f%partit%mype, f%partit%MPI_COMM_FESOM,  &
+                   tracers_info, f%tracers%num_tracers, f%tracers%work%tra_recom_sms, &
+                   f%partit%npes, f%partit%com_nod2D%sPEnum,   &
+                   f%partit%com_nod2D%rPEnum,  &
+                   f%partit%s_mpitype_nod2D, f%partit%r_mpitype_nod2D,              &
+                   f%partit%s_mpitype_nod3D, f%partit%r_mpitype_nod3D,              &
+                   f%partit%com_nod2D%sPE, f%partit%com_nod2D%rPE,                  &
+                   f%partit%com_nod2D%req, f%partit%com_nod2D%nreq,                 &
+                   dt, daynew, month, mstep, ndpyr, yearold, timenew, rad, kappa,            &
+                   press_air, u_wind, v_wind, shortwave)
         f%t1_recom = MPI_Wtime()
+
+        deallocate(tracers_info%ids)
+        deallocate(tracers_info%ltra_diag)
+        deallocate(tracers_info%data_pointers)
+
 #endif
         
         !___model ocean step____________________________________________________

@@ -160,8 +160,8 @@ endif()
 
 # Link RECOM code
 if(RECOM_COUPLED)  # ADD RECOM FILES
-   file(GLOB sources_recom ${src_home}/int_recom/*.F90
-                           ${src_home}/int_recom/recom/*.F90)
+   file(GLOB sources_recom ${src_home}/recom/*.F90
+                           ${src_home}/recom/mocsy/*.F90)
    list(APPEND sources_Fortran ${sources_recom})                           
 endif()                             
 
