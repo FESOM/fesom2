@@ -331,7 +331,12 @@ contains
     siextents = siextents / 1.0e12_WP  ! to 10^12 m^2
     sivoln = sivoln / 1.0e9_WP         ! to 10^9 m^3
     sivols = sivols / 1.0e9_WP         ! to 10^9 m^3
-    
+
+    ! NOTE: XIOS send for these scalars happens in fesom_module.F90 right
+    ! after compute_diagnostics returns. Placing it here would create a
+    ! circular module dependency: io_xios → diagnostics → cmor_variables_diag
+    ! → io_xios.
+
     ! Update previous tracer values for next time step
     do n2 = 1, myDim_nod2D
         do k = ulevels_nod2D(n2), nlevels_nod2D(n2)-1
@@ -339,7 +344,7 @@ contains
             previous_salt(k, n2) = salt(k, n2)
         end do
     end do
-    
+
   end subroutine compute_cmor_diag
 
 

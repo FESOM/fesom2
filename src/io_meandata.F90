@@ -3019,13 +3019,21 @@ subroutine output_0D_streams(istep, partit)
     implicit none
     integer, intent(in) :: istep
     type(t_partit), intent(inout) :: partit
-    
+
     integer :: n, ierr
     logical :: do_output
     type(Meandata0D), pointer :: entry0D
     character(500) :: filepath
     real(real64) :: mean_value, rtime
-    
+
+    ! When XIOS is the I/O driver, the 0D scalar fields are written via
+    ! xios_send_field calls (see gen_modules_cmor_diag.F90's compute_cmor_diag)
+    ! and gated by file_def freq_op (e.g. "1mo"). The legacy writer below
+    ! would otherwise double-write those streams at the bypass-loop's
+    ! freq=1/'s' (every model step → ~87600 records/year for HR), which is
+    ! both wrong cadence AND a duplicate output. Skip when XIOS is on.
+    if (io_xios_is_on()) return
+
     do n = 1, io_NSTREAMS0D
         entry0D => io_stream0D(n)
         

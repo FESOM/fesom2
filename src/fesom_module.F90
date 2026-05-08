@@ -19,6 +19,15 @@ module fesom_main_storage_module
   use io_xios_module
   use io_mesh_info
   use diagnostics
+  ! Read-only access to the CMOR scalar diagnostics computed inside
+  ! compute_diagnostics → compute_cmor_diag, so we can send them to XIOS
+  ! from this top-level module. Doing the send inside cmor_variables_diag
+  ! itself would create a cycle (io_xios → diagnostics → cmor_variables_diag
+  ! → io_xios) and break the build.
+  use cmor_variables_diag, only: ldiag_cmor, &
+                                 volo, soga, thetaoga, &
+                                 siarean, siareas, siextentn, siextents, &
+                                 sivoln, sivols
   use mo_tidal
   use tracer_init_interface
   use ocean_setup_interface
@@ -766,6 +775,26 @@ contains
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("compute_diagnostics")
 #endif
+
+        ! XIOS send for CMOR 0D scalars. xios_send_field is a collective
+        ! over the FESOM client context: ALL ranks must participate or
+        ! XIOS errors with "callers not coherent" (event_server.cpp:29).
+        ! The values are MPI_AllReduced inside compute_cmor_diag so every
+        ! rank has the same global value; XIOS-side operation="average"
+        ! over identical values reduces to that value. The legacy
+        ! output_0D_streams writer is gated on io_xios_is_on() so these
+        ! scalars no longer double-write at every step.
+        if (ldiag_cmor .and. io_xios_is_on()) then
+            call io_xios_send_0d_r8('volo',      real(volo,      kind=8))
+            call io_xios_send_0d_r8('soga',      real(soga,      kind=8))
+            call io_xios_send_0d_r8('thetaoga',  real(thetaoga,  kind=8))
+            call io_xios_send_0d_r8('siarean',   real(siarean,   kind=8))
+            call io_xios_send_0d_r8('siareas',   real(siareas,   kind=8))
+            call io_xios_send_0d_r8('siextentn', real(siextentn, kind=8))
+            call io_xios_send_0d_r8('siextents', real(siextents, kind=8))
+            call io_xios_send_0d_r8('sivoln',    real(sivoln,    kind=8))
+            call io_xios_send_0d_r8('sivols',    real(sivols,    kind=8))
+        end if
 
         f%t4 = MPI_Wtime()
         !___prepare output______________________________________________________
