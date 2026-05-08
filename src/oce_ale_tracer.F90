@@ -235,7 +235,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         endif
         SinkingVel1 = 0.0d0 ! OG 16.03.23
         SinkingVel2 = 0.0d0 ! OG 16.03.23
-#endif
+#endif    
 
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
         ! needed
@@ -266,6 +266,24 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         if (ldiag_cmor .and. (tr_num <= 2)) then
             call save_cmor_advection(tr_num, tracers%work%del_ttf(:, 1:myDim_nod2D), myDim_nod2D, nl-1)
         end if
+
+!if (.FALSE.) then
+! O:G - tra_diag
+!#if defined (__recom)
+!        if (tracers%data(tr_num)%ltra_diag) then
+!           do n=1, myDim_nod2D+eDim_nod2D
+!              nu1 = ulevels_nod2D(n)
+!              nl1 = nlevels_nod2D(n)
+!              do nz = nu1, nl1-1
+                 ! Horizontal advection part
+!                 tracers%work%tra_advhoriz(nz,n,tr_num) = tracers%work%del_ttf_advhoriz(nz,n)
+                 ! Vertical advection part
+!                 tracers%work%tra_advvert (nz,n,tr_num) = tracers%work%del_ttf_advvert(nz,n)
+!              end do
+!           end do
+!        end if
+!#endif
+!endif
 
         !___________________________________________________________________________
         ! diffuse tracers
