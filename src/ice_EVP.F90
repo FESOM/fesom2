@@ -422,19 +422,18 @@ subroutine EVPdynamics(ice, partit, mesh)
 #endif
 
     !___________________________________________________________________________
-    ! Diagnostic-only: populate strength_ice with canonical Hibler (1979)
-    ! P = P*·h·exp(-C(1-A)) for the strength_ice output stream. Independent of
-    ! the rheology storage (ice_strength holds P/2 for inlining); recomputing
-    ! from m_ice/a_ice keeps EVP results bit-identical to before this fix.
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnodes, msum, asum)
-    do el = 1, myDim_elem2D
-        strength_ice(el) = 0.0_WP
-        if (ulevels(el) > 1) cycle
-        elnodes = elem2D_nodes(:,el)
-        if (any(m_ice(elnodes) <= 0._WP) .or. any(a_ice(elnodes) <= 0._WP)) cycle
-        msum = sum(m_ice(elnodes))/3.0_WP
-        asum = sum(a_ice(elnodes))/3.0_WP
-        strength_ice(el) = ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
+    ! Diagnostic-only: populate strength_ice (nodal) with the canonical Hibler
+    ! (1979) P = P*·h·exp(-C(1-A)) for the strength_ice output stream.
+    ! Computed pointwise from m_ice and a_ice so it lines up with every other
+    ! ice state diagnostic (a_ice, m_ice, ...) which are also nodal. The
+    ! rheology storage ice_strength is per-element and stays untouched, so
+    ! EVP results are bit-identical to before this fix.
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+    do n = 1, myDim_nod2D
+        strength_ice(n) = 0.0_WP
+        if (ulevels_nod2D(n) > 1) cycle
+        if (m_ice(n) <= 0._WP .or. a_ice(n) <= 0._WP) cycle
+        strength_ice(n) = ice%pstar*m_ice(n)*exp(-ice%c_pressure*(1.0_WP-a_ice(n)))
     end do
 !$OMP END PARALLEL DO
 

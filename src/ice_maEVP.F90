@@ -524,18 +524,16 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     v_ice_aux=v_ice
 
     !___________________________________________________________________________
-    ! Diagnostic-only: populate strength_ice with canonical Hibler (1979)
-    ! P = P*·h·exp(-C(1-A)) for the strength_ice output stream. Independent of
-    ! the rheology storage in pressure_fac, so mEVP results stay bit-identical.
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnodes, msum, asum)
-    do el=1,myDim_elem2D
-        strength_ice(el) = 0.0_WP
-        if (ulevels(el) > 1) cycle
-        elnodes = elem2D_nodes(:,el)
-        if (any(m_ice(elnodes) <= 0._WP) .or. any(a_ice(elnodes) <= 0._WP)) cycle
-        msum = sum(m_ice(elnodes))*val3
-        asum = sum(a_ice(elnodes))*val3
-        strength_ice(el) = ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
+    ! Diagnostic-only: populate strength_ice (nodal) with the canonical Hibler
+    ! (1979) P = P*·h·exp(-C(1-A)) for the strength_ice output stream.
+    ! Independent of the per-element rheology storage in pressure_fac, so mEVP
+    ! results stay bit-identical.
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+    do n = 1, myDim_nod2D
+        strength_ice(n) = 0.0_WP
+        if (ulevels_nod2D(n) > 1) cycle
+        if (m_ice(n) <= 0._WP .or. a_ice(n) <= 0._WP) cycle
+        strength_ice(n) = ice%pstar*m_ice(n)*exp(-ice%c_pressure*(1.0_WP-a_ice(n)))
     end do
 !$OMP END PARALLEL DO
 
@@ -1141,11 +1139,9 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(in),    target :: mesh
     !___________________________________________________________________________
-    integer          :: steps, shortstep, i, ed
-    integer          :: el, elnodes(3)
+    integer          :: steps, shortstep, i, ed, n
     real(kind=WP)    :: rdt, drag, det, fc
     real(kind=WP)    :: thickness, inv_thickness, umod, rhsu, rhsv
-    real(kind=WP)    :: msum, asum, val3
     REAL(kind=WP)    :: t0,t1, t2, t3, t4, t5, t00, txx
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -1183,28 +1179,24 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     !___________________________________________________________________________
     steps=ice%evp_rheol_steps
     rdt=ice%ice_dt
-    val3=1.0_WP/3.0_WP
     u_ice_aux=u_ice    ! Initialize solver variables
     v_ice_aux=v_ice
     call ssh2rhs(ice, partit, mesh)
 
     !___________________________________________________________________________
-    ! Diagnostic-only: populate strength_ice with canonical Hibler (1979)
-    ! P = P*·h·exp(-C(1-A)) for the strength_ice output stream. With icepack,
-    ! use the per-node icepack strength averaged to the element, matching the
-    ! rheology branch in stress_tensor_a. aEVP rheology is untouched.
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnodes, msum, asum)
-    do el=1,myDim_elem2D
-        strength_ice(el) = 0.0_WP
-        if (ulevels(el) > 1) cycle
-        elnodes = elem2D_nodes(:,el)
-        if (any(m_ice(elnodes) <= 0._WP) .or. any(a_ice(elnodes) <= 0._WP)) cycle
+    ! Diagnostic-only: populate strength_ice (nodal) with the canonical Hibler
+    ! (1979) P = P*·h·exp(-C(1-A)) for the strength_ice output stream.
+    ! With icepack, use the per-node icepack strength field directly.
+    ! aEVP rheology is untouched.
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+    do n = 1, myDim_nod2D
+        strength_ice(n) = 0.0_WP
+        if (ulevels_nod2D(n) > 1) cycle
+        if (m_ice(n) <= 0._WP .or. a_ice(n) <= 0._WP) cycle
 #if defined (__icepack)
-        strength_ice(el) = sum(strength(elnodes))*val3
+        strength_ice(n) = strength(n)
 #else
-        msum = sum(m_ice(elnodes))*val3
-        asum = sum(a_ice(elnodes))*val3
-        strength_ice(el) = ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
+        strength_ice(n) = ice%pstar*m_ice(n)*exp(-ice%c_pressure*(1.0_WP-a_ice(n)))
 #endif
     end do
 !$OMP END PARALLEL DO
