@@ -370,6 +370,7 @@ subroutine EVPdynamics(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: u_w, v_w, elevation
     real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
     real(kind=WP), dimension(:), pointer  :: inv_areamass, inv_mass, ice_strength
+    real(kind=WP), dimension(:), pointer  :: strength_ice
 #if defined (__icepack)
     real(kind=WP), dimension(:), pointer  :: a_ice_old, m_ice_old, m_snow_old
 #endif
@@ -406,6 +407,7 @@ subroutine EVPdynamics(ice, partit, mesh)
     inv_areamass    => ice%work%inv_areamass(:)
     inv_mass        => ice%work%inv_mass(:)
     ice_strength    => ice%work%ice_strength(:)
+    strength_ice    => ice%work%strength_ice(:)
 
     !___________________________________________________________________________
     ! If Icepack is used, always update the tracers
@@ -418,6 +420,23 @@ subroutine EVPdynamics(ice, partit, mesh)
                             vice_out=m_ice,                 &
                             vsno_out=m_snow)
 #endif
+
+    !___________________________________________________________________________
+    ! Diagnostic-only: populate strength_ice with canonical Hibler (1979)
+    ! P = P*·h·exp(-C(1-A)) for the strength_ice output stream. Independent of
+    ! the rheology storage (ice_strength holds P/2 for inlining); recomputing
+    ! from m_ice/a_ice keeps EVP results bit-identical to before this fix.
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnodes, msum, asum)
+    do el = 1, myDim_elem2D
+        strength_ice(el) = 0.0_WP
+        if (ulevels(el) > 1) cycle
+        elnodes = elem2D_nodes(:,el)
+        if (any(m_ice(elnodes) <= 0._WP) .or. any(a_ice(elnodes) <= 0._WP)) cycle
+        msum = sum(m_ice(elnodes))/3.0_WP
+        asum = sum(a_ice(elnodes))/3.0_WP
+        strength_ice(el) = ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
+    end do
+!$OMP END PARALLEL DO
 
     !___________________________________________________________________________
     rdt=ice%ice_dt/(1.0*ice%evp_rheol_steps)

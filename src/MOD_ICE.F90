@@ -34,6 +34,11 @@ TYPE T_ICE_WORK
     real(kind=WP), allocatable, dimension(:)    :: sigma11, sigma12, sigma22
     real(kind=WP), allocatable, dimension(:)    :: eps11, eps12, eps22
     real(kind=WP), allocatable, dimension(:)    :: ice_strength, inv_areamass, inv_mass
+    ! strength_ice: canonical Hibler (1979) ice strength P = P*·h·exp(-C(1-A))
+    ! exposed to def_stream as the 'strength_ice' output. Distinct from
+    ! ice_strength, which stores P/2 as an inlining optimisation for the
+    ! standard EVP rheology iteration.
+    real(kind=WP), allocatable, dimension(:)    :: strength_ice
     !___________________________________________________________________________
     contains
         procedure WRITE_T_ICE_WORK
@@ -825,9 +830,11 @@ subroutine ice_init(ice, partit, mesh)
     allocate(ice%work%ice_strength(    elem_size))
     allocate(ice%work%inv_areamass(    node_size))
     allocate(ice%work%inv_mass(        node_size))
+    allocate(ice%work%strength_ice(    elem_size))
     ice%work%ice_strength= 0.0_WP
     ice%work%inv_areamass= 0.0_WP
     ice%work%inv_mass    = 0.0_WP
+    ice%work%strength_ice= 0.0_WP
 
     !___________________________________________________________________________
     ! initialse thermo array of ice derived type
