@@ -40,6 +40,7 @@ module io_xios_module
   public :: io_xios_update_calendar
   public :: io_xios_send_2d_r8, io_xios_send_3d_r8
   public :: io_xios_send_2d_r4, io_xios_send_3d_r4
+  public :: io_xios_send_0d_r8, io_xios_send_0d_r4
   public :: io_xios_is_on
   public :: io_xios_field_is_active
   public :: io_xios_set_ice_conc, io_xios_is_ice_field
@@ -375,6 +376,32 @@ contains
   end subroutine
 
 
+  !> Send a 0D (scalar) field. For CMOR global diagnostics
+  !> (siarean / siareas / siextentn / siextents / sivoln / sivols / volo /
+  !> soga / thetaoga, etc.). Field must be declared in field_def with
+  !> grid_ref="grid_scalar" and routed to a file_def entry — see
+  !> namelists/fesom2/xios_xml_cmip7/{field_def,file_def_*}.xml{,.j2}.
+  !> The XIOS-side scalar grid has no spatial dim; netCDF write produces
+  !> a (time)-only variable.
+  subroutine io_xios_send_0d_r8(name, val)
+    character(len=*), intent(in) :: name
+    real(kind=8),     intent(in) :: val
+    if (.not. xios_on) return
+    if (.not. xios_is_valid_field(trim(name))) return
+    if (.not. xios_field_is_active(trim(name), .TRUE.)) return
+    call xios_send_field(trim(name), val)
+  end subroutine
+
+  subroutine io_xios_send_0d_r4(name, val)
+    character(len=*), intent(in) :: name
+    real(kind=4),     intent(in) :: val
+    if (.not. xios_on) return
+    if (.not. xios_is_valid_field(trim(name))) return
+    if (.not. xios_field_is_active(trim(name), .TRUE.)) return
+    call xios_send_field(trim(name), val)
+  end subroutine
+
+
   !> Insertion sort owned elements by global index (i_index), carrying
   !> lon/lat/local-id in lock-step. ne_owned is typically ~1000-3000 per rank,
   !> so O(n^2) is fine here.
@@ -666,6 +693,7 @@ contains
   public :: io_xios_field_is_active
   public :: io_xios_send_2d_r8, io_xios_send_3d_r8
   public :: io_xios_send_2d_r4, io_xios_send_3d_r4
+  public :: io_xios_send_0d_r8, io_xios_send_0d_r4
   public :: io_xios_owned_elem_local, io_xios_n_owned_elem
   public :: io_xios_set_ice_conc, io_xios_is_ice_field
   public :: io_xios_apply_ice_mask_2d_r4, io_xios_apply_ice_mask_2d_r8
@@ -703,6 +731,16 @@ contains
   subroutine io_xios_send_3d_r4(name, buf)
     character(len=*), intent(in) :: name
     real(kind=4),     intent(in) :: buf(:,:)
+  end subroutine
+
+  subroutine io_xios_send_0d_r8(name, val)
+    character(len=*), intent(in) :: name
+    real(kind=8),     intent(in) :: val
+  end subroutine
+
+  subroutine io_xios_send_0d_r4(name, val)
+    character(len=*), intent(in) :: name
+    real(kind=4),     intent(in) :: val
   end subroutine
 
   function io_xios_owned_elem_local() result(p)
