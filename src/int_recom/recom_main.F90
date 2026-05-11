@@ -133,11 +133,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     allocate(C(nl-1, bgc_num))
     allocate(CO2_watercolumn(nl-1), pH_watercolumn(nl-1), pCO2_watercolumn(nl-1) , HCO3_watercolumn(nl-1))
     allocate(CO3_watercolumn(nl-1), OmegaC_watercolumn(nl-1), kspc_watercolumn(nl-1) , rhoSW_watercolumn(nl-1))
-#if defined(__RECOM_WAVEBANDS)
-    allocate(Light_watercolumn(nl-1, tlam, ed_num))
-    Light_watercolumn = 0.d0
- if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> after allocate in main'//achar(27)//'[0m'   
-#endif
+
     !< ice concentration [0 to 1]
 
     a_ice       => ice%data(1)%values(:)
@@ -276,6 +272,12 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
         !!---- a_ice(row): Ice concentration in the local node
         FeDust = GloFeDust(n) * (1.d0 - a_ice(n)) * dust_sol
         NDust  = GloNDust(n)  * (1.d0 - a_ice(n))
+
+#if defined(__RECOM_WAVEBANDS)
+    allocate(Light_watercolumn(nl-1, tlam, ed_num))
+    Light_watercolumn = 0.d0
+ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> after allocate in main'//achar(27)//'[0m'
+#endif        
 
         if (Diags) then
 
@@ -507,12 +509,13 @@ if (enable_coccos) then
 
 endif
 #if defined(__RECOM_WAVEBANDS)
-            Ed4D    (1:nzmax,n,1:tlam,1:ed_num) = Light_watercolumn(1:nzmax,1:tlam,1:ed_num) 
-if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after main Ed4D'//achar(27)//'[0m'            
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> before main Ed4D'//achar(27)//'[0m'
+          !  Ed4D    (1:nl-1,n,:,:) = Light_watercolumn(1:nl-1,:,:) 
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> after main Ed4D'//achar(27)//'[0m'            
 #endif
 
 
-if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after main REcoM_Forcing'//achar(27)//'[0m'
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> main after REcoM_Forcing'//achar(27)//'[0m'
 
             !! * Deallocating 2D diagnostics *
             deallocate(vertNPPn, vertGPPn, vertNNAn, vertChldegn) 
@@ -544,12 +547,16 @@ if (enable_coccos) then
             deallocate(VTTemp_phaeo, VTPhaeoCO2, VTqlimitFac_phaeo, VTCphotLigLim_phaeo, VTCphot_phaeo)
 
 endif
-#if defined(__RECOM_WAVEBANDS)
-            deallocate(Light_watercolumn)
-if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> deallocate Light_watercolomn'//achar(27)//'[0m'           
-#endif
+!#if defined(__RECOM_WAVEBANDS)
+!            deallocate(Light_watercolumn)
+!if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> deallocate Light_watercolomn'//achar(27)//'[0m'           
+!#endif
 
         end if 
+#if defined(__RECOM_WAVEBANDS)
+            deallocate(Light_watercolumn)
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> deallocate Light_watercolomn'//achar(27)//'[0m'
+#endif        
 
         AtmFeInput(n)            = FeDust
         AtmNInput(n)             = NDust
@@ -591,6 +598,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> deallocate 
     end do
 
 #if defined(__RECOM_WAVEBANDS)
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> before exchange_nod Ed4D'//achar(27)//'[0m'
     do n = 1, ed_num
        do tr_num = 1, tlam
          call exchange_nod(Ed4D(:,:,tr_num,n), partit)
@@ -658,6 +666,7 @@ endif
     call exchange_nod(OmegaC3D, partit)
     call exchange_nod(kspc3D, partit)
     call exchange_nod(rhoSW3D, partit)
+    if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> end subroutine recom'//achar(27)//'[0m'    
 
 end subroutine recom
 
