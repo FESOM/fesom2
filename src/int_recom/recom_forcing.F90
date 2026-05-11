@@ -703,7 +703,12 @@ endif
 !     PARw and PARwup from non-spectral RECOM are from previous timestep
 !     (attenuation done in recom_sms) but PARw and PARwup from WAVEBANDS
 !     and RADTRANS are for the current timestep.
-
+!SL to diagnose Light version v0:
+        Light_watercolumn(:,1:tlam,1) = Edz
+        Light_watercolumn(:,1:tlam,2) = Esz
+        Light_watercolumn(:,1:tlam,3) = Esz
+        Light_watercolumn(:,1:tlam,4) = Eutop
+        Light_watercolumn(:,1:tlam,5) = Estop
 
 ! ----------------- Reflectance -------------------------         
 !douple check w.r.t. existance name dz_k(kSurface) 

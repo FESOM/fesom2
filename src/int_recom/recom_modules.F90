@@ -1961,7 +1961,7 @@ module REcoM_spectral
   Logical :: DAR_NONSPECTRAL_BACKSCATTERING_RATIO =.false.
   Logical :: DAR_RADTRANS_RMUS_PAR =.false.
   Logical :: DAR_RADTRANS_DECREASING =.false.
-  integer :: ed_num = 3   ! number of light related diagnostic 
+  integer :: ed_num = 5   ! number of light related diagnostic 
 !sl the following lines moved to general recom_module  
 !slif (RECOM_MARSHALL) then
 !sl  integer :: id1, id1d, id1c, id1p
