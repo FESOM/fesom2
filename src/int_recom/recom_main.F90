@@ -510,7 +510,7 @@ if (enable_coccos) then
 endif
 #if defined(__RECOM_WAVEBANDS)
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> before main Ed4D'//achar(27)//'[0m'
-          !  Ed4D    (1:nl-1,n,:,:) = Light_watercolumn(1:nl-1,:,:) 
+            Ed4D    (1:nl-1,n,:,:) = Light_watercolumn(1:nl-1,:,:) 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> after main Ed4D'//achar(27)//'[0m'            
 #endif
 
