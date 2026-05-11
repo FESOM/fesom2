@@ -134,9 +134,10 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     allocate(CO2_watercolumn(nl-1), pH_watercolumn(nl-1), pCO2_watercolumn(nl-1) , HCO3_watercolumn(nl-1))
     allocate(CO3_watercolumn(nl-1), OmegaC_watercolumn(nl-1), kspc_watercolumn(nl-1) , rhoSW_watercolumn(nl-1))
 #if defined(__RECOM_WAVEBANDS)
-    allocate(Light_watercolumn(nl-1, ed_num, tlam))
+    allocate(Light_watercolumn(nl-1, tlam, ed_num))
+    Light_watercolumn = 0.d0
+ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> after allocate in main'//achar(27)//'[0m'   
 #endif
-
     !< ice concentration [0 to 1]
 
     a_ice       => ice%data(1)%values(:)
@@ -507,10 +508,11 @@ if (enable_coccos) then
 endif
 #if defined(__RECOM_WAVEBANDS)
             Ed4D    (1:nzmax,n,1:tlam,1:ed_num) = Light_watercolumn(1:nzmax,1:tlam,1:ed_num) 
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after main Ed4D'//achar(27)//'[0m'            
 #endif
 
 
-if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after main REcoM_Forcing'//achar(27)//'[0m'
 
             !! * Deallocating 2D diagnostics *
             deallocate(vertNPPn, vertGPPn, vertNNAn, vertChldegn) 
@@ -544,6 +546,7 @@ if (enable_coccos) then
 endif
 #if defined(__RECOM_WAVEBANDS)
             deallocate(Light_watercolumn)
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> deallocate Light_watercolomn'//achar(27)//'[0m'           
 #endif
 
         end if 
@@ -593,6 +596,7 @@ endif
          call exchange_nod(Ed4D(:,:,tr_num,n), partit)
        end do
     end do
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> after exchange_nod Ed4D'//achar(27)//'[0m'    
 #endif
 
     call exchange_nod(GloPCO2surf, partit)

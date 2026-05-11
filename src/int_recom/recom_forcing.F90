@@ -970,6 +970,8 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
   end if
 ! ciso
 
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Diags after ciso'//achar(27)//'[0m'
+
 !-------------------------------------------------------------------------------
 ! Diagnostics
   if (Diags) then
@@ -1002,4 +1004,5 @@ if (enable_coccos) then
 endif
 
   end if
+  if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> end REcoM_Forcing'//achar(27)//'[0m'  
 end subroutine REcoM_Forcing

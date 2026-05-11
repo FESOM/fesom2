@@ -523,6 +523,11 @@ module recom_config
   Logical                :: RECOM_CALC_APHYT      = .false.
   Logical                :: RECOM_CALC_REFLEC     = .false.
   Logical                :: RECOM_BMASS           = .false.
+  character(80)           :: darwin_waterabsorbFile = 'abw25par.dat'
+  character(80)           :: darwin_surfacespecFile = 'surfspec_13amt6.dat'
+  character(80)           :: darwin_phytoabsorbFile = 'optics_phyto_recom_carbon_12.dat'
+  character(80)           :: darwin_acdomFile       = 'aCDOM13amtVK2006.dat'
+  character(80)           :: darwin_particleabsorbFile = 'optics_detritus_3bb.dat'
   integer :: icdom
 !slif (RECOM_MARSHALL) then
   integer :: id1, id1d, id1c, id1p
@@ -533,7 +538,12 @@ module recom_config
   integer, dimension(4)  :: recom_d1_tracer_id = (/1038, 1039, 1040, 1041/)
   namelist /spectral/ RECOM_CDOM, RECOM_MARSHALL, RECOM_RADTRANS, OASIM, RECOM_BMASS, &
                       RECOM_CALC_ACDOM,  RECOM_CALC_APART, RECOM_CALC_APHYT,         &
-                      RECOM_CALC_REFLEC  
+                      RECOM_CALC_REFLEC, &
+                      darwin_waterabsorbFile, &
+                      darwin_surfacespecFile, &
+                      darwin_phytoabsorbFile, &
+                      darwin_acdomFile, &
+                      darwin_particleabsorbFile  
 #endif  
 contains
 
@@ -1951,7 +1961,7 @@ module REcoM_spectral
   Logical :: DAR_NONSPECTRAL_BACKSCATTERING_RATIO =.false.
   Logical :: DAR_RADTRANS_RMUS_PAR =.false.
   Logical :: DAR_RADTRANS_DECREASING =.false.
-  integer :: ed_num = 4   ! number of light related diagnostic 
+  integer :: ed_num = 3   ! number of light related diagnostic 
 !sl the following lines moved to general recom_module  
 !slif (RECOM_MARSHALL) then
 !sl  integer :: id1, id1d, id1c, id1p
@@ -2307,11 +2317,11 @@ contains
       integer, parameter      :: MAX_LEN_MBUF = 1000
       CHARACTER(MAX_LEN_MBUF) :: msgBuf
       character(80)           :: title
-      character(80)           :: darwin_waterabsorbFile
-      character(80)           :: darwin_surfacespecFile
-      character(80)           :: darwin_phytoabsorbFile
-      character(80)           :: darwin_acdomFile
-      character(80)           :: darwin_particleabsorbFile
+!  character(80)           :: darwin_waterabsorbFile = 'abw25par.dat'
+!  character(80)           :: darwin_surfacespecFile = 'surfspec_13amt6.dat'
+!  character(80)           :: darwin_phytoabsorbFile = 'optics_phyto_recom_carbon_12.dat'
+!  character(80)           :: darwin_acdomFile       = 'aCDOM13amtVK2006.dat'
+!  character(80)           :: darwin_particleabsorbFile = 'optics_detritus_3bb.dat'
       integer       :: iUnit
       integer       :: swlambda,splambda,ssflambda
       Real(kind=8)  :: sap,sap_ps,sbp,sbbp
@@ -2428,6 +2438,7 @@ contains
 
 !  Water data files
       if (darwin_waterabsorbFile .NE. ' '  ) THEN
+ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Water data file'//achar(27)//'[0m'             
 !sl        CALL MDSFINDUNIT( iUnit, myThid )
         open(iUnit,file=darwin_waterabsorbFile,                 &
                                  status='old',form='formatted')
@@ -2450,6 +2461,7 @@ contains
         enddo
         close(iUnit)
 20      format(i5,f15.4,f10.4)
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> end Water data file'//achar(27)//'[0m'
       else
         WRITE(msgBuf,'(A)')                                           &
             'WAVEBANDS_INIT_FIXED: need to specify water absorption'
@@ -2462,6 +2474,7 @@ contains
 ! ANNA phyto input data files must have a column for absorption by PS pigs
 ! ANNA easiest way to 'turn off' PS for growth is to put same values in both abs columns
       if (darwin_phytoabsorbFile.NE. ' '  ) THEN
+ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> phytoabsorb file'//achar(27)//'[0m'             
 !sl        CALL MDSFINDUNIT( iUnit, myThid )
         open(iUnit,file=darwin_phytoabsorbFile,                          &
                                          status='old',form='formatted')
@@ -2505,6 +2518,7 @@ endif
 ! QQ Surface spectrum NEED IN HERE for initial use
 if (.not. OASIM) then
       if (darwin_surfacespecFile .NE. ' '  ) THEN
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> surfacespec file'//achar(27)//'[0m'              
 !sl       CALL MDSFINDUNIT( iUnit, myThid )
        open(iUnit,file=darwin_surfacespecFile,                      &
                                   status='old',form='formatted')
@@ -2537,6 +2551,7 @@ endif  ! no OASIM
 if (.not. RECOM_CALC_ACDOM) then
 ! if no file given then CDOM is zero
       if (darwin_acdomFile.NE. ' '  ) THEN
+ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> acdom file'//achar(27)//'[0m'             
 !sl        CALL MDSFINDUNIT( iUnit, myThid )
         open(iUnit,file=darwin_acdomFile,                             &
                               status='old',form='formatted')
