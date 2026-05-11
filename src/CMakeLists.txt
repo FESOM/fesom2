@@ -158,13 +158,6 @@ elseif(ENABLE_IFS_INTERFACE) # ICEPACK + IFS_INTERFACE NOT SUPPORTED (YET)
                                ${src_home}/ifs_interface/mpp_io.F90)
 endif()
 
-# Link RECOM code
-if(RECOM_COUPLED)  # ADD RECOM FILES
-   file(GLOB sources_recom ${src_home}/recom/*.F90
-                           ${src_home}/recom/mocsy/*.F90)
-   list(APPEND sources_Fortran ${sources_recom})                           
-endif()                             
-
 # generate a custom file from fesom_version_info.F90 which includes the current git SHA
 set(FESOM_ORIGINAL_VERSION_FILE ${src_home}/fesom_version_info.F90)
 set(FESOM_GENERATED_VERSION_FILE ${CMAKE_CURRENT_BINARY_DIR}/fesom_version_info-generated.F90)
@@ -200,6 +193,12 @@ add_dependencies(${PROJECT_NAME} fesom_version_info-generated.F90)
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_Fortran_MODULE_DIRECTORY}>)
 target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:module/fesom>)
 target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
+
+# Link RECOM code
+if(RECOM_COUPLED)  # ADD RECOM LIB
+   add_subdirectory(recom)
+   target_link_libraries(${PROJECT_NAME} PRIVATE recom)
+endif()
 
 # Pull CVMix in via FetchContent and build it as part of FESOM's build tree.
 # Offline workflow:
