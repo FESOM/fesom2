@@ -20,12 +20,8 @@ MODULE g_ic3d
    USE g_comm_auto
    USE g_support
    USE g_config, only: dummy, ClimateDataPath, use_cavity
-<<<<<<< fesom2.7-recom3.1
    use recom_config, only: enable_3zoo2det, enable_coccos !OG
-=======
    USE g_clock, only: r_restart
-   
->>>>>>> main
    IMPLICIT NONE
 
    include 'netcdf.inc'
