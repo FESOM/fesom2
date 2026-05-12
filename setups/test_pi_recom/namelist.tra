@@ -36,16 +36,16 @@ nml_tracer_list =
 1028,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
 1029,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
 1030,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1031,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1032,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
-1033,  'MFCT',       'QR4C',       'FCT ',        1.,          1.,
+!1031, 'MFCT',       'QR4C',       'FCT ',        1.,          1.,
+!1032, 'MFCT',       'QR4C',       'FCT ',        1.,          1.,
+!1033, 'MFCT',       'QR4C',       'FCT ',        1.,          1.,
 !101, 'UPW1',       'UPW1',       'NON ',        0.,          0.
 /
 
 &tracer_init3d                            ! initial conditions for tracers
 n_ic3d   = 8                              ! number of tracers to initialize
 idlist   = 1019, 1022, 1018, 1003, 1002, 1001, 2, 1 ! their IDs (0 is temperature, 1 is salinity, etc.). The reading order is defined here!
-filelist = 'fe_pisces_opa_eq_init_3D_changed_name.nc', 'woa18_all_o00_01_mmol_fesom2.nc', 'woa13_all_i00_01_fesom2.nc', 'GLODAPv2.2016b.TAlk_fesom2_mmol_fix_z_Fillvalue.nc', 'GLODAPv2.2016b.TCO2_fesom2_mmol_fix_z_Fillvalue.nc', 'woa13_all_n00_01_fesom2.nc', 'phc3.0_winter.nc', 'phc3.0_winter.nc'  ! list of files in ClimateDataPath to read (one file per tracer), same order as idlist
+filelist = 'fe5deg.nc', 'oxy5deg.nc', 'si5deg.nc', 'talk5deg.nc', 'tco2_5deg.nc', 'din5deg.nc', 'woa18_netcdf_5deg.nc', 'woa18_netcdf_5deg.nc'  ! list of files in ClimateDataPath to read (one file per tracer), same order as idlist
 varlist  = 'Fe', 'oxygen_mmol', 'i_an', 'TAlk_mmol', 'TCO2_mmol', 'n_an', 'salt', 'temp'                 ! variables to read from specified files
 t_insitu = .true.                         ! if T is insitu it will be converted to potential after reading it
 /

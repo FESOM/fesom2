@@ -157,7 +157,6 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     use diagnostics, only: ldiag_DVD
     use g_forcing_param, only: use_age_tracer !---age-code
     use mod_transit, only: decay14, decay39
-    use cmor_variables_diag, only: ldiag_cmor, save_cmor_advection
     implicit none
     type(t_ice)   , intent(in)   , target    :: ice
     type(t_dyn)   , intent(inout), target    :: dynamics
@@ -167,6 +166,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     integer                                  :: i, tr_num, node, elem, nzmax, nzmin
     real(kind=WP)                            :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_elem2D) ! local variable
+    real(kind=WP)                            :: ttf_rhs_bak_tend (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     integer                                  :: nz, n, nu1, nl1
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -193,7 +193,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         call cal_rejected_salt(ice, partit, mesh)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call app_rejected_salt'//achar(27)//'[0m'
         call app_rejected_salt(tracers%data(2)%values, partit, mesh)
-    end if 
+    end if
 
     !___________________________________________________________________________
     ! update 3D velocities with the bolus velocities:
@@ -219,6 +219,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 !    tracers%work%tra_advhoriz = 0.0 ! O:G - tra_diag
 !    tracers%work%tra_advvert  = 0.0
     ttf_rhs_bak = 0.0
+    ttf_rhs_bak_tend = 0.0
 !#endif
     
     !___________________________________________________________________________
@@ -233,17 +234,29 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         if(use_MEDUSA) then
             SinkFlx = 0.0d0
         endif
-        SinkingVel1 = 0.0d0 ! OG 16.03.23
-        SinkingVel2 = 0.0d0 ! OG 16.03.23
+        SinkingVel1 = 0.0d0
+        SinkingVel2 = 0.0d0
 #endif
-
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
         ! needed
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
         call init_tracers_AB(tr_num, tracers, partit, mesh)
- 
+
         ! advect tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call adv_tracers_ale'//achar(27)//'[0m'
+
+   !============================================================     
+
+   if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+          do n=1, myDim_nod2D+eDim_nod2D
+          nu1 = ulevels_nod2D(n)
+          nl1 = nlevels_nod2D(n)
+          do nz = nu1, nl1-1
+             ttf_rhs_bak_tend(nz,n) = tracers%data(tr_num)%values(nz,n)
+          end do
+       end do
+    end if
+   !============================================================
 	!here update only those initialized in the init_tracers. (values, valuesAB, edge_up_dn_grad, ...)
         !!$ACC UPDATE  DEVICE(tracers%data(tr_num)%values, tracers%data(tr_num)%valuesAB, tracers%data(tr_num)%valuesold)
         !$ACC  UPDATE DEVICE(tracers%work%edge_up_dn_grad) !!&
@@ -260,13 +273,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
            tracers%work%del_ttf(:, node)=tracers%work%del_ttf(:, node)+tracers%work%del_ttf_advhoriz(:, node)+tracers%work%del_ttf_advvert(:, node)
         end do
 !$OMP END PARALLEL DO
-
-        !___________________________________________________________________________
-        ! Save advection snapshot for CMOR tendency decomposition
-        if (ldiag_cmor .and. (tr_num <= 2)) then
-            call save_cmor_advection(tr_num, tracers%work%del_ttf(:, 1:myDim_nod2D), myDim_nod2D, nl-1)
-        end if
-
+ 
         !___________________________________________________________________________
         ! diffuse tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
@@ -276,21 +283,12 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         ! Radioactive decay of 14C and 39Ar
         if (tracers%data(tr_num)%ID == 14) tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * exp(-decay14 * dt)
         if (tracers%data(tr_num)%ID == 39) tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * exp(-decay39 * dt)
-
-!YY: C14 seems to be calculated both in fesom and recom
-!YY: decay differently calculated???
-#if defined(__ciso)
-        ! radioactive decay of 14C
-        if (ciso_14 .and. any(c14_tracer_id == tracers%data(tr_num)%ID)) then
-          tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * (1 - lambda_14 * dt)
-        end if    ! ciso & ciso_14
-#endif
-
+ 
         !___________________________________________________________________________
         ! relax to salt and temp climatology
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
         ! if ((toy_ocean) .AND. ((tr_num==1) .AND. (TRIM(which_toy)=="soufflet"))) then
-        if     ((toy_ocean) .AND. ((TRIM(which_toy)=="soufflet"))) then
+        if ((toy_ocean) .AND. ((TRIM(which_toy)=="soufflet"))) then
             call relax_zonal_temp(tracers%data(1), partit, mesh)
             
         elseif ((toy_ocean) .AND. ((TRIM(which_toy)=="neverworld2"))) then
@@ -396,6 +394,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     use ver_sinking_recom_interface
     use diff_ver_recom_expl_interface
     use ver_sinking_recom_benthos_interface
+    use recom_nitrogenss_interface
     use recom_glovar
     use recom_config
     use g_comm_auto
@@ -430,7 +429,13 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     ttf_rhs_bak = 0.0
 
     if (tracers%data(tr_num)%ltra_diag) then
-       call backup_ttf_rhs(del_ttf, ttf_rhs_bak, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D)
+          do n=1, myDim_nod2D+eDim_nod2D
+          nu1 = ulevels_nod2D(n)
+          nl1 = nlevels_nod2D(n)
+          do nz = nu1, nl1-1
+             ttf_rhs_bak(nz,n) = del_ttf(nz,n)
+          end do
+       end do
     end if
     !___________________________________________________________________________
     ! do horizontal diffusion
@@ -440,12 +445,25 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     call diff_part_hor_redi(tracers, partit, mesh)  ! seems to be ~9% faster than diff_part_hor
 
     if (tracers%data(tr_num)%ltra_diag) then
-       call store_diag_component(del_ttf, ttf_rhs_bak, hnode_new, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D, &
-                                 tracers%work%tra_diff_part_hor_redi(:,:,tr_num))
+       do n=1, myDim_nod2D+eDim_nod2D
+          nu1 = ulevels_nod2D(n)
+          nl1 = nlevels_nod2D(n)
+          do nz = nu1, nl1-1
+             ! horizontal diffusion (w/out Redi)
+             tracers%work%tra_diff_part_hor_redi(nz,n,tr_num) = (del_ttf(nz,n) - ttf_rhs_bak(nz,n)) ! Unit [Conc]
+             !if (mype==0)  print *, tracers%work%tra_diff_part_hor_redi(nz,n,tr_num)
+          end do
+       end do
     end if
 
     if ((.not. tracers%data(tr_num)%i_vert_diff) .and. tracers%data(tr_num)%ltra_diag) then
-       call backup_ttf_rhs(del_ttf, ttf_rhs_bak, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D)
+       do n=1, myDim_nod2D+eDim_nod2D
+          nu1 = ulevels_nod2D(n)
+          nl1 = nlevels_nod2D(n)
+          do nz = nu1, nl1-1
+             ttf_rhs_bak(nz,n) = del_ttf(nz,n)
+          end do
+       end do
     end if
     !___________________________________________________________________________
     ! do vertical diffusion: explicit
@@ -454,22 +472,42 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     ! OG i_vert_diff = TRUE so, we dont call explicit scheme
     ! If we use this, check surface forcing for recom variables (They are not updated)
     if ((.not. tracers%data(tr_num)%i_vert_diff) .and. tracers%data(tr_num)%ltra_diag) then 
-       call store_diag_component(del_ttf, ttf_rhs_bak, hnode_new, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D, &
-                                 tracers%work%tra_diff_part_ver_expl(:,:,tr_num))
+       do n=1, myDim_nod2D+eDim_nod2D
+          nu1 = ulevels_nod2D(n)
+          nl1 = nlevels_nod2D(n)
+          do nz = nu1, nl1-1
+             ! vertical diffusion: explicit
+             tracers%work%tra_diff_part_ver_expl(nz,n,tr_num) = (del_ttf(nz,n) - ttf_rhs_bak(nz,n))  ! Unit [Conc]
+             !if (mype==0)  print *,  tra_diff_part_ver_expl(:,:,tr_num)
+          end do
+       end do
     end if
 
     ! A projection of horizontal Redi diffussivity onto vertical. This par contains horizontal
     ! derivatives and has to be computed explicitly!
 
     if (tracers%data(tr_num)%ltra_diag .and. Redi) then
-       call backup_ttf_rhs(del_ttf, ttf_rhs_bak, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D)
+       do n=1, myDim_nod2D+eDim_nod2D
+          nu1 = ulevels_nod2D(n)
+          nl1 = nlevels_nod2D(n)
+          do nz = nu1, nl1-1
+             ttf_rhs_bak(nz,n) = del_ttf(nz,n)
+          end do
+       end do
     end if
 
     if (Redi) call diff_ver_part_redi_expl(tracers, partit, mesh)
 
     if (tracers%data(tr_num)%ltra_diag .and. Redi) then
-       call store_diag_component(del_ttf, ttf_rhs_bak, hnode_new, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D, &
-                                 tracers%work%tra_diff_part_ver_redi_expl(:,:,tr_num))
+       do n=1, myDim_nod2D+eDim_nod2D
+          nu1 = ulevels_nod2D(n)
+          nl1 = nlevels_nod2D(n)
+          do nz = nu1, nl1-1
+             ! Redi diffussivity onto vertical: explicit
+             tracers%work%tra_diff_part_ver_redi_expl(nz,n,tr_num) = (del_ttf(nz,n) - ttf_rhs_bak(nz,n)) ! Unit [Conc]
+             !if (mype==0)  print *,  tra_diff_part_ver_redi_expl(:,:,tr_num)
+          end do
+       end do
     end if
 
 !        if (recom_debug .and. mype==0)  print *, tracers%data(tr_num)%ID
@@ -483,14 +521,43 @@ if (any(recom_remin_tracer_id == tracers%data(tr_num)%ID)) then
 
 ! call bottom boundary
         call diff_ver_recom_expl(tr_num, tracers, partit, mesh)
+!        print*, 'Calling diff_ver_recom_expl and tr_num is:',tracers%data(tr_num)%ID
+        SELECT CASE (tracers%data(tr_num)%ID)
+            CASE (1001) ! DIN
+                dtr_bflux_din(:,:) = 0.0d0 !tracers%data(tr_num)%values(:,:)*0.0d0
+            CASE (1002) ! DIC
+                dtr_bflux_dic(:,:) = 0.0d0 !tracers%data(tr_num)%values(:,:)*0.0d0
+            CASE (1003) ! Alk
+                dtr_bflux_alk(:,:) = 0.0d0 !tracers%data(tr_num)%values(:,:)*0.0d0
+            CASE (1018) ! DSi
+                dtr_bflux_dsi(:,:) = 0.0d0 !tracers%data(tr_num)%values(:,:)*0.0d0
+        END SELECT
 ! update tracer fields
         do n=1, myDim_nod2D
             nzmax=nlevels_nod2D(n)-1
             nzmin=ulevels_nod2D(n)
-!            tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
-!                                                dtr_bf(nzmin:nzmax,n)
-        tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
+            SELECT CASE (tracers%data(tr_num)%ID)
+               CASE (1001) ! DIN
+                   tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
                                                 dtr_bf(nzmin:nzmax,n)
+                   dtr_bflux_din(nzmin:nzmax,n) = dtr_bflux_din(nzmin:nzmax,n) + dtr_bf(nzmin:nzmax,n)
+               CASE (1002) ! DIC
+                   tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
+                                                dtr_bf(nzmin:nzmax,n)
+                   dtr_bflux_dic(nzmin:nzmax,n) = dtr_bflux_dic(nzmin:nzmax,n) + dtr_bf(nzmin:nzmax,n)
+               CASE (1003) ! Alk
+                   tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
+                                                dtr_bf(nzmin:nzmax,n)
+                   dtr_bflux_alk(nzmin:nzmax,n) = dtr_bflux_alk(nzmin:nzmax,n) + dtr_bf(nzmin:nzmax,n)
+               CASE (1018) ! DSi
+                   tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
+                                                dtr_bf(nzmin:nzmax,n)
+                   dtr_bflux_dsi(nzmin:nzmax,n) = dtr_bflux_dsi(nzmin:nzmax,n) + dtr_bf(nzmin:nzmax,n)
+
+               CASE DEFAULT
+                   tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
+                                                dtr_bf(nzmin:nzmax,n)
+            END SELECT
         end do
 end if
 
@@ -522,7 +589,7 @@ if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
         call ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)  !--- str_bf ---
 
 ! update tracer fields
-
+!print*, 'Calling ver_sinking_recom_benthos and tr_num is:',tracers%data(tr_num)%ID
         do n=1, myDim_nod2D
             nzmax=nlevels_nod2D(n)-1
             nzmin=ulevels_nod2D(n)
@@ -536,6 +603,18 @@ if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
                                                 str_bf(nzmin:nzmax,n)
         end do
 endif
+
+! 3) Nitrogen SS
+    if (NitrogenSS .and. tracers%data(tr_num)%ID==1008) then ! idetc
+        call recom_nitrogenss(tracers, partit, mesh) !--- nss for idetc ---
+        do n=1, myDim_nod2D
+            nzmax=nlevels_nod2D(n)-1
+            nzmin=ulevels_nod2D(n)
+        tracers%data(3)%values(nzmin:nzmax,n)=tracers%data(3)%values(nzmin:nzmax,n)+ &   ! tracer_id(tr_num)==1001 !idin
+                                           nss(nzmin:nzmax,n)
+        end do
+    end if
+
 #endif
     !___________________________________________________________________________
     ! Update tracers --> calculate T* see Danilov et al. (2017)
@@ -585,54 +664,12 @@ endif
         end if
 
     end if
-    
+
     !We DO not set del_ttf to zero because it will not be used in this timestep anymore
     !init_tracers_AB will set it to zero for the next timestep
     if (tracers%data(tr_num)%smooth_bh_tra) then
        call diff_part_bh(tr_num, dynamics, tracers, partit, mesh)  ! alpply biharmonic diffusion (implemented as filter)
     end if
-
-contains
-
-subroutine backup_ttf_rhs(del_ttf, ttf_rhs_bak, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D)
-    real(kind=WP), intent(in)    :: del_ttf(:,:)
-    real(kind=WP), intent(inout) :: ttf_rhs_bak(:,:)
-    integer      , intent(in)    :: ulevels_nod2D(:)
-    integer      , intent(in)    :: nlevels_nod2D(:)
-    integer      , intent(in)    :: myDim_nod2D
-    integer      , intent(in)    :: eDim_nod2D
-
-    integer :: n, nz, nu1, nl1
-
-    do n=1, myDim_nod2D+eDim_nod2D
-        nu1 = ulevels_nod2D(n)
-        nl1 = nlevels_nod2D(n)
-        do nz = nu1, nl1-1
-            ttf_rhs_bak(nz,n) = del_ttf(nz,n)
-        end do
-    end do
-end subroutine backup_ttf_rhs
-
-subroutine store_diag_component(del_ttf, ttf_rhs_bak, hnode_new, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D, target_field)
-    real(kind=WP), intent(in)    :: del_ttf(:,:)
-    real(kind=WP), intent(in)    :: ttf_rhs_bak(:,:)
-    real(kind=WP), intent(in)    :: hnode_new(:,:)
-    integer      , intent(in)    :: ulevels_nod2D(:)
-    integer      , intent(in)    :: nlevels_nod2D(:)
-    integer      , intent(in)    :: myDim_nod2D
-    integer      , intent(in)    :: eDim_nod2D
-    real(kind=WP), intent(inout) :: target_field(:,:)
-
-    integer :: n, nz, nu1, nl1
-
-    do n=1, myDim_nod2D+eDim_nod2D
-        nu1 = ulevels_nod2D(n)
-        nl1 = nlevels_nod2D(n)
-        do nz = nu1, nl1-1
-            target_field(nz,n) = (del_ttf(nz,n) - ttf_rhs_bak(nz,n)) / hnode_new(nz,n) ! Unit [Conc]
-        end do
-    end do
-end subroutine store_diag_component
 
 end subroutine diff_tracers_ale
 !
@@ -1003,7 +1040,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
             a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv
             b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
         end if
-        
+
         !_______________________________________________________________________
         ! the rhs (inhomogene part): --> rhs = K_33*dt*d/dz*Tstar --> Tstar...trarr
         ! solve difference quotient for rhs --> tr
@@ -1028,7 +1065,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         nz=nzmax-1
         dz=hnode_new(nz,n)
         tr(nz)=-a(nz)*trarr(nz-1,n)-(b(nz)-dz)*trarr(nz,n)
-        
+
         !_______________________________________________________________________
         ! Add KPP nonlocal fluxes to the rhs (only T and S currently)
         ! use here blmc or kpp_oblmixc instead of Kv, since Kv already contains
@@ -1131,7 +1168,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 #endif                
             end if
         end if ! --> if (use_kpp_nonlclflx) then
-        
+
         !_______________________________________________________________________
         ! case of activated shortwave penetration into the ocean, ad 3d contribution
         if (use_sw_pene .and. tracers%data(tr_num)%ID==1 .and. .not. toy_ocean) then
@@ -1213,7 +1250,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         do nz = nzmax-2, nzmin, -1
             tr(nz) = tp(nz)-cp(nz)*tr(nz+1)
         end do
-        
+
         !_______________________________________________________________________
         ! update tracer
         ! tr ... dTnew = T^(n+0.5) - T*
@@ -1665,7 +1702,7 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
     !___temperature_____________________________________________________________
     CASE (1)
         bc_surface=-dt*(heat_flux(n)/vcpw + sval*water_flux(n)*is_nonlinfs)
-    
+
     !___salinity________________________________________________________________
     CASE (2)
         ! --> real_salt_flux(:): salt flux due to containment/releasing of salt
@@ -1756,102 +1793,321 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
     CASE (39) ! Argon-39 (fractionationation-corrected 39Ar/Ar)
       ! Local isotopic 39Ar/Ar air-sea exchange flux (m / s)
       bc_surface = dt * (iso_flux("arg", sst, sss, wind_2, aice, press_a, xarg_a, r39ar_a, sval, arg_0) - sval * water_flux(n) * is_nonlinfs)
+
 !---  Done with boundary conditions for transient tracers.
+
 #if defined(__recom)
-    CASE (1001) ! DIN
-        if (use_MEDUSA .and. add_loopback) then  ! OG: add is_MEDUSA_loopback flag is_MEDUSA_loopback flag * lb_flux(n,1)
-            bc_surface= dt*(AtmNInput(n) + RiverDIN2D(n)   * is_riverinput                &
-                                         + ErosionTON2D(n) * is_erosioninput + lb_flux(n,1))
-        else
-            bc_surface= dt*(AtmNInput(n) + RiverDIN2D(n)   * is_riverinput                &
-                                         + ErosionTON2D(n) * is_erosioninput)
-        end if
+! =============================================================================
+! SURFACE BOUNDARY CONDITIONS FOR RECOM BIOGEOCHEMICAL TRACERS
+!
+! bc_surface is the surface flux [tracer units] applied to each tracer per
+! timestep (dt). Fluxes include atmospheric deposition, river input, erosion,
+! air-sea gas exchange, and (optionally) MEDUSA sediment loopback fluxes.
+!
+! Flags used throughout:
+!   is_riverinput   : 1 if river input is enabled, else 0
+!   is_erosioninput : 1 if erosion input is enabled, else 0
+!   use_MEDUSA      : true if MEDUSA sediment module is active
+!   add_loopback    : true if sediment loopback fluxes are included
+!   enable_R2OMIP   : true if R2OMIP river chemistry scheme is active
+!   ciso, ciso_14   : true if carbon isotope tracers (13C / 14C) are enabled
+!
+! lb_flux(n, k) : MEDUSA loopback fluxes at column n for tracer k:
+!   k=1  DIN    k=2  DIC    k=3  Alk    k=4  DSi
+!   k=5  CaCO3  k=6  DIC13  k=7  CaCO3-13C
+!   k=8  DIC14  k=9  CaCO3-14C
+! =============================================================================
 
-    CASE (1002) ! DIC
-        if (use_MEDUSA .and. add_loopback) then
-            bc_surface= dt*(GloCO2flux_seaicemask(n)                &
-                                + RiverDIC2D(n)   * is_riverinput   &
-                                + ErosionTOC2D(n) * is_erosioninput &
-                                + lb_flux(n,2) + lb_flux(n,5))
-        else
-            bc_surface= dt*(GloCO2flux_seaicemask(n)                &
-                                + RiverDIC2D(n)   * is_riverinput   &
-                                + ErosionTOC2D(n) * is_erosioninput)
-       end if
+    ! -------------------------------------------------------------------------
+    ! 1001 : DIN – Dissolved Inorganic Nitrogen
+    ! Sources: atmospheric N deposition + river DIN + erosion TON
+    !          + MEDUSA loopback (lb_flux k=1) when enabled
+    ! -------------------------------------------------------------------------
 
-    CASE (1003) ! Alk
-        if (use_MEDUSA .and. add_loopback) then
-            bc_surface= dt*(virtual_alk(n) + relax_alk(n)       &
-                            + RiverAlk2D(n) * is_riverinput     &
-                            + lb_flux(n,3) + lb_flux(n,5)*2) !CaCO3:Alk burial=1:2
-        else
-            bc_surface= dt*(virtual_alk(n) + relax_alk(n)       &
-                            + RiverAlk2D(n) * is_riverinput)
-        end if
-    CASE (1004:1010)
+    CASE (1001)
+        IF (use_MEDUSA .AND. add_loopback) THEN
+            bc_surface = dt * ( AtmNInput(n)              &
+                              + RiverDIN2D(n)   * is_riverinput   &
+                              + ErosionTON2D(n) * is_erosioninput &
+                              + lb_flux(n,1) )
+        ELSE
+            bc_surface = dt * ( AtmNInput(n)              &
+                              + RiverDIN2D(n)   * is_riverinput   &
+                              + ErosionTON2D(n) * is_erosioninput )
+        END IF
+
+    ! -------------------------------------------------------------------------
+    ! 1002 : DIC – Dissolved Inorganic Carbon
+    ! Sources: air-sea CO2 flux + river DIC + erosion TOC
+    !          + MEDUSA loopback (lb_flux k=2 DIC, k=5 CaCO3) when enabled
+    !
+    ! R2OMIP variant: also adds river labile DOC (RiverDOCl2D) to DIC;
+    !                 labile DOC is assumed to remineralise rapidly.
+    ! -------------------------------------------------------------------------
+
+    CASE (1002)
+        IF (use_MEDUSA .AND. add_loopback) THEN
+            bc_surface = dt * ( GloCO2flux_seaicemask(n)                &
+                              + RiverDIC2D(n)   * is_riverinput         &
+                              + ErosionTOC2D(n) * is_erosioninput       &
+                              + lb_flux(n,2) + lb_flux(n,5) )
+        ELSE
+            IF (enable_R2OMIP) THEN
+                bc_surface = dt * ( GloCO2flux_seaicemask(n)            &
+                                  + RiverDIC2D(n)  * is_riverinput      &
+                                  + RiverDOCl2D(n) * is_riverinput      &  ! labile DOC treated as DIC in R2OMIP
+                                  + ErosionTOC2D(n) * is_erosioninput )
+            ELSE
+                bc_surface = dt * ( GloCO2flux_seaicemask(n)            &
+                                  + RiverDIC2D(n)   * is_riverinput     &
+                                  + ErosionTOC2D(n) * is_erosioninput )
+            END IF
+        END IF
+
+    ! -------------------------------------------------------------------------
+    ! 1003 : Alk – Total Alkalinity
+    ! Sources: virtual salt flux (virtual_alk), relaxation term (relax_alk),
+    !          river Alk + MEDUSA loopback (lb_flux k=3 Alk, k=5 CaCO3)
+    !
+    ! CaCO3 dissolution releases 2 mol Alk per mol C (1:2 ratio).
+    !
+    ! R2OMIP variant: river alkalinity prescribed via RiverDIC2D (no
+    !                 explicit RiverAlk2D), loopback uses lb_flux k=5 only.
+    ! -------------------------------------------------------------------------
+
+    CASE (1003)
+        IF (use_MEDUSA .AND. add_loopback) THEN
+            IF (enable_R2OMIP) THEN
+                bc_surface = dt * ( virtual_alk(n) + relax_alk(n)      &
+                                  + lb_flux(n,3) + lb_flux(n,5)*2 )    ! CaCO3:Alk = 1:2
+            ELSE
+                bc_surface = dt * ( virtual_alk(n) + relax_alk(n)      &
+                                  + RiverAlk2D(n) * is_riverinput      &
+                                  + lb_flux(n,3) + lb_flux(n,5)*2 )    ! CaCO3:Alk = 1:2
+            END IF
+        ELSE
+            IF (enable_R2OMIP) THEN
+                bc_surface = dt * ( virtual_alk(n) + relax_alk(n)      &
+                                  + RiverDIC2D(n) * is_riverinput )    ! R2OMIP proxy for river Alk
+            ELSE
+                bc_surface = dt * ( virtual_alk(n) + relax_alk(n)      &
+                                  + RiverAlk2D(n) * is_riverinput )
+            END IF
+        END IF
+
+    ! -------------------------------------------------------------------------
+    ! 1004–1006 : No surface flux
+    ! -------------------------------------------------------------------------
+
+    CASE (1004:1006)
         bc_surface=0.0_WP
-    CASE (1011) ! DON
-        bc_surface= dt*RiverDON2D(n) * is_riverinput
-    CASE (1012) ! DOC
-        bc_surface= dt*RiverDOC2D(n) * is_riverinput
+
+    ! -------------------------------------------------------------------------
+    ! 1007 : PON – Particulate Organic Nitrogen (= detN in RECOM)
+    ! R2OMIP only: derived from river POC using Redfield-like N:C ratio (25/276)
+    ! -------------------------------------------------------------------------
+
+    CASE (1007)
+        IF (enable_R2OMIP) THEN
+            bc_surface = (25.0_WP / 276.0_WP) * dt * RiverPOC2D(n) * is_riverinput
+        ELSE
+            bc_surface = 0.0_WP
+        END IF
+
+    ! -------------------------------------------------------------------------
+    ! 1008 : POC – Particulate Organic Carbon (= detC in RECOM)
+    ! R2OMIP only: river particulate organic carbon input
+    ! -------------------------------------------------------------------------
+    CASE (1008)
+        IF (enable_R2OMIP) THEN
+            bc_surface = dt * RiverPOC2D(n) * is_riverinput
+        ELSE
+            bc_surface = 0.0_WP
+        END IF
+
+    ! -------------------------------------------------------------------------
+    ! 1009–1010 : No surface flux
+    ! -------------------------------------------------------------------------
+    CASE (1009:1010)
+        bc_surface=0.0_WP
+
+    ! -------------------------------------------------------------------------
+    ! 1011 : DON – Dissolved Organic Nitrogen
+    ! R2OMIP: derived from river semi-labile DOC (RiverDOCsl2D) using N:C
+    !         stoichiometry from Seitzinger et al. (103/2583 ≈ C/N ~25)
+    ! Standard: river DON directly
+    ! -------------------------------------------------------------------------
+
+    CASE (1011)
+        IF (enable_R2OMIP) THEN
+            bc_surface = (103.0_WP / 2583.0_WP) * dt * RiverDOCsl2D(n) * is_riverinput
+        ELSE
+            bc_surface = dt * RiverDON2D(n) * is_riverinput
+        END IF
+
+    ! -------------------------------------------------------------------------
+    ! 1012 : DOC – Dissolved Organic Carbon (refractory / bulk)
+    ! R2OMIP: DOC split into labile (→ DIC, see 1002) and semi-labile (→ 1031);
+    !         bulk DOC field receives no direct flux under R2OMIP.
+    ! Standard: river DOC directly
+    ! -------------------------------------------------------------------------
+    CASE (1012)
+        IF (enable_R2OMIP) THEN
+            bc_surface = 0.0_WP
+        ELSE
+            bc_surface = dt * RiverDOC2D(n) * is_riverinput
+        END IF
+ 
+    ! -------------------------------------------------------------------------
+    ! 1013–1017 : No surface flux
+    ! -------------------------------------------------------------------------
     CASE (1013:1017)
-        bc_surface=0.0_WP
-    CASE (1018) ! DSi
-        if (use_MEDUSA .and. add_loopback) then
-           bc_surface=dt*(RiverDSi2D(n)   * is_riverinput        &
-                        + ErosionTSi2D(n) * is_erosioninput      &
-                        + lb_flux(n,4))
-        else
-            bc_surface=dt*(RiverDSi2D(n) * is_riverinput + ErosionTSi2D(n) * is_erosioninput)
-        end if
+        bc_surface = 0.0_WP
 
-    CASE (1019) ! Fe
-        if (useRivFe) then
-            bc_surface= dt*(AtmFeInput(n) + RiverFe(n))
-        else
-           bc_surface= dt*AtmFeInput(n)
-        end if
-    CASE (1020:1021) ! Cal
-        bc_surface=0.0_WP
-    CASE (1022) ! OXY
-        bc_surface= dt*GloO2flux_seaicemask(n)
-!        bc_surface=0.0_WP
-    CASE (1023:1036)
-        bc_surface=0.0_WP  ! OG added bc for recom fields
-    CASE (1302) ! Before (1037) ! DIC_13
+    ! -------------------------------------------------------------------------
+    ! 1018 : DSi – Dissolved Silica
+    ! Sources: river DSi + erosion TSi + MEDUSA loopback (lb_flux k=4)
+    !
+    ! R2OMIP variant (no loopback): DSi estimated from river DIN using the
+    !   Si:N ratio from Turner et al. (2003): Si ≈ (194/16.2) × DIN
+    ! R2OMIP + MEDUSA loopback: currently set to zero (under review – CHECK)
+    ! -------------------------------------------------------------------------
+    CASE (1018)
+        IF (use_MEDUSA .AND. add_loopback) THEN
+            IF (enable_R2OMIP) THEN
+                bc_surface = 0.0_WP  ! TODO: R2OMIP + loopback path not yet implemented
+            ELSE
+                bc_surface = dt * ( RiverDSi2D(n)   * is_riverinput    &
+                                  + ErosionTSi2D(n) * is_erosioninput  &
+                                  + lb_flux(n,4) )
+            END IF
+        ELSE
+            IF (enable_R2OMIP) THEN
+                ! Si:N proxy ratio from Turner et al. (2003)
+                bc_surface = dt * ( (194.0_WP / 16.2_WP) * RiverDIN2D(n) * is_riverinput &
+                                  + ErosionTSi2D(n) * is_erosioninput )
+            ELSE
+                bc_surface = dt * ( RiverDSi2D(n)   * is_riverinput    &
+                                  + ErosionTSi2D(n) * is_erosioninput )
+            END IF
+        END IF
 
+    ! -------------------------------------------------------------------------
+    ! 1019 : Fe – Dissolved Iron
+    ! Sources: atmospheric dust deposition (AtmFeInput)
+    !          + river Fe (RiverFe) when useRivFe is enabled
+    !
+    ! Commented alternative (Tashiro et al. 2023 R2OMIP formula) — unstable:
+    !   bc_surface = dt*AtmFeInput + dt*(0.002*(RiverDOCsl2D**(-1.616)))
+    ! -------------------------------------------------------------------------
+    CASE (1019)
+        IF (useRivFe) THEN
+            bc_surface = dt * ( AtmFeInput(n) + RiverFe(n) )
+        ELSE
+            bc_surface = dt * AtmFeInput(n)
+           !bc_surface= dt*AtmFeInput(n) + dt*(0.002*(RiverDOCsl2D(n)**(-1.616))) * is_riverinput ! From Tashiro et al. 2023 - R2OMIP (OG model explodes here)
+        END IF
+
+    ! -------------------------------------------------------------------------
+    ! 1020–1021 : CaCO3 – no surface boundary flux (internal source/sink only)
+    ! -------------------------------------------------------------------------
+    CASE (1020:1021)
+        bc_surface = 0.0_WP
+ 
+    ! -------------------------------------------------------------------------
+    ! 1022 : OXY – Dissolved Oxygen
+    ! Source: air-sea O2 flux (seaice-masked)
+    ! -------------------------------------------------------------------------
+    CASE (1022)
+        bc_surface = dt * GloO2flux_seaicemask(n)
+ 
+    ! -------------------------------------------------------------------------
+    ! 1023–1030 : No surface flux (additional RECOM fields)
+    ! -------------------------------------------------------------------------
+    CASE (1023:1030)
+        bc_surface = 0.0_WP
+
+    ! -------------------------------------------------------------------------
+    ! 1031 : DOC_terr – Terrigenous (semi-labile) dissolved organic carbon
+    ! R2OMIP only: river semi-labile DOC (RiverDOCsl2D) input
+    !              Labile fraction goes to DIC (case 1002); DON to case 1011.
+    ! -------------------------------------------------------------------------
+    CASE (1031)
+        IF (enable_R2OMIP) THEN
+            bc_surface = dt * RiverDOCsl2D(n) * is_riverinput
+        ELSE
+            bc_surface = 0.0_WP
+        END IF
+
+    ! -------------------------------------------------------------------------
+    ! 1032–1037 : No surface flux (additional RECOM fields)
+    ! -------------------------------------------------------------------------
+    CASE (1032:1037)
+        bc_surface = 0.0_WP
+ 
+    ! =========================================================================
+    ! CARBON ISOTOPE TRACERS (requires __ciso preprocessor flag)
+    ! =========================================================================
+ 
 #if defined (__ciso)
-         if (ciso) then
-            if (use_MEDUSA .and. add_loopback) then
-               bc_surface= dt*(GloCO2flux_seaicemask_13(n) &
-                           + lb_flux(n,6) + lb_flux(n,7))
-            else
-               bc_surface= dt*(GloCO2flux_seaicemask_13(n))
-            end if
-         else
-            bc_surface=0.0_WP
-         end if
-#endif
+ 
+    ! -------------------------------------------------------------------------
+    ! 1302 : DIC_13 – Dissolved 13C-labelled inorganic carbon
+    ! Source: isotopically fractionated air-sea CO2 flux
+    !         + MEDUSA loopback for 13C-DIC (k=6) and 13C-CaCO3 (k=7)
+    ! Only active when ciso = .true.
+    ! -------------------------------------------------------------------------
+    CASE (1302)
+        IF (ciso) THEN
+            IF (use_MEDUSA .AND. add_loopback) THEN
+                bc_surface = dt * ( GloCO2flux_seaicemask_13(n) &
+                                  + lb_flux(n,6) + lb_flux(n,7) )
+            ELSE
+                bc_surface = dt * GloCO2flux_seaicemask_13(n)
+            END IF
+        ELSE
+            bc_surface = 0.0_WP
+        END IF
+ 
+    ! -------------------------------------------------------------------------
+    ! 1305–1321 : Organic 13C tracers – no surface flux
+    ! -------------------------------------------------------------------------
     CASE (1305:1321)
-         bc_surface=0.0_WP ! organic 13C
-    CASE (1402) ! Before (1034) ! DIC_14
-#if defined (__ciso)
-         if (ciso .and. ciso_14) then
-             if (use_MEDUSA .and. add_loopback .and. ciso_organic_14) then
-                 bc_surface= dt*(GloCO2flux_seaicemask_14(n) &
-                             + lb_flux(n,8) + lb_flux(n,9))
-             else
-                 bc_surface= dt*GloCO2flux_seaicemask_14(n)
-             end if
-         else
-             bc_surface=0.0_WP
-         end if
-#endif
+        bc_surface = 0.0_WP
+ 
+    ! -------------------------------------------------------------------------
+    ! 1402 : DIC_14 – Dissolved 14C-labelled inorganic carbon (radiocarbon)
+    ! Source: isotopically fractionated air-sea CO2 flux
+    !         + MEDUSA loopback for 14C-DIC (k=8) and 14C-CaCO3 (k=9)
+    !           (only when ciso_organic_14 is also enabled)
+    ! Only active when ciso = .true. AND ciso_14 = .true.
+    ! -------------------------------------------------------------------------
+    CASE (1402)
+        IF (ciso .AND. ciso_14) THEN
+            IF (use_MEDUSA .AND. add_loopback .AND. ciso_organic_14) THEN
+                bc_surface = dt * ( GloCO2flux_seaicemask_14(n) &
+                                  + lb_flux(n,8) + lb_flux(n,9) )
+            ELSE
+                bc_surface = dt * GloCO2flux_seaicemask_14(n)
+            END IF
+        ELSE
+            bc_surface = 0.0_WP
+        END IF
+ 
+    ! -------------------------------------------------------------------------
+    ! 1405–1421 : Organic 14C tracers – no surface flux
+    ! -------------------------------------------------------------------------
     CASE (1405:1421)
-         bc_surface=0.0_WP ! organic 14C
-#endif
+        bc_surface = 0.0_WP
+ 
+#endif  ! __ciso
+ 
+#endif  ! __recom
+
     CASE (101) ! apply boundary conditions to tracer ID=101
         bc_surface= dt*(prec_rain(n))! - real_salt_flux(n)*is_nonlinfs)
+!---Transient tracers (case ##6,12,14,39) need additional input parameters 
+!   and are considered in the separate function transit_bc_surface
 !---wiso-code
     CASE (102) ! apply boundary conditions to tracer ID=101 (H218O)
         bc_surface = dt*wiso_flux_oce(n,1)

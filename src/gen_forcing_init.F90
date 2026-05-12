@@ -143,6 +143,7 @@ subroutine forcing_array_setup(partit, mesh)
   runoff=0.0_WP
   evaporation = 0.0_WP
   ice_sublimation = 0.0_WP
+
 #if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
   allocate(sublimation(n2), evap_no_ifrac(n2))
   sublimation=0.0_WP

@@ -250,6 +250,8 @@ real(kind=WP), allocatable :: tr_z(:,:)
 #if defined(__recom)
 real(kind=WP), allocatable    :: dtr_bf(:,:), str_bf(:,:)
 real(kind=WP), allocatable    :: vert_sink(:,:)
+real(kind=WP), allocatable    :: nss(:,:)   ! OG -> vertical sinking !R2OMIP (Burial)
+real(kind=WP), allocatable    :: bur(:,:,:)   ! LO !R2OMIP (Burial)
 #endif
 
 !Viscosity and diff coefs

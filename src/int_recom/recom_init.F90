@@ -30,7 +30,6 @@ subroutine recom_init(tracers, partit, mesh)
     use REcoM_locVar
     use recom_config
     use REcoM_ciso
-
     implicit none
 #include "netcdf.inc"
     !___________________________________________________________________________
@@ -41,6 +40,7 @@ subroutine recom_init(tracers, partit, mesh)
     real(kind=WP)                           :: locDINmax, locDINmin, locDICmax, locDICmin, locAlkmax, glo
     real(kind=WP)                           :: locAlkmin, locDSimax, locDSimin, locDFemax, locDFemin
     real(kind=WP)                           :: locO2max, locO2min
+    real(kind=WP)                           :: locDICremin, locDICremax ! initialization of DIC remin (added by Sina)
 
     type(t_tracer), intent(inout), target   :: tracers
     type(t_partit), intent(inout), target   :: partit
@@ -67,14 +67,25 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(GloNDust              ( node_size ))
     allocate(AtmNInput             ( node_size ))
 
+    ! calcite dissolution at the ocean bottom
+    allocate(OmegaC_bottom(node_size)) !R2OMIP
+
     !! * River nutrients as surface boundary condition *
-    allocate(RiverDIN2D            ( node_size ))
-    allocate(RiverDON2D            ( node_size ))
-    allocate(RiverDOC2D            ( node_size ))
-    allocate(RiverDSi2D            ( node_size ))
-    allocate(RiverDIC2D            ( node_size ))
-    allocate(RiverAlk2D            ( node_size ))
-    allocate(RiverFe               ( node_size ))
+    if (enable_R2OMIP) then
+        allocate(RiverDIC2D            ( node_size ))
+        allocate(RiverDIN2D            ( node_size ))
+        allocate(RiverDOCl2D           ( node_size ))
+        allocate(RiverDOCsl2D          ( node_size ))
+        allocate(RiverPOC2D            ( node_size ))
+    else
+        allocate(RiverDIN2D            ( node_size ))
+        allocate(RiverDON2D            ( node_size ))
+        allocate(RiverDOC2D            ( node_size ))
+        allocate(RiverDSi2D            ( node_size ))
+        allocate(RiverDIC2D            ( node_size ))
+        allocate(RiverAlk2D            ( node_size ))
+    endif
+        allocate(RiverFe               ( node_size ))
 
     !! * Erosion nutrients as surface boundary condition *
     allocate(ErosionTON2D          ( node_size ))
@@ -95,8 +106,19 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(GlodecayBenthos       ( node_size, benthos_num ))
     allocate(Benthos               ( node_size, benthos_num ))
     allocate(Benthos_tr            ( node_size, benthos_num, num_tracers )) ! kh 25.03.22 buffer per tracer index
+
+    allocate(LocDenit              ( node_size ))
+    allocate(LocBurial             ( benthos_num, node_size )) ! R2OMIP
+    allocate(Burial                ( benthos_num, node_size )) ! R2OMIP
+    allocate(BurialBen             ( benthos_num )) ! R2OMIP
+    allocate(Sed_2_Ocean_Flux      ( node_size, 6 )) ! DIN, DIC, Alk, DSi, DFe, O2 ! R2OMIP
+    allocate(Ocean_2_Sed_Flux      ( node_size, benthos_num )) ! C, Si, N, Calc ! R2OMIP
+
     allocate(GloHplus              ( node_size ))
     allocate(DenitBen              ( node_size ))
+    allocate(PistonVelocity        ( node_size ))
+    allocate(alphaCO2              ( node_size ))
+
 
     allocate(LocBenthos            ( benthos_num ))
     allocate(decayBenthos          ( benthos_num ))     ! [1/day] Decay rate of detritus in the benthic layer
@@ -108,16 +130,27 @@ subroutine recom_init(tracers, partit, mesh)
     GloNDust              = 0.d0
     AtmNInput             = 0.d0
 
-    RiverDIN2D            = 0.d0
-    RiverDON2D            = 0.d0
-    RiverDOC2D            = 0.d0
-    RiverDSi2D            = 0.d0
-    RiverDIC2D            = 0.d0
-    RiverAlk2D            = 0.d0
+    ! calcite dissolution at the ocean bottom !R2OMIP
+    OmegaC_bottom         = 0.d0
+
+    if (enable_R2OMIP) then
+        RiverDIC2D             = 0.d0
+        RiverDIN2D             = 0.d0
+        RiverDOCl2D            = 0.d0
+        RiverDOCsl2D           = 0.d0
+        RiverPOC2D             = 0.d0
+    else
+        RiverDIN2D            = 0.d0
+        RiverDON2D            = 0.d0
+        RiverDOC2D            = 0.d0
+        RiverDSi2D            = 0.d0
+        RiverDIC2D            = 0.d0
+        RiverAlk2D            = 0.d0
+    end if
     RiverFe               = 0.d0
 
-    ErosionTON2D          = 0.d0
     ErosionTOC2D          = 0.d0
+    ErosionTON2D          = 0.d0
     ErosionTSi2D          = 0.d0
 
     relax_alk             = 0.d0
@@ -134,6 +167,12 @@ subroutine recom_init(tracers, partit, mesh)
     Benthos_tr(:,:,:)     = 0.0d0 ! kh 25.03.22
     GloHplus              = exp(-8.d0 * log(10.d0)) ! = 10**(-8)
     DenitBen              = 0.d0
+    PistonVelocity        = 0.d0
+    alphaCO2              = 0.d0
+
+    Burial                = 0.d0 ! R2OMIP
+    Sed_2_Ocean_Flux      = 0.0d0 ! R2OMIP
+    Ocean_2_Sed_Flux      = 0.0d0 ! R2OMIP
 
     LocBenthos            = 0.d0
     decayBenthos          = 0.d0
@@ -184,6 +223,70 @@ subroutine recom_init(tracers, partit, mesh)
     Chldegc = 0.d0
     Chldegp = 0.d0
 
+  allocate(grazmeso_tot(node_size))
+  allocate(grazmeso_n(node_size))
+  allocate(grazmeso_d(node_size))
+  allocate(grazmeso_c(node_size))
+  allocate(grazmeso_p(node_size))
+  allocate(grazmeso_det(node_size))
+  allocate(grazmeso_mic(node_size))
+  allocate(grazmeso_det2(node_size))
+
+  grazmeso_tot = 0.d0
+  grazmeso_n   = 0.d0
+  grazmeso_d   = 0.d0
+  grazmeso_c   = 0.d0
+  grazmeso_p   = 0.d0
+  grazmeso_det = 0.d0
+  grazmeso_mic = 0.d0
+  grazmeso_det2= 0.d0
+
+  allocate(grazmacro_tot(node_size))
+  allocate(grazmacro_n(node_size))
+  allocate(grazmacro_d(node_size))
+  allocate(grazmacro_c(node_size))
+  allocate(grazmacro_p(node_size))
+  allocate(grazmacro_mes(node_size))
+  allocate(grazmacro_det(node_size))
+  allocate(grazmacro_mic(node_size))
+  allocate(grazmacro_det2(node_size))
+
+  grazmacro_tot = 0.d0
+  grazmacro_n = 0.d0
+  grazmacro_d = 0.d0
+  grazmacro_c = 0.d0
+  grazmacro_p = 0.d0
+  grazmacro_mes = 0.d0
+  grazmacro_det = 0.d0
+  grazmacro_mic = 0.d0
+  grazmacro_det2= 0.d0
+
+  allocate(grazmicro_tot(node_size))
+  allocate(grazmicro_n(node_size))
+  allocate(grazmicro_d(node_size))
+  allocate(grazmicro_c(node_size))
+  allocate(grazmicro_p(node_size))
+
+  grazmicro_tot = 0.d0
+  grazmicro_n = 0.d0
+  grazmicro_d = 0.d0
+  grazmicro_c = 0.d0
+  grazmicro_p = 0.d0
+
+  ! Dissolution and remineralization ! R2OMIP
+  allocate(DISSOC(node_size))
+  allocate(DISSON(node_size))
+  allocate(DISSOSi(node_size))
+  allocate(REMOC(node_size))
+  allocate(REMOCt(node_size))
+  allocate(REMON(node_size))
+  DISSOC = 0.d0
+  DISSON = 0.d0
+  DISSOSi = 0.d0
+  REMOC = 0.d0
+  REMOCt = 0.d0
+  REMON = 0.d0
+
 !! *** Allocate 3D diagnostics ***
     allocate(respmeso     ( nl-1, node_size ))
     allocate(respmacro    ( nl-1, node_size ))
@@ -207,6 +310,21 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(NPPc3D       ( nl-1, node_size ))
     allocate(NPPp3D       ( nl-1, node_size ))
 
+    allocate(photn        ( nl-1, node_size ))
+    allocate(photd        ( nl-1, node_size ))
+    allocate(photc        ( nl-1, node_size ))
+    allocate(photp        ( nl-1, node_size ))
+    allocate(DOCremin     ( nl-1, node_size ))
+    allocate(Nassimn      ( nl-1, node_size ))
+    allocate(Nassimd      ( nl-1, node_size ))
+    allocate(Nassimc      ( nl-1, node_size ))
+    allocate(Nassimp      ( nl-1, node_size ))
+    allocate(DONremin     ( nl-1, node_size ))
+    allocate(fastcdis     ( nl-1, node_size ))
+    allocate(mesocdis     ( nl-1, node_size ))
+    allocate(microcdis    ( nl-1, node_size ))
+    allocate(macrocdis    ( nl-1, node_size ))
+
     respmeso     = 0.d0
     respmacro    = 0.d0
     respmicro    = 0.d0
@@ -228,6 +346,21 @@ subroutine recom_init(tracers, partit, mesh)
     NPPd3D       = 0.d0
     NPPc3D       = 0.d0
     NPPp3D       = 0.d0
+
+    photn       = 0.d0
+    photd       = 0.d0
+    photc       = 0.d0
+    photp       = 0.d0
+    DOCremin    = 0.d0
+    Nassimn     = 0.d0
+    Nassimd     = 0.d0
+    Nassimc     = 0.d0
+    Nassimp     = 0.d0
+    DONremin    = 0.d0
+    fastcdis    = 0.d0
+    mesocdis    = 0.d0
+    microcdis   = 0.d0
+    macrocdis   = 0.d0
 
 !! From Hannahs new temperature function (not sure if needed as diagnostic):
 
@@ -327,8 +460,24 @@ subroutine recom_init(tracers, partit, mesh)
     Sinkingvel2(:,:)      = 0.d0
 
     allocate(Sinkvel1_tr(nl,node_size,num_tracers), Sinkvel2_tr(nl,node_size,num_tracers))  ! OG 16.03.23
-    Sinkvel1_tr(:,:,:)    = 0.0d0 ! OG 16.03.23
-    Sinkvel2_tr(:,:,:)    = 0.0d0 ! OG 16.03.23
+    Sinkvel1_tr(:,:,:)    = 0.0d0
+    Sinkvel2_tr(:,:,:)    = 0.0d0
+
+    allocate(dtr_bf_dic(nl,node_size,num_tracers),dtr_bflux_dic(nl,node_size))   ! RP on 26.09.2025
+    dtr_bflux_dic(:,:)    = 0.0d0 !RP on 26.09.2025
+    dtr_bf_dic(:,:,:)     = 0.0d0 !RP on 26.09.2025
+
+    allocate(dtr_bf_din(nl,node_size,num_tracers),dtr_bflux_din(nl,node_size))
+    dtr_bflux_din(:,:)    = 0.0d0
+    dtr_bf_din(:,:,:)     = 0.0d0
+
+    allocate(dtr_bf_alk(nl,node_size,num_tracers),dtr_bflux_alk(nl,node_size))
+    dtr_bflux_alk(:,:)    = 0.0d0
+    dtr_bf_alk(:,:,:)     = 0.0d0
+
+    allocate(dtr_bf_dsi(nl,node_size,num_tracers),dtr_bflux_dsi(nl,node_size))
+    dtr_bflux_dsi(:,:)    = 0.0d0
+    dtr_bf_dsi(:,:,:)     = 0.0d0
 
     if (use_MEDUSA) then
         allocate(GloSed(node_size,sedflx_num))
@@ -344,6 +493,7 @@ subroutine recom_init(tracers, partit, mesh)
 
     ! After reading parecomsetup namelist
     call initialize_tracer_indices
+    call print_sinking_config(mype)
 
     ! Validation check here
     call validate_recom_tracers(num_tracers, mype)
@@ -529,6 +679,8 @@ subroutine recom_init(tracers, partit, mesh)
             IF (enable_coccos .AND. enable_3zoo2det) THEN
                 ! CoccoChl - Coccolithophore Chlorophyll
                 tracers%data(i)%values(:,:) = tiny_chl
+            ELSE IF (useRivers) THEN
+                tracers%data(i)%values(:,:) = 0.0_WP !tiny  !R2OMIP
             END IF
 
         CASE (1032)
@@ -597,6 +749,8 @@ subroutine recom_init(tracers, partit, mesh)
         locDFemin = locDINmin
         locO2max  = locDINmax
         locO2min  = locDINmin
+        locDICremax = locDICremax ! init DIC remin (added by Sina)
+        locDICremin = locDICremin ! init DIC remin (added by Sina)
 
         do n=1, myDim_nod2d
             locDINmax = max(locDINmax,maxval(tracers%data(3)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
@@ -611,16 +765,54 @@ subroutine recom_init(tracers, partit, mesh)
             locDFemin = min(locDFemin,minval(tracers%data(21)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
             locO2max  = max(locO2max,maxval(tracers%data(24)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
             locO2min  = min(locO2min,minval(tracers%data(24)%values(ulevels_nod2D(n):nlevels_nod2D(n)-1,n)) )
+        ! DICremin tracer (added by Sina)
+        if (enable_3zoo2det .and. enable_coccos) then
+            locDICremax = max(locDICremax,maxval(tracers%data(39)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) ) 
+            locDICremin = min(locDICremin,minval(tracers%data(39)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+        else if (enable_coccos .and. .not. enable_3zoo2det) then
+            locDICremax = max(locDICremax,maxval(tracers%data(31)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) ) 
+            locDICremin = min(locDICremin,minval(tracers%data(31)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+        else if (enable_3zoo2det .and. .not. enable_coccos) then
+            locDICremax = max(locDICremax,maxval(tracers%data(33)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+            locDICremin = min(locDICremin,minval(tracers%data(33)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+        else
+            locDICremax = max(locDICremax,maxval(tracers%data(25)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+            locDICremin = min(locDICremin,minval(tracers%data(25)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )    
+        end if
+
         end do
 
         if (mype==0) write(*,*) "Sanity check for REcoM variables after recom_init call"
-        call print_global_minmax('DIN', locDINmin, locDINmax, .true.)
-        call print_global_minmax('DIC', locDICmin, locDICmax, .true.)
-        call print_global_minmax('Alk', locAlkmin, locAlkmax, .true.)
-        call print_global_minmax('DSi', locDSimin, locDSimax, .true.)
-        call print_global_minmax('DFe', locDFemin, locDFemax, .false.)
-        call print_global_minmax('O2',  locO2min,  locO2max,  .false.)
+        call MPI_AllREDUCE(locDINmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal max init. DIN. =', glo
+        call MPI_AllREDUCE(locDINmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal min init. DIN. =', glo
 
+        call MPI_AllREDUCE(locDICmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal max init. DIC. =', glo
+        call MPI_AllREDUCE(locDICmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal min init. DIC. =', glo
+        call MPI_AllREDUCE(locAlkmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal max init. Alk. =', glo
+        call MPI_AllREDUCE(locAlkmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal min init. Alk. =', glo
+        call MPI_AllREDUCE(locDSimax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal max init. DSi. =', glo
+        call MPI_AllREDUCE(locDSimin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal min init. DSi. =', glo
+        call MPI_AllREDUCE(locDFemax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal max init. DFe. =', glo
+        call MPI_AllREDUCE(locDFemin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  `-> gobal min init. DFe. =', glo
+        call MPI_AllREDUCE(locO2max , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal max init. O2. =', glo
+        call MPI_AllREDUCE(locO2min , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  `-> gobal min init. O2. =', glo
+        call MPI_AllREDUCE(locDICremax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal max init. DICremin =', glo
+        call MPI_AllREDUCE(locDICremin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+        if (mype==0) write(*,*) '  |-> gobal min init. DICremin =', glo
+        
         if (enable_3zoo2det) then
             is_3zoo2det=1.0_WP
         else
@@ -633,28 +825,11 @@ subroutine recom_init(tracers, partit, mesh)
             is_coccos=0.0_WP
         endif
 
-contains
-
-subroutine print_global_minmax(label, loc_min, loc_max, use_pipe)
-    character(len=*), intent(in) :: label
-    real(kind=8)    , intent(in) :: loc_min, loc_max
-    logical         , intent(in) :: use_pipe
-
-    real(kind=8)                 :: glo_min, glo_max
-    character(len=3)             :: prefix_min, prefix_max
-
-    if (use_pipe) then
-        prefix_max = '  |'
-        prefix_min = '  |'
-    else
-        prefix_max = '  |'
-        prefix_min = '  `'
-    end if
-
-    call MPI_AllREDUCE(loc_max , glo_max  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    if (mype==0) write(*,*) prefix_max//'-> gobal max init. '//trim(label)//' =', glo_max
-    call MPI_AllREDUCE(loc_min , glo_min  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-    if (mype==0) write(*,*) prefix_min//'-> gobal min init. '//trim(label)//' =', glo_min
-end subroutine print_global_minmax
+       if (enable_R2OMIP) then
+            is_R2OMIP=1.0_WP
+        else
+            is_R2OMIP=0.0_WP
+        endif
 
     end subroutine recom_init
+

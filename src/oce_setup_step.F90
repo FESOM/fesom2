@@ -157,7 +157,6 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
         case ('cvmix_PP+cvmix_TIDAL'  ) ; mix_scheme_nmb = 47
         case ('cvmix_TKE+cvmix_IDEMIX') ; mix_scheme_nmb = 56
 #endif        
-        case ('TOY'                   ) ; mix_scheme_nmb = 8
         case default 
             stop "!not existing mixing scheme!"
             call par_ex(partit%MPI_COMM_FESOM, partit%mype)
@@ -320,7 +319,7 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     integer        :: AB_order = 2
     namelist /tracer_listsize/ num_tracers
     namelist /tracer_list    / nml_tracer_list
-    namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff, AB_order, ltra_diag
+    namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff, AB_order
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -498,11 +497,15 @@ nl => mesh%nl
         allocate(tracers%work%tra_diff_part_hor_redi(nl-1,node_size,num_tracers),tracers%work%tra_diff_part_ver_expl(nl-1,node_size,num_tracers))
         allocate(tracers%work%tra_diff_part_ver_redi_expl(nl-1,node_size,num_tracers),tracers%work%tra_diff_part_ver_impl(nl-1,node_size,num_tracers))
         allocate(tracers%work%tra_recom_sms(nl-1,node_size,num_tracers))
+        allocate(tracers%work%tra_advhoriz_LO(nl-1,node_size,num_tracers))
+        allocate(tracers%work%tra_advvert_LO(nl-1,node_size,num_tracers))
         tracers%work%tra_diff_part_hor_redi = 0.0_WP
         tracers%work%tra_diff_part_ver_expl = 0.0_WP
         tracers%work%tra_diff_part_ver_redi_expl = 0.0_WP
         tracers%work%tra_diff_part_ver_impl = 0.0_WP
         tracers%work%tra_recom_sms = 0.0_WP
+        tracers%work%tra_advhoriz_LO = 0.0_WP
+        tracers%work%tra_advvert_LO = 0.0_WP
 
     end if
 END SUBROUTINE tracer_init
@@ -527,7 +530,6 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     ! define dynamics namelist parameter
     integer        :: opt_visc
     real(kind=WP)  :: visc_gamma0, visc_gamma1, visc_gamma2
-    real(kind=WP)  :: visc_gamma0_h, visc_gamma1_h
     real(kind=WP)  :: visc_easybsreturn
     logical        :: use_ivertvisc=.true.
     logical        :: uke_scaling=.true.
@@ -553,7 +555,6 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     real(kind=WP)  :: se_visc_gamma0, se_visc_gamma1, se_visc_gamma2
     
     namelist /dynamics_visc   / opt_visc, check_opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
-                                visc_gamma0_h, visc_gamma1_h,                                     &
                                 use_ivertvisc, visc_easybsreturn, &
                                 uke_scaling, uke_scaling_factor, uke_advection, &
                                 rosb_dis, smooth_back, smooth_dis, smooth_back_tend, K_back, c_back
@@ -593,8 +594,6 @@ nl => mesh%nl
     dynamics%visc_gamma0         = visc_gamma0
     dynamics%visc_gamma1         = visc_gamma1
     dynamics%visc_gamma2         = visc_gamma2
-    dynamics%visc_gamma0_h       = visc_gamma0_h
-    dynamics%visc_gamma1_h       = visc_gamma1_h
     dynamics%visc_easybsreturn   = visc_easybsreturn
     dynamics%uke_scaling         = uke_scaling
     dynamics%uke_scaling_factor  = uke_scaling_factor
@@ -893,6 +892,8 @@ nl              => mesh%nl
     allocate(str_bf    ( nl-1, node_size ))
     allocate(vert_sink ( nl-1, node_size ))
     allocate(Alk_surf  (       node_size ))
+    allocate(nss       ( nl-1, node_size )) !R2OMIP (Burial)
+    allocate(bur       ( 1:benthos_num, nl-1, node_size )) ! LO !R2OMIP (Burial)
 #endif
     ! =================
     ! Visc and Diff coefs
@@ -1005,20 +1006,20 @@ nl              => mesh%nl
     str_bf              = 0.0_WP
     vert_sink           = 0.0_WP
     Alk_surf            = 0.0_WP
+    nss                 = 0.0_WP !R2OMIP (Burial)
+    bur                 = 0.0_WP !R2OMIP (Burial)
 #endif
     
     ! init field for pressure force 
     allocate(density_ref(nl-1,node_size))
     density_ref = density_0
     allocate(density_m_rho0(nl-1, node_size))
-    allocate(density_sigma0(nl-1, node_size))
     allocate(density_m_rho0_slev(nl-1, node_size)) !!PS
     if (ldiag_dMOC) then
        allocate(density_dMOC       (nl-1, node_size))
     end if
     allocate(pgf_x(nl-1, elem_size),pgf_y(nl-1, elem_size)) 
     density_m_rho0=0.0_WP
-    density_sigma0=0.0_WP
     density_m_rho0_slev=0.0_WP !!PS
     if (ldiag_dMOC) then
        density_dMOC       =0.0_WP
@@ -1126,6 +1127,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             write(*,*) 'read Nitrate     climatology from:', trim(filelist(6))
             write(*,*) 'read Salt        climatology from:', trim(filelist(7))
             write(*,*) 'read Temperature climatology from:', trim(filelist(8))
+            write(*,*) 'read DIC remineralization    from:', trim(filelist(9)) ! DICremin (added by Sina)
     end if
     ! read ocean state
     ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
@@ -1211,7 +1213,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-        CASE (1023:1036)
+        CASE (1023:1037)
             tracers%data(i)%values(:,:)=0.0_WP
             if (mype==0) then
                 write (i_string,  "(I4)") i

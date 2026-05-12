@@ -33,7 +33,6 @@ MODULE g_sbf
    !!   sbc_ini  -- initialization atmpospheric forcing
    !!   sbc_do   -- provide a sbc (surface boundary conditions) each time step
    !!
-   USE iso_fortran_env, only: error_unit
    USE MOD_MESH
    USE MOD_PARTIT
    USE MOD_PARSUP
@@ -415,17 +414,17 @@ CONTAINS
             (trim(flf%calendar).eq.'noleap') .or. &
             (trim(flf%calendar).eq.'365_days')) then
             if (include_fleapyear .eqv. .true.) then
-                write(error_unit,*) achar(27)//'[33m'
-                write(error_unit,*) '____________________________________________________________'
-                write(error_unit,*) ' WARNING: It looks like you want to use CORE forcing, Right?'
-                write(error_unit,*) '          but setted include_fleapyear=.true.. CORE forcing '
-                write(error_unit,*) '          does not contain any leap years or particular '
-                write(error_unit,*) '          calender option (julian, gregorian). So if im right,'
-                write(error_unit,*) '          please go to namelist.config and set '
-                write(error_unit,*) '          include_fleapyear=.false. otherwise comment this '
-                write(error_unit,*) '          message block in gen_surface_forcing.F90.'
-                write(error_unit,*) '____________________________________________________________'
-                write(error_unit,*) achar(27)//'[0m'
+                print *, achar(27)//'[33m'
+                write(*,*) '____________________________________________________________'
+                write(*,*) ' WARNING: It looks like you want to use CORE forcing, Right?'
+                write(*,*) '          but setted include_fleapyear=.true.. CORE forcing '
+                write(*,*) '          does not contain any leap years or particular '
+                write(*,*) '          calender option (julian, gregorian). So if im right,'
+                write(*,*) '          please go to namelist.config and set '
+                write(*,*) '          include_fleapyear=.false. otherwise comment this '
+                write(*,*) '          message block in gen_surface_forcing.F90.'
+                write(*,*) '____________________________________________________________'
+                print *, achar(27)//'[0m'
                 call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
             end if
         elseif ((trim(flf%calendar).eq.'julian')    .or. &
@@ -433,39 +432,39 @@ CONTAINS
                 (trim(flf%calendar).eq.'proleptic_gregorian') .or. &
                 (trim(flf%calendar).eq.'standard')) then
             if (include_fleapyear .eqv. .false.) then
-                write(error_unit,*) achar(27)//'[33m'
-                write(error_unit,*) '____________________________________________________________'
-                write(error_unit,*) ' WARNING: It looks like you want to use either JRA55, ERA,'
-                write(error_unit,*) '          NCEP or a similar forcing, Right?, but setted '
-                write(error_unit,*) '          include_fleapyear=.false. JRA55, ERA or NCEP contain'
-                write(error_unit,*) '          all fleapyears and use a specific calendar option '
-                write(error_unit,*) '          (julian, gregorian). So that the calendars in FESOM2.0'
-                write(error_unit,*) '          work properly, when using these forcings '
-                write(error_unit,*) '          include_fleapyear must be true. So if im right, please go'
-                write(error_unit,*) '          to namelist.config and set include_fleapyear=.true. '
-                write(error_unit,*) '          otherwise comment this message block in'
-                write(error_unit,*) '          gen_surface_forcing.F90'
-                write(error_unit,*) '____________________________________________________________'
-                write(error_unit,*) achar(27)//'[0m'
+                print *, achar(27)//'[33m'
+                write(*,*) '____________________________________________________________'
+                write(*,*) ' WARNING: It looks like you want to use either JRA55, ERA,'
+                write(*,*) '          NCEP or a similar forcing, Right?, but setted '
+                write(*,*) '          include_fleapyear=.false. JRA55, ERA or NCEP contain'
+                write(*,*) '          all fleapyears and use a specific calendar option '
+                write(*,*) '          (julian, gregorian). So that the calendars in FESOM2.0'
+                write(*,*) '          work properly, when using these forcings '
+                write(*,*) '          include_fleapyear must be true. So if im right, please go'
+                write(*,*) '          to namelist.config and set include_fleapyear=.true. '
+                write(*,*) '          otherwise comment this message block in'
+                write(*,*) '          gen_surface_forcing.F90'
+                write(*,*) '____________________________________________________________'
+                print *, achar(27)//'[0m'
                 call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
             end if 
         else
-            write(error_unit,*) achar(27)//'[31m'
-            write(error_unit,*) '____________________________________________________________'
-            write(error_unit,*) ' ERROR: I am not familiar with the found calendar option,'
-            write(error_unit,*) '        dont know what to do. Either talk to the FESOM2 developers'
-            write(error_unit,*) '        or add the calendar option by your self in ...'
-            write(error_unit,*) '        gen_surface_forcing.F90, line:364-367'
-            write(error_unit,*) '                                                            '
-            write(error_unit,*) '        elseif ((trim(flf%calendar).eq."julian")      .or. &'
-            write(error_unit,*) '                (trim(flf%calendar).eq."gregorian")   .or. &'
-            write(error_unit,*) '                (trim(flf%calendar).eq."NEW_CALENDAR").or. &'
-            write(error_unit,*) '                (trim(flf%calendar).eq."standard")) then    '
-            write(error_unit,*) '                                                            '
-            write(error_unit,*) '        The time axis calendar attribute can be checked for '
-            write(error_unit,*) '        example with ncdump -h forcing_file.nc '
-            write(error_unit,*) '____________________________________________________________'
-            write(error_unit,*) achar(27)//'[0m'
+            print *, achar(27)//'[31m'
+            write(*,*) '____________________________________________________________'
+            write(*,*) ' ERROR: I am not familiar with the found calendar option,'
+            write(*,*) '        dont know what to do. Either talk to the FESOM2 developers'
+            write(*,*) '        or add the calendar option by your self in ...'
+            write(*,*) '        gen_surface_forcing.F90, line:364-367'
+            write(*,*) '                                                            '
+            write(*,*) '        elseif ((trim(flf%calendar).eq."julian")      .or. &'
+            write(*,*) '                (trim(flf%calendar).eq."gregorian")   .or. &'
+            write(*,*) '                (trim(flf%calendar).eq."NEW_CALENDAR").or. &'
+            write(*,*) '                (trim(flf%calendar).eq."standard")) then    '
+            write(*,*) '                                                            '
+            write(*,*) '        The time axis calendar attribute can be checked for '
+            write(*,*) '        example with ncdump -h forcing_file.nc '
+            write(*,*) '____________________________________________________________'
+            print *, achar(27)//'[0m'
             call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
         end if ! --> if ((trim(flf%calendar).eq.'none')   .or. & ...
     end if !--> if (partit%mype==0 .and. use_flpyrcheck) then
@@ -548,6 +547,7 @@ CONTAINS
       !! ** Purpose : Fill names of sbc_flfi array (file names and variable names)
 
       !prepare proper nc file (add year and .nc to the end of the file name from namelist
+if (.NOT. enable_AWICM) then
       if (l_xwind) write(sbc_flfi(i_xwind)%file_name, *) trim(make_full_path(nm_xwind_file)),trim(yyear),'.nc'
       if (l_ywind) write(sbc_flfi(i_ywind)%file_name, *) trim(make_full_path(nm_ywind_file)),trim(yyear),'.nc'
       if (l_xstre) write(sbc_flfi(i_xstre)%file_name, *) trim(make_full_path(nm_xstre_file)),trim(yyear),'.nc'
@@ -560,7 +560,21 @@ CONTAINS
       if (l_snow)  write(sbc_flfi(i_snow)%file_name,  *) trim(make_full_path(nm_snow_file)), trim(yyear),'.nc'
       if (l_mslp)  write(sbc_flfi(i_mslp)%file_name,  *) trim(make_full_path(nm_mslp_file)), trim(yyear),'.nc'
       if (l_cloud) write(sbc_flfi(i_cloud)%file_name, *) trim(make_full_path(nm_cloud_file)),trim(yyear),'.nc'
-
+else
+      ! AWICM forcing
+      if (l_xwind) write(sbc_flfi(i_xwind)%file_name, *) trim(make_full_path(nm_xwind_file)),trim(yyear),'01_reduced.nc'
+      if (l_ywind) write(sbc_flfi(i_ywind)%file_name, *) trim(make_full_path(nm_ywind_file)),trim(yyear),'01_reduced.nc'
+      if (l_xstre) write(sbc_flfi(i_xstre)%file_name, *) trim(make_full_path(nm_xstre_file)),trim(yyear),'01_reduced.nc'
+      if (l_ystre) write(sbc_flfi(i_ystre)%file_name, *) trim(make_full_path(nm_ystre_file)),trim(yyear),'01_reduced.nc'
+      if (l_humi) write(sbc_flfi(i_humi)%file_name, *) trim(make_full_path(nm_humi_file)), trim(yyear),'01_reduced.nc'
+      if (l_qsr) write(sbc_flfi(i_qsr)%file_name, *) trim(make_full_path(nm_qsr_file)), trim(yyear),'01_reduced.nc'
+      if (l_qlw) write(sbc_flfi(i_qlw)%file_name, *) trim(make_full_path(nm_qlw_file)), trim(yyear),'01_reduced.nc'
+      if (l_tair) write(sbc_flfi(i_tair)%file_name, *) trim(make_full_path(nm_tair_file)), trim(yyear),'01_reduced.nc'
+      if (l_prec) write(sbc_flfi(i_prec)%file_name, *) trim(make_full_path(nm_prec_file)), trim(yyear),'01_reduced.nc'
+      if (l_snow) write(sbc_flfi(i_snow)%file_name, *) trim(make_full_path(nm_snow_file)), trim(yyear),'01_reduced.nc'
+      if (l_mslp) write(sbc_flfi(i_mslp)%file_name, *) trim(make_full_path(nm_mslp_file)), trim(yyear),'01_reduced.nc'
+      if (l_cloud) write(sbc_flfi(i_cloud)%file_name, *) trim(make_full_path(nm_cloud_file)), trim(yyear),'01_reduced.nc'
+endif
       if (l_xwind) sbc_flfi(i_xwind)%file_name=ADJUSTL(trim(sbc_flfi(i_xwind)%file_name))
       if (l_ywind) sbc_flfi(i_ywind)%file_name=ADJUSTL(trim(sbc_flfi(i_ywind)%file_name))
       if (l_xstre) sbc_flfi(i_xstre)%file_name=ADJUSTL(trim(sbc_flfi(i_xstre)%file_name))
@@ -827,20 +841,18 @@ CONTAINS
          t_indx_p1 = t_indx
          delta_t = 1.0_wp
          if (mype==0) then
-            write(error_unit,*) 'WARNING: no temporal extrapolation into future (nearest neighbour is used): ', trim(var_name), ' !'
-            write(error_unit,*) trim(file_name)
-            write(error_unit,*) nc_time(1), nc_time(nc_Ntime), now_date
-            flush(error_unit)
+            write(*,*) 'WARNING: no temporal extrapolation into future (nearest neighbour is used): ', trim(var_name), ' !'
+            write(*,*) trim(file_name)
+            write(*,*) nc_time(1), nc_time(nc_Ntime), now_date
          end if
       elseif (t_indx < 1) then ! NO extrapolation back in time
          t_indx = 1
          t_indx_p1 = t_indx
          delta_t = 1.0_wp
          if (mype==0) then 
-            write(error_unit,*) 'WARNING: no temporal extrapolation back in time (nearest neighbour is used): ', trim(var_name), ' !'
-            write(error_unit,*) trim(file_name)
-            write(error_unit,*) nc_time(1), nc_time(nc_Ntime), now_date
-            flush(error_unit)
+            write(*,*) 'WARNING: no temporal extrapolation back in time (nearest neighbour is used): ', trim(var_name), ' !'
+            write(*,*) trim(file_name)
+            write(*,*) nc_time(1), nc_time(nc_Ntime), now_date
          end if
       end if
 
@@ -1066,7 +1078,7 @@ CONTAINS
       if (iost == 0) then
          if (mype==0) WRITE(*,*) '     file   : ', 'namelist.forcing',' open ok'
       else
-         if (mype==0) WRITE(error_unit,*) 'ERROR: --> bad opening file   : ', 'namelist.forcing',' ; iostat=',iost
+         if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.forcing',' ; iostat=',iost
          call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
       endif
       READ( nm_sbc_unit, nml=nam_sbc, iostat=iost )
@@ -1224,38 +1236,38 @@ CONTAINS
             inquire(file=make_full_path(nm_sss_data_file), exist=file_exist) 
             if ( .not. file_exist) then   
                 if (mype==0) then
-                    write(error_unit,*)
-                    write(error_unit,*) achar(27)//'[33m'
-                    write(error_unit,*) '____________________________________________________________________'
-                    write(error_unit,*) ' ERROR: file not found: ', trim(make_full_path(nm_sss_data_file))
-                    write(error_unit,*) '        --> check your namelist.focing'
-                    write(error_unit,*) '            ...'
-                    write(error_unit,*) '            nm_sss_data_file    =...'
-                    write(error_unit,*) '            ...'
-                    write(error_unit,*) '____________________________________________________________________'
-                    write(error_unit,*) achar(27)//'[0m'
-                    write(error_unit,*)
+                    write(*,*)
+                    print *, achar(27)//'[33m'
+                    write(*,*) '____________________________________________________________________'
+                    write(*,*) ' ERROR: file not found: ', trim(make_full_path(nm_sss_data_file))
+                    write(*,*) '        --> check your namelist.focing'
+                    write(*,*) '            ...'
+                    write(*,*) '            nm_sss_data_file    =...'
+                    write(*,*) '            ...'
+                    write(*,*) '____________________________________________________________________'
+                    print *, achar(27)//'[0m'
+                    write(*,*)
                 end if
                 call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
             end if
             
         else
             if (mype==0) then
-            write(error_unit,*)
-                write(error_unit,*) achar(27)//'[33m'
-                write(error_unit,*) '____________________________________________________________________'
-                write(error_unit,*) ' ERROR: you choose an unknown sss_data_source ! '
-                write(error_unit,*) '        currently supported is only sss_data_soure=:'
-                write(error_unit,*) '        - ''CORE1'' or ''CORE2'': for monthly SSS climatology'
-                write(error_unit,*) ''
-                write(error_unit,*) '        --> please check your namelist.forcing'
-                write(error_unit,*) '            ...'
-                write(error_unit,*) '            sss_data_source=...'
-                write(error_unit,*) '            nm_sss_file    =...'
-                write(error_unit,*) '            ...'
-                write(error_unit,*) '____________________________________________________________________'
-                write(error_unit,*) achar(27)//'[0m'
-                write(error_unit,*)
+            write(*,*)
+                print *, achar(27)//'[33m'
+                write(*,*) '____________________________________________________________________'
+                write(*,*) ' ERROR: you choose an unknown sss_data_source ! '
+                write(*,*) '        currently supported is only sss_data_soure=:'
+                write(*,*) '        - ''CORE1'' or ''CORE2'': for monthly SSS climatology'
+                write(*,*) ''
+                write(*,*) '        --> please check your namelist.forcing'
+                write(*,*) '            ...'
+                write(*,*) '            sss_data_source=...'
+                write(*,*) '            nm_sss_file    =...'
+                write(*,*) '            ...'
+                write(*,*) '____________________________________________________________________'
+                print *, achar(27)//'[0m'
+                write(*,*)
             end if
             call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
         
@@ -1274,7 +1286,6 @@ CONTAINS
             write(*,*) '     nm_runoff_file     = ', trim(make_full_path(nm_runoff_file))
             write(*,*)
         end if     
-            
         ! runoff in CORE is constant in time
         ! Warning: For a global mesh, conservative scheme is to be updated!!
         file_exist=.false.
@@ -1285,22 +1296,22 @@ CONTAINS
             
         else
             if (mype==0) then
-                write(error_unit,*)
-                write(error_unit,*) achar(27)//'[31m'
-                write(error_unit,*) '____________________________________________________________________'
-                write(error_unit,*) ' ERROR: file not found: ', trim(make_full_path(nm_runoff_file))
-                write(error_unit,*) '        --> check your namelist.focing'
-                write(error_unit,*) '            ...'
-                write(error_unit,*) '            nm_runoff_file    =...'
-                write(error_unit,*) '            ...'
-                write(error_unit,*) '____________________________________________________________________'
-                write(error_unit,*) achar(27)//'[0m'
-                write(error_unit,*)
+                write(*,*)
+                print *, achar(27)//'[31m'
+                write(*,*) '____________________________________________________________________'
+                write(*,*) ' ERROR: file not found: ', trim(make_full_path(nm_runoff_file))
+                write(*,*) '        --> check your namelist.focing'
+                write(*,*) '            ...'
+                write(*,*) '            nm_runoff_file    =...'
+                write(*,*) '            ...'
+                write(*,*) '____________________________________________________________________'
+                print *, achar(27)//'[0m'
+                write(*,*)
             end if
             call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
-
+                            
         end if
-
+        
     elseif (runoff_data_source=='Dai09' .or. runoff_data_source=='JRA55') then 
         if (mype==0) then 
             write(*,*) ' --> using monthly runoff climatology (12 time slices) '
@@ -1317,46 +1328,46 @@ CONTAINS
         inquire(file=make_full_path(nm_runoff_file), exist=file_exist) 
         if ( .not. file_exist .and. runoff_climatology) then   
             if (mype==0) then
-                write(error_unit,*)
-                write(error_unit,*) achar(27)//'[31m'
-                write(error_unit,*) '____________________________________________________________________'
-                write(error_unit,*) ' ERROR: file not found: ', trim(make_full_path(nm_runoff_file))
-                write(error_unit,*) '        --> check your namelist.focing'
-                write(error_unit,*) '            ...'
-                write(error_unit,*) '            nm_runoff_file    =...'
-                write(error_unit,*) '            ...'
-                write(error_unit,*) '____________________________________________________________________'
-                write(error_unit,*) achar(27)//'[0m'
-                write(error_unit,*)
+                write(*,*)
+                print *, achar(27)//'[31m'
+                write(*,*) '____________________________________________________________________'
+                write(*,*) ' ERROR: file not found: ', trim(make_full_path(nm_runoff_file))
+                write(*,*) '        --> check your namelist.focing'
+                write(*,*) '            ...'
+                write(*,*) '            nm_runoff_file    =...'
+                write(*,*) '            ...'
+                write(*,*) '____________________________________________________________________'
+                print *, achar(27)//'[0m'
+                write(*,*)
             end if
             call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
-
+                            
         end if
-
+        
     else
         if (mype==0) then
-            write(error_unit,*)
-            write(error_unit,*) achar(27)//'[31m'
-            write(error_unit,*) '____________________________________________________________________'
-            write(error_unit,*) ' ERROR: you choose an unknown runoff_data_source ! '
-            write(error_unit,*) '        supported is only runoff_data_soure=:'
-            write(error_unit,*) '        - ''CORE1'' or ''CORE2'': for longterm climatology (only one timeslice for the entire simulation)  '
-            write(error_unit,*) '        - ''JRA55'' or ''Dai09'': for monthly climatology (each month has a different runoff timeslice,    '
-            write(error_unit,*) '                                  this can be done as a monthly climatology (runoff_climatology=.true.) or '
-            write(error_unit,*) '                                  as a transient monthly climatology (runoff_climatology=.false.) than each'
-            write(error_unit,*) '                                  month and each year have differnt runoff'
-            write(error_unit,*) ''
-            write(error_unit,*) '        --> please check your namelist.forcing'
-            write(error_unit,*) '            ...'
-            write(error_unit,*) '            runoff_data_source=...'
-            write(error_unit,*) '            nm_runoff_file    =...'
-            write(error_unit,*) '            ...'
-            write(error_unit,*) '____________________________________________________________________'
-            write(error_unit,*) achar(27)//'[0m'
-            write(error_unit,*)
+            write(*,*)
+            print *, achar(27)//'[31m'
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: you choose an unknown runoff_data_source ! '
+            write(*,*) '        supported is only runoff_data_soure=:'
+            write(*,*) '        - ''CORE1'' or ''CORE2'': for longterm climatology (only one timeslice for the entire simulation)  '
+            write(*,*) '        - ''JRA55'' or ''Dai09'': for monthly climatology (each month has a different runoff timeslice,    ' 
+            write(*,*) '                                  this can be done as a monthly climatology (runoff_climatology=.true.) or '
+            write(*,*) '                                  as a transient monthly climatology (runoff_climatology=.false.) than each'
+            write(*,*) '                                  month and each year have differnt runoff'
+            write(*,*) ''
+            write(*,*) '        --> please check your namelist.forcing'
+            write(*,*) '            ...'
+            write(*,*) '            runoff_data_source=...'
+            write(*,*) '            nm_runoff_file    =...'
+            write(*,*) '            ...'
+            write(*,*) '____________________________________________________________________'
+            print *, achar(27)//'[0m'
+            write(*,*)
         end if
         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
-
+        
     end if   
     
     !___________________________________________________________________________
@@ -1376,51 +1387,50 @@ CONTAINS
                 end if    
             else 
                 if (mype==0) then
-                    write(error_unit,*)
-                    write(error_unit,*) achar(27)//'[31m'
-                    write(error_unit,*) '____________________________________________________________________'
-                    write(error_unit,*) ' ERROR: file not found: ', make_full_path(nm_chl_data_file)
-                    write(error_unit,*) '        --> check your namelist.focing'
-                    write(error_unit,*) '            ...'
-                    write(error_unit,*) '            chl_data_source  =...'
-                    write(error_unit,*) '            nm_chl_data_file =...'
-                    write(error_unit,*) '            ...'
-                    write(error_unit,*) '____________________________________________________________________'
-                    write(error_unit,*) achar(27)//'[0m'
-                    write(error_unit,*)
+                    write(*,*)
+                    print *, achar(27)//'[31m'
+                    write(*,*) '____________________________________________________________________'
+                    write(*,*) ' ERROR: file not found: ', make_full_path(nm_chl_data_file)
+                    write(*,*) '        --> check your namelist.focing'
+                    write(*,*) '            ...'
+                    write(*,*) '            chl_data_source  =...'
+                    write(*,*) '            nm_chl_data_file =...'
+                    write(*,*) '            ...'
+                    write(*,*) '____________________________________________________________________'
+                    print *, achar(27)//'[0m'
+                    write(*,*)
                 end if
                 call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
                 
             end if 
         elseif (chl_data_source == 'Const.' .or. chl_data_source == 'None') then
             if (mype==0) then 
-                write(error_unit,*) achar(27)//'[33m'
-                write(error_unit,*) ' --> you will use short-wave penetration with constant chlorophyll concentration: ', chl_const
-                write(error_unit,*) '     Are you sure about this??? Usually the shortwave penetration will run better with Sweeney'
-                write(error_unit,*) '     heterogenous chlorophyl climatology. So set chl_data_source=''Sweeney'' and nm_chl_data_file=... '
-                write(error_unit,*) '     chl_data_source =', trim(chl_data_source)
-                write(error_unit,*) achar(27)//'[0m'
-                flush(error_unit)
+                print *, achar(27)//'[33m'
+                write(*,*) ' --> you will use short-wave penetration with constant chlorophyll concentration: ', chl_const
+                write(*,*) '     Are you sure about this??? Usually the shortwave penetration will run better with Sweeney'
+                write(*,*) '     heterogenous chlorophyl climatology. So set chl_data_source=''Sweeney'' and nm_chl_data_file=... '
+                write(*,*) '     chl_data_source =', trim(chl_data_source)
+                print *, achar(27)//'[0m'
             end if     
             chl=chl_const
             
         else
             if (mype==0) then
-                write(error_unit,*)
-                write(error_unit,*) achar(27)//'[31m'
-                write(error_unit,*) '____________________________________________________________________'
-                write(error_unit,*) ' ERROR: you choose an unknown chl_data_source ! '
-                write(error_unit,*) '        supported is only chl_data_source=:'
-                write(error_unit,*) '        - ''Sweeney''            : use Sweeney chlorophyl climatology'
-                write(error_unit,*) '        - ''Const.'' or ''None'' : use constant chlorophyl value of chl_const=',chl_const
-                write(error_unit,*) ''
-                write(error_unit,*) '        --> please check your namelist.forcing'
-                write(error_unit,*) '            ...'
-                write(error_unit,*) '            chl_data_source=...'
-                write(error_unit,*) '            ...'
-                write(error_unit,*) '____________________________________________________________________'
-                write(error_unit,*) achar(27)//'[0m'
-                write(error_unit,*)
+                write(*,*)
+                print *, achar(27)//'[31m'
+                write(*,*) '____________________________________________________________________'
+                write(*,*) ' ERROR: you choose an unknown chl_data_source ! '
+                write(*,*) '        supported is only chl_data_source=:'
+                write(*,*) '        - ''Sweeney''            : use Sweeney chlorophyl climatology'
+                write(*,*) '        - ''Const.'' or ''None'' : use constant chlorophyl value of chl_const=',chl_const
+                write(*,*) ''
+                write(*,*) '        --> please check your namelist.forcing'
+                write(*,*) '            ...'
+                write(*,*) '            chl_data_source=...'
+                write(*,*) '            ...'
+                write(*,*) '____________________________________________________________________'
+                print *, achar(27)//'[0m'
+                write(*,*)
             end if
             call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
             
@@ -1434,13 +1444,18 @@ CONTAINS
 #if defined(__recom)
         ! OPEN and read namelist for SBC REcoM
         open( unit=nm_sbc_unit+1, file='namelist.recom', form='formatted', access='sequential', status='old', iostat=iost )
-        if (iost == 0) then
-            if (mype==0) WRITE(*,*) '     file   : ', 'namelist.recom for sbc',' open ok'
-        else
-            if (mype==0) WRITE(error_unit,*) 'ERROR: --> bad opening file   : ', 'namelist.recom for sbc',' ; iostat=',iost
+        !if (iost == 0) then
+        !    if (mype==0) WRITE(*,*) '     file   : ', 'namelist.recom for sbc',' open ok'
+        !else
+        !    if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.recom for sbc',' ; iostat=',iost
+        call log_recom_namelist_open(mype, iost)
+        if (iost /= 0) then
             call par_ex(partit%MPI_COMM_FESOM, partit%mype)
             stop
         endif
+
+    
+
         READ( nm_sbc_unit+1, nml=nam_rsbc, iostat=iost )
         close( nm_sbc_unit+1 )
 #endif
@@ -1468,6 +1483,7 @@ CONTAINS
       real(wp)     :: rdate ! date
       integer      :: fld_idx, i
       logical      :: do_rotation_wind, do_rotation_stre, force_newcoeff, update_monthly_flag
+      logical      :: update_daily_flag ! enable_AWICM = .true.
       integer      :: yyyy, dd, mm, flag_flpyr=0
       integer,   pointer   :: nc_Ntime, t_indx, t_indx_p1
       real(wp),  pointer   :: nc_time(:)
@@ -1478,13 +1494,9 @@ CONTAINS
       integer                   :: firstyearofcurrentCO2cycle, totnumyear, currentCO2year
       character(4)              :: currentCO2year_char
       real(kind=8), allocatable :: ncdata(:)
-      integer                   :: CO2start, CO2count
-      integer	                :: status, ncid, varid
-      character(300)            :: sedfilename
-      logical                   :: do_read=.false.
-      integer                   :: n_lb
-      integer, dimension(2)     :: istart, icount
-      real(kind=8)              :: total_runoff
+      integer                   :: CO2start, CO2count, RIstart, RIcount
+      real(kind=8)              :: locmax, locmin, glo
+      integer	                :: status, ncid, varid, ierror, n
 #endif
       type(t_partit), intent(inout), target :: partit
       type(t_mesh),   intent(in),    target :: mesh
@@ -1575,7 +1587,11 @@ CONTAINS
     !===========================================================================
 
     ! prepare a flag which checks whether to update monthly data (SSS, river runoff)
-     update_monthly_flag=( (day_in_month==num_day_in_month(fleapyear,month) .AND. timenew==86400._WP) .OR. mstep==1  )
+     update_monthly_flag=( (day_in_month==num_day_in_month(fleapyear,month) .AND. timenew==86400._WP) .OR. mstep==1)
+     !AWICM
+     if (enable_AWICM) then
+         update_daily_flag = ( (timenew==86400._WP) .OR. mstep==1)
+     endif
 
     !___________________________________________________________________________ 
     ! read in SSS for applying SSS restoring
@@ -1604,7 +1620,7 @@ CONTAINS
             end if
         end if
     end if
-     
+
     !___________________________________________________________________________
     ! runoff --> depends on simulated month
     if(runoff_data_source=='Dai09' .or. runoff_data_source=='JRA55') then
@@ -1638,18 +1654,18 @@ CONTAINS
                 inquire(file=filename, exist=file_exist) 
                 if (.not. file_exist) then   
                     if (mype==0) then
-                        write(error_unit,*)
-                        write(error_unit,*) achar(27)//'[31m'
-                        write(error_unit,*) '____________________________________________________________________'
-                        write(error_unit,*) ' ERROR: file not found: ',trim(filename)
-                        write(error_unit,*) '        --> check your namelist.focing'
-                        write(error_unit,*) '            ...'
-                        write(error_unit,*) '            nm_runoff_file    =...'
-                        write(error_unit,*) '            ...'
-                        write(error_unit,*) '____________________________________________________________________'
-                        write(error_unit,*) achar(27)//'[0m'
-                        write(error_unit,*)
-                    end if
+                        write(*,*)
+                        print *, achar(27)//'[31m'
+                        write(*,*) '____________________________________________________________________'
+                        write(*,*) ' ERROR: file not found: ',trim(filename)
+                        write(*,*) '        --> check your namelist.focing'
+                        write(*,*) '            ...'
+                        write(*,*) '            nm_runoff_file    =...'
+                        write(*,*) '            ...'
+                        write(*,*) '____________________________________________________________________'
+                        print *, achar(27)//'[0m'
+                        write(*,*)
+                    end if 
                     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
                 end if 
             
@@ -1658,460 +1674,442 @@ CONTAINS
             call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, partit, mesh)
             !kg/m2/s -> m/s
             runoff=runoff/1000.0_WP
-            
+
         end if ! --> if(update_monthly_flag) then
     end if ! --> if(runoff_data_source=='Dai09' .or. ... 
 
+    !river runoff AWICM
+    if(runoff_data_source == 'AWICM') then
+            if(update_daily_flag) then
+                    !daily data already in m/s
+                    i = daynew
+                    filename=trim(make_full_path(nm_runoff_file))//cyearnew//'0101_redistributed.nc'
+                    call read_2ddata_on_grid_NetCDF(filename,'runoff', i, runoff, partit, mesh)
+            end if
+    end if
+
 #if defined (__recom)
-!<  read surface atmospheric deposition for Fe, N, CO2
-if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'//achar(27)//'[0m'
 
-! ******** Atmospheric CO2 *********
-    if (mstep == 1) then ! The year has changed
+! ============================================================
+!  Read surface atmospheric deposition for Fe, N, CO2
+! ============================================================
+    call log_recom_atm_input_entry(mype, recom_debug)
 
-    if (use_atbox) then  
-!     Atmospheric box model CO2 values
-      AtmCO2(:)                   = x_co2atm(1)
-      if (ciso) then 
-        AtmCO2_13(:)              = x_co2atm_13(1)
-        if (ciso_14) AtmCO2_14(:,1) = x_co2atm_14(1)
-      end if
-    else 
-!     Prescribed atmospheric CO2 values
+    ! ----------------------------------------------------------------
+    !  Atmospheric CO2 — update once per year (when mstep == 1)
+    ! ----------------------------------------------------------------
 
-        if (constant_CO2) then
-            AtmCO2(:) = CO2_for_spinup
-            if (mype==0) write(*,*) 'Constant_CO2 = ', CO2_for_spinup 
-            if (mype==0) write(*,*),'Atm CO2=', AtmCO2     
-            if (ciso) then
-                AtmCO2_13          = CO2_for_spinup * (1. + 0.001 * delta_co2_13)
-                if (ciso_14) then
-!               Atmospheric 14C varies with latitude
-                    do i=1, myDim_nod2D
-!                       Latitude of atmospheric input data
-                        lat_val = geo_coord_nod2D(2,i) / rad
-!                       Binning to latitude zones
-                        if (ciso_organic_14) then
-!                           Convert Delta_14C to delta_14C
-                            delta_co2_14 = (big_delta_co2_14(lat_zone(lat_val)) + 2. * delta_co2_13 + 50.) / &
-                                         (0.95 - 0.002 * delta_co2_13)
-                        else
-!                           "Inorganic" 14C approximation: delta_14C := Delta_14C 
-                            delta_co2_14 = big_delta_co2_14(lat_zone(lat_val))
-                        end if
-                        AtmCO2_14(lat_zone(lat_val),:) = CO2_for_spinup * (1. + 0.001 * delta_co2_14)
-                    end do
-                end if
-            end if          
+    if (mstep == 1) then
+
+        ! --- Source: Atmospheric box model ---
+        if (use_atbox) then  
+            AtmCO2(:) = x_co2atm(1)
+
+            if (ciso) then 
+                AtmCO2_13(:) = x_co2atm_13(1)
+                if (ciso_14) AtmCO2_14(:,1) = x_co2atm_14(1)
+            end if
+
+        ! --- Source: Prescribed CO2 values ---
         else
-            filename=trim(make_full_path(nm_co2_data_file))
-            if (mype==0) write(*,*) 'Updating CO2 climatology for month       ', i,' from ', trim(filename)
 
-            totnumyear                 = lastyearoffesomcycle-firstyearoffesomcycle+1
-            firstyearofcurrentCO2cycle = lastyearoffesomcycle-numofCO2cycles*totnumyear+(currentCO2cycle-1)*totnumyear
-    
-            currentCO2year = firstyearofcurrentCO2cycle + (yearnew-firstyearoffesomcycle)+1
-            if(mype==0) write(*,*),currentCO2year, firstyearofcurrentCO2cycle, yearnew, firstyearoffesomcycle
-            write(currentCO2year_char,'(i4)') currentCO2year
-            CO2vari     = 'AtmCO2_'//currentCO2year_char
+            ! Option A: Constant CO2 (spinup mode)
+            if (constant_CO2) then
+                AtmCO2(:) = CO2_for_spinup
+                if (mype == 0) then
+                    write(*,*) 'Constant_CO2   = ', CO2_for_spinup
+                    write(*,*) 'Atm CO2        = ', AtmCO2
+            end if
 
-            ! open file
-            status=nf90_open(filename, nf90_nowrite, ncid)
-            if (status.ne.nf90_noerr)then
-                write(error_unit,*) 'ERROR: CANNOT READ CO2 FILE CORRECTLY !!!!!'
-                write(error_unit,*) 'Error in opening netcdf file '//filename
-                call par_ex(MPI_COMM_FESOM, mype)
-                stop
-            endif
-	
-            ! data
-            allocate(ncdata(12))
-            status=nf90_inq_varid(ncid, CO2vari, varid)
-            CO2start = 1
-            CO2count = 12
-            status=nf90_get_var(ncid, varid, ncdata, start=(/CO2start/), count=(/CO2count/))
-            AtmCO2(:)=ncdata(:)
-            deallocate(ncdata)
-            if (mype==0) write(*,*),'Current carbon year=',currentCO2year
-            if (mype==0) write(*,*),'Atm CO2=', AtmCO2
-            status=nf90_close(ncid)
+                if (ciso) then
+                    AtmCO2_13 = CO2_for_spinup * (1. + 0.001 * delta_co2_13)
+
+                    if (ciso_14) then
+                        ! Atmospheric 14C varies with latitude
+                        do i=1, myDim_nod2D
+                            lat_val = geo_coord_nod2D(2,i) / rad
+
+                            if (ciso_organic_14) then
+!                               Convert Delta_14C to delta_14C
+                                delta_co2_14 = (big_delta_co2_14(lat_zone(lat_val)) &
+                                                + 2. * delta_co2_13 + 50.) &
+                                                 / (0.95 - 0.002 * delta_co2_13)
+                            else
+!                               "Inorganic" 14C approximation: delta_14C := Delta_14C 
+                                delta_co2_14 = big_delta_co2_14(lat_zone(lat_val))
+                            end if
+
+                            AtmCO2_14(lat_zone(lat_val),:) = &
+                                CO2_for_spinup * (1. + 0.001 * delta_co2_14)
+                        end do
+                    end if
+                end if
+
+            ! Option B: Transient CO2 from file
+            else
+                filename=trim(make_full_path(nm_co2_data_file))
+            !if (mype==0) write(*,*) 'Updating CO2 climatology for month       ', i,' from ', trim(filename)
+
+                ! Compute the CO2 year corresponding to the current FESOM cycle
+                totnumyear                 = lastyearoffesomcycle - firstyearoffesomcycle + 1
+                firstyearofcurrentCO2cycle = lastyearoffesomcycle &
+                                           - numofCO2cycles*totnumyear &
+                                           + (currentCO2cycle-1) * totnumyear
+
+                currentCO2year = firstyearofcurrentCO2cycle &
+                               + (yearnew - firstyearoffesomcycle) + 1
+
+                if (mype == 0) write(*,*) currentCO2year, firstyearofcurrentCO2cycle, &
+                                          yearnew, firstyearoffesomcycle
+
+                write(currentCO2year_char, '(i4)') currentCO2year
+                CO2vari = 'AtmCO2_' // currentCO2year_char
+
+                ! Open NetCDF file
+                status = nf90_open(filename, nf90_nowrite, ncid)
+                if (status /= nf90_noerr) then
+                    if (mype == 0) then
+                        print *, 'ERROR: Cannot open CO2 file: ', trim(filename)
+                    end if
+                    call par_ex(MPI_COMM_FESOM, mype)
+                    stop
+                end if
+
+                ! Read 12-month CO2 array
+                allocate(ncdata(12))
+                status   = nf90_inq_varid(ncid, CO2vari, varid)
+                CO2start = 1
+                CO2count = 12
+                status   = nf90_get_var(ncid, varid, ncdata, &
+                                         start=(/CO2start/), count=(/CO2count/))
+                AtmCO2(:) = ncdata(:)
+                deallocate(ncdata)
+
+                !if (mype==0) write(*,*),'Current carbon year=',currentCO2year
+                !if (mype==0) write(*,*),'Atm CO2=', AtmCO2
+                call log_co2_transient_update(mype, i, currentCO2year, filename)
+                status = nf90_close(ncid)
+
+            end if  ! constant_CO2 / transient CO2
+
+        end if  ! use_atbox / prescribed CO2
+
+        ! --- Diagnostic output ---
+        call log_co2_control_output(mype, AtmCO2(1), ciso, AtmCO2_13(1), &
+                                    ciso_14, AtmCO2_14(1,1), use_atbox)
+
+        if (mype == 0 .and. ciso) then
+            print *, '  AtmCO2_13 = ', AtmCO2_13(1)
+            if (ciso_14) print *, '  AtmCO2_14 = ', AtmCO2_14(:,1)
+            if (use_atbox) print *, '  use_atbox = .true.'
         end if
-    end if   ! atmospheric box model or prescribed CO2 values   
 
-!   Control output of atmospheric CO2 values
-    if (mype==0) then !OG
-      print *,                "In atm_input: AtmCO2    = ", AtmCO2(1)
-      if (ciso) then
-        print *,              "              AtmCO2_13 = ", AtmCO2_13(1)
-        if (ciso_14) print *, "              AtmCO2_14 = ", AtmCO2_14(:,1)
-      end if
-      if (use_atbox) print *, "              use_atbox = .true."
-    end if
- 
+    end if  ! mstep == 1
 
-
-! ******** Sediment input *********
-!-Checking if files need to be opened---------------------------------------------
-        if(use_MEDUSA .and. (sedflx_num .ne. 0)) then
-            allocate(ncdata(9))
-            if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Sed_input'//achar(27)//'[0m'
-            ! MEDUSA input needs to be renamed via jobscript
-            sedfilename  = trim(ResultPath)//'medusa_flux2fesom.nc'
-            if (mype==0) write(*,*) 'Updating sedimentary input first time from', sedfilename
-
-!-Opening files--------------------------------------------------------------------
-
-            call read_2ddata_on_grid_NetCDF(sedfilename, 'df_din', 1, GloSed(:,1), partit,mesh)
-!      if (mype==0) write(*,*) mype, 'sediment DIN flux:', maxval(GloSed(:,1)), minval(GloSed(:,1))
-
-            call read_2ddata_on_grid_NetCDF(sedfilename, 'df_dic', 1, GloSed(:,2), partit, mesh)
-!      if (mype==0) write(*,*) mype, 'sediment DIC flux:', maxval(GloSed(:,2)), minval(GloSed(:,2))
-
-            call read_2ddata_on_grid_NetCDF(sedfilename, 'df_alk', 1, GloSed(:,3), partit, mesh)
-!      if (mype==0) write(*,*) mype, 'sediment Alk flux:', maxval(GloSed(:,3)), minval(GloSed(:,3))
-
-            call read_2ddata_on_grid_NetCDF(sedfilename, 'df_dsi', 1, GloSed(:,4), partit, mesh)
-!      if (mype==0) write(*,*) mype, 'sediment DSi flux:', maxval(GloSed(:,4)), minval(GloSed(:,4))
-
-            call read_2ddata_on_grid_NetCDF(sedfilename, 'df_o2', 1, GloSed(:,5), partit, mesh)
-!      if (mype==0) write(*,*) mype, 'sediment O2 flux:', maxval(GloSed(:,5)), minval(GloSed(:,5))
-
-            if(ciso) then
-                call read_2ddata_on_grid_NetCDF(sedfilename, 'df_dic13', 1, GloSed(:,6), partit, mesh)
-!        if (mype==0) write(*,*) mype, 'sediment DIC13 flux:', maxval(GloSed(:,6)), minval(GloSed(:,6))
-                if(ciso_14) then
-                    call read_2ddata_on_grid_NetCDF(sedfilename, 'df_dic14', 1, GloSed(:,7), partit, mesh)
-!        if (mype==0) write(*,*) mype, 'sediment DIC14 flux:', maxval(GloSed(:,7)), minval(GloSed(:,7))
-                end if ! ciso_14
-            end if ! ciso
-
-! unit conversion
-      GloSed(:,:)=GloSed(:,:)/86400
-
-! read loopback fluxes from the same file
-      if(add_loopback) then
-        if (mype==0) write(*,*) 'adding loopback fluxes through runoff for the first time' !OG
-
-        istart = (/1,1/)
-        icount = (/1,1/)
-        ncdata = 0.d0
-
-        total_runoff = 8.76d5*86400
-
-        status=nf_open(sedfilename, nf_nowrite, ncid)
-        if(status.ne.nf_noerr) call handle_err(status)
-
-        status=nf_inq_varid(ncid, 'loopback_orgm_din', varid)
-        if(status.ne.nf_noerr) call handle_err(status)
-        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(1))
-        if(status.ne.nf_noerr) call handle_err(status)
-        if (mype==0) write(*,*) mype, 'loopback_orgm_din (mmolN/day):', ncdata(1) !OG
-
-        status=nf_inq_varid(ncid, 'loopback_orgm_dic', varid)
-        if(status.ne.nf_noerr) call handle_err(status)
-        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(2))
-        if(status.ne.nf_noerr) call handle_err(status)
-        if (mype==0) write(*,*) mype, 'loopback_orgm_dic (mmolC/day):', ncdata(2) !OG
-
-        status=nf_inq_varid(ncid, 'loopback_orgm_alk', varid)
-        if(status.ne.nf_noerr) call handle_err(status)
-        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(3))
-        if(status.ne.nf_noerr) call handle_err(status)
-        if (mype==0) write(*,*) mype, 'loopback_orgm_alk (mmolAlk/day):', ncdata(3) !OG
-
-        status=nf_inq_varid(ncid, 'loopback_opal', varid)
-        if(status.ne.nf_noerr) call handle_err(status)
-        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(4))
-        if(status.ne.nf_noerr) call handle_err(status)
-        if (mype==0) write(*,*) mype, 'loopback_opal (mmolSi/day):', ncdata(4) !OG
-
-        status=nf_inq_varid(ncid, 'loopback_caco3', varid)
-        if(status.ne.nf_noerr) call handle_err(status)
-        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(5))
-        if(status.ne.nf_noerr) call handle_err(status)
-        if (mype==0) write(*,*) mype, 'loopback_caco3 (mmolC/day):', ncdata(5) !OG
-
-      if(ciso) then
-        status=nf_inq_varid(ncid, 'loopback_orgm_dic13', varid)
-        if(status.ne.nf_noerr) call handle_err(status)
-        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(6))
-        if(status.ne.nf_noerr) call handle_err(status)
-        if (mype==0) write(*,*) mype, 'loopback_dic13:', ncdata(6)      !OG   
-
-        status=nf_inq_varid(ncid, 'loopback_caco313', varid)
-        if(status.ne.nf_noerr) call handle_err(status)
-        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(7))
-        if(status.ne.nf_noerr) call handle_err(status)
-        if (mype==0) write(*,*) mype, 'loopback_caco313:', ncdata(7)!OG
-
-       if(ciso_14 .and. ciso_organic_14) then
-        status=nf_inq_varid(ncid, 'loopback_orgm_dic14', varid)
-        if(status.ne.nf_noerr) call handle_err(status)
-        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(8))
-        if(status.ne.nf_noerr) call handle_err(status)
-        if (mype==0) write(*,*) mype, 'loopback_dic14:', ncdata(8) !OG
-
-        status=nf_inq_varid(ncid, 'loopback_caco314', varid)
-        if(status.ne.nf_noerr) call handle_err(status)
-        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(9))
-        if(status.ne.nf_noerr) call handle_err(status)
-        if (mype==0) write(*,*) mype, 'loopback_caco314:', ncdata(9) !OG
-
-       end if ! ciso_14 .and. ciso_organic_14
-      end if ! ciso
-        deallocate(ncdata)
-        status=nf_close(ncid)
-
-! calculating fluxes back to ocean surface through rivers (mmol/m2/s)
-! converting from fluxes out of sediment to fluxes into the ocean 
-        do n_lb = 1,9
-           lb_flux(:,n_lb) = -runoff*ncdata(n_lb)/total_runoff*lb_tscale
-        end do
-
-      end if ! add_loopback
-
-   else
-
-!-Checking if files need to be opened---------------------------------------------
-     call monthly_event(do_read, 1)
-     if(do_read) then ! file is opened and read every year
-      i=month
-      if (i > 12) i=1
-      if (mype==0) write(*,*) 'Updating sedimentary input for month', i, 'from', sedfilename !OG
-
-      call read_2ddata_on_grid_NetCDF(sedfilename, 'df_din', 1, GloSed(:,1), partit, mesh)
-!      if (mype==0) write(*,*) mype, 'sediment DIN flux:', maxval(GloSed(:,1)), minval(GloSed(:,1))
-
-      call read_2ddata_on_grid_NetCDF(sedfilename, 'df_dic', 1, GloSed(:,2), partit, mesh)
-!      if (mype==0) write(*,*) mype, 'sediment DIC flux:', maxval(GloSed(:,2)), minval(GloSed(:,2))
-
-      call read_2ddata_on_grid_NetCDF(sedfilename, 'df_alk', 1, GloSed(:,3), partit, mesh)
-!      if (mype==0) write(*,*) mype, 'sediment Alk flux:', maxval(GloSed(:,3)), minval(GloSed(:,3))
-
-      call read_2ddata_on_grid_NetCDF(sedfilename, 'df_dsi', 1, GloSed(:,4), partit, mesh)
-!      if (mype==0) write(*,*) mype, 'sediment DSi flux:', maxval(GloSed(:,4)), minval(GloSed(:,4))
-
-      call read_2ddata_on_grid_NetCDF(sedfilename, 'df_o2', 1, GloSed(:,5), partit, mesh)
-!      if (mype==0) write(*,*) mype, 'sediment O2 flux:', maxval(GloSed(:,5)), minval(GloSed(:,5))
-
-      if(ciso) then
-        call read_2ddata_on_grid_NetCDF(sedfilename, 'df_dic13', 1, GloSed(:,6), partit, mesh)
-!        if (mype==0) write(*,*) mype, 'sediment DIC13 flux:', maxval(GloSed(:,6)), minval(GloSed(:,6))
-        if(ciso_14) then
-          call read_2ddata_on_grid_NetCDF(sedfilename, 'df_dic14', 1, GloSed(:,7), partit, mesh)
-!          if (mype==0) write(*,*) mype, 'sediment DIC14 flux:', maxval(GloSed(:,7)), minval(GloSed(:,7))
-        end if ! ciso_14
-      end if ! ciso
-
-!to mmol/m2/s
-      GloSed(:,:)=GloSed(:,:)/86400
-
-! read loopback fluxes from the same file
-      if(add_loopback) then
-        if (mype==0) write(*,*) 'adding loopback fluxes into the ocean monthly' !OG
-
-        istart = (/1,1/)
-        icount = (/1,1/)
-        ncdata = 0.d0
-
-        total_runoff = 8.76d5*86400
-
-        status=nf_open(sedfilename, nf_nowrite, ncid)
-        if(status.ne.nf_noerr) call handle_err(status)
-
-        status=nf_inq_varid(ncid, 'loopback_orgm_din', varid)
-        if(status.ne.nf_noerr) call handle_err(status)
-        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(1))
-        if(status.ne.nf_noerr) call handle_err(status)
-        if (mype==0) write(*,*) mype, 'loopback_orgm_din (mmolN/day):', ncdata(1) !OG
-
-        status=nf_inq_varid(ncid, 'loopback_orgm_dic', varid)
-        if(status.ne.nf_noerr) call handle_err(status)
-        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(2))
-        if(status.ne.nf_noerr) call handle_err(status)
-        if (mype==0) write(*,*) mype, 'loopback_orgm_dic (mmolC/day):', ncdata(2) !OG
-
-        status=nf_inq_varid(ncid, 'loopback_orgm_alk', varid)
-        if(status.ne.nf_noerr) call handle_err(status)
-        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(3))
-        if(status.ne.nf_noerr) call handle_err(status)
-        if (mype==0) write(*,*) mype, 'loopback_orgm_alk (mmolAlk/day):', ncdata(3) !OG
-
-        status=nf_inq_varid(ncid, 'loopback_opal', varid)
-        if(status.ne.nf_noerr) call handle_err(status)
-        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(4))
-        if(status.ne.nf_noerr) call handle_err(status)
-        if (mype==0) write(*,*) mype, 'loopback_opal (mmolSi/day):', ncdata(4) !OG
-
-        status=nf_inq_varid(ncid, 'loopback_caco3', varid)
-        if(status.ne.nf_noerr) call handle_err(status)
-        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(5))
-        if(status.ne.nf_noerr) call handle_err(status)
-        if (mype==0) write(*,*) mype, 'loopback_caco3 (mmolC/day):', ncdata(5) !OG
-
-      if(ciso) then
-        status=nf_inq_varid(ncid, 'loopback_orgm_dic13', varid)
-        if(status.ne.nf_noerr) call handle_err(status)
-        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(6))
-        if(status.ne.nf_noerr) call handle_err(status)
-        if (mype==0) write(*,*) mype, 'loopback_dic13:', ncdata(6)     !OG   
-
-        status=nf_inq_varid(ncid, 'loopback_caco313', varid)
-        if(status.ne.nf_noerr) call handle_err(status)
-        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(7))
-        if(status.ne.nf_noerr) call handle_err(status)
-        if (mype==0) write(*,*) mype, 'loopback_caco313:', ncdata(7) !OG
-
-       if(ciso_14 .and. ciso_organic_14) then
-        status=nf_inq_varid(ncid, 'loopback_orgm_dic14', varid)
-        if(status.ne.nf_noerr) call handle_err(status)
-        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(8))
-        if(status.ne.nf_noerr) call handle_err(status)
-        if (mype==0) write(*,*) mype, 'loopback_dic14:', ncdata(8) !OG
-
-        status=nf_inq_varid(ncid, 'loopback_caco314', varid)
-        if(status.ne.nf_noerr) call handle_err(status)
-        status=nf_get_vara_double(ncid,varid,istart,icount,ncdata(9))
-        if(status.ne.nf_noerr) call handle_err(status)
-        if (mype==0) write(*,*) mype, 'loopback_caco314:', ncdata(9) !OG
-
-       end if ! ciso_14 .and. ciso_organic_14
-      end if ! ciso
-        status=nf_close(ncid)
-
-! calculating fluxes back to ocean surface through rivers (mmol/m2/s)
-! converting from fluxes out of sediment to fluxes into the ocean 
-        do n_lb = 1,9
-           lb_flux(:,n_lb) = -runoff*ncdata(n_lb)/total_runoff*lb_tscale
-        end do
-
-      end if ! add_loopback
-
-    end if ! do_read
-
-    if (mype==0) write(*,*) 'sedimentary input from MEDUSA not used!' !OG
-
-    end if ! use_MEDUSA and sedflx_num not 0
-
-    end if
-
-
-! ******** Fe deposition *********
-    if (fe_data_source=='Albani') then
+    ! ----------------------------------------------------------------
+    !  Iron (Fe) deposition
+    ! ----------------------------------------------------------------
+    if (fe_data_source == 'Albani') then
         if (update_monthly_flag) then
-            i=month
-            if (mstep > 1) i=i+1 
-            if (i > 12) i=1
-            filename=trim(make_full_path(nm_fe_data_file))
-            if (mype==0) write(*,*) 'Updating iron climatology for month       ', i,' from ', trim(filename)
-            call read_2ddata_on_grid_NetCDF(filename,'DustClim', i, GloFeDust, partit, mesh)
+            i = month
+            if (mstep > 1) i = i + 1
+            if (i > 12)    i = 1
+
+            filename = trim(make_full_path(nm_fe_data_file))
+            !if (mype==0) write(*,*) 'Updating iron climatology for month       ', i,' from ', trim(filename)
+            call log_fe_update(mype, i, filename)
+            call read_2ddata_on_grid_NetCDF(filename, 'DustClim', i, GloFeDust, partit, mesh)
         end if
     else
-        if (mype==0) write(*,*) 'Albani is switched off --> Check namelist.recom'     
+        if (mype == 0) write(*,*) 'Albani is switched off --> Check namelist.recom'
     end if
 
-! ******** N deposition *********
+    ! ----------------------------------------------------------------
+    !  Nitrogen (N) deposition
+    ! ----------------------------------------------------------------
     if (useAeolianN) then
-! todo: check below when useAeolianN is .true.
-        if (mstep==1) then ! The year has changed
-            i=month
-!            if (mstep > 1) i=i+1 
-!            if (i > 12) i=1
-!            if (mype==0) write(*,*) 'Updating iron climatology for month ', i 
-            filename=trim(make_full_path(nm_aen_data_file))
-            if (mype==0) write(*,*) 'Updating nitrogen climatology for month   ', i,' from ', trim(filename)
-            if (yearnew .gt. 2009) then
+        ! TODO: verify behaviour when useAeolianN is .true.
+        if (mstep == 1) then  ! Year has changed — update annually
+
+            i        = month
+            filename = trim(make_full_path(nm_aen_data_file))
+
+            ! Select variable name based on year bounds
+            if (yearnew > 2009) then
                 Nvari = 'NDep2009'
-            else if (yearnew .lt. 1850) then
+            else if (yearnew < 1850) then
                 Nvari = 'NDep1850'
             else
-                Nvari = 'NDep'//cyearnew
-            endif
+                Nvari = 'NDep' // cyearnew
+            end if
 
+            call log_nitrogen_update(mype, i, filename, Nvari)
             call read_2ddata_on_grid_NetCDF(filename, Nvari, i, GloNDust, partit, mesh)
+
         end if
     else
         GloNDust = 0.0_WP
-        if (mstep==1 .and. mype==0) write(*,*) 'useAeolianN is switched off'       
+        if (mstep == 1) call log_nitrogen_disabled(mype)
+        !if (mstep==1 .and. mype==0) write(*,*) 'useAeolianN is switched off'
     end if
 
-! ******** Riverine input (Nutrients) *********
+    !-----------------------------------------------------------------------------
+    ! Configure river nutrient inputs
+    !-----------------------------------------------------------------------------
+
     if (useRivers) then
-!<  read riverine input
+
     ! *** River inputs are in mmol/m2/s ***
-    ! add river nutrients as surface boundary condition (surface_bc function in oce_ale_tracers)
+
         if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'   --> River_input'//achar(27)//'[0m'
 
+        ! add river nutrients as surface boundary condition (surface_bc function in oce_ale_tracers)
+        ! Enable river input flag
         is_riverinput = 1.0d0
 
-        if (update_monthly_flag) then
-            i=month
-            if (mstep > 1) i=i+1 
-            if (i > 12) i=1
-            filename=trim(nm_river_data_file)
-            if (mype==0) write(*,*) 'Updating riverine restoring data for month', i,' from ', trim(filename)
-            call read_2ddata_on_grid_NetCDF(filename,'Alkalinity', i, RiverAlk2D, partit, mesh)
-            ! write(*,*) mype, 'RiverAlk2D', maxval(RiverAlk2D(:)), minval(RiverAlk2D(:))        
-            ! molar convertion of [CaCo3] * 2  -> [total Alkalinity]   
-            RiverAlk2D = RiverAlk2D * 2
-  
-            call read_2ddata_on_grid_NetCDF(filename, 'DIC', i, RiverDIC2D, partit, mesh) 
-            ! write(*,*) mype, 'RiverDIC2D', maxval(RiverDIC2D(:)), minval(RiverDIC2D(:))     
+        !=========================================================================
+        ! RIVER INPUT
+        !
+        ! Two mutually exclusive river input pathways:
+        !
+        !   1. R2OMIP pathway  (enable_R2OMIP = .true.)
+        !      - Reads DIN, DOC_l, DOC_sl, POC from a NetCDF file.
+        !      - File is opened ONCE at the first model step (mstep == 1).
+        !      - Two sub-modes:
+        !          a) constant_PI_Rivers = .true.  → pre-industrial climatology
+        !          b) constant_PI_Rivers = .false. → transient, year-specific file
+        !
+        !   2. Standard monthly pathway  (enable_R2OMIP = .false.)
+        !      - Reads Alk, DIC, DIN, DOC, DON monthly.
+        !      - DSi is derived from DIN via a Redfield-like ratio.
+        !      - Updated only when update_monthly_flag is set.
+        !
+        ! If useRivers = .false., all riverine fluxes are suppressed.
+        !=========================================================================
 
-            call read_2ddata_on_grid_NetCDF(filename, 'DIN', i, RiverDIN2D, partit, mesh) 
-            ! write(*,*) mype, 'RiverDIN2D', maxval(RiverDIN2D(:)), minval(RiverDIN2D(:))     
+        !-------------------------------------------------------------------------
+        ! R2OMIP river input pathway (transient or constant pre-industrial)
+        !-------------------------------------------------------------------------
 
-            call read_2ddata_on_grid_NetCDF(filename, 'DOC', i, RiverDOC2D, partit, mesh) 
-            ! write(*,*) mype, 'RiverDOC2D', maxval(RiverDOC2D(:)), minval(RiverDOC2D(:))     
+        if (enable_R2OMIP) then
 
-            call read_2ddata_on_grid_NetCDF(filename, 'DON', i, RiverDON2D, partit, mesh) 
-            ! write(*,*) mype, 'RiverDON2D', maxval(RiverDON2D(:)), minval(RiverDON2D(:))     
+            ! File is read once — at the very first model time step only.
+            if (mstep == 1) then
 
-            RiverDSi2D = RiverDIN2D * (16/15)
-        end if
-    else
-        is_riverinput = 0.0d0
-        if (mype==0 .and. mstep==1) write(*,*) 'No riverine input' 
-    end if
+                !--- Rank 0: resolve filename and open the NetCDF file ---
+                if (mype==0) then
 
-! ******** Riverine input of iron *********
+                    if (constant_PI_Rivers) then
+
+                        ! Pre-industrial climatology (time-invariant)
+                        !write(*,'(A)') 'INFO: Using constant pre-industrial riverine inputs'
+                        filename = trim(REcoMDataPath) // 'Rivers_R2OMIP_PI.nc'
+                        call log_river_r2omip_pi(mype, filename)
+
+                    else
+                        ! Transient forcing — one file per simulation year
+                        !write(*,'(4A)') 'INFO: Using transient riverine inputs — ', &
+                        !                'model year = ', trim(cyearnew), &
+                        !                ' from ', trim(filename)
+                        filename = trim(REcoMDataPath) // 'Rivers_R2OMIP_' // trim(cyearnew) // '.nc'
+                        call log_river_r2omip_transient(mype, cyearnew, filename)
+
+                    endif
+
+                    write(*,*) 'Opening river file: ', trim(filename)
+
+                    status=nf90_open(filename, nf90_nowrite, ncid)
+
+                end if ! mype == 0
+
+                !--- Broadcast open status to all MPI ranks ---
+                call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+
+                if (status /= nf90_noerr) then
+                    if (mype == 0) then
+                        write(*,'(A)') 'ERROR: Failed to open river input file: ' // trim(filename)
+                    end if
+                    call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+                    stop
+                end if
+
+                !--- Load river nutrient fields and validate each ---
+                ! Each variable is read onto the 2-D unstructured grid and
+                ! checked for physical plausibility (river_sanity_check).
+                !if (mype == 0) write(*,*) 'Sanity-checking R2OMIP river variables...'
+                call log_river_sanity_start(mype)
+
+                call load_river_variable(ncid, 'DIC', RiverDIC2D, partit, mesh)
+                locmax = maxval(RiverDIC2D)
+                locmin = minval(RiverDIC2D)
+                call river_sanity_check (locmax, locmin, 'DIC', partit, mesh)
+                !call river_sanity_check (RiverDIC2D,  'DIC', partit, mesh)
+
+                call load_river_variable(ncid, 'DIN', RiverDIN2D, partit, mesh)
+                locmax = maxval(RiverDIN2D)
+                locmin = minval(RiverDIN2D)
+                call river_sanity_check (locmax, locmin, 'DIN', partit, mesh)
+                !call river_sanity_check (RiverDIN2D,  'DIN', partit, mesh)
+
+                call load_river_variable(ncid, 'DOC_l', RiverDOCl2D,  partit, mesh)
+                locmax = maxval(RiverDOCl2D)
+                locmin = minval(RiverDOCl2D)
+                call river_sanity_check (locmax, locmin, 'DOC_l', partit, mesh)
+                !call river_sanity_check (RiverDOCl2D, 'DOC_l', partit, mesh)
+
+                call load_river_variable(ncid, 'DOC_sl', RiverDOCsl2D, partit, mesh)
+                locmax = maxval(RiverDOCsl2D)
+                locmin = minval(RiverDOCsl2D)
+                call river_sanity_check (locmax, locmin, 'DOC_sl', partit, mesh)
+                !call river_sanity_check (RiverDOCsl2D, 'DOC_sl', partit, mesh)
+ 
+                call load_river_variable(ncid, 'POC', RiverPOC2D, partit, mesh)
+                locmax = maxval(RiverPOC2D)
+                locmin = minval(RiverPOC2D)
+                call river_sanity_check (locmax, locmin, 'POC', partit, mesh)
+                !call river_sanity_check (RiverPOC2D, 'POC', partit, mesh)
+
+                !--- Close the file (rank 0 only; others never opened it) ---
+                if (mype == 0) status = nf90_close(ncid)
+
+            end if ! mstep == 1
+
+        !---------------------------------------------------------------------
+        ! PATHWAY 2: Standard monthly river inputs
+        !---------------------------------------------------------------------
+        else
+ 
+            if (update_monthly_flag) then
+ 
+                !--- Compute the correct month index with year-end wrap-around ---
+                ! At mstep == 1 the month index is used as-is; thereafter it is
+                ! incremented by 1 to advance to the next calendar month.
+                i = month
+                if (mstep > 1) i = i + 1
+                if (i > 12)    i = 1
+
+                filename = trim(nm_river_data_file)
+                !if (mype == 0) then
+                !    write(*,'(A,I2,2A)') 'Updating riverine data for month ', i, &
+                !                         ' from ', trim(filename)
+                !end if
+                call log_river_monthly_update(mype, i, filename)
+
+                !--- Read biogeochemical tracers from the monthly climatology ---
+                call read_2ddata_on_grid_NetCDF(filename, 'Alkalinity', i, RiverAlk2D, partit, mesh)
+                call read_2ddata_on_grid_NetCDF(filename, 'DIC',        i, RiverDIC2D, partit, mesh)
+                call read_2ddata_on_grid_NetCDF(filename, 'DIN',        i, RiverDIN2D, partit, mesh)
+                call read_2ddata_on_grid_NetCDF(filename, 'DOC',        i, RiverDOC2D, partit, mesh)
+                call read_2ddata_on_grid_NetCDF(filename, 'DON',        i, RiverDON2D, partit, mesh)
+
+                ! Alkalinity in the file is given as [CaCO3]; convert to
+                ! total alkalinity by multiplying by 2 (each mol CaCO3
+                ! releases 2 equivalents of carbonate alkalinity).
+                RiverAlk2D = RiverAlk2D * 2.0d0
+
+                ! DSi is not stored in the climatology file; estimate it
+                ! from DIN using a Redfield-like Si:N ratio of 16:15.
+                RiverDSi2D = RiverDIN2D * (16.0d0 / 15.0d0)
+ 
+            end if ! update_monthly_flag
+ 
+        end if ! enable_R2OMIP
+
+        !-------------------------------------------------------------------------
+        ! RIVERS DISABLED: zero out all riverine fluxes
+        !-------------------------------------------------------------------------
+        else
+ 
+            is_riverinput = 0.0d0
+            !if (mype == 0 .and. mstep == 1) then
+            !    write(*,*) 'INFO: Riverine input disabled (useRivers = .false.)'
+            !end if
+            if (mstep == 1) call log_river_disabled(mype)
+
+        end if ! useRivers
+
+    !-----------------------------------------------------------------------------
+    ! Riverine iron input
+    !-----------------------------------------------------------------------------
+
     if (useRivFe) then
-    ! River runoff (m/s) is multiplied with Fe concentration * muemolFe/m3 -> muemolFe/m2/s
-    ! add river nutrients as surface boundary condition (surface_bc function in
-    ! oce_ale_tracers)
+
+        ! River runoff (m/s) is multiplied with Fe concentration * muemolFe/m3 -> muemolFe/m2/s
+        ! add river nutrients as surface boundary condition (surface_bc function in
+        ! oce_ale_tracers)
         RiverFe = runoff * RiverFeConc
     else
+
         RiverFe = 0.0d0
+
     end if
 
-! ******** Erosion (Nutrients) *********
-    if (useErosion) then
-!<  read erosion input
-    ! *** River inputs are in mmol/m2/s ***
-    ! add erosion nutrients as surface boundary condition (surface_bc function in oce_ale_tracers)
-    if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//' --> Erosion_input'//achar(27)//'[0m'
+        !=========================================================================
+        ! EROSION INPUT MODULE — REcoM Biogeochemistry
+        !
+        ! Applies monthly erosion fluxes as a surface boundary condition.
+        ! Units: mmol m⁻² s⁻¹  (passed to surface_bc in oce_ale_tracers)
+        !
+        ! Variables loaded:
+        !   POC  → ErosionTOC2D   (particulate organic carbon)
+        !   PON  → ErosionTON2D   (particulate organic nitrogen)
+        !   TSi  → ErosionTSi2D   (silicate, derived from TON via Redfield ratio)
+        !
+        ! Note: Silicate is not stored in the erosion file; it is estimated
+        !       from TON using a Redfield-like Si:N ratio of 16:15.
+        !=========================================================================
+ 
+        if (useErosion) then
 
-    is_erosioninput = 1.0d0
+            is_erosioninput = 1.0d0
+
+            !--- Optional debug trace (ANSI cyan, rank 0 only) ---
+            !if (recom_debug .and. mype == 0) then
+            !    print *, achar(27)//'[36m'//' --> Erosion_input'//achar(27)//'[0m'
+            !end if
+
+            call log_erosion_entry(mype, recom_debug)
 
         if (update_monthly_flag) then
-            i=month
-            if (mstep > 1) i=i+1 
-            if (i > 12) i=1
-            filename=trim(nm_erosion_data_file)
-            if (mype==0) write(*,*) 'Updating erosion restoring data for month ', i,' from ', trim(filename)
-            call read_2ddata_on_grid_NetCDF(filename,'POC', i, ErosionTOC2D, partit, mesh)
-            ! write(*,*) mype, 'ErosionTOC2D', maxval(ErosionTOC2D(:)), minval(ErosionTOC2D(:))    
-    
-            call read_2ddata_on_grid_NetCDF(filename,'PON', i, ErosionTON2D, partit, mesh)
-            ! write(*,*) mype, 'ErosionTON2D', maxval(ErosionTON2D(:)), minval(ErosionTON2D(:))        
+ 
+                !--- Compute current month index with year-end wrap-around ---
+                ! At mstep == 1 the month index is used as-is; thereafter it is
+                ! incremented by 1 to advance to the next calendar month.
+                i = month
+                if (mstep > 1) i = i + 1
+                if (i > 12)    i = 1
 
-            ! No silicates in erosion, we convert from nitrogen with redfieldian ratio     
-	    ErosionTSi2D=ErosionTON2D * 16/15
-        end if
-    else
-        is_erosioninput = 0.0d0
-        if (mype==0 .and. mstep==1) write(*,*) 'No erosion input' 
-    end if
+                filename = trim(nm_erosion_data_file)
+                !if (mype == 0) then
+                !    write(*,'(A,I2,2A)') 'Updating erosion data for month ', i, &
+                !                         ' from ', trim(filename)
+                !end if
+                call log_erosion_monthly_update(mype, i, filename)
+
+                !--- Read particulate organic tracers from the monthly file ---
+                call read_2ddata_on_grid_NetCDF(filename, 'POC', i, ErosionTOC2D, partit, mesh)
+                call read_2ddata_on_grid_NetCDF(filename, 'PON', i, ErosionTON2D, partit, mesh)
+ 
+                ! Silicate is absent from the erosion file; derive it from TON
+                ! using a Redfield-like Si:N ratio of 16:15.
+                ! Note: integer division (16/15 = 1) is avoided by using
+                ! double-precision literals.
+                ErosionTSi2D = ErosionTON2D * (16.0d0 / 15.0d0)
+
+            end if ! update_monthly_flag
+
+        !-------------------------------------------------------------------------
+        ! EROSION DISABLED: zero out all erosion fluxes
+        !-------------------------------------------------------------------------
+        else
+
+            is_erosioninput = 0.0d0
+            !if (mype == 0 .and. mstep == 1) then
+            !    write(*,*) 'INFO: Erosion input disabled (useErosion = .false.)'
+            !end if
+            if (mstep == 1) call log_erosion_disabled(mype)
+
+        end if ! useErosion
 #endif
 
       !!PS if (partit%mype==0) then 
@@ -2229,7 +2227,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
       integer, intent(in)                            :: iost
 
       if (iost .ne. NF90_NOERR) then
-         write(error_unit,*) 'ERROR: I/O status= "',trim(nf90_strerror(iost)),'";',iost,' file= ',fname
+         write(*,*) 'ERROR: I/O status= "',trim(nf90_strerror(iost)),'";',iost,' file= ',fname
          call par_ex(partit%MPI_COMM_FESOM, partit%mype)
          stop
       endif
@@ -2579,7 +2577,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
 
          end if ! ier >0
       end if ! Ri < 0.25
-      end if  !delw != 0.0
+   end if  !delw != 0.0
 
    return
    end subroutine fairall
@@ -3153,12 +3151,12 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
  
    call MPI_BCast(status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
    if (status.ne.nf90_noerr)then
-      write(error_unit,*) 'ERROR: CANNOT READ 2D netCDF FILE CORRECTLY !!!!!'
-      write(error_unit,*) 'Error in opening netcdf file '//file
+      print*,'ERROR: CANNOT READ 2D netCDF FILE CORRECTLY !!!!!'
+      print*,'Error in opening netcdf file '//file
       call par_ex(partit%MPI_COMM_FESOM, partit%mype)
       stop
    endif
-
+ 
    if (mype==0) then
       ! lat
       status=nf90_inq_dimid(ncid, 'lat', latid)
@@ -3274,8 +3272,8 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
 
    if (status/=number_arrival_points) then
       if (mype==0) then
-         write(error_unit,*) 'RUNOFF MAPPER ERROR: total number of arrival points does not sum up among partitions: ', status, number_arrival_points
-         write(error_unit,*) 'two different grid points have same distance to a target point!'
+         write(*,*) 'RUNOFF MAPPER ERROR: total number of arrival points does not sum up among partitions: ', status, number_arrival_points
+         write(*,*) 'two different grid points have same distance to a target point!'
       end if
       call par_ex(partit%MPI_COMM_FESOM, partit%mype)
       STOP
@@ -3304,8 +3302,8 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
          j=data_sparse(i)
          if ((j<0) .OR. (j>drain_num)) then
             if (mype==0) then
-               write(error_unit,*) 'RUNOFF MAPPER ERROR: arrival point has an index outside of permitted range', j, drain_num
-               write(error_unit,*) 'two different grid points have same distance to a target point!'
+               write(*,*) 'RUNOFF MAPPER ERROR: arrival point has an index outside of permitted range', j, drain_num
+               write(*,*) 'two different grid points have same distance to a target point!'
             end if
             call par_ex(partit%MPI_COMM_FESOM, partit%mype)
             STOP

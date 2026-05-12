@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --account=biogeo_model.biogeo_model
+#SBATCH --account=biogeo_model.biogeo_model # edit your account
 #SBATCH --job-name=2p1z1d
 #SBATCH --partition=mpp
 #SBATCH -N 9

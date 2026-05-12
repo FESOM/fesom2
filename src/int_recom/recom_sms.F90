@@ -31,7 +31,6 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     use mvars
     use mdepth2press                                   
     use gsw_mod_toolbox, only: gsw_sa_from_sp,gsw_ct_from_pt,gsw_rho
-    use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
 
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -41,6 +40,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     type(t_ice)   , intent(inout), target :: ice
 
     integer, intent(in)                                     :: Nn                   !< Total number of nodes in the vertical
+    integer                                                 :: nzmax, nzmin, k_bottom, nlevels_nod2D_minimum  !R2OMIP (OmegaC)
     real(kind=8),dimension(mesh%nl-1,bgc_num),intent(inout) :: state                !< ChlA conc in phytoplankton [mg/m3]
                                                                                     !! should be in instead of inout
 
@@ -101,6 +101,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     HetC,    & ! [mmol/m3] Heterotroph carbon
     DON,     & ! [mmol/m3] Dissolved organic nitrogen
     EOC,     & ! [mmol/m3] Extracellular organic carbon
+    DOCt,    & ! [mmol/m3] terrestrial DOC	! R2OMIP
     DiaN,    & ! [mmol/m3] Diatom nitrogen
     DiaC,    & ! [mmol/m3] Diatom carbon
     DiaChl,  & ! [mg/m3] Diatom chlorophyll
@@ -111,7 +112,8 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     PhyCalc, & ! [mmol/m3] Phytoplankton calcite
     DetCalc, & ! [mmol/m3] Detrital calcite
     FreeFe,  & ! [mmol/m3] Free iron
-    O2         ! [mmol/m3] Dissolved oxygen
+    O2,      & ! [mmol/m3] Dissolved oxygen
+    DICremin   ! tracer for DIC remineralization (for tracking as diagnostic (added by Sina)
 
 ! Coccolithophore variables (conditionally used based on namelist)
 real(kind=8) :: &
@@ -411,11 +413,13 @@ real(kind=8) :: &
             !   DIC : Dissolved inorganic carbon (CO2 + HCO3- + CO3--) [mmolC m-3]
             !   ALK : Total alkalinity [meq m-3]
             !   O2  : Dissolved oxygen [mmolO2 m-3]
+            !   DICremin : Tracer for DIC remineralization (added by Sina)
             !-----------------------------------------------------------------------
 
             DIC = max(tiny, state(k, idic) + sms(k, idic))
             ALK = max(tiny, state(k, ialk) + sms(k, ialk))
             O2  = max(tiny, state(k, ioxy) + sms(k, ioxy))
+            DICremin = max(tiny, state(k, idicremin) + sms(k, idicremin))
 
             !-----------------------------------------------------------------------
             ! DISSOLVED ORGANIC MATTER
@@ -430,6 +434,11 @@ real(kind=8) :: &
             DON = max(tiny, state(k, idon) + sms(k, idon))
             EOC = max(tiny, state(k, idoc) + sms(k, idoc))
 
+            if (enable_R2OMIP) then
+                DOCt = max(tiny, state(k,idoct) + sms(k, idoct)) ! R2OMIP
+            else 
+                DOCt = 0.0_WP
+            end if 
             !-----------------------------------------------------------------------
             ! SMALL PHYTOPLANKTON
             !-----------------------------------------------------------------------
@@ -987,8 +996,8 @@ real(kind=8) :: &
                         HetC_14           = max(tiny, state(k,ihetc_14)   + sms(k, ihetc_14))
                         EOC_14            = max(tiny, state(k,idoc_14)    + sms(k, idoc_14))
                         DiaC_14           = max(tiny_C, state(k,idiac_14) + sms(k, idiac_14))
-                        PhyCalc_14        = max(tiny, state(k,iphycal_14) + sms(k,iphycal_14))
-                        DetCalc_14        = max(tiny, state(k,idetcal_14) + sms(k,idetcal_14))
+                        PhyCalc_14        = max(tiny, state(k,iphycal_14) + sms(k, iphycal_14))
+                        DetCalc_14        = max(tiny, state(k,idetcal_14) + sms(k, idetcal_14))
 
                         calc_diss_14      = alpha_dcal_14 * calc_diss
 
@@ -1620,6 +1629,25 @@ real(kind=8) :: &
 
             endif
 
+            if (NitrogenSS) then
+                ! This part has been developpes for R2OMIP for calculating bottom ocean OmegaC
+                nzmax=nlevels_nod2D(n)-1
+                nzmin=ulevels_nod2D(n)
+                k_bottom=nod_in_elem2D_num(n)
+            
+                ! Screening minimum depth in neigbouring nodes around node n
+                nlevels_nod2D_minimum=minval(nlevels(nod_in_elem2D(1:k_bottom, n))-1)
+                    
+                if (k >= nlevels_nod2D_minimum .and. k < nzmax) then
+                    OmegaC_bottom(n) =  (OmegaC_depth(1) * (area(k,n)-area(k+1,n)) / area(k,n))
+
+                else if (k == nzmax) then
+                    OmegaC_bottom(n) =  (OmegaC_depth(1) * (area(k+1,n) / area(k,n)))
+                else
+                    OmegaC_bottom(n) =  0.0_WP
+                end if
+            endif
+
             !===============================================================================
             ! CO2 EFFECTS AND CALCITE DISSOLUTION
             !===============================================================================
@@ -1950,6 +1978,9 @@ real(kind=8) :: &
             ! Apply Liebig's law: most limiting nutrient controls photosynthesis
             qlimitFac = min(qlimitFac, feLimitFac)
 
+            ! Track limitation
+            VTqlimitFac_phyto(k) = qlimitFac
+
             ! Calculate maximum photosynthesis rate with temperature correction
             if (enable_coccos) then
                 ! Use species-specific temperature function (when cocco module active)
@@ -1977,6 +2008,9 @@ real(kind=8) :: &
             feLimitFac = Fe / (k_Fe_d + Fe)
             qlimitFac = min(qlimitFac, feLimitFac)
 
+            ! Track limitation
+            VTqlimitFac_diatoms(k) = qlimitFac
+
             ! Calculate maximum photosynthesis rate
             if (enable_coccos) then
                 pMax_dia = qlimitFac * Temp_diatoms
@@ -1999,6 +2033,9 @@ real(kind=8) :: &
                 feLimitFac = Fe / (k_Fe_c + Fe)
                 qlimitFac = min(qlimitFac, feLimitFac)
 
+                ! Track limitation
+                VTqlimitFac_cocco(k) = qlimitFac
+
                 ! Calculate maximum photosynthesis rate
                 pMax_cocco = qlimitFac * Temp_cocco
 
@@ -2014,6 +2051,9 @@ real(kind=8) :: &
                 ! Iron limitation
                 feLimitFac = Fe / (k_Fe_p + Fe)
                 qlimitFac = min(qlimitFac, feLimitFac)
+
+                ! Track limitation
+                VTqlimitFac_phaeo(k) = qlimitFac
 
                 ! Calculate maximum photosynthesis rate
                 pMax_phaeo = qlimitFac * Temp_phaeo
@@ -3970,6 +4010,7 @@ real(kind=8) :: &
             !---------------------------------------------------------------------------
             ! Microbial degradation of dissolved organic carbon
             + rho_C1 * arrFunc * O2Func * EOC                     & ! Temperature and O2 dependent
+            + rho_C1t                   * DOCt * is_R2OMIP        & ! --> Remineralization of terrestrial DOC ! R2OMIP
             !---------------------------------------------------------------------------
             ! SOURCES: Zooplankton Respiration (increases DIC)
             !---------------------------------------------------------------------------
@@ -4235,7 +4276,7 @@ real(kind=8) :: &
                     ! SOURCES: Direct Transfer from Grazing
                     !-----------------------------------------------------------------------
                     ! All grazed material enters detritus (no detritus grazing)
-                    + grazingFlux_phy3                                     & ! Microzooplankton->small phyto
+                    + grazingFlux_phy3                                     & ! Microzooplankton->small phyto    !OG added
                     + grazingFlux_dia3                                     & ! Microzooplankton->diatoms
                     + grazingFlux_Cocco3             * is_coccos           & ! Microzooplankton->coccoliths
                     + grazingFlux_Phaeo3             * is_coccos           & ! Microzooplankton->Phaeocystis
@@ -4360,7 +4401,7 @@ real(kind=8) :: &
                     ! SINKS: Detritus Consumption (C-basis)
                     !-----------------------------------------------------------------------
                     - grazingFlux_Det    * recipDet  * grazEff             & ! Mesozooplankton
-                    - grazingFlux_Det2   * recipDet  * grazEff2            & ! Macrozooplankton
+                    - grazingFlux_Det2   * recipDet  * grazEff2            & ! Macrozooplankton     ! corrected recipDet2 -> recipDet
                     !-----------------------------------------------------------------------
                     ! SINKS: Remineralization
                     !-----------------------------------------------------------------------
@@ -4394,6 +4435,7 @@ real(kind=8) :: &
                     ! SINKS: Detritus Consumption (C-basis)
                     !-----------------------------------------------------------------------
                     - grazingFlux_Det    * recipDet  * grazEff             &
+                    ! - grazingFlux_Det2 * recipDet2 * grazEff           & !!!!!! CHECK
                     !-----------------------------------------------------------------------
                     ! SINKS: Remineralization
                     !-----------------------------------------------------------------------
@@ -4739,7 +4781,7 @@ real(kind=8) :: &
                     !-----------------------------------------------------------------------
                     + grazingFlux_phy2    * (1.d0 - grazEff2)              & ! Small phytoplankton
                     + grazingFlux_dia2    * (1.d0 - grazEff2)              & ! Diatoms
-                    + grazingFlux_Cocco   * (1.d0 - grazEff)  * is_coccos  & ! Coccoliths (meso)
+                    + grazingFlux_Cocco   * (1.d0 - grazEff)  * is_coccos  & ! Coccoliths (meso) ! grazEff2 --> grazEff
                     + grazingFlux_Cocco2  * (1.d0 - grazEff2) * is_coccos  & ! Coccoliths (macro)
                     + grazingFlux_Phaeo   * (1.d0 - grazEff)  * is_coccos  & ! Phaeocystis (meso)
                     + grazingFlux_Phaeo2  * (1.d0 - grazEff2) * is_coccos  & ! Phaeocystis (macro)
@@ -4878,7 +4920,7 @@ real(kind=8) :: &
                         + grazingFlux_phy2    * recipQuota       * (1.d0 - grazEff2) &
                         + grazingFlux_Dia2    * recipQuota_Dia   * (1.d0 - grazEff2) &
                         + grazingFlux_Cocco   * recipQuota_Cocco * (1.d0 - grazEff)  * is_coccos &
-                        + grazingFlux_Cocco2  * recipQuota_Cocco * (1.d0 - grazEff2) * is_coccos &
+                        + grazingFlux_Cocco2  * recipQuota_Cocco * (1.d0 - grazEff2) * is_coccos &  ! grazEff ->  grazEff2
                         + grazingFlux_Phaeo   * recipQuota_Phaeo * (1.d0 - grazEff)  * is_coccos &
                         + grazingFlux_Phaeo2  * recipQuota_Phaeo * (1.d0 - grazEff2) * is_coccos &
                         + grazingFlux_het2    * recipQZoo        * (1.d0 - grazEff2) &
@@ -5033,7 +5075,12 @@ real(kind=8) :: &
             !---------------------------------------------------------------------------
             - rho_c1 * arrFunc * O2Func * EOC                              & ! Bacterial respiration
                                                                           ) * dt_b + sms(k,idoc)
-
+        if (enable_R2OMIP) then
+            ! R2OMIP - terrestrial DOC
+            sms(k,idoct) = (                                                   &
+                - rho_C1t                        * DOCt                        &
+                                                                          ) * dt_b + sms(k,idoct)
+        end if
         !===============================================================================
         ! 21. DIATOM NITROGEN (DiaN)
         !===============================================================================
@@ -5700,12 +5747,21 @@ real(kind=8) :: &
             ! SINKS: Heterotrophic Respiration and Remineralization
             !---------------------------------------------------------------------------
             - rho_C1 * arrFunc * O2Func * EOC                              & ! DOC remineralization
+            - rho_C1t                   * DOCt * is_R2OMIP                 &
             - hetRespFlux                                                  & ! Mesozooplankton
             - Zoo2RespFlux * is_3zoo2det                                   & ! Macrozooplankton
             - MicZooRespFlux * is_3zoo2det                                 & ! Microzooplankton
                                                                           ) * redO2C * dt_b + sms(k,ioxy)
             ! Note: redO2C converts carbon-based rates to oxygen equivalents
             !       using the Redfield ratio (typically ~170/122 = 1.39 mol O2/mol C)
+
+            !===============================================================================
+            ! 37. DIC remineralzation tracer to track remineralization as an diagnostics
+            !===============================================================================
+            !   idicremin       : Tracer for remineralization diagnostics (added by Sina)
+            sms(k,idicremin) = (                  &
+                + rho_c1 * arrFunc * O2Func * EOC &
+                ) * dt_b + sms(k,idicremin)
 
             if (ciso) then
 
@@ -6225,6 +6281,7 @@ real(kind=8) :: &
                 end if ! ciso_14
 
             end if ! ciso
+
             !-------------------------------------------------------------------------------
             ! DIAGNOSTIC ACCUMULATION INITIALIZATION
             !-------------------------------------------------------------------------------
@@ -6413,7 +6470,7 @@ real(kind=8) :: &
                     ) * recipbiostep
                 endif
 
-               !===========================================================================
+                !===========================================================================
                 ! CHLOROPHYLL DEGRADATION RATES
                 !===========================================================================
                 ! Tracks chlorophyll turnover rates (photodamage + senescence)
@@ -6462,6 +6519,332 @@ real(kind=8) :: &
                         + KOchl_phaeo &
                     ) * recipbiostep
                 endif
+
+!--------------------------------------------------------------------------------------------------------------------------------------
+
+! GRAZING FLUXES
+! Only for the case with detritus grazing, not without detritus grazing, because this output is probably anyway not needed as a default.
+! diagnostics, combined from Onur and Cara, modified by Miriam
+
+    if (Grazing_detritus) then
+
+!===========================================================================
+! MESOZOOPLANKTON GRAZING
+!===========================================================================
+! Tracks grazing by mesozooplankton (100-2000 μm) on multiple prey types
+! Central trophic link connecting primary producers to higher consumers
+!
+! Variables:
+!   vertgrazmeso_tot(k)   : Total assimilated grazing [mmolC m-3 day-1]
+!   vertgrazmeso_n(k)     : Grazing on nanophytoplankton [mmolC m-3 day-1]
+!   vertgrazmeso_d(k)     : Grazing on diatoms [mmolC m-3 day-1]
+!   vertgrazmeso_c(k)     : Grazing on coccolithophores [mmolC m-3 day-1]
+!   vertgrazmeso_p(k)     : Grazing on Phaeocystis [mmolC m-3 day-1]
+!   vertgrazmeso_det(k)   : Grazing on detritus 1 [mmolC m-3 day-1]
+!   vertgrazmeso_det2(k)  : Grazing on detritus 2 [mmolC m-3 day-1]
+!   vertgrazmeso_mic(k)   : Grazing on microzooplankton [mmolC m-3 day-1]
+!
+! Prey Composition:
+!   PHY    : Nanophytoplankton (2-20 μm) - primary prey
+!   DIA    : Diatoms (>20 μm) - silicified cells
+!   COCCO  : Coccolithophores - calcifying cells (optional)
+!   PHAEO  : Phaeocystis colonies (optional)
+!   DET    : Detritus type 1 - particulate organic matter
+!   DET2   : Detritus type 2 - larger particles (optional)
+!   MICZOO : Microzooplankton - intraguild predation (optional)
+!
+! Ecological Significance:
+!   - Grazing efficiency (grazEff): 30-70%, rest to fecal pellets
+!   - Prey selection via Holling Type II/III functional response
+!   - Major pathway for carbon export via fecal pellets
+!   - Controls phytoplankton bloom magnitude/duration
+!
+! Validation:
+!   - Gut content analysis & pigment measurements
+!   - Dilution experiments (Landry-Hassett method)
+!   - Typical rates: 0.01-10 mmolC m-3 day-1
+!   - Clearance rates: 1-100 mL ind-1 day-1
+!---------------------------------------------------------------------------
+
+        ! Total assimilated grazing (with efficiency applied)
+        vertgrazmeso_tot(k) = vertgrazmeso_tot(k) + (          &
+        + grazingFlux_phy * recipQuota * grazEff               &  ! Nanophytoplankton
+        + grazingFlux_Dia * recipQuota_Dia * grazEff           &  ! Diatoms
+        + grazingFlux_Det * recipDet * grazEff                 &  ! Detritus 1
+        ) * recipbiostep
+       
+        if (enable_coccos) then
+            vertgrazmeso_tot(k) = vertgrazmeso_tot(k) + ( &
+            + grazingFlux_Cocco * recipQuota_Cocco * grazEff &  ! Coccolithophores
+            + grazingFlux_Phaeo * recipQuota_Phaeo * grazEff &  ! Phaeocystis
+            ) * recipbiostep
+        endif
+
+        if (enable_3zoo2det) then
+            vertgrazmeso_tot(k) = vertgrazmeso_tot(k) + (      &
+            + GrazingFlux_DetZ2 * recipDet2 * grazEff          &  ! Detritus 2
+            + grazingFlux_miczoo * recipQZoo3 * grazEff        &  ! Microzooplankton
+            ) * recipbiostep
+        endif
+
+        ! Prey-specific mortality (loss terms, no efficiency applied)
+        ! These track carbon removal from each prey population
+        
+        ! Small phytoplankton mortality
+        vertgrazmeso_n(k) = vertgrazmeso_n(k) + ( &
+        + grazingFlux_phy * recipQuota             &
+        ) * recipbiostep
+        
+        ! Diatom mortality
+        vertgrazmeso_d(k) = vertgrazmeso_d(k) + ( &
+        + grazingFlux_dia * recipQuota_dia         &
+        ) * recipbiostep
+
+        if (enable_coccos) then
+            ! Coccolithophore mortality
+            vertgrazmeso_c(k) = vertgrazmeso_c(k) + ( &
+            + grazingFlux_Cocco * recipQuota_cocco     &
+            ) * recipbiostep
+
+            ! Phaeocystis mortality
+            vertgrazmeso_p(k) = vertgrazmeso_p(k) + ( &
+            + grazingFlux_Phaeo * recipQuota_Phaeo     &
+            ) * recipbiostep
+        endif
+
+        ! Detritus 1 consumption
+        vertgrazmeso_det(k) = vertgrazmeso_det(k) + ( &
+        + grazingFlux_Det * recipDet                   &
+        ) * recipbiostep
+        
+        if (enable_3zoo2det) then
+            ! Microzooplankton mortality (intraguild predation)
+            vertgrazmeso_mic(k) = vertgrazmeso_mic(k) + ( &
+            + grazingFlux_miczoo * recipQZoo3              &
+            ) * recipbiostep
+            
+            ! Detritus 2 consumption
+            vertgrazmeso_det2(k) = vertgrazmeso_det2(k) + ( &
+            + GrazingFlux_DetZ2 * recipDet2                 &
+            ) * recipbiostep
+        endif
+
+
+
+!===========================================================================
+! MACROZOOPLANKTON GRAZING (KRILL)
+!===========================================================================
+! Tracks grazing by macrozooplankton (2-20 mm), often dominated by krill
+! Top mesozooplankton predator with omnivorous feeding strategy
+!
+! Variables:
+!   vertgrazmacro_tot(k)  : Total assimilated grazing [mmolC m-3 day-1]
+!   vertgrazmacro_n(k)    : Grazing on small phytoplankton [mmolC m-3 day-1]
+!   vertgrazmacro_d(k)    : Grazing on diatoms [mmolC m-3 day-1]
+!   vertgrazmacro_c(k)    : Grazing on coccolithophores [mmolC m-3 day-1]
+!   vertgrazmacro_p(k)    : Grazing on Phaeocystis [mmolC m-3 day-1]
+!   vertgrazmacro_mes(k)  : Grazing on mesozooplankton [mmolC m-3 day-1]
+!   vertgrazmacro_mic(k)  : Grazing on microzooplankton [mmolC m-3 day-1]
+!   vertgrazmacro_det(k)  : Grazing on detritus 1 [mmolC m-3 day-1]
+!   vertgrazmacro_det2(k) : Grazing on detritus 2 [mmolC m-3 day-1]
+!
+! Prey Composition:
+!   PHY    : Small phytoplankton - supplementary prey
+!   DIA    : Diatoms - preferred prey in productive waters
+!   COCCO  : Coccolithophores (optional)
+!   PHAEO  : Phaeocystis colonies (optional)
+!   HET    : Mesozooplankton - carnivory/cannibalism
+!   MICZOO : Microzooplankton - smaller zooplankton
+!   DET    : Detritus 1 - opportunistic feeding
+!   DET2   : Detritus 2 - larger particles
+!
+! Ecological Significance:
+!   - Grazing efficiency (grazEff2): typically 30-60%
+!   - Major prey for fish, seabirds, marine mammals
+!   - Produces large, fast-sinking fecal pellets
+!   - Vertical migration enhances carbon export
+!   - Key species: Antarctic krill (Euphausia superba)
+!
+! Validation:
+!   - Net tows & acoustic surveys for biomass
+!   - Feeding experiments with size-fractionated prey
+!   - Typical rates: 0.1-50 mmolC m-3 day-1
+!   - Individual ingestion: 10-100% body C day-1
+!---------------------------------------------------------------------------
+
+        if (enable_3zoo2det) then
+            
+            ! Total assimilated grazing (with efficiency applied)
+            vertgrazmacro_tot(k) = vertgrazmacro_tot(k) + (    &
+            + grazingFlux_phy2 * recipQuota * grazEff2          &  ! Small phytoplankton
+            + grazingFlux_Dia2 * recipQuota_Dia * grazEff2      &  ! Diatoms
+            + grazingFlux_het2 * recipQZoo * grazEff2           &  ! Mesozooplankton
+            + grazingFlux_miczoo2 * recipQZoo3 * grazEff2       &  ! Microzooplankton
+            + grazingFlux_Det2 * recipDet * grazEff2            &  ! Detritus 1
+            + grazingFlux_DetZ22 * recipDet2 * grazEff2         &  ! Detritus 2
+            ) * recipbiostep
+            
+            if (enable_coccos) then
+                vertgrazmacro_tot(k) = vertgrazmacro_tot(k) + ( &
+                + grazingFlux_Cocco2 * recipQuota_Cocco * grazEff2 &  ! Coccolithophores
+                + grazingFlux_Phaeo2 * recipQuota_Phaeo * grazEff2 &  ! Phaeocystis
+                ) * recipbiostep
+            endif
+
+            ! Prey-specific mortality (loss terms, no efficiency applied)
+            ! These track carbon removal from each prey population
+            
+            ! Small phytoplankton mortality
+            vertgrazmacro_n(k) = vertgrazmacro_n(k) + ( &
+            + grazingFlux_phy2 * recipQuota              &
+            ) * recipbiostep
+            
+            ! Diatom mortality
+            vertgrazmacro_d(k) = vertgrazmacro_d(k) + ( &
+            + grazingFlux_Dia2 * recipQuota_Dia          &
+            ) * recipbiostep
+            
+            if (enable_coccos) then
+                ! Coccolithophore mortality
+                vertgrazmacro_c(k) = vertgrazmacro_c(k) + ( &
+                + grazingFlux_Cocco2 * recipQuota_cocco      &
+                ) * recipbiostep
+
+                ! Phaeocystis mortality
+                vertgrazmacro_p(k) = vertgrazmacro_p(k) + ( &
+                + grazingFlux_Phaeo2 * recipQuota_Phaeo      &
+                ) * recipbiostep
+            endif
+            
+            ! Mesozooplankton mortality (carnivory)
+            vertgrazmacro_mes(k) = vertgrazmacro_mes(k) + ( &
+            + grazingFlux_het2 * recipQZoo                   &
+            ) * recipbiostep
+            
+            ! Detritus 1 consumption
+            vertgrazmacro_det(k) = vertgrazmacro_det(k) + ( &
+            + grazingFlux_Det2 * recipDet                    &
+            ) * recipbiostep
+            
+            ! Microzooplankton mortality
+            vertgrazmacro_mic(k) = vertgrazmacro_mic(k) + ( &
+            + grazingFlux_miczoo2 * recipQZoo3               &
+            ) * recipbiostep
+            
+            ! Detritus 2 consumption
+            vertgrazmacro_det2(k) = vertgrazmacro_det2(k) + ( &
+            + GrazingFlux_DetZ22 * recipDet2                   &
+            ) * recipbiostep
+            
+        endif
+
+!===========================================================================
+! MICROZOOPLANKTON GRAZING
+!===========================================================================
+! Tracks grazing by microzooplankton (20-200 μm), mainly ciliates/dinoflagellates
+! Critical link between picoplankton and mesozooplankton
+!
+! Variables:
+!   vertgrazmicro_tot(k) : Total assimilated grazing [mmolC m-3 day-1]
+!   vertgrazmicro_n(k)   : Grazing on nanophytoplankton [mmolC m-3 day-1]
+!   vertgrazmicro_d(k)   : Grazing on diatoms [mmolC m-3 day-1]
+!   vertgrazmicro_c(k)   : Grazing on coccolithophores [mmolC m-3 day-1]
+!   vertgrazmicro_p(k)   : Grazing on Phaeocystis [mmolC m-3 day-1]
+!
+! Prey Composition:
+!   PHY   : Snall phytoplankton (2-20 μm) - primary prey
+!   DIA   : Small diatoms - when available
+!   COCCO : Coccolithophores - calcifying prey (optional)
+!   PHAEO : Phaeocystis colonies/single cells (optional)
+!
+! Ecological Significance:
+!   - Grazing efficiency (grazEff3): typically 40-70%
+!   - Consumes 60-100% of primary production in oligotrophic waters
+!   - High growth rates (1-2 doublings day-1 at 20°C)
+!   - Size-selective feeding (optimal prey 10-50% predator size)
+!   - Regenerates nutrients in upper water column
+!
+! Validation:
+!   - Dilution experiments (most common method)
+!   - Epifluorescence microscopy for biomass
+!   - Typical rates: 0.01-5 mmolC m-3 day-1
+!   - Clearance rates: 10-10,000 nL ind-1 hour-1
+!---------------------------------------------------------------------------
+
+        if (enable_3zoo2det) then
+            
+            ! Total assimilated grazing (with efficiency applied)
+            vertgrazmicro_tot(k) = vertgrazmicro_tot(k) + (     &
+            + grazingFlux_phy3 * recipQuota * grazEff3           &  ! Small phytoplankton
+            + grazingFlux_Dia3 * recipQuota_Dia * grazEff3       &  ! Diatoms
+            ) * recipbiostep
+            
+            if (enable_coccos) then
+                vertgrazmicro_tot(k) = vertgrazmicro_tot(k) + ( &
+                + grazingFlux_Cocco3 * recipQuota_Cocco * grazEff3 &  ! Coccolithophores
+                + grazingFlux_Phaeo3 * recipQuota_Phaeo * grazEff3 &  ! Phaeocystis
+                ) * recipbiostep
+            endif
+            
+            ! Prey-specific mortality (loss terms, no efficiency applied)
+            ! These track carbon removal from each prey population
+            
+            ! Small phytoplankton mortality
+            vertgrazmicro_n(k) = vertgrazmicro_n(k) + ( &
+            + grazingFlux_phy3 * recipQuota              &
+            ) * recipbiostep
+            
+            ! Diatom mortality
+            vertgrazmicro_d(k) = vertgrazmicro_d(k) + ( &
+            + grazingFlux_Dia3 * recipQuota_Dia          &
+            ) * recipbiostep
+            
+            if (enable_coccos) then
+                ! Coccolithophore mortality
+                vertgrazmicro_c(k) = vertgrazmicro_c(k) + ( &
+                + grazingFlux_Cocco3 * recipQuota_cocco      &
+                ) * recipbiostep
+
+                ! Phaeocystis mortality
+                vertgrazmicro_p(k) = vertgrazmicro_p(k) + ( &
+                + grazingFlux_Phaeo3 * recipQuota_Phaeo      &
+                ) * recipbiostep
+            endif
+            
+        endif
+        
+    end if ! Grazing_detritus
+
+!===========================================================================
+! DISSOLUTION AND REMINERALIZATION ! R2OMIP
+!===========================================================================
+
+    vertDISSOC(k) = vertDISSOC(k) + ( &
+    + reminC * arrFunc * O2Func * DetC                 & ! Slow-sinking detritus dissolution
+    + reminC * arrFunc * O2Func * DetZ2C * is_3zoo2det & ! Fast-sinking detritus dissolution
+    ) * recipbiostep
+
+    vertDISSON(k) = vertDISSON(k) + ( &
+    + reminN * arrFunc * O2Func * DetN                 & ! Slow-sinking detritus dissolution
+    + reminN * arrFunc * O2Func * DetZ2N * is_3zoo2det & ! Fast-sinking detritus dissolution
+    ) * recipbiostep
+
+    vertDISSOSi(k) = vertDISSOSi(k) + ( &
+    + reminSiT * DetSi                                 & ! Slow-sinking detritus dissolution
+    ) * recipbiostep
+
+    vertREMOC(k) = vertREMOC(k) + ( &
+    + rho_c1 * arrFunc * O2Func * EOC                  & ! Bacterial respiration / remineralization of oceanic DOC
+    + rho_C1t                   * DOCt   * is_R2OMIP              & ! Bacterial respiration / remineralization of terrestriel DOC 
+    ) * recipbiostep
+
+    vertREMOCt(k) = vertREMOCt(k) + ( &
+    + rho_C1t                   * DOCt   * is_R2OMIP              & ! Bacterial respiration / remineralization of terrestriel DOC 
+    ) * recipbiostep
+
+    vertREMON(k) = vertREMON(k) + ( &
+    + rho_N * arrFunc * O2Func * DON                   & ! Bacterial respiration / remineralization
+    ) * recipbiostep
 
                 !===========================================================================
                 ! ZOOPLANKTON RESPIRATION
@@ -6537,6 +6920,28 @@ real(kind=8) :: &
                     + calc_diss * DetCalc &       ! Dissolution flux
                 ) * recipbiostep
 
+                !*** meso-zooplankton dissolution                                               !RP 14.07.2025
+                vertmesocdis(k) = vertmesocdis(k) + (  &
+                    + calc_loss_gra  * calc_diss_guts                         &
+                ) * recipbiostep
+
+                if (enable_3zoo2det) then
+                    !*** micro-zooplankton dissolution                                          !RP 14.07.2025
+                    vertmicrocdis(k) = vertmicrocdis(k) + (  &
+                        + calc_loss_gra2  * calc_diss_guts                    &
+                    ) * recipbiostep
+
+                    !*** macro-zooplankton dissolution                                          !RP 14.07.2025
+                    vertmacrocdis(k) = vertmacrocdis(k) + (  &
+                       + calc_loss_gra3  * calc_diss_guts                     &
+                    ) * recipbiostep
+
+                    !*** calc_diss by fast-sinking detritus                                     !RP 14.07.2025
+                    vertfastcdis(k) = vertfastcdis(k) + (     &
+                        + calc_diss2 * DetZ2Calc                              &
+                    ) * recipbiostep
+
+                endif
                 !===========================================================================
                 ! PARTICLE AGGREGATION
                 !===========================================================================
@@ -6593,6 +6998,42 @@ real(kind=8) :: &
                         + aggregationrate * PhaeoC &
                     ) * recipbiostep
                 endif
+
+                !===========================================================================
+                ! N ASSIMILATION and REMINERALIZATION
+                !===========================================================================
+
+                !***    N assim by small phytoplankton                                          !RP 15.07.2025
+                vertNassimn(k) = vertNassimn(k) + (             &
+                    + N_assim * PhyC                            &
+                ) * recipbiostep
+
+                !***    N assim by diatoms                                                      !RP 15.07.2025
+                vertNassimd(k) = vertNassimd(k) + (             &
+                    + N_assim_Dia           * DiaC              &
+                ) * recipbiostep
+
+                if (enable_coccos) then
+                    !***    N assim by coccolithophores                                         !RP 15.07.2025
+                    vertNassimc(k) = vertNassimc(k) + (         &
+                        + N_assim_Cocco  * CoccoC               &
+                    ) * recipbiostep
+
+                    !***    N assim by phaeocystis                                              !OG 08.01.2026
+                    vertNassimp(k) = vertNassimp(k) + (         &
+                        + N_assim_Phaeo  * PhaeoC               &
+                    ) * recipbiostep
+                endif
+
+                !***    DON remineralization                                                    !RP 15.07.2025
+                vertDONremin(k) = vertDONremin(k) + (             &
+                    + rho_N * arrFunc * O2Func   * DON       &
+                ) * recipbiostep
+
+                !***    DOC remineralization                                                    !RP 15.07.2025
+                vertDOCremin(k) = vertDOCremin(k) + (             &
+                    + rho_C1 * arrFunc * O2Func   * EOC       &
+                ) * recipbiostep
 
                 !===========================================================================
                 ! DOC EXCRETION
@@ -6696,6 +7137,32 @@ real(kind=8) :: &
                     + calcification &             ! CaCO3 precipitation
                 ) * recipbiostep
 
+                !===========================================================================
+                ! PHYTOPLANKTON PHOTOSYNTHESIS
+                !===========================================================================
+
+                ! phy photosynthesis                                           !RP 14.07.2025
+                vertphotn(k) = vertphotn(k) + (           &
+                    + Cphot             * PhyC          &
+                ) * recipbiostep
+
+                ! dia photosynthesis                                           !RP 14.07.2025
+                vertphotd(k) = vertphotd(k) + (           &
+                    + Cphot_Dia         * DiaC          &
+                ) * recipbiostep
+
+                if (enable_coccos) then
+                ! cocco photosynthesis                                          !RP 14.07.2025
+                vertphotc(k) = vertphotc(k) + (           &
+                    + Cphot_Cocco       * CoccoC        &
+                ) * recipbiostep
+
+                ! phaeocystis photosynthesis                                          !OG 08.01.2026
+                vertphotp(k) = vertphotp(k) + (           &
+                    + Cphot_Phaeo       * PhaeoC        &
+                ) * recipbiostep
+
+                endif
                 !===========================================================================
                 ! PHYTOPLANKTON RESPIRATION
                 !===========================================================================
@@ -6861,6 +7328,7 @@ real(kind=8) :: &
             !===========================================================================
             ! Aerobic remineralization of organic nitrogen in sediments releases
             ! bioavailable nitrogen (NH4+ and NO3-) back to the water column.
+            ! Burial for R2OMIP
             !
             ! Variables:
             !   decayBenthos(1) : N remineralization flux [mmolN m-2 day-1]
@@ -6882,13 +7350,17 @@ real(kind=8) :: &
             !---------------------------------------------------------------------------
 
             ! Calculate N remineralization flux [mmolN m-2 day-1]
-            call update_benthos_decay(decayRateBenN, 1)
+            decayBenthos(1) = decayRateBenN * LocBenthos(1)
+
+            ! Update benthic N pool (remove remineralized N)
+            LocBenthos(1) = LocBenthos(1) - decayBenthos(1) * dt_b - BurialBen(1) !R2OMIP (Burial) remove from benthos (flux) 
 
             !===========================================================================
             ! DISSOLVED INORGANIC CARBON (DIC) REMINERALIZATION
             !===========================================================================
             ! Aerobic respiration of organic carbon releases CO2 to bottom water.
             ! Affects carbonate system (pH, pCO2, saturation state).
+            ! Burial for R2OMIP
             !
             ! Variables:
             !   decayBenthos(2) : C remineralization flux [mmolC m-2 day-1]
@@ -6909,13 +7381,17 @@ real(kind=8) :: &
             !---------------------------------------------------------------------------
 
             ! Calculate C remineralization flux [mmolC m-2 day-1]
-            call update_benthos_decay(decayRateBenC, 2)
+            decayBenthos(2) = decayRateBenC * LocBenthos(2)
+
+            ! Update benthic C pool
+            LocBenthos(2) = LocBenthos(2) - decayBenthos(2) * dt_b - BurialBen(2) !R2OMIP (Burial)
 
             !===========================================================================
             ! SILICATE (Si) DISSOLUTION
             !===========================================================================
             ! Dissolution of biogenic silica (diatom frustules) releases Si(OH)4.
             ! Temperature-dependent process (faster in warm water).
+            ! Burial for R2OMIP
             !
             ! Variables:
             !   decayBenthos(3) : Si dissolution flux [mmolSi m-2 day-1]
@@ -6938,13 +7414,17 @@ real(kind=8) :: &
             !---------------------------------------------------------------------------
 
             ! Calculate Si dissolution flux [mmolSi m-2 day-1]
-            call update_benthos_decay(decayRateBenSi, 3)
+            decayBenthos(3) = decayRateBenSi * LocBenthos(3)
+
+            ! Update benthic Si pool
+            LocBenthos(3) = LocBenthos(3) - decayBenthos(3) * dt_b - BurialBen(3) !R2OMIP (Burial)
 
             !===========================================================================
             ! CALCITE (CaCO3) DISSOLUTION
             !===========================================================================
             ! Dissolution of calcium carbonate affects both DIC and alkalinity.
             ! Rate depends on saturation state (calculated in deepest water layer).
+            ! Burial for R2OMIP
             !
             ! Variables:
             !   decayBenthos(4) : Calcite dissolution flux [mmolC m-2 day-1]
@@ -6970,7 +7450,10 @@ real(kind=8) :: &
             !---------------------------------------------------------------------------
 
             ! Calculate calcite dissolution flux [mmolC m-2 day-1]
-            call update_benthos_decay(calc_diss_ben, 4)
+            decayBenthos(4) = calc_diss_ben * LocBenthos(4)
+
+            ! Update benthic calcite pool
+            LocBenthos(4) = LocBenthos(4) - decayBenthos(4) * dt_b - BurialBen(4) !R2OMIP (Burial)
 
             if (ciso) then
 
@@ -6997,7 +7480,10 @@ real(kind=8) :: &
 
                 ! Calculate 13C remineralization flux
                 ! Ignores isotopic fractionation during remineralization (alpha ≈ 1)
-                call update_benthos_decay(alpha_dcal_13 * decayRateBenC, 5)
+                decayBenthos(5) = alpha_dcal_13 * decayRateBenC * LocBenthos(5)
+
+                ! Update benthic 13C pool
+                LocBenthos(5) = LocBenthos(5) - decayBenthos(5) * dt_b
 
                 !=======================================================================
                 ! Carbon-13 Calcite Dissolution
@@ -7011,7 +7497,10 @@ real(kind=8) :: &
                 !-----------------------------------------------------------------------
 
                 ! Calculate 13C calcite dissolution flux
-                call update_benthos_decay(calc_diss_13, 6)
+                decayBenthos(6) = calc_diss_13 * LocBenthos(6)
+
+                ! Update benthic 13C-calcite pool
+                LocBenthos(6) = LocBenthos(6) - decayBenthos(6) * dt_b
 
                 if (ciso_14) then
 
@@ -7033,7 +7522,10 @@ real(kind=8) :: &
 
                         ! Calculate 14C remineralization flux
                         ! Ignores isotopic fractionation during remineralization
-                        call update_benthos_decay(alpha_dcal_14 * decayRateBenC, 7)
+                        decayBenthos(7) = alpha_dcal_14 * decayRateBenC * LocBenthos(7)
+
+                        ! Update benthic 14C pool
+                        LocBenthos(7) = LocBenthos(7) - decayBenthos(7) * dt_b
 
                         !===============================================================
                         ! 3.4 Carbon-14 Calcite Dissolution
@@ -7047,7 +7539,10 @@ real(kind=8) :: &
                         !---------------------------------------------------------------
 
                         ! Calculate 14C calcite dissolution flux
-                        call update_benthos_decay(calc_diss_14, 8)
+                        decayBenthos(8) = calc_diss_14 * LocBenthos(8)
+
+                        ! Update benthic 14C-calcite pool
+                        LocBenthos(8) = LocBenthos(8) - decayBenthos(8) * dt_b
 
                     else
                         !---------------------------------------------------------------
@@ -7068,16 +7563,6 @@ real(kind=8) :: &
         endif ! use_MEDUSA
 
     end do ! Main time loop ends
-
-contains
-
-subroutine update_benthos_decay(rate, idx)
-    real(kind=8), intent(in) :: rate
-    integer     , intent(in) :: idx
-
-    decayBenthos(idx) = rate * LocBenthos(idx)
-    LocBenthos(idx) = LocBenthos(idx) - decayBenthos(idx) * dt_b
-end subroutine update_benthos_decay
 
 end subroutine REcoM_sms
 

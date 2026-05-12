@@ -92,8 +92,8 @@ namelist.recom:
         useErosion: False
         NitrogenSS: False
         useAeolianN: False
-        firstyearoffesomcycle: 1948
-        lastyearoffesomcycle: 1948
+        firstyearoffesomcycle: 1958
+        lastyearoffesomcycle: 2024
         numofCO2cycles: 1
         currentCO2cycle: 1
         DIC_PI: True
@@ -135,7 +135,11 @@ namelist.io:
                 freq: 1
                 unit: d
                 prec: 8
-            "otracers  ":
+            "DIN       ":
+                freq: 1
+                unit: d
+                prec: 8
+            "DIC       ":
                 freq: 1
                 unit: d
                 prec: 8

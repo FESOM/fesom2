@@ -221,6 +221,11 @@ contains
       end if
 
       do lvl=1, nlvl
+
+#ifdef ENABLE_ALBEDO_INTELMPI_WORKAROUNDS
+        call MPI_Barrier(this%comm, mpierr)
+#endif
+
         if(this%is_iorank()) then
           t_start = MPI_Wtime()
           if(is_2d) then
@@ -313,6 +318,11 @@ contains
       end if
 
       do lvl=1, nlvl
+
+#ifdef ENABLE_ALBEDO_INTELMPI_WORKAROUNDS
+        call MPI_Barrier(this%comm, mpierr)        
+#endif
+
         ! the data from our pointer is not contiguous (if it is 3D data), so we can not pass the pointer directly to MPI
         laux = var%local_data_copy(lvl,:) ! todo: remove this buffer and pass the data directly to MPI (change order of data layout to be levelwise or do not gather levelwise but by columns)
 

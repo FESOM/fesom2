@@ -146,11 +146,11 @@ kpp_reduce_tauuice = .false.    ! reduce wind stress (u*) under sea ice
 ! (MOST). The code logic probably augments or replaces parts of the standard boundary 
 ! (layer similarity (or nonlocal mixing) using a Stokes‐drift‐aware correction.
 kpp_use_StokesMOST= .false. !.true.
-    
+
 ! approximate proportionality between surface wind velocity and stokes velocity
 ! U_stokes ~ kpp_A_stokes * U_wind
 kpp_A_stokes      = 0.005 ! a
-    
+
 ! Langmuir option
 ! Option of Langmuir enhanced mixing apply an enhancement factor to the
 ! turbulent velocity scale
@@ -159,7 +159,7 @@ kpp_A_stokes      = 0.005 ! a
 !                                      (Langmuir_EFactor - cvmix_one)
 ! NONE      -  Langmuir switched off, MixingCoefEnhancement=1 
 kpp_langmuir_mixing= "NONE" !"LWF16"
-        
+
 ! Option of Langmuir turbulence enhanced entrainment - modify the unresolved shear
 ! LWF16     -  Li Q., Webb A., Fox-Kemper B., Craig A., Danabasoglu G., 
 !              Large W., Vertenstein M., 2016, Langmuir mixing effects on 

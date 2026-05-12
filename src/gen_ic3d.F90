@@ -20,8 +20,8 @@ MODULE g_ic3d
    USE g_comm_auto
    USE g_support
    USE g_config, only: dummy, ClimateDataPath, use_cavity
+   use recom_config, only: enable_3zoo2det, enable_coccos !OG
    USE g_clock, only: r_restart
-   
    IMPLICIT NONE
 
    include 'netcdf.inc'
@@ -257,7 +257,7 @@ CONTAINS
       
       call nc_readGrid(partit)
 
-      ! prepare nearest coordinates in INfile , save to bilin_indx_i/j
+      ! prepare nearest coordinates in INfile, save to bilin_indx_i/j
       !_________________________________________________________________________
       ! cavity case
       if (use_cavity) then
@@ -531,6 +531,7 @@ CONTAINS
       real(kind=WP)                           :: locDINmax, locDINmin, locDICmax, locDICmin, locAlkmax !OG
       real(kind=WP)                           :: locAlkmin, locDSimax, locDSimin, locDFemax, locDFemin
       real(kind=WP)                           :: locO2min,  locO2max
+      real(kind=WP)                           :: locDICremax, locDICremin ! DICremin tracer (added by Sina)
 
 
       if (partit%mype==0) write(*,*) "Start: Initial conditions  for tracers"
@@ -606,6 +607,8 @@ CONTAINS
         locDFemin = locDINmin
         locO2max  = locDINmax
         locO2min  = locDINmin
+        locDICremax = locDINmax ! DICremin tracer (added by Sina)
+        locDICremin = locDINmin
 #endif
       do n=1, partit%myDim_nod2d
         locTmax = max(locTmax,maxval(tracers%data(1)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
@@ -626,6 +629,20 @@ CONTAINS
         locDFemin = min(locDFemin,minval(tracers%data(21)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
         locO2max  = max(locO2max,maxval(tracers%data(24)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
         locO2min  = min(locO2min,minval(tracers%data(24)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+    ! DICremin tracer (added by Sina)
+    if (enable_3zoo2det .and. enable_coccos) then
+        locDICremax = max(locDICremax,maxval(tracers%data(39)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+        locDICremin = min(locDICremin,minval(tracers%data(39)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+    else if (enable_coccos .and. .not. enable_3zoo2det) then
+        locDICremax = max(locDICremax,maxval(tracers%data(31)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+        locDICremin = min(locDICremin,minval(tracers%data(31)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+    else if (enable_3zoo2det .and. .not. enable_coccos) then
+        locDICremax = max(locDICremax,maxval(tracers%data(33)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+        locDICremin = min(locDICremin,minval(tracers%data(33)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+    else 
+        locDICremax = max(locDICremax,maxval(tracers%data(25)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+        locDICremin = min(locDICremin,minval(tracers%data(25)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+    end if
 #endif
       end do
       call MPI_AllREDUCE(locTmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
@@ -664,6 +681,11 @@ CONTAINS
       if (partit%mype==0) write(*,*) '  |-> gobal max init. O2. =', glo
       call MPI_AllREDUCE(locO2min , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  `-> gobal min init. O2. =', glo
+      call MPI_AllREDUCE(locDICremax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+      if (partit%mype==0) write(*,*) '  |-> gobal max init. DICremin. =', glo
+      call MPI_AllREDUCE(locDICremin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+      if (partit%mype==0) write(*,*) '  |-> gobal min init. DICremin. =', glo
+
 #endif
       
       ! Apply perturbations based on selected mode

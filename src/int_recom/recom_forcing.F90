@@ -34,7 +34,6 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
     use g_forcing_arrays
     use g_comm_auto
     use g_support
-    use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
     implicit none
 
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -277,6 +276,8 @@ if (enable_3zoo2det) then
   state(1:nn,imiczoon)  = max(tiny,state(1:nn,imiczoon))
   state(1:nn,imiczooc)  = max(tiny,state(1:nn,imiczooc))
 endif
+  
+  state(1:nn,idicremin) = max(tiny,state(1:nn,idicremin)) ! for DICremin tracer (added by Sina)
 
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
 
@@ -358,6 +359,55 @@ if (enable_coccos) then
      locNNAp = sum(vertNNAp(1:nn) * thick(1:nn))
      locChldegp = sum(vertChldegp(1:nn) * thick(1:nn))
 endif
+
+     if (Grazing_detritus) then    ! only for the case if grazing detritus is used, as probably only needed for tuning which uses detritus grazing
+        ! Mesozooplankton
+        locgrazmeso_tot = sum(vertgrazmeso_tot(1:nn) * thick(1:nn))
+        locgrazmeso_n   = sum(vertgrazmeso_n(1:nn) * thick(1:nn))
+        locgrazmeso_d 	= sum(vertgrazmeso_d(1:nn) * thick(1:nn))
+        if (enable_coccos) then
+            locgrazmeso_c   = sum(vertgrazmeso_c(1:nn) * thick(1:nn))
+            locgrazmeso_p   = sum(vertgrazmeso_p(1:nn) * thick(1:nn))
+        endif
+        locgrazmeso_det = sum(vertgrazmeso_det(1:nn) * thick(1:nn))
+        if (enable_3zoo2det) then
+            locgrazmeso_mic = sum(vertgrazmeso_mic(1:nn) * thick(1:nn))
+            locgrazmeso_det2= sum(vertgrazmeso_det2(1:nn) * thick(1:nn))
+        endif
+
+        if (enable_3zoo2det) then
+            ! Macrozooplankton
+            locgrazmacro_tot = sum(vertgrazmacro_tot(1:nn) * thick(1:nn))
+            locgrazmacro_n   = sum(vertgrazmacro_n(1:nn) * thick(1:nn))
+            locgrazmacro_d   = sum(vertgrazmacro_d(1:nn) * thick(1:nn))
+            if (enable_coccos) then
+                locgrazmacro_c = sum(vertgrazmacro_c(1:nn) * thick(1:nn))
+                locgrazmacro_p = sum(vertgrazmacro_p(1:nn) * thick(1:nn))
+            endif
+            locgrazmacro_mes  = sum(vertgrazmacro_mes(1:nn) * thick(1:nn))
+            locgrazmacro_det  = sum(vertgrazmacro_det(1:nn) * thick(1:nn))
+            locgrazmacro_mic  = sum(vertgrazmacro_mic(1:nn) * thick(1:nn))
+            locgrazmacro_det2 = sum(vertgrazmacro_det2(1:nn) * thick(1:nn))
+
+            ! Microzooplankton
+            locgrazmicro_tot = sum(vertgrazmicro_tot(1:nn) * thick(1:nn))
+            locgrazmicro_n   = sum(vertgrazmicro_n(1:nn) * thick(1:nn))
+            locgrazmicro_d   = sum(vertgrazmicro_d(1:nn) * thick(1:nn))
+            if (enable_coccos) then
+                locgrazmicro_c = sum(vertgrazmicro_c(1:nn) * thick(1:nn))
+                locgrazmicro_p = sum(vertgrazmicro_p(1:nn) * thick(1:nn))
+            endif
+        
+        endif        
+     endif
+
+    ! Dissolution and remineralization ! R2OMIP
+     locDISSOC  = sum(vertDISSOC(1:nn) * thick(1:nn))
+     locDISSON  = sum(vertDISSON(1:nn) * thick(1:nn))
+     locDISSOSi = sum(vertDISSOSi(1:nn) * thick(1:nn))
+     locREMOC   = sum(vertREMOC(1:nn) * thick(1:nn))
+     locREMOCt  = sum(vertREMOCt(1:nn) * thick(1:nn))
+     locREMON   = sum(vertREMON(1:nn) * thick(1:nn))
 
   end if
 end subroutine REcoM_Forcing
