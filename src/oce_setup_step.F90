@@ -872,6 +872,8 @@ nl              => mesh%nl
     allocate(relax2clim(node_size)) 
     allocate(heat_flux(node_size), Tsurf(node_size))
     allocate(water_flux(node_size), Ssurf(node_size))
+    allocate(hosing_flux(node_size), hosing_heat_flux(node_size))
+    allocate(hosing_flux3D(nl-1,node_size), hosing_heat_flux3D(nl-1,node_size))
     allocate(fw_ice(node_size), fw_snw(node_size))
     allocate(relax_salt(node_size))
     allocate(virtual_salt(node_size))
@@ -967,6 +969,10 @@ nl              => mesh%nl
     Tsurf=0.0_WP
 
     water_flux=0.0_WP
+    hosing_flux=0.0_WP
+    hosing_heat_flux=0.0_WP
+    hosing_flux3D=0.0_WP
+    hosing_heat_flux3D=0.0_WP
     fw_ice    =0.0_WP
     fw_snw    =0.0_WP
     relax_salt=0.0_WP
@@ -1394,7 +1400,16 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I3)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-            
+
+        !_______________________________________________________________________
+        CASE (304) ! passive tracer for water hosing experiment
+            tracers%data(i)%values(:,:)=0.0_WP
+            if (mype==0) then
+                write (i_string,  "(I3)") i
+                write (id_string, "(I3)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            end if
+
         !_______________________________________________________________________
         CASE (501) ! ice-shelf water due to basal melting
             tracers%data(i)%values(:,:)=0.0_WP

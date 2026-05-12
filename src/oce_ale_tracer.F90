@@ -1173,7 +1173,17 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         !  (BUT CHECK!)              |    |                         |    |
         !                            v   (+)                        v   (+)
         !
-        tr(nzmin)= tr(nzmin)+bc_surface(n, tracers%data(tr_num)%ID, trarr(nzmin,n), nzmin, partit, mesh, sst(nzmin,n), sss(nzmin,n), a_ice(n))
+
+        !for depth freshwater exp
+        if (tracers%data(tr_num)%ID==304) then
+            do nz=nzmin,nzmax
+                tr(nz)= tr(nz)+bc_surface(n, tracers%data(tr_num)%ID, trarr(nz,n), nz, partit, mesh, sst(nz,n), sss(nz,n), a_ice(n))
+            end do
+        else
+            tr(nzmin)= tr(nzmin)+bc_surface(n, tracers%data(tr_num)%ID, trarr(nzmin,n), nzmin, partit, mesh, sst(nzmin,n), sss(nzmin,n), a_ice(n))
+        end if
+         !for surface freshwater exp 
+        tr(nzmin)= tr(nzmin)+bc_surface(n, tracers%data(tr_num)%ID, trarr(nzmin,n), nzmin, partit, mesh, sst(nzmin,n), sss(nzmin,n), a_ice(n)) 
 
         !_______________________________________________________________________
         ! The forward sweep algorithm to solve the three-diagonal matrix
@@ -1871,6 +1881,9 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
         bc_surface=0.0_WP
     CASE (303)
         bc_surface=0.0_WP
+    CASE (304)
+        bc_surface= dt*(hosing_flux3D(nzmin,n)) !for depth freshwater exp
+        bc_surface= dt*(hosing_flux(n)) !for surf freshwater exp
     CASE (501) ! ice-shelf water due to basal melting
         if (nzmin==1) then
            bc_surface = 0.0_WP
