@@ -325,7 +325,7 @@ CASE ('ipnd      ')
 ! Debug ice variables    
 CASE ('strength_ice')
     if (use_ice) then
-    call def_stream(elem2D, myDim_elem2D, 'strength_ice', 'ice strength', '?', ice%work%ice_strength(1:myDim_elem2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(elem2D, myDim_elem2D, 'strength_ice', 'ice strength', 'N m-1', ice%work%strength_ice(1:myDim_elem2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('inv_areamass')
     if (use_ice) then
@@ -4351,6 +4351,152 @@ ctime=timeold+(dayold-1.)*86400
 #endif
 
 end subroutine
+
+
+!_______________________________________________________________________________
+! Output routine for 0D (scalar) streams
+subroutine output_0D_streams(istep, partit)
+    use g_clock
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    implicit none
+    integer, intent(in) :: istep
+    type(t_partit), intent(inout) :: partit
+
+    integer :: n, ierr
+    logical :: do_output
+    type(Meandata0D), pointer :: entry0D
+    character(500) :: filepath
+    real(real64) :: mean_value, rtime
+
+    ! When XIOS is the I/O driver, the 0D scalar fields are written via
+    ! xios_send_field calls (see gen_modules_cmor_diag.F90's compute_cmor_diag)
+    ! and gated by file_def freq_op (e.g. "1mo"). The legacy writer below
+    ! would otherwise double-write those streams at the bypass-loop's
+    ! freq=1/'s' (every model step → ~87600 records/year for HR), which is
+    ! both wrong cadence AND a duplicate output. Skip when XIOS is on.
+    if (io_xios_is_on()) return
+
+    do n = 1, io_NSTREAMS0D
+        entry0D => io_stream0D(n)
+        
+        ! Check whether output will be written based on event frequency
+        do_output = .false.
+        if (entry0D%freq_unit == 'y') then
+            call annual_event(do_output, entry0D%freq)
+        else if (entry0D%freq_unit == 'm') then 
+            call monthly_event(do_output, entry0D%freq) 
+        else if (entry0D%freq_unit == 'd') then
+            call daily_event(do_output, entry0D%freq)
+        else if (entry0D%freq_unit == 'h') then
+            call hourly_event(do_output, entry0D%freq)
+        else if (entry0D%freq_unit == 's') then
+            call step_event(do_output, istep, entry0D%freq)
+        endif
+        
+        if (do_output) then
+            ! Compute mean value
+            if (entry0D%addcounter > 0) then
+                mean_value = entry0D%local_value / real(entry0D%addcounter, real64)
+            else
+                mean_value = entry0D%local_value
+            endif
+            
+            ! Only rank 0 does the output (scalar is already globally reduced)
+            if (partit%mype == 0) then
+                ! Build filepath
+                if (filesplit_freq == 'm') then
+                    filepath = trim(ResultPath)//trim(entry0D%name)//'.'//trim(runid)//'.'//cyearnew//'_'//cmonth//'.nc'
+                else
+                    filepath = trim(ResultPath)//trim(entry0D%name)//'.'//trim(runid)//'.'//cyearnew//'.nc'
+                endif
+                
+                ! Close old file and reset if year/month has changed
+                if (filepath /= trim(entry0D%filename)) then
+                    if (trim(entry0D%filename) /= "" .and. entry0D%ncid >= 0) then
+                        call assert_nf(nf90_close(entry0D%ncid), __LINE__)
+                    endif
+                    entry0D%ncid = -1
+                    entry0D%filename = filepath
+                endif
+                
+                ! Create or open file
+                if (entry0D%ncid < 0) then
+                    ! Try to open existing file
+                    ierr = nf90_open(trim(filepath), NF90_WRITE, entry0D%ncid)
+                    if (ierr /= NF90_NOERR) then
+                        ! Create new file
+                        call create_0D_file(entry0D, filepath)
+                    else
+                        ! Get existing variable and dimension IDs
+                        call assert_nf(nf90_inq_dimid(entry0D%ncid, 'time', entry0D%timedimid), __LINE__)
+                        call assert_nf(nf90_inq_varid(entry0D%ncid, 'time', entry0D%timeid), __LINE__)
+                        call assert_nf(nf90_inq_varid(entry0D%ncid, trim(entry0D%name), entry0D%varid), __LINE__)
+                        call assert_nf(nf90_inquire_dimension(entry0D%ncid, entry0D%timedimid, len=entry0D%rec_count), __LINE__)
+                    endif
+                endif
+                
+                ! Write data
+                entry0D%rec_count = entry0D%rec_count + 1
+                rtime = ctime
+                
+                call assert_nf(nf90_put_var(entry0D%ncid, entry0D%timeid, rtime, start=(/entry0D%rec_count/)), __LINE__)
+                call assert_nf(nf90_put_var(entry0D%ncid, entry0D%varid, mean_value, start=(/entry0D%rec_count/)), __LINE__)
+                call assert_nf(nf90_sync(entry0D%ncid), __LINE__)
+            endif
+            
+            ! Reset accumulator
+            entry0D%local_value = 0._real64
+            entry0D%addcounter = 0
+        endif
+    end do
+    
+end subroutine output_0D_streams
+
+
+!_______________________________________________________________________________
+! Create a new NetCDF file for 0D (scalar) output
+subroutine create_0D_file(entry0D, filepath)
+    use g_clock
+    implicit none
+    type(Meandata0D), intent(inout) :: entry0D
+    character(len=*), intent(in) :: filepath
+    
+    integer :: ierr
+    character(100) :: time_units
+    
+    ! Create file
+    call assert_nf(nf90_create(trim(filepath), IOR(NF90_CLOBBER, NF90_NETCDF4), entry0D%ncid), __LINE__)
+    
+    ! Define time dimension (unlimited)
+    call assert_nf(nf90_def_dim(entry0D%ncid, 'time', NF90_UNLIMITED, entry0D%timedimid), __LINE__)
+    
+    ! Define time variable
+    call assert_nf(nf90_def_var(entry0D%ncid, 'time', NF90_DOUBLE, (/entry0D%timedimid/), entry0D%timeid), __LINE__)
+    write(time_units, '(a,i4.4,a,i2.2,a,i2.2,a)') 'seconds since ', yearnew, '-01-01 00:00:00'
+    call assert_nf(nf90_put_att(entry0D%ncid, entry0D%timeid, 'units', trim(time_units)), __LINE__)
+    call assert_nf(nf90_put_att(entry0D%ncid, entry0D%timeid, 'calendar', 'standard'), __LINE__)
+    
+    ! Define data variable
+    if (entry0D%accuracy == i_real8) then
+        call assert_nf(nf90_def_var(entry0D%ncid, trim(entry0D%name), NF90_DOUBLE, (/entry0D%timedimid/), entry0D%varid), __LINE__)
+    else
+        call assert_nf(nf90_def_var(entry0D%ncid, trim(entry0D%name), NF90_FLOAT, (/entry0D%timedimid/), entry0D%varid), __LINE__)
+    endif
+    
+    ! Add attributes
+    call assert_nf(nf90_put_att(entry0D%ncid, entry0D%varid, 'description', trim(entry0D%description)), __LINE__)
+    call assert_nf(nf90_put_att(entry0D%ncid, entry0D%varid, 'units', trim(entry0D%units)), __LINE__)
+    if (len_trim(entry0D%long_description) > 0) then
+        call assert_nf(nf90_put_att(entry0D%ncid, entry0D%varid, 'long_name', trim(entry0D%long_description)), __LINE__)
+    endif
+    
+    ! End define mode
+    call assert_nf(nf90_enddef(entry0D%ncid), __LINE__)
+    
+    entry0D%rec_count = 0
+    
+end subroutine create_0D_file
 !
 !
 !_______________________________________________________________________________
