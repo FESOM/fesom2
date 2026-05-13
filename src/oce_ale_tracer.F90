@@ -2100,9 +2100,9 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
     CASE (1405:1421)
         bc_surface = 0.0_WP
  
-#endif  ! __ciso
- 
-#endif  ! __recom
+#endif
+
+#endif
 
     CASE (101) ! apply boundary conditions to tracer ID=101
         bc_surface= dt*(prec_rain(n))! - real_salt_flux(n)*is_nonlinfs)

@@ -20,7 +20,9 @@ MODULE g_ic3d
    USE g_comm_auto
    USE g_support
    USE g_config, only: dummy, ClimateDataPath, use_cavity
-   use recom_config, only: enable_3zoo2det, enable_coccos !OG
+#if defined(__recom)
+   use recom_config, only: enable_3zoo2det, enable_coccos
+#endif
    USE g_clock, only: r_restart
    IMPLICIT NONE
 
