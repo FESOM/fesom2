@@ -880,10 +880,10 @@ CASE ('pH        ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'pH',  'pH',  'total scale',                      pH3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 
-CASE ('CO3       ')
-    if (use_REcoM) then
-    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'CO3', 'Carbonate ion concentration', 'mol/m3',   CO33D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-    end if
+!CASE ('CO3       ')
+!    if (use_REcoM) then
+!    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'CO3', 'Carbonate ion concentration', 'mol/m3',   CO33D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+!    end if
    
 CASE ('respmeso       ')
    if (use_REcoM) then
