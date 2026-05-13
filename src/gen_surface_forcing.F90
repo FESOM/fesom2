@@ -547,7 +547,7 @@ CONTAINS
       !! ** Purpose : Fill names of sbc_flfi array (file names and variable names)
 
       !prepare proper nc file (add year and .nc to the end of the file name from namelist
-if (.NOT. enable_AWICM) then
+if (.NOT. recom_coupled_to_atmosphere) then
       if (l_xwind) write(sbc_flfi(i_xwind)%file_name, *) trim(make_full_path(nm_xwind_file)),trim(yyear),'.nc'
       if (l_ywind) write(sbc_flfi(i_ywind)%file_name, *) trim(make_full_path(nm_ywind_file)),trim(yyear),'.nc'
       if (l_xstre) write(sbc_flfi(i_xstre)%file_name, *) trim(make_full_path(nm_xstre_file)),trim(yyear),'.nc'
@@ -1483,7 +1483,7 @@ endif
       real(wp)     :: rdate ! date
       integer      :: fld_idx, i
       logical      :: do_rotation_wind, do_rotation_stre, force_newcoeff, update_monthly_flag
-      logical      :: update_daily_flag ! enable_AWICM = .true.
+      logical      :: update_daily_flag = .false. ! true when recom_coupled_to_atmosphere
       integer      :: yyyy, dd, mm, flag_flpyr=0
       integer,   pointer   :: nc_Ntime, t_indx, t_indx_p1
       real(wp),  pointer   :: nc_time(:)
@@ -1588,8 +1588,7 @@ endif
 
     ! prepare a flag which checks whether to update monthly data (SSS, river runoff)
      update_monthly_flag=( (day_in_month==num_day_in_month(fleapyear,month) .AND. timenew==86400._WP) .OR. mstep==1)
-     !AWICM
-     if (enable_AWICM) then
+     if (recom_coupled_to_atmosphere) then
          update_daily_flag = ( (timenew==86400._WP) .OR. mstep==1)
      endif
 

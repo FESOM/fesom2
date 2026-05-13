@@ -15,6 +15,7 @@
 !!   2014: original implementation (V. Schourup-Kristensen)
 !
 module recom_config
+  use g_config, only: recom_coupled_to_atmosphere
   implicit none
   save
 
@@ -94,9 +95,8 @@ module recom_config
 !! *** REcoM setup ***
   Logical                :: enable_3zoo2det = .false.   ! Control extended zooplankton variables
   Logical                :: enable_coccos = .false.     ! Control coccolithophore variables
-  Logical                :: enable_AWICM = .false.      ! Control AWICM
   Logical                :: enable_R2OMIP = .false.     ! Control R2OMIP
-  namelist /parecomsetup/ enable_3zoo2det, enable_coccos, enable_AWICM, enable_R2OMIP
+  namelist /parecomsetup/ enable_3zoo2det, enable_coccos, recom_coupled_to_atmosphere, enable_R2OMIP
 
 !! *** General configuration ***
 
@@ -912,7 +912,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
     write(*,*) 'Model configuration:'
     write(*,*) '  enable_3zoo2det = ', enable_3zoo2det
     write(*,*) '  enable_coccos   = ', enable_coccos
-    write(*,*) '  enable_AWICM    = ', enable_AWICM
+    write(*,*) '  recom_coupled_to_atmosphere = ', recom_coupled_to_atmosphere
     write(*,*) '  enable_R2OMIP   = ', enable_R2OMIP
     write(*,*) '  useRivers       = ', useRivers
     write(*,*) ''

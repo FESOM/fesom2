@@ -120,8 +120,17 @@ module g_config
   !_____________________________________________________________________________
   ! *** configuration***
   logical                       :: use_sw_pene=.true.
-  logical                       :: use_ice=.false.  
+  logical                       :: use_ice=.false.
                                                    ! to be supplied
+  ! *** REcoM coupled to the atmosphere ***
+  ! True when REcoM is driven by atmospheric forcing produced by a coupled
+  ! atmosphere model: switches SBC input filenames to the daily
+  ! '<yyyy>01_reduced.nc' pattern and triggers daily (rather than monthly)
+  ! refresh of SSS restoring and river runoff in gen_surface_forcing. Read
+  ! from &parecomsetup in namelist.recom; default .false. keeps standard
+  ! yearly-file forcing.
+  logical                       :: recom_coupled_to_atmosphere = .false.
+
   ! *** icebergs ***
   logical                       :: use_icebergs=.false.
   logical                       :: turn_off_hf=.false.
