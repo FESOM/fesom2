@@ -28,6 +28,7 @@ module io_MEANDATA
   implicit none
   private
   public :: def_stream, def_stream2D, def_stream3D, def_stream0D, output, finalize_output
+  public :: print_per_stream_costs
 
   ! Sub-decomposition timers for FESOM `output`. Accumulated per-rank by the
   ! output() routine; reduced and printed once at finalize from fesom_module.
@@ -5123,4 +5124,14 @@ subroutine def_stream0D(name, description, units, data, freq, freq_unit, accurac
     end if
     
 end subroutine def_stream0D
+
+!_______________________________________________________________________________
+! Per-stream output cost report (sorted at finalize). The current Meandata type
+! on this branch does not carry the per-stream wall-clock accumulator the full
+! reporter on main consumes; for now this is a no-op stub so the unconditional
+! call in fesom_module.F90 links cleanly.
+subroutine print_per_stream_costs(comm, mype, npes)
+    integer, intent(in) :: comm, mype, npes
+end subroutine print_per_stream_costs
+
 end module
