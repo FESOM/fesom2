@@ -12,10 +12,22 @@ module io_MEANDATA
   use io_data_strategy_module
   use async_threads_module
   use netcdf
+  use io_xios_module, only: io_xios_is_on, io_xios_field_is_active, &
+                            io_xios_send_2d_r8, io_xios_send_2d_r4, &
+                            io_xios_send_3d_r8, io_xios_send_3d_r4, &
+                            io_xios_set_ice_conc, io_xios_is_ice_field, &
+                            io_xios_apply_ice_mask_2d_r4, io_xios_apply_ice_mask_2d_r8, &
+                            io_xios_apply_ice_mask_2d_elem_r4, io_xios_apply_ice_mask_2d_elem_r8, &
+                            io_xios_set_wet_ptrs, &
+                            io_xios_apply_wet_2d_r4, io_xios_apply_wet_2d_r8, &
+                            io_xios_apply_wet_2d_elem_r4, io_xios_apply_wet_2d_elem_r8, &
+                            io_xios_apply_wet_3d_r4, io_xios_apply_wet_3d_r8, &
+                            io_xios_apply_wet_3d_elem_r4, io_xios_apply_wet_3d_elem_r8, &
+                            io_xios_owned_elem_local, io_xios_n_owned_elem
 
   implicit none
   private
-  public :: def_stream, def_stream2D, def_stream3D, output, finalize_output
+  public :: def_stream, def_stream2D, def_stream3D, def_stream0D, output, finalize_output
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -96,6 +108,30 @@ module io_MEANDATA
   end type io_entry 
 
   type(io_entry), save, allocatable, target   :: io_list(:)
+!
+!--------------------------------------------------------------------------------------------
+! Type for 0D (scalar) output streams - global values with time dimension only
+  type Meandata0D
+    character(100)                             :: name
+    character(500)                             :: description
+    character(100)                             :: units
+    character(500)                             :: long_description=""
+    real(kind=WP), pointer                     :: ptr          ! pointer to scalar value
+    real(real64)                               :: local_value  ! accumulated value
+    integer                                    :: addcounter = 0
+    integer                                    :: accuracy
+    integer                                    :: freq = 1
+    character                                  :: freq_unit = 'm'
+    logical                                    :: is_in_use = .false.
+    ! NetCDF handles
+    integer                                    :: ncid = -1
+    integer                                    :: varid, timeid, timedimid
+    integer                                    :: rec_count = 0
+    character(500)                             :: filename = ""  ! current output file path
+  end type Meandata0D
+
+  type(Meandata0D), save, target :: io_stream0D(50)
+  integer, save                  :: io_NSTREAMS0D = 0
 !
 !--------------------------------------------------------------------------------------------
 ! generic interface was required to associate variables of unknown rank with the pointers of the same rank
@@ -5019,4 +5055,64 @@ SUBROUTINE send_data_to_multio(entry)
     END DO
 END SUBROUTINE
 #endif
+!
+!
+!_______________________________________________________________________________
+! initialse new meandata streaming object for a 0D (scalar) output
+subroutine def_stream0D(name, description, units, data, freq, freq_unit, accuracy, partit, long_description)
+  USE MOD_PARTIT
+  USE MOD_PARSUP
+  implicit none
+  character(len=*),      intent(in)    :: name, description, units
+  real(kind=WP), target, intent(in)    :: data
+  integer,               intent(in)    :: freq
+  character,             intent(in)    :: freq_unit
+  integer,               intent(in)    :: accuracy
+  type(t_partit),        intent(inout) :: partit
+  character(len=*), optional, intent(in) :: long_description
+  type(Meandata0D),      pointer       :: entry
+  integer :: i
+
+    !___________________________________________________________________________
+    if (partit%mype==0) then
+        write(*,*) 'adding I/O stream 0D (scalar) for ', trim(name)
+    end if
+
+    !___________________________________________________________________________
+    ! check if we already have this variable
+    do i=1, io_NSTREAMS0D
+        if(trim(io_stream0D(i)%name) .eq. name) then
+            print *,"variable '"//name//"' already exists in 0D streams"
+            call assert(.false., __LINE__) 
+        end if
+    end do
+    
+    !___________________________________________________________________________
+    ! add this instance to io_stream0D array
+    io_NSTREAMS0D = io_NSTREAMS0D + 1
+    call assert(size(io_stream0D) >= io_NSTREAMS0D, __LINE__)
+    entry => io_stream0D(io_NSTREAMS0D)
+    
+    !___________________________________________________________________________
+    ! fill up 0D meandata streaming object
+    entry%name = name
+    entry%description = description
+    entry%units = units
+    entry%ptr => data
+    entry%local_value = 0._real64
+    entry%addcounter = 0
+    entry%accuracy = accuracy
+    entry%freq = freq
+    entry%freq_unit = freq_unit
+    entry%is_in_use = .true.
+    entry%ncid = -1
+    entry%rec_count = 0
+    
+    if (present(long_description)) then
+        entry%long_description = long_description
+    else
+        entry%long_description = description
+    end if
+    
+end subroutine def_stream0D
 end module
