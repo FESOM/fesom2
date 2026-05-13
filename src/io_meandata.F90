@@ -28,6 +28,14 @@ module io_MEANDATA
   implicit none
   private
   public :: def_stream, def_stream2D, def_stream3D, def_stream0D, output, finalize_output
+
+  ! Sub-decomposition timers for FESOM `output`. Accumulated per-rank by the
+  ! output() routine; reduced and printed once at finalize from fesom_module.
+  real(WP), public, save :: rtime_om_update_means = 0.0_WP
+  real(WP), public, save :: rtime_om_streamloop   = 0.0_WP
+  real(WP), public, save :: rtime_om_pack         = 0.0_WP
+  real(WP), public, save :: rtime_om_mask         = 0.0_WP
+  real(WP), public, save :: rtime_om_xsend        = 0.0_WP
 !
 !--------------------------------------------------------------------------------------------
 !
