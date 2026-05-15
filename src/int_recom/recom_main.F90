@@ -510,7 +510,12 @@ if (enable_coccos) then
 endif
 #if defined(__RECOM_WAVEBANDS)
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> before main Ed4D'//achar(27)//'[0m'
-            Ed4D    (1:nl-1,n,:,:) = Light_watercolumn(1:nl-1,:,:) 
+!sl            Ed4D    (1:nl-1,n,:,:) = Light_watercolumn(1:nl-1,:,:) 
+             Edz3D    (1:nl-1,n,:) = Light_watercolumn(1:nl-1,:,1)
+             Esz3D    (1:nl-1,n,:) = Light_watercolumn(1:nl-1,:,2)
+             Euz3D    (1:nl-1,n,:) = Light_watercolumn(1:nl-1,:,3)
+             Eutop3D  (1:nl-1,n,:) = Light_watercolumn(1:nl-1,:,4)
+             Estop3D  (1:nl-1,n,:) = Light_watercolumn(1:nl-1,:,5)
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> after main Ed4D'//achar(27)//'[0m'            
 #endif
 
@@ -599,11 +604,16 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> deallocate 
 
 #if defined(__RECOM_WAVEBANDS)
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> before exchange_nod Ed4D'//achar(27)//'[0m'
-    do n = 1, ed_num
+!sl    do n = 1, ed_num
        do tr_num = 1, tlam
-         call exchange_nod(Ed4D(:,:,tr_num,n), partit)
+!sl         call exchange_nod(Ed4D(:,:,tr_num,n), partit)
+            call exchange_nod(Edz3D(:,:,tr_num), partit)
+            call exchange_nod(Esz3D(:,:,tr_num), partit)
+            call exchange_nod(Euz3D(:,:,tr_num), partit)
+            call exchange_nod(Eutop3D(:,:,tr_num), partit)
+            call exchange_nod(Estop3D(:,:,tr_num), partit)
        end do
-    end do
+!sl    end do
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> after exchange_nod Ed4D'//achar(27)//'[0m'    
 #endif
 

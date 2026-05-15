@@ -312,8 +312,18 @@ subroutine recom_init(tracers, partit, mesh)
 
 #if defined(__RECOM_WAVEBANDS) 
 !! *** Allocate 4D Light
-    allocate(Ed4D      ( nl-1, node_size,tlam,ed_num ))
-    Ed4D(:,:,:,:)      = 0.d0
+!sl    allocate(Ed4D      ( nl-1, node_size,tlam,ed_num ))
+!sl    Ed4D(:,:,:,:)      = 0.d0
+    allocate(Edz3D      ( nl-1, node_size,tlam))
+    allocate(Esz3D      ( nl-1, node_size,tlam))
+    allocate(Euz3D      ( nl-1, node_size,tlam))
+    allocate(Eutop3D      ( nl-1, node_size,tlam))
+    allocate(Estop3D      ( nl-1, node_size,tlam))
+    Edz3D     = 0.d0
+    Esz3D     = 0.d0
+    Euz3D     = 0.d0
+    Eutop3D   = 0.d0
+    Estop3D   = 0.d0
 #endif
 
 !! *** Allocate ballasting ***

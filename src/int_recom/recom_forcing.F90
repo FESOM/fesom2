@@ -699,16 +699,16 @@ if (RECOM_CALC_REFLEC) then
              amp2_wb(k) = amp2(index,k)
              amp2_wb(k) = amp2(index,k)
 endif            
+!SL to diagnose Light version v0:
+        Light_watercolumn(k,1:tlam,1) = Edz(1:tlam,k)
+        Light_watercolumn(k,1:tlam,2) = Esz(1:tlam,k)
+        Light_watercolumn(k,1:tlam,3) = Euz(1:tlam,k)
+        Light_watercolumn(k,1:tlam,4) = Eutop(1:tlam,k)
+        Light_watercolumn(k,1:tlam,5) = Estop(1:tlam,k)
       ENDDO        !k
 !     PARw and PARwup from non-spectral RECOM are from previous timestep
 !     (attenuation done in recom_sms) but PARw and PARwup from WAVEBANDS
 !     and RADTRANS are for the current timestep.
-!SL to diagnose Light version v0:
-        Light_watercolumn(:,1:tlam,1) = Edz
-        Light_watercolumn(:,1:tlam,2) = Esz
-        Light_watercolumn(:,1:tlam,3) = Esz
-        Light_watercolumn(:,1:tlam,4) = Eutop
-        Light_watercolumn(:,1:tlam,5) = Estop
 
 ! ----------------- Reflectance -------------------------         
 !douple check w.r.t. existance name dz_k(kSurface) 

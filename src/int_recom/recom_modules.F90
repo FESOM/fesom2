@@ -1961,7 +1961,7 @@ module REcoM_spectral
   Logical :: DAR_NONSPECTRAL_BACKSCATTERING_RATIO =.false.
   Logical :: DAR_RADTRANS_RMUS_PAR =.false.
   Logical :: DAR_RADTRANS_DECREASING =.false.
-  integer :: ed_num = 5   ! number of light related diagnostic 
+!  integer :: ed_num = 5   ! number of light related diagnostic 
 !sl the following lines moved to general recom_module  
 !slif (RECOM_MARSHALL) then
 !sl  integer :: id1, id1d, id1c, id1p
@@ -2275,7 +2275,9 @@ module REcoM_spectral
   Real(kind=8)  :: alpha_mean_cocco
   Real(kind=8)  :: alpha_mean_phaeo
   ! Light diagnostics Ed4D more work to be done
-  Real(kind=8), allocatable, dimension(:,:,:,:)   ::  Ed4D
+!  Real(kind=8), allocatable, dimension(:,:,:,:)   ::  Ed4D
+  integer, parameter :: iEdz=1, iEsz=2, iEuz=3, iEutop=4, iEstop=5, ed_num=5
+  Real(kind=8), allocatable, dimension(:,:,:) :: Edz3D, Esz3D, Euz3D, Eutop3D, Estop3D
 contains
 !BOP
 !     !ROUTINE: WAVEBANDS_INIT_FIXED
