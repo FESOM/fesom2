@@ -47,7 +47,7 @@ MODULE g_sbf
    USE g_forcing_arrays,    only: runoff, chl
 #if defined (__recom)
    use recom_config
-   use recom_declarations
+   use recom_declarations, only: is_erosioninput, is_riverinput
 #endif
    USE g_read_other_NetCDF, only: read_other_NetCDF, read_2ddata_on_grid_netcdf
 

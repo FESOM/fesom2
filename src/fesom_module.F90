@@ -19,6 +19,15 @@ module fesom_main_storage_module
   use io_xios_module
   use io_mesh_info
   use diagnostics
+  ! Read-only access to the CMOR scalar diagnostics computed inside
+  ! compute_diagnostics → compute_cmor_diag, so we can send them to XIOS
+  ! from this top-level module. Doing the send inside cmor_variables_diag
+  ! itself would create a cycle (io_xios → diagnostics → cmor_variables_diag
+  ! → io_xios) and break the build.
+  use cmor_variables_diag, only: ldiag_cmor, &
+                                 volo, soga, thetaoga, &
+                                 siarean, siareas, siextentn, siextents, &
+                                 sivoln, sivols
   use mo_tidal
   use tracer_init_interface
   use ocean_setup_interface
@@ -56,6 +65,7 @@ use cpl_yac_driver
 #if defined (__recom)
   use recom_init_interface
   use recom_interface
+  use recom_glovar
 #endif
 
 ! Transient tracers
@@ -128,7 +138,12 @@ contains
       integer, intent(out) :: fesom_total_nsteps
       ! EO parameters
       logical mpi_is_initialized
-      integer              :: tr_num
+      integer              :: tr_num, n
+
+#if defined (__recom)
+      type(tracers_info_type)               :: tracers_info
+#endif
+
 #if !defined  __ifsinterface
       if(command_argument_count() > 0) then
         call command_line_options%parse()
@@ -319,9 +334,26 @@ contains
         ! recom setup
 #if defined (__recom)
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call recom_init'//achar(27)//'[0m'
+
+        allocate(tracers_info%ids(f%tracers%num_tracers))
+        allocate(tracers_info%data_pointers(f%tracers%num_tracers))
+
+        do n = 1, f%tracers%num_tracers
+          tracers_info%ids(n) = f%tracers%data(n)%id
+          tracers_info%data_pointers(n)%tracer_data => f%tracers%data(n)%values
+        end do
+
         f%t0_recom=MPI_Wtime()
-        call recom_init(f%tracers, f%partit, f%mesh) ! adjust values for recom tracers (derived type "t_tracer")
+        call recom_init(f%mesh%nl, f%mesh%ulevels_nod2d, f%mesh%nlevels_nod2D, &
+                        f%mesh%geo_coord_nod2D, f%mesh%z_3d_n, f%partit%myDim_nod2d,      &
+                        f%partit%eDim_nod2D, f%partit%mype, f%partit%MPI_COMM_FESOM,      &
+                        f%partit%myDim_elem2D, f%partit%eDim_elem2D, tracers_info,        &
+                        f%tracers%num_tracers, rad) ! adjust values for recom tracers (derived type "t_tracer")
         f%t1_recom=MPI_Wtime()
+
+        deallocate(tracers_info%ids)
+        deallocate(tracers_info%data_pointers)
+
         if (f%mype==0) write(*,*) 'RECOM recom_init... complete'
 #endif
 
@@ -564,7 +596,11 @@ contains
 !   use openacc_lib
     integer, intent(in) :: current_nsteps 
     ! EO parameters
-    integer n, nstart, ntotal, tr_num
+    integer n, nstart, ntotal, tr_num, tracer_index
+
+#if defined (__recom)
+    type(tracers_info_type)               :: tracers_info
+#endif
 
     !=====================
     ! Time stepping
@@ -733,9 +769,38 @@ contains
 #if defined (__recom)
         if (f%mype==0 .and. n==1)  print *, achar(27)//'[46'  //'_____________________________________________________________'//achar(27)//'[0m'
         if (f%mype==0 .and. n==1)  print *, achar(27)//'[46;1m'//'     --> call REcoM                                         '//achar(27)//'[0m'
+
+        allocate(tracers_info%ids(f%tracers%num_tracers))
+        allocate(tracers_info%ltra_diag(f%tracers%num_tracers))
+        allocate(tracers_info%data_pointers(f%tracers%num_tracers))
+
+        do tracer_index = 1, f%tracers%num_tracers
+          tracers_info%ids(tracer_index) = f%tracers%data(tracer_index)%id
+          tracers_info%ltra_diag(tracer_index) = f%tracers%data(tracer_index)%ltra_diag
+          tracers_info%data_pointers(tracer_index)%tracer_data => f%tracers%data(tracer_index)%values
+        end do
+
         f%t0_recom = MPI_Wtime()
-        call recom(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        call recom(f%ice%data(1)%values, f%mesh%nl, &
+                   f%mesh%ulevels_nod2d, f%mesh%nlevels_nod2D, f%mesh%hnode,     &
+                   f%mesh%z_3d_n, f%mesh%zbar_3d_n, f%mesh%geo_coord_nod2d,      &
+                   f%mesh%ocean_area, f%mesh%areasvol, f%partit%myDim_nod2d,     &
+                   f%partit%eDim_nod2D, f%partit%mype, f%partit%MPI_COMM_FESOM,  &
+                   tracers_info, f%tracers%num_tracers, f%tracers%work%tra_recom_sms, &
+                   f%partit%npes, f%partit%com_nod2D%sPEnum,   &
+                   f%partit%com_nod2D%rPEnum,  &
+                   f%partit%s_mpitype_nod2D, f%partit%r_mpitype_nod2D,              &
+                   f%partit%s_mpitype_nod3D, f%partit%r_mpitype_nod3D,              &
+                   f%partit%com_nod2D%sPE, f%partit%com_nod2D%rPE,                  &
+                   f%partit%com_nod2D%req, f%partit%com_nod2D%nreq,                 &
+                   dt, daynew, month, mstep, ndpyr, yearold, timenew, rad, kappa,            &
+                   press_air, u_wind, v_wind, shortwave)
         f%t1_recom = MPI_Wtime()
+
+        deallocate(tracers_info%ids)
+        deallocate(tracers_info%ltra_diag)
+        deallocate(tracers_info%data_pointers)
+
 #endif
         
         !___model ocean step____________________________________________________
@@ -766,6 +831,26 @@ contains
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("compute_diagnostics")
 #endif
+
+        ! XIOS send for CMOR 0D scalars. xios_send_field is a collective
+        ! over the FESOM client context: ALL ranks must participate or
+        ! XIOS errors with "callers not coherent" (event_server.cpp:29).
+        ! The values are MPI_AllReduced inside compute_cmor_diag so every
+        ! rank has the same global value; XIOS-side operation="average"
+        ! over identical values reduces to that value. The legacy
+        ! output_0D_streams writer is gated on io_xios_is_on() so these
+        ! scalars no longer double-write at every step.
+        if (ldiag_cmor .and. io_xios_is_on()) then
+            call io_xios_send_0d_r8('volo',      real(volo,      kind=8))
+            call io_xios_send_0d_r8('soga',      real(soga,      kind=8))
+            call io_xios_send_0d_r8('thetaoga',  real(thetaoga,  kind=8))
+            call io_xios_send_0d_r8('siarean',   real(siarean,   kind=8))
+            call io_xios_send_0d_r8('siareas',   real(siareas,   kind=8))
+            call io_xios_send_0d_r8('siextentn', real(siextentn, kind=8))
+            call io_xios_send_0d_r8('siextents', real(siextents, kind=8))
+            call io_xios_send_0d_r8('sivoln',    real(sivoln,    kind=8))
+            call io_xios_send_0d_r8('sivols',    real(sivols,    kind=8))
+        end if
 
         f%t4 = MPI_Wtime()
         !___prepare output______________________________________________________
