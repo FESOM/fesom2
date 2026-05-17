@@ -454,11 +454,9 @@ contains
     integer :: i, n
     if (.not. associated(p_ice_conc)) return
     n = min(size(buf), size(p_ice_conc))
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i)
     do i = 1, n
        if (real(p_ice_conc(i), kind=8) < ICE_CONC_EPS) buf(i) = NC_FILL_DOUBLE
     end do
-!$OMP END PARALLEL DO
   end subroutine
 
   subroutine io_xios_apply_ice_mask_2d_r4(buf)
@@ -466,11 +464,9 @@ contains
     integer :: i, n
     if (.not. associated(p_ice_conc)) return
     n = min(size(buf), size(p_ice_conc))
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i)
     do i = 1, n
        if (real(p_ice_conc(i), kind=4) < real(ICE_CONC_EPS, kind=4)) buf(i) = NC_FILL_FLOAT
     end do
-!$OMP END PARALLEL DO
   end subroutine
 
   !> Element-based ice mask: element is ice-covered iff any of its 3 vertex
@@ -478,13 +474,11 @@ contains
   !> element indices come from owned_elem_local.
   subroutine io_xios_apply_ice_mask_2d_elem_r8(buf)
     real(kind=8), intent(inout) :: buf(:)
-    integer :: ee, e, n1, n2, n3, ne
+    integer :: ee, e, n1, n2, n3
     real(kind=8) :: amax
     if (.not. associated(p_ice_conc) .or. .not. associated(p_elem2D_nodes)) return
     if (.not. allocated(owned_elem_local)) return
-    ne = min(size(buf), n_owned_elem)
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ee, e, n1, n2, n3, amax)
-    do ee = 1, ne
+    do ee = 1, min(size(buf), n_owned_elem)
        e  = owned_elem_local(ee)
        n1 = p_elem2D_nodes(1, e)
        n2 = p_elem2D_nodes(2, e)
@@ -494,18 +488,15 @@ contains
                   real(p_ice_conc(n3), kind=8))
        if (amax < ICE_CONC_EPS) buf(ee) = NC_FILL_DOUBLE
     end do
-!$OMP END PARALLEL DO
   end subroutine
 
   subroutine io_xios_apply_ice_mask_2d_elem_r4(buf)
     real(kind=4), intent(inout) :: buf(:)
-    integer :: ee, e, n1, n2, n3, ne
+    integer :: ee, e, n1, n2, n3
     real(kind=4) :: amax
     if (.not. associated(p_ice_conc) .or. .not. associated(p_elem2D_nodes)) return
     if (.not. allocated(owned_elem_local)) return
-    ne = min(size(buf), n_owned_elem)
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ee, e, n1, n2, n3, amax)
-    do ee = 1, ne
+    do ee = 1, min(size(buf), n_owned_elem)
        e  = owned_elem_local(ee)
        n1 = p_elem2D_nodes(1, e)
        n2 = p_elem2D_nodes(2, e)
@@ -515,7 +506,6 @@ contains
                   real(p_ice_conc(n3), kind=4))
        if (amax < real(ICE_CONC_EPS, kind=4)) buf(ee) = NC_FILL_FLOAT
     end do
-!$OMP END PARALLEL DO
   end subroutine
 
 
@@ -537,56 +527,44 @@ contains
   !> for non-cavity runs where all nodes are wet at surface).
   subroutine io_xios_apply_wet_2d_r8(buf)
     real(kind=8), intent(inout) :: buf(:)
-    integer :: n, nn
+    integer :: n
     if (.not. associated(p_ulevels_nod)) return
-    nn = min(size(buf), size(p_ulevels_nod))
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
-    do n = 1, nn
+    do n = 1, min(size(buf), size(p_ulevels_nod))
        if (p_ulevels_nod(n) > 1) buf(n) = NC_FILL_DOUBLE
     end do
-!$OMP END PARALLEL DO
   end subroutine
 
   subroutine io_xios_apply_wet_2d_r4(buf)
     real(kind=4), intent(inout) :: buf(:)
-    integer :: n, nn
+    integer :: n
     if (.not. associated(p_ulevels_nod)) return
-    nn = min(size(buf), size(p_ulevels_nod))
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
-    do n = 1, nn
+    do n = 1, min(size(buf), size(p_ulevels_nod))
        if (p_ulevels_nod(n) > 1) buf(n) = NC_FILL_FLOAT
     end do
-!$OMP END PARALLEL DO
   end subroutine
 
   !> 2D element field (strictly-owned subset): NC_FILL where any of the
   !> 3 vertex nodes has ulevels > 1 (cavity element).
   subroutine io_xios_apply_wet_2d_elem_r8(buf)
     real(kind=8), intent(inout) :: buf(:)
-    integer :: ee, e, ne
+    integer :: ee, e
     if (.not. associated(p_ulevels_elem)) return
     if (.not. allocated(owned_elem_local)) return
-    ne = min(size(buf), n_owned_elem)
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ee, e)
-    do ee = 1, ne
+    do ee = 1, min(size(buf), n_owned_elem)
        e = owned_elem_local(ee)
        if (p_ulevels_elem(e) > 1) buf(ee) = NC_FILL_DOUBLE
     end do
-!$OMP END PARALLEL DO
   end subroutine
 
   subroutine io_xios_apply_wet_2d_elem_r4(buf)
     real(kind=4), intent(inout) :: buf(:)
-    integer :: ee, e, ne
+    integer :: ee, e
     if (.not. associated(p_ulevels_elem)) return
     if (.not. allocated(owned_elem_local)) return
-    ne = min(size(buf), n_owned_elem)
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ee, e)
-    do ee = 1, ne
+    do ee = 1, min(size(buf), n_owned_elem)
        e = owned_elem_local(ee)
        if (p_ulevels_elem(e) > 1) buf(ee) = NC_FILL_FLOAT
     end do
-!$OMP END PARALLEL DO
   end subroutine
 
   !> 3D node field, axis-first (nz, nn). Valid range is
@@ -598,10 +576,9 @@ contains
     integer :: n, k, nz, nn, ub, un, bn
     logical :: is_interface
     if (.not. associated(p_ulevels_nod) .or. .not. associated(p_nlevels_nod)) return
-    nz = size(buf, 1); nn = min(size(buf, 2), size(p_ulevels_nod))
+    nz = size(buf, 1); nn = size(buf, 2)
     is_interface = (p_nl > 0 .and. nz == p_nl)
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, k, un, bn, ub)
-    do n = 1, nn
+    do n = 1, min(nn, size(p_ulevels_nod))
        un = p_ulevels_nod(n)
        bn = p_nlevels_nod(n)
        ub = bn; if (.not. is_interface) ub = bn - 1
@@ -609,7 +586,6 @@ contains
           if (k < un .or. k > ub) buf(k, n) = NC_FILL_DOUBLE
        end do
     end do
-!$OMP END PARALLEL DO
   end subroutine
 
   subroutine io_xios_apply_wet_3d_r4(buf)
@@ -617,10 +593,9 @@ contains
     integer :: n, k, nz, nn, ub, un, bn
     logical :: is_interface
     if (.not. associated(p_ulevels_nod) .or. .not. associated(p_nlevels_nod)) return
-    nz = size(buf, 1); nn = min(size(buf, 2), size(p_ulevels_nod))
+    nz = size(buf, 1); nn = size(buf, 2)
     is_interface = (p_nl > 0 .and. nz == p_nl)
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, k, un, bn, ub)
-    do n = 1, nn
+    do n = 1, min(nn, size(p_ulevels_nod))
        un = p_ulevels_nod(n)
        bn = p_nlevels_nod(n)
        ub = bn; if (.not. is_interface) ub = bn - 1
@@ -628,7 +603,6 @@ contains
           if (k < un .or. k > ub) buf(k, n) = NC_FILL_FLOAT
        end do
     end do
-!$OMP END PARALLEL DO
   end subroutine
 
   !> 3D element field, axis-first (nz, ne_owned). Same bound logic as
@@ -639,10 +613,9 @@ contains
     logical :: is_interface
     if (.not. associated(p_ulevels_elem) .or. .not. associated(p_nlevels_elem)) return
     if (.not. allocated(owned_elem_local)) return
-    nz = size(buf, 1); ne = min(size(buf, 2), n_owned_elem)
+    nz = size(buf, 1); ne = size(buf, 2)
     is_interface = (p_nl > 0 .and. nz == p_nl)
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ee, e, k, ue, be, ub)
-    do ee = 1, ne
+    do ee = 1, min(ne, n_owned_elem)
        e = owned_elem_local(ee)
        ue = p_ulevels_elem(e)
        be = p_nlevels_elem(e)
@@ -651,7 +624,6 @@ contains
           if (k < ue .or. k > ub) buf(k, ee) = NC_FILL_DOUBLE
        end do
     end do
-!$OMP END PARALLEL DO
   end subroutine
 
   subroutine io_xios_apply_wet_3d_elem_r4(buf)
@@ -660,10 +632,9 @@ contains
     logical :: is_interface
     if (.not. associated(p_ulevels_elem) .or. .not. associated(p_nlevels_elem)) return
     if (.not. allocated(owned_elem_local)) return
-    nz = size(buf, 1); ne = min(size(buf, 2), n_owned_elem)
+    nz = size(buf, 1); ne = size(buf, 2)
     is_interface = (p_nl > 0 .and. nz == p_nl)
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ee, e, k, ue, be, ub)
-    do ee = 1, ne
+    do ee = 1, min(ne, n_owned_elem)
        e = owned_elem_local(ee)
        ue = p_ulevels_elem(e)
        be = p_nlevels_elem(e)
@@ -672,7 +643,6 @@ contains
           if (k < ue .or. k > ub) buf(k, ee) = NC_FILL_FLOAT
        end do
     end do
-!$OMP END PARALLEL DO
   end subroutine
 
 

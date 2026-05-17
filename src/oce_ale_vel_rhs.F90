@@ -288,8 +288,7 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         ff=1.0_WP
         lfirst=.false.
     end if
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
-!$OMP DO
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
     do elem=1, myDim_elem2D
         nzmin = ulevels(elem)
         nzmax = nlevels(elem)
@@ -299,19 +298,19 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
             !                       |                   |
             !                       V                   V
             !        fAB = (f_pgf - 1/2*fab_n-1)    +3/2*fab_n
-            !
-            ! until here: UV_rhs = dt*[ (R_advec + R_coriolis)^n + R_pressure]
-            ! --> horizontal viscosity contribution still missing is added in
-            !     call viscosity_filter
-            ! --> vertical viscosity contribution still missing is added in
-            !     call impl_vert_visc_ale
+            !        
+            ! until here: UV_rhs = dt*[ (R_advec + R_coriolis)^n + R_pressure] 
+            ! --> horizontal viscosity contribution still missing is added in 
+            !     call viscosity_filter      
+            ! --> vertical viscosity contribution still missing is added in 
+            !     call impl_vert_visc_ale      
         end do
     end do
-!$OMP END DO
+!$OMP END PARALLEL DO
 
     !___________________________________________________________________________
     if (dynamics%ldiag_ke) then
-!$OMP DO
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, nz, nzmin, nzmax)
         do elem=1, myDim_elem2D
             nzmin = ulevels(elem)
             nzmax = nlevels(elem)
@@ -320,9 +319,8 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
                 dynamics%ke_cor(:,nz,elem)=dt*(dynamics%ke_cor(:,nz,elem)+dynamics%ke_cor_AB(1,:,nz,elem)*ff)/elem_area(elem)
             end do
         end do
-!$OMP END DO
+!$OMP END PARALLEL DO
     end if
-!$OMP END PARALLEL
     
     ! =======================  
     ! U_rhs contains all contributions to velocity from old time steps   

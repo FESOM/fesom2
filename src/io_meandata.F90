@@ -2678,64 +2678,55 @@ subroutine update_means
     type(Meandata), pointer :: entry
     integer                 :: n
     integer                 :: I, J
-    integer                 :: szI, szJ
 
-    ! Single OMP fork-join across all streams instead of one per stream. With
-    ! ~50 io_NSTREAMS and ~6700 calls/sim-month at HR (FESOM dt=400s), the
-    ! original code spawned ~335k OMP regions per rank per month, each with
-    ! its own fork-join overhead. SIMD hints on the innermost loop let the
-    ! compiler vectorize the float adds. Targets the 146 s/rank/month
-    ! FESOM-side stream-prep cost identified in HR_test_45 profiling.
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, entry, I, J, szI, szJ) SCHEDULE(dynamic)
     DO n=1, io_NSTREAMS
         entry=>io_stream(n)%p
 
         !_____________ compute in 8 byte accuracy ______________________________
         IF (entry%accuracy == i_real8) then
-            szI = size(entry%local_values_r8, dim=1)
-            szJ = size(entry%local_values_r8, dim=2)
             IF (entry%flip) then
-                DO J=1, szJ
-!$OMP SIMD
-                    DO I=1, szI
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
+                DO J=1, size(entry%local_values_r8,dim=2)
+                    DO I=1, size(entry%local_values_r8,dim=1)
                         entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+entry%ptr3(J,I)
                     END DO
                 END DO
+!$OMP END PARALLEL DO
             ELSE
-                DO J=1, szJ
-!$OMP SIMD
-                    DO I=1, szI
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
+                DO J=1, size(entry%local_values_r8,dim=2)
+                    DO I=1, size(entry%local_values_r8,dim=1)
                         entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+entry%ptr3(I,J)
                     END DO
                 END DO
+!$OMP END PARALLEL DO
             END IF
-
+            
         !_____________ compute in 4 byte accuracy ______________________________
         ELSE IF (entry%accuracy == i_real4) then
-            szI = size(entry%local_values_r4, dim=1)
-            szJ = size(entry%local_values_r4, dim=2)
             IF (entry%flip) then
-                DO J=1, szJ
-!$OMP SIMD
-                    DO I=1, szI
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
+                DO J=1, size(entry%local_values_r4,dim=2)
+                    DO I=1, size(entry%local_values_r4,dim=1)
                         entry%local_values_r4(I,J)=entry%local_values_r4(I,J)+real(entry%ptr3(J,I), real32)
                     END DO
                 END DO
+!$OMP END PARALLEL DO
             ELSE
-                DO J=1, szJ
-!$OMP SIMD
-                    DO I=1, szI
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I, J)
+                DO J=1, size(entry%local_values_r4,dim=2)
+                    DO I=1, size(entry%local_values_r4,dim=1)
                         entry%local_values_r4(I,J)=entry%local_values_r4(I,J)+real(entry%ptr3(I,J), real32)
                     END DO
                 END DO
+!$OMP END PARALLEL DO
             END IF
         END IF ! --> IF (entry%accuracy == i_real8) then
-
+        
         entry%addcounter=entry%addcounter+1
     END DO ! --> DO n=1, io_NSTREAMS
-!$OMP END PARALLEL DO
-
-    ! Update 0D (scalar) means — small loop, leave serial
+    
+    ! Update 0D (scalar) means
     DO n=1, io_NSTREAMS0D
         io_stream0D(n)%local_value = io_stream0D(n)%local_value + real(io_stream0D(n)%ptr, real64)
         io_stream0D(n)%addcounter = io_stream0D(n)%addcounter + 1

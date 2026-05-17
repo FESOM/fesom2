@@ -26,7 +26,6 @@ SUBROUTINE init_tracers_AB(tr_num, tracers, partit, mesh)
     integer                               :: n,nz 
 
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz)
 #else
 !$ACC PARALLEL LOOP COLLAPSE(2) DEFAULT(PRESENT)
 #endif
@@ -39,19 +38,14 @@ do n=1, partit%myDim_nod2D+partit%eDim_nod2D
        end do
 end do
 #ifndef ENABLE_OPENACC
-!$OMP END PARALLEL DO
 #else
 !$ACC END PARALLEL LOOP
 #endif
 
-    ! AB interpolation. Both the valuesAB compute and the valuesold update
-    ! were originally separate PARALLEL DO regions; combined here into a
-    ! single PARALLEL with two DOs, saving one fork-join per tracer per
-    ! timestep.
+    ! AB interpolation
     if (tracers%data(tr_num)%AB_order==2) then
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n)
-!$OMP DO
+!$OMP PARALLEL DO
 #else
 !ACC PARALLEL LOOP DEFAULT(PRESENT)
 #endif
@@ -59,25 +53,13 @@ end do
            tracers%data(tr_num)%valuesAB(:, n)  =-(0.5_WP+epsilon)*tracers%data(tr_num)%valuesold(1, :, n)+(1.5_WP+epsilon)*tracers%data(tr_num)%values(:, n)
        end do
 #ifndef ENABLE_OPENACC
-!$OMP END DO
-!$OMP DO
-#else
-!ACC END PARALLEL LOOP
-!ACC PARALLEL LOOP DEFAULT(PRESENT)
-#endif
-       do n=1, partit%myDim_nod2d+partit%eDim_nod2D
-          tracers%data(tr_num)%valuesold(1, :, n)=tracers%data(tr_num)%values(:, n)
-       end do
-#ifndef ENABLE_OPENACC
-!$OMP END DO
-!$OMP END PARALLEL
+!$OMP END PARALLEL DO
 #else
 !ACC END PARALLEL LOOP
 #endif
     elseif (tracers%data(tr_num)%AB_order==3) then
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n)
-!$OMP DO
+!$OMP PARALLEL DO
 #else
 !ACC PARALLEL LOOP DEFAULT(PRESENT)
 #endif
@@ -86,19 +68,7 @@ end do
            tracers%data(tr_num)%valuesAB(:, n)  =tracers%data(tr_num)%valuesAB(:, n)/12.0_WP
        end do
 #ifndef ENABLE_OPENACC
-!$OMP END DO
-!$OMP DO
-#else
-!ACC END PARALLEL LOOP
-!ACC PARALLEL LOOP DEFAULT(PRESENT)
-#endif
-       do n=1, partit%myDim_nod2d+partit%eDim_nod2D
-          tracers%data(tr_num)%valuesold(2, :, n)=tracers%data(tr_num)%valuesold(1, :, n)
-          tracers%data(tr_num)%valuesold(1, :, n)=tracers%data(tr_num)%values(:, n)
-       end do
-#ifndef ENABLE_OPENACC
-!$OMP END DO
-!$OMP END PARALLEL
+!$OMP END PARALLEL DO
 #else
 !ACC END PARALLEL LOOP
 #endif
@@ -119,6 +89,37 @@ end do
        print *, achar(27)//'[0m'
        write(*,*)
        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+    end if
+
+    if (tracers%data(tr_num)%AB_order==2) then
+#ifndef ENABLE_OPENACC
+!$OMP PARALLEL DO
+#else
+!ACC PARALLEL LOOP DEFAULT(PRESENT)
+#endif
+       do n=1, partit%myDim_nod2d+partit%eDim_nod2D
+          tracers%data(tr_num)%valuesold(1, :, n)=tracers%data(tr_num)%values(:, n)
+       end do
+#ifndef ENABLE_OPENACC
+!$OMP END PARALLEL DO
+#else
+!ACC END PARALLEL LOOP
+#endif
+    elseif (tracers%data(tr_num)%AB_order==3) then
+#ifndef ENABLE_OPENACC
+!$OMP PARALLEL DO
+#else
+!ACC PARALLEL LOOP DEFAULT(PRESENT)
+#endif
+       do n=1, partit%myDim_nod2d+partit%eDim_nod2D
+          tracers%data(tr_num)%valuesold(2, :, n)=tracers%data(tr_num)%valuesold(1, :, n)
+          tracers%data(tr_num)%valuesold(1, :, n)=tracers%data(tr_num)%values(:, n)
+       end do
+#ifndef ENABLE_OPENACC
+!$OMP END PARALLEL DO
+#else
+!ACC END PARALLEL LOOP
+#endif
     end if
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'

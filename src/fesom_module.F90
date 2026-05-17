@@ -813,13 +813,6 @@ contains
         end if
         !--------------------------
 
-        ! Sync point at end of I/O block: any upstream stall (XIOS client work,
-        ! OASIS asymmetry) that would otherwise be absorbed by the next MPI
-        ! halo exchange in ice_timestep is captured here, attributed to
-        ! rtime_write_means instead of rtime_fullice. Doesn't add wall time
-        ! (the wait happens anyway), just makes timer accounting honest.
-        call MPI_Barrier(f%MPI_COMM_FESOM, f%MPIerr)
-
         f%t5 = MPI_Wtime()
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("restart")

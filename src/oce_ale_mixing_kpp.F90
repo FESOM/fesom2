@@ -277,13 +277,12 @@ contains
 #include "associate_mesh_ass.h"
     UVnode=>dynamics%uvnode(:,:,:)
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, usurf, vsurf, u_loc, v_loc)
-!$OMP DO
+!$OMP PARALLEL DO
      DO node=1, myDim_nod2D+eDim_nod2D
         ViscA(:, node) = 0.0_WP
      END DO
-!$OMP END DO
-!$OMP DO
+!$OMP END PARALLEL DO
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, usurf, vsurf, u_loc, v_loc)
      DO node=1, myDim_nod2D !+eDim_nod2D
         nzmin = ulevels_nod2D(node)
         nzmax = nlevels_nod2D(node)
@@ -321,8 +320,7 @@ contains
          END DO
          dVsq ( nzmax, node ) = dVsq  ( nzmax-1, node )
      END DO
-!$OMP END DO
-!$OMP END PARALLEL
+!$OMP END PARALLEL DO
 
 !      *******************************************************************
 !       compute thermal and haline expansion coefficients (without factor of rho).
@@ -488,17 +486,18 @@ contains
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, coeff_sw, Rib_km1, zk, zkm1, sigma, zehat, &
-!$OMP                                  wm, ws, bvsq, Vtsq, Ritop, Rib_k, dzup, hekman, hmonob, hlimit)
-!$OMP DO
+!$OMP PARALLEL DO
      ! Initialize hbl and kbl to bottomed out values
      DO node=1, myDim_nod2D !+eDim_nod2D
         ! Index of first grid level below hbl
-        kbl(node) = nlevels_nod2D(node)
+        kbl(node) = nlevels_nod2D(node)      
         ! Boundary layer depth
         hbl(node) = ABS( zbar_3d_n( nlevels_nod2d(node),node ) )
      END DO
-!$OMP END DO
+!$OMP END PARALLEL DO
+
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, coeff_sw, Rib_km1, zk, zkm1, sigma, zehat, &
+!$OMP                                  wm, ws, bvsq, Vtsq, Ritop, Rib_k, dzup, hekman, hmonob, hlimit)
 !$OMP DO
      DO node=1, myDim_nod2D !+eDim_nod2D
         nzmin = ulevels_nod2D(node)
@@ -968,16 +967,16 @@ contains
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, kn, knm1, knp1, nl1, nu1, delhat, R, dvdzup, dvdzdn, viscp, difsp, diftp, visch, difsh, difth, f1, sig, &
-!$OMP                                            a1, a2, a3, Gm, Gs, Gt, sigma, zehat, wm, ws, gat1m, gat1t, gat1s, dat1m, dat1s, dat1t, dthick, diff_col)
-!$OMP DO
+!$OMP PARALLEL DO
      DO node=1, myDim_nod2D+eDim_nod2D
         blmc   (:, node,  :) = 0.0_WP
      END DO
-!$OMP END DO
+!$OMP END PARALLEL DO
 !    *******************************************************************
-!     Kv over the NODE
+!     Kv over the NODE 
 !    *******************************************************************
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, kn, knm1, knp1, nl1, nu1, delhat, R, dvdzup, dvdzdn, viscp, difsp, diftp, visch, difsh, difth, f1, sig, &
+!$OMP                                            a1, a2, a3, Gm, Gs, Gt, sigma, zehat, wm, ws, gat1m, gat1t, gat1s, dat1m, dat1s, dat1t, dthick, diff_col)
 !$OMP DO
      DO node=1, myDim_nod2D
         nl1=nlevels_nod2d(node)
