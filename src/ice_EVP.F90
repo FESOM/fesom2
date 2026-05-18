@@ -66,7 +66,9 @@ subroutine stress_tensor(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
     real(kind=WP), dimension(:), pointer  :: eps11, eps12, eps22
     real(kind=WP), dimension(:), pointer  :: sigma11, sigma12, sigma22
-    real(kind=WP), dimension(:), pointer  :: ice_strength
+    real(kind=WP), dimension(:), pointer  :: m_ice, a_ice
+    integer       :: elnodes(3)
+    real(kind=WP) :: m_el, a_el, pelem
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -79,7 +81,8 @@ subroutine stress_tensor(ice, partit, mesh)
     sigma11     => ice%work%sigma11(:)
     sigma12     => ice%work%sigma12(:)
     sigma22     => ice%work%sigma22(:)
-    ice_strength=> ice%work%ice_strength(:)
+    a_ice       => ice%data(1)%values(:)
+    m_ice       => ice%data(2)%values(:)
     !___________________________________________________________________________
     vale = 1.0_WP/(ice%ellipse**2)
     dte  = ice%ice_dt/(1.0_WP*ice%evp_rheol_steps)
@@ -87,19 +90,26 @@ subroutine stress_tensor(ice, partit, mesh)
     det2 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte) !*ellipse**2
 
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, r1, r2, r3, si1, si2, zeta, delta, delta_inv, d1, d2)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnodes, m_el, a_el, pelem, r1, r2, r3, si1, si2, zeta, delta, delta_inv, d1, d2)
 #else
-!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
+!$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(elnodes)
 #endif
     do el=1,myDim_elem2D
         !_______________________________________________________________________
         ! if element contains cavity node skip it
         if (ulevels(el) > 1) cycle
 
+        elnodes = elem2D_nodes(:,el)
         ! ===== Check if there is ice on elem
-        ! There is no ice in elem
-        ! if (any(m_ice(elnodes)<= 0.) .or. any(a_ice(elnodes) <=0.)) CYCLE
-        if (ice_strength(el) > 0.) then
+        if (any(m_ice(elnodes) <= 0._WP) .or. any(a_ice(elnodes) <= 0._WP)) cycle
+
+        ! ===== Per-element Hibler (1979) strength P = P*·h·exp(-C(1-A)), evaluated
+        ! from the element-mean m and a; the leading 0.5 is the EVP replacement-
+        ! pressure factor previously baked into the per-element cache.
+        m_el  = sum(m_ice(elnodes)) / 3.0_WP
+        a_el  = sum(a_ice(elnodes)) / 3.0_WP
+        pelem = 0.5_WP * ice%pstar * m_el * exp(-ice%c_pressure * (1.0_WP - a_el))
+
             ! =====
             ! ===== Deformation rate tensor on element elem:
                 !du/dx
@@ -124,13 +134,13 @@ subroutine stress_tensor(ice, partit, mesh)
 
             !if(delta>pressure/ice%zeta_min) delta=pressure/ice%zeta_min
                 !It does not work properly by
-            !creating response where ice_strength is small
+            !creating response where pelem is small
                 ! Uncomment and test if necessary
 
             ! ===== if delta is too small or zero, viscosity will too large (unlimited)
             ! (limit delta_inv)
             delta_inv = 1.0_WP/max(delta,ice%delta_min)
-            zeta = ice_strength(el)*delta_inv
+            zeta = pelem*delta_inv
             ! ===== Limiting pressure/Delta  (zeta): it may still happen that pressure/Delta
             ! is too large in some regions and CFL criterion is violated.
             ! The regularization below was introduced by Hunke,
@@ -145,7 +155,7 @@ subroutine stress_tensor(ice, partit, mesh)
 
             zeta = zeta*ice%Tevp_inv
 
-            r1  = zeta*(eps11(el)+eps22(el)) - ice_strength(el)*ice%Tevp_inv
+            r1  = zeta*(eps11(el)+eps22(el)) - pelem*ice%Tevp_inv
             r2  = zeta*(eps11(el)-eps22(el))*vale
             r3  = zeta*eps12(el)*vale
 
@@ -160,7 +170,6 @@ subroutine stress_tensor(ice, partit, mesh)
             rdg_conv_elem(el)  = -min((eps11(el)+eps22(el)),0.0_WP)
             rdg_shear_elem(el) = 0.5_WP*(delta - abs(eps11(el)+eps22(el)))
 #endif
-        endif
     end do
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
@@ -191,7 +200,9 @@ subroutine stress2rhs(ice, partit, mesh)
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: sigma11, sigma12, sigma22
     real(kind=WP), dimension(:), pointer  :: u_rhs_ice, v_rhs_ice, rhs_a, rhs_m
-    real(kind=WP), dimension(:), pointer  :: inv_areamass, ice_strength
+    real(kind=WP), dimension(:), pointer  :: inv_areamass
+    real(kind=WP), dimension(:), pointer  :: m_ice, a_ice
+    integer       :: elnodes(3)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -204,7 +215,8 @@ subroutine stress2rhs(ice, partit, mesh)
     rhs_a        => ice%data(1)%values_rhs(:)
     rhs_m        => ice%data(2)%values_rhs(:)
     inv_areamass => ice%work%inv_areamass(:)
-    ice_strength => ice%work%ice_strength(:)
+    a_ice        => ice%data(1)%values(:)
+    m_ice        => ice%data(2)%values(:)
 
     !___________________________________________________________________________
     val3=1/3.0_WP
@@ -244,8 +256,10 @@ subroutine stress2rhs(ice, partit, mesh)
         if (ulevels(el) > 1) cycle
 
         !_______________________________________________________________________
-        if (ice_strength(el) > 0._WP) then
-            DO k=1,3
+        elnodes = elem2D_nodes(:,el)
+        if (any(m_ice(elnodes) <= 0._WP) .or. any(a_ice(elnodes) <= 0._WP)) cycle
+
+        DO k=1,3
 
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
@@ -281,8 +295,7 @@ subroutine stress2rhs(ice, partit, mesh)
 !$OMP END ORDERED
 #endif
 #endif
-            END DO
-        endif
+        END DO
     end do
 #ifdef ENABLE_OPENACC
 #if !defined(DISABLE_OPENACC_ATOMICS)
@@ -347,7 +360,7 @@ subroutine EVPdynamics(ice, partit, mesh)
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
     integer         :: steps, shortstep
-    real(kind=WP)   :: rdt, asum, msum, r_a, r_b
+    real(kind=WP)   :: rdt, r_a, r_b
     real(kind=WP)   :: drag, det, umod, rhsu, rhsv
     integer         :: n, ed, ednodes(2), el,  elnodes(3)
     real(kind=WP)   :: ax, ay, aa, elevation_dx, elevation_dy
@@ -369,8 +382,8 @@ subroutine EVPdynamics(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: u_rhs_ice, v_rhs_ice, rhs_a, rhs_m
     real(kind=WP), dimension(:), pointer  :: u_w, v_w, elevation
     real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
-    real(kind=WP), dimension(:), pointer  :: inv_areamass, inv_mass, ice_strength
-    real(kind=WP), dimension(:), pointer  :: strength_ice
+    real(kind=WP), dimension(:), pointer  :: inv_areamass, inv_mass
+    real(kind=WP), dimension(:), pointer  :: ice_strength
 #if defined (__icepack)
     real(kind=WP), dimension(:), pointer  :: a_ice_old, m_ice_old, m_snow_old
 #endif
@@ -407,7 +420,6 @@ subroutine EVPdynamics(ice, partit, mesh)
     inv_areamass    => ice%work%inv_areamass(:)
     inv_mass        => ice%work%inv_mass(:)
     ice_strength    => ice%work%ice_strength(:)
-    strength_ice    => ice%work%strength_ice(:)
 
     !___________________________________________________________________________
     ! If Icepack is used, always update the tracers
@@ -422,19 +434,19 @@ subroutine EVPdynamics(ice, partit, mesh)
 #endif
 
     !___________________________________________________________________________
-    ! Diagnostic-only: populate strength_ice with canonical Hibler (1979)
-    ! P = P*·h·exp(-C(1-A)) for the strength_ice output stream. Independent of
-    ! the rheology storage (ice_strength holds P/2 for inlining); recomputing
-    ! from m_ice/a_ice keeps EVP results bit-identical to before this fix.
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnodes, msum, asum)
-    do el = 1, myDim_elem2D
-        strength_ice(el) = 0.0_WP
-        if (ulevels(el) > 1) cycle
-        elnodes = elem2D_nodes(:,el)
-        if (any(m_ice(elnodes) <= 0._WP) .or. any(a_ice(elnodes) <= 0._WP)) cycle
-        msum = sum(m_ice(elnodes))/3.0_WP
-        asum = sum(a_ice(elnodes))/3.0_WP
-        strength_ice(el) = ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
+    ! Populate the nodal ice_strength diagnostic with the canonical Hibler
+    ! (1979) P = P*·h·exp(-C(1-A)) from per-node m_ice and a_ice. This is
+    ! exposed as the 'strength_ice' output stream and lines up with every
+    ! other ice state diagnostic (a_ice, m_ice, ...) which are also nodal.
+    ! The EVP rheology evaluates the per-element strength inline from
+    ! element-mean m_ice / a_ice in stress_tensor, so this nodal field is
+    ! not consumed by the solver.
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+    do n = 1, myDim_nod2D
+        ice_strength(n) = 0.0_WP
+        if (ulevels_nod2D(n) > 1) cycle
+        if (m_ice(n) <= 0._WP .or. a_ice(n) <= 0._WP) cycle
+        ice_strength(n) = ice%pstar*m_ice(n)*exp(-ice%c_pressure*(1.0_WP-a_ice(n)))
     end do
 !$OMP END PARALLEL DO
 
@@ -502,7 +514,7 @@ subroutine EVPdynamics(ice, partit, mesh)
         ! for full free surface include pressure from ice mass
 
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(el, elnodes, msum, asum, aa, p_ice, elevation_elem, elevation_dx, elevation_dy)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(el, elnodes, aa, p_ice, elevation_elem, elevation_dx, elevation_dy)
 !$OMP DO
 #else
 
@@ -513,63 +525,46 @@ subroutine EVPdynamics(ice, partit, mesh)
 #endif
 #endif
         do el = 1,myDim_elem2D
-            elnodes = elem2D_nodes(:,el)
-            ice_strength(el)=0.0_WP
             !___________________________________________________________________
             ! if element has any cavity node skip it
             if (ulevels(el) > 1) cycle
 
+            elnodes = elem2D_nodes(:,el)
             !___________________________________________________________________
-            if (any(m_ice(elnodes)<=0._WP) .or. &
-                any(a_ice(elnodes)<=0._WP)) then
-
-                ! There is no ice in elem
-                ice_strength(el) = 0._WP
+            ! skip if any node is ice-free; rhs_a / rhs_m contributions only
+            ! make sense where there is ice on all three element nodes.
+            if (any(m_ice(elnodes) <= 0._WP) .or. &
+                any(a_ice(elnodes) <= 0._WP)) cycle
 
             !___________________________________________________________________
-            else
-                msum = sum(m_ice(elnodes))/3.0_WP
-                asum = sum(a_ice(elnodes))/3.0_WP
+            ! use rhs_m and rhs_a for storing the contribution from elevation:
+            aa = 9.81_WP*elem_area(el)/3.0_WP
 
-                !_______________________________________________________________
-                ! Hunke and Dukowicz c*h*p*
-#if defined (__icepack)
-                ice_strength(el) = ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
-#else
-                ice_strength(el) = ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
-#endif
-                ice_strength(el) = 0.5_WP*ice_strength(el)
+            !___________________________________________________________________
+            ! add and limit pressure from ice weight in case of floating ice
+            ! like in FESOM 1.4
+            p_ice=(rhoice*m_ice(elnodes)+rhosno*m_snow(elnodes))*inv_rhowat
+            do n=1,3
+                p_ice(n)=min(p_ice(n),max_ice_loading)
+            end do
+            !!PS p_ice= 0.0_WP
 
-                !_______________________________________________________________
-                ! use rhs_m and rhs_a for storing the contribution from elevation:
-                aa = 9.81_WP*elem_area(el)/3.0_WP
+            !___________________________________________________________________
+            elevation_elem = elevation(elnodes)
+            elevation_dx   = sum(gradient_sca(1:3,el)*(elevation_elem+p_ice*use_pice))
+            elevation_dy   = sum(gradient_sca(4:6,el)*(elevation_elem+p_ice*use_pice))
 
-                !_______________________________________________________________
-                ! add and limit pressure from ice weight in case of floating ice
-                ! like in FESOM 1.4
-                p_ice=(rhoice*m_ice(elnodes)+rhosno*m_snow(elnodes))*inv_rhowat
-                do n=1,3
-                    p_ice(n)=min(p_ice(n),max_ice_loading)
-                end do
-                !!PS p_ice= 0.0_WP
-
-                !_______________________________________________________________
-                elevation_elem = elevation(elnodes)
-                elevation_dx   = sum(gradient_sca(1:3,el)*(elevation_elem+p_ice*use_pice))
-                elevation_dy   = sum(gradient_sca(4:6,el)*(elevation_elem+p_ice*use_pice))
-
-                !_______________________________________________________________
-                do k = 1, 3
+            !___________________________________________________________________
+            do k = 1, 3
 #if !defined(DISABLE_OPENACC_ATOMICS)
-                    !$ACC ATOMIC UPDATE
+                !$ACC ATOMIC UPDATE
 #endif
-                    rhs_a(elnodes(k)) = rhs_a(elnodes(k))-aa*elevation_dx
+                rhs_a(elnodes(k)) = rhs_a(elnodes(k))-aa*elevation_dx
 #if !defined(DISABLE_OPENACC_ATOMICS)
-                    !$ACC ATOMIC UPDATE
+                !$ACC ATOMIC UPDATE
 #endif
-                    rhs_m(elnodes(k)) = rhs_m(elnodes(k))-aa*elevation_dy
-                end do
-            end if
+                rhs_m(elnodes(k)) = rhs_m(elnodes(k))-aa*elevation_dy
+            end do
         enddo
 #ifndef ENABLE_OPENACC
 !$OMP END DO
@@ -578,62 +573,47 @@ subroutine EVPdynamics(ice, partit, mesh)
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC END PARALLEL LOOP
 #else
-        !$ACC UPDATE DEVICE(rhs_a, rhs_m, ice_strength)
+        !$ACC UPDATE DEVICE(rhs_a, rhs_m)
 #endif
 #endif
     else
         ! for linear free surface
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnodes, msum, asum, aa, elevation_elem, elevation_dx, elevation_dy)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnodes, aa, elevation_elem, elevation_dx, elevation_dy)
 #else
 #if !defined(DISABLE_OPENACC_ATOMICS)
             !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(elnodes) DEFAULT(PRESENT)
 #else
-            !$ACC UPDATE SELF(rhs_a, rhs_m, ice_strength, m_ice, a_ice)
+            !$ACC UPDATE SELF(rhs_a, rhs_m, m_ice, a_ice)
 #endif
 #endif
         do el = 1,myDim_elem2D
-            ice_strength(el)=0.0_WP
-            elnodes = elem2D_nodes(:,el)
             !___________________________________________________________________
             ! if element has any cavity node skip it
             if (ulevels(el) > 1) cycle
 
+            elnodes = elem2D_nodes(:,el)
             !___________________________________________________________________
+            ! skip if any node is ice-free
             if (any(m_ice(elnodes) <= 0._WP) .or. &
-                any(a_ice(elnodes) <=0._WP)) then
+                any(a_ice(elnodes) <= 0._WP)) cycle
 
-                ! There is no ice in elem
-                ice_strength(el) = 0._WP
-            else
-                msum = sum(m_ice(elnodes))/3.0_WP
-                asum = sum(a_ice(elnodes))/3.0_WP
+            ! use rhs_m and rhs_a for storing the contribution from elevation:
+            aa = 9.81_WP*elem_area(el)/3.0_WP
 
-                ! ===== Hunke and Dukowicz c*h*p*
-#if defined (__icepack)
-                ice_strength(el) = ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
-#else
-                ice_strength(el) = ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
-#endif
-                ice_strength(el) = 0.5_WP*ice_strength(el)
+            elevation_dx = sum(gradient_sca(1:3,el)*elevation(elnodes))
+            elevation_dy = sum(gradient_sca(4:6,el)*elevation(elnodes))
 
-                ! use rhs_m and rhs_a for storing the contribution from elevation:
-                aa = 9.81_WP*elem_area(el)/3.0_WP
-
-                elevation_dx = sum(gradient_sca(1:3,el)*elevation(elnodes))
-                elevation_dy = sum(gradient_sca(4:6,el)*elevation(elnodes))
-
-                do k = 1, 3
+            do k = 1, 3
 #if !defined(DISABLE_OPENACC_ATOMICS)
-                    !$ACC ATOMIC UPDATE
+                !$ACC ATOMIC UPDATE
 #endif
-                    rhs_a(elnodes(k)) = rhs_a(elnodes(k))-aa*elevation_dx
+                rhs_a(elnodes(k)) = rhs_a(elnodes(k))-aa*elevation_dx
 #if !defined(DISABLE_OPENACC_ATOMICS)
-                    !$ACC ATOMIC UPDATE
+                !$ACC ATOMIC UPDATE
 #endif
-                    rhs_m(elnodes(k)) = rhs_m(elnodes(k))-aa*elevation_dy
-                end do
-            end if
+                rhs_m(elnodes(k)) = rhs_m(elnodes(k))-aa*elevation_dy
+            end do
         enddo
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
@@ -641,7 +621,7 @@ subroutine EVPdynamics(ice, partit, mesh)
 #if !defined(DISABLE_OPENACC_ATOMICS)
             !$ACC END PARALLEL LOOP
 #else
-            !$ACC UPDATE DEVICE(rhs_a, rhs_m, ice_strength)
+            !$ACC UPDATE DEVICE(rhs_a, rhs_m)
 #endif
 #endif
     endif ! --> if ( .not. trim(which_ALE)=='linfs') then
