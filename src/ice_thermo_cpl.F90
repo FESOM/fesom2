@@ -483,9 +483,12 @@ contains
     !---- melt pond calculations (if enabled)
     fpond = 0._WP
     if (ice%thermo%use_meltponds .and. A > Aimin) then
-        ! Calculate melt rates for pond formation
-        meltt_rate = max(0._WP, -dhgrowth)  ! Top melt rate (negative dhgrowth is melting)
-        melts_rate = max(0._WP, -dhsngrowth) ! Snow melt rate
+        ! Signed net thermodynamic tendency as proxy for surface conditions:
+        !   meltt_rate > 0  -> net melting  (top surface losing ice)
+        !   meltt_rate < 0  -> net freezing (top surface gaining ice)
+        ! meltpond_area uses the sign to drive pond-lid formation/melt.
+        meltt_rate = -dhgrowth
+        melts_rate = -dhsngrowth
         
         ! Update melt pond area and depth
         call meltpond_area(A, h, hsn, meltt_rate, melts_rate, dt, &

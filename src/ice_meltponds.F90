@@ -100,8 +100,8 @@ module ice_meltponds
         ! Current pond volume per unit area
         volpnd_init = apnd * hpnd
         
-        ! Add melt water (both surface and snow melt)
-        dvolpnd = rfrac * (meltt + melts) * dt
+        ! Add melt water (only positive contributions; freezing must not remove pond water)
+        dvolpnd = rfrac * (max(c0, meltt) + max(c0, melts)) * dt
         volpnd = volpnd_init + dvolpnd
         
         ! Pond drainage - simple exponential decay when snow is thin
@@ -136,15 +136,14 @@ module ice_meltponds
         ! Calculate fresh water flux (pond volume change)
         fpond = (volpnd - volpnd_init) / dt
         
-        ! Simple pond ice formation/melting (frozen lid)
-        if (meltt < c0 .and. apnd > puny) then
-            ! Freezing conditions - form/thicken pond ice
-            ipnd = ipnd - meltt * dt  ! meltt is negative for freezing
-            ipnd = max(c0, ipnd)
-        else
-            ! Melting conditions - melt pond ice
-            ipnd = max(c0, ipnd + meltt * dt)
-        endif
+        ! Pond ice lid update; meltt sign convention: <0 freezing, >0 melting.
+        if (meltt < c0) then
+            ! Surface freezing: thicken lid only where a pond actually exists
+            if (apnd > puny) ipnd = ipnd - meltt * dt   ! meltt<0 -> grow
+        else if (meltt > c0) then
+            ! Surface melting: thin pond ice lid
+            ipnd = max(c0, ipnd - meltt * dt)           ! meltt>0 -> shrink
+        end if
         
     end subroutine meltpond_area
     
