@@ -20,13 +20,13 @@ module ice_meltponds
     real(kind=WP), parameter :: hs0 = 0.0_WP         ! Snow depth controlling drainage [m] 
     real(kind=WP), parameter :: hs1 = 0.03_WP        ! Snow depth threshold [m]
     real(kind=WP), parameter :: rfracmin = 0.15_WP   ! Minimum retained melt fraction
-    real(kind=WP), parameter :: rfracmax = 1.0_WP    ! Maximum retained melt fraction
+    real(kind=WP), parameter :: rfracmax = 0.5_WP    ! Maximum retained melt fraction
     real(kind=WP), parameter :: pndaspect = 0.8_WP   ! Pond aspect ratio
     real(kind=WP), parameter :: dpscale = 1.e-3_WP   ! Drainage timescale parameter
-    
-    ! Pond albedo parameters
-    real(kind=WP), parameter :: albpnd = 0.2_WP      ! Pond albedo (open water-like)
-    real(kind=WP), parameter :: albpnd_frz = 0.36_WP ! Frozen pond albedo
+
+    ! Pond albedo parameters (CICE/CESM-range)
+    real(kind=WP), parameter :: albpnd = 0.30_WP     ! Open melt pond albedo
+    real(kind=WP), parameter :: albpnd_frz = 0.50_WP ! Frozen pond albedo
     
     ! Physical constants
     real(kind=WP), parameter :: puny = 1.e-11_WP     ! Small number
