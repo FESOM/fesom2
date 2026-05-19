@@ -2355,7 +2355,7 @@ contains
       integer       ::  nabp,i,ilam
 
       darwin_waves =0.0d0
-      IF ( darwin_waves(1).EQ.0.0d0 .AND. tlam.EQ.13 ) THEN
+!sl      IF ( darwin_waves(1).EQ.0.0d0 .AND. tlam.EQ.13 ) THEN
         darwin_waves(1) = 400
         darwin_waves(2) = 425
         darwin_waves(3) = 450
@@ -2369,7 +2369,7 @@ contains
         darwin_waves(11) = 650
         darwin_waves(12) = 675
         darwin_waves(13) = 700
-      ENDIF
+!sl      ENDIF
 
 
 !sl      _BEGIN_MASTER(myThid)
@@ -2382,13 +2382,13 @@ contains
       oavo = 1.0/6.023d23   ! 1/Avogadros number
       hcoavo = hc*oavo
       do i = 1,tlam
-       rlamm = darwin_waves(ilam)*1.0d-9  !lambda in m
+       rlamm = darwin_waves(i)*1.0d-9  !lambda in m
        WtouEins(i) = 1.0d6*rlamm*hcoavo      !Watts to uEin/s conversion
        IF ( rlamm .EQ. 0.0 ) THEN
         WRITE(msgBuf,'(2A)') 'RECOM_READPARMS: ',    &
        'please provide wavelengths in darwin_waves.'
 !sl        CALL PRINT_ERROR( msgBuf, myThid )
-        STOP 'ABNORMAL END: S/R RECOM_READPARNS'
+        STOP 'ABNORMAL END: S/R RECOM_READPARMS'
        ENDIF
       enddo
          
