@@ -269,6 +269,13 @@ endif
 
     call Depth_calculations(n, Nn,SinkVel,zF,thick,recipthick, partit, mesh)
 
+!SL as proposed moved from following down lines    
+    !!---- lon
+    Lond=geo_coord_nod2D(1,n)/rad !! convert from rad to degree
+    !!---- lat
+    Latr=geo_coord_nod2D(2,n)
+    Latd=geo_coord_nod2D(2,n)/rad !! convert from rad to degree
+    
 !------------SPECTRAL LIGHT--------------------------------------------
 !======================================================================
 #if defined(__RECOM_WAVEBANDS)
@@ -283,6 +290,11 @@ endif
        ldiscEu = 0
        discEs = 0.
        discEu = 0.
+!SL as proposed:
+!if (OASIM) then
+!      call recom_oasim_get_surface_light(...)
+!returning oasim_ed(:) and oasim_es(:) on the model wavebands
+!endif
 ! ------ GET constant acdom_k -------
      DO k=1,Nr
      if (.not. RECOM_CALC_ACDOM) then
@@ -759,12 +771,12 @@ endif        !/* RECOM_RADTRANS */
 
     !!---- convert from Pa to atm.
     Patm = Loc_slp/Pa2atm  
-
-    !!---- lon
-    Lond=geo_coord_nod2D(1,n)/rad !! convert from rad to degree
-    !!---- lat
-    Latr=geo_coord_nod2D(2,n)
-    Latd=geo_coord_nod2D(2,n)/rad !! convert from rad to degree
+!SL as proposed to move up: moved up
+!sl    !!---- lon
+!sl    Lond=geo_coord_nod2D(1,n)/rad !! convert from rad to degree
+!sl    !!---- lat
+!sl    Latr=geo_coord_nod2D(2,n)
+!sl    Latd=geo_coord_nod2D(2,n)/rad !! convert from rad to degree
 
     !!---- calculate piston velocity kw660, which is an input to the flxco2 calculation
     !!---- pistonvel already scaled for ice-free area

@@ -324,6 +324,15 @@ subroutine recom_init(tracers, partit, mesh)
     Euz3D     = 0.d0
     Eutop3D   = 0.d0
     Estop3D   = 0.d0
+    call wavebands_init_fixed(mype)    
+!if (OASIM) then
+!SL as proposed
+    allocate(oasim_ed2D(node_size,tlam))
+    allocate(oasim_es2D(node_size,tlam))
+    oasim_ed2D = 0.d0
+    oasim_es2D = 0.d0
+!   call recom_oasim_init(mesh, partit, mype)
+!endif   
 #endif
 
 !! *** Allocate ballasting ***

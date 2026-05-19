@@ -2017,6 +2017,15 @@ module REcoM_spectral
    Real(kind=8)                                :: OASIM_lat_inc
    INTEGER                                     :: OASIM_nlon
    INTEGER                                     :: OASIM_nlat
+   character(len=256) :: OASIM_path
+   character(len=128) :: OASIM_file_pattern
+   character(len=32)  :: OASIM_Ed_varname
+   character(len=32)  :: OASIM_Es_varname
+   logical            :: OASIM_time_interp = .true.
+   logical            :: OASIM_wavelength_interp = .true.
+   real(kind=8)       :: OASIM_missing_value = -1.d30
+   Real(kind=8), allocatable, dimension(:,:) :: oasim_es2D
+   Real(kind=8), allocatable, dimension(:,:) :: oasim_ed2D
 !SL endif
 !sl consider this module only in case of RECOM_WAVEBANDS
 !sl then the followingb line should be commented 
@@ -2345,6 +2354,24 @@ contains
 ! local indeces
       integer       ::  nabp,i,ilam
 
+      darwin_waves =0.0d0
+      IF ( darwin_waves(1).EQ.0.0d0 .AND. tlam.EQ.13 ) THEN
+        darwin_waves(1) = 400
+        darwin_waves(2) = 425
+        darwin_waves(3) = 450
+        darwin_waves(4) = 475
+        darwin_waves(5) = 500
+        darwin_waves(6) = 525
+        darwin_waves(7) = 550
+        darwin_waves(8) = 575
+        darwin_waves(9) = 600
+        darwin_waves(10) = 625
+        darwin_waves(11) = 650
+        darwin_waves(12) = 675
+        darwin_waves(13) = 700
+      ENDIF
+
+
 !sl      _BEGIN_MASTER(myThid)
       if (mype == 0) then
 !sl      rad = 180.0D0/pid        
@@ -2361,7 +2388,7 @@ contains
         WRITE(msgBuf,'(2A)') 'RECOM_READPARMS: ',    &
        'please provide wavelengths in darwin_waves.'
 !sl        CALL PRINT_ERROR( msgBuf, myThid )
-        STOP 'ABNORMAL END: S/R RECOM_READPARMS'
+        STOP 'ABNORMAL END: S/R RECOM_READPARNS'
        ENDIF
       enddo
          
@@ -3812,6 +3839,12 @@ if (RECOM_CALC_APHYT) then
 endif !/* RECOM_CALC_APHYT */
       RETURN
       END SUBROUTINE RECOM_APHYTO
+
+!   subroutine recom_oasim_get_surface_light(n, time, lon, lat, oasim_ed, oasim_es, mesh, partit)
+!   ! Read monthly OASIM/NOBM fields
+!   ! Interpolate in time, horizontal space, and possibly wavelength
+!   ! Return Ed and Es on REcoM wavebands
+!   end subroutine
 
 #endif /* RECOM_WAVEBANDS */
 
