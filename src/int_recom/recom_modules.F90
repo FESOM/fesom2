@@ -2045,7 +2045,7 @@ module REcoM_spectral
 ! tnabp = number of types of absorption spectra for phyto
 !         must match number of types in input data file for phyto absorption spectra
 
-         Integer, parameter                      :: tnabp = 4
+         Integer, parameter                      :: tnabp = 2
 !         PARAMETER (tnabp=2)
 ! Input and assigned data:
 ! pwaves       = actual values of wavebands (nm)
@@ -2354,7 +2354,8 @@ contains
 ! local indeces
       integer       ::  nabp,i,ilam
 
-      darwin_waves =0.0d0
+      darwin_waves = 0.0d0
+      darwin_wavebands = 0.0d0
 !sl      IF ( darwin_waves(1).EQ.0.0d0 .AND. tlam.EQ.13 ) THEN
         darwin_waves(1) = 400
         darwin_waves(2) = 425
@@ -2391,7 +2392,7 @@ contains
         STOP 'ABNORMAL END: S/R RECOM_READPARMS'
        ENDIF
       enddo
-         
+      if (mype==0) WRITE(*,*) ' 1 darwin_waves = ', darwin_waves    
 
 ! fill in missing waveband information:
 ! "representative values" darwin_waves need not be centered within
@@ -2399,43 +2400,49 @@ contains
 ! if representative values are not given, compute from waveband
 ! boundaries
       do i = 1,tlam
-        if (darwin_waves(i) .gt. 0) then
+        if (darwin_waves(i) .gt. 0.0d0) then
           pwaves(i) = darwin_waves(i)
-        elseif (darwin_wavebands(i).ge.0 .and.         &
-                darwin_wavebands(i+1).ge.0 ) then
+        elseif (darwin_wavebands(i).ge.0.0d0 .and.         &
+                darwin_wavebands(i+1).ge.0.0d0 ) then
           pwaves(i) = .5*(darwin_wavebands(i)+darwin_wavebands(i+1))
         else
           WRITE(msgBuf,'(3A)') 'WAVEBANDS_INIT_FIXED: ',          &
           'please provide wavelengths in darwin_waves or ',       &
           'waveband boundaries in darwin_wavebands.'
 !sl          CALL PRINT_ERROR( msgBuf, myThid )
-          STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED'
+          STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 1'
         endif
       enddo
+      if (mype==0) WRITE(*,*) '1 pwaves = ', pwaves
 
 ! if waveband boundaries not given, compute from representative values
 ! these will be used to compute waveband widths
       do i=1,tlam+1
-        if (darwin_wavebands(i).LT.0) then
+        if (darwin_wavebands(i).LE.0.0d0) then
 !         put boundaries half-way between central values
 !         but first and last boundary are at first and last "central" value
           if (i.eq.1) then
-            darwin_wavebands(i) = pwaves(1)
-          elseif (i.le.tlam) then
-            darwin_wavebands(i) = .5*(pwaves(i-1)+pwaves(i))
+            darwin_wavebands(i) = real(pwaves(1))
           else
-            darwin_wavebands(i) = pwaves(tlam)
-          endif
-        endif
-      enddo
+             if (i.le.tlam) then
+                darwin_wavebands(i) = 0.5*(real(pwaves(i-1))+real(pwaves(i)))
+             else
+                darwin_wavebands(i) = real(pwaves(tlam))
+              endif
+           endif
+         endif
+       enddo
+
+      if (mype==0) WRITE(*,*) ' darwin_wavebands = ', darwin_wavebands
+      if (mype==0) WRITE(*,*) ' pwaves = ', pwaves
 
 ! waveband widths used to compute total PAR and alpha_mean
-      wb_totalWidth = 0.0
+      wb_totalWidth = 0.0d0
       do i=1,tlam
         wb_width(i) = darwin_wavebands(i+1) - darwin_wavebands(i)
         wb_totalWidth = wb_totalWidth + wb_width(i)
 !       allow for zero-width wavebands...
-        if (wb_width(i).LT.0) then
+        if (wb_width(i).LT.0.0d0) then
 !sl          WRITE(msgBuf,'(2A,I3)') 'WAVEBANDS_INIT_FIXED: ',       &
 !sl          'negative waveband width encountered, waveband: ', i
 !sl          CALL PRINT_ERROR( msgBuf, myThid )
@@ -2453,15 +2460,19 @@ contains
 !sl           pwaves(ilam),darwin_wavebands(ilam+1),wb_width(ilam)
 !sl           CALL PRINT_ERROR( msgBuf, myThid )
 !sl          enddo
-          STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED'
+          STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 2'
         endif
       enddo
+      if (mype==0) WRITE(*,*) 'wb_Width = ', wb_width
+      !sl double check the following      
 !     ...but require at least one non-zero-width band
-      if (wb_totalWidth.LE.0) then
-        WRITE(msgBuf,'(2A)') 'WAVEBANDS_INIT_FIXED: ',           &
-        'need to provide waveband boundaries in darwin_wavebands.'
-!sl        CALL PRINT_ERROR( msgBuf, myThid )
-        STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED'
+      if (wb_totalWidth.LE.0.0d0) then
+        if (mype==0) then
+           WRITE(*,'(2A)') 'WAVEBANDS_INIT_FIXED: ',           &
+           'need to provide waveband boundaries in darwin_wavebands.'
+           WRITE(*,*) 'wb_totalWidth = ', wb_totalWidth
+        endif
+        STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 3'
       endif
 
 
@@ -2483,7 +2494,7 @@ contains
            WRITE(msgBuf,'(2A,I3,A,I4,A,I4)') 'WAVEBANDS_INIT_FIXED: ', &
            'ilam', ilam, ': ', swlambda, ' versus ', pwaves(ilam)
 !sl           CALL PRINT_ERROR( msgBuf, myThid )
-           STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED'
+           STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 4'
          endif
          aw(ilam) = saw
          bw(ilam) = sbw
@@ -2495,7 +2506,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> end Water d
         WRITE(msgBuf,'(A)')                                           &
             'WAVEBANDS_INIT_FIXED: need to specify water absorption'
 !sl        CALL PRINT_ERROR( msgBuf, myThid )
-        STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED'
+        STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 5'
       endif
 
 
@@ -2513,11 +2524,14 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> end Water d
         sbbp = 0.0d0
         do nabp = 1,tnabp
          read(iUnit,'(a50)')title   ! reads one line of text for the phytoplankton type header
+         if (mype==0) write(*,*) ' title = ', title
          do ilam  = 1,tlam
 if  (DAR_NONSPECTRAL_BACKSCATTERING_RATIO) then
           read(iUnit,30)splambda,sap,sap_ps,sbp
+          if (mype==0) write(*,*) ' DAR_NONSPECTRAL_BACKSCATTERING_RATIO ', splambda,sap,sap_ps,sbp
 else
           read(iUnit,'(i4,3f10.4,f20.14)')splambda,sap,sap_ps,sbp,sbbp
+          if (mype==0) write(*,*) 'no DAR_NONSPECTRAL_BACKSCATTERING_RATIO ', splambda,sap,sap_ps,sbp,sbbp
 endif
           if (splambda.NE.pwaves(ilam)) then
            WRITE(msgBuf,'(2A)') 'WAVEBANDS_INIT_FIXED: ',                &
@@ -2526,7 +2540,7 @@ endif
            WRITE(msgBuf,'(2A,I3,A,I4,A,I4)') 'WAVEBANDS_INIT_FIXED: ',   &
            'ilam', ilam, ': ', splambda, ' versus ', pwaves(ilam)
 !sl           CALL PRINT_ERROR( msgBuf, myThid )
-           STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED'
+           STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 6'
           endif
           ap(nabp,ilam) = sap
           ap_ps(nabp,ilam) = sap_ps
@@ -2540,7 +2554,7 @@ endif
         WRITE(msgBuf,'(A)')                                            &
             'WAVEBANDS_INIT_FIXED: need to specify phyto absorption'
 !sl        CALL PRINT_ERROR( msgBuf, myThid )
-        STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED'
+        STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 7'
       endif
 
 
@@ -2563,7 +2577,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> surfacespec
            WRITE(msgBuf,'(2A,I3,A,I4,A,I4)') 'WAVEBANDS_INIT_FIXED: ', &
            'ilam', ilam, ': ', ssflambda, ' versus ', pwaves(ilam)
 !sl           CALL PRINT_ERROR( msgBuf, myThid )
-           STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED'
+           STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 8'
         endif
         sf(ilam) = ssf
        enddo
@@ -2573,7 +2587,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> surfacespec
         WRITE(msgBuf,'(A)')                                            &
      &      'WAVEBANDS_INIT_FIXED: need surface spectrum'
 !sl        CALL PRINT_ERROR( msgBuf, myThid )
-        STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED'
+        STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 9'
       endif
 endif  ! no OASIM
 ! absorption by cdom
@@ -2617,7 +2631,7 @@ else  !/* RECOM_CALC_ACDOM */
             'WAVEBANDS_INIT_FIXED: no waveband found at ',            &
              darwin_lambda_aCDOM, ' nm (needed for RECOM_CALC_ACDOM).'
 !sl        CALL PRINT_ERROR( msgBuf, myThid )
-        STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED'
+        STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 10'
       endif
 
       WRITE(msgBuf,'(A,1P1E20.12)')                                   &
@@ -2649,7 +2663,7 @@ if (RECOM_CALC_REFLEC) then
        'darwin_diag_acdom_ilam =',darwin_diag_acdom_ilam,             &
        ' not found in darwin_waves'
 !sl       CALL PRINT_ERROR( msgBuf, myThid )
-       STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED'
+       STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 11'
 60     continue
       endif
 
@@ -2699,7 +2713,7 @@ if (.not. RECOM_CALC_APART) then
            WRITE(msgBuf,'(2A,I3,A,I4,A,I4)') 'WAVEBANDS_INIT_FIXED: ',&
            'ilam', ilam, ': ', splambda, ' versus ', pwaves(ilam)
 !sl           CALL PRINT_ERROR( msgBuf, myThid )
-           STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED'
+           STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 12'
          endif
          apart(ilam) = sap
          bpart(ilam) = sbp
