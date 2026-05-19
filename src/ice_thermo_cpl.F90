@@ -483,13 +483,15 @@ contains
     !---- melt pond calculations (if enabled)
     fpond = 0._WP
     if (ice%thermo%use_meltponds .and. A > Aimin) then
-        ! Calculate melt rates for pond formation
-        meltt_rate = max(0._WP, -dhgrowth)  ! Top melt rate (negative dhgrowth is melting)
-        melts_rate = max(0._WP, -dhsngrowth) ! Snow melt rate
-        
-        ! Update melt pond area and depth
-        call meltpond_area(A, h, hsn, meltt_rate, melts_rate, dt, &
-                          apnd(inod), hpnd(inod), ipnd(inod), fpond)
+        ! Top-ice and snow melt magnitudes (>= 0, m s^-1 of fresh water)
+        meltt_rate = max(0._WP, -dhgrowth)
+        melts_rate = max(0._WP, -dhsngrowth)
+        ! Lid freeze/melt is driven by ice surface temperature `t` (K) and the
+        ! atm->ice surface heat flux `a2ihf` (W m^-2, positive downward).
+        call meltpond_area(A, h, hsn, &
+                           meltt_rate, melts_rate, rain, &
+                           t, a2ihf, dt, &
+                           apnd(inod), hpnd(inod), ipnd(inod), fpond)
     else
         apnd(inod) = 0._WP
         hpnd(inod) = 0._WP
