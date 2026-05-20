@@ -582,24 +582,24 @@ contains
         recom_det2_tracer_id = (/1025, 1026, 1027, 1028/)        
 #if defined(__RECOM_WAVEBANDS)         
 !SL to be further extend for if cases
-if (RECOM_CDOM) then
-        icdom = 37 
-        recom_cdom_tracer_id = 1037
-endif    
-if (RECOM_RADTRANS) then
-if (RECOM_MARSHALL) then
-        ! MARSHALL related
-        id1 = 38
-        id1d = 39       
-        if (enable_coccos) then
-            id1c = 40
-            id1p = 41
-            recom_d1_tracer_id = (/1038, 1039, 1040, 1041/)
-        else
-            recom_d1_tracer_id = (/1038, 1039, 0, 0/)     
-        end if        
-endif
-endif          
+        if (RECOM_CDOM) then
+           icdom = 37 
+           recom_cdom_tracer_id = 1037
+        endif
+        if (RECOM_RADTRANS) then
+           if (RECOM_MARSHALL) then
+! MARSHALL related
+              id1 = 38
+              id1d = 39       
+              if (enable_coccos) then
+                 id1c = 40
+                 id1p = 41
+                 recom_d1_tracer_id = (/1038, 1039, 1040, 1041/)
+              else
+                 recom_d1_tracer_id = (/1038, 1039, 0, 0/)     
+              end if
+           endif
+        endif
 #endif
     else if (enable_coccos .and. .not. enable_3zoo2det) then
         ! =======================================================================
@@ -635,6 +635,21 @@ endif
 
 !        allocate(recom_det2_tracer_id(4))
         recom_det2_tracer_id = (/1025, 1026, 1027, 1028/)
+#if defined(__RECOM_WAVEBANDS)         
+!CV to be further extend for if cases
+        if (RECOM_CDOM) then
+           icdom = 31 
+           recom_cdom_tracer_id = 1031
+        endif
+        if (RECOM_RADTRANS) then
+           if (RECOM_MARSHALL) then
+! MARSHALL related
+              id1 = 32
+              id1d = 33       
+              recom_d1_tracer_id = (/1032, 1033, 0, 0/)     
+           endif
+        endif
+#endif
     else
         ! =======================================================================
         ! CASE: 2 phytoplankton + 1 zooplankton + 1 detritus (BASE CONFIGURATION)
@@ -697,19 +712,19 @@ subroutine validate_recom_tracers(num_tracers, mype)
     ! Total: 22 + 4 + 6 + 3 + 2 = 36 (actually 22 + 14 = 36)
     expected_bgc_num = 36
 #if defined(__RECOM_WAVEBANDS)    
-if (RECOM_CDOM) then
-    ! + 1 for CDOM 
-    expected_bgc_num = 37 
-endif    
-if (RECOM_RADTRANS) then
-if (RECOM_MARSHALL) then
-    ! + 2(4) MARSHALL related
-    expected_bgc_num = 39 
-    if (enable_coccos) then
-       expected_bgc_num = 41
-    end if
-endif
-endif    
+    if (RECOM_CDOM) then
+       ! + 1 for CDOM 
+       expected_bgc_num = 37 
+    endif
+    if (RECOM_RADTRANS) then
+       if (RECOM_MARSHALL) then
+          ! + 2(4) MARSHALL related
+          expected_bgc_num = 39 
+          if (enable_coccos) then
+             expected_bgc_num = 41
+          endif
+       endif
+    endif
 #endif
 
   else if (enable_coccos .and. .not. enable_3zoo2det) then
@@ -732,6 +747,21 @@ endif
     ! Additional microzoo: 2 tracers (1029-1030)
     ! Total: 22 + 8 = 30
     expected_bgc_num = 30
+#if defined(__RECOM_WAVEBANDS)    
+    if (RECOM_CDOM) then
+       ! + 1 for CDOM 
+       expected_bgc_num = 31 
+    endif
+    if (RECOM_RADTRANS) then
+       if (RECOM_MARSHALL) then
+          ! + 2(4) MARSHALL related
+          expected_bgc_num = 33 
+          if (enable_coccos) then
+             expected_bgc_num = 35
+          endif
+       endif
+    endif
+#endif
 
   else
     ! ---------------------------------------------------------------------------
@@ -781,23 +811,20 @@ endif
     expected_tracer_ids(37) = 1035  ! Zoo3N
     expected_tracer_ids(38) = 1036  ! Zoo3C
 #if defined(__RECOM_WAVEBANDS)    
-if (RECOM_CDOM) then
-    expected_tracer_ids(39) = 1037  ! CDOM
-endif    
-if (RECOM_RADTRANS) then
-if (RECOM_MARSHALL)then
-    ! + 2(4) MARSHALL related
-    expected_tracer_ids(40) = 1038  ! d1
-    expected_tracer_ids(41) = 1039  ! d1d
-    if (enable_coccos) then
-       expected_tracer_ids(42) = 1040  ! d1c
-       expected_tracer_ids(43) = 1041  ! d1p
-    end if
-endif
-endif
+    if (RECOM_CDOM) then
+       expected_tracer_ids(39) = 1037  ! CDOM
+    endif
+    if (RECOM_RADTRANS) then
+       if (RECOM_MARSHALL)then
+          ! + 2(4) MARSHALL related
+          expected_tracer_ids(40) = 1038  ! d1
+          expected_tracer_ids(41) = 1039  ! d1d
+          expected_tracer_ids(42) = 1040  ! d1c
+          expected_tracer_ids(43) = 1041  ! d1p
+       endif
+    endif
 #endif
     
-
   else if (enable_coccos .and. .not. enable_3zoo2det) then
     ! Coccos only: 1001-1022 (base) + 1023-1028 (coccos+phaeo)
     expected_tracer_ids(25) = 1023  ! CoccoN
@@ -817,6 +844,18 @@ endif
     expected_tracer_ids(30) = 1028  ! DetZ2Calc
     expected_tracer_ids(31) = 1029  ! Zoo3N
     expected_tracer_ids(32) = 1030  ! Zoo3C
+#if defined(__RECOM_WAVEBANDS)    
+    if (RECOM_CDOM) then
+       expected_tracer_ids(33) = 1031  ! CDOM
+    endif
+    if (RECOM_RADTRANS) then
+       if (RECOM_MARSHALL)then
+          ! + 2(4) MARSHALL related
+          expected_tracer_ids(34) = 1032  ! d1
+          expected_tracer_ids(35) = 1033  ! d1d
+       endif
+    endif
+#endif
   end if
   ! else: base configuration only needs tracers 1, 2, 1001-1022
 
@@ -864,17 +903,37 @@ endif
         write(*,*) '    - Zoo2N, Zoo2C:       1023-1024'
         write(*,*) '    - DetZ2 pool:         1025-1028'
         write(*,*) '    - MicZooN, MicZooC:   1029-1030'
-      else if (enable_coccos .and. .not. enable_3zoo2det) then
+#if defined(__RECOM_WAVEBANDS)    
+        if (RECOM_CDOM) then
+           write(*,*) '    - CDOM:               1031'       
+        endif
+        if (RECOM_RADTRANS) then
+           if (RECOM_MARSHALL)then
+              write(*,*) '    - D1Phy, D1Dia:       1032-1033'       
+           endif
+        endif
+#endif
+     else if (enable_coccos .and. .not. enable_3zoo2det) then
         write(*,*) '  Coccos extension:       1023-1028 (6 tracers)'
         write(*,*) '    - CoccoN, C, Chl:     1023-1025'
         write(*,*) '    - PhaeoN, C, Chl:     1026-1028'
-      else if (enable_3zoo2det .and. enable_coccos) then
+     else if (enable_3zoo2det .and. enable_coccos) then
         write(*,*) '    - Zoo2N, Zoo2C:       1023-1024'
         write(*,*) '  3Zoo2Det extension:     1025-1028 (4 tracers for det2)'
         write(*,*) '  Coccos extension:       1029-1034 (6 tracers)'
         write(*,*) '    - CoccoN, C, Chl:     1029-1031'
         write(*,*) '    - PhaeoN, C, Chl:     1032-1034'
         write(*,*) '  MicroZoo extension:     1035-1036 (2 tracers)'
+#if defined(__RECOM_WAVEBANDS)    
+        if (RECOM_CDOM) then
+           write(*,*) '    - CDOM:               1037'       
+        endif
+        if (RECOM_RADTRANS) then
+           if (RECOM_MARSHALL)then
+              write(*,*) '    - D1 for 4 phyto:    1038-1041'       
+           endif
+        endif
+#endif
       end if
 
       write(*,*) ''
