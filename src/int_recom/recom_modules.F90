@@ -97,7 +97,7 @@ module recom_config
   Logical                :: use_REcoM            = .true.
   Logical                :: REcoM_restart        = .false.
 
-  Integer                :: bgc_num               = 36      ! NEW increased the number from 28 to 34 (added coccos and respiration) ! NEW 3Zoo changed from 31 to 33 ! added phaeocystis: changed from 33 to 36
+  Integer                :: bgc_num               = 31      ! NEW increased the number from 28 to 34 (added coccos and respiration) ! NEW 3Zoo changed from 31 to 33 ! added phaeocystis: changed from 33 to 36
 !SL consider to increase bgc_num -> 41  
   integer                :: bgc_base_num          = 22      ! standard tracers
   Integer                :: diags3d_num           = 31      ! Number of diagnostic 3d tracers to be saved
@@ -591,13 +591,13 @@ contains
 ! MARSHALL related
               id1 = 38
               id1d = 39       
-              if (enable_coccos) then
+!sl              if (enable_coccos) then
                  id1c = 40
                  id1p = 41
                  recom_d1_tracer_id = (/1038, 1039, 1040, 1041/)
-              else
-                 recom_d1_tracer_id = (/1038, 1039, 0, 0/)     
-              end if
+!sl              else
+!sl                 recom_d1_tracer_id = (/1038, 1039, 0, 0/)     
+!sl              end if
            endif
         endif
 #endif
@@ -719,10 +719,7 @@ subroutine validate_recom_tracers(num_tracers, mype)
     if (RECOM_RADTRANS) then
        if (RECOM_MARSHALL) then
           ! + 2(4) MARSHALL related
-          expected_bgc_num = 39 
-          if (enable_coccos) then
-             expected_bgc_num = 41
-          endif
+          expected_bgc_num = 41
        endif
     endif
 #endif
@@ -756,9 +753,6 @@ subroutine validate_recom_tracers(num_tracers, mype)
        if (RECOM_MARSHALL) then
           ! + 2(4) MARSHALL related
           expected_bgc_num = 33 
-          if (enable_coccos) then
-             expected_bgc_num = 35
-          endif
        endif
     endif
 #endif
@@ -926,14 +920,14 @@ subroutine validate_recom_tracers(num_tracers, mype)
         write(*,*) '  MicroZoo extension:     1035-1036 (2 tracers)'
 #if defined(__RECOM_WAVEBANDS)    
         if (RECOM_CDOM) then
-           write(*,*) '    - CDOM:               1037'       
+           write(*,*) '    - CDOM:               1037'
         endif
         if (RECOM_RADTRANS) then
            if (RECOM_MARSHALL)then
-              write(*,*) '    - D1 for 4 phyto:    1038-1041'       
+              write(*,*) '    - D1 for 4 phyto:    1038-1041'
            endif
         endif
-#endif
+#endif        
       end if
 
       write(*,*) ''
@@ -1145,21 +1139,29 @@ subroutine validate_tracer_id_sequence(tracer_ids, num_tracers, mype)
 if (RECOM_RADTRANS) then
 if (RECOM_CDOM) then
     expected_ids(39:39) = (/1037/)
-endif    
+endif
 if (RECOM_MARSHALL) then
     expected_ids(40:41) = (/1038, 1039/)
-    if (enable_coccos) then
-       expected_ids(42:43) = (/1040, 1041/)
-    end if
+    expected_ids(42:43) = (/1040, 1041/)
 endif
 endif
-#endif
-
+#endif    
   else if (enable_coccos .and. .not. enable_3zoo2det) then
     expected_ids(25:30) = (/1023, 1024, 1025, 1026, 1027, 1028/)
 
   else if (enable_3zoo2det .and. .not. enable_coccos) then
     expected_ids(25:32) = (/1023, 1024, 1025, 1026, 1027, 1028, 1029, 1030/)
+#if defined(__RECOM_WAVEBANDS)    
+!SL indexing should be better organised    
+if (RECOM_RADTRANS) then
+if (RECOM_CDOM) then
+    expected_ids(33:33) = (/1031/)
+endif
+if (RECOM_MARSHALL) then
+    expected_ids(34:35) = (/1032, 1033/)
+endif
+endif
+#endif    
   end if
 
   ! ===========================================================================
