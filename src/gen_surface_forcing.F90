@@ -1042,7 +1042,17 @@ CONTAINS
 
 #if defined(__recom)
       namelist /nam_rsbc/ fe_data_source, nm_fe_data_file, nm_aen_data_file, nm_river_data_file, nm_erosion_data_file, nm_co2_data_file
-#endif
+#if defined (__recom_spectral)
+      namelist /nam_rspecsbc/  nm_ed400nm_file,  nm_ed425nm_file,  nm_ed450nm_file, nm_ed475nm_file, &
+           nm_ed500nm_file,  nm_ed525nm_file,  nm_ed550nm_file, nm_ed575nm_file, &
+           nm_ed600nm_file,  nm_ed625nm_file,  nm_ed650nm_file, nm_ed675nm_file, &
+           nm_ed700nm_file,  nm_ed725nm_file,  nm_ed750nm_file, nm_ed775nm_file, &
+           nm_es400nm_file,  nm_es425nm_file,  nm_es450nm_file, nm_es475nm_file, &
+           nm_es500nm_file,  nm_es525nm_file,  nm_es550nm_file, nm_es575nm_file, &
+           nm_es600nm_file,  nm_es625nm_file,  nm_es650nm_file, nm_es675nm_file, &
+           nm_es700nm_file,  nm_es725nm_file,  nm_es750nm_file, nm_es775nm_file
+#endif /* (__recom_spectral) */
+#endif /* (__recom) */
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"

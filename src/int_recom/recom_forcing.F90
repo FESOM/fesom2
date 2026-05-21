@@ -40,7 +40,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
     use g_support
 #if defined(__RECOM_WAVEBANDS)    
     use REcoM_spectral
-#endif /* RECOM_WAVEBANDS  */    
+#endif /* (__RECOM_WAVEBANDS)  */    
     implicit none
 
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -91,10 +91,10 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
     Real(kind=8)                                  :: PARwup_total
     Real(kind=8),dimension(tlam)                  :: Edwsf
     Real(kind=8),dimension(tlam)                  :: Eswsf
-!#ifdef RECOM_CALC_REFLEC
+!CV #ifdef RECOM_CALC_REFLEC
     INTEGER :: index
     Real(kind=8),dimension(mesh%nl-1)             :: PARw_kwb
-!#endif /* RECOM_CALC_REFLEC */
+!CV #endif /* RECOM_CALC_REFLEC */
     Real(kind=8),dimension(tlam)                  :: C_phot_nl
     Real(kind=8),dimension(tlam)                  :: C_phot_nl_dia
     Real(kind=8),dimension(tlam)                  :: C_phot_nl_cocco
@@ -208,8 +208,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
 !if (enable_coccos) then
 !! remember to introduce and declare new _cocco and _phaeo related
 !endif
-#endif /* RECOM_WAVEBANDS */    
-
+#endif /* (__RECOM_WAVEBANDS) */    
 
     !!---- Subroutine Depth
 
@@ -353,15 +352,15 @@ endif
 !     In Darwin-MONOD particulate matter is calculated in P units.
 !     We use either detC and a C per particle factor (Stramski 2001) or
 !     detC with a biomass-specific spectrum (Gallegos 2011).
-
-      DO ilam = 1,tlam
+    
+    DO ilam = 1,tlam
        DO k=1,Nr
 
-      if (RECOM_CALC_APART) then
-      apart_k(k,ilam) = part_k(k) * aparcoeff * exapar(ilam)
-         if (RECOM_RADTRANS) then
-         bpart_k(k,ilam) = part_k(k) * bparcoeff * exbpar(ilam)
-         bbpart_k(k,ilam) = part_k(k) * bparcoeff                         &
+          if (RECOM_CALC_APART) then
+             apart_k(k,ilam) = part_k(k) * aparcoeff * exapar(ilam)
+             if (RECOM_RADTRANS) then
+                bpart_k(k,ilam) = part_k(k) * bparcoeff * exbpar(ilam)
+                bbpart_k(k,ilam) = part_k(k) * bparcoeff             &
                        * exbpar(ilam) * bb_to_b
          endif
       else
@@ -386,17 +385,17 @@ endif
            PARadiation = SurfSW      
 ! sf is per nm; convert to per waveband
           Edwsf(ilam) = wb_width(ilam) * sf(ilam)                        &
-                      * PARadiation
+               * PARadiation
           Eswsf(ilam) = tiny
           PARwup(ilam) = Edwsf(ilam) * WtouEins(ilam)
-          endif
-          PARwup_diag(ilam) = PARwup(ilam)
-       enddo   ! ilam
-          PARwup_total = 0.
-             do ilam = 1,tlam
-             PARwup_total = PARwup_total + PARwup(ilam)
-             enddo ! ilam
-if (RECOM_RADTRANS) then
+       endif
+       PARwup_diag(ilam) = PARwup(ilam)
+    enddo   ! ilam
+    PARwup_total = 0.
+    do ilam = 1,tlam
+       PARwup_total = PARwup_total + PARwup(ilam)
+    enddo ! ilam
+    if (RECOM_RADTRANS) then
 !     Compute 1/cos(zenith) for direct light below surface given solar zenith
 !     angle (in radians) at surface (solz=zenith_deg from RECOM_INSOLATION.F)
          sinszaw = sin(solz)/rn
@@ -419,23 +418,23 @@ if (.not. RECOM_RADTRANS) then
            do ilam = 1,tlam
                if (zNodes(k).gt.0.d0) then
 ! get total attenuation (absorption) by phyto at each wavelength
-              actot(k,ilam) = 0.
-              actot(k,ilam) = actot(k,ilam)                         &
-                        + (phychl_k(1,k)*aphy_chl_k(k,ilam))        &
-                        + (phychl_k(2,k)*aphy_chl_dia_k(k,ilam))
-if (enable_coccos) then
-              actot(k,ilam) = actot(k,ilam)                         &
+                actot(k,ilam) = 0.
+                actot(k,ilam) = actot(k,ilam)                         &
+                     + (phychl_k(1,k)*aphy_chl_k(k,ilam))        &
+                     + (phychl_k(2,k)*aphy_chl_dia_k(k,ilam))
+                if (enable_coccos) then
+                   actot(k,ilam) = actot(k,ilam)                         &
                         + (phychl_k(3,k)*aphy_chl_cocco_k(k,ilam))  &
                         + (phychl_k(4,k)*aphy_chl_phaeo_k(k,ilam))
-endif
-              a_k(k,ilam) = aw(ilam)                                &
-                           + actot(k,ilam)                          &
-                           + acdom_k(k,ilam)                        &
-                           + apart_k(k,ilam)
-              atten = a_k(k,ilam) * thick(k)    !find drF(k) it is now thick why not dz_k ?
-              PARwdn(ilam) = PARwup(ilam)*exp(-atten)
-              endif
-           enddo !ilam
+                endif
+                a_k(k,ilam) = aw(ilam)                                &
+                     + actot(k,ilam)                          &
+                     + acdom_k(k,ilam)                        &
+                     + apart_k(k,ilam)
+                atten = a_k(k,ilam) * thick(k)    !find drF(k) it is now thick why not dz_k ?
+                PARwdn(ilam) = PARwup(ilam)*exp(-atten)
+             endif
+          enddo !ilam
 ! find for the midpoint of the gridcell (gridcell mean)
 ! what could it be instead of hFacC dch w.r.t. drF(k)=:thick
 ! zNodes ??
@@ -454,38 +453,38 @@ endif
                 endif
            enddo   !ilam
 ! sum wavebands for total PAR at the mid point of the gridcell (PARl)
-           PARl(k) = 0.
-            do ilam = 1,tlam
-              PARl(k) = PARl(k) + PARw_k(ilam,k)
-            enddo !ilam
+          PARl(k) = 0.
+          do ilam = 1,tlam
+             PARl(k) = PARl(k) + PARw_k(ilam,k)
+          enddo !ilam
 !CCEA compute averages and wb=index for exporting
-             a_kave(k) = 0.d0
-             acdom_kave(k) = 0.d0
-             apart_kave(k) = 0.d0
-             actot_ave(k) = 0.d0
-              do ilam = 1,tlam
-                 a_kave(k)     = a_kave(k)                       &
-                               + wb_width(ilam) * a_k(k,ilam)
-                 acdom_kave(k) = acdom_kave(k)                   &
-                               + wb_width(ilam) * acdom_k(k,ilam)
-                 apart_kave(k) = apart_kave(k)                   &
-                               + wb_width(ilam) * apart_k(k,ilam)
-                 actot_ave(k)  = actot_ave(k)                    &
-                               + wb_width(ilam) * actot(k,ilam)
-              enddo   !ilam
-              a_kave(k) = a_kave(k) / wb_totalWidth
-             acdom_kave(k) = acdom_kave(k) / wb_totalWidth
-             apart_kave(k) = apart_kave(k) / wb_totalWidth
-             actot_ave(k) = actot_ave(k) / wb_totalWidth
-if (RECOM_CALC_REFLEC) then
+          a_kave(k) = 0.d0
+          acdom_kave(k) = 0.d0
+          apart_kave(k) = 0.d0
+          actot_ave(k) = 0.d0
+          do ilam = 1,tlam
+             a_kave(k)     = a_kave(k)                       &
+                  + wb_width(ilam) * a_k(k,ilam)
+             acdom_kave(k) = acdom_kave(k)                   &
+                  + wb_width(ilam) * acdom_k(k,ilam)
+             apart_kave(k) = apart_kave(k)                   &
+                  + wb_width(ilam) * apart_k(k,ilam)
+             actot_ave(k)  = actot_ave(k)                    &
+                  + wb_width(ilam) * actot(k,ilam)
+          enddo   !ilam
+          a_kave(k) = a_kave(k) / wb_totalWidth
+          acdom_kave(k) = acdom_kave(k) / wb_totalWidth
+          apart_kave(k) = apart_kave(k) / wb_totalWidth
+          actot_ave(k) = actot_ave(k) / wb_totalWidth
+          if (RECOM_CALC_REFLEC) then
              index = darwin_diag_acdom_ilam
              PARw_kwb(k) = PARw_k(index,k)
              a_kwb(k) = a_k(k,index)
              acdom_kwb(k) = acdom_k(k,index)
              apart_kwb(k) = apart_k(k,index)
              actot_wb(k) = actot(k,index)
-endif
-      enddo       !k
+          endif
+       enddo       !k
 ! iops surface for diagnostics
         DO ilam = 1,tlam
               IF( dz_k(kSurface) .GT. 0.d0)THEN
@@ -504,12 +503,12 @@ else        !/* RECOM_RADTRANS */
 !CEA Direct and difusse irradiance: both with OASIM, only Ed without
 !
 ! Compute total absorption/scattering coefficients
-      DO k=1,Nr
-       DO ilam = 1,tlam
-!   absorption by phyto: if RADTRANS actot is computed twice
-            actot(k,ilam) = 0.0
-            bctot(k,ilam) = 0.0
-            bbctot(k,ilam) = 0.0
+       DO k=1,Nr
+          DO ilam = 1,tlam
+             !   absorption by phyto: if RADTRANS actot is computed twice
+             actot(k,ilam) = 0.0
+             bctot(k,ilam) = 0.0
+             bbctot(k,ilam) = 0.0
 !            DO np = 1,npmax
             actot(k,ilam)  = actot(k,ilam)                       &
                            + phychl_k(1,k) * aphy_chl_k(k,ilam)  &
@@ -556,22 +555,22 @@ endif
 endif
 !            ENDDO
 !   total: water, CDOM, phyto, particles
-            a_k(k,ilam) = aw(ilam) + acdom_k(k,ilam)             &
-                        + actot(k,ilam) + apart_k(k,ilam)
-            bt_k(k,ilam) = bw(ilam)                              &
-                         + bctot(k,ilam) + bpart_k(k,ilam)
-            bb_k(k,ilam) = darwin_bbw * bw(ilam)                 &
-                         + bbctot(k,ilam) + bbpart_k(k,ilam)
-            bb_k(k,ilam) = MAX(darwin_bbmin, bb_k(k,ilam))
+             a_k(k,ilam) = aw(ilam) + acdom_k(k,ilam)             &
+                  + actot(k,ilam) + apart_k(k,ilam)
+             bt_k(k,ilam) = bw(ilam)                              &
+                  + bctot(k,ilam) + bpart_k(k,ilam)
+             bb_k(k,ilam) = darwin_bbw * bw(ilam)                 &
+                  + bbctot(k,ilam) + bbpart_k(k,ilam)
+             bb_k(k,ilam) = MAX(darwin_bbmin, bb_k(k,ilam))
 !   initialize output variables
-            Edz(ilam,k) = 0.0
-            Esz(ilam,k) = 0.0
-            Euz(ilam,k) = 0.0
-            Estop(ilam,k) = 0.0
-            Eutop(ilam,k) = 0.0
-            amp1(ilam,k) = 0.0
-            amp2(ilam,k) = 0.0
-        ENDDO    !ilam
+             Edz(ilam,k) = 0.0
+             Esz(ilam,k) = 0.0
+             Euz(ilam,k) = 0.0
+             Estop(ilam,k) = 0.0
+             Eutop(ilam,k) = 0.0
+             amp1(ilam,k) = 0.0
+             amp2(ilam,k) = 0.0
+          ENDDO    !ilam
        ENDDO     !k
 
 ! ------ Propagate three-beam light in the water column -------
@@ -632,10 +631,10 @@ endif
 !
 !     Now copy
        DO k=1,Nr
-                       PARl(k) = tirrq(k)
-           DO ilam = 1,tlam
-                       PARw_k(ilam,k) = tirrwq(ilam,k)
-           ENDDO  !ilam
+          PARl(k) = tirrq(k)
+          DO ilam = 1,tlam
+             PARw_k(ilam,k) = tirrwq(ilam,k)
+          ENDDO  !ilam
 !CCEA Compute averages and wb=index for exporting
              a_kave(k) = 0.d0
              acdom_kave(k) = 0.d0
@@ -693,15 +692,15 @@ if (RECOM_CALC_REFLEC) then
              acdom_kwb(k) = acdom_k(k,index)
              apart_kwb(k) = apart_k(k,index)
              actot_wb(k) = actot(k,index)
-
+             
              bt_kwb(k) = bt_k(k,index)
              bpart_kwb(k) = bpart_k(k,index)
              bctot_wb(k) = bctot(k,index)
-
+                
              bb_kwb(k) = bb_k(k,index)
              bbpart_kwb(k) = bbpart_k(k,index)
              bbctot_wb(k) = bbctot(k,index)
-
+                
              Edz_wb(k) = Edz(index,k)
              Esz_wb(k) = Esz(index,k)
              Euz_wb(k) = Euz(index,k)
@@ -724,28 +723,28 @@ endif
 
 ! ----------------- Reflectance -------------------------         
 !douple check w.r.t. existance name dz_k(kSurface) 
-        DO ilam = 1,tlam
-              IF( dz_k(kSurface) .GT. 0.0 )THEN
-                IF(Eswsf(ilam).GE.darwin_radmodThresh .OR.    &
-                   Edwsf(ilam).GE.darwin_radmodThresh ) THEN
+       DO ilam = 1,tlam
+          IF( dz_k(kSurface) .GT. 0.0 ) THEN
+             IF(Eswsf(ilam).GE.darwin_radmodThresh .OR.    &
+                  Edwsf(ilam).GE.darwin_radmodThresh ) THEN
                 Eupwel(ilam) = Eutop(ilam,kSurface)
                 Reflec(ilam) = Eupwel(ilam) /                 &
-                        (Eswsf(ilam) + Edwsf(ilam))
+                     (Eswsf(ilam) + Edwsf(ilam))
 !     iops surface
-             a_ksur(ilam) = a_k(kSurface,ilam)
-             acdom_ksur(ilam) = acdom_k(kSurface,ilam)
-             apart_ksur(ilam) = apart_k(kSurface,ilam)
-             actot_sur(ilam) = actot(kSurface,ilam)
-             bt_ksur(ilam) = bt_k(kSurface,ilam)
-             bpart_ksur(ilam) = bpart_k(kSurface,ilam)
-             bctot_sur(ilam) = bctot(kSurface,ilam)
-             bb_ksur(ilam) = bb_k(kSurface,ilam)
-             bbpart_ksur(ilam) = bbpart_k(kSurface,ilam)
-             bbctot_sur(ilam) = bbctot(kSurface,ilam)
-                ENDIF !light
-              ENDIF !depth         
-          ENDDO   !ilam   
-endif        !/* RECOM_RADTRANS */       
+                a_ksur(ilam) = a_k(kSurface,ilam)
+                acdom_ksur(ilam) = acdom_k(kSurface,ilam)
+                apart_ksur(ilam) = apart_k(kSurface,ilam)
+                actot_sur(ilam) = actot(kSurface,ilam)
+                bt_ksur(ilam) = bt_k(kSurface,ilam)
+                bpart_ksur(ilam) = bpart_k(kSurface,ilam)
+                bctot_sur(ilam) = bctot(kSurface,ilam)
+                bb_ksur(ilam) = bb_k(kSurface,ilam)
+                bbpart_ksur(ilam) = bbpart_k(kSurface,ilam)
+                bbctot_sur(ilam) = bbctot(kSurface,ilam)
+             ENDIF !light
+          ENDIF !depth         
+       ENDDO   !ilam   
+    endif        !/* RECOM_RADTRANS */       
 #endif /* RECOM_WAVEBANDS */
 !======================================================================
     
