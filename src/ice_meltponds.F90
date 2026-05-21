@@ -135,8 +135,12 @@ contains
         armor = min(c1, hi / 0.50_WP)
         rfrac = rfracmin + (rfracmax - rfracmin) * armor
 
-        ! Initial pond volume per unit grid area  (m of fresh water)
-        volpn_init = apnd * hpnd * aice
+        ! Pond water volume per unit grid area  (m of fresh water).
+        ! apnd is the absolute grid-cell fraction occupied by ponds (FESOM
+        ! convention), so volpn = apnd * hpnd is already grid-averaged.
+        ! dvn below uses an explicit * aice to convert per-ice-area melt
+        ! rates into the same grid-averaged units.
+        volpn_init = apnd * hpnd
         volpn      = volpn_init
         hlid       = ipnd
 
@@ -167,23 +171,52 @@ contains
             dhlid = -min(dhlid, hlid)                          ! <= 0, capped at existing lid
             hlid  = max(hlid + dhlid, c0)
         endif
-        ! Lid grow/melt redistributes pond water vs. ice mass
-        alid = apnd * aice                          ! lid sits on pond area
+        ! Lid grow/melt redistributes pond water vs. ice mass.
+        ! Lid sits on the current pond area: alid = apnd (FESOM absolute).
+        alid = apnd
         dvn  = dvn - dhlid * alid * rhoice_p/rhofresh
 
         volpn = volpn + dvn
 
         !-----------------------------------------------------------------------
-        ! Pond geometry — CESM aspect-ratio formulation
+        ! Pond geometry — Icepack `meltpond_lvl` dual-branch:
+        !   existing ponds get an incremental area update (preserve geometry),
+        !   new ponds form via the aspect-ratio sqrt formula.
         !-----------------------------------------------------------------------
-        if (volpn > puny) then
-            apondn = min(sqrt(volpn / (pndaspect * aice)), aice * 0.9_WP)
+        if (volpn <= c0) then
+            volpn  = c0
+            apondn = c0
+            hpondn = c0
+            hlid   = c0
+        else if (apnd > puny) then
+            ! Existing pond — incremental area update (Icepack absolute form:
+            !   d apondn_abs = 0.5 * dvn * aice / (pndaspect * apondn_abs_old)
+            ! ).  hpondn from volume conservation.
+            apondn = max(c0, min(aice * 0.9_WP, &
+                         apnd + p5 * dvn * aice / (pndaspect * apnd)))
+            if (apondn > puny) then
+                hpondn = volpn / apondn
+            else
+                hpondn = c0
+            endif
+        else if (aice > 10.0_WP * puny) then
+            ! New pond — aspect-ratio formula
+            apondn = min(sqrt(volpn * aice / pndaspect), aice * 0.9_WP)
             apondn = max(apondn, puny)
             hpondn = volpn / max(apondn, puny)
+        else
+            apondn = c0
+            hpondn = c0
+        endif
+
+        if (apondn > puny) then
             ! Limit pond depth to maintain positive freeboard:
             !   draft <= hi  =>  hpondn <= ((rhow-rhoi)*hi - rhos*hs) / rhofresh
             fbcap  = ((rhowat_p - rhoice_p) * hi - rhosno_p * hs) / rhofresh
             hpondn = min(hpondn, max(fbcap, c0))
+            ! Recompute volpn after freeboard cap so next step's bookkeeping
+            ! reflects the truncated pond water.
+            volpn  = apondn * hpondn
         else
             apondn = c0
             hpondn = c0
