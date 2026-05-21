@@ -122,6 +122,9 @@ subroutine setup_model(partit)
   read (fileunit, NML=paalkalinity_restoring)
   read (fileunit, NML=paballasting)
   read (fileunit, NML=paciso)
+#if defined (__RECOM_WAVEBANDS)
+  read (fileunit, NML=spectral)
+#endif
   close (fileunit)
 #endif
 

@@ -90,13 +90,15 @@ module recom_config
   Logical                :: enable_3zoo2det = .false.   ! Control extended zooplankton variables
   Logical                :: enable_coccos = .false.      ! Control coccolithophore variables
   namelist /parecomsetup/ enable_3zoo2det, enable_coccos
+!sl
+  Logical                :: FeLimit = .false.      ! ?? SL
 
 !! *** General configuration ***
 
   Logical                :: use_REcoM            = .true.
   Logical                :: REcoM_restart        = .false.
 
-  Integer                :: bgc_num               = 36      ! NEW increased the number from 28 to 34 (added coccos and respiration) ! NEW 3Zoo changed from 31 to 33 ! added phaeocystis: changed from 33 to 36
+  Integer                :: bgc_num               = 31      ! NEW increased the number from 28 to 34 (added coccos and respiration) ! NEW 3Zoo changed from 31 to 33 ! added phaeocystis: changed from 33 to 36
 !SL consider to increase bgc_num -> 41  
   integer                :: bgc_base_num          = 22      ! standard tracers
   Integer                :: diags3d_num           = 31      ! Number of diagnostic 3d tracers to be saved
@@ -510,18 +512,23 @@ module recom_config
                           rho_ref_water, visc_ref_water, w_ref1, w_ref2, depth_scaling1,   &
                           depth_scaling2, max_sinking_velocity
   !------------------------if RECOM_WAVEBANDS--------------------------
-#if defined (__RECOM_WAVEBANDS)  
+#if defined(__RECOM_WAVEBANDS)  
 !! *** General configuration ***
 
   Logical                :: RECOM_CDOM            = .true.
   Logical                :: RECOM_MARSHALL        = .false.
-  Logical                :: RECOM_RADTRANS        = .false.
+  Logical                :: RECOM_RADTRANS        = .true.
   Logical                :: OASIM                 = .false.
   Logical                :: RECOM_CALC_ACDOM      = .false.
   Logical                :: RECOM_CALC_APART      = .false.
   Logical                :: RECOM_CALC_APHYT      = .false.
   Logical                :: RECOM_CALC_REFLEC     = .false.
   Logical                :: RECOM_BMASS           = .false.
+  character(80)           :: darwin_waterabsorbFile = 'abw25par.dat'
+  character(80)           :: darwin_surfacespecFile = 'surfspec_13amt6.dat'
+  character(80)           :: darwin_phytoabsorbFile = 'optics_phyto_recom_carbon_12.dat'
+  character(80)           :: darwin_acdomFile       = 'aCDOM13amtVK2006.dat'
+  character(80)           :: darwin_particleabsorbFile = 'optics_detritus_3bb.dat'
   integer :: icdom
 !slif (RECOM_MARSHALL) then
   integer :: id1, id1d, id1c, id1p
@@ -532,7 +539,12 @@ module recom_config
   integer, dimension(4)  :: recom_d1_tracer_id = (/1038, 1039, 1040, 1041/)
   namelist /spectral/ RECOM_CDOM, RECOM_MARSHALL, RECOM_RADTRANS, OASIM, RECOM_BMASS, &
                       RECOM_CALC_ACDOM,  RECOM_CALC_APART, RECOM_CALC_APHYT,         &
-                      RECOM_CALC_REFLEC  
+                      RECOM_CALC_REFLEC, &
+                      darwin_waterabsorbFile, &
+                      darwin_surfacespecFile, &
+                      darwin_phytoabsorbFile, &
+                      darwin_acdomFile, &
+                      darwin_particleabsorbFile  
 #endif  
 contains
 
@@ -569,24 +581,24 @@ contains
 
 !        allocate(recom_det2_tracer_id(4))
         recom_det2_tracer_id = (/1025, 1026, 1027, 1028/)        
-#if defined (__RECOM_WAVEBANDS)         
+#if defined(__RECOM_WAVEBANDS)         
+!SL to be further extend for if cases
+        if (RECOM_CDOM) then
+           icdom = 37 
+           recom_cdom_tracer_id = 1037
+        endif
         if (RECOM_RADTRANS) then
-           !SL to be further extend for if cases
-           if (RECOM_CDOM) then
-              icdom = 37 
-              recom_cdom_tracer_id = 1037
-           endif
            if (RECOM_MARSHALL) then
-              ! MARSHALL related
+! MARSHALL related
               id1 = 38
               id1d = 39       
-              if (enable_coccos) then
+!sl              if (enable_coccos) then
                  id1c = 40
                  id1p = 41
                  recom_d1_tracer_id = (/1038, 1039, 1040, 1041/)
-              else
-                 recom_d1_tracer_id = (/1038, 1039, 0, 0/)     
-              end if
+!sl              else
+!sl                 recom_d1_tracer_id = (/1038, 1039, 0, 0/)     
+!sl              end if
            endif
         endif
 #endif
@@ -624,6 +636,21 @@ contains
 
 !        allocate(recom_det2_tracer_id(4))
         recom_det2_tracer_id = (/1025, 1026, 1027, 1028/)
+#if defined(__RECOM_WAVEBANDS)         
+!CV to be further extend for if cases
+        if (RECOM_CDOM) then
+           icdom = 31 
+           recom_cdom_tracer_id = 1031
+        endif
+        if (RECOM_RADTRANS) then
+           if (RECOM_MARSHALL) then
+! MARSHALL related
+              id1 = 32
+              id1d = 33       
+              recom_d1_tracer_id = (/1032, 1033, 0, 0/)     
+           endif
+        endif
+#endif
     else
         ! =======================================================================
         ! CASE: 2 phytoplankton + 1 zooplankton + 1 detritus (BASE CONFIGURATION)
@@ -685,18 +712,15 @@ subroutine validate_recom_tracers(num_tracers, mype)
     ! Additional microzoo: 2 tracers (1035-1036)
     ! Total: 22 + 4 + 6 + 3 + 2 = 36 (actually 22 + 14 = 36)
     expected_bgc_num = 36
-#if defined (__RECOM_WAVEBANDS)    
+#if defined(__RECOM_WAVEBANDS)    
+    if (RECOM_CDOM) then
+       ! + 1 for CDOM 
+       expected_bgc_num = 37 
+    endif
     if (RECOM_RADTRANS) then
-       if (RECOM_CDOM) then
-    ! + 1 for CDOM 
-          expected_bgc_num = 37 
-       endif
        if (RECOM_MARSHALL) then
           ! + 2(4) MARSHALL related
-          expected_bgc_num = 39 
-          if (enable_coccos) then
-             expected_bgc_num = 41
-          end if
+          expected_bgc_num = 41
        endif
     endif
 #endif
@@ -721,6 +745,18 @@ subroutine validate_recom_tracers(num_tracers, mype)
     ! Additional microzoo: 2 tracers (1029-1030)
     ! Total: 22 + 8 = 30
     expected_bgc_num = 30
+#if defined(__RECOM_WAVEBANDS)    
+    if (RECOM_CDOM) then
+       ! + 1 for CDOM 
+       expected_bgc_num = 31 
+    endif
+    if (RECOM_RADTRANS) then
+       if (RECOM_MARSHALL) then
+          ! + 2(4) MARSHALL related
+          expected_bgc_num = 33 
+       endif
+    endif
+#endif
 
   else
     ! ---------------------------------------------------------------------------
@@ -769,24 +805,21 @@ subroutine validate_recom_tracers(num_tracers, mype)
     expected_tracer_ids(36) = 1034  ! PhaeoChl
     expected_tracer_ids(37) = 1035  ! Zoo3N
     expected_tracer_ids(38) = 1036  ! Zoo3C
-#if defined (__RECOM_WAVEBANDS)    
+#if defined(__RECOM_WAVEBANDS)    
+    if (RECOM_CDOM) then
+       expected_tracer_ids(39) = 1037  ! CDOM
+    endif
     if (RECOM_RADTRANS) then
-       if (RECOM_CDOM) then
-          expected_tracer_ids(39) = 1037  ! CDOM
-       endif
        if (RECOM_MARSHALL)then
           ! + 2(4) MARSHALL related
           expected_tracer_ids(40) = 1038  ! d1
           expected_tracer_ids(41) = 1039  ! d1d
-          if (enable_coccos) then
-             expected_tracer_ids(42) = 1040  ! d1c
-             expected_tracer_ids(43) = 1041  ! d1p
-          end if
+          expected_tracer_ids(42) = 1040  ! d1c
+          expected_tracer_ids(43) = 1041  ! d1p
        endif
     endif
 #endif
     
-
   else if (enable_coccos .and. .not. enable_3zoo2det) then
     ! Coccos only: 1001-1022 (base) + 1023-1028 (coccos+phaeo)
     expected_tracer_ids(25) = 1023  ! CoccoN
@@ -806,6 +839,18 @@ subroutine validate_recom_tracers(num_tracers, mype)
     expected_tracer_ids(30) = 1028  ! DetZ2Calc
     expected_tracer_ids(31) = 1029  ! Zoo3N
     expected_tracer_ids(32) = 1030  ! Zoo3C
+#if defined(__RECOM_WAVEBANDS)    
+    if (RECOM_CDOM) then
+       expected_tracer_ids(33) = 1031  ! CDOM
+    endif
+    if (RECOM_RADTRANS) then
+       if (RECOM_MARSHALL)then
+          ! + 2(4) MARSHALL related
+          expected_tracer_ids(34) = 1032  ! d1
+          expected_tracer_ids(35) = 1033  ! d1d
+       endif
+    endif
+#endif
   end if
   ! else: base configuration only needs tracers 1, 2, 1001-1022
 
@@ -853,17 +898,37 @@ subroutine validate_recom_tracers(num_tracers, mype)
         write(*,*) '    - Zoo2N, Zoo2C:       1023-1024'
         write(*,*) '    - DetZ2 pool:         1025-1028'
         write(*,*) '    - MicZooN, MicZooC:   1029-1030'
-      else if (enable_coccos .and. .not. enable_3zoo2det) then
+#if defined(__RECOM_WAVEBANDS)    
+        if (RECOM_CDOM) then
+           write(*,*) '    - CDOM:               1031'       
+        endif
+        if (RECOM_RADTRANS) then
+           if (RECOM_MARSHALL)then
+              write(*,*) '    - D1Phy, D1Dia:       1032-1033'       
+           endif
+        endif
+#endif
+     else if (enable_coccos .and. .not. enable_3zoo2det) then
         write(*,*) '  Coccos extension:       1023-1028 (6 tracers)'
         write(*,*) '    - CoccoN, C, Chl:     1023-1025'
         write(*,*) '    - PhaeoN, C, Chl:     1026-1028'
-      else if (enable_3zoo2det .and. enable_coccos) then
+     else if (enable_3zoo2det .and. enable_coccos) then
         write(*,*) '    - Zoo2N, Zoo2C:       1023-1024'
         write(*,*) '  3Zoo2Det extension:     1025-1028 (4 tracers for det2)'
         write(*,*) '  Coccos extension:       1029-1034 (6 tracers)'
         write(*,*) '    - CoccoN, C, Chl:     1029-1031'
         write(*,*) '    - PhaeoN, C, Chl:     1032-1034'
         write(*,*) '  MicroZoo extension:     1035-1036 (2 tracers)'
+#if defined(__RECOM_WAVEBANDS)    
+        if (RECOM_CDOM) then
+           write(*,*) '    - CDOM:               1037'
+        endif
+        if (RECOM_RADTRANS) then
+           if (RECOM_MARSHALL)then
+              write(*,*) '    - D1 for 4 phyto:    1038-1041'
+           endif
+        endif
+#endif        
       end if
 
       write(*,*) ''
@@ -1070,26 +1135,34 @@ subroutine validate_tracer_id_sequence(tracer_ids, num_tracers, mype)
     expected_ids(25:30) = (/1023, 1024, 1025, 1026, 1027, 1028/)
     expected_ids(31:36) = (/1029, 1030, 1031, 1032, 1033, 1034/)
     expected_ids(37:38) = (/1035, 1036/)
-#if defined (__RECOM_WAVEBANDS)    
+#if defined(__RECOM_WAVEBANDS)    
 !SL indexing should be better organised    
-    if (RECOM_RADTRANS) then
-       if (RECOM_CDOM) then
-          expected_ids(39:39) = (/1037/)
-       endif
-       if (RECOM_MARSHALL) then
-          expected_ids(40:41) = (/1038, 1039/)
-          if (enable_coccos) then
-             expected_ids(42:43) = (/1040, 1041/)
-          end if
-       endif
-    endif
-#endif
-
+if (RECOM_RADTRANS) then
+if (RECOM_CDOM) then
+    expected_ids(39:39) = (/1037/)
+endif
+if (RECOM_MARSHALL) then
+    expected_ids(40:41) = (/1038, 1039/)
+    expected_ids(42:43) = (/1040, 1041/)
+endif
+endif
+#endif    
   else if (enable_coccos .and. .not. enable_3zoo2det) then
     expected_ids(25:30) = (/1023, 1024, 1025, 1026, 1027, 1028/)
 
   else if (enable_3zoo2det .and. .not. enable_coccos) then
     expected_ids(25:32) = (/1023, 1024, 1025, 1026, 1027, 1028, 1029, 1030/)
+#if defined(__RECOM_WAVEBANDS)    
+!SL indexing should be better organised    
+if (RECOM_RADTRANS) then
+if (RECOM_CDOM) then
+    expected_ids(33:33) = (/1031/)
+endif
+if (RECOM_MARSHALL) then
+    expected_ids(34:35) = (/1032, 1033/)
+endif
+endif
+#endif    
   end if
 
   ! ===========================================================================
@@ -1944,12 +2017,13 @@ module REcoM_spectral
   use recom_config      
   implicit none
   save
-#if defined (__RECOM_WAVEBANDS)
+#if defined(__RECOM_WAVEBANDS)
 ! Module REcoM_constants: tracer indices
 !sl  integer :: icdom  ! moved to general recom_module
   Logical :: DAR_NONSPECTRAL_BACKSCATTERING_RATIO =.false.
   Logical :: DAR_RADTRANS_RMUS_PAR =.false.
   Logical :: DAR_RADTRANS_DECREASING =.false.
+!  integer :: ed_num = 5   ! number of light related diagnostic 
 !sl the following lines moved to general recom_module  
 !slif (RECOM_MARSHALL) then
 !sl  integer :: id1, id1d, id1c, id1p
@@ -1971,10 +2045,22 @@ module REcoM_spectral
    Real(kind=8)                :: k_deg_d              = 8.0e-7    ! Target size for photoinhibition [m^{-2} (J)^{-1}]
    Real(kind=8)                :: r_max_d              = 20.       ! Maximum repair rate [d^{-1}]
    Real(kind=8)                :: k_rep_d              = 0.5       ! half saturation constant for repair, [same as DD1]
+   !sl if cocco
+   Real(kind=8)                :: astar_cocco              = 0.007     ! chlorophyll absortion cross section [m^{-2} (mg CHL)^{-1}]
+   Real(kind=8)                :: k_deg_cocco              = 8.0e-7    ! Target size for photoinhibition [m^{-2} (J)^{-1}]
+   Real(kind=8)                :: r_max_cocco              = 20.       ! Maximum repair rate [d^{-1}]
+   Real(kind=8)                :: k_rep_cocco              = 0.5       ! half saturation constant for repair, [same as DD1]
+   Real(kind=8)                :: astar_phaeo              = 0.007     ! chlorophyll absortion cross section [m^{-2} (mg CHL)^{-1}]
+   Real(kind=8)                :: k_deg_phaeo              = 8.0e-7    ! Target size for photoinhibition [m^{-2} (J)^{-1}]
+   Real(kind=8)                :: r_max_phaeo              = 20.       ! Maximum repair rate [d^{-1}]
+   Real(kind=8)                :: k_rep_phaeo              = 0.5       ! half saturation constant for repair, [same as DD1]   
+   !sl  
 !     photoinhibition
 !#ifndef RECOM_WAVEBANDS
    Real(kind=8)                :: QYmax                = 4.8e-4    ! maximum quantum yield of photosynthesis [mmol C (J)^{-1}]
    Real(kind=8)                :: QYmax_d              = 4.8e-4    ! maximum quantum yield of photosynthesis [mmol C (J)^{-1}]
+   Real(kind=8)                :: QYmax_cocco          = 4.8e-4    ! maximum quantum yield of photosynthesis [mmol C (J)^{-1}]
+   Real(kind=8)                :: QYmax_phaeo          = 4.8e-4    ! maximum quantum yield of photosynthesis [mmol C (J)^{-1}]
 !#endif
 !slendif
 !SL TODO: introduce a related namelist file
@@ -1993,6 +2079,15 @@ module REcoM_spectral
    Real(kind=8)                                :: OASIM_lat_inc
    INTEGER                                     :: OASIM_nlon
    INTEGER                                     :: OASIM_nlat
+   character(len=256) :: OASIM_path
+   character(len=128) :: OASIM_file_pattern
+   character(len=32)  :: OASIM_Ed_varname
+   character(len=32)  :: OASIM_Es_varname
+   logical            :: OASIM_time_interp = .true.
+   logical            :: OASIM_wavelength_interp = .true.
+   real(kind=8)       :: OASIM_missing_value = -1.d30
+   Real(kind=8), allocatable, dimension(:,:) :: oasim_es2D
+   Real(kind=8), allocatable, dimension(:,:) :: oasim_ed2D
 !SL endif
 !sl consider this module only in case of RECOM_WAVEBANDS
 !sl then the followingb line should be commented 
@@ -2012,7 +2107,7 @@ module REcoM_spectral
 ! tnabp = number of types of absorption spectra for phyto
 !         must match number of types in input data file for phyto absorption spectra
 
-   Integer, parameter                      :: tnabp = 4
+         Integer, parameter                      :: tnabp = 2
 !         PARAMETER (tnabp=2)
 ! Input and assigned data:
 ! pwaves       = actual values of wavebands (nm)
@@ -2099,27 +2194,29 @@ module REcoM_spectral
 
 ! Initially was ap_type(npmax), the number of PT
 
-   Integer,dimension(4)         :: ap_type
-   Integer,parameter            :: tlam = 13
-   Integer,dimension(tlam)      :: pwaves
+         Integer,dimension(tnabp)         :: ap_type
+         Integer,parameter            :: tlam = 13
+         Integer,dimension(tlam)      :: pwaves
 
-   Real(kind=8),dimension(tlam) :: aphy_chl
-   Real(kind=8),dimension(tlam) :: aphy_chl_ps
-   Real(kind=8),dimension(tlam) :: aphy_chl_dia, aphy_chl_cocco
-   Real(kind=8),dimension(tlam) :: aphy_chl_ps_dia, aphy_chl_ps_cocco
-   Real(kind=8),dimension(tlam) :: aphy_chl_phaeo,aphy_chl_ps_phaeo
-   Real(kind=8),dimension(tlam) :: alphachl_nl
-   Real(kind=8),dimension(tlam) :: alphachl_nl_dia
-   Real(kind=8),dimension(tlam) :: WtouEins
-   Real(kind=8),dimension(tnabp,tlam) :: ap
-   Real(kind=8),dimension(tnabp,tlam) :: ap_ps
-   Real(kind=8),dimension(tnabp,tlam) :: bp
-   Real(kind=8),dimension(tnabp,tlam) :: bbp
-   Real(kind=8),dimension(tlam) :: aw
-   Real(kind=8),dimension(tlam) :: bw
-   Real(kind=8),dimension(tlam) :: wb_width
-   Real(kind=8)                 :: wb_totalWidth
-   Real(kind=8),dimension(tlam) :: sf
+         Real(kind=8),dimension(tlam) :: aphy_chl
+         Real(kind=8),dimension(tlam) :: aphy_chl_ps
+         Real(kind=8),dimension(tlam) :: aphy_chl_dia, aphy_chl_cocco
+         Real(kind=8),dimension(tlam) :: aphy_chl_ps_dia, aphy_chl_ps_cocco
+         Real(kind=8),dimension(tlam) :: aphy_chl_phaeo,aphy_chl_ps_phaeo
+         Real(kind=8),dimension(tlam) :: alphachl_nl
+         Real(kind=8),dimension(tlam) :: alphachl_nl_dia
+         Real(kind=8),dimension(tlam) :: alphachl_nl_cocco
+         Real(kind=8),dimension(tlam) :: alphachl_nl_phaeo
+         Real(kind=8),dimension(tlam) :: WtouEins
+         Real(kind=8),dimension(tnabp,tlam) :: ap
+         Real(kind=8),dimension(tnabp,tlam) :: ap_ps
+         Real(kind=8),dimension(tnabp,tlam) :: bp
+         Real(kind=8),dimension(tnabp,tlam) :: bbp
+         Real(kind=8),dimension(tlam) :: aw
+         Real(kind=8),dimension(tlam) :: bw
+         Real(kind=8),dimension(tlam) :: wb_width
+         Real(kind=8)                 :: wb_totalWidth
+         Real(kind=8),dimension(tlam) :: sf
 !sl         Real(kind=8)                 :: QYmax
 !sl         Real(kind=8)                 :: QYmax_d
 !sl if (RECOM_CALC_ACDOM) then
@@ -2221,15 +2318,16 @@ module REcoM_spectral
 ! SOME OF THESE parameter names are the same as WAVEBANDS, but have an added k dimension....
 ! the params aw, bw are only temporary in wavebands_1d .:. CHANGE THEM in WAVEBANDS_1D to something else
 ! this list mostly from light.F
-   Real(kind=8)                  ::  pid, rad       !radias and pi - use these rather than darwin versions for simplicity.
-   Real(kind=8),dimension(tlam)  ::  bphy_chl       !scat coef for phyto
-   Real(kind=8),dimension(tlam)  ::  bbphy_chl      !backscat coef for phyto
-   Real(kind=8),dimension(tlam)  ::  bphy_chl_dia   !scat coef for diatoms
-   Real(kind=8),dimension(tlam)  ::  bbphy_chl_dia  !backscat coef for diatoms
-   Real(kind=8),dimension(tlam)  ::  bphy_chl_cocco   !scat coef for cocco
-   Real(kind=8),dimension(tlam)  ::  bbphy_chl_cocco  !backscat coef for cocco
-   Real(kind=8),dimension(tlam)  ::  bphy_chl_phaeo   !scat coef for phaeo
-   Real(kind=8),dimension(tlam)  ::  bbphy_chl_phaeo  !backscat coef for phaeo      
+      Real(kind=8)                  ::  radd       !radias and pi - use these rather than darwin versions for simplicity.
+      Real(kind=8)                  ::  pid = 3.1415926535897931
+      Real(kind=8),dimension(tlam)  ::  bphy_chl       !scat coef for phyto
+      Real(kind=8),dimension(tlam)  ::  bbphy_chl      !backscat coef for phyto
+      Real(kind=8),dimension(tlam)  ::  bphy_chl_dia   !scat coef for diatoms
+      Real(kind=8),dimension(tlam)  ::  bbphy_chl_dia  !backscat coef for diatoms
+      Real(kind=8),dimension(tlam)  ::  bphy_chl_cocco   !scat coef for cocco
+      Real(kind=8),dimension(tlam)  ::  bbphy_chl_cocco  !backscat coef for cocco
+      Real(kind=8),dimension(tlam)  ::  bphy_chl_phaeo   !scat coef for phaeo
+      Real(kind=8),dimension(tlam)  ::  bbphy_chl_phaeo  !backscat coef for phaeo      
 !sl end   !/* RECOM_RADTRANS */
 
 !!-----------------------------------------------------------------------------
@@ -2243,14 +2341,19 @@ module REcoM_spectral
 !SL  Integer       :: tlam = 13
 !find a place to specify that tlam = 13 
 ! think of whether it is the right plase to declare
-   Real(kind=8)  :: alpha_mean
-   Real(kind=8)  :: alpha_mean_dia
-
+  Real(kind=8)  :: alpha_mean
+  Real(kind=8)  :: alpha_mean_dia
+  Real(kind=8)  :: alpha_mean_cocco
+  Real(kind=8)  :: alpha_mean_phaeo
+  ! Light diagnostics Ed4D more work to be done
+!  Real(kind=8), allocatable, dimension(:,:,:,:)   ::  Ed4D
+  integer, parameter :: iEdz=1, iEsz=2, iEuz=3, iEutop=4, iEstop=5, ed_num=5
+  Real(kind=8), allocatable, dimension(:,:,:) :: Edz3D, Esz3D, Euz3D, Eutop3D, Estop3D
 contains
 !BOP
 !     !ROUTINE: WAVEBANDS_INIT_FIXED
 !     !INTERFACE:
-  subroutine wavebands_init_fixed(mype)
+       subroutine wavebands_init_fixed(mype)
 
 !     !DESCRIPTION: \bv
 !     *==========================================================*
@@ -2260,33 +2363,47 @@ contains
 !     \ev
 
 !     !USES:
-    implicit none
+       implicit none
+!sl#if defined(__RECOM_WAVEBANDS)
+!     == Global variables ===
+!#include "SIZE.h"
+!#include "EEPARAMS.h"
+!#include "PARAMS.h"
+!#include "SPECTRAL_SIZE.h"
+!#include "SPECTRAL.h"
+!#if defined(__RECOM_WAVEBANDS)
+!#include "WAVEBANDS_PARAMS.h"
+!#include "RECOM.h"
+!#endif
 !     !INPUT/OUTPUT PARAMETERS:
-    integer, intent(in) :: mype  ! MPI rank
+!     == Routine arguments ==
+!     myThid     :: my Thread Id number
+!sl      integer :: myThid
+      integer, intent(in) :: mype         ! MPI rank
 !EOP
 
-!#ifdef RECOM_WAVEBANDS
+!#if defined(__RECOM_WAVEBANDS)
 
 !     !LOCAL VARIABLES:
 !     == Local variables ==
 ! local variables
-    integer, parameter      :: MAX_LEN_MBUF = 1000
-    CHARACTER(MAX_LEN_MBUF) :: msgBuf
-    character(80)           :: title
-    character(80)           :: darwin_waterabsorbFile
-    character(80)           :: darwin_surfacespecFile
-    character(80)           :: darwin_phytoabsorbFile
-    character(80)           :: darwin_acdomFile
-    character(80)           :: darwin_particleabsorbFile
-    integer       :: iUnit
-    integer       :: swlambda,splambda,ssflambda
-    Real(kind=8)  :: sap,sap_ps,sbp,sbbp
-    Real(kind=8)  :: saw,sbw
-    Real(kind=8)  :: ssf
-    Real(kind=8), dimension(tlam)    :: darwin_waves,wb_width
-    Real(kind=8), dimension(tlam+1)  :: darwin_wavebands
-    Real(kind=8)  :: wb_totalWidth
-    Real(kind=8)  :: planck, c, hc, oavo, hcoavo
+      integer, parameter      :: MAX_LEN_MBUF = 1000
+      CHARACTER(MAX_LEN_MBUF) :: msgBuf
+      character(80)           :: title
+!  character(80)           :: darwin_waterabsorbFile = 'abw25par.dat'
+!  character(80)           :: darwin_surfacespecFile = 'surfspec_13amt6.dat'
+!  character(80)           :: darwin_phytoabsorbFile = 'optics_phyto_recom_carbon_12.dat'
+!  character(80)           :: darwin_acdomFile       = 'aCDOM13amtVK2006.dat'
+!  character(80)           :: darwin_particleabsorbFile = 'optics_detritus_3bb.dat'
+      integer       :: iUnit
+      integer       :: swlambda,splambda,ssflambda
+      Real(kind=8)  :: sap,sap_ps,sbp,sbbp
+      Real(kind=8)  :: saw,sbw
+      Real(kind=8)  :: ssf
+      Real(kind=8), dimension(tlam)    :: darwin_waves,wb_width
+      Real(kind=8), dimension(tlam+1)  :: darwin_wavebands
+      Real(kind=8)  :: wb_totalWidth
+      Real(kind=8)  :: planck, c, hc, oavo, hcoavo
 !sl if (RECOM_CALC_ACDOM) then
     Real(kind=8)  ::  rlamm
 !sl else
@@ -2299,70 +2416,95 @@ contains
 ! local indeces
     integer       ::  nabp,i,ilam
 
+      darwin_waves = 0.0d0
+      darwin_wavebands = 0.0d0
+!sl      IF ( darwin_waves(1).EQ.0.0d0 .AND. tlam.EQ.13 ) THEN
+        darwin_waves(1) = 400
+        darwin_waves(2) = 425
+        darwin_waves(3) = 450
+        darwin_waves(4) = 475
+        darwin_waves(5) = 500
+        darwin_waves(6) = 525
+        darwin_waves(7) = 550
+        darwin_waves(8) = 575
+        darwin_waves(9) = 600
+        darwin_waves(10) = 625
+        darwin_waves(11) = 650
+        darwin_waves(12) = 675
+        darwin_waves(13) = 700
+!sl      ENDIF
+
+
 !sl      _BEGIN_MASTER(myThid)
-! this is only done once
-    if (mype == 0) then
+      if (mype == 0) then
+!sl      rad = 180.0D0/pid        
 ! Quanta conversion
-       planck = 6.6256d-34   !Plancks constant J sec
-       c = 2.998d8                 !speed of light m/sec
-       hc = 1.0/(planck*c)
-       oavo = 1.0/6.023d23   ! 1/Avogadros number
-       hcoavo = hc*oavo
-       do i = 1,tlam
-          rlamm = darwin_waves(ilam)*1.0d-9  !lambda in m
-          WtouEins(i) = 1.0d6*rlamm*hcoavo      !Watts to uEin/s conversion
-          IF ( rlamm .EQ. 0.0 ) THEN
-             WRITE(msgBuf,'(2A)') 'RECOM_READPARMS: ',    &
-                  'please provide wavelengths in darwin_waves.'
+      planck = 6.6256d-34   !Plancks constant J sec
+      c = 2.998d8                 !speed of light m/sec
+      hc = 1.0/(planck*c)
+      oavo = 1.0/6.023d23   ! 1/Avogadros number
+      hcoavo = hc*oavo
+      do i = 1,tlam
+       rlamm = darwin_waves(i)*1.0d-9  !lambda in m
+       WtouEins(i) = 1.0d6*rlamm*hcoavo      !Watts to uEin/s conversion
+       IF ( rlamm .EQ. 0.0 ) THEN
+        WRITE(msgBuf,'(2A)') 'RECOM_READPARMS: ',    &
+       'please provide wavelengths in darwin_waves.'
 !sl        CALL PRINT_ERROR( msgBuf, myThid )
-             STOP 'ABNORMAL END: S/R RECOM_READPARMS'
-          ENDIF
-       enddo
-         
+        STOP 'ABNORMAL END: S/R RECOM_READPARMS'
+       ENDIF
+      enddo
+      if (mype==0) WRITE(*,*) ' 1 darwin_waves = ', darwin_waves    
 
 ! fill in missing waveband information:
 ! "representative values" darwin_waves need not be centered within
 ! waveband boundaries darwin_wavebands, so both may be given
 ! if representative values are not given, compute from waveband
 ! boundaries
-         do i = 1,tlam
-            if (darwin_waves(i) .gt. 0) then
-               pwaves(i) = darwin_waves(i)
-            elseif (darwin_wavebands(i).ge.0 .and.         &
-                 darwin_wavebands(i+1).ge.0 ) then
-               pwaves(i) = .5*(darwin_wavebands(i)+darwin_wavebands(i+1))
-            else
-               WRITE(msgBuf,'(3A)') 'WAVEBANDS_INIT_FIXED: ',          &
-                    'please provide wavelengths in darwin_waves or ',       &
-                    'waveband boundaries in darwin_wavebands.'
-               !sl          CALL PRINT_ERROR( msgBuf, myThid )
-               STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED'
-            endif
-         enddo
+      do i = 1,tlam
+        if (darwin_waves(i) .gt. 0.0d0) then
+          pwaves(i) = darwin_waves(i)
+        elseif (darwin_wavebands(i).ge.0.0d0 .and.         &
+                darwin_wavebands(i+1).ge.0.0d0 ) then
+          pwaves(i) = .5*(darwin_wavebands(i)+darwin_wavebands(i+1))
+        else
+          WRITE(msgBuf,'(3A)') 'WAVEBANDS_INIT_FIXED: ',          &
+          'please provide wavelengths in darwin_waves or ',       &
+          'waveband boundaries in darwin_wavebands.'
+!sl          CALL PRINT_ERROR( msgBuf, myThid )
+          STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 1'
+        endif
+      enddo
+      if (mype==0) WRITE(*,*) '1 pwaves = ', pwaves
 
 ! if waveband boundaries not given, compute from representative values
 ! these will be used to compute waveband widths
-         do i=1,tlam+1
-            if (darwin_wavebands(i).LT.0) then
-               !         put boundaries half-way between central values
-               !         but first and last boundary are at first and last "central" value
-               if (i.eq.1) then
-                  darwin_wavebands(i) = pwaves(1)
-               elseif (i.le.tlam) then
-                  darwin_wavebands(i) = .5*(pwaves(i-1)+pwaves(i))
-               else
-                  darwin_wavebands(i) = pwaves(tlam)
-               endif
-            endif
-         enddo
-         
+      do i=1,tlam+1
+        if (darwin_wavebands(i).LE.0.0d0) then
+!         put boundaries half-way between central values
+!         but first and last boundary are at first and last "central" value
+          if (i.eq.1) then
+            darwin_wavebands(i) = real(pwaves(1))
+          else
+             if (i.le.tlam) then
+                darwin_wavebands(i) = 0.5*(real(pwaves(i-1))+real(pwaves(i)))
+             else
+                darwin_wavebands(i) = real(pwaves(tlam))
+              endif
+           endif
+         endif
+       enddo
+
+      if (mype==0) WRITE(*,*) ' darwin_wavebands = ', darwin_wavebands
+      if (mype==0) WRITE(*,*) ' pwaves = ', pwaves
+
 ! waveband widths used to compute total PAR and alpha_mean
-         wb_totalWidth = 0.0
-         do i=1,tlam
-            wb_width(i) = darwin_wavebands(i+1) - darwin_wavebands(i)
-            wb_totalWidth = wb_totalWidth + wb_width(i)
-            !       allow for zero-width wavebands...
-            if (wb_width(i).LT.0) then
+      wb_totalWidth = 0.0d0
+      do i=1,tlam
+        wb_width(i) = darwin_wavebands(i+1) - darwin_wavebands(i)
+        wb_totalWidth = wb_totalWidth + wb_width(i)
+!       allow for zero-width wavebands...
+        if (wb_width(i).LT.0.0d0) then
 !sl          WRITE(msgBuf,'(2A,I3)') 'WAVEBANDS_INIT_FIXED: ',       &
 !sl          'negative waveband width encountered, waveband: ', i
 !sl          CALL PRINT_ERROR( msgBuf, myThid )
@@ -2380,20 +2522,25 @@ contains
 !sl           pwaves(ilam),darwin_wavebands(ilam+1),wb_width(ilam)
 !sl           CALL PRINT_ERROR( msgBuf, myThid )
 !sl          enddo
-               STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED'
-            endif
-         enddo
+          STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 2'
+        endif
+      enddo
+      if (mype==0) WRITE(*,*) 'wb_Width = ', wb_width
+      !sl double check the following      
 !     ...but require at least one non-zero-width band
-         if (wb_totalWidth.LE.0) then
-            WRITE(msgBuf,'(2A)') 'WAVEBANDS_INIT_FIXED: ',           &
-                 'need to provide waveband boundaries in darwin_wavebands.'
-!sl        CALL PRINT_ERROR( msgBuf, myThid )
-            STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED'
-         endif
+      if (wb_totalWidth.LE.0.0d0) then
+        if (mype==0) then
+           WRITE(*,'(2A)') 'WAVEBANDS_INIT_FIXED: ',           &
+           'need to provide waveband boundaries in darwin_wavebands.'
+           WRITE(*,*) 'wb_totalWidth = ', wb_totalWidth
+        endif
+        STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 3'
+      endif
 
 
 !  Water data files
-         if (darwin_waterabsorbFile .NE. ' '  ) THEN
+      if (darwin_waterabsorbFile .NE. ' '  ) THEN
+ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Water data file'//achar(27)//'[0m'             
 !sl        CALL MDSFINDUNIT( iUnit, myThid )
             open(iUnit,file=darwin_waterabsorbFile,                 &
                  status='old',form='formatted')
@@ -2409,68 +2556,74 @@ contains
                   WRITE(msgBuf,'(2A,I3,A,I4,A,I4)') 'WAVEBANDS_INIT_FIXED: ', &
                        'ilam', ilam, ': ', swlambda, ' versus ', pwaves(ilam)
 !sl           CALL PRINT_ERROR( msgBuf, myThid )
-                  STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED'
-               endif
-               aw(ilam) = saw
-               bw(ilam) = sbw
-            enddo
-            close(iUnit)
-20          format(i5,f15.4,f10.4)
-         else
-            WRITE(msgBuf,'(A)')                                           &
-                 'WAVEBANDS_INIT_FIXED: need to specify water absorption'
-!sl        CALL PRINT_ERROR( msgBuf, myThid )
-            STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED'
+           STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 4'
          endif
+         aw(ilam) = saw
+         bw(ilam) = sbw
+        enddo
+        close(iUnit)
+20      format(i5,f15.4,f10.4)
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> end Water data file'//achar(27)//'[0m'
+      else
+        WRITE(msgBuf,'(A)')                                           &
+            'WAVEBANDS_INIT_FIXED: need to specify water absorption'
+!sl        CALL PRINT_ERROR( msgBuf, myThid )
+        STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 5'
+      endif
 
 
 ! phyto data files
 ! ANNA phyto input data files must have a column for absorption by PS pigs
 ! ANNA easiest way to 'turn off' PS for growth is to put same values in both abs columns
-         if (darwin_phytoabsorbFile.NE. ' '  ) THEN
+      if (darwin_phytoabsorbFile.NE. ' '  ) THEN
+ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> phytoabsorb file'//achar(27)//'[0m'             
 !sl        CALL MDSFINDUNIT( iUnit, myThid )
             open(iUnit,file=darwin_phytoabsorbFile,                          &
                                          status='old',form='formatted')
-            do i = 1,6                       ! six lines of text for the header
-               read(iUnit,'(a50)')title
-            enddo
-            sbbp = 0.0d0
-            do nabp = 1,tnabp
-               read(iUnit,'(a50)')title   ! reads one line of text for the phytoplankton type header
-               do ilam  = 1,tlam
-                  if  (DAR_NONSPECTRAL_BACKSCATTERING_RATIO) then
-                     read(iUnit,30)splambda,sap,sap_ps,sbp
-                  else
-                     read(iUnit,'(i4,3f10.4,f20.14)')splambda,sap,sap_ps,sbp,sbbp
-                  endif
-                  if (splambda.NE.pwaves(ilam)) then
-                     WRITE(msgBuf,'(2A)') 'WAVEBANDS_INIT_FIXED: ',                &
-                          "wavelength for phyto spectrum doesn't match darwin_waves:"
+        do i = 1,6                       ! six lines of text for the header
+         read(iUnit,'(a50)')title
+        enddo
+        sbbp = 0.0d0
+        do nabp = 1,tnabp
+         read(iUnit,'(a50)')title   ! reads one line of text for the phytoplankton type header
+         if (mype==0) write(*,*) ' title = ', title
+         do ilam  = 1,tlam
+if  (DAR_NONSPECTRAL_BACKSCATTERING_RATIO) then
+          read(iUnit,30)splambda,sap,sap_ps,sbp
+          if (mype==0) write(*,*) ' DAR_NONSPECTRAL_BACKSCATTERING_RATIO ', splambda,sap,sap_ps,sbp
+else
+          read(iUnit,'(i4,3f10.4,f20.14)')splambda,sap,sap_ps,sbp,sbbp
+          if (mype==0) write(*,*) 'no DAR_NONSPECTRAL_BACKSCATTERING_RATIO ', splambda,sap,sap_ps,sbp,sbbp
+endif
+          if (splambda.NE.pwaves(ilam)) then
+           WRITE(msgBuf,'(2A)') 'WAVEBANDS_INIT_FIXED: ',                &
+           "wavelength for phyto spectrum doesn't match darwin_waves:"
 !sl           CALL PRINT_ERROR( msgBuf, myThid )
-                     WRITE(msgBuf,'(2A,I3,A,I4,A,I4)') 'WAVEBANDS_INIT_FIXED: ',   &
-                          'ilam', ilam, ': ', splambda, ' versus ', pwaves(ilam)
-                     !sl           CALL PRINT_ERROR( msgBuf, myThid )
-                     STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED'
-                  endif
-                  ap(nabp,ilam) = sap
-                  ap_ps(nabp,ilam) = sap_ps
-                  bp(nabp,ilam) = sbp
-                  bbp(nabp,ilam) = sbbp
-               enddo
-            enddo
-            close(iUnit)
-30          format(i4,3f10.4)
-         else
-            WRITE(msgBuf,'(A)')                                            &
-                 'WAVEBANDS_INIT_FIXED: need to specify phyto absorption'
+           WRITE(msgBuf,'(2A,I3,A,I4,A,I4)') 'WAVEBANDS_INIT_FIXED: ',   &
+           'ilam', ilam, ': ', splambda, ' versus ', pwaves(ilam)
+!sl           CALL PRINT_ERROR( msgBuf, myThid )
+           STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 6'
+          endif
+          ap(nabp,ilam) = sap
+          ap_ps(nabp,ilam) = sap_ps
+          bp(nabp,ilam) = sbp
+          bbp(nabp,ilam) = sbbp
+         enddo
+        enddo
+        close(iUnit)
+30      format(i4,3f10.4)
+      else
+        WRITE(msgBuf,'(A)')                                            &
+            'WAVEBANDS_INIT_FIXED: need to specify phyto absorption'
 !sl        CALL PRINT_ERROR( msgBuf, myThid )
-            STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED'
-         endif
+        STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 7'
+      endif
 
 
 ! QQ Surface spectrum NEED IN HERE for initial use
-         if (.not. OASIM) then
-            if (darwin_surfacespecFile .NE. ' '  ) THEN
+if (.not. OASIM) then
+      if (darwin_surfacespecFile .NE. ' '  ) THEN
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> surfacespec file'//achar(27)//'[0m'              
 !sl       CALL MDSFINDUNIT( iUnit, myThid )
                open(iUnit,file=darwin_surfacespecFile,                      &
                     status='old',form='formatted')
@@ -2486,7 +2639,7 @@ contains
                      WRITE(msgBuf,'(2A,I3,A,I4,A,I4)') 'WAVEBANDS_INIT_FIXED: ', &
            'ilam', ilam, ': ', ssflambda, ' versus ', pwaves(ilam)
 !sl           CALL PRINT_ERROR( msgBuf, myThid )
-           STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED'
+           STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 8'
         endif
         sf(ilam) = ssf
        enddo
@@ -2496,13 +2649,14 @@ contains
         WRITE(msgBuf,'(A)')                                            &
      &      'WAVEBANDS_INIT_FIXED: need surface spectrum'
 !sl        CALL PRINT_ERROR( msgBuf, myThid )
-        STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED'
+        STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 9'
       endif
 endif  ! no OASIM
 ! absorption by cdom
 if (.not. RECOM_CALC_ACDOM) then
 ! if no file given then CDOM is zero
       if (darwin_acdomFile.NE. ' '  ) THEN
+ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> acdom file'//achar(27)//'[0m'             
 !sl        CALL MDSFINDUNIT( iUnit, myThid )
         open(iUnit,file=darwin_acdomFile,                             &
                               status='old',form='formatted')
@@ -2539,7 +2693,7 @@ else  !/* RECOM_CALC_ACDOM */
             'WAVEBANDS_INIT_FIXED: no waveband found at ',            &
              darwin_lambda_aCDOM, ' nm (needed for RECOM_CALC_ACDOM).'
 !sl        CALL PRINT_ERROR( msgBuf, myThid )
-        STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED'
+        STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 10'
       endif
 
       WRITE(msgBuf,'(A,1P1E20.12)')                                   &
@@ -2571,7 +2725,7 @@ if (RECOM_CALC_REFLEC) then
        'darwin_diag_acdom_ilam =',darwin_diag_acdom_ilam,             &
        ' not found in darwin_waves'
 !sl       CALL PRINT_ERROR( msgBuf, myThid )
-       STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED'
+       STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 11'
 60     continue
       endif
 
@@ -2621,7 +2775,7 @@ if (.not. RECOM_CALC_APART) then
            WRITE(msgBuf,'(2A,I3,A,I4,A,I4)') 'WAVEBANDS_INIT_FIXED: ',&
            'ilam', ilam, ': ', splambda, ' versus ', pwaves(ilam)
 !sl           CALL PRINT_ERROR( msgBuf, myThid )
-           STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED'
+           STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 12'
          endif
          apart(ilam) = sap
          bpart(ilam) = sbp
@@ -2781,7 +2935,7 @@ endif
 if (RECOM_RADTRANS) then
 !     constants
       pid = DACOS(-1.0D0)
-      rad = 180.0D0/pid
+      radd = 180.0D0/pid
 endif
 
 !sl      _END_MASTER(myThid)
@@ -2793,12 +2947,22 @@ endif
       end subroutine wavebands_init_fixed
 
 
-  SUBROUTINE WAVEBANDS_INIT_VARI()
-    implicit none
+  SUBROUTINE WAVEBANDS_INIT_VARI(mype)
+       implicit none
+!     == Global variables ===
+!#include "SIZE.h"
+!#include "SPECTRAL_SIZE.h"
+!#if defined(__RECOM_WAVEBANDS)
+!#include "WAVEBANDS_PARAMS.h"
+!#endif
 !     !INPUT/OUTPUT PARAMETERS:
 !     == Routine arguments ==
+!     myThid     :: my Thread Id number
+!sl       INTEGER   :: myThid
+       integer, intent(in) :: mype         ! MPI rank
 !CEOP
 
+!sl#if defined(__RECOM_WAVEBANDS)
 
 !     !FUNCTIONS:
 !      LOGICAL MASTER_CPU_THREAD
@@ -2922,13 +3086,25 @@ endif
 !#endif /* RECOM_WAVEBANDS */
     return
   end SUBROUTINE WAVEBANDS_INIT_VARI
-
-  
-  SUBROUTINE MONOD_ACDOM_CDOM(                                    &
-       Nn, cdomlocal,                                             &
-       acdomlocal)
-    IMPLICIT NONE
-    INTEGER      :: Nn
+  SUBROUTINE MONOD_ACDOM(                                        &
+!if (RECOM_CDOM) then
+                             Nn, cdomlocal,                      &
+!else
+!                             P_chl, aclocal, awlocal,            &
+!endif
+                             acdomlocal                         &
+                             , mype)
+      IMPLICIT NONE
+!     === Global variables ===
+!#include "SIZE.h"
+!#include "EEPARAMS.h"
+!#include "PARAMS.h"
+!#include "SPECTRAL_SIZE.h"
+!#if defined(__RECOM_WAVEBANDS)
+!#include "WAVEBANDS_PARAMS.h"
+!#endif
+      integer, intent(in) :: mype         ! MPI rank
+      INTEGER      :: Nn
 ! !INPUT PARAMETERS: ===================================================
 !     P_chl      :: Chlorophyll per species and level
 !     ac         :: absorption spectra for each phtyo (chl normalised)
@@ -2936,13 +3112,13 @@ endif
 
 ! !OUTPUT PARAMETERS: ==================================================
 !     acdom      :: absortpion spectra for CDOM per level
-    real(kind=8), dimension(Nn)      :: cdomlocal
-    real(kind=8), dimension(Nn,tlam) :: acdomlocal
+      real(kind=8), dimension(Nn)      :: cdomlocal
+      real(kind=8), dimension(Nn,tlam) ::acdomlocal
+!sl      INTEGER      :: myThid
 !     !LOCAL VARIABLES:
 !     == Local variables ==
-    INTEGER      :: npmax
-    INTEGER      :: k, np, ilam
-    real(kind=8) ::  actot450, atot450      
+      INTEGER      :: k, np, ilam
+      real(kind=8) ::  actot450, atot450      
 !EOP
     if (RECOM_CALC_ACDOM) then
 
@@ -2953,80 +3129,88 @@ endif
 !sl      real(kind=8) ::  actot450, atot450
 
 ! use cdom-like tracer
-       do k = 1,Nn  !Nr
-          do ilam = 1,tlam
-             acdomlocal(k,ilam) = cdomcoeff*cdomlocal(k)*excdom(ilam)
-          enddo
+      do k = 1,Nn  !Nr
+       do ilam = 1,tlam
+        acdomlocal(k,ilam) = cdomcoeff*cdomlocal(k)*excdom(ilam)
        enddo
-!      do nl = 1,tlam
-!       write(6,*)'nl,lam,aw,ac,acdom = ',nl,lam(nl),
-!    *aw(nl),ac(1,nl),acdom(1,nl)
-!      enddo
-! ANNA cdom end
-    endif  !/* RECOM_CALC_ACDOM */
-    RETURN
-      
-  end SUBROUTINE MONOD_ACDOM_CDOM
-
-  SUBROUTINE MONOD_ACDOM_noCDOM(                                     &
-                             Nn, P_chl, aclocal, awlocal,            &
-                             acdomlocal)
-    IMPLICIT NONE
-    INTEGER      :: Nn
+      enddo
+endif  !/* RECOM_CALC_ACDOM */
+      RETURN
+  end SUBROUTINE MONOD_ACDOM
+  SUBROUTINE MONOD_no_ACDOM(                                     &
+                             Nn,                                 &
+                             P_chl, aclocal, awlocal,            &
+                             acdomlocal                          &
+                             ,npmax, mype)
+      IMPLICIT NONE
+!     === Global variables ===
+!#include "SIZE.h"
+!#include "EEPARAMS.h"
+!#include "PARAMS.h"
+!#include "SPECTRAL_SIZE.h"
+!#if defined(__RECOM_WAVEBANDS)
+!#include "WAVEBANDS_PARAMS.h"
+!#endif
+      integer, intent(in) :: mype         ! MPI rank
+      INTEGER, intent(in) :: npmax
+      INTEGER      :: Nn
 ! !INPUT PARAMETERS: ===================================================
 !     P_chl      :: Chlorophyll per species and level
-!     aclocal    :: absorption spectra for each phtyo (chl normalised)
-!     awlocal    :: absorption spectra for water (m-1)
+!     ac         :: absorption spectra for each phtyo (chl normalised)
+!     awlocal    :: absoprtion spectra for water (m-1)
+!     myTime     :: Current time in simulation
+!     myIter     :: Current iteration number in simulation
+!     myThid     :: My Thread Id number
 
 ! !OUTPUT PARAMETERS: ==================================================
-    !     acdomlocal :: absorption spectra for CDOM per level
-    
-    real(kind=8), dimension(4,Nn)    :: P_chl
-    real(kind=8), dimension(4,tlam)  :: aclocal
-    real(kind=8), dimension(tlam  )  :: awlocal
-    real(kind=8), dimension(Nn,tlam) :: acdomlocal
+!     acdom      :: absortpion spectra for CDOM per level
+      real(kind=8), dimension(npmax,Nn)    :: P_chl
+      real(kind=8), dimension(npmax,tlam)  :: aclocal
+      real(kind=8), dimension(tlam  )  :: awlocal
+      real(kind=8), dimension(Nn,tlam) ::acdomlocal
+!sl      INTEGER      :: myThid
 !     !LOCAL VARIABLES:
-!     == Local variables ==
-    INTEGER      :: npmax
-    INTEGER      :: k, np, ilam
-    real(kind=8) ::  actot450, atot450      
+      INTEGER      :: k, np, ilam
+      real(kind=8) ::  actot450, atot450
 !EOP
-    if (RECOM_CALC_ACDOM) then
+if (RECOM_CALC_ACDOM) then
 
 !sl!     !LOCAL VARIABLES:
 !sl!     == Local variables ==
 !sl      INTEGER      :: npmax
 !sl      INTEGER      :: k, np, ilam
 !sl      real(kind=8) ::  actot450, atot450
-
 ! ANNA moved cdom calculation from WG's light.f
 ! it's done for RADTRANS and WAVEBANDS_3D
-       npmax = 2
-       if (enable_coccos) npmax = 4
-       do k = 1,Nn
-          actot450 = 0.0d0
-          atot450 = 0.0d0
-          do np = 1,npmax
-             actot450 = actot450  + P_chl(np,k) * aclocal(np,nlaCDOM) !nb. n,k swapped from WG
-          enddo
-          atot450 = awlocal(nlaCDOM) + actot450
-          do ilam = 1,tlam
-             acdomlocal(k,ilam) = darwin_aCDOM_fac * atot450 * excdom(ilam)
-          enddo
+!sl      npmax = tnabp
+!sl      if (enable_coccos) npmax = 4
+      do k = 1,Nn
+       actot450 = 0.0d0
+       atot450 = 0.0d0
+       do np = 1,npmax
+        actot450 = actot450  + P_chl(np,k) * aclocal(np,nlaCDOM) !nb. n,k swapped from WG
        enddo
+       atot450 = awlocal(nlaCDOM) + actot450
+       do ilam = 1,tlam
+        acdomlocal(k,ilam) = darwin_aCDOM_fac * atot450 * excdom(ilam)
+       enddo
+!      do nl = 1,tlam
+!       write(6,*)'nl,lam,aw,ac,acdom = ',nl,lam(nl),
+!    *aw(nl),ac(1,nl),acdom(1,nl)
+!      enddo
 ! ANNA cdom end
-    endif  !/* RECOM_CALC_ACDOM */
-    RETURN
-      
-  end SUBROUTINE MONOD_ACDOM_noCDOM
+endif  !/* RECOM_CALC_ACDOM */
+      RETURN
 
+  end SUBROUTINE MONOD_no_ACDOM  
 !--------------------- MONOD_RADTRANS_ITER ---------------------------
   subroutine MONOD_RADTRANS_ITER(                                      &
                          Nn,                                           &
                          H,rmud,Edsf,Essf,a_k,bt_k,bb_k,kmax,niter,    &
                          Edbot,Esbot,Eubot,Eutop,                      &
                          tirrq,tirrwq,                                 &
-                         c1out, c2out)
+                         c1out, c2out                                  & 
+                         , mype)
 
 ! !DESCRIPTION:
 !
@@ -3066,16 +3250,18 @@ endif
 !     bb_k  :: backscattering coefficient per level and waveband (1/m)
 !     kmax  :: maximum number of layers to compute
 !     niter :: number of up-down iterations after initial Aas integration
-    INTEGER                          :: Nn
-    Real(kind=8),dimension(Nn)       :: H
-    Real(kind=8)                     :: rmud
-    Real(kind=8),dimension(tlam)     :: Edsf
-    Real(kind=8),dimension(tlam)     :: Essf
-    Real(kind=8),dimension(Nn,tlam)  :: a_k
-    Real(kind=8),dimension(Nn,tlam)  :: bt_k
-    Real(kind=8),dimension(Nn,tlam)  :: bb_k
-    INTEGER                          :: kmax,niter
-
+      integer, intent(in) :: mype         ! MPI rank
+      INTEGER                          :: Nn
+      Real(kind=8),dimension(Nn)       :: H
+      Real(kind=8)                     :: rmud
+      Real(kind=8),dimension(tlam)     :: Edsf
+      Real(kind=8),dimension(tlam)     :: Essf
+      Real(kind=8),dimension(Nn,tlam)  :: a_k
+      Real(kind=8),dimension(Nn,tlam)  :: bt_k
+      Real(kind=8),dimension(Nn,tlam)  :: bb_k
+      INTEGER                          :: kmax,niter
+!sl      INTEGER                          :: myThid
+!?                                                                                                                 62,1          18%
 ! !OUTPUT PARAMETERS: ==================================================
 !     Edbot    :: direct downwelling irradiance at bottom of layer
 !     Esbot    :: diffuse downwelling irradiance at bottom of layer
@@ -3282,12 +3468,13 @@ end subroutine MONOD_RADTRANS_ITER
 !======================================================================
 ! !ROUTINE: MONOD_RADTRANS_DIRECT
 ! !INTERFACE: ==========================================================
-   subroutine MONOD_RADTRANS_DIRECT(                              &
-        Nn,                                         &
-        H,rmud,Edsf,Essf,a_k,bt_k,bb_k,kmax,        &
-        Edbot,Esbot,Eubot,Estop,Eutop,              &
-        tirrq,tirrwq,                               &
-        amp1, amp2)
+      subroutine MONOD_RADTRANS_DIRECT(                              &
+                         Nn,                                         &
+                         H,rmud,Edsf,Essf,a_k,bt_k,bb_k,kmax,        &
+                         Edbot,Esbot,Eubot,Estop,Eutop,              &
+                         tirrq,tirrwq,                               &
+                         amp1, amp2                                  &
+                         , mype)
 ! !DESCRIPTION:
 !
 !  Model of irradiance in the water column.  Accounts for three
@@ -3331,15 +3518,17 @@ end subroutine MONOD_RADTRANS_ITER
 !              = forward + back scattering coefficient
 !     bb_k  :: backscattering coefficient per level and waveband (1/m)
 !     kmax  :: maximum number of layers to compute
-     Real(kind=8),dimension(Nn)       :: H
-     Integer                          :: Nn
-     Real(kind=8)                     :: rmud
-     Real(kind=8),dimension(tlam)     :: Edsf
-     Real(kind=8),dimension(tlam)     :: Essf
-     Real(kind=8),dimension(Nn,tlam)  :: a_k
-     Real(kind=8),dimension(Nn,tlam)  :: bt_k
-     Real(kind=8),dimension(Nn,tlam)  :: bb_k
-     INTEGER                          :: kmax
+      integer, intent(in) :: mype         ! MPI rank
+      Real(kind=8),dimension(Nn)       :: H
+      Integer                          :: Nn
+      Real(kind=8)                     :: rmud
+      Real(kind=8),dimension(tlam)     :: Edsf
+      Real(kind=8),dimension(tlam)     :: Essf
+      Real(kind=8),dimension(Nn,tlam)  :: a_k
+      Real(kind=8),dimension(Nn,tlam)  :: bt_k
+      Real(kind=8),dimension(Nn,tlam)  :: bb_k
+      INTEGER                          :: kmax
+!sl      INTEGER                          :: myThid
 
 ! !OUTPUT PARAMETERS: ==================================================
 !     Edbot  :: direct downwelling irradiance at bottom of layer
@@ -3474,7 +3663,7 @@ end subroutine MONOD_RADTRANS_ITER
                  c3d(2*kbot) = 0.0d0  ! not used
                  y3d(2*kbot) = 0.0d0  ! = 0
 
-                 CALL SOLVE_TRIDIAGONAL_PIVOT(Nn,a3d,b3d,c3d,y3d,2*kbot)
+         CALL SOLVE_TRIDIAGONAL_PIVOT(Nn,a3d,b3d,c3d,y3d,2*kbot)
 
 ! compute irradiances
                  DO k=1,kbot
@@ -3539,7 +3728,7 @@ end subroutine MONOD_RADTRANS_ITER
                            Nn,                             &                      
                            a3d, b3d, c3d,                  &
                            y3d,                            &
-                           n)                     
+                           n)                      
 !     !DESCRIPTION: \bv
 !     *==========================================================*
 !     | S/R SOLVE_TRIDIAGONAL_PIVOT
@@ -3560,12 +3749,13 @@ end subroutine MONOD_RADTRANS_ITER
 !     b3d(1:n)   :: matrix main  diagnonal
 !     c3d(1:n-1) :: matrix upper diagnonal
 !     y3d(1:n)   :: Input = Y vector ; Output = X = solution of A*X=Y
+!sl      integer, intent(in) :: mype         ! MPI rank
       integer                             :: Nn
       Real(kind=8),dimension(2*Nn)        :: a3d
       Real(kind=8),dimension(2*Nn)        :: b3d
       Real(kind=8),dimension(2*Nn)        :: c3d
       Real(kind=8),dimension(2*Nn)        :: y3d
-      INTEGER                             :: n
+      INTEGER                             :: n       !sl ,myThid
 !EOP
 
 !     !LOCAL VARIABLES:
@@ -3627,14 +3817,23 @@ end subroutine MONOD_RADTRANS_ITER
                              Nr,                                &   
                              D1,QYm,Drel,                       &
                              aphy_PSpigm,aphy_ALLpigm,          &
-                             aphytolocal)
+                             aphytolocal                        &
+                             , mype)
 
 ! !DESCRIPTION:
 !     computes aphyto from D1 state variable
 
 ! !USES: ===============================================================
       IMPLICIT NONE
-
+!     === Global variables ===
+!#include "SIZE.h"
+!#include "EEPARAMS.h"
+!#include "PARAMS.h"
+!#include "SPECTRAL_SIZE.h"
+!#if defined(__RECOM_WAVEBANDS)
+!#include "WAVEBANDS_PARAMS.h"
+!C#include "RECOM_PARAMS.h"
+!#endif
 ! !INPUT PARAMETERS: ===================================================
 !     D1         :: Fraction of PSII active for photochemistry
 !     QYm        :: Maximum quantum yield of photochemistry
@@ -3643,6 +3842,7 @@ end subroutine MONOD_RADTRANS_ITER
 !     aphy_chl   :: absorption spectrum all pigments (ap, m2 mgChla-1)
 ! !OUTPUT PARAMETERS: ==================================================
 !     aphytolocal :: absortpion spectra for phytoplankton group per level
+      integer, intent(in) :: mype         ! MPI rank
       integer                         :: Nr
       Real(kind=8),dimension(Nr)      :: D1(Nr)
       Real(kind=8)                    :: QYm
@@ -3650,6 +3850,9 @@ end subroutine MONOD_RADTRANS_ITER
       Real(kind=8),dimension(tlam)    :: aphy_PSpigm
       Real(kind=8),dimension(tlam)    :: aphy_ALLpigm
       Real(kind=8),dimension(Nr,tlam) :: aphytolocal
+!     _RL     myTime
+!     INTEGER myIter
+!sl      INTEGER :: myThid
 !EOP
 
 !sl if (RECOM_CALC_APHYT) then
@@ -3701,6 +3904,12 @@ if (RECOM_CALC_APHYT) then
 endif !/* RECOM_CALC_APHYT */
       RETURN
       END SUBROUTINE RECOM_APHYTO
+
+!   subroutine recom_oasim_get_surface_light(n, time, lon, lat, oasim_ed, oasim_es, mesh, partit)
+!   ! Read monthly OASIM/NOBM fields
+!   ! Interpolate in time, horizontal space, and possibly wavelength
+!   ! Return Ed and Es on REcoM wavebands
+!   end subroutine
 
 #endif /* RECOM_WAVEBANDS */
 

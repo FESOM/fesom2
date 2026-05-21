@@ -68,7 +68,7 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     use g_forcing_arrays, only: press_air, u_wind, v_wind, shortwave
     use g_comm_auto
 
-#if defined (__RECOM_WAVEBANDS)   
+#if defined(__RECOM_WAVEBANDS)   
     use REcoM_spectral
 #endif
 
@@ -120,6 +120,9 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     real(kind=8),  allocatable :: kspc_watercolumn(:)
     real(kind=8),  allocatable :: rhoSW_watercolumn(:)
     real(kind=WP)              :: ttf_rhs_bak (mesh%nl-1, tracers%num_tracers) ! local variable ! OG - tra_diag
+#if defined(__RECOM_WAVEBANDS)
+    real(kind=8),  allocatable :: Light_watercolumn(:,:,:)
+#endif
 
 #include "../associate_part_def.h"
 #include "../associate_mesh_def.h"
@@ -270,6 +273,12 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
         FeDust = GloFeDust(n) * (1.d0 - a_ice(n)) * dust_sol
         NDust  = GloNDust(n)  * (1.d0 - a_ice(n))
 
+#if defined(__RECOM_WAVEBANDS)
+    allocate(Light_watercolumn(nl-1, tlam, ed_num))
+    Light_watercolumn = 0.d0
+ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> after allocate in main'//achar(27)//'[0m'
+#endif        
+
         if (Diags) then
 
         !! * Allocate 3D diagnostics *
@@ -386,6 +395,7 @@ endif
 
 ! ======================================================================================
 !******************************** RECOM FORCING ****************************************
+!sl we might want to consider to have a separate REcoM_Forcing_spectral subroutine
         call REcoM_Forcing(zr, n, nzmax, C, SW, Loc_slp, Temp, Sali, Sali_depth &
            , CO2_watercolumn                                     & ! NEW MOCSY CO2 for the whole watercolumn
            , pH_watercolumn                                      & ! NEW MOCSY pH for the whole watercolumn
@@ -395,6 +405,9 @@ endif
            , OmegaC_watercolumn                                  & ! NEW DISS OmegaC for the whole watercolumn
            , kspc_watercolumn                                    & ! NEW DISS stoichiometric solubility product for calcite [mol^2/kg^2]
            , rhoSW_watercolumn                                   & ! NEW DISS in-situ density of seawater [mol/m^3]
+#if defined(__RECOM_WAVEBANDS)
+           , Light_watercolumn                                   & ! Light (Ed) variables
+#endif           
                            , PAR, ice, dynamics, tracers, partit, mesh)
 
         do tr_num = num_tracers-bgc_num+1, num_tracers !bgc_num+2
@@ -495,8 +508,19 @@ if (enable_coccos) then
             TCphot_phaeo        (1:nzmax,n) = VTCphot_phaeo             (1:nzmax)
 
 endif
+#if defined(__RECOM_WAVEBANDS)
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> before main Ed4D'//achar(27)//'[0m'
+!sl            Ed4D    (1:nl-1,n,:,:) = Light_watercolumn(1:nl-1,:,:) 
+             Edz3D    (1:nl-1,n,:) = Light_watercolumn(1:nl-1,:,1)
+             Esz3D    (1:nl-1,n,:) = Light_watercolumn(1:nl-1,:,2)
+             Euz3D    (1:nl-1,n,:) = Light_watercolumn(1:nl-1,:,3)
+             Eutop3D  (1:nl-1,n,:) = Light_watercolumn(1:nl-1,:,4)
+             Estop3D  (1:nl-1,n,:) = Light_watercolumn(1:nl-1,:,5)
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> after main Ed4D'//achar(27)//'[0m'            
+#endif
 
-if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after REcoM_Forcing'//achar(27)//'[0m'
+
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> main after REcoM_Forcing'//achar(27)//'[0m'
 
             !! * Deallocating 2D diagnostics *
             deallocate(vertNPPn, vertGPPn, vertNNAn, vertChldegn) 
@@ -528,8 +552,16 @@ if (enable_coccos) then
             deallocate(VTTemp_phaeo, VTPhaeoCO2, VTqlimitFac_phaeo, VTCphotLigLim_phaeo, VTCphot_phaeo)
 
 endif
+!#if defined(__RECOM_WAVEBANDS)
+!            deallocate(Light_watercolumn)
+!if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> deallocate Light_watercolomn'//achar(27)//'[0m'           
+!#endif
 
         end if 
+#if defined(__RECOM_WAVEBANDS)
+            deallocate(Light_watercolumn)
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> deallocate Light_watercolomn'//achar(27)//'[0m'
+#endif        
 
         AtmFeInput(n)            = FeDust
         AtmNInput(n)             = NDust
@@ -569,6 +601,21 @@ endif
     do tr_num=num_tracers-bgc_num+1, num_tracers
         call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
     end do
+
+#if defined(__RECOM_WAVEBANDS)
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> before exchange_nod Ed4D'//achar(27)//'[0m'
+!sl    do n = 1, ed_num
+       do tr_num = 1, tlam
+!sl         call exchange_nod(Ed4D(:,:,tr_num,n), partit)
+            call exchange_nod(Edz3D(:,:,tr_num), partit)
+            call exchange_nod(Esz3D(:,:,tr_num), partit)
+            call exchange_nod(Euz3D(:,:,tr_num), partit)
+            call exchange_nod(Eutop3D(:,:,tr_num), partit)
+            call exchange_nod(Estop3D(:,:,tr_num), partit)
+       end do
+!sl    end do
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> after exchange_nod Ed4D'//achar(27)//'[0m'    
+#endif
 
     call exchange_nod(GloPCO2surf, partit)
     call exchange_nod(GlodPCO2surf, partit)
@@ -629,6 +676,7 @@ endif
     call exchange_nod(OmegaC3D, partit)
     call exchange_nod(kspc3D, partit)
     call exchange_nod(rhoSW3D, partit)
+    if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> end subroutine recom'//achar(27)//'[0m'    
 
 end subroutine recom
 

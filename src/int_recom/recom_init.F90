@@ -30,6 +30,9 @@ subroutine recom_init(tracers, partit, mesh)
     use REcoM_locVar
     use recom_config
     use REcoM_ciso
+#if defined(__RECOM_WAVEBANDS)   
+    use REcoM_spectral
+#endif    
     implicit none
 #include "netcdf.inc"
     !___________________________________________________________________________
@@ -307,6 +310,31 @@ subroutine recom_init(tracers, partit, mesh)
     kspc3D(:,:)         = 0.d0
     rhoSW3D(:,:)        = 0.d0
 
+#if defined(__RECOM_WAVEBANDS) 
+!! *** Allocate 4D Light
+!sl    allocate(Ed4D      ( nl-1, node_size,tlam,ed_num ))
+!sl    Ed4D(:,:,:,:)      = 0.d0
+    allocate(Edz3D      ( nl-1, node_size,tlam))
+    allocate(Esz3D      ( nl-1, node_size,tlam))
+    allocate(Euz3D      ( nl-1, node_size,tlam))
+    allocate(Eutop3D      ( nl-1, node_size,tlam))
+    allocate(Estop3D      ( nl-1, node_size,tlam))
+    Edz3D     = 0.d0
+    Esz3D     = 0.d0
+    Euz3D     = 0.d0
+    Eutop3D   = 0.d0
+    Estop3D   = 0.d0
+    call wavebands_init_fixed(mype)    
+!if (OASIM) then
+!SL as proposed
+    allocate(oasim_ed2D(node_size,tlam))
+    allocate(oasim_es2D(node_size,tlam))
+    oasim_ed2D = 0.d0
+    oasim_es2D = 0.d0
+!   call recom_oasim_init(mesh, partit, mype)
+!endif   
+#endif
+
 !! *** Allocate ballasting ***
     allocate(rho_particle1       ( nl-1, node_size ))
     allocate(rho_particle2       ( nl-1, node_size ))
@@ -377,6 +405,7 @@ subroutine recom_init(tracers, partit, mesh)
 
     DO i=num_tracers-bgc_num+1, num_tracers
         id=tracers%data(i)%ID
+        if(mype==0) write(*,*), ' init tracer id = ', id
 
         SELECT CASE (id)
 
@@ -443,6 +472,9 @@ subroutine recom_init(tracers, partit, mesh)
 
         CASE (1021)  ! DetCalc - Detrital Calcite
             tracers%data(i)%values(:,:) = tiny
+
+        CASE (1022)  ! What is this? 02?
+            tracers%data(i)%values(:,:) = tiny    
 
         !---------------------------------------------------------------------------
         ! Extended Model: Additional Zooplankton and Detritus (enable_3zoo2det)
@@ -524,6 +556,32 @@ subroutine recom_init(tracers, partit, mesh)
                 tracers%data(i)%values(:,:) = tiny * Redfield
             END IF
 
+#if defined (__RECOM_WAVEBANDS)         
+         CASE (1031)
+            IF (enable_coccos .AND. enable_3zoo2det) THEN
+                ! CoccoChl - Coccolithophore Chlorophyll
+               tracers%data(i)%values(:,:) = tiny_chl
+            ELSEIF (enable_3zoo2det .AND. RECOM_CDOM) THEN   
+                ! CDOM, Colored dissolved organic matter
+               tracers%data(i)%values(:,:) = tiny
+            END IF
+        CASE (1032)
+            IF (enable_coccos .AND. enable_3zoo2det) THEN
+                ! PhaeoN - Phaeocystis Nitrogen
+                tracers%data(i)%values(:,:) = tiny_chl / chl2N_max
+            ELSEIF (enable_3zoo2det .AND. RECOM_CDOM .AND. RECOM_MARSHALL) THEN   
+                ! D1 protein small phytos
+               tracers%data(i)%values(:,:) = tiny
+            END IF
+        CASE (1033)
+            IF (enable_coccos .AND. enable_3zoo2det) THEN
+                ! PhaeoC - Phaeocystis Carbon
+                tracers%data(i)%values(:,:) = tiny_chl / chl2N_max / NCmax
+            ELSEIF (enable_3zoo2det .AND. RECOM_CDOM .AND. RECOM_MARSHALL) THEN 
+                ! D1 protein diatoms
+               tracers%data(i)%values(:,:) = tiny
+            END IF
+#else             
         CASE (1031)
             IF (enable_coccos .AND. enable_3zoo2det) THEN
                 ! CoccoChl - Coccolithophore Chlorophyll
@@ -541,6 +599,7 @@ subroutine recom_init(tracers, partit, mesh)
                 ! PhaeoC - Phaeocystis Carbon
                 tracers%data(i)%values(:,:) = tiny_chl / chl2N_max / NCmax
             END IF
+#endif /* (__RECOM_WAVEBANDS) */ 
 
         CASE (1034)
             IF (enable_coccos .AND. enable_3zoo2det) THEN
@@ -559,6 +618,33 @@ subroutine recom_init(tracers, partit, mesh)
                 ! Zoo3C - Zooplankton 3 Carbon
                 tracers%data(i)%values(:,:) = tiny * Redfield
             END IF
+#if defined (__RECOM_WAVEBANDS)         
+        CASE (1037)
+            IF (enable_coccos .AND. enable_3zoo2det .AND. RECOM_CDOM) THEN
+                ! CDOM, Colored dissolved organic matter
+               tracers%data(i)%values(:,:) = tiny
+            END IF
+        CASE (1038)
+            IF (enable_coccos .AND. enable_3zoo2det .AND. RECOM_CDOM .AND. RECOM_MARSHALL) THEN   
+                ! D1 protein small phyto
+               tracers%data(i)%values(:,:) = tiny
+            END IF
+        CASE (1039)
+            IF (enable_coccos .AND. enable_3zoo2det .AND. RECOM_CDOM .AND. RECOM_MARSHALL) THEN   
+                ! D1 protein diatoms
+               tracers%data(i)%values(:,:) = tiny
+            END IF
+        CASE (1040)
+            IF (enable_coccos .AND. enable_3zoo2det .AND. RECOM_CDOM .AND. RECOM_MARSHALL) THEN   
+                ! D1 protein coccos
+               tracers%data(i)%values(:,:) = tiny
+            END IF
+        CASE (1041)
+            IF (enable_coccos .AND. enable_3zoo2det .AND. RECOM_CDOM .AND. RECOM_MARSHALL) THEN   
+                ! D1 protein phaeocystis
+               tracers%data(i)%values(:,:) = tiny
+            END IF
+#endif /* (__RECOM_WAVEBANDS) */
 
         END SELECT
     END DO
