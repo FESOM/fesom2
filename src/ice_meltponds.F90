@@ -20,16 +20,17 @@ module ice_meltponds
     private
     public :: meltpond_area, meltpond_albedo, init_meltponds
 
-    ! Melt pond parameters (similar to Icepack ponds_nml)
-    real(kind=WP), parameter :: hi_min     = 0.10_WP  ! Min ice thickness for ponds [m]
-    real(kind=WP), parameter :: hs1        = 0.03_WP  ! Snow depth threshold for pond reset [m]
-    real(kind=WP), parameter :: rfracmin   = 0.15_WP  ! Min retained melt fraction
-    real(kind=WP), parameter :: rfracmax   = 0.50_WP  ! Max retained melt fraction
-    real(kind=WP), parameter :: pndaspect  = 0.80_WP  ! Pond depth/area aspect ratio
-
-    ! Pond albedo (CICE/CESM range)
-    real(kind=WP), parameter :: albpnd     = 0.30_WP  ! Open melt pond albedo
-    real(kind=WP), parameter :: albpnd_frz = 0.50_WP  ! Frozen pond albedo
+    ! Melt pond tuning parameters, namelist `&meltpond` in namelist.ice.
+    ! Defaults reproduce CESM/Icepack values; setting an empty &meltpond
+    ! block in namelist.ice gives bit-identical behaviour to a build without
+    ! the namelist.
+    real(kind=WP) :: hi_min     = 0.10_WP  ! Min ice thickness for ponds [m]
+    real(kind=WP) :: hs1        = 0.03_WP  ! Snow depth threshold for pond reset [m]
+    real(kind=WP) :: rfracmin   = 0.15_WP  ! Min retained melt fraction
+    real(kind=WP) :: rfracmax   = 1.00_WP  ! Max retained melt fraction
+    real(kind=WP) :: pndaspect  = 0.80_WP  ! Pond depth/area aspect ratio
+    real(kind=WP) :: albpnd     = 0.20_WP  ! Open melt pond albedo
+    real(kind=WP) :: albpnd_frz = 0.36_WP  ! Frozen pond albedo
 
     ! Physical constants
     real(kind=WP), parameter :: puny     = 1.e-11_WP
@@ -49,8 +50,41 @@ module ice_meltponds
 contains
 
     !===========================================================================
-    subroutine init_meltponds()
+    ! Read &meltpond block from a namelist file (typically namelist.ice).
+    ! Silent fallback to defaults if the block is absent or the file cannot
+    ! be opened — same behaviour as a build without the namelist.
+    !===========================================================================
+    subroutine init_meltponds(filename, mype)
         implicit none
+        character(len=*), intent(in) :: filename
+        integer,          intent(in) :: mype
+        integer :: unit_in, iost
+        namelist /meltpond/ hi_min, hs1, rfracmin, rfracmax, pndaspect, &
+                            albpnd, albpnd_frz
+        open(newunit=unit_in, file=trim(filename), form='formatted', &
+             access='sequential', status='old', iostat=iost)
+        if (iost /= 0) then
+            if (mype == 0) write(*,*) '   meltpond: ', trim(filename), &
+                ' not found, using defaults'
+            return
+        endif
+        read(unit_in, nml=meltpond, iostat=iost)
+        close(unit_in)
+        if (mype == 0) then
+            if (iost == 0) then
+                write(*,*) '   meltpond: read &meltpond from ', trim(filename)
+            else
+                write(*,*) '   meltpond: no &meltpond block in ', &
+                    trim(filename), ' (iostat=', iost, '), using defaults'
+            endif
+            write(*,'(a,f6.3)') '     hi_min     = ', hi_min
+            write(*,'(a,f6.3)') '     hs1        = ', hs1
+            write(*,'(a,f6.3)') '     rfracmin   = ', rfracmin
+            write(*,'(a,f6.3)') '     rfracmax   = ', rfracmax
+            write(*,'(a,f6.3)') '     pndaspect  = ', pndaspect
+            write(*,'(a,f6.3)') '     albpnd     = ', albpnd
+            write(*,'(a,f6.3)') '     albpnd_frz = ', albpnd_frz
+        endif
     end subroutine init_meltponds
 
     !===========================================================================
