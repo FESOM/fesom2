@@ -580,6 +580,7 @@ subroutine ice_init(ice, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     USE o_param, only: WP
+    use ice_meltponds, only: init_meltponds
     IMPLICIT NONE
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -708,6 +709,7 @@ subroutine ice_init(ice, partit, mesh)
     ice%thermo%new_iclasses=new_iclasses
     ice%thermo%open_water_albedo=open_water_albedo
     ice%thermo%use_meltponds = use_meltponds
+    if (use_meltponds) call init_meltponds('namelist.ice', partit%mype)
     ice%thermo%c_melt   = c_melt
     ice%thermo%h_cutoff = h_cutoff    
     ice%thermo%cc       =ice%thermo%rhowat*4190.0  ! Volumetr. heat cap. of water [J/m**3/K](cc = rhowat*cp_water)
