@@ -93,6 +93,11 @@ consn          = 0.31           ! thermal conductivity of snow [W/m/K]
 ! --- Snow Distribution ---
 snowdist       = .true.         ! distribute snow depth according to ice thickness distribution
 
+! --- Snow-cover albedo blending ---
+h_snowscale    = 0.0            ! tanh blend scale for snow → bare-ice albedo [m]
+                                !   0.0    -> legacy step function at hsn > 1 mm (default)
+                                !   0.02-0.05 -> CICE-like smooth transition
+
 ! --- Melting Parameters ---
 c_melt         = 0.5            ! constant in concentration equation for melting conditions (0-1)
 /

@@ -615,31 +615,41 @@ contains
   real(kind=WP) :: alb
   real(kind=WP) :: geolat
   real(kind=WP), pointer :: albsn, albi, albsnm, albim
-  real(kind=WP) :: alb_noponds  ! albedo without pond effects
-  
-  albsn  => ice%thermo%albsn
-  albi   => ice%thermo%albi
-  albsnm => ice%thermo%albsnm
-  albim  => ice%thermo%albim
-  
+  real(kind=WP) :: alb_noponds         ! albedo without pond effects
+  real(kind=WP) :: alpha_snow          ! 0..1 snow-cover blend weight
+  real(kind=WP) :: alb_snow, alb_bare  ! season-selected snow / bare-ice albedo
+  real(kind=WP) :: h_snowscale         ! local copy of namelist tanh scale
+
+  albsn       => ice%thermo%albsn
+  albi        => ice%thermo%albi
+  albsnm      => ice%thermo%albsnm
+  albim       => ice%thermo%albim
+  h_snowscale =  ice%thermo%h_snowscale
+
   ! Calculate standard albedo first (without pond effects)
   if (h>0.0_WP) then
-     if (t<273.15_WP) then         ! freezing condition    
-        if (hsn.gt.0.001_WP) then !   snow cover present  
-           alb_noponds=albsn       
-        else                    !   no snow cover       
-           alb_noponds=albi           
-        endif
-     else                               ! melting condition     
-        if (hsn.gt.0.001_WP) then !   snow cover present  
-           alb_noponds=albsnm          
-        else                    !   no snow cover       
-           alb_noponds=albim
+     if (t<273.15_WP) then     ! freezing surface
+        alb_snow = albsn
+        alb_bare = albi
+     else                      ! melting surface
+        alb_snow = albsnm
+        alb_bare = albim
+     endif
+     if (h_snowscale > 0.0_WP) then
+        ! Smooth tanh blend; alpha_snow -> 1 as hsn >> h_snowscale
+        alpha_snow = tanh(hsn / h_snowscale)
+        alb_noponds = alpha_snow * alb_snow + (1.0_WP - alpha_snow) * alb_bare
+     else
+        ! Legacy 1 mm step function
+        if (hsn .gt. 0.001_WP) then
+           alb_noponds = alb_snow
+        else
+           alb_noponds = alb_bare
         endif
      endif
-   else
-      alb_noponds=0.066_WP            !  ocean albedo
-   endif
+  else
+     alb_noponds = 0.066_WP    ! ocean albedo
+  endif
    
    ! Apply melt pond albedo modification if enabled
    if (ithermp%use_meltponds .and. h > 0.0_WP) then

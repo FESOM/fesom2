@@ -87,6 +87,10 @@ TYPE T_ICE_THERMO
     real(kind=WP) :: albi  = 0.70      !         frozen ice
     real(kind=WP) :: albim = 0.68      !         melting ice
     real(kind=WP) :: albw  = 0.066     !         open water, LY2004
+    ! Smooth snow→bare-ice albedo blend; alpha_snow = tanh(hsn/h_snowscale).
+    ! 0 (default) keeps the legacy step function at hsn > 1 mm.
+    ! Typical CICE-style values are 0.02-0.05 m.
+    real(kind=WP) :: h_snowscale = 0.0_WP
     real(kind=WP) :: h_ml  = 2.5_WP    ! thickness of uppermost layer deacides how much heat is available
 
     ! --- additional namelist parameters (Frank.Kauker(at)awi.de 2023/04/04)
@@ -598,9 +602,10 @@ subroutine ice_init(ice, partit, mesh)
     logical        :: snowdist, new_iclasses, use_meltponds
     integer        :: open_water_albedo, iclasses
     real(kind=WP)  :: Sice, h0, h0_s, emiss_ice, emiss_wat, albsn, albsnm, albi, &
-                      albim, albw, con, consn, hmin, armin, c_melt, h_cutoff, h_ml
+                      albim, albw, con, consn, hmin, armin, c_melt, h_cutoff, h_ml, h_snowscale
     namelist /ice_therm/ Sice, iclasses, h0, h0_s, hmin, armin,  emiss_ice, emiss_wat, albsn, albsnm, albi, &
-                         albim, albw, con, consn,  snowdist, new_iclasses, open_water_albedo, c_melt, h_cutoff, h_ml, use_meltponds
+                         albim, albw, con, consn,  snowdist, new_iclasses, open_water_albedo, c_melt, h_cutoff, h_ml, use_meltponds, &
+                         h_snowscale
 
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -643,6 +648,7 @@ subroutine ice_init(ice, partit, mesh)
     albim            = ice%thermo%albim
     albw             = ice%thermo%albw
     h_ml             = ice%thermo%h_ml
+    h_snowscale      = ice%thermo%h_snowscale
     snowdist         = ice%thermo%snowdist
     new_iclasses     = ice%thermo%new_iclasses
     open_water_albedo= ice%thermo%open_water_albedo
@@ -703,6 +709,7 @@ subroutine ice_init(ice, partit, mesh)
     ice%thermo%albim    = albim
     ice%thermo%albw     = albw
     ice%thermo%h_ml     = h_ml
+    ice%thermo%h_snowscale = h_snowscale
     ice%thermo%snowdist = snowdist
     ice%thermo%new_iclasses=new_iclasses
     ice%thermo%open_water_albedo=open_water_albedo
