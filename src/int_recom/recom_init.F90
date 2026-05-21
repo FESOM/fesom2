@@ -377,8 +377,6 @@ subroutine recom_init(tracers, partit, mesh)
 
     ! ... populate tracer_id_array from namelist ...
     tracer_id_array = tracers%data(1:tracers%num_tracers)%ID
-    if(mype==0) write(*,*), ' RECOM INIT tracer_id_array ', tracer_id_array
-    if(mype==0) write(*,*), ' RECOM INIT num_tracers ', num_tracers
     call validate_tracer_id_sequence(tracer_id_array, num_tracers, mype)
 
     !===============================================================================
@@ -565,7 +563,6 @@ subroutine recom_init(tracers, partit, mesh)
                tracers%data(i)%values(:,:) = tiny_chl
             ELSEIF (enable_3zoo2det .AND. RECOM_CDOM) THEN   
                 ! CDOM, Colored dissolved organic matter
-             if(mype==0) write(*,*), ' CDOM, Colored dissolved organic matter no enable_coccos'   
                tracers%data(i)%values(:,:) = tiny
             END IF
         CASE (1032)
@@ -573,7 +570,6 @@ subroutine recom_init(tracers, partit, mesh)
                 ! PhaeoN - Phaeocystis Nitrogen
                 tracers%data(i)%values(:,:) = tiny_chl / chl2N_max
             ELSEIF (enable_3zoo2det .AND. RECOM_CDOM .AND. RECOM_MARSHALL) THEN   
-               if(mype==0) write(*,*), ' ´D1 protein small phytos, D1 no enable_coccos'     
                 ! D1 protein small phytos
                tracers%data(i)%values(:,:) = tiny
             END IF
@@ -582,7 +578,6 @@ subroutine recom_init(tracers, partit, mesh)
                 ! PhaeoC - Phaeocystis Carbon
                 tracers%data(i)%values(:,:) = tiny_chl / chl2N_max / NCmax
             ELSEIF (enable_3zoo2det .AND. RECOM_CDOM .AND. RECOM_MARSHALL) THEN 
-               if(mype==0) write(*,*), ' ´D1 protein Diatoms, D1 no enable_coccos'     
                 ! D1 protein diatoms
                tracers%data(i)%values(:,:) = tiny
             END IF
