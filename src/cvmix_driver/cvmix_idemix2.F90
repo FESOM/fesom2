@@ -337,23 +337,7 @@ subroutine compute_param(             &
         !   v0(di) = 0d0
         !endif
     enddo
-    ! --> ATTENTION: REMEMBER TO CHECK HORIZONTAL STABILTY CRITERIA WHEN 
-    !     HORIZOTNAL OPERATION IS DONE !!!
-    ! --> pyOM2:    
-    !     if (enable_idemix_hor_diffusion .or. enable_idemix_hor_diffusion_iter) then
-    !     ! check for stability criterium, lateral diffusion is explicit
-    !     !  tau_h v0^2 *dt/dx^2 <= 0.5  ->   v0  <  sqrt( 0.5*dx^2/(dt tau_h)  )
-    !     do j=js_pe-onx,je_pe+onx
-    !       do i=is_pe-onx,ie_pe+onx
-    !          if (enable_idemix_hor_diffusion_iter) then
-    !             fxa = 0.2*min( dxt(i)*cost(j), dyt(j) )**2/ max(1D0,dt_tracer/idemix_hor_diffusion_iter *tau_h )
-    !          else
-    !             fxa = 0.2*min( dxt(i)*cost(j), dyt(j) )**2/ max(1D0,dt_tracer *tau_h )
-    !          endif
-    !          v0(i,j,:) = min( sqrt(fxa), v0(i,j,:) )
-    !       enddo
-    !     enddo
-    !   endif
+    
 end subroutine compute_param
     
     
@@ -467,6 +451,7 @@ subroutine compute_compart_interact_tscale(   &
                 topo_shelf          , &
                 omega_compart       , &
                 tau_compart         , &
+                compart_name        , &
                 idemix2_const_userdef &
                 )    
     !___Input___________________________________________________________________
@@ -482,6 +467,7 @@ subroutine compute_compart_interact_tscale(   &
     logical           , intent(in)                    :: topo_shelf
     !___Output__________________________________________________________________
     real(cvmix_r8)    , intent(out)                   :: tau_compart
+    character(len=*)  , intent(in)                    :: compart_name
     !___Local___________________________________________________________________
     real(cvmix_r8)                                    :: fxb, fxc, N0, small=1.0e-12_cvmix_r8
     type(idemix2_type), pointer                       :: idemix2_const_in
@@ -497,17 +483,36 @@ subroutine compute_compart_interact_tscale(   &
     if (zbottom>0) then
         N0=cn*cvmix_PI/zbottom
         if (  N0 > abs(coriolis) .and. omega_compart > abs(coriolis)  ) then
-            fxc = topo_hrms**2.0 * 2.0*cvmix_PI/(small+topo_hlam) 
-            fxb = 0.5* N0*( (omega_compart**2.0 + coriolis**2.0)/omega_compart**2.0 )**2.0  &
-                           *(omega_compart**2.0 - coriolis**2.0)**0.5/omega_compart
-            tau_compart = min(0.5/dtime, fxc*fxb/zbottom) 
+        
+            if (trim(compart_name)=='niw') then 
+                ! fxc = topo_hrms**2.0 * 2.0*cvmix_PI/(small+topo_hlam) ! Goff & Arbic
+                fxc = topo_hrms**2.0 * 2.0*sqrt(2.6)/(small+topo_hlam)  ! Goff for nu=0.8 FP 2020
+                fxb = 0.5* N0*( (omega_compart**2.0 + coriolis**2.0)/omega_compart**2.0 )**2.0  &
+                               *(omega_compart**2.0 - coriolis**2.0)**0.5/omega_compart
+                tau_compart = min(0.5/dtime, fxc*fxb/zbottom) 
+            
+            elseif (trim(compart_name)=='M2') then 
+            
+                if (topo_hrms>0.0) then 
+                    ! fxc = topo_hrms**2.0 * 2.0*cvmix_PI/(small+topo_hlam) ! Goff & Arbic
+                    fxc = topo_hrms**2.0 * 2.0*sqrt(2.6)/(small+topo_hlam)  ! Goff for nu=0.8 FP 2020
+                    fxb = 0.5* N0*( (omega_compart**2.0 + coriolis**2.0)/omega_compart**2.0 )**2.0  &
+                               *(omega_compart**2.0 - coriolis**2.0)**0.5/omega_compart
+                    tau_compart = min(0.5/dtime, fxc*fxb/zbottom)            
+                else
+                    tau_compart = 1./(50.*86400.0)   
+                end if 
+            end if 
         endif
     endif
         
     ! on shelf limitation 
-    if (topo_shelf) tau_compart  = 1./(3.*86400.0)
-    tau_compart = max(1d0/(50.*86400.0), tau_compart )
-    
+    if (topo_shelf) tau_compart  = 1./(7.*86400.0)
+    if (trim(compart_name)=='niw') then 
+        tau_compart = max(1d0/(3.*86400.0), tau_compart )
+    else if (trim(compart_name)=='M2') then 
+        tau_compart = max(1d0/(50.*86400.0), tau_compart )
+    end if 
 end subroutine compute_compart_interact_tscale                                     
 
 
@@ -530,7 +535,7 @@ subroutine compute_M2_dissipation(    &
     !___Output__________________________________________________________________
     real(cvmix_r8)    , intent(out)                   :: alpha_M2_c
     !___Local___________________________________________________________________
-    real(cvmix_r8)                                    :: N0
+    real(cvmix_r8)                                    :: N0, xalpha1, xalpha2
     real(cvmix_r8)                                    :: mstar=0.01 ,&
                                                          M2_f=2*cvmix_PI/(12.42*60*60)
     type(idemix2_type), pointer                       :: idemix2_const_in
@@ -546,13 +551,36 @@ subroutine compute_M2_dissipation(    &
     alpha_M2_c = 0.0
     if (zbottom > 0.) then 
         N0 = cn*cvmix_PI/zbottom+1D-20
+!         if (abs(lat) < 28.5 ) then
+!             ! lambda+/M2=15*E*mstar/N * (sin(phi-28.5)/sin(28.5))^1/2
+!             alpha_M2_c=alpha_M2_c+ M2_f*15*mstar/N0* (sin( abs(abs(lat) -28.5)/180.*cvmix_PI )/sin(28.5/180.*cvmix_PI) )**0.5
+!         endif
+!         if (abs(lat) < 74.5 ) then
+!             ! lambda-/M2 =  0.7*E*mstar/N *sin^2(phi)
+!             alpha_M2_c=alpha_M2_c+ M2_f*0.7*mstar/N0* sin( abs(lat)/180.*cvmix_PI )**2
+!         endif
+        ! sum interaction        !FP 2020 
         if (abs(lat) < 28.5 ) then
-            ! lambda+/M2=15*E*mstar/N * (sin(phi-28.5)/sin(28.5))^1/2
-            alpha_M2_c=alpha_M2_c+ M2_f*15*mstar/N0* (sin( abs(abs(lat) -28.5)/180.*cvmix_PI )/sin(28.5/180.*cvmix_PI) )**0.5
+            if(lat < 0.) then
+                xalpha1 = 13.0076
+                xalpha2 = 3.1617*1d-6
+            else
+                xalpha1 = 13.1923
+                xalpha2 = 3.4391*1d-6
+            endif
+            alpha_M2_c  = alpha_M2_c + xalpha2*10.0**(abs(lat)/xalpha1)
         endif
+        
+        ! difference interaction    !FP 2020
         if (abs(lat) < 74.5 ) then
-            ! lambda-/M2 =  0.7*E*mstar/N *sin^2(phi)
-            alpha_M2_c=alpha_M2_c+ M2_f*0.7*mstar/N0* sin( abs(lat)/180.*cvmix_PI )**2
+            if(lat < 0.) then
+                xalpha1 = -2.8223
+                xalpha2 = 1.4875*1d-4             
+            else
+                xalpha1 = -6.6848
+                xalpha2 = 1.8207*1d-4        
+            endif
+            alpha_M2_c = alpha_M2_c + xalpha2*(sin((2.*lat+xalpha1)*cvmix_PI/180.)/sin(74.5*cvmix_PI/180.))**2.
         endif
         alpha_M2_c=alpha_M2_c/zbottom
     endif
@@ -1079,15 +1107,15 @@ subroutine compute_Eiw_waveinteract(  &
             M2_diss         = min(M2_diss, E_M2_new(fbini)/max(small,dt))
             E_M2_new(fbini) = E_M2_new(fbini)-dt*M2_diss 
             E_M2_new(fbini) = max(0.0_cvmix_r8, E_M2_new(fbini))
-            if (E_M2_new(fbini)/=E_M2_new(fbini) .or. E_M2_new(fbini)<0.0_cvmix_r8) then 
-                write(*,*) " }-))))°> found negative/NaN E_M2_new from WWI M2", E_M2_new(fbini)
-                write(*,*) "fbini           = ", fbini
-                write(*,*) "E_M2_new(fbini) = ", E_M2_new(fbini)
-                write(*,*) "E_M2_old(fbini) = ", E_M2_old(fbini)
-                write(*,*) "M2_diss         = ", -dt*M2_diss
-                write(*,*) "aM2c            = ", aM2c
-                write(*,*) "vint            = ", vint
-            end if
+!             if (E_M2_new(fbini)/=E_M2_new(fbini) .or. E_M2_new(fbini)<0.0_cvmix_r8) then 
+!                 write(*,*) " }-))))°> found negative/NaN E_M2_new from WWI M2", E_M2_new(fbini)
+!                 write(*,*) "fbini           = ", fbini
+!                 write(*,*) "E_M2_new(fbini) = ", E_M2_new(fbini)
+!                 write(*,*) "E_M2_old(fbini) = ", E_M2_old(fbini)
+!                 write(*,*) "M2_diss         = ", -dt*M2_diss
+!                 write(*,*) "aM2c            = ", aM2c
+!                 write(*,*) "vint            = ", vint
+!             end if
         end do     
         
         ! update E_iw from E_M2
@@ -1096,18 +1124,18 @@ subroutine compute_Eiw_waveinteract(  &
             E_iw_new(nz) =   E_iw_new(nz) &
                               + dt * tau_M2* sint * E_M2_struct(nz) &
                               + dt * fmin  * sint * E_M2_struct(nz)
-                              
-            if (E_iw_new(nz)/=E_iw_new(nz) .or. E_iw_new(nz)<0.0_cvmix_r8) then 
-                write(*,*) " }-))))°> found negative/NaN Eiw_new from WWI M2", E_iw_new(nz)
-                write(*,*) "nz              = ", nz
-                write(*,*) "E_iw_new(nz)    = ", E_iw_new(nz)
-                write(*,*) "E_M2_new        = ", minval(E_M2_new), maxval(E_M2_new)
-                write(*,*) "E_M2_old        = ", minval(E_M2_old), maxval(E_M2_old)
-                write(*,*) "tau_M2          = ", tau_M2
-                write(*,*) "fmin            = ", fmin
-                write(*,*) "sint            = ", sint
-                write(*,*) "E_M2_struct(nz) = ", E_M2_struct(nz)
-            end if                   
+            E_iw_new(nz) = max(0.0_cvmix_r8, E_iw_new(nz))                 
+!             if (E_iw_new(nz)/=E_iw_new(nz) .or. E_iw_new(nz)<0.0_cvmix_r8) then 
+!                 write(*,*) " }-))))°> found negative/NaN Eiw_new from WWI M2", E_iw_new(nz)
+!                 write(*,*) "nz              = ", nz
+!                 write(*,*) "E_iw_new(nz)    = ", E_iw_new(nz)
+!                 write(*,*) "E_M2_new        = ", minval(E_M2_new), maxval(E_M2_new)
+!                 write(*,*) "E_M2_old        = ", minval(E_M2_old), maxval(E_M2_old)
+!                 write(*,*) "tau_M2          = ", tau_M2
+!                 write(*,*) "fmin            = ", fmin
+!                 write(*,*) "sint            = ", sint
+!                 write(*,*) "E_M2_struct(nz) = ", E_M2_struct(nz)
+!             end if                   
         end do
     end if
     
@@ -1123,15 +1151,15 @@ subroutine compute_Eiw_waveinteract(  &
         do nz = 1, nlev
             E_iw_new(nz) =   E_iw_new(nz) &
                               + dt * tau_niw * sint * E_niw_struct(nz)
-                              
-            if (E_iw_new(nz)/=E_iw_new(nz) .or. E_iw_new(nz)<0.0_cvmix_r8 ) then 
-                write(*,*) " }-))))°> found negative/NaN Eiw_new from WWI NIW", E_iw_new(nz)
-                write(*,*) "nz              = ", nz
-                write(*,*) "E_iw_new(nz)    = ", E_iw_new(nz)
-                write(*,*) "tau_niw         = ", tau_niw
-                write(*,*) "sint            = ", sint
-                write(*,*) "E_niw_struct(nz)= ", E_niw_struct(nz)
-            end if 
+            E_iw_new(nz) = max(0.0_cvmix_r8, E_iw_new(nz))                  
+!             if (E_iw_new(nz)/=E_iw_new(nz) .or. E_iw_new(nz)<0.0_cvmix_r8 ) then 
+!                 write(*,*) " }-))))°> found negative/NaN Eiw_new from WWI NIW", E_iw_new(nz)
+!                 write(*,*) "nz              = ", nz
+!                 write(*,*) "E_iw_new(nz)    = ", E_iw_new(nz)
+!                 write(*,*) "tau_niw         = ", tau_niw
+!                 write(*,*) "sint            = ", sint
+!                 write(*,*) "E_niw_struct(nz)= ", E_niw_struct(nz)
+!             end if 
         end do
     end if
 end subroutine compute_Eiw_waveinteract

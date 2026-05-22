@@ -72,7 +72,7 @@ module g_cvmix_idemix2
     ! use superbee-spectral advection scheme and Adams-Bashfort timestepping 
 !     logical            :: idemix2_enable_superbee_adv = .true.
     logical            :: idemix2_enable_AB_timestep  = .true.
-    integer            :: idemix2_AB_epsilon = 0.0_WP
+    integer            :: idemix2_AB_epsilon = 0.1_WP
     ! number of spectral bins used for the M2 tidal and near-inertial wave (niw) components
     ! e.g 50+2 in loop used as do fbin=2,51 ... 1 and 52 serve as spectral boudary condition
     ! The first and last bins are used for boundary conditions in the spectral space.
@@ -91,6 +91,9 @@ module g_cvmix_idemix2
     
     ! define shelf is defined as distance from coast (default 300km)
     real(kind=WP)      :: idemix2_shelf_dist = 300.0e3 
+    
+    ! scal down baroclinic wave speed when not all modes are used
+    real(kind=WP)      :: idemix2_scal_cn = 1.0
     
     !___________________________________________________________________________
     ! enable M2 tidal component as significant source of internal wave energy in IDEMIX2, 
@@ -154,7 +157,7 @@ module g_cvmix_idemix2
     character(MAX_PATH):: idemix2_hlamforc_file = './idemix2_forcing_t-scattering_1deg.nc'
     character(MAX_PATH):: idemix2_hlamforc_vname= 'LAMBDA_G10'
     
-    namelist /param_idemix2/ idemix2_tau_v, idemix2_tau_h, idemix2_gamma, idemix2_jstar, idemix2_mu0, &
+    namelist /param_idemix2/ idemix2_tau_v, idemix2_tau_h, idemix2_gamma, idemix2_jstar, idemix2_mu0, idemix2_scal_cn, &
                              idemix2_enable_AB_timestep, idemix2_nfbin, & ! idemix2_enable_superbee_adv
                              idemix2_enable_hor_diffusion, idemix2_enable_hor_diff_iter, idemix2_hor_diff_niter, &
                              idemix2_shelf_dist, &
@@ -176,6 +179,7 @@ module g_cvmix_idemix2
     real(kind=WP), allocatable, dimension(:,:)  :: iwe2_M2_w, iwe2_fM2, iwe2_E_M2_struct 
     real(kind=WP), allocatable, dimension(:)    :: w_M2_e, iwe2_alpha_M2_c, iwe2_M2_tau    
     real(kind=WP), allocatable, dimension(:,:)  :: iwe2_E_M2_dt, iwe2_E_M2_advh, iwe2_E_M2_advs, iwe2_E_M2_diss, iwe2_E_M2_forc
+    real(kind=WP), allocatable, dimension(:,:)  :: iwe2_M2_div_uv
 
     ! niw related global variables
     real(kind=WP), allocatable, dimension(:)    :: iwe2_omega_niw
@@ -183,6 +187,7 @@ module g_cvmix_idemix2
     real(kind=WP), allocatable, dimension(:,:)  :: iwe2_niw_w, iwe2_fniw, iwe2_E_niw_struct
     real(kind=WP), allocatable, dimension(:)    :: w_niw_e, iwe2_niw_tau
     real(kind=WP), allocatable, dimension(:,:)  :: iwe2_E_niw_dt, iwe2_E_niw_advh, iwe2_E_niw_advs, iwe2_E_niw_diss, iwe2_E_niw_forc
+    real(kind=WP), allocatable, dimension(:,:)  :: iwe2_niw_div_uv
     
     ! general idemix variable
     real(kind=WP), allocatable, dimension(:)    :: iwe2_cn
@@ -202,15 +207,15 @@ module g_cvmix_idemix2
     real(kind=WP), allocatable, dimension(:,:)  :: iwe2_Av
     
     ! support variables 
+    real(kind=WP), allocatable, dimension(:)    :: vol_nodB2T
     real(kind=WP), allocatable, dimension(:,:)  :: vol_wcelli
     integer      , allocatable, dimension(:,:)  :: edge_up_dn_tri      
     real(kind=WP), allocatable, dimension(:)    :: iwe2_grady_coriol, aux
     real(kind=WP), allocatable, dimension(:,:,:):: iwe2_gradxy_e, iwe2_gradxy_n
-    real(kind=WP), allocatable, dimension(:,:  ):: iwe2_flx_uv, iwe2_flx_w, iwe2_div_hv
+    real(kind=WP), allocatable, dimension(:,:  ):: iwe2_flx_uv, iwe2_flx_w
     integer                                     :: iwe2_taum1=1, iwe2_tau=2, iwe2_taup1=3, otaum1
     
-    real(kind=WP), allocatable, dimension(:)    :: iwe2_cn_e, iwe2_cn_gradx, iwe2_cn_grady
-    real(kind=WP), allocatable, dimension(:,:)  :: iwe2_M2_w_e, iwe2_niw_w_e, iwe2_niw_cflcs, iwe2_M2_cflcs
+    ! real(kind=WP), allocatable, dimension(:)    :: iwe2_cn_e, iwe2_cn_gradx, iwe2_cn_grady
     
     ! load variables from CVMix list
     type(cvmix_data_type)                       :: CVMix_vars
@@ -320,13 +325,14 @@ module g_cvmix_idemix2
         
         ! baroclionic gravity wave speed
         allocate(iwe2_cn(node_size))
-        allocate(iwe2_cn_e(elem_size))
-        allocate(iwe2_cn_gradx(elem_size))
-        allocate(iwe2_cn_grady(elem_size))
         iwe2_cn(:)           = 0.0_WP
-        iwe2_cn_e(:)         = 0.0_WP
-        iwe2_cn_gradx(:)     = 0.0_WP
-        iwe2_cn_grady(:)     = 0.0_WP
+        
+!         allocate(iwe2_cn_e(elem_size))
+!         allocate(iwe2_cn_gradx(elem_size))
+!         allocate(iwe2_cn_grady(elem_size))
+!         iwe2_cn_e(:)         = 0.0_WP
+!         iwe2_cn_gradx(:)     = 0.0_WP
+!         iwe2_cn_grady(:)     = 0.0_WP
         
         ! Eiw 3d enery dissipation coefficient 
         allocate(iwe2_alpha_c(nl,node_size))
@@ -366,10 +372,11 @@ module g_cvmix_idemix2
             ! at vertices
             allocate(iwe2_M2_uv(2, nfbin,elem_size))
             allocate(iwe2_M2_w(    nfbin,node_size))
-            allocate(iwe2_M2_w_e(    nfbin,elem_size))
             iwe2_M2_uv(:,:,:)     = 0.0_WP
             iwe2_M2_w(:,:)        = 0.0_WP
-            iwe2_M2_w_e(:,:)      = 0.0_WP
+            
+            allocate(iwe2_M2_div_uv(    nfbin,elem_size))
+            iwe2_M2_div_uv        = 0.0_WP
             
             ! M2 forcing
             allocate(iwe2_fM2(nfbin, node_size))
@@ -402,8 +409,6 @@ module g_cvmix_idemix2
             iwe2_E_M2_diss(:,:)   = 0.0_WP
             iwe2_E_M2_forc(:,:)   = 0.0_WP
             
-            allocate(  iwe2_M2_cflcs(  nfbin, node_size))
-            iwe2_M2_cflcs = 0.0_WP
         end if 
         
         ! initialise niw variables 
@@ -424,10 +429,11 @@ module g_cvmix_idemix2
             ! at vertices
             allocate(iwe2_niw_uv(2, nfbin,elem_size))
             allocate(iwe2_niw_w(    nfbin,node_size))
-            allocate(iwe2_niw_w_e(  nfbin,elem_size))
             iwe2_niw_uv(:,:,:)     = 0.0_WP
             iwe2_niw_w(:,:)        = 0.0_WP
-            iwe2_niw_w_e(:,:)      = 0.0_WP
+            
+            allocate(iwe2_niw_div_uv(    nfbin,elem_size))
+            iwe2_niw_div_uv        = 0.0_WP
             
             ! niw forcing
             allocate(iwe2_fniw(nfbin, node_size))
@@ -460,8 +466,6 @@ module g_cvmix_idemix2
             iwe2_E_niw_diss(:,:)   = 0.0_WP
             iwe2_E_niw_forc(:,:)   = 0.0_WP
             
-            allocate(  iwe2_niw_cflcs(  nfbin, node_size))
-            iwe2_niw_cflcs = 0.0_WP
         end if 
         
         ! allocate 1d Spectral space coordinates
@@ -501,25 +505,26 @@ module g_cvmix_idemix2
         
         ! support gradient variables 
         allocate(  iwe2_grady_coriol(      elem_size)   &   
-                 , iwe2_gradxy_e(2, nfbin, elem_size   )   &
-                 , iwe2_gradxy_n(2, nfbin, node_size   )   &
+                 , iwe2_gradxy_e(2, nfbin, elem_size)   &
+                 , iwe2_gradxy_n(2, nfbin, node_size)   &
                  )
         iwe2_grady_coriol(:) = 0.0_WP
         iwe2_gradxy_e(:,:,:) = 0.0_WP
         iwe2_gradxy_n(:,:,:) = 0.0_WP
         
         ! support horizontal edge flux and vertical flux and accumulated divergence variables 
-        allocate(  iwe2_flx_uv(nfbin, partit%myDim_edge2D) &
-                 , iwe2_flx_w( nfbin, node_size)           &
-                 , iwe2_div_hv(nfbin, node_size)           &
+        allocate(  iwe2_flx_uv(nfbin, partit%myDim_edge2D) & 
+                 , iwe2_flx_w( nfbin, partit%myDim_nod2D ) & 
                  )
         iwe2_flx_uv(:,:)     = 0.0
         iwe2_flx_w( :,:)     = 0.0
-        iwe2_div_hv(:,:)     = 0.0
         
         ! support inverse volume of wcell
         allocate(vol_wcelli(nl, node_size))
-        vol_wcelli(:,:)      = 0.0_WP
+        vol_wcelli(:,:)     = 0.0_WP
+        allocate(vol_nodB2T(node_size))
+        vol_nodB2T(:)     = 0.0_WP
+        
         
         !_______________________________________________________________________
         ! width of spectral frequency bins
@@ -532,15 +537,7 @@ module g_cvmix_idemix2
         do fbin_i=2,nfbin 
             iwe2_phit(fbin_i) = iwe2_phit(fbin_i-1) + iwe2_dphit(fbin_i)
             iwe2_phiu(fbin_i) = iwe2_phiu(fbin_i-1) + iwe2_dphiu(fbin_i)
-        end do
-        
-        if (partit%mype==0) then 
-            write(*,*) 'iwe2_phit = ', iwe2_phit
-            write(*,*) 'iwe2_phiu = ', iwe2_phiu
-            write(*,*)
-        end if 
-        
-        
+        end do 
         
         !_______________________________________________________________________
         ! read idemix M2 forcing from cfsr data --> file 
@@ -609,15 +606,26 @@ module g_cvmix_idemix2
             ! in this case standard idemix1 behaviour 
             iwe2_fsrf = max(0.0_WP,iwe2_fsrf)
             iwe2_fsrf = iwe2_fsrf/density_0*idemix2_fniw_usage
+            
+            ! check for total tidal energy that is infused through the surface, see how 
+            ! much is lossed during interpolation and compare with value of the 
+            ! original files
+            loc_Etot = 0.0_WP
+            do node=1, myDim_nod2D
+                loc_Etot = loc_Etot + area(1,node)*iwe2_fsrf(node)*density_0                    
+            end do
+            call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+            
             if (idemix2_enable_niw) then
                 if (mype==0) write(*,*) '     ├> read IDEMIX2 niw wave forcing'
                 do fbin_i =2, nfbin-1
-                    iwe2_fniw(fbin_i, :) = iwe2_fsrf(:)/iwe2_dphit(fbin_i) !!!ATTENTION CHECK THIS AGAIN!!!
+                    iwe2_fniw(fbin_i, :) = iwe2_fsrf(:)/(2.0_WP*pi)
                 end do 
                 iwe2_fsrf(:) = 0.0_WP
             else
                 if (mype==0) write(*,*) '     ├> read IDEMIX2 surface wave forcing'
             end if
+            if (mype==0) write(*,*) '     ├> IDEMIX2 total srf. energy Etot_srf =', glb_Etot*1.0e-12, ' TW'
             
         else
             if (mype==0) then
@@ -844,6 +852,13 @@ module g_cvmix_idemix2
         call find_up_downwind_triangles(partit, mesh, mesh%edge_up_dn_tri)
         
         !_______________________________________________________________________
+        ! compute scalar cell volume from top to bottom 
+        ! --> if take the fixed standard levels (zbar) to compute the ocean volume 
+        !     than only normal numerical drift, ocean volume can be computed at 
+        !     initialisation point
+        call compute_vol_nodB2T_fix(vol_nodB2T, mesh, partit)
+        
+        !_______________________________________________________________________
         ! initialise IDEMIX parameters
         call cvmix_idemix2_init(                                 &
               tau_v               = idemix2_tau_v                &
@@ -902,6 +917,15 @@ module g_cvmix_idemix2
         ! if (mype==0) write(*,*) " --> taum1, tau, taup1: ", iwe2_taum1, iwe2_tau, iwe2_taup1
         
         !_______________________________________________________________________
+        ! compute scalar cell volume from top to bottom 
+        ! --> if we take not the ALE variying ocean layer into account --> slight 
+        !     numerical drift
+        ! --> if take the fixed standard levels (zbar) to compute the ocean volume 
+        !     than only normal numerical drift, ocean volume can be computed at 
+        !     initialisation point
+        ! call compute_vol_nodB2T_hnode(vol_nodB2T, mesh, partit)
+        
+        !_______________________________________________________________________
         do node=1, myDim_nod2D+eDim_nod2D
             !___________________________________________________________________
             ! re-initialse cross spectral velocites, for later accumulation through 
@@ -924,7 +948,7 @@ module g_cvmix_idemix2
             do nz=uln, nln-1
                 cn=cn+hnode(nz,node)*sqrt(max(bvfreq(nz,node), 0._WP) + max(bvfreq(nz+1,node), 0._WP))/2._WP
             end do
-            cn = cn/pi
+            cn = cn/pi * idemix2_scal_cn
             iwe2_cn(node)=cn
             
             !
@@ -997,6 +1021,7 @@ module g_cvmix_idemix2
                         , topo_shelf   = topo_shelf                  & !IN
                         , omega_compart= iwe2_omega_M2               & !IN
                         , tau_compart  = iwe2_M2_tau(          node) & !OUT
+                        , compart_name = 'M2'                        &
                         )
                     call cvmix_idemix2_compute_M2_dissipation(       &
                           lat          = lat_n_deg                   & !IN
@@ -1017,6 +1042,7 @@ module g_cvmix_idemix2
                         , topo_shelf   = topo_shelf                  & !IN
                         , omega_compart= iwe2_omega_niw(       node) & !IN
                         , tau_compart  = iwe2_niw_tau(         node) & !OUT
+                        , compart_name = 'niw'                       &
                         )
                 end if  
             end if 
@@ -1050,7 +1076,8 @@ module g_cvmix_idemix2
                     , omega_niw   = iwe2_omega_niw(            node) & !IN
                     , E_struct_M2 = iwe2_E_M2_struct( uln:nln, node) & !OUT
                     , E_struct_niw= iwe2_E_niw_struct(uln:nln, node) & !OUT
-                    )    
+                    )
+                    
             else if (idemix2_enable_M2) then 
                 call cvmix_idemix2_compute_vert_struct_fct(          &
                       nlev        = nln-uln+1                        & !IN 
@@ -1060,7 +1087,8 @@ module g_cvmix_idemix2
                     , Nsqr        = bvfreq(           uln:nln, node) & !IN
                     , omega_M2    = iwe2_omega_M2                    & !IN
                     , E_struct_M2 = iwe2_E_M2_struct( uln:nln, node) & !OUT
-                    ) 
+                    )
+                    
             else if (idemix2_enable_niw) then 
                 call cvmix_idemix2_compute_vert_struct_fct(          &
                       nlev        = nln-uln+1                        & !IN 
@@ -1070,7 +1098,8 @@ module g_cvmix_idemix2
                     , Nsqr        = bvfreq(           uln:nln, node) & !IN
                     , omega_niw   = iwe2_omega_niw(            node) & !IN
                     , E_struct_niw= iwe2_E_niw_struct(uln:nln, node) & !OUT
-                    )     
+                    )
+                    
             end if         
         end do ! --> do node=1, myDim_nod2D+eDim_nod2D
         
@@ -1094,9 +1123,9 @@ module g_cvmix_idemix2
             cn_gradx_e  = sum(gradient_sca(1:3,elem)*iwe2_cn(elnodes))
             cn_grady_e  = sum(gradient_sca(4:6,elem)*iwe2_cn(elnodes))
             
-            iwe2_cn_e(elem)     = cn_e
-            iwe2_cn_gradx(elem) = cn_gradx_e
-            iwe2_cn_grady(elem) = cn_grady_e
+!             iwe2_cn_e(elem)     = cn_e
+!             iwe2_cn_gradx(elem) = cn_gradx_e
+!             iwe2_cn_grady(elem) = cn_grady_e
             
             ! average to elem
             if (idemix2_enable_niw) omega_niw_e = sum(iwe2_omega_niw(elnodes))/3.0
@@ -1151,14 +1180,12 @@ module g_cvmix_idemix2
                     , omega_compart= iwe2_omega_M2               & !IN
                     , u_compart    = iwe2_M2_uv(1,      :, elem) & !OUT
                     , v_compart    = iwe2_M2_uv(2,      :, elem) & !OUT
-!                     , w_compart    = w_M2_e(            :      ) & !OUT
-                    , w_compart    = iwe2_M2_w_e(       :, elem) & !OUT
+                    , w_compart    = w_M2_e(            :      ) & !OUT
                     )
                 ! --> here w_M2_e and w_niw_e are still on elements but for the proper 
                 !     finite volume advection implementation we need them on nodes !
                 do k=1,3
-!                     iwe2_M2_w(:, elnodes(k)) = iwe2_M2_w(:, elnodes(k)) + w_M2_e(:)*elem_area(elem)/3.0_WP
-                    iwe2_M2_w(:, elnodes(k)) = iwe2_M2_w(:, elnodes(k)) + iwe2_M2_w_e(:, elem)*elem_area(elem)/3.0_WP
+                    iwe2_M2_w(:, elnodes(k)) = iwe2_M2_w(:, elnodes(k)) + w_M2_e(:)*elem_area(elem)/3.0_WP
                 end do
                 
             end if
@@ -1176,12 +1203,17 @@ module g_cvmix_idemix2
                     , omega_compart= omega_niw_e                  & !IN
                     , u_compart    = iwe2_niw_uv(1,      :, elem) & !OUT
                     , v_compart    = iwe2_niw_uv(2,      :, elem) & !OUT
-!                     , w_compart    = w_niw_e(            :      ) & !OUT
-                    , w_compart    = iwe2_niw_w_e(       :, elem) & !OUT
+                    , w_compart    = w_niw_e(            :      ) & !OUT
                     )
+                
+                ! Mask out NIW velocities near equator where physics is singular
+                if (abs(lat_e_deg) < 5.0_WP) then  ! ~5° latitude
+                    iwe2_niw_uv( :, :, elem) = 0.0_WP
+                    w_niw_e(           :   ) = 0.0_WP
+                end if
+                
                 do k=1,3
-!                     iwe2_niw_w(:, elnodes(k)) = iwe2_niw_w(:, elnodes(k)) + w_niw_e(:)*elem_area(elem)/3.0_WP
-                    iwe2_niw_w(:, elnodes(k)) = iwe2_niw_w(:, elnodes(k)) + iwe2_niw_w_e(:, elem)*elem_area(elem)/3.0_WP
+                    iwe2_niw_w(:, elnodes(k)) = iwe2_niw_w(:, elnodes(k)) + w_niw_e(:)*elem_area(elem)/3.0_WP
                 end do
             end if
             ! --> at the end we still need to normalize iwe2_M2_w and iwe2_niw_w 
@@ -1196,7 +1228,6 @@ module g_cvmix_idemix2
             call exchange_nod_fbin(iwe2_M2_w, partit)
             do node=1, myDim_nod2D+eDim_nod2D
                 iwe2_M2_w( :, node) = iwe2_M2_w(:, node)/area(1, node)
-!                 write(*,*) "iwe2_M2_w([1, 2, nfbin-1, nfbin],:)=", iwe2_M2_w(1, node), iwe2_M2_w(2, node), iwe2_M2_w(idemix2_nfbin-1, node), iwe2_M2_w(idemix2_nfbin, node)                
             end do
         end if
         
@@ -1204,11 +1235,9 @@ module g_cvmix_idemix2
             call exchange_elem_fbin(iwe2_niw_uv, partit)
             call exchange_nod_fbin(iwe2_niw_w, partit)
             do node=1, myDim_nod2D+eDim_nod2D
-                iwe2_niw_w(:, node) = iwe2_niw_w(:, node)/area(1,node)
-!                 write(*,*) "iwe2_niw_w([1, 2, nfbin-1, nfbin],:)=", iwe2_niw_w(1, node), iwe2_niw_w(2, node), iwe2_niw_w(idemix2_nfbin-1, node), iwe2_niw_w(idemix2_nfbin, node)
+                iwe2_niw_w( :, node) = iwe2_niw_w(:, node)/area(1, node)
             end do            
-        end if    
-        
+        end if
         
         
         !_______________________________________________________________________
@@ -1217,61 +1246,68 @@ module g_cvmix_idemix2
         ! dE/dt = -div(vec_u * E) - tau*E + Forc    
         ! E^(n+1) = E^n + dt*( -div(vec_u^n*E^n) - tau*E^n + Forc^n)
         if (idemix2_enable_M2) then 
-            call hsintegrate_Ecompart(&
-                  iwe2_taum1, iwe2_tau, iwe2_taup1     &
-                , 'M2'                &  
-                , iwe2_E_M2           & 
-                , iwe2_E_M2_divh      &
-                , iwe2_E_M2_divs      &
-                , iwe2_M2_uv          &
-                , iwe2_M2_w           &
-                , iwe2_fM2            &
-                , iwe2_M2_tau         &
-                , iwe2_dphit          &
-                , iwe2_gradxy_e       &
-                , iwe2_gradxy_n       &
-                , iwe2_flx_uv         &
-                , iwe2_flx_w          &
-                , iwe2_M2_cflcs        &
-                , mesh%edge_up_dn_tri &
-                , partit              &
-                , mesh                &
-                , iwe2_E_M2_dt        & ! optional: diagnostic
-                , iwe2_E_M2_advs      & ! optional: diagnostic
-                , iwe2_E_M2_diss      & ! optional: diagnostic
-                , iwe2_E_M2_forc      & ! optional: diagnostic
-                , geo_coord_nod2D(1,:)&
-                , geo_coord_nod2D(2,:)&
+            call hsintegrate_Ecompart(              &
+                  iwe2_taum1, iwe2_tau, iwe2_taup1  &
+                , 'M2'                              &  
+                , iwe2_E_M2                         & 
+                , iwe2_E_M2_divh                    &
+                , iwe2_E_M2_divs                    &
+                , iwe2_M2_uv                        &
+                , iwe2_M2_w                         &
+                , iwe2_fM2                          &
+                , iwe2_M2_tau                       &
+                , iwe2_dphit                        &
+                , iwe2_gradxy_e                     &
+                , iwe2_gradxy_n                     &
+                , iwe2_flx_uv                       &
+                , iwe2_flx_w                        &
+                , vol_nodB2T                        &
+                , partit                            &
+                , mesh                              &
+                , .True.                            & ! flag_AB2, do 2nd order adams-bashfort in time
+                , iwe2_E_M2_dt                      & ! optional: diagnostic
+                , iwe2_E_M2_advh                    & ! optional: diagnostic
+                , iwe2_E_M2_advs                    & ! optional: diagnostic
+                , iwe2_E_M2_diss                    & ! optional: diagnostic
+                , iwe2_E_M2_forc                    & ! optional: diagnostic
                 )
-        end if     
+                
+            ! Compute global total NIW energy for conservation check
+            call check_global_energy(iwe2_E_M2, iwe2_taup1, iwe2_dphit, vol_nodB2T, iwe2_fM2, iwe2_M2_tau, partit, mesh, 'M2')
+!             call check_flux_conservation(  iwe2_E_niw_divh, iwe2_E_niw_divs, iwe2_tau, iwe2_dphit, vol_nodB2T, partit, mesh, 'M2')
+        end if 
+        
         if (idemix2_enable_niw) then
-            call hsintegrate_Ecompart(&
-                  iwe2_taum1, iwe2_tau, iwe2_taup1     & 
-                , 'NIW'               &
-                , iwe2_E_niw          & 
-                , iwe2_E_niw_divh     &
-                , iwe2_E_niw_divs     &
-                , iwe2_niw_uv         &
-                , iwe2_niw_w          &
-                , iwe2_fniw           &
-                , iwe2_niw_tau        &
-                , iwe2_dphit          &
-                , iwe2_gradxy_e       &
-                , iwe2_gradxy_n       &
-                , iwe2_flx_uv         &
-                , iwe2_flx_w          &
-                , iwe2_niw_cflcs      &
-                , mesh%edge_up_dn_tri &
-                , partit              &
-                , mesh                &
-                , iwe2_E_niw_dt       & ! optional: diagnostic
-                , iwe2_E_niw_advh     & ! optional: diagnostic
-                , iwe2_E_niw_advs     & ! optional: diagnostic
-                , iwe2_E_niw_diss     & ! optional: diagnostic
-                , iwe2_E_niw_forc     & ! optional: diagnostic
-                , geo_coord_nod2D(1,:)&
-                , geo_coord_nod2D(2,:)&
+            call hsintegrate_Ecompart(              &
+                  iwe2_taum1, iwe2_tau, iwe2_taup1  & 
+                , 'NIW'                             &
+                , iwe2_E_niw                        & 
+                , iwe2_E_niw_divh                   &
+                , iwe2_E_niw_divs                   &
+                , iwe2_niw_uv                       &
+                , iwe2_niw_w                        &
+                , iwe2_fniw                         &
+                , iwe2_niw_tau                      &
+                , iwe2_dphit                        &
+                , iwe2_gradxy_e                     &
+                , iwe2_gradxy_n                     &
+                , iwe2_flx_uv                       &
+                , iwe2_flx_w                        &
+                , vol_nodB2T                        &
+                , partit                            &
+                , mesh                              &
+                , .True.                            & ! flag_AB2, do 2nd order adams-bashfort in time
+                , iwe2_E_niw_dt                     & ! optional: diagnostic
+                , iwe2_E_niw_advh                   & ! optional: diagnostic
+                , iwe2_E_niw_advs                   & ! optional: diagnostic
+                , iwe2_E_niw_diss                   & ! optional: diagnostic
+                , iwe2_E_niw_forc                   & ! optional: diagnostic
                 )
+            
+            ! Compute global total NIW energy for conservation check
+            call check_global_energy(iwe2_E_niw, iwe2_taup1, iwe2_dphit, vol_nodB2T, iwe2_fniw, iwe2_niw_tau, partit, mesh, 'niw')
+!             call check_max_cfl(iwe2_niw_uv, iwe2_niw_w, iwe2_dphit, partit, mesh, 'niw')
+!             call check_flux_conservation(  iwe2_E_niw_divh, iwe2_E_niw_divs, iwe2_tau, iwe2_dphit, vol_nodB2T, partit, mesh, 'niw')
         end if 
         
         
@@ -1344,67 +1380,67 @@ module g_cvmix_idemix2
         
         
         
-!         !_______________________________________________________________________
-!         ! 10th. compute wave-wave interaction 
-!         if (idemix2_enable_M2 .or. idemix2_enable_niw) then 
-!             do node = 1, myDim_nod2D
-!                 uln = ulevels_nod2D(node)
-!                 nln = nlevels_nod2D(node)
-!                 !_______________________________________________________________
-!                 if     (idemix2_enable_M2 .and. idemix2_enable_niw) then 
-!                     call cvmix_idemix2_compute_Eiw_waveinteract(                      &
-!                               nlev         = nln-uln+1                                & 
-!                             , nfbin        = idemix2_nfbin                            &
-!                             , dzw          = hnode(                uln:nln-1, node)   &
-!                             , dphi         = iwe2_dphit                               &
-!                             , dt           = dt                                       &
-!                             , E_iw_old     = iwe2_E_iw( iwe2_tau  ,  uln:nln, node)   &
-!                             , E_iw_new     = iwe2_E_iw( iwe2_taup1,  uln:nln, node)   &
-!                             , E_M2_old     = iwe2_E_M2( iwe2_tau  ,  :      , node)   &
-!                             , E_M2_new     = iwe2_E_M2( iwe2_taup1,  :      , node)   &
-!                             , E_M2_struct  = iwe2_E_M2_struct(       :      , node)   &
-!                             , alpha_M2_c   = iwe2_alpha_M2_c(                 node)   &
-!                             , tau_M2       = iwe2_M2_tau(                     node)   &
-!                             , E_niw_old    = iwe2_E_niw(iwe2_tau  ,  :      , node)   &
-!                             , E_niw_new    = iwe2_E_niw(iwe2_taup1,  :      , node)   &
-!                             , E_niw_struct = iwe2_E_niw_struct(      :      , node)   &
-!                             , tau_niw      = iwe2_niw_tau(                    node)   &
-!                             )
-!                 elseif (idemix2_enable_M2) then 
-!                     call cvmix_idemix2_compute_Eiw_waveinteract(                      &
-!                               nlev         = nln-uln+1                                & 
-!                             , nfbin        = idemix2_nfbin                            &
-!                             , dzw          = hnode(                uln:nln-1, node)   &
-!                             , dphi         = iwe2_dphit                               &
-!                             , dt           = dt                                       &
-!                             , E_iw_old     = iwe2_E_iw( iwe2_tau  ,  uln:nln, node)   &
-!                             , E_iw_new     = iwe2_E_iw( iwe2_taup1,  uln:nln, node)   &
-!                             , E_M2_old     = iwe2_E_M2( iwe2_tau  ,  :      , node)   &
-!                             , E_M2_new     = iwe2_E_M2( iwe2_taup1,  :      , node)   &
-!                             , E_M2_struct  = iwe2_E_M2_struct(       :      , node)   &
-!                             , alpha_M2_c   = iwe2_alpha_M2_c(                 node)   &
-!                             , tau_M2       = iwe2_M2_tau(                     node)   &
-!                             )
-!                 elseif (idemix2_enable_niw) then 
-!                     call cvmix_idemix2_compute_Eiw_waveinteract(                      &
-!                               nlev         = nln-uln+1                                & 
-!                             , nfbin        = idemix2_nfbin                            &
-!                             , dzw          = hnode(                uln:nln-1, node)   &
-!                             , dphi         = iwe2_dphit                               &
-!                             , dt           = dt                                       &
-!                             , E_iw_old     = iwe2_E_iw( iwe2_tau  ,  uln:nln, node)   &
-!                             , E_iw_new     = iwe2_E_iw( iwe2_taup1,  uln:nln, node)   &
-!                             , E_niw_old    = iwe2_E_niw(iwe2_tau  ,  :      , node)   &
-!                             , E_niw_new    = iwe2_E_niw(iwe2_taup1,  :      , node)   &
-!                             , E_niw_struct = iwe2_E_niw_struct(      :      , node)   &
-!                             , tau_niw      = iwe2_niw_tau(                    node)   &
-!                             )
-!                 end if ! -->  (idemix2_enable_M2 .and. idemix2_enable_niw) then 
-!             end do ! --> for node = 1, myDim_nod2D
-!         end if ! --> if (idemix2_enable_M2 .or . idemix2_enable_niw) then 
-        
-        
-        
+        !_______________________________________________________________________
+        ! 10th. compute wave-wave interaction 
+        if (idemix2_enable_M2 .or. idemix2_enable_niw) then 
+            do node = 1, myDim_nod2D+eDim_nod2D
+                uln = ulevels_nod2D(node)
+                nln = nlevels_nod2D(node)
+                !_______________________________________________________________
+                if     (idemix2_enable_M2 .and. idemix2_enable_niw) then 
+                    call cvmix_idemix2_compute_Eiw_waveinteract(                      &
+                              nlev         = nln-uln+1                                & 
+                            , nfbin        = idemix2_nfbin                            &
+                            , dzw          = hnode(                uln:nln-1, node)   &
+                            , dphi         = iwe2_dphit                               &
+                            , dt           = dt                                       &
+                            , E_iw_old     = iwe2_E_iw( iwe2_tau  ,  uln:nln, node)   &
+                            , E_iw_new     = iwe2_E_iw( iwe2_taup1,  uln:nln, node)   &
+                            , E_M2_old     = iwe2_E_M2( iwe2_tau  ,  :      , node)   &
+                            , E_M2_new     = iwe2_E_M2( iwe2_taup1,  :      , node)   &
+                            , E_M2_struct  = iwe2_E_M2_struct(       :      , node)   &
+                            , alpha_M2_c   = iwe2_alpha_M2_c(                 node)   &
+                            , tau_M2       = iwe2_M2_tau(                     node)   &
+                            , E_niw_old    = iwe2_E_niw(iwe2_tau  ,  :      , node)   &
+                            , E_niw_new    = iwe2_E_niw(iwe2_taup1,  :      , node)   &
+                            , E_niw_struct = iwe2_E_niw_struct(      :      , node)   &
+                            , tau_niw      = iwe2_niw_tau(                    node)   &
+                            )
+                elseif (idemix2_enable_M2) then 
+                    call cvmix_idemix2_compute_Eiw_waveinteract(                      &
+                              nlev         = nln-uln+1                                & 
+                            , nfbin        = idemix2_nfbin                            &
+                            , dzw          = hnode(                uln:nln-1, node)   &
+                            , dphi         = iwe2_dphit                               &
+                            , dt           = dt                                       &
+                            , E_iw_old     = iwe2_E_iw( iwe2_tau  ,  uln:nln, node)   &
+                            , E_iw_new     = iwe2_E_iw( iwe2_taup1,  uln:nln, node)   &
+                            , E_M2_old     = iwe2_E_M2( iwe2_tau  ,  :      , node)   &
+                            , E_M2_new     = iwe2_E_M2( iwe2_taup1,  :      , node)   &
+                            , E_M2_struct  = iwe2_E_M2_struct(       :      , node)   &
+                            , alpha_M2_c   = iwe2_alpha_M2_c(                 node)   &
+                            , tau_M2       = iwe2_M2_tau(                     node)   &
+                            )
+                elseif (idemix2_enable_niw) then 
+                    call cvmix_idemix2_compute_Eiw_waveinteract(                      &
+                              nlev         = nln-uln+1                                & 
+                            , nfbin        = idemix2_nfbin                            &
+                            , dzw          = hnode(                uln:nln-1, node)   &
+                            , dphi         = iwe2_dphit                               &
+                            , dt           = dt                                       &
+                            , E_iw_old     = iwe2_E_iw( iwe2_tau  ,  uln:nln, node)   &
+                            , E_iw_new     = iwe2_E_iw( iwe2_taup1,  uln:nln, node)   &
+                            , E_niw_old    = iwe2_E_niw(iwe2_tau  ,  :      , node)   &
+                            , E_niw_new    = iwe2_E_niw(iwe2_taup1,  :      , node)   &
+                            , E_niw_struct = iwe2_E_niw_struct(      :      , node)   &
+                            , tau_niw      = iwe2_niw_tau(                    node)   &
+                            )
+                end if ! -->  (idemix2_enable_M2 .and. idemix2_enable_niw) then 
+            end do ! --> for node = 1, myDim_nod2D
+        end if ! --> if (idemix2_enable_M2 .or . idemix2_enable_niw) then 
+
+
+
         !_______________________________________________________________________
         ! 11th. write IDEMIX2 diffusivities and viscositie to FESOM only when IDEMIX2 is 
         ! used alone --> mostly for debuging --> otherwise TKE Av and Kv are use
@@ -1452,11 +1488,9 @@ module g_cvmix_idemix2
                 vel                         , & 
                 ttf                         , &
                 ttf_grad_n                  , &
-                dphi                        , &
                 flux                        , &
                 partit                      , &
                 mesh                        , &
-                edge_up_dn_tri              , &
                 flag_2ndord_time            , &
                 flag_posdef                   &
                 )
@@ -1465,19 +1499,19 @@ module g_cvmix_idemix2
         !___INPUT/OUTPUT VARIABLES______________________________________________
         type(t_partit)  , intent(inout), target :: partit
         type(t_mesh)    , intent(in)   , target :: mesh
-        real(kind=WP)   , intent(in)            :: ttf(          idemix2_nfbin, partit%myDim_nod2D+partit%eDim_nod2D)
-        real(kind=WP)   , intent(in)            :: ttf_grad_n(2, idemix2_nfbin, partit%myDim_nod2D+partit%eDim_nod2D)
+        real(kind=WP)   , intent(in)            :: ttf(          idemix2_nfbin, partit%myDim_nod2D +partit%eDim_nod2D)
+        real(kind=WP)   , intent(in)            :: ttf_grad_n(2, idemix2_nfbin, partit%myDim_nod2D +partit%eDim_nod2D)
         real(kind=WP)   , intent(in)            :: vel(2,        idemix2_nfbin, partit%myDim_elem2D+partit%eDim_elem2D)
-        real(kind=WP)   , intent(in)            :: dphi(         idemix2_nfbin)
         real(kind=WP)   , intent(inout)         :: flux(         idemix2_nfbin, partit%myDim_edge2D)
-        integer         , intent(in)            :: edge_up_dn_tri(2           , partit%myDim_edge2D)
         logical         , intent(in)            :: flag_2ndord_time
         logical         , intent(in)            :: flag_posdef
+        
         !___LOCAL VARIABLES_____________________________________________________
         real(kind=WP)                           :: dx1, dy1, dx2, dy2, dxdy12(2), edlen, n_x, n_y, n_len  
-        real(kind=WP)                           :: u1, u2, v1, v2, Ue, CFL, fac_2ndord_time
+        real(kind=WP)                           :: u1, u2, v1, v2, Ue, CFL, dh1, dh2
         real(kind=WP)                           :: R, ttfp2, ttfm1, ttf0, ttfp1, dttf0p1, Tmean1, Tmean2, Cr, vflux, vfabs
-        integer                                 :: el(2), el2, ednodes(2), edge, fbini, nfbin
+        integer                                 :: el(2), el2, ednodes(2), edge, fbini, nfbin, nln, uln, nz
+        logical, parameter                      :: flag_volfix=.True.
 #include "../associate_part_def.h"
 #include "../associate_mesh_def.h"
 #include "../associate_part_ass.h"
@@ -1486,12 +1520,12 @@ module g_cvmix_idemix2
         !_______________________________________________________________________
         nfbin=idemix2_nfbin
         
-        !_______________________________________________________________________
         ! this advection does !!! NOT !!! go over the vertical dimension it goes 
         ! over the domain of the spectral bins 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, ednodes, el, el2, fbini, &
-!$OMP                                  dx1, dy1, dx2, dy2, dxdy12, vflux, vfabs, &
-!$OMP                                  ttf0, ttfp1, dttf02, ttfp2, ttfm1, R, Cr, Tmean1, Tmean2
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, ednodes, el, el2, fbini, nln, &
+!$OMP                                  dx1, dy1, dx2, dy2, dxdy12, dh1, dh2, n_x, n_y, n_len, edlen, &
+!$OMP                                  u1, v1, u2, v2, Ue, CFL, vflux, vfabs, &
+!$OMP                                  ttf0, ttfp1, dttf0p1, ttfp2, ttfm1, R, Cr, Tmean1, Tmean2)
 !$OMP DO        
         do edge=1, myDim_edge2D
             !___________________________________________________________________
@@ -1509,16 +1543,43 @@ module g_cvmix_idemix2
             ! length of edge dx dy
             dxdy12 = edge_dxdy(:,edge)*r_earth  
             
+            ! compute elemental local bottom depth for volume flux computation 
+            if (flag_volfix) then 
+                nln = nlevels(el(1))
+                dh1 = abs(zbar(nln))
+            else
+                uln = ulevels(el(1))
+                nln = nlevels(el(1))-1
+                dh1  = 0.0_WP
+                do nz=uln,nln
+                    dh1 = dh1 + helem(nz, el(1))
+                end do
+            end if 
+            
             !___________________________________________________________________
             ! same parameter but for other element el(2) that contributes to edge ed
             ! if el(2)==0 than edge is boundary edge
             dx2    = 0.0_WP
             dy2    = 0.0_WP
+            dh2    = 0.0_WP
             el2    = el(1) ! --> just a dummy index here is vel(el2) are multiplied with 0.0_WP
             if(el(2)>0) then
                 el2      = el(2) ! --> dummy replaced with valid el(2), dx2 and dy2
                 dx2      = edge_cross_dxdy(3,edge)
                 dy2      = edge_cross_dxdy(4,edge)
+                
+                ! compute elemental local bottom depth for volume flux computation 
+                if (flag_volfix) then 
+                    nln = nlevels(el2)
+                    dh2 = abs(zbar(nln))
+                else
+                    uln = ulevels(el2)
+                    nln = nlevels(el2)-1
+                    do nz=uln,nln
+                        dh2 = dh2 + helem(nz, el2)
+                    end do
+                end if 
+                
                 dxdy12(1)= dxdy12(1) * (elem_cos(el(1)) + elem_cos(el2)) * 0.5_WP
                 
                 ! compute mean edge-segment normal vector
@@ -1560,19 +1621,21 @@ module g_cvmix_idemix2
                 v1     = vel(2, fbini, el(1))
                 u2     = vel(1, fbini, el2  )
                 v2     = vel(2, fbini, el2  )
-                vflux  =  ((-v1*dx1 + u1*dy1) + ( v2*dx2 - u2*dy2)) ! NO * dphi(fbini)
+                
+                vflux  =  (-v1*dx1 + u1*dy1) * dh1 &
+                        + ( v2*dx2 - u2*dy2) * dh2 ! NO * dphi(fbini)
                 
                 ! compute approximated edge centered and along edge projected 
                 ! mean velocity --> need to add component to make second order
                 ! in time
-                Ue    =  sqrt((0.5_WP*( u1 + u2 )*n_x)**2 +  (0.5_WP*( v1 + v2 )*n_y)**2)
-                CFL   = Ue*dt/edlen
+                Ue    = sqrt((0.5_WP*( u1 + u2 )*n_x)**2 +  (0.5_WP*( v1 + v2 )*n_y)**2)
+                CFL   = min(1.0_WP, Ue*dt/edlen)
                 
                 !_______________________________________________________________
                 ! compute tracer difference allong edge
                 ttf0    = ttf(fbini, ednodes(1))
                 ttfp1   = ttf(fbini, ednodes(2))
-                dttf0p1 = ttfp1-ttf0
+                dttf0p1 = (ttfp1-ttf0)
                 
                 !_______________________________________________________________
                 ! tracer Slope Ratio Calculation for upwind augmented point
@@ -1604,9 +1667,8 @@ module g_cvmix_idemix2
                 R       = (ttfp1-ttfp2)/(-dttf0p1+small)
                 
                 ! apply superbee limiter
-                Cr      = slimiter_superbee(R)     
-!                 Cr      = 0.0_WP  ! First-order upwind (Cr=0 gives upwind, Cr=1 gives average!)
-                
+                Cr      = slimiter_superbee(R)  ! DEBUG: force pure upwind (no reconstruction)
+               
                 ! construct edge centered tracer value
                 ! T_(i+0.5) = T_i+1 - [ (T_i+1 - T_i)/dx ]_Limited * dx/2
                 !  --> this is seconds order in space, but first order in time 
@@ -1618,23 +1680,6 @@ module g_cvmix_idemix2
                 !  --> n_ed  = (n_1 + n_2)/2
                 !  --> CFL_h = u_ed*n_ed*dt/dx
                 Tmean2  = ttfp1 + 0.5_WP * Cr * (-dttf0p1) * (1.0_WP-merge(CFL, 0.0_WP, flag_2ndord_time)) 
-!                 if (ttfp2<0) then   
-!                     write(*,*) "mype=", partit%mype, ', edge=', edge, ', fbini=',fbini
-!                     write(*,*) "ttfp2              = ", ttfp2
-!                     write(*,*) "ttfp1              = ", ttfp1
-!                     write(*,*) "ttf0               = ", ttf0
-!                     write(*,*) "dttf0p1            = ", dttf0p1
-!                     write(*,*) "E(node1)           = ", ttf(fbini, ednodes(1))
-!                     write(*,*) "E(node2)           = ", ttf(fbini, ednodes(2))
-!                     write(*,*) "dxdy12             = ", dxdy12
-!                     write(*,*) "ttf_grad_nx(node1) = ", ttf_grad_n(1, fbini, ednodes(1)) 
-!                     write(*,*) "ttf_grad_ny(node1) = ", ttf_grad_n(2, fbini, ednodes(1)) 
-!                     write(*,*) "ttf_grad_nx(node2) = ", ttf_grad_n(1, fbini, ednodes(2)) 
-!                     write(*,*) "ttf_grad_ny(node2) = ", ttf_grad_n(2, fbini, ednodes(2)) 
-!                     write(*,*) "Cr                 = ", Cr
-!                     write(*,*) "Tmean2             = ", Tmean2
-!                     write(*,*)
-!                 end if 
                 
                 !_______________________________________________________________
                 ! tracer Slope Ratio Calculation for downwind augmented point
@@ -1666,8 +1711,7 @@ module g_cvmix_idemix2
                 R       = (ttf0-ttfm1)/(dttf0p1+small)
                 
                 ! apply superbee limiter
-                Cr      = slimiter_superbee(R)     
-!                 Cr      = 0.0_WP  ! First-order upwind (Cr=0 gives upwind, Cr=1 gives average!)
+                Cr      = slimiter_superbee(R)  ! DEBUG: force pure upwind (no reconstruction)
                 
                 ! construct edge centered tracer value
                 ! T_(i+0.5) = T_i + [ (T_i+1 - T_i)/dx ]_Limited * dx/2
@@ -1680,24 +1724,6 @@ module g_cvmix_idemix2
                 !  --> n_ed  = (n_1 + n_2)/2
                 !  --> CFL_h = u_ed*n_ed*dt/dx
                 Tmean1  = ttf0 + 0.5_WP * Cr * (dttf0p1) * (1.0_WP-merge(CFL, 0.0_WP, flag_2ndord_time))
-!                 if (ttfm1<0) then  
-!                     write(*,*) "mype=", partit%mype, ' , edge=', edge, ' , fbini=',fbini
-!                     write(*,*) "ttfm1              = ", ttfm1
-!                     write(*,*) "ttf0               = ", ttf0
-!                     write(*,*) "ttfp1              = ", ttfp1
-!                     write(*,*) "ttfp2              = ", ttfp2
-!                     write(*,*) "dttf0p1            = ", dttf0p1
-!                     write(*,*) "dxdy12             = ", dxdy12
-!                     write(*,*) "E(node1)           = ", ttf(fbini, ednodes(1))
-!                     write(*,*) "E(node2)           = ", ttf(fbini, ednodes(2))
-!                     write(*,*) "ttf_grad_nx(node1) = ", ttf_grad_n(1, fbini, ednodes(1)) 
-!                     write(*,*) "ttf_grad_ny(node1) = ", ttf_grad_n(2, fbini, ednodes(1)) 
-!                     write(*,*) "ttf_grad_nx(node2) = ", ttf_grad_n(1, fbini, ednodes(2)) 
-!                     write(*,*) "ttf_grad_ny(node2) = ", ttf_grad_n(2, fbini, ednodes(2)) 
-!                     write(*,*) "Cr                 = ", Cr
-!                     write(*,*) "Tmean1             = ", Tmean1
-!                     write(*,*)
-!                 end if 
                 
                 !_______________________________________________________________
                 ! Horizontal flux
@@ -1706,42 +1732,11 @@ module g_cvmix_idemix2
                                            (vflux+vfabs)*Tmean1+ &
                                            (vflux-vfabs)*Tmean2  &
                                           )
-                                         
-                                         
-!                 if (  (mype==226)                              &
-!                      .and. (ednodes(1) == 6 .or. ednodes(2)== 6)    &   
-!                      .and. (fbini==2)                               &
-!                      ) then 
-!                      
-!                     write(*,*) " edge =",edge, ', fbini=',fbini, ', mype=',mype
-!                     write(*,*) " ednodes           = ", ednodes
-!                     write(*,*) " el                = ", el
-!                     write(*,*) " flux(fbini, edge) = ", flux(fbini, edge)
-!                     write(*,*) " dx1,dy1           = ", dx1,dy1
-!                     write(*,*) " u1 ,v1            = ", u1,v1
-!                     write(*,*) " dx2,dy2           = ", dx2,dy2
-!                     write(*,*) " u2 ,v2            = ", u2,v2
-!                     write(*,*) " vflux             = ", vflux
-!                     write(*,*) " vfabs             = ", vfabs
-!                     write(*,*) " ttf0              = ", ttf0
-!                     write(*,*) " ttfp1             = ", ttfp1
-!                     write(*,*) " dttf0p1           = ", dttf0p1
-!                     write(*,*) " Tmean1            = ", Tmean1
-!                     write(*,*) " Tmean2            = ", Tmean2
-!                     write(*,*) " CFL               = ", CFL
-!                     write(*,*) " Ue                = ", Ue
-!                     write(*,*) " edlen             = ", edlen
-!                     write(*,*) " dt                = ", dt
-!                     write(*,*) " n_x               = ", n_x
-!                     write(*,*) " n_y               = ", n_y
-!                     write(*,*)
-!                     write(*,*)
-!                 end if 
-                
+
             end do ! --> for fbini = 1, nfbin 
         end do !--> do edge=1, myDim_edge2D
 !$OMP END DO
-!$OMP END PARALLEL DO
+!$OMP END PARALLEL
     end subroutine adv_Ecompart_hor_spctrl_superbee
     
     
@@ -1751,31 +1746,32 @@ module g_cvmix_idemix2
     !___________________________________________________________________________
     ! cross spectral superbee advection across spectral bins
     subroutine adv_Ecompart_crss_spctrl_superbee( &
-                W                               , &
-                ttf                             , & 
-                dphi                            , &
-                flux                            , &
-                cflcs                           , &
+                cs                              , & ! cross-spectral exchange rate
+                ttf                             , & ! Energy compartment @ node
+                dphi                            , & ! width spectral bin
+                flux                            , & ! cross-spectral flux
                 partit                          , &
                 mesh                            , &
                 flag_2ndord_time                , &
                 flag_posdef                       &
+                ! flag_wlimitcfl                    &
                 )
         implicit none
         !___INPUT/OUTPUT VARIABLES______________________________________________
         type(t_partit),intent(inout), target :: partit
         type(t_mesh),  intent(in)   , target :: mesh
-        real(kind=WP), intent(inout)         :: W  ( idemix2_nfbin, partit%myDim_nod2D+partit%eDim_nod2D)
+        real(kind=WP), intent(inout)         :: cs(  idemix2_nfbin, partit%myDim_nod2D+partit%eDim_nod2D)
         real(kind=WP), intent(in)            :: ttf( idemix2_nfbin, partit%myDim_nod2D+partit%eDim_nod2D)
         real(kind=WP), intent(in)            :: dphi(idemix2_nfbin)
-        real(kind=WP), intent(inout)         :: flux(idemix2_nfbin, partit%myDim_nod2D+partit%eDim_nod2D)
-        real(kind=WP), intent(inout)         :: cflcs(idemix2_nfbin, partit%myDim_nod2D+partit%eDim_nod2D)
+        real(kind=WP), intent(inout)         :: flux(idemix2_nfbin, partit%myDim_nod2D)
         logical      , intent(in)            :: flag_2ndord_time
         logical      , intent(in)            :: flag_posdef
+        ! logical      , intent(in)            :: flag_wlimitcfl
+        
         !___LOCAL VARIABLES_____________________________________________________
         integer                              :: node, fbini, nfbin, idxp1, idxp2, idxm1
         real(kind=WP)                        :: R, ttf0, ttfp1, dttf0p1, Tmean1, Tmean2, Cr, vflux, vfabs
-        real(kind=WP)                        :: CFL, cflmax=0.50_WP
+        real(kind=WP)                        :: CFL !, cflmax=0.50_WP
 #include "../associate_part_def.h"
 #include "../associate_mesh_def.h"
 #include "../associate_part_ass.h"
@@ -1786,8 +1782,9 @@ module g_cvmix_idemix2
         
         !_______________________________________________________________________
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, fbini, idxp2, idxm1, tff0, tffp1, &
-!$OMP                                  dttf0p1, R, Cr, Tmean2, Tmean1, vfabs)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, fbini, idxp1, idxp2, idxm1, &
+!$OMP                                  ttf0, ttfp1, dttf0p1, R, Cr, Tmean1, Tmean2, &
+!$OMP                                  CFL, vflux, vfabs)
 !$OMP DO
 #else
 !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
@@ -1795,7 +1792,7 @@ module g_cvmix_idemix2
         !_______________________________________________________________________
         ! this advection does !!! NOT !!! go over the vertical dimension it goes 
         ! over the domain of the spectral bins 
-        do node = 1, myDim_nod2D+eDim_nod2D
+        do node = 1, myDim_nod2D
             
             !___________________________________________________________________
             !loop over spectral bins 
@@ -1805,15 +1802,17 @@ module g_cvmix_idemix2
             do fbini = 1, nfbin
                 !_______________________________________________________________
                 ! Periodic wrapping for gradient stencil
-                idxp1   = fbini+1 ; if (idxp1>nfbin) idxp1=2+(fbini-nfbin)
-                idxp2   = fbini+2 ; if (idxp2>nfbin) idxp2=2+(fbini-nfbin)
+                idxp1   = fbini+1 ; if (idxp1>nfbin) idxp1=idxp1-(nfbin-2)
+                idxp2   = fbini+2 ; if (idxp2>nfbin) idxp2=idxp2-(nfbin-2)
                 idxm1   = fbini-1 ; if (idxm1<1    ) idxm1=nfbin-2
                 
-                ! limit W cross spectral exchange rate to the CFL limit 
-                W(fbini, node) = min(abs(W(fbini, node)), cflmax*dphi(fbini)/dt)*sign(1.0_WP, W(fbini, node))
+                ! ! limit W cross spectral exchange rate to the CFL limit 
+                ! cs(fbini, node) = merge(  min(abs(cs(fbini, node)), cflmax*dphi(fbini)/dt)*sign(1.0_WP, cs(fbini, node)) &
+                !                         , cs(fbini, node) &
+                !                         , flag_wlimitcfl &
+                !                        )
                 
-                CFL     = abs(W(fbini, node)) * dt / dphi(fbini)
-                cflcs(fbini, node) = CFL
+                CFL     = abs(cs(fbini, node)) * dt / dphi(fbini)
                 
                 !_______________________________________________________________
                 ! compute tracer difference 
@@ -1859,23 +1858,13 @@ module g_cvmix_idemix2
 
                 !_______________________________________________________________
                 ! cross spectral flux matching pyOM2 (NO negative sign, NO area)
-                vflux = W(fbini, node)
+                vflux = cs(fbini, node)
                 vfabs = abs(vflux)
-                flux(fbini, node) = 0.5_WP*(                     &
-                                           (vflux+vfabs)*Tmean1+ &
-                                           (vflux-vfabs)*Tmean2  &
-                                          )
+                flux(fbini, node) = -0.5_WP*(                     &
+                                            (vflux+vfabs)*Tmean1+ &
+                                            (vflux-vfabs)*Tmean2  &
+                                            )
                 
-!                 if (ttf0 /= 0.0_WP .or. ttfp1 /= 0.0_WP) then 
-!                 write(*,*)  'fbini, node       = ', fbini, node
-!                 write(*,*)  'flux(fbini, node) = ', flux(fbini, node)                         
-!                 write(*,*)  'vflux             = ', vflux
-!                 write(*,*)  'vfabs             = ', vfabs
-!                 write(*,*)  'ttf0, ttfp1       = ', ttf0, ttfp1
-!                 write(*,*)  'ttf(:, node)      = ', ttf(:, node)
-!                 write(*,*)  'Tmean1, Tmean2    = ', Tmean1, Tmean2
-!                 write(*,*)
-!                 end if
             end do !--> do fbini = 1, nfbin
 !$ACC END LOOP
         end do ! --> do node = 1, myDim_nod2D
@@ -1896,7 +1885,7 @@ module g_cvmix_idemix2
     ! superbee slope limiter
     pure elemental real(kind=WP) function slimiter_superbee(R) result(Cr)
         real(kind=WP), intent(in) :: R
-        Cr = max(0._WP, min( min(2._WP*R, 0.5_WP+R/2._WP), 2._WP ))
+        Cr = max( 0._WP, min(1.0_WP, 2.0_WP*R), min(2.0_WP, R) )
     end function slimiter_superbee
     
     
@@ -1919,6 +1908,7 @@ module g_cvmix_idemix2
                 div_h                   , &
                 div_v                   , &
                 dphit                   , &
+                vol_s                   , &
                 partit                  , &
                 mesh                      &
                     )
@@ -1926,14 +1916,16 @@ module g_cvmix_idemix2
         !___INPUT/OUTPUT VARIABLES______________________________________________
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in   ), target :: mesh
-        real(kind=WP) , intent(in)            :: flx_h( idemix2_nfbin, partit%myDim_edge2D)
-        real(kind=WP) , intent(in)            :: flx_v( idemix2_nfbin, partit%myDim_nod2D+partit%eDim_nod2D)
-        real(kind=WP) , intent(inout)         :: div_h( idemix2_nfbin, partit%myDim_nod2D+partit%eDim_nod2D)
-        real(kind=WP) , intent(inout)         :: div_v( idemix2_nfbin, partit%myDim_nod2D+partit%eDim_nod2D)
+        real(kind=WP) , intent(in)            :: flx_h( idemix2_nfbin, partit%myDim_edge2D) 
+        real(kind=WP) , intent(in)            :: flx_v( idemix2_nfbin, partit%myDim_nod2D) 
+        real(kind=WP) , intent(inout)         :: div_h( idemix2_nfbin, partit%myDim_nod2D +partit%eDim_nod2D)
+        real(kind=WP) , intent(inout)         :: div_v( idemix2_nfbin, partit%myDim_nod2D +partit%eDim_nod2D)
         real(kind=WP) , intent(in   )         :: dphit( idemix2_nfbin)
+        real(kind=WP) , intent(in   )         :: vol_s(partit%myDim_nod2D+partit%eDim_nod2D)
         !___LOCAL VARIABLES_____________________________________________________
         integer                               :: node, edge, fbini, nfbin, ednodes(2)
-        real(kind=WP)                         :: inv_dphi(idemix2_nfbin), inv_fac1, inv_fac2
+        real(kind=WP)                         :: inv_dphi(idemix2_nfbin)
+        
 #include "../associate_part_def.h"
 #include "../associate_mesh_def.h"
 #include "../associate_part_ass.h"
@@ -1967,25 +1959,25 @@ module g_cvmix_idemix2
         !_______________________________________________________________________
         ! Vertical part
 #ifndef ENABLE_OPENACC
-        !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, edge, ednodes, fbini, nfbin)
-        !$OMP DO
+       !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, edge, ednodes, fbini)
+       !$OMP DO
 #else
-        !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+       !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #endif
-        do node=1, myDim_nod2d+eDim_nod2D
+        do node=1, myDim_nod2d
             !$ACC LOOP VECTOR
             do fbini=2,nfbin-1
-                ! Cross-spectral divergence matching pyOM2: -(flux(k) - flux(k-1))/dphi
+                ! Cross-spectral divergence: (flux(fbini) - flux(fbini-1))/dphi
                 ! flux(fbini) is at interface between fbini and fbini+1
                 ! flux(fbini-1) is at interface between fbini-1 and fbini
-                div_v(fbini,node) = div_v(fbini,node) - (flx_v(fbini,node) - flx_v(fbini-1,node)) * inv_dphi(fbini)
+                div_v(fbini,node) = div_v(fbini,node) + (flx_v(fbini,node)-flx_v(fbini-1,node)) * inv_dphi(fbini)
             end do
             !$ACC END LOOP
         end do
 #ifndef ENABLE_OPENACC
-        !$OMP END DO
+       !$OMP END DO
 #else
-        !$ACC END PARALLEL LOOP
+       !$ACC END PARALLEL LOOP
 #endif
 
         !
@@ -1993,34 +1985,25 @@ module g_cvmix_idemix2
         !_______________________________________________________________________
         ! Horizontal part
 #ifndef ENABLE_OPENACC
-        !$OMP DO
+       !$OMP DO
 #else
 #   if !defined(DISABLE_OPENACC_ATOMICS)
-        !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+       !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #   else
-        !$ACC UPDATE SELF(dttf_h, flux_h)
+       !$ACC UPDATE SELF(dttf_h, flux_h)
 #   endif
 #endif
-        do edge=1, myDim_edge2D
+        do edge=1, myDim_edge2D 
             ednodes  = edges(:,edge)
-            
-            
-!             if ((ednodes(1)==6 .or. ednodes(2) == 6) .and. partit%mype==226) then 
-!                 write(*,*) " critical edge index:", edge
-!             end if 
-        
-            
-            inv_fac1 = 1.0_WP/areasvol(1,ednodes(1))
-            inv_fac2 = 1.0_WP/areasvol(1,ednodes(2))
 #ifndef ENABLE_OPENACC
 #   if defined(_OPENMP) && !defined(__openmp_reproducible)
-            call omp_set_lock(partit%plock(ednodes(1)))
+           call omp_set_lock(partit%plock(ednodes(1)))
 #   else
-            !$OMP ORDERED
+           !$OMP ORDERED
 #   endif 
 #else
 #   if !defined(DISABLE_OPENACC_ATOMICS)
-            !$ACC LOOP VECTOR
+           !$ACC LOOP VECTOR
 #   endif
 #endif      
             !
@@ -2028,25 +2011,25 @@ module g_cvmix_idemix2
             ! horizontal flux contribution to ednode_1
             do fbini=2, nfbin-1
 #if !defined(DISABLE_OPENACC_ATOMICS)
-                !$ACC ATOMIC UPDATE
+               !$ACC ATOMIC UPDATE
 #endif
                 ! Horizontal divergence: flux/area (NO inv_dphi - that's only for cross-spectral!)
-                div_h(fbini,ednodes(1))=div_h(fbini,ednodes(1))+flx_h(fbini,edge)*inv_fac1
-!                 div_h(fbini,ednodes(1))=div_h(fbini,ednodes(1))-flx_h(fbini,edge)*inv_fac1
-            !
-            !___________________________________________________________________
-            ! horizontal flux contribution to ednode_2    
+                div_h(fbini, ednodes(1))=div_h(fbini, ednodes(1))+flx_h(fbini, edge)
+                
+                
 #ifndef ENABLE_OPENACC
 #   if defined(_OPENMP)  && !defined(__openmp_reproducible)
             ! if there is now __openmp or __openmp_reproducible assemble horizontal
             ! divergence in one loop
             end do
+            
+            !___________________________________________________________________
             call omp_unset_lock(partit%plock(ednodes(1)))
             call omp_set_lock  (partit%plock(ednodes(2)))
             
             !
             !___________________________________________________________________
-            ! horizontal flux contribution to ednode_1
+            ! horizontal flux contribution to ednode_2
             do fbini=2, nfbin-1
 #   endif    
 #else
@@ -2055,12 +2038,12 @@ module g_cvmix_idemix2
 #   endif                
 #endif
                 ! Horizontal divergence: flux/area (NO inv_dphi - that's only for cross-spectral!)
-                div_h(fbini,ednodes(2))=div_h(fbini,ednodes(2))-flx_h(fbini,edge)*inv_fac2
-!                 div_h(fbini,ednodes(2))=div_h(fbini,ednodes(2))+flx_h(fbini,edge)*inv_fac2
+                div_h(fbini,ednodes(2))=div_h(fbini,ednodes(2))-flx_h(fbini,edge)
             end do
+            
 #ifndef ENABLE_OPENACC
 #   if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_unset_lock(partit%plock(ednodes(2)))
+           call omp_unset_lock(partit%plock(ednodes(2)))
 #   else
             !$OMP END ORDERED
 #   endif
@@ -2070,16 +2053,35 @@ module g_cvmix_idemix2
 #   endif
 #endif
     end do
+
 #ifndef ENABLE_OPENACC
-    !$OMP END DO
-    !$OMP END PARALLEL
+   !$OMP END DO
+   !$OMP END PARALLEL
 #else
 #   if !defined(DISABLE_OPENACC_ATOMICS)
-    !$ACC END PARALLEL LOOP
+   !$ACC END PARALLEL LOOP
 #   else
-    !$ACC UPDATE DEVICE(dttf_h)
+   !$ACC UPDATE DEVICE(dttf_h)
 #   endif
 #endif
+        
+        ! normalize with total volume of scalar cell from top to bottom
+#ifndef ENABLE_OPENACC
+        !$OMP PARALLEL DO COLLAPSE(2)
+#else
+        !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+#endif
+        do node=1, myDim_nod2d+eDim_nod2D
+            do fbini=2,nfbin-1
+                div_h(fbini, node) = div_h(fbini,node)/vol_s(node)
+            end do
+        end do
+#ifndef ENABLE_OPENACC
+        !$OMP END PARALLEL DO
+#else
+        !$ACC END PARALLEL LOOP
+#endif
+
     end subroutine adv_Ecompart_flx2tra_spctrl
     
     
@@ -2095,7 +2097,7 @@ module g_cvmix_idemix2
                 , Edivh                   &
                 , Edivs                   &
                 , vel                     &
-                , w                       &
+                , cs                      & ! cross-spectral exchange rate phi_dot
                 , forc                    &
                 , tauE                    &
                 , dphit                   &
@@ -2103,113 +2105,109 @@ module g_cvmix_idemix2
                 , gradxy_n                &
                 , flx_uv                  &
                 , flx_cs                  &
-                , cflcs                   &
-                , edge_up_dn_tri          &
+                , vol_s                   &
                 , partit                  &
                 , mesh                    &
+                , flag_AB2                & ! to 2nd order Adams-Bashfort on top 
                 , Edt                     &
                 , Eadvh                   &
                 , Eadvs                   &
                 , Ediss                   &
                 , Eforc                   &
-                , glon,glat               &
                 )
         implicit none
         !___INPUT/OUTPUT VARIABLES______________________________________________
-        type(t_partit)  , intent(inout), target :: partit
-        type(t_mesh)    , intent(in   ), target :: mesh
-        integer         , intent(in   )         :: ti, tim1, tip1
-        character(len=*), intent(in   )         :: Ename
-        real(kind=WP)   , intent(inout)         :: E(       3, idemix2_nfbin, partit%myDim_nod2D +partit%eDim_nod2D)
-        real(kind=WP)   , intent(inout)         :: Edivh(   3, idemix2_nfbin, partit%myDim_nod2D +partit%eDim_nod2D)
-        real(kind=WP)   , intent(inout)         :: Edivs(   3, idemix2_nfbin, partit%myDim_nod2D +partit%eDim_nod2D)
-        real(kind=WP)   , intent(in   )         :: vel(     2, idemix2_nfbin, partit%myDim_elem2D+partit%eDim_elem2D)
-        real(kind=WP)   , intent(inout)         :: w(          idemix2_nfbin, partit%myDim_nod2D +partit%eDim_nod2D)
-        real(kind=WP)   , intent(in   )         :: forc(       idemix2_nfbin, partit%myDim_nod2D +partit%eDim_nod2D)
-        real(kind=WP)   , intent(in   )         :: tauE(                      partit%myDim_nod2D +partit%eDim_nod2D)
-        real(kind=WP)   , intent(inout)         :: gradxy_e(2, idemix2_nfbin, partit%myDim_elem2D+partit%eDim_elem2D)
-        real(kind=WP)   , intent(inout)         :: gradxy_n(2, idemix2_nfbin, partit%myDim_nod2D +partit%eDim_nod2D)
-        real(kind=WP)   , intent(in   )         :: dphit(      idemix2_nfbin)
-        real(kind=WP)   , intent(inout)         :: flx_uv(     idemix2_nfbin, partit%myDim_edge2D)
-        real(kind=WP)   , intent(inout)         :: flx_cs(      idemix2_nfbin, partit%myDim_nod2D+partit%eDim_nod2D)
-        real(kind=WP)   , intent(inout)         :: cflcs(      idemix2_nfbin, partit%myDim_nod2D+partit%eDim_nod2D)
-        integer         , intent(in   )         :: edge_up_dn_tri(2         , partit%myDim_edge2D)
+        type(t_partit)  , intent(inout), target  :: partit
+        type(t_mesh)    , intent(in   ), target  :: mesh
+        integer         , intent(in   )          :: ti, tim1, tip1
+        character(len=*), intent(in   )          :: Ename
+        real(kind=WP)   , intent(inout)          :: E(       3, idemix2_nfbin, partit%myDim_nod2D +partit%eDim_nod2D)
+        real(kind=WP)   , intent(inout)          :: Edivh(   3, idemix2_nfbin, partit%myDim_nod2D +partit%eDim_nod2D)
+        real(kind=WP)   , intent(inout)          :: Edivs(   3, idemix2_nfbin, partit%myDim_nod2D +partit%eDim_nod2D)
+        real(kind=WP)   , intent(in   )          :: vel(     2, idemix2_nfbin, partit%myDim_elem2D+partit%eDim_elem2D)
+        real(kind=WP)   , intent(inout)          :: cs(         idemix2_nfbin, partit%myDim_nod2D +partit%eDim_nod2D)
+        real(kind=WP)   , intent(in   )          :: forc(       idemix2_nfbin, partit%myDim_nod2D +partit%eDim_nod2D)
+        real(kind=WP)   , intent(in   )          :: tauE(                      partit%myDim_nod2D +partit%eDim_nod2D)
+        real(kind=WP)   , intent(inout)          :: gradxy_e(2, idemix2_nfbin, partit%myDim_elem2D+partit%eDim_elem2D)
+        real(kind=WP)   , intent(inout)          :: gradxy_n(2, idemix2_nfbin, partit%myDim_nod2D +partit%eDim_nod2D)
+        real(kind=WP)   , intent(in   )          :: dphit(      idemix2_nfbin)
+        real(kind=WP)   , intent(inout)          :: flx_uv(     idemix2_nfbin, partit%myDim_edge2D)
+        real(kind=WP)   , intent(inout)          :: flx_cs(     idemix2_nfbin, partit%myDim_nod2D ) 
+        real(kind=WP)   , intent(in   )          :: vol_s(                     partit%myDim_nod2D +partit%eDim_nod2D)
+        logical         , intent(in)             :: flag_AB2
         
-        real(kind=WP)   , intent(inout), optional:: Edt(       idemix2_nfbin, partit%myDim_nod2D)
-        real(kind=WP)   , intent(inout), optional:: Eadvh(     idemix2_nfbin, partit%myDim_nod2D)
-        real(kind=WP)   , intent(inout), optional:: Eadvs(     idemix2_nfbin, partit%myDim_nod2D)
-        real(kind=WP)   , intent(inout), optional:: Ediss(     idemix2_nfbin, partit%myDim_nod2D)
-        real(kind=WP)   , intent(inout), optional:: Eforc(     idemix2_nfbin, partit%myDim_nod2D)
         
-        real(kind=WP)   , intent(in)   , optional:: glon(partit%myDim_nod2D+partit%eDim_nod2D),glat(partit%myDim_nod2D+partit%eDim_nod2D)
+        real(kind=WP)   , intent(inout), optional:: Edt(        idemix2_nfbin, partit%myDim_nod2D)
+        real(kind=WP)   , intent(inout), optional:: Eadvh(      idemix2_nfbin, partit%myDim_nod2D)
+        real(kind=WP)   , intent(inout), optional:: Eadvs(      idemix2_nfbin, partit%myDim_nod2D)
+        real(kind=WP)   , intent(inout), optional:: Ediss(      idemix2_nfbin, partit%myDim_nod2D)
+        real(kind=WP)   , intent(inout), optional:: Eforc(      idemix2_nfbin, partit%myDim_nod2D)
         
-        real(kind=WP)                            :: mval
         !___LOCAL VARIABLES_____________________________________________________
-        integer                                 :: node, fbini, nfbin
+        integer                                  :: node, fbini, nfbin
 #include "../associate_part_def.h"
 #include "../associate_mesh_def.h"
 #include "../associate_part_ass.h"
 #include "../associate_mesh_ass.h"        
         !_______________________________________________________________________
         nfbin=idemix2_nfbin
+        iwe2_flx_uv(:,:)     = 0.0
+        iwe2_flx_w( :,:)     = 0.0
         
         !_______________________________________________________________________
-        ! Exchange energy at ghost nodes before advection
         ! Exchange all 3 time levels (minimal overhead, avoids array slicing issues)
         call exchange_nod_fbin(E, partit)
         
         !_______________________________________________________________________
-        ! compute gradient of iwe2_E_M2 on nodes is need for
+        ! compute gradient of iwe2_E on nodes
         call tracer_gradient_elements(E(ti,:,:), gradxy_e, partit, mesh, .False.)
         call exchange_elem_fbin(gradxy_e, partit)
         call interp_e2n(gradxy_e, gradxy_n, mesh, partit, .False.)
         call exchange_nod_fbin(gradxy_n, partit)
-
         
+        !_______________________________________________________________________
         ! compute horizontal superbee advected tracer flux 
         call adv_Ecompart_hor_spctrl_superbee(            &
-                                        vel             , & 
-                                        E(ti,:,:)       , &
-                                        gradxy_n        , &
-                                        dphit           , &
-                                        flx_uv          , &
-                                        partit          , &
-                                        mesh            , &
-                                        edge_up_dn_tri  , &
-                                        .True.          , & ! do 2nd order in space & time
-                                        .True.            & ! enforce positive definit 
+                                          vel             &
+                                        , E(ti,:,:)       &
+                                        , gradxy_n        &
+                                        , flx_uv          &
+                                        , partit          &
+                                        , mesh            &
+                                        , .True.          & ! do 2nd order in space & time
+                                        , .True.          & ! enforce positive definit 
                                         )
                                         
         ! compute cross spectral superbee advected tracer flux                                 
         call adv_Ecompart_crss_spctrl_superbee(           &  
-                                        w               , &
-                                        E(ti,:,:)       , & 
-                                        dphit           , &
-                                        flx_cs          , &
-                                        cflcs           , &
-                                        partit          , &
-                                        mesh            , &
-                                        .True.         , & ! do 2nd order in space & time
-                                        .True.           & ! enforce positive definit 
+                                          cs              &
+                                        , E(ti,:,:)       & 
+                                        , dphit           &
+                                        , flx_cs          &
+                                        , partit          &
+                                        , mesh            &
+                                        , .True.          & ! do 2nd order in space & time
+                                        , .True.          & ! enforce positive definit
                                         )
-                                        
+        
+        !_______________________________________________________________________
         ! compute flux divergence 
         call adv_Ecompart_flx2tra_spctrl(                 &
-                                        flx_uv          , &
-                                        flx_cs          , &
-                                        Edivh(ti,:,:)   , &
-                                        Edivs(ti,:,:)   , &
-                                        dphit           , &
-                                        partit          , &
-                                        mesh              &
+                                         flx_uv           &
+                                        ,flx_cs           &
+                                        ,Edivh(ti,:,:)    &
+                                        ,Edivs(ti,:,:)    &
+                                        ,dphit            &
+                                        ,vol_s            &
+                                        ,partit           &
+                                        ,mesh             &
                                         )
-!         if (any(Edivh(ti,:,:)/=Edivh(ti,:,:))) write(*,*) " }-)))d°> found NaN in Edivh(ti,:,:)"
-!         if (any(Edivs(ti,:,:)/=Edivs(ti,:,:))) write(*,*) " }-)))d°> found NaN in Edivs(ti,:,:)"
-        
+
+        !_______________________________________________________________________        
         ! Eden and Olbers 2014, eq. 2
         ! integrate E_M2^(n+1) = E_M2^(n) + dt*[ 
-        !                        - div(c_uv*E_M2^n) 
-        !                        - d/dphi (dphit/dt*E_M2^n)
+        !                        - div(c_uv*E_M2^n)         --> (the minus is hidden in the flux computation)
+        !                        - d/dphi (dphit/dt*E_M2^n) --> (the minus is hidden in the flux computation)
         !                        + forc
         !                        + W + T]
         !                      
@@ -2219,89 +2217,74 @@ module g_cvmix_idemix2
         !                              └> this part added in wave-wave-interaction
         ! T_niw + W_niw =  -1/tau_niw * E_niw
         ! --> here variable tauE is already 1/tau
-        do node= 1, myDim_nod2d+eDim_nod2D
-            do fbini=2,nfbin-1
-                ! Check if this is the first timestep (previous divergence is zero)
-!                 if (abs(Edivh(tim1, fbini, node)) < 1.0e-20_WP .and. abs(Edivs(tim1, fbini, node)) < 1.0e-20_WP) then
-                    ! First timestep: use forward Euler to avoid Adams-Bashforth amplification
-                    E(tip1, fbini, node) = E(ti, fbini, node) &
-                                           + dt * (+                          Edivh(ti  , fbini, node) & ! div(c_uv*E_M2^n) 
-                                                   +                          Edivs(ti  , fbini, node) & ! d/dphi (dphit/dt*E_M2)
-                                                   +                          forc(       fbini, node) & ! forc
-                                                   -               tauE(node)*E(    ti  , fbini, node) & ! diss
-                                                  )
-!                 else
-!                     ! Subsequent timesteps: use Adams-Bashforth
-!                     E(tip1, fbini, node) = E(ti, fbini, node) &
-!                                            + dt * (+ (1.5+idemix2_AB_epsilon)*Edivh(ti  , fbini, node) & ! div(c_uv*E_M2^n) 
-!                                                    - (0.5+idemix2_AB_epsilon)*Edivh(tim1, fbini, node) & ! div(c_uv*E_M2^n) 
-!                                                    + (1.5+idemix2_AB_epsilon)*Edivs(ti  , fbini, node) & ! d/dphi (dphit/dt*E_M2)
-!                                                    - (0.5+idemix2_AB_epsilon)*Edivs(tim1, fbini, node) & ! d/dphi (dphit/dt*E_M2)
-!                                                    +                          forc(       fbini, node) & ! forc
-!                                                    -               tauE(node)*E(    ti  , fbini, node) & ! diss
-!                                                   )
-!                 endif
-                                              
-                if (E(tip1, fbini, node)/=E(tip1, fbini, node) .or. E(tip1, fbini, node)<0.0_WP) then 
-                    write(*,*) " }-))))°> found negative/NaN " ,trim(Ename)," advection", E(tip1, fbini, node)
-                    write(*,*) " tip1, fbini, node, myDim_nod2D  = ", tip1, fbini, node, myDim_nod2D
-                    write(*,*) " mype                 = ", mype
-                    write(*,*) " glon, glat           = ", glon(node)/rad, glat(node)/rad
-                    write(*,*) " E(ti  , fbini, node) = ",  E(ti  , fbini, node)
-                    write(*,*) " E(tip1, fbini, node) = ",  E(tip1, fbini, node)
-                    write(*,*) " dt*forc              = ",  dt*forc(fbini, node)
-                    write(*,*) " -dt*tau*E            = ",  -dt*tauE(node)*E(    ti  , fbini, node)
-                    write(*,*) " dt*Edivh(t)          = ", dt*Edivh(ti  , fbini, node)!, dt*Edivh(tim1  , fbini, node)  
-!                     write(*,*) " dt*Edivh_AB         q = ", dt*( (1.5+idemix2_AB_epsilon)*Edivh(ti  , fbini, node) - (0.5+idemix2_AB_epsilon)*Edivh(tim1, fbini, node))
-                    write(*,*) " dt*Edivs(t)          = ", dt*Edivs(ti  , fbini, node)!, dt*Edivs(tim1  , fbini, node)  
-!                     write(*,*) " dt*Edivs_AB          = ", dt*( (1.5+idemix2_AB_epsilon)*Edivs(ti  , fbini, node) - (0.5+idemix2_AB_epsilon)*Edivs(tim1, fbini, node))
-                    write(*,*)
-!                     write(*,*) " E(fbin-1,fbin,fbin+1)    = ", E(ti,fbini-1, node), E(ti,fbini, node), E(ti,fbini-1, node)
-!                     write(*,*) " W(fbin-1,fbin,fbin+1)    = ", w(fbini-1, node), w(fbini, node), w(fbini-1, node)
-!                     write(*,*) " CFLcs(fbin-1,fbin,fbin+1)= ", cflcs(fbini-1, node),cflcs(fbini, node),cflcs(fbini+1, node)
-!                     write(*,*) 
-!                     write(*,*) " E                        = ", E(ti,:, node)
-!                     write(*,*) " W                        = ", w(:, node), w(fbini, node), w(fbini-1, node)
-!                     write(*,*) " CFLcs                    = ", cflcs(:, node)
-                end if 
-                
-                ! ATTENTION:
-                ! This line ensures that the compartment energy is always numerically 
-                ! positive, clip off negative values due to rounding error !
-                ! BUT this line will also hide a lot of bugs if there are some. 
-                ! If you suspect bugs in the code of the Energy compartment 
-                ! integration comment this line.
-                E(tip1, fbini, node) = max(0.0_WP, E(tip1, fbini, node))
-            end do
-            
-            !___________________________________________________________________
-            ! Fill ghost cells with periodic boundary values, ensure periodic wrapping 
-            ! in specrtal domain, 
-            E(tip1,     1, node) = E(tip1, nfbin-1, node)      ! left ghost = right interior
-            E(tip1, nfbin, node) = E(tip1,       2, node)      ! right ghost = left interior
-        end do
         
+        !_______________________________________________________________________
+        ! Adams-Bashforth 2nd order + implicit dissipation
+        if (flag_AB2) then             
+            do node= 1, myDim_nod2d
+                do fbini=2,nfbin-1
+                    E(tip1, fbini, node) = ( E(ti, fbini, node) &
+                                            + dt * ( &
+                                                    + (1.5_WP+idemix2_AB_epsilon)*Edivh(ti  , fbini, node) &
+                                                    - (0.5_WP+idemix2_AB_epsilon)*Edivh(tim1, fbini, node) &
+                                                    + (1.5_WP+idemix2_AB_epsilon)*Edivs(ti  , fbini, node) &
+                                                    - (0.5_WP+idemix2_AB_epsilon)*Edivs(tim1, fbini, node) &
+                                                    +                              forc(      fbini, node) &
+                                                ) &
+                                            ) / (1.0_WP + dt*tauE(node))  
+                end do
+                E(tip1,     1, node) = E(tip1, nfbin-1, node)
+                E(tip1, nfbin, node) = E(tip1,       2, node)
+            end do    
+        !_______________________________________________________________________
+        ! Forward Euler + implicit dissipation
+        else
+            do node= 1, myDim_nod2d
+                do fbini=2,nfbin-1
+                    E(tip1, fbini, node) = ( E(ti, fbini, node) &
+                                            + dt * ( &
+                                                    + Edivh(ti, fbini, node) & ! div(c_uv*E^n)
+                                                    + Edivs(ti, fbini, node) & ! d/dphi (w*E^n)
+                                                    + forc(     fbini, node) & ! forc
+                                                   ) &
+                                            ) / (1.0_WP + dt*tauE(node)) 
+                end do
+                E(tip1,     1, node) = E(tip1, nfbin-1, node)
+                E(tip1, nfbin, node) = E(tip1,       2, node)
+            end do
+        end if     
         
         !_______________________________________________________________________
         ! additional diagnostics
         if (present(Edt))   Edt(:,:)   =  (E(tip1, :, 1:myDim_nod2D)-E(ti, :, 1:myDim_nod2D))
         
-        if (present(Eadvh)) Eadvh(:,:) =  ((1.5+idemix2_AB_epsilon)*Edivh(ti  , :, 1:myDim_nod2D) &
-                                         - (0.5+idemix2_AB_epsilon)*Edivh(tim1, :, 1:myDim_nod2D))
+        if (present(Eadvh)) then 
+            if (flag_AB2) then    
+                Eadvh(:,:) =  ((1.5+idemix2_AB_epsilon)*Edivh(ti  , :, 1:myDim_nod2D) &
+                             - (0.5+idemix2_AB_epsilon)*Edivh(tim1, :, 1:myDim_nod2D))
+            else                             
+                Eadvh(:,:) = Edivh(ti, :, 1:myDim_nod2D)                             
+            end if 
+        end if 
         
-        if (present(Eadvs)) Eadvs(:,:) =  ((1.5+idemix2_AB_epsilon)*Edivs(ti  , :, 1:myDim_nod2D) &
-                                         - (0.5+idemix2_AB_epsilon)*Edivs(tim1, :, 1:myDim_nod2D))
-                                          
+        if (present(Eadvs)) then 
+            if (flag_AB2) then    
+                Eadvs(:,:) =  ((1.5+idemix2_AB_epsilon)*Edivs(ti  , :, 1:myDim_nod2D) &
+                             - (0.5+idemix2_AB_epsilon)*Edivs(tim1, :, 1:myDim_nod2D))
+            else                 
+                Eadvs(:,:) = Edivs(ti, :, 1:myDim_nod2D)
+            end if
+        end if     
+        
         if (present(Ediss)) then
             do node= 1, myDim_nod2d
-                Ediss(:,node) =  - tauE(node)*E(    ti  , :, node)                                      
+                Ediss(:,node) =  - tauE(node)*E(tip1, :, node)                                      
             end do
         end if     
         
         if (present(Eforc)) Eforc(:,:) = forc(:, 1:myDim_nod2D)
         
     end subroutine hsintegrate_Ecompart
-    
     
     
     !
@@ -2363,6 +2346,127 @@ module g_cvmix_idemix2
     !
     !
     !___________________________________________________________________________
+    ! compute volume of scalar cell from bottom to top
+    ! ~~~~~~~~~o zbar_1~~~~~~~~~~
+    !          |
+    !          x Z_1 
+    !          |             
+    !          o zbar_2 
+    !          |     
+    !          x Z_2 
+    !          |
+    !          o zbar_3
+    !          :
+    !          :
+    !          :
+    ! ---------o zbar_n----------
+    ! ///////////////////////////
+    subroutine compute_vol_nodB2T_fix(vol_nodB2T, mesh, partit)
+        implicit none
+        !___INPUT/OUTPUT VARIABLES______________________________________________
+        type(t_partit)  , intent(inout), target :: partit
+        type(t_mesh)    , intent(in   ), target :: mesh
+        real(kind=WP)   , intent(inout)         :: vol_nodB2T(partit%myDim_nod2D+partit%eDim_nod2D)
+        !___LOCAL VARIABLES_____________________________________________________
+        integer                                 :: node, elem, nz, nln, uln, elnodes(3)
+        real(kind=WP)                           :: lcl_sumvol, glb_sumvol, vol
+#include "../associate_part_def.h"
+#include "../associate_mesh_def.h"
+#include "../associate_part_ass.h"
+#include "../associate_mesh_ass.h"   
+        vol_nodB2T = 0.0_WP
+        lcl_sumvol = 0.0_WP
+        do node = 1, myDim_nod2D
+            nln = nlevels_nod2D(node)-1
+            uln = ulevels_nod2D(node)
+            do nz=uln,nln
+                lcl_sumvol       = lcl_sumvol       + areasvol(nz,node)*abs(zbar(nz)-zbar(nz+1))
+                vol_nodB2T(node) = vol_nodB2T(node) + areasvol(nz,node)*abs(zbar(nz)-zbar(nz+1))
+            end do
+        end do !-->do node = 1,node_size
+        call MPI_Allreduce(lcl_sumvol, glb_sumvol, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+        if (partit%mype == 0) then
+            write(*,*) ' debug: vol_node_fix: ', glb_sumvol
+        end if
+        call exchange_nod(vol_nodB2T, partit)
+        
+        lcl_sumvol = 0.0_WP
+        do elem = 1, myDim_elem2D
+            ! Nodes are uniquely partitioned (e.g., via METIS) — each node belongs 
+            ! to exactly one rank Elements are then distributed so that each rank 
+            ! has all elements touching its owned nodes — but boundary elements 
+            ! necessarily appear on multiple ranks (they share vertices across partitions)
+            elnodes=mesh%elem2D_nodes(:,elem)
+            if (elnodes(1) > myDim_nod2D) cycle
+            nln = nlevels(elem)-1
+            uln = ulevels(elem)
+            do nz=uln,nln
+                lcl_sumvol       = lcl_sumvol       + elem_area(elem)*abs(zbar(nz)-zbar(nz+1))
+            end do
+        end do !-->do node = 1,node_size
+        call MPI_Allreduce(lcl_sumvol, glb_sumvol, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+        if (partit%mype == 0) then
+            write(*,*) ' debug: vol_elem_fix: ', glb_sumvol
+        end if
+        
+    end subroutine compute_vol_nodB2T_fix
+    
+    
+    
+    !
+    !
+    !___________________________________________________________________________
+    ! compute volume of scalar cell from bottom to top
+    ! ~~~~~~~~~o zbar_1~~~~~~~~~~
+    !          |
+    !          x Z_1 
+    !          |             
+    !          o zbar_2 -------+
+    !          |               |
+    !          x Z_2           |--------> hnode(2, node)
+    !          |               |
+    !          o zbar_3--------+
+    !          :
+    !          :
+    !          :
+    ! ---------o zbar_n----------
+    ! ///////////////////////////
+    subroutine compute_vol_nodB2T_hnode(vol_nodB2T, mesh, partit)
+        implicit none
+        !___INPUT/OUTPUT VARIABLES______________________________________________
+        type(t_partit)  , intent(inout), target :: partit
+        type(t_mesh)    , intent(in   ), target :: mesh
+        real(kind=WP)   , intent(inout)         :: vol_nodB2T(partit%myDim_nod2D+partit%eDim_nod2D)
+        !___LOCAL VARIABLES_____________________________________________________
+        integer                                 :: node, elem, nz, nln, uln
+!         real(kind=WP)                           :: lcl_sumvol, glb_sumvol, vol
+#include "../associate_part_def.h"
+#include "../associate_mesh_def.h"
+#include "../associate_part_ass.h"
+#include "../associate_mesh_ass.h"   
+        vol_nodB2T = 0.0_WP
+        ! lcl_sumvol = 0.0_WP
+        do node = 1, myDim_nod2D
+            nln = nlevels_nod2D(node)-1
+            uln = ulevels_nod2D(node)
+            do nz=uln,nln
+                ! lcl_sumvol       = lcl_sumvol       + areasvol(nz,node)*hnode(nz,node)
+                vol_nodB2T(node) = vol_nodB2T(node) + areasvol(nz,node)*hnode(nz,node)
+            end do
+        end do !-->do node = 1,node_size
+        ! call MPI_Allreduce(lcl_sumvol, glb_sumvol, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+        ! if (partit%mype == 0) then
+        !     write(*,*) ' debug: vol_node_hnode: ', glb_sumvol
+        ! end if
+        call exchange_nod(vol_nodB2T, partit)
+        
+    end subroutine compute_vol_nodB2T_hnode
+    
+    
+    
+    !
+    !
+    !___________________________________________________________________________
     ! --> add contribution from horizontal wave propagation
     ! Since IDEMIX is used in a global model configuration the vertical 
     ! internal wave mixing (call cvmix_coeffs_idemix) have to be extended by 
@@ -2411,6 +2515,9 @@ module g_cvmix_idemix2
         ! calculate horizontal diffusion term div( grad(Eiw*v0) * tau_h*v0) 
         do edge=1,myDim_edge2D
             !___________________________________________________________________
+            ! ednode ... vertices that form the edge
+            ednodes  = edges(:,edge)
+            
             ! deltaX1,deltaY1 ... cross edge dx and dy for the two elements 
             ! that contribute to the edge
             !                 o
@@ -2429,8 +2536,6 @@ module g_cvmix_idemix2
             !                 
             dx1      = edge_cross_dxdy(1,edge)
             dy1      = edge_cross_dxdy(2,edge)
-            ! ednode ... vertices that form the edgeiwe_Thdi
-            ednodes  = edges(:,edge)
             ! el ... elements that contribute to edge
             edel     = edge_tri(:,edge)
             ! elnodes1 ... nodes that contribute to element el(1) 
@@ -2639,4 +2744,352 @@ module g_cvmix_idemix2
         end do
     end subroutine compute_hdiff_Eiw
 
+
+
+    !
+    !
+    !___________________________________________________________________________
+    ! Check if velocity field is divergence-free using gradient_vec operator
+    subroutine check_Ecompart_div_uv(vel_uv, div_uv, partit, mesh, compartment_name)
+        implicit none
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        real(kind=WP),  intent(in)            :: vel_uv(2, idemix2_nfbin, partit%myDim_elem2D+partit%eDim_elem2D)
+        real(kind=WP),  intent(inout)         :: div_uv(idemix2_nfbin, partit%myDim_elem2D+partit%eDim_elem2D)
+        character(len=*), intent(in)          :: compartment_name
+        
+        integer                               :: elem, fbini, j, neighbor_elem
+        real(kind=WP)                         :: local_div_sum, global_div_sum, global_div_max
+        real(kind=WP)                         :: u_neighbor(idemix2_nfbin), v_neighbor(idemix2_nfbin)
+        
+#include "../associate_part_def.h"
+#include "../associate_mesh_def.h"
+#include "../associate_part_ass.h"
+#include "../associate_mesh_ass.h"
+        
+        ! Compute divergence of velocity field using gradient_vec operator
+        ! gradient_vec(1:3, elem) are coefficients for ∂/∂x
+        ! gradient_vec(4:6, elem) are coefficients for ∂/∂y
+        do elem = 1, myDim_elem2D
+        
+            ! Initialize divergence arrays
+            div_uv(:, elem) = 0.0_WP
+            
+            do j = 1, 3
+                neighbor_elem = mesh%elem_neighbors(j, elem)
+                if (neighbor_elem > 0) then
+                    u_neighbor(:) = vel_uv(1, :, neighbor_elem)
+                    v_neighbor(:) = vel_uv(2, :, neighbor_elem)
+                else
+                    u_neighbor(:) = vel_uv(1, :, elem)
+                    v_neighbor(:) = vel_uv(2, :, elem)
+                end if 
+                
+                do fbini = 2, idemix2_nfbin-1
+                    ! Compute Total divergence
+                    ! Compute gradients using gradient_vec coefficients
+                    ! ∂u/∂x = Σ(gradient_vec(1:3, elem) * u_neighbor)
+                    ! ∂v/∂y = Σ(gradient_vec(4:6, elem) * v_neighbor)
+                    div_uv(fbini, elem) = div_uv(fbini, elem) &
+                                          + (mesh%gradient_vec(j  , elem)*u_neighbor(fbini)) &
+                                          + (mesh%gradient_vec(j+3, elem)*v_neighbor(fbini))
+                end do
+            end do
+        end do
+        
+    end subroutine check_Ecompart_div_uv
+
+    
+    
+    !
+    !
+    !___________________________________________________________________________
+    ! Check flux conservation: sum of all divergences weighted by area should be zero
+    subroutine check_flux_conservation(div_h, div_s, ti, dphit, vol_s, partit, mesh, compartment_name)
+        implicit none
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        real(kind=WP),  intent(in)            :: div_h(3, idemix2_nfbin, partit%myDim_nod2D+partit%eDim_nod2D)
+        real(kind=WP),  intent(in)            :: div_s(3, idemix2_nfbin, partit%myDim_nod2D+partit%eDim_nod2D)
+        integer,        intent(in)            :: ti
+        real(kind=WP),  intent(in)            :: dphit(idemix2_nfbin)
+        real(kind=WP),  intent(in)            :: vol_s(partit%myDim_nod2D+partit%eDim_nod2D)
+        character(len=*), intent(in)          :: compartment_name
+        
+        integer                               :: node, fbini, lcl_nedge, glb_nedge
+        real(kind=WP)                         :: lcl_divh_sum, lcl_divs_sum
+        real(kind=WP)                         :: glb_divh_sum, glb_divs_sum
+        
+#include "../associate_part_def.h"
+#include "../associate_mesh_def.h"
+#include "../associate_part_ass.h"
+#include "../associate_mesh_ass.h"
+        
+        ! Compute local sum: div * area * dphi
+        ! For a closed domain with no sources/sinks, this should sum to zero
+        lcl_divh_sum = 0.0_WP
+        do node = 1, myDim_nod2D + eDim_nod2D  ! Full extended domain: telescoping holds locally per rank
+            do fbini = 2, idemix2_nfbin-1  ! Exclude ghost bins
+                lcl_divh_sum = lcl_divh_sum + div_h(ti, fbini, node)*vol_s(node)
+            end do
+        end do
+!         write(*,*) lcl_divh_sum, mype
+        
+        lcl_divs_sum = 0.0_WP
+        do node = 1, myDim_nod2D  ! Full extended domain: telescoping holds locally per rank
+            do fbini = 2, idemix2_nfbin-1  ! Exclude ghost bins
+                lcl_divs_sum = lcl_divs_sum + div_s(ti, fbini, node)*dphit(fbini) 
+            end do
+        end do
+        
+        ! Sum across all MPI ranks
+        glb_divh_sum = 0.0_WP
+        glb_divs_sum = 0.0_WP
+        call MPI_Allreduce(lcl_divh_sum, glb_divh_sum, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+        call MPI_Allreduce(lcl_divs_sum, glb_divs_sum, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+        
+        if (mype == 0) then
+            write(*,*) ' debug: flux total conservation check (',trim(compartment_name),'):',&
+                       '  Σ(div_h*vols) = ', glb_divh_sum, &
+                       ', Σ(div_s*dphi) = ', glb_divs_sum
+        end if
+        
+    end subroutine check_flux_conservation
+
+
+
+    !
+    !
+    !___________________________________________________________________________
+    ! Compute and print global total NIW energy for conservation check
+    subroutine check_global_energy(Ecompart, ti, dphit, vol_s, forc, tauE, partit, mesh, compartment_name)
+        implicit none
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        real(kind=WP),  intent(in)            :: Ecompart(3, idemix2_nfbin, partit%myDim_nod2D+partit%eDim_nod2D)
+        real(kind=WP),  intent(in)            :: vol_s(partit%myDim_nod2D+partit%eDim_nod2D)
+        integer,        intent(in)            :: ti
+        real(kind=WP),  intent(in)            :: dphit(idemix2_nfbin)
+        real(kind=WP),  intent(in)            :: forc(idemix2_nfbin, partit%myDim_nod2D+partit%eDim_nod2D)
+        real(kind=WP),  intent(in)            :: tauE(partit%myDim_nod2D+partit%eDim_nod2D)
+        character(len=*), intent(in)          :: compartment_name
+        
+        integer                               :: node, fbini
+        real(kind=WP)                         :: lcl_energy, lcl_vol, glb_energy, glb_vol
+        real(kind=WP)                         :: lcl_forc, glb_forc, lcl_diss, glb_diss
+        real(kind=WP)                         :: lcl_maxE, glb_maxE, lcl_minE, glb_minE
+        
+#include "../associate_part_def.h"
+#include "../associate_mesh_def.h"
+#include "../associate_part_ass.h"
+#include "../associate_mesh_ass.h"
+        
+        lcl_energy = 0.0_WP
+        lcl_vol    = 0.0_WP
+        lcl_forc   = 0.0_WP
+        lcl_diss   = 0.0_WP
+        lcl_maxE   = -1.0e33
+        lcl_minE   =  1.0e33
+        do node = 1, myDim_nod2D  ! Only owned nodes
+            lcl_vol = lcl_vol + vol_s(node)
+            do fbini = 2, idemix2_nfbin-1  ! Exclude ghost bins
+                lcl_energy = lcl_energy + Ecompart(ti, fbini, node) * dphit(fbini) * vol_s(node)
+                lcl_forc   = lcl_forc   + forc(fbini, node)         * dphit(fbini) * vol_s(node)
+                lcl_diss   = lcl_diss   + tauE(node) * Ecompart(ti, fbini, node) * dphit(fbini) * vol_s(node)
+                lcl_maxE   = max(lcl_maxE, Ecompart(ti, fbini, node))
+                lcl_minE   = min(lcl_minE, Ecompart(ti, fbini, node))
+            end do
+        end do
+        
+        ! Sum across all MPI ranks
+        glb_energy = 0.0_WP
+        glb_vol    = 0.0_WP
+        glb_forc   = 0.0_WP
+        glb_diss   = 0.0_WP
+        call MPI_Allreduce(lcl_energy, glb_energy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+        call MPI_Allreduce(lcl_vol   , glb_vol   , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+        call MPI_Allreduce(lcl_forc  , glb_forc  , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+        call MPI_Allreduce(lcl_diss  , glb_diss  , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+        call MPI_Allreduce(lcl_minE  , glb_minE  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+        call MPI_Allreduce(lcl_maxE  , glb_maxE  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        
+        
+        ! Print on rank 0
+        if (mype == 0) then
+            write(*,*) ' debug: global Σ(E_',trim(compartment_name),'*dphi*vols) = ', glb_energy, ' J', &
+                             ', global min(E_',trim(compartment_name),') = ', glb_minE, &
+                             ', global max(E_',trim(compartment_name),') = ', glb_maxE
+            write(*,*) ' debug: global Σ(forc_',trim(compartment_name),'*dphi*vols) = ', glb_forc, ' W', &
+                             ', global Σ(tau*E_',trim(compartment_name),'*dphi*vols) = ', glb_diss, ' W', &
+                             ', global forc/diss = ', glb_forc/glb_diss, ' W'
+        end if
+        
+    end subroutine check_global_energy
+    
+    
+    !
+    !___________________________________________________________________________
+    ! Compute and print maximum CFL numbers for horizontal and cross-spectral advection
+    subroutine check_max_cfl(vel, cs, dphit, partit, mesh, compartment_name)
+        implicit none
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh),   intent(in),    target :: mesh
+        real(kind=WP),  intent(in)            :: vel(2, idemix2_nfbin, partit%myDim_elem2D+partit%eDim_elem2D)
+        real(kind=WP),  intent(in)            :: cs(idemix2_nfbin, partit%myDim_nod2D+partit%eDim_nod2D)
+        real(kind=WP),  intent(in)            :: dphit(idemix2_nfbin)
+        character(len=*), intent(in)          :: compartment_name
+        
+        integer                               :: edge, fbini, nfbin, node, el(2), el2, ednodes(2)
+        real(kind=WP)                         :: dx1, dy1, dx2, dy2, dxdy12(2), edlen, n_x, n_y, n_len
+        real(kind=WP)                         :: u1, u2, v1, v2, Ue, CFL_h, CFL_cs
+        real(kind=WP)                         :: lcl_cfl_h, glb_cfl_h, lcl_cfl_cs, glb_cfl_cs
+        
+#include "../associate_part_def.h"
+#include "../associate_mesh_def.h"
+#include "../associate_part_ass.h"
+#include "../associate_mesh_ass.h"
+        
+        nfbin = idemix2_nfbin
+        lcl_cfl_h  = 0.0_WP
+        lcl_cfl_cs = 0.0_WP
+        
+        ! Max horizontal CFL over all edges
+        do edge = 1, myDim_edge2D
+            ednodes = edges(:,edge)
+            el      = edge_tri(:,edge)
+            
+            dx1     = edge_cross_dxdy(1,edge)
+            dy1     = edge_cross_dxdy(2,edge)
+            dxdy12  = edge_dxdy(:,edge)*r_earth
+            
+            el2 = el(1)
+            dx2 = 0.0_WP
+            dy2 = 0.0_WP
+            if (el(2) > 0) then
+                el2     = el(2)
+                dx2     = edge_cross_dxdy(3,edge)
+                dy2     = edge_cross_dxdy(4,edge)
+                dxdy12(1) = dxdy12(1) * (elem_cos(el(1)) + elem_cos(el2)) * 0.5_WP
+                n_x     = (  dy1  + (-dy2))/2
+                n_y     = ((-dx1) +   dx2 )/2
+            else
+                dxdy12(1) = dxdy12(1) * elem_cos(el(1))
+                n_x     =  dy1
+                n_y     = -dx1
+            end if
+            edlen = sqrt(dxdy12(1)**2 + dxdy12(2)**2)
+            n_len = sqrt(n_x**2 + n_y**2)
+            if (n_len > 0.0_WP) then
+                n_x = n_x / n_len
+                n_y = n_y / n_len
+            end if
+            
+            do fbini = 2, nfbin-1
+                u1  = vel(1, fbini, el(1))
+                v1  = vel(2, fbini, el(1))
+                u2  = vel(1, fbini, el2)
+                v2  = vel(2, fbini, el2)
+                Ue  = sqrt((0.5_WP*(u1+u2)*n_x)**2 + (0.5_WP*(v1+v2)*n_y)**2)
+                CFL_h = Ue * dt / edlen
+                lcl_cfl_h = max(lcl_cfl_h, CFL_h)
+            end do
+        end do
+        
+        ! Max cross-spectral CFL over all nodes and bins
+        do node = 1, myDim_nod2D
+            do fbini = 2, nfbin-1
+                CFL_cs = abs(cs(fbini, node)) * dt / dphit(fbini)
+                lcl_cfl_cs = max(lcl_cfl_cs, CFL_cs)
+            end do
+        end do
+        
+        ! Global max across MPI ranks
+        glb_cfl_h  = 0.0_WP
+        glb_cfl_cs = 0.0_WP
+        call MPI_Allreduce(lcl_cfl_h , glb_cfl_h , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        call MPI_Allreduce(lcl_cfl_cs, glb_cfl_cs, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        
+        if (mype == 0) then
+            write(*,*) ' debug: CFL_max_horizontal(',trim(compartment_name),') = ', glb_cfl_h, &
+                       ', CFL_max_cross_spectral(',trim(compartment_name),') = ', glb_cfl_cs
+!             write(*,*) ' debug: dt_max_FE(',trim(compartment_name),') = ', dt/max(glb_cfl_h, glb_cfl_cs), ' s', &
+!                        ', dt_max_AB2(',trim(compartment_name),') = ', 0.5_WP*dt/max(glb_cfl_h, glb_cfl_cs), ' s'
+        end if
+        
+    end subroutine check_max_cfl
+
+
+!     !===========================================================================
+!     ! Compute velocity flux divergence consistent with the edge-based Superbee
+!     ! flux scheme. For tracer h=1, the Superbee flux reduces to -vflux (since
+!     ! gradients are zero for a constant field). This gives the numerical velocity
+!     ! divergence as seen by the flux operator.
+!     !
+!     ! Used for compatible transport: E(n+1) = [E(n)+dt*Edivh] / [1+dt*div_vel]
+!     ! which preserves constant fields exactly while maintaining conservation.
+!     subroutine compute_vel_div_consistent(vel, div_vel, partit, mesh)
+!         implicit none
+!         type(t_partit), intent(inout), target :: partit
+!         type(t_mesh),   intent(in),    target :: mesh
+!         real(kind=WP),  intent(in)            :: vel(2, idemix2_nfbin, partit%myDim_elem2D+partit%eDim_elem2D)
+!         real(kind=WP),  intent(inout)         :: div_vel(idemix2_nfbin, partit%myDim_nod2D+partit%eDim_nod2D)
+!         
+!         integer        :: edge, fbini, nfbin, node, el(2), el2, ednodes(2)
+!         real(kind=WP)  :: dx1, dy1, dx2, dy2, u1, v1, u2, v2, vflux
+!         
+! #include "../associate_part_def.h"
+! #include "../associate_mesh_def.h"
+! #include "../associate_part_ass.h"
+! #include "../associate_mesh_ass.h"
+!         
+!         nfbin = idemix2_nfbin
+!         div_vel = 0.0_WP
+!         
+!         ! Edge loop: compute vflux using SAME geometry as Superbee routine
+!         do edge = 1, myDim_edge2D
+!             ednodes = edges(:, edge)
+!             el      = edge_tri(:, edge)
+!             
+!             dx1 = edge_cross_dxdy(1, edge)
+!             dy1 = edge_cross_dxdy(2, edge)
+!             
+!             dx2 = 0.0_WP
+!             dy2 = 0.0_WP
+!             el2 = el(1)
+!             if (el(2) > 0) then
+!                 el2 = el(2)
+!                 dx2 = edge_cross_dxdy(3, edge)
+!                 dy2 = edge_cross_dxdy(4, edge)
+!             end if
+!             
+!             do fbini = 2, nfbin-1
+!                 u1 = vel(1, fbini, el(1))
+!                 v1 = vel(2, fbini, el(1))
+!                 u2 = vel(1, fbini, el2)
+!                 v2 = vel(2, fbini, el2)
+!                 
+!                 vflux = (-v1*dx1 + u1*dy1) + (v2*dx2 - u2*dy2)
+!                 
+!                 ! For tracer h=1: flux_h1 = -vflux
+!                 ! Assembly matches Superbee: div(node1) += flux, div(node2) -= flux
+!                 div_vel(fbini, ednodes(1)) = div_vel(fbini, ednodes(1)) - vflux
+!                 div_vel(fbini, ednodes(2)) = div_vel(fbini, ednodes(2)) + vflux
+!             end do
+!         end do
+!         
+!         ! Assemble halo contributions to owner (same as for div_h)
+!         call assemble_nod2D_fbin(div_vel, partit)
+!         ! Distribute complete values to halos
+!         call exchange_nod_fbin(div_vel, partit)
+!         ! Normalize by area (same as for div_h)
+!         do node = 1, myDim_nod2D + eDim_nod2D
+!             do fbini = 2, nfbin-1
+!                 div_vel(fbini, node) = div_vel(fbini, node) / areasvol(1, node)
+!             end do
+!         end do
+!         
+!     end subroutine compute_vel_div_consistent
+
+
 end module g_cvmix_idemix2
+
