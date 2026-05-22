@@ -2990,7 +2990,7 @@ USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(real64),   intent(inout)         :: nod_array(:,:)
-integer                               :: n, sn, rn, i
+integer                               :: n, sn, rn
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 
@@ -3003,19 +3003,17 @@ if (npes > 1) then
    sn=com_nod2D%sPEnum
    rn=com_nod2D%rPEnum
 
-   ! Exchange all spectral bins
-   DO i=1,nfbin_mpi
-      DO n=1,rn
-         call MPI_IRECV(nod_array, 1, r_mpitype_nod3D_fbin(n,i,1), com_nod2D%rPE(n), &
-              com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr)
-      END DO
-      DO n=1, sn
-         call MPI_ISEND(nod_array, 1, s_mpitype_nod3D_fbin(n,i,1), com_nod2D%sPE(n), &
-              mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
-      END DO
-      com_nod2D%nreq = rn+sn
-      call MPI_WAITALL(com_nod2D%nreq, com_nod2D%req, MPI_STATUSES_IGNORE, MPIerr)
+   ! Exchange full spectral column at once (n_val=1 for 2D array)
+   DO n=1,rn
+      call MPI_IRECV(nod_array, 1, r_mpitype_nod3D_fbin(n,nfbin_mpi,1), com_nod2D%rPE(n), &
+           com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr)
    END DO
+   DO n=1, sn
+      call MPI_ISEND(nod_array, 1, s_mpitype_nod3D_fbin(n,nfbin_mpi,1), com_nod2D%sPE(n), &
+           mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
+   END DO
+   com_nod2D%nreq = rn+sn
+   call MPI_WAITALL(com_nod2D%nreq, com_nod2D%req, MPI_STATUSES_IGNORE, MPIerr)
 endif
 END SUBROUTINE exchange_nod2D_fbin_begin
 
@@ -3042,7 +3040,7 @@ USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(real64),   intent(inout)         :: nod_array(:,:,:)
-integer                               :: n, sn, rn, n_val, i
+integer                               :: n, sn, rn, n_val
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 
@@ -3062,19 +3060,17 @@ if (npes > 1) then
    sn=com_nod2D%sPEnum
    rn=com_nod2D%rPEnum
 
-   ! Exchange all spectral bins
-   DO i=1,nfbin_mpi
-      DO n=1,rn
-         call MPI_IRECV(nod_array, 1, r_mpitype_nod3D_fbin(n,i,n_val), com_nod2D%rPE(n), &
-              com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr)
-      END DO
-      DO n=1, sn
-         call MPI_ISEND(nod_array, 1, s_mpitype_nod3D_fbin(n,i,n_val), com_nod2D%sPE(n), &
-              mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
-      END DO
-      com_nod2D%nreq = rn+sn
-      call MPI_WAITALL(com_nod2D%nreq, com_nod2D%req, MPI_STATUSES_IGNORE, MPIerr)
+   ! Exchange full spectral column at once
+   DO n=1,rn
+      call MPI_IRECV(nod_array, 1, r_mpitype_nod3D_fbin(n,nfbin_mpi,n_val), com_nod2D%rPE(n), &
+           com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr)
    END DO
+   DO n=1, sn
+      call MPI_ISEND(nod_array, 1, s_mpitype_nod3D_fbin(n,nfbin_mpi,n_val), com_nod2D%sPE(n), &
+           mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
+   END DO
+   com_nod2D%nreq = rn+sn
+   call MPI_WAITALL(com_nod2D%nreq, com_nod2D%req, MPI_STATUSES_IGNORE, MPIerr)
 endif
 END SUBROUTINE exchange_nod3D_fbin_begin
 
@@ -3104,7 +3100,7 @@ USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(real64),   intent(inout)          :: elem_array(:,:)
-integer                                :: n, sn, rn, i
+integer                                :: n, sn, rn
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 
@@ -3120,38 +3116,34 @@ if (npes > 1) then
       sn=com_elem2D%sPEnum
       rn=com_elem2D%rPEnum
 
-      ! Exchange all spectral bins
-      DO i=1,nfbin_mpi
-         DO n=1,rn
-            call MPI_IRECV(elem_array, 1, r_mpitype_elem2D_fbin(n,i), com_elem2D%rPE(n), &
-                 com_elem2D%rPE(n), MPI_COMM_FESOM, com_elem2D%req(n), MPIerr)
-         END DO
-         DO n=1, sn
-            call MPI_ISEND(elem_array, 1, s_mpitype_elem2D_fbin(n,i), com_elem2D%sPE(n), &
-                 mype, MPI_COMM_FESOM, com_elem2D%req(rn+n), MPIerr)
-         END DO
-         com_elem2D%nreq = rn+sn
-         call MPI_WAITALL(com_elem2D%nreq, com_elem2D%req, MPI_STATUSES_IGNORE, MPIerr)
+      ! Exchange full spectral column at once
+      DO n=1,rn
+         call MPI_IRECV(elem_array, 1, r_mpitype_elem2D_fbin(n,nfbin_mpi), com_elem2D%rPE(n), &
+              com_elem2D%rPE(n), MPI_COMM_FESOM, com_elem2D%req(n), MPIerr)
       END DO
+      DO n=1, sn
+         call MPI_ISEND(elem_array, 1, s_mpitype_elem2D_fbin(n,nfbin_mpi), com_elem2D%sPE(n), &
+              mype, MPI_COMM_FESOM, com_elem2D%req(rn+n), MPIerr)
+      END DO
+      com_elem2D%nreq = rn+sn
+      call MPI_WAITALL(com_elem2D%nreq, com_elem2D%req, MPI_STATUSES_IGNORE, MPIerr)
    else
       ! full halo
       elem_full_flag = .true.
       sn=com_elem2D_full%sPEnum
       rn=com_elem2D_full%rPEnum
 
-      ! Exchange all spectral bins
-      DO i=1,nfbin_mpi
-         DO n=1,rn
-            call MPI_IRECV(elem_array, 1, r_mpitype_elem2D_full_fbin(n,i), com_elem2D_full%rPE(n), &
-                 com_elem2D_full%rPE(n), MPI_COMM_FESOM, com_elem2D_full%req(n), MPIerr)
-         END DO
-         DO n=1, sn
-            call MPI_ISEND(elem_array, 1, s_mpitype_elem2D_full_fbin(n,i), com_elem2D_full%sPE(n), &
-                 mype, MPI_COMM_FESOM, com_elem2D_full%req(rn+n), MPIerr)
-         END DO
-         com_elem2D_full%nreq = rn+sn
-         call MPI_WAITALL(com_elem2D_full%nreq, com_elem2D_full%req, MPI_STATUSES_IGNORE, MPIerr)
+      ! Exchange full spectral column at once
+      DO n=1,rn
+         call MPI_IRECV(elem_array, 1, r_mpitype_elem2D_full_fbin(n,nfbin_mpi), com_elem2D_full%rPE(n), &
+              com_elem2D_full%rPE(n), MPI_COMM_FESOM, com_elem2D_full%req(n), MPIerr)
       END DO
+      DO n=1, sn
+         call MPI_ISEND(elem_array, 1, s_mpitype_elem2D_full_fbin(n,nfbin_mpi), com_elem2D_full%sPE(n), &
+              mype, MPI_COMM_FESOM, com_elem2D_full%req(rn+n), MPIerr)
+      END DO
+      com_elem2D_full%nreq = rn+sn
+      call MPI_WAITALL(com_elem2D_full%nreq, com_elem2D_full%req, MPI_STATUSES_IGNORE, MPIerr)
    endif
 endif
 END SUBROUTINE exchange_elem2D_fbin_begin
@@ -3182,7 +3174,7 @@ USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(real64),   intent(inout)          :: elem_array(:,:,:)
-integer                                :: n, sn, rn, n_val, i
+integer                                :: n, sn, rn, n_val
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 
@@ -3205,38 +3197,34 @@ if (npes > 1) then
       sn=com_elem2D%sPEnum
       rn=com_elem2D%rPEnum
 
-      ! Exchange all spectral bins
-      DO i=1,nfbin_mpi
-         DO n=1,rn
-            call MPI_IRECV(elem_array, 1, r_mpitype_elem3D_fbin(n,i,n_val), com_elem2D%rPE(n), &
-                 com_elem2D%rPE(n), MPI_COMM_FESOM, com_elem2D%req(n), MPIerr)
-         END DO
-         DO n=1, sn
-            call MPI_ISEND(elem_array, 1, s_mpitype_elem3D_fbin(n,i,n_val), com_elem2D%sPE(n), &
-                 mype, MPI_COMM_FESOM, com_elem2D%req(rn+n), MPIerr)
-         END DO
-         com_elem2D%nreq = rn+sn
-         call MPI_WAITALL(com_elem2D%nreq, com_elem2D%req, MPI_STATUSES_IGNORE, MPIerr)
+      ! Exchange full spectral column at once
+      DO n=1,rn
+         call MPI_IRECV(elem_array, 1, r_mpitype_elem3D_fbin(n,nfbin_mpi,n_val), com_elem2D%rPE(n), &
+              com_elem2D%rPE(n), MPI_COMM_FESOM, com_elem2D%req(n), MPIerr)
       END DO
+      DO n=1, sn
+         call MPI_ISEND(elem_array, 1, s_mpitype_elem3D_fbin(n,nfbin_mpi,n_val), com_elem2D%sPE(n), &
+              mype, MPI_COMM_FESOM, com_elem2D%req(rn+n), MPIerr)
+      END DO
+      com_elem2D%nreq = rn+sn
+      call MPI_WAITALL(com_elem2D%nreq, com_elem2D%req, MPI_STATUSES_IGNORE, MPIerr)
    else
       ! full halo
       elem_full_flag = .true.
       sn=com_elem2D_full%sPEnum
       rn=com_elem2D_full%rPEnum
 
-      ! Exchange all spectral bins
-      DO i=1,nfbin_mpi
-         DO n=1,rn
-            call MPI_IRECV(elem_array, 1, r_mpitype_elem3D_full_fbin(n,i,n_val), com_elem2D_full%rPE(n), &
-                 com_elem2D_full%rPE(n), MPI_COMM_FESOM, com_elem2D_full%req(n), MPIerr)
-         END DO
-         DO n=1, sn
-            call MPI_ISEND(elem_array, 1, s_mpitype_elem3D_full_fbin(n,i,n_val), com_elem2D_full%sPE(n), &
-                 mype, MPI_COMM_FESOM, com_elem2D_full%req(rn+n), MPIerr)
-         END DO
-         com_elem2D_full%nreq = rn+sn
-         call MPI_WAITALL(com_elem2D_full%nreq, com_elem2D_full%req, MPI_STATUSES_IGNORE, MPIerr)
+      ! Exchange full spectral column at once
+      DO n=1,rn
+         call MPI_IRECV(elem_array, 1, r_mpitype_elem3D_full_fbin(n,nfbin_mpi,n_val), com_elem2D_full%rPE(n), &
+              com_elem2D_full%rPE(n), MPI_COMM_FESOM, com_elem2D_full%req(n), MPIerr)
       END DO
+      DO n=1, sn
+         call MPI_ISEND(elem_array, 1, s_mpitype_elem3D_full_fbin(n,nfbin_mpi,n_val), com_elem2D_full%sPE(n), &
+              mype, MPI_COMM_FESOM, com_elem2D_full%req(rn+n), MPIerr)
+      END DO
+      com_elem2D_full%nreq = rn+sn
+      call MPI_WAITALL(com_elem2D_full%nreq, com_elem2D_full%req, MPI_STATUSES_IGNORE, MPIerr)
    endif
 endif
 END SUBROUTINE exchange_elem3D_fbin_begin

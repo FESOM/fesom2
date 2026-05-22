@@ -87,9 +87,9 @@ TYPE T_PARTIT
   integer, allocatable       :: s_mpitype_nod3D(:,:,:), r_mpitype_nod3D(:,:,:)
 
   ! Spectral bin (fbin) fields for IDEMIX2 halo exchange
-  ! The first dimension is the number of spectral bins (nfbin) instead of vertical levels.
+  ! Full spectral column exchanged at once (like standard nod3D exchanges full depth column).
   ! Nodal fields: (peer, nfbin:nfbin, n_val) with n_val=1..3
-  ! Element fields: (peer, nfbin:nfbin, n_val) with n_val=1..4, small halo and full halo
+  ! Element fields: (peer, nfbin:nfbin) for 2D, (peer, nfbin:nfbin, n_val) for 3D with n_val=1..4
   integer              :: nfbin_mpi = 0  ! number of spectral bins for MPI types (0 = not initialized)
   integer, allocatable :: s_mpitype_nod3D_fbin(:,:,:),          r_mpitype_nod3D_fbin(:,:,:)
   integer, allocatable :: s_mpitype_elem2D_fbin(:,:),           r_mpitype_elem2D_fbin(:,:)

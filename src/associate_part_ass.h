@@ -73,14 +73,14 @@ end if
 
 nfbin_mpi => partit%nfbin_mpi
 if (allocated(partit%s_mpitype_nod3D_fbin)) then
-   s_mpitype_nod3D_fbin(      1:com_nod2D%sPEnum      , 1:nfbin_mpi, 1:3) => partit%s_mpitype_nod3D_fbin(      :,:,:)
-   r_mpitype_nod3D_fbin(      1:com_nod2D%rPEnum      , 1:nfbin_mpi, 1:3) => partit%r_mpitype_nod3D_fbin(      :,:,:)
-   s_mpitype_elem2D_fbin(     1:com_elem2D%sPEnum     , 1:nfbin_mpi     ) => partit%s_mpitype_elem2D_fbin(       :,:)
-   r_mpitype_elem2D_fbin(     1:com_elem2D%rPEnum     , 1:nfbin_mpi     ) => partit%r_mpitype_elem2D_fbin(       :,:)
-   s_mpitype_elem2D_full_fbin(1:com_elem2D_full%sPEnum, 1:nfbin_mpi     ) => partit%s_mpitype_elem2D_full_fbin(  :,:)
-   r_mpitype_elem2D_full_fbin(1:com_elem2D_full%rPEnum, 1:nfbin_mpi     ) => partit%r_mpitype_elem2D_full_fbin(  :,:)
-   s_mpitype_elem3D_fbin(     1:com_elem2D%sPEnum     , 1:nfbin_mpi, 1:4) => partit%s_mpitype_elem3D_fbin(     :,:,:)
-   r_mpitype_elem3D_fbin(     1:com_elem2D%rPEnum     , 1:nfbin_mpi, 1:4) => partit%r_mpitype_elem3D_fbin(     :,:,:)
-   s_mpitype_elem3D_full_fbin(1:com_elem2D_full%sPEnum, 1:nfbin_mpi, 1:4) => partit%s_mpitype_elem3D_full_fbin(:,:,:)
-   r_mpitype_elem3D_full_fbin(1:com_elem2D_full%rPEnum, 1:nfbin_mpi, 1:4) => partit%r_mpitype_elem3D_full_fbin(:,:,:)
+   s_mpitype_nod3D_fbin(      1:com_nod2D%sPEnum      , nfbin_mpi:nfbin_mpi, 1:3) => partit%s_mpitype_nod3D_fbin(      :,:,:)
+   r_mpitype_nod3D_fbin(      1:com_nod2D%rPEnum      , nfbin_mpi:nfbin_mpi, 1:3) => partit%r_mpitype_nod3D_fbin(      :,:,:)
+   s_mpitype_elem2D_fbin(     1:com_elem2D%sPEnum     , nfbin_mpi:nfbin_mpi     ) => partit%s_mpitype_elem2D_fbin(       :,:)
+   r_mpitype_elem2D_fbin(     1:com_elem2D%rPEnum     , nfbin_mpi:nfbin_mpi     ) => partit%r_mpitype_elem2D_fbin(       :,:)
+   s_mpitype_elem2D_full_fbin(1:com_elem2D_full%sPEnum, nfbin_mpi:nfbin_mpi     ) => partit%s_mpitype_elem2D_full_fbin(  :,:)
+   r_mpitype_elem2D_full_fbin(1:com_elem2D_full%rPEnum, nfbin_mpi:nfbin_mpi     ) => partit%r_mpitype_elem2D_full_fbin(  :,:)
+   s_mpitype_elem3D_fbin(     1:com_elem2D%sPEnum     , nfbin_mpi:nfbin_mpi, 1:4) => partit%s_mpitype_elem3D_fbin(     :,:,:)
+   r_mpitype_elem3D_fbin(     1:com_elem2D%rPEnum     , nfbin_mpi:nfbin_mpi, 1:4) => partit%r_mpitype_elem3D_fbin(     :,:,:)
+   s_mpitype_elem3D_full_fbin(1:com_elem2D_full%sPEnum, nfbin_mpi:nfbin_mpi, 1:4) => partit%s_mpitype_elem3D_full_fbin(:,:,:)
+   r_mpitype_elem3D_full_fbin(1:com_elem2D_full%rPEnum, nfbin_mpi:nfbin_mpi, 1:4) => partit%r_mpitype_elem3D_full_fbin(:,:,:)
 end if

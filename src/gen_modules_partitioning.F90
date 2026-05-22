@@ -522,266 +522,249 @@ end subroutine init_mpi_types
 ! (number of spectral frequency bins) instead of nl (number of vertical levels).
 ! Must be called after init_mpi_types and before first spectral bin exchange.
 subroutine init_mpi_types_fbin(nfbin, partit)
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  implicit none
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    implicit none
 
-  integer,        intent(in)           :: nfbin
-  type(t_partit), intent(inout), target :: partit
-  integer                          :: n, n_val
-  integer                          :: i, max_nb, nb, nini, nend
-  integer, allocatable             :: blocklen(:),     displace(:)
-  integer, allocatable             :: blocklen_tmp(:), displace_tmp(:)
+    integer,        intent(in)           :: nfbin
+    type(t_partit), intent(inout), target :: partit
+    integer                          :: n, n_val
+    integer                          :: i, max_nb, nb, nini, nend
+    integer, allocatable             :: blocklen(:),     displace(:)
+    integer, allocatable             :: blocklen_tmp(:), displace_tmp(:)
 
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 
-  if (npes <= 1) return
+    if (npes <= 1) return
 
-  ! Store nfbin for runtime checks in exchange routines
-  partit%nfbin_mpi = nfbin
+    ! Store nfbin for runtime checks in exchange routines
+    partit%nfbin_mpi = nfbin
 
-  !================================================================
-  ! Allocate MPI datatype arrays for spectral bin exchange
-  !================================================================
-  allocate(partit%r_mpitype_nod3D_fbin(com_nod2D%rPEnum, 1:nfbin, 3))      ! nodes, 1-3 values
-  allocate(partit%s_mpitype_nod3D_fbin(com_nod2D%sPEnum, 1:nfbin, 3))
-  allocate(partit%r_mpitype_elem2D_fbin(com_elem2D%rPEnum, 1:nfbin))            ! elems 2D small halo
-  allocate(partit%s_mpitype_elem2D_fbin(com_elem2D%sPEnum, 1:nfbin))
-  allocate(partit%r_mpitype_elem2D_full_fbin(com_elem2D_full%rPEnum, 1:nfbin))   ! elems 2D full halo
-  allocate(partit%s_mpitype_elem2D_full_fbin(com_elem2D_full%sPEnum, 1:nfbin))
-  allocate(partit%r_mpitype_elem3D_fbin(com_elem2D%rPEnum, 1:nfbin, 4))          ! elems 3D small halo, 1-4 values
-  allocate(partit%s_mpitype_elem3D_fbin(com_elem2D%sPEnum, 1:nfbin, 4))
-  allocate(partit%r_mpitype_elem3D_full_fbin(com_elem2D_full%rPEnum, 1:nfbin, 4))  ! elems 3D full halo
-  allocate(partit%s_mpitype_elem3D_full_fbin(com_elem2D_full%sPEnum, 1:nfbin, 4))
+    !================================================================
+    ! Allocate MPI datatype arrays for spectral bin exchange
+    ! Full spectral column exchanged at once (mirroring standard nod3D/elem3D pattern)
+    !================================================================
+    allocate(partit%r_mpitype_nod3D_fbin(      com_nod2D%rPEnum      , nfbin:nfbin, 3)) ! nodes, nfbin bins, 1-3 values
+    allocate(partit%s_mpitype_nod3D_fbin(      com_nod2D%sPEnum      , nfbin:nfbin, 3))
+    allocate(partit%r_mpitype_elem2D_fbin(     com_elem2D%rPEnum     , nfbin:nfbin   )) ! elems 2D small halo
+    allocate(partit%s_mpitype_elem2D_fbin(     com_elem2D%sPEnum     , nfbin:nfbin   ))
+    allocate(partit%r_mpitype_elem2D_full_fbin(com_elem2D_full%rPEnum, nfbin:nfbin   )) ! elems 2D full halo
+    allocate(partit%s_mpitype_elem2D_full_fbin(com_elem2D_full%sPEnum, nfbin:nfbin   ))
+    allocate(partit%r_mpitype_elem3D_fbin(     com_elem2D%rPEnum     , nfbin:nfbin, 4)) ! elems 3D small halo, 1-4 values
+    allocate(partit%s_mpitype_elem3D_fbin(     com_elem2D%sPEnum     , nfbin:nfbin, 4))
+    allocate(partit%r_mpitype_elem3D_full_fbin(com_elem2D_full%rPEnum, nfbin:nfbin, 4)) ! elems 3D full halo
+    allocate(partit%s_mpitype_elem3D_full_fbin(com_elem2D_full%sPEnum, nfbin:nfbin, 4))
 
-  !================================================================
-  ! Build MPI Data types for element fields (small halo)
-  !================================================================
-  max_nb = max(  &
-       maxval(com_elem2D%rptr(2:com_elem2D%rPEnum+1) - com_elem2D%rptr(1:com_elem2D%rPEnum)), &
-       maxval(com_elem2D%sptr(2:com_elem2D%sPEnum+1) - com_elem2D%sptr(1:com_elem2D%sPEnum)), &
-       maxval(com_elem2D_full%rptr(2:com_elem2D_full%rPEnum+1) - com_elem2D_full%rptr(1:com_elem2D_full%rPEnum)), &
-       maxval(com_elem2D_full%sptr(2:com_elem2D_full%sPEnum+1) - com_elem2D_full%sptr(1:com_elem2D_full%sPEnum)))
+    !================================================================
+    ! Build MPI Data types for element fields (small halo)
+    !================================================================
+    max_nb = max(  &
+                maxval(com_elem2D%rptr(     2:com_elem2D%rPEnum+1     ) - com_elem2D%rptr(     1:com_elem2D%rPEnum     )), &
+                maxval(com_elem2D%sptr(     2:com_elem2D%sPEnum+1     ) - com_elem2D%sptr(     1:com_elem2D%sPEnum     )), &
+                maxval(com_elem2D_full%rptr(2:com_elem2D_full%rPEnum+1) - com_elem2D_full%rptr(1:com_elem2D_full%rPEnum)), &
+                maxval(com_elem2D_full%sptr(2:com_elem2D_full%sPEnum+1) - com_elem2D_full%sptr(1:com_elem2D_full%sPEnum)))
 
-  allocate(displace(max_nb),     blocklen(max_nb))
-  allocate(displace_tmp(max_nb), blocklen_tmp(max_nb))
+    allocate(displace(max_nb),     blocklen(max_nb))
+    allocate(displace_tmp(max_nb), blocklen_tmp(max_nb))
 
-  ! --- Receive types for elements (small halo) ---
-  do n=1,com_elem2D%rPEnum
-     nb = 1
-     nini = com_elem2D%rptr(n)
-     nend = com_elem2D%rptr(n+1) - 1
-     displace(:) = 0
-     displace(1) = com_elem2D%rlist(nini) -1
-     blocklen(:) = 1
-     do i=nini+1, nend
-        if (com_elem2D%rlist(i) /= com_elem2D%rlist(i-1) + 1) then
-           nb = nb+1
-           displace(nb) = com_elem2D%rlist(i) -1
-        else
-           blocklen(nb) = blocklen(nb)+1
-        endif
-     enddo
-     ! 2D fbin types: one for each spectral bin
-     DO i=1,nfbin
-        blocklen_tmp(1:nb) = blocklen(1:nb)
-        displace_tmp(1:nb) = displace(1:nb)*nfbin + (i-1)
+    ! --- Receive types for elements (small halo) ---
+    do n=1,com_elem2D%rPEnum
+        nb = 1
+        nini = com_elem2D%rptr(n)
+        nend = com_elem2D%rptr(n+1) - 1
+        displace(:) = 0
+        displace(1) = com_elem2D%rlist(nini) -1
+        blocklen(:) = 1
+        do i=nini+1, nend
+            if (com_elem2D%rlist(i) /= com_elem2D%rlist(i-1) + 1) then
+            nb = nb+1
+            displace(nb) = com_elem2D%rlist(i) -1
+            else
+            blocklen(nb) = blocklen(nb)+1
+            endif
+        enddo
+        ! 2D fbin type: full spectral column at once (nfbin per element)
+        blocklen_tmp(1:nb) = blocklen(1:nb)*nfbin
+        displace_tmp(1:nb) = displace(1:nb)*nfbin
         call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
-             partit%r_mpitype_elem2D_fbin(n,i), partit%MPIerr)
-        call MPI_TYPE_COMMIT(partit%r_mpitype_elem2D_fbin(n,i), partit%MPIerr)
-     ENDDO
-     ! 3D fbin types: one for each spectral bin and n_val
-     DO i=1,nfbin
+            partit%r_mpitype_elem2D_fbin(n,nfbin), partit%MPIerr)
+        call MPI_TYPE_COMMIT(partit%r_mpitype_elem2D_fbin(n,nfbin), partit%MPIerr)
+        ! 3D fbin types: full spectral column, n_val values per bin
         DO n_val=1,4
-           blocklen_tmp(1:nb) = blocklen(1:nb)*n_val
-           displace_tmp(1:nb) = (displace(1:nb)*nfbin + (i-1))*n_val
-           call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
-                partit%r_mpitype_elem3D_fbin(n,i,n_val), partit%MPIerr)
-           call MPI_TYPE_COMMIT(partit%r_mpitype_elem3D_fbin(n,i,n_val), partit%MPIerr)
+            blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nfbin
+            displace_tmp(1:nb) = displace(1:nb)*n_val*nfbin
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
+                partit%r_mpitype_elem3D_fbin(n,nfbin,n_val), partit%MPIerr)
+            call MPI_TYPE_COMMIT(partit%r_mpitype_elem3D_fbin(n,nfbin,n_val), partit%MPIerr)
         ENDDO
-     ENDDO
-  enddo
+    enddo
 
-  ! --- Send types for elements (small halo) ---
-  do n=1,com_elem2D%sPEnum
-     nb = 1
-     nini = com_elem2D%sptr(n)
-     nend = com_elem2D%sptr(n+1) - 1
-     displace(:) = 0
-     displace(1) = com_elem2D%slist(nini) -1
-     blocklen(:) = 1
-     do i=nini+1, nend
-        if (com_elem2D%slist(i) /= com_elem2D%slist(i-1) + 1) then
-           nb = nb+1
-           displace(nb) = com_elem2D%slist(i) -1
-        else
-           blocklen(nb) = blocklen(nb)+1
-        endif
-     enddo
-     ! 2D fbin types: one for each spectral bin
-     DO i=1,nfbin
-        blocklen_tmp(1:nb) = blocklen(1:nb)
-        displace_tmp(1:nb) = displace(1:nb)*nfbin + (i-1)
+    ! --- Send types for elements (small halo) ---
+    do n=1,com_elem2D%sPEnum
+        nb = 1
+        nini = com_elem2D%sptr(n)
+        nend = com_elem2D%sptr(n+1) - 1
+        displace(:) = 0
+        displace(1) = com_elem2D%slist(nini) -1
+        blocklen(:) = 1
+        do i=nini+1, nend
+            if (com_elem2D%slist(i) /= com_elem2D%slist(i-1) + 1) then
+            nb = nb+1
+            displace(nb) = com_elem2D%slist(i) -1
+            else
+            blocklen(nb) = blocklen(nb)+1
+            endif
+        enddo
+        ! 2D fbin type: full spectral column at once
+        blocklen_tmp(1:nb) = blocklen(1:nb)*nfbin
+        displace_tmp(1:nb) = displace(1:nb)*nfbin
         call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
-             partit%s_mpitype_elem2D_fbin(n,i), partit%MPIerr)
-        call MPI_TYPE_COMMIT(partit%s_mpitype_elem2D_fbin(n,i), partit%MPIerr)
-     ENDDO
-     ! 3D fbin types: one for each spectral bin and n_val
-     DO i=1,nfbin
+            partit%s_mpitype_elem2D_fbin(n,nfbin), partit%MPIerr)
+        call MPI_TYPE_COMMIT(partit%s_mpitype_elem2D_fbin(n,nfbin), partit%MPIerr)
+        ! 3D fbin types: full spectral column, n_val values per bin
         DO n_val=1,4
-           blocklen_tmp(1:nb) = blocklen(1:nb)*n_val
-           displace_tmp(1:nb) = (displace(1:nb)*nfbin + (i-1))*n_val
-           call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
-                partit%s_mpitype_elem3D_fbin(n,i,n_val), partit%MPIerr)
-           call MPI_TYPE_COMMIT(partit%s_mpitype_elem3D_fbin(n,i,n_val), partit%MPIerr)
+            blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nfbin
+            displace_tmp(1:nb) = displace(1:nb)*n_val*nfbin
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
+                partit%s_mpitype_elem3D_fbin(n,nfbin,n_val), partit%MPIerr)
+            call MPI_TYPE_COMMIT(partit%s_mpitype_elem3D_fbin(n,nfbin,n_val), partit%MPIerr)
         ENDDO
-     ENDDO
-  enddo
+    enddo
 
-  !================================================================
-  ! Build MPI Data types for element fields (full halo)
-  !================================================================
-  ! --- Receive types for elements (full halo) ---
-  do n=1,com_elem2D_full%rPEnum
-     nb = 1
-     nini = com_elem2D_full%rptr(n)
-     nend = com_elem2D_full%rptr(n+1) - 1
-     displace(:) = 0
-     displace(1) = com_elem2D_full%rlist(nini) -1
-     blocklen(:) = 1
-     do i=nini+1, nend
-        if (com_elem2D_full%rlist(i) /= com_elem2D_full%rlist(i-1) + 1) then
-           nb = nb+1
-           displace(nb) = com_elem2D_full%rlist(i) -1
-        else
-           blocklen(nb) = blocklen(nb)+1
-        endif
-     enddo
-     ! 2D fbin types: one for each spectral bin
-     DO i=1,nfbin
-        blocklen_tmp(1:nb) = blocklen(1:nb)
-        displace_tmp(1:nb) = displace(1:nb)*nfbin + (i-1)
+    !================================================================
+    ! Build MPI Data types for element fields (full halo)
+    !================================================================
+    ! --- Receive types for elements (full halo) ---
+    do n=1,com_elem2D_full%rPEnum
+        nb = 1
+        nini = com_elem2D_full%rptr(n)
+        nend = com_elem2D_full%rptr(n+1) - 1
+        displace(:) = 0
+        displace(1) = com_elem2D_full%rlist(nini) -1
+        blocklen(:) = 1
+        do i=nini+1, nend
+            if (com_elem2D_full%rlist(i) /= com_elem2D_full%rlist(i-1) + 1) then
+            nb = nb+1
+            displace(nb) = com_elem2D_full%rlist(i) -1
+            else
+            blocklen(nb) = blocklen(nb)+1
+            endif
+        enddo
+        ! 2D fbin type: full spectral column at once
+        blocklen_tmp(1:nb) = blocklen(1:nb)*nfbin
+        displace_tmp(1:nb) = displace(1:nb)*nfbin
         call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
-             partit%r_mpitype_elem2D_full_fbin(n,i), partit%MPIerr)
-        call MPI_TYPE_COMMIT(partit%r_mpitype_elem2D_full_fbin(n,i), partit%MPIerr)
-     ENDDO
-     ! 3D fbin types: one for each spectral bin and n_val
-     DO i=1,nfbin
+            partit%r_mpitype_elem2D_full_fbin(n,nfbin), partit%MPIerr)
+        call MPI_TYPE_COMMIT(partit%r_mpitype_elem2D_full_fbin(n,nfbin), partit%MPIerr)
+        ! 3D fbin types: full spectral column, n_val values per bin
         DO n_val=1,4
-           blocklen_tmp(1:nb) = blocklen(1:nb)*n_val
-           displace_tmp(1:nb) = (displace(1:nb)*nfbin + (i-1))*n_val
-           call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
-                partit%r_mpitype_elem3D_full_fbin(n,i,n_val), partit%MPIerr)
-           call MPI_TYPE_COMMIT(partit%r_mpitype_elem3D_full_fbin(n,i,n_val), partit%MPIerr)
+            blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nfbin
+            displace_tmp(1:nb) = displace(1:nb)*n_val*nfbin
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
+                partit%r_mpitype_elem3D_full_fbin(n,nfbin,n_val), partit%MPIerr)
+            call MPI_TYPE_COMMIT(partit%r_mpitype_elem3D_full_fbin(n,nfbin,n_val), partit%MPIerr)
         ENDDO
-     ENDDO
-  enddo
+    enddo
 
-  ! --- Send types for elements (full halo) ---
-  do n=1,com_elem2D_full%sPEnum
-     nb = 1
-     nini = com_elem2D_full%sptr(n)
-     nend = com_elem2D_full%sptr(n+1) - 1
-     displace(:) = 0
-     displace(1) = com_elem2D_full%slist(nini) -1
-     blocklen(:) = 1
-     do i=nini+1, nend
-        if (com_elem2D_full%slist(i) /= com_elem2D_full%slist(i-1) + 1) then
-           nb = nb+1
-           displace(nb) = com_elem2D_full%slist(i) -1
-        else
-           blocklen(nb) = blocklen(nb)+1
-        endif
-     enddo
-     ! 2D fbin types: one for each spectral bin
-     DO i=1,nfbin
-        blocklen_tmp(1:nb) = blocklen(1:nb)
-        displace_tmp(1:nb) = displace(1:nb)*nfbin + (i-1)
+    ! --- Send types for elements (full halo) ---
+    do n=1,com_elem2D_full%sPEnum
+        nb = 1
+        nini = com_elem2D_full%sptr(n)
+        nend = com_elem2D_full%sptr(n+1) - 1
+        displace(:) = 0
+        displace(1) = com_elem2D_full%slist(nini) -1
+        blocklen(:) = 1
+        do i=nini+1, nend
+            if (com_elem2D_full%slist(i) /= com_elem2D_full%slist(i-1) + 1) then
+            nb = nb+1
+            displace(nb) = com_elem2D_full%slist(i) -1
+            else
+            blocklen(nb) = blocklen(nb)+1
+            endif
+        enddo
+        ! 2D fbin type: full spectral column at once
+        blocklen_tmp(1:nb) = blocklen(1:nb)*nfbin
+        displace_tmp(1:nb) = displace(1:nb)*nfbin
         call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
-             partit%s_mpitype_elem2D_full_fbin(n,i), partit%MPIerr)
-        call MPI_TYPE_COMMIT(partit%s_mpitype_elem2D_full_fbin(n,i), partit%MPIerr)
-     ENDDO
-     ! 3D fbin types: one for each spectral bin and n_val
-     DO i=1,nfbin
+            partit%s_mpitype_elem2D_full_fbin(n,nfbin), partit%MPIerr)
+        call MPI_TYPE_COMMIT(partit%s_mpitype_elem2D_full_fbin(n,nfbin), partit%MPIerr)
+        ! 3D fbin types: full spectral column, n_val values per bin
         DO n_val=1,4
-           blocklen_tmp(1:nb) = blocklen(1:nb)*n_val
-           displace_tmp(1:nb) = (displace(1:nb)*nfbin + (i-1))*n_val
-           call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
-                partit%s_mpitype_elem3D_full_fbin(n,i,n_val), partit%MPIerr)
-           call MPI_TYPE_COMMIT(partit%s_mpitype_elem3D_full_fbin(n,i,n_val), partit%MPIerr)
+            blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nfbin
+            displace_tmp(1:nb) = displace(1:nb)*n_val*nfbin
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
+                partit%s_mpitype_elem3D_full_fbin(n,nfbin,n_val), partit%MPIerr)
+            call MPI_TYPE_COMMIT(partit%s_mpitype_elem3D_full_fbin(n,nfbin,n_val), partit%MPIerr)
         ENDDO
-     ENDDO
-  enddo
+    enddo
 
-  deallocate(displace,     blocklen)
-  deallocate(displace_tmp, blocklen_tmp)
+    deallocate(displace,     blocklen)
+    deallocate(displace_tmp, blocklen_tmp)
 
-  !================================================================
-  ! Build MPI Data types for nodal fields
-  !================================================================
-  max_nb = max(maxval(com_nod2D%rptr(2:com_nod2D%rPEnum+1) - com_nod2D%rptr(1:com_nod2D%rPEnum)), &
-               maxval(com_nod2D%sptr(2:com_nod2D%sPEnum+1) - com_nod2D%sptr(1:com_nod2D%sPEnum)))
+    !================================================================
+    ! Build MPI Data types for nodal fields
+    !================================================================
+    max_nb = max(maxval(com_nod2D%rptr(2:com_nod2D%rPEnum+1) - com_nod2D%rptr(1:com_nod2D%rPEnum)), &
+                 maxval(com_nod2D%sptr(2:com_nod2D%sPEnum+1) - com_nod2D%sptr(1:com_nod2D%sPEnum)))
 
-  allocate(displace(max_nb),     blocklen(max_nb))
-  allocate(displace_tmp(max_nb), blocklen_tmp(max_nb))
+    allocate(displace(max_nb),     blocklen(max_nb))
+    allocate(displace_tmp(max_nb), blocklen_tmp(max_nb))
 
-  ! --- Receive types for nodes ---
-  do n=1,com_nod2D%rPEnum
-     nb = 1
-     nini = com_nod2D%rptr(n)
-     nend = com_nod2D%rptr(n+1) - 1
-     displace(:) = 0
-     displace(1) = com_nod2D%rlist(nini) -1
-     blocklen(:) = 1
-     do i=nini+1, nend
-        if (com_nod2D%rlist(i) /= com_nod2D%rlist(i-1) + 1) then
-           nb = nb+1
-           displace(nb) = com_nod2D%rlist(i) -1
-        else
-           blocklen(nb) = blocklen(nb)+1
-        endif
-     enddo
-     DO i=1,nfbin
+    ! --- Receive types for nodes ---
+    do n=1,com_nod2D%rPEnum
+        nb = 1
+        nini = com_nod2D%rptr(n)
+        nend = com_nod2D%rptr(n+1) - 1
+        displace(:) = 0
+        displace(1) = com_nod2D%rlist(nini) -1
+        blocklen(:) = 1
+        do i=nini+1, nend
+            if (com_nod2D%rlist(i) /= com_nod2D%rlist(i-1) + 1) then
+            nb = nb+1
+            displace(nb) = com_nod2D%rlist(i) -1
+            else
+            blocklen(nb) = blocklen(nb)+1
+            endif
+        enddo
+        ! Full spectral column: n_val*nfbin contiguous elements per node
         DO n_val=1,3
-           blocklen_tmp(1:nb) = blocklen(1:nb)*n_val
-           displace_tmp(1:nb) = (displace(1:nb)*nfbin + (i-1))*n_val
-           call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
-                partit%r_mpitype_nod3D_fbin(n,i,n_val), partit%MPIerr)
-           call MPI_TYPE_COMMIT(partit%r_mpitype_nod3D_fbin(n,i,n_val), partit%MPIerr)
+            blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nfbin
+            displace_tmp(1:nb) = displace(1:nb)*n_val*nfbin
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
+                partit%r_mpitype_nod3D_fbin(n,nfbin,n_val), partit%MPIerr)
+            call MPI_TYPE_COMMIT(partit%r_mpitype_nod3D_fbin(n,nfbin,n_val), partit%MPIerr)
         ENDDO
-     ENDDO
-  enddo
+    enddo
 
-  ! --- Send types for nodes ---
-  do n=1,com_nod2D%sPEnum
-     nb = 1
-     nini = com_nod2D%sptr(n)
-     nend = com_nod2D%sptr(n+1) - 1
-     displace(:) = 0
-     displace(1) = com_nod2D%slist(nini) -1
-     blocklen(:) = 1
-     do i=nini+1, nend
-        if (com_nod2D%slist(i) /= com_nod2D%slist(i-1) + 1) then
-           nb = nb+1
-           displace(nb) = com_nod2D%slist(i) -1
-        else
-           blocklen(nb) = blocklen(nb)+1
-        endif
-     enddo
-     DO i=1,nfbin
+    ! --- Send types for nodes ---
+    do n=1,com_nod2D%sPEnum
+        nb = 1
+        nini = com_nod2D%sptr(n)
+        nend = com_nod2D%sptr(n+1) - 1
+        displace(:) = 0
+        displace(1) = com_nod2D%slist(nini) -1
+        blocklen(:) = 1
+        do i=nini+1, nend
+            if (com_nod2D%slist(i) /= com_nod2D%slist(i-1) + 1) then
+            nb = nb+1
+            displace(nb) = com_nod2D%slist(i) -1
+            else
+            blocklen(nb) = blocklen(nb)+1
+            endif
+        enddo
+        ! Full spectral column: n_val*nfbin contiguous elements per node
         DO n_val=1,3
-           blocklen_tmp(1:nb) = blocklen(1:nb)*n_val
-           displace_tmp(1:nb) = (displace(1:nb)*nfbin + (i-1))*n_val
-           call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
-                partit%s_mpitype_nod3D_fbin(n,i,n_val), partit%MPIerr)
-           call MPI_TYPE_COMMIT(partit%s_mpitype_nod3D_fbin(n,i,n_val), partit%MPIerr)
+            blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nfbin
+            displace_tmp(1:nb) = displace(1:nb)*n_val*nfbin
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
+                partit%s_mpitype_nod3D_fbin(n,nfbin,n_val), partit%MPIerr)
+            call MPI_TYPE_COMMIT(partit%s_mpitype_nod3D_fbin(n,nfbin,n_val), partit%MPIerr)
         ENDDO
-     ENDDO
-  enddo
+    enddo
 
-  deallocate(blocklen,     displace)
-  deallocate(blocklen_tmp, displace_tmp)
+    deallocate(blocklen,     displace)
+    deallocate(blocklen_tmp, displace_tmp)
 
 end subroutine init_mpi_types_fbin
 !===================================================================
