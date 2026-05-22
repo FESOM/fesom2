@@ -33,7 +33,12 @@ TYPE T_ICE_WORK
     real(kind=WP), allocatable, dimension(:)    :: fct_massmatrix
     real(kind=WP), allocatable, dimension(:)    :: sigma11, sigma12, sigma22
     real(kind=WP), allocatable, dimension(:)    :: eps11, eps12, eps22
-    real(kind=WP), allocatable, dimension(:)    :: ice_strength, inv_areamass, inv_mass
+    real(kind=WP), allocatable, dimension(:)    :: inv_areamass, inv_mass
+    ! ice_strength: canonical Hibler (1979) ice strength P = P*·h·exp(-C(1-A))
+    ! evaluated at nodes from m_ice and a_ice. Exposed to def_stream as the
+    ! 'strength_ice' output. EVP/mEVP/aEVP all evaluate the per-element strength
+    ! inline from this nodal field; no per-element cache is kept.
+    real(kind=WP), allocatable, dimension(:)    :: ice_strength
     !___________________________________________________________________________
     contains
         procedure WRITE_T_ICE_WORK
@@ -278,7 +283,6 @@ subroutine WRITE_T_ICE_WORK(twork, unit)
     call write_bin_array(twork%eps11,        unit, iostat, iomsg)
     call write_bin_array(twork%eps12,        unit, iostat, iomsg)
     call write_bin_array(twork%eps22,        unit, iostat, iomsg)
-    call write_bin_array(twork%ice_strength, unit, iostat, iomsg)
     call write_bin_array(twork%inv_areamass, unit, iostat, iomsg)
     call write_bin_array(twork%inv_mass,     unit, iostat, iomsg)
 end subroutine WRITE_T_ICE_WORK
@@ -302,7 +306,6 @@ subroutine READ_T_ICE_WORK(twork, unit)
     call read_bin_array(twork%eps11,        unit, iostat, iomsg)
     call read_bin_array(twork%eps12,        unit, iostat, iomsg)
     call read_bin_array(twork%eps22,        unit, iostat, iomsg)
-    call read_bin_array(twork%ice_strength, unit, iostat, iomsg)
     call read_bin_array(twork%inv_areamass, unit, iostat, iomsg)
     call read_bin_array(twork%inv_mass,     unit, iostat, iomsg)
 end subroutine READ_T_ICE_WORK
@@ -822,12 +825,12 @@ subroutine ice_init(ice, partit, mesh)
     ice%work%eps12       = 0.0_WP
     ice%work%eps22       = 0.0_WP
 
-    allocate(ice%work%ice_strength(    elem_size))
-    allocate(ice%work%inv_areamass(    node_size))
-    allocate(ice%work%inv_mass(        node_size))
-    ice%work%ice_strength= 0.0_WP
-    ice%work%inv_areamass= 0.0_WP
-    ice%work%inv_mass    = 0.0_WP
+    allocate(ice%work%inv_areamass(node_size))
+    allocate(ice%work%inv_mass(    node_size))
+    allocate(ice%work%ice_strength(node_size))
+    ice%work%inv_areamass = 0.0_WP
+    ice%work%inv_mass     = 0.0_WP
+    ice%work%ice_strength = 0.0_WP
 
     !___________________________________________________________________________
     ! initialse thermo array of ice derived type

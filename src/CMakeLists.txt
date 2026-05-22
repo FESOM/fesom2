@@ -15,14 +15,16 @@ else()
 endif()
 
 # Cray compiler specific optimizations
-if(CMAKE_Fortran_COMPILER_ID MATCHES "Cray")
-   # Use alternative cray-mpich library, about 5% faster with cray-mpich/7.7.3
-   # Not available for modules cray-mpich > 7.7.3
-   add_compile_options(-craympich-mt)
+if(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
    # Make sure to also set these variables in the runtime environment:
    #    MPICH_MAX_THREAD_SAFETY=multiple # allows highest MPI thread level (i.e. MPI_THREAD_MULTIPLE)
    #    MPICH_CRAY_OPT_THREAD_SYNC=0 # the Cray MPICH library falls back to using the pthread_mutex-based thread-synchronization implementation
    #    MPICH_OPT_THREAD_SYNC=0 # seems to be a duplicate variable which also appears in some documentation instead of MPICH_CRAY_OPT_THREAD_SYNC (but this one brings a huge speed gain on aleph)
+   if(DEFINED ENV{CRAY_MPICH_VERSION})
+      if("$ENV{CRAY_MPICH_VERSION}" VERSION_LESS_EQUAL "7.7.3")
+         add_compile_options(-craympich-mt)
+      endif()
+   endif()
 endif()
 
 # Backward compatibility: convert old DISABLE_MULTITHREADING to new ASYNCHRONOUS_IO_THREADS
@@ -70,6 +72,9 @@ message(STATUS "ENABLE_OPENMP: ${ENABLE_OPENMP}")
 if(${ENABLE_OPENMP})
    find_package(OpenMP REQUIRED COMPONENTS Fortran)
 endif()
+
+option(RECOM_COUPLED "Use RECOM" OFF)
+message(STATUS "RECOM_COUPLED: ${RECOM_COUPLED}")
 
 option(USE_ICEPACK "Use ICEPACK" OFF)
 message(STATUS "USE_ICEPACK: ${USE_ICEPACK}")
@@ -153,13 +158,6 @@ elseif(ENABLE_IFS_INTERFACE) # ICEPACK + IFS_INTERFACE NOT SUPPORTED (YET)
                                ${src_home}/ifs_interface/mpp_io.F90)
 endif()
 
-# Link RECOM code
-if(RECOM_COUPLED)  # ADD RECOM FILES
-   file(GLOB sources_recom ${src_home}/int_recom/*.F90
-                           ${src_home}/int_recom/recom/*.F90)
-   list(APPEND sources_Fortran ${sources_recom})                           
-endif()                             
-
 # generate a custom file from fesom_version_info.F90 which includes the current git SHA
 set(FESOM_ORIGINAL_VERSION_FILE ${src_home}/fesom_version_info.F90)
 set(FESOM_GENERATED_VERSION_FILE ${CMAKE_CURRENT_BINARY_DIR}/fesom_version_info-generated.F90)
@@ -196,65 +194,36 @@ target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_Fort
 target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:module/fesom>)
 target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
 
-# build CVMix library if CVMIX is ON
-if (CVMIX)
-   message(STATUS "CVMIX: ${CVMIX}")
-   
-   # read CVMix install and src directories from the download script, so that there
-   # is only one place where they are defined
-   execute_process(COMMAND bash ${src_home}/cvmix_driver/download_cvmix.sh --print-src_dir
-                   OUTPUT_VARIABLE CVMIX_DIR_src OUTPUT_STRIP_TRAILING_WHITESPACE)
-   execute_process(COMMAND bash ${src_home}/cvmix_driver/download_cvmix.sh --print-prefix
-                   OUTPUT_VARIABLE CVMIX_DIR_install OUTPUT_STRIP_TRAILING_WHITESPACE)  
-   
-   # set default CVMix installation path
-   set(CVMIX_ROOT "${src_home}/cvmix_driver/${CVMIX_DIR_install}_${CMAKE_Fortran_COMPILER_ID}") 
-   message(STATUS "set default CVMIX_ROOT=${CVMIX_ROOT}")
-   
-   # Where library is located --> fix in download_cvmix.sh that it as always installed 
-   # in /lib and not in /lib64
-   set(CVMIX_LIB "${CVMIX_ROOT}/lib/libcvmix.a")
-   
-   # Create parent directory early so CMake does not fail on missing include paths
-   file(MAKE_DIRECTORY ${CVMIX_ROOT})
-   file(MAKE_DIRECTORY ${CVMIX_ROOT}/include/cvmix)
-   
-   # Collect CVMix source files so that CMake knows what changes triggers a 
-   # possible rebuild of the CVMix library
-   file(GLOB_RECURSE CVMIX_SOURCES
-         "${src_home}/cvmix_driver/${CVMIX_DIR_src}/src/*.F90"
-         "${src_home}/cvmix_driver/${CVMIX_DIR_src}/src/*/*.F90")
-        
-   # Add script dependency (rebuild if script changes)
-   set(CVMIX_DOWNLOAD "${src_home}/cvmix_driver/download_cvmix.sh")
-   
-   # Custom command: build CVMix if not yet built
-   add_custom_command(
-         OUTPUT ${CVMIX_LIB}
-         COMMAND bash ${src_home}/cvmix_driver/download_cvmix.sh --prefix ${CVMIX_ROOT}
-         WORKING_DIRECTORY ${src_home}/cvmix_driver
-         DEPENDS ${CVMIX_SOURCES} ${CVMIX_DOWNLOAD} # trigger rebuild if source or download script change
-         COMMENT "Downloading and building CVMix into ${CVMIX_ROOT}"
-         VERBATIM)
-   
-   # check if ${CVMIX_ROOT}/lib/libcvmix.a exist or not, only if it does not 
-   # exist build library
-   add_custom_target(cvmix_autobuild DEPENDS ${CVMIX_LIB})
- 
-   # build cvmix external libray
-   add_library(cvmix_external STATIC IMPORTED GLOBAL)
-   set_target_properties(cvmix_external PROPERTIES
-         IMPORTED_LOCATION ${CVMIX_LIB}
-         INTERFACE_INCLUDE_DIRECTORIES "${CVMIX_ROOT}/include/cvmix")
+# Link RECOM code
+if(RECOM_COUPLED)  # ADD RECOM LIB
+   add_subdirectory(recom)
+   target_link_libraries(${PROJECT_NAME} PRIVATE recom)
+endif()
 
-   # cvmix_autobuild is a custom target that runs your download_cvmix.sh script 
-   # and produces libcvmix.a. cvmix_external is an imported library, meaning CMake 
-   # doesn’t build it — it just points to an existing file (libcvmix.a).
-   add_dependencies(cvmix_external  cvmix_autobuild)
-   
-   # Link CVMix library to fesom, build chain becomes: fesom → cvmix_external → cvmix_autobuild
-   target_link_libraries(${PROJECT_NAME} PRIVATE cvmix_external)
-   
+# Pull CVMix in via FetchContent and build it as part of FESOM's build tree.
+# Offline workflow:
+#   - point at a manually placed checkout: -DFETCHCONTENT_SOURCE_DIR_CVMIX=/path/to/CVMix-src
+#   - or pre-populate <build>/_deps/cvmix-src and pass -DFETCHCONTENT_FULLY_DISCONNECTED=ON
+if(CVMIX)
+   message(STATUS "CVMIX: ${CVMIX}")
+
+   include(FetchContent)
+   set(CVMIX_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+   set(CVMIX_BUILD_DRIVER      OFF CACHE BOOL "" FORCE)
+   FetchContent_Declare(cvmix
+      GIT_REPOSITORY https://github.com/CVMix/CVMix-src.git
+      GIT_TAG        v1.0.0
+   )
+   FetchContent_MakeAvailable(cvmix)
+
+   # CVMix's own CMakeLists exposes its module dir only via INSTALL_INTERFACE and
+   # writes .mod files to ${CMAKE_BINARY_DIR}/modules (top-level build dir, set
+   # in the subdirectory scope). Expose that path on the BUILD_INTERFACE so
+   # FESOM's wrapper sources in cvmix_driver/ can find the CVMix .mod files.
+   target_include_directories(cvmix_static INTERFACE
+      $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/modules>)
+
+   target_link_libraries(${PROJECT_NAME} PRIVATE cvmix_static)
 endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
@@ -267,8 +236,31 @@ if(ENABLE_MULTIO)
    target_link_libraries(${PROJECT_NAME} PRIVATE multio-fapi)
 endif()
 
+option(FESOM_WITH_XIOS "Route FESOM output through XIOS async server ranks" OFF)
+if(FESOM_WITH_XIOS AND ASYNCHRONOUS_IO_THREADS)
+   message(STATUS "FESOM_WITH_XIOS=ON forces ASYNCHRONOUS_IO_THREADS=OFF: "
+                  "XIOS requires deterministic xios_send_field order across ranks, "
+                  "which per-stream pthreads break.")
+   set(ASYNCHRONOUS_IO_THREADS OFF CACHE BOOL "enable asynchronous I/O threads" FORCE)
+endif()
+
 if(ASYNCHRONOUS_IO_THREADS)
    target_compile_definitions(${PROJECT_NAME} PRIVATE ASYNCHRONOUS_IO_THREADS)
+endif()
+
+if(FESOM_WITH_XIOS)
+   find_path(XIOS_INCLUDE_DIR NAMES xios.mod
+             HINTS $ENV{XIOS_ROOT}/inc $ENV{XIOS_ROOT}/include)
+   find_library(XIOS_LIB NAMES xios
+                HINTS $ENV{XIOS_ROOT}/lib)
+   if(NOT XIOS_INCLUDE_DIR OR NOT XIOS_LIB)
+      message(FATAL_ERROR "FESOM_WITH_XIOS=ON but XIOS not found. Set XIOS_ROOT.")
+   endif()
+   message(STATUS "XIOS include: ${XIOS_INCLUDE_DIR}")
+   message(STATUS "XIOS lib    : ${XIOS_LIB}")
+   target_include_directories(${PROJECT_NAME} PRIVATE ${XIOS_INCLUDE_DIR})
+   target_link_libraries(${PROJECT_NAME} PRIVATE ${XIOS_LIB} stdc++)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __XIOS)
 endif()
 
 if(${FESOM_COUPLED})
@@ -317,7 +309,7 @@ if(OPENMP_REPRODUCIBLE)
 endif()
 
 if(${RECOM_COUPLED})
-   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2 __3Zoo2Det __coccos)# __usetp)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2) # __3Zoo2Det __coccos)# __usetp)
 endif()
 
 if(${CISO_COUPLED})

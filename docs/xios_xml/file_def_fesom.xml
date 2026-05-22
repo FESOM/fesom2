@@ -1,0 +1,101 @@
+<?xml version="1.0"?>
+<file_definition type="one_file" format="netcdf4" par_access="collective"
+                 compression_level="1"
+                 time_counter_name="time" time_counter="exclusive">
+
+  <!-- FESOM-2.7 XIOS file definition. One file per variable, grouped by
+       output frequency (3h / 1d / 1mo). All files split yearly. Filenames
+       are "<var>.fesom" + XIOS split suffix. -->
+
+  <!-- ================= 3-hourly ================= -->
+  <file_group id="fesom_3h" output_freq="3h" split_freq="1y" enabled="true">
+    <file id="f_tx_sur" name="tx_sur.fesom" par_access="independent"><field field_ref="tx_sur"/></file>
+    <file id="f_ty_sur" name="ty_sur.fesom" par_access="independent"><field field_ref="ty_sur"/></file>
+  </file_group>
+
+  <!-- ================= Daily ================= -->
+  <file_group id="fesom_1d" output_freq="1d" split_freq="1y" enabled="true">
+    <file id="f_sst"    name="sst.fesom"   ><field field_ref="sst"   /></file>
+    <file id="f_sss"    name="sss.fesom"   ><field field_ref="sss"   /></file>
+    <file id="f_ssh"    name="ssh.fesom"   ><field field_ref="ssh"   /></file>
+    <file id="f_uice"   name="uice.fesom"  ><field field_ref="uice"  /></file>
+    <file id="f_vice"   name="vice.fesom"  ><field field_ref="vice"  /></file>
+    <file id="f_a_ice"  name="a_ice.fesom" ><field field_ref="a_ice" /></file>
+    <file id="f_m_snow" name="m_snow.fesom"><field field_ref="m_snow"/></file>
+    <file id="f_ist"    name="ist.fesom"   ><field field_ref="ist"   /></file>
+    <file id="f_MLD3"   name="MLD3.fesom"  ><field field_ref="MLD3"  /></file>
+    <file id="f_h_ice"  name="h_ice.fesom" ><field field_ref="h_ice" /></file>
+    <file id="f_h_snow" name="h_snow.fesom"><field field_ref="h_snow"/></file>
+    <file id="f_unod"   name="unod.fesom"  ><field field_ref="unod"  /></file>
+    <file id="f_vnod"   name="vnod.fesom"  ><field field_ref="vnod"  /></file>
+  </file_group>
+
+  <!-- ================= Monthly ================= -->
+  <file_group id="fesom_1mo" output_freq="1mo" split_freq="1y" enabled="true">
+
+    <!-- 2D nodes -->
+    <file id="f_m_ice"           name="m_ice.fesom"          ><field field_ref="m_ice"          /></file>
+    <file id="f_MLD1"            name="MLD1.fesom"           ><field field_ref="MLD1"           /></file>
+    <file id="f_MLD2"            name="MLD2.fesom"           ><field field_ref="MLD2"           /></file>
+    <file id="f_fw"              name="fw.fesom"             ><field field_ref="fw"             /></file>
+    <file id="f_fh"              name="fh.fesom"             ><field field_ref="fh"             /></file>
+    <file id="f_thdgrarea"       name="thdgrarea.fesom"      ><field field_ref="thdgrarea"      /></file>
+    <file id="f_dyngrarea"       name="dyngrarea.fesom"      ><field field_ref="dyngrarea"      /></file>
+    <file id="f_thdgrice"        name="thdgrice.fesom"       ><field field_ref="thdgrice"       /></file>
+    <file id="f_dyngrice"        name="dyngrice.fesom"       ><field field_ref="dyngrice"       /></file>
+    <file id="f_thdgrsnw"        name="thdgrsnw.fesom"       ><field field_ref="thdgrsnw"       /></file>
+    <file id="f_atmice_x"        name="atmice_x.fesom"       ><field field_ref="atmice_x"       /></file>
+    <file id="f_atmice_y"        name="atmice_y.fesom"       ><field field_ref="atmice_y"       /></file>
+    <file id="f_iceoce_x"        name="iceoce_x.fesom"       ><field field_ref="iceoce_x"       /></file>
+    <file id="f_iceoce_y"        name="iceoce_y.fesom"       ><field field_ref="iceoce_y"       /></file>
+    <file id="f_fw_ice"          name="fw_ice.fesom"         ><field field_ref="fw_ice"         /></file>
+    <file id="f_fw_snw"          name="fw_snw.fesom"         ><field field_ref="fw_snw"         /></file>
+    <file id="f_virtsalt"        name="virtsalt.fesom"       ><field field_ref="virtsalt"       /></file>
+    <file id="f_realsalt"        name="realsalt.fesom"       ><field field_ref="realsalt"       /></file>
+    <file id="f_relaxsalt"       name="relaxsalt.fesom"      ><field field_ref="relaxsalt"      /></file>
+    <file id="f_qcon"            name="qcon.fesom"           ><field field_ref="qcon"           /></file>
+    <file id="f_apnd"            name="apnd.fesom"           ><field field_ref="apnd"           /></file>
+    <file id="f_hpnd"            name="hpnd.fesom"           ><field field_ref="hpnd"           /></file>
+    <file id="f_ipnd"            name="ipnd.fesom"           ><field field_ref="ipnd"           /></file>
+    <file id="f_evap"            name="evap.fesom"           ><field field_ref="evap"           /></file>
+    <file id="f_prec"            name="prec.fesom"           ><field field_ref="prec"           /></file>
+    <file id="f_snow"            name="snow.fesom"           ><field field_ref="snow"           /></file>
+    <file id="f_runoff"          name="runoff.fesom"         ><field field_ref="runoff"         /></file>
+    <file id="f_pbo"             name="pbo.fesom"            ><field field_ref="pbo"            /></file>
+    <file id="f_opottemptend"    name="opottemptend.fesom"   ><field field_ref="opottemptend"   /></file>
+    <file id="f_opottemprmadvect" name="opottemprmadvect.fesom"><field field_ref="opottemprmadvect"/></file>
+    <file id="f_opottempdiff"    name="opottempdiff.fesom"   ><field field_ref="opottempdiff"   /></file>
+    <file id="f_osalttend"       name="osalttend.fesom"      ><field field_ref="osalttend"      /></file>
+    <file id="f_osaltrmadvect"   name="osaltrmadvect.fesom"  ><field field_ref="osaltrmadvect"  /></file>
+    <file id="f_osaltdiff"       name="osaltdiff.fesom"      ><field field_ref="osaltdiff"      /></file>
+
+    <!-- 2D elements -->
+    <file id="f_strength_ice" name="strength_ice.fesom" par_access="independent"><field field_ref="strength_ice"/></file>
+    <file id="f_sgm11"        name="sgm11.fesom"        par_access="independent"><field field_ref="sgm11"       /></file>
+    <file id="f_sgm12"        name="sgm12.fesom"        par_access="independent"><field field_ref="sgm12"       /></file>
+    <file id="f_sgm22"        name="sgm22.fesom"        par_access="independent"><field field_ref="sgm22"       /></file>
+
+    <!-- 3D nodes, cell-center -->
+    <file id="f_temp"       name="temp.fesom"      ><field field_ref="temp"      /></file>
+    <file id="f_salt"       name="salt.fesom"      ><field field_ref="salt"      /></file>
+    <file id="f_hnode"      name="hnode.fesom"     ><field field_ref="hnode"     /></file>
+    <file id="f_rsdoabsorb" name="rsdoabsorb.fesom"><field field_ref="rsdoabsorb"/></file>
+
+    <!-- 3D nodes, interface levels -->
+    <file id="f_w"       name="w.fesom"      ><field field_ref="w"      /></file>
+    <file id="f_bolus_w" name="bolus_w.fesom"><field field_ref="bolus_w"/></file>
+    <file id="f_N2"      name="N2.fesom"     ><field field_ref="N2"     /></file>
+    <file id="f_Kv"      name="Kv.fesom"     ><field field_ref="Kv"     /></file>
+
+    <!-- 3D elements, cell-center -->
+    <file id="f_u"       name="u.fesom"       par_access="independent"><field field_ref="u"      /></file>
+    <file id="f_v"       name="v.fesom"       par_access="independent"><field field_ref="v"      /></file>
+    <file id="f_bolus_u" name="bolus_u.fesom" par_access="independent"><field field_ref="bolus_u"/></file>
+    <file id="f_bolus_v" name="bolus_v.fesom" par_access="independent"><field field_ref="bolus_v"/></file>
+
+    <!-- 3D elements, interface levels -->
+    <file id="f_Av" name="Av.fesom" par_access="independent"><field field_ref="Av"/></file>
+
+  </file_group>
+
+</file_definition>
