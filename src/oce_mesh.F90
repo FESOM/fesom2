@@ -2093,8 +2093,7 @@ END DO
     ! which made the XIOS regrid path crash in standalone FESOM builds
     ! (io_xios.F90: size(mesh%x_corners,2) on an unallocated array).
     ! Always allocate now — cost is O(local_nodes * avg_nodal_valence),
-    ! tiny vs the rest of mesh setup, and no useful FESOM build wants to
-    ! skip it.
+    ! tiny vs the rest of mesh setup.
     allocate(mesh%x_corners(myDim_nod2D, maxval(rmax)))
     allocate(mesh%y_corners(myDim_nod2D, maxval(rmax)))
     DO n=1, myDim_nod2D
