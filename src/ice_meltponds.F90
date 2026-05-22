@@ -121,8 +121,10 @@ contains
 
         fpond = c0
 
-        ! No ponds on thin ice / heavy snow / no ice
-        if (aice < puny .or. hice < hi_min .or. hsno > hs1) then
+        ! Reset pond state where ice is absent or too thin. Heavy snow does
+        ! NOT reset; ponds and lid persist under snow and the Stefan branch
+        ! lets the lid grow via conduction (matches Icepack meltpond_lvl).
+        if (aice < puny .or. hice < hi_min) then
             apnd = c0; hpnd = c0; ipnd = c0
             return
         endif
