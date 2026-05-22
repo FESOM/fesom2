@@ -234,6 +234,8 @@ contains
     if (nv > 10 .and. partit%mype == 0) &
        write(*,*) '[XIOS] WARNING: x_corners nv=', nv, ' exceeds XIOS NMAX=10; capping.'
     nv = min(nv, 10)
+    ! DIAGNOSTIC TEST: force nv=3 to isolate whether XIOS fails for many-vertex polygons
+    nv = 3
     allocate(blon_n(nv, nn), blat_n(nv, nn))
     do i = 1, nn
        v1lon         = mesh%x_corners(i, 1)
@@ -254,6 +256,13 @@ contains
        call sort_cv_corners_ccw(blon_n(:, i), blat_n(:, i), nv, &
                                 lon_n(i) * rad, lat_n(i) * rad)
     end do
+
+    if (partit%mype == 0) then
+       write(*,'(A,I0)')    '[XIOS-DBG] nodes: nv=', nv
+       write(*,'(A,F10.4,A,F10.4)') '[XIOS-DBG] node 1 centre lon=', lon_n(1), ' lat=', lat_n(1)
+       write(*,'(A,10F10.4)') '[XIOS-DBG] node 1 bounds_lon=', blon_n(1:nv, 1)
+       write(*,'(A,10F10.4)') '[XIOS-DBG] node 1 bounds_lat=', blat_n(1:nv, 1)
+    end if
 
     call xios_set_domain_attr("nodes",                &
          type          = "unstructured",              &
