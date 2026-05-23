@@ -14,7 +14,7 @@
 ! ============================================================================
 &ice_dyn
 ! --- EVP Rheology Options ---
-whichEVP       = 0              ! EVP solver type:
+whichEVP       = 1              ! EVP solver type:
                                 !   0 = standard EVP
                                 !   1 = modified EVP (mEVP)
                                 !   2 = adaptive EVP (aEVP)
@@ -31,8 +31,8 @@ delta_min      = 1.0e-11        ! minimum strain rate for viscosity regularizati
 evp_rheol_steps = 120           ! number of EVP subcycles per ice time step
 
 ! --- mEVP Stability Parameters (for whichEVP=1) ---
-alpha_evp      = 250            ! mEVP stability constant (adjust with resolution)
-beta_evp       = 250            ! mEVP stability constant (adjust with resolution)
+alpha_evp      = 500            ! mEVP stability constant (adjust with resolution)
+beta_evp       = 500            ! mEVP stability constant (adjust with resolution)
 
 ! --- aEVP Tuning (for whichEVP=2) ---
 c_aevp         = 0.15           ! aEVP tuning constant (adjust with resolution)
