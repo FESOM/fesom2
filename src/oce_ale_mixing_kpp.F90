@@ -76,7 +76,17 @@ MODULE o_mixing_KPP_mod
   logical                    :: smooth_Ri_ver    =.false.
   logical                    :: limit_hbl_ekmmob =.false. !.true.
 
-  integer                                   :: n          ! to perform loop iterations 
+  integer                                   :: n          ! to perform loop iterations
+
+  ! --- KPP dual-instrumentation dump (FESOM_KPP_DUMP_DIR-gated) -------------
+  ! Mirror of the C port's fesom_kpp_dump_nodes (fesom_kpp.c) for per-routine
+  ! validation against the C (reference_evp_dump_diagnostic methodology). Off
+  ! by default (one env read). Writes owned-node fields keyed by 1-based gid to
+  ! <dir>/kpp_dump_s<step>_<tag>_rank<R>.txt; diff with scripts/kpp_dump_diff.py.
+  character(len=512) :: kpp_dump_dir    = ''
+  logical            :: kpp_dump_loaded = .false.
+  integer            :: kpp_dump_step   = 1   ! FESOM_KPP_DUMP_STEP override
+  integer            :: kpp_call_count  = 0   ! oce_mixing_KPP call index (= step)
 
 contains
 
@@ -207,6 +217,53 @@ contains
           endif
        enddo
     enddo
+
+    ! K1 init dump (FESOM_KPP_DUMP_DIR-gated; rank 0; table is rank-independent)
+    call kpp_dump_load_env()
+    if (len_trim(kpp_dump_dir) > 0 .and. mype == 0) then
+       block
+         integer :: u, ii, jj, ios
+         character(len=640) :: path
+         write(path,'(a,"/kpp_init_rank0.txt")') trim(kpp_dump_dir)
+         open(newunit=u, file=trim(path), status='replace', action='write', iostat=ios)
+         if (ios == 0) then
+            write(u,'("# Vtc ",es24.16)')    Vtc
+            write(u,'("# cg ",es24.16)')     cg
+            write(u,'("# deltaz ",es24.16)') deltaz
+            write(u,'("# deltau ",es24.16)') deltau
+            write(u,'("# i j wmt wst  (nni=",i0," nnj=",i0,")")') nni, nnj
+            do ii=0, nni+1
+               do jj=0, nnj+1
+                  write(u,'(i0," ",i0," ",es24.16," ",es24.16)') ii, jj, wmt(ii,jj), wst(ii,jj)
+               end do
+            end do
+            close(u)
+         end if
+       end block
+
+       ! K2 wscale sweep (identical grid to fesom_kpp_dump_wscale_sweep)
+       block
+         integer, parameter :: NZ=201, NU=101
+         integer :: u, ii, jj, ios
+         real(kind=WP) :: zehat, us, wm, ws
+         character(len=640) :: path
+         write(path,'(a,"/kpp_wscale_rank0.txt")') trim(kpp_dump_dir)
+         open(newunit=u, file=trim(path), status='replace', action='write', iostat=ios)
+         if (ios == 0) then
+            write(u,'("# i j zehat ustar wm ws  (sweep ",i0,"x",i0,")")') NZ, NU
+            do ii=0, NZ-1
+               zehat = -1.0e-6_WP + real(ii,WP) * (2.0e-6_WP / real(NZ-1,WP))
+               do jj=0, NU-1
+                  us = real(jj,WP) * (0.05_WP / real(NU-1,WP))
+                  call wscale(zehat, us, wm, ws)
+                  write(u,'(i0," ",i0," ",es24.16," ",es24.16," ",es24.16," ",es24.16)') &
+                       ii, jj, zehat, us, wm, ws
+               end do
+            end do
+            close(u)
+         end if
+       end block
+    end if
   end subroutine oce_mixing_kpp_init
 
   !#######################################################################
@@ -276,6 +333,8 @@ contains
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     UVnode=>dynamics%uvnode(:,:,:)
+
+     kpp_call_count = kpp_call_count + 1   ! KPP dump step index (= ocean step)
 
 !$OMP PARALLEL DO
      DO node=1, myDim_nod2D+eDim_nod2D
@@ -348,13 +407,18 @@ contains
      !!PS Bo(node)  = -g * ( sw_alpha(1,node) * heat_flux(node)  / vcpw             &   !heat_flux & water_flux: positive up
      !!PS                  + sw_beta (1,node) * water_flux(node) * tr_arr(1,node,2))
      Bo(node)  = -g * ( sw_alpha(nzmin,node) * heat_flux(node)  / vcpw             &   !heat_flux & water_flux: positive up
-                      + sw_beta (nzmin,node) * water_flux(node) * tracers%data(2)%values(nzmin,node)) 
+                      + sw_beta (nzmin,node) * water_flux(node) * tracers%data(2)%values(nzmin,node))
   END DO
-      
-! compute interior mixing coefficients everywhere, due to constant 
+
+  ! K5 dump: driver pre-step inputs to bldepth (ustar/Bo + dVsq/dbsfc columns)
+  call kpp_dump_prestep(dVsq, dbsfc, partit, mesh)
+
+! compute interior mixing coefficients everywhere, due to constant
 ! internal wave activity, static instability, and local shear 
 ! instability.
      CALL ri_iwmix(viscA, diffK, dynamics, tracers, partit, mesh)
+     ! K3 dump: raw interior-mixing outputs (before bldepth/blmix combine)
+     call kpp_dump_riiwmix(viscA, diffK, partit, mesh)
 ! add double diffusion
      IF (double_diffusion) then
         CALL ddmix(diffK, tracers, partit, mesh)
@@ -364,6 +428,9 @@ contains
      CALL bldepth(partit, mesh)
 ! boundary layer diffusivities
      CALL blmix_kpp(viscA, diffK, partit, mesh)
+     ! K6 dump: blmix outputs (blmc/dkm1/ghats) BEFORE enhance (enhance modifies
+     ! blmc/ghats at kbl-1) — apples-to-apples with the incremental C driver.
+     call kpp_dump_blmix(partit, mesh)
 ! enhance diffusivity at interface kbl - 1
      CALL enhance(viscA, diffK, partit, mesh)
     
@@ -419,10 +486,221 @@ contains
         ! this is very helpful to avoid huge surface velocity when vertical
         ! viscosity is very small derived from the KPP scheme.
         ! I strongly recommend this trick, at least in the current FESOM version.    
-        IF (viscAE(nzmin,elem) < minmix) viscAE(nzmin,elem) = minmix    
+        IF (viscAE(nzmin,elem) < minmix) viscAE(nzmin,elem) = minmix
      END DO
 !$OMP END PARALLEL DO
+
+  ! K7/K8 dump: final per-node KPP outputs (the module-level gate). viscA is the
+  ! post-combine node viscosity that feeds viscAE; diffK(:,:,1) is the single Kv.
+  call kpp_dump_final(viscAE, viscA, diffK, partit, mesh)
+
   END SUBROUTINE oce_mixing_kpp
+
+  !=========================================================================
+  ! KPP dump helpers (FESOM_KPP_DUMP_DIR-gated). Mirror of fesom_kpp.c's
+  ! fesom_kpp_dump_nodes; same filename/format so scripts/kpp_dump_diff.py
+  ! reads both. Per-routine dump calls are added to each routine as it is
+  ! validated against the C; the driver bookends (prestep/final) land first.
+  !=========================================================================
+  subroutine kpp_dump_load_env()
+    integer            :: ios
+    character(len=32)  :: env_step
+    if (kpp_dump_loaded) return
+    call get_environment_variable('FESOM_KPP_DUMP_DIR', kpp_dump_dir, status=ios)
+    if (ios /= 0) kpp_dump_dir = ''
+    call get_environment_variable('FESOM_KPP_DUMP_STEP', env_step, status=ios)
+    if (ios == 0 .and. len_trim(env_step) > 0) then
+       read(env_step, *, iostat=ios) kpp_dump_step
+       if (ios /= 0) kpp_dump_step = 1
+    end if
+    kpp_dump_loaded = .true.
+  end subroutine kpp_dump_load_env
+
+  ! Write owned-node field(s) keyed by 1-based gid. vals is (ncomp, nnod) with
+  ! nnod = myDim_nod2D. Matches the C format exactly.
+  subroutine kpp_dump_nod(tag, ncomp, vals, partit, mesh)
+    character(len=*), intent(in)        :: tag
+    integer,          intent(in)        :: ncomp
+    real(kind=WP),    intent(in)        :: vals(:,:)
+    type(t_partit), intent(in), target  :: partit
+    type(t_mesh),   intent(in), target  :: mesh
+    integer            :: u, nn, c, ios, nnod
+    character(len=640) :: path
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    if (.not. kpp_dump_loaded) call kpp_dump_load_env()
+    if (len_trim(kpp_dump_dir) == 0) return
+    if (kpp_call_count /= kpp_dump_step) return
+    nnod = size(vals, 2)
+    write(path,'(a,"/kpp_dump_s",i0,"_",a,"_rank",i0,".txt")') &
+         trim(kpp_dump_dir), kpp_call_count, trim(tag), mype
+    open(newunit=u, file=trim(path), status='replace', action='write', iostat=ios)
+    if (ios /= 0) then
+       write(*,*) '[kpp_dump] cannot open ', trim(path)
+       return
+    end if
+    write(u,'("# step=",i0," tag=",a," rank=",i0," N=",i0," ncomp=",i0)') &
+         kpp_call_count, trim(tag), mype, nnod, ncomp
+    do nn=1, nnod
+       write(u,'(i0)', advance='no') myList_nod2D(nn)
+       do c=1, ncomp
+          write(u,'(" ",es24.16)', advance='no') vals(c, nn)
+       end do
+       write(u,'(a)') ''
+    end do
+    close(u)
+  end subroutine kpp_dump_nod
+
+  ! As kpp_dump_nod but per owned ELEMENT (keyed by 1-based element gid). For the
+  ! K7 viscAE element field. vals is (ncomp, nelem) with nelem = myDim_elem2D.
+  subroutine kpp_dump_elem(tag, ncomp, vals, partit, mesh)
+    character(len=*), intent(in)        :: tag
+    integer,          intent(in)        :: ncomp
+    real(kind=WP),    intent(in)        :: vals(:,:)
+    type(t_partit), intent(in), target  :: partit
+    type(t_mesh),   intent(in), target  :: mesh
+    integer            :: u, ne, c, ios, nel
+    character(len=640) :: path
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    if (.not. kpp_dump_loaded) call kpp_dump_load_env()
+    if (len_trim(kpp_dump_dir) == 0) return
+    if (kpp_call_count /= kpp_dump_step) return
+    nel = size(vals, 2)
+    write(path,'(a,"/kpp_dump_s",i0,"_",a,"_rank",i0,".txt")') &
+         trim(kpp_dump_dir), kpp_call_count, trim(tag), mype
+    open(newunit=u, file=trim(path), status='replace', action='write', iostat=ios)
+    if (ios /= 0) then
+       write(*,*) '[kpp_dump] cannot open ', trim(path)
+       return
+    end if
+    write(u,'("# step=",i0," tag=",a," rank=",i0," N=",i0," ncomp=",i0)') &
+         kpp_call_count, trim(tag), mype, nel, ncomp
+    do ne=1, nel
+       write(u,'(i0)', advance='no') myList_elem2D(ne)
+       do c=1, ncomp
+          write(u,'(" ",es24.16)', advance='no') vals(c, ne)
+       end do
+       write(u,'(a)') ''
+    end do
+    close(u)
+  end subroutine kpp_dump_elem
+
+  ! K5 bookend: driver pre-step inputs to bldepth.
+  subroutine kpp_dump_prestep(dVsq_in, dbsfc_in, partit, mesh)
+    real(kind=WP),  intent(in)          :: dVsq_in(:,:)    ! (nl, N)
+    real(kind=WP),  intent(in)          :: dbsfc_in(:,:)   ! (nl, N)
+    type(t_partit), intent(in), target  :: partit
+    type(t_mesh),   intent(in), target  :: mesh
+    real(kind=WP), allocatable :: tmp(:,:)
+    integer :: nn, myn
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    if (.not. kpp_dump_loaded) call kpp_dump_load_env()
+    if (len_trim(kpp_dump_dir) == 0) return
+    if (kpp_call_count /= kpp_dump_step) return
+    myn = myDim_nod2D
+    allocate(tmp(2, myn))
+    do nn=1, myn
+       tmp(1, nn) = ustar(nn)
+       tmp(2, nn) = Bo(nn)
+    end do
+    call kpp_dump_nod('prestep', 2, tmp, partit, mesh)
+    deallocate(tmp)
+    call kpp_dump_nod('dVsq',  nl, dVsq_in (1:nl, 1:myn), partit, mesh)
+    call kpp_dump_nod('dbsfc', nl, dbsfc_in(1:nl, 1:myn), partit, mesh)
+  end subroutine kpp_dump_prestep
+
+  ! K7/K8 bookend: final per-node outputs (module-level gate).
+  subroutine kpp_dump_final(viscAE_in, viscA_in, diffK_in, partit, mesh)
+    real(kind=WP),  intent(in)          :: viscAE_in(:,:)    ! (nl, elem)
+    real(kind=WP),  intent(in)          :: viscA_in(:,:)     ! (nl, N)
+    real(kind=WP),  intent(in)          :: diffK_in(:,:,:)   ! (nl, N, ntr)
+    type(t_partit), intent(in), target  :: partit
+    type(t_mesh),   intent(in), target  :: mesh
+    real(kind=WP), allocatable :: tmp(:,:)
+    integer :: nn, myn
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    if (.not. kpp_dump_loaded) call kpp_dump_load_env()
+    if (len_trim(kpp_dump_dir) == 0) return
+    if (kpp_call_count /= kpp_dump_step) return
+    myn = myDim_nod2D
+    allocate(tmp(5, myn))
+    do nn=1, myn
+       tmp(1, nn) = hbl(nn)
+       tmp(2, nn) = real(kbl(nn), WP)
+       tmp(3, nn) = bfsfc(nn)
+       tmp(4, nn) = stable(nn)
+       tmp(5, nn) = caseA(nn)
+    end do
+    call kpp_dump_nod('bldepth', 5, tmp, partit, mesh)
+    deallocate(tmp)
+    call kpp_dump_nod('viscA',  nl,   viscA_in(1:nl, 1:myn),    partit, mesh)
+    call kpp_dump_nod('diffKt', nl,   diffK_in(1:nl, 1:myn, 1), partit, mesh)
+    call kpp_dump_nod('diffKs', nl,   diffK_in(1:nl, 1:myn, 2), partit, mesh)
+    call kpp_dump_nod('ghats',  nl-1, ghats   (1:nl-1, 1:myn),  partit, mesh)
+    call kpp_dump_elem('viscAE', nl, viscAE_in(1:nl, 1:myDim_elem2D), partit, mesh)
+  end subroutine kpp_dump_final
+
+  ! K3 dump: raw ri_iwmix node outputs (viscA + diffK T/S channels).
+  subroutine kpp_dump_riiwmix(viscA_in, diffK_in, partit, mesh)
+    real(kind=WP),  intent(in)          :: viscA_in(:,:)     ! (nl, N)
+    real(kind=WP),  intent(in)          :: diffK_in(:,:,:)   ! (nl, N, ntr)
+    type(t_partit), intent(in), target  :: partit
+    type(t_mesh),   intent(in), target  :: mesh
+    integer :: myn
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    if (.not. kpp_dump_loaded) call kpp_dump_load_env()
+    if (len_trim(kpp_dump_dir) == 0) return
+    if (kpp_call_count /= kpp_dump_step) return
+    myn = myDim_nod2D
+    call kpp_dump_nod('ri_viscA',  nl, viscA_in(1:nl, 1:myn),    partit, mesh)
+    call kpp_dump_nod('ri_diffKt', nl, diffK_in(1:nl, 1:myn, 1), partit, mesh)
+    call kpp_dump_nod('ri_diffKs', nl, diffK_in(1:nl, 1:myn, 2), partit, mesh)
+    call kpp_dump_nod('ri_bvfreq', nl, bvfreq  (1:nl, 1:myn),    partit, mesh)
+  end subroutine kpp_dump_riiwmix
+
+  ! K6 dump: blmix_kpp outputs (blmc[3], ghats, dkm1[3]) — called right after
+  ! CALL blmix_kpp, BEFORE enhance (which modifies blmc/ghats at kbl-1). Matches
+  ! the C kpp_dump_blmix tags so scripts/kpp_dump_diff.py reads both.
+  subroutine kpp_dump_blmix(partit, mesh)
+    type(t_partit), intent(in), target  :: partit
+    type(t_mesh),   intent(in), target  :: mesh
+    real(kind=WP), allocatable :: tmp(:,:)
+    integer :: nn, myn
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    if (.not. kpp_dump_loaded) call kpp_dump_load_env()
+    if (len_trim(kpp_dump_dir) == 0) return
+    if (kpp_call_count /= kpp_dump_step) return
+    myn = myDim_nod2D
+    call kpp_dump_nod('blmc_m',   nl,   blmc(1:nl,   1:myn, 1), partit, mesh)
+    call kpp_dump_nod('blmc_t',   nl,   blmc(1:nl,   1:myn, 2), partit, mesh)
+    call kpp_dump_nod('blmc_s',   nl,   blmc(1:nl,   1:myn, 3), partit, mesh)
+    call kpp_dump_nod('bl_ghats', nl-1, ghats(1:nl-1, 1:myn),   partit, mesh)
+    allocate(tmp(3, myn))
+    do nn=1, myn
+       tmp(1, nn) = dkm1(nn, 1)
+       tmp(2, nn) = dkm1(nn, 2)
+       tmp(3, nn) = dkm1(nn, 3)
+    end do
+    call kpp_dump_nod('dkm1', 3, tmp, partit, mesh)
+    deallocate(tmp)
+  end subroutine kpp_dump_blmix
 
 
   !#######################################################################

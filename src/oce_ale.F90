@@ -3400,7 +3400,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     eta_n => dynamics%eta_n(:)
-    
+
     !___________________________________________________________________________
     t0=MPI_Wtime()
 !PS     water_flux = 0.0_WP
@@ -3778,6 +3778,38 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
         call dump_shim_record_node_2d(DUMP_SUBSTEP_ETA_N, n, 'eta_n', eta_n)
         ! --> eta_(n)
+        !=== DEBUG: per-step SSH-solve dump at one global node, to compare the
+        !=== implicit free surface against the identically-instrumented C port. ===
+        block
+          integer :: ssh_nn, ssh_kk, ssh_el, ssh_j, ssh_nd, ssh_ig
+          integer :: ssh_gids(2) = (/ 47138, 87875 /)
+          integer :: ssh_gid
+          real(kind=WP) :: ssh_smin, ssh_smax
+          ! Dump hbar + 1-ring hbar spread (the 2dx checkerboard indicator) at
+          ! both the old (47138) and new (87875) C-blow-up nodes, to compare the
+          ! SSH instability against the identically-instrumented C port.
+          do ssh_ig=1,2
+            ssh_gid = ssh_gids(ssh_ig)
+            do ssh_nn=1, myDim_nod2D
+              if (myList_nod2D(ssh_nn) == ssh_gid) then
+                ssh_smin = hbar(ssh_nn); ssh_smax = hbar(ssh_nn)
+                do ssh_kk=1, nod_in_elem2D_num(ssh_nn)
+                  ssh_el = nod_in_elem2D(ssh_kk, ssh_nn)
+                  do ssh_j=1,3
+                    ssh_nd = elem2D_nodes(ssh_j, ssh_el)
+                    ssh_smin = min(ssh_smin, hbar(ssh_nd))
+                    ssh_smax = max(ssh_smax, hbar(ssh_nd))
+                  end do
+                end do
+                write(*,'(a,i7,a,i6,a,es15.7,a,es15.7,a,es15.7,a,es12.4)') '[FSSH] gid=', ssh_gid, &
+                  ' step=', n, ' ssh_rhs=', dynamics%ssh_rhs(ssh_nn), &
+                  ' d_eta=', dynamics%d_eta(ssh_nn), ' hbar=', hbar(ssh_nn), &
+                  ' spread=', (ssh_smax - ssh_smin)
+                exit
+              end if
+            end do
+          end do
+        end block
         ! call zero_dynamics !DS, zeros several dynamical variables; to be used for testing new implementations!
         t5=MPI_Wtime()
 #if defined (FESOM_PROFILING)
@@ -3873,7 +3905,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
  
     !___________________________________________________________________________
     ! DEBUG: print max diagnostics before tracers (compare with C port)
-    if (n <= 50) then
+    if (n <= 50 .or. mod(n,100)==0) then
         block
             real(kind=WP) :: local_uv, local_ssh, local_pgf, global_uv, global_ssh, global_pgf
             local_uv  = maxval(abs(dynamics%uv(:,:,1:myDim_elem2D)))

@@ -74,8 +74,15 @@ subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
     real(kind=WP)            :: aux
     !___________________________________________________________________________
     ! pointer on necessary derived types
-    real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, a_ice, u_w, v_w
-    real(kind=WP), dimension(:), pointer  :: stress_iceoce_x, stress_iceoce_y  
+    real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, a_ice, u_w, v_w, m_ice
+    real(kind=WP), dimension(:), pointer  :: stress_iceoce_x, stress_iceoce_y
+    ! [forcing-diff dig] step-1 ice/stress dump state (FESOM_KPP_DUMP_DIR-gated)
+    integer,            save :: idump_call = 0, idump_step = 1
+    logical,            save :: idump_loaded = .false.
+    character(len=512), save :: idump_dir = ''
+    character(len=32)        :: idump_env
+    character(len=640)       :: idump_path
+    integer                  :: idump_u, idump_nn, idump_ios
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -83,6 +90,7 @@ subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
     u_ice           => ice%uice(:)
     v_ice           => ice%vice(:)
     a_ice           => ice%data(1)%values(:)
+    m_ice           => ice%data(2)%values(:)
     u_w             => ice%srfoce_u(:)
     v_w             => ice%srfoce_v(:)
     stress_iceoce_x => ice%stress_iceoce_x(:)
@@ -145,7 +153,39 @@ subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
 !$OMP END PARALLEL
     !___________________________________________________________________________
     if (use_cavity) call cavity_momentum_fluxes(dynamics, partit, mesh)
-  
+
+    !___________________________________________________________________________
+    ! [forcing-diff dig] step-1 ice/stress dump to pinpoint the sea-ice source of
+    ! the C-vs-Fortran step-1 ustar difference. 10 comps per owned node, same file
+    ! format as the KPP dumps (tag 'iceforce') so scripts/kpp_dump_diff.py reads it.
+    idump_call = idump_call + 1
+    if (.not. idump_loaded) then
+       call get_environment_variable('FESOM_KPP_DUMP_DIR', idump_dir, status=idump_ios)
+       if (idump_ios /= 0) idump_dir = ''
+       call get_environment_variable('FESOM_KPP_DUMP_STEP', idump_env, status=idump_ios)
+       if (idump_ios == 0 .and. len_trim(idump_env) > 0) then
+          read(idump_env, *, iostat=idump_ios) idump_step
+          if (idump_ios /= 0) idump_step = 1
+       end if
+       idump_loaded = .true.
+    end if
+    if (len_trim(idump_dir) > 0 .and. idump_call == idump_step) then
+       write(idump_path,'(a,"/kpp_dump_s",i0,"_iceforce_rank",i0,".txt")') &
+            trim(idump_dir), idump_call, mype
+       open(newunit=idump_u, file=trim(idump_path), status='replace', action='write', iostat=idump_ios)
+       if (idump_ios == 0) then
+          write(idump_u,'("# step=",i0," tag=iceforce rank=",i0," N=",i0," ncomp=10")') &
+               idump_call, mype, myDim_nod2D
+          do idump_nn=1, myDim_nod2D
+             write(idump_u,'(i0,10(" ",es24.16))') myList_nod2D(idump_nn), &
+                  a_ice(idump_nn), m_ice(idump_nn), u_ice(idump_nn), v_ice(idump_nn), &
+                  u_w(idump_nn), v_w(idump_nn), stress_iceoce_x(idump_nn), stress_iceoce_y(idump_nn), &
+                  stress_node_surf(1,idump_nn), stress_node_surf(2,idump_nn)
+          end do
+          close(idump_u)
+       end if
+    end if
+
 end subroutine oce_fluxes_mom
 !
 !

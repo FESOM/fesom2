@@ -1,3 +1,87 @@
+!_______________________________________________________________________________
+! Per-substep EVP dump for the C-port step-1 forcing comparison.
+! Writes the SAME text format as the C port's evp_dump (fesom2_port
+! src/fesom_ice_evp.c) so scripts/evp_dump_diff.py compares C-vs-Fortran
+! directly. Output is gid-keyed (owned nodes/elems only), so the diff is
+! partition-independent. Gated by FESOM_EVP_DUMP_DIR; a complete no-op when
+! unset (one branch per call). Dumps on EVP call 1 and 2 (== ocean step 1, 2).
+! NOTE: a dump run must use OMP_NUM_THREADS=1 — the '3'/'4' dump points sit
+! inside an !$OMP PARALLEL region and are only single-thread-safe. In normal
+! runs FESOM_EVP_DUMP_DIR is unset, so the dump bodies never execute.
+module fesom_evp_dump
+  implicit none
+  private
+  logical, save :: evpd_loaded = .false.
+  logical, save :: evpd_active = .false.
+  integer, save :: evpd_call   = 0
+  character(len=900), save :: evpd_dir = ''
+  public :: evp_dump_step, evp_dump_is_active, evp_dump_node, evp_dump_elem
+contains
+  ! Load env on first call, increment the call counter, return the new count.
+  integer function evp_dump_step() result(cnt)
+    integer :: ios, ln
+    if (.not. evpd_loaded) then
+      evpd_loaded = .true.
+      call get_environment_variable('FESOM_EVP_DUMP_DIR', evpd_dir, length=ln, status=ios)
+      evpd_active = (ios == 0 .and. ln > 0)
+    end if
+    evpd_call = evpd_call + 1
+    cnt = evpd_call
+  end function evp_dump_step
+
+  logical function evp_dump_is_active() result(a)
+    a = evpd_active
+  end function evp_dump_is_active
+
+  subroutine evp_dump_node(step, point, N, gids, rank, a, b, c, d, e)
+    integer, intent(in) :: step, N, rank
+    character(len=*), intent(in) :: point
+    integer, intent(in) :: gids(:)
+    real(kind=8), intent(in) :: a(:)
+    real(kind=8), intent(in), optional :: b(:), c(:), d(:), e(:)
+    call evp_dump_write(step, point, 'node', N, gids, rank, a, b, c, d, e)
+  end subroutine evp_dump_node
+
+  subroutine evp_dump_elem(step, point, N, gids, rank, a, b, c, d, e)
+    integer, intent(in) :: step, N, rank
+    character(len=*), intent(in) :: point
+    integer, intent(in) :: gids(:)
+    real(kind=8), intent(in) :: a(:)
+    real(kind=8), intent(in), optional :: b(:), c(:), d(:), e(:)
+    call evp_dump_write(step, point, 'elem', N, gids, rank, a, b, c, d, e)
+  end subroutine evp_dump_elem
+
+  subroutine evp_dump_write(step, point, cls, N, gids, rank, a, b, c, d, e)
+    integer, intent(in) :: step, N, rank
+    character(len=*), intent(in) :: point, cls
+    integer, intent(in) :: gids(:)
+    real(kind=8), intent(in) :: a(:)
+    real(kind=8), intent(in), optional :: b(:), c(:), d(:), e(:)
+    integer :: u, ios, nn
+    character(len=1024) :: path
+    if (.not. evpd_active) return
+    write(path,'(A,"/evp_dump_s",I0,"_",A,"_",A,"_rank",I0,".txt")') &
+         trim(evpd_dir), step, trim(point), trim(cls), rank
+    open(newunit=u, file=trim(path), status='replace', action='write', iostat=ios)
+    if (ios /= 0) then
+      write(0,'(A,A)') '[evp_dump] cannot open ', trim(path)
+      return
+    end if
+    write(u,'("# step=",I0," point=",A," array=",A," rank=",I0," N=",I0)') &
+         step, trim(point), trim(cls), rank, N
+    do nn = 1, N
+      write(u,'(I0)', advance='no') gids(nn)
+                          write(u,'(1x,ES24.16E3)', advance='no') a(nn)
+      if (present(b))     write(u,'(1x,ES24.16E3)', advance='no') b(nn)
+      if (present(c))     write(u,'(1x,ES24.16E3)', advance='no') c(nn)
+      if (present(d))     write(u,'(1x,ES24.16E3)', advance='no') d(nn)
+      if (present(e))     write(u,'(1x,ES24.16E3)', advance='no') e(nn)
+      write(u,'(A)') ''
+    end do
+    close(u)
+  end subroutine evp_dump_write
+end module fesom_evp_dump
+
 module ice_EVP_interfaces
     interface
         subroutine stress_tensor(ice, partit, mesh)
@@ -337,6 +421,7 @@ subroutine EVPdynamics(ice, partit, mesh)
     USE g_CONFIG
     USE g_comm_auto
     use ice_EVP_interfaces
+    use fesom_evp_dump
 #if defined (__icepack)
     use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
     use icedrv_main,   only: icepack_to_fesom
@@ -361,6 +446,8 @@ subroutine EVPdynamics(ice, partit, mesh)
     real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2, dte
     real(kind=WP)   :: zeta, delta_inv, d1, d2
     INTEGER         :: elem
+    integer         :: evpd_nstep
+    logical         :: dump_now
     !_______________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
@@ -423,6 +510,18 @@ subroutine EVPdynamics(ice, partit, mesh)
     rdt=ice%ice_dt/(1.0*ice%evp_rheol_steps)
     ax=cos(ice%theta_io)
     ay=sin(ice%theta_io)
+
+    !___________________________________________________________________________
+    ! C-port step-1 forcing comparison: dump EVP-entry inputs (gid-keyed text,
+    ! matches fesom2_port src/fesom_ice_evp.c). No-op unless FESOM_EVP_DUMP_DIR set.
+    evpd_nstep = evp_dump_step()
+    dump_now   = evp_dump_is_active() .and. (evpd_nstep <= 16)
+    if (dump_now) then
+       call evp_dump_node(evpd_nstep, 'Q', myDim_nod2D, myList_nod2D, mype, &
+            a_ice, m_ice, m_snow, elevation, ice%srfoce_temp)
+       call evp_dump_node(evpd_nstep, 'U0', myDim_nod2D, myList_nod2D, mype, &
+            u_ice, v_ice)
+    end if
 
     !___________________________________________________________________________
     ! Precompute values that are never changed during the iteration
@@ -644,6 +743,20 @@ subroutine EVPdynamics(ice, partit, mesh)
     !$ACC END PARALLEL LOOP
 #endif
     !___________________________________________________________________________
+    ! C-port comparison: dump precompute results (P) + EVP forcing inputs (F).
+    ! At step 1 (u_ice=u_w=0 at iter 0) the velocity update reads only F plus
+    ! the Q-derived inv_mass/u_rhs and mesh coriolis -> F (rotated wind-on-ice
+    ! stress) is the prime suspect for the polar step-1 u_ice difference.
+    if (dump_now) then
+       call evp_dump_node(evpd_nstep, 'P', myDim_nod2D, myList_nod2D, mype, &
+            inv_mass, inv_areamass, rhs_a, rhs_m)
+       call evp_dump_elem(evpd_nstep, 'P', myDim_elem2D, myList_elem2D, mype, &
+            ice_strength)
+       call evp_dump_node(evpd_nstep, 'F', myDim_nod2D, myList_nod2D, mype, &
+            stress_atmice_x, stress_atmice_y, u_w, v_w)
+    end if
+
+    !___________________________________________________________________________
     ! End of Precomputing --> And the ice stepping starts
 #if defined (__icepack)
     rdg_conv_elem(:)  = 0.0_WP
@@ -656,10 +769,16 @@ subroutine EVPdynamics(ice, partit, mesh)
 	!dir$ noinline
 #endif
         call stress_tensor(ice, partit, mesh)
+        if (dump_now .and. shortstep == 1) &
+           call evp_dump_elem(evpd_nstep, '1', myDim_elem2D, myList_elem2D, mype, &
+                ice%work%sigma11, ice%work%sigma12, ice%work%sigma22)
 #if defined(_CRAYFTN)
 	!dir$ noinline
 #endif
         call stress2rhs(ice, partit, mesh)
+        if (dump_now .and. shortstep == 1) &
+           call evp_dump_node(evpd_nstep, '2', myDim_nod2D, myList_nod2D, mype, &
+                u_rhs_ice, v_rhs_ice)
 
         !_______________________________________________________________________
 #ifndef ENABLE_OPENACC
@@ -714,6 +833,11 @@ subroutine EVPdynamics(ice, partit, mesh)
 #endif
         !_______________________________________________________________________
         ! apply sea ice velocity boundary condition
+        ! (C-port '3': iter-0 velocity, pre-BC. Inside !$OMP PARALLEL ->
+        !  dump run must use OMP_NUM_THREADS=1; no-op when dump inactive.)
+        if (dump_now .and. shortstep == 1) &
+           call evp_dump_node(evpd_nstep, '3', myDim_nod2D, myList_nod2D, mype, &
+                u_ice, v_ice)
 
 #ifndef ENABLE_OPENACC
 !$OMP DO
@@ -824,11 +948,18 @@ subroutine EVPdynamics(ice, partit, mesh)
 
 !write(*,*) partit%mype, shortstep, 'CP4'
         !_______________________________________________________________________
+        if (dump_now .and. shortstep == 1) &
+           call evp_dump_node(evpd_nstep, '4', myDim_nod2D, myList_nod2D, mype, &
+                u_ice, v_ice)
         call exchange_nod(U_ice,V_ice,partit, luse_g2g = .true.)
 
 !ifndef ENABLE_OPENACC
 !$OMP BARRIER
 !endif
     END DO !--> do shortstep=1, ice%evp_rheol_steps
+
+    if (dump_now) &
+       call evp_dump_node(evpd_nstep, 'END', myDim_nod2D, myList_nod2D, mype, &
+            u_ice, v_ice)
 
 end subroutine EVPdynamics
