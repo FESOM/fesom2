@@ -691,6 +691,32 @@ CONTAINS
          ! get first coefficients for time interpolation on model grid for all data
          call getcoeffld(fld_idx, rdate, partit, mesh)
       end do
+
+      ! On a rotated grid, rotate the INITIAL wind/stress interpolation
+      ! coefficients into the rotated frame. sbc_do applies this g2r rotation
+      ! only when coefficients are refreshed (do_rotation_wind, set inside the
+      ! getcoeffld branch). The first set loaded here was never rotated, so the
+      ! first forcing window's wind stress on BOTH ocean and ice stayed in the
+      ! geographic frame, mis-directed by the local g2r angle at cold start.
+      ! Magnitude-preserving, hence invisible to |stress|-based diagnostics
+      ! (u*, fluxes); it shows up in the ice/ocean momentum direction at the
+      ! first steps. Mirror the sbc_do rotation here.
+      if (l_xwind .and. rotated_grid) then
+!$OMP PARALLEL DO
+         do i=1, myDim_nod2D+eDim_nod2D
+            call vector_g2r(coef_a(i_xwind,i), coef_a(i_ywind,i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
+            call vector_g2r(coef_b(i_xwind,i), coef_b(i_ywind,i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
+         end do
+!$OMP END PARALLEL DO
+      end if
+      if (l_xstre .and. rotated_grid) then
+!$OMP PARALLEL DO
+         do i=1, myDim_nod2D+eDim_nod2D
+            call vector_g2r(coef_a(i_xstre,i), coef_a(i_ystre,i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
+            call vector_g2r(coef_b(i_xstre,i), coef_b(i_ystre,i), coord_nod2D(1,i), coord_nod2D(2,i), 0)
+         end do
+!$OMP END PARALLEL DO
+      end if
          ! interpolate in time
          
       !!PS if (partit%mype==0) then 
