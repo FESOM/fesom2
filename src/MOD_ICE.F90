@@ -759,8 +759,8 @@ subroutine ice_init(ice, partit, mesh)
         ice%vice_aux    = 0.0_WP
     end if
     if (ice%whichEVP == 2) then
-        allocate(ice%alpha_evp_array(  node_size))
-        allocate(ice%beta_evp_array(   node_size))
+        allocate(ice%alpha_evp_array(  elem_size))   ! element-indexed in stress_tensor_a/find_alpha_field_a
+        allocate(ice%beta_evp_array(   node_size))   ! node-indexed in ice_momentum_step_a
         ice%alpha_evp_array = ice%alpha_evp
         ice%beta_evp_array  = ice%alpha_evp
     end if
