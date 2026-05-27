@@ -220,27 +220,6 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
 
   call MPI_Allreduce(MPI_IN_PLACE, s_aux, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 
-  ! *** CG breakdown check ***
-  ! s_aux = p^T A p must be strictly positive for a SPD matrix.
-  ! If it is zero, negative, or NaN the matrix has lost positive definiteness
-  ! (ill-conditioned stiffness matrix, too large dt, or extreme ssh forcing).
-  ! Without this guard al = s_old/s_aux produces NaN/Inf which then silently
-  ! poisons d_eta -> UV -> Wvel through the rest of the time step.
-  if (s_aux <= 0.0_WP .or. s_aux /= s_aux) then
-      if (mype == 0) then
-          write(*,*)
-          write(*,*) '*** CG BREAKDOWN in ssh_solve_cg ***'
-          write(*,*) '    iter   = ', iter
-          write(*,*) '    s_aux  = p^T A p = ', s_aux   ! should be > 0
-          write(*,*) '    s_old  = r^T z   = ', s_old
-          write(*,*) '    rtol   = ', rtol
-          write(*,*) '    --> stiffness matrix lost positive definiteness'
-          write(*,*) '    --> likely cause: dt too large for mesh resolution,'
-          write(*,*) '    -->               extreme ssh forcing, or large dhe'
-      end if
-      exit   ! keep current X (d_eta) rather than overwriting it with NaN
-  end if
-
   al=s_old/s_aux
      ! ===========
      ! New X and residual r
