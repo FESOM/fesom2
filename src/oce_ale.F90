@@ -3443,8 +3443,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         call calc_cvmix_idemix(partit, mesh)
     elseif (mod(mix_scheme_nmb,10)==7) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_idemix2'//achar(27)//'[0m'
-        ! if (flag_debug .and. mype==0)  print *, achar(27)//'[31m'//'     --> call calc_cvmix_idemix2'//achar(27)//'[0m'
-        call calc_cvmix_idemix2(partit, mesh)
+        call calc_cvmix_idemix2(n, partit, mesh)
     end if 
 #endif    
 
@@ -3859,22 +3858,23 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     rtime_oce_solvetra = rtime_oce_solvetra + (t9-t8)
     rtime_tot          = rtime_tot          + (t11-t0)-(t11-t10)
     if(mod(n,logfile_outfreq)==0 .and. mype==0) then  
+        write(*,*)
         write(*,*) '___ALE OCEAN STEP EXECUTION TIMES______________________'
-        write(*,"(A, ES10.3)") '     Oce. Press, Dens.:', t1-t0
-        write(*,"(A, ES10.3)") '     Oce. Mixing      :', t2-t1
-        write(*,"(A, ES10.3)") '     Oce. Dynamics    :', t3-t2
-        write(*,"(A, ES10.3)") '     Oce. Update Vel. :', t5-t4
-        write(*,"(A, ES10.3)") '     Oce. Fer-GM.     :', t7-t6
+        write(*,"(A, ES10.3, A, F6.2, A)") '     Oce. Press, Dens.:', t1-t0,    '  (', 100.0*(t1-t0)/(t11-t0),    '%)'
+        write(*,"(A, ES10.3, A, F6.2, A)") '     Oce. Mixing      :', t2-t1,    '  (', 100.0*(t2-t1)/(t11-t0),    '%)'
+        write(*,"(A, ES10.3, A, F6.2, A)") '     Oce. Dynamics    :', t3-t2,    '  (', 100.0*(t3-t2)/(t11-t0),    '%)'
+        write(*,"(A, ES10.3, A, F6.2, A)") '     Oce. Update Vel. :', t5-t4,    '  (', 100.0*(t5-t4)/(t11-t0),    '%)'
+        write(*,"(A, ES10.3, A, F6.2, A)") '     Oce. Fer-GM.     :', t7-t6,    '  (', 100.0*(t7-t6)/(t11-t0),    '%)'
         write(*,*) '    _______________________________'
-        write(*,"(A, ES10.3)") '     ALE-Solve SSH    :', t4-t3
-        write(*,"(A, ES10.3)") '     ALE-Calc. hbar   :', t6-t5
-        write(*,"(A, ES10.3)") '     ALE-Update+W     :', t8-t7
-        write(*,"(A, ES10.3)") '     ALE-Solve Tracer :', t9-t8
-        write(*,"(A, ES10.3)") '     ALE-Update hnode :', t10-t9
+        write(*,"(A, ES10.3, A, F6.2, A)") '     ALE-Solve SSH    :', t4-t3,    '  (', 100.0*(t4-t3)/(t11-t0),    '%)'
+        write(*,"(A, ES10.3, A, F6.2, A)") '     ALE-Calc. hbar   :', t6-t5,    '  (', 100.0*(t6-t5)/(t11-t0),    '%)'
+        write(*,"(A, ES10.3, A, F6.2, A)") '     ALE-Update+W     :', t8-t7,    '  (', 100.0*(t8-t7)/(t11-t0),    '%)'
+        write(*,"(A, ES10.3, A, F6.2, A)") '     ALE-Solve Tracer :', t9-t8,    '  (', 100.0*(t9-t8)/(t11-t0),    '%)'
+        write(*,"(A, ES10.3, A, F6.2, A)") '     ALE-Update hnode :', t10-t9,   '  (', 100.0*(t10-t9)/(t11-t0),   '%)'
         write(*,*) '    _______________________________'
-        write(*,"(A, ES10.3)") '     check for blowup :', t11-t10
+        write(*,"(A, ES10.3, A, F6.2, A)") '     check for blowup :', t11-t10,  '  (', 100.0*(t11-t10)/(t11-t0),  '%)'
         write(*,*) '    _______________________________'
-        write(*,"(A, ES10.3)") '     Oce. TOTAL       :', t11-t0
+        write(*,"(A, ES10.3)")             '     Oce. TOTAL       :', t11-t0
         write(*,*)
         write(*,*)
     end if    
