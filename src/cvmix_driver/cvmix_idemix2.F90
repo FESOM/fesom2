@@ -1030,24 +1030,30 @@ end subroutine compute_vdiff_vdiss_Eiw
 ! Integrate vertical part of internal wave energy idemix equation, solve vertical 
 ! diffusion an dissipation implicitly over the water column. Keep in mind Eiw lives 
 ! on the full depth levels
-subroutine compute_Eiw_waveinteract(  &
-                nlev                , & 
-                nfbin               , &
-                dzw                 , &
-                dphi                , &
-                dt                  , &
-                E_iw_old            , &
-                E_iw_new            , &
-                E_M2_old            , &
-                E_M2_new            , &
-                E_M2_struct         , &
-                alpha_M2_c          , &
-                tau_M2              , &
-                E_niw_old           , &
-                E_niw_new           , &
-                E_niw_struct        , &
-                tau_niw             , &
-                idemix2_const_userdef &
+subroutine compute_Eiw_waveinteract(    &
+                  nlev                  & 
+                , nfbin                 &
+                , dzw                   &
+                , dphi                  &
+                , dt                    &
+                , flag_posdef           &
+                , E_iw_old              &
+                , E_iw_new              &
+                , E_M2_old              &
+                , E_M2_new              &
+                , E_M2_struct           &
+                , alpha_M2_c            &
+                , tau_M2                &
+                , E_niw_old             &
+                , E_niw_new             &
+                , E_niw_struct          &
+                , tau_niw               &
+                , idemix2_const_userdef &
+                , E_iw_dt               &
+                , E_iw_diss_M2          &
+                , E_iw_diss_niw         &
+                , E_M2_dt               &
+                , E_M2_diss_wwi         &
                 )
     !___Input/Output____________________________________________________________
     type(idemix2_type), intent(in   ), optional, target :: idemix2_const_userdef
@@ -1056,6 +1062,7 @@ subroutine compute_Eiw_waveinteract(  &
     real(cvmix_r8)    , intent(in   )                   :: dzw(nlev-1)   ! --> layer thickness
     real(cvmix_r8)    , intent(in   )                   :: dphi(nfbin) 
     real(cvmix_r8)    , intent(in   )                   :: dt
+    logical    , intent(in   )                          :: flag_posdef
     real(cvmix_r8)    , intent(in   )                   :: E_iw_old(nlev)
     real(cvmix_r8)    , intent(inout)                   :: E_iw_new(nlev)
     real(cvmix_r8)    , intent(in   ), optional         :: E_M2_old(nfbin)
@@ -1066,11 +1073,19 @@ subroutine compute_Eiw_waveinteract(  &
     real(cvmix_r8)    , intent(in   ), optional         :: E_niw_old(nfbin)
     real(cvmix_r8)    , intent(inout), optional         :: E_niw_new(nfbin)
     real(cvmix_r8)    , intent(in   ), optional         :: E_niw_struct(nfbin)
-    real(cvmix_r8)    , optional                        :: tau_niw
+    real(cvmix_r8)    , intent(in   ), optional         :: tau_niw
+    
+    ! optional diagnostics
+    real(cvmix_r8)    , intent(inout), optional         :: E_iw_dt(nlev)
+    real(cvmix_r8)    , intent(inout), optional         :: E_iw_diss_M2(nlev)
+    real(cvmix_r8)    , intent(inout), optional         :: E_iw_diss_niw(nlev)
+    real(cvmix_r8)    , intent(inout), optional         :: E_M2_dt(nfbin)
+    real(cvmix_r8)    , intent(inout), optional         :: E_M2_diss_wwi(nfbin)
     
     !___Local___________________________________________________________________
     integer                                             :: nz, fbini 
-    real(cvmix_r8)                                      :: vint, sint, aM2c, M2_diss, fmin, small=1.0e-12_cvmix_r8 
+    real(cvmix_r8)                                      :: vint, sint, aM2c, fmin, small=1.0e-12_cvmix_r8
+    real(cvmix_r8), dimension(:)                        :: M2_diss(nfbin),  IW_diss(nlev)
     type(idemix2_type), pointer                         :: idemix2_const_in     
     
     ! do pointer into save variable or into user defined input variable 
@@ -1098,45 +1113,39 @@ subroutine compute_Eiw_waveinteract(  &
             sint = sint + E_M2_old(fbini)*dphi(fbini)
         end do
         
+        ! initialise M2 WWI dissipation
+        M2_diss = 0.0_cvmix_r8
+        
         ! update M2 energy: interaction of M2 and continuum
         aM2c = alpha_M2_c
         aM2c = max(0.0_cvmix_r8,min(aM2c,1./max(small,dt*vint))) ! FP 2020
         aM2c = max(0.0_cvmix_r8,min(aM2c,1./max(small,dt*sint)))
-        do fbini = 2, nfbin-1
-            M2_diss         = aM2c*vint*E_M2_old(fbini)
-            M2_diss         = min(M2_diss, E_M2_new(fbini)/max(small,dt))
-            E_M2_new(fbini) = E_M2_new(fbini)-dt*M2_diss 
-            E_M2_new(fbini) = max(0.0_cvmix_r8, E_M2_new(fbini))
-!             if (E_M2_new(fbini)/=E_M2_new(fbini) .or. E_M2_new(fbini)<0.0_cvmix_r8) then 
-!                 write(*,*) " }-))))°> found negative/NaN E_M2_new from WWI M2", E_M2_new(fbini)
-!                 write(*,*) "fbini           = ", fbini
-!                 write(*,*) "E_M2_new(fbini) = ", E_M2_new(fbini)
-!                 write(*,*) "E_M2_old(fbini) = ", E_M2_old(fbini)
-!                 write(*,*) "M2_diss         = ", -dt*M2_diss
-!                 write(*,*) "aM2c            = ", aM2c
-!                 write(*,*) "vint            = ", vint
-!             end if
-        end do     
         
-        ! update E_iw from E_M2
+        do fbini = 2, nfbin-1
+            M2_diss(fbini)  = aM2c*vint*E_M2_old(fbini)
+            M2_diss(fbini)  = min(M2_diss(fbini), E_M2_new(fbini)/max(small,dt))
+            E_M2_new(fbini) = E_M2_new(fbini)-dt*M2_diss(fbini)
+            E_M2_new(fbini) = merge(max(0.0_cvmix_r8, E_M2_new(fbini)), E_M2_new(fbini), flag_posdef)
+        end do    
+        
+        ! optional M2 WWI diagnostic
+        if (present(E_M2_dt))       E_M2_dt(:) = E_M2_dt(:) - dt*M2_diss(:)
+        if (present(E_M2_diss_wwi)) E_M2_diss_wwi(:) = -dt*M2_diss(:)
+        
+        ! update E_iw from E_M2 through wave-wave-interaction
+        IW_diss(:) = 0.0_cvmix_r8
         do nz = 1, nlev
             fmin = min( 0.5_cvmix_r8/dt,aM2c*vint ) ! flux limiter
-            E_iw_new(nz) =   E_iw_new(nz) &
-                              + dt * tau_M2* sint * E_M2_struct(nz) &
-                              + dt * fmin  * sint * E_M2_struct(nz)
-            E_iw_new(nz) = max(0.0_cvmix_r8, E_iw_new(nz))                 
-!             if (E_iw_new(nz)/=E_iw_new(nz) .or. E_iw_new(nz)<0.0_cvmix_r8) then 
-!                 write(*,*) " }-))))°> found negative/NaN Eiw_new from WWI M2", E_iw_new(nz)
-!                 write(*,*) "nz              = ", nz
-!                 write(*,*) "E_iw_new(nz)    = ", E_iw_new(nz)
-!                 write(*,*) "E_M2_new        = ", minval(E_M2_new), maxval(E_M2_new)
-!                 write(*,*) "E_M2_old        = ", minval(E_M2_old), maxval(E_M2_old)
-!                 write(*,*) "tau_M2          = ", tau_M2
-!                 write(*,*) "fmin            = ", fmin
-!                 write(*,*) "sint            = ", sint
-!                 write(*,*) "E_M2_struct(nz) = ", E_M2_struct(nz)
-!             end if                   
+            IW_diss(nz)  =   dt * tau_M2* sint * E_M2_struct(nz) &
+                           + dt * fmin  * sint * E_M2_struct(nz)
+            E_iw_new(nz) =   E_iw_new(nz) + IW_diss(nz)
+            E_iw_new(nz) = merge(max(0.0_cvmix_r8, E_iw_new(nz)), E_iw_new(nz), flag_posdef)
         end do
+        
+        ! optional E_iw diagnostic
+        if (present(E_iw_dt))      E_iw_dt      = E_iw_dt + IW_diss
+        if (present(E_iw_diss_M2)) E_iw_diss_M2 = IW_diss
+        
     end if
     
     !___________________________________________________________________________
@@ -1147,20 +1156,18 @@ subroutine compute_Eiw_waveinteract(  &
             sint = sint + E_niw_old(fbini)*dphi(fbini)
         end do
         
-        ! update E_iw from E_niw
+        ! update E_iw from E_niw through wave-wave-interaction
+        IW_diss(:) = 0.0_cvmix_r8
         do nz = 1, nlev
-            E_iw_new(nz) =   E_iw_new(nz) &
-                              + dt * tau_niw * sint * E_niw_struct(nz)
-            E_iw_new(nz) = max(0.0_cvmix_r8, E_iw_new(nz))                  
-!             if (E_iw_new(nz)/=E_iw_new(nz) .or. E_iw_new(nz)<0.0_cvmix_r8 ) then 
-!                 write(*,*) " }-))))°> found negative/NaN Eiw_new from WWI NIW", E_iw_new(nz)
-!                 write(*,*) "nz              = ", nz
-!                 write(*,*) "E_iw_new(nz)    = ", E_iw_new(nz)
-!                 write(*,*) "tau_niw         = ", tau_niw
-!                 write(*,*) "sint            = ", sint
-!                 write(*,*) "E_niw_struct(nz)= ", E_niw_struct(nz)
-!             end if 
+            IW_diss(nz)  =   dt * tau_niw * sint * E_niw_struct(nz)
+            E_iw_new(nz) =   E_iw_new(nz) + IW_diss(nz)
+            E_iw_new(nz) = merge(max(0.0_cvmix_r8, E_iw_new(nz)), E_iw_new(nz), flag_posdef)
         end do
+        
+        ! optional E_iw diagnostic
+        if (present(E_iw_dt))       E_iw_dt       = E_iw_dt + IW_diss
+        if (present(E_iw_diss_niw)) E_iw_diss_niw = IW_diss
+        
     end if
 end subroutine compute_Eiw_waveinteract
 

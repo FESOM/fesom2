@@ -31,7 +31,7 @@ module g_cvmix_idemix2
     
     !___________________________________________________________________________
     ! module calls from FESOM
-    use g_config , only: dt, flag_debug
+    use g_config , only: dt, flag_debug, logfile_outfreq
     use o_param           
     use MOD_MESH
     USE MOD_PARTIT
@@ -173,40 +173,55 @@ module g_cvmix_idemix2
     ! CVMIX-IDEMIX variables
     real(kind=WP), allocatable, dimension(:)    :: iwe2_phit, iwe2_phiu, iwe2_dphit, iwe2_dphiu
     
-    ! M2 related global variables
+    !
+    ! --- M2 related global variables ---
     real(kind=WP)                               :: iwe2_omega_M2 
     real(kind=WP), allocatable, dimension(:,:,:):: iwe2_M2_uv, iwe2_E_M2, iwe2_E_M2_divh, iwe2_E_M2_divs
     real(kind=WP), allocatable, dimension(:,:)  :: iwe2_M2_w, iwe2_fM2, iwe2_E_M2_struct 
     real(kind=WP), allocatable, dimension(:)    :: w_M2_e, iwe2_alpha_M2_c, iwe2_M2_tau    
-    real(kind=WP), allocatable, dimension(:,:)  :: iwe2_E_M2_dt, iwe2_E_M2_advh, iwe2_E_M2_advs, iwe2_E_M2_diss, iwe2_E_M2_forc
-    real(kind=WP), allocatable, dimension(:,:)  :: iwe2_M2_div_uv
-
-    ! niw related global variables
+    
+    ! optional diagnostic
+    real(kind=WP), allocatable, dimension(:,:)  :: iwe2_E_M2_dt  ,                     &
+                                                   iwe2_E_M2_advh, iwe2_E_M2_advs    , &
+                                                   iwe2_E_M2_diss, iwe2_E_M2_diss_wwi, &
+                                                   iwe2_E_M2_forc
+    
+    
+    ! --- niw related global variables --- 
     real(kind=WP), allocatable, dimension(:)    :: iwe2_omega_niw
     real(kind=WP), allocatable, dimension(:,:,:):: iwe2_niw_uv, iwe2_E_niw, iwe2_E_niw_divh, iwe2_E_niw_divs
     real(kind=WP), allocatable, dimension(:,:)  :: iwe2_niw_w, iwe2_fniw, iwe2_E_niw_struct
     real(kind=WP), allocatable, dimension(:)    :: w_niw_e, iwe2_niw_tau
-    real(kind=WP), allocatable, dimension(:,:)  :: iwe2_E_niw_dt, iwe2_E_niw_advh, iwe2_E_niw_advs, iwe2_E_niw_diss, iwe2_E_niw_forc
-    real(kind=WP), allocatable, dimension(:,:)  :: iwe2_niw_div_uv
     
-    ! general idemix variable
+    ! optional diagnostic
+    real(kind=WP), allocatable, dimension(:,:)  :: iwe2_E_niw_dt  ,                      & 
+                                                   iwe2_E_niw_advh, iwe2_E_niw_advs    , &
+                                                   iwe2_E_niw_diss,                      &
+                                                   iwe2_E_niw_forc
+    
+    ! --- Eiw - internal wave energy related variables ---
+    real(kind=WP), allocatable, dimension(:,:,:):: iwe2_E_iw
+    real(kind=WP), allocatable, dimension(:,:)  :: iwe2_E_iw_diss
+    real(kind=WP), allocatable, dimension(:)    :: iwe_E_iw_vint
+    
+    ! optional diagnostic
+    real(kind=WP), allocatable, dimension(:,:)  :: iwe2_E_iw_dt, iwe2_E_iw_fbot, & 
+                                                   iwe2_E_iw_vdif, iwe2_E_iw_hdif
+    real(kind=WP), allocatable, dimension(:)    :: iwe2_E_iw_fsrf
+    real(kind=WP), allocatable, dimension(:,:)  :: iwe2_E_iw_diss_M2, iwe2_E_iw_diss_niw
+    
+    real(kind=WP), allocatable, dimension(:,:)  :: iwe2_Av
+    
+    ! --- general idemix variable ---
     real(kind=WP), allocatable, dimension(:)    :: iwe2_cn
     real(kind=WP), allocatable, dimension(:,:)  :: iwe2_c0, iwe2_v0, iwe2_alpha_c
     
-    ! forcing realted variables
+    ! --- forcing realted variables ---
     real(kind=WP), allocatable, dimension(:)    :: iwe2_topo_hrms, iwe2_topo_hlam, iwe2_topo_dist
     real(kind=WP), allocatable, dimension(:)    :: iwe2_fbot_e, iwe2_fleew, iwe2_fsrf
     real(kind=WP), allocatable, dimension(:,:)  :: iwe2_fbot
     
-    ! Eiw - internal wave energy related variables
-    real(kind=WP), allocatable, dimension(:,:,:):: iwe2_E_iw
-    real(kind=WP), allocatable, dimension(:,:)  :: iwe2_E_iw_diss, iwe2_E_iw_dt, iwe2_E_iw_fbot, & 
-                                                   iwe2_E_iw_vdif, iwe2_E_iw_hdif
-    real(kind=WP), allocatable, dimension(:)    :: iwe2_E_iw_fsrf, iwe_E_iw_vint
-    
-    real(kind=WP), allocatable, dimension(:,:)  :: iwe2_Av
-    
-    ! support variables 
+    ! --- support variables ---
     real(kind=WP), allocatable, dimension(:)    :: vol_nodB2T
     real(kind=WP), allocatable, dimension(:,:)  :: vol_wcelli
     integer      , allocatable, dimension(:,:)  :: edge_up_dn_tri      
@@ -341,7 +356,10 @@ module g_cvmix_idemix2
         ! initialise Eiw - internal wave energy variables
         ! index (1:3,...) timestep index E^(n-1), E^(n), E^(n+1)
         allocate(iwe2_E_iw(   3, nl, node_size))
-        allocate(iwe2_E_iw_diss(nl, node_size), iwe2_E_iw_dt(nl, node_size), iwe2_E_iw_fbot(nl, node_size))
+        allocate( iwe2_E_iw_diss(nl, node_size) &
+                , iwe2_E_iw_dt(  nl, node_size) &
+                , iwe2_E_iw_fbot(nl, node_size) &
+                )
         allocate(iwe2_E_iw_vdif(nl, node_size), iwe2_E_iw_hdif(nl, node_size))
         allocate(iwe2_E_iw_fsrf(node_size))
         iwe2_E_iw(     :,:,:)= 0.0_WP
@@ -356,6 +374,10 @@ module g_cvmix_idemix2
         
         ! initialise M2 variables 
         if (idemix2_enable_M2) then 
+            ! dissipation of E_iw through E_M2
+            allocate( iwe2_E_iw_diss_M2(nl, node_size))
+            iwe2_E_iw_diss_M2(:,:)= 0.0_WP
+        
             ! M2 energy dissipation
             allocate(iwe2_alpha_M2_c(node_size))
             iwe2_alpha_M2_c(:)    = 0.0_WP
@@ -374,9 +396,6 @@ module g_cvmix_idemix2
             allocate(iwe2_M2_w(    nfbin,node_size))
             iwe2_M2_uv(:,:,:)     = 0.0_WP
             iwe2_M2_w(:,:)        = 0.0_WP
-            
-            allocate(iwe2_M2_div_uv(    nfbin,elem_size))
-            iwe2_M2_div_uv        = 0.0_WP
             
             ! M2 forcing
             allocate(iwe2_fM2(nfbin, node_size))
@@ -397,22 +416,28 @@ module g_cvmix_idemix2
             iwe2_E_M2_struct(:,:) = 0.0_WP
             
             ! diagnostic for M2 spectral energy advection 
-            allocate(  iwe2_E_M2_dt(  nfbin, myDim_nod2D)  &
-                     , iwe2_E_M2_advh(nfbin, myDim_nod2D)  &
-                     , iwe2_E_M2_advs(nfbin, myDim_nod2D)  &
-                     , iwe2_E_M2_diss(nfbin, myDim_nod2D)  &
-                     , iwe2_E_M2_forc(nfbin, myDim_nod2D)  &
+            allocate(  iwe2_E_M2_dt(      nfbin, myDim_nod2D) & ! total change in E_M2
+                     , iwe2_E_M2_advh(    nfbin, myDim_nod2D) &
+                     , iwe2_E_M2_advs(    nfbin, myDim_nod2D) &
+                     , iwe2_E_M2_diss(    nfbin, myDim_nod2D) &
+                     , iwe2_E_M2_diss_wwi(nfbin, myDim_nod2D) &
+                     , iwe2_E_M2_forc(    nfbin, myDim_nod2D) &
                      )
-            iwe2_E_M2_dt(  :,:)   = 0.0_WP
-            iwe2_E_M2_advh(:,:)   = 0.0_WP
-            iwe2_E_M2_advs(:,:)   = 0.0_WP
-            iwe2_E_M2_diss(:,:)   = 0.0_WP
-            iwe2_E_M2_forc(:,:)   = 0.0_WP
+            iwe2_E_M2_dt(      :,:) = 0.0_WP
+            iwe2_E_M2_advh(    :,:) = 0.0_WP
+            iwe2_E_M2_advs(    :,:) = 0.0_WP
+            iwe2_E_M2_diss(    :,:) = 0.0_WP
+            iwe2_E_M2_diss_wwi(:,:) = 0.0_WP
+            iwe2_E_M2_forc(    :,:) = 0.0_WP
             
         end if 
         
         ! initialise niw variables 
         if (idemix2_enable_niw) then 
+            ! dissipation of E_iw through E_M2
+            allocate( iwe2_E_iw_diss_niw(nl, node_size))
+            iwe2_E_iw_diss_niw(:,:)= 0.0_WP
+            
             ! niw frequency
             allocate(iwe2_omega_niw(node_size))
             iwe2_omega_niw(:)      = 0.0_WP
@@ -432,18 +457,15 @@ module g_cvmix_idemix2
             iwe2_niw_uv(:,:,:)     = 0.0_WP
             iwe2_niw_w(:,:)        = 0.0_WP
             
-            allocate(iwe2_niw_div_uv(    nfbin,elem_size))
-            iwe2_niw_div_uv        = 0.0_WP
-            
             ! niw forcing
             allocate(iwe2_fniw(nfbin, node_size))
             iwe2_fniw(:,:)         = 0.0_WP
             
             ! niw wave energy, and divergence of niw wave energy 
             ! index (1:3,...) timestep index E^(n-1), E^(n), E^(n+1)
-            allocate(  iwe2_E_niw(     3, nfbin, node_size)   &
-                     , iwe2_E_niw_divh(3, nfbin, node_size)   &
-                     , iwe2_E_niw_divs(3, nfbin, node_size)   &
+            allocate(  iwe2_E_niw(     3, nfbin, node_size) &
+                     , iwe2_E_niw_divh(3, nfbin, node_size) &
+                     , iwe2_E_niw_divs(3, nfbin, node_size) &
                      )
             iwe2_E_niw(      :,:,:)= 0.0_WP
             iwe2_E_niw_divh( :,:,:)= 0.0_WP
@@ -454,17 +476,17 @@ module g_cvmix_idemix2
             iwe2_E_niw_struct(:,:) = 0.0_WP
         
             ! diagnostic for niw spectral energy advection 
-            allocate(  iwe2_E_niw_dt(  nfbin, myDim_nod2D)   &
-                     , iwe2_E_niw_advh(nfbin, myDim_nod2D)   &
-                     , iwe2_E_niw_advs(nfbin, myDim_nod2D)   &
-                     , iwe2_E_niw_diss(nfbin, myDim_nod2D)   &
-                     , iwe2_E_niw_forc(nfbin, myDim_nod2D)   &
+            allocate(  iwe2_E_niw_dt(      nfbin, myDim_nod2D) &
+                     , iwe2_E_niw_advh(    nfbin, myDim_nod2D) &
+                     , iwe2_E_niw_advs(    nfbin, myDim_nod2D) &
+                     , iwe2_E_niw_diss(    nfbin, myDim_nod2D) &
+                     , iwe2_E_niw_forc(    nfbin, myDim_nod2D) &
                      )
-            iwe2_E_niw_dt(  :,:)   = 0.0_WP
-            iwe2_E_niw_advh(:,:)   = 0.0_WP
-            iwe2_E_niw_advs(:,:)   = 0.0_WP
-            iwe2_E_niw_diss(:,:)   = 0.0_WP
-            iwe2_E_niw_forc(:,:)   = 0.0_WP
+            iwe2_E_niw_dt(      :,:) = 0.0_WP
+            iwe2_E_niw_advh(    :,:) = 0.0_WP
+            iwe2_E_niw_advs(    :,:) = 0.0_WP
+            iwe2_E_niw_diss(    :,:) = 0.0_WP
+            iwe2_E_niw_forc(    :,:) = 0.0_WP
             
         end if 
         
@@ -576,9 +598,10 @@ module g_cvmix_idemix2
                     write(*,*) '____________________________________________________________________'
                     print *, achar(27)//'[0m'
                     write(*,*)
+                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
                 end if
             end if 
-            if (.not. file_exist) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            
             t1=MPI_Wtime()
             if (mype==0) write(*,*) '     │  └> elapsed time:', t1-t0
         end if ! --> if (idemix2_enable_M2) then
@@ -638,9 +661,10 @@ module g_cvmix_idemix2
                 write(*,*) '____________________________________________________________________'
                 print *, achar(27)//'[0m'
                 write(*,*)
+                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
             end if
         end if 
-        if (.not. file_exist) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+        
         
         ! NIWs are super-inertial (ω_niw > |f|), which is essential for their propagation as internal waves.
         ! The factor 1.05 ensures the frequency is 5% above the local inertial frequency.
@@ -721,9 +745,9 @@ module g_cvmix_idemix2
                     write(*,*) '____________________________________________________________________'
                     print *, achar(27)//'[0m'
                     write(*,*)
+                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
                 end if 
             end if 
-            if (.not. file_exist) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
             t1=MPI_Wtime()
             if (mype==0) write(*,*) '     │  └> elapsed time:', t1-t0
         end if !--> if (idemix2_enable_bot) then
@@ -753,9 +777,9 @@ module g_cvmix_idemix2
 !                     write(*,*) '____________________________________________________________________'
 !                     print *, achar(27)//'[0m'
 !                     write(*,*)
+!                     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
 !                 end if
 !             end if 
-!             if (.not. file_exist) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
 !         end if ! --> if (idemix2_enable_leew) then 
         
         !_______________________________________________________________________
@@ -781,9 +805,9 @@ module g_cvmix_idemix2
                     write(*,*) '____________________________________________________________________'
                     print *, achar(27)//'[0m'
                     write(*,*)
+                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
                 end if
             end if 
-            if (.not. file_exist) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
             
             ! topo_hlam (Topographic Wavelength), Definition: Characteristic horizontal length scale of topographic features.
             ! Units: Meters (m), Role: Represents the dominant wavelength of seafloor roughness. Used to normalize the topographic forcing.
@@ -805,8 +829,7 @@ module g_cvmix_idemix2
                     write(*,*)
                     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
                 end if
-            end if 
-            if (.not. file_exist) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            end if
             
             ! In the M2 tidal and NIW energy calculations:
             !  --> fxc = topo_hrms(i,j)**2 * 2*pi / (1d-12 + topo_lam(i,j))
@@ -887,8 +910,9 @@ module g_cvmix_idemix2
     !
     !===========================================================================
     ! calculate IDEMIX2 internal wave energy and its dissipation
-    subroutine calc_cvmix_idemix2(partit, mesh)   
+    subroutine calc_cvmix_idemix2(istep, partit, mesh)   
         implicit none
+        integer,        intent(in)            :: istep
         type(t_mesh),   intent(in),    target :: mesh
         type(t_partit), intent(inout), target :: partit
         integer       :: node, elem, edge, node_size, elem_size, k, fbini, nfbin, nodeH_size, elemH_size
@@ -898,6 +922,10 @@ module g_cvmix_idemix2
         real(kind=WP) :: cn, cn_e, cn_gradx_e, cn_grady_e, omega_niw_e
         logical       :: topo_shelf=.False.
         logical       :: debug=.false.
+        ! Timing variables
+        real(kind=WP) :: t_start, t_end, t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10
+        real(kind=WP) :: time_params, time_groupvel, time_M2_integ, time_niw_integ
+        real(kind=WP) :: time_Eiw_vdiff, time_Eiw_hdiff, time_waveint, time_Kv_Av, time_total
 
 #include "../associate_part_def.h"
 #include "../associate_mesh_def.h"
@@ -908,6 +936,11 @@ module g_cvmix_idemix2
         elem_size  = myDim_elem2D
         elemH_size = myDim_elem2D+eDim_elem2D
         nfbin      = idemix2_nfbin
+        
+        !_______________________________________________________________________
+        ! Start total timing
+        t_start = MPI_Wtime()
+        
         !_______________________________________________________________________
         ! do tau timestepping indices shift
         otaum1= iwe2_taum1 
@@ -926,6 +959,8 @@ module g_cvmix_idemix2
         ! call compute_vol_nodB2T_hnode(vol_nodB2T, mesh, partit)
         
         !_______________________________________________________________________
+        ! 1. Compute IDEMIX2 parameters (cn, alpha_c, v0, c0, tau, struct functions)
+        t0 = MPI_Wtime()
         do node=1, myDim_nod2D+eDim_nod2D
             !___________________________________________________________________
             ! re-initialse cross spectral velocites, for later accumulation through 
@@ -1102,11 +1137,12 @@ module g_cvmix_idemix2
                     
             end if         
         end do ! --> do node=1, myDim_nod2D+eDim_nod2D
-        
-        
+        t1 = MPI_Wtime()
+        time_params = t1 - t0
         
         !_______________________________________________________________________
-        ! 5th. compute idemix2 group velocites for M2 an NIW
+        ! 2. Compute idemix2 group velocites for M2 an NIW
+        t1 = MPI_Wtime()
         do elem = 1, myDim_elem2D
             nln        = nlevels(elem)-1
             uln        = ulevels(elem)
@@ -1218,7 +1254,9 @@ module g_cvmix_idemix2
             end if
             ! --> at the end we still need to normalize iwe2_M2_w and iwe2_niw_w 
             !     with the scalararea!
-        end do ! --> do elem = 1, myDim_elem2D         
+        end do ! --> do elem = 1, myDim_elem2D
+        t2 = MPI_Wtime()
+        time_groupvel = t2 - t1
         
         ! finalize elem2node averaging of iwe2_M2_w and iwe2_niw_w
         ! cross spectral exachange has to be related to nodes, since general advection 
@@ -1241,10 +1279,11 @@ module g_cvmix_idemix2
         
         
         !_______________________________________________________________________
-        ! 6th. horizontal spectral integrate energy compartment E_M2^(n+1) and 
+        ! 3. Horizontal spectral integrate energy compartment E_M2^(n+1) and 
         ! E_niw^(n+1) equation. 
         ! dE/dt = -div(vec_u * E) - tau*E + Forc    
         ! E^(n+1) = E^n + dt*( -div(vec_u^n*E^n) - tau*E^n + Forc^n)
+        t3 = MPI_Wtime()
         if (idemix2_enable_M2) then 
             call hsintegrate_Ecompart(              &
                   iwe2_taum1, iwe2_tau, iwe2_taup1  &
@@ -1273,10 +1312,13 @@ module g_cvmix_idemix2
                 )
                 
             ! Compute global total NIW energy for conservation check
-            call check_global_energy(iwe2_E_M2, iwe2_taup1, iwe2_dphit, vol_nodB2T, iwe2_fM2, iwe2_M2_tau, partit, mesh, 'M2')
-!             call check_flux_conservation(  iwe2_E_niw_divh, iwe2_E_niw_divs, iwe2_tau, iwe2_dphit, vol_nodB2T, partit, mesh, 'M2')
-        end if 
+            ! call check_global_energy(iwe2_E_M2, iwe2_taup1, iwe2_dphit, vol_nodB2T, iwe2_fM2, iwe2_M2_tau, partit, mesh, 'M2')
+            ! call check_flux_conservation(  iwe2_E_niw_divh, iwe2_E_niw_divs, iwe2_tau, iwe2_dphit, vol_nodB2T, partit, mesh, 'M2')
+        end if
+        t4 = MPI_Wtime()
+        time_M2_integ = t4 - t3
         
+        t4 = MPI_Wtime()
         if (idemix2_enable_niw) then
             call hsintegrate_Ecompart(              &
                   iwe2_taum1, iwe2_tau, iwe2_taup1  & 
@@ -1305,15 +1347,15 @@ module g_cvmix_idemix2
                 )
             
             ! Compute global total NIW energy for conservation check
-            call check_global_energy(iwe2_E_niw, iwe2_taup1, iwe2_dphit, vol_nodB2T, iwe2_fniw, iwe2_niw_tau, partit, mesh, 'niw')
-!             call check_max_cfl(iwe2_niw_uv, iwe2_niw_w, iwe2_dphit, partit, mesh, 'niw')
-!             call check_flux_conservation(  iwe2_E_niw_divh, iwe2_E_niw_divs, iwe2_tau, iwe2_dphit, vol_nodB2T, partit, mesh, 'niw')
-        end if 
-        
-        
+            ! call check_global_energy(iwe2_E_niw, iwe2_taup1, iwe2_dphit, vol_nodB2T, iwe2_fniw, iwe2_niw_tau, partit, mesh, 'niw')
+            ! call check_flux_conservation(  iwe2_E_niw_divh, iwe2_E_niw_divs, iwe2_tau, iwe2_dphit, vol_nodB2T, partit, mesh, 'niw')
+        end if
+        t5 = MPI_Wtime()
+        time_niw_integ = t5 - t4
         
         !_______________________________________________________________________
-        ! 7th. Integrate IDEMIX equation vertical, solve vertical diffusion and 
+        ! 4. Integrate IDEMIX equation vertical, solve vertical diffusion and
+        t6 = MPI_Wtime() 
         ! dissipation part implicitly
         ! Eiw^(t+1) = Eiw^(t) + dt*[  d/dz( c_0 * tau_v * d/dz(c_0*E_iw))^(t+1) 
         !                           - alpha_c*Eiw^(t+1)
@@ -1338,8 +1380,16 @@ module g_cvmix_idemix2
                 , Eiw_bot  = iwe2_E_iw_fbot(  uln:nln  , node)       & ! optional: diagnostic
                 )
         end do ! --> do node = 1, myDim_nod2D
+        t7 = MPI_Wtime()
+        time_Eiw_vdiff = t7 - t6
         
-        ! 8th. add lateral diffusion term (see. Olbers D., Eden C., 2013, A Global Model 
+        !_______________________________________________________________________
+        ! Exchange E_iw after vertical diffusion - needed for horizontal diffusion gradients
+        call exchange_nod(iwe2_E_iw, partit)
+        
+        !_______________________________________________________________________
+        ! 5. add lateral diffusion term (see. Olbers D., Eden C., 2013, A Global Model
+        t7 = MPI_Wtime() 
         ! for the Diapycnal Diffusivity Induced Internal Gravity Waves...)
         ! Eiw^(t+1) = Eiw^(t+1) + div_h( v_0 * tau_h * grad_h(v_0*E_iw^(t)) )
         if (idemix2_enable_hor_diffusion .or. idemix2_enable_hor_diff_iter) then 
@@ -1361,7 +1411,7 @@ module g_cvmix_idemix2
         
         
         !_______________________________________________________________________
-        ! 9th. add tendency due to lateral diffusion with iterative method in case of 
+        ! 6. add tendency due to lateral diffusion with iterative method in case of 
         ! high resolution
         if (idemix2_enable_hor_diff_iter) then
             do iter=1, idemix2_hor_diff_niter
@@ -1376,14 +1426,15 @@ module g_cvmix_idemix2
                     , Eiw_hdif = iwe2_E_iw_hdif(  :, :) & ! optional: diagnostic
                     )
             end do
-        end if 
-        
-        
+        end if
+        t8 = MPI_Wtime()
+        time_Eiw_hdiff = t8 - t7
         
         !_______________________________________________________________________
-        ! 10th. compute wave-wave interaction 
+        ! 7. compute wave-wave interaction
+        t8 = MPI_Wtime() 
         if (idemix2_enable_M2 .or. idemix2_enable_niw) then 
-            do node = 1, myDim_nod2D+eDim_nod2D
+            do node = 1, myDim_nod2D
                 uln = ulevels_nod2D(node)
                 nln = nlevels_nod2D(node)
                 !_______________________________________________________________
@@ -1394,6 +1445,7 @@ module g_cvmix_idemix2
                             , dzw          = hnode(                uln:nln-1, node)   &
                             , dphi         = iwe2_dphit                               &
                             , dt           = dt                                       &
+                            , flag_posdef  = .True.                                   & 
                             , E_iw_old     = iwe2_E_iw( iwe2_tau  ,  uln:nln, node)   &
                             , E_iw_new     = iwe2_E_iw( iwe2_taup1,  uln:nln, node)   &
                             , E_M2_old     = iwe2_E_M2( iwe2_tau  ,  :      , node)   &
@@ -1405,6 +1457,11 @@ module g_cvmix_idemix2
                             , E_niw_new    = iwe2_E_niw(iwe2_taup1,  :      , node)   &
                             , E_niw_struct = iwe2_E_niw_struct(      :      , node)   &
                             , tau_niw      = iwe2_niw_tau(                    node)   &
+                            , E_iw_dt      = iwe2_E_iw_dt(           :      , node)   & ! optional: diagnostic
+                            , E_iw_diss_M2 = iwe2_E_iw_diss_M2(      :      , node)   & ! optional: diagnostic
+                            , E_iw_diss_niw= iwe2_E_iw_diss_niw(     :      , node)   & ! optional: diagnostic
+                            , E_M2_dt      = iwe2_E_M2_dt(           :      , node)   & ! optional: diagnostic
+                            , E_M2_diss_wwi= iwe2_E_M2_diss_wwi(     :      , node)   & ! optional: diagnostic
                             )
                 elseif (idemix2_enable_M2) then 
                     call cvmix_idemix2_compute_Eiw_waveinteract(                      &
@@ -1413,6 +1470,7 @@ module g_cvmix_idemix2
                             , dzw          = hnode(                uln:nln-1, node)   &
                             , dphi         = iwe2_dphit                               &
                             , dt           = dt                                       &
+                            , flag_posdef  = .True.                                   &
                             , E_iw_old     = iwe2_E_iw( iwe2_tau  ,  uln:nln, node)   &
                             , E_iw_new     = iwe2_E_iw( iwe2_taup1,  uln:nln, node)   &
                             , E_M2_old     = iwe2_E_M2( iwe2_tau  ,  :      , node)   &
@@ -1420,6 +1478,10 @@ module g_cvmix_idemix2
                             , E_M2_struct  = iwe2_E_M2_struct(       :      , node)   &
                             , alpha_M2_c   = iwe2_alpha_M2_c(                 node)   &
                             , tau_M2       = iwe2_M2_tau(                     node)   &
+                            , E_iw_dt      = iwe2_E_iw_dt(           :      , node)   & ! optional: diagnostic
+                            , E_iw_diss_M2 = iwe2_E_iw_diss_M2(      :      , node)   & ! optional: diagnostic
+                            , E_M2_dt      = iwe2_E_M2_dt(           :      , node)   & ! optional: diagnostic
+                            , E_M2_diss_wwi= iwe2_E_M2_diss_wwi(     :      , node)   & ! optional: diagnostic
                             )
                 elseif (idemix2_enable_niw) then 
                     call cvmix_idemix2_compute_Eiw_waveinteract(                      &
@@ -1428,27 +1490,31 @@ module g_cvmix_idemix2
                             , dzw          = hnode(                uln:nln-1, node)   &
                             , dphi         = iwe2_dphit                               &
                             , dt           = dt                                       &
+                            , flag_posdef  = .True.                                   &
                             , E_iw_old     = iwe2_E_iw( iwe2_tau  ,  uln:nln, node)   &
                             , E_iw_new     = iwe2_E_iw( iwe2_taup1,  uln:nln, node)   &
                             , E_niw_old    = iwe2_E_niw(iwe2_tau  ,  :      , node)   &
                             , E_niw_new    = iwe2_E_niw(iwe2_taup1,  :      , node)   &
                             , E_niw_struct = iwe2_E_niw_struct(      :      , node)   &
                             , tau_niw      = iwe2_niw_tau(                    node)   &
+                            , E_iw_dt      = iwe2_E_iw_dt(           :      , node)   & ! optional: diagnostic
+                            , E_iw_diss_niw= iwe2_E_iw_diss_niw(     :      , node)   & ! optional: diagnostic
                             )
                 end if ! -->  (idemix2_enable_M2 .and. idemix2_enable_niw) then 
             end do ! --> for node = 1, myDim_nod2D
-        end if ! --> if (idemix2_enable_M2 .or . idemix2_enable_niw) then 
-
-
+        end if ! --> if (idemix2_enable_M2 .or . idemix2_enable_niw) then
+        t9 = MPI_Wtime()
+        time_waveint = t9 - t8
 
         !_______________________________________________________________________
-        ! 11th. write IDEMIX2 diffusivities and viscositie to FESOM only when IDEMIX2 is 
+        ! 8. write IDEMIX2 diffusivities and viscositie to FESOM only when IDEMIX2 is
+        t9 = MPI_Wtime() 
         ! used alone --> mostly for debuging --> otherwise TKE Av and Kv are use
         if(mix_scheme_nmb==7) then 
             
             !___________________________________________________________________
             ! write out diffusivity --> convert from elem to vertices
-            do node=1, myDim_nod2D+eDim_nod2D
+            do node=1, myDim_nod2D
                 uln = ulevels_nod2D(node)
                 nln = nlevels_nod2D(node)
                 !_______________________________________________________________
@@ -1461,10 +1527,12 @@ module g_cvmix_idemix2
                         , KappaM  = iwe2_Av(       uln:nln, node) &
                         )
             end do        
-                
+            call exchange_nod(iwe2_Av, partit)    
+            call exchange_nod(Kv , partit)
+            
             !___________________________________________________________________
             ! more idemix2 viscosity from vertices to elements
-            do elem=1,myDim_elem2D
+            do elem=1,myDim_elem2D+eDim_elem2D
                 uln = ulevels(elem)
                 nln = nlevels(elem)
                 elnodes = elem2d_nodes(:,elem)
@@ -1472,9 +1540,32 @@ module g_cvmix_idemix2
                     Av(nz, elem) = sum(iwe2_Av(nz, elnodes))/3.0_WP
                 end do
             end do
-            call exchange_elem(Av, partit)
-            call exchange_nod(Kv , partit)
-        end if 
+            
+        end if
+        t10 = MPI_Wtime()
+        time_Kv_Av = t10 - t9
+        
+        !_______________________________________________________________________
+        ! Timing report
+        t_end = MPI_Wtime()
+        time_total = t_end - t_start
+        
+        if (mype==0 .and. mod(istep, logfile_outfreq)==0) then
+            write(*,*)
+            write(*,'(A)') ' ___IDEMIX2 EXECUTION TIMES_____________________________'
+            write(*,'(A, ES10.3, A, F6.2, A)') '     Params (cn,tau,struct)    : ', time_params,    ' s  (', 100.0*time_params/time_total,    '%)'
+            write(*,'(A, ES10.3, A, F6.2, A)') '     Group velocities (u,v,w)  : ', time_groupvel,  ' s  (', 100.0*time_groupvel/time_total,  '%)'
+            write(*,'(A, ES10.3, A, F6.2, A)') '     M2 spectral integration   : ', time_M2_integ,  ' s  (', 100.0*time_M2_integ/time_total,  '%)'
+            write(*,'(A, ES10.3, A, F6.2, A)') '     NIW spectral integration  : ', time_niw_integ, ' s  (', 100.0*time_niw_integ/time_total, '%)'
+            write(*,'(A, ES10.3, A, F6.2, A)') '     Eiw vertical diffusion    : ', time_Eiw_vdiff, ' s  (', 100.0*time_Eiw_vdiff/time_total, '%)'
+            write(*,'(A, ES10.3, A, F6.2, A)') '     Eiw horizontal diffusion  : ', time_Eiw_hdiff, ' s  (', 100.0*time_Eiw_hdiff/time_total, '%)'
+            write(*,'(A, ES10.3, A, F6.2, A)') '     Wave-wave interaction     : ', time_waveint,   ' s  (', 100.0*time_waveint/time_total,   '%)'
+            write(*,'(A, ES10.3, A, F6.2, A)') '     Kv/Av output              : ', time_Kv_Av,     ' s  (', 100.0*time_Kv_Av/time_total,     '%)'
+            write(*,'(A)') ' _______________________________________'
+            write(*,'(A, ES10.3,A)')        '     IDEMIX2 TOTAL time        : ', time_total, ' s'
+            write(*,*)
+            write(*,*)
+        end if
         
     end subroutine calc_cvmix_idemix2    
 
@@ -2384,30 +2475,30 @@ module g_cvmix_idemix2
                 vol_nodB2T(node) = vol_nodB2T(node) + areasvol(nz,node)*abs(zbar(nz)-zbar(nz+1))
             end do
         end do !-->do node = 1,node_size
-        call MPI_Allreduce(lcl_sumvol, glb_sumvol, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-        if (partit%mype == 0) then
-            write(*,*) ' debug: vol_node_fix: ', glb_sumvol
-        end if
+        ! call MPI_Allreduce(lcl_sumvol, glb_sumvol, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+        ! if (partit%mype == 0) then
+        !     write(*,*) ' debug: vol_node_fix: ', glb_sumvol
+        ! end if
         call exchange_nod(vol_nodB2T, partit)
         
-        lcl_sumvol = 0.0_WP
-        do elem = 1, myDim_elem2D
-            ! Nodes are uniquely partitioned (e.g., via METIS) — each node belongs 
-            ! to exactly one rank Elements are then distributed so that each rank 
-            ! has all elements touching its owned nodes — but boundary elements 
-            ! necessarily appear on multiple ranks (they share vertices across partitions)
-            elnodes=mesh%elem2D_nodes(:,elem)
-            if (elnodes(1) > myDim_nod2D) cycle
-            nln = nlevels(elem)-1
-            uln = ulevels(elem)
-            do nz=uln,nln
-                lcl_sumvol       = lcl_sumvol       + elem_area(elem)*abs(zbar(nz)-zbar(nz+1))
-            end do
-        end do !-->do node = 1,node_size
-        call MPI_Allreduce(lcl_sumvol, glb_sumvol, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-        if (partit%mype == 0) then
-            write(*,*) ' debug: vol_elem_fix: ', glb_sumvol
-        end if
+        ! lcl_sumvol = 0.0_WP
+        ! do elem = 1, myDim_elem2D
+        !     ! Nodes are uniquely partitioned (e.g., via METIS) — each node belongs 
+        !     ! to exactly one rank Elements are then distributed so that each rank 
+        !     ! has all elements touching its owned nodes — but boundary elements 
+        !     ! necessarily appear on multiple ranks (they share vertices across partitions)
+        !     elnodes=mesh%elem2D_nodes(:,elem)
+        !     if (elnodes(1) > myDim_nod2D) cycle
+        !     nln = nlevels(elem)-1
+        !     uln = ulevels(elem)
+        !     do nz=uln,nln
+        !         lcl_sumvol       = lcl_sumvol       + elem_area(elem)*abs(zbar(nz)-zbar(nz+1))
+        !     end do
+        ! end do !-->do node = 1,node_size
+        ! call MPI_Allreduce(lcl_sumvol, glb_sumvol, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+        ! if (partit%mype == 0) then
+        !     write(*,*) ' debug: vol_elem_fix: ', glb_sumvol
+        ! end if
         
     end subroutine compute_vol_nodB2T_fix
     
@@ -2733,15 +2824,25 @@ module g_cvmix_idemix2
         end do !-->do edge=1,myDim_edge2D
         
         !_______________________________________________________________________
-        ! add to total change in Eiw 
-        do node = 1, myDim_nod2D
-            nu1 = ulevels_nod2D(node)
-            nl1 = nlevels_nod2D(node)
-            do nz = nu1, nl1
-                Eiw_hdif(nz, node) = Eiw_hdif(nz, node) + (Eiw(nz, node)-Eiw_old(nz, node))/dt
-                Eiw_dt(nz, node)   = Eiw_dt(nz, node) + (Eiw(nz, node)-Eiw_old(nz, node))/dt
-            end do        
-        end do
+        ! add to total change in Eiw --> optional diagnsotic
+        if (present(Eiw_dt) .or. present(Eiw_hdif)) then 
+            do node = 1, myDim_nod2D
+                nu1 = ulevels_nod2D(node)
+                nl1 = nlevels_nod2D(node)
+                
+                if (present(Eiw_dt)) then 
+                    do nz = nu1, nl1
+                        Eiw_dt(nz, node)   = Eiw_dt(nz, node) + (Eiw(nz, node)-Eiw_old(nz, node))/dt
+                    end do        
+                end if
+                
+                if (present(Eiw_hdif)) then 
+                    do nz = nu1, nl1
+                        Eiw_hdif(nz, node) = (Eiw(nz, node)-Eiw_old(nz, node))
+                    end do        
+                end if 
+            end do
+        end if 
     end subroutine compute_hdiff_Eiw
 
 
@@ -2921,7 +3022,7 @@ module g_cvmix_idemix2
                              ', global max(E_',trim(compartment_name),') = ', glb_maxE
             write(*,*) ' debug: global Σ(forc_',trim(compartment_name),'*dphi*vols) = ', glb_forc, ' W', &
                              ', global Σ(tau*E_',trim(compartment_name),'*dphi*vols) = ', glb_diss, ' W', &
-                             ', global forc/diss = ', glb_forc/glb_diss, ' W'
+                             ', global forc_',trim(compartment_name),'/diss_',trim(compartment_name),' = ', glb_forc/glb_diss, ' W'
         end if
         
     end subroutine check_global_energy
