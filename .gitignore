@@ -17,3 +17,5 @@ mesh_part/build
 test/output_pi 
 src/cvmix_driver/CVMix-*
 finished_config.yaml
+GM1000/
+1800_sp/
