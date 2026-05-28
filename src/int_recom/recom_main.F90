@@ -71,6 +71,8 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     use g_clock
     use g_forcing_arrays, only: press_air, u_wind, v_wind, shortwave
     use g_comm_auto
+    use mod_transit,      only: l_sf6, l_f11, l_f12, l_r14c, l_r39ar
+    use g_forcing_param,  only: use_age_tracer
 
     implicit none
 
@@ -121,6 +123,10 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
     real(kind=8),  allocatable :: rhoSW_watercolumn(:)
     real(kind=WP)              :: ttf_rhs_bak (mesh%nl-1, tracers%num_tracers) ! local variable
 
+    integer                    :: transit_tracers        ! number of active transit tracers
+    integer                    :: actual_bgc_num
+    integer                    :: num_physical_tracers
+
 #include "../associate_part_def.h"
 #include "../associate_mesh_def.h"
 #include "../associate_part_ass.h"
@@ -160,6 +166,21 @@ subroutine recom(ice, dynamics, tracers, partit, mesh)
        tracers%data(tr_num)%values(1, : ) = 0
    end if
 end do
+
+  num_physical_tracers = 2
+  ! Transit tracers are appended after the age tracer in tracer_init.
+  ! Count only the active subset governed by individual l_* flags.
+  transit_tracers = 0
+  if (use_transit) then
+    if (l_sf6 )  transit_tracers = transit_tracers + 1
+    if (l_f11 )  transit_tracers = transit_tracers + 1
+    if (l_f12 )  transit_tracers = transit_tracers + 1
+    if (l_r14c)  transit_tracers = transit_tracers + 1
+    if (l_r39ar) transit_tracers = transit_tracers + 1
+  end if
+  actual_bgc_num = num_tracers - num_physical_tracers
+  if (use_age_tracer) actual_bgc_num = actual_bgc_num - 1
+  actual_bgc_num = actual_bgc_num - transit_tracers
 
 ! ======================================================================================
 !********************************* LOOP STARTS *****************************************
@@ -256,18 +277,27 @@ end do
         rhoSW_watercolumn(1:nzmax)  = rhoSW3D(1:nzmax, n)
 
         !!---- Biogeochemical tracers
-        if (use_transit) then
-        do tr_num = index_transit_sf6 - bgc_num, index_transit_sf6 -1
-            C(1:nzmax, tr_num-2) = tracers%data(tr_num)%values(1:nzmax, n)
+
+!if (use_transit) then
+!        do tr_num = index_transit_sf6 - bgc_num, index_transit_sf6 -1
+!            C(1:nzmax, tr_num-2) = tracers%data(tr_num)%values(1:nzmax, n)
+!        end do
+!else
+
+!        do tr_num = num_tracers-bgc_num+1, num_tracers
+!            C(1:nzmax, tr_num-2) = tracers%data(tr_num)%values(1:nzmax, n)
+!        end do
+!endif
+
+
+        do tr_num = num_physical_tracers+1, num_physical_tracers+actual_bgc_num
+            C(1:nzmax, tr_num-num_physical_tracers) = tracers%data(tr_num)%values(1:nzmax, n)
         end do
-        else
-        do tr_num = num_tracers-bgc_num+1, num_tracers
-            C(1:nzmax, tr_num-2) = tracers%data(tr_num)%values(1:nzmax, n)
-        end do
-        endif
+
+
+!!!!! Update below
 
         ttf_rhs_bak = 0.0
-
 
         do tr_num=1, num_tracers
             if (tracers%data(tr_num)%ltra_diag) then
@@ -304,17 +334,20 @@ end do
            , kspc_watercolumn                                    &
            , rhoSW_watercolumn                                   &
                            , PAR, ice, dynamics, tracers, partit, mesh)
+!if (use_transit) then
+!        do tr_num = index_transit_sf6 - bgc_num, index_transit_sf6 -1
+!            tracers%data(tr_num)%values(1:nzmax, n) = C(1:nzmax, tr_num-2)
+!        end do
+!else
+!        do tr_num = num_tracers-bgc_num+1, num_tracers !bgc_num+2
+!            tracers%data(tr_num)%values(1:nzmax, n) = C(1:nzmax, tr_num-2)
+!        end do
+!end if
 
-       if (use_transit) then
-       do tr_num = index_transit_sf6 - bgc_num, index_transit_sf6 -1
-        tracers%data(tr_num)%values(1:nzmax, n) = C(1:nzmax, tr_num-2)
+        do tr_num = num_physical_tracers+1, num_physical_tracers+actual_bgc_num
+             tracers%data(tr_num)%values(1:nzmax, n) = C(1:nzmax, tr_num-num_physical_tracers)
         end do
-        else
 
-        do tr_num = num_tracers-bgc_num+1, num_tracers !bgc_num+2
-            tracers%data(tr_num)%values(1:nzmax, n) = C(1:nzmax, tr_num-2)
-        end do
-       endif
         ! recom_sms
 
            do tr_num=1, num_tracers

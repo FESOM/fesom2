@@ -309,6 +309,8 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(NPPd3D       ( nl-1, node_size ))
     allocate(NPPc3D       ( nl-1, node_size ))
     allocate(NPPp3D       ( nl-1, node_size ))
+    allocate(DISSOC3D     ( nl-1, node_size ))
+    allocate(DISSON3D     ( nl-1, node_size ))
 
     allocate(photn        ( nl-1, node_size ))
     allocate(photd        ( nl-1, node_size ))
@@ -343,6 +345,8 @@ subroutine recom_init(tracers, partit, mesh)
     respc        = 0.d0
     respp        = 0.d0
     NPPn3D       = 0.d0
+    DISSOC3D     = 0.d0
+    DISSON3D     = 0.d0
     NPPd3D       = 0.d0
     NPPc3D       = 0.d0
     NPPp3D       = 0.d0

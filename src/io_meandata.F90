@@ -1811,6 +1811,21 @@ CASE ('scaling_visc   ')
                    'scaling_visc', 'scaling factor of particle sinking speed', 'n.d.', scaling_visc_3D(:,:), &
                    io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 
+
+CASE ('scaling_dens   ')  !Simone
+    ! =====================================================================
+    ! Variable: scaling_dens
+    ! Description: Density-based scaling factor for sinking speed
+    ! Function: Adjusts particle sinking based on water viscosity
+    ! Role: Temperature/salinity affect viscosity, thus sinking rates
+    ! Context: Warmer water = lower viscosity = faster sinking
+    ! Units: n.d. (non-dimensional scaling factor)
+    ! =====================================================================
+    call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), &
+                   'scaling_dens', 'scaling factor of particle sinking speed', 'n.d.', scaling_density2_3D(:,:), &
+                   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+
 CASE ('wsink_det1')
     ! =====================================================================
     ! Variable: wsink_det1
@@ -2108,6 +2123,57 @@ CASE ('docexp         ')
                       'docexp', 'DOC excretion by phaeocystis', 'mmolC/(m2*d)', docexp(:,:), &
                       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
+
+
+CASE ('DOCremin         ')  !Added by Simone
+    ! =====================================================================
+    ! Variable: DOCremin
+    ! Description: Remineralization of DOC
+    ! Units: mmolC/m3/d
+    ! =====================================================================
+    if (use_REcoM) then
+    call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), &
+            'DOCremin', 'Remineralization of DOC', 'mmolC/m3/d', DOCremin(:,:), &
+                   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+
+CASE ('DONremin         ')  !Added by Simone
+    ! =====================================================================
+    ! Variable: DONremin
+    ! Description: Remineralization of DON
+    ! Units: mmolC/m3/d
+    ! =====================================================================
+    if (use_REcoM) then
+    call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), &
+            'DONremin', 'Remineralization of DON', 'mmolC/m3/d', DONremin(:,:), &
+                   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+
+CASE ('DISSOC3D         ')  !Added by Simone
+    ! =====================================================================
+    ! Variable: DISSOC
+    ! Description: Slow and fast sinking detritus dissolution
+    ! Units: mmolC/m3/d
+    ! =====================================================================
+    if (use_REcoM) then
+    call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), &
+            'DISSOC3D', 'Slow and fast sinking detritus dissolution', 'mmolC/m3/d', DISSOC3D(:,:), &
+                   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DISSON3D         ')  !Added by Simone
+    ! =====================================================================
+    ! Variable: DISSON
+    ! Description: Slow and fast sinking detritus dissolution
+    ! Units: mmolC/m3/d
+    ! =====================================================================
+    if (use_REcoM) then
+    call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), &
+            'DISSON3D', 'Slow and fast sinking detritus dissolution', 'mmolC/m3/d', DISSON3D(:,:), &
+                   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
 
 ! =====================================================================
 ! PHYTOPLANKTON RESPIRATION
