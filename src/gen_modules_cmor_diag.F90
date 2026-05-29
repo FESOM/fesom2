@@ -359,8 +359,9 @@ contains
     ! → io_xios.
 
     ! Accumulate instantaneous 0D scalars; overwrite public vars with running
-    ! mean so the XIOS send (gated by xios_field_is_active) sees a proper
-    ! time-average rather than an end-of-period snapshot.
+    ! mean so the XIOS send sees a proper time-average. Reset is triggered
+    ! from fesom_module.F90 via monthly_event (calendar-based, independent of
+    ! XIOS field name configuration).
     n_cmor_acc    = n_cmor_acc    + 1
     soga_acc      = soga_acc      + soga
     thetaoga_acc  = thetaoga_acc  + thetaoga
@@ -411,8 +412,9 @@ contains
 
   end subroutine save_cmor_advection
 
-  ! Reset 0D accumulators after the XIOS send. Called from fesom_module.F90
-  ! at the output timestep so the next accumulation period starts clean.
+  ! Reset 0D accumulators after the monthly send. Called from fesom_module.F90
+  ! gated on monthly_event (not xios_field_is_active) so it fires regardless
+  ! of XIOS field name configuration.
   subroutine reset_cmor_acc()
     n_cmor_acc    = 0
     soga_acc      = 0.0_WP
