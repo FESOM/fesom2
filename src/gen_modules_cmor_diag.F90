@@ -16,7 +16,7 @@ module cmor_variables_diag
   
   implicit none
   
-  public :: init_cmor_diag, compute_cmor_diag, ldiag_cmor
+  public :: init_cmor_diag, compute_cmor_diag, reset_cmor_acc, ldiag_cmor
   public :: save_cmor_advection
   public :: volo, opottemptend, pbo, soga, thetaoga, tos, sos
   public :: siarean, siareas, siextentn, siextents, sivoln, sivols
@@ -42,6 +42,17 @@ module cmor_variables_diag
   real(kind=WP), save :: siarean, siareas                ! Sea ice area north/south [10^12 m^2]
   real(kind=WP), save :: siextentn, siextents            ! Sea ice extent north/south [10^12 m^2]
   real(kind=WP), save :: sivoln, sivols                  ! Sea ice volume north/south [10^9 m^3]
+
+  ! Accumulators for FESOM-side time-averaging before XIOS send (reset each output period)
+  integer,       save :: n_cmor_acc    = 0
+  real(kind=WP), save :: soga_acc      = 0.0_WP
+  real(kind=WP), save :: thetaoga_acc  = 0.0_WP
+  real(kind=WP), save :: siarean_acc   = 0.0_WP
+  real(kind=WP), save :: siareas_acc   = 0.0_WP
+  real(kind=WP), save :: siextentn_acc = 0.0_WP
+  real(kind=WP), save :: siextents_acc = 0.0_WP
+  real(kind=WP), save :: sivoln_acc    = 0.0_WP
+  real(kind=WP), save :: sivols_acc    = 0.0_WP
 
   ! New CMOR diagnostic variables
   real(kind=WP), save, allocatable :: osalttend(:)          ! Salinity tendency [psu*m/s] - 2D column-integrated
@@ -129,6 +140,16 @@ contains
     previous_salt = 0.0_WP
     cmor_del_ttf_adv_temp = 0.0_WP
     cmor_del_ttf_adv_salt = 0.0_WP
+
+    n_cmor_acc    = 0
+    soga_acc      = 0.0_WP
+    thetaoga_acc  = 0.0_WP
+    siarean_acc   = 0.0_WP
+    siareas_acc   = 0.0_WP
+    siextentn_acc = 0.0_WP
+    siextents_acc = 0.0_WP
+    sivoln_acc    = 0.0_WP
+    sivols_acc    = 0.0_WP
 
     initialized = .true.
     first_call = .true.
@@ -337,6 +358,27 @@ contains
     ! circular module dependency: io_xios → diagnostics → cmor_variables_diag
     ! → io_xios.
 
+    ! Accumulate instantaneous 0D scalars; overwrite public vars with running
+    ! mean so the XIOS send (gated by xios_field_is_active) sees a proper
+    ! time-average rather than an end-of-period snapshot.
+    n_cmor_acc    = n_cmor_acc    + 1
+    soga_acc      = soga_acc      + soga
+    thetaoga_acc  = thetaoga_acc  + thetaoga
+    siarean_acc   = siarean_acc   + siarean
+    siareas_acc   = siareas_acc   + siareas
+    siextentn_acc = siextentn_acc + siextentn
+    siextents_acc = siextents_acc + siextents
+    sivoln_acc    = sivoln_acc    + sivoln
+    sivols_acc    = sivols_acc    + sivols
+    soga      = soga_acc      / n_cmor_acc
+    thetaoga  = thetaoga_acc  / n_cmor_acc
+    siarean   = siarean_acc   / n_cmor_acc
+    siareas   = siareas_acc   / n_cmor_acc
+    siextentn = siextentn_acc / n_cmor_acc
+    siextents = siextents_acc / n_cmor_acc
+    sivoln    = sivoln_acc    / n_cmor_acc
+    sivols    = sivols_acc    / n_cmor_acc
+
     ! Update previous tracer values for next time step
     do n2 = 1, myDim_nod2D
         do k = ulevels_nod2D(n2), nlevels_nod2D(n2)-1
@@ -368,5 +410,19 @@ contains
     end if
 
   end subroutine save_cmor_advection
+
+  ! Reset 0D accumulators after the XIOS send. Called from fesom_module.F90
+  ! at the output timestep so the next accumulation period starts clean.
+  subroutine reset_cmor_acc()
+    n_cmor_acc    = 0
+    soga_acc      = 0.0_WP
+    thetaoga_acc  = 0.0_WP
+    siarean_acc   = 0.0_WP
+    siareas_acc   = 0.0_WP
+    siextentn_acc = 0.0_WP
+    siextents_acc = 0.0_WP
+    sivoln_acc    = 0.0_WP
+    sivols_acc    = 0.0_WP
+  end subroutine reset_cmor_acc
 
 end module cmor_variables_diag

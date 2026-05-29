@@ -24,7 +24,7 @@ module fesom_main_storage_module
   ! from this top-level module. Doing the send inside cmor_variables_diag
   ! itself would create a cycle (io_xios → diagnostics → cmor_variables_diag
   ! → io_xios) and break the build.
-  use cmor_variables_diag, only: ldiag_cmor, &
+  use cmor_variables_diag, only: ldiag_cmor, reset_cmor_acc, &
                                  volo, soga, thetaoga, &
                                  siarean, siareas, siextentn, siextents, &
                                  sivoln, sivols
@@ -850,6 +850,7 @@ contains
             call io_xios_send_0d_r8('siextents', real(siextents, kind=8))
             call io_xios_send_0d_r8('sivoln',    real(sivoln,    kind=8))
             call io_xios_send_0d_r8('sivols',    real(sivols,    kind=8))
+            if (io_xios_field_is_active('siextentn')) call reset_cmor_acc()
         end if
 
         f%t4 = MPI_Wtime()
