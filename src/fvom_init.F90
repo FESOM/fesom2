@@ -212,11 +212,24 @@ INTEGER                             :: i_error
   ! purely triangular, with 3 columns each. Test, how many
   ! columns there are!  
   read(21,*,iostat=i_error) elem_data(1:4*mesh%elem2D)
+  ! NR Do NOT use reshape() here: ifort places the array temporary it
+  !    creates on the stack, which overflows for large meshes (ng5 etc.)
+  !    and causes a segfault in read_mesh_ini. Copy element by element
+  !    instead, which needs no temporary and works for any mesh size.
   if (i_error == 0) then      ! There is a fourth column => quad or mixed mesh (not working yet!)
-     mesh%elem2D_nodes = reshape(elem_data, shape(mesh%elem2D_nodes))
+     do n=1, mesh%elem2D
+        mesh%elem2D_nodes(1,n) = elem_data(4*n-3)
+        mesh%elem2D_nodes(2,n) = elem_data(4*n-2)
+        mesh%elem2D_nodes(3,n) = elem_data(4*n-1)
+        mesh%elem2D_nodes(4,n) = elem_data(4*n)
+     end do
   else     ! No fourth column => triangles only
-     mesh%elem2D_nodes(1:3,:) = reshape(elem_data, shape(mesh%elem2D_nodes(1:3,:)))
-     mesh%elem2D_nodes(4,:)   = mesh%elem2D_nodes(1,:)
+     do n=1, mesh%elem2D
+        mesh%elem2D_nodes(1,n) = elem_data(3*n-2)
+        mesh%elem2D_nodes(2,n) = elem_data(3*n-1)
+        mesh%elem2D_nodes(3,n) = elem_data(3*n)
+        mesh%elem2D_nodes(4,n) = elem_data(3*n-2)  ! 4th node = 1st node for triangles
+     end do
   end if
     
   deallocate(elem_data)
