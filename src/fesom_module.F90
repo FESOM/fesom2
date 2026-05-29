@@ -24,7 +24,7 @@ module fesom_main_storage_module
   ! from this top-level module. Doing the send inside cmor_variables_diag
   ! itself would create a cycle (io_xios → diagnostics → cmor_variables_diag
   ! → io_xios) and break the build.
-  use cmor_variables_diag, only: ldiag_cmor, &
+  use cmor_variables_diag, only: ldiag_cmor, reset_cmor_acc, &
                                  volo, soga, thetaoga, &
                                  siarean, siareas, siextentn, siextents, &
                                  sivoln, sivols
@@ -597,6 +597,7 @@ contains
     integer, intent(in) :: current_nsteps 
     ! EO parameters
     integer n, nstart, ntotal, tr_num, tracer_index
+    logical :: do_cmor_0d_reset
 
 #if defined (__recom)
     type(tracers_info_type)               :: tracers_info
@@ -850,6 +851,15 @@ contains
             call io_xios_send_0d_r8('siextents', real(siextents, kind=8))
             call io_xios_send_0d_r8('sivoln',    real(sivoln,    kind=8))
             call io_xios_send_0d_r8('sivols',    real(sivols,    kind=8))
+        end if
+        ! Reset 0D accumulators at month end — outside the io_xios_is_on() block
+        ! so the reset fires in both XIOS and legacy output modes. Gated on
+        ! monthly_event (FESOM calendar) so it is independent of XIOS field
+        ! name configuration.
+        if (ldiag_cmor) then
+            do_cmor_0d_reset = .false.
+            call monthly_event(do_cmor_0d_reset, 1)
+            if (do_cmor_0d_reset) call reset_cmor_acc()
         end if
 
         f%t4 = MPI_Wtime()
