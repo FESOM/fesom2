@@ -210,6 +210,25 @@ contains
       if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_trgrd_xyz=',   ldiag_trgrd_xyz
       ov = xios_getvar("ldiag_cmor",        ldiag_cmor)
       if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_cmor=',        ldiag_cmor
+      ! Ship-track / mooring curtain output (io_tracks.F90). Per-track
+      ! config is supplied via context_fesom.xml in the XIOS-coupled path.
+      block
+        use io_tracks_module, only: ltracks, track_files, track_vars,      &
+                                    track_names, track_resolution_km,       &
+                                    track_output_freq
+        ov = xios_getvar("ltracks",             ltracks)
+        if (ov .and. partit%mype==0) write(*,*) '[XIOS] ltracks=',             ltracks
+        ov = xios_getvar("track_files",         track_files)
+        if (ov .and. partit%mype==0) write(*,*) '[XIOS] track_files=',         trim(track_files)
+        ov = xios_getvar("track_vars",          track_vars)
+        if (ov .and. partit%mype==0) write(*,*) '[XIOS] track_vars=',          trim(track_vars)
+        ov = xios_getvar("track_names",         track_names)
+        if (ov .and. partit%mype==0) write(*,*) '[XIOS] track_names=',         trim(track_names)
+        ov = xios_getvar("track_resolution_km", track_resolution_km)
+        if (ov .and. partit%mype==0) write(*,*) '[XIOS] track_resolution_km=', track_resolution_km
+        ov = xios_getvar("track_output_freq",   track_output_freq)
+        if (ov .and. partit%mype==0) write(*,*) '[XIOS] track_output_freq=',   trim(track_output_freq)
+      end block
     end block
 
     ! --- 3. calendar: left to XML (calendar_type on the context element) -----
@@ -380,6 +399,14 @@ contains
          xios_date(yearnew, 1, 1, 0, 0, 0) + &
          xios_duration(day = real(daynew - 1, kind=8), &
                        second = real(timenew, kind=8)))
+
+    ! --- 7c. tracks (ship-track / mooring-array curtain output) -------------
+    ! Inert unless ltracks=.true. (set via &nml_general or the XIOS XML
+    ! override). See io_tracks.F90.
+    block
+      use io_tracks_module, only: io_tracks_register_xios
+      call io_tracks_register_xios(mesh, partit, nz_cell)
+    end block
 
     ! --- 8. close context definition ----------------------------------------
     call xios_close_context_definition()
