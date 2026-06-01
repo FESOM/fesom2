@@ -135,10 +135,10 @@ contains
   !> client_comm:  returned equal to parent_comm (kept for API compat; OASIS
   !>               has already done the world split, so no further split here).
   subroutine io_xios_init(mesh, partit, parent_comm, client_comm)
-    type(T_MESH),    intent(in), target :: mesh
-    type(T_PARTIT),  intent(in), target :: partit
-    integer,         intent(in)         :: parent_comm
-    integer,         intent(out)        :: client_comm
+    type(T_MESH),    intent(in),    target :: mesh
+    type(T_PARTIT),  intent(inout), target :: partit
+    integer,         intent(in)            :: parent_comm
+    integer,         intent(out)           :: client_comm
 
     integer                       :: i, j, e, n1, n2, n3, nn, ne, ne_owned, nz_cell, nv
     real(kind=8), allocatable     :: lon_n(:),  lat_n(:)
@@ -214,8 +214,7 @@ contains
       ! config is supplied via context_fesom.xml in the XIOS-coupled path.
       block
         use io_tracks_module, only: ltracks, track_files, track_vars,      &
-                                    track_names, track_resolution_km,       &
-                                    track_output_freq
+                                    track_names, track_output_freq
         ov = xios_getvar("ltracks",             ltracks)
         if (ov .and. partit%mype==0) write(*,*) '[XIOS] ltracks=',             ltracks
         ov = xios_getvar("track_files",         track_files)
@@ -224,8 +223,6 @@ contains
         if (ov .and. partit%mype==0) write(*,*) '[XIOS] track_vars=',          trim(track_vars)
         ov = xios_getvar("track_names",         track_names)
         if (ov .and. partit%mype==0) write(*,*) '[XIOS] track_names=',         trim(track_names)
-        ov = xios_getvar("track_resolution_km", track_resolution_km)
-        if (ov .and. partit%mype==0) write(*,*) '[XIOS] track_resolution_km=', track_resolution_km
         ov = xios_getvar("track_output_freq",   track_output_freq)
         if (ov .and. partit%mype==0) write(*,*) '[XIOS] track_output_freq=',   trim(track_output_freq)
       end block

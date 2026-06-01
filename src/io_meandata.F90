@@ -221,8 +221,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     use g_config, only : use_cavity, lwiso !---wiso-code
     use mod_transit, only : index_transit_r14c, index_transit_r39ar, index_transit_f11, index_transit_f12, index_transit_sf6
     use io_tracks_module, only: ltracks, track_files, track_vars,        &
-                                track_names, track_resolution_km,         &
-                                track_output_freq
+                                track_names, track_output_freq
 
     implicit none
     integer                   :: i, j
@@ -241,7 +240,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
                             ltracks
     namelist /nml_list    / io_list
     namelist /nml_tracks  / track_files, track_vars, track_names,        &
-                            track_resolution_km, track_output_freq
+                            track_output_freq
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"

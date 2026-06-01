@@ -1,17 +1,30 @@
-!> Ship-track / mooring-array curtain output for FESOM-2.
+!> Ship-track / mooring-array curtain output for FESOM-2, v2 (geometry-aware).
 !>
-!> See ../runtime/fesom-2.7/meltpond_diag/ship_track_curtain_plan.md for
-!> the full design. The model walks each user-supplied polyline CSV,
-!> densifies the geodesic between consecutive vertices at
-!> track_resolution_km, snaps every dense sample to its nearest
-!> strictly-owned mesh node via MPI_MINLOC, collapses consecutive
-!> duplicate nodes, and writes the resulting sequence of unique mesh
-!> nodes at all depths as a NetCDF "curtain" via XIOS.
+!> Each user-supplied polyline CSV is converted to a list of "crossed
+!> edges": the actual edges of the FESOM mesh whose interior the polyline
+!> passes through. For each crossed edge a sample value is built by
+!> linearly interpolating the two endpoint values
+!>     V_at_crossing = V(n1) * (1 - t) + V(n2) * t,
+!> with t in [0,1] from the line-edge intersection. This replaces the
+!> earlier snap-to-nearest-node approach which produced mesh-scale
+!> zig-zag artefacts and could not compute transport.
 !>
-!> Multi-track: track_files / track_vars / track_names are
-!> semicolon-separated strings. One file_group at a single shared
-!> output cadence (track_output_freq), one <file> per track inside it,
-!> one runtime XIOS domain per track.
+!> Geometry pipeline (lives in mod_tracks_geometry, pure Fortran):
+!>   * bbox + polar widening
+!>   * signed-distance line-edge intersection
+!>   * alternating triangle path with up/down section dx/dy
+!>   * cumulative great-circle distance
+!>
+!> MPI layout:
+!>   * Rank 0 gathers the global topology (edges, edge_tri, face_nodes,
+!>     edge_cross_dxdy, lon/lat) using FESOM's existing gather_* primitives
+!>   * Rank 0 runs analyse_transect once per track
+!>   * The resulting transect_t (M <= ~few thousand) is broadcast to all
+!>     ranks
+!>   * Each rank precomputes which edge endpoints it strict-owns
+!>   * At each output step: per-rank contributions are summed via
+!>     MPI_Allreduce; slots where no rank contributed (boundary edge or
+!>     both endpoints dry at this level) become NaN
 !>
 !> Activation: ltracks=.true. plus a non-empty track_files. XML override
 !> in io_xios_init wins over the (skipped in XIOS mode) namelist.
@@ -21,12 +34,15 @@ module io_tracks_module
   ! are compiled in only when __XIOS is defined.
 #if defined(__XIOS)
   use xios
-  use ixml_tree,   only: xios_add_axistogrid, xios_add_domaintogrid
+  use ixml_tree,           only: xios_add_axistogrid, xios_add_domaintogrid
   use mpi
-  use mod_mesh,    only: t_mesh
-  use mod_partit,  only: t_partit
-  use mod_tracer,  only: t_tracer
-  use o_param,     only: WP, rad
+  use mod_mesh,            only: t_mesh
+  use mod_partit,          only: t_partit
+  use mod_tracer,          only: t_tracer
+  use o_param,             only: WP, rad
+  use g_comm_auto,         only: gather_nod, gather_elem, gather_edge
+  use mod_tracks_geometry, only: transect_t, analyse_transect, free_transect
+  use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_quiet_nan
 #endif
   implicit none
   private
@@ -35,7 +51,6 @@ module io_tracks_module
   character(len=4096), save, public :: track_files           = ''
   character(len=512),  save, public :: track_vars            = 'temp'
   character(len=512),  save, public :: track_names           = ''
-  real(kind=8),        save, public :: track_resolution_km   = 5.0_8
   character(len=16),   save, public :: track_output_freq     = '1h'
 
   public :: io_tracks_is_on
@@ -43,17 +58,32 @@ module io_tracks_module
   public :: io_tracks_register_xios
   public :: io_tracks_send
 
-  ! Per-track state. One element per user-supplied CSV.
+  ! Per-track state.
   type :: track_t
     character(len=64)    :: name       = ''
     character(len=512)   :: csv_path   = ''
     character(len=32)    :: var_name   = 'temp'
     integer              :: tracer_idx = 1            ! 1=temp, 2=salt
-    integer              :: N          = 0            ! unique mesh nodes after dedupe
-    integer              :: nL         = 0            ! per-rank owned count
     character(len=64)    :: field_id   = ''
-    integer, allocatable :: track_pos(:)              ! length nL
-    integer, allocatable :: track_lid(:)              ! length nL
+
+    ! Geometry — broadcast from rank 0 to all ranks after analyse_transect.
+    integer              :: M          = 0            ! # crossed edges (global)
+    integer, allocatable :: edge_cut_ni(:, :)         ! (2, M) global node ids
+    real(WP), allocatable :: edge_cut_lint(:)         ! (M)
+    real(WP), allocatable :: lon_mid(:), lat_mid(:)   ! (M) midpoint coords (deg)
+    real(WP), allocatable :: dist_km(:)               ! (M)
+
+    ! Per-rank sampling lookups. lid_*(m) > 0 iff this rank strict-owns
+    ! endpoint *; the lid value indexes nodal arrays (1..myDim_nod2D).
+    integer, allocatable :: lid_n1(:)                 ! (M) 0 if not owned
+    integer, allocatable :: lid_n2(:)                 ! (M) 0 if not owned
+
+    ! XIOS-side: each rank "owns" a stride of m's for write purposes.
+    ! nL = # m's this rank pushes to XIOS; my_m(k) = global m index (1-based)
+    ! and i_index(k) = m - 1 (0-based for XIOS).
+    integer              :: nL         = 0
+    integer, allocatable :: my_m(:)                   ! (nL)
+    integer, allocatable :: i_index(:)                ! (nL)
   end type track_t
 
   type(track_t), allocatable, save :: tracks(:)
@@ -71,18 +101,20 @@ contains
 
 #if defined(__XIOS)
 
-
-  !> Parse semicolon-separated lists, then for each track: read CSV,
-  !> densify the polyline, MPI_MINLOC ownership, dedupe, build per-rank
-  !> sparse lists, register XIOS domain/grid/field. One shared file_group
-  !> is created once and each track's <file> is added inside it.
+  !> Parse semicolon-separated lists, gather the global mesh on rank 0,
+  !> run analyse_transect per track, broadcast geometry, register the
+  !> per-track XIOS domain/grid/field.
   subroutine io_tracks_register_xios(mesh, partit, nz_cell)
-    type(t_mesh),   intent(in) :: mesh
-    type(t_partit), intent(in) :: partit
-    integer,        intent(in) :: nz_cell
+    type(t_mesh),   intent(in)    :: mesh
+    type(t_partit), intent(inout) :: partit
+    integer,        intent(in)    :: nz_cell
     logical, save :: already = .false.
-    integer :: i
-    integer :: ierr
+    integer :: i, ierr
+
+    ! Global mesh assembled on rank 0
+    real(WP), allocatable :: lon_glo(:), lat_glo(:)
+    integer,  allocatable :: edges_glo(:, :), edge_tri_glo(:, :), elem_nodes_glo(:, :)
+    real(WP), allocatable :: edge_cross_dxdy_glo(:, :)
 
     if (.not. io_tracks_is_on()) return
     if (already) return
@@ -97,19 +129,32 @@ contains
        call mpi_abort(partit%MPI_COMM_FESOM, 1, ierr)
     end if
 
+    call gather_global_mesh(mesh, partit, &
+                            lon_glo, lat_glo, edges_glo, edge_tri_glo, &
+                            elem_nodes_glo, edge_cross_dxdy_glo)
+
     call register_track_filegroup(partit)
 
     do i = 1, n_tracks
-       call process_one_track(mesh, partit, nz_cell, tracks(i))
+       call process_one_track(mesh, partit, nz_cell, tracks(i), &
+                              lon_glo, lat_glo, edges_glo, edge_tri_glo, &
+                              elem_nodes_glo, edge_cross_dxdy_glo)
     end do
+
+    ! Drop the global temps once all tracks have their geometry.
+    if (allocated(lon_glo))            deallocate(lon_glo)
+    if (allocated(lat_glo))            deallocate(lat_glo)
+    if (allocated(edges_glo))          deallocate(edges_glo)
+    if (allocated(edge_tri_glo))       deallocate(edge_tri_glo)
+    if (allocated(elem_nodes_glo))     deallocate(elem_nodes_glo)
+    if (allocated(edge_cross_dxdy_glo)) deallocate(edge_cross_dxdy_glo)
   end subroutine io_tracks_register_xios
 
 
-  !> Loop tracks, pack the per-track variable from the tracer array at
-  !> owned mesh nodes, send via XIOS. Call once per timestep alongside
-  !> the existing 0D send block in fesom_module.F90.
-  subroutine io_tracks_send(tracers, partit)
+  !> Loop tracks, sample, MPI_Allreduce, send via XIOS.
+  subroutine io_tracks_send(tracers, mesh, partit)
     type(t_tracer), intent(in) :: tracers
+    type(t_mesh),   intent(in) :: mesh
     type(t_partit), intent(in) :: partit
     integer :: i
 
@@ -117,30 +162,150 @@ contains
     if (n_tracks == 0) return
 
     do i = 1, n_tracks
-       call send_one_track(tracers, partit, tracks(i))
+       call send_one_track(tracers, mesh, partit, tracks(i))
     end do
   end subroutine io_tracks_send
+
+
+  ! ====================================================================
+  ! Rank-0 mesh gather
+  ! ====================================================================
+
+  !> Use FESOM's gather_edge / gather_elem / gather_nod primitives to
+  !> assemble the global topology on rank 0. Connectivity arrays carry
+  !> LOCAL ids per rank; translate to GLOBAL ids before gather (the
+  !> pattern at io_mesh_info.F90:441-526).
+  !>
+  !> Non-rank-0 receive dummy size-1 arrays — the gather routines write
+  !> to arr_global only on rank 0.
+  subroutine gather_global_mesh(mesh, partit, &
+                                lon_glo, lat_glo, edges_glo, edge_tri_glo, &
+                                elem_nodes_glo, edge_cross_dxdy_glo)
+    type(t_mesh),   intent(in)    :: mesh
+    type(t_partit), intent(inout) :: partit
+    real(WP), allocatable, intent(out) :: lon_glo(:), lat_glo(:)
+    integer,  allocatable, intent(out) :: edges_glo(:, :), edge_tri_glo(:, :)
+    integer,  allocatable, intent(out) :: elem_nodes_glo(:, :)
+    real(WP), allocatable, intent(out) :: edge_cross_dxdy_glo(:, :)
+
+    integer :: nod2D_g, edge2D_g, elem2D_g, k, j
+    integer :: myDim_nod2D, myDim_edge2D, myDim_elem2D
+    integer, allocatable :: lbuf_i(:), tmp_col(:)
+    real(WP), allocatable :: lbuf_r(:), tmp_col_r(:)
+
+    nod2D_g  = mesh%nod2D
+    edge2D_g = mesh%edge2D
+    elem2D_g = mesh%elem2D
+
+    myDim_nod2D   = partit%myDim_nod2D
+    myDim_edge2D  = partit%myDim_edge2D
+    myDim_elem2D  = partit%myDim_elem2D
+
+    if (partit%mype == 0) then
+       allocate(lon_glo(nod2D_g), lat_glo(nod2D_g))
+       allocate(edges_glo(2, edge2D_g))
+       allocate(edge_tri_glo(2, edge2D_g))
+       allocate(elem_nodes_glo(3, elem2D_g))
+       allocate(edge_cross_dxdy_glo(4, edge2D_g))
+    else
+       allocate(lon_glo(1), lat_glo(1))
+       allocate(edges_glo(1, 1))
+       allocate(edge_tri_glo(1, 1))
+       allocate(elem_nodes_glo(1, 1))
+       allocate(edge_cross_dxdy_glo(1, 1))
+    end if
+
+    ! ---- geo_coord_nod2D (radians on the model side; convert to degrees later) ----
+    allocate(lbuf_r(myDim_nod2D), tmp_col_r(nod2D_g))
+    do k = 1, myDim_nod2D
+       lbuf_r(k) = mesh%geo_coord_nod2D(1, k)
+    end do
+    if (partit%mype == 0) then
+       call gather_nod(lbuf_r, tmp_col_r, partit)
+       lon_glo = tmp_col_r / rad     ! rad-per-degree -> degrees
+    else
+       call gather_nod(lbuf_r, tmp_col_r, partit)
+    end if
+    do k = 1, myDim_nod2D
+       lbuf_r(k) = mesh%geo_coord_nod2D(2, k)
+    end do
+    if (partit%mype == 0) then
+       call gather_nod(lbuf_r, tmp_col_r, partit)
+       lat_glo = tmp_col_r / rad
+    else
+       call gather_nod(lbuf_r, tmp_col_r, partit)
+    end if
+    deallocate(lbuf_r, tmp_col_r)
+
+    ! ---- edges (LOCAL node ids -> GLOBAL via myList_nod2D) ----
+    allocate(lbuf_i(myDim_edge2D), tmp_col(edge2D_g))
+    do j = 1, 2
+       do k = 1, myDim_edge2D
+          lbuf_i(k) = partit%myList_nod2D(mesh%edges(j, k))
+       end do
+       call gather_edge(lbuf_i, tmp_col, partit)
+       if (partit%mype == 0) edges_glo(j, :) = tmp_col
+    end do
+
+    ! ---- edge_tri (LOCAL elem ids -> GLOBAL via myList_elem2D; -1 = boundary) ----
+    do j = 1, 2
+       do k = 1, myDim_edge2D
+          if (mesh%edge_tri(j, k) > 0) then
+             lbuf_i(k) = partit%myList_elem2D(mesh%edge_tri(j, k))
+          else
+             lbuf_i(k) = -1
+          end if
+       end do
+       call gather_edge(lbuf_i, tmp_col, partit)
+       if (partit%mype == 0) edge_tri_glo(j, :) = tmp_col
+    end do
+    deallocate(lbuf_i, tmp_col)
+
+    ! ---- elem_nodes (LOCAL node ids -> GLOBAL) ----
+    allocate(lbuf_i(myDim_elem2D), tmp_col(elem2D_g))
+    do j = 1, 3
+       do k = 1, myDim_elem2D
+          lbuf_i(k) = partit%myList_nod2D(mesh%elem2D_nodes(j, k))
+       end do
+       call gather_elem(lbuf_i, tmp_col, partit)
+       if (partit%mype == 0) elem_nodes_glo(j, :) = tmp_col
+    end do
+    deallocate(lbuf_i, tmp_col)
+
+    ! ---- edge_cross_dxdy (no id translation; values only) ----
+    allocate(lbuf_r(myDim_edge2D), tmp_col_r(edge2D_g))
+    do j = 1, 4
+       do k = 1, myDim_edge2D
+          lbuf_r(k) = mesh%edge_cross_dxdy(j, k)
+       end do
+       call gather_edge(lbuf_r, tmp_col_r, partit)
+       if (partit%mype == 0) edge_cross_dxdy_glo(j, :) = tmp_col_r
+    end do
+    deallocate(lbuf_r, tmp_col_r)
+  end subroutine gather_global_mesh
 
 
   ! ====================================================================
   ! Per-track pipeline
   ! ====================================================================
 
-  subroutine process_one_track(mesh, partit, nz_cell, t)
+  subroutine process_one_track(mesh, partit, nz_cell, t, &
+                               lon_glo, lat_glo, edges_glo, edge_tri_glo, &
+                               elem_nodes_glo, edge_cross_dxdy_glo)
     type(t_mesh),   intent(in)    :: mesh
-    type(t_partit), intent(in)    :: partit
+    type(t_partit), intent(inout) :: partit
     integer,        intent(in)    :: nz_cell
     type(track_t),  intent(inout) :: t
+    real(WP),       intent(in)    :: lon_glo(:), lat_glo(:)
+    integer,        intent(in)    :: edges_glo(:, :), edge_tri_glo(:, :)
+    integer,        intent(in)    :: elem_nodes_glo(:, :)
+    real(WP),       intent(in)    :: edge_cross_dxdy_glo(:, :)
 
-    real(kind=8), allocatable :: lon_csv(:), lat_csv(:)
-    real(kind=8), allocatable :: lon_dense(:), lat_dense(:)
-    integer,      allocatable :: gid_track(:), owner_track(:), lid_owner(:)
-    integer,      allocatable :: i_index(:)
-    real(kind=8), allocatable :: lon_out(:), lat_out(:)
-    character(len=64) :: domain_id, grid_id, file_id, file_name
-    integer :: N_csv, N_dense, N_uniq, ierr
+    real(WP), allocatable :: lon_csv(:), lat_csv(:)
+    type(transect_t)      :: geom
+    integer :: N_csv, ierr
 
-    ! --- 0. tracer slot ---------------------------------------------------
+    ! --- tracer slot ---------------------------------------------------
     select case (trim(t%var_name))
     case ('temp')
        t%tracer_idx = 1
@@ -156,97 +321,250 @@ contains
     end select
     t%field_id = trim(t%var_name) // '_track_' // trim(t%name)
 
-    ! --- 1. parse + densify on rank 0, bcast dense (lon, lat) -------------
+    ! --- parse CSV on rank 0; analyse_transect there; broadcast --------
     if (partit%mype == 0) then
        call parse_csv(trim(t%csv_path), N_csv, lon_csv, lat_csv, partit)
        write(*,'(a,a,a,a,a,i0,a)') '[TRACKS] ', trim(t%name), ': parsed ', &
             trim(t%csv_path), ' -> ', N_csv, ' polyline vertices'
-       call densify_polyline(N_csv, lon_csv, lat_csv, track_resolution_km, &
-                             N_dense, lon_dense, lat_dense)
-       write(*,'(a,a,a,f6.2,a,i0,a)') '[TRACKS] ', trim(t%name),           &
-            ': densified at ', track_resolution_km, ' km -> ',             &
-            N_dense, ' query points'
+
+       call analyse_transect(size(lon_glo),     lon_glo, lat_glo,             &
+                             size(edges_glo, 2), edges_glo, edge_tri_glo,     &
+                             edge_cross_dxdy_glo,                              &
+                             size(elem_nodes_glo, 2), elem_nodes_glo,         &
+                             N_csv, lon_csv, lat_csv, trim(t%name), geom)
+
        deallocate(lon_csv, lat_csv)
-    end if
-    call mpi_bcast(N_dense, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierr)
-    if (partit%mype /= 0) allocate(lon_dense(N_dense), lat_dense(N_dense))
-    call mpi_bcast(lon_dense, N_dense, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierr)
-    call mpi_bcast(lat_dense, N_dense, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierr)
-
-    ! --- 2. nearest-neighbour resolution + dedupe -------------------------
-    allocate(gid_track(N_dense), owner_track(N_dense), lid_owner(N_dense))
-    call resolve_owners(mesh, partit, N_dense, lon_dense, lat_dense,       &
-                        gid_track, owner_track, lid_owner)
-    deallocate(lon_dense, lat_dense)
-    call dedupe_adjacent(N_dense, gid_track, owner_track, lid_owner, N_uniq)
-    t%N = N_uniq
-    if (partit%mype == 0) then
-       write(*,'(a,a,a,i0,a)') '[TRACKS] ', trim(t%name),                  &
-            ': deduplicated to ', t%N, ' unique mesh nodes'
+       write(*,'(a,a,a,i0,a)') '[TRACKS] ', trim(t%name),                    &
+            ': geometry M=', geom%M, ' crossed edges'
     end if
 
-    ! --- 3. per-rank sparse lists, monotonic by track_pos -----------------
-    call build_local_lists(partit, t%N, owner_track, lid_owner,            &
-                           t%nL, t%track_pos, t%track_lid)
+    call broadcast_transect_min(geom, partit)
+    if (geom%M == 0) then
+       if (partit%mype == 0) write(*,'(a,a,a)') '[TRACKS] WARNING: track "', &
+            trim(t%name), '" has no mesh crossings — skipping.'
+       call free_transect(geom)
+       return
+    end if
 
-    ! --- 4. XIOS attr arrays for this rank --------------------------------
-    allocate(i_index(t%nL), lon_out(t%nL), lat_out(t%nL))
-    call build_xios_attrs(mesh, t, lon_out, lat_out, i_index)
+    ! --- store the small geometry pieces we need at sample time ---------
+    t%M = geom%M
+    allocate(t%edge_cut_ni(2, t%M))
+    allocate(t%edge_cut_lint(t%M))
+    allocate(t%lon_mid(t%M), t%lat_mid(t%M))
+    allocate(t%dist_km(t%M))
+    t%edge_cut_ni   = geom%edge_cut_ni
+    t%edge_cut_lint = geom%edge_cut_lint
+    t%lon_mid       = geom%edge_cut_midP(1, :)
+    t%lat_mid       = geom%edge_cut_midP(2, :)
+    t%dist_km       = geom%edge_cut_dist
 
-    ! --- 5. domain + grid + field + add file in the shared file_group -----
-    domain_id = 'track_' // trim(t%name)
-    grid_id   = 'grid_3d_track_' // trim(t%name)
-    file_id   = 'f_' // trim(t%field_id)
-    file_name = trim(t%field_id) // '.fesom'
+    call free_transect(geom)
 
-    call register_xios_objects_for_track(partit, t%N, t%nL,                &
-                                         trim(domain_id), trim(grid_id),   &
-                                         trim(t%field_id), trim(file_id),  &
-                                         trim(file_name),                  &
-                                         i_index, lon_out, lat_out)
+    ! --- per-rank: for each m, find local strict-owned lid for n1, n2 ---
+    call build_sampling_lookups(mesh, partit, t)
+
+    ! --- per-rank XIOS assignment: m mod npes -> my_m / i_index ---------
+    call assign_xios_cells(partit, t)
+
+    ! --- register XIOS objects ------------------------------------------
+    call register_xios_objects_for_track(partit, t)
 
     if (partit%mype == 0) then
-       write(*,'(a,a,a,a,a,i0,a)') '[TRACKS] ', trim(t%name),              &
-            ': registered runtime XML (domain=', trim(domain_id),          &
-            ', N=', t%N, ' cells)'
-       write(*,'(a,a,a,a)')        '[TRACKS]   field=', trim(t%field_id),  &
-                                   '  file=', trim(file_name)
+       write(*,'(a,a,a,i0,a)') '[TRACKS] ', trim(t%name),                    &
+            ': registered runtime XML, M=', t%M, ' cells'
+       write(*,'(a,a,a,a)')    '[TRACKS]   field=', trim(t%field_id),         &
+                               '  file=', trim(t%field_id) // '.fesom'
     end if
-
-    deallocate(gid_track, owner_track, lid_owner)
-    deallocate(i_index, lon_out, lat_out)
   end subroutine process_one_track
 
 
-  subroutine send_one_track(tracers, partit, t)
+  !> Broadcast only the fields we sample at runtime (edge_cut_ni,
+  !> edge_cut_lint, edge_cut_midP, edge_cut_dist) plus M. The richer
+  !> transect_t produced by analyse_transect carries path-side arrays
+  !> that Step 1 doesn't need; we drop them after geometry runs.
+  subroutine broadcast_transect_min(geom, partit)
+    type(transect_t), intent(inout) :: geom
+    type(t_partit),   intent(in)    :: partit
+    integer :: ierr, M_b
+
+    M_b = geom%M
+    call mpi_bcast(M_b, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierr)
+    if (M_b == 0) then
+       geom%M = 0
+       return
+    end if
+
+    if (partit%mype /= 0) then
+       if (allocated(geom%edge_cut_ni))   deallocate(geom%edge_cut_ni)
+       if (allocated(geom%edge_cut_lint)) deallocate(geom%edge_cut_lint)
+       if (allocated(geom%edge_cut_midP)) deallocate(geom%edge_cut_midP)
+       if (allocated(geom%edge_cut_dist)) deallocate(geom%edge_cut_dist)
+       allocate(geom%edge_cut_ni(2, M_b))
+       allocate(geom%edge_cut_lint(M_b))
+       allocate(geom%edge_cut_midP(2, M_b))
+       allocate(geom%edge_cut_dist(M_b))
+       geom%M = M_b
+    end if
+    call mpi_bcast(geom%edge_cut_ni,   2*M_b, MPI_INTEGER,          0, partit%MPI_COMM_FESOM, ierr)
+    call mpi_bcast(geom%edge_cut_lint, M_b,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierr)
+    call mpi_bcast(geom%edge_cut_midP, 2*M_b, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierr)
+    call mpi_bcast(geom%edge_cut_dist, M_b,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierr)
+  end subroutine broadcast_transect_min
+
+
+  !> For each crossed edge m, record this rank's lid for n1 and n2 if it
+  !> strict-owns them, else 0. Strict-own = present in
+  !> myList_nod2D(1:myDim_nod2D) only — never the halo range.
+  !> Implementation: build a global->local lookup once (size nod2D), use
+  !> for all m's, drop. Memory: 4*nod2D bytes per rank — cheap.
+  subroutine build_sampling_lookups(mesh, partit, t)
+    type(t_mesh),   intent(in)    :: mesh
+    type(t_partit), intent(in)    :: partit
+    type(track_t),  intent(inout) :: t
+    integer, allocatable :: g2l(:)
+    integer :: m, g, k
+
+    allocate(g2l(mesh%nod2D))
+    g2l = 0
+    do k = 1, partit%myDim_nod2D
+       g2l(partit%myList_nod2D(k)) = k
+    end do
+
+    allocate(t%lid_n1(t%M), t%lid_n2(t%M))
+    do m = 1, t%M
+       g = t%edge_cut_ni(1, m)
+       if (g >= 1 .and. g <= mesh%nod2D) then
+          t%lid_n1(m) = g2l(g)
+       else
+          t%lid_n1(m) = 0
+       end if
+       g = t%edge_cut_ni(2, m)
+       if (g >= 1 .and. g <= mesh%nod2D) then
+          t%lid_n2(m) = g2l(g)
+       else
+          t%lid_n2(m) = 0
+       end if
+    end do
+    deallocate(g2l)
+  end subroutine build_sampling_lookups
+
+
+  !> Round-robin assignment of global edge indices m=1..M to ranks for
+  !> XIOS write purposes. Each rank's nL = ceil((M - mype) / npes).
+  subroutine assign_xios_cells(partit, t)
+    type(t_partit), intent(in)    :: partit
+    type(track_t),  intent(inout) :: t
+    integer :: m, k, nL
+
+    nL = 0
+    do m = 1, t%M
+       if (mod(m - 1, partit%npes) == partit%mype) nL = nL + 1
+    end do
+    t%nL = nL
+    allocate(t%my_m(nL), t%i_index(nL))
+    k = 0
+    do m = 1, t%M
+       if (mod(m - 1, partit%npes) == partit%mype) then
+          k = k + 1
+          t%my_m(k)   = m
+          t%i_index(k) = m - 1     ! XIOS expects 0-based
+       end if
+    end do
+  end subroutine assign_xios_cells
+
+
+  !> Sample one track: per-rank contributions to (nz_track x M), MPI_Allreduce,
+  !> mask boundary/dry-bottom slots as NaN, push this rank's stride to XIOS.
+  subroutine send_one_track(tracers, mesh, partit, t)
     type(t_tracer), intent(in) :: tracers
+    type(t_mesh),   intent(in) :: mesh
     type(t_partit), intent(in) :: partit
     type(track_t),  intent(in) :: t
-    real(kind=8), allocatable  :: buf(:,:)
-    integer :: j, kk
+    real(WP), allocatable :: contrib(:, :), wsum(:, :), sampled(:, :), wsum_tot(:, :), buf(:, :)
+    integer  :: m, kk, ierr, nz_wet, k, lid
+    real(WP) :: tt, nan, w
 
     if (len_trim(t%field_id) == 0)                            return
     if (.not. xios_is_valid_field(trim(t%field_id)))          return
     if (.not. xios_field_is_active(trim(t%field_id), .true.)) return
+    if (t%M == 0)                                             return
 
-    allocate(buf(nz_track, t%nL))
-    do j = 1, t%nL
+    nan = ieee_value(0.0_WP, ieee_quiet_nan)
+
+    ! Sum both the weighted contributions AND the contributed weights so
+    ! we can rescale at the end. This makes wet/dry edges fall back to
+    ! the surviving endpoint's value rather than the biased partial sum.
+    !   both wet:  sampled = V1*(1-t)+V2*t   (weight sum = 1)
+    !   only n1:   sampled = V1               (weight sum = 1-t, value = V1*(1-t)/(1-t))
+    !   only n2:   sampled = V2
+    !   both dry:  wsum=0 -> NaN
+    allocate(contrib(nz_track, t%M), wsum(nz_track, t%M))
+    contrib = 0.0_WP
+    wsum    = 0.0_WP
+
+    do m = 1, t%M
+       tt = t%edge_cut_lint(m)
+
+       lid = t%lid_n1(m)
+       if (lid > 0) then
+          if (lid > partit%myDim_nod2D) call mpi_abort(partit%MPI_COMM_FESOM, 1, ierr)
+          nz_wet = max(0, mesh%nlevels_nod2D(lid) - 1)
+          w = 1.0_WP - tt
+          do kk = 1, min(nz_track, nz_wet)
+             contrib(kk, m) = contrib(kk, m) + &
+                  real(tracers%data(t%tracer_idx)%values(kk, lid), WP) * w
+             wsum   (kk, m) = wsum   (kk, m) + w
+          end do
+       end if
+
+       lid = t%lid_n2(m)
+       if (lid > 0) then
+          if (lid > partit%myDim_nod2D) call mpi_abort(partit%MPI_COMM_FESOM, 1, ierr)
+          nz_wet = max(0, mesh%nlevels_nod2D(lid) - 1)
+          w = tt
+          do kk = 1, min(nz_track, nz_wet)
+             contrib(kk, m) = contrib(kk, m) + &
+                  real(tracers%data(t%tracer_idx)%values(kk, lid), WP) * w
+             wsum   (kk, m) = wsum   (kk, m) + w
+          end do
+       end if
+    end do
+
+    allocate(sampled(nz_track, t%M), wsum_tot(nz_track, t%M))
+    call MPI_Allreduce(contrib, sampled,  nz_track*t%M, MPI_DOUBLE_PRECISION, &
+                       MPI_SUM, partit%MPI_COMM_FESOM, ierr)
+    call MPI_Allreduce(wsum,    wsum_tot, nz_track*t%M, MPI_DOUBLE_PRECISION, &
+                       MPI_SUM, partit%MPI_COMM_FESOM, ierr)
+    deallocate(contrib, wsum)
+
+    ! Rescale by the actual contributed weight, NaN where no endpoint contributed.
+    do m = 1, t%M
        do kk = 1, nz_track
-          buf(kk, j) = real(tracers%data(t%tracer_idx)%values(kk, t%track_lid(j)), kind=8)
+          if (wsum_tot(kk, m) > 0.0_WP) then
+             sampled(kk, m) = sampled(kk, m) / wsum_tot(kk, m)
+          else
+             sampled(kk, m) = nan
+          end if
+       end do
+    end do
+    deallocate(wsum_tot)
+
+    ! Push this rank's stride of m's.
+    allocate(buf(nz_track, t%nL))
+    do k = 1, t%nL
+       do kk = 1, nz_track
+          buf(kk, k) = sampled(kk, t%my_m(k))
        end do
     end do
     call xios_send_field(trim(t%field_id), buf)
-    deallocate(buf)
+    deallocate(buf, sampled)
   end subroutine send_one_track
 
 
   ! ====================================================================
-  ! Config parsing
+  ! Config parsing (unchanged from v1 modulo track_resolution_km drop)
   ! ====================================================================
 
-  !> Parse the comma- (or semicolon-) separated config strings into the
-  !> tracks(:) array. All three lists must be the same length; track_names
-  !> defaults to "track<i>" if left empty.
   subroutine parse_track_config(partit)
     type(t_partit), intent(in) :: partit
     character(len=512), allocatable :: files(:), vars(:), names(:)
@@ -261,26 +579,24 @@ contains
     if (n_tracks == 0) return
 
     if (nv == 1 .and. n_tracks > 1) then
-       ! Single var supplied -> broadcast to all tracks
        deallocate(vars)
        allocate(vars(n_tracks))
        vars(:) = trim(track_vars)
        nv = n_tracks
     end if
     if (nv /= n_tracks .and. partit%mype == 0) then
-       write(*,'(a,i0,a,i0)') '[TRACKS] ERROR: track_vars has ', nv,       &
+       write(*,'(a,i0,a,i0)') '[TRACKS] ERROR: track_vars has ', nv,         &
             ' entries but track_files has ', n_tracks
     end if
 
     if (nn == 0) then
-       ! Default names: "track1", "track2", ...
        allocate(names(n_tracks))
        do i = 1, n_tracks
           write(tag, '(i0)') i
           names(i) = 'track' // trim(tag)
        end do
     else if (nn /= n_tracks .and. partit%mype == 0) then
-       write(*,'(a,i0,a,i0)') '[TRACKS] ERROR: track_names has ', nn,      &
+       write(*,'(a,i0,a,i0)') '[TRACKS] ERROR: track_names has ', nn,        &
             ' entries but track_files has ', n_tracks
     end if
 
@@ -302,22 +618,18 @@ contains
     if (partit%mype == 0) then
        write(*,'(a,i0,a)') '[TRACKS] parsed config: ', n_tracks, ' track(s):'
        do i = 1, n_tracks
-          write(*,'(a,i0,a,a,a,a,a,a,a)') '[TRACKS]   ', i, '. name="',    &
-               trim(tracks(i)%name), '" var="', trim(tracks(i)%var_name),  &
+          write(*,'(a,i0,a,a,a,a,a,a,a)') '[TRACKS]   ', i, '. name="',      &
+               trim(tracks(i)%name), '" var="', trim(tracks(i)%var_name),    &
                '" csv="', trim(tracks(i)%csv_path), '"'
        end do
-       write(*,'(a,a,a,f6.2,a)') '[TRACKS] shared cadence=',               &
-            trim(track_output_freq), ', resolution=',                       &
-            track_resolution_km, ' km'
+       write(*,'(a,a)') '[TRACKS] shared cadence=', trim(track_output_freq)
     end if
   end subroutine parse_track_config
 
 
-  !> Split a string on ';' or ',' (whichever appears first); trim tokens.
-  !> Returns n=0 and unallocated tokens if input is empty.
   subroutine split_semi_or_comma(s_in, n, tokens)
-    character(len=*),               intent(in)  :: s_in
-    integer,                        intent(out) :: n
+    character(len=*),                intent(in)  :: s_in
+    integer,                         intent(out) :: n
     character(len=512), allocatable, intent(out) :: tokens(:)
     character(len=len(s_in)) :: s
     character :: sep
@@ -354,32 +666,30 @@ contains
   end subroutine split_semi_or_comma
 
 
-  !> Parse a cadence string like '1h', '6h', '1d', '1mo', '1y' into the
-  !> matching xios_duration. Default fallback: 1 hour.
   function parse_xios_freq(s) result(d)
     character(len=*), intent(in) :: s
     type(xios_duration) :: d
-    character(len=16) :: t
+    character(len=16) :: tok
     integer :: n, idx, ios
-    t = adjustl(s)
-    idx = index(t, 'mo')
+    tok = adjustl(s)
+    idx = index(tok, 'mo')
     if (idx > 0) then
-       read(t(1:idx-1), *, iostat=ios) n
+       read(tok(1:idx-1), *, iostat=ios) n
        if (ios == 0) then; d = xios_duration(month=real(n, 8)); return; end if
     end if
-    idx = index(t, 'y')
+    idx = index(tok, 'y')
     if (idx > 0) then
-       read(t(1:idx-1), *, iostat=ios) n
+       read(tok(1:idx-1), *, iostat=ios) n
        if (ios == 0) then; d = xios_duration(year=real(n, 8)); return; end if
     end if
-    idx = index(t, 'd')
+    idx = index(tok, 'd')
     if (idx > 0) then
-       read(t(1:idx-1), *, iostat=ios) n
+       read(tok(1:idx-1), *, iostat=ios) n
        if (ios == 0) then; d = xios_duration(day=real(n, 8)); return; end if
     end if
-    idx = index(t, 'h')
+    idx = index(tok, 'h')
     if (idx > 0) then
-       read(t(1:idx-1), *, iostat=ios) n
+       read(tok(1:idx-1), *, iostat=ios) n
        if (ios == 0) then; d = xios_duration(hour=real(n, 8)); return; end if
     end if
     d = xios_duration(hour=1.0_8)
@@ -390,18 +700,15 @@ contains
   ! XIOS runtime registration
   ! ====================================================================
 
-  !> Create the shared file_group "fesom_tracks" once with the global
-  !> output_freq + split_freq + enabled=true. Each per-track <file> is
-  !> later added inside this group.
   subroutine register_track_filegroup(partit)
     type(t_partit), intent(in) :: partit
     type(xios_filegroup) :: filgrp_root, my_filgrp
 
     call xios_get_handle("file_definition", filgrp_root)
     call xios_add_child(filgrp_root, my_filgrp, "fesom_tracks")
-    call xios_set_attr(my_filgrp,                                          &
-         output_freq = parse_xios_freq(trim(track_output_freq)),            &
-         split_freq  = xios_duration(year = 1.0_8),                         &
+    call xios_set_attr(my_filgrp,                                              &
+         output_freq = parse_xios_freq(trim(track_output_freq)),                &
+         split_freq  = xios_duration(year = 1.0_8),                             &
          enabled     = .true.)
     if (partit%mype == 0) then
        write(*,'(a,a,a)') '[TRACKS] file_group "fesom_tracks" created with output_freq=', &
@@ -410,18 +717,9 @@ contains
   end subroutine register_track_filegroup
 
 
-  !> Per-track: register domain, grid, field, plus a <file> inside the
-  !> existing "fesom_tracks" file_group with field_ref + freq_op.
-  subroutine register_xios_objects_for_track(partit, N_glo, nL_loc,        &
-                                             domain_id, grid_id,            &
-                                             field_id_in, file_id, file_name, &
-                                             i_index, lon_out, lat_out)
-    type(t_partit),   intent(in) :: partit
-    integer,          intent(in) :: N_glo, nL_loc
-    character(len=*), intent(in) :: domain_id, grid_id
-    character(len=*), intent(in) :: field_id_in, file_id, file_name
-    integer,          intent(in) :: i_index(nL_loc)
-    real(kind=8),     intent(in) :: lon_out(nL_loc), lat_out(nL_loc)
+  subroutine register_xios_objects_for_track(partit, t)
+    type(t_partit), intent(in) :: partit
+    type(track_t),  intent(in) :: t
 
     type(xios_domaingroup) :: dgrp
     type(xios_domain)      :: dom, dom_in_grid
@@ -434,74 +732,85 @@ contains
     type(xios_file)        :: fil
     type(xios_field)       :: fld_in_file
     type(xios_duration)    :: freq
+    character(len=64)      :: domain_id, grid_id, file_id, file_name
+    real(WP), allocatable  :: lon_loc(:), lat_loc(:)
+    integer :: k
 
     freq = parse_xios_freq(trim(track_output_freq))
 
-    ! domain
+    domain_id = 'track_' // trim(t%name)
+    grid_id   = 'grid_3d_track_' // trim(t%name)
+    file_id   = 'f_' // trim(t%field_id)
+    file_name = trim(t%field_id) // '.fesom'
+
+    allocate(lon_loc(t%nL), lat_loc(t%nL))
+    do k = 1, t%nL
+       lon_loc(k) = t%lon_mid(t%my_m(k))
+       lat_loc(k) = t%lat_mid(t%my_m(k))
+    end do
+
     call xios_get_handle("domain_definition", dgrp)
-    call xios_add_child(dgrp, dom, domain_id)
+    call xios_add_child(dgrp, dom, trim(domain_id))
     call xios_set_attr(dom,                              &
          type        = "unstructured",                    &
-         ni_glo      = N_glo,                              &
-         ni          = nL_loc,                             &
-         i_index     = i_index,                            &
-         lonvalue_1d = lon_out,                            &
-         latvalue_1d = lat_out,                            &
+         ni_glo      = t%M,                                &
+         ni          = t%nL,                               &
+         i_index     = t%i_index,                          &
+         lonvalue_1d = lon_loc,                            &
+         latvalue_1d = lat_loc,                            &
          data_dim    = 1,                                  &
-         data_ni     = nL_loc)
+         data_ni     = t%nL)
 
-    ! grid (nz x domain)
     call xios_get_handle("grid_definition", ggrp)
-    call xios_add_child(ggrp, grd, grid_id)
+    call xios_add_child(ggrp, grd, trim(grid_id))
     call xios_add_axistogrid(grd, ax_in_grid)
     call xios_set_attr(ax_in_grid, axis_ref = "nz")
     call xios_add_domaintogrid(grd, dom_in_grid)
-    call xios_set_attr(dom_in_grid, domain_ref = domain_id)
+    call xios_set_attr(dom_in_grid, domain_ref = trim(domain_id))
 
-    ! field
     call xios_get_handle("field_definition", fgrp)
-    call xios_add_child(fgrp, fld, field_id_in)
+    call xios_add_child(fgrp, fld, trim(t%field_id))
     call xios_set_attr(fld,                              &
-         grid_ref  = grid_id,                             &
+         grid_ref  = trim(grid_id),                       &
          operation = "average",                           &
          prec      = 8,                                   &
-         long_name = "ship-track/mooring curtain output")
+         long_name = "ship-track/mooring curtain (geometry-aware)")
 
-    ! file inside the shared fesom_tracks group
     call xios_get_handle("fesom_tracks", my_filgrp)
-    call xios_add_child(my_filgrp, fil, file_id)
-    call xios_set_attr(fil, name = file_name)
+    call xios_add_child(my_filgrp, fil, trim(file_id))
+    call xios_set_attr(fil, name = trim(file_name))
     call xios_add_child(fil, fld_in_file)
-    call xios_set_attr(fld_in_file,                                        &
-         field_ref = field_id_in,                                           &
-         operation = "instant",                                             &
+    call xios_set_attr(fld_in_file,                                            &
+         field_ref = trim(t%field_id),                                          &
+         operation = "instant",                                                 &
          freq_op   = freq)
 
     call xios_solve_inheritance()
+    deallocate(lon_loc, lat_loc)
   end subroutine register_xios_objects_for_track
 
 
   ! ====================================================================
-  ! Private helpers (CSV, geometry, MPI, per-rank packing)
+  ! CSV parser (unchanged)
   ! ====================================================================
 
   subroutine parse_csv(path, N, lon_out, lat_out, partit)
     character(len=*),              intent(in)  :: path
     integer,                       intent(out) :: N
-    real(kind=8), allocatable,     intent(out) :: lon_out(:), lat_out(:)
+    real(WP), allocatable,         intent(out) :: lon_out(:), lat_out(:)
     type(t_partit),                intent(in)  :: partit
 
     integer, parameter :: MAX_WPTS = 100000
-    real(kind=8) :: lon_buf(MAX_WPTS), lat_buf(MAX_WPTS)
+    real(WP) :: lon_buf(MAX_WPTS), lat_buf(MAX_WPTS)
     character(len=512) :: line
     integer :: u, ios, line_no, k
     integer :: comma1, ierr
     character(len=128) :: ftok, stok
-    real(kind=8) :: lon, lat
+    real(WP) :: lon, lat
 
     open(newunit=u, file=trim(path), status='old', action='read', iostat=ios)
     if (ios /= 0) then
-       write(*,'(a,a,a,i0)') '[TRACKS] ERROR: cannot open track file "',   &
+       write(*,'(a,a,a,i0)') '[TRACKS] ERROR: cannot open track file "',     &
                               trim(path), '" iostat=', ios
        call mpi_abort(partit%MPI_COMM_FESOM, 1, ierr)
     end if
@@ -533,11 +842,6 @@ contains
        ftok = adjustl(line(1:comma1-1))
        stok = adjustl(line(comma1+1:))
 
-       if (index(ftok, ',') > 0) then
-          call csv_fatal(path, line_no, 'decimal point required (no decimal comma)')
-          call mpi_abort(partit%MPI_COMM_FESOM, 1, ierr)
-       end if
-
        read(ftok, *, iostat=ios) lon
        if (ios /= 0) then
           call csv_fatal(path, line_no, 'cannot parse lon')
@@ -550,15 +854,15 @@ contains
        end if
 
        if (N >= MAX_WPTS) then
-          write(*,'(a,a,a,i0)') '[TRACKS] ERROR: ', trim(path),            &
+          write(*,'(a,a,a,i0)') '[TRACKS] ERROR: ', trim(path),               &
                                  ' exceeds MAX_WPTS=', MAX_WPTS
           call mpi_abort(partit%MPI_COMM_FESOM, 1, ierr)
        end if
 
        do k = 1, N
-          if (abs(lon_buf(k) - lon) < 1.0e-12_8 .and. &
-              abs(lat_buf(k) - lat) < 1.0e-12_8) then
-             write(*,'(a,a,a,i0,a,i0)') '[TRACKS] ERROR: ', trim(path),    &
+          if (abs(lon_buf(k) - lon) < 1.0e-12_WP .and. &
+              abs(lat_buf(k) - lat) < 1.0e-12_WP) then
+             write(*,'(a,a,a,i0,a,i0)') '[TRACKS] ERROR: ', trim(path),       &
                   ' line ', line_no, ' duplicates waypoint ', k
              call mpi_abort(partit%MPI_COMM_FESOM, 1, ierr)
           end if
@@ -588,204 +892,6 @@ contains
                               ':', line_no, ': ', trim(msg)
   end subroutine csv_fatal
 
-
-  subroutine resolve_owners(mesh, partit, N, lon_in, lat_in,               &
-                            gid_track, owner_track, lid_owner)
-    type(t_mesh),   intent(in)  :: mesh
-    type(t_partit), intent(in)  :: partit
-    integer,        intent(in)  :: N
-    real(kind=8),   intent(in)  :: lon_in(N), lat_in(N)
-    integer,        intent(out) :: gid_track(N), owner_track(N), lid_owner(N)
-    integer :: k, i, ierr
-    real(kind=8) :: local_best_dist, d, lon_k, lat_k
-    integer :: local_best_lid
-    real(kind=8) :: pair_in(2), pair_out(2)
-    integer :: bcast_buf(2)
-
-    lid_owner(:) = 0
-    do k = 1, N
-       lon_k = lon_in(k)
-       lat_k = lat_in(k)
-       local_best_dist = huge(0.0_8)
-       local_best_lid  = 0
-       do i = 1, partit%myDim_nod2D
-          d = gcdist_km(lon_k, lat_k,                                       &
-                        real(mesh%geo_coord_nod2D(1, i), kind=8) / rad,    &
-                        real(mesh%geo_coord_nod2D(2, i), kind=8) / rad)
-          if (d < local_best_dist) then
-             local_best_dist = d
-             local_best_lid  = i
-          end if
-       end do
-       pair_in(1) = local_best_dist
-       pair_in(2) = real(partit%mype, kind=8)
-       call mpi_allreduce(pair_in, pair_out, 1, MPI_2DOUBLE_PRECISION,     &
-                          MPI_MINLOC, partit%MPI_COMM_FESOM, ierr)
-       owner_track(k) = nint(pair_out(2))
-       if (partit%mype == owner_track(k)) then
-          bcast_buf(1) = partit%myList_nod2D(local_best_lid)
-          bcast_buf(2) = local_best_lid
-       else
-          bcast_buf(:) = 0
-       end if
-       call mpi_bcast(bcast_buf, 2, MPI_INTEGER, owner_track(k),           &
-                      partit%MPI_COMM_FESOM, ierr)
-       gid_track(k) = bcast_buf(1)
-       if (partit%mype == owner_track(k)) lid_owner(k) = bcast_buf(2)
-    end do
-  end subroutine resolve_owners
-
-
-  function gcdist_km(lon1, lat1, lon2, lat2) result(d)
-    real(kind=8), intent(in) :: lon1, lat1, lon2, lat2
-    real(kind=8) :: d
-    real(kind=8), parameter :: deg2rad = 3.141592653589793_8 / 180.0_8
-    real(kind=8) :: phi1, phi2, dl, c
-    phi1 = lat1 * deg2rad
-    phi2 = lat2 * deg2rad
-    dl   = (lon2 - lon1) * deg2rad
-    c    = sin(phi1)*sin(phi2) + cos(phi1)*cos(phi2)*cos(dl)
-    c    = max(-1.0_8, min(1.0_8, c))
-    d    = 6371.0_8 * acos(c)
-  end function gcdist_km
-
-
-  subroutine densify_polyline(N_in, lon_in, lat_in, res_km,                &
-                              N_out, lon_out, lat_out)
-    integer,                   intent(in)  :: N_in
-    real(kind=8),              intent(in)  :: lon_in(N_in), lat_in(N_in)
-    real(kind=8),              intent(in)  :: res_km
-    integer,                   intent(out) :: N_out
-    real(kind=8), allocatable, intent(out) :: lon_out(:), lat_out(:)
-
-    real(kind=8), parameter :: deg2rad = 3.141592653589793_8 / 180.0_8
-    real(kind=8) :: lon1, lat1, lon2, lat2, d_km
-    real(kind=8) :: p1(3), p2(3), pv(3), angle, sinang, t
-    integer :: seg, ns, j, k, cap
-    real(kind=8), allocatable :: buf_lon(:), buf_lat(:)
-
-    if (N_in <= 0) then
-       N_out = 0
-       allocate(lon_out(0), lat_out(0))
-       return
-    end if
-    if (N_in == 1) then
-       N_out = 1
-       allocate(lon_out(1), lat_out(1))
-       lon_out(1) = lon_in(1)
-       lat_out(1) = lat_in(1)
-       return
-    end if
-
-    cap = N_in + max(1, int(40000.0_8 / max(res_km, 0.1_8))) * (N_in - 1)
-    allocate(buf_lon(cap), buf_lat(cap))
-
-    k = 1
-    buf_lon(k) = lon_in(1)
-    buf_lat(k) = lat_in(1)
-
-    do seg = 2, N_in
-       lon1 = lon_in(seg-1); lat1 = lat_in(seg-1)
-       lon2 = lon_in(seg);   lat2 = lat_in(seg)
-       d_km = gcdist_km(lon1, lat1, lon2, lat2)
-       ns = max(1, int(ceiling(d_km / max(res_km, 1.0e-3_8))))
-
-       p1(1) = cos(lat1*deg2rad) * cos(lon1*deg2rad)
-       p1(2) = cos(lat1*deg2rad) * sin(lon1*deg2rad)
-       p1(3) = sin(lat1*deg2rad)
-       p2(1) = cos(lat2*deg2rad) * cos(lon2*deg2rad)
-       p2(2) = cos(lat2*deg2rad) * sin(lon2*deg2rad)
-       p2(3) = sin(lat2*deg2rad)
-       angle  = acos(max(-1.0_8, min(1.0_8, p1(1)*p2(1)+p1(2)*p2(2)+p1(3)*p2(3))))
-       sinang = sin(angle)
-
-       do j = 1, ns
-          t = real(j, kind=8) / real(ns, kind=8)
-          if (sinang < 1.0e-12_8) then
-             pv = p2
-          else
-             pv = (sin((1.0_8 - t) * angle) * p1                           &
-                 + sin(t          * angle) * p2) / sinang
-          end if
-          k = k + 1
-          if (k > cap) then
-             write(*,'(a)') '[TRACKS] BUG: densify buffer overflow'
-             exit
-          end if
-          buf_lat(k) = asin(max(-1.0_8, min(1.0_8, pv(3)))) / deg2rad
-          buf_lon(k) = atan2(pv(2), pv(1)) / deg2rad
-       end do
-    end do
-
-    N_out = k
-    allocate(lon_out(N_out), lat_out(N_out))
-    lon_out = buf_lon(1:N_out)
-    lat_out = buf_lat(1:N_out)
-    deallocate(buf_lon, buf_lat)
-  end subroutine densify_polyline
-
-
-  subroutine dedupe_adjacent(N_in, gid, owner, lid, N_out)
-    integer, intent(in)    :: N_in
-    integer, intent(inout) :: gid(N_in), owner(N_in), lid(N_in)
-    integer, intent(out)   :: N_out
-    integer :: i
-    if (N_in == 0) then
-       N_out = 0
-       return
-    end if
-    N_out = 1
-    do i = 2, N_in
-       if (gid(i) /= gid(N_out)) then
-          N_out = N_out + 1
-          gid(N_out)   = gid(i)
-          owner(N_out) = owner(i)
-          lid(N_out)   = lid(i)
-       end if
-    end do
-  end subroutine dedupe_adjacent
-
-
-  subroutine build_local_lists(partit, N, owner_track, lid_owner,          &
-                               nL_out, track_pos_out, track_lid_out)
-    type(t_partit), intent(in)  :: partit
-    integer,        intent(in)  :: N, owner_track(N), lid_owner(N)
-    integer,        intent(out) :: nL_out
-    integer,    allocatable, intent(out) :: track_pos_out(:), track_lid_out(:)
-    integer :: k, j, ierr
-
-    nL_out = count(owner_track == partit%mype)
-    allocate(track_pos_out(nL_out), track_lid_out(nL_out))
-
-    j = 0
-    do k = 1, N
-       if (owner_track(k) /= partit%mype) cycle
-       j = j + 1
-       track_pos_out(j) = k
-       track_lid_out(j) = lid_owner(k)
-    end do
-    do j = 2, nL_out
-       if (track_pos_out(j) < track_pos_out(j-1)) then
-          write(*,'(a)') '[TRACKS] BUG: track_pos out of order; sort needed.'
-          call mpi_abort(partit%MPI_COMM_FESOM, 1, ierr)
-       end if
-    end do
-  end subroutine build_local_lists
-
-
-  subroutine build_xios_attrs(mesh, t, lon_out, lat_out, i_index)
-    type(t_mesh),  intent(in)  :: mesh
-    type(track_t), intent(in)  :: t
-    real(kind=8),  intent(out) :: lon_out(t%nL), lat_out(t%nL)
-    integer,       intent(out) :: i_index(t%nL)
-    integer :: j, lid
-    do j = 1, t%nL
-       lid = t%track_lid(j)
-       lon_out(j) = real(mesh%geo_coord_nod2D(1, lid), kind=8) / rad
-       lat_out(j) = real(mesh%geo_coord_nod2D(2, lid), kind=8) / rad
-       i_index(j) = t%track_pos(j) - 1
-    end do
-  end subroutine build_xios_attrs
-
 #endif
+
 end module io_tracks_module

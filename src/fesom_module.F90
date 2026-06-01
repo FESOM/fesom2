@@ -862,7 +862,7 @@ contains
         if (io_xios_is_on()) then
             block
               use io_tracks_module, only: io_tracks_send
-              call io_tracks_send(f%tracers, f%partit)
+              call io_tracks_send(f%tracers, f%mesh, f%partit)
             end block
         end if
 #endif
