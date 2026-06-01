@@ -57,7 +57,7 @@ save
   logical       :: l_iniuser = .false.          ! (prescribe init. velo or let model decide?)
   ! =========================================== !
   real          :: smallestvol_icb = 10.0       ! (smallest iceberg volume in m^3?)	
-  real          :: maxspeed_icb = 3.0           ! (cap iceberg speed at ?? m/s?) !security value !not used
+  real          :: maxspeed_icb = 3.0           ! cap iceberg speed [m/s] to prevent numerical artifacts
   ! ========= For sensitivity studies ========= !
   real,dimension(:), allocatable:: coriolis_scale   ! (scale the body forces, Coriolis and
   real,dimension(:), allocatable:: surfslop_scale   !  surface slope, by those factors:

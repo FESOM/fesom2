@@ -71,6 +71,7 @@ subroutine iceberg_dyn(mesh, partit, ice, dynamics, ib, new_u_ib, new_v_ib, u_ib
  real, dimension(2,2) 	:: SI_matrix
  real, dimension(2)	:: SI_velo
  real 			:: u_ib_tmp, v_ib_tmp, normold, normnew, abs_omib, abs_omib_skin, ocean_drag
+real			:: speed_ib
  integer 		:: iter_ib, n, n2
  real          		:: M_b, M_v, M_e, M_bv, sst_ib, sss_ib ! meltrates (basal, lateral, erosion, lateral 'basal'), temp. & salinity
  real			:: T_ave_ib, S_ave_ib, T_keel_ib, S_keel_ib
@@ -240,6 +241,13 @@ arr_S_ave_ib = 0.0
       
  new_u_ib = (1-frozen_in) * new_u_ib + frozen_in * ui_ib
  new_v_ib = (1-frozen_in) * new_v_ib + frozen_in * vi_ib
+
+ ! Cap velocity to prevent numerical artifacts from MPI communication issues
+ speed_ib = sqrt(new_u_ib**2 + new_v_ib**2)
+ if (speed_ib > maxspeed_icb) then
+    new_u_ib = new_u_ib * maxspeed_icb / speed_ib
+    new_v_ib = new_v_ib * maxspeed_icb / speed_ib
+ end if
  
 end subroutine iceberg_dyn
 
