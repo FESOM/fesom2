@@ -128,7 +128,7 @@ module g_config
   logical                       :: turn_off_fw=.false.
   logical                       :: use_icesheet_coupling=.false.  
   logical                       :: lbalance_fw=.true.
-  integer                       :: cell_saturation=2 ! 0=no cell saturation, 1=one additional iceberg allowed, 2=no daddtional iceberg allowed
+  integer                       :: cell_saturation=2 ! 0=no check, 1=one additional allowed, 2=area check (elem_area), 4=single iceberg per element
   logical                       :: lmin_latent_hf=.true.
   logical                       :: lverbose_icb=.false.  
   integer                       :: ib_num=0
