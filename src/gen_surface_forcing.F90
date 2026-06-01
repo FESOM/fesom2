@@ -115,6 +115,29 @@ MODULE g_sbf
 
    character(len=MAX_PATH), save   :: nm_sed_data_file     ='medusa_flux2fesom.nc'
 
+#if defined (__RECOM_WAVEBANDS)
+!CV These are variables used for reading in on OASIM files.
+!CV They are only needed if OASIM=.true. but have to be defined anyways
+!CV Not all of them are actually needed (this comes from MITgcm), but I
+!CV keep them all for now
+!CV The values can be changed via a namelist in namelist.recom   
+   
+   integer            :: OASIMstartdate1, OASIMstartdate2
+   Real(kind=8)       :: OASIMperiod, OASIMrepeatperiod
+   Real(kind=8)       :: OASIM_lon0, OASIM_lon_inc
+   Real(kind=8)       :: exf_inscal_OASIM, exf_outscal_OASIM
+   Real(kind=8)       :: OASIM_lat0, OASIM_lat_inc
+   INTEGER            :: OASIM_nlon
+   INTEGER            :: OASIM_nlat
+   logical            :: OASIM_time_interp = .true.
+   logical            :: OASIM_wavelength_interp = .true.
+   real(kind=8)       :: OASIM_missing_value = -1.d30
+   character(len=256) :: OASIM_path = '/albedo/work/projects/p_specbic/data/forcing/'
+   character(len=128) :: OASIM_file_pattern = 'filled_nan_land.nc'
+   character(len=32)  :: OASIM_Ed_varname = 'Ed'
+   character(len=32)  :: OASIM_Es_varname = 'Es'
+#endif /* (__RECOM_WAVEBANDS) */
+   
 #endif
 
    logical                         :: use_runoff_mapper = .false.               !runof mapper to be used in the coupled mode with IFS
@@ -1042,7 +1065,10 @@ CONTAINS
 
 #if defined(__recom)
       namelist /nam_rsbc/ fe_data_source, nm_fe_data_file, nm_aen_data_file, nm_river_data_file, nm_erosion_data_file, nm_co2_data_file
-#endif
+#if defined (__RECOM_WAVEBANDS)
+      namelist /nam_rspecsbc/ OASIM_path, OASIM_file_pattern, OASIM_Ed_varname, OASIM_Es_varname
+#endif /* (__RECOM_WAVEBANDS) */
+#endif /* (__recom) */
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -1227,6 +1253,12 @@ CONTAINS
             stop
         endif
         READ( nm_sbc_unit+1, nml=nam_rsbc, iostat=iost )
+#if defined (__RECOM_WAVEBANDS)
+!CV read namelist for OASIM data
+        if (OASIM) then
+           READ( nm_sbc_unit+1, nml=nam_rspecsbc, iostat=iost )
+        endif
+#endif /* (__RECOM_WAVEBANDS) */
         close( nm_sbc_unit+1 )
 #endif
 
@@ -1247,7 +1279,10 @@ CONTAINS
       use recom_config
       use recom_glovar
       use REcoM_ciso
-#endif
+#if defined (__RECOM_WAVEBANDS)
+      use recom_spectral, only : tlam, pwaves, oasim_surf, oasim_es2d, oasim_ed2d
+#endif /* (__RECOM_WAVEBANDS) */
+#endif /* (__recom) */
       IMPLICIT NONE
 
       real(wp)     :: rdate ! date
@@ -1272,6 +1307,10 @@ CONTAINS
 #endif
       type(t_partit), intent(inout), target :: partit
       type(t_mesh),   intent(in),    target :: mesh
+#if defined (__RECOM_WAVEBANDS)
+      integer nlam
+      character(3) :: wavelen_str ! string variable for OASIM wavelengths
+#endif /* (__RECOM_WAVEBANDS) */
       
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -1752,7 +1791,27 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
     end if ! use_MEDUSA and sedflx_num not 0
 
     end if
-
+#if defined (__RECOM_WAVEBANDS)
+    !CV read spectrally resolved shortwave radiation from OASIM
+    if (OASIM) then
+       if (update_monthly_flag) then
+          i=month
+          if (mstep > 1) i=i+1 
+          if (i > 12) i=1
+          do nlam=1,tlam
+             write(wavelen_str,'(i3)') pwaves(nlam)
+             filename = TRIM(OASIM_path)//'Es_'//wavelen_str//'_'//TRIM(OASIM_file_pattern)
+             if (mype==0) write(*,*) 'Reading OASIM spectral shortwave input for month ', i,' from ', trim(filename)
+             call read_other_NetCDF(filename, OASIM_Es_varname, i, oasim_surf, .true., .true., partit, mesh)
+             oasim_es2d(:,nlam) = oasim_surf
+             filename = TRIM(OASIM_path)//'Ed_'//wavelen_str//'_'//TRIM(OASIM_file_pattern)
+             if (mype==0) write(*,*) 'Reading OASIM spectral shortwave input for month ', i,' from ', trim(filename)
+             call read_other_NetCDF(filename, OASIM_Ed_varname, i, oasim_surf, .true., .true., partit, mesh)
+             oasim_ed2d(:,nlam) = oasim_surf
+          enddo
+       endif
+    endif
+#endif /* (__RECOM_WAVEBANDS) */
 
 ! ******** Fe deposition *********
     if (fe_data_source=='Albani') then

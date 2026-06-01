@@ -327,8 +327,10 @@ subroutine recom_init(tracers, partit, mesh)
     call wavebands_init_fixed(mype)    
 !if (OASIM) then
 !SL as proposed
+    allocate(oasim_surf(node_size))
     allocate(oasim_ed2D(node_size,tlam))
     allocate(oasim_es2D(node_size,tlam))
+    oasim_surf = 0.d0
     oasim_ed2D = 0.d0
     oasim_es2D = 0.d0
 !   call recom_oasim_init(mesh, partit, mype)

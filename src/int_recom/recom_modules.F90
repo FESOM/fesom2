@@ -30,7 +30,7 @@ module recom_config
              isi   = 18, ife    = 19, iphycal = 20, idetcal = 21,            &
              ioxy  = 22
 
-  Integer :: izoo2n  = 23, izoo2c   = 24, idetz2n    = 25,                   &
+  Integer :: izoo2n  = 23, izoo2c   = 24, idetz2n    = 25, &
              idetz2c = 26, idetz2si = 27, idetz2calc = 28
 
   ! Microzooplankton (third zooplankton group)
@@ -544,7 +544,7 @@ module recom_config
                       darwin_phytoabsorbFile, &
                       darwin_acdomFile, &
                       darwin_particleabsorbFile  
-#endif  
+#endif  /* (__RECOM_WAVEBANDS) */ 
 contains
 
   ! ---------------------------------------------------------------------------
@@ -2062,35 +2062,15 @@ module REcoM_spectral
    Real(kind=8)                :: QYmax_phaeo          = 4.8e-4    ! maximum quantum yield of photosynthesis [mmol C (J)^{-1}]
 !#endif
 !slendif
-!SL TODO: introduce a related namelist file
-!SL relates to interpolation (to be work on)
-!SL if (OASIM)
-   integer                     :: OASIMstartdate1, OASIMstartdate2
-   Real(kind=8)                :: OASIMperiod, OASIMrepeatperiod
-   Real(kind=8)                :: OASIM_lon0, OASIM_lon_inc
-!SL   Real(kind=8)                :: OASIM_lat0, OASIM_lat_inc, OASIM_nlat
-   Real(kind=8)                :: exf_inscal_OASIM, exf_outscal_OASIM
-!------------------------------------------------------------------------------
-!SL remember to declare MAX_LAT_INC
-!SL  Real(kind=8)                                :: OASIM_lon0, OASIM_lon_inc
-   Real(kind=8)                                :: OASIM_lat0 
-!SL   Real(kind=8), dimension(MAX_LAT_INC)       :: OASIM_lat_inc
-   Real(kind=8)                                :: OASIM_lat_inc
-   INTEGER                                     :: OASIM_nlon
-   INTEGER                                     :: OASIM_nlat
-   character(len=256) :: OASIM_path
-   character(len=128) :: OASIM_file_pattern
-   character(len=32)  :: OASIM_Ed_varname
-   character(len=32)  :: OASIM_Es_varname
-   logical            :: OASIM_time_interp = .true.
-   logical            :: OASIM_wavelength_interp = .true.
-   real(kind=8)       :: OASIM_missing_value = -1.d30
-   Real(kind=8), allocatable, dimension(:,:) :: oasim_es2D
-   Real(kind=8), allocatable, dimension(:,:) :: oasim_ed2D
-!SL endif
 !sl consider this module only in case of RECOM_WAVEBANDS
 !sl then the followingb line should be commented 
 !sl #endif
+
+ !CV Global variables to hold spectral shortwave irradiace
+   Real(kind=8), allocatable, dimension(:) :: oasim_surf  ! 1-d field for reading file
+   Real(kind=8), allocatable, dimension(:,:) :: oasim_es2D
+   Real(kind=8), allocatable, dimension(:,:) :: oasim_ed2D
+
 !!-----------------------------------------------------------------------------
 !! ANNA WAVEBANDS_PARAMS.h define key paramters for wavebands
 !! ANNA WAVEBANDS_PARAMS.h set number of wavebands, number of absorption 'types' here
@@ -2193,7 +2173,7 @@ module REcoM_spectral
 
 ! Initially was ap_type(npmax), the number of PT
 
-         Integer,dimension(tnabp)         :: ap_type
+         Integer,dimension(tnabp)     :: ap_type
          Integer,parameter            :: tlam = 13
          Integer,dimension(tlam)      :: pwaves
 
