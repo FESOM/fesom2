@@ -316,7 +316,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   real(kind=WP), dimension(:), pointer  ::  tmp_oce_heat_flux, tmp_ice_heat_flux 
 #endif 
 #if defined (__oifs) || defined (__ifsinterface)
-  real(kind=WP), dimension(:), pointer  :: ice_temp, ice_alb, enthalpyoffuse, runoff_liquid, runoff_solid
+  real(kind=WP), dimension(:), pointer  :: ice_temp, ice_alb, enthalpyoffuse, runoff_liquid, runoff_solid, calving_AA
   real(kind=WP),               pointer  :: tmelt
   real(kind=WP), dimension(:,:,:), pointer :: UVnode
 #endif
@@ -340,6 +340,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   enthalpyoffuse   => ice%atmcoupl%enthalpyoffuse(:)
   runoff_liquid    => ice%atmcoupl%runoff_liquid(:)
   runoff_solid     => ice%atmcoupl%runoff_solid(:)
+  calving_AA       => ice%atmcoupl%calving_AA(:)
   tmelt            => ice%thermo%tmelt
   UVnode           => dynamics%uvnode(:,:,:)
 #endif  
@@ -564,6 +565,10 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
          elseif (i.eq.15) then
              if (action) then
                 v_wind(:)                     = exchange(:)        ! meridional wind
+             end if
+         elseif (i.eq.16) then
+             if (action) then
+                calving_AA(:)                 = exchange(:)        ! Antarctic calving flux (pass-through, not applied)
              end if
 #else
          elseif (i.eq.13) then

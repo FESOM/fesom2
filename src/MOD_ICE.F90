@@ -119,7 +119,7 @@ TYPE T_ICE_ATMCOUPL
     real(kind=WP), allocatable, dimension(:)    :: oce_flx_h, ice_flx_h, tmpoce_flx_h, tmpice_flx_h
 #if defined (__oifs) || defined (__ifsinterface) || defined(__yac)
     !___________________________________________________________________________
-    real(kind=WP), allocatable, dimension(:)    :: ice_alb, enthalpyoffuse, runoff_liquid, runoff_solid, flx_qres, flx_qcon
+    real(kind=WP), allocatable, dimension(:)    :: ice_alb, enthalpyoffuse, runoff_liquid, runoff_solid, calving_AA, flx_qres, flx_qcon
     ! !!! DONT FORGET ice_temp rhs_tempdiv rhs_temp is advected for oifs !!! --> becomes additional ice
     ! tracer in ice%data(4)%values
 #endif /* (__oifs)  */
@@ -383,6 +383,7 @@ subroutine WRITE_T_ICE_ATMCOUPL(tcoupl, unit)
     call write_bin_array(tcoupl%enthalpyoffuse, unit, iostat, iomsg)
     call write_bin_array(tcoupl%runoff_liquid, unit, iostat, iomsg)
     call write_bin_array(tcoupl%runoff_solid, unit, iostat, iomsg)
+    call write_bin_array(tcoupl%calving_AA, unit, iostat, iomsg)
 #endif /* (__oifs) */
 
 end subroutine WRITE_T_ICE_ATMCOUPL  
@@ -405,6 +406,7 @@ subroutine READ_T_ICE_ATMCOUPL(tcoupl, unit)
     call read_bin_array(tcoupl%enthalpyoffuse, unit, iostat, iomsg)
     call read_bin_array(tcoupl%runoff_liquid, unit, iostat, iomsg)
     call read_bin_array(tcoupl%runoff_solid, unit, iostat, iomsg)
+    call read_bin_array(tcoupl%calving_AA, unit, iostat, iomsg)
 #endif /* (__oifs) */
 end subroutine READ_T_ICE_ATMCOUPL
 #endif /* (__coupled:oasis or yac) || (__ifsinterface) */
@@ -884,6 +886,8 @@ subroutine ice_init(ice, partit, mesh)
     ice%atmcoupl%enthalpyoffuse= 0.0_WP
     ice%atmcoupl%runoff_liquid= 0.0_WP
     ice%atmcoupl%runoff_solid= 0.0_WP
+    allocate(ice%atmcoupl%calving_AA(node_size))
+    ice%atmcoupl%calving_AA= 0.0_WP
     allocate(ice%atmcoupl%flx_qres(node_size))
     allocate(ice%atmcoupl%flx_qcon(node_size))
     ice%atmcoupl%flx_qres      = 0.0_WP    

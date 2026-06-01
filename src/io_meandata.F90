@@ -309,6 +309,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
           "rhs_a               ", "rhs_m               ", "rsdoabsorb          ", &
           "runoff              ", "runoff_liquid       ", "runoff_solid        ", &
           "salt                ", "sgm11               ", "sgm12               ", &
+          "calving_AA          ", &
           "sgm22               ", "shum                ", "siarean             ", &
           "siareas             ", "siextentn           ", "siextents           ", &
           "sigma0              ", "sigma_x             ", "sigma_y             ", &
@@ -1651,6 +1652,8 @@ CASE ('runoff_liquid  ')
   call def_stream(nod2D, myDim_nod2D, 'runoff_liquid',  'liquid water runoff',     'm/s',    ice%atmcoupl%runoff_liquid(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('runoff_solid  ')
   call def_stream(nod2D, myDim_nod2D, 'runoff_solid',  'solid water runoff',     'm/s',    ice%atmcoupl%runoff_solid(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('calving_AA  ')
+  call def_stream(nod2D, myDim_nod2D, 'calving_AA',  'Antarctic calving flux',     'm/s',    ice%atmcoupl%calving_AA(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('enthalpy  ')
   call def_stream(nod2D, myDim_nod2D, 'enth',  'enthalpy of fusion of solid water runoff',     'W/m^2',    ice%atmcoupl%enthalpyoffuse(:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('qcon      ')
