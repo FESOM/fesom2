@@ -296,8 +296,9 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   real(kind=WP), dimension(:), allocatable , save  :: mask !, weight
   logical, save                                    :: firstcall=.true.
   logical                                          :: action
-  logical                                          :: do_rotate_oce_wind=.false.
-  logical                                          :: do_rotate_ice_wind=.false.
+  logical                                          :: do_rotate_oce_windstress=.false.
+  logical                                          :: do_rotate_ice_windstress=.false.
+  logical                                          :: do_rotate_oce_windspeed=.false.
   INTEGER                                          :: my_global_rank, ierror
   INTEGER 					   :: status(MPI_STATUS_SIZE)
 #endif
@@ -464,19 +465,19 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
         if (i.eq.1) then
             if (.not. action) cycle
             stress_atmoce_x(:) =  exchange(:)                    ! taux_oce
-            do_rotate_oce_wind=.true.
+            do_rotate_oce_windstress=.true.
         elseif (i.eq.2) then
             if (.not. action) cycle
             stress_atmoce_y(:) =  exchange(:)                    ! tauy_oce
-            do_rotate_oce_wind=.true.
+            do_rotate_oce_windstress=.true.
         elseif (i.eq.3) then
             if (.not. action) cycle	
             stress_atmice_x(:) =  exchange(:)                    ! taux_ice
-            do_rotate_ice_wind=.true.
+            do_rotate_ice_windstress=.true.
         elseif (i.eq.4) then
             if (.not. action) cycle	
             stress_atmice_y(:) =  exchange(:)                    ! tauy_ice
-            do_rotate_ice_wind=.true.	     
+            do_rotate_ice_windstress=.true.	     
         elseif (i.eq.5) then
             if (action) then 
                 prec_rain(:)    =  exchange(:)	                  ! tot_prec
@@ -561,10 +562,12 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
          elseif (i.eq.14) then
              if (action) then
                 u_wind(:)                     = exchange(:)        ! zonal wind
+                do_rotate_oce_windspeed=.true.
              end if
          elseif (i.eq.15) then
              if (action) then
                 v_wind(:)                     = exchange(:)        ! meridional wind
+                do_rotate_oce_windspeed=.true.
              end if
          elseif (i.eq.16) then
              if (action) then
@@ -670,13 +673,20 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 #endif
       end do
 
-    if ((do_rotate_oce_wind .AND. do_rotate_ice_wind) .AND. rotated_grid) then
+    if ((do_rotate_oce_windstress .AND. do_rotate_ice_windstress) .AND. rotated_grid) then
         do n=1, myDim_nod2D+eDim_nod2D
             call vector_g2r(stress_atmoce_x(n), stress_atmoce_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0)
             call vector_g2r(stress_atmice_x(n), stress_atmice_y(n), coord_nod2D(1, n), coord_nod2D(2, n), 0)
         end do
-        do_rotate_oce_wind=.false.
-        do_rotate_ice_wind=.false.
+        do_rotate_oce_windstress=.false.
+        do_rotate_ice_windstress=.false.
+    end if
+
+    if ((do_rotate_oce_windspeed) .AND. rotated_grid) then
+        do n=1, myDim_nod2D+eDim_nod2D
+            call vector_g2r(u_wind(n), v_wind(n), coord_nod2D(1, n), coord_nod2D(2, n), 0)
+        end do
+        do_rotate_oce_windspeed=.false.
     end if
 #else
 #ifndef __ifsinterface
