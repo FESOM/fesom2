@@ -563,38 +563,70 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
      write(*,*) " * checking for cell saturation"
      write(*,*) " * ib: ", ib, ", old_elem: ", old_element, ", new_elem: ", iceberg_elem
     end if
-    select case(cell_saturation) !num of coastal points
-     case(1) 
-      area_ib_tot = 0.0
-     case(2) 
-      area_ib_tot = length_ib_single*width_ib_single*scaling(ib)
-    end select
+    
+    ! cell_saturation=4: single iceberg per element (count-based)
+    if (cell_saturation == 4) then
+      num_ib_in_elem = 0
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(idx) REDUCTION(+:num_ib_in_elem)
+!$OMP DO
+      do idx = 1, size(elem_block)
+          if (elem_block(idx) == iceberg_elem .and. idx /= ib) then
+              num_ib_in_elem = num_ib_in_elem + 1
+          end if
+      end do
+!$OMP END DO
+!$OMP END PARALLEL
+      if ((num_ib_in_elem > 0) .and. (old_element.ne.0)) then
+          if( lverbose_icb) then
+              write(*,*) " *******************************************************"
+              write(*,*) " * set iceberg ", ib, " back to elem ", old_element, " from elem ", iceberg_elem
+              write(*,*) " * element already occupied by ", num_ib_in_elem, " iceberg(s)"
+          end if
+          i_have_element = .true.
+          left_mype = 0.0
+          lon_rad = old_lon
+          lat_rad = old_lat
+          lon_deg = lon_rad/rad
+          lat_deg = lat_rad/rad
+          iceberg_elem = old_element
+          u_ib    = 0.
+          v_ib    = 0.
+      end if
+    else
+      ! cell_saturation=1,2: area-based checks
+      select case(cell_saturation)
+       case(1) 
+        area_ib_tot = 0.0
+       case(2) 
+        area_ib_tot = length_ib_single*width_ib_single*scaling(ib)
+      end select
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(idx) REDUCTION(+:area_ib_tot)
 !$OMP DO
-    do idx = 1, size(elem_block)
-        if (elem_block(idx) == iceberg_elem) then
-            area_ib_tot = area_ib_tot + length_ib(idx) * width_ib(idx) * scaling(idx)
-        end if
-    end do
+      do idx = 1, size(elem_block)
+          if (elem_block(idx) == iceberg_elem) then
+              area_ib_tot = area_ib_tot + length_ib(idx) * width_ib(idx) * scaling(idx)
+          end if
+      end do
 !$OMP END DO
 !$OMP END PARALLEL
   !-----------------------------
 
-    if ((area_ib_tot > elem_area_glob(iceberg_elem)) .and. (old_element.ne.0)) then ! .and. (left_mype == 0)) then 
-        if( lverbose_icb) then
-            write(*,*) " *******************************************************"
-            write(*,*) " * set iceberg ", ib, " back to elem ", old_element, " from elem ", iceberg_elem
-            write(*,*) " * area_ib_tot = ", area_ib_tot, "; elem_area = ", elem_area(local_idx_of(iceberg_elem))
-        end if
-        i_have_element = .true.
-        left_mype = 0.0
-        lon_rad = old_lon
-        lat_rad = old_lat
-        lon_deg = lon_rad/rad
-        lat_deg = lat_rad/rad
-        iceberg_elem = old_element
-        u_ib    = 0.
-        v_ib    = 0.
+      if ((area_ib_tot > elem_area_glob(iceberg_elem)) .and. (old_element.ne.0)) then
+          if( lverbose_icb) then
+              write(*,*) " *******************************************************"
+              write(*,*) " * set iceberg ", ib, " back to elem ", old_element, " from elem ", iceberg_elem
+              write(*,*) " * area_ib_tot = ", area_ib_tot, "; elem_area = ", elem_area(local_idx_of(iceberg_elem))
+          end if
+          i_have_element = .true.
+          left_mype = 0.0
+          lon_rad = old_lon
+          lat_rad = old_lat
+          lon_deg = lon_rad/rad
+          lat_deg = lat_rad/rad
+          iceberg_elem = old_element
+          u_ib    = 0.
+          v_ib    = 0.
+      end if
     end if
   end if
   !###########################################
@@ -784,47 +816,84 @@ type(t_partit), intent(inout), target :: partit
            u_ib    = 0.
            v_ib    = 0.
    else if((cell_saturation>0) .and. (iceberg_elem.ne.old_element)) then
-     if (mype==0) write(*,*) 'iceberg ',ib, ' changed PE or was very fast'
-     elem_area_tmp = elem_area_glob(iceberg_elem)
-     select case(cell_saturation) !num of coastal points
-      case(1) 
-       area_ib_tot = 0.0
-      case(2) 
-       area_ib_tot = length_ib_single*width_ib_single*scaling(ib)
-     end select
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(idx) REDUCTION(+:area_ib_tot)
+     if (mype==0 .and. lverbose_icb) write(*,*) 'iceberg ',ib, ' changed PE or was very fast'
+     
+     ! cell_saturation=4: single iceberg per element (count-based)
+     if (cell_saturation == 4) then
+       num_ib_in_elem = 0
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(idx) REDUCTION(+:num_ib_in_elem)
 !$OMP DO
-     do idx = 1, size(elem_block_red)
-         if (elem_block_red(idx) == iceberg_elem) then
-     !        write(*,*) " * Found element ",elem_block_red(idx), " for ib ",idx, ", elem_area=",elem_area_tmp
-             area_ib_tot = area_ib_tot + length_ib(idx) * width_ib(idx) * scaling(idx)
-         end if
-     end do
+       do idx = 1, size(elem_block_red)
+           if (elem_block_red(idx) == iceberg_elem .and. idx /= ib) then
+               num_ib_in_elem = num_ib_in_elem + 1
+           end if
+       end do
 !$OMP END DO
 !$OMP END PARALLEL
-     if((area_ib_tot > elem_area_tmp) .and. (elem_area_tmp > 0.0) .and. (old_element.ne.0)) then
-         if(mype==pe_block_red(ib) .and. lverbose_icb) then
-            write(*,*) " *******************************************************"
-            write(*,*) " * iceberg changed PE and saturation"
-            write(*,*) " * set iceberg ", ib, " back to elem ", old_element, " from elem ", iceberg_elem
-            write(*,*) " * area_ib = ", length_ib_single * width_ib_single, "; area_ib_tot = ", area_ib_tot, "; elem_area = ", elem_area_tmp
-         end if
-         
-         left_mype = 0.0
-         lon_rad = old_lon
-         lat_rad = old_lat
-         lon_deg = lon_rad/rad
-         lat_deg = lat_rad/rad
-         u_ib    = 0.
-         v_ib    = 0.
+       if ((num_ib_in_elem > 0) .and. (old_element.ne.0)) then
+           if(mype==pe_block_red(ib) .and. lverbose_icb) then
+              write(*,*) " *******************************************************"
+              write(*,*) " * iceberg changed PE and saturation"
+              write(*,*) " * set iceberg ", ib, " back to elem ", old_element, " from elem ", iceberg_elem
+              write(*,*) " * element already occupied by ", num_ib_in_elem, " iceberg(s)"
+           end if
+           
+           left_mype = 0.0
+           lon_rad = old_lon
+           lat_rad = old_lat
+           lon_deg = lon_rad/rad
+           lat_deg = lat_rad/rad
+           u_ib    = 0.
+           v_ib    = 0.
 
-         i_have_element= (local_idx_of(iceberg_elem) .ne. 0) 
-         if(i_have_element) then
-            i_have_element= mesh%elem2D_nodes(1,local_idx_of(iceberg_elem)) <= partit%myDim_nod2D !1 PE still .true.
-         end if
+           i_have_element= (local_idx_of(iceberg_elem) .ne. 0) 
+           if(i_have_element) then
+              i_have_element= mesh%elem2D_nodes(1,local_idx_of(iceberg_elem)) <= partit%myDim_nod2D !1 PE still .true.
+           end if
+       end if
+     else
+       ! cell_saturation=1,2: area-based checks
+       elem_area_tmp = elem_area_glob(iceberg_elem)
+       select case(cell_saturation)
+        case(1) 
+         area_ib_tot = 0.0
+        case(2) 
+         area_ib_tot = length_ib_single*width_ib_single*scaling(ib)
+       end select
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(idx) REDUCTION(+:area_ib_tot)
+!$OMP DO
+       do idx = 1, size(elem_block_red)
+           if (elem_block_red(idx) == iceberg_elem) then
+       !        write(*,*) " * Found element ",elem_block_red(idx), " for ib ",idx, ", elem_area=",elem_area_tmp
+               area_ib_tot = area_ib_tot + length_ib(idx) * width_ib(idx) * scaling(idx)
+           end if
+       end do
+!$OMP END DO
+!$OMP END PARALLEL
+       if((area_ib_tot > elem_area_tmp) .and. (elem_area_tmp > 0.0) .and. (old_element.ne.0)) then
+           if(mype==pe_block_red(ib) .and. lverbose_icb) then
+              write(*,*) " *******************************************************"
+              write(*,*) " * iceberg changed PE and saturation"
+              write(*,*) " * set iceberg ", ib, " back to elem ", old_element, " from elem ", iceberg_elem
+              write(*,*) " * area_ib = ", length_ib_single * width_ib_single, "; area_ib_tot = ", area_ib_tot, "; elem_area = ", elem_area_tmp
+           end if
+           
+           left_mype = 0.0
+           lon_rad = old_lon
+           lat_rad = old_lat
+           lon_deg = lon_rad/rad
+           lat_deg = lat_rad/rad
+           u_ib    = 0.
+           v_ib    = 0.
+
+           i_have_element= (local_idx_of(iceberg_elem) .ne. 0) 
+           if(i_have_element) then
+              i_have_element= mesh%elem2D_nodes(1,local_idx_of(iceberg_elem)) <= partit%myDim_nod2D !1 PE still .true.
+           end if
+       end if
      end if
    else 
-     if (mype==0) write(*,*) 'iceberg ',ib, ' changed PE or was very fast'
+     if (mype==0 .and. lverbose_icb) write(*,*) 'iceberg ',ib, ' changed PE or was very fast'
    end if
  end if
  
