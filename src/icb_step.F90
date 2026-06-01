@@ -263,7 +263,7 @@ end do
 
  t4=MPI_Wtime() 
  
- if (mod(istep,logfile_outfreq)==0 .and. mype==0) then 
+ if (lverbose_icb .and. mod(istep,logfile_outfreq)==0 .and. mype==0) then 
    write(*,*) 'icebergs took', t4-t0 
    write(*,*) 'iceberg step1 took', t1-t0
    write(*,*) 'NEW comvalues took', t2-t1
@@ -377,7 +377,7 @@ type(t_dyn)   , intent(inout), target :: dynamics
  if(volume_ib .le. smallestvol_icb) then
   melted(ib) = .true.
 
-  if (mod(istep_end_synced,logfile_outfreq)==0 .and. mype==0 .and. lastsubstep) then
+  if (lverbose_icb .and. mod(istep_end_synced,logfile_outfreq)==0 .and. mype==0 .and. lastsubstep) then
    write(*,*) 'iceberg ', ib,' melted'
   end if
 
@@ -415,9 +415,11 @@ type(t_dyn)   , intent(inout), target :: dynamics
       reject_tmp = any(mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0) .OR. all(mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==0.0) 
       !reject_tmp = all( (mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==0.0) )
       if(reject_tmp) then
-       write(*,*) " * set IB elem ",iceberg_elem,"to zero for IB=",ib
-       write(*,*) " cavity: ",all((mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0))
-       write(*,*) " boundary: ", all(mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==0)
+       if(lverbose_icb) then
+        write(*,*) " * set IB elem ",iceberg_elem,"to zero for IB=",ib
+        write(*,*) " cavity: ",all((mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0))
+        write(*,*) " boundary: ", all(mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==0)
+       end if
        iceberg_elem=0 !reject element
        i_have_element=.false.
       else 
@@ -439,7 +441,7 @@ type(t_dyn)   , intent(inout), target :: dynamics
   if(local_idx_of(iceberg_elem) <= partit%myDim_elem2D ) then
     call initialize_velo(mesh, partit, dynamics, i_have_element, ib, u_ib, v_ib, lon_rad, lat_rad, depth_ib, local_idx_of(iceberg_elem))
   else
-    write(*,*) " * skip initialize_velo"
+    if(lverbose_icb) write(*,*) " * skip initialize_velo"
   end if
   !iceberg elem of ib is found
   find_iceberg_elem = .false.
@@ -1572,6 +1574,7 @@ subroutine determine_save_count(partit)
   ! computes save_count_buoys and prev_sec_in_year from records in existing netcdf file
   !-----------------------------------------------------------  
   use g_clock
+  use g_config, only: lverbose_icb
   use netcdf
 !  use iceberg_params, only : file_icb_netcdf, save_count_buoys, prev_sec_in_year
   !use iceberg_params, only : save_count_buoys, prev_sec_in_year
@@ -1600,7 +1603,7 @@ type(t_partit), intent(inout), target :: partit
   ! the next buoy/iceberg record to be saved
   save_count_buoys=buoy_nrec+1
 
-  write(*,*) 'next record is #',save_count_buoys
+  if(lverbose_icb) write(*,*) 'next record is #',save_count_buoys
 
   ! load sec_in_year up to now in 'prev_sec_in_year', time axis will be continued
   status=nf90_inq_varid(ncid, 'time', time_varid)
@@ -1608,7 +1611,7 @@ type(t_partit), intent(inout), target :: partit
   status=nf90_get_var(ncid, time_varid, prev_sec_in_year) 
   if (status .ne. nf90_noerr) call handle_err(status, partit)
 
-  write(*,*) 'seconds passed up to now: ',prev_sec_in_year
+  if(lverbose_icb) write(*,*) 'seconds passed up to now: ',prev_sec_in_year
 
   !close file
   status=nf90_close(ncid)
@@ -1628,7 +1631,7 @@ subroutine init_buoy_output(partit)
   ! reviewed by T. Rackow, 14.08.2015
   !-----------------------------------------------------------  
   use g_clock
-  use g_config, only : ib_num
+  use g_config, only : ib_num, lverbose_icb
   use netcdf
 !  use iceberg_params, only : file_icb_netcdf, save_count_buoys !ggf in namelist
   implicit none

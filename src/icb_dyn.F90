@@ -6,6 +6,7 @@ module iceberg_dynamics
  USE MOD_DYN
  use iceberg_params
  use iceberg_element
+ use g_config, only: lverbose_icb
  !use iceberg_step
 
 implicit none
@@ -1019,11 +1020,11 @@ else !# comp cav flag
       T_keel(m)=Temkeel
       S_keel(m)=Salkeel
       
-      if(S_dz(m)/abs(depth_ib)>70.) then
+      if(lverbose_icb .and. S_dz(m)/abs(depth_ib)>70.) then
        write(*,*) 'innerloop, dz:',dz,', depth:',depth_ib,',S_dz(m):',S_dz(m),"m:",m,", k:",k,", Tclim_ib(k-1,n2):",Tclim_ib(k-1,n2),", Tclim_ib(k,n2):", Tclim_ib(k,n2),", Salkeel:",Salkeel,", lev_low:",lev_low,", lev_up:",lev_up
       end if
       
-      if(T_dz(m)/abs(depth_ib)>70.) then
+      if(lverbose_icb .and. T_dz(m)/abs(depth_ib)>70.) then
        write(*,*) 'innerloop, dz:',dz,', depth:',depth_ib,',T_dz(m):',T_dz(m),"m:",m,", k:",k,", Sclim_ib(k-1,n2):",Sclim_ib(k-1,n2),", Sclim_ib(k,n2):", Sclim_ib(k,n2),",Temkeel:",Temkeel,", lev_low:",lev_low,", lev_up:",lev_up
       end if
 
@@ -1056,11 +1057,11 @@ else !# comp cav flag
       end if
 
    
-      if(S_dz(m)/abs(depth_ib)>70.) then
+      if(lverbose_icb .and. S_dz(m)/abs(depth_ib)>70.) then
        write(*,*) 'innerloop, dz:',dz,', depth:',depth_ib,',S_dz(m):',S_dz(m),"m:",m,", k:",k,", Tclim_ib(k-1,n2):",Tclim_ib(k-1,n2),", Tclim_ib(k,n2):", Tclim_ib(k,n2),", lev_low:",lev_low,", lev_up:",lev_up
       end if
       
-      if(T_dz(m)/abs(depth_ib)>70.) then
+      if(lverbose_icb .and. T_dz(m)/abs(depth_ib)>70.) then
        write(*,*) 'innerloop, dz:',dz,', depth:',depth_ib,',T_dz(m):',T_dz(m),"m:",m,", k:",k,", Sclim_ib(k-1,n2):",Sclim_ib(k-1,n2),", Sclim_ib(k,n2):", Sclim_ib(k,n2),", lev_low:",lev_low,", lev_up:",lev_up
       end if
 
