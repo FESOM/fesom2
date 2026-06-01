@@ -1458,6 +1458,13 @@ subroutine init_icebergs
     read(98,*) scaling(i)
  end do
  close(98)
+!calving_day_file > calving_day
+ open(unit=97, file=calving_day_file,status='old',action='read',iostat=io_error)
+ if ( io_error.ne.0) stop 'ERROR while reading file calving_day_file'
+ do i = 1, ib_num
+    read(97,*) calving_day(i)
+ end do
+ close(97)
 
 end subroutine init_icebergs
 !
@@ -1518,6 +1525,13 @@ subroutine init_icebergs_with_icesheet
     read(98,*) scaling(i)
  end do
  close(98)
+!calving_day_file > calving_day (for new icebergs only)
+ open(unit=97, file=calving_day_file,status='old',action='read',iostat=io_error)
+ if ( io_error.ne.0) stop 'ERROR while reading file calving_day_file'
+ do i = 1+num_non_melted_icb, ib_num
+    read(97,*) calving_day(i)
+ end do
+ close(97)
 
 end subroutine init_icebergs_with_icesheet
 !
