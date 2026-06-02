@@ -134,6 +134,12 @@ module g_cvmix_idemix2
     ! total global Energy input that should be conserved if 0.0 no conservation is applied
     real(kind=WP)      :: idemix2_botforc_Etot = 0.0_WP ! units W
     
+    !___________________________________________________________________________
+    ! switch on extended diagnostic
+    logical            :: idemix2_diag_Ecompart = .false.
+    logical            :: idemix2_diag_Eiw      = .false.
+    logical            :: idemix2_diag_WWI      = .false.
+    
 !     !___________________________________________________________________________
 !     ! enable lee wave source of internal wave energy in IDEMIX2, 
 !     ! Lee Wave Generation: Generated when mean flow encounters topography Energy 
@@ -167,7 +173,8 @@ module g_cvmix_idemix2
 !                              idemix2_enable_leew, idemix2_leewforc_file, idemix2_leewforc_vname, &
                              idemix2_enable_bot , idemix2_botforc_file , idemix2_botforc_vname , &
                              idemix2_hrmsforc_file, idemix2_hrmsforc_vname, &
-                             idemix2_hlamforc_file, idemix2_hlamforc_vname
+                             idemix2_hlamforc_file, idemix2_hlamforc_vname, &
+                             idemix2_diag_Ecompart, idemix2_diag_Eiw, idemix2_diag_WWI
     
     !___________________________________________________________________________
     ! CVMIX-IDEMIX variables
@@ -229,7 +236,25 @@ module g_cvmix_idemix2
     real(kind=WP), allocatable, dimension(:,:,:):: iwe2_gradxy_e, iwe2_gradxy_n
     real(kind=WP), allocatable, dimension(:,:  ):: iwe2_flx_uv, iwe2_flx_w
     integer                                     :: iwe2_taum1=1, iwe2_tau=2, iwe2_taup1=3, otaum1
-    
+
+    ! reflective coastal BC: for each edge touching exactly one coast node,
+    ! iwe2_bc_reflect_bin stores the mirror spectral bin (0 = edge not flagged),
+    ! iwe2_bc_reflect_sgn = +1 if ednodes(1) is the coast node, -1 if ednodes(2) is.
+    integer      , allocatable, dimension(:)    :: iwe2_bc_reflect_bin
+    integer      , allocatable, dimension(:)    :: iwe2_bc_reflect_sgn
+    ! per-timestep scratch: blocked coast flux accumulated per (mirror bin, interior node),
+    ! filled by apply_reflect_bc_spctrl, applied to Edivh in hsintegrate_Ecompart
+    real(kind=WP), allocatable, dimension(:,:)  :: iwe2_reflect_src
+    ! persistent per-compartment copies of iwe2_reflect_src for I/O output
+    real(kind=WP), allocatable, dimension(:,:)  :: iwe2_M2_reflect_src
+    real(kind=WP), allocatable, dimension(:,:)  :: iwe2_niw_reflect_src
+    ! mask: .true. for own nodes that are interior to at least one coast edge
+    logical,       allocatable, dimension(:)    :: iwe2_is_reflect_node
+    ! compact list of own-node indices that have at least one coast edge;
+    ! used to restrict the Edivh reflect_src injection to coast-adjacent nodes only
+    integer,       allocatable, dimension(:)    :: iwe2_reflect_nodes
+    integer                                     :: iwe2_n_reflect_nodes
+
     ! real(kind=WP), allocatable, dimension(:)    :: iwe2_cn_e, iwe2_cn_gradx, iwe2_cn_grady
     
     ! load variables from CVMix list
@@ -252,7 +277,7 @@ module g_cvmix_idemix2
         
         character(len=cvmix_strlen) :: nmlfile
         logical                     :: file_exist=.False.
-        integer                     :: node_size, elem_size, elem, node, nfbin, & 
+        integer                     :: node_size, elem_size, elem, node, nfbin, &
                                        fbin_i, elnodes(3), nzmax
         real(kind=WP)               :: loc_Etot=0.0_WP, glb_Etot=0.0_WP
         real(kind=WP)               :: t0, t1
@@ -342,13 +367,6 @@ module g_cvmix_idemix2
         allocate(iwe2_cn(node_size))
         iwe2_cn(:)           = 0.0_WP
         
-!         allocate(iwe2_cn_e(elem_size))
-!         allocate(iwe2_cn_gradx(elem_size))
-!         allocate(iwe2_cn_grady(elem_size))
-!         iwe2_cn_e(:)         = 0.0_WP
-!         iwe2_cn_gradx(:)     = 0.0_WP
-!         iwe2_cn_grady(:)     = 0.0_WP
-        
         ! Eiw 3d enery dissipation coefficient 
         allocate(iwe2_alpha_c(nl,node_size))
         iwe2_alpha_c(:,:)    = 0.0_WP
@@ -356,52 +374,54 @@ module g_cvmix_idemix2
         ! initialise Eiw - internal wave energy variables
         ! index (1:3,...) timestep index E^(n-1), E^(n), E^(n+1)
         allocate(iwe2_E_iw(   3, nl, node_size))
-        allocate( iwe2_E_iw_diss(nl, node_size) &
-                , iwe2_E_iw_dt(  nl, node_size) &
-                , iwe2_E_iw_fbot(nl, node_size) &
-                )
-        allocate(iwe2_E_iw_vdif(nl, node_size), iwe2_E_iw_hdif(nl, node_size))
-        allocate(iwe2_E_iw_fsrf(node_size))
         iwe2_E_iw(     :,:,:)= 0.0_WP
         
-        ! Eiw production terms: 
-        iwe2_E_iw_dt(    :,:)= 0.0_WP ! total Eiw production
+        allocate(iwe2_E_iw_diss(nl, node_size))
         iwe2_E_iw_diss(  :,:)= 0.0_WP ! Eiw production from disspation 
-        iwe2_E_iw_fbot(  :,:)= 0.0_WP ! Eiw production from bottom forcing 
-        iwe2_E_iw_hdif(  :,:)= 0.0_WP ! Eiw production from horizontal diffusion
-        iwe2_E_iw_vdif(  :,:)= 0.0_WP ! Eiw production from vertical diffusion
-        iwe2_E_iw_fsrf(    :)= 0.0_WP ! Eiw production from surface forcing 
         
-        ! initialise M2 variables 
-        if (idemix2_enable_M2) then 
-            ! dissipation of E_iw through E_M2
-            allocate( iwe2_E_iw_diss_M2(nl, node_size))
-            iwe2_E_iw_diss_M2(:,:)= 0.0_WP
+        ! Diagnostics
+        if (idemix2_diag_Eiw) then
+            allocate( iwe2_E_iw_fbot(nl, node_size) &
+                    , iwe2_E_iw_vdif(nl, node_size) &
+                    , iwe2_E_iw_hdif(nl, node_size) &
+                    , iwe2_E_iw_fsrf(    node_size) &
+                    )
+            iwe2_E_iw_fbot(  :,:)= 0.0_WP
+            iwe2_E_iw_hdif(  :,:)= 0.0_WP
+            iwe2_E_iw_vdif(  :,:)= 0.0_WP
+            iwe2_E_iw_fsrf(    :)= 0.0_WP
+        end if
+        if (idemix2_diag_Eiw .or. idemix2_diag_WWI) then
+            allocate( iwe2_E_iw_dt(  nl, node_size))
+            iwe2_E_iw_dt(    :,:)= 0.0_WP
+        end if
         
+        ! initialise M2 variables
+        if (idemix2_enable_M2) then
             ! M2 energy dissipation
             allocate(iwe2_alpha_M2_c(node_size))
             iwe2_alpha_M2_c(:)    = 0.0_WP
-            
-            ! M2 dissipation timescale 
+
+            ! M2 dissipation timescale
             allocate(iwe2_M2_tau(node_size))
             iwe2_M2_tau(:)        = 0.0_WP
-            
-            ! M2 cross spectral propagation at elements  
+
+            ! M2 cross spectral propagation at elements
             allocate(w_M2_e(nfbin))
             w_M2_e(:)             = 0.0_WP
-            
+
             ! M2 zonal/merid group velocity, and cross spectral propagation
             ! at vertices
             allocate(iwe2_M2_uv(2, nfbin,elem_size))
             allocate(iwe2_M2_w(    nfbin,node_size))
             iwe2_M2_uv(:,:,:)     = 0.0_WP
             iwe2_M2_w(:,:)        = 0.0_WP
-            
+
             ! M2 forcing
             allocate(iwe2_fM2(nfbin, node_size))
             iwe2_fM2(:,:)         = 0.0_WP
-            
-            ! M2 wave energy, and divergence of M2 wave energy 
+
+            ! M2 wave energy, and divergence of M2 wave energy
             ! index (1:3,...) timestep index E^(n-1), E^(n), E^(n+1)
             allocate(  iwe2_E_M2(     3, nfbin, node_size) &
                      , iwe2_E_M2_divh(3, nfbin, node_size) &
@@ -410,58 +430,65 @@ module g_cvmix_idemix2
             iwe2_E_M2(      :,:,:)= 0.0_WP
             iwe2_E_M2_divh( :,:,:)= 0.0_WP
             iwe2_E_M2_divs( :,:,:)= 0.0_WP
-            
-            ! structure function for M2 energy 
+
+            ! structure function for M2 energy
             allocate(iwe2_E_M2_struct(nl, node_size))
             iwe2_E_M2_struct(:,:) = 0.0_WP
+
+            ! Diagnostics
+            if (idemix2_diag_Ecompart) then
+                ! diagnostic for M2 spectral energy advection
+                allocate( iwe2_E_M2_advh(nfbin, myDim_nod2D) &
+                        , iwe2_E_M2_advs(nfbin, myDim_nod2D) &
+                        , iwe2_E_M2_diss(nfbin, myDim_nod2D) &
+                        , iwe2_E_M2_forc(nfbin, myDim_nod2D) )
+                iwe2_E_M2_advh(:,:) = 0.0_WP
+                iwe2_E_M2_advs(:,:) = 0.0_WP
+                iwe2_E_M2_diss(:,:) = 0.0_WP
+                iwe2_E_M2_forc(:,:) = 0.0_WP
+            end if
             
-            ! diagnostic for M2 spectral energy advection 
-            allocate(  iwe2_E_M2_dt(      nfbin, myDim_nod2D) & ! total change in E_M2
-                     , iwe2_E_M2_advh(    nfbin, myDim_nod2D) &
-                     , iwe2_E_M2_advs(    nfbin, myDim_nod2D) &
-                     , iwe2_E_M2_diss(    nfbin, myDim_nod2D) &
-                     , iwe2_E_M2_diss_wwi(nfbin, myDim_nod2D) &
-                     , iwe2_E_M2_forc(    nfbin, myDim_nod2D) &
-                     )
-            iwe2_E_M2_dt(      :,:) = 0.0_WP
-            iwe2_E_M2_advh(    :,:) = 0.0_WP
-            iwe2_E_M2_advs(    :,:) = 0.0_WP
-            iwe2_E_M2_diss(    :,:) = 0.0_WP
-            iwe2_E_M2_diss_wwi(:,:) = 0.0_WP
-            iwe2_E_M2_forc(    :,:) = 0.0_WP
+            if (idemix2_diag_Ecompart .or. idemix2_diag_WWI) then
+                ! diagnostic for M2 spectral energy advection
+                allocate( iwe2_E_M2_dt(  nfbin, myDim_nod2D) )
+                iwe2_E_M2_dt(  :,:) = 0.0_WP
+            end if 
             
-        end if 
-        
-        ! initialise niw variables 
-        if (idemix2_enable_niw) then 
-            ! dissipation of E_iw through E_M2
-            allocate( iwe2_E_iw_diss_niw(nl, node_size))
-            iwe2_E_iw_diss_niw(:,:)= 0.0_WP
-            
+            if (idemix2_diag_WWI) then
+                ! diagnostic for M2 wave-wave interaction
+                allocate( iwe2_E_iw_diss_M2( nl   , node_size   ) &
+                        , iwe2_E_M2_diss_wwi(nfbin, myDim_nod2D) )
+                iwe2_E_iw_diss_M2( :,:) = 0.0_WP
+                iwe2_E_M2_diss_wwi(:,:) = 0.0_WP
+            end if
+        end if
+
+        ! initialise niw variables
+        if (idemix2_enable_niw) then
             ! niw frequency
             allocate(iwe2_omega_niw(node_size))
             iwe2_omega_niw(:)      = 0.0_WP
-            
-            ! niw dissipation timescale 
+
+            ! niw dissipation timescale
             allocate(iwe2_niw_tau(node_size))
             iwe2_niw_tau(:)        = 0.0_WP
-            
-            ! niw cross spectral propagation at elements  
+
+            ! niw cross spectral propagation at elements
             allocate(w_niw_e(nfbin))
             w_niw_e(:)             = 0.0_WP
-            
+
             ! niw zonal/merid group velocity, and cross spectral propagation
             ! at vertices
             allocate(iwe2_niw_uv(2, nfbin,elem_size))
             allocate(iwe2_niw_w(    nfbin,node_size))
             iwe2_niw_uv(:,:,:)     = 0.0_WP
             iwe2_niw_w(:,:)        = 0.0_WP
-            
+
             ! niw forcing
             allocate(iwe2_fniw(nfbin, node_size))
             iwe2_fniw(:,:)         = 0.0_WP
-            
-            ! niw wave energy, and divergence of niw wave energy 
+
+            ! niw wave energy, and divergence of niw wave energy
             ! index (1:3,...) timestep index E^(n-1), E^(n), E^(n+1)
             allocate(  iwe2_E_niw(     3, nfbin, node_size) &
                      , iwe2_E_niw_divh(3, nfbin, node_size) &
@@ -470,24 +497,36 @@ module g_cvmix_idemix2
             iwe2_E_niw(      :,:,:)= 0.0_WP
             iwe2_E_niw_divh( :,:,:)= 0.0_WP
             iwe2_E_niw_divs( :,:,:)= 0.0_WP
-            
-            ! structure function for niw energy 
+
+            ! structure function for niw energy
             allocate(iwe2_E_niw_struct(nl, node_size))
             iwe2_E_niw_struct(:,:) = 0.0_WP
-        
-            ! diagnostic for niw spectral energy advection 
-            allocate(  iwe2_E_niw_dt(      nfbin, myDim_nod2D) &
-                     , iwe2_E_niw_advh(    nfbin, myDim_nod2D) &
-                     , iwe2_E_niw_advs(    nfbin, myDim_nod2D) &
-                     , iwe2_E_niw_diss(    nfbin, myDim_nod2D) &
-                     , iwe2_E_niw_forc(    nfbin, myDim_nod2D) &
-                     )
-            iwe2_E_niw_dt(      :,:) = 0.0_WP
-            iwe2_E_niw_advh(    :,:) = 0.0_WP
-            iwe2_E_niw_advs(    :,:) = 0.0_WP
-            iwe2_E_niw_diss(    :,:) = 0.0_WP
-            iwe2_E_niw_forc(    :,:) = 0.0_WP
+
+            ! Diagnostics
+            if (idemix2_diag_Ecompart) then
+                ! diagnostic for niw spectral energy advection
+                allocate( iwe2_E_niw_advh(nfbin, myDim_nod2D) &
+                        , iwe2_E_niw_advs(nfbin, myDim_nod2D) &
+                        , iwe2_E_niw_diss(nfbin, myDim_nod2D) &
+                        , iwe2_E_niw_forc(nfbin, myDim_nod2D) )
+                iwe2_E_niw_dt(  :,:) = 0.0_WP
+                iwe2_E_niw_advh(:,:) = 0.0_WP
+                iwe2_E_niw_advs(:,:) = 0.0_WP
+                iwe2_E_niw_diss(:,:) = 0.0_WP
+                iwe2_E_niw_forc(:,:) = 0.0_WP
+            end if
+
+            if (idemix2_diag_Ecompart .or. idemix2_diag_WWI) then
+                ! diagnostic for niw spectral energy advection
+                allocate( iwe2_E_niw_dt(  nfbin, myDim_nod2D))
+                iwe2_E_niw_dt(  :,:) = 0.0_WP
+            end if
             
+            if (idemix2_diag_WWI) then
+                ! diagnostic for niw wave-wave interaction
+                allocate( iwe2_E_iw_diss_niw(nl, node_size) )
+                iwe2_E_iw_diss_niw(:,:) = 0.0_WP
+            end if
         end if 
         
         ! allocate 1d Spectral space coordinates
@@ -502,13 +541,15 @@ module g_cvmix_idemix2
         iwe2_dphiu(:)        = 0.0_WP
                 
         ! internal wave related vertical viscosity and diffusivity
-        allocate(iwe2_Av(nl,elem_size))
-        iwe2_Av(:,:)         = 0.0_WP
-
+        if(mix_scheme_nmb==7) then 
+            allocate(iwe2_Av(nl,elem_size))
+            iwe2_Av(:,:)     = 0.0_WP
+        endif 
+        
         ! forcing fields, M2 tidal forcing (spectral) and NIW forcing (spectral)
         allocate(  iwe2_fbot_e(  myDim_elem2D)    &
                  , iwe2_fbot(nl, node_size)       &
-                 , iwe2_fsrf(    node_size)     &
+                 , iwe2_fsrf(    node_size)       &
 !                  , iwe2_fleew(   myDim_elem2D)    &                 
                  )
         iwe2_fbot_e(:)       = 0.0_WP
@@ -562,7 +603,11 @@ module g_cvmix_idemix2
         end do 
         
         !_______________________________________________________________________
-        ! read idemix M2 forcing from cfsr data --> file 
+        ! pre-compute reflective coastal BC lookup tables
+        call init_reflect_bc(partit, mesh)
+
+        !_______________________________________________________________________
+        ! read idemix M2 forcing from cfsr data --> file
         if (idemix2_enable_M2) then
             t0=MPI_Wtime()
             ! omega_M2 is fixed, as the M2 tidal forcing is independent of the local inertial frequency.
@@ -654,8 +699,9 @@ module g_cvmix_idemix2
             if (mype==0) then
                 print *, achar(27)//'[33m'
                 write(*,*) '____________________________________________________________________'
-                write(*,*) ' ERROR: IDEMIX2 NIW forcing file not found! Cant apply IDEMIX2'
-                write(*,*) '        vertical mixing parameterisation! '
+                write(*,*) ' ERROR: IDEMIX2 NIW/Srf. forcing file not found! '
+                write(*,*) '        Required for srf. energy input even when idemix2_enable_niw=.false.!'
+                write(*,*) '        Cant apply IDEMIX2 vertical mixing parameterisation! '
                 write(*,*) '        ├> file: ', trim(idemix2_niwforc_file)
                 write(*,*) '        └> check: namelist.cvmix, idemix2_niwforc_file &  '
                 write(*,*) '____________________________________________________________________'
@@ -902,15 +948,187 @@ module g_cvmix_idemix2
                                 
         if (partit%mype==0) write(*,*)                  
     end subroutine init_cvmix_idemix2
-    
-    
-    
+
+
+
+    !
+    !
+    !
+    !===========================================================================
+    ! pre-compute reflective coastal BC lookup tables iwe2_bc_reflect_bin and
+    ! iwe2_bc_reflect_sgn.  Must be called after iwe2_phit is initialised.
+    ! 
+    ! SETUP (pre-computed once in init_reflect_bc)
+    ! ─────────────────────────────────────────────
+    ! LAND │  n_coast ──────edge──────  n_int
+    !         │    sgn=+1                (interior)
+    !         │
+    !         │  iwe2_bc_reflect_bin(edge) = kk   (mirror spectral bin)
+    !         │  iwe2_bc_reflect_sgn(edge) = +1   (coast = ednodes(1))
+    subroutine init_reflect_bc(partit, mesh)
+        implicit none
+        type(t_mesh),   intent(in), target :: mesh
+        type(t_partit), intent(in), target :: partit
+
+        integer       :: edge, n1, n2, n_int, node, kk_bc, fbinj, nfbin
+        real(kind=WP) :: lon1, lat1, lon2, lat2, lat_mean
+        real(kind=WP) :: edge_dx, edge_dy, phi_mirror, dist, dist_min
+        logical, allocatable :: is_coast_node(:)
+#include "../associate_part_def.h"
+#include "../associate_mesh_def.h"
+#include "../associate_part_ass.h"
+#include "../associate_mesh_ass.h"
+        nfbin = idemix2_nfbin
+
+        allocate(iwe2_bc_reflect_bin(myDim_edge2D))
+        allocate(iwe2_bc_reflect_sgn(myDim_edge2D))
+        allocate(iwe2_reflect_src(idemix2_nfbin, myDim_nod2D))
+        if (idemix2_diag_Ecompart) then
+            allocate(iwe2_M2_reflect_src (idemix2_nfbin, myDim_nod2D))
+            allocate(iwe2_niw_reflect_src(idemix2_nfbin, myDim_nod2D))
+        end if
+        allocate(is_coast_node(myDim_nod2D+eDim_nod2D))
+                
+        ! > iwe2_bc_reflect_bin(edge) stores the MIRROR SPECTRAL BIN for a flagged
+        ! coast edge.  0 = edge not flagged, BC skipped.
+        ! 
+        ! > HOW IT IS COMPUTED (init_reflect_bc)
+        ! For each edge with exactly one coast node:
+        !   1. Compute direction FROM coast node BACK INTO the ocean:
+        !        edge_dx = (lon_interior - lon_coast) * cos(lat_mean)
+        !        edge_dy =  lat_interior - lat_coast
+        !   2. phi_mirror = atan2(edge_dy, edge_dx)  mapped to [0, 2*pi)
+        !   3. kk = interior bin (2..nfbin-1) with angle closest to phi_mirror
+        !   4. iwe2_bc_reflect_bin(edge) = kk
+        ! 
+        ! > HOW IT IS USED (apply_reflect_bc_spctrl):
+        ! ALL toward-coast bins at this edge (any fbini where sgn*flux > 0)
+        ! are blocked and their energy reflected into the SAME single bin kk:
+        !   reflect_src(kk, n_int) += sgn * outflux   (for all toward-coast fbini)
+        ! One kk per edge — an approximation based on the edge-normal geometry.
+        iwe2_bc_reflect_bin(:) = 0
+        
+        ! > iwe2_bc_reflect_sgn(edge) encodes WHICH of the two edge nodes is the coast
+        ! node, and from that, WHICH flux sign means "toward coast". Each edge has 
+        ! two endpoint nodes: edges(1, edge) and edges(2, edge). The sign convention 
+        ! in the FV scheme is:
+        !   flux(fbini, edge) > 0  =  transport from edges(2) -> edges(1)
+        !   flux(fbini, edge) < 0  =  transport from edges(1) -> edges(2)
+        !   sgn = +1  -->  coast node = edges(1, edge)
+        !                  interior   = edges(2, edge)
+        !                  flux toward coast when: flux > 0
+        !   sgn = -1  -->  coast node = edges(2, edge)
+        !                  interior   = edges(1, edge)
+        !                  flux toward coast when: flux < 0
+        ! 
+        ! > The single condition:
+        !     sgn * flux(fbini, edge) > 0
+        ! 
+        ! > captures both cases -- it is true whenever the flux is directed toward
+        ! whichever node is the coast node, regardless of edge orientation.
+        ! It also determines the interior node n_int:
+        !     n_int = merge(edges(2, edge), edges(1, edge), sgn == +1)
+        ! And the reflected energy magnitude is always:
+        !     sgn * outflux = |outflux| > 0
+        ! 
+        ! in both orientations (positive for sgn=+1 with outflux>0,
+        !                       positive for sgn=-1 with outflux<0).
+        iwe2_bc_reflect_sgn(:) = 0
+        
+        ! > iwe2_reflect_src is a 2D scratch array (nfbin, nod2D) used to implement
+        ! reflective boundary conditions at coastlines for horizontal NIW energy advection.
+        ! 1. During apply_reflect_bc_spctrl:
+        !    For every coast-adjacent edge flagged in iwe2_bc_reflect_bin, any flux
+        !    directed toward the coast node is zeroed out and the blocked energy is
+        !    accumulated into iwe2_reflect_src(kk, n_int) at the interior node (n_int),
+        !    with the sign corrected so energy is conserved.
+        ! 2. After advection in hsintegrate_Ecompart:
+        !    The accumulated blocked flux is re-injected as a divergence source
+        !    Edivh += iwe2_reflect_src / vol_s, effectively bouncing the energy back
+        !    into the interior in bin kk (the mirror/reflected propagation direction).
+        !    
+        ! > In short: it is a flux-blocking + re-injection buffer that prevents NIW energy
+        ! from leaking into land, redirecting it instead into the spectrally mirrored
+        ! propagation direction at the last ocean node.        
+        iwe2_reflect_src(:,:) = 0.0_WP
+        if (idemix2_diag_Ecompart) then
+            iwe2_M2_reflect_src (:,:) = 0.0_WP
+            iwe2_niw_reflect_src(:,:) = 0.0_WP
+        end if
+        
+        ! a node is a coast node if it belongs to at least one boundary edge
+        is_coast_node(:)       = .false.
+        do edge = 1, myDim_edge2D
+            if (edge_tri(2, edge) == 0) then
+                is_coast_node(edges(1, edge)) = .true.
+                is_coast_node(edges(2, edge)) = .true.
+            end if
+        end do
+
+        do edge = 1, myDim_edge2D
+            if (edge_tri(2, edge) == 0) cycle   ! skip coast-parallel boundary edges
+            n1 = edges(1, edge)
+            n2 = edges(2, edge)
+            ! only process edges with exactly one coast node
+            if (is_coast_node(n1) .eqv. is_coast_node(n2)) cycle
+            
+            ! geographic coordinates of the two nodes (lon/lat in radians)
+            lon1 = geo_coord_nod2D(1, n1);  lat1 = geo_coord_nod2D(2, n1)
+            lon2 = geo_coord_nod2D(1, n2);  lat2 = geo_coord_nod2D(2, n2)
+            lat_mean = 0.5_WP*(lat1 + lat2)
+            
+            ! edge direction FROM coast node BACK TO interior node (the reflection direction)
+            if (is_coast_node(n2)) then
+                ! coast = n2, interior = n1: reflect direction is n2 -> n1
+                edge_dx = (lon1 - lon2) * cos(lat_mean)
+                edge_dy =  lat1 - lat2
+                iwe2_bc_reflect_sgn(edge) = -1  ! negative flux = transport n1->n2 = INTO coast
+            else
+                ! coast = n1, interior = n2: reflect direction is n1 -> n2
+                edge_dx = (lon2 - lon1) * cos(lat_mean)
+                edge_dy =  lat2 - lat1
+                iwe2_bc_reflect_sgn(edge) = +1  ! positive flux = transport n2->n1 = INTO coast
+            end if
+            
+            ! mirror angle = direction away from coast, mapped to [0, 2*pi)
+            phi_mirror = atan2(edge_dy, edge_dx)
+            if (phi_mirror < 0.0_WP) phi_mirror = phi_mirror + 2.0_WP*pi
+            
+            ! find nearest interior spectral bin (skip ghost cells 1 and nfbin)
+            kk_bc    = 2
+            dist_min = (iwe2_phit(2) - phi_mirror)**2
+            do fbinj = 3, nfbin-1
+                dist = (iwe2_phit(fbinj) - phi_mirror)**2
+                if (dist < dist_min) then
+                    dist_min = dist
+                    kk_bc    = fbinj
+                end if
+            end do
+            iwe2_bc_reflect_bin(edge) = kk_bc
+        end do
+
+        ! create logical array if node is a reflected boudnary node
+        allocate(iwe2_is_reflect_node(myDim_nod2D))
+        iwe2_is_reflect_node(:) = .false.
+        do edge = 1, myDim_edge2D
+            if (iwe2_bc_reflect_bin(edge) == 0) cycle
+            n_int = merge(edges(2,edge), edges(1,edge), iwe2_bc_reflect_sgn(edge) == +1)
+            if (n_int <= myDim_nod2D) iwe2_is_reflect_node(n_int) = .true.
+        end do
+
+        deallocate(is_coast_node)
+          
+        if (mype==0) write(*,*) '     ├> IDEMIX2 reflective coastal BC lookup table built'
+    end subroutine init_reflect_bc
+
+
+
     !
     !
     !
     !===========================================================================
     ! calculate IDEMIX2 internal wave energy and its dissipation
-    subroutine calc_cvmix_idemix2(istep, partit, mesh)   
+    subroutine calc_cvmix_idemix2(istep, partit, mesh)
         implicit none
         integer,        intent(in)            :: istep
         type(t_mesh),   intent(in),    target :: mesh
@@ -1284,35 +1502,57 @@ module g_cvmix_idemix2
         ! dE/dt = -div(vec_u * E) - tau*E + Forc    
         ! E^(n+1) = E^n + dt*( -div(vec_u^n*E^n) - tau*E^n + Forc^n)
         t3 = MPI_Wtime()
-        if (idemix2_enable_M2) then 
-            call hsintegrate_Ecompart(              &
-                  iwe2_taum1, iwe2_tau, iwe2_taup1  &
-                , 'M2'                              &  
-                , iwe2_E_M2                         & 
-                , iwe2_E_M2_divh                    &
-                , iwe2_E_M2_divs                    &
-                , iwe2_M2_uv                        &
-                , iwe2_M2_w                         &
-                , iwe2_fM2                          &
-                , iwe2_M2_tau                       &
-                , iwe2_dphit                        &
-                , iwe2_gradxy_e                     &
-                , iwe2_gradxy_n                     &
-                , iwe2_flx_uv                       &
-                , iwe2_flx_w                        &
-                , vol_nodB2T                        &
-                , partit                            &
-                , mesh                              &
-                , .True.                            & ! flag_AB2, do 2nd order adams-bashfort in time
-                , iwe2_E_M2_dt                      & ! optional: diagnostic
-                , iwe2_E_M2_advh                    & ! optional: diagnostic
-                , iwe2_E_M2_advs                    & ! optional: diagnostic
-                , iwe2_E_M2_diss                    & ! optional: diagnostic
-                , iwe2_E_M2_forc                    & ! optional: diagnostic
-                )
-                
+        if (idemix2_enable_M2) then
+            if (idemix2_diag_Ecompart) then
+                call hsintegrate_Ecompart(              &
+                      iwe2_taum1, iwe2_tau, iwe2_taup1  &
+                    , 'M2'                              &
+                    , iwe2_E_M2                         &
+                    , iwe2_E_M2_divh                    &
+                    , iwe2_E_M2_divs                    &
+                    , iwe2_M2_uv                        &
+                    , iwe2_M2_w                         &
+                    , iwe2_fM2                          &
+                    , iwe2_M2_tau                       &
+                    , iwe2_dphit                        &
+                    , iwe2_gradxy_e                     &
+                    , iwe2_gradxy_n                     &
+                    , iwe2_flx_uv                       &
+                    , iwe2_flx_w                        &
+                    , vol_nodB2T                        &
+                    , partit                            &
+                    , mesh                              &
+                    , .True.                            & ! flag_AB2, do 2nd order adams-bashfort in time
+                    , iwe2_E_M2_dt                      & ! optional: diagnostic
+                    , iwe2_E_M2_advh                    & ! optional: diagnostic
+                    , iwe2_E_M2_advs                    & ! optional: diagnostic
+                    , iwe2_E_M2_diss                    & ! optional: diagnostic
+                    , iwe2_E_M2_forc                    & ! optional: diagnostic
+                    )
+            else
+                call hsintegrate_Ecompart(              &
+                      iwe2_taum1, iwe2_tau, iwe2_taup1  &
+                    , 'M2'                              &
+                    , iwe2_E_M2                         &
+                    , iwe2_E_M2_divh                    &
+                    , iwe2_E_M2_divs                    &
+                    , iwe2_M2_uv                        &
+                    , iwe2_M2_w                         &
+                    , iwe2_fM2                          &
+                    , iwe2_M2_tau                       &
+                    , iwe2_dphit                        &
+                    , iwe2_gradxy_e                     &
+                    , iwe2_gradxy_n                     &
+                    , iwe2_flx_uv                       &
+                    , iwe2_flx_w                        &
+                    , vol_nodB2T                        &
+                    , partit                            &
+                    , mesh                              &
+                    , .True.                            & ! flag_AB2, do 2nd order adams-bashfort in time
+                    )
+            end if
             ! Compute global total NIW energy for conservation check
-            ! call check_global_energy(iwe2_E_M2, iwe2_taup1, iwe2_dphit, vol_nodB2T, iwe2_fM2, iwe2_M2_tau, partit, mesh, 'M2')
+            call check_global_energy(iwe2_E_M2, iwe2_taup1, iwe2_dphit, vol_nodB2T, iwe2_fM2, iwe2_M2_tau, partit, mesh, 'M2')
             ! call check_flux_conservation(  iwe2_E_niw_divh, iwe2_E_niw_divs, iwe2_tau, iwe2_dphit, vol_nodB2T, partit, mesh, 'M2')
         end if
         t4 = MPI_Wtime()
@@ -1320,34 +1560,57 @@ module g_cvmix_idemix2
         
         t4 = MPI_Wtime()
         if (idemix2_enable_niw) then
+            ! create complete Ecomaprt diagnostic
+            if (idemix2_diag_Ecompart) then
+                call hsintegrate_Ecompart(              &
+                    iwe2_taum1, iwe2_tau, iwe2_taup1  & 
+                    , 'NIW'                             &
+                    , iwe2_E_niw                        & 
+                    , iwe2_E_niw_divh                   &
+                    , iwe2_E_niw_divs                   &
+                    , iwe2_niw_uv                       &
+                    , iwe2_niw_w                        &
+                    , iwe2_fniw                         &
+                    , iwe2_niw_tau                      &
+                    , iwe2_dphit                        &
+                    , iwe2_gradxy_e                     &
+                    , iwe2_gradxy_n                     &
+                    , iwe2_flx_uv                       &
+                    , iwe2_flx_w                        &
+                    , vol_nodB2T                        &
+                    , partit                            &
+                    , mesh                              &
+                    , .True.                            & ! flag_AB2, do 2nd order adams-bashfort in time
+                    , iwe2_E_niw_dt                     & ! optional: diagnostic
+                    , iwe2_E_niw_advh                   & ! optional: diagnostic
+                    , iwe2_E_niw_advs                   & ! optional: diagnostic
+                    , iwe2_E_niw_diss                   & ! optional: diagnostic
+                    , iwe2_E_niw_forc                   & ! optional: diagnostic
+                    )
+            else
             call hsintegrate_Ecompart(              &
-                  iwe2_taum1, iwe2_tau, iwe2_taup1  & 
-                , 'NIW'                             &
-                , iwe2_E_niw                        & 
-                , iwe2_E_niw_divh                   &
-                , iwe2_E_niw_divs                   &
-                , iwe2_niw_uv                       &
-                , iwe2_niw_w                        &
-                , iwe2_fniw                         &
-                , iwe2_niw_tau                      &
-                , iwe2_dphit                        &
-                , iwe2_gradxy_e                     &
-                , iwe2_gradxy_n                     &
-                , iwe2_flx_uv                       &
-                , iwe2_flx_w                        &
-                , vol_nodB2T                        &
-                , partit                            &
-                , mesh                              &
-                , .True.                            & ! flag_AB2, do 2nd order adams-bashfort in time
-                , iwe2_E_niw_dt                     & ! optional: diagnostic
-                , iwe2_E_niw_advh                   & ! optional: diagnostic
-                , iwe2_E_niw_advs                   & ! optional: diagnostic
-                , iwe2_E_niw_diss                   & ! optional: diagnostic
-                , iwe2_E_niw_forc                   & ! optional: diagnostic
-                )
-            
+                    iwe2_taum1, iwe2_tau, iwe2_taup1  & 
+                    , 'NIW'                             &
+                    , iwe2_E_niw                        & 
+                    , iwe2_E_niw_divh                   &
+                    , iwe2_E_niw_divs                   &
+                    , iwe2_niw_uv                       &
+                    , iwe2_niw_w                        &
+                    , iwe2_fniw                         &
+                    , iwe2_niw_tau                      &
+                    , iwe2_dphit                        &
+                    , iwe2_gradxy_e                     &
+                    , iwe2_gradxy_n                     &
+                    , iwe2_flx_uv                       &
+                    , iwe2_flx_w                        &
+                    , vol_nodB2T                        &
+                    , partit                            &
+                    , mesh                              &
+                    , .True.                            & ! flag_AB2, do 2nd order adams-bashfort in time
+                    )
+            end if 
             ! Compute global total NIW energy for conservation check
-            ! call check_global_energy(iwe2_E_niw, iwe2_taup1, iwe2_dphit, vol_nodB2T, iwe2_fniw, iwe2_niw_tau, partit, mesh, 'niw')
+            call check_global_energy(iwe2_E_niw, iwe2_taup1, iwe2_dphit, vol_nodB2T, iwe2_fniw, iwe2_niw_tau, partit, mesh, 'niw')
             ! call check_flux_conservation(  iwe2_E_niw_divh, iwe2_E_niw_divs, iwe2_tau, iwe2_dphit, vol_nodB2T, partit, mesh, 'niw')
         end if
         t5 = MPI_Wtime()
@@ -1363,22 +1626,37 @@ module g_cvmix_idemix2
         do node = 1, myDim_nod2D
             uln = ulevels_nod2D(node)
             nln = nlevels_nod2D(node)
-            call cvmix_idemix2_compute_vdiff_vdiss_Eiw(              &
-                  nlev     = nln-uln+1                               & 
-                , dzw      = hnode(           uln:nln-1, node)       &
-                , dt       = dt                                      &
-                , c0       = iwe2_c0(         uln:nln  , node)       &
-                , alpha_c  = iwe2_alpha_c(    uln:nln  , node)       &
-                , fsrf     = iwe2_fsrf(                  node)       &
-                , fbot     = iwe2_fbot(       uln:nln  , node)       &
-                , Eiw_old  = iwe2_E_iw(iwe2_tau  , uln:nln  , node)  &
-                , Eiw_new  = iwe2_E_iw(iwe2_taup1, uln:nln  , node)  &
-                , Eiw_diss = iwe2_E_iw_diss(  uln:nln  , node)       &
-                , Eiw_dt   = iwe2_E_iw_dt(    uln:nln  , node)       & ! optional: diagnostic
-                , Eiw_vdif = iwe2_E_iw_vdif(  uln:nln  , node)       & ! optional: diagnostic
-                , Eiw_srf  = iwe2_E_iw_fsrf(             node)       & ! optional: diagnostic
-                , Eiw_bot  = iwe2_E_iw_fbot(  uln:nln  , node)       & ! optional: diagnostic
+            if (idemix2_diag_Eiw) then 
+                call cvmix_idemix2_compute_vdiff_vdiss_Eiw(              &
+                      nlev     = nln-uln+1                               & 
+                    , dzw      = hnode(           uln:nln-1, node)       &
+                    , dt       = dt                                      &
+                    , c0       = iwe2_c0(         uln:nln  , node)       &
+                    , alpha_c  = iwe2_alpha_c(    uln:nln  , node)       &
+                    , fsrf     = iwe2_fsrf(                  node)       &
+                    , fbot     = iwe2_fbot(       uln:nln  , node)       &
+                    , Eiw_old  = iwe2_E_iw(iwe2_tau  , uln:nln  , node)  &
+                    , Eiw_new  = iwe2_E_iw(iwe2_taup1, uln:nln  , node)  &
+                    , Eiw_diss = iwe2_E_iw_diss(  uln:nln  , node)       &
+                    , Eiw_dt   = iwe2_E_iw_dt(    uln:nln  , node)       & ! optional: diagnostic
+                    , Eiw_vdif = iwe2_E_iw_vdif(  uln:nln  , node)       & ! optional: diagnostic
+                    , Eiw_srf  = iwe2_E_iw_fsrf(             node)       & ! optional: diagnostic
+                    , Eiw_bot  = iwe2_E_iw_fbot(  uln:nln  , node)       & ! optional: diagnostic
                 )
+            else
+                call cvmix_idemix2_compute_vdiff_vdiss_Eiw(              &
+                      nlev     = nln-uln+1                               & 
+                    , dzw      = hnode(           uln:nln-1, node)       &
+                    , dt       = dt                                      &
+                    , c0       = iwe2_c0(         uln:nln  , node)       &
+                    , alpha_c  = iwe2_alpha_c(    uln:nln  , node)       &
+                    , fsrf     = iwe2_fsrf(                  node)       &
+                    , fbot     = iwe2_fbot(       uln:nln  , node)       &
+                    , Eiw_old  = iwe2_E_iw(iwe2_tau  , uln:nln  , node)  &
+                    , Eiw_new  = iwe2_E_iw(iwe2_taup1, uln:nln  , node)  &
+                    , Eiw_diss = iwe2_E_iw_diss(  uln:nln  , node)       &
+                    )
+            end if     
         end do ! --> do node = 1, myDim_nod2D
         t7 = MPI_Wtime()
         time_Eiw_vdiff = t7 - t6
@@ -1392,20 +1670,31 @@ module g_cvmix_idemix2
         t7 = MPI_Wtime() 
         ! for the Diapycnal Diffusivity Induced Internal Gravity Waves...)
         ! Eiw^(t+1) = Eiw^(t+1) + div_h( v_0 * tau_h * grad_h(v_0*E_iw^(t)) )
-        if (idemix2_enable_hor_diffusion .or. idemix2_enable_hor_diff_iter) then 
+        if ((idemix2_enable_hor_diffusion .or. idemix2_enable_hor_diff_iter) .and. idemix2_diag_Eiw) then 
             iwe2_E_iw_hdif = 0.0_WP
         end if 
         if (idemix2_enable_hor_diffusion) then 
-            call compute_hdiff_Eiw(                 &  
-                  iwe2_E_iw(iwe2_tau  , :, :)       &
-                , iwe2_E_iw(iwe2_taup1, :, :)       &
-                , iwe2_v0                           &
-                , 1                                 &
-                , partit                            &
-                , mesh                              &
-                , Eiw_dt   = iwe2_E_iw_dt(    :, :) & ! optional: diagnostic
-                , Eiw_hdif = iwe2_E_iw_hdif(  :, :) & ! optional: diagnostic                   
-                )
+            if (idemix2_diag_Eiw) then
+                call compute_hdiff_Eiw(                 &  
+                      iwe2_E_iw(iwe2_tau  , :, :)       &
+                    , iwe2_E_iw(iwe2_taup1, :, :)       &
+                    , iwe2_v0                           &
+                    , 1                                 &
+                    , partit                            &
+                    , mesh                              &
+                    , Eiw_dt   = iwe2_E_iw_dt           &
+                    , Eiw_hdif = iwe2_E_iw_hdif         &
+                    )
+            else
+                call compute_hdiff_Eiw(                 &  
+                      iwe2_E_iw(iwe2_tau  , :, :)       &
+                    , iwe2_E_iw(iwe2_taup1, :, :)       &
+                    , iwe2_v0                           &
+                    , 1                                 &
+                    , partit                            &
+                    , mesh                              &
+                    )
+            end if
         end if
         
         
@@ -1415,16 +1704,27 @@ module g_cvmix_idemix2
         ! high resolution
         if (idemix2_enable_hor_diff_iter) then
             do iter=1, idemix2_hor_diff_niter
-                call compute_hdiff_Eiw(                 &
-                      iwe2_E_iw(iwe2_taup1, :, :)       &
-                    , iwe2_E_iw(iwe2_taup1, :, :)       &
-                    , iwe2_v0                           &
-                    , idemix2_hor_diff_niter            &
-                    , partit                            &
-                    , mesh                              &
-                    , Eiw_dt   = iwe2_E_iw_dt(    :, :) & ! optional: diagnostic
-                    , Eiw_hdif = iwe2_E_iw_hdif(  :, :) & ! optional: diagnostic
-                    )
+                if (idemix2_diag_Eiw) then
+                    call compute_hdiff_Eiw(                 &
+                          iwe2_E_iw(iwe2_taup1, :, :)       &
+                        , iwe2_E_iw(iwe2_taup1, :, :)       &
+                        , iwe2_v0                           &
+                        , idemix2_hor_diff_niter            &
+                        , partit                            &
+                        , mesh                              &
+                        , Eiw_dt   = iwe2_E_iw_dt           &
+                        , Eiw_hdif = iwe2_E_iw_hdif         &
+                        )
+                else
+                    call compute_hdiff_Eiw(                 &
+                          iwe2_E_iw(iwe2_taup1, :, :)       &
+                        , iwe2_E_iw(iwe2_taup1, :, :)       &
+                        , iwe2_v0                           &
+                        , idemix2_hor_diff_niter            &
+                        , partit                            &
+                        , mesh                              &
+                        )
+                end if
             end do
         end if
         t8 = MPI_Wtime()
@@ -1438,68 +1738,126 @@ module g_cvmix_idemix2
                 uln = ulevels_nod2D(node)
                 nln = nlevels_nod2D(node)
                 !_______________________________________________________________
-                if     (idemix2_enable_M2 .and. idemix2_enable_niw) then 
-                    call cvmix_idemix2_compute_Eiw_waveinteract(                      &
-                              nlev         = nln-uln+1                                & 
-                            , nfbin        = idemix2_nfbin                            &
-                            , dzw          = hnode(                uln:nln-1, node)   &
-                            , dphi         = iwe2_dphit                               &
-                            , dt           = dt                                       &
-                            , flag_posdef  = .True.                                   & 
-                            , E_iw_old     = iwe2_E_iw( iwe2_tau  ,  uln:nln, node)   &
-                            , E_iw_new     = iwe2_E_iw( iwe2_taup1,  uln:nln, node)   &
-                            , E_M2_old     = iwe2_E_M2( iwe2_tau  ,  :      , node)   &
-                            , E_M2_new     = iwe2_E_M2( iwe2_taup1,  :      , node)   &
-                            , E_M2_struct  = iwe2_E_M2_struct(       :      , node)   &
-                            , alpha_M2_c   = iwe2_alpha_M2_c(                 node)   &
-                            , tau_M2       = iwe2_M2_tau(                     node)   &
-                            , E_niw_old    = iwe2_E_niw(iwe2_tau  ,  :      , node)   &
-                            , E_niw_new    = iwe2_E_niw(iwe2_taup1,  :      , node)   &
-                            , E_niw_struct = iwe2_E_niw_struct(      :      , node)   &
-                            , tau_niw      = iwe2_niw_tau(                    node)   &
-                            , E_iw_dt      = iwe2_E_iw_dt(           :      , node)   & ! optional: diagnostic
-                            , E_iw_diss_M2 = iwe2_E_iw_diss_M2(      :      , node)   & ! optional: diagnostic
-                            , E_iw_diss_niw= iwe2_E_iw_diss_niw(     :      , node)   & ! optional: diagnostic
-                            , E_M2_dt      = iwe2_E_M2_dt(           :      , node)   & ! optional: diagnostic
-                            , E_M2_diss_wwi= iwe2_E_M2_diss_wwi(     :      , node)   & ! optional: diagnostic
-                            )
+                if (idemix2_enable_M2 .and. idemix2_enable_niw) then 
+                    if (idemix2_diag_WWI) then
+                        call cvmix_idemix2_compute_Eiw_waveinteract(                       &
+                                  nlev          = nln-uln+1                                & 
+                                , nfbin         = idemix2_nfbin                            &
+                                , dzw           = hnode(                uln:nln-1, node)   &
+                                , dphi          = iwe2_dphit                               &
+                                , dt            = dt                                       &
+                                , flag_posdef   = .True.                                   & 
+                                , E_iw_old      = iwe2_E_iw( iwe2_tau  ,  uln:nln, node)   &
+                                , E_iw_new      = iwe2_E_iw( iwe2_taup1,  uln:nln, node)   &
+                                , E_M2_old      = iwe2_E_M2( iwe2_tau  ,  :      , node)   &
+                                , E_M2_new      = iwe2_E_M2( iwe2_taup1,  :      , node)   &
+                                , E_M2_struct   = iwe2_E_M2_struct(       :      , node)   &
+                                , alpha_M2_c    = iwe2_alpha_M2_c(                 node)   &
+                                , tau_M2        = iwe2_M2_tau(                     node)   &
+                                , E_niw_old     = iwe2_E_niw(iwe2_tau  ,  :      , node)   &
+                                , E_niw_new     = iwe2_E_niw(iwe2_taup1,  :      , node)   &
+                                , E_niw_struct  = iwe2_E_niw_struct(      :      , node)   &
+                                , tau_niw       = iwe2_niw_tau(                    node)   &
+                                , E_iw_dt       = iwe2_E_iw_dt(           :      , node)   & ! optional: diagnostic
+                                , E_iw_diss_M2  = iwe2_E_iw_diss_M2(      :      , node)   & ! optional: diagnostic
+                                , E_iw_diss_niw = iwe2_E_iw_diss_niw(     :      , node)   & ! optional: diagnostic
+                                , E_M2_dt       = iwe2_E_M2_dt(           :      , node)   & ! optional: diagnostic
+                                , E_M2_diss_wwi = iwe2_E_M2_diss_wwi(     :      , node)   & ! optional: diagnostic
+                                )
+                    else
+                        call cvmix_idemix2_compute_Eiw_waveinteract(                       &
+                                  nlev          = nln-uln+1                                & 
+                                , nfbin         = idemix2_nfbin                            &
+                                , dzw           = hnode(                uln:nln-1, node)   &
+                                , dphi          = iwe2_dphit                               &
+                                , dt            = dt                                       &
+                                , flag_posdef   = .True.                                   & 
+                                , E_iw_old      = iwe2_E_iw( iwe2_tau  ,  uln:nln, node)   &
+                                , E_iw_new      = iwe2_E_iw( iwe2_taup1,  uln:nln, node)   &
+                                , E_M2_old      = iwe2_E_M2( iwe2_tau  ,  :      , node)   &
+                                , E_M2_new      = iwe2_E_M2( iwe2_taup1,  :      , node)   &
+                                , E_M2_struct   = iwe2_E_M2_struct(       :      , node)   &
+                                , alpha_M2_c    = iwe2_alpha_M2_c(                 node)   &
+                                , tau_M2        = iwe2_M2_tau(                     node)   &
+                                , E_niw_old     = iwe2_E_niw(iwe2_tau  ,  :      , node)   &
+                                , E_niw_new     = iwe2_E_niw(iwe2_taup1,  :      , node)   &
+                                , E_niw_struct  = iwe2_E_niw_struct(      :      , node)   &
+                                , tau_niw       = iwe2_niw_tau(                    node)   &
+                                )
+                    end if 
+                
                 elseif (idemix2_enable_M2) then 
-                    call cvmix_idemix2_compute_Eiw_waveinteract(                      &
-                              nlev         = nln-uln+1                                & 
-                            , nfbin        = idemix2_nfbin                            &
-                            , dzw          = hnode(                uln:nln-1, node)   &
-                            , dphi         = iwe2_dphit                               &
-                            , dt           = dt                                       &
-                            , flag_posdef  = .True.                                   &
-                            , E_iw_old     = iwe2_E_iw( iwe2_tau  ,  uln:nln, node)   &
-                            , E_iw_new     = iwe2_E_iw( iwe2_taup1,  uln:nln, node)   &
-                            , E_M2_old     = iwe2_E_M2( iwe2_tau  ,  :      , node)   &
-                            , E_M2_new     = iwe2_E_M2( iwe2_taup1,  :      , node)   &
-                            , E_M2_struct  = iwe2_E_M2_struct(       :      , node)   &
-                            , alpha_M2_c   = iwe2_alpha_M2_c(                 node)   &
-                            , tau_M2       = iwe2_M2_tau(                     node)   &
-                            , E_iw_dt      = iwe2_E_iw_dt(           :      , node)   & ! optional: diagnostic
-                            , E_iw_diss_M2 = iwe2_E_iw_diss_M2(      :      , node)   & ! optional: diagnostic
-                            , E_M2_dt      = iwe2_E_M2_dt(           :      , node)   & ! optional: diagnostic
-                            , E_M2_diss_wwi= iwe2_E_M2_diss_wwi(     :      , node)   & ! optional: diagnostic
-                            )
+                    if (idemix2_diag_WWI) then
+                        call cvmix_idemix2_compute_Eiw_waveinteract(                       &
+                                  nlev          = nln-uln+1                                & 
+                                , nfbin         = idemix2_nfbin                            &
+                                , dzw           = hnode(                uln:nln-1, node)   &
+                                , dphi          = iwe2_dphit                               &
+                                , dt            = dt                                       &
+                                , flag_posdef   = .True.                                   &
+                                , E_iw_old      = iwe2_E_iw( iwe2_tau  ,  uln:nln, node)   &
+                                , E_iw_new      = iwe2_E_iw( iwe2_taup1,  uln:nln, node)   &
+                                , E_M2_old      = iwe2_E_M2( iwe2_tau  ,  :      , node)   &
+                                , E_M2_new      = iwe2_E_M2( iwe2_taup1,  :      , node)   &
+                                , E_M2_struct   =  iwe2_E_M2_struct(       :      , node)  &
+                                , alpha_M2_c    = iwe2_alpha_M2_c(                 node)   &
+                                , tau_M2        = iwe2_M2_tau(                     node)   &
+                                , E_iw_dt       = iwe2_E_iw_dt(           :      , node)   & ! optional: diagnostic
+                                , E_iw_diss_M2  = iwe2_E_iw_diss_M2(      :      , node)   & ! optional: diagnostic
+                                , E_M2_dt       = iwe2_E_M2_dt(           :      , node)   & ! optional: diagnostic
+                                , E_M2_diss_wwi = iwe2_E_M2_diss_wwi(     :      , node)   & ! optional: diagnostic
+                                )
+                    else
+                        call cvmix_idemix2_compute_Eiw_waveinteract(                       &
+                                  nlev          = nln-uln+1                                & 
+                                , nfbin         = idemix2_nfbin                            &
+                                , dzw           = hnode(                uln:nln-1, node)   &
+                                , dphi          = iwe2_dphit                               &
+                                , dt            = dt                                       &
+                                , flag_posdef   = .True.                                   &
+                                , E_iw_old      = iwe2_E_iw( iwe2_tau  ,  uln:nln, node)   &
+                                , E_iw_new      = iwe2_E_iw( iwe2_taup1,  uln:nln, node)   &
+                                , E_M2_old      = iwe2_E_M2( iwe2_tau  ,  :      , node)   &
+                                , E_M2_new      = iwe2_E_M2( iwe2_taup1,  :      , node)   &
+                                , E_M2_struct   =  iwe2_E_M2_struct(       :      , node)  &
+                                , alpha_M2_c    = iwe2_alpha_M2_c(                 node)   &
+                                , tau_M2        = iwe2_M2_tau(                     node)   &
+                                )
+                    end if 
                 elseif (idemix2_enable_niw) then 
-                    call cvmix_idemix2_compute_Eiw_waveinteract(                      &
-                              nlev         = nln-uln+1                                & 
-                            , nfbin        = idemix2_nfbin                            &
-                            , dzw          = hnode(                uln:nln-1, node)   &
-                            , dphi         = iwe2_dphit                               &
-                            , dt           = dt                                       &
-                            , flag_posdef  = .True.                                   &
-                            , E_iw_old     = iwe2_E_iw( iwe2_tau  ,  uln:nln, node)   &
-                            , E_iw_new     = iwe2_E_iw( iwe2_taup1,  uln:nln, node)   &
-                            , E_niw_old    = iwe2_E_niw(iwe2_tau  ,  :      , node)   &
-                            , E_niw_new    = iwe2_E_niw(iwe2_taup1,  :      , node)   &
-                            , E_niw_struct = iwe2_E_niw_struct(      :      , node)   &
-                            , tau_niw      = iwe2_niw_tau(                    node)   &
-                            , E_iw_dt      = iwe2_E_iw_dt(           :      , node)   & ! optional: diagnostic
-                            , E_iw_diss_niw= iwe2_E_iw_diss_niw(     :      , node)   & ! optional: diagnostic
-                            )
+                    if (idemix2_diag_WWI) then
+                        call cvmix_idemix2_compute_Eiw_waveinteract(                       &
+                                  nlev          = nln-uln+1                                & 
+                                , nfbin         = idemix2_nfbin                            &
+                                , dzw           = hnode(                uln:nln-1, node)   &
+                                , dphi          = iwe2_dphit                               &
+                                , dt            = dt                                       &
+                                , flag_posdef   = .True.                                   &
+                                , E_iw_old      = iwe2_E_iw( iwe2_tau  ,  uln:nln, node)   &
+                                , E_iw_new      = iwe2_E_iw( iwe2_taup1,  uln:nln, node)   &
+                                , E_niw_old     = iwe2_E_niw(iwe2_tau  ,  :      , node)   &
+                                , E_niw_new     = iwe2_E_niw(iwe2_taup1,  :      , node)   &
+                                , E_niw_struct  = iwe2_E_niw_struct(      :      , node)   &
+                                , tau_niw       = iwe2_niw_tau(                    node)   &
+                                , E_iw_dt       = iwe2_E_iw_dt(           :      , node)   & ! optional: diagnostic
+                                , E_iw_diss_niw = iwe2_E_iw_diss_niw(     :      , node)   & ! optional: diagnostic
+                                )
+                    else
+                        call cvmix_idemix2_compute_Eiw_waveinteract(                       &
+                                nlev          = nln-uln+1                                & 
+                                , nfbin         = idemix2_nfbin                            &
+                                , dzw           = hnode(                uln:nln-1, node)   &
+                                , dphi          = iwe2_dphit                               &
+                                , dt            = dt                                       &
+                                , flag_posdef   = .True.                                   &
+                                , E_iw_old      = iwe2_E_iw( iwe2_tau  ,  uln:nln, node)   &
+                                , E_iw_new      = iwe2_E_iw( iwe2_taup1,  uln:nln, node)   &
+                                , E_niw_old     = iwe2_E_niw(iwe2_tau  ,  :      , node)   &
+                                , E_niw_new     = iwe2_E_niw(iwe2_taup1,  :      , node)   &
+                                , E_niw_struct  = iwe2_E_niw_struct(      :      , node)   &
+                                , tau_niw       = iwe2_niw_tau(                    node)   &
+                               )
+                    end if 
                 end if ! -->  (idemix2_enable_M2 .and. idemix2_enable_niw) then 
             end do ! --> for node = 1, myDim_nod2D
         end if ! --> if (idemix2_enable_M2 .or . idemix2_enable_niw) then
@@ -1829,9 +2187,146 @@ module g_cvmix_idemix2
 !$OMP END DO
 !$OMP END PARALLEL
     end subroutine adv_Ecompart_hor_spctrl_superbee
-    
-    
-    
+
+
+
+    !
+    !
+    !___________________________________________________________________________
+    ! reflective coastal boundary condition for horizontal spectral energy flux
+    !
+    ! For every interior edge touching exactly one coast node, any flux directed
+    ! TOWARD that coast node is blocked and re-injected at the same edge into the
+    ! mirror spectral bin (bin whose propagation angle points back into the ocean).
+    ! This conserves total energy: the divergence seen by adv_Ecompart_flx2tra_spctrl
+    ! has zero net flux at coastal edges.
+    !
+    ! Sign convention (matches adv_Ecompart_flx2tra_spctrl):
+    !   flux > 0  ->  transport from ednodes(2) to ednodes(1)
+    !   flux < 0  ->  transport from ednodes(1) to ednodes(2)
+    !
+    ! iwe2_bc_reflect_sgn(edge) = +1  when ednodes(1) is the coast node
+    !                           = -1  when ednodes(2) is the coast node
+    ! Transport is INTO the coast when  sgn * flux > 0.
+    !___________________________________________________________________________
+    !
+    ! EACH TIMESTEP — 4 steps
+    ! ────────────────────────
+    !
+    ! STEP 1 │  adv_Ecompart_hor_spctrl_superbee
+    !        │
+    !        │  Computes flux(fbini, edge) for all bins.
+    !        │  In bin fbini, wave energy at n_int propagates toward coast:
+    !        │
+    !        │    n_coast <━━━━━━━━━━━━━━  n_int
+    !        │              flux(fbini) > 0
+    !        │              (positive = toward n_coast)
+    !        │
+    !        │  Superbee enforces positivity on its own fluxes here.
+    !
+    ! STEP 2 │  apply_reflect_bc_spctrl
+    !        │
+    !        │  For each flagged edge where sgn * flux(fbini) > 0:
+    !        │
+    !        │    flux(fbini, edge) = 0          <- coast-directed flux blocked
+    !        │    reflect_src(kk, n_int) += sgn * outflux   <- energy saved for n_int
+    !        │
+    !        │    n_coast   ................  n_int
+    !        │              flux = 0  (blocked)    reflect_src(kk) = |outflux|
+    !        │
+    !        │  Coast node is NEVER written to.
+    !        │  sgn * outflux = |outflux| > 0 regardless of edge orientation.
+    !
+    ! STEP 3 │  adv_Ecompart_flx2tra_spctrl
+    !        │
+    !        │  Accumulates flux divergence into Edivh, divides by vol_s.
+    !        │  Bin fbini flux was zeroed -> n_int keeps its energy in fbini,
+    !        │                               n_coast gets nothing.
+    !        │
+    !        │    Edivh(fbini, n_int)  = 0  (no export toward coast)
+    !        │    Edivh(fbini, n_coast)= 0  (nothing received)
+    !
+    ! STEP 4 │  inject reflect_src into Edivh  (in hsintegrate_Ecompart)
+    !        │
+    !        │    Edivh(kk, n_int) += reflect_src(kk, n_int) / vol_s(n_int)
+    !        │
+    !        │  Energy appears as a SOURCE at n_int in the mirror bin kk --
+    !        │  the reflected wave now propagates AWAY from the coast:
+    !        │
+    !        │    n_coast               n_int ━━━━━━━━━━━━>
+    !        │                                bin kk  (away from coast)
+    !
+    ! ENERGY BALANCE
+    ! ──────────────
+    ! n_coast : gained 0 (fbini blocked) + 0 (not in kk path) = 0  (unchanged)
+    ! n_int   : gained 0 in fbini (blocked)
+    !           gained |outflux|/vol_s in kk (reflect_src)
+    !           net total = 0  ->  spectral redistribution only     (conserved)
+    ! fbini --> energy blocked at coast, stays at n_int
+    ! kk    <-- same energy re-injected at n_int in mirror direction
+    !
+    subroutine apply_reflect_bc_spctrl(flux, partit, mesh)
+        implicit none
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh)  , intent(in   ), target :: mesh
+        real(kind=WP) , intent(inout)         :: flux(idemix2_nfbin, partit%myDim_edge2D)
+
+        integer       :: edge, fbini, kk, nfbin, sgn, n_int
+        real(kind=WP) :: outflux
+#include "../associate_part_def.h"
+#include "../associate_mesh_def.h"1
+#include "../associate_part_ass.h"
+#include "../associate_mesh_ass.h"
+
+        nfbin = idemix2_nfbin
+
+        ! Reset scratch; will be divided by vol_s and added to Edivh in
+        ! hsintegrate_Ecompart after adv_Ecompart_flx2tra_spctrl.
+        iwe2_reflect_src(:,:) = 0.0_WP
+
+        ! Zero every coast-directed flux so no energy reaches the coast node.
+        ! For each blocked flux in bin fbini, accumulate two terms into reflect_src:
+        !   +sgn*outflux in mirror bin kk    (energy gained in reflected direction)
+        !   -sgn*outflux in source bin fbini (energy lost from incident direction)
+        ! Net: energy is redistributed fbini→kk at n_int with zero total change.
+        ! Applied to Edivh after adv_Ecompart_flx2tra_spctrl in hsintegrate_Ecompart.
+!$OMP PARALLEL DO PRIVATE(edge, fbini, kk, sgn, n_int, outflux)
+        do edge = 1, myDim_edge2D
+            kk  = iwe2_bc_reflect_bin(edge)
+            ! edge is not connected to coast
+            if (kk == 0) cycle
+
+            !   sgn = +1  -->  coast node = edges(1, edge)
+            !                  interior   = edges(2, edge)
+            !   sgn = -1  -->  coast node = edges(2, edge)
+            !                  interior   = edges(1, edge)
+            sgn   = iwe2_bc_reflect_sgn(edge)
+            
+            ! which one is interior coastal edge node
+            n_int = merge(edges(2, edge), edges(1, edge), sgn == +1)
+
+            do fbini = 2, nfbin-1
+                outflux = flux(fbini, edge)
+                if (sgn * outflux > 0.0_WP) then
+                    ! block flux towards coast by setting to zero
+                    flux(fbini, edge) = 0.0_WP
+                    if (n_int <= myDim_nod2D) then
+!$OMP ATOMIC
+                        ! put energy in edge mirror spectral bin
+                        iwe2_reflect_src(kk,    n_int) = iwe2_reflect_src(kk,    n_int) + sgn * outflux
+!$OMP ATOMIC
+                        ! take energy from actual spectral bin
+                        iwe2_reflect_src(fbini, n_int) = iwe2_reflect_src(fbini, n_int) - sgn * outflux
+                    end if
+                end if
+            end do ! --> do fbini = 2, nfbin-1
+        end do ! --> do edge = 1, myDim_edge2D
+!$OMP END PARALLEL DO
+
+    end subroutine apply_reflect_bc_spctrl
+
+
+
     !
     !
     !___________________________________________________________________________
@@ -2227,7 +2722,6 @@ module g_cvmix_idemix2
         real(kind=WP)   , intent(in   )          :: vol_s(                     partit%myDim_nod2D +partit%eDim_nod2D)
         logical         , intent(in)             :: flag_AB2
         
-        
         real(kind=WP)   , intent(inout), optional:: Edt(        idemix2_nfbin, partit%myDim_nod2D)
         real(kind=WP)   , intent(inout), optional:: Eadvh(      idemix2_nfbin, partit%myDim_nod2D)
         real(kind=WP)   , intent(inout), optional:: Eadvs(      idemix2_nfbin, partit%myDim_nod2D)
@@ -2269,8 +2763,19 @@ module g_cvmix_idemix2
                                         , .True.          & ! enforce positive definit 
                                         )
                                         
-        ! compute cross spectral superbee advected tracer flux                                 
-        call adv_Ecompart_crss_spctrl_superbee(           &  
+        ! apply reflective coastal BC: redirect coast-directed fluxes into mirror bins
+        call apply_reflect_bc_spctrl(flx_uv, partit, mesh)
+        if (idemix2_diag_Ecompart) then
+            if (Ename == 'M2') then
+                iwe2_M2_reflect_src (:,:) = iwe2_reflect_src(:,:)
+            else
+                iwe2_niw_reflect_src(:,:) = iwe2_reflect_src(:,:)
+            end if
+        end if
+
+        !_______________________________________________________________________
+        ! compute cross spectral superbee advected tracer flux
+        call adv_Ecompart_crss_spctrl_superbee(           &
                                           cs              &
                                         , E(ti,:,:)       & 
                                         , dphit           &
@@ -2294,7 +2799,19 @@ module g_cvmix_idemix2
                                         ,mesh             &
                                         )
 
-        !_______________________________________________________________________        
+        !_______________________________________________________________________
+        ! inject blocked coast fluxes as source at interior nodes in mirror bin
+!$OMP PARALLEL DO PRIVATE(node, fbini)
+        do node = 1, myDim_nod2D
+            if (.not. iwe2_is_reflect_node(node)) cycle
+            do fbini = 2, nfbin-1
+                Edivh(ti, fbini, node) = Edivh(ti, fbini, node) &
+                                       + iwe2_reflect_src(fbini, node) / vol_s(node)
+            end do
+        end do
+!$OMP END PARALLEL DO
+
+        !_______________________________________________________________________
         ! Eden and Olbers 2014, eq. 2
         ! integrate E_M2^(n+1) = E_M2^(n) + dt*[ 
         !                        - div(c_uv*E_M2^n)         --> (the minus is hidden in the flux computation)
@@ -2348,33 +2865,33 @@ module g_cvmix_idemix2
         !_______________________________________________________________________
         ! additional diagnostics
         if (present(Edt))   Edt(:,:)   =  (E(tip1, :, 1:myDim_nod2D)-E(ti, :, 1:myDim_nod2D))
-        
+            
         if (present(Eadvh)) then 
             if (flag_AB2) then    
                 Eadvh(:,:) =  ((1.5+idemix2_AB_epsilon)*Edivh(ti  , :, 1:myDim_nod2D) &
-                             - (0.5+idemix2_AB_epsilon)*Edivh(tim1, :, 1:myDim_nod2D))
+                            - (0.5+idemix2_AB_epsilon)*Edivh(tim1, :, 1:myDim_nod2D))
             else                             
                 Eadvh(:,:) = Edivh(ti, :, 1:myDim_nod2D)                             
             end if 
         end if 
-        
+            
         if (present(Eadvs)) then 
             if (flag_AB2) then    
                 Eadvs(:,:) =  ((1.5+idemix2_AB_epsilon)*Edivs(ti  , :, 1:myDim_nod2D) &
-                             - (0.5+idemix2_AB_epsilon)*Edivs(tim1, :, 1:myDim_nod2D))
+                            - (0.5+idemix2_AB_epsilon)*Edivs(tim1, :, 1:myDim_nod2D))
             else                 
                 Eadvs(:,:) = Edivs(ti, :, 1:myDim_nod2D)
             end if
         end if     
-        
+            
         if (present(Ediss)) then
             do node= 1, myDim_nod2d
                 Ediss(:,node) =  - tauE(node)*E(tip1, :, node)                                      
             end do
         end if     
-        
+            
         if (present(Eforc)) Eforc(:,:) = forc(:, 1:myDim_nod2D)
-        
+
     end subroutine hsintegrate_Ecompart
     
     
@@ -2829,20 +3346,22 @@ module g_cvmix_idemix2
             do node = 1, myDim_nod2D
                 nu1 = ulevels_nod2D(node)
                 nl1 = nlevels_nod2D(node)
-                
+                    
                 if (present(Eiw_dt)) then 
                     do nz = nu1, nl1
                         Eiw_dt(nz, node)   = Eiw_dt(nz, node) + (Eiw(nz, node)-Eiw_old(nz, node))/dt
                     end do        
                 end if
-                
+                    
                 if (present(Eiw_hdif)) then 
                     do nz = nu1, nl1
-                        Eiw_hdif(nz, node) = (Eiw(nz, node)-Eiw_old(nz, node))
+                        Eiw_hdif(nz, node) = Eiw_hdif(nz, node)+(Eiw(nz, node)-Eiw_old(nz, node))
                     end do        
                 end if 
+                    
             end do
         end if 
+        
     end subroutine compute_hdiff_Eiw
 
 
