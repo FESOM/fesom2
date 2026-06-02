@@ -803,9 +803,11 @@ subroutine compute_vdiff_vdiss_Eiw( &
     real(cvmix_r8)    , intent(in), dimension(nlev)   :: fbot
 !     real(cvmix_r8)    , intent(in), dimension(nlev)   :: fadd --> in moment no additional forcings
     real(cvmix_r8)    , intent(in), dimension(nlev)   :: Eiw_old
-    !___Output_________________________________________________________________
+    
+    !___Output__________________________________________________________________
     real(cvmix_r8)    , intent(out), dimension(nlev)  :: Eiw_new
     real(cvmix_r8)    , intent(out), dimension(nlev)  :: Eiw_diss
+    
     real(cvmix_r8)    , intent(out), optional         :: Eiw_dt(nlev)
     real(cvmix_r8)    , intent(out), optional         :: Eiw_vdif(nlev)
     real(cvmix_r8)    , intent(out), optional         :: Eiw_bot(nlev)
@@ -835,7 +837,6 @@ subroutine compute_vdiff_vdiss_Eiw( &
     d_tri       = 0.0_cvmix_r8
     Eiw_new     = 0.0_cvmix_r8
     Eiw_diss    = 0.0_cvmix_r8
-    Eiw_bot     = 0.0_cvmix_r8
     
     !___________________________________________________________________________
     ! initialise additional forcings with zeros, there can be additional forcing terms
@@ -1001,6 +1002,7 @@ subroutine compute_vdiff_vdiss_Eiw( &
     
     !___________________________________________________________________________
     ! debuggin diagnostics: 
+    
     ! production of Eiw from vertical diffusion
     if (present(Eiw_vdif)) then 
         nz = 1
@@ -1011,7 +1013,7 @@ subroutine compute_vdiff_vdiss_Eiw( &
         nz = nlev
         Eiw_vdif(nz) = a_dif(nz)*Eiw_new(nz-1) - b_dif(nz)*Eiw_new(nz)
     end if 
-    
+        
     ! total production of Eiw
     if (present(Eiw_dt )) Eiw_dt(:) = (Eiw_new(:) - Eiw_old(:))/dt
     
@@ -1062,17 +1064,17 @@ subroutine compute_Eiw_waveinteract(    &
     real(cvmix_r8)    , intent(in   )                   :: dzw(nlev-1)   ! --> layer thickness
     real(cvmix_r8)    , intent(in   )                   :: dphi(nfbin) 
     real(cvmix_r8)    , intent(in   )                   :: dt
-    logical    , intent(in   )                          :: flag_posdef
+    logical           , intent(in   )                   :: flag_posdef
     real(cvmix_r8)    , intent(in   )                   :: E_iw_old(nlev)
     real(cvmix_r8)    , intent(inout)                   :: E_iw_new(nlev)
     real(cvmix_r8)    , intent(in   ), optional         :: E_M2_old(nfbin)
     real(cvmix_r8)    , intent(inout), optional         :: E_M2_new(nfbin)
-    real(cvmix_r8)    , intent(in   ), optional         :: E_M2_struct(nfbin)
+    real(cvmix_r8)    , intent(in   ), optional         :: E_M2_struct(nlev)
     real(cvmix_r8)    , intent(in   ), optional         :: alpha_M2_c
     real(cvmix_r8)    , intent(in   ), optional         :: tau_M2
     real(cvmix_r8)    , intent(in   ), optional         :: E_niw_old(nfbin)
     real(cvmix_r8)    , intent(inout), optional         :: E_niw_new(nfbin)
-    real(cvmix_r8)    , intent(in   ), optional         :: E_niw_struct(nfbin)
+    real(cvmix_r8)    , intent(in   ), optional         :: E_niw_struct(nlev)
     real(cvmix_r8)    , intent(in   ), optional         :: tau_niw
     
     ! optional diagnostics
