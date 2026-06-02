@@ -29,7 +29,7 @@ module cpl_driver
 
 #if defined (__oifs)
   integer                    :: nsend = 7
-  integer                    :: nrecv = 15
+  integer                    :: nrecv = 16
 #else
   integer                    :: nsend = 4
   integer                    :: nrecv = 12
@@ -701,6 +701,7 @@ include "associate_mesh_ass.h"
     cpl_recv(13) = 'calv_oce'
     cpl_recv(14) = 'u10w_oce'
     cpl_recv(15) = 'v10w_oce'
+    cpl_recv(16) = 'calv_AA'
 #else
     cpl_recv(1)  = 'taux_oce'
     cpl_recv(2)  = 'tauy_oce'
