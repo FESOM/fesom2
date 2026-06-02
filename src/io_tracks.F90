@@ -39,8 +39,11 @@ module io_tracks_module
   use mod_mesh,            only: t_mesh
   use mod_partit,          only: t_partit
   use mod_tracer,          only: t_tracer
+  use mod_dyn,             only: t_dyn
   use o_param,             only: WP, rad
   use g_comm_auto,         only: gather_nod, gather_elem, gather_edge
+  use g_rotate_grid,       only: vector_r2g
+  use g_config,            only: rotated_grid, force_rotation
   use mod_tracks_geometry, only: transect_t, analyse_transect, free_transect
   use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_quiet_nan
 #endif
@@ -59,31 +62,50 @@ module io_tracks_module
   public :: io_tracks_send
 
   ! Per-track state.
+  ! var_kind selects the output domain:
+  !   1 = node-based (temp, salt) -> M-sized edge-crossings domain
+  !   2 = elem-based (u, v)       -> P-sized path-steps domain
   type :: track_t
     character(len=64)    :: name       = ''
     character(len=512)   :: csv_path   = ''
     character(len=32)    :: var_name   = 'temp'
-    integer              :: tracer_idx = 1            ! 1=temp, 2=salt
+    integer              :: var_kind   = 1            ! 1=node, 2=elem
+    integer              :: tracer_idx = 1            ! 1=temp, 2=salt (kind=1 only)
+    integer              :: uv_comp    = 1            ! 1=u, 2=v       (kind=2 only)
     character(len=64)    :: field_id   = ''
 
-    ! Geometry — broadcast from rank 0 to all ranks after analyse_transect.
+    ! ------- Node-side geometry (M-sized, used by temp/salt) -------
     integer              :: M          = 0            ! # crossed edges (global)
     integer, allocatable :: edge_cut_ni(:, :)         ! (2, M) global node ids
     real(WP), allocatable :: edge_cut_lint(:)         ! (M)
     real(WP), allocatable :: lon_mid(:), lat_mid(:)   ! (M) midpoint coords (deg)
     real(WP), allocatable :: dist_km(:)               ! (M)
 
-    ! Per-rank sampling lookups. lid_*(m) > 0 iff this rank strict-owns
-    ! endpoint *; the lid value indexes nodal arrays (1..myDim_nod2D).
+    ! Per-rank node lookups. lid_*(m) > 0 iff this rank strict-owns
+    ! endpoint *; lid indexes nodal arrays in 1..myDim_nod2D.
     integer, allocatable :: lid_n1(:)                 ! (M) 0 if not owned
     integer, allocatable :: lid_n2(:)                 ! (M) 0 if not owned
 
-    ! XIOS-side: each rank "owns" a stride of m's for write purposes.
-    ! nL = # m's this rank pushes to XIOS; my_m(k) = global m index (1-based)
-    ! and i_index(k) = m - 1 (0-based for XIOS).
+    ! Node-side XIOS assignment (round-robin m mod npes).
     integer              :: nL         = 0
     integer, allocatable :: my_m(:)                   ! (nL)
     integer, allocatable :: i_index(:)                ! (nL)
+
+    ! ------- Path-side geometry (P-sized, used by u/v) -------
+    integer              :: P          = 0            ! # path triangle steps (global)
+    integer, allocatable :: path_ei(:)                ! (P) global elem ids, -1 = land
+    real(WP), allocatable :: path_dx(:), path_dy(:)   ! (P) midpoint->centroid (m)
+    real(WP), allocatable :: path_lon(:), path_lat(:) ! (P) centroid coords (deg)
+    real(WP), allocatable :: path_nvec_x(:), path_nvec_y(:) ! (P) section-normal unit vector
+
+    ! Per-rank elem lookups. lid_elem(p) > 0 iff this rank strict-owns
+    ! the path triangle; lid indexes elem arrays in 1..myDim_elem2D.
+    integer, allocatable :: lid_elem(:)               ! (P) 0 if not owned
+
+    ! Path-side XIOS assignment (round-robin p mod npes).
+    integer              :: nL_p       = 0
+    integer, allocatable :: my_p(:)                   ! (nL_p)
+    integer, allocatable :: i_index_p(:)              ! (nL_p)
   end type track_t
 
   type(track_t), allocatable, save :: tracks(:)
@@ -152,8 +174,9 @@ contains
 
 
   !> Loop tracks, sample, MPI_Allreduce, send via XIOS.
-  subroutine io_tracks_send(tracers, mesh, partit)
+  subroutine io_tracks_send(tracers, dynamics, mesh, partit)
     type(t_tracer), intent(in) :: tracers
+    type(t_dyn),    intent(in) :: dynamics
     type(t_mesh),   intent(in) :: mesh
     type(t_partit), intent(in) :: partit
     integer :: i
@@ -162,7 +185,11 @@ contains
     if (n_tracks == 0) return
 
     do i = 1, n_tracks
-       call send_one_track(tracers, mesh, partit, tracks(i))
+       if (tracks(i)%var_kind == 1) then
+          call send_one_track(tracers, mesh, partit, tracks(i))
+       else
+          call send_one_track_elem(dynamics, mesh, partit, tracks(i))
+       end if
     end do
   end subroutine io_tracks_send
 
@@ -305,17 +332,33 @@ contains
     type(transect_t)      :: geom
     integer :: N_csv, ierr
 
-    ! --- tracer slot ---------------------------------------------------
+    ! --- track variable kind + index slot ---
+    ! var_kind = 1 -> node-based linear interp (temp, salt)
+    ! var_kind = 2 -> element-based path sample (u, v, vflx)
+    !   uv_comp = 1 -> u (geographic east, m/s)
+    !   uv_comp = 2 -> v (geographic north, m/s)
+    !   uv_comp = 3 -> vflx (per-cell volume transport, m^3/s)
     select case (trim(t%var_name))
     case ('temp')
+       t%var_kind   = 1
        t%tracer_idx = 1
     case ('salt')
+       t%var_kind   = 1
        t%tracer_idx = 2
+    case ('u')
+       t%var_kind   = 2
+       t%uv_comp    = 1
+    case ('v')
+       t%var_kind   = 2
+       t%uv_comp    = 2
+    case ('vflx')
+       t%var_kind   = 2
+       t%uv_comp    = 3
     case default
        if (partit%mype == 0) then
           write(*,'(a,a,a,a,a)') '[TRACKS] ERROR: track "', trim(t%name), &
                '" unsupported track_var="', trim(t%var_name),             &
-               '". Supported: temp, salt.'
+               '". Supported: temp, salt, u, v, vflx.'
        end if
        call mpi_abort(partit%MPI_COMM_FESOM, 1, ierr)
     end select
@@ -338,7 +381,7 @@ contains
             ': geometry M=', geom%M, ' crossed edges'
     end if
 
-    call broadcast_transect_min(geom, partit)
+    call broadcast_transect_min(geom, partit, t%var_kind)
     if (geom%M == 0) then
        if (partit%mype == 0) write(*,'(a,a,a)') '[TRACKS] WARNING: track "', &
             trim(t%name), '" has no mesh crossings — skipping.'
@@ -346,7 +389,7 @@ contains
        return
     end if
 
-    ! --- store the small geometry pieces we need at sample time ---------
+    ! --- node-side geometry (always; M-sized) ---------------------------
     t%M = geom%M
     allocate(t%edge_cut_ni(2, t%M))
     allocate(t%edge_cut_lint(t%M))
@@ -358,34 +401,58 @@ contains
     t%lat_mid       = geom%edge_cut_midP(2, :)
     t%dist_km       = geom%edge_cut_dist
 
+    ! --- path-side geometry (only when element-based; P-sized) ----------
+    if (t%var_kind == 2) then
+       t%P = geom%P
+       allocate(t%path_ei    (t%P))
+       allocate(t%path_dx    (t%P), t%path_dy(t%P))
+       allocate(t%path_lon   (t%P), t%path_lat(t%P))
+       allocate(t%path_nvec_x(t%P), t%path_nvec_y(t%P))
+       t%path_ei     = geom%path_ei
+       t%path_dx     = geom%path_dx
+       t%path_dy     = geom%path_dy
+       t%path_lon    = geom%path_centroid_xy(1, :)
+       t%path_lat    = geom%path_centroid_xy(2, :)
+       t%path_nvec_x = geom%path_nvec_cs(1, :)
+       t%path_nvec_y = geom%path_nvec_cs(2, :)
+    end if
+
     call free_transect(geom)
 
-    ! --- per-rank: for each m, find local strict-owned lid for n1, n2 ---
-    call build_sampling_lookups(mesh, partit, t)
+    if (t%var_kind == 1) then
+       call build_sampling_lookups(mesh, partit, t)
+       call assign_xios_cells(partit, t)
+    else
+       call build_sampling_lookups_elem(mesh, partit, t)
+       call assign_xios_cells_elem(partit, t)
+    end if
 
-    ! --- per-rank XIOS assignment: m mod npes -> my_m / i_index ---------
-    call assign_xios_cells(partit, t)
-
-    ! --- register XIOS objects ------------------------------------------
     call register_xios_objects_for_track(partit, t)
 
     if (partit%mype == 0) then
-       write(*,'(a,a,a,i0,a)') '[TRACKS] ', trim(t%name),                    &
-            ': registered runtime XML, M=', t%M, ' cells'
-       write(*,'(a,a,a,a)')    '[TRACKS]   field=', trim(t%field_id),         &
-                               '  file=', trim(t%field_id) // '.fesom'
+       if (t%var_kind == 1) then
+          write(*,'(a,a,a,i0,a)') '[TRACKS] ', trim(t%name),                 &
+               ': node-based, M=', t%M, ' cells'
+       else
+          write(*,'(a,a,a,i0,a,i0,a)') '[TRACKS] ', trim(t%name),            &
+               ': elem-based, M=', t%M, ' edge crossings, P=', t%P,          &
+               ' path steps'
+       end if
+       write(*,'(a,a,a,a)') '[TRACKS]   field=', trim(t%field_id),            &
+                            '  file=', trim(t%field_id) // '.fesom'
     end if
   end subroutine process_one_track
 
 
-  !> Broadcast only the fields we sample at runtime (edge_cut_ni,
-  !> edge_cut_lint, edge_cut_midP, edge_cut_dist) plus M. The richer
-  !> transect_t produced by analyse_transect carries path-side arrays
-  !> that Step 1 doesn't need; we drop them after geometry runs.
-  subroutine broadcast_transect_min(geom, partit)
+  !> Broadcast the fields we sample at runtime. Node-side fields
+  !> (edge_cut_ni, edge_cut_lint, edge_cut_midP, edge_cut_dist) are
+  !> always broadcast. Path-side fields (path_ei, path_dx, path_dy,
+  !> path_centroid_xy) are broadcast only for element-based variables.
+  subroutine broadcast_transect_min(geom, partit, var_kind)
     type(transect_t), intent(inout) :: geom
     type(t_partit),   intent(in)    :: partit
-    integer :: ierr, M_b
+    integer,          intent(in)    :: var_kind        ! 1 = node, 2 = elem
+    integer :: ierr, M_b, P_b
 
     M_b = geom%M
     call mpi_bcast(M_b, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierr)
@@ -409,6 +476,33 @@ contains
     call mpi_bcast(geom%edge_cut_lint, M_b,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierr)
     call mpi_bcast(geom%edge_cut_midP, 2*M_b, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierr)
     call mpi_bcast(geom%edge_cut_dist, M_b,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierr)
+
+    if (var_kind /= 2) return
+
+    P_b = geom%P
+    call mpi_bcast(P_b, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierr)
+    if (P_b == 0) then
+       geom%P = 0
+       return
+    end if
+
+    if (partit%mype /= 0) then
+       if (allocated(geom%path_ei))          deallocate(geom%path_ei)
+       if (allocated(geom%path_dx))          deallocate(geom%path_dx)
+       if (allocated(geom%path_dy))          deallocate(geom%path_dy)
+       if (allocated(geom%path_centroid_xy)) deallocate(geom%path_centroid_xy)
+       if (allocated(geom%path_nvec_cs))     deallocate(geom%path_nvec_cs)
+       allocate(geom%path_ei(P_b))
+       allocate(geom%path_dx(P_b), geom%path_dy(P_b))
+       allocate(geom%path_centroid_xy(2, P_b))
+       allocate(geom%path_nvec_cs(2, P_b))
+       geom%P = P_b
+    end if
+    call mpi_bcast(geom%path_ei,          P_b,   MPI_INTEGER,          0, partit%MPI_COMM_FESOM, ierr)
+    call mpi_bcast(geom%path_dx,          P_b,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierr)
+    call mpi_bcast(geom%path_dy,          P_b,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierr)
+    call mpi_bcast(geom%path_centroid_xy, 2*P_b, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierr)
+    call mpi_bcast(geom%path_nvec_cs,     2*P_b, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierr)
   end subroutine broadcast_transect_min
 
 
@@ -466,11 +560,65 @@ contains
     do m = 1, t%M
        if (mod(m - 1, partit%npes) == partit%mype) then
           k = k + 1
-          t%my_m(k)   = m
+          t%my_m(k)    = m
           t%i_index(k) = m - 1     ! XIOS expects 0-based
        end if
     end do
   end subroutine assign_xios_cells
+
+
+  !> Path-side counterpart: for each path triangle p, find the local elem
+  !> id if this rank strictly owns it, else 0. Strict ownership:
+  !> elem owned iff elem2D_nodes(1, e) <= myDim_nod2D (the standard FESOM
+  !> rule, mirrored by myInd_elem2D_shrinked).
+  subroutine build_sampling_lookups_elem(mesh, partit, t)
+    type(t_mesh),   intent(in)    :: mesh
+    type(t_partit), intent(in)    :: partit
+    type(track_t),  intent(inout) :: t
+    integer, allocatable :: g2l_elem(:)
+    integer :: p, g, i, e
+
+    allocate(g2l_elem(mesh%elem2D))
+    g2l_elem = 0
+    do i = 1, partit%myDim_elem2D_shrinked
+       e = partit%myInd_elem2D_shrinked(i)
+       g2l_elem(partit%myList_elem2D(e)) = e
+    end do
+
+    allocate(t%lid_elem(t%P))
+    do p = 1, t%P
+       g = t%path_ei(p)
+       if (g >= 1 .and. g <= mesh%elem2D) then
+          t%lid_elem(p) = g2l_elem(g)
+       else
+          t%lid_elem(p) = 0          ! land slot (path_ei == -1) or out of range
+       end if
+    end do
+    deallocate(g2l_elem)
+  end subroutine build_sampling_lookups_elem
+
+
+  !> Round-robin assignment of path indices p=1..P to ranks.
+  subroutine assign_xios_cells_elem(partit, t)
+    type(t_partit), intent(in)    :: partit
+    type(track_t),  intent(inout) :: t
+    integer :: p, k, nL
+
+    nL = 0
+    do p = 1, t%P
+       if (mod(p - 1, partit%npes) == partit%mype) nL = nL + 1
+    end do
+    t%nL_p = nL
+    allocate(t%my_p(nL), t%i_index_p(nL))
+    k = 0
+    do p = 1, t%P
+       if (mod(p - 1, partit%npes) == partit%mype) then
+          k = k + 1
+          t%my_p(k)      = p
+          t%i_index_p(k) = p - 1
+       end if
+    end do
+  end subroutine assign_xios_cells_elem
 
 
   !> Sample one track: per-rank contributions to (nz_track x M), MPI_Allreduce,
@@ -559,6 +707,98 @@ contains
     call xios_send_field(trim(t%field_id), buf)
     deallocate(buf, sampled)
   end subroutine send_one_track
+
+
+  !> Element-based sampling at path triangles. Each rank contributes
+  !> dynamics%uv at its strict-owned path elements; the value is
+  !> rotated to geographic (when the mesh uses rotation) before the
+  !> requested component is extracted; MPI_Allreduce assembles the
+  !> P-sized curtain; XIOS gets this rank's stride.
+  subroutine send_one_track_elem(dynamics, mesh, partit, t)
+    type(t_dyn),    intent(in) :: dynamics
+    type(t_mesh),   intent(in) :: mesh
+    type(t_partit), intent(in) :: partit
+    type(track_t),  intent(in) :: t
+    real(WP), allocatable :: contrib(:, :), sampled(:, :), buf(:, :)
+    integer,  allocatable :: nhit(:, :), nhit_tot(:, :)
+    integer  :: p, kk, ierr, nz_wet, k, eid
+    real(WP) :: u_loc, v_loc, lon_r, lat_r, nan
+    logical  :: do_rot
+
+    if (len_trim(t%field_id) == 0)                            return
+    if (.not. xios_is_valid_field(trim(t%field_id)))          return
+    if (.not. xios_field_is_active(trim(t%field_id), .true.)) return
+    if (t%P == 0)                                             return
+
+    nan    = ieee_value(0.0_WP, ieee_quiet_nan)
+    do_rot = rotated_grid .or. force_rotation
+
+    allocate(contrib(nz_track, t%P), nhit(nz_track, t%P))
+    contrib = 0.0_WP
+    nhit    = 0
+
+    do p = 1, t%P
+       eid = t%lid_elem(p)
+       if (eid <= 0) cycle
+       if (eid > partit%myDim_elem2D) call mpi_abort(partit%MPI_COMM_FESOM, 1, ierr)
+       nz_wet = max(0, mesh%nlevels(eid) - 1)
+       lon_r  = t%path_lon(p) * rad     ! geographic lon (rad) at path centroid
+       lat_r  = t%path_lat(p) * rad
+
+       do kk = 1, min(nz_track, nz_wet)
+          u_loc = real(dynamics%uv(1, kk, eid), WP)
+          v_loc = real(dynamics%uv(2, kk, eid), WP)
+          if (do_rot) then
+             ! Rotate (u, v) from model frame to geographic at this centroid.
+             ! flag_coord=1: lon/lat are GEOGRAPHIC.
+             call vector_r2g(u_loc, v_loc, lon_r, lat_r, 1)
+          end if
+          select case (t%uv_comp)
+          case (1)
+             contrib(kk, p) = u_loc
+          case (2)
+             contrib(kk, p) = v_loc
+          case (3)
+             ! Per-cell volume transport across the section, m^3/s.
+             ! Matches tripyview's do_nveccs=True canonical formula
+             ! (calc_transect_Xtransp, sub_transect.py:1371-1382):
+             !   transp = u * |path_dy| * nvec_x + v * |path_dx| * nvec_y
+             ! path_dx/path_dy are midpoint->centroid in metres; nvec is
+             ! the section unit normal; mesh%helem is the ALE layer
+             ! thickness at this element.
+             contrib(kk, p) = (u_loc * abs(t%path_dy(p)) * t%path_nvec_x(p) &
+                             + v_loc * abs(t%path_dx(p)) * t%path_nvec_y(p)) &
+                             * real(mesh%helem(kk, eid), WP)
+          end select
+          nhit(kk, p) = 1
+       end do
+    end do
+
+    allocate(sampled(nz_track, t%P), nhit_tot(nz_track, t%P))
+    call MPI_Allreduce(contrib, sampled,  nz_track*t%P, MPI_DOUBLE_PRECISION, &
+                       MPI_SUM, partit%MPI_COMM_FESOM, ierr)
+    call MPI_Allreduce(nhit,    nhit_tot, nz_track*t%P, MPI_INTEGER,          &
+                       MPI_SUM, partit%MPI_COMM_FESOM, ierr)
+    deallocate(contrib, nhit)
+
+    ! Element ownership is unique per element, so nhit_tot is 0 or 1.
+    ! 0 -> boundary slot (path_ei = -1) or dry-bottom -> NaN.
+    do p = 1, t%P
+       do kk = 1, nz_track
+          if (nhit_tot(kk, p) == 0) sampled(kk, p) = nan
+       end do
+    end do
+    deallocate(nhit_tot)
+
+    allocate(buf(nz_track, t%nL_p))
+    do k = 1, t%nL_p
+       do kk = 1, nz_track
+          buf(kk, k) = sampled(kk, t%my_p(k))
+       end do
+    end do
+    call xios_send_field(trim(t%field_id), buf)
+    deallocate(buf, sampled)
+  end subroutine send_one_track_elem
 
 
   ! ====================================================================
@@ -734,32 +974,63 @@ contains
     type(xios_duration)    :: freq
     character(len=64)      :: domain_id, grid_id, file_id, file_name
     real(WP), allocatable  :: lon_loc(:), lat_loc(:)
-    integer :: k
+    integer :: k, ni_glo_d, ni_d
+    character(len=64)      :: long_name
 
     freq = parse_xios_freq(trim(track_output_freq))
 
-    domain_id = 'track_' // trim(t%name)
-    grid_id   = 'grid_3d_track_' // trim(t%name)
     file_id   = 'f_' // trim(t%field_id)
     file_name = trim(t%field_id) // '.fesom'
 
-    allocate(lon_loc(t%nL), lat_loc(t%nL))
-    do k = 1, t%nL
-       lon_loc(k) = t%lon_mid(t%my_m(k))
-       lat_loc(k) = t%lat_mid(t%my_m(k))
-    end do
+    ! Per-kind domain: node-based -> M-sized "track_<name>";
+    !                  elem-based -> P-sized "path_<name>".
+    if (t%var_kind == 1) then
+       domain_id = 'track_' // trim(t%name)
+       grid_id   = 'grid_3d_track_' // trim(t%name)
+       ni_glo_d  = t%M
+       ni_d      = t%nL
+       long_name = 'ship-track curtain (node-based, geometry-aware)'
+       allocate(lon_loc(t%nL), lat_loc(t%nL))
+       do k = 1, t%nL
+          lon_loc(k) = t%lon_mid(t%my_m(k))
+          lat_loc(k) = t%lat_mid(t%my_m(k))
+       end do
+    else
+       domain_id = 'path_'  // trim(t%name)
+       grid_id   = 'grid_3d_path_' // trim(t%name)
+       ni_glo_d  = t%P
+       ni_d      = t%nL_p
+       long_name = 'ship-track curtain (element-based, path triangles)'
+       allocate(lon_loc(t%nL_p), lat_loc(t%nL_p))
+       do k = 1, t%nL_p
+          lon_loc(k) = t%path_lon(t%my_p(k))
+          lat_loc(k) = t%path_lat(t%my_p(k))
+       end do
+    end if
 
     call xios_get_handle("domain_definition", dgrp)
     call xios_add_child(dgrp, dom, trim(domain_id))
-    call xios_set_attr(dom,                              &
-         type        = "unstructured",                    &
-         ni_glo      = t%M,                                &
-         ni          = t%nL,                               &
-         i_index     = t%i_index,                          &
-         lonvalue_1d = lon_loc,                            &
-         latvalue_1d = lat_loc,                            &
-         data_dim    = 1,                                  &
-         data_ni     = t%nL)
+    if (t%var_kind == 1) then
+       call xios_set_attr(dom,                           &
+            type        = "unstructured",                 &
+            ni_glo      = ni_glo_d,                       &
+            ni          = ni_d,                           &
+            i_index     = t%i_index,                      &
+            lonvalue_1d = lon_loc,                        &
+            latvalue_1d = lat_loc,                        &
+            data_dim    = 1,                              &
+            data_ni     = ni_d)
+    else
+       call xios_set_attr(dom,                           &
+            type        = "unstructured",                 &
+            ni_glo      = ni_glo_d,                       &
+            ni          = ni_d,                           &
+            i_index     = t%i_index_p,                    &
+            lonvalue_1d = lon_loc,                        &
+            latvalue_1d = lat_loc,                        &
+            data_dim    = 1,                              &
+            data_ni     = ni_d)
+    end if
 
     call xios_get_handle("grid_definition", ggrp)
     call xios_add_child(ggrp, grd, trim(grid_id))
@@ -774,7 +1045,7 @@ contains
          grid_ref  = trim(grid_id),                       &
          operation = "average",                           &
          prec      = 8,                                   &
-         long_name = "ship-track/mooring curtain (geometry-aware)")
+         long_name = trim(long_name))
 
     call xios_get_handle("fesom_tracks", my_filgrp)
     call xios_add_child(my_filgrp, fil, trim(file_id))
