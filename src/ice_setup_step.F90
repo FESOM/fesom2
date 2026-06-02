@@ -333,7 +333,10 @@ subroutine ice_timestep(step, ice, partit, mesh)
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("ice_thermodynamics")
 #endif
-    rtime_ice = rtime_ice + (t3-t0)
+    rtime_ice       = rtime_ice       + (t3-t0)
+    rtime_ice_evp   = rtime_ice_evp   + t1-t0
+    rtime_ice_adv   = rtime_ice_adv   + t2-t1
+    rtime_ice_therm = rtime_ice_therm + t3-t2
     rtime_tot = rtime_tot + (t3-t0)
     if(mod(step,logfile_outfreq)==0 .and. mype==0) then
         write(*,*) '___ICE STEP EXECUTION TIMES____________________________'
