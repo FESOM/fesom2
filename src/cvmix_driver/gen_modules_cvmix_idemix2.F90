@@ -191,7 +191,8 @@ module g_cvmix_idemix2
     real(kind=WP), allocatable, dimension(:,:)  :: iwe2_E_M2_dt  ,                     &
                                                    iwe2_E_M2_advh, iwe2_E_M2_advs    , &
                                                    iwe2_E_M2_diss, iwe2_E_M2_diss_wwi, &
-                                                   iwe2_E_M2_forc
+                                                   iwe2_E_M2_forc,                     &
+                                                   iwe2_E_M2_refl
     
     
     ! --- niw related global variables --- 
@@ -204,7 +205,8 @@ module g_cvmix_idemix2
     real(kind=WP), allocatable, dimension(:,:)  :: iwe2_E_niw_dt  ,                      & 
                                                    iwe2_E_niw_advh, iwe2_E_niw_advs    , &
                                                    iwe2_E_niw_diss,                      &
-                                                   iwe2_E_niw_forc
+                                                   iwe2_E_niw_forc,                      &
+                                                   iwe2_E_niw_refl
     
     ! --- Eiw - internal wave energy related variables ---
     real(kind=WP), allocatable, dimension(:,:,:):: iwe2_E_iw
@@ -240,23 +242,17 @@ module g_cvmix_idemix2
     ! reflective coastal BC: for each edge touching exactly one coast node,
     ! iwe2_bc_reflect_bin stores the mirror spectral bin (0 = edge not flagged),
     ! iwe2_bc_reflect_sgn = +1 if ednodes(1) is the coast node, -1 if ednodes(2) is.
-    integer      , allocatable, dimension(:)    :: iwe2_bc_reflect_bin
-    integer      , allocatable, dimension(:)    :: iwe2_bc_reflect_sgn
+    integer      , allocatable, dimension(:)    :: iwe2_refl_bin
+    integer      , allocatable, dimension(:)    :: iwe2_refl_sgn
     ! per-timestep scratch: blocked coast flux accumulated per (mirror bin, interior node),
     ! filled by apply_reflect_bc_spctrl, applied to Edivh in hsintegrate_Ecompart
-    real(kind=WP), allocatable, dimension(:,:)  :: iwe2_reflect_src
-    ! persistent per-compartment copies of iwe2_reflect_src for I/O output
-    real(kind=WP), allocatable, dimension(:,:)  :: iwe2_M2_reflect_src
-    real(kind=WP), allocatable, dimension(:,:)  :: iwe2_niw_reflect_src
+    real(kind=WP), allocatable, dimension(:,:)  :: iwe2_refl_src
     ! mask: .true. for own nodes that are interior to at least one coast edge
-    logical,       allocatable, dimension(:)    :: iwe2_is_reflect_node
-    ! compact list of own-node indices that have at least one coast edge;
-    ! used to restrict the Edivh reflect_src injection to coast-adjacent nodes only
-    integer,       allocatable, dimension(:)    :: iwe2_reflect_nodes
-    integer                                     :: iwe2_n_reflect_nodes
-
-    ! real(kind=WP), allocatable, dimension(:)    :: iwe2_cn_e, iwe2_cn_gradx, iwe2_cn_grady
-    
+    logical,       allocatable, dimension(:)    :: iwe2_refl_node
+    ! pre-computed periodic wrap indices for cross-spectral superbee stencil
+    ! (branch-free inner loop in adv_Ecompart_crss_spctrl_superbee)
+    integer,       allocatable, dimension(:)    :: iwe2_idxp1, iwe2_idxp2, iwe2_idxm1
+        
     ! load variables from CVMix list
     type(cvmix_data_type)                       :: CVMix_vars
 
@@ -441,11 +437,13 @@ module g_cvmix_idemix2
                 allocate( iwe2_E_M2_advh(nfbin, myDim_nod2D) &
                         , iwe2_E_M2_advs(nfbin, myDim_nod2D) &
                         , iwe2_E_M2_diss(nfbin, myDim_nod2D) &
-                        , iwe2_E_M2_forc(nfbin, myDim_nod2D) )
+                        , iwe2_E_M2_forc(nfbin, myDim_nod2D) &
+                        , iwe2_E_M2_refl(nfbin, myDim_nod2D) )
                 iwe2_E_M2_advh(:,:) = 0.0_WP
                 iwe2_E_M2_advs(:,:) = 0.0_WP
                 iwe2_E_M2_diss(:,:) = 0.0_WP
                 iwe2_E_M2_forc(:,:) = 0.0_WP
+                iwe2_E_M2_refl(:,:) = 0.0_WP
             end if
             
             if (idemix2_diag_Ecompart .or. idemix2_diag_WWI) then
@@ -508,12 +506,13 @@ module g_cvmix_idemix2
                 allocate( iwe2_E_niw_advh(nfbin, myDim_nod2D) &
                         , iwe2_E_niw_advs(nfbin, myDim_nod2D) &
                         , iwe2_E_niw_diss(nfbin, myDim_nod2D) &
-                        , iwe2_E_niw_forc(nfbin, myDim_nod2D) )
-                iwe2_E_niw_dt(  :,:) = 0.0_WP
+                        , iwe2_E_niw_forc(nfbin, myDim_nod2D) &
+                        , iwe2_E_niw_refl(nfbin, myDim_nod2D) )
                 iwe2_E_niw_advh(:,:) = 0.0_WP
                 iwe2_E_niw_advs(:,:) = 0.0_WP
                 iwe2_E_niw_diss(:,:) = 0.0_WP
                 iwe2_E_niw_forc(:,:) = 0.0_WP
+                iwe2_E_niw_refl(:,:) = 0.0_WP
             end if
 
             if (idemix2_diag_Ecompart .or. idemix2_diag_WWI) then
@@ -528,6 +527,16 @@ module g_cvmix_idemix2
                 iwe2_E_iw_diss_niw(:,:) = 0.0_WP
             end if
         end if 
+        
+        ! reflected boundary condition
+        allocate(iwe2_refl_bin(myDim_edge2D))
+        allocate(iwe2_refl_sgn(myDim_edge2D))
+        allocate(iwe2_refl_src(idemix2_nfbin, myDim_nod2D))
+        allocate(iwe2_refl_node(myDim_nod2D+eDim_nod2D))
+        iwe2_refl_bin(:)  = 0
+        iwe2_refl_sgn(:)  = 0
+        iwe2_refl_src(:,:)= 0.0_WP
+        iwe2_refl_node(:) = .false.
         
         ! allocate 1d Spectral space coordinates
         allocate(  iwe2_phit( nfbin)              &  
@@ -597,14 +606,29 @@ module g_cvmix_idemix2
         ! iwe2_phit(k) represents the edge of the k-th spectral bin
         iwe2_phit(1) = -iwe2_dphit(1)
         iwe2_phiu(1 )= iwe2_phit(1)+iwe2_dphit(1)/2.0_WP
-        do fbin_i=2,nfbin 
+        do fbin_i=2,nfbin
             iwe2_phit(fbin_i) = iwe2_phit(fbin_i-1) + iwe2_dphit(fbin_i)
             iwe2_phiu(fbin_i) = iwe2_phiu(fbin_i-1) + iwe2_dphiu(fbin_i)
-        end do 
-        
+        end do
+
+        !_______________________________________________________________________
+        ! pre-compute periodic wrap indices for cross-spectral superbee stencil
+        allocate(iwe2_idxp1(nfbin), iwe2_idxp2(nfbin), iwe2_idxm1(nfbin))
+        do fbin_i = 1, nfbin
+            iwe2_idxp1(fbin_i) = fbin_i+1; if (iwe2_idxp1(fbin_i)>nfbin) iwe2_idxp1(fbin_i)=iwe2_idxp1(fbin_i)-(nfbin-2)
+            iwe2_idxp2(fbin_i) = fbin_i+2; if (iwe2_idxp2(fbin_i)>nfbin) iwe2_idxp2(fbin_i)=iwe2_idxp2(fbin_i)-(nfbin-2)
+            iwe2_idxm1(fbin_i) = fbin_i-1; if (iwe2_idxm1(fbin_i)<1    ) iwe2_idxm1(fbin_i)=nfbin-2
+        end do
+
         !_______________________________________________________________________
         ! pre-compute reflective coastal BC lookup tables
-        call init_reflect_bc(partit, mesh)
+        call init_reflect_bc( iwe2_refl_bin  &
+                            , iwe2_refl_sgn  &
+                            , iwe2_refl_src  &
+                            , iwe2_refl_node &
+                            , partit         &
+                            , mesh           &
+                            )
 
         !_______________________________________________________________________
         ! read idemix M2 forcing from cfsr data --> file
@@ -965,11 +989,21 @@ module g_cvmix_idemix2
     !         │
     !         │  iwe2_bc_reflect_bin(edge) = kk   (mirror spectral bin)
     !         │  iwe2_bc_reflect_sgn(edge) = +1   (coast = ednodes(1))
-    subroutine init_reflect_bc(partit, mesh)
+    subroutine init_reflect_bc(   refl_bin   &
+                                , refl_sgn   &
+                                , refl_src   &
+                                , refl_node  &
+                                , partit     &
+                                , mesh       &
+                               )
         implicit none
-        type(t_mesh),   intent(in), target :: mesh
+        type(t_mesh)  , intent(in), target :: mesh
         type(t_partit), intent(in), target :: partit
-
+        integer       , intent(inout)      :: refl_bin(partit%myDim_edge2D)
+        integer       , intent(inout)      :: refl_sgn(partit%myDim_edge2D)
+        real(kind=WP) , intent(inout)      :: refl_src(idemix2_nfbin, partit%myDim_nod2D)
+        logical       , intent(inout)      :: refl_node(partit%myDim_nod2D+partit%eDim_nod2D)
+        
         integer       :: edge, n1, n2, n_int, node, kk_bc, fbinj, nfbin
         real(kind=WP) :: lon1, lat1, lon2, lat2, lat_mean
         real(kind=WP) :: edge_dx, edge_dy, phi_mirror, dist, dist_min
@@ -979,17 +1013,8 @@ module g_cvmix_idemix2
 #include "../associate_part_ass.h"
 #include "../associate_mesh_ass.h"
         nfbin = idemix2_nfbin
-
-        allocate(iwe2_bc_reflect_bin(myDim_edge2D))
-        allocate(iwe2_bc_reflect_sgn(myDim_edge2D))
-        allocate(iwe2_reflect_src(idemix2_nfbin, myDim_nod2D))
-        if (idemix2_diag_Ecompart) then
-            allocate(iwe2_M2_reflect_src (idemix2_nfbin, myDim_nod2D))
-            allocate(iwe2_niw_reflect_src(idemix2_nfbin, myDim_nod2D))
-        end if
-        allocate(is_coast_node(myDim_nod2D+eDim_nod2D))
-                
-        ! > iwe2_bc_reflect_bin(edge) stores the MIRROR SPECTRAL BIN for a flagged
+    
+        ! > refl_bin(edge) stores the MIRROR SPECTRAL BIN for a flagged
         ! coast edge.  0 = edge not flagged, BC skipped.
         ! 
         ! > HOW IT IS COMPUTED (init_reflect_bc)
@@ -999,16 +1024,16 @@ module g_cvmix_idemix2
         !        edge_dy =  lat_interior - lat_coast
         !   2. phi_mirror = atan2(edge_dy, edge_dx)  mapped to [0, 2*pi)
         !   3. kk = interior bin (2..nfbin-1) with angle closest to phi_mirror
-        !   4. iwe2_bc_reflect_bin(edge) = kk
+        !   4. refl_bin(edge) = kk
         ! 
         ! > HOW IT IS USED (apply_reflect_bc_spctrl):
         ! ALL toward-coast bins at this edge (any fbini where sgn*flux > 0)
         ! are blocked and their energy reflected into the SAME single bin kk:
         !   reflect_src(kk, n_int) += sgn * outflux   (for all toward-coast fbini)
         ! One kk per edge — an approximation based on the edge-normal geometry.
-        iwe2_bc_reflect_bin(:) = 0
+        ! refl_bin(:) = 0
         
-        ! > iwe2_bc_reflect_sgn(edge) encodes WHICH of the two edge nodes is the coast
+        ! > refl_sgn(edge) encodes WHICH of the two edge nodes is the coast
         ! node, and from that, WHICH flux sign means "toward coast". Each edge has 
         ! two endpoint nodes: edges(1, edge) and edges(2, edge). The sign convention 
         ! in the FV scheme is:
@@ -1033,30 +1058,27 @@ module g_cvmix_idemix2
         ! 
         ! in both orientations (positive for sgn=+1 with outflux>0,
         !                       positive for sgn=-1 with outflux<0).
-        iwe2_bc_reflect_sgn(:) = 0
+        ! refl_sgn(:) = 0
         
-        ! > iwe2_reflect_src is a 2D scratch array (nfbin, nod2D) used to implement
+        ! > refl_src is a 2D scratch array (nfbin, nod2D) used to implement
         ! reflective boundary conditions at coastlines for horizontal NIW energy advection.
         ! 1. During apply_reflect_bc_spctrl:
         !    For every coast-adjacent edge flagged in iwe2_bc_reflect_bin, any flux
         !    directed toward the coast node is zeroed out and the blocked energy is
-        !    accumulated into iwe2_reflect_src(kk, n_int) at the interior node (n_int),
+        !    accumulated into refl_src(kk, n_int) at the interior node (n_int),
         !    with the sign corrected so energy is conserved.
         ! 2. After advection in hsintegrate_Ecompart:
         !    The accumulated blocked flux is re-injected as a divergence source
-        !    Edivh += iwe2_reflect_src / vol_s, effectively bouncing the energy back
+        !    Edivh += refl_src / vol_s, effectively bouncing the energy back
         !    into the interior in bin kk (the mirror/reflected propagation direction).
         !    
         ! > In short: it is a flux-blocking + re-injection buffer that prevents NIW energy
         ! from leaking into land, redirecting it instead into the spectrally mirrored
         ! propagation direction at the last ocean node.        
-        iwe2_reflect_src(:,:) = 0.0_WP
-        if (idemix2_diag_Ecompart) then
-            iwe2_M2_reflect_src (:,:) = 0.0_WP
-            iwe2_niw_reflect_src(:,:) = 0.0_WP
-        end if
+        ! refl_src(:,:) = 0.0_WP
         
         ! a node is a coast node if it belongs to at least one boundary edge
+        allocate(is_coast_node(myDim_nod2D+eDim_nod2D))
         is_coast_node(:)       = .false.
         do edge = 1, myDim_edge2D
             if (edge_tri(2, edge) == 0) then
@@ -1082,12 +1104,12 @@ module g_cvmix_idemix2
                 ! coast = n2, interior = n1: reflect direction is n2 -> n1
                 edge_dx = (lon1 - lon2) * cos(lat_mean)
                 edge_dy =  lat1 - lat2
-                iwe2_bc_reflect_sgn(edge) = -1  ! negative flux = transport n1->n2 = INTO coast
+                refl_sgn(edge) = -1  ! negative flux = transport n1->n2 = INTO coast
             else
                 ! coast = n1, interior = n2: reflect direction is n1 -> n2
                 edge_dx = (lon2 - lon1) * cos(lat_mean)
                 edge_dy =  lat2 - lat1
-                iwe2_bc_reflect_sgn(edge) = +1  ! positive flux = transport n2->n1 = INTO coast
+                refl_sgn(edge) = +1  ! positive flux = transport n2->n1 = INTO coast
             end if
             
             ! mirror angle = direction away from coast, mapped to [0, 2*pi)
@@ -1104,16 +1126,15 @@ module g_cvmix_idemix2
                     kk_bc    = fbinj
                 end if
             end do
-            iwe2_bc_reflect_bin(edge) = kk_bc
+            refl_bin(edge) = kk_bc
         end do
 
         ! create logical array if node is a reflected boudnary node
-        allocate(iwe2_is_reflect_node(myDim_nod2D))
-        iwe2_is_reflect_node(:) = .false.
+        refl_node(:) = .false.
         do edge = 1, myDim_edge2D
-            if (iwe2_bc_reflect_bin(edge) == 0) cycle
-            n_int = merge(edges(2,edge), edges(1,edge), iwe2_bc_reflect_sgn(edge) == +1)
-            if (n_int <= myDim_nod2D) iwe2_is_reflect_node(n_int) = .true.
+            if (refl_bin(edge) == 0) cycle
+            n_int = merge(edges(2,edge), edges(1,edge), refl_sgn(edge) == +1)
+            if (n_int <= myDim_nod2D) refl_node(n_int) = .true.
         end do
 
         deallocate(is_coast_node)
@@ -1138,6 +1159,7 @@ module g_cvmix_idemix2
         integer       :: elnodes(3), el(2), ednodes(2) 
         real(kind=WP) :: lat_n_deg, lat_e_deg
         real(kind=WP) :: cn, cn_e, cn_gradx_e, cn_grady_e, omega_niw_e
+        real(kind=WP) :: inv_area, area_third
         logical       :: topo_shelf=.False.
         logical       :: debug=.false.
         ! Timing variables
@@ -1179,6 +1201,7 @@ module g_cvmix_idemix2
         !_______________________________________________________________________
         ! 1. Compute IDEMIX2 parameters (cn, alpha_c, v0, c0, tau, struct functions)
         t0 = MPI_Wtime()
+!$OMP PARALLEL DO PRIVATE(node, lat_n_deg, nln, uln, nz, cn, topo_shelf)
         do node=1, myDim_nod2D+eDim_nod2D
             !___________________________________________________________________
             ! re-initialse cross spectral velocites, for later accumulation through 
@@ -1187,7 +1210,7 @@ module g_cvmix_idemix2
             if (idemix2_enable_niw) iwe2_niw_w(:,node) = 0.0_WP
             
             !___________________________________________________________________
-            lat_n_deg = geo_coord_nod2D(2,node) * 180.0/pi   
+            lat_n_deg = geo_coord_nod2D(2,node) / rad
             
             !___________________________________________________________________
             ! compute baroclinic gravity wave speed
@@ -1355,6 +1378,7 @@ module g_cvmix_idemix2
                     
             end if         
         end do ! --> do node=1, myDim_nod2D+eDim_nod2D
+!$OMP END PARALLEL DO
         t1 = MPI_Wtime()
         time_params = t1 - t0
         
@@ -1365,7 +1389,8 @@ module g_cvmix_idemix2
             nln        = nlevels(elem)-1
             uln        = ulevels(elem)
             elnodes    = elem2d_nodes(:,elem)
-            lat_e_deg  = sum(geo_coord_nod2D(2,elnodes))/3.0 * 180.0/pi    
+            lat_e_deg  = sum(geo_coord_nod2D(2,elnodes)) / (3.0_WP*rad)
+            area_third = elem_area(elem) / 3.0_WP
             if (idemix2_enable_M2)  w_M2_e(:)  = 0.0_WP
             if (idemix2_enable_niw) w_niw_e(:) = 0.0_WP
             
@@ -1439,7 +1464,7 @@ module g_cvmix_idemix2
                 ! --> here w_M2_e and w_niw_e are still on elements but for the proper 
                 !     finite volume advection implementation we need them on nodes !
                 do k=1,3
-                    iwe2_M2_w(:, elnodes(k)) = iwe2_M2_w(:, elnodes(k)) + w_M2_e(:)*elem_area(elem)/3.0_WP
+                    iwe2_M2_w(:, elnodes(k)) = iwe2_M2_w(:, elnodes(k)) + w_M2_e(:)*area_third
                 end do
                 
             end if
@@ -1467,7 +1492,7 @@ module g_cvmix_idemix2
                 end if
                 
                 do k=1,3
-                    iwe2_niw_w(:, elnodes(k)) = iwe2_niw_w(:, elnodes(k)) + w_niw_e(:)*elem_area(elem)/3.0_WP
+                    iwe2_niw_w(:, elnodes(k)) = iwe2_niw_w(:, elnodes(k)) + w_niw_e(:)*area_third
                 end do
             end if
             ! --> at the end we still need to normalize iwe2_M2_w and iwe2_niw_w 
@@ -1482,17 +1507,23 @@ module g_cvmix_idemix2
         if (idemix2_enable_M2) then 
             call exchange_elem_fbin(iwe2_M2_uv, partit)
             call exchange_nod_fbin(iwe2_M2_w, partit)
+!$OMP PARALLEL DO PRIVATE(node, inv_area)
             do node=1, myDim_nod2D+eDim_nod2D
-                iwe2_M2_w( :, node) = iwe2_M2_w(:, node)/area(1, node)
+                inv_area = 1.0_WP / area(1, node)
+                iwe2_M2_w(:, node) = iwe2_M2_w(:, node) * inv_area
             end do
+!$OMP END PARALLEL DO
         end if
-        
-        if (idemix2_enable_niw) then 
+
+        if (idemix2_enable_niw) then
             call exchange_elem_fbin(iwe2_niw_uv, partit)
             call exchange_nod_fbin(iwe2_niw_w, partit)
+!$OMP PARALLEL DO PRIVATE(node, inv_area)
             do node=1, myDim_nod2D+eDim_nod2D
-                iwe2_niw_w( :, node) = iwe2_niw_w(:, node)/area(1, node)
-            end do            
+                inv_area = 1.0_WP / area(1, node)
+                iwe2_niw_w(:, node) = iwe2_niw_w(:, node) * inv_area
+            end do
+!$OMP END PARALLEL DO
         end if
         
         
@@ -1519,6 +1550,10 @@ module g_cvmix_idemix2
                     , iwe2_gradxy_n                     &
                     , iwe2_flx_uv                       &
                     , iwe2_flx_w                        &
+                    , iwe2_refl_bin                     &
+                    , iwe2_refl_sgn                     &
+                    , iwe2_refl_src                     &
+                    , iwe2_refl_node                    &
                     , vol_nodB2T                        &
                     , partit                            &
                     , mesh                              &
@@ -1528,6 +1563,7 @@ module g_cvmix_idemix2
                     , iwe2_E_M2_advs                    & ! optional: diagnostic
                     , iwe2_E_M2_diss                    & ! optional: diagnostic
                     , iwe2_E_M2_forc                    & ! optional: diagnostic
+                    , iwe2_E_M2_refl                    & ! optional: diagnostic
                     )
             else
                 call hsintegrate_Ecompart(              &
@@ -1545,6 +1581,10 @@ module g_cvmix_idemix2
                     , iwe2_gradxy_n                     &
                     , iwe2_flx_uv                       &
                     , iwe2_flx_w                        &
+                    , iwe2_refl_bin                     &
+                    , iwe2_refl_sgn                     &
+                    , iwe2_refl_src                     &
+                    , iwe2_refl_node                    &
                     , vol_nodB2T                        &
                     , partit                            &
                     , mesh                              &
@@ -1563,7 +1603,7 @@ module g_cvmix_idemix2
             ! create complete Ecomaprt diagnostic
             if (idemix2_diag_Ecompart) then
                 call hsintegrate_Ecompart(              &
-                    iwe2_taum1, iwe2_tau, iwe2_taup1  & 
+                    iwe2_taum1, iwe2_tau, iwe2_taup1    & 
                     , 'NIW'                             &
                     , iwe2_E_niw                        & 
                     , iwe2_E_niw_divh                   &
@@ -1577,6 +1617,10 @@ module g_cvmix_idemix2
                     , iwe2_gradxy_n                     &
                     , iwe2_flx_uv                       &
                     , iwe2_flx_w                        &
+                    , iwe2_refl_bin                     &
+                    , iwe2_refl_sgn                     &
+                    , iwe2_refl_src                     &
+                    , iwe2_refl_node                    &
                     , vol_nodB2T                        &
                     , partit                            &
                     , mesh                              &
@@ -1586,10 +1630,11 @@ module g_cvmix_idemix2
                     , iwe2_E_niw_advs                   & ! optional: diagnostic
                     , iwe2_E_niw_diss                   & ! optional: diagnostic
                     , iwe2_E_niw_forc                   & ! optional: diagnostic
+                    , iwe2_E_niw_refl                   & ! optional: diagnostic
                     )
             else
-            call hsintegrate_Ecompart(              &
-                    iwe2_taum1, iwe2_tau, iwe2_taup1  & 
+            call hsintegrate_Ecompart(                  &
+                    iwe2_taum1, iwe2_tau, iwe2_taup1    &  
                     , 'NIW'                             &
                     , iwe2_E_niw                        & 
                     , iwe2_E_niw_divh                   &
@@ -1603,6 +1648,10 @@ module g_cvmix_idemix2
                     , iwe2_gradxy_n                     &
                     , iwe2_flx_uv                       &
                     , iwe2_flx_w                        &
+                    , iwe2_refl_bin                     &
+                    , iwe2_refl_sgn                     &
+                    , iwe2_refl_src                     &
+                    , iwe2_refl_node                    &
                     , vol_nodB2T                        &
                     , partit                            &
                     , mesh                              &
@@ -1618,11 +1667,12 @@ module g_cvmix_idemix2
         
         !_______________________________________________________________________
         ! 4. Integrate IDEMIX equation vertical, solve vertical diffusion and
-        t6 = MPI_Wtime() 
+        t6 = MPI_Wtime()
         ! dissipation part implicitly
-        ! Eiw^(t+1) = Eiw^(t) + dt*[  d/dz( c_0 * tau_v * d/dz(c_0*E_iw))^(t+1) 
+        ! Eiw^(t+1) = Eiw^(t) + dt*[  d/dz( c_0 * tau_v * d/dz(c_0*E_iw))^(t+1)
         !                           - alpha_c*Eiw^(t+1)
         !                           + Forc^(t) ]
+!$OMP PARALLEL DO PRIVATE(node, uln, nln)
         do node = 1, myDim_nod2D
             uln = ulevels_nod2D(node)
             nln = nlevels_nod2D(node)
@@ -1658,6 +1708,7 @@ module g_cvmix_idemix2
                     )
             end if     
         end do ! --> do node = 1, myDim_nod2D
+!$OMP END PARALLEL DO
         t7 = MPI_Wtime()
         time_Eiw_vdiff = t7 - t6
         
@@ -1733,7 +1784,8 @@ module g_cvmix_idemix2
         !_______________________________________________________________________
         ! 7. compute wave-wave interaction
         t8 = MPI_Wtime() 
-        if (idemix2_enable_M2 .or. idemix2_enable_niw) then 
+        if (idemix2_enable_M2 .or. idemix2_enable_niw) then
+!$OMP PARALLEL DO PRIVATE(node, uln, nln)
             do node = 1, myDim_nod2D
                 uln = ulevels_nod2D(node)
                 nln = nlevels_nod2D(node)
@@ -1860,6 +1912,7 @@ module g_cvmix_idemix2
                     end if 
                 end if ! -->  (idemix2_enable_M2 .and. idemix2_enable_niw) then 
             end do ! --> for node = 1, myDim_nod2D
+!$OMP END PARALLEL DO
         end if ! --> if (idemix2_enable_M2 .or . idemix2_enable_niw) then
         t9 = MPI_Wtime()
         time_waveint = t9 - t8
@@ -1872,6 +1925,7 @@ module g_cvmix_idemix2
             
             !___________________________________________________________________
             ! write out diffusivity --> convert from elem to vertices
+!$OMP PARALLEL DO PRIVATE(node, uln, nln)
             do node=1, myDim_nod2D
                 uln = ulevels_nod2D(node)
                 nln = nlevels_nod2D(node)
@@ -1884,7 +1938,8 @@ module g_cvmix_idemix2
                         , KappaH  = Kv(            uln:nln, node) &
                         , KappaM  = iwe2_Av(       uln:nln, node) &
                         )
-            end do        
+            end do
+!$OMP END PARALLEL DO
             call exchange_nod(iwe2_Av, partit)    
             call exchange_nod(Kv , partit)
             
@@ -1933,15 +1988,15 @@ module g_cvmix_idemix2
     !
     !___________________________________________________________________________
     ! horizontal superbee advection of spectral bins
-    subroutine adv_Ecompart_hor_spctrl_superbee(   &
-                vel                         , & 
-                ttf                         , &
-                ttf_grad_n                  , &
-                flux                        , &
-                partit                      , &
-                mesh                        , &
-                flag_2ndord_time            , &
-                flag_posdef                   &
+    subroutine adv_Ecompart_hor_spctrl_superbee(&
+                  vel                           & 
+                , ttf                           &
+                , ttf_grad_n                    &
+                , flux                          &
+                , partit                        &
+                , mesh                          &
+                , flag_2ndord_time              &
+                , flag_posdef                   &
                 )
 
         implicit none
@@ -2265,24 +2320,33 @@ module g_cvmix_idemix2
     ! fbini --> energy blocked at coast, stays at n_int
     ! kk    <-- same energy re-injected at n_int in mirror direction
     !
-    subroutine apply_reflect_bc_spctrl(flux, partit, mesh)
+    subroutine apply_reflect_bc_spctrl(   flux      &
+                                        , refl_src  &
+                                        , refl_bin  &
+                                        , refl_sgn  &
+                                        , vol_s     &
+                                        , partit    & 
+                                        , mesh)
         implicit none
+        !___INPUT/OUTPUT VARIABLES______________________________________________
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in   ), target :: mesh
         real(kind=WP) , intent(inout)         :: flux(idemix2_nfbin, partit%myDim_edge2D)
-
+        integer       , intent(in   )         :: refl_bin(   partit%myDim_edge2D )
+        integer       , intent(in   )         :: refl_sgn(   partit%myDim_edge2D ) 
+        real(kind=WP) , intent(out  )         :: refl_src(idemix2_nfbin, partit%myDim_nod2D)
+        real(kind=WP) , intent(in   )         :: vol_s(partit%myDim_nod2D+partit%eDim_nod2D)
+        !___LOCAL VARIABLES_____________________________________________________
         integer       :: edge, fbini, kk, nfbin, sgn, n_int
-        real(kind=WP) :: outflux
+        real(kind=WP) :: outflux, ivols_int
 #include "../associate_part_def.h"
-#include "../associate_mesh_def.h"1
+#include "../associate_mesh_def.h"
 #include "../associate_part_ass.h"
 #include "../associate_mesh_ass.h"
 
         nfbin = idemix2_nfbin
 
-        ! Reset scratch; will be divided by vol_s and added to Edivh in
-        ! hsintegrate_Ecompart after adv_Ecompart_flx2tra_spctrl.
-        iwe2_reflect_src(:,:) = 0.0_WP
+        refl_src(:,:) = 0.0_WP
 
         ! Zero every coast-directed flux so no energy reaches the coast node.
         ! For each blocked flux in bin fbini, accumulate two terms into reflect_src:
@@ -2292,7 +2356,7 @@ module g_cvmix_idemix2
         ! Applied to Edivh after adv_Ecompart_flx2tra_spctrl in hsintegrate_Ecompart.
 !$OMP PARALLEL DO PRIVATE(edge, fbini, kk, sgn, n_int, outflux)
         do edge = 1, myDim_edge2D
-            kk  = iwe2_bc_reflect_bin(edge)
+            kk  = refl_bin(edge)
             ! edge is not connected to coast
             if (kk == 0) cycle
 
@@ -2300,23 +2364,24 @@ module g_cvmix_idemix2
             !                  interior   = edges(2, edge)
             !   sgn = -1  -->  coast node = edges(2, edge)
             !                  interior   = edges(1, edge)
-            sgn   = iwe2_bc_reflect_sgn(edge)
+            sgn   = refl_sgn(edge)
             
             ! which one is interior coastal edge node
             n_int = merge(edges(2, edge), edges(1, edge), sgn == +1)
 
+            ! local scaler volume
+            ivols_int = 1/vol_s(n_int)
+            
             do fbini = 2, nfbin-1
-                outflux = flux(fbini, edge)
+                outflux = flux(fbini, edge)*ivols_int
                 if (sgn * outflux > 0.0_WP) then
                     ! block flux towards coast by setting to zero
                     flux(fbini, edge) = 0.0_WP
                     if (n_int <= myDim_nod2D) then
 !$OMP ATOMIC
-                        ! put energy in edge mirror spectral bin
-                        iwe2_reflect_src(kk,    n_int) = iwe2_reflect_src(kk,    n_int) + sgn * outflux
+                        refl_src(kk,    n_int) = refl_src(kk,    n_int) + sgn * outflux
 !$OMP ATOMIC
-                        ! take energy from actual spectral bin
-                        iwe2_reflect_src(fbini, n_int) = iwe2_reflect_src(fbini, n_int) - sgn * outflux
+                        refl_src(fbini, n_int) = refl_src(fbini, n_int) - sgn * outflux
                     end if
                 end if
             end do ! --> do fbini = 2, nfbin-1
@@ -2332,15 +2397,15 @@ module g_cvmix_idemix2
     !___________________________________________________________________________
     ! cross spectral superbee advection across spectral bins
     subroutine adv_Ecompart_crss_spctrl_superbee( &
-                cs                              , & ! cross-spectral exchange rate
-                ttf                             , & ! Energy compartment @ node
-                dphi                            , & ! width spectral bin
-                flux                            , & ! cross-spectral flux
-                partit                          , &
-                mesh                            , &
-                flag_2ndord_time                , &
-                flag_posdef                       &
-                ! flag_wlimitcfl                    &
+                  cs                              & ! cross-spectral exchange rate
+                , ttf                             & ! Energy compartment @ node
+                , dphi                            & ! width spectral bin
+                , flux                            & ! cross-spectral flux
+                , partit                          &
+                , mesh                            &
+                , flag_2ndord_time                &
+                , flag_posdef                     &
+                ! flag_wlimitcfl                  &
                 )
         implicit none
         !___INPUT/OUTPUT VARIABLES______________________________________________
@@ -2355,7 +2420,7 @@ module g_cvmix_idemix2
         ! logical      , intent(in)            :: flag_wlimitcfl
         
         !___LOCAL VARIABLES_____________________________________________________
-        integer                              :: node, fbini, nfbin, idxp1, idxp2, idxm1
+        integer                              :: node, fbini, nfbin
         real(kind=WP)                        :: R, ttf0, ttfp1, dttf0p1, Tmean1, Tmean2, Cr, vflux, vfabs
         real(kind=WP)                        :: CFL !, cflmax=0.50_WP
 #include "../associate_part_def.h"
@@ -2368,7 +2433,7 @@ module g_cvmix_idemix2
         
         !_______________________________________________________________________
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, fbini, idxp1, idxp2, idxm1, &
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, fbini, &
 !$OMP                                  ttf0, ttfp1, dttf0p1, R, Cr, Tmean1, Tmean2, &
 !$OMP                                  CFL, vflux, vfabs)
 !$OMP DO
@@ -2386,60 +2451,50 @@ module g_cvmix_idemix2
             ! Compute flux at all interfaces (1 to nfbin-1)
             ! Bins 1 and nfbin are boundary bins (should have zero energy)
             do fbini = 1, nfbin
-                !_______________________________________________________________
-                ! Periodic wrapping for gradient stencil
-                idxp1   = fbini+1 ; if (idxp1>nfbin) idxp1=idxp1-(nfbin-2)
-                idxp2   = fbini+2 ; if (idxp2>nfbin) idxp2=idxp2-(nfbin-2)
-                idxm1   = fbini-1 ; if (idxm1<1    ) idxm1=nfbin-2
-                
-                ! ! limit W cross spectral exchange rate to the CFL limit 
-                ! cs(fbini, node) = merge(  min(abs(cs(fbini, node)), cflmax*dphi(fbini)/dt)*sign(1.0_WP, cs(fbini, node)) &
-                !                         , cs(fbini, node) &
-                !                         , flag_wlimitcfl &
-                !                        )
-                
+                ! wrap indices pre-computed in init (branch-free, module arrays)
+
                 CFL     = abs(cs(fbini, node)) * dt / dphi(fbini)
-                
+
                 !_______________________________________________________________
-                ! compute tracer difference 
-                ttf0    = ttf(fbini  , node)
-                ttfp1   = ttf(idxp1  , node)
+                ! compute tracer difference
+                ttf0    = ttf(fbini              , node)
+                ttfp1   = ttf(iwe2_idxp1(fbini)  , node)
                 dttf0p1 = ttfp1 - ttf0
-                
+
                 !_______________________________________________________________
                 ! tracer Slope Ratio Calculation for upwind point
-                ! compute tracer slope 
-                R      = (ttfp1-ttf(idxp2,node))/(-dttf0p1+small)
-                
+                ! compute tracer slope
+                R      = (ttfp1-ttf(iwe2_idxp2(fbini),node))/(-dttf0p1+small)
+
                 ! apply superbee limiter
-                Cr     = slimiter_superbee(R)     
-                
+                Cr     = slimiter_superbee(R)
+
                 ! construct edge centered tracer value
                 ! T_(i+0.5) = T_i+1 - [ (T_i+1 - T_i)/dz ]_Limited * dz/2
-                !  --> this is seconds order in space, but first order in time 
-                !  
+                !  --> this is seconds order in space, but first order in time
+                !
                 ! T_(i+0.5) = T_i+1 - [ (T_i+1 - T_i)/dz ]_Limited * (dz/2 -|W|*dt/2)
                 ! T_(i+0.5) = T_i+1 - [ (T_i+1 - T_i)/dz ]_Limited * dz/2 *(1 - CFL)
                 !  --> CFL = W*dt/dx
                 Tmean2 = ttfp1 + 0.5_WP*Cr*(-dttf0p1) * (1.0_WP-merge(CFL, 0.0_WP, flag_2ndord_time))
                 Tmean2 = merge(max(0.0_WP, Tmean2), Tmean2, flag_posdef)
-                
+
                 !_______________________________________________________________
                 ! tracer Slope Ratio Calculation for downwind point
-                ! compute tracer slope 
-                R      = (ttf0-ttf(idxm1,node))/(dttf0p1+small)
-                
+                ! compute tracer slope
+                R      = (ttf0-ttf(iwe2_idxm1(fbini),node))/(dttf0p1+small)
+
                 ! apply superbee limiter
-                Cr     = slimiter_superbee(R)     
-                
+                Cr     = slimiter_superbee(R)
+
                 ! construct edge centered tracer value
                 ! T_(i+0.5) = T_i + [ (T_i+1 - T_i)/dz ]_Limited * dz/2
-                !  --> this is seconds order in space, but first order in time 
-                !  
+                !  --> this is seconds order in space, but first order in time
+                !
                 ! T_(i+0.5) = T_i + [ (T_i+1 - T_i)/dz ]_Limited * (dz/2 -|W|*dt/2)
                 ! T_(i+0.5) = T_i + [ (T_i+1 - T_i)/dz ]_Limited * dz/2 *(1 - CFL)
                 !  --> CFL = W*dt/dx
-                Tmean1 = ttf0 + 0.5_WP*Cr*(dttf0p1) * (1.0_WP-merge(CFL, 0.0_WP, flag_2ndord_time))   
+                Tmean1 = ttf0 + 0.5_WP*Cr*(dttf0p1) * (1.0_WP-merge(CFL, 0.0_WP, flag_2ndord_time))
                 Tmean1 = merge(max(0.0_WP, Tmean1), Tmean1, flag_posdef)
 
                 !_______________________________________________________________
@@ -2491,6 +2546,8 @@ module g_cvmix_idemix2
     subroutine adv_Ecompart_flx2tra_spctrl(    &
                 flx_h                   , &
                 flx_v                   , &
+                refl_src                , &
+                refl_node               , &
                 div_h                   , &
                 div_v                   , &
                 dphit                   , &
@@ -2502,15 +2559,18 @@ module g_cvmix_idemix2
         !___INPUT/OUTPUT VARIABLES______________________________________________
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in   ), target :: mesh
-        real(kind=WP) , intent(in)            :: flx_h( idemix2_nfbin, partit%myDim_edge2D) 
-        real(kind=WP) , intent(in)            :: flx_v( idemix2_nfbin, partit%myDim_nod2D) 
-        real(kind=WP) , intent(inout)         :: div_h( idemix2_nfbin, partit%myDim_nod2D +partit%eDim_nod2D)
-        real(kind=WP) , intent(inout)         :: div_v( idemix2_nfbin, partit%myDim_nod2D +partit%eDim_nod2D)
-        real(kind=WP) , intent(in   )         :: dphit( idemix2_nfbin)
+        real(kind=WP) , intent(in)            :: flx_h(   idemix2_nfbin, partit%myDim_edge2D) 
+        real(kind=WP) , intent(in)            :: flx_v(   idemix2_nfbin, partit%myDim_nod2D) 
+        real(kind=WP) , intent(inout)         :: refl_src(idemix2_nfbin, partit%myDim_nod2D ) 
+        logical       , intent(in)            :: refl_node(              partit%myDim_nod2D+partit%eDim_nod2D ) 
+        
+        real(kind=WP) , intent(inout)         :: div_h(   idemix2_nfbin, partit%myDim_nod2D +partit%eDim_nod2D)
+        real(kind=WP) , intent(inout)         :: div_v(   idemix2_nfbin, partit%myDim_nod2D +partit%eDim_nod2D)
+        real(kind=WP) , intent(in   )         :: dphit(   idemix2_nfbin)
         real(kind=WP) , intent(in   )         :: vol_s(partit%myDim_nod2D+partit%eDim_nod2D)
         !___LOCAL VARIABLES_____________________________________________________
         integer                               :: node, edge, fbini, nfbin, ednodes(2)
-        real(kind=WP)                         :: inv_dphi(idemix2_nfbin)
+        real(kind=WP)                         :: inv_dphi(idemix2_nfbin), ivols_lcl
         
 #include "../associate_part_def.h"
 #include "../associate_mesh_def.h"
@@ -2650,16 +2710,36 @@ module g_cvmix_idemix2
    !$ACC UPDATE DEVICE(dttf_h)
 #   endif
 #endif
-        
+        !_______________________________________________________________________
         ! normalize with total volume of scalar cell from top to bottom
 #ifndef ENABLE_OPENACC
         !$OMP PARALLEL DO COLLAPSE(2)
 #else
         !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #endif
-        do node=1, myDim_nod2d+eDim_nod2D
+        do node=1, myDim_nod2d! +eDim_nod2D
+            ivols_lcl = 1/vol_s(node)
             do fbini=2,nfbin-1
-                div_h(fbini, node) = div_h(fbini,node)/vol_s(node)
+                div_h(fbini, node) = div_h(fbini,node)*ivols_lcl
+            end do
+        end do
+#ifndef ENABLE_OPENACC
+        !$OMP END PARALLEL DO
+#else
+        !$ACC END PARALLEL LOOP
+#endif
+
+        !_______________________________________________________________________
+        ! inject blocked coast fluxes as source at interior nodes in mirror bin
+#ifndef ENABLE_OPENACC
+        !$OMP PARALLEL DO
+#else
+        !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+#endif
+        do node = 1, myDim_nod2D
+            if (.not. refl_node(node)) cycle
+            do fbini = 2, nfbin-1
+                div_h(fbini, node) = div_h(fbini, node) + refl_src(fbini, node)
             end do
         end do
 #ifndef ENABLE_OPENACC
@@ -2691,6 +2771,10 @@ module g_cvmix_idemix2
                 , gradxy_n                &
                 , flx_uv                  &
                 , flx_cs                  &
+                , refl_bin                &
+                , refl_sgn                &
+                , refl_src                &
+                , refl_node               &
                 , vol_s                   &
                 , partit                  &
                 , mesh                    &
@@ -2700,6 +2784,7 @@ module g_cvmix_idemix2
                 , Eadvs                   &
                 , Ediss                   &
                 , Eforc                   &
+                , Erefl                   &
                 )
         implicit none
         !___INPUT/OUTPUT VARIABLES______________________________________________
@@ -2718,7 +2803,11 @@ module g_cvmix_idemix2
         real(kind=WP)   , intent(inout)          :: gradxy_n(2, idemix2_nfbin, partit%myDim_nod2D +partit%eDim_nod2D)
         real(kind=WP)   , intent(in   )          :: dphit(      idemix2_nfbin)
         real(kind=WP)   , intent(inout)          :: flx_uv(     idemix2_nfbin, partit%myDim_edge2D)
-        real(kind=WP)   , intent(inout)          :: flx_cs(     idemix2_nfbin, partit%myDim_nod2D ) 
+        real(kind=WP)   , intent(inout)          :: flx_cs(     idemix2_nfbin, partit%myDim_nod2D )
+        integer         , intent(in   )          :: refl_bin(   partit%myDim_edge2D )
+        integer         , intent(in   )          :: refl_sgn(   partit%myDim_edge2D ) 
+        real(kind=WP)   , intent(inout)          :: refl_src(   idemix2_nfbin, partit%myDim_nod2D ) 
+        logical         , intent(in   )          :: refl_node(                 partit%myDim_nod2D +partit%eDim_nod2D) 
         real(kind=WP)   , intent(in   )          :: vol_s(                     partit%myDim_nod2D +partit%eDim_nod2D)
         logical         , intent(in)             :: flag_AB2
         
@@ -2727,9 +2816,11 @@ module g_cvmix_idemix2
         real(kind=WP)   , intent(inout), optional:: Eadvs(      idemix2_nfbin, partit%myDim_nod2D)
         real(kind=WP)   , intent(inout), optional:: Ediss(      idemix2_nfbin, partit%myDim_nod2D)
         real(kind=WP)   , intent(inout), optional:: Eforc(      idemix2_nfbin, partit%myDim_nod2D)
+        real(kind=WP)   , intent(inout), optional:: Erefl(      idemix2_nfbin, partit%myDim_nod2D)
         
         !___LOCAL VARIABLES_____________________________________________________
         integer                                  :: node, fbini, nfbin
+        real(kind=WP)                            :: inv_denom
 #include "../associate_part_def.h"
 #include "../associate_mesh_def.h"
 #include "../associate_part_ass.h"
@@ -2764,15 +2855,15 @@ module g_cvmix_idemix2
                                         )
                                         
         ! apply reflective coastal BC: redirect coast-directed fluxes into mirror bins
-        call apply_reflect_bc_spctrl(flx_uv, partit, mesh)
-        if (idemix2_diag_Ecompart) then
-            if (Ename == 'M2') then
-                iwe2_M2_reflect_src (:,:) = iwe2_reflect_src(:,:)
-            else
-                iwe2_niw_reflect_src(:,:) = iwe2_reflect_src(:,:)
-            end if
-        end if
-
+        call apply_reflect_bc_spctrl(     flx_uv          &      
+                                        , refl_src        &
+                                        , refl_bin        &
+                                        , refl_sgn        &          
+                                        , vol_s           &
+                                        , partit          &
+                                        , mesh            & 
+                                        )
+        
         !_______________________________________________________________________
         ! compute cross spectral superbee advected tracer flux
         call adv_Ecompart_crss_spctrl_superbee(           &
@@ -2791,6 +2882,8 @@ module g_cvmix_idemix2
         call adv_Ecompart_flx2tra_spctrl(                 &
                                          flx_uv           &
                                         ,flx_cs           &
+                                        ,refl_src         &
+                                        ,refl_node        &
                                         ,Edivh(ti,:,:)    &
                                         ,Edivs(ti,:,:)    &
                                         ,dphit            &
@@ -2798,18 +2891,6 @@ module g_cvmix_idemix2
                                         ,partit           &
                                         ,mesh             &
                                         )
-
-        !_______________________________________________________________________
-        ! inject blocked coast fluxes as source at interior nodes in mirror bin
-!$OMP PARALLEL DO PRIVATE(node, fbini)
-        do node = 1, myDim_nod2D
-            if (.not. iwe2_is_reflect_node(node)) cycle
-            do fbini = 2, nfbin-1
-                Edivh(ti, fbini, node) = Edivh(ti, fbini, node) &
-                                       + iwe2_reflect_src(fbini, node) / vol_s(node)
-            end do
-        end do
-!$OMP END PARALLEL DO
 
         !_______________________________________________________________________
         ! Eden and Olbers 2014, eq. 2
@@ -2828,8 +2909,9 @@ module g_cvmix_idemix2
         
         !_______________________________________________________________________
         ! Adams-Bashforth 2nd order + implicit dissipation
-        if (flag_AB2) then             
+        if (flag_AB2) then
             do node= 1, myDim_nod2d
+                inv_denom = 1.0_WP / (1.0_WP + dt*tauE(node))
                 do fbini=2,nfbin-1
                     E(tip1, fbini, node) = ( E(ti, fbini, node) &
                                             + dt * ( &
@@ -2839,15 +2921,16 @@ module g_cvmix_idemix2
                                                     - (0.5_WP+idemix2_AB_epsilon)*Edivs(tim1, fbini, node) &
                                                     +                              forc(      fbini, node) &
                                                 ) &
-                                            ) / (1.0_WP + dt*tauE(node))  
+                                            ) * inv_denom
                 end do
                 E(tip1,     1, node) = E(tip1, nfbin-1, node)
                 E(tip1, nfbin, node) = E(tip1,       2, node)
-            end do    
+            end do
         !_______________________________________________________________________
         ! Forward Euler + implicit dissipation
         else
             do node= 1, myDim_nod2d
+                inv_denom = 1.0_WP / (1.0_WP + dt*tauE(node))
                 do fbini=2,nfbin-1
                     E(tip1, fbini, node) = ( E(ti, fbini, node) &
                                             + dt * ( &
@@ -2855,7 +2938,7 @@ module g_cvmix_idemix2
                                                     + Edivs(ti, fbini, node) & ! d/dphi (w*E^n)
                                                     + forc(     fbini, node) & ! forc
                                                    ) &
-                                            ) / (1.0_WP + dt*tauE(node)) 
+                                            ) * inv_denom
                 end do
                 E(tip1,     1, node) = E(tip1, nfbin-1, node)
                 E(tip1, nfbin, node) = E(tip1,       2, node)
@@ -2891,6 +2974,8 @@ module g_cvmix_idemix2
         end if     
             
         if (present(Eforc)) Eforc(:,:) = forc(:, 1:myDim_nod2D)
+        
+        if (present(Erefl)) Erefl(:,:) = refl_src(:, 1:myDim_nod2D)
 
     end subroutine hsintegrate_Ecompart
     
@@ -2977,18 +3062,18 @@ module g_cvmix_idemix2
         real(kind=WP)   , intent(inout)         :: vol_nodB2T(partit%myDim_nod2D+partit%eDim_nod2D)
         !___LOCAL VARIABLES_____________________________________________________
         integer                                 :: node, elem, nz, nln, uln, elnodes(3)
-        real(kind=WP)                           :: lcl_sumvol, glb_sumvol, vol
+!         real(kind=WP)                           :: lcl_sumvol, glb_sumvol, vol
 #include "../associate_part_def.h"
 #include "../associate_mesh_def.h"
 #include "../associate_part_ass.h"
 #include "../associate_mesh_ass.h"   
         vol_nodB2T = 0.0_WP
-        lcl_sumvol = 0.0_WP
+!         lcl_sumvol = 0.0_WP
         do node = 1, myDim_nod2D
             nln = nlevels_nod2D(node)-1
             uln = ulevels_nod2D(node)
             do nz=uln,nln
-                lcl_sumvol       = lcl_sumvol       + areasvol(nz,node)*abs(zbar(nz)-zbar(nz+1))
+!                 lcl_sumvol       = lcl_sumvol       + areasvol(nz,node)*abs(zbar(nz)-zbar(nz+1))
                 vol_nodB2T(node) = vol_nodB2T(node) + areasvol(nz,node)*abs(zbar(nz)-zbar(nz+1))
             end do
         end do !-->do node = 1,node_size
