@@ -188,7 +188,7 @@ contains
        if (tracks(i)%var_kind == 1) then
           call send_one_track(tracers, mesh, partit, tracks(i))
        else
-          call send_one_track_elem(dynamics, mesh, partit, tracks(i))
+          call send_one_track_elem(tracers, dynamics, mesh, partit, tracks(i))
        end if
     end do
   end subroutine io_tracks_send
@@ -334,10 +334,12 @@ contains
 
     ! --- track variable kind + index slot ---
     ! var_kind = 1 -> node-based linear interp (temp, salt)
-    ! var_kind = 2 -> element-based path sample (u, v, vflx)
-    !   uv_comp = 1 -> u (geographic east, m/s)
-    !   uv_comp = 2 -> v (geographic north, m/s)
+    ! var_kind = 2 -> element-based path sample (u, v, vflx, hflx, sflx)
+    !   uv_comp = 1 -> u    (geographic east, m/s)
+    !   uv_comp = 2 -> v    (geographic north, m/s)
     !   uv_comp = 3 -> vflx (per-cell volume transport, m^3/s)
+    !   uv_comp = 4 -> hflx (per-cell heat transport, PW)
+    !   uv_comp = 5 -> sflx (per-cell salinity transport, kg/s)
     select case (trim(t%var_name))
     case ('temp')
        t%var_kind   = 1
@@ -354,11 +356,19 @@ contains
     case ('vflx')
        t%var_kind   = 2
        t%uv_comp    = 3
+    case ('hflx')
+       t%var_kind   = 2
+       t%uv_comp    = 4
+       t%tracer_idx = 1     ! T at nodes
+    case ('sflx')
+       t%var_kind   = 2
+       t%uv_comp    = 5
+       t%tracer_idx = 2     ! S at nodes
     case default
        if (partit%mype == 0) then
           write(*,'(a,a,a,a,a)') '[TRACKS] ERROR: track "', trim(t%name), &
                '" unsupported track_var="', trim(t%var_name),             &
-               '". Supported: temp, salt, u, v, vflx.'
+               '". Supported: temp, salt, u, v, vflx, hflx, sflx.'
        end if
        call mpi_abort(partit%MPI_COMM_FESOM, 1, ierr)
     end select
@@ -714,16 +724,23 @@ contains
   !> rotated to geographic (when the mesh uses rotation) before the
   !> requested component is extracted; MPI_Allreduce assembles the
   !> P-sized curtain; XIOS gets this rank's stride.
-  subroutine send_one_track_elem(dynamics, mesh, partit, t)
+  subroutine send_one_track_elem(tracers, dynamics, mesh, partit, t)
+    type(t_tracer), intent(in) :: tracers
     type(t_dyn),    intent(in) :: dynamics
     type(t_mesh),   intent(in) :: mesh
     type(t_partit), intent(in) :: partit
     type(track_t),  intent(in) :: t
     real(WP), allocatable :: contrib(:, :), sampled(:, :), buf(:, :)
     integer,  allocatable :: nhit(:, :), nhit_tot(:, :)
-    integer  :: p, kk, ierr, nz_wet, k, eid
-    real(WP) :: u_loc, v_loc, lon_r, lat_r, nan
+    integer  :: p, kk, ierr, nz_wet, k, eid, n1, n2, n3
+    real(WP) :: u_loc, v_loc, lon_r, lat_r, nan, vflx_cell, t_elem
     logical  :: do_rot
+
+    ! Heat & salt flux scaling constants (match tripyview).
+    real(WP), parameter :: rho0_w  = 1030.0_WP       ! kg/m^3
+    real(WP), parameter :: cp_w    = 3850.0_WP       ! J/kg/K
+    real(WP), parameter :: in_PW   = 1.0e-15_WP      ! W -> PW
+    real(WP), parameter :: psu_inv = 1.0_WP / 1000.0_WP
 
     if (len_trim(t%field_id) == 0)                            return
     if (.not. xios_is_valid_field(trim(t%field_id)))          return
@@ -744,6 +761,9 @@ contains
        nz_wet = max(0, mesh%nlevels(eid) - 1)
        lon_r  = t%path_lon(p) * rad     ! geographic lon (rad) at path centroid
        lat_r  = t%path_lat(p) * rad
+       n1 = mesh%elem2D_nodes(1, eid)   ! local node ids (own + halo)
+       n2 = mesh%elem2D_nodes(2, eid)
+       n3 = mesh%elem2D_nodes(3, eid)
 
        do kk = 1, min(nz_track, nz_wet)
           u_loc = real(dynamics%uv(1, kk, eid), WP)
@@ -758,17 +778,32 @@ contains
              contrib(kk, p) = u_loc
           case (2)
              contrib(kk, p) = v_loc
-          case (3)
-             ! Per-cell volume transport across the section, m^3/s.
-             ! Matches tripyview's do_nveccs=True canonical formula
-             ! (calc_transect_Xtransp, sub_transect.py:1371-1382):
-             !   transp = u * |path_dy| * nvec_x + v * |path_dx| * nvec_y
-             ! path_dx/path_dy are midpoint->centroid in metres; nvec is
-             ! the section unit normal; mesh%helem is the ALE layer
-             ! thickness at this element.
-             contrib(kk, p) = (u_loc * abs(t%path_dy(p)) * t%path_nvec_x(p) &
-                             + v_loc * abs(t%path_dx(p)) * t%path_nvec_y(p)) &
-                             * real(mesh%helem(kk, eid), WP)
+          case (3:5)
+             ! Per-cell volume transport (m^3/s) — tripyview's
+             ! calc_transect_Xtransp canonical formula:
+             !   vflx = (u * |dy| * nvec_x + v * |dx| * nvec_y) * dz
+             vflx_cell = (u_loc * abs(t%path_dy(p)) * t%path_nvec_x(p)         &
+                        + v_loc * abs(t%path_dx(p)) * t%path_nvec_y(p))        &
+                        * real(mesh%helem(kk, eid), WP)
+             if (t%uv_comp == 3) then
+                contrib(kk, p) = vflx_cell
+             else
+                ! Average the 3 vertex node tracer values to get T or S at
+                ! the element centroid. Halo nodes are kept up to date by
+                ! FESOM's standard exchange, so this works for any path
+                ! element this rank strict-owns.
+                t_elem = ( real(tracers%data(t%tracer_idx)%values(kk, n1), WP) &
+                         + real(tracers%data(t%tracer_idx)%values(kk, n2), WP) &
+                         + real(tracers%data(t%tracer_idx)%values(kk, n3), WP) &
+                         ) / 3.0_WP
+                if (t%uv_comp == 4) then
+                   ! Heat transport, PW per cell.
+                   contrib(kk, p) = vflx_cell * t_elem * rho0_w * cp_w * in_PW
+                else
+                   ! Salinity transport, kg/s per cell.
+                   contrib(kk, p) = vflx_cell * t_elem * rho0_w * psu_inv
+                end if
+             end if
           end select
           nhit(kk, p) = 1
        end do
