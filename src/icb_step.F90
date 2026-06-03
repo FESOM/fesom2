@@ -1589,7 +1589,7 @@ subroutine init_buoy_output(partit)
   implicit none
 
 #include "netcdf.inc" 
-  integer                   :: status,ncid,year_start,month_start,day_start
+  integer                   :: status,ncid
   integer                   :: dimid_ib, dimid_rec, dimids(2)
   integer                   :: time_varid, iter_varid
   integer                   :: lonrad_id, latrad_id, londeg_id, latdeg_id
@@ -1693,7 +1693,7 @@ type(t_partit), intent(inout), target :: partit
   longname='time' ! use NetCDF Climate and Forecast (CF) Metadata Convention
   status = nf_PUT_ATT_TEXT(ncid, time_varid, 'long_name', len_trim(longname), trim(longname)) 
   if (status .ne. nf_noerr) call handle_err(status, partit)
-  write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a6)') 'seconds since ', year_start, '-', month_start, '-', day_start, ' 00:00:00'
+  write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a9)') 'seconds since ', yearstart, '-', 1, '-', 1, ' 00:00:00'
   status = nf_PUT_ATT_TEXT(ncid, time_varid, 'units', len_trim(att_text), trim(att_text))
   if (status .ne. nf_noerr) call handle_err(status, partit)
   if (include_fleapyear) then
@@ -1890,7 +1890,7 @@ type(t_partit), intent(inout), target :: partit
   longname='fesom element'
   status = nf_PUT_ATT_TEXT(ncid, felem_id, 'long_name', len_trim(longname), trim(longname)) 
   if (status .ne. nf_noerr) call handle_err(status, partit)
-  status = nf_put_att_text(ncid, felem_id, 'units', 18, '')
+  status = nf_put_att_text(ncid, felem_id, 'units', 0, '')
   if (status .ne. nf_noerr) call handle_err(status, partit)
   description=''
   status = nf_put_att_text(ncid, felem_id, 'description', len_trim(description), trim(description)) 
@@ -1901,7 +1901,7 @@ type(t_partit), intent(inout), target :: partit
   longname='grounded'
   status = nf_PUT_ATT_TEXT(ncid, grounded_id, 'long_name', len_trim(longname), trim(longname)) 
   if (status .ne. nf_noerr) call handle_err(status, partit)
-  status = nf_put_att_text(ncid, grounded_id, 'units', 18, '')
+  status = nf_put_att_text(ncid, grounded_id, 'units', 0, '')
   if (status .ne. nf_noerr) call handle_err(status, partit)
   description=''
   status = nf_put_att_text(ncid, grounded_id, 'description', len_trim(description), trim(description)) 
