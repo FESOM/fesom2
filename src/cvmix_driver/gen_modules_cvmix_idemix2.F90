@@ -2011,7 +2011,7 @@ module g_cvmix_idemix2
         logical         , intent(in)            :: flag_posdef
         
         !___LOCAL VARIABLES_____________________________________________________
-        real(kind=WP)                           :: dx1, dy1, dx2, dy2, dxdy12(2), edlen, n_x, n_y, n_len  
+        real(kind=WP)                           :: dx1, dy1, dx2, dy2, dxdy12(2), dt_over_edlen, n_x, n_y, n_len  
         real(kind=WP)                           :: u1, u2, v1, v2, Ue, CFL, dh1, dh2
         real(kind=WP)                           :: R, ttfp2, ttfm1, ttf0, ttfp1, dttf0p1, Tmean1, Tmean2, Cr, vflux, vfabs
         integer                                 :: el(2), el2, ednodes(2), edge, fbini, nfbin, nln, uln, nz
@@ -2027,7 +2027,7 @@ module g_cvmix_idemix2
         ! this advection does !!! NOT !!! go over the vertical dimension it goes 
         ! over the domain of the spectral bins 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, ednodes, el, el2, fbini, nln, &
-!$OMP                                  dx1, dy1, dx2, dy2, dxdy12, dh1, dh2, n_x, n_y, n_len, edlen, &
+!$OMP                                  dx1, dy1, dx2, dy2, dxdy12, dh1, dh2, n_x, n_y, n_len, dt_over_edlen, &
 !$OMP                                  u1, v1, u2, v2, Ue, CFL, vflux, vfabs, &
 !$OMP                                  ttf0, ttfp1, dttf0p1, ttfp2, ttfm1, R, Cr, Tmean1, Tmean2)
 !$OMP DO        
@@ -2108,7 +2108,7 @@ module g_cvmix_idemix2
                 n_x      =  dy1
                 n_y      = -dx1
             end if
-            edlen = sqrt(dxdy12(1)**2 + dxdy12(2)**2)
+            dt_over_edlen = dt/sqrt(dxdy12(1)**2 + dxdy12(2)**2)
             
             ! Normalize normal vector to unit length for CFL calculation
             n_len = sqrt(n_x**2 + n_y**2)
@@ -2133,7 +2133,7 @@ module g_cvmix_idemix2
                 ! mean velocity --> need to add component to make second order
                 ! in time
                 Ue    = sqrt((0.5_WP*( u1 + u2 )*n_x)**2 +  (0.5_WP*( v1 + v2 )*n_y)**2)
-                CFL   = min(1.0_WP, Ue*dt/edlen)
+                CFL   = min(1.0_WP, Ue*dt_over_edlen)
                 
                 !_______________________________________________________________
                 ! compute tracer difference allong edge
