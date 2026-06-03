@@ -3,7 +3,7 @@
 General configuration (namelist.config)
 ***************************************
 
-General configuation is defined in the ``namelist.conf``. Here you define time stepping and restart frequency, details of the ALE and mesh geometry.
+``namelist.config`` contains the switches that define the overall experiment setup: timing, restart cadence, paths to meshes and input data, vertical coordinate choice, grid geometry and which optional model components are active.
 
 Sections of the namelist
 ========================
@@ -11,79 +11,96 @@ Sections of the namelist
 Section &modelname
 """"""""""""""""""
 
-- **runid='fesom'** define name of the run. It will be used as part of the file name in model output and restarts. Don't change it if you don't have a good reason, since many post processing scripts assume it to be ``fesom``.
+- **runid='fesom'** identifier used in output, restart and log file names. Changing it also changes the expected clock file name (``<runid>.clock``) and any downstream scripts that look for ``fesom`` by default.
 
 Section &timestep
 """""""""""""""""
 
-- **step_per_day=32** define how many steps per day the model will have. The variable ``step_per_day`` must be an integer multiple of 86400 ``(mod(86400,step_per_day)==0)``. Valid values are, for example: 32(45min), 36(40min), 48(30min), 60(24min), 72(20min), 144(10min), 288(5min), 1440(1min).
-- **run_length= 62** length of the run in ``run_length_unit``.
-- **run_length_unit='y'** units of the ``run_length``. Valid values are year (``y``), month (``m``), day (``d``), and model time step (``s``).
+- **step_per_day=36** number of baroclinic steps per day. The code enforces that ``86400 mod step_per_day == 0`` and prints the supported values when the check fails. It sets the fundamental time step ``dt = 86400/step_per_day`` seconds that is shared by ocean and ice components. Valid values are, for example: 32(45min), 36(40min), 48(30min), 60(24min), 72(20min), 144(10min), 288(5min), 1440(1min).
+- **run_length=1** length of the submitted integration segment.
+- **run_length_unit='y'** unit for ``run_length``; one of ``'y'`` (years), ``'m'`` (months), ``'d'`` (days), or ``'s'`` (time steps). The calendar in :ref:`Section &calendar<chap_general_configuration_calendar>` determines how months/years are counted.
 
 Section &clockinit
 """"""""""""""""""
 
-- **timenew=0.0**, **daynew=1**, **yearnew=1948** gives the seconds, day and year of the initialisation time point, respectively. If the initialisation time is identical with the first line of the clock file runid.clock the model performs a cold start. If the initialisation time and the first line of the clock file are not identical the model assumes that a restart file must exist and tries to do a warm start.
-
+- **timenew=0.0**, **daynew=1**, **yearnew=1958** define the starting time stamp. If this triplet matches the first line of ``<runid>.clock`` the model performs a cold start from initial conditions; otherwise it expects restart files at ``RestartInPath`` and does a warm start. The driver resets ``timenew`` to ``0`` when it encounters ``86400`` to keep times in the ``[0,86400)`` range.
 
 Section &paths
 """"""""""""""
 
-- **Meshpath=''**, path to your mesh directory
-- **ClimateDataPath=''**, path to the location of your 3D initialisation data for temperature and salinity. 
-- **Resultpath=''**, directory where your results should be stored
-
+- **MeshPath** location of the unstructured grid description (``nod2d.out``, ``elem2d.out``, depth files, etc.).
+- **ClimateDataPath** directory containing initial hydrography and optional restoring climatologies.
+- **TideForcingPath** directory for external tidal potential files if tides are used.
+- **ResultPath** root directory for all model output, including ``<runid>.clock``.
+- **RestartInPath**, **RestartOutPath** allow separating where restarts are read from and where they are written. If they are left empty, both default to ``ResultPath``; the setup routine adds trailing slashes automatically.
+- **MeshId** optional string tag written into coupler metadata (useful when multiple meshes are supported in a workflow).
 
 Section &restart_log
 """"""""""""""""""""
 
-- **restart_length=1**, how often should restart file be written in units of  ``restart_length_unit``
-- **restart_length_unit='y'** units of the ``restart_length``. Valid values are year (``y``), month (``m``), day (``d``), and model time step (``s``).
-- **logfile_outfreq=960** the frequency (in timesteps), the model state information should be written into the job monitor .log/.out file.
-
+- **restart_length=1**, **restart_length_unit='y'** cadence for portable netCDF restarts (units: ``y``, ``m``, ``d``, ``h``, ``s``, or ``off`` to disable). When a portable restart is written, the raw/binary formats are written as well unless explicitly disabled.
+- **raw_restart_length=1**, **raw_restart_length_unit='y'** frequency of raw binary “core dump” restarts. If the unit is ``off`` only the portable restarts are produced.
+- **bin_restart_length=1**, **bin_restart_length_unit='y'** frequency of derived-type binary restarts (Fortran binary) used for fast restarts on identical hardware/compiler stacks.
+- **logfile_outfreq=960** number of model steps between status lines written to the stdout/stderr log.
 
 Section &ale_def
 """"""""""""""""
 
-- **which_ALE='linfs'**, which Arbitrary Lagrangian Eulerian (ALE) approach should be used? Options are 1) ``linfs`` - vertical grid is fixed in time, 2) ``zlevel`` - only the surface layer is allowed to move with the change in ssh all other levels are fixed in time 3) ``zstar`` - all layers, except the bottom layer are allowed to move, the change in ssh is equally distributed over all layers. It is recommended to use either ``linfs`` or ``zstar``.
-- **use_partial_cell=.false.**, switch if partial bottom cells should be used or not. Partial cell means that the bottom layer thickness can be different from the full depth levels to be closer to the real bottom topography
-- **min_hnode=0.5**, for ``zlevel``: layer thickness should not become smaller than min_hnode [in fraction from 0 to 1] of original layer thickness. If it happens switch from ``zlevel`` to local ``zstar``.
-- **lzstar_lev=4**, for ``zlevel``  in case min_hnode criteria is reached over how many level should ssh change be distributed for local zstar
-- **max_ice_loading=5.0**, for ``use_floatice=.True.`` in case of floating sea ice how much ice loading is allowed [unit m] the excess is discarded
+- **which_ALE='zstar'** choice of vertical coordinate: ``'linfs'`` (linear free surface), ``'zlevel'`` (fixed levels with moving surface layer only), or ``'zstar'`` (all layers except the bottom move with sea surface height). ``zstar`` keeps column thickness proportional to local depth and is the recommended default.
+- **use_partial_cell=.false.** enables bottom partial cells. When enabled, bottom layer thickness can deviate from the canonical level spacing to better fit bathymetry.
+- **partial_cell_thresh=0.0** minimum full-cell thickness (in metres) allowed before applying a thinner partial bottom cell. Prevents already thin layers from being reduced further.
+- **min_hnode=0.5**, **lzstar_lev=4** controls the ``zlevel`` → local ``zstar`` fallback: if a surface layer would shrink below ``min_hnode`` of its nominal thickness, the surface height anomaly is distributed over ``lzstar_lev`` levels instead of one.
+- **max_ice_loading=5.0** cap on how much overburden from floating ice is transferred to the ocean when ``use_floatice`` is active; excess is discarded.
 
 Section &geometry
 """""""""""""""""
 
-- **cartesian     =.false.**, use flat cartesian coordinates (idealized geometry)
-- **fplane        =.false.**, use fplane approximation, coriolis force is lat independent coriolis=2*omega*0.71
-- **rotated_grid  =.true.**, should the model perform on rotated grid.
-- **force_rotation=.false.**, if input mesh is unrotated it must be rotated in FESOM2.0 than ``.true.``, if input mesh is already rotated ``.false.``
+- **cartesian=.false.** use a planar Cartesian grid instead of spherical geometry (useful for idealised setups).
+- **fplane=.false.** use a constant Coriolis parameter instead of latitude-dependent rotation.
+- **cyclic_length=360** longitudinal domain length in degrees; change for limited-area or regional cyclic domains.
+- **rotated_grid=.true.**, **force_rotation=.true.** control whether grid coordinates are rotated away from the geographic pole. ``force_rotation`` enforces rotation even if the mesh was already rotated (used for coupled runs to avoid a land pole).
+- **alphaEuler=50.**, **betaEuler=15.**, **gammaEuler=-90.** Euler angles (degrees) describing the rotation applied when ``rotated_grid`` is used; converted to radians internally.
+- **which_depth_n2e='mean'** how nodal depths are mapped to elements when no element depth file is supplied: ``'mean'`` (default), ``'min'`` (use shallowest node), ``'max'`` (use deepest node).
+- **use_depthonelem=.false.**, **use_depthfile='aux3d'** control which bathymetry file is read: ``depth@elem.out`` (element-based) when ``use_depthonelem`` is true, otherwise ``depth@node.out``. ``use_depthfile`` switches between reading auxiliary depths from ``aux3d.out`` or the ``depth@`` files.
+- **use_cavityonelem=.false.** analogous flag for cavity bathymetry (``cavity_depth@elem.out``).
+- **metric_factor_zero=.false.** set the metric factor to zero, effectively switching to Cartesian metric factors even on spherical meshes (expert/debug option).
 
-- **alphaEuler    =50.0**, rotated Euler angles, alpha [degree]
-- **betaEuler     =15.0**, rotated Euler angles, beta [degree]
-- **gammaEuler    =-90.0**, rotated Euler angles, gamma [degree]
-
+.. _chap_general_configuration_calendar:
 
 Section &calendar
 """""""""""""""""
 
-- **include_fleapyear=.false.**, should be ``.true.`` when the forcing contains fleapyears (i.e. NCEP...)
-
+- **include_fleapyear=.true.** include leap years in the model clock. Set to ``.false.`` for perpetual-365-day calendars (e.g. CORE forcing).
+- **use_flpyrcheck=.true.** aborts early if the leap-year setting is inconsistent with the calendar encoded in forcing files (helpful when swapping between CORE/JRA/ERA forcings).
 
 Section &run_config
 """""""""""""""""""
 
-- **use_ice     =.true.**, simulate ocean + sea ice
-- **use_floatice=.false.**, allow floating sea ice only possible with ``zlevel`` or ``zstar``
-- **use_sw_pene =.true.**, use parameterisation for short wave penetration. Incoming short wave radiation is distributed over several layers
-
+- **use_ice=.true.** enable the dynamic/thermodynamic sea ice model.
+- **use_floatice=.false.** allow floating ice above the ocean (ice shelf/iceberg loading); requires ``zlevel`` or ``zstar`` ALE.
+- **use_sw_pene=.true.** apply shortwave penetration below the surface; requires chlorophyll data or a constant value (see ``namelist.forcing``).
+- **use_cavity=.false.**, **use_cavity_partial_cell=.false.** activate ice-shelf cavities and optional surface partial cells inside cavities.
+- **cavity_partial_cell_thresh=0.0** minimum cavity layer thickness before applying surface partial cells (prevents extremely thin top cavity layers).
+- **use_cavity_fw2press=.true.** whether freshwater fluxes in cavities affect the hydrostatic pressure field.
+- **toy_ocean=.false.**, **which_toy='soufflet'** enable idealised “toy” forcing/geometry setups.
+- **flag_debug=.false.**, **flag_warn_cflz=.true.** runtime verbosity and vertical CFL warnings.
+- **lwiso=.false.** enable water isotope tracers (adds isotope tracers internally).
+- **use_transit=.false.** enable transient tracer package (CFCs, SF6, etc.; controlled via ``namelist.transit``).
+- **compute_oasis_corners=.false.** compute grid cell corners for conservative coupling through OASIS.
 
 Section &machine
 """"""""""""""""
 
-- **n_levels = 2**, number of hierarchy level for mesh partitioning
-- **n_part   = 12, 36**, number of partitions on each hierarchy level, the last number should optimal corresponds with the number of cores per computational node
+- **n_levels=1**, **n_part=...** hierarchical partitioning settings for the mesh partitioner. The product of ``n_part`` entries gives the total number of MPI ranks targeted by the partition.
 
+Section &icebergs
+"""""""""""""""""
 
+- **use_icebergs=.false.**, **use_icesheet_coupling=.false.** toggle the iceberg module and coupling to an ice-sheet model.
+- **turn_off_hf=.false.**, **turn_off_fw=.false.** disable latent heat or freshwater fluxes from icebergs when needed for debugging.
+- **lbalance_fw=.true.**, **cell_saturation=2** controls for preventing excessive freshwater injection into small grid cells.
+- **lmin_latent_hf=.true.**, **lverbose_icb=.false.** control numerical safety and verbosity of iceberg thermodynamics.
+- **ib_num=0**, **steps_per_ib_step=8** number of iceberg classes and sub-cycling of iceberg dynamics relative to the ocean step.
+- **ib_async_mode=0**, **thread_support_level_required=3** OpenMP-assisted asynchronous iceberg computation; the default keeps iceberg calculations synchronous.
 
 
