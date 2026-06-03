@@ -857,6 +857,8 @@ end subroutine adv_tra_hor_mfct
 !_______________________________________________________________________________
 ! horizontal advection second order in space (2nd oprder in time) using superbee
 ! slope limiter
+! !!! ATTENTION !!! 
+! This part is sofar untested it is left here for later pickup
 subroutine adv_tra_hor_spbee(             &
             vel                         , & 
             ttf                         , &
@@ -900,10 +902,10 @@ subroutine adv_tra_hor_spbee(             &
     
     !___________________________________________________________________________
     if (num_ord == 1.0_WP) then
-        flag_2ndord_time = .True.
-    else
         flag_2ndord_time = .False.
-    end if 
+    else
+        flag_2ndord_time = .True.
+    end if
     
     !___________________________________________________________________________
     l_init_zero=.true.
@@ -1129,7 +1131,7 @@ subroutine adv_tra_hor_spbee(             &
     ! superbee slope limiter
     pure elemental real(kind=WP) function spbee_limiter(R) result(Cr)
         real(kind=WP), intent(in) :: R
-        Cr = max(0._WP, min( min(2._WP*R, 0.5_WP+R/2._WP), 2._WP ))
+        Cr = max(0._WP, max( min(2._WP*R, 1._WP), min(R, 2._WP) ))
     end function spbee_limiter
     
     !
