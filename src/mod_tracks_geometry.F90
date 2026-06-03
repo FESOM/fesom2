@@ -3,7 +3,6 @@ module mod_tracks_geometry
   !   _do_calc_csect_vec
   !   _do_find_intersected_edges_fastnew
   !   _do_build_path (+ __add_upsection_elem2path / __add_downsection_elem2path)
-  !   _do_insert_landpts
   !   _do_compute_distance_from_startpoint
   !
   ! Reference: /work/ab0246/a270092/software/tripyview/tripyview/sub_transect.py
@@ -77,7 +76,21 @@ module mod_tracks_geometry
 contains
 
 ! -----------------------------------------------------------------------------
-! Public driver
+!> Full geometry pipeline: take a CSV polyline and a global FESOM mesh,
+!> return a populated transect_t holding the list of crossed edges, the
+!> alternating triangle path, the cross-vectors and the cumulative
+!> great-circle distance.
+!>
+!> in:  n_nod, n_edge, n_elem   array sizes for the global mesh
+!>      lon_nod, lat_nod        global node coordinates [deg, geographic]
+!>      edge                    global edge -> 2 node ids (1-based)
+!>      edge_tri                global edge -> 2 element ids (-1 = boundary)
+!>      edge_cross_dxdy         midpoint-to-centroid (4, n_edge) [m]:
+!>                                rows 1:2 left tri, rows 3:4 right tri
+!>      elem_nodes              global element -> 3 node ids (1-based)
+!>      n_csi, csi_lon/csi_lat  CSV polyline (degrees)
+!>      name                    transect label
+!> out: transect                fully populated transect_t
 ! -----------------------------------------------------------------------------
   subroutine analyse_transect(n_nod, lon_nod, lat_nod, &
                               n_edge, edge, edge_tri, edge_cross_dxdy, &
@@ -175,13 +188,16 @@ contains
       transect%path_nvec_cs(2, :) = n_vec_tot(2)
     end if
 
-    ! ------- insert NaN slots between consecutive boundary cuts (land) -------
-    call insert_landpts(transect)
+    ! Note: tripyview's _do_insert_landpts adds synthetic NaN slots
+    ! between consecutive boundary edges (polyline crossing a continent).
+    ! Not ported -- the within-segment boundary case is handled by
+    ! push_ghost at build_path time. Add later if a use case appears.
 
-    ! ------- cumulative great-circle distance -------
     call compute_distance_from_startpoint(transect)
   end subroutine analyse_transect
 
+  !> Deallocate every allocatable array in t and reset the counters.
+  !> Safe to call on a partially-built or already-freed transect.
   subroutine free_transect(t)
     type(transect_t), intent(inout) :: t
     if (allocated(t%edge_cut_i))     deallocate(t%edge_cut_i)
@@ -206,7 +222,9 @@ contains
   end subroutine free_transect
 
 ! -----------------------------------------------------------------------------
-! Sub-segment unit-and-normal vector  (port of _do_calc_csect_vec)
+!> Fill seg%e_vec, seg%n_vec and seg%alpha (radians) for the lat-lon
+!> straight sub-segment from (x0, y0) to (x1, y1) in degrees. Port of
+!> tripyview's _do_calc_csect_vec.
 ! -----------------------------------------------------------------------------
   subroutine calc_csect_vec(x0, x1, y0, y1, seg)
     real(TG_WP),     intent(in)    :: x0, x1, y0, y1
@@ -227,7 +245,16 @@ contains
   end subroutine calc_csect_vec
 
 ! -----------------------------------------------------------------------------
-! Line-edge intersection  (port of _do_find_intersected_edges_fastnew)
+!> For one sub-segment, find every mesh edge it crosses and record the
+!> per-edge geometry needed downstream. Bounding-box pre-filter widens
+!> to 180 deg in longitude at high latitudes, then a signed-distance
+!> test on the line equation a*x + b*y + c = 0 picks crossings and
+!> sorts them by progression along the sub-segment. Port of tripyview's
+!> _do_find_intersected_edges_fastnew.
+!>
+!> When crosses_dl is true the sub-segment wraps the dateline; both the
+!> input endpoints (x0, x1) and the candidate edge endpoints are
+!> shifted to a common [0, 360] frame for the intersection test.
 ! -----------------------------------------------------------------------------
   subroutine find_intersected_edges(n_nod, lon_nod, lat_nod, n_edge, edge, &
                                     x0, x1, y0, y1, crosses_dl, seg)
@@ -380,7 +407,18 @@ contains
   end subroutine find_intersected_edges
 
 ! -----------------------------------------------------------------------------
-! Build alternating midP/centroid path  (port of _do_build_path + helpers)
+!> Build the alternating midpoint -> centroid -> midpoint path that the
+!> sub-segment makes through the mesh triangles, with per-step cross-
+!> vectors (path_dx, path_dy). Each crossed edge contributes an
+!> up-section step (incoming triangle, signed -edge_cross_dxdy) and a
+!> down-section step (outgoing triangle, +edge_cross_dxdy). Boundary
+!> edges inject ghost slots with NaN dx/dy and path_ei = -1. Port of
+!> tripyview's _do_build_path + __add_*section_elem2path.
+!>
+!> ncsi is this sub-segment's 1-based index, ncs the total sub-segment
+!> count; both influence boundary-edge ghost handling at sub-segment
+!> ends. edge_cross_dxdy is (4, n_edge) with rows 1:2 = left tri,
+!> rows 3:4 = right tri.
 ! -----------------------------------------------------------------------------
   subroutine build_path(n_nod, lon_nod, lat_nod, n_elem, elem_nodes, &
                         edge_tri, edge_cross_dxdy, ncsi, ncs, seg)
@@ -470,6 +508,12 @@ contains
     deallocate(bei, bni, bcni, bdx, bdy, bcen, bxy)
   end subroutine build_path
 
+  !> Append the up-section triangle for the current crossed edge to the
+  !> growing path. theta's sign decides whether the up-section side is
+  !> the LEFT (>=0) or the RIGHT (<0) mesh triangle. el(1:2) are the two
+  !> elem ids around the crossed edge; eg is the global edge id. Boundary
+  !> edges (el(.)==-1) push a NaN ghost slot; the first edge of a sub-
+  !> segment also adds a centroid path_xy point.
   subroutine add_upsection(edi, nced, ncsi, ncs, theta, el, eg, &
                            n_nod, lon_nod, lat_nod, n_elem, elem_nodes, &
                            edge_cross_dxdy, seg, &
@@ -551,6 +595,10 @@ contains
     end if
   end subroutine add_upsection
 
+  !> Symmetric counterpart to add_upsection: same arguments, opposite
+  !> triangle choice (theta>=0 -> RIGHT, theta<0 -> LEFT). Always inserts
+  !> a centroid path_xy point and an elem/node entry (or a NaN ghost slot
+  !> for boundary edges).
   subroutine add_downsection(edi, nced, theta, el, eg, &
                              n_nod, lon_nod, lat_nod, n_elem, elem_nodes, &
                              edge_cross_dxdy, seg, &
@@ -610,6 +658,9 @@ contains
     end if
   end subroutine add_downsection
 
+  !> Append one synthetic NaN path step (-1 element id, NaN dx/dy, NaN
+  !> centroid). Keeps the path index in sync with the edge index when a
+  !> boundary edge has no far-side triangle.
   subroutine push_ghost(bei, bni, bcni, bdx, bdy, bcen, pcap, pp)
     integer,     allocatable, intent(inout) :: bei(:), bni(:, :), bcni(:, :)
     real(TG_WP), allocatable, intent(inout) :: bdx(:), bdy(:), bcen(:, :)
@@ -627,7 +678,10 @@ contains
   end subroutine push_ghost
 
 ! -----------------------------------------------------------------------------
-! Concatenate sub-segments into the public transect_t
+!> Concatenate the per-sub-segment scratch into a single transect_t,
+!> allocated at the total size (sum of ncut and P over all sub-segments).
+!> Copies edge_cut_* and path_* blocks in CSV-vertex order; zero-
+!> initialises path_nvec_cs; skips sub-segments with ncut == 0.
 ! -----------------------------------------------------------------------------
   subroutine concat_subtransects(segs, n_subs, t)
     type(subseg_t),   intent(in)    :: segs(:)
@@ -691,49 +745,10 @@ contains
   end subroutine concat_subtransects
 
 ! -----------------------------------------------------------------------------
-! Insert NaN slots between consecutive boundary cuts  (port of _do_insert_landpts)
-! -----------------------------------------------------------------------------
-  subroutine insert_landpts(t)
-    type(transect_t), intent(inout) :: t
-    integer :: m, n_bnd, n_pairs, j, ni_s, ni_e, k
-    integer,     allocatable :: edge_cut_bei(:)
-    logical,     allocatable :: is_bnd(:), is_pair(:)
-    integer :: M_new
-    real(TG_WP) :: nan
-
-    if (t%M < 2) return
-    nan = ieee_value(0.0_TG_WP, ieee_quiet_nan)
-
-    allocate(is_bnd (t%M))
-    allocate(is_pair(t%M - 1))
-    ! Mark which edges are boundary cuts (edge_tri[1, ed] == -1 in tripyview).
-    ! We don't have edge_tri here directly — but boundary cuts in our path are
-    ! the edges whose path_ei stays -1 on both up/down (i.e., the edge has
-    ! NaN path_dx). However, we use `edge_cut_ni == -1` as the marker for
-    ! inserted slots; here we test edge_tri at concat time by passing it in.
-    ! Simpler: a boundary edge produces a NaN path_dx contribution. We re-detect
-    ! by checking edge_cut_lint... actually no — we tracked this via path_ei.
-    ! Use the post-build invariant: an edge is boundary iff the corresponding
-    ! downsection (or upsection) is the only one with NaN dx for that edge.
-    ! Simplest reliable signal here: scan path_ei for sequences of -1 around
-    ! each cut.
-    !
-    ! In practice, we know upstream from edge_tri. We mark is_bnd(m) by walking
-    ! the path: each edge_cut entry m corresponds to a midP in path_xy preceded
-    ! by one upsection entry in path_ei (possibly ghost). For now, treat the
-    ! land-pt insertion as a no-op when no boundary cuts exist; the NaN slots
-    ! already injected by push_ghost cover the within-section land case. The
-    ! end-of-section land case is handled by the ghost-pair logic in
-    ! add_upsection.
-    deallocate(is_bnd, is_pair)
-    ! This routine is a placeholder — boundary handling is already done at
-    ! build_path time via push_ghost. Re-enable explicit pair injection here
-    ! if we discover a case the per-edi ghost insertion misses.
-    return
-  end subroutine insert_landpts
-
-! -----------------------------------------------------------------------------
-! Cumulative great-circle distance  (port of _do_compute_distance_from_startpoint)
+!> Fill t%path_dist (length Pxy) and t%edge_cut_dist (length M) with
+!> cumulative great-circle distance from the section start, in km.
+!> Uses cartesian unit-sphere coordinates so the arc length reduces to
+!> arccos(p_i . p_{i+1}) * R_earth.
 ! -----------------------------------------------------------------------------
   subroutine compute_distance_from_startpoint(t)
     type(transect_t), intent(inout) :: t
@@ -786,6 +801,8 @@ contains
 ! -----------------------------------------------------------------------------
 ! small helpers
 ! -----------------------------------------------------------------------------
+
+  !> Project (lon, lat) in degrees onto the unit sphere.
   subroutine lonlat_to_cart3d(lon_deg, lat_deg, x, y, z)
     real(TG_WP), intent(in)  :: lon_deg, lat_deg
     real(TG_WP), intent(out) :: x, y, z
@@ -798,6 +815,8 @@ contains
     z = sin(lat)
   end subroutine lonlat_to_cart3d
 
+  !> Centroid (cx, cy) of element eid's three vertex nodes in degrees,
+  !> with a [-180, 180] wrap when the element straddles the dateline.
   subroutine elem_centroid(eid, n_nod, lon_nod, lat_nod, n_elem, elem_nodes, cx, cy)
     integer,     intent(in)  :: eid, n_nod, n_elem
     real(TG_WP), intent(in)  :: lon_nod(n_nod), lat_nod(n_nod)
@@ -821,6 +840,8 @@ contains
     cy = sum(yv) / 3.0_TG_WP
   end subroutine elem_centroid
 
+  !> Insertion-sort permutation: idx is filled such that arr(idx(i))
+  !> is non-decreasing. O(n^2); fine for the few-hundred-crossings size.
   subroutine argsort_real(arr, idx)
     real(TG_WP), intent(in)  :: arr(:)
     integer,     intent(out) :: idx(size(arr))
@@ -840,6 +861,8 @@ contains
     end do
   end subroutine argsort_real
 
+  !> Geometric-growth resize of a 2 x cap buffer so it can hold at least
+  !> `want` entries along its second axis. No-op when cap is large enough.
   subroutine grow_xy(buf, cap, want)
     real(TG_WP), allocatable, intent(inout) :: buf(:, :)
     integer,                  intent(inout) :: cap
@@ -854,6 +877,9 @@ contains
     cap = ncap
   end subroutine grow_xy
 
+  !> Geometric-growth resize of the bundle of path-step scratch buffers
+  !> so they can all hold at least `want` entries. No-op when cap is
+  !> large enough.
   subroutine grow_p(bei, bni, bcni, bdx, bdy, bcen, cap, want)
     integer,     allocatable, intent(inout) :: bei(:), bni(:, :), bcni(:, :)
     real(TG_WP), allocatable, intent(inout) :: bdx(:), bdy(:), bcen(:, :)

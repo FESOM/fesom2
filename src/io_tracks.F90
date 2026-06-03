@@ -1,13 +1,13 @@
-!> Ship-track / mooring-array curtain output for FESOM-2, v2 (geometry-aware).
+!> Ship-track / mooring-array curtain output for FESOM-2.
 !>
-!> Each user-supplied polyline CSV is converted to a list of "crossed
-!> edges": the actual edges of the FESOM mesh whose interior the polyline
-!> passes through. For each crossed edge a sample value is built by
-!> linearly interpolating the two endpoint values
-!>     V_at_crossing = V(n1) * (1 - t) + V(n2) * t,
-!> with t in [0,1] from the line-edge intersection. This replaces the
-!> earlier snap-to-nearest-node approach which produced mesh-scale
-!> zig-zag artefacts and could not compute transport.
+!> Each user-supplied polyline CSV is intersected with the FESOM mesh.
+!> For node-based variables (temp, salt) each output cell is one mesh
+!> edge crossed by the polyline; the value at the crossing point is the
+!> linear interpolation V(n1)*(1-t) + V(n2)*t between the two endpoint
+!> nodes, with t in [0,1] from the line-edge intersection. For element-
+!> based variables (u, v, vflx, hflx, sflx) the output cells are the
+!> path triangles that make up the alternating up-section / down-section
+!> traversal of each crossed edge.
 !>
 !> Geometry pipeline (lives in mod_tracks_geometry, pure Fortran):
 !>   * bbox + polar widening
@@ -21,7 +21,8 @@
 !>   * Rank 0 runs analyse_transect once per track
 !>   * The resulting transect_t (M <= ~few thousand) is broadcast to all
 !>     ranks
-!>   * Each rank precomputes which edge endpoints it strict-owns
+!>   * Each rank precomputes which edge endpoints / path elements it
+!>     strict-owns
 !>   * At each output step: per-rank contributions are summed via
 !>     MPI_Allreduce; slots where no rank contributed (boundary edge or
 !>     both endpoints dry at this level) become NaN
@@ -115,7 +116,7 @@ module io_tracks_module
 
 contains
 
-  !> True iff tracks output is enabled this run.
+  !> True iff tracks output is enabled (the ltracks namelist / XML flag).
   logical function io_tracks_is_on() result(on)
     on = ltracks
   end function io_tracks_is_on
@@ -123,9 +124,13 @@ contains
 
 #if defined(__XIOS)
 
-  !> Parse semicolon-separated lists, gather the global mesh on rank 0,
-  !> run analyse_transect per track, broadcast geometry, register the
-  !> per-track XIOS domain/grid/field.
+  !> One-shot init at the start of the run: parse the semicolon-separated
+  !> track config strings, gather the global mesh on rank 0, run
+  !> analyse_transect per track, broadcast the geometry, build per-rank
+  !> ownership lookups, register a node-based or element-based XIOS
+  !> domain/grid/field per track. nz_cell is the shared count of cell-
+  !> centred vertical levels. partit is intent(inout) because the
+  !> gather_* primitives mutate it. Subsequent calls are no-ops.
   subroutine io_tracks_register_xios(mesh, partit, nz_cell)
     type(t_mesh),   intent(in)    :: mesh
     type(t_partit), intent(inout) :: partit
@@ -173,7 +178,9 @@ contains
   end subroutine io_tracks_register_xios
 
 
-  !> Loop tracks, sample, MPI_Allreduce, send via XIOS.
+  !> Per-step entry point: dispatch each registered track to the
+  !> node-based or element-based sampler, which assembles a curtain via
+  !> MPI_Allreduce and pushes this rank's stride to XIOS.
   subroutine io_tracks_send(tracers, dynamics, mesh, partit)
     type(t_tracer), intent(in) :: tracers
     type(t_dyn),    intent(in) :: dynamics
@@ -198,13 +205,12 @@ contains
   ! Rank-0 mesh gather
   ! ====================================================================
 
-  !> Use FESOM's gather_edge / gather_elem / gather_nod primitives to
-  !> assemble the global topology on rank 0. Connectivity arrays carry
-  !> LOCAL ids per rank; translate to GLOBAL ids before gather (the
-  !> pattern at io_mesh_info.F90:441-526).
-  !>
-  !> Non-rank-0 receive dummy size-1 arrays — the gather routines write
-  !> to arr_global only on rank 0.
+  !> One-shot rank-0 assembly of the global topology (lon, lat, edges,
+  !> edge_tri, elem_nodes, edge_cross_dxdy) using FESOM's gather_*
+  !> primitives. Connectivity arrays carry LOCAL ids per rank and are
+  !> translated to GLOBAL ids via myList_* before each gather (the
+  !> pattern at io_mesh_info.F90:441-526). Non-rank-0 receive dummy
+  !> size-1 arrays; the gather routines write to *_glo only on rank 0.
   subroutine gather_global_mesh(mesh, partit, &
                                 lon_glo, lat_glo, edges_glo, edge_tri_glo, &
                                 elem_nodes_glo, edge_cross_dxdy_glo)
@@ -316,6 +322,12 @@ contains
   ! Per-track pipeline
   ! ====================================================================
 
+  !> Resolve t%var_kind / tracer_idx / uv_comp from the user-supplied
+  !> var_name, parse the CSV on rank 0, run analyse_transect there,
+  !> broadcast the geometry, store the M-sized (always) and P-sized
+  !> (element-based variables only) fields needed at sample time, build
+  !> per-rank strict-own lookups, assign cells to ranks for XIOS write
+  !> ownership, then register the XIOS domain/grid/field.
   subroutine process_one_track(mesh, partit, nz_cell, t, &
                                lon_glo, lat_glo, edges_glo, edge_tri_glo, &
                                elem_nodes_glo, edge_cross_dxdy_glo)
@@ -391,7 +403,7 @@ contains
             ': geometry M=', geom%M, ' crossed edges'
     end if
 
-    call broadcast_transect_min(geom, partit, t%var_kind)
+    call broadcast_transect(geom, partit, t%var_kind)
     if (geom%M == 0) then
        if (partit%mype == 0) write(*,'(a,a,a)') '[TRACKS] WARNING: track "', &
             trim(t%name), '" has no mesh crossings — skipping.'
@@ -458,7 +470,7 @@ contains
   !> (edge_cut_ni, edge_cut_lint, edge_cut_midP, edge_cut_dist) are
   !> always broadcast. Path-side fields (path_ei, path_dx, path_dy,
   !> path_centroid_xy) are broadcast only for element-based variables.
-  subroutine broadcast_transect_min(geom, partit, var_kind)
+  subroutine broadcast_transect(geom, partit, var_kind)
     type(transect_t), intent(inout) :: geom
     type(t_partit),   intent(in)    :: partit
     integer,          intent(in)    :: var_kind        ! 1 = node, 2 = elem
@@ -513,7 +525,7 @@ contains
     call mpi_bcast(geom%path_dy,          P_b,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierr)
     call mpi_bcast(geom%path_centroid_xy, 2*P_b, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierr)
     call mpi_bcast(geom%path_nvec_cs,     2*P_b, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierr)
-  end subroutine broadcast_transect_min
+  end subroutine broadcast_transect
 
 
   !> For each crossed edge m, record this rank's lid for n1 and n2 if it
@@ -837,9 +849,14 @@ contains
 
 
   ! ====================================================================
-  ! Config parsing (unchanged from v1 modulo track_resolution_km drop)
+  ! Config parsing
   ! ====================================================================
 
+  !> Split the semicolon-separated track_files / track_vars / track_names
+  !> strings into the global tracks(:) array. If track_names is empty,
+  !> auto-generate "trackN". If track_vars has a single entry but
+  !> track_files has many, broadcast that single var across all tracks.
+  !> Errors out via mpi_abort if the list lengths disagree.
   subroutine parse_track_config(partit)
     type(t_partit), intent(in) :: partit
     character(len=512), allocatable :: files(:), vars(:), names(:)
@@ -902,6 +919,8 @@ contains
   end subroutine parse_track_config
 
 
+  !> Split s_in on ';' (preferred) or ',' into tokens(1:n). n=0 with
+  !> tokens unallocated when the input is empty or whitespace only.
   subroutine split_semi_or_comma(s_in, n, tokens)
     character(len=*),                intent(in)  :: s_in
     integer,                         intent(out) :: n
@@ -941,6 +960,8 @@ contains
   end subroutine split_semi_or_comma
 
 
+  !> Convert a cadence string like '3h', '1d', '1mo', '1y' into the
+  !> matching XIOS duration. Falls back to 1 hour on parse failure.
   function parse_xios_freq(s) result(d)
     character(len=*), intent(in) :: s
     type(xios_duration) :: d
@@ -975,6 +996,9 @@ contains
   ! XIOS runtime registration
   ! ====================================================================
 
+  !> Create the shared XIOS file_group "fesom_tracks" with the global
+  !> output_freq and split_freq=1y. Each per-track file is added inside
+  !> this group by register_xios_objects_for_track.
   subroutine register_track_filegroup(partit)
     type(t_partit), intent(in) :: partit
     type(xios_filegroup) :: filgrp_root, my_filgrp
@@ -992,6 +1016,11 @@ contains
   end subroutine register_track_filegroup
 
 
+  !> Register XIOS domain + grid + field + per-track file. var_kind = 1
+  !> uses an M-sized "track_<name>" unstructured domain; var_kind = 2 a
+  !> P-sized "path_<name>" domain. The field references the per-track
+  !> 3D grid and the file is added inside the shared "fesom_tracks"
+  !> file_group.
   subroutine register_xios_objects_for_track(partit, t)
     type(t_partit), intent(in) :: partit
     type(track_t),  intent(in) :: t
@@ -1097,9 +1126,12 @@ contains
 
 
   ! ====================================================================
-  ! CSV parser (unchanged)
+  ! CSV parser
   ! ====================================================================
 
+  !> Read a CSV polyline (lon, lat per line; '#' comments; UTF-8 BOM
+  !> tolerated on line 1) into lon_out, lat_out. Duplicate consecutive
+  !> waypoints are rejected. Calls mpi_abort on any parse failure.
   subroutine parse_csv(path, N, lon_out, lat_out, partit)
     character(len=*),              intent(in)  :: path
     integer,                       intent(out) :: N
@@ -1191,6 +1223,7 @@ contains
   end subroutine parse_csv
 
 
+  !> One-line "[TRACKS] ERROR: <path>:<line_no>: <msg>" stderr write.
   subroutine csv_fatal(path, line_no, msg)
     character(len=*), intent(in) :: path, msg
     integer,          intent(in) :: line_no
