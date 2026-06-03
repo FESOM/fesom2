@@ -69,6 +69,7 @@ module mod_tracks_geometry
     integer,     allocatable  :: path_cut_ni     (:, :)
     real(TG_WP), allocatable  :: path_dx         (:)
     real(TG_WP), allocatable  :: path_dy         (:)
+    real(TG_WP), allocatable  :: path_nvec_cs    (:, :)   ! (2, P) per-sub-segment n_vec
     real(TG_WP), allocatable  :: path_centroid_xy(:, :)
     real(TG_WP), allocatable  :: path_xy         (:, :)
   end type subseg_t
@@ -179,13 +180,15 @@ contains
     deallocate(segs)
 
     ! ------- flip sign if total normal points SW/S (positive transport S->N, W->E) -------
+    ! Matches tripyview's _do_build_path:875 which gates on n_vec_tot
+    ! and flips path_dx/path_dy uniformly across all sub-segments.
+    ! path_nvec_cs is left as-is from concat_subtransects: each path step
+    ! carries its sub-segment's own n_vec (tripyview's _do_build_path:855).
     if (transect%P > 0) then
       if (n_vec_tot(1) < 0.0_TG_WP .or. n_vec_tot(2) < 0.0_TG_WP) then
         transect%path_dx = -transect%path_dx
         transect%path_dy = -transect%path_dy
       end if
-      transect%path_nvec_cs(1, :) = n_vec_tot(1)
-      transect%path_nvec_cs(2, :) = n_vec_tot(2)
     end if
 
     ! Note: tripyview's _do_insert_landpts adds synthetic NaN slots
@@ -236,7 +239,14 @@ contains
     dn = sqrt(dx*dx + dy*dy)
     if (dn > 0.0_TG_WP) then
       seg%e_vec = (/  dx/dn,  dy/dn /)
-      seg%n_vec = (/ -dy/dn,  dx/dn /)
+      ! Per-sub-segment normal with tripyview's conditional flip:
+      ! going N (dy > 0) or W (dx < 0) -> clockwise rotation;
+      ! otherwise counter-clockwise. Matches sub_transect.py:437-440.
+      if (dy > 0.0_TG_WP .or. dx < 0.0_TG_WP) then
+        seg%n_vec = (/  dy/dn, -dx/dn /)
+      else
+        seg%n_vec = (/ -dy/dn,  dx/dn /)
+      end if
     else
       seg%e_vec = 0.0_TG_WP
       seg%n_vec = 0.0_TG_WP
@@ -494,6 +504,7 @@ contains
     allocate(seg%path_cut_ni     (2, pp))
     allocate(seg%path_dx         (pp))
     allocate(seg%path_dy         (pp))
+    allocate(seg%path_nvec_cs    (2, pp))
     allocate(seg%path_centroid_xy(2, pp))
     allocate(seg%path_xy         (2, pxy_p))
 
@@ -504,6 +515,11 @@ contains
     seg%path_dy         = bdy(1:pp)
     seg%path_centroid_xy = bcen(:, 1:pp)
     seg%path_xy         = bxy(:, 1:pxy_p)
+
+    ! Tag every path step inside this sub-segment with its own n_vec,
+    ! matching tripyview's _do_build_path:855-857.
+    seg%path_nvec_cs(1, :) = seg%n_vec(1)
+    seg%path_nvec_cs(2, :) = seg%n_vec(2)
 
     deallocate(bei, bni, bcni, bdx, bdy, bcen, bxy)
   end subroutine build_path
@@ -718,7 +734,6 @@ contains
     allocate(t%path_centroid_xy(2, tot_P))
 
     allocate(t%path_xy         (2, tot_Pxy))
-    t%path_nvec_cs = 0.0_TG_WP
 
     off_M = 0; off_P = 0; off_Pxy = 0
     do ii = 1, n_subs
@@ -736,6 +751,7 @@ contains
       t%path_cut_ni     (:, off_P+1 : off_P+segs(ii)%P)     = segs(ii)%path_cut_ni
       t%path_dx         (off_P+1 : off_P+segs(ii)%P)        = segs(ii)%path_dx
       t%path_dy         (off_P+1 : off_P+segs(ii)%P)        = segs(ii)%path_dy
+      t%path_nvec_cs    (:, off_P+1 : off_P+segs(ii)%P)     = segs(ii)%path_nvec_cs
       t%path_centroid_xy(:, off_P+1 : off_P+segs(ii)%P)     = segs(ii)%path_centroid_xy
       off_P = off_P + segs(ii)%P
 
