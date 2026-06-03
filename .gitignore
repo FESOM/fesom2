@@ -14,5 +14,5 @@ lib/*.so
 /work_*
 Makefile.in
 mesh_part/build
-test/output_pi 
-src/cvmix_driver/CVMix-*
+test/output_pi
+.claude/

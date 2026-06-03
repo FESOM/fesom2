@@ -298,6 +298,24 @@ subroutine ini_bio_io(tracers, partit, mesh)
     call bio_files%def_node_var('BenSi',   'Benthos Silicate', 'mmol/m3',   Benthos(:,3), mesh, partit);
     call bio_files%def_node_var('BenCalc', 'Benthos Calcite',  'mmol/m3',   Benthos(:,4), mesh, partit);
     call bio_files%def_node_var('HPlus',   'Conc. of H-plus ions in the surface water', 'mol/kg',   GloHplus, mesh, partit);
+  if (ciso) then
+    call bio_files%def_node_var('BenC_13', 'Benthos Carbon-13', 'mmol/m3',   Benthos(:,5), mesh, partit);
+    call bio_files%def_node_var('BenCalc_13', 'Benthos Calcite-13', 'mmol/m3',   Benthos(:,6), mesh, partit); 
+    if (ciso_14 .and. ciso_organic_14) then
+      call bio_files%def_node_var('BenC_14', 'Benthos Carbon-14',  'mmol/m3',   Benthos(:,7), mesh, partit);
+      call bio_files%def_node_var('BenCalc_14', 'Benthos Calcite-14', 'mmol/m3',   Benthos(:,8), mesh, partit); 
+    end if ! ciso_14
+  end if   ! ciso
+  if (use_atbox) then
+    call bio_files%def_node_var('xCO2', 'Atm. CO2 mixing ratio', 'mol / mol', x_co2atm(:), mesh, partit);
+    if (ciso) then
+      call bio_files%def_node_var('xCO2_13', 'Atm. 13CO2 mixing ratio', 'mol / mol', x_co2atm_13(:), mesh, partit);
+      if (ciso_14) then
+        call bio_files%def_node_var('xCO2_14', 'Atm. 14CO2 mixing ratio', 'mol / mol', x_co2atm_14(:), mesh, partit);
+        call bio_files%def_node_var('cosmic_14', 'Cosmic 14C production', 'mol / s', cosmic_14(:), mesh, partit);
+      end if
+    end if
+  end if  ! use_atbox
 
 end subroutine ini_bio_io
 #endif
@@ -336,7 +354,7 @@ subroutine read_initial_conditions(which_readr, ice, dynamics, tracers, partit, 
   call ini_ocean_io(dynamics, tracers, partit, mesh)
   if (use_ice) then
 #if defined(__icepack)    
-      call ini_icepack_io(partit, mesh)
+      call ini_icepack_io(yearold, partit, mesh)
 #else
       call ini_ice_io  (ice, partit, mesh)
 #endif        
@@ -497,25 +515,32 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
   ! Calculate current time from clock (seconds from beginning of year)
   ctime = timeold + (dayold - 1.0_WP) * 86400.0_WP
   
-  ! Check whether restart will be written
-  is_portable_restart_write = is_due(trim(restart_length_unit), restart_length, istep)
-  
+  ! Check whether portable (NetCDF) restart will be written
+  if(restart_length_unit /= "off") then
+    is_portable_restart_write = is_due(trim(restart_length_unit), restart_length, istep) .OR. (istep==ntotal)
+  else
+    is_portable_restart_write = .false.
+  end if
+
   ! Should write core dump restart?
+  ! Gate the segment-end fallback on the raw restart being configured at all;
+  ! otherwise we trigger a write into a directory that was never mkdir'd
+  ! (the init block is skipped when raw_restart_length_unit == "off").
   if(is_portable_restart_write .and. (raw_restart_length_unit /= "off")) then
     is_raw_restart_write = .true. ! always write a raw restart together with the portable restart
-  else
-#if !defined __ifsinterface
-    is_raw_restart_write = is_due(trim(raw_restart_length_unit), raw_restart_length, istep)
-#else
+  else if(raw_restart_length_unit /= "off") then
     is_raw_restart_write = is_due(trim(raw_restart_length_unit), raw_restart_length, istep) .OR. (istep==ntotal)
-#endif
+  else
+    is_raw_restart_write = .false.
   end if
-  
+
   ! Should write derived type binary restart?
   if(is_portable_restart_write .and. (bin_restart_length_unit /= "off")) then
     is_bin_restart_write = .true. ! always write a binary restart together with the portable restart
+  else if(bin_restart_length_unit /= "off") then
+    is_bin_restart_write = is_due(trim(bin_restart_length_unit), bin_restart_length, istep) .OR. (istep==ntotal)
   else
-    is_bin_restart_write = is_due(trim(bin_restart_length_unit), bin_restart_length, istep)
+    is_bin_restart_write = .false.
   end if
 
   ! Write restart files

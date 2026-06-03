@@ -16,8 +16,18 @@ module fesom_main_storage_module
   use g_forcing_arrays
   use io_RESTART
   use io_MEANDATA
+  use io_xios_module
   use io_mesh_info
   use diagnostics
+  ! Read-only access to the CMOR scalar diagnostics computed inside
+  ! compute_diagnostics → compute_cmor_diag, so we can send them to XIOS
+  ! from this top-level module. Doing the send inside cmor_variables_diag
+  ! itself would create a cycle (io_xios → diagnostics → cmor_variables_diag
+  ! → io_xios) and break the build.
+  use cmor_variables_diag, only: ldiag_cmor, reset_cmor_acc, &
+                                 volo, soga, thetaoga, &
+                                 siarean, siareas, siextentn, siextents, &
+                                 sivoln, sivols
   use mo_tidal
   use tracer_init_interface
   use ocean_setup_interface
@@ -47,11 +57,15 @@ module fesom_main_storage_module
 #if defined (__oasis)
   use cpl_driver
 #endif
+#if defined (__yac)
+use cpl_yac_driver
+#endif
 
 ! define recom module
 #if defined (__recom)
   use recom_init_interface
   use recom_interface
+  use recom_glovar
 #endif
 
 ! Transient tracers
@@ -135,7 +149,12 @@ contains
       integer, intent(out) :: fesom_total_nsteps
       ! EO parameters
       logical mpi_is_initialized
-      integer              :: tr_num
+      integer              :: tr_num, n
+
+#if defined (__recom)
+      type(tracers_info_type)               :: tracers_info
+#endif
+
 #if !defined  __ifsinterface
       if(command_argument_count() > 0) then
         call command_line_options%parse()
@@ -169,7 +188,10 @@ contains
 #if defined (__oasis)
 
         call cpl_oasis3mct_init(f%partit,f%partit%MPI_COMM_FESOM)
+#elif defined (__yac)
+        call cpl_yac_init(f%partit%MPI_COMM_FESOM)
 #endif
+
         f%t1 = MPI_Wtime()
 
         ! Initialize enhanced profiler
@@ -241,6 +263,22 @@ contains
 
         if (f%mype==0) write(*,*) 'FESOM mesh_setup... complete'
 
+#if defined (__XIOS)
+        ! XIOS client init (NEMO/OIFS pattern). xios_initialize is called with
+        ! local_comm=MPI_COMM_FESOM -- OASIS already split MPI_COMM_WORLD, so
+        ! no further split is needed; the FESOM comm stays valid. The separate
+        ! xios_server.exe binary registers with OASIS independently.
+        !
+        ! Ordering: OASIS3-MCT was initialised above (before par_init). This
+        ! matches the EC-Earth-proven NEMO ordering (OASIS -> XIOS on OASIS
+        ! local comm). Called here after mesh_setup so coord_nod2D /
+        ! elem2D_nodes / zbar / myList_* are populated.
+        block
+          integer :: xios_client_comm
+          call io_xios_init(f%mesh, f%partit, f%partit%MPI_COMM_FESOM, xios_client_comm)
+        end block
+#endif
+
 !       Transient tracers: control output of initial input values
         if(use_transit .and. anthro_transit .and. f%mype==0) then
           write (*,*)
@@ -307,9 +345,26 @@ contains
         ! recom setup
 #if defined (__recom)
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call recom_init'//achar(27)//'[0m'
+
+        allocate(tracers_info%ids(f%tracers%num_tracers))
+        allocate(tracers_info%data_pointers(f%tracers%num_tracers))
+
+        do n = 1, f%tracers%num_tracers
+          tracers_info%ids(n) = f%tracers%data(n)%id
+          tracers_info%data_pointers(n)%tracer_data => f%tracers%data(n)%values
+        end do
+
         f%t_recom_s=MPI_Wtime()
-        call recom_init(f%tracers, f%partit, f%mesh) ! adjust values for recom tracers (derived type "t_tracer")
-        f%t_recom_e=MPI_Wtime()
+        call recom_init(f%mesh%nl, f%mesh%ulevels_nod2d, f%mesh%nlevels_nod2D, &
+                        f%mesh%geo_coord_nod2D, f%mesh%z_3d_n, f%partit%myDim_nod2d,      &
+                        f%partit%eDim_nod2D, f%partit%mype, f%partit%MPI_COMM_FESOM,      &
+                        f%partit%myDim_elem2D, f%partit%eDim_elem2D, tracers_info,        &
+                        f%tracers%num_tracers, rad) ! adjust values for recom tracers (derived type "t_tracer")
+        f%partit, f%mesh) ! adjust values for recom tracers (derived type "t_tracer")
+
+        deallocate(tracers_info%ids)
+        deallocate(tracers_info%data_pointers)
+
         if (f%mype==0) write(*,*) 'RECOM recom_init... complete'
 #endif
 
@@ -365,6 +420,11 @@ contains
             call allocate_icb(f%partit, f%mesh)
         endif
         ! --------------
+
+#if defined (__yac)
+        call cpl_yac_define_unstr(f%partit, f%mesh)
+        if(f%mype==0)  write(*,*) 'FESOM ---->     cpl_yac_define_unstr nsend, nrecv:',nsend, nrecv
+#endif
 
 #if defined (__icepack)
         !=====================
@@ -552,7 +612,12 @@ contains
 !   use openacc_lib
     integer, intent(in) :: current_nsteps 
     ! EO parameters
-    integer n, nstart, ntotal, tr_num
+    integer n, nstart, ntotal, tr_num, tracer_index
+    logical :: do_cmor_0d_reset
+
+#if defined (__recom)
+    type(tracers_info_type)               :: tracers_info
+#endif
 
     !=====================
     ! Time stepping
@@ -588,6 +653,9 @@ contains
     ntotal=f%from_nstep-1+current_nsteps
 
     do n=nstart, ntotal
+#if defined (__XIOS)
+        call io_xios_update_calendar(n)
+#endif
         if (use_icebergs) then
             f%t_iceb_s0 = MPI_Wtime()
                 !n_ib         = n
@@ -684,7 +752,11 @@ contains
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("update_atm_forcing")
 #endif
+#if defined (__yac)
+            call update_atm_forcing_yac(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
+#else
             call update_atm_forcing(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
+#endif 
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("update_atm_forcing")
 #endif
@@ -722,9 +794,38 @@ contains
 #if defined (__recom)
         if (f%mype==0 .and. n==1)  print *, achar(27)//'[46'  //'_____________________________________________________________'//achar(27)//'[0m'
         if (f%mype==0 .and. n==1)  print *, achar(27)//'[46;1m'//'     --> call REcoM                                         '//achar(27)//'[0m'
+
+        allocate(tracers_info%ids(f%tracers%num_tracers))
+        allocate(tracers_info%ltra_diag(f%tracers%num_tracers))
+        allocate(tracers_info%data_pointers(f%tracers%num_tracers))
+
+        do tracer_index = 1, f%tracers%num_tracers
+          tracers_info%ids(tracer_index) = f%tracers%data(tracer_index)%id
+          tracers_info%ltra_diag(tracer_index) = f%tracers%data(tracer_index)%ltra_diag
+          tracers_info%data_pointers(tracer_index)%tracer_data => f%tracers%data(tracer_index)%values
+        end do
+
         f%t_recom_s = MPI_Wtime()
-        call recom(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        call recom(f%ice%data(1)%values, f%mesh%nl, &
+                   f%mesh%ulevels_nod2d, f%mesh%nlevels_nod2D, f%mesh%hnode,     &
+                   f%mesh%z_3d_n, f%mesh%zbar_3d_n, f%mesh%geo_coord_nod2d,      &
+                   f%mesh%ocean_area, f%mesh%areasvol, f%partit%myDim_nod2d,     &
+                   f%partit%eDim_nod2D, f%partit%mype, f%partit%MPI_COMM_FESOM,  &
+                   tracers_info, f%tracers%num_tracers, f%tracers%work%tra_recom_sms, &
+                   f%partit%npes, f%partit%com_nod2D%sPEnum,   &
+                   f%partit%com_nod2D%rPEnum,  &
+                   f%partit%s_mpitype_nod2D, f%partit%r_mpitype_nod2D,              &
+                   f%partit%s_mpitype_nod3D, f%partit%r_mpitype_nod3D,              &
+                   f%partit%com_nod2D%sPE, f%partit%com_nod2D%rPE,                  &
+                   f%partit%com_nod2D%req, f%partit%com_nod2D%nreq,                 &
+                   dt, daynew, month, mstep, ndpyr, yearold, timenew, rad, kappa,            &
+                   press_air, u_wind,  f%tracers, f%partit, f%mesh)
         f%t_recom_e = MPI_Wtime()
+
+        deallocate(tracers_info%ids)
+        deallocate(tracers_info%ltra_diag)
+        deallocate(tracers_info%data_pointers)
+
 #endif
         
         !___model ocean step____________________________________________________
@@ -758,10 +859,40 @@ contains
         call fesom_profiler_end("compute_diagnostics")
 #endif
         f%t_diag_e = MPI_Wtime()
-        
+
+
         !___prepare output______________________________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
         f%t_io_s = MPI_Wtime()
+        ! XIOS send for CMOR 0D scalars. xios_send_field is a collective
+        ! over the FESOM client context: ALL ranks must participate or
+        ! XIOS errors with "callers not coherent" (event_server.cpp:29).
+        ! The values are MPI_AllReduced inside compute_cmor_diag so every
+        ! rank has the same global value; XIOS-side operation="average"
+        ! over identical values reduces to that value. The legacy
+        ! output_0D_streams writer is gated on io_xios_is_on() so these
+        ! scalars no longer double-write at every step.
+        if (ldiag_cmor .and. io_xios_is_on()) then
+            call io_xios_send_0d_r8('volo',      real(volo,      kind=8))
+            call io_xios_send_0d_r8('soga',      real(soga,      kind=8))
+            call io_xios_send_0d_r8('thetaoga',  real(thetaoga,  kind=8))
+            call io_xios_send_0d_r8('siarean',   real(siarean,   kind=8))
+            call io_xios_send_0d_r8('siareas',   real(siareas,   kind=8))
+            call io_xios_send_0d_r8('siextentn', real(siextentn, kind=8))
+            call io_xios_send_0d_r8('siextents', real(siextents, kind=8))
+            call io_xios_send_0d_r8('sivoln',    real(sivoln,    kind=8))
+            call io_xios_send_0d_r8('sivols',    real(sivols,    kind=8))
+        end if
+        ! Reset 0D accumulators at month end — outside the io_xios_is_on() block
+        ! so the reset fires in both XIOS and legacy output modes. Gated on
+        ! monthly_event (FESOM calendar) so it is independent of XIOS field
+        ! name configuration.
+        if (ldiag_cmor) then
+            do_cmor_0d_reset = .false.
+            call monthly_event(do_cmor_0d_reset, 1)
+            if (do_cmor_0d_reset) call reset_cmor_acc()
+        end if
+
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("output")
 #endif
@@ -785,6 +916,13 @@ contains
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("restart")
 #endif
+        ! Pass f%total_nsteps (namelist run length) as the segment-end marker
+        ! rather than the runloop-chunk end (ntotal). In standalone FESOM they
+        ! are identical (fesom_runloop is called once with all steps), so the
+        ! year-boundary fix from PR #880 still fires. Under __ifsinterface,
+        ! fesom_runloop is called per IFS coupling step with a small chunk, so
+        ! ntotal == istep on every call; using it as the segment-end marker
+        ! would force a restart every coupling timestep.
         call write_initial_conditions(n, nstart, f%total_nsteps, f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("restart")
@@ -853,7 +991,10 @@ contains
     use mpp_io
 #endif
     ! EO parameters
-    integer           :: tr_num, n_rtime=22
+    ! 1..19 are the existing FESOM timers (ocean components, ice, output, etc.)
+    ! 20..24 are the io_meandata sub-decomposition: update_means, streamloop,
+    ! pack, mask, xsend (see rtime_om_* in io_meandata.F90).
+    integer           :: tr_num, n_rtime=27
     real(kind=real32), allocatable :: mean_rtime(:), max_rtime(:), min_rtime(:)
     allocate(mean_rtime(n_rtime), max_rtime(n_rtime), min_rtime(n_rtime))
     
@@ -867,6 +1008,7 @@ contains
          call iceberg_out(f%partit)
     end if
     ! --------------
+
     call finalize_output()
     call finalize_restart()
 
@@ -952,10 +1094,21 @@ contains
     ! diag, mean I/O, restart timing
     mean_rtime(18) = f%rtime_compute_diag
     mean_rtime(19) = f%rtime_write_means
-    mean_rtime(20) = f%rtime_write_restart
+    ! Sub-decomposition of rtime_write_means (= mean_rtime(12)):
+    ! (20) update_means accumulator cost (per step, every step)
+    ! (21) per-stream loop in output() (incl. write_mean dispatch)
+    ! (22) Fortran tmp2/tmp3 nested-loop pack from local_values_*_copy
+    ! (23) io_xios_apply_wet_* / apply_ice_mask_* full-array scans
+    ! (24) pure xios_send_field call wall (post-gate, the actual XIOS pipeline)
+    mean_rtime(20) = real(rtime_om_update_means, real32)
+    mean_rtime(21) = real(rtime_om_streamloop,   real32)
+    mean_rtime(22) = real(rtime_om_pack,         real32)
+    mean_rtime(23) = real(rtime_om_mask,         real32)
+    mean_rtime(24) = real(rtime_om_xsend,        real32)
+    mean_rtime(25) = f%rtime_write_restart
     
     ! total runtime
-    mean_rtime(21) = f%runtime_alltimesteps
+    mean_rtime(26) = f%runtime_alltimesteps
     
 #if defined (__recom)
     ! recom timing
@@ -980,7 +1133,15 @@ contains
     call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime(n_rtime),  1, MPI_REAL, MPI_MIN, f%MPI_COMM_FESOM, f%MPIerr)
 #endif
 
-    
+    ! Per-stream cumulative cost — printed sorted at finalize from rank 0.
+    call print_per_stream_costs(f%partit%MPI_COMM_FESOM, f%partit%mype, f%npes)
+
+#if defined (__XIOS)
+    ! Must finalize XIOS BEFORE MPI/OASIS teardown so server2 receives
+    ! the client-finalize signal on MPI_COMM_WORLD (matches NEMO/OIFS).
+    call io_xios_close()
+#endif
+
 #if defined (__oifs) 
     ! OpenIFS coupled version has to call oasis_terminate through par_ex
     call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
@@ -1003,27 +1164,32 @@ contains
         43 format (a,3f15.4,f8.2,a1)           !Format other (one %)
         
         print 41, '___MODEL RUNTIME per task [seconds]','_____mean_','___________min_','___________max_','____%tot_','_%ice+oce_'
-        write(*,42) ' > runtime ocean             :',  mean_rtime(1),  min_rtime(1),  max_rtime(1),  100.*mean_rtime(1) /mean_rtime(21),'%',100.*mean_rtime(1) /mean_rtime(17),'%'
-        write(*,42) '   ├> runtime oce. pres.,dens:',  mean_rtime(2),  min_rtime(2),  max_rtime(2),  100.*mean_rtime(2) /mean_rtime(21),'%',100.*mean_rtime(2) /mean_rtime(17),'%'
-        write(*,42) '   ├> runtime oce. mixing    :',  mean_rtime(3),  min_rtime(3),  max_rtime(3),  100.*mean_rtime(3) /mean_rtime(21),'%',100.*mean_rtime(3) /mean_rtime(17),'%'
-        write(*,42) '   ├> runtime oce. dyn. u,v,w:',  mean_rtime(4),  min_rtime(4),  max_rtime(4),  100.*mean_rtime(4) /mean_rtime(21),'%',100.*mean_rtime(4) /mean_rtime(17),'%'
-        write(*,42) '   ├> runtime oce. dyn. ssh  :',  mean_rtime(5),  min_rtime(5),  max_rtime(5),  100.*mean_rtime(5) /mean_rtime(21),'%',100.*mean_rtime(5) /mean_rtime(17),'%'
-        write(*,42) '   │  └> runtime oce. slv ssh:',  mean_rtime(6),  min_rtime(6),  max_rtime(6),  100.*mean_rtime(6) /mean_rtime(21),'%',100.*mean_rtime(6) /mean_rtime(17),'%'
-        write(*,42) '   ├> runtime oce. GM/Redi   :',  mean_rtime(7),  min_rtime(7),  max_rtime(7),  100.*mean_rtime(7) /mean_rtime(21),'%',100.*mean_rtime(7) /mean_rtime(17),'%'
-        write(*,42) '   └> runtime oce. tracer    :',  mean_rtime(8),  min_rtime(8),  max_rtime(8),  100.*mean_rtime(8) /mean_rtime(21),'%',100.*mean_rtime(8) /mean_rtime(17),'%'
-        write(*,42) ' > runtime ice               :',  mean_rtime(9),  min_rtime(9),  max_rtime(9),  100.*mean_rtime(9) /mean_rtime(21),'%',100.*mean_rtime(9) /mean_rtime(17),'%'
-        write(*,42) '   ├> runtime ice o2iflx     :',  mean_rtime(10), min_rtime(10), max_rtime(10), 100.*mean_rtime(10)/mean_rtime(21),'%',100.*mean_rtime(10)/mean_rtime(17),'%'
-        write(*,42) '   ├> runtime ice read forc  :',  mean_rtime(11), min_rtime(11), max_rtime(11), 100.*mean_rtime(11)/mean_rtime(21),'%',100.*mean_rtime(11)/mean_rtime(17),'%'
-        write(*,42) '   ├> runtime ice step       :',  mean_rtime(12), min_rtime(12), max_rtime(12), 100.*mean_rtime(12)/mean_rtime(21),'%',100.*mean_rtime(12)/mean_rtime(17),'%'
-        write(*,42) '   │  ├> runtime ice evp     :',  mean_rtime(13), min_rtime(13), max_rtime(13), 100.*mean_rtime(13)/mean_rtime(21),'%',100.*mean_rtime(13)/mean_rtime(17),'%'
-        write(*,42) '   │  ├> runtime ice adv.    :',  mean_rtime(14), min_rtime(14), max_rtime(14), 100.*mean_rtime(14)/mean_rtime(21),'%',100.*mean_rtime(14)/mean_rtime(17),'%'
-        write(*,42) '   │  └> runtime ice therm.  :',  mean_rtime(15), min_rtime(15), max_rtime(15), 100.*mean_rtime(15)/mean_rtime(21),'%',100.*mean_rtime(15)/mean_rtime(17),'%'
-        write(*,42) '   └> runtime ice o2aflx     :',  mean_rtime(16), min_rtime(16), max_rtime(16), 100.*mean_rtime(16)/mean_rtime(21),'%',100.*mean_rtime(16)/mean_rtime(17),'%'
-        write(*,42) ' > runtime total (ice+oce)   :',  mean_rtime(17), min_rtime(17), max_rtime(17), 100.*mean_rtime(17)/mean_rtime(21),'%',100.*mean_rtime(17)/mean_rtime(17),'%'
-        write(*,43) ' > runtime diag              :',  mean_rtime(18), min_rtime(18), max_rtime(18), 100.*mean_rtime(18)/mean_rtime(21),'%'
-        write(*,43) ' > runtime output            :',  mean_rtime(19), min_rtime(19), max_rtime(19), 100.*mean_rtime(19)/mean_rtime(21),'%'
-        write(*,43) ' > runtime restart           :',  mean_rtime(20), min_rtime(20), max_rtime(20), 100.*mean_rtime(20)/mean_rtime(21),'%'
-        
+        write(*,42) ' > runtime ocean             :',  mean_rtime(1),  min_rtime(1),  max_rtime(1),  100.*mean_rtime(1) /mean_rtime(26),'%',100.*mean_rtime(1) /mean_rtime(17),'%'
+        write(*,42) '   ├> runtime oce. pres.,dens:',  mean_rtime(2),  min_rtime(2),  max_rtime(2),  100.*mean_rtime(2) /mean_rtime(26),'%',100.*mean_rtime(2) /mean_rtime(17),'%'
+        write(*,42) '   ├> runtime oce. mixing    :',  mean_rtime(3),  min_rtime(3),  max_rtime(3),  100.*mean_rtime(3) /mean_rtime(26),'%',100.*mean_rtime(3) /mean_rtime(17),'%'
+        write(*,42) '   ├> runtime oce. dyn. u,v,w:',  mean_rtime(4),  min_rtime(4),  max_rtime(4),  100.*mean_rtime(4) /mean_rtime(26),'%',100.*mean_rtime(4) /mean_rtime(17),'%'
+        write(*,42) '   ├> runtime oce. dyn. ssh  :',  mean_rtime(5),  min_rtime(5),  max_rtime(5),  100.*mean_rtime(5) /mean_rtime(26),'%',100.*mean_rtime(5) /mean_rtime(17),'%'
+        write(*,42) '   │  └> runtime oce. slv ssh:',  mean_rtime(6),  min_rtime(6),  max_rtime(6),  100.*mean_rtime(6) /mean_rtime(26),'%',100.*mean_rtime(6) /mean_rtime(17),'%'
+        write(*,42) '   ├> runtime oce. GM/Redi   :',  mean_rtime(7),  min_rtime(7),  max_rtime(7),  100.*mean_rtime(7) /mean_rtime(26),'%',100.*mean_rtime(7) /mean_rtime(17),'%'
+        write(*,42) '   └> runtime oce. tracer    :',  mean_rtime(8),  min_rtime(8),  max_rtime(8),  100.*mean_rtime(8) /mean_rtime(26),'%',100.*mean_rtime(8) /mean_rtime(17),'%'
+        write(*,42) ' > runtime ice               :',  mean_rtime(9),  min_rtime(9),  max_rtime(9),  100.*mean_rtime(9) /mean_rtime(26),'%',100.*mean_rtime(9) /mean_rtime(17),'%'
+        write(*,42) '   ├> runtime ice o2iflx     :',  mean_rtime(10), min_rtime(10), max_rtime(10), 100.*mean_rtime(10)/mean_rtime(26),'%',100.*mean_rtime(10)/mean_rtime(17),'%'
+        write(*,42) '   ├> runtime ice read forc  :',  mean_rtime(11), min_rtime(11), max_rtime(11), 100.*mean_rtime(11)/mean_rtime(26),'%',100.*mean_rtime(11)/mean_rtime(17),'%'
+        write(*,42) '   ├> runtime ice step       :',  mean_rtime(12), min_rtime(12), max_rtime(12), 100.*mean_rtime(12)/mean_rtime(26),'%',100.*mean_rtime(12)/mean_rtime(17),'%'
+        write(*,42) '   │  ├> runtime ice evp     :',  mean_rtime(13), min_rtime(13), max_rtime(13), 100.*mean_rtime(13)/mean_rtime(26),'%',100.*mean_rtime(13)/mean_rtime(17),'%'
+        write(*,42) '   │  ├> runtime ice adv.    :',  mean_rtime(14), min_rtime(14), max_rtime(14), 100.*mean_rtime(14)/mean_rtime(26),'%',100.*mean_rtime(14)/mean_rtime(17),'%'
+        write(*,42) '   │  └> runtime ice therm.  :',  mean_rtime(15), min_rtime(15), max_rtime(15), 100.*mean_rtime(15)/mean_rtime(26),'%',100.*mean_rtime(15)/mean_rtime(17),'%'
+        write(*,42) '   └> runtime ice o2aflx     :',  mean_rtime(16), min_rtime(16), max_rtime(16), 100.*mean_rtime(16)/mean_rtime(26),'%',100.*mean_rtime(16)/mean_rtime(17),'%'
+        write(*,42) ' > runtime total (ice+oce)   :',  mean_rtime(17), min_rtime(17), max_rtime(17), 100.*mean_rtime(17)/mean_rtime(26),'%',100.*mean_rtime(17)/mean_rtime(17),'%'
+        write(*,43) ' > runtime diag              :',  mean_rtime(18), min_rtime(18), max_rtime(18), 100.*mean_rtime(18)/mean_rtime(26),'%'
+        write(*,43) ' > runtime output            :',  mean_rtime(19), min_rtime(19), max_rtime(19), 100.*mean_rtime(19)/mean_rtime(26),'%'
+        write(*,43) '   ├> runtime update_means   :',  mean_rtime(20), min_rtime(20), max_rtime(20), 100.*mean_rtime(20)/mean_rtime(26),'%'
+        write(*,43) '   ├> runtime streamloop     :',  mean_rtime(21), min_rtime(21), max_rtime(21), 100.*mean_rtime(21)/mean_rtime(26),'%'
+        write(*,43) '   ├> runtime pack           :',  mean_rtime(22), min_rtime(22), max_rtime(22), 100.*mean_rtime(22)/mean_rtime(26),'%'
+        write(*,43) '   ├> runtime mask           :',  mean_rtime(23), min_rtime(23), max_rtime(23), 100.*mean_rtime(23)/mean_rtime(26),'%'
+        write(*,43) '   └> runtime xsend          :',  mean_rtime(24), min_rtime(24), max_rtime(24), 100.*mean_rtime(24)/mean_rtime(26),'%'
+        write(*,43) ' > runtime restart           :',  mean_rtime(25), min_rtime(25), max_rtime(25), 100.*mean_rtime(25)/mean_rtime(26),'%'
+
 #if defined (__recom)
         print 43, '  runtime recom:              ',  mean_rtime(n_rtime), min_rtime(n_rtime), max_rtime(n_rtime), 100.*mean_rtime(n_rtime)/mean_rtime(21),'%'
 #endif
