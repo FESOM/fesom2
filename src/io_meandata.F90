@@ -121,6 +121,8 @@ module io_MEANDATA
   integer, save                  :: nlev_upper=1
   character(len=1), save         :: filesplit_freq='y'
   integer, save                  :: compression_level=0
+  ! Ship-track / mooring curtain output config: variables declared in
+  ! io_tracks_module and pulled into ini_mean_io for namelist binding.
   type io_entry
         CHARACTER(len=20)        :: id        ='unknown             '
         INTEGER                  :: freq      =0
@@ -220,6 +222,8 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     use g_forcing_param, only: use_virt_salt, use_landice_water, use_age_tracer !---fwf-code, age-code
     use g_config, only : use_cavity, lwiso !---wiso-code
     use mod_transit, only : index_transit_r14c, index_transit_r39ar, index_transit_f11, index_transit_f12, index_transit_sf6
+    use io_tracks_module, only: ltracks, track_files, track_vars,        &
+                                track_names, track_output_freq
 
     implicit none
     integer                   :: i, j
@@ -234,8 +238,11 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     type(t_tracer), intent(in)   , target :: tracers
     type(t_dyn)   , intent(in)   , target :: dynamics
     type(t_ice)   , intent(in)   , target :: ice
-    namelist /nml_general / io_listsize, vec_autorotate, lnextGEMS, nlev_upper, filesplit_freq, compression_level
+    namelist /nml_general / io_listsize, vec_autorotate, lnextGEMS, nlev_upper, filesplit_freq, compression_level, &
+                            ltracks
     namelist /nml_list    / io_list
+    namelist /nml_tracks  / track_files, track_vars, track_names,        &
+                            track_output_freq
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -371,6 +378,12 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
 
     allocate(io_list(io_listsize))
     READ(nm_io_unit, nml=nml_list,     iostat=iost )
+    ! &nml_tracks block (optional; absent is fine, defaults stand).
+    rewind(nm_io_unit)
+    READ(nm_io_unit, nml=nml_tracks,   iostat=iost )
+    if (iost > 0 .and. mype==0) then
+       WRITE(*,*) 'WARNING: &nml_tracks present in namelist.io but malformed; using defaults.'
+    end if
     close(nm_io_unit )
 #if defined(__XIOS)
     end if
