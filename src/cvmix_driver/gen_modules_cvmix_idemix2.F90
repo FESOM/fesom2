@@ -2698,7 +2698,7 @@ module g_cvmix_idemix2
             !$ACC END LOOP
 #   endif
 #endif
-    end do
+        end do
 
 #ifndef ENABLE_OPENACC
    !$OMP END DO
@@ -2713,19 +2713,26 @@ module g_cvmix_idemix2
         !_______________________________________________________________________
         ! normalize with total volume of scalar cell from top to bottom
 #ifndef ENABLE_OPENACC
-        !$OMP PARALLEL DO COLLAPSE(2)
-#else
-        !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
-#endif
+        ! precompute reciprocal outside inner loop: FP division is ~6x more expensive
+        ! than multiply on CPU, and the outer loop already saturates thread count
+        !$OMP PARALLEL DO PRIVATE(ivols_lcl)
         do node=1, myDim_nod2d! +eDim_nod2D
             ivols_lcl = 1/vol_s(node)
             do fbini=2,nfbin-1
                 div_h(fbini, node) = div_h(fbini,node)*ivols_lcl
             end do
         end do
-#ifndef ENABLE_OPENACC
         !$OMP END PARALLEL DO
 #else
+        ! on GPU, division throughput is far less asymmetric than on CPU and memory
+        ! bandwidth dominates; inline division to keep loops perfectly nested for
+        ! COLLAPSE(2), which gives a flat warp-filling iteration space
+        !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+        do node=1, myDim_nod2d! +eDim_nod2D
+            do fbini=2,nfbin-1
+                div_h(fbini, node) = div_h(fbini,node)/vol_s(node)
+            end do
+        end do
         !$ACC END PARALLEL LOOP
 #endif
 
@@ -2733,18 +2740,23 @@ module g_cvmix_idemix2
         ! inject blocked coast fluxes as source at interior nodes in mirror bin
 #ifndef ENABLE_OPENACC
         !$OMP PARALLEL DO
-#else
-        !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
-#endif
         do node = 1, myDim_nod2D
             if (.not. refl_node(node)) cycle
             do fbini = 2, nfbin-1
                 div_h(fbini, node) = div_h(fbini, node) + refl_src(fbini, node)
             end do
         end do
-#ifndef ENABLE_OPENACC
         !$OMP END PARALLEL DO
 #else
+        ! cycle on outer loop is semantically wrong in a COLLAPSE(2) combined iteration
+        ! space (would cycle fbini, not node); condition moved inside inner loop —
+        ! a predicated assignment is GPU-friendly and restores perfect nesting
+        !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
+        do node = 1, myDim_nod2D
+            do fbini = 2, nfbin-1
+                if (refl_node(node)) div_h(fbini, node) = div_h(fbini, node) + refl_src(fbini, node)
+            end do
+        end do
         !$ACC END PARALLEL LOOP
 #endif
 
