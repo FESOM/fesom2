@@ -200,14 +200,14 @@ SUBROUTINE tracer_gradient_elements(ttf, ttf_grad, partit, mesh, do_overz_in)
 
     !
     !___________________________________________________________________________
-    else ! (do_overz==.False.) 
-#ifndef ENABLE_OPENACC
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax)
-#else
-!ACC PARALLEL LOOP DEFAULT(PRESENT) PRIVATE(elnodes)
-#endif    
+    else ! (do_overz==.False.)
         nzmin = 1
         nzmax = size(ttf, 1)
+#ifndef ENABLE_OPENACC
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz)
+#else
+!ACC PARALLEL LOOP DEFAULT(PRESENT) PRIVATE(elnodes)
+#endif
         do elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:,elem)
             do nz=nzmin+1, nzmax-1   
