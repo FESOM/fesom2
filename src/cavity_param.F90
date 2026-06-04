@@ -357,7 +357,7 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
         
         !_______________________________________________________________________
         ! Calculate the melting/freezing rate [m/s]
-        ! seta = rhow / rhofw * gas * (1.0-sal/sf)
+        ! seta = ep5*(1.0-sal/sf)     !rt thinks this is not needed, ep5=gas/rhor
         !rt  t_surf_flux(i,j)=gat*(tf-tin)
         !rt  s_surf_flux(i,j)=gas*(sf-(s(i,j,N,lrhs)+35.0))
         
