@@ -360,7 +360,7 @@ contains
                         f%partit%eDim_nod2D, f%partit%mype, f%partit%MPI_COMM_FESOM,      &
                         f%partit%myDim_elem2D, f%partit%eDim_elem2D, tracers_info,        &
                         f%tracers%num_tracers, rad) ! adjust values for recom tracers (derived type "t_tracer")
-        f%partit, f%mesh) ! adjust values for recom tracers (derived type "t_tracer")
+        f%t_recom_e=MPI_Wtime()
 
         deallocate(tracers_info%ids)
         deallocate(tracers_info%data_pointers)
@@ -819,7 +819,7 @@ contains
                    f%partit%com_nod2D%sPE, f%partit%com_nod2D%rPE,                  &
                    f%partit%com_nod2D%req, f%partit%com_nod2D%nreq,                 &
                    dt, daynew, month, mstep, ndpyr, yearold, timenew, rad, kappa,            &
-                   press_air, u_wind,  f%tracers, f%partit, f%mesh)
+                   press_air, u_wind, v_wind, shortwave)
         f%t_recom_e = MPI_Wtime()
 
         deallocate(tracers_info%ids)
