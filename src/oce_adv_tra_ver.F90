@@ -718,6 +718,8 @@ end subroutine adv_tra_ver_cdiff
 !
 !_______________________________________________________________________________
 ! vertical advection 2nd order in space (and time) using  superbee slope limiter
+! !!! ATTENTION !!! 
+! This part is sofar untested it is left here for later pickup
 subroutine adv_tra_ver_spbee(                 &
             W                               , &
             ttf                             , &
@@ -769,7 +771,7 @@ subroutine adv_tra_ver_spbee(                 &
     
     !___________________________________________________________________________
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, tff0, tffp1, dttf0p1, &
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, ttf0, ttfp1, dttf0p1, &
 !$OMP                                  R, Cr, Tmean2, Tmean1, cfl, vflux, vfabs)
 !$OMP DO
 #else
