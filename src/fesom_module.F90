@@ -650,6 +650,8 @@ contains
         ! LA - this causes the blowup !
         !        f%ice%data(size(f%ice%data))      = f%ice%data(2)
         !        f%ice%data(size(f%ice%data)-1)    = f%ice%data(1)
+                f%ice%data(size(f%ice%data))%values   = f%ice%data(2)%values   ! m_ice -> m_ice_ib
+                f%ice%data(size(f%ice%data)-1)%values = f%ice%data(1)%values   ! a_ice -> a_ice_ib
         !!!!!!!!!!!!!!!!!!
         
         
@@ -852,6 +854,20 @@ contains
             call io_xios_send_0d_r8('sivoln',    real(sivoln,    kind=8))
             call io_xios_send_0d_r8('sivols',    real(sivols,    kind=8))
         end if
+
+#if defined(__XIOS)
+        ! Ship-track / mooring curtain output (io_tracks.F90). Inert
+        ! unless &nml_general/ltracks=.true. or the XIOS XML override is
+        ! set. Collective over MPI_COMM_FESOM: every rank must call this
+        ! for XIOS to advance its temporal filter consistently, including
+        ! ranks whose ni=0.
+        if (io_xios_is_on()) then
+            block
+              use io_tracks_module, only: io_tracks_send
+              call io_tracks_send(f%tracers, f%dynamics, f%mesh, f%partit)
+            end block
+        end if
+#endif
         ! Reset 0D accumulators at month end — outside the io_xios_is_on() block
         ! so the reset fires in both XIOS and legacy output modes. Gated on
         ! monthly_event (FESOM calendar) so it is independent of XIOS field
