@@ -156,7 +156,20 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
   endif
   if (mix_scheme_nmb==6 .or. mix_scheme_nmb==56) then
         call oce_files%def_elem_var_optional('iwe', 'Internal Wave Energy'    , 'm2/s2', iwe(:,:), mesh, partit)
-  endif 
+  endif
+  if (mod(mix_scheme_nmb,10)==7) then
+        call oce_files%def_node_var_optional('iwe2_Eiw'     , 'IDEMIX2 low-mode IW energy'     , 'm2/s2', iwe2_E_iw(:,:,1),       mesh, partit)
+        if (idemix2_enable_M2) then
+            call oce_files%def_node_var_optional('iwe2_EM2'     , 'IDEMIX2 M2 spectral energy'      , 'm2/s2', iwe2_E_M2(:,:,1),      mesh, partit, nfbin=idemix2_nfbin)
+            call oce_files%def_node_var_optional('iwe2_EM2divh' , 'IDEMIX2 M2 horiz div (AB2 prev)' , 'm2/s3', iwe2_E_M2_divh(:,:,1), mesh, partit, nfbin=idemix2_nfbin)
+            call oce_files%def_node_var_optional('iwe2_EM2divs' , 'IDEMIX2 M2 spec  div (AB2 prev)' , 'm2/s3', iwe2_E_M2_divs(:,:,1), mesh, partit, nfbin=idemix2_nfbin)
+        end if
+        if (idemix2_enable_niw) then
+            call oce_files%def_node_var_optional('iwe2_Eniw'    , 'IDEMIX2 NIW spectral energy'     , 'm2/s2', iwe2_E_niw(:,:,1),      mesh, partit, nfbin=idemix2_nfbin)
+            call oce_files%def_node_var_optional('iwe2_Eniwdivh', 'IDEMIX2 NIW horiz div (AB2 prev)', 'm2/s3', iwe2_E_niw_divh(:,:,1), mesh, partit, nfbin=idemix2_nfbin)
+            call oce_files%def_node_var_optional('iwe2_Eniwdivs', 'IDEMIX2 NIW spec  div (AB2 prev)', 'm2/s3', iwe2_E_niw_divs(:,:,1), mesh, partit, nfbin=idemix2_nfbin)
+        end if
+  endif
 #endif  
   if (dynamics%opt_visc==8) then
         call oce_files%def_elem_var_optional('uke', 'unresolved kinetic energy', 'm2/s2', uke(:,:), mesh, partit)
@@ -427,8 +440,12 @@ subroutine read_initial_conditions(which_readr, ice, dynamics, tracers, partit, 
     end if
 #endif
 
+#if defined (__cvmix)
+    if (mod(mix_scheme_nmb,10)==7) call apply_idemix2_restart()
+#endif
+
   end if
-  
+
 end subroutine read_initial_conditions
 
 !--------------------------------------------------------------------------------------------
@@ -545,6 +562,9 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
 
   ! Write restart files
   if(is_portable_restart_write) then
+#if defined (__cvmix)
+    if (mod(mix_scheme_nmb,10)==7) call prepare_idemix2_restart()
+#endif
     ! Write OCEAN restart
     if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: ocean'//achar(27)//'[0m'
     call write_netcdf_restarts(write_oce_path, oce_files, istep)
