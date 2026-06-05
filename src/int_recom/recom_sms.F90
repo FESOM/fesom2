@@ -741,7 +741,7 @@ endif
                 if (pMax .lt. tiny .OR. PARave /= PARave .OR. CHL2C_plast /= CHL2C_plast) then
                     KOchl = deg_Chl*0.1d0
                 else
-                   !KOchl = deg_Chl*(real(one) - exp(-alfa * CHL2C_plast * PARave / pMax))
+                   !KOchl = deg_Chl*(real(one) - exp(-alfa * CHL2C_plast * PARave / pMax)) !OLD deg function
                     KOchl = deg_Chl * CHL2C_plast * PARave
                     KOchl = max((deg_Chl*0.1d0), KOchl)
                     KOchl = min(KOChl, 0.3d0)
@@ -751,7 +751,7 @@ endif
                 if (pMax_dia .lt. tiny .OR. PARave /= PARave .OR. CHL2C_plast_dia /= CHL2C_plast_dia) then
                     KOchl_dia = deg_Chl_d*0.1d0
                 else
-                   !KOchl_dia = deg_Chl_d * (real(one) - exp(-alfa_d * CHL2C_plast_dia * PARave / pMax_dia ))
+                   !KOchl_dia = deg_Chl_d * (real(one) - exp(-alfa_d * CHL2C_plast_dia * PARave / pMax_dia )) !OLD deg function
                     KOchl_dia = deg_Chl_d * CHL2C_plast_dia * PARave
                     KOchl_dia = max((deg_Chl_d*0.1d0), KOchl_dia)
                     KOchl_dia = min(KOChl_dia, 0.3d0)
