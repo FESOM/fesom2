@@ -309,7 +309,6 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
           "rhs_a               ", "rhs_m               ", "rsdoabsorb          ", &
           "runoff              ", "runoff_liquid       ", "runoff_solid        ", &
           "salt                ", "sgm11               ", "sgm12               ", &
-          "calving_AA          ", &
           "sgm22               ", "shum                ", "siarean             ", &
           "siareas             ", "siextentn           ", "siextents           ", &
           "sigma0              ", "sigma_x             ", "sigma_y             ", &
