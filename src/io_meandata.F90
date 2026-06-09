@@ -332,7 +332,9 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
           "virtsalt            ", "vnod                ", "vnod_sfc            ", &
           "volo                ", &
           "v_rhs_ice           ", "v_total_tend        ", "vve_5               ", &
-          "vwice               ", "vwind               ", "w                   " /)
+          "vwice               ", "vwind               ", "w                   ", &
+          "ibfwb               ", "ibfwl               ", "ibfwe               ", &
+          "ibfwbv              ", "ibhf                ", "calving_AA          " /)
         integer :: k
         if (mype==0) WRITE(*,*) 'XIOS mode: skipping namelist.io; registering all ', &
                                  size(xios_ids), ' known streams. XML decides output.'
@@ -1661,16 +1663,19 @@ CASE ('qres      ')
      call def_stream(nod2D, myDim_nod2D, 'qres',  'residual heat flux',     'W/m^2',    ice%atmcoupl%flx_qres(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 #endif
 
-!------------------------------------------
-! LA 2023-01-31 adding iceberg outputs
-CASE ('icb       ')
-  if (use_icebergs) then
+!CASE ('icb       ')
+!  if (use_icebergs) then
+CASE ('ibfwb       ')
     call def_stream(nod2D, myDim_nod2D, 'ibfwb',   'basal iceberg melting',            'm/s',    ibfwb(:),         1, 'm', i_real4, partit, mesh)
+CASE ('ibfwbv       ')
     call def_stream(nod2D, myDim_nod2D, 'ibfwbv',  'basal iceberg melting',            'm/s',    ibfwbv(:),        1, 'm', i_real4, partit, mesh)
+CASE ('ibfwl       ')
     call def_stream(nod2D, myDim_nod2D, 'ibfwl',   'lateral iceberg melting',          'm/s',    ibfwl(:),         1, 'm', i_real4, partit, mesh)
+CASE ('ibfwe       ')
     call def_stream(nod2D, myDim_nod2D, 'ibfwe',   'iceberg erosion',                  'm/s',    ibfwe(:),         1, 'm', i_real4, partit, mesh)
+CASE ('ibhf       ')
     call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'ibhf',    'heat flux from iceberg melting',   'W/m2',    ibhf_n(:,:),      1, 'm', i_real4, partit, mesh)
-  end if
+!  end if
 
 #if defined (__cvmix)    
 !_______________________________________________________________________________
