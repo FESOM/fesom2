@@ -916,7 +916,7 @@ subroutine compute_vdiff_vdiss_Eiw( &
     dzmid(nz)      = dzw(nz)*0.5_cvmix_r8
     
     do nz = 2, nlev-1
-        c0_zmid(nz-1) = dt * idemix2_const_in%tau_v * (c0(nz)+c0(nz-1))*0.5_cvmix_r8 / dzw(nz-1)
+        c0_zmid(nz-1) = idemix2_const_in%tau_v * (c0(nz)+c0(nz-1))*0.5_cvmix_r8 / dzw(nz-1)
         dzmid(nz)     = (dzw(nz) + dzw(nz-1))*0.5_cvmix_r8
     end do
     

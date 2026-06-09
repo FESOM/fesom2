@@ -1446,7 +1446,7 @@ module g_cvmix_idemix2
             if (idemix2_enable_M2) then
                 if (idemix2_diag_Ecompart) then
                     call hsintegrate_Ecompart(              &
-                        iwe2_ti, iwe2_tip1                 & ! IN:    current and next time indices
+                        iwe2_ti, iwe2_tip1                  & ! IN:    current and next time indices
                         , 'M2'                              & ! IN:    compartment name
                         , iwe2_E_M2                         & ! INOUT: energy array [2,nfbin,node]
                         , iwe2_E_M2_divh                    & ! INOUT: horizontal divergence flux accumulator
@@ -2844,7 +2844,7 @@ module g_cvmix_idemix2
                                                     - (0.5_WP+idemix2_AB_epsilon)*Edivh(fbini, node, tip1) &
                                                     + (1.5_WP+idemix2_AB_epsilon)*Edivs(fbini, node, ti  ) &
                                                     - (0.5_WP+idemix2_AB_epsilon)*Edivs(fbini, node, tip1) &
-                                                    +                              forc( fbini, node)       &
+                                                    +                              forc(fbini, node)       &
                                                 ) &
                                             ) * inv_denom
                 end do
