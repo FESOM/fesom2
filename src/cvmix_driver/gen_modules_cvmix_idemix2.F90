@@ -1598,8 +1598,8 @@ module g_cvmix_idemix2
                     , alpha_c  = iwe2_alpha_c(    uln:nln  , node)      & !IN:    wave-wave dissipation rate (1/s)
                     , fsrf     = iwe2_fsrf(                  node)      & !IN:    surface IW energy flux (m²/s³)
                     , fbot     = iwe2_fbot(       uln:nln  , node)      & !IN:    bottom tidal energy flux (m²/s³)
-                    , Eiw_old  = iwe2_E_iw(uln:nln  , node, iwe2_ti) & !IN:    IW energy at current time (m²/s²)
-                    , Eiw_new  = iwe2_E_iw(uln:nln  , node, iwe2_tip1) & !OUT:   IW energy at next time (m²/s²)
+                    , Eiw_old  = iwe2_E_iw(uln:nln  , node, iwe2_ti)    & !IN:    IW energy at current time (m²/s²)
+                    , Eiw_new  = iwe2_E_iw(uln:nln  , node, iwe2_tip1)  & !OUT:   IW energy at next time (m²/s²)
                     , Eiw_diss = iwe2_E_iw_diss(  uln:nln  , node)      & !OUT:   IW dissipation rate for TKE coupling (m²/s³)
                     , Eiw_dt   = iwe2_E_iw_dt(    uln:nln  , node)      & !OUT:   optional diagnostic: total tendency
                     , Eiw_vdif = iwe2_E_iw_vdif(  uln:nln  , node)      & !OUT:   optional diagnostic: vertical diffusion tendency
@@ -1615,8 +1615,8 @@ module g_cvmix_idemix2
                     , alpha_c  = iwe2_alpha_c(    uln:nln  , node)      & !IN:    wave-wave dissipation rate (1/s)
                     , fsrf     = iwe2_fsrf(                  node)      & !IN:    surface IW energy flux (m²/s³)
                     , fbot     = iwe2_fbot(       uln:nln  , node)      & !IN:    bottom tidal energy flux (m²/s³)
-                    , Eiw_old  = iwe2_E_iw(uln:nln  , node, iwe2_ti) & !IN:    IW energy at current time (m²/s²)
-                    , Eiw_new  = iwe2_E_iw(uln:nln  , node, iwe2_tip1) & !OUT:   IW energy at next time (m²/s²)
+                    , Eiw_old  = iwe2_E_iw(uln:nln, node, iwe2_ti)      & !IN:    IW energy at current time (m²/s²)
+                    , Eiw_new  = iwe2_E_iw(uln:nln, node, iwe2_tip1)    & !OUT:   IW energy at next time (m²/s²)
                     , Eiw_diss = iwe2_E_iw_diss(  uln:nln  , node)      & !OUT:   IW dissipation rate for TKE coupling (m²/s³)
                     )
             end if     
@@ -1634,6 +1634,7 @@ module g_cvmix_idemix2
         t7 = MPI_Wtime() 
         ! for the Diapycnal Diffusivity Induced Internal Gravity Waves...)
         ! Eiw^(t+1) = Eiw^(t+1) + div_h( v_0 * tau_h * grad_h(v_0*E_iw^(t)) )
+        ! --> do single disffusion step explicite
         if ((idemix2_enable_hor_diffusion .or. idemix2_enable_hor_diff_iter) .and. idemix2_diag_Eiw) then 
             iwe2_E_iw_hdif = 0.0_WP
         end if 
@@ -1666,6 +1667,7 @@ module g_cvmix_idemix2
         !_______________________________________________________________________
         ! 6. add tendency due to lateral diffusion with iterative method in case of 
         ! high resolution
+        ! --> do iterative disffusion step implicitly
         if (idemix2_enable_hor_diff_iter) then
             do iter=1, idemix2_hor_diff_niter
                 if (idemix2_diag_Eiw) then
