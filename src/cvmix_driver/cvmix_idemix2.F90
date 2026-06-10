@@ -783,6 +783,7 @@ subroutine compute_vdiff_vdiss_Eiw( &
                 alpha_c          , &
                 fsrf             , &
                 fbot             , &
+                Eiw_maxthresh    , &
                 Eiw_old          , &
                 Eiw_new          , &
                 Eiw_diss         , &
@@ -802,6 +803,7 @@ subroutine compute_vdiff_vdiss_Eiw( &
     real(cvmix_r8)    , intent(in)                    :: fsrf
     real(cvmix_r8)    , intent(in), dimension(nlev)   :: fbot
 !     real(cvmix_r8)    , intent(in), dimension(nlev)   :: fadd --> in moment no additional forcings
+    real(cvmix_r8)    , intent(in)                    :: Eiw_maxthresh
     real(cvmix_r8)    , intent(in), dimension(nlev)   :: Eiw_old
     
     !___Output__________________________________________________________________
@@ -984,6 +986,9 @@ subroutine compute_vdiff_vdiss_Eiw( &
     ! solve tridiagonal matrix
     call solve_tridiag(a_tri, b_tri, c_tri, d_tri, Eiw_new, nlev)
     
+    !___________________________________________________________________________
+    ! build in some upper lower Eiw bounds
+    Eiw_new = max(0.0_cvmix_r8, min(Eiw_maxthresh, Eiw_new))
 !     do nz=1,nlev
 !         ! if (any(Eiw_new<0.0_cvmix_r8)) then
 !         if (Eiw_new(nz)/=Eiw_new(nz) .or. Eiw_new(nz)<0.0_cvmix_r8) then 

@@ -44,6 +44,7 @@ module g_cvmix_idemix2
     use g_dist2coast, only: compute_dist2coast
     use find_up_downwind_triangles_interface
     use par_support_interfaces, only: init_mpi_types_fbin
+    use gen_support,            only: smooth_nod
     implicit none
     public
     
@@ -82,7 +83,7 @@ module g_cvmix_idemix2
     integer            :: idemix2_nfbin=52
     
     ! enable adding of idemix full horizontal tendency from 
-    ! div(grad(Eiw*v0)*v0*tauh) diffusion term
+    ! div(grad(Eiw*v0)*v0*tauh) diffusion term --> explicit
     logical            :: idemix2_enable_hor_diffusion = .false.
     
     ! enable idemix1 functionality of homogenous diffusion into all directions
@@ -135,10 +136,17 @@ module g_cvmix_idemix2
     real(kind=WP)      :: idemix2_botforc_Etot = 0.0_WP ! units W
     
     !___________________________________________________________________________
+    ! maximum cutoff value for interal wave energy --> is there for stability
+    real(kind=WP)      :: idemix2_Eiw_maxthresh= 0.1
+    ! apply one pass of area-weighted node smoothing to Eiw_diss after the vertical
+    ! implicit solve -- equivalent to the implicit elem->node smoothing in IDEMIX1
+    logical            :: idemix2_smooth_Eiw_diss = .false.
+    
+    !___________________________________________________________________________
     ! switch on extended diagnostic
-    logical            :: idemix2_diag_Ecompart = .false.
-    logical            :: idemix2_diag_Eiw      = .false.
-    logical            :: idemix2_diag_WWI      = .false.
+    logical            :: idemix2_diag_Ecompart= .false.
+    logical            :: idemix2_diag_Eiw     = .false.
+    logical            :: idemix2_diag_WWI     = .false.
     
 !     !___________________________________________________________________________
 !     ! enable lee wave source of internal wave energy in IDEMIX2, 
@@ -174,6 +182,7 @@ module g_cvmix_idemix2
                              idemix2_enable_bot , idemix2_botforc_file , idemix2_botforc_vname , &
                              idemix2_hrmsforc_file, idemix2_hrmsforc_vname, &
                              idemix2_hlamforc_file, idemix2_hlamforc_vname, &
+                             idemix2_Eiw_maxthresh, idemix2_smooth_Eiw_diss, &
                              idemix2_diag_Ecompart, idemix2_diag_Eiw, idemix2_diag_WWI
     
     !___________________________________________________________________________
@@ -310,8 +319,17 @@ module g_cvmix_idemix2
             write(*,*) "     ├> idemix2_jstar               = ", idemix2_jstar
             write(*,*) "     ├> idemix2_mu0                 = ", idemix2_mu0
             write(*,*) "     │                                "
-!             write(*,*) "     ├> idemix2_superbee_adv        = ", idemix2_enable_superbee_adv
+            write(*,*) "     ├> idemix2_scal_cn             = ", idemix2_scal_cn
+            write(*,*) "     ├> idemix2_Eiw_maxthresh       = ", idemix2_Eiw_maxthresh
+            write(*,*) "     ├> idemix2_smooth_Eiw_diss     = ", idemix2_smooth_Eiw_diss
+            write(*,*) "     │                                "
             write(*,*) "     ├> idemix2_AB_timestep         = ", idemix2_enable_AB
+            write(*,*) "     │  └> idemix2_AB_epsilon       = ", idemix2_AB_epsilon
+            write(*,*) "     │                                "
+            write(*,*) "     ├> idemix2_enable_hor_diffusion= ", idemix2_enable_hor_diffusion
+            write(*,*) "     ├> idemix2_enable_hor_diff_iter= ", idemix2_enable_hor_diff_iter
+            write(*,*) "     │  └> idemix2_hor_diff_niter   = ", idemix2_hor_diff_niter
+            write(*,*) "     │                                "
             write(*,*) "     ├> idemix2_nfbin               = ", idemix2_nfbin
             write(*,*) "     │                                "
             write(*,*) "     ├> idemix2_enable_M2           = ", idemix2_enable_M2
@@ -339,7 +357,12 @@ module g_cvmix_idemix2
             write(*,*) "     ├> idemix2_hlamforc_file       = ", trim(idemix2_hlamforc_file)
             write(*,*) "     │  └> idemix2_hlamforc_vname   = ", trim(idemix2_hlamforc_vname)
             write(*,*) "     │                                "
-            WRITE(*,*) "     └> idemix2_shelf_dist         = ", idemix2_shelf_dist
+            WRITE(*,*) "     ├> idemix2_shelf_dist          = ", idemix2_shelf_dist
+            write(*,*) "     │                                "
+            write(*,*) "     ├> diagnostic switches           "
+            write(*,*) "     │  ├> idemix2_diag_Ecompart    = ", idemix2_diag_Ecompart 
+            write(*,*) "     │  └> idemix2_diag_Eiw         = ", idemix2_diag_Eiw
+            write(*,*) "     │  └> idemix2_diag_WWI         = ", idemix2_diag_WWI
             write(*,*)
             write(*,*) "     IDEMIX2 inputs:"
         end if
@@ -1598,6 +1621,7 @@ module g_cvmix_idemix2
                     , alpha_c  = iwe2_alpha_c(    uln:nln  , node)      & !IN:    wave-wave dissipation rate (1/s)
                     , fsrf     = iwe2_fsrf(                  node)      & !IN:    surface IW energy flux (m²/s³)
                     , fbot     = iwe2_fbot(       uln:nln  , node)      & !IN:    bottom tidal energy flux (m²/s³)
+                    , Eiw_maxthresh = idemix2_Eiw_maxthresh             & !IN:
                     , Eiw_old  = iwe2_E_iw(uln:nln  , node, iwe2_ti)    & !IN:    IW energy at current time (m²/s²)
                     , Eiw_new  = iwe2_E_iw(uln:nln  , node, iwe2_tip1)  & !OUT:   IW energy at next time (m²/s²)
                     , Eiw_diss = iwe2_E_iw_diss(  uln:nln  , node)      & !OUT:   IW dissipation rate for TKE coupling (m²/s³)
@@ -1615,6 +1639,7 @@ module g_cvmix_idemix2
                     , alpha_c  = iwe2_alpha_c(    uln:nln  , node)      & !IN:    wave-wave dissipation rate (1/s)
                     , fsrf     = iwe2_fsrf(                  node)      & !IN:    surface IW energy flux (m²/s³)
                     , fbot     = iwe2_fbot(       uln:nln  , node)      & !IN:    bottom tidal energy flux (m²/s³)
+                    , Eiw_maxthresh = idemix2_Eiw_maxthresh             & !IN:
                     , Eiw_old  = iwe2_E_iw(uln:nln, node, iwe2_ti)      & !IN:    IW energy at current time (m²/s²)
                     , Eiw_new  = iwe2_E_iw(uln:nln, node, iwe2_tip1)    & !OUT:   IW energy at next time (m²/s²)
                     , Eiw_diss = iwe2_E_iw_diss(  uln:nln  , node)      & !OUT:   IW dissipation rate for TKE coupling (m²/s³)
@@ -1624,7 +1649,13 @@ module g_cvmix_idemix2
 !$OMP END PARALLEL DO
         t7 = MPI_Wtime()
         time_Eiw_vdiff = t7 - t6
-        
+
+        !_______________________________________________________________________
+        ! One-pass area-weighted node smoothing of Eiw_diss -- equivalent to the
+        ! implicit elem->node smoothing that IDEMIX1 applies to its dissipation field
+        ! should benefit long term stability
+        if (idemix2_smooth_Eiw_diss) call smooth_nod(iwe2_E_iw_diss, 1, partit, mesh)
+
         !_______________________________________________________________________
         ! Exchange E_iw after vertical diffusion - needed for horizontal diffusion gradients
         call exchange_nod(iwe2_E_iw(:, :, iwe2_tip1), partit)
