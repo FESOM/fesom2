@@ -332,7 +332,9 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
           "virtsalt            ", "vnod                ", "vnod_sfc            ", &
           "volo                ", &
           "v_rhs_ice           ", "v_total_tend        ", "vve_5               ", &
-          "vwice               ", "vwind               ", "w                   " /)
+          "vwice               ", "vwind               ", "w                   ", &
+          "ibfwb               ", "ibfwl               ", "ibfwe               ", &
+          "ibfwbv              ", "ibhf                ", "calving_AA          " /)
         integer :: k
         if (mype==0) WRITE(*,*) 'XIOS mode: skipping namelist.io; registering all ', &
                                  size(xios_ids), ' known streams. XML decides output.'
@@ -1663,14 +1665,19 @@ CASE ('qres      ')
 
 !------------------------------------------
 ! LA 2023-01-31 adding iceberg outputs
-CASE ('icb       ')
-  if (use_icebergs) then
+!CASE ('icb       ')
+!  if (use_icebergs) then
+CASE ('ibfwb       ')
     call def_stream(nod2D, myDim_nod2D, 'ibfwb',   'basal iceberg melting',            'm/s',    ibfwb(:),         1, 'm', i_real4, partit, mesh)
+CASE ('ibfwbv       ')
     call def_stream(nod2D, myDim_nod2D, 'ibfwbv',  'basal iceberg melting',            'm/s',    ibfwbv(:),        1, 'm', i_real4, partit, mesh)
+CASE ('ibfwl       ')
     call def_stream(nod2D, myDim_nod2D, 'ibfwl',   'lateral iceberg melting',          'm/s',    ibfwl(:),         1, 'm', i_real4, partit, mesh)
+CASE ('ibfwe       ')
     call def_stream(nod2D, myDim_nod2D, 'ibfwe',   'iceberg erosion',                  'm/s',    ibfwe(:),         1, 'm', i_real4, partit, mesh)
+CASE ('ibhf       ')
     call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'ibhf',    'heat flux from iceberg melting',   'W/m2',    ibhf_n(:,:),      1, 'm', i_real4, partit, mesh)
-  end if
+!  end if
 
 #if defined (__cvmix)    
 !_______________________________________________________________________________
@@ -2445,7 +2452,7 @@ subroutine write_mean(entry, entry_index)
                 tm0 = MPI_Wtime()
                 if (io_xios_is_ice_field(entry%name)) then
                    call io_xios_apply_ice_mask_2d_elem_r8(tmp2_r8)
-                else
+                else if (trim(entry%name) /= 'fw' .and. trim(entry%name) /= 'fh') then
                    call io_xios_apply_wet_2d_elem_r8(tmp2_r8)
                 end if
                 tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
@@ -2478,7 +2485,7 @@ subroutine write_mean(entry, entry_index)
                 tm0 = MPI_Wtime()
                 if (io_xios_is_ice_field(entry%name)) then
                    call io_xios_apply_ice_mask_2d_elem_r4(tmp2_r4)
-                else
+                else if (trim(entry%name) /= 'fw' .and. trim(entry%name) /= 'fh') then
                    call io_xios_apply_wet_2d_elem_r4(tmp2_r4)
                 end if
                 tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
@@ -2515,7 +2522,7 @@ subroutine write_mean(entry, entry_index)
                 tm0 = MPI_Wtime()
                 if (io_xios_is_ice_field(entry%name)) then
                    call io_xios_apply_ice_mask_2d_r8(tmp2_r8)
-                else
+                else if (trim(entry%name) /= 'fw' .and. trim(entry%name) /= 'fh') then
                    call io_xios_apply_wet_2d_r8(tmp2_r8)
                 end if
                 tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
@@ -2550,7 +2557,7 @@ subroutine write_mean(entry, entry_index)
                 tm0 = MPI_Wtime()
                 if (io_xios_is_ice_field(entry%name)) then
                    call io_xios_apply_ice_mask_2d_r4(tmp2_r4)
-                else
+                else if (trim(entry%name) /= 'fw' .and. trim(entry%name) /= 'fh') then
                    call io_xios_apply_wet_2d_r4(tmp2_r4)
                 end if
                 tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
