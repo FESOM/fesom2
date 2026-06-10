@@ -984,21 +984,21 @@ subroutine compute_vdiff_vdiss_Eiw( &
     ! solve tridiagonal matrix
     call solve_tridiag(a_tri, b_tri, c_tri, d_tri, Eiw_new, nlev)
     
-    do nz=1,nlev
-        ! if (any(Eiw_new<0.0_cvmix_r8)) then
-        if (Eiw_new(nz)/=Eiw_new(nz) .or. Eiw_new(nz)<0.0_cvmix_r8) then 
-            write(*,*) " }-))))°> found negative/NaN Eiw_new in vdiff", Eiw_new(nz)
-            write(*,*) " Eiw_old(nz)=", Eiw_old(nz)
-            write(*,*) " fsrf       =", fsrf
-            write(*,*) " fbot(nz)   =", fbot(nz)
-            write(*,*) " alpha_c(nz)=", alpha_c(nz)
-            write(*,*) " Eiw_max(nz)=", Eiw_max(nz)
-        end if 
-    end do
+!     do nz=1,nlev
+!         ! if (any(Eiw_new<0.0_cvmix_r8)) then
+!         if (Eiw_new(nz)/=Eiw_new(nz) .or. Eiw_new(nz)<0.0_cvmix_r8) then 
+!             write(*,*) " }-))))°> found negative/NaN Eiw_new in vdiff", Eiw_new(nz)
+!             write(*,*) " Eiw_old(nz)=", Eiw_old(nz)
+!             write(*,*) " fsrf       =", fsrf
+!             write(*,*) " fbot(nz)   =", fbot(nz)
+!             write(*,*) " alpha_c(nz)=", alpha_c(nz)
+!             write(*,*) " Eiw_max(nz)=", Eiw_max(nz)
+!         end if 
+!     end do
     
     !___________________________________________________________________________
     ! dissipation of E_iw
-    Eiw_diss(:) = -alpha_c(: )*Eiw_max(:)*Eiw_new(:)
+    Eiw_diss(2:nlev-1) = -alpha_c(2:nlev-1)*Eiw_max(2:nlev-1)*Eiw_new(2:nlev-1)
     
     !___________________________________________________________________________
     ! debuggin diagnostics: 
