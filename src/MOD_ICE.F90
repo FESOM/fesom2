@@ -161,7 +161,7 @@ TYPE T_ICE
     !___________________________________________________________________________
     ! total number of ice tracers (default=3, 1=area, 2=mice, 3=msnow, (4=ice_temp)
 #if defined (__oifs) || defined (__ifsinterface)
-    integer                                     :: num_itracers=4
+    integer                                     :: num_itracers=6
 #else
 !    integer                                     :: num_itracers=3
     !------------------------------
