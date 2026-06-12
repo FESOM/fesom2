@@ -37,6 +37,7 @@ integer,       allocatable, dimension(:,:)  :: elem_edges   ! elem_edges(:,n) ar
 real(kind=WP), allocatable, dimension(:)    :: elem_area
 real(kind=WP), allocatable, dimension(:,:)  :: edge_dxdy
 real(kind=WP), allocatable, dimension(:,:)  :: edge_cross_dxdy
+integer      , allocatable, dimension(:,:)  :: edge_up_dn_tri
 real(kind=WP), allocatable, dimension(:)    :: elem_cos
 real(kind=WP), allocatable, dimension(:)    :: metric_factor
 integer,       allocatable, dimension(:,:)  :: elem_neighbors
@@ -198,6 +199,7 @@ subroutine write_t_mesh(mesh, unit, iostat, iomsg)
     call write_bin_array(mesh%elem_edges,   unit, iostat, iomsg)
     call write_bin_array(mesh%elem_area,    unit, iostat, iomsg)
     call write_bin_array(mesh%edge_dxdy,    unit, iostat, iomsg)
+    call write_bin_array(mesh%edge_up_dn_tri,unit, iostat, iomsg)
 
     call write_bin_array(mesh%edge_cross_dxdy,     unit, iostat, iomsg)
     call write_bin_array(mesh%elem_cos,            unit, iostat, iomsg)
@@ -295,7 +297,7 @@ subroutine read_t_mesh(mesh, unit, iostat, iomsg)
     call read_bin_array(mesh%elem_edges,   unit, iostat, iomsg)
     call read_bin_array(mesh%elem_area,    unit, iostat, iomsg)
     call read_bin_array(mesh%edge_dxdy,    unit, iostat, iomsg)
-
+    call read_bin_array(mesh%edge_up_dn_tri,unit, iostat, iomsg)
     call read_bin_array(mesh%edge_cross_dxdy,     unit, iostat, iomsg)
     call read_bin_array(mesh%elem_cos,            unit, iostat, iomsg)
     call read_bin_array(mesh%metric_factor,       unit, iostat, iomsg)

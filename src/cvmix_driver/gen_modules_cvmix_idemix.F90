@@ -133,7 +133,7 @@ module g_cvmix_idemix
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
-            write(*,*) ' --> initialise IDEMIX'
+            write(*,*) ' --> initialise IDEMIX', mype
             write(*,*)
         end if
             
@@ -249,8 +249,8 @@ module g_cvmix_idemix
                 write(*,*) '        --> check your namelist.cvmix, idemix_surforc_file &  '
                 write(*,*) '            idemix_botforc_file'
                 write(*,*) '____________________________________________________________________'
+                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
             end if
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
         end if 
         
         !_______________________________________________________________________
@@ -310,8 +310,9 @@ module g_cvmix_idemix
                 write(*,*) '        --> check your namelist.cvmix, idemix_surforc_file &  '
                 write(*,*) '            idemix_botforc_file'
                 write(*,*) '____________________________________________________________________'
+                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
             end if 
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+            
         end if 
         
         !_______________________________________________________________________

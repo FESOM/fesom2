@@ -175,9 +175,9 @@ subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
         loc=omp_min_max_sum1(hbar-hbar_old, 1, myDim_nod2D, 'min', partit)
     end if 
     call MPI_AllREDUCE(loc , min_deta  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(hnode(1,:), 1, myDim_nod2D, 'min', partit)
+    loc=omp_min_max_sum1(hnode(1,1:myDim_nod2d), 1, myDim_nod2D, 'min', partit)
     call MPI_AllREDUCE(loc , min_hnode , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(hnode(2,:), 1, myDim_nod2D, 'min', partit)
+    loc=omp_min_max_sum1(hnode(2,1:myDim_nod2d), 1, myDim_nod2D, 'min', partit)
     call MPI_AllREDUCE(loc , min_hnode2 , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
     
     !_______________________________________________________________________
@@ -248,28 +248,28 @@ subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
        write(*,*) '   int(dhbar)-int(wflux)*dt =', int_dhbar-int_wflux*dt*(-1.0)
        write(*,*)
        write(*,*) '  ___global min/max/mean  --> mstep=',mstep,'____________'
-       write(*,"(A, ES10.3, A, ES10.3, A, A     )") '       eta= ', min_eta  ,' | ',max_eta  ,' | ','N.A.'
-       write(*,"(A, ES10.3, A, ES10.3, A, A     )") '      deta= ', min_deta ,' | ',max_deta ,' | ','N.A.'
-       write(*,"(A, ES10.3, A, ES10.3, A, A     )") '      hbar= ', min_hbar ,' | ',max_hbar ,' | ','N.A.'
-       write(*,"(A, ES10.3, A, ES10.3, A, ES10.3)") '     wflux= ', min_wflux,' | ',max_wflux,' | ',int_wflux
-       write(*,"(A, ES10.3, A, ES10.3, A, ES10.3)") '     hflux= ', min_hflux,' | ',max_hflux,' | ',int_hflux
-       write(*,"(A, ES10.3, A, ES10.3, A, ES10.3)") '      temp= ', min_temp ,' | ',max_temp ,' | ',int_temp
-       write(*,"(A, ES10.3, A, ES10.3, A, ES10.3)") '      salt= ', min_salt ,' | ',max_salt ,' | ',int_salt
-       write(*,"(A, ES10.3, A, ES10.3, A, A     )") '    wvel(1,:)= ', min_wvel ,' | ',max_wvel ,' | ','N.A.'
-       write(*,"(A, ES10.3, A, ES10.3, A, A     )") '    wvel(2,:)= ', min_wvel2,' | ',max_wvel2,' | ','N.A.'
-       write(*,"(A, ES10.3, A, ES10.3, A, A     )") '    uvel(1,:)= ', min_uvel ,' | ',max_uvel ,' | ','N.A.'
-       write(*,"(A, ES10.3, A, ES10.3, A, A     )") '    uvel(2,:)= ', min_uvel2,' | ',max_uvel2,' | ','N.A.'
-       write(*,"(A, ES10.3, A, ES10.3, A, A     )") '    vvel(1,:)= ', min_vvel ,' | ',max_vvel ,' | ','N.A.'
-       write(*,"(A, ES10.3, A, ES10.3, A, A     )") '    vvel(2,:)= ', min_vvel2,' | ',max_vvel2,' | ','N.A.'
-       write(*,"(A, ES10.3, A, ES10.3, A, A     )") '   hnode(1,:)= ', min_hnode,' | ',max_hnode,' | ','N.A.'
-       write(*,"(A, ES10.3, A, ES10.3, A, A     )") '   hnode(2,:)= ', min_hnode2,' | ',max_hnode2,' | ','N.A.'
-       write(*,"(A, A     , A, ES10.3, A, A     )") '     cfl_z= ',' N.A.     ',' | ',max_cfl_z  ,' | ','N.A.'
-       write(*,"(A, A     , A, ES10.3, A, A     )") '     pgf_x= ',' N.A.     ',' | ',max_pgfx  ,' | ','N.A.'
-       write(*,"(A, A     , A, ES10.3, A, A     )") '     pgf_y= ',' N.A.     ',' | ',max_pgfy  ,' | ','N.A.'
-       write(*,"(A, A     , A, ES10.3, A, A     )") '          Av= ',' N.A.     ',' | ',max_av    ,' | ','N.A.'
-       write(*,"(A, A     , A, ES10.3, A, A     )") '          Kv= ',' N.A.     ',' | ',max_kv    ,' | ','N.A.'
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") '       eta= ', min_eta   , ' | ', max_eta   , ' | ', 'N.A.'
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") '      deta= ', min_deta  , ' | ', max_deta  , ' | ', 'N.A.'
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") '      hbar= ', min_hbar  , ' | ', max_hbar  , ' | ', 'N.A.'
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, ES10.3)") '     wflux= ', min_wflux , ' | ', max_wflux , ' | ', int_wflux
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, ES10.3)") '     hflux= ', min_hflux , ' | ', max_hflux , ' | ', int_hflux
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, ES10.3)") '      temp= ', min_temp  , ' | ', max_temp  , ' | ', int_temp
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, ES10.3)") '      salt= ', min_salt  , ' | ', max_salt  , ' | ', int_salt
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") ' wvel(1,:)= ', min_wvel  , ' | ', max_wvel  , ' | ', 'N.A.'
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") ' wvel(2,:)= ', min_wvel2 , ' | ', max_wvel2 , ' | ', 'N.A.'
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") ' uvel(1,:)= ', min_uvel  , ' | ', max_uvel  , ' | ', 'N.A.'
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") ' uvel(2,:)= ', min_uvel2 , ' | ', max_uvel2 , ' | ', 'N.A.'
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") ' vvel(1,:)= ', min_vvel  , ' | ', max_vvel  , ' | ', 'N.A.'
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") ' vvel(2,:)= ', min_vvel2 , ' | ', max_vvel2 , ' | ', 'N.A.'
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") 'hnode(1,:)= ', min_hnode , ' | ', max_hnode , ' | ', 'N.A.'
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") 'hnode(2,:)= ', min_hnode2, ' | ', max_hnode2, ' | ', 'N.A.'
+       write(*,"(A15, A10   , A3, ES10.3, A3, A10   )") '     cfl_z= ', ' N.A.'   , ' | ', max_cfl_z , ' | ', 'N.A.'
+       write(*,"(A15, A10   , A3, ES10.3, A3, A10   )") '     pgf_x= ', ' N.A.'   , ' | ', max_pgfx  , ' | ', 'N.A.'
+       write(*,"(A15, A10   , A3, ES10.3, A3, A10   )") '     pgf_y= ', ' N.A.'   , ' | ', max_pgfy  , ' | ', 'N.A.'
+       write(*,"(A15, A10   , A3, ES10.3, A3, A10   )") '        Av= ', ' N.A.'   , ' | ', max_av    , ' | ', 'N.A.'
+       write(*,"(A15, A10   , A3, ES10.3, A3, A10   )") '        Kv= ', ' N.A.'   , ' | ', max_kv    , ' | ', 'N.A.'
        if (use_ice)  then
-       write(*,"(A, A     , A, ES10.3, A, A)")      '     m_ice= ',' N.A.     ',' | ',max_m_ice  ,' | ','N.A.'
+       write(*,"(A15, A10   , A3, ES10.3, A3, A10)")    '     m_ice= ', ' N.A.'   , ' | ', max_m_ice , ' | ', 'N.A.'
        end if
      end if
      endif ! --> if (mod(istep,logfile_outfreq)==0) then

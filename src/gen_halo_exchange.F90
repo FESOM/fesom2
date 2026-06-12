@@ -2721,6 +2721,516 @@ CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
 end subroutine gather_edg2D_i
 !==============================================
 
+! ========================================================================
+! Gather routines for spectral bin (fbin) fields used by IDEMIX2.
+! These handle arrays with dimensions (nfbin, horizontal) instead of (nl, horizontal).
+! ========================================================================
+
+!============================================================================
+! Make nodal spectral bin information available to master PE
+! arr3D(nfbin, nod2D)
+subroutine gather_nod2D_fbin(arr2D, arr2D_global, partit)
+use MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
+IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+integer                                :: nfbin
+integer                                :: n
+real(real64)                           :: arr2D(:,:)
+real(real64)                           :: arr2D_global(:,:)
+real(real64), allocatable              :: recvbuf(:,:)
+integer                                :: req(partit%npes-1)
+integer                                :: start, n2D
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
+
+if (npes> 1) then
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+
+nfbin=ubound(arr2D,1)
+
+IF ( mype == 0 ) THEN
+
+   if (npes>1) then
+      allocate(recvbuf(nfbin,ubound(arr2D_global,2)))
+
+      do  n = 1, npes-1
+         n2D = (remPtr_nod2D(n+1) - remPtr_nod2D(n))*nfbin
+         start = remPtr_nod2D(n)
+         call MPI_IRECV(recvbuf(1,start), n2D, MPI_DOUBLE_PRECISION, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      enddo
+
+      arr2D_global(1:nfbin,myList_nod2D(1:myDim_nod2D)) = arr2D(1:nfbin,1:myDim_nod2D)
+
+      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+
+      arr2D_global(1:nfbin, remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
+                       = recvbuf(1:nfbin, 1 : remPtr_nod2D(npes)-1)
+
+      deallocate(recvbuf)
+
+   else
+      arr2D_global(:,:) = arr2D(:,:)
+   endif
+
+ELSE
+
+   call MPI_SEND( arr2D, myDim_nod2D*nfbin, MPI_DOUBLE_PRECISION, 0, 2, MPI_COMM_FESOM, MPIerr )
+
+ENDIF
+
+end if
+end subroutine gather_nod2D_fbin
+
+!============================================================================
+! Make element spectral bin information available to master PE
+! arr2D(nfbin, elem2D)
+subroutine gather_elem2D_fbin(arr2D, arr2D_global, partit)
+use MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
+IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+integer                                :: nfbin
+integer                                :: n
+real(real64)                           :: arr2D(:,:)
+real(real64)                           :: arr2D_global(:,:)
+real(real64), allocatable              :: recvbuf(:,:)
+integer                                :: req(partit%npes-1)
+integer                                :: start, n2D
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
+
+if (npes> 1) then
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+
+nfbin=ubound(arr2D,1)
+
+IF ( mype == 0 ) THEN
+
+   if (npes>1) then
+      allocate(recvbuf(nfbin,ubound(arr2D_global,2)))
+
+      do  n = 1, npes-1
+         n2D = (remPtr_elem2D(n+1) - remPtr_elem2D(n))*nfbin
+         start = remPtr_elem2D(n)
+         call MPI_IRECV(recvbuf(1,start), n2D, MPI_DOUBLE_PRECISION, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      enddo
+
+      arr2D_global(1:nfbin,myList_elem2D(1:myDim_elem2D)) = arr2D(1:nfbin,1:myDim_elem2D)
+
+      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+
+      arr2D_global(1:nfbin, remList_elem2D(1 : remPtr_elem2D(npes)-1)) &
+                       = recvbuf(1:nfbin, 1 : remPtr_elem2D(npes)-1)
+
+      deallocate(recvbuf)
+
+   else
+      arr2D_global(:,:) = arr2D(:,:)
+   endif
+
+ELSE
+
+   call MPI_SEND( arr2D, myDim_elem2D*nfbin, MPI_DOUBLE_PRECISION, 0, 2, MPI_COMM_FESOM, MPIerr )
+
+ENDIF
+
+end if
+end subroutine gather_elem2D_fbin
+
+!============================================================================
+! Make nodal spectral bin information available to master PE (real4 version)
+! arr2D(nfbin, nod2D)
+subroutine gather_real4_nod2D_fbin(arr2D, arr2D_global, partit)
+use MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
+IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+integer                                :: nfbin
+integer                                :: n
+real(real32)                           :: arr2D(:,:)
+real(real32)                           :: arr2D_global(:,:)
+real(real32), allocatable              :: recvbuf(:,:)
+integer                                :: req(partit%npes-1)
+integer                                :: start, n2D
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
+
+if (npes> 1) then
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+
+nfbin=ubound(arr2D,1)
+
+IF ( mype == 0 ) THEN
+
+   if (npes>1) then
+      allocate(recvbuf(nfbin,ubound(arr2D_global,2)))
+
+      do  n = 1, npes-1
+         n2D = (remPtr_nod2D(n+1) - remPtr_nod2D(n))*nfbin
+         start = remPtr_nod2D(n)
+         call MPI_IRECV(recvbuf(1,start), n2D, MPI_REAL, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      enddo
+
+      arr2D_global(1:nfbin,myList_nod2D(1:myDim_nod2D)) = arr2D(1:nfbin,1:myDim_nod2D)
+
+      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+
+      arr2D_global(1:nfbin, remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
+                       = recvbuf(1:nfbin, 1 : remPtr_nod2D(npes)-1)
+
+      deallocate(recvbuf)
+
+   else
+      arr2D_global(:,:) = arr2D(:,:)
+   endif
+
+ELSE
+
+   call MPI_SEND( arr2D, myDim_nod2D*nfbin, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
+
+ENDIF
+
+end if
+end subroutine gather_real4_nod2D_fbin
+
+!============================================================================
+! Make element spectral bin information available to master PE (real4 version)
+! arr2D(nfbin, elem2D)
+subroutine gather_real4_elem2D_fbin(arr2D, arr2D_global, partit)
+use MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
+IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+integer                                :: nfbin
+integer                                :: n
+real(real32)                           :: arr2D(:,:)
+real(real32)                           :: arr2D_global(:,:)
+real(real32), allocatable              :: recvbuf(:,:)
+integer                                :: req(partit%npes-1)
+integer                                :: start, n2D
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
+
+if (npes> 1) then
+CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+
+nfbin=ubound(arr2D,1)
+
+IF ( mype == 0 ) THEN
+
+   if (npes>1) then
+      allocate(recvbuf(nfbin,ubound(arr2D_global,2)))
+
+      do  n = 1, npes-1
+         n2D = (remPtr_elem2D(n+1) - remPtr_elem2D(n))*nfbin
+         start = remPtr_elem2D(n)
+         call MPI_IRECV(recvbuf(1,start), n2D, MPI_REAL, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      enddo
+
+      arr2D_global(1:nfbin,myList_elem2D(1:myDim_elem2D)) = arr2D(1:nfbin,1:myDim_elem2D)
+
+      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+
+      arr2D_global(1:nfbin, remList_elem2D(1 : remPtr_elem2D(npes)-1)) &
+                       = recvbuf(1:nfbin, 1 : remPtr_elem2D(npes)-1)
+
+      deallocate(recvbuf)
+
+   else
+      arr2D_global(:,:) = arr2D(:,:)
+   endif
+
+ELSE
+
+   call MPI_SEND( arr2D, myDim_elem2D*nfbin, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
+
+ENDIF
+
+end if
+end subroutine gather_real4_elem2D_fbin
+
+!==============================================
+
+! ========================================================================
+! Halo exchange routines for spectral bin (fbin) fields used by IDEMIX2.
+! The first array dimension is nfbin (number of spectral frequency bins)
+! instead of nl (number of vertical levels).
+! Naming convention:
+!   exchange_nod2D_fbin:  nodal 2D spectral field  arr(nfbin, nod2D)
+!   exchange_nod3D_fbin:  nodal 3D spectral field  arr(n_val, nfbin, nod2D)
+!   exchange_elem2D_fbin: elem  2D spectral field  arr(nfbin, elem2D)
+!   exchange_elem3D_fbin: elem  3D spectral field  arr(n_val, nfbin, elem2D)
+! ========================================================================
+
+! ========================================================================
+! 2D nodal spectral field:  arr(nfbin, myDim_nod2D+eDim_nod2D)
+! ========================================================================
+subroutine exchange_nod2D_fbin(nod_array, partit)
+use MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
+IMPLICIT NONE
+type(t_partit), intent(inout), target :: partit
+real(real64),   intent(inout)         :: nod_array(:,:)
+if (partit%npes > 1) then
+   call exchange_nod2D_fbin_begin(nod_array, partit)
+   call exchange_nod_end(partit)
+endif
+END SUBROUTINE exchange_nod2D_fbin
+
+subroutine exchange_nod2D_fbin_begin(nod_array, partit)
+use MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
+IMPLICIT NONE
+type(t_partit), intent(inout), target :: partit
+real(real64),   intent(inout)         :: nod_array(:,:)
+integer                               :: n, sn, rn
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
+
+if (npes > 1) then
+   if (nfbin_mpi == 0) then
+      if (mype==0) print *,'ERROR: exchange_nod2D_fbin called but init_mpi_types_fbin was not called.'
+      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+   endif
+
+   sn=com_nod2D%sPEnum
+   rn=com_nod2D%rPEnum
+
+   ! Exchange full spectral column at once (n_val=1 for 2D array)
+   DO n=1,rn
+      call MPI_IRECV(nod_array, 1, r_mpitype_nod3D_fbin(n,nfbin_mpi,1), com_nod2D%rPE(n), &
+           com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr)
+   END DO
+   DO n=1, sn
+      call MPI_ISEND(nod_array, 1, s_mpitype_nod3D_fbin(n,nfbin_mpi,1), com_nod2D%sPE(n), &
+           mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
+   END DO
+   com_nod2D%nreq = rn+sn
+   call MPI_WAITALL(com_nod2D%nreq, com_nod2D%req, MPI_STATUSES_IGNORE, MPIerr)
+endif
+END SUBROUTINE exchange_nod2D_fbin_begin
+
+! ========================================================================
+! 3D nodal spectral field:  arr(n_val, nfbin, myDim_nod2D+eDim_nod2D)
+! ========================================================================
+subroutine exchange_nod3D_fbin(nod_array, partit)
+use MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
+IMPLICIT NONE
+type(t_partit), intent(inout), target :: partit
+real(real64),   intent(inout)         :: nod_array(:,:,:)
+if (partit%npes > 1) then
+   call exchange_nod3D_fbin_begin(nod_array, partit)
+   call exchange_nod_end(partit)
+endif
+END SUBROUTINE exchange_nod3D_fbin
+
+subroutine exchange_nod3D_fbin_begin(nod_array, partit)
+use MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
+IMPLICIT NONE
+type(t_partit), intent(inout), target :: partit
+real(real64),   intent(inout)         :: nod_array(:,:,:)
+integer                               :: n, sn, rn, n_val
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
+
+if (npes > 1) then
+   if (nfbin_mpi == 0) then
+      if (mype==0) print *,'ERROR: exchange_nod3D_fbin called but init_mpi_types_fbin was not called.'
+      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+   endif
+
+   ! nod_array(n_val, nfbin, nod2D)
+   n_val = ubound(nod_array,1)
+   if (n_val < 1 .or. n_val > 3) then
+      if (mype==0) print *,'exchange_nod3D_fbin: n_val must be 1..3, got', n_val
+      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+   endif
+
+   sn=com_nod2D%sPEnum
+   rn=com_nod2D%rPEnum
+
+   ! Exchange full spectral column at once
+   DO n=1,rn
+      call MPI_IRECV(nod_array, 1, r_mpitype_nod3D_fbin(n,nfbin_mpi,n_val), com_nod2D%rPE(n), &
+           com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr)
+   END DO
+   DO n=1, sn
+      call MPI_ISEND(nod_array, 1, s_mpitype_nod3D_fbin(n,nfbin_mpi,n_val), com_nod2D%sPE(n), &
+           mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
+   END DO
+   com_nod2D%nreq = rn+sn
+   call MPI_WAITALL(com_nod2D%nreq, com_nod2D%req, MPI_STATUSES_IGNORE, MPIerr)
+endif
+END SUBROUTINE exchange_nod3D_fbin_begin
+
+! ========================================================================
+! 2D elemental spectral field:  arr(nfbin, myDim_elem2D+eDim_elem2D)
+! ========================================================================
+subroutine exchange_elem2D_fbin(elem_array, partit)
+use MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
+IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+real(real64),   intent(inout)          :: elem_array(:,:)
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
+
+if (npes > 1) then
+   call exchange_elem2D_fbin_begin(elem_array, partit)
+   call exchange_elem_end(partit)
+endif
+END SUBROUTINE exchange_elem2D_fbin
+
+subroutine exchange_elem2D_fbin_begin(elem_array, partit)
+use MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
+IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+real(real64),   intent(inout)          :: elem_array(:,:)
+integer                                :: n, sn, rn
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
+
+if (npes > 1) then
+   if (nfbin_mpi == 0) then
+      if (mype==0) print *,'ERROR: exchange_elem2D_fbin called but init_mpi_types_fbin was not called.'
+      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+   endif
+
+   if (ubound(elem_array,2)<=myDim_elem2D+eDim_elem2D) then
+      ! small halo
+      elem_full_flag = .false.
+      sn=com_elem2D%sPEnum
+      rn=com_elem2D%rPEnum
+
+      ! Exchange full spectral column at once
+      DO n=1,rn
+         call MPI_IRECV(elem_array, 1, r_mpitype_elem2D_fbin(n,nfbin_mpi), com_elem2D%rPE(n), &
+              com_elem2D%rPE(n), MPI_COMM_FESOM, com_elem2D%req(n), MPIerr)
+      END DO
+      DO n=1, sn
+         call MPI_ISEND(elem_array, 1, s_mpitype_elem2D_fbin(n,nfbin_mpi), com_elem2D%sPE(n), &
+              mype, MPI_COMM_FESOM, com_elem2D%req(rn+n), MPIerr)
+      END DO
+      com_elem2D%nreq = rn+sn
+      call MPI_WAITALL(com_elem2D%nreq, com_elem2D%req, MPI_STATUSES_IGNORE, MPIerr)
+   else
+      ! full halo
+      elem_full_flag = .true.
+      sn=com_elem2D_full%sPEnum
+      rn=com_elem2D_full%rPEnum
+
+      ! Exchange full spectral column at once
+      DO n=1,rn
+         call MPI_IRECV(elem_array, 1, r_mpitype_elem2D_full_fbin(n,nfbin_mpi), com_elem2D_full%rPE(n), &
+              com_elem2D_full%rPE(n), MPI_COMM_FESOM, com_elem2D_full%req(n), MPIerr)
+      END DO
+      DO n=1, sn
+         call MPI_ISEND(elem_array, 1, s_mpitype_elem2D_full_fbin(n,nfbin_mpi), com_elem2D_full%sPE(n), &
+              mype, MPI_COMM_FESOM, com_elem2D_full%req(rn+n), MPIerr)
+      END DO
+      com_elem2D_full%nreq = rn+sn
+      call MPI_WAITALL(com_elem2D_full%nreq, com_elem2D_full%req, MPI_STATUSES_IGNORE, MPIerr)
+   endif
+endif
+END SUBROUTINE exchange_elem2D_fbin_begin
+
+! ========================================================================
+! 3D elemental spectral field:  arr(n_val, nfbin, myDim_elem2D+eDim_elem2D)
+! ========================================================================
+subroutine exchange_elem3D_fbin(elem_array, partit)
+use MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
+IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+real(real64),   intent(inout)          :: elem_array(:,:,:)
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
+
+if (npes > 1) then
+   call exchange_elem3D_fbin_begin(elem_array, partit)
+   call exchange_elem_end(partit)
+endif
+END SUBROUTINE exchange_elem3D_fbin
+
+subroutine exchange_elem3D_fbin_begin(elem_array, partit)
+use MOD_MESH
+USE MOD_PARTIT
+USE MOD_PARSUP
+IMPLICIT NONE
+type(t_partit), intent(inout), target  :: partit
+real(real64),   intent(inout)          :: elem_array(:,:,:)
+integer                                :: n, sn, rn, n_val
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
+
+if (npes > 1) then
+   if (nfbin_mpi == 0) then
+      if (mype==0) print *,'ERROR: exchange_elem3D_fbin called but init_mpi_types_fbin was not called.'
+      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+   endif
+
+   ! elem_array(n_val, nfbin, elem2D)
+   n_val = ubound(elem_array,1)
+   if (n_val < 1 .or. n_val > 4) then
+      if (mype==0) print *,'exchange_elem3D_fbin: n_val must be 1..4, got', n_val
+      call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+   endif
+
+   if (ubound(elem_array,3)<=myDim_elem2D+eDim_elem2D) then
+      ! small halo
+      elem_full_flag = .false.
+      sn=com_elem2D%sPEnum
+      rn=com_elem2D%rPEnum
+
+      ! Exchange full spectral column at once
+      DO n=1,rn
+         call MPI_IRECV(elem_array, 1, r_mpitype_elem3D_fbin(n,nfbin_mpi,n_val), com_elem2D%rPE(n), &
+              com_elem2D%rPE(n), MPI_COMM_FESOM, com_elem2D%req(n), MPIerr)
+      END DO
+      DO n=1, sn
+         call MPI_ISEND(elem_array, 1, s_mpitype_elem3D_fbin(n,nfbin_mpi,n_val), com_elem2D%sPE(n), &
+              mype, MPI_COMM_FESOM, com_elem2D%req(rn+n), MPIerr)
+      END DO
+      com_elem2D%nreq = rn+sn
+      call MPI_WAITALL(com_elem2D%nreq, com_elem2D%req, MPI_STATUSES_IGNORE, MPIerr)
+   else
+      ! full halo
+      elem_full_flag = .true.
+      sn=com_elem2D_full%sPEnum
+      rn=com_elem2D_full%rPEnum
+
+      ! Exchange full spectral column at once
+      DO n=1,rn
+         call MPI_IRECV(elem_array, 1, r_mpitype_elem3D_full_fbin(n,nfbin_mpi,n_val), com_elem2D_full%rPE(n), &
+              com_elem2D_full%rPE(n), MPI_COMM_FESOM, com_elem2D_full%req(n), MPIerr)
+      END DO
+      DO n=1, sn
+         call MPI_ISEND(elem_array, 1, s_mpitype_elem3D_full_fbin(n,nfbin_mpi,n_val), com_elem2D_full%sPE(n), &
+              mype, MPI_COMM_FESOM, com_elem2D_full%req(rn+n), MPIerr)
+      END DO
+      com_elem2D_full%nreq = rn+sn
+      call MPI_WAITALL(com_elem2D_full%nreq, com_elem2D_full%req, MPI_STATUSES_IGNORE, MPIerr)
+   endif
+endif
+END SUBROUTINE exchange_elem3D_fbin_begin
+
+! ========================================================================
+
 end module g_comm
 
 
@@ -2767,6 +3277,26 @@ interface exchange_elem_begin
       module procedure exchange_elem2d_i_begin
 end interface exchange_elem_begin
 
+interface exchange_nod_fbin
+      module procedure exchange_nod2D_fbin
+      module procedure exchange_nod3D_fbin
+end interface exchange_nod_fbin
+
+interface exchange_nod_fbin_begin
+      module procedure exchange_nod2D_fbin_begin
+      module procedure exchange_nod3D_fbin_begin
+end interface exchange_nod_fbin_begin
+
+interface exchange_elem_fbin
+      module procedure exchange_elem2D_fbin
+      module procedure exchange_elem3D_fbin
+end interface exchange_elem_fbin
+
+interface exchange_elem_fbin_begin
+      module procedure exchange_elem2D_fbin_begin
+      module procedure exchange_elem3D_fbin_begin
+end interface exchange_elem_fbin_begin
+
 
 interface broadcast_nod
       module procedure broadcast_nod3D
@@ -2790,6 +3320,11 @@ interface gather_nod
       module procedure gather_nod2D_i
 end interface gather_nod
 
+interface gather_nod_fbin
+      module procedure gather_nod2D_fbin
+      module procedure gather_real4_nod2D_fbin
+end interface gather_nod_fbin
+
 interface gather_elem
       module procedure gather_elem3D
       module procedure gather_elem2D
@@ -2802,6 +3337,11 @@ interface gather_elem
       module procedure gather_elem2D_i
 end interface gather_elem
 
+interface gather_elem_fbin
+      module procedure gather_elem2D_fbin
+      module procedure gather_real4_elem2D_fbin
+end interface gather_elem_fbin
+
 interface gather_edge
       module procedure gather_edg2D
       module procedure gather_edg2D_i
@@ -2811,5 +3351,8 @@ end interface gather_edge
 private  ! hides items not listed on public statement
 public :: exchange_nod,exchange_elem,broadcast_nod,broadcast_elem, &
           gather_nod, gather_elem, exchange_nod_begin, exchange_nod_end, exchange_elem_begin, &
-          exchange_elem_end, gather_edge
+          exchange_elem_end, gather_edge, &
+          exchange_nod_fbin, exchange_elem_fbin, &
+          exchange_nod_fbin_begin, exchange_elem_fbin_begin, &
+          gather_nod_fbin, gather_elem_fbin
 end module g_comm_auto

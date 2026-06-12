@@ -16,6 +16,13 @@
   integer, dimension(:),     pointer :: s_mpitype_nod2D_i, r_mpitype_nod2D_i
   integer, dimension(:,:,:), pointer :: s_mpitype_nod3D, r_mpitype_nod3D
 
+  integer, dimension(:,:,:), pointer :: s_mpitype_nod3D_fbin      , r_mpitype_nod3D_fbin
+  integer, dimension(:,:),   pointer :: s_mpitype_elem2D_fbin     , r_mpitype_elem2D_fbin
+  integer, dimension(:,:),   pointer :: s_mpitype_elem2D_full_fbin, r_mpitype_elem2D_full_fbin
+  integer, dimension(:,:,:), pointer :: s_mpitype_elem3D_fbin     , r_mpitype_elem3D_fbin
+  integer, dimension(:,:,:), pointer :: s_mpitype_elem3D_full_fbin, r_mpitype_elem3D_full_fbin
+  integer, pointer                   :: nfbin_mpi
+
   integer, pointer   :: MPIERR
   integer, pointer   :: MPIERR_IB       ! copy for icebergs LA: 2023-05-22
   integer, pointer   :: npes
