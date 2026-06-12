@@ -91,20 +91,26 @@ idemix2_jstar         = 5.0          ! spectral bandwidth in vertical modes [dim
 idemix2_mu0           = 0.33333333   ! dissipation parameter [dimensionless]
 
 ! --- superbee-spectral advection scheme and Adams-Bashfort timestepping ---
-! idemix2_enable_superbee_adv= .false.
-idemix2_enable_AB_timestep   = .false.
+idemix2_enable_AB     = .true.
+idemix2_AB_epsilon    = 0.1_WP
 
 ! --- Number of used spectral frequency bins
 idemix2_nfbin         = 52 
 
-! ensures idemix1 functionality
-idemix2_enable_hor_diffusion = .false.
-idemix2_enable_hor_diff_iter = .false.   ! from Pollman et al. (2017)
+! --- ensures idemix1 functionality ---
+idemix2_enable_hor_diff_expl = .false.
+idemix2_enable_hor_diff_impl_iter = .true.   ! from Pollman et al. (2017)
 idemix2_hor_diff_niter       = 5
 
 ! --- shelf definition as distance from coast in meters
 idemix2_shelf_dist    = 300.e3
 
+! --- scal down baroclinic wave speed when not all modes are used ---
+idemix2_scal_cn = 1.0
+
+! --- maximum cutoff value for interal wave energy ---
+idemix2_Eiw_maxthresh= 0.1
+    
 ! --- M2 Forcing (Summed anisotropic M2-tide generation modes 1-2 (W/m2)) ---
 idemix2_enable_M2     = .false.
 idemix2_M2forc_file   = '/albedo/work/user/pscholz/forcing/IDEMIX2/idemix2_IT_forc_M2modes1-2_aniso.nc'
@@ -122,10 +128,10 @@ idemix2_enable_bot    = .true.
 idemix2_botforc_file  = '/albedo/pool/FESOM/fesom2.0/forcing/idemix/forcing_idemix_final_bin/FIN_STORMTIDE2_M2_plus_NYCANDER_CnoM2_bin_0.40deg.nc'         ! path to bottom forcing file,
 idemix2_botforc_vname = 'stormt_M2_plus_nycand_CnoM2'  ! variable name in bottom forcing file
 
-! --- Lee-Wave Forcing ---
-idemix2_enable_leew   = .false.
-idemix2_leewforc_file = '/albedo/work/user/pscholz/forcing/IDEMIX2/idemix2_lee_forc_Eden.nc'
-idemix2_leewforc_vname= 'C_lee'
+! ! --- Lee-Wave Forcing ---
+! idemix2_enable_leew   = .false.
+! idemix2_leewforc_file = '/albedo/work/user/pscholz/forcing/IDEMIX2/idemix2_lee_forc_Eden.nc'
+! idemix2_leewforc_vname= 'C_lee'
 
 ! --- Root Mean Square Topographic Height forcing ---
 idemix2_hrmsforc_file = '/albedo/work/user/pscholz/forcing/IDEMIX2/idemix2_hrms_Goff2023.nc'
@@ -134,6 +140,11 @@ idemix2_hrmsforc_vname= 'HRMS'
 ! --- Characteristic horizontal length scale of topographic feature ---
 idemix2_hlamforc_file = '/albedo/work/user/pscholz/forcing/IDEMIX2/idemix2_lambda_Goff2010.nc'
 idemix2_hlamforc_vname= 'LAMBDA'
+
+! --- diagnostics
+idemix2_diag_Ecompart = .false.
+idemix2_diag_Eiw      = .false.
+idemix2_diag_WWI      = .false.
 /
 
 ! ============================================================================
