@@ -176,7 +176,7 @@ module g_cvmix_idemix2
     character(MAX_PATH):: idemix2_hlamforc_vname= 'LAMBDA_G10'
     
     namelist /param_idemix2/ idemix2_tau_v, idemix2_tau_h, idemix2_gamma, idemix2_jstar, idemix2_mu0, idemix2_scal_cn, &
-                             idemix2_enable_AB, idemix2_nfbin, & ! idemix2_enable_superbee_adv
+                             idemix2_enable_AB, idemix2_AB_epsilon, idemix2_nfbin, & ! idemix2_enable_superbee_adv
                              idemix2_enable_hor_diff_expl, idemix2_enable_hor_diff_impl_iter, idemix2_hor_diff_niter, &
                              idemix2_shelf_dist, &
                              idemix2_botforc_Etot, &
@@ -241,13 +241,12 @@ module g_cvmix_idemix2
     
     ! --- forcing realted variables ---
     real(kind=WP), allocatable, dimension(:)    :: iwe2_topo_hrms, iwe2_topo_hlam, iwe2_topo_dist
-    real(kind=WP), allocatable, dimension(:)    :: iwe2_fbot_e, iwe2_fleew, iwe2_fsrf
+    real(kind=WP), allocatable, dimension(:)    :: iwe2_fleew, iwe2_fsrf, iwe2_fbot_n
     real(kind=WP), allocatable, dimension(:,:)  :: iwe2_fbot
     
     ! --- support variables ---
     real(kind=WP), allocatable, dimension(:)    :: vol_nodB2T
     real(kind=WP), allocatable, dimension(:,:)  :: vol_wcelli
-    integer      , allocatable, dimension(:,:)  :: edge_up_dn_tri      
     real(kind=WP), allocatable, dimension(:)    :: iwe2_grady_coriol, aux
     real(kind=WP), allocatable, dimension(:,:,:):: iwe2_gradxy_e, iwe2_gradxy_n
     real(kind=WP), allocatable, dimension(:,:  ):: iwe2_flx_uv, iwe2_flx_w
@@ -428,26 +427,26 @@ module g_cvmix_idemix2
             ! M2 energy dissipation
             allocate(iwe2_alpha_M2_c(node_size))
             iwe2_alpha_M2_c(:)    = 0.0_WP
-
+            
             ! M2 dissipation timescale
             allocate(iwe2_M2_tau(node_size))
             iwe2_M2_tau(:)        = 0.0_WP
-
+            
             ! M2 cross spectral propagation at elements
             allocate(w_M2_e(nfbin))
             w_M2_e(:)             = 0.0_WP
-
+            
             ! M2 zonal/merid group velocity, and cross spectral propagation
             ! at vertices
             allocate(iwe2_M2_uv(2, nfbin,elem_size))
             allocate(iwe2_M2_w(    nfbin,node_size))
             iwe2_M2_uv(:,:,:)     = 0.0_WP
             iwe2_M2_w(:,:)        = 0.0_WP
-
+            
             ! M2 forcing
             allocate(iwe2_fM2(nfbin, node_size))
             iwe2_fM2(:,:)         = 0.0_WP
-
+            
             ! M2 wave energy, and divergence of M2 wave energy
             ! index (..., 1:3) timestep index E^(n-1), E^(n), E^(n+1)
             allocate(  iwe2_E_M2(     nfbin, node_size, 2) &
@@ -457,19 +456,19 @@ module g_cvmix_idemix2
             iwe2_E_M2(      :,:,:)= 0.0_WP
             iwe2_E_M2_divh( :,:,:)= 0.0_WP
             iwe2_E_M2_divs( :,:,:)= 0.0_WP
-
+            
             ! structure function for M2 energy
             allocate(iwe2_E_M2_struct(nl, node_size))
             iwe2_E_M2_struct(:,:) = 0.0_WP
-
+            
             ! Diagnostics
             if (idemix2_diag_Ecompart) then
                 ! diagnostic for M2 spectral energy advection
-                allocate( iwe2_E_M2_advh(nfbin, myDim_nod2D) &
-                        , iwe2_E_M2_advs(nfbin, myDim_nod2D) &
-                        , iwe2_E_M2_diss(nfbin, myDim_nod2D) &
-                        , iwe2_E_M2_forc(nfbin, myDim_nod2D) &
-                        , iwe2_E_M2_refl(nfbin, myDim_nod2D) )
+                allocate( iwe2_E_M2_advh(nfbin, node_size) &
+                        , iwe2_E_M2_advs(nfbin, node_size) &
+                        , iwe2_E_M2_diss(nfbin, node_size) &
+                        , iwe2_E_M2_forc(nfbin, node_size) &
+                        , iwe2_E_M2_refl(nfbin, node_size) )
                 iwe2_E_M2_advh(:,:) = 0.0_WP
                 iwe2_E_M2_advs(:,:) = 0.0_WP
                 iwe2_E_M2_diss(:,:) = 0.0_WP
@@ -479,14 +478,14 @@ module g_cvmix_idemix2
             
             if (idemix2_diag_Ecompart .or. idemix2_diag_WWI) then
                 ! diagnostic for M2 spectral energy advection
-                allocate( iwe2_E_M2_dt(  nfbin, myDim_nod2D) )
+                allocate( iwe2_E_M2_dt(  nfbin, node_size) )
                 iwe2_E_M2_dt(  :,:) = 0.0_WP
             end if 
             
             if (idemix2_diag_WWI) then
                 ! diagnostic for M2 wave-wave interaction
                 allocate( iwe2_E_iw_diss_M2( nl   , node_size   ) &
-                        , iwe2_E_M2_diss_wwi(nfbin, myDim_nod2D) )
+                        , iwe2_E_M2_diss_wwi(nfbin, node_size) )
                 iwe2_E_iw_diss_M2( :,:) = 0.0_WP
                 iwe2_E_M2_diss_wwi(:,:) = 0.0_WP
             end if
@@ -497,26 +496,26 @@ module g_cvmix_idemix2
             ! niw frequency
             allocate(iwe2_omega_niw(node_size))
             iwe2_omega_niw(:)      = 0.0_WP
-
+            
             ! niw dissipation timescale
             allocate(iwe2_niw_tau(node_size))
             iwe2_niw_tau(:)        = 0.0_WP
-
+            
             ! niw cross spectral propagation at elements
             allocate(w_niw_e(nfbin))
             w_niw_e(:)             = 0.0_WP
-
+            
             ! niw zonal/merid group velocity, and cross spectral propagation
             ! at vertices
             allocate(iwe2_niw_uv(2, nfbin,elem_size))
             allocate(iwe2_niw_w(    nfbin,node_size))
             iwe2_niw_uv(:,:,:)     = 0.0_WP
             iwe2_niw_w(:,:)        = 0.0_WP
-
+            
             ! niw forcing
             allocate(iwe2_fniw(nfbin, node_size))
             iwe2_fniw(:,:)         = 0.0_WP
-
+            
             ! niw wave energy, and divergence of niw wave energy
             ! index (..., 1:3) timestep index E^(n-1), E^(n), E^(n+1)
             allocate(  iwe2_E_niw(     nfbin, node_size, 2) &
@@ -526,29 +525,29 @@ module g_cvmix_idemix2
             iwe2_E_niw(      :,:,:)= 0.0_WP
             iwe2_E_niw_divh( :,:,:)= 0.0_WP
             iwe2_E_niw_divs( :,:,:)= 0.0_WP
-
+            
             ! structure function for niw energy
             allocate(iwe2_E_niw_struct(nl, node_size))
             iwe2_E_niw_struct(:,:) = 0.0_WP
-
+            
             ! Diagnostics
             if (idemix2_diag_Ecompart) then
                 ! diagnostic for niw spectral energy advection
-                allocate( iwe2_E_niw_advh(nfbin, myDim_nod2D) &
-                        , iwe2_E_niw_advs(nfbin, myDim_nod2D) &
-                        , iwe2_E_niw_diss(nfbin, myDim_nod2D) &
-                        , iwe2_E_niw_forc(nfbin, myDim_nod2D) &
-                        , iwe2_E_niw_refl(nfbin, myDim_nod2D) )
+                allocate( iwe2_E_niw_advh(nfbin, node_size) &
+                        , iwe2_E_niw_advs(nfbin, node_size) &
+                        , iwe2_E_niw_diss(nfbin, node_size) &
+                        , iwe2_E_niw_forc(nfbin, node_size) &
+                        , iwe2_E_niw_refl(nfbin, node_size) )
                 iwe2_E_niw_advh(:,:) = 0.0_WP
                 iwe2_E_niw_advs(:,:) = 0.0_WP
                 iwe2_E_niw_diss(:,:) = 0.0_WP
                 iwe2_E_niw_forc(:,:) = 0.0_WP
                 iwe2_E_niw_refl(:,:) = 0.0_WP
             end if
-
+            
             if (idemix2_diag_Ecompart .or. idemix2_diag_WWI) then
                 ! diagnostic for niw spectral energy advection
-                allocate( iwe2_E_niw_dt(  nfbin, myDim_nod2D))
+                allocate( iwe2_E_niw_dt(  nfbin, node_size))
                 iwe2_E_niw_dt(  :,:) = 0.0_WP
             end if
             
@@ -587,12 +586,12 @@ module g_cvmix_idemix2
         endif 
         
         ! forcing fields, M2 tidal forcing (spectral) and NIW forcing (spectral)
-        allocate(  iwe2_fbot_e(  myDim_elem2D)    &
+        allocate(  iwe2_fbot_n(    node_size)     &
                  , iwe2_fbot(nl, node_size)       &
                  , iwe2_fsrf(    node_size)       &
-!                  , iwe2_fleew(   myDim_elem2D)    &                 
+!                  , iwe2_fleew(   myDim_elem2D)    &
                  )
-        iwe2_fbot_e(:)       = 0.0_WP
+        iwe2_fbot_n(:)       = 0.0_WP
         iwe2_fbot(:,:)       = 0.0_WP
         iwe2_fsrf(  :)       = 0.0_WP
 !         iwe2_fleew( :)       = 0.0_WP
@@ -789,51 +788,38 @@ module g_cvmix_idemix2
             inquire(file=trim(idemix2_botforc_file),exist=file_exist) 
             if (file_exist) then
                 if (mype==0) write(*,*) '     ├> read IDEMIX2 near tidal bottom forcing'
-                call read_other_NetCDF(trim(idemix2_botforc_file), trim(idemix2_botforc_vname), 1, iwe2_fbot_e, .true., .false., partit, mesh)
-                !                                                                                                  |           
-                !                                 .false.=interpolate on element centroids instead of vertices <---+   
-                
+                call read_other_NetCDF(trim(idemix2_botforc_file), trim(idemix2_botforc_vname), 1, iwe2_fbot_n, .true., .true., partit, mesh)                !                                                                                                |       |
+                !                                                   .true.=NN for missing values ----------------+       |
+                !                                                   .true.=interpolate to vertices ----------------------+
+
                 ! make sure forcing is all positive no numerical negative values
-                iwe2_fbot_e = max(0.0_WP,iwe2_fbot_e)
-                
-                
-                ! check for total tidal energy that is infused through the bottom, see how 
-                ! much is lossed during interpolation and compare with value of the 
-                ! original files
+                iwe2_fbot_n = max(0.0_WP, iwe2_fbot_n)
+
+                ! check for total tidal energy that is infused through the bottom
                 loc_Etot = 0.0_WP
-                do elem=1, myDim_elem2D
-                    ! REMEMBER!!!: the partition on elements is not unique there are 
-                    ! elements that belong to two CPUs. For unique elements the index
-                    ! of the First trinagle node must  be <= myDim_nod2D
-                    if (elem2D_nodes(1,elem)<=myDim_nod2D) then
-                        loc_Etot = loc_Etot + elem_area(elem)*iwe2_fbot_e(elem)
-                    end if     
+                do node=1, myDim_nod2D
+                    loc_Etot = loc_Etot + area(1,node)*iwe2_fbot_n(node)
                 end do
                 call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
                 if (mype==0) write(*,*) "     │  └> IDEMIX2 total tidal energy Etot_bot =", glb_Etot*1.0e-12, ' TW'
-                
-                ! normalize total tidal energy at bottom with respect to the total 
-                ! tidal energy that is e.g in the original forcing files to accomodate 
-                ! non concerving losses during interpolation. This is only done when 
+
+                ! normalize total tidal energy at bottom with respect to the total
+                ! tidal energy that is e.g in the original forcing files to accomodate
+                ! non concerving losses during interpolation. This is only done when
                 ! in namelist.cvmix: idemix2_botforc_Etot \= 0.0_WP
                 if (idemix2_botforc_Etot /= 0.0_WP) then
-                    iwe2_fbot_e = iwe2_fbot_e * idemix2_botforc_Etot/glb_Etot
-                    
+                    iwe2_fbot_n = iwe2_fbot_n * idemix2_botforc_Etot/glb_Etot
+
                     loc_Etot = 0.0_WP
-                    do elem=1, myDim_elem2D
-                        ! REMEMBER!!!: the partition on elements is not unique there are 
-                        ! elements that belong to two CPUs. For unique elements the index
-                        ! of the First trinagle node must  be <= myDim_nod2D
-                        if (elem2D_nodes(1,elem)<=myDim_nod2D) then
-                            loc_Etot = loc_Etot + elem_area(elem)*iwe2_fbot_e(elem)
-                        end if     
+                    do node=1, myDim_nod2D
+                        loc_Etot = loc_Etot + area(1,node)*iwe2_fbot_n(node)
                     end do
                     call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
                     if (mype==0) write(*,*) "     │  └> IDEMIX2 Etot_bot after normalizing =", glb_Etot*1.0e-12, ' TW'
-                end if 
-                
+                end if
+
                 ! divide by density_0 --> convert from W/m^2 to m^3/s^3
-                iwe2_fbot_e  = iwe2_fbot_e/density_0
+                iwe2_fbot_n = iwe2_fbot_n/density_0
                 
             else
                 if (mype==0) then
@@ -863,10 +849,10 @@ module g_cvmix_idemix2
 !                 if (mype==0) write(*,*) '     ├> read IDEMIX2 lee wave forcing --> add to bottom forcing'
 !                 call read_other_NetCDF(trim(idemix2_leewforc_file), trim(idemix2_leewforc_vname), 1, iwe2_fleew, .true., .false., partit, mesh)
 !                 
-!                 iwe2_fbot_e = iwe2_fbot_e + iwe2_fleew
-!                 !                           |
-!                 !                           +-> no dividion by density_0, Lee wave Forcing
-!                 !                               already in units of m^3/s^3
+!                 iwe2_fbot_n = iwe2_fbot_n + iwe2_fleew
+!                 !                      |
+!                 !                      +-> no division by density_0, Lee wave Forcing
+!                 !                          already in units of m^3/s^3
 !             else
 !                 if (mype==0) then
 !                     print *, achar(27)//'[33m'
@@ -948,43 +934,16 @@ module g_cvmix_idemix2
         end if ! --> if (idemix2_enable_M2 .or. idemix2_enable_niw ) then
         
         !_______________________________________________________________________
-        ! convert elemental bot forcing into nodal bottom forcing
-        do elem = 1, myDim_elem2D
-            nzmax   = nlevels(elem)
-            elnodes = elem2d_nodes(:,elem)
-            iwe2_fbot(nzmax, elnodes(:)) = iwe2_fbot(nzmax, elnodes(:)) + iwe2_fbot_e(elem) * elem_area(elem) / 3.0_WP 
-        end do
-        do node = 1, myDim_nod2D
+        ! distribute nodal bottom flux across staircase depth levels using cap
+        ! area fractions: iwe2_fbot(nz,n) = fbot_n * (area(nz-1,n)-area(nz,n)) / area(1,n)
+        do node = 1, myDim_nod2D+eDim_nod2D
             nlu = nlevels_nod2D_min(node)
             nln = nlevels_nod2D(node)
             do nz = nlu, nln
-                if (iwe2_fbot(nz, node)==0.0_WP) cycle
-                iwe2_fbot(nz,node) = iwe2_fbot(nz, node) / (area(nz-1, node)-area(nz, node))
+                iwe2_fbot(nz, node) = iwe2_fbot_n(node) * (area(nz-1, node) - area(nz, node)) / area(1, node)
             end do
         end do
-
-!         !_______________________________________________________________________
-!         ! diagnostic: compare elemental vs nodal area-weighted total bottom energy
-!         loc_Etot = 0.0_WP
-!         do elem = 1, myDim_elem2D
-!             if (elem2D_nodes(1,elem) <= myDim_nod2D) then
-!                 loc_Etot = loc_Etot + elem_area(elem)*iwe2_fbot_e(elem)
-!             end if
-!         end do
-!         call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-!         if (mype==0) write(*,*) '     ├> IDEMIX2 Etot_bot elemental (post-scatter): ', glb_Etot*density_0*1.0e-12, ' TW'
-! 
-!         loc_Etot = 0.0_WP
-!         do node = 1, myDim_nod2D
-!             nlu =ulevels_nod2D(node)+1
-!             nln =nlevels_nod2D(node)
-!             do nz = nlu, nln
-!                 loc_Etot = loc_Etot + (area(nz-1, node)-area(nz, node))*iwe2_fbot(nz, node)
-!             end do
-!         end do
-!         call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-!         if (mype==0) write(*,*) '     └> IDEMIX2 Etot_bot nodal    (post-scatter): ', glb_Etot*density_0*1.0e-12, ' TW'
-
+        
         !_______________________________________________________________________
         ! compute centroid distance from nearset coastal point together with
         ! idemix2_shelf_dist defines what is shelf and what not  
@@ -1000,10 +959,6 @@ module g_cvmix_idemix2
             elnodes = elem2d_nodes(:,elem)
             iwe2_grady_coriol(elem) = sum(gradient_sca(4:6, elem)*mesh%coriolis_node(elnodes))
         end do       
-        
-        !_______________________________________________________________________
-        ! compute d/dy of coriolis 
-        call find_up_downwind_triangles(partit, mesh, mesh%edge_up_dn_tri)
         
         !_______________________________________________________________________
         ! compute scalar cell volume from top to bottom 
@@ -1028,7 +983,6 @@ module g_cvmix_idemix2
             , enable_hor_diffusion= idemix2_enable_hor_diff_expl & !IN: enable horizontal Laplacian diffusion
             , enable_hor_diff_iter= idemix2_enable_hor_diff_impl_iter & !IN: use iterative horizontal diffusion
             , hor_diff_niter      = idemix2_hor_diff_niter       & !IN: number of horizontal diffusion iterations
-            ! enable_superbee_adv = idemix2_enable_superbee_adv  &
             )
                                 
         if (partit%mype==0) write(*,*)                  
