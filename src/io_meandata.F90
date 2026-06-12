@@ -1732,7 +1732,7 @@ CASE ('IDEMIX2   ')
         call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_c0'      , 'Eiw vertical group velocity'    , 'm/s'    , iwe2_c0(:,:)          , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_v0'      , 'Eiw horizontal group velocity'  , 'm/s'    , iwe2_v0(:,:)          , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_alpha_c' , 'Eiw dissipation coefficien'     , 'none'   , iwe2_alpha_c(:,:)     , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-        call def_stream(    elem2D  ,      myDim_elem2D , 'iwe2_fbot'    , 'bottom forcing'                 , 'm^3/s^3', iwe2_fbot_e(:)        , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream(     nod2d  ,      myDim_nod2D  , 'iwe2_fbot'    , 'bottom forcing'                 , 'm^3/s^3', iwe2_fbot_n(:)        , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream(     nod2d  ,      myDim_nod2D  , 'iwe2_fsrf'    , 'surface forcing'                , 'm^3/s^3', iwe2_fsrf(:)          , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream(     nod2d  ,      myDim_nod2D  , 'iwe2_cn'      , 'baroclinic velocity'            , 'm/s'    , iwe2_cn(:)            , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         ! optional diagnostic 
