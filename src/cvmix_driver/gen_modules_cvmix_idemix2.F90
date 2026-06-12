@@ -44,7 +44,7 @@ module g_cvmix_idemix2
     use g_dist2coast, only: compute_dist2coast
     use find_up_downwind_triangles_interface
     use par_support_interfaces, only: init_mpi_types_fbin
-    use gen_support,            only: smooth_nod
+    use g_support,              only: smooth_nod
     implicit none
     public
     
@@ -84,10 +84,10 @@ module g_cvmix_idemix2
     
     ! enable adding of idemix full horizontal tendency from 
     ! div(grad(Eiw*v0)*v0*tauh) diffusion term --> explicit
-    logical            :: idemix2_enable_hor_diffusion = .false.
+    logical            :: idemix2_enable_hor_diff_expl = .false.
     
     ! enable idemix1 functionality of homogenous diffusion into all directions
-    logical            :: idemix2_enable_hor_diff_iter = .false.
+    logical            :: idemix2_enable_hor_diff_impl_iter = .false.
     integer            :: idemix2_hor_diff_niter       = 5   ! from Pollman et al. (2017)
     
     ! define shelf is defined as distance from coast (default 300km)
@@ -138,9 +138,13 @@ module g_cvmix_idemix2
     !___________________________________________________________________________
     ! maximum cutoff value for interal wave energy --> is there for stability
     real(kind=WP)      :: idemix2_Eiw_maxthresh= 0.1
-    ! apply one pass of area-weighted node smoothing to Eiw_diss after the vertical
-    ! implicit solve -- equivalent to the implicit elem->node smoothing in IDEMIX1
-    logical            :: idemix2_smooth_Eiw_diss = .false.
+    ! Option A: smooth IDEMIX2 internal fields to improve long-term stability.
+    ! All flags default to .false. so Option B (TKE-interface smoothing in
+    ! gen_modules_cvmix_tke.F90) is tested first.
+    logical            :: idemix2_smooth_Eiw_diss = .false.   ! smooth iwe2_E_iw_diss after vertical solve
+    logical            :: idemix2_smooth_Eiw      = .false.   ! smooth iwe2_E_iw(:,:,tip1) after wave-wave
+    logical            :: idemix2_smooth_alpha_c  = .false.   ! smooth iwe2_alpha_c after parameter loop
+    integer            :: idemix2_smooth_niter    = 1
     
     !___________________________________________________________________________
     ! switch on extended diagnostic
@@ -173,7 +177,7 @@ module g_cvmix_idemix2
     
     namelist /param_idemix2/ idemix2_tau_v, idemix2_tau_h, idemix2_gamma, idemix2_jstar, idemix2_mu0, idemix2_scal_cn, &
                              idemix2_enable_AB, idemix2_nfbin, & ! idemix2_enable_superbee_adv
-                             idemix2_enable_hor_diffusion, idemix2_enable_hor_diff_iter, idemix2_hor_diff_niter, &
+                             idemix2_enable_hor_diff_expl, idemix2_enable_hor_diff_impl_iter, idemix2_hor_diff_niter, &
                              idemix2_shelf_dist, &
                              idemix2_botforc_Etot, &
                              idemix2_enable_M2  , idemix2_M2forc_file  , idemix2_M2forc_vname  , idemix2_M2forc_zname, &
@@ -182,7 +186,8 @@ module g_cvmix_idemix2
                              idemix2_enable_bot , idemix2_botforc_file , idemix2_botforc_vname , &
                              idemix2_hrmsforc_file, idemix2_hrmsforc_vname, &
                              idemix2_hlamforc_file, idemix2_hlamforc_vname, &
-                             idemix2_Eiw_maxthresh, idemix2_smooth_Eiw_diss, &
+                             idemix2_Eiw_maxthresh, &
+                             idemix2_smooth_Eiw_diss, idemix2_smooth_Eiw, idemix2_smooth_alpha_c, idemix2_smooth_niter, &
                              idemix2_diag_Ecompart, idemix2_diag_Eiw, idemix2_diag_WWI
     
     !___________________________________________________________________________
@@ -283,7 +288,7 @@ module g_cvmix_idemix2
         character(len=cvmix_strlen) :: nmlfile
         logical                     :: file_exist=.False.
         integer                     :: node_size, elem_size, elem, node, nfbin, &
-                                       fbin_i, elnodes(3), nzmax
+                                       fbin_i, elnodes(3), nzmax, nlu, nln, nz
         real(kind=WP)               :: loc_Etot=0.0_WP, glb_Etot=0.0_WP
         real(kind=WP)               :: t0, t1
 #include "../associate_part_def.h"
@@ -321,13 +326,16 @@ module g_cvmix_idemix2
             write(*,*) "     │                                "
             write(*,*) "     ├> idemix2_scal_cn             = ", idemix2_scal_cn
             write(*,*) "     ├> idemix2_Eiw_maxthresh       = ", idemix2_Eiw_maxthresh
-            write(*,*) "     ├> idemix2_smooth_Eiw_diss     = ", idemix2_smooth_Eiw_diss
+            write(*,*) "     ├> idemix2_smooth_Eiw_diss     = ", idemix2_smooth_Eiw_diss, " (Option A: smooth Eiw_diss after vdiff)"
+            write(*,*) "     ├> idemix2_smooth_Eiw          = ", idemix2_smooth_Eiw,      " (Option A: smooth Eiw tip1 after wave-wave)"
+            write(*,*) "     ├> idemix2_smooth_alpha_c      = ", idemix2_smooth_alpha_c,  " (Option A: smooth alpha_c after param loop)"
+            write(*,*) "     │  └> idemix2_smooth_niter     = ", idemix2_smooth_niter
             write(*,*) "     │                                "
             write(*,*) "     ├> idemix2_AB_timestep         = ", idemix2_enable_AB
             write(*,*) "     │  └> idemix2_AB_epsilon       = ", idemix2_AB_epsilon
             write(*,*) "     │                                "
-            write(*,*) "     ├> idemix2_enable_hor_diffusion= ", idemix2_enable_hor_diffusion
-            write(*,*) "     ├> idemix2_enable_hor_diff_iter= ", idemix2_enable_hor_diff_iter
+            write(*,*) "     ├> idemix2_enable_hor_diff_expl= ", idemix2_enable_hor_diff_expl
+            write(*,*) "     ├> idemix2_enable_hor_diff_impl_iter= ", idemix2_enable_hor_diff_impl_iter
             write(*,*) "     │  └> idemix2_hor_diff_niter   = ", idemix2_hor_diff_niter
             write(*,*) "     │                                "
             write(*,*) "     ├> idemix2_nfbin               = ", idemix2_nfbin
@@ -940,13 +948,43 @@ module g_cvmix_idemix2
         end if ! --> if (idemix2_enable_M2 .or. idemix2_enable_niw ) then
         
         !_______________________________________________________________________
-        ! convert elemental bot forcing into nodal bottom forcing 
+        ! convert elemental bot forcing into nodal bottom forcing
         do elem = 1, myDim_elem2D
-            nzmax = nlevels(elem)
+            nzmax   = nlevels(elem)
             elnodes = elem2d_nodes(:,elem)
-            iwe2_fbot(nzmax, elnodes(:)) = iwe2_fbot(nzmax, elnodes(:)) + iwe2_fbot_e(elem)/3.0
+            iwe2_fbot(nzmax, elnodes(:)) = iwe2_fbot(nzmax, elnodes(:)) + iwe2_fbot_e(elem) * elem_area(elem) / 3.0_WP 
         end do
-        
+        do node = 1, myDim_nod2D
+            nlu = nlevels_nod2D_min(node)
+            nln = nlevels_nod2D(node)
+            do nz = nlu, nln
+                if (iwe2_fbot(nz, node)==0.0_WP) cycle
+                iwe2_fbot(nz,node) = iwe2_fbot(nz, node) / (area(nz-1, node)-area(nz, node))
+            end do
+        end do
+
+!         !_______________________________________________________________________
+!         ! diagnostic: compare elemental vs nodal area-weighted total bottom energy
+!         loc_Etot = 0.0_WP
+!         do elem = 1, myDim_elem2D
+!             if (elem2D_nodes(1,elem) <= myDim_nod2D) then
+!                 loc_Etot = loc_Etot + elem_area(elem)*iwe2_fbot_e(elem)
+!             end if
+!         end do
+!         call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+!         if (mype==0) write(*,*) '     ├> IDEMIX2 Etot_bot elemental (post-scatter): ', glb_Etot*density_0*1.0e-12, ' TW'
+! 
+!         loc_Etot = 0.0_WP
+!         do node = 1, myDim_nod2D
+!             nlu =ulevels_nod2D(node)+1
+!             nln =nlevels_nod2D(node)
+!             do nz = nlu, nln
+!                 loc_Etot = loc_Etot + (area(nz-1, node)-area(nz, node))*iwe2_fbot(nz, node)
+!             end do
+!         end do
+!         call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+!         if (mype==0) write(*,*) '     └> IDEMIX2 Etot_bot nodal    (post-scatter): ', glb_Etot*density_0*1.0e-12, ' TW'
+
         !_______________________________________________________________________
         ! compute centroid distance from nearset coastal point together with
         ! idemix2_shelf_dist defines what is shelf and what not  
@@ -987,8 +1025,8 @@ module g_cvmix_idemix2
             , enable_M2           = idemix2_enable_M2            & !IN: activate M2 tidal compartment
             , enable_niw          = idemix2_enable_niw           & !IN: activate NIW compartment
             , enable_AB_timestep  = idemix2_enable_AB            & !IN: use Adams-Bashforth 2nd-order time stepping
-            , enable_hor_diffusion= idemix2_enable_hor_diffusion & !IN: enable horizontal Laplacian diffusion
-            , enable_hor_diff_iter= idemix2_enable_hor_diff_iter & !IN: use iterative horizontal diffusion
+            , enable_hor_diffusion= idemix2_enable_hor_diff_expl & !IN: enable horizontal Laplacian diffusion
+            , enable_hor_diff_iter= idemix2_enable_hor_diff_impl_iter & !IN: use iterative horizontal diffusion
             , hor_diff_niter      = idemix2_hor_diff_niter       & !IN: number of horizontal diffusion iterations
             ! enable_superbee_adv = idemix2_enable_superbee_adv  &
             )
@@ -1351,7 +1389,7 @@ module g_cvmix_idemix2
 !$OMP END PARALLEL DO
         t1 = MPI_Wtime()
         time_params = t1 - t0
-        
+
         !___________________________________________________________________________
         if (idemix2_enable_M2 .or. idemix2_enable_niw) then 
             !_______________________________________________________________________
@@ -1609,7 +1647,7 @@ module g_cvmix_idemix2
         !                           - alpha_c*Eiw^(t+1)
         !                           + Forc^(t) ]
 !$OMP PARALLEL DO PRIVATE(node, uln, nln)
-        do node = 1, myDim_nod2D
+        do node = 1, myDim_nod2D+eDim_nod2D
             uln = ulevels_nod2D(node)
             nln = nlevels_nod2D(node)
             if (idemix2_diag_Eiw) then 
@@ -1651,14 +1689,10 @@ module g_cvmix_idemix2
         time_Eiw_vdiff = t7 - t6
 
         !_______________________________________________________________________
-        ! One-pass area-weighted node smoothing of Eiw_diss -- equivalent to the
-        ! implicit elem->node smoothing that IDEMIX1 applies to its dissipation field
-        ! should benefit long term stability
-        if (idemix2_smooth_Eiw_diss) call smooth_nod(iwe2_E_iw_diss, 1, partit, mesh)
-
-        !_______________________________________________________________________
-        ! Exchange E_iw after vertical diffusion - needed for horizontal diffusion gradients
-        call exchange_nod(iwe2_E_iw(:, :, iwe2_tip1), partit)
+        ! Exchange E_iw(..., tp1) after vertical diffusion - needed for horizontal diffusion gradients
+        if (idemix2_enable_hor_diff_expl .or. idemix2_enable_hor_diff_impl_iter) then
+            call exchange_nod(iwe2_E_iw(:, :, iwe2_tip1), partit)
+        end if 
         
         !_______________________________________________________________________
         ! 5. add lateral diffusion term (see. Olbers D., Eden C., 2013, A Global Model
@@ -1666,10 +1700,14 @@ module g_cvmix_idemix2
         ! for the Diapycnal Diffusivity Induced Internal Gravity Waves...)
         ! Eiw^(t+1) = Eiw^(t+1) + div_h( v_0 * tau_h * grad_h(v_0*E_iw^(t)) )
         ! --> do single disffusion step explicite
-        if ((idemix2_enable_hor_diffusion .or. idemix2_enable_hor_diff_iter) .and. idemix2_diag_Eiw) then 
+        if ((idemix2_enable_hor_diff_expl .or. idemix2_enable_hor_diff_impl_iter) .and. idemix2_diag_Eiw) then 
             iwe2_E_iw_hdif = 0.0_WP
         end if 
-        if (idemix2_enable_hor_diffusion) then 
+        if (idemix2_enable_hor_diff_expl) then 
+            ! Exchange E_iw(...,ti) halo after vertical diffusion - needed for explicite 
+            ! horizontal diffusion gradients
+            call exchange_nod(iwe2_E_iw(:, :, iwe2_ti), partit)
+            
             if (idemix2_diag_Eiw) then
                 call compute_hdiff_Eiw(                 &
                       iwe2_E_iw(:, :, iwe2_ti)          & ! IN:    IW energy at current time
@@ -1693,13 +1731,11 @@ module g_cvmix_idemix2
             end if
         end if
         
-        
-        
         !_______________________________________________________________________
         ! 6. add tendency due to lateral diffusion with iterative method in case of 
         ! high resolution
         ! --> do iterative disffusion step implicitly
-        if (idemix2_enable_hor_diff_iter) then
+        if (idemix2_enable_hor_diff_impl_iter) then
             do iter=1, idemix2_hor_diff_niter
                 if (idemix2_diag_Eiw) then
                     call compute_hdiff_Eiw(                 &
@@ -1722,6 +1758,10 @@ module g_cvmix_idemix2
                         , mesh                              & ! IN
                         )
                 end if
+                
+                ! refresh iwe2_E_iw(:, :, iwe2_tip1) halo for the next diffusive 
+                ! iteration call
+                call exchange_nod(iwe2_E_iw(:, :, iwe2_tip1), partit)
             end do
         end if
         t8 = MPI_Wtime()
@@ -1732,7 +1772,7 @@ module g_cvmix_idemix2
         t8 = MPI_Wtime() 
         if (idemix2_enable_M2 .or. idemix2_enable_niw) then
 !$OMP PARALLEL DO PRIVATE(node, uln, nln)
-            do node = 1, myDim_nod2D
+            do node = 1, myDim_nod2D+eDim_nod2D
                 uln = ulevels_nod2D(node)
                 nln = nlevels_nod2D(node)
                 !_______________________________________________________________
@@ -1783,7 +1823,7 @@ module g_cvmix_idemix2
                             , tau_niw       = iwe2_niw_tau(                    node)  & !IN:    NIW interaction timescale (s)
                             )
                     end if
-
+                    
                 elseif (idemix2_enable_M2) then
                     if (idemix2_diag_WWI) then
                         call cvmix_idemix2_compute_Eiw_waveinteract(                  &
@@ -1862,6 +1902,15 @@ module g_cvmix_idemix2
         end if ! --> if (idemix2_enable_M2 .or . idemix2_enable_niw) then
         t9 = MPI_Wtime()
         time_waveint = t9 - t8
+
+        !_______________________________________________________________________
+        ! Option A: smooth IDEMIX2 internal fields before TKE reads them.
+        ! No prior exchange needed: vdiff and wave-wave loops are extended to
+        ! myDim_nod2D+eDim_nod2D so all three fields carry fresh halo values.
+        ! smooth_nod calls exchange_nod internally at its end.
+        if (idemix2_smooth_Eiw)      call smooth_nod(iwe2_E_iw(:, :, iwe2_tip1) , idemix2_smooth_niter, partit, mesh)
+        if (idemix2_smooth_Eiw_diss) call smooth_nod(iwe2_E_iw_diss             , idemix2_smooth_niter, partit, mesh)
+        if (idemix2_smooth_alpha_c)  call smooth_nod(iwe2_alpha_c               , idemix2_smooth_niter, partit, mesh)
 
         !_______________________________________________________________________
         ! 8. write IDEMIX2 diffusivities and viscositie to FESOM only when IDEMIX2 is
@@ -3403,7 +3452,7 @@ module g_cvmix_idemix2
                 end if 
                     
             end do
-        end if 
+        end if        
         
     end subroutine compute_hdiff_Eiw
 
