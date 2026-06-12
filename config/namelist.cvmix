@@ -128,11 +128,6 @@ idemix2_enable_bot    = .true.
 idemix2_botforc_file  = '/albedo/pool/FESOM/fesom2.0/forcing/idemix/forcing_idemix_final_bin/FIN_STORMTIDE2_M2_plus_NYCANDER_CnoM2_bin_0.40deg.nc'         ! path to bottom forcing file,
 idemix2_botforc_vname = 'stormt_M2_plus_nycand_CnoM2'  ! variable name in bottom forcing file
 
-! ! --- Lee-Wave Forcing ---
-! idemix2_enable_leew   = .false.
-! idemix2_leewforc_file = '/albedo/work/user/pscholz/forcing/IDEMIX2/idemix2_lee_forc_Eden.nc'
-! idemix2_leewforc_vname= 'C_lee'
-
 ! --- Root Mean Square Topographic Height forcing ---
 idemix2_hrmsforc_file = '/albedo/work/user/pscholz/forcing/IDEMIX2/idemix2_hrms_Goff2023.nc'
 idemix2_hrmsforc_vname= 'HRMS'
