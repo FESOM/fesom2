@@ -141,6 +141,13 @@ idemix2_hrmsforc_vname= 'HRMS'
 idemix2_hlamforc_file = '/albedo/work/user/pscholz/forcing/IDEMIX2/idemix2_lambda_Goff2010.nc'
 idemix2_hlamforc_vname= 'LAMBDA'
 
+! --- apply one pass of area-weighted node smoothin after wave-wave interaction
+! --- the idemix2 only mode (no EM2 or Eniw) needs some additional smoothing otherwise instable 
+idemix2_smooth_Eiw_diss= .false.
+idemix2_smooth_Eiw     = .false.   ! smooth iwe2_E_iw(:,:,tip1) after wave-wave
+idemix2_smooth_alpha_c = .false.   ! smooth iwe2_alpha_c after parameter loop
+idemix2_smooth_niter   = 1
+
 ! --- diagnostics
 idemix2_diag_Ecompart = .false.
 idemix2_diag_Eiw      = .false.
