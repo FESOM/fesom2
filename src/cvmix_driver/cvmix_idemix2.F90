@@ -331,11 +331,10 @@ subroutine compute_param(             &
         v0(di)      = max(0d0, idemix2_const_in%gamma*cstar*hofx2(fxa))
         alpha_c(di) = max( 1d-4, idemix2_const_in%mu0*acosh(max(1d0,fxa))*abs(coriolis)/cstar**2 )
         
-        ! --> ATTENTION: CHECK EFFECT OF THESE LINES !!!
-        !! set v0 to zero to prevent horizontal iwe propagation in mixed layer
-        !if ( fxa<1d0 ) then
-        !   v0(di) = 0d0
-        !endif
+        ! set v0 to zero to prevent horizontal iwe propagation in mixed layer
+        if ( fxa<1d0 ) then
+           v0(di) = 0d0
+        endif
     enddo
     
 end subroutine compute_param
@@ -346,7 +345,7 @@ end subroutine compute_param
 !_______________________________________________________________________________
 ! Compute idemix representative vertical (v0) and horizontal (c0) group velocites 
 ! as well as the enery dissipation coefficient alpha_c
-subroutine compute_compart_groupvel(          &
+subroutine compute_compart_groupvel(  &
                 nfbin               , &   
                 coriolis            , & 
                 coriol_grady        , &
@@ -950,12 +949,16 @@ subroutine compute_vdiff_vdiss_Eiw( &
     
     !___________________________________________________________________________
     ! prepare tridiagonal matrix elements: a,b,c,d
+    ! alpha_c dissipation is applied only at interior levels (2:nlev-1).
+    ! Boundary levels (nz=1 surface, nz=nlev bottom) are excluded, consistent
+    ! with IDEMIX1 (iwe_Tdis(2:nlev)), to avoid feeding Kv/TKE at W-grid
+    ! boundary cells where forcing BCs already control tracer fluxes.
     nz = 1
     a_tri(nz)     =  -dt * a_dif(nz)
     b_tri(nz)     = 1.0_cvmix_r8                    &
                     + dt * b_dif(nz)
     c_tri(nz)     =  -dt * c_dif(nz)
-    
+
     do nz=2,nlev-1
         a_tri(nz) =  -dt * a_dif(nz)
         b_tri(nz) = 1.0_cvmix_r8                    &
@@ -963,7 +966,7 @@ subroutine compute_vdiff_vdiss_Eiw( &
                     + dt * alpha_c(nz)*Eiw_max(nz)
         c_tri(nz) =  -dt * c_dif(nz)
     end do
-    
+
     nz = nlev
     a_tri(nz)     =  -dt * a_dif(nz)
     b_tri(nz)     = 1.0_cvmix_r8                    &

@@ -716,7 +716,7 @@ module g_cvmix_idemix2
                                     trim(idemix2_niwforc_vname)      , &
                                     1                                , & 
                                     iwe2_fsrf                        , & 
-                                    .false.                          , & ! NN for missing values
+                                    .true.                           , & ! NN for missing values
                                     .true.                           , & ! interpolate to vertices  
                                     partit                           , & 
                                     mesh                               &
@@ -1213,6 +1213,10 @@ module g_cvmix_idemix2
 !$OMP PARALLEL DO PRIVATE(node, lat_n_deg, nln, uln, nz, cn, topo_shelf)
         do node=1, myDim_nod2D+eDim_nod2D
             !___________________________________________________________________
+            uln = ulevels_nod2D(node)
+            nln = nlevels_nod2D(node)
+            
+            !___________________________________________________________________
             ! re-initialse cross spectral velocites, for later accumulation through 
             ! elemental values
             if (idemix2_enable_M2 ) iwe2_M2_w( :,node) = 0.0_WP
@@ -1222,16 +1226,10 @@ module g_cvmix_idemix2
             lat_n_deg = geo_coord_nod2D(2,node) / rad
             
             !___________________________________________________________________
-            ! compute baroclinic gravity wave speed
-            nln = mesh%nl
-            uln = 1
-            do nz=1, nod_in_elem2D_num(node)
-                nln=min(nln, nlevels(nod_in_elem2D(nz, node)))
-                uln=max(uln, ulevels(nod_in_elem2D(nz, node)))
-            end do
+            ! compute baroclinic gravity wave speed            
             cn=0.0_WP
             do nz=uln, nln-1
-                cn=cn+hnode(nz,node)*sqrt(max(bvfreq(nz,node), 0._WP) + max(bvfreq(nz+1,node), 0._WP))/2._WP
+                cn=cn+hnode(nz,node)*(sqrt(max(bvfreq(nz,node), 0._WP)) + sqrt(max(bvfreq(nz+1,node), 0._WP)))/2._WP
             end do
             cn = cn/pi * idemix2_scal_cn
             iwe2_cn(node)=cn

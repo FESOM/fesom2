@@ -239,8 +239,18 @@ module g_cvmix_idemix
             
             ! only 20% of the niw-input are available to penetrate into the deeper ocean
             ! divide by density_0 --> convert from W/m^2 to m^3/s^3
-            iwe_fsrf = iwe_fsrf/density_0 * idemix_sforcusage 
-            
+            iwe_fsrf = iwe_fsrf/density_0 * idemix_sforcusage
+
+            ! check for total surface energy that is infused, compare with IDEMIX2 Etot_srf
+            loc_Etot = 0.0_WP
+            do elem=1, myDim_elem2D
+                if (elem2D_nodes(1,elem)<=myDim_nod2D) then
+                    loc_Etot = loc_Etot + elem_area(elem)*iwe_fsrf(elem)*density_0
+                end if
+            end do
+            call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+            if (mype==0) write(*,*) " --> IDEMIX total srf. energy Etot_srf =", glb_Etot*1.0e-12, ' TW'
+
         else
             if (mype==0) then
                 write(*,*) '____________________________________________________________________'
@@ -301,7 +311,6 @@ module g_cvmix_idemix
             
             ! divide by density_0 --> convert from W/m^2 to m^3/s^3
             iwe_fbot  = iwe_fbot/density_0
-            
         else
             if (mype==0) then
                 write(*,*) '____________________________________________________________________'
