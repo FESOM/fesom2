@@ -96,6 +96,10 @@ module g_cvmix_idemix2
     ! scal down baroclinic wave speed when not all modes are used
     real(kind=WP)      :: idemix2_scal_cn = 1.0
     
+    ! minimum cn floor: prevents cg_compart→0 in convective columns near the M2 critical latitude (~74.5°N).
+    ! Recommended value: 0.1 m/s (symmetric with the cstar=max(1e-2,...) floor already applied for Eiw).
+    real(kind=WP)      :: idemix2_cn_min  = 0.0
+    
     !___________________________________________________________________________
     ! enable M2 tidal component as significant source of internal wave energy in IDEMIX2, 
     ! lower frequency modes
@@ -175,7 +179,7 @@ module g_cvmix_idemix2
     character(MAX_PATH):: idemix2_hlamforc_file = './idemix2_forcing_t-scattering_1deg.nc'
     character(MAX_PATH):: idemix2_hlamforc_vname= 'LAMBDA_G10'
     
-    namelist /param_idemix2/ idemix2_tau_v, idemix2_tau_h, idemix2_gamma, idemix2_jstar, idemix2_mu0, idemix2_scal_cn, &
+    namelist /param_idemix2/ idemix2_tau_v, idemix2_tau_h, idemix2_gamma, idemix2_jstar, idemix2_mu0, idemix2_scal_cn, idemix2_cn_min, &
                              idemix2_enable_AB, idemix2_AB_epsilon, idemix2_nfbin, & ! idemix2_enable_superbee_adv
                              idemix2_enable_hor_diff_expl, idemix2_enable_hor_diff_impl_iter, idemix2_hor_diff_niter, &
                              idemix2_shelf_dist, &
@@ -316,40 +320,40 @@ module g_cvmix_idemix2
         
         !_______________________________________________________________________
         if (mype==0) then
-            write(*,*) "     IDEMIX2 parameters:"
-            write(*,*) "     ├> idemix2_tau_v               = ", idemix2_tau_v
-            write(*,*) "     ├> idemix2_tau_h               = ", idemix2_tau_h
-            write(*,*) "     ├> idemix2_gamma               = ", idemix2_gamma
-            write(*,*) "     ├> idemix2_jstar               = ", idemix2_jstar
-            write(*,*) "     ├> idemix2_mu0                 = ", idemix2_mu0
-            write(*,*) "     │                                "
-            write(*,*) "     ├> idemix2_scal_cn             = ", idemix2_scal_cn
-            write(*,*) "     ├> idemix2_Eiw_maxthresh       = ", idemix2_Eiw_maxthresh
-            write(*,*) "     ├> idemix2_smooth_Eiw_diss     = ", idemix2_smooth_Eiw_diss, " (Option A: smooth Eiw_diss after vdiff)"
-            write(*,*) "     ├> idemix2_smooth_Eiw          = ", idemix2_smooth_Eiw,      " (Option A: smooth Eiw tip1 after wave-wave)"
-            write(*,*) "     ├> idemix2_smooth_alpha_c      = ", idemix2_smooth_alpha_c,  " (Option A: smooth alpha_c after param loop)"
-            write(*,*) "     │  └> idemix2_smooth_niter     = ", idemix2_smooth_niter
+            write(*,*) "     IDEMIX2:"
+            write(*,*) "     ├> parameter                     "
+            write(*,*) "     │  ┌──────────────────────────── "
+            write(*,*) "     │  ├> idemix2_tau_v            = ", idemix2_tau_v
+            write(*,*) "     │  ├> idemix2_tau_h            = ", idemix2_tau_h
+            write(*,*) "     │  ├> idemix2_gamma            = ", idemix2_gamma
+            write(*,*) "     │  ├> idemix2_jstar            = ", idemix2_jstar
+            write(*,*) "     │  ├> idemix2_mu0              = ", idemix2_mu0
+            write(*,*) "     │  ├> idemix2_scal_cn          = ", idemix2_scal_cn
+            write(*,*) "     │  ├> idemix2_cn_min           = ", idemix2_cn_min
+            write(*,*) "     │  ├> idemix2_Eiw_maxthresh    = ", idemix2_Eiw_maxthresh
+            write(*,*) "     │  ├> idemix2...hor_diff_expl  = ", idemix2_enable_hor_diff_expl
+            write(*,*) "     │  └> idemix2...hor_diff_impl_iter= ", idemix2_enable_hor_diff_impl_iter
+            write(*,*) "     │     └> idemix2_hor_diff_niter= ", idemix2_hor_diff_niter
             write(*,*) "     │                                "
             write(*,*) "     ├> idemix2_AB_timestep         = ", idemix2_enable_AB
             write(*,*) "     │  └> idemix2_AB_epsilon       = ", idemix2_AB_epsilon
             write(*,*) "     │                                "
-            write(*,*) "     ├> idemix2_enable_hor_diff_expl= ", idemix2_enable_hor_diff_expl
-            write(*,*) "     ├> idemix2_enable_hor_diff_impl_iter= ", idemix2_enable_hor_diff_impl_iter
-            write(*,*) "     │  └> idemix2_hor_diff_niter   = ", idemix2_hor_diff_niter
-            write(*,*) "     │                                "
             write(*,*) "     ├> idemix2_nfbin               = ", idemix2_nfbin
             write(*,*) "     │                                "
             write(*,*) "     ├> idemix2_enable_M2           = ", idemix2_enable_M2
+            write(*,*) "     │  ┌──────────────────────────── "
             write(*,*) "     │  └> idemix2_M2forc_file      = ", trim(idemix2_M2forc_file)
             write(*,*) "     │     ├> idemix2_M2forc_vname  = ", trim(idemix2_M2forc_vname)
             write(*,*) "     │     └> idemix2_M2forc_zname  = ", trim(idemix2_M2forc_zname)
             write(*,*) "     │                                "
             write(*,*) "     ├> idemix2_enable_niw          = ", idemix2_enable_niw 
+            write(*,*) "     │  ┌──────────────────────────── "
             write(*,*) "     │  ├> idemix2_fniw_usage       = ", idemix2_fniw_usage 
             write(*,*) "     │  └> idemix2_niwforc_file     = ", trim(idemix2_niwforc_file)
             write(*,*) "     │     └> idemix2_niwforc_vname = ", trim(idemix2_niwforc_vname)
             write(*,*) "     │                                "
             write(*,*) "     ├> idemix2_enable_bot          = ", idemix2_enable_bot
+            write(*,*) "     │  ┌──────────────────────────── "
             write(*,*) "     │  └> idemix2_botforc_file     = ", trim(idemix2_botforc_file)
             write(*,*) "     │     ├> idemix2_botforc_vname = ", trim(idemix2_botforc_vname)
             write(*,*) "     │     └> idemix2_botforc_Etot  = ", idemix2_botforc_Etot
@@ -358,17 +362,26 @@ module g_cvmix_idemix2
 !             write(*,*) "     │  └> idemix2_leewforc_file    = ", trim(idemix2_leewforc_file)
 !             write(*,*) "     │     └> idemix2_leewforc_vname= ", trim(idemix2_leewforc_vname)
 !             write(*,*) "     │                                "
-            write(*,*) "     ├> idemix2_hrmsforc_file       = ", trim(idemix2_hrmsforc_file)
-            write(*,*) "     │  └> idemix2_hrmsforc_vname   = ", trim(idemix2_hrmsforc_vname)
-            write(*,*) "     │                                "
-            write(*,*) "     ├> idemix2_hlamforc_file       = ", trim(idemix2_hlamforc_file)
-            write(*,*) "     │  └> idemix2_hlamforc_vname   = ", trim(idemix2_hlamforc_vname)
+            write(*,*) "     ├> topographic height forcing    "
+            write(*,*) "     │  ┌──────────────────────────── "
+            write(*,*) "     │  ├> idemix2_hrmsforc_file    = ", trim(idemix2_hrmsforc_file)
+            write(*,*) "     │  │  └> idemix2_hrmsforc_vname= ", trim(idemix2_hrmsforc_vname)
+            write(*,*) "     │  └> idemix2_hlamforc_file    = ", trim(idemix2_hlamforc_file)
+            write(*,*) "     │     └> idemix2_hlamforc_vname= ", trim(idemix2_hlamforc_vname)
             write(*,*) "     │                                "
             WRITE(*,*) "     ├> idemix2_shelf_dist          = ", idemix2_shelf_dist
             write(*,*) "     │                                "
+            write(*,*) "     ├> smoothing switches            "
+            write(*,*) "     │  ┌──────────────────────────── "
+            write(*,*) "     │  ├> idemix2_smooth_Eiw_diss  = ", idemix2_smooth_Eiw_diss 
+            write(*,*) "     │  ├> idemix2_smooth_Eiw       = ", idemix2_smooth_Eiw
+            write(*,*) "     │  ├> idemix2_smooth_alpha_c   = ", idemix2_smooth_alpha_c
+            write(*,*) "     │  └> idemix2_smooth_niter     = ", idemix2_smooth_niter
+            write(*,*) "     │                                "
             write(*,*) "     ├> diagnostic switches           "
+            write(*,*) "     │  ┌──────────────────────────── "
             write(*,*) "     │  ├> idemix2_diag_Ecompart    = ", idemix2_diag_Ecompart 
-            write(*,*) "     │  └> idemix2_diag_Eiw         = ", idemix2_diag_Eiw
+            write(*,*) "     │  ├> idemix2_diag_Eiw         = ", idemix2_diag_Eiw
             write(*,*) "     │  └> idemix2_diag_WWI         = ", idemix2_diag_WWI
             write(*,*)
             write(*,*) "     IDEMIX2 inputs:"
@@ -1232,6 +1245,7 @@ module g_cvmix_idemix2
                 cn=cn+hnode(nz,node)*(sqrt(max(bvfreq(nz,node), 0._WP)) + sqrt(max(bvfreq(nz+1,node), 0._WP)))/2._WP
             end do
             cn = cn/pi * idemix2_scal_cn
+            cn = max(cn, idemix2_cn_min)
             iwe2_cn(node)=cn
             
             !
