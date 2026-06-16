@@ -507,9 +507,8 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
   
   !=================CHECK IF ICEBERG IS GROUNDED...===================
  old_element = iceberg_elem !save if iceberg left model domain
- if((draft_scale(ib)*abs(depth_ib) .gt. Zdepth) .and. l_allowgrounding ) then 
- !if((draft_scale(ib)*abs(depth_ib) .gt. minval(Zdepth3)) .and. l_allowgrounding ) then 
-   !icebergs remains stationary (iceberg can melt above in iceberg_dyn!)
+ if((draft_scale(ib)*abs(depth_ib) .gt. Zdepth) .and. l_allowgrounding ) then  
+   ! grounded iceberg velocity is scaled down by a factor (0, 1] according to Marsh et al. https://doi.org/10.5194/gmd-8-1547-2015 (iceberg can melt above in iceberg_dyn!)
     left_mype = 0.0 
     fact=1.0-((draft_scale(ib)*abs(depth_ib)-Zdepth) / (draft_scale(ib)*abs(depth_ib)))
     u_ib = u_ib * fact
