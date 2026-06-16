@@ -353,6 +353,7 @@ use iceberg_params, only: length_ib, width_ib, scaling, elem_block, elem_area_gl
  !for grounding										!=
  real, dimension(3)		:: Zdepth3						!=
  real				:: Zdepth						!=
+ real               :: fact                 ! factor to scale down the velocity of grounded icebergs 
  											!=
  real, dimension(2)             :: coords_tmp
 ! integer, pointer  :: mype
@@ -510,8 +511,9 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
  !if((draft_scale(ib)*abs(depth_ib) .gt. minval(Zdepth3)) .and. l_allowgrounding ) then 
    !icebergs remains stationary (iceberg can melt above in iceberg_dyn!)
     left_mype = 0.0 
-    u_ib = 0.0
-    v_ib = 0.0
+    fact=1.0-((draft_scale(ib)*abs(depth_ib)-Zdepth) / (draft_scale(ib)*abs(depth_ib)))
+    u_ib = u_ib * fact
+    v_ib = v_ib * fact
     old_lon = lon_rad
     old_lat = lat_rad
  
