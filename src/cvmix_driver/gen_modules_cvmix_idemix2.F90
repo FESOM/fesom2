@@ -1870,15 +1870,6 @@ module g_cvmix_idemix2
         time_waveint = t9 - t8
 
         !_______________________________________________________________________
-        ! Option A: smooth IDEMIX2 internal fields before TKE reads them.
-        ! No prior exchange needed: vdiff and wave-wave loops are extended to
-        ! myDim_nod2D+eDim_nod2D so all three fields carry fresh halo values.
-        ! smooth_nod calls exchange_nod internally at its end.
-        if (idemix2_smooth_Eiw)      call smooth_nod(iwe2_E_iw(:, :, iwe2_tip1) , idemix2_smooth_niter, partit, mesh)
-        if (idemix2_smooth_Eiw_diss) call smooth_nod(iwe2_E_iw_diss             , idemix2_smooth_niter, partit, mesh)
-        if (idemix2_smooth_alpha_c)  call smooth_nod(iwe2_alpha_c               , idemix2_smooth_niter, partit, mesh)
-
-        !_______________________________________________________________________
         ! 8. write IDEMIX2 diffusivities and viscositie to FESOM only when IDEMIX2 is
         t9 = MPI_Wtime() 
         ! used alone --> mostly for debuging --> otherwise TKE Av and Kv are use
