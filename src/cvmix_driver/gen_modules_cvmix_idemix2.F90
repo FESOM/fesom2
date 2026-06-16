@@ -1661,73 +1661,53 @@ module g_cvmix_idemix2
         end if 
         
         !_______________________________________________________________________
-        ! 5. add lateral diffusion term (see. Olbers D., Eden C., 2013, A Global Model
-        t7 = MPI_Wtime() 
-        ! for the Diapycnal Diffusivity Induced Internal Gravity Waves...)
-        ! Eiw^(t+1) = Eiw^(t+1) + div_h( v_0 * tau_h * grad_h(v_0*E_iw^(t)) )
-        ! --> do single disffusion step explicite
-        if ((idemix2_enable_hor_diff_expl .or. idemix2_enable_hor_diff_impl_iter) .and. idemix2_diag_Eiw) then 
-            iwe2_E_iw_hdif = 0.0_WP
-        end if 
-        if (idemix2_enable_hor_diff_expl) then 
-            ! Exchange E_iw(...,ti) halo after vertical diffusion - needed for explicite 
-            ! horizontal diffusion gradients
-            call exchange_nod(iwe2_E_iw(:, :, iwe2_ti), partit)
-            
-            if (idemix2_diag_Eiw) then
-                call compute_hdiff_Eiw(                 &
-                      iwe2_E_iw(:, :, iwe2_ti)          & ! IN:    IW energy at current time
-                    , iwe2_E_iw(:, :, iwe2_tip1)        & ! INOUT: IW energy updated by horizontal diffusion
-                    , iwe2_v0                           & ! IN:    first baroclinic mode group speed (m/s)
-                    , 1                                 & ! IN:    number of horizontal diffusion iterations
-                    , partit                            & ! INOUT
-                    , mesh                              & ! IN
-                    , Eiw_dt   = iwe2_E_iw_dt           & ! INOUT: optional diagnostic: total tendency
-                    , Eiw_hdif = iwe2_E_iw_hdif         & ! INOUT: optional diagnostic: horiz. diffusion tendency
-                    )
-            else
-                call compute_hdiff_Eiw(                 &
-                      iwe2_E_iw(:, :, iwe2_ti)          & ! IN:    IW energy at current time
-                    , iwe2_E_iw(:, :, iwe2_tip1)        & ! INOUT: IW energy updated by horizontal diffusion
-                    , iwe2_v0                           & ! IN:    first baroclinic mode group speed (m/s)
-                    , 1                                 & ! IN:    number of horizontal diffusion iterations
-                    , partit                            & ! INOUT
-                    , mesh                              & ! IN
-                    )
-            end if
+        ! 5+6. Horizontal Eiw diffusion (explicit single-pass or iterative implicit)
+        ! Eiw^(t+1) += div_h( v_0 * tau_h * grad_h(v_0 * Eiw) )
+        t7 = MPI_Wtime()
+        ! Diagnostic: capture negated pre-diffusion iwe2_tip1 state.
+        ! The before/after approach is used for both modes because the iterative
+        ! implicit call aliases Eiw_old and Eiw to the same array, making any
+        ! in-subroutine Eiw-Eiw_old difference zero (Fortran aliasing bug).
+        if ((idemix2_enable_hor_diff_expl .or. idemix2_enable_hor_diff_impl_iter) .and. idemix2_diag_Eiw) then
+            iwe2_E_iw_hdif = -iwe2_E_iw(:, :, iwe2_tip1)
         end if
-        
-        !_______________________________________________________________________
-        ! 6. add tendency due to lateral diffusion with iterative method in case of 
-        ! high resolution
-        ! --> do iterative disffusion step implicitly
+
+        if (idemix2_enable_hor_diff_expl) then
+            ! Exchange E_iw(...,ti) halo - needed for explicit horizontal diffusion gradients
+            call exchange_nod(iwe2_E_iw(:, :, iwe2_ti), partit)
+            call compute_hdiff_Eiw(         &
+                  iwe2_E_iw(:, :, iwe2_ti)  & ! IN:    IW energy at current time
+                , iwe2_E_iw(:, :, iwe2_tip1)& ! INOUT: IW energy updated by horizontal diffusion
+                , iwe2_v0                   & ! IN:    first baroclinic mode group speed (m/s)
+                , 1                         & ! IN:    number of horizontal diffusion iterations
+                , partit                    & ! INOUT
+                , mesh                      & ! IN
+                )
+        end if
+
         if (idemix2_enable_hor_diff_impl_iter) then
             do iter=1, idemix2_hor_diff_niter
-                if (idemix2_diag_Eiw) then
-                    call compute_hdiff_Eiw(                 &
-                          iwe2_E_iw(:, :, iwe2_tip1)        & ! IN:    IW energy from previous iteration
-                        , iwe2_E_iw(:, :, iwe2_tip1)        & ! INOUT: IW energy updated in-place (iterative)
-                        , iwe2_v0                           & ! IN:    first baroclinic mode group speed (m/s)
-                        , idemix2_hor_diff_niter            & ! IN:    total number of diffusion iterations
-                        , partit                            & ! INOUT
-                        , mesh                              & ! IN
-                        , Eiw_dt   = iwe2_E_iw_dt           & ! INOUT: optional diagnostic: total tendency
-                        , Eiw_hdif = iwe2_E_iw_hdif         & ! INOUT: optional diagnostic: horiz. diffusion tendency
-                        )
-                else
-                    call compute_hdiff_Eiw(                 &
-                          iwe2_E_iw(:, :, iwe2_tip1)        & ! IN:    IW energy from previous iteration
-                        , iwe2_E_iw(:, :, iwe2_tip1)        & ! INOUT: IW energy updated in-place (iterative)
-                        , iwe2_v0                           & ! IN:    first baroclinic mode group speed (m/s)
-                        , idemix2_hor_diff_niter            & ! IN:    total number of diffusion iterations
-                        , partit                            & ! INOUT
-                        , mesh                              & ! IN
-                        )
-                end if
-                
-                ! refresh iwe2_E_iw(:, :, iwe2_tip1) halo for the next diffusive 
-                ! iteration call
+                call compute_hdiff_Eiw(             &
+                      iwe2_E_iw(:, :, iwe2_tip1)    & ! IN:    IW energy from previous iteration
+                    , iwe2_E_iw(:, :, iwe2_tip1)    & ! INOUT: IW energy updated in-place (iterative)
+                    , iwe2_v0                       & ! IN:    first baroclinic mode group speed (m/s)
+                    , idemix2_hor_diff_niter        & ! IN:    total number of diffusion iterations
+                    , partit                        & ! INOUT
+                    , mesh                          & ! IN
+                    )
                 call exchange_nod(iwe2_E_iw(:, :, iwe2_tip1), partit)
+            end do
+        end if
+
+        ! Diagnostic: iwe2_E_iw_hdif = (Eiw_after - Eiw_before) / dt  [m²/s³]
+        if ((idemix2_enable_hor_diff_expl .or. idemix2_enable_hor_diff_impl_iter) .and. idemix2_diag_Eiw) then
+            do node = 1, myDim_nod2D
+                uln = ulevels_nod2D(node)
+                nln = nlevels_nod2D(node)
+                iwe2_E_iw_hdif(uln:nln, node) = (iwe2_E_iw_hdif(uln:nln, node) &
+                                                + iwe2_E_iw(uln:nln, node, iwe2_tip1)) / dt
+                iwe2_E_iw_dt(uln:nln, node)   =  iwe2_E_iw_dt(uln:nln, node) &
+                                                + iwe2_E_iw_hdif(uln:nln, node)
             end do
         end if
         t8 = MPI_Wtime()
@@ -3134,15 +3114,13 @@ module g_cvmix_idemix2
     ! 
     ! use Gaussian integral satz ... int(div vec_A)dV = ringint(A*vec_n)dA
     !                                    div vec_A    = 1/V * sum_i=1...nface( A_i*vec_n_i)*A_i
-    subroutine compute_hdiff_Eiw(         &  
+    subroutine compute_hdiff_Eiw(         &
                 Eiw_old                 , &
                 Eiw                     , &
                 v0                      , &
                 n_hor_iter              , &
                 partit                  , &
-                mesh                    , &
-                Eiw_dt                  , &
-                Eiw_hdif                  &
+                mesh                      &
                 )
         implicit none
         !___INPUT/OUTPUT VARIABLES______________________________________________
@@ -3152,9 +3130,6 @@ module g_cvmix_idemix2
         real(kind=WP)   , intent(inout)         :: Eiw(:,:)
         real(kind=WP)   , intent(in   )         :: v0(:,:)
         integer         , intent(in   )         :: n_hor_iter
-        real(kind=WP)   , intent(inout),optional:: Eiw_dt(:,:)
-        real(kind=WP)   , intent(inout),optional:: Eiw_hdif(:,:)
-        
         !___LOCAL VARIABLES_____________________________________________________
         integer                                 :: edge, ednodes(2), edel(2),          &
                                                    elnodes1(3), elnodes2(3),           & 
@@ -3388,28 +3363,6 @@ module g_cvmix_idemix2
                 
             end do !-->do nz=nl12+1,nl1
         end do !-->do edge=1,myDim_edge2D
-        
-        !_______________________________________________________________________
-        ! add to total change in Eiw --> optional diagnsotic
-        if (present(Eiw_dt) .or. present(Eiw_hdif)) then 
-            do node = 1, myDim_nod2D
-                nu1 = ulevels_nod2D(node)
-                nl1 = nlevels_nod2D(node)
-                    
-                if (present(Eiw_dt)) then 
-                    do nz = nu1, nl1
-                        Eiw_dt(nz, node)   = Eiw_dt(nz, node) + (Eiw(nz, node)-Eiw_old(nz, node))/dt
-                    end do        
-                end if
-                    
-                if (present(Eiw_hdif)) then 
-                    do nz = nu1, nl1
-                        Eiw_hdif(nz, node) = Eiw_hdif(nz, node)+(Eiw(nz, node)-Eiw_old(nz, node))
-                    end do        
-                end if 
-                    
-            end do
-        end if        
         
     end subroutine compute_hdiff_Eiw
 
