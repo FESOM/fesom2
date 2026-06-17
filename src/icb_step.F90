@@ -505,28 +505,23 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
   !write(*,*) 'nodal depth in iceberg ', ib,'s element:', Zdepth3
   !write(*,*) 'depth at iceberg ', ib, 's location:', Zdepth
   
-  !=================CHECK IF ICEBERG IS GROUNDED...===================
- old_element = iceberg_elem !save if iceberg left model domain
- if((draft_scale(ib)*abs(depth_ib) .gt. Zdepth) .and. l_allowgrounding ) then  
-   ! grounded iceberg velocity is scaled down by a factor (0, 1] according to Marsh et al. https://doi.org/10.5194/gmd-8-1547-2015 (iceberg can melt above in iceberg_dyn!)
-    left_mype = 0.0 
-    fact=1.0-((draft_scale(ib)*abs(depth_ib)-Zdepth) / (draft_scale(ib)*abs(depth_ib)))
-    u_ib = u_ib * fact
-    v_ib = v_ib * fact
-    old_lon = lon_rad
-    old_lat = lat_rad
- 
-! kh 16.03.21 (asynchronous) iceberg calculation starts with the content in common arrays at istep and will merge its results at istep_end_synced
+  !================= CHECK IF ICEBERG IS GROUNDED ===================
+ ! The grounding flag is always set to False in line 469.  
+ ! First, check if the iceberg is grounded.
+ if((draft_scale(ib)*abs(depth_ib) .gt. Zdepth) .and. l_allowgrounding ) then 
+    ! If so, scale the velocity down by a factor [0, 1) to slow down the iceberg
+    ! depending on how deep it penetrates the sea floor ... (Marsh etl al. https://doi.org/10.5194/gmd-8-1547-2015)
+    fact=1.0-( (draft_scale(ib)*abs(depth_ib)-Zdepth) / (draft_scale(ib)*abs(depth_ib)) ) 
+    u_ib = u_ib*fact
+    v_ib = v_ib*fact
+    ! ... and set the grounded flag to True ...
     grounded_ib = 1.
-    !if (mod(istep_end_synced,logfile_outfreq)==0) then
+    ! ... and print a message if verbose output is enabled
     if (lverbose_icb) write(*,*) 'iceberg ib ', ib, 'is grounded; ib_depth=',draft_scale(ib)*abs(depth_ib),'; Zdepth=',Zdepth
-    !end if
- 	
- else 
-  !===================...ELSE CALCULATE TRAJECTORY====================
-    grounded_ib = 0.
-
+ end if
  
+ ! Second, calculate the trajectory of the iceberg based on either the 
+ ! full velocity (ungrounded case) or the scaled down velocity (grounded case)
  t0=MPI_Wtime()
   call trajectory( lon_rad,lat_rad, u_ib,v_ib, new_u_ib,new_v_ib, &
 		   lon_deg,lat_deg,old_lon,old_lat, dt*REAL(steps_per_ib_step))
@@ -559,7 +554,6 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
    iceberg_elem=partit%myList_elem2D(iceberg_elem)  	!global
   end if		   
   !================END OF TRAJECTORY CALCULATION=====================
- end if ! iceberg stationary?
 
   !-----------------------------
   ! LA 2022-11-30
