@@ -311,7 +311,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
           "salt                ", "sgm11               ", "sgm12               ", &
           "sgm22               ", "shum                ", "siarean             ", &
           "siareas             ", "siextentn           ", "siextents           ", &
-          "sigma0              ", "sigma_x             ", "sigma_y             ", &
+          "dens_sigma0         ", "sigma_x             ", "sigma_y             ", &
           "sivoln              ", "sivols              ", "slopetap_x          ", &
           "slopetap_y          ", "slopetap_z          ", "slope_x             ", &
           "slope_y             ", "slope_z             ", "snow                ", &
@@ -326,7 +326,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
           "ty_sur              ", "u                   ", "u_back_tend         ", &
           "u_dis_tend          ", "uice                ", "unod                ", &
           "unod_sfc            ", "u_rhs_ice           ", "u_total_tend        ", &
-          "UVW_SQR             ", &
+          "UVW_SQR             ", "dens_insitu", &
           "uwice               ", "uwind               ", "v                   ", &
           "v_back_tend         ", "v_dis_tend          ", "vice                ", &
           "virtsalt            ", "vnod                ", "vnod_sfc            ", &
