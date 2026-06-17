@@ -640,7 +640,6 @@ module g_cvmix_idemix2
         allocate(vol_nodB2T(node_size))
         vol_nodB2T(:)     = 0.0_WP
         
-        
         !_______________________________________________________________________
         ! width of spectral frequency bins
         iwe2_dphit(:)   = 2.0_WP*pi/(nfbin-2)
@@ -975,9 +974,6 @@ module g_cvmix_idemix2
         
         !_______________________________________________________________________
         ! compute scalar cell volume from top to bottom 
-        ! --> if take the fixed standard levels (zbar) to compute the ocean volume 
-        !     than only normal numerical drift, ocean volume can be computed at 
-        !     initialisation point
         call compute_vol_nodB2T_fix(vol_nodB2T, mesh, partit)
         
         !_______________________________________________________________________
@@ -1219,6 +1215,10 @@ module g_cvmix_idemix2
         !     than only normal numerical drift, ocean volume can be computed at 
         !     initialisation point
         ! call compute_vol_nodB2T_hnode(vol_nodB2T, mesh, partit)
+        
+        ! compute inverse cell volume for horizontal diffusion; uses Z_3d_n and
+        ! hnode which change every timestep under ALE, so must be updated here
+        call compute_vol_wcell(vol_wcelli, mesh, partit)
         
         !_______________________________________________________________________
         ! 1. Compute IDEMIX2 parameters (cn, alpha_c, v0, c0, tau, struct functions)
@@ -2891,7 +2891,7 @@ module g_cvmix_idemix2
 
         !_______________________________________________________________________
         ! additional diagnostics
-        if (present(Edt))   Edt(:,:)   =  (E(:, 1:myDim_nod2D, tip1)-E(:, 1:myDim_nod2D, ti))
+        if (present(Edt))   Edt(:,:)   =  (E(:, 1:myDim_nod2D, tip1)-E(:, 1:myDim_nod2D, ti)) / dt
 
         if (present(Eadvh)) then
             if (flag_AB2) then

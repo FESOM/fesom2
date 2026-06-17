@@ -1139,8 +1139,8 @@ subroutine compute_Eiw_waveinteract(    &
         end do    
         
         ! optional M2 WWI diagnostic
-        if (present(E_M2_dt))       E_M2_dt(:) = E_M2_dt(:) - dt*M2_diss(:)
-        if (present(E_M2_diss_wwi)) E_M2_diss_wwi(:) = -dt*M2_diss(:)
+        if (present(E_M2_dt))       E_M2_dt(:) = E_M2_dt(:) - M2_diss(:)
+        if (present(E_M2_diss_wwi)) E_M2_diss_wwi(:) = -M2_diss(:)
         
         ! update E_iw from E_M2 through wave-wave-interaction
         IW_diss(:) = 0.0_cvmix_r8
@@ -1153,8 +1153,8 @@ subroutine compute_Eiw_waveinteract(    &
         end do
         
         ! optional E_iw diagnostic
-        if (present(E_iw_dt))      E_iw_dt      = E_iw_dt + IW_diss
-        if (present(E_iw_diss_M2)) E_iw_diss_M2 = IW_diss
+        if (present(E_iw_dt))      E_iw_dt      = E_iw_dt + IW_diss/dt
+        if (present(E_iw_diss_M2)) E_iw_diss_M2 = IW_diss/dt
         
     end if
     
@@ -1175,8 +1175,8 @@ subroutine compute_Eiw_waveinteract(    &
         end do
         
         ! optional E_iw diagnostic
-        if (present(E_iw_dt))       E_iw_dt       = E_iw_dt + IW_diss
-        if (present(E_iw_diss_niw)) E_iw_diss_niw = IW_diss
+        if (present(E_iw_dt))       E_iw_dt       = E_iw_dt + IW_diss/dt
+        if (present(E_iw_diss_niw)) E_iw_diss_niw = IW_diss/dt
         
     end if
 end subroutine compute_Eiw_waveinteract
