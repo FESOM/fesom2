@@ -253,7 +253,7 @@ end do
 
  if (mod(istep_end_synced,icb_outfreq)==0 .AND. .not.ascii_out) then
 
-   if (mype==0 .AND. (real(istep) > real(step_per_day)*calving_day(1) ) ) call write_buoy_props_netcdf(partit)
+   if (mype==0) call write_buoy_props_netcdf(partit)
        
    ! all PEs: set back to zero for next round
    bvl_mean=0.0
@@ -353,6 +353,7 @@ use iceberg_params, only: length_ib, width_ib, scaling, elem_block, elem_area_gl
  !for grounding										!=
  real, dimension(3)		:: Zdepth3						!=
  real				:: Zdepth						!=
+ real       :: fact
  											!=
  real, dimension(2)             :: coords_tmp
 ! integer, pointer  :: mype
@@ -504,28 +505,24 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
   !write(*,*) 'nodal depth in iceberg ', ib,'s element:', Zdepth3
   !write(*,*) 'depth at iceberg ', ib, 's location:', Zdepth
   
-  !=================CHECK IF ICEBERG IS GROUNDED...===================
+  !================= CHECK IF ICEBERG IS GROUNDED...===================
  old_element = iceberg_elem !save if iceberg left model domain
+ ! The grounding flag is always set to False in line 469.  
+ ! First, check if the iceberg is grounded.
  if((draft_scale(ib)*abs(depth_ib) .gt. Zdepth) .and. l_allowgrounding ) then 
- !if((draft_scale(ib)*abs(depth_ib) .gt. minval(Zdepth3)) .and. l_allowgrounding ) then 
-   !icebergs remains stationary (iceberg can melt above in iceberg_dyn!)
-    left_mype = 0.0 
-    u_ib = 0.0
-    v_ib = 0.0
-    old_lon = lon_rad
-    old_lat = lat_rad
- 
-! kh 16.03.21 (asynchronous) iceberg calculation starts with the content in common arrays at istep and will merge its results at istep_end_synced
+    ! If so, scale the velocity down by a factor [0, 1) to slow down the iceberg
+    ! depending on how deep it penetrates the sea floor ...
+    fact=1.0-( (draft_scale(ib)*abs(depth_ib)-Zdepth) / (draft_scale(ib)*abs(depth_ib)) ) 
+    u_ib = u_ib*fact
+    v_ib = v_ib*fact
+    ! ... and set the grounded flag to True ...
     grounded_ib = 1.
-    !if (mod(istep_end_synced,logfile_outfreq)==0) then
+    ! ... and print a message if verbose output is enabled
     if (lverbose_icb) write(*,*) 'iceberg ib ', ib, 'is grounded; ib_depth=',draft_scale(ib)*abs(depth_ib),'; Zdepth=',Zdepth
-    !end if
- 	
- else 
-  !===================...ELSE CALCULATE TRAJECTORY====================
-    grounded_ib = 0.
-
+ end if
  
+ ! Second, calculate the trajectory of the iceberg based on either the 
+ ! full velocity (ungrounded case) or the scaled down velocity (grounded case)
  t0=MPI_Wtime()
   call trajectory( lon_rad,lat_rad, u_ib,v_ib, new_u_ib,new_v_ib, &
 		   lon_deg,lat_deg,old_lon,old_lat, dt*REAL(steps_per_ib_step))
@@ -558,7 +555,7 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
    iceberg_elem=partit%myList_elem2D(iceberg_elem)  	!global
   end if		   
   !================END OF TRAJECTORY CALCULATION=====================
- end if ! iceberg stationary?
+ 
 
   !-----------------------------
   ! LA 2022-11-30
@@ -1426,7 +1423,7 @@ type(t_partit), intent(inout), target :: partit
             Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
             conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
             u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),		&
-            f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), grounded(ib), scaling(ib), melted(ib)
+            f_u_ib_old(ib), f_v_ib_old(ib), 0.0, grounded(ib), scaling(ib), melted(ib)
    end if
 
   end do
