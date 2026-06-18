@@ -479,6 +479,7 @@ subroutine compute_compart_interact_tscale(   &
     
     !___________________________________________________________________________
     ! compute NIW Dissipation Timescale
+    tau_compart = 0.0_cvmix_r8
     if (zbottom>0) then
         N0=cn*cvmix_PI/zbottom
         if (  N0 > abs(coriolis) .and. omega_compart > abs(coriolis)  ) then

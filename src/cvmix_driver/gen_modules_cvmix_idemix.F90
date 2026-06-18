@@ -741,11 +741,11 @@ module g_cvmix_idemix
             end do
             
             !___________________________________________________________________
-            ! diagnostic: add horizontal propgation to the total production rate
-            ! of internal wave energy iwe_Tot
-            do node = 1,node_size
-                iwe_Thdi(:,node) = ( iwe(:,node) - iwe_Thdi(:,node) )/dt
-                iwe_Ttot(:,node) = iwe_Ttot(:,node) + iwe_Thdi(:,node)
+            ! diagnostic: add horizontal propagation to the total production rate
+            ! of internal wave energy iwe_Ttot
+            do elem = 1, elem_size
+                iwe_Thdi(:,elem) = ( iwe(:,elem) - iwe_Thdi(:,elem) )/dt
+                iwe_Ttot(:,elem) = iwe_Ttot(:,elem) + iwe_Thdi(:,elem)
             end do
         end if !-->if (idemix_n_hor_iwe_prop_iter>0) then
         

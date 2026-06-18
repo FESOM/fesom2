@@ -1735,12 +1735,12 @@ module g_cvmix_idemix2
                             , E_iw_new      = iwe2_E_iw( uln:nln, node, iwe2_tip1)    & !INOUT: IDEMIX1 IW energy updated by wave-wave interaction
                             , E_M2_old      = iwe2_E_M2( :      , node, iwe2_ti)      & !IN:    M2 compartment energy at current time (m²/s²)
                             , E_M2_new      = iwe2_E_M2( :      , node, iwe2_tip1)    & !INOUT: M2 compartment energy updated
-                            , E_M2_struct   = iwe2_E_M2_struct(       :      , node)  & !IN:    M2 vertical structure function
+                            , E_M2_struct   = iwe2_E_M2_struct( uln:nln, node)  & !IN:    M2 vertical structure function
                             , alpha_M2_c    = iwe2_alpha_M2_c(                 node)  & !IN:    M2 continuous dissipation rate
                             , tau_M2        = iwe2_M2_tau(                     node)  & !IN:    M2 interaction timescale (s)
                             , E_niw_old     = iwe2_E_niw(:      , node, iwe2_ti)      & !IN:    NIW compartment energy at current time (m²/s²)
                             , E_niw_new     = iwe2_E_niw(:      , node, iwe2_tip1)    & !INOUT: NIW compartment energy updated
-                            , E_niw_struct  = iwe2_E_niw_struct(      :      , node)  & !IN:    NIW vertical structure function
+                            , E_niw_struct  = iwe2_E_niw_struct( uln:nln, node)  & !IN:    NIW vertical structure function
                             , tau_niw       = iwe2_niw_tau(                    node)  & !IN:    NIW interaction timescale (s)
                             , E_iw_dt       = iwe2_E_iw_dt(           :      , node)  & !INOUT: optional diagnostic: IDEMIX1 tendency from wave-wave
                             , E_iw_diss_M2  = iwe2_E_iw_diss_M2(      :      , node)  & !INOUT: optional diagnostic: IDEMIX1 dissipation from M2
@@ -1760,12 +1760,12 @@ module g_cvmix_idemix2
                             , E_iw_new      = iwe2_E_iw( uln:nln, node, iwe2_tip1)    & !INOUT: IDEMIX1 IW energy updated by wave-wave interaction
                             , E_M2_old      = iwe2_E_M2( :      , node, iwe2_ti)      & !IN:    M2 compartment energy at current time (m²/s²)
                             , E_M2_new      = iwe2_E_M2( :      , node, iwe2_tip1)    & !INOUT: M2 compartment energy updated
-                            , E_M2_struct   = iwe2_E_M2_struct(       :      , node)  & !IN:    M2 vertical structure function
+                            , E_M2_struct   = iwe2_E_M2_struct( uln:nln, node)  & !IN:    M2 vertical structure function
                             , alpha_M2_c    = iwe2_alpha_M2_c(                 node)  & !IN:    M2 continuous dissipation rate
                             , tau_M2        = iwe2_M2_tau(                     node)  & !IN:    M2 interaction timescale (s)
                             , E_niw_old     = iwe2_E_niw(:      , node, iwe2_ti)      & !IN:    NIW compartment energy at current time (m²/s²)
                             , E_niw_new     = iwe2_E_niw(:      , node, iwe2_tip1)    & !INOUT: NIW compartment energy updated
-                            , E_niw_struct  = iwe2_E_niw_struct(      :      , node)  & !IN:    NIW vertical structure function
+                            , E_niw_struct  = iwe2_E_niw_struct( uln:nln, node)  & !IN:    NIW vertical structure function
                             , tau_niw       = iwe2_niw_tau(                    node)  & !IN:    NIW interaction timescale (s)
                             )
                     end if
@@ -1783,7 +1783,7 @@ module g_cvmix_idemix2
                             , E_iw_new      = iwe2_E_iw( uln:nln, node, iwe2_tip1)    & !INOUT: IDEMIX1 IW energy updated by wave-wave interaction
                             , E_M2_old      = iwe2_E_M2( :      , node, iwe2_ti)      & !IN:    M2 compartment energy at current time (m²/s²)
                             , E_M2_new      = iwe2_E_M2( :      , node, iwe2_tip1)    & !INOUT: M2 compartment energy updated
-                            , E_M2_struct   = iwe2_E_M2_struct(       :      , node)  & !IN:    M2 vertical structure function
+                            , E_M2_struct   = iwe2_E_M2_struct( uln:nln, node)  & !IN:    M2 vertical structure function
                             , alpha_M2_c    = iwe2_alpha_M2_c(                 node)  & !IN:    M2 continuous dissipation rate
                             , tau_M2        = iwe2_M2_tau(                     node)  & !IN:    M2 interaction timescale (s)
                             , E_iw_dt       = iwe2_E_iw_dt(           :      , node)  & !INOUT: optional diagnostic: IDEMIX1 tendency from wave-wave
@@ -1803,7 +1803,7 @@ module g_cvmix_idemix2
                             , E_iw_new      = iwe2_E_iw( uln:nln, node, iwe2_tip1)    & !INOUT: IDEMIX1 IW energy updated by wave-wave interaction
                             , E_M2_old      = iwe2_E_M2( :      , node, iwe2_ti)      & !IN:    M2 compartment energy at current time (m²/s²)
                             , E_M2_new      = iwe2_E_M2( :      , node, iwe2_tip1)    & !INOUT: M2 compartment energy updated
-                            , E_M2_struct   = iwe2_E_M2_struct(       :      , node)  & !IN:    M2 vertical structure function
+                            , E_M2_struct   = iwe2_E_M2_struct( uln:nln, node)  & !IN:    M2 vertical structure function
                             , alpha_M2_c    = iwe2_alpha_M2_c(                 node)  & !IN:    M2 continuous dissipation rate
                             , tau_M2        = iwe2_M2_tau(                     node)  & !IN:    M2 interaction timescale (s)
                             )
@@ -1821,7 +1821,7 @@ module g_cvmix_idemix2
                             , E_iw_new      = iwe2_E_iw( uln:nln, node, iwe2_tip1)    & !INOUT: IDEMIX1 IW energy updated by wave-wave interaction
                             , E_niw_old     = iwe2_E_niw(:      , node, iwe2_ti)      & !IN:    NIW compartment energy at current time (m²/s²)
                             , E_niw_new     = iwe2_E_niw(:      , node, iwe2_tip1)    & !INOUT: NIW compartment energy updated
-                            , E_niw_struct  = iwe2_E_niw_struct(      :      , node)  & !IN:    NIW vertical structure function
+                            , E_niw_struct  = iwe2_E_niw_struct( uln:nln, node)  & !IN:    NIW vertical structure function
                             , tau_niw       = iwe2_niw_tau(                    node)  & !IN:    NIW interaction timescale (s)
                             , E_iw_dt       = iwe2_E_iw_dt(           :      , node)  & !INOUT: optional diagnostic: IDEMIX1 tendency from wave-wave
                             , E_iw_diss_niw = iwe2_E_iw_diss_niw(     :      , node)  & !INOUT: optional diagnostic: IDEMIX1 dissipation from NIW
@@ -1838,7 +1838,7 @@ module g_cvmix_idemix2
                             , E_iw_new      = iwe2_E_iw( uln:nln, node, iwe2_tip1)    & !INOUT: IDEMIX1 IW energy updated by wave-wave interaction
                             , E_niw_old     = iwe2_E_niw(:      , node, iwe2_ti)      & !IN:    NIW compartment energy at current time (m²/s²)
                             , E_niw_new     = iwe2_E_niw(:      , node, iwe2_tip1)    & !INOUT: NIW compartment energy updated
-                            , E_niw_struct  = iwe2_E_niw_struct(      :      , node)  & !IN:    NIW vertical structure function
+                            , E_niw_struct  = iwe2_E_niw_struct( uln:nln, node)  & !IN:    NIW vertical structure function
                             , tau_niw       = iwe2_niw_tau(                    node)  & !IN:    NIW interaction timescale (s)
                             )
                     end if
