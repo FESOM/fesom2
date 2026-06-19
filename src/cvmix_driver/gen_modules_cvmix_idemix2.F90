@@ -229,7 +229,6 @@ module g_cvmix_idemix2
     ! --- Eiw - internal wave energy related variables ---
     real(kind=WP), allocatable, dimension(:,:,:):: iwe2_E_iw
     real(kind=WP), allocatable, dimension(:,:)  :: iwe2_E_iw_diss
-    real(kind=WP), allocatable, dimension(:)    :: iwe_E_iw_vint
     
     ! optional diagnostic
     real(kind=WP), allocatable, dimension(:,:)  :: iwe2_E_iw_dt, iwe2_E_iw_fbot, & 

@@ -380,7 +380,7 @@ subroutine compute_compart_groupvel(  &
                                                          w_compart
     !___Local___________________________________________________________________
     integer                                           :: di, fbin_i
-    real(cvmix_r8)                                    :: fxa, fxa2, intNz, cstar, &
+    real(cvmix_r8)                                    :: fxa, fxa2, cstar, &
                                                          kdot_x, kdot_y, cg_compart
     type(idemix2_type), pointer                       :: idemix2_const_in
     
@@ -719,20 +719,20 @@ subroutine compute_vert_struct_fct(   &
             E_struct_M2(di) = mask * 0.5_cvmix_r8*( (1.0_cvmix_r8+coriolis**2/omega_M2**2)*phin(   di)**2 /(small+cn**2) &
                                                    +(1.0_cvmix_r8-coriolis**2/omega_M2**2)*dphindz(di)**2 /Nzw(di) )
                                              
-            if (E_struct_M2(di)/=E_struct_M2(di) .or. E_struct_M2(di)<0.0_cvmix_r8) then 
-                write(*,*) " }-))))°> found negative/NaN E_struct_M2", E_struct_M2(di)
-                write(*,*) "di              = ", di
-                write(*,*) "mask            = ", mask
-                write(*,*) "coriolis        = ", coriolis
-                write(*,*) "omega_M2        = ", omega_M2
-                write(*,*) "phin(   di)     = ", phin(   di)
-                write(*,*) "dphindz(di)     = ", dphindz(di)
-                write(*,*) "Nzw(di)         = ", Nzw(di)
-                write(*,*) "cn              = ", cn
-                write(*,*) "coriolis**2/omega_M2**2 = ", coriolis**2/omega_M2**2
-                write(*,*) "(1.0_cvmix_r8+coriolis**2/omega_M2**2) = ", (1.0_cvmix_r8+coriolis**2/omega_M2**2)
-                write(*,*) "(1.0_cvmix_r8-coriolis**2/omega_M2**2) = ", (1.0_cvmix_r8-coriolis**2/omega_M2**2)
-            end if   
+!             if (E_struct_M2(di)/=E_struct_M2(di) .or. E_struct_M2(di)<0.0_cvmix_r8) then 
+!                 write(*,*) " }-))))°> found negative/NaN E_struct_M2", E_struct_M2(di)
+!                 write(*,*) "di              = ", di
+!                 write(*,*) "mask            = ", mask
+!                 write(*,*) "coriolis        = ", coriolis
+!                 write(*,*) "omega_M2        = ", omega_M2
+!                 write(*,*) "phin(   di)     = ", phin(   di)
+!                 write(*,*) "dphindz(di)     = ", dphindz(di)
+!                 write(*,*) "Nzw(di)         = ", Nzw(di)
+!                 write(*,*) "cn              = ", cn
+!                 write(*,*) "coriolis**2/omega_M2**2 = ", coriolis**2/omega_M2**2
+!                 write(*,*) "(1.0_cvmix_r8+coriolis**2/omega_M2**2) = ", (1.0_cvmix_r8+coriolis**2/omega_M2**2)
+!                 write(*,*) "(1.0_cvmix_r8-coriolis**2/omega_M2**2) = ", (1.0_cvmix_r8-coriolis**2/omega_M2**2)
+!             end if   
             
         enddo
     endif
@@ -753,19 +753,19 @@ subroutine compute_vert_struct_fct(   &
             E_struct_niw(di) = mask * 0.5_cvmix_r8*( (1.0_cvmix_r8+coriolis**2/(small+omega_niw**2))*phin(   di)**2/(small+cn**2) &
                                                     +(1.0_cvmix_r8-coriolis**2/(small+omega_niw**2))*dphindz(di)**2/Nzw(di) )
                                              
-            if (E_struct_niw(di)/=E_struct_niw(di) .or. E_struct_niw(di)<0.0_cvmix_r8) then 
-                write(*,*) " }-))))°> found negative/NaN E_struct_niw", E_struct_niw(di)
-                write(*,*) "di              = ", di
-                write(*,*) "mask            = ", mask
-                write(*,*) "coriolis        = ", coriolis
-                write(*,*) "omega_niw       = ", omega_niw
-                write(*,*) "phin(   di)     = ", phin(   di)
-                write(*,*) "dphindz(di)     = ", dphindz(di)
-                write(*,*) "Nzw(di)         = ", Nzw(di)
-                write(*,*) "cn              = ", cn
-                write(*,*) "(1.0_cvmix_r8+coriolis**2/omega_M2**2) = ", (1.0_cvmix_r8+coriolis**2/omega_M2**2)
-                write(*,*) "(1.0_cvmix_r8-coriolis**2/omega_M2**2) = ", (1.0_cvmix_r8-coriolis**2/omega_M2**2)
-            end if 
+!             if (E_struct_niw(di)/=E_struct_niw(di) .or. E_struct_niw(di)<0.0_cvmix_r8) then 
+!                 write(*,*) " }-))))°> found negative/NaN E_struct_niw", E_struct_niw(di)
+!                 write(*,*) "di              = ", di
+!                 write(*,*) "mask            = ", mask
+!                 write(*,*) "coriolis        = ", coriolis
+!                 write(*,*) "omega_niw       = ", omega_niw
+!                 write(*,*) "phin(   di)     = ", phin(   di)
+!                 write(*,*) "dphindz(di)     = ", dphindz(di)
+!                 write(*,*) "Nzw(di)         = ", Nzw(di)
+!                 write(*,*) "cn              = ", cn
+!                 write(*,*) "(1.0_cvmix_r8+coriolis**2/omega_M2**2) = ", (1.0_cvmix_r8+coriolis**2/omega_M2**2)
+!                 write(*,*) "(1.0_cvmix_r8-coriolis**2/omega_M2**2) = ", (1.0_cvmix_r8-coriolis**2/omega_M2**2)
+!             end if 
         enddo
     endif
     
