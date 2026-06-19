@@ -2551,7 +2551,7 @@ subroutine write_mean(entry, entry_index)
                 tm0 = MPI_Wtime()
                 if (io_xios_is_ice_field(entry%name)) then
                    call io_xios_apply_ice_mask_2d_elem_r8(tmp2_r8)
-                else
+                else if (trim(entry%name) /= 'fw' .and. trim(entry%name) /= 'fh') then
                    call io_xios_apply_wet_2d_elem_r8(tmp2_r8)
                 end if
                 tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
@@ -2584,7 +2584,7 @@ subroutine write_mean(entry, entry_index)
                 tm0 = MPI_Wtime()
                 if (io_xios_is_ice_field(entry%name)) then
                    call io_xios_apply_ice_mask_2d_elem_r4(tmp2_r4)
-                else
+                else if (trim(entry%name) /= 'fw' .and. trim(entry%name) /= 'fh') then
                    call io_xios_apply_wet_2d_elem_r4(tmp2_r4)
                 end if
                 tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
@@ -2621,7 +2621,7 @@ subroutine write_mean(entry, entry_index)
                 tm0 = MPI_Wtime()
                 if (io_xios_is_ice_field(entry%name)) then
                    call io_xios_apply_ice_mask_2d_r8(tmp2_r8)
-                else
+                else if (trim(entry%name) /= 'fw' .and. trim(entry%name) /= 'fh') then
                    call io_xios_apply_wet_2d_r8(tmp2_r8)
                 end if
                 tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
@@ -2656,7 +2656,7 @@ subroutine write_mean(entry, entry_index)
                 tm0 = MPI_Wtime()
                 if (io_xios_is_ice_field(entry%name)) then
                    call io_xios_apply_ice_mask_2d_r4(tmp2_r4)
-                else
+                else if (trim(entry%name) /= 'fw' .and. trim(entry%name) /= 'fh') then
                    call io_xios_apply_wet_2d_r4(tmp2_r4)
                 end if
                 tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
