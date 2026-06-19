@@ -1422,12 +1422,6 @@ module g_cvmix_idemix2
                         , w_compart    = w_niw_e(            :      ) & !OUT: cross-spectral propagation rate per bin (1/s)
                         )
                     
-                    ! Mask out NIW velocities near equator where physics is singular
-                    if (abs(lat_e_deg) < 5.0_WP) then  ! ~5° latitude
-                        iwe2_niw_uv( :, :, elem) = 0.0_WP
-                        w_niw_e(           :   ) = 0.0_WP
-                    end if
-                    
                     do k=1,3
                         iwe2_niw_w(:, elnodes(k)) = iwe2_niw_w(:, elnodes(k)) + w_niw_e(:)*area_third
                     end do

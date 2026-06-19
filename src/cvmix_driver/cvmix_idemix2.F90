@@ -380,7 +380,7 @@ subroutine compute_compart_groupvel(  &
                                                          w_compart
     !___Local___________________________________________________________________
     integer                                           :: di, fbin_i
-    real(cvmix_r8)                                    :: fxa, intNz, cstar, &
+    real(cvmix_r8)                                    :: fxa, fxa2, intNz, cstar, &
                                                          kdot_x, kdot_y, cg_compart
     type(idemix2_type), pointer                       :: idemix2_const_in
     
@@ -407,19 +407,22 @@ subroutine compute_compart_groupvel(  &
     ! kdot_M2 = (kdot_x_M2, kdot_y_M2)
     
     ! compute: sqrt(omega²-f²)
-    fxa = sqrt(max(1d-10, omega_compart**2 - coriolis**2 ))
-        
+    ! 1st term (Coriolis refraction, cn/fxa singular at f=omega): floor prevents 1/fxa divergence
+    fxa  = sqrt(max(1d-10, omega_compart**2 - coriolis**2 ))
+    ! 2nd term (cn-gradient refraction, sqrt(fxa) non-singular): no floor, goes to zero naturally
+    fxa2 = sqrt(max(0d0,   omega_compart**2 - coriolis**2 ))
+
     ! 1st part coriolis contribution
-    ! compute: c_n/omega/sqrt(omega²-f²)) * f * grad_f 
+    ! compute: c_n/omega/sqrt(omega²-f²)) * f * grad_f  (uses fxa with floor)
     ! 2nd part topographic/buoyancy driven contribution
-    ! compute: sqrt(omega²-f²)/omega * grad_cn
+    ! compute: sqrt(omega²-f²)/omega * grad_cn           (uses fxa2, physical zero at equator)
     kdot_y = -cn/fxa/omega_compart * coriolis*coriol_grady &
-             -fxa/omega_compart*cn_grady
+             -fxa2/omega_compart*cn_grady
     !        |
     !        +-> this minus sign is from the -cos(phi)
     !
-    
-    kdot_x = fxa/omega_compart*cn_gradx
+
+    kdot_x = fxa2/omega_compart*cn_gradx
     
     !___________________________________________________________________________
     !zonal, meridional and cross-spectral component of M2 internal tide group velocity
