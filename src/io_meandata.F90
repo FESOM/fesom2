@@ -1731,7 +1731,7 @@ CASE ('IDEMIX2   ')
         call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_Eiw_diss', 'Eiw production from dissipation', 'm^2/s^3', iwe2_E_iw_diss( :,:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_c0'      , 'Eiw vertical group velocity'    , 'm/s'    , iwe2_c0(:,:)          , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_v0'      , 'Eiw horizontal group velocity'  , 'm/s'    , iwe2_v0(:,:)          , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-        call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_alpha_c' , 'Eiw dissipation coefficien'     , 'none'   , iwe2_alpha_c(:,:)     , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_alpha_c' , 'Eiw dissipation coefficien'     , 's/m^2'  , iwe2_alpha_c(:,:)     , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream(     nod2d  ,      myDim_nod2D  , 'iwe2_fbot'    , 'bottom forcing'                 , 'm^3/s^3', iwe2_fbot_n(:)        , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream(     nod2d  ,      myDim_nod2D  , 'iwe2_fsrf'    , 'surface forcing'                , 'm^3/s^3', iwe2_fsrf(:)          , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream(     nod2d  ,      myDim_nod2D  , 'iwe2_cn'      , 'baroclinic velocity'            , 'm/s'    , iwe2_cn(:)            , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -1746,7 +1746,7 @@ CASE ('IDEMIX2   ')
         
         if (idemix2_enable_M2) then 
         
-            call def_stream(                 nod2d  ,                myDim_nod2D   , 'iwe2_m2_alphac'  , 'M2 energy dissipation'              , 'none'     , iwe2_alpha_M2_c(:)       , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream(                 nod2d  ,                myDim_nod2D   , 'iwe2_m2_alphac'  , 'M2 energy dissipation'              , 's/m^2'    , iwe2_alpha_M2_c(:)       , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
             call def_stream(                 nod2d  ,                myDim_nod2D   , 'iwe2_m2_tau'     , 'M2 dissipation timescale'           , 's'        , iwe2_M2_tau(:)           , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
             call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_m2_forc'    , 'M2 forcing'                         , 'm^3/s^3/rad', iwe2_fM2(:,:)          , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
             call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_m2_w'       , 'M2 cross. spectr. propag.'          , 'rad/s'    , iwe2_M2_w(:,:)           , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -1800,7 +1800,7 @@ CASE ('IDEMIX2   ')
         if (idemix2_enable_M2 .or. idemix2_enable_niw) then 
             call def_stream(nod2d, myDim_nod2D, 'topo_dist2c', 'distance from coast'               , 'm', iwe2_topo_dist, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)    
             call def_stream(nod2d, myDim_nod2D, 'topo_hrms'  , 'Root Mean Square Topographic Heigh', 'm', iwe2_topo_hrms, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)    
-            call def_stream(nod2d, myDim_nod2D, 'topo_hlam'  , 'Topographic Wavelength'            , 'm', iwe2_topo_hrms, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)    
+            call def_stream(nod2d, myDim_nod2D, 'topo_hlam'  , 'Topographic Wavelength'            , 'm', iwe2_topo_hlam, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)    
         end if 
     end if     
 
