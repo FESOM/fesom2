@@ -3323,9 +3323,9 @@ subroutine init_ref_density_advanced(tracers, partit, mesh)
     type(t_tracer), intent(in),     target  :: tracers
     integer                                 :: node, nz, nzmin, nzmax
     real(kind=WP)                           :: rhopot, bulk_0, bulk_pz, bulk_pz2, rho
-    real(kind=8)                            :: T, S, auxz, x, y
+    real(kind=WP)                           :: T, S, auxz, x, y
     real(kind=WP),  dimension(:,:), pointer :: temp, salt
-    real(kind=8)                            :: ref_temp1D(mesh%nl-1), ref_salt1D(mesh%nl-1), vol1D(mesh%nl-1)
+    real(kind=WP)                           :: ref_temp1D(mesh%nl-1), ref_salt1D(mesh%nl-1), vol1D(mesh%nl-1)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -3351,9 +3351,9 @@ do node=1,myDim_nod2d
     end do
 end do
 !$OMP END PARALLEL DO
-call MPI_Allreduce(MPI_IN_PLACE, ref_temp1D, mesh%nl-1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
-call MPI_Allreduce(MPI_IN_PLACE, ref_salt1D, mesh%nl-1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
-call MPI_Allreduce(MPI_IN_PLACE,      vol1D, mesh%nl-1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+call MPI_Allreduce(MPI_IN_PLACE, ref_temp1D, mesh%nl-1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+call MPI_Allreduce(MPI_IN_PLACE, ref_salt1D, mesh%nl-1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+call MPI_Allreduce(MPI_IN_PLACE,      vol1D, mesh%nl-1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 
 where( vol1D > 1.e-12_WP) !more than 0.!
      ref_temp1D=ref_temp1D/vol1D

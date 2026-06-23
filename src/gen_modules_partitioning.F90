@@ -260,7 +260,7 @@ subroutine init_mpi_types(partit, mesh)
             blocklen_tmp(1:nb) = blocklen(1:nb)*n_val 
             displace_tmp(1:nb) = displace(1:nb)*n_val 
 
-            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
                  partit%r_mpitype_elem2D(n,n_val), partit%MPIerr)
 
             call MPI_TYPE_COMMIT(partit%r_mpitype_elem2D(n,n_val), partit%MPIerr) 
@@ -276,7 +276,7 @@ subroutine init_mpi_types(partit, mesh)
                print *,"out of bounds error, lbound:",lbound(partit%r_mpitype_elem3D), "indices:", n,nl1,n_val, "ubound:",ubound(partit%r_mpitype_elem3D), __FILE__,__LINE__
                stop 1
              end if
-               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, & 
                     partit%r_mpitype_elem3D(n,nl1,n_val),  partit%MPIerr)
 
                call MPI_TYPE_COMMIT(partit%r_mpitype_elem3D(n,nl1,n_val),  partit%MPIerr)  
@@ -306,7 +306,7 @@ subroutine init_mpi_types(partit, mesh)
             blocklen_tmp(1:nb) = blocklen(1:nb)*n_val 
             displace_tmp(1:nb) = displace(1:nb)*n_val 
 
-            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
                  partit%s_mpitype_elem2D(n, n_val), partit%MPIerr)
 
             call MPI_TYPE_COMMIT(partit%s_mpitype_elem2D(n, n_val),   partit%MPIerr) 
@@ -316,7 +316,7 @@ subroutine init_mpi_types(partit, mesh)
                blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nl1 
                displace_tmp(1:nb) = displace(1:nb)*n_val*nl1 
 
-               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, & 
                     partit%s_mpitype_elem3D(n,nl1,n_val),  partit%MPIerr)
 
                call MPI_TYPE_COMMIT(partit%s_mpitype_elem3D(n,nl1,n_val),  partit%MPIerr)  
@@ -347,7 +347,7 @@ subroutine init_mpi_types(partit, mesh)
 
          DO n_val=1,4
 
-            call MPI_TYPE_INDEXED(nb, blocklen, displace, MPI_DOUBLE_PRECISION, &
+            call MPI_TYPE_INDEXED(nb, blocklen, displace, MPI_WP, &
                  partit%r_mpitype_elem2D_full(n,n_val), partit%MPIerr)
             call MPI_TYPE_COMMIT(partit%r_mpitype_elem2D_full(n, n_val),   partit%MPIerr)
 
@@ -362,7 +362,7 @@ subroutine init_mpi_types(partit, mesh)
                print *,"out of bounds error, lbound:",lbound(partit%r_mpitype_elem3D_full), "indices:", n,nl1,n_val, "ubound:", ubound(partit%r_mpitype_elem3D_full), __FILE__,__LINE__
                stop 1
              end if
-               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, & 
                     partit%r_mpitype_elem3D_full(n,nl1,n_val),  partit%MPIerr)
 
                call MPI_TYPE_COMMIT(partit%r_mpitype_elem3D_full(n,nl1,n_val),  partit%MPIerr)  
@@ -392,7 +392,7 @@ subroutine init_mpi_types(partit, mesh)
          call MPI_TYPE_COMMIT(partit%s_mpitype_elem2D_full_i(n), partit%MPIerr)  
  
          DO n_val=1,4
-            call MPI_TYPE_INDEXED(nb, blocklen, displace, MPI_DOUBLE_PRECISION, &
+            call MPI_TYPE_INDEXED(nb, blocklen, displace, MPI_WP, &
                  partit%s_mpitype_elem2D_full(n,n_val), partit%MPIerr)
             call MPI_TYPE_COMMIT(partit%s_mpitype_elem2D_full(n,n_val),   partit%MPIerr)
   
@@ -401,7 +401,7 @@ subroutine init_mpi_types(partit, mesh)
                blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nl1 
                displace_tmp(1:nb) = displace(1:nb)*n_val*nl1 
 
-               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, & 
                     partit%s_mpitype_elem3D_full(n,nl1,n_val),  partit%MPIerr)
 
                call MPI_TYPE_COMMIT(partit%s_mpitype_elem3D_full(n,nl1,n_val),  partit%MPIerr)  
@@ -450,7 +450,7 @@ subroutine init_mpi_types(partit, mesh)
             endif
          enddo
 
-         call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_DOUBLE_PRECISION, & 
+         call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_WP, & 
               partit%r_mpitype_nod2D(n),     partit%MPIerr)
 
          call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_INTEGER, & 
@@ -465,7 +465,7 @@ subroutine init_mpi_types(partit, mesh)
                blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nl1 
                displace_tmp(1:nb) = displace(1:nb)*n_val*nl1 
 
-               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, & 
                     partit%r_mpitype_nod3D(n,nl1,n_val),  partit%MPIerr)
 
                call MPI_TYPE_COMMIT(partit%r_mpitype_nod3D(n,nl1,n_val),  partit%MPIerr)  
@@ -490,7 +490,7 @@ subroutine init_mpi_types(partit, mesh)
             endif
          enddo
 
-         call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_DOUBLE_PRECISION, & 
+         call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_WP, & 
               partit%s_mpitype_nod2D(n),     partit%MPIerr)
 
          call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_INTEGER, & 
@@ -505,7 +505,7 @@ subroutine init_mpi_types(partit, mesh)
                blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nl1 
                displace_tmp(1:nb) = displace(1:nb)*n_val*nl1 
 
-               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, & 
                     partit%s_mpitype_nod3D(n,nl1,n_val),  partit%MPIerr)
 
                call MPI_TYPE_COMMIT(partit%s_mpitype_nod3D(n,nl1,n_val),  partit%MPIerr)  

@@ -1003,8 +1003,8 @@ subroutine check_validviscopt_5(partit, mesh)
     !___________________________________________________________________________
     ! compute global mean ratio --> core2 Ratio=4.26 (eddy parameterizted), 
     ! dart Ratio=0.97 (eddy resolving/permitting)
-    call MPI_AllREDUCE(loc_R, glb_R, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(loc_A, glb_A, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(loc_R, glb_R, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(loc_A, glb_A, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
     glb_R  = glb_R/glb_A
     
     !___________________________________________________________________________

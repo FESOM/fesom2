@@ -212,6 +212,11 @@ contains
             print *,"FESOM2 git SHA: "//fesom_git_sha()
             call MPI_Get_library_version(f%mpi_version_txt, f%mpi_version_len, f%MPIERR)
             print *,"MPI library version: "//trim(f%mpi_version_txt)
+#if defined(USE_SINGLE_PRECISION)
+            print '(a,i0,a)'," FESOM working precision: WP=",WP," bytes (SINGLE PRECISION MODE)"
+#else
+            print '(a,i0,a)'," FESOM working precision: WP=",WP," bytes (DOUBLE PRECISION MODE)"
+#endif
             print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
             print *, achar(27)//'[7;32m'//' --> FESOM BUILDS UP MODEL CONFIGURATION                    '//achar(27)//'[0m'
         end if
