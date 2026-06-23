@@ -251,8 +251,8 @@ CONTAINS
       warn = 0
 
       if (mype==0) then
-         write(*,*) 'reading ',     trim(filename)
-         write(*,*) 'variable  : ', trim(varname)
+         write(*,*) 'variable ', trim(varname)
+         write(*,*) 'from     ', trim(filename)
       end if
       
       call nc_readGrid(partit)
@@ -538,7 +538,7 @@ CONTAINS
       type(t_mesh),   intent(in),    target   :: mesh
       type(t_partit), intent(inout), target   :: partit 
       type(t_tracer), intent(inout), target   :: tracers  
-      integer                                 :: n, i
+      integer                                 :: n, i, id
       real(kind=WP)                           :: locTmax, locTmin, locSmax, locSmin, glo   
       real(kind=WP)                           :: locDINmax, locDINmin, locDICmax, locDICmin, locAlkmax !OG
       real(kind=WP)                           :: locAlkmin, locDSimax, locDSimin, locDFemax, locDFemin
@@ -621,41 +621,11 @@ CONTAINS
       locTmin = 6666
       locSmax = locTmax
       locSmin = locTmin
-
-#if defined(__recom)
-        locDINmax = -66666
-        locDINmin = 66666
-        locDICmax = locDINmax
-        locDICmin = locDINmin
-        locAlkmax = locDINmax
-        locAlkmin = locDINmin
-        locDSimax = locDINmax
-        locDSimin = locDINmin
-        locDFemax = locDINmax
-        locDFemin = locDINmin
-        locO2max  = locDINmax
-        locO2min  = locDINmin
-#endif
       do n=1, partit%myDim_nod2d
         locTmax = max(locTmax,maxval(tracers%data(1)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
         locTmin = min(locTmin,minval(tracers%data(1)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
         locSmax = max(locSmax,maxval(tracers%data(2)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
         locSmin = min(locSmin,minval(tracers%data(2)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-
-#if defined(__recom)
-        locDINmax = max(locDINmax,maxval(tracers%data(3)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-        locDINmin = min(locDINmin,minval(tracers%data(3)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-        locDICmax = max(locDICmax,maxval(tracers%data(4)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-        locDICmin = min(locDICmin,minval(tracers%data(4)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-        locAlkmax = max(locAlkmax,maxval(tracers%data(5)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-        locAlkmin = min(locAlkmin,minval(tracers%data(5)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-        locDSimax = max(locDSimax,maxval(tracers%data(20)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-        locDSimin = min(locDSimin,minval(tracers%data(20)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-        locDFemax = max(locDFemax,maxval(tracers%data(21)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-        locDFemin = min(locDFemin,minval(tracers%data(21)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-        locO2max  = max(locO2max,maxval(tracers%data(24)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-        locO2min  = min(locO2min,minval(tracers%data(24)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-#endif
       end do
       call MPI_AllREDUCE(locTmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal max init. temp. =', glo
@@ -665,14 +635,60 @@ CONTAINS
       if (partit%mype==0) write(*,*) '  |-> gobal max init. salt. =', glo
       call MPI_AllREDUCE(locSmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  `-> gobal min init. salt. =', glo      
-#if defined(__recom)
 
+#if defined(__recom)
+      locDINmax = -66666
+      locDINmin = 66666
+      locDICmax = locDINmax
+      locDICmin = locDINmin
+      locAlkmax = locDINmax
+      locAlkmin = locDINmin
+      locDSimax = locDINmax
+      locDSimin = locDINmin
+      locDFemax = locDINmax
+      locDFemin = locDINmin
+      locO2max  = locDINmax
+      locO2min  = locDINmin
+      do i=3, tracers%num_tracers
+        id=tracers%data(i)%ID
+        SELECT CASE (id)
+          CASE (1001) ! din
+            do n=1, partit%myDim_nod2d
+              locDINmax = max(locDINmax,maxval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+              locDINmin = min(locDINmin,minval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+            end do
+          CASE (1002) ! dic
+            do n=1, partit%myDim_nod2d
+              locDICmax = max(locDICmax,maxval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+              locDICmin = min(locDICmin,minval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+            end do
+          CASE (1003) ! alk
+            do n=1, partit%myDim_nod2d
+              locAlkmax = max(locAlkmax,maxval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+              locAlkmin = min(locAlkmin,minval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+            end do
+          CASE (1018) ! si
+            do n=1, partit%myDim_nod2d
+              locDSimax = max(locDSimax,maxval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+              locDSimin = min(locDSimin,minval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+            end do
+          CASE (1019) ! fe
+            do n=1, partit%myDim_nod2d
+              locDFemax = max(locDFemax,maxval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+              locDFemin = min(locDFemin,minval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+            end do
+          CASE (1022) ! o2
+            do n=1, partit%myDim_nod2d
+              locO2max  = max(locO2max,maxval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+              locO2min  = min(locO2min,minval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
+            end do
+        END SELECT
+      end do ! i num_tracers
       if (partit%mype==0) write(*,*) "Sanity check for REcoM variables"
       call MPI_AllREDUCE(locDINmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal max init. DIN. =', glo
       call MPI_AllREDUCE(locDINmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal min init. DIN. =', glo
-
       call MPI_AllREDUCE(locDICmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal max init. DIC. =', glo
       call MPI_AllREDUCE(locDICmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)

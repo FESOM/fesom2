@@ -3002,7 +3002,6 @@ ctime=timeold+(dayold-1.)*86400
                         else
                             entry%local_values_r8_copy(I,J) = entry%local_values_r8(I,J) /real(entry%addcounter,real64)  ! compute_means
                         end if
-#endif
                         entry%local_values_r8(I,J) = 0._real64 ! clean_meanarrays - reset to 0 for next accumulation
                     END DO ! --> DO I=1, nlev_loc
                 END DO ! --> DO J=1, size(entry%local_values_r8,dim=2)
@@ -3022,7 +3021,6 @@ ctime=timeold+(dayold-1.)*86400
                         else
                             entry%local_values_r4_copy(I,J) = entry%local_values_r4(I,J) /real(entry%addcounter,real32)  ! compute_means
                         end if
-#endif
                         entry%local_values_r4(I,J) = 0._real32 ! clean_meanarrays - reset to 0 for next accumulation
                     END DO ! --> DO I=1, nlev_loc
                 END DO ! --> DO J=1, size(entry%local_values_r4,dim=2)
