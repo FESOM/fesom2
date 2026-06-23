@@ -403,6 +403,12 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
             set(ENV{OMPI_ALLOW_RUN_AS_ROOT} \"1\")
             set(ENV{OMPI_ALLOW_RUN_AS_ROOT_CONFIRM} \"1\")
 
+            # Allow oversubscription so high-rank tests (e.g. NP=8) run on CI
+            # runners with fewer cores. Open MPI 4 reads OMPI_MCA_*, Open MPI 5
+            # (PRRTE) reads PRTE_MCA_*; both are ignored by other MPIs.
+            set(ENV{OMPI_MCA_rmaps_base_oversubscribe} \"1\")
+            set(ENV{PRTE_MCA_rmaps_default_mapping_policy} \":oversubscribe\")
+
             # Run FESOM with MPI
             execute_process(
                 COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${FESOM_TEST_NP} ${CMAKE_BINARY_DIR}/bin/fesom.x
@@ -571,6 +577,12 @@ function(add_fesom_meshdiag_test_with_options TEST_NAME MESH_NAME RUNID)
         # to Open MPI; ignored by other MPIs and by non-root runs.
         set(ENV{OMPI_ALLOW_RUN_AS_ROOT} \"1\")
         set(ENV{OMPI_ALLOW_RUN_AS_ROOT_CONFIRM} \"1\")
+
+        # Allow oversubscription so high-rank tests (e.g. NP=8) run on CI
+        # runners with fewer cores. Open MPI 4 reads OMPI_MCA_*, Open MPI 5
+        # (PRRTE) reads PRTE_MCA_*; both are ignored by other MPIs.
+        set(ENV{OMPI_MCA_rmaps_base_oversubscribe} \"1\")
+        set(ENV{PRTE_MCA_rmaps_default_mapping_policy} \":oversubscribe\")
 
         # Run fesom_meshdiag with MPI
         execute_process(

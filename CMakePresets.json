@@ -184,11 +184,14 @@
       "name": "coupled",
       "configurePreset": "coupled",
       "displayName": "Test Coupled Configuration",
-      "description": "Run integration tests for the coupled FESOM2 configuration",
+      "description": "Build-only verification: a coupled (OASIS/OIFS) fesom.x cannot run the standalone pi integration tests, so none are registered",
       "filter": {
         "include": {
           "name": "integration_.*"
         }
+      },
+      "execution": {
+        "noTestsAction": "ignore"
       }
     },
     {
