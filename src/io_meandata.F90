@@ -12,7 +12,8 @@ module io_MEANDATA
   use io_data_strategy_module
   use async_threads_module
   use netcdf
-  use io_xios_module, only: io_xios_is_on, io_xios_send_2d_r8, io_xios_send_2d_r4, &
+  use io_xios_module, only: io_xios_is_on, io_xios_field_is_active, &
+                            io_xios_send_2d_r8, io_xios_send_2d_r4, &
                             io_xios_send_3d_r8, io_xios_send_3d_r4, &
                             io_xios_set_ice_conc, io_xios_is_ice_field, &
                             io_xios_apply_ice_mask_2d_r4, io_xios_apply_ice_mask_2d_r8, &
@@ -27,6 +28,16 @@ module io_MEANDATA
   implicit none
   private
   public :: def_stream, def_stream2D, def_stream3D, def_stream0D, output, finalize_output
+  public :: print_per_stream_costs
+
+  ! Sub-decomposition timers for FESOM `output`. Accumulated per-rank by the
+  ! output() routine; reduced + printed once at finalize from fesom_module.
+  ! Cost is one MPI_Wtime() pair per region per call — negligible.
+  real(WP), public, save :: rtime_om_update_means = 0.0_WP   !< update_means accumulator (every step)
+  real(WP), public, save :: rtime_om_streamloop   = 0.0_WP   !< per-stream loop incl. write_mean dispatch
+  real(WP), public, save :: rtime_om_pack         = 0.0_WP   !< Fortran nested-loop pack from local_values_*_copy → tmp2/tmp3
+  real(WP), public, save :: rtime_om_mask         = 0.0_WP   !< io_xios_apply_wet_* / apply_ice_mask_* full-array scans
+  real(WP), public, save :: rtime_om_xsend        = 0.0_WP   !< pure io_xios_send_* (xios_send_field) call
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -62,6 +73,7 @@ module io_MEANDATA
     integer                                            :: dimID(2), dimvarID(2), varID
     integer                                            :: freq=1
     character                                          :: freq_unit='m'
+    real(kind=WP)                                      :: rtime_per_stream=0._WP   !< cumulative wall in this stream's write_mean dispatch over the run; printed sorted at finalize
     logical                                            :: is_in_use=.false.
     logical :: is_elem_based = .false.
     logical :: flip
@@ -87,7 +99,16 @@ module io_MEANDATA
 !
 !--------------------------------------------------------------------------------------------
 !
-  type(Meandata), save, target   :: io_stream(150) ! todo: find a way to increase the array withhout move_alloc to keep the derived types in Meandata intact
+  ! Wrapper holding a pointer to a heap-allocated Meandata. io_stream is an
+  ! array of these wrappers so the backing array can be grown via move_alloc
+  ! without moving the Meandata targets themselves: existing entry=>io_stream(i)%p
+  ! pointers stay valid across resizes, and the Meandata's final destructor is
+  ! not triggered (finalisation only runs on explicit deallocate of %p).
+  type :: MeandataPtr
+     type(Meandata), pointer :: p => null()
+  end type MeandataPtr
+  type(MeandataPtr), allocatable, save :: io_stream(:)
+  integer, parameter             :: IO_STREAM_INITIAL_CAPACITY = 32
   integer, save                  :: io_NSTREAMS=0
   real(kind=WP)                  :: ctime !current time in seconds from the beginning of the year
 !
@@ -99,6 +120,8 @@ module io_MEANDATA
   integer, save                  :: nlev_upper=1
   character(len=1), save         :: filesplit_freq='y'
   integer, save                  :: compression_level=0
+  ! Ship-track / mooring curtain output config: variables declared in
+  ! io_tracks_module and pulled into ini_mean_io for namelist binding.
   type io_entry
         CHARACTER(len=20)        :: id        ='unknown             '
         INTEGER                  :: freq      =0
@@ -197,6 +220,8 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     use g_forcing_param, only: use_virt_salt, use_landice_water, use_age_tracer !---fwf-code, age-code
     use g_config, only : use_cavity, lwiso !---wiso-code
     use mod_transit, only : index_transit_r14c, index_transit_r39ar, index_transit_f11, index_transit_f12, index_transit_sf6
+    use io_tracks_module, only: ltracks, track_files, track_vars,        &
+                                track_names, track_output_freq
 
     implicit none
     integer                   :: i, j
@@ -211,8 +236,11 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     type(t_tracer), intent(in)   , target :: tracers
     type(t_dyn)   , intent(in)   , target :: dynamics
     type(t_ice)   , intent(in)   , target :: ice
-    namelist /nml_general / io_listsize, vec_autorotate, lnextGEMS, nlev_upper, filesplit_freq, compression_level
+    namelist /nml_general / io_listsize, vec_autorotate, lnextGEMS, nlev_upper, filesplit_freq, compression_level, &
+                            ltracks
     namelist /nml_list    / io_list
+    namelist /nml_tracks  / track_files, track_vars, track_names,        &
+                            track_output_freq
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -304,10 +332,12 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
           "t_star              ", "twice               ", "tx_sur              ", &
           "ty_sur              ", "u                   ", "u_back_tend         ", &
           "u_dis_tend          ", "uice                ", "unod                ", &
-          "u_rhs_ice           ", "u_total_tend        ", "UVW_SQR             ", &
+          "unod_sfc            ", "u_rhs_ice           ", "u_total_tend        ", &
+          "UVW_SQR             ", &
           "uwice               ", "uwind               ", "v                   ", &
           "v_back_tend         ", "v_dis_tend          ", "vice                ", &
-          "virtsalt            ", "vnod                ", "volo                ", &
+          "virtsalt            ", "vnod                ", "vnod_sfc            ", &
+          "volo                ", &
           "v_rhs_ice           ", "v_total_tend        ", "vve_5               ", &
           "vwice               ", "vwind               ", "w                   " /)
         integer :: k
@@ -346,6 +376,12 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
 
     allocate(io_list(io_listsize))
     READ(nm_io_unit, nml=nml_list,     iostat=iost )
+    ! &nml_tracks block (optional; absent is fine, defaults stand).
+    rewind(nm_io_unit)
+    READ(nm_io_unit, nml=nml_tracks,   iostat=iost )
+    if (iost > 0 .and. mype==0) then
+       WRITE(*,*) 'WARNING: &nml_tracks present in namelist.io but malformed; using defaults.'
+    end if
     close(nm_io_unit )
 #if defined(__XIOS)
     end if
@@ -551,7 +587,7 @@ CASE ('ipnd      ')
 ! Debug ice variables    
 CASE ('strength_ice')
     if (use_ice) then
-    call def_stream(elem2D, myDim_elem2D, 'strength_ice', 'ice strength', '?', ice%work%ice_strength(1:myDim_elem2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D, myDim_nod2D, 'strength_ice', 'ice strength', 'N m-1', ice%work%ice_strength(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('inv_areamass')
     if (use_ice) then
@@ -1494,6 +1530,10 @@ CASE ('unod      ')
     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/),'unod',      'zonal velocity at nodes', 'm/s', dynamics%uvnode(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('vnod      ')
     call def_stream((/nl-1, nod2D/),  (/nl-1,   myDim_nod2D/),'vnod',      'meridional velocity at nodes', 'm/s', dynamics%uvnode(2,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('unod_sfc  ')
+    call def_stream(nod2D, myDim_nod2D, 'unod_sfc', 'zonal surface velocity at nodes', 'm/s', dynamics%uvnode(1,1,1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('vnod_sfc  ')
+    call def_stream(nod2D, myDim_nod2D, 'vnod_sfc', 'meridional surface velocity at nodes', 'm/s', dynamics%uvnode(2,1,1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('w         ')
     call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'w',         'vertical velocity',  'm/s',           dynamics%w(:,:),        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('Av        ')
@@ -1820,8 +1860,8 @@ CASE ('UVW_SQR   ')
 !_______________________________________________________________________________
 ! compute horizontal and vertical tracer gradients
 CASE ('TRGRD_XYZ ')
-    sel_trgrd_xyz=1
     if (ldiag_trgrd_xyz) then
+        sel_trgrd_xyz = 1
         call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/),  'temp_grdx',   'zonal temperature gradient',        'K/m', trgrd_x(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl-1, elem2D/), (/nl-1, myDim_elem2D/),  'temp_grdy',   'meridional temperature gradient',   'K/m', trgrd_y(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl-1,  nod2D/), (/nl-1, myDim_nod2D /),  'temp_grdz',   'vertical temperature gradient',     'K/m', trgrd_z(1,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -2140,7 +2180,7 @@ function stream_already_defined(name) result(found)
     
     found = .false.
     do i = 1, io_NSTREAMS
-        if (trim(io_stream(i)%name) == trim(name)) then
+        if (trim(io_stream(i)%p%name) == trim(name)) then
             found = .true.
             return
         end if
@@ -2386,6 +2426,7 @@ end subroutine
 subroutine write_mean(entry, entry_index)
     use mod_mesh
     use io_gather_module
+    use diagnostics, only: std_dens_N
     implicit none
     type(Meandata), intent(inout) :: entry
     integer, intent(in) :: entry_index
@@ -2407,89 +2448,146 @@ subroutine write_mean(entry, entry_index)
           integer, pointer :: own(:)
           real(real64), allocatable :: tmp2_r8(:), tmp3_r8(:,:)
           real(real32), allocatable :: tmp2_r4(:), tmp3_r4(:,:)
+          real(WP) :: tp0, tp1, tm0, tm1, ts0, ts1
           if (entry%is_elem_based) then
             own   => io_xios_owned_elem_local()
             n_own =  io_xios_n_owned_elem()
             if (entry%accuracy == i_real8) then
               if (entry%glsize(1) == 1) then
+                tp0 = MPI_Wtime()
                 allocate(tmp2_r8(n_own))
                 do k=1, n_own; tmp2_r8(k) = entry%local_values_r8_copy(1, own(k)); end do
+                tp1 = MPI_Wtime(); rtime_om_pack = rtime_om_pack + (tp1 - tp0)
+                tm0 = MPI_Wtime()
                 if (io_xios_is_ice_field(entry%name)) then
                    call io_xios_apply_ice_mask_2d_elem_r8(tmp2_r8)
-                else
+                else if (trim(entry%name) /= 'fw' .and. trim(entry%name) /= 'fh') then
                    call io_xios_apply_wet_2d_elem_r8(tmp2_r8)
                 end if
+                tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
+                ts0 = MPI_Wtime()
                 call io_xios_send_2d_r8(entry%name, tmp2_r8)
+                ts1 = MPI_Wtime(); rtime_om_xsend = rtime_om_xsend + (ts1 - ts0)
                 deallocate(tmp2_r8)
               else
+                tp0 = MPI_Wtime()
                 nze = size(entry%local_values_r8_copy, 1)
                 allocate(tmp3_r8(nze, n_own))
                 do k=1, n_own
                   do kk=1, nze; tmp3_r8(kk,k) = entry%local_values_r8_copy(kk, own(k)); end do
                 end do
-                call io_xios_apply_wet_3d_elem_r8(tmp3_r8)
+                tp1 = MPI_Wtime(); rtime_om_pack = rtime_om_pack + (tp1 - tp0)
+                tm0 = MPI_Wtime()
+                if (nze /= std_dens_N) call io_xios_apply_wet_3d_elem_r8(tmp3_r8)
+                tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
+                ts0 = MPI_Wtime()
                 call io_xios_send_3d_r8(entry%name, tmp3_r8)
+                ts1 = MPI_Wtime(); rtime_om_xsend = rtime_om_xsend + (ts1 - ts0)
                 deallocate(tmp3_r8)
               end if
             else
               if (entry%glsize(1) == 1) then
+                tp0 = MPI_Wtime()
                 allocate(tmp2_r4(n_own))
                 do k=1, n_own; tmp2_r4(k) = entry%local_values_r4_copy(1, own(k)); end do
+                tp1 = MPI_Wtime(); rtime_om_pack = rtime_om_pack + (tp1 - tp0)
+                tm0 = MPI_Wtime()
                 if (io_xios_is_ice_field(entry%name)) then
                    call io_xios_apply_ice_mask_2d_elem_r4(tmp2_r4)
-                else
+                else if (trim(entry%name) /= 'fw' .and. trim(entry%name) /= 'fh') then
                    call io_xios_apply_wet_2d_elem_r4(tmp2_r4)
                 end if
+                tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
+                ts0 = MPI_Wtime()
                 call io_xios_send_2d_r4(entry%name, tmp2_r4)
+                ts1 = MPI_Wtime(); rtime_om_xsend = rtime_om_xsend + (ts1 - ts0)
                 deallocate(tmp2_r4)
               else
+                tp0 = MPI_Wtime()
                 nze = size(entry%local_values_r4_copy, 1)
                 allocate(tmp3_r4(nze, n_own))
                 do k=1, n_own
                   do kk=1, nze; tmp3_r4(kk,k) = entry%local_values_r4_copy(kk, own(k)); end do
                 end do
-                call io_xios_apply_wet_3d_elem_r4(tmp3_r4)
+                tp1 = MPI_Wtime(); rtime_om_pack = rtime_om_pack + (tp1 - tp0)
+                tm0 = MPI_Wtime()
+                if (nze /= std_dens_N) call io_xios_apply_wet_3d_elem_r4(tmp3_r4)
+                tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
+                ts0 = MPI_Wtime()
                 call io_xios_send_3d_r4(entry%name, tmp3_r4)
+                ts1 = MPI_Wtime(); rtime_om_xsend = rtime_om_xsend + (ts1 - ts0)
                 deallocate(tmp3_r4)
               end if
             end if
           else
             if (entry%accuracy == i_real8) then
               if (entry%glsize(1) == 1) then
+                tp0 = MPI_Wtime()
                 allocate(tmp2_r8(entry%p_partit%myDim_nod2D))
-                tmp2_r8(:) = entry%local_values_r8_copy(1, 1:entry%p_partit%myDim_nod2D)
+                do k=1, entry%p_partit%myDim_nod2D
+                  tmp2_r8(k) = entry%local_values_r8_copy(1, k)
+                end do
+                tp1 = MPI_Wtime(); rtime_om_pack = rtime_om_pack + (tp1 - tp0)
+                tm0 = MPI_Wtime()
                 if (io_xios_is_ice_field(entry%name)) then
                    call io_xios_apply_ice_mask_2d_r8(tmp2_r8)
-                else
+                else if (trim(entry%name) /= 'fw' .and. trim(entry%name) /= 'fh') then
                    call io_xios_apply_wet_2d_r8(tmp2_r8)
                 end if
+                tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
+                ts0 = MPI_Wtime()
                 call io_xios_send_2d_r8(entry%name, tmp2_r8)
+                ts1 = MPI_Wtime(); rtime_om_xsend = rtime_om_xsend + (ts1 - ts0)
                 deallocate(tmp2_r8)
               else
+                tp0 = MPI_Wtime()
                 nze = size(entry%local_values_r8_copy, 1)
                 allocate(tmp3_r8(nze, entry%p_partit%myDim_nod2D))
-                tmp3_r8(:,:) = entry%local_values_r8_copy(:, 1:entry%p_partit%myDim_nod2D)
-                call io_xios_apply_wet_3d_r8(tmp3_r8)
+                do k=1, entry%p_partit%myDim_nod2D
+                  do kk=1, nze; tmp3_r8(kk,k) = entry%local_values_r8_copy(kk, k); end do
+                end do
+                tp1 = MPI_Wtime(); rtime_om_pack = rtime_om_pack + (tp1 - tp0)
+                tm0 = MPI_Wtime()
+                if (nze /= std_dens_N) call io_xios_apply_wet_3d_r8(tmp3_r8)
+                tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
+                ts0 = MPI_Wtime()
                 call io_xios_send_3d_r8(entry%name, tmp3_r8)
+                ts1 = MPI_Wtime(); rtime_om_xsend = rtime_om_xsend + (ts1 - ts0)
                 deallocate(tmp3_r8)
               end if
             else
               if (entry%glsize(1) == 1) then
+                tp0 = MPI_Wtime()
                 allocate(tmp2_r4(entry%p_partit%myDim_nod2D))
-                tmp2_r4(:) = entry%local_values_r4_copy(1, 1:entry%p_partit%myDim_nod2D)
+                do k=1, entry%p_partit%myDim_nod2D
+                  tmp2_r4(k) = entry%local_values_r4_copy(1, k)
+                end do
+                tp1 = MPI_Wtime(); rtime_om_pack = rtime_om_pack + (tp1 - tp0)
+                tm0 = MPI_Wtime()
                 if (io_xios_is_ice_field(entry%name)) then
                    call io_xios_apply_ice_mask_2d_r4(tmp2_r4)
-                else
+                else if (trim(entry%name) /= 'fw' .and. trim(entry%name) /= 'fh') then
                    call io_xios_apply_wet_2d_r4(tmp2_r4)
                 end if
+                tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
+                ts0 = MPI_Wtime()
                 call io_xios_send_2d_r4(entry%name, tmp2_r4)
+                ts1 = MPI_Wtime(); rtime_om_xsend = rtime_om_xsend + (ts1 - ts0)
                 deallocate(tmp2_r4)
               else
+                tp0 = MPI_Wtime()
                 nze = size(entry%local_values_r4_copy, 1)
                 allocate(tmp3_r4(nze, entry%p_partit%myDim_nod2D))
-                tmp3_r4(:,:) = entry%local_values_r4_copy(:, 1:entry%p_partit%myDim_nod2D)
-                call io_xios_apply_wet_3d_r4(tmp3_r4)
+                do k=1, entry%p_partit%myDim_nod2D
+                  do kk=1, nze; tmp3_r4(kk,k) = entry%local_values_r4_copy(kk, k); end do
+                end do
+                tp1 = MPI_Wtime(); rtime_om_pack = rtime_om_pack + (tp1 - tp0)
+                tm0 = MPI_Wtime()
+                if (nze /= std_dens_N) call io_xios_apply_wet_3d_r4(tmp3_r4)
+                tm1 = MPI_Wtime(); rtime_om_mask = rtime_om_mask + (tm1 - tm0)
+                ts0 = MPI_Wtime()
                 call io_xios_send_3d_r4(entry%name, tmp3_r4)
+                ts1 = MPI_Wtime(); rtime_om_xsend = rtime_om_xsend + (ts1 - ts0)
                 deallocate(tmp3_r4)
               end if
             end if
@@ -2600,8 +2698,8 @@ subroutine update_means
     integer                 :: I, J
 
     DO n=1, io_NSTREAMS
-        entry=>io_stream(n)
-        
+        entry=>io_stream(n)%p
+
         !_____________ compute in 8 byte accuracy ______________________________
         IF (entry%accuracy == i_real8) then
             IF (entry%flip) then
@@ -2749,8 +2847,14 @@ ctime=timeold+(dayold-1.)*86400
     end if ! --> if (lfirst) then
     
     !___________________________________________________________________________
-    !PS if (partit%flag_debug .and. partit%mype==0)  print *, achar(27)//'[33m'//' -I/O-> call update_means'//achar(27)//'[0m'  
-    call update_means
+    !PS if (partit%flag_debug .and. partit%mype==0)  print *, achar(27)//'[33m'//' -I/O-> call update_means'//achar(27)//'[0m'
+    block
+      real(WP) :: tum0, tum1
+      tum0 = MPI_Wtime()
+      call update_means
+      tum1 = MPI_Wtime()
+      rtime_om_update_means = rtime_om_update_means + (tum1 - tum0)
+    end block
 
 #if defined(__MULTIO)
     output_done = .false.
@@ -2758,10 +2862,13 @@ ctime=timeold+(dayold-1.)*86400
 
     !___________________________________________________________________________
     ! loop over defined streams
+    block
+    real(WP) :: tsl0, tsl1
+    tsl0 = MPI_Wtime()
     do n=1, io_NSTREAMS
         !_______________________________________________________________________
         ! make pointer for entry onto io_stream object
-        entry=>io_stream(n)
+        entry=>io_stream(n)%p
 !#if defined(__MULTIO)
 !        call mio_write_nod(mio, entry)
 !        lfirst=.false.
@@ -2769,8 +2876,19 @@ ctime=timeold+(dayold-1.)*86400
 !#endif
 
         !_______________________________________________________________________
-        !check whether output will be written based on event frequency
+        ! Cadence dispatch:
+        !   - XIOS-driven path: ask XIOS whether this field needs a sample now.
+        !     Cadence is set in XML (field_def freq_op), so the per-event heavy
+        !     work below (mean-divide, pack, mask, write_mean dispatch) only
+        !     fires at the XML-declared cadence, not every model step.
+        !   - Native (non-XIOS) path: keep the namelist.io freq_unit-based
+        !     event check (unchanged behaviour for FESOM-standalone runs).
         do_output=.false.
+#if defined(__XIOS)
+        if (io_xios_is_on()) then
+            do_output = io_xios_field_is_active(trim(entry%name))
+        else
+#endif
         if (entry%freq_unit.eq.'y') then
             call annual_event(do_output, entry%freq)
         else if (entry%freq_unit == 'm') then
@@ -2787,6 +2905,9 @@ ctime=timeold+(dayold-1.)*86400
             call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
             stop
         endif
+#if defined(__XIOS)
+        end if
+#endif
 
 #if defined(__MULTIO)
         output_done = output_done .or. do_output
@@ -2860,6 +2981,11 @@ ctime=timeold+(dayold-1.)*86400
 #endif
             !___________________________________________________________________
             ! write double precision output
+            !
+            ! NetCDF fill-value substitution is skipped under __MULTIO: multio
+            ! ships the array straight to GRIB and a 9.97e36 sentinel in the
+            ! data range wrecks GRIB packing precision (real ice values get
+            ! quantized to ~0). Multio gets the clean mean (zeros stay zeros).
             if (entry%accuracy == i_real8) then
                 nlev_loc = size(entry%local_values_r8,dim=1)
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J,ul_loc,kmax_loc)
@@ -2876,11 +3002,12 @@ ctime=timeold+(dayold-1.)*86400
                         else
                             entry%local_values_r8_copy(I,J) = entry%local_values_r8(I,J) /real(entry%addcounter,real64)  ! compute_means
                         end if
+#endif
                         entry%local_values_r8(I,J) = 0._real64 ! clean_meanarrays - reset to 0 for next accumulation
                     END DO ! --> DO I=1, nlev_loc
                 END DO ! --> DO J=1, size(entry%local_values_r8,dim=2)
 !$OMP END PARALLEL DO
-                
+
             !___________________________________________________________________
             ! write single precision output
             else if (entry%accuracy == i_real4) then
@@ -2895,6 +3022,7 @@ ctime=timeold+(dayold-1.)*86400
                         else
                             entry%local_values_r4_copy(I,J) = entry%local_values_r4(I,J) /real(entry%addcounter,real32)  ! compute_means
                         end if
+#endif
                         entry%local_values_r4(I,J) = 0._real32 ! clean_meanarrays - reset to 0 for next accumulation
                     END DO ! --> DO I=1, nlev_loc
                 END DO ! --> DO J=1, size(entry%local_values_r4,dim=2)
@@ -2914,11 +3042,20 @@ ctime=timeold+(dayold-1.)*86400
             !___________________________________________________________________
             ! this is where the magic happens --> here do_output_callback is
             ! triggered as a method of the io_stream object --> call write_mean(...)
-            call entry%thread%run()
+            block
+              real(WP) :: tps0, tps1
+              tps0 = MPI_Wtime()
+              call entry%thread%run()
+              tps1 = MPI_Wtime()
+              entry%rtime_per_stream = entry%rtime_per_stream + (tps1 - tps0)
+            end block
             entry%thread_running = .true.
 #endif
         endif ! --> if (do_output) then
     end do ! --> do n=1, io_NSTREAMS
+    tsl1 = MPI_Wtime()
+    rtime_om_streamloop = rtime_om_streamloop + (tsl1 - tsl0)
+    end block
 
     !___________________________________________________________________________
     ! Handle 0D (scalar) output streams
@@ -2944,13 +3081,21 @@ subroutine output_0D_streams(istep, partit)
     implicit none
     integer, intent(in) :: istep
     type(t_partit), intent(inout) :: partit
-    
+
     integer :: n, ierr
     logical :: do_output
     type(Meandata0D), pointer :: entry0D
     character(500) :: filepath
     real(real64) :: mean_value, rtime
-    
+
+    ! When XIOS is the I/O driver, the 0D scalar fields are written via
+    ! xios_send_field calls (see gen_modules_cmor_diag.F90's compute_cmor_diag)
+    ! and gated by file_def freq_op (e.g. "1mo"). The legacy writer below
+    ! would otherwise double-write those streams at the bypass-loop's
+    ! freq=1/'s' (every model step → ~87600 records/year for HR), which is
+    ! both wrong cadence AND a duplicate output. Skip when XIOS is on.
+    if (io_xios_is_on()) return
+
     do n = 1, io_NSTREAMS0D
         entry0D => io_stream0D(n)
         
@@ -3089,7 +3234,7 @@ subroutine do_output_callback(entry_index)
     ! EO args
     type(Meandata), pointer :: entry
 
-    entry=>io_stream(entry_index)
+    entry=>io_stream(entry_index)%p
     entry%p_partit%mype=entry%mype_workaround ! for the thread callback, copy back the value of our mype as a workaround for errors with the cray envinronment (at least with ftn 2.5.9 and cray-mpich 7.5.3)
     !___________________________________________________________________________
     ! collect local mean output data (entry%local_values_r8_copy) into global 2d 
@@ -3123,11 +3268,11 @@ subroutine finalize_output()
     integer i
     type(Meandata), pointer :: entry
     do i=1, io_NSTREAMS
-        entry=>io_stream(i)
+        entry=>io_stream(i)%p
         if(entry%thread_running) call entry%thread%join()
-        entry%thread_running = .false.    
+        entry%thread_running = .false.
     end do
-    
+
     ! Close 0D stream files
     do i=1, io_NSTREAMS0D
         if (io_stream0D(i)%ncid >= 0) then
@@ -3135,6 +3280,66 @@ subroutine finalize_output()
             io_stream0D(i)%ncid = -1
         end if
     end do
+end subroutine
+!
+!
+!_______________________________________________________________________________
+!> Print per-stream cumulative cost (entry%thread%run() wrap time, mean across
+!> ranks) sorted descending. Called from fesom_module's finalize block;
+!> master-rank only to keep the log readable.
+subroutine print_per_stream_costs(comm, mype, npes)
+    use mpi
+    integer, intent(in) :: comm, mype, npes
+    integer :: i, ierr, k, top_n, idx
+    real(real32) :: ttime
+    real(real32), allocatable :: per_stream(:), per_stream_max(:), sorted(:)
+    integer, allocatable :: order(:)
+
+    if (io_NSTREAMS <= 0) return
+    allocate(per_stream(io_NSTREAMS), per_stream_max(io_NSTREAMS))
+    do i = 1, io_NSTREAMS
+        per_stream(i) = real(io_stream(i)%p%rtime_per_stream, real32)
+    end do
+    per_stream_max = per_stream
+    call MPI_AllREDUCE(MPI_IN_PLACE, per_stream,     io_NSTREAMS, MPI_REAL, MPI_SUM, comm, ierr)
+    per_stream = per_stream / real(npes, real32)
+    call MPI_AllREDUCE(MPI_IN_PLACE, per_stream_max, io_NSTREAMS, MPI_REAL, MPI_MAX, comm, ierr)
+
+    if (mype /= 0) then
+        deallocate(per_stream, per_stream_max)
+        return
+    end if
+
+    ! sort by mean descending
+    allocate(order(io_NSTREAMS), sorted(io_NSTREAMS))
+    do i = 1, io_NSTREAMS; order(i) = i; end do
+    sorted = per_stream
+    do i = 1, io_NSTREAMS-1
+        do k = i+1, io_NSTREAMS
+            if (sorted(k) > sorted(i)) then
+                ttime = sorted(i); sorted(i) = sorted(k); sorted(k) = ttime
+                idx = order(i);    order(i)  = order(k);    order(k)  = idx
+            end if
+        end do
+    end do
+
+    write(*,*) '___PER-STREAM OUTPUT COST [seconds] (entry%thread%run() wrap, sorted desc)'
+    write(*,'(2x,a30,2a12,3x,a8,2x,a5)') 'stream', 'mean', 'max', 'freq', 'is_3D'
+    top_n = min(io_NSTREAMS, 30)
+    do i = 1, top_n
+        idx = order(i)
+        block
+          character(len=8) :: freq_str
+          write(freq_str,'(i0,a1)') io_stream(idx)%p%freq, io_stream(idx)%p%freq_unit
+          write(*,'(2x,a30,2f12.4,3x,a8,2x,L5)') trim(io_stream(idx)%p%name), &
+              per_stream(idx), per_stream_max(idx), &
+              adjustl(freq_str), &
+              (io_stream(idx)%p%glsize(1) > 1)
+        end block
+    end do
+    if (io_NSTREAMS > top_n) write(*,'(2x,a,i0,a)') '...', io_NSTREAMS - top_n, ' more streams below the top 30'
+
+    deallocate(per_stream, per_stream_max, order, sorted)
 end subroutine
 !
 !
@@ -3365,19 +3570,20 @@ subroutine associate_new_stream(name, entry)
     !___________________________________________________________________________
     ! check if we already have this variable
     do i=1, io_NSTREAMS
-        if(trim(io_stream(i)%name) .eq. name) then
+        if(trim(io_stream(i)%p%name) .eq. name) then
             print *,"variable '"//name//"' already exists, &
                 &check if you define it multiple times, for example in namelist.io, &
                 &namelist.icepack, io_meandata.F90 or other place that add I/O stream."
-            call assert(.false., __LINE__) 
+            call assert(.false., __LINE__)
         end if
     end do
-    
+
     !___________________________________________________________________________
     ! add this instance to io_stream array
     io_NSTREAMS = io_NSTREAMS +1
-    call assert(size(io_stream) >= io_NSTREAMS, __LINE__)
-    entry=>io_stream(io_NSTREAMS)
+    call ensure_io_stream_capacity(io_NSTREAMS)
+    allocate(io_stream(io_NSTREAMS)%p)
+    entry=>io_stream(io_NSTREAMS)%p
 end subroutine
 !
 !
@@ -3503,6 +3709,31 @@ subroutine assert(val, line)
     end if
 end subroutine
 !
+!_______________________________________________________________________________
+! Grow io_stream wrapper array as needed. Only the pointer wrappers are copied;
+! the heap-allocated Meandata targets stay put, so existing pointers into
+! io_stream(i)%p remain valid and no finalisation of Meandata is triggered.
+subroutine ensure_io_stream_capacity(required)
+    integer, intent(in) :: required
+    type(MeandataPtr), allocatable :: tmp(:)
+    integer :: old_size, new_size, i
+    if (.not. allocated(io_stream)) then
+        allocate(io_stream(max(IO_STREAM_INITIAL_CAPACITY, required)))
+        return
+    end if
+    old_size = size(io_stream)
+    if (old_size >= required) return
+    new_size = old_size
+    do while (new_size < required)
+        new_size = new_size * 2
+    end do
+    allocate(tmp(new_size))
+    do i = 1, old_size
+        tmp(i)%p => io_stream(i)%p
+    end do
+    call move_alloc(tmp, io_stream)
+end subroutine
+!
 !
 !_______________________________________________________________________________
 ! do vector rotation on the fly 
@@ -3521,8 +3752,8 @@ subroutine io_r2g(n, partit, mesh)
     logical                               :: do_rotation
 
     if (n==io_NSTREAMS) RETURN
-    entry_x=>io_stream(n)
-    entry_y=>io_stream(n+1)
+    entry_x=>io_stream(n)%p
+    entry_y=>io_stream(n+1)%p
     IF (.NOT. (entry_x%freq_unit==entry_y%freq_unit) .and. ((entry_x%freq==entry_y%freq))) RETURN
     IF (entry_x%accuracy /= entry_y%accuracy) RETURN
     do_rotation=.FALSE.

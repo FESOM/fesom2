@@ -411,15 +411,15 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     use diff_ver_part_impl_ale_interface
     use diff_part_bh_interface
 #if defined(__recom)
-    use ver_sinking_recom_interface
-    use diff_ver_recom_expl_interface
-    use ver_sinking_recom_benthos_interface
+    use recom_sinking
     use recom_glovar
     use recom_config
     use g_comm_auto
     use g_support
 #endif
     use mod_ice
+    use g_clock
+
     implicit none
     integer       , intent(in)   , target :: tr_num
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -431,9 +431,13 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     integer                               :: n, nzmax, nzmin
     real(kind=WP)                         :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     integer                               :: nz, nu1, nl1
+#if defined(__recom)
+    type(tracers_info_type)               :: tracers_info
+#endif
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), pointer                :: del_ttf(:,:)
+
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -500,7 +504,14 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 if (any(recom_remin_tracer_id == tracers%data(tr_num)%ID)) then
 
 ! call bottom boundary
-        call diff_ver_recom_expl(tr_num, tracers, partit, mesh)
+      call diff_ver_recom_expl(mesh%nl, &  !--- vert_sink ---
+                               mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
+                               mesh%nod_in_elem2D_num, &
+                               mesh%nod_in_elem2D, mesh%nlevels,       &
+                               mesh%area, mesh%areasvol, mesh%hnode_new, &
+                               tracers%data(tr_num)%ID,  &
+                               partit%myDim_nod2D, partit%eDim_nod2D, &
+                               partit%mype, partit%MPI_COMM_FESOM, dtr_bf, dt)  !--- str_bf ---
 ! update tracer fields
         do n=1, myDim_nod2D
             nzmax=nlevels_nod2D(n)-1
@@ -522,22 +533,59 @@ if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
 
          if (use_ballasting) then
 !< get seawater viscosity, seawater_visc_3D
-              call get_seawater_viscosity(tr_num, tracers, partit, mesh) ! seawater_visc_3D
+              call get_seawater_viscosity(tr_num, partit%myDim_nod2D, &
+                                          mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
+                                          tracers%data(1)%values, tracers%data(2)%values) ! seawater_visc_3D
+
+              allocate(tracers_info%ids(tracers%num_tracers))
+              allocate(tracers_info%data_pointers(tracers%num_tracers))
+
+              do n = 1, tracers%num_tracers
+                tracers_info%ids(n) = tracers%data(n)%id
+                tracers_info%data_pointers(n)%tracer_data => tracers%data(n)%values
+              end do
 
 !< get particle density of class 1 and 2 !rho_particle1 and rho_particle2
-              call get_particle_density(tracers, partit, mesh) ! rho_particle = density of particle class 1 and 2
+              call get_particle_density(tracers%num_tracers, partit%myDim_nod2D, partit%eDim_nod2D, &
+                                        mesh%nl, mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
+                                        tracers_info) ! rho_particle = density of particle class 1 and 2
+
+              deallocate(tracers_info%ids)
+              deallocate(tracers_info%data_pointers)
 
 !< calculate scaling factors
 !< scaling_visc_3D
 !< scaling_density1_3D, scaling_density2_3D
-              call ballast(tr_num, tracers, partit, mesh)
+              call ballast(partit%myDim_nod2D, mesh%ulevels_nod2D, &
+                           mesh%nlevels_nod2D, mesh%geo_coord_nod2D, mesh%z_3d_n,                 &
+                           tracers%data(1)%values, tracers%data(2)%values, rad)
         end if
 
 ! sinking
-        call ver_sinking_recom(tr_num, tracers, partit, mesh)  !--- vert_sink ---
+        call ver_sinking_recom(tr_num, mesh%nl, &  !--- vert_sink ---
+                               mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
+                               mesh%zbar_3d_n, mesh%z_3d_n, mesh%nod_in_elem2D_num, &
+                               mesh%nod_in_elem2D, mesh%nlevels,       &
+                               mesh%area, mesh%areasvol, mesh%hnode, mesh%hnode_new, &
+                               tracers%data(tr_num)%ID,  &
+                               tracers%data(tr_num)%values(:,:),       &
+                               partit%myDim_nod2D, vert_sink, dt)  !--- str_bf ---
 ! update tracer fields
 ! sinking into the benthos
-        call ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)  !--- str_bf ---
+        call ver_sinking_recom_benthos(tr_num, mesh%nl, &
+                                       mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
+                                       mesh%zbar_3d_n, mesh%nod_in_elem2D_num, &
+                                       mesh%nod_in_elem2D, mesh%nlevels,       &
+                                       mesh%area, tracers%data(tr_num)%ID,     &
+                                       tracers%data(tr_num)%values(:,:),       &
+                                       partit%myDim_nod2D, str_bf,             &
+                                       partit%mype, partit%MPI_COMM_FESOM,   &
+                                       partit%npes, partit%com_nod2D%sPEnum,   &
+                                       partit%com_nod2D%rPEnum,  &
+                                       partit%s_mpitype_nod2D, partit%r_mpitype_nod2D,              &
+                                       partit%s_mpitype_nod3D, partit%r_mpitype_nod3D,              &
+                                       partit%com_nod2D%sPE, partit%com_nod2D%rPE,                  &
+                                       partit%com_nod2D%req, partit%com_nod2D%nreq, dt)  !--- str_bf ---
 
 ! update tracer fields
 
@@ -1173,9 +1221,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         if (use_icebergs .and. (.not. turn_off_hf) .and. tracers%data(tr_num)%ID==1) then
             do nz=nzmin, nzmax-1
                 zinv=1.0_WP*dt  !/(zbar(nz)-zbar(nz+1)) ale!
-                !!PS tr(nz)=tr(nz)+(sw_3d(nz, n)-sw_3d(nz+1, n) * ( area(nz+1,n)/areasvol(nz,n)) ) * zinv
-                tr(nz)=tr(nz)+(ibhf_n(nz, n)) * zinv / vcpw * area(nz+1,n)/areasvol(nz,n) !) * zinv / vcpw
-                !tr(nz)=tr(nz)+(ibhf_n(nz, n)-ibhf_n(nz+1, n)) * zinv / vcpw ! * area(nz+1,n)/areasvol(nz,n)) * zinv / vcpw
+                tr(nz)=tr(nz) + ibhf_n(nz, n) * zinv / vcpw * (area(nz,n)/areasvol(nz,n))
             end do
         end if
         
@@ -1644,7 +1690,7 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
   USE g_forcing_arrays
   USE g_config
 #if defined (__recom)
-   use recoM_declarations
+   use recoM_declarations, only: is_erosioninput, is_riverinput
    use recom_glovar
    use recom_config
 #endif

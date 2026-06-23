@@ -219,6 +219,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
 #endif
 
   call MPI_Allreduce(MPI_IN_PLACE, s_aux, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+
   al=s_old/s_aux
      ! ===========
      ! New X and residual r

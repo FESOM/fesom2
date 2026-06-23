@@ -30,7 +30,8 @@ module io_xios_module
                                   ldiag_dMOC, ldiag_DVD, ldiag_forc,     &
                                   ldiag_extflds, ldiag_destine,          &
                                   ldiag_ice, ldiag_trflx,                &
-                                  ldiag_uvw_sqr, ldiag_trgrd_xyz
+                                  ldiag_uvw_sqr, ldiag_trgrd_xyz,        &
+                                  std_dens_N, std_dens
   use cmor_variables_diag,  only: ldiag_cmor
   implicit none
   private
@@ -39,7 +40,9 @@ module io_xios_module
   public :: io_xios_update_calendar
   public :: io_xios_send_2d_r8, io_xios_send_3d_r8
   public :: io_xios_send_2d_r4, io_xios_send_3d_r4
+  public :: io_xios_send_0d_r8, io_xios_send_0d_r4
   public :: io_xios_is_on
+  public :: io_xios_field_is_active
   public :: io_xios_set_ice_conc, io_xios_is_ice_field
   public :: io_xios_apply_ice_mask_2d_r4, io_xios_apply_ice_mask_2d_r8
   public :: io_xios_apply_ice_mask_2d_elem_r4, io_xios_apply_ice_mask_2d_elem_r8
@@ -103,23 +106,48 @@ contains
     r = xios_on
   end function
 
+  !> Wrapper around the XIOS Fortran binding xios_field_is_active. Returns
+  !> true only when XIOS expects a sample for this field at the current
+  !> calendar timestep. Used by io_meandata's streamloop to gate per-stream
+  !> heavy work (mean-divide, pack, mask, write_mean dispatch) on the
+  !> cadence XIOS XML declares via field_def freq_op.
+  !>
+  !> CRITICAL: xios_field_is_active is called with at_current_timestep=.TRUE..
+  !> When that argument is omitted the binding defaults it to .FALSE. and
+  !> returns "is this field registered in any output?" (= unconditionally
+  !> true), which would defeat the gate.
+  logical function io_xios_field_is_active(name) result(r)
+    character(len=*), intent(in) :: name
+    if (.not. xios_on) then
+       r = .false.
+       return
+    end if
+    if (.not. xios_is_valid_field(trim(name))) then
+       r = .false.
+       return
+    end if
+    r = xios_field_is_active(trim(name), .TRUE.)
+  end function
+
 
   !> Initialise the XIOS client side.
   !> parent_comm:  the FESOM OASIS local communicator (partit%MPI_COMM_FESOM).
   !> client_comm:  returned equal to parent_comm (kept for API compat; OASIS
   !>               has already done the world split, so no further split here).
   subroutine io_xios_init(mesh, partit, parent_comm, client_comm)
-    type(T_MESH),    intent(in), target :: mesh
-    type(T_PARTIT),  intent(in), target :: partit
-    integer,         intent(in)         :: parent_comm
-    integer,         intent(out)        :: client_comm
+    type(T_MESH),    intent(in),    target :: mesh
+    type(T_PARTIT),  intent(inout), target :: partit
+    integer,         intent(in)            :: parent_comm
+    integer,         intent(out)           :: client_comm
 
-    integer                       :: i, e, n1, n2, n3, nn, ne, ne_owned, nz_cell
+    integer                       :: i, j, e, n1, n2, n3, nn, ne, ne_owned, nz_cell, nv
     real(kind=8), allocatable     :: lon_n(:),  lat_n(:)
     real(kind=8), allocatable     :: lon_e(:),  lat_e(:)
+    real(kind=8), allocatable     :: blon_n(:,:), blat_n(:,:)
+    real(kind=8), allocatable     :: blon_e(:,:), blat_e(:,:)
     integer,      allocatable     :: i_index_n(:), i_index_e(:)
     real(kind=8), allocatable     :: z_mid(:)
-    real(kind=8)                  :: xlon, ylat
+    real(kind=8)                  :: xlon, ylat, v1lon, v2lon, v3lon, vlon
 
     nn = partit%myDim_nod2D
     ne = partit%myDim_elem2D
@@ -182,6 +210,22 @@ contains
       if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_trgrd_xyz=',   ldiag_trgrd_xyz
       ov = xios_getvar("ldiag_cmor",        ldiag_cmor)
       if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_cmor=',        ldiag_cmor
+      ! Ship-track / mooring curtain output (io_tracks.F90). Per-track
+      ! config is supplied via context_fesom.xml in the XIOS-coupled path.
+      block
+        use io_tracks_module, only: ltracks, track_files, track_vars,      &
+                                    track_names, track_output_freq
+        ov = xios_getvar("ltracks",             ltracks)
+        if (ov .and. partit%mype==0) write(*,*) '[XIOS] ltracks=',             ltracks
+        ov = xios_getvar("track_files",         track_files)
+        if (ov .and. partit%mype==0) write(*,*) '[XIOS] track_files=',         trim(track_files)
+        ov = xios_getvar("track_vars",          track_vars)
+        if (ov .and. partit%mype==0) write(*,*) '[XIOS] track_vars=',          trim(track_vars)
+        ov = xios_getvar("track_names",         track_names)
+        if (ov .and. partit%mype==0) write(*,*) '[XIOS] track_names=',         trim(track_names)
+        ov = xios_getvar("track_output_freq",   track_output_freq)
+        if (ov .and. partit%mype==0) write(*,*) '[XIOS] track_output_freq=',   trim(track_output_freq)
+      end block
     end block
 
     ! --- 3. calendar: left to XML (calendar_type on the context element) -----
@@ -194,18 +238,53 @@ contains
        i_index_n(i)= partit%myList_nod2D(i) - 1         ! 1-based -> 0-based
     end do
 
-    call xios_set_domain_attr("nodes",              &
-         type        = "unstructured",              &
-         ni_glo      = mesh%nod2D,                  &
-         ni          = nn,                          &
-         ibegin      = 0,                           &
-         i_index     = i_index_n,                   &
-         lonvalue_1d = lon_n,                       &
-         latvalue_1d = lat_n,                       &
-         data_dim    = 1,                           &
-         data_ni     = nn)
+    ! Build control-volume (Voronoi) bounds for the nodes domain.
+    ! mesh%x_corners/y_corners are shaped (node, corner), already in degrees,
+    ! with shorter polygons padded to maxval(rmax) by repeating the last corner.
+    ! Transpose to XIOS shape (corner, node) and apply dateline unwrapping.
+    ! Cap at XIOS's hard-coded NMAX=10 (elt.hpp): the Elt constructor writes
+    ! vertex[k] before the duplicate check, so vertex[10] is out of bounds when
+    ! nv>10 and a node has 10 unique real corners — causing heap corruption and
+    ! the segfault in CParallelTree::buildLocalTree()/insert().
+    nv = size(mesh%x_corners, 2)
+    if (nv > 10 .and. partit%mype == 0) &
+       write(*,*) '[XIOS] WARNING: x_corners nv=', nv, ' exceeds XIOS NMAX=10; capping.'
+    nv = min(nv, 10)
+    allocate(blon_n(nv, nn), blat_n(nv, nn))
+    do i = 1, nn
+       v1lon         = mesh%x_corners(i, 1)
+       blon_n(1, i)  = v1lon
+       blat_n(1, i)  = mesh%y_corners(i, 1)
+       do j = 2, nv
+          vlon = mesh%x_corners(i, j)
+          do while (vlon - v1lon >  180.0_8); vlon = vlon - 360.0_8; end do
+          do while (vlon - v1lon < -180.0_8); vlon = vlon + 360.0_8; end do
+          blon_n(j, i) = vlon
+          blat_n(j, i) = mesh%y_corners(i, j)
+       end do
+       ! mesh%x_corners stores CV corners in element-encounter order, not angular
+       ! order. airbar() in XIOS's remap library asserts each fan triangle is
+       ! outward-facing, which fails for non-convex (scrambled) polygons. Sort
+       ! corners CCW by azimuth around the node so the polygon is convex and
+       ! correctly wound.
+       call sort_cv_corners_ccw(blon_n(:, i), blat_n(:, i), nv, &
+                                lon_n(i) * rad, lat_n(i) * rad)
+    end do
 
-    deallocate(lon_n, lat_n, i_index_n)
+    call xios_set_domain_attr("nodes",                &
+         type          = "unstructured",              &
+         ni_glo        = mesh%nod2D,                  &
+         ni            = nn,                          &
+         i_index       = i_index_n,                   &
+         lonvalue_1d   = lon_n,                       &
+         latvalue_1d   = lat_n,                       &
+         nvertex       = nv,                          &
+         bounds_lon_1d = blon_n(:, 1:nn),             &
+         bounds_lat_1d = blat_n(:, 1:nn),             &
+         data_dim      = 1,                           &
+         data_ni       = nn)
+
+    deallocate(lon_n, lat_n, i_index_n, blon_n, blat_n)
 
     ! --- 5. unstructured element (triangle-centre) domain "elements" --------
     ! FESOM's myList_elem2D overlaps across ranks (any element touching a node
@@ -242,20 +321,52 @@ contains
     ! redistributed as a whole -> writeDomain_ 'intern vs input' mismatch).
     call sort_owned_by_gid(i_index_e, lon_e, lat_e, owned_elem_local, ne_owned)
 
+    ! Compute triangle vertex bounds with dateline unwrapping so that
+    ! XIOS conservative remapping gets correct cell boundaries. Without
+    ! bounds_lon_1d/bounds_lat_1d, XIOS cannot compute cell overlaps and
+    ! produces degenerate (zero-area) triangles in triarea().
+    ! Vertices 2 and 3 are unwrapped relative to vertex 1 so that no two
+    ! corners of the same triangle differ by more than 180 degrees in longitude.
+    allocate(blon_e(3, ne_owned), blat_e(3, ne_owned))
+    do i = 1, ne_owned
+       e  = owned_elem_local(i)
+       n1 = mesh%elem2D_nodes(1, e)
+       n2 = mesh%elem2D_nodes(2, e)
+       n3 = mesh%elem2D_nodes(3, e)
+       v1lon = mesh%geo_coord_nod2D(1, n1) / rad
+       v2lon = mesh%geo_coord_nod2D(1, n2) / rad
+       v3lon = mesh%geo_coord_nod2D(1, n3) / rad
+       do while (v2lon - v1lon >  180.0_8); v2lon = v2lon - 360.0_8; end do
+       do while (v2lon - v1lon < -180.0_8); v2lon = v2lon + 360.0_8; end do
+       do while (v3lon - v1lon >  180.0_8); v3lon = v3lon - 360.0_8; end do
+       do while (v3lon - v1lon < -180.0_8); v3lon = v3lon + 360.0_8; end do
+       blon_e(1,i) = v1lon;  blon_e(2,i) = v2lon;  blon_e(3,i) = v3lon
+       blat_e(1,i) = mesh%geo_coord_nod2D(2, n1) / rad
+       blat_e(2,i) = mesh%geo_coord_nod2D(2, n2) / rad
+       blat_e(3,i) = mesh%geo_coord_nod2D(2, n3) / rad
+       ! Overwrite centre lon with dateline-corrected average of the already-unwrapped vertices.
+       ! The raw average in the earlier loop is wrong for elements crossing the dateline.
+       lon_e(i) = (v1lon + v2lon + v3lon) / 3.0_8
+       if (lon_e(i) >  180.0_8) lon_e(i) = lon_e(i) - 360.0_8
+       if (lon_e(i) <= -180.0_8) lon_e(i) = lon_e(i) + 360.0_8
+    end do
+
     ! Omit ibegin: per XIOS 2.5 domain.cpp:479-488, supplying i_index causes
     ! XIOS to set ibegin = i_index(0). Explicitly passing ibegin=0 alongside
     ! i_index confuses the server-side band distribution attribute check.
-    call xios_set_domain_attr("elements",                   &
-         type        = "unstructured",                      &
-         ni_glo      = mesh%elem2D,                         &
-         ni          = ne_owned,                            &
-         i_index     = i_index_e(1:ne_owned),               &
-         lonvalue_1d = lon_e(1:ne_owned),                   &
-         latvalue_1d = lat_e(1:ne_owned),                   &
-         data_dim    = 1,                                   &
-         data_ni     = ne_owned)
+    call xios_set_domain_attr("elements",                     &
+         type          = "unstructured",                      &
+         ni_glo        = mesh%elem2D,                         &
+         ni            = ne_owned,                            &
+         i_index       = i_index_e(1:ne_owned),               &
+         lonvalue_1d   = lon_e(1:ne_owned),                   &
+         latvalue_1d   = lat_e(1:ne_owned),                   &
+         bounds_lon_1d = blon_e(:, 1:ne_owned),               &
+         bounds_lat_1d = blat_e(:, 1:ne_owned),               &
+         data_dim      = 1,                                   &
+         data_ni       = ne_owned)
 
-    deallocate(lon_e, lat_e, i_index_e)
+    deallocate(lon_e, lat_e, i_index_e, blon_e, blat_e)
 
     ! --- 6. vertical axes ---------------------------------------------------
     !   nz  : cell-centred,  nl-1 layers (for T, S, u, v, unod, vnod, ...)
@@ -267,9 +378,10 @@ contains
     do i = 1, nz_cell
        z_mid(i) = -0.5_WP * (mesh%zbar(i) + mesh%zbar(i+1))
     end do
-    call xios_set_axis_attr("nz",  n_glo = nz_cell, value = z_mid)
+    call xios_set_axis_attr("nz",      n_glo = nz_cell,    value = z_mid)
     deallocate(z_mid)
-    call xios_set_axis_attr("nz1", n_glo = mesh%nl, value = -mesh%zbar(1:mesh%nl))
+    call xios_set_axis_attr("nz1",     n_glo = mesh%nl,    value = -mesh%zbar(1:mesh%nl))
+    call xios_set_axis_attr("std_dens", n_glo = std_dens_N, value = std_dens)
 
     ! --- 7. timestep (required by XIOS before close_context_definition) -----
     call xios_set_timestep(timestep = xios_duration(second = dt))
@@ -284,6 +396,14 @@ contains
          xios_date(yearnew, 1, 1, 0, 0, 0) + &
          xios_duration(day = real(daynew - 1, kind=8), &
                        second = real(timenew, kind=8)))
+
+    ! --- 7c. tracks (ship-track / mooring-array curtain output) -------------
+    ! Inert unless ltracks=.true. (set via &nml_general or the XIOS XML
+    ! override). See io_tracks.F90.
+    block
+      use io_tracks_module, only: io_tracks_register_xios
+      call io_tracks_register_xios(mesh, partit, nz_cell)
+    end block
 
     ! --- 8. close context definition ----------------------------------------
     call xios_close_context_definition()
@@ -301,25 +421,30 @@ contains
   end subroutine
 
 
+  ! All four send wrappers gate the actual xios_send_field call on
+  ! xios_field_is_active(name, .TRUE.). With field_def freq_op set per file
+  ! (e.g., 1d / 1mo to match output_freq), xios_field_is_active returns true
+  ! only at the cadence XIOS expects a sample, so xios_send_field — and its
+  ! client-side pipeline (inputField, temporal_filter, downstream MPI) —
+  ! only runs when the XML asks. xios_is_valid_field stays as a defensive
+  ! check for fields not declared in field_def (silently dropped).
   !> Send a 2D (node-only) field. Shape: (ni=myDim_nod2D).
   !> Caller (io_meandata.F90) must already have sliced to owned nodes.
   subroutine io_xios_send_2d_r8(name, buf)
     character(len=*), intent(in) :: name
     real(kind=8),     intent(in) :: buf(:)
-    logical :: is_valid
     if (.not. xios_on) return
-    is_valid = xios_is_valid_field(trim(name))
-    if (.not. is_valid) return
+    if (.not. xios_is_valid_field(trim(name))) return
+    if (.not. xios_field_is_active(trim(name), .TRUE.)) return
     call xios_send_field(trim(name), buf)
   end subroutine
 
   subroutine io_xios_send_2d_r4(name, buf)
     character(len=*), intent(in) :: name
     real(kind=4),     intent(in) :: buf(:)
-    logical :: is_valid
     if (.not. xios_on) return
-    is_valid = xios_is_valid_field(trim(name))
-    if (.not. is_valid) return
+    if (.not. xios_is_valid_field(trim(name))) return
+    if (.not. xios_field_is_active(trim(name), .TRUE.)) return
     call xios_send_field(trim(name), buf)
   end subroutine
 
@@ -328,22 +453,87 @@ contains
   subroutine io_xios_send_3d_r8(name, buf)
     character(len=*), intent(in) :: name
     real(kind=8),     intent(in) :: buf(:,:)
-    logical :: is_valid
     if (.not. xios_on) return
-    is_valid = xios_is_valid_field(trim(name))
-    if (.not. is_valid) return
+    if (.not. xios_is_valid_field(trim(name))) return
+    if (.not. xios_field_is_active(trim(name), .TRUE.)) return
     call xios_send_field(trim(name), buf)
   end subroutine
 
   subroutine io_xios_send_3d_r4(name, buf)
     character(len=*), intent(in) :: name
     real(kind=4),     intent(in) :: buf(:,:)
-    logical :: is_valid
     if (.not. xios_on) return
-    is_valid = xios_is_valid_field(trim(name))
-    if (.not. is_valid) return
+    if (.not. xios_is_valid_field(trim(name))) return
+    if (.not. xios_field_is_active(trim(name), .TRUE.)) return
     call xios_send_field(trim(name), buf)
   end subroutine
+
+
+  !> Send a 0D (scalar) field. For CMOR global diagnostics
+  !> (siarean / siareas / siextentn / siextents / sivoln / sivols / volo /
+  !> soga / thetaoga, etc.). Field must be declared in field_def with
+  !> grid_ref="grid_scalar" and routed to a file_def entry — see
+  !> namelists/fesom2/xios_xml_cmip7/{field_def,file_def_*}.xml{,.j2}.
+  !> The XIOS-side scalar grid has no spatial dim; netCDF write produces
+  !> a (time)-only variable.
+  subroutine io_xios_send_0d_r8(name, val)
+    character(len=*), intent(in) :: name
+    real(kind=8),     intent(in) :: val
+    if (.not. xios_on) return
+    if (.not. xios_is_valid_field(trim(name))) return
+    if (.not. xios_field_is_active(trim(name), .TRUE.)) return
+    call xios_send_field(trim(name), val)
+  end subroutine
+
+  subroutine io_xios_send_0d_r4(name, val)
+    character(len=*), intent(in) :: name
+    real(kind=4),     intent(in) :: val
+    if (.not. xios_on) return
+    if (.not. xios_is_valid_field(trim(name))) return
+    if (.not. xios_field_is_active(trim(name), .TRUE.)) return
+    call xios_send_field(trim(name), val)
+  end subroutine
+
+
+  !> Sort nv control-volume corner coordinates (degrees) into counter-clockwise
+  !> angular order around the node at (lon_rad, lat_rad). Uses 3D projection
+  !> onto the local east-north tangent plane, then insertion sort (nv <= ~8).
+  subroutine sort_cv_corners_ccw(blon, blat, nv, lon_rad, lat_rad)
+    real(kind=8), intent(inout) :: blon(:), blat(:)
+    integer,      intent(in)    :: nv
+    real(kind=8), intent(in)    :: lon_rad, lat_rad
+    real(kind=8) :: ex, ey, nx_v, ny_v, nz_v, cx, cy, cz
+    real(kind=8) :: dx, dy, dz, ae, an, tmp_lon, tmp_lat, tmp_ang
+    real(kind=8) :: angles(nv)
+    integer :: j, k
+    ! Local east unit vector at node: (-sin(lon), cos(lon), 0)
+    ex = -sin(lon_rad); ey = cos(lon_rad)
+    ! Local north unit vector: (-sin(lat)cos(lon), -sin(lat)sin(lon), cos(lat))
+    nx_v = -sin(lat_rad)*cos(lon_rad)
+    ny_v = -sin(lat_rad)*sin(lon_rad)
+    nz_v =  cos(lat_rad)
+    ! Node 3D position on unit sphere
+    cx = cos(lat_rad)*cos(lon_rad)
+    cy = cos(lat_rad)*sin(lon_rad)
+    cz = sin(lat_rad)
+    do j = 1, nv
+       dx = cos(blat(j)*rad)*cos(blon(j)*rad) - cx
+       dy = cos(blat(j)*rad)*sin(blon(j)*rad) - cy
+       dz = sin(blat(j)*rad)                  - cz
+       ae = ex*dx + ey*dy            ! projection onto east (ez=0)
+       an = nx_v*dx + ny_v*dy + nz_v*dz  ! projection onto north
+       angles(j) = atan2(an, ae)
+    end do
+    do j = 2, nv
+       tmp_lon = blon(j); tmp_lat = blat(j); tmp_ang = angles(j)
+       k = j - 1
+       do while (k >= 1 .and. angles(k) > tmp_ang)
+          blon(k+1) = blon(k); blat(k+1) = blat(k); angles(k+1) = angles(k)
+          k = k - 1
+       end do
+       blon(k+1) = tmp_lon; blat(k+1) = tmp_lat; angles(k+1) = tmp_ang
+    end do
+  end subroutine sort_cv_corners_ccw
 
 
   !> Insertion sort owned elements by global index (i_index), carrying
@@ -604,8 +794,10 @@ contains
   implicit none
   private
   public :: io_xios_is_on
+  public :: io_xios_field_is_active
   public :: io_xios_send_2d_r8, io_xios_send_3d_r8
   public :: io_xios_send_2d_r4, io_xios_send_3d_r4
+  public :: io_xios_send_0d_r8, io_xios_send_0d_r4
   public :: io_xios_owned_elem_local, io_xios_n_owned_elem
   public :: io_xios_set_ice_conc, io_xios_is_ice_field
   public :: io_xios_apply_ice_mask_2d_r4, io_xios_apply_ice_mask_2d_r8
@@ -617,6 +809,11 @@ contains
   public :: io_xios_apply_wet_3d_elem_r4, io_xios_apply_wet_3d_elem_r8
 contains
   logical function io_xios_is_on() result(r)
+    r = .false.
+  end function
+
+  logical function io_xios_field_is_active(name) result(r)
+    character(len=*), intent(in) :: name
     r = .false.
   end function
 
@@ -638,6 +835,16 @@ contains
   subroutine io_xios_send_3d_r4(name, buf)
     character(len=*), intent(in) :: name
     real(kind=4),     intent(in) :: buf(:,:)
+  end subroutine
+
+  subroutine io_xios_send_0d_r8(name, val)
+    character(len=*), intent(in) :: name
+    real(kind=8),     intent(in) :: val
+  end subroutine
+
+  subroutine io_xios_send_0d_r4(name, val)
+    character(len=*), intent(in) :: name
+    real(kind=4),     intent(in) :: val
   end subroutine
 
   function io_xios_owned_elem_local() result(p)

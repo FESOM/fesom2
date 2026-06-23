@@ -204,7 +204,7 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
     real (kind=WP)  :: temp,sal,tin,zice
     real (kind=WP)  :: rhow, rhor, rho
     real (kind=WP)  :: gats1, gats2, gas, gat
-    real (kind=WP)  :: ep1,ep2,ep3,ep4,ep5,ep31
+    real (kind=WP)  :: ep1,ep2,ep3,ep4,ep31
     real (kind=WP)  :: ex1,ex2,ex3,ex4,ex5,ex6
     real (kind=WP)  :: vt1,sr1,sr2,sf1,sf2,tf1,tf2,tf,sf,seta,re
     integer         :: node, nzmax, nzmin
@@ -224,6 +224,7 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
 
     real(kind=WP),parameter ::  tob=  -20.                       !temperatur at the ice surface
     real(kind=WP),parameter ::  rhoi=  920.                      !mean ice density
+    real(kind=WP),parameter ::  rhofw=  1000.                    !mean freshwater density
     real(kind=WP),parameter ::  cpw =  4180.0                    !Barnier et al. (1995)
     real(kind=WP),parameter ::  lhf =  3.33e+5                   !latent heat of fusion
     real(kind=WP),parameter ::  tdif=  1.54e-6                   !thermal conductivity of ice shelf !RG4190 / RG44027
@@ -303,7 +304,6 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
         ep3  = lhf*gas
         ep31 = -rhor*cpi*tdif/zice   !RG4190 / RG44027  ! CW
         ep4  = b+c*zice
-        ep5  = gas/rhor
         
         ! negative heat flux term in the ice (due to -kappa/D)
         !    ex1 = a*(ep1-ep2)
@@ -357,12 +357,12 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
         
         !_______________________________________________________________________
         ! Calculate the melting/freezing rate [m/s]
-        ! seta = ep5*(1.0-sal/sf)     !rt thinks this is not needed
+        ! seta = ep5*(1.0-sal/sf)     !rt thinks this is not needed, ep5=gas/rhor
         !rt  t_surf_flux(i,j)=gat*(tf-tin)
         !rt  s_surf_flux(i,j)=gas*(sf-(s(i,j,N,lrhs)+35.0))
         
         heat_flux(node)  = rhow*cpw*gat*(tin-tf)      ! [W/m2]  ! positive for upward
-        water_flux(node) =          ep5*(sf-sal)/sf   ! [m/s]   !
+        water_flux(node) = rhow / rhofw * gas * (sf-sal)/sf   ! [m/s]   !
         
         !      qo=-rhor*seta*oofw
         !      if(seta.le.0.) then
