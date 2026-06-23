@@ -27,6 +27,13 @@ set(VERBOSE             OFF CACHE BOOL "toggle debug output")
 set(FESOM_PROFILING     OFF CACHE BOOL "Enable enhanced profiling system")
 set(CVMIX               ON  CACHE BOOL "Download/Compile/Install/Link CVMix libray")
 
+# Single precision (WP=4) build: CVMix is a double-precision library and is out of scope
+# for the SP port, so disable it to keep the SP build clean (native KPP/PP still work).
+if(USE_SINGLE_PRECISION)
+   message(STATUS "USE_SINGLE_PRECISION=ON: forcing CVMIX=OFF (out of scope for single precision)")
+   set(CVMIX OFF CACHE BOOL "Download/Compile/Install/Link CVMix libray" FORCE)
+endif()
+
 # Testing options
 option(BUILD_TESTING "Build tests" OFF)
 

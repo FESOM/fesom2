@@ -3728,7 +3728,7 @@ subroutine io_r2g(n, partit, mesh)
 
     !___________________________________________________________________________
     IF ((entry_x%accuracy == i_real8) .AND. (entry_y%accuracy == i_real8)) THEN
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I, J, xmean, ymean)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I, J, temp_x, temp_y, xmean, ymean)
         DO J=1, size(entry_x%local_values_r8,dim=2)
             if (entry_x%is_elem_based) then
                 xmean=sum(mesh%coord_nod2D(1, mesh%elem2D_nodes(:, J)))/3._WP
@@ -3738,7 +3738,12 @@ subroutine io_r2g(n, partit, mesh)
                 ymean=mesh%coord_nod2D(2, J)
             end if
             DO I=1, size(entry_x%local_values_r8,dim=1)
-                call vector_r2g(entry_x%local_values_r8(I,J), entry_y%local_values_r8(I,J), xmean, ymean, 0)
+                ! vector_r2g works in WP; round-trip through WP temps so the on-disk r8 buffer rotates correctly at WP=4 and WP=8
+                temp_x=real(entry_x%local_values_r8(I,J), kind=WP)
+                temp_y=real(entry_y%local_values_r8(I,J), kind=WP)
+                call vector_r2g(temp_x, temp_y, xmean, ymean, 0)
+                entry_x%local_values_r8(I,J)=real(temp_x, real64)
+                entry_y%local_values_r8(I,J)=real(temp_y, real64)
             END DO
         END DO
 !$OMP END PARALLEL DO

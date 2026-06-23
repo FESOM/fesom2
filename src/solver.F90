@@ -150,7 +150,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
  s_old = sum(rhs(1:myDim_nod2D) * rhs(1:myDim_nod2D))
 #endif
 
-  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
   rtol=solverinfo%soltol*sqrt(s_old/real(nod2D,WP))
   ! ==============
   ! Compute r0
@@ -188,7 +188,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   s_old = sum(rr(1:myDim_nod2D) * zz(1:myDim_nod2D))
 #endif
 
-  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
   
   ! ===============
   ! Iterations
@@ -218,7 +218,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
  s_aux = sum(pp(1:myDim_nod2D) * App(1:myDim_nod2D))
 #endif
 
-  call MPI_Allreduce(MPI_IN_PLACE, s_aux, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  call MPI_Allreduce(MPI_IN_PLACE, s_aux, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 
   al=s_old/s_aux
      ! ===========
@@ -256,7 +256,7 @@ sprod(1:2)=0.0_WP
     sprod(1) = sum(rr(1:myDim_nod2D) * rr(1:myDim_nod2D))
 #endif
   
-  call MPI_Allreduce(MPI_IN_PLACE, sprod, 2, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  call MPI_Allreduce(MPI_IN_PLACE, sprod, 2, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 
 !$OMP BARRIER
      ! ===========

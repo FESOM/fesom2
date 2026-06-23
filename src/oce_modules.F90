@@ -5,7 +5,12 @@
 
 !==========================================================
 MODULE o_PARAM
-integer, parameter            :: WP=8        ! Working precision
+! Working precision - configurable via preprocessor (-DUSE_SINGLE_PRECISION)
+#if defined(USE_SINGLE_PRECISION)
+integer, parameter            :: WP=4        ! Single precision
+#else
+integer, parameter            :: WP=8        ! Double precision (default)
+#endif
 integer, parameter            :: MAX_PATH=4096 ! Maximum file path length
 integer		                  :: mstep
 real(kind=WP), parameter      :: pi=3.14159265358979

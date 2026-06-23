@@ -79,6 +79,9 @@ message(STATUS "RECOM_COUPLED: ${RECOM_COUPLED}")
 option(USE_ICEPACK "Use ICEPACK" OFF)
 message(STATUS "USE_ICEPACK: ${USE_ICEPACK}")
 
+option(USE_SINGLE_PRECISION "Build FESOM in single precision (WP=4)" OFF)
+message(STATUS "USE_SINGLE_PRECISION: ${USE_SINGLE_PRECISION}")
+
 
 # option to trigger building a library version of FESOM
 # we do not always build the library along with the executable to avoid having two targets here in the CMakeLists.txt
@@ -292,6 +295,10 @@ if(USE_ICEPACK)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __icepack)
 endif()
 
+if(USE_SINGLE_PRECISION)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE USE_SINGLE_PRECISION)
+endif()
+
 if(CVMIX)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __cvmix)
 endif()
@@ -323,8 +330,12 @@ endif()
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} STREQUAL  IntelLLVM )
    
-   # Base compiler flags
-   target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0 -fpp)
+   # Base compiler flags (default real kind follows USE_SINGLE_PRECISION)
+   if(USE_SINGLE_PRECISION)
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r4 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0 -fpp)
+   else()
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0 -fpp)
+   endif()
    
    # compiler flags not supported by IntelLLVM
    if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
@@ -381,11 +392,17 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} 
 
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 #    target_compile_options(${PROJECT_NAME} PRIVATE -O3 -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
+   # default real kind follows USE_SINGLE_PRECISION: promote to 8 for DP, leave at 4 for SP
+   if(USE_SINGLE_PRECISION)
+      set(_FESOM_GNU_RKIND "")
+   else()
+      set(_FESOM_GNU_RKIND -fdefault-real-8 -fdefault-double-8)
+   endif()
    if(${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu )
       message(STATUS "Allowing type mismatches on Ubuntu for CI Testing" )  # NOTE(PG): Would be nicer to grab the CI=True from the env variable
-      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -cpp)
+      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  ${_FESOM_GNU_RKIND} -ffree-line-length-none -cpp)
    else()
-      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -cpp)
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  ${_FESOM_GNU_RKIND} -ffree-line-length-none -cpp)
    endif()
    if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
       if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
@@ -450,7 +467,13 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
 	#target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -N 1023 -g -G2 -O3)
-   target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -N 1023 -g -G2 -O2 -hnoacc -M878)  #-hnoacc is a workaround for cray automatically activate -hacc, -M878 is to suppress ftn-878 warning
+   # default real kind follows USE_SINGLE_PRECISION
+   if(USE_SINGLE_PRECISION)
+      set(_FESOM_CRAY_RKIND real32)
+   else()
+      set(_FESOM_CRAY_RKIND real64)
+   endif()
+   target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s ${_FESOM_CRAY_RKIND} -N 1023 -g -G2 -O2 -hnoacc -M878)  #-hnoacc is a workaround for cray automatically activate -hacc, -M878 is to suppress ftn-878 warning
    if(${ENABLE_OPENMP})
       target_compile_options(${PROJECT_NAME} PRIVATE -homp)
    else()
@@ -464,10 +487,16 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
    endif()
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
    target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_NVHPC_WORKAROUNDS)
+   # default real kind follows USE_SINGLE_PRECISION
+   if(USE_SINGLE_PRECISION)
+      set(_FESOM_NVHPC_RKIND -Mr4)
+   else()
+      set(_FESOM_NVHPC_RKIND -Mr8)
+   endif()
    if(${ENABLE_OPENACC})
       target_compile_options(${PROJECT_NAME} PRIVATE
-      $<$<CONFIG:DEBUG>:-Mallocatable=95 -Mr8 -pgf90libs -Mnofma -Minfo=all -acc=verystrict -gpu=math_uniform,cuda12.2,cc80>
-      $<$<CONFIG:RELEASE>:-Mallocatable=95 -Mr8 -pgf90libs -Minfo=all -acc=verystrict -gpu=cc80>)
+      $<$<CONFIG:DEBUG>:-Mallocatable=95 ${_FESOM_NVHPC_RKIND} -pgf90libs -Mnofma -Minfo=all -acc=verystrict -gpu=math_uniform,cuda12.2,cc80>
+      $<$<CONFIG:RELEASE>:-Mallocatable=95 ${_FESOM_NVHPC_RKIND} -pgf90libs -Minfo=all -acc=verystrict -gpu=cc80>)
       set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-acc=verystrict -Mnofma -gpu=math_uniform,cuda12.2,cc80")
       set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-acc=verystrict -gpu=cc80")
       if(${DISABLE_OPENACC_ATOMICS})
@@ -475,8 +504,8 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
       endif()
    else()
       target_compile_options(${PROJECT_NAME} PRIVATE 
-      $<$<CONFIG:DEBUG>:-Mallocatable=95 -Mr8 -pgf90libs -Mnofma>
-      $<$<CONFIG:RELEASE>:-Mallocatable=95 -Mr8 -pgf90libs>)
+      $<$<CONFIG:DEBUG>:-Mallocatable=95 ${_FESOM_NVHPC_RKIND} -pgf90libs -Mnofma>
+      $<$<CONFIG:RELEASE>:-Mallocatable=95 ${_FESOM_NVHPC_RKIND} -pgf90libs>)
    endif()
 endif()
 

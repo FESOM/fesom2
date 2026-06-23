@@ -346,7 +346,7 @@ lval=0.0_WP
 !$OMP END PARALLEL
 #endif
   int2D=0.0_WP
-  call MPI_AllREDUCE(lval, int2D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+  call MPI_AllREDUCE(lval, int2D, 1, MPI_WP, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
 end subroutine integrate_nod_2D
 !
@@ -391,7 +391,7 @@ subroutine integrate_nod_3D(data, int3D, partit, mesh)
 !$OMP END PARALLEL DO
 
   int3D=0.0_WP
-  call MPI_AllREDUCE(lval, int3D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+  call MPI_AllREDUCE(lval, int3D, 1, MPI_WP, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
 end subroutine integrate_nod_3D
 !
@@ -421,7 +421,7 @@ subroutine extrap_nod3D(arr, partit, mesh)
     !___________________________________________________________________________
     loc_max=maxval(arr(1,:))
     glob_max=0._WP
-    call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
     glob_sum=-1
 
     !___________________________________________________________________________
@@ -485,7 +485,7 @@ subroutine extrap_nod3D(arr, partit, mesh)
         
         !_______________________________________________________________________
         loc_max=maxval(arr(1,:))
-        call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)   
+        call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)   
         
     END DO ! -->  DO WHILE (glob_max>0.99_WP*dummy)  
     
@@ -681,7 +681,7 @@ subroutine integrate_elem_3D(data, int3D, partit, mesh)
 !$OMP END PARALLEL DO
 
   int3D=0.0_WP
-  call MPI_AllREDUCE(lval, int3D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+  call MPI_AllREDUCE(lval, int3D, 1, MPI_WP, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
 end subroutine integrate_elem_3D
 !
@@ -721,7 +721,7 @@ subroutine integrate_elem_2D(data, int2D, partit, mesh)
 !$OMP END PARALLEL DO
 
   int2D=0.0_WP
-  call MPI_AllREDUCE(lval, int2D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+  call MPI_AllREDUCE(lval, int2D, 1, MPI_WP, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
 end subroutine integrate_elem_2D
 
