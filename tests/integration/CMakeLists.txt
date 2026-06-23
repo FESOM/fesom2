@@ -4,11 +4,13 @@
 
 # MPI tests (if enabled)
 #
-# These run a plain standalone fesom.x. A coupled build (FESOM_COUPLED or
-# OIFS_COUPLED) links OASIS and aborts at startup without a coupling setup
-# (namcouple), so the standalone pi run is not applicable there - skip
-# registering them for coupled configurations (build-only verification).
-if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED)
+# These run a plain standalone fesom.x. A build that activates an external
+# coupler at runtime cannot run the standalone pi test and aborts at startup:
+#   * FESOM_COUPLED / OIFS_COUPLED -> OASIS, aborts without 'namcouple'
+#   * USE_YAC                      -> YAC,   aborts without 'coupling.yaml'
+# Skip registering the standalone integration tests for those configurations
+# (build-only verification).
+if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED AND NOT USE_YAC)
     # Basic integration test with PI mesh and 2 processes (minimum required for mesh partitioning)
     add_fesom_test(integration_pi_mpi2
         MPI_TEST
@@ -36,7 +38,7 @@ if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED)
 elseif(NOT ENABLE_MPI_TESTS)
     message(WARNING "MPI tests are disabled. Set ENABLE_MPI_TESTS=ON to enable them.")
 else()
-    message(STATUS "Standalone integration tests skipped for coupled build (FESOM_COUPLED/OIFS_COUPLED): a coupled fesom.x requires an OASIS coupling setup and cannot run the standalone pi test.")
+    message(STATUS "Standalone integration tests skipped for coupled build (FESOM_COUPLED/OIFS_COUPLED/USE_YAC): a coupled fesom.x requires an external coupler setup (namcouple/coupling.yaml) and cannot run the standalone pi test.")
 endif()
 
 

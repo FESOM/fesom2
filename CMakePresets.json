@@ -198,11 +198,14 @@
       "name": "coupled_yac",
       "configurePreset": "coupled_yac",
       "displayName": "Test YAC Coupled Configuration",
-      "description": "Run integration tests for the YAC coupled FESOM2 configuration",
+      "description": "Build-only verification: a YAC (USE_YAC) fesom.x requires a coupling.yaml and cannot run the standalone pi integration tests, so none are registered",
       "filter": {
         "include": {
           "name": "integration_.*"
         }
+      },
+      "execution": {
+        "noTestsAction": "ignore"
       }
     },
     {
