@@ -597,7 +597,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
         end if
         
         call integrate_nod(ibfwb + ibfwe + ibfwl + ibfwbv, net, partit, mesh)
-        if (mype==0) write(*,*) " * total iceberg fw flux: ", net
+        if (mype==0 .and. lverbose_icb) write(*,*) " * total iceberg fw flux: ", net
     end if
     
     !___________________________________________________________________________
