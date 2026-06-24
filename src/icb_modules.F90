@@ -78,6 +78,7 @@ save
   character(100):: width_icb_file='icb_length.dat' !iceberg width [m]
   character(100):: height_icb_file='icb_height.dat' !iceberg height [m]
   character(100):: scaling_file='icb_scaling.dat' !scaling factor
+  character(100):: calving_day_file='icb_calving_day.dat' !calving day for each iceberg
   
   !===== OUTPUT RELATED SETTINGS  =====
   integer :: icb_outfreq           ! 180; for FESOM_dt=2min this is 6 hourly output !120; for FESOM_dt=3min this is 6 hourly output
