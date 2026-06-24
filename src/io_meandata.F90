@@ -832,6 +832,11 @@ CASE ('curl_surf ')
 ! output RECOM 2D
 #if defined(__recom)
 
+CASE ('xCO2atm    ')
+    if (use_REcoM) then
+    call def_stream(nod2D,  myDim_nod2D,   'xCO2atm',    'atmospheric CO2 mass mixing ratio',  'mole fraction', x_co2atm(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
 CASE ('dpCO2s    ')
     if (use_REcoM) then
     call def_stream(nod2D,  myDim_nod2D,   'dpCO2s',    'Difference of oceanic pCO2 minus atmospheric pCO2',  'uatm', GlodPCO2surf(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -1002,7 +1007,7 @@ CASE ('Chldegp  ')
 #endif
     
 !___________________________________________________________________________________________________________________________________    
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>   3D streams   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+!   3D streams
 !___________________________________________________________________________________________________________________________________
 CASE ('temp      ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp',      'temperature', 'C',      tracers%data(1)%values(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -2748,7 +2753,46 @@ end subroutine
 !
 !
 !_______________________________________________________________________________
-! main output routine called at the end of each time step --> here is decided if 
+! Return the vertically valid (wet) index range [ul_loc, kmax_loc] for column j of
+! the given output stream. Cells with level index outside this range are below the
+! bottom topography or above a cavity and are the only ones written as _FillValue.
+! For 2D fields (nlev_loc==1) and non-spatial vertical axes (density / ice classes)
+! the whole column is valid, so a legitimate zero (e.g. ice-free a_ice or vanishing
+! IDEMIX energy) is kept as zero rather than turned into a missing value.
+subroutine get_wet_range(entry, mesh, nlev_loc, j, ul_loc, kmax_loc)
+    use mod_mesh
+    implicit none
+    type(Meandata), intent(in)  :: entry
+    type(t_mesh),   intent(in)  :: mesh
+    integer,        intent(in)  :: nlev_loc, j
+    integer,        intent(out) :: ul_loc, kmax_loc
+    integer                     :: nl_bot
+
+    if (nlev_loc == mesh%nl .or. nlev_loc == mesh%nl-1) then
+        ! genuine 3D field on the vertical grid --> mask by topography / cavity
+        if (entry%is_elem_based) then
+            ul_loc = mesh%ulevels(j)
+            nl_bot = mesh%nlevels(j)
+        else
+            ul_loc = mesh%ulevels_nod2D(j)
+            nl_bot = mesh%nlevels_nod2D(j)
+        end if
+        ! full levels (nz, interfaces) keep nl_bot levels, mid layers (nz1) keep nl_bot-1
+        if (nlev_loc == mesh%nl) then
+            kmax_loc = nl_bot
+        else
+            kmax_loc = nl_bot - 1
+        end if
+    else
+        ! 2D fields and non-spatial vertical axes: every entry is valid
+        ul_loc   = 1
+        kmax_loc = nlev_loc
+    end if
+end subroutine
+!
+!
+!_______________________________________________________________________________
+! main output routine called at the end of each time step --> here is decided if
 ! output event is triggered
 subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     use g_clock
@@ -2770,6 +2814,7 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     logical, save :: lfirst=.true.
     integer       :: n, k
     integer       :: i, j !for OMP loops
+    integer       :: nlev_loc, ul_loc, kmax_loc !for wet-cell masking of output
     logical       :: do_output
     type(Meandata), pointer :: entry
     type(t_mesh), intent(in) , target :: mesh
@@ -2942,40 +2987,44 @@ ctime=timeold+(dayold-1.)*86400
             ! data range wrecks GRIB packing precision (real ice values get
             ! quantized to ~0). Multio gets the clean mean (zeros stay zeros).
             if (entry%accuracy == i_real8) then
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
+                nlev_loc = size(entry%local_values_r8,dim=1)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J,ul_loc,kmax_loc)
                 DO J=1, size(entry%local_values_r8,dim=2)
-                    DO I=1, size(entry%local_values_r8,dim=1)
-#if defined(__MULTIO)
-                        entry%local_values_r8_copy(I,J) = entry%local_values_r8(I,J) /real(entry%addcounter,real64)  ! compute_means
-#else
-                        if (abs(entry%local_values_r8(I,J)) < 1.0e-30_real64) then
-                            entry%local_values_r8_copy(I,J) = NC_FILL_DOUBLE  ! No data - set to fill value
+                    ! Determine the vertically valid (wet) range for this column. Cells
+                    ! outside [ul_loc,kmax_loc] are below the bottom topography or above
+                    ! the cavity and have never been touched -> they are the only ones set
+                    ! to _FillValue. Wet cells keep their (averaged) value, even when it is
+                    ! a legitimate zero (e.g. ice-free a_ice or vanishing IDEMIX energy).
+                    call get_wet_range(entry, mesh, nlev_loc, J, ul_loc, kmax_loc)
+                    DO I=1, nlev_loc
+                        if (I < ul_loc .or. I > kmax_loc) then
+                            entry%local_values_r8_copy(I,J) = NC_FILL_DOUBLE  ! dry cell - set to fill value
                         else
                             entry%local_values_r8_copy(I,J) = entry%local_values_r8(I,J) /real(entry%addcounter,real64)  ! compute_means
                         end if
 #endif
                         entry%local_values_r8(I,J) = 0._real64 ! clean_meanarrays - reset to 0 for next accumulation
-                    END DO ! --> DO I=1, size(entry%local_values_r8,dim=1)
+                    END DO ! --> DO I=1, nlev_loc
                 END DO ! --> DO J=1, size(entry%local_values_r8,dim=2)
 !$OMP END PARALLEL DO
 
             !___________________________________________________________________
             ! write single precision output
             else if (entry%accuracy == i_real4) then
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
+                nlev_loc = size(entry%local_values_r4,dim=1)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J,ul_loc,kmax_loc)
                 DO J=1, size(entry%local_values_r4,dim=2)
-                    DO I=1, size(entry%local_values_r4,dim=1)
-#if defined(__MULTIO)
-                        entry%local_values_r4_copy(I,J) = entry%local_values_r4(I,J) /real(entry%addcounter,real32)  ! compute_means
-#else
-                        if (abs(entry%local_values_r4(I,J)) < 1.0e-30_real32) then
-                            entry%local_values_r4_copy(I,J) = NC_FILL_FLOAT  ! No data - set to fill value
+                    ! see comment in the double precision branch above
+                    call get_wet_range(entry, mesh, nlev_loc, J, ul_loc, kmax_loc)
+                    DO I=1, nlev_loc
+                        if (I < ul_loc .or. I > kmax_loc) then
+                            entry%local_values_r4_copy(I,J) = NC_FILL_FLOAT  ! dry cell - set to fill value
                         else
                             entry%local_values_r4_copy(I,J) = entry%local_values_r4(I,J) /real(entry%addcounter,real32)  ! compute_means
                         end if
 #endif
                         entry%local_values_r4(I,J) = 0._real32 ! clean_meanarrays - reset to 0 for next accumulation
-                    END DO ! --> DO I=1, size(entry%local_values_r4,dim=1)
+                    END DO ! --> DO I=1, nlev_loc
                 END DO ! --> DO J=1, size(entry%local_values_r4,dim=2)
 !$OMP END PARALLEL DO
             end if ! --> if (entry%accuracy == i_real8) then
