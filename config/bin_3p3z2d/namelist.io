@@ -12,7 +12,7 @@ ldiag_extflds    =.false.
 /
 
 &nml_general
-io_listsize    =100 !number of streams to allocate. shallbe large or equal to the number of streams in &nml_list
+io_listsize    =150 !number of streams to allocate. shallbe large or equal to the number of streams in &nml_list
 vec_autorotate =.false.
 /
 
@@ -55,6 +55,7 @@ io_list =  'sst       ',1, 'm', 4,
            'Hp        ',1, 'm', 4,
            'aFe       ',1, 'm', 4,
            'aN        ',1, 'm', 4,
+           'denb      ',1, 'm', 4,
            'benN      ',1, 'm', 4,
            'benC      ',1, 'm', 4,
            'benSi     ',1, 'm', 4,

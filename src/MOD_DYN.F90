@@ -103,6 +103,13 @@ TYPE T_DYN
     real(kind=WP)                               :: visc_gamma1   = 0.1
     real(kind=WP)                               :: visc_gamma2   = 0.285
 
+    ! harmonic (Laplacian) viscosity coefficients for opt_visc=7
+    ! when both are 0: pure biharmonic; when > 0: combined biharmonic + harmonic
+    ! gamma0_h [m/s],   background harmonic viscosity
+    ! gamma1_h [nodim], flow-aware harmonic viscosity scaling
+    real(kind=WP)                               :: visc_gamma0_h = 0.0
+    real(kind=WP)                               :: visc_gamma1_h = 0.0
+
     ! coefficient for returned sub-gridscale energy, to be used with opt_visc=5
     ! (easy backscatter)
     real(kind=WP)                               :: visc_easybsreturn = 1.5
