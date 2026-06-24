@@ -294,7 +294,7 @@ subroutine iceberg_step1(ice, mesh, partit, dynamics, ib, height_ib_single,lengt
  												!=
  use o_param 		!for rad								!=
  use g_rotate_grid	!for subroutine g2r, logfile_outfreq					!=
- use g_config, only: steps_per_ib_step
+ use g_config, only: steps_per_ib_step, l_allowgrounding
  !=
 use iceberg_params, only: length_ib, width_ib, scaling, elem_block, elem_area_glob !, smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem, melted, grounded !, length_ib, width_ib, scaling
 !#else
@@ -506,52 +506,75 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
   !write(*,*) 'depth at iceberg ', ib, 's location:', Zdepth
   
   !================= CHECK IF ICEBERG IS GROUNDED ===================
- ! The grounding flag is always set to False in line 469.  
- ! First, check if the iceberg is grounded.
- if((draft_scale(ib)*abs(depth_ib) .gt. Zdepth) .and. l_allowgrounding ) then 
-    ! If so, scale the velocity down by a factor [0, 1) to slow down the iceberg
-    ! depending on how deep it penetrates the sea floor ... (Marsh etl al. https://doi.org/10.5194/gmd-8-1547-2015)
-    fact=1.0-( (draft_scale(ib)*abs(depth_ib)-Zdepth) / (draft_scale(ib)*abs(depth_ib)) ) 
-    u_ib = u_ib*fact
-    v_ib = v_ib*fact
-    ! ... and set the grounded flag to True ...
-    grounded_ib = 1.
-    ! ... and print a message if verbose output is enabled
-    if (lverbose_icb) write(*,*) 'iceberg ib ', ib, 'is grounded; ib_depth=',draft_scale(ib)*abs(depth_ib),'; Zdepth=',Zdepth
- end if
- 
- ! Second, calculate the trajectory of the iceberg based on either the 
- ! full velocity (ungrounded case) or the scaled down velocity (grounded case)
- t0=MPI_Wtime()
-  call trajectory( lon_rad,lat_rad, u_ib,v_ib, new_u_ib,new_v_ib, &
-		   lon_deg,lat_deg,old_lon,old_lat, dt*REAL(steps_per_ib_step))
-  	   
- t1=MPI_Wtime()
-  iceberg_elem=local_idx_of(iceberg_elem)  	!local
-  
- t2=MPI_Wtime()
-  call find_new_iceberg_elem(mesh, partit, iceberg_elem, [lon_deg, lat_deg], left_mype)
- t3=MPI_Wtime()
-  iceberg_elem=partit%myList_elem2D(iceberg_elem)  	!global
-  
-  if(left_mype > 0.) then
-   lon_rad = old_lon
-   lat_rad = old_lat
- t4=MPI_Wtime()
-   call parallel2coast(mesh,partit, new_u_ib, new_v_ib, lon_rad,lat_rad, local_idx_of(iceberg_elem))
- t5=MPI_Wtime()
-   call trajectory( lon_rad,lat_rad, new_u_ib,new_v_ib, new_u_ib,new_v_ib, &
-		   lon_deg,lat_deg,old_lon,old_lat, dt*REAL(steps_per_ib_step))
- t6=MPI_Wtime()
-   u_ib = new_u_ib
-   v_ib = new_v_ib
-		   
-   iceberg_elem=local_idx_of(iceberg_elem)  	!local
- t7=MPI_Wtime()
-   call find_new_iceberg_elem(mesh,partit, iceberg_elem, (/lon_deg, lat_deg/), left_mype)
+  ! l_allowgrounding == 0: no grounding (free drift)
+  ! l_allowgrounding == 1: reduce velocity (slow drift)
+  ! l_allowgrounding == 2: velocity 0m/s (stationary)
 
- t8=MPI_Wtime()
-   iceberg_elem=partit%myList_elem2D(iceberg_elem)  	!global
+  if (l_allowgrounding == 1 .or. l_allowgrounding == 2) then
+    ! First, check if the iceberg is grounded.
+    if((draft_scale(ib)*abs(depth_ib) .gt. Zdepth)) then
+      ! The grounding flag is always set to False in line 469.  
+      ! Set the grounded flag to True ...
+      grounded_ib = 1.
+      ! ... and print a message about the iceberg draft and the ocean depth
+      if (lverbose_icb) write(*,*) 'iceberg ib ', ib, 'is grounded; ib_depth=',draft_scale(ib)*abs(depth_ib),'; Zdepth=',Zdepth
+      
+      ! If case 1, scale the velocity down by a factor [0, 1) to slow down the iceberg
+      ! depending on how deep it penetrates the sea floor ... (Marsh etl al. https://doi.org/10.5194/gmd-8-1547-2015)  
+      if (l_allowgrounding == 1) then
+        fact=1.0-( (draft_scale(ib)*abs(depth_ib)-Zdepth) / (draft_scale(ib)*abs(depth_ib)) ) 
+        u_ib = u_ib*fact
+        v_ib = v_ib*fact
+        ! ... and print a message if verbose output is enabled
+        if (lverbose_icb) write(*,*) 'iceberg ib ', ib, 'reduced velocity: u_ib=',u_ib,'m/s; v_ib=',v_ib,'m/s,',' fact:', fact
+      
+        ! If case 2, set the velocity to 0
+      elseif (l_allowgrounding == 2) then
+        left_mype = 0.0 
+        u_ib = 0.0
+        v_ib = 0.0
+        old_lon = lon_rad
+        old_lat = lat_rad
+        if (lverbose_icb) write(*,*) 'iceberg ib ', ib, 'is stationary; u_ib=',u_ib,'; v_ib=',v_ib
+      end if
+    end if
+  end if
+  
+  ! Second, calculate the trajectory of the iceberg based on either the 
+  ! l_allowgrounding == 0: no grounding (free drift)
+  ! l_allowgrounding == 1: reduce velocity (slow drift)  
+  if (l_allowgrounding == 0 .or. l_allowgrounding == 1) then 
+    t0=MPI_Wtime()
+    call trajectory( lon_rad,lat_rad, u_ib,v_ib, new_u_ib,new_v_ib, &
+	 	     lon_deg,lat_deg,old_lon,old_lat, dt*REAL(steps_per_ib_step))
+  	   
+    t1=MPI_Wtime()
+    iceberg_elem=local_idx_of(iceberg_elem)  	!local
+  
+    t2=MPI_Wtime()
+    call find_new_iceberg_elem(mesh, partit, iceberg_elem, [lon_deg, lat_deg], left_mype)
+    t3=MPI_Wtime()
+    iceberg_elem=partit%myList_elem2D(iceberg_elem)  	!global
+  
+    if(left_mype > 0.) then
+      lon_rad = old_lon
+      lat_rad = old_lat
+      t4=MPI_Wtime()
+      call parallel2coast(mesh,partit, new_u_ib, new_v_ib, lon_rad,lat_rad, local_idx_of(iceberg_elem))
+      t5=MPI_Wtime()
+      call trajectory(lon_rad,lat_rad, new_u_ib,new_v_ib, new_u_ib,new_v_ib, &
+		      lon_deg,lat_deg,old_lon,old_lat, dt*REAL(steps_per_ib_step))
+      t6=MPI_Wtime()
+      u_ib = new_u_ib
+      v_ib = new_v_ib
+		   
+      iceberg_elem=local_idx_of(iceberg_elem)  	!local
+      t7=MPI_Wtime()
+      call find_new_iceberg_elem(mesh,partit, iceberg_elem, (/lon_deg, lat_deg/), left_mype)
+
+      t8=MPI_Wtime()
+      iceberg_elem=partit%myList_elem2D(iceberg_elem)  	!global
+    end if
   end if		   
   !================END OF TRAJECTORY CALCULATION=====================
 

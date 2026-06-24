@@ -48,7 +48,6 @@ save
   ! =========================================== !
   logical       :: l_melt = .true.              ! (use melting parametrization?)
   logical       :: l_weeksmellor = .true.       ! (use weeks & mellor stability criterion?)
-  logical       :: l_allowgrounding = .true.    ! (are icebergs allowed to ground?)
   real,dimension(:), allocatable:: draft_scale  ! (account for irregularities of draft
   ! =========================================== !
   logical       :: l_tides = .false.            ! (simulate sensitivity to tides? !!check for HLRN-III!!)
