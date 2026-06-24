@@ -121,6 +121,7 @@ MODULE g_sbf
 !CV Not all of them are actually needed (this comes from MITgcm), but I
 !CV keep them all for now
 !CV The values can be changed via a namelist in namelist.recom   
+!SL IT could be still introduced in REcoM_spectral and just use(d) here
    
    integer            :: OASIMstartdate1, OASIMstartdate2
    Real(kind=8)       :: OASIMperiod, OASIMrepeatperiod
