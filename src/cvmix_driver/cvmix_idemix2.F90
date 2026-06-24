@@ -94,7 +94,11 @@ type, public :: idemix2_type
     gamma               , & ! constant of order one derived from the shape of the spectrum in m space (dimensionless)
     jstar               , & ! spectral bandwidth in modes (dimensionless)
     mu0                 , & ! dissipation parameter (dimensionless)
-    shelf_dist              ! shelf definition in meters from coast
+    shelf_dist          , & ! shelf definition in meters from coast
+    tau_niw_shelf       , & ! NIW dissipation timescale on shelf (days)
+    tau_niw_oce         , & ! NIW dissipation timescale floor in open ocean (days)
+    tau_M2_shelf        , & ! M2 dissipation timescale on shelf (days)
+    tau_M2_oce              ! M2 dissipation timescale floor in open ocean (days)
     
     logical        ::     &
     enable_M2           , &
@@ -127,6 +131,10 @@ subroutine compute_init(tau_v               , & ! time scale for vertical symmet
                         mu0                 , & ! dissipation parameter (dimensionless)
                         nfbin               , & ! number of spectral bins
                         shelf_dist          , & ! shelf definition in meters from coast
+                        tau_niw_shelf       , &
+                        tau_niw_oce         , &
+                        tau_M2_shelf        , &
+                        tau_M2_oce          , &
                         enable_M2           , &
                         enable_niw          , & 
                         enable_superbee_adv , &
@@ -137,7 +145,8 @@ subroutine compute_init(tau_v               , & ! time scale for vertical symmet
                         handle_old_vals, idemix2_userdef_constants)
 
     ! This subroutine sets user or default values for IDEMIX parameters
-    real(cvmix_r8), optional, intent(in) :: tau_v, tau_h, gamma, jstar, mu0, shelf_dist
+    real(cvmix_r8), optional, intent(in) :: tau_v, tau_h, gamma, jstar, mu0, shelf_dist, &
+                                            tau_niw_shelf, tau_niw_oce, tau_M2_shelf, tau_M2_oce
     logical       , optional, intent(in) :: enable_M2, enable_niw, &
                                             enable_superbee_adv, enable_AB_timestep, &
                                             enable_hor_diffusion, enable_hor_diff_iter
@@ -208,7 +217,35 @@ subroutine compute_init(tau_v               , & ! time scale for vertical symmet
     else
         call idemix2_put('shelf_dist', 300000._cvmix_r8, idemix2_userdef_constants)
     end if
-    
+
+    !___ tau_niw_shelf _________________________________________________________
+    if (present(tau_niw_shelf)) then
+        call idemix2_put('tau_niw_shelf', tau_niw_shelf, idemix2_userdef_constants)
+    else
+        call idemix2_put('tau_niw_shelf', 7._cvmix_r8, idemix2_userdef_constants)
+    end if
+
+    !___ tau_niw_oce ___________________________________________________________
+    if (present(tau_niw_oce)) then
+        call idemix2_put('tau_niw_oce', tau_niw_oce, idemix2_userdef_constants)
+    else
+        call idemix2_put('tau_niw_oce', 3._cvmix_r8, idemix2_userdef_constants)
+    end if
+
+    !___ tau_M2_shelf __________________________________________________________
+    if (present(tau_M2_shelf)) then
+        call idemix2_put('tau_M2_shelf', tau_M2_shelf, idemix2_userdef_constants)
+    else
+        call idemix2_put('tau_M2_shelf', 7._cvmix_r8, idemix2_userdef_constants)
+    end if
+
+    !___ tau_M2_oce ____________________________________________________________
+    if (present(tau_M2_oce)) then
+        call idemix2_put('tau_M2_oce', tau_M2_oce, idemix2_userdef_constants)
+    else
+        call idemix2_put('tau_M2_oce', 50._cvmix_r8, idemix2_userdef_constants)
+    end if
+
     !___ superbee_adv __________________________________________________________
     if (present(nfbin)) then
         call idemix2_put('nfbin', nfbin, idemix2_userdef_constants)
@@ -503,19 +540,22 @@ subroutine compute_compart_interact_tscale(   &
                                *(omega_compart**2.0 - coriolis**2.0)**0.5/omega_compart
                     tau_compart = min(0.5/dtime, fxc*fxb/zbottom)            
                 else
-                    tau_compart = 1./(50.*86400.0)   
-                end if 
-            end if 
+                    tau_compart = 1.0/(idemix2_const_in%tau_M2_oce*86400.0_cvmix_r8)
+                end if
+            end if
         endif
     endif
-        
-    ! on shelf limitation 
-    if (topo_shelf) tau_compart  = 1./(7.*86400.0)
-    if (trim(compart_name)=='niw') then 
-        tau_compart = max(1d0/(3.*86400.0), tau_compart )
-    else if (trim(compart_name)=='M2') then 
-        tau_compart = max(1d0/(50.*86400.0), tau_compart )
-    end if 
+
+    ! on shelf limitation
+    if (topo_shelf) then
+        if (trim(compart_name)=='niw') tau_compart = 1.0/(idemix2_const_in%tau_niw_shelf*86400.0_cvmix_r8)
+        if (trim(compart_name)=='M2' ) tau_compart = 1.0/(idemix2_const_in%tau_M2_shelf *86400.0_cvmix_r8)
+    end if
+    if (trim(compart_name)=='niw') then
+        tau_compart = max(1.0/(idemix2_const_in%tau_niw_oce*86400.0_cvmix_r8), tau_compart)
+    else if (trim(compart_name)=='M2') then
+        tau_compart = max(1.0/(idemix2_const_in%tau_M2_oce *86400.0_cvmix_r8), tau_compart)
+    end if
 end subroutine compute_compart_interact_tscale                                     
 
 
@@ -1227,12 +1267,16 @@ subroutine vmix_tke_put_idemix2_real(varname, val, idemix2_userdef_constants)
     ! if input idemix_userdef_constants present do pointer into this 
     if (present(idemix2_userdef_constants)) idemix2_constants_out=> idemix2_userdef_constants
     select case(trim(varname))
-        case('tau_v') ; idemix2_constants_out%tau_v = val
-        case('tau_h') ; idemix2_constants_out%tau_h = val
-        case('jstar') ; idemix2_constants_out%jstar = val
-        case('gamma') ; idemix2_constants_out%gamma = val
-        case('mu0'  ) ; idemix2_constants_out%mu0   = val
+        case('tau_v'       ) ; idemix2_constants_out%tau_v        = val
+        case('tau_h'       ) ; idemix2_constants_out%tau_h        = val
+        case('jstar'       ) ; idemix2_constants_out%jstar        = val
+        case('gamma'       ) ; idemix2_constants_out%gamma        = val
+        case('mu0'         ) ; idemix2_constants_out%mu0          = val
         case('shelf_dist'  ) ; idemix2_constants_out%shelf_dist   = val
+        case('tau_niw_shelf') ; idemix2_constants_out%tau_niw_shelf = val
+        case('tau_niw_oce'  ) ; idemix2_constants_out%tau_niw_oce   = val
+        case('tau_M2_shelf' ) ; idemix2_constants_out%tau_M2_shelf  = val
+        case('tau_M2_oce'   ) ; idemix2_constants_out%tau_M2_oce    = val
         case DEFAULT
             print*, "ERROR:", trim(varname), " not a valid choice"
             stop 1

@@ -1758,13 +1758,12 @@ CASE ('IDEMIX2   ')
             call def_stream((/nl           , nod2d/),(/nl           ,myDim_nod2D /), 'iwe2_Em2_strct'  , 'EM2 structure function energy'      , 'm^2/s^2'  , iwe2_E_M2_struct(:,:)    , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
             ! optional diagnostic
             if (idemix2_diag_Ecompart) then
-                if (allocated(iwe2_E_M2_refl   )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Em2_refl'   , 'EM2 coast-reflect. accumulated flux', 'm^2/s^3'  , iwe2_E_M2_refl(:,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                if (allocated(iwe2_E_M2_refl   )) call def_stream(nod2d, myDim_nod2D, 'iwe2_Em2_refl'   , 'EM2 coast-intercept. accumulated flux', 'm^2/s^3', iwe2_E_M2_refl(:)        , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
                 if (allocated(iwe2_E_M2_dt     )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Em2_dt'     , 'EM2 total tendency'                 , 'm^2/s^3'  , iwe2_E_M2_dt(  :,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
                 if (allocated(iwe2_E_M2_advh   )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Em2_advh'   , 'EM2 horizontal advection'           , 'm^2/s^3'  , iwe2_E_M2_advh(:,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
                 if (allocated(iwe2_E_M2_advs   )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Em2_advs'   , 'EM2 spectral advection'             , 'm^2/s^3'  , iwe2_E_M2_advs(:,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
                 if (allocated(iwe2_E_M2_diss   )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Em2_diss'   , 'EM2 dissipation'                    , 'm^2/s^3'  , iwe2_E_M2_diss(:,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
                 if (allocated(iwe2_E_M2_forc   )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Em2_forc'   , 'EM2 forcing tendency'               , 'm^2/s^3'  , iwe2_E_M2_forc(:,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-                
             end if 
             if (idemix2_diag_WWI) then
                 if (allocated(iwe2_E_iw_diss_M2)) call def_stream((/nl            ,nod2d/),(/nl           ,myDim_nod2D /), 'iwe2_Eiw_dissM2' , 'Eiw dissipation through M2 WWI'     , 'm^2/s^3'  , iwe2_E_iw_diss_M2(:,:)   , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -1785,7 +1784,7 @@ CASE ('IDEMIX2   ')
             call def_stream((/nl           , nod2d/),(/nl           ,myDim_nod2D /), 'iwe2_Eniw_strct' , 'Eniw structure function energy'     , 'm^2/s^2' , iwe2_E_niw_struct(:,:)    , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
             ! optional diagnostic
             if (idemix2_diag_Ecompart) then
-                if (allocated(iwe2_E_niw_refl   )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Eniw_refl'  , 'Eniw coast-reflect. accumulated flux', 'm^2/s^3', iwe2_E_niw_refl(:,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                if (allocated(iwe2_E_niw_refl   )) call def_stream(nod2d, myDim_nod2D, 'iwe2_Eniw_refl'  , 'Eniw coast-intercept. accumulated flux', 'm^2/s^3', iwe2_E_niw_refl(:)       , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
                 if (allocated(iwe2_E_niw_dt     )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Eniw_dt'    , 'Eniw total tendency'                , 'm^2/s^3' , iwe2_E_niw_dt(  :,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
                 if (allocated(iwe2_E_niw_advh   )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Eniw_advh'  , 'Eniw horizontal advection'          , 'm^2/s^3' , iwe2_E_niw_advh(:,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
                 if (allocated(iwe2_E_niw_advs   )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Eniw_advs'  , 'Eniw spectral advection'            , 'm^2/s^3' , iwe2_E_niw_advs(:,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)

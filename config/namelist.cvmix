@@ -116,12 +116,16 @@ idemix2_enable_M2     = .false.
 idemix2_M2forc_file   = '/albedo/work/user/pscholz/forcing/IDEMIX2/idemix2_IT_forc_M2modes1-2_aniso.nc'
 idemix2_M2forc_vname  = 'Flux_to2'   ! variable name in surface forcing file
 idemix2_M2forc_zname  = 'phi'        ! zdim variable name in surface forcing file
-
+idemix2_tau_M2_shelf  = 7.0
+idemix2_tau_M2_oce    = 50.0
+    
 ! --- NIW Forcing (Summed anisotropic M2-tide generation modes 1-2 (W/m2)) ---
 idemix2_enable_niw    = .false.
 idemix2_fniw_usage    = 0.2          ! fraction of surface forcing used [dimensionless]
 idemix2_niwforc_file  = '/albedo/work/user/pscholz/forcing/IDEMIX/fourier_smooth_2005_cfsr_inert_rgrid.nc'
 idemix2_niwforc_vname = 'var706'
+idemix2_tau_niw_shelf = 7.0
+idemix2_tau_niw_oce   = 3.0
 
 ! --- Bottom Forcing (Tidal Internal Waves) ---
 idemix2_enable_bot    = .true.
