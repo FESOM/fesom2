@@ -58,6 +58,7 @@ MODULE g_sbf
 
    public  sbc_ini  ! routine called before 1st time step (open files, read namelist,...)
    public  sbc_do   ! routine called each time step to provide a sbc fileds (wind,...)
+   public  sbc_do_recom ! routine called each time step to provide a sbc fileds for REcoM
    public  sbc_end  ! routine called after last time step
    public  RUNOFF_MAPPER
    public  julday   ! get julian day from date
@@ -1467,11 +1468,11 @@ CONTAINS
       !! ** Action  :
       !!----------------------------------------------------------------------
       use g_clock
-#if defined (__recom)
-      use recom_config
-      use recom_glovar
-      use REcoM_ciso
-#endif
+!#if defined (__recom)
+!      use recom_config
+!      use recom_glovar
+!      use REcoM_ciso
+!#endif
       IMPLICIT NONE
 
       include 'netcdf.inc'
@@ -1483,18 +1484,18 @@ CONTAINS
       real(wp),  pointer   :: nc_time(:)
       character(len=MAX_PATH)               :: filename
       logical                               :: file_exist=.false.
-#if defined (__recom)
-      character(15)             :: CO2vari, Nvari
-      integer                   :: firstyearofcurrentCO2cycle, totnumyear, currentCO2year
-      character(4)              :: currentCO2year_char
-      real(kind=8), allocatable :: ncdata(:)
-      integer                   :: CO2start, CO2count
-      integer	                :: status, ncid, varid
-      logical                   :: do_read=.false.
-      integer                   :: n_lb
-      integer, dimension(2)     :: istart, icount
-      real(kind=8)              :: total_runoff
-#endif
+!#if defined (__recom)
+!      character(15)             :: CO2vari, Nvari
+!      integer                   :: firstyearofcurrentCO2cycle, totnumyear, currentCO2year
+!      character(4)              :: currentCO2year_char
+!      real(kind=8), allocatable :: ncdata(:)
+!      integer                   :: CO2start, CO2count
+!      integer	                :: status, ncid, varid
+!      logical                   :: do_read=.false.
+!      integer                   :: n_lb
+!      integer, dimension(2)     :: istart, icount
+!      real(kind=8)              :: total_runoff
+!#endif
       type(t_partit), intent(inout), target :: partit
       type(t_mesh),   intent(in),    target :: mesh
       
@@ -1601,7 +1602,7 @@ CONTAINS
     end if
 
     !___________________________________________________________________________
-    ! read inCHL for applying shortwave penetration
+    ! read in CHL for applying shortwave penetration
     if (use_sw_pene) then
         if (chl_data_source=='Sweeney') then
             if (update_monthly_flag) then
@@ -1671,55 +1672,108 @@ CONTAINS
         end if ! --> if(update_monthly_flag) then
     end if ! --> if(runoff_data_source=='Dai09' .or. ... 
 
-#if defined(__recom)
-!<  read surface atmospheric deposition for Fe, N, CO2
-if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'//achar(27)//'[0m'
+      call data_timeinterp(rdate, partit)
+   END SUBROUTINE sbc_do
 
-! ******** Atmospheric CO2 *********
-  if (mstep == 1) then ! The year has changed
+#if defined (__recom)
+SUBROUTINE sbc_do_recom(partit, mesh)
+! ============================================================
+!  Read surface atmospheric deposition for Fe, N, CO2
+! ============================================================
+    !!---------------------------------------------------------------------
+    !!                    ***  ROUTINE sbc_do_recom ***
+    !!
+    !! ** Purpose : provide at each time-step: REcoM atmospheric and
+    !!              riverine boundary conditions (CO2, Fe, N, rivers,
+    !!              erosion)
+    !! ** Method  :
+    !! ** Action  :
+    !!----------------------------------------------------------------------
+    use g_clock
+    use recom_config
+    use recom_glovar
+    use REcoM_ciso
+    IMPLICIT NONE
 
-    if (use_atbox) then  
-!     Atmospheric box model CO2 values
-      AtmCO2(:)                   = x_co2atm(1)
-      if (ciso) then 
-        AtmCO2_13(:)              = x_co2atm_13(1)
-        if (ciso_14) AtmCO2_14(:,1) = x_co2atm_14(1)
-      end if
-    else 
-!     Prescribed atmospheric CO2 values
-        if (constant_CO2) then
-            AtmCO2(:) = CO2_for_spinup
+    integer      :: i
+    logical      :: update_monthly_flag
+    integer      :: flag_flpyr=0
+    character(len=MAX_PATH)               :: filename
+    character(15)             :: CO2vari, Nvari
+    integer                   :: firstyearofcurrentCO2cycle, totnumyear, currentCO2year
+    character(4)              :: currentCO2year_char
+    real(kind=8), allocatable :: ncdata(:)
+    integer                   :: CO2start, CO2count
+    integer                   :: status, ncid, varid, ierror, n
+    logical                   :: do_read=.false.
+    integer                   :: n_lb
+    integer, dimension(2)     :: istart, icount
+    real(kind=8)              :: total_runoff
+    type(t_partit), intent(inout), target :: partit
+    type(t_mesh),   intent(in),    target :: mesh
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
+        update_monthly_flag=( (day_in_month==num_day_in_month(fleapyear,month) .AND. timenew==86400._WP) .OR. mstep==1)
+
+    ! ----------------------------------------------------------------
+    !  Atmospheric CO2 — update once per year (when mstep == 1)
+    ! ----------------------------------------------------------------
+
+    if (mstep == 1) then
+
+        ! --- Source: Atmospheric box model ---
+        if (use_atbox) then  
+            AtmCO2(:) = x_co2atm(1)
+
+            if (ciso) then 
+                AtmCO2_13(:) = x_co2atm_13(1)
+                if (ciso_14) AtmCO2_14(:,1) = x_co2atm_14(1)
+            end if
+
+        ! --- Source: Prescribed CO2 values ---
+        else
+
+            if (constant_CO2) then
+                AtmCO2(:) = CO2_for_spinup
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
-            if (mype==0) write(*,*) 'Constant_CO2 = ', CO2_for_spinup 
-            if (mype==0) write(*,*) 'Atm CO2=', AtmCO2     
+                if (mype == 0) then
+                    write(*,*) 'Constant_CO2   = ', CO2_for_spinup
+                    write(*,*) 'Atm CO2        = ', AtmCO2
+            end if
 #if defined(__usetp)
-        endif !(partit%my_fesom_group==0) then
+        endif
 #endif
-            if (ciso) then
-                AtmCO2_13          = CO2_for_spinup * (1. + 0.001 * delta_co2_13)
-                if (ciso_14) then
-!               Atmospheric 14C varies with latitude
-                    do i=1, myDim_nod2D
-!                       Latitude of atmospheric input data
-                        lat_val = geo_coord_nod2D(2,i) / rad
-!                       Binning to latitude zones
-                        if (ciso_organic_14) then
-!                           Convert Delta_14C to delta_14C
-                            delta_co2_14 = (big_delta_co2_14(lat_zone(lat_val)) + 2. * delta_co2_13 + 50.) / &
-                                         (0.95 - 0.002 * delta_co2_13)
-                        else
-!                           "Inorganic" 14C approximation: delta_14C := Delta_14C 
-                            delta_co2_14 = big_delta_co2_14(lat_zone(lat_val))
-                        end if
-                        AtmCO2_14(lat_zone(lat_val),:) = CO2_for_spinup * (1. + 0.001 * delta_co2_14)
-                    end do
-                end if
-            end if          
 
-        else !not constant_CO2
-        
+                if (ciso) then
+                    AtmCO2_13 = CO2_for_spinup * (1. + 0.001 * delta_co2_13)
+
+                    if (ciso_14) then
+                        ! Atmospheric 14C varies with latitude
+                        do i=1, myDim_nod2D
+                            lat_val = geo_coord_nod2D(2,i) / rad
+
+                            if (ciso_organic_14) then
+!                               Convert Delta_14C to delta_14C
+                                delta_co2_14 = (big_delta_co2_14(lat_zone(lat_val)) &
+                                                + 2. * delta_co2_13 + 50.) &
+                                                 / (0.95 - 0.002 * delta_co2_13)
+                            else
+!                               "Inorganic" 14C approximation: delta_14C := Delta_14C 
+                                delta_co2_14 = big_delta_co2_14(lat_zone(lat_val))
+                            end if
+
+                            AtmCO2_14(lat_zone(lat_val),:) = CO2_for_spinup * (1. + 0.001 * delta_co2_14)
+                        end do
+                    end if
+                end if
+
+        else !Transient CO2 from file        
             filename=trim(make_full_path(nm_co2_data_file))
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
@@ -1730,11 +1784,19 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
         endif !(partit%my_fesom_group==0) then
 #endif
 
+            ! Compute the CO2 year corresponding to the current FESOM cycle
             totnumyear                 = lastyearoffesomcycle-firstyearoffesomcycle+1
             firstyearofcurrentCO2cycle = lastyearoffesomcycle-numofCO2cycles*totnumyear+(currentCO2cycle-1)*totnumyear
     
             currentCO2year = firstyearofcurrentCO2cycle + (yearnew-firstyearoffesomcycle)+1
+
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif    
             if(mype==0) write(*,*) currentCO2year, firstyearofcurrentCO2cycle, yearnew, firstyearoffesomcycle
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
             write(currentCO2year_char,'(i4)') currentCO2year
             CO2vari     = 'AtmCO2_'//currentCO2year_char
 
@@ -1747,7 +1809,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
                 stop
             endif
 	
-            ! data
+            ! Read 12-month CO2 array
             allocate(ncdata(12))
             status=nf90_inq_varid(ncid, CO2vari, varid)
             CO2start = 1
@@ -1764,7 +1826,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
         endif !(partit%my_fesom_group==0) then
 #endif
             status=nf90_close(ncid)
-        end if
+        end if ! constant_CO2 / transient CO2
     end if   ! atmospheric box model or prescribed CO2 values   
 
 !   Control output of atmospheric CO2 values
@@ -1784,7 +1846,9 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
     end if
   end if ! mstep ==1
 
-! ******** Fe deposition *********
+    ! ----------------------------------------------------------------
+    !  Iron (Fe) deposition
+    ! ----------------------------------------------------------------
     if (fe_data_source=='Albani') then
         if (update_monthly_flag) then
             i=month
@@ -1794,7 +1858,6 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif 
-
             if (mype==0) write(*,*) 'Updating iron climatology for month       ', i,' from ', trim(filename)
 #if defined(__usetp)
         endif
@@ -1811,7 +1874,9 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
 #endif
     end if
 
-! ******** N deposition *********
+    ! ----------------------------------------------------------------
+    !  Nitrogen (N) deposition
+    ! ----------------------------------------------------------------
     if (useAeolianN) then
 ! todo: check below when useAeolianN is .true.
         if (mstep==1) then ! The year has changed
@@ -1849,7 +1914,9 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
 #endif
     end if
 
-! ******** Riverine input (Nutrients) *********
+    !-----------------------------------------------------------------------------
+    ! Configure river nutrient inputs
+    !-----------------------------------------------------------------------------
     if (useRivers) then
 !<  read riverine input
     ! *** River inputs are in mmol/m2/s ***
@@ -1900,7 +1967,9 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
 #endif
     end if
 
-! ******** Riverine input of iron *********
+    !-----------------------------------------------------------------------------
+    ! Riverine iron input
+    !-----------------------------------------------------------------------------
     if (useRivFe) then
     ! River runoff (m/s) is multiplied with Fe concentration * muemolFe/m3 -> muemolFe/m2/s
     ! add river nutrients as surface boundary condition (surface_bc function in
@@ -1957,7 +2026,9 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
 #endif
     end if
 
-! ******** Sediment input *********
+    !-----------------------------------------------------------------------------
+    ! Sedimentary input
+    !-----------------------------------------------------------------------------
 !-Checking if files need to be opened---------------------------------------------
     if(use_MEDUSA .and. (sedflx_num .ne. 0)) then
             allocate(ncdata(9))
@@ -2123,15 +2194,8 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
 
     end if ! use_MEDUSA and sedflx_num not 0
 
+END SUBROUTINE sbc_do_recom
 #endif !defined(__recom)
-
-      !!PS if (partit%mype==0) then 
-      !!PS   write(*,*) 'sbc_do --> mstep:',mstep, ' rdate=', rdate
-      !!PS end if 
-
-      ! interpolate in time
-      call data_timeinterp(rdate, partit)
-   END SUBROUTINE sbc_do
 
    FUNCTION julday(yyyy, mm, dd, calendar)
 

@@ -265,7 +265,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   use g_comm_auto
   use g_rotate_grid
   use net_rec_from_atm_interface
-  use g_sbf, only: sbc_do
+  use g_sbf, only: sbc_do, sbc_do_recom
   use g_sbf, only: atmdata, i_totfl, i_xwind, i_ywind, i_xstre, i_ystre, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_snow, &
                                      l_xwind, l_ywind, l_xstre, l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow
 #if defined (__oasis)
@@ -773,6 +773,10 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   ! heat and fresh water fluxes are treated in i_therm and ice2ocean
 #endif /* skip all in case of __ifsinterface */
 #endif /* (__oasis) */
+
+#if defined (__recom) /* consider in all cases */
+  call sbc_do_recom(partit, mesh)
+#endif
 
   t2=MPI_Wtime()
 
