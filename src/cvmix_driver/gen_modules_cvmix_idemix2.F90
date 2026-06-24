@@ -103,7 +103,7 @@ module g_cvmix_idemix2
     ! | pyOM2_fpohlmann   |  3 days     | fast dissipation, stays near source |
     ! | FESOM2 default    |  3 days     | matches pyOM2_fpohlmann             |
     real(kind=WP)      :: idemix2_tau_niw_shelf = 7.0_WP
-    real(kind=WP)      :: idemix2_tau_niw_oce   = 3.0_WP ! pyOM2_fpohlmann default; pyOM2_orig: 50.0
+    real(kind=WP)      :: idemix2_tau_niw_oce   = 50.0_WP ! pyOM2_fpohlmann default; pyOM2_orig: 50.0
     real(kind=WP)      :: idemix2_tau_M2_shelf  = 7.0_WP
     real(kind=WP)      :: idemix2_tau_M2_oce    = 50.0_WP
 
