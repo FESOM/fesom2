@@ -5,6 +5,9 @@ module io_MEANDATA
   use recom_glovar
   use recom_config
   use recom_ciso
+#if defined (__RECOM_WAVEBANDS)
+!  use recom_spectral
+#endif /* (__RECOM_WAVEBANDS) */
 #endif
   USE g_clock
   use o_PARAM, only : WP
@@ -146,9 +149,12 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     use g_config,        only: use_cavity
     use g_forcing_param, only: use_virt_salt
 #if defined(__recom)
-  use recom_glovar
-  use recom_config
-  use recom_ciso
+    use recom_glovar
+    use recom_config
+    use recom_ciso
+#if defined (__RECOM_WAVEBANDS)
+    use recom_spectral
+#endif /* (__RECOM_WAVEBANDS) */
 #endif
     use g_forcing_param, only: use_virt_salt, use_landice_water, use_age_tracer !---fwf-code, age-code
     use g_config, only : lwiso !---wiso-code
@@ -161,6 +167,14 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     integer,dimension(15)     :: sel_forcvar=0
     character(len=10)         :: id_string
 
+#if defined (__RECOM_WAVEBANDS)
+    integer nlam
+    character(len=3)   :: wavelen_str             ! string variable for OASIM wavelengths
+    character(len=100) :: var_name                ! for constructing OASIM outout file and variable names
+    character(len=500) :: var_longname   
+!    real(real64), allocatable, dimension(:,:) :: var_dummy ! local variable to hold radiation in one waveband
+#endif /* (__RECOM_WAVEBANDS) */
+    
     type(t_mesh), intent(in) , target :: mesh
     type(t_partit), intent(inout), target :: partit
     type(t_tracer), intent(in)   , target :: tracers
@@ -866,6 +880,76 @@ CASE ('TSi_assimDia          ')
    if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'TSi_assimDia','Silicate assimilation', 'per day',TSi_assimDia(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
+
+#if defined (__RECOM_WAVEBANDS)
+   ! 3-d radiation output: 
+   ! I am unsure whether we can define a 3-dimensional output with def_stream; so for the moment
+   ! I define one output for each wave band, and in addition with fixed spectral ranges. This is
+   ! error-prone and should be changed.
+CASE ('edz3d                 ')
+   if (use_REcoM .and. RECOM_RADTRANS) then
+      var_name = 'edz3d_400'
+      var_longname = 'Direct downwelling radiation at 400 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Edz3d(:,:,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'edz3d_425'
+      var_longname = 'Direct downwelling radiation at 425 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Edz3d(:,:,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'edz3d_450'
+      var_longname = 'Direct downwelling radiation at 450 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Edz3d(:,:,3), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'edz3d_475'
+      var_longname = 'Direct downwelling radiation at 475 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Edz3d(:,:,4), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+!CASE ('edz3d                 ')
+!   if (use_REcoM .and. RECOM_RADTRANS) then
+!      do nlam=1,tlam
+!         write(wavelen_str, "(i3.3)") pwaves(nlam)
+!         var_name = 'edz3d_'//wavelen_str
+!         var_longname = 'Direct downwelling radiation at '//wavelen_str//' nm'
+!         if (mype==0) then
+!            write(*,*) 'Wavelength', pwaves(nlam), var_name
+!         endif
+!         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Edz3d(:,:,nlam), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+!      enddo
+!   endif
+CASE ('esz3d                 ')
+   if (use_REcoM .and. RECOM_RADTRANS) then
+      do nlam=1,tlam
+         write(wavelen_str, "(i3.3)") pwaves(nlam)
+         var_name = 'esz3d_'//wavelen_str
+         var_longname = 'Diffuse radiation at '//wavelen_str//' nm'
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Esz3d(:,:,nlam), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      enddo
+   endif
+CASE ('euz3d                 ')
+   if (use_REcoM .and. RECOM_RADTRANS) then
+      do nlam=1,tlam
+         write(wavelen_str, "(i3.3)") pwaves(nlam)
+         var_name = 'euz3d_'//wavelen_str
+         var_longname = 'Direct upwelling radiation at '//wavelen_str//' nm'
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Euz3d(:,:,nlam), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      enddo
+   endif
+CASE ('eutop3d                 ')
+   if (use_REcoM .and. RECOM_RADTRANS) then
+      do nlam=1,tlam
+         write(wavelen_str, "(i3.3)") pwaves(nlam)
+         var_name = 'eutop3d_'//wavelen_str
+         var_longname = 'Direct upwelling radiation (top) at '//wavelen_str//' nm'
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Eutop3d(:,:,nlam), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      enddo
+   endif
+CASE ('estop3d                 ')
+   if (use_REcoM .and. RECOM_RADTRANS) then
+      do nlam=1,tlam
+         write(wavelen_str, "(i3.3)") pwaves(nlam)
+         var_name = 'estop3d_'//wavelen_str
+         var_longname = 'Diffuse radiation (top) at '//wavelen_str//' nm'
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Estop3d(:,:,nlam), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      enddo
+   endif
+#endif /* (__RECOM_WAVEBANDS) */
 
 #endif
 
