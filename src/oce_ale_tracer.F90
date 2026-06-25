@@ -952,8 +952,8 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         zinv=1.0_WP*dt    ! no .../(zbar(1)-zbar(2)) because of  ALE
 
         ! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
-        Ty1= (Z_n(nz)     -zbar_n(nz+1))*zinv2 *slope_tapered(3,nz  ,n)**2*Ki(nz  ,n) + &
-             (zbar_n(nz+1)-Z_n(   nz+1))*zinv2 *slope_tapered(3,nz+1,n)**2*Ki(nz+1,n)
+        Ty1= (zbar_n(nz+1)-Z_n(   nz+1))*zinv2 *slope_tapered(3,nz  ,n)**2*Ki(nz  ,n) + &
+             (Z_n(nz)     -zbar_n(nz+1))*zinv2 *slope_tapered(3,nz+1,n)**2*Ki(nz+1,n)
         Ty1=Ty1*isredi
 
         ! layer dependent coefficients for for solving dT(1)/dt+d/dz*K_33*d/dz*T(1) = ...
@@ -985,10 +985,10 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
             ! 1/dz(nz)
             zinv2=1.0_WP/(Z_n(nz)-Z_n(nz+1))
             ! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
-            Ty = (Z_n(nz-1   )-zbar_n(nz  ))*zinv1 *slope_tapered(3,nz-1,n)**2*Ki(nz-1,n)+ &
-                 (zbar_n(nz  )-Z_n(nz     ))*zinv1 *slope_tapered(3,nz  ,n)**2*Ki(nz  ,n)
-            Ty1= (Z_n(nz     )-zbar_n(nz+1))*zinv2 *slope_tapered(3,nz  ,n)**2*Ki(nz  ,n)+ &
-                 (zbar_n(nz+1)-Z_n(nz+1   ))*zinv2 *slope_tapered(3,nz+1,n)**2*Ki(nz+1,n)
+            Ty = (zbar_n(nz  )-Z_n(nz     ))*zinv1 *slope_tapered(3,nz-1,n)**2*Ki(nz-1,n)+ &
+                 (Z_n(nz-1   )-zbar_n(nz  ))*zinv1 *slope_tapered(3,nz  ,n)**2*Ki(nz  ,n)
+            Ty1= (zbar_n(nz+1)-Z_n(nz+1   ))*zinv2 *slope_tapered(3,nz  ,n)**2*Ki(nz  ,n)+ &
+                 (Z_n(nz     )-zbar_n(nz+1))*zinv2 *slope_tapered(3,nz+1,n)**2*Ki(nz+1,n)
             Ty =Ty *isredi
             Ty1=Ty1*isredi
 
@@ -1028,8 +1028,8 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         zinv=1.0_WP*dt   ! no ... /(zbar(nzmax-1)-zbar(nzmax)) because of ale
 
         ! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
-        Ty= (Z_n(nz-1) -zbar_n(nz)) * zinv1 * slope_tapered(3,nz-1,n)**2 * Ki(nz-1,n) + &
-            (zbar_n(nz)-Z_n(nz)   ) * zinv1 * slope_tapered(3,nz  ,n)**2 * Ki(nz,n)
+        Ty= (zbar_n(nz)-Z_n(nz)   ) * zinv1 * slope_tapered(3,nz-1,n)**2 * Ki(nz-1,n) + &
+            (Z_n(nz-1) -zbar_n(nz)) * zinv1 * slope_tapered(3,nz  ,n)**2 * Ki(nz,n)
         Ty =Ty *isredi
         ! layer dependent coefficients for for solving dT(nz)/dt+d/dz*K_33*d/dz*T(nz) = ...
 
