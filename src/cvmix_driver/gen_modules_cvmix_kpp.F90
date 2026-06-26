@@ -931,8 +931,8 @@ module g_cvmix_kpp
                 ! applied and where surface averages are taken — not something that 
                 ! varies with depth.
                 sldepth = kpp_surf_layer_ext*max(kpp_obldepth(node), kpp_minOBLdepth)
-                nzsfc = kpp_obldepth(node)
-                do nztmp = nun, int(kpp_obldepth(node))
+                nzsfc = int(kpp_nzobldepth(node))
+                do nztmp = nun, int(kpp_nzobldepth(node))
                     if (-zbar_3d_n(nztmp+1,node)>=sldepth) then
                         nzsfc = nztmp
                         exit
