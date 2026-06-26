@@ -958,6 +958,8 @@ contains
     ! LA icebergs: 2023-05-17 
     if (use_icebergs) then
          call iceberg_out(f%partit)
+         ! Print iceberg heat flux energy budget (supercooling guard diagnostic)
+         call print_ibhf_energy_summary(f%partit)
     end if
     ! --------------
 

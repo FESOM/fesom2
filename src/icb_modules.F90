@@ -104,6 +104,8 @@ save
   !===== FRESHWATER AND HEAT ARRAYS ON FESOM GRID =====
   real,dimension(:), allocatable:: ibhf    !icb heat flux into ocean 
   real(kind=WP),dimension(:,:), allocatable:: ibhf_n    !icb heat flux into ocean
+  real(kind=WP) :: skipped_ibhf_energy = 0.0_WP  ! Accumulated energy skipped by supercooling guard [J]
+  real(kind=WP) :: applied_ibhf_energy = 0.0_WP  ! Accumulated energy applied from icebergs [J]
   real,dimension(:), allocatable:: ibfwb   !freshwater flux into ocean from basal melting
   real,dimension(:), allocatable:: ibfwbv   !freshwater flux into ocean from basal melting
   real,dimension(:), allocatable:: ibfwl   !freshwater flux into ocean from lateral melting
@@ -172,5 +174,40 @@ else
  coastal_nodes = count( (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
 endif
  end function coastal_nodes
+
+!-------------------------------------------------------------------------------
+subroutine print_ibhf_energy_summary(partit)
+    ! Print summary of iceberg heat flux energy budget at end of simulation
+    ! Compares applied vs skipped (due to supercooling guard) energy
+    use o_PARAM, only: WP
+    implicit none
+    type(t_partit), intent(in) :: partit
+    real(kind=WP) :: global_applied, global_skipped, ratio
+    integer :: ierr
+
+    ! Sum across all MPI ranks
+    call MPI_ALLREDUCE(applied_ibhf_energy, global_applied, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                       partit%MPI_COMM_FESOM, ierr)
+    call MPI_ALLREDUCE(skipped_ibhf_energy, global_skipped, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                       partit%MPI_COMM_FESOM, ierr)
+
+    ! Print summary on rank 0
+    if (partit%mype == 0) then
+        write(*,*) ''
+        write(*,*) '============================================================'
+        write(*,*) 'ICEBERG HEAT FLUX ENERGY BUDGET (Supercooling Guard Summary)'
+        write(*,*) '============================================================'
+        write(*,*) '  Applied energy [J]:  ', global_applied
+        write(*,*) '  Skipped energy [J]:  ', global_skipped
+        if (abs(global_applied) > 1.0e-10_WP) then
+            ratio = global_skipped / global_applied
+            write(*,*) '  Ratio skipped/applied: ', ratio
+        else
+            write(*,*) '  Ratio skipped/applied: N/A (no applied energy)'
+        end if
+        write(*,*) '============================================================'
+        write(*,*) ''
+    end if
+end subroutine print_ibhf_energy_summary
 
 end module iceberg_params

@@ -1203,6 +1203,17 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         if (use_icebergs .and. (.not. turn_off_hf) .and. tracers%data(tr_num)%ID==1) then
             do nz=nzmin, nzmax-1
                 zinv=1.0_WP*dt  !/(zbar(nz)-zbar(nz+1)) ale!
+                ! Supercooling guard: skip heat sink if layer is at/below freezing
+                ! Wave Erosion term (first layer) and basal melt of grounded icebergs (last layer) with a keel well below
+                ! the seafloor combined with steps_per_ib_step >> 1 disable the feedback which stops iceberg melt in 
+                ! supercooled conditions and can cause runaway low temperatures
+                if (trarr(nz,n) <= -1.85_WP) then
+                    ! Accumulate skipped energy: ibhf_n [W/m2] * area [m2] * dt [s] = [J]
+                    skipped_ibhf_energy = skipped_ibhf_energy + ibhf_n(nz, n) * area(nz,n) * dt
+                    cycle
+                end if
+                ! Accumulate applied energy
+                applied_ibhf_energy = applied_ibhf_energy + ibhf_n(nz, n) * area(nz,n) * dt
                 tr(nz)=tr(nz) + ibhf_n(nz, n) * zinv / vcpw * (area(nz,n)/areasvol(nz,n))
             end do
         end if
