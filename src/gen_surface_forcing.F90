@@ -58,7 +58,9 @@ MODULE g_sbf
 
    public  sbc_ini  ! routine called before 1st time step (open files, read namelist,...)
    public  sbc_do   ! routine called each time step to provide a sbc fileds (wind,...)
+#if defined (__recom)
    public  sbc_do_recom ! routine called each time step to provide a sbc fileds for REcoM
+#endif
    public  sbc_end  ! routine called after last time step
    public  RUNOFF_MAPPER
    public  julday   ! get julian day from date
