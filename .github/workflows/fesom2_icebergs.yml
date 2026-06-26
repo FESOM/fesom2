@@ -39,6 +39,7 @@ jobs:
           cp test/input/icebergs/icb_length.dat work_iceberg/
           cp test/input/icebergs/icb_longitude.dat work_iceberg/
           cp test/input/icebergs/icb_scaling.dat work_iceberg/
+          cp test/input/icebergs/icb_calving_day.dat work_iceberg/
 
       - name: FESOM2 iceberg test run
         run: |

@@ -253,7 +253,7 @@ end do
 
  if (mod(istep_end_synced,icb_outfreq)==0 .AND. .not.ascii_out) then
 
-   if (mype==0 .AND. (real(istep) > real(step_per_day)*calving_day(1) ) ) call write_buoy_props_netcdf(partit)
+   if (mype==0) call write_buoy_props_netcdf(partit)
        
    ! all PEs: set back to zero for next round
    bvl_mean=0.0
@@ -1364,7 +1364,7 @@ type(t_partit), intent(inout), target :: partit
 	Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
 	conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
 	u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),		&
-	f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), grounded(ib), scaling(ib), melted(ib)
+	f_u_ib_old(ib), f_v_ib_old(ib), 0.0, grounded(ib), scaling(ib), melted(ib)
    
    !***************************************************************
    !write new restart file with only non melted icebergs
@@ -1375,7 +1375,7 @@ type(t_partit), intent(inout), target :: partit
             Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
             conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
             u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),		&
-            f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), grounded(ib), scaling(ib), melted(ib)
+            f_u_ib_old(ib), f_v_ib_old(ib), 0.0, grounded(ib), scaling(ib), melted(ib)
    end if
 
   end do
@@ -1476,6 +1476,13 @@ subroutine init_icebergs
     read(98,*) scaling(i)
  end do
  close(98)
+!calving_day_file > calving_day
+ open(unit=97, file=calving_day_file,status='old',action='read',iostat=io_error)
+ if ( io_error.ne.0) stop 'ERROR while reading file calving_day_file'
+ do i = 1, ib_num
+    read(97,*) calving_day(i)
+ end do
+ close(97)
 
 end subroutine init_icebergs
 !
@@ -1536,6 +1543,13 @@ subroutine init_icebergs_with_icesheet
     read(98,*) scaling(i)
  end do
  close(98)
+!calving_day_file > calving_day
+ open(unit=97, file=calving_day_file,status='old',action='read',iostat=io_error)
+ if ( io_error.ne.0) stop 'ERROR while reading file calving_day_file'
+ do i = 1+num_non_melted_icb, ib_num
+    read(97,*) calving_day(i)
+ end do
+ close(97)
 
 end subroutine init_icebergs_with_icesheet
 !
