@@ -1245,8 +1245,9 @@ module g_cvmix_kpp
         
         real(WP) :: uv10, Tp, fp, kp, uS0_mag, uS0, vS0, C, fexp
         
-        uv10 = sqrt(uwind**2 + vwind**2) 
-        
+        ! floor prevents Tp=0 → fp=Inf and uwind/uv10=0/0=NaN under calm wind
+        uv10 = max(1.0e-3_WP, sqrt(uwind**2 + vwind**2))
+
         !_______________________________________________________________________
         ! Empirical relationships
         ! Peak period Tp ≈ α * U10  (fetch-limited wind-sea)
