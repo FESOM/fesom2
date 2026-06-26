@@ -447,6 +447,7 @@ module g_cvmix_kpp
         real(kind=WP) :: vshear2, dz2, aux, aux_wm(mesh%nl), aux_ws(mesh%nl)
         real(kind=WP) :: aux_coeff, sigma, stable
         real(kind=WP) :: ustar, aux_surfbuoyflx_nl(mesh%nl), wind_norm
+        real(kind=WP) :: u_wind_eff, v_wind_eff
         
         integer       :: nzsfc, nztmp, nz_buoyflx_idx
         real(kind=WP) :: sldepth, sfc_temp, sfc_salt, sfc_u, sfc_v, htot, delh, rho_sfc, rho_nz, oblguess
@@ -528,11 +529,27 @@ module g_cvmix_kpp
             ! calculate friction velocity (ustar) at surface (m/s)
             ustar = sqrt( sqrt( stress_node_surf(1,node)**2 + stress_node_surf(2,node)**2 )*density_0_r ) ! @ the surface (eqn. 2)
             
-            ! reduce friction velocity under ice --> approach take from the mpiom
-            ! interface --> haven't been tested before with FESOM
+            ! reduce friction velocity under ice --> approach taken from the mpiom
+            ! interface. Physical basis: effective wind speed on the ocean is reduced
+            ! by (1-a_ice) due to ice sheltering, so stress ∝ u_eff^2 ∝ (1-a_ice)^2,
+            ! giving ustar = sqrt(tau/rho) ∝ (1-a_ice).
             if (kpp_reduce_tauuice) then
-                ustar = ustar*(1.0_WP-a_ice(node))**2
-            end if 
+                ustar = ustar*(1.0_WP-a_ice(node))
+                !ustar = ustar*(1.0_WP-a_ice(node))**2   ! original MPIOM-ported scaling
+            end if
+
+            ! reduce effective wind velocity for Stokes drift / Langmuir turbulence
+            ! under sea ice. The Pierson-Moskowitz parameterisation assumes a locally
+            ! generated wind-sea; sea ice suppresses local wave growth. Using the same
+            ! (1-a_ice) factor as ustar keeps LaSL = sqrt(ustar/us) finite and prevents
+            ! spurious EFactor blow-up (EFactor → ∞ when ustar→0 but us stays finite).
+            if (kpp_reduce_tauuice) then
+                u_wind_eff = u_wind(node) * (1.0_WP - a_ice(node))
+                v_wind_eff = v_wind(node) * (1.0_WP - a_ice(node))
+            else
+                u_wind_eff = u_wind(node)
+                v_wind_eff = v_wind(node)
+            end if
             
             !___3D Quantities___________________________________________________
             !!PS if (flag_debug .and. mype==0)  print *, achar(27)//'[35m'//'         --> call shear variables'//achar(27)//'[0m'
@@ -588,19 +605,19 @@ module g_cvmix_kpp
                             zbar_3d_n(nz,node),          &
                             zbar_3d_n(nz+1,node),        &
                             kpp_A_stokes,                &
-                            u_wind(node), v_wind(node) , &
+                            u_wind_eff, v_wind_eff ,     &
                             kpp_uS_t(nz), kpp_vS_t(nz) , &
                             kpp_uS_c(nz), kpp_vS_c(nz) , &
-                            kpp_uS_m(nz), kpp_vS_m(nz))    
-                                                    
-                        call compute_stokes_velocities_MOM6style(& 
+                            kpp_uS_m(nz), kpp_vS_m(nz))
+
+                        call compute_stokes_velocities_MOM6style(&
                             zbar_3d_n(nzsfc,node),       &
                             sldepth,                     &
                             kpp_A_stokes,                &
-                            u_wind(node), v_wind(node),  &
+                            u_wind_eff, v_wind_eff,      &
                             uS_sld_t, vS_sld_t , &
                             uS_sld_c, vS_sld_c , &
-                            uS_sld_m, vS_sld_m)                                   
+                            uS_sld_m, vS_sld_m)                                  
                         
                         
                         call cvmix_kpp_compute_StokesXi (&
@@ -798,7 +815,7 @@ module g_cvmix_kpp
                 OBL_depth       = abs(Z_3d_n(nun:nln,node)),   & ! (in)  Assume OBL depth (m) =  mid-depth level
                 surf_buoy_force = kpp_buoyflx_nl(nun:nln),     & ! (in)  surfce buoyancy flux (m2/s3) consider sw_pene
                 surf_fric_vel   = ustar,                       & ! (in)  turbulent friction velocity at surface (m/s)
-                xi              = kpp_stokesVt_z(nun:nln),    & ! (in)  Stokes parameter xi= Ps/(PU+PS+PB)
+                xi              = kpp_stokesVt_z(nun:nln),     & ! (in)  Stokes parameter xi= Ps/(PU+PS+PB)
                 w_s             = kpp_ws_cntr(nun:nln)         & ! (out) Turbulent velocity scale profile (m/s) for skalars
                 ) 
             ! --> need w_s to compute cvmix_kpp_compute_bulk_Richardson(...)
@@ -813,8 +830,8 @@ module g_cvmix_kpp
             ! is known
             oblguess = max(kpp_obldepth(node), kpp_minOBLdepth)
             
-            ! compute norm of wind velocity 
-            wind_norm = sqrt(u_wind(node)**2 + v_wind(node)**2)
+            ! compute norm of effective wind velocity (ice-scaled when kpp_reduce_tauuice)
+            wind_norm = sqrt(u_wind_eff**2 + v_wind_eff**2)
             
             ! computes the surface layer averaged Stokes drift, given
             ! the 10-meter wind (m/s) and the boundary layer depth (m).
@@ -939,14 +956,14 @@ module g_cvmix_kpp
                     end if                        
                 end do
                 
-                call compute_stokes_velocities_MOM6style(& 
+                call compute_stokes_velocities_MOM6style(&
                     zbar_3d_n(nzsfc,node),       &
                     sldepth,                     &
                     kpp_A_stokes,                &
-                    u_wind(node), v_wind(node),  &
+                    u_wind_eff, v_wind_eff,      &
                     uS_sld_t, vS_sld_t ,         &
                     uS_sld_c, vS_sld_c ,         &
-                    uS_sld_m, vS_sld_m) 
+                    uS_sld_m, vS_sld_m)
                 
                 ! Cray compiler workaround: store subscript as scalar integer
                 nz_buoyflx_idx = kpp_nzobldepth(node)
