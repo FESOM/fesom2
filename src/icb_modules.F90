@@ -48,7 +48,6 @@ save
   ! =========================================== !
   logical       :: l_melt = .true.              ! (use melting parametrization?)
   logical       :: l_weeksmellor = .true.       ! (use weeks & mellor stability criterion?)
-  logical       :: l_allowgrounding = .true.    ! (are icebergs allowed to ground?)
   real,dimension(:), allocatable:: draft_scale  ! (account for irregularities of draft
   ! =========================================== !
   logical       :: l_tides = .false.            ! (simulate sensitivity to tides? !!check for HLRN-III!!)
@@ -78,6 +77,7 @@ save
   character(100):: width_icb_file='icb_length.dat' !iceberg width [m]
   character(100):: height_icb_file='icb_height.dat' !iceberg height [m]
   character(100):: scaling_file='icb_scaling.dat' !scaling factor
+  character(100):: calving_day_file='icb_calving_day.dat' !calving day for each iceberg
   
   !===== OUTPUT RELATED SETTINGS  =====
   integer :: icb_outfreq           ! 180; for FESOM_dt=2min this is 6 hourly output !120; for FESOM_dt=3min this is 6 hourly output
