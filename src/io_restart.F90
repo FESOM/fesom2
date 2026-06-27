@@ -210,13 +210,13 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
          write(longname,'(A15,i4.4)') 'passive tracer ', j
          units='none'
      END SELECT
-     if ((tracers%data(j)%ID==101) .or. (tracers%data(j)%ID==102) .or. (tracers%data(j)%ID==103)) then
+     if ((tracers%data(j)%ID==101) .or. (tracers%data(j)%ID==102) .or. (tracers%data(j)%ID==103) .or. (tracers%data(j)%ID==304)) then
         call oce_files%def_node_var_optional(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
      else
         call oce_files%def_node_var(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
      endif
      longname=trim(longname)//', Adams-Bashforth'
-     if ((tracers%data(j)%ID==101) .or. (tracers%data(j)%ID==102) .or. (tracers%data(j)%ID==103)) then
+     if ((tracers%data(j)%ID==101) .or. (tracers%data(j)%ID==102) .or. (tracers%data(j)%ID==103) .or. (tracers%data(j)%ID==304)) then
         call oce_files%def_node_var_optional(trim(trname)//'_AB', trim(longname), trim(units), tracers%data(j)%valuesAB(:,:),    mesh, partit)
      else
         call oce_files%def_node_var(trim(trname)//'_AB', trim(longname), trim(units), tracers%data(j)%valuesAB(:,:),    mesh, partit)
