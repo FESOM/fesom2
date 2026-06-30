@@ -1159,9 +1159,13 @@ module g_cvmix_idemix2
             ! only process edges with exactly one coast node
             if (is_coast_node(n1) .eqv. is_coast_node(n2)) cycle
             
-            ! geographic coordinates of the two nodes (lon/lat in radians)
-            lon1 = geo_coord_nod2D(1, n1);  lat1 = geo_coord_nod2D(2, n1)
-            lon2 = geo_coord_nod2D(1, n2);  lat2 = geo_coord_nod2D(2, n2)
+            ! rotated model coordinates of the two nodes (lon/lat in radians).
+            ! Must use coord_nod2D (rotated) NOT geo_coord_nod2D (geographic):
+            ! the spectral bins phit(k) are in the rotated frame because
+            ! u_compart = cg*cos(phit) is projected onto edge_cross_dxdy,
+            ! which is built from coord_nod2D with cos(rotated_lat) metric.
+            lon1 = coord_nod2D(1, n1);  lat1 = coord_nod2D(2, n1)
+            lon2 = coord_nod2D(1, n2);  lat2 = coord_nod2D(2, n2)
             lat_mean = 0.5_WP*(lat1 + lat2)
             
             ! edge direction FROM coast node BACK TO interior node (the reflection direction)

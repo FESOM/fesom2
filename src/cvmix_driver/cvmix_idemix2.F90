@@ -466,8 +466,15 @@ subroutine compute_compart_groupvel(  &
 !     do fbin_i=2,nfbin-1
     do fbin_i=1, nfbin ! --> include ghost cells ofthe periodic boundary
         u_compart(fbin_i) = cg_compart*cos( phit(fbin_i) )
-        ! Keep coslat to match pyOM2 - need to investigate divergence normalization
-        ! v_compart(fbin_i) = cg_compart*sin( phit(fbin_i) ) * coslat
+        ! pyOM2 has v_M2 = cg*sin(phi)*cosu(j): the V-face zonal width on a lat-lon
+        ! grid is r*cos(lat_face)*dx, so the FV budget gives cosu/cost*dyt in the
+        ! denominator — this correctly implements the spherical divergence metric
+        ! term 1/(r*cos)*d(cos*v*E)/dlat = -v*tan(lat)/r * E (convergence of meridians).
+        ! In FESOM2 the FV scheme computes EUCLIDEAN divergence on the unstructured
+        ! mesh; multiplying v_compart by cos(lat) would NOT reproduce pyOM2's
+        ! correction (different denominator structure). The proper fix would be an
+        ! explicit source +cg*sin(phi)*tan(lat)/r * E per bin, but FESOM2 standard
+        ! tracer advection omits this metric term too — omitting it here is consistent.
         v_compart(fbin_i) = cg_compart*sin( phit(fbin_i) )
         w_compart(fbin_i) = (kdot_y*cos(phiu(fbin_i)) + kdot_x*sin(phiu(fbin_i)) )
     end do
