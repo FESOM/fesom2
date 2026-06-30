@@ -8,7 +8,7 @@ module g_cvmix_tidal
     !___________________________________________________________________________
     ! module calls from cvmix library
     use cvmix_tidal,  only :  cvmix_init_tidal, cvmix_coeffs_tidal, cvmix_compute_Simmons_invariant                 
-    use cvmix_kinds_and_types, only: cvmix_data_type, cvmix_global_params_type
+    use cvmix_kinds_and_types, only: cvmix_data_type, cvmix_global_params_type, cvmix_r8
     
     !___________________________________________________________________________
     ! module calls from FESOM
@@ -204,12 +204,12 @@ module g_cvmix_tidal
         
         !_______________________________________________________________________
         ! initialise TIDAL parameters
-        call cvmix_init_tidal(mix_scheme           = tidal_mixscheme,        &
-                              efficiency           = tidal_efficiency,       &
-                              vertical_decay_scale = tidal_vert_decayscale,  &
-                              max_coefficient      = tidal_max_coeff,        &
-                              local_mixing_frac    = tidal_lcl_mixfrac,      &
-                              depth_cutoff         = tidal_depth_cutoff)
+        call cvmix_init_tidal(mix_scheme           = tidal_mixscheme,                          &
+                              efficiency           = real(tidal_efficiency,      cvmix_r8),    &
+                              vertical_decay_scale = real(tidal_vert_decayscale, cvmix_r8),    &
+                              max_coefficient      = real(tidal_max_coeff,       cvmix_r8),    &
+                              local_mixing_frac    = real(tidal_lcl_mixfrac,     cvmix_r8),    &
+                              depth_cutoff         = real(tidal_depth_cutoff,    cvmix_r8))
         
     end subroutine init_cvmix_tidal
     !
@@ -226,6 +226,11 @@ module g_cvmix_tidal
         real(kind=WP)                         :: simmonscoeff, vertdep(mesh%nl)
         real(kind=WP)                         :: zbar_e(mesh%nl), Z_e(mesh%nl-1), bvfreq2(mesh%nl)
         real(kind=WP)                         :: tsum1, tvol
+        ! cvmix_r8 temporaries so CVMix always runs in double precision (no-op when WP==cvmix_r8)
+        real(cvmix_r8)                        :: simmonscoeff_r8
+        real(cvmix_r8)                        :: vertdep_r8(mesh%nl), bvfreq2_r8(mesh%nl)
+        real(cvmix_r8)                        :: zbar_e_r8(mesh%nl), Z_e_r8(mesh%nl-1)
+        real(cvmix_r8)                        :: av_r8(mesh%nl), kv_r8(mesh%nl)
 #include "../associate_part_def.h"
 #include "../associate_mesh_def.h"
 #include "../associate_part_ass.h"
@@ -263,28 +268,41 @@ module g_cvmix_tidal
             !___________________________________________________________________
             ! Compute the time-invariant portion of the tidal mixing coefficient
             ! using the Simmons et al.(2004) scheme.
+            ! copy WP -> cvmix_r8 for input arrays before the CVMix call
+            zbar_e_r8(uln:nln+1) = real(zbar_e(uln:nln+1), cvmix_r8)
+            Z_e_r8(uln:nln)      = real(Z_e(uln:nln),      cvmix_r8)
+            vertdep_r8(uln:nln)  = real(vertdep(uln:nln),  cvmix_r8)
             call cvmix_compute_Simmons_invariant(         &
                  nlev            = nln-uln+1 ,                &
-                 energy_flux     = tidal_fbot(elem),          & !in W m-2  
-                 rho             = density_0,                 &
-                 SimmonsCoeff    = simmonscoeff,              &
-                 VertDep         = vertdep(uln:nln),          & ! vertical deposition function 
-                 zw              = zbar_e(uln:nln+1),         & 
-                 zt              = Z_e(uln:nln))
+                 energy_flux     = real(tidal_fbot(elem), cvmix_r8), & !in W m-2
+                 rho             = real(density_0, cvmix_r8), &
+                 SimmonsCoeff    = simmonscoeff_r8,           &
+                 VertDep         = vertdep_r8(uln:nln),       & ! vertical deposition function
+                 zw              = zbar_e_r8(uln:nln+1),      &
+                 zt              = Z_e_r8(uln:nln))
+            ! copy cvmix_r8 -> WP for output args after the CVMix call
+            simmonscoeff       = real(simmonscoeff_r8,      WP)
+            vertdep(uln:nln)   = real(vertdep_r8(uln:nln),  WP)
                 
             !___________________________________________________________________
             ! Computes vertical diffusion coefficients for tidal mixing 
             ! parameterizations.
+            ! copy WP -> cvmix_r8 for input arrays before the CVMix call
+            bvfreq2_r8(uln:nln) = real(bvfreq2(uln:nln), cvmix_r8)
+            vertdep_r8(uln:nln) = real(vertdep(uln:nln), cvmix_r8)
             call cvmix_coeffs_tidal(                      &
-                 Mdiff_out       = tidal_Av(uln:nln,elem),    &
-                 Tdiff_out       = tidal_Kv(uln:nln,elem),    &
-                 Nsqr            = bvfreq2(uln:nln),          & !FIXME: limit to N2 > 10^-8 ? as in Simmons et al.
-                 OceanDepth      = -zbar_e_bot(elem),         & !FIXME: neglecting free surface contribution
-                 SimmonsCoeff    = simmonscoeff,              &
-                 vert_dep        = vertdep(uln:nln),          &
+                 Mdiff_out       = av_r8(uln:nln),            &
+                 Tdiff_out       = kv_r8(uln:nln),            &
+                 Nsqr            = bvfreq2_r8(uln:nln),       & !FIXME: limit to N2 > 10^-8 ? as in Simmons et al.
+                 OceanDepth      = real(-zbar_e_bot(elem), cvmix_r8), & !FIXME: neglecting free surface contribution
+                 SimmonsCoeff    = real(simmonscoeff, cvmix_r8), &
+                 vert_dep        = vertdep_r8(uln:nln),       &
                  nlev            = nln-uln+1,                       &
                  max_nlev        = nl-1,                      &
                  CVmix_params    = CVmix_tidal_params) ! FIXME: Simmons et al. use Prandtl=10.0 (atm its 1.0)
+            ! copy cvmix_r8 -> WP for output arrays after the CVMix call
+            tidal_Av(uln:nln,elem) = real(av_r8(uln:nln), WP)
+            tidal_Kv(uln:nln,elem) = real(kv_r8(uln:nln), WP)
                  
 !!PS             if (mype==0) then 
 !!PS                 write(*,*) 'SimmonsCoeff = ',simmonscoeff

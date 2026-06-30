@@ -27,12 +27,12 @@ set(VERBOSE             OFF CACHE BOOL "toggle debug output")
 set(FESOM_PROFILING     OFF CACHE BOOL "Enable enhanced profiling system")
 set(CVMIX               ON  CACHE BOOL "Download/Compile/Install/Link CVMix libray")
 
-# Single precision (WP=4) build: CVMix is a double-precision library and is out of scope
-# for the SP port, so disable it to keep the SP build clean (native KPP/PP still work).
-if(USE_SINGLE_PRECISION)
-   message(STATUS "USE_SINGLE_PRECISION=ON: forcing CVMIX=OFF (out of scope for single precision)")
-   set(CVMIX OFF CACHE BOOL "Download/Compile/Install/Link CVMix libray" FORCE)
-endif()
+# CVMix is a fixed double-precision library (its kind is cvmix_r8 = real64). It is
+# linked in BOTH double- and single-precision FESOM builds: the FESOM wrappers in
+# src/cvmix_driver/ convert WP<->cvmix_r8 at the CVMix call boundary, so CVMix always
+# runs in double precision. This keeps the available mixing schemes identical in SP and
+# DP (so SP and DP configurations can be compared like-for-like) and leaves the default
+# DP build numerically unchanged. CVMIX can still be turned off explicitly (-DCVMIX=OFF).
 
 # Testing options
 option(BUILD_TESTING "Build tests" OFF)
