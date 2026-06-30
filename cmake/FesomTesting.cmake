@@ -409,9 +409,13 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
             set(ENV{OMPI_MCA_rmaps_base_oversubscribe} \"1\")
             set(ENV{PRTE_MCA_rmaps_default_mapping_policy} \":oversubscribe\")
 
-            # Run FESOM with MPI
+            # Run FESOM with MPI.
+            # Wrap the launch in a shell that raises the stack limit: Intel-compiled
+            # fesom.x puts large per-column automatic arrays on the stack and SIGSEGVs
+            # on global meshes (e.g. core2) under the default 8 MB limit. ulimit is
+            # inherited by mpiexec and the ranks it spawns locally. Harmless for GNU/CI.
             execute_process(
-                COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${FESOM_TEST_NP} ${CMAKE_BINARY_DIR}/bin/fesom.x
+                COMMAND /bin/sh -c \"ulimit -s unlimited 2>/dev/null || ulimit -s 1048576 2>/dev/null; exec '${MPIEXEC_EXECUTABLE}' ${MPIEXEC_NUMPROC_FLAG} ${FESOM_TEST_NP} '${CMAKE_BINARY_DIR}/bin/fesom.x'\"
                 WORKING_DIRECTORY \"${TEST_RUN_DIR}\"
                 RESULT_VARIABLE test_result
                 OUTPUT_VARIABLE test_output
@@ -441,9 +445,10 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
             file(MAKE_DIRECTORY \"${TEST_RUN_DIR}\")
             file(MAKE_DIRECTORY \"${RESULT_DIR}\")
             
-            # Run FESOM
+            # Run FESOM (serial). Raise the stack limit as for the MPI case above
+            # (Intel fesom.x overflows the default 8 MB stack on large meshes).
             execute_process(
-                COMMAND ${CMAKE_BINARY_DIR}/bin/fesom.x
+                COMMAND /bin/sh -c \"ulimit -s unlimited 2>/dev/null || ulimit -s 1048576 2>/dev/null; exec '${CMAKE_BINARY_DIR}/bin/fesom.x'\"
                 WORKING_DIRECTORY \"${TEST_RUN_DIR}\"
                 RESULT_VARIABLE test_result
                 OUTPUT_VARIABLE test_output
@@ -584,9 +589,10 @@ function(add_fesom_meshdiag_test_with_options TEST_NAME MESH_NAME RUNID)
         set(ENV{OMPI_MCA_rmaps_base_oversubscribe} \"1\")
         set(ENV{PRTE_MCA_rmaps_default_mapping_policy} \":oversubscribe\")
 
-        # Run fesom_meshdiag with MPI
+        # Run fesom_meshdiag with MPI. Raise the stack limit (Intel builds overflow
+        # the default 8 MB stack on large meshes); inherited by mpiexec + ranks.
         execute_process(
-            COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${FESOM_TEST_NP} ${CMAKE_BINARY_DIR}/bin/fesom_meshdiag
+            COMMAND /bin/sh -c \"ulimit -s unlimited 2>/dev/null || ulimit -s 1048576 2>/dev/null; exec '${MPIEXEC_EXECUTABLE}' ${MPIEXEC_NUMPROC_FLAG} ${FESOM_TEST_NP} '${CMAKE_BINARY_DIR}/bin/fesom_meshdiag'\"
             WORKING_DIRECTORY \"${TEST_RUN_DIR}\"
             RESULT_VARIABLE test_result
             OUTPUT_VARIABLE test_output
