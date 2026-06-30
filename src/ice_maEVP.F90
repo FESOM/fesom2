@@ -413,7 +413,8 @@ subroutine stress2rhs_m(ice, partit, mesh)
         if ( ulevels_nod2d(row)>1 ) cycle
 
         mass=(m_ice(row)*rhoice+m_snow(row)*rhosno)
-        mass=mass/(1.0_WP+mass*mass)
+        mass=1.0_WP/max(mass, 9.0_WP)  ! 9.0 kg/m² per GRID area — numerical floor to prevent near-zero inertia
+        !mass=mass/(1.0_WP+mass*mass)   ! original: dimensionally inconsistent (1 + [kg/m²]²)
         u_rhs_ice(row)=(u_rhs_ice(row)*mass + rhs_a(row))/area(1,row)
         v_rhs_ice(row)=(v_rhs_ice(row)*mass + rhs_m(row))/area(1,row)
     end do
@@ -649,10 +650,11 @@ subroutine EVPdynamics_m(ice, partit, mesh)
 
         if (a_ice(i) >= 0.01_WP) then
             inv_thickness(i) = (rhoice*m_ice(i)+rhosno*m_snow(i))/a_ice(i)
-            inv_thickness(i) = 1.0_WP/max(inv_thickness(i), 9.0_WP)  ! Limit the mass
+            inv_thickness(i) = 1.0_WP/max(inv_thickness(i), 9.0_WP)  ! 9.0 kg/m² per ICE area (≈1 cm ice per unit ice area)
 
             mass(i) = (m_ice(i)*rhoice+m_snow(i)*rhosno)
-            mass(i) = mass(i)/((1.0_WP+mass(i)*mass(i))*area(1,i))
+            mass(i) = 1.0_WP/(max(mass(i), 9.0_WP)*area(1,i))  ! 9.0 kg/m² per GRID area (different quantity; same floor for numerical safety)
+            !mass(i) = mass(i)/((1.0_WP+mass(i)*mass(i))*area(1,i))   ! original: dimensionally inconsistent
 
             ! scale rhs_a, rhs_m, too.
             rhs_a(i) = rhs_a(i)/area(1,i)
