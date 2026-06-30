@@ -11,6 +11,12 @@ USE mpi
 #endif
 IMPLICIT NONE
 SAVE
+! MPI datatype matching the working precision WP (see o_PARAM)
+#if defined(USE_SINGLE_PRECISION)
+integer, parameter   :: MPI_WP = MPI_REAL             ! single precision
+#else
+integer, parameter   :: MPI_WP = MPI_DOUBLE_PRECISION ! double precision (default)
+#endif
 integer, parameter   :: MAX_LAENDERECK=16
 integer, parameter   :: MAX_NEIGHBOR_PARTITIONS=32
 

@@ -387,7 +387,7 @@ CONTAINS
         iost = nf90_get_var(ncid, id_time, flf%nc_time, start=(/1/), count=(/flf%nc_Ntime/))
         ! digg for calendar attribute in time axis variable         
     end if
-    call MPI_BCast(flf%nc_time, flf%nc_Ntime, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+    call MPI_BCast(flf%nc_time, flf%nc_Ntime, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
     call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
     call check_nferr(iost,flf%file_name,partit)
       
@@ -511,8 +511,8 @@ CONTAINS
            flf%nc_time(flf%nc_Ntime) = flf%nc_time(flf%nc_Ntime) + (flf%nc_time(flf%nc_Ntime) - flf%nc_time(flf%nc_Ntime-1))/2.0
         end if
     end if
-    call MPI_BCast(flf%nc_lon,   flf%nc_Nlon,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
-    call MPI_BCast(flf%nc_lat,   flf%nc_Nlat,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+    call MPI_BCast(flf%nc_lon,   flf%nc_Nlon,   MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
+    call MPI_BCast(flf%nc_lat,   flf%nc_Nlat,   MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
     
     !___________________________________________________________________________
     !flip lat and data in case of lat from -90 to 90
@@ -3229,8 +3229,8 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
       end do
       deallocate(ncdata, lon, lat)
    end if
-   call MPI_BCast(lon_sparse,  number_arrival_points, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-   call MPI_BCast(lat_sparse,  number_arrival_points, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+   call MPI_BCast(lon_sparse,  number_arrival_points, MPI_WP, 0, MPI_COMM_FESOM, ierror)
+   call MPI_BCast(lat_sparse,  number_arrival_points, MPI_WP, 0, MPI_COMM_FESOM, ierror)
    call MPI_BCast(data_sparse, number_arrival_points, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
    drain_num=maxval(data_sparse)
    ALLOCATE(arrival_area(drain_num))
@@ -3255,7 +3255,7 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
    do i=1, number_arrival_points
       dist_min_glo(i)=dist_min(i)
    end do
-   call MPI_AllREDUCE(MPI_IN_PLACE , dist_min_glo , number_arrival_points, MPI_DOUBLE, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+   call MPI_AllREDUCE(MPI_IN_PLACE , dist_min_glo , number_arrival_points, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
 
    lon_sparse=0.0_WP
    lat_sparse=0.0_WP
@@ -3268,8 +3268,8 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
            status=status+1
       end if
    end do
-   call MPI_AllREDUCE(MPI_IN_PLACE , lon_sparse , number_arrival_points, MPI_DOUBLE, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-   call MPI_AllREDUCE(MPI_IN_PLACE , lat_sparse , number_arrival_points, MPI_DOUBLE, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+   call MPI_AllREDUCE(MPI_IN_PLACE , lon_sparse , number_arrival_points, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+   call MPI_AllREDUCE(MPI_IN_PLACE , lat_sparse , number_arrival_points, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
    call MPI_AllREDUCE(MPI_IN_PLACE , status ,     1, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 
    if (status/=number_arrival_points) then
@@ -3326,7 +3326,7 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
       end if
    END DO
 
-   call MPI_AllREDUCE(MPI_IN_PLACE , arrival_area, drain_num, MPI_DOUBLE, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+   call MPI_AllREDUCE(MPI_IN_PLACE , arrival_area, drain_num, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 
    DO i=1, drain_num
       where (RUNOFF_MAPPER%colind==i)

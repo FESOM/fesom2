@@ -10,8 +10,8 @@ module io_fesom_file_module
   
   type var_info
     integer var_index
-    real(kind=8), pointer :: external_local_data_ptr(:,:) => null()
-    real(kind=8), allocatable, dimension(:,:) :: local_data_copy
+    real(kind=WP), pointer :: external_local_data_ptr(:,:) => null()
+    real(kind=WP), allocatable, dimension(:,:) :: local_data_copy
     real(kind=8), allocatable :: global_level_data(:)
     integer :: global_level_data_size = 0
     logical is_elem_based
@@ -485,9 +485,9 @@ use nvfortran_subarray_workaround_module
     class(fesom_file_type), intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
-    real(kind=8), target, intent(inout) :: local_data(:) ! todo: be able to set precision
+    real(kind=WP), target, intent(inout) :: local_data(:) ! todo: be able to set precision
     ! EO parameters
-    real(8), pointer :: external_local_data_ptr(:,:)
+    real(kind=WP), pointer :: external_local_data_ptr(:,:)
     type(dim_info) level_diminfo
 
 !PS     write(*,*) "--> specify_node_var_2d:", __LINE__, __FILE__
@@ -502,7 +502,7 @@ use nvfortran_subarray_workaround_module
     class(fesom_file_type), intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
-    real(kind=8), target, intent(inout) :: local_data(:,:)
+    real(kind=WP), target, intent(inout) :: local_data(:,:)
     integer, intent(in) :: ncat! todo: be able to set precision
     ! EO parameters
     type(dim_info) level_diminfo, ncat_diminfo
@@ -521,7 +521,7 @@ use nvfortran_subarray_workaround_module
     class(fesom_file_type), intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
-    real(kind=8), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
+    real(kind=WP), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
     ! EO parameters
     type(dim_info) level_diminfo, depth_diminfo
     
@@ -538,9 +538,9 @@ use nvfortran_subarray_workaround_module
     class(fesom_file_type), intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
-    real(kind=8), target, intent(inout) :: local_data(:) ! todo: be able to set precision
+    real(kind=WP), target, intent(inout) :: local_data(:) ! todo: be able to set precision
     ! EO parameters
-    real(8), pointer :: external_local_data_ptr(:,:)
+    real(kind=WP), pointer :: external_local_data_ptr(:,:)
     type(dim_info) level_diminfo
 
 !PS     write(*,*) "--> specify_elem_var_2d:", __LINE__, __FILE__
@@ -556,7 +556,7 @@ use nvfortran_subarray_workaround_module
     class(fesom_file_type), intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
-    real(kind=8), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
+    real(kind=WP), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
     ! EO parameters
     type(dim_info) level_diminfo, depth_diminfo
 
@@ -614,7 +614,7 @@ use nvfortran_subarray_workaround_module
     character(len=*)     , intent(in)               :: name
     integer              , intent(in)               :: dim_indices(:)
     integer              , intent(in)               :: global_level_data_size
-    real(kind=8)         , intent(inout), target    :: local_data(:,:) ! todo: be able to set precision?
+    real(kind=WP)         , intent(inout), target    :: local_data(:,:) ! todo: be able to set precision?
     logical              , intent(in)               :: is_elem_based
     character(len=*)     , intent(in)               :: units, longname
     integer              , intent(in)   , optional  :: ncat
