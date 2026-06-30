@@ -19,7 +19,12 @@ module g_cvmix_pp
     !___________________________________________________________________________
     ! module calls from cvmix library
     use cvmix_shear,    only: cvmix_init_shear, cvmix_coeffs_shear
-    
+    ! CVMix is a fixed double-precision library (kind cvmix_r8). FESOM's WP may be real4
+    ! (single precision); convert WP<->cvmix_r8 at the CVMix call boundary below so CVMix
+    ! always runs in double precision. In a double-precision FESOM build cvmix_r8==WP, so
+    ! the casts/temps are exact no-ops and the result is bit-identical.
+    use cvmix_kinds_and_types, only: cvmix_r8
+
     !___________________________________________________________________________
     ! module calls from FESOM
     use g_config
@@ -142,19 +147,19 @@ module g_cvmix_pp
             ! already diffusive model even more diffusive --> it was done in 
             ! FESOM1.4 like this. In this case set pp_Avbckg and pp_Kvbckg by
             ! hand
-            call cvmix_init_shear(mix_scheme  = 'PP',         &
-                                PP_nu_zero  = pp_Av0,         &
-                                PP_alpha    = pp_alpha,       &
-                                PP_exp      = pp_exp,         &
-                                PP_nu_b     = 0.0_WP,         &
-                                PP_kappa_b  = 0.0_WP)      
+            call cvmix_init_shear(mix_scheme  = 'PP',                       &
+                                PP_nu_zero  = real(pp_Av0,   cvmix_r8),     &
+                                PP_alpha    = real(pp_alpha, cvmix_r8),     &
+                                PP_exp      = real(pp_exp,   cvmix_r8),     &
+                                PP_nu_b     = 0.0_cvmix_r8,                 &
+                                PP_kappa_b  = 0.0_cvmix_r8)
         else
-            call cvmix_init_shear(mix_scheme  = 'PP',         &
-                                PP_nu_zero  = pp_Av0,         &
-                                PP_alpha    = pp_alpha,       &
-                                PP_exp      = pp_exp,         &
-                                PP_nu_b     = pp_Avbckg,      &
-                                PP_kappa_b  = pp_Kvbckg)      
+            call cvmix_init_shear(mix_scheme  = 'PP',                       &
+                                PP_nu_zero  = real(pp_Av0,    cvmix_r8),    &
+                                PP_alpha    = real(pp_alpha,  cvmix_r8),    &
+                                PP_exp      = real(pp_exp,    cvmix_r8),    &
+                                PP_nu_b     = real(pp_Avbckg, cvmix_r8),    &
+                                PP_kappa_b  = real(pp_Kvbckg, cvmix_r8))
         end if
     end subroutine init_cvmix_pp
     !
@@ -171,6 +176,8 @@ module g_cvmix_pp
         type(t_dyn), intent(inout), target :: dynamics
         integer       :: node, elem, nz, nln, nun, elnodes(3), windnl=2, node_size
         real(kind=WP) :: vshear2, dz2, Kvb
+        ! double-precision (cvmix_r8) buffers for the CVMix call boundary
+        real(cvmix_r8) :: av_r8(mesh%nl), kv_r8(mesh%nl), rich_r8(mesh%nl)
         real(kind=WP), dimension(:,:,:), pointer :: UVnode
 #include "../associate_part_def.h"
 #include "../associate_mesh_def.h"
@@ -212,11 +219,14 @@ module g_cvmix_pp
             
             !___________________________________________________________________
             ! use cvmix library function 
-            call cvmix_coeffs_shear(Mdiff_out = pp_Av(:,node),         &
-                                    Tdiff_out = pp_Kv(:,node),         &
-                                    RICH      = pp_richardnmb(:,node), &
+            rich_r8(:) = real(pp_richardnmb(:,node), cvmix_r8)
+            call cvmix_coeffs_shear(Mdiff_out = av_r8,                  &
+                                    Tdiff_out = kv_r8,                  &
+                                    RICH      = rich_r8,               &
                                     nlev      = nln,                   &
                                     max_nlev  = nl-1)
+            pp_Av(:,node) = real(av_r8, WP)
+            pp_Kv(:,node) = real(kv_r8, WP)
             
             !___________________________________________________________________
             ! In the fesom flavour of PP mixing is the term from the background
