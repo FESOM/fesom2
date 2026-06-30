@@ -76,6 +76,7 @@ module io_MEANDATA
     real(kind=WP)                                      :: rtime_per_stream=0._WP   !< cumulative wall in this stream's write_mean dispatch over the run; printed sorted at finalize
     logical                                            :: is_in_use=.false.
     logical :: is_elem_based = .false.
+    logical :: is_fbin_based = .false.
     logical :: flip
     class(data_strategy_type), allocatable :: data_strategy
     integer :: comm
@@ -209,6 +210,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
 #if defined (__cvmix)    
     use g_cvmix_tke
     use g_cvmix_idemix
+    use g_cvmix_idemix2
     use g_cvmix_kpp
     use g_cvmix_tidal
 #endif    
@@ -1687,7 +1689,7 @@ CASE ('icb       ')
 !_______________________________________________________________________________
 ! TKE mixing diagnostic 
 CASE ('TKE       ')
-    if (mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then
+    if (mix_scheme_nmb==5 .or. mix_scheme_nmb==56 .or. mix_scheme_nmb==57) then
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke'     , 'turbulent kinetic energy'                    , 'm^2/s^2', tke(:,:)     , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke_Ttot', 'total production of turbulent kinetic energy', 'm^2/s^3', tke_Ttot(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke_Tbpr', 'TKE production by buoyancy'                  , 'm^2/s^3', tke_Tbpr(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -1709,22 +1711,102 @@ CASE ('TKE       ')
 CASE ('IDEMIX    ')
     if (mod(mix_scheme_nmb,10)==6) then
         call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe'     , 'internal wave energy'                      , 'm^2/s^2', iwe(:,:)     , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-        call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_Ttot', 'total production of internal wave energy'  , 'm^2/s^2', iwe_Ttot(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_Ttot', 'total production of internal wave energy'  , 'm^2/s^3', iwe_Ttot(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_Tdif', 'IWE production by vertical diffusion'      , 'm^2/s^3', iwe_Tdif(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_Tdis', 'IWE production by dissipation'             , 'm^2/s^3', iwe_Tdis(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-        call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_Tsur', 'IWE production from surface forcing'       , 'm^2/s^2', iwe_Tsur(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-        call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_Tbot', 'IWE production from bottom forcing'        , 'm^2/s^2', iwe_Tbot(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-        call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_Thdi', 'IWE production from hori. diffusion'       , 'm^2/s^2', iwe_Thdi(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_Tsur', 'IWE production from surface forcing'       , 'm^2/s^3', iwe_Tsur(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_Tbot', 'IWE production from bottom forcing'        , 'm^2/s^3', iwe_Tbot(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_Thdi', 'IWE production from hori. diffusion'       , 'm^2/s^3', iwe_Thdi(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_c0'  , 'IWE vertical group velocity'               , 'm/s'    , iwe_c0(:,:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-        call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_v0'  , 'IWE horizontal group velocity'             , 'm/s'    , iwe_c0(:,:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_v0'  , 'IWE horizontal group velocity'             , 'm/s'    , iwe_v0(:,:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream(elem2D       , myDim_elem2D       , 'iwe_fbot', 'IDEMIX bottom forcing'                     , 'm^3/s^3', iwe_fbot(:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream(elem2D       , myDim_elem2D       , 'iwe_fsrf', 'IDEMIX surface forcing'                    , 'm^3/s^3', iwe_fsrf(:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if    
 
 !_______________________________________________________________________________
+! IDEMIX2 mixing Internal-Wave-Energy diagnostics
+CASE ('IDEMIX2   ')
+    if (mod(mix_scheme_nmb,10)==7) then
+        call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_Eiw'     , 'internal wave energy '          , 'm^2/s^2', iwe2_E_iw(:,:,iwe2_tip1)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_Eiw_diss', 'Eiw production from dissipation', 'm^2/s^3', iwe2_E_iw_diss( :,:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_c0'      , 'Eiw vertical group velocity'    , 'm/s'    , iwe2_c0(:,:)          , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_v0'      , 'Eiw horizontal group velocity'  , 'm/s'    , iwe2_v0(:,:)          , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_alpha_c' , 'Eiw dissipation coefficien'     , 's/m^2'  , iwe2_alpha_c(:,:)     , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream(     nod2d  ,      myDim_nod2D  , 'iwe2_fbot'    , 'bottom forcing'                 , 'm^3/s^3', iwe2_fbot_n(:)        , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream(     nod2d  ,      myDim_nod2D  , 'iwe2_fsrf'    , 'surface forcing'                , 'm^3/s^3', iwe2_fsrf(:)          , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream(     nod2d  ,      myDim_nod2D  , 'iwe2_cn'      , 'baroclinic velocity'            , 'm/s'    , iwe2_cn(:)            , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        ! optional diagnostic 
+        if (idemix2_diag_Eiw) then
+            if (allocated(iwe2_E_iw_dt  )) call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_Eiw_dt'  , 'Eiw total production '          , 'm^2/s^3', iwe2_E_iw_dt(   :,:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            if (allocated(iwe2_E_iw_hdif)) call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_Eiw_hdif', 'Eiw production from hor. diff.' , 'm^2/s^3', iwe2_E_iw_hdif( :,:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            if (allocated(iwe2_E_iw_vdif)) call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_Eiw_vdif', 'Eiw production from ver. diff.' , 'm^2/s^3', iwe2_E_iw_vdif( :,:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            if (allocated(iwe2_E_iw_fsrf)) call def_stream(     nod2d  ,      myDim_nod2D  , 'iwe2_Eiw_fsrf', 'Eiw production from srf. forc.' , 'm^2/s^3', iwe2_E_iw_fsrf(   :)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            if (allocated(iwe2_E_iw_fbot)) call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_Eiw_fbot', 'Eiw production from bot. forc.' , 'm^2/s^3', iwe2_E_iw_fbot( :,:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        end if 
+        
+        if (idemix2_enable_M2) then 
+        
+            call def_stream(                 nod2d  ,                myDim_nod2D   , 'iwe2_m2_alphac'  , 'M2 energy dissipation'              , 's/m^2'    , iwe2_alpha_M2_c(:)       , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream(                 nod2d  ,                myDim_nod2D   , 'iwe2_m2_tau'     , 'M2 dissipation timescale'           , 's'        , iwe2_M2_tau(:)           , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_m2_forc'    , 'M2 forcing'                         , 'm^3/s^3/rad', iwe2_fM2(:,:)          , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_m2_w'       , 'M2 cross. spectr. propag.'          , 'rad/s'    , iwe2_M2_w(:,:)           , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin,elem2D/),(/idemix2_nfbin,myDim_elem2D/), 'iwe2_m2_u'       , 'M2 zonal propag.'                   , 'm/s'      , iwe2_M2_uv(1,:,:)        , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin,elem2D/),(/idemix2_nfbin,myDim_elem2D/), 'iwe2_m2_v'       , 'M2 merid. propag.'                  , 'm/s'      , iwe2_M2_uv(2,:,:)        , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Em2'        , 'M2 wave energy'                     , 'm^2/s^2'  , iwe2_E_M2(     :,:,iwe2_tip1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Em2_divh'   , 'EM2 horiz wave energy diverg.'      , 'm^2/s^2'  , iwe2_E_M2_divh(:,:,iwe2_ti   ), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Em2_divs'   , 'EM2 crss spctr wave energy diverg.' , 'm^2/s^2'  , iwe2_E_M2_divs(:,:,iwe2_ti   ), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/nl           , nod2d/),(/nl           ,myDim_nod2D /), 'iwe2_Em2_strct'  , 'EM2 structure function energy'      , 'm^2/s^2'  , iwe2_E_M2_struct(:,:)    , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            ! optional diagnostic
+            if (idemix2_diag_Ecompart) then
+                if (allocated(iwe2_E_M2_refl   )) call def_stream(nod2d, myDim_nod2D, 'iwe2_Em2_refl'   , 'EM2 coast-intercept. accumulated flux', 'm^2/s^3', iwe2_E_M2_refl(:)        , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                if (allocated(iwe2_E_M2_dt     )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Em2_dt'     , 'EM2 total tendency'                 , 'm^2/s^3'  , iwe2_E_M2_dt(  :,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                if (allocated(iwe2_E_M2_advh   )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Em2_advh'   , 'EM2 horizontal advection'           , 'm^2/s^3'  , iwe2_E_M2_advh(:,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                if (allocated(iwe2_E_M2_advs   )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Em2_advs'   , 'EM2 spectral advection'             , 'm^2/s^3'  , iwe2_E_M2_advs(:,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                if (allocated(iwe2_E_M2_diss   )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Em2_diss'   , 'EM2 dissipation'                    , 'm^2/s^3'  , iwe2_E_M2_diss(:,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                if (allocated(iwe2_E_M2_forc   )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Em2_forc'   , 'EM2 forcing tendency'               , 'm^2/s^3'  , iwe2_E_M2_forc(:,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            end if 
+            if (idemix2_diag_WWI) then
+                if (allocated(iwe2_E_iw_diss_M2)) call def_stream((/nl            ,nod2d/),(/nl           ,myDim_nod2D /), 'iwe2_Eiw_dissM2' , 'Eiw dissipation through M2 WWI'     , 'm^2/s^3'  , iwe2_E_iw_diss_M2(:,:)   , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                if (allocated(iwe2_E_M2_diss_wwi))call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Em2_dissWWI', 'EM2 dissipation through Eiw'        , 'm^2/s^3'  , iwe2_E_M2_diss_wwi(:,:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            end if 
+        end if 
+        
+        if (idemix2_enable_niw) then 
+            call def_stream(                 nod2d  ,                myDim_nod2D   , 'iwe2_niw_omega'  , 'niw frequency'                      , '1/s'     , iwe2_omega_niw(:)         , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream(                 nod2d  ,                myDim_nod2D   , 'iwe2_niw_tau'    , 'niw dissipation timescale'          , 's'       , iwe2_niw_tau(:)           , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_niw_forc'   , 'niw forcing'                        , 'm^3/s^3/rad', iwe2_fniw(:,:)         , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_niw_w'      , 'niw cross. spectr. propag.'         , 'rad/s'   , iwe2_niw_w(:,:)           , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin,elem2D/),(/idemix2_nfbin,myDim_elem2D/), 'iwe2_niw_u'      , 'niw zonal propag.'                  , 'm/s'     , iwe2_niw_uv(1,:,:)        , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin,elem2D/),(/idemix2_nfbin,myDim_elem2D/), 'iwe2_niw_v'      , 'niw merid. propag.'                 , 'm/s'     , iwe2_niw_uv(2,:,:)        , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Eniw'       , 'niw wave energy'                    , 'm^2/s^2' , iwe2_E_niw(     :,:,iwe2_tip1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Eniw_divh'  , 'Eniw horz wave energy diverg.'      , 'm^2/s^2' , iwe2_E_niw_divh(:,:,iwe2_ti   ), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Eniw_divs'  , 'Eniw crss spctr wave energy diverg.', 'm^2/s^2' , iwe2_E_niw_divs(:,:,iwe2_ti   ), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/nl           , nod2d/),(/nl           ,myDim_nod2D /), 'iwe2_Eniw_strct' , 'Eniw structure function energy'     , 'm^2/s^2' , iwe2_E_niw_struct(:,:)    , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            ! optional diagnostic
+            if (idemix2_diag_Ecompart) then
+                if (allocated(iwe2_E_niw_refl   )) call def_stream(nod2d, myDim_nod2D, 'iwe2_Eniw_refl'  , 'Eniw coast-intercept. accumulated flux', 'm^2/s^3', iwe2_E_niw_refl(:)       , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                if (allocated(iwe2_E_niw_dt     )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Eniw_dt'    , 'Eniw total tendency'                , 'm^2/s^3' , iwe2_E_niw_dt(  :,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                if (allocated(iwe2_E_niw_advh   )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Eniw_advh'  , 'Eniw horizontal advection'          , 'm^2/s^3' , iwe2_E_niw_advh(:,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                if (allocated(iwe2_E_niw_advs   )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Eniw_advs'  , 'Eniw spectral advection'            , 'm^2/s^3' , iwe2_E_niw_advs(:,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                if (allocated(iwe2_E_niw_diss   )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Eniw_diss'  , 'Eniw dissipation'                   , 'm^2/s^3' , iwe2_E_niw_diss(:,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                if (allocated(iwe2_E_niw_forc   )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Eniw_forc'  , 'Eniw forcing tendency'              , 'm^2/s^3' , iwe2_E_niw_forc(:,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            end if 
+            if (idemix2_diag_WWI) then
+                if (allocated(iwe2_E_iw_diss_niw)) call def_stream((/nl            ,nod2d/),(/nl           ,myDim_nod2D /), 'iwe2_Eiw_dissniw', 'Eiw dissipation through niw WWI'    , 'm^2/s^3' , iwe2_E_iw_diss_niw(:,:)   , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            end if 
+        end if 
+        
+        if (idemix2_enable_M2 .or. idemix2_enable_niw) then 
+            call def_stream(nod2d, myDim_nod2D, 'topo_dist2c', 'distance from coast'               , 'm', iwe2_topo_dist, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)    
+            call def_stream(nod2d, myDim_nod2D, 'topo_hrms'  , 'Root Mean Square Topographic Heigh', 'm', iwe2_topo_hrms, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)    
+            call def_stream(nod2d, myDim_nod2D, 'topo_hlam'  , 'Topographic Wavelength'            , 'm', iwe2_topo_hlam, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)    
+        end if 
+    end if     
+
+!_______________________________________________________________________________
 ! TIDAL mixing diagnostics
 CASE ('TIDAL     ')
-    if (mod(mix_scheme_nmb,10)==7) then
+    if (mod(mix_scheme_nmb,10)==8) then
         ! cvmix_TIDAL diagnostics
         call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'tidal_Kv'  , 'tidal diffusivity'                       , 'm^2/s'  , tidal_Kv(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'tidal_Av'  , 'tidal viscosity'                         , 'm^2/s'  , tidal_Av(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -2209,6 +2291,7 @@ function mesh_dimname_from_dimsize(size, partit, mesh) result(name)
 #if defined (__icepack)
     use icedrv_main,   only: ncat ! number of ice thickness cathegories
 #endif
+    use g_cvmix_idemix2, only: idemix2_nfbin
     implicit none
     integer       :: size
     type(t_mesh)  , intent(in) :: mesh
@@ -2229,6 +2312,8 @@ function mesh_dimname_from_dimsize(size, partit, mesh) result(name)
     elseif (size==ncat) then
         name='ncat'
 #endif
+    elseif (size==idemix2_nfbin) then
+        name='nfbin'
     else
         name='unknown'
         if (partit%mype==0) write(*,*) 'WARNING: unknown dimension in mean I/O with size of ', size
@@ -2247,6 +2332,7 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     use fesom_version_info_module
     use g_config
     use o_PARAM
+    use g_cvmix_idemix2, only: idemix2_nfbin, iwe2_phit
     use diagnostics, only: std_dens
 
     implicit none
@@ -2294,6 +2380,10 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
         elseif (entry%dimname(1)=='ndens') then
             call assert_nf( nf90_def_var(entry%ncid,  entry%dimname(1), nf90_int,   (/entry%dimID(1)/), entry%dimvarID(1)), __LINE__)
             call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'long_name', 'sigma2 density class'), __LINE__)
+        
+        elseif (entry%dimname(1)=='nfbin') then
+            call assert_nf( nf90_def_var(entry%ncid,  entry%dimname(1), nf90_int,   (/entry%dimID(1)/), entry%dimvarID(1)), __LINE__)
+            call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'long_name', 'spectral bins'), __LINE__)
         
         else
             if (partit%mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
@@ -2384,6 +2474,10 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
 #endif
     elseif (entry%dimname(1)=='ndens') then
         call assert_nf( nf90_put_var(entry%ncid, entry%dimvarID(1), std_dens), __LINE__)
+        
+    elseif (entry%dimname(1)=='nfbin') then
+        call assert_nf( nf90_put_var(entry%ncid, entry%dimvarID(1), iwe2_phit), __LINE__)
+        
     else
         if (partit%mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
     end if 
@@ -2617,16 +2711,25 @@ subroutine write_mean(entry, entry_index)
         end if
         
         !_______________________________________________________________________
-        ! loop over vertical layers --> do gather 3d variables layerwise in 2d
-        ! slices
+        ! loop over vertical layers or spectral bins --> do gather 3d variables layerwise in 2d slices
         do lev=1, size1
             !___________________________________________________________________
-            ! local output variables are gahtered in 2d shaped entry%aux_r8 
+            ! local output variables are gathered in 2d shaped entry%aux_r8 
             ! either for vertices or elements
-            if(.not. entry%is_elem_based) then
-                call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
+            if (entry%is_fbin_based) then
+                ! Spectral bin arrays: gather bin by bin (same pattern as vertical levels)
+                if(.not. entry%is_elem_based) then
+                    call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
+                else
+                    call gather_elem2D(entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
+                end if
             else
-                call gather_elem2D(entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
+                ! Regular vertical-level arrays: gather layer by layer
+                if(.not. entry%is_elem_based) then
+                    call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
+                else
+                    call gather_elem2D(entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
+                end if
             end if
             
             !___________________________________________________________________
@@ -2653,17 +2756,26 @@ subroutine write_mean(entry, entry_index)
         end if
         
         !_______________________________________________________________________
-        ! loop over vertical layers --> do gather 3d variables layerwise in 2d
-        ! slices
+        ! loop over vertical layers or spectral bins --> do gather 3d variables layerwise in 2d slices
         do lev=1, size1
             !PS if (entry%p_partit%mype==entry%root_rank) t0=MPI_Wtime()  
             !___________________________________________________________________
-            ! local output variables are gahtered in 2d shaped entry%aux_r8 
+            ! local output variables are gathered in 2d shaped entry%aux_r4 
             ! either for vertices or elements
-            if(.not. entry%is_elem_based) then
-                call gather_real4_nod2D (entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
+            if (entry%is_fbin_based) then
+                ! Spectral bin arrays: gather bin by bin (same pattern as vertical levels)
+                if(.not. entry%is_elem_based) then
+                    call gather_real4_nod2D (entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
+                else
+                    call gather_real4_elem2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
+                end if
             else
-                call gather_real4_elem2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
+                ! Regular vertical-level arrays: gather layer by layer
+                if(.not. entry%is_elem_based) then
+                    call gather_real4_nod2D (entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
+                else
+                    call gather_real4_elem2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
+                end if
             end if
             
             !___________________________________________________________________
@@ -3301,6 +3413,7 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   use mod_mesh
   USE MOD_PARTIT
   USE MOD_PARSUP
+  use g_cvmix_idemix2, only: idemix2_nfbin
   implicit none
   type(t_partit),        intent(inout), target :: partit
   integer,               intent(in)    :: glsize(2), lcsize(2)
@@ -3372,6 +3485,14 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
 
     entry%dimname(1)=mesh_dimname_from_dimsize(glsize(1), partit, mesh)     !2D! mesh_dimname_from_dimsize(glsize, mesh)
     entry%dimname(2)=mesh_dimname_from_dimsize(glsize(2), partit, mesh)     !2D! entry%dimname(2)='unknown'
+    
+    ! Check if this is a spectral bin array based on dimension size
+    if (glsize(1) == idemix2_nfbin) then
+        entry%is_fbin_based = .true.
+    else
+        entry%is_fbin_based = .false.
+    end if
+    
     ! non dimension specific
     call def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh, long_description)
 

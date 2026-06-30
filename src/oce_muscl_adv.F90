@@ -1,13 +1,15 @@
 module find_up_downwind_triangles_interface
   interface
-    subroutine find_up_downwind_triangles(twork, partit, mesh)
+    subroutine find_up_downwind_triangles(partit, mesh, edge_up_dn_tri, edge_up_dn_grad )
       use MOD_MESH
       USE MOD_PARTIT
       USE MOD_PARSUP
       use MOD_TRACER
-      type(t_mesh),        intent(in)  ,  target :: mesh
+      type(t_mesh),        intent(inout)  ,  target :: mesh
       type(t_partit),      intent(inout), target :: partit
-      type(t_tracer_work), intent(inout), target :: twork
+!       type(t_tracer_work), intent(inout), target :: twork
+      integer      , intent(inout), allocatable,dimension(:,:)  :: edge_up_dn_tri
+      real(kind=WP), intent(inout), allocatable,dimension(:,:,:), optional :: edge_up_dn_grad
     end subroutine find_up_downwind_triangles
   end interface
 end module find_up_downwind_triangles_interface
@@ -53,7 +55,7 @@ subroutine muscl_adv_init(twork, partit, mesh)
 
     !___________________________________________________________________________
     ! find upwind and downwind triangle for each local edge 
-    call find_up_downwind_triangles(twork, partit, mesh)
+    call find_up_downwind_triangles(partit, mesh, twork%edge_up_dn_tri, twork%edge_up_dn_grad)
     
     !___________________________________________________________________________
     nn_size=0
@@ -159,7 +161,7 @@ end SUBROUTINE muscl_adv_init
 !
 !
 !_______________________________________________________________________________
-SUBROUTINE find_up_downwind_triangles(twork, partit, mesh)
+SUBROUTINE find_up_downwind_triangles(partit, mesh, edge_up_dn_tri, edge_up_dn_grad)
 USE MOD_MESH
 USE MOD_PARTIT
 USE MOD_PARSUP
@@ -174,17 +176,19 @@ real(kind=WP)              :: x(2),b(2), c(2), cr, bx, by, xx, xy, ab, ax
 real(kind=WP), allocatable :: coord_elem(:, :,:), temp(:)
 integer, allocatable       :: temp_i(:), e_nodes(:,:)
 
-type(t_mesh),        intent(in)   , target :: mesh
+type(t_mesh),        intent(inout), target :: mesh
 type(t_partit),      intent(inout), target :: partit
-type(t_tracer_work), intent(inout), target :: twork
+!       type(t_tracer_work), intent(inout), target :: twork
+integer      , intent(inout), allocatable, dimension(:,:)  :: edge_up_dn_tri
+real(kind=WP), intent(inout), allocatable, dimension(:,:,:), optional  :: edge_up_dn_grad
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-allocate(twork%edge_up_dn_tri(2,myDim_edge2D))
-allocate(twork%edge_up_dn_grad(4,nl-1,myDim_edge2D))
-twork%edge_up_dn_tri=0
+allocate(edge_up_dn_tri(2,myDim_edge2D))
+edge_up_dn_tri=0
+
 ! =====
 ! In order that this procedure works, we need to know nodes and their coordinates 
 ! on the extended set of elements (not only my, but myDim+eDim+eXDim) 
@@ -275,15 +279,15 @@ DO n=1, myDim_edge2d
       ! Since b and c are the sides of triangle, |ab|<pi, and atan2 should 
       ! be what is needed
       if((ab>0.0_WP).and.(ax>0.0_WP).and.(ax<ab)) then
-      twork%edge_up_dn_tri(1,n)=elem
+      edge_up_dn_tri(1,n)=elem
       cycle
       endif
       if((ab<0.0_WP).and.(ax<0.0_WP).and.(ax>ab)) then
-      twork%edge_up_dn_tri(1,n)=elem
+      edge_up_dn_tri(1,n)=elem
       cycle
       endif
       if((ab==ax).or.(ax==0.0_WP)) then
-      twork%edge_up_dn_tri(1,n)=elem
+      edge_up_dn_tri(1,n)=elem
       cycle
       endif
    END DO
@@ -318,15 +322,15 @@ DO n=1, myDim_edge2d
       ! Since b and c are the sides of triangle, |ab|<pi, and atan2 should 
       ! be what is needed
       if((ab>0.0_WP).and.(ax>0.0_WP).and.(ax<ab)) then
-      twork%edge_up_dn_tri(2,n)=elem
+      edge_up_dn_tri(2,n)=elem
       cycle
       endif
       if((ab<0.0_WP).and.(ax<0.0_WP).and.(ax>ab)) then
-      twork%edge_up_dn_tri(2,n)=elem
+      edge_up_dn_tri(2,n)=elem
       cycle
       endif
       if((ab==ax).or.(ax==0.0)) then
-      twork%edge_up_dn_tri(2,n)=elem
+      edge_up_dn_tri(2,n)=elem
       cycle
       endif
    END DO
@@ -340,14 +344,19 @@ END DO
 ! Count the number of 'good' edges:
 !k=0
 !DO n=1, myDim_edge2D
-!   if((twork%edge_up_dn_tri(1,n).ne.0).and.(twork%edge_up_dn_tri(2,n).ne.0)) k=k+1
+!   if((edge_up_dn_tri(1,n).ne.0).and.(edge_up_dn_tri(2,n).ne.0)) k=k+1
 !END DO
 
+
+if (present(edge_up_dn_grad)) then 
+    allocate(edge_up_dn_grad(4,nl-1,myDim_edge2D))
 !$OMP PARALLEL DO
-DO n=1, myDim_edge2D
-   twork%edge_up_dn_grad(:, :, n)=0.0_WP
-END DO
+    DO n=1, myDim_edge2D
+        edge_up_dn_grad(:, :, n)=0.0_WP
+    END DO
 !$OMP END PARALLEL DO
+end if 
+
 deallocate(e_nodes, coord_elem)
 end SUBROUTINE find_up_downwind_triangles
 !

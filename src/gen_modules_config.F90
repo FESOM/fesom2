@@ -169,9 +169,9 @@ module g_config
   real(kind=WP)                 :: dt
   integer                       :: save_count_mean, save_count_restart
   logical                       :: r_restart
-  real(kind=WP)                 :: rtime_ice=0.0, rtime_tot=0.0
+  real(kind=WP)                 :: rtime_ice=0.0, rtime_tot=0.0, rtime_ice_evp=0.0, rtime_ice_adv=0.0, rtime_ice_therm=0.0
   real(kind=WP)                 :: rtime_oce=0.0, rtime_oce_dyn=0.0, rtime_oce_dynssh=0.0,  rtime_oce_solvessh=0.0
-  real(kind=WP)                 :: rtime_oce_solvetra=0.0, rtime_oce_GMRedi=0.0, rtime_oce_mixpres=0.0
+  real(kind=WP)                 :: rtime_oce_solvetra=0.0, rtime_oce_GMRedi=0.0, rtime_oce_presdens=0.0, rtime_oce_mixing=0.0
   real(kind=WP)                 :: dummy=1.e10
   
   
