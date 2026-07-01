@@ -107,15 +107,19 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   USE MOD_PARSUP
   USE MOD_DYN
   USE g_comm_auto
+#if defined(FESOM_PROFILING)
+  USE fesom_diagnostics, only: diag_count
+#endif
   IMPLICIT NONE
   type(t_solverinfo),  intent(inout), target :: solverinfo
   type(t_partit),      intent(inout), target :: partit
   type(t_mesh),        intent(inout), target :: mesh
   real(kind=WP),       intent(inout)         :: x(partit%myDim_nod2D+partit%eDim_nod2D)
   real(kind=WP),       intent(in)            :: rhs(partit%myDim_nod2D+partit%eDim_nod2D)
-  integer                      :: row, nini, nend, iter 
+  integer                      :: row, nini, nend, iter
   real(kind=WP)                :: sprod(2), s_old, s_aux, al, be, rtol
   integer                      :: req
+  logical                      :: converged
   real(kind=WP), pointer       :: pr_values(:), rr(:), zz(:), pp(:), App(:)
   integer,       pointer       :: rptr(:), cind(:)
 
@@ -193,6 +197,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   ! ===============
   ! Iterations
   ! ===============
+  converged = .false.
   Do iter=1, solverinfo%maxiter
      ! ============
      ! Compute Ap
@@ -263,6 +268,7 @@ sprod(1:2)=0.0_WP
      ! Exit if tolerance is achieved
      ! ===========
   if (sqrt(sprod(2)/nod2D)< rtol) then
+     converged = .true.
      exit
   endif
   be=sprod(1)/s_old
@@ -276,10 +282,22 @@ sprod(1:2)=0.0_WP
   END DO
 !$OMP END PARALLEL DO
   END DO
+
+  ! Record SSH-CG iteration count (and non-convergence) for fesom.stats.
+#if defined(FESOM_PROFILING)
+  call diag_count("ssh_cg_iters", min(iter, solverinfo%maxiter))
+  if (.not. converged) call diag_count("ssh_cg_nonconv", 1)
+#endif
+  ! Safety-net log line (always on): a silent stall at maxiter used to be invisible.
+  if (.not. converged .and. partit%mype==0) then
+     write(*,*) 'WARNING: ssh CG did not converge in ', solverinfo%maxiter, &
+                ' iters; rms(resid)=', sqrt(sprod(2)/nod2D), ' target rtol=', rtol
+  endif
+
  ! At the end: The result is in X, but it needs a halo exchange.
   call exchange_nod(x, partit)
 !$OMP BARRIER
-end subroutine ssh_solve_cg 
+end subroutine ssh_solve_cg
 
 ! ===================================================================
 

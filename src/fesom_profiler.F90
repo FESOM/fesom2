@@ -14,6 +14,7 @@
 
 module fesom_profiler
     use g_config, only: runid, ResultPath
+    use fesom_diagnostics, only: diag_init, diag_reset, diag_report
     use mpi
 #ifdef _OPENMP
     use omp_lib
@@ -93,7 +94,10 @@ contains
         if (present(enable_profiling)) then
             profiler_enabled = enable_profiling
         endif
-        
+
+        ! Scalar-diagnostics facility rides along with profiling
+        call diag_init(profiler_enabled)
+
         if (.not. profiler_enabled) return
 
         ! Detect OpenMP thread count
@@ -305,6 +309,10 @@ contains
         call MPI_Allreduce(local_data(3::4), global_data(3::4), num_profiles, &
                           MPI_DOUBLE_PRECISION, MPI_MAX, mpi_comm, ierr)
         
+        ! Scalar diagnostics (collective: all ranks reduce, rank 0 writes the block
+        ! above the timing table). Must be outside the rank-0 guard below.
+        call diag_report(unit, mpi_comm, mpi_rank)
+
         ! Only rank 0 prints the report
         if (mpi_rank == 0) then
             call print_detailed_report(unit, global_data, global_counts, npes)
@@ -863,6 +871,7 @@ contains
         end do
         
         call_stack_depth = 0
+        call diag_reset()
     end subroutine fesom_profiler_reset
 
     !=========================================================================
