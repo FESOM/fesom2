@@ -546,6 +546,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     integer        :: AB_order     = 2
     logical        :: check_opt_visc=.true.
     real(kind=WP)  :: wsplit_maxcfl
+    real(kind=WP)  :: soltol = 1.e-5_WP  ! ssh CG rel. tolerance; default matches T_SOLVERINFO
     logical        :: use_ssh_se_subcycl=.false.
     integer        :: se_BTsteps
     real(kind=WP)  :: se_BTtheta
@@ -558,11 +559,11 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
                                 uke_scaling, uke_scaling_factor, uke_advection, &
                                 rosb_dis, smooth_back, smooth_dis, smooth_back_tend, K_back, c_back
 
-    namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, & 
+    namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, &
                                 ldiag_KE, AB_order,                                  &
                                 use_ssh_se_subcycl, se_BTsteps, se_BTtheta,          &
                                 se_bottdrag, se_bdrag_si, se_visc, se_visc_gamma0,   &
-                                se_visc_gamma1, se_visc_gamma2
+                                se_visc_gamma1, se_visc_gamma2, soltol
 
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -632,8 +633,14 @@ nl => mesh%nl
             write(*,*) "     se_visc_gamma0 = ", dynamics%se_visc_gamma0
             write(*,*) "     se_visc_gamma1 = ", dynamics%se_visc_gamma1
             write(*,*) "     se_visc_gamma2 = ", dynamics%se_visc_gamma2
-        end if 
-    end if 
+        end if
+    end if
+
+    ! ssh CG solver tolerance (optional, backward compatible): if 'soltol' is
+    ! absent from namelist.dyn the namelist read leaves it at the default above,
+    ! matching the previous hard-coded T_SOLVERINFO value.
+    dynamics%solverinfo%soltol = soltol
+    if (mype==0) write(*,*) '     ssh CG soltol  = ', dynamics%solverinfo%soltol
 
     !___________________________________________________________________________
     ! define local vertice & elem array size
