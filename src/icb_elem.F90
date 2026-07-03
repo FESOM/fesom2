@@ -111,25 +111,23 @@ type(t_dyn)   , intent(inout), target :: dynamics
   return !not my node
  end if 
 
- do node=1,myDim_nod2D
-   do k=1, nod_in_elem2D_num(node) 
-     elem  = nod_in_elem2D(k,node) 
+ do k=1, nod_in_elem2D_num(local_idx)
+   elem  = nod_in_elem2D(k,local_idx)
 
-     !do idx_elem = 1,  nod_in_elem2D(local_idx)%nmb
-     !elem = nod_in_elem2D(local_idx)%addresses(idx_elem)
-     !area_ = voltriangle(elem)
-     area_ = elem_area(elem)
-     patch= patch + area_
-     
-     !gradientx = gradientx + area * sum( ssh(elem2D_nodes(:,elem)) * bafux_2D(:,elem) )
-     !gradienty = gradienty + area * sum( ssh(elem2D_nodes(:,elem)) * bafuy_2D(:,elem) )
+   !do idx_elem = 1,  nod_in_elem2D(local_idx)%nmb
+   !elem = nod_in_elem2D(local_idx)%addresses(idx_elem)
+   !area_ = voltriangle(elem)
+   area_ = elem_area(elem)
+   patch= patch + area_
 
-!LA 2023-03-07
+   !gradientx = gradientx + area * sum( ssh(elem2D_nodes(:,elem)) * bafux_2D(:,elem) )
+   !gradienty = gradienty + area * sum( ssh(elem2D_nodes(:,elem)) * bafuy_2D(:,elem) )
+
+! 2023-03-07
 eta_n_ib => dynamics%eta_n_ib(:)
-! kh 18.03.21 use eta_n_ib buffered values here
-     gradientx = gradientx + area_ * sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(1:3, elem)) 
-     gradienty = gradienty + area_ * sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(4:6, elem)) 
-   end do
+!h 18.03.21 use eta_n_ib buffered values here
+   gradientx = gradientx + area_ * sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(1:3, elem))
+   gradienty = gradienty + area_ * sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(4:6, elem))
  end do
  
  gradientx = gradientx / patch
@@ -399,13 +397,12 @@ type(t_partit), intent(inout), target :: partit
   if(i_have_element) then
    i_have_element= elem2D_nodes(1,elem) <= myDim_nod2D !1 PE still .true.
    if (use_cavity) then 
-      !reject_tmp = all( (mesh%cavity_depth(elem2D_nodes(:,elem))/=0.0) .OR. (mesh%bc_index_nod2D(elem2D_nodes(:,elem))==0.0) )
-      reject_tmp = any(mesh%cavity_depth(elem2D_nodes(:,elem))/=0.0) .OR. all(mesh%bc_index_nod2D(elem2D_nodes(:,elem))==0.0)
+      reject_tmp = all( (mesh%cavity_depth(elem2D_nodes(:,elem))/=0.0) .OR. (mesh%bc_index_nod2D(elem2D_nodes(:,elem))==0.0) )
       if(reject_tmp) then
       !if( reject_elem(mesh, partit, elem) ) then
        elem=0 !reject element
        i_have_element=.false.
-       write(*,*) 'elem4all: iceberg found in shelf region: elem = 0'
+       !write(*,*) 'elem4all: iceberg found in shelf region: elem = 0'
       else 
        elem=myList_elem2D(elem) !global now
       end if 
@@ -462,12 +459,17 @@ do m=1, 3
    old_iceberg_elem=elem_containing_n2
    if (use_cavity) then 
       !if( reject_elem(mesh, partit, old_iceberg_elem) ) then
-      !reject_tmp = all( (mesh%cavity_depth(elem2D_nodes(:,ibelem_tmp))/=0.0) .OR. (mesh%bc_index_nod2D(elem2D_nodes(:,ibelem_tmp))==0.0) )
-      reject_tmp = any(mesh%cavity_depth(elem2D_nodes(:,ibelem_tmp))/=0.0) .OR. all(mesh%bc_index_nod2D(elem2D_nodes(:,ibelem_tmp))==0.0)
+      reject_tmp = all( (mesh%cavity_depth(elem2D_nodes(:,elem_containing_n2))/=0.0) .OR. (mesh%bc_index_nod2D(elem2D_nodes(:,elem_containing_n2))==0.0) )
       if(reject_tmp) then
          left_mype=1.0
-         write(*,*) 'iceberg found in shelf region: left_mype = 1'
+         !write(*,*) 'iceberg found in shelf region: left_mype = 1'
          old_iceberg_elem=ibelem_tmp
+         ! Do NOT return here.  At a cavity boundary the trajectory endpoint
+         ! can lie inside both the cavity element and an adjacent non-cavity
+         ! neighbour (shared edge).  If the cavity element is encountered
+         ! first in the search order, returning immediately would miss the
+         ! valid non-cavity alternative and trigger a spurious left_mype=1.
+         cycle
       end if
    endif
    RETURN 
