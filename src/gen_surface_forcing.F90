@@ -59,6 +59,7 @@ MODULE g_sbf
    public  sbc_ini  ! routine called before 1st time step (open files, read namelist,...)
    public  sbc_do   ! routine called each time step to provide a sbc fileds (wind,...)
 #if defined (__recom)
+   public  sbc_ini_recom
    public  sbc_do_recom ! routine called each time step to provide a sbc fileds for REcoM
 #endif
    public  sbc_end  ! routine called after last time step
@@ -1052,9 +1053,9 @@ CONTAINS
                         nm_runoff_file, runoff_data_source, runoff_climatology, nm_sss_data_file, sss_data_source, &
                         chl_data_source, nm_chl_data_file, chl_const, use_runoff_mapper, runoff_basins_file, runoff_radius
 
-#if defined(__recom)
-      namelist /nam_rsbc/ fe_data_source, nm_fe_data_file, nm_aen_data_file, nm_river_data_file, nm_erosion_data_file, nm_co2_data_file
-#endif
+!#if defined(__recom)
+!      namelist /nam_rsbc/ fe_data_source, nm_fe_data_file, nm_aen_data_file, nm_river_data_file, nm_erosion_data_file, nm_co2_data_file
+!#endif
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -1430,36 +1431,79 @@ CONTAINS
     if (mype==0) write(*,*) "DONE:  Ocean forcing initialization."
     if (mype==0) write(*,*) 'Parts of forcing data (only constant in time fields) are read'
 
-#if defined(__recom)
-        ! OPEN and read namelist for SBC REcoM
-        open( unit=nm_sbc_unit+1, file='namelist.recom', form='formatted', access='sequential', status='old', iostat=iost )
-        if (iost == 0) then
-#if defined(__usetp)
-        if (partit%my_fesom_group==0) then
-#endif
-            if (mype==0) WRITE(*,*) '     file   : ', 'namelist.recom for sbc',' open ok'
-#if defined(__usetp)
-        endif !(partit%my_fesom_group==0) then
-#endif
-        else
-#if defined(__usetp)
-        if (partit%my_fesom_group==0) then
-#endif
-
-            if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.recom for sbc',' ; iostat=',iost
-#if defined(__usetp)
-        endif !(partit%my_fesom_group==0) then
-#endif
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-            stop
-        endif
-        READ( nm_sbc_unit+1, nml=nam_rsbc, iostat=iost )
-        close( nm_sbc_unit+1 )
-#endif
+!#if defined(__recom)
+!        ! OPEN and read namelist for SBC REcoM
+!        open( unit=nm_sbc_unit+1, file='namelist.recom', form='formatted', access='sequential', status='old', iostat=iost )
+!        if (iost == 0) then
+!#if defined(__usetp)
+!        if (partit%my_fesom_group==0) then
+!#endif
+!            if (mype==0) WRITE(*,*) '     file   : ', 'namelist.recom for sbc',' open ok'
+!#if defined(__usetp)
+!        endif !(partit%my_fesom_group==0) then
+!#endif
+!        else
+!#if defined(__usetp)
+!        if (partit%my_fesom_group==0) then
+!#endif
+!
+!            if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.recom for sbc',' ; iostat=',iost
+!#if defined(__usetp)
+!        endif !(partit%my_fesom_group==0) then
+!#endif
+!            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+!            stop
+!        endif
+!        READ( nm_sbc_unit+1, nml=nam_rsbc, iostat=iost )
+!        close( nm_sbc_unit+1 )
+!#endif
 
       if (use_runoff_mapper) call read_runoff_mapper(make_full_path(runoff_basins_file), "arrival_point_id", runoff_radius, partit, mesh)
 
    END SUBROUTINE sbc_ini
+
+#if defined (__recom)
+   SUBROUTINE sbc_ini_recom(partit)
+      !!---------------------------------------------------------------------
+      !!                    ***  ROUTINE recom_sbc_ini ***
+      !!
+      !! ** Purpose : read the REcoM surface boundary condition namelist
+      !!              (namelist.recom / nam_rsbc). Split out of sbc_ini so it
+      !!              can be called independently from the REcoM init sequence.
+      !!----------------------------------------------------------------------
+      IMPLICIT NONE
+      type(t_partit), intent(inout), target :: partit
+      integer            :: iost  ! I/O status
+
+      namelist /nam_rsbc/ fe_data_source, nm_fe_data_file, nm_aen_data_file, &
+                           nm_river_data_file, nm_erosion_data_file, nm_co2_data_file
+
+      ! OPEN and read namelist for SBC REcoM
+      open( unit=nm_sbc_unit+1, file='namelist.recom', form='formatted', access='sequential', status='old', iostat=iost )
+      if (iost == 0) then
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
+          if (partit%mype==0) WRITE(*,*) '     file   : ', 'namelist.recom for sbc',' open ok'
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
+      else
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
+          if (partit%mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.recom for sbc',' ; iostat=',iost
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
+          call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+          stop
+      endif
+
+      READ( nm_sbc_unit+1, nml=nam_rsbc, iostat=iost )
+      close( nm_sbc_unit+1 )
+   END SUBROUTINE sbc_ini_recom
+#endif
 
    SUBROUTINE sbc_do(partit, mesh)
       !!---------------------------------------------------------------------
