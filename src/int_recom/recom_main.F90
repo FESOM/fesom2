@@ -360,8 +360,6 @@ if (UseDustClimMyrio) dust_sol=1.0 !Solubulity set to one, because it is already
             allocate(VTCphot_cocco(nl-1), VTCphot_phaeo(nl-1))
             VTCphot_cocco  = 0.d0
             VTCphot_phaeo  = 0.d0
-
-
 #endif
 
 #if defined (__diaH)
@@ -413,7 +411,11 @@ if (UseDustClimMyrio) dust_sol=1.0 !Solubulity set to one, because it is already
             vertNNAdiaH = 0.d0
             ChldegdiaH = 0.d0
 #endif
-        end if
+
+            allocate( vert_detl_agg(nl-1), vert_dets_agg(nl-1) )
+            vert_detl_agg     = 0.0 
+            vert_dets_agg     = 0.0
+
 
         if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forcing'//achar(27)//'[0m'
 
@@ -478,6 +480,11 @@ if (UseDustClimMyrio) dust_sol=1.0 !Solubulity set to one, because it is already
             NNAdiaH(n) = locNNAdiaH
             ChldegdiaH(n) = locChldegdiaH
 #endif
+#if defined (__3Zoo2Det)
+            detl_agg(n) = loc_detl_agg
+            dets_agg(n) = loc_dets_agg
+#endif
+        endif
 
             !! * Update 3D diagnostics *
             respmeso     (1:nzmax,n) = vertrespmeso     (1:nzmax)
@@ -562,6 +569,10 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
 #if defined (__diaH)
             deallocate(vertNPPdiaH,vertGPPdiaH,vertNNAdiaH,vertChldegdiaH) 
 #endif
+
+#if defined (__3Zoo2Det)
+            deallocate(vert_detl_agg, vert_dets_agg)
+#endif 
 
             !! * Deallocating 3D Diagnostics *
             deallocate(vertrespmeso)

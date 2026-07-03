@@ -67,6 +67,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
     real(kind=8)                                            :: dt_b                 !< Size of time steps [day]
     real(kind=8),dimension(mesh%nl-1)                       :: Sink
     real(kind=8)                                            :: dt_sink              !< Size of local time step
+    real(kind=8)                                            :: dia_stick, diaH_stick ! stickiness for diatom aggregation
 
     real(kind=8)                                            :: recip_hetN_plus      !< MB's addition to heterotrophic respiration
     real(kind=8)                                            :: recip_res_het        !< [day] Reciprocal of respiration by heterotrophs and mortality (loss to detritus)
@@ -1434,23 +1435,39 @@ endif
                 qlimitFac = min(qLimitFac, qlimitFacTmp)
                 feLimitFac= Fe/(k_Fe_d + Fe)
                 qlimitFac = min(qlimitFac, feLimitFac)
-                aggregationrate = agg_PP * (1 - qlimitFac) * DiaN
+                dia_stick = (1.d0 - qlimitFac)
+
             else
-                aggregationrate = agg_PP * DiaN
+                dia_stick = 1.d0
             endif
-                   
+            aggregationrate = agg_PP * dia_stick * DiaN
+
             aggregationrate = aggregationrate + agg_PD * DetN + agg_PP * PhyN
 
 #if defined (__3Zoo2Det)
             aggregationrate = aggregationrate + agg_PD * DetZ2N ! 2Det
+! This has been retired: aggregation with large detritus is now a source of
+! large dteritus (CV, Jan '25)
 #endif
+
 #if defined (__coccos)
             aggregationrate = aggregationrate + agg_PP * CoccoN
             aggregationrate = aggregationrate + agg_PP * PhaeoN
 #endif
 
 #if defined (__diaH)
-            aggregationrate = aggregationrate + agg_PP * DiaH_N
+            if (diatom_mucus) then
+                qlimitFac = recom_limiter(NMinSlope, NCmin_d_H, quota_diaH)
+                qlimitFacTmp = recom_limiter(SiMinSlope, SiCmin_H, qSiC_H)
+                qlimitFac = min(qLimitFac, qlimitFacTmp)
+                feLimitFac= Fe/(k_Fe_d_H + Fe)
+                qlimitFac = min(qlimitFac, feLimitFac)
+                diaH_stick = (1.d0 - qlimitFac)
+
+            else
+                diaH_stick = 1.d0
+            endif
+            aggregationrate = aggregationrate + agg_PP * diaH_stick * DiaH_N
 #endif    
 !-------------------------------------------------------------------------------
 ! Calcification
@@ -1650,7 +1667,8 @@ endif
         - grazingFlux_phy                                  & ! --> Grazing loss
 #if defined (__3Zoo2Det)
         - grazingFlux_phy2                                 & 
-        - grazingFlux_phy3                                 & ! 3Zoo    
+        - grazingFlux_phy3                                 & ! 3Zoo
+        - agg_PD2 * DetZ2N                       * PhyN    &
 #endif
                                                           ) * dt_b + sms(k,iphyn)
 !____________________________________________________________
@@ -1670,6 +1688,7 @@ endif
 #if defined (__3Zoo2Det)
         - grazingFlux_phy2 * recipQuota                    &
         - grazingFlux_phy3 * recipQuota                    & ! 3Zoo
+        - agg_PD2 * DetZ2N                       * PhyC    &
 #endif
                                                           ) * dt_b + sms(k,iphyc)
 !____________________________________________________________
@@ -1686,6 +1705,7 @@ endif
 #if defined (__3Zoo2Det)
         - grazingFlux_phy2 * Chl2N                         & 
         - grazingFlux_phy3 * Chl2N                         & ! 3Zoo
+        - agg_PD2 * DetZ2N                       * PhyChl  &
 #endif
                                                           ) * dt_b + sms(k,ipchl)
 
@@ -1720,6 +1740,7 @@ endif
             - grazingFlux_Det2   * grazEff2                & ! --> grazing of second zoo (macro) on first detritus class
             + aggregationRate               * PhyN         &
             + aggregationRate               * DiaN         &
+            - agg_DD2 * DetZ2N              * DetN         & ! aggregation small/large detritus
             + miczooLossFlux                               & !  --> microzooplankton, mortality
             - reminN * arrFunc * O2Func     * DetN         & !  --> O2remin
                                                           ) * dt_b + sms(k,idetn)
@@ -1759,7 +1780,7 @@ endif
 #if defined (__coccos)
             + grazingFlux_Cocco3                           &
             + aggregationRate               * CoccoN       &
-            + grazingFlux_Phaeo3 *                         &
+            + grazingFlux_Phaeo3                           &
             + aggregationRate               * PhaeoN       &
 #endif
 
@@ -1770,6 +1791,7 @@ endif
             - grazingFlux        * grazEff3                &
             + aggregationRate               * PhyN         &
             + aggregationRate               * DiaN         &
+            - agg_DD2 * DetZ2N              * DetN         & ! aggregation small/large detritus
             + miczooLossFlux                               &
             - reminN * arrFunc * O2Func     * DetN         & ! O2remin
                                                           ) * dt_b + sms(k,idetn)
@@ -1824,6 +1846,7 @@ endif
             - grazingFlux_Det2 * recipDet  * grazEff2          & ! corrected recipDet2 -> recipDet
             + aggregationRate                         * PhyC   &
             + aggregationRate                         * DiaC   &
+            - agg_DD2 * DetZ2N                        * DetC   &
             + miczooLossFlux   * recipQZoo3                    &
             - reminC * arrFunc * O2Func   * DetC               & ! O2remin
                                                               ) * dt_b + sms(k,idetc)
@@ -1878,6 +1901,7 @@ endif
 #endif
             + aggregationRate                       * PhyC     &
             + aggregationRate                       * DiaC     &
+            - agg_DD2 * DetZ2N                      * DetC     &
             + miczooLossFlux     * recipQZoo3                  &
             - reminC * arrFunc * O2Func    * DetC              & ! O2remin
                                                               ) * dt_b + sms(k,idetc)
@@ -2111,6 +2135,16 @@ endif
             - grazingFlux_miczoo  * grazEff          &
             - grazingFlux_DetZ2   * grazEff          &
             - grazingFlux_DetZ22  * grazEff2         &
+            + agg_PD2 * detZ2N * PhyN                &
+            + agg_PD2 * detZ2N * DiaN                &
+#if defined (__coccos)
+            + agg_PD2 * detZ2N * CoccoN              &
+            + agg_PD2 * detZ2N * PhaeoN              &
+#endif
+#if defined (_diaH)
+            + agg_PD2 * detZ2N * DiaH_N              &
+#endif
+            + agg_DD2 * detZ2N * DetN                &
             + Zoo2LossFlux                           &
             + hetLossFlux                            &
             + Zoo2fecalloss_n                        &
@@ -2140,6 +2174,16 @@ endif
             + grazingFlux_dia                        &
             + grazingFlux_miczoo                     &
             - grazingFlux         * grazEff          &
+            + agg_PD2 * detZ2N * PhyN                &
+            + agg_PD2 * detZ2N * DiaN                &
+#if defined (__coccos)
+            + agg_PD2 * detZ2N * CoccoN              &
+            + agg_PD2 * detZ2N * PhaeoN              &
+#endif
+#if defined (__diaH)
+            + agg_PD2 * detZ2N * DiaH_N              &
+#endif
+            + agg_DD2 * detZ2N * DetN                &
             + Zoo2LossFlux                           &
             + hetLossFlux                            &
             + Zoo2fecalloss_n                        &
@@ -2186,6 +2230,16 @@ endif
             - grazingFlux_miczoo  * recipQZoo3       * grazEff  &
             - grazingFlux_DetZ2   * recipDet2        * grazEff  &
             - grazingFlux_DetZ22  * recipDet2        * grazEff2 &
+            + agg_PD2 * detZ2N * PhyC                           &
+            + agg_PD2 * detZ2N * DiaC                           &
+#if defined (__coccos)
+            + agg_PD2 * detZ2N * CoccoC                         &
+            + agg_PD2 * detZ2N * PhaeoC                         &
+#endif
+#if defined (__diaH)
+            + agg_PD2 * detZ2N * DiaH_C                         &
+#endif
+            + agg_DD2 * detZ2N * DetC                           &
             + Zoo2LossFlux        * recipQZoo2                  &
             + hetLossFlux         * recipQZoo                   &
             + Zoo2fecalloss_c                                   &
@@ -2226,6 +2280,16 @@ endif
             - grazingFlux_Dia     * recipQuota_Dia   * grazEff  &
             + grazingFlux_miczoo  * recipQZoo3                  &
             - grazingFlux_miczoo  * recipQZoo3       * grazEff  &
+            + agg_PD2 * detZ2N * PhyC                           &
+            + agg_PD2 * detZ2N * DiaC                           &
+#if defined (__coccos)
+            + agg_PD2 * detZ2N * CoccoC                         &
+            + agg_PD2 * detZ2N * PhaeoC                         &
+#endif
+#if defined (__diaH)
+            + agg_PD2 * detZ2N * DiaH_C                         &
+#endif
+            + agg_DD2 * detZ2N * DetC                           &
             + Zoo2LossFlux        * recipQZoo2                  &
             + hetLossFlux         * recipQZoo                   &
             + Zoo2fecalloss_c                                   &
@@ -2239,9 +2303,12 @@ endif
     sms(k,idetz2si)     = (                 &
         + grazingFlux_dia2 * qSiN           &  ! --> qSin convert N to Si
         + grazingFlux_dia  * qSiN           &
+        + agg_PD2 * detZ2N * DiaSi                           &
+        + agg_DD2 * detZ2N * DetSi                           &
 #if defined (__diaH)
         + grazingFlux_diaH2 * qSiN_H        &  ! --> qSin_h convert N to Si
         + grazingFlux_diaH  * qSiN_H        &
+        + agg_PD2 * detZ2N * DiaH_Si                           &
 #endif
         - reminSiT                * DetZ2Si &
                                           ) * dt_b + sms(k,idetz2si)
@@ -2253,6 +2320,8 @@ endif
         - calc_loss_gra2 * calc_diss_guts &
         + calc_loss_gra                   &
         - calc_loss_gra  * calc_diss_guts &
+        + agg_PD2 * detZ2N * PhyCalc      &
+        + agg_DD2 * detZ2N * DetCalc      &
         - calc_diss2     * DetZ2Calc      &
                                          ) * dt_b + sms(k,idetz2calc)
 #endif 
@@ -2334,6 +2403,7 @@ endif
 #if defined (__3Zoo2Det)
         - grazingFlux_Dia2                       &
         - grazingFlux_Dia3                       & ! 3Zoo
+        - agg_PD2 * DetZ2N               * DiaN  & 
 #endif
                                                 ) * dt_b + sms(k,idian)
 #if defined (__diaH)
@@ -2347,6 +2417,7 @@ endif
 #if defined (__3Zoo2Det)
         - grazingFlux_DiaH2                       &
         - grazingFlux_DiaH3                       & ! 3Zoo
+        - agg_PD2 * DetZ2N               * DiaH_N &
 #endif
                                                 ) * dt_b + sms(k,idiaH_n)
 !____________________________________________________________
@@ -2366,13 +2437,14 @@ endif
 #if defined (__3Zoo2Det)
         - grazingFlux_dia2 * recipQuota_dia         &
         - grazingFlux_dia3 * recipQuota_dia         & ! 3Zoo
+        - agg_PD2 * DetZ2N                  * DiaC  & 
 #endif
                                                    ) * dt_b + sms(k,idiac)
 #if defined (__diaH)
     sms(k,idiaH_c)      = (                           &
-        + Cphot_diaH                         * DiaH_C  & ! -- Photosynthesis ---->/
-        - lossC_d_H * limitFacN_diaH           * DiaH_C  & ! -- Excretion of DOC --/ Net Photosynthesis
-        - phyRespRate_diaH                   * DiaH_C  & ! -- Respiration ----->/
+        + Cphot_diaH                        * DiaH_C  & ! -- Photosynthesis ---->/
+        - lossC_d_H * limitFacN_diaH        * DiaH_C  & ! -- Excretion of DOC --/ Net Photosynthesis
+        - phyRespRate_diaH                  * DiaH_C  & ! -- Respiration ----->/
         - aggregationRate                   * DiaH_C  &
         - grazingFlux_diaH  * recipQuota_diaH         &
 #endif
@@ -2380,6 +2452,7 @@ endif
 #if defined (__3Zoo2Det)
         - grazingFlux_diaH2 * recipQuota_diaH         &
         - grazingFlux_diaH3 * recipQuota_diaH         & ! 3Zoo
+        - agg_PD2 * DetZ2N                  * DiaH_C  &
 #endif
      	                                           ) * dt_b + sms(k,idiaH_c)
 
@@ -2394,6 +2467,7 @@ endif
 #if defined (__3Zoo2Det)
         - grazingFlux_dia2 * Chl2N_dia              &          
         - grazingFlux_dia3 * Chl2N_dia              & ! 3Zoo
+        - agg_PD2 * DetZ2N                 * DiaChl & 
 #endif
                                                    ) * dt_b + sms(k,idchl)
 
@@ -2408,6 +2482,7 @@ endif
 #if defined (__3Zoo2Det)
         - grazingFlux_diaH2 * Chl2N_diaH              &          
         - grazingFlux_diaH3 * Chl2N_diaH              & ! 3Zoo
+        - agg_PD2 * DetZ2N                 * DiaH_Chl &
 #endif
                                                    ) * dt_b + sms(k,idiaH_chl)
 
@@ -2427,6 +2502,7 @@ endif
 #if defined (__3Zoo2Det)
         - grazingFlux_dia2 * qSiN                   &
         - grazingFlux_dia3 * qSiN                   & ! 3Zoo
+        - agg_PD2 * DetZ2N                  * DiaSi & 
 #endif
                                                    ) * dt_b + sms(k,idiasi)
 #if defined (__diaH)
@@ -2440,6 +2516,7 @@ endif
 #if defined (__3Zoo2Det)
         - grazingFlux_diaH2 * qSiN_H                 &
         - grazingFlux_diaH3 * qSiN_H                 & ! 3Zoo
+        - agg_PD2 * DetZ2N                 * DiaH_Si & 
 #endif
                                                    ) * dt_b + sms(k,idiaH_si)
 
@@ -2457,6 +2534,7 @@ endif
 #if defined (__3Zoo2Det)
         - grazingFlux_Cocco2                 &                        
         - grazingFlux_Cocco3                 &  ! 3Zoo 
+        - agg_PD2 * DetZ2N          * CoccoN & 
 #endif
                                             ) * dt_b + sms(k,icocn)    
 
@@ -2472,6 +2550,7 @@ endif
 #if defined (__3Zoo2Det)
       - grazingFlux_Cocco2        * recipQuota_cocco &
       - grazingFlux_Cocco3        * recipQuota_cocco & ! 3Zoo
+        - agg_PD2 * DetZ2N        * CoccoC           & 
 #endif
                                                     ) * dt_b + sms(k,icocc)
 
@@ -2508,6 +2587,7 @@ endif
 #if defined (__3Zoo2Det)
       - grazingFlux_Cocco2 * Chl2N_cocco            & 
       - grazingFlux_Cocco3 * Chl2N_cocco            & ! 3Zoo
+      - agg_PD2 * DetZ2N   * CoccoChl               & 
 #endif
                                                    ) * dt_b + sms(k,icchl)
 
@@ -2526,7 +2606,8 @@ endif
         - grazingFlux_phaeo                                & ! --> Grazing loss
 #if defined (__3Zoo2Det)
         - grazingFlux_phaeo2                               &
-        - grazingFlux_phaeo3                               & ! 3Zoo    
+        - grazingFlux_phaeo3                               & ! 3Zoo
+        - agg_PD2 * DetZ2N                       * PhaeoN  &    
 #endif
                                                           ) * dt_b + sms(k,iphan)
 !____________________________________________________________    
@@ -2546,6 +2627,7 @@ endif
 #if defined (__3Zoo2Det)
         - grazingFlux_phaeo2 * recipQuota_phaeo            &
         - grazingFlux_phaeo3 * recipQuota_phaeo            & ! 3Zoo
+        - agg_PD2 * DetZ2N                       * PhaeoC  &
 #endif
                                                           ) * dt_b + sms(k,iphac)
 !__________________________________________________________    
@@ -2562,6 +2644,7 @@ endif
 #if defined (__3Zoo2Det)
         - grazingFlux_phaeo2 * Chl2N_phaeo                 &
         - grazingFlux_phaeo3 * Chl2N_phaeo                 & ! 3Zoo
+        - agg_PD2 * DetZ2N                      * PhaeoChl &
 #endif
                                                           ) * dt_b + sms(k,iphachl)
 #endif
@@ -2577,6 +2660,7 @@ endif
         + aggregationRate                  * DiaSi &
         + lossN_d          * limitFacN_dia * DiaSi &
         + grazingFlux_dia3 * qSiN                  &
+        - agg_DD2 * DetZ2N                 * DetSi & 
 
 #if defined (__diaH)
         + aggregationRate                    * DiaH_Si &
@@ -2690,6 +2774,7 @@ endif
 #if defined (__3Zoo2Det)
         - calc_loss_gra2                                &
         - calc_loss_gra3                                & ! 3Zoo
+        - agg_PD2 * DetZ2N                    * PhyCalc & 
 #endif
                                                        ) * dt_b + sms(k,iphycal)
 #else
@@ -2702,6 +2787,7 @@ endif
 #if defined (__3Zoo2Det)
         - calc_loss_gra2                       &
         - calc_loss_gra3                       & ! 3Zoo
+        - agg_PD2 * DetZ2N           * PhyCalc & 
 #endif
                                               ) * dt_b + sms(k,iphycal)
 #endif
@@ -2716,6 +2802,7 @@ endif
         + phyRespRate_cocco                   * PhyCalc & 
         + calc_loss_agg                                 &
         + calc_loss_gra3                                &
+        - agg_DD2 * DetZ2N                    * DetCalc & 
         - calc_loss_gra3    * calc_diss_guts            &
         - calc_diss                           * DetCalc &
                                                        ) * dt_b + sms(k,idetcal)
@@ -2741,6 +2828,7 @@ endif
         + calc_loss_agg                             &
         + calc_loss_gra3                            &
         - calc_loss_gra3 * calc_diss_guts           &
+        - agg_DD2 * DetZ2N                * DetCalc & 
         - calc_diss                       * DetCalc &
                                                    ) * dt_b + sms(k,idetcal)
 #else
@@ -3065,6 +3153,33 @@ if (Diags) then
         + KOchl_diaH & 
         ) * recipbiostep
 #endif
+
+!*** formation of detritus through aggregation     
+#if defined (__3Zoo2Det)
+        vert_dets_agg(k) = (                      &
+              agg_PD * DetN * PhyN                &
+            + agg_PD * DetN * dia_stick * DiaN    &      
+#if defined (__coccos)
+            + agg_PD * DetN * CoccoN              &
+#endif
+            + agg_PP * (PhyN + dia_stick * DiaN) * (DiaN + PhyN)   &
+#if defined (__coccos)
+            + agg_PP * (PhyN + dia_stick * DiaN + CoccoN) * CoccoN &
+#endif
+        ) * recipbiostep
+        vert_detl_agg(k) = (                         &
+              agg_PD2 * detZ2N * PhyN                &
+            + agg_PD2 * detZ2N * dia_stick * DiaN                &
+#if defined (__coccos)
+            + agg_PD2 * detZ2N * CoccoN              &
+#endif
+#if defined (__diaH)
+            + agg_PD2 * detZ2N * diaH_stick * DiaH_N              &
+#endif
+            + agg_DD2 * detZ2N * DetN                &
+        ) * recipbiostep
+#endif  
+!--------------------
 
 !*** zooplankton1 respiration
         vertrespmeso(k) = vertrespmeso(k) + (     &

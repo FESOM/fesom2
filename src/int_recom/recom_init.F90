@@ -175,6 +175,9 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(ChldegdiaH ( node_size ))
     allocate(Chldegc ( node_size ))
     allocate(Chldegp ( node_size ))
+    allocate(dets_agg ( node_size ))
+    allocate(detl_agg ( node_size ))
+
 
     NPPn    = 0.d0
     NPPd    = 0.d0
@@ -196,6 +199,8 @@ subroutine recom_init(tracers, partit, mesh)
     ChldegdiaH = 0.d0
     Chldegc = 0.d0
     Chldegp = 0.d0
+    dets_agg = 0.d0
+    detl_agg = 0.d0
 
 !! *** Allocate 3D diagnostics ***
     allocate(respmeso     ( nl-1, node_size ))

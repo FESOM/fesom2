@@ -420,7 +420,9 @@ module recom_config
 !! *** Aggregation ***
   Real(kind=8)                 :: agg_PD        = 0.165d0         ! [m3/(mmol N * day)] Maximum aggregation loss parameter for DetN
   Real(kind=8)                 :: agg_PP        = 0.015d0         ! [m3/(mmol N * day)] Maximum aggregation loss parameter for PhyN and DiaN (plankton)
-  namelist /paaggregation/ agg_PD, agg_PP
+  Real(kind=8)                 :: agg_PD2       = 0.165d0         ! [m3/(mmol N * day)] aggregation kernel between PhyN (DiaN, CoccoN) and DetZ2N 
+  Real(kind=8)                 :: agg_DD2       = 0.165d0         ! [m3/(mmol N * day)] aggregation kernel between DetN and DetZ2N
+  namelist /paaggregation/ agg_PD, agg_PP, agg_PD2, agg_DD2
 !!------------------------------------------------------------------------------
 !! *** DIN ***
   Real(kind=8)                 :: rho_N         = 0.11d0          ! [1/day] Temperature dependent N degradation of extracellular organic N (EON) (Remineralization of DON)
@@ -757,14 +759,16 @@ Module REcoM_declarations
   Real(kind=8),allocatable,dimension(:,:) :: Diags3Dloc
   Real(kind=8)  :: locNPPn, locGPPn, locNNAn, locChldegn
   Real(kind=8)  :: locNPPd, locGPPd, locNNAd, locChldegd
-  Real(kind=8)  :: locNPPdiaH, locGPPdiaH, locNNAdiaH, locChldegdiaH
+  Real(kind=8)  :: locNPPdiaH, locGPPdiaH, locNNAdiaH, locChldegdiaH ! heavily silicifying diatoms
   Real(kind=8)  :: locNPPc, locGPPc, locNNAc, locChldegc
   Real(kind=8)  :: locNPPp, locGPPp, locNNAp, locChldegp     ! Phaeocystis
+  Real(kind=8)  :: loc_detl_agg, loc_dets_agg ! aggregation of large & small detritus
   Real(kind=8),allocatable,dimension(:) :: vertNPPn, vertGPPn, vertNNAn, vertChldegn
   Real(kind=8),allocatable,dimension(:) :: vertNPPd, vertGPPd, vertNNAd, vertChldegd
-  Real(kind=8),allocatable,dimension(:) :: vertNPPdiaH, vertGPPdiaH, vertNNAdiaH, vertChldegdiaH
+  Real(kind=8),allocatable,dimension(:) :: vertNPPdiaH, vertGPPdiaH, vertNNAdiaH, vertChldegdiaH ! heavily silicifying diatoms
   Real(kind=8),allocatable,dimension(:) :: vertNPPc, vertGPPc, vertNNAc, vertChldegc
   Real(kind=8),allocatable,dimension(:) :: vertNPPp, vertGPPp, vertNNAp, vertChldegp     ! Phaeocystis
+  Real(kind=8),allocatable,dimension(:) :: vert_detl_agg, vert_dets_agg ! aggregation of large & small detritus
   Real(kind=8),allocatable,dimension(:) :: vertrespmeso, vertrespmacro, vertrespmicro
   Real(kind=8),allocatable,dimension(:) :: vertcalcdiss, vertcalcif
   Real(kind=8),allocatable,dimension(:) :: vertaggn, vertaggd, vertaggdiaH, vertaggc, vertaggp
@@ -891,6 +895,8 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:,:)   :: aggdiaH
   Real(kind=8),allocatable,dimension(:,:)   :: aggc
   Real(kind=8),allocatable,dimension(:,:)   :: aggp             ! Phaeocystis
+  Real(kind=8),allocatable,dimension(:)     :: detl_agg  ! source of large detritus from aggregation (vertical integral)
+  Real(kind=8),allocatable,dimension(:)     :: dets_agg  ! source of small detritus from aggregation (vertical integral)
   Real(kind=8),allocatable,dimension(:,:)   :: docexn
   Real(kind=8),allocatable,dimension(:,:)   :: docexd
   Real(kind=8),allocatable,dimension(:,:)   :: docexdiaH
