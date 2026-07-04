@@ -51,6 +51,10 @@ compression_level = 1        ! compression level for netCDF output (1=fastest, 9
 !   frequency  = output frequency (integer)
 !   unit       = 'y' (yearly), 'm' (monthly), 'd' (daily), 'h' (hourly), 's' (steps)
 !   precision  = 4 (single precision) or 8 (double precision)
+!   Note: in a single-precision build (WP=4) a field requesting precision 8 is
+!   still honoured (written as NF_DOUBLE; means accumulated in real64), but its
+!   samples are single-precision-sourced. FESOM prints one summary line at
+!   startup listing such fields.
 ! ============================================================================
 &nml_list
 io_list =  'sst       ',1, 'm', 4,

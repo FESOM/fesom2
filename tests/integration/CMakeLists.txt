@@ -33,6 +33,21 @@ if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED AND NOT USE_YAC)
         TIMEOUT ${TEST_TIMEOUT}
     )
     
+    # Single-precision build: same pi run, but additionally assert that the
+    # binary is genuinely single precision via the startup banner. This marker
+    # is only meaningful in an SP build, so the test is only registered there;
+    # DP builds are unaffected.
+    if(USE_SINGLE_PRECISION)
+        add_fesom_test(integration_pi_sp_mpi2
+            MPI_TEST
+            NP 2
+            TIMEOUT ${TEST_TIMEOUT}
+            LABEL single_precision
+            EXTRA_SUCCESS_MARKERS
+                "SINGLE PRECISION MODE"
+        )
+    endif()
+
     # Additional MPI test configurations can be added here
     # For example, testing different domain decompositions
 elseif(NOT ENABLE_MPI_TESTS)

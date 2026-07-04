@@ -366,10 +366,10 @@ endfunction()
 # Function to add a FESOM integration test with custom options
 function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH RUN_LENGTH_UNIT RESTART_LENGTH RESTART_LENGTH_UNIT LOGFILE_OUTFREQ FORCE_ROTATION USE_CAVITY)
     set(options MPI_TEST)
-    set(oneValueArgs NP TIMEOUT)
-    set(multiValueArgs COMMAND_ARGS)
+    set(oneValueArgs NP TIMEOUT LABEL)
+    set(multiValueArgs COMMAND_ARGS EXTRA_SUCCESS_MARKERS)
     cmake_parse_arguments(FESOM_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
-    
+
     # Set defaults
     if(NOT DEFINED FESOM_TEST_NP)
         set(FESOM_TEST_NP 1)
@@ -377,6 +377,14 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
     if(NOT DEFINED FESOM_TEST_TIMEOUT)
         set(FESOM_TEST_TIMEOUT 300)  # 5 minutes default
     endif()
+
+    # Assemble the success-marker list: the mandatory clean-exit marker plus any
+    # caller-supplied EXTRA_SUCCESS_MARKERS (e.g. the single-precision banner).
+    # Each is quoted so check_fesom_run() receives them as distinct list items.
+    set(_success_markers "\"fesom should stop with exit status = 0\"")
+    foreach(_m IN LISTS FESOM_TEST_EXTRA_SUCCESS_MARKERS)
+        string(APPEND _success_markers " \"${_m}\"")
+    endforeach()
     
     # Create test run directory
     set(TEST_RUN_DIR "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}")
@@ -434,7 +442,7 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
                 RESULT \"\${test_result}\"
                 OUTPUT_LOG \"${TEST_RUN_DIR}/test_output.log\"
                 ERROR_LOG \"${TEST_RUN_DIR}/test_error.log\"
-                SUCCESS_MARKERS \"fesom should stop with exit status = 0\"
+                SUCCESS_MARKERS ${_success_markers}
                 REQUIRED_ARTIFACTS \"${RESULT_DIR}/sst.fesom.1948.nc\"
             )
         ")
@@ -467,7 +475,7 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
                 RESULT \"\${test_result}\"
                 OUTPUT_LOG \"${TEST_RUN_DIR}/test_output.log\"
                 ERROR_LOG \"${TEST_RUN_DIR}/test_error.log\"
-                SUCCESS_MARKERS \"fesom should stop with exit status = 0\"
+                SUCCESS_MARKERS ${_success_markers}
                 REQUIRED_ARTIFACTS \"${RESULT_DIR}/sst.fesom.1948.nc\"
             )
         ")
@@ -487,7 +495,12 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
         TIMEOUT ${FESOM_TEST_TIMEOUT}
         WORKING_DIRECTORY ${TEST_RUN_DIR}
     )
-    
+
+    # Optional test label (e.g. single_precision) for `ctest -L`
+    if(DEFINED FESOM_TEST_LABEL)
+        set_tests_properties(${TEST_NAME} PROPERTIES LABELS "${FESOM_TEST_LABEL}")
+    endif()
+
     # For MPI tests, set required properties
     if(FESOM_TEST_MPI_TEST AND FESOM_TEST_NP GREATER 1)
         set_tests_properties(${TEST_NAME} PROPERTIES

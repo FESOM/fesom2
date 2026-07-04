@@ -130,6 +130,13 @@ module io_MEANDATA
   end type io_entry 
 
   type(io_entry), save, allocatable, target   :: io_list(:)
+
+  ! Fields whose requested output precision exceeds the working precision
+  ! (e.g. 8-byte output requested in a WP=4 single-precision build). Collected
+  ! during stream definition and reported once at the end of ini_mean_io so the
+  ! user is aware, without any per-stream or per-step printing.
+  integer, save                  :: n_wp_promoted = 0
+  character(len=20), save        :: wp_promoted_names(256)
 !
 !--------------------------------------------------------------------------------------------
 ! Type for 0D (scalar) output streams - global values with time dimension only
@@ -397,7 +404,8 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
         end if
     end do
 
-!_______________________________________________________________________________    
+    n_wp_promoted = 0   ! reset the WP-vs-requested-precision awareness tally
+!_______________________________________________________________________________
 DO i=1, io_listsize
 SELECT CASE (trim(io_list(i)%id))
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!2D streams!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2162,7 +2170,22 @@ END DO ! --> DO i=1, io_listsize
             write(*,*) '    Override via io_list entries in namelist.io'
         end if
     end if
-    
+
+    !___________________________________________________________________________
+    ! Awareness: in a single-precision build (WP=4) some output fields may
+    ! request 8-byte precision in namelist.io. Those are honoured (written as
+    ! NF_DOUBLE, with means accumulated in real64), but their samples are
+    ! single-precision-sourced. Report the list once per run (silent in DP,
+    ! where WP=8 and the condition can never trigger).
+    if (n_wp_promoted > 0 .and. mype == 0) then
+        write(*,'(a,i0,a,i0,a)') ' FESOM I/O (WP=', WP, '): ', n_wp_promoted, &
+            ' field(s) request 8-byte output -> honoured as NF_DOUBLE (real64-accumulated means, SP-sourced samples):'
+        write(*,'(4x,*(1x,a))') (trim(wp_promoted_names(j)), &
+            j=1, min(n_wp_promoted, size(wp_promoted_names)))
+        if (n_wp_promoted > size(wp_promoted_names)) &
+            write(*,'(4x,a)') '... (list truncated)'
+    end if
+
 end subroutine
 
 
@@ -3564,6 +3587,16 @@ subroutine def_stream_after_dimension_specific(entry, name, description, units, 
     
     !___________________________________________________________________________
     entry%accuracy = accuracy
+
+    ! Awareness (single-precision builds): note fields whose requested output
+    ! precision exceeds the working precision (e.g. 8-byte output with WP=4).
+    ! The request is still honoured (written as NF_DOUBLE, means accumulated in
+    ! real64), but the samples are single-precision-sourced. Only tallied here;
+    ! reported once per run at the end of ini_mean_io.
+    if (accuracy > WP) then
+      n_wp_promoted = n_wp_promoted + 1
+      if (n_wp_promoted <= size(wp_promoted_names)) wp_promoted_names(n_wp_promoted) = name
+    end if
 
     if (accuracy == i_real8) then
       allocate(data_strategy_nf_double_type :: entry%data_strategy)
