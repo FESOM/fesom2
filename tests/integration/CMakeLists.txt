@@ -33,6 +33,36 @@ if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED AND NOT USE_YAC)
         TIMEOUT ${TEST_TIMEOUT}
     )
     
+    # CVMix vertical mixing: run the pi mesh with CVMix schemes so the CVMix code
+    # path is exercised end to end. NOTE: the stock namelist.oce ships
+    # mix_scheme='KPP' -- FESOM's native (non-CVMix) KPP -- so a CVMix-enabled
+    # build (CVMIX=ON) never runs CVMix by default; the scheme must be selected
+    # explicitly. These tests do that via MIX_SCHEME.
+    #
+    # CVMix is a fixed double-precision library (kind cvmix_r8 = real64) built
+    # into FESOM's tree; the FESOM-side WP<->cvmix_r8 conversion is what differs
+    # between builds. So each test covers the previously-untested FESOM-DP+CVMix
+    # path in a DP build and the FESOM-SP+CVMix path (the conversion shims) in an
+    # SP build. Registered only when CVMix is compiled in (CVMIX=ON, the default).
+    # Pass/fail is the clean run + artifacts: a wrong scheme string or missing
+    # CVMix aborts at setup.
+    if(CVMIX)
+        add_fesom_test(integration_pi_cvmix_tke_mpi2
+            MPI_TEST
+            NP 2
+            TIMEOUT ${TEST_TIMEOUT}
+            LABEL cvmix
+            MIX_SCHEME "cvmix_TKE"
+        )
+        add_fesom_test(integration_pi_cvmix_kpp_mpi2
+            MPI_TEST
+            NP 2
+            TIMEOUT ${TEST_TIMEOUT}
+            LABEL cvmix
+            MIX_SCHEME "cvmix_KPP"
+        )
+    endif()
+
     # Single-precision build: same pi run, but additionally assert that the
     # binary is genuinely single precision via the startup banner. This marker
     # is only meaningful in an SP build, so the test is only registered there;

@@ -366,7 +366,7 @@ endfunction()
 # Function to add a FESOM integration test with custom options
 function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH RUN_LENGTH_UNIT RESTART_LENGTH RESTART_LENGTH_UNIT LOGFILE_OUTFREQ FORCE_ROTATION USE_CAVITY)
     set(options MPI_TEST)
-    set(oneValueArgs NP TIMEOUT LABEL)
+    set(oneValueArgs NP TIMEOUT LABEL MIX_SCHEME)
     set(multiValueArgs COMMAND_ARGS EXTRA_SUCCESS_MARKERS)
     cmake_parse_arguments(FESOM_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
@@ -483,7 +483,18 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
     
     # Configure namelists for this test with custom options
     configure_fesom_namelists_with_options("${TEST_RUN_DIR}" "${TEST_DATA_DIR}" "${RESULT_DIR}" "${MESH_NAME}" "${STEP_PER_DAY}" "${RUN_LENGTH}" "${RUN_LENGTH_UNIT}" "${RESTART_LENGTH}" "${RESTART_LENGTH_UNIT}" "${LOGFILE_OUTFREQ}" "${FORCE_ROTATION}" "${USE_CAVITY}")
-    
+
+    # Optional: override the vertical mixing scheme in namelist.oce (e.g. to
+    # exercise a CVMix scheme). Whitespace-tolerant and anchored on the char
+    # before the key, matching the harness's other namelist rewrites; the
+    # trailing comment is preserved.
+    if(DEFINED FESOM_TEST_MIX_SCHEME)
+        file(READ "${TEST_RUN_DIR}/namelist.oce" _oce_content)
+        string(REGEX REPLACE "([^A-Za-z0-9_]mix_scheme[ \t]*=[ \t]*)'[^']*'"
+               "\\1'${FESOM_TEST_MIX_SCHEME}'" _oce_content "${_oce_content}")
+        file(WRITE "${TEST_RUN_DIR}/namelist.oce" "${_oce_content}")
+    endif()
+
     # Add the test
     add_test(
         NAME ${TEST_NAME}
