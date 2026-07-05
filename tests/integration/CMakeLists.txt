@@ -63,20 +63,11 @@ if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED AND NOT USE_YAC)
         )
     endif()
 
-    # Single-precision build: same pi run, but additionally assert that the
-    # binary is genuinely single precision via the startup banner. This marker
-    # is only meaningful in an SP build, so the test is only registered there;
-    # DP builds are unaffected.
-    if(USE_SINGLE_PRECISION)
-        add_fesom_test(integration_pi_sp_mpi2
-            MPI_TEST
-            NP 2
-            TIMEOUT ${TEST_TIMEOUT}
-            LABEL single_precision
-            EXTRA_SUCCESS_MARKERS
-                "SINGLE PRECISION MODE"
-        )
-    endif()
+    # Note: there is no separate "SP" integration test. Precision is a property of
+    # the build, not the test -- in a USE_SINGLE_PRECISION build every test above runs
+    # single precision, and each fesom.x test auto-asserts the build's precision banner
+    # (see add_fesom_test_with_options in cmake/FesomTesting.cmake). Run the suite in an
+    # SP build dir to get SP coverage of everything, including the CVMix schemes.
 
     # Additional MPI test configurations can be added here
     # For example, testing different domain decompositions

@@ -385,6 +385,17 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
     foreach(_m IN LISTS FESOM_TEST_EXTRA_SUCCESS_MARKERS)
         string(APPEND _success_markers " \"${_m}\"")
     endforeach()
+
+    # Self-certify the build precision: every fesom.x run prints a working-precision
+    # banner at startup. Appending the build's banner as a mandatory marker makes each
+    # integration test verify it actually ran at the intended precision -- so a
+    # mis-configured build (DP when SP was wanted, or vice versa) fails loudly on every
+    # test rather than silently running the wrong precision. Silent no-op in DP.
+    if(USE_SINGLE_PRECISION)
+        string(APPEND _success_markers " \"SINGLE PRECISION MODE\"")
+    else()
+        string(APPEND _success_markers " \"DOUBLE PRECISION MODE\"")
+    endif()
     
     # Create test run directory
     set(TEST_RUN_DIR "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}")
@@ -507,10 +518,15 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
         WORKING_DIRECTORY ${TEST_RUN_DIR}
     )
 
-    # Optional test label (e.g. single_precision) for `ctest -L`
+    # Every fesom.x integration test carries the base label 'integration', plus any
+    # extra label passed via LABEL (e.g. cvmix). CTest LABELS is a list, so this yields
+    # e.g. "integration" for the base pi tests and "integration;cvmix" for CVMix tests:
+    # `ctest -L integration` runs the whole suite, `ctest -L cvmix` isolates CVMix.
+    set(_labels "integration")
     if(DEFINED FESOM_TEST_LABEL)
-        set_tests_properties(${TEST_NAME} PROPERTIES LABELS "${FESOM_TEST_LABEL}")
+        list(APPEND _labels "${FESOM_TEST_LABEL}")
     endif()
+    set_tests_properties(${TEST_NAME} PROPERTIES LABELS "${_labels}")
 
     # For MPI tests, set required properties
     if(FESOM_TEST_MPI_TEST AND FESOM_TEST_NP GREATER 1)
