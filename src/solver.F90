@@ -115,12 +115,19 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   real(kind=WP),       intent(inout)         :: x(partit%myDim_nod2D+partit%eDim_nod2D)
   real(kind=WP),       intent(in)            :: rhs(partit%myDim_nod2D+partit%eDim_nod2D)
   integer                      :: row, nini, nend, iter
-  ! Mixed-precision CG: keep the vectors and matvec in WP, but form the inner
-  ! products and step scalars in double precision (and reduce them with
-  ! MPI_DOUBLE_PRECISION). In single precision the SP reduction of ~1e6 terms
-  ! drives s_aux = p.Ap toward zero, so al = s_old/s_aux blows up to Inf/NaN
-  ! across the whole solution vector (systemic Wvel NaN at step 1 on ng5/CORE2).
-  ! In a double-precision build real64 == WP, so this is bit-identical to before.
+  ! Mixed-precision CG. Vectors stay in WP (so the halo exchanges are unchanged),
+  ! but every accumulation is done in double precision:
+  !   * step scalars / inner products (s_old, s_aux, al, be, sprod) are real64 and
+  !     reduced with MPI_DOUBLE_PRECISION;
+  !   * the sparse sums -- residual r=b-Ax, preconditioner apply z=M^-1 r, and the
+  !     matvec Ap -- accumulate in real64 (operands cast per element) before being
+  !     stored back to WP.
+  ! In single precision the SP reductions/matvec of ~1e6 terms lose enough
+  ! precision that s_aux=p.Ap drifts to ~0 and the matvec loses SPD-consistency, so
+  ! al=s_old/s_aux blows up to Inf/NaN across the whole solution vector (the
+  ! systemic "Nan in Wvel" at step 1: CORE2 needed the DP inner products, ng5 also
+  ! needs the DP sparse sums). In a double-precision build real64 == WP and
+  ! MPI_DOUBLE_PRECISION == MPI_WP, so this is bit-identical to before.
   real(real64)                 :: sprod(2), s_old, s_aux, al, be
   real(kind=WP)                :: rtol
   integer                      :: req
@@ -165,8 +172,10 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   ! ==============
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) 
   DO row=1, myDim_nod2D
-     rr(row)=rhs(row)-sum(ssh_stiff%values(rptr(row):rptr(row+1)-1)* &
-                      X(cind(rptr(row):rptr(row+1)-1)))
+     ! residual r0 = b - A x0, matvec accumulated in double precision (see header)
+     rr(row)=real(real(rhs(row),real64) &
+             - sum(real(ssh_stiff%values(rptr(row):rptr(row+1)-1),real64)* &
+                   real(X(cind(rptr(row):rptr(row+1)-1)),real64)), WP)
   END DO
 !$OMP END PARALLEL DO 
   call exchange_nod(rr, partit)
@@ -177,7 +186,8 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   ! =============
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) 
   DO row=1, myDim_nod2D
-     zz(row)= sum(pr_values(rptr(row):rptr(row+1)-1)*rr(cind(rptr(row):rptr(row+1)-1)))
+     zz(row)= real(sum(real(pr_values(rptr(row):rptr(row+1)-1),real64)* &
+                       real(rr(cind(rptr(row):rptr(row+1)-1)),real64)), WP)  ! precond apply in DP
      pp(row)=zz(row)
   END DO
 !$OMP END PARALLEL DO 
@@ -208,7 +218,8 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   call exchange_nod(pp, partit)     !  Update before matrix-vector multiplications
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) 
   DO row=1, myDim_nod2D
-     App(row)=sum(ssh_stiff%values(rptr(row):rptr(row+1)-1)*pp(cind(rptr(row):rptr(row+1)-1)))
+     App(row)=real(sum(real(ssh_stiff%values(rptr(row):rptr(row+1)-1),real64)* &
+                       real(pp(cind(rptr(row):rptr(row+1)-1)),real64)), WP)  ! matvec A.p in DP
   END DO
 !$OMP END PARALLEL DO 
      ! ============
@@ -245,7 +256,8 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
 !$OMP BARRIER
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
   DO row=1, myDim_nod2D
-     zz(row)= sum(pr_values(rptr(row):rptr(row+1)-1)*rr(cind(rptr(row):rptr(row+1)-1)))
+     zz(row)= real(sum(real(pr_values(rptr(row):rptr(row+1)-1),real64)* &
+                       real(rr(cind(rptr(row):rptr(row+1)-1)),real64)), WP)  ! precond apply in DP
   END DO
 !$OMP END PARALLEL DO
      ! ===========
