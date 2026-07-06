@@ -194,8 +194,8 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
           tvert_min(nz, n) = AUX(2,nz, nod_in_elem2D(1, n))
           !$ACC LOOP SEQ
           do elem=2,nod_in_elem2D_num(n)
-              tvert_max(nz, n) = dmax1(tvert_max(nz, n), AUX(1,nz, nod_in_elem2D(elem,n)))
-              tvert_min(nz, n) = dmin1(tvert_min(nz, n), AUX(2,nz, nod_in_elem2D(elem,n)))
+              tvert_max(nz, n) = max(tvert_max(nz, n), AUX(1,nz, nod_in_elem2D(elem,n)))
+              tvert_min(nz, n) = min(tvert_min(nz, n), AUX(2,nz, nod_in_elem2D(elem,n)))
           end do
           !$ACC END LOOP
        end do
@@ -224,8 +224,8 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
        ! solution at layer nz
        !$ACC LOOP VECTOR
        do nz=nu1+1,nl1-2
-          fct_ttf_max(nz,n)=dmax1(tvert_max(nz-1, n), tvert_max(nz, n), tvert_max(nz+1, n))-LO(nz,n)
-          fct_ttf_min(nz,n)=dmin1(tvert_min(nz-1, n), tvert_min(nz, n), tvert_min(nz+1, n))-LO(nz,n)
+          fct_ttf_max(nz,n)=max(tvert_max(nz-1, n), tvert_max(nz, n), tvert_max(nz+1, n))-LO(nz,n)
+          fct_ttf_min(nz,n)=min(tvert_min(nz-1, n), tvert_min(nz, n), tvert_min(nz+1, n))-LO(nz,n)
        end do
        !$ACC END LOOP
        ! calc max,min increment of bottom layer -1 with respect to low order
