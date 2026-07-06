@@ -2105,7 +2105,7 @@ end subroutine compute_hbar_ale
 ! > for zstar : dh_k/dt_k=1...kbot-1 != 0
 !
 subroutine vert_vel_ale(dynamics, partit, mesh)
-    use g_config,only: dt, which_ALE, min_hnode, lzstar_lev, flag_warn_cflz
+    use g_config,only: dt, which_ALE, min_hnode, lzstar_lev, flag_warn_cflz, flag_debug
     use MOD_MESH
     use o_ARRAYS, only: water_flux
     use o_PARAM
@@ -2157,8 +2157,41 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
         ssh_rhs_old => dynamics%ssh_rhs_old(:)
     else
     
-    end if 
-    
+    end if
+
+    !___________________________________________________________________________
+    ! NaN-localization probe (g_config flag_debug): report the first non-finite UV /
+    ! helem / hnode_new ENTERING vert_vel_ale -- distinguishes a NaN inherited from
+    ! the momentum chain (UV) or a bad layer thickness (a division source) from one
+    ! generated inside vert_vel_ale. One line per rank; opt-in; remove when done.
+    if (flag_debug) then
+       uvprb: do ed=1, partit%myDim_elem2D
+          do nz=1, mesh%nl-1
+             if (UV(1,nz,ed) /= UV(1,nz,ed) .or. UV(2,nz,ed) /= UV(2,nz,ed) .or. &
+                 abs(UV(1,nz,ed)) > 1.0e30_WP .or. abs(UV(2,nz,ed)) > 1.0e30_WP) then
+                write(*,*) ' PROBE[vve-entry] UV non-finite: mype=', mype, ' elem=', ed, ' nz=', nz
+                exit uvprb
+             end if
+          end do
+       end do uvprb
+       heprb: do ed=1, partit%myDim_elem2D
+          do nz=1, mesh%nl-1
+             if (mesh%helem(nz,ed) /= mesh%helem(nz,ed)) then
+                write(*,*) ' PROBE[vve-entry] helem NaN: mype=', mype, ' elem=', ed, ' nz=', nz
+                exit heprb
+             end if
+          end do
+       end do heprb
+       hnprb: do n=1, partit%myDim_nod2D
+          do nz=1, mesh%nl-1
+             if (mesh%hnode_new(nz,n) /= mesh%hnode_new(nz,n)) then
+                write(*,*) ' PROBE[vve-entry] hnode_new NaN: mype=', mype, ' node=', n, ' nz=', nz
+                exit hnprb
+             end if
+          end do
+       end do hnprb
+    end if
+
     !___________________________________________________________________________
     ! Contributions from levels in divergence
 !$OMP PARALLEL DO
@@ -3511,6 +3544,19 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! UV_rhs = dt*[ (R_advec + R_coriolis)_AB2^n + R_pressure^n ]
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call compute_vel_rhs'//achar(27)//'[0m'
     call compute_vel_rhs(ice, dynamics, partit, mesh)
+    if (flag_debug) then   ! NaN probe: momentum tendency after RHS
+       d1: do elem=1, partit%myDim_elem2D
+          do nz=1, mesh%nl-1
+             if (dynamics%uv_rhs(1,nz,elem) /= dynamics%uv_rhs(1,nz,elem) .or. &
+                 dynamics%uv_rhs(2,nz,elem) /= dynamics%uv_rhs(2,nz,elem) .or. &
+                 abs(dynamics%uv_rhs(1,nz,elem)) > 1.0e30_WP .or. &
+                 abs(dynamics%uv_rhs(2,nz,elem)) > 1.0e30_WP) then
+                write(*,*) ' PROBE[after compute_vel_rhs] uv_rhs non-finite: mype=',partit%mype,' elem=',elem,' nz=',nz
+                exit d1
+             end if
+          end do
+       end do d1
+    end if
      
     !___________________________________________________________________________
     ! Energy diagnostic contribution
@@ -3601,6 +3647,19 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     if(dynamics%use_ivertvisc) then
         if ( .not. dynamics%use_ssh_se_subcycl ) then
             call impl_vert_visc_ale(dynamics,partit, mesh)
+            if (flag_debug) then   ! NaN probe: after vertical-viscosity solve (/hnode_new)
+               d2: do elem=1, partit%myDim_elem2D
+                  do nz=1, mesh%nl-1
+                     if (dynamics%uv_rhs(1,nz,elem) /= dynamics%uv_rhs(1,nz,elem) .or. &
+                         dynamics%uv_rhs(2,nz,elem) /= dynamics%uv_rhs(2,nz,elem) .or. &
+                         abs(dynamics%uv_rhs(1,nz,elem)) > 1.0e30_WP .or. &
+                         abs(dynamics%uv_rhs(2,nz,elem)) > 1.0e30_WP) then
+                        write(*,*) ' PROBE[after impl_vert_visc] uv_rhs non-finite: mype=',partit%mype,' elem=',elem,' nz=',nz
+                        exit d2
+                     end if
+                  end do
+               end do d2
+            end if
         else
             call impl_vert_visc_ale_vtransp(dynamics, partit, mesh)
         end if 
@@ -3670,6 +3729,19 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call update_vel'//achar(27)//'[0m'
         ! ke will be computed inside there if dynamics%ldiag_ke is .TRUE.
         call update_vel(dynamics, partit, mesh)
+        if (flag_debug) then   ! NaN probe: velocity after barotropic update
+           d3: do elem=1, partit%myDim_elem2D
+              do nz=1, mesh%nl-1
+                 if (dynamics%uv(1,nz,elem) /= dynamics%uv(1,nz,elem) .or. &
+                     dynamics%uv(2,nz,elem) /= dynamics%uv(2,nz,elem) .or. &
+                     abs(dynamics%uv(1,nz,elem)) > 1.0e30_WP .or. &
+                     abs(dynamics%uv(2,nz,elem)) > 1.0e30_WP) then
+                    write(*,*) ' PROBE[after update_vel] uv non-finite: mype=',partit%mype,' elem=',elem,' nz=',nz
+                    exit d3
+                 end if
+              end do
+           end do d3
+        end if
         
         ! --> eta_(n) --> eta_(n+1) = eta_(n) + deta = eta_(n) + (eta_(n+1) + eta_(n))
         t4=MPI_Wtime()
