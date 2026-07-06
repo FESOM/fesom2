@@ -217,6 +217,7 @@ subroutine pressure_bv(tracers, partit, mesh)
     real(kind=WP)                           :: bulk_up, bulk_dn, smallvalue, buoyancy_crit, rho_surf, aux_rho, aux_rho1
     real(kind=WP)                           :: sigma_theta_crit=0.125_WP   !kg/m3, Levitus threshold for computing MLD2
     real(kind=WP)                           :: sigma_theta_crit_cmor=0.03_WP   !kg/m3, Griffies threshold for computing MLD3
+    logical, save                           :: bv_dbg_printed=.false.   ! NaN-localization probe (flag_debug): print bvfreq constituents once per rank
     logical                                 :: flag1, flag2, flag3, mixing_kpp
 !PS     logical                                 :: smooth_bv_vertical=.false. ! smoothing Bv in vertical is sometimes necessary in order to avoid vertival noise in Kv/Av
     real(kind=WP),  dimension(:,:), pointer :: temp, salt
@@ -442,6 +443,17 @@ subroutine pressure_bv(tracers, partit, mesh)
             ! N^2<0 stratification is unstable vertical elongated parcel is
             ! accelerated away from initial point
             bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/density_0
+            !--- NaN-localization probe (flag_debug): if bvfreq is non-finite, print its
+            !    constituents once per rank so we see whether dz_inv (zero spacing) or the
+            !    density terms (rho_up/rho_dn/rhopot) are the source. Remove when done.
+            if (flag_debug .and. .not.bv_dbg_printed) then
+               if (bvfreq(nz,node) /= bvfreq(nz,node) .or. abs(bvfreq(nz,node)) > 1.0e30_WP) then
+                  write(*,*) ' PROBE[bvfreq] non-finite: mype=',mype,' node=',node,' nz=',nz, &
+                       ' dZ=',(Z_3d_n(nz-1,node)-Z_3d_n(nz,node)),' dz_inv=',dz_inv, &
+                       ' rho_up=',rho_up,' rho_dn=',rho_dn,' rhopot(u,d)=',rhopot(nz-1),rhopot(nz)
+                  bv_dbg_printed=.true.
+               end if
+            end if
             !!PS !--> Why not like this ?
             !!PS bvfreq(nz,node)  = -g*dz_inv*(rho_up-rho_dn)/(rho_dn)
             !_______________________________________________________________
