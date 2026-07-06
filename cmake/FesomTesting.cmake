@@ -103,6 +103,42 @@ function(update_namelist_config_with_options NAMELIST_IN NAMELIST_OUT STEP_PER_D
     file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
 endfunction()
 
+# CORE2 helpers ---------------------------------------------------------------
+# n_part for a pre-made dist_${NP}/ partition (no partitioner run at test time).
+function(update_namelist_npart NAMELIST_IN NAMELIST_OUT NPART_A NPART_B)
+    file(READ "${NAMELIST_IN}" CONTENT)
+    string(REGEX REPLACE "([^A-Za-z0-9_])n_part[ \t]*=[ \t]*[^!\n]*"
+        "\\1n_part   = ${NPART_A}, ${NPART_B}        " CONTENT "${CONTENT}")
+    file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
+endfunction()
+
+# Calendar start year (CORE2 forcing begins 1948).
+function(update_namelist_yearnew NAMELIST_IN NAMELIST_OUT YEARN)
+    file(READ "${NAMELIST_IN}" CONTENT)
+    string(REGEX REPLACE "([^A-Za-z0-9_])yearnew[ \t]*=[ \t]*[0-9]+"
+        "\\1yearnew = ${YEARN}" CONTENT "${CONTENT}")
+    file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
+endfunction()
+
+# PHC3.0 initial conditions (CORE2 production default; pi tests use WOA18).
+function(update_tracer_init3d_phc3 NAMELIST_IN NAMELIST_OUT TEST_DATA_DIR)
+    file(READ "${NAMELIST_IN}" NAMELIST_TEXT)
+    set(PHC3_BLOCK "&tracer_init3d
+n_ic3d   = 2
+idlist   = 2, 1
+filelist = 'INITIAL/phc3.0/phc3.0_winter.nc', 'INITIAL/phc3.0/phc3.0_winter.nc'
+varlist  = 'salt', 'temp'
+t_insitu = .true.
+/
+")
+    if(NOT NAMELIST_TEXT MATCHES "&tracer_init3d")
+        message(FATAL_ERROR "Could not find &tracer_init3d block in ${NAMELIST_IN}")
+    endif()
+    string(REGEX REPLACE "&tracer_init3d[^\n]*\n(([^/]*\n)*)[ \t]*/\n" "${PHC3_BLOCK}" NAMELIST_MODIFIED "${NAMELIST_TEXT}")
+    file(WRITE "${NAMELIST_OUT}" "${NAMELIST_MODIFIED}")
+endfunction()
+# -----------------------------------------------------------------------------
+
 # Function to update namelist.dyn for test_pi
 function(update_namelist_dyn NAMELIST_IN NAMELIST_OUT)
     file(READ "${NAMELIST_IN}" CONTENT)
@@ -335,11 +371,22 @@ function(configure_fesom_namelists_with_options TARGET_DIR TEST_DATA_DIR RESULT_
             elseif("${NAMELIST}" STREQUAL "namelist.ice")
                 update_namelist_ice("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}")
             elseif("${NAMELIST}" STREQUAL "namelist.tra")
-                update_namelist_tra("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}" "${TEST_DATA_DIR}")
+                # core2 uses PHC3.0 IC; the WOA18 rewrite injects '/'-containing
+                # paths that break the &tracer_init3d block regex, so apply PHC3
+                # instead of (not after) update_namelist_tra.
+                if("${MESH_NAME}" STREQUAL "core2")
+                    update_tracer_init3d_phc3("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}" "${TEST_DATA_DIR}")
+                else()
+                    update_namelist_tra("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}" "${TEST_DATA_DIR}")
+                endif()
             elseif("${NAMELIST}" STREQUAL "namelist.forcing")
                 update_namelist_forcing("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}" "${TEST_DATA_DIR}")
             elseif("${NAMELIST}" STREQUAL "namelist.oce")
-                update_namelist_oce("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}")
+                if("${MESH_NAME}" STREQUAL "core2")
+                    update_tracer_init3d_phc3("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}" "${TEST_DATA_DIR}")
+                else()
+                    update_namelist_oce("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}")
+                endif()
             elseif("${NAMELIST}" STREQUAL "namelist.io")
                 update_namelist_io("${TARGET_DIR}/${NAMELIST}" "${TARGET_DIR}/${NAMELIST}")
             elseif("${NAMELIST}" STREQUAL "namelist.cvmix")
@@ -504,6 +551,25 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
         string(REGEX REPLACE "([^A-Za-z0-9_]mix_scheme[ \t]*=[ \t]*)'[^']*'"
                "\\1'${FESOM_TEST_MIX_SCHEME}'" _oce_content "${_oce_content}")
         file(WRITE "${TEST_RUN_DIR}/namelist.oce" "${_oce_content}")
+    endif()
+
+    # CORE2 global mesh: apply the production configuration that the pi tests do
+    # not need. Done here (post-configure) because n_part depends on NP, which is
+    # not visible inside configure_fesom_namelists_with_options.
+    #  - yearnew=1948 (CORE2 forcing starts 1948);
+    #  - n_part to match the pre-made dist_${NP}/ hierarchy (no partitioner run);
+    #  - PHC3.0 initial conditions in both namelist.tra and namelist.oce.
+    if("${MESH_NAME}" STREQUAL "core2")
+        update_namelist_yearnew("${TEST_RUN_DIR}/namelist.config" "${TEST_RUN_DIR}/namelist.config" "1948")
+        if(FESOM_TEST_NP EQUAL 16)
+            update_namelist_npart("${TEST_RUN_DIR}/namelist.config" "${TEST_RUN_DIR}/namelist.config" "2" "8")
+        elseif(FESOM_TEST_NP EQUAL 64)
+            update_namelist_npart("${TEST_RUN_DIR}/namelist.config" "${TEST_RUN_DIR}/namelist.config" "8" "8")
+        else()
+            message(WARNING "core2 test NP=${FESOM_TEST_NP}: n_part not adjusted; ensure dist_${FESOM_TEST_NP}/ matches namelist n_part")
+        endif()
+        # PHC3.0 IC is applied inside configure_fesom_namelists_with_options
+        # (must replace, not follow, the WOA18 rewrite).
     endif()
 
     # Add the test

@@ -18,6 +18,10 @@ endif()
 # Testing configuration options
 option(ENABLE_MPI_TESTS "Enable MPI tests (requires mpiexec/mpirun)" ON)
 set(TEST_TIMEOUT 600 CACHE STRING "Default timeout for tests in seconds")
+# CORE2 global-mesh integration test: heavy, local/HPC only (not CI). Needs the
+# bundled tests/data/MESHES/core2 + dist_16 + INITIAL/phc3.0 + FORCING/CORE2.
+option(ENABLE_CORE2_INTEGRATION_TEST "Register integration_core2_mpi16 (heavy; off by default, local/HPC only)" OFF)
+set(CORE2_TEST_TIMEOUT 1200 CACHE STRING "Timeout for integration_core2_mpi16 in seconds")
 
 # Validate test data directory
 set(TEST_DATA_DIR "${CMAKE_CURRENT_SOURCE_DIR}/data")

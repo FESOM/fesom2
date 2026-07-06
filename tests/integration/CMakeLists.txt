@@ -63,6 +63,28 @@ if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED AND NOT USE_YAC)
         )
     endif()
 
+    # CORE2 global mesh, 1 model day, NP=16, pre-made dist_16 (Levante-style).
+    # Heavy and local/HPC-only (never CI), and off by default. Enable with
+    #   -DENABLE_CORE2_INTEGRATION_TEST=ON
+    # Requires bundled tests/data/MESHES/core2/ + dist_16/ + INITIAL/phc3.0/ +
+    # FORCING/CORE2/. This is the key SP-validation case (pi is insufficient).
+    if(ENABLE_CORE2_INTEGRATION_TEST)
+        set(_CORE2_MESH "${CMAKE_SOURCE_DIR}/tests/data/MESHES/core2/nod2d.out")
+        set(_CORE2_DIST "${CMAKE_SOURCE_DIR}/tests/data/MESHES/core2/dist_16/rpart.out")
+        set(_CORE2_IC   "${CMAKE_SOURCE_DIR}/tests/data/INITIAL/phc3.0/phc3.0_winter.nc")
+        if(EXISTS "${_CORE2_MESH}" AND EXISTS "${_CORE2_DIST}" AND EXISTS "${_CORE2_IC}")
+            add_fesom_test_with_options(integration_core2_mpi16
+                "core2" "32" "1" "d" "1" "d" "10" ".true." ".false."
+                MPI_TEST
+                NP 16
+                TIMEOUT ${CORE2_TEST_TIMEOUT}
+                LABEL core2
+            )
+        else()
+            message(WARNING "ENABLE_CORE2_INTEGRATION_TEST=ON but CORE2 data missing (need MESHES/core2 + dist_16 + INITIAL/phc3.0)")
+        endif()
+    endif()
+
     # Note: there is no separate "SP" integration test. Precision is a property of
     # the build, not the test -- in a USE_SINGLE_PRECISION build every test above runs
     # single precision, and each fesom.x test auto-asserts the build's precision banner

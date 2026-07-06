@@ -25,6 +25,8 @@ set(OASIS_WITH_YAC      OFF CACHE BOOL "Useing a version of OASIS compiled with 
 set(ASYNC_ICEBERGS      ON  CACHE BOOL "compile fesom with or without support for asynchronous iceberg computations")
 set(VERBOSE             OFF CACHE BOOL "toggle debug output")
 set(FESOM_PROFILING     OFF CACHE BOOL "Enable enhanced profiling system")
+option(FESOM_GNU_NATIVE_O3 "GNU ubuntu: -O3 -march=native instead of CI -O2 -ffloat-store" OFF)
+option(FESOM_INTEL_SAFE_FP "Intel: disable -fimf-use-svml (debug SP NaN/blowup on icx/ifort)" OFF)
 set(CVMIX               ON  CACHE BOOL "Download/Compile/Install/Link CVMix libray")
 
 # CVMix is a fixed double-precision library (its kind is cvmix_r8 = real64). It is
