@@ -3160,6 +3160,30 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
     Wvel_i =>dynamics%w_i(:,:)
 
     !___________________________________________________________________________
+    ! NaN-localization probe (flag_debug): which INPUT to the vertical-viscosity
+    ! solve is non-finite -- Av (from the mixing scheme) or helem (layer thickness,
+    ! the zinv/spacing denominators). w_i is zeroed at setup so its advection terms
+    ! are 0 at step 1. Wet levels only; one line per rank; opt-in; remove when done.
+    if (flag_debug) then
+       avpb: do elem=1, myDim_elem2D
+          do nz = ulevels(elem), nlevels(elem)
+             if (Av(nz,elem) /= Av(nz,elem) .or. abs(Av(nz,elem)) > 1.0e30_WP) then
+                write(*,*) ' PROBE[ivv-in] Av non-finite: mype=',mype,' elem=',elem,' nz=',nz,' Av=',Av(nz,elem)
+                exit avpb
+             end if
+          end do
+       end do avpb
+       hepb: do elem=1, myDim_elem2D
+          do nz = ulevels(elem), nlevels(elem)-1
+             if (helem(nz,elem) /= helem(nz,elem) .or. helem(nz,elem) <= 0.0_WP) then
+                write(*,*) ' PROBE[ivv-in] helem<=0/NaN: mype=',mype,' elem=',elem,' nz=',nz,' helem=',helem(nz,elem)
+                exit hepb
+             end if
+          end do
+       end do hepb
+    end if
+
+    !___________________________________________________________________________
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(a, b, c, ur, vr, cp, up, vp, elem, nz, nzmin, nzmax, elnodes, &
 !$OMP                                                          zinv, m, friction, wu, wd, zbar_n, Z_n)
 
