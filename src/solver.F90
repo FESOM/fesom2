@@ -107,14 +107,22 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   USE MOD_PARSUP
   USE MOD_DYN
   USE g_comm_auto
+  use, intrinsic :: iso_fortran_env, only: real64
   IMPLICIT NONE
   type(t_solverinfo),  intent(inout), target :: solverinfo
   type(t_partit),      intent(inout), target :: partit
   type(t_mesh),        intent(inout), target :: mesh
   real(kind=WP),       intent(inout)         :: x(partit%myDim_nod2D+partit%eDim_nod2D)
   real(kind=WP),       intent(in)            :: rhs(partit%myDim_nod2D+partit%eDim_nod2D)
-  integer                      :: row, nini, nend, iter 
-  real(kind=WP)                :: sprod(2), s_old, s_aux, al, be, rtol
+  integer                      :: row, nini, nend, iter
+  ! Mixed-precision CG: keep the vectors and matvec in WP, but form the inner
+  ! products and step scalars in double precision (and reduce them with
+  ! MPI_DOUBLE_PRECISION). In single precision the SP reduction of ~1e6 terms
+  ! drives s_aux = p.Ap toward zero, so al = s_old/s_aux blows up to Inf/NaN
+  ! across the whole solution vector (systemic Wvel NaN at step 1 on ng5/CORE2).
+  ! In a double-precision build real64 == WP, so this is bit-identical to before.
+  real(real64)                 :: sprod(2), s_old, s_aux, al, be
+  real(kind=WP)                :: rtol
   integer                      :: req
   real(kind=WP), pointer       :: pr_values(:), rr(:), zz(:), pp(:), App(:)
   integer,       pointer       :: rptr(:), cind(:)
@@ -147,10 +155,10 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   END DO
 !$OMP END PARALLEL DO
 #else
- s_old = sum(rhs(1:myDim_nod2D) * rhs(1:myDim_nod2D))
+ s_old = sum(real(rhs(1:myDim_nod2D),real64) * real(rhs(1:myDim_nod2D),real64))
 #endif
 
-  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
   rtol=solverinfo%soltol*sqrt(s_old/real(nod2D,WP))
   ! ==============
   ! Compute r0
@@ -185,10 +193,10 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   END DO
 !$OMP END PARALLEL DO
 #else
-  s_old = sum(rr(1:myDim_nod2D) * zz(1:myDim_nod2D))
+  s_old = sum(real(rr(1:myDim_nod2D),real64) * real(zz(1:myDim_nod2D),real64))
 #endif
 
-  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
   
   ! ===============
   ! Iterations
@@ -215,10 +223,10 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   END DO
 !$OMP END PARALLEL DO
 #else
- s_aux = sum(pp(1:myDim_nod2D) * App(1:myDim_nod2D))
+ s_aux = sum(real(pp(1:myDim_nod2D),real64) * real(App(1:myDim_nod2D),real64))
 #endif
 
-  call MPI_Allreduce(MPI_IN_PLACE, s_aux, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  call MPI_Allreduce(MPI_IN_PLACE, s_aux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 
   al=s_old/s_aux
      ! ===========
@@ -252,11 +260,11 @@ sprod(1:2)=0.0_WP
   END DO
 !$OMP END PARALLEL DO
 #else
-    sprod(1) = sum(rr(1:myDim_nod2D) * zz(1:myDim_nod2D))
-    sprod(1) = sum(rr(1:myDim_nod2D) * rr(1:myDim_nod2D))
+    sprod(1) = sum(real(rr(1:myDim_nod2D),real64) * real(zz(1:myDim_nod2D),real64))
+    sprod(2) = sum(real(rr(1:myDim_nod2D),real64) * real(rr(1:myDim_nod2D),real64))
 #endif
   
-  call MPI_Allreduce(MPI_IN_PLACE, sprod, 2, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  call MPI_Allreduce(MPI_IN_PLACE, sprod, 2, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 
 !$OMP BARRIER
      ! ===========
