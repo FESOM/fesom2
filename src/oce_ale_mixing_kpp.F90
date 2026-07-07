@@ -957,7 +957,7 @@ contains
   !      real ghats(3d)  = nonlocal scalar transport              
   !
   subroutine blmix_kpp(viscA,diffK, partit, mesh)
-
+     use g_config, only: flag_debug
      IMPLICIT NONE
      type(t_mesh),   intent(in),    target :: mesh
      type(t_partit), intent(inout), target :: partit
@@ -969,6 +969,7 @@ contains
      real(KIND=WP)     :: gat1m, gat1t, gat1s, dat1m, dat1s, dat1t
 
      real(KIND=WP)     :: dthick(mesh%nl), diff_col(mesh%nl,3)
+     logical, save     :: bl_dbg_printed=.false.   ! NaN-localization probe (flag_debug), once per rank
 
      real(KIND=WP), dimension(mesh%nl, partit%myDim_nod2D+partit%eDim_nod2D    ), intent(inout) :: viscA ! for momentum (nodes)
      real(KIND=WP), dimension(mesh%nl, partit%myDim_nod2D+partit%eDim_nod2D, 2 ), intent(inout) :: diffK ! for T and S
@@ -1091,10 +1092,22 @@ contains
 !       eqn. (10)
 !      *******************************************************************
 
-           blmc(nz,node,1) = hbl(node) * wm * sig * (1.0_WP + sig * Gm) 
-           blmc(nz,node,2) = hbl(node) * ws * sig * (1.0_WP + sig * Gt) 
-           blmc(nz,node,3) = hbl(node) * ws * sig * (1.0_WP + sig * Gs) 
-        
+           blmc(nz,node,1) = hbl(node) * wm * sig * (1.0_WP + sig * Gm)
+           blmc(nz,node,2) = hbl(node) * ws * sig * (1.0_WP + sig * Gt)
+           blmc(nz,node,3) = hbl(node) * ws * sig * (1.0_WP + sig * Gs)
+           !--- NaN-localization probe (flag_debug): dump all blmix intermediates for the
+           !    first NaN blmc per rank so we see whether wm/ws (wscale), viscp (/dthick),
+           !    gat1m/dat1m, or a zero dthick is the source. Remove when done.
+           if (flag_debug .and. .not.bl_dbg_printed) then
+              if (blmc(nz,node,1) /= blmc(nz,node,1) .or. abs(blmc(nz,node,1)) > 1.0e30_WP) then
+                 write(*,*) ' PROBE[blmix] blmc NaN: mype=',mype,' node=',node,' nz=',nz,' kbl=',kbl(node),' kn=',kn, &
+                      ' hbl=',hbl(node),' bfsfc=',bfsfc(node),' stable=',stable(node),' ustar=',ustar(node), &
+                      ' wm=',wm,' ws=',ws,' sig=',sig,' viscp=',viscp,' gat1m=',gat1m,' dat1m=',dat1m, &
+                      ' R=',R,' delhat=',delhat,' dthick(kn)=',dthick(kn),' dthick(knp1)=',dthick(knp1)
+                 bl_dbg_printed=.true.
+              end if
+           end if
+
 !      *******************************************************************
 !       Nonlocal transport term = ghats * <ws>o (eqn. 20)
 !      *******************************************************************
