@@ -3181,6 +3181,14 @@ subroutine impl_vert_visc_ale(dynamics, partit, mesh)
              end if
           end do
        end do hepb
+       stpb: do elem=1, myDim_elem2D   ! wind stress: only surface input to the nzmin row
+          if (stress_surf(1,elem) /= stress_surf(1,elem) .or. stress_surf(2,elem) /= stress_surf(2,elem) .or. &
+              abs(stress_surf(1,elem)) > 1.0e30_WP .or. abs(stress_surf(2,elem)) > 1.0e30_WP) then
+             write(*,*) ' PROBE[ivv-in] stress_surf non-finite: mype=',mype,' elem=',elem, &
+                  ' sx=',stress_surf(1,elem),' sy=',stress_surf(2,elem)
+             exit stpb
+          end if
+       end do stpb
     end if
 
     !___________________________________________________________________________
