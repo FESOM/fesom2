@@ -408,7 +408,7 @@ endif
 #if defined(__RECOM_WAVEBANDS)
            , Light_watercolumn                                   & ! Light (Ed) variables
 #endif           
-                           , PAR, ice, dynamics, tracers, partit, mesh)
+           , PAR, ice, dynamics, tracers, partit, mesh)
 
         do tr_num = num_tracers-bgc_num+1, num_tracers !bgc_num+2
             tracers%data(tr_num)%values(1:nzmax, n) = C(1:nzmax, tr_num-2)
@@ -416,13 +416,12 @@ endif
 
         ! recom_sms
 
-           do tr_num=1, num_tracers
-        if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
-             tracers%work%tra_recom_sms(1:nzmax,n,tr_num) = tracers%data(tr_num)%values(1:nzmax, n) - ttf_rhs_bak(1:nzmax,tr_num)
-             !if (mype==0)  print *,  tra_recom_sms(:,:,tr_num)
-        end if
-
-           end do
+        do tr_num=1, num_tracers
+           if (tracers%data(tr_num)%ltra_diag) then ! OG - tra_diag
+              tracers%work%tra_recom_sms(1:nzmax,n,tr_num) = tracers%data(tr_num)%values(1:nzmax, n) - ttf_rhs_bak(1:nzmax,tr_num)
+              !if (mype==0)  print *,  tra_recom_sms(:,:,tr_num)
+           end if
+        end do
 
         !!---- Local variables that have been changed during the time-step are stored so they can be saved
         Benthos(n,1:benthos_num) = LocBenthos(1:benthos_num)
