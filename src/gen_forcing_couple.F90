@@ -779,7 +779,9 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
              vv = (/ u_wind(i), v_wind(i), Tair(i), shum(i), shortwave(i), longwave(i), &
                      u_w(i), v_w(i), cd_atm_oce_arr(i), stress_atmoce_x(i), stress_atmoce_y(i) /)
              do kk=1,11
-                if (vv(kk) /= vv(kk) .or. abs(vv(kk)) > 1.0e30_WP) then
+                ! 1e10 (not 1e30): catches a large-but-finite forcing _FillValue
+                ! (e.g. 1e20) that is DP-safe but overflows SP once squared.
+                if (vv(kk) /= vv(kk) .or. abs(vv(kk)) > 1.0e10_WP) then
                    write(*,'(a,i2,a,i8,a,i2)') 'PROBE[frc-out] rank=', mype, &
                         ' first non-finite node=', i, ' field#=', kk
                    write(*,'(a,11es13.5)') 'PROBE[frc-out] u_wind v_wind Tair shum swr lwr u_w v_w cd taux tauy = ', vv

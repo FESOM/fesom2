@@ -155,10 +155,12 @@ subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
          if (.not. ssurf_dbg_printed) then
             do nn=1, myDim_nod2D
                if (ulevels_nod2d(nn)>1) cycle
+               ! 1e10 (not 1e30): also catch a large-but-finite forcing fill value
+               ! that is DP-safe but overflows SP downstream.
                if ( stress_node_surf(1,nn) /= stress_node_surf(1,nn) .or. &
                     stress_node_surf(2,nn) /= stress_node_surf(2,nn) .or. &
-                    abs(stress_node_surf(1,nn)) > 1.0e30_WP .or.          &
-                    abs(stress_node_surf(2,nn)) > 1.0e30_WP ) then
+                    abs(stress_node_surf(1,nn)) > 1.0e10_WP .or.          &
+                    abs(stress_node_surf(2,nn)) > 1.0e10_WP ) then
                   write(*,'(a,i5,a,i9)') 'PROBE[ssurf-asm] rank=', mype, ' first non-finite node=', nn
                   write(*,'(a,8es13.5)') 'PROBE[ssurf-asm] a_ice tauioX tauioY tauaoX tauaoY u_ice u_w ssurfX = ', &
                        a_ice(nn), stress_iceoce_x(nn), stress_iceoce_y(nn), &
