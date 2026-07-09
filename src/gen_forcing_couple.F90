@@ -763,6 +763,34 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
      stress_atmice_y(i) = Cd_atm_ice_arr(i)*aux*dvy
   end do
 !$OMP END PARALLEL DO
+
+  !___________________________________________________________________________
+  ! PROBE[frc-out]: first non-finite among the interpolated forcing inputs and
+  ! the assembled atm-ocean stress / drag coeff. Isolates whether the ng5 SP NaN
+  ! originates in the CORE2->mesh interpolation (u_wind/Tair/shum/shortwave),
+  ! in the NCAR drag coeff (cd_atm_oce_arr), or in the stress assembly.
+  if (flag_debug) then
+     block
+       logical, save :: frc_dbg_printed = .false.
+       real(kind=WP) :: vv(11)
+       integer :: kk
+       if (.not. frc_dbg_printed) then
+          probe_loop: do i=1, myDim_nod2d
+             vv = (/ u_wind(i), v_wind(i), Tair(i), shum(i), shortwave(i), longwave(i), &
+                     u_w(i), v_w(i), cd_atm_oce_arr(i), stress_atmoce_x(i), stress_atmoce_y(i) /)
+             do kk=1,11
+                if (vv(kk) /= vv(kk) .or. abs(vv(kk)) > 1.0e30_WP) then
+                   write(*,'(a,i2,a,i8,a,i2)') 'PROBE[frc-out] rank=', mype, &
+                        ' first non-finite node=', i, ' field#=', kk
+                   write(*,'(a,11es13.5)') 'PROBE[frc-out] u_wind v_wind Tair shum swr lwr u_w v_w cd taux tauy = ', vv
+                   frc_dbg_printed = .true.
+                   exit probe_loop
+                end if
+             end do
+          end do probe_loop
+       end if
+     end block
+  end if
   ! heat and fresh water fluxes are treated in i_therm and ice2ocean
 #endif /* skip all in case of __ifsinterface */
 #endif /* (__oasis) */
