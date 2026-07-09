@@ -143,6 +143,34 @@ subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
     END DO
 !$OMP END DO
 !$OMP END PARALLEL
+
+    !___________________________________________________________________________
+    ! PROBE[ssurf-asm]: first non-finite assembled surface stress, with its three
+    ! raw inputs. At step 1 ice is at rest -> stress_iceoce=0, so a NaN here must be
+    ! stress_atmoce (forcing) or a_ice (ice IC), NOT the EVP. Isolates which.
+    if (flag_debug) then
+       block
+         logical, save :: ssurf_dbg_printed = .false.
+         integer :: nn
+         if (.not. ssurf_dbg_printed) then
+            do nn=1, myDim_nod2D
+               if (ulevels_nod2d(nn)>1) cycle
+               if ( stress_node_surf(1,nn) /= stress_node_surf(1,nn) .or. &
+                    stress_node_surf(2,nn) /= stress_node_surf(2,nn) .or. &
+                    abs(stress_node_surf(1,nn)) > 1.0e30_WP .or.          &
+                    abs(stress_node_surf(2,nn)) > 1.0e30_WP ) then
+                  write(*,'(a,i5,a,i9)') 'PROBE[ssurf-asm] rank=', mype, ' first non-finite node=', nn
+                  write(*,'(a,8es13.5)') 'PROBE[ssurf-asm] a_ice tauioX tauioY tauaoX tauaoY u_ice u_w ssurfX = ', &
+                       a_ice(nn), stress_iceoce_x(nn), stress_iceoce_y(nn), &
+                       stress_atmoce_x(nn), stress_atmoce_y(nn), u_ice(nn), u_w(nn), stress_node_surf(1,nn)
+                  ssurf_dbg_printed = .true.
+                  exit
+               end if
+            end do
+         end if
+       end block
+    end if
+
     !___________________________________________________________________________
     if (use_cavity) call cavity_momentum_fluxes(dynamics, partit, mesh)
   
