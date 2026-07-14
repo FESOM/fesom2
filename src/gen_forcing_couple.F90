@@ -375,7 +375,18 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
             elseif (i.eq.3) then
               exchange(:) = m_snow(:)                                 ! snow thickness
             elseif (i.eq.4) then
-              exchange(:) = ice_temp(:)                               ! ice surface temperature
+              ! Ice surface temperature, ICE-CONCENTRATION WEIGHTED
+              ! (requires ECE_CPL_NEMO_WEIGHTED_ICE=.true. on the OIFS side,
+              ! which divides by the received ice fraction on ingest).
+              ! Sending the raw temperature lets ice-free nodes (which carry
+              ! the seawater freezing point, ~271 K) warm the remapped cell
+              ! blend in the marginal ice zone; OIFS then computes a strongly
+              ! negative ice-tile flux for that too-warm surface and the remap
+              ! hands it back to the fully-iced nodes, whose unbounded surface
+              ! solve (ice_thermo_cpl.F90) equilibrates far below any physical
+              ! temperature (measured: chronic 183 K, spikes to 145 K) until
+              ! OIFS's saturation math overflows (forrtl in cubasen/vsurf).
+              exchange(:) = ice_temp(:)*a_ice(:)                      ! ice surface temperature * concentration
             elseif (i.eq.5) then
               exchange(:) = ice_alb(:)                                ! ice albedo
             elseif (i.eq.6) then
