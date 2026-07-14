@@ -309,9 +309,9 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 !YY: decay differently calculated???
 #if defined(__ciso)
         ! radioactive decay of 14C
-        if (ciso_14 .and. any(c14_tracer_id == tracers%data(tr_num)%ID)) then
-          tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * (1 - lambda_14 * dt)
-        end if    ! ciso & ciso_14
+        !if (ciso_14 .and. any(c14_tracer_id == tracers%data(tr_num)%ID)) then
+        !  tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * (1 - lambda_14 * dt)
+        !end if    ! ciso & ciso_14
 #endif
 
         !___________________________________________________________________________

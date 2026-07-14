@@ -1,0 +1,14 @@
+/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-install_Intel/lib/libcvmix.a
+/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-install_Intel/lib/libcvmix.so
+/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-install_Intel/include/cvmix/cvmix_background.mod
+/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-install_Intel/include/cvmix/cvmix_convection.mod
+/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-install_Intel/include/cvmix/cvmix_shear.mod
+/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-install_Intel/include/cvmix/cvmix_tidal.mod
+/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-install_Intel/include/cvmix/cvmix_put_get.mod
+/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-install_Intel/include/cvmix/cvmix_kinds_and_types.mod
+/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-install_Intel/include/cvmix/cvmix_math.mod
+/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-install_Intel/include/cvmix/cvmix_ddiff.mod
+/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-install_Intel/include/cvmix/cvmix_kpp.mod
+/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-install_Intel/include/cvmix/cvmix_utils.mod
+/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-install_Intel/cmake/cvmixConfig.cmake
+/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-install_Intel/cmake/cvmixConfig-release.cmake

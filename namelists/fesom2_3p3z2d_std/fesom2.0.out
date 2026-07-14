@@ -1,0 +1,762 @@
+ MPI has been initialized, provided MPI thread support level: MPI_THREAD_MULTIPLE           3
+ Running on          864  PEs
+ npes_fesom_world, num_fesom_groups         864           1
+ processes_per_group         864
+ 
+ FESOM2 git SHA: 3aac240f
+ [32m____________________________________________________________[0m
+ [7;32m --> FESOM BUILDS UP MODEL CONFIGURATION                    [0m
+ Namelist files are read in
+ time step size is set to    2700.00000000000      sec
+ 
+ [31m____________________________________________________________[0m
+ [5;7;31m --> THIS IS A RESTART RUN !!!                              [0m
+     > clock restarted at time: 1.00   1 1979
+ 
+          96  steps to run for fesom job submission
+ rotation matrix for rotated model grids prepared
+           0 rpart is read
+ myLists are read
+ reading /albedo/work/projects/p_recompdaf/frbunsen/FESOM2/meshes/core2/nod2d.out
+ reading /albedo/work/projects/p_recompdaf/frbunsen/FESOM2/meshes/core2/elem2d.out
+ elements are read
+ communication arrays are read
+ =========================
+ 2D mesh was read in    1.71579143280542       seconds
+ 2D mesh info : nod2D=      126858  elem2D=      244659 checksum= 96ef52281f7e327b221950bcd07cc1d8
+ =========================
+ Communication arrays are set
+ test_tri finished in   6.910086085554212E-006  seconds
+ =========================
+ reading /albedo/work/projects/p_recompdaf/frbunsen/FESOM2/meshes/core2/edgenum.out
+ 2D mesh info : edge2D=      371644
+ reading /albedo/work/projects/p_recompdaf/frbunsen/FESOM2/meshes/core2/edges.out
+ reading /albedo/work/projects/p_recompdaf/frbunsen/FESOM2/meshes/core2/edge_tri.out
+ load_edges finished in   0.657494337683602       seconds
+ =========================
+ find_neighbors finished in   3.708707536134170E-003  seconds
+ =========================
+ reading /albedo/work/projects/p_recompdaf/frbunsen/FESOM2/meshes/core2/elvls.out
+ reading /albedo/work/projects/p_recompdaf/frbunsen/FESOM2/meshes/core2/nlvls.out
+ ____________________________________________________________________
+  --> 3D mesh was read in   0.271514530239074       seconds
+  --> Min/max depth on mype :            0   1180.00000000000        5400.00000000000     
+ ____________________________________________________________________
+  --> find min/max level e2n in  2.201828247052617E-004  seconds
+ ____________________________________________________________________
+  --> mesh statistics:           0
+           0 maxArea    9293855608.15890         MinArea    2517260066.06088     
+           0 maxScArea    17113834049.5471         MinScArea    4643380667.43227     
+           0 Edges:          371644  internal       362333
+      > Total ocean surface area is           :    364354316635734.       m^2
+      > Total ocean surface area wth cavity is:    364354316635734.       m^2
+      > mesh_areas finished in   1.777162779035280E-003  seconds
+ mesh_auxiliary_arrays finished in   1.033553249726538E-003  seconds
+ =========================
+ FESOM mesh_setup... complete
+ ***start level area_test***
+   364354316635734.        364354316635734.     
+   364354316635734.        364354316635734.     
+   364354316635734.        364354316635734.     
+   364354316635734.        364354316635734.     
+   357300317315119.        357300317315119.     
+   354113237650775.        354113237650775.     
+   351817051983039.        351817051983039.     
+   350065333681600.        350065333681600.     
+   348637576114935.        348637576114935.     
+   347389346086852.        347389346086852.     
+   346308199729719.        346308199729719.     
+   345140644361352.        345140644361352.     
+   343747935112280.        343747935112280.     
+   342363896845861.        342363896845861.     
+   340772744666857.        340772744666857.     
+   338775524312136.        338775524312136.     
+   336980984452424.        336980984452424.     
+   335064352342050.        335064352342050.     
+   333090746166042.        333090746166042.     
+   330929778381294.        330929778381294.     
+   328629163831422.        328629163831422.     
+   326592233920372.        326592233920372.     
+   324682485855654.        324682485855654.     
+   322811207664366.        322811207664366.     
+   320902632281560.        320902632281560.     
+   318964714574213.        318964714574213.     
+   316759412805279.        316759412805279.     
+   314415479883026.        314415479883026.     
+   311078606168458.        311078606168458.     
+   307180109446522.        307180109446522.     
+   302361363952099.        302361363952099.     
+   297029016477066.        297029016477066.     
+   290635153372101.        290635153372101.     
+   282779027925473.        282779027925473.     
+   270339151690562.        270339151690562.     
+   253778375323382.        253778375323382.     
+   233908883135421.        233908883135421.     
+   209698317850281.        209698317850281.     
+   182770853080492.        182770853080492.     
+   154768218654313.        154768218654313.     
+   123906855474557.        123906855474557.     
+   94313998475014.3        94313998475014.2     
+   66563213207699.0        66563213207699.0     
+   39329830643744.6        39329830643744.6     
+   18995266378258.7        18995266378258.7     
+   5037468695982.90        5037468695982.90     
+  0.000000000000000E+000  0.000000000000000E+000
+  0.000000000000000E+000  0.000000000000000E+000
+ ***end level area_test***
+ ____________________________________________________________
+  --> initialise ALE arrays + sparse SSH stiff matrix
+ 
+ ____________________________________________________________
+  --> initialise ssh operator using unperturbed ocean depth
+      > in stiff_mat_ale, reading /albedo/work/projects/p_recompdaf/frbunsen/FESOM2/meshes/core2/dist_864/rpart.out
+      took:   2.068761517148232E-002  sec
+ 
+ Arrays are set
+ FCT is initialized
+          35  tracers will be used in FESOM
+ tracer IDs are:            0           1        1001        1002        1003        1004        1005        1006        1007        1008        1009        1010        1011        1012        1013        1014        1015        1016        1017        1018        1019        1020        1021        1022        1023        1024        1025        1026        1027        1028        1029        1030        1031        1032        1033
+ 
+ [36m     --> RECOM ON[0m
+ [36m     --> CISO OFF[0m
+ ____________________________________________________________
+  --> Check namelist.oce for the number of tracers
+ 
+ ____________________________________________________________
+  --> Reading REcoM2 preindustrial DIC for restart
+ 
+ read Iron        climatology from:fe_pisces_opa_eq_init_3D_changed_name.nc
+ read Oxygen      climatology from:woa18_all_o00_01_mmol_fesom2.nc
+ read Silicate    climatology from:woa13_all_i00_01_fesom2.nc
+ read Alkalinity  climatology from:GLODAPv2.2016b.TAlk_fesom2_mmol_fix_z_Fillvalue.nc
+ read DIC         climatology from:GLODAPv2.2016b.PI_TCO2_fesom2_mmol_fix_z_Fillvalue.nc
+ read Nitrate     climatology from:woa13_all_n00_01_fesom2.nc
+ read Salt        climatology from:phc3.0_winter.nc
+ read Temperature climatology from:phc3.0_winter.nc
+ Start: Initial conditions  for tracers
+ reading input tracer file for tracer ID=         1019
+ input file: /albedo/work/projects/MarESys/ogurses/input/corrected_input/fe_pisces_opa_eq_init_3D_changed_name.nc
+ variable  : Fe
+ reading input tracer file for tracer ID=         1022
+ input file: /albedo/work/projects/MarESys/ogurses/input/corrected_input/woa18_all_o00_01_mmol_fesom2.nc
+ variable  : oxygen_mmol
+ reading input tracer file for tracer ID=         1018
+ input file: /albedo/work/projects/MarESys/ogurses/input/corrected_input/woa13_all_i00_01_fesom2.nc
+ variable  : i_an
+ reading input tracer file for tracer ID=         1003
+ input file: /albedo/work/projects/MarESys/ogurses/input/corrected_input/GLODAPv2.2016b.TAlk_fesom2_mmol_fix_z_Fillvalue.nc
+ variable  : TAlk_mmol
+ reading input tracer file for tracer ID=         1002
+ input file: /albedo/work/projects/MarESys/ogurses/input/corrected_input/GLODAPv2.2016b.PI_TCO2_fesom2_mmol_fix_z_Fillvalue.nc
+ variable  : PI_TCO2_mmol
+ reading input tracer file for tracer ID=         1001
+ input file: /albedo/work/projects/MarESys/ogurses/input/corrected_input/woa13_all_n00_01_fesom2.nc
+ variable  : n_an
+ reading input tracer file for tracer ID=            1
+ input file: /albedo/work/projects/MarESys/ogurses/input/corrected_input/phc3.0_winter.nc
+ variable  : salt
+ reading input tracer file for tracer ID=            0
+ input file: /albedo/work/projects/MarESys/ogurses/input/corrected_input/phc3.0_winter.nc
+ variable  : temp
+ converting insitu temperature to potential...
+ DONE:  Initial conditions for tracers
+   |-> gobal max init. temp. =   30.0510326153043     
+   |-> gobal min init. temp. =  -2.06008970141432     
+   |-> gobal max init. salt. =   41.1176835670450     
+   `-> gobal min init. salt. =   5.62836183480000     
+ Sanity check for REcoM variables
+   |-> gobal max init. DIN. =   53.0303514775767     
+   |-> gobal min init. DIN. =  7.812823240199695E-003
+   |-> gobal max init. DIC. =   2467.73270205940     
+   |-> gobal min init. DIC. =   1082.94938277298     
+   |-> gobal max init. Alk. =   2715.00723192219     
+   |-> gobal min init. Alk. =   1102.52251499341     
+   |-> gobal max init. DSi. =   245.254346844946     
+   |-> gobal min init. DSi. =  0.340649448051430     
+   |-> gobal max init. DFe. =  4.239583905802221E-002
+   `-> gobal min init. DFe. = -6.398613047393471E-012
+ [46;1m--> Set surface field for alkalinity restoring[0m
+ Alkalinity restoring = true. Field read in.
+ initializing    6th tracer with ID=1004
+ initializing    7th tracer with ID=1005
+ initializing    8th tracer with ID=1006
+ initializing    9th tracer with ID=1007
+ initializing   10th tracer with ID=1008
+ initializing   11th tracer with ID=1009
+ initializing   12th tracer with ID=1010
+ initializing   13th tracer with ID=1011
+ initializing   14th tracer with ID=1012
+ initializing   15th tracer with ID=1013
+ initializing   16th tracer with ID=1014
+ initializing   17th tracer with ID=1015
+ initializing   18th tracer with ID=1016
+ initializing   19th tracer with ID=1017
+ initializing   22th tracer with ID=1020
+ initializing   23th tracer with ID=1021
+ initializing   25th tracer with ID=1023
+ initializing   26th tracer with ID=1024
+ initializing   27th tracer with ID=1025
+ initializing   28th tracer with ID=1026
+ initializing   29th tracer with ID=1027
+ initializing   30th tracer with ID=1028
+ initializing   31th tracer with ID=1029
+ initializing   32th tracer with ID=1030
+ initializing   33th tracer with ID=1031
+ initializing   34th tracer with ID=1032
+ initializing   35th tracer with ID=1033
+ ____________________________________________________________
+  --> call init_thickness_ale
+ 
+ ____________________________________________________________
+  --> initialise ALE layerthicknesses, depth levels and middepth levels
+ 
+ Initial state
+ Benthic layers are set
+ Tracers have been initialized as spinup from WOA/glodap netcdf files
+ RECOM recom_init... complete
+ FESOM ocean_setup... complete
+ ****************************************************
+ forcing arrays have been set up
+      file   : namelist_bc.nml open ok
+ Start: Ocean forcing inizialization.
+ Surface boundary conditions parameters:
+       nm_xwind_file = /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/uas.clim61 ! name of file with X winds
+       nm_xwind_var  = uas ! name of variable in file with wind 
+       nm_ywind_file = /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/vas.clim61 ! name of file with Y winds
+       nm_ywind_var  = vas ! name of variable in file with wind 
+       nm_humi_file = /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/huss.clim61 ! name of file with humidity
+       nm_humi_var   = huss ! name of variable in file with humidity  
+       nm_qsr_file = /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/rsds.clim61 ! name of file with solar heat 
+       nm_qsr_var  = rsds ! name of variable in file with solar heat 
+       nm_qlw_file   = /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/rlds.clim61 ! name of file with Long wave 
+       nm_qlw_var    = rlds ! name of variable in file with Long wave 
+       nm_tair_file  = /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/tas.clim61 ! name of file with 2m air temperature 
+       nm_tair_var   = tas ! name of variable in file with 2m air temperature 
+       nm_prec_file  = /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/prra.clim61 ! name of file with total precipitation 
+       nm_prec_var   = prra ! name of variable in file with total precipitation  
+       nm_snow_file  = /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/prsn.clim61 ! name of file with snow precipitation 
+       nm_snow_var   = prsn !name of variable in file with air_pressure_at_sea_level 
+       nm_mslp_file  = /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/psl.clim61 !air_pressure_at_sea_level 
+       nm_mslp_var   = psl !name of variable in file with air_pressure_at_sea_level 
+ total fluxes to read:            9
+  --> found calendar attr. in time axis: |365_days|
+  --> found calendar attr. in time axis: |365_days|
+  --> found calendar attr. in time axis: |365_days|
+  --> found calendar attr. in time axis: |365_days|
+  --> found calendar attr. in time axis: |365_days|
+  --> found calendar attr. in time axis: |365_days|
+  --> found calendar attr. in time axis: |365_days|
+  --> found calendar attr. in time axis: |365_days|
+  --> found calendar attr. in time axis: |365_days|
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): uas !
+ /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/uas.clim61.nc
+  6.250000000000000E-002   364.906250000000       1.157407407407407E-005
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): vas !
+ /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/vas.clim61.nc
+  6.250000000000000E-002   364.906250000000       1.157407407407407E-005
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): huss !
+ /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/huss.clim61.nc
+  6.250000000000000E-002   364.906250000000       1.157407407407407E-005
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): rsds !
+ /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/rsds.clim61.nc
+  6.250000000000000E-002   364.906250000000       1.157407407407407E-005
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): rlds !
+ /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/rlds.clim61.nc
+  6.250000000000000E-002   364.906250000000       1.157407407407407E-005
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): tas !
+ /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/tas.clim61.nc
+  6.250000000000000E-002   364.906250000000       1.157407407407407E-005
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): prra !
+ /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/prra.clim61.nc
+  6.250000000000000E-002   364.906250000000       1.157407407407407E-005
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): prsn !
+ /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/prsn.clim61.nc
+  6.250000000000000E-002   364.906250000000       1.157407407407407E-005
+ WARNING: no temporal extrapolation back in time (nearest neighbour is used): psl !
+ /albedo/work/projects/MarESys/FROM-OLLIE/forcing_JRA55-do-v1.4.0_clim61/psl.clim61.nc
+  6.250000000000000E-002   364.906250000000       1.157407407407407E-005
+ DONE:  Ocean forcing inizialization.
+ Parts of forcing data (only constant in time fields) are read
+ Ice FCT is initialized
+ initialize the sea ice
+ Ice is initialized
+ EVP scheme option=           0
+ associating restart file /albedo/work/user/anbros001/runs/testlauf/fesom.1978.oce.restart.nc
+ current restart counter =            1
+      reading restart file:  /albedo/work/user/anbros001/runs/testlauf/fesom.1978.oce.restart.nc
+ restart from record            1  of            1
+ reading restart for ssh
+ reading restart for hbar
+ reading restart for ssh_rhs_old
+ reading restart for hnode
+ reading restart for u
+ reading restart for v
+ reading restart for urhs_AB
+ reading restart for vrhs_AB
+ reading restart for temp
+ reading restart for temp_AB
+ reading restart for salt
+ reading restart for salt_AB
+ reading restart for w
+ reading restart for w_expl
+ reading restart for w_impl
+ reading restart for tra0002
+ reading restart for tra0002_AB
+ reading restart for tra0003
+ reading restart for tra0003_AB
+ reading restart for tra0004
+ reading restart for tra0004_AB
+ reading restart for tra0005
+ reading restart for tra0005_AB
+ reading restart for tra0006
+ reading restart for tra0006_AB
+ reading restart for tra0007
+ reading restart for tra0007_AB
+ reading restart for tra0008
+ reading restart for tra0008_AB
+ reading restart for tra0009
+ reading restart for tra0009_AB
+ reading restart for tra0010
+ reading restart for tra0010_AB
+ reading restart for tra0011
+ reading restart for tra0011_AB
+ reading restart for tra0012
+ reading restart for tra0012_AB
+ reading restart for tra0013
+ reading restart for tra0013_AB
+ reading restart for tra0014
+ reading restart for tra0014_AB
+ reading restart for tra0015
+ reading restart for tra0015_AB
+ reading restart for tra0016
+ reading restart for tra0016_AB
+ reading restart for tra0017
+ reading restart for tra0017_AB
+ reading restart for tra0018
+ reading restart for tra0018_AB
+ reading restart for tra0019
+ reading restart for tra0019_AB
+ reading restart for tra0020
+ reading restart for tra0020_AB
+ reading restart for tra0021
+ reading restart for tra0021_AB
+ reading restart for tra0022
+ reading restart for tra0022_AB
+ reading restart for tra0023
+ reading restart for tra0023_AB
+ reading restart for tra0024
+ reading restart for tra0024_AB
+ reading restart for tra0025
+ reading restart for tra0025_AB
+ reading restart for tra0026
+ reading restart for tra0026_AB
+ reading restart for tra0027
+ reading restart for tra0027_AB
+ reading restart for tra0028
+ reading restart for tra0028_AB
+ reading restart for tra0029
+ reading restart for tra0029_AB
+ reading restart for tra0030
+ reading restart for tra0030_AB
+ reading restart for tra0031
+ reading restart for tra0031_AB
+ reading restart for tra0032
+ reading restart for tra0032_AB
+ reading restart for tra0033
+ reading restart for tra0033_AB
+ reading restart for tra0034
+ reading restart for tra0034_AB
+ reading restart for tra0035
+ reading restart for tra0035_AB
+ associating restart file /albedo/work/user/anbros001/runs/testlauf/fesom.1978.ice.restart.nc
+ current restart counter =            1
+      reading restart file:  /albedo/work/user/anbros001/runs/testlauf/fesom.1978.ice.restart.nc
+ restart from record            1  of            1
+ reading restart for area
+ reading restart for hice
+ reading restart for hsnow
+ reading restart for uice
+ reading restart for vice
+ REcoM_restart=  T
+ associating restart file /albedo/work/user/anbros001/runs/testlauf/fesom.1978.bio.restart.nc
+ current restart counter =            1
+      reading restart file:  /albedo/work/user/anbros001/runs/testlauf/fesom.1978.bio.restart.nc
+ restart from record            1  of            1
+ reading restart for BenN
+ reading restart for BenC
+ reading restart for BenSi
+ reading restart for BenCalc
+ ____________________________________________________________
+  --> restart ALE layerthicknesses, depth levels and middepth levels
+ 
+ ==========================================
+ MODEL SETUP took on mype=0 [seconds]      
+ runtime setup total         50.11278    
+  > runtime setup mesh       2.711255    
+  > runtime setup ocean      4.497245    
+  > runtime setup forcing    1.067304    
+  > runtime setup ice       1.4229183E-04
+  > runtime setup restart    41.83625    
+  > runtime setup other     5.8829755E-04
+ ============================================
+ FESOM start iteration before the barrier...
+ FESOM start iteration after the barrier...
+ 
+ [32m____________________________________________________________[0m
+ [7;32m --> FESOM STARTS TIME LOOP                                 [0m
+ Updating SSS restoring data for month            1
+           1
+ Updating Iron restoring data for month            1  from/albedo/work/projects/MarESys/ogurses/input/mesh_CORE2_finaltopo_mean/DustClimMonthlyAlbani.nc                                                                                                                                                                                                              
+ In atm_input: AtmCO2    =    278.000000000000     
+ [46;1m     --> call RECOM         [0m
+ [46;1m --> call compute_recom_diagnostics(1)[0m
+ Using namelist.io.recom
+      file   : namelist.io.recom open ok
+ io_listsize will be changed from          100  to           93 !
+ adding I/O stream 2D for sst
+ adding I/O stream 2D for sss
+ adding I/O stream 2D for ssh
+ adding I/O stream 2D for vve_5
+ adding I/O stream 2D for uice
+ adding I/O stream 2D for vice
+ adding I/O stream 2D for a_ice
+ adding I/O stream 2D for m_ice
+ adding I/O stream 2D for thdgr
+ adding I/O stream 2D for thdgrsn
+ adding I/O stream 2D for m_snow
+ adding I/O stream 2D for MLD1
+ adding I/O stream 2D for MLD2
+ adding I/O stream 2D for fh
+ adding I/O stream 2D for fw
+ adding I/O stream 2D for alpha
+ adding I/O stream 2D for beta
+ adding I/O stream 2D for runoff
+ adding I/O stream 2D for evap
+ adding I/O stream 2D for prec
+ adding I/O stream 2D for tx_sur
+ adding I/O stream 2D for ty_sur
+ adding I/O stream 2D for fer_C
+ adding I/O stream 3D for temp
+ adding I/O stream 3D for salt
+ adding I/O stream 3D for DIN
+ adding I/O stream 3D for DIC
+ adding I/O stream 3D for Alk
+ adding I/O stream 3D for PhyN
+ adding I/O stream 3D for PhyC
+ adding I/O stream 3D for PhyChl
+ adding I/O stream 3D for DetN
+ adding I/O stream 3D for DetC
+ adding I/O stream 3D for HetN
+ adding I/O stream 3D for HetC
+ adding I/O stream 3D for DON
+ adding I/O stream 3D for DOC
+ adding I/O stream 3D for DiaN
+ adding I/O stream 3D for DiaC
+ adding I/O stream 3D for DiaChl
+ adding I/O stream 3D for DiaSi
+ adding I/O stream 3D for DetSi
+ adding I/O stream 3D for DSi
+ adding I/O stream 3D for DFe
+ adding I/O stream 3D for PhyCalc
+ adding I/O stream 3D for DetCalc
+ adding I/O stream 3D for O2
+ adding I/O stream 3D for Zoo2N
+ adding I/O stream 3D for Zoo2C
+ adding I/O stream 3D for idetz2n
+ adding I/O stream 3D for idetz2c
+ adding I/O stream 3D for idetz2si
+ adding I/O stream 3D for idetz2calc
+ adding I/O stream 3D for CoccoN
+ adding I/O stream 3D for CoccoC
+ adding I/O stream 3D for CoccoChl
+ adding I/O stream 3D for Zoo3N
+ adding I/O stream 3D for Zoo3C
+ adding I/O stream 3D for N2
+ adding I/O stream 3D for Kv
+ adding I/O stream 3D for u
+ adding I/O stream 3D for v
+ adding I/O stream 3D for w
+ adding I/O stream 3D for Av
+ adding I/O stream 3D for bolus_u
+ adding I/O stream 3D for bolus_v
+ adding I/O stream 3D for bolus_w
+ adding I/O stream 2D for dpCO2s
+ adding I/O stream 2D for pCO2s
+ adding I/O stream 2D for CO2f
+ adding I/O stream 2D for Hp
+ adding I/O stream 2D for aFe
+ adding I/O stream 2D for aN
+ adding I/O stream 2D for denb
+ adding I/O stream 2D for benN
+ adding I/O stream 2D for benC
+ adding I/O stream 2D for benSi
+ adding I/O stream 2D for benCalc
+ adding I/O stream 2D for ChlDegd
+ adding I/O stream 2D for ChlDegn
+ adding I/O stream 2D for NNAd
+ adding I/O stream 2D for NNAn
+ adding I/O stream 2D for GPPd
+ adding I/O stream 2D for GPPn
+ adding I/O stream 2D for NPPd
+ adding I/O stream 2D for NPPn
+ adding I/O stream 2D for NPPc
+ adding I/O stream 2D for GPPc
+ adding I/O stream 2D for NNAc
+ adding I/O stream 2D for ChlDegc
+ adding I/O stream 3D for PAR
+ adding I/O stream 3D for CO2
+ adding I/O stream 3D for pH
+ adding I/O stream 3D for pCO2
+ adding I/O stream 3D for HCO3
+ adding I/O stream 3D for CO3
+ adding I/O stream 3D for OmegaC
+ adding I/O stream 3D for kspc
+ adding I/O stream 3D for rhoSW
+ adding I/O stream 3D for wsink_det1
+ adding I/O stream 3D for wsink_det2
+ adding I/O stream 3D for rho_det1
+ adding I/O stream 3D for rho_det2
+ adding I/O stream 3D for scaling_rho_1
+ adding I/O stream 3D for scaling_rho_2
+ adding I/O stream 3D for scaling_visc
+ adding I/O stream 2D for grazmicro_tot
+ adding I/O stream 2D for grazmacro_tot
+ adding I/O stream 2D for grazmeso_tot
+ adding I/O stream 3D for respmeso
+ adding I/O stream 3D for respmacro
+ adding I/O stream 3D for respmicro
+ adding I/O stream 3D for calcdiss
+ adding I/O stream 3D for calcif
+ adding I/O stream 3D for aggn
+ adding I/O stream 3D for aggd
+ adding I/O stream 3D for aggc
+ adding I/O stream 3D for docexn
+ adding I/O stream 3D for docexd
+ adding I/O stream 3D for docexc
+ adding I/O stream 3D for respn
+ adding I/O stream 3D for respd
+ adding I/O stream 3D for respc
+ adding I/O stream 3D for Redi_K
+ adding I/O stream 2D for momix_length
+ FESOM =======================================================
+ FESOM step:          32  day:           1  year:        1979
+ 
+ ___ICE STEP EXECUTION TIMES____________________________
+	Ice Dyn.        : 4.212E-03
+	Ice Advect.     : 5.202E-04
+	Ice Thermodyn.  : 4.268E-05
+    _______________________________
+	Ice TOTAL       : 4.775E-03
+ 
+ ___CHECK GLOBAL OCEAN VARIABLES --> mstep=          32
+ 	___global estimat of eta & hbar____________________
+ 	 int(eta), int(hbar)      = -4.717248901756072E-016 -4.717248901756072E-016
+ 	  --> error(eta-hbar)     =  0.000000000000000E+000
+ 	 min(eta) , max(eta)      =  -1.64129718700013        1.02562403412376     
+ 	 max(hbar), max(hbar)     =  -1.64129718700013        1.02562403412376     
+ 
+ 	 int(deta), int(dhbar)    = -4.226591066762920E-012  3.140923895878066E-020
+ 	  --> error(deta-dhbar)   = -4.226591098172160E-012
+ 	  --> error(deta-wflux)   = -4.226591066762601E-012
+ 	  --> error(dhbar-wflux)  =  3.140955847008192E-020
+ 
+ 	 -int(wflux)*dt           =  8.626805133942444E-022
+ 	 int(deta )-int(wflux)*dt = -4.226591067625601E-012
+ 	 int(dhbar)-int(wflux)*dt =  3.054655844538642E-020
+ 
+ 	___global min/max/mean  --> mstep=          32 ____________
+ 	       eta= -1.641E+00 |  1.026E+00 | N.A.
+ 	      deta= -6.077E-02 |  6.476E-02 | N.A.
+ 	      hbar= -1.641E+00 |  1.026E+00 | N.A.
+ 	     wflux= -1.421E-05 |  2.377E-06 | -3.195E-25
+ 	     hflux= -3.411E+02 |  4.872E+03 |  0.000E+00
+ 	      temp= -1.945E+00 |  3.118E+01 |  0.000E+00
+ 	      salt=  3.848E+00 |  4.031E+01 |  0.000E+00
+ 	 wvel(1,:)= -5.498E-18 |  5.492E-18 | N.A.
+ 	 wvel(2,:)= -9.804E-05 |  9.148E-05 | N.A.
+ 	 uvel(1,:)= -1.256E+00 |  9.195E-01 | N.A.
+ 	 uvel(2,:)= -1.194E+00 |  9.151E-01 | N.A.
+ 	 vvel(1,:)= -1.032E+00 |  1.117E+00 | N.A.
+ 	 vvel(2,:)= -1.031E+00 |  1.114E+00 | N.A.
+ 	hnode(1,:)=  4.676E+00 |  5.256E+00 | N.A.
+ 	hnode(2,:)=  4.676E+00 |  5.256E+00 | N.A.
+ 	     cfl_z=  N.A.      |  8.052E-01 | N.A.
+ 	     pgf_x=  N.A.      |  4.579E-05 | N.A.
+ 	     pgf_y=  N.A.      |  6.185E-05 | N.A.
+ 	        Av=  N.A.      |  1.176E+00 | N.A.
+ 	        Kv=  N.A.      |  1.954E+00 | N.A.
+ 	     m_ice=  N.A.      |  1.028E+01 | N.A.
+ 
+ ___ALE OCEAN STEP EXECUTION TIMES______________________
+     Oce. Mix,Press.. : 3.531E-03
+     Oce. Dynamics    : 1.771E-03
+     Oce. Update Vel. : 1.194E-04
+     Oce. Fer-GM.     : 6.294E-04
+     _______________________________
+     ALE-Solve SSH    : 6.980E-03
+     ALE-Calc. hbar   : 1.120E-04
+     ALE-Update+W     : 4.476E-04
+     ALE-Solve Tracer : 2.029E-01
+     ALE-Update hnode : 1.231E-04
+     _______________________________
+     check for blowup : 7.054E-03
+     _______________________________
+     Oce. TOTAL       : 2.237E-01
+ 
+ 
+ FESOM =======================================================
+ FESOM step:          64  day:           2  year:        1979
+ 
+ ___ICE STEP EXECUTION TIMES____________________________
+	Ice Dyn.        : 3.449E-03
+	Ice Advect.     : 5.066E-04
+	Ice Thermodyn.  : 4.126E-05
+    _______________________________
+	Ice TOTAL       : 3.997E-03
+ 
+ ___CHECK GLOBAL OCEAN VARIABLES --> mstep=          64
+ 	___global estimat of eta & hbar____________________
+ 	 int(eta), int(hbar)      = -4.717248901756072E-016 -4.717248901756072E-016
+ 	  --> error(eta-hbar)     =  0.000000000000000E+000
+ 	 min(eta) , max(eta)      =  -1.61488585834955       0.905074666439055     
+ 	 max(hbar), max(hbar)     =  -1.61488585834955       0.905074666439055     
+ 
+ 	 int(deta), int(dhbar)    = -6.487899257009574E-012 -1.465764484743098E-019
+ 	  --> error(deta-dhbar)   = -6.487899110433125E-012
+ 	  --> error(deta-wflux)   = -6.487899257010213E-012
+ 	  --> error(dhbar-wflux)  = -1.465770874969123E-019
+ 
+ 	 -int(wflux)*dt           = -1.725361026788489E-021
+ 	 int(deta )-int(wflux)*dt = -6.487899255284213E-012
+ 	 int(dhbar)-int(wflux)*dt = -1.448510874475213E-019
+ 
+ 	___global min/max/mean  --> mstep=          64 ____________
+ 	       eta= -1.615E+00 |  9.051E-01 | N.A.
+ 	      deta= -7.945E-02 |  6.827E-02 | N.A.
+ 	      hbar= -1.615E+00 |  9.051E-01 | N.A.
+ 	     wflux= -9.312E-06 |  2.456E-06 |  6.390E-25
+ 	     hflux= -3.389E+02 |  3.255E+03 |  0.000E+00
+ 	      temp= -1.945E+00 |  3.118E+01 |  0.000E+00
+ 	      salt=  3.852E+00 |  4.031E+01 |  0.000E+00
+ 	 wvel(1,:)= -8.087E-18 |  5.925E-18 | N.A.
+ 	 wvel(2,:)= -1.132E-04 |  1.171E-04 | N.A.
+ 	 uvel(1,:)= -1.175E+00 |  9.221E-01 | N.A.
+ 	 uvel(2,:)= -1.115E+00 |  9.234E-01 | N.A.
+ 	 vvel(1,:)= -1.008E+00 |  1.098E+00 | N.A.
+ 	 vvel(2,:)= -1.006E+00 |  1.096E+00 | N.A.
+ 	hnode(1,:)=  4.665E+00 |  5.226E+00 | N.A.
+ 	hnode(2,:)=  4.665E+00 |  5.226E+00 | N.A.
+ 	     cfl_z=  N.A.      |  9.036E-01 | N.A.
+ 	     pgf_x=  N.A.      |  4.682E-05 | N.A.
+ 	     pgf_y=  N.A.      |  6.282E-05 | N.A.
+ 	        Av=  N.A.      |  1.335E+00 | N.A.
+ 	        Kv=  N.A.      |  2.314E+00 | N.A.
+ 	     m_ice=  N.A.      |  1.029E+01 | N.A.
+ 
+ ___ALE OCEAN STEP EXECUTION TIMES______________________
+     Oce. Mix,Press.. : 3.457E-03
+     Oce. Dynamics    : 1.792E-03
+     Oce. Update Vel. : 1.239E-04
+     Oce. Fer-GM.     : 6.417E-04
+     _______________________________
+     ALE-Solve SSH    : 6.041E-03
+     ALE-Calc. hbar   : 1.041E-04
+     ALE-Update+W     : 4.370E-04
+     ALE-Solve Tracer : 1.895E-01
+     ALE-Update hnode : 1.279E-04
+     _______________________________
+     check for blowup : 2.983E-03
+     _______________________________
+     Oce. TOTAL       : 2.052E-01
+ 
+ 
+ FESOM =======================================================
+ FESOM step:          96  day:           3  year:        1979
+ 
+ ___ICE STEP EXECUTION TIMES____________________________
+	Ice Dyn.        : 3.400E-03
+	Ice Advect.     : 5.992E-04
+	Ice Thermodyn.  : 5.016E-05
+    _______________________________
+	Ice TOTAL       : 4.049E-03
+ 
+ ___CHECK GLOBAL OCEAN VARIABLES --> mstep=          96
+ 	___global estimat of eta & hbar____________________
+ 	 int(eta), int(hbar)      = -4.931669306381348E-016 -4.931669306381348E-016
+ 	  --> error(eta-hbar)     =  0.000000000000000E+000
+ 	 min(eta) , max(eta)      =  -1.68829909603070       0.968074717425641     
+ 	 max(hbar), max(hbar)     =  -1.68829909603070       0.968074717425641     
+ 
+ 	 int(deta), int(dhbar)    = -2.821875421535461E-012  6.281847791756133E-020
+ 	  --> error(deta-dhbar)   = -2.821875484353939E-012
+ 	  --> error(deta-wflux)   = -2.821875421532586E-012
+ 	  --> error(dhbar-wflux)  =  6.282135351927264E-020
+ 
+ 	 -int(wflux)*dt           =  7.764124620548198E-021
+ 	 int(deta )-int(wflux)*dt = -2.821875429299586E-012
+ 	 int(dhbar)-int(wflux)*dt =  5.505435329701313E-020
+ 
+ 	___global min/max/mean  --> mstep=          96 ____________
+ 	       eta= -1.688E+00 |  9.681E-01 | N.A.
+ 	      deta= -4.086E-02 |  4.771E-02 | N.A.
+ 	      hbar= -1.688E+00 |  9.681E-01 | N.A.
+ 	     wflux= -8.832E-06 |  2.488E-06 | -2.876E-24
+ 	     hflux= -3.517E+02 |  3.134E+03 |  0.000E+00
+ 	      temp= -1.940E+00 |  3.115E+01 |  0.000E+00
+ 	      salt=  3.855E+00 |  4.031E+01 |  0.000E+00
+ 	 wvel(1,:)= -6.753E-18 |  7.205E-18 | N.A.
+ 	 wvel(2,:)= -1.228E-04 |  1.038E-04 | N.A.
+ 	 uvel(1,:)= -1.219E+00 |  1.003E+00 | N.A.
+ 	 uvel(2,:)= -1.150E+00 |  1.005E+00 | N.A.
+ 	 vvel(1,:)= -9.330E-01 |  1.114E+00 | N.A.
+ 	 vvel(2,:)= -9.303E-01 |  1.117E+00 | N.A.
+ 	hnode(1,:)=  4.656E+00 |  5.232E+00 | N.A.
+ 	hnode(2,:)=  4.656E+00 |  5.232E+00 | N.A.
+ 	     cfl_z=  N.A.      |  9.114E-01 | N.A.
+ 	     pgf_x=  N.A.      |  4.725E-05 | N.A.
+ 	     pgf_y=  N.A.      |  6.407E-05 | N.A.
+ 	        Av=  N.A.      |  1.040E+00 | N.A.
+ 	        Kv=  N.A.      |  2.402E+00 | N.A.
+ 	     m_ice=  N.A.      |  1.029E+01 | N.A.
+ 
+ ___ALE OCEAN STEP EXECUTION TIMES______________________
+     Oce. Mix,Press.. : 3.547E-03
+     Oce. Dynamics    : 1.715E-03
+     Oce. Update Vel. : 1.272E-04
+     Oce. Fer-GM.     : 6.567E-04
+     _______________________________
+     ALE-Solve SSH    : 6.517E-03
+     ALE-Calc. hbar   : 1.037E-04
+     ALE-Update+W     : 4.262E-04
+     ALE-Solve Tracer : 1.892E-01
+     ALE-Update hnode : 1.136E-04
+     _______________________________
+     check for blowup : 2.857E-03
+     _______________________________
+     Oce. TOTAL       : 2.053E-01
+ 
+ 
+ FESOM Run is finished, updating clock, my_fesom_group:           0
+ ___MODEL RUNTIME mean, min, max per task [seconds]________________________
+   runtime ocean:   19.35427       18.58110       19.68752    
+     > runtime oce. mix,pres. :  0.3508413      0.3250021      0.3779126    
+     > runtime oce. dyn. u,v,w:  0.2132915      0.1151932      0.2469212    
+     > runtime oce. dyn. ssh  :  0.6461307      0.6156363      0.7325759    
+         > runtime oce. solve ssh:  0.6170687      0.5937055      0.7162957    
+     > runtime oce. GM/Redi   :  5.3958319E-02  1.9448359E-02  6.8664983E-02
+     > runtime oce. tracer    :   18.07994       17.35383       18.40830    
+   runtime ice  :   1.881353       1.840815       1.926813    
+     > runtime ice step :  0.4296719      0.3894745      0.4919107    
+   runtime diag:     3.1781965E-04  1.1106041E-04  6.5850612E-04
+   runtime output:   0.4645637      0.3826129      0.5248631    
+   runtime restart:  3.1429082E-03  1.0684156E-03  6.4946925E-03
+   runtime forcing:  0.6830838      0.6554325      0.7042906    
+   runtime total (ice+oce):   19.78395       19.03099       20.09285    
+ 
+ ============================================
+ =========== BENCHMARK RUNTIME ==============
+     Number of cores :          864
+     Runtime for all timesteps :    22.78967      sec
+ ============================================
+ 
+ fesom should stop with exit status = 0

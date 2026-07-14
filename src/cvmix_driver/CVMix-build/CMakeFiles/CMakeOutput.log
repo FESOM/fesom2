@@ -1,0 +1,354 @@
+The system is: Linux - 4.18.0-372.13.1.el8_6.x86_64 - x86_64
+Compiling the Fortran compiler identification source file "CMakeFortranCompilerId.F" succeeded.
+Compiler: /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/bin/mpiifort -qmkl
+Build flags: 
+Id flags: -v 
+
+The output was:
+0
+mpiifort for the Intel(R) MPI Library 2021.6 for Linux*
+Copyright Intel Corporation.
+ifort version 2021.6.0
+/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../bin/intel64/fpp    -D__INTEL_COMPILER=2021 -D__INTEL_COMPILER_UPDATE=6 -D__unix__ -D__unix -D__linux__ -D__linux -D__gnu_linux__ -Dunix -Dlinux -D__ELF__ -D__x86_64 -D__x86_64__ -D__amd64 -D__amd64__ -D__INTEL_COMPILER_BUILD_DATE=20220226 -D__INTEL_OFFLOAD -D__MMX__ -D__SSE__ -D__SSE_MATH__ -D__SSE2__ -D__SSE2_MATH__ -D__pentium4 -D__pentium4__ -D__tune_pentium4__ -I. -I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include -I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/include -I/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include/intel64/lp64 -I/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include -I/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include -I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include -I/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/intel64 -I/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/icc -I/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include -I/usr/local/include -I/usr/lib/gcc/x86_64-redhat-linux/8/include -I/usr/include/ -I/usr/include -fixed -4Ycpp -4Ncvf -f_com=yes -MX CMakeFortranCompilerId.F /tmp/ifortY1uPvK.i
+#include "..." search starts here:
+#include <...> search starts here:
+ .
+ /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include
+ /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/include
+ /albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include/intel64/lp64
+ /albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include
+ /albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include
+ /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include
+ /albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/intel64
+ /albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/icc
+ /albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include
+ /usr/local/include
+ /usr/lib/gcc/x86_64-redhat-linux/8/include
+ /usr/include/
+ /usr/include
+End of search list.
+/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../bin/intel64/fortcom    -D__INTEL_COMPILER=2021 -D__INTEL_COMPILER_UPDATE=6 -D__unix__ -D__unix -D__linux__ -D__linux -D__gnu_linux__ -Dunix -Dlinux -D__ELF__ -D__x86_64 -D__x86_64__ -D__amd64 -D__amd64__ -D__INTEL_COMPILER_BUILD_DATE=20220226 -D__INTEL_OFFLOAD -D__MMX__ -D__SSE__ -D__SSE_MATH__ -D__SSE2__ -D__SSE2_MATH__ -D__pentium4 -D__pentium4__ -D__tune_pentium4__ -I. -I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include -I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/include -I/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include/intel64/lp64 -I/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include -I/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include -I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include -I/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/intel64 -I/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/icc -I/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include -I/usr/local/include -I/usr/lib/gcc/x86_64-redhat-linux/8/include -I/usr/include/ -I/usr/include -omp_simd -O2 "-reentrancy threaded" -simd -offload_host -mGLOB_em64t=TRUE -mP1OPT_version=2021.6.0-intel64 -mGLOB_diag_file=/tmp/ifortrGYNCJ.diag -mGLOB_long_size_64 -mGLOB_routine_pointer_size_64 -mGLOB_source_language=GLOB_SOURCE_LANGUAGE_F90 -mP2OPT_static_promotion -mGLOB_pack_sort_init_list -mP1OPT_print_version=FALSE -mCG_use_gas_got_workaround=F -mP2OPT_align_option_used=TRUE -mGLOB_gcc_version=850 "-mGLOB_options_string=-I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include -I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/include -qmkl -v -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib/release -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib -Xlinker --enable-new-dtags -Xlinker -rpath -Xlinker /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib/release -Xlinker -rpath -Xlinker /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib -lmpifort -lmpi -ldl -lrt -lpthread" -mGLOB_cxx_limited_range=FALSE -mCG_extend_parms=FALSE -mGLOB_compiler_bin_directory=/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../bin/intel64 -mGLOB_as_output_backup_file_name=/tmp/ifortMrEskmas_.s -mGLOB_dashboard_use_source_name -mIPOPT_activate -mIPOPT_lite -mGLOB_uarch_tuning=0x0 -mGLOB_product_id_code=0x22006d91 -mCG_bnl_movbe=T -mP3OPT_use_mspp_call_convention -mP2OPT_subs_out_of_bound=FALSE -mP2OPT_disam_type_based_disam=2 -mGLOB_ansi_alias -mPGOPTI_value_profile_use=T -mGLOB_opt_report_use_source_name -mGLOB_offload_mode=1 -mGLOB_offload_no_openmp=TRUE -mP2OPT_offload_unique_var_string=ifort0072982670NbB9dz -mP2OPT_hlo_level=2 -mP2OPT_hlo -mP2OPT_hpo_rtt_control=0 -mIPOPT_args_in_regs=0 -mP2OPT_disam_assume_nonstd_intent_in=FALSE -mGLOB_imf_mapping_library=/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../bin/intel64/libiml_attr.so -mIPOPT_single_file_compile_and_link=TRUE -mPGOPTI_gen_threadsafe_level=0 -mIPOPT_lto_object_enabled -mIPOPT_lto_object_value=1 -mIPOPT_obj_output_file_name=/tmp/ifortrGYNCJ.o -mIPOPT_whole_archive_fixup_file_name=/tmp/ifortwarchf3F8xl -mGLOB_linker_version=2.30 -mGLOB_linker=ld -mGLOB_driver_tempfile_name=/tmp/iforttempfileoNve95 -mP3OPT_asm_target=P3OPT_ASM_TARGET_GAS -mGLOB_async_unwind_tables=TRUE -mGLOB_obj_output_file=/tmp/ifortrGYNCJ.o -mGLOB_source_dialect=GLOB_SOURCE_DIALECT_FORTRAN -mP1OPT_source_file_name=CMakeFortranCompilerId.F -mP1OPT_full_source_file_name=/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-build/CMakeFiles/3.20.2/CompilerIdFortran/CMakeFortranCompilerId.F -mP2OPT_symtab_type_copy=true /tmp/ifortY1uPvK.i
+#include "..." search starts here:
+#include <...> search starts here:
+ .
+ /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include
+ /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/include
+ /albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include/intel64/lp64
+ /albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include
+ /albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include
+ /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include
+ /albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/intel64
+ /albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/icc
+ /albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include
+ /usr/local/include
+ /usr/lib/gcc/x86_64-redhat-linux/8/include
+ /usr/include/
+ /usr/include
+End of search list.
+ld    /usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/8/crtbegin.o --eh-frame-hdr --build-id -dynamic-linker /lib64/ld-linux-x86-64.so.2 -m elf_x86_64 -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib/release -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib -plugin /albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../bin/intel64/../../lib/icx-lto.so -o a.out /albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/lib/intel64_lin/for_main.o -L/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64 -L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/lib/intel64_lin -L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/lib -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//libfabric/lib -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib/release -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib -L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/lib/intel64_lin -L/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64 -L/usr/lib/gcc/x86_64-redhat-linux/8/ -L/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/ -L/lib/../lib64 -L/lib/../lib64/ -L/usr/lib/../lib64 -L/usr/lib/../lib64/ -L/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64/ -L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/lib/intel64_lin/ -L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/lib/ -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//libfabric/lib/ -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib/release/ -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib/ -L/usr/lib/gcc/x86_64-redhat-linux/8/../../../ -L/lib64 -L/lib/ -L/usr/lib64 -L/usr/lib --start-group -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 --end-group -Bdynamic /tmp/ifortrGYNCJ.o --enable-new-dtags -rpath /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib/release -rpath /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib -lmpifort -lmpi -ldl -lrt -lpthread --start-group -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 --end-group -Bdynamic -Bstatic -lifport -lifcoremt -limf -lsvml -Bdynamic -lm -Bstatic -lipgo -lirc -Bdynamic -lpthread -Bstatic -lsvml -Bdynamic -lc -lgcc -lgcc_s -Bstatic -lirc_s -Bdynamic -ldl -lc /usr/lib/gcc/x86_64-redhat-linux/8/crtend.o /usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crtn.o
+
+
+Compilation of the Fortran compiler identification source "CMakeFortranCompilerId.F" produced "a.out"
+
+The Fortran compiler identification is Intel, found in "/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-build/CMakeFiles/3.20.2/CompilerIdFortran/a.out"
+
+Detecting Fortran compiler ABI info compiled with the following output:
+Change Dir: /albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_45d1c/fast && gmake[3]: Entering directory '/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-build/CMakeFiles/CMakeTmp'
+/usr/bin/gmake  -f CMakeFiles/cmTC_45d1c.dir/build.make CMakeFiles/cmTC_45d1c.dir/build
+gmake[4]: Entering directory '/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-build/CMakeFiles/CMakeTmp'
+Building Fortran object CMakeFiles/cmTC_45d1c.dir/CMakeFortranCompilerABI.F.o
+/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/bin/mpiifort  -qmkl   -v -c /usr/share/cmake/Modules/CMakeFortranCompilerABI.F -o CMakeFiles/cmTC_45d1c.dir/CMakeFortranCompilerABI.F.o
+mpiifort for the Intel(R) MPI Library 2021.6 for Linux*
+Copyright Intel Corporation.
+ifort version 2021.6.0
+/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../bin/intel64/fpp    -D__INTEL_COMPILER=2021 -D__INTEL_COMPILER_UPDATE=6 -D__unix__ -D__unix -D__linux__ -D__linux -D__gnu_linux__ -Dunix -Dlinux -D__ELF__ -D__x86_64 -D__x86_64__ -D__amd64 -D__amd64__ -D__INTEL_COMPILER_BUILD_DATE=20220226 -D__INTEL_OFFLOAD -D__MMX__ -D__SSE__ -D__SSE_MATH__ -D__SSE2__ -D__SSE2_MATH__ -D__pentium4 -D__pentium4__ -D__tune_pentium4__ -I. -I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include -I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/include -I/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include/intel64/lp64 -I/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include -I/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include -I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include -I/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/intel64 -I/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/icc -I/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include -I/usr/local/include -I/usr/lib/gcc/x86_64-redhat-linux/8/include -I/usr/include/ -I/usr/include -fixed -4Ycpp -4Ncvf -f_com=yes -MX /usr/share/cmake/Modules/CMakeFortranCompilerABI.F /tmp/ifortAPlsCW.i
+#include "..." search starts here:
+#include <...> search starts here:
+ .
+ /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include
+ /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/include
+ /albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include/intel64/lp64
+ /albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include
+ /albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include
+ /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include
+ /albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/intel64
+ /albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/icc
+ /albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include
+ /usr/local/include
+ /usr/lib/gcc/x86_64-redhat-linux/8/include
+ /usr/include/
+ /usr/include
+End of search list.
+/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../bin/intel64/fortcom    -D__INTEL_COMPILER=2021 -D__INTEL_COMPILER_UPDATE=6 -D__unix__ -D__unix -D__linux__ -D__linux -D__gnu_linux__ -Dunix -Dlinux -D__ELF__ -D__x86_64 -D__x86_64__ -D__amd64 -D__amd64__ -D__INTEL_COMPILER_BUILD_DATE=20220226 -D__INTEL_OFFLOAD -D__MMX__ -D__SSE__ -D__SSE_MATH__ -D__SSE2__ -D__SSE2_MATH__ -D__pentium4 -D__pentium4__ -D__tune_pentium4__ -I/usr/share/cmake/Modules -I. -I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include -I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/include -I/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include/intel64/lp64 -I/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include -I/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include -I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include -I/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/intel64 -I/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/icc -I/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include -I/usr/local/include -I/usr/lib/gcc/x86_64-redhat-linux/8/include -I/usr/include/ -I/usr/include -omp_simd -O2 "-reentrancy threaded" -simd -offload_host -mGLOB_em64t=TRUE -mP1OPT_version=2021.6.0-intel64 -mGLOB_diag_file=CMakeFiles/cmTC_45d1c.dir/CMakeFortranCompilerABI.F.diag -mGLOB_long_size_64 -mGLOB_routine_pointer_size_64 -mGLOB_source_language=GLOB_SOURCE_LANGUAGE_F90 -mP2OPT_static_promotion -mGLOB_pack_sort_init_list -mP1OPT_print_version=FALSE -mCG_use_gas_got_workaround=F -mP2OPT_align_option_used=TRUE -mGLOB_gcc_version=850 "-mGLOB_options_string=-I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include -I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/include -qmkl -v -c -o CMakeFiles/cmTC_45d1c.dir/CMakeFortranCompilerABI.F.o" -mGLOB_cxx_limited_range=FALSE -mCG_extend_parms=FALSE -mGLOB_compiler_bin_directory=/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../bin/intel64 -mGLOB_as_output_backup_file_name=/tmp/ifortaGeiN9as_.s -mIPOPT_activate -mIPOPT_lite -mGLOB_uarch_tuning=0x0 -mGLOB_product_id_code=0x22006d91 -mCG_bnl_movbe=T -mP3OPT_use_mspp_call_convention -mP2OPT_subs_out_of_bound=FALSE -mP2OPT_disam_type_based_disam=2 -mGLOB_ansi_alias -mPGOPTI_value_profile_use=T -mGLOB_offload_mode=1 -mGLOB_offload_no_openmp=TRUE -mP2OPT_offload_unique_var_string=ifort1933678043gJf7u7 -mP2OPT_hlo_level=2 -mP2OPT_hlo -mP2OPT_hpo_rtt_control=0 -mIPOPT_args_in_regs=0 -mP2OPT_disam_assume_nonstd_intent_in=FALSE -mGLOB_imf_mapping_library=/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../bin/intel64/libiml_attr.so -mPGOPTI_gen_threadsafe_level=0 -mIPOPT_lto_object_enabled -mIPOPT_lto_object_value=1 -mIPOPT_obj_output_file_name=CMakeFiles/cmTC_45d1c.dir/CMakeFortranCompilerABI.F.o -mIPOPT_whole_archive_fixup_file_name=/tmp/ifortwarchNf3cvN -mGLOB_linker_version=2.30 -mGLOB_linker=ld -mGLOB_driver_tempfile_name=/tmp/iforttempfile2BYYI2 -mP3OPT_asm_target=P3OPT_ASM_TARGET_GAS -mGLOB_async_unwind_tables=TRUE -mGLOB_obj_output_file=CMakeFiles/cmTC_45d1c.dir/CMakeFortranCompilerABI.F.o -mGLOB_source_dialect=GLOB_SOURCE_DIALECT_FORTRAN -mP1OPT_source_file_name=/usr/share/cmake/Modules/CMakeFortranCompilerABI.F -mP1OPT_full_source_file_name=/usr/share/cmake/Modules/CMakeFortranCompilerABI.F -mP2OPT_symtab_type_copy=true /tmp/ifortAPlsCW.i
+#include "..." search starts here:
+#include <...> search starts here:
+ /usr/share/cmake/Modules
+ .
+ /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include
+ /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/include
+ /albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include/intel64/lp64
+ /albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include
+ /albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include
+ /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include
+ /albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/intel64
+ /albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/icc
+ /albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include
+ /usr/local/include
+ /usr/lib/gcc/x86_64-redhat-linux/8/include
+ /usr/include/
+ /usr/include
+End of search list.
+Linking Fortran executable cmTC_45d1c
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_45d1c.dir/link.txt --verbose=1
+/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/bin/mpiifort  -qmkl  -v CMakeFiles/cmTC_45d1c.dir/CMakeFortranCompilerABI.F.o -o cmTC_45d1c 
+mpiifort for the Intel(R) MPI Library 2021.6 for Linux*
+Copyright Intel Corporation.
+ifort version 2021.6.0
+/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../bin/intel64/fortcom    -mGLOB_em64t=TRUE -mP1OPT_version=2021.6.0-intel64 -mGLOB_diag_file=CMakeFiles/cmTC_45d1c.dir/CMakeFortranCompilerABI.F.diag -mGLOB_long_size_64 -mGLOB_routine_pointer_size_64 -mGLOB_source_language=GLOB_SOURCE_LANGUAGE_F90 -mP2OPT_static_promotion -mGLOB_pack_sort_init_list -mP1OPT_print_version=FALSE -mCG_use_gas_got_workaround=F -mP2OPT_align_option_used=TRUE -mGLOB_gcc_version=850 "-mGLOB_options_string=-I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include -I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/include -qmkl -v -o cmTC_45d1c -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib/release -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib -Xlinker --enable-new-dtags -Xlinker -rpath -Xlinker /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib/release -Xlinker -rpath -Xlinker /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib -lmpifort -lmpi -ldl -lrt -lpthread" -mGLOB_cxx_limited_range=FALSE -mCG_extend_parms=FALSE -mGLOB_compiler_bin_directory=/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../bin/intel64 -mGLOB_as_output_backup_file_name=/tmp/ifortfkJANqas_.s -mGLOB_dashboard_use_source_name -mIPOPT_activate -mGLOB_product_id_code=0x22006d91 -mP3OPT_use_mspp_call_convention -mP2OPT_subs_out_of_bound=FALSE -mP2OPT_disam_type_based_disam=2 -mGLOB_ansi_alias -mPGOPTI_value_profile_use=T -mGLOB_opt_report_use_source_name -mGLOB_offload_mode=1 -mGLOB_offload_no_openmp=TRUE -mP2OPT_offload_unique_var_string=ifort0869172350YJvJnj -mP2OPT_hlo -mP2OPT_hpo_rtt_control=0 -mIPOPT_args_in_regs=0 -mP2OPT_disam_assume_nonstd_intent_in=FALSE -mGLOB_imf_mapping_library=/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../bin/intel64/libiml_attr.so -mPGOPTI_gen_threadsafe_level=0 -mIPOPT_link -mIPOPT_ipo_activate -mIPOPT_mo_activate -mIPOPT_source_files_list=/tmp/ifortslisHb0Jas -mIPOPT_mo_global_data -mIPOPT_link_script_file=/tmp/ifortscript7DnCJW "-mIPOPT_cmdline_link="/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crt1.o" "/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crti.o" "/usr/lib/gcc/x86_64-redhat-linux/8/crtbegin.o" "--eh-frame-hdr" "--build-id" "-dynamic-linker" "/lib64/ld-linux-x86-64.so.2" "-m" "elf_x86_64" "-L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib/release" "-L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib" "-plugin" "/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../bin/intel64/../../lib/icx-lto.so" "-o" "cmTC_45d1c" "/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/lib/intel64_lin/for_main.o" "-L/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64" "-L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/lib/intel64_lin" "-L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/lib" "-L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//libfabric/lib" "-L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib/release" "-L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib" "-L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/lib/intel64_lin" "-L/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64" "-L/usr/lib/gcc/x86_64-redhat-linux/8/" "-L/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64" "-L/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/" "-L/lib/../lib64" "-L/lib/../lib64/" "-L/usr/lib/../lib64" "-L/usr/lib/../lib64/" "-L/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64/" "-L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/lib/intel64_lin/" "-L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/lib/" "-L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//libfabric/lib/" "-L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib/release/" "-L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib/" "-L/usr/lib/gcc/x86_64-redhat-linux/8/../../../" "-L/lib64" "-L/lib/" "-L/usr/lib64" "-L/usr/lib" "--start-group" "-lmkl_intel_lp64" "-lmkl_intel_thread" "-lmkl_core" "-liomp5" "--end-group" "-Bdynamic" "CMakeFiles/cmTC_45d1c.dir/CMakeFortranCompilerABI.F.o" "--enable-new-dtags" "-rpath" "/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib/release" "-rpath" "/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib" "-lmpifort" "-lmpi" "-ldl" "-lrt" "-lpthread" "--start-group" "-lmkl_intel_lp64" "-lmkl_intel_thread" "-lmkl_core" "-liomp5" "--end-group" "-Bdynamic" "-Bstatic" "-lifport" "-lifcoremt" "-limf" "-lsvml" "-Bdynamic" "-lm" "-Bstatic" "-lipgo" "-lirc" "-Bdynamic" "-lpthread" "-Bstatic" "-lsvml" "-Bdynamic" "-lc" "-lgcc" "-lgcc_s" "-Bstatic" "-lirc_s" "-Bdynamic" "-ldl" "-lc" "/usr/lib/gcc/x86_64-redhat-linux/8/crtend.o" "/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crtn.o"" -mIPOPT_il_in_obj -mIPOPT_ipo_activate_warn=FALSE -mIPOPT_obj_output_file_name=/tmp/ipo_iforthdAOn6.o -mIPOPT_whole_archive_fixup_file_name=/tmp/ifortwarchXOoesy -mGLOB_linker_version=2.30 -mGLOB_linker=ld -mGLOB_driver_tempfile_name=/tmp/iforttempfileTKdZVk -mP3OPT_asm_target=P3OPT_ASM_TARGET_GAS -mGLOB_async_unwind_tables=TRUE -mGLOB_obj_output_file=/tmp/ipo_iforthdAOn6.o -mGLOB_source_dialect=GLOB_SOURCE_DIALECT_NONE -mP1OPT_source_file_name=ipo_out.f -mP2OPT_symtab_type_copy=true CMakeFiles/cmTC_45d1c.dir/CMakeFortranCompilerABI.F.o -mIPOPT_object_files=T -mIPOPT_assembly_files=/tmp/ifortalis6Htqsk -mIPOPT_generated_tempfiles=/tmp/ifortelisM4cgRp -mIPOPT_embedded_object_base_name=/tmp/iforteobjqoajwG -mIPOPT_cmdline_link_new_name=/tmp/ifortllisXKF04Z
+ld    /usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/8/crtbegin.o --eh-frame-hdr --build-id -dynamic-linker /lib64/ld-linux-x86-64.so.2 -m elf_x86_64 -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib/release -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib -plugin /albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../bin/intel64/../../lib/icx-lto.so -o cmTC_45d1c /albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/lib/intel64_lin/for_main.o -L/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64 -L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/lib/intel64_lin -L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/lib -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//libfabric/lib -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib/release -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib -L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/lib/intel64_lin -L/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64 -L/usr/lib/gcc/x86_64-redhat-linux/8/ -L/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/ -L/lib/../lib64 -L/lib/../lib64/ -L/usr/lib/../lib64 -L/usr/lib/../lib64/ -L/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64/ -L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/lib/intel64_lin/ -L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/lib/ -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//libfabric/lib/ -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib/release/ -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib/ -L/usr/lib/gcc/x86_64-redhat-linux/8/../../../ -L/lib64 -L/lib/ -L/usr/lib64 -L/usr/lib --start-group -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 --end-group -Bdynamic CMakeFiles/cmTC_45d1c.dir/CMakeFortranCompilerABI.F.o --enable-new-dtags -rpath /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib/release -rpath /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib -lmpifort -lmpi -ldl -lrt -lpthread --start-group -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 --end-group -Bdynamic -Bstatic -lifport -lifcoremt -limf -lsvml -Bdynamic -lm -Bstatic -lipgo -lirc -Bdynamic -lpthread -Bstatic -lsvml -Bdynamic -lc -lgcc -lgcc_s -Bstatic -lirc_s -Bdynamic -ldl -lc /usr/lib/gcc/x86_64-redhat-linux/8/crtend.o /usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crtn.o
+gmake[4]: Leaving directory '/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-build/CMakeFiles/CMakeTmp'
+gmake[3]: Leaving directory '/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-build/CMakeFiles/CMakeTmp'
+
+
+
+Parsed Fortran implicit include dir info from above output: rv=done
+  found start of include info
+  found start of implicit include info
+    add: [.]
+    add: [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include]
+    add: [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/include]
+    add: [/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include/intel64/lp64]
+    add: [/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include]
+    add: [/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include]
+    add: [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include]
+    add: [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/intel64]
+    add: [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/icc]
+    add: [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include]
+    add: [/usr/local/include]
+    add: [/usr/lib/gcc/x86_64-redhat-linux/8/include]
+    add: [/usr/include/]
+    add: [/usr/include]
+  end of search list found
+  skipping relative include dir [.]
+  collapse include dir [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/include]
+  collapse include dir [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/include] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/include]
+  collapse include dir [/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include/intel64/lp64] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include/intel64/lp64]
+  collapse include dir [/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include]
+  collapse include dir [/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include]
+  collapse include dir [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/include]
+  collapse include dir [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/intel64] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/include/intel64]
+  collapse include dir [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/icc] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/include/icc]
+  collapse include dir [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/include]
+  collapse include dir [/usr/local/include] ==> [/usr/local/include]
+  collapse include dir [/usr/lib/gcc/x86_64-redhat-linux/8/include] ==> [/usr/lib/gcc/x86_64-redhat-linux/8/include]
+  collapse include dir [/usr/include/] ==> [/usr/include]
+  collapse include dir [/usr/include] ==> [/usr/include]
+  implicit include dirs: [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/include;/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include/intel64/lp64;/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include;/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/include/intel64;/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/include/icc;/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/include;/usr/local/include;/usr/lib/gcc/x86_64-redhat-linux/8/include;/usr/include]
+
+
+Parsed Fortran implicit link information from above output:
+  link line regex: [^( *|.*[/\])(ld|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\]+-)?ld|collect2)[^/\]*( |$)]
+  ignore line: [Change Dir: /albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-build/CMakeFiles/CMakeTmp]
+  ignore line: []
+  ignore line: [Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_45d1c/fast && gmake[3]: Entering directory '/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-build/CMakeFiles/CMakeTmp']
+  ignore line: [/usr/bin/gmake  -f CMakeFiles/cmTC_45d1c.dir/build.make CMakeFiles/cmTC_45d1c.dir/build]
+  ignore line: [gmake[4]: Entering directory '/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-build/CMakeFiles/CMakeTmp']
+  ignore line: [Building Fortran object CMakeFiles/cmTC_45d1c.dir/CMakeFortranCompilerABI.F.o]
+  ignore line: [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/bin/mpiifort  -qmkl   -v -c /usr/share/cmake/Modules/CMakeFortranCompilerABI.F -o CMakeFiles/cmTC_45d1c.dir/CMakeFortranCompilerABI.F.o]
+  ignore line: [mpiifort for the Intel(R) MPI Library 2021.6 for Linux*]
+  ignore line: [Copyright Intel Corporation.]
+  ignore line: [ifort version 2021.6.0]
+  ignore line: [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../bin/intel64/fpp    -D__INTEL_COMPILER=2021 -D__INTEL_COMPILER_UPDATE=6 -D__unix__ -D__unix -D__linux__ -D__linux -D__gnu_linux__ -Dunix -Dlinux -D__ELF__ -D__x86_64 -D__x86_64__ -D__amd64 -D__amd64__ -D__INTEL_COMPILER_BUILD_DATE=20220226 -D__INTEL_OFFLOAD -D__MMX__ -D__SSE__ -D__SSE_MATH__ -D__SSE2__ -D__SSE2_MATH__ -D__pentium4 -D__pentium4__ -D__tune_pentium4__ -I. -I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include -I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/include -I/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include/intel64/lp64 -I/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include -I/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include -I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include -I/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/intel64 -I/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/icc -I/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include -I/usr/local/include -I/usr/lib/gcc/x86_64-redhat-linux/8/include -I/usr/include/ -I/usr/include -fixed -4Ycpp -4Ncvf -f_com=yes -MX /usr/share/cmake/Modules/CMakeFortranCompilerABI.F /tmp/ifortAPlsCW.i]
+  ignore line: [#include "..." search starts here:]
+  ignore line: [#include <...> search starts here:]
+  ignore line: [ .]
+  ignore line: [ /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include]
+  ignore line: [ /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/include]
+  ignore line: [ /albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include/intel64/lp64]
+  ignore line: [ /albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include]
+  ignore line: [ /albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include]
+  ignore line: [ /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include]
+  ignore line: [ /albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/intel64]
+  ignore line: [ /albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/icc]
+  ignore line: [ /albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include]
+  ignore line: [ /usr/local/include]
+  ignore line: [ /usr/lib/gcc/x86_64-redhat-linux/8/include]
+  ignore line: [ /usr/include/]
+  ignore line: [ /usr/include]
+  ignore line: [End of search list.]
+  ignore line: [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../bin/intel64/fortcom    -D__INTEL_COMPILER=2021 -D__INTEL_COMPILER_UPDATE=6 -D__unix__ -D__unix -D__linux__ -D__linux -D__gnu_linux__ -Dunix -Dlinux -D__ELF__ -D__x86_64 -D__x86_64__ -D__amd64 -D__amd64__ -D__INTEL_COMPILER_BUILD_DATE=20220226 -D__INTEL_OFFLOAD -D__MMX__ -D__SSE__ -D__SSE_MATH__ -D__SSE2__ -D__SSE2_MATH__ -D__pentium4 -D__pentium4__ -D__tune_pentium4__ -I/usr/share/cmake/Modules -I. -I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include -I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/include -I/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include/intel64/lp64 -I/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include -I/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include -I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include -I/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/intel64 -I/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/icc -I/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include -I/usr/local/include -I/usr/lib/gcc/x86_64-redhat-linux/8/include -I/usr/include/ -I/usr/include -omp_simd -O2 "-reentrancy threaded" -simd -offload_host -mGLOB_em64t=TRUE -mP1OPT_version=2021.6.0-intel64 -mGLOB_diag_file=CMakeFiles/cmTC_45d1c.dir/CMakeFortranCompilerABI.F.diag -mGLOB_long_size_64 -mGLOB_routine_pointer_size_64 -mGLOB_source_language=GLOB_SOURCE_LANGUAGE_F90 -mP2OPT_static_promotion -mGLOB_pack_sort_init_list -mP1OPT_print_version=FALSE -mCG_use_gas_got_workaround=F -mP2OPT_align_option_used=TRUE -mGLOB_gcc_version=850 "-mGLOB_options_string=-I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include -I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/include -qmkl -v -c -o CMakeFiles/cmTC_45d1c.dir/CMakeFortranCompilerABI.F.o" -mGLOB_cxx_limited_range=FALSE -mCG_extend_parms=FALSE -mGLOB_compiler_bin_directory=/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../bin/intel64 -mGLOB_as_output_backup_file_name=/tmp/ifortaGeiN9as_.s -mIPOPT_activate -mIPOPT_lite -mGLOB_uarch_tuning=0x0 -mGLOB_product_id_code=0x22006d91 -mCG_bnl_movbe=T -mP3OPT_use_mspp_call_convention -mP2OPT_subs_out_of_bound=FALSE -mP2OPT_disam_type_based_disam=2 -mGLOB_ansi_alias -mPGOPTI_value_profile_use=T -mGLOB_offload_mode=1 -mGLOB_offload_no_openmp=TRUE -mP2OPT_offload_unique_var_string=ifort1933678043gJf7u7 -mP2OPT_hlo_level=2 -mP2OPT_hlo -mP2OPT_hpo_rtt_control=0 -mIPOPT_args_in_regs=0 -mP2OPT_disam_assume_nonstd_intent_in=FALSE -mGLOB_imf_mapping_library=/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../bin/intel64/libiml_attr.so -mPGOPTI_gen_threadsafe_level=0 -mIPOPT_lto_object_enabled -mIPOPT_lto_object_value=1 -mIPOPT_obj_output_file_name=CMakeFiles/cmTC_45d1c.dir/CMakeFortranCompilerABI.F.o -mIPOPT_whole_archive_fixup_file_name=/tmp/ifortwarchNf3cvN -mGLOB_linker_version=2.30 -mGLOB_linker=ld -mGLOB_driver_tempfile_name=/tmp/iforttempfile2BYYI2 -mP3OPT_asm_target=P3OPT_ASM_TARGET_GAS -mGLOB_async_unwind_tables=TRUE -mGLOB_obj_output_file=CMakeFiles/cmTC_45d1c.dir/CMakeFortranCompilerABI.F.o -mGLOB_source_dialect=GLOB_SOURCE_DIALECT_FORTRAN -mP1OPT_source_file_name=/usr/share/cmake/Modules/CMakeFortranCompilerABI.F -mP1OPT_full_source_file_name=/usr/share/cmake/Modules/CMakeFortranCompilerABI.F -mP2OPT_symtab_type_copy=true /tmp/ifortAPlsCW.i]
+  ignore line: [#include "..." search starts here:]
+  ignore line: [#include <...> search starts here:]
+  ignore line: [ /usr/share/cmake/Modules]
+  ignore line: [ .]
+  ignore line: [ /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include]
+  ignore line: [ /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/include]
+  ignore line: [ /albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include/intel64/lp64]
+  ignore line: [ /albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include]
+  ignore line: [ /albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/include]
+  ignore line: [ /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include]
+  ignore line: [ /albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/intel64]
+  ignore line: [ /albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include/icc]
+  ignore line: [ /albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/include]
+  ignore line: [ /usr/local/include]
+  ignore line: [ /usr/lib/gcc/x86_64-redhat-linux/8/include]
+  ignore line: [ /usr/include/]
+  ignore line: [ /usr/include]
+  ignore line: [End of search list.]
+  ignore line: [Linking Fortran executable cmTC_45d1c]
+  ignore line: [/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_45d1c.dir/link.txt --verbose=1]
+  ignore line: [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/bin/mpiifort  -qmkl  -v CMakeFiles/cmTC_45d1c.dir/CMakeFortranCompilerABI.F.o -o cmTC_45d1c ]
+  ignore line: [mpiifort for the Intel(R) MPI Library 2021.6 for Linux*]
+  ignore line: [Copyright Intel Corporation.]
+  ignore line: [ifort version 2021.6.0]
+  ignore line: [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../bin/intel64/fortcom    -mGLOB_em64t=TRUE -mP1OPT_version=2021.6.0-intel64 -mGLOB_diag_file=CMakeFiles/cmTC_45d1c.dir/CMakeFortranCompilerABI.F.diag -mGLOB_long_size_64 -mGLOB_routine_pointer_size_64 -mGLOB_source_language=GLOB_SOURCE_LANGUAGE_F90 -mP2OPT_static_promotion -mGLOB_pack_sort_init_list -mP1OPT_print_version=FALSE -mCG_use_gas_got_workaround=F -mP2OPT_align_option_used=TRUE -mGLOB_gcc_version=850 "-mGLOB_options_string=-I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//include -I/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/include -qmkl -v -o cmTC_45d1c -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib/release -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib -Xlinker --enable-new-dtags -Xlinker -rpath -Xlinker /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib/release -Xlinker -rpath -Xlinker /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib -lmpifort -lmpi -ldl -lrt -lpthread" -mGLOB_cxx_limited_range=FALSE -mCG_extend_parms=FALSE -mGLOB_compiler_bin_directory=/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../bin/intel64 -mGLOB_as_output_backup_file_name=/tmp/ifortfkJANqas_.s -mGLOB_dashboard_use_source_name -mIPOPT_activate -mGLOB_product_id_code=0x22006d91 -mP3OPT_use_mspp_call_convention -mP2OPT_subs_out_of_bound=FALSE -mP2OPT_disam_type_based_disam=2 -mGLOB_ansi_alias -mPGOPTI_value_profile_use=T -mGLOB_opt_report_use_source_name -mGLOB_offload_mode=1 -mGLOB_offload_no_openmp=TRUE -mP2OPT_offload_unique_var_string=ifort0869172350YJvJnj -mP2OPT_hlo -mP2OPT_hpo_rtt_control=0 -mIPOPT_args_in_regs=0 -mP2OPT_disam_assume_nonstd_intent_in=FALSE -mGLOB_imf_mapping_library=/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../bin/intel64/libiml_attr.so -mPGOPTI_gen_threadsafe_level=0 -mIPOPT_link -mIPOPT_ipo_activate -mIPOPT_mo_activate -mIPOPT_source_files_list=/tmp/ifortslisHb0Jas -mIPOPT_mo_global_data -mIPOPT_link_script_file=/tmp/ifortscript7DnCJW "-mIPOPT_cmdline_link="/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crt1.o" "/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crti.o" "/usr/lib/gcc/x86_64-redhat-linux/8/crtbegin.o" "--eh-frame-hdr" "--build-id" "-dynamic-linker" "/lib64/ld-linux-x86-64.so.2" "-m" "elf_x86_64" "-L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib/release" "-L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib" "-plugin" "/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../bin/intel64/../../lib/icx-lto.so" "-o" "cmTC_45d1c" "/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/lib/intel64_lin/for_main.o" "-L/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64" "-L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/lib/intel64_lin" "-L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/lib" "-L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//libfabric/lib" "-L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib/release" "-L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib" "-L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/lib/intel64_lin" "-L/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64" "-L/usr/lib/gcc/x86_64-redhat-linux/8/" "-L/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64" "-L/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/" "-L/lib/../lib64" "-L/lib/../lib64/" "-L/usr/lib/../lib64" "-L/usr/lib/../lib64/" "-L/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64/" "-L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/lib/intel64_lin/" "-L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/lib/" "-L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//libfabric/lib/" "-L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib/release/" "-L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib/" "-L/usr/lib/gcc/x86_64-redhat-linux/8/../../../" "-L/lib64" "-L/lib/" "-L/usr/lib64" "-L/usr/lib" "--start-group" "-lmkl_intel_lp64" "-lmkl_intel_thread" "-lmkl_core" "-liomp5" "--end-group" "-Bdynamic" "CMakeFiles/cmTC_45d1c.dir/CMakeFortranCompilerABI.F.o" "--enable-new-dtags" "-rpath" "/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib/release" "-rpath" "/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib" "-lmpifort" "-lmpi" "-ldl" "-lrt" "-lpthread" "--start-group" "-lmkl_intel_lp64" "-lmkl_intel_thread" "-lmkl_core" "-liomp5" "--end-group" "-Bdynamic" "-Bstatic" "-lifport" "-lifcoremt" "-limf" "-lsvml" "-Bdynamic" "-lm" "-Bstatic" "-lipgo" "-lirc" "-Bdynamic" "-lpthread" "-Bstatic" "-lsvml" "-Bdynamic" "-lc" "-lgcc" "-lgcc_s" "-Bstatic" "-lirc_s" "-Bdynamic" "-ldl" "-lc" "/usr/lib/gcc/x86_64-redhat-linux/8/crtend.o" "/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crtn.o"" -mIPOPT_il_in_obj -mIPOPT_ipo_activate_warn=FALSE -mIPOPT_obj_output_file_name=/tmp/ipo_iforthdAOn6.o -mIPOPT_whole_archive_fixup_file_name=/tmp/ifortwarchXOoesy -mGLOB_linker_version=2.30 -mGLOB_linker=ld -mGLOB_driver_tempfile_name=/tmp/iforttempfileTKdZVk -mP3OPT_asm_target=P3OPT_ASM_TARGET_GAS -mGLOB_async_unwind_tables=TRUE -mGLOB_obj_output_file=/tmp/ipo_iforthdAOn6.o -mGLOB_source_dialect=GLOB_SOURCE_DIALECT_NONE -mP1OPT_source_file_name=ipo_out.f -mP2OPT_symtab_type_copy=true CMakeFiles/cmTC_45d1c.dir/CMakeFortranCompilerABI.F.o -mIPOPT_object_files=T -mIPOPT_assembly_files=/tmp/ifortalis6Htqsk -mIPOPT_generated_tempfiles=/tmp/ifortelisM4cgRp -mIPOPT_embedded_object_base_name=/tmp/iforteobjqoajwG -mIPOPT_cmdline_link_new_name=/tmp/ifortllisXKF04Z]
+  link line: [ld    /usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crt1.o /usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crti.o /usr/lib/gcc/x86_64-redhat-linux/8/crtbegin.o --eh-frame-hdr --build-id -dynamic-linker /lib64/ld-linux-x86-64.so.2 -m elf_x86_64 -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib/release -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib -plugin /albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../bin/intel64/../../lib/icx-lto.so -o cmTC_45d1c /albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/lib/intel64_lin/for_main.o -L/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64 -L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/lib/intel64_lin -L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/lib -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//libfabric/lib -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib/release -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib -L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/lib/intel64_lin -L/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64 -L/usr/lib/gcc/x86_64-redhat-linux/8/ -L/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64 -L/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/ -L/lib/../lib64 -L/lib/../lib64/ -L/usr/lib/../lib64 -L/usr/lib/../lib64/ -L/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64/ -L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/lib/intel64_lin/ -L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/lib/ -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//libfabric/lib/ -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib/release/ -L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib/ -L/usr/lib/gcc/x86_64-redhat-linux/8/../../../ -L/lib64 -L/lib/ -L/usr/lib64 -L/usr/lib --start-group -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 --end-group -Bdynamic CMakeFiles/cmTC_45d1c.dir/CMakeFortranCompilerABI.F.o --enable-new-dtags -rpath /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib/release -rpath /albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib -lmpifort -lmpi -ldl -lrt -lpthread --start-group -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 --end-group -Bdynamic -Bstatic -lifport -lifcoremt -limf -lsvml -Bdynamic -lm -Bstatic -lipgo -lirc -Bdynamic -lpthread -Bstatic -lsvml -Bdynamic -lc -lgcc -lgcc_s -Bstatic -lirc_s -Bdynamic -ldl -lc /usr/lib/gcc/x86_64-redhat-linux/8/crtend.o /usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crtn.o]
+    arg [ld] ==> ignore
+    arg [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crt1.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crt1.o]
+    arg [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crti.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crti.o]
+    arg [/usr/lib/gcc/x86_64-redhat-linux/8/crtbegin.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/8/crtbegin.o]
+    arg [--eh-frame-hdr] ==> ignore
+    arg [--build-id] ==> ignore
+    arg [-dynamic-linker] ==> ignore
+    arg [/lib64/ld-linux-x86-64.so.2] ==> ignore
+    arg [-m] ==> ignore
+    arg [elf_x86_64] ==> ignore
+    arg [-L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib/release] ==> dir [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib/release]
+    arg [-L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib] ==> dir [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib]
+    arg [-plugin] ==> ignore
+    arg [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../bin/intel64/../../lib/icx-lto.so] ==> ignore
+    arg [-o] ==> ignore
+    arg [cmTC_45d1c] ==> ignore
+    arg [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/lib/intel64_lin/for_main.o] ==> obj [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/lib/intel64_lin/for_main.o]
+    arg [-L/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64] ==> dir [/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64]
+    arg [-L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/lib/intel64_lin] ==> dir [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/lib/intel64_lin]
+    arg [-L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/lib] ==> dir [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/lib]
+    arg [-L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//libfabric/lib] ==> dir [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//libfabric/lib]
+    arg [-L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib/release] ==> dir [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib/release]
+    arg [-L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib] ==> dir [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib]
+    arg [-L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/lib/intel64_lin] ==> dir [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/lib/intel64_lin]
+    arg [-L/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64] ==> dir [/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64]
+    arg [-L/usr/lib/gcc/x86_64-redhat-linux/8/] ==> dir [/usr/lib/gcc/x86_64-redhat-linux/8/]
+    arg [-L/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64] ==> dir [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64]
+    arg [-L/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/] ==> dir [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/]
+    arg [-L/lib/../lib64] ==> dir [/lib/../lib64]
+    arg [-L/lib/../lib64/] ==> dir [/lib/../lib64/]
+    arg [-L/usr/lib/../lib64] ==> dir [/usr/lib/../lib64]
+    arg [-L/usr/lib/../lib64/] ==> dir [/usr/lib/../lib64/]
+    arg [-L/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64/] ==> dir [/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64/]
+    arg [-L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/lib/intel64_lin/] ==> dir [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/lib/intel64_lin/]
+    arg [-L/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/lib/] ==> dir [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/lib/]
+    arg [-L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//libfabric/lib/] ==> dir [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//libfabric/lib/]
+    arg [-L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib/release/] ==> dir [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib/release/]
+    arg [-L/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib/] ==> dir [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib/]
+    arg [-L/usr/lib/gcc/x86_64-redhat-linux/8/../../../] ==> dir [/usr/lib/gcc/x86_64-redhat-linux/8/../../../]
+    arg [-L/lib64] ==> dir [/lib64]
+    arg [-L/lib/] ==> dir [/lib/]
+    arg [-L/usr/lib64] ==> dir [/usr/lib64]
+    arg [-L/usr/lib] ==> dir [/usr/lib]
+    arg [--start-group] ==> ignore
+    arg [-lmkl_intel_lp64] ==> lib [mkl_intel_lp64]
+    arg [-lmkl_intel_thread] ==> lib [mkl_intel_thread]
+    arg [-lmkl_core] ==> lib [mkl_core]
+    arg [-liomp5] ==> lib [iomp5]
+    arg [--end-group] ==> ignore
+    arg [-Bdynamic] ==> ignore
+    arg [CMakeFiles/cmTC_45d1c.dir/CMakeFortranCompilerABI.F.o] ==> ignore
+    arg [--enable-new-dtags] ==> ignore
+    arg [-rpath] ==> ignore
+    arg [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib/release] ==> ignore
+    arg [-rpath] ==> ignore
+    arg [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib] ==> ignore
+    arg [-lmpifort] ==> lib [mpifort]
+    arg [-lmpi] ==> lib [mpi]
+    arg [-ldl] ==> lib [dl]
+    arg [-lrt] ==> lib [rt]
+    arg [-lpthread] ==> lib [pthread]
+    arg [--start-group] ==> ignore
+    arg [-lmkl_intel_lp64] ==> lib [mkl_intel_lp64]
+    arg [-lmkl_intel_thread] ==> lib [mkl_intel_thread]
+    arg [-lmkl_core] ==> lib [mkl_core]
+    arg [-liomp5] ==> lib [iomp5]
+    arg [--end-group] ==> ignore
+    arg [-Bdynamic] ==> ignore
+    arg [-Bstatic] ==> ignore
+    arg [-lifport] ==> lib [ifport]
+    arg [-lifcoremt] ==> lib [ifcoremt]
+    arg [-limf] ==> lib [imf]
+    arg [-lsvml] ==> lib [svml]
+    arg [-Bdynamic] ==> ignore
+    arg [-lm] ==> lib [m]
+    arg [-Bstatic] ==> ignore
+    arg [-lipgo] ==> lib [ipgo]
+    arg [-lirc] ==> lib [irc]
+    arg [-Bdynamic] ==> ignore
+    arg [-lpthread] ==> lib [pthread]
+    arg [-Bstatic] ==> ignore
+    arg [-lsvml] ==> lib [svml]
+    arg [-Bdynamic] ==> ignore
+    arg [-lc] ==> lib [c]
+    arg [-lgcc] ==> lib [gcc]
+    arg [-lgcc_s] ==> lib [gcc_s]
+    arg [-Bstatic] ==> ignore
+    arg [-lirc_s] ==> lib [irc_s]
+    arg [-Bdynamic] ==> ignore
+    arg [-ldl] ==> lib [dl]
+    arg [-lc] ==> lib [c]
+    arg [/usr/lib/gcc/x86_64-redhat-linux/8/crtend.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/8/crtend.o]
+    arg [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crtn.o] ==> obj [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crtn.o]
+  collapse obj [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crt1.o] ==> [/usr/lib64/crt1.o]
+  collapse obj [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crti.o] ==> [/usr/lib64/crti.o]
+  collapse obj [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/lib/intel64_lin/for_main.o] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/lib/intel64_lin/for_main.o]
+  collapse obj [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/crtn.o] ==> [/usr/lib64/crtn.o]
+  collapse library dir [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib/release] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib/release]
+  collapse library dir [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib]
+  collapse library dir [/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64]
+  collapse library dir [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/lib/intel64_lin] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/lib/intel64_lin]
+  collapse library dir [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/lib] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/lib]
+  collapse library dir [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//libfabric/lib] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/libfabric/lib]
+  collapse library dir [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib/release] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib/release]
+  collapse library dir [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib]
+  collapse library dir [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/bin/intel64/../../compiler/lib/intel64_lin] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/lib/intel64_lin]
+  collapse library dir [/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64]
+  collapse library dir [/usr/lib/gcc/x86_64-redhat-linux/8/] ==> [/usr/lib/gcc/x86_64-redhat-linux/8]
+  collapse library dir [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64] ==> [/usr/lib64]
+  collapse library dir [/usr/lib/gcc/x86_64-redhat-linux/8/../../../../lib64/] ==> [/usr/lib64]
+  collapse library dir [/lib/../lib64] ==> [/lib64]
+  collapse library dir [/lib/../lib64/] ==> [/lib64]
+  collapse library dir [/usr/lib/../lib64] ==> [/usr/lib64]
+  collapse library dir [/usr/lib/../lib64/] ==> [/usr/lib64]
+  collapse library dir [/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64/] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64]
+  collapse library dir [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/lib/intel64_lin/] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/lib/intel64_lin]
+  collapse library dir [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/lib/] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/lib]
+  collapse library dir [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//libfabric/lib/] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/libfabric/lib]
+  collapse library dir [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib/release/] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib/release]
+  collapse library dir [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0//lib/] ==> [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib]
+  collapse library dir [/usr/lib/gcc/x86_64-redhat-linux/8/../../../] ==> [/usr/lib]
+  collapse library dir [/lib64] ==> [/lib64]
+  collapse library dir [/lib/] ==> [/lib]
+  collapse library dir [/usr/lib64] ==> [/usr/lib64]
+  collapse library dir [/usr/lib] ==> [/usr/lib]
+  implicit libs: [mkl_intel_lp64;mkl_intel_thread;mkl_core;iomp5;mpifort;mpi;dl;rt;pthread;mkl_intel_lp64;mkl_intel_thread;mkl_core;iomp5;ifport;ifcoremt;imf;svml;m;ipgo;irc;pthread;svml;c;gcc;gcc_s;irc_s;dl;c]
+  implicit objs: [/usr/lib64/crt1.o;/usr/lib64/crti.o;/usr/lib/gcc/x86_64-redhat-linux/8/crtbegin.o;/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/lib/intel64_lin/for_main.o;/usr/lib/gcc/x86_64-redhat-linux/8/crtend.o;/usr/lib64/crtn.o]
+  implicit dirs: [/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib/release;/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/lib;/albedo/soft/sw/spack-sw/intel-oneapi-mkl/2022.1.0-7235vfh/mkl/2022.1.0/lib/intel64;/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/compiler/lib/intel64_lin;/albedo/soft/sw/spack-sw/intel-oneapi-compilers/2022.1.0-kwhaebe/compiler/2022.1.0/linux/lib;/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/libfabric/lib;/usr/lib/gcc/x86_64-redhat-linux/8;/usr/lib64;/lib64;/usr/lib;/lib]
+  implicit fwks: []
+
+
+Determining if the Fortran compiler supports Fortran 90 passed with the following output:
+Change Dir: /albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_a759f/fast && gmake[3]: Entering directory '/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-build/CMakeFiles/CMakeTmp'
+/usr/bin/gmake  -f CMakeFiles/cmTC_a759f.dir/build.make CMakeFiles/cmTC_a759f.dir/build
+gmake[4]: Entering directory '/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-build/CMakeFiles/CMakeTmp'
+Building Fortran object CMakeFiles/cmTC_a759f.dir/testFortranCompilerF90.f90.o
+/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/bin/mpiifort  -qmkl    -c /albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-build/CMakeFiles/CMakeTmp/testFortranCompilerF90.f90 -o CMakeFiles/cmTC_a759f.dir/testFortranCompilerF90.f90.o
+Linking Fortran executable cmTC_a759f
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_a759f.dir/link.txt --verbose=1
+/albedo/soft/sw/spack-sw/intel-oneapi-mpi/2021.6.0-ypwmdz5/mpi/2021.6.0/bin/mpiifort  -qmkl CMakeFiles/cmTC_a759f.dir/testFortranCompilerF90.f90.o -o cmTC_a759f 
+gmake[4]: Leaving directory '/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-build/CMakeFiles/CMakeTmp'
+gmake[3]: Leaving directory '/albedo/home/anbros001/fesom2/src/cvmix_driver/CVMix-build/CMakeFiles/CMakeTmp'
+
+
+

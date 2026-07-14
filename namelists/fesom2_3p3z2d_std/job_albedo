@@ -1,0 +1,76 @@
+#!/bin/bash
+#SBATCH --job-name=recom_3p3z2d_std
+#SBATCH --account=biogeo.p_specbic
+#SBATCH --partition=mpp
+#SBATCH -N 9
+#SBATCH --cpus-per-task=1
+#SBATCH --time=00:30:00
+#SBATCH --qos=30min
+#SBATCH --tasks-per-node 96  # using all 128CPus we exceed the maxload limit (>130) of many used nodes when us parallel I/O
+
+#SBATCH -o slurm-out.out
+#SBATCH -e slurm-err.out
+######SBATCH --mail-user=ozgur.gurses@awi.de
+######SBATCH --mail-type=END
+
+# disable hyperthreading
+#SBATCH --hint=nomultithread
+
+module purge 
+source /albedo/home/anbros001/fesom2/env/albedo/shell 
+export OMP_NUM_THREADS=1
+ulimit -s unlimited
+
+
+# determine JOBID
+JOBID=`echo $SLURM_JOB_ID |cut -d"." -f1`
+
+#ln -s ../bin/fesom.x .           # cp -n ../bin/fesom.x
+#cp -n ../../config/namelist.config  .
+#cp -n ../../config/namelist.forcing .
+#cp -n ../../config/namelist.oce     .
+#cp -n ../../config/namelist.ice     .
+#cp -n ../../config/namelist.io      .
+#cp -n ../../config/namelist.icepack .
+
+#___DETERMINE SLURM JOBID+OUTPUTFILE____________________________________________
+jobid=$(echo $SLURM_JOB_ID | cut -d"." -f1)
+fname="fesom2.0.out"
+
+date
+srun --mpi=pmi2 ./fesom.x  > fesom2.0.out #${fname}
+date
+
+#qstat -f $PBS_JOBID
+#export EXITSTATUS=$?
+#if [ ${EXITSTATUS} -eq 0 ] || [ ${EXITSTATUS} -eq 127 ] ; then
+#sbatch job_albedo
+#fi
+
+Resultpath='/albedo/work/user/anbros001/runs/testlauf/'
+
+# Datei mit Uhrzeitangaben
+clockfile="${Resultpath}fesom.clock"
+
+# Lese die zweite Zahl aus der ersten Zeile
+second_value=$(awk '{print $2}' "$clockfile" | head -n 1)
+
+# Prüfe, ob sie gleich 1 ist
+if [ "$second_value" -gt 6 ]; then
+	exit
+fi
+
+
+#test -e $Resultpath/fesom.1980.oce.restart.nc && exit
+
+IsInFile=$( tail -1 fesom2.0.out | grep -c should)
+if (( IsInFile > 0 )); then
+# submit next #job                                                                                                     \
+ echo "submitting next job"
+ cp fesom2.0.out fesom.out.done
+ sbatch job_albedo
+else
+ echo "something is wrong, last line of fesom.out reads"
+ echo $( tail -1 fesom2.0.out)
+ echo "abnormal termination of job script"
+fi

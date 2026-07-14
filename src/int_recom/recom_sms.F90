@@ -6235,8 +6235,7 @@ endif
 #if defined(__RECOM_WAVEBANDS)
 if (RECOM_CDOM) then
         cdom_photo_rate = phot_cdom * MIN((PARave/kphot_CDOM), 1.0d0)
-endif
-#endif /* RECOM_WAVEBANDS  */
+
         sms(k,icdom) = (                                                    &
 !sl#if defined(__RECOM_WAVEBANDS)
 !slif (RECOM_CDOM) then
@@ -6263,11 +6262,9 @@ endif
             + lossC_z3                  * MicZooC * is_3zoo2det            & ! Microzooplankton
 !sl the following line is introduced to allow RECOM_CDOM 
             ) * dt_b           
-#if defined(__RECOM_WAVEBANDS)
-if (RECOM_CDOM) then
+
+
             sms(k,idoc) = fcdom * sms(k,idoc)                             
-endif !/* RECOM_CDOM */
-#endif /* RECOM_WAVEBANDS  */
             !---------------------------------------------------------------------------
             ! SINKS: Remineralization to CO2
             !---------------------------------------------------------------------------
@@ -6276,6 +6273,8 @@ endif !/* RECOM_CDOM */
             - rho_c1 * arrFunc          * cdomC                            & ! Bacterial respiration
             - cdom_photo_rate           * cdomC                            &        
                                                                           ) * dt_b + sms(k,idoc)
+endif !/* RECOM_CDOM */
+#endif /* RECOM_WAVEBANDS  */
 
         !===============================================================================
         ! 36. DISSOLVED OXYGEN (O2)
