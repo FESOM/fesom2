@@ -137,6 +137,10 @@ set(src_home ${CMAKE_CURRENT_SOURCE_DIR}) # path to src directory starting from 
 # Link FESOM2 fortran code
 file(GLOB sources_Fortran ${src_home}/*.F90)
 
+# FTZ/DAZ denormal-flush shim (C). Always compiled (the symbol is harmless when unused);
+# the startup call is gated by the FESOM_FLUSH_DENORMALS compile definition (see below).
+list(APPEND sources_Fortran ${src_home}/fesom_ftz.c)
+
 # Link custom CVMix files and fesom2cvmix wrapper-interface files
 if(CVMIX)
    file(GLOB sources_cvmix_addon ${src_home}/cvmix_driver/*.F90)
@@ -327,15 +331,30 @@ if(${FESOM_PROFILING})
    target_compile_definitions(${PROJECT_NAME} PRIVATE FESOM_PROFILING)
 endif()
 
+# Flush subnormals to zero (FTZ+DAZ) at startup. Removes the single-precision
+# denormal-underflow penalty in the EVP sea-ice loop (and any SP kernel relaxing
+# toward zero). No effect on the numerical result beyond zeroing sub-1.2e-38 values.
+option(FESOM_FLUSH_DENORMALS "Enable FTZ+DAZ denormal flushing at startup (SP perf)" OFF)
+message(STATUS "FESOM_FLUSH_DENORMALS: ${FESOM_FLUSH_DENORMALS}")
+if(${FESOM_FLUSH_DENORMALS})
+   target_compile_definitions(${PROJECT_NAME} PRIVATE FESOM_FLUSH_DENORMALS)
+endif()
+
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} STREQUAL  IntelLLVM )
    
-   # Base compiler flags (default real kind follows USE_SINGLE_PRECISION)
+   set(_FESOM_INTEL_RKIND -r8)
    if(USE_SINGLE_PRECISION)
-      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r4 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0 -fpp)
-   else()
-      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0 -fpp)
+      set(_FESOM_INTEL_RKIND -r4)
    endif()
+   set(_FESOM_INTEL_SVML -fimf-use-svml)
+   if(FESOM_INTEL_SAFE_FP)
+      message(STATUS "FESOM_INTEL_SAFE_FP=ON: omitting -fimf-use-svml")
+      set(_FESOM_INTEL_SVML "")
+   endif()
+
+   # Base compiler flags (default real kind follows USE_SINGLE_PRECISION)
+   target_compile_options(${PROJECT_NAME} PRIVATE -O3 ${_FESOM_INTEL_RKIND} -i4 -fp-model precise -no-prec-div ${_FESOM_INTEL_SVML} -init=zero -no-wrap-margin -fpe0 -fpp)
    
    # compiler flags not supported by IntelLLVM
    if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
@@ -400,7 +419,12 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
    endif()
    if(${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu )
       message(STATUS "Allowing type mismatches on Ubuntu for CI Testing" )  # NOTE(PG): Would be nicer to grab the CI=True from the env variable
-      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  ${_FESOM_GNU_RKIND} -ffree-line-length-none -cpp)
+      if(FESOM_GNU_NATIVE_O3)
+         message(STATUS "FESOM_GNU_NATIVE_O3: -O3 -march=native (performance benchmark flags)")
+         target_compile_options(${PROJECT_NAME} PRIVATE -O3 -march=native -ftree-vectorize -finit-local-zero -finline-functions -fimplicit-none ${_FESOM_GNU_RKIND} -ffree-line-length-none -cpp)
+      else()
+         target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  ${_FESOM_GNU_RKIND} -ffree-line-length-none -cpp)
+      endif()
    else()
       target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  ${_FESOM_GNU_RKIND} -ffree-line-length-none -cpp)
    endif()

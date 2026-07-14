@@ -139,6 +139,15 @@ contains
       ! EO parameters
       logical mpi_is_initialized
       integer              :: tr_num, n
+#if defined(FESOM_FLUSH_DENORMALS)
+      ! FTZ/DAZ denormal-flush shim (src/fesom_ftz.c); enabled via CMake option
+      ! FESOM_FLUSH_DENORMALS. Removes the single-precision subnormal penalty in the
+      ! EVP sea-ice loop (and any other SP kernel that relaxes toward zero).
+      interface
+         subroutine fesom_set_ftz_daz() bind(C, name="fesom_set_ftz_daz")
+         end subroutine fesom_set_ftz_daz
+      end interface
+#endif
 
 #if defined (__recom)
       type(tracers_info_type)               :: tracers_info
@@ -220,6 +229,14 @@ contains
             print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
             print *, achar(27)//'[7;32m'//' --> FESOM BUILDS UP MODEL CONFIGURATION                    '//achar(27)//'[0m'
         end if
+#if defined(FESOM_FLUSH_DENORMALS)
+        ! Flush subnormals to zero (FTZ+DAZ). MXCSR is per-thread; call on every
+        ! OpenMP worker (the directives are inert comments in a serial build).
+        !$OMP PARALLEL
+        call fesom_set_ftz_daz()
+        !$OMP END PARALLEL
+        if(f%mype==0) print *,"FESOM: FTZ+DAZ denormal flushing ENABLED (FESOM_FLUSH_DENORMALS)"
+#endif
         !=====================
         ! Read configuration data,  
         ! load the mesh and fill in 

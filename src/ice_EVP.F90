@@ -60,7 +60,7 @@ subroutine stress_tensor(ice, partit, mesh)
     !___________________________________________________________________________
     integer         :: el
     real(kind=WP)   :: det1, det2, dte, vale, r1, r2, r3, si1, si2
-    real(kind=WP)   :: zeta, delta, delta_inv, d1, d2
+    real(kind=WP)   :: zeta, delta, delta_inv, d1, d2, strain_floor
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
@@ -85,6 +85,7 @@ subroutine stress_tensor(ice, partit, mesh)
     m_ice       => ice%data(2)%values(:)
     !___________________________________________________________________________
     vale = 1.0_WP/(ice%ellipse**2)
+    strain_floor = ice%ice_strain_floor   ! 0 => disabled (see MOD_ICE.F90); SP subnormal guard
     dte  = ice%ice_dt/(1.0_WP*ice%evp_rheol_steps)
     det1 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte)
     det2 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte) !*ellipse**2
@@ -121,6 +122,15 @@ subroutine stress_tensor(ice, partit, mesh)
             eps12(el) = 0.5_WP*(sum(gradient_sca(4:6,el)*U_ice(elem2D_nodes(1:3,el))) &
                         + sum(gradient_sca(1:3,el)*V_ice(elem2D_nodes(1:3,el))) &
                         + metric_factor(el) * sum(U_ice(elem2D_nodes(1:3,el)))/3.0_WP)
+            ! ===== SP subnormal guard: flush negligibly-small strain components to 0 so
+            ! their products below stay out of the single-precision subnormal range.
+            ! Loop-invariant guard; when strain_floor==0 (default) this is a no-op and
+            ! the double-precision result is bit-identical.
+            if (strain_floor > 0.0_WP) then
+               if (abs(eps11(el)) < strain_floor) eps11(el) = 0.0_WP
+               if (abs(eps22(el)) < strain_floor) eps22(el) = 0.0_WP
+               if (abs(eps12(el)) < strain_floor) eps12(el) = 0.0_WP
+            end if
             ! ===== moduli:
             delta = sqrt((eps11(el)*eps11(el) + eps22(el)*eps22(el))*(1.0_WP+vale) + 4.0_WP*vale*eps12(el)*eps12(el) + &
                                 2.0_WP*eps11(el)*eps22(el)*(1.0_WP-vale))

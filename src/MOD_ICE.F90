@@ -197,6 +197,13 @@ TYPE T_ICE
     real(kind=WP)             :: ellipse    = 2.0_WP       !
     real(kind=WP)             :: c_pressure = 20.0_WP      !
     real(kind=WP)             :: delta_min  = 1.0e-11      ! [s^(-1)]
+    ! Strain-rate flush floor [s^(-1)]: strain components |eps| < this are set to 0
+    ! before forming delta/stresses. Default 0.0 => disabled (bit-identical, DP-safe).
+    ! Purpose: in single precision, tiny strain products (~1e-40) underflow to SP
+    ! subnormals and trigger slow FPU microcode assists in the EVP subcycle loop.
+    ! A floor ~1e-15 flushes only numerical noise (physical strains are >~1e-9) and
+    ! keeps products (>~1e-30) well above the SP subnormal threshold (~1.2e-38).
+    real(kind=WP)             :: ice_strain_floor = 0.0_WP ! [s^(-1)] see note above
     real(kind=WP)             :: Clim_evp   = 615          ! kg/m^2
     real(kind=WP)             :: zeta_min   = 4.0e+8       ! kg/s
     integer                   :: evp_rheol_steps=120       ! EVP rheology cybcycling steps
@@ -595,10 +602,11 @@ subroutine ice_init(ice, partit, mesh)
     ! define ice namelist parameter
     integer        :: whichEVP, evp_rheol_steps, ice_ave_steps
     real(kind=WP)  :: Pstar, ellipse, c_pressure, delta_min, ice_gamma_fct, &
-                      ice_diff, theta_io, alpha_evp, beta_evp, c_aevp, Cd_oce_ice
+                      ice_diff, theta_io, alpha_evp, beta_evp, c_aevp, Cd_oce_ice, &
+                      ice_strain_floor
     namelist /ice_dyn/ whichEVP, Pstar, ellipse, c_pressure, delta_min, evp_rheol_steps, &
                        Cd_oce_ice, ice_gamma_fct, ice_diff, theta_io, ice_ave_steps, &
-                       alpha_evp, beta_evp, c_aevp
+                       alpha_evp, beta_evp, c_aevp, ice_strain_floor
     logical        :: snowdist, new_iclasses, use_meltponds
     integer        :: open_water_albedo, iclasses
     real(kind=WP)  :: Sice, h0, h0_s, emiss_ice, emiss_wat, albsn, albsnm, albi, &
@@ -623,6 +631,7 @@ subroutine ice_init(ice, partit, mesh)
     ellipse          = ice%ellipse
     c_pressure       = ice%c_pressure
     delta_min        = ice%delta_min
+    ice_strain_floor = ice%ice_strain_floor
     evp_rheol_steps  = ice%evp_rheol_steps
     Cd_oce_ice       = ice%cd_oce_ice
     ice_gamma_fct    = ice%ice_gamma_fct
@@ -682,6 +691,7 @@ subroutine ice_init(ice, partit, mesh)
     ice%ellipse         = ellipse
     ice%c_pressure      = c_pressure
     ice%delta_min       = delta_min
+    ice%ice_strain_floor= ice_strain_floor
     ice%evp_rheol_steps = evp_rheol_steps
     ice%cd_oce_ice      = Cd_oce_ice
     ice%ice_gamma_fct   = ice_gamma_fct

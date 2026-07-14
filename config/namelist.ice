@@ -26,6 +26,9 @@ c_pressure     = 20.0           ! ice concentration parameter for strength compu
 
 ! --- Ice Deformation ---
 delta_min      = 1.0e-11        ! minimum strain rate for viscosity regularization [s⁻¹]
+ice_strain_floor = 0.0          ! flush |strain rate| < this to 0 before forming stresses [s⁻¹]
+                                ! 0.0 = disabled (default, DP bit-identical). Set ~1e-15 in
+                                ! single precision to avoid subnormal-underflow slowdown in EVP.
 
 ! --- EVP Subcycling ---
 evp_rheol_steps = 120           ! number of EVP subcycles per ice time step
