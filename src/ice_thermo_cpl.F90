@@ -586,7 +586,17 @@ contains
   hcapice=rhoice*cpice*dice             ! heat capacity of upper 0.05 cm sea ice layer [J/(m²K)]
   zcpdt=hcapice/dt                      ! Energy required to change temperature of top ice "layer" [J/(sm²K)]
   zcprosn=rhosno*cpsno/dt               ! Specific Energy required to change temperature of 1m snow on ice [J/(sm³K)]
-  zcpdte=zcpdt !+zcprosn*hsn            ! Combined Energy required to change temperature of snow + 0.05m of upper ice
+  ! Snow heat capacity RE-ENABLED (2026-07-14): with only the top 10 cm of ice
+  ! as thermal mass, the hourly explicit flux coupling with OpenIFS is an
+  ! underdamped oscillator (no dQ/dT feedback within the coupling interval); in
+  ! snow-loaded winter pack ice (largest zsniced/con gain) the surface
+  ! temperature oscillation grows until OIFS's single-precision saturation math
+  ! overflows (movcav16 attempt-8 crash, day 141, austral-winter MIZ). The snow
+  ! term is physical damping and scales with actual snow depth, so thin-snow
+  ! response stays fast. Historical caveat (from the 3-hourly-coupling era):
+  ! too much thermal mass thinned the ice and slowed the response to warm-air
+  ! intrusions -- watch ice volume in verification.
+  zcpdte=zcpdt+zcprosn*hsn              ! Combined Energy required to change temperature of snow + 0.05m of upper ice
   t=(zcpdte*t+a2ihf+zicefl)/(zcpdte+con/zsniced) ! New sea ice surf temp [K]
   if (t>273.15_WP) then
      qres=(con/zsniced+zcpdte)*(t-273.15_WP)
