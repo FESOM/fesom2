@@ -391,10 +391,11 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
               end do
 #if defined (__recom)
             elseif (i.eq.8) then
-              ! GloCO2flux_seaicemask is in [mmol/m2/s], need [kg/m2/s]
+              ! GloCO2flux_seaicemask is in [mmolCO2 m-2 s-1], need [kgCO2 m-2 s-1]
               ! Conversion: 1.0e-3_WP -> mol/s -> kg/s
               ! 1 mol CO2 = 44.0095 g/mol = 0.0440095 kg/mol (NIST 2018)
-              exchange(:) = GloCO2flux_seaicemask(:) * 1.0e-3_WP * 0.0440095_WP  ! [kg m⁻² s⁻¹]
+              ! *-1 for correct flux direction convention: oifs expects >0: downward; fesom: >0: upward
+              exchange(:) = GloCO2flux_seaicemask(:) * 1.0e-3_WP * 0.0440095_WP * -1 ! [kgCO2 m-2 s-1]
 #endif
             else    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
@@ -578,10 +579,10 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 #if defined (__recom)
          elseif (i.eq.16) then
              if (action) then
-                ! Convert mass mixing ratio (kg/kg) to mole fraction (dimensionless)
+                ! Convert mass mixing ratio (kg/kg) to ppm
                 ! MW_CO2 = 44.0095 g/mol (NIST 2018)
                 ! MW_dry_air = 28.9647 g/mol (standard atmosphere composition)
-                x_co2atm(:) = exchange(:) * ((28.9647_WP/44.0095_WP)*1e6_WP)  ! [mole fraction]
+                x_co2atm(:) = exchange(:) * ((28.9647_WP/44.0095_WP)*1e6_WP)  ! [ppm]
              end if
 #endif
 #else
