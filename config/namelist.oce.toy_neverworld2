@@ -79,3 +79,20 @@ state_equation     = 0         ! 0: use linear equation of state
 
 /
 
+! ============================================================================
+! NEVERWORLD2 SST RESTORING (Toy_Neverworld2 module, only read if which_toy='neverworld2')
+! ============================================================================
+&neverworld2_forcing
+trelax_opt         = 1         ! 1: nudge the temperature tracer directly, T += dt*tau_inv*(Ttarget-T)
+                                ! 2: apply restoring as a surface heat flux instead (Genevieve's method):
+                                !    heat_flux = gamma_restore*(Tsurface-Ttarget), visible in the heat budget
+gamma_restore      = 40.0      ! [W/m^2/K] restoring strength, only used if trelax_opt=2.
+                                ! NOT independently tuned for this mesh -- Genevieve's original default.
+                                ! To pick a value from a target restoring timescale instead:
+                                !   gamma_restore = h*vcpw / tau_eff   (vcpw = 4.2e6 J/m^3/K)
+                                ! For comparison against trelax_opt=1's tau=50 days (tau_inv default):
+                                !   h=50m, tau_eff=50 days -> gamma_restore = 50*4.2e6/(50*86400) = 48.6 W/m^2/K
+                                ! i.e. 40 W/m^2/K already implies tau_eff=61 days at h=50m -- same ballpark
+                                ! as the original 50-day default, not wildly off.
+/
+

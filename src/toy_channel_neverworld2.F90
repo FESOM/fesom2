@@ -13,14 +13,50 @@ MODULE Toy_Neverworld2
     SAVE 
     private
     public            :: initial_state_neverworld2, relax_2_tsurf, oce_mixing_TOY,  &
-                        do_wind, wind_opt, tau_inv, do_Trelax, do_Tpert
+                        do_wind, wind_opt, tau_inv, do_Trelax, do_Tpert, trelax_opt, &
+                        gamma_restore, do_north_cold_patch, north_pole_target, north_cold_patch_power, &
+                        neverworld2_forcing
     logical           :: do_wind  = .True.    ! apply surface windstress
     integer           :: wind_opt = 2         ! 1: interpolate tau from profile data, 2: read already to elem interp profile data
-    
+
     logical           :: do_Trelax= .False.   ! apply surface temp relaxation
     logical           :: do_Tpert = .True.    ! apply temp. perturbation to trigger instabilities
-    
-    real(kind=WP)     :: tau_inv  =1.0/50.0/24.0/3600.0 
+
+    ! Two alternative SST restoring implementations, picked by trelax_opt (same pattern as wind_opt):
+    !   1: original -- directly nudges the temperature tracer: T += dt*tau_inv*(Ttarget-T)
+    !   2: Genevieve's -- applies restoring as a surface heat flux instead, so it is visible
+    !      in the heat budget: heat_flux = gamma_restore*(Tsurface-Ttarget) [W/m^2/K].
+    !      FESOM heat_flux convention: >0 cools the ocean (heat leaving), <0 warms it.
+    integer           :: trelax_opt = 1
+    real(kind=WP)     :: tau_inv  =1.0/50.0/24.0/3600.0   ! used by trelax_opt=1, i.e. tau=1/tau_inv=50 days
+    !
+    ! gamma_restore = 40.0 W/m^2/K is Genevieve's original default, carried over as-is.
+    ! It is NOT independently derived/tuned for this mesh/config -- treat it as a
+    ! placeholder and revisit before relying on it scientifically.
+    !
+    ! To pick a value from a target restoring timescale instead, note that a heat
+    ! flux of gamma_restore*(Tsurface-Ttarget) applied over a layer of thickness h
+    ! is equivalent to a Newtonian relaxation (trelax_opt=1 style) with timescale
+    !     tau_eff = h*vcpw / gamma_restore                 (vcpw = 4.2e6 J/m^3/K)
+    ! i.e.
+    !     gamma_restore = h*vcpw / tau_eff
+    ! For comparison against trelax_opt=1's tau=50 days (the tau_inv default above):
+    !   h=50m, tau_eff=50 days -> gamma_restore = 50*4.2e6/(50*86400) = 48.6 W/m^2/K
+    ! i.e. Genevieve's 40 W/m^2/K already corresponds to tau_eff=h*vcpw/40=61 days at
+    ! h=50m -- in the same ballpark as the original 50-day default, not wildly off.
+    real(kind=WP)     :: gamma_restore = 40.0_WP           ! used by trelax_opt=2
+
+    ! Optional asymmetric cold patch near the northern edge, only used with trelax_opt=2:
+    ! blends the symmetric cosine restoring target towards north_pole_target as
+    ! ynorm=lat/Ly -> 1. Off by default.
+    logical           :: do_north_cold_patch    = .False.
+    real(kind=WP)     :: north_pole_target      = 0.0_WP
+    real(kind=WP)     :: north_cold_patch_power = 2.0_WP
+
+    ! trelax_opt and gamma_restore are namelist-controlled: read from the &neverworld2_forcing
+    ! group in namelist.oce by gen_model_setup.F90 (only when which_toy=='neverworld2').
+    ! The other toy parameters above stay compiled-in defaults, same as before.
+    NAMELIST /neverworld2_forcing/ trelax_opt, gamma_restore
     contains
     !
     !
@@ -35,6 +71,7 @@ MODULE Toy_Neverworld2
 
         integer                               :: elem, node, ii, nz, nzmin, nzmax, elnodes(3), taul, idx
         real(kind=WP)                         :: lon, lat, dlat_tau, loc_Ly, Ly
+        real(kind=WP)                         :: ynorm, t_base, cold_weight   ! used by trelax_opt=2
         real(kind=WP), allocatable            :: lat_tau(:), val_tau(:)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -121,20 +158,43 @@ MODULE Toy_Neverworld2
         ! --> see oce_ale_pressure_bv.F90 --> subroutine density_linear(...)
         
         !___________________________________________________________________________
-        ! Surface temperature relaxation:
-        ! The Neverworld2 is adiabatic, but I suspect some surface forcing will be 
-        ! needed for long runs. This is an example of some surface temperature 
+        ! Surface temperature relaxation target:
+        ! The Neverworld2 is adiabatic, but I suspect some surface forcing will be
+        ! needed for long runs. This is an example of some surface temperature
         ! distribution. Relaxation of surface temperature to this distribution will
-        ! be introducing some temperature forcing. 
+        ! be introducing some temperature forcing.
         ! Some experiments are needed to adjust Tsurf
-        if (do_Trelax) then 
-            do node = 1, myDim_nod2D+eDim_nod2D 
-                lat          = coord_nod2D(2,node)/rad
-                Tsurf(node) = 18.0+10.0*cos(pi*lat/Ly)
-            end do
-        end if     
-        ! In order to introduce forcing we need to allow surface relaxation to 
-        ! climatology. 
+        if (do_Trelax) then
+            select case(trelax_opt)
+            case(1)
+                ! original: symmetric cosine target, ~18-28C, lat in degrees
+                do node = 1, myDim_nod2D+eDim_nod2D
+                    lat          = coord_nod2D(2,node)/rad
+                    Tsurf(node) = 18.0+10.0*cos(pi*lat/Ly)
+                end do
+            case(2)
+                ! Genevieve: symmetric cosine target, ~5-28C, consistent radian units
+                ! throughout (lat and Ly both in radians), plus optional asymmetric
+                ! cold patch that pulls the target down to north_pole_target near the
+                ! northern edge (ynorm=lat/Ly -> 1).
+                do node = 1, myDim_nod2D+eDim_nod2D
+                    lat   = coord_nod2D(2,node)
+                    ynorm = lat/Ly
+                    t_base = 5.0_WP + 28.0_WP*cos(0.5_WP*pi*lat/Ly)
+                    if (do_north_cold_patch .and. ynorm>0.0_WP) then
+                        cold_weight = ynorm**north_cold_patch_power
+                        Tsurf(node) = (1.0_WP-cold_weight)*t_base + cold_weight*north_pole_target
+                    else
+                        Tsurf(node) = t_base
+                    end if
+                end do
+            case default
+                write(*,*) " -ERROR-> This trelax_opt is not supported !"
+                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            end select
+        end if
+        ! In order to introduce forcing we need to allow surface relaxation to
+        ! climatology.
 
         !___________________________________________________________________________
         ! Temperature perturbation to trigger instabilities
@@ -165,16 +225,45 @@ MODULE Toy_Neverworld2
         type(t_partit),      intent(inout), target  :: partit
         type(t_tracer_data), intent(inout), target  :: tdata
         integer                                     :: node
+        real(kind=WP)                               :: t_surface, t_target   ! used by trelax_opt=2
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
-        if (do_Trelax) then 
-            do node=1, myDim_nod2D
-                tdata%values(1,node)  = tdata%values(1,node)+dt*tau_inv*(Tsurf(node)-tdata%values(1,node))
-            end do
-        end if 
-        
+#include "associate_mesh_ass.h"
+        if (do_Trelax) then
+            select case(trelax_opt)
+            case(1)
+                ! original: nudge the tracer directly towards Tsurf
+                do node=1, myDim_nod2D
+                    tdata%values(1,node)  = tdata%values(1,node)+dt*tau_inv*(Tsurf(node)-tdata%values(1,node))
+                end do
+            case(2)
+                ! Genevieve: apply restoring as a surface heat flux instead of nudging
+                ! the tracer directly, so it shows up in the heat budget. Overwrites
+                ! heat_flux every call since, for this adiabatic toy config, restoring
+                ! is its only source.
+                heat_flux = 0.0_WP
+                do node=1, myDim_nod2D
+                    t_surface = tdata%values(1,node)
+                    t_target  = Tsurf(node)
+                    heat_flux(node) = gamma_restore*(t_surface-t_target)
+                end do
+                ! heat_flux_in is what diag_densMOC actually reads for its heat-driven
+                ! buoyancy-flux term (dens_flux_e, std_heat_flux) -- it's normally set in
+                ! oce_fluxes/ice_oce_coupling.F90, a path this toy config never runs
+                ! (use_ice=.false.), so without this line heat_flux_in would stay 0 forever
+                ! and the DMOC diagnostic would silently miss this restoring flux entirely.
+                heat_flux_in = heat_flux
+                ! The loop above only fills owned nodes (1:myDim_nod2D); halo nodes are
+                ! still whatever heat_flux=0.0_WP reset them to. diag_densMOC reads these
+                ! per-element (elnodes), and elements straddling a partition boundary have
+                ! halo-node vertices -- without this exchange those would silently read 0
+                ! instead of the neighbouring rank's value, biasing dens_flux_e/std_heat_flux
+                ! low near partition boundaries.
+                call exchange_nod(heat_flux, heat_flux_in, partit)
+            end select
+        end if
+
     end subroutine relax_2_tsurf
 
 
