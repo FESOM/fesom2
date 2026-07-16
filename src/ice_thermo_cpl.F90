@@ -37,6 +37,12 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP)  :: A, h, hsn, alb, t
   !---- atmospheric heat fluxes (provided by ECHAM)
   real(kind=WP)  :: a2ohf, a2ihf, qres, qcon
+  !---- implicit-solve bookkeeping (see ice_surftemp): tref = ist anchor the
+  !---- atmosphere evaluated a2ihf at; qlam = linearization heat booked to the
+  !---- ice growth budget as latent-heat closure (energy conservation).
+  real(kind=WP)  :: qlam, tref
+  !---- ICEDBG descent-diagnostics line counter (log-only)
+  integer, save  :: icedbg_n = 0
   !---- evaporation and sublimation (provided by ECHAM)
   real(kind=WP)  :: evap, subli
   !---- add residual freshwater flux over ice to freshwater (setted in ice_growth)
@@ -74,6 +80,7 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
 #if defined (__oifs) || defined (__ifsinterface)
   real(kind=WP), dimension(:) , pointer  :: ice_temp, ice_alb, enthalpyoffuse, ice_heat_qres, ice_heat_qcon, runoff_liquid, runoff_solid
+  real(kind=WP), dimension(:) , pointer  :: ist_ref
 #endif
 #if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
   real(kind=WP), dimension(:)  , pointer ::  oce_heat_flux, ice_heat_flux 
@@ -109,7 +116,8 @@ subroutine thermodynamics(ice, partit, mesh)
   runoff_solid  => ice%atmcoupl%runoff_solid(:)
   ice_heat_qres => ice%atmcoupl%flx_qres(:)
   ice_heat_qcon => ice%atmcoupl%flx_qcon(:)
-#endif 
+  ist_ref       => ice%atmcoupl%ist_ref(:)
+#endif
 #if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
   oce_heat_flux => ice%atmcoupl%oce_flx_h(:)
   ice_heat_flux => ice%atmcoupl%ice_flx_h(:)
@@ -172,9 +180,29 @@ subroutine thermodynamics(ice, partit, mesh)
      t                   = ice_temp(inod)
      qres     = 0.0_WP
      qcon     = 0.0_WP
+     qlam     = 0.0_WP
      if(A>Aimin) then
-        call ice_surftemp(ice%thermo, max(h/(max(A,Aimin)),0.05), hsn/(max(A,Aimin)), a2ihf, t)
+        ! Anchor temperature for the implicit flux linearization: the ist OIFS
+        ! actually evaluated a2ihf at (captured at the OASIS send). Fall back
+        ! to the local t before the first transmission (cold start / restart).
+        tref = ist_ref(inod)
+        if (tref < 100.0_WP) tref = t
+        call ice_surftemp(ice%thermo, max(h/(max(A,Aimin)),0.05), hsn/(max(A,Aimin)), a2ihf, tref, t)
         ice_temp(inod)  = t
+        ! ==== ICEDBG (descent diagnostics 2026-07-16): capture the RECEIVED
+        ! atmosphere->ice flux while the surface temperature slides below the
+        ! physical polar-night range, to establish why a2ihf stays negative on
+        ! a surface this cold (suspect: stable-BL turbulent cutoff upstream).
+        ! Log-only, no effect on the solution; capped to avoid log flood.
+        if (t < 225.0_WP .and. icedbg_n < 2000) then
+           write(*,'(A,I8,A,F7.2,A,F8.2,A,F8.2,A,F9.2,A,F9.2,A,F9.2,A,F6.3,A,F7.2,A,F6.2)') &
+             ' ICEDBG n=',inod,' lat=',geo_coord_nod2D(2,inod)*57.29578_WP, &
+             ' t=',t,' tref=',tref,' a2ihf=',a2ihf,' qcon=',qcon,' qlam=',qlam, &
+             ' A=',A,' h=',h,' hsn=',hsn
+           call flush(6)
+           icedbg_n = icedbg_n + 1
+        endif
+        ! ==== end ICEDBG ====================================================
      else
         ! Freezing temp of saltwater in K
         ice_temp(inod) = -0.0575_WP*S_oc_array(inod) + 1.7105e-3_WP*sqrt(S_oc_array(inod)**3) -2.155e-4_WP*(S_oc_array(inod)**2)+273.15_WP        
@@ -282,7 +310,12 @@ contains
     !---- atmospheric heat fluxes (provided by the atmosphere model)
 
 #if defined (__oifs) || defined (__ifsinterface)
-    Qatmice = -qres-qcon
+    ! qlam: latent-heat closure of the implicit flux linearization in
+    ! ice_surftemp -- heat the linearization fed the skin beyond the
+    ! atmosphere-booked a2ihf is repaid by freezing (qlam>0 -> growth),
+    ! excess removal by melt (qlam<0). In within-interval steady state
+    ! this reduces to Qatmice = -a2ihf exactly (the #else convention).
+    Qatmice = -qres-qcon+qlam
 #else
     Qatmice = -a2ihf
 #endif
@@ -539,13 +572,15 @@ contains
     return
   end subroutine ice_growth
 
- subroutine ice_surftemp(ithermp, h,hsn,a2ihf,t)
+ subroutine ice_surftemp(ithermp, h,hsn,a2ihf,tref,t)
   ! INPUT:
   ! a2ihf - Total atmo heat flux to ice
   ! A  - Ice fraction
   ! h  - Ice thickness
   ! hsn   - Snow thickness
-  ! 
+  ! tref  - ist the atmosphere evaluated a2ihf at (last transmitted ist);
+  !         linearization anchor for the implicit flux term
+  !
   ! INPUT/OUTPUT:
   ! t     - Ice surface temperature
 
@@ -556,7 +591,15 @@ contains
   !---- ocean variables (provided by FESOM)
   real(kind=WP)  h
   real(kind=WP)  hsn
+  real(kind=WP)  tref
   real(kind=WP)  t
+  !---- flux-linearization coefficient dQ/dT [W/m2/K]
+  real(kind=WP)  zlam
+  !---- bulk near-neutral turbulent flux sensitivity rho*cp*C_H*|U| [W/m2/K]
+  !---- (C_H ~ 1.5e-3, |U| ~ 8 m/s). Radiative + turbulent together give
+  !---- ~20 W/m2/K, the standard fallback flux derivative used in
+  !---- NEMO/SI3-family couplings when the atmosphere does not export dQ/dT.
+  real(kind=WP), parameter :: zlam_turb = 16.0_WP
   !---- local variables
   real(kind=WP)  snicecond
   real(kind=WP)  zsniced
@@ -570,12 +613,14 @@ contains
   !---- freezing temperature of sea-water [K]
   real(kind=WP)  :: TFrezs
   
-  real(kind=WP), pointer :: con, consn, cpsno, rhoice, rhosno
+  real(kind=WP), pointer :: con, consn, cpsno, rhoice, rhosno, emiss_ice, boltzmann
   con    => ice%thermo%con
   consn  => ice%thermo%consn
   cpsno  => ice%thermo%cpsno
   rhoice => ice%thermo%rhoice
   rhosno => ice%thermo%rhosno
+  emiss_ice => ice%thermo%emiss_ice
+  boltzmann => ice%thermo%boltzmann
 
   !---- compute freezing temperature of sea-water from salinity
   TFrezs = -0.0575_WP*S_oc + 1.7105e-3_WP*sqrt(S_oc**3) - 2.155e-4_WP*(S_oc**2)+273.15
@@ -587,12 +632,29 @@ contains
   zcpdt=hcapice/dt                      ! Energy required to change temperature of top ice "layer" [J/(sm²K)]
   zcprosn=rhosno*cpsno/dt               ! Specific Energy required to change temperature of 1m snow on ice [J/(sm³K)]
   zcpdte=zcpdt !+zcprosn*hsn            ! Combined Energy required to change temperature of snow + 0.05m of upper ice
-  t=(zcpdte*t+a2ihf+zicefl)/(zcpdte+con/zsniced) ! New sea ice surf temp [K]
+
+  !---- Implicit (dQ/dT-linearized) atmospheric flux.
+  ! a2ihf was computed by the atmosphere at tref (the last transmitted ist)
+  ! and is held constant over the coupling interval. As the surface departs
+  ! from tref, the flux's dominant temperature response is the surface's own
+  ! longwave emission, linearized here:
+  !     Q(t) = a2ihf + zlam*(tref - t),   zlam = 4*eps*sigma*tref**3
+  ! This keeps the solve stable regardless of the snow/ice insulation
+  ! (con/zsniced) and leaves the fixed point unchanged wherever the surface
+  ! tracks the coupling temperature. Energy added/removed by the
+  ! linearization is booked to the ice growth budget as latent heat via qlam
+  ! (see ice_growth), so the atmosphere-booked flux is conserved exactly.
+  zlam=4.0_WP*emiss_ice*boltzmann*tref**3 + zlam_turb
+  t=(zcpdte*t+a2ihf+zlam*tref+zicefl)/(zcpdte+con/zsniced+zlam) ! New sea ice surf temp [K]
   if (t>273.15_WP) then
-     qres=(con/zsniced+zcpdte)*(t-273.15_WP)
+     qres=(con/zsniced+zcpdte+zlam)*(t-273.15_WP)
      t=273.15_WP
   endif
   qcon=con*(t-TFrezs)/max(zsniced, himin)
+  !---- heat the linearization injected into (t<tref) or removed from
+  !---- (t>tref) the skin beyond what the atmosphere booked; repaid from
+  !---- latent heat: freezing when positive, melt when negative (ice_growth).
+  qlam=zlam*(tref-t)
 ! t=min(273.15_WP,t)
  end subroutine ice_surftemp
 

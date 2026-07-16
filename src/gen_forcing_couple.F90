@@ -447,6 +447,14 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 #endif
          endif
          call cpl_oasis3mct_send(i, exchange, action, partit)
+#if defined (__oifs)
+         ! Anchor for the implicit ice surface-temperature solve
+         ! (ice_thermo_cpl.F90/ice_surftemp): remember the ist as ACTUALLY
+         ! transmitted -- the temperature OIFS evaluates its ice-tile fluxes
+         ! at for the coming coupling interval. `action` is only true on real
+         ! OASIS transmissions, so this stays frozen between coupling events.
+         if (i==4 .and. action) ice%atmcoupl%ist_ref(:) = exchange(:)
+#endif
       end do
 #ifdef VERBOSE
       do i=1, nsend 
