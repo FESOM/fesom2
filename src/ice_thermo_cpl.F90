@@ -310,12 +310,23 @@ contains
     !---- atmospheric heat fluxes (provided by the atmosphere model)
 
 #if defined (__oifs) || defined (__ifsinterface)
-    ! qlam: latent-heat closure of the implicit flux linearization in
-    ! ice_surftemp -- heat the linearization fed the skin beyond the
-    ! atmosphere-booked a2ihf is repaid by freezing (qlam>0 -> growth),
-    ! excess removal by melt (qlam<0). In within-interval steady state
-    ! this reduces to Qatmice = -a2ihf exactly (the #else convention).
-    Qatmice = -qres-qcon+qlam
+    if (ice%thermo%latm_owns_ist) then
+       ! Coupled-slab mode (OIFS LNEMOLIMTEMP=.false., LNEMOLIMTHK=.true.):
+       ! the atmosphere solves the ice surface temperature implicitly in its
+       ! own surface scheme, with slab conduction through the coupled FESOM
+       ! ice/snow thickness. Its surface energy balance flux drives growth
+       ! directly (ECHAM convention); FESIM's ist solve is internal-only
+       ! (albedo/melt-pond state) and does not enter the budget.
+       Qatmice = -a2ihf
+    else
+       ! FESIM owns the ice surface temperature. qlam: latent-heat closure of
+       ! the implicit flux linearization in ice_surftemp -- heat the
+       ! linearization fed the skin beyond the atmosphere-booked a2ihf is
+       ! repaid by freezing (qlam>0 -> growth), excess removal by melt
+       ! (qlam<0). In within-interval steady state this reduces to
+       ! Qatmice = -a2ihf exactly (the #else convention).
+       Qatmice = -qres-qcon+qlam
+    endif
 #else
     Qatmice = -a2ihf
 #endif

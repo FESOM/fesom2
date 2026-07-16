@@ -100,6 +100,10 @@ TYPE T_ICE_THERMO
     REAL(kind=WP) :: c_melt=0.5        ! constant in concentration equation for melting conditions
     ! --- melt pond parameters
     logical       :: use_meltponds=.false. ! enable melt pond parameterization
+    ! atmosphere owns the ice surface temperature (OIFS LNEMOLIMTEMP=.false.,
+    ! coupled-slab mode): FESIM's ist solve is internal-only and the ice
+    ! growth budget uses the received atmosphere flux directly (-a2ihf).
+    logical       :: latm_owns_ist=.false.
     REAL(kind=WP) :: h_cutoff=3.0      ! cutoff thickness of thickness pdf
     REAL(kind=WP), DIMENSION(15) :: hpdf = (/ 0.066745491, 0.1462317, 0.17769822, 0.13131106, &
          0.11518432, 0.08514193, 0.06871303, 0.05592151, 0.04428673, 0.03584652, 0.02970195, 0.02469673, &
@@ -604,12 +608,12 @@ subroutine ice_init(ice, partit, mesh)
     namelist /ice_dyn/ whichEVP, Pstar, ellipse, c_pressure, delta_min, evp_rheol_steps, &
                        Cd_oce_ice, ice_gamma_fct, ice_diff, theta_io, ice_ave_steps, &
                        alpha_evp, beta_evp, c_aevp
-    logical        :: snowdist, new_iclasses, use_meltponds
+    logical        :: snowdist, new_iclasses, use_meltponds, latm_owns_ist
     integer        :: open_water_albedo, iclasses
     real(kind=WP)  :: Sice, h0, h0_s, emiss_ice, emiss_wat, albsn, albsnm, albi, &
                       albim, albw, con, consn, hmin, armin, c_melt, h_cutoff, h_ml, h_snowscale
     namelist /ice_therm/ Sice, iclasses, h0, h0_s, hmin, armin,  emiss_ice, emiss_wat, albsn, albsnm, albi, &
-                         albim, albw, con, consn,  snowdist, new_iclasses, open_water_albedo, c_melt, h_cutoff, h_ml, use_meltponds, &
+                         albim, albw, con, consn,  snowdist, new_iclasses, open_water_albedo, c_melt, h_cutoff, h_ml, use_meltponds, latm_owns_ist, &
                          h_snowscale
 
     !___________________________________________________________________________
@@ -718,6 +722,7 @@ subroutine ice_init(ice, partit, mesh)
     ice%thermo%snowdist = snowdist
     ice%thermo%new_iclasses=new_iclasses
     ice%thermo%open_water_albedo=open_water_albedo
+    ice%thermo%latm_owns_ist=latm_owns_ist
     ice%thermo%use_meltponds = use_meltponds
     if (use_meltponds) call init_meltponds('namelist.ice', partit%mype)
     ice%thermo%c_melt   = c_melt
