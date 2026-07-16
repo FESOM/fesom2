@@ -2777,6 +2777,7 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
   USE MOD_PARSUP
   use o_arrays
   use o_param
+  use g_config
   use g_comm_auto
   implicit none
   !
@@ -2785,12 +2786,34 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
   integer                                :: n, nz, nzmin, nzmax
   real(kind=WP)                          :: t1, t1_2, t1_3, t1_4, p1, p1_2, p1_3, s1, s35, s35_2
   real(kind=WP)                          :: a_over_b
+  real(kind=WP)                          :: sw_alpha_lin, sw_beta_lin
   real(kind=WP)                          :: TF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D),SF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+
+  ! For state_equation==0 (linear EOS, "toy" configs) alpha/beta are constant
+  ! and must mirror the exact linear density law used in density_linear(),
+  ! not the McDougall (1987) nonlinear polynomial below -- otherwise the
+  ! neutral slopes fed into Redi/GM are inconsistent with the density that
+  ! actually drives the model.
+  if (state_equation==0) then
+     if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) then
+        sw_alpha_lin = 0.00025_WP
+        sw_beta_lin  = 0.0_WP
+     else if ((toy_ocean) .AND. (TRIM(which_toy)=="dbgyre")) then
+        sw_alpha_lin = 0.0002052_WP
+        sw_beta_lin  = 0.00079_WP
+     else if ((toy_ocean) .AND. (TRIM(which_toy)=="neverworld2")) then
+        sw_alpha_lin = 0.0002_WP
+        sw_beta_lin  = 0.0_WP
+     else
+        sw_alpha_lin = 0.2_WP/density_0
+        sw_beta_lin  = 0.8_WP/density_0
+     end if
+  end if
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, t1, t1_2, t1_3, t1_4, p1, p1_2, p1_3, s1, s35, s35_2, a_over_b)
 !$OMP DO
@@ -2799,6 +2822,12 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
      nzmax = nlevels_nod2d(n)
      !!PS do nz=1, nlevels_nod2d(n) -1
      do nz=nzmin, nzmax-1
+
+     if (state_equation==0) then
+        sw_alpha(nz,n) = sw_alpha_lin
+        sw_beta(nz,n)  = sw_beta_lin
+        cycle
+     end if
 
      t1 = TF1(nz,n)*1.00024_WP
      s1 = SF1(nz,n)
