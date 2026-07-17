@@ -2199,29 +2199,29 @@ module REcoM_spectral
 !sl         Real(kind=8)                 :: QYmax
 !sl         Real(kind=8)                 :: QYmax_d
 !sl if (RECOM_CALC_ACDOM) then
-         Real(kind=8)                 :: darwin_Sdom          ! used in acdom calculations
-         Real(kind=8)                 :: darwin_lambda_aCDOM  ! wavelength where aCDOM is given
-         Real(kind=8),dimension(tlam) :: excdom               ! CDOM exponent
-         Real(kind=8)                 :: cdomcoeff            ! specific CDOM absorption
-         Integer                      :: nlaCDOM              ! nl number where aCDOM is given used in acdom calculations
+         Real(kind=8)                 :: darwin_Sdom=0.021        ! used in acdom calculations
+         Real(kind=8)                 :: darwin_lambda_aCDOM=450. ! wavelength where aCDOM is given
+         Real(kind=8),dimension(tlam) :: excdom                   ! CDOM exponent
+         Real(kind=8)                 :: cdomcoeff= 0.18          ! specific CDOM absorption
+         Integer                      :: nlaCDOM                  ! nl number where aCDOM is given used in acdom calculations
 !sl if (RECOM_CDOM) then
-         Real(kind=8)                 :: darwin_aCDOM_fac     ! ratio of aCDOM to (aphy+aw) at darwin_lambda_aCDOM
+         Real(kind=8)                 :: darwin_aCDOM_fac=0.2     ! ratio of aCDOM to (aphy+aw) at darwin_lambda_aCDOM
 !sl endif
 !sl else
          Real(kind=8),dimension(tlam) :: acdom
 !sl endif
 !sl if (RECOM_CALC_APART) then
-         Real(kind=8)                 :: darwin_Sapar          ! used in aPart calculations
-         Real(kind=8)                 :: darwin_lambda_aPart   ! wavelength where aPart is given
-         Real(kind=8),dimension(tlam) :: exapar                ! aPart exponent
-         Real(kind=8)                 :: aparcoeff             ! specific Particles absorption
-         Integer                      ::nlaAPAR                ! nl number where aPart is given used in aPart calculations
-         Real(kind=8)                 :: darwin_Sbpar          ! used in bPart calculations
-         Real(kind=8)                 :: darwin_lambda_bPart   ! wavelength where bPart is given
-         Real(kind=8),dimension(tlam) :: exbpar                ! bPart exponent
-         Real(kind=8)                 :: bparcoeff             ! specific Particles scatter
-         Integer                      :: nlaBPAR                ! nl number where bPart is given used in bPart calculations
-         Real(kind=8)                 :: bb_to_b               ! backscatter to total scatter ratio
+         Real(kind=8)                 :: darwin_Sapar=0.013       ! used in aPart calculations
+         Real(kind=8)                 :: darwin_lambda_aPart=440. ! wavelength where aPart is given
+         Real(kind=8),dimension(tlam) :: exapar                   ! aPart exponent
+         Real(kind=8)                 :: aparcoeff=0.016          ! specific Particles absorption
+         Integer                      :: nlaAPAR                  ! nl number where aPart is given used in aPart calculations
+         Real(kind=8)                 :: darwin_Sbpar=0.5         ! used in bPart calculations
+         Real(kind=8)                 :: darwin_lambda_bPart=550  ! wavelength where bPart is given
+         Real(kind=8),dimension(tlam) :: exbpar                   ! bPart exponent
+         Real(kind=8)                 :: bparcoeff=0.345          ! specific Particles scatter
+         Integer                      :: nlaBPAR                  ! nl number where bPart is given used in bPart calculations
+         Real(kind=8)                 :: bb_to_b=0.05             ! backscatter to total scatter ratio
 !sl else
          Real(kind=8),dimension(tlam) :: apart
          Real(kind=8),dimension(tlam) :: bpart
@@ -2229,10 +2229,10 @@ module REcoM_spectral
          Real(kind=8),dimension(tlam) :: apart_P
          Real(kind=8),dimension(tlam) :: bpart_P
          Real(kind=8),dimension(tlam) :: bbpart_P
-         Real(kind=8)                 :: darwin_part_size_P
+         Real(kind=8)                 :: darwin_part_size_P=1.06e-13
 !sl endif
 !sl if (RECOM_CALC_REFLEC) then
-         Integer                      :: darwin_diag_acdom_ilam    ! waveband to write to diagnostic
+         Integer                      :: darwin_diag_acdom_ilam=450 ! waveband to write to diagnostic
 !sl endif
 
 !sl if (RECOM_RADTRANS) then
@@ -2271,12 +2271,13 @@ module REcoM_spectral
 !     &       darwin_bbphy,
 !     &       darwin_bbmin
 
-      Real(kind=8)                  :: darwin_radmodThresh
-      Real(kind=8)                  :: darwin_Dmax
-      Real(kind=8)                  :: darwin_rmus, darwin_rmuu
-      Real(kind=8)                  :: darwin_bbw
+      Real(kind=8)                  :: darwin_radmodThresh=1e-4
+      Real(kind=8)                  :: darwin_Dmax=500.0
+      Real(kind=8)                  :: darwin_rmus=1.204819277 ! 1.0/0.83
+      Real(kind=8)                  :: darwin_rmuu=2.5         ! 1.0/0.4
+      Real(kind=8)                  :: darwin_bbw=0.5
       Real(kind=8)                  :: darwin_bbphy(tnabp)
-      Real(kind=8)                  :: darwin_bbmin
+      Real(kind=8)                  :: darwin_bbmin=0.0002
 
 ! dependent/hardcoded parameters:
 !

@@ -287,6 +287,31 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
     ldiscEu = 0
     discEs = 0.
     discEu = 0.
+    
+! -------------
+! CV: transfer biogeochemical state variables to the fields that are used to
+! calculate absorption and scattering
+! This should be cleaned up, the intermediate fields are not really necessary,
+! but for now I stick to it. 
+    DO k=1,Nr
+       phychl_k(1,k) = state(k,ipchl)
+       phychl_k(2,k) = state(k,idchl)
+       if (enable_coccos) then
+          phychl_k(3,k) = state(k,icchl)
+          phychl_k(4,k) = state(k,iphachl)
+       endif
+       phychl_k(1,k) = state(k,iphyc)
+       phychl_k(2,k) = state(k,idiac)
+       if (enable_coccos) then
+          phychl_k(3,k) = state(k,icocc)
+          phychl_k(4,k) = state(k,iphac)
+       endif
+       part_k(k) = state(k,idetc) + state(k,idetz2c)
+       if (RECOM_CDOM) then
+          cdom_k(k) = state(k,icdom)
+       endif
+    enddo
+    
 ! ------ GET constant acdom_k -------
     DO k=1,Nr
        if (.not. RECOM_CALC_ACDOM) then
@@ -397,6 +422,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
        rmud = min(rmudl,1.5)
        rmud = max(rmud,0.0)
     end if
+    
     if (.not. RECOM_RADTRANS) then
 ! ------------ WAVEBANDS W/O RADTRANS ----------------------------------
 !SL drF is thick
@@ -567,12 +593,25 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
           ENDDO    !ilam
        ENDDO     !k
 
+! check input variables
+       if ((mype.eq.0) .and. (n==33)) then
+          write(*,*) 'debug: ak(1,1)', a_k(1,1)
+          write(*,*) 'debug: bt_k(1,1)', bt_k(1,1)
+          write(*,*) 'debug: bb_k(1,1)', bb_k(1,1)
+          !write(*,*) 'debug: aw(1)', aw(1)
+          !write(*,*) 'debug: acdom_k(1,1)', acdom_k(1,1)
+          write(*,*) 'debug: actot(1,1)', actot(1,1)
+          !write(*,*) 'debug: phychl_k(1,1)', phychl_k(1,1)
+          write(*,*) 'debug: aphy_chl_k(1,1)', aphy_chl_k(1,1)
+          write(*,*) 'debug: apart_k(1,1)', apart_k(1,1)
+       endif
+
 ! ------ Propagate three-beam light in the water column -------
 !CEA Some of the routines use drF and others dz_k, why?
          IF (darwin_radtrans_niter.GE.0) THEN
            call MONOD_RADTRANS_ITER(                             &
                     Nr,                                          &
-                    dz_k(1:Nr),rmud,                             &
+                    thick(1:Nr),rmud,                            &
                     Edwsf(1:tlam),                               &
                     Eswsf(1:tlam),                               &
                     a_k(1:Nr,1:tlam),                            &
@@ -603,7 +642,7 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
          ELSE
             call MONOD_RADTRANS_DIRECT(                          &
                     Nr,                                          &
-                    dz_k(1:Nr),rmud,                             &
+                    thick(1:Nr),rmud,                            &
                     Edwsf(1:tlam),Eswsf(1:tlam),                 &
                     a_k(1:Nr,1:tlam),                            &
                     bt_k(1:Nr,1:tlam),                           &
@@ -618,6 +657,13 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
                     , mype)
 
          ENDIF
+! check output variables
+       if ((mype.eq.0) .and. (n==33)) then
+          write(*,*) 'debug: Edz(1,1)', Edz(1,1)
+          write(*,*) 'debug: Esz(1,1)', Esz(1,1)
+          write(*,*) 'debug: Euz(1,1)', Euz(1,1)
+       endif
+         
 !     Uses chl from prev timestep (as wavebands does) keep like this in case
 !     need to consider upwelling irradiance as affecting the grid box above
 !     Pass to sms: PARw_k only, but will be for this timestep for RADTRANST
