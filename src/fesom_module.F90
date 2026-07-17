@@ -69,7 +69,7 @@ use cpl_yac_driver
 #endif
 
 ! Transient tracers
-use mod_transit, only: year_ce, r14c_nh, r14c_tz, r14c_sh, r14c_ti, xCO2_ti, xf11_nh, xf11_sh, xf12_nh, xf12_sh, xsf6_nh, xsf6_sh, ti_transit, anthro_transit
+use mod_transit, only: year_ce, r14c_nh, r14c_tz, r14c_sh, r14c_ti, xCO2_ti, xf11_nh, xf11_sh, xf12_nh, xf12_sh, xsf6_nh, xsf6_sh, ti_transit, anthro_transit, l_sf6, l_f11, l_f12, l_r14c, l_r39ar
 
   implicit none
     
@@ -348,7 +348,8 @@ contains
                         f%mesh%geo_coord_nod2D, f%mesh%z_3d_n, f%partit%myDim_nod2d,      &
                         f%partit%eDim_nod2D, f%partit%mype, f%partit%MPI_COMM_FESOM,      &
                         f%partit%myDim_elem2D, f%partit%eDim_elem2D, tracers_info,        &
-                        f%tracers%num_tracers, rad, use_age_tracer) ! adjust values for recom tracers (derived type "t_tracer")
+                        f%tracers%num_tracers, rad, use_age_tracer, use_transit, l_sf6,   &
+                        l_f11, l_f12, l_r14c, l_r39ar) ! adjust values for recom tracers (derived type "t_tracer")
         f%t1_recom=MPI_Wtime()
 
         deallocate(tracers_info%ids)
@@ -797,7 +798,8 @@ contains
                    f%partit%com_nod2D%sPE, f%partit%com_nod2D%rPE,                  &
                    f%partit%com_nod2D%req, f%partit%com_nod2D%nreq,                 &
                    dt, daynew, month, mstep, ndpyr, yearold, timenew, rad, kappa,            &
-                   press_air, u_wind, v_wind, shortwave, use_age_tracer)
+                   press_air, u_wind, v_wind, shortwave, use_age_tracer, use_transit,  &
+                   l_sf6, l_f11, l_f12, l_r14c, l_r39ar) ! adjust values for recom tracers (derived type "t_tracer"))
         f%t1_recom = MPI_Wtime()
 
         deallocate(tracers_info%ids)
