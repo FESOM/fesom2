@@ -325,6 +325,8 @@ subroutine recom_init(tracers, partit, mesh)
     Eutop3D   = 0.d0
     Estop3D   = 0.d0
     call wavebands_init_fixed(mype)    
+! CV insert missing call to wavebands_init_vari    
+    call wavebands_init_vari(mype)    
 !if (OASIM) then
 !SL as proposed
     allocate(oasim_surf(node_size))

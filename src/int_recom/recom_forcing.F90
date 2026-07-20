@@ -595,15 +595,20 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
 
 ! check input variables
        if ((mype.eq.0) .and. (n==33)) then
-          write(*,*) 'debug: ak(1,1)', a_k(1,1)
-          write(*,*) 'debug: bt_k(1,1)', bt_k(1,1)
-          write(*,*) 'debug: bb_k(1,1)', bb_k(1,1)
+          !write(*,*) 'debug: ak(1,1)', a_k(1,1)
+          !write(*,*) 'debug: bt_k(1,1)', bt_k(1,1)
+          !write(*,*) 'debug: bb_k(1,1)', bb_k(1,1)
           !write(*,*) 'debug: aw(1)', aw(1)
           !write(*,*) 'debug: acdom_k(1,1)', acdom_k(1,1)
           write(*,*) 'debug: actot(1,1)', actot(1,1)
-          !write(*,*) 'debug: phychl_k(1,1)', phychl_k(1,1)
+          write(*,*) 'debug: phychl_k(1,1)', phychl_k(1,1)
           write(*,*) 'debug: aphy_chl_k(1,1)', aphy_chl_k(1,1)
-          write(*,*) 'debug: apart_k(1,1)', apart_k(1,1)
+          !write(*,*) 'debug: apart_k(1,1)', apart_k(1,1)
+          !write(*,*) 'debug: bw(1)', bw(1)
+          write(*,*) 'debug: bctot(1,1)', bctot(1,1)
+          !write(*,*) 'debug: bpart_k(1,1)', bpart_k(1,1)
+          write(*,*) 'debug: bbctot(1,1)', bbctot(1,1)
+          !write(*,*) 'debug: bbpart_k(1,1)', bbpart_k(1,1)
        endif
 
 ! ------ Propagate three-beam light in the water column -------
