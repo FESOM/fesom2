@@ -2334,7 +2334,7 @@ contains
   
 !     !ROUTINE: WAVEBANDS_INIT_FIXED
 !     !INTERFACE:
-  subroutine wavebands_init_fixed(mype)
+  subroutine wavebands_init_fixed(mype, partit, mesh)
 
 !     !DESCRIPTION: \bv
 !     *==========================================================*
@@ -2344,26 +2344,15 @@ contains
 !     \ev
 
 !     !USES:
+    USE MOD_MESH
+    use MOD_PARTIT ! to get MPI_COMM_FESOM
     implicit none
-!sl#if defined(__RECOM_WAVEBANDS)
-!     == Global variables ===
-!#include "SIZE.h"
-!#include "EEPARAMS.h"
-!#include "PARAMS.h"
-!#include "SPECTRAL_SIZE.h"
-!#include "SPECTRAL.h"
-!#if defined(__RECOM_WAVEBANDS)
-!#include "WAVEBANDS_PARAMS.h"
-!#include "RECOM.h"
-!#endif
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
 !     !INPUT/OUTPUT PARAMETERS:
-!     == Routine arguments ==
-!     myThid     :: my Thread Id number
 !sl      integer :: myThid
     integer, intent(in) :: mype         ! MPI rank
 !EOP
-
-!#if defined(__RECOM_WAVEBANDS)
 
 !     !LOCAL VARIABLES:
 !     == Local variables ==
@@ -2390,6 +2379,7 @@ contains
 
 ! local indeces
     integer       ::  nabp,i,ilam
+    integer       :: ierror           ! return error code
 
     darwin_waves = 0.0d0
     darwin_wavebands = 0.0d0
@@ -2408,74 +2398,71 @@ contains
     darwin_waves(13) = 700
 
 !sl      _BEGIN_MASTER(myThid)
-    if (mype == 0) then
+!    if (mype == 0) then
 !sl      rad = 180.0D0/pid        
 ! Quanta conversion
-       planck = 6.6256d-34   !Plancks constant J sec
-       c = 2.998d8                 !speed of light m/sec
-       hc = 1.0/(planck*c)
-       oavo = 1.0/6.023d23   ! 1/Avogadros number
-       hcoavo = hc*oavo
-       do i = 1,tlam
-          rlamm = darwin_waves(i)*1.0d-9  !lambda in m
-          WtouEins(i) = 1.0d6*rlamm*hcoavo      !Watts to uEin/s conversion
-          IF ( rlamm .EQ. 0.0 ) THEN
-             WRITE(msgBuf,'(2A)') 'RECOM_READPARMS: ',    &
-                  'please provide wavelengths in darwin_waves.'
-!sl        CALL PRINT_ERROR( msgBuf, myThid )
-             STOP 'ABNORMAL END: S/R RECOM_READPARMS'
-          ENDIF
-       enddo
-       WRITE(*,*) ' 1 darwin_waves = ', darwin_waves ! no if (mype==0) here, since the whole block only happes then
+    planck = 6.6256d-34   !Plancks constant J sec
+    c = 2.998d8                 !speed of light m/sec
+    hc = 1.0/(planck*c)
+    oavo = 1.0/6.023d23   ! 1/Avogadros number
+    hcoavo = hc*oavo
+    do i = 1,tlam
+       rlamm = darwin_waves(i)*1.0d-9  !lambda in m
+       WtouEins(i) = 1.0d6*rlamm*hcoavo      !Watts to uEin/s conversion
+       IF ( rlamm .EQ. 0.0 ) THEN
+          if (mype==0) WRITE(msgBuf,'(2A)') 'RECOM_READPARMS: ',    &
+               'please provide wavelengths in darwin_waves.'
+          STOP 'ABNORMAL END: S/R RECOM_READPARMS'
+       ENDIF
+    enddo
+    if (mype==0) WRITE(*,*) ' 1 darwin_waves = ', darwin_waves ! no if (mype==0) here, since the whole block only happes then
 
 ! fill in missing waveband information:
 ! "representative values" darwin_waves need not be centered within
 ! waveband boundaries darwin_wavebands, so both may be given
 ! if representative values are not given, compute from waveband
 ! boundaries
-       do i = 1,tlam
-          if (darwin_waves(i) .gt. 0.0d0) then
-             pwaves(i) = darwin_waves(i)
-          elseif (darwin_wavebands(i).ge.0.0d0 .and.         &
-               darwin_wavebands(i+1).ge.0.0d0 ) then
-             pwaves(i) = .5*(darwin_wavebands(i)+darwin_wavebands(i+1))
-          else
-             WRITE(msgBuf,'(3A)') 'WAVEBANDS_INIT_FIXED: ',          &
-                  'please provide wavelengths in darwin_waves or ',       &
-                  'waveband boundaries in darwin_wavebands.'
-             !sl          CALL PRINT_ERROR( msgBuf, myThid )
-             STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 1'
-          endif
-       enddo
-       WRITE(*,*) '1 pwaves = ', pwaves
+    do i = 1,tlam
+       if (darwin_waves(i) .gt. 0.0d0) then
+          pwaves(i) = darwin_waves(i)
+       elseif (darwin_wavebands(i).ge.0.0d0 .and.         &
+            darwin_wavebands(i+1).ge.0.0d0 ) then
+          pwaves(i) = .5*(darwin_wavebands(i)+darwin_wavebands(i+1))
+       else
+          if (mype==0) WRITE(msgBuf,'(3A)') 'WAVEBANDS_INIT_FIXED: ',          &
+               'please provide wavelengths in darwin_waves or ',       &
+               'waveband boundaries in darwin_wavebands.'
+          STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 1'
+       endif
+    enddo
+    if (mype==0) WRITE(*,*) '1 pwaves = ', pwaves
 
 ! if waveband boundaries not given, compute from representative values
 ! these will be used to compute waveband widths
-       do i=1,tlam+1
-          if (darwin_wavebands(i).LE.0.0d0) then
-             !         put boundaries half-way between central values
-             !         but first and last boundary are at first and last "central" value
-             if (i.eq.1) then
-                darwin_wavebands(i) = real(pwaves(1))
+    do i=1,tlam+1
+       if (darwin_wavebands(i).LE.0.0d0) then
+          !         put boundaries half-way between central values
+          !         but first and last boundary are at first and last "central" value
+          if (i.eq.1) then
+             darwin_wavebands(i) = real(pwaves(1))
+          else
+             if (i.le.tlam) then
+                darwin_wavebands(i) = 0.5*(real(pwaves(i-1))+real(pwaves(i)))
              else
-                if (i.le.tlam) then
-                   darwin_wavebands(i) = 0.5*(real(pwaves(i-1))+real(pwaves(i)))
-                else
-                   darwin_wavebands(i) = real(pwaves(tlam))
-                endif
+                darwin_wavebands(i) = real(pwaves(tlam))
              endif
           endif
-       enddo
-
-       WRITE(*,*) ' darwin_wavebands = ', darwin_wavebands
+       endif
+    enddo
+    if (mype==0) WRITE(*,*) ' darwin_wavebands = ', darwin_wavebands
 
 ! waveband widths used to compute total PAR and alpha_mean
-       wb_totalWidth = 0.0d0
-       do i=1,tlam
-          wb_width(i) = darwin_wavebands(i+1) - darwin_wavebands(i)
-          wb_totalWidth = wb_totalWidth + wb_width(i)
-          !       allow for zero-width wavebands...
-          if (wb_width(i).LT.0.0d0) then
+    wb_totalWidth = 0.0d0
+    do i=1,tlam
+       wb_width(i) = darwin_wavebands(i+1) - darwin_wavebands(i)
+       wb_totalWidth = wb_totalWidth + wb_width(i)
+       !       allow for zero-width wavebands...
+       if (wb_width(i).LT.0.0d0) then
 !sl          WRITE(msgBuf,'(2A,I3)') 'WAVEBANDS_INIT_FIXED: ',       &
 !sl          'negative waveband width encountered, waveband: ', i
 !sl          CALL PRINT_ERROR( msgBuf, myThid )
@@ -2493,21 +2480,24 @@ contains
 !sl           pwaves(ilam),darwin_wavebands(ilam+1),wb_width(ilam)
 !sl           CALL PRINT_ERROR( msgBuf, myThid )
 !sl          enddo
-             STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 2'
-          endif
-       enddo
+          STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 2'
+       endif
+    enddo
+    
+    if (mype==0) then
        WRITE(*,*) 'wb_Width = ', wb_width
-       !sl double check the following      
-       !     ...but require at least one non-zero-width band
+    !sl double check the following      
+    !     ...but require at least one non-zero-width band
        if (wb_totalWidth.LE.0.0d0) then
           WRITE(*,'(2A)') 'WAVEBANDS_INIT_FIXED: ',           &
                'need to provide waveband boundaries in darwin_wavebands.'
           WRITE(*,*) 'wb_totalWidth = ', wb_totalWidth
           STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 3'
        endif
-
+    endif
 
 !  Water data files
+    if (mype == 0) then
        if (darwin_waterabsorbFile .NE. ' '  ) THEN
           if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Water data file'//achar(27)//'[0m'             
           open(iUnit,file=darwin_waterabsorbFile,                 &
@@ -2536,10 +2526,14 @@ contains
           STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 5'
        endif
        write(*,*) 'debug in init: aw(1)', aw(1)
-
+    endif ! (mype==0)
+    call MPI_BCast(aw, tlam, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+    call MPI_BCast(bw, tlam, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+    
 ! phyto data files
 ! ANNA phyto input data files must have a column for absorption by PS pigs
 ! ANNA easiest way to 'turn off' PS for growth is to put same values in both abs columns
+    if (mype == 0) then
        if (darwin_phytoabsorbFile.NE. ' '  ) THEN
           if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> phytoabsorb file'//achar(27)//'[0m'             
           open(iUnit,file=darwin_phytoabsorbFile,                          &
@@ -2580,9 +2574,14 @@ contains
           STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 7'
        endif
        write(*,*) 'debug in init: ap(1,1)', ap(1,1)
-
+    endif ! (mype==0)
+    call MPI_BCast(ap,    tnabp*tlam, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+    call MPI_BCast(ap_ps, tnabp*tlam, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+    call MPI_BCast(bp,    tnabp*tlam, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+    call MPI_BCast(bbp,   tnabp*tlam, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
 
 ! QQ Surface spectrum NEED IN HERE for initial use
+    if (mype == 0) then
        if (.not. OASIM) then
           if (darwin_surfacespecFile .NE. ' '  ) THEN
              if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> surfacespec file'//achar(27)//'[0m'              
@@ -2610,9 +2609,13 @@ contains
              STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 9'
           endif
        endif  ! no OASIM
+    endif ! (mype==0)
+    call MPI_BCast(sf, tlam, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+    
 ! absorption by cdom
-       if (.not. RECOM_CALC_ACDOM) then
+    if (.not. RECOM_CALC_ACDOM) then
 ! if no file given then CDOM is zero
+       if (mype == 0) then
           if (darwin_acdomFile.NE. ' '  ) THEN
              if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> acdom file'//achar(27)//'[0m'             
              open(iUnit,file=darwin_acdomFile,                             &
@@ -2633,67 +2636,69 @@ contains
                 acdom(i) = 0.0d0
              enddo
           endif
-       else  !/* RECOM_CALC_ACDOM */
+       endif ! (mype==0)
+       call MPI_BCast(acdom, tlam, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+    else  !/* RECOM_CALC_ACDOM */
 ! for 3-D or for direct comparison to RADTRANS would need the same formulation for CDOM as in radtrans.
 !   CDOM absorption exponent
-          nlaCDOM = 0
+       nlaCDOM = 0
+       do ilam = 1,tlam
+          if (pwaves(ilam) .eq. darwin_lambda_aCDOM) nlaCDOM = ilam
+          rlamm = float(pwaves(ilam))
+          excdom(ilam) = exp(-darwin_Sdom*(rlamm-darwin_lambda_aCDOM))
+       enddo
+       if (nlaCDOM.eq.0) then
+          if (mype==0) WRITE(msgBuf,'(A,I3,A)')                                      &
+               'WAVEBANDS_INIT_FIXED: no waveband found at ',            &
+               darwin_lambda_aCDOM, ' nm (needed for RECOM_CALC_ACDOM).'
+          STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 10'
+       endif
+       
+       if (mype==0) WRITE(msgBuf,'(A,1P1E20.12)')                                   &
+            'WAVEBANDS_INIT_FIXED: darwin_aCDOM_fac = ',darwin_aCDOM_fac
+       if (mype==0) WRITE(msgBuf,'(A,1P1E20.12)')                                   &
+            'WAVEBANDS_INIT_FIXED: darwin_Sdom = ', darwin_Sdom
+       if (mype==0) WRITE(msgBuf,'(A,I3,A,I4)')                                     &
+            'WAVEBANDS_INIT_FIXED: nlaCDOM = ', nlaCDOM, ', lambda = ',&
+            pwaves(nlaCDOM)
+    endif !/* RECOM_CALC_ACDOM */
+
+    if (RECOM_CALC_REFLEC) then
+       !     find waveband index for diagnostics
+       if (darwin_diag_acdom_ilam.GE.100) then
           do ilam = 1,tlam
-             if (pwaves(ilam) .eq. darwin_lambda_aCDOM) nlaCDOM = ilam
-             rlamm = float(pwaves(ilam))
-             excdom(ilam) = exp(-darwin_Sdom*(rlamm-darwin_lambda_aCDOM))
+             if (pwaves(ilam) .eq. darwin_diag_acdom_ilam) then
+                darwin_diag_acdom_ilam = ilam
+                goto 60
+             endif
           enddo
-          if (nlaCDOM.eq.0) then
-             WRITE(msgBuf,'(A,I3,A)')                                      &
-                  'WAVEBANDS_INIT_FIXED: no waveband found at ',            &
-                  darwin_lambda_aCDOM, ' nm (needed for RECOM_CALC_ACDOM).'
-             STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 10'
-          endif
-
-          WRITE(msgBuf,'(A,1P1E20.12)')                                   &
-               'WAVEBANDS_INIT_FIXED: darwin_aCDOM_fac = ',darwin_aCDOM_fac
-          WRITE(msgBuf,'(A,1P1E20.12)')                                   &
-               'WAVEBANDS_INIT_FIXED: darwin_Sdom = ', darwin_Sdom
-          WRITE(msgBuf,'(A,I3,A,I4)')                                     &
-               'WAVEBANDS_INIT_FIXED: nlaCDOM = ', nlaCDOM, ', lambda = ',&
-               pwaves(nlaCDOM)
-       endif !/* RECOM_CALC_ACDOM */
-
-
-       if (RECOM_CALC_REFLEC) then
-!     find waveband index for diagnostics
-          if (darwin_diag_acdom_ilam.GE.100) then
-             do ilam = 1,tlam
-                if (pwaves(ilam) .eq. darwin_diag_acdom_ilam) then
-                   darwin_diag_acdom_ilam = ilam
-                   goto 60
-                endif
-             enddo
-             WRITE(msgBuf,'(2A,I3,A)') 'WAVEBANDS_INIT_FIXED: ',            &
-                  'darwin_diag_acdom_ilam =',darwin_diag_acdom_ilam,             &
-                  ' not found in darwin_waves'
-             STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 11'
-60           continue
-          endif
-
-          WRITE(msgBuf,'(A,I3,A,I4)')                                     &
-               'WAVEBANDS_INIT_FIXED: Index diag ilam = ',               &
-               darwin_diag_acdom_ilam, ', lambda = ',                    &
-               pwaves(darwin_diag_acdom_ilam)
+          if (mype==0) WRITE(msgBuf,'(2A,I3,A)') 'WAVEBANDS_INIT_FIXED: ',            &
+               'darwin_diag_acdom_ilam =',darwin_diag_acdom_ilam,             &
+               ' not found in darwin_waves'
+          STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 11'
+60        continue
        endif
 
-       WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED:'
-       WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED: wavebands:'
-       WRITE(msgBuf,'(2A)') 'WAVEBANDS_INIT_FIXED: ',                  &
-            ' idx       low   rep      high    width'
-       do i=1,tlam
-          WRITE(msgBuf,'(A,I4,F10.3,I6,F10.3,F9.3)')                    &
-               'WAVEBANDS_INIT_FIXED: ', i,                                  &
-               darwin_wavebands(i),pwaves(i),darwin_wavebands(i+1),wb_width(i)
-       enddo
-       WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED:'
+       if (mype==0) WRITE(msgBuf,'(A,I3,A,I4)')                                     &
+            'WAVEBANDS_INIT_FIXED: Index diag ilam = ',               &
+            darwin_diag_acdom_ilam, ', lambda = ',                    &
+            pwaves(darwin_diag_acdom_ilam)
+    endif
 
-       if (.not. RECOM_CALC_APART) then
+    if (mype==0) WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED:'
+    if (mype==0) WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED: wavebands:'
+    if (mype==0) WRITE(msgBuf,'(2A)') 'WAVEBANDS_INIT_FIXED: ',                  &
+         ' idx       low   rep      high    width'
+    do i=1,tlam
+       if (mype==0) WRITE(msgBuf,'(A,I4,F10.3,I6,F10.3,F9.3)')                    &
+            'WAVEBANDS_INIT_FIXED: ', i,                                  &
+            darwin_wavebands(i),pwaves(i),darwin_wavebands(i+1),wb_width(i)
+    enddo
+    if (mype==0) WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED:'
+
+    if (.not. RECOM_CALC_APART) then
 !   absorption and scattering by particles
+       if (mype == 0) then
           if (darwin_particleabsorbFile .NE. ' '  ) THEN
              open(iUnit,file=darwin_particleabsorbFile,                    &
                   status='old',form='formatted')
@@ -2727,99 +2732,106 @@ contains
                 bbpart_P(ilam) = 0.0d0
              enddo
           endif
-       else
-          nlaAPAR = 0
-          do ilam = 1,tlam
-             if (pwaves(ilam) .eq. darwin_lambda_aPart) nlaAPAR = ilam
-             rlamm = float(pwaves(ilam))
-             exapar(ilam) = exp(-darwin_Sapar*(rlamm-darwin_lambda_aPart))
-          enddo
-          nlaBPAR = 0
-          do ilam = 1,tlam
-             if (pwaves(ilam) .eq. darwin_lambda_bPart) nlaBPAR = ilam
-             rlamm = float(pwaves(ilam))
-             exbpar(ilam) = (darwin_lambda_bPart/rlamm)**darwin_Sbpar
-          enddo
-       endif ! /* RECOM_CALC_APART */
+       endif ! (mype==0)
+       call MPI_BCast(apart,    tlam, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+       call MPI_BCast(bpart,    tlam, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+       call MPI_BCast(bbpart,   tlam, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+       call MPI_BCast(apart_P,  tlam, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+       call MPI_BCast(bpart_P,  tlam, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+       call MPI_BCast(bbpart_P, tlam, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+    else
+       nlaAPAR = 0
+       do ilam = 1,tlam
+          if (pwaves(ilam) .eq. darwin_lambda_aPart) nlaAPAR = ilam
+          rlamm = float(pwaves(ilam))
+          exapar(ilam) = exp(-darwin_Sapar*(rlamm-darwin_lambda_aPart))
+       enddo
+       nlaBPAR = 0
+       do ilam = 1,tlam
+          if (pwaves(ilam) .eq. darwin_lambda_bPart) nlaBPAR = ilam
+          rlamm = float(pwaves(ilam))
+          exbpar(ilam) = (darwin_lambda_bPart/rlamm)**darwin_Sbpar
+       enddo
+    endif ! /* RECOM_CALC_APART */
 
 !
 ! PRINT A SUMMARY (in STDOUT)
 !
 !     Incoming Light
-       if (.not. OASIM) then
-          WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED: surface spectrum:'
-          WRITE(msgBuf,'(A,A)') 'WAVEBANDS_INIT_FIXED:  lam      sf'
-          do ilam = 1,tlam
-             WRITE(msgBuf,'(A,I4,F15.6)') 'WAVEBANDS_INIT_FIXED: ',    &
-                  pwaves(ilam), sf(ilam)
-          enddo
-          WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED:'
-       endif
+    if (.not. OASIM) then
+       if (mype==0) WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED: surface spectrum:'
+       if (mype==0) WRITE(msgBuf,'(A,A)') 'WAVEBANDS_INIT_FIXED:  lam      sf'
+       do ilam = 1,tlam
+          if (mype==0) WRITE(msgBuf,'(A,I4,F15.6)') 'WAVEBANDS_INIT_FIXED: ',    &
+               pwaves(ilam), sf(ilam)
+       enddo
+       if (mype==0) WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED:'
+    endif
 !
 !     Water absorption/scatter/backsc.
-       WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED: water spectra:'
-       WRITE(msgBuf,'(A,A)') 'WAVEBANDS_INIT_FIXED: ',             &
-            ' lam         aw        bw'
-       do ilam = 1,tlam
-          WRITE(msgBuf,'(A,I4,F15.4,F10.4)') 'WAVEBANDS_INIT_FIXED: ', &
-               pwaves(ilam), aw(ilam), bw(ilam)
-       enddo
-       WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED:'
+    if (mype==0) WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED: water spectra:'
+    if (mype==0) WRITE(msgBuf,'(A,A)') 'WAVEBANDS_INIT_FIXED: ',             &
+         ' lam         aw        bw'
+    do ilam = 1,tlam
+       if (mype==0) WRITE(msgBuf,'(A,I4,F15.4,F10.4)') 'WAVEBANDS_INIT_FIXED: ', &
+            pwaves(ilam), aw(ilam), bw(ilam)
+    enddo
+    if (mype==0) WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED:'
 !
 !     Phyto absorption/scatter/backsc.
-       WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED: phyto spectra:'
-       do nabp = 1,tnabp
-          WRITE(msgBuf,'(A,I4)') 'WAVEBANDS_INIT_FIXED: type ',nabp
-          WRITE(msgBuf,'(A,A)') 'WAVEBANDS_INIT_FIXED: ',              &
-               ' lam    ap        ap_ps     bp             bbp'
-          do ilam = 1,tlam
-             WRITE(msgBuf,'(A,I4,3F10.4,F20.9)') 'WAVEBANDS_INIT_FIXED: ', &
-                  pwaves(ilam), ap(nabp,ilam), ap_ps(nabp,ilam),                &
-                  bp(nabp,ilam), bbp(nabp,ilam)
-          enddo
-          WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED:'
+    if (mype==0) WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED: phyto spectra:'
+    do nabp = 1,tnabp
+       if (mype==0) WRITE(msgBuf,'(A,I4)') 'WAVEBANDS_INIT_FIXED: type ',nabp
+       if (mype==0) WRITE(msgBuf,'(A,A)') 'WAVEBANDS_INIT_FIXED: ',              &
+            ' lam    ap        ap_ps     bp             bbp'
+       do ilam = 1,tlam
+          if (mype==0) WRITE(msgBuf,'(A,I4,3F10.4,F20.9)') 'WAVEBANDS_INIT_FIXED: ', &
+               pwaves(ilam), ap(nabp,ilam), ap_ps(nabp,ilam),                &
+               bp(nabp,ilam), bbp(nabp,ilam)
        enddo
+       if (mype==0) WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED:'
+    enddo
 !
 !     Particulate absorption/scatter/backsc.
-       if (.not. RECOM_CALC_APART) then
-          WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED: particulate spectra:'
-          WRITE(msgBuf,'(A,A)') 'WAVEBANDS_INIT_FIXED: ',                   &
-               ' lam      apart          bpart          bbpart'
-          do ilam = 1,tlam
-             WRITE(msgBuf,'(A,I4,1P3G15.6)')'WAVEBANDS_INIT_FIXED: ',        &
-                  pwaves(ilam), apart(ilam), bpart(ilam), bbpart(ilam)
-          enddo
-          WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED:'
-          WRITE(msgBuf,'(2A)') 'WAVEBANDS_INIT_FIXED: particulate spectra ', &
-               'in phosphorus units:'
-          WRITE(msgBuf,'(A,A)') 'WAVEBANDS_INIT_FIXED: ',                    &
-               ' lam      apart_P        bpart_P        bbpart_P'
-          do ilam = 1,tlam
-             WRITE(msgBuf,'(A,I4,2F15.9,F15.12)') 'WAVEBANDS_INIT_FIXED: ',   &
-                  pwaves(ilam), apart_P(ilam), bpart_P(ilam), bbpart_P(ilam)
-          enddo
-          WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED:'
-       endif
+    if (.not. RECOM_CALC_APART) then
+       if (mype==0) WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED: particulate spectra:'
+       if (mype==0) WRITE(msgBuf,'(A,A)') 'WAVEBANDS_INIT_FIXED: ',                   &
+            ' lam      apart          bpart          bbpart'
+       do ilam = 1,tlam
+          if (mype==0) WRITE(msgBuf,'(A,I4,1P3G15.6)')'WAVEBANDS_INIT_FIXED: ',        &
+               pwaves(ilam), apart(ilam), bpart(ilam), bbpart(ilam)
+       enddo
+       if (mype==0) WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED:'
+       if (mype==0) WRITE(msgBuf,'(2A)') 'WAVEBANDS_INIT_FIXED: particulate spectra ', &
+            'in phosphorus units:'
+       if (mype==0) WRITE(msgBuf,'(A,A)') 'WAVEBANDS_INIT_FIXED: ',                    &
+            ' lam      apart_P        bpart_P        bbpart_P'
+       do ilam = 1,tlam
+          if (mype==0) WRITE(msgBuf,'(A,I4,2F15.9,F15.12)') 'WAVEBANDS_INIT_FIXED: ',   &
+               pwaves(ilam), apart_P(ilam), bpart_P(ilam), bbpart_P(ilam)
+       enddo
+       if (mype==0) WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED:'
+    endif
 !
 !     CDOM absorption
-       if (.not. RECOM_CALC_ACDOM) then
-          WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED: CDOM spectrum:'
-          WRITE(msgBuf,'(A,A)') 'WAVEBANDS_INIT_FIXED:  lam   aCDOM'
-          do ilam = 1,tlam
-             WRITE(msgBuf,'(A,I4,F10.4)') 'WAVEBANDS_INIT_FIXED: ',           &
-                  pwaves(ilam), acdom(ilam)
-          enddo
-          WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED:'
-       endif
+    if (.not. RECOM_CALC_ACDOM) then
+       if (mype==0) WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED: CDOM spectrum:'
+       if (mype==0) WRITE(msgBuf,'(A,A)') 'WAVEBANDS_INIT_FIXED:  lam   aCDOM'
+       do ilam = 1,tlam
+          if (mype==0) WRITE(msgBuf,'(A,I4,F10.4)') 'WAVEBANDS_INIT_FIXED: ',           &
+               pwaves(ilam), acdom(ilam)
+       enddo
+       if (mype==0) WRITE(msgBuf,'(A)') 'WAVEBANDS_INIT_FIXED:'
+    endif
 
-       if (RECOM_RADTRANS) then
+    if (RECOM_RADTRANS) then
 !     constants
-          pid = DACOS(-1.0D0)
-          radd = 180.0D0/pid
-       endif
+       pid = DACOS(-1.0D0)
+       radd = 180.0D0/pid
+    endif
 
 !sl      _END_MASTER(myThid)
-    endif ! if (mpye==0) then
+!    endif ! if (mpye==0) then
 
 !Sl#endif /* RECOM_WAVEBANDS */
 
@@ -2919,7 +2931,7 @@ contains
     enddo
     !          endif  
 !         enddo
-    write(*,*) 'debug in init_vari 1: aphy_chl(1)', aphy_chl(1)
+    if (mype==0) write(*,*) 'debug in init_vari 1: aphy_chl(1)', aphy_chl(1)
 
 !SL we have to extend to account for more PFTs (cocco and phaeo)
     if(ap_type(1).eq.0) then
@@ -2964,7 +2976,7 @@ contains
           enddo
        endif
     endif
-    write(*,*) 'debug in init_vari 1: aphy_chl(1)', aphy_chl(1)
+    if (mype==0) write(*,*) 'debug in init_vari 1: aphy_chl(1)', aphy_chl(1)
 !#endif /* RECOM_WAVEBANDS */
     return
   end SUBROUTINE WAVEBANDS_INIT_VARI
