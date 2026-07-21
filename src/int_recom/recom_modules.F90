@@ -2525,7 +2525,6 @@ contains
               'WAVEBANDS_INIT_FIXED: need to specify water absorption'
           STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 5'
        endif
-       write(*,*) 'debug in init: aw(1)', aw(1)
     endif ! (mype==0)
     call MPI_BCast(aw, tlam, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
     call MPI_BCast(bw, tlam, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
@@ -2573,7 +2572,6 @@ contains
                'WAVEBANDS_INIT_FIXED: need to specify phyto absorption'
           STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED 7'
        endif
-       write(*,*) 'debug in init: ap(1,1)', ap(1,1)
     endif ! (mype==0)
     call MPI_BCast(ap,    tnabp*tlam, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
     call MPI_BCast(ap_ps, tnabp*tlam, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
@@ -2931,7 +2929,6 @@ contains
     enddo
     !          endif  
 !         enddo
-    if (mype==0) write(*,*) 'debug in init_vari 1: aphy_chl(1)', aphy_chl(1)
 
 !SL we have to extend to account for more PFTs (cocco and phaeo)
     if(ap_type(1).eq.0) then
@@ -2976,7 +2973,6 @@ contains
           enddo
        endif
     endif
-    if (mype==0) write(*,*) 'debug in init_vari 1: aphy_chl(1)', aphy_chl(1)
 !#endif /* RECOM_WAVEBANDS */
     return
   end SUBROUTINE WAVEBANDS_INIT_VARI

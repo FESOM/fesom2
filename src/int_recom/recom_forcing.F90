@@ -595,15 +595,15 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
        ENDDO     !k
 
 ! check input variables
-       if ((mype.eq.0) .and. (n==33)) then
-          write(*,*) 'debug: Edwsf(n)', Edwsf(n)
-          write(*,*) 'debug: Eswsf(n)', Eswsf(n)
-          write(*,*) 'debug: a_k(1,1)', a_k(1,1)
-          write(*,*) 'debug: bt_k(1,1)', bt_k(1,1)
-          write(*,*) 'debug: bb_k(1,1)', bb_k(1,1)
-          write(*,*) 'debug: rmud', rmud
-          write(*,*) 'debug: darwin_radtrans_kmax', darwin_radtrans_kmax
-       endif
+!       if ((mype.eq.0) .and. (n==33)) then
+!          write(*,*) 'debug: Edwsf(n)', Edwsf(n)
+!          write(*,*) 'debug: Eswsf(n)', Eswsf(n)
+!          write(*,*) 'debug: a_k(1,1)', a_k(1,1)
+!          write(*,*) 'debug: bt_k(1,1)', bt_k(1,1)
+!          write(*,*) 'debug: bb_k(1,1)', bb_k(1,1)
+!          write(*,*) 'debug: rmud', rmud
+!          write(*,*) 'debug: darwin_radtrans_kmax', darwin_radtrans_kmax
+!       endif
 
 ! ------ Propagate three-beam light in the water column -------
 !CEA Some of the routines use drF and others dz_k, why?
@@ -657,11 +657,11 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
 
          ENDIF
 ! check output variables
-       if ((mype.eq.0) .and. (n==33)) then
-          write(*,*) 'debug: Edz(1,1)', Edz(1,1)
-          write(*,*) 'debug: Esz(1,1)', Esz(1,1)
-          write(*,*) 'debug: Euz(1,1)', Euz(1,1)
-       endif
+!       if ((mype.eq.0) .and. (n==33)) then
+!          write(*,*) 'debug: Edz(1,1)', Edz(1,1)
+!          write(*,*) 'debug: Esz(1,1)', Esz(1,1)
+!          write(*,*) 'debug: Euz(1,1)', Euz(1,1)
+!       endif
          
 !     Uses chl from prev timestep (as wavebands does) keep like this in case
 !     need to consider upwelling irradiance as affecting the grid box above
