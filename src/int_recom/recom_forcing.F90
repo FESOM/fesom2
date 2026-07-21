@@ -416,9 +416,10 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
     if (RECOM_RADTRANS) then
 !     Compute 1/cos(zenith) for direct light below surface given solar zenith
 !     angle (in radians) at surface (solz=zenith_deg from RECOM_INSOLATION.F)
-       sinszaw = sin(solz)/rn
-       szaw = asin(sinszaw)
-       rmudl = 1.0/cos(szaw)    !avg cosine direct (1 over)
+!       sinszaw = sin(solz)/rn
+!       szaw = asin(sinszaw)
+!       rmudl = 1.0/cos(szaw)    !avg cosine direct (1 over)
+       rmudl = 1.0/cosAI(n)    !avg cosine direct (1 over)
        rmud = min(rmudl,1.5)
        rmud = max(rmud,0.0)
     end if
@@ -595,20 +596,13 @@ subroutine REcoM_Forcing(zNodes, n, Nn, state, SurfSW, Loc_slp, Temp, Sali, Sali
 
 ! check input variables
        if ((mype.eq.0) .and. (n==33)) then
-          !write(*,*) 'debug: ak(1,1)', a_k(1,1)
-          !write(*,*) 'debug: bt_k(1,1)', bt_k(1,1)
-          !write(*,*) 'debug: bb_k(1,1)', bb_k(1,1)
-          !write(*,*) 'debug: aw(1)', aw(1)
-          !write(*,*) 'debug: acdom_k(1,1)', acdom_k(1,1)
-          write(*,*) 'debug: actot(1,1)', actot(1,1)
-          write(*,*) 'debug: phychl_k(1,1)', phychl_k(1,1)
-          write(*,*) 'debug: aphy_chl_k(1,1)', aphy_chl_k(1,1)
-          !write(*,*) 'debug: apart_k(1,1)', apart_k(1,1)
-          !write(*,*) 'debug: bw(1)', bw(1)
-          write(*,*) 'debug: bctot(1,1)', bctot(1,1)
-          !write(*,*) 'debug: bpart_k(1,1)', bpart_k(1,1)
-          write(*,*) 'debug: bbctot(1,1)', bbctot(1,1)
-          !write(*,*) 'debug: bbpart_k(1,1)', bbpart_k(1,1)
+          write(*,*) 'debug: Edwsf(n)', Edwsf(n)
+          write(*,*) 'debug: Eswsf(n)', Eswsf(n)
+          write(*,*) 'debug: a_k(1,1)', a_k(1,1)
+          write(*,*) 'debug: bt_k(1,1)', bt_k(1,1)
+          write(*,*) 'debug: bb_k(1,1)', bb_k(1,1)
+          write(*,*) 'debug: rmud', rmud
+          write(*,*) 'debug: darwin_radtrans_kmax', darwin_radtrans_kmax
        endif
 
 ! ------ Propagate three-beam light in the water column -------

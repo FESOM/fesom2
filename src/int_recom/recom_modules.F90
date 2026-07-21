@@ -2261,8 +2261,8 @@ module REcoM_spectral
 !     &      ,darwin_radtrans_kmax
 !     &      ,darwin_radtrans_niter
 
-      Integer                      :: darwin_PAR_ilamLo, darwin_PAR_ilamHi
-      Integer                      :: darwin_radtrans_kmax
+      Integer                      :: darwin_PAR_ilamLo = 1, darwin_PAR_ilamHi=13
+      Integer                      :: darwin_radtrans_kmax = 30
       Integer, parameter           :: darwin_radtrans_niter = -2
 !      COMMON /DARWIN_RADTRANS_PARM_R/
 !     &       darwin_radmodThresh, darwin_Dmax,
