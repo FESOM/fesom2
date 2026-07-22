@@ -151,6 +151,8 @@ module g_config
   logical                       :: use_cavity = .false. ! switch on/off cavity usage
   logical                       :: use_cavity_partial_cell = .false. ! switch on/off cavity usage
   logical                       :: use_cavity_fw2press = .true. ! switch on/off cavity+zstar input of freshwater leads to increase in pressure
+  logical                       :: turn_off_cav_hf = .false. ! switch off cavity heat flux
+  logical                       :: turn_off_cav_fw = .false. ! switch off cavity freshwater flux
   real(kind=WP)                 :: cavity_partial_cell_thresh=0.0_WP ! same as partial_cell_tresh but for surface
   logical                       :: toy_ocean=.false. ! Ersatz forcing has to be supplied
   character(100)                :: which_toy="soufflet" 
@@ -160,7 +162,8 @@ module g_config
   logical                       :: compute_oasis_corners=.false. ! switches on corner calculation for 1st order conserv remapping 
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
-                        use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
+                        use_cavity_fw2press, turn_off_cav_hf, turn_off_cav_fw, &
+                        toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
                         use_transit, compute_oasis_corners
   
   !_____________________________________________________________________________

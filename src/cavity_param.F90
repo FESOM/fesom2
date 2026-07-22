@@ -194,6 +194,7 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
     use MOD_ICE
     use o_PARAM , only: density_0, WP
     use o_ARRAYS, only: heat_flux, water_flux, density_m_rho0, density_ref
+    use g_config, only: turn_off_cav_hf, turn_off_cav_fw
     implicit none
     !___________________________________________________________________________
     type(t_partit), intent(inout), target :: partit
@@ -361,8 +362,16 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
         !rt  t_surf_flux(i,j)=gat*(tf-tin)
         !rt  s_surf_flux(i,j)=gas*(sf-(s(i,j,N,lrhs)+35.0))
         
-        heat_flux(node)  = rhow*cpw*gat*(tin-tf)      ! [W/m2]  ! positive for upward
-        water_flux(node) =          rhow / rhofw * gas *(sf-sal)/sf   ! [m/s]   !
+        if (.not. turn_off_cav_hf) then
+            heat_flux(node)  = rhow*cpw*gat*(tin-tf)      ! [W/m2]  ! positive for upward
+        else
+            heat_flux(node)  = 0.0_WP
+        end if
+        if (.not. turn_off_cav_fw) then
+            water_flux(node) =          rhow / rhofw * gas *(sf-sal)/sf   ! [m/s]   !
+        else
+            water_flux(node) = 0.0_WP
+        end if
         
         !      qo=-rhor*seta*oofw
         !      if(seta.le.0.) then
@@ -391,6 +400,7 @@ subroutine cavity_heat_water_fluxes_2eq(ice, tracers, partit, mesh)
     use MOD_ICE
     use o_PARAM , only: WP
     use o_ARRAYS, only: heat_flux, water_flux
+    use g_config, only: turn_off_cav_hf, turn_off_cav_fw
     implicit none
 
     type(t_partit), intent(inout), target :: partit
@@ -429,8 +439,16 @@ subroutine cavity_heat_water_fluxes_2eq(ice, tracers, partit, mesh)
         s_i  = tracers%data(2)%values(nzmin,node)
         t_fz = c3*(s_i**(3./2.)) + c4*(s_i**2) + c5*s_i + c6*abs(Z_3d_n(nzmin,node))
         
-        heat_flux(node)=vcpw*gama*(t_i - t_fz)  ! Hunter2006 used cpw=3974J/Kg (*rhowat)
-        water_flux(node) = -1.0*heat_flux(node)/(L*1000.0)  
+        if (.not. turn_off_cav_hf) then
+            heat_flux(node)=vcpw*gama*(t_i - t_fz)  ! Hunter2006 used cpw=3974J/Kg (*rhowat)
+        else
+            heat_flux(node) = 0.0_WP
+        end if
+        if (.not. turn_off_cav_fw) then
+            water_flux(node) = -1.0*heat_flux(node)/(L*1000.0)
+        else
+            water_flux(node) = 0.0_WP
+        end if  
         
         !for saving to output:
         net_heat_flux(node)=-heat_flux(node)
