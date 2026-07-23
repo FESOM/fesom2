@@ -378,7 +378,13 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
             elseif (i.eq.3) then
               exchange(:) = m_snow(:)                                 ! snow thickness
             elseif (i.eq.4) then
-              exchange(:) = ice_temp(:)                               ! ice surface temperature
+              ! Concentration-weighted ice surface temperature (ist*a_ice).
+              ! The o2a remap blend must be concentration-weighted so the
+              ! atmosphere's prescribed ice-tile skin is representative of the
+              ! ice actually present in the cell; PAIRED with
+              ! ECE_CPL_NEMO_WEIGHTED_ICE=.true. (OIFS divides by the received
+              ! ice fraction on ingest) and a weighted-convention rstos.nc.
+              exchange(:) = ice_temp(:)*a_ice(:)                      ! ice surface temperature * concentration
             elseif (i.eq.5) then
               exchange(:) = ice_alb(:)                                ! ice albedo
             elseif (i.eq.6) then
@@ -389,15 +395,21 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
               do n=1,myDim_nod2D+eDim_nod2D
                 exchange(n) = UVnode(2,1,n)
               end do
-#if defined (__recom)
             elseif (i.eq.8) then
+              ! Effective (grid-mean = per-ice * concentration) sea-ice
+              ! thickness for the atmosphere's ice-tile slab conduction
+              ! (OIFS ECE_FESIM_GET_ICE_STATE divides by the received ice
+              ! fraction under LNEMOLIMTHK). Weighted convention as ist/alb.
+              exchange(:) = m_ice(:)                                  ! effective sea ice thickness
+#if defined (__recom)
+            elseif (i.eq.9) then
               ! GloCO2flux_seaicemask is in [mmolCO2 m-2 s-1], need [kgCO2 m-2 s-1]
               ! Conversion: 1.0e-3_WP -> mol/s -> kg/s
               ! 1 mol CO2 = 44.0095 g/mol = 0.0440095 kg/mol (NIST 2018)
               ! *-1 for correct flux direction convention: oifs expects >0: downward; fesom: >0: upward
               exchange(:) = GloCO2flux_seaicemask(:) * 1.0e-3_WP * 0.0440095_WP * -1 ! [kgCO2 m-2 s-1]
 #endif
-            else    
+            else
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
 #else
             ! AWI-CM2 outgoing state vectors
@@ -458,6 +470,14 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 #endif
          endif
          call cpl_oasis3mct_send(i, exchange, action, partit)
+#if defined (__oifs)
+         ! Anchor for the implicit ice surface-temperature solve
+         ! (ice_thermo_cpl.F90/ice_surftemp): remember the ist as ACTUALLY
+         ! transmitted -- the temperature OIFS evaluates its ice-tile fluxes
+         ! at for the coming coupling interval. `action` is only true on real
+         ! OASIS transmissions, so this stays frozen between coupling events.
+         if (i==4 .and. action) ice%atmcoupl%ist_ref(:) = exchange(:)
+#endif
       end do
 #ifdef VERBOSE
       do i=1, nsend 

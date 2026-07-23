@@ -31,11 +31,11 @@ module cpl_driver
 
 #if defined (__oifs)
 #if defined(__recom)
-  integer                    :: nsend = 8
+  integer                    :: nsend = 9
   integer                    :: nrecv = 16
 !With oifs, without recom:
 #else
-  integer                    :: nsend = 7
+  integer                    :: nsend = 8
   integer                    :: nrecv = 15
 #endif
 !Without oifs
@@ -670,8 +670,9 @@ include "associate_mesh_ass.h"
     cpl_send( 5)='sia_feom' ! 5. sea ice albedo [%-100]            ->
     cpl_send( 6)='u_feom'   ! 6. eastward  surface velocity [m/s]  ->
     cpl_send( 7)='v_feom'   ! 7. northward surface velocity [m/s]  ->
+    cpl_send( 8)='sit_feom' ! 8. effective sea ice thickness [m]   ->
 #if defined (__recom)
-    cpl_send( 8)='FCO2_feom'! 8. CO2 flux [kgCO2 m-2 s-1]             ->
+    cpl_send( 9)='FCO2_feom'! 9. CO2 flux [kgCO2 m-2 s-1]             ->
 #endif
 #else
     cpl_send( 1)='sst_feom' ! 1. sea surface temperature [°C]      ->
