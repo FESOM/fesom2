@@ -41,8 +41,6 @@ subroutine thermodynamics(ice, partit, mesh)
   !---- atmosphere evaluated a2ihf at; qlam = linearization heat booked to the
   !---- ice growth budget as latent-heat closure (energy conservation).
   real(kind=WP)  :: qlam, tref
-  !---- ICEDBG descent-diagnostics line counter (log-only)
-  integer, save  :: icedbg_n = 0
   !---- evaporation and sublimation (provided by ECHAM)
   real(kind=WP)  :: evap, subli
   !---- add residual freshwater flux over ice to freshwater (setted in ice_growth)
@@ -189,20 +187,6 @@ subroutine thermodynamics(ice, partit, mesh)
         if (tref < 100.0_WP) tref = t
         call ice_surftemp(ice%thermo, max(h/(max(A,Aimin)),0.05), hsn/(max(A,Aimin)), a2ihf, tref, t)
         ice_temp(inod)  = t
-        ! ==== ICEDBG (descent diagnostics 2026-07-16): capture the RECEIVED
-        ! atmosphere->ice flux while the surface temperature slides below the
-        ! physical polar-night range, to establish why a2ihf stays negative on
-        ! a surface this cold (suspect: stable-BL turbulent cutoff upstream).
-        ! Log-only, no effect on the solution; capped to avoid log flood.
-        if (t < 225.0_WP .and. icedbg_n < 2000) then
-           write(*,'(A,I8,A,F7.2,A,F8.2,A,F8.2,A,F9.2,A,F9.2,A,F9.2,A,F6.3,A,F7.2,A,F6.2)') &
-             ' ICEDBG n=',inod,' lat=',geo_coord_nod2D(2,inod)*57.29578_WP, &
-             ' t=',t,' tref=',tref,' a2ihf=',a2ihf,' qcon=',qcon,' qlam=',qlam, &
-             ' A=',A,' h=',h,' hsn=',hsn
-           call flush(6)
-           icedbg_n = icedbg_n + 1
-        endif
-        ! ==== end ICEDBG ====================================================
      else
         ! Freezing temp of saltwater in K
         ice_temp(inod) = -0.0575_WP*S_oc_array(inod) + 1.7105e-3_WP*sqrt(S_oc_array(inod)**3) -2.155e-4_WP*(S_oc_array(inod)**2)+273.15_WP        
