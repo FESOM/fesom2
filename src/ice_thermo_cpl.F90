@@ -37,10 +37,9 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP)  :: A, h, hsn, alb, t
   !---- atmospheric heat fluxes (provided by ECHAM)
   real(kind=WP)  :: a2ohf, a2ihf, qres, qcon
-  !---- implicit-solve bookkeeping (see ice_surftemp): tref = ist anchor the
-  !---- atmosphere evaluated a2ihf at; qlam = linearization heat booked to the
-  !---- ice growth budget as latent-heat closure (energy conservation).
-  real(kind=WP)  :: qlam, tref
+  !---- tref: ist anchor the atmosphere evaluated a2ihf at, the linearization
+  !---- anchor for the internal surface-temperature solve (see ice_surftemp).
+  real(kind=WP)  :: tref
   !---- evaporation and sublimation (provided by ECHAM)
   real(kind=WP)  :: evap, subli
   !---- add residual freshwater flux over ice to freshwater (setted in ice_growth)
@@ -178,7 +177,6 @@ subroutine thermodynamics(ice, partit, mesh)
      t                   = ice_temp(inod)
      qres     = 0.0_WP
      qcon     = 0.0_WP
-     qlam     = 0.0_WP
      if(A>Aimin) then
         ! Anchor temperature for the implicit flux linearization: the ist OIFS
         ! actually evaluated a2ihf at (captured at the OASIS send). Fall back
@@ -293,27 +291,13 @@ contains
 
     !---- atmospheric heat fluxes (provided by the atmosphere model)
 
-#if defined (__oifs) || defined (__ifsinterface)
-    if (ice%thermo%latm_owns_ist) then
-       ! Coupled-slab mode (OIFS LNEMOLIMTEMP=.false., LNEMOLIMTHK=.true.):
-       ! the atmosphere solves the ice surface temperature implicitly in its
-       ! own surface scheme, with slab conduction through the coupled FESOM
-       ! ice/snow thickness. Its surface energy balance flux drives growth
-       ! directly (ECHAM convention); FESIM's ist solve is internal-only
-       ! (albedo/melt-pond state) and does not enter the budget.
-       Qatmice = -a2ihf
-    else
-       ! FESIM owns the ice surface temperature. qlam: latent-heat closure of
-       ! the implicit flux linearization in ice_surftemp -- heat the
-       ! linearization fed the skin beyond the atmosphere-booked a2ihf is
-       ! repaid by freezing (qlam>0 -> growth), excess removal by melt
-       ! (qlam<0). In within-interval steady state this reduces to
-       ! Qatmice = -a2ihf exactly (the #else convention).
-       Qatmice = -qres-qcon+qlam
-    endif
-#else
+    ! Coupled-slab convention: the atmosphere solves the ice surface
+    ! temperature implicitly in its own surface scheme, with slab conduction
+    ! through the coupled ice/snow thickness, and its surface energy balance
+    ! flux drives ice growth directly. The ice model's own surface-temperature
+    ! solve is internal-only (albedo/melt-pond state) and does not enter the
+    ! growth budget.
     Qatmice = -a2ihf
-#endif
     Qatmocn = -a2ohf
 
     !---- oceanic heat fluxes
@@ -634,11 +618,11 @@ contains
   ! from tref, the flux's dominant temperature response is the surface's own
   ! longwave emission, linearized here:
   !     Q(t) = a2ihf + zlam*(tref - t),   zlam = 4*eps*sigma*tref**3
-  ! This keeps the solve stable regardless of the snow/ice insulation
-  ! (con/zsniced) and leaves the fixed point unchanged wherever the surface
-  ! tracks the coupling temperature. Energy added/removed by the
-  ! linearization is booked to the ice growth budget as latent heat via qlam
-  ! (see ice_growth), so the atmosphere-booked flux is conserved exactly.
+  ! This keeps the internal surface-temperature solve stable regardless of
+  ! the snow/ice insulation (con/zsniced) and leaves the fixed point unchanged
+  ! wherever the surface tracks the coupling temperature. In coupled-slab mode
+  ! the growth budget is driven by the atmosphere flux (-a2ihf), so this solve
+  ! only sets the internal skin temperature (albedo/melt-pond state).
   zlam=4.0_WP*emiss_ice*boltzmann*tref**3 + zlam_turb
   t=(zcpdte*t+a2ihf+zlam*tref+zicefl)/(zcpdte+con/zsniced+zlam) ! New sea ice surf temp [K]
   if (t>273.15_WP) then
@@ -646,10 +630,6 @@ contains
      t=273.15_WP
   endif
   qcon=con*(t-TFrezs)/max(zsniced, himin)
-  !---- heat the linearization injected into (t<tref) or removed from
-  !---- (t>tref) the skin beyond what the atmosphere booked; repaid from
-  !---- latent heat: freezing when positive, melt when negative (ice_growth).
-  qlam=zlam*(tref-t)
 ! t=min(273.15_WP,t)
  end subroutine ice_surftemp
 
