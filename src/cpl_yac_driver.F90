@@ -99,7 +99,7 @@ contains
     integer :: ierr, i, j, k, nbr_vertices, nbr_boundary_nodes, nbr_connections, vtx_idx, c2v_idx
     integer :: curr_elem, curr_edge
     logical, allocatable :: node_is_boundary(:)
-    character(len=4)           :: dt_str
+    character(len=8)           :: dt_str
     character(LEN=24) :: startdatetime
 
 #include "associate_part_def.h"
@@ -111,6 +111,8 @@ contains
          yearnew, month, day_in_month, &
          INT(timenew)/3600, MODULO(INT(timenew), 3600)/60, MODULO(INT(timenew), 60), &
          INT(MODULO(timenew, 1.0_WP)*1000)
+
+    WRITE(dt_str, '(I8.8)') INT(dt*1000)
 
     CALL yac_fdef_datetime(startdatetime)
 
@@ -248,7 +250,7 @@ contains
     DO i=1,nsend
        CALL yac_fdef_field(cpl_send(i), comp_id, [points_id], 1, &
             cpl_send_collection_size(i), &
-            dt_str, YAC_TIME_UNIT_SECOND, send_field_id(i))
+            dt_str, YAC_TIME_UNIT_MILLISECOND, send_field_id(i))
     END DO
 
     cpl_recv(1)  = 'taux'
@@ -268,7 +270,7 @@ contains
 
     DO i=1,nrecv
        CALL yac_fdef_field(cpl_recv(i), comp_id, [points_id], 1, cpl_recv_collection_size(i), &
-            dt_str, YAC_TIME_UNIT_SECOND, recv_field_id(i))
+            dt_str, YAC_TIME_UNIT_MILLISECOND, recv_field_id(i))
     END DO
 
     CALL yac_fenddef(ierr)

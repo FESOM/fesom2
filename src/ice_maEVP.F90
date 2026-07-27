@@ -470,6 +470,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: elevation
     real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
     real(kind=WP), dimension(:), pointer  :: u_ice_aux, v_ice_aux
+    real(kind=WP), dimension(:), pointer  :: ice_strength
 #if defined (__icepack)
     real(kind=WP), dimension(:), pointer  :: a_ice_old, m_ice_old, m_snow_old
 #endif
@@ -500,6 +501,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     stress_atmice_y => ice%stress_atmice_y(:)
     u_ice_aux       => ice%uice_aux(:)
     v_ice_aux       => ice%vice_aux(:)
+    ice_strength    => ice%work%ice_strength(:)
 #if defined (__icepack)
     a_ice_old       => ice%data(1)%values_old(:)
     m_ice_old       => ice%data(2)%values_old(:)
@@ -520,6 +522,21 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     !___________________________________________________________________________
     u_ice_aux=u_ice    ! Initialize solver variables
     v_ice_aux=v_ice
+
+    !___________________________________________________________________________
+    ! Populate the nodal ice_strength diagnostic with the canonical Hibler
+    ! (1979) P = P*·h·exp(-C(1-A)) from per-node m_ice and a_ice. Exposed as
+    ! the 'strength_ice' output stream. mEVP evaluates the per-element
+    ! strength inline in its iteration, so this nodal field is purely a
+    ! diagnostic.
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+    do n = 1, myDim_nod2D
+        ice_strength(n) = 0.0_WP
+        if (ulevels_nod2D(n) > 1) cycle
+        if (m_ice(n) <= 0._WP .or. a_ice(n) <= 0._WP) cycle
+        ice_strength(n) = ice%pstar*m_ice(n)*exp(-ice%c_pressure*(1.0_WP-a_ice(n)))
+    end do
+!$OMP END PARALLEL DO
 
 #if defined (__icepack)
     a_ice_old(:)  = a_ice(:)
@@ -1116,14 +1133,14 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     use g_comm_auto
     use ice_maEVP_interfaces
 #if defined (__icepack)
-    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem
+    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
 #endif
     implicit none
     type(t_ice),    intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(in),    target :: mesh
     !___________________________________________________________________________
-    integer          :: steps, shortstep, i, ed
+    integer          :: steps, shortstep, i, ed, n
     real(kind=WP)    :: rdt, drag, det, fc
     real(kind=WP)    :: thickness, inv_thickness, umod, rhsu, rhsv
     REAL(kind=WP)    :: t0,t1, t2, t3, t4, t5, t00, txx
@@ -1136,6 +1153,7 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
     real(kind=WP), dimension(:), pointer  :: u_ice_aux, v_ice_aux
     real(kind=WP), dimension(:), pointer  :: beta_evp_array
+    real(kind=WP), dimension(:), pointer  :: ice_strength
     real(kind=WP)              , pointer  :: rhoice, rhosno
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -1155,6 +1173,7 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     u_ice_aux       => ice%uice_aux(:)
     v_ice_aux       => ice%vice_aux(:)
     beta_evp_array  => ice%beta_evp_array(:)
+    ice_strength    => ice%work%ice_strength(:)
     rhoice          => ice%thermo%rhoice
     rhosno          => ice%thermo%rhosno
 
@@ -1164,6 +1183,25 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     u_ice_aux=u_ice    ! Initialize solver variables
     v_ice_aux=v_ice
     call ssh2rhs(ice, partit, mesh)
+
+    !___________________________________________________________________________
+    ! Populate the nodal ice_strength diagnostic. With icepack, use the per-
+    ! node icepack strength field directly; otherwise the canonical Hibler
+    ! (1979) P = P*·h·exp(-C(1-A)) from per-node m_ice and a_ice. Exposed
+    ! as the 'strength_ice' output stream. aEVP evaluates the per-element
+    ! strength inline in its iteration.
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+    do n = 1, myDim_nod2D
+        ice_strength(n) = 0.0_WP
+        if (ulevels_nod2D(n) > 1) cycle
+        if (m_ice(n) <= 0._WP .or. a_ice(n) <= 0._WP) cycle
+#if defined (__icepack)
+        ice_strength(n) = strength(n)
+#else
+        ice_strength(n) = ice%pstar*m_ice(n)*exp(-ice%c_pressure*(1.0_WP-a_ice(n)))
+#endif
+    end do
+!$OMP END PARALLEL DO
 
 #if defined (__icepack)
     rdg_conv_elem(:)  = 0.0_WP

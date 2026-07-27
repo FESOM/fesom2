@@ -212,11 +212,24 @@ INTEGER                             :: i_error
   ! purely triangular, with 3 columns each. Test, how many
   ! columns there are!  
   read(21,*,iostat=i_error) elem_data(1:4*mesh%elem2D)
+  ! NR Do NOT use reshape() here: ifort places the array temporary it
+  !    creates on the stack, which overflows for large meshes (ng5 etc.)
+  !    and causes a segfault in read_mesh_ini. Copy element by element
+  !    instead, which needs no temporary and works for any mesh size.
   if (i_error == 0) then      ! There is a fourth column => quad or mixed mesh (not working yet!)
-     mesh%elem2D_nodes = reshape(elem_data, shape(mesh%elem2D_nodes))
+     do n=1, mesh%elem2D
+        mesh%elem2D_nodes(1,n) = elem_data(4*n-3)
+        mesh%elem2D_nodes(2,n) = elem_data(4*n-2)
+        mesh%elem2D_nodes(3,n) = elem_data(4*n-1)
+        mesh%elem2D_nodes(4,n) = elem_data(4*n)
+     end do
   else     ! No fourth column => triangles only
-     mesh%elem2D_nodes(1:3,:) = reshape(elem_data, shape(mesh%elem2D_nodes(1:3,:)))
-     mesh%elem2D_nodes(4,:)   = mesh%elem2D_nodes(1,:)
+     do n=1, mesh%elem2D
+        mesh%elem2D_nodes(1,n) = elem_data(3*n-2)
+        mesh%elem2D_nodes(2,n) = elem_data(3*n-1)
+        mesh%elem2D_nodes(3,n) = elem_data(3*n)
+        mesh%elem2D_nodes(4,n) = elem_data(3*n-2)  ! 4th node = 1st node for triangles
+     end do
   end if
     
   deallocate(elem_data)
@@ -346,8 +359,9 @@ integer, allocatable                  :: aux1(:), ne_num(:), ne_pos(:,:), nn_num
 integer                               :: counter, counter_in, n, k, q
 integer                               :: elem, elem1, elems(2), q1, q2
 integer                               :: elnodes(4), ed(2), flag, eledges(4)
-integer                               :: temp(100), node 
+integer                               :: temp(100), node
 real(kind=WP)                         :: xc(2), xe(2), ax(3), amin
+logical                               :: file_exist1, file_exist2, file_exist3
 type(t_mesh), intent(inout), target   :: mesh
 #include "associate_mesh_ini.h"
 ! ====================
@@ -642,18 +656,31 @@ deallocate(aux1)
 
  !> The edge and elem lists agree in the sense that edge 1 does not
  !! contain node 1 and so on
- open(11, file=trim(meshpath)//'edgenum.out')
- write(11,*) edge2D
- write(11,*) edge2D_in
- close(11)
- open(10, file=trim(meshpath)//'edges.out')
- open(12, file=trim(meshpath)//'edge_tri.out')
- do n=1,edge2D
-    write(10,*) edges(:,n)
-    write(12,*) edge_tri(:,n)
- end do
- close(10)
- close(12)
+ ! Never overwrite edge files that already exist in the mesh directory: existing
+ ! experiments (and their restarts) depend on them. A newer algorithm rewriting
+ ! them in place silently invalidates every restart written before. Delete the
+ ! files by hand if you really want to regenerate them.
+ inquire(file=trim(meshpath)//'edgenum.out',  exist=file_exist1)
+ inquire(file=trim(meshpath)//'edges.out',    exist=file_exist2)
+ inquire(file=trim(meshpath)//'edge_tri.out', exist=file_exist3)
+ if (file_exist1 .or. file_exist2 .or. file_exist3) then
+    print *, achar(27)//'[1;33m'//' WARNING: edgenum.out/edges.out/edge_tri.out already exist in '//trim(meshpath)
+    print *, '          keeping the EXISTING files untouched; the partitioning itself uses the'
+    print *, '          newly computed in-memory edges. Delete the files first to regenerate them.'//achar(27)//'[0m'
+ else
+    open(11, file=trim(meshpath)//'edgenum.out')
+    write(11,*) edge2D
+    write(11,*) edge2D_in
+    close(11)
+    open(10, file=trim(meshpath)//'edges.out')
+    open(12, file=trim(meshpath)//'edge_tri.out')
+    do n=1,edge2D
+       write(10,*) edges(:,n)
+       write(12,*) edge_tri(:,n)
+    end do
+    close(10)
+    close(12)
+ end if
  deallocate(ne_num, ne_pos)
 END SUBROUTINE find_edges_ini
 !=========================================================================
@@ -860,11 +887,16 @@ subroutine find_levels(mesh)
     ! exclude isolated cells 
     !_______________________________________________________________________
     file_name=trim(meshpath)//'elvls_raw.out'
-    open(fileID, file=file_name)
-      do n=1,elem2D
-         write(fileID,*) nlevels(n)
-      end do
-    close(fileID)
+    inquire(file=trim(file_name), exist=file_exist)
+    if (file_exist) then
+        print *, achar(27)//'[1;33m'//' WARNING: '//trim(file_name)//' already exists, keeping the existing file'//achar(27)//'[0m'
+    else
+        open(fileID, file=file_name)
+          do n=1,elem2D
+             write(fileID,*) nlevels(n)
+          end do
+        close(fileID)
+    end if
     
     !___________________________________________________________________________
     ! check for isolated cells (cells with at least two boundary faces or three 
@@ -956,19 +988,33 @@ subroutine find_levels(mesh)
 
     !___________________________________________________________________________
     ! write vertical level indices into file
-    file_name=trim(meshpath)//'elvls.out'
-    open(fileID, file=file_name)
-    do n=1,elem2D
-       write(fileID,*) nlevels(n)
-    end do
-    close(fileID)
-    
-    file_name=trim(meshpath)//'nlvls.out'
-    open(fileID, file=file_name)
-      do n=1,nod2D
-         write(fileID,*) nlevels_nod2D(n)
-      end do
-    close(fileID)
+    ! Never overwrite elvls.out/nlvls.out if they already exist: the runtime model
+    ! reads them, and every restart ever written with the existing files depends on
+    ! the level structure they define. Overwriting them with the output of a newer
+    ! (even slightly different) level-finding algorithm makes old restarts blow up
+    ! with zero-thickness layers. Delete the files by hand to regenerate them.
+    inquire(file=trim(meshpath)//'elvls.out', exist=file_exist)
+    if (.not. file_exist) inquire(file=trim(meshpath)//'nlvls.out', exist=file_exist)
+    if (file_exist) then
+        print *, achar(27)//'[1;33m'//' WARNING: elvls.out/nlvls.out already exist in '//trim(meshpath)
+        print *, '          keeping the EXISTING files untouched; the partitioning itself uses the'
+        print *, '          newly computed in-memory levels (only load-balance weights are affected).'
+        print *, '          Delete the files first if you really want to regenerate them.'//achar(27)//'[0m'
+    else
+        file_name=trim(meshpath)//'elvls.out'
+        open(fileID, file=file_name)
+        do n=1,elem2D
+           write(fileID,*) nlevels(n)
+        end do
+        close(fileID)
+
+        file_name=trim(meshpath)//'nlvls.out'
+        open(fileID, file=file_name)
+          do n=1,nod2D
+             write(fileID,*) nlevels_nod2D(n)
+          end do
+        close(fileID)
+    end if
         
     !_______________________________________________________________________
     write(*,*) '========================='
@@ -994,7 +1040,8 @@ subroutine find_levels_cavity(mesh)
     integer        :: exit_flag1, count_iter, max_iter=1000, exit_flag2, count_iter2, max_iter2=25
     real(kind=WP)  :: dmean
     character(MAX_PATH) :: file_name
-    integer, allocatable, dimension(:)   :: aux_arr, aux_idx 
+    logical        :: file_exist
+    integer, allocatable, dimension(:)   :: aux_arr, aux_idx
     integer, allocatable, dimension(:)   :: numelemtonode
     logical, allocatable, dimension(:)   :: elemreducelvl, elemfixlvl
     type(t_mesh), intent(inout), target  :: mesh
@@ -1049,11 +1096,16 @@ subroutine find_levels_cavity(mesh)
     ! eliminate isolated cells
     ! write out elemental cavity-ocean boundary level
     file_name=trim(meshpath)//'cavity_elvls_raw.out'
-    open(20, file=file_name)
-    do elem=1,elem2D
-        write(20,*) ulevels(elem)
-    enddo
-    close(20) 
+    inquire(file=trim(file_name), exist=file_exist)
+    if (file_exist) then
+        print *, achar(27)//'[1;33m'//' WARNING: '//trim(file_name)//' already exists, keeping the existing file'//achar(27)//'[0m'
+    else
+        open(20, file=file_name)
+        do elem=1,elem2D
+            write(20,*) ulevels(elem)
+        enddo
+        close(20)
+    end if
     
     !___________________________________________________________________________
     ! Eliminate cells that have two cavity boundary faces --> should not be 
@@ -1389,21 +1441,31 @@ subroutine find_levels_cavity(mesh)
     !___________________________________________________________________________
     ! write out cavity mesh files for vertice and elemental position of 
     ! vertical cavity-ocean boundary
-    ! write out elemental cavity-ocean boundary level
-    file_name=trim(meshpath)//'cavity_elvls.out'
-    open(20, file=file_name)
-    do elem=1,elem2D
-        write(20,*) ulevels(elem)
-    enddo
-    close(20)
-    
-    ! write out vertice cavity-ocean boundary level + yes/no cavity flag
-    file_name=trim(meshpath)//'cavity_nlvls.out'
-    open(20, file=file_name)
-    do node=1,nod2D
-        write(20,*) ulevels_nod2D(node)
-    enddo
-    close(20)
+    ! Never overwrite cavity_elvls.out/cavity_nlvls.out if they already exist:
+    ! same reasoning as for elvls.out/nlvls.out -- existing restarts depend on them.
+    inquire(file=trim(meshpath)//'cavity_elvls.out', exist=file_exist)
+    if (.not. file_exist) inquire(file=trim(meshpath)//'cavity_nlvls.out', exist=file_exist)
+    if (file_exist) then
+        print *, achar(27)//'[1;33m'//' WARNING: cavity_elvls.out/cavity_nlvls.out already exist in '//trim(meshpath)
+        print *, '          keeping the EXISTING files untouched.'
+        print *, '          Delete the files first if you really want to regenerate them.'//achar(27)//'[0m'
+    else
+        ! write out elemental cavity-ocean boundary level
+        file_name=trim(meshpath)//'cavity_elvls.out'
+        open(20, file=file_name)
+        do elem=1,elem2D
+            write(20,*) ulevels(elem)
+        enddo
+        close(20)
+
+        ! write out vertice cavity-ocean boundary level + yes/no cavity flag
+        file_name=trim(meshpath)//'cavity_nlvls.out'
+        open(20, file=file_name)
+        do node=1,nod2D
+            write(20,*) ulevels_nod2D(node)
+        enddo
+        close(20)
+    end if
 
 end subroutine find_levels_cavity
 

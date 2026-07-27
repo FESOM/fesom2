@@ -27,11 +27,13 @@ jobs:
             display_name: "REcoM3 Configuration"
           - preset: ifs_interface
             display_name: "IFS Interface Configuration"
-    
+
     # Containers must run in Linux based operating systems
     runs-on: ubuntu-latest
-    # Docker Hub image that `container-job` executes in
-    container: ghcr.io/suvarchal/fesom2-ci:latest
+    # FESOM-org-owned CI image: ubuntu 22.04 + GCC/MPI/NetCDF/HDF5/LAPACK,
+    # OASIS3-MCT pre-built at /oasis. Built and published from
+    # FESOM/FESOM2_Docker (fesom2_ci/Dockerfile).
+    container: ghcr.io/fesom/fesom2_docker:fesom2_ci-master
 
     # Service containers to run with `gfortran_ubuntu`
     steps:
@@ -40,6 +42,7 @@ jobs:
       with:
         # Don't Fetch all history for all tags and branches to ensure we have the latest presets
         fetch-depth: 1
+        submodules: 'recursive'
 
     - name: Git safe directory
       run: |
@@ -62,13 +65,13 @@ jobs:
         echo "Building ${{ matrix.display_name }} (preset: ${{ matrix.preset }})"
         cmake --preset ${{ matrix.preset }}
         cmake --build --preset ${{ matrix.preset }} --parallel $(nproc)
-        
+
     - name: Run integration tests for ${{ matrix.display_name }}
       run: |
         echo "Running integration tests for ${{ matrix.display_name }}..."
         ctest --preset ${{ matrix.preset }} --output-on-failure
       continue-on-error: ${{ matrix.preset == 'recom' }}  # REcoM3 tests may fail as noted in documentation
-        
+
     - name: Verify build artifacts for ${{ matrix.display_name }}
       run: |
         echo "Checking build artifacts for ${{ matrix.display_name }}:"

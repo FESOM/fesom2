@@ -3712,23 +3712,32 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         ! Compute vertical integral of transport velocity rhs omitting the contributions from
         ! the elevation and Coriolis. 
         t30=MPI_Wtime()
+        ! Sub-sections nested under oce_ssh_solve (the barotropic subcycle is the
+        ! split-explicit analogue of the CG SSH solve). oce_bt_step is the
+        ! se_BTsteps subcycle loop — the expensive, halo-heavy part.
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_start("oce_bt_rhs")
+#endif
         call compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
-        
-        ! Do barotropic step, get eta_{n+1} and BT transport 
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("oce_bt_rhs")
+    call fesom_profiler_start("oce_bt_step")
+#endif
+        ! Do barotropic step, get eta_{n+1} and BT transport
         call compute_BT_step_SE_ale(dynamics, partit, mesh)
         t3=MPI_Wtime()
 #if defined (FESOM_PROFILING)
+    call fesom_profiler_end("oce_bt_step")
     call fesom_profiler_end("oce_ssh_solve")
     call fesom_profiler_start("oce_vel_update")
-#endif        
+#endif
         ! Trim U to be consistent with BT transport
         call update_trim_vel_ale_vtransp(1, dynamics, partit, mesh) 
         t4=MPI_Wtime()
         t5=t4
 #if defined (FESOM_PROFILING)
+    ! no separate hbar step in split-explicit subcycling (t5=t4)
     call fesom_profiler_end("oce_vel_update")
-    call fesom_profiler_start("oce_hbar_calc")
-    call fesom_profiler_end("oce_hbar_calc")
     call fesom_profiler_start("oce_gm_redi")
 #endif
     end if ! --> if (.not. dynamics%use_ssh_se_subcycl) then

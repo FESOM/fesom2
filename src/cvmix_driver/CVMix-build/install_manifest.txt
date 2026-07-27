@@ -1,0 +1,14 @@
+/home/a/a270105/fesom-2.7/fesom2/src/cvmix_driver/CVMix-install_Intel/lib/libcvmix.a
+/home/a/a270105/fesom-2.7/fesom2/src/cvmix_driver/CVMix-install_Intel/lib/libcvmix.so
+/home/a/a270105/fesom-2.7/fesom2/src/cvmix_driver/CVMix-install_Intel/include/cvmix/cvmix_background.mod
+/home/a/a270105/fesom-2.7/fesom2/src/cvmix_driver/CVMix-install_Intel/include/cvmix/cvmix_convection.mod
+/home/a/a270105/fesom-2.7/fesom2/src/cvmix_driver/CVMix-install_Intel/include/cvmix/cvmix_ddiff.mod
+/home/a/a270105/fesom-2.7/fesom2/src/cvmix_driver/CVMix-install_Intel/include/cvmix/cvmix_kinds_and_types.mod
+/home/a/a270105/fesom-2.7/fesom2/src/cvmix_driver/CVMix-install_Intel/include/cvmix/cvmix_kpp.mod
+/home/a/a270105/fesom-2.7/fesom2/src/cvmix_driver/CVMix-install_Intel/include/cvmix/cvmix_math.mod
+/home/a/a270105/fesom-2.7/fesom2/src/cvmix_driver/CVMix-install_Intel/include/cvmix/cvmix_put_get.mod
+/home/a/a270105/fesom-2.7/fesom2/src/cvmix_driver/CVMix-install_Intel/include/cvmix/cvmix_shear.mod
+/home/a/a270105/fesom-2.7/fesom2/src/cvmix_driver/CVMix-install_Intel/include/cvmix/cvmix_tidal.mod
+/home/a/a270105/fesom-2.7/fesom2/src/cvmix_driver/CVMix-install_Intel/include/cvmix/cvmix_utils.mod
+/home/a/a270105/fesom-2.7/fesom2/src/cvmix_driver/CVMix-install_Intel/cmake/cvmixConfig.cmake
+/home/a/a270105/fesom-2.7/fesom2/src/cvmix_driver/CVMix-install_Intel/cmake/cvmixConfig-release.cmake
