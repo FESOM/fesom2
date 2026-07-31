@@ -14,7 +14,7 @@
 ! HORIZONTAL VISCOSITY
 ! ============================================================================
 &dynamics_visc
-! --- Viscosity Coefficients ---
+! --- Biharmonic Viscosity Coefficients ---
 visc_gamma0        = 0.003       ! background viscosity coefficient [m/s]
                                  ! viscosity = gamma0 × element_length
                                  ! keep < 0.01 m/s for numerical stability
@@ -23,11 +23,18 @@ visc_gamma2        = 0.285       ! additional viscosity coefficient [s/m]
                                  ! only used for easy backscatter (opt_visc=5) and dynamic backscatter (opt_visc=8)
 visc_easybsreturn  = 1.5         ! energy return parameter for easy backscatter [dimensionless]
 
+! --- Harmonic (Laplacian) Viscosity Coefficients (for opt_visc=7) ---
+! When both are 0, opt_visc=7 is pure biharmonic viscosity.
+! When > 0, harmonic viscosity is added to biharmonic (combined mode).
+visc_gamma0_h      = 0.0         ! < 0.003 background harmonic viscosity coefficient [m/s]
+visc_gamma1_h      = 0.0         ! < 0.05  flow-aware harmonic viscosity coefficient [dimensionless]
+
 ! --- Viscosity Scheme Selection ---
 opt_visc           = 5           ! horizontal viscosity scheme:
                                  !   5 = Kinematic (easy) Backscatter
                                  !   6 = Biharmonic flow-aware (depends on velocity Laplacian)
                                  !   7 = Biharmonic flow-aware (depends on velocity differences)
+                                 !       + optional Laplacian when visc_gamma0_h or visc_gamma1_h > 0
                                  !   8 = Dynamic Backscatter
 check_opt_visc     = .true.      ! check if opt_visc=5 is valid based on resolution/Rossby radius ratio
 

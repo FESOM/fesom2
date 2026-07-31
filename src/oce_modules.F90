@@ -276,7 +276,7 @@ real(kind=WP)                               :: is_nonlinfs
 
 !_______________________________________________________________________________
 ! Arrays added for pressure gradient force calculation
-real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0
+real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0, density_sigma0
 real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0_slev
 real(kind=WP), allocatable,dimension(:,:)   :: density_ref
 real(kind=WP), allocatable,dimension(:,:)   :: density_dmoc

@@ -33,7 +33,12 @@ TYPE T_ICE_WORK
     real(kind=WP), allocatable, dimension(:)    :: fct_massmatrix
     real(kind=WP), allocatable, dimension(:)    :: sigma11, sigma12, sigma22
     real(kind=WP), allocatable, dimension(:)    :: eps11, eps12, eps22
-    real(kind=WP), allocatable, dimension(:)    :: ice_strength, inv_areamass, inv_mass
+    real(kind=WP), allocatable, dimension(:)    :: inv_areamass, inv_mass
+    ! ice_strength: canonical Hibler (1979) ice strength P = P*·h·exp(-C(1-A))
+    ! evaluated at nodes from m_ice and a_ice. Exposed to def_stream as the
+    ! 'strength_ice' output. EVP/mEVP/aEVP all evaluate the per-element strength
+    ! inline from this nodal field; no per-element cache is kept.
+    real(kind=WP), allocatable, dimension(:)    :: ice_strength
     !___________________________________________________________________________
     contains
         procedure WRITE_T_ICE_WORK
@@ -82,6 +87,10 @@ TYPE T_ICE_THERMO
     real(kind=WP) :: albi  = 0.70      !         frozen ice
     real(kind=WP) :: albim = 0.68      !         melting ice
     real(kind=WP) :: albw  = 0.066     !         open water, LY2004
+    ! Smooth snow→bare-ice albedo blend; alpha_snow = tanh(hsn/h_snowscale).
+    ! 0 (default) keeps the legacy step function at hsn > 1 mm.
+    ! Typical CICE-style values are 0.02-0.05 m.
+    real(kind=WP) :: h_snowscale = 0.0_WP
     real(kind=WP) :: h_ml  = 2.5_WP    ! thickness of uppermost layer deacides how much heat is available
 
     ! --- additional namelist parameters (Frank.Kauker(at)awi.de 2023/04/04)
@@ -103,12 +112,12 @@ END TYPE T_ICE_THERMO
 !
 !_______________________________________________________________________________
 ! set work array derived type for ice
-#if defined (__oasis) || defined (__ifsinterface)
+#if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
 TYPE T_ICE_ATMCOUPL
 
     !___________________________________________________________________________
     real(kind=WP), allocatable, dimension(:)    :: oce_flx_h, ice_flx_h, tmpoce_flx_h, tmpice_flx_h
-#if defined (__oifs) || defined (__ifsinterface)
+#if defined (__oifs) || defined (__ifsinterface) || defined(__yac)
     !___________________________________________________________________________
     real(kind=WP), allocatable, dimension(:)    :: ice_alb, enthalpyoffuse, runoff_liquid, runoff_solid, flx_qres, flx_qcon
     ! !!! DONT FORGET ice_temp rhs_tempdiv rhs_temp is advected for oifs !!! --> becomes additional ice
@@ -119,7 +128,7 @@ TYPE T_ICE_ATMCOUPL
         procedure WRITE_T_ICE_ATMCOUPL
         procedure READ_T_ICE_ATMCOUPL
 END TYPE T_ICE_ATMCOUPL
-#endif /* (__oasis) */
+#endif /* (__oasis) || __ifsinterface|| __yac */ 
 
 !
 !
@@ -152,7 +161,7 @@ TYPE T_ICE
     !___________________________________________________________________________
     ! total number of ice tracers (default=3, 1=area, 2=mice, 3=msnow, (4=ice_temp)
 #if defined (__oifs) || defined (__ifsinterface)
-    integer                                     :: num_itracers=4
+    integer                                     :: num_itracers=6
 #else
 !    integer                                     :: num_itracers=3
     !------------------------------
@@ -174,12 +183,12 @@ TYPE T_ICE
 
     ! put thermodynamics arrays
     type(t_ice_thermo)                          :: thermo
-
-#if defined (__oasis) || defined (__ifsinterface)
+    
+#if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
     !___________________________________________________________________________
     ! put ice arrays for coupled model
     type(t_ice_atmcoupl)                        :: atmcoupl
-#endif /* (__oasis) */
+#endif /* (__coupled: oasis or yac) || (__ifsinterface)*/ 
 
     !___________________________________________________________________________
     ! set ice model parameters:
@@ -199,7 +208,7 @@ TYPE T_ICE
     real(kind=WP)             :: c_aevp=0.15               ! 0.1--0.2, but should be adjusted experimentally
     ! --- Ice forcing averaging ---
     integer                   :: ice_ave_steps=1           !ice step=ice_ave_steps*oce_step
-    real(kind=WP)             :: cd_oce_ice = 5.5e-3       ! drag coef. oce - ice
+    real(kind=WP)             :: cd_oce_ice = 5.5e-3       ! drag coef. oce - ice 
     logical                   :: ice_free_slip=.false.
     integer                   :: whichEVP=0                ! 0=standart; 1=mEVP; 2=aEVP
 
@@ -278,7 +287,6 @@ subroutine WRITE_T_ICE_WORK(twork, unit)
     call write_bin_array(twork%eps11,        unit, iostat, iomsg)
     call write_bin_array(twork%eps12,        unit, iostat, iomsg)
     call write_bin_array(twork%eps22,        unit, iostat, iomsg)
-    call write_bin_array(twork%ice_strength, unit, iostat, iomsg)
     call write_bin_array(twork%inv_areamass, unit, iostat, iomsg)
     call write_bin_array(twork%inv_mass,     unit, iostat, iomsg)
 end subroutine WRITE_T_ICE_WORK
@@ -302,7 +310,6 @@ subroutine READ_T_ICE_WORK(twork, unit)
     call read_bin_array(twork%eps11,        unit, iostat, iomsg)
     call read_bin_array(twork%eps12,        unit, iostat, iomsg)
     call read_bin_array(twork%eps22,        unit, iostat, iomsg)
-    call read_bin_array(twork%ice_strength, unit, iostat, iomsg)
     call read_bin_array(twork%inv_areamass, unit, iostat, iomsg)
     call read_bin_array(twork%inv_mass,     unit, iostat, iomsg)
 end subroutine READ_T_ICE_WORK
@@ -360,7 +367,7 @@ end subroutine READ_T_ICE_THERMO
 !
 !_______________________________________________________________________________
 ! Unformatted writing for T_ICE_ATMCOUPL
-#if defined (__oasis) || defined (__ifsinterface)
+#if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
 subroutine WRITE_T_ICE_ATMCOUPL(tcoupl, unit)
     IMPLICIT NONE
     class(T_ICE_ATMCOUPL),  intent(in)     :: tcoupl
@@ -377,11 +384,12 @@ subroutine WRITE_T_ICE_ATMCOUPL(tcoupl, unit)
     call write_bin_array(tcoupl%runoff_liquid, unit, iostat, iomsg)
     call write_bin_array(tcoupl%runoff_solid, unit, iostat, iomsg)
 #endif /* (__oifs) */
-end subroutine WRITE_T_ICE_ATMCOUPL
-#endif /* (__oasis) */
+
+end subroutine WRITE_T_ICE_ATMCOUPL  
+#endif /* (__coupled:oasis or yac)  || (__ifsinterface) */
 
 ! Unformatted reading for T_ICE_ATMCOUPL
-#if defined (__oasis) || defined (__ifsinterface)
+#if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
 subroutine READ_T_ICE_ATMCOUPL(tcoupl, unit)
     IMPLICIT NONE
     class(T_ICE_ATMCOUPL),  intent(inout)  :: tcoupl
@@ -399,7 +407,7 @@ subroutine READ_T_ICE_ATMCOUPL(tcoupl, unit)
     call read_bin_array(tcoupl%runoff_solid, unit, iostat, iomsg)
 #endif /* (__oifs) */
 end subroutine READ_T_ICE_ATMCOUPL
-#endif /* (__oasis) */
+#endif /* (__coupled:oasis or yac) || (__ifsinterface) */
 !
 !
 !_______________________________________________________________________________
@@ -419,9 +427,9 @@ subroutine WRITE_T_ICE(ice, unit, iostat, iomsg)
     !___________________________________________________________________________
     call ice%thermo%WRITE_T_ICE_THERMO(unit)
     call ice%work%WRITE_T_ICE_WORK(unit)
-#if defined (__oasis) || defined (__ifsinterface)
+#if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
     call ice%atmcoupl%WRITE_T_ICE_ATMCOUPL(unit)
-#endif /* (__oasis) */
+#endif /* (__coupled) */
 
     !___________________________________________________________________________
     write(unit, iostat=iostat, iomsg=iomsg) ice%pstar
@@ -492,9 +500,9 @@ subroutine READ_T_ICE(ice, unit, iostat, iomsg)
     !___________________________________________________________________________
     call ice%thermo%READ_T_ICE_THERMO(unit)
     call ice%work%READ_T_ICE_WORK(unit)
-#if defined (__oasis) || defined (__ifsinterface)
+#if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
     call ice%atmcoupl%READ_T_ICE_ATMCOUPL(unit)
-#endif /* (__oasis) */
+#endif /* (__coupled) */
 
     !___________________________________________________________________________
     read(unit, iostat=iostat, iomsg=iomsg) ice%pstar
@@ -574,6 +582,7 @@ subroutine ice_init(ice, partit, mesh)
     USE MOD_PARSUP
     USE MOD_MESH
     USE o_param, only: WP
+    use ice_meltponds, only: init_meltponds
     IMPLICIT NONE
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -593,9 +602,10 @@ subroutine ice_init(ice, partit, mesh)
     logical        :: snowdist, new_iclasses, use_meltponds
     integer        :: open_water_albedo, iclasses
     real(kind=WP)  :: Sice, h0, h0_s, emiss_ice, emiss_wat, albsn, albsnm, albi, &
-                      albim, albw, con, consn, hmin, armin, c_melt, h_cutoff, h_ml
+                      albim, albw, con, consn, hmin, armin, c_melt, h_cutoff, h_ml, h_snowscale
     namelist /ice_therm/ Sice, iclasses, h0, h0_s, hmin, armin,  emiss_ice, emiss_wat, albsn, albsnm, albi, &
-                         albim, albw, con, consn,  snowdist, new_iclasses, open_water_albedo, c_melt, h_cutoff, h_ml, use_meltponds
+                         albim, albw, con, consn,  snowdist, new_iclasses, open_water_albedo, c_melt, h_cutoff, h_ml, use_meltponds, &
+                         h_snowscale
 
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -638,6 +648,7 @@ subroutine ice_init(ice, partit, mesh)
     albim            = ice%thermo%albim
     albw             = ice%thermo%albw
     h_ml             = ice%thermo%h_ml
+    h_snowscale      = ice%thermo%h_snowscale
     snowdist         = ice%thermo%snowdist
     new_iclasses     = ice%thermo%new_iclasses
     open_water_albedo= ice%thermo%open_water_albedo
@@ -698,10 +709,12 @@ subroutine ice_init(ice, partit, mesh)
     ice%thermo%albim    = albim
     ice%thermo%albw     = albw
     ice%thermo%h_ml     = h_ml
+    ice%thermo%h_snowscale = h_snowscale
     ice%thermo%snowdist = snowdist
     ice%thermo%new_iclasses=new_iclasses
     ice%thermo%open_water_albedo=open_water_albedo
     ice%thermo%use_meltponds = use_meltponds
+    if (use_meltponds) call init_meltponds('namelist.ice', partit%mype)
     ice%thermo%c_melt   = c_melt
     ice%thermo%h_cutoff = h_cutoff    
     ice%thermo%cc       =ice%thermo%rhowat*4190.0  ! Volumetr. heat cap. of water [J/m**3/K](cc = rhowat*cp_water)
@@ -746,8 +759,8 @@ subroutine ice_init(ice, partit, mesh)
         ice%vice_aux    = 0.0_WP
     end if
     if (ice%whichEVP == 2) then
-        allocate(ice%alpha_evp_array(  node_size))
-        allocate(ice%beta_evp_array(   node_size))
+        allocate(ice%alpha_evp_array(  elem_size))   ! element-indexed in stress_tensor_a/find_alpha_field_a
+        allocate(ice%beta_evp_array(   node_size))   ! node-indexed in ice_momentum_step_a
         ice%alpha_evp_array = ice%alpha_evp
         ice%beta_evp_array  = ice%alpha_evp
     end if
@@ -821,12 +834,12 @@ subroutine ice_init(ice, partit, mesh)
     ice%work%eps12       = 0.0_WP
     ice%work%eps22       = 0.0_WP
 
-    allocate(ice%work%ice_strength(    elem_size))
-    allocate(ice%work%inv_areamass(    node_size))
-    allocate(ice%work%inv_mass(        node_size))
-    ice%work%ice_strength= 0.0_WP
-    ice%work%inv_areamass= 0.0_WP
-    ice%work%inv_mass    = 0.0_WP
+    allocate(ice%work%inv_areamass(node_size))
+    allocate(ice%work%inv_mass(    node_size))
+    allocate(ice%work%ice_strength(node_size))
+    ice%work%inv_areamass = 0.0_WP
+    ice%work%inv_mass     = 0.0_WP
+    ice%work%ice_strength = 0.0_WP
 
     !___________________________________________________________________________
     ! initialse thermo array of ice derived type
@@ -852,8 +865,8 @@ subroutine ice_init(ice, partit, mesh)
     ice%thermo%ipnd      = 0.0_WP
 
     !___________________________________________________________________________
-    ! initialse coupling array of ice derived type
-#if defined (__oasis) || defined (__ifsinterface)
+    ! initialse coupling array of ice derived type 
+#if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
     allocate(ice%atmcoupl%oce_flx_h(     node_size))
     allocate(ice%atmcoupl%ice_flx_h(     node_size))
     allocate(ice%atmcoupl%tmpoce_flx_h(  node_size))
@@ -876,7 +889,7 @@ subroutine ice_init(ice, partit, mesh)
     ice%atmcoupl%flx_qres      = 0.0_WP    
     ice%atmcoupl%flx_qcon      = 0.0_WP
 #endif /* (__oifs) */
-#endif /* (__oasis) */
+#endif /* (__coupled: oasis or ifsinterface or yac) */
 
     !___________________________________________________________________________
     ! --> took from oce_mesh.F90 --> subroutine mesh_auxiliary_arrays(partit, mesh)

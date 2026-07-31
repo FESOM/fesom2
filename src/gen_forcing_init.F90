@@ -42,7 +42,7 @@ type(t_partit), intent(inout), target :: partit
   if (partit%mype==0) write(*,*) '****************************************************'
   if (use_ice) then
      call forcing_array_setup(partit, mesh)
-#ifndef __oasis
+#if !defined(__oasis) && !defined(__yac)
      call sbc_ini(partit, mesh)         ! initialize forcing fields
 #endif
   endif 
@@ -87,7 +87,9 @@ subroutine forcing_array_setup(partit, mesh)
   use g_sbf, only: l_mslp, l_cloud
 #if defined (__oasis)
   use cpl_driver, only : nrecv
-#endif   
+#elif defined(__yac)
+  use cpl_yac_driver, only : nrecv
+#endif
   implicit none
   type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit
@@ -141,14 +143,12 @@ subroutine forcing_array_setup(partit, mesh)
   runoff=0.0_WP
   evaporation = 0.0_WP
   ice_sublimation = 0.0_WP
-
-
-#if defined (__oasis) || defined (__ifsinterface)
+#if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
   allocate(sublimation(n2), evap_no_ifrac(n2))
   sublimation=0.0_WP
   evap_no_ifrac=0.0_WP
 #endif
-#if defined (__oasis)
+#if defined (__oasis) || defined (__yac)
   allocate(tmp_sublimation(n2),tmp_evap_no_ifrac(n2), tmp_shortwave(n2))
   allocate(atm_net_fluxes_north(nrecv), atm_net_fluxes_south(nrecv))
   allocate(oce_net_fluxes_north(nrecv), oce_net_fluxes_south(nrecv))
