@@ -253,7 +253,7 @@ end do
 
  if (mod(istep_end_synced,icb_outfreq)==0 .AND. .not.ascii_out) then
 
-   if (mype==0 .AND. (real(istep) > real(step_per_day)*calving_day(1) ) ) call write_buoy_props_netcdf(partit)
+   if (mype==0) call write_buoy_props_netcdf(partit)
        
    ! all PEs: set back to zero for next round
    bvl_mean=0.0
@@ -294,7 +294,7 @@ subroutine iceberg_step1(ice, mesh, partit, dynamics, ib, height_ib_single,lengt
  												!=
  use o_param 		!for rad								!=
  use g_rotate_grid	!for subroutine g2r, logfile_outfreq					!=
- use g_config, only: steps_per_ib_step
+ use g_config, only: steps_per_ib_step, l_allowgrounding
  !=
 use iceberg_params, only: length_ib, width_ib, scaling, elem_block, elem_area_glob !, smallestvol_icb, arr_block, elem_block, l_geo_out, icb_outfreq, l_allowgrounding, draft_scale, reject_elem, melted, grounded !, length_ib, width_ib, scaling
 !#else
@@ -353,6 +353,7 @@ use iceberg_params, only: length_ib, width_ib, scaling, elem_block, elem_area_gl
  !for grounding										!=
  real, dimension(3)		:: Zdepth3						!=
  real				:: Zdepth						!=
+ real               :: fact                 ! factor to scale down the velocity of grounded icebergs 
  											!=
  real, dimension(2)             :: coords_tmp
 ! integer, pointer  :: mype
@@ -415,12 +416,11 @@ type(t_dyn)   , intent(inout), target :: dynamics
    
    
    if (use_cavity) then
-      reject_tmp = any(mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0) .OR. all(mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==0.0) 
-      !reject_tmp = all( (mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==0.0) )
+      reject_tmp = all( (mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==0.0) )
       if(reject_tmp) then
-       write(*,*) " * set IB elem ",iceberg_elem,"to zero for IB=",ib
-       write(*,*) " cavity: ",all((mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0))
-       write(*,*) " boundary: ", all(mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==0)
+!       write(*,*) " * set IB elem ",iceberg_elem,"to zero for IB=",ib
+!       write(*,*) " cavity: ",all((mesh%cavity_depth(mesh%elem2D_nodes(:,iceberg_elem))/=0.0))
+!       write(*,*) " boundary: ", all(mesh%bc_index_nod2D(mesh%elem2D_nodes(:,iceberg_elem))==1)
        iceberg_elem=0 !reject element
        i_have_element=.false.
       else 
@@ -433,9 +433,9 @@ type(t_dyn)   , intent(inout), target :: dynamics
   call com_integer(partit, i_have_element,iceberg_elem)
  
   if(iceberg_elem .EQ. 0) then
-    write(*,*) 'IB ',ib,' rot. coords:', lon_deg, lat_deg !,lon_rad, lat_rad
-    call par_ex (partit%MPI_COMM_FESOM, partit%mype)
-    stop 'ICEBERG OUTSIDE MODEL DOMAIN OR IN ICE SHELF REGION'
+        write(*,*) 'IB ',ib,' rot. coords:', lon_deg, lat_deg !,lon_rad, lat_rad
+   	call par_ex (partit%MPI_COMM_FESOM, partit%mype)
+   	stop 'ICEBERG OUTSIDE MODEL DOMAIN OR IN ICE SHELF REGION'
   end if
   
   ! initialize the iceberg velocity
@@ -505,62 +505,78 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
   !write(*,*) 'nodal depth in iceberg ', ib,'s element:', Zdepth3
   !write(*,*) 'depth at iceberg ', ib, 's location:', Zdepth
   
-  !=================CHECK IF ICEBERG IS GROUNDED...===================
- old_element = iceberg_elem !save if iceberg left model domain
- if((draft_scale(ib)*abs(depth_ib) .gt. Zdepth) .and. l_allowgrounding ) then 
- !if((draft_scale(ib)*abs(depth_ib) .gt. minval(Zdepth3)) .and. l_allowgrounding ) then 
-   !icebergs remains stationary (iceberg can melt above in iceberg_dyn!)
-    left_mype = 0.0 
-    u_ib = 0.0
-    v_ib = 0.0
-    old_lon = lon_rad
-    old_lat = lat_rad
- 
-! kh 16.03.21 (asynchronous) iceberg calculation starts with the content in common arrays at istep and will merge its results at istep_end_synced
-    grounded_ib = 1.
-    !if (mod(istep_end_synced,logfile_outfreq)==0) then
-    if (lverbose_icb) write(*,*) 'iceberg ib ', ib, 'is grounded; ib_depth=',draft_scale(ib)*abs(depth_ib),'; Zdepth=',Zdepth
-    !end if
- 	
- else 
-  !===================...ELSE CALCULATE TRAJECTORY====================
-    grounded_ib = 0.
+  !================= CHECK IF ICEBERG IS GROUNDED ===================
+  ! l_allowgrounding == 0: no grounding (free drift)
+  ! l_allowgrounding == 1: reduce velocity (slow drift)
+  ! l_allowgrounding == 2: velocity 0m/s (stationary)
 
- 
- t0=MPI_Wtime()
-  call trajectory( lon_rad,lat_rad, u_ib,v_ib, new_u_ib,new_v_ib, &
-		   lon_deg,lat_deg,old_lon,old_lat, dt*REAL(steps_per_ib_step))
+  if (l_allowgrounding == 1 .or. l_allowgrounding == 2) then
+    ! First, check if the iceberg is grounded.
+    if((draft_scale(ib)*abs(depth_ib) .gt. Zdepth)) then
+      ! The grounding flag is always set to False in line 469.  
+      ! Set the grounded flag to True ...
+      grounded_ib = 1.
+      ! ... and print a message about the iceberg draft and the ocean depth
+      if (lverbose_icb) write(*,*) 'iceberg ib ', ib, 'is grounded; ib_depth=',draft_scale(ib)*abs(depth_ib),'; Zdepth=',Zdepth
+      
+      ! If case 1, scale the velocity down by a factor [0, 1) to slow down the iceberg
+      ! depending on how deep it penetrates the sea floor ... (Marsh etl al. https://doi.org/10.5194/gmd-8-1547-2015)  
+      if (l_allowgrounding == 1) then
+        fact=1.0-( (draft_scale(ib)*abs(depth_ib)-Zdepth) / (draft_scale(ib)*abs(depth_ib)) ) 
+        u_ib = u_ib*fact
+        v_ib = v_ib*fact
+        ! ... and print a message if verbose output is enabled
+        if (lverbose_icb) write(*,*) 'iceberg ib ', ib, 'reduced velocity: u_ib=',u_ib,'m/s; v_ib=',v_ib,'m/s,',' fact:', fact
+      
+        ! If case 2, set the velocity to 0
+      elseif (l_allowgrounding == 2) then
+        left_mype = 0.0 
+        u_ib = 0.0
+        v_ib = 0.0
+        old_lon = lon_rad
+        old_lat = lat_rad
+        if (lverbose_icb) write(*,*) 'iceberg ib ', ib, 'is stationary; u_ib=',u_ib,'; v_ib=',v_ib
+      end if
+    end if
+  end if
+  
+  ! Second, calculate the trajectory of the iceberg based on either the 
+  ! l_allowgrounding == 0: no grounding (free drift)
+  ! l_allowgrounding == 1: reduce velocity (slow drift)  
+  if (l_allowgrounding == 0 .or. l_allowgrounding == 1) then 
+    t0=MPI_Wtime()
+    call trajectory( lon_rad,lat_rad, u_ib,v_ib, new_u_ib,new_v_ib, &
+	 	     lon_deg,lat_deg,old_lon,old_lat, dt*REAL(steps_per_ib_step))
   	   
- t1=MPI_Wtime()
-  iceberg_elem=local_idx_of(iceberg_elem)  	!local
+    t1=MPI_Wtime()
+    iceberg_elem=local_idx_of(iceberg_elem)  	!local
   
- t2=MPI_Wtime()
-  call find_new_iceberg_elem(mesh, partit, iceberg_elem, [lon_deg, lat_deg], left_mype)
- t3=MPI_Wtime()
-  iceberg_elem=partit%myList_elem2D(iceberg_elem)  	!global
+    t2=MPI_Wtime()
+    call find_new_iceberg_elem(mesh, partit, iceberg_elem, [lon_deg, lat_deg], left_mype)
+    t3=MPI_Wtime()
+    iceberg_elem=partit%myList_elem2D(iceberg_elem)  	!global
   
-  if(left_mype > 0.) then
-   lon_rad = old_lon
-   lat_rad = old_lat
- t4=MPI_Wtime()
-   ! LA: Does this work corretly?
-   call parallel2coast(mesh,partit, new_u_ib, new_v_ib, lon_rad,lat_rad, local_idx_of(iceberg_elem), ib, iceberg_elem)
- t5=MPI_Wtime()
-   call trajectory( lon_rad,lat_rad, new_u_ib,new_v_ib, new_u_ib,new_v_ib, &
-		   lon_deg,lat_deg,old_lon,old_lat, dt*REAL(steps_per_ib_step))
- t6=MPI_Wtime()
-   u_ib = new_u_ib
-   v_ib = new_v_ib
+    if(left_mype > 0.) then
+      lon_rad = old_lon
+      lat_rad = old_lat
+      t4=MPI_Wtime()
+      call parallel2coast(mesh,partit, new_u_ib, new_v_ib, lon_rad,lat_rad, local_idx_of(iceberg_elem))
+      t5=MPI_Wtime()
+      call trajectory(lon_rad,lat_rad, new_u_ib,new_v_ib, new_u_ib,new_v_ib, &
+		      lon_deg,lat_deg,old_lon,old_lat, dt*REAL(steps_per_ib_step))
+      t6=MPI_Wtime()
+      u_ib = new_u_ib
+      v_ib = new_v_ib
 		   
-   iceberg_elem=local_idx_of(iceberg_elem)  	!local
- t7=MPI_Wtime()
-   call find_new_iceberg_elem(mesh,partit, iceberg_elem, (/lon_deg, lat_deg/), left_mype)
+      iceberg_elem=local_idx_of(iceberg_elem)  	!local
+      t7=MPI_Wtime()
+      call find_new_iceberg_elem(mesh,partit, iceberg_elem, (/lon_deg, lat_deg/), left_mype)
 
- t8=MPI_Wtime()
-   iceberg_elem=partit%myList_elem2D(iceberg_elem)  	!global
+      t8=MPI_Wtime()
+      iceberg_elem=partit%myList_elem2D(iceberg_elem)  	!global
+    end if
   end if		   
   !================END OF TRAJECTORY CALCULATION=====================
- end if ! iceberg stationary?
 
   !-----------------------------
   ! LA 2022-11-30
@@ -1046,16 +1062,14 @@ end subroutine depth_bathy
 !****************************************************************************************************************************
 !****************************************************************************************************************************
 
-subroutine parallel2coast(mesh, partit,u, v, lon,lat, elem, ib, elem_global)
+subroutine parallel2coast(mesh, partit,u, v, lon,lat, elem)
  use iceberg_params, only: coastal_nodes
- use g_config, only: lverbose_icb
- 
  implicit none
  
  real, intent(inout) 	:: u, v 	!velocity
  real, intent(in)	:: lon, lat 	!radiant
  integer, intent(in)	:: elem
- integer, intent(in)    :: ib, elem_global
+ 
  integer :: fld_tmp
  integer, dimension(3) :: n
  integer :: node, m, i
@@ -1068,19 +1082,14 @@ type(t_partit), intent(inout), target :: partit
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
- 
+  
   if( use_cavity ) then
     !fld_tmp = coastal_nodes(mesh, partit, elem)
     fld_tmp =  count( (mesh%cavity_depth(mesh%elem2D_nodes(:,elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
   else
     fld_tmp =  count( (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
   end if
- 
-  if( lverbose_icb ) then
-    write(*,*) " - running parallel2coast for  IB ",ib," on elem ",elem_global,", fld_tmp=",fld_tmp
-    write(*,*) " - u_old, v_old =",u,v
-  end if
-
+  
   SELECT CASE ( fld_tmp ) !num of coastal points
    CASE (0) !...coastal points: do nothing
     return
@@ -1128,7 +1137,7 @@ type(t_partit), intent(inout), target :: partit
          i = i+1
         end if
       else
-        if( mesh%bc_index_nod2D(node)==0.0 ) then
+        if( mesh%bc_index_nod2D(node)==1 ) then
          n(i) = node
          i = i+1
         end if
@@ -1149,9 +1158,6 @@ type(t_partit), intent(inout), target :: partit
  
  u = velocity(1)
  v = velocity(2)
-  if( lverbose_icb ) then
-    write(*,*) " - u_new, v_new =",u,v
-  end if
 
 end subroutine parallel2coast
 
@@ -1358,7 +1364,7 @@ type(t_partit), intent(inout), target :: partit
 	Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
 	conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
 	u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),		&
-	f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), grounded(ib), scaling(ib), melted(ib)
+	f_u_ib_old(ib), f_v_ib_old(ib), 0.0, grounded(ib), scaling(ib), melted(ib)
    
    !***************************************************************
    !write new restart file with only non melted icebergs
@@ -1369,7 +1375,7 @@ type(t_partit), intent(inout), target :: partit
             Co(ib),Ca(ib),Ci(ib), Cdo_skin(ib),Cda_skin(ib), rho_icb(ib), 		&
             conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
             u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),		&
-            f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), grounded(ib), scaling(ib), melted(ib)
+            f_u_ib_old(ib), f_v_ib_old(ib), 0.0, grounded(ib), scaling(ib), melted(ib)
    end if
 
   end do
@@ -1470,6 +1476,13 @@ subroutine init_icebergs
     read(98,*) scaling(i)
  end do
  close(98)
+!calving_day_file > calving_day
+ open(unit=97, file=calving_day_file,status='old',action='read',iostat=io_error)
+ if ( io_error.ne.0) stop 'ERROR while reading file calving_day_file'
+ do i = 1, ib_num
+    read(97,*) calving_day(i)
+ end do
+ close(97)
 
 end subroutine init_icebergs
 !
@@ -1530,6 +1543,13 @@ subroutine init_icebergs_with_icesheet
     read(98,*) scaling(i)
  end do
  close(98)
+!calving_day_file > calving_day
+ open(unit=97, file=calving_day_file,status='old',action='read',iostat=io_error)
+ if ( io_error.ne.0) stop 'ERROR while reading file calving_day_file'
+ do i = 1+num_non_melted_icb, ib_num
+    read(97,*) calving_day(i)
+ end do
+ close(97)
 
 end subroutine init_icebergs_with_icesheet
 !
@@ -1540,15 +1560,15 @@ subroutine determine_save_count(partit)
   ! computes save_count_buoys and prev_sec_in_year from records in existing netcdf file
   !-----------------------------------------------------------  
   use g_clock
-  use netcdf
 !  use iceberg_params, only : file_icb_netcdf, save_count_buoys, prev_sec_in_year
   !use iceberg_params, only : save_count_buoys, prev_sec_in_year
   implicit none
+
+#include "netcdf.inc" 
   integer		    :: buoy_nrec
   integer                   :: status, ncid
   integer                   :: dimid_rec
   integer                   :: time_varid
-  integer                   :: start_1d(1), count_1d(1)
 type(t_partit), intent(inout), target :: partit
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
@@ -1556,14 +1576,14 @@ type(t_partit), intent(inout), target :: partit
  if (mype==0) then
 
   ! open file
-  status = nf90_open(file_icb_netcdf, nf90_nowrite, ncid)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_open(file_icb_netcdf, nf_nowrite, ncid)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
   ! inquire time dimension ID and its length
-  status = nf90_inq_dimid(ncid, 'time', dimid_rec)
-  if(status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_inquire_dimension(ncid, dimid_rec, len=buoy_nrec)
-  if(status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_inq_dimid(ncid, 'time', dimid_rec)
+  if(status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_inq_dimlen(ncid, dimid_rec, buoy_nrec)
+  if(status .ne. nf_noerr) call handle_err(status, partit)
 
   ! the next buoy/iceberg record to be saved
   save_count_buoys=buoy_nrec+1
@@ -1571,16 +1591,16 @@ type(t_partit), intent(inout), target :: partit
   write(*,*) 'next record is #',save_count_buoys
 
   ! load sec_in_year up to now in 'prev_sec_in_year', time axis will be continued
-  status=nf90_inq_varid(ncid, 'time', time_varid)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status=nf90_get_var(ncid, time_varid, prev_sec_in_year) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status=nf_inq_varid(ncid, 'time', time_varid)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status=nf_get_vara_double(ncid, time_varid, save_count_buoys-1, 1, prev_sec_in_year) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
   write(*,*) 'seconds passed up to now: ',prev_sec_in_year
 
   !close file
-  status=nf90_close(ncid)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status=nf_close(ncid)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
 end if
 
@@ -1597,10 +1617,11 @@ subroutine init_buoy_output(partit)
   !-----------------------------------------------------------  
   use g_clock
   use g_config, only : ib_num
-  use netcdf
 !  use iceberg_params, only : file_icb_netcdf, save_count_buoys !ggf in namelist
   implicit none
-  integer                   :: status,ncid,year_start,month_start,day_start
+
+#include "netcdf.inc" 
+  integer                   :: status,ncid
   integer                   :: dimid_ib, dimid_rec, dimids(2)
   integer                   :: time_varid, iter_varid
   integer                   :: lonrad_id, latrad_id, londeg_id, latdeg_id
@@ -1608,7 +1629,7 @@ subroutine init_buoy_output(partit)
   integer                   :: uib_id, vib_id
   integer                   :: height_id, length_id, width_id
   integer                   :: bvl_id, lvlv_id, lvle_id, lvlb_id, felem_id, grounded_id
-  character(100)            :: longname, att_text, description, units
+  character(100)            :: longname, att_text, description
 type(t_partit), intent(inout), target :: partit
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
@@ -1618,21 +1639,21 @@ type(t_partit), intent(inout), target :: partit
  
 
  ! create a file
-  status = nf90_create(file_icb_netcdf, nf90_clobber, ncid)
-  if (status.ne.nf90_noerr)  call handle_err(status, partit)
+  status = nf_create(file_icb_netcdf, nf_clobber, ncid)
+  if (status.ne.nf_noerr)  call handle_err(status, partit)
 
   ! Define the dimensions
-  status = nf90_def_dim(ncid, 'number_tracer', ib_num, dimid_ib)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_def_dim(ncid, 'time', nf90_unlimited, dimid_rec)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_def_dim(ncid, 'number_tracer', ib_num, dimid_ib)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_def_dim(ncid, 'time', NF_UNLIMITED, dimid_rec)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
 
   ! Define the time and iteration variables
-  status = nf90_def_var(ncid, 'time', nf90_double, dimids=(/dimid_rec/), varid=time_varid)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_def_var(ncid, 'iter', nf90_int, dimids=(/dimid_rec/), varid=iter_varid)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_def_var(ncid, 'time', NF_DOUBLE, 1, dimid_rec, time_varid)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_def_var(ncid, 'iter', NF_INT, 1, dimid_rec, iter_varid)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
   ! Define the netCDF variables for the tracers.
   ! In Fortran, the unlimited dimension must come
@@ -1641,290 +1662,290 @@ type(t_partit), intent(inout), target :: partit
   dimids(2) = dimid_rec
 
 
-  status = nf90_def_var(ncid, 'pos_lon_rad', nf90_double, dimids=dimids, varid=lonrad_id)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_def_var(ncid, 'pos_lon_rad', NF_DOUBLE, 2, dimids, lonrad_id)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
-  status = nf90_def_var(ncid, 'pos_lat_rad', nf90_double, dimids=dimids, varid=latrad_id)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_def_var(ncid, 'pos_lat_rad', NF_DOUBLE, 2, dimids, latrad_id)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
-  status = nf90_def_var(ncid, 'pos_lon_deg', nf90_double, dimids=dimids, varid=londeg_id)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_def_var(ncid, 'pos_lon_deg', NF_DOUBLE, 2, dimids, londeg_id)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
-  status = nf90_def_var(ncid, 'pos_lat_deg', nf90_double, dimids=dimids, varid=latdeg_id)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_def_var(ncid, 'pos_lat_deg', NF_DOUBLE, 2, dimids, latdeg_id)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
-  status = nf90_def_var(ncid, 'frozen_in', nf90_double, dimids=dimids, varid=frozen_id)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_def_var(ncid, 'frozen_in', NF_DOUBLE, 2, dimids, frozen_id)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
-  status = nf90_def_var(ncid, 'du_dt', nf90_double, dimids=dimids, varid=dudt_id)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_def_var(ncid, 'du_dt', NF_DOUBLE, 2, dimids, dudt_id)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
-  status = nf90_def_var(ncid, 'dv_dt', nf90_double, dimids=dimids, varid=dvdt_id)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_def_var(ncid, 'dv_dt', NF_DOUBLE, 2, dimids, dvdt_id)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
-  status = nf90_def_var(ncid, 'icb_vel_u', nf90_double, dimids=dimids, varid=uib_id)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_def_var(ncid, 'icb_vel_u', NF_DOUBLE, 2, dimids, uib_id)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
-  status = nf90_def_var(ncid, 'icb_vel_v', nf90_double, dimids=dimids, varid=vib_id)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_def_var(ncid, 'icb_vel_v', NF_DOUBLE, 2, dimids, vib_id)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
   ! 3 dimensions of the iceberg, comment for buoy case
 
-  status = nf90_def_var(ncid, 'height', nf90_double, dimids=dimids, varid=height_id)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_def_var(ncid, 'height', NF_DOUBLE, 2, dimids, height_id)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
-  status = nf90_def_var(ncid, 'length', nf90_double, dimids=dimids, varid=length_id)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_def_var(ncid, 'length', NF_DOUBLE, 2, dimids, length_id)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
-  status = nf90_def_var(ncid, 'width', nf90_double, dimids=dimids, varid=width_id)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_def_var(ncid, 'width', NF_DOUBLE, 2, dimids, width_id)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
   ! 4 additional iceberg variables (meltrates), comment for buoy case
 
-  status = nf90_def_var(ncid, 'bvl', nf90_double, dimids=dimids, varid=bvl_id)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_def_var(ncid, 'bvl', NF_DOUBLE, 2, dimids, bvl_id)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
-  status = nf90_def_var(ncid, 'lvlv', nf90_double, dimids=dimids, varid=lvlv_id)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_def_var(ncid, 'lvlv', NF_DOUBLE, 2, dimids, lvlv_id)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
-  status = nf90_def_var(ncid, 'lvle', nf90_double, dimids=dimids, varid=lvle_id)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_def_var(ncid, 'lvle', NF_DOUBLE, 2, dimids, lvle_id)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
-  status = nf90_def_var(ncid, 'lvlb', nf90_double, dimids=dimids, varid=lvlb_id)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_def_var(ncid, 'lvlb', NF_DOUBLE, 2, dimids, lvlb_id)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
   ! LA: add felem
-  status = nf90_def_var(ncid, 'felem', nf90_double, dimids=dimids, varid=felem_id)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_def_var(ncid, 'felem', NF_DOUBLE, 2, dimids, felem_id)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
-  status = nf90_def_var(ncid, 'grounded', nf90_double, dimids=dimids, varid=grounded_id)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_def_var(ncid, 'grounded', NF_DOUBLE, 2, dimids, grounded_id)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
   
   ! Assign long_name and units attributes to variables.
   longname='time' ! use NetCDF Climate and Forecast (CF) Metadata Convention
-  status=nf90_put_att(ncid, time_varid, 'long_name', trim(longname))
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  units='seconds since model start'
-  status=nf90_put_att(ncid, time_varid, 'units', trim(units))
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, time_varid, 'long_name', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a9)') 'seconds since ', yearstart, '-', 1, '-', 1, ' 00:00:00'
+  status = nf_PUT_ATT_TEXT(ncid, time_varid, 'units', len_trim(att_text), trim(att_text))
+  if (status .ne. nf_noerr) call handle_err(status, partit)
   if (include_fleapyear) then
       att_text='standard'
   else
       att_text='noleap'
   end if
-  status = nf90_put_att(ncid, time_varid, 'calendar', trim(att_text))
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, time_varid, 'calendar', len_trim(att_text), trim(att_text))
+  if (status .ne. nf_noerr) call handle_err(status, partit)
   longname='iteration_count'
-  status = nf90_put_att(ncid, iter_varid, 'long_name', trim(longname)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, iter_varid, 'long_name', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
   longname='longitude of buoy/iceberg position in radiant'
-  status = nf90_put_att(ncid, lonrad_id, 'long_name', trim(longname)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, lonrad_id, 'units', 'radiant')
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, lonrad_id, 'long_name', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, lonrad_id, 'units', 7, 'radiant')
+  if (status .ne. nf_noerr) call handle_err(status, partit)
   !rotated or not rotated due to setting in iceberg module
   description='(un)rotated according to setting of l_geo_out in iceberg module'
-  status = nf90_put_att(ncid, lonrad_id, 'description', trim(description)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, lonrad_id, 'description', len_trim(description), trim(description)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
   longname='latitude of buoy/iceberg position in radiant'
-  status = nf90_put_att(ncid, latrad_id, 'long_name', trim(longname)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, latrad_id, 'units', 'radiant')
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, latrad_id, 'long_name', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, latrad_id, 'units', 7, 'radiant')
+  if (status .ne. nf_noerr) call handle_err(status, partit)
   !rotated or not rotated due to setting in iceberg module
   description='(un)rotated according to setting of l_geo_out in iceberg module'
-  status = nf90_put_att(ncid, latrad_id, 'description', trim(description)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, latrad_id, 'description', len_trim(description), trim(description)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
   longname='longitude of buoy/iceberg position in degree'
-  status = nf90_put_att(ncid, londeg_id, 'long_name', trim(longname)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, londeg_id, 'units', 'degree')
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, londeg_id, 'long_name', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, londeg_id, 'units', 12, 'degrees_east')
+  if (status .ne. nf_noerr) call handle_err(status, partit)
   !rotated or not rotated due to setting in iceberg module
   description='(un)rotated according to setting of l_geo_out in iceberg module'
-  status = nf90_put_att(ncid, londeg_id, 'description', trim(description)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, londeg_id, 'description', len_trim(description), trim(description)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
   longname='latitude of buoy/iceberg position in degree'
-  status = nf90_put_att(ncid, latdeg_id, 'long_name', trim(longname)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, latdeg_id, 'units', 'degree')
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, latdeg_id, 'long_name', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, latdeg_id, 'units', 13, 'degrees_north')
+  if (status .ne. nf_noerr) call handle_err(status, partit)
   !rotated or not rotated due to setting in iceberg module
   description='(un)rotated according to setting of l_geo_out in iceberg module'
-  status = nf90_put_att(ncid, latdeg_id, 'description', trim(description)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, latdeg_id, 'description', len_trim(description), trim(description)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
   longname='status of buoy/iceberg (frozen in/not frozen in)'
-  status = nf90_put_att(ncid, frozen_id, 'long_name', trim(longname)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, frozen_id, 'long_name', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
   description='1 = frozen, 0 = not frozen, else partially frozen'
-  status = nf90_put_att(ncid, frozen_id, 'description', trim(description)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, frozen_id, 'Coordinates', 'pos_lon_deg pos_lat_deg') ! arcGIS 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, frozen_id, 'description', len_trim(description), trim(description)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, frozen_id, 'Coordinates', 23, 'pos_lon_deg pos_lat_deg') ! arcGIS 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
   longname='du/dt of buoy/iceberg in last time step'
-  status = nf90_put_att(ncid, dudt_id, 'long_name', trim(longname)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, dudt_id, 'units', 'm s^(-2)')
-  if (status .ne. nf90_noerr) call handle_err(status, partit)  
+  status = nf_PUT_ATT_TEXT(ncid, dudt_id, 'long_name', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, dudt_id, 'units', 8, 'm s^(-2)')
+  if (status .ne. nf_noerr) call handle_err(status, partit)  
   !rotated or not rotated due to setting in iceberg module
   description='(un)rotated according to setting of l_geo_out in iceberg module'
-  status = nf90_put_att(ncid, dudt_id, 'description', trim(description)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, dudt_id, 'Coordinates', 'pos_lon_deg pos_lat_deg') ! arcGIS 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, dudt_id, 'description', len_trim(description), trim(description)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, dudt_id, 'Coordinates', 23, 'pos_lon_deg pos_lat_deg') ! arcGIS 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
   longname='dv/dt of buoy/iceberg in last time step'
-  status = nf90_put_att(ncid, dvdt_id, 'long_name', trim(longname)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, dvdt_id, 'units', 'm s^(-2)')
-  if (status .ne. nf90_noerr) call handle_err(status, partit)  
+  status = nf_PUT_ATT_TEXT(ncid, dvdt_id, 'long_name', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, dvdt_id, 'units', 8, 'm s^(-2)')
+  if (status .ne. nf_noerr) call handle_err(status, partit)  
   !rotated or not rotated due to setting in iceberg module
   description='(un)rotated according to setting of l_geo_out in iceberg module'
-  status = nf90_put_att(ncid, dvdt_id, 'description', trim(description)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, dvdt_id, 'Coordinates', 'pos_lon_deg pos_lat_deg') ! arcGIS 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, dvdt_id, 'description', len_trim(description), trim(description)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, dvdt_id, 'Coordinates', 23, 'pos_lon_deg pos_lat_deg') ! arcGIS 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
   longname='velocity of buoy/iceberg, u component'
-  status = nf90_put_att(ncid, uib_id, 'long_name', trim(longname)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, uib_id, 'units', 'm s^(-1)')
-  if (status .ne. nf90_noerr) call handle_err(status, partit)  
+  status = nf_PUT_ATT_TEXT(ncid, uib_id, 'long_name', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, uib_id, 'units', 8, 'm s^(-1)')
+  if (status .ne. nf_noerr) call handle_err(status, partit)  
   !rotated or not rotated due to setting in iceberg module
   description='(un)rotated according to setting of l_geo_out in iceberg module'
-  status = nf90_put_att(ncid, uib_id, 'description', trim(description)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, uib_id, 'Coordinates', 'pos_lon_deg pos_lat_deg') ! arcGIS 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, uib_id, 'description', len_trim(description), trim(description)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, uib_id, 'Coordinates', 23, 'pos_lon_deg pos_lat_deg') ! arcGIS 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
   longname='velocity of buoy/iceberg, v component'
-  status = nf90_put_att(ncid, vib_id, 'long_name', trim(longname)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, vib_id, 'units', 'm s^(-1)')
-  if (status .ne. nf90_noerr) call handle_err(status, partit)  
+  status = nf_PUT_ATT_TEXT(ncid, vib_id, 'long_name', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, vib_id, 'units', 8, 'm s^(-1)')
+  if (status .ne. nf_noerr) call handle_err(status, partit)  
   !rotated or not rotated due to setting in iceberg module
   description='(un)rotated according to setting of l_geo_out in iceberg module'
-  status = nf90_put_att(ncid, vib_id, 'description', trim(description)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, vib_id, 'Coordinates', 'pos_lon_deg pos_lat_deg') ! arcGIS 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, vib_id, 'description', len_trim(description), trim(description)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, vib_id, 'Coordinates', 23, 'pos_lon_deg pos_lat_deg') ! arcGIS 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
   ! 3 dimensions of the iceberg, comment for buoy case
 
   longname='height of the iceberg'
-  status = nf90_put_att(ncid, height_id, 'long_name', trim(longname)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, height_id, 'units', 'm')
-  if (status .ne. nf90_noerr) call handle_err(status, partit)  
+  status = nf_PUT_ATT_TEXT(ncid, height_id, 'long_name', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, height_id, 'units', 1, 'm')
+  if (status .ne. nf_noerr) call handle_err(status, partit)  
   description='freeboard + draft'
-  status = nf90_put_att(ncid, height_id, 'description', trim(description)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, height_id, 'Coordinates', 'pos_lon_deg pos_lat_deg') ! arcGIS 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, height_id, 'description', len_trim(description), trim(description)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, height_id, 'Coordinates', 23, 'pos_lon_deg pos_lat_deg') ! arcGIS 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
   longname='length of the iceberg'
-  status = nf90_put_att(ncid, length_id, 'long_name', trim(longname)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, length_id, 'units', 'm')
-  if (status .ne. nf90_noerr) call handle_err(status, partit)  
+  status = nf_PUT_ATT_TEXT(ncid, length_id, 'long_name', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, length_id, 'units', 1, 'm')
+  if (status .ne. nf_noerr) call handle_err(status, partit)  
   description='open'
-  status = nf90_put_att(ncid, length_id, 'description', trim(description)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, length_id, 'Coordinates', 'pos_lon_deg pos_lat_deg') ! arcGIS 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, length_id, 'description', len_trim(description), trim(description)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, length_id, 'Coordinates', 23, 'pos_lon_deg pos_lat_deg') ! arcGIS 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
   longname='width of the iceberg'
-  status = nf90_put_att(ncid, width_id, 'long_name', trim(longname)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, width_id, 'units', 'm')
-  if (status .ne. nf90_noerr) call handle_err(status, partit)  
+  status = nf_PUT_ATT_TEXT(ncid, width_id, 'long_name', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, width_id, 'units', 1, 'm')
+  if (status .ne. nf_noerr) call handle_err(status, partit)  
   description='open'
-  status = nf90_put_att(ncid, width_id, 'description', trim(description)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, width_id, 'Coordinates', 'pos_lon_deg pos_lat_deg') ! arcGIS 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, width_id, 'description', len_trim(description), trim(description)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, width_id, 'Coordinates', 23, 'pos_lon_deg pos_lat_deg') ! arcGIS 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
 
   ! 4 additional iceberg variables (meltrates), comment for buoy case
 
   longname='basal volume loss'
-  status = nf90_put_att(ncid, bvl_id, 'long_name', trim(longname)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, bvl_id, 'units', 'm^3 (ice) day^(-1)')
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, bvl_id, 'long_name', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, bvl_id, 'units', 18, 'm^3 (ice) day^(-1)')
+  if (status .ne. nf_noerr) call handle_err(status, partit)
   description='losses are averaged over the preceding output interval'
-  status = nf90_put_att(ncid, bvl_id, 'description', trim(description)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, bvl_id, 'Coordinates', 'pos_lon_deg pos_lat_deg') ! arcGIS 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, bvl_id, 'description', len_trim(description), trim(description)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, bvl_id, 'Coordinates', 23, 'pos_lon_deg pos_lat_deg') ! arcGIS 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
   longname='lateral volume loss due to 1) bouyant convection'
-  status = nf90_put_att(ncid, lvlv_id, 'long_name', trim(longname)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, lvlv_id, 'units', 'm^3 (ice) day^(-1)')
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, lvlv_id, 'long_name', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, lvlv_id, 'units', 18, 'm^3 (ice) day^(-1)')
+  if (status .ne. nf_noerr) call handle_err(status, partit)
   description='losses are averaged over the preceding output interval'
-  status = nf90_put_att(ncid, lvlv_id, 'description', trim(description)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, lvlv_id, 'Coordinates', 'pos_lon_deg pos_lat_deg') ! arcGIS 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, lvlv_id, 'description', len_trim(description), trim(description)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, lvlv_id, 'Coordinates', 23, 'pos_lon_deg pos_lat_deg') ! arcGIS 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
   longname='lateral volume loss due to 2) wave erosion'
-  status = nf90_put_att(ncid, lvle_id, 'long_name', trim(longname)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, lvle_id, 'units', 'm^3 (ice) day^(-1)')
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, lvle_id, 'long_name', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, lvle_id, 'units', 18, 'm^3 (ice) day^(-1)')
+  if (status .ne. nf_noerr) call handle_err(status, partit)
   description='losses are averaged over the preceding output interval'
-  status = nf90_put_att(ncid, lvle_id, 'description', trim(description)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, lvle_id, 'Coordinates', 'pos_lon_deg pos_lat_deg') ! arcGIS 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, lvle_id, 'description', len_trim(description), trim(description)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, lvle_id, 'Coordinates', 23, 'pos_lon_deg pos_lat_deg') ! arcGIS 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
   longname='lateral volume loss due to 3) "basal" formulation'
-  status = nf90_put_att(ncid, lvlb_id, 'long_name', trim(longname)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, lvlb_id, 'units', 'm^3 (ice) day^(-1)')
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, lvlb_id, 'long_name', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, lvlb_id, 'units', 18, 'm^3 (ice) day^(-1)')
+  if (status .ne. nf_noerr) call handle_err(status, partit)
   description='losses are averaged over the preceding output interval'
-  status = nf90_put_att(ncid, lvlb_id, 'description', trim(description)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, lvlb_id, 'Coordinates', 'pos_lon_deg pos_lat_deg') ! arcGIS 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, lvlb_id, 'description', len_trim(description), trim(description)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, lvlb_id, 'Coordinates', 23, 'pos_lon_deg pos_lat_deg') ! arcGIS 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
   ! LA: add felem
   longname='fesom element'
-  status = nf90_put_att(ncid, felem_id, 'long_name', trim(longname)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, felem_id, 'units', '')
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, felem_id, 'long_name', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, felem_id, 'units', 0, '')
+  if (status .ne. nf_noerr) call handle_err(status, partit)
   description=''
-  status = nf90_put_att(ncid, felem_id, 'description', trim(description)) 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, felem_id, 'Coordinates', 'pos_lon_deg pos_lat_deg') ! arcGIS 
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, felem_id, 'description', len_trim(description), trim(description)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, felem_id, 'Coordinates', 23, 'pos_lon_deg pos_lat_deg') ! arcGIS 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
   longname='grounded'
-  status = nf90_put_att(ncid, grounded_id, 'long_name', trim(longname))
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, grounded_id, 'units', '')
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, grounded_id, 'long_name', len_trim(longname), trim(longname)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, grounded_id, 'units', 0, '')
+  if (status .ne. nf_noerr) call handle_err(status, partit)
   description=''
-  status = nf90_put_att(ncid, grounded_id, 'description', trim(description))
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-  status = nf90_put_att(ncid, grounded_id, 'Coordinates', 'pos_lon_deg pos_lat_deg') ! arcGIS
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
+  status = nf_put_att_text(ncid, grounded_id, 'description', len_trim(description), trim(description)) 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  status = nf_PUT_ATT_TEXT(ncid, grounded_id, 'Coordinates', 23, 'pos_lon_deg pos_lat_deg') ! arcGIS 
+  if (status .ne. nf_noerr) call handle_err(status, partit)
+  
+  status = nf_enddef(ncid)
+  if (status .ne. nf_noerr) call handle_err(status, partit)
 
-  status = nf90_enddef(ncid)
-  if (status .ne. nf90_noerr) call handle_err(status, partit)
-
-  status = nf90_close(ncid)
-  if (status .ne. nf90_noerr) call handle_err(status, partit) 
+  status=nf_close(ncid)
+  if (status .ne. nf_noerr) call handle_err(status, partit) 
 
  ! initialize the counter for saving results
   save_count_buoys=1
@@ -1944,11 +1965,12 @@ subroutine write_buoy_props_netcdf(partit)
 
  use g_config
  use g_clock
- use netcdf
 ! use iceberg_params, only : buoy_props, file_icb_netcdf, save_count_buoys, prev_sec_in_year, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean
  use g_forcing_param
 
  implicit none
+
+#include "netcdf.inc" 
 
   integer                   :: status,ncid, istep
   integer                   :: dimid_ib, dimid_rec, dimids(2)
@@ -1959,7 +1981,6 @@ subroutine write_buoy_props_netcdf(partit)
   integer                   :: height_id, length_id, width_id
   integer                   :: bvl_id, lvlv_id, lvle_id, lvlb_id, felem_id, grounded_id
   integer                   :: start(2), count(2)
-  integer                   :: start_1d(1), count_1d(1)
   real(kind=8)              :: sec_in_year
 type(t_partit), intent(inout), target :: partit
 !type(t_ice),    intent(inout), target :: ice
@@ -1975,147 +1996,147 @@ type(t_partit), intent(inout), target :: partit
      sec_in_year=dt*istep
 
     ! open files
-     status = nf90_open(trim(file_icb_netcdf), nf90_write, ncid)
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status = nf_open(trim(file_icb_netcdf), nf_write, ncid)
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
      ! inquire variable id
 
-     status = nf90_inq_varid(ncid, 'time', time_varid)
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status = nf_inq_varid(ncid, 'time', time_varid)
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf90_inq_varid(ncid, 'iter', iter_varid)
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status=nf_inq_varid(ncid, 'iter', iter_varid)
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status = nf90_inq_varid(ncid, 'pos_lon_rad', lonrad_id)
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status = nf_inq_varid(ncid, 'pos_lon_rad', lonrad_id)
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status = nf90_inq_varid(ncid, 'pos_lat_rad', latrad_id)
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status = nf_inq_varid(ncid, 'pos_lat_rad', latrad_id)
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status = nf90_inq_varid(ncid, 'pos_lon_deg', londeg_id)
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status = nf_inq_varid(ncid, 'pos_lon_deg', londeg_id)
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status = nf90_inq_varid(ncid, 'pos_lat_deg', latdeg_id)
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status = nf_inq_varid(ncid, 'pos_lat_deg', latdeg_id)
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status = nf90_inq_varid(ncid, 'frozen_in',  frozen_id)
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status = nf_inq_varid(ncid, 'frozen_in',  frozen_id)
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status = nf90_inq_varid(ncid, 'du_dt',  dudt_id)
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status = nf_inq_varid(ncid, 'du_dt',  dudt_id)
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status = nf90_inq_varid(ncid, 'dv_dt',  dvdt_id)
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status = nf_inq_varid(ncid, 'dv_dt',  dvdt_id)
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status = nf90_inq_varid(ncid, 'icb_vel_u',  uib_id)
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status = nf_inq_varid(ncid, 'icb_vel_u',  uib_id)
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status = nf90_inq_varid(ncid, 'icb_vel_v',  vib_id)
-     if (status .ne. nf90_noerr) call handle_err(status, partit)  
+     status = nf_inq_varid(ncid, 'icb_vel_v',  vib_id)
+     if (status .ne. nf_noerr) call handle_err(status, partit)  
 
      ! inquire 3 additional IDs for iceberg case, comment for buoy case
 
-     status = nf90_inq_varid(ncid, 'height',  height_id)
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status = nf_inq_varid(ncid, 'height',  height_id)
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status = nf90_inq_varid(ncid, 'length',  length_id)
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status = nf_inq_varid(ncid, 'length',  length_id)
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status = nf90_inq_varid(ncid, 'width',  width_id)
-     if (status .ne. nf90_noerr) call handle_err(status, partit)  
+     status = nf_inq_varid(ncid, 'width',  width_id)
+     if (status .ne. nf_noerr) call handle_err(status, partit)  
 
      ! inquire 4 additional IDs for iceberg case, comment for buoy case
 
-     status = nf90_inq_varid(ncid, 'bvl',  bvl_id)
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status = nf_inq_varid(ncid, 'bvl',  bvl_id)
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status = nf90_inq_varid(ncid, 'lvlv',  lvlv_id)
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status = nf_inq_varid(ncid, 'lvlv',  lvlv_id)
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status = nf90_inq_varid(ncid, 'lvle',  lvle_id)
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status = nf_inq_varid(ncid, 'lvle',  lvle_id)
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status = nf90_inq_varid(ncid, 'lvlb',  lvlb_id)
-     if (status .ne. nf90_noerr) call handle_err(status, partit) 
+     status = nf_inq_varid(ncid, 'lvlb',  lvlb_id)
+     if (status .ne. nf_noerr) call handle_err(status, partit) 
 
      ! * LA: include fesom elemt in output
-     status = nf90_inq_varid(ncid, 'felem', felem_id)
-     if (status .ne. nf90_noerr) call handle_err(status, partit) 
+     status = nf_inq_varid(ncid, 'felem', felem_id)
+     if (status .ne. nf_noerr) call handle_err(status, partit) 
 
-     status = nf90_inq_varid(ncid, 'grounded', grounded_id)
-     if (status .ne. nf90_noerr) call handle_err(status, partit) 
+     status = nf_inq_varid(ncid, 'grounded', grounded_id)
+     if (status .ne. nf_noerr) call handle_err(status, partit) 
 
-      ! time and iteration
-      status=nf90_put_var(ncid, time_varid, prev_sec_in_year+sec_in_year) 
-      if (status .ne. nf90_noerr) call handle_err(status, partit)
-      status=nf90_put_var(ncid, iter_varid, istep)
-      if (status .ne. nf90_noerr) call handle_err(status, partit)
+     ! time and iteration
+     status=nf_put_vara_double(ncid, time_varid, save_count_buoys, 1, prev_sec_in_year+sec_in_year) 
+     if (status .ne. nf_noerr) call handle_err(status, partit)
+     status=nf_put_vara_int(ncid, iter_varid, save_count_buoys, 1, istep)
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-      !variables
-      start=(/1,save_count_buoys/)
-      count=(/ib_num, 1/)
-      status=nf90_put_var(ncid, lonrad_id, buoy_props(:, 1), start=start, count=count) 
-      if (status .ne. nf90_noerr) call handle_err(status, partit)
+     !variables
+     start=(/1,save_count_buoys/)
+     count=(/ib_num, 1/)
+     status=nf_put_vara_double(ncid, lonrad_id, start, count, buoy_props(:, 1)) 
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf90_put_var(ncid, latrad_id, buoy_props(:, 2), start=start, count=count) 
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status=nf_put_vara_double(ncid, latrad_id, start, count, buoy_props(:, 2)) 
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf90_put_var(ncid, londeg_id, buoy_props(:, 3), start=start, count=count) 
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status=nf_put_vara_double(ncid, londeg_id, start, count, buoy_props(:, 3)) 
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf90_put_var(ncid, latdeg_id, buoy_props(:, 4), start=start, count=count) 
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status=nf_put_vara_double(ncid, latdeg_id, start, count, buoy_props(:, 4)) 
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf90_put_var(ncid, frozen_id, buoy_props(:, 5), start=start, count=count) 
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status=nf_put_vara_double(ncid, frozen_id, start, count, buoy_props(:, 5)) 
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf90_put_var(ncid, dudt_id, buoy_props(:, 6), start=start, count=count) 
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status=nf_put_vara_double(ncid, dudt_id, start, count, buoy_props(:, 6)) 
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf90_put_var(ncid, dvdt_id, buoy_props(:, 7), start=start, count=count) 
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status=nf_put_vara_double(ncid, dvdt_id, start, count, buoy_props(:, 7)) 
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf90_put_var(ncid, uib_id, buoy_props(:, 8), start=start, count=count) 
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status=nf_put_vara_double(ncid, uib_id, start, count, buoy_props(:, 8)) 
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf90_put_var(ncid, vib_id, buoy_props(:, 9), start=start, count=count) 
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status=nf_put_vara_double(ncid, vib_id, start, count, buoy_props(:, 9)) 
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
      ! write 3 additional variables for iceberg case, comment for buoy case
 
-     status=nf90_put_var(ncid, height_id, buoy_props(:,10), start=start, count=count) 
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status=nf_put_vara_double(ncid, height_id, start, count, buoy_props(:,10)) 
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf90_put_var(ncid, length_id, buoy_props(:,11), start=start, count=count) 
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status=nf_put_vara_double(ncid, length_id, start, count, buoy_props(:,11)) 
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf90_put_var(ncid, width_id, buoy_props(:,12), start=start, count=count) 
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status=nf_put_vara_double(ncid, width_id, start, count, buoy_props(:,12)) 
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
      ! write 4 additional variables for iceberg case, comment for buoy case
 
-     status=nf90_put_var(ncid, bvl_id, bvl_mean(:)*step_per_day, start=start, count=count) 
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status=nf_put_vara_double(ncid, bvl_id, start, count, bvl_mean(:)*step_per_day) 
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf90_put_var(ncid, lvlv_id, lvlv_mean(:)*step_per_day, start=start, count=count) 
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status=nf_put_vara_double(ncid, lvlv_id, start, count, lvlv_mean(:)*step_per_day) 
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf90_put_var(ncid, lvle_id, lvle_mean(:)*step_per_day, start=start, count=count) 
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status=nf_put_vara_double(ncid, lvle_id, start, count, lvle_mean(:)*step_per_day) 
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf90_put_var(ncid, lvlb_id, lvlb_mean(:)*step_per_day, start=start, count=count) 
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status=nf_put_vara_double(ncid, lvlb_id, start, count, lvlb_mean(:)*step_per_day) 
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
      ! LA: add felem
-     status=nf90_put_var(ncid, felem_id, buoy_props(:,13), start=start, count=count) 
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status=nf_put_vara_double(ncid, felem_id, start, count, buoy_props(:,13)) 
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
-     status=nf90_put_var(ncid, grounded_id, buoy_props(:,14), start=start, count=count)
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status=nf_put_vara_double(ncid, grounded_id, start, count, buoy_props(:,14)) 
+     if (status .ne. nf_noerr) call handle_err(status, partit)
      
      !close file
-     status=nf90_close(ncid)
-     if (status .ne. nf90_noerr) call handle_err(status, partit)
+     status=nf_close(ncid)
+     if (status .ne. nf_noerr) call handle_err(status, partit)
 
      save_count_buoys=save_count_buoys+1
 !==========================================================
