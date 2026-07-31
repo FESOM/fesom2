@@ -1730,7 +1730,7 @@ type(t_partit), intent(inout), target :: partit
   longname='time' ! use NetCDF Climate and Forecast (CF) Metadata Convention
   status = nf_PUT_ATT_TEXT(ncid, time_varid, 'long_name', len_trim(longname), trim(longname)) 
   if (status .ne. nf_noerr) call handle_err(status, partit)
-  write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a9)') 'seconds since ', yearstart, '-', 1, '-', 1, ' 00:00:00'
+  write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a9)') 'seconds since ', yearold, '-', 1, '-', 1, ' 00:00:00'
   status = nf_PUT_ATT_TEXT(ncid, time_varid, 'units', len_trim(att_text), trim(att_text))
   if (status .ne. nf_noerr) call handle_err(status, partit)
   if (include_fleapyear) then
