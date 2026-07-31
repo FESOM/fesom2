@@ -390,9 +390,10 @@ contains
 
         if (f%mype==0) write(*,*) 'FESOM mesh_setup... complete'
 
-<<<<<<< HEAD
 #if defined(__recom) && defined(__usetp)
-=======
+        end if
+#endif
+
 #if defined (__XIOS)
         ! XIOS client init (NEMO/OIFS pattern). xios_initialize is called with
         ! local_comm=MPI_COMM_FESOM -- OASIS already split MPI_COMM_WORLD, so
@@ -421,9 +422,7 @@ contains
                   xf12_nh(ti_transit) * 1.e12, xf12_sh(ti_transit) * 1.e12, &
                   xsf6_nh(ti_transit) * 1.e12, xsf6_sh(ti_transit) * 1.e12
           write (*,*)
->>>>>>> main
         end if
-#endif 
 
         !=====================
         ! Allocate field variables 
@@ -479,11 +478,9 @@ contains
         if(f%my_fesom_group==0) then
 #endif 
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call recom_init'//achar(27)//'[0m'
-<<<<<<< HEAD
 #if defined (__usetp)
         end if
 #endif
-=======
 
         allocate(tracers_info%ids(f%tracers%num_tracers))
         allocate(tracers_info%data_pointers(f%tracers%num_tracers))
@@ -492,7 +489,6 @@ contains
           tracers_info%ids(n) = f%tracers%data(n)%id
           tracers_info%data_pointers(n)%tracer_data => f%tracers%data(n)%values
         end do
->>>>>>> main
 
         f%t0_recom=MPI_Wtime()
         call recom_init(f%mesh%nl, f%mesh%ulevels_nod2d, f%mesh%nlevels_nod2D, &
@@ -502,15 +498,12 @@ contains
                         f%tracers%num_tracers, rad) ! adjust values for recom tracers (derived type "t_tracer")
         f%t1_recom=MPI_Wtime()
 
-<<<<<<< HEAD
+        deallocate(tracers_info%ids)
+        deallocate(tracers_info%data_pointers)
+        
 #if defined (__usetp)
         if(f%my_fesom_group==0) then
 #endif
-=======
-        deallocate(tracers_info%ids)
-        deallocate(tracers_info%data_pointers)
-
->>>>>>> main
         if (f%mype==0) write(*,*) 'RECOM recom_init... complete'
 #if defined (__usetp)
         end if
@@ -1055,11 +1048,9 @@ contains
 #endif 
         if (f%mype==0 .and. n==1)  print *, achar(27)//'[46'  //'_____________________________________________________________'//achar(27)//'[0m'
         if (f%mype==0 .and. n==1)  print *, achar(27)//'[46;1m'//'     --> call REcoM                                         '//achar(27)//'[0m'
-<<<<<<< HEAD
 #if defined(__usetp)
         end if
 #endif 
-=======
 
         allocate(tracers_info%ids(f%tracers%num_tracers))
         allocate(tracers_info%ltra_diag(f%tracers%num_tracers))
@@ -1070,7 +1061,6 @@ contains
           tracers_info%ltra_diag(tracer_index) = f%tracers%data(tracer_index)%ltra_diag
           tracers_info%data_pointers(tracer_index)%tracer_data => f%tracers%data(tracer_index)%values
         end do
->>>>>>> main
 
         f%t0_recom = MPI_Wtime()
         call recom(f%ice%data(1)%values, f%mesh%nl, &
