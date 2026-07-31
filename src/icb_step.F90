@@ -504,7 +504,8 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
   call FEM_3eval(mesh,partit, Zdepth,Zdepth,lon_rad,lat_rad,Zdepth3,Zdepth3,local_idx_of(iceberg_elem))
   !write(*,*) 'nodal depth in iceberg ', ib,'s element:', Zdepth3
   !write(*,*) 'depth at iceberg ', ib, 's location:', Zdepth
-  
+  old_element = iceberg_elem !save if iceberg left model domain
+
   !================= CHECK IF ICEBERG IS GROUNDED ===================
   ! l_allowgrounding == 0: no grounding (free drift)
   ! l_allowgrounding == 1: reduce velocity (slow drift)
@@ -540,10 +541,14 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
     end if
   end if
   
-  ! Second, calculate the trajectory of the iceberg based on either the 
-  ! l_allowgrounding == 0: no grounding (free drift)
-  ! l_allowgrounding == 1: reduce velocity (slow drift)  
-  if (l_allowgrounding == 0 .or. l_allowgrounding == 1) then 
+  ! Second, calculate the trajectory of the iceberg -- for every iceberg that
+  ! isn't stationary this step.  Gating on l_allowgrounding alone (regardless
+  ! of grounded_ib) would freeze every iceberg globally under mode 2, not just
+  ! the ones actually grounded; skip trajectory() only for the one case that's
+  ! truly stationary (mode 2 AND grounded this step).  Modes 0 (free drift)
+  ! and 1 (reduced-velocity creep, incl. non-grounded icebergs at full speed)
+  ! always compute a trajectory.
+  if (.not. (l_allowgrounding == 2 .and. grounded_ib > 0.5)) then
     t0=MPI_Wtime()
     call trajectory( lon_rad,lat_rad, u_ib,v_ib, new_u_ib,new_v_ib, &
 	 	     lon_deg,lat_deg,old_lon,old_lat, dt*REAL(steps_per_ib_step))
