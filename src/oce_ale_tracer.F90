@@ -1707,8 +1707,8 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit)
     CASE (1022) ! OXY
         bc_surface= dt*GloO2flux_seaicemask(n)
 !        bc_surface=0.0_WP
-    CASE (1023:1040)
-        bc_surface=0.0_WP  ! OG added bc for recom fields, increased to 1040 with DiaH
+    CASE (1023:1041)
+        bc_surface=0.0_WP  ! OG added bc for recom fields, increased to 1040 with DiaH !increased to 1041 with DICremin
     CASE (1302) ! Before (1037) ! DIC_13
 
 #if defined (__ciso)
