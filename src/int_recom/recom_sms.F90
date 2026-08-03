@@ -109,6 +109,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         DiaH_C,  &
         DiaH_Chl,&
         DiaH_Si, &
+        DICremin, &
 #endif
 
 #if defined (__coccos) 
@@ -219,6 +220,7 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
             DiaH_C   = max(tiny_C_d,state(k,idiaH_c)     + sms(k,idiaH_c ))
             DiaH_Chl = max(tiny_chl,state(k,idiaH_chl)   + sms(k,idiaH_chl ))
             DiaH_Si  = max(tiny_si,state(k,idiaH_si)     + sms(k,idiaH_si)) 
+            DICremin = max(tiny, state(k, idicremin) + sms(k, idicremin)) !Tracer for DIC remineralization added, must be initialized with AOU from WOA
 #endif
 
 #if defined (__coccos) 
@@ -2868,7 +2870,19 @@ endif
       - MicZooRespFlux                      & ! 3Zoo
 #endif
                                            ) * redO2C * dt_b + sms(k,ioxy)  
-!   
+!  
+
+
+        ! 37. DIC remineralzation tracer to track remineralization as an diagnostics
+        !===============================================================================
+        !   idicremin       : Tracer for remineralization diagnostics (added by Sina)
+#if defined (__diaH)
+        sms(k,idicremin) = (                  &
+            + rho_c1 * arrFunc * O2Func * EOC &
+            ) * dt_b + sms(k,idicremin)
+#endif
+
+ 
     if (ciso) then
 !-------------------------------------------------------------------------------
 ! DIC_13

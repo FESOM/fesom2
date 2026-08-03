@@ -72,6 +72,7 @@ module recom_config
 ! *******************
   Integer :: idiaH_n = 37, idiaH_c = 38, idiaH_chl = 39, idiaH_si = 40
   integer, dimension(4)  :: recom_diaH_tracer_id   = (/1037, 1038, 1039, 1040/)
+  Integer :: idicremin = 41 !DIC remin added
 #endif
 
   Integer :: ivphy = 1, ivdia = 2, ivdet = 3, ivdetsc = 4, ivcoc = 5, ivpha = 6, ivdiaH = 7
@@ -79,6 +80,7 @@ module recom_config
 !=============================================================================
 
   integer, dimension(8)  :: recom_remin_tracer_id   = (/1001, 1002, 1003, 1018, 1019, 1022, 1302, 1402/)
+
 
 ! OG
 ! Todo:  Make recom_sinking_tracer_id case sensitive
@@ -122,9 +124,9 @@ module recom_config
   Logical                :: use_REcoM            = .true.
   Logical                :: REcoM_restart        = .false.
 
-  Integer                :: bgc_num               = 40      ! NEW increased the number from 28 to 34 (added coccos and respiration) ! NEW 3Zoo changed from 31 to 33 ! added phaeocystis: changed from 33 to 36 ! added DiaH: changed from 36 to 40
-  integer                :: bgc_base_num          = 22      ! standard tracers
-  Integer                :: diags3d_num           = 31      ! Number of diagnostic 3d tracers to be saved
+  Integer                :: bgc_num               = 41      !increased no. from 28 to 34 (added coccos & respiration), 3Zoo changed from 31 to 33, added phaeocystis: changed from 33 to 36 !added DiaH: changed from 36 to 40 !added DICremin increased from 40 to 41
+  integer                :: bgc_base_num          = 23      ! standard tracers
+  Integer                :: diags3d_num           = 32      ! Number of diagnostic 3d tracers to be saved
   Real(kind=8)           :: VDet                  = 20.d0   ! Sinking velocity, constant through the water column and positive downwards
   Real(kind=8)           :: VDet_zoo2             = 200.d0  ! Sinking velocity, constant through the water column 
   Real(kind=8)           :: VPhy                  = 0.d0    !!! If the number of sinking velocities are different from 3, code needs to be changed !!!

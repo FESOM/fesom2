@@ -283,6 +283,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_sms'/
   state(1:nn,idiaH_n)  = max(tiny_N_diaH,state(1:nn,idiaH_n))
   state(1:nn,idiaH_c)  = max(tiny_C_diaH,state(1:nn,idiaH_c))
   state(1:nn,idiaH_si) = max(tiny_Si_diaH, state(1:nn,idiaH_si))
+  state(1:nn,idicremin) = max(tiny,state(1:nn,idicremin)) ! for DICremin tracer (added by Sina)
 #endif 
 
 #if defined (__3Zoo2Det)
