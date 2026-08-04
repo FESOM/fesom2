@@ -15,19 +15,20 @@ MODULE Toy_Neverworld2
     public            :: initial_state_neverworld2, relax_2_tsurf, oce_mixing_TOY,  &
                         do_wind, wind_opt, tau_inv, do_Trelax, do_Tpert, trelax_opt, &
                         gamma_restore, do_north_cold_patch, north_pole_target, north_cold_patch_power, &
-                        neverworld2_forcing
+                        do_south_cold_patch, south_pole_target, south_cold_patch_power, &
+                        oce_neverworld2
     logical           :: do_wind  = .True.    ! apply surface windstress
     integer           :: wind_opt = 2         ! 1: interpolate tau from profile data, 2: read already to elem interp profile data
 
-    logical           :: do_Trelax= .False.   ! apply surface temp relaxation
-    logical           :: do_Tpert = .True.    ! apply temp. perturbation to trigger instabilities
+    logical           :: do_Tpert = .False.    ! apply temp. perturbation to trigger instabilities
 
     ! Two alternative SST restoring implementations, picked by trelax_opt (same pattern as wind_opt):
     !   1: original -- directly nudges the temperature tracer: T += dt*tau_inv*(Ttarget-T)
     !   2: Genevieve's -- applies restoring as a surface heat flux instead, so it is visible
     !      in the heat budget: heat_flux = gamma_restore*(Tsurface-Ttarget) [W/m^2/K].
     !      FESOM heat_flux convention: >0 cools the ocean (heat leaving), <0 warms it.
-    integer           :: trelax_opt = 1
+    logical           :: do_Trelax= .True.   ! apply surface temp relaxation
+    integer           :: Trelax_opt = 1
     real(kind=WP)     :: tau_inv  =1.0/50.0/24.0/3600.0   ! used by trelax_opt=1, i.e. tau=1/tau_inv=50 days
     !
     ! gamma_restore = 40.0 W/m^2/K is Genevieve's original default, carried over as-is.
@@ -46,17 +47,26 @@ MODULE Toy_Neverworld2
     ! h=50m -- in the same ballpark as the original 50-day default, not wildly off.
     real(kind=WP)     :: gamma_restore = 40.0_WP           ! used by trelax_opt=2
 
-    ! Optional asymmetric cold patch near the northern edge, only used with trelax_opt=2:
-    ! blends the symmetric cosine restoring target towards north_pole_target as
-    ! ynorm=lat/Ly -> 1. Off by default.
+    ! Optional asymmetric cold patch near the northern and/or southern edge, only used with
+    ! trelax_opt=2: blends the symmetric cosine restoring target towards north_pole_target /
+    ! south_pole_target as ynorm=lat/Ly -> +-1. Each edge is independently switchable/tunable.
+    ! Off by default.
     logical           :: do_north_cold_patch    = .False.
     real(kind=WP)     :: north_pole_target      = 0.0_WP
     real(kind=WP)     :: north_cold_patch_power = 2.0_WP
+    
+    logical           :: do_south_cold_patch    = .False.
+    real(kind=WP)     :: south_pole_target      = 0.0_WP
+    real(kind=WP)     :: south_cold_patch_power = 2.0_WP
 
-    ! trelax_opt and gamma_restore are namelist-controlled: read from the &neverworld2_forcing
-    ! group in namelist.oce by gen_model_setup.F90 (only when which_toy=='neverworld2').
-    ! The other toy parameters above stay compiled-in defaults, same as before.
-    NAMELIST /neverworld2_forcing/ trelax_opt, gamma_restore
+    ! All toy_neverworld2 parameters above are namelist-controlled: read from the
+    ! &oce_neverworld2 group in namelist.oce by gen_model_setup.F90 (only when
+    ! which_toy=='neverworld2'), tolerant of the group being missing (falls back to
+    ! the compiled-in defaults declared above).
+    NAMELIST /oce_neverworld2/ do_wind, wind_opt, do_Tpert, do_Trelax, Trelax_opt, tau_inv, &
+                                gamma_restore, &
+                                do_north_cold_patch, north_pole_target, north_cold_patch_power, &
+                                do_south_cold_patch, south_pole_target, south_cold_patch_power
     contains
     !
     !
@@ -175,8 +185,9 @@ MODULE Toy_Neverworld2
             case(2)
                 ! Genevieve: symmetric cosine target, ~5-28C, consistent radian units
                 ! throughout (lat and Ly both in radians), plus optional asymmetric
-                ! cold patch that pulls the target down to north_pole_target near the
-                ! northern edge (ynorm=lat/Ly -> 1).
+                ! cold patch(es) that pull the target down to north_pole_target /
+                ! south_pole_target near the northern (ynorm=lat/Ly -> 1) and/or
+                ! southern (ynorm -> -1) edge, independently switchable.
                 do node = 1, myDim_nod2D+eDim_nod2D
                     lat   = coord_nod2D(2,node)
                     ynorm = lat/Ly
@@ -184,6 +195,9 @@ MODULE Toy_Neverworld2
                     if (do_north_cold_patch .and. ynorm>0.0_WP) then
                         cold_weight = ynorm**north_cold_patch_power
                         Tsurf(node) = (1.0_WP-cold_weight)*t_base + cold_weight*north_pole_target
+                    else if (do_south_cold_patch .and. ynorm<0.0_WP) then
+                        cold_weight = abs(ynorm)**south_cold_patch_power
+                        Tsurf(node) = (1.0_WP-cold_weight)*t_base + cold_weight*south_pole_target
                     else
                         Tsurf(node) = t_base
                     end if

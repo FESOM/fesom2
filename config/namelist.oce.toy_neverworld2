@@ -80,12 +80,24 @@ state_equation     = 0         ! 0: use linear equation of state
 /
 
 ! ============================================================================
-! NEVERWORLD2 SST RESTORING (Toy_Neverworld2 module, only read if which_toy='neverworld2')
+! NEVERWORLD2 TOY CONFIG (Toy_Neverworld2 module, only read if which_toy='neverworld2')
 ! ============================================================================
-&neverworld2_forcing
-trelax_opt         = 1         ! 1: nudge the temperature tracer directly, T += dt*tau_inv*(Ttarget-T)
+&oce_neverworld2
+! --- Wind forcing ---
+do_wind            = .True.    ! apply surface windstress
+wind_opt           = 2         ! 1: interpolate tau from windstress.out profile data
+                                ! 2: read already-to-element-interpolated windstress@elem.out
+
+! --- Temperature perturbation (triggers instabilities) ---
+do_Tpert           = .False.   ! inject a one-off surface temperature perturbation at init
+                                ! (upper 2 layers, centered @[30E,-50S], 5deg radius)
+
+! --- SST restoring ---
+do_Trelax          = .True.    ! apply surface temperature relaxation
+trelax_opt         = 2         ! 1: nudge the temperature tracer directly, T += dt*tau_inv*(Ttarget-T)
                                 ! 2: apply restoring as a surface heat flux instead (Genevieve's method):
                                 !    heat_flux = gamma_restore*(Tsurface-Ttarget), visible in the heat budget
+tau_inv            = 2.3148e-7 ! [1/s] relaxation rate, only used if trelax_opt=1. Default = 1/(50 days).
 gamma_restore      = 40.0      ! [W/m^2/K] restoring strength, only used if trelax_opt=2.
                                 ! NOT independently tuned for this mesh -- Genevieve's original default.
                                 ! To pick a value from a target restoring timescale instead:
@@ -94,5 +106,15 @@ gamma_restore      = 40.0      ! [W/m^2/K] restoring strength, only used if trel
                                 !   h=50m, tau_eff=50 days -> gamma_restore = 50*4.2e6/(50*86400) = 48.6 W/m^2/K
                                 ! i.e. 40 W/m^2/K already implies tau_eff=61 days at h=50m -- same ballpark
                                 ! as the original 50-day default, not wildly off.
+
+! --- Optional asymmetric cold patch(es), only used if trelax_opt=2 ---
+! Blends the symmetric cosine restoring target towards {north,south}_pole_target as
+! ynorm=lat/Ly -> +-1. Each edge is independently switchable/tunable. Off by default.
+do_north_cold_patch    = .False.
+north_pole_target      = 0.0
+north_cold_patch_power = 2.0
+do_south_cold_patch    = .False.
+south_pole_target      = 0.0
+south_cold_patch_power = 2.0
 /
 

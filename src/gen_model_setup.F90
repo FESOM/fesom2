@@ -113,14 +113,15 @@ subroutine setup_model(partit)
   read (fileunit, NML=oce_dyn, iostat=istat)
   if (istat /= 0) call check_namelist_read(fileunit, 'oce_dyn', nmlfile, partit)
 
-  ! Optional, neverworld2-only: SST restoring method/strength. Read last from this file
-  ! (nothing else is read from namelist.oce afterwards) and tolerate a missing group so
-  ! that older namelist.oce files without it keep working with the compiled-in defaults.
+  ! Optional, neverworld2-only: wind forcing, SST restoring, and temperature perturbation
+  ! parameters (Toy_Neverworld2 module). Read last from this file (nothing else is read
+  ! from namelist.oce afterwards) and tolerate a missing group so that older namelist.oce
+  ! files without it keep working with the compiled-in defaults.
   if (toy_ocean .and. trim(which_toy)=='neverworld2') then
-    read (fileunit, NML=neverworld2_forcing, iostat=istat)
+    read (fileunit, NML=oce_neverworld2, iostat=istat)
     if (istat /= 0) then
       if (partit%mype==0) write(*,*) &
-        'WARNING: could not read &neverworld2_forcing from ', trim(nmlfile), &
+        'WARNING: could not read &oce_neverworld2 from ', trim(nmlfile), &
         ' -- using defaults trelax_opt=', trelax_opt, ' gamma_restore=', gamma_restore
     endif
   endif
