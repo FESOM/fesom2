@@ -109,8 +109,11 @@ type(t_partit), intent(inout), target :: partit
 
         do i=1, 3
             iceberg_node=ib_nods_in_ib_elem(i)
+            ! Halo nodes are marked 0 above. Test that before indexing, since
+            ! Fortran does not promise to short-circuit .or. and Intel does not.
+            if (iceberg_node <= 0) cycle
             ! Skip nodes with no ocean column; do NOT skip valid cavity nodes
-            if (iceberg_node <= 0 .or. ulevels_nod2d(iceberg_node) == 0) cycle
+            if (ulevels_nod2d(iceberg_node) == 0) cycle
 
             if (iceberg_node>0) then
                 ! Guard: tot_area at level 1 is zero when all element nodes are cavity nodes
