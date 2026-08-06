@@ -394,8 +394,9 @@ type(t_dyn)   , intent(inout), target :: dynamics
   !creates mapping
   call global2local(mesh, partit, local_idx_of, elem2D)
   firstcall=.false.
-  if(mype==0) write(*,*) 'Preparing local_idx_of done.' 
- end if 
+  if(mype==0) write(*,*) 'Preparing local_idx_of done.'
+ end if
+
  
  if (find_iceberg_elem) then
   lon_rad = lon_deg*rad
@@ -461,6 +462,12 @@ type(t_dyn)   , intent(inout), target :: dynamics
   endif
  end if
  
+ if (iceberg_elem < 1 .or. iceberg_elem > elem2D) then
+  if (mype==0) write(*,*) 'WARNING: iceberg ', ib, ' has invalid iceberg_elem = ', &
+       iceberg_elem, ' (valid range 1..', elem2D, '). Marking as melted to avoid crash.'
+  melted(ib) = .true.
+  return
+ end if
  
  ! ================== START ICEBERG CALCULATION ====================
  
@@ -994,7 +1001,9 @@ subroutine trajectory( lon_rad,lat_rad, old_u,old_v, new_u,new_v, &
  real, intent(in)	:: dt_ib
  
  real :: deltax1, deltay1, deltax2, deltay2	
- 
+ real :: cos_lat_safe
+ real, parameter :: lat_rad_max = 89.5*rad
+
  !save old position in case the iceberg leaves the domain
  old_lon = lon_rad
  old_lat = lat_rad
@@ -1006,8 +1015,10 @@ subroutine trajectory( lon_rad,lat_rad, old_u,old_v, new_u,new_v, &
  deltay2 = new_v * dt_ib
    
  !heun method
- lon_rad = lon_rad + (0.5*(deltax1 + deltax2) / (r_earth*cos(lat_rad)) )
+ cos_lat_safe = max(cos(lat_rad), cos(lat_rad_max))
+ lon_rad = lon_rad + (0.5*(deltax1 + deltax2) / (r_earth*cos_lat_safe) )
  lat_rad = lat_rad + (0.5*(deltay1 + deltay2) /  r_earth )
+ lat_rad = max(-lat_rad_max, min(lat_rad_max, lat_rad))
  lon_deg=lon_rad/rad
  lat_deg=lat_rad/rad
    
