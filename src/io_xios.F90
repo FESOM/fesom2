@@ -135,10 +135,10 @@ contains
   !> client_comm:  returned equal to parent_comm (kept for API compat; OASIS
   !>               has already done the world split, so no further split here).
   subroutine io_xios_init(mesh, partit, parent_comm, client_comm)
-    type(T_MESH),    intent(in), target :: mesh
-    type(T_PARTIT),  intent(in), target :: partit
-    integer,         intent(in)         :: parent_comm
-    integer,         intent(out)        :: client_comm
+    type(T_MESH),    intent(in),    target :: mesh
+    type(T_PARTIT),  intent(inout), target :: partit
+    integer,         intent(in)            :: parent_comm
+    integer,         intent(out)           :: client_comm
 
     integer                       :: i, j, e, n1, n2, n3, nn, ne, ne_owned, nz_cell, nv
     real(kind=8), allocatable     :: lon_n(:),  lat_n(:)
@@ -210,6 +210,22 @@ contains
       if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_trgrd_xyz=',   ldiag_trgrd_xyz
       ov = xios_getvar("ldiag_cmor",        ldiag_cmor)
       if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_cmor=',        ldiag_cmor
+      ! Ship-track / mooring curtain output (io_tracks.F90). Per-track
+      ! config is supplied via context_fesom.xml in the XIOS-coupled path.
+      block
+        use io_tracks_module, only: ltracks, track_files, track_vars,      &
+                                    track_names, track_output_freq
+        ov = xios_getvar("ltracks",             ltracks)
+        if (ov .and. partit%mype==0) write(*,*) '[XIOS] ltracks=',             ltracks
+        ov = xios_getvar("track_files",         track_files)
+        if (ov .and. partit%mype==0) write(*,*) '[XIOS] track_files=',         trim(track_files)
+        ov = xios_getvar("track_vars",          track_vars)
+        if (ov .and. partit%mype==0) write(*,*) '[XIOS] track_vars=',          trim(track_vars)
+        ov = xios_getvar("track_names",         track_names)
+        if (ov .and. partit%mype==0) write(*,*) '[XIOS] track_names=',         trim(track_names)
+        ov = xios_getvar("track_output_freq",   track_output_freq)
+        if (ov .and. partit%mype==0) write(*,*) '[XIOS] track_output_freq=',   trim(track_output_freq)
+      end block
     end block
 
     ! --- 3. calendar: left to XML (calendar_type on the context element) -----
@@ -380,6 +396,14 @@ contains
          xios_date(yearnew, 1, 1, 0, 0, 0) + &
          xios_duration(day = real(daynew - 1, kind=8), &
                        second = real(timenew, kind=8)))
+
+    ! --- 7c. tracks (ship-track / mooring-array curtain output) -------------
+    ! Inert unless ltracks=.true. (set via &nml_general or the XIOS XML
+    ! override). See io_tracks.F90.
+    block
+      use io_tracks_module, only: io_tracks_register_xios
+      call io_tracks_register_xios(mesh, partit, nz_cell)
+    end block
 
     ! --- 8. close context definition ----------------------------------------
     call xios_close_context_definition()
