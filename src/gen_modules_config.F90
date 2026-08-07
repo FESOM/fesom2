@@ -132,7 +132,7 @@ module g_config
   logical                       :: lmin_latent_hf=.true.
   logical                       :: lverbose_icb=.false.  
   integer                       :: l_allowgrounding=1    ! 0=free drift, 1=slow drift, 2=stationary
-  logical                       :: l_cap_ibhf_n=.true.   ! cap iceberg-driven interior cooling (ibhf_n) at a safe temperature floor per cell/step
+  logical                       :: l_cap_ibhf_n=.false.   ! cap iceberg-driven interior cooling (ibhf_n) at a safe temperature floor per cell/step
   integer                       :: ib_num=0
   integer                       :: steps_per_ib_step=8
 
