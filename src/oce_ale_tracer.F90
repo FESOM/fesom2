@@ -1862,7 +1862,7 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
     CASE (1022) ! OXY
         bc_surface= dt*GloO2flux_seaicemask(n)
 !        bc_surface=0.0_WP
-    CASE (1023:1036)
+    CASE (1023:1037)
         bc_surface=0.0_WP  ! OG added bc for recom fields
     CASE (1302) ! Before (1037) ! DIC_13
 
