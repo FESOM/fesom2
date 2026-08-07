@@ -253,7 +253,7 @@ end do
 
  if (mod(istep_end_synced,icb_outfreq)==0 .AND. .not.ascii_out) then
 
-   if (mype==0) call write_buoy_props_netcdf(partit)
+   if (mype==0 .AND. ib_num > 0) call write_buoy_props_netcdf(partit)
        
    ! all PEs: set back to zero for next round
    bvl_mean=0.0
@@ -1250,7 +1250,7 @@ type(t_partit), intent(inout), target :: partit
   write(*,*) 'read iceberg restart file'
 
   !if(.NOT.ascii_out) call determine_save_count ! computed from existing records in netcdf file
-  if(.NOT.ascii_out) call init_buoy_output(partit)
+  if(.NOT.ascii_out .AND. ib_num > 0) call init_buoy_output(partit)
   !call init_icebergs_with_icesheet ! all PEs read LON,LAT,LENGTH from files
 
   !write(*,*) '*************************************************************'
@@ -1260,7 +1260,7 @@ type(t_partit), intent(inout), target :: partit
   if(mype==0) then
   write(*,*) 'no iceberg restart'
 
-  if(.NOT.ascii_out) call init_buoy_output(partit)
+  if(.NOT.ascii_out .AND. ib_num > 0) call init_buoy_output(partit)
 
   end if
 
@@ -1317,7 +1317,7 @@ type(t_partit), intent(inout), target :: partit
   write(*,*) 'read iceberg restart file'
 
   !if(.NOT.ascii_out) call determine_save_count ! computed from existing records in netcdf file
-  if(.NOT.ascii_out) call init_buoy_output(partit)
+  if(.NOT.ascii_out .AND. ib_num > 0) call init_buoy_output(partit)
   end if
   call init_icebergs_with_icesheet
   !write(*,*) 'initialized positions and length/width from file'
@@ -1327,7 +1327,7 @@ type(t_partit), intent(inout), target :: partit
   if(mype==0) then
   write(*,*) 'no iceberg restart'
 
-  if(.NOT.ascii_out) call init_buoy_output(partit)
+  if(.NOT.ascii_out .AND. ib_num > 0) call init_buoy_output(partit)
 
   end if
 
