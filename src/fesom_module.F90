@@ -146,6 +146,10 @@ contains
       logical mpi_is_initialized
       integer              :: tr_num, n
 
+#if defined (__recom)
+      type(tracers_info_type)               :: tracers_info
+#endif
+
 #if defined(__usetp)
 ! multi FESOM group loop parallelization
 ! moved from fvom_main.F90
@@ -158,10 +162,6 @@ contains
 
 ! get current value for num_fesom_groups
       call read_namelist_run_config
-#endif
-
-#if defined (__recom)
-      type(tracers_info_type)               :: tracers_info
 #endif
 
 #if !defined  __ifsinterface
@@ -495,7 +495,8 @@ contains
                         f%mesh%geo_coord_nod2D, f%mesh%z_3d_n, f%partit%myDim_nod2d,      &
                         f%partit%eDim_nod2D, f%partit%mype, f%partit%MPI_COMM_FESOM,      &
                         f%partit%myDim_elem2D, f%partit%eDim_elem2D, tracers_info,        &
-                        f%tracers%num_tracers, rad) ! adjust values for recom tracers (derived type "t_tracer")
+                        f%tracers%num_tracers, rad, use_age_tracer, use_transit, l_sf6, l_f11, &
+                        l_f12, l_r14c, l_r39ar, f%mesh%ocean_area) ! adjust values for recom tracers (derived type "t_tracer")
         f%t1_recom=MPI_Wtime()
 
         deallocate(tracers_info%ids)
@@ -1076,7 +1077,8 @@ contains
                    f%partit%com_nod2D%sPE, f%partit%com_nod2D%rPE,                  &
                    f%partit%com_nod2D%req, f%partit%com_nod2D%nreq,                 &
                    dt, daynew, month, mstep, ndpyr, yearold, timenew, rad, kappa,            &
-                   press_air, u_wind, v_wind, shortwave)
+                   press_air, u_wind, v_wind, shortwave, use_age_tracer, use_transit, l_sf6, &
+                   l_f11, l_f12, l_r14c, l_r39ar)
         f%t1_recom = MPI_Wtime()
 
         deallocate(tracers_info%ids)

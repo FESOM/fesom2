@@ -1246,6 +1246,9 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
+#if defined(__recom) && defined(__usetp)
+    endif !(partit%my_fesom_group==0) then
+#endif
         CASE (1023:1036)
             tracers%data(i)%values(:,:)=0.0_WP
 #if defined(__recom) && defined(__usetp)
