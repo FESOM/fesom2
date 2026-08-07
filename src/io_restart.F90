@@ -132,7 +132,16 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
   call oce_files%def_node_var('hbar', 'ALE surface elevation', 'm',   mesh%hbar, mesh, partit)
 !!PS   call oce_files%def_node_var('ssh_rhs', 'RHS for the elevation', '?',   ssh_rhs, mesh, partit)
   call oce_files%def_node_var('ssh_rhs_old', 'RHS for the elevation', '?',   dynamics%ssh_rhs_old, mesh, partit)
+  ! d_eta is passed to ssh_solve_cg as X: it is the CG initial guess as well as the solution.
+  ! The CG stops on a relative residual (soltol), not at machine precision, so the result
+  ! depends on the guess -> prognostic.
+  call oce_files%def_node_var_optional('d_eta', 'SSH increment / CG initial guess', 'm', dynamics%d_eta, mesh, partit)
   call oce_files%def_node_var('hnode', 'nodal layer thickness', 'm',   mesh%hnode, mesh, partit)
+  ! hnode_new is filled by vert_vel_ale, but fer_solve_Gamma and init_Redi_GM run EARLIER in
+  ! the step and read it (oce_fer_gm.F90:82, :266), so with Fer_GM they consume the previous
+  ! step's value -> prognostic across the step boundary. Also written by the binary path
+  ! (MOD_MESH.F90, write_bin_array(mesh%hnode_new)).
+  call oce_files%def_node_var_optional('hnode_new', 'nodal layer thickness, next step', 'm', mesh%hnode_new, mesh, partit)
   
   !___Define the netCDF variables for 3D fields_______________________________
 #ifdef ENABLE_NVHPC_WORKAROUNDS
@@ -252,6 +261,16 @@ subroutine ini_ice_io(ice, partit, mesh)
   call ice_files%def_node_var('hsnow', 'effective snow thickness',  'm',   ice%data(3)%values(:), mesh, partit)
   call ice_files%def_node_var('uice', 'zonal velocity',             'm/s', ice%uice, mesh, partit)
   call ice_files%def_node_var('vice', 'meridional velocity',        'm',   ice%vice, mesh, partit)
+  ! EVP/mEVP carry the internal stress across time steps (ice_maEVP.F90:
+  ! sigma12 = det1*sigma12 + det2*r3), so the stress tensor is prognostic, not diagnostic.
+  ! Without it a restart re-spins the stresses from zero. Written by the binary path already.
+  call ice_files%def_elem_var_optional('sigma11', 'EVP internal stress sigma11', 'N/m', ice%work%sigma11, mesh, partit)
+  call ice_files%def_elem_var_optional('sigma12', 'EVP internal stress sigma12', 'N/m', ice%work%sigma12, mesh, partit)
+  call ice_files%def_elem_var_optional('sigma22', 'EVP internal stress sigma22', 'N/m', ice%work%sigma22, mesh, partit)
+  ! ice_thermo_oce.F90 seeds its Newton-Raphson solve for the ice surface temperature from
+  ! t_skin (:280, stored back at :321) and runs a fixed imax=5 iterations with no convergence
+  ! test (:713, :741), so the result depends on the seed -> prognostic. Binary path saves it.
+  call ice_files%def_node_var_optional('t_skin', 'ice skin temperature (Newton-Raphson seed)', 'C', ice%thermo%t_skin, mesh, partit)
 #if defined (__oifs) || defined (__ifsinterface)
   call ice_files%def_node_var_optional('ice_albedo', 'ice albedo',    '-',   ice%atmcoupl%ice_alb, mesh, partit)
   call ice_files%def_node_var_optional('ice_temp', 'ice surface temperature',  'K',   ice%data(4)%values, mesh, partit)
