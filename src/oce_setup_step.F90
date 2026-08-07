@@ -437,11 +437,6 @@ nl => mesh%nl
         num_tracers = num_tracers + 1
       endif
 
-      ! tracers initialised from file
-      idlist((n_ic3d+1):(n_ic3d+1)) = (/14/)
-      filelist((n_ic3d+1):(n_ic3d+1)) = (/'R14C.nc'/)
-      varlist((n_ic3d+1):(n_ic3d+1))  = (/'R14C'/)
-
       if (mype==0) write(*,*) 'XXX Transient tracers will be used in FESOM'
     endif
     ! 'use_transit' end
@@ -1288,14 +1283,15 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             write (*,*) tracers%data(i)%values(1,1)
          end if
        CASE (14)        ! initialize tracer ID=14, fractionation-corrected 14C/C
-!        this initialization can be overwritten by calling do_ic3d
-         if (.not. any(idlist == 14)) then ! CHECK IF THIS LINE IS STILL NECESSARY
+!        this initialization can be overwritten by calling do_ic3d if any(idlist == 14)
+         if (.not. any(idlist == 14)) then         ! set alternative initial values
          tracers%data(i)%values(:,:) = 0.85
+         tracers%data(i)%values(1:10,:) = 0.95
            if (mype==0) then
               write (i_string,  "(I3)") i
               write (id_string, "(I3)") id
               write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
-              write (*,*) tracers%data(i)%values(1,1)
+              write (*,*) tracers%data(i)%values(1,1), tracers%data(i)%values(11,1)
            end if
          end if
        CASE (39)        ! initialize tracer ID=39, fractionation-corrected 39Ar/Ar
