@@ -394,8 +394,9 @@ type(t_dyn)   , intent(inout), target :: dynamics
   !creates mapping
   call global2local(mesh, partit, local_idx_of, elem2D)
   firstcall=.false.
-  if(mype==0) write(*,*) 'Preparing local_idx_of done.' 
- end if 
+  if(mype==0) write(*,*) 'Preparing local_idx_of done.'
+ end if
+
  
  if (find_iceberg_elem) then
   lon_rad = lon_deg*rad
@@ -461,6 +462,12 @@ type(t_dyn)   , intent(inout), target :: dynamics
   endif
  end if
  
+ if (iceberg_elem < 1 .or. iceberg_elem > elem2D) then
+  if (mype==0) write(*,*) 'WARNING: iceberg ', ib, ' has invalid iceberg_elem = ', &
+       iceberg_elem, ' (valid range 1..', elem2D, '). Marking as melted to avoid crash.'
+  melted(ib) = .true.
+  return
+ end if
  
  ! ================== START ICEBERG CALCULATION ====================
  
@@ -504,7 +511,8 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
   call FEM_3eval(mesh,partit, Zdepth,Zdepth,lon_rad,lat_rad,Zdepth3,Zdepth3,local_idx_of(iceberg_elem))
   !write(*,*) 'nodal depth in iceberg ', ib,'s element:', Zdepth3
   !write(*,*) 'depth at iceberg ', ib, 's location:', Zdepth
-  
+  old_element = iceberg_elem !save if iceberg left model domain
+
   !================= CHECK IF ICEBERG IS GROUNDED ===================
   ! l_allowgrounding == 0: no grounding (free drift)
   ! l_allowgrounding == 1: reduce velocity (slow drift)
@@ -540,10 +548,14 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
     end if
   end if
   
-  ! Second, calculate the trajectory of the iceberg based on either the 
-  ! l_allowgrounding == 0: no grounding (free drift)
-  ! l_allowgrounding == 1: reduce velocity (slow drift)  
-  if (l_allowgrounding == 0 .or. l_allowgrounding == 1) then 
+  ! Second, calculate the trajectory of the iceberg -- for every iceberg that
+  ! isn't stationary this step.  Gating on l_allowgrounding alone (regardless
+  ! of grounded_ib) would freeze every iceberg globally under mode 2, not just
+  ! the ones actually grounded; skip trajectory() only for the one case that's
+  ! truly stationary (mode 2 AND grounded this step).  Modes 0 (free drift)
+  ! and 1 (reduced-velocity creep, incl. non-grounded icebergs at full speed)
+  ! always compute a trajectory.
+  if (.not. (l_allowgrounding == 2 .and. grounded_ib > 0.5)) then
     t0=MPI_Wtime()
     call trajectory( lon_rad,lat_rad, u_ib,v_ib, new_u_ib,new_v_ib, &
 	 	     lon_deg,lat_deg,old_lon,old_lat, dt*REAL(steps_per_ib_step))
@@ -989,7 +1001,9 @@ subroutine trajectory( lon_rad,lat_rad, old_u,old_v, new_u,new_v, &
  real, intent(in)	:: dt_ib
  
  real :: deltax1, deltay1, deltax2, deltay2	
- 
+ real :: cos_lat_safe
+ real, parameter :: lat_rad_max = 89.5*rad
+
  !save old position in case the iceberg leaves the domain
  old_lon = lon_rad
  old_lat = lat_rad
@@ -1001,8 +1015,10 @@ subroutine trajectory( lon_rad,lat_rad, old_u,old_v, new_u,new_v, &
  deltay2 = new_v * dt_ib
    
  !heun method
- lon_rad = lon_rad + (0.5*(deltax1 + deltax2) / (r_earth*cos(lat_rad)) )
+ cos_lat_safe = max(cos(lat_rad), cos(lat_rad_max))
+ lon_rad = lon_rad + (0.5*(deltax1 + deltax2) / (r_earth*cos_lat_safe) )
  lat_rad = lat_rad + (0.5*(deltay1 + deltay2) /  r_earth )
+ lat_rad = max(-lat_rad_max, min(lat_rad_max, lat_rad))
  lon_deg=lon_rad/rad
  lat_deg=lat_rad/rad
    
@@ -1725,7 +1741,7 @@ type(t_partit), intent(inout), target :: partit
   longname='time' ! use NetCDF Climate and Forecast (CF) Metadata Convention
   status = nf_PUT_ATT_TEXT(ncid, time_varid, 'long_name', len_trim(longname), trim(longname)) 
   if (status .ne. nf_noerr) call handle_err(status, partit)
-  write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a9)') 'seconds since ', yearstart, '-', 1, '-', 1, ' 00:00:00'
+  write(att_text, '(a14,I4.4,a1,I2.2,a1,I2.2,a9)') 'seconds since ', yearold, '-', 1, '-', 1, ' 00:00:00'
   status = nf_PUT_ATT_TEXT(ncid, time_varid, 'units', len_trim(att_text), trim(att_text))
   if (status .ne. nf_noerr) call handle_err(status, partit)
   if (include_fleapyear) then
