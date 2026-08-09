@@ -3285,12 +3285,21 @@ ctime=timeold+(dayold-1.)*86400
                         exit ! a proper rec_count detected, exit the loop
                     end if
                     if (k==1) then
+                        if (merge(out_is_lead_writer(), .true., parallel_write)) &
                         write(*,*) 'I/O '//trim(entry%name)//' WARNING: the existing output file will be overwritten'//'; ', entry%rec_count, ' records in the file;'
                         entry%rec_count=1
                         exit ! no appropriate rec_count detected
                     end if
                 end do
                 entry%rec_count=max(entry%rec_count, 1)
+                ! One line per output event, not one per writer. The guard above
+                ! used to be `mype == entry%root_rank`, so exactly one CPU reached
+                ! these prints; widening it to the writer set is right for the
+                ! netCDF calls in this block and wrong for the diagnostics.
+                ! Measured at 8192 ranks with 512 writers: 512 lines per stream per
+                ! output event, ~250k lines per model month through a single
+                ! srun -l stdout. On the gather path the single root still prints.
+                if (merge(out_is_lead_writer(), .true., parallel_write)) &
                 write(*,*) trim(entry%name)//': current mean I/O counter = ', entry%rec_count
             end if ! --> if(partit%mype == entry%root_rank) then
 #endif
