@@ -116,6 +116,38 @@ module g_config
   integer                :: n_levels = 1       ! Number of levels for hierarchic partitioning
   integer, dimension(10) :: n_part = RESHAPE((/0/), (/10/), (/0/)) ! Number of partitions on each hierarchy level
   namelist /machine/ n_levels, n_part
+
+  ! --- parallel output/restart writing -------------------------------------
+  ! Lives in namelist.config, NOT namelist.io: namelist.io is read by
+  ! ini_mean_io on the first call to output(), i.e. inside the timestep loop,
+  ! long after the restart file group has been built. A setting placed there
+  ! would silently have no effect on restarts.
+  logical :: parallel_write = .false.   !< collective writes instead of gather-to-one
+  integer :: n_writers     = 0          !< 0 = as many as the block-size guard allows
+  !> Vertical extent of an output chunk, in levels. 0 = all levels, 1 = one level.
+  !>
+  !> Chunk size = chunk_levels * block * bytes_per_value, where
+  !>   block = ceil(nod2D / n_writers) is one writer's share of the horizontal
+  !>   dimension. The horizontal extent is NOT free: a chunk wider than a
+  !>   writer's block would span two writers, and HDF5 would then have to ship
+  !>   and re-compress it between ranks -- exactly what this design avoids.
+  !>   The VERTICAL extent is free, because a writer owns every level of its
+  !>   own nodes, so raising chunk_levels costs no write performance at all.
+  !>
+  !> NG5 (nod2D = 7402886, nz = 69), float32:
+  !>   n_writers = 256, chunk_levels = 1   ->   0.12 MB
+  !>   n_writers = 256, chunk_levels = 8   ->   0.93 MB   (default)
+  !>   n_writers = 256, chunk_levels = 69  ->   8.0 MB
+  !>   n_writers =  64, chunk_levels = 69  ->  31.9 MB
+  !>   n_writers =  20, chunk_levels = 69  -> 102 MB
+  !>
+  !> Which value suits depends on how the data is read. Tall chunks (many
+  !> levels) favour profiles and time series at a point, and conversion to
+  !> zarr; flat chunks favour maps at a single depth, because reading one level
+  !> out of a chunk of k costs k times the bytes. Default 8 is a compromise
+  !> leaning toward maps, which are the more common access pattern here.
+  integer :: chunk_levels  = 8
+  namelist /io_parallel/ parallel_write, n_writers, chunk_levels
   
   !_____________________________________________________________________________
   ! *** configuration***

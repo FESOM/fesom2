@@ -2,9 +2,11 @@
 module io_fesom_file_module
   use io_netcdf_file_module
   use async_threads_module
+  use io_redistribute
   use MOD_PARTIT
   implicit none
   public fesom_file_type
+  public set_parallel_write, parallel_write_enabled
   private
   
   
@@ -50,13 +52,28 @@ module io_fesom_file_module
     procedure, private :: specify_node_var_2d, specify_node_var_2dicepack, specify_node_var_3d
     procedure, private :: specify_elem_var_2d, specify_elem_var_3d
     procedure, private :: gather_and_write_variables
+    procedure, private :: redist_and_write_variables
+    procedure, public  :: is_writer, is_lead_writer, writer_comm
   end type fesom_file_type
   
   
   integer, save :: m_nod2d
   integer, save :: m_elem2d
   integer, save :: m_nl
-  integer, save :: m_ncat  
+  integer, save :: m_ncat
+
+  ! --- parallel (collective) write path -------------------------------------
+  ! Off by default, so the gather path stays the shipped behaviour and remains
+  ! available for A/B comparison. Enable with set_parallel_write before any
+  ! fesom_file_type is initialised.
+  !
+  ! The schedules depend only on the partition and the writer count, not on the
+  ! file, so all files share one nodal and one element schedule, built once.
+  logical, save :: m_parallel_write = .false.
+  integer, save :: m_n_writers = 0
+  type(redist_type), save, target :: m_sched_nod, m_sched_elem
+  logical, save :: m_sched_ready = .false.
+  integer, save :: m_writer_comm = -1   !< communicator holding exactly the writers
   
 
   type fesom_file_type_ptr
@@ -170,7 +187,19 @@ contains
     ! tough MPI_THREAD_FUNNELED should be enough here, at least on cray-mpich 7.5.3 async mpi calls fail if we do not have support level 'MPI_THREAD_MULTIPLE'
     ! on cray-mpich we only get level 'MPI_THREAD_MULTIPLE' if 'MPICH_MAX_THREAD_SAFETY=multiple' is set in the environment
     call MPI_Query_thread(provided_mpi_thread_support_level, err)
-    if(provided_mpi_thread_support_level < MPI_THREAD_MULTIPLE) call this%thread%disable_async()    
+    if(provided_mpi_thread_support_level < MPI_THREAD_MULTIPLE) call this%thread%disable_async()
+
+    ! The collective path MUST NOT run on a worker thread. Two independent
+    ! reasons: (1) Levante's HDF5 1.12.1 reports Threadsafety: OFF, and with a
+    ! shared writer set several files' workers would land on the same rank and
+    ! call HDF5 concurrently; (2) a collective put_var issued from a worker while
+    ! the main thread proceeds deadlocks at the next matched collective.
+    if(m_parallel_write) then
+      call this%thread%disable_async()
+      ! Schedules and the writer communicator must exist before the first file
+      ! is created, because the create itself is collective over the writers.
+      call ensure_schedules(partit, this%comm)
+    end if
   end subroutine init
   
   
@@ -286,6 +315,175 @@ contains
   end subroutine
 
 
+  !> Select the collective write path. Call before any file is initialised.
+  !> n_writers <= 0 means "as many as the block-size guard allows".
+  subroutine set_parallel_write(enable, n_writers)
+    logical, intent(in) :: enable
+    integer, intent(in) :: n_writers
+    m_parallel_write = enable
+    m_n_writers = n_writers
+  end subroutine set_parallel_write
+
+
+  logical function parallel_write_enabled()
+    parallel_write_enabled = m_parallel_write
+  end function parallel_write_enabled
+
+
+  !> Build the nodal and element schedules once, from the partition.
+  !> Elements use myInd_elem2D_shrinked, NOT myList_elem2D: an element belongs
+  !> to a PE if ANY of its nodes does (gen_comm.F90:265), so sum(myDim_elem2D)
+  !> exceeds elem2D and there is no bijection. The shrinked set assigns each
+  !> element to the rank owning its first node (oce_mesh.F90:888-898).
+  subroutine ensure_schedules(partit, comm)
+    type(t_partit), intent(in) :: partit
+    integer, intent(in) :: comm
+    integer :: ierr, k
+    integer, allocatable :: gelem(:)
+
+    if(m_sched_ready) return
+
+    call redist_build(m_sched_nod, partit%myList_nod2D(1:partit%myDim_nod2D), &
+                      partit%myDim_nod2D, m_nod2d, m_n_writers, comm, &
+                      partit%mype==0, ierr)
+    if(ierr /= 0) then
+      if(partit%mype==0) write(*,*) 'io_fesom_file: nodal redist_build failed, ierr=', ierr
+      stop 1
+    end if
+
+    allocate(gelem(max(1, partit%myDim_elem2D_shrinked)))
+    do k = 1, partit%myDim_elem2D_shrinked
+      gelem(k) = partit%myList_elem2D( partit%myInd_elem2D_shrinked(k) )
+    end do
+    call redist_build(m_sched_elem, gelem, partit%myDim_elem2D_shrinked, &
+                      m_elem2d, m_n_writers, comm, .false., ierr)
+    if(ierr /= 0) then
+      if(partit%mype==0) write(*,*) 'io_fesom_file: element redist_build failed, ierr=', ierr
+      stop 1
+    end if
+    deallocate(gelem)
+
+    ! Writer sub-communicator. The nodal and element schedules select the same
+    ! ranks -- both use redist_writer_rank with the same npes and effective
+    ! writer count -- so one communicator serves both. Assert that rather than
+    ! rely on it silently.
+    if(m_sched_nod%is_writer .neqv. m_sched_elem%is_writer) then
+      write(*,*) 'io_fesom_file: nodal and element writer sets disagree on rank ', partit%mype
+      stop 1
+    end if
+    call MPI_Comm_split(comm, merge(1,0,m_sched_nod%is_writer), partit%mype, m_writer_comm, ierr)
+
+    m_sched_ready = .true.
+  end subroutine ensure_schedules
+
+
+  !> Communicator containing exactly the writer ranks. Valid after init.
+  integer function writer_comm(this)
+    class(fesom_file_type), intent(in) :: this
+    writer_comm = m_writer_comm
+  end function writer_comm
+
+
+  !> One designated writer, for per-record scalars like iter and time that must
+  !> be written once rather than once per writer.
+  logical function is_lead_writer(this)
+    class(fesom_file_type), intent(in) :: this
+    is_lead_writer = m_parallel_write .and. m_sched_ready .and. (m_sched_nod%widx == 0)
+  end function is_lead_writer
+
+
+  !> Collective write: one MPI_Alltoallv moves a whole field into block order,
+  !> then every writer issues one put_var per level with identical call counts.
+  !> Writers whose block is empty still call, with count 0, so the collective
+  !> stays matched.
+  subroutine redist_and_write_variables(this)
+    class(fesom_file_type), target :: this
+    integer :: i, lvl, nlvl, k, ierr, nloc
+    type(var_info), pointer :: var
+    type(redist_type), pointer :: sched
+    real(kind=8), allocatable :: sbuf(:,:), blk(:,:), lvlbuf(:), flat(:,:)
+    real(kind=8) :: empty(0)
+
+    call ensure_schedules(this%partit, this%comm)
+
+    ! Every writer has the same file open, so they all read the same record
+    ! count and agree without a broadcast.
+    if(this%is_writer()) this%rec_cnt = this%rec_count()+1
+
+    do i=1, this%nvar_infos
+      var => this%var_infos(i)
+      nlvl = size(var%local_data_copy, dim=1)
+
+      if(var%is_elem_based) then
+        sched => m_sched_elem
+        nloc = this%partit%myDim_elem2D_shrinked
+        allocate(sbuf(nlvl, max(1,nloc)))
+        do k = 1, nloc
+          sbuf(:,k) = var%local_data_copy(:, this%partit%myInd_elem2D_shrinked(k))
+        end do
+      else
+        sched => m_sched_nod
+        nloc = this%partit%myDim_nod2D
+        allocate(sbuf(nlvl, max(1,nloc)))
+        do k = 1, nloc
+          sbuf(:,k) = var%local_data_copy(:, k)
+        end do
+      end if
+
+      allocate(blk(nlvl, max(1, sched%count)))
+      call redist_exchange(sched, nlvl, sbuf, blk, this%comm, ierr)
+      if(ierr /= 0) then
+        write(*,*) 'io_fesom_file: redist_exchange failed for ', trim(var%varname)
+        stop 1
+      end if
+
+      if(this%is_writer()) then
+        ! ONE write per variable, not one per level. On the output path the same
+        ! change was worth 1.35x on NG5/1024 purely by collapsing 69 collective
+        ! calls into one; with a chunk spanning several levels it also stops
+        ! HDF5 rewriting a partially-filled chunk once per level.
+        !
+        ! write_var takes `values` as TARGET and calls c_loc on it, so the array
+        ! handed over must be contiguous -- passing a strided section blk(lvl,:)
+        ! silently wrote permuted data for every 3D field while 2D ones, where
+        ! blk(1,:) happens to be contiguous, looked correct. Hence the explicit
+        ! transpose into (count, nlvl), which is also the file's own order.
+        if(nlvl == 1) then
+          if(sched%count > 0) then
+            allocate(lvlbuf(sched%count))
+            lvlbuf(1:sched%count) = blk(1, 1:sched%count)
+            call this%write_var(var%var_index, [sched%first, this%rec_cnt], &
+                                [sched%count, 1], lvlbuf)
+            deallocate(lvlbuf)
+          else
+            call this%write_var(var%var_index, [1, this%rec_cnt], [0, 1], empty)
+          end if
+        else
+          if(sched%count > 0) then
+            allocate(flat(sched%count, nlvl))
+            do lvl=1, nlvl
+              flat(1:sched%count, lvl) = blk(lvl, 1:sched%count)
+            end do
+            call this%write_var(var%var_index, [sched%first, 1, this%rec_cnt], &
+                                [sched%count, nlvl, 1], reshape(flat, [sched%count*nlvl]))
+            deallocate(flat)
+          else
+            call this%write_var(var%var_index, [1, 1, this%rec_cnt], [0, nlvl, 1], empty)
+          end if
+        end if
+      end if
+
+      deallocate(sbuf, blk)
+    end do
+  end subroutine redist_and_write_variables
+
+
+  logical function is_writer(this)
+    class(fesom_file_type), intent(in) :: this
+    is_writer = m_parallel_write .and. m_sched_ready .and. m_sched_nod%is_writer
+  end function is_writer
+
+
   subroutine gather_and_write_variables(this)
     use io_gather_module
     class(fesom_file_type), target :: this
@@ -296,8 +494,15 @@ contains
     type(var_info), pointer :: var
     integer mpierr
 
+    ! Collective path: every rank participates, the record index is decided by
+    ! the caller (io_restart) and broadcast, and there is no gather at all.
+    if(m_parallel_write) then
+      call this%redist_and_write_variables()
+      return
+    end if
+
     if(this%is_iorank()) this%rec_cnt = this%rec_count()+1
-    
+
     do i=1, this%nvar_infos
       var => this%var_infos(i)
 

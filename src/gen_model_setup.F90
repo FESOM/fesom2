@@ -82,6 +82,18 @@ subroutine setup_model(partit)
   read (fileunit, NML=icebergs, iostat=istat)
   if (istat /= 0) call check_namelist_read(fileunit, 'icebergs', nmlfile, partit)
 
+  ! Optional group: absent in existing namelist.config files, which must keep
+  ! working, so a failed read is rewound and the compiled-in defaults stand.
+  read (fileunit, NML=io_parallel, iostat=istat)
+  if (istat /= 0) then
+     rewind(fileunit)
+     parallel_write = .false.
+     n_writers      = 0
+  end if
+  if (partit%mype == 0) then
+     write(*,*) 'parallel_write = ', parallel_write, '  n_writers = ', n_writers
+  end if
+
 !!$  read (fileunit, NML=machine)
   close (fileunit)
   

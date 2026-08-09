@@ -1,5 +1,6 @@
 MODULE io_RESTART
   use restart_file_group_module
+  use io_fesom_file_module, only: parallel_write_enabled, set_parallel_write
   use restart_derivedtype_module
   use g_clock
   use g_config
@@ -121,6 +122,11 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
 
   if(has_been_called) return
   has_been_called = .true.
+
+  ! Select the write path before any restart file is initialised: fesom_file's
+  ! init builds the redistribution schedules and the writer communicator, and
+  ! both must exist before the first collective create.
+  call set_parallel_write(parallel_write, n_writers)
 
   !===========================================================================
   !===================== Definition part =====================================
@@ -608,7 +614,8 @@ subroutine write_netcdf_restarts(path, filegroup, istep)
   character(:), allocatable :: dirpath
   character(:), allocatable :: filepath
   logical file_exists
-  
+  integer mpierr_par
+
   cstep = globalstep+istep
   
   ! Calculate current time from clock (seconds from beginning of year)
@@ -616,6 +623,64 @@ subroutine write_netcdf_restarts(path, filegroup, istep)
   
   do i=1, filegroup%nfiles
     call filegroup%files(i)%join() ! join the previous write (if required)
+
+    if(parallel_write_enabled()) then
+      ! Collective path. Everything below that the serial path does under
+      ! is_iorank() has to be done by every WRITER instead, because they all
+      ! take part in the create and in every put_var. Non-writers skip it and
+      ! only join the redistribution inside the write call.
+      !
+      ! The path/create-vs-append decision is taken identically on every writer:
+      ! they inspect the same filesystem and hold the same `path` state, so no
+      ! broadcast is needed. mkdir is idempotent and only rank 0 calls it, with
+      ! a barrier afterwards so no writer races ahead to create inside a
+      ! directory that does not exist yet.
+      if(filegroup%files(i)%is_writer()) then
+        if(filegroup%files(i)%is_attached()) call filegroup%files(i)%close_file()
+
+        dirpath = path(1:len(path)-3)
+        filepath = dirpath//"/"//filegroup%files(i)%varname//".nc"
+
+        if(filegroup%files(i)%path == "" .or. (.not. filegroup%files(i)%must_exist_on_read)) then
+          inquire(file=filepath, exist=file_exists)
+          if(file_exists) then
+            filegroup%files(i)%path = filepath
+          else if(.not. filegroup%files(i)%must_exist_on_read) then
+            filegroup%files(i)%path = ""
+          end if
+        end if
+      end if
+
+      if(filegroup%files(i)%is_lead_writer()) call mkdir(path(1:len(path)-3))
+      if(filegroup%files(i)%is_writer()) &
+         call MPI_Barrier(filegroup%files(i)%writer_comm(), mpierr_par)
+
+      if(filegroup%files(i)%is_writer()) then
+        if(filegroup%files(i)%path .ne. filepath) then
+          filegroup%files(i)%path = filepath
+          call filegroup%files(i)%open_write_create_par(filegroup%files(i)%path, &
+                                                        filegroup%files(i)%writer_comm())
+        else
+          call filegroup%files(i)%open_write_append_par(filegroup%files(i)%path, &
+                                                        filegroup%files(i)%writer_comm())
+        end if
+
+        ! iter and time are per-record scalars, but they are in COLLECTIVE access
+        ! mode like every other variable, and writing them extends the unlimited
+        ! time dimension -- which is a collective operation. So EVERY writer must
+        ! issue them, all writing the same value to the same record. Restricting
+        ! this to the lead writer deadlocked the other writers, which is what hung
+        ! core2 at 8 writers while pi (one writer) passed. Same rule as the output
+        ! path in io_meandata.F90.
+        call filegroup%files(i)%write_var(filegroup%files(i)%iter_varindex, &
+                                          [filegroup%files(i)%rec_count()+1], [1], [cstep])
+        call filegroup%files(i)%write_var(filegroup%files(i)%time_varindex(), &
+                                          [filegroup%files(i)%rec_count()+1], [1], [ctime])
+      end if
+
+      call filegroup%files(i)%async_gather_and_write_variables()
+      cycle
+    end if
 
     if(filegroup%files(i)%is_iorank()) then
       if(filegroup%files(i)%is_attached()) call filegroup%files(i)%close_file() ! close the file from previous write
@@ -784,10 +849,15 @@ subroutine finalize_restart()
 
   ! join all previous writes
   ! close all restart files
+  !
+  ! nf_close is COLLECTIVE in parallel netCDF-4, so in the collective path every
+  ! writer must close, not just the iorank. Closing on one rank only left the
+  ! other writers blocked after the restart had been written correctly -- the run
+  ! produced complete restart files and then hung in finalisation.
 
   do i=1, oce_files%nfiles
     call oce_files%files(i)%join()
-    if(oce_files%files(i)%is_iorank()) then
+    if(merge(oce_files%files(i)%is_writer(), oce_files%files(i)%is_iorank(), parallel_write_enabled())) then
       if(oce_files%files(i)%is_attached()) call oce_files%files(i)%close_file()
     end if
   end do
@@ -795,7 +865,7 @@ subroutine finalize_restart()
   if(use_ice) then
     do i=1, ice_files%nfiles
       call ice_files%files(i)%join()
-      if(ice_files%files(i)%is_iorank()) then
+      if(merge(ice_files%files(i)%is_writer(), ice_files%files(i)%is_iorank(), parallel_write_enabled())) then
         if(ice_files%files(i)%is_attached()) call ice_files%files(i)%close_file()
       end if
     end do
@@ -803,7 +873,7 @@ subroutine finalize_restart()
 #if defined(__recom)
   do i=1, bio_files%nfiles
     call bio_files%files(i)%join()
-    if(bio_files%files(i)%is_iorank()) then
+    if(merge(bio_files%files(i)%is_writer(), bio_files%files(i)%is_iorank(), parallel_write_enabled())) then
       if(bio_files%files(i)%is_attached()) call bio_files%files(i)%close_file()
     end if
   end do
