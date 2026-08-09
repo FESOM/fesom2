@@ -37,6 +37,8 @@ module io_redistribute
   public :: redist_effective_writers
   public :: redist_build, redist_free, redist_check
   public :: redist_exchange
+  public :: redist_scatter_type
+  public :: redist_build_scatter, redist_scatter, redist_scatter_free
   public :: REDIST_MIN_BLOCK
 
   !> Move a field from the model decomposition into block order.
@@ -75,6 +77,49 @@ module io_redistribute
      integer, allocatable :: rcnt(:), rdsp(:)   !< 0:npes-1
      integer, allocatable :: rloc(:)            !< 1:nrecv, offset within the block
   end type redist_type
+
+  !> Schedule for the opposite direction: block order on the readers out to
+  !> every rank that needs an entry.
+  !>
+  !> This is deliberately NOT redist_type reversed. A write schedule is a
+  !> partition -- redist_build fails with ierr = 3 if a writer would not receive
+  !> exactly its block -- because each global entry is written once. A read is
+  !> not a partition: a rank needs every entry it holds locally, owned or halo,
+  !> and neighbouring ranks need the same entry at the same time.
+  !>
+  !> For nodes the difference is only the halo, which exchange_nod3D could patch
+  !> up afterwards. For ELEMENTS there is a second gap that no halo exchange
+  !> closes, and it is the reason this type exists. myInd_elem2D_shrinked keeps
+  !> only local elements whose FIRST node is owned (oce_mesh.F90:888-899), while
+  !> an element enters the halo receive list only when NONE of its nodes belongs
+  !> to this PE (gen_comm.F90:430). An element in 1:myDim_elem2D whose first node
+  !> is a halo node is in neither set: inverting the write schedule would leave
+  !> it holding whatever was in memory, and this rank would then pass that on,
+  !> because the element does appear in its own send lists. Nothing catches this
+  !> during normal running, where such elements are recomputed from nodal values
+  !> every step; a restart read is the one place the value has to come from
+  !> outside.
+  !>
+  !> So each rank simply asks for what it needs and readers serve the requests.
+  !> Duplicate requests across ranks are expected, not an error.
+  type :: redist_scatter_type
+     integer :: n_global  = 0
+     integer :: n_readers = 0     !< same blocks as the writers, so the same count
+     integer :: block     = 0
+     integer :: npes      = 0
+     integer :: mype      = -1
+     logical :: is_reader = .false.
+     integer :: widx      = -1
+     integer :: first     = 0     !< first global index this reader owns (1-based)
+     integer :: last      = -1
+     integer :: count     = 0     !< block length held by this reader, may be 0
+     integer :: nwant     = 0     !< entries this rank needs (owned + halo)
+     integer :: nserve    = 0     !< entries this rank must send out as a reader
+     integer, allocatable :: qcnt(:), qdsp(:)   !< 0:npes-1, what we ask of each reader
+     integer, allocatable :: scnt(:), sdsp(:)   !< 0:npes-1, what we serve each requester
+     integer, allocatable :: sloc(:)            !< 1:nserve, offset within our block
+     integer, allocatable :: qperm(:)           !< 1:nwant, request slot -> local position
+  end type redist_scatter_type
 
 contains
 
@@ -286,6 +331,183 @@ contains
 
     deallocate(rbuf, sc, sd, rc, rd)
   end subroutine redist_exchange_r8
+
+
+
+  !> Build the read-side schedule. `want(1:nwant)` is every global index this
+  !> rank needs a value for -- owned AND halo, in whatever order the model keeps
+  !> them. Collective over comm.
+  !>
+  !> `n_readers_req` must be the value the WRITER used, so that first/last/count
+  !> describe the same blocks the file was written in. Passing something else is
+  !> not an error here, but then the reader blocks will not line up with the
+  !> file's chunks and every read crosses chunk boundaries.
+  !>
+  !> Unlike redist_build this does NOT require `want` to be ascending. The write
+  !> side gets away with the grouping shortcut because myList_nod2D(1:myDim) is
+  !> sorted; append the halo tail and it is not, so the destination-sorted order
+  !> is built explicitly and qperm remembers the way back.
+  subroutine redist_build_scatter(this, want, nwant, n_global, n_readers_req, comm, verbose, ierr)
+    type(redist_scatter_type), intent(out) :: this
+    integer, intent(in)  :: nwant, n_global, n_readers_req, comm
+    integer, intent(in)  :: want(nwant)
+    logical, intent(in)  :: verbose
+    integer, intent(out) :: ierr
+
+    integer :: i, w, r, mpierr, slot
+    integer, allocatable :: fill(:), qglob(:), sglob(:)
+
+    ierr = 0
+    call MPI_Comm_size(comm, this%npes, mpierr)
+    call MPI_Comm_rank(comm, this%mype, mpierr)
+
+    this%n_global  = n_global
+    this%n_readers = redist_effective_writers(n_global, n_readers_req, this%npes)
+    this%block     = redist_block_size(n_global, this%n_readers)
+    this%nwant     = nwant
+
+    ! Reader set and block range: identical rules to the writer side, so the
+    ! two agree by construction rather than by coincidence.
+    this%is_reader = .false.
+    this%widx      = -1
+    do w = 0, this%n_readers - 1
+       if (redist_writer_rank(w, this%npes, this%n_readers) == this%mype) then
+          this%is_reader = .true.
+          this%widx      = w
+          exit
+       end if
+    end do
+    if (this%is_reader) then
+       this%first = this%widx * this%block + 1
+       this%last  = min((this%widx + 1) * this%block, n_global)
+       this%count = max(0, this%last - this%first + 1)
+    else
+       this%first = 0; this%last = -1; this%count = 0
+    end if
+
+    ! --- what we ask of each reader -----------------------------------------
+    allocate(this%qcnt(0:this%npes-1), this%qdsp(0:this%npes-1))
+    allocate(this%scnt(0:this%npes-1), this%sdsp(0:this%npes-1))
+    this%qcnt = 0
+
+    do i = 1, nwant
+       if (want(i) < 1 .or. want(i) > n_global) then
+          ierr = 1
+          if (verbose) write(*,'(a,i0,a,i0)') ' io_redistribute: requested index out of range: ', &
+               want(i), ' on rank ', this%mype
+          return
+       end if
+       w = redist_owner_of(want(i), this%block, this%n_readers)
+       r = redist_writer_rank(w, this%npes, this%n_readers)
+       this%qcnt(r) = this%qcnt(r) + 1
+    end do
+
+    this%qdsp(0) = 0
+    do r = 1, this%npes - 1
+       this%qdsp(r) = this%qdsp(r-1) + this%qcnt(r-1)
+    end do
+
+    ! Destination-sorted request list, plus the permutation back to local slots.
+    allocate(qglob(max(1, nwant)), this%qperm(max(1, nwant)), fill(0:this%npes-1))
+    fill = this%qdsp
+    do i = 1, nwant
+       w = redist_owner_of(want(i), this%block, this%n_readers)
+       r = redist_writer_rank(w, this%npes, this%n_readers)
+       fill(r) = fill(r) + 1
+       slot = fill(r)
+       qglob(slot)      = want(i)
+       this%qperm(slot) = i
+    end do
+    deallocate(fill)
+
+    ! --- what we must serve --------------------------------------------------
+    call MPI_Alltoall(this%qcnt, 1, MPI_INTEGER, this%scnt, 1, MPI_INTEGER, comm, mpierr)
+    this%sdsp(0) = 0
+    do r = 1, this%npes - 1
+       this%sdsp(r) = this%sdsp(r-1) + this%scnt(r-1)
+    end do
+    this%nserve = sum(this%scnt)
+
+    if (this%nserve > 0 .and. .not. this%is_reader) then
+       ierr = 2                       ! a non-reader was asked for data
+       if (verbose) write(*,'(a,i0,a,i0)') ' io_redistribute: rank ', this%mype, &
+            ' is not a reader but was asked for ', this%nserve
+       deallocate(qglob)
+       return
+    end if
+
+    allocate(sglob(max(1, this%nserve)))
+    call MPI_Alltoallv(qglob, this%qcnt, this%qdsp, MPI_INTEGER, &
+                       sglob, this%scnt, this%sdsp, MPI_INTEGER, comm, mpierr)
+    deallocate(qglob)
+
+    allocate(this%sloc(max(1, this%nserve)))
+    do i = 1, this%nserve
+       this%sloc(i) = sglob(i) - this%first + 1
+       if (this%sloc(i) < 1 .or. this%sloc(i) > this%count) then
+          ierr = 3
+          if (verbose) write(*,'(a,i0,a,i0)') ' io_redistribute: asked for index ', sglob(i), &
+               ' outside block on rank ', this%mype
+          deallocate(sglob)
+          return
+       end if
+    end do
+    deallocate(sglob)
+  end subroutine redist_build_scatter
+
+
+  !> blk(nlev, count) in block order on the readers -> out(nlev, nwant) in the
+  !> model's own local order on every rank. Non-readers pass a size-0 blk.
+  !>
+  !> Mirror image of redist_exchange: gather into the send buffer through sloc,
+  !> one Alltoallv, then scatter through qperm.
+  subroutine redist_scatter(this, nlev, blk, out, comm, ierr)
+    type(redist_scatter_type), intent(in) :: this
+    integer, intent(in)  :: nlev, comm
+    real(kind=8), intent(in)  :: blk(nlev, *)
+    real(kind=8), intent(out) :: out(nlev, *)
+    integer, intent(out) :: ierr
+    real(kind=8), allocatable :: sbuf(:,:), rbuf(:,:)
+    integer, allocatable :: sc(:), sd(:), rc(:), rd(:)
+    integer :: i, mpierr
+
+    ierr = 0
+    allocate(sc(0:this%npes-1), sd(0:this%npes-1), rc(0:this%npes-1), rd(0:this%npes-1))
+    sc = this%scnt * nlev ; sd = this%sdsp * nlev
+    rc = this%qcnt * nlev ; rd = this%qdsp * nlev
+
+    allocate(sbuf(nlev, max(1, this%nserve)))
+    do i = 1, this%nserve
+       sbuf(1:nlev, i) = blk(1:nlev, this%sloc(i))
+    end do
+
+    allocate(rbuf(nlev, max(1, this%nwant)))
+    call MPI_Alltoallv(sbuf, sc, sd, MPI_REAL8, rbuf, rc, rd, MPI_REAL8, comm, mpierr)
+    if (mpierr /= MPI_SUCCESS) ierr = mpierr
+
+    do i = 1, this%nwant
+       out(1:nlev, this%qperm(i)) = rbuf(1:nlev, i)
+    end do
+
+    deallocate(sbuf, rbuf, sc, sd, rc, rd)
+  end subroutine redist_scatter
+
+
+  subroutine redist_scatter_free(this)
+    type(redist_scatter_type), intent(inout) :: this
+    if (allocated(this%qcnt))  deallocate(this%qcnt)
+    if (allocated(this%qdsp))  deallocate(this%qdsp)
+    if (allocated(this%scnt))  deallocate(this%scnt)
+    if (allocated(this%sdsp))  deallocate(this%sdsp)
+    if (allocated(this%sloc))  deallocate(this%sloc)
+    if (allocated(this%qperm)) deallocate(this%qperm)
+    this%is_reader = .false.
+    this%widx   = -1
+    this%count  = 0
+    this%nwant  = 0
+    this%nserve = 0
+  end subroutine redist_scatter_free
+
 
   !> Confirm the schedule partitions the global index space exactly once.
   !> Collective. Allocates two n_global integer arrays, so this is a test and

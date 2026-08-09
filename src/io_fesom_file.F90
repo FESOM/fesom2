@@ -53,7 +53,9 @@ module io_fesom_file_module
     procedure, private :: specify_elem_var_2d, specify_elem_var_3d
     procedure, private :: gather_and_write_variables
     procedure, private :: redist_and_write_variables
+    procedure, private :: redist_and_read_variables
     procedure, public  :: is_writer, is_lead_writer, writer_comm
+    procedure, public  :: is_reader, is_lead_reader, reader_comm
   end type fesom_file_type
   
   
@@ -73,7 +75,16 @@ module io_fesom_file_module
   integer, save :: m_n_writers = 0
   type(redist_type), save, target :: m_sched_nod, m_sched_elem
   logical, save :: m_sched_ready = .false.
+  !> Read-side counterparts. Separate schedules, not the write ones reversed:
+  !> a write is a partition of the global index space and a read is not, because
+  !> a rank needs every entry it holds locally and neighbours need the same ones.
+  !> See the header of io_redistribute for why elements make this mandatory
+  !> rather than merely convenient.
+  type(redist_scatter_type), save, target :: m_rsched_nod, m_rsched_elem
+  logical, save :: m_rsched_ready = .false.
   integer, save :: m_writer_comm = -1   !< communicator holding exactly the writers
+  integer, save :: m_n_readers = 0
+  integer, save :: m_reader_comm = -1   !< communicator holding exactly the readers
   
 
   type fesom_file_type_ptr
@@ -199,6 +210,11 @@ contains
       ! Schedules and the writer communicator must exist before the first file
       ! is created, because the create itself is collective over the writers.
       call ensure_schedules(partit, this%comm)
+      ! Likewise the read side: io_restart asks is_reader() to decide who opens
+      ! a restart file, which happens before anything calls into the read path,
+      ! so the reader schedules cannot be built lazily on first use. Two
+      ! Alltoall(v) once per run, paid even by a cold start that never reads.
+      call ensure_read_schedules(partit, this%comm)
     end if
   end subroutine init
   
@@ -218,6 +234,14 @@ contains
     integer mpierr
     real(kind=8) :: total_netcdf_time, total_scatter_time, total_barrier_time
     real(kind=8) :: t_start, t_end
+
+    ! Collective path: every rank takes part in the exchange, only the readers
+    ! touch netCDF, and the requested lists already cover the halo, so nothing
+    ! below this point applies.
+    if(m_parallel_write) then
+      call this%redist_and_read_variables()
+      return
+    end if
 
     ! Initialize timing variables
     total_netcdf_time = 0.0d0
@@ -317,11 +341,15 @@ contains
 
   !> Select the collective write path. Call before any file is initialised.
   !> n_writers <= 0 means "as many as the block-size guard allows".
-  subroutine set_parallel_write(enable, n_writers)
+  !> Restart writer and reader counts are separate: they peak at different
+  !> values, and the reader set is therefore not the writer set in general.
+  subroutine set_parallel_write(enable, n_writers, n_readers)
     logical, intent(in) :: enable
     integer, intent(in) :: n_writers
+    integer, intent(in) :: n_readers
     m_parallel_write = enable
     m_n_writers = n_writers
+    m_n_readers = n_readers
   end subroutine set_parallel_write
 
 
@@ -375,6 +403,54 @@ contains
 
     m_sched_ready = .true.
   end subroutine ensure_schedules
+
+
+  !> Build the read-side schedules. Lazy, like the write side, so a cold start
+  !> pays nothing: this is only reached when a restart is actually read.
+  !>
+  !> The requested lists are the FULL local lists, myDim + eDim, not the owned
+  !> subsets the writer uses. For nodes that difference is the halo. For elements
+  !> it is the halo plus every local element whose first node is not owned, which
+  !> is the case no halo exchange would repair afterwards.
+  subroutine ensure_read_schedules(partit, comm)
+    type(t_partit), intent(in) :: partit
+    integer, intent(in) :: comm
+    integer :: ierr, nwant
+
+    if(m_rsched_ready) return
+
+    nwant = partit%myDim_nod2D + partit%eDim_nod2D
+    call redist_build_scatter(m_rsched_nod, partit%myList_nod2D(1:nwant), nwant, &
+                              m_nod2d, m_n_readers, comm, partit%mype==0, ierr)
+    if(ierr /= 0) then
+      if(partit%mype==0) write(*,*) 'io_fesom_file: nodal redist_build_scatter failed, ierr=', ierr
+      stop 1
+    end if
+
+    nwant = partit%myDim_elem2D + partit%eDim_elem2D
+    call redist_build_scatter(m_rsched_elem, partit%myList_elem2D(1:nwant), nwant, &
+                              m_elem2d, m_n_readers, comm, .false., ierr)
+    if(ierr /= 0) then
+      if(partit%mype==0) write(*,*) 'io_fesom_file: element redist_build_scatter failed, ierr=', ierr
+      stop 1
+    end if
+
+    ! The nodal and element schedules must select the same ranks -- both use
+    ! redist_writer_rank with the same npes and reader count -- so one
+    ! communicator serves both. Asserted rather than assumed, as on the write
+    ! side. The reader set is NOT compared against the writer set: with
+    ! n_readers_restart different from n_writers_restart they are deliberately
+    ! different, which is the whole point of the separate knob.
+    if(m_rsched_nod%is_reader .neqv. m_rsched_elem%is_reader) then
+      write(*,*) 'io_fesom_file: nodal and element reader sets disagree on rank ', partit%mype
+      stop 1
+    end if
+    call MPI_Comm_split(comm, merge(1,0,m_rsched_nod%is_reader), partit%mype, m_reader_comm, ierr)
+
+    if(partit%mype == 0) write(*,*) 'io_fesom_file: restart readers = ', m_rsched_nod%n_readers
+
+    m_rsched_ready = .true.
+  end subroutine ensure_read_schedules
 
 
   !> Communicator containing exactly the writer ranks. Valid after init.
@@ -478,10 +554,173 @@ contains
   end subroutine redist_and_write_variables
 
 
+  !> Collective read: every reader pulls its own contiguous block with one
+  !> get_var per variable, then one MPI_Alltoallv delivers every entry to every
+  !> rank that needs it.
+  !>
+  !> Mirror of redist_and_write_variables, with two asymmetries worth stating.
+  !> First, the exchange runs the other way and is a scatter rather than a
+  !> gather, so entries are duplicated on purpose. Second, the requested lists
+  !> cover myDim + eDim, so nothing is left for a halo exchange to fix up.
+  !>
+  !> Non-readers never touch netCDF here; they only take part in the exchange.
+  subroutine redist_and_read_variables(this)
+#ifdef ENABLE_NVHPC_WORKAROUNDS
+    use nvfortran_subarray_workaround_module
+#endif
+    class(fesom_file_type), target :: this
+    integer :: i, lvl, nlvl, k, ierr, nloc, last_rec_idx, nlvl_min, nlvl_max
+    integer :: nvar_min, nvar_max
+    type(var_info), pointer :: var
+    type(redist_scatter_type), pointer :: sched
+    real(kind=8), allocatable :: blk(:,:), out(:,:), lvlbuf(:), flatv(:)
+
+    call ensure_read_schedules(this%partit, this%comm)
+
+    ! Same reasoning as the nlvl check below, one level up: the loop itself must
+    ! have the same trip count everywhere, or ranks meet different exchanges.
+    call MPI_Allreduce(this%nvar_infos, nvar_min, 1, MPI_INTEGER, MPI_MIN, this%comm, ierr)
+    call MPI_Allreduce(this%nvar_infos, nvar_max, 1, MPI_INTEGER, MPI_MAX, this%comm, ierr)
+    if(nvar_min /= nvar_max) then
+      if(this%partit%mype == 0) write(*,*) 'io_fesom_file: nvar_infos disagrees across ranks: ', &
+           nvar_min, nvar_max
+      stop 1
+    end if
+
+    ! Every reader has the same file open and reads the same record count, so
+    ! they agree without a broadcast -- the same argument the write path uses.
+    last_rec_idx = 0
+    if(this%is_reader()) last_rec_idx = this%rec_count()
+
+    do i=1, this%nvar_infos
+      var => this%var_infos(i)
+
+      if(var%is_icepackvar2) then
+        nlvl = size(var%external_local_data_ptr, dim=2)
+        nloc = size(var%external_local_data_ptr, dim=1)
+      else
+        nlvl = size(var%external_local_data_ptr, dim=1)
+        nloc = size(var%external_local_data_ptr, dim=2)
+      end if
+
+      if(var%is_elem_based) then
+        sched => m_rsched_elem
+      else
+        sched => m_rsched_nod
+      end if
+
+      ! nloc is myDim+eDim for this entity, which is exactly what the schedule
+      ! was built to request. If they disagree the schedule and the model array
+      ! describe different things and the copy below would run off the end.
+      if(nloc /= sched%nwant) then
+        write(*,*) 'io_fesom_file: local size ', nloc, ' /= requested ', sched%nwant, &
+                   ' for ', trim(var%varname), ' on rank ', this%partit%mype
+        stop 1
+      end if
+
+      ! nlvl MUST agree across every rank. MPI_Alltoallv matches
+      ! sendcount(A->B) against recvcount(B<-A), and both are scaled by the
+      ! local nlvl, so a single rank disagreeing turns the exchange into a
+      ! silent hang rather than an error. Checked collectively, and the abort is
+      ! taken by everyone, so the check itself cannot deadlock.
+      call MPI_Allreduce(nlvl, nlvl_min, 1, MPI_INTEGER, MPI_MIN, this%comm, ierr)
+      call MPI_Allreduce(nlvl, nlvl_max, 1, MPI_INTEGER, MPI_MAX, this%comm, ierr)
+      if(nlvl_min /= nlvl_max) then
+        if(this%partit%mype == 0) write(*,*) 'io_fesom_file: nlvl disagrees across ranks for ', &
+             trim(var%varname), ': min ', nlvl_min, ' max ', nlvl_max
+        stop 1
+      end if
+
+      allocate(blk(nlvl, max(1, sched%count)))
+      blk = 0._8
+
+      if(this%is_reader() .and. sched%count > 0) then
+        ! One get_var per variable, matching the single put_var on the write
+        ! side. read_var takes a rank-1 buffer, and the file's order is
+        ! (entry, level), so the flat buffer is unpacked by hand -- the same
+        ! transpose the writer does, in the opposite direction.
+        if(nlvl == 1) then
+          allocate(lvlbuf(sched%count))
+          call this%read_var(var%var_index, [sched%first, last_rec_idx], &
+                             [sched%count, 1], lvlbuf)
+          blk(1, 1:sched%count) = lvlbuf(1:sched%count)
+          deallocate(lvlbuf)
+        else
+          allocate(flatv(sched%count*nlvl))
+          call this%read_var(var%var_index, [sched%first, 1, last_rec_idx], &
+                             [sched%count, nlvl, 1], flatv)
+          do lvl=1, nlvl
+            blk(lvl, 1:sched%count) = flatv((lvl-1)*sched%count+1 : lvl*sched%count)
+          end do
+          deallocate(flatv)
+        end if
+      end if
+      ! A reader with an empty block issues nothing. open_read_par uses
+      ! INDEPENDENT access precisely so that reads need not be matched across
+      ! the reader set, which is also what lets io_restart read the record
+      ! scalars from a single CPU.
+
+      allocate(out(nlvl, max(1, sched%nwant)))
+      call redist_scatter(sched, nlvl, blk, out, this%comm, ierr)
+      if(ierr /= 0) then
+        write(*,*) 'io_fesom_file: redist_scatter failed for ', trim(var%varname)
+        stop 1
+      end if
+
+#ifdef ENABLE_NVHPC_WORKAROUNDS
+      if(var%varname=='u') then
+        do k = 1, nloc; dynamics_workaround%uv(1,1:nlvl,k)       = out(1:nlvl,k); end do
+      else if(var%varname=='v') then
+        do k = 1, nloc; dynamics_workaround%uv(2,1:nlvl,k)       = out(1:nlvl,k); end do
+      else if(var%varname=='urhs_AB') then
+        do k = 1, nloc; dynamics_workaround%uv_rhsAB(1,1:nlvl,k) = out(1:nlvl,k); end do
+      else if(var%varname=='vrhs_AB') then
+        do k = 1, nloc; dynamics_workaround%uv_rhsAB(2,1:nlvl,k) = out(1:nlvl,k); end do
+      else
+#endif
+      if(var%is_icepackvar2) then
+        do k = 1, nloc
+          var%external_local_data_ptr(k, 1:nlvl) = out(1:nlvl, k)
+        end do
+      else
+        do k = 1, nloc
+          var%external_local_data_ptr(1:nlvl, k) = out(1:nlvl, k)
+        end do
+      end if
+#ifdef ENABLE_NVHPC_WORKAROUNDS
+      end if
+#endif
+
+      deallocate(blk, out)
+    end do
+  end subroutine redist_and_read_variables
+
+
   logical function is_writer(this)
     class(fesom_file_type), intent(in) :: this
     is_writer = m_parallel_write .and. m_sched_ready .and. m_sched_nod%is_writer
   end function is_writer
+
+
+  !> Reader predicates. Separate from the writer ones because
+  !> n_readers_restart may differ from n_writers_restart, so the two sets are
+  !> not the same ranks and do not hold the same blocks.
+  logical function is_reader(this)
+    class(fesom_file_type), intent(in) :: this
+    is_reader = m_parallel_write .and. m_rsched_ready .and. m_rsched_nod%is_reader
+  end function is_reader
+
+
+  logical function is_lead_reader(this)
+    class(fesom_file_type), intent(in) :: this
+    is_lead_reader = m_parallel_write .and. m_rsched_ready .and. (m_rsched_nod%widx == 0)
+  end function is_lead_reader
+
+
+  integer function reader_comm(this)
+    class(fesom_file_type), intent(in) :: this
+    reader_comm = m_reader_comm
+  end function reader_comm
 
 
   subroutine gather_and_write_variables(this)

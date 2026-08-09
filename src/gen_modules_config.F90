@@ -147,7 +147,21 @@ module g_config
   !> out of a chunk of k costs k times the bytes. Default 8 is a compromise
   !> leaning toward maps, which are the more common access pattern here.
   integer :: chunk_levels  = 8
-  namelist /io_parallel/ parallel_write, n_writers, chunk_levels
+  !> Restart writers and restart readers, separately from the output writers.
+  !> -1 means "same as n_writers", which is what one knob used to give.
+  !>
+  !> The three want different values, measured on NG5/8192: output peaks near
+  !> 512 writers, restarts peak lower, and reading peaks lower still -- 128
+  !> readers beat 512 by a third (141.2 s gather -> 52.9 s at 512 -> 39.9 s at
+  !> 128). Output writes compressed chunks whose boundaries must coincide with
+  !> writer blocks, so its optimum is tied to chunk size; a read decompresses
+  !> whole chunks and has no such constraint, which is why its optimum sits
+  !> elsewhere. Zero keeps its meaning of "as many as the block-size guard
+  !> allows" for all three.
+  integer :: n_writers_restart = -1     !< -1 = use n_writers
+  integer :: n_readers_restart = -1     !< -1 = use n_writers
+  namelist /io_parallel/ parallel_write, n_writers, chunk_levels, &
+                         n_writers_restart, n_readers_restart
   
   !_____________________________________________________________________________
   ! *** configuration***
