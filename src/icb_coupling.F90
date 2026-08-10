@@ -8,6 +8,7 @@ module iceberg_ocean_coupling
  public :: reset_ib_fluxes
  public :: prepare_icb2fesom
  public :: icb2fesom
+ public :: cap_ibhf_n
 
  contains
 
@@ -247,4 +248,107 @@ type(t_partit), intent(inout), target :: partit
     end if
 !---wiso-code-end
 end subroutine icb2fesom
+
+!_______________________________________________________________________________
+! Cap the per-layer iceberg heat flux (ibhf_n) so it cannot cool a layer below
+! a safe seawater threshold in a single timestep.  Without this cap, shallow
+! shelves with several (or a slow-creeping / grounded) icebergs can drive a
+! cell's temperature below freezing over many timesteps and trip the
+! temperature blow-up check (cf. Chukchi Sea grounding case).
+!
+! Deliberate trade-off: this caps heat only, not the paired freshwater flux
+! (ibfwb/ibfwl/ibfwe/ibfwbv) -- icb2fesom has already consumed those into
+! water_flux/heat_flux by the time this runs (it's called right after
+! icb2fesom, since ibhf_n itself is only consumed later, in
+! oce_ale_tracer.F90). So when the cap binds, the ocean receives the
+! iceberg's full freshwater but pays less than the full latent-heat cost for
+! it: a bounded, rare-case energy leak rather than a mass leak. Capping the
+! freshwater to match would instead leak mass, since the iceberg's own volume
+! update in iceberg_newdimensions has already consumed the uncapped melt
+! rates by this point -- closing both gaps at once would require moving the
+! cap before that commit, per-iceberg rather than per-cell, which cannot see
+! multiple icebergs hitting one node in the same step and would still need
+! this aggregate cap as a backstop. The diagnostic below quantifies the
+! energy leak so it's monitored rather than silently ignored.
+!
+! Toggle via namelist /icebergs/ l_cap_ibhf_n (default .true.).
+!_______________________________________________________________________________
+subroutine cap_ibhf_n(tracers, mesh, partit)
+    use o_param
+    use g_config
+    use MOD_MESH
+    use MOD_PARTIT
+    use MOD_TRACER
+    use iceberg_params
+    implicit none
+    type(t_tracer), intent(in), target :: tracers
+    type(t_mesh)  , intent(in), target :: mesh
+    type(t_partit), intent(in), target :: partit
+    integer        :: n, nz, nzmin, nzmax, ierr_mpi
+    real(kind=WP)  :: t_now, hloc, ibhf_n_min, dheat_cell
+    ! Conservation diagnostic: heat [W] discarded by the cap this step,
+    ! local-PE-only accumulator (n <= myDim_nod2D guard avoids double-counting
+    ! halo nodes), then MPI-summed and logged on PE 0.
+    real(kind=WP)  :: heat_disc_loc, heat_disc_glob
+    integer        :: cells_capped_loc, cells_capped_glob
+    ! Lowest temperature we allow iceberg cooling to drive a cell to.
+    ! Slightly above the freezing point of seawater at S~34, so the cap kicks
+    ! in before we reach the freezing point and protects the blow-up check.
+    real(kind=WP), parameter :: ibhf_n_t_threshold = -1.85_WP
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
+    if (turn_off_hf .or. .not. l_cap_ibhf_n) return
+
+    heat_disc_loc    = 0.0_WP
+    cells_capped_loc = 0
+
+!$OMP PARALLEL DO PRIVATE(n, nz, nzmin, nzmax, t_now, hloc, ibhf_n_min, dheat_cell) &
+!$OMP             REDUCTION(+: heat_disc_loc, cells_capped_loc)
+    do n = 1, myDim_nod2D + eDim_nod2D
+        nzmin = ulevels_nod2D(n)
+        nzmax = nlevels_nod2D(n)
+        do nz = nzmin, nzmax - 1
+            if (ibhf_n(nz, n) >= 0.0_WP) cycle   ! only cooling (negative) needs capping
+            hloc = hnode(nz, n)
+            if (hloc <= 0.0_WP) cycle
+            t_now = tracers%data(1)%values(nz, n)
+            if (t_now <= ibhf_n_t_threshold) then
+                ! Water already at/below the safe threshold; disallow further
+                ! iceberg-driven cooling entirely.
+                if (n <= myDim_nod2D) then
+                    heat_disc_loc    = heat_disc_loc    + (-ibhf_n(nz, n)) * areasvol(nz, n)
+                    cells_capped_loc = cells_capped_loc + 1
+                end if
+                ibhf_n(nz, n) = 0.0_WP
+            else
+                ! Cooling allowed up to bringing T down to the threshold in
+                ! a single timestep:
+                !   dT = ibhf_n * dt / (vcpw * h)   (vcpw = rho_w * cp_w)
+                ! Most negative ibhf_n that keeps T_new >= T_thresh:
+                ibhf_n_min = (ibhf_n_t_threshold - t_now) * vcpw * hloc / dt
+                if (ibhf_n(nz, n) < ibhf_n_min) then
+                    if (n <= myDim_nod2D) then
+                        dheat_cell       = (ibhf_n_min - ibhf_n(nz, n)) * areasvol(nz, n)
+                        heat_disc_loc    = heat_disc_loc    + dheat_cell
+                        cells_capped_loc = cells_capped_loc + 1
+                    end if
+                    ibhf_n(nz, n) = ibhf_n_min
+                end if
+            end if
+        end do
+    end do
+!$OMP END PARALLEL DO
+
+    call MPI_AllReduce(heat_disc_loc,    heat_disc_glob,    1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, ierr_mpi)
+    call MPI_AllReduce(cells_capped_loc, cells_capped_glob, 1, MPI_INTEGER,          MPI_SUM, MPI_COMM_FESOM, ierr_mpi)
+
+    if (mype == 0 .and. cells_capped_glob > 0) then
+        write(*, '(A, I7, A, ES12.4, A)') &
+              " * cap_ibhf_n: capped ", cells_capped_glob, &
+              " cells; discarded heat = ", heat_disc_glob * dt, " J/step"
+    end if
+end subroutine cap_ibhf_n
 end module iceberg_ocean_coupling
