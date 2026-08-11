@@ -1075,7 +1075,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(in) ,   target :: mesh
     !___________________________________________________________________________
-    integer                  :: i, k, counter, rcounter3, id
+    integer                  :: i, k, counter, rcounter3, id, alk_check
     character(len=10)        :: i_string, id_string
     real(kind=WP)            :: loc, max_temp, min_temp, max_salt, min_salt
     !___________________________________________________________________________
@@ -1090,54 +1090,17 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     if (mype==0) write(*,*) 'tracer IDs are: ', tracers%data(1:tracers%num_tracers)%ID
     !
 #if defined(__recom)
-    ! read preindustrial DIC
-    if(DIC_PI) then
-        filelist(5) = 'GLODAPv2.2016b.PI_TCO2_fesom2_mmol_fix_z_Fillvalue.nc'
-        varlist(5)  = 'PI_TCO2_mmol'
-    end if
-
     if (mype==0) then
-            write(*,*)
-            print *, achar(27)//'[36m'//'*************************'//achar(27)//'[0m'
-            print *, achar(27)//'[36m'//' --> RECOM ON'//achar(27)//'[0m'
-            if (ciso) then
-                print *, achar(27)//'[36m'//' --> CISO ON'//achar(27)//'[0m'
-            else
-                print *, achar(27)//'[36m'//' --> CISO OFF'//achar(27)//'[0m'
-            endif
-            if(DIC_PI) then
-                print *, achar(27)//'[36m'// ' --> Preindustrial DIC will be used'//achar(27)//'[0m'
-            end if
-            if (restore_alkalinity)  then
-               print *, achar(27)//'[36m'//' --> Alkalinity restoring = .true.'//achar(27)//'[0m'
-            endif
-            print *, achar(27)//'[36m'//'*************************'//achar(27)//'[0m'
-            write(*,*)
-            write(*,*) 'read Iron        climatology from:', trim(filelist(1))
-            write(*,*) 'read Oxygen      climatology from:', trim(filelist(2))
-            write(*,*) 'read Silicate    climatology from:', trim(filelist(3))
-            write(*,*) 'read Alkalinity  climatology from:', trim(filelist(4))
-            write(*,*) 'read DIC         climatology from:', trim(filelist(5))
-            write(*,*) 'read Nitrate     climatology from:', trim(filelist(6))
-            write(*,*) 'read Salt        climatology from:', trim(filelist(7))
-            write(*,*) 'read Temperature climatology from:', trim(filelist(8))
+        write(*,*)
+        print *, achar(27)//'[36m'//'*************************'//achar(27)//'[0m'
+        print *, achar(27)//'[36m'//' --> RECOM ON'//achar(27)//'[0m'
+        if (ciso) then
+            print *, achar(27)//'[36m'//' --> CISO ON'//achar(27)//'[0m'
+        else
+            print *, achar(27)//'[36m'//' --> CISO OFF'//achar(27)//'[0m'
+        endif
+        print *, achar(27)//'[36m'//'*************************'//achar(27)//'[0m'
     end if
-    ! read ocean state
-    ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
-!    if(mype==0) write(*,*) 'read Iron        climatology from:', trim(filelist(1))
-!    if(mype==0) write(*,*) 'read Oxygen      climatology from:', trim(filelist(2))
-!    if(mype==0) write(*,*) 'read Silicate    climatology from:', trim(filelist(3))
-!    if(mype==0) write(*,*) 'read Alkalinity  climatology from:', trim(filelist(4))
-!    if(mype==0) write(*,*) 'read DIC         climatology from:', trim(filelist(5))
-!    if(mype==0) write(*,*) 'read Nitrate     climatology from:', trim(filelist(6))
-!    if(mype==0) write(*,*) 'read Salt        climatology from:', trim(filelist(7))
-!    if(mype==0) write(*,*) 'read Temperature climatology from:', trim(filelist(8))
-#else
-    ! read ocean state
-    ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
-    if(mype==0) write(*,*) 'read Temperature climatology from:', trim(filelist(1))
-    if(mype==0) write(*,*) 'read Salinity    climatology from:', trim(filelist(2))
-
 #endif
     if(any(idlist == 14) .and. mype==0) write(*,*) 'read radiocarbon climatology from:', trim(filelist(3))
     call do_ic3d(tracers, partit, mesh)
@@ -1157,12 +1120,26 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 
 #if defined(__recom)
     if (restore_alkalinity) then
-        if (mype==0) write(*,*)
-        if (mype==0) print *, achar(27)//'[46;1m'//' --> Set surface field for alkalinity restoring'//achar(27)//'[0m'
-        if (mype==0) write(*,*)
-        Alk_surf = tracers%data(5)%values(1,:) ! alkalinity is the 5th tracer
-    endif
-
+        if (mype==0) then
+            write(*,*)
+            print *, achar(27)//'[46;1m'//' restore_alkalinity is true --> Set surface field for alkalinity restoring'//achar(27)//'[0m'
+            write(*,*)
+        end if
+        alk_check=1
+        do i=3, tracers%num_tracers
+          id=tracers%data(i)%ID
+          SELECT CASE (id)
+            CASE (1003) ! alk
+                Alk_surf = tracers%data(i)%values(1,:) ! surface alkalinity
+                alk_check = 0
+            END SELECT
+        end do
+        if (alk_check /= 0) then
+            if (mype==0) write(*,*) 'not a single tracer ID = 1003 = alkalinity. this should not happen'
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            stop
+        end if
+    endif ! restore_alkalinity
 #endif
 
     ! count the passive tracers which require 3D source (ptracers_restore_total)
