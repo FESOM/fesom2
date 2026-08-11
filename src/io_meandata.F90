@@ -1036,7 +1036,6 @@ CASE ('euz3d                 ')
 !!$         var_longname = 'Direct upwelling radiation at '//wavelen_str//' nm'
 !!$         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Euz3d(:,:,nlam), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 !!$      enddo
-   endif
 CASE ('eutop3d                 ')
    if (use_REcoM .and. RECOM_RADTRANS) then
       do nlam=1,tlam
