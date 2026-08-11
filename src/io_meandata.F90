@@ -900,6 +900,33 @@ CASE ('edz3d                 ')
       var_name = 'edz3d_475'
       var_longname = 'Direct downwelling radiation at 475 nm'
       call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Edz3d(:,:,4), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'edz3d_500'
+      var_longname = 'Direct downwelling radiation at 500 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Edz3d(:,:,5), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'edz3d_525'
+      var_longname = 'Direct downwelling radiation at 525 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Edz3d(:,:,6), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'edz3d_550'
+      var_longname = 'Direct downwelling radiation at 550 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Edz3d(:,:,7), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'edz3d_575'
+      var_longname = 'Direct downwelling radiation at 575 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Edz3d(:,:,8), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'edz3d_600'
+      var_longname = 'Direct downwelling radiation at 600 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Edz3d(:,:,9), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'edz3d_625'
+      var_longname = 'Direct downwelling radiation at 625 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Edz3d(:,:,10), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'edz3d_650'
+      var_longname = 'Direct downwelling radiation at 650 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Edz3d(:,:,11), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'edz3d_675'
+      var_longname = 'Direct downwelling radiation at 675 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Edz3d(:,:,12), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'edz3d_700'
+      var_longname = 'Direct downwelling radiation at 700 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Edz3d(:,:,13), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
 !CASE ('edz3d                 ')
 !   if (use_REcoM .and. RECOM_RADTRANS) then
@@ -915,21 +942,100 @@ CASE ('edz3d                 ')
 !   endif
 CASE ('esz3d                 ')
    if (use_REcoM .and. RECOM_RADTRANS) then
-      do nlam=1,tlam
-         write(wavelen_str, "(i3.3)") pwaves(nlam)
-         var_name = 'esz3d_'//wavelen_str
-         var_longname = 'Diffuse radiation at '//wavelen_str//' nm'
-         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Esz3d(:,:,nlam), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-      enddo
+      var_name = 'edz3d_400'
+      var_longname = 'Diffuse radiation at 400 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Esz3d(:,:,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'esz3d_425'
+      var_longname = 'Diffuse radiation at 425 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Esz3d(:,:,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'esz3d_450'
+      var_longname = 'Diffuse radiation at 450 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Esz3d(:,:,3), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'esz3d_475'
+      var_longname = 'Diffuse radiation at 475 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Esz3d(:,:,4), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'esz3d_500'
+      var_longname = 'Diffuse radiation at 500 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Esz3d(:,:,5), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'esz3d_525'
+      var_longname = 'Diffuse radiation at 525 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Esz3d(:,:,6), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'esz3d_550'
+      var_longname = 'Diffuse radiation at 550 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Esz3d(:,:,7), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'esz3d_575'
+      var_longname = 'Diffuse radiation at 575 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Esz3d(:,:,8), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'esz3d_600'
+      var_longname = 'Diffuse radiation at 600 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Esz3d(:,:,9), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'esz3d_625'
+      var_longname = 'Diffuse radiation at 625 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Esz3d(:,:,10), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'esz3d_650'
+      var_longname = 'Diffuse radiation at 650 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Esz3d(:,:,11), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'esz3d_675'
+      var_longname = 'Diffuse radiation at 675 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Esz3d(:,:,12), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'esz3d_700'
+      var_longname = 'Diffuse radiation at 700 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Esz3d(:,:,13), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+!      do nlam=1,tlam
+!         write(wavelen_str, "(i3.3)") pwaves(nlam)
+!         var_name = 'esz3d_'//wavelen_str
+!         var_longname = 'Diffuse radiation at '//wavelen_str//' nm'
+!         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Esz3d(:,:,nlam), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+!      enddo
    endif
 CASE ('euz3d                 ')
    if (use_REcoM .and. RECOM_RADTRANS) then
-      do nlam=1,tlam
-         write(wavelen_str, "(i3.3)") pwaves(nlam)
-         var_name = 'euz3d_'//wavelen_str
-         var_longname = 'Direct upwelling radiation at '//wavelen_str//' nm'
-         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Euz3d(:,:,nlam), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-      enddo
+      var_name = 'euz3d_400'
+      var_longname = 'Direct upwelling radiation at 400 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Euz3d(:,:,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'euz3d_425'
+      var_longname = 'Direct upwelling radiation at 425 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Euz3d(:,:,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'euz3d_450'
+      var_longname = 'Direct upwelling radiation at 450 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Euz3d(:,:,3), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'euz3d_475'
+      var_longname = 'Direct upwelling radiation at 475 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Euz3d(:,:,4), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'euz3d_500'
+      var_longname = 'Direct upwelling radiation at 500 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Euz3d(:,:,5), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'euz3d_525'
+      var_longname = 'Direct upwelling radiation at 525 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Euz3d(:,:,6), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'euz3d_550'
+      var_longname = 'Direct upwelling radiation at 550 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Euz3d(:,:,7), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'euz3d_575'
+      var_longname = 'Direct upwelling radiation at 575 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Euz3d(:,:,8), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'euz3d_600'
+      var_longname = 'Direct upwelling radiation at 600 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Euz3d(:,:,9), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'euz3d_625'
+      var_longname = 'Direct upwelling radiation at 625 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Euz3d(:,:,10), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'euz3d_650'
+      var_longname = 'Direct upwelling radiation at 650 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Euz3d(:,:,11), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'euz3d_675'
+      var_longname = 'Direct upwelling radiation at 675 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Euz3d(:,:,12), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      var_name = 'euz3d_700'
+      var_longname = 'Direct upwelling radiation at 700 nm'
+      call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Euz3d(:,:,13), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+!!$      do nlam=1,tlam
+!!$         write(wavelen_str, "(i3.3)") pwaves(nlam)
+!!$         var_name = 'euz3d_'//wavelen_str
+!!$         var_longname = 'Direct upwelling radiation at '//wavelen_str//' nm'
+!!$         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Euz3d(:,:,nlam), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+!!$      enddo
    endif
 CASE ('eutop3d                 ')
    if (use_REcoM .and. RECOM_RADTRANS) then
