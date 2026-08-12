@@ -250,6 +250,14 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
        call oce_initial_state(tracers, partit, mesh)   ! Use it if not running tests
     end if
 
+#ifdef PROBE_SALT_ANOMALY
+    ! salinity state is stored as the anomaly S-35 (finer float32 ulp where the
+    ! ocean lives); initial conditions arrive absolute -> convert ONCE here,
+    ! before the AB copies. All absolute-S consumers carry +35 shims (EOS,
+    ! ice gather, rsss, SSS restoring); clip bounds shifted accordingly.
+    tracers%data(2)%values = tracers%data(2)%values - 35._WP
+    if (partit%mype==0) write(*,*) 'PROBE_SALT_ANOMALY: salinity state = S - 35'
+#endif
     if (.not.r_restart) then
        do n=1, tracers%num_tracers
           do i=1, tracers%data(n)%AB_order-1

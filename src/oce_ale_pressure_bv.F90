@@ -2749,7 +2749,11 @@ IMPLICIT NONE
   !compute secant bulk modulus
 
   tt = real(t, EWP)
+#ifdef PROBE_SALT_ANOMALY
+  ss = real(s, EWP) + 35._EWP   ! state stores S-35; EOS needs absolute
+#else
   ss = real(s, EWP)
+#endif
   s_sqrt = sqrt(ss)
 
   bulk_0 =  a0      + tt*(at   + tt*(at2  + tt*(at3 + tt*at4)))      &
