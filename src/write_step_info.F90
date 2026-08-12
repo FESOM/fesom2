@@ -407,6 +407,11 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
             write(*,*) 'ibfwe(n) = ',ibfwe(n)
             write(*,*) 'ibfwbv(n) = ',ibfwbv(n)
             do ib=1, ib_num
+                ! global2local zeroes every element this rank does not own, so an
+                ! iceberg living on another rank maps to 0 and indexing elem2d_nodes
+                ! with it runs off the array.
+                if (iceberg_elem(ib) < 1 .or. iceberg_elem(ib) > elem2D) cycle
+                if (local_idx_of(iceberg_elem(ib)) == 0) cycle
                 if (mesh%elem2d_nodes(1, local_idx_of(iceberg_elem(ib))) == n) then
                     write(*,*) 'ib = ',ib, ', length = ',length_ib(ib), ', height = ', height_ib(ib), ', scaling = ', scaling(ib) 
                     write(*,*) 'hfb_flux_ib(ib) = ',hfb_flux_ib(ib)
@@ -465,6 +470,11 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
             write(*,*) 'ibfwe(n) = ',ibfwe(n)
             write(*,*) 'ibfwbv(n) = ',ibfwbv(n)
             do ib=1, ib_num
+                ! global2local zeroes every element this rank does not own, so an
+                ! iceberg living on another rank maps to 0 and indexing elem2d_nodes
+                ! with it runs off the array.
+                if (iceberg_elem(ib) < 1 .or. iceberg_elem(ib) > elem2D) cycle
+                if (local_idx_of(iceberg_elem(ib)) == 0) cycle
                 if (mesh%elem2d_nodes(1, local_idx_of(iceberg_elem(ib))) == n) then
                     write(*,*) 'ib = ',ib, ', length = ',length_ib(ib), ', height = ', height_ib(ib), ', scaling = ', scaling(ib) 
                     write(*,*) 'hfb_flux_ib(ib) = ',hfb_flux_ib(ib)
@@ -513,6 +523,11 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
             write(*,*) 'ibfwe(n) = ',ibfwe(n)
             write(*,*) 'ibfwbv(n) = ',ibfwbv(n)
             do ib=1, ib_num
+                ! global2local zeroes every element this rank does not own, so an
+                ! iceberg living on another rank maps to 0 and indexing elem2d_nodes
+                ! with it runs off the array.
+                if (iceberg_elem(ib) < 1 .or. iceberg_elem(ib) > elem2D) cycle
+                if (local_idx_of(iceberg_elem(ib)) == 0) cycle
                 if (mesh%elem2d_nodes(1, local_idx_of(iceberg_elem(ib))) == n) then
                     write(*,*) 'ib = ',ib, ', length = ',length_ib(ib), ', height = ', height_ib(ib), ', scaling = ', scaling(ib) 
                     write(*,*) 'hfb_flux_ib(ib) = ',hfb_flux_ib(ib)
@@ -587,6 +602,11 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
             write(*,*) 'ibfwe(n) = ',ibfwe(n)
             write(*,*) 'ibfwbv(n) = ',ibfwbv(n)
             do ib=1, ib_num
+                ! global2local zeroes every element this rank does not own, so an
+                ! iceberg living on another rank maps to 0 and indexing elem2d_nodes
+                ! with it runs off the array.
+                if (iceberg_elem(ib) < 1 .or. iceberg_elem(ib) > elem2D) cycle
+                if (local_idx_of(iceberg_elem(ib)) == 0) cycle
                 if (mesh%elem2d_nodes(1, local_idx_of(iceberg_elem(ib))) == n) then
                     write(*,*) 'ib = ',ib, ', length = ',length_ib(ib), ', height = ', height_ib(ib), ', scaling = ', scaling(ib) 
                     write(*,*) 'hfb_flux_ib(ib) = ',hfb_flux_ib(ib)
@@ -663,6 +683,11 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
             write(*,*) 'ibfwe(n) = ',ibfwe(n)
             write(*,*) 'ibfwbv(n) = ',ibfwbv(n)
             do ib=1, ib_num
+                ! global2local zeroes every element this rank does not own, so an
+                ! iceberg living on another rank maps to 0 and indexing elem2d_nodes
+                ! with it runs off the array.
+                if (iceberg_elem(ib) < 1 .or. iceberg_elem(ib) > elem2D) cycle
+                if (local_idx_of(iceberg_elem(ib)) == 0) cycle
                 if (mesh%elem2d_nodes(1, local_idx_of(iceberg_elem(ib))) == n) then
                     write(*,*) 'ib = ',ib, ', length = ',length_ib(ib), ', height = ', height_ib(ib), ', scaling = ', scaling(ib) 
                     write(*,*) 'hfb_flux_ib(ib) = ',hfb_flux_ib(ib)
