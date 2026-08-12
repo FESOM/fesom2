@@ -167,6 +167,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     integer                                  :: i, tr_num, node, elem, nzmax, nzmin
     real(kind=WP)                            :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_elem2D) ! local variable
+    real(kind=8), allocatable, save          :: trstate8(:,:,:)  ! PROBE_FP64_TRACER_STATE shadow
     integer                                  :: nz, n, nu1, nl1
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -361,6 +362,29 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         end where
     end do
 !$OMP END PARALLEL DO
+
+#ifdef PROBE_FP64_TRACER_STATE
+    !___________________________________________________________________________
+    ! probe hybrid: FP64 accumulation shadow of the FULL tracer state. All
+    ! physics runs in WP as usual; each step's increment (values - round(S8),
+    ! exact in real64) accumulates in the shadow and the WP state is refreshed
+    ! as its rounded view -> absorption of sub-ulp increments is eliminated
+    ! while every kernel keeps WP bandwidth. Single-job runs only (the shadow
+    ! does not survive restart chains; it re-seeds from the WP state).
+    if (.not. allocated(trstate8)) then
+        allocate(trstate8(size(tracers%data(1)%values,1), &
+                          size(tracers%data(1)%values,2), tracers%num_tracers))
+        do tr_num=1, tracers%num_tracers
+            trstate8(:,:,tr_num) = real(tracers%data(tr_num)%values, 8)
+        end do
+        if (partit%mype==0) write(*,*) 'PROBE_FP64_TRACER_STATE: shadow seeded'
+    end if
+    do tr_num=1, tracers%num_tracers
+        trstate8(:,:,tr_num) = trstate8(:,:,tr_num) &
+            + (real(tracers%data(tr_num)%values,8) - real(real(trstate8(:,:,tr_num), WP),8))
+        tracers%data(tr_num)%values = real(trstate8(:,:,tr_num), WP)
+    end do
+#endif
 
     !---age-code-begin
     if (use_age_tracer) then
