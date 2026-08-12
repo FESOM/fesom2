@@ -717,19 +717,22 @@ endif
     ! Update tracers --> calculate T* see Danilov et al. (2017)
     ! T* =  (dt*R_T^n + h^(n-0.5)*T^(n-0.5))/h^(n+0.5)
 #if defined(PROBE_FP64_TRACER_STATE_V2)
-!   state ledger: same WP del_ttf as vanilla, but the state update happens in
-!   the real64 ledger; the WP state becomes the ledger's rounded view. This is
-!   absorption site (1): vanilla does values += del_ttf/hnode_new in fp32.
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, dtt8)
+!   state ledger, absorption site (1). The per-step increment is computed
+!   BIT-EXACTLY as vanilla fp32 (del_ttf update and the del/h_new division in
+!   WP), so the discrete constancy/telescoping of the h-cycle is preserved;
+!   ONLY the accumulation into the state happens in the real64 ledger instead
+!   of the absorbing fp32 '+='. (A first version formed the increment in
+!   real64 from the ledger itself; the broken fp32 telescoping of the seasonal
+!   h-cycle produced a spurious +0.02 mpsu/yr secular term.)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax)
     do n=1, myDim_nod2D
         nzmax=nlevels_nod2D(n)-1
         nzmin=ulevels_nod2D(n)
         do nz=nzmin,nzmax
-            dtt8 = real(del_ttf(nz,n),8) + ledger8(nz,n,tr_num)* &
-                       (real(hnode(nz,n),8)-real(hnode_new(nz,n),8))
             del_ttf(nz,n) = del_ttf(nz,n) + tracers%data(tr_num)%values(nz,n)* &
                                         (hnode(nz,n)-hnode_new(nz,n))
-            ledger8(nz,n,tr_num) = ledger8(nz,n,tr_num) + dtt8/real(hnode_new(nz,n),8)
+            ledger8(nz,n,tr_num) = ledger8(nz,n,tr_num) + &
+                real(del_ttf(nz,n)/hnode_new(nz,n), 8)
             tracers%data(tr_num)%values(nz,n) = real(ledger8(nz,n,tr_num), WP)
         end do
     end do
