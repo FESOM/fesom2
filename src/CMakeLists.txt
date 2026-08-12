@@ -330,6 +330,19 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} 
    if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
       target_compile_options(${PROJECT_NAME} PRIVATE -no-prec-sqrt -ip )
    endif()   
+
+   # Bounds-check the iceberg sources only, so the rest of the model keeps its
+   # optimisation. Opt-in with -DFESOM_ICB_BOUNDS_CHECK=ON: off by default,
+   # since -O0 on the code that runs per berg per step is not free. It earned
+   # its keep once, catching the ulevels_nod2d(0) read of FESOM/fesom2#963
+   # within 100 timesteps.
+   if(FESOM_ICB_BOUNDS_CHECK)
+      set_source_files_properties(
+         icb_step.F90 icb_thermo.F90 icb_dyn.F90 icb_modules.F90 icb_elem.F90
+         icb_allocate.F90 icb_coupling.F90
+         PROPERTIES COMPILE_OPTIONS "-check;bounds;-check;pointers;-traceback;-g;-O0")
+      message(STATUS "FESOM: iceberg sources built with -check bounds")
+   endif()
    
    if(ENABLE_OPENMP)
       target_compile_options(${PROJECT_NAME} PRIVATE -qopenmp)
