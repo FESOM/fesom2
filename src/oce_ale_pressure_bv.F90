@@ -246,6 +246,20 @@ subroutine pressure_bv(tracers, partit, mesh)
 
     !___________________________________________________________________________
     ! model explodes, no OpenMP parallelization !
+#ifdef PROBE_SALT_ANOMALY
+    ! state stores S-35: absolute S<0 <=> anomaly < -35
+    if( a < -35.0_WP ) then
+        write (*,*)' --> pressure_bv: s<0 happens! (anomaly state)', a
+        pe_status=1
+        do node=1, myDim_nod2D+eDim_nod2D
+            nzmin = ulevels_nod2D(node)
+            nzmax = nlevels_nod2D(node)
+            do nz=nzmin, nzmax-1
+                if (salt(nz, node) < -35.0_WP) write (*,*) 'the model blows up at n=', mylist_nod2D(node), ' ; ', 'nz=', nz
+            end do
+        end do
+    endif
+#else
     if( a < 0.0_WP ) then
         write (*,*)' --> pressure_bv: s<0 happens!', a
         pe_status=1
@@ -257,6 +271,7 @@ subroutine pressure_bv(tracers, partit, mesh)
             end do
         end do
     endif
+#endif
 
     !___________________________________________________________________________
 
@@ -2906,6 +2921,9 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
 
      t1 = TF1(nz,n)*1.00024_WP
      s1 = SF1(nz,n)
+#ifdef PROBE_SALT_ANOMALY
+     s1 = s1 + 35._WP   ! state stores S-35; McDougall polynomial wants absolute
+#endif
     !!PS      p1 = abs(Z(nz))
      p1 = abs(Z_3d_n(nz,n))
 

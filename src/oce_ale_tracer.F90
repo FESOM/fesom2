@@ -779,7 +779,13 @@ subroutine diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
             rdata =  Tsurf(n)
             rlx   =  surf_relax_T
         elseif (tracers%data(tr_num)%ID==2) then
+#ifdef PROBE_SALT_ANOMALY
+            ! state stores S-35: add the background-35 dilution term (see the
+            ! implicit-path salinity BC for the derivation)
+            flux  =  virtual_salt(n)+relax_salt(n) + (real_salt_flux(n) + 35._WP*water_flux(n))*is_nonlinfs
+#else
             flux  =  virtual_salt(n)+relax_salt(n) + real_salt_flux(n)*is_nonlinfs
+#endif
         else
             flux  = 0._WP
             rdata = 0._WP
@@ -1769,8 +1775,18 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
     CASE (2)
         ! --> real_salt_flux(:): salt flux due to containment/releasing of salt
         !     by forming/melting of sea ice
+#ifdef PROBE_SALT_ANOMALY
+        ! state stores S-35: the surface volume flux (folded into Wvel(nzmin))
+        ! concentrates/dilutes only the stored anomaly at its local value; the
+        ! background 35 must be supplied explicitly -- water enters/leaves
+        ! carrying S=0, i.e. anomaly -35 -- exactly the sval*water_flux pattern
+        ! of the temperature BC above, with sval = -35.
+        bc_surface= dt*(virtual_salt(n) &
+                    + relax_salt(n) + (real_salt_flux(n) + 35._WP*water_flux(n))*is_nonlinfs)
+#else
         bc_surface= dt*(virtual_salt(n) & !--> is zeros for zlevel/zstar
                     + relax_salt(n) + real_salt_flux(n)*is_nonlinfs)
+#endif
             
     !___Transient tracers (cases ##6,11,12,14,39)__________________________________
     CASE (6) ! SF6
