@@ -315,6 +315,10 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
     real(kind=WP), dimension(:)    , pointer :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:)    , pointer :: a_ice_old, m_ice_old, m_snow_old
     real(kind=WP), dimension(:), allocatable, target :: dhbar
+    ! Saved, and the global-to-local map is fixed for the run, so it is built
+    ! on first use. Each of the five dump sites below used to allocate it
+    ! afresh and nothing ever deallocated it, so the second node to blow up
+    ! aborted here and took the blowup diagnostic with it.
     integer, dimension(:), save, allocatable :: local_idx_of
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -393,8 +397,10 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
           write(*,*) 'hnode(:, n)  = ',hnode(ulevels_nod2D(n):nlevels_nod2D(n),n)
           write(*,*)
           if (use_icebergs) then
-            allocate(local_idx_of(elem2D))
-            call global2local(mesh, partit, local_idx_of, elem2D)
+            if (.not. allocated(local_idx_of)) then
+              allocate(local_idx_of(elem2D))
+              call global2local(mesh, partit, local_idx_of, elem2D)
+            end if
             write(*,*) 'ibhf_n(:, n) = ',ibhf_n(ulevels_nod2D(n):nlevels_nod2D(n),n)
             write(*,*) 'ibfwb(n) = ',ibfwb(n)
             write(*,*) 'ibfwl(n) = ',ibfwl(n)
@@ -449,8 +455,10 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
           write(*,*) 'CFL_z(:,n)  = ',CFL_z(:,n)
           write(*,*)
           if (use_icebergs) then
-            allocate(local_idx_of(elem2D))
-            call global2local(mesh, partit, local_idx_of, elem2D)
+            if (.not. allocated(local_idx_of)) then
+              allocate(local_idx_of(elem2D))
+              call global2local(mesh, partit, local_idx_of, elem2D)
+            end if
             write(*,*) 'ibhf_n(:, n) = ',ibhf_n(ulevels_nod2D(n):nlevels_nod2D(n),n)
             write(*,*) 'ibfwb(n) = ',ibfwb(n)
             write(*,*) 'ibfwl(n) = ',ibfwl(n)
@@ -495,8 +503,10 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
           write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,n)/rad
           write(*,*)
           if (use_icebergs) then
-            allocate(local_idx_of(elem2D))
-            call global2local(mesh, partit, local_idx_of, elem2D)
+            if (.not. allocated(local_idx_of)) then
+              allocate(local_idx_of(elem2D))
+              call global2local(mesh, partit, local_idx_of, elem2D)
+            end if
             write(*,*) 'ibhf_n(:, n) = ',ibhf_n(ulevels_nod2D(n):nlevels_nod2D(n),n)
             write(*,*) 'ibfwb(n) = ',ibfwb(n)
             write(*,*) 'ibfwl(n) = ',ibfwl(n)
@@ -567,8 +577,10 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
              write(*,*) 'CFL_z(:,n)  = ',CFL_z(:,n)
              write(*,*)
           if (use_icebergs) then
-            allocate(local_idx_of(elem2D))
-            call global2local(mesh, partit, local_idx_of, elem2D)
+            if (.not. allocated(local_idx_of)) then
+              allocate(local_idx_of(elem2D))
+              call global2local(mesh, partit, local_idx_of, elem2D)
+            end if
             write(*,*) 'ibhf_n(:, n) = ',ibhf_n(ulevels_nod2D(n):nlevels_nod2D(n),n)
             write(*,*) 'ibfwb(n) = ',ibfwb(n)
             write(*,*) 'ibfwl(n) = ',ibfwl(n)
@@ -641,8 +653,10 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
              write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,n)/rad
              write(*,*)
           if (use_icebergs) then
-            allocate(local_idx_of(elem2D))
-            call global2local(mesh, partit, local_idx_of, elem2D)
+            if (.not. allocated(local_idx_of)) then
+              allocate(local_idx_of(elem2D))
+              call global2local(mesh, partit, local_idx_of, elem2D)
+            end if
             write(*,*) 'ibhf_n(:, n) = ',ibhf_n(ulevels_nod2D(n):nlevels_nod2D(n),n)
             write(*,*) 'ibfwb(n) = ',ibfwb(n)
             write(*,*) 'ibfwl(n) = ',ibfwl(n)
