@@ -63,6 +63,30 @@ if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED AND NOT USE_YAC)
         )
     endif()
 
+    # JRA55 atmospheric forcing: run the pi mesh for one day driven by the bundled
+    # JRA55-do dataset (tests/data/FORCING/JRA55, year 1958, 3-hourly) instead of the
+    # default CORE2 forcing. This exercises the JRA55 namelist wiring end to end:
+    #   * FORCING JRA        -> namelist.forcing from config/namelist.forcing.JRA,
+    #                           pool paths rewired to the bundled tree (CMOR var
+    #                           names uas/tas/prra/..., relative to ClimateDataPath)
+    #   * FORCING_YEAR 1958  -> fesom.clock start year, per-year forcing file, and
+    #                           the required output artifact sst.fesom.1958.nc
+    #   * LEAPYEAR .true.    -> include_fleapyear=.true., mandatory for JRA55's
+    #                           gregorian time axis (fesom.x aborts otherwise; see
+    #                           the calendar-consistency check in gen_surface_forcing.F90)
+    # NOTE: passes in BOTH double- and single-precision builds (verified on pi/1-day).
+    # The JRA55 SP-NaN concern is specific to large meshes (e.g. ng5), not the finer
+    # sub-daily cadence itself, so it does not surface on the small pi mesh here.
+    add_fesom_test(integration_pi_jra_mpi2
+        MPI_TEST
+        NP 2
+        TIMEOUT ${TEST_TIMEOUT}
+        LABEL jra
+        FORCING "JRA"
+        FORCING_YEAR "1958"
+        LEAPYEAR ".true."
+    )
+
     # Note: there is no separate "SP" integration test. Precision is a property of
     # the build, not the test -- in a USE_SINGLE_PRECISION build every test above runs
     # single precision, and each fesom.x test auto-asserts the build's precision banner

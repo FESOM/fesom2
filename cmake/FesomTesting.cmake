@@ -251,6 +251,34 @@ function(update_namelist_forcing NAMELIST_IN NAMELIST_OUT TEST_DATA_DIR)
     file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
 endfunction()
 
+# Function to configure namelist.forcing for the bundled JRA55 test dataset.
+# The stock config/namelist.forcing.JRA points at absolute Levante pool paths
+# (/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/...); this rewrites them to the
+# bundled tests/data/FORCING/JRA55 tree. Paths are made RELATIVE (no leading '/')
+# so FESOM's make_full_path() prepends ClimateDataPath (=tests/data/), exactly as
+# the CORE2 variant resolves 'FORCING/CORE2/...'. The forcing file names, variable
+# names, time-axis reference (nm_nc_iyear=1900, nm_nc_freq=1 -- the bundled axis is
+# already in days) and the .true. l_* switches are taken as-is from the config
+# variant. The paired include_fleapyear=.true. (gregorian calendar) is applied by
+# the caller via the LEAPYEAR option.
+function(update_namelist_forcing_jra NAMELIST_IN NAMELIST_OUT)
+    file(READ "${NAMELIST_IN}" CONTENT)
+
+    # Runoff climatology: the stock namelist names CORE2_runoff.nc, but the bundled
+    # JRA55 dataset ships runoff.nc -- rewrite this specific file before the blanket
+    # pool-prefix replacement below.
+    string(REGEX REPLACE
+        "/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1\\.4\\.0/CORE2_runoff\\.nc"
+        "FORCING/JRA55/runoff.nc" CONTENT "${CONTENT}")
+
+    # All remaining absolute pool paths -> bundled tree, relative to ClimateDataPath.
+    string(REGEX REPLACE
+        "/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1\\.4\\.0/"
+        "FORCING/JRA55/" CONTENT "${CONTENT}")
+
+    file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
+endfunction()
+
 # Function to update namelist.oce (placeholder for future customization)
 function(update_namelist_oce NAMELIST_IN NAMELIST_OUT)
     file(READ "${NAMELIST_IN}" CONTENT)
@@ -351,11 +379,20 @@ endfunction()
 
 # Function to generate fesom.clock file
 function(generate_fesom_clock OUTPUT_DIR)
+    # Optional 2nd arg: the start year (defaults to 1948, the CORE2 forcing year).
+    # The clock start year selects which per-year forcing file FESOM opens and
+    # names the output artifacts (sst.fesom.<year>.nc), so a non-CORE2 dataset
+    # (e.g. JRA55, bundled for year 1958) must pass its matching year.
+    set(_year 1948)
+    if(ARGC GREATER 1)
+        set(_year "${ARGV1}")
+    endif()
+
     # Create the output directory if it doesn't exist
     file(MAKE_DIRECTORY "${OUTPUT_DIR}")
-    
+
     # Create the fesom.clock file with the correct format
-    file(WRITE "${OUTPUT_DIR}/fesom.clock" "0 1 1948\n0 1 1948\n")
+    file(WRITE "${OUTPUT_DIR}/fesom.clock" "0 1 ${_year}\n0 1 ${_year}\n")
 endfunction()
 
 # Function to add a FESOM integration test
@@ -366,7 +403,7 @@ endfunction()
 # Function to add a FESOM integration test with custom options
 function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH RUN_LENGTH_UNIT RESTART_LENGTH RESTART_LENGTH_UNIT LOGFILE_OUTFREQ FORCE_ROTATION USE_CAVITY)
     set(options MPI_TEST)
-    set(oneValueArgs NP TIMEOUT LABEL MIX_SCHEME)
+    set(oneValueArgs NP TIMEOUT LABEL MIX_SCHEME FORCING FORCING_YEAR LEAPYEAR)
     set(multiValueArgs COMMAND_ARGS EXTRA_SUCCESS_MARKERS)
     cmake_parse_arguments(FESOM_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
@@ -376,6 +413,21 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
     endif()
     if(NOT DEFINED FESOM_TEST_TIMEOUT)
         set(FESOM_TEST_TIMEOUT 300)  # 5 minutes default
+    endif()
+    # Atmospheric forcing dataset. Default CORE2 is wired into the namelist config
+    # (see configure_fesom_namelists_with_options); other datasets are applied as a
+    # post-configure override below so the default path is untouched. FORCING_YEAR
+    # is the clock/forcing-file/output year (CORE2 data is 1948, bundled JRA55 is
+    # 1958). LEAPYEAR toggles include_fleapyear -- real-calendar forcing such as
+    # JRA55 (gregorian) requires .true. or fesom.x aborts at the calendar check.
+    if(NOT DEFINED FESOM_TEST_FORCING)
+        set(FESOM_TEST_FORCING "CORE2")
+    endif()
+    if(NOT DEFINED FESOM_TEST_FORCING_YEAR)
+        set(FESOM_TEST_FORCING_YEAR "1948")
+    endif()
+    if(NOT DEFINED FESOM_TEST_LEAPYEAR)
+        set(FESOM_TEST_LEAPYEAR ".false.")
     endif()
 
     # Assemble the success-marker list: the mandatory clean-exit marker plus any
@@ -401,10 +453,10 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
     set(TEST_RUN_DIR "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}")
     set(TEST_DATA_DIR "${CMAKE_SOURCE_DIR}/tests/data")
     set(RESULT_DIR "${TEST_RUN_DIR}/results")
-    
-    # Generate fesom.clock file in the results directory
-    generate_fesom_clock("${RESULT_DIR}")
-    
+
+    # Generate fesom.clock file in the results directory (year matches the forcing)
+    generate_fesom_clock("${RESULT_DIR}" "${FESOM_TEST_FORCING_YEAR}")
+
     # Generate the test script
     set(TEST_SCRIPT "${TEST_RUN_DIR}/run_test.cmake")
     
@@ -454,7 +506,7 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
                 OUTPUT_LOG \"${TEST_RUN_DIR}/test_output.log\"
                 ERROR_LOG \"${TEST_RUN_DIR}/test_error.log\"
                 SUCCESS_MARKERS ${_success_markers}
-                REQUIRED_ARTIFACTS \"${RESULT_DIR}/sst.fesom.1948.nc\"
+                REQUIRED_ARTIFACTS \"${RESULT_DIR}/sst.fesom.${FESOM_TEST_FORCING_YEAR}.nc\"
             )
         ")
     else()
@@ -487,7 +539,7 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
                 OUTPUT_LOG \"${TEST_RUN_DIR}/test_output.log\"
                 ERROR_LOG \"${TEST_RUN_DIR}/test_error.log\"
                 SUCCESS_MARKERS ${_success_markers}
-                REQUIRED_ARTIFACTS \"${RESULT_DIR}/sst.fesom.1948.nc\"
+                REQUIRED_ARTIFACTS \"${RESULT_DIR}/sst.fesom.${FESOM_TEST_FORCING_YEAR}.nc\"
             )
         ")
     endif()
@@ -504,6 +556,32 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
         string(REGEX REPLACE "([^A-Za-z0-9_]mix_scheme[ \t]*=[ \t]*)'[^']*'"
                "\\1'${FESOM_TEST_MIX_SCHEME}'" _oce_content "${_oce_content}")
         file(WRITE "${TEST_RUN_DIR}/namelist.oce" "${_oce_content}")
+    endif()
+
+    # Optional: swap the atmospheric forcing dataset away from the CORE2 default.
+    # configure_fesom_namelists_with_options() has already written a CORE2
+    # namelist.forcing; here we overwrite it from the matching config/ variant,
+    # rewiring its paths to the bundled tests/data/FORCING tree.
+    if(NOT "${FESOM_TEST_FORCING}" STREQUAL "CORE2")
+        if("${FESOM_TEST_FORCING}" STREQUAL "JRA")
+            update_namelist_forcing_jra(
+                "${CMAKE_SOURCE_DIR}/config/namelist.forcing.JRA"
+                "${TEST_RUN_DIR}/namelist.forcing")
+        else()
+            message(FATAL_ERROR "add_fesom_test_with_options(${TEST_NAME}): unknown FORCING '${FESOM_TEST_FORCING}' (expected 'CORE2' or 'JRA')")
+        endif()
+    endif()
+
+    # Optional: include leap years. update_namelist_config_with_options() forces
+    # include_fleapyear=.false. for the (no-leap) CORE2 data; real-calendar forcing
+    # such as JRA55 (gregorian time axis) needs .true. or fesom.x aborts at the
+    # calendar-consistency check in gen_surface_forcing.F90. Anchored/whitespace-
+    # tolerant like the other namelist rewrites.
+    if("${FESOM_TEST_LEAPYEAR}" STREQUAL ".true.")
+        file(READ "${TEST_RUN_DIR}/namelist.config" _cfg_content)
+        string(REGEX REPLACE "([^A-Za-z0-9_])include_fleapyear[ \t]*=[ \t]*\\.[a-zA-Z]+\\."
+               "\\1include_fleapyear=.true." _cfg_content "${_cfg_content}")
+        file(WRITE "${TEST_RUN_DIR}/namelist.config" "${_cfg_content}")
     endif()
 
     # Add the test
