@@ -674,8 +674,13 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     ! boundary condition) to compute the dens_flux for MOC diagnostic
 !$OMP PARALLEL DO
     do n=1, myDim_nod2D+eDim_nod2D    
-        if (ulevels_nod2d(n) == 1) then ! --> is open ocean node 
+        if (ulevels_nod2d(n) == 1) then ! --> is open ocean node
+#ifdef PROBE_SALT_ANOMALY
+            ! state stores S-35; diagnostic density flux wants absolute S
+            dens_flux(n)=sw_alpha(1,n) * heat_flux_in(n) / vcpw + sw_beta(1, n) * (relax_salt(n) + water_flux(n) * (salt(1,n)+35._WP))
+#else
             dens_flux(n)=sw_alpha(1,n) * heat_flux_in(n) / vcpw + sw_beta(1, n) * (relax_salt(n) + water_flux(n) * salt(1,n))
+#endif
         else
             dens_flux(n)=0.0_WP
         end if
