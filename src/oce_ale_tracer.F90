@@ -1,3 +1,37 @@
+#if defined(PROBE_FP64_TRACER_STATE_V2) && defined(PROBE_FP64_TRACER_STATE)
+#error "PROBE_FP64_TRACER_STATE_V2 supersedes PROBE_FP64_TRACER_STATE; build with one"
+#endif
+#if defined(PROBE_FP64_TRACER_STATE_V2) && defined(PROBE_SALT_ANOMALY)
+#error "PROBE_FP64_TRACER_STATE_V2 and PROBE_SALT_ANOMALY are separate experiments"
+#endif
+#ifdef PROBE_FP64_TRACER_STATE_V2
+module probe_state_ledger
+    ! PROBE_FP64_TRACER_STATE_V2 -- real64 ledger of the tracer state.
+    !
+    ! v1 (PROBE_FP64_TRACER_STATE) sampled the state after the step's fp32
+    ! writes and was a no-op by construction: any increment below ulp of the
+    ! state had already been absorbed inside the fp32 '+=' before the shadow
+    ! saw it (confirmed: its 20-yr twin reproduces the vanilla drift).
+    !
+    ! v2 never lets the state pass through an fp32 accumulation: the WP
+    ! pipeline computes every increment as usual (coefficients, fluxes and the
+    ! tridiagonal solve stay WP -- an increment array carries full relative
+    ! precision on its own), but the three places that WRITE the state
+    !   (1) del_ttf application            (diff_tracers_ale)
+    !   (2) implicit vertical-diffusion up (diff_ver_part_impl_ale)
+    !   (3) end-of-step salinity clip      (solve_tracers_ale)
+    ! go through this ledger in real64, and the WP state array is refreshed as
+    ! the ledger's rounded view. Halo rows are re-seeded from the exchanged WP
+    ! values each step (owners keep the exact ledger; halo copies only feed WP
+    ! flux computations). Single-job cold-start runs only: the ledger does not
+    ! survive restart chains (re-seeds from the WP state). Preconditions of
+    ! this config: SPP=.false., clim_relax=0, smooth_bh_tra=.false.,
+    ! use_kpp_nonlclflx=.false. (all state writes outside the three hooks).
+    implicit none
+    real(kind=8), allocatable, save :: ledger8(:,:,:)
+end module probe_state_ledger
+#endif
+
 module diff_part_hor_redi_interface
     interface
         subroutine diff_part_hor_redi(tracer, partit, mesh)
@@ -143,6 +177,9 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     use mod_tracer
     use g_comm_auto
     use o_tracers
+#ifdef PROBE_FP64_TRACER_STATE_V2
+    use probe_state_ledger
+#endif
     use Toy_Channel_Soufflet
     use Toy_Channel_Dbgyre
     use Toy_Neverworld2
@@ -222,9 +259,21 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     ttf_rhs_bak = 0.0
 !#endif
     
+#ifdef PROBE_FP64_TRACER_STATE_V2
+    !___________________________________________________________________________
+    ! seed the real64 state ledger once, from the initial WP state (cold start)
+    if (.not. allocated(ledger8)) then
+        allocate(ledger8(size(tracers%data(1)%values,1), &
+                         size(tracers%data(1)%values,2), tracers%num_tracers))
+        do tr_num=1, tracers%num_tracers
+            ledger8(:,:,tr_num) = real(tracers%data(tr_num)%values, 8)
+        end do
+        if (partit%mype==0) write(*,*) 'PROBE_FP64_TRACER_STATE_V2: state ledger seeded'
+    end if
+#endif
     !___________________________________________________________________________
     ! loop over all tracers
-        !$ACC UPDATE DEVICE(dynamics%w, dynamics%w_e, dynamics%uv) !!! async(1) 
+        !$ACC UPDATE DEVICE(dynamics%w, dynamics%w_e, dynamics%uv) !!! async(1)
 !!!     !$ACC UPDATE DEVICE(tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus)
         !$ACC UPDATE DEVICE (mesh%helem, mesh%hnode, mesh%hnode_new, mesh%zbar_3d_n, mesh%z_3d_n)
     do tr_num=1, tracers%num_tracers
@@ -304,6 +353,13 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 
         call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
 !$OMP BARRIER
+#ifdef PROBE_FP64_TRACER_STATE_V2
+        ! halo rows carry no accumulation of their own: re-seed them from the
+        ! owners' exchanged (rounded) values so full-array ledger ops are valid
+        if (eDim_nod2D > 0) &
+            ledger8(:, myDim_nod2D+1:myDim_nod2D+eDim_nod2D, tr_num) = &
+                real(tracers%data(tr_num)%values(:, myDim_nod2D+1:myDim_nod2D+eDim_nod2D), 8)
+#endif
 
     end do
 !!!        !$ACC UPDATE HOST (tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus) &
@@ -360,6 +416,17 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         where (tracers%data(2)%values(nzmin:nzmax,node) < -32._WP )
                tracers%data(2)%values(nzmin:nzmax,node) = -32._WP
         end where
+#elif defined(PROBE_FP64_TRACER_STATE_V2)
+        ! absorption site (3): clip the ledger, state = its rounded view
+        ! (halo rows were re-seeded from exchanged values above, so this is
+        ! owner-consistent over the full myDim+eDim range)
+        where (ledger8(nzmin:nzmax,node,2) > 45._8)
+               ledger8(nzmin:nzmax,node,2) = 45._8
+        end where
+        where (ledger8(nzmin:nzmax,node,2) < 3._8 )
+               ledger8(nzmin:nzmax,node,2) = 3._8
+        end where
+        tracers%data(2)%values(nzmin:nzmax,node) = real(ledger8(nzmin:nzmax,node,2), WP)
 #else
         where (tracers%data(2)%values(nzmin:nzmax,node) > 45._WP)
                tracers%data(2)%values(nzmin:nzmax,node)=45._WP
@@ -425,6 +492,9 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     use diff_ver_part_redi_expl_interface
     use diff_ver_part_impl_ale_interface
     use diff_part_bh_interface
+#ifdef PROBE_FP64_TRACER_STATE_V2
+    use probe_state_ledger
+#endif
 #if defined(__recom)
     use recom_sinking
     use recom_glovar
@@ -622,7 +692,25 @@ endif
     !___________________________________________________________________________
     ! Update tracers --> calculate T* see Danilov et al. (2017)
     ! T* =  (dt*R_T^n + h^(n-0.5)*T^(n-0.5))/h^(n+0.5)
-#ifdef PROBE_FP64_TRACER
+#if defined(PROBE_FP64_TRACER_STATE_V2)
+!   state ledger: same WP del_ttf as vanilla, but the state update happens in
+!   the real64 ledger; the WP state becomes the ledger's rounded view. This is
+!   absorption site (1): vanilla does values += del_ttf/hnode_new in fp32.
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, dtt8)
+    do n=1, myDim_nod2D
+        nzmax=nlevels_nod2D(n)-1
+        nzmin=ulevels_nod2D(n)
+        do nz=nzmin,nzmax
+            dtt8 = real(del_ttf(nz,n),8) + ledger8(nz,n,tr_num)* &
+                       (real(hnode(nz,n),8)-real(hnode_new(nz,n),8))
+            del_ttf(nz,n) = del_ttf(nz,n) + tracers%data(tr_num)%values(nz,n)* &
+                                        (hnode(nz,n)-hnode_new(nz,n))
+            ledger8(nz,n,tr_num) = ledger8(nz,n,tr_num) + dtt8/real(hnode_new(nz,n),8)
+            tracers%data(tr_num)%values(nz,n) = real(ledger8(nz,n,tr_num), WP)
+        end do
+    end do
+!$OMP END PARALLEL DO
+#elif defined(PROBE_FP64_TRACER)
 !   probe hybrid: the tracer state-update chain in real64 (the accumulation
 !   ledger's absorption site: T += del_ttf/hnode_new with increments far below
 !   T's ulp in WP=4). State stays WP; only the update arithmetic is promoted.
@@ -824,6 +912,9 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     USE MOD_PARSUP
     use g_CONFIG
     use g_forcing_arrays
+#ifdef PROBE_FP64_TRACER_STATE_V2
+    use probe_state_ledger
+#endif
     use o_mixing_KPP_mod !for ghats _GO_
 #if defined (__cvmix)       
     use g_cvmix_kpp, only: kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc
@@ -1322,10 +1413,19 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         !_______________________________________________________________________
         ! update tracer
         ! tr ... dTnew = T^(n+0.5) - T*
+#ifdef PROBE_FP64_TRACER_STATE_V2
+        ! absorption site (2): the WP-solved increment lands in the real64
+        ! ledger; the WP state becomes the ledger's rounded view
+        do nz=nzmin,nzmax-1
+            ledger8(nz,n,tr_num) = ledger8(nz,n,tr_num) + real(tr(nz),8)
+            trarr(nz,n) = real(ledger8(nz,n,tr_num), WP)
+        end do
+#else
         do nz=nzmin,nzmax-1
             ! trarr - before ... T*
             trarr(nz,n)=trarr(nz,n)+tr(nz)
         end do
+#endif
 
     end do ! --> do n=1,myDim_nod2D
 !$OMP END DO
