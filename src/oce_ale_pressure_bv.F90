@@ -2711,7 +2711,7 @@ IMPLICIT NONE
   
   real(kind=WP),  intent(IN)            :: t,s
   real(kind=WP),  intent(OUT)           :: bulk_0, bulk_pz, bulk_pz2, rhopot
-  real(kind=WP)                         :: s_sqrt
+  real(kind=WP)                         :: s_sqrt, s_abs
 
   real(kind=WP), parameter   :: a0    = 19092.56,     at   = 209.8925
   real(kind=WP), parameter   :: at2   = -3.041638,    at3  = -1.852732e-3
@@ -2740,22 +2740,27 @@ IMPLICIT NONE
 
   !compute secant bulk modulus
 
-  s_sqrt = sqrt(s)
+#ifdef PROBE_SALT_ANOMALY
+  s_abs = s + 35._WP   ! state stores S-35; the EOS needs absolute salinity
+#else
+  s_abs = s
+#endif
+  s_sqrt = sqrt(s_abs)
 
   bulk_0 =  a0      + t*(at   + t*(at2  + t*(at3 + t*at4)))      &
-          + s* (as  + t*(ast  + t*(ast2 + t*ast3))               &
+          + s_abs* (as  + t*(ast  + t*(ast2 + t*ast3))               &
                + s_sqrt*(ass  + t*(asst + t*asst2)))
 
   bulk_pz =  ap  + t*(apt  + t*(apt2 + t*apt3))                  &
-                  + s*(aps + t*(apst + t*apst2) + s_sqrt*apss)
+                  + s_abs*(aps + t*(apst + t*apst2) + s_sqrt*apss)
 
   bulk_pz2 = ap2 + t*(ap2t + t*ap2t2)		                 &
-                + s *(ap2s + t*(ap2st + t*ap2st2))
+                + s_abs *(ap2s + t*(ap2st + t*ap2st2))
 
   rhopot =  b0 + t*(bt + t*(bt2 + t*(bt3  + t*(bt4  + t*bt5))))	 &
-               + s*(bs + t*(bst + t*(bst2 + t*(bst3 + t*bst4)))  &
+               + s_abs*(bs + t*(bst + t*(bst2 + t*(bst3 + t*bst4)))  &
                   + s_sqrt*(bss + t*(bsst + t*bsst2))            &
-                       + s* bss2)
+                       + s_abs* bss2)
 end subroutine densityJM_components
 !
 !
