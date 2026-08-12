@@ -1060,6 +1060,9 @@ CONTAINS
       !! ** Method  :
       !! ** Action  :
       !!----------------------------------------------------------------------
+#ifdef FESOM_PROFILING
+      use fesom_profiler, only: fesom_profiler_start, fesom_profiler_end
+#endif
       IMPLICIT NONE
       type(t_partit), intent(inout), target :: partit
       real(real64),   intent(in)            :: rdate  ! absolute Julian day (real64)
@@ -1068,6 +1071,11 @@ CONTAINS
       integer            :: fld_idx, i,j,ii
       real(wp)           :: dt_elapsed   ! elapsed time since bracket start [days], WP
 
+      ! Accumulated over the whole run (start/end sums into the named section on
+      ! every call), so the report shows total time-interpolation cost, not one step.
+#ifdef FESOM_PROFILING
+      call fesom_profiler_start("sbc_time_interp")
+#endif
       do fld_idx = 1, i_totfl
          ! Elapsed time since this field's bracket start. Formed once per field: the
          ! subtraction is done in real64 (so no absolute ~2.4e6 Julian day enters WP)
@@ -1083,6 +1091,9 @@ CONTAINS
          end do !nod2D
 !$OMP END PARALLEL DO
       end do
+#ifdef FESOM_PROFILING
+      call fesom_profiler_end("sbc_time_interp")
+#endif
    END SUBROUTINE data_timeinterp
 
    SUBROUTINE sbc_ini(partit, mesh)
