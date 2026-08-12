@@ -227,13 +227,18 @@ jobs:
           else
             echo "Running core integration tests:"
             echo "- integration_pi_mpi2"
-            echo "- integration_pi_mpi8" 
+            echo "- integration_pi_mpi8"
             echo "- integration_pi_cavity_mpi2"
+            echo "- integration_pi_jra_mpi2"
+            echo "- integration_pi_cvmix_tke_mpi2"
+            echo "- integration_pi_cvmix_kpp_mpi2"
             echo "- integration_meshdiag_pi_mpi2"
             echo "- meshpartitioner_partition_local_pi_mesh_4"
-            
-            # Run only the core local tests (skip remote tests in CI to avoid external dependencies)
-            ctest $CTEST_ARGS -R "(integration_pi_mpi2|integration_pi_mpi8|integration_pi_cavity_mpi2|integration_meshdiag_pi_mpi2|meshpartitioner_partition_local_pi_mesh_4)"
+
+            # Run only the core local tests (skip remote tests in CI to avoid external dependencies).
+            # NOTE: this is an explicit allow-list on purpose -- new local tests must be added here
+            # deliberately to gate merges (they do not auto-run). Keep it in sync with tests/integration.
+            ctest $CTEST_ARGS -R "(integration_pi_mpi2|integration_pi_mpi8|integration_pi_cavity_mpi2|integration_pi_jra_mpi2|integration_pi_cvmix_tke_mpi2|integration_pi_cvmix_kpp_mpi2|integration_meshdiag_pi_mpi2|meshpartitioner_partition_local_pi_mesh_4)"
           fi
           
           # Capture exit code
