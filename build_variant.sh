@@ -10,6 +10,7 @@ cd "$(dirname "$0")"
 name=$1; shift
 flags=""
 for f in "$@"; do flags="$flags -D$f"; done
+flags="${flags# }"
 [ -z "$(git status --porcelain)" ] || { echo "ERROR: dirty tree — commit first"; exit 1; }
 commit=$(git rev-parse --short=12 HEAD); branch=$(git rev-parse --abbrev-ref HEAD)
 export BUILD_DIR=build_$name
