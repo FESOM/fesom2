@@ -591,8 +591,14 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
           
           !_______________________________________________________________
           ! check salt
+#ifdef PROBE_SALT_ANOMALY
+          ! state stores S-35: bounds shifted like the clip in oce_ale_tracer
+          if ( (tracers%data(2)%values(nz, n) /= tracers%data(2)%values(nz, n)) .or.  &
+             tracers%data(2)%values(nz, n) < -32.0_WP .or. tracers%data(2)%values(nz, n) > 10.0_WP ) then
+#else
           if ( (tracers%data(2)%values(nz, n) /= tracers%data(2)%values(nz, n)) .or.  &
              tracers%data(2)%values(nz, n) <3.0_WP .or. tracers%data(2)%values(nz, n) >45.0_WP ) then
+#endif
 !$OMP CRITICAL
              found_blowup_loc=1
              write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
