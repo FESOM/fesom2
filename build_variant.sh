@@ -14,10 +14,17 @@ flags="${flags# }"
 [ -z "$(git status --porcelain)" ] || { echo "ERROR: dirty tree — commit first"; exit 1; }
 commit=$(git rev-parse --short=12 HEAD); branch=$(git rev-parse --abbrev-ref HEAD)
 export BUILD_DIR=build_$name
+# PRECIS=dp builds a double-precision variant (for DP-base probes); default sp
+precis=${PRECIS:-sp}
+case $precis in
+  sp) pflag="-DUSE_SINGLE_PRECISION=ON" ;;
+  dp) pflag="-DUSE_SINGLE_PRECISION=OFF" ;;
+  *)  echo "ERROR: PRECIS must be sp or dp"; exit 1 ;;
+esac
 if [ -n "$flags" ]; then
-  ./configure.sh -DUSE_SINGLE_PRECISION=ON "-DCMAKE_Fortran_FLAGS=$flags"
+  ./configure.sh $pflag "-DCMAKE_Fortran_FLAGS=$flags"
 else
-  ./configure.sh -DUSE_SINGLE_PRECISION=ON
+  ./configure.sh $pflag
 fi
 F=/work/ab0995/a270088/sp_paper/frozen/$name
 mkdir -p $F/bin $F/lib64
@@ -26,7 +33,7 @@ cp lib64/libfesom.so $F/lib64/ 2>/dev/null || cp lib/libfesom.so $F/lib64/
 { echo "variant:  $name"
   echo "branch:   $branch"
   echo "commit:   $commit"
-  echo "cpp:      ${flags:-<none>} (+ USE_SINGLE_PRECISION=ON)"
+  echo "cpp:      ${flags:-<none>} (+ USE_SINGLE_PRECISION=$([ $precis = sp ] && echo ON || echo OFF))"
   echo "built:    $(date -Is) on $(hostname) by $USER"
   echo "builddir: $PWD/$BUILD_DIR"
   sha256sum $F/bin/fesom.x $F/lib64/libfesom.so

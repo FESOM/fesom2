@@ -1,6 +1,12 @@
 #if defined(PROBE_FP64_TRACER_STATE_V2) && defined(PROBE_FP64_TRACER_STATE)
 #error "PROBE_FP64_TRACER_STATE_V2 supersedes PROBE_FP64_TRACER_STATE; build with one"
 #endif
+#if defined(PROBE_QUANTIZE_STATE) && defined(USE_SINGLE_PRECISION)
+#error "PROBE_QUANTIZE_STATE is a DP-base experiment; build without USE_SINGLE_PRECISION"
+#endif
+#if defined(PROBE_QUANTIZE_STATE) && (defined(PROBE_FP64_TRACER_STATE_V2) || defined(PROBE_FP64_TRACER_STATE) || defined(PROBE_SALT_ANOMALY))
+#error "PROBE_QUANTIZE_STATE cannot combine with other state probes"
+#endif
 #if defined(PROBE_FP64_TRACER_STATE_V2) && defined(PROBE_SALT_ANOMALY)
 #error "PROBE_FP64_TRACER_STATE_V2 and PROBE_SALT_ANOMALY are separate experiments"
 #endif
@@ -205,6 +211,9 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     integer                                  :: i, tr_num, node, elem, nzmax, nzmin
     real(kind=WP)                            :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_elem2D) ! local variable
     real(kind=8), allocatable, save          :: trstate8(:,:,:)  ! PROBE_FP64_TRACER_STATE shadow
+#ifdef PROBE_QUANTIZE_STATE
+    logical, save                            :: quantize_banner_done=.false.
+#endif
     integer                                  :: nz, n, nu1, nl1
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -462,6 +471,21 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     end do
 #endif
 
+#ifdef PROBE_QUANTIZE_STATE
+    !___________________________________________________________________________
+    ! DP run with the tracer state quantized to real32 once per step, after the
+    ! full solve (clip included): everything else in the model stays real64.
+    ! Isolates state-representation rounding from every other fp32 effect --
+    ! the converse of the FP64 ledger probe. Quantization is deterministic, so
+    ! owners and halo copies stay bit-consistent.
+    do tr_num=1, tracers%num_tracers
+        tracers%data(tr_num)%values = real(real(tracers%data(tr_num)%values, 4), WP)
+    end do
+    if (partit%mype==0 .and. .not. quantize_banner_done) then
+        write(*,*) 'PROBE_QUANTIZE_STATE: tracer state rounded to real32 each step'
+        quantize_banner_done = .true.
+    end if
+#endif
     !---age-code-begin
     if (use_age_tracer) then
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nzmin, nzmax)
