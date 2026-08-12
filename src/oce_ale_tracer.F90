@@ -413,6 +413,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     integer                               :: n, nzmax, nzmin
     real(kind=WP)                         :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     integer                               :: nz, nu1, nl1
+    real(kind=8)                          :: dtt8   ! PROBE_FP64_TRACER accumulator
 #if defined(__recom)
     type(tracers_info_type)               :: tracers_info
 #endif
@@ -588,6 +589,24 @@ endif
     !___________________________________________________________________________
     ! Update tracers --> calculate T* see Danilov et al. (2017)
     ! T* =  (dt*R_T^n + h^(n-0.5)*T^(n-0.5))/h^(n+0.5)
+#ifdef PROBE_FP64_TRACER
+!   probe hybrid: the tracer state-update chain in real64 (the accumulation
+!   ledger's absorption site: T += del_ttf/hnode_new with increments far below
+!   T's ulp in WP=4). State stays WP; only the update arithmetic is promoted.
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, dtt8)
+    do n=1, myDim_nod2D
+        nzmax=nlevels_nod2D(n)-1
+        nzmin=ulevels_nod2D(n)
+        do nz=nzmin,nzmax
+            dtt8 = real(del_ttf(nz,n),8) + real(tracers%data(tr_num)%values(nz,n),8)* &
+                       (real(hnode(nz,n),8)-real(hnode_new(nz,n),8))
+            del_ttf(nz,n) = real(dtt8, WP)
+            tracers%data(tr_num)%values(nz,n) = real( &
+                real(tracers%data(tr_num)%values(nz,n),8) + dtt8/real(hnode_new(nz,n),8), WP)
+        end do
+    end do
+!$OMP END PARALLEL DO
+#else
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nzmin, nzmax)
     do n=1, myDim_nod2D
         nzmax=nlevels_nod2D(n)-1
@@ -602,6 +621,7 @@ endif
         !                           del_ttf(1:nzmax,n))/hnode_new(1:nzmax,n)
     end do
 !$OMP END PARALLEL DO
+#endif
 
     !___________________________________________________________________________
     if (tracers%data(tr_num)%i_vert_diff) then
