@@ -268,6 +268,9 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   use g_sbf, only: sbc_do
   use g_sbf, only: atmdata, i_totfl, i_xwind, i_ywind, i_xstre, i_ystre, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_snow, &
                                      l_xwind, l_ywind, l_xstre, l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow
+#if defined (__recom)
+  use g_sbf, only: sbc_do_recom
+#endif
 #if defined (__oasis)
   use cpl_driver
 #endif
@@ -457,7 +460,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
       do i=1,nrecv
          exchange =0.0
          call cpl_oasis3mct_recv (i, exchange, action, partit)
-	 !if (.not. action) cycle
+         !if (.not. action) cycle
 	 !Do not apply a correction at first time step!
     if (i==1 .and. action .and. istep/=1) call net_rec_from_atm(action, partit)
         if (i.eq.1) then
@@ -766,6 +769,11 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   ! heat and fresh water fluxes are treated in i_therm and ice2ocean
 #endif /* skip all in case of __ifsinterface */
 #endif /* (__oasis) */
+
+! consider in all cases
+#if defined (__recom)
+  call sbc_do_recom(partit, mesh)
+#endif
 
   t2=MPI_Wtime()
 

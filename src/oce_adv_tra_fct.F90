@@ -147,8 +147,10 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 #endif
     do elem=1, myDim_elem2D
         enodes=elem2D_nodes(:,elem)
-        nu1 = ulevels(elem)
-        nl1 = nlevels(elem)
+        !nu1 = ulevels(elem)
+        !nl1 = nlevels(elem)
+        nu1=minval(ulevels_nod2D(enodes(:)))
+        nl1=maxval(nlevels_nod2D(enodes(:)))
         !$ACC LOOP VECTOR
         do nz=nu1, nl1-1
             AUX(1,nz,elem)=max(fct_ttf_max(nz,enodes(1)), fct_ttf_max(nz,enodes(2)), fct_ttf_max(nz,enodes(3)))

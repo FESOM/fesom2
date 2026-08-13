@@ -193,7 +193,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         call cal_rejected_salt(ice, partit, mesh)
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call app_rejected_salt'//achar(27)//'[0m'
         call app_rejected_salt(tracers%data(2)%values, partit, mesh)
-    end if 
+    end if
 
     !___________________________________________________________________________
     ! update 3D velocities with the bolus velocities:
@@ -233,10 +233,9 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         if(use_MEDUSA) then
             SinkFlx = 0.0d0
         endif
-        SinkingVel1 = 0.0d0 ! OG 16.03.23
-        SinkingVel2 = 0.0d0 ! OG 16.03.23
+        SinkingVel1 = 0.0d0
+        SinkingVel2 = 0.0d0
 #endif
-
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
         ! needed
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
@@ -290,7 +289,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         ! relax to salt and temp climatology
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call relax_to_clim'//achar(27)//'[0m'
         ! if ((toy_ocean) .AND. ((tr_num==1) .AND. (TRIM(which_toy)=="soufflet"))) then
-        if     ((toy_ocean) .AND. ((TRIM(which_toy)=="soufflet"))) then
+        if ((toy_ocean) .AND. ((TRIM(which_toy)=="soufflet"))) then
             call relax_zonal_temp(tracers%data(1), partit, mesh)
             
         elseif ((toy_ocean) .AND. ((TRIM(which_toy)=="neverworld2"))) then
@@ -419,7 +418,6 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), pointer                :: del_ttf(:,:)
-
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -498,9 +496,9 @@ if (any(recom_remin_tracer_id == tracers%data(tr_num)%ID)) then
         do n=1, myDim_nod2D
             nzmax=nlevels_nod2D(n)-1
             nzmin=ulevels_nod2D(n)
-!            tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
-!                                                dtr_bf(nzmin:nzmax,n)
-        tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
+
+            if (nzmin > nzmax) cycle   ! guard: skip degenerate nodes
+        tracers%data(tr_num)%values(nzmin:nzmax,n) = tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
                                                 dtr_bf(nzmin:nzmax,n)
         end do
 end if
@@ -510,10 +508,7 @@ end if
 ! but not for the combination ciso + 2. zoo!
 if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
 
-!< activate Ballasting
-!< .OG. 04.11.2022
-
-         if (use_ballasting) then
+        if (use_ballasting) then
 !< get seawater viscosity, seawater_visc_3D
               call get_seawater_viscosity(tr_num, partit%myDim_nod2D, &
                                           mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
@@ -574,14 +569,13 @@ if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
         do n=1, myDim_nod2D
             nzmax=nlevels_nod2D(n)-1
             nzmin=ulevels_nod2D(n)
-!            tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
-!                                                vert_sink(nzmin:nzmax,n)
-!            tr_arr(nzmin:nzmax,n,tr_num)=tr_arr(nzmin:nzmax,n,tr_num)+ &
-!                                                str_bf(nzmin:nzmax,n)
-        tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
-                                                vert_sink(nzmin:nzmax,n)
-        tracers%data(tr_num)%values(nzmin:nzmax,n)=tracers%data(tr_num)%values(nzmin:nzmax,n)+ &
-                                                str_bf(nzmin:nzmax,n)
+
+            if (nzmin > nzmax) cycle   ! guard: skip degenerate nodes
+
+            tracers%data(tr_num)%values(nzmin:nzmax,n) = &
+                tracers%data(tr_num)%values(nzmin:nzmax,n) + vert_sink(nzmin:nzmax,n)
+            tracers%data(tr_num)%values(nzmin:nzmax,n) = &
+                tracers%data(tr_num)%values(nzmin:nzmax,n) + str_bf(nzmin:nzmax,n)
         end do
 endif
 #endif
@@ -633,7 +627,7 @@ endif
         end if
 
     end if
-    
+
     !We DO not set del_ttf to zero because it will not be used in this timestep anymore
     !init_tracers_AB will set it to zero for the next timestep
     if (tracers%data(tr_num)%smooth_bh_tra) then
@@ -1051,7 +1045,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
             a(nz)=a(nz)+min(0._WP, Wvel_i(nz, n))*v_adv
             b(nz)=b(nz)+max(0._WP, Wvel_i(nz, n))*v_adv
         end if
-        
+
         !_______________________________________________________________________
         ! the rhs (inhomogene part): --> rhs = K_33*dt*d/dz*Tstar --> Tstar...trarr
         ! solve difference quotient for rhs --> tr
@@ -1076,7 +1070,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         nz=nzmax-1
         dz=hnode_new(nz,n)
         tr(nz)=-a(nz)*trarr(nz-1,n)-(b(nz)-dz)*trarr(nz,n)
-        
+
         !_______________________________________________________________________
         ! Add KPP nonlocal fluxes to the rhs (only T and S currently)
         ! use here blmc or kpp_oblmixc instead of Kv, since Kv already contains
@@ -1179,7 +1173,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 #endif                
             end if
         end if ! --> if (use_kpp_nonlclflx) then
-        
+
         !_______________________________________________________________________
         ! case of activated shortwave penetration into the ocean, ad 3d contribution
         if (use_sw_pene .and. tracers%data(tr_num)%ID==1 .and. .not. toy_ocean) then
@@ -1259,7 +1253,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         do nz = nzmax-2, nzmin, -1
             tr(nz) = tp(nz)-cp(nz)*tr(nz+1)
         end do
-        
+
         !_______________________________________________________________________
         ! update tracer
         ! tr ... dTnew = T^(n+0.5) - T*
@@ -1711,7 +1705,7 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
     !___temperature_____________________________________________________________
     CASE (1)
         bc_surface=-dt*(heat_flux(n)/vcpw + sval*water_flux(n)*is_nonlinfs)
-    
+
     !___salinity________________________________________________________________
     CASE (2)
         ! --> real_salt_flux(:): salt flux due to containment/releasing of salt
@@ -1802,8 +1796,30 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
     CASE (39) ! Argon-39 (fractionationation-corrected 39Ar/Ar)
       ! Local isotopic 39Ar/Ar air-sea exchange flux (m / s)
       bc_surface = dt * (iso_flux("arg", sst, sss, wind_2, aice, press_a, xarg_a, r39ar_a, sval, arg_0) - sval * water_flux(n) * is_nonlinfs)
+
 !---  Done with boundary conditions for transient tracers.
+
 #if defined(__recom)
+! =============================================================================
+! SURFACE BOUNDARY CONDITIONS FOR RECOM BIOGEOCHEMICAL TRACERS
+!
+! bc_surface is the surface flux [tracer units] applied to each tracer per
+! timestep (dt). Fluxes include atmospheric deposition, river input, erosion,
+! air-sea gas exchange, and (optionally) MEDUSA sediment loopback fluxes.
+!
+! Flags used throughout:
+!   is_riverinput   : 1 if river input is enabled, else 0
+!   is_erosioninput : 1 if erosion input is enabled, else 0
+!   use_MEDUSA      : true if MEDUSA sediment module is active
+!   add_loopback    : true if sediment loopback fluxes are included
+!   ciso, ciso_14   : true if carbon isotope tracers (13C / 14C) are enabled
+!
+! lb_flux(n, k) : MEDUSA loopback fluxes at column n for tracer k:
+!   k=1  DIN    k=2  DIC    k=3  Alk    k=4  DSi
+!   k=5  CaCO3  k=6  DIC13  k=7  CaCO3-13C
+!   k=8  DIC14  k=9  CaCO3-14C
+! =============================================================================
+
     CASE (1001) ! DIN
         if (use_MEDUSA .and. add_loopback) then  ! OG: add is_MEDUSA_loopback flag is_MEDUSA_loopback flag * lb_flux(n,1)
             bc_surface= dt*(AtmNInput(n) + RiverDIN2D(n)   * is_riverinput                &
@@ -1893,11 +1909,15 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
              bc_surface=0.0_WP
          end if
 #endif
+
     CASE (1405:1421)
          bc_surface=0.0_WP ! organic 14C
 #endif
+
     CASE (101) ! apply boundary conditions to tracer ID=101
         bc_surface= dt*(prec_rain(n))! - real_salt_flux(n)*is_nonlinfs)
+!---Transient tracers (case ##6,12,14,39) need additional input parameters
+!   and are considered in the separate function transit_bc_surface
 !---wiso-code
     CASE (102) ! apply boundary conditions to tracer ID=101 (H218O)
         bc_surface = dt*wiso_flux_oce(n,1)
