@@ -16,6 +16,11 @@ integer		                  :: mstep
 real(kind=WP), parameter      :: pi=3.14159265358979
 real(kind=WP), parameter      :: rad=pi/180.0_WP
 real(kind=WP), parameter      :: density_0=1030.0_WP
+! USE_SALT_ANOMALY: the salinity state is stored as S - S_ref_anomaly, so that
+! the float32 spacing at typical open-ocean values (|S-35| < ~2) is 30-250x
+! finer than at S~35 (ulp 1.9e-6 psu). All consumers of absolute salinity add
+! the offset back at their gather points; see the USE_SALT_ANOMALY blocks.
+real(kind=WP), parameter      :: S_ref_anomaly=35.0_WP
 real(kind=WP), parameter      :: density_0_r=1.0_WP/density_0 ! [m^3/kg]
 real(kind=WP), parameter      :: g=9.81_WP
 real(kind=WP), parameter      :: r_earth=6367500.0_WP

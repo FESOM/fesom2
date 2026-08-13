@@ -134,7 +134,7 @@ end module solve_tracers_ale_interface
 ! Driving routine    Here with ALE changes!!!
 subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     use g_config
-    use o_PARAM, only: SPP, Fer_GM
+    use o_PARAM, only: SPP, Fer_GM, S_ref_anomaly
     use mod_mesh
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -352,12 +352,12 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     do node=1,myDim_nod2D+eDim_nod2D
         nzmax=nlevels_nod2D(node)-1
         nzmin=ulevels_nod2D(node)
-#ifdef PROBE_SALT_ANOMALY
-        where (tracers%data(2)%values(nzmin:nzmax,node) > 10._WP)
-               tracers%data(2)%values(nzmin:nzmax,node)=10._WP
+#ifdef USE_SALT_ANOMALY
+        where (tracers%data(2)%values(nzmin:nzmax,node) > 45._WP - S_ref_anomaly)
+               tracers%data(2)%values(nzmin:nzmax,node)= 45._WP - S_ref_anomaly
         end where
-        where (tracers%data(2)%values(nzmin:nzmax,node) < -32._WP )
-               tracers%data(2)%values(nzmin:nzmax,node) = -32._WP
+        where (tracers%data(2)%values(nzmin:nzmax,node) < 3._WP - S_ref_anomaly )
+               tracers%data(2)%values(nzmin:nzmax,node) = 3._WP - S_ref_anomaly
         end where
 #else
         where (tracers%data(2)%values(nzmin:nzmax,node) > 45._WP)
@@ -697,6 +697,7 @@ end subroutine diff_tracers_ale
 !===============================================================================
 !Vertical diffusive flux(explicit scheme):
 subroutine diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
+    use o_PARAM, only: S_ref_anomaly
     use o_ARRAYS
     use g_forcing_arrays
     use MOD_MESH
@@ -735,10 +736,10 @@ subroutine diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
             rdata =  Tsurf(n)
             rlx   =  surf_relax_T
         elseif (tracers%data(tr_num)%ID==2) then
-#ifdef PROBE_SALT_ANOMALY
+#ifdef USE_SALT_ANOMALY
             ! state stores S-35: add the background-35 dilution term (see the
             ! implicit-path salinity BC for the derivation)
-            flux  =  virtual_salt(n)+relax_salt(n) + (real_salt_flux(n) + 35._WP*water_flux(n))*is_nonlinfs
+            flux  =  virtual_salt(n)+relax_salt(n) + (real_salt_flux(n) + S_ref_anomaly*water_flux(n))*is_nonlinfs
 #else
             flux  =  virtual_salt(n)+relax_salt(n) + real_salt_flux(n)*is_nonlinfs
 #endif
@@ -1683,6 +1684,7 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
   use MOD_MESH
   USE MOD_PARTIT
   USE MOD_PARSUP
+  use o_PARAM, only: S_ref_anomaly
   USE o_ARRAYS
   USE g_forcing_arrays
   USE g_config
@@ -1731,14 +1733,14 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
     CASE (2)
         ! --> real_salt_flux(:): salt flux due to containment/releasing of salt
         !     by forming/melting of sea ice
-#ifdef PROBE_SALT_ANOMALY
+#ifdef USE_SALT_ANOMALY
         ! state stores S-35: the surface volume flux (folded into Wvel(nzmin))
         ! concentrates/dilutes only the stored anomaly at its local value; the
         ! background 35 must be supplied explicitly -- water enters/leaves
         ! carrying S=0, i.e. anomaly -35 -- exactly the sval*water_flux pattern
         ! of the temperature BC above, with sval = -35.
         bc_surface= dt*(virtual_salt(n) &
-                    + relax_salt(n) + (real_salt_flux(n) + 35._WP*water_flux(n))*is_nonlinfs)
+                    + relax_salt(n) + (real_salt_flux(n) + S_ref_anomaly*water_flux(n))*is_nonlinfs)
 #else
         bc_surface= dt*(virtual_salt(n) & !--> is zeros for zlevel/zstar
                     + relax_salt(n) + real_salt_flux(n)*is_nonlinfs)

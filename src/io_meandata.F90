@@ -7,7 +7,7 @@ module io_MEANDATA
   use recom_ciso
 #endif
   USE g_clock
-  use o_PARAM, only : WP
+  use o_PARAM, only : WP, S_ref_anomaly
   use, intrinsic :: iso_fortran_env, only: real64, real32
   use io_data_strategy_module
   use async_threads_module
@@ -62,6 +62,7 @@ module io_MEANDATA
     integer                                            :: addcounter =0
     integer                                            :: lastcounter=0 ! before addcounter is set to 0
     real(kind=WP), pointer                             :: ptr3(:,:) ! todo: use netcdf types, not WP
+    real(kind=WP)                                      :: offset = 0.0_WP ! added to ptr3 at accumulation (USE_SALT_ANOMALY: salt/sss carry +S_ref_anomaly so output stays absolute)
     character(500)                                     :: filename
     character(100)                                     :: name
     character(500)                                     :: description
@@ -413,6 +414,9 @@ CASE ('sst       ')
     call def_stream(nod2D, myDim_nod2D, 'sst',      'sea surface temperature',        'C', tracers%data(1)%values(1,1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Sea surface temperature")
 CASE ('sss       ')
     call def_stream(nod2D, myDim_nod2D, 'sss',      'sea surface salinity',           'psu', tracers%data(2)%values(1,1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Sea surface salinity")
+#ifdef USE_SALT_ANOMALY
+    io_stream(io_NSTREAMS)%p%offset = S_ref_anomaly   ! state stores S-S_ref; output stays absolute
+#endif
 CASE ('ssh       ')
     call def_stream(nod2D, myDim_nod2D, 'ssh',      'sea surface elevation',          'm',      dynamics%eta_n,                          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('vve_5     ')
@@ -1016,6 +1020,9 @@ CASE ('temp      ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp',      'temperature', 'C',      tracers%data(1)%values(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('salt      ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt',      'salinity',    'psu',    tracers%data(2)%values(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+#ifdef USE_SALT_ANOMALY
+    io_stream(io_NSTREAMS)%p%offset = S_ref_anomaly   ! state stores S-S_ref; output stays absolute
+#endif
 
 #if defined(__recom)
 
@@ -2724,7 +2731,7 @@ subroutine update_means
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
                 DO J=1, size(entry%local_values_r8,dim=2)
                     DO I=1, size(entry%local_values_r8,dim=1)
-                        entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+entry%ptr3(J,I)
+                        entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+entry%ptr3(J,I)+entry%offset
                     END DO
                 END DO
 !$OMP END PARALLEL DO
@@ -2732,7 +2739,7 @@ subroutine update_means
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
                 DO J=1, size(entry%local_values_r8,dim=2)
                     DO I=1, size(entry%local_values_r8,dim=1)
-                        entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+entry%ptr3(I,J)
+                        entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+entry%ptr3(I,J)+entry%offset
                     END DO
                 END DO
 !$OMP END PARALLEL DO
@@ -2744,7 +2751,7 @@ subroutine update_means
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
                 DO J=1, size(entry%local_values_r4,dim=2)
                     DO I=1, size(entry%local_values_r4,dim=1)
-                        entry%local_values_r4(I,J)=entry%local_values_r4(I,J)+real(entry%ptr3(J,I), real32)
+                        entry%local_values_r4(I,J)=entry%local_values_r4(I,J)+real(entry%ptr3(J,I)+entry%offset, real32)
                     END DO
                 END DO
 !$OMP END PARALLEL DO
@@ -2752,7 +2759,7 @@ subroutine update_means
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I, J)
                 DO J=1, size(entry%local_values_r4,dim=2)
                     DO I=1, size(entry%local_values_r4,dim=1)
-                        entry%local_values_r4(I,J)=entry%local_values_r4(I,J)+real(entry%ptr3(I,J), real32)
+                        entry%local_values_r4(I,J)=entry%local_values_r4(I,J)+real(entry%ptr3(I,J)+entry%offset, real32)
                     END DO
                 END DO
 !$OMP END PARALLEL DO

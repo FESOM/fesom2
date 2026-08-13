@@ -83,7 +83,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     USE o_PARAM
     USE o_ARRAYS
     USE g_config
-    USE g_forcing_param, only: use_virt_salt
+    USE g_forcing_param, only: use_virt_salt, use_age_tracer
     use o_mixing_KPP_mod
 #if defined (__cvmix)       
     use g_cvmix_tke
@@ -250,13 +250,25 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
        call oce_initial_state(tracers, partit, mesh)   ! Use it if not running tests
     end if
 
-#ifdef PROBE_SALT_ANOMALY
-    ! salinity state is stored as the anomaly S-35 (finer float32 ulp where the
-    ! ocean lives); initial conditions arrive absolute -> convert ONCE here,
-    ! before the AB copies. All absolute-S consumers carry +35 shims (EOS,
-    ! ice gather, rsss, SSS restoring); clip bounds shifted accordingly.
-    tracers%data(2)%values = tracers%data(2)%values - 35._WP
-    if (partit%mype==0) write(*,*) 'PROBE_SALT_ANOMALY: salinity state = S - 35'
+#ifdef USE_SALT_ANOMALY
+    ! salinity state is stored as the anomaly S - S_ref_anomaly (finer float32
+    ! spacing where the ocean lives); initial conditions arrive absolute ->
+    ! convert ONCE here, before the AB copies. All absolute-S consumers carry
+    ! offset corrections (EOS, sw_alpha_beta, ice gather, rsss, SSS restoring,
+    ! KPP buoyancy/double-diffusion, surface dilution term); clip and blowup
+    ! bounds shifted accordingly. Restart reads are converted in fesom_init.
+    tracers%data(2)%values = tracers%data(2)%values - S_ref_anomaly
+    if (partit%mype==0) write(*,*) 'USE_SALT_ANOMALY: salinity state = S - ', S_ref_anomaly
+    ! configurations with absolute-salinity consumers that carry NO offset
+    ! correction yet: refuse to start instead of silently computing wrong
+    ! physics (extend the offset corrections before lifting a guard)
+    if (SPP .or. use_cavity .or. use_icebergs .or. use_age_tracer .or. use_transit &
+        .or. use_kpp_nonlclflx .or. clim_relax > 1.e-8_WP) then
+        if (partit%mype==0) write(*,*) 'USE_SALT_ANOMALY does not support yet: ', &
+            'SPP, cavities, icebergs, age tracer, transient tracers, ', &
+            'KPP nonlocal fluxes, 3D climatology relaxation'
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    end if
 #endif
     if (.not.r_restart) then
        do n=1, tracers%num_tracers
