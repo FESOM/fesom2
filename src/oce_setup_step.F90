@@ -557,6 +557,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     logical        :: check_opt_visc=.true.
     real(kind=WP)  :: wsplit_maxcfl
     real(kind=WP)  :: soltol = 1.e-5_WP  ! ssh CG rel. tolerance; default matches T_SOLVERINFO
+    integer        :: maxiter = 2000     ! ssh CG iteration cap; default matches T_SOLVERINFO
     logical        :: use_ssh_se_subcycl=.false.
     integer        :: se_BTsteps
     real(kind=WP)  :: se_BTtheta
@@ -573,7 +574,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
                                 ldiag_KE, AB_order,                                  &
                                 use_ssh_se_subcycl, se_BTsteps, se_BTtheta,          &
                                 se_bottdrag, se_bdrag_si, se_visc, se_visc_gamma0,   &
-                                se_visc_gamma1, se_visc_gamma2, soltol
+                                se_visc_gamma1, se_visc_gamma2, soltol, maxiter
 
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -651,6 +652,17 @@ nl => mesh%nl
     ! matching the previous hard-coded T_SOLVERINFO value.
     dynamics%solverinfo%soltol = soltol
     if (mype==0) write(*,*) '     ssh CG soltol  = ', dynamics%solverinfo%soltol
+
+    ! ssh CG iteration cap, same contract as soltol above. Needed to tell a stall
+    ! apart from a truncation when sweeping soltol: raise it and a solver that is
+    ! merely slow still converges, while one that has hit its residual floor
+    ! plateaus instead.
+    ! NOTE both of these are also read back from the binary dump in
+    ! READ_T_SOLVERINFO, which runs after this, so on a RESTART the dumped value
+    ! still wins over the namelist. Cold starts honour the namelist. Fixing that
+    ! is deferred until the restart-vs-continuous test exists.
+    dynamics%solverinfo%maxiter = maxiter
+    if (mype==0) write(*,*) '     ssh CG maxiter = ', dynamics%solverinfo%maxiter
 
     !___________________________________________________________________________
     ! define local vertice & elem array size
