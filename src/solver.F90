@@ -288,10 +288,35 @@ sprod(1:2)=0.0_WP
   call diag_count("ssh_cg_iters", min(iter, solverinfo%maxiter))
   if (.not. converged) call diag_count("ssh_cg_nonconv", 1)
 #endif
-  ! Safety-net log line (always on): a silent stall at maxiter used to be invisible.
+
+  !_____________________________________________________________________________
+  ! Always-on counters. FESOM_PROFILING defaults OFF, so the block above is
+  ! invisible in a normal run; these feed the per-step line in write_step_info
+  ! and the end-of-run summary, which are not gated on anything.
+  ! No MPI needed: every rank exits on the same iteration, because the exit test
+  ! above is on the globally reduced sprod.
+  solverinfo%iters_last = min(iter, solverinfo%maxiter)
+  solverinfo%iters_max  = max(solverinfo%iters_max, solverinfo%iters_last)
+  solverinfo%iters_sum  = solverinfo%iters_sum + solverinfo%iters_last
+  solverinfo%nsolves    = solverinfo%nsolves + 1
+  solverinfo%resid_last = sqrt(sprod(2)/nod2D)
+  solverinfo%rtol_last  = rtol
+  if (.not. converged) solverinfo%nonconv = solverinfo%nonconv + 1
+
+  !_____________________________________________________________________________
+  ! Safety-net log line: a stall at maxiter used to be completely silent. Unlike
+  ! cfl_z, which has check_blowup as a hard backstop, non-convergence has none --
+  ! we deliberately do not abort, because a stall on step 1 is legitimate in some
+  ! configurations, so this line is the only thing between a silently
+  ! under-converged run and nobody noticing. Rate-limited because a stalled
+  ! solver usually stalls every step, and one line per step would bury the
+  ! surrounding diagnostics.
   if (.not. converged .and. partit%mype==0) then
-     write(*,*) 'WARNING: ssh CG did not converge in ', solverinfo%maxiter, &
-                ' iters; rms(resid)=', sqrt(sprod(2)/nod2D), ' target rtol=', rtol
+     if (solverinfo%nonconv <= 5 .or. mod(solverinfo%nonconv, 100) == 0) then
+        write(*,*) 'WARNING: ssh CG did not converge in ', solverinfo%maxiter, &
+                   ' iters; rms(resid)=', solverinfo%resid_last,               &
+                   ' target rtol=', rtol, ' (occurrence ', solverinfo%nonconv, ')'
+     endif
   endif
 
  ! At the end: The result is in X, but it needs a halo exchange.

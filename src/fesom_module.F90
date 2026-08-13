@@ -1461,6 +1461,22 @@ contains
         44 format (a33,i15)        !Format OMP threads
         45 format (a33,f15.4,a4)   !Format runtime
 
+        !_______________________________________________________________________
+        ! SSH CG solver summary. Always on -- fesom.stats only exists when
+        ! FESOM_PROFILING is compiled in, and it defaults OFF, so this table is
+        ! the one place a normal run reports how the solver behaved.
+        ! No reduce: the iteration count is identical on every rank, since the CG
+        ! exit test is on a globally reduced quantity.
+        if (.not. f%dynamics%use_ssh_se_subcycl .and. f%dynamics%solverinfo%nsolves > 0) then
+            write(*,*)
+            write(*,*) '___SSH CG SOLVER_____________________________________'
+            print 43, '    solves :                     ', f%dynamics%solverinfo%nsolves
+            print 45, '    iterations mean :            ',                                &
+                 real(f%dynamics%solverinfo%iters_sum)/real(f%dynamics%solverinfo%nsolves), '    '
+            print 43, '    iterations max :             ', f%dynamics%solverinfo%iters_max
+            print 43, '    non-convergences (maxiter) : ', f%dynamics%solverinfo%nonconv
+        end if
+
         write(*,*)
         write(*,*) '======================================================'
         write(*,*) '================ BENCHMARK RUNTIME ==================='
