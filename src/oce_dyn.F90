@@ -323,7 +323,11 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
 
     !___________________________________________________________________________
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, nz, ed, el, nelem, k, elem, nzmin, nzmax, update_u, update_v)
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)
@@ -473,7 +477,11 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! Sum up velocity differences over edge with respect to elemtnal index
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, ed, el, nz, nzmin, nzmax)
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el    = edge_tri(:,ed)
@@ -533,7 +541,11 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
 !$OMP BARRIER
 
     !___________________________________________________________________________
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)
@@ -627,7 +639,11 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
 
     !___________________________________________________________________________
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, viLapl, ed, el, nz, nzmin, nzmax, update_u, update_v)
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)
@@ -675,7 +691,11 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
 !$OMP BARRIER
 
     !___________________________________________________________________________
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)
@@ -959,9 +979,13 @@ subroutine check_validviscopt_5(partit, mesh)
     loc_R = 0.0_WP
     loc_A = 0.0_WP
     
+#if !defined(__openmp_reproducible)
+! A "+" reduction combines the per-thread partial sums in a thread-count
+! dependent order, so it is not bit-reproducible: run the loop serially.
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmax, nzmin, c1, rossbyr_1barocl, &
 !$OMP                                  fac_ResR1barocl) REDUCTION(+:loc_R, loc_A)
 !$OMP DO
+#endif
     do node=1, myDim_nod2D
         !_______________________________________________________________________
         ! Exlude the equator |lat|<30° from checking the ration between resolution
@@ -996,8 +1020,12 @@ subroutine check_validviscopt_5(partit, mesh)
         loc_R   = loc_R + fac_ResR1barocl
         loc_A   = loc_A + 1.0_WP
     end do
+#if !defined(__openmp_reproducible)
+! A "+" reduction combines the per-thread partial sums in a thread-count
+! dependent order, so it is not bit-reproducible: run the loop serially.
 !$OMP END DO
 !$OMP END PARALLEL
+#endif
 !$OMP BARRIER
 
     !___________________________________________________________________________

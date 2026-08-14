@@ -3336,7 +3336,11 @@ salt=>tracers%data(2)%values(:,:)
 vol1D=0.0_WP
 ref_temp1D=0.0_WP
 ref_salt1D=0.0_WP
+#if !defined(__openmp_reproducible)
+! A "+" reduction combines the per-thread partial sums in a thread-count
+! dependent order, so it is not bit-reproducible: run the loop serially.
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax) REDUCTION(+:vol1D)
+#endif
 do node=1,myDim_nod2d
     x=geo_coord_nod2D(1,node)/rad
     y=geo_coord_nod2D(1,node)/rad
@@ -3350,7 +3354,11 @@ do node=1,myDim_nod2d
        vol1D(nz)=vol1D(nz)+areasvol(nz,node)
     end do
 end do
+#if !defined(__openmp_reproducible)
+! A "+" reduction combines the per-thread partial sums in a thread-count
+! dependent order, so it is not bit-reproducible: run the loop serially.
 !$OMP END PARALLEL DO
+#endif
 call MPI_Allreduce(MPI_IN_PLACE, ref_temp1D, mesh%nl-1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 call MPI_Allreduce(MPI_IN_PLACE, ref_salt1D, mesh%nl-1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 call MPI_Allreduce(MPI_IN_PLACE,      vol1D, mesh%nl-1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
