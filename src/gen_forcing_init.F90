@@ -30,6 +30,9 @@ end module forcing_array_setup_dbgyre_interfaces
 subroutine forcing_setup(partit, mesh)
 use g_CONFIG
 use g_sbf, only: sbc_ini
+#if defined(__recom)
+use g_sbf, only: sbc_ini_recom
+#endif
 use mod_mesh
 USE MOD_PARTIT
 USE MOD_PARSUP
@@ -42,10 +45,13 @@ type(t_partit), intent(inout), target :: partit
   if (partit%mype==0) write(*,*) '****************************************************'
   if (use_ice) then
      call forcing_array_setup(partit, mesh)
+#if defined(__recom)
+     call sbc_ini_recom(partit)         ! initialize forcing fields
+#endif
 #if !defined(__oasis) && !defined(__yac)
      call sbc_ini(partit, mesh)         ! initialize forcing fields
 #endif
-  endif 
+  endif
   if ((toy_ocean) .AND. TRIM(which_toy)=="dbgyre" .AND. (use_sw_pene)) then
      call forcing_array_setup_dbgyre(partit, mesh)
   endif

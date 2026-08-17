@@ -437,11 +437,6 @@ nl => mesh%nl
         num_tracers = num_tracers + 1
       endif
 
-      ! tracers initialised from file
-      idlist((n_ic3d+1):(n_ic3d+1)) = (/14/)
-      filelist((n_ic3d+1):(n_ic3d+1)) = (/'R14C.nc'/)
-      varlist((n_ic3d+1):(n_ic3d+1))  = (/'R14C'/)
-
       if (mype==0) write(*,*) 'XXX Transient tracers will be used in FESOM'
     endif
     ! 'use_transit' end
@@ -893,6 +888,11 @@ nl              => mesh%nl
     allocate(str_bf    ( nl-1, node_size ))
     allocate(vert_sink ( nl-1, node_size ))
     allocate(Alk_surf  (       node_size ))
+#if defined(__usetp)
+    allocate(tr_arr_requests(num_tracers), tr_arr_old_requests(num_tracers))
+    allocate(SinkFlx_tr_requests(num_tracers))
+    allocate(Benthos_tr_requests(num_tracers))
+#endif
 #endif
     ! =================
     ! Visc and Diff coefs
@@ -1005,6 +1005,12 @@ nl              => mesh%nl
     str_bf              = 0.0_WP
     vert_sink           = 0.0_WP
     Alk_surf            = 0.0_WP
+#if defined(__usetp)
+    tr_arr_requests     = 0
+    tr_arr_old_requests = 0
+    SinkFlx_tr_requests = 0
+    Benthos_tr_requests = 0
+#endif  
 #endif
     
     ! init field for pressure force 
@@ -1096,18 +1102,56 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     !
 #if defined(__recom)
     if (mype==0) then
-        write(*,*)
-        print *, achar(27)//'[36m'//'*************************'//achar(27)//'[0m'
-        print *, achar(27)//'[36m'//' --> RECOM ON'//achar(27)//'[0m'
-        if (ciso) then
-            print *, achar(27)//'[36m'//' --> CISO ON'//achar(27)//'[0m'
-        else
-            print *, achar(27)//'[36m'//' --> CISO OFF'//achar(27)//'[0m'
-        endif
-        print *, achar(27)//'[36m'//'*************************'//achar(27)//'[0m'
-    end if
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
 #endif
+            write(*,*)
+            print *, achar(27)//'[36m'//'*************************'//achar(27)//'[0m'
+            print *, achar(27)//'[36m'//' --> RECOM ON'//achar(27)//'[0m'
+            if (ciso) then
+                print *, achar(27)//'[36m'//' --> CISO ON'//achar(27)//'[0m'
+            else
+                print *, achar(27)//'[36m'//' --> CISO OFF'//achar(27)//'[0m'
+            endif
+            if(DIC_PI) then
+                print *, achar(27)//'[36m'// ' --> Preindustrial DIC will be used'//achar(27)//'[0m'
+            end if
+            if (restore_alkalinity)  then
+               print *, achar(27)//'[36m'//' --> Alkalinity restoring = .true.'//achar(27)//'[0m'
+            endif
+            print *, achar(27)//'[36m'//'*************************'//achar(27)//'[0m'
+            write(*,*)
+            write(*,*) 'read Iron        climatology from:', trim(filelist(1))
+            write(*,*) 'read Oxygen      climatology from:', trim(filelist(2))
+            write(*,*) 'read Silicate    climatology from:', trim(filelist(3))
+            write(*,*) 'read Alkalinity  climatology from:', trim(filelist(4))
+            write(*,*) 'read DIC         climatology from:', trim(filelist(5))
+            write(*,*) 'read Nitrate     climatology from:', trim(filelist(6))
+            write(*,*) 'read Salt        climatology from:', trim(filelist(7))
+            write(*,*) 'read Temperature climatology from:', trim(filelist(8))
+#if defined(__usetp)
+        end if ! (partit%my_fesom_group==0) then
+#endif
+    end if
+    ! read ocean state
+    ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
+!    if(mype==0) write(*,*) 'read Iron        climatology from:', trim(filelist(1))
+!    if(mype==0) write(*,*) 'read Oxygen      climatology from:', trim(filelist(2))
+!    if(mype==0) write(*,*) 'read Silicate    climatology from:', trim(filelist(3))
+!    if(mype==0) write(*,*) 'read Alkalinity  climatology from:', trim(filelist(4))
+!    if(mype==0) write(*,*) 'read DIC         climatology from:', trim(filelist(5))
+!    if(mype==0) write(*,*) 'read Nitrate     climatology from:', trim(filelist(6))
+!    if(mype==0) write(*,*) 'read Salt        climatology from:', trim(filelist(7))
+!    if(mype==0) write(*,*) 'read Temperature climatology from:', trim(filelist(8))
+#else
+    ! read ocean state
+    ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
+    if(mype==0) write(*,*) 'read Temperature climatology from:', trim(filelist(1))
+    if(mype==0) write(*,*) 'read Salinity    climatology from:', trim(filelist(2))
+#endif
+
     if(any(idlist == 14) .and. mype==0) write(*,*) 'read radiocarbon climatology from:', trim(filelist(3))
+
     call do_ic3d(tracers, partit, mesh)
     
     Tclim=tracers%data(1)%values
@@ -1125,26 +1169,20 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 
 #if defined(__recom)
     if (restore_alkalinity) then
-        if (mype==0) then
-            write(*,*)
-            print *, achar(27)//'[46;1m'//' restore_alkalinity is true --> Set surface field for alkalinity restoring'//achar(27)//'[0m'
-            write(*,*)
-        end if
-        alk_check=1
-        do i=3, tracers%num_tracers
-          id=tracers%data(i)%ID
-          SELECT CASE (id)
-            CASE (1003) ! alk
-                Alk_surf = tracers%data(i)%values(1,:) ! surface alkalinity
-                alk_check = 0
-            END SELECT
-        end do
-        if (alk_check /= 0) then
-            if (mype==0) write(*,*) 'not a single tracer ID = 1003 = alkalinity. this should not happen'
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-            stop
-        end if
-    endif ! restore_alkalinity
+
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
+        if (mype==0) write(*,*)
+        if (mype==0) print *, achar(27)//'[46;1m'//' --> Set surface field for alkalinity restoring'//achar(27)//'[0m'
+        if (mype==0) write(*,*) 'Alkalinity restoring = true. Field is read.'
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
+
+        Alk_surf = tracers%data(5)%values(1,:) ! alkalinity is the 5th tracer
+    endif
+
 #endif
 
     ! count the passive tracers which require 3D source (ptracers_restore_total)
@@ -1176,26 +1214,101 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
         !_______________________________________________________________________
         CASE (1004:1017)
             tracers%data(i)%values(:,:)=0.0_WP
+#if defined(__recom) && defined(__usetp)
+    if (partit%my_fesom_group==0) then
+#endif
             if (mype==0) then
                 write (i_string,  "(I4)") i
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
+#if defined(__recom) && defined(__usetp)
+    endif !(partit%my_fesom_group==0) then
+#endif
         CASE (1020:1021)
             tracers%data(i)%values(:,:)=0.0_WP
+#if defined(__recom) && defined(__usetp)
+    if (partit%my_fesom_group==0) then
+#endif
             if (mype==0) then
                 write (i_string,  "(I4)") i
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
+#if defined(__recom) && defined(__usetp)
+    endif !(partit%my_fesom_group==0) then
+#endif
         CASE (1023:1036)
             tracers%data(i)%values(:,:)=0.0_WP
+#if defined(__recom) && defined(__usetp)
+    if (partit%my_fesom_group==0) then
+#endif
             if (mype==0) then
                 write (i_string,  "(I4)") i
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-        !_______________________________________________________________________
+#if defined(__recom) && defined(__usetp)
+    endif !(partit%my_fesom_group==0) then
+#endif
+!_______________________________________________________________________
+! Carbon isotopes
+! Carbon-13
+       CASE (1302)
+            tracers%data(i)%values(:,:)=0.0_WP
+#if defined(__recom) && defined(__usetp)
+    if (partit%my_fesom_group==0) then
+#endif
+            if (mype==0) then
+                write (i_string,  "(I4)") i
+                write (id_string, "(I4)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            end if
+#if defined(__recom) && defined(__usetp)
+    endif !(partit%my_fesom_group==0) then
+#endif
+       CASE (1305:1321)
+            tracers%data(i)%values(:,:)=0.0_WP
+#if defined(__recom) && defined(__usetp)
+    if (partit%my_fesom_group==0) then
+#endif
+            if (mype==0) then
+                write (i_string,  "(I4)") i
+                write (id_string, "(I4)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            end if
+#if defined(__recom) && defined(__usetp)
+    endif !(partit%my_fesom_group==0) then
+#endif
+! Radiocarbon
+       CASE (1402)
+            tracers%data(i)%values(:,:)=0.0_WP
+#if defined(__recom) && defined(__usetp)
+    if (partit%my_fesom_group==0) then
+#endif
+            if (mype==0) then
+                write (i_string,  "(I4)") i
+                write (id_string, "(I4)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            end if
+#if defined(__recom) && defined(__usetp)
+    endif !(partit%my_fesom_group==0) then
+#endif
+       CASE (1405:1421)
+            tracers%data(i)%values(:,:)=0.0_WP
+#if defined(__recom) && defined(__usetp)
+    if (partit%my_fesom_group==0) then
+#endif
+            if (mype==0) then
+                write (i_string,  "(I4)") i
+                write (id_string, "(I4)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            end if
+#if defined(__recom) && defined(__usetp)
+    endif !(partit%my_fesom_group==0) then
+#endif
+! End of carbon isotopes section
+!_______________________________________________________________________
         CASE (101)       ! initialize tracer ID=101
             tracers%data(i)%values(:,:)=0.0_WP
             if (mype==0) then
@@ -1265,14 +1378,15 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             write (*,*) tracers%data(i)%values(1,1)
          end if
        CASE (14)        ! initialize tracer ID=14, fractionation-corrected 14C/C
-!        this initialization can be overwritten by calling do_ic3d
-         if (.not. any(idlist == 14)) then ! CHECK IF THIS LINE IS STILL NECESSARY
+!        this initialization can be overwritten by calling do_ic3d if any(idlist == 14)
+         if (.not. any(idlist == 14)) then         ! set alternative initial values
          tracers%data(i)%values(:,:) = 0.85
+         tracers%data(i)%values(1:10,:) = 0.95
            if (mype==0) then
               write (i_string,  "(I3)") i
               write (id_string, "(I3)") id
               write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
-              write (*,*) tracers%data(i)%values(1,1)
+              write (*,*) tracers%data(i)%values(1,1), tracers%data(i)%values(11,1)
            end if
          end if
        CASE (39)        ! initialize tracer ID=39, fractionation-corrected 39Ar/Ar

@@ -635,55 +635,10 @@ CONTAINS
       if (partit%mype==0) write(*,*) '  |-> gobal max init. salt. =', glo
       call MPI_AllREDUCE(locSmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  `-> gobal min init. salt. =', glo      
-
 #if defined(__recom)
-      locDINmax = -66666
-      locDINmin = 66666
-      locDICmax = locDINmax
-      locDICmin = locDINmin
-      locAlkmax = locDINmax
-      locAlkmin = locDINmin
-      locDSimax = locDINmax
-      locDSimin = locDINmin
-      locDFemax = locDINmax
-      locDFemin = locDINmin
-      locO2max  = locDINmax
-      locO2min  = locDINmin
-      do i=3, tracers%num_tracers
-        id=tracers%data(i)%ID
-        SELECT CASE (id)
-          CASE (1001) ! din
-            do n=1, partit%myDim_nod2d
-              locDINmax = max(locDINmax,maxval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-              locDINmin = min(locDINmin,minval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-            end do
-          CASE (1002) ! dic
-            do n=1, partit%myDim_nod2d
-              locDICmax = max(locDICmax,maxval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-              locDICmin = min(locDICmin,minval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-            end do
-          CASE (1003) ! alk
-            do n=1, partit%myDim_nod2d
-              locAlkmax = max(locAlkmax,maxval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-              locAlkmin = min(locAlkmin,minval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-            end do
-          CASE (1018) ! si
-            do n=1, partit%myDim_nod2d
-              locDSimax = max(locDSimax,maxval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-              locDSimin = min(locDSimin,minval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-            end do
-          CASE (1019) ! fe
-            do n=1, partit%myDim_nod2d
-              locDFemax = max(locDFemax,maxval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-              locDFemin = min(locDFemin,minval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-            end do
-          CASE (1022) ! o2
-            do n=1, partit%myDim_nod2d
-              locO2max  = max(locO2max,maxval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-              locO2min  = min(locO2min,minval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-            end do
-        END SELECT
-      end do ! i num_tracers
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
       if (partit%mype==0) write(*,*) "Sanity check for REcoM variables"
       call MPI_AllREDUCE(locDINmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal max init. DIN. =', glo
@@ -709,6 +664,9 @@ CONTAINS
       if (partit%mype==0) write(*,*) '  |-> gobal max init. O2. =', glo
       call MPI_AllREDUCE(locO2min , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  `-> gobal min init. O2. =', glo
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
 #endif
       
       ! Apply perturbations based on selected mode
