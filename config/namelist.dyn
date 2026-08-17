@@ -63,6 +63,9 @@ ldiag_KE           = .false.     ! enable kinetic energy diagnostics (requires a
 ! --- Time Stepping ---
 AB_order           = 2           ! Adams-Bashforth time stepping order (2 or 3)
 
+! --- SSH elliptic solver ---
+soltol             = 1e-5        ! ssh CG relative tolerance (optional; default 1e-5 if omitted)
+
 ! --- Split-Explicit Barotropic Subcycling ---
 use_ssh_se_subcycl = .false.     ! enable split-explicit subcycling for barotropic mode
                                  ! (faster time stepping for sea surface height)
