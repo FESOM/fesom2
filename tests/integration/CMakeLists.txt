@@ -12,10 +12,22 @@
 # (build-only verification).
 if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED AND NOT USE_YAC)
     # Basic integration test with PI mesh and 2 processes (minimum required for mesh partitioning)
+    #
+    # The EXTRA_SUCCESS_MARKERS pin the always-on SSH-CG solver diagnostics. Both the
+    # end-of-run summary and the per-step line are plain writes with no artifact behind
+    # them, so if either stops being emitted nothing else in the suite would notice --
+    # which is exactly how the sprod(2) defect in this solver survived unfixed. Matching
+    # the labels (not the numbers) keeps this stable across meshes and precisions.
     add_fesom_test(integration_pi_mpi2
         MPI_TEST
         NP 2
         TIMEOUT ${TEST_TIMEOUT}
+        EXTRA_SUCCESS_MARKERS
+            "___SSH CG SOLVER"            # end-of-run summary block
+            "non-convergences (maxiter)"  # the stall counter is reported
+            "breakdowns (p.Ap<=0)"        # the breakdown guard is wired up
+            "ssh_cg iters="               # per-step line, beside cfl_z
+            "ssh_cg rms(r)="              # per-step residual vs its target
     )
     
     # PI mesh test with 8 processes
