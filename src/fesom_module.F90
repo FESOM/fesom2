@@ -1475,6 +1475,8 @@ contains
                  real(f%dynamics%solverinfo%iters_sum)/real(f%dynamics%solverinfo%nsolves), '    '
             print 43, '    iterations max :             ', f%dynamics%solverinfo%iters_max
             print 43, '    non-convergences (maxiter) : ', f%dynamics%solverinfo%nonconv
+            print 43, '    breakdowns (p.Ap<=0) :       ', f%dynamics%solverinfo%nbreakdown
+            print 43, '    iters with r.z<0 (not SPD) : ', f%dynamics%solverinfo%nnegrz
         end if
 
         write(*,*)

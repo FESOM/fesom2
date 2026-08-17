@@ -31,6 +31,8 @@ TYPE T_SOLVERINFO
     integer       :: iters_sum  = 0     ! for the running mean
     integer       :: nsolves    = 0
     integer       :: nonconv    = 0     ! solves that hit maxiter
+    integer       :: nbreakdown = 0     ! solves where p.Ap was not positive
+    integer       :: nnegrz     = 0     ! iterations with r.z < 0 (M^-1 not SPD)
     real(kind=WP) :: resid_last = 0.0_WP ! rms residual at exit
     real(kind=WP) :: rtol_last  = 0.0_WP ! target it was compared against
     contains

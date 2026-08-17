@@ -60,7 +60,11 @@ subroutine ssh_solve_preconditioner(solverinfo, partit, mesh)
 #include "associate_mesh_ass.h"
 
     nend=ssh_stiff%rowptr(myDim_nod2D+1)-ssh_stiff%rowptr(1)
-    allocate(mesh%ssh_stiff%pr_values(nend))     ! Will store the values of inverse preconditioner matrix 
+    ! Guarded: building the preconditioner twice (a restart path can do this)
+    ! otherwise aborts with "allocatable array is already allocated".
+    if (.not. allocated(mesh%ssh_stiff%pr_values)) then
+        allocate(mesh%ssh_stiff%pr_values(nend))  ! values of the inverse preconditioner matrix
+    end if
     pr_values=>mesh%ssh_stiff%pr_values
     cind     =>mesh%ssh_stiff%colind_loc
     rptr     =>mesh%ssh_stiff%rowptr_loc
@@ -87,7 +91,9 @@ subroutine ssh_solve_preconditioner(solverinfo, partit, mesh)
    deallocate(diag_values)
 
    n=myDim_nod2D+eDim_nod2D
-   allocate(solverinfo%rr(n), solverinfo%zz(n), solverinfo%pp(n), solverinfo%App(n))
+   if (.not. allocated(solverinfo%rr)) then
+      allocate(solverinfo%rr(n), solverinfo%zz(n), solverinfo%pp(n), solverinfo%App(n))
+   end if
    solverinfo%rr =0.0_WP
    solverinfo%zz =0.0_WP
    solverinfo%pp =0.0_WP
@@ -225,6 +231,24 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
 
   call MPI_Allreduce(MPI_IN_PLACE, s_aux, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 
+     ! ===========
+     ! Breakdown guard. An equivalent check existed until 4eb2f21d ("Removed
+     ! debug output in solver."). p.Ap must be positive for an SPD system; if it
+     ! reaches zero or NaN then al = s_old/s_aux poisons the entire d_eta vector
+     ! with Inf/NaN, and that surfaces several stages downstream -- typically as
+     ! a NaN in Wvel -- with nothing pointing back here. Keep the current X and
+     ! leave the loop; do not abort, and do not mark the solve converged.
+     ! Evaluated on the already-reduced value, so every rank branches alike.
+     ! ===========
+  if (s_aux <= 0.0_WP .or. s_aux /= s_aux) then
+     solverinfo%nbreakdown = solverinfo%nbreakdown + 1
+     if (partit%mype==0 .and. solverinfo%nbreakdown <= 5) then
+        write(*,*) 'WARNING: ssh CG breakdown at iter ', iter, ': p.Ap= ', s_aux, &
+                   ' is not positive; keeping current solution and leaving the loop'
+     endif
+     exit
+  endif
+
   al=s_old/s_aux
      ! ===========
      ! New X and residual r
@@ -269,6 +293,26 @@ sprod(1:2)=0.0_WP
      ! ===========
   if (sqrt(sprod(2)/nod2D)< rtol) then
      converged = .true.
+     exit
+  endif
+     ! ===========
+     ! SPD sensor. r.z cannot be negative for an SPD preconditioner, so any count
+     ! here is direct evidence that M^-1 is not SPD. Cheap, and evaluated on the
+     ! already-reduced value so all ranks agree.
+     ! ===========
+  if (sprod(1) < 0.0_WP) then
+     solverinfo%nnegrz = solverinfo%nnegrz + 1
+     if (partit%mype==0 .and. solverinfo%nnegrz == 1) then
+        write(*,*) 'WARNING: ssh CG r.z < 0 at iter ', iter, ': r.z= ', sprod(1), &
+                   ' -- preconditioner is not symmetric positive definite'
+     endif
+  endif
+
+  if (s_old == 0.0_WP) then
+     solverinfo%nbreakdown = solverinfo%nbreakdown + 1
+     if (partit%mype==0 .and. solverinfo%nbreakdown <= 5) then
+        write(*,*) 'WARNING: ssh CG breakdown at iter ', iter, ': previous r.z is zero'
+     endif
      exit
   endif
   be=sprod(1)/s_old
