@@ -650,6 +650,19 @@ nl => mesh%nl
     ! ssh CG solver tolerance (optional, backward compatible): if 'soltol' is
     ! absent from namelist.dyn the namelist read leaves it at the default above,
     ! matching the previous hard-coded T_SOLVERINFO value.
+    !
+    ! KNOWN LIMITATION -- these two settings are honoured on a COLD START only.
+    ! soltol and maxiter are both members of T_SOLVERINFO, which is serialized into
+    ! the derived-type (bin) restart dump, and READ_T_SOLVERINFO runs *after* this
+    ! routine (fesom_module.F90: dynamics_init -> ... -> read_initial_conditions).
+    ! So on a bin restart the dumped values silently replace whatever the namelist
+    ! asked for, while the echo below still prints the namelist value.
+    ! Measured on pi: cold start at soltol=1e-5 takes 8.60 iterations/solve; restart
+    ! with soltol=1e-2 in the namelist still takes 8.95 -- i.e. it is still solving to
+    ! 1e-5 -- although the log reports 1.0E-002. The raw-restart path is unaffected.
+    ! Not fixed here: the fix is to read these into throwaway locals so the byte
+    ! layout is preserved, and that needs the restart-vs-continuous regression test,
+    ! which does not exist yet. Set them on the cold start of an experiment.
     dynamics%solverinfo%soltol = soltol
     if (mype==0) write(*,*) '     ssh CG soltol  = ', dynamics%solverinfo%soltol
 
@@ -657,10 +670,7 @@ nl => mesh%nl
     ! apart from a truncation when sweeping soltol: raise it and a solver that is
     ! merely slow still converges, while one that has hit its residual floor
     ! plateaus instead.
-    ! NOTE both of these are also read back from the binary dump in
-    ! READ_T_SOLVERINFO, which runs after this, so on a RESTART the dumped value
-    ! still wins over the namelist. Cold starts honour the namelist. Fixing that
-    ! is deferred until the restart-vs-continuous test exists.
+    ! Same cold-start-only caveat as soltol above; see the note there.
     dynamics%solverinfo%maxiter = maxiter
     if (mype==0) write(*,*) '     ssh CG maxiter = ', dynamics%solverinfo%maxiter
 

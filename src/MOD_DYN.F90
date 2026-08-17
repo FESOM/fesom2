@@ -231,6 +231,11 @@ subroutine READ_T_SOLVERINFO(tsolverinfo, unit)
     integer                              :: iostat
     character(len=1024)                  :: iomsg
     read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%ident
+    ! NOTE maxiter and soltol are configurable from namelist.dyn, but this read
+    ! runs after dynamics_init, so on a restart these dumped values override what
+    ! the namelist asked for. Reading them into throwaway locals would make the
+    ! namelist authoritative while preserving the byte layout exactly; deferred
+    ! until there is a restart-vs-continuous test to verify it against.
     read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%maxiter
     read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%restart
     read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%fillin
