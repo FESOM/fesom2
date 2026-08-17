@@ -16,3 +16,5 @@ Makefile.in
 mesh_part/build
 test/output_pi
 .claude/
+cmake/cvmixConfig-debug.cmake
+cmake/cvmixConfig.cmake
