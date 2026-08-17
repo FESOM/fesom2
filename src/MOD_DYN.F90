@@ -18,6 +18,11 @@ TYPE T_SOLVERINFO
     integer       :: lutype  = 2
     real(kind=WP) :: droptol = 1.e-8
     real(kind=WP)  :: soltol  = 1e-5
+    ! Which symmetrised-Jacobi formula the preconditioner uses.
+    ! 0 = as coded since 60b46bdc (default, keeps results unchanged)
+    ! 1 = textbook M^-1 = 2D^-1 - D^-1 A D^-1, which is genuinely symmetric
+    ! See ssh_solve_preconditioner for why this switch exists.
+    integer       :: precond_variant = 0
     real(kind=WP), allocatable   :: rr(:), zz(:), pp(:), App(:)
     !___________________________________________________________________________
     ! Per-run solver diagnostics. Deliberately NOT in WRITE/READ_T_SOLVERINFO

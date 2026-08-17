@@ -73,6 +73,8 @@ soltol             = 1e-5        ! ssh CG relative tolerance (optional; default 
                                  ! a ratio and cannot see the float32 residual floor, so
                                  ! the solver will report success it has not achieved
 maxiter            = 2000        ! ssh CG iteration cap (optional; default 2000 if omitted)
+precond_variant    = 0           ! ssh CG preconditioner: 0 = as-is, 1 = symmetric
+                                 ! 2D^-1 - D^-1*A*D^-1 (experimental; 0 keeps results unchanged)
                                  ! hitting the cap does not abort -- it is reported as
                                  ! 'non-convergences' in the end-of-run solver summary
 

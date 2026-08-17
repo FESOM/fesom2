@@ -558,6 +558,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     real(kind=WP)  :: wsplit_maxcfl
     real(kind=WP)  :: soltol = 1.e-5_WP  ! ssh CG rel. tolerance; default matches T_SOLVERINFO
     integer        :: maxiter = 2000     ! ssh CG iteration cap; default matches T_SOLVERINFO
+    integer        :: precond_variant = 0 ! ssh CG preconditioner formula; 0 keeps results unchanged
     logical        :: use_ssh_se_subcycl=.false.
     integer        :: se_BTsteps
     real(kind=WP)  :: se_BTtheta
@@ -574,7 +575,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
                                 ldiag_KE, AB_order,                                  &
                                 use_ssh_se_subcycl, se_BTsteps, se_BTtheta,          &
                                 se_bottdrag, se_bdrag_si, se_visc, se_visc_gamma0,   &
-                                se_visc_gamma1, se_visc_gamma2, soltol, maxiter
+                                se_visc_gamma1, se_visc_gamma2, soltol, maxiter, precond_variant
 
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -673,6 +674,9 @@ nl => mesh%nl
     ! Same cold-start-only caveat as soltol above; see the note there.
     dynamics%solverinfo%maxiter = maxiter
     if (mype==0) write(*,*) '     ssh CG maxiter = ', dynamics%solverinfo%maxiter
+
+    dynamics%solverinfo%precond_variant = precond_variant
+    if (mype==0) write(*,*) '     ssh CG precond = ', dynamics%solverinfo%precond_variant
 
     !___________________________________________________________________________
     ! define local vertice & elem array size
