@@ -29,6 +29,7 @@ Authors
    general_configuration/general_configuration
    ocean_configuration/ocean_configuration
    forcing_configuration
+   output_configuration
    seaice_configuration
    icepack_in_fesom
    data_processing/data_processing
@@ -64,16 +65,16 @@ Proposed structure:
         Build model on Ubuntu (Video)
         Add new output variable (Video)
         First look at model output (Video)
-    General configuration (namelist.configure)
+    General configuration (namelist.config)
         Time stepping
         Restarts
         ALE options
         Mesh geometry and partitioning
-    Ocean configuration (namelist.oce)
-        Ocean dynamics
-        Ocean tracers
-        Adding a new tracer
-        Initial conditions
+    Ocean configuration (namelist.oce, namelist.dyn, namelist.tra, namelist.cvmix, namelist.transit)
+        Ocean dynamics and GM/Redi choices
+        Momentum advection and viscosity options
+        Tracer advection/diffusion and initialisation
+        Vertical mixing (CVMix) and transient tracers
     Sea ice configuration (namelist.ice)
         Ice dynamics
         Ice thermodynamics

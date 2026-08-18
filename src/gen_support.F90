@@ -11,7 +11,7 @@ module g_support
   implicit none
 
   private
-  public :: smooth_nod, smooth_elem, integrate_nod, integrate_elem, extrap_nod, omp_min_max_sum1, omp_min_max_sum2
+  public :: smooth_nod, smooth_elem, integrate_nod, integrate_elem, extrap_nod, omp_min_max_sum1, omp_min_max_sum2, point_in_polygon
   real(kind=WP), dimension(:), allocatable  :: work_array
 !
 !--------------------------------------------------------------------------------------------
@@ -439,7 +439,7 @@ subroutine extrap_nod3D(arr, partit, mesh)
                 
                 !_______________________________________________________________
                 ! loop over local vertices n 
-                do n=1, myDim_nod2D+eDim_nod2D
+                do n=1, myDim_nod2D!+eDim_nod2D
                     ! found node n that has to be extrapolated
                     if ( (work_array(n)>0.99_WP*dummy) .and.  (nlevels_nod2D(n)>nz)) then
                         cnt=0
@@ -724,6 +724,72 @@ subroutine integrate_elem_2D(data, int2D, partit, mesh)
   call MPI_AllREDUCE(lval, int2D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
 end subroutine integrate_elem_2D
+
+
+!
+!
+!-------------------------------------------------------------------------------
+! compute if lon/lat point lies within polygon --> using common ray tracing algorithm
+real(kind=WP) function point_in_polygon(lon, lat, poly_lon, poly_lat)
+    USE o_param, only: WP
+    implicit none
+    real(kind=WP), intent(in)               :: lon, lat           ! test point
+    real(kind=WP), dimension(:), intent(in) :: poly_lon    ! polygon longitudes
+    real(kind=WP), dimension(:), intent(in) :: poly_lat    ! polygon latitudes
+    integer                                 :: npts, ii, jj         ! number of polygon vertices
+    logical                                 :: isIN
+    
+    ! is point in or out of polygon 
+    isIN = .false.
+    
+    ! number of polygon points 
+    npts = size(poly_lon)
+    
+    ! index of last polygon point, keep polygon closed
+    jj = npts 
+    
+    ! ray tracing algorithm, loop over the edges of the polygon, compute how often edges 
+    ! are cutted by a ray if cutted with an odd number point is in polygon, if 
+    ! cutted with an even number point is outside polygon 
+    do ii = 1, npts
+        !
+        ! if lon/lat point is within the lat range of the edge
+        !        o poly_lat(jj)
+        !         \
+        !  x lat --\-----------> can cut the edge
+        !           \
+        !            \   
+        !             o poly_lat(ii)
+        !             
+        !  x lat --------------> can not cut the edge
+        !             
+        if ( ((poly_lat(ii) > lat) .neqv. (poly_lat(jj) > lat)) ) then
+        
+            ! checking if a horizontal ray starting at the point (lon, lat) 
+            ! crosses the polygon edge between vertices ii and ij.
+            ! We want to know: At the horizontal line y = lat (i.e. the ray from 
+            ! the test point), what is the x-coordinate (lon_intersect) where the 
+            ! edge crosses?
+            !  (lat - poly_lat(i)) / (poly_lat(j) - poly_lat(i)) --> interpolation factor (how far along the edge we are).
+            !  * (poly_lon(j) - poly_lon(i))                     --> scales it to longitude distance.
+            !  + poly_lon(i)                                     --> shifts to the starting longitude.
+            ! So this line is simply checking:
+            !   “Is the intersection longitude to the right of my test point?”
+            !   If yes --> the ray crosses the edge → flip inside/outside.
+            if ( lon < (poly_lon(jj)-poly_lon(ii))*(lat-poly_lat(ii)) / &
+                       (poly_lat(jj)-poly_lat(ii)) + poly_lon(ii) ) then
+                isIN = .not. isIN
+            end if
+        end if
+        jj = ii
+    end do
+    
+    ! GINsea lsmask: 1.0 ... point in Gin sea, 0.0 ... point outside GINsea polygon
+    point_in_polygon = merge(1.0_WP, 0.0_WP, isIN)
+    
+end function point_in_polygon
+
+
 end module g_support
 
 

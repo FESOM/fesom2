@@ -16,8 +16,18 @@ module fesom_main_storage_module
   use g_forcing_arrays
   use io_RESTART
   use io_MEANDATA
+  use io_xios_module
   use io_mesh_info
   use diagnostics
+  ! Read-only access to the CMOR scalar diagnostics computed inside
+  ! compute_diagnostics → compute_cmor_diag, so we can send them to XIOS
+  ! from this top-level module. Doing the send inside cmor_variables_diag
+  ! itself would create a cycle (io_xios → diagnostics → cmor_variables_diag
+  ! → io_xios) and break the build.
+  use cmor_variables_diag, only: ldiag_cmor, reset_cmor_acc, &
+                                 volo, soga, thetaoga, &
+                                 siarean, siareas, siextentn, siextents, &
+                                 sivoln, sivols
   use mo_tidal
   use tracer_init_interface
   use ocean_setup_interface
@@ -37,6 +47,7 @@ module fesom_main_storage_module
   use iceberg_params
   use iceberg_step
   use iceberg_ocean_coupling
+  use Toy_Channel_Soufflet, only: compute_zonal_mean
   ! Define icepack module
 
 #if defined (__icepack)
@@ -46,11 +57,15 @@ module fesom_main_storage_module
 #if defined (__oasis)
   use cpl_driver
 #endif
+#if defined (__yac)
+use cpl_yac_driver
+#endif
 
 ! define recom module
 #if defined (__recom)
   use recom_init_interface
   use recom_interface
+  use recom_glovar
 #endif
 
 ! Transient tracers
@@ -105,6 +120,10 @@ module fesom_module
 #if defined  __ifsinterface
   use, intrinsic :: ieee_exceptions
 #endif
+  ! Enhanced profiler integration
+#if defined (FESOM_PROFILING)
+  use fesom_profiler
+#endif
   implicit none
   public fesom_init, fesom_runloop, fesom_finalize
   private
@@ -119,7 +138,12 @@ contains
       integer, intent(out) :: fesom_total_nsteps
       ! EO parameters
       logical mpi_is_initialized
-      integer              :: tr_num
+      integer              :: tr_num, n
+
+#if defined (__recom)
+      type(tracers_info_type)               :: tracers_info
+#endif
+
 #if !defined  __ifsinterface
       if(command_argument_count() > 0) then
         call command_line_options%parse()
@@ -153,10 +177,25 @@ contains
 #if defined (__oasis)
 
         call cpl_oasis3mct_init(f%partit,f%partit%MPI_COMM_FESOM)
+#elif defined (__yac)
+        call cpl_yac_init(f%partit%MPI_COMM_FESOM)
 #endif
+
         f%t1 = MPI_Wtime()
 
+        ! Initialize enhanced profiler
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_init(.true.)
+        call fesom_profiler_start("fesom_init_total")
+#endif
+
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("par_init")
+#endif
         call par_init(f%partit)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("par_init")
+#endif
 
         f%mype          =>f%partit%mype
         f%MPIerr        =>f%partit%MPIerr
@@ -166,8 +205,9 @@ contains
 
         f%npes          =>f%partit%npes
 
-
+        
         if(f%mype==0) then
+            call plot_fesomlogo()
             write(*,*)
             print *,"FESOM2 git SHA: "//fesom_git_sha()
             call MPI_Get_library_version(f%mpi_version_txt, f%mpi_version_len, f%MPIERR)
@@ -181,19 +221,52 @@ contains
         ! auxiliary mesh arrays
         !=====================
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call setup_model'//achar(27)//'[0m'
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("setup_model")
+#endif
         call setup_model(f%partit)  ! Read Namelists, always before clock_init
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("setup_model")
+#endif
         
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call clock_init'//achar(27)//'[0m'
-        call clock_init(f%partit)   ! read the clock file 
+        call clock_init(f%partit)   ! read the clock file
         
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call get_run_steps'//achar(27)//'[0m'
         call get_run_steps(fesom_total_nsteps, f%partit)
         f%total_nsteps=fesom_total_nsteps
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_set_timesteps(fesom_total_nsteps)
+        ! Set timestep size in seconds for SYPD calculation: 86400 seconds/day / steps_per_day
+        call fesom_profiler_set_timestep_size(86400.0d0 / real(step_per_day, kind=8))
+#endif
         
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call mesh_setup'//achar(27)//'[0m'
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("mesh_setup")
+#endif
         call mesh_setup(f%partit, f%mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("mesh_setup")
+#endif
 
         if (f%mype==0) write(*,*) 'FESOM mesh_setup... complete'
+
+#if defined (__XIOS)
+        ! XIOS client init (NEMO/OIFS pattern). xios_initialize is called with
+        ! local_comm=MPI_COMM_FESOM -- OASIS already split MPI_COMM_WORLD, so
+        ! no further split is needed; the FESOM comm stays valid. The separate
+        ! xios_server.exe binary registers with OASIS independently.
+        !
+        ! Ordering: OASIS3-MCT was initialised above (before par_init). This
+        ! matches the EC-Earth-proven NEMO ordering (OASIS -> XIOS on OASIS
+        ! local comm). Called here after mesh_setup so coord_nod2D /
+        ! elem2D_nodes / zbar / myList_* are populated.
+        block
+          integer :: xios_client_comm
+          call io_xios_init(f%mesh, f%partit, f%partit%MPI_COMM_FESOM, xios_client_comm)
+        end block
+#endif
 
 !       Transient tracers: control output of initial input values
         if(use_transit .and. anthro_transit .and. f%mype==0) then
@@ -222,9 +295,11 @@ contains
           nrecv = nrecv + 6
         END IF
         !---wiso-code-end
+#if !defined (__oifs)
         IF (use_icebergs) THEN
           nrecv = nrecv + 2
         END IF
+#endif
 #endif
 
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call check_mesh_consistency'//achar(27)//'[0m'
@@ -241,14 +316,44 @@ contains
         call arrays_init(f%tracers%num_tracers, f%partit, f%mesh)    ! allocate other arrays (to be refactured same as tracers in the future)
         
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ocean_setup'//achar(27)//'[0m'
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("ocean_setup")
+        call fesom_profiler_start("dynamics_init")
+#endif
         call ocean_setup(f%dynamics, f%tracers, f%partit, f%mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("dynamics_init")
+        call fesom_profiler_end("ocean_setup")
+#endif
+
+        ! global tides
+        if (use_global_tides) then
+           call foreph_ini(yearnew, month, f%partit)
+        end if
 
         ! recom setup
 #if defined (__recom)
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call recom_init'//achar(27)//'[0m'
+
+        allocate(tracers_info%ids(f%tracers%num_tracers))
+        allocate(tracers_info%data_pointers(f%tracers%num_tracers))
+
+        do n = 1, f%tracers%num_tracers
+          tracers_info%ids(n) = f%tracers%data(n)%id
+          tracers_info%data_pointers(n)%tracer_data => f%tracers%data(n)%values
+        end do
+
         f%t0_recom=MPI_Wtime()
-        call recom_init(f%tracers, f%partit, f%mesh) ! adjust values for recom tracers (derived type "t_tracer")
+        call recom_init(f%mesh%nl, f%mesh%ulevels_nod2d, f%mesh%nlevels_nod2D, &
+                        f%mesh%geo_coord_nod2D, f%mesh%z_3d_n, f%partit%myDim_nod2d,      &
+                        f%partit%eDim_nod2D, f%partit%mype, f%partit%MPI_COMM_FESOM,      &
+                        f%partit%myDim_elem2D, f%partit%eDim_elem2D, tracers_info,        &
+                        f%tracers%num_tracers, rad) ! adjust values for recom tracers (derived type "t_tracer")
         f%t1_recom=MPI_Wtime()
+
+        deallocate(tracers_info%ids)
+        deallocate(tracers_info%data_pointers)
+
         if (f%mype==0) write(*,*) 'RECOM recom_init... complete'
 #endif
 
@@ -280,12 +385,16 @@ contains
         
         !---fwf-code-begin
         if(f%mype==0)  write(*,*) 'use_landice_water', use_landice_water
-        if(use_landice_water) call landice_water_init(f%partit, f%mesh)
+        if(use_landice_water) then
+            call landice_water_init(f%partit, f%mesh)
+        endif
         !---fwf-code-end
 
         !---age-code-begin
         if(f%mype==0)  write(*,*) 'use_age_tracer', use_age_tracer
-        if(use_age_tracer) call age_tracer_init(f%partit, f%mesh)
+        if(use_age_tracer) then
+            call age_tracer_init(f%partit, f%mesh)
+        endif
         !---age-code-end
 #if defined (__oasis)
 
@@ -301,6 +410,11 @@ contains
         endif
         ! --------------
 
+#if defined (__yac)
+        call cpl_yac_define_unstr(f%partit, f%mesh)
+        if(f%mype==0)  write(*,*) 'FESOM ---->     cpl_yac_define_unstr nsend, nrecv:',nsend, nrecv
+#endif
+
 #if defined (__icepack)
         !=====================
         ! Setup icepack
@@ -313,9 +427,22 @@ contains
 #endif
         call clock_newyear                        ! check if it is a new year
         if (f%mype==0) f%t6=MPI_Wtime()
-        !___CREATE NEW RESTART FILE IF APPLICABLE___________________________________
-        call restart(0, 0, 0, r_restart, f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        !___READ INITIAL CONDITIONS IF THIS IS A RESTART RUN________________________
+        if (r_restart) then
+            call read_initial_conditions(f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        end if
         if (f%mype==0) f%t7=MPI_Wtime()
+        
+        ! recompute zonal profiles of temp and velocity, with the data from the restart
+        ! otherwise zonal profiles of the initial condition are used, this will 
+        ! fuck up the continutiy of the restart
+        if (toy_ocean .and. r_restart) then  
+            SELECT CASE (TRIM(which_toy))
+                CASE ("soufflet") !forcing update for soufflet testcase
+                    call compute_zonal_mean(f%dynamics, f%tracers, f%partit, f%mesh)
+            END SELECT
+        end if    
+        
         ! store grid information into netcdf file
         if (.not. r_restart) call write_mesh_info(f%partit, f%mesh)
 
@@ -324,6 +451,9 @@ contains
         if (r_restart .and. .not. f%which_readr==2) then
             call restart_thickness_ale(f%partit, f%mesh)
         end if
+        ! for KE diagnostic we need to compute an exact profile of reference density
+        ! it will be used to compute RHO*
+        if (f%dynamics%ldiag_ke) call init_ref_density_advanced(f%tracers, f%partit, f%mesh)
         if (f%mype==0) then
            f%t8=MPI_Wtime()
     
@@ -405,6 +535,11 @@ contains
 
     f%from_nstep = 1
 
+    ! End initialization profiling
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("fesom_init_total")
+#endif
+
     !enter mesh and partit data. 
     !$ACC ENTER DATA COPYIN (f) 
     !$ACC ENTER DATA COPYIN (f%mesh, f%mesh%coriolis_node, f%mesh%nn_num, f%mesh%nn_pos) 
@@ -461,7 +596,12 @@ contains
 !   use openacc_lib
     integer, intent(in) :: current_nsteps 
     ! EO parameters
-    integer n, nstart, ntotal, tr_num
+    integer n, nstart, ntotal, tr_num, tracer_index
+    logical :: do_cmor_0d_reset
+
+#if defined (__recom)
+    type(tracers_info_type)               :: tracers_info
+#endif
 
     !=====================
     ! Time stepping
@@ -487,15 +627,19 @@ contains
         print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
         print *, achar(27)//'[7;32m'//' --> FESOM STARTS TIME LOOP                                 '//achar(27)//'[0m'
     end if
-    !___MODEL TIME STEPPING LOOP________________________________________________
-    if (use_global_tides) then
-       call foreph_ini(yearnew, month, f%partit)
-    end if
     
+    ! Start main time loop profiling
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("fesom_runloop_total")
+#endif
+    !___MODEL TIME STEPPING LOOP________________________________________________
     nstart=f%from_nstep
     ntotal=f%from_nstep-1+current_nsteps
 
     do n=nstart, ntotal
+#if defined (__XIOS)
+        call io_xios_update_calendar(n)
+#endif
         if (use_icebergs) then
                 !n_ib         = n
                 u_wind_ib    = u_wind
@@ -585,7 +729,17 @@ contains
             !___compute update of atmospheric forcing____________________________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call update_atm_forcing(n)'//achar(27)//'[0m'
             f%t0_frc = MPI_Wtime()
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("update_atm_forcing")
+#endif
+#if defined (__yac)
+            call update_atm_forcing_yac(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
+#else
             call update_atm_forcing(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
+#endif 
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("update_atm_forcing")
+#endif
             f%t1_frc = MPI_Wtime()
             !___compute ice step________________________________________________
             if (f%ice%ice_steps_since_upd>=f%ice%ice_ave_steps-1) then
@@ -596,7 +750,15 @@ contains
                 f%ice%ice_steps_since_upd=f%ice%ice_steps_since_upd+1
             endif
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call ice_timestep(n)'//achar(27)//'[0m'
-            if (f%ice%ice_update) call ice_timestep(n, f%ice, f%partit, f%mesh)  
+            if (f%ice%ice_update) then
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("ice_timestep")
+#endif
+                call ice_timestep(n, f%ice, f%partit, f%mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("ice_timestep")
+#endif
+            endif
 
             !___compute fluxes to the ocean: heat, freshwater, momentum_________
             if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_fluxes_mom...'//achar(27)//'[0m'
@@ -610,14 +772,49 @@ contains
 #if defined (__recom)
         if (f%mype==0 .and. n==1)  print *, achar(27)//'[46'  //'_____________________________________________________________'//achar(27)//'[0m'
         if (f%mype==0 .and. n==1)  print *, achar(27)//'[46;1m'//'     --> call REcoM                                         '//achar(27)//'[0m'
+
+        allocate(tracers_info%ids(f%tracers%num_tracers))
+        allocate(tracers_info%ltra_diag(f%tracers%num_tracers))
+        allocate(tracers_info%data_pointers(f%tracers%num_tracers))
+
+        do tracer_index = 1, f%tracers%num_tracers
+          tracers_info%ids(tracer_index) = f%tracers%data(tracer_index)%id
+          tracers_info%ltra_diag(tracer_index) = f%tracers%data(tracer_index)%ltra_diag
+          tracers_info%data_pointers(tracer_index)%tracer_data => f%tracers%data(tracer_index)%values
+        end do
+
         f%t0_recom = MPI_Wtime()
-        call recom(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        call recom(f%ice%data(1)%values, f%mesh%nl, &
+                   f%mesh%ulevels_nod2d, f%mesh%nlevels_nod2D, f%mesh%hnode,     &
+                   f%mesh%z_3d_n, f%mesh%zbar_3d_n, f%mesh%geo_coord_nod2d,      &
+                   f%mesh%ocean_area, f%mesh%areasvol, f%partit%myDim_nod2d,     &
+                   f%partit%eDim_nod2D, f%partit%mype, f%partit%MPI_COMM_FESOM,  &
+                   tracers_info, f%tracers%num_tracers, f%tracers%work%tra_recom_sms, &
+                   f%partit%npes, f%partit%com_nod2D%sPEnum,   &
+                   f%partit%com_nod2D%rPEnum,  &
+                   f%partit%s_mpitype_nod2D, f%partit%r_mpitype_nod2D,              &
+                   f%partit%s_mpitype_nod3D, f%partit%r_mpitype_nod3D,              &
+                   f%partit%com_nod2D%sPE, f%partit%com_nod2D%rPE,                  &
+                   f%partit%com_nod2D%req, f%partit%com_nod2D%nreq,                 &
+                   dt, daynew, month, mstep, ndpyr, yearold, timenew, rad, kappa,            &
+                   press_air, u_wind, v_wind, shortwave)
         f%t1_recom = MPI_Wtime()
+
+        deallocate(tracers_info%ids)
+        deallocate(tracers_info%ltra_diag)
+        deallocate(tracers_info%data_pointers)
+
 #endif
         
         !___model ocean step____________________________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call oce_timestep_ale'//achar(27)//'[0m'
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("oce_timestep_ale")
+#endif
         call oce_timestep_ale(n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("oce_timestep_ale")
+#endif
         if (use_transit) then
           ! Prevent negative concentrations of SF6, CFC-11 and CFC-12 during the first years (inital values are zero)
           do tr_num=1, f%tracers%num_tracers
@@ -630,12 +827,67 @@ contains
         f%t3 = MPI_Wtime()
         !___compute energy diagnostics..._______________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call compute_diagnostics(1)'//achar(27)//'[0m'
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("compute_diagnostics")
+#endif
         call compute_diagnostics(1, f%dynamics, f%tracers, f%ice, f%partit, f%mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("compute_diagnostics")
+#endif
+
+        ! XIOS send for CMOR 0D scalars. xios_send_field is a collective
+        ! over the FESOM client context: ALL ranks must participate or
+        ! XIOS errors with "callers not coherent" (event_server.cpp:29).
+        ! The values are MPI_AllReduced inside compute_cmor_diag so every
+        ! rank has the same global value; XIOS-side operation="average"
+        ! over identical values reduces to that value. The legacy
+        ! output_0D_streams writer is gated on io_xios_is_on() so these
+        ! scalars no longer double-write at every step.
+        if (ldiag_cmor .and. io_xios_is_on()) then
+            call io_xios_send_0d_r8('volo',      real(volo,      kind=8))
+            call io_xios_send_0d_r8('soga',      real(soga,      kind=8))
+            call io_xios_send_0d_r8('thetaoga',  real(thetaoga,  kind=8))
+            call io_xios_send_0d_r8('siarean',   real(siarean,   kind=8))
+            call io_xios_send_0d_r8('siareas',   real(siareas,   kind=8))
+            call io_xios_send_0d_r8('siextentn', real(siextentn, kind=8))
+            call io_xios_send_0d_r8('siextents', real(siextents, kind=8))
+            call io_xios_send_0d_r8('sivoln',    real(sivoln,    kind=8))
+            call io_xios_send_0d_r8('sivols',    real(sivols,    kind=8))
+        end if
+
+#if defined(__XIOS)
+        ! Ship-track / mooring curtain output (io_tracks.F90). Inert
+        ! unless &nml_general/ltracks=.true. or the XIOS XML override is
+        ! set. Collective over MPI_COMM_FESOM: every rank must call this
+        ! for XIOS to advance its temporal filter consistently, including
+        ! ranks whose ni=0.
+        if (io_xios_is_on()) then
+            block
+              use io_tracks_module, only: io_tracks_send
+              call io_tracks_send(f%tracers, f%dynamics, f%mesh, f%partit)
+            end block
+        end if
+#endif
+        ! Reset 0D accumulators at month end — outside the io_xios_is_on() block
+        ! so the reset fires in both XIOS and legacy output modes. Gated on
+        ! monthly_event (FESOM calendar) so it is independent of XIOS field
+        ! name configuration.
+        if (ldiag_cmor) then
+            do_cmor_0d_reset = .false.
+            call monthly_event(do_cmor_0d_reset, 1)
+            if (do_cmor_0d_reset) call reset_cmor_acc()
+        end if
 
         f%t4 = MPI_Wtime()
         !___prepare output______________________________________________________
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call output (n)'//achar(27)//'[0m'
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("output")
+#endif
         call output (n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("output")
+#endif
 
         ! LA icebergs: 2023-05-17 
         if (use_icebergs .and. mod(n, steps_per_ib_step)==0.0) then
@@ -644,7 +896,20 @@ contains
         !--------------------------
 
         f%t5 = MPI_Wtime()
-        call restart(n, nstart, f%total_nsteps, .false., f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("restart")
+#endif
+        ! Pass f%total_nsteps (namelist run length) as the segment-end marker
+        ! rather than the runloop-chunk end (ntotal). In standalone FESOM they
+        ! are identical (fesom_runloop is called once with all steps), so the
+        ! year-boundary fix from PR #880 still fires. Under __ifsinterface,
+        ! fesom_runloop is called per IFS coupling step with a small chunk, so
+        ! ntotal == istep on every call; using it as the segment-end marker
+        ! would force a restart every coupling timestep.
+        call write_initial_conditions(n, nstart, f%total_nsteps, f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("restart")
+#endif
         f%t6 = MPI_Wtime()
         
         f%rtime_fullice       = f%rtime_fullice       + f%t2 - f%t1
@@ -678,6 +943,11 @@ contains
     f%from_nstep = f%from_nstep+current_nsteps
 !call cray_acc_set_debug_global_level(0)    
 !   write(0,*) 'f%from_nstep after the loop:', f%from_nstep    
+    
+    ! End main time loop profiling
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("fesom_runloop_total")
+#endif
   end subroutine fesom_runloop
 
 
@@ -688,14 +958,23 @@ contains
     use mpp_io
 #endif
     ! EO parameters
-    real(kind=real32) :: mean_rtime(15), max_rtime(15), min_rtime(15)
+    ! 1..15 are the existing FESOM timers (ocean components, ice, output, etc.)
+    ! 16..20 are the io_meandata sub-decomposition: update_means, streamloop,
+    ! pack, mask, xsend (see rtime_om_* in io_meandata.F90).
+    real(kind=real32) :: mean_rtime(20), max_rtime(20), min_rtime(20)
     integer           :: tr_num
+    
+    ! Start finalization profiling
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("fesom_finalize_total")
+#endif
     ! --------------
     ! LA icebergs: 2023-05-17 
     if (use_icebergs) then
          call iceberg_out(f%partit)
     end if
     ! --------------
+
     call finalize_output()
     call finalize_restart()
 
@@ -770,8 +1049,21 @@ contains
 #if defined (__recom)
     mean_rtime(15) = f%rtime_compute_recom
 #endif
+    ! Sub-decomposition of rtime_write_means (= mean_rtime(12)):
+    ! (16) update_means accumulator cost (per step, every step)
+    ! (17) per-stream loop in output() (incl. write_mean dispatch)
+    ! (18) Fortran tmp2/tmp3 nested-loop pack from local_values_*_copy
+    ! (19) io_xios_apply_wet_* / apply_ice_mask_* full-array scans
+    ! (20) pure xios_send_field call wall (post-gate, the actual XIOS pipeline)
+    mean_rtime(16) = real(rtime_om_update_means, real32)
+    mean_rtime(17) = real(rtime_om_streamloop,   real32)
+    mean_rtime(18) = real(rtime_om_pack,         real32)
+    mean_rtime(19) = real(rtime_om_mask,         real32)
+    mean_rtime(20) = real(rtime_om_xsend,        real32)
     max_rtime(1:14) = mean_rtime(1:14)
     min_rtime(1:14) = mean_rtime(1:14)
+    max_rtime(16:20) = mean_rtime(16:20)
+    min_rtime(16:20) = mean_rtime(16:20)
 #if defined (__recom)
     max_rtime(15) = mean_rtime(15)
     min_rtime(15) = mean_rtime(15)
@@ -785,8 +1077,22 @@ contains
     mean_rtime(1:14) = mean_rtime(1:14) / real(f%npes,real32)
     call MPI_AllREDUCE(MPI_IN_PLACE, max_rtime,  14, MPI_REAL, MPI_MAX, f%MPI_COMM_FESOM, f%MPIerr)
     call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime,  14, MPI_REAL, MPI_MIN, f%MPI_COMM_FESOM, f%MPIerr)
-    
-#if defined (__oifs) 
+    ! Sub-decomposition of write_means: indices (16)..(20)
+    call MPI_AllREDUCE(MPI_IN_PLACE, mean_rtime(16), 5, MPI_REAL, MPI_SUM, f%MPI_COMM_FESOM, f%MPIerr)
+    mean_rtime(16:20) = mean_rtime(16:20) / real(f%npes,real32)
+    call MPI_AllREDUCE(MPI_IN_PLACE, max_rtime(16),  5, MPI_REAL, MPI_MAX, f%MPI_COMM_FESOM, f%MPIerr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, min_rtime(16),  5, MPI_REAL, MPI_MIN, f%MPI_COMM_FESOM, f%MPIerr)
+
+    ! Per-stream cumulative cost — printed sorted at finalize from rank 0.
+    call print_per_stream_costs(f%partit%MPI_COMM_FESOM, f%partit%mype, f%npes)
+
+#if defined (__XIOS)
+   ! Must finalize XIOS BEFORE MPI/OASIS teardown so server2 receives
+   ! the client-finalize signal on MPI_COMM_WORLD (matches NEMO/OIFS).
+   call io_xios_close()
+#endif
+
+#if defined (__oifs)
     ! OpenIFS coupled version has to call oasis_terminate through par_ex
     call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
 #endif
@@ -794,6 +1100,13 @@ contains
 #if defined(__MULTIO) && !defined(__ifsinterface) && !defined(__oasis)
    call mpp_stop
 #endif
+    ! Generate enhanced profiler report BEFORE MPI finalization
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("fesom_finalize_total")
+        call fesom_profiler_report(f%MPI_COMM_FESOM, f%mype)
+        ! Note: Do NOT call fesom_profiler_finalize here as it would duplicate the report
+#endif
+    
     if(f%fesom_did_mpi_init) call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype) ! finalize MPI before FESOM prints its stats block, otherwise there is sometimes output from other processes from an earlier time in the programm AFTER the starts block (with parastationMPI)
     if (f%mype==0) then
         41 format (a35,a10,2a15) !Format for table heading
@@ -811,6 +1124,11 @@ contains
         print 42, '    > runtime ice step :      ',    mean_rtime(8),     min_rtime(8),      max_rtime(8)
         print 42, '  runtime diag:               ',    mean_rtime(11),    min_rtime(11),     max_rtime(11)
         print 42, '  runtime output:             ',    mean_rtime(12),    min_rtime(12),     max_rtime(12)
+        print 42, '    > out: update_means       ',    mean_rtime(16),    min_rtime(16),     max_rtime(16)
+        print 42, '    > out: streamloop         ',    mean_rtime(17),    min_rtime(17),     max_rtime(17)
+        print 42, '    > out:   pack             ',    mean_rtime(18),    min_rtime(18),     max_rtime(18)
+        print 42, '    > out:   mask             ',    mean_rtime(19),    min_rtime(19),     max_rtime(19)
+        print 42, '    > out:   xsend            ',    mean_rtime(20),    min_rtime(20),     max_rtime(20)
         print 42, '  runtime restart:            ',    mean_rtime(13),    min_rtime(13),     max_rtime(13)
         print 42, '  runtime forcing:            ',    mean_rtime(14),    min_rtime(14),     max_rtime(14)
         print 42, '  runtime total (ice+oce):    ',    mean_rtime(9),     min_rtime(9),      max_rtime(9)
@@ -834,6 +1152,8 @@ contains
         write(*,*)
     end if    
 !   call clock_finish  
+    
+    ! Enhanced profiler is already finalized above before MPI finalization
   end subroutine fesom_finalize
 
 end module fesom_module

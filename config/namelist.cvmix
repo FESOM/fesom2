@@ -1,75 +1,211 @@
-! namelist for Turbulent Kinetic Energy (TKE) 
+! ============================================================================
+! ========== Namelist file for FESOM2 CVMix parameterizations ===============
+! ============================================================================
+! This file contains configuration for CVMix (Community Vertical Mixing) 
+! parameterizations:
+! - TKE (Turbulent Kinetic Energy) scheme
+! - IDEMIX (Internal Wave Dissipation, Energy, and Mixing)
+! - PP (Pacanowski-Philander) scheme
+! - KPP (K-Profile Parameterization)
+! - TIDAL mixing parameterization
+!
+! Select the active scheme in namelist.oce (mix_scheme parameter)
+! ============================================================================
+
+! ============================================================================
+! TKE (TURBULENT KINETIC ENERGY) SCHEME
+! ============================================================================
 &param_tke
-tke_c_k            = 0.1              
-tke_c_eps          = 0.7               
-tke_alpha          = 30.0              
-tke_mxl_min        = 1.0e-8            
-tke_kappaM_min     = 0.0                
-tke_kappaM_max     = 100.0              
-tke_cd            = 3.75 ! for Dirichlet boundary conditions
-!tke_cd             = 1.0  ! for Neumann boundary conditions 
-tke_surf_min       = 1.0e-4             
-tke_min            = 1.0e-6
-! tke_mxl_choice ... Can only be 1 or 2, choice of calculation of mixing 
-! length; currently only Blanke, B., P. Delecluse option is implemented
-tke_mxl_choice     = 2     
-tke_dolangmuir     = .false.    
+! --- TKE Model Parameters ---
+tke_c_k          = 0.1          ! TKE parameter c_k [dimensionless]
+tke_c_eps        = 0.7          ! TKE dissipation parameter c_eps [dimensionless]
+tke_alpha        = 30.0         ! TKE stability function parameter [dimensionless]
+
+! --- Mixing Length ---
+tke_mxl_min      = 1.0e-8       ! minimum mixing length [m]
+tke_mxl_choice   = 2            ! mixing length calculation method:
+                                 !   1 = not implemented
+                                 !   2 = Blanke & Delecluse option (currently only option)
+
+! --- Viscosity/Diffusivity Limits ---
+tke_kappaM_min   = 0.0          ! minimum momentum diffusivity [m²/s]
+tke_kappaM_max   = 100.0        ! maximum momentum diffusivity [m²/s]
+
+! --- Boundary Conditions ---
+tke_cd           = 3.75         ! surface boundary condition parameter
+                                 ! 3.75 for Dirichlet BC, 1.0 for Neumann BC
+
+! --- TKE Minimum Values ---
+tke_surf_min     = 1.0e-4       ! minimum surface TKE [m²/s²]
+tke_min          = 1.0e-6       ! minimum interior TKE [m²/s²]
+
+! --- Langmuir Turbulence ---
+tke_dolangmuir   = .false.      ! include Langmuir turbulence parameterization
 /
 
-! namelist for IDEMIX von Pollman et al. (2017)
+! ============================================================================
+! IDEMIX (INTERNAL WAVE ENERGY PARAMETERIZATION)
+! ============================================================================
+! Based on Olbers & Eden (2013) and von Pollmann et al. (2017)
+! ============================================================================
 &param_idemix
-idemix_tau_v       = 172800.0   ! 2days ! time scale for vertical symmetrisation (sec)
-idemix_tau_h       = 1296000.0  !15days ! time scale for horizontal symmetrisation
-idemix_gamma       = 1.570      ! constant of order one derived from the shape of the spectrum in m space (dimensionless)
-idemix_jstar       = 5.0        ! spectral bandwidth in modes (dimensionless)
-idemix_mu0         = 0.33333333 ! dissipation parameter (dimensionless)
-idemix_sforcusage  = 0.2
-idemix_n_hor_iwe_prop_iter = 5  ! iterations for contribution from horiz. wave propagation
-idemix_surforc_file = '/work/ollie/clidyn/forcing/IDEMIX/fourier_smooth_2005_cfsr_inert_rgrid.nc'
-idemix_surforc_vname= 'var706'
-idemix_botforc_file = '/work/ollie/clidyn/forcing/IDEMIX/tidal_energy_gx1v6_20090205_rgrid.nc'
-idemix_botforc_vname= 'wave_dissipation'
+! --- Time Scales ---
+idemix_tau_v     = 172800.0     ! vertical symmetrization time scale [s] (2 days)
+idemix_tau_h     = 1296000.0    ! horizontal symmetrization time scale [s] (15 days)
+
+! --- Spectral Parameters ---
+idemix_gamma     = 1.570        ! spectral shape constant [dimensionless] (order 1)
+idemix_jstar     = 5.0          ! spectral bandwidth in vertical modes [dimensionless]
+idemix_mu0       = 0.33333333   ! dissipation parameter [dimensionless]
+
+! --- Energy Forcing ---
+idemix_sforcusage = 0.2         ! fraction of surface forcing used [dimensionless]
+idemix_n_hor_iwe_prop_iter = 5  ! iterations for horizontal wave propagation
+
+! --- Surface Forcing (Wind-Generated Internal Waves) ---
+idemix_surforc_file  = '/pool/data/AWICM/FESOM2/FORCING/IDEMIX/fourier_smooth_2005_cfsr_inert_rgrid.nc'   ! path to surface forcing file
+idemix_surforc_vname = 'var706'      ! variable name in surface forcing file
+
+! --- Bottom Forcing (Tidal Internal Waves) ---
+!idemix_botforc_file  = '/albedo/pool/FESOM/fesom2.0/forcing/idemix/forcing_idemix_final_bin/FIN_tidal_energy_gx1v6_20090205_CESMJayne_remapnn_0.40deg.nc'  ! path to bottom forcing !file
+!idemix_botforc_vname = 'wave_dissipation'  ! variable name in bottom forcing file
+idemix_botforc_file  = '/albedo/pool/FESOM/fesom2.0/forcing/idemix/forcing_idemix_final_bin/FIN_STORMTIDE2_M2_plus_NYCANDER_CnoM2_bin_0.40deg.nc'         ! path to bottom forcing file,
+idemix_botforc_vname = 'stormt_M2_plus_nycand_CnoM2'  ! variable name in bottom forcing file
+
 /
 
-! namelist for PP
+! ============================================================================
+! PP (PACANOWSKI-PHILANDER) SCHEME
+! ============================================================================
+! Based on Pacanowski & Philander (1981)
+! ============================================================================
 &param_pp
-pp_use_fesompp     = .true.     ! if true use fesom flavor off PP if false use original PP of Pacanowski & Philander
-pp_Av0             = 0.01       ! mixing coeff. for PP
-pp_alpha           = 5.0        ! alpha param eq. (1) in Pacanowski and Philander 1981
-pp_exp             = 2.0        ! n param eq. (1) in Pacanowski and Philander 1981
-pp_Avbckg          = 1.0e-4     ! const. pp background viscosity
-pp_Kvbckg          = 1.0e-5     ! const. pp background diffusivity
-pp_use_nonconstKvb = .true.     ! use lat and depth dependent background diffusivity
+! --- PP Variant ---
+pp_use_fesompp = .true.         ! use FESOM flavor of PP (true) or original PP (false)
+
+! --- Mixing Coefficients ---
+pp_Av0         = 0.01           ! reference mixing coefficient [m²/s]
+pp_alpha       = 5.0            ! Richardson number dependency parameter [dimensionless]
+                                ! (alpha in eq. 1 of Pacanowski & Philander 1981)
+pp_exp         = 2.0            ! Richardson number exponent [dimensionless]
+                                ! (n in eq. 1 of Pacanowski & Philander 1981)
+
+! --- Background Mixing ---
+pp_Avbckg          = 1.0e-4     ! constant background viscosity [m²/s]
+pp_Kvbckg          = 1.0e-5     ! constant background diffusivity [m²/s]
+pp_use_nonconstKvb = .true.     ! use latitude and depth dependent background diffusivity
 /
 
-! namelist for KPP
+! ============================================================================
+! KPP (K-PROFILE PARAMETERIZATION)
+! ============================================================================
+! Based on Large et al. (1994) with CVMix implementation options
+! ============================================================================
 &param_kpp
-kpp_use_fesomkpp   = .false.     ! if true use cvmix MOM5 like kpp if false use cvmix MOM6 like kpp
-kpp_use_enhanceKv  = .true.     ! If true, add enhanced diffusivity at base of boundary layer
-kpp_use_compEkman  = .true.     ! If true, compute Ekman depth limit for OBLdepth 
-kpp_use_monob      = .true.     ! If true, compute Monin-Obukhov limit for OBLdepth
-kpp_interptype_ri  = "linear"    ! Type of interpolation in determining OBL depth: linear,quadratic,cubic
-kpp_interptype_atobl= "LMD94"   ! Type of interpolation of visc and diff at obl depth: linear,quadratic,cubic,LMD94
-kpp_matchtechc     = "ParabolicNonLocal" ! Setting diffusivity and NLT profile functions:SimpleShapes, MatchGradient, MatchBoth, ParabolicNonLocal
-kpp_internalmix    = "KPP"      ! Ri-number dependet mixing scheme below the OBL: 'PP' or 'KPP'
-kpp_reduce_tauuice = .false.    ! If True, reduce the wind stress (ustar) under sea ice.
-kpp_Av0            = 5.0e-3     ! leading coefficient of shear mixing formula, units: m^2/s: default= 5e-3  
-kpp_Kv0            = 5.0e-3 
-kpp_Ri0            = 0.7        ! critical Richardson number value, units: unitless (0.7 in LMD94)
-kpp_pp_Av0         = 0.01       ! Parameter in case of PP mixing below the OBL
-kpp_use_nonconstKvb= .true.     ! If True use non constant background diffusivity of Qiang from FESOM1.4
-kpp_Avbckg         = 1.0e-4     ! Values for const. background viscosity and diffusivity
-kpp_Kvbckg         = 1.0e-5
+! --- KPP Implementation ---
+kpp_use_fesomkpp  = .false.      ! use CVMix MOM5-like KPP (true) or MOM6-like KPP (false)
+
+! --- Ocean Boundary Layer (OBL) Depth Calculation ---
+kpp_use_enhanceKv = .true.      ! add enhanced diffusivity at base of boundary layer
+kpp_use_compEkman = .true.      ! compute Ekman depth limit for OBL depth
+kpp_use_monob     = .true.      ! compute Monin-Obukhov limit for OBL depth
+
+! --- Interpolation Methods ---
+kpp_interptype_ri = "linear"         ! interpolation type for OBL depth determination:
+                                     !   'linear', 'quadratic', 'cubic'
+kpp_interptype_atobl = "LMD94"       ! interpolation of viscosity/diffusivity at OBL depth:
+                                     !   'linear', 'quadratic', 'cubic', 'LMD94'
+kpp_matchtechc = "ParabolicNonLocal" ! diffusivity and non-local transport profile:
+                                     !   'SimpleShapes', 'MatchGradient', 'MatchBoth', 'ParabolicNonLocal'
+
+! --- Mixing Below OBL ---
+kpp_internalmix = "KPP"         ! Richardson number dependent mixing below OBL:
+                                !   'KPP' or 'PP'
+kpp_pp_Av0      = 0.01          ! mixing coefficient for PP scheme below OBL [m²/s]
+
+! --- Shear Mixing Parameters ---
+kpp_Av0         = 5.0e-3        ! leading coefficient of shear mixing [m²/s] (default: 5e-3)
+kpp_Kv0         = 5.0e-3        ! leading coefficient of shear diffusion [m²/s]
+kpp_Ri0         = 0.7           ! critical Richardson number [dimensionless] (0.7 in LMD94)
+
+! --- Background Mixing ---
+kpp_use_nonconstKvb = .true.    ! use non-constant background diffusivity (FESOM1.4 formulation)
+kpp_Avbckg      = 1.0e-4        ! constant background viscosity [m²/s]
+kpp_Kvbckg      = 1.0e-5        ! constant background diffusivity [m²/s]
+
+! --- Sea Ice Effects ---
+kpp_reduce_tauuice = .false.    ! reduce wind stress (u*) under sea ice
+
+! --- Langmuir Options in cvmix KPP ---
+
+! Stokes Similarty package
+! If true, use Stokes Similarty package (i.e. include wave‐related / Stokes drift 
+! effects in the surface layer). Triggers usage of additional routines 
+! that alter the shape functions, or mixing formulations, incorporating wave / 
+! Stokes drift effects consistent with Monin–Obukhov similarity theory 
+! (MOST). The code logic probably augments or replaces parts of the standard boundary 
+! (layer similarity (or nonlocal mixing) using a Stokes‐drift‐aware correction.
+kpp_use_StokesMOST= .false. !.true.
+    
+! approximate proportionality between surface wind velocity and stokes velocity
+! U_stokes ~ kpp_A_stokes * U_wind
+kpp_A_stokes      = 0.005 ! a
+    
+! Langmuir option
+! Option of Langmuir enhanced mixing apply an enhancement factor to the
+! turbulent velocity scale
+! LWF16     -  MixingCoefEnhancement = Langmuir_EFactor
+! RWHGK16   -  MixingCoefEnhancement = cvmix_one + ShapeNoMatchAtS/NMshapeMax * &
+!                                      (Langmuir_EFactor - cvmix_one)
+! NONE      -  Langmuir switched off, MixingCoefEnhancement=1 
+kpp_langmuir_mixing= "NONE" !"LWF16"
+        
+! Option of Langmuir turbulence enhanced entrainment - modify the unresolved shear
+! LWF16     -  Li Q., Webb A., Fox-Kemper B., Craig A., Danabasoglu G., 
+!              Large W., Vertenstein M., 2016, Langmuir mixing effects on 
+!              global climate: WAVEWATCH III in CESM, Ocean Modelling 103 (2016) 145–160
+!              
+! LF17      -  Li Q., Fox-Kemper B., Breivik O., Webb A., 2017, Statistical 
+!              models of global Langmuir mixing, Ocean Modelling 113 (2017) 95–114
+!              
+! RWHGK16   -  Reichl B., Wang D., Hara T., Ginis I. and Kukulka T, 2016, Impact 
+!              of Sea-State-Dependent Langmuir Turbulence on the Ocean
+!              Response to a Tropical Cyclone, Mon. Wea. Rev., 144
+!              
+! NONE      -  
+kpp_langmuir_entrainment= "NONE" !"LF17"
 /
 
-! namelist for TIDAL
+
+! ============================================================================
+! TIDAL MIXING PARAMETERIZATION
+! ============================================================================
+! Based on Simmons et al. (2004)
+! ============================================================================
 &param_tidal
-tidal_mixscheme    = "Simmons"
-tidal_efficiency   = 0.2         ! units: unitless (fraction); (Gamma in Simmons et al.)
-tidal_vert_decayscale= 500.0     ! units: m; zeta in Simmons et al. (used to compute the vertical deposition function)   
-tidal_max_coeff    = 50e-4       ! units: m^2/s; largest acceptable value for diffusivity          
-tidal_lcl_mixfrac  = 0.33        !tidal dissipation efficiency (q in Simmons et al.), i.e. fraction of energy that dissipates locally
-tidal_depth_cutoff = 0.0         !depth of the shallowest column where tidal mixing is computed (positive below surface)
-tidal_botforc_file = '/albedo/work/projects/p_pool_fesom1/fesom2.0/forcing/idemix/tidal_energy_gx1v6_20090205_rgrid.nc'
+! --- Tidal Mixing Scheme ---
+tidal_mixscheme = "Simmons"     ! tidal mixing scheme (currently only 'Simmons' implemented)
+
+! --- Energy Dissipation Parameters ---
+tidal_efficiency   = 0.2        ! mixing efficiency [dimensionless, 0-1]
+                                ! (Gamma in Simmons et al. 2004)
+tidal_lcl_mixfrac  = 0.33       ! local dissipation fraction [dimensionless]
+                                ! (q in Simmons et al. 2004)
+                                ! fraction of tidal energy dissipated locally vs radiated away
+
+! --- Vertical Structure ---
+tidal_vert_decayscale = 500.0   ! vertical decay scale [m]
+                                ! (zeta in Simmons et al. 2004)
+                                ! controls vertical distribution of tidal mixing
+
+! --- Diffusivity Limits ---
+tidal_max_coeff = 50e-4         ! maximum tidal diffusivity [m²/s]
+
+! --- Spatial Limits ---
+tidal_depth_cutoff = 0.0        ! minimum depth for tidal mixing [m, positive downward]
+                                ! (0.0 = compute everywhere)
+
+! --- Bottom Forcing (Tidal Energy Input) ---
+tidal_botforc_file = '/pool/data/AWICM/FESOM2/FORCING/IDEMIX/tidal_energy_gx1v6_20090205_rgrid.nc'
 /
 

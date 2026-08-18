@@ -1,0 +1,47 @@
+# Intel OneAPI Compilers environment for Ubuntu local development
+# This environment uses Intel Fortran with system GCC for C/C++
+
+# Source Intel OneAPI environment (this sets up paths and environment variables)
+# Check common installation paths
+if [ -f "/opt/intel/oneapi/setvars.sh" ]; then
+    source /opt/intel/oneapi/setvars.sh --force
+elif [ -f "${HOME}/intel/oneapi/setvars.sh" ]; then
+    source ${HOME}/intel/oneapi/setvars.sh --force
+elif [ -f "/usr/local/intel/oneapi/setvars.sh" ]; then
+    source /usr/local/intel/oneapi/setvars.sh --force
+else
+    echo "ERROR: Intel OneAPI setvars.sh not found in common locations"
+    echo "Please set INTEL_ONEAPI_ROOT environment variable or install Intel OneAPI"
+    return 1
+fi
+
+# Use Intel Fortran with system GCC (mixed-compiler setup common for Intel OneAPI)
+export FC=mpiifx CC=mpicc CXX=mpicxx
+
+# Set the underlying compilers for Intel MPI wrappers
+# Intel OneAPI 2025 may not have all C/C++ compilers, so use mixed approach
+if command -v ifx >/dev/null 2>&1; then
+    export I_MPI_F90=ifx
+    export I_MPI_FC=ifx
+elif command -v ifort >/dev/null 2>&1; then
+    export I_MPI_F90=ifort
+    export I_MPI_FC=ifort
+fi
+
+# For C/C++, use system compilers with Intel MPI (common practice)
+# This allows Intel Fortran with system GCC, which is often more compatible
+export I_MPI_CC=gcc
+export I_MPI_CXX=g++
+
+# Ensure Intel MPI is used instead of system MPI (add to front of PATH)
+if [ -d "/opt/intel/oneapi/mpi/latest/bin" ]; then
+    export PATH="/opt/intel/oneapi/mpi/latest/bin:${PATH}"
+elif [ -d "/opt/intel/oneapi/mpi/2021.16/bin" ]; then
+    export PATH="/opt/intel/oneapi/mpi/2021.16/bin:${PATH}"
+fi
+
+# Intel MKL for LAPACK
+export LAPACK_LIBRARIES="-mkl=sequential"
+export CMAKE_ARGS="-DLAPACK_LIBRARIES='${LAPACK_LIBRARIES}'"
+
+# Let Intel OneAPI setvars.sh handle all library paths

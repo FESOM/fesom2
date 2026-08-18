@@ -16,6 +16,7 @@ module diagnostics
   use g_rotate_grid
   use g_support
   use Toy_Channel_Soufflet
+  use cmor_variables_diag
   implicit none
 
   private
@@ -30,7 +31,9 @@ module diagnostics
             dvd_SD_chi_dif_heR, dvd_SD_chi_dif_hbh, dvd_SD_chi_dif_veR, dvd_SD_chi_dif_viR, dvd_SD_chi_dif_vi,    &
             dvd_SD_chi_dif_ve, dvd_SD_chi_dif_sbc, dvd_xdfac,                                                     &
             ldiag_uvw_sqr, uv2, wvel2,                                                                            &
-            ldiag_trgrd_xyz, trgrd_x, trgrd_y, trgrd_z
+            ldiag_trgrd_xyz, trgrd_x, trgrd_y, trgrd_z,                                                           &
+            ldiag_cmor,                                                                                            &
+            dmoc_call_freq, dmoc_call_freq_unit, dmoc_is_due
              
 
   ! Arrays used for diagnostics, some shall be accessible to the I/O
@@ -90,7 +93,9 @@ module diagnostics
   ! this option activates writing the horizintal velocity transports within the density bins (U_rho_x_DZ and V_rho_x_DZ)
   ! an additional field (RHO_Z) will be computed which allows for diagnosing the numerical diapycnal mixing after A. Megann 2018
   logical                                       :: ldiag_dMOC       =.false.
-  
+  integer                                       :: dmoc_call_freq      = 1    ! call diag_densMOC every N units
+  character(3)                                  :: dmoc_call_freq_unit = 's'  ! unit: 's'=steps, 'h'=hours, 'd'=days, 'm'=months
+
   ! flag for calculating the Discrete Variance Decay --> estimator for numerical/
   ! spurious mixing in the advection schemes
   logical                                       :: ldiag_DVD        =.false.
@@ -104,11 +109,24 @@ module diagnostics
   logical                                       :: ldiag_uvw_sqr    =.false.
   logical                                       :: ldiag_trgrd_xyz  =.false.
   
-  namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_Ri, & 
-                       ldiag_TurbFlux, ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc, &
-                       ldiag_extflds, ldiag_destine, ldiag_trflx, ldiag_ice, ldiag_uvw_sqr, ldiag_trgrd_xyz
+  namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_Ri, &
+                       ldiag_TurbFlux, ldiag_dMOC, dmoc_call_freq, dmoc_call_freq_unit, ldiag_DVD, ldiag_salt3D, ldiag_forc, &
+                       ldiag_extflds, ldiag_destine, ldiag_trflx, ldiag_ice, ldiag_uvw_sqr, ldiag_trgrd_xyz, &
+                       ldiag_cmor
   
   contains
+
+logical function dmoc_is_due(istep)
+  integer, intent(in) :: istep
+  dmoc_is_due = .false.
+  select case (trim(dmoc_call_freq_unit))
+    case ('s'); call step_event  (dmoc_is_due, istep, dmoc_call_freq)
+    case ('h'); call hourly_event(dmoc_is_due,        dmoc_call_freq)
+    case ('d'); call daily_event (dmoc_is_due,        dmoc_call_freq)
+    case ('m'); call monthly_event(dmoc_is_due,       dmoc_call_freq)
+    case default; dmoc_is_due = .true.
+  end select
+end function dmoc_is_due
 
 ! ==============================================================
 !rhs_diag=ssh_rhs?
@@ -433,6 +451,7 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
   real(kind=WP), save, allocatable        :: dens(:), aux(:), el_depth(:)
   real(kind=WP), save, allocatable        :: std_dens_w(:,:), std_dens_VOL1(:,:), std_dens_VOL2(:,:)
   logical, save                           :: firstcall_s=.true., firstcall_e=.true.
+  real(kind=WP), save                     :: dmoc_dt_factor = 1.0_WP  ! steps between calls, used for dVdT divisor
   real(kind=WP), dimension(:,:), pointer  :: temp, salt
   real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
 #include "associate_part_def.h"
@@ -480,6 +499,12 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
      std_dens_H   =0. !will be the vertical layerthickness of the density class (for convertion between dAMOC <-> zMOC)
      depth        =0.
      el_depth     =0.
+     select case (trim(dmoc_call_freq_unit))
+       case ('s'); dmoc_dt_factor = real(dmoc_call_freq, WP)
+       case ('h'); dmoc_dt_factor = real(dmoc_call_freq, WP) * 3600.0_WP / dt
+       case ('d'); dmoc_dt_factor = real(dmoc_call_freq, WP) * 86400.0_WP / dt
+       case default; dmoc_dt_factor = 1.0_WP
+     end select
      firstcall_s=.false.
      if (mode==0) return
   end if
@@ -732,7 +757,7 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
   !_____________________________________________________________________________
   ! compute density class volume change over time 
   if (.not. firstcall_e) then
-     std_dens_dVdT=(std_dens_VOL2-std_dens_VOL1)/dt
+     std_dens_dVdT=(std_dens_VOL2-std_dens_VOL1)/(dmoc_dt_factor*dt)
   end if
   std_dens_VOL1=std_dens_VOL2
   
@@ -1100,7 +1125,8 @@ subroutine compute_diagnostics(mode, dynamics, tracers, ice, partit, mesh)
   end if
   
   ! 6. MOC in density coordinate
-  if (ldiag_dMOC)        call diag_densMOC(mode, dynamics, tracers, partit, mesh)
+  if (ldiag_dMOC .and. dmoc_is_due(mstep)) &
+      call diag_densMOC(mode, dynamics, tracers, partit, mesh)
   
   ! 7. compute turbulent fluxes
   if (ldiag_turbflux)    call diag_turbflux(mode, dynamics, tracers, partit, mesh)
@@ -1129,7 +1155,17 @@ subroutine compute_diagnostics(mode, dynamics, tracers, ice, partit, mesh)
   
   if (ldiag_destine)     call compute_destinE(mode, dynamics, tracers, partit, mesh)
   
-  call compute_thetao(mode, tracers, partit, mesh) 
+  ! 14. compute CMOR diagnostics for CMIP6/CMIP7
+  if (ldiag_cmor) then
+     if (mode == 0) then
+        call init_cmor_diag(partit, mesh)
+     else
+        call compute_cmor_diag(tracers, ice, dynamics, partit, mesh)
+     end if
+  end if
+  
+  ! Currently deactivated, as it is not needed
+  ! call compute_thetao(mode, tracers, partit, mesh) 
 
 end subroutine compute_diagnostics
 
@@ -1498,7 +1534,7 @@ subroutine dvd_add_advflux_hor(do_SDdvd, tr_num, dvd_tot, trflx_h, UV, trstar, d
             !  U = u*h
             !  Xchi_(i+0.5) = 2*[U_(i+0.5)* T^tilde_(i+0.5) * ( Tstar_i-Tstar_(i-1) ) -
             !                    U_(i+0.5)*0.5*(Tstar_i+Tstar_(i-1))*(Tstar_i-Tstar_(i-1))]
-            xchi   = 2.0_WP * -trflx_h(nz, edge)*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
+            xchi   = 2.0_WP * (-trflx_h(nz, edge))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
             !                 |-> this minus because trflx_v contains the 
             !                      negative tracer flx we need it positive
             xchi   = xchi - vflx*(trstar(nz,ednodes(1))+trstar(nz,ednodes(2)))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
@@ -1532,7 +1568,7 @@ subroutine dvd_add_advflux_hor(do_SDdvd, tr_num, dvd_tot, trflx_h, UV, trstar, d
                 !  U = u*h
                 !  Xchi_(i+0.5) = 2*[U_(i+0.5)* T^tilde_(i+0.5) * ( Tstar_i-Tstar_(i-1) ) -
                 !                    U_(i+0.5)*0.5*(Tstar_i+Tstar_(i-1))*(Tstar_i-Tstar_(i-1))]
-                xchi   = 2.0_WP * -trflx_h(nz, edge)*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
+                xchi   = 2.0_WP * (-trflx_h(nz, edge))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
                 !                 |-> this minus because trflx_v contains the 
                 !                      negative tracer flx we need it positive                         
                 xchi   = xchi - vflx*(trstar(nz,ednodes(1))+trstar(nz,ednodes(2)))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
@@ -1568,7 +1604,7 @@ subroutine dvd_add_advflux_hor(do_SDdvd, tr_num, dvd_tot, trflx_h, UV, trstar, d
             !  U = u*h
             !  Xchi_(i+0.5) = 2*[U_(i+0.5)* T^tilde_(i+0.5) * ( Tstar_i-Tstar_(i-1) ) -
             !                    U_(i+0.5)*0.5*(Tstar_i+Tstar_(i-1))*(Tstar_i-Tstar_(i-1))]
-            xchi   = 2.0_WP * -trflx_h(nz, edge)*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
+            xchi   = 2.0_WP * (-trflx_h(nz, edge))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
             !                 |-> this minus because trflx_v contains the 
             !                      negative tracer flx we need it positive
             xchi   = xchi - vflx*(trstar(nz,ednodes(1))+trstar(nz,ednodes(2)))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
@@ -1602,7 +1638,7 @@ subroutine dvd_add_advflux_hor(do_SDdvd, tr_num, dvd_tot, trflx_h, UV, trstar, d
             !  U = u*h
             !  Xchi_(i+0.5) = 2*[U_(i+0.5)* T^tilde_(i+0.5) * ( Tstar_i-Tstar_(i-1) ) -
             !                    U_(i+0.5)*0.5*(Tstar_i+Tstar_(i-1))*(Tstar_i-Tstar_(i-1))]
-            xchi   = 2.0_WP * -trflx_h(nz, edge)*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
+            xchi   = 2.0_WP * (-trflx_h(nz, edge))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
             !                 |-> this minus because trflx_v contains the 
             !                      negative tracer flx we need it positive
             xchi   = xchi - vflx*(trstar(nz,ednodes(1))+trstar(nz,ednodes(2)))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
@@ -1636,7 +1672,7 @@ subroutine dvd_add_advflux_hor(do_SDdvd, tr_num, dvd_tot, trflx_h, UV, trstar, d
             !  U = u*h
             !  Xchi_(i+0.5) = 2*[U_(i+0.5)* T^tilde_(i+0.5) * ( Tstar_i-Tstar_(i-1) ) -
             !                    U_(i+0.5)*0.5*(Tstar_i+Tstar_(i-1))*(Tstar_i-Tstar_(i-1))]
-            xchi   = 2.0_WP * -trflx_h(nz, edge)*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
+            xchi   = 2.0_WP * (-trflx_h(nz, edge))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
             !                 |-> this minus because trflx_v contains the 
             !                      negative tracer flx we need it positive
             xchi   = xchi - vflx*(trstar(nz,ednodes(1))+trstar(nz,ednodes(2)))*(trstar(nz,ednodes(1))-trstar(nz,ednodes(2)))
@@ -1714,7 +1750,7 @@ subroutine dvd_add_advflux_ver(do_SDdvd, tr_num, dvd_tot, trflx_v, Wvel, trstar,
             ! surface xchi
             nz=nu1
             trstar_zlev = trstar(nz, node)
-            xchi(nz) = 2.0_WP*-trflx_v(nz, node)*(trstar(nz, node)-trstar(nz+1, node))
+            xchi(nz) = 2.0_WP*(-trflx_v(nz, node))*(trstar(nz, node)-trstar(nz+1, node))
             xchi(nz) = xchi(nz) - 2.0_WP*Wvel(nz, node)*area(nz, node)*trstar_zlev*(trstar(nz, node)-trstar(nz+1, node))
             
             ! surface and bulk dvd, bulk xchi 
@@ -1725,7 +1761,7 @@ subroutine dvd_add_advflux_ver(do_SDdvd, tr_num, dvd_tot, trflx_v, Wvel, trstar,
                 trstar_zlev = (trstar(nz-1, node)*hnode(nz-1, node)+trstar(nz, node)*hnode(nz, node))/(hnode(nz-1,node)+hnode(nz,node))
                 
                 ! --> here we are on full depth levels eq. 26 for small dt
-                xchi(nz) = 2.0_WP*-trflx_v(nz, node)*(trstar(nz-1, node)-trstar(nz, node))
+                xchi(nz) = 2.0_WP*(-trflx_v(nz, node))*(trstar(nz-1, node)-trstar(nz, node))
                 !                 |-> this minus because trflx_v contains the 
                 !                     negative tracer flx we need it positive
                 xchi(nz) = xchi(nz) - 2.0_WP*Wvel(nz, node)*area(nz, node)*trstar_zlev*(trstar(nz-1, node)-trstar(nz, node))
@@ -2762,7 +2798,6 @@ end subroutine dvd_add_difflux_vertexplredi
 ! Xchi^(n+1) =  ...+ (2*Tr^(n+1) * Dflx[Tr^(n+1)] )/ V^(n+1) +...
 ! --> here Tr^(n+1) und Dflx[...] are reconstructed values at the interfase
 subroutine dvd_add_difflux_vertimplredi(do_SDdvd, tr_num, dvd_tot, tr, trstar, Ki, slope, partit, mesh)
-    use g_cvmix_kpp, only: kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc
     implicit none
         type(t_partit), intent(inout), target  :: partit
         type(t_mesh)  , intent(in)   , target  :: mesh
@@ -2905,7 +2940,6 @@ end subroutine dvd_add_difflux_vertimplredi
 ! Xchi^(n+1) =  ...+ (2*Tr^(n+1) * Dflx[Tr^(n+1)] )/ V^(n+1) +...
 ! --> here Tr^(n+1) und Dflx[...] are reconstructed values at the interfase
 subroutine dvd_add_difflux_vertimpl(do_SDdvd, tr_num, dvd_tot, tr, trstar, Kv, partit, mesh)
-    use g_cvmix_kpp, only: kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc
     implicit none
         type(t_partit), intent(inout), target  :: partit
         type(t_mesh)  , intent(in)   , target  :: mesh
@@ -3047,7 +3081,9 @@ end subroutine dvd_add_difflux_vertimpl
 ! Xchi^(n+1) =  ...+ (2*Tr^(n+1) * Dflx[Tr^(n+1)] )/ V^(n+1) +...
 ! --> here Tr^(n+1) und Dflx[...] are reconstructed values at the interfase
 subroutine dvd_add_difflux_sbc(do_SDdvd, tr_num, dvd_tot, tr, trstar, partit, mesh)
+#if defined (__cvmix)
     use g_cvmix_kpp, only: kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc
+#endif    
     implicit none
         type(t_partit), intent(inout), target  :: partit
         type(t_mesh)  , intent(in)   , target  :: mesh
@@ -3122,6 +3158,7 @@ subroutine dvd_add_difflux_sbc(do_SDdvd, tr_num, dvd_tot, tr, trstar, partit, me
                         Dflx(nz) = Dflx(nz) + MIN(ghats(nz, node)*blmc(nz, node, 3), 1.0_WP)*rsss*water_flux(node)*area(nz, node) 
                     end do
                 end if
+#if defined (__cvmix)                
             !___________________________________________________________________
             ! use cvmix KPP
             elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
@@ -3134,6 +3171,7 @@ subroutine dvd_add_difflux_sbc(do_SDdvd, tr_num, dvd_tot, tr, trstar, partit, me
                         Dflx(nz) = Dflx(nz) + MIN(kpp_nonlcltranspT(nz, node)*kpp_oblmixc(nz, node, 3), 1.0_WP)*rsss*water_flux(node)*area(nz, node) 
                     end do
                 end if    
+#endif                
             end if
         end if ! --> if (use_kpp_nonlclflx) then
         

@@ -42,7 +42,7 @@ type(t_partit), intent(inout), target :: partit
   if (partit%mype==0) write(*,*) '****************************************************'
   if (use_ice) then
      call forcing_array_setup(partit, mesh)
-#ifndef __oasis
+#if !defined(__oasis) && !defined(__yac)
      call sbc_ini(partit, mesh)         ! initialize forcing fields
 #endif
   endif 
@@ -87,7 +87,9 @@ subroutine forcing_array_setup(partit, mesh)
   use g_sbf, only: l_mslp, l_cloud
 #if defined (__oasis)
   use cpl_driver, only : nrecv
-#endif   
+#elif defined(__yac)
+  use cpl_yac_driver, only : nrecv
+#endif
   implicit none
   type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit
@@ -141,14 +143,12 @@ subroutine forcing_array_setup(partit, mesh)
   runoff=0.0_WP
   evaporation = 0.0_WP
   ice_sublimation = 0.0_WP
-
-
-#if defined (__oasis) || defined (__ifsinterface)
+#if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
   allocate(sublimation(n2), evap_no_ifrac(n2))
   sublimation=0.0_WP
   evap_no_ifrac=0.0_WP
 #endif
-#if defined (__oasis)
+#if defined (__oasis) || defined (__yac)
   allocate(tmp_sublimation(n2),tmp_evap_no_ifrac(n2), tmp_shortwave(n2))
   allocate(atm_net_fluxes_north(nrecv), atm_net_fluxes_south(nrecv))
   allocate(oce_net_fluxes_north(nrecv), oce_net_fluxes_south(nrecv))
@@ -238,15 +238,15 @@ subroutine forcing_array_setup(partit, mesh)
 
   !for ice diagnose
   if(use_ice) then
-!     allocate(thdgr(n2), thdgrsn(n2))
     allocate(flice(n2))
-    allocate(olat_heat(n2), osen_heat(n2), olwout(n2))
-!     thdgr=0.0_WP
-!     thdgrsn=0.0_WP
-    flice=0.0_WP
-    olat_heat=0.0_WP
-    osen_heat=0.0_WP
-    olwout=0.0_WP
+    allocate(hf_Qlat(n2), hf_Qsen(n2), hf_Qradtot(n2), hf_Qswr(n2), hf_Qlwr(n2), hf_Qlwrout(n2))
+    flice     = 0.0_WP
+    hf_Qlat   = 0.0_WP
+    hf_Qsen   = 0.0_WP
+    hf_Qradtot= 0.0_WP
+    hf_Qswr   = 0.0_WP
+    hf_Qlwr   = 0.0_WP
+    hf_Qlwrout= 0.0_WP
   endif 
 
   ! drag coefficient and transfer coefficients for latent and sensible heat
