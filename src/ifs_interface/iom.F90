@@ -23,6 +23,8 @@ MODULE iom
     PUBLIC iom_flush
 
     LOGICAL :: lnomultio = .TRUE.
+    LOGICAL :: lmio_handle = .FALSE.   ! .TRUE. once iom_initialize created mio_handle
+
 
     PRIVATE ctl_stop
     !!----------------------------------------------------------------------
@@ -164,11 +166,15 @@ CONTAINS
         IF (err /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('mio_handle%open_connections failed: ', multio_error_string(err))
         END IF
+
+        lmio_handle = .TRUE.
     END SUBROUTINE iom_initialize
 
     SUBROUTINE iom_finalize()
         IMPLICIT NONE
         INTEGER :: err
+
+        IF (.NOT. lmio_handle) RETURN
 
         IF (lnomultio) RETURN
 
