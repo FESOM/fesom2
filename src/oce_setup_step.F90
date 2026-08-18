@@ -1096,9 +1096,21 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     !
 #if defined(__recom)
     ! read preindustrial DIC
-    if(DIC_PI) then
-        filelist(5) = 'GLODAPv2.2016b.PI_TCO2_fesom2_mmol_fix_z_Fillvalue.nc'
-        varlist(5)  = 'PI_TCO2_mmol'
+    if(DIC_PI .and. mype==0) then
+            write(*,*)
+            write(*,*) 'WARNING: Use pre-industrial (PI) TCO2 field, NOT the'
+            write(*,*) 'present-day/observed TCO2. Values are model-adjusted for anthropogenic'
+            write(*,*) 'carbon removal via the back-calculation method, not raw GLODAPv2 obs.'
+            write(*,*) 'Do not mix with present-day TCO2 fields elsewhere in filelist without'
+            write(*,*) 'accounting for this offset. Units are mmol (per the "_mmol" suffix) -'
+            write(*,*) 'verify this matches expected units downstream (mol vs mmol mismatches'
+            write(*,*) 'are a common source of silent scaling errors).'
+            write(*,*)
+            write(*,*) 'Check namelist for the following entries,'
+            write(*,*) 'filelist = GLODAPv2.2016b.PI_TCO2_fesom2_mmol_fix_z_Fillvalue.nc'
+            write(*,*) 'varlist = PI_TCO2_mmol'
+!        filelist(5) = 'GLODAPv2.2016b.PI_TCO2_fesom2_mmol_fix_z_Fillvalue.nc'
+!        varlist(5)  = 'PI_TCO2_mmol'
     end if
 
     if (mype==0) then
@@ -1128,16 +1140,6 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             write(*,*) 'read Temperature climatology from:', trim(filelist(8))
             write(*,*) 'read DIC remineralization    from:', trim(filelist(9)) ! DICremin (added by Sina)
     end if
-    ! read ocean state
-    ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
-!    if(mype==0) write(*,*) 'read Iron        climatology from:', trim(filelist(1))
-!    if(mype==0) write(*,*) 'read Oxygen      climatology from:', trim(filelist(2))
-!    if(mype==0) write(*,*) 'read Silicate    climatology from:', trim(filelist(3))
-!    if(mype==0) write(*,*) 'read Alkalinity  climatology from:', trim(filelist(4))
-!    if(mype==0) write(*,*) 'read DIC         climatology from:', trim(filelist(5))
-!    if(mype==0) write(*,*) 'read Nitrate     climatology from:', trim(filelist(6))
-!    if(mype==0) write(*,*) 'read Salt        climatology from:', trim(filelist(7))
-!    if(mype==0) write(*,*) 'read Temperature climatology from:', trim(filelist(8))
 #else
     ! read ocean state
     ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
