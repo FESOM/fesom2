@@ -404,6 +404,10 @@ endfunction()
 function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH RUN_LENGTH_UNIT RESTART_LENGTH RESTART_LENGTH_UNIT LOGFILE_OUTFREQ FORCE_ROTATION USE_CAVITY)
     set(options MPI_TEST)
     set(oneValueArgs NP TIMEOUT LABEL MIX_SCHEME FORCING FORCING_YEAR LEAPYEAR)
+    # EXTRA_SUCCESS_MARKERS: literal strings that must ALL appear in the run log for
+    # the test to pass, on top of the clean-exit marker. Use these to pin behaviour
+    # that would otherwise rot silently -- a diagnostic block that stops being
+    # printed is a regression no artifact check can see.
     set(multiValueArgs COMMAND_ARGS EXTRA_SUCCESS_MARKERS)
     cmake_parse_arguments(FESOM_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 

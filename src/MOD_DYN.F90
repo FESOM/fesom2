@@ -18,7 +18,28 @@ TYPE T_SOLVERINFO
     integer       :: lutype  = 2
     real(kind=WP) :: droptol = 1.e-8
     real(kind=WP)  :: soltol  = 1e-5
+    ! Which symmetrised-Jacobi formula the preconditioner uses.
+    ! 0 = as coded since 60b46bdc (default, keeps results unchanged)
+    ! 1 = textbook M^-1 = 2D^-1 - D^-1 A D^-1, which is genuinely symmetric
+    ! See ssh_solve_preconditioner for why this switch exists.
+    integer       :: precond_variant = 0
     real(kind=WP), allocatable   :: rr(:), zz(:), pp(:), App(:)
+    !___________________________________________________________________________
+    ! Per-run solver diagnostics. Deliberately NOT in WRITE/READ_T_SOLVERINFO
+    ! below: these are transients, and adding them to the dump would change the
+    ! restart record layout and silently break every existing restart file (the
+    ! read would just consume the wrong bytes).
+    ! The iteration count is identical on every rank -- the CG exit test is on a
+    ! globally reduced sprod -- so none of this needs an MPI reduction.
+    integer       :: iters_last = 0     ! iterations taken by the last solve
+    integer       :: iters_max  = 0     ! worst solve so far
+    integer       :: iters_sum  = 0     ! for the running mean
+    integer       :: nsolves    = 0
+    integer       :: nonconv    = 0     ! solves that hit maxiter
+    integer       :: nbreakdown = 0     ! solves where p.Ap was not positive
+    integer       :: nnegrz     = 0     ! iterations with r.z < 0 (M^-1 not SPD)
+    real(kind=WP) :: resid_last = 0.0_WP ! rms residual at exit
+    real(kind=WP) :: rtol_last  = 0.0_WP ! target it was compared against
     contains
     procedure WRITE_T_SOLVERINFO
     procedure READ_T_SOLVERINFO
@@ -215,6 +236,11 @@ subroutine READ_T_SOLVERINFO(tsolverinfo, unit)
     integer                              :: iostat
     character(len=1024)                  :: iomsg
     read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%ident
+    ! NOTE maxiter and soltol are configurable from namelist.dyn, but this read
+    ! runs after dynamics_init, so on a restart these dumped values override what
+    ! the namelist asked for. Reading them into throwaway locals would make the
+    ! namelist authoritative while preserving the byte layout exactly; deferred
+    ! until there is a restart-vs-continuous test to verify it against.
     read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%maxiter
     read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%restart
     read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%fillin

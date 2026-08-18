@@ -60,7 +60,11 @@ subroutine ssh_solve_preconditioner(solverinfo, partit, mesh)
 #include "associate_mesh_ass.h"
 
     nend=ssh_stiff%rowptr(myDim_nod2D+1)-ssh_stiff%rowptr(1)
-    allocate(mesh%ssh_stiff%pr_values(nend))     ! Will store the values of inverse preconditioner matrix 
+    ! Guarded: building the preconditioner twice (a restart path can do this)
+    ! otherwise aborts with "allocatable array is already allocated".
+    if (.not. allocated(mesh%ssh_stiff%pr_values)) then
+        allocate(mesh%ssh_stiff%pr_values(nend))  ! values of the inverse preconditioner matrix
+    end if
     pr_values=>mesh%ssh_stiff%pr_values
     cind     =>mesh%ssh_stiff%colind_loc
     rptr     =>mesh%ssh_stiff%rowptr_loc
@@ -80,14 +84,32 @@ subroutine ssh_solve_preconditioner(solverinfo, partit, mesh)
        pr_values(offset+1)=1.0_WP/ssh_stiff%values(offset+1)
        DO n=2, nend   
           node=cind(offset+n)    ! Will be ssh_stiff$colind(offset+n) 
-          pr_values(n+offset)=-0.5_WP*(ssh_stiff%values(n+offset)/ssh_stiff%values(1+offset))/  &
-                               (ssh_stiff%values(1+offset)+ diag_values(node)) 
+          if (solverinfo%precond_variant == 0) then
+             ! As coded since 60b46bdc. Note two things about it. The comment at
+             ! the top of this routine specifies -2*a_i/a_r/(a_r+(a_diag)_i),
+             ! which is this expression times 4. And entry (r,i) here is
+             ! -c*a_ri/(a_rr*(a_rr+a_ii)) while its transpose (i,r) is
+             ! -c*a_ir/(a_ii*(a_ii+a_rr)); with A symmetric those agree only
+             ! where a_rr == a_ii, i.e. on a uniform mesh. CG needs an SPD M^-1,
+             ! so this is worth measuring rather than assuming -- see the r.z<0
+             ! sensor in ssh_solve_cg.
+             pr_values(n+offset)=-0.5_WP*(ssh_stiff%values(n+offset)/ssh_stiff%values(1+offset))/  &
+                                  (ssh_stiff%values(1+offset)+ diag_values(node)) 
+          else
+             ! Textbook symmetrised Jacobi, M^-1 = 2D^-1 - D^-1 A D^-1. The
+             ! off-diagonal -a_ri/(a_rr*a_ii) is symmetric by construction, and
+             ! its diagonal reduces to 1/a_rr, which is what is coded above.
+             pr_values(n+offset)=-ssh_stiff%values(n+offset)/                                     &
+                                  (ssh_stiff%values(1+offset)*diag_values(node))
+          end if
        END DO
     END DO
    deallocate(diag_values)
 
    n=myDim_nod2D+eDim_nod2D
-   allocate(solverinfo%rr(n), solverinfo%zz(n), solverinfo%pp(n), solverinfo%App(n))
+   if (.not. allocated(solverinfo%rr)) then
+      allocate(solverinfo%rr(n), solverinfo%zz(n), solverinfo%pp(n), solverinfo%App(n))
+   end if
    solverinfo%rr =0.0_WP
    solverinfo%zz =0.0_WP
    solverinfo%pp =0.0_WP
@@ -107,15 +129,19 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   USE MOD_PARSUP
   USE MOD_DYN
   USE g_comm_auto
+#if defined(FESOM_PROFILING)
+  USE fesom_rtdiagnostics, only: diag_count
+#endif
   IMPLICIT NONE
   type(t_solverinfo),  intent(inout), target :: solverinfo
   type(t_partit),      intent(inout), target :: partit
   type(t_mesh),        intent(inout), target :: mesh
   real(kind=WP),       intent(inout)         :: x(partit%myDim_nod2D+partit%eDim_nod2D)
   real(kind=WP),       intent(in)            :: rhs(partit%myDim_nod2D+partit%eDim_nod2D)
-  integer                      :: row, nini, nend, iter 
+  integer                      :: row, nini, nend, iter
   real(kind=WP)                :: sprod(2), s_old, s_aux, al, be, rtol
   integer                      :: req
+  logical                      :: converged
   real(kind=WP), pointer       :: pr_values(:), rr(:), zz(:), pp(:), App(:)
   integer,       pointer       :: rptr(:), cind(:)
 
@@ -193,6 +219,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   ! ===============
   ! Iterations
   ! ===============
+  converged = .false.
   Do iter=1, solverinfo%maxiter
      ! ============
      ! Compute Ap
@@ -219,6 +246,24 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
 #endif
 
   call MPI_Allreduce(MPI_IN_PLACE, s_aux, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+
+     ! ===========
+     ! Breakdown guard. An equivalent check existed until 4eb2f21d ("Removed
+     ! debug output in solver."). p.Ap must be positive for an SPD system; if it
+     ! reaches zero or NaN then al = s_old/s_aux poisons the entire d_eta vector
+     ! with Inf/NaN, and that surfaces several stages downstream -- typically as
+     ! a NaN in Wvel -- with nothing pointing back here. Keep the current X and
+     ! leave the loop; do not abort, and do not mark the solve converged.
+     ! Evaluated on the already-reduced value, so every rank branches alike.
+     ! ===========
+  if (s_aux <= 0.0_WP .or. s_aux /= s_aux) then
+     solverinfo%nbreakdown = solverinfo%nbreakdown + 1
+     if (partit%mype==0 .and. solverinfo%nbreakdown <= 5) then
+        write(*,*) 'WARNING: ssh CG breakdown at iter ', iter, ': p.Ap= ', s_aux, &
+                   ' is not positive; keeping current solution and leaving the loop'
+     endif
+     exit
+  endif
 
   al=s_old/s_aux
      ! ===========
@@ -263,6 +308,27 @@ sprod(1:2)=0.0_WP
      ! Exit if tolerance is achieved
      ! ===========
   if (sqrt(sprod(2)/nod2D)< rtol) then
+     converged = .true.
+     exit
+  endif
+     ! ===========
+     ! SPD sensor. r.z cannot be negative for an SPD preconditioner, so any count
+     ! here is direct evidence that M^-1 is not SPD. Cheap, and evaluated on the
+     ! already-reduced value so all ranks agree.
+     ! ===========
+  if (sprod(1) < 0.0_WP) then
+     solverinfo%nnegrz = solverinfo%nnegrz + 1
+     if (partit%mype==0 .and. solverinfo%nnegrz == 1) then
+        write(*,*) 'WARNING: ssh CG r.z < 0 at iter ', iter, ': r.z= ', sprod(1), &
+                   ' -- preconditioner is not symmetric positive definite'
+     endif
+  endif
+
+  if (s_old == 0.0_WP) then
+     solverinfo%nbreakdown = solverinfo%nbreakdown + 1
+     if (partit%mype==0 .and. solverinfo%nbreakdown <= 5) then
+        write(*,*) 'WARNING: ssh CG breakdown at iter ', iter, ': previous r.z is zero'
+     endif
      exit
   endif
   be=sprod(1)/s_old
@@ -276,10 +342,47 @@ sprod(1:2)=0.0_WP
   END DO
 !$OMP END PARALLEL DO
   END DO
+
+  ! Record SSH-CG iteration count (and non-convergence) for fesom.stats.
+#if defined(FESOM_PROFILING)
+  call diag_count("ssh_cg_iters", min(iter, solverinfo%maxiter))
+  if (.not. converged) call diag_count("ssh_cg_nonconv", 1)
+#endif
+
+  !_____________________________________________________________________________
+  ! Always-on counters. FESOM_PROFILING defaults OFF, so the block above is
+  ! invisible in a normal run; these feed the per-step line in write_step_info
+  ! and the end-of-run summary, which are not gated on anything.
+  ! No MPI needed: every rank exits on the same iteration, because the exit test
+  ! above is on the globally reduced sprod.
+  solverinfo%iters_last = min(iter, solverinfo%maxiter)
+  solverinfo%iters_max  = max(solverinfo%iters_max, solverinfo%iters_last)
+  solverinfo%iters_sum  = solverinfo%iters_sum + solverinfo%iters_last
+  solverinfo%nsolves    = solverinfo%nsolves + 1
+  solverinfo%resid_last = sqrt(sprod(2)/nod2D)
+  solverinfo%rtol_last  = rtol
+  if (.not. converged) solverinfo%nonconv = solverinfo%nonconv + 1
+
+  !_____________________________________________________________________________
+  ! Safety-net log line: a stall at maxiter used to be completely silent. Unlike
+  ! cfl_z, which has check_blowup as a hard backstop, non-convergence has none --
+  ! we deliberately do not abort, because a stall on step 1 is legitimate in some
+  ! configurations, so this line is the only thing between a silently
+  ! under-converged run and nobody noticing. Rate-limited because a stalled
+  ! solver usually stalls every step, and one line per step would bury the
+  ! surrounding diagnostics.
+  if (.not. converged .and. partit%mype==0) then
+     if (solverinfo%nonconv <= 5 .or. mod(solverinfo%nonconv, 100) == 0) then
+        write(*,*) 'WARNING: ssh CG did not converge in ', solverinfo%maxiter, &
+                   ' iters; rms(resid)=', solverinfo%resid_last,               &
+                   ' target rtol=', rtol, ' (occurrence ', solverinfo%nonconv, ')'
+     endif
+  endif
+
  ! At the end: The result is in X, but it needs a halo exchange.
   call exchange_nod(x, partit)
 !$OMP BARRIER
-end subroutine ssh_solve_cg 
+end subroutine ssh_solve_cg
 
 ! ===================================================================
 
