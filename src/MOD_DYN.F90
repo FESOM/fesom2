@@ -19,6 +19,22 @@ TYPE T_SOLVERINFO
     real(kind=WP) :: droptol = 1.e-8
     real(kind=WP)  :: soltol  = 1e-5
     real(kind=WP), allocatable   :: rr(:), zz(:), pp(:), App(:)
+    !___________________________________________________________________________
+    ! Per-run solver diagnostics. Deliberately NOT in WRITE/READ_T_SOLVERINFO
+    ! below: these are transients, and adding them to the dump would change the
+    ! restart record layout and silently break every existing restart file (the
+    ! read would just consume the wrong bytes).
+    ! The iteration count is identical on every rank -- the CG exit test is on a
+    ! globally reduced sprod -- so none of this needs an MPI reduction.
+    integer       :: iters_last = 0     ! iterations taken by the last solve
+    integer       :: iters_max  = 0     ! worst solve so far
+    integer       :: iters_sum  = 0     ! for the running mean
+    integer       :: nsolves    = 0
+    integer       :: nonconv    = 0     ! solves that hit maxiter
+    integer       :: nbreakdown = 0     ! solves where p.Ap was not positive
+    integer       :: nnegrz     = 0     ! iterations with r.z < 0 (M^-1 not SPD)
+    real(kind=WP) :: resid_last = 0.0_WP ! rms residual at exit
+    real(kind=WP) :: rtol_last  = 0.0_WP ! target it was compared against
     contains
     procedure WRITE_T_SOLVERINFO
     procedure READ_T_SOLVERINFO
