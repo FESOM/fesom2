@@ -23,6 +23,8 @@ MODULE iom
     PUBLIC iom_flush
 
     LOGICAL :: lnomultio = .TRUE.
+    LOGICAL :: lmio_handle = .FALSE.   ! .TRUE. once iom_initialize created mio_handle
+
 
     PRIVATE ctl_stop
     !!----------------------------------------------------------------------
@@ -164,11 +166,15 @@ CONTAINS
         IF (err /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('mio_handle%open_connections failed: ', multio_error_string(err))
         END IF
+
+        lmio_handle = .TRUE.
     END SUBROUTINE iom_initialize
 
     SUBROUTINE iom_finalize()
         IMPLICIT NONE
         INTEGER :: err
+
+        IF (.NOT. lmio_handle) RETURN
 
         IF (lnomultio) RETURN
 
@@ -297,7 +303,7 @@ CONTAINS
             CALL ctl_stop('send_fesom_domains: ngrid, md%set_string(representation) failed: ', multio_error_string(cerr))
         END IF
 
-        cerr = md%set("globalSize", mesh%nod2D)
+        cerr = md%set("misc-globalSize", mesh%nod2D)
         IF (cerr /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('send_fesom_domains: ngrid, md%set_int(globalSize) failed: ', multio_error_string(cerr))
         END IF
@@ -339,7 +345,7 @@ CONTAINS
             CALL ctl_stop('send_fesom_domains: egrid, md%set_string(representation) failed: ', multio_error_string(cerr))
         END IF
 
-        cerr = md%set("globalSize", mesh%elem2D)
+        cerr = md%set("misc-globalSize", mesh%elem2D)
         IF (cerr /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('send_fesom_domains: egrid, md%set_int(globalSize) failed: ', multio_error_string(cerr))
         END IF
@@ -381,7 +387,7 @@ CONTAINS
             CALL ctl_stop('send_fesom_data: md%set_string(category) failed: ', multio_error_string(cerr))
         END IF
 
-        cerr = md%set("globalSize", data%globalSize)
+        cerr = md%set("misc-globalSize", data%globalSize)
         IF (cerr /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('send_fesom_data: md%set_int(globalSize) failed: ', multio_error_string(cerr))
         END IF
