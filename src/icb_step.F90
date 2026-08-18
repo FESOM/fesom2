@@ -52,6 +52,11 @@ subroutine iceberg_calculation(ice, mesh, partit, dynamics, istep)
  integer	:: istep_end_synced
  integer:: req, status(MPI_STATUS_SIZE)
  logical:: completed
+ integer	:: n_melted_before, n_melted_after, n_find_before, n_find_after
+ real		:: cday_sum_before, cday_sum_after
+ integer:: block_reduce_ierr
+ real(kind=8) :: t_start_block
+ real(kind=8), parameter :: block_reduce_timeout = 300.0
  real(kind=8) 	:: t0, t1, t2, t3, t4, t0_restart, t1_restart   	!=
  logical	:: firstcall=.true. 					!=
  logical	:: lastsubstep  					!=
@@ -88,6 +93,37 @@ type(t_dyn)   , intent(inout), target :: dynamics
     call iceberg_restart(partit)
   end if
   t1_restart=MPI_Wtime()
+  n_melted_before  = count(melted)
+  n_find_before    = count(find_iceberg_elem)
+  cday_sum_before  = sum(calving_day)
+
+  call MPI_Allreduce(MPI_IN_PLACE, melted, ib_num, MPI_LOGICAL, MPI_LOR, &
+       partit%MPI_COMM_FESOM_IB, partit%MPIERR_IB)
+  call MPI_Allreduce(MPI_IN_PLACE, find_iceberg_elem, ib_num, MPI_LOGICAL, MPI_LOR, &
+       partit%MPI_COMM_FESOM_IB, partit%MPIERR_IB)
+  call MPI_Allreduce(MPI_IN_PLACE, calving_day, ib_num, MPI_DOUBLE_PRECISION, MPI_MAX, &
+       partit%MPI_COMM_FESOM_IB, partit%MPIERR_IB)
+
+  n_melted_after = count(melted)
+  n_find_after   = count(find_iceberg_elem)
+  cday_sum_after = sum(calving_day)
+
+  !Any output here means this rank's restart state really did disagree with
+  !its peers - i.e. the desync is real and this patch just prevented a hang.
+  !Silence on every rank means the gates were already consistent.
+  if (n_melted_after /= n_melted_before) then
+   write(*,*) 'WARNING: icb gate sync corrected ', n_melted_after-n_melted_before, &
+        ' melted flag(s) on rank ', mype
+  end if
+  if (n_find_after /= n_find_before) then
+   write(*,*) 'WARNING: icb gate sync corrected ', n_find_after-n_find_before, &
+        ' find_iceberg_elem flag(s) on rank ', mype
+  end if
+  if (cday_sum_after /= cday_sum_before) then
+   write(*,*) 'WARNING: icb gate sync corrected calving_day on rank ', mype, &
+        ' (sum ', cday_sum_before, ' -> ', cday_sum_after, ')'
+  end if
+
   firstcall = .false.
   !call init_global_tides
   !call tides_distr
@@ -152,21 +188,33 @@ type(t_dyn)   , intent(inout), target :: dynamics
 !$omp end critical
 
  completed = .false.
+ t_start_block = MPI_Wtime()
  do while (.not. completed)
 !$omp critical
 CALL MPI_TEST(req, completed, status, partit%MPIERR_IB)
 !$omp end critical
+     if (.not. completed .and. (MPI_Wtime() - t_start_block) > block_reduce_timeout) then
+      write(*,*) 'FATAL: arr_block Allreduce deadlock on rank ', partit%mype, &
+           ' after ', block_reduce_timeout, ' s (iceberg_calculation, istep=', istep, ')'
+      call MPI_Abort(MPI_COMM_WORLD, 1, block_reduce_ierr)
+     end if
  end do
 
 !$omp critical 
- call MPI_IAllREDUCE(elem_block, elem_block_red, ib_num, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM_IB, req, partit%MPIERR_IB)  
+ call MPI_IAllREDUCE(elem_block, elem_block_red, ib_num, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM_IB, req, partit%MPIERR_IB)
 !$omp end critical
 
 completed = .false.
+ t_start_block = MPI_Wtime()
  do while (.not. completed)
 !$omp critical
   CALL MPI_TEST(req, completed, status, partit%MPIERR_IB)
 !$omp end critical
+     if (.not. completed .and. (MPI_Wtime() - t_start_block) > block_reduce_timeout) then
+      write(*,*) 'FATAL: elem_block Allreduce deadlock on rank ', partit%mype, &
+           ' after ', block_reduce_timeout, ' s (iceberg_calculation, istep=', istep, ')'
+      call MPI_Abort(MPI_COMM_WORLD, 1, block_reduce_ierr)
+     end if
  end do
 
 !$omp critical
@@ -174,10 +222,16 @@ completed = .false.
 !$omp end critical
 
 completed = .false.
+ t_start_block = MPI_Wtime()
  do while (.not. completed)
 !$omp critical
   CALL MPI_TEST(req, completed, status, partit%MPIERR_IB)
 !$omp end critical
+     if (.not. completed .and. (MPI_Wtime() - t_start_block) > block_reduce_timeout) then
+      write(*,*) 'FATAL: pe_block Allreduce deadlock on rank ', partit%mype, &
+           ' after ', block_reduce_timeout, ' s (iceberg_calculation, istep=', istep, ')'
+      call MPI_Abort(MPI_COMM_WORLD, 1, block_reduce_ierr)
+     end if
  end do
 
 !!$omp critical
@@ -197,10 +251,16 @@ completed = .false.
 !$omp end critical
 
  completed = .false.
+ t_start_block = MPI_Wtime()
  do while (.not. completed)
 !$omp critical
   CALL MPI_TEST(req, completed, status, partit%MPIERR_IB)
 !$omp end critical
+     if (.not. completed .and. (MPI_Wtime() - t_start_block) > block_reduce_timeout) then
+      write(*,*) 'FATAL: vl_block Allreduce deadlock on rank ', partit%mype, &
+           ' after ', block_reduce_timeout, ' s (iceberg_calculation, istep=', istep, ')'
+      call MPI_Abort(MPI_COMM_WORLD, 1, block_reduce_ierr)
+     end if
  end do
 
  buoy_props=0.
@@ -304,6 +364,7 @@ use iceberg_params, only: length_ib, width_ib, scaling, elem_block, elem_area_gl
  implicit none											!=
  
  logical                :: reject_tmp 
+ logical                :: melted_local
  integer, intent(in)	:: ib, istep
  real,    intent(inout)	:: height_ib_single,length_ib_single,width_ib_single
  real,    intent(inout)	:: lon_deg,lat_deg
@@ -378,7 +439,8 @@ type(t_dyn)   , intent(inout), target :: dynamics
  lon_rad = lon_deg*rad
  lat_rad = lat_deg*rad
  
- if(volume_ib .le. smallestvol_icb) then
+ melted_local = (volume_ib .le. smallestvol_icb)
+ if(melted_local) then
   melted(ib) = .true.
 
   if (mod(istep_end_synced,logfile_outfreq)==0 .and. mype==0 .and. lastsubstep) then
@@ -431,11 +493,12 @@ type(t_dyn)   , intent(inout), target :: dynamics
       iceberg_elem=partit%myList_elem2D(iceberg_elem) !global now
    endif   
   end if
-  call com_integer(partit, i_have_element,iceberg_elem)
+  call com_integer(partit, i_have_element, iceberg_elem, ib=ib)
  
   if(iceberg_elem .EQ. 0) then
         write(*,*) 'IB ',ib,' rot. coords:', lon_deg, lat_deg !,lon_rad, lat_rad
-   	call par_ex (partit%MPI_COMM_FESOM, partit%mype)
+        write(*,*) 'FATAL: iceberg ', ib, ' outside model domain on rank ', partit%mype
+   	call par_ex (partit%MPI_COMM_FESOM, partit%mype, abort=1)
    	stop 'ICEBERG OUTSIDE MODEL DOMAIN OR IN ICE SHELF REGION'
   end if
   
@@ -462,7 +525,8 @@ type(t_dyn)   , intent(inout), target :: dynamics
   endif
  end if
  
- if (iceberg_elem < 1 .or. iceberg_elem > elem2D) then
+ melted_local = (iceberg_elem < 1 .or. iceberg_elem > elem2D)
+ if (melted_local) then
   if (mype==0) write(*,*) 'WARNING: iceberg ', ib, ' has invalid iceberg_elem = ', &
        iceberg_elem, ' (valid range 1..', elem2D, '). Marking as melted to avoid crash.'
   melted(ib) = .true.
@@ -978,7 +1042,7 @@ type(t_partit), intent(inout), target :: partit
 		v_ib = ini_v_rot	
 	else
    		!OCEAN VELOCITY uo_ib, voib is start velocity
-   		call iceberg_avvelo(mesh, partit, dynamics, startu,startv,depth_ib,localelem)
+   		call iceberg_avvelo(mesh, partit, dynamics, startu,startv,depth_ib,localelem, ib=ib)
         call FEM_3eval(mesh, partit,u_ib,v_ib,lon_rad,lat_rad,startu,startv,localelem)
 	end if
  end if
@@ -1283,7 +1347,7 @@ subroutine iceberg_restart_with_icesheet(partit)
  use g_config, only : ib_num
 
  implicit none
- integer :: icbID_ISM, icbID_non_melted_icb, ib, st
+ integer :: icbID_ISM, icbID_non_melted_icb, ib, st, mpierr_icb
  LOGICAL :: file_exists, file_exists_non_melted
 type(t_partit), intent(inout), target :: partit
 #include "associate_part_def.h"
@@ -1310,6 +1374,12 @@ type(t_partit), intent(inout), target :: partit
 	conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
 	u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),		&
 	f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), grounded(ib), scaling(ib), melted(ib)
+   if (st /= 0) then
+    write(*,*) 'FATAL: rank ', mype, ' failed reading iceberg restart record ', ib, &
+         ' of ', num_non_melted_icb, ' from ', trim(IcebergRestartPath_ISM), &
+         '; iostat=', st
+    call MPI_Abort(MPI_COMM_WORLD, 1, mpierr_icb)
+   end if
   end do
   close(icbID_ISM)
 

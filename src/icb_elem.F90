@@ -261,12 +261,14 @@ type(t_partit), intent(inout), target :: partit
   if( (x > maxlon) .OR. (x < minlon) ) then
     write(*,*) 'FEM_eval error: iceberg lon ', x, ' outside element!'
     write(*,*) 'maxlon:', maxlon, ' minlon:', minlon
-    call par_ex (partit%MPI_COMM_FESOM, partit%mype)
+    write(*,*) 'FEM_eval fatal on rank ', partit%mype
+    call par_ex (partit%MPI_COMM_FESOM, partit%mype, abort=1)
     stop
   else if( (y > maxlat) .OR. (y < minlat)) then
     write(*,*) 'FEM_eval error: iceberg lat', y, ' outside element!'
     write(*,*) 'maxlat:', maxlat, ' minlat:', minlat
-    call par_ex (partit%MPI_COMM_FESOM, partit%mype)
+    write(*,*) 'FEM_eval fatal on rank ', partit%mype
+    call par_ex (partit%MPI_COMM_FESOM, partit%mype, abort=1)
     stop
   else
     !everything okay
@@ -652,16 +654,25 @@ end subroutine global2local
  !***************************************************************************************************************************
  !***************************************************************************************************************************
 
-subroutine com_integer(partit, i_have_element, iceberg_element)
+subroutine com_integer(partit, i_have_element, iceberg_element, ib)
  use MOD_PARTIT !for npes
  implicit none
  
  logical, intent(in):: i_have_element
  integer, intent(inout):: iceberg_element
  
+ integer, intent(in), optional :: ib
+
  integer:: status(MPI_STATUS_SIZE)
  integer:: req
+ integer:: ierr
  logical:: completed
+ real(kind=8) :: t_start
+ !bugfix 2026-08-12: see commit message. 5 min is far longer than a healthy
+ !MPI_IAllreduce over <=288 ranks should ever take, and short enough to still
+ !leave most of a 2h20 compute-job walltime for a rerun once the root cause
+ !is fixed, instead of burning the whole budget on a silent hang.
+ real(kind=8), parameter :: com_integer_timeout = 300.0
 type(t_partit), intent(inout), target :: partit
 !#include "associate_part_def.h"
 !#include "associate_part_ass.h"
@@ -677,15 +688,39 @@ type(t_partit), intent(inout), target :: partit
 !$omp end critical
  end if
 
+ !bugfix 2026-08-12: com_integer is a collective - every rank in
+ !MPI_COMM_FESOM_IB must reach this call for a given iceberg, or the ranks
+ !that did reach it wait here forever (production hang: spinup_20261108
+ !jobs 26882618 / 26893155, frozen here for the full walltime with zero
+ !further output and no error). Fail loudly with the state needed to find
+ !the diverging rank/iceberg instead of spinning silently until the batch
+ !scheduler kills the job on walltime.
  completed = .false.
+ t_start = MPI_Wtime()
  do while (.not. completed)
 !$omp critical
      CALL MPI_TEST(req, completed, status, partit%MPIERR_IB)
 !$omp end critical
+     if (.not. completed .and. (MPI_Wtime() - t_start) > com_integer_timeout) then
+      if (present(ib)) then
+       write(*,*) 'FATAL: com_integer deadlock on rank ', partit%mype, &
+            ' after ', com_integer_timeout, ' s waiting on iceberg ib=', ib, &
+            '; i_have_element=', i_have_element, ' iceberg_element=', iceberg_element
+      else
+       write(*,*) 'FATAL: com_integer deadlock on rank ', partit%mype, &
+            ' after ', com_integer_timeout, ' s; i_have_element=', i_have_element, &
+            ' iceberg_element=', iceberg_element
+      end if
+      call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
+     end if
  end do
 
  end subroutine com_integer
 
+
+
+ !***************************************************************************************************************************
+ !***************************************************************************************************************************
 
 
  !***************************************************************************************************************************

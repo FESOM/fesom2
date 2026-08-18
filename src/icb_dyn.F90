@@ -1070,7 +1070,7 @@ end subroutine iceberg_average_andkeel
 !***************************************************************************************************************************
 !***************************************************************************************************************************
 
-subroutine iceberg_avvelo(mesh, partit, dynamics, uo_dz,vo_dz,depth_ib,iceberg_elem)
+subroutine iceberg_avvelo(mesh, partit, dynamics, uo_dz,vo_dz,depth_ib,iceberg_elem, ib)
   USE MOD_MESH
   use o_param
   use MOD_PARTIT
@@ -1089,6 +1089,7 @@ subroutine iceberg_avvelo(mesh, partit, dynamics, uo_dz,vo_dz,depth_ib,iceberg_e
   REAl,               INTENT(IN)  :: depth_ib
   REAL, dimension(:,:,:), pointer :: UV_ib
   INTEGER,            INTENT(IN)  :: iceberg_elem
+  INTEGER, OPTIONAL,  INTENT(IN)  :: ib
 
   real           :: lev_up, lev_low  
   integer        :: m, k, n2, n_up, n_low
@@ -1116,10 +1117,20 @@ type(t_partit), intent(inout), target :: partit
    ! ..consider all neighboring pairs (n_up,n_low) of 3D nodes
    ! below n2..
    do k=1, nl+1
+    !bugfix 2026-08-17: mirror the cavity handling already present in
+    !iceberg_average_andkeel above. Levels inside the ice shelf are never
+    !updated by the tracer solver and the first wet level's upper boundary
+    !is the shelf base, not z=0. iceberg_avvelo was overlooked when that
+    !fix was made, so iceberg placement integrated through shelf layers.
+    if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
+        .AND. k < ulevels_nod2d(n2)) cycle
 
 ! kh 18.03.21 use zbar_3d_n_ib buffered values here
     if( k==1 ) then
         lev_up = 0.0
+    else if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
+             .AND. k == ulevels_nod2d(n2)) then
+        lev_up = mesh%zbar_3d_n(k, n2)
     else
         lev_up = mesh%Z_3d_n_ib(k-1, n2)
     end if
@@ -1129,12 +1140,6 @@ type(t_partit), intent(inout), target :: partit
         exit
     end if
     dz = abs( lev_low - lev_up )
-	
-    if(dz < 1) then
-      !write(*,*) 'z coord of up node', n_up, ':', coord_nod3D(3, n_up), 'z coord of low node', n_low, ':', coord_nod3D(3, n_low)
-      call par_ex (partit%MPI_COMM_FESOM, partit%mype)
-      stop
-    end if
 	
     ! if the lowest z coord is below the iceberg draft, exit
     if ( abs(lev_low)>= abs(depth_ib)) then
@@ -1169,8 +1174,13 @@ type(t_partit), intent(inout), target :: partit
    end do
  
    ! divide by depth over which was integrated
-   uo_dz(m)=uo_dz(m)/abs(depth_ib)
-   vo_dz(m)=vo_dz(m)/abs(depth_ib)
+   if (abs(depth_ib) > 0.0) then
+     uo_dz(m)=uo_dz(m)/abs(depth_ib)
+     vo_dz(m)=vo_dz(m)/abs(depth_ib)
+   else
+     uo_dz(m)=0.0
+     vo_dz(m)=0.0
+   end if
          
  end do !loop over all nodes of iceberg element
        
