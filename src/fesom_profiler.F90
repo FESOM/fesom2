@@ -283,12 +283,14 @@ contains
         allocate(local_data(4 * num_profiles), global_data(4 * num_profiles))
         allocate(local_counts(num_profiles), global_counts(num_profiles))
         
-        ! Pack local data: total_time, min_total_time, max_total_time, sum_squares
+        ! Pack local data: total_time (for mean/min/max across ranks) and the
+        ! square of this rank's total_time (for a genuine cross-rank std of the
+        ! per-rank totals — the coefficient of variation reported as StdImb).
         do i = 1, num_profiles
             local_data(4*i-3) = profiles(i)%total_time  ! For averaging (wall clock)
             local_data(4*i-2) = profiles(i)%total_time  ! For min across ranks
             local_data(4*i-1) = profiles(i)%total_time  ! For max across ranks
-            local_data(4*i)   = profiles(i)%sum_squares
+            local_data(4*i)   = profiles(i)%total_time * profiles(i)%total_time  ! (per-rank total)^2
             local_counts(i)   = profiles(i)%call_count
         end do
         
@@ -304,7 +306,13 @@ contains
                           MPI_DOUBLE_PRECISION, MPI_MIN, mpi_comm, ierr)
         call MPI_Allreduce(local_data(3::4), global_data(3::4), num_profiles, &
                           MPI_DOUBLE_PRECISION, MPI_MAX, mpi_comm, ierr)
-        
+
+        ! Sum of squared per-rank totals -> genuine cross-rank std (StdImb).
+        ! (Previously this stride was packed but never reduced, leaving StdImb
+        ! either a range/4 approximation or, rarely, uninitialised garbage.)
+        call MPI_Allreduce(local_data(4::4), global_data(4::4), num_profiles, &
+                          MPI_DOUBLE_PRECISION, MPI_SUM, mpi_comm, ierr)
+
         ! Only rank 0 prints the report
         if (mpi_rank == 0) then
             call print_detailed_report(unit, global_data, global_counts, npes)
@@ -426,7 +434,7 @@ contains
         real(kind=PROF_WP), intent(in), optional :: parent_runtime
         integer :: i, j, total_calls
         real(kind=PROF_WP) :: wall_clock_time, min_total, max_total, load_imbalance
-        real(kind=PROF_WP) :: mean_time, min_call_time, max_call_time, std_dev, sum_squares, std_imbalance
+        real(kind=PROF_WP) :: std_dev, sum_squares, std_imbalance
         real(kind=PROF_WP) :: percent_total, percent_parent, current_parent_runtime
         character(len=100) :: display_name
         character(len=15) :: indent_prefix
@@ -444,38 +452,20 @@ contains
             endif
             
             ! Extract all statistics from global data
-            wall_clock_time = global_data(4*i-3) / real(npes, PROF_WP)  ! Wall clock time
+            wall_clock_time = global_data(4*i-3) / real(npes, PROF_WP)  ! mean total across ranks
             min_total = global_data(4*i-2)                         ! Min total across ranks
             max_total = global_data(4*i-1)                         ! Max total across ranks
-            sum_squares = global_data(4*i)                         ! Sum of squares
+            sum_squares = global_data(4*i)                         ! Sum over ranks of (total)^2
             total_calls = global_counts(i)
-            
+
             if (total_calls == 0) cycle
-            
-            ! Calculate per-call statistics
-            mean_time = wall_clock_time / real(total_calls/npes, PROF_WP)
-            
-            ! Calculate min/max per-call times (approximation)
-            if (total_calls > 0) then
-                min_call_time = min_total / real(max(1, total_calls/npes), PROF_WP)
-                max_call_time = max_total / real(max(1, total_calls/npes), PROF_WP)
-            else
-                min_call_time = 0.0_PROF_WP
-                max_call_time = 0.0_PROF_WP
-            endif
-            
-            ! Calculate standard deviation (use mean per-call time for high-frequency calls)
-            if (total_calls > npes .and. wall_clock_time > 0.0_PROF_WP) then
-                if (total_calls > 100) then
-                    ! For high-frequency calls, use mean-based std dev to avoid overflow
-                    std_dev = (max_total - min_total) / 4.0_PROF_WP  ! Approximation: range/4 ≈ std dev
-                else
-                    std_dev = sqrt(abs(sum_squares/real(npes,PROF_WP) - (wall_clock_time**2/real(npes,PROF_WP))))
-                endif
-            else
-                std_dev = 0.0_PROF_WP
-            endif
-            
+
+            ! Genuine cross-rank standard deviation of the per-rank total time:
+            !   var = mean(total^2) - mean(total)^2 = sum_squares/npes - wall_clock_time^2
+            ! (wall_clock_time is the cross-rank mean). StdImb below = std/mean*100 is
+            ! then a real coefficient of variation, independent of RngImb.
+            std_dev = sqrt(max(0.0_PROF_WP, sum_squares/real(npes,PROF_WP) - wall_clock_time**2))
+
             ! Calculate load imbalance
             if (wall_clock_time > 0.0_PROF_WP) then
                 load_imbalance = (max_total - min_total) / wall_clock_time * 100.0_PROF_WP
