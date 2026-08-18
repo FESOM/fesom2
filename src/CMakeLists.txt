@@ -316,7 +316,7 @@ if(OPENMP_REPRODUCIBLE)
 endif()
 
 if(${RECOM_COUPLED})
-   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2) # __3Zoo2Det __coccos)# __usetp)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2 __usetp) #__3Zoo2Det __coccos)
 endif()
 
 if(${CISO_COUPLED})
@@ -332,9 +332,9 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} 
    
    # Base compiler flags (default real kind follows USE_SINGLE_PRECISION)
    if(USE_SINGLE_PRECISION)
-      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r4 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0 -fpp)
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r4 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0 -fpp -fPIC)
    else()
-      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0 -fpp)
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0 -fpp -fPIC)
    endif()
    
    # compiler flags not supported by IntelLLVM
@@ -356,7 +356,7 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} 
       # | Intel/MPI | -O3                                                                 | 144s |
       # |*Intel/MPI | -03 -march=core-avx2 -mtune=core-avx2 -qopt-zmm-usage=low           | 140.95s |
       # |           | -align array64byte -unroll-aggressive -qopt-malloc-options=2        |         |
-      #target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2 -qopt-zmm-usage=low -align array64byte -unroll-aggressive -qopt-malloc-options=2)
+      #     target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2 -qopt-zmm-usage=low -align array64byte -unroll-aggressive -qopt-malloc-options=2 -g -traceback -check)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
       target_compile_options(${PROJECT_NAME} PRIVATE -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte -ipo)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL mn5-gpp )
@@ -440,7 +440,7 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
       # |             | -mno-fma4 -mavx2 -mfma                                            |      |
       # | GCC/openMPI | -O3 -march=znver3 -mtune=znver3 -ftree-vectorize -flto            | 280s | chatgpt recomendation
       # |             | -mcpu=znver3                                                      |      |
-      target_compile_options(${PROJECT_NAME} PRIVATE -march=znver3 -mtune=znver3 -ftree-vectorize -flto)      
+      target_compile_options(${PROJECT_NAME} PRIVATE -march=znver3 -mtune=znver3 -ftree-vectorize -flto -fPIC)      
    else()
       #[[if(NOT (${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu))
          target_compile_options(${PROJECT_NAME} PRIVATE -native)

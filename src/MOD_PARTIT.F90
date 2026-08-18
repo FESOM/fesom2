@@ -77,6 +77,12 @@ TYPE T_PARTIT
   integer              :: MPI_COMM_FESOM ! FESOM communicator (for ocean only runs if often a copy of MPI_COMM_WORLD)
   integer              :: MPI_COMM_WORLD ! FESOM communicator (for ocean only runs if often a copy of MPI_COMM_WORLD)
 
+! communicator for multi FESOM group loop parallelization
+  integer              :: MPI_COMM_FESOM_WORLD
+
+! communicator for multi FESOM group loop parallelization
+  integer              :: MPI_COMM_FESOM_SAME_RANK_IN_GROUPS
+
   ! MPI Datatypes for interface exchange
   ! Element fields (2D; 2D integer; 3D with nl-1 or nl levels, 1 - 4 values)
   !                 small halo and / or full halo
@@ -93,7 +99,10 @@ TYPE T_PARTIT
   integer, allocatable       :: s_mpitype_nod3D(:,:,:), r_mpitype_nod3D(:,:,:)
 
   integer            :: MPIERR
-  
+
+! multi FESOM group loop parallelization
+  integer              :: my_fesom_group
+
   !!! remPtr_* are constructed during the runtime and shall not be dumped!!!
   integer, allocatable ::  remPtr_nod2D(:),  remList_nod2D(:)
   integer, allocatable ::  remPtr_elem2D(:), remList_elem2D(:)
