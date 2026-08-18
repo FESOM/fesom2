@@ -309,7 +309,9 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 
 !#if defined (__recom)
         if (tracers%data(tr_num)%ltra_diag) then
-           do n=1, myDim_nod2D+eDim_nod2D
+           ! NOTE: adv_flux_ver is only allocated over myDim_nod2D (no halo, see
+           ! oce_adv_tra_fct.F90), so this loop must not extend into eDim_nod2D.
+           do n=1, myDim_nod2D
               nu1 = ulevels_nod2D(n)
               nl1 = nlevels_nod2D(n)
               do nz = nu1, nl1-1
