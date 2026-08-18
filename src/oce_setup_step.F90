@@ -100,6 +100,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     use oce_adv_tra_fct_interfaces
     use init_ale_interface
     use init_thickness_ale_interface
+    use ssh_solve_preconditioner_interface
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_tracer), intent(inout), target :: tracers
@@ -136,7 +137,21 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     call init_ale(dynamics, partit, mesh)
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_stiff_mat_ale'//achar(27)//'[0m'
     call init_stiff_mat_ale(partit, mesh) !!PS test  
-    
+
+    !___________________________________________________________________________
+    ! Build the SSH-solver preconditioner here, from the freshly initialised stiffness matrix,
+    ! instead of lazily on the first solve. SSH_stiff%values is CUMULATIVE: update_stiff_mat_ale
+    ! adds the elevation increment dhe to it once per step and it is never rebuilt. Building it
+    ! on the first solve therefore made it depend on WHEN in the run that happened -- a cold
+    ! start got the unperturbed matrix (dhe==0 because hbar==0), a restart got it after
+    ! restart_thickness_ale had already fed the absolute sea surface height in via dhe. The CG
+    ! stops on a relative residual, so the two preconditioners leave different O(soltol) errors.
+    ! Bit-identical for cold starts: at the first cold-start solve the matrix was base + 0.
+    if (.not. dynamics%use_ssh_se_subcycl) then
+        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call ssh_solve_preconditioner'//achar(27)//'[0m'
+        call ssh_solve_preconditioner(dynamics%solverinfo, partit, mesh)
+    end if
+
     !___________________________________________________________________________
     ! initialize arrays from cvmix library for CVMIX_KPP, CVMIX_PP, CVMIX_TKE,
     ! CVMIX_IDEMIX and CVMIX_TIDAL
