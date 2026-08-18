@@ -62,7 +62,7 @@ module io_MEANDATA
     integer                                            :: addcounter =0
     integer                                            :: lastcounter=0 ! before addcounter is set to 0
     real(kind=WP), pointer                             :: ptr3(:,:) ! todo: use netcdf types, not WP
-    real(kind=WP)                                      :: offset = 0.0_WP ! added to ptr3 at accumulation (USE_SALT_ANOMALY: salt/sss carry +S_ref_anomaly so output stays absolute)
+    real(kind=WP)                                      :: offset = 0.0_WP ! added to ptr3 at accumulation (use_salt_anomaly: salt/sss carry +S_ref_anomaly so output stays absolute)
     character(500)                                     :: filename
     character(100)                                     :: name
     character(500)                                     :: description
@@ -414,9 +414,7 @@ CASE ('sst       ')
     call def_stream(nod2D, myDim_nod2D, 'sst',      'sea surface temperature',        'C', tracers%data(1)%values(1,1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Sea surface temperature")
 CASE ('sss       ')
     call def_stream(nod2D, myDim_nod2D, 'sss',      'sea surface salinity',           'psu', tracers%data(2)%values(1,1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Sea surface salinity")
-#ifdef USE_SALT_ANOMALY
-    io_stream(io_NSTREAMS)%p%offset = S_ref_anomaly   ! state stores S-S_ref; output stays absolute
-#endif
+    io_stream(io_NSTREAMS)%p%offset = S_ref_anomaly   ! state stores S-S_ref; output stays absolute (S_ref=0 unless use_salt_anomaly)
 CASE ('ssh       ')
     call def_stream(nod2D, myDim_nod2D, 'ssh',      'sea surface elevation',          'm',      dynamics%eta_n,                          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('vve_5     ')
@@ -1020,9 +1018,7 @@ CASE ('temp      ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp',      'temperature', 'C',      tracers%data(1)%values(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('salt      ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt',      'salinity',    'psu',    tracers%data(2)%values(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-#ifdef USE_SALT_ANOMALY
-    io_stream(io_NSTREAMS)%p%offset = S_ref_anomaly   ! state stores S-S_ref; output stays absolute
-#endif
+    io_stream(io_NSTREAMS)%p%offset = S_ref_anomaly   ! state stores S-S_ref; output stays absolute (S_ref=0 unless use_salt_anomaly)
 
 #if defined(__recom)
 

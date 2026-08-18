@@ -16,11 +16,18 @@ integer		                  :: mstep
 real(kind=WP), parameter      :: pi=3.14159265358979
 real(kind=WP), parameter      :: rad=pi/180.0_WP
 real(kind=WP), parameter      :: density_0=1030.0_WP
-! USE_SALT_ANOMALY: the salinity state is stored as S - S_ref_anomaly, so that
-! the float32 spacing at typical open-ocean values (|S-35| < ~2) is 30-250x
-! finer than at S~35 (ulp 1.9e-6 psu). All consumers of absolute salinity add
-! the offset back at their gather points; see the USE_SALT_ANOMALY blocks.
-real(kind=WP), parameter      :: S_ref_anomaly=35.0_WP
+! use_salt_anomaly (namelist &oce_dyn): store the salinity state as the anomaly
+! S - S_ref_anomaly, so the float32 spacing at typical open-ocean values
+! (|S-35| < ~2) is 30-250x finer than at S~35 (ulp 1.9e-6 psu). S_ref_anomaly is
+! DERIVED in ocean_setup: 35.0 when the toggle is on, else 0.0 -- so every
+! absolute-salinity consumer can add it back unconditionally (`+ 0.0` is a
+! bit-identical no-op when the feature is off). See the S_ref_anomaly sites.
+! NOTE: enabling it is NOT exactly DP-neutral -- FESOM's free-surface advection
+! is not perfectly constancy-preserving, leaving a small (~8e-6/step, surface,
+! freshwater-driven) residual; see the note at the salinity surface BC in
+! oce_ale_tracer.F90 (and the PR description).
+logical                       :: use_salt_anomaly = .false.
+real(kind=WP)                 :: S_ref_anomaly = 0.0_WP
 real(kind=WP), parameter      :: density_0_r=1.0_WP/density_0 ! [m^3/kg]
 real(kind=WP), parameter      :: g=9.81_WP
 real(kind=WP), parameter      :: r_earth=6367500.0_WP
@@ -210,7 +217,8 @@ character(20)                  :: which_pgf='shchepetkin'
                     scaling_ODM95, ODM95_Scr, ODM95_Sd, &
                     scaling_LDD97, LDD97_c, LDD97_rmin, LDD97_rmax, &
                     scaling_GINsea, GINsea_fac, GMzexp_smin, &
-                    scaling_GMzexp, GMzexp_zref
+                    scaling_GMzexp, GMzexp_zref, &
+                    use_salt_anomaly
 
  NAMELIST /tracer_phys/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, &
             balance_salt_water, clim_relax, ref_sss_local, ref_sss, &

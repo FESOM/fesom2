@@ -357,14 +357,9 @@ contains
 ! Surface buoyancy forcing (eqns. A2c & A2d & A3b & A3d)
      !!PS Bo(node)  = -g * ( sw_alpha(1,node) * heat_flux(node)  / vcpw             &   !heat_flux & water_flux: positive up
      !!PS                  + sw_beta (1,node) * water_flux(node) * tr_arr(1,node,2))
-#ifdef USE_SALT_ANOMALY
-     ! state stores S-35; the buoyancy flux from the freshwater flux wants absolute S
+     ! buoyancy flux from the freshwater flux wants absolute S (S_ref=0 unless use_salt_anomaly)
      Bo(node)  = -g * ( sw_alpha(nzmin,node) * heat_flux(node)  / vcpw             &   !heat_flux & water_flux: positive up
                       + sw_beta (nzmin,node) * water_flux(node) * (tracers%data(2)%values(nzmin,node)+S_ref_anomaly))
-#else
-     Bo(node)  = -g * ( sw_alpha(nzmin,node) * heat_flux(node)  / vcpw             &   !heat_flux & water_flux: positive up
-                      + sw_beta (nzmin,node) * water_flux(node) * tracers%data(2)%values(nzmin,node))
-#endif
   END DO
       
 ! compute interior mixing coefficients everywhere, due to constant 
@@ -892,12 +887,8 @@ contains
         nzmax = nlevels_nod2D(node)
         DO nz=nzmin+1,nzmax-1
            alphaDT = sw_alpha(nz-1,node) * tracers%data(1)%values(nz-1,node)
-#ifdef USE_SALT_ANOMALY
-           ! state stores S-35; double-diffusion density ratio wants absolute S
+           ! double-diffusion density ratio wants absolute S (S_ref=0 unless use_salt_anomaly)
            betaDS  = sw_beta (nz-1,node) * (tracers%data(2)%values(nz-1,node)+S_ref_anomaly)
-#else
-           betaDS  = sw_beta (nz-1,node) * tracers%data(2)%values(nz-1,node)
-#endif
 
            IF (alphaDT > betaDS .and. betaDS > 0.0_WP) THEN
 

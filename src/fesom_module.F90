@@ -139,9 +139,7 @@ contains
       ! EO parameters
       logical mpi_is_initialized
       integer              :: tr_num, n
-#ifdef USE_SALT_ANOMALY
-      real(kind=WP)        :: salt_max_loc, salt_max_glob
-#endif
+      real(kind=WP)        :: salt_max_loc, salt_max_glob   ! use_salt_anomaly restart detect
 
 #if defined (__recom)
       type(tracers_info_type)               :: tracers_info
@@ -438,9 +436,9 @@ contains
         !___READ INITIAL CONDITIONS IF THIS IS A RESTART RUN________________________
         if (r_restart) then
             call read_initial_conditions(f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
-#ifdef USE_SALT_ANOMALY
+            if (use_salt_anomaly) then
             ! Restart files may hold ABSOLUTE salinity (migrating from a run
-            ! without USE_SALT_ANOMALY) or the anomaly (a chain of anomaly
+            ! without use_salt_anomaly) or the anomaly (a chain of anomaly
             ! runs writes the state as stored). Detect by the global maximum:
             ! absolute salinity peaks near 41 psu, the anomaly near 41-S_ref.
             ! Convert once when migrating; all AB history levels shift by the
@@ -453,12 +451,12 @@ contains
                 f%tracers%data(2)%valuesAB  = f%tracers%data(2)%valuesAB  - S_ref_anomaly
                 f%tracers%data(2)%valuesold = f%tracers%data(2)%valuesold - S_ref_anomaly
                 if (f%mype==0) write(*,*) &
-                    'USE_SALT_ANOMALY: absolute-salinity restart detected -> converted to S - S_ref'
+                    'use_salt_anomaly: absolute-salinity restart detected -> converted to S - S_ref'
             else
                 if (f%mype==0) write(*,*) &
-                    'USE_SALT_ANOMALY: anomaly-salinity restart -> no conversion'
+                    'use_salt_anomaly: anomaly-salinity restart -> no conversion'
             end if
-#endif
+            end if
         end if
         if (f%mype==0) f%t7=MPI_Wtime()
         

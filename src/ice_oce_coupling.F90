@@ -193,11 +193,7 @@ subroutine ocean2ice(ice, dynamics, tracers, partit, mesh)
         do n=1, myDim_nod2d+eDim_nod2d  
             if (ulevels_nod2D(n)>1) cycle 
             T_oc_array(n) = temp(1,n)
-#ifdef USE_SALT_ANOMALY
-            S_oc_array(n) = salt(1,n) + S_ref_anomaly   ! state stores S-35
-#else
-            S_oc_array(n) = salt(1,n)
-#endif
+            S_oc_array(n) = salt(1,n) + S_ref_anomaly   ! state stores S-S_ref (0 unless use_salt_anomaly)
             elevation(n)  = hbar(n)
         end do
 !$OMP END DO
@@ -206,11 +202,7 @@ subroutine ocean2ice(ice, dynamics, tracers, partit, mesh)
         do n=1, myDim_nod2d+eDim_nod2d
             if (ulevels_nod2D(n)>1) cycle 
              T_oc_array(n) = (T_oc_array(n)*real(ice%ice_steps_since_upd,WP)+temp(1,n))/real(ice%ice_steps_since_upd+1,WP)
-#ifdef USE_SALT_ANOMALY
              S_oc_array(n) = (S_oc_array(n)*real(ice%ice_steps_since_upd,WP)+salt(1,n)+S_ref_anomaly)/real(ice%ice_steps_since_upd+1,WP)
-#else
-             S_oc_array(n) = (S_oc_array(n)*real(ice%ice_steps_since_upd,WP)+salt(1,n))/real(ice%ice_steps_since_upd+1,WP)
-#endif
              elevation(n)  = (elevation(n) *real(ice%ice_steps_since_upd,WP)+  hbar(n))/real(ice%ice_steps_since_upd+1,WP)
         end do
 !$OMP END DO
@@ -445,12 +437,8 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
         rsss=ref_sss
 !$OMP PARALLEL DO
         do n=1, myDim_nod2D+eDim_nod2D
-#ifdef USE_SALT_ANOMALY
-            if (ref_sss_local) rsss = salt(ulevels_nod2d(n),n) + S_ref_anomaly
-#else
-            if (ref_sss_local) rsss = salt(ulevels_nod2d(n),n)
-#endif
-            virtual_salt(n)=rsss*water_flux(n) 
+            if (ref_sss_local) rsss = salt(ulevels_nod2d(n),n) + S_ref_anomaly   ! S_ref=0 unless use_salt_anomaly
+            virtual_salt(n)=rsss*water_flux(n)
         end do
 !$OMP END PARALLEL DO        
 
@@ -487,12 +475,8 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
         do n=1, myDim_nod2D+eDim_nod2D
             virtual_salt(n)=0.0_WP
             if (ulevels_nod2d(n) == 1) cycle ! --> is open ocean node 
-#ifdef USE_SALT_ANOMALY
-            if (ref_sss_local) rsss = salt(ulevels_nod2d(n),n) + S_ref_anomaly
-#else
-            if (ref_sss_local) rsss = salt(ulevels_nod2d(n),n)
-#endif
-            virtual_salt(n)=rsss*water_flux(n) 
+            if (ref_sss_local) rsss = salt(ulevels_nod2d(n),n) + S_ref_anomaly   ! S_ref=0 unless use_salt_anomaly
+            virtual_salt(n)=rsss*water_flux(n)
         end do
 !$OMP END PARALLEL DO        
         
@@ -517,21 +501,15 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
         do n=1, myDim_nod2D+eDim_nod2D
             relax_salt(n) = 0.0_WP
             if (ulevels_nod2d(n) > 1) cycle ! --> is cavity node --> only do salt relaxation in open ocean
-#ifdef USE_SALT_ANOMALY
+            ! Ssurf is absolute; subtract S_ref (0 unless use_salt_anomaly) to match the anomaly state
             relax_salt(n)=surf_relax_S*(Ssurf(n)-S_ref_anomaly-salt(ulevels_nod2d(n),n))
-#else
-            relax_salt(n)=surf_relax_S*(Ssurf(n)-salt(ulevels_nod2d(n),n))
-#endif
         end do
 !$OMP END PARALLEL DO
     else
 !$OMP PARALLEL DO
         do n=1, myDim_nod2D+eDim_nod2D
-#ifdef USE_SALT_ANOMALY
+            ! Ssurf is absolute; subtract S_ref (0 unless use_salt_anomaly) to match the anomaly state
             relax_salt(n)=surf_relax_S*(Ssurf(n)-S_ref_anomaly-salt(ulevels_nod2d(n),n))
-#else
-            relax_salt(n)=surf_relax_S*(Ssurf(n)-salt(ulevels_nod2d(n),n))
-#endif
         end do
 !$OMP END PARALLEL DO
     end if 
@@ -675,12 +653,8 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
 !$OMP PARALLEL DO
     do n=1, myDim_nod2D+eDim_nod2D    
         if (ulevels_nod2d(n) == 1) then ! --> is open ocean node
-#ifdef USE_SALT_ANOMALY
-            ! state stores S-35; diagnostic density flux wants absolute S
+            ! density-flux diagnostic wants absolute S; S_ref=0 unless use_salt_anomaly
             dens_flux(n)=sw_alpha(1,n) * heat_flux_in(n) / vcpw + sw_beta(1, n) * (relax_salt(n) + water_flux(n) * (salt(1,n)+S_ref_anomaly))
-#else
-            dens_flux(n)=sw_alpha(1,n) * heat_flux_in(n) / vcpw + sw_beta(1, n) * (relax_salt(n) + water_flux(n) * salt(1,n))
-#endif
         else
             dens_flux(n)=0.0_WP
         end if

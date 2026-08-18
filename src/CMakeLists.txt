@@ -81,8 +81,6 @@ message(STATUS "USE_ICEPACK: ${USE_ICEPACK}")
 
 option(USE_SINGLE_PRECISION "Build FESOM in single precision (WP=4)" OFF)
 message(STATUS "USE_SINGLE_PRECISION: ${USE_SINGLE_PRECISION}")
-option(USE_SALT_ANOMALY "Store the salinity state as the anomaly S - S_ref (finer float32 spacing; see o_PARAM::S_ref_anomaly)" OFF)
-message(STATUS "USE_SALT_ANOMALY: ${USE_SALT_ANOMALY}")
 
 
 # option to trigger building a library version of FESOM
@@ -299,10 +297,6 @@ endif()
 
 if(USE_SINGLE_PRECISION)
    target_compile_definitions(${PROJECT_NAME} PRIVATE USE_SINGLE_PRECISION)
-endif()
-
-if(USE_SALT_ANOMALY)
-   target_compile_definitions(${PROJECT_NAME} PRIVATE USE_SALT_ANOMALY)
 endif()
 
 if(CVMIX)

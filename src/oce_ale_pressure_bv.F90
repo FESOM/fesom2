@@ -246,10 +246,9 @@ subroutine pressure_bv(tracers, partit, mesh)
 
     !___________________________________________________________________________
     ! model explodes, no OpenMP parallelization !
-#ifdef USE_SALT_ANOMALY
-    ! state stores S-35: absolute S<0 <=> anomaly < -35
+    ! absolute S<0 <=> anomaly < -S_ref (S_ref=0 unless use_salt_anomaly)
     if( a < -S_ref_anomaly ) then
-        write (*,*)' --> pressure_bv: s<0 happens! (anomaly state)', a
+        write (*,*)' --> pressure_bv: s<0 happens!', a
         pe_status=1
         do node=1, myDim_nod2D+eDim_nod2D
             nzmin = ulevels_nod2D(node)
@@ -259,19 +258,6 @@ subroutine pressure_bv(tracers, partit, mesh)
             end do
         end do
     endif
-#else
-    if( a < 0.0_WP ) then
-        write (*,*)' --> pressure_bv: s<0 happens!', a
-        pe_status=1
-        do node=1, myDim_nod2D+eDim_nod2D
-            nzmin = ulevels_nod2D(node)
-            nzmax = nlevels_nod2D(node)
-            do nz=nzmin, nzmax-1
-                if (salt(nz, node) < 0) write (*,*) 'the model blows up at n=', mylist_nod2D(node), ' ; ', 'nz=', nz
-            end do
-        end do
-    endif
-#endif
 
     !___________________________________________________________________________
 
@@ -2755,11 +2741,7 @@ IMPLICIT NONE
 
   !compute secant bulk modulus
 
-#ifdef USE_SALT_ANOMALY
-  s_abs = s + S_ref_anomaly   ! state stores S-35; the EOS needs absolute salinity
-#else
-  s_abs = s
-#endif
+  s_abs = s + S_ref_anomaly   ! EOS needs absolute salinity (S_ref=0 unless use_salt_anomaly)
   s_sqrt = sqrt(s_abs)
 
   bulk_0 =  a0      + t*(at   + t*(at2  + t*(at3 + t*at4)))      &
@@ -2911,10 +2893,7 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
      do nz=nzmin, nzmax-1
 
      t1 = TF1(nz,n)*1.00024_WP
-     s1 = SF1(nz,n)
-#ifdef USE_SALT_ANOMALY
-     s1 = s1 + S_ref_anomaly   ! state stores S-35; McDougall polynomial wants absolute
-#endif
+     s1 = SF1(nz,n) + S_ref_anomaly   ! McDougall polynomial wants absolute (S_ref=0 unless use_salt_anomaly)
     !!PS      p1 = abs(Z(nz))
      p1 = abs(Z_3d_n(nz,n))
 
@@ -3242,7 +3221,7 @@ use g_config !, only: which_toy, toy_ocean
 IMPLICIT NONE
   real(kind=WP),  intent(IN)             :: t,s
   real(kind=WP),  intent(OUT)            :: rho_out
-  real(kind=WP)                          :: rhopot, bulk
+  real(kind=WP)                          :: rhopot, bulk, s_abs
   real(kind=WP), intent(OUT)             :: bulk_0, bulk_pz, bulk_pz2
 
   !compute secant bulk modulus
@@ -3251,17 +3230,19 @@ IMPLICIT NONE
   bulk_pz  = 0
   bulk_pz2 = 0
 
+  s_abs = s + S_ref_anomaly   ! linear EOS needs absolute S (S_ref=0 unless use_salt_anomaly)
+
   IF((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) THEN
       rho_out  = density_0 - 0.00025_WP*(t - 10.0_WP)*density_0
-      
+
   ELSE IF((toy_ocean) .AND. (TRIM(which_toy)=="dbgyre")) THEN
-      rho_out  = density_0 - density_0*0.0002052_WP*(t - 10.0_WP) + density_0*0.00079_WP*(s - 35.0_WP)
-      
-  ELSE IF((toy_ocean) .AND. (TRIM(which_toy)=="neverworld2")) THEN    
+      rho_out  = density_0 - density_0*0.0002052_WP*(t - 10.0_WP) + density_0*0.00079_WP*(s_abs - 35.0_WP)
+
+  ELSE IF((toy_ocean) .AND. (TRIM(which_toy)=="neverworld2")) THEN
       rho_out  = density_0 - 0.0002_WP*(t - 10.0_WP)*density_0
-      
+
   ELSE
-      rho_out  = density_0 + 0.8_WP*(s - 34.0_WP) - 0.2*(t - 20.0_WP)
+      rho_out  = density_0 + 0.8_WP*(s_abs - 34.0_WP) - 0.2*(t - 20.0_WP)
   END IF
 
 end subroutine density_linear

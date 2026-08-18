@@ -84,6 +84,8 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     USE o_ARRAYS
     USE g_config
     USE g_forcing_param, only: use_virt_salt, use_age_tracer
+    use diagnostics,         only: ldiag_extflds, ldiag_trflx, ldiag_salt3D, ldiag_DVD
+    use cmor_variables_diag, only: ldiag_cmor
     use o_mixing_KPP_mod
 #if defined (__cvmix)       
     use g_cvmix_tke
@@ -250,26 +252,34 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
        call oce_initial_state(tracers, partit, mesh)   ! Use it if not running tests
     end if
 
-#ifdef USE_SALT_ANOMALY
-    ! salinity state is stored as the anomaly S - S_ref_anomaly (finer float32
-    ! spacing where the ocean lives); initial conditions arrive absolute ->
-    ! convert ONCE here, before the AB copies. All absolute-S consumers carry
+    !___________________________________________________________________________
+    ! use_salt_anomaly (namelist &oce_dyn): store the salinity state as the
+    ! anomaly S - S_ref_anomaly (finer float32 spacing where the ocean lives).
+    ! S_ref_anomaly stays 0 unless the toggle is on, so the subtraction and every
+    ! downstream `+ S_ref_anomaly` are bit-identical no-ops when off. Initial
+    ! conditions arrive absolute -> convert ONCE here, after oce_initial_state
+    ! (insitu2pot has already used absolute S), before the AB copies below.
+    ! Restart reads are converted in fesom_init. All absolute-S consumers carry
     ! offset corrections (EOS, sw_alpha_beta, ice gather, rsss, SSS restoring,
     ! KPP buoyancy/double-diffusion, surface dilution term); clip and blowup
-    ! bounds shifted accordingly. Restart reads are converted in fesom_init.
-    tracers%data(2)%values = tracers%data(2)%values - S_ref_anomaly
-    if (partit%mype==0) write(*,*) 'USE_SALT_ANOMALY: salinity state = S - ', S_ref_anomaly
-    ! configurations with absolute-salinity consumers that carry NO offset
-    ! correction yet: refuse to start instead of silently computing wrong
-    ! physics (extend the offset corrections before lifting a guard)
-    if (SPP .or. use_cavity .or. use_icebergs .or. use_age_tracer .or. use_transit &
-        .or. use_kpp_nonlclflx .or. clim_relax > 1.e-8_WP) then
-        if (partit%mype==0) write(*,*) 'USE_SALT_ANOMALY does not support yet: ', &
-            'SPP, cavities, icebergs, age tracer, transient tracers, ', &
-            'KPP nonlocal fluxes, 3D climatology relaxation'
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    ! bounds shifted accordingly.
+    if (use_salt_anomaly) then
+        S_ref_anomaly = 35.0_WP
+        tracers%data(2)%values = tracers%data(2)%values - S_ref_anomaly
+        if (partit%mype==0) write(*,*) 'use_salt_anomaly: salinity state = S - ', S_ref_anomaly
+        ! configurations with absolute-salinity consumers that carry NO offset
+        ! correction yet: refuse to start instead of silently computing wrong
+        ! physics (extend the offset corrections before lifting a guard)
+        if (SPP .or. use_cavity .or. use_icebergs .or. use_age_tracer .or. use_transit &
+            .or. use_kpp_nonlclflx .or. clim_relax > 1.e-8_WP &
+            .or. ldiag_extflds .or. ldiag_trflx .or. ldiag_salt3D .or. ldiag_DVD .or. ldiag_cmor) then
+            if (partit%mype==0) write(*,*) 'use_salt_anomaly does not support yet: ', &
+                'SPP, cavities, icebergs, age tracer, transient tracers, ', &
+                'KPP nonlocal fluxes, 3D climatology relaxation, ', &
+                'salinity diagnostics (extflds/trflx/salt3D/DVD/cmor)'
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        end if
     end if
-#endif
     if (.not.r_restart) then
        do n=1, tracers%num_tracers
           do i=1, tracers%data(n)%AB_order-1
