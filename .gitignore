@@ -19,3 +19,4 @@ src/cvmix_driver/CVMix-src/
 cmake/cvmixConfig-release.cmake
 cmake/cvmixConfig.cmake
 .claude/
+build_*/

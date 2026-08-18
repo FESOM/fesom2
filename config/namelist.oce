@@ -19,6 +19,9 @@ C_d                = 0.0025  ! bottom drag coefficient (dimensionless, typical: 
 A_ver              = 1.e-4   ! background vertical viscosity [m²/s]
 scale_area         = 5.8e9   ! reference element area for viscosity/diffusivity scaling [m²]
 
+! --- Salinity state representation ---
+use_salt_anomaly   = .false. ! store salinity as the anomaly S-35 (finer float32 spacing; helps single precision). .false. = absolute salinity, bit-identical to before
+
 ! --- Salt Plume Parameterization ---
 SPP                = .false. ! enable Salt Plume Parameterization (for brine rejection under sea ice)
 

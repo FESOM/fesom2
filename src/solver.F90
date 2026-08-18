@@ -84,8 +84,24 @@ subroutine ssh_solve_preconditioner(solverinfo, partit, mesh)
        pr_values(offset+1)=1.0_WP/ssh_stiff%values(offset+1)
        DO n=2, nend   
           node=cind(offset+n)    ! Will be ssh_stiff$colind(offset+n) 
-          pr_values(n+offset)=-0.5_WP*(ssh_stiff%values(n+offset)/ssh_stiff%values(1+offset))/  &
-                               (ssh_stiff%values(1+offset)+ diag_values(node)) 
+          if (solverinfo%precond_variant == 0) then
+             ! As coded since 60b46bdc. Note two things about it. The comment at
+             ! the top of this routine specifies -2*a_i/a_r/(a_r+(a_diag)_i),
+             ! which is this expression times 4. And entry (r,i) here is
+             ! -c*a_ri/(a_rr*(a_rr+a_ii)) while its transpose (i,r) is
+             ! -c*a_ir/(a_ii*(a_ii+a_rr)); with A symmetric those agree only
+             ! where a_rr == a_ii, i.e. on a uniform mesh. CG needs an SPD M^-1,
+             ! so this is worth measuring rather than assuming -- see the r.z<0
+             ! sensor in ssh_solve_cg.
+             pr_values(n+offset)=-0.5_WP*(ssh_stiff%values(n+offset)/ssh_stiff%values(1+offset))/  &
+                                  (ssh_stiff%values(1+offset)+ diag_values(node)) 
+          else
+             ! Textbook symmetrised Jacobi, M^-1 = 2D^-1 - D^-1 A D^-1. The
+             ! off-diagonal -a_ri/(a_rr*a_ii) is symmetric by construction, and
+             ! its diagonal reduces to 1/a_rr, which is what is coded above.
+             pr_values(n+offset)=-ssh_stiff%values(n+offset)/                                     &
+                                  (ssh_stiff%values(1+offset)*diag_values(node))
+          end if
        END DO
     END DO
    deallocate(diag_values)
@@ -160,7 +176,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
  s_old = sum(rhs(1:myDim_nod2D) * rhs(1:myDim_nod2D))
 #endif
 
-  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
   rtol=solverinfo%soltol*sqrt(s_old/real(nod2D,WP))
   ! ==============
   ! Compute r0
@@ -198,7 +214,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   s_old = sum(rr(1:myDim_nod2D) * zz(1:myDim_nod2D))
 #endif
 
-  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
   
   ! ===============
   ! Iterations
@@ -229,7 +245,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
  s_aux = sum(pp(1:myDim_nod2D) * App(1:myDim_nod2D))
 #endif
 
-  call MPI_Allreduce(MPI_IN_PLACE, s_aux, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  call MPI_Allreduce(MPI_IN_PLACE, s_aux, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 
      ! ===========
      ! Breakdown guard. An equivalent check existed until 4eb2f21d ("Removed
@@ -285,7 +301,7 @@ sprod(1:2)=0.0_WP
     sprod(2) = sum(rr(1:myDim_nod2D) * rr(1:myDim_nod2D))
 #endif
   
-  call MPI_Allreduce(MPI_IN_PLACE, sprod, 2, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  call MPI_Allreduce(MPI_IN_PLACE, sprod, 2, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 
 !$OMP BARRIER
      ! ===========
