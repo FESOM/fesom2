@@ -345,6 +345,16 @@ contains
 #else
             print '(a,i0,a)'," FESOM working precision: WP=",WP," bytes (DOUBLE PRECISION MODE)"
 #endif
+            ! Intrinsic characteristics of the DEFAULT working-precision kind (once,
+            ! root rank). Labelled "Default WP" because the model is mixed-precision:
+            ! some paths are fixed real64 (e.g. the forcing time axis) or run in double
+            ! (CVMix) regardless of WP. A stable reference if the toolchain changes.
+            print *, "   Default WP kind    :", WP
+            print *, "   Default WP storage :", storage_size(0.0_WP), "bits"
+            print *, "   Default WP digits  :", precision(0.0_WP)
+            ! spacing(1.0_WP) == machine epsilon on IEEE; the intrinsic epsilon() is
+            ! shadowed here by the AB2 offset variable 'epsilon' (oce_modules.F90).
+            print *, "   Default WP epsilon :", spacing(1.0_WP)
             print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
             print *, achar(27)//'[7;32m'//' --> FESOM BUILDS UP MODEL CONFIGURATION                    '//achar(27)//'[0m'
         end if
