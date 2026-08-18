@@ -3069,7 +3069,6 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
     !___________________________________________________________________________
-    logical, save        :: lfirst=.true.
     integer              :: n
     
     ! pointer on necessary derived types
@@ -3087,10 +3086,15 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     droptol => dynamics%solverinfo%droptol
     soltol  => dynamics%solverinfo%soltol
 
-    if (lfirst) call ssh_solve_preconditioner(dynamics%solverinfo, partit, mesh)
+    ! Normally already built in ocean_setup, from the unperturbed stiffness matrix. Keep a
+    ! fallback, but key it on whether the arrays exist rather than on a saved first-call flag:
+    ! a flag says nothing about how much elevation the cumulative matrix has already absorbed,
+    ! and it double-allocates on the binary restart path, which restores solverinfo%rr/zz/pp/App
+    ! and then aborts with "allocatable array is already allocated".
+    if (.not. allocated(mesh%ssh_stiff%pr_values)) &
+        call ssh_solve_preconditioner(dynamics%solverinfo, partit, mesh)
     call ssh_solve_cg(dynamics%d_eta, dynamics%ssh_rhs, dynamics%solverinfo, partit, mesh)
     call exchange_nod(dynamics%d_eta, partit) !is this required after calling psolve ?
-    lfirst=.false.
 
 end subroutine solve_ssh_ale
 !

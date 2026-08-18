@@ -149,6 +149,18 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
         enodes=elem2D_nodes(:,elem)
         nu1 = ulevels(elem)
         nl1 = nlevels(elem)
+        ! under a cavity the element starts at nu1>1, the levels above it are
+        ! never filled below. Pad them like the sub-bottom levels, otherwise the
+        ! node loop in a3 reads uninitialised AUX for nodes whose ulevels_nod2D
+        ! is shallower than ulevels of a neighbouring element --> NaNs
+        if (nu1>1) then
+            !$ACC LOOP VECTOR
+            do nz=1,nu1-1
+                AUX(1,nz,elem)=-bignumber
+                AUX(2,nz,elem)= bignumber
+            end do
+            !$ACC END LOOP
+        endif
         !$ACC LOOP VECTOR
         do nz=nu1, nl1-1
             AUX(1,nz,elem)=max(fct_ttf_max(nz,enodes(1)), fct_ttf_max(nz,enodes(2)), fct_ttf_max(nz,enodes(3)))
