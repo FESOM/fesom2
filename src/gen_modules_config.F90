@@ -161,11 +161,21 @@ module g_config
   logical                       :: flag_warn_cflz=.true. ! switches off cflz warning
   logical                       :: use_transit=.false.    ! switches off transient tracers
   logical                       :: compute_oasis_corners=.false. ! switches on corner calculation for 1st order conserv remapping 
+
+#if defined(__recom) && defined(__usetp)
+! number of groups for multi FESOM group loop parallelization
+  integer                       :: num_fesom_groups=1
+  namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, &
+                        use_cavity_partial_cell, cavity_partial_cell_thresh, &
+                        use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
+                        use_transit, compute_oasis_corners, num_fesom_groups
+#else
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
                         use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
                         use_transit, compute_oasis_corners
-  
+#endif
+
   !_____________________________________________________________________________
   ! *** others ***
   real(kind=WP)                 :: dt
