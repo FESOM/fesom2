@@ -556,6 +556,8 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     integer        :: AB_order     = 2
     logical        :: check_opt_visc=.true.
     real(kind=WP)  :: wsplit_maxcfl
+    real(kind=WP)  :: soltol = 1.e-5_WP  ! ssh CG rel. tolerance; default matches T_SOLVERINFO
+    integer        :: maxiter = 2000     ! ssh CG iteration cap; default matches T_SOLVERINFO
     logical        :: use_ssh_se_subcycl=.false.
     integer        :: se_BTsteps
     real(kind=WP)  :: se_BTtheta
@@ -568,11 +570,11 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
                                 uke_scaling, uke_scaling_factor, uke_advection, &
                                 rosb_dis, smooth_back, smooth_dis, smooth_back_tend, K_back, c_back
 
-    namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, & 
+    namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, &
                                 ldiag_KE, AB_order,                                  &
                                 use_ssh_se_subcycl, se_BTsteps, se_BTtheta,          &
                                 se_bottdrag, se_bdrag_si, se_visc, se_visc_gamma0,   &
-                                se_visc_gamma1, se_visc_gamma2
+                                se_visc_gamma1, se_visc_gamma2, soltol, maxiter
 
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -642,8 +644,35 @@ nl => mesh%nl
             write(*,*) "     se_visc_gamma0 = ", dynamics%se_visc_gamma0
             write(*,*) "     se_visc_gamma1 = ", dynamics%se_visc_gamma1
             write(*,*) "     se_visc_gamma2 = ", dynamics%se_visc_gamma2
-        end if 
-    end if 
+        end if
+    end if
+
+    ! ssh CG solver tolerance (optional, backward compatible): if 'soltol' is
+    ! absent from namelist.dyn the namelist read leaves it at the default above,
+    ! matching the previous hard-coded T_SOLVERINFO value.
+    !
+    ! KNOWN LIMITATION -- these two settings are honoured on a COLD START only.
+    ! soltol and maxiter are both members of T_SOLVERINFO, which is serialized into
+    ! the derived-type (bin) restart dump, and READ_T_SOLVERINFO runs *after* this
+    ! routine (fesom_module.F90: dynamics_init -> ... -> read_initial_conditions).
+    ! So on a bin restart the dumped values silently replace whatever the namelist
+    ! asked for, while the echo below still prints the namelist value.
+    ! Measured on pi: cold start at soltol=1e-5 takes 8.60 iterations/solve; restart
+    ! with soltol=1e-2 in the namelist still takes 8.95 -- i.e. it is still solving to
+    ! 1e-5 -- although the log reports 1.0E-002. The raw-restart path is unaffected.
+    ! Not fixed here: the fix is to read these into throwaway locals so the byte
+    ! layout is preserved, and that needs the restart-vs-continuous regression test,
+    ! which does not exist yet. Set them on the cold start of an experiment.
+    dynamics%solverinfo%soltol = soltol
+    if (mype==0) write(*,*) '     ssh CG soltol  = ', dynamics%solverinfo%soltol
+
+    ! ssh CG iteration cap, same contract as soltol above. Needed to tell a stall
+    ! apart from a truncation when sweeping soltol: raise it and a solver that is
+    ! merely slow still converges, while one that has hit its residual floor
+    ! plateaus instead.
+    ! Same cold-start-only caveat as soltol above; see the note there.
+    dynamics%solverinfo%maxiter = maxiter
+    if (mype==0) write(*,*) '     ssh CG maxiter = ', dynamics%solverinfo%maxiter
 
     !___________________________________________________________________________
     ! define local vertice & elem array size
