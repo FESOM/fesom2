@@ -52,6 +52,12 @@ type(t_partit), intent(inout), target :: partit
      call sbc_ini(partit, mesh)         ! initialize forcing fields
 #endif
   endif
+  ! modini needs the standalone forcing reader also in the coupled build,
+  ! because it drives the ocean/ice stresses from forcing winds rather than
+  ! from the stresses received via OASIS
+  if (use_modini) then
+     call sbc_ini(partit, mesh)
+  endif
   if ((toy_ocean) .AND. TRIM(which_toy)=="dbgyre" .AND. (use_sw_pene)) then
      call forcing_array_setup_dbgyre(partit, mesh)
   endif

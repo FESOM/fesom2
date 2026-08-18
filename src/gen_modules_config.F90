@@ -119,6 +119,9 @@ module g_config
   
   !_____________________________________________________________________________
   ! *** configuration***
+  logical                       :: use_modini=.false. !switch for modini approach (Thoma et al., 2015) for atmosphere-ocean coupling
+  logical                       :: check_modini=.false. !special check option for modini approach
+  logical                       :: check_fesom=.false.
   logical                       :: use_sw_pene=.true.
   logical                       :: use_ice=.false.  
                                                    ! to be supplied
@@ -165,12 +168,12 @@ module g_config
 #if defined(__recom) && defined(__usetp)
 ! number of groups for multi FESOM group loop parallelization
   integer                       :: num_fesom_groups=1
-  namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, &
+  namelist /run_config/ use_modini, check_modini, check_fesom, use_ice,use_floatice, use_sw_pene, use_cavity, &
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
                         use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
                         use_transit, compute_oasis_corners, num_fesom_groups
 #else
-  namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
+  namelist /run_config/ use_modini, check_modini, check_fesom, use_ice,use_floatice, use_sw_pene, use_cavity, & 
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
                         use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
                         use_transit, compute_oasis_corners

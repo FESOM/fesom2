@@ -90,6 +90,8 @@ age_start_year    = 2000     ! year to start age tracer (tracer age = 0 at this 
    nm_tair_file  = '/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/tas.'        ! name of file with 2m air temperature
    nm_prec_file  = '/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/prra.'       ! name of file with total precipitation
    nm_snow_file  = '/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/prsn.'       ! name of file with snow precipitation
+   nm_xmodini_file = '/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/uas.'      ! name of file with modini zonal wind speeds (use_modini=.true.)
+   nm_ymodini_file = '/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/vas.'      ! name of file with modini meridional wind speeds (use_modini=.true.)
 
    ! --- Variable names in netCDF forcing files ---
    nm_xwind_var  = 'uas'      ! name of variable in file with wind
@@ -103,6 +105,8 @@ age_start_year    = 2000     ! year to start age tracer (tracer age = 0 at this 
    nm_prec_var   = 'prra'     ! name of variable in file with total precipitation
    nm_snow_var   = 'prsn'     ! name of variable in file with total precipitation
    nm_mslp_var   = 'psl'      ! name of variable in file with air_pressure_at_sea_level
+   nm_xmodini_var  = 'uas'    ! name of variable in file with modini zonal wind (use_modini=.true.)
+   nm_ymodini_var  = 'vas'    ! name of variable in file with modini meridional wind (use_modini=.true.)
 
    ! --- Time axis configuration in forcing files ---
    nm_nc_iyear   = 1900       ! initial year of forcing data time axis (note, not the first year in the file!)

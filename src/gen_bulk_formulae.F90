@@ -4,10 +4,11 @@ MODULE gen_bulk
     USE MOD_PARTIT
     USE MOD_PARSUP    
     USE MOD_ICE
+    use g_config, only: use_modini
     use g_forcing_arrays
     use g_forcing_param, only: ncar_bulk_z_wind, ncar_bulk_z_tair, ncar_bulk_z_shum
     use o_param, only: WP
-    use g_sbf, only: atmdata, i_totfl, i_xwind, i_ywind, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud
+    use g_sbf, only: atmdata, i_totfl, i_xwind, i_ywind, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_xmodini, i_ymodini
 
     implicit none
 
@@ -397,8 +398,13 @@ SUBROUTINE nemo_ocean_fluxes_mode(ice, partit)
    
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i, wdx, wdy, wndm, zst, q_sat, Cd, Ch, Ce, t_zu, q_zu)
    do i = 1, partit%myDim_nod2D+partit%eDim_nod2d
-      wdx  = atmdata(i_xwind,i) - u_w(i) ! wind from data - ocean current ( x direction)
-      wdy  = atmdata(i_ywind,i) - v_w(i) ! wind from data - ocean current ( y direction)
+      if (use_modini) then
+         wdx = atmdata(i_xmodini,i) - u_w(i) ! modini wind from data - ocean current ( x direction)
+         wdy = atmdata(i_ymodini,i) - v_w(i) ! modini wind from data - ocean current ( y direction)
+      else
+         wdx  = atmdata(i_xwind,i) - u_w(i) ! wind from data - ocean current ( x direction)
+         wdy  = atmdata(i_ywind,i) - v_w(i) ! wind from data - ocean current ( y direction)
+      endif
       wndm = SQRT( wdx * wdx + wdy * wdy )
       zst  = t_oc_array(i)+273.15_WP
 
