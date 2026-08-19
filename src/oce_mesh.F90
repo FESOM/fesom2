@@ -2181,6 +2181,8 @@ SUBROUTINE mesh_areas(partit, mesh)
 
     integer                                   :: n,j,q, elnodes(3), ed(2), elem, nz,nzmin, nzmax
     real(kind=WP)                             :: a(2), b(2), ax, ay, lon, lat, vol, vol2
+    ! full-precision accumulators for the total ocean areas (see below)
+    real(kind=WP_full)                        :: area_acc, area_acc2, area_glob, area_glob2
     real(kind=WP), allocatable,dimension(:)   :: work_array
     integer, allocatable,dimension(:,:)       :: cavity_contribut
     real(kind=WP)                             :: t0, t1
@@ -2389,22 +2391,36 @@ type(t_partit), intent(inout), target :: partit
     deallocate(work_array)
 
     !___compute total ocean areas with/without cavity___________________________
-    vol = 0.0_WP
-    vol2= 0.0_WP
+    ! Accumulate the total areas in WP_full rather than WP. These are sums over
+    ! every surface node in the domain (~1e5 on CORE2, ~7e6 on NG5) reaching
+    ! ~3.6e14 m^2, and they are the DENOMINATOR of every global-mean flux
+    ! correction: freshwater, virtual salt, SSS restoring, icebergs and water
+    ! isotopes all form net = integrate_nod(flux)/ocean_area and subtract it so
+    ! the domain integral vanishes. A relative error here is therefore a
+    ! systematic net source applied to every surface node, not noise that
+    ! averages out. In float32 a single ulp at 3.6e14 is ~3.4e7 m^2, and the
+    ! uncompensated sum's error is far larger than that.
+    ! Dedicated WP_full locals rather than retyping vol/vol2, which are shared
+    ! with the mesh-resolution loop above. mesh%ocean_area keeps its WP type, so
+    ! nothing ripples to its consumers.
+    area_acc  = 0.0_WP_full
+    area_acc2 = 0.0_WP_full
     do n=1, myDim_nod2D
 !!PS         vol2=vol2+mesh%area(mesh%ulevels_nod2D(n), n) ! area also under cavity
 !!PS         if (mesh%ulevels_nod2D(n)>1) cycle
 !!PS         vol=vol+mesh%area(1, n) ! area only surface
-        vol2=vol2+mesh%areasvol(mesh%ulevels_nod2D(n), n) ! area also under cavity
+        area_acc2 = area_acc2 + real(mesh%areasvol(mesh%ulevels_nod2D(n), n), WP_full) ! area also under cavity
         if (mesh%ulevels_nod2D(n)>1) cycle
-        vol=vol+mesh%areasvol(1, n) ! area only surface  
+        area_acc  = area_acc  + real(mesh%areasvol(1, n), WP_full) ! area only surface
     end do
-    mesh%ocean_area=0.0_WP
-    mesh%ocean_areawithcav=0.0_WP
-    call MPI_AllREDUCE(vol, mesh%ocean_area, 1, MPI_WP, MPI_SUM, &
+    area_glob  = 0.0_WP_full
+    area_glob2 = 0.0_WP_full
+    call MPI_AllREDUCE(area_acc,  area_glob,  1, MPI_DOUBLE_PRECISION, MPI_SUM, &
         MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(vol2, mesh%ocean_areawithcav, 1, MPI_WP, MPI_SUM, &
+    call MPI_AllREDUCE(area_acc2, area_glob2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
         MPI_COMM_FESOM, MPIerr)
+    mesh%ocean_area        = real(area_glob,  WP)
+    mesh%ocean_areawithcav = real(area_glob2, WP)
     
     !___write mesh statistics___________________________________________________
     if (mype==0) then
