@@ -171,6 +171,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 ! multi FESOM group loop parallelization
     integer             :: num_tracers
     integer             :: tr_num_start_memo
+    integer             :: tr_num_end_memo
 
     integer             :: group_i
     integer             :: tr_num_start
@@ -270,6 +271,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     Benthos_tr_slice_count_fix_1 = 1 * (myDim_nod2D + eDim_nod2D) * benthos_num
 
     tr_num_start_memo = tr_num_start
+    tr_num_end_memo   = tr_num_end
 
     request_count = 0
 #endif
@@ -460,6 +462,16 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 #if defined(__recom) && defined(__usetp)
 ! SinkFlx and Benthos values are buffered per tracer index in the loop above and now summed up to
 ! avoid non bit identical results regarding global sums when running the tracer loop in parallel
+! ver_sinking_recom_benthos adds each contribution to Benthos directly AND
+! buffers the same value in Benthos_tr. Summing the buffers below would
+! therefore count this group's own tracers twice. Remove that slice again
+! first, so Benthos ends up with every tracer exactly once. Where the
+! buffers are not filled (use_MEDUSA with sedflx_num /= 0) they are zero
+! and both loops are a no-op, leaving the previous behaviour untouched.
+        do tr_num = tr_num_start_memo, tr_num_end_memo
+            Benthos = Benthos - Benthos_tr(:, :, tr_num)
+        end do
+
         do tr_num = 1, num_tracers
             if(use_MEDUSA) then
                 SinkFlx = SinkFlx + SinkFlx_tr(:, :, tr_num)
