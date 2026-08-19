@@ -350,7 +350,7 @@ lval=0.0_WP_full
 !$OMP END PARALLEL
 #endif
   int2D=0.0_WP
-  call MPI_AllREDUCE(lval, int2D, 1, MPI_WP, MPI_SUM, &
+  call MPI_AllREDUCE(lval, int2D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
 end subroutine integrate_nod_2D
 !
@@ -397,7 +397,7 @@ subroutine integrate_nod_3D(data, int3D, partit, mesh)
 !$OMP END PARALLEL DO
 
   int3D=0.0_WP
-  call MPI_AllREDUCE(lval, int3D, 1, MPI_WP, MPI_SUM, &
+  call MPI_AllREDUCE(lval, int3D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
 end subroutine integrate_nod_3D
 !
@@ -689,7 +689,7 @@ subroutine integrate_elem_3D(data, int3D, partit, mesh)
 !$OMP END PARALLEL DO
 
   int3D=0.0_WP
-  call MPI_AllREDUCE(lval, int3D, 1, MPI_WP, MPI_SUM, &
+  call MPI_AllREDUCE(lval, int3D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
 end subroutine integrate_elem_3D
 !
@@ -731,7 +731,7 @@ subroutine integrate_elem_2D(data, int2D, partit, mesh)
 !$OMP END PARALLEL DO
 
   int2D=0.0_WP
-  call MPI_AllREDUCE(lval, int2D, 1, MPI_WP, MPI_SUM, &
+  call MPI_AllREDUCE(lval, int2D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
 end subroutine integrate_elem_2D
 
