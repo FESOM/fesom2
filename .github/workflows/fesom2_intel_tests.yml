@@ -16,6 +16,7 @@ jobs:
   intel_test:
     # Containers must run in Linux based operating systems
     runs-on: ubuntu-latest
+    timeout-minutes: 12
     # Intel compiler container
     container: ghcr.io/suvarchal/fesom2-ci-intel
 
@@ -46,7 +47,7 @@ jobs:
       run: |
         test -x bin/fesom.x
         echo "Intel build OK (integration tests skipped)"
-    
+
         # TODO issues with netcdf: cd build
--       # ctest -R "integration_*" --output-on-failure --verbose
+        # ctest -R "integration_*" --output-on-failure --verbose
 

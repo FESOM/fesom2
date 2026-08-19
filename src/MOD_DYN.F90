@@ -18,6 +18,11 @@ TYPE T_SOLVERINFO
     integer       :: lutype  = 2
     real(kind=WP) :: droptol = 1.e-8
     real(kind=WP)  :: soltol  = 1e-5
+    ! Which symmetrised-Jacobi formula the preconditioner uses.
+    ! 0 = as coded since 60b46bdc, used before version 2.8.0
+    ! 1 = textbook M^-1 = 2D^-1 - D^-1 A D^-1, which is genuinely symmetric
+    ! See ssh_solve_preconditioner for why this switch exists.
+    integer       :: precond_variant = 1
     real(kind=WP), allocatable   :: rr(:), zz(:), pp(:), App(:)
     !___________________________________________________________________________
     ! Per-run solver diagnostics. Deliberately NOT in WRITE/READ_T_SOLVERINFO
@@ -231,6 +236,11 @@ subroutine READ_T_SOLVERINFO(tsolverinfo, unit)
     integer                              :: iostat
     character(len=1024)                  :: iomsg
     read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%ident
+    ! NOTE maxiter and soltol are configurable from namelist.dyn, but this read
+    ! runs after dynamics_init, so on a restart these dumped values override what
+    ! the namelist asked for. Reading them into throwaway locals would make the
+    ! namelist authoritative while preserving the byte layout exactly; deferred
+    ! until there is a restart-vs-continuous test to verify it against.
     read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%maxiter
     read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%restart
     read(unit, iostat=iostat, iomsg=iomsg) tsolverinfo%fillin
