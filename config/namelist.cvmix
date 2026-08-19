@@ -92,7 +92,7 @@ idemix2_mu0           = 0.33333333   ! dissipation parameter [dimensionless]
 
 ! --- superbee-spectral advection scheme and Adams-Bashfort timestepping ---
 idemix2_enable_AB     = .true.
-idemix2_AB_epsilon    = 0.1_WP
+idemix2_AB_epsilon    = 0.1
 
 ! --- Number of used spectral frequency bins
 idemix2_nfbin         = 52 
