@@ -3069,7 +3069,6 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
     !___________________________________________________________________________
-    logical, save        :: lfirst=.true.
     integer              :: n
     
     ! pointer on necessary derived types
@@ -3087,10 +3086,15 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     droptol => dynamics%solverinfo%droptol
     soltol  => dynamics%solverinfo%soltol
 
-    if (lfirst) call ssh_solve_preconditioner(dynamics%solverinfo, partit, mesh)
+    ! Normally already built in ocean_setup, from the unperturbed stiffness matrix. Keep a
+    ! fallback, but key it on whether the arrays exist rather than on a saved first-call flag:
+    ! a flag says nothing about how much elevation the cumulative matrix has already absorbed,
+    ! and it double-allocates on the binary restart path, which restores solverinfo%rr/zz/pp/App
+    ! and then aborts with "allocatable array is already allocated".
+    if (.not. allocated(mesh%ssh_stiff%pr_values)) &
+        call ssh_solve_preconditioner(dynamics%solverinfo, partit, mesh)
     call ssh_solve_cg(dynamics%d_eta, dynamics%ssh_rhs, dynamics%solverinfo, partit, mesh)
     call exchange_nod(dynamics%d_eta, partit) !is this required after calling psolve ?
-    lfirst=.false.
 
 end subroutine solve_ssh_ale
 !
@@ -3724,25 +3728,33 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         ! Compute vertical integral of transport velocity rhs omitting the contributions from
         ! the elevation and Coriolis. 
         t30=MPI_Wtime()
+        ! Sub-sections nested under oce_ssh_solve (the barotropic subcycle is the
+        ! split-explicit analogue of the CG SSH solve). oce_bt_step is the
+        ! se_BTsteps subcycle loop — the expensive, halo-heavy part.
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_start("oce_bt_rhs")
+#endif
         call compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
-        
-        ! Do barotropic step, get eta_{n+1} and BT transport 
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("oce_bt_rhs")
+    call fesom_profiler_start("oce_bt_step")
+#endif
+        ! Do barotropic step, get eta_{n+1} and BT transport
         call compute_BT_step_SE_ale(dynamics, partit, mesh)
         t4=MPI_Wtime()
 #if defined (FESOM_PROFILING)
-        call fesom_profiler_end("oce_ssh_solve")
-        call fesom_profiler_start("oce_vel_update")
-#endif   
-
+    call fesom_profiler_end("oce_bt_step")
+    call fesom_profiler_end("oce_ssh_solve")
+    call fesom_profiler_start("oce_vel_update")
+#endif
         ! Trim U to be consistent with BT transport
         call update_trim_vel_ale_vtransp(1, dynamics, partit, mesh) 
         t5=MPI_Wtime()
         t6=t5
 #if defined (FESOM_PROFILING)
-        call fesom_profiler_end("oce_vel_update")
-        call fesom_profiler_start("oce_hbar_calc")
-        call fesom_profiler_end("oce_hbar_calc")
-        call fesom_profiler_start("oce_gm_redi")
+    ! no separate hbar step in split-explicit subcycling (t6=t5)
+    call fesom_profiler_end("oce_vel_update")
+    call fesom_profiler_start("oce_gm_redi")
 #endif
     end if ! --> if (.not. dynamics%use_ssh_se_subcycl) then
     
@@ -3832,6 +3844,10 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     ! write out global fields for debugging
+#if defined(__recom) && defined(__usetp)
+    if(partit%my_fesom_group == 0) then
+#endif
+
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call write_step_info'//achar(27)//'[0m'
     call write_step_info(n,logfile_outfreq, ice, dynamics, tracers, partit, mesh)
     
@@ -3846,6 +3862,10 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call check_blowup'//achar(27)//'[0m'
     call check_blowup(n, ice, dynamics, tracers, partit, mesh)
     t11=MPI_Wtime()
+
+#if defined(__recom) && defined(__usetp)
+    endif
+#endif
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("oce_blowup_check")
 #endif
@@ -3861,6 +3881,10 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     rtime_oce_GMRedi   = rtime_oce_GMRedi   + (t7-t6)
     rtime_oce_solvetra = rtime_oce_solvetra + (t9-t8)
     rtime_tot          = rtime_tot          + (t11-t0)-(t11-t10)
+
+#if defined(__recom) && defined(__usetp)
+    if(partit%my_fesom_group == 0) then
+#endif    
     if(mod(n,logfile_outfreq)==0 .and. mype==0) then  
         write(*,*)
         write(*,*) '___ALE OCEAN STEP EXECUTION TIMES______________________'
@@ -3881,6 +3905,10 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         write(*,"(A, ES10.3)")             '     Oce. TOTAL       :', t11-t0
         write(*,*)
         write(*,*)
-    end if    
+    end if 
+#if defined(__recom) && defined(__usetp)
+    endif
+#endif
+
 end subroutine oce_timestep_ale
 
