@@ -49,9 +49,12 @@ on:
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   ctest_framework:
-    # Run directly on Ubuntu runner
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 12
+    # Same image fesom2_build_tests.yml uses. It already provides gcc/gfortran
+    # 11.4, cmake 3.22, OpenMPI 4.1.2 and netCDF 4.8.1 / netCDF-Fortran 4.5.4
+    # under /usr, which is what NETCDF_ROOT below expects.
+    container: ghcr.io/fesom/fesom2_docker:fesom2_ci-master
     
     env:
       # Set environment variables for the build
@@ -64,50 +67,11 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE
       - name: Checkout repository
         uses: actions/checkout@v4
-      
-      - name: Install system dependencies
-        timeout-minutes: 22
+
+      - name: Git safe directory
         run: |
-          cat > /tmp/install_deps.sh <<'SCRIPT'
-          set -eux
-          # Acquire::*::Timeout is the important part: the classic apt hang is a
-          # stalled connection that otherwise never times out at all.
-          APT_OPTS="-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30"
-          sudo apt-get $APT_OPTS update
-          sudo apt-get $APT_OPTS install -y \
-            gcc gfortran g++ cmake make \
-            openmpi-bin libopenmpi-dev \
-            libnetcdf-dev libnetcdff-dev \
-            pkg-config git wget ca-certificates
-          SCRIPT
+          git config --global --add safe.directory ${PWD}
 
-          ok=0
-          for attempt in 1 2; do
-            echo "::group::dependency install attempt $attempt"
-            if timeout 10m bash /tmp/install_deps.sh; then ok=1; fi
-            echo "::endgroup::"
-            [ "$ok" = 1 ] && break
-            echo "::warning::dependency install attempt $attempt timed out or failed; retrying"
-            # a killed apt leaves locks and a half-configured dpkg behind,
-            # which would make the next attempt fail for a different reason
-            sudo pkill -9 -f apt-get 2>/dev/null || true
-            sudo rm -f /var/lib/apt/lists/lock /var/cache/apt/archives/lock \
-                       /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend || true
-            sudo dpkg --configure -a || true
-            sleep 20
-          done
-          if [ "$ok" != 1 ]; then
-            echo "::error::dependency install failed after 2 attempts of 10 min each"
-            exit 1
-          fi
-
-          echo "Verifying installations..."
-          gcc --version
-          gfortran --version
-          mpirun --version
-          cmake --version
-          pkg-config --modversion netcdf
-          pkg-config --modversion netcdf-fortran
       - name: Set up environment variables
         run: |
           echo "Setting up environment for FESOM2 build..."
