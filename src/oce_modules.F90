@@ -21,7 +21,7 @@ integer, parameter            :: WP=real64   ! Working precision
 integer, parameter            :: WP_full=real64
 integer, parameter            :: MAX_PATH=4096 ! Maximum file path length
 integer		                  :: mstep
-real(kind=WP), parameter      :: pi=3.14159265358979_WP
+real(kind=WP), parameter      :: pi=3.141592653589793238462643383279502884_WP
 real(kind=WP), parameter      :: rad=pi/180.0_WP
 real(kind=WP), parameter      :: density_0=1030.0_WP
 real(kind=WP), parameter      :: density_0_r=1.0_WP/density_0 ! [m^3/kg]
