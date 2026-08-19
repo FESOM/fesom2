@@ -32,7 +32,8 @@ module diagnostics
             dvd_SD_chi_dif_ve, dvd_SD_chi_dif_sbc, dvd_xdfac,                                                     &
             ldiag_uvw_sqr, uv2, wvel2,                                                                            &
             ldiag_trgrd_xyz, trgrd_x, trgrd_y, trgrd_z,                                                           &
-            ldiag_cmor
+            ldiag_cmor,                                                                                            &
+            dmoc_call_freq, dmoc_call_freq_unit, dmoc_is_due
              
 
   ! Arrays used for diagnostics, some shall be accessible to the I/O
@@ -92,7 +93,9 @@ module diagnostics
   ! this option activates writing the horizintal velocity transports within the density bins (U_rho_x_DZ and V_rho_x_DZ)
   ! an additional field (RHO_Z) will be computed which allows for diagnosing the numerical diapycnal mixing after A. Megann 2018
   logical                                       :: ldiag_dMOC       =.false.
-  
+  integer                                       :: dmoc_call_freq      = 1    ! call diag_densMOC every N units
+  character(3)                                  :: dmoc_call_freq_unit = 's'  ! unit: 's'=steps, 'h'=hours, 'd'=days, 'm'=months
+
   ! flag for calculating the Discrete Variance Decay --> estimator for numerical/
   ! spurious mixing in the advection schemes
   logical                                       :: ldiag_DVD        =.false.
@@ -106,12 +109,24 @@ module diagnostics
   logical                                       :: ldiag_uvw_sqr    =.false.
   logical                                       :: ldiag_trgrd_xyz  =.false.
   
-  namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_Ri, & 
-                       ldiag_TurbFlux, ldiag_dMOC, ldiag_DVD, ldiag_salt3D, ldiag_forc, &
+  namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_Ri, &
+                       ldiag_TurbFlux, ldiag_dMOC, dmoc_call_freq, dmoc_call_freq_unit, ldiag_DVD, ldiag_salt3D, ldiag_forc, &
                        ldiag_extflds, ldiag_destine, ldiag_trflx, ldiag_ice, ldiag_uvw_sqr, ldiag_trgrd_xyz, &
                        ldiag_cmor
   
   contains
+
+logical function dmoc_is_due(istep)
+  integer, intent(in) :: istep
+  dmoc_is_due = .false.
+  select case (trim(dmoc_call_freq_unit))
+    case ('s'); call step_event  (dmoc_is_due, istep, dmoc_call_freq)
+    case ('h'); call hourly_event(dmoc_is_due,        dmoc_call_freq)
+    case ('d'); call daily_event (dmoc_is_due,        dmoc_call_freq)
+    case ('m'); call monthly_event(dmoc_is_due,       dmoc_call_freq)
+    case default; dmoc_is_due = .true.
+  end select
+end function dmoc_is_due
 
 ! ==============================================================
 !rhs_diag=ssh_rhs?
@@ -436,6 +451,7 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
   real(kind=WP), save, allocatable        :: dens(:), aux(:), el_depth(:)
   real(kind=WP), save, allocatable        :: std_dens_w(:,:), std_dens_VOL1(:,:), std_dens_VOL2(:,:)
   logical, save                           :: firstcall_s=.true., firstcall_e=.true.
+  real(kind=WP), save                     :: dmoc_dt_factor = 1.0_WP  ! steps between calls, used for dVdT divisor
   real(kind=WP), dimension(:,:), pointer  :: temp, salt
   real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
 #include "associate_part_def.h"
@@ -483,6 +499,12 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
      std_dens_H   =0. !will be the vertical layerthickness of the density class (for convertion between dAMOC <-> zMOC)
      depth        =0.
      el_depth     =0.
+     select case (trim(dmoc_call_freq_unit))
+       case ('s'); dmoc_dt_factor = real(dmoc_call_freq, WP)
+       case ('h'); dmoc_dt_factor = real(dmoc_call_freq, WP) * 3600.0_WP / dt
+       case ('d'); dmoc_dt_factor = real(dmoc_call_freq, WP) * 86400.0_WP / dt
+       case default; dmoc_dt_factor = 1.0_WP
+     end select
      firstcall_s=.false.
      if (mode==0) return
   end if
@@ -735,7 +757,7 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
   !_____________________________________________________________________________
   ! compute density class volume change over time 
   if (.not. firstcall_e) then
-     std_dens_dVdT=(std_dens_VOL2-std_dens_VOL1)/dt
+     std_dens_dVdT=(std_dens_VOL2-std_dens_VOL1)/(dmoc_dt_factor*dt)
   end if
   std_dens_VOL1=std_dens_VOL2
   
@@ -1103,7 +1125,8 @@ subroutine compute_diagnostics(mode, dynamics, tracers, ice, partit, mesh)
   end if
   
   ! 6. MOC in density coordinate
-  if (ldiag_dMOC)        call diag_densMOC(mode, dynamics, tracers, partit, mesh)
+  if (ldiag_dMOC .and. dmoc_is_due(mstep)) &
+      call diag_densMOC(mode, dynamics, tracers, partit, mesh)
   
   ! 7. compute turbulent fluxes
   if (ldiag_turbflux)    call diag_turbflux(mode, dynamics, tracers, partit, mesh)

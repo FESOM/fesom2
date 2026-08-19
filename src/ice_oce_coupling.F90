@@ -422,6 +422,11 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
 
     if (use_icebergs) then
         call icb2fesom(mesh, partit, ice)
+        ! Safety net against iceberg-driven super-cooling of shallow shelf
+        ! cells, which otherwise drifts a cell's temperature below freezing
+        ! over many timesteps. Cap ibhf_n before the tracer solver consumes
+        ! it in oce_ale_tracer.F90; toggle via namelist l_cap_ibhf_n.
+        call cap_ibhf_n(tracers, mesh, partit)
     end if
 
     !___________________________________________________________________________

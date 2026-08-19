@@ -11,6 +11,7 @@ jobs:
   icepack_test:
     # Containers must run in Linux based operating systems
     runs-on: ubuntu-latest
+    timeout-minutes: 12
     # Docker Hub image that `container-job` executes in
     container: koldunovn/fesom2_test:refactoring2
 
