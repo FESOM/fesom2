@@ -139,7 +139,11 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   real(kind=WP),       intent(inout)         :: x(partit%myDim_nod2D+partit%eDim_nod2D)
   real(kind=WP),       intent(in)            :: rhs(partit%myDim_nod2D+partit%eDim_nod2D)
   integer                      :: row, nini, nend, iter
-  real(kind=WP)                :: sprod(2), s_old, s_aux, al, be, rtol
+  ! CG scalars in WP_full: each is a global reduction over all nod2D, or derived
+  ! from one, and they set the search direction and the stopping test -- so
+  ! rounding here steers the iteration rather than just reporting on it. Vectors
+  ! and matrix stay WP: the bandwidth is theirs, the accuracy is these.
+  real(kind=WP_full)           :: sprod(2), s_old, s_aux, al, be, rtol
   integer                      :: req
   logical                      :: converged
   real(kind=WP), pointer       :: pr_values(:), rr(:), zz(:), pp(:), App(:)
@@ -166,25 +170,26 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   ! Define working tolerance: 
   ! ==============
 #if !defined(__openmp_reproducible)
-  s_old=0.0_WP
+  s_old=0.0_WP_full
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) REDUCTION(+:s_old)
   DO row=1, myDim_nod2D
-     s_old=s_old+rhs(row)*rhs(row)
+     s_old=s_old+real(rhs(row),WP_full)*real(rhs(row),WP_full)
   END DO
 !$OMP END PARALLEL DO
 #else
- s_old = sum(rhs(1:myDim_nod2D) * rhs(1:myDim_nod2D))
+ s_old = sum(real(rhs(1:myDim_nod2D),WP_full) * real(rhs(1:myDim_nod2D),WP_full))
 #endif
 
-  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
-  rtol=solverinfo%soltol*sqrt(s_old/real(nod2D,WP))
+  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  rtol=solverinfo%soltol*sqrt(s_old/real(nod2D,WP_full))
   ! ==============
   ! Compute r0
   ! ==============
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) 
   DO row=1, myDim_nod2D
-     rr(row)=rhs(row)-sum(ssh_stiff%values(rptr(row):rptr(row+1)-1)* &
-                      X(cind(rptr(row):rptr(row+1)-1)))
+     rr(row)=real(real(rhs(row),WP_full)                                        &
+              - sum(real(ssh_stiff%values(rptr(row):rptr(row+1)-1),WP_full)*     &
+                    real(X(cind(rptr(row):rptr(row+1)-1)),WP_full)), WP)
   END DO
 !$OMP END PARALLEL DO 
   call exchange_nod(rr, partit)
@@ -195,7 +200,8 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   ! =============
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) 
   DO row=1, myDim_nod2D
-     zz(row)= sum(pr_values(rptr(row):rptr(row+1)-1)*rr(cind(rptr(row):rptr(row+1)-1)))
+     zz(row)= real(sum(real(pr_values(rptr(row):rptr(row+1)-1),WP_full)*       &
+                       real(rr(cind(rptr(row):rptr(row+1)-1)),WP_full)), WP)
      pp(row)=zz(row)
   END DO
 !$OMP END PARALLEL DO 
@@ -204,17 +210,17 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   ! ===============
 
 #if !defined(__openmp_reproducible)
-  s_old=0.0_WP
+  s_old=0.0_WP_full
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) REDUCTION(+:s_old)
   DO row=1, myDim_nod2D
-     s_old=s_old+rr(row)*zz(row)
+     s_old=s_old+real(rr(row),WP_full)*real(zz(row),WP_full)
   END DO
 !$OMP END PARALLEL DO
 #else
-  s_old = sum(rr(1:myDim_nod2D) * zz(1:myDim_nod2D))
+  s_old = sum(real(rr(1:myDim_nod2D),WP_full) * real(zz(1:myDim_nod2D),WP_full))
 #endif
 
-  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
   
   ! ===============
   ! Iterations
@@ -227,7 +233,8 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   call exchange_nod(pp, partit)     !  Update before matrix-vector multiplications
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) 
   DO row=1, myDim_nod2D
-     App(row)=sum(ssh_stiff%values(rptr(row):rptr(row+1)-1)*pp(cind(rptr(row):rptr(row+1)-1)))
+     App(row)=real(sum(real(ssh_stiff%values(rptr(row):rptr(row+1)-1),WP_full)* &
+                        real(pp(cind(rptr(row):rptr(row+1)-1)),WP_full)), WP)
   END DO
 !$OMP END PARALLEL DO 
      ! ============
@@ -235,17 +242,17 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
      ! ============
  
 #if !defined(__openmp_reproducible)
-  s_aux=0.0_WP
+  s_aux=0.0_WP_full
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) REDUCTION(+:s_aux)
   DO row=1, myDim_nod2D
-     s_aux=s_aux+pp(row)*App(row)
+     s_aux=s_aux+real(pp(row),WP_full)*real(App(row),WP_full)
   END DO
 !$OMP END PARALLEL DO
 #else
- s_aux = sum(pp(1:myDim_nod2D) * App(1:myDim_nod2D))
+ s_aux = sum(real(pp(1:myDim_nod2D),WP_full) * real(App(1:myDim_nod2D),WP_full))
 #endif
 
-  call MPI_Allreduce(MPI_IN_PLACE, s_aux, 1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  call MPI_Allreduce(MPI_IN_PLACE, s_aux, 1, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 
      ! ===========
      ! Breakdown guard. An equivalent check existed until 4eb2f21d ("Removed
@@ -282,26 +289,27 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
 !$OMP BARRIER
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row)
   DO row=1, myDim_nod2D
-     zz(row)= sum(pr_values(rptr(row):rptr(row+1)-1)*rr(cind(rptr(row):rptr(row+1)-1)))
+     zz(row)= real(sum(real(pr_values(rptr(row):rptr(row+1)-1),WP_full)*       &
+                       real(rr(cind(rptr(row):rptr(row+1)-1)),WP_full)), WP)
   END DO
 !$OMP END PARALLEL DO
      ! ===========
      ! Scalar products for beta
      ! ===========
 #if !defined(__openmp_reproducible)
-sprod(1:2)=0.0_WP
+sprod(1:2)=0.0_WP_full
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) REDUCTION(+:sprod)
   DO row=1, myDim_nod2D
-     sprod(1)=sprod(1)+rr(row)*zz(row)
-     sprod(2)=sprod(2)+rr(row)*rr(row)
+     sprod(1)=sprod(1)+real(rr(row),WP_full)*real(zz(row),WP_full)
+     sprod(2)=sprod(2)+real(rr(row),WP_full)*real(rr(row),WP_full)
   END DO
 !$OMP END PARALLEL DO
 #else
-    sprod(1) = sum(rr(1:myDim_nod2D) * zz(1:myDim_nod2D))
-    sprod(2) = sum(rr(1:myDim_nod2D) * rr(1:myDim_nod2D))
+    sprod(1) = sum(real(rr(1:myDim_nod2D),WP_full) * real(zz(1:myDim_nod2D),WP_full))
+    sprod(2) = sum(real(rr(1:myDim_nod2D),WP_full) * real(rr(1:myDim_nod2D),WP_full))
 #endif
   
-  call MPI_Allreduce(MPI_IN_PLACE, sprod, 2, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  call MPI_Allreduce(MPI_IN_PLACE, sprod, 2, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 
 !$OMP BARRIER
      ! ===========
@@ -316,7 +324,7 @@ sprod(1:2)=0.0_WP
      ! here is direct evidence that M^-1 is not SPD. Cheap, and evaluated on the
      ! already-reduced value so all ranks agree.
      ! ===========
-  if (sprod(1) < 0.0_WP) then
+  if (sprod(1) < 0.0_WP_full) then
      solverinfo%nnegrz = solverinfo%nnegrz + 1
      if (partit%mype==0 .and. solverinfo%nnegrz == 1) then
         write(*,*) 'WARNING: ssh CG r.z < 0 at iter ', iter, ': r.z= ', sprod(1), &
