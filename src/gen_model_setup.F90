@@ -111,6 +111,16 @@ subroutine setup_model(partit)
   endif
   read (fileunit, NML=oce_dyn, iostat=istat)
   if (istat /= 0) call check_namelist_read(fileunit, 'oce_dyn', nmlfile, partit)
+  
+  read (fileunit, NML=tracer_init3d, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'tracer_init3d', nmlfile, partit)
+  
+  ! Optional reading of oce_perturb namelist for backward compatibility
+  read (fileunit, NML=oce_perturb, iostat=istat)
+  if (istat /= 0) then
+    if (partit%mype==0) write(*,*) 'INFO: oce_perturb namelist not found, using defaults (no perturbations)'
+  end if
+  
   close (fileunit)
 
   nmlfile ='namelist.tra'    ! name of ocean namelist file
@@ -175,6 +185,9 @@ subroutine setup_model(partit)
     endif
     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
   endif
+  read (fileunit, NML=parecomsetup, iostat=istat)
+  if (istat /= 0) call check_namelist_read(fileunit, 'parecomsetup', nmlfile, partit)
+  
   read (fileunit, NML=pavariables, iostat=istat)
   if (istat /= 0) call check_namelist_read(fileunit, 'pavariables', nmlfile, partit)
 
@@ -330,6 +343,36 @@ subroutine setup_model(partit)
   endif
 ! if ((output_length_unit=='s').or.(int(real(step_per_day)/24.0)<=1)) use_means=.false.
 end subroutine setup_model
+
+
+#if defined(__recom) && defined(__usetp)
+! read num_fesom_groups for multi FESOM group loop parallelization
+! =================================================================
+subroutine read_namelist_run_config
+
+  ! Reads run_config namelist and overwrite default parameters.
+  ! Copied by Kai Himstedt (based on read_namelist)
+
+  !--------------------------------------------------------------
+  USE MOD_PARTIT
+  USE MOD_PARSUP
+  use g_config
+  implicit none
+
+  character(len=100)   :: nmlfile
+  integer fileunit
+
+  nmlfile ='namelist.config'    ! name of general configuration namelist file
+  open (newunit=fileunit, file=nmlfile)
+
+  open (fileunit,file=nmlfile)
+  read (fileunit,NML=run_config)
+  close (fileunit)
+
+end subroutine read_namelist_run_config
+
+#endif
+
 ! =================================================================
 subroutine get_run_steps(nsteps, partit)
   ! Coded by Qiang Wang

@@ -48,6 +48,7 @@ jobs:
   ecbundle_ctest_framework:
     # Run directly on Ubuntu runner
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     
     env:
       # Set environment variables for the build
@@ -62,42 +63,43 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Install system dependencies
+        timeout-minutes: 22
         run: |
-          echo "Installing FESOM2 dependencies..."
-          sudo apt-get update
-          sudo apt-get install -y \
-            gcc \
-            gfortran \
-            g++ \
-            cmake \
-            make \
-            openmpi-bin \
-            libopenmpi-dev \
-            libnetcdf-dev \
-            libnetcdff-dev \
-            pkg-config \
-            git \
-            wget \
-            ca-certificates \
-            gnupg \
-            lsb-release \
-            python3 \
-            python3-pip
-          
-          echo "Installing CMake 3.25+ from Kitware repository..."
-          # Add Kitware's signing key
-          wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | sudo tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null
-          
-          # Add Kitware repository
-          echo "deb https://apt.kitware.com/ubuntu/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/kitware.list >/dev/null
-          
-          # Update package list and install latest CMake
-          sudo apt-get update
-          sudo apt-get install -y cmake
-          
-          echo "Installing ecbundle..."
-          pip install ecbundle
-          
+          cat > /tmp/install_deps.sh <<'SCRIPT'
+          set -eux
+          # Acquire::*::Timeout is the important part: the classic apt hang is a
+          # stalled connection that otherwise never times out at all.
+          APT_OPTS="-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30"
+          sudo apt-get $APT_OPTS update
+          sudo apt-get $APT_OPTS install -y \
+            gcc gfortran g++ cmake make \
+            openmpi-bin libopenmpi-dev \
+            libnetcdf-dev libnetcdff-dev \
+            pkg-config git wget ca-certificates \
+            python3 python3-pip
+          pip install --retries 3 --timeout 30 ecbundle
+          SCRIPT
+
+          ok=0
+          for attempt in 1 2; do
+            echo "::group::dependency install attempt $attempt"
+            if timeout 10m bash /tmp/install_deps.sh; then ok=1; fi
+            echo "::endgroup::"
+            [ "$ok" = 1 ] && break
+            echo "::warning::dependency install attempt $attempt timed out or failed; retrying"
+            # a killed apt leaves locks and a half-configured dpkg behind,
+            # which would make the next attempt fail for a different reason
+            sudo pkill -9 -f apt-get 2>/dev/null || true
+            sudo rm -f /var/lib/apt/lists/lock /var/cache/apt/archives/lock \
+                       /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend || true
+            sudo dpkg --configure -a || true
+            sleep 20
+          done
+          if [ "$ok" != 1 ]; then
+            echo "::error::dependency install failed after 2 attempts of 10 min each"
+            exit 1
+          fi
+
           echo "Verifying installations..."
           gcc --version
           gfortran --version
@@ -106,7 +108,6 @@ jobs:
           pkg-config --modversion netcdf
           pkg-config --modversion netcdf-fortran
           ecbundle --version
-          
       - name: Set up environment variables
         run: |
           echo "Setting up environment for FESOM2 build..."
