@@ -56,7 +56,8 @@ module io_fesom_file_module
   integer, save :: m_nod2d
   integer, save :: m_elem2d
   integer, save :: m_nl
-  integer, save :: m_ncat  
+  integer, save :: m_ncat
+  integer, save :: m_nfbin = 0
   
 
   type fesom_file_type_ptr
@@ -106,7 +107,7 @@ contains
   end function time_dimindex
   
   
-  subroutine init(this, mesh_nod2d, mesh_elem2d, mesh_nl, partit, mesh_ncat) ! todo: would like to call it initialize but Fortran is rather cluncky with overwriting base type procedures
+  subroutine init(this, mesh_nod2d, mesh_elem2d, mesh_nl, partit, mesh_ncat, mesh_nfbin) ! todo: would like to call it initialize but Fortran is rather cluncky with overwriting base type procedures
     use io_netcdf_workaround_module
     use io_gather_module
     use MOD_PARTIT
@@ -115,6 +116,7 @@ contains
     integer mesh_elem2d
     integer mesh_nl
     integer, optional :: mesh_ncat
+    integer, optional :: mesh_nfbin
     type(t_partit), target :: partit
     ! EO parameters
     type(fesom_file_type_ptr), allocatable :: tmparr(:)
@@ -129,11 +131,16 @@ contains
     m_elem2d = mesh_elem2d
     m_nl     = mesh_nl
     !PS mesh_ncat ... icepack number of ice thickness classes,
-    if (present(mesh_ncat)) then 
+    if (present(mesh_ncat)) then
         m_ncat   = mesh_ncat
-    else    
+    else
         m_ncat   = 0
-    end if 
+    end if
+    if (present(mesh_nfbin)) then
+        m_nfbin  = mesh_nfbin
+    else
+        m_nfbin  = 0
+    end if
     
     call this%netcdf_file_type%initialize()
 
@@ -593,7 +600,9 @@ use nvfortran_subarray_workaround_module
     else if(len == m_nl    ) then
       info = dim_info( idx=this%add_dim('nz'  , len), len=len)
     else if(len == m_ncat  ) then
-      info = dim_info( idx=this%add_dim('ncat', len), len=len)  
+      info = dim_info( idx=this%add_dim('ncat', len), len=len)
+    else if(len == m_nfbin .and. m_nfbin > 0) then
+      info = dim_info( idx=this%add_dim('nfbin', len), len=len)
     else
       print *, "error in line ",__LINE__, __FILE__," can not find dimension with size",len
       stop 1

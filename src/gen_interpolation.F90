@@ -1,3 +1,23 @@
+module g_interp
+    use MOD_MESH
+    use MOD_PARTIT
+    use MOD_PARSUP
+    use o_PARAM, only: WP
+    implicit none
+    
+    !___________________________________________________________________________
+    interface interp_e2n
+        module procedure interp_e2n_3d
+        module procedure interp_e2n_2d
+        module procedure interp_e2n_1d
+    end interface interp_e2n
+    
+    !___________________________________________________________________________
+    contains
+
+    
+
+
 ! routines doing 3D, 2D and 1D interpolation
 subroutine interp_2d_field_v2(num_lon_reg, num_lat_reg, lon_reg, lat_reg, data_reg, missvalue, &
      num_mod, lon_mod, lat_mod, data_mod, partit)
@@ -28,9 +48,6 @@ subroutine interp_2d_field_v2(num_lon_reg, num_lat_reg, lon_reg, lat_reg, data_r
   ! Coded by Qiang Wang
   ! Reviewed by ??
   !-------------------------------------------------------------------------------------
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use o_PARAM, only: WP
   implicit none
   integer             		:: n, i, ii, jj, k, nod_find
   integer			:: ind_lat_h, ind_lat_l, ind_lon_h, ind_lon_l
@@ -170,9 +187,6 @@ subroutine interp_2d_field(num_lon_reg, num_lat_reg, lon_reg, lat_reg, data_reg,
   ! Coded by Qiang Wang
   ! Reviewed by ??
   !-------------------------------------------------------------------------------------
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use o_PARAM, only: WP
   implicit none
   integer             		:: n, i
   integer			:: ind_lat_h, ind_lat_l, ind_lon_h, ind_lon_l
@@ -447,5 +461,191 @@ subroutine interp_3d_field(num_lon_reg, num_lat_reg, num_lay_reg, &
   end do
 end subroutine interp_3d_field
 !
-!---------------------------------------------------------------------------
 !
+!_______________________________________________________________________________
+! interpolate from node to elements 3d (2, nz, elem)
+subroutine interp_e2n_3d(data_e, data_n, mesh, partit, do_overz_in)
+    implicit none
+    !___INPUT/OUTPUT VARIABLES______________________________________________
+    real(kind=WP)   , intent(in   ), dimension(:,:,:) :: data_e
+    real(kind=WP)   , intent(inout), dimension(:,:,:) :: data_n    
+    type(t_mesh)    , intent(in   ), target           :: mesh
+    type(t_partit)  , intent(inout), target           :: partit
+    logical         , intent(in)   , optional         :: do_overz_in
+    !___LOCAL VARIABLES_____________________________________________________
+    integer                                           :: node, elem, nz, nl1, ul1, k
+    real(kind=WP)                                     :: vx, vy
+    logical                                           :: do_overz
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"     
+    !
+    !___________________________________________________________________________
+    do_overz = .True.
+    if (present(do_overz_in)) do_overz = do_overz_in
+    
+    !
+    !___________________________________________________________________________
+    ! Do interpolation over vertical depth dimension consider bottom topography 
+    if (do_overz) then 
+        do node = 1, myDim_nod2D
+            nl1 = nlevels_nod2D(node)-1
+            ul1 = ulevels_nod2D(node)
+            do nz = ul1, nl1
+                vx = 0.0_WP
+                vy = 0.0_WP
+                do k = 1, nod_in_elem2D_num(node)
+                    elem = nod_in_elem2D(k, node)
+                    if( nz.LE.(nlevels(elem)-1) .and. nz.GE.(ulevels(elem))) then
+                        vx = vx + data_e(1, nz, elem) * elem_area(elem)
+                        vy = vy + data_e(2, nz, elem) * elem_area(elem)
+                    endif
+                end do
+                data_n(1, nz, node)=vx/3.0_WP/areasvol(nz, node)
+                data_n(2, nz, node)=vy/3.0_WP/areasvol(nz, node)
+            end do
+        end do
+    
+    !
+    !___________________________________________________________________________
+    ! Do interpolation along spectral domain no bottom topography to consider
+    else
+        ul1=1
+        nl1=size(data_e,2)
+        do node = 1, myDim_nod2D
+            do nz = ul1+1, nl1-1
+                vx = 0.0_WP
+                vy = 0.0_WP
+                do k = 1, nod_in_elem2D_num(node)
+                    elem = nod_in_elem2D(k, node)
+                    vx = vx + data_e(1, nz, elem) * elem_area(elem)
+                    vy = vy + data_e(2, nz, elem) * elem_area(elem)
+                end do
+                data_n(1, nz, node)=vx/3.0_WP/areasvol(1, node)
+                data_n(2, nz, node)=vy/3.0_WP/areasvol(1, node)
+            end do
+        end do
+    end if 
+    
+end subroutine interp_e2n_3d
+
+
+!
+!
+!_______________________________________________________________________________
+! interpolate from elem to nodes 2d (2, elem), (nz, elem), (nfbin, elem) --> (.., node)
+subroutine interp_e2n_2d(data_e, data_n, mesh, partit, do_overz_in)
+    use MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    use o_param, only: WP
+    implicit none
+    !___INPUT/OUTPUT VARIABLES______________________________________________
+    real(kind=WP)   , intent(in   ), dimension(:,:) :: data_e
+    real(kind=WP)   , intent(inout), dimension(:,:) :: data_n    
+    type(t_mesh)    , intent(in   ), target         :: mesh
+    type(t_partit)  , intent(inout), target         :: partit
+    logical         , intent(in)   , optional       :: do_overz_in
+    !___LOCAL VARIABLES_____________________________________________________
+    integer                                         :: node, elem, nz, nl1, ul1, k
+    real(kind=WP)                                   :: vx, vy
+    logical                                         :: do_overz
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"     
+    !
+    !___________________________________________________________________________
+    do_overz = .True.
+    if (present(do_overz_in)) do_overz = do_overz_in
+    
+    !___________________________________________________________________________
+    ! Do interpolation for 2d vector data e.g 2d gradient (2, elem)
+    if (size(data_e, 1) == 2) then
+        do node = 1, myDim_nod2D
+            vx = 0.0_WP
+            vy = 0.0_WP
+            do k = 1, nod_in_elem2D_num(node)
+                elem = nod_in_elem2D(k, node)
+                vx = vx + data_e(1, elem) * elem_area(elem)
+                vy = vy + data_e(2, elem) * elem_area(elem)
+            end do    
+            data_n(1, node)=vx/3.0_WP/areasvol(1, node)
+            data_n(2, node)=vy/3.0_WP/areasvol(1, node)
+        end do
+    
+    !___________________________________________________________________________
+    ! Do interpolation over vertical depth dimension consider bottom topography (nz,elem)
+    else if (do_overz) then 
+        do node = 1, myDim_nod2D
+            nl1 = nlevels_nod2D(node)-1
+            ul1 = ulevels_nod2D(node)
+            do nz = ul1, nl1
+                vx = 0.0_WP
+                do k = 1, nod_in_elem2D_num(node)
+                    elem = nod_in_elem2D(k, node)
+                    if( nz.LE.(nlevels(elem)-1) .and. nz.GE.(ulevels(elem))) then
+                        vx = vx + data_e(nz, elem) * elem_area(elem)
+                    endif
+                end do
+                data_n(nz, node)=vx/3.0_WP/areasvol(nz, node) 
+            end do
+        end do
+    
+    !___________________________________________________________________________
+    ! Do interpolation along spectral domain no bottom topography to consider (nfbin, elem)
+    else
+        ul1=1
+        nl1=size(data_e,1)
+        do node = 1, myDim_nod2D
+            do nz = ul1+1, nl1-1
+                vx = 0.0_WP
+                do k = 1, nod_in_elem2D_num(node)
+                    elem = nod_in_elem2D(k, node)
+                    vx = vx + data_e(nz, elem) * elem_area(elem)
+                end do
+                data_n(nz, node)=vx/3.0_WP/areasvol(1, node)
+            end do
+        end do
+    end if 
+    
+end subroutine interp_e2n_2d
+
+
+!
+!
+!_______________________________________________________________________________
+! interpolate from elem to nodes 1d (elem) --> (node)
+subroutine interp_e2n_1d(data_e, data_n, mesh, partit)
+    use MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    use o_param, only: WP
+    implicit none
+    !___INPUT/OUTPUT VARIABLES______________________________________________
+    real(kind=WP)   , intent(in   ), dimension(:)   :: data_e
+    real(kind=WP)   , intent(inout), dimension(:)   :: data_n    
+    type(t_mesh)    , intent(in   ), target         :: mesh
+    type(t_partit)  , intent(inout), target         :: partit
+    !___LOCAL VARIABLES_____________________________________________________
+    integer                                         :: node, elem, nz, nl1, ul1, k
+    real(kind=WP)                                   :: vx
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"     
+    !
+    !___________________________________________________________________________
+    ! Do interpolation for 1d vector data (elem) --> (node)
+    do node = 1, myDim_nod2D
+        vx = 0.0_WP
+        do k = 1, nod_in_elem2D_num(node)
+            elem = nod_in_elem2D(k, node)
+            vx = vx + data_e(elem) * elem_area(elem)
+            data_n(node)=vx/3.0_WP/areasvol(1, node)
+        end do
+    end do    
+end subroutine interp_e2n_1d
+
+end module g_interp

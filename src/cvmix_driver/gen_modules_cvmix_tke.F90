@@ -20,6 +20,10 @@ module g_cvmix_tke
     use cvmix_put_get,     only: cvmix_put
     use cvmix_kinds_and_types
     use g_cvmix_idemix,    only: iwe_n, iwe_Tdis_n, iwe_alpha_c_n
+    use g_cvmix_idemix2,   only: iwe2_E_iw, iwe2_E_iw_diss, iwe2_alpha_c, iwe2_tip1, &
+                                    idemix2_smooth_Eiw, idemix2_smooth_Eiw_diss, &
+                                    idemix2_smooth_alpha_c, idemix2_smooth_niter
+    use g_support,         only: smooth_nod
     
     !___________________________________________________________________________
     ! module calls from FESOM
@@ -223,7 +227,7 @@ module g_cvmix_tke
         end if
         
         !_______________________________________________________________________
-        if(mix_scheme_nmb==56) tke_only=.False.
+        if(mix_scheme_nmb==56 .or. mix_scheme_nmb==57) tke_only=.False.
         
         if (mype==0) then
             write(*,*) "     tke_only       = ", tke_only
@@ -302,9 +306,21 @@ module g_cvmix_tke
         
         ! load things from idemix when selected
         if (.not. tke_only) then
-            tke_in3d_iwe       = iwe_n
-            tke_in3d_iwdis     = -iwe_Tdis_n
-            tke_in3d_iwealphac = iwe_alpha_c_n
+            if      (mod(mix_scheme_nmb,10)==6) then
+                tke_in3d_iwe       =  iwe_n
+                tke_in3d_iwdis     = -iwe_Tdis_n
+                tke_in3d_iwealphac =  iwe_alpha_c_n
+            else if (mod(mix_scheme_nmb,10)==7) then
+                tke_in3d_iwe       =  iwe2_E_iw(:,:,iwe2_tip1)
+                tke_in3d_iwdis     = -iwe2_E_iw_diss
+                tke_in3d_iwealphac =  iwe2_alpha_c
+                ! Smooth TKE-interface copies only — never the prognostic Eiw state.
+                ! All three arrays are recomputed each step so smoothing here has no
+                ! memory and does not accumulate: Eiw heterogeneity is fully preserved.
+                if (idemix2_smooth_Eiw)      call smooth_nod(tke_in3d_iwe,       idemix2_smooth_niter, partit, mesh)
+                if (idemix2_smooth_Eiw_diss) call smooth_nod(tke_in3d_iwdis,     idemix2_smooth_niter, partit, mesh)
+                if (idemix2_smooth_alpha_c)  call smooth_nod(tke_in3d_iwealphac, idemix2_smooth_niter, partit, mesh)
+            end if
         endif
         
         !_______________________________________________________________________
