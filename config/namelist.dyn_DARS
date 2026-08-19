@@ -1,7 +1,7 @@
 &dynamics_visc
 visc_gamma0  = 0.003 ! [m/s],   backgroung viscosity= gamma0*len, it should be as small a s possible (keep it < 0.01 m/s).
 visc_gamma1  = 0.2   ! [nodim], for computation of the flow aware viscosity
-visc_gamma2  = 0.0285 ! [s/m],   is only used in easy backscatter option
+visc_gamma2  = 0.285 ! [s/m],   is only used in easy backscatter option
 visc_easybsreturn= 1
 
 opt_visc     = 7          
@@ -20,5 +20,6 @@ use_wsplit   = .true. ! Switch for implicite/explicte splitting of vert. velocit
 wsplit_maxcfl= 1.0     ! maximum allowed CFL criteria in vertical (0.5 < w_max_cfl < 1.) 
                        ! in older FESOM it used to be w_exp_max=1.e-3
 ldiag_KE=.false.
+AB_order     = 3       ! Adams-Bashforth order for momentum
 /
 
