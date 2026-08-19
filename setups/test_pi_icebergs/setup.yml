@@ -17,7 +17,7 @@ namelist.config:
       steps_per_ib_step: 8
       ib_async_mode: 0
     run_config:
-      use_cavity: False
+      use_cavity: True
       use_cavity_partial_cell: False
     timestep:
         run_length: 1
