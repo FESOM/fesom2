@@ -270,6 +270,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   use g_sbf, only: sbc_do_recom
 #endif
   use g_sbf, only: atmdata, i_totfl, i_xwind, i_ywind, i_xstre, i_ystre, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_snow, &
+                                     i_xmodini, i_ymodini, &
                                      l_xwind, l_ywind, l_xstre, l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow
 #if defined (__oasis)
   use cpl_driver
@@ -682,6 +683,61 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
         end do
         do_rotate_oce_wind=.false.
         do_rotate_ice_wind=.false.
+    end if
+
+    !___________________________________________________________________________
+    ! modini (Thoma et al., 2015): discard the wind stresses received from the
+    ! atmosphere and recompute them from prescribed forcing winds instead, so the
+    ! ocean/ice sees a wind field that is not affected by the coupled feedback.
+    ! Placed after the rotation block above on purpose: sbc_do already rotates the
+    ! modini coefficients onto the rotated grid, so these stresses must not be
+    ! rotated a second time.
+    if (use_modini) then
+       call sbc_do(partit, mesh)
+!$OMP PARALLEL DO
+       do n=1, myDim_nod2D+eDim_nod2D
+          u_wind(n) = atmdata(i_xmodini,n)
+          v_wind(n) = atmdata(i_ymodini,n)
+       end do
+!$OMP END PARALLEL DO
+
+       ! exchange coefficients
+       if (AOMIP_drag_coeff) then
+          call cal_wind_drag_coeff(partit)
+       end if
+       if (ncar_bulk_formulae) then
+          call ncar_ocean_fluxes_mode(ice, partit, mesh)
+       elseif (AOMIP_drag_coeff) then
+          cd_atm_oce_arr=cd_atm_ice_arr
+       end if
+
+       ! wind stress from the modini winds
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i, dux, dvy, aux)
+       do i=1,myDim_nod2d+eDim_nod2d
+          !_____________________________________________________________________
+          if (ulevels_nod2d(i)>1) then
+             stress_atmoce_x(i)=0.0_WP
+             stress_atmoce_y(i)=0.0_WP
+             stress_atmice_x(i)=0.0_WP
+             stress_atmice_y(i)=0.0_WP
+             cycle
+          end if
+
+          !_____________________________________________________________________
+          dux=u_wind(i)-(1.0_WP-Swind)*u_w(i)
+          dvy=v_wind(i)-(1.0_WP-Swind)*v_w(i)
+          aux=sqrt(dux**2+dvy**2)*rhoair
+          stress_atmoce_x(i) = Cd_atm_oce_arr(i)*aux*dux
+          stress_atmoce_y(i) = Cd_atm_oce_arr(i)*aux*dvy
+
+          !_____________________________________________________________________
+          dux=u_wind(i)-u_ice(i)
+          dvy=v_wind(i)-v_ice(i)
+          aux=sqrt(dux**2+dvy**2)*rhoair
+          stress_atmice_x(i) = Cd_atm_ice_arr(i)*aux*dux
+          stress_atmice_y(i) = Cd_atm_ice_arr(i)*aux*dvy
+       end do
+!$OMP END PARALLEL DO
     end if
 #else
 #ifndef __ifsinterface
