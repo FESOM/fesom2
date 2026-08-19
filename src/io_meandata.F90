@@ -77,7 +77,7 @@ module io_MEANDATA
     real(kind=WP)                                      :: rtime_per_stream=0._WP   !< cumulative wall in this stream's write_mean dispatch over the run; printed sorted at finalize
     logical                                            :: is_in_use=.false.
     logical :: is_elem_based = .false.
-    logical :: flip
+    logical :: flip = .false.
     class(data_strategy_type), allocatable :: data_strategy
     integer :: comm
     type(thread_type) thread
