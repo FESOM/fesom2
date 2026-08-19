@@ -28,6 +28,8 @@ if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED AND NOT USE_YAC)
             "breakdowns (p.Ap<=0)"        # the breakdown guard is wired up
             "ssh_cg iters="               # per-step line, beside cfl_z
             "ssh_cg rms(r)="              # per-step residual vs its target
+            "ssh CG soltol"               # the namelist knobs are read and echoed
+            "ssh CG maxiter"
     )
     
     # PI mesh test with 8 processes
