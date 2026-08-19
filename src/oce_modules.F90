@@ -250,6 +250,13 @@ real(kind=WP), allocatable :: tr_z(:,:)
 #if defined(__recom)
 real(kind=WP), allocatable    :: dtr_bf(:,:), str_bf(:,:)
 real(kind=WP), allocatable    :: vert_sink(:,:)
+#if defined(__usetp)
+integer                       :: request_count
+integer, allocatable          :: tr_arr_requests(:), tr_arr_old_requests(:)
+
+integer, allocatable          :: SinkFlx_tr_requests(:)
+integer, allocatable          :: Benthos_tr_requests(:)
+#endif
 #endif
 
 !Viscosity and diff coefs
@@ -276,7 +283,7 @@ real(kind=WP)                               :: is_nonlinfs
 
 !_______________________________________________________________________________
 ! Arrays added for pressure gradient force calculation
-real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0
+real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0, density_sigma0
 real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0_slev
 real(kind=WP), allocatable,dimension(:,:)   :: density_ref
 real(kind=WP), allocatable,dimension(:,:)   :: density_dmoc

@@ -48,7 +48,7 @@ type(t_mesh), intent(in), target :: mesh
   linit_wave_erosion_pot = .true.
 
   allocate(calving_day(ib_num))
-  calving_day = 1   !28.0: September 29 for restart in 1 SEP 97 ! 271.0: September 29 for year 1997
+  calving_day = 0   !28.0: September 29 for restart in 1 SEP 97 ! 271.0: September 29 for year 1997
   allocate(height_ib(ib_num))
   height_ib = 1.0 ! 250.0 ! 360.0
   allocate(length_ib(ib_num))
@@ -128,7 +128,7 @@ type(t_mesh), intent(in), target :: mesh
   hfb_flux_ib = 0.0
   hfbv_flux_ib = 0.0
   lhfb_flux_ib = 0.0
-  allocate(arr_block(15*ib_num))
+  allocate(arr_block(16*ib_num))
   allocate(elem_block(ib_num))
   allocate(pe_block(ib_num))
 
@@ -138,7 +138,7 @@ type(t_mesh), intent(in), target :: mesh
   call MPI_Bcast(elem_area_glob, elem2D, MPI_DOUBLE, 0, MPI_COMM_FESOM, MPIERR)
 
   allocate(vl_block(4*ib_num))
-  allocate(buoy_props(ib_num,13))
+  allocate(buoy_props(ib_num,14))
   buoy_props = 0.0
   allocate(melted(ib_num))
   melted = .false.
