@@ -1,18 +1,4 @@
 
-#if defined(USE_SINGLE_PRECISION) && defined(DIAG_STIFF_DRIFT)
-module report_stiff_drift_interface
-    interface
-        subroutine report_stiff_drift(partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine report_stiff_drift
-    end interface
-end module report_stiff_drift_interface
-#endif
-
 module compute_CFLz_interface
     interface
         subroutine compute_CFLz(dynamics, partit, mesh)
@@ -1697,9 +1683,10 @@ end subroutine init_stiff_mat_ale
 subroutine update_stiff_mat_ale(partit, mesh)
     use, intrinsic :: iso_fortran_env, only: real64
 #if defined(USE_SINGLE_PRECISION) && defined(DIAG_STIFF_DRIFT)
-    use report_stiff_drift_interface
-#endif
+    use g_config,only: dt, logfile_outfreq
+#else
     use g_config,only: dt
+#endif
     use o_PARAM
     use MOD_MESH
     use MOD_TRACER
@@ -1715,6 +1702,10 @@ subroutine update_stiff_mat_ale(partit, mesh)
     integer                             :: elem, npos(3), offset, nini, nend
     real(kind=WP)                       :: factor 
     real(kind=WP)                       :: fx(3), fy(3)
+#if defined(USE_SINGLE_PRECISION) && defined(DIAG_STIFF_DRIFT)
+    integer, save                       :: drift_ncall = 0
+    real(kind=real64)                   :: drift_d, drift_r, drift_s(4), drift_g(4)
+#endif
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -1834,7 +1825,35 @@ subroutine update_stiff_mat_ale(partit, mesh)
     ! bandwidth -- only the accumulator is wider.
     SSH_stiff%values = real(SSH_stiff%values_full, WP)
 #if defined(DIAG_STIFF_DRIFT)
-    call report_stiff_drift(partit, mesh)
+    !___________________________________________________________________________
+    ! Instrument: how far has the WP-accumulated matrix drifted from the real64
+    ! one? Inlined rather than a subroutine because a separate routine needs an
+    ! explicit interface (target dummies), and CMake's Fortran dependency scanner
+    ! does not evaluate the preprocessor -- it would demand the interface .mod in
+    ! builds where the module is guarded out. In DP both accumulators are the same
+    ! arithmetic, so the drift is 0.0 by construction; that is the control, and it
+    ! is why this is single-precision only.
+    drift_ncall = drift_ncall + 1
+    if (mod(drift_ncall, max(1,logfile_outfreq)) == 0) then
+        drift_s = 0.0_real64
+        do n = 1, myDim_nod2D
+            do k = ssh_stiff%rowptr_loc(n), ssh_stiff%rowptr_loc(n+1)-1
+                drift_d = real(ssh_stiff%values_wp_drift(k), real64) - ssh_stiff%values_full(k)
+                drift_r = ssh_stiff%values_full(k)
+                if (ssh_stiff%colind_loc(k) == n) then
+                    drift_s(1) = drift_s(1) + drift_d*drift_d
+                    drift_s(2) = drift_s(2) + drift_r*drift_r
+                else
+                    drift_s(3) = drift_s(3) + drift_d*drift_d
+                    drift_s(4) = drift_s(4) + drift_r*drift_r
+                end if
+            end do
+        end do
+        call MPI_AllREDUCE(drift_s, drift_g, 4, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+        if (mype == 0) write(*,'(a,i8,a,es12.5,a,es12.5)') ' [STIFFDRIFT] update ', drift_ncall, &
+            '  relL2(diag)= ',    sqrt(drift_g(1)/max(drift_g(2), tiny(1.0_real64))),            &
+            '  relL2(offdiag)= ', sqrt(drift_g(3)/max(drift_g(4), tiny(1.0_real64)))
+    end if
 #endif
 #endif
 
@@ -1852,55 +1871,6 @@ subroutine update_stiff_mat_ale(partit, mesh)
 !DS
 
 end subroutine update_stiff_mat_ale
-
-#if defined(USE_SINGLE_PRECISION) && defined(DIAG_STIFF_DRIFT)
-!
-!_______________________________________________________________________________
-! Report how far the WP-accumulated stiffness matrix has drifted from the
-! real64-accumulated one. Build with -DDIAG_STIFF_DRIFT (single precision only;
-! in DP the two accumulations are the same arithmetic and the drift is 0 by
-! construction, which is the control this measurement needs).
-subroutine report_stiff_drift(partit, mesh)
-    use, intrinsic :: iso_fortran_env, only: real64
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use g_config, only: logfile_outfreq
-    implicit none
-    type(t_partit), intent(inout), target :: partit
-    type(t_mesh)  , intent(inout), target :: mesh
-    integer            :: k, row, nini, nend
-    integer, save      :: ncall = 0
-    real(kind=real64)  :: d, r, s(4), g4(4)
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
-    ncall = ncall + 1
-    if (mod(ncall, max(1,logfile_outfreq)) /= 0) return
-    ! s = (diag sum d^2, diag sum ref^2, offdiag sum d^2, offdiag sum ref^2)
-    s = 0.0_real64
-    do row = 1, myDim_nod2D
-        nini = ssh_stiff%rowptr_loc(row)
-        nend = ssh_stiff%rowptr_loc(row+1)-1
-        do k = nini, nend
-            d = real(ssh_stiff%values_wp_drift(k), real64) - ssh_stiff%values_full(k)
-            r = ssh_stiff%values_full(k)
-            if (ssh_stiff%colind_loc(k) == row) then
-                s(1) = s(1) + d*d;  s(2) = s(2) + r*r
-            else
-                s(3) = s(3) + d*d;  s(4) = s(4) + r*r
-            end if
-        end do
-    end do
-    call MPI_AllREDUCE(s, g4, 4, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    if (mype == 0) then
-        write(*,'(a,i8,a,es12.5,a,es12.5)') ' [STIFFDRIFT] update ', ncall,   &
-            '  relL2(diag)= ', sqrt(g4(1)/max(g4(2), tiny(1.0_real64))),      &
-            '  relL2(offdiag)= ', sqrt(g4(3)/max(g4(4), tiny(1.0_real64)))
-    end if
-end subroutine report_stiff_drift
-#endif
 !
 !
 !===============================================================================
