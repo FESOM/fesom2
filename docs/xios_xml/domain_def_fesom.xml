@@ -1,0 +1,20 @@
+<domain_definition>
+  <!-- FESOM unstructured triangular mesh. The attributes below (ni_glo,
+       ibegin, ni, lonvalue_1d, latvalue_1d, bounds_lon_1d, bounds_lat_1d,
+       nvertex) are filled at runtime by the Fortran side via
+       xios_set_domain_attr / xios_set_domainname_attr.
+
+       Two native domains are exposed:
+         * nodes    - scalar/tracer points at mesh vertices (2D nodes)
+         * elements - vector/velocity points at triangle centres (2D elem)
+  -->
+
+  <domain id="nodes"    type="unstructured" nvertex="6"
+          name="nod2" dim_i_name="nod2"
+          long_name="FESOM mesh nodes (vertices)" />
+
+  <domain id="elements" type="unstructured" nvertex="3"
+          name="elem" dim_i_name="elem"
+          long_name="FESOM mesh elements (triangle centres)" />
+
+</domain_definition>

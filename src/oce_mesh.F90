@@ -341,7 +341,13 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
     read(fileID,*) n      ! nod2D, we know it already
      error_status=0
      if (n/=mesh%nod2D) error_status=1 !set the error status for consistency between rpart and nod2D
+#if defined(__recom) && defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
     write(*,*) 'reading '// trim(file_name)   
+#if defined(__recom) && defined(__usetp)
+        end if
+#endif
   end if
   ! check the error status
   call MPI_BCast(error_status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
@@ -2087,7 +2093,13 @@ DO elem=1,myDim_elem2D
 END DO
 
 
-#if defined (__oasis)
+    ! Voronoi-style control-volume corners (ring of element centres around
+    ! each node). Used by OASIS coupling AND by XIOS conservative remap
+    ! (regular-grid output). Previously gated by #if defined(__oasis),
+    ! which made the XIOS regrid path crash in standalone FESOM builds
+    ! (io_xios.F90: size(mesh%x_corners,2) on an unallocated array).
+    ! Always allocate now — cost is O(local_nodes * avg_nodal_valence),
+    ! tiny vs the rest of mesh setup.
     allocate(mesh%x_corners(myDim_nod2D, maxval(rmax)))
     allocate(mesh%y_corners(myDim_nod2D, maxval(rmax)))
     DO n=1, myDim_nod2D
@@ -2102,7 +2114,6 @@ END DO
        mesh%y_corners(n, mesh%nod_in_elem2D_num(n)+1:maxval(rmax))=mesh%y_corners(n,mesh%nod_in_elem2D_num(n)) !or -999?
        ! to get the max number of corners use size(x_corners, 2)
     END DO
-#endif
 
 t1=MPI_Wtime()
 if (mype==0) then
