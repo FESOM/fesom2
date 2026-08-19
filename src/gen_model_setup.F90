@@ -87,11 +87,22 @@ subroutine setup_model(partit)
   read (fileunit, NML=io_parallel, iostat=istat)
   if (istat /= 0) then
      rewind(fileunit)
-     parallel_write = .false.
-     n_writers      = 0
+     parallel_write    = .false.
+     n_writers         = 0
+     chunk_levels      = 8
+     n_writers_restart = -1
+     n_readers_restart = -1
   end if
+  ! Resolve the "same as n_writers" sentinel once, here, so that every consumer
+  ! downstream sees a concrete count and none of them has to know about -1.
+  ! Zero is NOT the sentinel: it already means "as many as the block-size guard
+  ! allows" and stays a legitimate value for each of the three.
+  if (n_writers_restart < 0) n_writers_restart = n_writers
+  if (n_readers_restart < 0) n_readers_restart = n_writers
   if (partit%mype == 0) then
-     write(*,*) 'parallel_write = ', parallel_write, '  n_writers = ', n_writers
+     write(*,*) 'parallel_write = ', parallel_write, '  n_writers = ', n_writers, &
+                '  n_writers_restart = ', n_writers_restart, &
+                '  n_readers_restart = ', n_readers_restart
   end if
 
 !!$  read (fileunit, NML=machine)

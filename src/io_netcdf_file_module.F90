@@ -42,6 +42,7 @@ module io_netcdf_file_module
   contains
     procedure, public :: initialize, add_dim, add_dim_unlimited, add_var_double, add_var_real, add_var_int, open_read, flush_file, close_file, open_write_create, open_write_append
     procedure, public :: open_write_create_par, open_write_append_par, set_var_chunking
+    procedure, public :: open_read_par
     procedure, public :: is_attached, read_var_shape
     procedure, public :: ndims
     generic, public :: read_var => read_var_r4, read_var_r8, read_var_integer
@@ -264,6 +265,38 @@ contains
     ! attach our dims and vars to their counterparts in the file
     call this%attach_dims_vars_to_file()
   end subroutine open_read
+
+
+  ! Parallel counterpart of open_read: the file is opened collectively over
+  ! `comm`, which must contain the reading CPUs and only those.
+  !
+  ! Variable access is INDEPENDENT, unlike open_write_create_par. Collective
+  ! access is what makes compressed parallel WRITES work at all, so the write
+  ! side has no choice; a read has nothing equivalent to gain, since each reader
+  ! pulls a distinct chunk-aligned hyperslab and HDF5 decompresses per chunk
+  ! either way.
+  !
+  ! It also removes a deadlock rather than merely being equivalent. The restart
+  ! record scalars -- `iter` and the time axis -- are read by one CPU alone
+  ! (io_restart.F90, under is_iorank), and under collective access that single
+  ! get_var would wait forever for the other readers to join a call they never
+  ! make.
+  subroutine open_read_par(this, filepath, comm)
+    use mpi
+    class(netcdf_file_type), intent(inout) :: this
+    character(len=*), intent(in) :: filepath
+    integer, intent(in) :: comm
+    ! EO parameters
+    include "netcdf.inc"
+    integer i
+
+    this%filepath = filepath
+    call assert_nc( nf_open_par(this%filepath, ior(nf_nowrite, nf_mpiio), comm, MPI_INFO_NULL, this%ncid), __LINE__)
+    call this%attach_dims_vars_to_file()
+    do i=1, size(this%vars)
+      call assert_nc( nf_var_par_access(this%ncid, this%vars(i)%ncid, nf_independent), __LINE__)
+    end do
+  end subroutine open_read_par
 
 
   ! return an array with the dimension sizes for all dimensions of the given variable
