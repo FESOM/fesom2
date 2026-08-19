@@ -1314,9 +1314,9 @@ contains
     ! 20..24 are the io_meandata sub-decomposition: update_means, streamloop,
     ! pack, mask, xsend (see rtime_om_* in io_meandata.F90).
     integer           :: tr_num, n_rtime=27
+    integer           :: i 
     real(kind=real32), allocatable :: mean_rtime(:), max_rtime(:), min_rtime(:)
     allocate(mean_rtime(n_rtime), max_rtime(n_rtime), min_rtime(n_rtime))
-    integer           :: i 
     
     ! Start finalization profiling
 #if defined (FESOM_PROFILING)
