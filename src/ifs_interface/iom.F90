@@ -20,7 +20,7 @@ MODULE iom
     PUBLIC iom_initialize, iom_init_server, iom_finalize
     PUBLIC iom_send_fesom_domains
     PUBLIC iom_field_request, iom_send_fesom_data
-    PUBLIC iom_flush
+    PUBLIC iom_flush, iom_synchronize
 
     LOGICAL :: lnomultio = .TRUE.
     LOGICAL :: lmio_handle = .FALSE.   ! .TRUE. once iom_initialize created mio_handle
@@ -499,6 +499,47 @@ CONTAINS
         cerr = md%delete()
         IF (cerr /= MULTIO_SUCCESS) THEN
             CALL ctl_stop('iom_flush: md%delete failed: ', multio_error_string(cerr))
+        END IF
+    END SUBROUTINE
+
+    SUBROUTINE iom_synchronize(step)
+        ! Blocking call: ensure all server-side processing is complete and the
+        ! data are persisted to the filesystem before returning (checkpointing).
+        ! Analogue of NEMO's iom_synchronize, driven at a time-step interval from
+        ! the FESOM output() routine (see io_meandata.F90, io_flush_sync).
+        USE g_config, ONLY: dt
+        IMPLICIT NONE
+
+        INTEGER, INTENT(IN)                     :: step
+
+        INTEGER                                 :: cerr
+        TYPE(multio_metadata)                   :: md
+
+        IF (lnomultio) RETURN
+
+        cerr = md%new(mio_handle)
+        IF (cerr /= MULTIO_SUCCESS) THEN
+            CALL ctl_stop('iom_synchronize: md%new() failed: ', multio_error_string(cerr))
+        END IF
+
+        cerr = md%set_int("step", step)
+        IF (cerr /= MULTIO_SUCCESS) THEN
+            CALL ctl_stop('iom_synchronize: md%set_int(step) failed: ', multio_error_string(cerr))
+        END IF
+
+        cerr = md%set_int("timeStep", INT(dt))
+        IF (cerr /= MULTIO_SUCCESS) THEN
+            CALL ctl_stop('iom_synchronize: md%set_int(timeStep) failed: ', multio_error_string(cerr))
+        END IF
+
+        cerr = mio_handle%synchronize(md)
+        IF (cerr /= MULTIO_SUCCESS) THEN
+            CALL ctl_stop('iom_synchronize: mio_handle%synchronize failed: ', multio_error_string(cerr))
+        END IF
+
+        cerr = md%delete()
+        IF (cerr /= MULTIO_SUCCESS) THEN
+            CALL ctl_stop('iom_synchronize: md%delete failed: ', multio_error_string(cerr))
         END IF
     END SUBROUTINE
 
