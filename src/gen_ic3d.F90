@@ -16,7 +16,7 @@ MODULE g_ic3d
    USE MOD_PARTIT
    USE MOD_PARSUP
    USE MOD_TRACER
-   USE o_PARAM, only: mstep
+   USE o_PARAM, only: mstep, pi
    USE g_comm_auto
    USE g_support
    USE g_config, only: dummy, ClimateDataPath, use_cavity
@@ -937,7 +937,7 @@ CONTAINS
          if (rtemp1 < 1.0e-10_WP) rtemp1 = 1.0e-10_WP
          
          ! Box-Muller: generate standard normal, then scale by std_dev
-         rnum = param2 * sqrt(-2.0_WP * log(rtemp1)) * cos(2.0_WP * 3.14159265359_WP * rtemp2)
+         rnum = param2 * sqrt(-2.0_WP * log(rtemp1)) * cos(2.0_WP * pi * rtemp2)
          
      case default
          ! Default to uniform if unknown method
