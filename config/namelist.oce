@@ -76,17 +76,6 @@ use_global_tides   = .false. ! enable global tidal potential forcing
 /
 
 ! ===================================================================
-! Initial conditions for tracers
-! ===================================================================
-&tracer_init3d
-n_ic3d    = 2
-idlist    = 1, 0
-filelist  = 'phc3.0_winter.nc', 'phc3.0_winter.nc'
-varlist   = 'salt', 'temp'
-t_insitu  = .true.
-/
-
-! ===================================================================
 ! Initial condition perturbation settings
 ! ===================================================================
 ! This section controls random perturbation of initial temperature
