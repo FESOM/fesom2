@@ -155,6 +155,17 @@ module g_config
   logical                       :: use_cavity_partial_cell = .false. ! switch on/off cavity usage
   logical                       :: use_cavity_fw2press = .true. ! switch on/off cavity+zstar input of freshwater leads to increase in pressure
   real(kind=WP)                 :: cavity_partial_cell_thresh=0.0_WP ! same as partial_cell_tresh but for surface
+!runoff scaling 
+  logical                       :: use_runoff_scaling = .false. ! switch on/off runoff scaling module to adjust antarctic surface runoff
+  logical                       :: zero_antarctic_runoff = .false. ! drop surface runoff south of 60S (cavity/iceberg setups that deliver it another way)
+  character(len=10)             :: runoff_scaling_method = 'ref' ! set scaling to values from reference file: 'ref'
+                                                                 ! or constant value for SO: 'const'
+                                                                 ! or multiply existing runoff by facotr: 'mult'
+  character(MAX_PATH)           :: runoff_dir = './ref_runoff' ! path to reference files
+  character(len=3)              :: runoff_scaling_time = 'm' ! time resulotion of reference data
+  real(kind=WP)                 :: runoff_mult_factor = 1.0_WP ! multiplicative factor when using mult
+  real(kind=WP)                 :: runoff_const_ref = 1.0_WP ! constant reference runoff flux
+!runoff scaling
   logical                       :: toy_ocean=.false. ! Ersatz forcing has to be supplied
   character(100)                :: which_toy="soufflet" 
   logical                       :: flag_debug=.false.    ! prints name of actual subroutine he is in 
@@ -168,12 +179,18 @@ module g_config
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, &
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
                         use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
-                        use_transit, compute_oasis_corners, num_fesom_groups
+                        use_transit, compute_oasis_corners, num_fesom_groups, &
+                        use_runoff_scaling, runoff_scaling_method, runoff_dir, &
+                        runoff_scaling_time, runoff_mult_factor, runoff_const_ref, &
+                        zero_antarctic_runoff
 #else
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
                         use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
-                        use_transit, compute_oasis_corners
+                        use_transit, compute_oasis_corners, &
+                        use_runoff_scaling, runoff_scaling_method, runoff_dir, &
+                        runoff_scaling_time, runoff_mult_factor, runoff_const_ref, &
+                        zero_antarctic_runoff
 #endif
 
   !_____________________________________________________________________________

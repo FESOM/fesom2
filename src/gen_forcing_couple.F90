@@ -277,6 +277,9 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   use gen_bulk
   use force_flux_consv_interface
 
+  use g_support
+  use runoff_scaling_interface
+
   implicit none
   integer,        intent(in)            :: istep
   type(t_ice)   , intent(inout), target :: ice
@@ -324,10 +327,17 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   real(kind=WP), dimension(:,:,:), pointer :: UVnode
 #endif
   real(kind=WP)              , pointer  :: rhoair
+  real(kind=WP) :: runoff_south
+  real(kind=WP), allocatable :: runoff_masked(:)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+
+  if (use_runoff_scaling) then
+    allocate(runoff_masked(size(runoff)))
+  end if
+
   u_ice            => ice%uice(:)
   v_ice            => ice%vice(:)
   u_w              => ice%srfoce_u(:)
@@ -551,6 +561,22 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
                 runoff(:)            =  exchange(:)        ! AWI-CM2: runoff, AWI-CM3: runoff + excess snow on glaciers
                 mask=1.
                 call force_flux_consv(runoff, mask, i, 0,action, partit, mesh)
+                
+                  if (use_runoff_scaling) then
+                    runoff_masked = 0.0_WP
+                    where (geo_coord_nod2D(2, :) < -60.0_WP * rad)
+                      runoff_masked = runoff
+                    end where
+
+                    call integrate_nod(runoff_masked, runoff_south, partit, mesh)
+                    if (mype==0) write(*,*) "runoff southern ocean: ", runoff_south
+
+                    if (runoff_south == 0.0_WP) then
+                      if (mype==0) write(*,*) "Warning: runoff_south = 0, skipping scaling"
+                    else
+                      call runoff_scaling(runoff, partit, mesh)
+                    end if
+                  end if
             end if
 #if defined (__oifs)
 
@@ -780,6 +806,18 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 #if defined (__recom) /* consider in all cases */
   call sbc_do_recom(partit, mesh)
 #endif
+
+  ! Opt-in: drop surface runoff south of 60S, for setups where that water is
+  ! already delivered by the cavity and iceberg freshwater fluxes and would
+  ! otherwise be counted twice. Off by default, so enabling cavities alone
+  ! does not change the runoff field.
+  if (zero_antarctic_runoff) then
+     do i=1, myDim_nod2D+eDim_nod2D
+        if (geo_coord_nod2D(2,i) < -60.0*rad) then
+           runoff(i) = 0.0_WP
+        end if
+     end do
+  end if
 
   t2=MPI_Wtime()
 
