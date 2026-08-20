@@ -1092,7 +1092,7 @@ subroutine iceberg_avvelo(mesh, partit, dynamics, uo_dz,vo_dz,depth_ib,iceberg_e
   INTEGER, OPTIONAL,  INTENT(IN)  :: ib
 
   real           :: lev_up, lev_low  
-  integer        :: m, k, n2, n_up, n_low
+  integer        :: m, k, n2, n_up, n_low, safe_lev
   ! depth over which is integrated (layer and sum)
   real           :: dz, ufkeel1, ufkeel2
   ! variables for velocity correction
@@ -1140,7 +1140,14 @@ type(t_partit), intent(inout), target :: partit
         exit
     end if
     dz = abs( lev_low - lev_up )
-	
+    if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
+        .AND. abs(depth_ib) < abs(mesh%zbar_3d_n(k, n2))) then
+      safe_lev = max(k-1, ulevels_nod2d(n2))
+      uo_dz(m) = UV_ib(1,safe_lev,n2)*abs(depth_ib)
+      vo_dz(m) = UV_ib(2,safe_lev,n2)*abs(depth_ib)
+      exit
+    end if
+
     ! if the lowest z coord is below the iceberg draft, exit
     if ( abs(lev_low)>= abs(depth_ib)) then
   
@@ -1191,6 +1198,12 @@ type(t_partit), intent(inout), target :: partit
    real, intent(IN) :: x0,f0,x1,f1,x
    real :: frac
    
+   ! Guard against near-zero denominator (thin ALE layer).
+   ! An exact-zero check is insufficient; 0*Inf = NaN when x≈x0 too.
+   if (abs(x1-x0) < 1.0e-6) then
+     interpol1D = 0.5*(f0+f1)
+     return
+   end if
    frac = (f1 - f0)/(x1 - x0)
    interpol1D = f0 + frac * (x - x0)
   	

@@ -261,14 +261,12 @@ type(t_partit), intent(inout), target :: partit
   if( (x > maxlon) .OR. (x < minlon) ) then
     write(*,*) 'FEM_eval error: iceberg lon ', x, ' outside element!'
     write(*,*) 'maxlon:', maxlon, ' minlon:', minlon
-    write(*,*) 'FEM_eval fatal on rank ', partit%mype
-    call par_ex (partit%MPI_COMM_FESOM, partit%mype, abort=1)
+    call par_ex (partit%MPI_COMM_FESOM, partit%mype)
     stop
   else if( (y > maxlat) .OR. (y < minlat)) then
     write(*,*) 'FEM_eval error: iceberg lat', y, ' outside element!'
     write(*,*) 'maxlat:', maxlat, ' minlat:', minlat
-    write(*,*) 'FEM_eval fatal on rank ', partit%mype
-    call par_ex (partit%MPI_COMM_FESOM, partit%mype, abort=1)
+    call par_ex (partit%MPI_COMM_FESOM, partit%mype)
     stop
   else
     !everything okay
