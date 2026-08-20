@@ -149,6 +149,18 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
         enodes=elem2D_nodes(:,elem)
         nu1 = ulevels(elem)
         nl1 = nlevels(elem)
+        ! under a cavity the element starts at nu1>1, the levels above it are
+        ! never filled below. Pad them like the sub-bottom levels, otherwise the
+        ! node loop in a3 reads uninitialised AUX for nodes whose ulevels_nod2D
+        ! is shallower than ulevels of a neighbouring element --> NaNs
+        if (nu1>1) then
+            !$ACC LOOP VECTOR
+            do nz=1,nu1-1
+                AUX(1,nz,elem)=-bignumber
+                AUX(2,nz,elem)= bignumber
+            end do
+            !$ACC END LOOP
+        endif
         !$ACC LOOP VECTOR
         do nz=nu1, nl1-1
             AUX(1,nz,elem)=max(fct_ttf_max(nz,enodes(1)), fct_ttf_max(nz,enodes(2)), fct_ttf_max(nz,enodes(3)))
@@ -194,8 +206,8 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
           tvert_min(nz, n) = AUX(2,nz, nod_in_elem2D(1, n))
           !$ACC LOOP SEQ
           do elem=2,nod_in_elem2D_num(n)
-              tvert_max(nz, n) = dmax1(tvert_max(nz, n), AUX(1,nz, nod_in_elem2D(elem,n)))
-              tvert_min(nz, n) = dmin1(tvert_min(nz, n), AUX(2,nz, nod_in_elem2D(elem,n)))
+              tvert_max(nz, n) = max(tvert_max(nz, n), AUX(1,nz, nod_in_elem2D(elem,n)))
+              tvert_min(nz, n) = min(tvert_min(nz, n), AUX(2,nz, nod_in_elem2D(elem,n)))
           end do
           !$ACC END LOOP
        end do
@@ -224,8 +236,8 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
        ! solution at layer nz
        !$ACC LOOP VECTOR
        do nz=nu1+1,nl1-2
-          fct_ttf_max(nz,n)=dmax1(tvert_max(nz-1, n), tvert_max(nz, n), tvert_max(nz+1, n))-LO(nz,n)
-          fct_ttf_min(nz,n)=dmin1(tvert_min(nz-1, n), tvert_min(nz, n), tvert_min(nz+1, n))-LO(nz,n)
+          fct_ttf_max(nz,n)=max(tvert_max(nz-1, n), tvert_max(nz, n), tvert_max(nz+1, n))-LO(nz,n)
+          fct_ttf_min(nz,n)=min(tvert_min(nz-1, n), tvert_min(nz, n), tvert_min(nz+1, n))-LO(nz,n)
        end do
        !$ACC END LOOP
        ! calc max,min increment of bottom layer -1 with respect to low order
@@ -384,9 +396,9 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
         nl1=nlevels_nod2D(n)
         !$ACC LOOP VECTOR
         do nz=nu1,nl1-1
-            flux=fct_plus(nz,n)*dt/areasvol(nz,n)/hnode(nz,n)+flux_eps
+            flux=fct_plus(nz,n)*dt/areasvol(nz,n)/hnode_new(nz,n)+flux_eps
             fct_plus(nz,n)=min(1.0_WP,fct_ttf_max(nz,n)/flux)
-            flux=fct_minus(nz,n)*dt/areasvol(nz,n)/hnode(nz,n)-flux_eps
+            flux=fct_minus(nz,n)*dt/areasvol(nz,n)/hnode_new(nz,n)-flux_eps
             fct_minus(nz,n)=min(1.0_WP,fct_ttf_min(nz,n)/flux)
         end do
         !$ACC END LOOP

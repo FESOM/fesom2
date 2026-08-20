@@ -5,28 +5,41 @@
 
 !==========================================================
 MODULE o_PARAM
-integer, parameter            :: WP=8        ! Working precision
+use, intrinsic :: iso_fortran_env, only: real32, real64
+! keep the imported kind names local: o_PARAM is USEd unrestricted all over the
+! tree, and re-exporting real32/real64 would collide with modules that import
+! them directly from iso_fortran_env.
+private :: real32, real64
+! Kind numbers come from iso_fortran_env rather than being spelled as the byte
+! size. The standard does not require kind numbers to equal storage size (NAG,
+! for one, numbers real kinds 1,2,3), so WP=8 is only accidentally correct.
+! On GNU/Intel real64==8, making this a numerical no-op.
+integer, parameter            :: WP=real64   ! Working precision
+! Always-double precision, independent of WP. Use for quantities that must not
+! degrade if WP is ever narrowed (time axes, external double APIs, global
+! reduction accumulators).
+integer, parameter            :: WP_full=real64
 integer, parameter            :: MAX_PATH=4096 ! Maximum file path length
 integer		                  :: mstep
-real(kind=WP), parameter      :: pi=3.14159265358979
+real(kind=WP), parameter      :: pi=3.14159265358979_WP
 real(kind=WP), parameter      :: rad=pi/180.0_WP
 real(kind=WP), parameter      :: density_0=1030.0_WP
 real(kind=WP), parameter      :: density_0_r=1.0_WP/density_0 ! [m^3/kg]
 real(kind=WP), parameter      :: g=9.81_WP
 real(kind=WP), parameter      :: r_earth=6367500.0_WP
 real(kind=WP), parameter      :: omega=2*pi/(3600.0_WP*24.0_WP)
-real(kind=WP), parameter      :: vcpw=4.2e6   ![J/m^3/K] water heat cap
+real(kind=WP), parameter      :: vcpw=4.2e6_WP   ![J/m^3/K] water heat cap
 real(kind=WP), parameter      :: inv_vcpw = 1._WP / vcpw  ! inverse, to replace divide by multiply
-real(kind=WP), parameter      :: small=1.0e-8 !small value
+real(kind=WP), parameter      :: small=1.0e-8_WP !small value
 integer                       :: state_equation = 1     !1 - full equation of state, 0 - linear equation of state
 
 real(kind=WP)                 :: C_d= 0.0025_WP ! Bottom drag coefficient
-real(kind=WP)	              :: kappa=0.4      !von Karman's constant
+real(kind=WP)	              :: kappa=0.4_WP      !von Karman's constant
 real(kind=WP)                 :: mix_coeff_PP=0.01_WP   ! mixing coef for PP scheme
 real(kind=WP)                 :: A_ver=0.001_WP ! Vertical harm. visc.
 real(kind=WP)                 :: K_hor=10._WP
 real(kind=WP)                 :: K_ver=0.00001_WP
-real(kind=WP)                 :: scale_area=2.0e8
+real(kind=WP)                 :: scale_area=2.0e8_WP
 real(kind=WP)                 :: surf_relax_T= 0.0_WP
 real(kind=WP)                 :: surf_relax_S= 10.0_WP/(60*3600.0_WP*24)
 logical                       :: balance_salt_water =.true.
@@ -34,16 +47,16 @@ real(kind=WP)                 :: clim_relax= 1.0_WP/(10*3600.0_WP*24)
 real(kind=WP)                 :: clim_decay, clim_growth
                                  ! set to 0.0 if no relaxation
 logical                       :: ref_sss_local=.false.
-real(kind=WP)                 :: ref_sss=34.7
+real(kind=WP)                 :: ref_sss=34.7_WP
 logical                       :: Fer_GM =.false.  !flag for Ferrari et al. (2010) GM scheme
-real(kind=WP)                 :: K_GM_max = 3000.
-real(kind=WP)                 :: K_GM_min = 2.0
+real(kind=WP)                 :: K_GM_max = 3000._WP
+real(kind=WP)                 :: K_GM_min = 2.0_WP
 integer                       :: K_GM_bvref = 2 ! 0...surface, 1...bottom mixlay, 2...mean over mixlay
-real(kind=WP)                 :: K_GM_resscalorder = 2.0
-real(kind=WP)                 :: K_GM_rampmax = 40.0 ! Resol >K_GM_rampmax[km] GM full
-real(kind=WP)                 :: K_GM_rampmin = 30.0 ! Resol <K_GM_rampmin[km] GM off
-real(kind=WP)                 :: K_GM_cm = 1.0    ! =1.0 ...first baroclini wave speed, =2.0...2nd, =3.0...3rd, ...
-real(kind=WP)                 :: K_GM_cmin = 0.5 ! lower cutoff of baroclinic wave speed
+real(kind=WP)                 :: K_GM_resscalorder = 2.0_WP
+real(kind=WP)                 :: K_GM_rampmax = 40.0_WP ! Resol >K_GM_rampmax[km] GM full
+real(kind=WP)                 :: K_GM_rampmin = 30.0_WP ! Resol <K_GM_rampmin[km] GM off
+real(kind=WP)                 :: K_GM_cm = 1.0_WP    ! =1.0 ...first baroclini wave speed, =2.0...2nd, =3.0...3rd, ...
+real(kind=WP)                 :: K_GM_cmin = 0.5_WP ! lower cutoff of baroclinic wave speed
 logical                       :: K_GM_Ktaper = .false.
 
 logical                       :: scaling_Ferreira   =.true.
@@ -52,29 +65,29 @@ logical                       :: scaling_resolution =.true.
 logical                       :: scaling_FESOM14    =.false.
 
 logical                       :: scaling_GMzexp     =.false. ! do downscaling of GM & Redi over depth by exp(-z/z_ref)
-real(kind=WP)                 :: GMzexp_zref        = 500.0  ! reference for vertical exp GM scaling 
-real(kind=WP)                 :: GMzexp_smin        = 0.1    ! minimum scaling factor
+real(kind=WP)                 :: GMzexp_zref        = 500.0_WP  ! reference for vertical exp GM scaling 
+real(kind=WP)                 :: GMzexp_smin        = 0.1_WP    ! minimum scaling factor
 
 
 logical                       :: scaling_GINsea     =.false. ! do upsaling of GINsea via polygon 
-real(kind=WP)                 :: GINsea_fac         = 2.0    ! increase K_GM_max in Gin sea by factor 
+real(kind=WP)                 :: GINsea_fac         = 2.0_WP    ! increase K_GM_max in Gin sea by factor 
 
 logical                       :: Redi        = .false.  !flag for Redi scheme
 logical                       :: Redi_Ktaper = .false.
-real(kind=WP)                 :: Redi_Kmax   = 3000.0
-real(kind=WP)                 :: Redi_Kmin   = 2.0
+real(kind=WP)                 :: Redi_Kmax   = 3000.0_WP
+real(kind=WP)                 :: Redi_Kmin   = 2.0_WP
 
 logical                       :: scaling_ODM95 =.true.    ! tapering based on critical slope
-real(kind=WP)                 :: ODM95_Scr = 1.0e-2   ! Critical slope for tapering
-real(kind=WP)                 :: ODM95_Sd = 1.0e-3   ! slope width of tapering smoothing zone
+real(kind=WP)                 :: ODM95_Scr = 1.0e-2_WP   ! Critical slope for tapering
+real(kind=WP)                 :: ODM95_Sd = 1.0e-3_WP   ! slope width of tapering smoothing zone
 
 logical                       :: scaling_LDD97 =.false.   ! tapering in surface
-real(kind=WP)                 :: LDD97_c = 2.0      ! [m/s] is the first baroclinic wave speed
-real(kind=WP)                 :: LDD97_rmin = 15.0e3   ! rossby radius min cutoff [m]
-real(kind=WP)                 :: LDD97_rmax = 100.0e3  ! rossby radius max cutoff [m]
+real(kind=WP)                 :: LDD97_c = 2.0_WP      ! [m/s] is the first baroclinic wave speed
+real(kind=WP)                 :: LDD97_rmin = 15.0e3_WP   ! rossby radius min cutoff [m]
+real(kind=WP)                 :: LDD97_rmax = 100.0e3_WP  ! rossby radius max cutoff [m]
 
-real(kind=WP)                 :: visc_sh_limit=5.0e-3      !for KPP, max visc due to shear instability
-real(kind=WP)                 :: diff_sh_limit=5.0e-3      !for KPP, max diff due to shear instability
+real(kind=WP)                 :: visc_sh_limit=5.0e-3_WP      !for KPP, max visc due to shear instability
+real(kind=WP)                 :: diff_sh_limit=5.0e-3_WP      !for KPP, max diff due to shear instability
 logical                       :: Kv0_const=.true.		    !use Kv0 varying with depth and latitude
 logical                       :: double_diffusion=.false.  !for KPP,dd switch
                                  ! KPP parametrization
@@ -145,16 +158,16 @@ logical                       :: open_b=.false.   ! Reserved
 ! --> definetely recommented for KPP
 logical                       :: use_momix     = .true. !.false. !Monin-Obukhov -> TB04 mixing on/off
 real(kind=WP)                 :: momix_lat     = -50.0_WP ! latitudinal treshhold to apply mo_on <lat
-real(kind=WP)                 :: momix_kv      = 0.01   ! for PP/KPP, mixing coefficient within MO length
+real(kind=WP)                 :: momix_kv      = 0.01_WP   ! for PP/KPP, mixing coefficient within MO length
 
 ! Switch for enhanced vertical mixing in case of instable stratification --> enhanced
 ! convection
 logical                       :: use_instabmix = .true.
-real(kind=WP)                 :: instabmix_kv  = 0.1
+real(kind=WP)                 :: instabmix_kv  = 0.1_WP
 
 ! Switch for enhanced wind mixing --> nasty trick from pp mixing in FESOM1.4
 logical                       :: use_windmix   = .false.
-real(kind=WP)                 :: windmix_kv    = 1.e-3
+real(kind=WP)                 :: windmix_kv    = 1.e-3_WP
 integer                       :: windmix_nl    = 2
 
 !_______________________________________________________________________________
@@ -170,13 +183,13 @@ logical                       :: use_kpp_nonlclflx = .false.
 !_______________________________________________________________________________
 ! *** active tracer cutoff
 logical          :: limit_salinity=.true.         !set an allowed range for salinity
-real(kind=WP)    :: salinity_min=5.0              !minimal salinity
-real(kind=WP)    :: coeff_limit_salinity=0.0023   !m/s, coefficient to restore s to s_min
+real(kind=WP)    :: salinity_min=5.0_WP              !minimal salinity
+real(kind=WP)    :: coeff_limit_salinity=0.0023_WP   !m/s, coefficient to restore s to s_min
 
   namelist /tracer_cutoff/ limit_salinity, salinity_min, coeff_limit_salinity
 
 ! *** others ***
- real(kind=WP)                        :: time_sum=0.0 ! for runtime estimate
+ real(kind=WP)                        :: time_sum=0.0_WP ! for runtime estimate
 
 !___________________________________________
 ! Pressure Gradient Force  calculation (pgf)
@@ -250,6 +263,13 @@ real(kind=WP), allocatable :: tr_z(:,:)
 #if defined(__recom)
 real(kind=WP), allocatable    :: dtr_bf(:,:), str_bf(:,:)
 real(kind=WP), allocatable    :: vert_sink(:,:)
+#if defined(__usetp)
+integer                       :: request_count
+integer, allocatable          :: tr_arr_requests(:), tr_arr_old_requests(:)
+
+integer, allocatable          :: SinkFlx_tr_requests(:)
+integer, allocatable          :: Benthos_tr_requests(:)
+#endif
 #endif
 
 !Viscosity and diff coefs
@@ -276,7 +296,7 @@ real(kind=WP)                               :: is_nonlinfs
 
 !_______________________________________________________________________________
 ! Arrays added for pressure gradient force calculation
-real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0
+real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0, density_sigma0
 real(kind=WP), allocatable,dimension(:,:)   :: density_m_rho0_slev
 real(kind=WP), allocatable,dimension(:,:)   :: density_ref
 real(kind=WP), allocatable,dimension(:,:)   :: density_dmoc

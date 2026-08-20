@@ -131,6 +131,8 @@ module g_config
   integer                       :: cell_saturation=2 ! 0=no cell saturation, 1=one additional iceberg allowed, 2=no daddtional iceberg allowed
   logical                       :: lmin_latent_hf=.true.
   logical                       :: lverbose_icb=.false.  
+  integer                       :: l_allowgrounding=1    ! 0=free drift, 1=slow drift, 2=stationary
+  logical                       :: l_cap_ibhf_n=.false.   ! cap iceberg-driven interior cooling (ibhf_n) at a safe temperature floor per cell/step
   integer                       :: ib_num=0
   integer                       :: steps_per_ib_step=8
 
@@ -142,7 +144,8 @@ module g_config
   integer                       :: thread_support_level_required=3 ! 2 = MPI_THREAD_SERIALIZED, 3 = MPI_THREAD_MULTIPLE
 
   namelist /icebergs/   use_icebergs, turn_off_hf, turn_off_fw, use_icesheet_coupling, lbalance_fw, cell_saturation, lmin_latent_hf, &
-                        ib_num, steps_per_ib_step, ib_async_mode, thread_support_level_required, lverbose_icb
+                        ib_num, steps_per_ib_step, ib_async_mode, thread_support_level_required, lverbose_icb, l_allowgrounding, &
+                        l_cap_ibhf_n
 
 !wiso-code!!!
   logical                       :: lwiso  =.false.  ! enable isotope?
@@ -154,6 +157,7 @@ module g_config
   real(kind=WP)                 :: cavity_partial_cell_thresh=0.0_WP ! same as partial_cell_tresh but for surface
 !runoff scaling 
   logical                       :: use_runoff_scaling = .false. ! switch on/off runoff scaling module to adjust antarctic surface runoff
+  logical                       :: zero_antarctic_runoff = .false. ! drop surface runoff south of 60S (cavity/iceberg setups that deliver it another way)
   character(len=10)             :: runoff_scaling_method = 'ref' ! set scaling to values from reference file: 'ref'
                                                                  ! or constant value for SO: 'const'
                                                                  ! or multiply existing runoff by facotr: 'mult'
@@ -168,12 +172,27 @@ module g_config
   logical                       :: flag_warn_cflz=.true. ! switches off cflz warning
   logical                       :: use_transit=.false.    ! switches off transient tracers
   logical                       :: compute_oasis_corners=.false. ! switches on corner calculation for 1st order conserv remapping 
+
+#if defined(__recom) && defined(__usetp)
+! number of groups for multi FESOM group loop parallelization
+  integer                       :: num_fesom_groups=1
+  namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, &
+                        use_cavity_partial_cell, cavity_partial_cell_thresh, &
+                        use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
+                        use_transit, compute_oasis_corners, num_fesom_groups, &
+                        use_runoff_scaling, runoff_scaling_method, runoff_dir, &
+                        runoff_scaling_time, runoff_mult_factor, runoff_const_ref, &
+                        zero_antarctic_runoff
+#else
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
                         use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
-                        use_transit, compute_oasis_corners, use_runoff_scaling, runoff_scaling_method, runoff_dir, &
-                        runoff_scaling_time, runoff_mult_factor, runoff_const_ref
-  
+                        use_transit, compute_oasis_corners, &
+                        use_runoff_scaling, runoff_scaling_method, runoff_dir, &
+                        runoff_scaling_time, runoff_mult_factor, runoff_const_ref, &
+                        zero_antarctic_runoff
+#endif
+
   !_____________________________________________________________________________
   ! *** others ***
   real(kind=WP)                 :: dt

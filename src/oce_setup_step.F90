@@ -100,6 +100,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     use oce_adv_tra_fct_interfaces
     use init_ale_interface
     use init_thickness_ale_interface
+    use ssh_solve_preconditioner_interface
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_tracer), intent(inout), target :: tracers
@@ -136,7 +137,21 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     call init_ale(dynamics, partit, mesh)
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_stiff_mat_ale'//achar(27)//'[0m'
     call init_stiff_mat_ale(partit, mesh) !!PS test  
-    
+
+    !___________________________________________________________________________
+    ! Build the SSH-solver preconditioner here, from the freshly initialised stiffness matrix,
+    ! instead of lazily on the first solve. SSH_stiff%values is CUMULATIVE: update_stiff_mat_ale
+    ! adds the elevation increment dhe to it once per step and it is never rebuilt. Building it
+    ! on the first solve therefore made it depend on WHEN in the run that happened -- a cold
+    ! start got the unperturbed matrix (dhe==0 because hbar==0), a restart got it after
+    ! restart_thickness_ale had already fed the absolute sea surface height in via dhe. The CG
+    ! stops on a relative residual, so the two preconditioners leave different O(soltol) errors.
+    ! Bit-identical for cold starts: at the first cold-start solve the matrix was base + 0.
+    if (.not. dynamics%use_ssh_se_subcycl) then
+        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call ssh_solve_preconditioner'//achar(27)//'[0m'
+        call ssh_solve_preconditioner(dynamics%solverinfo, partit, mesh)
+    end if
+
     !___________________________________________________________________________
     ! initialize arrays from cvmix library for CVMIX_KPP, CVMIX_PP, CVMIX_TKE,
     ! CVMIX_IDEMIX and CVMIX_TIDAL
@@ -157,6 +172,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
         case ('cvmix_PP+cvmix_TIDAL'  ) ; mix_scheme_nmb = 47
         case ('cvmix_TKE+cvmix_IDEMIX') ; mix_scheme_nmb = 56
 #endif        
+        case ('TOY'                   ) ; mix_scheme_nmb = 8
         case default 
             stop "!not existing mixing scheme!"
             call par_ex(partit%MPI_COMM_FESOM, partit%mype)
@@ -314,12 +330,12 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     !___________________________________________________________________________
     ! define tracer namelist parameter
     integer        :: num_tracers
-    logical        :: i_vert_diff, smooth_bh_tra
+    logical        :: i_vert_diff, smooth_bh_tra , ltra_diag
     real(kind=WP)  :: gamma0_tra, gamma1_tra, gamma2_tra
     integer        :: AB_order = 2
     namelist /tracer_listsize/ num_tracers
     namelist /tracer_list    / nml_tracer_list
-    namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff, AB_order
+    namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff, AB_order, ltra_diag
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -436,11 +452,6 @@ nl => mesh%nl
         num_tracers = num_tracers + 1
       endif
 
-      ! tracers initialised from file
-      idlist((n_ic3d+1):(n_ic3d+1)) = (/14/)
-      filelist((n_ic3d+1):(n_ic3d+1)) = (/'R14C.nc'/)
-      varlist((n_ic3d+1):(n_ic3d+1))  = (/'R14C'/)
-
       if (mype==0) write(*,*) 'XXX Transient tracers will be used in FESOM'
     endif
     ! 'use_transit' end
@@ -477,6 +488,7 @@ nl => mesh%nl
         tracers%data(n)%valuesAB      = 0.
         tracers%data(n)%valuesold     = 0.
         tracers%data(n)%i_vert_diff   = i_vert_diff
+        tracers%data(n)%ltra_diag   = ltra_diag
     end do
     allocate(tracers%work%del_ttf(nl-1,node_size))
     allocate(tracers%work%del_ttf_advhoriz(nl-1,node_size),tracers%work%del_ttf_advvert(nl-1,node_size))
@@ -488,6 +500,20 @@ nl => mesh%nl
         allocate(tracers%work%dvd_trflx_ver(nl  , myDim_nod2D , 2))
         tracers%work%dvd_trflx_hor = 0.0_WP
         tracers%work%dvd_trflx_ver = 0.0_WP
+    end if
+    if (ltra_diag) then
+        allocate(tracers%work%tra_advhoriz(nl-1,node_size,num_tracers),tracers%work%tra_advvert(nl-1,node_size,num_tracers))
+        tracers%work%tra_advhoriz = 0.0_WP
+        tracers%work%tra_advvert  = 0.0_WP
+        allocate(tracers%work%tra_diff_part_hor_redi(nl-1,node_size,num_tracers),tracers%work%tra_diff_part_ver_expl(nl-1,node_size,num_tracers))
+        allocate(tracers%work%tra_diff_part_ver_redi_expl(nl-1,node_size,num_tracers),tracers%work%tra_diff_part_ver_impl(nl-1,node_size,num_tracers))
+        allocate(tracers%work%tra_recom_sms(nl-1,node_size,num_tracers))
+        tracers%work%tra_diff_part_hor_redi = 0.0_WP
+        tracers%work%tra_diff_part_ver_expl = 0.0_WP
+        tracers%work%tra_diff_part_ver_redi_expl = 0.0_WP
+        tracers%work%tra_diff_part_ver_impl = 0.0_WP
+        tracers%work%tra_recom_sms = 0.0_WP
+
     end if
 END SUBROUTINE tracer_init
 !
@@ -511,6 +537,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     ! define dynamics namelist parameter
     integer        :: opt_visc
     real(kind=WP)  :: visc_gamma0, visc_gamma1, visc_gamma2
+    real(kind=WP)  :: visc_gamma0_h, visc_gamma1_h
     real(kind=WP)  :: visc_easybsreturn
     logical        :: use_ivertvisc=.true.
     logical        :: uke_scaling=.true.
@@ -529,6 +556,9 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     integer        :: AB_order     = 2
     logical        :: check_opt_visc=.true.
     real(kind=WP)  :: wsplit_maxcfl
+    real(kind=WP)  :: soltol = 1.e-5_WP  ! ssh CG rel. tolerance; default matches T_SOLVERINFO
+    integer        :: maxiter = 2000     ! ssh CG iteration cap; default matches T_SOLVERINFO
+    integer        :: precond_variant = 0 ! ssh CG preconditioner formula; 0 keeps results unchanged
     logical        :: use_ssh_se_subcycl=.false.
     integer        :: se_BTsteps
     real(kind=WP)  :: se_BTtheta
@@ -536,15 +566,16 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     real(kind=WP)  :: se_visc_gamma0, se_visc_gamma1, se_visc_gamma2
     
     namelist /dynamics_visc   / opt_visc, check_opt_visc, visc_gamma0, visc_gamma1, visc_gamma2,  &
+                                visc_gamma0_h, visc_gamma1_h,                                     &
                                 use_ivertvisc, visc_easybsreturn, &
                                 uke_scaling, uke_scaling_factor, uke_advection, &
                                 rosb_dis, smooth_back, smooth_dis, smooth_back_tend, K_back, c_back
 
-    namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, & 
+    namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, &
                                 ldiag_KE, AB_order,                                  &
                                 use_ssh_se_subcycl, se_BTsteps, se_BTtheta,          &
                                 se_bottdrag, se_bdrag_si, se_visc, se_visc_gamma0,   &
-                                se_visc_gamma1, se_visc_gamma2
+                                se_visc_gamma1, se_visc_gamma2, soltol, maxiter, precond_variant
 
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -575,6 +606,8 @@ nl => mesh%nl
     dynamics%visc_gamma0         = visc_gamma0
     dynamics%visc_gamma1         = visc_gamma1
     dynamics%visc_gamma2         = visc_gamma2
+    dynamics%visc_gamma0_h       = visc_gamma0_h
+    dynamics%visc_gamma1_h       = visc_gamma1_h
     dynamics%visc_easybsreturn   = visc_easybsreturn
     dynamics%uke_scaling         = uke_scaling
     dynamics%uke_scaling_factor  = uke_scaling_factor
@@ -612,8 +645,38 @@ nl => mesh%nl
             write(*,*) "     se_visc_gamma0 = ", dynamics%se_visc_gamma0
             write(*,*) "     se_visc_gamma1 = ", dynamics%se_visc_gamma1
             write(*,*) "     se_visc_gamma2 = ", dynamics%se_visc_gamma2
-        end if 
-    end if 
+        end if
+    end if
+
+    ! ssh CG solver tolerance (optional, backward compatible): if 'soltol' is
+    ! absent from namelist.dyn the namelist read leaves it at the default above,
+    ! matching the previous hard-coded T_SOLVERINFO value.
+    !
+    ! KNOWN LIMITATION -- these two settings are honoured on a COLD START only.
+    ! soltol and maxiter are both members of T_SOLVERINFO, which is serialized into
+    ! the derived-type (bin) restart dump, and READ_T_SOLVERINFO runs *after* this
+    ! routine (fesom_module.F90: dynamics_init -> ... -> read_initial_conditions).
+    ! So on a bin restart the dumped values silently replace whatever the namelist
+    ! asked for, while the echo below still prints the namelist value.
+    ! Measured on pi: cold start at soltol=1e-5 takes 8.60 iterations/solve; restart
+    ! with soltol=1e-2 in the namelist still takes 8.95 -- i.e. it is still solving to
+    ! 1e-5 -- although the log reports 1.0E-002. The raw-restart path is unaffected.
+    ! Not fixed here: the fix is to read these into throwaway locals so the byte
+    ! layout is preserved, and that needs the restart-vs-continuous regression test,
+    ! which does not exist yet. Set them on the cold start of an experiment.
+    dynamics%solverinfo%soltol = soltol
+    if (mype==0) write(*,*) '     ssh CG soltol  = ', dynamics%solverinfo%soltol
+
+    ! ssh CG iteration cap, same contract as soltol above. Needed to tell a stall
+    ! apart from a truncation when sweeping soltol: raise it and a solver that is
+    ! merely slow still converges, while one that has hit its residual floor
+    ! plateaus instead.
+    ! Same cold-start-only caveat as soltol above; see the note there.
+    dynamics%solverinfo%maxiter = maxiter
+    if (mype==0) write(*,*) '     ssh CG maxiter = ', dynamics%solverinfo%maxiter
+
+    dynamics%solverinfo%precond_variant = precond_variant
+    if (mype==0) write(*,*) '     ssh CG precond = ', dynamics%solverinfo%precond_variant
 
     !___________________________________________________________________________
     ! define local vertice & elem array size
@@ -873,6 +936,11 @@ nl              => mesh%nl
     allocate(str_bf    ( nl-1, node_size ))
     allocate(vert_sink ( nl-1, node_size ))
     allocate(Alk_surf  (       node_size ))
+#if defined(__usetp)
+    allocate(tr_arr_requests(num_tracers), tr_arr_old_requests(num_tracers))
+    allocate(SinkFlx_tr_requests(num_tracers))
+    allocate(Benthos_tr_requests(num_tracers))
+#endif
 #endif
     ! =================
     ! Visc and Diff coefs
@@ -985,18 +1053,26 @@ nl              => mesh%nl
     str_bf              = 0.0_WP
     vert_sink           = 0.0_WP
     Alk_surf            = 0.0_WP
+#if defined(__usetp)
+    tr_arr_requests     = 0
+    tr_arr_old_requests = 0
+    SinkFlx_tr_requests = 0
+    Benthos_tr_requests = 0
+#endif  
 #endif
     
     ! init field for pressure force 
     allocate(density_ref(nl-1,node_size))
     density_ref = density_0
     allocate(density_m_rho0(nl-1, node_size))
+    allocate(density_sigma0(nl-1, node_size))
     allocate(density_m_rho0_slev(nl-1, node_size)) !!PS
     if (ldiag_dMOC) then
        allocate(density_dMOC       (nl-1, node_size))
     end if
     allocate(pgf_x(nl-1, elem_size),pgf_y(nl-1, elem_size)) 
     density_m_rho0=0.0_WP
+    density_sigma0=0.0_WP
     density_m_rho0_slev=0.0_WP !!PS
     if (ldiag_dMOC) then
        density_dMOC       =0.0_WP
@@ -1080,6 +1156,9 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     end if
 
     if (mype==0) then
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
             write(*,*)
             print *, achar(27)//'[36m'//'*************************'//achar(27)//'[0m'
             print *, achar(27)//'[36m'//' --> RECOM ON'//achar(27)//'[0m'
@@ -1104,6 +1183,9 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             write(*,*) 'read Nitrate     climatology from:', trim(filelist(6))
             write(*,*) 'read Salt        climatology from:', trim(filelist(7))
             write(*,*) 'read Temperature climatology from:', trim(filelist(8))
+#if defined(__usetp)
+        end if ! (partit%my_fesom_group==0) then
+#endif
     end if
     ! read ocean state
     ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
@@ -1120,9 +1202,10 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
     if(mype==0) write(*,*) 'read Temperature climatology from:', trim(filelist(1))
     if(mype==0) write(*,*) 'read Salinity    climatology from:', trim(filelist(2))
-
 #endif
+
     if(any(idlist == 14) .and. mype==0) write(*,*) 'read radiocarbon climatology from:', trim(filelist(3))
+
     call do_ic3d(tracers, partit, mesh)
     
     Tclim=tracers%data(1)%values
@@ -1140,9 +1223,17 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 
 #if defined(__recom)
     if (restore_alkalinity) then
+
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
         if (mype==0) write(*,*)
         if (mype==0) print *, achar(27)//'[46;1m'//' --> Set surface field for alkalinity restoring'//achar(27)//'[0m'
-        if (mype==0) write(*,*)
+        if (mype==0) write(*,*) 'Alkalinity restoring = true. Field is read.'
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
+
         Alk_surf = tracers%data(5)%values(1,:) ! alkalinity is the 5th tracer
     endif
 
@@ -1177,26 +1268,101 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
         !_______________________________________________________________________
         CASE (1004:1017)
             tracers%data(i)%values(:,:)=0.0_WP
+#if defined(__recom) && defined(__usetp)
+    if (partit%my_fesom_group==0) then
+#endif
             if (mype==0) then
                 write (i_string,  "(I4)") i
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
+#if defined(__recom) && defined(__usetp)
+    endif !(partit%my_fesom_group==0) then
+#endif
         CASE (1020:1021)
             tracers%data(i)%values(:,:)=0.0_WP
+#if defined(__recom) && defined(__usetp)
+    if (partit%my_fesom_group==0) then
+#endif
             if (mype==0) then
                 write (i_string,  "(I4)") i
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-        CASE (1023:1033)
+#if defined(__recom) && defined(__usetp)
+    endif !(partit%my_fesom_group==0) then
+#endif
+        CASE (1023:1036)
             tracers%data(i)%values(:,:)=0.0_WP
+#if defined(__recom) && defined(__usetp)
+    if (partit%my_fesom_group==0) then
+#endif
             if (mype==0) then
                 write (i_string,  "(I4)") i
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-        !_______________________________________________________________________
+#if defined(__recom) && defined(__usetp)
+    endif !(partit%my_fesom_group==0) then
+#endif
+!_______________________________________________________________________
+! Carbon isotopes
+! Carbon-13
+       CASE (1302)
+            tracers%data(i)%values(:,:)=0.0_WP
+#if defined(__recom) && defined(__usetp)
+    if (partit%my_fesom_group==0) then
+#endif
+            if (mype==0) then
+                write (i_string,  "(I4)") i
+                write (id_string, "(I4)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            end if
+#if defined(__recom) && defined(__usetp)
+    endif !(partit%my_fesom_group==0) then
+#endif
+       CASE (1305:1321)
+            tracers%data(i)%values(:,:)=0.0_WP
+#if defined(__recom) && defined(__usetp)
+    if (partit%my_fesom_group==0) then
+#endif
+            if (mype==0) then
+                write (i_string,  "(I4)") i
+                write (id_string, "(I4)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            end if
+#if defined(__recom) && defined(__usetp)
+    endif !(partit%my_fesom_group==0) then
+#endif
+! Radiocarbon
+       CASE (1402)
+            tracers%data(i)%values(:,:)=0.0_WP
+#if defined(__recom) && defined(__usetp)
+    if (partit%my_fesom_group==0) then
+#endif
+            if (mype==0) then
+                write (i_string,  "(I4)") i
+                write (id_string, "(I4)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            end if
+#if defined(__recom) && defined(__usetp)
+    endif !(partit%my_fesom_group==0) then
+#endif
+       CASE (1405:1421)
+            tracers%data(i)%values(:,:)=0.0_WP
+#if defined(__recom) && defined(__usetp)
+    if (partit%my_fesom_group==0) then
+#endif
+            if (mype==0) then
+                write (i_string,  "(I4)") i
+                write (id_string, "(I4)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            end if
+#if defined(__recom) && defined(__usetp)
+    endif !(partit%my_fesom_group==0) then
+#endif
+! End of carbon isotopes section
+!_______________________________________________________________________
         CASE (101)       ! initialize tracer ID=101
             tracers%data(i)%values(:,:)=0.0_WP
             if (mype==0) then
@@ -1266,14 +1432,15 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             write (*,*) tracers%data(i)%values(1,1)
          end if
        CASE (14)        ! initialize tracer ID=14, fractionation-corrected 14C/C
-!        this initialization can be overwritten by calling do_ic3d
-         if (.not. any(idlist == 14)) then ! CHECK IF THIS LINE IS STILL NECESSARY
+!        this initialization can be overwritten by calling do_ic3d if any(idlist == 14)
+         if (.not. any(idlist == 14)) then         ! set alternative initial values
          tracers%data(i)%values(:,:) = 0.85
+         tracers%data(i)%values(1:10,:) = 0.95
            if (mype==0) then
               write (i_string,  "(I3)") i
               write (id_string, "(I3)") id
               write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
-              write (*,*) tracers%data(i)%values(1,1)
+              write (*,*) tracers%data(i)%values(1,1), tracers%data(i)%values(11,1)
            end if
          end if
        CASE (39)        ! initialize tracer ID=39, fractionation-corrected 39Ar/Ar
