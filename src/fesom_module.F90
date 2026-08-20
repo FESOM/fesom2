@@ -34,6 +34,7 @@ module fesom_main_storage_module
   use ice_setup_interface
   use ocean2ice_interface
   use oce_fluxes_interface
+  use hosing_interface
   use update_atm_forcing_interface
   use before_oce_step_interface
   use oce_timestep_ale_interface
@@ -809,7 +810,6 @@ contains
     use fesom_main_storage_module
 !   use openacc_lib
     integer, intent(in) :: current_nsteps
-    real(kind=WP)                            :: hSv
     ! EO parameters
     integer n, nstart, ntotal, tr_num, tracer_index
     logical :: do_cmor_0d_reset
@@ -1042,8 +1042,10 @@ contains
             
             !___freshwater depth hosing routine_______________________________________
             !
-            hSv=0.1 !define freshwater anomaly magnitude
-            call fw_depth_anomaly(f%tracers%data(2)%values, f%tracers%data(1)%values,  hSv, f%partit, f%mesh)
+            if (use_hosing .and. trim(hosing_mode)=='depth') then
+                call fw_depth_anomaly(f%tracers%data(2)%values, f%tracers%data(1)%values, &
+                                      hosing_hSv, f%partit, f%mesh)
+            end if
             
         end if
         call before_oce_step(f%dynamics, f%tracers, f%partit, f%mesh) ! prepare the things if required
