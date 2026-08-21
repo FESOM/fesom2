@@ -3406,8 +3406,9 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
 
  
     !___________________________________________________________________________
-#if !defined(__PGI)  
-    do i = 1, rank(data)
+    ! data is rank 2 here; the rank is hardcoded because nvfortran implements
+    ! the rank() intrinsic only since 25.1
+    do i = 1, 2
         if ((ubound(data, dim = i)<=0)) then
             if (partit%mype==0) then
                 write(*,*) 'WARNING: adding I/O stream for ', trim(name), ' failed (contains 0 dimension)'
@@ -3416,7 +3417,6 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
             return
         end if    
     end do
-#endif
 
     !___________________________________________________________________________
     if (partit%mype==0) then
@@ -3487,8 +3487,9 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   integer i
 
     !___________________________________________________________________________
-#if !defined(__PGI)   
-    do i = 1, rank(data)
+    ! data is rank 1 here; the rank is hardcoded because nvfortran implements
+    ! the rank() intrinsic only since 25.1
+    do i = 1, 1
         if ((ubound(data, dim = i)<=0)) then
         if (partit%mype==0) then
             write(*,*) 'WARNING: adding I/O stream for ', trim(name), ' failed (contains 0 dimension)'
@@ -3497,7 +3498,6 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
         return
         end if    
     end do
-#endif
 
     !___________________________________________________________________________
     if (partit%mype==0) then
