@@ -48,6 +48,7 @@ module fesom_main_storage_module
   use iceberg_step
   use iceberg_ocean_coupling
   use Toy_Channel_Soufflet, only: compute_zonal_mean
+
   ! Define icepack module
 
 #if defined (__icepack)
@@ -349,7 +350,7 @@ contains
                         f%partit%eDim_nod2D, f%partit%mype, f%partit%MPI_COMM_FESOM,      &
                         f%partit%myDim_elem2D, f%partit%eDim_elem2D, tracers_info,        &
                         f%tracers%num_tracers, rad, use_age_tracer, use_transit, l_sf6,   &
-                        l_f11, l_f12, l_r14c, l_r39ar) ! adjust values for recom tracers (derived type "t_tracer")
+                        l_f11, l_f12, l_r14c, l_r39ar, f%mesh%ocean_area) ! adjust values for recom tracers (derived type "t_tracer")
         f%t1_recom=MPI_Wtime()
 
         deallocate(tracers_info%ids)

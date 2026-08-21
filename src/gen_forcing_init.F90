@@ -46,13 +46,14 @@ type(t_partit), intent(inout), target :: partit
   if (use_ice) then
      call forcing_array_setup(partit, mesh)
 
-#if defined(__recom)
-     call sbc_ini_recom(partit)         ! initialize forcing fields
-#endif
-
 #if !defined(__oasis) && !defined(__yac)
      call sbc_ini(partit, mesh)         ! initialize forcing fields
 #endif
+
+#if defined(__recom)
+     call sbc_ini_recom(partit)         ! initialize recom forcing fields
+#endif
+
   endif 
   if ((toy_ocean) .AND. TRIM(which_toy)=="dbgyre" .AND. (use_sw_pene)) then
      call forcing_array_setup_dbgyre(partit, mesh)
