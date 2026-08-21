@@ -12,6 +12,13 @@ module g_support
 
   private
   public :: smooth_nod, smooth_elem, integrate_nod, integrate_elem, extrap_nod, omp_min_max_sum1, omp_min_max_sum2, point_in_polygon
+  public :: ic_extrap_det, ic_extrap_tol
+  ! Deterministic, decomposition-independent hole filling for initial
+  ! conditions (see extrap_nod3D). Off by default: the historical fill is kept
+  ! bit-for-bit. Set ic_extrap_det=.true. in &tracer_init3d to make the filled
+  ! values independent of the partitioning and of the node numbering.
+  logical,       save :: ic_extrap_det = .false.
+  real(kind=WP), save :: ic_extrap_tol = 1.e-3_WP
   real(kind=WP), dimension(:), allocatable  :: work_array
 !
 !--------------------------------------------------------------------------------------------
@@ -419,8 +426,25 @@ subroutine extrap_nod3D(arr, partit, mesh)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
+#include "associate_mesh_ass.h"
     !___________________________________________________________________________
+    ! The historical fill below is order- and DECOMPOSITION-dependent: nodes are
+    ! filled in local-numbering order from already-filled neighbours (in-place
+    ! Gauss-Seidel), each PE runs its fill to local exhaustion before the next
+    ! halo exchange, and a filled node is never revisited (first-fill-wins).
+    ! The filled water masses therefore depend on where the PE boundaries fall.
+    ! In marginal seas whose climatology cells are land-contaminated this can
+    ! place large spurious density fronts across single elements (measured on a
+    ! 5 km global mesh: ~10 kg/m3 across one 2 km element in the Sea of
+    ! Marmara for one partitioning, zero gradient for another), which drives an
+    ! immediate local velocity ramp and a cold-start blow-up on unlucky
+    ! partitionings. ic_extrap_det=.true. (namelist tracer_init3d) switches to
+    ! a deterministic fill whose result is independent of the decomposition;
+    ! the default keeps the historical behaviour bit-for-bit.
+    if (ic_extrap_det) then
+       call extrap_nod3D_det(arr, partit, mesh)
+       return
+    end if
     allocate(work_array(myDim_nod2D+eDim_nod2D))
     call exchange_nod(arr, partit)
     
@@ -511,6 +535,176 @@ subroutine extrap_nod3D(arr, partit, mesh)
     deallocate(work_array)
     
 end subroutine extrap_nod3D
+!
+!--------------------------------------------------------------------------------------------
+!
+subroutine extrap_nod3D_det(arr, partit, mesh)
+    ! Deterministic, decomposition-independent hole filling (ic_extrap_det).
+    ! Two phases per layer, both Jacobi (source values frozen to the previous
+    ! sweep) with the neighbour sum accumulated in ASCENDING GLOBAL NODE ID
+    ! order, so the floating-point result is independent of the partitioning
+    ! and of the local numbering; halo exchange after every sweep; global
+    ! termination via MPI_Allreduce:
+    !   phase 1 - ring fill: every still-dummy node with at least one valid
+    !     neighbour takes the multiplicity-weighted mean of its valid
+    !     neighbours (same stencil and eligibility rules as the historical
+    !     fill: vertices of the node's element ring, element deep enough at
+    !     this level, neighbour column deep enough at this level).
+    !   phase 2 - relaxation: the FILLED nodes (original valid data kept fixed
+    !     as boundary values) are relaxed with the same neighbour mean until
+    !     the global max per-sweep change is below ic_extrap_tol. Phase 1
+    !     alone meets in an equidistant front of maximal contrast wherever two
+    !     water masses fill one basin (a step across ~one element); the
+    !     relaxation replaces those fronts with the smooth interior
+    !     interpolation of the valid boundary data (no interior extrema).
+    ! The vertical fill and the final exchange are identical to the
+    ! historical routine.
+    IMPLICIT NONE
+    type(t_mesh),   intent(in),    target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    real(KIND=WP),  intent(inout)  :: arr(:,:)
+    real(kind=WP), allocatable     :: cur(:), nxt(:)
+    logical,       allocatable     :: filled(:)
+    integer                        :: n, nz, nl1, nod_alloc, cnt
+    integer                        :: loc_prog, glob_prog
+    integer                        :: relax_sweeps, relax_cap
+    real(kind=WP)                  :: val, dmax, gdmax
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+    !___________________________________________________________________________
+    nod_alloc = myDim_nod2D + eDim_nod2D
+    allocate(cur(nod_alloc), nxt(nod_alloc), filled(nod_alloc))
+    relax_sweeps = 0
+
+    do nz = 1, nl-1
+        cur(1:nod_alloc) = arr(nz, 1:nod_alloc)
+        call exchange_nod(cur, partit)
+        filled(:) = (cur(:) > 0.99_WP*dummy)     ! dummy at entry = to be filled
+
+        !_______________________________________________________________________
+        ! phase 1 - ring fill
+        do
+            nxt(1:nod_alloc) = cur(1:nod_alloc)
+            loc_prog = 0
+            do n = 1, myDim_nod2D
+                if ((cur(n) > 0.99_WP*dummy) .and. (nlevels_nod2D(n) > nz)) then
+                    call det_ring_mean(n, nz, cur, val, cnt)
+                    if (cnt > 0) then
+                        nxt(n) = val
+                        loc_prog = 1
+                    end if
+                end if
+            end do
+            glob_prog = loc_prog
+            call MPI_AllREDUCE(loc_prog, glob_prog, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+            if (glob_prog == 0) exit
+            cur(1:nod_alloc) = nxt(1:nod_alloc)
+            call exchange_nod(cur, partit)
+        end do
+
+        ! nodes with no source at this level stay dummy for the vertical fill
+        do n = 1, nod_alloc
+            if (cur(n) > 0.99_WP*dummy) filled(n) = .false.
+        end do
+
+        !_______________________________________________________________________
+        ! phase 2 - relaxation of the filled nodes toward the smooth interior
+        ! interpolation of the fixed original data
+        relax_cap = relax_sweeps + 20000
+        do
+            nxt(1:nod_alloc) = cur(1:nod_alloc)
+            dmax = 0._WP
+            do n = 1, myDim_nod2D
+                if (filled(n) .and. (nlevels_nod2D(n) > nz)) then
+                    call det_ring_mean(n, nz, cur, val, cnt)
+                    if (cnt > 0) then
+                        nxt(n) = val
+                        dmax = max(dmax, abs(val - cur(n)))
+                    end if
+                end if
+            end do
+            gdmax = dmax
+            call MPI_AllREDUCE(dmax, gdmax, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+            if (gdmax <= ic_extrap_tol) exit
+            relax_sweeps = relax_sweeps + 1
+            if (relax_sweeps >= relax_cap) then
+                if (mype == 0) write(*,*) 'extrap_nod3D_det: relaxation sweep cap at level ', nz, &
+                                          ' (max change ', gdmax, ') - proceeding'
+                exit
+            end if
+            cur(1:nod_alloc) = nxt(1:nod_alloc)
+            call exchange_nod(cur, partit)
+        end do
+
+        arr(nz, 1:nod_alloc) = cur(1:nod_alloc)
+    end do
+
+    !___________________________________________________________________________
+    ! vertical fill - identical to the historical routine
+    do n = 1, myDim_nod2D
+        nl1 = nlevels_nod2D(n)-1
+        do nz = 2, nl1
+            if (arr(nz,n) > 0.99_WP*dummy) arr(nz,n) = arr(nz-1,n)
+        end do
+    end do
+    call exchange_nod(arr, partit)
+
+    deallocate(cur, nxt, filled)
+
+contains
+
+    subroutine det_ring_mean(n, nz, layer, val, cnt)
+        ! multiplicity-weighted mean of the eligible valid neighbours of node
+        ! n at level nz, summed in ascending global-id order (insertion sort;
+        ! the ring is at most a few tens of entries)
+        integer,       intent(in)  :: n, nz
+        real(kind=WP), intent(in)  :: layer(:)
+        real(kind=WP), intent(out) :: val
+        integer,       intent(out) :: cnt
+        integer                    :: k, j, el, a, b, g
+        integer                    :: ngid(64)
+        real(kind=WP)              :: nval(64), w
+        integer                    :: enodes(3)
+        cnt = 0
+        val = 0._WP
+        do k = 1, nod_in_elem2D_num(n)
+            el = nod_in_elem2D(k, n)
+            if (nz > nlevels(el)) cycle
+            enodes = elem2D_nodes(:, el)
+            do j = 1, 3
+                if (enodes(j) == 0) cycle
+                if (enodes(j) == n) cycle
+                if ((layer(enodes(j)) < 0.99_WP*dummy) .and. (nlevels_nod2D(enodes(j)) > nz)) then
+                    cnt = cnt + 1
+                    ngid(cnt) = myList_nod2D(enodes(j))
+                    nval(cnt) = layer(enodes(j))
+                end if
+            end do
+        end do
+        if (cnt == 0) return
+        do a = 2, cnt
+            g = ngid(a)
+            w = nval(a)
+            b = a - 1
+            do while (b >= 1)
+                if (ngid(b) <= g) exit
+                ngid(b+1) = ngid(b)
+                nval(b+1) = nval(b)
+                b = b - 1
+            end do
+            ngid(b+1) = g
+            nval(b+1) = w
+        end do
+        do a = 1, cnt
+            val = val + nval(a)
+        end do
+        val = val / real(cnt, WP)
+    end subroutine det_ring_mean
+
+end subroutine extrap_nod3D_det
 !
 !--------------------------------------------------------------------------------------------
 ! returns min/max/sum of a one dimentional array (same as minval) but with the support of OpenMP
