@@ -419,10 +419,86 @@ if (UseDustClimMyrio) dust_sol=1.0 !Solubulity set to one, because it is already
             ChldegdiaH = 0.d0
 #endif
 
+    ! Zooplankton Grazing
+    ! --------------------------------------------------------------------------
+    if (Grazing_detritus) then
+
+        ! Mesozooplankton
+        allocate(vertgrazmeso_tot(nl-1), vertgrazmeso_n(nl-1), vertgrazmeso_d(nl-1))
+        allocate(vertgrazmeso_det(nl-1))
+        vertgrazmeso_tot  = 0.d0
+        vertgrazmeso_n    = 0.d0
+        vertgrazmeso_d    = 0.d0
+        vertgrazmeso_det  = 0.d0
+
+#if defined (__3Zoo2Det)
+            ! Microzooplankton
+            allocate(vertgrazmicro_tot(nl-1), vertgrazmicro_n(nl-1), vertgrazmicro_d(nl-1))
+            
+            vertgrazmicro_tot = 0.d0
+            vertgrazmicro_n   = 0.d0
+            vertgrazmicro_d   = 0.d0
+
+            ! Mesozooplankton
+
+            allocate(vertgrazmeso_mic(nl-1), vertgrazmeso_det2(nl-1))
+            vertgrazmeso_mic  = 0.d0
+            vertgrazmeso_det2 = 0.d0
+            
+#if defined (__coccos)
+                allocate(vertgrazmicro_c(nl-1), vertgrazmicro_p(nl-1))
+                allocate(vertgrazmeso_c(nl-1), vertgrazmeso_p(nl-1))
+                
+                vertgrazmicro_c = 0.d0
+                vertgrazmicro_p = 0.d0
+                vertgrazmeso_c  = 0.d0
+                vertgrazmeso_p  = 0.d0
+#endif
+
+#if defined (__diaH)
+                allocate(vertgrazmicro_diaH(nl-1))
+                allocate(vertgrazmeso_diaH(nl-1))
+                
+                vertgrazmicro_diaH = 0.d0
+                vertgrazmeso_diaH  = 0.d0
+#endif
+
+            ! Macrozooplankton
+            allocate(vertgrazmacro_tot(nl-1), vertgrazmacro_n(nl-1), vertgrazmacro_d(nl-1))
+            allocate(vertgrazmacro_mes(nl-1), vertgrazmacro_det(nl-1))
+            allocate(vertgrazmacro_mic(nl-1), vertgrazmacro_det2(nl-1))
+
+            vertgrazmacro_tot  = 0.d0
+            vertgrazmacro_n    = 0.d0
+            vertgrazmacro_d    = 0.d0
+            vertgrazmacro_mes  = 0.d0
+            vertgrazmacro_det  = 0.d0
+            vertgrazmacro_mic  = 0.d0
+            vertgrazmacro_det2 = 0.d0
+        
+#if defined (__coccos)
+                allocate(vertgrazmacro_c(nl-1), vertgrazmacro_p(nl-1))
+                vertgrazmacro_c = 0.d0
+                vertgrazmacro_p = 0.d0
+#endif
+
+#if defined (__diaH)
+                allocate(vertgrazmacro_diaH(nl-1))
+                vertgrazmacro_diaH = 0.d0
+#endif
+
+#endif
+    endif
+
             allocate( vert_detl_agg(nl-1), vert_dets_agg(nl-1) )
             vert_detl_agg     = 0.0 
             vert_dets_agg     = 0.0
 
+            ! Dissolution ! R2OMIP
+            allocate(vertDISSOC(nl-1), vertDISSON(nl-1), vertDISSOSi(nl-1))
+            vertDISSOC  = 0.d0
+            vertDISSON  = 0.d0
+            vertDISSOSi = 0.d0
 
         if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> REcoM_Forcing'//achar(27)//'[0m'
 
@@ -469,6 +545,10 @@ if (UseDustClimMyrio) dust_sol=1.0 !Solubulity set to one, because it is already
             NNAd(n) = locNNAd
             Chldegn(n) = locChldegn
             Chldegd(n) = locChldegd
+            ! Dissolution ! R2OMIP
+            DISSOC(n)  = locDISSOC
+            DISSON(n)  = locDISSON
+            DISSOSi(n) = locDISSOSi
 
 #if defined (__coccos)
             NPPc(n) = locNPPc
@@ -491,6 +571,65 @@ if (UseDustClimMyrio) dust_sol=1.0 !Solubulity set to one, because it is already
             detl_agg(n) = loc_detl_agg
             dets_agg(n) = loc_dets_agg
 #endif
+
+! --------------------------------------------------------------------------
+! Zooplankton Grazing
+! --------------------------------------------------------------------------
+if (Grazing_detritus) then
+        ! Mesozooplankton
+        grazmeso_tot(n) = locgrazmeso_tot
+        grazmeso_n(n)   = locgrazmeso_n
+        grazmeso_d(n)   = locgrazmeso_d
+        grazmeso_det(n) = locgrazmeso_det
+        
+#if defined (__coccos)
+            grazmeso_c(n) = locgrazmeso_c
+            grazmeso_p(n) = locgrazmeso_p
+#endif
+
+#if defined (__diaH)
+        grazmeso_diaH(n)   = locgrazmeso_diaH
+#endif
+
+#if defined (__3Zoo2Det)
+            grazmeso_mic(n)  = locgrazmeso_mic
+            grazmeso_det2(n) = locgrazmeso_det2
+            
+            ! Macrozooplankton
+            grazmacro_tot(n)  = locgrazmacro_tot
+            grazmacro_n(n)    = locgrazmacro_n
+            grazmacro_d(n)    = locgrazmacro_d
+            grazmacro_mes(n)  = locgrazmacro_mes
+            grazmacro_det(n)  = locgrazmacro_det
+            grazmacro_mic(n)  = locgrazmacro_mic
+            grazmacro_det2(n) = locgrazmacro_det2
+            
+#if defined (__coccos)
+                grazmacro_c(n) = locgrazmacro_c
+                grazmacro_p(n) = locgrazmacro_p
+#endif
+
+#if defined (__diaH)
+        grazmacro_diaH(n)   = locgrazmacro_diaH
+#endif
+            
+            ! Microzooplankton
+            grazmicro_tot(n) = locgrazmicro_tot
+            grazmicro_n(n)   = locgrazmicro_n
+            grazmicro_d(n)   = locgrazmicro_d
+            
+#if defined (__coccos)
+                grazmicro_c(n) = locgrazmicro_c
+                grazmicro_p(n) = locgrazmicro_p
+#endif
+
+#if defined (__diaH)
+        grazmicro_diaH(n)   = locgrazmicro_diaH
+#endif
+
+#endif
+    endif
+
         endif
 
             !! * Update 3D diagnostics *
@@ -581,6 +720,51 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
             deallocate(vert_detl_agg, vert_dets_agg)
 #endif 
 
+! Zooplankton Grazing
+! --------------------------------------------------------------------------
+if (Grazing_detritus) then
+            deallocate(vertgrazmeso_tot, vertgrazmeso_n, vertgrazmeso_d)
+            deallocate(vertgrazmeso_det)
+        
+#if defined (__coccos)
+            deallocate(vertgrazmeso_c, vertgrazmeso_p)
+#endif
+
+#if defined (__diaH)
+            deallocate(vertgrazmeso_diaH)
+#endif
+        
+#if defined (__3Zoo2Det)
+            deallocate(vertgrazmeso_mic, vertgrazmeso_det2)
+            
+            deallocate(vertgrazmacro_tot, vertgrazmacro_n, vertgrazmacro_d)
+            deallocate(vertgrazmacro_mes, vertgrazmacro_det)
+            deallocate(vertgrazmacro_mic, vertgrazmacro_det2)
+            
+#if defined (__coccos)
+                deallocate(vertgrazmacro_c, vertgrazmacro_p)
+#endif
+
+#if defined (__diaH)
+            deallocate(vertgrazmacro_diaH)
+#endif
+
+            deallocate(vertgrazmicro_tot, vertgrazmicro_n, vertgrazmicro_d)
+            
+#if defined (__coccos)
+                deallocate(vertgrazmicro_c, vertgrazmicro_p)
+#endif
+
+#if defined (__diaH)
+            deallocate(vertgrazmicro_diaH)
+#endif
+
+#endif
+
+    endif
+
+            deallocate(vertDISSOC, vertDISSON, vertDISSOSi)
+
             !! * Deallocating 3D Diagnostics *
             deallocate(vertrespmeso)
 #if defined (__3Zoo2Det)
@@ -614,6 +798,8 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
         AtmFeInput(n)            = FeDust
         AtmNInput(n)             = NDust
         GloHplus(n)              = ph(1)
+        PistonVelocity(n)        = kw660(1)
+        alphaCO2(n)              = K0(1)
 
 #if defined (__seaice_tracers)
      !!---- flux of iron between sea-ice and ocean from melting/freezing of seaice
@@ -684,6 +870,7 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
         call exchange_nod(NNAd, partit)
         call exchange_nod(Chldegn, partit)
         call exchange_nod(Chldegd, partit)
+
 #if defined (__coccos)
         call exchange_nod(NPPc, partit)
         call exchange_nod(GPPc, partit)
@@ -702,10 +889,63 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> ciso after 
         call exchange_nod(ChldegdiaH, partit)
 #endif
 
+        call exchange_nod(grazmeso_tot, partit)
+        call exchange_nod(grazmeso_n, partit)
+        call exchange_nod(grazmeso_d, partit)
+
+#if defined (__coccos)
+        call exchange_nod(grazmeso_c, partit)
+        call exchange_nod(grazmeso_p, partit)
+#endif
+
+#if defined (__diaH)
+        call exchange_nod(grazmeso_diaH, partit)
+#endif
+        call exchange_nod(grazmeso_det, partit)
+
+#if defined (__3Zoo2Det)
+        call exchange_nod(grazmeso_mic, partit)
+        call exchange_nod(grazmeso_det2, partit)
+        call exchange_nod(grazmacro_tot, partit)
+        call exchange_nod(grazmacro_n, partit)
+        call exchange_nod(grazmacro_d, partit)
+
+#if defined (__coccos)
+        call exchange_nod(grazmacro_c, partit)
+        call exchange_nod(grazmacro_p, partit)
+#endif
+
+#if defined (__diaH)
+        call exchange_nod(grazmacro_diaH, partit)
+#endif
+
+        call exchange_nod(grazmacro_mes, partit)
+        call exchange_nod(grazmacro_det, partit)
+        call exchange_nod(grazmacro_mic, partit)
+        call exchange_nod(grazmacro_det2, partit)
+        call exchange_nod(grazmicro_tot, partit)
+        call exchange_nod(grazmicro_n, partit)
+        call exchange_nod(grazmicro_d, partit)
+
+#if defined (__coccos)
+        call exchange_nod(grazmicro_c, partit)
+        call exchange_nod(grazmicro_p, partit)
+#endif
+
+#if defined (__diaH)
+        call exchange_nod(grazmicro_diaH, partit)
+#endif
+
+#endif
+
     endif
 
     do n=1, benthos_num
         call exchange_nod(GlodecayBenthos(:,n), partit)
+    end do
+
+    do n=1, 6
+        call exchange_nod(Sed_2_Ocean_Flux(:,n), partit) ! Diagnose the flux back from Sediment to Ocean - R2OMIP
     end do
 
     call exchange_nod(GloHplus, partit)

@@ -764,18 +764,35 @@ Module REcoM_declarations
   Real(kind=8)  :: locNPPdiaH, locGPPdiaH, locNNAdiaH, locChldegdiaH ! heavily silicifying diatoms
   Real(kind=8)  :: locNPPc, locGPPc, locNNAc, locChldegc
   Real(kind=8)  :: locNPPp, locGPPp, locNNAp, locChldegp     ! Phaeocystis
+  Real(kind=8)  :: locgrazmeso_tot, locgrazmeso_n, locgrazmeso_d, locgrazmeso_diaH, locgrazmeso_c, locgrazmeso_p
+  Real(kind=8)  :: locgrazmeso_det, locgrazmeso_mic, locgrazmeso_det2  
+  Real(kind=8)  :: locgrazmacro_tot, locgrazmacro_n, locgrazmacro_d, locgrazmacro_diaH, locgrazmacro_c, locgrazmacro_p
+  Real(kind=8)  :: locgrazmacro_mes, locgrazmacro_det, locgrazmacro_mic, locgrazmacro_det2
+  Real(kind=8)  :: locgrazmicro_tot, locgrazmicro_n, locgrazmicro_d, locgrazmicro_diaH, locgrazmicro_c, locgrazmicro_p
   Real(kind=8)  :: loc_detl_agg, loc_dets_agg ! aggregation of large & small detritus
   Real(kind=8),allocatable,dimension(:) :: vertNPPn, vertGPPn, vertNNAn, vertChldegn
   Real(kind=8),allocatable,dimension(:) :: vertNPPd, vertGPPd, vertNNAd, vertChldegd
   Real(kind=8),allocatable,dimension(:) :: vertNPPdiaH, vertGPPdiaH, vertNNAdiaH, vertChldegdiaH ! heavily silicifying diatoms
   Real(kind=8),allocatable,dimension(:) :: vertNPPc, vertGPPc, vertNNAc, vertChldegc
   Real(kind=8),allocatable,dimension(:) :: vertNPPp, vertGPPp, vertNNAp, vertChldegp     ! Phaeocystis
+  Real(kind=8),allocatable,dimension(:) :: vertgrazmeso_tot, vertgrazmeso_n, vertgrazmeso_d, vertgrazmeso_diaH, vertgrazmeso_c, vertgrazmeso_p
+  Real(kind=8),allocatable,dimension(:) :: vertgrazmeso_det, vertgrazmeso_mic, vertgrazmeso_det2
+  Real(kind=8),allocatable,dimension(:) :: vertgrazmacro_tot, vertgrazmacro_n, vertgrazmacro_d, vertgrazmacro_diaH, vertgrazmacro_c, vertgrazmacro_p
+  Real(kind=8),allocatable,dimension(:) :: vertgrazmacro_mes, vertgrazmacro_det, vertgrazmacro_mic, vertgrazmacro_det2
+  Real(kind=8),allocatable,dimension(:) :: vertgrazmicro_tot, vertgrazmicro_n, vertgrazmicro_d, vertgrazmicro_diaH, vertgrazmicro_c, vertgrazmicro_p
   Real(kind=8),allocatable,dimension(:) :: vert_detl_agg, vert_dets_agg ! aggregation of large & small detritus
   Real(kind=8),allocatable,dimension(:) :: vertrespmeso, vertrespmacro, vertrespmicro
   Real(kind=8),allocatable,dimension(:) :: vertcalcdiss, vertcalcif
   Real(kind=8),allocatable,dimension(:) :: vertaggn, vertaggd, vertaggdiaH, vertaggc, vertaggp
   Real(kind=8),allocatable,dimension(:) :: vertdocexn, vertdocexd, vertdocexdiaH, vertdocexc, vertdocexp
   Real(kind=8),allocatable,dimension(:) :: vertrespn, vertrespd, vertrespdiaH, vertrespc, vertrespp
+
+  ! DISSOLUTION ! R2OMIP
+  !===================================================================
+  Real(kind=8)                          :: locDISSOC, locDISSON, locDISSOSi
+  Real(kind=8),allocatable,dimension(:) :: vertDISSOC, vertDISSON, vertDISSOSi
+!!----------------------------------------------------------------
+
 !!------------------------------------------------------------------------------                                                                                
 !! *** Benthos  ***
   Real(kind=8),allocatable,dimension(:) :: decayBenthos ! [1/day] Decay rate of detritus in the benthic layer
@@ -853,6 +870,9 @@ Module REcoM_GloVar
 
   Real(kind=8),allocatable,dimension(:)     :: GlodPCO2surf       ! [mmol/m2/day] ocean-atmosphere  
   Real(kind=8),allocatable,dimension(:,:)   :: GlodecayBenthos  ! [1/day] Decay rate of detritus in the benthic layer saved for oce_ale_tracer.F90
+  Real(kind=8),allocatable,dimension(:,:)   :: Sed_2_Ocean_Flux ! Flux from the sediment back to the bottom ocean ! R2OMIP
+  Real(kind=8),allocatable,dimension(:)     :: PistonVelocity   ! [m s-1]
+  Real(kind=8),allocatable,dimension(:)     :: alphaCO2         ! [mol L-1 atm-1]
 
   Real(kind=8),allocatable,dimension(:,:)   :: GlowFluxDet    ! 
   Real(kind=8),allocatable,dimension(:,:)   :: GlowFluxPhy    ! 
@@ -882,11 +902,34 @@ Module REcoM_GloVar
   Real(kind=8),allocatable,dimension(:)     :: GPPdiaH
   Real(kind=8),allocatable,dimension(:)     :: NNAdiaH
   Real(kind=8),allocatable,dimension(:)     :: ChldegdiaH
-  Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_tot
-  Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_n
-  Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_d
+  Real(kind=8),allocatable,dimension(:)     :: grazmeso_tot
+  Real(kind=8),allocatable,dimension(:)     :: grazmeso_n
+  Real(kind=8),allocatable,dimension(:)     :: grazmeso_d
   Real(kind=8),allocatable,dimension(:)     :: grazmeso_diaH
-  Real(kind=8),allocatable,dimension(:,:)   :: grazmeso_c
+  Real(kind=8),allocatable,dimension(:)     :: grazmeso_c
+  Real(kind=8),allocatable,dimension(:)     :: grazmeso_p
+  Real(kind=8),allocatable,dimension(:)     :: grazmeso_det
+  Real(kind=8),allocatable,dimension(:)     :: grazmeso_mic
+  Real(kind=8),allocatable,dimension(:)     :: grazmeso_det2
+  Real(kind=8),allocatable,dimension(:)     :: grazmacro_tot
+  Real(kind=8),allocatable,dimension(:)     :: grazmacro_n
+  Real(kind=8),allocatable,dimension(:)     :: grazmacro_d
+  Real(kind=8),allocatable,dimension(:)     :: grazmacro_diaH
+  Real(kind=8),allocatable,dimension(:)     :: grazmacro_c
+  Real(kind=8),allocatable,dimension(:)     :: grazmacro_p
+  Real(kind=8),allocatable,dimension(:)     :: grazmacro_mes
+  Real(kind=8),allocatable,dimension(:)     :: grazmacro_det
+  Real(kind=8),allocatable,dimension(:)     :: grazmacro_mic
+  Real(kind=8),allocatable,dimension(:)     :: grazmacro_det2
+  Real(kind=8),allocatable,dimension(:)     :: grazmicro_tot
+  Real(kind=8),allocatable,dimension(:)     :: grazmicro_n
+  Real(kind=8),allocatable,dimension(:)     :: grazmicro_d
+  Real(kind=8),allocatable,dimension(:)     :: grazmicro_diaH
+  Real(kind=8),allocatable,dimension(:)     :: grazmicro_c
+  Real(kind=8),allocatable,dimension(:)     :: grazmicro_p
+  Real(kind=8),allocatable,dimension(:)     :: DISSOC
+  Real(kind=8),allocatable,dimension(:)     :: DISSON
+  Real(kind=8),allocatable,dimension(:)     :: DISSOSi
   Real(kind=8),allocatable,dimension(:,:)   :: respmeso
   Real(kind=8),allocatable,dimension(:,:)   :: respmacro
   Real(kind=8),allocatable,dimension(:,:)   :: respmicro
