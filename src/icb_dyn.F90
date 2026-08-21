@@ -883,6 +883,8 @@ subroutine iceberg_average_andkeel(mesh, partit, dynamics, uo_dz,vo_dz, uo_keel,
   ! depth over which is integrated (layer and sum)
   real           :: dz, ufkeel1, ufkeel2, Temkeel, Salkeel
 
+  logical :: at_top
+
 type(t_mesh), intent(in) , target :: mesh
 type(t_dyn), intent(in) , target :: dynamics
 type(t_partit), intent(inout), target :: partit
@@ -893,6 +895,10 @@ type(t_partit), intent(inout), target :: partit
 
   UV_IB     => dynamics%uv_ib(:,:,:)
 
+  at_top = (k == 1)
+  if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0) &
+      at_top = (k == ulevels_nod2d(n2))
+  
   !LOOP: over all nodes of the iceberg element
   nodeloop: do m=1, 3
    !for each 2D node of the iceberg element..
@@ -915,7 +921,7 @@ type(t_partit), intent(inout), target :: partit
     if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
         .AND. k < ulevels_nod2d(n2)) cycle
 
-    if( k==1 ) then
+    if( at_top ) then
         lev_up = 0.0
     else if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
              .AND. k == ulevels_nod2d(n2)) then
@@ -960,7 +966,7 @@ type(t_partit), intent(inout), target :: partit
     else if( abs(lev_low)>=abs(depth_ib) ) then
       dz = abs( lev_up - depth_ib )
 
-      if( k==1 ) then
+      if( at_top ) then
         ! Draft within first half-layer: piecewise constant
         ufkeel1 = UV_ib(1,1,n2)
         ufkeel2 = UV_ib(2,1,n2)
@@ -1002,7 +1008,7 @@ type(t_partit), intent(inout), target :: partit
 
     ! Regular layer: iceberg extends deeper
     else
-      if( k==1 ) then
+      if( at_top ) then
         ! First half-layer (surface to first mid-level): piecewise constant
         uo_dz(m)=uo_dz(m)+ UV_ib(1,1,n2)*dz
         vo_dz(m)=vo_dz(m)+ UV_ib(2,1,n2)*dz
@@ -1070,7 +1076,7 @@ end subroutine iceberg_average_andkeel
 !***************************************************************************************************************************
 !***************************************************************************************************************************
 
-subroutine iceberg_avvelo(mesh, partit, dynamics, uo_dz,vo_dz,depth_ib,iceberg_elem)
+subroutine iceberg_avvelo(mesh, partit, dynamics, uo_dz,vo_dz,depth_ib,iceberg_elem, ib)
   USE MOD_MESH
   use o_param
   use MOD_PARTIT
@@ -1089,13 +1095,16 @@ subroutine iceberg_avvelo(mesh, partit, dynamics, uo_dz,vo_dz,depth_ib,iceberg_e
   REAl,               INTENT(IN)  :: depth_ib
   REAL, dimension(:,:,:), pointer :: UV_ib
   INTEGER,            INTENT(IN)  :: iceberg_elem
+  INTEGER, OPTIONAL,  INTENT(IN)  :: ib
 
   real           :: lev_up, lev_low  
-  integer        :: m, k, n2, n_up, n_low
+  integer        :: m, k, n2, n_up, n_low, safe_lev
   ! depth over which is integrated (layer and sum)
   real           :: dz, ufkeel1, ufkeel2
   ! variables for velocity correction
   real           :: delta_depth, u_bottom_x, u_bottom_y
+
+  logical :: at_top
 
 type(t_mesh), intent(in) , target :: mesh
 type(t_dyn), intent(in) , target :: dynamics
@@ -1107,6 +1116,11 @@ type(t_partit), intent(inout), target :: partit
 
   UV_IB     => dynamics%uv_ib(:,:,:)
   ! loop over all nodes of the iceberg element
+  
+  at_top = (k == 1)
+  if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0) &
+      at_top = (k == ulevels_nod2d(n2))
+  
   do m=1, 3
    !for each 2D node of the iceberg element..
    n2=mesh%elem2D_nodes(m,iceberg_elem)
@@ -1116,10 +1130,20 @@ type(t_partit), intent(inout), target :: partit
    ! ..consider all neighboring pairs (n_up,n_low) of 3D nodes
    ! below n2..
    do k=1, nl+1
+    !bugfix 2026-08-17: mirror the cavity handling already present in
+    !iceberg_average_andkeel above. Levels inside the ice shelf are never
+    !updated by the tracer solver and the first wet level's upper boundary
+    !is the shelf base, not z=0. iceberg_avvelo was overlooked when that
+    !fix was made, so iceberg placement integrated through shelf layers.
+    if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
+        .AND. k < ulevels_nod2d(n2)) cycle
 
 ! kh 18.03.21 use zbar_3d_n_ib buffered values here
-    if( k==1 ) then
+    if( at_top ) then
         lev_up = 0.0
+    else if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
+             .AND. k == ulevels_nod2d(n2)) then
+        lev_up = mesh%zbar_3d_n(k, n2)
     else
         lev_up = mesh%Z_3d_n_ib(k-1, n2)
     end if
@@ -1129,19 +1153,20 @@ type(t_partit), intent(inout), target :: partit
         exit
     end if
     dz = abs( lev_low - lev_up )
-	
-    if(dz < 1) then
-      !write(*,*) 'z coord of up node', n_up, ':', coord_nod3D(3, n_up), 'z coord of low node', n_low, ':', coord_nod3D(3, n_low)
-      call par_ex (partit%MPI_COMM_FESOM, partit%mype)
-      stop
+    if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
+        .AND. abs(depth_ib) < abs(mesh%zbar_3d_n(k, n2))) then
+      safe_lev = max(k-1, ulevels_nod2d(n2))
+      uo_dz(m) = UV_ib(1,safe_lev,n2)*abs(depth_ib)
+      vo_dz(m) = UV_ib(2,safe_lev,n2)*abs(depth_ib)
+      exit
     end if
-	
+
     ! if the lowest z coord is below the iceberg draft, exit
     if ( abs(lev_low)>= abs(depth_ib)) then
   
       dz = abs( lev_up - depth_ib )
 
-      if( k==1 ) then
+      if( at_top ) then
           ufkeel1 = UV_ib(1,k,n2)
           ufkeel2 = UV_ib(2,k,n2)
           uo_dz(m)= ufkeel1*dz 
@@ -1156,7 +1181,7 @@ type(t_partit), intent(inout), target :: partit
       exit
 	 
     else	
-      if( k==1 ) then
+      if( at_top ) then
         uo_dz(m)=uo_dz(m)+ UV_ib(1,k,n2)*dz
         vo_dz(m)=vo_dz(m)+ UV_ib(2,k,n2)*dz
         cycle
@@ -1169,8 +1194,13 @@ type(t_partit), intent(inout), target :: partit
    end do
  
    ! divide by depth over which was integrated
-   uo_dz(m)=uo_dz(m)/abs(depth_ib)
-   vo_dz(m)=vo_dz(m)/abs(depth_ib)
+   if (abs(depth_ib) > 0.0) then
+     uo_dz(m)=uo_dz(m)/abs(depth_ib)
+     vo_dz(m)=vo_dz(m)/abs(depth_ib)
+   else
+     uo_dz(m)=0.0
+     vo_dz(m)=0.0
+   end if
          
  end do !loop over all nodes of iceberg element
        
@@ -1181,6 +1211,12 @@ type(t_partit), intent(inout), target :: partit
    real, intent(IN) :: x0,f0,x1,f1,x
    real :: frac
    
+   ! Guard against near-zero denominator (thin ALE layer).
+   ! An exact-zero check is insufficient; 0*Inf = NaN when x≈x0 too.
+   if (abs(x1-x0) < 1.0e-6) then
+     interpol1D = 0.5*(f0+f1)
+     return
+   end if
    frac = (f1 - f0)/(x1 - x0)
    interpol1D = f0 + frac * (x - x0)
   	
