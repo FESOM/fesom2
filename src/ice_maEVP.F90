@@ -1092,7 +1092,7 @@ subroutine stress_tensor_a(ice, partit, mesh)
         pressure=ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))/(delta+ice%delta_min)
 #endif
 
-        r1=pressure*(eps1-delta)
+        r1=pressure*(eps1-max(delta,ice%delta_min))
         r2=pressure*eps2*vale
         r3=pressure*eps12(elem)*vale
         si1=sigma11(elem)+sigma22(elem)
