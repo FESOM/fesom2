@@ -125,9 +125,11 @@ age_start_year    = 2000     ! year to start age tracer (tracer age = 0 at this 
    l_snow        = .true.     ! use snow precipitation forcing
 
    ! --- Runoff configuration ---
-   runoff_data_source = 'JRA55'       ! runoff data source: 'Dai09', 'JRA55', 'CORE1', 'CORE2' or 'NONE'
-   nm_runoff_file     = '/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/friver.'  ! Dai09/JRA55 with runoff_climatology=.false.: prefix, year and '.nc' are appended (friver.1958.nc).
-                                        ! with runoff_climatology=.true., and for CORE1/CORE2, give the complete file name instead
+   runoff_data_source = 'CORE2'       ! runoff data source: 'Dai09', 'JRA55', 'CORE1', 'CORE2' or 'NONE'
+   nm_runoff_file     = '/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/CORE2_runoff.nc'  ! CORE1/CORE2: complete file name, one time slice for the whole run
+                                        ! Dai09/JRA55 with runoff_climatology=.false.: prefix only, year and '.nc' are appended (e.g. 'friver.')
+   ! to run transient JRA55 runoff instead, uncomment the next line (reads friver.<year>.nc):
+   ! runoff_data_source = 'JRA55', nm_runoff_file = '/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/friver.'
 
    ! --- Sea surface salinity restoring ---
    sss_data_source  = 'CORE2'  ! SSS restoring data source: 'CORE2', 'WOA', or 'NONE'
