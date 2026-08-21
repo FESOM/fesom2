@@ -883,6 +883,8 @@ subroutine iceberg_average_andkeel(mesh, partit, dynamics, uo_dz,vo_dz, uo_keel,
   ! depth over which is integrated (layer and sum)
   real           :: dz, ufkeel1, ufkeel2, Temkeel, Salkeel
 
+  logical :: at_top
+
 type(t_mesh), intent(in) , target :: mesh
 type(t_dyn), intent(in) , target :: dynamics
 type(t_partit), intent(inout), target :: partit
@@ -893,6 +895,10 @@ type(t_partit), intent(inout), target :: partit
 
   UV_IB     => dynamics%uv_ib(:,:,:)
 
+  at_top = (k == 1)
+  if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0) &
+      at_top = (k == ulevels_nod2d(n2))
+  
   !LOOP: over all nodes of the iceberg element
   nodeloop: do m=1, 3
    !for each 2D node of the iceberg element..
@@ -915,7 +921,7 @@ type(t_partit), intent(inout), target :: partit
     if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
         .AND. k < ulevels_nod2d(n2)) cycle
 
-    if( k==1 ) then
+    if( at_top ) then
         lev_up = 0.0
     else if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
              .AND. k == ulevels_nod2d(n2)) then
@@ -960,7 +966,7 @@ type(t_partit), intent(inout), target :: partit
     else if( abs(lev_low)>=abs(depth_ib) ) then
       dz = abs( lev_up - depth_ib )
 
-      if( k==1 ) then
+      if( at_top ) then
         ! Draft within first half-layer: piecewise constant
         ufkeel1 = UV_ib(1,1,n2)
         ufkeel2 = UV_ib(2,1,n2)
@@ -1002,7 +1008,7 @@ type(t_partit), intent(inout), target :: partit
 
     ! Regular layer: iceberg extends deeper
     else
-      if( k==1 ) then
+      if( at_top ) then
         ! First half-layer (surface to first mid-level): piecewise constant
         uo_dz(m)=uo_dz(m)+ UV_ib(1,1,n2)*dz
         vo_dz(m)=vo_dz(m)+ UV_ib(2,1,n2)*dz
@@ -1098,6 +1104,8 @@ subroutine iceberg_avvelo(mesh, partit, dynamics, uo_dz,vo_dz,depth_ib,iceberg_e
   ! variables for velocity correction
   real           :: delta_depth, u_bottom_x, u_bottom_y
 
+  logical :: at_top
+
 type(t_mesh), intent(in) , target :: mesh
 type(t_dyn), intent(in) , target :: dynamics
 type(t_partit), intent(inout), target :: partit
@@ -1108,6 +1116,11 @@ type(t_partit), intent(inout), target :: partit
 
   UV_IB     => dynamics%uv_ib(:,:,:)
   ! loop over all nodes of the iceberg element
+  
+  at_top = (k == 1)
+  if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0) &
+      at_top = (k == ulevels_nod2d(n2))
+  
   do m=1, 3
    !for each 2D node of the iceberg element..
    n2=mesh%elem2D_nodes(m,iceberg_elem)
@@ -1126,7 +1139,7 @@ type(t_partit), intent(inout), target :: partit
         .AND. k < ulevels_nod2d(n2)) cycle
 
 ! kh 18.03.21 use zbar_3d_n_ib buffered values here
-    if( k==1 ) then
+    if( at_top ) then
         lev_up = 0.0
     else if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
              .AND. k == ulevels_nod2d(n2)) then
@@ -1153,7 +1166,7 @@ type(t_partit), intent(inout), target :: partit
   
       dz = abs( lev_up - depth_ib )
 
-      if( k==1 ) then
+      if( at_top ) then
           ufkeel1 = UV_ib(1,k,n2)
           ufkeel2 = UV_ib(2,k,n2)
           uo_dz(m)= ufkeel1*dz 
@@ -1168,7 +1181,7 @@ type(t_partit), intent(inout), target :: partit
       exit
 	 
     else	
-      if( k==1 ) then
+      if( at_top ) then
         uo_dz(m)=uo_dz(m)+ UV_ib(1,k,n2)*dz
         vo_dz(m)=vo_dz(m)+ UV_ib(2,k,n2)*dz
         cycle
