@@ -485,6 +485,44 @@ CASE ('curl_surf ')
 ! output RECOM 2D
 #if defined(__recom)
 
+!===============================================================================
+! RECOM BIOGEOCHEMICAL MODEL - OUTPUT VARIABLE DEFINITIONS
+!===============================================================================
+! This module defines output streams for the REcoM (Regulated Ecosystem Model)
+! biogeochemical tracer variables. Variables are organized by functional groups.
+!===============================================================================
+
+! =====================================================================
+! CARBONATE CHEMISTRY & AIR-SEA GAS EXCHANGE
+! =====================================================================
+! These variables control and diagnose the exchange of CO2 and O2 between
+! the ocean and atmosphere, as well as ocean acidification processes.
+! =====================================================================
+
+CASE ('alphaCO2  ')
+    ! =====================================================================
+    ! Variable: alphaCO2
+    ! Description: CO2 solubility coefficient (Henry's Law constant)
+    ! Function: Determines how much CO2 dissolves in seawater at equilibrium
+    ! Dependencies: Temperature and salinity dependent
+    ! Units: mol/kg/atm
+    ! =====================================================================
+    if (use_REcoM) then
+    call def_stream(nod2D,  myDim_nod2D,   'alphaCO2',    'CO2 solubility',  'mol/kg/atm', alphaCO2(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('Kw        ')
+    ! =====================================================================
+    ! Variable: Kw (also known as k660 or gas transfer velocity)
+    ! Description: Air-sea piston velocity for gas exchange
+    ! Function: Controls the rate of gas transfer across the air-sea interface
+    ! Dependencies: Wind speed, sea state, and gas-specific Schmidt number
+    ! Units: m/s
+    ! =====================================================================
+    if (use_REcoM) then
+    call def_stream(nod2D,  myDim_nod2D,   'Kw',    'Air-sea piston velocity',  'm/s', PistonVelocity(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
 CASE ('dpCO2s    ')
     if (use_REcoM) then
     call def_stream(nod2D,  myDim_nod2D,   'dpCO2s',    'Difference of oceanic pCO2 minus atmospheric pCO2',  'uatm', GlodPCO2surf(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -544,6 +582,107 @@ CASE ('benCalc   ')
     if (use_REcoM) then
     call def_stream(nod2D,  myDim_nod2D,   'benCalc','Benthos calcite','mmol', Benthos(:,4), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
+
+CASE ('denb      ')
+    ! Variable: denb
+    ! Description: Benthic denitrification rate
+    ! Function: Conversion of nitrate to N₂ gas in anoxic sediments
+    ! Process: NO₃⁻ → NO₂⁻ → NO → N₂O → N₂ (anaerobic respiration pathway)
+    ! Role: Permanent nitrogen loss from ocean; regulates ocean N inventory
+    ! Units: mmol/m² (millimoles per square meter)
+    if (use_REcoM) then
+        call def_stream(nod2D, myDim_nod2D, &
+                       'denb', 'Benthic denitrification rate', 'mmol/m2', DenitBen(:), &
+                       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+! SEDIMENT → OCEAN FLUXES (REMINERALIZATION/DISSOLUTION)
+! =====================================================================
+CASE ('ReNb     ')
+    ! Variable: ReNb
+    ! Description: Benthic nitrogen remineralization flux
+    ! Function: Release of dissolved inorganic nitrogen from sediments
+    ! Process: Benthic organic N → bacterial degradation → NH₄⁺/NO₃⁻ → ocean
+    ! Role: Nutrient regeneration; supports primary production in shallow waters
+    ! Units: mmolN/(m²·s) (millimoles nitrogen per square meter per second)
+    if (use_REcoM) then
+        call def_stream(nod2D, myDim_nod2D, &
+                       'ReNb', 'benthic N release to the ocean (remineralization)', 'mmolN/(m2*s)', &
+                       Sed_2_Ocean_Flux(:,1), &
+                       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('ReCb     ')
+    ! Variable: ReCb
+    ! Description: Benthic carbon remineralization + calcite dissolution flux
+    ! Function: Release of dissolved inorganic carbon from sediments
+    ! Process: Organic C → remineralization → DIC + CaCO₃ dissolution → ocean
+    ! Role: CO₂ source; carbonate system buffering; alkalinity regulation
+    ! Units: mmolC/(m²·s) (millimoles carbon per square meter per second)
+    if (use_REcoM) then
+        call def_stream(nod2D, myDim_nod2D, &
+                       'ReCb', 'benthic C release to the ocean (remineralization + calcification)', &
+                       'mmolC/(m2*s)', Sed_2_Ocean_Flux(:,2), &
+                       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('ReSib     ')
+    ! Variable: ReSib
+    ! Description: Benthic silica dissolution flux
+    ! Function: Release of dissolved silicon from opal dissolution
+    ! Process: Benthic opal → porewater dissolution → Si(OH)₄ → ocean
+    ! Role: Silicon regeneration; supports diatom productivity
+    ! Units: mmolSi/(m²·s) (millimoles silicon per square meter per second)
+    if (use_REcoM) then
+        call def_stream(nod2D, myDim_nod2D, &
+                       'ReSib', 'benthic Si release to the ocean (dissolution)', 'mmolSi/(m2*s)', &
+                       Sed_2_Ocean_Flux(:,4), &
+                       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('ReAlkb     ')
+    ! Variable: ReAlkb
+    ! Description: Benthic alkalinity flux
+    ! Function: Release of alkalinity from organic matter and CaCO₃ processing
+    ! Process: Denitrification + sulfate reduction + CaCO₃ dissolution → Alk
+    ! Role: pH buffering; carbonate system regulation; CO₂ uptake capacity
+    ! Units: mmolC-eq/(m²·s) (millimole carbon-equivalents per square meter per second)
+    if (use_REcoM) then
+        call def_stream(nod2D, myDim_nod2D, &
+                       'ReAlkb', 'benthic Alk release to the ocean', 'mmolC-eq/(m2*s)', &
+                       Sed_2_Ocean_Flux(:,3), &
+                       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('ReFeb     ')
+    ! Variable: ReFeb
+    ! Description: Benthic iron flux
+    ! Function: Release of dissolved iron from reducing sediments
+    ! Process: Benthic Fe-oxides → anoxic reduction → Fe²⁺ → ocean
+    ! Role: Micronutrient supply; supports primary production in Fe-limited regions
+    ! Units: mmolFe/(m²·s) (millimoles iron per square meter per second)
+    if (use_REcoM) then
+        call def_stream(nod2D, myDim_nod2D, &
+                       'ReFeb', 'benthic Fe release to the ocean', 'mmolFe/(m2*s)', &
+                       Sed_2_Ocean_Flux(:,5), &
+                       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('ReO2b     ')
+    ! Variable: ReO2b
+    ! Description: Benthic oxygen consumption flux
+    ! Function: Oxygen demand from aerobic remineralization in sediments
+    ! Process: Organic matter + O₂ → CO₂ + nutrients (negative flux = consumption)
+    ! Role: Sediment oxygen demand; creates anoxic conditions; hypoxia indicator
+    ! Units: mmolO₂/(m²·s) (millimoles oxygen per square meter per second)
+    if (use_REcoM) then
+        call def_stream(nod2D, myDim_nod2D, &
+                       'ReO2b', 'benthic O2 release to the ocean', 'mmolO2/(m2*s)', &
+                       Sed_2_Ocean_Flux(:,6), &
+                       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+
 ! ciso 
 CASE ('benC_13   ')
     if (use_REcoM) then
@@ -682,6 +821,147 @@ CASE ('ChldegdiaH  ')
     call def_stream(nod2D,  myDim_nod2D,   'ChlDegdiaH','Chlorophyll degradation heavily silicifying diatoms','1/d', ChldegdiaH, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! heavily silicified diatoms
     endif
 
+CASE ('grazmeso_tot')
+    if (use_REcoM) then
+    call def_stream(nod2D, myDim_nod2D,'grazmeso_tot', 'Total grazing flux of mesozooplankton, dependent on grazing efficiency', 'mmolC/(m2d)', grazmeso_tot, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('grazmeso_n')
+    if (use_REcoM) then
+    call def_stream(nod2D, myDim_nod2D, 'grazmeso_n', 'Grazing flux of mesozooplankton on small phytoplankton without grazing efficiency (i.e., = loss small phytoplankton)', 'mmolC/(m2d)', grazmeso_n, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('grazmeso_d')
+    if (use_REcoM) then
+    call def_stream(nod2D, myDim_nod2D, 'grazmeso_d', 'Grazing flux of mesozooplankton on diatoms without grazing efficiency (i.e., = loss diatoms)', 'mmolC/(m2d)', grazmeso_d, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('grazmeso_diaH')
+    if (use_REcoM) then
+    call def_stream(nod2D, myDim_nod2D, 'grazmeso_diaH', 'Grazing flux of mesozooplankton on heavily silicified diatoms without grazing efficiency (i.e., = loss heavily silicified diatoms)', 'mmolC/(m2d)', grazmeso_diaH, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('grazmeso_c')
+    if (use_REcoM) then
+    call def_stream(nod2D, myDim_nod2D, 'grazmeso_c', 'Grazing flux of mesozooplankton on coccolithophores without grazing efficiency (i.e., = loss coccolithophores)', 'mmolC/(m2d)', grazmeso_c, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('grazmeso_p')
+    if (use_REcoM) then
+    call def_stream(nod2D, myDim_nod2D, 'grazmeso_p', 'Grazing flux of mesozooplankton on phaeocystis without grazing efficiency (i.e., = loss phaeocystis)', 'mmolC/(m2*d)', grazmeso_p, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('grazmeso_det')
+    if (use_REcoM) then
+    call def_stream(nod2D, myDim_nod2D, 'grazmeso_det','Grazing flux of mesozooplankton on first detritus group without grazing efficiency (i.e., = loss first detritus group)', 'mmolC/(m2d)', grazmeso_det, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('grazmeso_mic')
+    if (use_REcoM) then
+    call def_stream(nod2D, myDim_nod2D, 'grazmeso_mic', 'Grazing flux of mesozooplankton on microzooplankton without grazing efficiency (i.e., = loss microzooplankton)', 'mmolC/(m2d)', grazmeso_mic, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('grazmeso_det2')
+    if (use_REcoM) then
+    call def_stream(nod2D,  myDim_nod2D, 'grazmeso_det2', 'Grazing flux of mesozooplankton on first detritus without grazing efficiency (i.e., = loss second detritus group)', 'mmolC/(m2*d)', grazmeso_det2, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('grazmacro_tot')
+    if (use_REcoM) then
+    call def_stream(nod2D, myDim_nod2D, 'grazmacro_tot', 'Total grazing flux of macrozooplankton, dependent on grazing efficiency', 'mmolC/(m2d)', grazmacro_tot, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('grazmacro_n')
+    if (use_REcoM) then
+    call def_stream(nod2D, myDim_nod2D, 'grazmacro_n','Grazing flux of macrozooplankton on small phytoplankton without grazing efficiency (i.e., = loss small phytoplankton)', 'mmolC/(m2d)', grazmacro_n, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('grazmacro_d')
+    if (use_REcoM) then
+    call def_stream(nod2D, myDim_nod2D, 'grazmacro_d', 'Grazing flux of macrozooplankton on diatoms without grazing efficiency (i.e., = loss diatoms)','mmolC/(m2d)', grazmacro_d, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('grazmacro_diaH')
+    if (use_REcoM) then
+    call def_stream(nod2D, myDim_nod2D, 'grazmacro_diaH', 'Grazing flux of macrozooplankton on diatoms without grazing efficiency (i.e., = loss heavily silicified diatoms)','mmolC/(m2d)', grazmacro_diaH, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('grazmacro_c')
+    if (use_REcoM) then
+    call def_stream(nod2D, myDim_nod2D, 'grazmacro_c', 'Grazing flux of macrozooplankton on coccolithophores without grazing efficiency (i.e., = loss coccolithophores)','mmolC/(m2d)', grazmacro_c, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('grazmacro_p')
+    if (use_REcoM) then
+    call def_stream(nod2D, myDim_nod2D, 'grazmacro_p', 'Grazing flux of macrozooplankton on phaeocystis without grazing efficiency (i.e., = loss phaeocystis)', 'mmolC/(m2*d)', grazmacro_p, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('grazmacro_mes')
+    if (use_REcoM) then
+    call def_stream(nod2D, myDim_nod2D, 'grazmacro_mes', 'Grazing flux of mesozooplankton on macrozooplankton without grazing efficiency (i.e., = loss mesozooplankton)', 'mmolC/(m2d)', grazmacro_mes, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('grazmacro_det')
+    if (use_REcoM) then
+    call def_stream(nod2D, myDim_nod2D, 'grazmacro_det', 'Grazing flux of macrozooplankton on first detritus group without grazing efficiency (i.e., = loss first detritus group)', 'mmolC/(m2d)', grazmacro_det, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('grazmacro_mic')
+    if (use_REcoM) then
+    call def_stream(nod2D, myDim_nod2D, 'grazmacro_mic', 'Grazing flux of macrozooplankton on microzooplankton without grazing efficiency (i.e., = loss microzooplankton)', 'mmolC/(m2d)', grazmacro_mic, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('grazmacro_det2')
+    if (use_REcoM) then
+    call def_stream(nod2D, myDim_nod2D, 'grazmacro_det2', 'Grazing flux of macrozooplankton on first detritus without grazing efficiency (i.e., = loss second detritus group)', 'mmolC/(m2d)', grazmacro_det2, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('grazmicro_tot')
+    if (use_REcoM) then
+    call def_stream(nod2D, myDim_nod2D, 'grazmicro_tot', 'Total grazing flux of microzooplankton, dependent on grazing efficiency', 'mmolC/(m2d)', grazmicro_tot, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('grazmicro_n')
+    if (use_REcoM) then
+    call def_stream(nod2D, myDim_nod2D, 'grazmicro_n', 'Grazing flux of microzooplankton on small phytoplankton without grazing efficiency (i.e., = loss small phytoplankton)', 'mmolC/(m2d)', grazmicro_n, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('grazmicro_d')
+    if (use_REcoM) then
+    call def_stream(nod2D, myDim_nod2D, 'grazmicro_d', 'Grazing flux of microzooplankton on diatoms without grazing efficiency (i.e., = loss diatoms)', 'mmolC/(m2d)', grazmicro_d, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('grazmicro_diaH')
+    if (use_REcoM) then
+    call def_stream(nod2D, myDim_nod2D, 'grazmicro_diaH', 'Grazing flux of microzooplankton on diatoms without grazing efficiency (i.e., = loss heavily silicified diatoms)', 'mmolC/(m2d)', grazmicro_diaH, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif    
+
+CASE ('grazmicro_c')
+    if (use_REcoM) then
+    call def_stream(nod2D,  myDim_nod2D,   'grazmicro_c', 'Grazing flux of microzooplankton on coccolithophores without grazing efficiency (i.e., = loss coccolithophores)', 'mmolC/(m2d)', grazmicro_c, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('grazmicro_p')
+    if (use_REcoM) then
+    call def_stream(nod2D, myDim_nod2D, 'grazmicro_p', 'Grazing flux of microzooplankton on phaeocystis without grazing efficiency (i.e., = loss phaeocystis)', 'mmolC/(m2*d)', grazmicro_p, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    endif
+
+CASE ('DISSOSi     ')
+    if (use_REcoM) then
+    call def_stream(nod2D,  myDim_nod2D,   'DISSOSi','Dissolution of Si','mmolSi/(m2*d)', DISSOSi, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('DISSOC     ')
+    if (use_REcoM) then
+    call def_stream(nod2D,  myDim_nod2D,   'DISSOC','Dissolution of POC','mmolC/(m2*d)', DISSOC, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('DISSON     ')
+    if (use_REcoM) then
+    call def_stream(nod2D,  myDim_nod2D,   'DISSON','Dissolution of PON','mmolN/(m2*d)', DISSON, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+
 #endif
     
 !___________________________________________________________________________________________________________________________________    
@@ -698,6 +978,164 @@ CASE ('PAR       ')
     if (use_REcoM) then
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'PAR', 'PAR', 'W/m2',      PAR3D(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
+
+CASE ('CO2')
+    ! =====================================================================
+    ! Variable: CO2
+    ! Description: Aqueous CO2 concentration
+    ! Function: Dissolved CO2 in seawater, primary inorganic carbon form
+    ! Role: Substrate for phytoplankton photosynthesis, pH regulator
+    ! Units: mol/m³
+    ! =====================================================================
+    if (use_REcoM) then
+        call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), &
+                       'CO2', 'Aqueous CO2 concentration', 'mol/m3', CO23D(:,:), &
+                       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('pH')
+    ! =====================================================================
+    ! Variable: pH
+    ! Description: Acidity/alkalinity of seawater (total scale)
+    ! Function: Measure of hydrogen ion concentration
+    ! Role: Affects carbonate chemistry, organism physiology, calcification
+    ! Units: total scale (dimensionless, typically 7.5-8.5 in ocean)
+    ! =====================================================================
+    if (use_REcoM) then
+        call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), &
+                       'pH', 'pH', 'total scale', pH3D(:,:), &
+                       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('pCO2')
+    ! =====================================================================
+    ! Variable: pCO2
+    ! Description: Partial pressure of CO2 in seawater
+    ! Function: CO2 fugacity in equilibrium with atmosphere
+    ! Role: Determines air-sea CO2 flux direction and magnitude
+    ! Units: μatm (microatmospheres)
+    ! =====================================================================
+    if (use_REcoM) then
+        call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), &
+                       'pCO2', 'CO2 partial pressure', 'uatm', pCO23D(:,:), &
+                       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('HCO3')
+    ! =====================================================================
+    ! Variable: HCO3
+    ! Description: Bicarbonate ion concentration
+    ! Function: Major dissolved inorganic carbon species (~90% of DIC)
+    ! Role: pH buffer, carbon source for some phytoplankton
+    ! Units: mol/m³
+    ! =====================================================================
+    if (use_REcoM) then
+        call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), &
+                       'HCO3', 'Bicarbonate ion concentration', 'mol/m3', HCO33D(:,:),  &
+                       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('CO3')
+    ! =====================================================================
+    ! Variable: CO3
+    ! Description: Carbonate ion concentration
+    ! Function: Secondary dissolved inorganic carbon species
+    ! Role: Building block for calcium carbonate (CaCO3) formation
+    ! Units: mol/m³
+    ! =====================================================================
+    if (use_REcoM) then
+        call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), &
+                       'CO3', 'Carbonate ion concentration', 'mol/m3', CO33D(:,:), &
+                       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('OmegaC')
+    ! =====================================================================
+    ! Variable: OmegaC
+    ! Description: Calcite saturation state (Ω)
+    ! Function: Ratio of [Ca²⁺][CO3²⁻] to calcite solubility product
+    ! Role: Determines calcification vs dissolution; Ω>1 favors precipitation
+    ! Context: Ocean acidification reduces Ω, threatening calcifying organisms
+    ! Units: NN (dimensionless)
+    ! =====================================================================
+    if (use_REcoM) then
+        call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), &
+                       'OmegaC','calcite saturation state', 'NN', OmegaC3D(:,:), &
+                       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('kspc')
+    ! =====================================================================
+    ! Variable: kspc
+    ! Description: Calcite solubility product
+    ! Function: Equilibrium constant for CaCO3 dissolution
+    ! Role: Temperature/pressure dependent; controls calcite stability
+    ! Units: mol²/kg²
+    ! =====================================================================
+    if (use_REcoM) then
+        call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), &
+                       'kspc', 'calcite solubility product', 'mol^2/kg^2', kspc3D(:,:), &
+                       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('rhoSW')
+    ! =====================================================================
+    ! Variable: rhoSW
+    ! Description: In-situ seawater density
+    ! Function: Density at ambient temperature, salinity, and pressure
+    ! Role: Physical property affecting stratification and mixing
+    ! Units: mol/m³ (CHECK: unusual units, typically kg/m³)
+    ! =====================================================================
+    if (use_REcoM) then
+        call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), &
+                       'rhoSW', 'in-situ density of seawater', 'mol/m3', rhoSW3D(:,:), &
+                       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+! =====================================================================
+! PARTICLE DYNAMICS - DENSITY AND SINKING
+! Description: Physical properties of detrital particles
+! =====================================================================
+
+CASE ('rho_det1')
+    ! =====================================================================
+    ! Variable: rho_det1
+    ! Description: Density of detrital particles in size class 1
+    ! Function: Mass per unit volume of small/slow-sinking particles
+    ! Role: Determines sinking speed via Stokes' law
+    ! Context: Lower density = slower sinking = longer remineralization time
+    ! Units: kg/m³
+    ! =====================================================================
+    call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), &
+                   'rho_det1', 'rho of particles in class 1', 'kg/m3', rho_particle1(:,:), & 
+                   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+CASE ('rho_det2')
+    ! =====================================================================
+    ! Variable: rho_det2
+    ! Description: Density of detrital particles in size class 2
+    ! Function: Mass per unit volume of large/fast-sinking particles
+    ! Role: Determines sinking speed via Stokes' law
+    ! Context: Higher density = faster sinking = efficient carbon export
+    ! Units: kg/m³
+    ! =====================================================================
+    call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), &
+                   'rho_det2', 'rho of particles in class 2', 'kg/m3', rho_particle2(:,:), &
+                   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+CASE ('scaling_visc')
+    ! =====================================================================
+    ! Variable: scaling_visc
+    ! Description: Viscosity-based scaling factor for sinking speed
+    ! Function: Adjusts particle sinking based on water viscosity
+    ! Role: Temperature/salinity affect viscosity, thus sinking rates
+    ! Context: Warmer water = lower viscosity = faster sinking
+    ! Units: n.d. (non-dimensional scaling factor)
+    ! =====================================================================
+    call def_stream((/nl-1, nod2D/), (/nl-1, myDim_nod2D/), &
+                   'scaling_visc', 'scaling factor of particle sinking speed', 'n.d.', scaling_visc_3D(:,:), &
+                   io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
 CASE ('wsink_det1')
    call def_stream((/nl, nod2D/),  (/nl, myDim_nod2D/),  'wsink_det1', 'sinking speed of particles in class 1', 'm s-1',  Sinkingvel1(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('wsink_det2')
@@ -958,32 +1396,6 @@ CASE ('otracers  ')
       else if (tracers%data(j)%ID==1002) then    ! NOTE Divide tracers%work%tra_advvert(:,:,j) by dt
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC', 'Dissolved Inorganic C', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-            if (tracers%data(j)%ltra_diag) then ! OG - tra_diag
-               ! horizontal advection
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_hor_adv', 'Horizontal advection part of dissolved Inorganic C', '[mmol/m3/s]', tracers%work%tra_advhoriz(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! vertical advection
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_ver_adv', 'Vertical advection part of dissolved Inorganic C', '[mmol/m3/s]', tracers%work%tra_advvert(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! horizontal diffusion
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_hor_redi', 'Horizontal diffusion of dissolved Inorganic C (includes Redi diffusivity if Redi=.true.)', '[mmol/m3/s]', tracers%work%tra_diff_part_hor_redi(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               if (.not. tracers%data(j)%i_vert_diff) then
-               ! vertical diffusion (Explicit)
-                   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_ver_expl', 'Vertical diffusion of dissolved Inorganic C (Explicit)', '[mmol/m3/s]', tracers%work%tra_diff_part_ver_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-               end if
-
-               ! projection of horizontal Redi diffussivity onto vertical
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_ver_redi_expl', 'Projection of horizontal Redi diffussivity onto vertical for dissolved Inorganic C (Explicit)', '[mmol/m3/s]', tracers%work%tra_diff_part_ver_redi_expl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! vertical diffusion (Implicit)
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_tra_diff_part_ver_impl', 'Vertical diffusion of dissolved Inorganic C (Implicit)', '[mmol/m3/s]', tracers%work%tra_diff_part_ver_impl(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-
-               ! recom_sms
-               call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_recom_sms', 'Recom SMS', '[mmol/m3/s]', tracers%work%tra_recom_sms(:,:,j), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-            end if
-
          endif
 
       else if (tracers%data(j)%ID==1003) then
@@ -1065,6 +1477,7 @@ CASE ('otracers  ')
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DSi', 'DSi', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
+
 
       else if (tracers%data(j)%ID==1019) then
          if (use_REcoM) then
