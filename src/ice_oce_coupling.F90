@@ -43,6 +43,8 @@ module oce_fluxes_interface
         type(t_partit), intent(inout), target :: partit
         type(t_mesh)  , intent(in)   , target :: mesh
         end subroutine oce_fluxes_mom
+
+
     end interface
 end module oce_fluxes_interface
 
@@ -259,6 +261,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     use g_forcing_param, only: use_virt_salt, use_landice_water, use_age_tracer, use_age_mask, age_start_year !---fwf-code, age-code
     use g_forcing_arrays
     use g_support
+    use hosing_interface
     use cavity_interfaces
 #if defined (__icepack)
     use icedrv_main,   only: icepack_to_fesom,    &
@@ -279,7 +282,7 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
     integer                    :: n, elem, elnodes(3),n1
-    real(kind=WP)              :: rsss, net
+    real(kind=WP)              :: rsss, net, hSv
     real(kind=WP), allocatable :: flux(:)
     !___________________________________________________________________________
     real(kind=WP), dimension(:,:), pointer :: temp, salt
@@ -398,8 +401,19 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
 #endif
 
+    !___freshwater surface hosing routine_______________________________________
+    !
+    if (use_hosing .and. trim(hosing_mode)=='surf') then
+        call fw_surf_anomaly(hosing_hSv, tracers, partit, mesh)
+    end if
+
     if (use_icebergs) then
         call icb2fesom(mesh, partit, ice)
+        ! Safety net against iceberg-driven super-cooling of shallow shelf
+        ! cells, which otherwise drifts a cell's temperature below freezing
+        ! over many timesteps. Cap ibhf_n before the tracer solver consumes
+        ! it in oce_ale_tracer.F90; toggle via namelist l_cap_ibhf_n.
+        call cap_ibhf_n(tracers, mesh, partit)
     end if
 
     !___________________________________________________________________________
