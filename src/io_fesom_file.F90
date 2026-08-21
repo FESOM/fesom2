@@ -383,8 +383,14 @@ contains
     do k = 1, partit%myDim_elem2D_shrinked
       gelem(k) = partit%myList_elem2D( partit%myInd_elem2D_shrinked(k) )
     end do
+    ! The requested count is the one the NODAL schedule ended up with, not
+    ! m_n_writers: redist_effective_writers clamps to n_global/REDIST_MIN_BLOCK
+    ! and elem2D is about twice nod2D, so the same request can survive the
+    ! element clamp while the nodal one is halved. The assertion below then
+    ! fires; on the output path, which had no such assertion, the same
+    ! divergence silently dropped half the element blocks (#969).
     call redist_build(m_sched_elem, gelem, partit%myDim_elem2D_shrinked, &
-                      m_elem2d, m_n_writers, comm, .false., ierr)
+                      m_elem2d, m_sched_nod%n_writers, comm, .false., ierr)
     if(ierr /= 0) then
       if(partit%mype==0) write(*,*) 'io_fesom_file: element redist_build failed, ierr=', ierr
       stop 1
@@ -395,8 +401,11 @@ contains
     ! ranks -- both use redist_writer_rank with the same npes and effective
     ! writer count -- so one communicator serves both. Assert that rather than
     ! rely on it silently.
-    if(m_sched_nod%is_writer .neqv. m_sched_elem%is_writer) then
-      write(*,*) 'io_fesom_file: nodal and element writer sets disagree on rank ', partit%mype
+    if(m_sched_nod%n_writers /= m_sched_elem%n_writers .or. &
+       (m_sched_nod%is_writer .neqv. m_sched_elem%is_writer)) then
+      write(*,*) 'io_fesom_file: nodal and element writer sets disagree on rank ', partit%mype, &
+                 ' -- nodal writers ', m_sched_nod%n_writers, &
+                 ', element writers ', m_sched_elem%n_writers
       stop 1
     end if
     call MPI_Comm_split(comm, merge(1,0,m_sched_nod%is_writer), partit%mype, m_writer_comm, ierr)
@@ -428,8 +437,11 @@ contains
     end if
 
     nwant = partit%myDim_elem2D + partit%eDim_elem2D
+    ! Same rule as on the write side: the element schedule takes the count the
+    ! nodal one actually got, so the REDIST_MIN_BLOCK clamp cannot split the two
+    ! reader sets apart.
     call redist_build_scatter(m_rsched_elem, partit%myList_elem2D(1:nwant), nwant, &
-                              m_elem2d, m_n_readers, comm, .false., ierr)
+                              m_elem2d, m_rsched_nod%n_readers, comm, .false., ierr)
     if(ierr /= 0) then
       if(partit%mype==0) write(*,*) 'io_fesom_file: element redist_build_scatter failed, ierr=', ierr
       stop 1
@@ -441,8 +453,11 @@ contains
     ! side. The reader set is NOT compared against the writer set: with
     ! n_readers_restart different from n_writers_restart they are deliberately
     ! different, which is the whole point of the separate knob.
-    if(m_rsched_nod%is_reader .neqv. m_rsched_elem%is_reader) then
-      write(*,*) 'io_fesom_file: nodal and element reader sets disagree on rank ', partit%mype
+    if(m_rsched_nod%n_readers /= m_rsched_elem%n_readers .or. &
+       (m_rsched_nod%is_reader .neqv. m_rsched_elem%is_reader)) then
+      write(*,*) 'io_fesom_file: nodal and element reader sets disagree on rank ', partit%mype, &
+                 ' -- nodal readers ', m_rsched_nod%n_readers, &
+                 ', element readers ', m_rsched_elem%n_readers
       stop 1
     end if
     call MPI_Comm_split(comm, merge(1,0,m_rsched_nod%is_reader), partit%mype, m_reader_comm, ierr)

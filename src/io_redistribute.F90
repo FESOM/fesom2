@@ -26,6 +26,16 @@
 !> so sum(myDim_elem2D) > elem2D and there is no bijection to build a schedule on.
 !> The shrinked set assigns each element to the rank owning its FIRST node
 !> (oce_mesh.F90:888-898), which is the authoritative owner for this module.
+!>
+!> ONE MORE RULE FOR CALLERS THAT BUILD BOTH A NODAL AND AN ELEMENT SCHEDULE:
+!> build the nodal one first and pass ITS n_writers as the request for the
+!> element one. Do not hand the same namelist value to both. The requested count
+!> is clamped to n_global/REDIST_MIN_BLOCK, and elem2D is about twice nod2D, so
+!> one request can be halved for nodes and left alone for elements. The two
+!> schedules then choose writers with different strides and no longer sit on the
+!> same ranks -- while the caller has only one file, opened over one of the two
+!> sets. Everything the other set holds is lost without an error: on core2 with
+!> n_writers > 30 that is half of every element field (#969).
 
 module io_redistribute
   use mpi
@@ -136,6 +146,9 @@ contains
 
   !> Writer count actually used, after clamping to the rank count and to
   !> REDIST_MIN_BLOCK. Always >= 1.
+  !>
+  !> This clamp is why a node/element schedule pair must share one count: it
+  !> depends on n_global, which differs between the two. See the module header.
   pure function redist_effective_writers(n_global, n_writers_req, npes) result(nw)
     integer, intent(in) :: n_global, n_writers_req, npes
     integer :: nw

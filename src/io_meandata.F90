@@ -181,6 +181,10 @@ module io_MEANDATA
   !> Elements use myInd_elem2D_shrinked, not myList_elem2D: an element belongs
   !> to a PE if ANY of its nodes does, so sum(myDim_elem2D) > elem2D and there
   !> is no bijection to build a schedule on.
+  !>
+  !> The two schedules MUST end up on the same ranks: one communicator opens the
+  !> file, and par_put_r4/r8 gate on out_is_writer(), which is the NODAL writer
+  !> set. See the element-count note at the redist_build call below.
   subroutine ensure_out_schedules(partit, n_nod2d, n_elem2d)
     use MOD_PARTIT
     use mpi
@@ -203,13 +207,36 @@ module io_MEANDATA
     do k = 1, partit%myDim_elem2D_shrinked
        gelem(k) = partit%myList_elem2D( partit%myInd_elem2D_shrinked(k) )
     end do
+    ! Hand the element schedule the count the NODAL schedule actually ended up
+    ! with, not the requested n_writers.
+    !
+    ! redist_effective_writers clamps the request to n_global/REDIST_MIN_BLOCK,
+    ! and elem2D is about twice nod2D on a triangular mesh, so the same request
+    ! can survive the element clamp while the nodal one is cut in half. The
+    ! schedules then place their writers with different strides, the file is
+    ! opened on the nodal set only, and every element block held by a rank
+    ! outside that set is silently never written -- about half of the element
+    ! field on core2 with n_writers > 30, which is nod2D/REDIST_MIN_BLOCK.
+    ! Reported by JanStreffing on #969 as "missing half the element output".
+    ! nod2D <= elem2D, so the nodal count always passes the element clamp
+    ! unchanged and the two sets coincide by construction.
     call redist_build(out_sched_elem, gelem, partit%myDim_elem2D_shrinked, &
-                      n_elem2d, n_writers, partit%MPI_COMM_FESOM, .false., ierr)
+                      n_elem2d, out_sched_nod%n_writers, partit%MPI_COMM_FESOM, .false., ierr)
     if (ierr /= 0) then
        if (partit%mype==0) write(*,*) 'io_meandata: element redist_build failed, ierr=', ierr
        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     end if
     deallocate(gelem)
+
+    ! ... and assert it rather than trust it. This is cheap, and it is the check
+    ! that would have turned the silent data loss above into a failed run.
+    if (out_sched_nod%n_writers /= out_sched_elem%n_writers .or. &
+        (out_sched_nod%is_writer .neqv. out_sched_elem%is_writer)) then
+       write(*,*) 'io_meandata: nodal and element writer sets disagree on rank ', partit%mype, &
+                  ' -- nodal writers ', out_sched_nod%n_writers, &
+                  ', element writers ', out_sched_elem%n_writers
+       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    end if
 
     call MPI_Comm_split(partit%MPI_COMM_FESOM, merge(1,0,out_sched_nod%is_writer), &
                         partit%mype, out_wcomm, ierr)
