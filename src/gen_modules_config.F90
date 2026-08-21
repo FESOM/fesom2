@@ -116,6 +116,52 @@ module g_config
   integer                :: n_levels = 1       ! Number of levels for hierarchic partitioning
   integer, dimension(10) :: n_part = RESHAPE((/0/), (/10/), (/0/)) ! Number of partitions on each hierarchy level
   namelist /machine/ n_levels, n_part
+
+  ! --- parallel output/restart writing -------------------------------------
+  ! Lives in namelist.config, NOT namelist.io: namelist.io is read by
+  ! ini_mean_io on the first call to output(), i.e. inside the timestep loop,
+  ! long after the restart file group has been built. A setting placed there
+  ! would silently have no effect on restarts.
+  logical :: parallel_write = .false.   !< collective writes instead of gather-to-one
+  integer :: n_writers     = 0          !< 0 = as many as the block-size guard allows
+  !> Vertical extent of an output chunk, in levels. 0 = all levels, 1 = one level.
+  !>
+  !> Chunk size = chunk_levels * block * bytes_per_value, where
+  !>   block = ceil(nod2D / n_writers) is one writer's share of the horizontal
+  !>   dimension. The horizontal extent is NOT free: a chunk wider than a
+  !>   writer's block would span two writers, and HDF5 would then have to ship
+  !>   and re-compress it between ranks -- exactly what this design avoids.
+  !>   The VERTICAL extent is free, because a writer owns every level of its
+  !>   own nodes, so raising chunk_levels costs no write performance at all.
+  !>
+  !> NG5 (nod2D = 7402886, nz = 69), float32:
+  !>   n_writers = 256, chunk_levels = 1   ->   0.12 MB
+  !>   n_writers = 256, chunk_levels = 8   ->   0.93 MB   (default)
+  !>   n_writers = 256, chunk_levels = 69  ->   8.0 MB
+  !>   n_writers =  64, chunk_levels = 69  ->  31.9 MB
+  !>   n_writers =  20, chunk_levels = 69  -> 102 MB
+  !>
+  !> Which value suits depends on how the data is read. Tall chunks (many
+  !> levels) favour profiles and time series at a point, and conversion to
+  !> zarr; flat chunks favour maps at a single depth, because reading one level
+  !> out of a chunk of k costs k times the bytes. Default 8 is a compromise
+  !> leaning toward maps, which are the more common access pattern here.
+  integer :: chunk_levels  = 8
+  !> Restart writers and restart readers, separately from the output writers.
+  !> -1 means "same as n_writers", which is what one knob used to give.
+  !>
+  !> The three want different values, measured on NG5/8192: output peaks near
+  !> 512 writers, restarts peak lower, and reading peaks lower still -- 128
+  !> readers beat 512 by a third (141.2 s gather -> 52.9 s at 512 -> 39.9 s at
+  !> 128). Output writes compressed chunks whose boundaries must coincide with
+  !> writer blocks, so its optimum is tied to chunk size; a read decompresses
+  !> whole chunks and has no such constraint, which is why its optimum sits
+  !> elsewhere. Zero keeps its meaning of "as many as the block-size guard
+  !> allows" for all three.
+  integer :: n_writers_restart = -1     !< -1 = use n_writers
+  integer :: n_readers_restart = -1     !< -1 = use n_writers
+  namelist /io_parallel/ parallel_write, n_writers, chunk_levels, &
+                         n_writers_restart, n_readers_restart
   
   !_____________________________________________________________________________
   ! *** configuration***

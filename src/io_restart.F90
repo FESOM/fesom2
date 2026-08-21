@@ -1,5 +1,6 @@
 MODULE io_RESTART
   use restart_file_group_module
+  use io_fesom_file_module, only: parallel_write_enabled, set_parallel_write
   use restart_derivedtype_module
   use g_clock
   use g_config
@@ -121,6 +122,11 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
 
   if(has_been_called) return
   has_been_called = .true.
+
+  ! Select the write path before any restart file is initialised: fesom_file's
+  ! init builds the redistribution schedules and the writer communicator, and
+  ! both must exist before the first collective create.
+  call set_parallel_write(parallel_write, n_writers_restart, n_readers_restart)
 
   !===========================================================================
   !===================== Definition part =====================================
@@ -719,7 +725,8 @@ subroutine write_netcdf_restarts(path, filegroup, istep)
   character(:), allocatable :: dirpath
   character(:), allocatable :: filepath
   logical file_exists
-  
+  integer mpierr_par
+
   cstep = globalstep+istep
   
   ! Calculate current time from clock (seconds from beginning of year)
@@ -727,6 +734,64 @@ subroutine write_netcdf_restarts(path, filegroup, istep)
   
   do i=1, filegroup%nfiles
     call filegroup%files(i)%join() ! join the previous write (if required)
+
+    if(parallel_write_enabled()) then
+      ! Collective path. Everything below that the serial path does under
+      ! is_iorank() has to be done by every WRITER instead, because they all
+      ! take part in the create and in every put_var. Non-writers skip it and
+      ! only join the redistribution inside the write call.
+      !
+      ! The path/create-vs-append decision is taken identically on every writer:
+      ! they inspect the same filesystem and hold the same `path` state, so no
+      ! broadcast is needed. mkdir is idempotent and only rank 0 calls it, with
+      ! a barrier afterwards so no writer races ahead to create inside a
+      ! directory that does not exist yet.
+      if(filegroup%files(i)%is_writer()) then
+        if(filegroup%files(i)%is_attached()) call filegroup%files(i)%close_file()
+
+        dirpath = path(1:len(path)-3)
+        filepath = dirpath//"/"//filegroup%files(i)%varname//".nc"
+
+        if(filegroup%files(i)%path == "" .or. (.not. filegroup%files(i)%must_exist_on_read)) then
+          inquire(file=filepath, exist=file_exists)
+          if(file_exists) then
+            filegroup%files(i)%path = filepath
+          else if(.not. filegroup%files(i)%must_exist_on_read) then
+            filegroup%files(i)%path = ""
+          end if
+        end if
+      end if
+
+      if(filegroup%files(i)%is_lead_writer()) call mkdir(path(1:len(path)-3))
+      if(filegroup%files(i)%is_writer()) &
+         call MPI_Barrier(filegroup%files(i)%writer_comm(), mpierr_par)
+
+      if(filegroup%files(i)%is_writer()) then
+        if(filegroup%files(i)%path .ne. filepath) then
+          filegroup%files(i)%path = filepath
+          call filegroup%files(i)%open_write_create_par(filegroup%files(i)%path, &
+                                                        filegroup%files(i)%writer_comm())
+        else
+          call filegroup%files(i)%open_write_append_par(filegroup%files(i)%path, &
+                                                        filegroup%files(i)%writer_comm())
+        end if
+
+        ! iter and time are per-record scalars, but they are in COLLECTIVE access
+        ! mode like every other variable, and writing them extends the unlimited
+        ! time dimension -- which is a collective operation. So EVERY writer must
+        ! issue them, all writing the same value to the same record. Restricting
+        ! this to the lead writer deadlocked the other writers, which is what hung
+        ! core2 at 8 writers while pi (one writer) passed. Same rule as the output
+        ! path in io_meandata.F90.
+        call filegroup%files(i)%write_var(filegroup%files(i)%iter_varindex, &
+                                          [filegroup%files(i)%rec_count()+1], [1], [cstep])
+        call filegroup%files(i)%write_var(filegroup%files(i)%time_varindex(), &
+                                          [filegroup%files(i)%rec_count()+1], [1], [ctime])
+      end if
+
+      call filegroup%files(i)%async_gather_and_write_variables()
+      cycle
+    end if
 
     if(filegroup%files(i)%is_iorank()) then
       if(filegroup%files(i)%is_attached()) call filegroup%files(i)%close_file() ! close the file from previous write
@@ -895,10 +960,15 @@ subroutine finalize_restart()
 
   ! join all previous writes
   ! close all restart files
+  !
+  ! nf_close is COLLECTIVE in parallel netCDF-4, so in the collective path every
+  ! writer must close, not just the iorank. Closing on one rank only left the
+  ! other writers blocked after the restart had been written correctly -- the run
+  ! produced complete restart files and then hung in finalisation.
 
   do i=1, oce_files%nfiles
     call oce_files%files(i)%join()
-    if(oce_files%files(i)%is_iorank()) then
+    if(merge(oce_files%files(i)%is_writer(), oce_files%files(i)%is_iorank(), parallel_write_enabled())) then
       if(oce_files%files(i)%is_attached()) call oce_files%files(i)%close_file()
     end if
   end do
@@ -906,7 +976,7 @@ subroutine finalize_restart()
   if(use_ice) then
     do i=1, ice_files%nfiles
       call ice_files%files(i)%join()
-      if(ice_files%files(i)%is_iorank()) then
+      if(merge(ice_files%files(i)%is_writer(), ice_files%files(i)%is_iorank(), parallel_write_enabled())) then
         if(ice_files%files(i)%is_attached()) call ice_files%files(i)%close_file()
       end if
     end do
@@ -914,7 +984,7 @@ subroutine finalize_restart()
 #if defined(__recom)
   do i=1, bio_files%nfiles
     call bio_files%files(i)%join()
-    if(bio_files%files(i)%is_iorank()) then
+    if(merge(bio_files%files(i)%is_writer(), bio_files%files(i)%is_iorank(), parallel_write_enabled())) then
       if(bio_files%files(i)%is_attached()) call bio_files%files(i)%close_file()
     end if
   end do
@@ -966,16 +1036,33 @@ subroutine read_netcdf_restarts(path, filegroup, mpicomm, mype)
           write(*,*) 'skipping reading restart for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
         end if
         
-        if(.not. skip_file(i)) call filegroup%files(i)%open_read(filegroup%files(i)%path) ! do we need to bother with read-only access?
+        ! On the collective path the open is done below by every reader, not
+        ! here by one CPU: each get_var is collective over the reader
+        ! communicator, and a file opened serially on one rank cannot take part.
+        if(.not. skip_file(i) .and. .not. parallel_write_enabled()) &
+             call filegroup%files(i)%open_read(filegroup%files(i)%path) ! do we need to bother with read-only access?
         ! todo: print a reasonable error message if the file does not exist
-      end if      
+      end if
     end if
 
     ! iorank already knows if we skip the file, tell the others
     if(.not. filegroup%files(i)%must_exist_on_read) then
       call MPI_Allreduce(current_iorank_snd, current_iorank_rcv, 1, MPI_INTEGER, MPI_SUM, mpicomm, mpierr)
       call MPI_Bcast(skip_file(i), 1, MPI_LOGICAL, current_iorank_rcv, mpicomm, mpierr)
-    end if      
+    end if
+
+    ! Collective read: every reader opens the file for itself. The path is
+    ! derived from `path` and the file's own varname, both of which every rank
+    ! holds, so the readers agree without a broadcast -- the same argument the
+    ! collective write path makes about create-versus-append.
+    if(parallel_write_enabled() .and. .not. skip_file(i)) then
+      dirpath = path(1:len(path)-3)                       ! chop the ".nc" suffix
+      filegroup%files(i)%path = dirpath//"/"//filegroup%files(i)%varname//".nc"
+      if(filegroup%files(i)%is_reader()) then
+        if(filegroup%files(i)%is_attached()) call filegroup%files(i)%close_file()
+        call filegroup%files(i)%open_read_par(filegroup%files(i)%path, filegroup%files(i)%reader_comm())
+      end if
+    end if
 
     ! ========================================================================!
     !                           _____________________                         !
@@ -1018,7 +1105,17 @@ subroutine read_netcdf_restarts(path, filegroup, mpicomm, mype)
 
     if(skip_file(i)) cycle
 
-    if(filegroup%files(i)%is_iorank()) then
+    ! ⛔ On the collective path this block MUST NOT be selected by is_iorank().
+    ! That rank comes from the next_io_rank pool, which hands out one rank per
+    ! host in round robin -- on a single node it gives 1, 2, 3, ... -- while the
+    ! readers are chosen by redist_writer_rank, a fixed stride: 0, 4, 8, ... on
+    ! 128 ranks with 30 readers. The two sets barely overlap, so the iorank has
+    ! no file open and every call below fails with "NetCDF: Not a valid ID"
+    ! (job 26825609, rank 9). The lead reader is rank 0 by construction, and the
+    ! reader set is its own set now that n_readers_restart is separate from
+    ! n_writers_restart -- so this must be is_lead_reader, not is_lead_writer.
+    if(merge(filegroup%files(i)%is_lead_reader(), filegroup%files(i)%is_iorank(), &
+             parallel_write_enabled())) then
       write(*,*) 'restart from record ', filegroup%files(i)%rec_count(), ' of ', filegroup%files(i)%rec_count(), filegroup%files(i)%path
 
       ! read the last entry from the iter variable
@@ -1026,7 +1123,8 @@ subroutine read_netcdf_restarts(path, filegroup, mpicomm, mype)
 
       ! read the last entry from the time variable
       call filegroup%files(i)%read_var1(filegroup%files(i)%time_varindex(), [filegroup%files(i)%rec_count()], rtime)
-      call filegroup%files(i)%close_file()
+      ! On the collective path the close is done below by the whole reader set.
+      if(.not. parallel_write_enabled()) call filegroup%files(i)%close_file()
 
      if (int(ctime)/=int(rtime)) then
         print *, achar(27)//'[33m'    //'____________________________________________________________'//achar(27)//'[0m'
@@ -1039,6 +1137,26 @@ subroutine read_netcdf_restarts(path, filegroup, mpicomm, mype)
         write(*,*) 'WARNING: Please verify that this is the intended behavior for your simulation.'
         print *, achar(27)//'[33m'    //'____________________________________________________________'//achar(27)//'[0m'
       end if
+    end if
+
+    ! ⛔ nc_close on a file opened with nf_open_par is COLLECTIVE over the
+    ! communicator it was opened on. Leaving the close inside the is_iorank
+    ! block above is what hung job 26825509: one CPU entered nc_close and waited
+    ! for the other 29 readers, those 29 went on to open the next restart file
+    ! -- also collective -- and every non-reader piled up in the redistribution
+    ! Alltoallv behind them. No error, no message, just a stack trace pointing at
+    ! MPI_Alltoallv, which is nowhere near the actual mistake.
+    !
+    ! Same rule as the write path: on the collective path every netCDF operation
+    ! on a shared file belongs to exactly the reader set, never to one CPU.
+    if(parallel_write_enabled()) then
+      ! Only the lead reader read the record scalars, so globalstep has to be
+      ! spread before anything downstream uses it. Broadcasting from rank 0 is
+      ! valid because is_lead_writer is rank 0 by construction. The gather path
+      ! propagates globalstep only as far as RAW_RESTART_METADATA_RANK; giving it
+      ! to everyone here is a superset, so the send/recv below still works.
+      call MPI_Bcast(globalstep, 1, MPI_INTEGER, 0, mpicomm, mpierr)
+      if(filegroup%files(i)%is_reader()) call filegroup%files(i)%close_file()
     end if
   end do
 
