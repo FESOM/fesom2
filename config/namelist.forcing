@@ -126,7 +126,8 @@ age_start_year    = 2000     ! year to start age tracer (tracer age = 0 at this 
 
    ! --- Runoff configuration ---
    runoff_data_source = 'JRA55'       ! runoff data source: 'Dai09', 'JRA55', 'CORE1', 'CORE2' or 'NONE'
-   nm_runoff_file     = '/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/friver.'  ! for Dai09/JRA55 this is a prefix, year and '.nc' are appended
+   nm_runoff_file     = '/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/friver.'  ! Dai09/JRA55 with runoff_climatology=.false.: prefix, year and '.nc' are appended (friver.1958.nc).
+                                        ! with runoff_climatology=.true., and for CORE1/CORE2, give the complete file name instead
 
    ! --- Sea surface salinity restoring ---
    sss_data_source  = 'CORE2'  ! SSS restoring data source: 'CORE2', 'WOA', or 'NONE'
