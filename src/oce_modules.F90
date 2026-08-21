@@ -21,7 +21,7 @@ integer, parameter            :: WP=real64   ! Working precision
 integer, parameter            :: WP_full=real64
 integer, parameter            :: MAX_PATH=4096 ! Maximum file path length
 integer		                  :: mstep
-real(kind=WP), parameter      :: pi=3.14159265358979_WP
+real(kind=WP), parameter      :: pi=3.141592653589793238462643383279502884_WP
 real(kind=WP), parameter      :: rad=pi/180.0_WP
 real(kind=WP), parameter      :: density_0=1030.0_WP
 real(kind=WP), parameter      :: density_0_r=1.0_WP/density_0 ! [m^3/kg]
@@ -238,6 +238,8 @@ real(kind=WP), allocatable         :: heat_flux(:), Tsurf(:)
 real(kind=WP), allocatable         :: heat_flux_in(:) !to keep the unmodified (by SW penetration etc.) heat flux 
 real(kind=WP), allocatable         :: Tsurf_ib(:) ! kh 15.03.21 additional array for asynchronous iceberg computations
 real(kind=WP), allocatable    :: water_flux(:), fw_ice(:), fw_snw(:), Ssurf(:)
+real(kind=WP), allocatable    :: hosing_flux(:), hosing_heat_flux(:)
+real(kind=WP), allocatable    :: hosing_flux3D(:,:), hosing_heat_flux3D(:,:)
 real(kind=WP), allocatable    :: Ssurf_ib(:) ! kh 15.03.21 additional array for asynchronous iceberg computations
 real(kind=WP), allocatable    :: virtual_salt(:), relax_salt(:)
 real(kind=WP), allocatable    :: Tclim(:,:), Sclim(:,:)

@@ -2866,7 +2866,6 @@ END SUBROUTINE sbc_do_recom
 !
    real(wp), parameter :: r3 = 1.0/3.0
    real(wp), parameter :: sqr3 = 1.7320508
-   real(wp), parameter :: pi=3.141592653589
    real(wp)            :: Fw, chic, chik, psic, psik
 
 !  Initialize for the zero "ZoL" case.
@@ -3049,7 +3048,6 @@ END SUBROUTINE sbc_do_recom
 !  Original author(s): Karsten Bolding
 !
 ! !LOCAL VARIABLES:
-   real(wp), parameter       :: pi=3.14159265358979323846
    real(wp), parameter       :: deg2rad=pi/180.
    real(wp), parameter       :: rad2deg=180./pi
 
@@ -3132,7 +3130,6 @@ END SUBROUTINE sbc_do_recom
 !  Original author(s): Karsten Bolding & Hans Burchard
 !
 ! !LOCAL VARIABLES:
-   real(wp), parameter       :: pi=3.14159265358979323846
    real(wp), parameter       :: deg2rad=pi/180.
    real(wp), parameter       :: rad2deg=180./pi
 
