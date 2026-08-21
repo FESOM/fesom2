@@ -26,6 +26,7 @@ subroutine reset_ib_fluxes()
     ibfwb   = 0.0
     ibfwl   = 0.0
     ibfwe   = 0.0
+    ibiron  = 0.0
     ibhf    = 0.0
     ibhf_n  = 0.0_WP
 end subroutine reset_ib_fluxes
@@ -124,6 +125,11 @@ type(t_partit), intent(inout), target :: partit
                     ibfwb(iceberg_node) = ibfwb(iceberg_node) - fwb_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
                     ibfwl(iceberg_node) = ibfwl(iceberg_node) - fwl_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
                     ibfwe(iceberg_node) = ibfwe(iceberg_node) - fwe_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
+                    ! LA 2026 -- iron released with the meltwater, distributed over
+                    ! the element nodes exactly like the freshwater [mol m-2 s-1]
+                    if (use_icb_iron) then
+                        ibiron(iceberg_node) = ibiron(iceberg_node) - iron_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
+                    end if
                 end if
                 !ibhf(iceberg_node) = ibhf(iceberg_node) - hfb_flux_ib(ib) / tot_area_nods_in_ib_elem(1)
 

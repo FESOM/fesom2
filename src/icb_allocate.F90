@@ -40,6 +40,8 @@ type(t_mesh), intent(in), target :: mesh
   ibfwl     = 0.0
   ibfwe     = 0.0
   ibfwbv    = 0.0
+  allocate(ibiron(n2))
+  ibiron    = 0.0
   allocate(ibhf_n(mesh%nl, n2))
   ibhf_n    = 0.0_WP
 
@@ -114,6 +116,8 @@ type(t_mesh), intent(in), target :: mesh
   allocate(fwl_flux_ib(ib_num))
   allocate(fwb_flux_ib(ib_num))
   allocate(fwbv_flux_ib(ib_num))
+  allocate(iron_conc_ib(ib_num))
+  allocate(iron_flux_ib(ib_num))
   allocate(hfe_flux_ib(ib_num))
   allocate(hfl_flux_ib(ib_num,mesh%nl))
   allocate(hfb_flux_ib(ib_num))
@@ -123,6 +127,8 @@ type(t_mesh), intent(in), target :: mesh
   fwl_flux_ib = 0.0
   fwb_flux_ib = 0.0
   fwbv_flux_ib = 0.0
+  iron_conc_ib = icb_iron_const   ! overwritten by icb_iron.dat / the iron restart
+  iron_flux_ib = 0.0
   hfe_flux_ib = 0.0
   hfl_flux_ib = 0.0
   hfb_flux_ib = 0.0

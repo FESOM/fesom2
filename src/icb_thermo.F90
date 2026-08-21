@@ -203,7 +203,8 @@ subroutine iceberg_newdimensions(partit, ib, depth_ib,height_ib,length_ib,width_
   use g_forcing_arrays
   use g_rotate_grid
   use iceberg_params, only: l_weeksmellor, ascii_out, icb_outfreq, vl_block, bvl_mean, lvlv_mean, lvle_mean, lvlb_mean, smallestvol_icb, fwb_flux_ib, fwe_flux_ib, fwbv_flux_ib, fwl_flux_ib, scaling, hfb_flux_ib, hfbv_flux_ib, hfe_flux_ib, hfl_flux_ib, lhfb_flux_ib
-  use g_config, only: steps_per_ib_step
+  use g_config, only: steps_per_ib_step, use_icb_iron
+  use iceberg_params, only: iron_conc_ib, iron_flux_ib   ! LA 2026, iron tracer
 
   implicit none  
 
@@ -309,6 +310,15 @@ type(t_partit), intent(inout), target :: partit
     fwe_flux_ib(ib) = -lvl_e*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)*scaling(ib)
     fwbv_flux_ib(ib) = -lvl_b*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)*scaling(ib)
     fwl_flux_ib(ib) = -lvl_v*rho_icb/rho_h2o/dt/REAL(steps_per_ib_step)*scaling(ib)
+
+    ! LA 2026 -- passive iron tracer.  The fw fluxes above are volume fluxes of
+    ! meltwater [m3 s-1] (negative = leaving the iceberg) and already include
+    ! scaling(ib).  Multiplying by the Fe concentration of the ice [mol m-3]
+    ! gives the Fe release rate [mol s-1], with the same sign convention.
+    if (use_icb_iron) then
+      iron_flux_ib(ib) = ( fwb_flux_ib(ib) + fwe_flux_ib(ib)                    &
+                         + fwbv_flux_ib(ib) + fwl_flux_ib(ib) ) * iron_conc_ib(ib)
+    end if
 
     !stability criterion: icebergs are allowed to roll over
     if(l_weeksmellor) then
