@@ -3304,6 +3304,242 @@ if (Diags) then
         ) * recipbiostep
 #endif
 
+!*** mesozooplankton grazing
+! Total assimilated grazing (with efficiency applied)
+        vertgrazmeso_tot(k) = vertgrazmeso_tot(k) + (          &
+        + grazingFlux_phy * recipQuota * grazEff               &  ! Nanophytoplankton
+        + grazingFlux_Dia * recipQuota_Dia * grazEff           &  ! Diatoms
+        + grazingFlux_Det * recipDet * grazEff                 &  ! Detritus 1
+        ) * recipbiostep
+       
+#if defined (__coccos)
+        vertgrazmeso_tot(k) = vertgrazmeso_tot(k) + ( &
+        + grazingFlux_Cocco * recipQuota_Cocco * grazEff &  ! Coccolithophores
+        + grazingFlux_Phaeo * recipQuota_Phaeo * grazEff &  ! Phaeocystis
+        ) * recipbiostep
+#endif
+
+#if defined (__3Zoo2Det)
+        vertgrazmeso_tot(k) = vertgrazmeso_tot(k) + (      &
+        + GrazingFlux_DetZ2 * recipDet2 * grazEff          &  ! Detritus 2
+        + grazingFlux_miczoo * recipQZoo3 * grazEff        &  ! Microzooplankton
+        ) * recipbiostep
+#endif
+
+#if defined (__diaH)
+        vertgrazmeso_tot(k) = vertgrazmeso_tot(k) + ( &
+        + grazingFlux_DiaH * recipQuota_DiaH * grazEff &  ! heavily silicifying diatoms
+        ) * recipbiostep
+#endif
+
+
+! Prey-specific mortality (loss terms, no efficiency applied)
+! These track carbon removal from each prey population
+        
+! Small phytoplankton mortality
+        vertgrazmeso_n(k) = vertgrazmeso_n(k) + ( &
+        + grazingFlux_phy * recipQuota            &
+        ) * recipbiostep
+        
+! Diatom mortality
+        vertgrazmeso_d(k) = vertgrazmeso_d(k) + ( &
+        + grazingFlux_dia * recipQuota_dia        &
+        ) * recipbiostep
+
+#if defined (__diaH)
+! heavily silicifyig diatom mortality
+        vertgrazmeso_diaH(k) = vertgrazmeso_diaH(k) + ( &
+        + grazingFlux_diaH * recipQuota_diaH         &
+        ) * recipbiostep
+#endif
+
+#if defined (__coccos)
+            ! Coccolithophore mortality
+            vertgrazmeso_c(k) = vertgrazmeso_c(k) + ( &
+            + grazingFlux_Cocco * recipQuota_cocco     &
+            ) * recipbiostep
+
+            ! Phaeocystis mortality
+            vertgrazmeso_p(k) = vertgrazmeso_p(k) + ( &
+            + grazingFlux_Phaeo * recipQuota_Phaeo     &
+            ) * recipbiostep
+#endif
+
+        ! Detritus 1 consumption
+        vertgrazmeso_det(k) = vertgrazmeso_det(k) + ( &
+        + grazingFlux_Det * recipDet                   &
+        ) * recipbiostep
+        
+#if defined (__3Zoo2Det)
+            ! Microzooplankton mortality (intraguild predation)
+            vertgrazmeso_mic(k) = vertgrazmeso_mic(k) + ( &
+            + grazingFlux_miczoo * recipQZoo3              &
+            ) * recipbiostep
+            
+            ! Detritus 2 consumption
+            vertgrazmeso_det2(k) = vertgrazmeso_det2(k) + ( &
+            + GrazingFlux_DetZ2 * recipDet2                 &
+            ) * recipbiostep
+#endif
+
+
+
+! MACROZOOPLANKTON GRAZING (KRILL)
+
+#if defined (__3Zoo2Det)
+            
+            ! Total assimilated grazing (with efficiency applied)
+            vertgrazmacro_tot(k) = vertgrazmacro_tot(k) + (    &
+            + grazingFlux_phy2 * recipQuota * grazEff2          &  ! Small phytoplankton
+            + grazingFlux_Dia2 * recipQuota_Dia * grazEff2      &  ! Diatoms
+            + grazingFlux_het2 * recipQZoo * grazEff2           &  ! Mesozooplankton
+            + grazingFlux_miczoo2 * recipQZoo3 * grazEff2       &  ! Microzooplankton
+            + grazingFlux_Det2 * recipDet * grazEff2            &  ! Detritus 1
+            + grazingFlux_DetZ22 * recipDet2 * grazEff2         &  ! Detritus 2
+            ) * recipbiostep
+            
+#if defined (__coccos)
+            vertgrazmacro_tot(k) = vertgrazmacro_tot(k) + ( &
+            + grazingFlux_Cocco2 * recipQuota_Cocco * grazEff2 &  ! Coccolithophores
+            + grazingFlux_Phaeo2 * recipQuota_Phaeo * grazEff2 &  ! Phaeocystis
+            ) * recipbiostep
+#endif
+
+#if defined (__diaH)
+            vertgrazmacro_tot(k) = vertgrazmacro_tot(k) + ( &
+            + grazingFlux_DiaH2 * recipQuota_DiaH * grazEff2      &  ! Heavily silicified Diatoms
+            ) * recipbiostep
+#endif 
+
+! Prey-specific mortality (loss terms, no efficiency applied)
+! These track carbon removal from each prey population
+            
+! Small phytoplankton mortality
+            vertgrazmacro_n(k) = vertgrazmacro_n(k) + ( &
+            + grazingFlux_phy2 * recipQuota              &
+            ) * recipbiostep
+            
+! Diatom mortality
+            vertgrazmacro_d(k) = vertgrazmacro_d(k) + ( &
+            + grazingFlux_Dia2 * recipQuota_Dia          &
+            ) * recipbiostep
+
+#if defined (__diaH)
+! Heavily silicifying diatom mortality
+            vertgrazmacro_diaH(k) = vertgrazmacro_diaH(k) + ( &
+            + grazingFlux_DiaH2 * recipQuota_DiaH          &
+            ) * recipbiostep
+#endif
+            
+#if defined (__coccos)
+! Coccolithophore mortality
+            vertgrazmacro_c(k) = vertgrazmacro_c(k) + ( &
+            + grazingFlux_Cocco2 * recipQuota_cocco      &
+            ) * recipbiostep
+
+! Phaeocystis mortality
+            vertgrazmacro_p(k) = vertgrazmacro_p(k) + ( &
+            + grazingFlux_Phaeo2 * recipQuota_Phaeo      &
+            ) * recipbiostep
+#endif
+            
+! Mesozooplankton mortality (carnivory)
+            vertgrazmacro_mes(k) = vertgrazmacro_mes(k) + ( &
+            + grazingFlux_het2 * recipQZoo                   &
+            ) * recipbiostep
+            
+! Detritus 1 consumption
+            vertgrazmacro_det(k) = vertgrazmacro_det(k) + ( &
+            + grazingFlux_Det2 * recipDet                    &
+            ) * recipbiostep
+            
+! Microzooplankton mortality
+            vertgrazmacro_mic(k) = vertgrazmacro_mic(k) + ( &
+            + grazingFlux_miczoo2 * recipQZoo3               &
+            ) * recipbiostep
+            
+! Detritus 2 consumption
+            vertgrazmacro_det2(k) = vertgrazmacro_det2(k) + ( &
+            + GrazingFlux_DetZ22 * recipDet2                   &
+            ) * recipbiostep
+            
+#endif
+
+! MICROZOOPLANKTON GRAZING
+#if defined (__3Zoo2Det)
+            
+! Total assimilated grazing (with efficiency applied)
+            vertgrazmicro_tot(k) = vertgrazmicro_tot(k) + (     &
+            + grazingFlux_phy3 * recipQuota * grazEff3           &  ! Small phytoplankton
+            + grazingFlux_Dia3 * recipQuota_Dia * grazEff3       &  ! Diatoms
+            ) * recipbiostep
+            
+#if defined (__coccos)
+            vertgrazmicro_tot(k) = vertgrazmicro_tot(k) + ( &
+            + grazingFlux_Cocco3 * recipQuota_Cocco * grazEff3 &  ! Coccolithophores
+            + grazingFlux_Phaeo3 * recipQuota_Phaeo * grazEff3 &  ! Phaeocystis
+            ) * recipbiostep
+#endif
+
+#if defined (__diaH)
+! Heavily silicifying diatom mortality
+            vertgrazmicro_tot(k) = vertgrazmicro_tot(k) + (     &
+            + grazingFlux_DiaH3 * recipQuota_DiaH * grazEff3    &  ! Heavily silicifying diatoms
+            ) * recipbiostep
+#endif
+
+! Prey-specific mortality (loss terms, no efficiency applied)
+! These track carbon removal from each prey population
+            
+! Small phytoplankton mortality
+            vertgrazmicro_n(k) = vertgrazmicro_n(k) + ( &
+            + grazingFlux_phy3 * recipQuota             &
+            ) * recipbiostep
+            
+! Diatom mortality
+            vertgrazmicro_d(k) = vertgrazmicro_d(k) + ( &
+            + grazingFlux_Dia3 * recipQuota_Dia         &
+            ) * recipbiostep
+
+#if defined (__diaH)
+! Heavily silicifying diatom mortality
+            vertgrazmicro_diaH(k) = vertgrazmicro_diaH(k) + ( &
+            + grazingFlux_DiaH3 * recipQuota_DiaH       &
+            ) * recipbiostep
+#endif
+            
+#if defined (__coccos)
+! Coccolithophore mortality
+            vertgrazmicro_c(k) = vertgrazmicro_c(k) + ( &
+            + grazingFlux_Cocco3 * recipQuota_cocco     &
+            ) * recipbiostep
+
+! Phaeocystis mortality
+            vertgrazmicro_p(k) = vertgrazmicro_p(k) + ( &
+            + grazingFlux_Phaeo3 * recipQuota_Phaeo     &
+            ) * recipbiostep
+#endif
+
+           
+#endif
+
+! DISSOLUTION ! R2OMIP
+!===========================================================================
+
+    vertDISSOC(k) = vertDISSOC(k) + ( &
+    + reminC * arrFunc * O2Func * DetC                 & ! Slow-sinking detritus dissolution
+    + reminC * arrFunc * O2Func * DetZ2C               & ! Fast-sinking detritus dissolution
+    ) * recipbiostep
+
+    vertDISSON(k) = vertDISSON(k) + ( &
+    + reminN * arrFunc * O2Func * DetN                 & ! Slow-sinking detritus dissolution
+    + reminN * arrFunc * O2Func * DetZ2N               & ! Fast-sinking detritus dissolution
+    ) * recipbiostep
+
+    vertDISSOSi(k) = vertDISSOSi(k) + ( &
+    + reminSiT * DetSi                                 & ! Slow-sinking detritus dissolution
+    ) * recipbiostep
+
 endif
   end do ! Main vertical loop ends
 
