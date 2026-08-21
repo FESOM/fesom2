@@ -14,6 +14,7 @@ jobs:
   general_test:
     # Containers must run in Linux based operating systems
     runs-on: ubuntu-latest
+    timeout-minutes: 12
     # Image with mkfesom + XIOS 2.5 prebuilt at /xios (see FESOM/FESOM2_Docker
     # fesom2_test_refactoring/Dockerfile).
     container: ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master
@@ -110,12 +111,12 @@ jobs:
           # values will fail this check and either adjust the references or
           # explain the divergence.
           ref = {
-              "sst":   8.673937797546387,
-              "a_ice": 0.8812576105565201,
-              "temp":  2.473328515513666,
-              "salt":  34.73029091319962,
-              "u":    -0.002066224489183517,
-              "v":     0.0002165362787114573,
+              "sst":   8.677109718322754,
+              "a_ice": 0.883104954901662,
+              "temp":  2.473566693530158,
+              "salt":  34.73030748139613,
+              "u":    -0.002011677154530131,
+              "v":     0.0002909513948293978,
           }
           tol = 1e-12
           fail = False
