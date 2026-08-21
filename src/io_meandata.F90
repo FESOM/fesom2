@@ -767,7 +767,12 @@ CASE ('Chldegc  ')
     call def_stream(nod2D,  myDim_nod2D,   'ChlDegc','Chlorophyll degradation coccolithophores','1/d', Chldegc, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! NEW
     endif
 #endif
-    
+
+!___________________________________________________________________________________________________________________________________    
+CASE ('Tsurf    ')
+    call def_stream(nod2D , myDim_nod2D , 'tsurf' , 'virtual salt flux'          , '°C', Tsurf(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+
 !___________________________________________________________________________________________________________________________________    
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>   3D streams   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 !___________________________________________________________________________________________________________________________________

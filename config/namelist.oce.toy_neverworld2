@@ -116,5 +116,72 @@ north_cold_patch_power = 2.0
 do_south_cold_patch    = .False.
 south_pole_target      = 0.0
 south_cold_patch_power = 2.0
+
+! --- Equatorial value of the trelax_opt=2 symmetric cosine restoring target ---
+! t_base = 5 + (equator_target-5)*cos(0.5*pi*lat/Ly); the poleward endpoint (5degC,
+! before any cold-patch blending) stays hardcoded. Was hardcoded to 33degC (5+28);
+! default unchanged. DINO's own equatorial target (Kamm et al. 2025, Theta*_eq) is
+! 27degC, closer to realistic tropical SST than 33degC -- worth lowering this if
+! bringing t_base closer to DINO/realistic values.
+equator_target = 33.0
+
+! --- Linear thermal expansion coefficient, density_linear()/sw_alpha_beta() (state_equation=0) ---
+! rho = rho0 - rho0*thermal_alpha*(T-10). Was hardcoded to 0.0002 before; default unchanged.
+! Also the base slope for the do_cabbeling term below (a0 = thermal_alpha*rho0).
+thermal_alpha = 0.0002
+
+! --- Optional thermal cabbeling term for density_linear(), only used if state_equation=0 ---
+! Adds a quadratic-in-T term on top of the existing linear slope, following the standard
+! Vallis-style normalized quadratic EOS: rho = rho0*(1 - thermal_alpha*Ta - 0.5*cabbeling_Cb*Ta^2),
+! Ta = T-10degC. cabbeling_Cb is rho0-NORMALIZED [K^-2], same convention as thermal_alpha [K^-1] --
+! NOT DINO/Roquet's raw absolute Cb [kg/m^3/K^2] (their Table 1 value 9.9e-3 kg/m^3/K^2 converts to
+! 9.9e-3/density_0 = 9.6e-6 K^-2 here). Off by default -- reproduces the old linear-only formula
+! exactly when do_cabbeling=.False. Salinity stays dynamically inert (beta=0) either way.
+do_cabbeling  = .False.
+cabbeling_Cb  = 1.0e-5    ! [K^-2], TEOS-10/GSW-range realistic cabbeling coefficient (Vallis-style
+                          ! normalized form); numerically close to DINO's 9.6e-6 K^-2 equivalent
+
+! --- Optional thermobaric term for density_linear(), independent of do_cabbeling ---
+! rho = rho0 - (thermal_alpha + Th*depth)*(T-10), depth positive-downward [m] -- makes the
+! effective thermal expansion coefficient grow with depth (DINO/Roquet et al. 2015 Eq.6),
+! distinct from cabbeling: only strengthens already-sinking/dense water, doesn't also
+! lighten the warm equatorial surface. Off by default -- reproduces the unmodified formula
+! exactly when do_thermobar=.False. thermobaric_Th is rho0-NORMALIZED [K^-1 m^-1], same
+! convention as thermal_alpha/cabbeling_Cb -- NOT DINO/Roquet's raw absolute Th [kg/m^3/K/m]
+! (their Table 1 value 2.47e-5 kg/m^3/K/m converts to 2.47e-5/density_0 = 2.4e-8 K^-1 m^-1 here).
+do_thermobar    = .False.
+thermobaric_Th  = 2.4e-8  ! [K^-1 m^-1], DINO/Roquet Table 1 value normalized by density_0
+
+! --- Optional initial salinity stratification ---
+! Off by default: salinity stays flat/uniform (35 psu everywhere), the old behavior.
+! When on, uses S(z) = 35 + Sstrat_amp*exp(-|Z|/1000) instead -- same single-exponential
+! style as the temperature profile, anchored at 35 psu at depth. Still dynamically inert
+! in the neverworld2 EOS (beta=0) either way, cabbeling included -- this is only a
+! starting point for if/when a haline term gets added.
+do_Sstrat     = .False.
+Sstrat_amp    = 0.5      ! [psu], surface-minus-deep salinity anomaly
+
+! --- Optional linear haline (salt) term in density_linear(), independent of do_cabbeling ---
+! Off by default (beta=0), matching the original neverworld2 design -- salinity stays
+! dynamically inert regardless of do_Sstrat. When on, adds density_0*haline_beta*(S-35) on
+! top of whichever temperature term is active. Default value reuses the dbgyre toy branch's
+! existing beta (same normalized convention), not an independently-tuned neverworld2 value.
+! Turning this on without also giving salinity real forcing (do_Sstrat is IC-only, no
+! restoring exists yet) means any salinity structure just gets mixed away over a long run.
+do_haline     = .False.
+haline_beta   = 0.00079   ! [1/psu], normalized like sw_alpha (dbgyre's value)
+
+! --- Optional surface salinity restoring ---
+! Off by default. Provides the salt-restoring *target* do_haline needs to have any real,
+! sustained effect (do_Sstrat is IC-only and gets mixed away over a long run otherwise).
+! Target follows DINO's Eq. B2 (Kamm et al. 2025): constant in time, same
+! cos(0.5*pi*lat/Ly) shape as trelax_opt=2's t_base, no cold-patch-style polar blend.
+! Applied every timestep as a flux into relax_salt (same mechanism/units as FESOM's
+! generic SSS restoring), including domain-mean subtraction to keep net salt input at
+! zero -- no DINO-style E-P-climatology spin-up trick needed.
+do_Srelax     = .False.
+s_north       = 35.00     ! [psu], DINO S*_n
+s_south       = 35.10     ! [psu], DINO S*_s
+s_equator     = 37.25     ! [psu], DINO S*_eq
 /
 

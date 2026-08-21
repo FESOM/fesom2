@@ -259,7 +259,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
             
         elseif ((toy_ocean) .AND. ((TRIM(which_toy)=="neverworld2"))) then
             call relax_2_tsurf(tracers%data(1), partit, mesh)
-            
+            call relax_2_ssurf(tracers%data(2), partit, mesh)
+
         else
             call relax_to_clim(tr_num, tracers, partit, mesh)
             

@@ -11,11 +11,12 @@ end module densityJM_components_interface
 
 module density_linear_interface
   interface
-    subroutine density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out)
+    subroutine density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out, depth)
       USE MOD_PARSUP
       USE o_param
       real(kind=WP),  intent(IN)             :: t,s
       real(kind=WP),  intent(OUT)            :: bulk_0, bulk_pz, bulk_pz2, rho_out
+      real(kind=WP),  intent(IN),   optional :: depth
     end subroutine density_linear
   end interface
 end module density_linear_interface
@@ -286,7 +287,9 @@ subroutine pressure_bv(tracers, partit, mesh)
             s=salt(nz, node)
             select case(state_equation)
                 case(0)
-                    call density_linear(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
+                    ! depth (positive-downward, [m]) is only used by the neverworld2 branch's
+                    ! optional do_thermobar term -- every other branch/config ignores it
+                    call density_linear(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), depth=abs(Z_3d_n(nz,node)))
                 case(1)
                     call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
                 case default !unknown
@@ -2779,6 +2782,7 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
   use o_param
   use g_config
   use g_comm_auto
+  use Toy_Neverworld2, only: thermal_alpha, do_cabbeling, cabbeling_Cb, do_thermobar, thermobaric_Th, do_haline, haline_beta
   implicit none
   !
   type(t_mesh),   intent(in) ,    target :: mesh
@@ -2807,8 +2811,12 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
         sw_alpha_lin = 0.0002052_WP
         sw_beta_lin  = 0.00079_WP
      else if ((toy_ocean) .AND. (TRIM(which_toy)=="neverworld2")) then
-        sw_alpha_lin = 0.0002_WP
-        sw_beta_lin  = 0.0_WP
+        sw_alpha_lin = thermal_alpha
+        if (do_haline) then
+           sw_beta_lin = haline_beta
+        else
+           sw_beta_lin = 0.0_WP
+        end if
      else
         sw_alpha_lin = 0.2_WP/density_0
         sw_beta_lin  = 0.8_WP/density_0
@@ -2824,7 +2832,17 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
      do nz=nzmin, nzmax-1
 
      if (state_equation==0) then
-        sw_alpha(nz,n) = sw_alpha_lin
+        if ((toy_ocean) .AND. (TRIM(which_toy)=="neverworld2") .AND. (do_cabbeling .OR. do_thermobar)) then
+           ! local alpha = -(1/rho0)*d(rho)/dT, mirroring density_linear()'s alpha_local:
+           ! thermal_alpha, plus cabbeling's cabbeling_Cb*(T-10) and/or thermobaricity's
+           ! thermobaric_Th*depth (depth positive-downward [m], via abs(Z_3d_n)) -- same
+           ! consistency requirement as the plain-linear/cabbeling-only cases above it.
+           sw_alpha(nz,n) = thermal_alpha
+           if (do_cabbeling) sw_alpha(nz,n) = sw_alpha(nz,n) + cabbeling_Cb*(TF1(nz,n)-10.0_WP)
+           if (do_thermobar) sw_alpha(nz,n) = sw_alpha(nz,n) + thermobaric_Th*abs(Z_3d_n(nz,n))
+        else
+           sw_alpha(nz,n) = sw_alpha_lin
+        end if
         sw_beta(nz,n)  = sw_beta_lin
         cycle
      end if
@@ -3149,17 +3167,20 @@ end subroutine insitu2pot
 !
 !
 !===============================================================================
-SUBROUTINE density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out)
+SUBROUTINE density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out, depth)
 !coded by Margarita Smolentseva, 21.05.2020
 USE MOD_PARSUP !, only: par_ex,pe_status
 USE o_ARRAYS
 USE o_PARAM
 use g_config !, only: which_toy, toy_ocean
+use Toy_Neverworld2, only: thermal_alpha, do_cabbeling, cabbeling_Cb, do_thermobar, thermobaric_Th, do_haline, haline_beta
 IMPLICIT NONE
   real(kind=WP),  intent(IN)             :: t,s
   real(kind=WP),  intent(OUT)            :: rho_out
   real(kind=WP)                          :: rhopot, bulk
   real(kind=WP), intent(OUT)             :: bulk_0, bulk_pz, bulk_pz2
+  real(kind=WP), intent(IN),    optional :: depth
+  real(kind=WP)                          :: alpha_local
 
   !compute secant bulk modulus
 
@@ -3169,13 +3190,27 @@ IMPLICIT NONE
 
   IF((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) THEN
       rho_out  = density_0 - 0.00025_WP*(t - 10.0_WP)*density_0
-      
+
   ELSE IF((toy_ocean) .AND. (TRIM(which_toy)=="dbgyre")) THEN
       rho_out  = density_0 - density_0*0.0002052_WP*(t - 10.0_WP) + density_0*0.00079_WP*(s - 35.0_WP)
-      
-  ELSE IF((toy_ocean) .AND. (TRIM(which_toy)=="neverworld2")) THEN    
-      rho_out  = density_0 - 0.0002_WP*(t - 10.0_WP)*density_0
-      
+
+  ELSE IF((toy_ocean) .AND. (TRIM(which_toy)=="neverworld2")) THEN
+      ! local thermal expansion slope: thermal_alpha, plus cabbeling's quadratic-in-T term
+      ! (do_cabbeling) and/or thermobaricity's depth term (do_thermobar) layered on top --
+      ! both optional, independent, and off by default so the plain linear slope is
+      ! reproduced exactly when neither is active. depth is only present when the caller
+      ! actually has it (see density_linear's optional depth arg) -- absent means 0, i.e.
+      ! surface, matching the pre-thermobaricity behavior for every other call site.
+      alpha_local = thermal_alpha
+      IF (do_cabbeling) alpha_local = alpha_local + 0.5_WP*cabbeling_Cb*(t-10.0_WP)
+      IF (do_thermobar .AND. present(depth)) alpha_local = alpha_local + thermobaric_Th*depth
+      rho_out = density_0 - alpha_local*density_0*(t-10.0_WP)
+      IF (do_haline) THEN
+          ! Linear haline term, independent of do_cabbeling -- see the do_haline
+          ! declaration in Toy_Neverworld2 for the physical rationale/caveats.
+          rho_out = rho_out + density_0*haline_beta*(s - 35.0_WP)
+      END IF
+
   ELSE
       rho_out  = density_0 + 0.8_WP*(s - 34.0_WP) - 0.2*(t - 20.0_WP)
   END IF
