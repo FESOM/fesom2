@@ -99,7 +99,7 @@ end subroutine oce_mixing_pp
 ! after suggestions from Qiang Wang in FESOM1.4
 subroutine Kv0_background_qiang(Kv0_b,lat,dep)
     ! Kv0_b ... backround mixing coefficient
-    use o_PARAM, only: WP
+    use o_PARAM, only: WP, pi
     implicit none
     real(kind=WP), intent(out) :: Kv0_b
     real(kind=WP), intent(in)  :: lat, dep
@@ -109,7 +109,7 @@ subroutine Kv0_background_qiang(Kv0_b,lat,dep)
     ! set latitudinal and depth dependent background diffusivity after 
     ! Q. Wang FESOM1.4 approach
     !_______________________________________________________________________
-    aux = (0.6_WP + 1.0598_WP / 3.1415926_WP * ATAN( 4.5e-3_WP * (dep - 2500.0_WP))) * 1.0e-5_WP
+    aux = (0.6_WP + 1.0598_WP / pi * ATAN( 4.5e-3_WP * (dep - 2500.0_WP))) * 1.0e-5_WP
     
     !_______________________________________________________________________
     ! latitudinal equatorial scaling
@@ -140,7 +140,7 @@ end subroutine Kv0_background_qiang
 ! first implemented my Q.Wang in FESOM1.4
 subroutine Kv0_background(Kv0_b,lat,dep)
     ! Kv0_b ... backround mixing coefficient
-    use o_PARAM, only: WP
+    use o_PARAM, only: WP, pi
     implicit none
     real(kind=WP), intent(out) :: Kv0_b
     real(kind=WP), intent(in)  :: lat, dep
@@ -160,10 +160,10 @@ subroutine Kv0_background(Kv0_b,lat,dep)
     !_______________________________________________________________________
     ! latitudinal <70° scaling
     if (lat < 70.0_WP) then
-        aux = (0.6_WP + 1.0598_WP / 3.1415926_WP * ATAN( 4.5e-3_WP * (dep - 2500.0_WP))) * 1e-5_WP
+        aux = (0.6_WP + 1.0598_WP / pi * ATAN( 4.5e-3_WP * (dep - 2500.0_WP))) * 1e-5_WP
     ! latitudinal arctic scaling
     else
-        aux = (0.6_WP + 1.0598_WP / 3.1415926_WP * ATAN( 4.5e-3_WP * (dep - 2500.0_WP))) * 1.e-6_WP
+        aux = (0.6_WP + 1.0598_WP / pi * ATAN( 4.5e-3_WP * (dep - 2500.0_WP))) * 1.e-6_WP
         ratio=3.0_WP
         if (dep < 80.0_WP)     then
             ratio=1.0_WP
