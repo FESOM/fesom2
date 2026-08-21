@@ -52,8 +52,6 @@ subroutine iceberg_calculation(ice, mesh, partit, dynamics, istep)
  integer	:: istep_end_synced
  integer:: req, status(MPI_STATUS_SIZE)
  logical:: completed
- integer	:: n_melted_before, n_melted_after, n_find_before, n_find_after
- real		:: cday_sum_before, cday_sum_after
  integer:: block_reduce_ierr
  real(kind=8) :: t_start_block
  real(kind=8), parameter :: block_reduce_timeout = 300.0
@@ -93,37 +91,6 @@ type(t_dyn)   , intent(inout), target :: dynamics
     call iceberg_restart(partit)
   end if
   t1_restart=MPI_Wtime()
-  n_melted_before  = count(melted)
-  n_find_before    = count(find_iceberg_elem)
-  cday_sum_before  = sum(calving_day)
-
-  call MPI_Allreduce(MPI_IN_PLACE, melted, ib_num, MPI_LOGICAL, MPI_LOR, &
-       partit%MPI_COMM_FESOM_IB, partit%MPIERR_IB)
-  call MPI_Allreduce(MPI_IN_PLACE, find_iceberg_elem, ib_num, MPI_LOGICAL, MPI_LOR, &
-       partit%MPI_COMM_FESOM_IB, partit%MPIERR_IB)
-  call MPI_Allreduce(MPI_IN_PLACE, calving_day, ib_num, MPI_DOUBLE_PRECISION, MPI_MAX, &
-       partit%MPI_COMM_FESOM_IB, partit%MPIERR_IB)
-
-  n_melted_after = count(melted)
-  n_find_after   = count(find_iceberg_elem)
-  cday_sum_after = sum(calving_day)
-
-  !Any output here means this rank's restart state really did disagree with
-  !its peers - i.e. the desync is real and this patch just prevented a hang.
-  !Silence on every rank means the gates were already consistent.
-  if (n_melted_after /= n_melted_before) then
-   write(*,*) 'WARNING: icb gate sync corrected ', n_melted_after-n_melted_before, &
-        ' melted flag(s) on rank ', mype
-  end if
-  if (n_find_after /= n_find_before) then
-   write(*,*) 'WARNING: icb gate sync corrected ', n_find_after-n_find_before, &
-        ' find_iceberg_elem flag(s) on rank ', mype
-  end if
-  if (cday_sum_after /= cday_sum_before) then
-   write(*,*) 'WARNING: icb gate sync corrected calving_day on rank ', mype, &
-        ' (sum ', cday_sum_before, ' -> ', cday_sum_after, ')'
-  end if
-
   firstcall = .false.
   !call init_global_tides
   !call tides_distr
@@ -1347,7 +1314,7 @@ subroutine iceberg_restart_with_icesheet(partit)
  use g_config, only : ib_num
 
  implicit none
- integer :: icbID_ISM, icbID_non_melted_icb, ib, st, mpierr_icb
+ integer :: icbID_ISM, icbID_non_melted_icb, ib, st
  LOGICAL :: file_exists, file_exists_non_melted
 type(t_partit), intent(inout), target :: partit
 #include "associate_part_def.h"
@@ -1374,12 +1341,6 @@ type(t_partit), intent(inout), target :: partit
 	conc_sill(ib),P_sill(ib), rho_h2o(ib),rho_air(ib),rho_ice(ib),	   	& 
 	u_ib(ib),v_ib(ib), iceberg_elem(ib), find_iceberg_elem(ib),		&
 	f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), grounded(ib), scaling(ib), melted(ib)
-   if (st /= 0) then
-    write(*,*) 'FATAL: rank ', mype, ' failed reading iceberg restart record ', ib, &
-         ' of ', num_non_melted_icb, ' from ', trim(IcebergRestartPath_ISM), &
-         '; iostat=', st
-    call MPI_Abort(MPI_COMM_WORLD, 1, mpierr_icb)
-   end if
   end do
   close(icbID_ISM)
 
