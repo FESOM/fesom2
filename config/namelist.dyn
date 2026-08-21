@@ -63,6 +63,22 @@ ldiag_KE           = .false.     ! enable kinetic energy diagnostics (requires a
 ! --- Time Stepping ---
 AB_order           = 2           ! Adams-Bashforth time stepping order (2 or 3)
 
+! --- SSH elliptic solver ---
+soltol             = 1e-5        ! ssh CG relative tolerance (optional; default 1e-5 if omitted)
+                                 ! NOTE applied on a COLD START only: both this and
+                                 ! maxiter live in the derived-type restart dump, which
+                                 ! is read after the namelist, so a restart keeps the
+                                 ! value the experiment was started with
+                                 ! in SINGLE PRECISION do not go below ~1e-6: the test is
+                                 ! a ratio and cannot see the float32 residual floor, so
+                                 ! the solver will report success it has not achieved
+maxiter            = 2000        ! ssh CG iteration cap (optional; default 2000 if omitted)
+                                 ! hitting the cap does not abort -- it is reported as
+                                 ! 'non-convergences' in the end-of-run solver summary
+precond_variant    = 1           ! ssh CG preconditioner: 0 = pre version 2.8.0 asymetric, 
+                                 !                        1 = symmetric 2D^-1 - D^-1*A*D^-1
+
+
 ! --- Split-Explicit Barotropic Subcycling ---
 use_ssh_se_subcycl = .false.     ! enable split-explicit subcycling for barotropic mode
                                  ! (faster time stepping for sea surface height)
