@@ -98,8 +98,11 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(GlodecayBenthos       ( node_size, benthos_num ))
     allocate(Benthos               ( node_size, benthos_num ))
     allocate(Benthos_tr            ( node_size, benthos_num, num_tracers )) ! kh 25.03.22 buffer per tracer index
+    allocate(Sed_2_Ocean_Flux      ( node_size, 6 )) ! DIN, DIC, Alk, DSi, DFe, O2 ! R2OMIP
     allocate(GloHplus              ( node_size ))
     allocate(DenitBen              ( node_size ))
+    allocate(PistonVelocity        ( node_size ))
+    allocate(alphaCO2              ( node_size ))
 
     allocate(LocBenthos            ( benthos_num ))
     allocate(decayBenthos          ( benthos_num ))     ! [1/day] Decay rate of detritus in the benthic layer
@@ -137,6 +140,10 @@ subroutine recom_init(tracers, partit, mesh)
     Benthos_tr(:,:,:)     = 0.0d0 ! kh 25.03.22
     GloHplus              = exp(-8.d0 * log(10.d0)) ! = 10**(-8)
     DenitBen              = 0.d0
+    PistonVelocity        = 0.d0
+    alphaCO2              = 0.d0
+
+    Sed_2_Ocean_Flux      = 0.0d0 ! R2OMIP
 
     LocBenthos            = 0.d0
     decayBenthos          = 0.d0
@@ -178,7 +185,31 @@ subroutine recom_init(tracers, partit, mesh)
     allocate(Chldegp ( node_size ))
     allocate(dets_agg ( node_size ))
     allocate(detl_agg ( node_size ))
-
+    allocate(grazmeso_tot(node_size))
+    allocate(grazmeso_n(node_size))
+    allocate(grazmeso_d(node_size))
+    allocate(grazmeso_diaH(node_size))
+    allocate(grazmeso_c(node_size))
+    allocate(grazmeso_p(node_size))
+    allocate(grazmeso_det(node_size))
+    allocate(grazmeso_mic(node_size))
+    allocate(grazmeso_det2(node_size))
+    allocate(grazmacro_tot(node_size))
+    allocate(grazmacro_n(node_size))
+    allocate(grazmacro_d(node_size))
+    allocate(grazmacro_diaH(node_size))
+    allocate(grazmacro_c(node_size))
+    allocate(grazmacro_p(node_size))
+    allocate(grazmacro_mes(node_size))
+    allocate(grazmacro_det(node_size))
+    allocate(grazmacro_mic(node_size))
+    allocate(grazmacro_det2(node_size))
+    allocate(grazmicro_tot(node_size))
+    allocate(grazmicro_n(node_size))
+    allocate(grazmicro_d(node_size))
+    allocate(grazmicro_diaH(node_size))
+    allocate(grazmicro_c(node_size))
+    allocate(grazmicro_p(node_size))
 
     NPPn    = 0.d0
     NPPd    = 0.d0
@@ -202,6 +233,39 @@ subroutine recom_init(tracers, partit, mesh)
     Chldegp = 0.d0
     dets_agg = 0.d0
     detl_agg = 0.d0
+    grazmeso_tot = 0.d0
+    grazmeso_n   = 0.d0
+    grazmeso_d   = 0.d0
+    grazmeso_diaH = 0.d0
+    grazmeso_c   = 0.d0
+    grazmeso_p   = 0.d0
+    grazmeso_det = 0.d0
+    grazmeso_mic = 0.d0
+    grazmeso_det2= 0.d0
+    grazmacro_tot = 0.d0
+    grazmacro_n = 0.d0
+    grazmacro_d = 0.d0
+    grazmacro_diaH = 0.d0
+    grazmacro_c = 0.d0
+    grazmacro_p = 0.d0
+    grazmacro_mes = 0.d0
+    grazmacro_det = 0.d0
+    grazmacro_mic = 0.d0
+    grazmacro_det2= 0.d0
+    grazmicro_tot = 0.d0
+    grazmicro_n = 0.d0
+    grazmicro_d = 0.d0
+    grazmicro_diaH = 0.d0
+    grazmicro_c = 0.d0
+    grazmicro_p = 0.d0
+
+  ! Dissolution and remineralization ! R2OMIP
+  allocate(DISSOC(node_size))
+  allocate(DISSON(node_size))
+  allocate(DISSOSi(node_size))
+  DISSOC = 0.d0
+  DISSON = 0.d0
+  DISSOSi = 0.d0
 
 !! *** Allocate 3D diagnostics ***
     allocate(respmeso     ( nl-1, node_size ))
