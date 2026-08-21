@@ -49,8 +49,12 @@ on:
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   ctest_framework:
-    # Run directly on Ubuntu runner
     runs-on: ubuntu-latest
+    timeout-minutes: 12
+    # Same image fesom2_build_tests.yml uses. It already provides gcc/gfortran
+    # 11.4, cmake 3.22, OpenMPI 4.1.2 and netCDF 4.8.1 / netCDF-Fortran 4.5.4
+    # under /usr, which is what NETCDF_ROOT below expects.
+    container: ghcr.io/fesom/fesom2_docker:fesom2_ci-master
     
     env:
       # Set environment variables for the build
@@ -63,47 +67,11 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE
       - name: Checkout repository
         uses: actions/checkout@v4
-      
-      - name: Install system dependencies
+
+      - name: Git safe directory
         run: |
-          echo "Installing FESOM2 dependencies..."
-          sudo apt-get update
-          sudo apt-get install -y \
-            gcc \
-            gfortran \
-            g++ \
-            cmake \
-            make \
-            openmpi-bin \
-            libopenmpi-dev \
-            libnetcdf-dev \
-            libnetcdff-dev \
-            pkg-config \
-            git \
-            wget \
-            ca-certificates \
-            gnupg \
-            lsb-release
-          
-          echo "Installing CMake 3.25+ from Kitware repository..."
-          # Add Kitware's signing key
-          wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | sudo tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null
-          
-          # Add Kitware repository
-          echo "deb https://apt.kitware.com/ubuntu/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/kitware.list >/dev/null
-          
-          # Update package list and install latest CMake
-          sudo apt-get update
-          sudo apt-get install -y cmake
-          
-          echo "Verifying installations..."
-          gcc --version
-          gfortran --version
-          mpirun --version
-          cmake --version
-          pkg-config --modversion netcdf
-          pkg-config --modversion netcdf-fortran
-          
+          git config --global --add safe.directory ${PWD}
+
       - name: Set up environment variables
         run: |
           echo "Setting up environment for FESOM2 build..."

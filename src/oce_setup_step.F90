@@ -556,6 +556,9 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     integer        :: AB_order     = 2
     logical        :: check_opt_visc=.true.
     real(kind=WP)  :: wsplit_maxcfl
+    real(kind=WP)  :: soltol = 1.e-5_WP  ! ssh CG rel. tolerance; default matches T_SOLVERINFO
+    integer        :: maxiter = 2000     ! ssh CG iteration cap; default matches T_SOLVERINFO
+    integer        :: precond_variant = 0 ! ssh CG preconditioner formula; 0 keeps results unchanged
     logical        :: use_ssh_se_subcycl=.false.
     integer        :: se_BTsteps
     real(kind=WP)  :: se_BTtheta
@@ -568,11 +571,11 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
                                 uke_scaling, uke_scaling_factor, uke_advection, &
                                 rosb_dis, smooth_back, smooth_dis, smooth_back_tend, K_back, c_back
 
-    namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, & 
+    namelist /dynamics_general/ momadv_opt, use_freeslip, use_wsplit, wsplit_maxcfl, &
                                 ldiag_KE, AB_order,                                  &
                                 use_ssh_se_subcycl, se_BTsteps, se_BTtheta,          &
                                 se_bottdrag, se_bdrag_si, se_visc, se_visc_gamma0,   &
-                                se_visc_gamma1, se_visc_gamma2
+                                se_visc_gamma1, se_visc_gamma2, soltol, maxiter, precond_variant
 
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -642,8 +645,38 @@ nl => mesh%nl
             write(*,*) "     se_visc_gamma0 = ", dynamics%se_visc_gamma0
             write(*,*) "     se_visc_gamma1 = ", dynamics%se_visc_gamma1
             write(*,*) "     se_visc_gamma2 = ", dynamics%se_visc_gamma2
-        end if 
-    end if 
+        end if
+    end if
+
+    ! ssh CG solver tolerance (optional, backward compatible): if 'soltol' is
+    ! absent from namelist.dyn the namelist read leaves it at the default above,
+    ! matching the previous hard-coded T_SOLVERINFO value.
+    !
+    ! KNOWN LIMITATION -- these two settings are honoured on a COLD START only.
+    ! soltol and maxiter are both members of T_SOLVERINFO, which is serialized into
+    ! the derived-type (bin) restart dump, and READ_T_SOLVERINFO runs *after* this
+    ! routine (fesom_module.F90: dynamics_init -> ... -> read_initial_conditions).
+    ! So on a bin restart the dumped values silently replace whatever the namelist
+    ! asked for, while the echo below still prints the namelist value.
+    ! Measured on pi: cold start at soltol=1e-5 takes 8.60 iterations/solve; restart
+    ! with soltol=1e-2 in the namelist still takes 8.95 -- i.e. it is still solving to
+    ! 1e-5 -- although the log reports 1.0E-002. The raw-restart path is unaffected.
+    ! Not fixed here: the fix is to read these into throwaway locals so the byte
+    ! layout is preserved, and that needs the restart-vs-continuous regression test,
+    ! which does not exist yet. Set them on the cold start of an experiment.
+    dynamics%solverinfo%soltol = soltol
+    if (mype==0) write(*,*) '     ssh CG soltol  = ', dynamics%solverinfo%soltol
+
+    ! ssh CG iteration cap, same contract as soltol above. Needed to tell a stall
+    ! apart from a truncation when sweeping soltol: raise it and a solver that is
+    ! merely slow still converges, while one that has hit its residual floor
+    ! plateaus instead.
+    ! Same cold-start-only caveat as soltol above; see the note there.
+    dynamics%solverinfo%maxiter = maxiter
+    if (mype==0) write(*,*) '     ssh CG maxiter = ', dynamics%solverinfo%maxiter
+
+    dynamics%solverinfo%precond_variant = precond_variant
+    if (mype==0) write(*,*) '     ssh CG precond = ', dynamics%solverinfo%precond_variant
 
     !___________________________________________________________________________
     ! define local vertice & elem array size
@@ -882,6 +915,8 @@ nl              => mesh%nl
     allocate(relax2clim(node_size)) 
     allocate(heat_flux(node_size), Tsurf(node_size))
     allocate(water_flux(node_size), Ssurf(node_size))
+    allocate(hosing_flux(node_size), hosing_heat_flux(node_size))
+    allocate(hosing_flux3D(nl-1,node_size), hosing_heat_flux3D(nl-1,node_size))
     allocate(fw_ice(node_size), fw_snw(node_size))
     allocate(relax_salt(node_size))
     allocate(virtual_salt(node_size))
@@ -982,6 +1017,10 @@ nl              => mesh%nl
     Tsurf=0.0_WP
 
     water_flux=0.0_WP
+    hosing_flux=0.0_WP
+    hosing_heat_flux=0.0_WP
+    hosing_flux3D=0.0_WP
+    hosing_heat_flux3D=0.0_WP
     fw_ice    =0.0_WP
     fw_snw    =0.0_WP
     relax_salt=0.0_WP
@@ -1207,6 +1246,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 #endif
 
     ! count the passive tracers which require 3D source (ptracers_restore_total)
+    ! Every ID with a restoring box below has to be listed here too, or
+    ! ptracers_restore is allocated too short.
     ptracers_restore_total=0
     DO i=3, tracers%num_tracers
         id=tracers%data(i)%ID
@@ -1420,7 +1461,13 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
          end if
 ! Transient tracers end
 
-        !_______________________________________________________________________            
+        !_______________________________________________________________________
+        ! Fram Strait 3d restored passive tracer. The box (77.5-78.0N, 0-10E)
+        ! marks the Atlantic inflow branch on purpose, not the full strait; a
+        ! whole-gateway tracer needs its own ID, see issue #846. The bounds
+        ! appear twice below, to count nodes and to fill ind2, and both copies
+        ! have to stay identical. oce_ale_tracer.F90 resets the box to 1.0 each
+        ! timestep, so the 1.0 here and the 0.0 in 302/303 behave alike.
         CASE (301) !Fram Strait 3d restored passive tracer
             tracers%data(i)%values(:,:)=0.0_WP
             rcounter3    =rcounter3+1
@@ -1450,6 +1497,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             end if
             
         !_______________________________________________________________________
+        ! Bering Strait 3d restored passive tracer. The box (65.6-66.0N,
+        ! 172-166W) spans the strait, unlike the inflow-only boxes 301 and 303.
         CASE (302) !Bering Strait 3d restored passive tracer
             tracers%data(i)%values(:,:)=0.0_WP
             rcounter3    =rcounter3+1
@@ -1478,7 +1527,10 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
             
-        !_______________________________________________________________________            
+        !_______________________________________________________________________
+        ! Barents Sea Opening 3d restored passive tracer. The box (69.5-74.5N,
+        ! 19-20E) covers the southern inflow part only, as in case 301; see
+        ! issue #846. The bounds appear twice below and must stay identical.
         CASE (303) !BSO 3d restored passive tracer
             tracers%data(i)%values(:,:)=0.0_WP
             rcounter3    =rcounter3+1
@@ -1506,7 +1558,16 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I3)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-            
+
+        !_______________________________________________________________________
+        CASE (304) ! passive tracer for water hosing experiment
+            tracers%data(i)%values(:,:)=0.0_WP
+            if (mype==0) then
+                write (i_string,  "(I3)") i
+                write (id_string, "(I3)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            end if
+
         !_______________________________________________________________________
         CASE (501) ! ice-shelf water due to basal melting
             tracers%data(i)%values(:,:)=0.0_WP

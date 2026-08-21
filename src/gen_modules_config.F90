@@ -206,6 +206,11 @@ module g_config
   logical                       :: flag_debug=.false.    ! prints name of actual subroutine he is in 
   logical                       :: flag_warn_cflz=.true. ! switches off cflz warning
   logical                       :: use_transit=.false.    ! switches off transient tracers
+  !_____________________________________________________________________________
+  ! *** freshwater hosing experiments ***
+  logical                       :: use_hosing=.false.     ! impose an Antarctic freshwater anomaly
+  character(10)                 :: hosing_mode='surf'     ! 'surf' = surface virtual salinity flux, 'depth' = distributed over depth
+  real(kind=WP)                 :: hosing_hSv=0.0_WP      ! freshwater anomaly magnitude [Sv]
   logical                       :: compute_oasis_corners=.false. ! switches on corner calculation for 1st order conserv remapping 
 
 #if defined(__recom) && defined(__usetp)
@@ -214,12 +219,14 @@ module g_config
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, &
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
                         use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
-                        use_transit, compute_oasis_corners, num_fesom_groups
+                        use_transit, compute_oasis_corners, num_fesom_groups, &
+                        use_hosing, hosing_mode, hosing_hSv
 #else
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
                         use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
-                        use_transit, compute_oasis_corners
+                        use_transit, compute_oasis_corners, &
+                        use_hosing, hosing_mode, hosing_hSv
 #endif
 
   !_____________________________________________________________________________
