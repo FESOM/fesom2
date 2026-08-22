@@ -367,9 +367,20 @@ endfunction()
 function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH RUN_LENGTH_UNIT RESTART_LENGTH RESTART_LENGTH_UNIT LOGFILE_OUTFREQ FORCE_ROTATION USE_CAVITY)
     set(options MPI_TEST)
     set(oneValueArgs NP TIMEOUT)
-    set(multiValueArgs COMMAND_ARGS)
+    # EXTRA_SUCCESS_MARKERS: literal strings that must ALL appear in the run log for
+    # the test to pass, on top of the clean-exit marker. Use these to pin behaviour
+    # that would otherwise rot silently -- a diagnostic block that stops being
+    # printed is a regression no artifact check can see.
+    set(multiValueArgs COMMAND_ARGS EXTRA_SUCCESS_MARKERS)
     cmake_parse_arguments(FESOM_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
     
+    # Assemble the success-marker list: the clean-exit marker is mandatory, callers
+    # may pin additional ones. Each is quoted separately so markers may contain spaces.
+    set(_SUCCESS_MARKERS_ARG "\"fesom should stop with exit status = 0\"")
+    foreach(_m IN LISTS FESOM_TEST_EXTRA_SUCCESS_MARKERS)
+        string(APPEND _SUCCESS_MARKERS_ARG " \"${_m}\"")
+    endforeach()
+
     # Set defaults
     if(NOT DEFINED FESOM_TEST_NP)
         set(FESOM_TEST_NP 1)
@@ -430,7 +441,7 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
                 RESULT \"\${test_result}\"
                 OUTPUT_LOG \"${TEST_RUN_DIR}/test_output.log\"
                 ERROR_LOG \"${TEST_RUN_DIR}/test_error.log\"
-                SUCCESS_MARKERS \"fesom should stop with exit status = 0\"
+                SUCCESS_MARKERS ${_SUCCESS_MARKERS_ARG}
                 REQUIRED_ARTIFACTS \"${RESULT_DIR}/sst.fesom.1948.nc\"
             )
         ")
@@ -462,7 +473,7 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
                 RESULT \"\${test_result}\"
                 OUTPUT_LOG \"${TEST_RUN_DIR}/test_output.log\"
                 ERROR_LOG \"${TEST_RUN_DIR}/test_error.log\"
-                SUCCESS_MARKERS \"fesom should stop with exit status = 0\"
+                SUCCESS_MARKERS ${_SUCCESS_MARKERS_ARG}
                 REQUIRED_ARTIFACTS \"${RESULT_DIR}/sst.fesom.1948.nc\"
             )
         ")

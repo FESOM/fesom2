@@ -17,7 +17,7 @@ namelist.config:
       steps_per_ib_step: 8
       ib_async_mode: 0
     run_config:
-      use_cavity: False
+      use_cavity: True
       use_cavity_partial_cell: False
     timestep:
         run_length: 1
@@ -67,9 +67,9 @@ namelist.io:
                 prec: 8
 
 fcheck:
-    a_ice: 0.8923871638676533
-    salt: 34.71430537908671
-    sst: 12.605505832789817
-    temp: 2.824459175724552
-    u: -0.0027883197884205264
-    v: -0.00023131296009824316
+    a_ice: 0.17979497030980734
+    salt: 34.71518235817222
+    sst: 12.627374037962893
+    temp: 2.84496982326613
+    u: -0.002727093052635999
+    v: -0.00021483479328712082
