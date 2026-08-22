@@ -453,6 +453,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     real(kind=WP)    :: rdt, drag, det
     real(kind=WP)    :: inv_thickness(partit%myDim_nod2D), umod, rhsu, rhsv
     logical          :: ice_el(partit%myDim_elem2D), ice_nod(partit%myDim_nod2D)
+    logical          :: lcav_edge
     !NR for stress_tensor_m
     integer         :: el, elnodes(3)
     real(kind=WP)   :: dx(3), dy(3), msum, asum
@@ -706,7 +707,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
         ! New implementation following Boullion et al, Ocean Modelling 2013.
         ! SD, 30.07.2014
         !_______________________________________________________________________
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(el, i, ed, row, elnodes, dx, dy, meancos, eps1, eps2, delta, pressure, umod, drag, rhsu, rhsv, det, n)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(el, i, ed, row, elnodes, dx, dy, meancos, eps1, eps2, delta, pressure, umod, drag, rhsu, rhsv, det, n, lcav_edge)
 !$OMP DO
         do el=1,myDim_elem2D
             if (ulevels(el)>1) cycle
@@ -862,8 +863,13 @@ subroutine EVPdynamics_m(ice, partit, mesh)
             !___________________________________________________________________
             ! apply sea ice velocity boundary conditions at cavity-ocean edge
             if (use_cavity) then
-                if ( (ulevels(edge_tri(1,ed))>1) .or. &
-                    ( edge_tri(2,ed)>0 .and. ulevels(edge_tri(2,ed))>1) ) then
+                ! .and. is not short-circuit in Fortran: guard edge_tri(2,ed)>0
+                ! separately or ulevels(0) is read at boundary edges.
+                lcav_edge = (ulevels(edge_tri(1,ed)) > 1)
+                if (.not. lcav_edge) then
+                    if (edge_tri(2,ed) > 0) lcav_edge = (ulevels(edge_tri(2,ed)) > 1)
+                end if
+                if (lcav_edge) then
                     do n=1, 2
 #if defined(_OPENMP)
                        call omp_set_lock  (partit%plock(edges(n, ed)))
@@ -1151,6 +1157,7 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     type(t_mesh),   intent(in),    target :: mesh
     !___________________________________________________________________________
     integer          :: steps, shortstep, i, ed, n
+    logical          :: lcav_edge
     real(kind=WP)    :: rdt, drag, det, fc
     real(kind=WP)    :: thickness, inv_thickness, umod, rhsu, rhsv
     REAL(kind=WP)    :: t0,t1, t2, t3, t4, t5, t00, txx
@@ -1261,8 +1268,13 @@ subroutine EVPdynamics_a(ice, partit, mesh)
             !___________________________________________________________________
             ! apply sea ice velocity boundary conditions at cavity-ocean edge
             if (use_cavity) then
-                if ( (ulevels(edge_tri(1,ed))>1) .or. &
-                    ( edge_tri(2,ed)>0 .and. ulevels(edge_tri(2,ed))>1) ) then
+                ! .and. is not short-circuit in Fortran: guard edge_tri(2,ed)>0
+                ! separately or ulevels(0) is read at boundary edges.
+                lcav_edge = (ulevels(edge_tri(1,ed)) > 1)
+                if (.not. lcav_edge) then
+                    if (edge_tri(2,ed) > 0) lcav_edge = (ulevels(edge_tri(2,ed)) > 1)
+                end if
+                if (lcav_edge) then
                     u_ice_aux(edges(1:2,ed))=0.0_WP
                     v_ice_aux(edges(1:2,ed))=0.0_WP
                 end if
