@@ -9,6 +9,7 @@ MODULE Toy_Neverworld2
     use g_config
     use g_comm_auto
     use g_support
+    use g_clock, only: daynew, timenew, ndpyr
     implicit none
     SAVE 
     private
@@ -23,6 +24,7 @@ MODULE Toy_Neverworld2
                         do_Sstrat, Sstrat_amp, &
                         do_haline, haline_beta, &
                         do_Srelax, s_north, s_south, s_equator, &
+                        do_Tseasonal, north_seasonal_amp, south_seasonal_amp, &
                         oce_neverworld2
     logical           :: do_wind  = .True.    ! apply surface windstress
     integer           :: wind_opt = 2         ! 1: interpolate tau from profile data, 2: read already to elem interp profile data
@@ -156,6 +158,31 @@ MODULE Toy_Neverworld2
     real(kind=WP)     :: s_south    = 35.10_WP   ! [psu], DINO S*_s
     real(kind=WP)     :: s_equator  = 37.25_WP   ! [psu], DINO S*_eq
 
+    ! Optional seasonal cycle in the trelax_opt=2 north/south cold-patch pole targets,
+    ! off by default -- follows DINO's Eq. B3/B4 (Kamm et al. 2025, Appendix B): a plain
+    ! annual cosine, evaluated from FESOM's own clock (daynew/timenew/ndpyr, g_clock)
+    ! rescaled onto DINO's 1-360 day convention so their exact cos(pi*(d-201)/180) phasing
+    ! applies unchanged regardless of FESOM's own (365-day, include_fleapyear=.false. for
+    ! this config) calendar length. Composes with (adds on top of) north_pole_target/
+    ! south_pole_target rather than replacing them with DINO's own absolute means (5degC
+    ! north / -0.5degC south) -- so every existing sweep case's pole target stays its own
+    ! tuned mean, now with an optional seasonal wobble on top, rather than introducing a
+    ! second, DINO-specific mean-value convention alongside the existing one. Hemispheres
+    ! are deliberately out of phase (north: +amp*cos(...), south: -amp*cos(...)), matching
+    ! DINO's own sign convention (real NH-summer/SH-winter asymmetry, not two independent
+    ! wobbles). Recomputed every relax_2_tsurf() call (cheap -- pure per-node function of
+    ! latitude + day-of-year, no communication) rather than once at init time, since the
+    ! whole point is that the target itself now varies through the run.
+    logical           :: do_Tseasonal       = .False.
+    real(kind=WP)     :: north_seasonal_amp = 3.0_WP   ! [degC], DINO Eq. B3 amplitude
+    real(kind=WP)     :: south_seasonal_amp = 0.5_WP   ! [degC], DINO Eq. B4 amplitude
+
+    ! Meridional half-extent of the domain [rad], computed once in initial_state_neverworld2
+    ! (MPI reduction over mesh latitude) and reused here as a module-level constant -- needed
+    ! by relax_2_tsurf()'s do_Tseasonal recompute, which cannot afford to redo that reduction
+    ! every timestep.
+    real(kind=WP), save :: Ly
+
     ! All toy_neverworld2 parameters above are namelist-controlled: read from the
     ! &oce_neverworld2 group in namelist.oce by gen_model_setup.F90 (only when
     ! which_toy=='neverworld2'), tolerant of the group being missing (falls back to
@@ -170,7 +197,8 @@ MODULE Toy_Neverworld2
                                 do_thermobar, thermobaric_Th, &
                                 do_Sstrat, Sstrat_amp, &
                                 do_haline, haline_beta, &
-                                do_Srelax, s_north, s_south, s_equator
+                                do_Srelax, s_north, s_south, s_equator, &
+                                do_Tseasonal, north_seasonal_amp, south_seasonal_amp
     contains
     !
     !
@@ -184,7 +212,9 @@ MODULE Toy_Neverworld2
         type(t_dyn)   , intent(inout), target :: dynamics 
 
         integer                               :: elem, node, ii, nz, nzmin, nzmax, elnodes(3), taul, idx
-        real(kind=WP)                         :: lon, lat, dlat_tau, loc_Ly, Ly
+        real(kind=WP)                         :: lon, lat, dlat_tau, loc_Ly
+        ! Ly itself is now module-level (see declaration above) -- reused by relax_2_tsurf()'s
+        ! do_Tseasonal recompute, so it must survive past this subroutine's return.
         real(kind=WP)                         :: ynorm, t_base, cold_weight   ! used by trelax_opt=2
         real(kind=WP), allocatable            :: lat_tau(:), val_tau(:)
 #include "associate_part_def.h"
@@ -374,6 +404,9 @@ MODULE Toy_Neverworld2
         type(t_tracer_data), intent(inout), target  :: tdata
         integer                                     :: node
         real(kind=WP)                               :: t_surface, t_target   ! used by trelax_opt=2
+        real(kind=WP)                               :: lat, ynorm, t_base, cold_weight  ! used by do_Tseasonal
+        real(kind=WP)                               :: frac_year, d_dino, seasonal_phase
+        real(kind=WP)                               :: north_pole_target_now, south_pole_target_now
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -390,6 +423,42 @@ MODULE Toy_Neverworld2
                 ! the tracer directly, so it shows up in the heat budget. Overwrites
                 ! heat_flux every call since, for this adiabatic toy config, restoring
                 ! is its only source.
+                ! Recompute Tsurf every call (not just once at init) so relax_2_tsurf is the
+                ! single source of truth for the trelax_opt=2 target under BOTH do_Tseasonal
+                ! states -- avoids keeping two separate copies of the same cold-patch formula
+                ! (this one, and initial_state_neverworld2's) that could drift out of sync.
+                ! initial_state_neverworld2's own version now only supplies a harmless initial
+                ! value, immediately overwritten here on the first call.
+                if (do_Tseasonal) then
+                    ! DINO Eq. B3/B4 (Kamm et al. 2025): a plain annual cosine on top of
+                    ! the existing (namelist-tuned) pole-target means, hemispheres out of
+                    ! phase (real NH-summer/SH-winter asymmetry). Rescale FESOM's own
+                    ! day-of-year (daynew/timenew, out of ndpyr) onto DINO's 1-360 day
+                    ! convention so cos(pi*(d-201)/180) applies with its original phasing
+                    ! regardless of FESOM's calendar length.
+                    frac_year = (real(daynew-1,WP) + timenew/86400.0_WP) / real(ndpyr,WP)
+                    d_dino    = 1.0_WP + frac_year*360.0_WP
+                    seasonal_phase = cos(pi*(d_dino-201.0_WP)/180.0_WP)
+                    north_pole_target_now = north_pole_target +  north_seasonal_amp*seasonal_phase
+                    south_pole_target_now = south_pole_target -  south_seasonal_amp*seasonal_phase
+                else
+                    north_pole_target_now = north_pole_target
+                    south_pole_target_now = south_pole_target
+                end if
+                do node = 1, myDim_nod2D+eDim_nod2D
+                    lat   = coord_nod2D(2,node)
+                    ynorm = lat/Ly
+                    t_base = 5.0_WP + (equator_target-5.0_WP)*cos(0.5_WP*pi*lat/Ly)
+                    if (do_north_cold_patch .and. ynorm>0.0_WP) then
+                        cold_weight = ynorm**north_cold_patch_power
+                        Tsurf(node) = (1.0_WP-cold_weight)*t_base + cold_weight*north_pole_target_now
+                    else if (do_south_cold_patch .and. ynorm<0.0_WP) then
+                        cold_weight = abs(ynorm)**south_cold_patch_power
+                        Tsurf(node) = (1.0_WP-cold_weight)*t_base + cold_weight*south_pole_target_now
+                    else
+                        Tsurf(node) = t_base
+                    end if
+                end do
                 heat_flux = 0.0_WP
                 do node=1, myDim_nod2D
                     t_surface = tdata%values(1,node)

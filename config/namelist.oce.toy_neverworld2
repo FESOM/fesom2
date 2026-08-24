@@ -183,5 +183,16 @@ do_Srelax     = .False.
 s_north       = 35.00     ! [psu], DINO S*_n
 s_south       = 35.10     ! [psu], DINO S*_s
 s_equator     = 37.25     ! [psu], DINO S*_eq
+
+! --- Optional seasonal cycle in the trelax_opt=2 north/south pole targets ---
+! Off by default. DINO Eq. B3/B4 (Kamm et al. 2025): a plain annual cosine added on top
+! of north_pole_target/south_pole_target (not replacing them with DINO's own absolute
+! means), hemispheres out of phase (north +amp*cos, south -amp*cos -- real NH-summer/
+! SH-winter asymmetry). Recomputed every relax_2_tsurf() call from FESOM's own clock,
+! rescaled onto DINO's 1-360 day convention so their cos(pi*(d-201)/180) phasing applies
+! unchanged regardless of FESOM's calendar length.
+do_Tseasonal        = .False.
+north_seasonal_amp  = 3.0     ! [degC], DINO Eq. B3 amplitude
+south_seasonal_amp  = 0.5     ! [degC], DINO Eq. B4 amplitude
 /
 
