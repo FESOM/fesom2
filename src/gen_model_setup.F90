@@ -112,9 +112,6 @@ subroutine setup_model(partit)
   read (fileunit, NML=oce_dyn, iostat=istat)
   if (istat /= 0) call check_namelist_read(fileunit, 'oce_dyn', nmlfile, partit)
   
-  read (fileunit, NML=tracer_init3d, iostat=istat)
-  if (istat /= 0) call check_namelist_read(fileunit, 'tracer_init3d', nmlfile, partit)
-  
   ! Optional reading of oce_perturb namelist for backward compatibility
   read (fileunit, NML=oce_perturb, iostat=istat)
   if (istat /= 0) then
