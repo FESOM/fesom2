@@ -138,7 +138,12 @@ subroutine stress_tensor_m(ice, partit, mesh)
         if (ulevels(elem) > 1) cycle
 
         msum=sum(m_ice(elnodes))*val3
-        if(msum<=0.01_WP) cycle !DS
+        if(msum<=0.01_WP) then
+            sigma11(elem) = 0.0_WP
+            sigma22(elem) = 0.0_WP
+            sigma12(elem) = 0.0_WP
+            cycle
+        end if
         asum=sum(a_ice(elnodes))*val3
 
         dx=gradient_sca(1:3,elem)
@@ -1063,7 +1068,12 @@ subroutine stress_tensor_a(ice, partit, mesh)
         elnodes=elem2D_nodes(:,elem)
 
         msum=sum(m_ice(elnodes))*val3
-        if(msum<=0.01_WP) cycle !DS
+        if(msum<=0.01_WP) then
+            sigma11(elem) = 0.0_WP
+            sigma22(elem) = 0.0_WP
+            sigma12(elem) = 0.0_WP
+            cycle
+        end if
         asum=sum(a_ice(elnodes))*val3
 
         dx=gradient_sca(1:3,elem)
@@ -1094,7 +1104,7 @@ subroutine stress_tensor_a(ice, partit, mesh)
         pressure=ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))/(delta+ice%delta_min)
 #endif
 
-        r1=pressure*(eps1-delta)
+        r1=pressure*(eps1-max(delta,ice%delta_min))
         r2=pressure*eps2*vale
         r3=pressure*eps12(elem)*vale
         si1=sigma11(elem)+sigma22(elem)
