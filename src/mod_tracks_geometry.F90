@@ -8,17 +8,14 @@ module mod_tracks_geometry
   ! Reference: /work/ab0246/a270092/software/tripyview/tripyview/sub_transect.py
   !
   ! All inputs are GLOBAL mesh arrays — caller must gather/broadcast them.
-  ! Module has no MPI, no XIOS, no FESOM dependencies; safe to unit-test
-  ! in isolation against tripyview output.
   use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_quiet_nan
+  use o_param, only: pi, rad, r_earth
   implicit none
   private
 
   integer, parameter, public :: TG_WP = selected_real_kind(13)
 
-  real(TG_WP), parameter :: PI       = 3.14159265358979323846_TG_WP
-  real(TG_WP), parameter :: DEG2RAD  = PI / 180.0_TG_WP
-  real(TG_WP), parameter :: R_EARTH_KM = 6367.5_TG_WP
+  real(TG_WP), parameter :: R_EARTH_KM = real(r_earth, TG_WP)/1000.0_TG_WP
 
   type, public :: transect_t
     character(len=64)         :: name = ''
@@ -130,7 +127,7 @@ contains
       auxx = auxx / auxn
       auxy = auxy / auxn
     end if
-    alpha_tot = atan2(auxy, auxx) * 180.0_TG_WP / PI
+    alpha_tot = atan2(auxy, auxx) * 180.0_TG_WP / real(pi, TG_WP)
 
     ! tripyview flips the polyline if total bearing falls in [-180, -90]
     if (alpha_tot >= -180.0_TG_WP .and. alpha_tot <= -90.0_TG_WP) then
@@ -823,8 +820,8 @@ contains
     real(TG_WP), intent(in)  :: lon_deg, lat_deg
     real(TG_WP), intent(out) :: x, y, z
     real(TG_WP) :: lon, lat, clat
-    lon = lon_deg * DEG2RAD
-    lat = lat_deg * DEG2RAD
+    lon = lon_deg * real(rad, TG_WP)
+    lat = lat_deg * real(rad, TG_WP)
     clat = cos(lat)
     x = clat * cos(lon)
     y = clat * sin(lon)

@@ -138,7 +138,12 @@ subroutine stress_tensor_m(ice, partit, mesh)
         if (ulevels(elem) > 1) cycle
 
         msum=sum(m_ice(elnodes))*val3
-        if(msum<=0.01_WP) cycle !DS
+        if(msum<=0.01_WP) then
+            sigma11(elem) = 0.0_WP
+            sigma22(elem) = 0.0_WP
+            sigma12(elem) = 0.0_WP
+            cycle
+        end if
         asum=sum(a_ice(elnodes))*val3
 
         dx=gradient_sca(1:3,elem)
@@ -413,7 +418,8 @@ subroutine stress2rhs_m(ice, partit, mesh)
         if ( ulevels_nod2d(row)>1 ) cycle
 
         mass=(m_ice(row)*rhoice+m_snow(row)*rhosno)
-        mass=mass/(1.0_WP+mass*mass)
+        mass=1.0_WP/max(mass, 9.0_WP)  ! 9.0 kg/m² per GRID area — numerical floor to prevent near-zero inertia
+        !mass=mass/(1.0_WP+mass*mass)   ! original: dimensionally inconsistent (1 + [kg/m²]²)
         u_rhs_ice(row)=(u_rhs_ice(row)*mass + rhs_a(row))/area(1,row)
         v_rhs_ice(row)=(v_rhs_ice(row)*mass + rhs_m(row))/area(1,row)
     end do
@@ -650,10 +656,11 @@ subroutine EVPdynamics_m(ice, partit, mesh)
 
         if (a_ice(i) >= 0.01_WP) then
             inv_thickness(i) = (rhoice*m_ice(i)+rhosno*m_snow(i))/a_ice(i)
-            inv_thickness(i) = 1.0_WP/max(inv_thickness(i), 9.0_WP)  ! Limit the mass
+            inv_thickness(i) = 1.0_WP/max(inv_thickness(i), 9.0_WP)  ! 9.0 kg/m² per ICE area (≈1 cm ice per unit ice area)
 
             mass(i) = (m_ice(i)*rhoice+m_snow(i)*rhosno)
-            mass(i) = mass(i)/((1.0_WP+mass(i)*mass(i))*area(1,i))
+            mass(i) = 1.0_WP/(max(mass(i), 9.0_WP)*area(1,i))  ! 9.0 kg/m² per GRID area (different quantity; same floor for numerical safety)
+            !mass(i) = mass(i)/((1.0_WP+mass(i)*mass(i))*area(1,i))   ! original: dimensionally inconsistent
 
             ! scale rhs_a, rhs_m, too.
             rhs_a(i) = rhs_a(i)/area(1,i)
@@ -1067,7 +1074,12 @@ subroutine stress_tensor_a(ice, partit, mesh)
         elnodes=elem2D_nodes(:,elem)
 
         msum=sum(m_ice(elnodes))*val3
-        if(msum<=0.01_WP) cycle !DS
+        if(msum<=0.01_WP) then
+            sigma11(elem) = 0.0_WP
+            sigma22(elem) = 0.0_WP
+            sigma12(elem) = 0.0_WP
+            cycle
+        end if
         asum=sum(a_ice(elnodes))*val3
 
         dx=gradient_sca(1:3,elem)
@@ -1098,7 +1110,7 @@ subroutine stress_tensor_a(ice, partit, mesh)
         pressure=ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))/(delta+ice%delta_min)
 #endif
 
-        r1=pressure*(eps1-delta)
+        r1=pressure*(eps1-max(delta,ice%delta_min))
         r2=pressure*eps2*vale
         r3=pressure*eps12(elem)*vale
         si1=sigma11(elem)+sigma22(elem)

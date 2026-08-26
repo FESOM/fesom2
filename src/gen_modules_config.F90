@@ -132,7 +132,7 @@ module g_config
   logical                       :: lmin_latent_hf=.true.
   logical                       :: lverbose_icb=.false.  
   integer                       :: l_allowgrounding=1    ! 0=free drift, 1=slow drift, 2=stationary
-  logical                       :: l_cap_ibhf_n=.true.   ! cap iceberg-driven interior cooling (ibhf_n) at a safe temperature floor per cell/step
+  logical                       :: l_cap_ibhf_n=.false.   ! cap iceberg-driven interior cooling (ibhf_n) at a safe temperature floor per cell/step
   integer                       :: ib_num=0
   integer                       :: steps_per_ib_step=8
 
@@ -160,12 +160,29 @@ module g_config
   logical                       :: flag_debug=.false.    ! prints name of actual subroutine he is in 
   logical                       :: flag_warn_cflz=.true. ! switches off cflz warning
   logical                       :: use_transit=.false.    ! switches off transient tracers
+  !_____________________________________________________________________________
+  ! *** freshwater hosing experiments ***
+  logical                       :: use_hosing=.false.     ! impose an Antarctic freshwater anomaly
+  character(10)                 :: hosing_mode='surf'     ! 'surf' = surface virtual salinity flux, 'depth' = distributed over depth
+  real(kind=WP)                 :: hosing_hSv=0.0_WP      ! freshwater anomaly magnitude [Sv]
   logical                       :: compute_oasis_corners=.false. ! switches on corner calculation for 1st order conserv remapping 
+
+#if defined(__recom) && defined(__usetp)
+! number of groups for multi FESOM group loop parallelization
+  integer                       :: num_fesom_groups=1
+  namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, &
+                        use_cavity_partial_cell, cavity_partial_cell_thresh, &
+                        use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
+                        use_transit, compute_oasis_corners, num_fesom_groups, &
+                        use_hosing, hosing_mode, hosing_hSv
+#else
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
                         use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
-                        use_transit, compute_oasis_corners
-  
+                        use_transit, compute_oasis_corners, &
+                        use_hosing, hosing_mode, hosing_hSv
+#endif
+
   !_____________________________________________________________________________
   ! *** others ***
   real(kind=WP)                 :: dt
