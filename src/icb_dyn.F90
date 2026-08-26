@@ -660,6 +660,9 @@ subroutine iceberg_levelwise_andkeel(mesh, partit, dynamics, uo_dz,vo_dz, uo_kee
   integer        :: m, k, n2, max_node_level_count, safe_lev
   ! depth over which is integrated (layer and sum)
   real           :: dz, ufkeel1, ufkeel2, Temkeel, Salkeel
+  ! .true. on the first WET level of the column: k==1 in the open ocean,
+  ! k==ulevels_nod2d(n2) beneath an ice shelf cavity.
+  logical        :: at_top
 
 type(t_mesh), intent(in) , target :: mesh
 type(t_dyn), intent(in) , target :: dynamics
@@ -710,6 +713,16 @@ type(t_partit), intent(inout), target :: partit
     if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
         .AND. k < ulevels_nod2d(n2)) cycle
 
+    ! First wet level of this column.  Must be evaluated HERE, inside the k
+    ! loop: n2 and k only have values from this point on.
+    at_top = (k == 1)
+    if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0) &
+        at_top = (k == ulevels_nod2d(n2))
+
+    ! NOTE: k==1 here, deliberately not at_top.  The cavity top level is
+    ! handled by the else-if below, which sets lev_up to the shelf base;
+    ! at_top would set it to 0.0 (the sea surface) and leave that branch
+    ! unreachable.
     if( k==1 ) then
         lev_up = 0.0
     else if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
@@ -753,12 +766,14 @@ type(t_partit), intent(inout), target :: partit
 
     ! Keel layer: mid-level k is at or below the iceberg draft
     else if( abs(lev_low)>=abs(depth_ib) ) then
-      if( k==1 ) then
-        ! Draft within first half-layer: use first mid-level value
-        ufkeel1 = UV_ib(1,1,n2)
-        ufkeel2 = UV_ib(2,1,n2)
-        Temkeel = Tclim_ib(1,n2)
-        Salkeel = Sclim_ib(1,n2)
+      if( at_top ) then
+        ! Draft within the first wet half-layer: use that level's value.
+        ! Level k is the surface in the open ocean, the shelf base under a
+        ! cavity; there is no level above it to interpolate from.
+        ufkeel1 = UV_ib(1,k,n2)
+        ufkeel2 = UV_ib(2,k,n2)
+        Temkeel = Tclim_ib(k,n2)
+        Salkeel = Sclim_ib(k,n2)
       else if( k > nlevels_nod2D(n2)-1 ) then
         ! Last half-layer to bottom: no UV_ib(k), use piecewise constant
         ufkeel1 = UV_ib(1,k-1,n2)
@@ -882,8 +897,9 @@ subroutine iceberg_average_andkeel(mesh, partit, dynamics, uo_dz,vo_dz, uo_keel,
   integer        :: m, k, n2, safe_lev
   ! depth over which is integrated (layer and sum)
   real           :: dz, ufkeel1, ufkeel2, Temkeel, Salkeel
-
-  logical :: at_top
+  ! .true. on the first WET level of the column: k==1 in the open ocean,
+  ! k==ulevels_nod2d(n2) beneath an ice shelf cavity.
+  logical        :: at_top
 
 type(t_mesh), intent(in) , target :: mesh
 type(t_dyn), intent(in) , target :: dynamics
@@ -895,10 +911,6 @@ type(t_partit), intent(inout), target :: partit
 
   UV_IB     => dynamics%uv_ib(:,:,:)
 
-  at_top = (k == 1)
-  if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0) &
-      at_top = (k == ulevels_nod2d(n2))
-  
   !LOOP: over all nodes of the iceberg element
   nodeloop: do m=1, 3
    !for each 2D node of the iceberg element..
@@ -921,7 +933,17 @@ type(t_partit), intent(inout), target :: partit
     if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
         .AND. k < ulevels_nod2d(n2)) cycle
 
-    if( at_top ) then
+    ! First wet level of this column.  Must be evaluated HERE, inside the k
+    ! loop: n2 and k only have values from this point on.
+    at_top = (k == 1)
+    if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0) &
+        at_top = (k == ulevels_nod2d(n2))
+
+    ! NOTE: k==1 here, deliberately not at_top.  The cavity top level is
+    ! handled by the else-if below, which sets lev_up to the shelf base;
+    ! at_top would set it to 0.0 (the sea surface) and leave that branch
+    ! unreachable.
+    if( k==1 ) then
         lev_up = 0.0
     else if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
              .AND. k == ulevels_nod2d(n2)) then
@@ -967,11 +989,13 @@ type(t_partit), intent(inout), target :: partit
       dz = abs( lev_up - depth_ib )
 
       if( at_top ) then
-        ! Draft within first half-layer: piecewise constant
-        ufkeel1 = UV_ib(1,1,n2)
-        ufkeel2 = UV_ib(2,1,n2)
-        Temkeel = Tclim_ib(1,n2)
-        Salkeel = Sclim_ib(1,n2)
+        ! Draft within the first wet half-layer: piecewise constant.  Level k
+        ! is the surface in the open ocean, the shelf base under a cavity;
+        ! there is no level above it to interpolate from.
+        ufkeel1 = UV_ib(1,k,n2)
+        ufkeel2 = UV_ib(2,k,n2)
+        Temkeel = Tclim_ib(k,n2)
+        Salkeel = Sclim_ib(k,n2)
         uo_dz(m)=ufkeel1*dz 
         vo_dz(m)=ufkeel2*dz
         T_dz(m)=Temkeel*dz
@@ -1009,11 +1033,12 @@ type(t_partit), intent(inout), target :: partit
     ! Regular layer: iceberg extends deeper
     else
       if( at_top ) then
-        ! First half-layer (surface to first mid-level): piecewise constant
-        uo_dz(m)=uo_dz(m)+ UV_ib(1,1,n2)*dz
-        vo_dz(m)=vo_dz(m)+ UV_ib(2,1,n2)*dz
-        T_dz(m)=T_dz(m)+ Tclim_ib(1,n2)*dz
-        S_dz(m)=S_dz(m)+ Sclim_ib(1,n2)*dz
+        ! First wet half-layer (surface, or shelf base, to the first
+        ! mid-level): piecewise constant, no level above to interpolate from.
+        uo_dz(m)=uo_dz(m)+ UV_ib(1,k,n2)*dz
+        vo_dz(m)=vo_dz(m)+ UV_ib(2,k,n2)*dz
+        T_dz(m)=T_dz(m)+ Tclim_ib(k,n2)*dz
+        S_dz(m)=S_dz(m)+ Sclim_ib(k,n2)*dz
         cycle
       end if
 
@@ -1103,8 +1128,9 @@ subroutine iceberg_avvelo(mesh, partit, dynamics, uo_dz,vo_dz,depth_ib,iceberg_e
   real           :: dz, ufkeel1, ufkeel2
   ! variables for velocity correction
   real           :: delta_depth, u_bottom_x, u_bottom_y
-
-  logical :: at_top
+  ! .true. on the first WET level of the column: k==1 in the open ocean,
+  ! k==ulevels_nod2d(n2) beneath an ice shelf cavity.
+  logical        :: at_top
 
 type(t_mesh), intent(in) , target :: mesh
 type(t_dyn), intent(in) , target :: dynamics
@@ -1116,11 +1142,7 @@ type(t_partit), intent(inout), target :: partit
 
   UV_IB     => dynamics%uv_ib(:,:,:)
   ! loop over all nodes of the iceberg element
-  
-  at_top = (k == 1)
-  if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0) &
-      at_top = (k == ulevels_nod2d(n2))
-  
+
   do m=1, 3
    !for each 2D node of the iceberg element..
    n2=mesh%elem2D_nodes(m,iceberg_elem)
@@ -1138,8 +1160,18 @@ type(t_partit), intent(inout), target :: partit
     if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
         .AND. k < ulevels_nod2d(n2)) cycle
 
+    ! First wet level of this column.  Must be evaluated HERE, inside the k
+    ! loop: n2 and k only have values from this point on.
+    at_top = (k == 1)
+    if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0) &
+        at_top = (k == ulevels_nod2d(n2))
+
 ! kh 18.03.21 use zbar_3d_n_ib buffered values here
-    if( at_top ) then
+    ! NOTE: k==1 here, deliberately not at_top.  The cavity top level is
+    ! handled by the else-if below, which sets lev_up to the shelf base;
+    ! at_top would set it to 0.0 (the sea surface) and leave that branch
+    ! unreachable.
+    if( k==1 ) then
         lev_up = 0.0
     else if (use_cavity .AND. mesh%cavity_depth(n2) /= 0.0 &
              .AND. k == ulevels_nod2d(n2)) then
