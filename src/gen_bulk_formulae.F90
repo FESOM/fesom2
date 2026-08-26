@@ -6,7 +6,7 @@ MODULE gen_bulk
     USE MOD_ICE
     use g_forcing_arrays
     use g_forcing_param, only: ncar_bulk_z_wind, ncar_bulk_z_tair, ncar_bulk_z_shum
-    use o_param, only: WP
+    use o_param, only: WP, pi
     use g_sbf, only: atmdata, i_totfl, i_xwind, i_ywind, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud
 
     implicit none
@@ -572,7 +572,6 @@ FUNCTION psi_m( zta )
    real(wp)             :: stabit
    !!
    real(wp), intent(in) ::   zta
-   real(wp), parameter  :: pi = 3.141592653589793_WP
    real(wp)             :: psi_m
    !-------------------------------------------------------------------------------
 
