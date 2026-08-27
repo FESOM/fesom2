@@ -204,7 +204,7 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
     real (kind=WP)  :: temp,sal,tin,zice
     real (kind=WP)  :: rhow, rhor, rho
     real (kind=WP)  :: gats1, gats2, gas, gat
-    real (kind=WP)  :: ep1,ep2,ep3,ep4,ep5,ep31
+    real (kind=WP)  :: ep1,ep2,ep3,ep4,ep31
     real (kind=WP)  :: ex1,ex2,ex3,ex4,ex5,ex6
     real (kind=WP)  :: vt1,sr1,sr2,sf1,sf2,tf1,tf2,tf,sf,seta,re
     integer         :: node, nzmax, nzmin
@@ -224,9 +224,10 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
 
     real(kind=WP),parameter ::  tob=  -20.                       !temperatur at the ice surface
     real(kind=WP),parameter ::  rhoi=  920.                      !mean ice density
+    real(kind=WP),parameter ::  rhofw=  1000.                    !mean freshwater density
     real(kind=WP),parameter ::  cpw =  4180.0                    !Barnier et al. (1995)
-    real(kind=WP),parameter ::  lhf =  3.33e+5                   !latent heat of fusion
-    real(kind=WP),parameter ::  tdif=  1.54e-6                   !thermal conductivity of ice shelf !RG4190 / RG44027
+    real(kind=WP),parameter ::  lhf =  334000.                   !latent heat of fusion [J/kg]
+    real(kind=WP),parameter ::  tdif=  1.54e-6                   !thermal diffusivity of ice shelf [m2/s] !RG4190 / RG44027
     real(kind=WP),parameter ::  atk =  273.15                    !0 deg C in Kelvin
     real(kind=WP),parameter ::  cpi =  152.5+7.122*(atk+tob)     !Paterson:"The Physics of Glaciers"
 
@@ -262,7 +263,7 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
         !_______________________________________________________________________
         ! Calculate the in-situ temperature tin
         !call potit(s(i,j,N,lrhs)+35.0,t(i,j,N,lrhs),-zice(i,j),rp,tin)
-        call potit(sal,temp,abs(zice),rp,tin)
+        call potit(sal,temp,abs(zice)*1.025_WP,rp,tin)  ! convert depth [m] to pressure [dbar]
         
         !_______________________________________________________________________
         ! Calculate or prescribe the turbulent heat and salt transfer coeff. GAT and GAS
@@ -275,7 +276,7 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
         vt1  = sqrt(UVnode(1,nzmin,node)*UVnode(1,nzmin,node)+UVnode(2,nzmin,node)*UVnode(2,nzmin,node))
         vt1  = max(vt1,0.001_WP)
         !vt1  = max(vt1,0.005) ! CW
-        re   = 10._WP/un                   !vt1*re (=velocity times length scale over kinematic viscosity) is the Reynolds number
+        re   = hnode(nzmin,node)/un        !vt1*re is the Reynolds number; use actual top-layer thickness [m]
         
         gats1= sak1*vt1
         gats2= 2.12_WP*log(gats1*re)-9._WP
@@ -301,9 +302,8 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
         ep1  = cpw*gat
         ep2  = cpi*gas
         ep3  = lhf*gas
-        ep31 = -rhor*cpi*tdif/zice   !RG4190 / RG44027  ! CW
+        ep31 = -rhor*rhor*cpi*tdif/zice   !RG4190 / RG44027  ! CW; rhor^2 because D_ice = D_draft*(rhow/rhoi) = D_draft/rhor
         ep4  = b+c*zice
-        ep5  = gas/rhor
         
         ! negative heat flux term in the ice (due to -kappa/D)
         !    ex1 = a*(ep1-ep2)
@@ -336,7 +336,7 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
         ex4 = ex2/ex1
         ex5 = ex3/ex1
         
-        sr1 = 0.25_WP*ex4*ex4-ex5
+        sr1 = max(0.25_WP*ex4*ex4-ex5, 0._WP)  ! guard against negative discriminant
         !sr2 = -0.5*ex4
         sr2 = ex6*ex4   ! modified for RG4190 / RG44027 ! CW
         sf1 = sr2+sqrt(sr1)
@@ -357,12 +357,12 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
         
         !_______________________________________________________________________
         ! Calculate the melting/freezing rate [m/s]
-        ! seta = ep5*(1.0-sal/sf)     !rt thinks this is not needed
+        ! seta = ep5*(1.0-sal/sf)     !rt thinks this is not needed, ep5=gas/rhor
         !rt  t_surf_flux(i,j)=gat*(tf-tin)
         !rt  s_surf_flux(i,j)=gas*(sf-(s(i,j,N,lrhs)+35.0))
         
         heat_flux(node)  = rhow*cpw*gat*(tin-tf)      ! [W/m2]  ! positive for upward
-        water_flux(node) =          gas*(sf-sal)/sf   ! [m/s]   !
+        water_flux(node) = rhow / rhofw * gas * (sf-sal)/sf   ! [m/s]   !
         
         !      qo=-rhor*seta*oofw
         !      if(seta.le.0.) then

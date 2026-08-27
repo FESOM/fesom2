@@ -134,7 +134,7 @@ END DO
 !$OMP END PARALLEL DO
 end subroutine cut_off
 
-#if !defined (__oasis) && !defined (__ifsinterface)
+#if !defined (__oasis) && !defined (__ifsinterface) && !defined (__yac)
 !_______________________________________________________________________________
 ! Sea-ice thermodynamics routines
 !
@@ -929,7 +929,7 @@ function compute_solar_zenith_angle(day_of_year, hour_utc, longitude, latitude) 
     ! Written for Apache 2.0 licensed projects.
     !-----------------------------------------------------------------------
 
-    use o_param, only: WP  ! Ensure precision consistency
+    use o_param, only: WP, pi  ! Ensure precision consistency
 
     implicit none
 
@@ -942,7 +942,6 @@ function compute_solar_zenith_angle(day_of_year, hour_utc, longitude, latitude) 
     real(kind=WP)              :: cos_zenith
 
     ! Constants
-    real(kind=WP), parameter   :: PI = 3.141592653589793_WP
     real(kind=WP), parameter   :: DEG_TO_RAD = PI / 180.0_WP
     real(kind=WP), parameter   :: RAD_TO_DEG = 180.0_WP / PI
     real(kind=WP), parameter   :: DAYS_PER_YEAR = 365.25_WP
@@ -1012,4 +1011,4 @@ end function compute_solar_zenith_angle
 !
 !
 !_______________________________________________________________________________
-#endif /* #if !defined (__oasis) && !defined (__ifsinterface) */
+#endif /* #if !defined (__coupled) && !defined (__ifsinterface) */

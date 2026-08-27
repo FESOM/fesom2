@@ -138,7 +138,12 @@ subroutine stress_tensor_m(ice, partit, mesh)
         if (ulevels(elem) > 1) cycle
 
         msum=sum(m_ice(elnodes))*val3
-        if(msum<=0.01_WP) cycle !DS
+        if(msum<=0.01_WP) then
+            sigma11(elem) = 0.0_WP
+            sigma22(elem) = 0.0_WP
+            sigma12(elem) = 0.0_WP
+            cycle
+        end if
         asum=sum(a_ice(elnodes))*val3
 
         dx=gradient_sca(1:3,elem)
@@ -413,7 +418,8 @@ subroutine stress2rhs_m(ice, partit, mesh)
         if ( ulevels_nod2d(row)>1 ) cycle
 
         mass=(m_ice(row)*rhoice+m_snow(row)*rhosno)
-        mass=mass/(1.0_WP+mass*mass)
+        mass=1.0_WP/max(mass, 9.0_WP)  ! 9.0 kg/m² per GRID area — numerical floor to prevent near-zero inertia
+        !mass=mass/(1.0_WP+mass*mass)   ! original: dimensionally inconsistent (1 + [kg/m²]²)
         u_rhs_ice(row)=(u_rhs_ice(row)*mass + rhs_a(row))/area(1,row)
         v_rhs_ice(row)=(v_rhs_ice(row)*mass + rhs_m(row))/area(1,row)
     end do
@@ -448,6 +454,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     real(kind=WP)    :: rdt, drag, det
     real(kind=WP)    :: inv_thickness(partit%myDim_nod2D), umod, rhsu, rhsv
     logical          :: ice_el(partit%myDim_elem2D), ice_nod(partit%myDim_nod2D)
+    logical          :: lcav_edge
     !NR for stress_tensor_m
     integer         :: el, elnodes(3)
     real(kind=WP)   :: dx(3), dy(3), msum, asum
@@ -470,6 +477,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: elevation
     real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
     real(kind=WP), dimension(:), pointer  :: u_ice_aux, v_ice_aux
+    real(kind=WP), dimension(:), pointer  :: ice_strength
 #if defined (__icepack)
     real(kind=WP), dimension(:), pointer  :: a_ice_old, m_ice_old, m_snow_old
 #endif
@@ -500,6 +508,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     stress_atmice_y => ice%stress_atmice_y(:)
     u_ice_aux       => ice%uice_aux(:)
     v_ice_aux       => ice%vice_aux(:)
+    ice_strength    => ice%work%ice_strength(:)
 #if defined (__icepack)
     a_ice_old       => ice%data(1)%values_old(:)
     m_ice_old       => ice%data(2)%values_old(:)
@@ -520,6 +529,21 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     !___________________________________________________________________________
     u_ice_aux=u_ice    ! Initialize solver variables
     v_ice_aux=v_ice
+
+    !___________________________________________________________________________
+    ! Populate the nodal ice_strength diagnostic with the canonical Hibler
+    ! (1979) P = P*·h·exp(-C(1-A)) from per-node m_ice and a_ice. Exposed as
+    ! the 'strength_ice' output stream. mEVP evaluates the per-element
+    ! strength inline in its iteration, so this nodal field is purely a
+    ! diagnostic.
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+    do n = 1, myDim_nod2D
+        ice_strength(n) = 0.0_WP
+        if (ulevels_nod2D(n) > 1) cycle
+        if (m_ice(n) <= 0._WP .or. a_ice(n) <= 0._WP) cycle
+        ice_strength(n) = ice%pstar*m_ice(n)*exp(-ice%c_pressure*(1.0_WP-a_ice(n)))
+    end do
+!$OMP END PARALLEL DO
 
 #if defined (__icepack)
     a_ice_old(:)  = a_ice(:)
@@ -632,10 +656,11 @@ subroutine EVPdynamics_m(ice, partit, mesh)
 
         if (a_ice(i) >= 0.01_WP) then
             inv_thickness(i) = (rhoice*m_ice(i)+rhosno*m_snow(i))/a_ice(i)
-            inv_thickness(i) = 1.0_WP/max(inv_thickness(i), 9.0_WP)  ! Limit the mass
+            inv_thickness(i) = 1.0_WP/max(inv_thickness(i), 9.0_WP)  ! 9.0 kg/m² per ICE area (≈1 cm ice per unit ice area)
 
             mass(i) = (m_ice(i)*rhoice+m_snow(i)*rhosno)
-            mass(i) = mass(i)/((1.0_WP+mass(i)*mass(i))*area(1,i))
+            mass(i) = 1.0_WP/(max(mass(i), 9.0_WP)*area(1,i))  ! 9.0 kg/m² per GRID area (different quantity; same floor for numerical safety)
+            !mass(i) = mass(i)/((1.0_WP+mass(i)*mass(i))*area(1,i))   ! original: dimensionally inconsistent
 
             ! scale rhs_a, rhs_m, too.
             rhs_a(i) = rhs_a(i)/area(1,i)
@@ -684,7 +709,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
         ! New implementation following Boullion et al, Ocean Modelling 2013.
         ! SD, 30.07.2014
         !_______________________________________________________________________
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(el, i, ed, row, elnodes, dx, dy, meancos, eps1, eps2, delta, pressure, umod, drag, rhsu, rhsv, det, n)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(el, i, ed, row, elnodes, dx, dy, meancos, eps1, eps2, delta, pressure, umod, drag, rhsu, rhsv, det, n, lcav_edge)
 !$OMP DO
         do el=1,myDim_elem2D
             if (ulevels(el)>1) cycle
@@ -840,8 +865,13 @@ subroutine EVPdynamics_m(ice, partit, mesh)
             !___________________________________________________________________
             ! apply sea ice velocity boundary conditions at cavity-ocean edge
             if (use_cavity) then
-                if ( (ulevels(edge_tri(1,ed))>1) .or. &
-                    ( edge_tri(2,ed)>0 .and. ulevels(edge_tri(2,ed))>1) ) then
+                ! .and. is not short-circuit in Fortran: guard edge_tri(2,ed)>0
+                ! separately or ulevels(0) is read at boundary edges.
+                lcav_edge = (ulevels(edge_tri(1,ed)) > 1)
+                if (.not. lcav_edge) then
+                    if (edge_tri(2,ed) > 0) lcav_edge = (ulevels(edge_tri(2,ed)) > 1)
+                end if
+                if (lcav_edge) then
                     do n=1, 2
 #if defined(_OPENMP)
                        call omp_set_lock  (partit%plock(edges(n, ed)))
@@ -1044,7 +1074,12 @@ subroutine stress_tensor_a(ice, partit, mesh)
         elnodes=elem2D_nodes(:,elem)
 
         msum=sum(m_ice(elnodes))*val3
-        if(msum<=0.01_WP) cycle !DS
+        if(msum<=0.01_WP) then
+            sigma11(elem) = 0.0_WP
+            sigma22(elem) = 0.0_WP
+            sigma12(elem) = 0.0_WP
+            cycle
+        end if
         asum=sum(a_ice(elnodes))*val3
 
         dx=gradient_sca(1:3,elem)
@@ -1075,7 +1110,7 @@ subroutine stress_tensor_a(ice, partit, mesh)
         pressure=ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))/(delta+ice%delta_min)
 #endif
 
-        r1=pressure*(eps1-delta)
+        r1=pressure*(eps1-max(delta,ice%delta_min))
         r2=pressure*eps2*vale
         r3=pressure*eps12(elem)*vale
         si1=sigma11(elem)+sigma22(elem)
@@ -1116,14 +1151,15 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     use g_comm_auto
     use ice_maEVP_interfaces
 #if defined (__icepack)
-    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem
+    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
 #endif
     implicit none
     type(t_ice),    intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(in),    target :: mesh
     !___________________________________________________________________________
-    integer          :: steps, shortstep, i, ed
+    integer          :: steps, shortstep, i, ed, n
+    logical          :: lcav_edge
     real(kind=WP)    :: rdt, drag, det, fc
     real(kind=WP)    :: thickness, inv_thickness, umod, rhsu, rhsv
     REAL(kind=WP)    :: t0,t1, t2, t3, t4, t5, t00, txx
@@ -1136,6 +1172,7 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
     real(kind=WP), dimension(:), pointer  :: u_ice_aux, v_ice_aux
     real(kind=WP), dimension(:), pointer  :: beta_evp_array
+    real(kind=WP), dimension(:), pointer  :: ice_strength
     real(kind=WP)              , pointer  :: rhoice, rhosno
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -1155,6 +1192,7 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     u_ice_aux       => ice%uice_aux(:)
     v_ice_aux       => ice%vice_aux(:)
     beta_evp_array  => ice%beta_evp_array(:)
+    ice_strength    => ice%work%ice_strength(:)
     rhoice          => ice%thermo%rhoice
     rhosno          => ice%thermo%rhosno
 
@@ -1164,6 +1202,25 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     u_ice_aux=u_ice    ! Initialize solver variables
     v_ice_aux=v_ice
     call ssh2rhs(ice, partit, mesh)
+
+    !___________________________________________________________________________
+    ! Populate the nodal ice_strength diagnostic. With icepack, use the per-
+    ! node icepack strength field directly; otherwise the canonical Hibler
+    ! (1979) P = P*·h·exp(-C(1-A)) from per-node m_ice and a_ice. Exposed
+    ! as the 'strength_ice' output stream. aEVP evaluates the per-element
+    ! strength inline in its iteration.
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+    do n = 1, myDim_nod2D
+        ice_strength(n) = 0.0_WP
+        if (ulevels_nod2D(n) > 1) cycle
+        if (m_ice(n) <= 0._WP .or. a_ice(n) <= 0._WP) cycle
+#if defined (__icepack)
+        ice_strength(n) = strength(n)
+#else
+        ice_strength(n) = ice%pstar*m_ice(n)*exp(-ice%c_pressure*(1.0_WP-a_ice(n)))
+#endif
+    end do
+!$OMP END PARALLEL DO
 
 #if defined (__icepack)
     rdg_conv_elem(:)  = 0.0_WP
@@ -1213,8 +1270,13 @@ subroutine EVPdynamics_a(ice, partit, mesh)
             !___________________________________________________________________
             ! apply sea ice velocity boundary conditions at cavity-ocean edge
             if (use_cavity) then
-                if ( (ulevels(edge_tri(1,ed))>1) .or. &
-                    ( edge_tri(2,ed)>0 .and. ulevels(edge_tri(2,ed))>1) ) then
+                ! .and. is not short-circuit in Fortran: guard edge_tri(2,ed)>0
+                ! separately or ulevels(0) is read at boundary edges.
+                lcav_edge = (ulevels(edge_tri(1,ed)) > 1)
+                if (.not. lcav_edge) then
+                    if (edge_tri(2,ed) > 0) lcav_edge = (ulevels(edge_tri(2,ed)) > 1)
+                end if
+                if (lcav_edge) then
                     u_ice_aux(edges(1:2,ed))=0.0_WP
                     v_ice_aux(edges(1:2,ed))=0.0_WP
                 end if

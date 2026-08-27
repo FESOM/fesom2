@@ -287,6 +287,21 @@ subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
        if (use_ice)  then
        write(*,"(A, A     , A, ES10.3, A, A)")      '     m_ice= ',' N.A.     ',' | ',max_m_ice  ,' | ','N.A.'
        end if
+       !________________________________________________________________________
+       ! SSH CG solver. A named quantity in every standard block, like cfl_z
+       ! above -- not something that only shows up when it misbehaves. The
+       ! cumulative non-convergence count is here so a run that is quietly
+       ! stalling is visible in a log people already read.
+       ! Skipped on the split-explicit barotropic path, which has no solver.
+       if (.not. dynamics%use_ssh_se_subcycl) then
+       write(*,*)
+       write(*,"(A, I6, A, I6, A, F8.2)")           '   ssh_cg iters= ', dynamics%solverinfo%iters_last, &
+            '  | max= ', dynamics%solverinfo%iters_max,                                                  &
+            '  | mean= ', real(dynamics%solverinfo%iters_sum)/real(max(dynamics%solverinfo%nsolves,1))
+       write(*,"(A, ES10.3, A, ES10.3, A, I6)")     '   ssh_cg rms(r)= ', dynamics%solverinfo%resid_last, &
+            '  | rtol= ', dynamics%solverinfo%rtol_last,                                                 &
+            '  | nonconv= ', dynamics%solverinfo%nonconv
+       end if
      end if
      endif ! --> if (mod(istep,logfile_outfreq)==0) then
 end subroutine write_step_info
@@ -695,7 +710,7 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
         end if
         call blowup(istep, ice, dynamics, tracers, partit, mesh)
         if (mype==0) write(*,*) ' --> finished writing blow up file'
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, abort=1)
     endif 
 end subroutine check_blowup
 !===============================================================================

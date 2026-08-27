@@ -3,12 +3,33 @@
 #===============================================================================
 
 # MPI tests (if enabled)
-if(ENABLE_MPI_TESTS)
+#
+# These run a plain standalone fesom.x. A build that activates an external
+# coupler at runtime cannot run the standalone pi test and aborts at startup:
+#   * FESOM_COUPLED / OIFS_COUPLED -> OASIS, aborts without 'namcouple'
+#   * USE_YAC                      -> YAC,   aborts without 'coupling.yaml'
+# Skip registering the standalone integration tests for those configurations
+# (build-only verification).
+if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED AND NOT USE_YAC)
     # Basic integration test with PI mesh and 2 processes (minimum required for mesh partitioning)
+    #
+    # The EXTRA_SUCCESS_MARKERS pin the always-on SSH-CG solver diagnostics. Both the
+    # end-of-run summary and the per-step line are plain writes with no artifact behind
+    # them, so if either stops being emitted nothing else in the suite would notice --
+    # which is exactly how the sprod(2) defect in this solver survived unfixed. Matching
+    # the labels (not the numbers) keeps this stable across meshes and precisions.
     add_fesom_test(integration_pi_mpi2
         MPI_TEST
         NP 2
         TIMEOUT ${TEST_TIMEOUT}
+        EXTRA_SUCCESS_MARKERS
+            "___SSH CG SOLVER"            # end-of-run summary block
+            "non-convergences (maxiter)"  # the stall counter is reported
+            "breakdowns (p.Ap<=0)"        # the breakdown guard is wired up
+            "ssh_cg iters="               # per-step line, beside cfl_z
+            "ssh_cg rms(r)="              # per-step residual vs its target
+            "ssh CG soltol"               # the namelist knobs are read and echoed
+            "ssh CG maxiter"
     )
     
     # PI mesh test with 8 processes
@@ -28,8 +49,10 @@ if(ENABLE_MPI_TESTS)
     
     # Additional MPI test configurations can be added here
     # For example, testing different domain decompositions
-else()
+elseif(NOT ENABLE_MPI_TESTS)
     message(WARNING "MPI tests are disabled. Set ENABLE_MPI_TESTS=ON to enable them.")
+else()
+    message(STATUS "Standalone integration tests skipped for coupled build (FESOM_COUPLED/OIFS_COUPLED/USE_YAC): a coupled fesom.x requires an external coupler setup (namcouple/coupling.yaml) and cannot run the standalone pi test.")
 endif()
 
 
