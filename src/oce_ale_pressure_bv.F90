@@ -3321,6 +3321,7 @@ subroutine init_ref_density(partit, mesh)
     use o_PARAM
     use o_ARRAYS
     use densityJM_components_interface
+    use density_linear_interface
     implicit none
 
     !___________________________________________________________________________
@@ -3379,6 +3380,7 @@ subroutine init_ref_density_advanced(tracers, partit, mesh)
     use o_PARAM
     use o_ARRAYS
     use densityJM_components_interface
+    use density_linear_interface
     implicit none
 
     !___________________________________________________________________________
