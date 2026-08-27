@@ -609,7 +609,6 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! proceed with fields at nodes (cycle over edges to compute the divergence)...
     do edge=1, myDim_edge2D
-        if (myList_edge2D(edge) > edge2D_in) cycle
         enodes=edges(:,edge)
         eelems=edge_tri(:,edge)
         nzmax =nlevels(eelems(1))
