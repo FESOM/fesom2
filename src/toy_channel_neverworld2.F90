@@ -247,7 +247,7 @@ MODULE Toy_Neverworld2
         
         !___________________________________________________________________________
         ! determine latitudinal domain size from mesh
-        loc_Ly=omp_min_max_sum1(coord_nod2D(2,:), 1, myDim_nod2D, 'max', partit) 
+        loc_Ly=omp_min_max_sum1(geo_coord_nod2D(2,:), 1, myDim_nod2D, 'max', partit)
         call MPI_AllREDUCE(loc_Ly, Ly, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
         
         !___________________________________________________________________________
@@ -275,21 +275,35 @@ MODULE Toy_Neverworld2
                 ! linear interpolate windstress profile data to our elem locations
                 do elem=1, myDim_elem2D
                     elnodes = elem2d_nodes(:,elem)
-                    lat     = sum(coord_nod2D(2,elnodes))/3.0_WP
+                    lat     = sum(geo_coord_nod2D(2,elnodes))/3.0_WP
                     lat     = lat*180/pi    ! We return to degrees
                     idx     = int((lat+lat_tau(1))/dlat_tau)+1
                     stress_surf(1,elem) = val_tau(idx) + (val_tau(idx+1)-val_tau(idx))* (lat-lat_tau(idx))/dlat_tau
                 end do
                 deallocate(val_tau, lat_tau)
-                
-            ! Option (2) read already to elements interpoalted windprofile file 
-            elseif (wind_opt == 2) then 
+
+                ! stress_surf is injected directly along the model's own native
+                ! (coord_nod2D-frame) x/y axes -- NOT rotated into true geographic
+                ! east/north. That's deliberate: unlike a real global mesh,
+                ! neverworld2's "longitude" is an artificial coordinate, periodic
+                ! at cyclic_length=60deg rather than the real sphere's 360deg, so
+                ! true-geographic vector rotation (vector_g2r, which depends on
+                ! ABSOLUTE longitude via sin/cos) is not well-posed here -- it was
+                ! tried and confirmed (by comparing tx_sur/ty_sur across the
+                ! lon=0/lon=60 seam) to break periodicity right at the domain
+                ! wrap, causing a blow-up there. Injecting along the model's own
+                ! local axes is automatically consistent with ur/vr's own frame
+                ! and with the mesh's own (coord_nod2D-based) periodicity,
+                ! regardless of rotated_grid/force_rotation.
+
+            ! Option (2) read already to elements interpoalted windprofile file
+            elseif (wind_opt == 2) then
                 allocate(val_tau(elem2d))
                 open(20, file=trim(meshpath)//'windstress@elem.out', status='old')
                 read(20, *) val_tau
                 stress_surf(1,:)=val_tau(myList_elem2D)
                 deallocate(val_tau)
-                
+
             else
                 write(*,*) " -ERROR-> This wind_opt is not supported !"
                 call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
@@ -327,7 +341,7 @@ MODULE Toy_Neverworld2
             case(1)
                 ! original: symmetric cosine target, ~18-28C, lat in degrees
                 do node = 1, myDim_nod2D+eDim_nod2D
-                    lat          = coord_nod2D(2,node)/rad
+                    lat          = geo_coord_nod2D(2,node)/rad
                     Tsurf(node) = 18.0+10.0*cos(pi*lat/Ly)
                 end do
             case(2)
@@ -337,7 +351,7 @@ MODULE Toy_Neverworld2
                 ! south_pole_target near the northern (ynorm=lat/Ly -> 1) and/or
                 ! southern (ynorm -> -1) edge, independently switchable.
                 do node = 1, myDim_nod2D+eDim_nod2D
-                    lat   = coord_nod2D(2,node)
+                    lat   = geo_coord_nod2D(2,node)
                     ynorm = lat/Ly
                     t_base = 5.0_WP + (equator_target-5.0_WP)*cos(0.5_WP*pi*lat/Ly)
                     if (do_north_cold_patch .and. ynorm>0.0_WP) then
@@ -365,7 +379,7 @@ MODULE Toy_Neverworld2
         ! every timestep by relax_2_ssurf(), not here.
         if (do_Srelax) then
             do node = 1, myDim_nod2D+eDim_nod2D
-                lat = coord_nod2D(2,node)
+                lat = geo_coord_nod2D(2,node)
                 if (lat>=0.0_WP) then
                     Ssurf(node) = s_north + (s_equator-s_north)*cos(0.5_WP*pi*lat/Ly)
                 else
@@ -381,8 +395,8 @@ MODULE Toy_Neverworld2
                 ! inject surface perturbations (in the upper two layers) in the 
                 ! middle of the ocean @[30°E, -50°S] in a
                 ! distance radius of 5deg around tha point
-                lat=coord_nod2D(2,node)+50.0*rad
-                lon=coord_nod2D(1,node)-30.0*rad
+                lat=geo_coord_nod2D(2,node)+50.0*rad
+                lon=geo_coord_nod2D(1,node)-30.0*rad
                 lat=sqrt(lat*lat+lon*lon)
                 if (lat<=5*rad) then
                     tracers%data(1)%values(1:2,node)=tracers%data(1)%values(1:2,node)+0.5*cos(pi*lat/2.0/5.0/rad)
@@ -446,7 +460,7 @@ MODULE Toy_Neverworld2
                     south_pole_target_now = south_pole_target
                 end if
                 do node = 1, myDim_nod2D+eDim_nod2D
-                    lat   = coord_nod2D(2,node)
+                    lat   = geo_coord_nod2D(2,node)
                     ynorm = lat/Ly
                     t_base = 5.0_WP + (equator_target-5.0_WP)*cos(0.5_WP*pi*lat/Ly)
                     if (do_north_cold_patch .and. ynorm>0.0_WP) then
