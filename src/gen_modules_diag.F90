@@ -522,15 +522,8 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
                           aux(nz-1)   * helem(nz,  elem))/sum(helem(nz-1:nz,elem))
         el_depth(nz)   = el_depth(nz+1) + helem(nz, elem)
      end do
-     ! TEST FIX: cap the extrapolation step at one gradient-length (ratio<=1). Without this,
-     ! a thick boundary layer relative to its neighbour (large helem ratio) lets this linear
-     ! extrapolation overshoot far past the physical density range -- seen as spurious very
-     ! light density classes in the DMOC diagnostic, most visible in the tropics where the
-     ! near-surface density gradient is steep.
-     !dens(nzmax)=dens(nzmax-1)+(dens(nzmax-1)-dens(nzmax-2))*helem(nzmax-1,elem)/helem(nzmax-2,elem)
-     !dens(nzmin)    =dens(nzmin+1)      +(dens(nzmin+1)-dens(nzmin+2))            *helem(nzmin, elem)/helem(nzmin+1,elem)
-     dens(nzmax)=dens(nzmax-1)+(dens(nzmax-1)-dens(nzmax-2))*min(helem(nzmax-1,elem)/helem(nzmax-2,elem), 1.0_WP)
-     dens(nzmin)    =dens(nzmin+1)      +(dens(nzmin+1)-dens(nzmin+2))            *min(helem(nzmin, elem)/helem(nzmin+1,elem), 1.0_WP)
+     dens(nzmax)=dens(nzmax-1)+(dens(nzmax-1)-dens(nzmax-2))*helem(nzmax-1,elem)/helem(nzmax-2,elem)
+     dens(nzmin)    =dens(nzmin+1)      +(dens(nzmin+1)-dens(nzmin+2))            *helem(nzmin, elem)/helem(nzmin+1,elem)
      el_depth(1)=0.
 
      ! heat, freshwater and restoring at density classes
@@ -633,7 +626,7 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
                             aux(nz-1)   * helem(nz,  elem))/sum(helem(nz-1:nz,elem))
             end do
             dens(nzmax)=dens(nzmax-1)+(dens(nzmax-1)-dens(nzmax-2))*helem(nzmax-1,elem)/helem(nzmax-2,elem)
-            dens(nzmin)    =dens(nzmin+1)      +(dens(nzmin+1)-dens(nzmin+2))            *helem(nzmin, elem)     /helem(nzmin+1,elem)       
+            dens(nzmin)    =dens(nzmin+1)      +(dens(nzmin+1)-dens(nzmin+2))            *helem(nzmin, elem)     /helem(nzmin+1,elem)
             is=minloc(abs(std_dens-dens(nzmin)),1)
             
             !___________________________________________________________________
