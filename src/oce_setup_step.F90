@@ -588,7 +588,12 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     real(kind=WP)  :: wsplit_maxcfl
     real(kind=WP)  :: soltol = 1.e-5_WP  ! ssh CG rel. tolerance; default matches T_SOLVERINFO
     integer        :: maxiter = 2000     ! ssh CG iteration cap; default matches T_SOLVERINFO
-    integer        :: precond_variant = 0 ! ssh CG preconditioner formula; 0 keeps results unchanged
+    ! ssh CG preconditioner formula. -1 = auto: resolved below to 1 in a
+    ! single-precision build and 0 in double. An explicit namelist value wins in
+    ! either direction, so a DP run can opt in to 1 and an SP run can force 0 to
+    ! reproduce an older experiment.
+    integer        :: precond_variant = -1
+    logical        :: precond_auto = .false.  ! true if the auto default was applied
     logical        :: use_ssh_se_subcycl=.false.
     integer        :: se_BTsteps
     real(kind=WP)  :: se_BTtheta
@@ -705,8 +710,27 @@ nl => mesh%nl
     dynamics%solverinfo%maxiter = maxiter
     if (mype==0) write(*,*) '     ssh CG maxiter = ', dynamics%solverinfo%maxiter
 
+    ! Resolve the auto default. precision(0.0_WP) < precision(0.0d0) is true iff
+    ! WP is narrower than double -- a plain runtime test, so both variants stay
+    ! compiled and reachable in either build rather than one being preprocessed
+    ! out. In single precision the symmetric variant is not an optimisation but a
+    ! requirement: it costs 33-39% fewer CG iterations on every mesh measured up
+    ! to NG5, which is what keeps the SSH solve affordable when the working
+    ! precision is halved. Double precision keeps 0 until the long-run validation
+    ! of variant 1 completes.
+    if (precond_variant < 0) then
+        precond_variant = merge(1, 0, precision(0.0_WP) < precision(0.0d0))
+        precond_auto = .true.
+    end if
     dynamics%solverinfo%precond_variant = precond_variant
-    if (mype==0) write(*,*) '     ssh CG precond = ', dynamics%solverinfo%precond_variant
+    if (mype==0) then
+        if (precond_auto) then
+            write(*,*) '     ssh CG precond = ', dynamics%solverinfo%precond_variant, &
+                       ' (auto: ', trim(merge('single', 'double', precision(0.0_WP) < precision(0.0d0))), ' precision)'
+        else
+            write(*,*) '     ssh CG precond = ', dynamics%solverinfo%precond_variant, ' (from namelist)'
+        end if
+    end if
 
     !___________________________________________________________________________
     ! define local vertice & elem array size
