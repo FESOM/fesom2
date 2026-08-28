@@ -31,12 +31,12 @@
 # Example usage for custom namelist configuration:
 # ```
 # # Copy and configure namelist.config with common paths
-# configure_file("${CMAKE_SOURCE_DIR}/config/namelist.config" "${TARGET_DIR}/namelist.config" COPYONLY)
+# configure_file("${FESOM_TESTING_ROOT}/config/namelist.config" "${TARGET_DIR}/namelist.config" COPYONLY)
 # update_common_paths("${TARGET_DIR}/namelist.config" "${TARGET_DIR}/namelist.config" "${TEST_DATA_DIR}" "${RESULT_DIR}")
 # update_namelist_config("${TARGET_DIR}/namelist.config" "${TARGET_DIR}/namelist.config")
 # 
 # # Copy and configure a specific namelist (e.g., tracer)
-# configure_file("${CMAKE_SOURCE_DIR}/config/namelist.tra" "${TARGET_DIR}/namelist.tra" COPYONLY)
+# configure_file("${FESOM_TESTING_ROOT}/config/namelist.tra" "${TARGET_DIR}/namelist.tra" COPYONLY)
 # update_tracer_init3d_filelist("${TARGET_DIR}/namelist.tra" "${TARGET_DIR}/namelist.tra" "${TEST_DATA_DIR}")
 # 
 # # Example: Custom test with pi_cavity mesh and cavity enabled
@@ -45,6 +45,13 @@
 # )
 # ```
 #
+
+# Root of the FESOM source tree, resolved relative to this file. Do NOT use
+# CMAKE_SOURCE_DIR here: in a bundled build (ecbundle) fesom is a subproject
+# and CMAKE_SOURCE_DIR is the bundle root, so config/ and tests/ paths built
+# from it silently point at nothing (see the EXISTS guard in
+# configure_fesom_namelists_with_options).
+get_filename_component(FESOM_TESTING_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 
 # Function to update common paths in any namelist
 function(update_common_paths NAMELIST_IN NAMELIST_OUT TEST_DATA_DIR RESULT_DIR)
@@ -335,15 +342,15 @@ function(configure_fesom_namelists_with_options TARGET_DIR TEST_DATA_DIR RESULT_
     )
     
     foreach(NAMELIST ${NAMELISTS})
-        if(EXISTS "${CMAKE_SOURCE_DIR}/config/${NAMELIST}")
+        if(EXISTS "${FESOM_TESTING_ROOT}/config/${NAMELIST}")
             # Pick the source variant to copy. Tests use CORE2 forcing because the
             # bundled tests/data/FORCING/CORE2 dataset matches it (its relative
             # paths resolve under ClimateDataPath); the default namelist.forcing
             # points at JRA55 data that is not bundled.
-            set(NAMELIST_SOURCE "${CMAKE_SOURCE_DIR}/config/${NAMELIST}")
+            set(NAMELIST_SOURCE "${FESOM_TESTING_ROOT}/config/${NAMELIST}")
             if("${NAMELIST}" STREQUAL "namelist.forcing"
-               AND EXISTS "${CMAKE_SOURCE_DIR}/config/namelist.forcing.CORE2")
-                set(NAMELIST_SOURCE "${CMAKE_SOURCE_DIR}/config/namelist.forcing.CORE2")
+               AND EXISTS "${FESOM_TESTING_ROOT}/config/namelist.forcing.CORE2")
+                set(NAMELIST_SOURCE "${FESOM_TESTING_ROOT}/config/namelist.forcing.CORE2")
             endif()
 
             # Copy the namelist to target directory first
@@ -455,7 +462,7 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
     
     # Create test run directory
     set(TEST_RUN_DIR "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}")
-    set(TEST_DATA_DIR "${CMAKE_SOURCE_DIR}/tests/data")
+    set(TEST_DATA_DIR "${FESOM_TESTING_ROOT}/tests/data")
     set(RESULT_DIR "${TEST_RUN_DIR}/results")
 
     # Generate fesom.clock file in the results directory (year matches the forcing)
@@ -503,7 +510,7 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
             file(WRITE \"${TEST_RUN_DIR}/test_error.log\" \"\${test_error}\")
             
             # Robust pass/fail check: exit code + success marker + failure signatures + artifacts
-            include(\"${CMAKE_SOURCE_DIR}/cmake/CheckFesomRun.cmake\")
+            include(\"${FESOM_TESTING_ROOT}/cmake/CheckFesomRun.cmake\")
             check_fesom_run(
                 NAME \"${TEST_NAME}\"
                 RESULT \"\${test_result}\"
@@ -536,7 +543,7 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
             file(WRITE \"${TEST_RUN_DIR}/test_error.log\" \"\${test_error}\")
             
             # Robust pass/fail check: exit code + success marker + failure signatures + artifacts
-            include(\"${CMAKE_SOURCE_DIR}/cmake/CheckFesomRun.cmake\")
+            include(\"${FESOM_TESTING_ROOT}/cmake/CheckFesomRun.cmake\")
             check_fesom_run(
                 NAME \"${TEST_NAME}\"
                 RESULT \"\${test_result}\"
@@ -569,7 +576,7 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
     if(NOT "${FESOM_TEST_FORCING}" STREQUAL "CORE2")
         if("${FESOM_TEST_FORCING}" STREQUAL "JRA")
             update_namelist_forcing_jra(
-                "${CMAKE_SOURCE_DIR}/config/namelist.forcing.JRA"
+                "${FESOM_TESTING_ROOT}/config/namelist.forcing.JRA"
                 "${TEST_RUN_DIR}/namelist.forcing")
         else()
             message(FATAL_ERROR "add_fesom_test_with_options(${TEST_NAME}): unknown FORCING '${FESOM_TEST_FORCING}' (expected 'CORE2' or 'JRA')")
@@ -676,7 +683,7 @@ function(add_fesom_meshdiag_test_with_options TEST_NAME MESH_NAME RUNID)
     
     # Create test run directory
     set(TEST_RUN_DIR "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}")
-    set(TEST_DATA_DIR "${CMAKE_SOURCE_DIR}/tests/data")
+    set(TEST_DATA_DIR "${FESOM_TESTING_ROOT}/tests/data")
     set(RESULT_DIR "${TEST_RUN_DIR}/results")
     
     # Configure namelists with custom runid to avoid conflicts
@@ -729,7 +736,7 @@ function(add_fesom_meshdiag_test_with_options TEST_NAME MESH_NAME RUNID)
         # Robust pass/fail check. fesom_meshdiag finalizes MPI directly (it does
         # not print the standalone success marker), so verification relies on the
         # exit code, absence of failure signatures, and the diagnostics artifact.
-        include(\"${CMAKE_SOURCE_DIR}/cmake/CheckFesomRun.cmake\")
+        include(\"${FESOM_TESTING_ROOT}/cmake/CheckFesomRun.cmake\")
         check_fesom_run(
             NAME \"${TEST_NAME}\"
             RESULT \"\${test_result}\"
@@ -775,9 +782,9 @@ function(add_mesh_download_fixture MESH_NAME)
     add_test(
         NAME ${DOWNLOAD_TEST_NAME}
         COMMAND ${CMAKE_COMMAND}
-            -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -DSOURCE_DIR=${FESOM_TESTING_ROOT}
             -DMESH_NAME=${MESH_NAME}
-            -P ${CMAKE_SOURCE_DIR}/tests/integration/mesh_download.cmake
+            -P ${FESOM_TESTING_ROOT}/tests/integration/mesh_download.cmake
     )
     
     set_tests_properties(${DOWNLOAD_TEST_NAME} PROPERTIES
@@ -804,11 +811,11 @@ function(add_mesh_partition_fixture MESH_NAME NUM_PROCESSES)
     add_test(
         NAME ${PARTITION_TEST_NAME}
         COMMAND ${CMAKE_COMMAND}
-            -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -DSOURCE_DIR=${FESOM_TESTING_ROOT}
             -DBUILD_DIR=${CMAKE_BINARY_DIR}
             -DMESH_NAME=${MESH_NAME}
             -DNUM_PROCESSES=${NUM_PROCESSES}
-            -P ${CMAKE_SOURCE_DIR}/tests/integration/mesh_partition.cmake
+            -P ${FESOM_TESTING_ROOT}/tests/integration/mesh_partition.cmake
     )
     
     set_tests_properties(${PARTITION_TEST_NAME} PROPERTIES
@@ -868,7 +875,7 @@ function(add_fesom_mesh_test TEST_NAME MESH_NAME NP)
     endif()
     
     # Parse mesh configuration from registry
-    set(MESH_REGISTRY "${CMAKE_SOURCE_DIR}/tests/mesh_registry.json")
+    set(MESH_REGISTRY "${FESOM_TESTING_ROOT}/tests/mesh_registry.json")
     if(EXISTS "${MESH_REGISTRY}")
         file(READ "${MESH_REGISTRY}" REGISTRY_CONTENT)
         
