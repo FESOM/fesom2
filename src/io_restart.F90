@@ -219,17 +219,15 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
          write(longname,'(A15,i4.4)') 'passive tracer ', j
          units='none'
      END SELECT
-     if ((tracers%data(j)%ID==101) .or. (tracers%data(j)%ID==102) .or. (tracers%data(j)%ID==103)) then
+     if ((tracers%data(j)%ID==101) .or. (tracers%data(j)%ID==102) .or. (tracers%data(j)%ID==103) .or. (tracers%data(j)%ID==304)) then
         call oce_files%def_node_var_optional(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
      else
         call oce_files%def_node_var(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
      endif
+     ! NOTE: valuesAB is not part of the restart. init_tracers_AB recomputes it
+     ! from values and valuesold at the start of every tracer solve, before any
+     ! consumer reads it, so a restarted run reconstructs it from _M1 (and _M2).
      longname=trim(longname)//', Adams-Bashforth'
-     if ((tracers%data(j)%ID==101) .or. (tracers%data(j)%ID==102) .or. (tracers%data(j)%ID==103)) then
-        call oce_files%def_node_var_optional(trim(trname)//'_AB', trim(longname), trim(units), tracers%data(j)%valuesAB(:,:),    mesh, partit)
-     else
-        call oce_files%def_node_var(trim(trname)//'_AB', trim(longname), trim(units), tracers%data(j)%valuesAB(:,:),    mesh, partit)
-     endif
      call oce_files%def_node_var_optional(trim(trname)//'_M1', trim(longname), trim(units), tracers%data(j)%valuesold(1,:,:), mesh, partit)
      if (tracers%data(j)%AB_order==3) &
      call oce_files%def_node_var_optional(trim(trname)//'_M2', trim(longname), trim(units), tracers%data(j)%valuesold(2,:,:), mesh, partit)
@@ -599,8 +597,8 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
 
   ! --> synchronizes tracer data within fesom groups
 
-! kh 09.01.26 merging of valuesold and valuesAB between all fesom groups is only necessary here, immediately before writing the corresponding restart files
-! this will give better performance than merging valuesold and valuesAB in each simulation step in the main loop over all tracers in solve_tracers_ale in oce_ale_tracers.F90
+! kh 09.01.26 merging of valuesold between all fesom groups is only necessary here, immediately before writing the corresponding restart files
+! this will give better performance than merging valuesold in each simulation step in the main loop over all tracers in solve_tracers_ale in oce_ale_tracers.F90
 
 #if defined(__recom) && defined(__usetp)
     if(num_fesom_groups > 1) then
@@ -614,8 +612,6 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
 
 ! kh 09.01.26 also handle additional dimension of valuesold for AB_order
                 call MPI_Bcast(tracers%data(tr_num)%valuesold(:,:,:), tr_arr_slice_count_fix_1 * (tracers%data(tr_num)%AB_order - 1), MPI_DOUBLE_PRECISION, group_i, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%mpierr)
-
-                call MPI_Bcast(tracers%data(tr_num)%valuesAB(:,:), tr_arr_slice_count_fix_1, MPI_DOUBLE_PRECISION, group_i, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%mpierr)
             end do
         end do
     end if

@@ -58,7 +58,8 @@ subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
   use MOD_ICE
   use o_PARAM
   use o_ARRAYS, only: water_flux, heat_flux, &
-                 pgf_x, pgf_y, Av, Kv
+                 pgf_x, pgf_y, Av, Kv, density_dmoc
+  use diagnostics, only: ldiag_dMOC
   use g_comm_auto
   use g_support
   use iceberg_params
@@ -68,11 +69,11 @@ subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
   real(kind=WP)              :: int_eta, int_hbar, int_wflux, int_hflux, int_temp, int_salt
   real(kind=WP)              :: min_eta, min_hbar, min_wflux, min_hflux, min_temp, min_salt, &
                                min_wvel,min_hnode,min_deta,min_wvel2,min_hnode2, &
-                               min_vvel, min_vvel2, min_uvel, min_uvel2
+                               min_vvel, min_vvel2, min_uvel, min_uvel2, min_dens
   real(kind=WP)              :: max_eta, max_hbar, max_wflux, max_hflux, max_temp, max_salt, &
                                max_wvel, max_hnode, max_deta, max_wvel2, max_hnode2, max_m_ice, &
                                max_vvel, max_vvel2, max_uvel, max_uvel2, &
-                               max_cfl_z, max_pgfx, max_pgfy, max_kv, max_av 
+                               max_cfl_z, max_pgfx, max_pgfy, max_kv, max_av, max_dens
   real(kind=WP)              :: int_deta , int_dhbar
   real(kind=WP)              :: loc, loc_eta, loc_hbar, loc_deta, loc_dhbar, loc_wflux,loc_hflux, loc_temp, loc_salt
     type(t_mesh),   intent(in)   , target :: mesh
@@ -155,8 +156,16 @@ subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
     call MPI_AllREDUCE(loc , min_hflux, 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
     loc=omp_min_max_sum2(tracers%data(1)%values, 1, nl-1, 1, myDim_nod2D, 'min', partit, 0.0_WP) 
     call MPI_AllREDUCE(loc , min_temp , 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum2(tracers%data(2)%values, 1, nl-1, 1, myDim_nod2D, 'min', partit, 0.0_WP) 
+    loc=omp_min_max_sum2(tracers%data(2)%values, 1, nl-1, 1, myDim_nod2D, 'min', partit, 0.0_WP)
     call MPI_AllREDUCE(loc , min_salt , 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+    ! density_dmoc is only computed when ldiag_dMOC is on (oce_ale_pressure_bv.F90) --
+    ! otherwise it's unallocated/stale, so guard the check the same way.
+    ! It is raw (sigma2+1000) density, offset like everywhere else that reads it
+    ! (gen_modules_diag.F90); report as sigma2 by subtracting 1000 below.
+    if (ldiag_dMOC) then
+        loc=omp_min_max_sum2(density_dmoc, 1, nl-1, 1, myDim_nod2D, 'min', partit, 0.0_WP)
+        call MPI_AllREDUCE(loc , min_dens , 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+    end if
     loc=omp_min_max_sum1(Wvel(1,:), 1, myDim_nod2D, 'min', partit)
     call MPI_AllREDUCE(loc , min_wvel , 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
     loc=omp_min_max_sum1(Wvel(2,:), 1, myDim_nod2D, 'min', partit)
@@ -193,6 +202,10 @@ subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
     call MPI_AllREDUCE(loc , max_temp , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
     loc=omp_min_max_sum2(tracers%data(2)%values, 1, nl-1, 1, myDim_nod2D, 'max', partit, 0.0_WP)
     call MPI_AllREDUCE(loc , max_salt , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+    if (ldiag_dMOC) then
+        loc=omp_min_max_sum2(density_dmoc, 1, nl-1, 1, myDim_nod2D, 'max', partit, 0.0_WP)
+        call MPI_AllREDUCE(loc , max_dens , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+    end if
     loc=omp_min_max_sum1(Wvel(1,:), 1, myDim_nod2D, 'max', partit)
     call MPI_AllREDUCE(loc , max_wvel , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
     loc=omp_min_max_sum1(Wvel(2,:), 1, myDim_nod2D, 'max', partit)
@@ -255,6 +268,9 @@ subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
        write(*,"(A, ES10.3, A, ES10.3, A, ES10.3)") '     hflux= ', min_hflux,' | ',max_hflux,' | ',int_hflux
        write(*,"(A, ES10.3, A, ES10.3, A, ES10.3)") '      temp= ', min_temp ,' | ',max_temp ,' | ',int_temp
        write(*,"(A, ES10.3, A, ES10.3, A, ES10.3)") '      salt= ', min_salt ,' | ',max_salt ,' | ',int_salt
+       if (ldiag_dMOC) then
+           write(*,"(A, ES10.3, A, ES10.3, A, A     )") '      dens= ', min_dens-1000.0_WP ,' | ',max_dens-1000.0_WP ,' | ','N.A.'
+       end if
        write(*,"(A, ES10.3, A, ES10.3, A, A     )") '    wvel(1,:)= ', min_wvel ,' | ',max_wvel ,' | ','N.A.'
        write(*,"(A, ES10.3, A, ES10.3, A, A     )") '    wvel(2,:)= ', min_wvel2,' | ',max_wvel2,' | ','N.A.'
        write(*,"(A, ES10.3, A, ES10.3, A, A     )") '    uvel(1,:)= ', min_uvel ,' | ',max_uvel ,' | ','N.A.'

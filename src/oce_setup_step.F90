@@ -945,6 +945,8 @@ nl              => mesh%nl
     allocate(relax2clim(node_size)) 
     allocate(heat_flux(node_size), Tsurf(node_size))
     allocate(water_flux(node_size), Ssurf(node_size))
+    allocate(hosing_flux(node_size), hosing_heat_flux(node_size))
+    allocate(hosing_flux3D(nl-1,node_size), hosing_heat_flux3D(nl-1,node_size))
     allocate(fw_ice(node_size), fw_snw(node_size))
     allocate(relax_salt(node_size))
     allocate(virtual_salt(node_size))
@@ -1045,6 +1047,10 @@ nl              => mesh%nl
     Tsurf=0.0_WP
 
     water_flux=0.0_WP
+    hosing_flux=0.0_WP
+    hosing_heat_flux=0.0_WP
+    hosing_flux3D=0.0_WP
+    hosing_heat_flux3D=0.0_WP
     fw_ice    =0.0_WP
     fw_snw    =0.0_WP
     relax_salt=0.0_WP
@@ -1270,6 +1276,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 #endif
 
     ! count the passive tracers which require 3D source (ptracers_restore_total)
+    ! Every ID with a restoring box below has to be listed here too, or
+    ! ptracers_restore is allocated too short.
     ptracers_restore_total=0
     DO i=3, tracers%num_tracers
         id=tracers%data(i)%ID
@@ -1483,7 +1491,13 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
          end if
 ! Transient tracers end
 
-        !_______________________________________________________________________            
+        !_______________________________________________________________________
+        ! Fram Strait 3d restored passive tracer. The box (77.5-78.0N, 0-10E)
+        ! marks the Atlantic inflow branch on purpose, not the full strait; a
+        ! whole-gateway tracer needs its own ID, see issue #846. The bounds
+        ! appear twice below, to count nodes and to fill ind2, and both copies
+        ! have to stay identical. oce_ale_tracer.F90 resets the box to 1.0 each
+        ! timestep, so the 1.0 here and the 0.0 in 302/303 behave alike.
         CASE (301) !Fram Strait 3d restored passive tracer
             tracers%data(i)%values(:,:)=0.0_WP
             rcounter3    =rcounter3+1
@@ -1513,6 +1527,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             end if
             
         !_______________________________________________________________________
+        ! Bering Strait 3d restored passive tracer. The box (65.6-66.0N,
+        ! 172-166W) spans the strait, unlike the inflow-only boxes 301 and 303.
         CASE (302) !Bering Strait 3d restored passive tracer
             tracers%data(i)%values(:,:)=0.0_WP
             rcounter3    =rcounter3+1
@@ -1541,7 +1557,10 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
             
-        !_______________________________________________________________________            
+        !_______________________________________________________________________
+        ! Barents Sea Opening 3d restored passive tracer. The box (69.5-74.5N,
+        ! 19-20E) covers the southern inflow part only, as in case 301; see
+        ! issue #846. The bounds appear twice below and must stay identical.
         CASE (303) !BSO 3d restored passive tracer
             tracers%data(i)%values(:,:)=0.0_WP
             rcounter3    =rcounter3+1
@@ -1569,7 +1588,16 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I3)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-            
+
+        !_______________________________________________________________________
+        CASE (304) ! passive tracer for water hosing experiment
+            tracers%data(i)%values(:,:)=0.0_WP
+            if (mype==0) then
+                write (i_string,  "(I3)") i
+                write (id_string, "(I3)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            end if
+
         !_______________________________________________________________________
         CASE (501) ! ice-shelf water due to basal melting
             tracers%data(i)%values(:,:)=0.0_WP

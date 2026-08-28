@@ -34,6 +34,7 @@ module fesom_main_storage_module
   use ice_setup_interface
   use ocean2ice_interface
   use oce_fluxes_interface
+  use hosing_interface
   use update_atm_forcing_interface
   use before_oce_step_interface
   use oce_timestep_ale_interface
@@ -845,7 +846,7 @@ contains
   subroutine fesom_runloop(current_nsteps)
     use fesom_main_storage_module
 !   use openacc_lib
-    integer, intent(in) :: current_nsteps 
+    integer, intent(in) :: current_nsteps
     ! EO parameters
     integer n, nstart, ntotal, tr_num, tracer_index
     logical :: do_cmor_0d_reset
@@ -1075,6 +1076,14 @@ contains
 #endif
             call oce_fluxes_mom(f%ice, f%dynamics, f%partit, f%mesh) ! momentum only
             call oce_fluxes(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+            
+            !___freshwater depth hosing routine_______________________________________
+            !
+            if (use_hosing .and. trim(hosing_mode)=='depth') then
+                call fw_depth_anomaly(f%tracers%data(2)%values, f%tracers%data(1)%values, &
+                                      hosing_hSv, f%partit, f%mesh)
+            end if
+            
         end if
         call before_oce_step(f%dynamics, f%tracers, f%partit, f%mesh) ! prepare the things if required
         f%t2 = MPI_Wtime()

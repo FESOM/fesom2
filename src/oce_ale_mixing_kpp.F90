@@ -886,9 +886,8 @@ contains
         nzmin = ulevels_nod2D(node)
         nzmax = nlevels_nod2D(node)
         DO nz=nzmin+1,nzmax-1
-           alphaDT = sw_alpha(nz-1,node) * tracers%data(1)%values(nz-1,node)
-           ! double-diffusion density ratio wants absolute S (S_ref=0 unless use_salt_anomaly)
-           betaDS  = sw_beta (nz-1,node) * (tracers%data(2)%values(nz-1,node)+S_ref_anomaly)
+           alphaDT = sw_alpha(nz-1,node) * (tracers%data(1)%values(nz-1,node) - tracers%data(1)%values(nz,node))
+           betaDS  = sw_beta (nz-1,node) * (tracers%data(2)%values(nz-1,node) - tracers%data(2)%values(nz,node))
 
            IF (alphaDT > betaDS .and. betaDS > 0.0_WP) THEN
 

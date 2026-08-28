@@ -77,7 +77,7 @@ module io_MEANDATA
     real(kind=WP)                                      :: rtime_per_stream=0._WP   !< cumulative wall in this stream's write_mean dispatch over the run; printed sorted at finalize
     logical                                            :: is_in_use=.false.
     logical :: is_elem_based = .false.
-    logical :: flip
+    logical :: flip = .false.
     class(data_strategy_type), allocatable :: data_strategy
     integer :: comm
     type(thread_type) thread
@@ -810,6 +810,17 @@ CASE ('ice_rejectsalt')
     if (SPP) call def_stream(nod2D , myDim_nod2D , 'ice_rejectsalt' , 'salt flux from plum parameterisation ', 'm/s*psu', ice_rejected_salt(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     
 !___________________________________________________________________________________________________________________________________
+! output hosing experiment  
+CASE ('hfw       ')
+call def_stream(nod2D, myDim_nod2D,     'hfw',      'hosing water flux',               'm/s',    hosing_flux(:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('hfh       ')
+call def_stream(nod2D, myDim_nod2D,     'hfh',      'hosing heat flux',                'W',      hosing_heat_flux(:),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('hfw3D     ')
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'hfw3D',     'hosing water flux in 3D', 'm/s',    hosing_flux3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('hfh3D     ')
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'hfh3D',     'hosing heat flux in 3D',  'W',      hosing_heat_flux3D(:,:),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+!___________________________________________________________________________________________________________________________________
 ! output KPP vertical mixing schemes
 CASE ('kpp_obldepth   ')
     if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then! fesom KPP
@@ -1010,7 +1021,12 @@ CASE ('Chldegp  ')
     call def_stream(nod2D,  myDim_nod2D,   'ChlDegp','Chlorophyll degradation phaeocystis','1/d', Chldegp, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
     endif
 #endif
-    
+
+!___________________________________________________________________________________________________________________________________    
+CASE ('Tsurf    ')
+    call def_stream(nod2D , myDim_nod2D , 'tsurf' , 'virtual salt flux'          , '°C', Tsurf(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+
 !___________________________________________________________________________________________________________________________________    
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>   3D streams   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 !___________________________________________________________________________________________________________________________________
@@ -1118,22 +1134,22 @@ CASE ('respp          ')
 
 CASE ('NPPn3D         ')
    if (use_REcoM) then
-   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPn3D','Net primary production of small phytoplankton', 'mmolC/m2/d', NPPn3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPn3D','Net primary production of small phytoplankton', 'mmolC/(m3*d)', NPPn3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
 
 CASE ('NPPd3D         ')
    if (use_REcoM) then
-   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPd3D','Net primary production of diatoms', 'mmolC/m2/d', NPPd3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPd3D','Net primary production of diatoms', 'mmolC/(m3*d)', NPPd3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
 
 CASE ('NPPc3D         ')
    if (use_REcoM) then
-   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPc3D','Net primary production of coccolithophores', 'mmolC/m2/d', NPPc3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPc3D','Net primary production of coccolithophores', 'mmolC/(m3*d)', NPPc3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
 
 CASE ('NPPp3D         ')
    if (use_REcoM) then
-   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPp3D','Net primary production of phaeocystis', 'mmolC/(m2*d)', NPPp3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPp3D','Net primary production of phaeocystis', 'mmolC/(m3*d)', NPPp3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
    endif
 
 CASE ('TTemp_diatoms          ')
@@ -2318,14 +2334,21 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
             call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'long_name', 'sea-ice thickness class'), __LINE__)
         
         elseif (entry%dimname(1)=='ndens') then
-            call assert_nf( nf90_def_var(entry%ncid,  entry%dimname(1), nf90_int,   (/entry%dimID(1)/), entry%dimvarID(1)), __LINE__)
+            ! must be a float type: the axis values are the real sigma2 bin
+            ! edges from std_dens (e.g. 30.12) -- nf90_int silently truncates
+            ! them to whole numbers in the output file
+            call assert_nf( nf90_def_var(entry%ncid,  entry%dimname(1), nf90_double,   (/entry%dimID(1)/), entry%dimvarID(1)), __LINE__)
             call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'long_name', 'sigma2 density class'), __LINE__)
-        
+
         else
             if (partit%mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
-            
-        end if 
-        call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'units', 'm'), __LINE__)
+
+        end if
+        if (entry%dimname(1)=='ndens') then
+            call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'units', 'kg/m^3'), __LINE__)
+        else
+            call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'units', 'm'), __LINE__)
+        end if
         call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'positive', 'down'), __LINE__)
         call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'axis', 'Z'), __LINE__)
         
@@ -2792,7 +2815,46 @@ end subroutine
 !
 !
 !_______________________________________________________________________________
-! main output routine called at the end of each time step --> here is decided if 
+! Return the vertically valid (wet) index range [ul_loc, kmax_loc] for column j of
+! the given output stream. Cells with level index outside this range are below the
+! bottom topography or above a cavity and are the only ones written as _FillValue.
+! For 2D fields (nlev_loc==1) and non-spatial vertical axes (density / ice classes)
+! the whole column is valid, so a legitimate zero (e.g. ice-free a_ice or vanishing
+! IDEMIX energy) is kept as zero rather than turned into a missing value.
+subroutine get_wet_range(entry, mesh, nlev_loc, j, ul_loc, kmax_loc)
+    use mod_mesh
+    implicit none
+    type(Meandata), intent(in)  :: entry
+    type(t_mesh),   intent(in)  :: mesh
+    integer,        intent(in)  :: nlev_loc, j
+    integer,        intent(out) :: ul_loc, kmax_loc
+    integer                     :: nl_bot
+
+    if (nlev_loc == mesh%nl .or. nlev_loc == mesh%nl-1) then
+        ! genuine 3D field on the vertical grid --> mask by topography / cavity
+        if (entry%is_elem_based) then
+            ul_loc = mesh%ulevels(j)
+            nl_bot = mesh%nlevels(j)
+        else
+            ul_loc = mesh%ulevels_nod2D(j)
+            nl_bot = mesh%nlevels_nod2D(j)
+        end if
+        ! full levels (nz, interfaces) keep nl_bot levels, mid layers (nz1) keep nl_bot-1
+        if (nlev_loc == mesh%nl) then
+            kmax_loc = nl_bot
+        else
+            kmax_loc = nl_bot - 1
+        end if
+    else
+        ! 2D fields and non-spatial vertical axes: every entry is valid
+        ul_loc   = 1
+        kmax_loc = nlev_loc
+    end if
+end subroutine
+!
+!
+!_______________________________________________________________________________
+! main output routine called at the end of each time step --> here is decided if
 ! output event is triggered
 subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     use g_clock
@@ -2814,6 +2876,7 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     logical, save :: lfirst=.true.
     integer       :: n, k
     integer       :: i, j !for OMP loops
+    integer       :: nlev_loc, ul_loc, kmax_loc !for wet-cell masking of output
     logical       :: do_output
     type(Meandata), pointer :: entry
     type(t_mesh), intent(in) , target :: mesh
@@ -2986,40 +3049,59 @@ ctime=timeold+(dayold-1.)*86400
             ! data range wrecks GRIB packing precision (real ice values get
             ! quantized to ~0). Multio gets the clean mean (zeros stay zeros).
             if (entry%accuracy == i_real8) then
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
+                nlev_loc = size(entry%local_values_r8,dim=1)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J,ul_loc,kmax_loc)
                 DO J=1, size(entry%local_values_r8,dim=2)
-                    DO I=1, size(entry%local_values_r8,dim=1)
 #if defined(__MULTIO)
+                    ! multio ships the clean mean to GRIB; no _FillValue substitution
+                    ! (a 9.97e36 sentinel in the data range wrecks GRIB packing).
+                    DO I=1, nlev_loc
                         entry%local_values_r8_copy(I,J) = entry%local_values_r8(I,J) /real(entry%addcounter,real64)  ! compute_means
+                        entry%local_values_r8(I,J) = 0._real64 ! clean_meanarrays - reset to 0 for next accumulation
+                    END DO ! --> DO I=1, nlev_loc
 #else
-                        if (abs(entry%local_values_r8(I,J)) < 1.0e-30_real64) then
-                            entry%local_values_r8_copy(I,J) = NC_FILL_DOUBLE  ! No data - set to fill value
+                    ! Determine the vertically valid (wet) range for this column. Cells
+                    ! outside [ul_loc,kmax_loc] are below the bottom topography or above
+                    ! the cavity and have never been touched -> they are the only ones set
+                    ! to _FillValue. Wet cells keep their (averaged) value, even when it is
+                    ! a legitimate zero (e.g. ice-free a_ice or vanishing IDEMIX energy).
+                    call get_wet_range(entry, mesh, nlev_loc, J, ul_loc, kmax_loc)
+                    DO I=1, nlev_loc
+                        if (I < ul_loc .or. I > kmax_loc) then
+                            entry%local_values_r8_copy(I,J) = NC_FILL_DOUBLE  ! dry cell - set to fill value
                         else
                             entry%local_values_r8_copy(I,J) = entry%local_values_r8(I,J) /real(entry%addcounter,real64)  ! compute_means
                         end if
-#endif
                         entry%local_values_r8(I,J) = 0._real64 ! clean_meanarrays - reset to 0 for next accumulation
-                    END DO ! --> DO I=1, size(entry%local_values_r8,dim=1)
+                    END DO ! --> DO I=1, nlev_loc
+#endif
                 END DO ! --> DO J=1, size(entry%local_values_r8,dim=2)
 !$OMP END PARALLEL DO
 
             !___________________________________________________________________
             ! write single precision output
             else if (entry%accuracy == i_real4) then
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
+                nlev_loc = size(entry%local_values_r4,dim=1)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J,ul_loc,kmax_loc)
                 DO J=1, size(entry%local_values_r4,dim=2)
-                    DO I=1, size(entry%local_values_r4,dim=1)
 #if defined(__MULTIO)
+                    ! see comment in the double precision branch above
+                    DO I=1, nlev_loc
                         entry%local_values_r4_copy(I,J) = entry%local_values_r4(I,J) /real(entry%addcounter,real32)  ! compute_means
+                        entry%local_values_r4(I,J) = 0._real32 ! clean_meanarrays - reset to 0 for next accumulation
+                    END DO ! --> DO I=1, nlev_loc
 #else
-                        if (abs(entry%local_values_r4(I,J)) < 1.0e-30_real32) then
-                            entry%local_values_r4_copy(I,J) = NC_FILL_FLOAT  ! No data - set to fill value
+                    ! see comment in the double precision branch above
+                    call get_wet_range(entry, mesh, nlev_loc, J, ul_loc, kmax_loc)
+                    DO I=1, nlev_loc
+                        if (I < ul_loc .or. I > kmax_loc) then
+                            entry%local_values_r4_copy(I,J) = NC_FILL_FLOAT  ! dry cell - set to fill value
                         else
                             entry%local_values_r4_copy(I,J) = entry%local_values_r4(I,J) /real(entry%addcounter,real32)  ! compute_means
                         end if
-#endif
                         entry%local_values_r4(I,J) = 0._real32 ! clean_meanarrays - reset to 0 for next accumulation
-                    END DO ! --> DO I=1, size(entry%local_values_r4,dim=1)
+                    END DO ! --> DO I=1, nlev_loc
+#endif
                 END DO ! --> DO J=1, size(entry%local_values_r4,dim=2)
 !$OMP END PARALLEL DO
             end if ! --> if (entry%accuracy == i_real8) then
@@ -3362,8 +3444,9 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
 
  
     !___________________________________________________________________________
-#if !defined(__PGI)  
-    do i = 1, rank(data)
+    ! data is rank 2 here; the rank is hardcoded because nvfortran implements
+    ! the rank() intrinsic only since 25.1
+    do i = 1, 2
         if ((ubound(data, dim = i)<=0)) then
             if (partit%mype==0) then
                 write(*,*) 'WARNING: adding I/O stream for ', trim(name), ' failed (contains 0 dimension)'
@@ -3372,7 +3455,6 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
             return
         end if    
     end do
-#endif
 
     !___________________________________________________________________________
     if (partit%mype==0) then
@@ -3443,8 +3525,9 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   integer i
 
     !___________________________________________________________________________
-#if !defined(__PGI)   
-    do i = 1, rank(data)
+    ! data is rank 1 here; the rank is hardcoded because nvfortran implements
+    ! the rank() intrinsic only since 25.1
+    do i = 1, 1
         if ((ubound(data, dim = i)<=0)) then
         if (partit%mype==0) then
             write(*,*) 'WARNING: adding I/O stream for ', trim(name), ' failed (contains 0 dimension)'
@@ -3453,7 +3536,6 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
         return
         end if    
     end do
-#endif
 
     !___________________________________________________________________________
     if (partit%mype==0) then

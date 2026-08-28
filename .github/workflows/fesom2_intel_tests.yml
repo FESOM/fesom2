@@ -16,8 +16,11 @@ jobs:
   intel_test:
     # Containers must run in Linux based operating systems
     runs-on: ubuntu-latest
-    # Intel compiler container
-    container: ghcr.io/suvarchal/fesom2-ci-intel
+    timeout-minutes: 12
+    # FESOM-owned Intel image. Carries ifx + Intel MPI and the ifx-built
+    # HDF5/netCDF stack, without the rest of intel-hpckit that this build
+    # never invokes - see FESOM/FESOM2_Docker#8.
+    container: ghcr.io/fesom/fesom2_docker:fesom2_intel-master
 
     steps:
     # Checkout repository with latest git action
@@ -46,7 +49,7 @@ jobs:
       run: |
         test -x bin/fesom.x
         echo "Intel build OK (integration tests skipped)"
-    
+
         # TODO issues with netcdf: cd build
         # ctest -R "integration_*" --output-on-failure --verbose
 
