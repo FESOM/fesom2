@@ -1011,7 +1011,12 @@ CASE ('Chldegp  ')
     call def_stream(nod2D,  myDim_nod2D,   'ChlDegp','Chlorophyll degradation phaeocystis','1/d', Chldegp, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
     endif
 #endif
-    
+
+!___________________________________________________________________________________________________________________________________    
+CASE ('Tsurf    ')
+    call def_stream(nod2D , myDim_nod2D , 'tsurf' , 'virtual salt flux'          , '°C', Tsurf(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+
 !___________________________________________________________________________________________________________________________________    
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>   3D streams   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 !___________________________________________________________________________________________________________________________________
@@ -2303,14 +2308,21 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
             call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'long_name', 'sea-ice thickness class'), __LINE__)
         
         elseif (entry%dimname(1)=='ndens') then
-            call assert_nf( nf90_def_var(entry%ncid,  entry%dimname(1), nf90_int,   (/entry%dimID(1)/), entry%dimvarID(1)), __LINE__)
+            ! must be a float type: the axis values are the real sigma2 bin
+            ! edges from std_dens (e.g. 30.12) -- nf90_int silently truncates
+            ! them to whole numbers in the output file
+            call assert_nf( nf90_def_var(entry%ncid,  entry%dimname(1), nf90_double,   (/entry%dimID(1)/), entry%dimvarID(1)), __LINE__)
             call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'long_name', 'sigma2 density class'), __LINE__)
-        
+
         else
             if (partit%mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
-            
-        end if 
-        call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'units', 'm'), __LINE__)
+
+        end if
+        if (entry%dimname(1)=='ndens') then
+            call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'units', 'kg/m^3'), __LINE__)
+        else
+            call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'units', 'm'), __LINE__)
+        end if
         call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'positive', 'down'), __LINE__)
         call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'axis', 'Z'), __LINE__)
         
