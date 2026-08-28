@@ -712,15 +712,15 @@ type(t_partit), intent(inout), target :: partit
 !       CALL MPI_RECV(he_has_element, 1, MPI_LOGICAL, MPI_ANY_SOURCE, 0, MPI_COMM_FESOM, status, MPIerr )		      
 !       sender = status(MPI_SOURCE)
 !       if (he_has_element) then
-!          CALL MPI_RECV(arr_r, 15, MPI_DOUBLE_PRECISION, sender, 1, MPI_COMM_FESOM, status, MPIerr )
-!	  CALL MPI_RECV(iceberg_element, 1, MPI_DOUBLE_PRECISION, sender, 2, MPI_COMM_FESOM, status, MPIerr )
+!          CALL MPI_RECV(arr_r, 15, MPI_WP, sender, 1, MPI_COMM_FESOM, status, MPIerr )
+!	  CALL MPI_RECV(iceberg_element, 1, MPI_WP, sender, 2, MPI_COMM_FESOM, status, MPIerr )
 !	  arr=arr_r
 !       end if
 !    end do
 ! else
 !       CALL MPI_SEND(i_have_element, 1, MPI_LOGICAL, 0, 0, MPI_COMM_FESOM, MPIerr )
 !       if (i_have_element) then
-!          CALL MPI_SEND(arr, 15, MPI_DOUBLE_PRECISION,0, 1, MPI_COMM_FESOM, MPIerr )
+!          CALL MPI_SEND(arr, 15, MPI_WP,0, 1, MPI_COMM_FESOM, MPIerr )
 !	  CALL MPI_SEND(iceberg_element, 1, MPI_INTEGER,0, 2, MPI_COMM_FESOM, MPIerr )
 !       end if 
 ! end if
@@ -730,15 +730,15 @@ type(t_partit), intent(inout), target :: partit
 !!       CALL MPI_RECV(he_has_element, 1, MPI_LOGICAL, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, status, MPIerr )		      
 !!       sender = status(MPI_SOURCE)
 !!       if (he_has_element) then
-!!          CALL MPI_RECV(arr_r, 15, MPI_DOUBLE_PRECISION, sender, 1, MPI_COMM_WORLD, status, MPIerr )
-!!	  CALL MPI_RECV(iceberg_element, 1, MPI_DOUBLE_PRECISION, sender, 2, MPI_COMM_WORLD, status, MPIerr )
+!!          CALL MPI_RECV(arr_r, 15, MPI_WP, sender, 1, MPI_COMM_WORLD, status, MPIerr )
+!!	  CALL MPI_RECV(iceberg_element, 1, MPI_WP, sender, 2, MPI_COMM_WORLD, status, MPIerr )
 !!	  arr=arr_r
 !!       end if
 !!    end do
 !! else
 !!       CALL MPI_SEND(i_have_element, 1, MPI_LOGICAL, 0, 0, MPI_COMM_WORLD, MPIerr )
 !!       if (i_have_element) then
-!!          CALL MPI_SEND(arr, 15, MPI_DOUBLE_PRECISION,0, 1, MPI_COMM_WORLD, MPIerr )
+!!          CALL MPI_SEND(arr, 15, MPI_WP,0, 1, MPI_COMM_WORLD, MPIerr )
 !!	  CALL MPI_SEND(iceberg_element, 1, MPI_INTEGER,0, 2, MPI_COMM_WORLD, MPIerr )
 !!       end if 
 !! end if
@@ -750,9 +750,9 @@ type(t_partit), intent(inout), target :: partit
 ! !3. datatype - Datentyp der Pufferelemente (handle)
 ! !4. root - Wurzelproze�; der, welcher sendet (integer)
 ! !5. comm - Kommunikator (handle) 
-! CALL MPI_BCAST(arr, 15, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, MPIerr)
+! CALL MPI_BCAST(arr, 15, MPI_WP, 0, MPI_COMM_FESOM, MPIerr)
 ! CALL MPI_BCAST(iceberg_element, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
-! !CALL MPI_BCAST(arr, 15, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, MPIerr)
+! !CALL MPI_BCAST(arr, 15, MPI_WP, 0, MPI_COMM_WORLD, MPIerr)
 ! !CALL MPI_BCAST(iceberg_element, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, MPIerr)
 ! 
 ! ! kh 10.02.21
@@ -864,9 +864,9 @@ subroutine  matrix_inverse_2x2 (A, AINV, DET, elem, coords)
   integer                                   :: elem
   REAL, DIMENSION(2), INTENT(IN) :: coords
   
-  real(kind=8), dimension(2,2), intent(IN)  :: A
-  real(kind=8), dimension(2,2), intent(OUT) :: AINV
-  real(kind=8), intent(OUT)                 :: DET
+  real(kind=WP), dimension(2,2), intent(IN)  :: A
+  real(kind=WP), dimension(2,2), intent(OUT) :: AINV
+  real(kind=WP), intent(OUT)                 :: DET
   integer                                   :: i,j
   
   DET  = A(1,1)*A(2,2) - A(1,2)*A(2,1)

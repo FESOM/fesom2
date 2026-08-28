@@ -423,8 +423,8 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
             end if    
         end do
      end if
-     call MPI_BCast(rbuff(1:k,1), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-     call MPI_BCast(rbuff(1:k,2), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+     call MPI_BCast(rbuff(1:k,1), k, MPI_WP, 0, MPI_COMM_FESOM, ierror)
+     call MPI_BCast(rbuff(1:k,2), k, MPI_WP, 0, MPI_COMM_FESOM, ierror)
      call MPI_BCast(ibuff(1:k,2), k, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
      ! fill the local arrays
      do n=1, k
@@ -594,7 +594,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
         end if
         allocate(mesh%zbar(mesh%nl))              ! allocate the array for storing the standard depths
         if (mype==0) read(fileID,*) mesh%zbar
-        call MPI_BCast(mesh%zbar, mesh%nl, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+        call MPI_BCast(mesh%zbar, mesh%nl, MPI_WP, 0, MPI_COMM_FESOM, ierror)
         if(mesh%zbar(2)>0) mesh%zbar=-mesh%zbar   ! zbar is negative 
         allocate(mesh%Z(mesh%nl-1))
         mesh%Z=mesh%zbar(1:mesh%nl-1)+mesh%zbar(2:mesh%nl)  ! mid-depths of cells
@@ -635,7 +635,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
         end if
         allocate(mesh%zbar(mesh%nl))              ! allocate the array for storing the standard depths
         if (mype==0) read(fileID,*) mesh%zbar
-        call MPI_BCast(mesh%zbar, mesh%nl, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+        call MPI_BCast(mesh%zbar, mesh%nl, MPI_WP, 0, MPI_COMM_FESOM, ierror)
         if(mesh%zbar(2)>0) mesh%zbar=-mesh%zbar   ! zbar is negative 
         allocate(mesh%Z(mesh%nl-1))
         mesh%Z=mesh%zbar(1:mesh%nl-1)+mesh%zbar(2:mesh%nl)  ! mid-depths of cells
@@ -713,7 +713,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
             ! the maximum depth on earth in marianen trench
             if ( flag_wrongaux3d==0 .and. any(abs(rbuff(1:k,1))>11000.0_WP) ) flag_wrongaux3d=1
         end if
-        call MPI_BCast(rbuff(1:k,1), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+        call MPI_BCast(rbuff(1:k,1), k, MPI_WP, 0, MPI_COMM_FESOM, ierror)
         
         do n=1, k
             x=rbuff(n,1)
@@ -766,7 +766,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
             ! the maximum depth on earth in marianen trench
             if ( flag_wrongaux3d==0 .and. any(abs(rbuff(1:k,1))>11000.0_WP) ) flag_wrongaux3d=1
         end if
-        call MPI_BCast(rbuff(1:k,1), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+        call MPI_BCast(rbuff(1:k,1), k, MPI_WP, 0, MPI_COMM_FESOM, ierror)
         
         do n=1, k
             x=rbuff(n,1)
@@ -1490,7 +1490,7 @@ subroutine find_levels_cavity(partit, mesh)
             
             !___________________________________________________________________
             ! broadcast chunk buffer to all other CPUs (k...size of buffer)
-            call MPI_BCast(rbuff(1:k), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+            call MPI_BCast(rbuff(1:k), k, MPI_WP, 0, MPI_COMM_FESOM, ierror)
             
             !___________________________________________________________________
             ! fill the local arrays
@@ -1563,7 +1563,7 @@ subroutine find_levels_cavity(partit, mesh)
             
             !___________________________________________________________________
             ! broadcast chunk buffer to all other CPUs (k...size of buffer)
-            call MPI_BCast(rbuff(1:k), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+            call MPI_BCast(rbuff(1:k), k, MPI_WP, 0, MPI_COMM_FESOM, ierror)
             
             !___________________________________________________________________
             ! fill the local arrays
@@ -2857,7 +2857,7 @@ real(kind=WP)	            :: vol_n(mesh%nl), vol_e(mesh%nl), aux(mesh%nl)
          aux(nz)=aux(nz)+mesh%areasvol(nz, n)
       end do
    end do
-   call MPI_AllREDUCE(aux, vol_n, mesh%nl, MPI_DOUBLE_PRECISION, MPI_SUM, &
+   call MPI_AllREDUCE(aux, vol_n, mesh%nl, MPI_WP, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
 
    aux=0._WP
@@ -2868,7 +2868,7 @@ real(kind=WP)	            :: vol_n(mesh%nl), vol_e(mesh%nl), aux(mesh%nl)
          aux(nz)=aux(nz)+mesh%elem_area(elem)
       end do
    end do
-   call MPI_AllREDUCE(aux, vol_e, mesh%nl, MPI_DOUBLE_PRECISION, MPI_SUM, &
+   call MPI_AllREDUCE(aux, vol_e, mesh%nl, MPI_WP, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
 
 if (mype==0) then
@@ -2915,7 +2915,7 @@ subroutine check_total_volume(partit, mesh)
             aux=aux+areasvol(nz, n)*hnode(nz,n)
         end do
     end do
-    call MPI_AllREDUCE(aux, vol_n, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(aux, vol_n, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
     !___________________________________________________________________________
     ! total ocean volume on elements
     aux=0._WP
@@ -2926,7 +2926,7 @@ subroutine check_total_volume(partit, mesh)
             aux=aux+elem_area(elem)*helem(nz,elem)
         end do
     end do
-    call MPI_AllREDUCE(aux, vol_e, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(aux, vol_e, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 
     !___write mesh statistics___________________________________________________
     if (mype==0) then

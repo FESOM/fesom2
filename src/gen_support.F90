@@ -435,7 +435,7 @@ subroutine extrap_nod3D(arr, partit, mesh)
     !___________________________________________________________________________
     loc_max=maxval(arr(1,:))
     glob_max=0._WP
-    call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
     glob_sum=-1
 
     !___________________________________________________________________________
@@ -499,7 +499,7 @@ subroutine extrap_nod3D(arr, partit, mesh)
         
         !_______________________________________________________________________
         loc_max=maxval(arr(1,:))
-        call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)   
+        call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)   
         
     END DO ! -->  DO WHILE (glob_max>0.99_WP*dummy)  
     

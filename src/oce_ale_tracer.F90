@@ -134,7 +134,7 @@ end module solve_tracers_ale_interface
 ! Driving routine    Here with ALE changes!!!
 subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     use g_config
-    use o_PARAM, only: SPP, Fer_GM
+    use o_PARAM, only: SPP, Fer_GM, S_ref_anomaly
     use mod_mesh
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -504,12 +504,12 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     do node=1,myDim_nod2D+eDim_nod2D
         nzmax=nlevels_nod2D(node)-1
         nzmin=ulevels_nod2D(node)
-        where (tracers%data(2)%values(nzmin:nzmax,node) > 45._WP)
-               tracers%data(2)%values(nzmin:nzmax,node)=45._WP
+        ! clip bounds shifted to anomaly space (S_ref=0 unless use_salt_anomaly)
+        where (tracers%data(2)%values(nzmin:nzmax,node) > 45._WP - S_ref_anomaly)
+               tracers%data(2)%values(nzmin:nzmax,node)= 45._WP - S_ref_anomaly
         end where
-
-        where (tracers%data(2)%values(nzmin:nzmax,node) < 3._WP )
-               tracers%data(2)%values(nzmin:nzmax,node) = 3._WP
+        where (tracers%data(2)%values(nzmin:nzmax,node) < 3._WP - S_ref_anomaly )
+               tracers%data(2)%values(nzmin:nzmax,node) = 3._WP - S_ref_anomaly
         end where
     end do
 !$OMP END PARALLEL DO
@@ -840,6 +840,7 @@ end subroutine diff_tracers_ale
 !===============================================================================
 !Vertical diffusive flux(explicit scheme):
 subroutine diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
+    use o_PARAM, only: S_ref_anomaly
     use o_ARRAYS
     use g_forcing_arrays
     use MOD_MESH
@@ -878,7 +879,10 @@ subroutine diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
             rdata =  Tsurf(n)
             rlx   =  surf_relax_T
         elseif (tracers%data(tr_num)%ID==2) then
-            flux  =  virtual_salt(n)+relax_salt(n) + real_salt_flux(n)*is_nonlinfs
+            ! use_salt_anomaly background-dilution term (S_ref=0 unless enabled).
+            ! See bc_surface (implicit path) below for the derivation and the note
+            ! on the ~8e-6/step constancy-error residual it leaves.
+            flux  =  virtual_salt(n)+relax_salt(n) + (real_salt_flux(n) + S_ref_anomaly*water_flux(n))*is_nonlinfs
         else
             flux  = 0._WP
             rdata = 0._WP
@@ -1830,6 +1834,7 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
   use MOD_MESH
   USE MOD_PARTIT
   USE MOD_PARSUP
+  use o_PARAM, only: S_ref_anomaly
   USE o_ARRAYS
   USE g_forcing_arrays
   USE g_config
@@ -1878,8 +1883,26 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
     CASE (2)
         ! --> real_salt_flux(:): salt flux due to containment/releasing of salt
         !     by forming/melting of sea ice
+        ! use_salt_anomaly background-dilution term (S_ref=0 unless enabled, so
+        ! this reduces to the original salinity BC). WHY it is needed and where a
+        ! residual error comes from:
+        !   Storing S = S' + S_ref should be invisible in DP: advection is linear
+        !   and, by continuity, adv(S_ref) = -S_ref*dh/dt exactly cancels the
+        !   -S_ref*dh/dt from the anomaly transform, leaving the same equation in
+        !   S'. That holds ONLY if the free-surface advection preserves a constant
+        !   exactly. FESOM's does not: with no correction the DP anomaly-vs-absolute
+        !   salt error is ~1.3e-3, a constancy error for the offset S_ref localised
+        !   where the surface freshwater flux enters. The S_ref*water_flux term
+        !   below cancels ~99.4% of it, leaving a ~8e-6/step residual (the part not
+        !   proportional to water_flux: the grid-divergence / FCT-limiter part).
+        !   An exact fix would carry S'+S_ref in the surface ADVECTIVE flux across
+        !   all schemes, not add a surface source here (a per-layer thickness term
+        !   was tried and does not help; it makes it worse combined with this term).
+        ! real_salt_flux / relax_salt / virtual_salt are already anomaly-consistent
+        ! (real_salt_flux is built from the corrected absolute ice gather; relax_salt
+        ! subtracts S_ref from the absolute Ssurf; virtual_salt is 0 in zstar/zlevel).
         bc_surface= dt*(virtual_salt(n) & !--> is zeros for zlevel/zstar
-                    + relax_salt(n) + real_salt_flux(n)*is_nonlinfs)
+                    + relax_salt(n) + (real_salt_flux(n) + S_ref_anomaly*water_flux(n))*is_nonlinfs)
             
     !___Transient tracers (cases ##6,11,12,14,39)__________________________________
     CASE (6) ! SF6
