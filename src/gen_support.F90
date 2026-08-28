@@ -351,9 +351,8 @@ lval=0.0_WP_full
 #endif
   int2D=0.0_WP
   gval=0.0_WP_full
-  ! reduce into a WP_full buffer and round once: lval is real64, so the MPI
-  ! type must be MPI_DOUBLE_PRECISION -- and MPI must not then write eight
-  ! bytes into the caller's real(WP) argument when WP is single precision.
+  ! reduce into a WP_full buffer and round once: MPI must not write a real64
+  ! into the caller's real(WP) argument when WP is single precision.
   call MPI_AllREDUCE(lval, gval, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
   int2D=real(gval, WP)
@@ -403,9 +402,8 @@ subroutine integrate_nod_3D(data, int3D, partit, mesh)
 
   int3D=0.0_WP
   gval=0.0_WP_full
-  ! reduce into a WP_full buffer and round once: lval is real64, so the MPI
-  ! type must be MPI_DOUBLE_PRECISION -- and MPI must not then write eight
-  ! bytes into the caller's real(WP) argument when WP is single precision.
+  ! reduce into a WP_full buffer and round once: MPI must not write a real64
+  ! into the caller's real(WP) argument when WP is single precision.
   call MPI_AllREDUCE(lval, gval, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
   int3D=real(gval, WP)
@@ -700,9 +698,8 @@ subroutine integrate_elem_3D(data, int3D, partit, mesh)
 
   int3D=0.0_WP
   gval=0.0_WP_full
-  ! reduce into a WP_full buffer and round once: lval is real64, so the MPI
-  ! type must be MPI_DOUBLE_PRECISION -- and MPI must not then write eight
-  ! bytes into the caller's real(WP) argument when WP is single precision.
+  ! reduce into a WP_full buffer and round once: MPI must not write a real64
+  ! into the caller's real(WP) argument when WP is single precision.
   call MPI_AllREDUCE(lval, gval, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
   int3D=real(gval, WP)
@@ -747,9 +744,8 @@ subroutine integrate_elem_2D(data, int2D, partit, mesh)
 
   int2D=0.0_WP
   gval=0.0_WP_full
-  ! reduce into a WP_full buffer and round once: lval is real64, so the MPI
-  ! type must be MPI_DOUBLE_PRECISION -- and MPI must not then write eight
-  ! bytes into the caller's real(WP) argument when WP is single precision.
+  ! reduce into a WP_full buffer and round once: MPI must not write a real64
+  ! into the caller's real(WP) argument when WP is single precision.
   call MPI_AllREDUCE(lval, gval, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
   int2D=real(gval, WP)
