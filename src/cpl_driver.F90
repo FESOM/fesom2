@@ -32,7 +32,7 @@ module cpl_driver
   ! (final number of fields depends now on lwiso switch and is set in subroutine cpl_oasis3mct_define_unstr)
 
 #if defined (__oifs)
-  integer                    :: nsend = 7
+  integer                    :: nsend = 8
   integer                    :: nrecv = 15
 #else
   integer                    :: nsend = 4
@@ -695,6 +695,7 @@ include "associate_mesh_ass.h"
     cpl_send( 5)='sia_feom' ! 5. sea ice albedo [%-100]            ->
     cpl_send( 6)='u_feom'   ! 6. eastward  surface velocity [m/s]  ->
     cpl_send( 7)='v_feom'   ! 7. northward surface velocity [m/s]  ->
+    cpl_send( 8)='sit_feom' ! 8. effective sea ice thickness [m]   ->
 #else
     cpl_send( 1)='sst_feom' ! 1. sea surface temperature [°C]      ->
     cpl_send( 2)='sit_feom' ! 2. sea ice thickness [m]             ->
