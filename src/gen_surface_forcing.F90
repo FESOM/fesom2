@@ -1297,7 +1297,14 @@ CONTAINS
     ! when used runoff_data_source='CORE1' or 'CORE2' we use a total climatological 
     ! runoff, so only one runoff time slice for the entire simulation is used. 
     ! This part is only read ones when the forcing is first time initialized
-    if (runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
+    if (runoff_data_source=='NONE') then
+        if (mype==0) then
+            write(*,*) ' --> river runoff is switched off (runoff_data_source=''NONE'') '
+            write(*,*)
+        end if
+        ! runoff was allocated and set to zero in forcing_array_setup, nothing to read
+
+    elseif (runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
         if (mype==0) then 
             write(*,*) ' --> using total longterm runoff climatology (only 1 time slice) '
             write(*,*) '     runoff_data_source = ', runoff_data_source
@@ -1318,11 +1325,13 @@ CONTAINS
                 write(error_unit,*)
                 write(error_unit,*) achar(27)//'[31m'
                 write(error_unit,*) '____________________________________________________________________'
-                write(error_unit,*) ' ERROR: file not found: ', trim(make_full_path(nm_runoff_file))
-                write(error_unit,*) '        --> check your namelist.focing'
-                write(error_unit,*) '            ...'
-                write(error_unit,*) '            nm_runoff_file    =...'
-                write(error_unit,*) '            ...'
+                write(error_unit,*) ' ERROR: runoff file not found: ', trim(make_full_path(nm_runoff_file))
+                write(error_unit,*) '        --> check your namelist.forcing'
+                write(error_unit,*) '            runoff_data_source = ', trim(runoff_data_source)
+                write(error_unit,*) '            nm_runoff_file     = ', trim(nm_runoff_file)
+                write(error_unit,*) '        a nm_runoff_file without a leading ''/'' is taken as relative and gets'
+                write(error_unit,*) '        ClimateDataPath prepended, which is why an unrelated path may appear'
+                write(error_unit,*) '        above. give an absolute path to avoid this.'
                 write(error_unit,*) '____________________________________________________________________'
                 write(error_unit,*) achar(27)//'[0m'
                 write(error_unit,*)
@@ -1350,11 +1359,13 @@ CONTAINS
                 write(error_unit,*)
                 write(error_unit,*) achar(27)//'[31m'
                 write(error_unit,*) '____________________________________________________________________'
-                write(error_unit,*) ' ERROR: file not found: ', trim(make_full_path(nm_runoff_file))
-                write(error_unit,*) '        --> check your namelist.focing'
-                write(error_unit,*) '            ...'
-                write(error_unit,*) '            nm_runoff_file    =...'
-                write(error_unit,*) '            ...'
+                write(error_unit,*) ' ERROR: runoff file not found: ', trim(make_full_path(nm_runoff_file))
+                write(error_unit,*) '        --> check your namelist.forcing'
+                write(error_unit,*) '            runoff_data_source = ', trim(runoff_data_source)
+                write(error_unit,*) '            nm_runoff_file     = ', trim(nm_runoff_file)
+                write(error_unit,*) '        a nm_runoff_file without a leading ''/'' is taken as relative and gets'
+                write(error_unit,*) '        ClimateDataPath prepended, which is why an unrelated path may appear'
+                write(error_unit,*) '        above. give an absolute path to avoid this.'
                 write(error_unit,*) '____________________________________________________________________'
                 write(error_unit,*) achar(27)//'[0m'
                 write(error_unit,*)
@@ -1375,6 +1386,7 @@ CONTAINS
             write(error_unit,*) '                                  this can be done as a monthly climatology (runoff_climatology=.true.) or '
             write(error_unit,*) '                                  as a transient monthly climatology (runoff_climatology=.false.) than each'
             write(error_unit,*) '                                  month and each year have differnt runoff'
+            write(error_unit,*) '        - ''NONE''             : no river runoff is applied                                 '
             write(error_unit,*) ''
             write(error_unit,*) '        --> please check your namelist.forcing'
             write(error_unit,*) '            ...'
@@ -2866,7 +2878,6 @@ END SUBROUTINE sbc_do_recom
 !
    real(wp), parameter :: r3 = 1.0/3.0
    real(wp), parameter :: sqr3 = 1.7320508
-   real(wp), parameter :: pi=3.141592653589
    real(wp)            :: Fw, chic, chik, psic, psik
 
 !  Initialize for the zero "ZoL" case.
@@ -3049,7 +3060,6 @@ END SUBROUTINE sbc_do_recom
 !  Original author(s): Karsten Bolding
 !
 ! !LOCAL VARIABLES:
-   real(wp), parameter       :: pi=3.14159265358979323846
    real(wp), parameter       :: deg2rad=pi/180.
    real(wp), parameter       :: rad2deg=180./pi
 
@@ -3132,7 +3142,6 @@ END SUBROUTINE sbc_do_recom
 !  Original author(s): Karsten Bolding & Hans Burchard
 !
 ! !LOCAL VARIABLES:
-   real(wp), parameter       :: pi=3.14159265358979323846
    real(wp), parameter       :: deg2rad=pi/180.
    real(wp), parameter       :: rad2deg=180./pi
 
