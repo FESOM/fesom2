@@ -46,8 +46,12 @@ on:
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   ecbundle_ctest_framework:
-    # Run directly on Ubuntu runner
     runs-on: ubuntu-latest
+    timeout-minutes: 12
+    # Image used by the ten mkrun-based workflows. It already provides gcc,
+    # gfortran, OpenMPI, netCDF under /usr and python3-pip, which is all this
+    # job installed by hand - see FESOM/FESOM2_Docker#7.
+    container: ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master
     
     env:
       # Set environment variables for the build
@@ -61,43 +65,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      - name: Install system dependencies
+      - name: Git safe directory
         run: |
-          echo "Installing FESOM2 dependencies..."
-          sudo apt-get update
-          sudo apt-get install -y \
-            gcc \
-            gfortran \
-            g++ \
-            cmake \
-            make \
-            openmpi-bin \
-            libopenmpi-dev \
-            libnetcdf-dev \
-            libnetcdff-dev \
-            pkg-config \
-            git \
-            wget \
-            ca-certificates \
-            gnupg \
-            lsb-release \
-            python3 \
-            python3-pip
-          
-          echo "Installing CMake 3.25+ from Kitware repository..."
-          # Add Kitware's signing key
-          wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | sudo tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null
-          
-          # Add Kitware repository
-          echo "deb https://apt.kitware.com/ubuntu/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/kitware.list >/dev/null
-          
-          # Update package list and install latest CMake
-          sudo apt-get update
-          sudo apt-get install -y cmake
-          
-          echo "Installing ecbundle..."
-          pip install ecbundle
-          
+          git config --global --add safe.directory ${PWD}
+
+      - name: Install ecbundle
+        timeout-minutes: 5
+        run: |
+          pip install --retries 3 --timeout 30 ecbundle
           echo "Verifying installations..."
           gcc --version
           gfortran --version
@@ -106,7 +81,7 @@ jobs:
           pkg-config --modversion netcdf
           pkg-config --modversion netcdf-fortran
           ecbundle --version
-          
+
       - name: Set up environment variables
         run: |
           echo "Setting up environment for FESOM2 build..."

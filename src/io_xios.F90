@@ -527,7 +527,10 @@ contains
     do j = 2, nv
        tmp_lon = blon(j); tmp_lat = blat(j); tmp_ang = angles(j)
        k = j - 1
-       do while (k >= 1 .and. angles(k) > tmp_ang)
+       ! .and. is not short-circuit in Fortran: split the test or angles(0)
+       ! is read at the end of the sweep.
+       do while (k >= 1)
+          if (angles(k) <= tmp_ang) exit
           blon(k+1) = blon(k); blat(k+1) = blat(k); angles(k+1) = angles(k)
           k = k - 1
        end do

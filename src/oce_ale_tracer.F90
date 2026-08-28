@@ -153,6 +153,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 #if defined(__recom)
     use recom_glovar
     use recom_config
+    use recom_ciso
+    use o_arrays
 #endif
     use diagnostics, only: ldiag_DVD
     use g_forcing_param, only: use_age_tracer !---age-code
@@ -164,6 +166,34 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     type(t_tracer), intent(inout), target    :: tracers
     type(t_partit), intent(inout), target    :: partit
     type(t_mesh)  , intent(in)   , target    :: mesh
+
+#if defined(__recom) && defined(__usetp)
+! multi FESOM group loop parallelization
+    integer             :: num_tracers
+    integer             :: tr_num_start_memo
+
+    integer             :: group_i
+    integer             :: tr_num_start
+
+    logical             :: has_one_added_tracer
+    logical             :: has_one_added_tracer_local_dummy
+    logical             :: tr_num_end_local_dummy
+    logical             :: tr_num_in_group_local_dummy
+    integer             :: tr_num_end
+    logical             :: tr_num_in_group_dummy
+    integer             :: tr_arr_slice_count_fix_1
+
+    integer             :: Sinkflx_tr_slice_count_fix_1
+    integer             :: Benthos_tr_slice_count_fix_1
+
+    integer             :: tr_num_start_local
+    integer             :: tr_num_to_send
+
+    logical             :: completed
+
+    logical             :: bBreak
+#endif
+
     !___________________________________________________________________________
     integer                                  :: i, tr_num, node, elem, nzmax, nzmin
     real(kind=WP)                            :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_elem2D) ! local variable
@@ -186,6 +216,10 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         fer_Wvel   => dynamics%fer_w(:,:)
     end if
     del_ttf => tracers%work%del_ttf
+
+#if defined(__recom) && defined(__usetp)
+    num_tracers=tracers%num_tracers
+#endif
 
     !___________________________________________________________________________
     if (SPP) then
@@ -226,13 +260,39 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         !$ACC UPDATE DEVICE(dynamics%w, dynamics%w_e, dynamics%uv) !!! async(1) 
 !!!     !$ACC UPDATE DEVICE(tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus)
         !$ACC UPDATE DEVICE (mesh%helem, mesh%hnode, mesh%hnode_new, mesh%zbar_3d_n, mesh%z_3d_n)
+
+#if defined(__recom) && defined(__usetp)
+    call calc_slice(num_tracers, num_fesom_groups, partit%my_fesom_group, tr_num_start, tr_num_end, tr_num_in_group_dummy, has_one_added_tracer)
+
+    tr_arr_slice_count_fix_1 = 1 * (nl - 1) * (myDim_nod2D + eDim_nod2D)
+
+    Sinkflx_tr_slice_count_fix_1 = 1 * (myDim_nod2D + eDim_nod2D) * bottflx_num
+    Benthos_tr_slice_count_fix_1 = 1 * (myDim_nod2D + eDim_nod2D) * benthos_num
+
+    tr_num_start_memo = tr_num_start
+
+    request_count = 0
+#endif
+
+#if defined(__recom) && defined(__usetp)
+    do tr_num = tr_num_start, tr_num_end
+#else
     do tr_num=1, tracers%num_tracers
+#endif
 
 #if defined(__recom)
-!YY: sinkflx needs to be reset at each time step
-        if(use_MEDUSA) then
+    if(use_MEDUSA) then
             SinkFlx = 0.0d0
-        endif
+#if defined(__usetp)
+            SinkFlx_tr(:, :, tr_num) = 0.0d0
+#endif !__usetp
+    endif
+#if defined(__usetp)
+    Benthos_tr(:, :, tr_num) = 0.0d0
+#endif !__usetp
+#endif !__recom
+
+#if defined(__recom)
         SinkingVel1 = 0.0d0 ! OG 16.03.23
         SinkingVel2 = 0.0d0 ! OG 16.03.23
 #endif
@@ -267,6 +327,24 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
             call save_cmor_advection(tr_num, tracers%work%del_ttf(:, 1:myDim_nod2D), myDim_nod2D, nl-1)
         end if
 
+!if (.FALSE.) then
+! O:G - tra_diag
+!#if defined (__recom)
+!        if (tracers%data(tr_num)%ltra_diag) then
+!           do n=1, myDim_nod2D+eDim_nod2D
+!              nu1 = ulevels_nod2D(n)
+!              nl1 = nlevels_nod2D(n)
+!              do nz = nu1, nl1-1
+                 ! Horizontal advection part
+!                 tracers%work%tra_advhoriz(nz,n,tr_num) = tracers%work%del_ttf_advhoriz(nz,n)
+                 ! Vertical advection part
+!                 tracers%work%tra_advvert (nz,n,tr_num) = tracers%work%del_ttf_advvert(nz,n)
+!              end do
+!           end do
+!        end if
+!#endif
+!endif 
+
         !___________________________________________________________________________
         ! diffuse tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
@@ -295,7 +373,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
             
         elseif ((toy_ocean) .AND. ((TRIM(which_toy)=="neverworld2"))) then
             call relax_2_tsurf(tracers%data(1), partit, mesh)
-            
+            call relax_2_ssurf(tracers%data(2), partit, mesh)
+
         else
             call relax_to_clim(tr_num, tracers, partit, mesh)
             
@@ -304,19 +383,92 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
 !$OMP BARRIER
 
-    end do
 !!!        !$ACC UPDATE HOST (tracers%work%fct_ttf_min, tracers%work%fct_ttf_max, tracers%work%fct_plus, tracers%work%fct_minus) &
 !!!        !$ACC HOST  (tracers%work%edge_up_dn_grad)
 
-#if defined(__recom)
-    do tr_num = 1, tracers%num_tracers
-        if (use_MEDUSA) then
-            SinkFlx = SinkFlx + SinkFlx_tr(:, :, tr_num)
-        endif
-!        Benthos = Benthos + Benthos_tr(:, :, tr_num)
-        Sinkingvel1(:,:) = Sinkingvel1(:,:) + Sinkvel1_tr(:, :, tr_num)
-        Sinkingvel2(:,:) = Sinkingvel2(:,:) + Sinkvel2_tr(:, :, tr_num)
-    end do
+#if defined(__recom) && defined(__usetp)
+! broadcast tracer results to fesom groups
+        if(num_fesom_groups > 1) then
+
+            do group_i = 0, num_fesom_groups - 1
+                call calc_slice(num_tracers, num_fesom_groups, group_i, tr_num_start_local, tr_num_end_local_dummy, tr_num_in_group_local_dummy, has_one_added_tracer_local_dummy)
+
+                tr_num_to_send = tr_num_start_local + (tr_num - tr_num_start_memo)
+
+                if((tr_num == tr_num_end) .and. has_one_added_tracer) then
+                    ! skip: if last tracer in group was added to compensate for fragementation it is skipped here and handled after the loop
+                else
+                    request_count = request_count + 1
+
+! non-blocking communication overlapped with computation in loop
+                    call MPI_IBcast(tracers%data(tr_num_to_send)%values(:, :), tr_arr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                                                group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, tr_arr_requests(request_count),     MPIerr)
+
+                    if(use_MEDUSA) then
+                        call MPI_IBcast(Sinkflx_tr (:, :, tr_num_to_send), Sinkflx_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                                                    group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, SinkFlx_tr_requests(request_count), MPIerr)
+                    endif
+                        call MPI_IBcast(Benthos_tr (:, :, tr_num_to_send), Benthos_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                                                    group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, Benthos_tr_requests(request_count), MPIerr)
+                end if
+            end do
+        end if ! (num_fesom_groups > 1) then
+#endif
+    end do ! EITHER: tr_num = tr_num_start, tr_num_end OR 1, tracers%num_tracers, depending on __usetp
+    
+#if defined(__recom) && defined(__usetp)
+! if tracer in group was added to compensate for fragmentation its broadcast of the last index is handled here
+    if(num_fesom_groups > 1) then
+        do group_i = 0, num_fesom_groups - 1
+            call calc_slice(num_tracers, num_fesom_groups, group_i, tr_num_start, tr_num_end, tr_num_in_group_dummy, has_one_added_tracer)
+
+            if(has_one_added_tracer) then
+
+                request_count = request_count + 1
+
+                call MPI_IBcast(tracers%data(tr_num_end)%values(:, :), tr_arr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                                group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, tr_arr_requests(request_count),     MPIerr)
+                if(use_MEDUSA) then
+                    call MPI_IBcast(Sinkflx_tr (:, :, tr_num_end), Sinkflx_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                                    group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, SinkFlx_tr_requests(request_count), MPIerr)
+                endif
+                    call MPI_IBcast(Benthos_tr (:, :, tr_num_end), Benthos_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                                    group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, Benthos_tr_requests(request_count), MPIerr)
+            end if
+        end do
+    end if !(num_fesom_groups > 1) then
+
+    if(num_fesom_groups > 1) then
+        completed = .false.
+        do while (.not. completed)
+            call MPI_TESTALL(request_count, tr_arr_requests(:),     completed, MPI_STATUSES_IGNORE, MPIerr)
+        end do
+
+        if(use_MEDUSA) then
+            completed = .false.
+            do while (.not. completed)
+                call MPI_TESTALL(request_count, SinkFlx_tr_requests(:), completed, MPI_STATUSES_IGNORE, MPIerr)
+            end do
+        endif ! (use_MEDUSA) then
+
+            completed = .false.
+            do while (.not. completed)
+                call MPI_TESTALL(request_count, Benthos_tr_requests(:), completed, MPI_STATUSES_IGNORE, MPIerr)
+            end do
+    end if ! (num_fesom_groups > 1) then
+#endif
+
+#if defined(__recom) && defined(__usetp)
+! SinkFlx and Benthos values are buffered per tracer index in the loop above and now summed up to
+! avoid non bit identical results regarding global sums when running the tracer loop in parallel
+        do tr_num = 1, num_tracers
+            if(use_MEDUSA) then
+                SinkFlx = SinkFlx + SinkFlx_tr(:, :, tr_num)
+            endif
+            Benthos = Benthos + Benthos_tr(:, :, tr_num)
+!            Sinkingvel1(:,:) = Sinkingvel1(:,:) + Sinkvel1_tr(:, :, tr_num)
+!            Sinkingvel2(:,:) = Sinkingvel2(:,:) + Sinkvel2_tr(:, :, tr_num)
+        end do
 #endif
 
     !___________________________________________________________________________
@@ -431,7 +583,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     vert_sink      = 0.0_WP
 #endif
 
-    ttf_rhs_bak = 0.0
+    ttf_rhs_bak = 0.0 
 
     if (tracers%data(tr_num)%ltra_diag) then
        call backup_ttf_rhs(del_ttf, ttf_rhs_bak, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D)
@@ -952,8 +1104,8 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         zinv=1.0_WP*dt    ! no .../(zbar(1)-zbar(2)) because of  ALE
 
         ! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
-        Ty1= (Z_n(nz)     -zbar_n(nz+1))*zinv2 *slope_tapered(3,nz  ,n)**2*Ki(nz  ,n) + &
-             (zbar_n(nz+1)-Z_n(   nz+1))*zinv2 *slope_tapered(3,nz+1,n)**2*Ki(nz+1,n)
+        Ty1= (zbar_n(nz+1)-Z_n(   nz+1))*zinv2 *slope_tapered(3,nz  ,n)**2*Ki(nz  ,n) + &
+             (Z_n(nz)     -zbar_n(nz+1))*zinv2 *slope_tapered(3,nz+1,n)**2*Ki(nz+1,n)
         Ty1=Ty1*isredi
 
         ! layer dependent coefficients for for solving dT(1)/dt+d/dz*K_33*d/dz*T(1) = ...
@@ -985,10 +1137,10 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
             ! 1/dz(nz)
             zinv2=1.0_WP/(Z_n(nz)-Z_n(nz+1))
             ! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
-            Ty = (Z_n(nz-1   )-zbar_n(nz  ))*zinv1 *slope_tapered(3,nz-1,n)**2*Ki(nz-1,n)+ &
-                 (zbar_n(nz  )-Z_n(nz     ))*zinv1 *slope_tapered(3,nz  ,n)**2*Ki(nz  ,n)
-            Ty1= (Z_n(nz     )-zbar_n(nz+1))*zinv2 *slope_tapered(3,nz  ,n)**2*Ki(nz  ,n)+ &
-                 (zbar_n(nz+1)-Z_n(nz+1   ))*zinv2 *slope_tapered(3,nz+1,n)**2*Ki(nz+1,n)
+            Ty = (zbar_n(nz  )-Z_n(nz     ))*zinv1 *slope_tapered(3,nz-1,n)**2*Ki(nz-1,n)+ &
+                 (Z_n(nz-1   )-zbar_n(nz  ))*zinv1 *slope_tapered(3,nz  ,n)**2*Ki(nz  ,n)
+            Ty1= (zbar_n(nz+1)-Z_n(nz+1   ))*zinv2 *slope_tapered(3,nz  ,n)**2*Ki(nz  ,n)+ &
+                 (Z_n(nz     )-zbar_n(nz+1))*zinv2 *slope_tapered(3,nz+1,n)**2*Ki(nz+1,n)
             Ty =Ty *isredi
             Ty1=Ty1*isredi
 
@@ -1028,8 +1180,8 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         zinv=1.0_WP*dt   ! no ... /(zbar(nzmax-1)-zbar(nzmax)) because of ale
 
         ! calculate isoneutral diffusivity : Kd*s^2 --> K_33 = Kv + Kd*s^2
-        Ty= (Z_n(nz-1) -zbar_n(nz)) * zinv1 * slope_tapered(3,nz-1,n)**2 * Ki(nz-1,n) + &
-            (zbar_n(nz)-Z_n(nz)   ) * zinv1 * slope_tapered(3,nz  ,n)**2 * Ki(nz,n)
+        Ty= (zbar_n(nz)-Z_n(nz)   ) * zinv1 * slope_tapered(3,nz-1,n)**2 * Ki(nz-1,n) + &
+            (Z_n(nz-1) -zbar_n(nz)) * zinv1 * slope_tapered(3,nz  ,n)**2 * Ki(nz,n)
         Ty =Ty *isredi
         ! layer dependent coefficients for for solving dT(nz)/dt+d/dz*K_33*d/dz*T(nz) = ...
 
@@ -1219,7 +1371,17 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
         !  (BUT CHECK!)              |    |                         |    |
         !                            v   (+)                        v   (+)
         !
-        tr(nzmin)= tr(nzmin)+bc_surface(n, tracers%data(tr_num)%ID, trarr(nzmin,n), nzmin, partit, mesh, sst(nzmin,n), sss(nzmin,n), a_ice(n))
+
+        ! The hosing passive tracer (ID 304) receives its source over the whole
+        ! column when the anomaly is applied at depth; every other tracer, and
+        ! 304 itself in surface mode, gets the usual single surface term.
+        if (tracers%data(tr_num)%ID==304 .and. use_hosing .and. trim(hosing_mode)=='depth') then
+            do nz=nzmin,nzmax
+                tr(nz)= tr(nz)+bc_surface(n, tracers%data(tr_num)%ID, trarr(nz,n), nz, partit, mesh, sst(nz,n), sss(nz,n), a_ice(n))
+            end do
+        else
+            tr(nzmin)= tr(nzmin)+bc_surface(n, tracers%data(tr_num)%ID, trarr(nzmin,n), nzmin, partit, mesh, sst(nzmin,n), sss(nzmin,n), a_ice(n))
+        end if
 
         !_______________________________________________________________________
         ! The forward sweep algorithm to solve the three-diagonal matrix
@@ -1865,7 +2027,6 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
     CASE (1023:1036)
         bc_surface=0.0_WP  ! OG added bc for recom fields
     CASE (1302) ! Before (1037) ! DIC_13
-
 #if defined (__ciso)
          if (ciso) then
             if (use_MEDUSA .and. add_loopback) then
@@ -1917,6 +2078,12 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
         bc_surface=0.0_WP
     CASE (303)
         bc_surface=0.0_WP
+    CASE (304) ! hosing passive tracer; nzmin is the level being filled
+        if (use_hosing .and. trim(hosing_mode)=='depth') then
+            bc_surface= dt*(hosing_flux3D(nzmin,n))
+        else
+            bc_surface= dt*(hosing_flux(n))
+        end if
     CASE (501) ! ice-shelf water due to basal melting
         if (nzmin==1) then
            bc_surface = 0.0_WP
@@ -1933,5 +2100,176 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
       stop
   END SELECT
   RETURN
+END FUNCTION
 
-end function bc_surface
+!===============================================================================
+! This function returns a boundary conditions for a specified transient tracer ID and surface node.
+! Different to function bc_surface, SST, SSS, and sea ice concentrations are always needed as
+! auxiliary variable
+FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit, mesh)
+  use MOD_MESH
+  USE MOD_PARTIT
+  USE MOD_PARSUP
+  USE o_ARRAYS
+  USE g_forcing_arrays
+  USE g_config
+  use g_clock
+  use mod_transit
+  implicit none
+
+  integer,       intent(in)            :: n, id, nzmin
+  real(kind=WP), intent(in)            :: sst, sss, aice, sval
+  type(t_partit),intent(inout), target :: partit
+  type(t_mesh),  intent(in), target    :: mesh
+  REAL(kind=WP)                        :: transit_bc_surface
+  character(len=10)                    :: id_string
+
+
+  !  --> is_nonlinfs=1.0 for zelvel,zstar ....
+  !  --> is_nonlinfs=0.0 for linfs
+
+#if defined (__oasis)
+! SLP and wind speed in coupled setups. This is a makeshift solution
+! as long as the true values are not provided by the AGCM / OASIS.
+  press_a = mean_slp
+  wind_2  = speed_2(stress_atmoce_x(n), stress_atmoce_y(n))
+#else
+  press_a = press_air(n)
+  wind_2  = u_wind(n)**2 + v_wind(n)**2
+#endif
+
+! The atmospheric input of bomb 14C, CFC-12, and SF6 depends on latitude. To that effect specify
+  y_abc = mesh%geo_coord_nod2D(2,n) / rad  ! latitude of atmospheric tracer input
+  yy_nh = (10. - y_abc) * 0.05             ! interpolation weight for tropical tracer values
+
+
+  SELECT CASE (id)
+
+!   Boundary conditions for additional (transient) tracers (14C, 39Ar, CFC-12, and SF6)
+    CASE (14) !   Radiocarbon (more precisely, fractionation-corrected 14C/C):
+      if (anthro_transit) then
+!       Select atmospheric input values corresponding to the latitude
+        if (y_abc > 30.)  then
+!         Northern Hemisphere
+          r14c_a = r14c_nh(ti_transit)
+        else if (y_abc <- 30.) then
+!         Southern Hemisphere
+          r14c_a = r14c_sh(ti_transit)
+        else
+!         Tropical zone
+          r14c_a = r14c_tz(ti_transit)
+        end if
+        xCO2_a = xCO2_ti(ti_transit)
+      else if (paleo_transit) then
+        r14c_a = r14c_ti(ti_transit)
+        xCO2_a = xCO2_ti(ti_transit)
+      else
+!       Constant (global-mean) namelist values are taken
+      end if
+!     Local isotopic 14CO2/CO2 air-sea exchange flux (in m / s),
+!     since F14C is normalized to atmospheric (water) values the isotopic flux has to be
+!     corrected for precipitation or evaporation fluxes with different isotopic signatures.
+      transit_bc_surface = dt * (iso_flux("co2", sst, sss, wind_2, aice, press_a, xco2_a, r14c_a, sval, dic_0)   &
+                                 - sval * water_flux(n) * is_nonlinfs)
+
+    CASE (39) ! Argon-39 (fractionationation-corrected 39Ar/Ar)
+!     Local isotopic 39Ar/Ar air-sea exchange flux (in m / s),
+!     since F39Ar is normalized to atmospheric (water) values the isotopic flux has to be
+!     corrected for precipitation or evaporation fluxes with different isotopic signatures.
+      transit_bc_surface = dt * (iso_flux("arg", sst, sss, wind_2, aice, press_a, xarg_a, r39ar_a, sval, arg_0)  &
+                                 - sval * water_flux(n) * is_nonlinfs)
+
+    CASE (12) ! CFC-12
+      if (anthro_transit) then
+!       Select atmospheric input values corresponding to the latitude
+!       Annual values are interpolated to monthly values, this is omitted in the last simulation year
+        if (y_abc > 10.)  then       ! Northern Hemisphere
+!          Northern Hemisphere
+           xf12_a = xf12_nh(ti_transit)
+           if (ti_transit < length_transit) xf12_a = xf12_a + month * (xf12_nh(ti_transit + 1) - xf12_a) / 12.
+        else if (y_abc <- 10.) then
+!          Southern Hemisphere
+           xf12_a = xf12_sh(ti_transit)
+           if (ti_transit < length_transit) xf12_a = xf12_a + month * (xf12_sh(ti_transit + 1) - xf12_a) / 12.
+        else
+!          Tropical zone, interpolate between NH and SH
+           xf12_a = (1 - yy_nh) * xf12_nh(ti_transit) + yy_nh * xf12_sh(ti_transit)
+           if (ti_transit < length_transit) &
+             xf12_a = xf12_a + month * ((1 - yy_nh) * xf12_nh(ti_transit + 1) + yy_nh * xf12_sh(ti_transit + 1) - xf12_a) / 12.
+        end if
+      else
+!       Constant (global-mean) namelist values are taken
+      end if
+
+!     Local air-sea exchange gas flux of CFC-12 (in m / s):
+      transit_bc_surface = dt * (gas_flux("f12", sst, sss, wind_2, aice, press_a, xf12_a, sval)  &
+                                 - sval * water_flux(n) * is_nonlinfs)
+
+    CASE (6) ! SF6
+      if (anthro_transit) then
+!       Select atmospheric input values corresponding to the latitude
+!       Annual values are interpolated to monthly values, this is omitted in the last simulation year
+        if (y_abc > 10.)  then       ! Northern Hemisphere
+!         Northern Hemisphere
+          xsf6_a = xsf6_nh(ti_transit)
+          if (ti_transit < length_transit) xsf6_a = xsf6_a + month * (xsf6_nh(ti_transit + 1) - xsf6_a) / 12.
+        else if (y_abc <- 10.) then
+!         Southern Hemisphere
+          xsf6_a = xsf6_sh(ti_transit)
+          if (ti_transit < length_transit) xsf6_a = xsf6_a + month * (xsf6_sh(ti_transit + 1) - xsf6_a) / 12.
+        else
+!         Tropical zone, interpolate between NH and SH
+          xsf6_a = (1 - yy_nh) * xsf6_nh(ti_transit) + yy_nh * xsf6_sh(ti_transit)
+          if (ti_transit < length_transit) &
+            xsf6_a = xsf6_a + month * ((1 - yy_nh) * xsf6_nh(ti_transit + 1) + yy_nh * xsf6_sh(ti_transit + 1) - xsf6_a) / 12.
+        end if
+      else
+!       Constant (global-mean) namelist values are taken
+      end if
+
+!     Local air-sea exchange gas flux of SF6 (in m / s):
+      transit_bc_surface = dt * (gas_flux("sf6", sst, sss, wind_2, aice, press_a, xsf6_a, sval)  &
+                                 - sval * water_flux(n) * is_nonlinfs)
+
+!   Done with boundary conditions for (transient) tracers.
+  END SELECT
+  RETURN
+
+END FUNCTION
+
+!===============================================================================
+! divide the range specified by indexcount into fesom_group_count equal slices and calculate
+! the start_index and end_index for the given fesom_group_id.
+! if necessary to compensate for fragmentation, the end index of the first n slices
+! might be one higher than for the remaining slices. this is indicated by end_index_is_one_higher
+subroutine calc_slice(index_count, fesom_group_count, fesom_group_id, start_index, end_index, index_count_in_group, end_index_is_one_higher)
+!   use g_config
+
+    implicit none
+    integer, intent(in)      :: index_count
+    integer, intent(in)      :: fesom_group_count
+    integer, intent(in)      :: fesom_group_id
+    integer, intent(out)     :: start_index
+    integer, intent(out)     :: end_index
+    integer, intent(out)     :: index_count_in_group
+    logical, intent(out)     :: end_index_is_one_higher
+
+    integer                  :: group_id_limit_to_adjust_end_index
+
+    index_count_in_group               = index_count / fesom_group_count
+    group_id_limit_to_adjust_end_index = mod(index_count, fesom_group_count)
+    start_index                        = (fesom_group_id * index_count_in_group) + 1
+
+! adjust loop start and number of loop iterations by 1 if necessary
+    if(fesom_group_id < group_id_limit_to_adjust_end_index) then
+      start_index = start_index + fesom_group_id
+      index_count_in_group = index_count_in_group + 1
+      end_index_is_one_higher = .true.
+    else
+      start_index = start_index + group_id_limit_to_adjust_end_index
+      end_index_is_one_higher = .false.
+    end if
+
+    end_index  = start_index + index_count_in_group - 1
+end subroutine calc_slice
+

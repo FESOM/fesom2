@@ -16,7 +16,7 @@ MODULE g_ic3d
    USE MOD_PARTIT
    USE MOD_PARSUP
    USE MOD_TRACER
-   USE o_PARAM, only: mstep
+   USE o_PARAM, only: mstep, pi
    USE g_comm_auto
    USE g_support
    USE g_config, only: dummy, ClimateDataPath, use_cavity
@@ -637,7 +637,9 @@ CONTAINS
       call MPI_AllREDUCE(locSmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  `-> gobal min init. salt. =', glo      
 #if defined(__recom)
-
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
       if (partit%mype==0) write(*,*) "Sanity check for REcoM variables"
       call MPI_AllREDUCE(locDINmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal max init. DIN. =', glo
@@ -664,6 +666,9 @@ CONTAINS
       if (partit%mype==0) write(*,*) '  |-> gobal max init. O2. =', glo
       call MPI_AllREDUCE(locO2min , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  `-> gobal min init. O2. =', glo
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
 #endif
       
       ! Apply perturbations based on selected mode
@@ -932,7 +937,7 @@ CONTAINS
          if (rtemp1 < 1.0e-10_WP) rtemp1 = 1.0e-10_WP
          
          ! Box-Muller: generate standard normal, then scale by std_dev
-         rnum = param2 * sqrt(-2.0_WP * log(rtemp1)) * cos(2.0_WP * 3.14159265359_WP * rtemp2)
+         rnum = param2 * sqrt(-2.0_WP * log(rtemp1)) * cos(2.0_WP * pi * rtemp2)
          
      case default
          ! Default to uniform if unknown method
