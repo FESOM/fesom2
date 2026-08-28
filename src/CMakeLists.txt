@@ -98,6 +98,62 @@ endif()
 message(STATUS "ENABLE_IFS_INTERFACE: ${ENABLE_IFS_INTERFACE}")
 
 
+# ---------------------------------------------------------------------------
+# Single precision is not yet supported in any coupled configuration.
+#
+# The coupling and interface layers were written when WP was unconditionally
+# real64 and still assume it:
+#
+#   * cpl_driver.F90 and gen_forcing_couple.F90 pass MPI_DOUBLE_PRECISION for
+#     buffers declared real(kind=WP) (cpl_driver.F90:608,614,620,625,627,988
+#     and 8 further sites in gen_forcing_couple.F90). With WP=real32 MPI reads
+#     eight bytes out of a four-byte variable -- memory corruption, not a
+#     precision question, and invisible in a double-precision build because
+#     there real64 == WP.
+#
+#   * The OASIS exchange buffers exfld and cplsnd (cpl_driver.F90:79-80) are
+#     real(kind=WP), so a single-precision build would hand the coupler single
+#     precision where the partner model may expect double.
+#
+# None of this is exercised by any test: there is no coupled CTest, so a
+# single-precision coupled build would fail silently at runtime rather than
+# loudly at build time. Refuse it at configure time until the interfaces are
+# typed explicitly and a coupled test exists to validate them.
+#
+# Set FESOM_ALLOW_SINGLE_PRECISION_COUPLED=ON to override -- intended for
+# developing the fix itself, not for production runs.
+# ---------------------------------------------------------------------------
+option(FESOM_ALLOW_SINGLE_PRECISION_COUPLED
+       "Override the guard refusing single-precision coupled builds (unvalidated)" OFF)
+
+if(USE_SINGLE_PRECISION AND NOT FESOM_ALLOW_SINGLE_PRECISION_COUPLED)
+   set(_fesom_sp_coupled_modes "")
+   if(FESOM_COUPLED)
+      list(APPEND _fesom_sp_coupled_modes "FESOM_COUPLED (OASIS)")
+   endif()
+   if(OIFS_COUPLED)
+      list(APPEND _fesom_sp_coupled_modes "OIFS_COUPLED (OpenIFS)")
+   endif()
+   if(USE_YAC)
+      list(APPEND _fesom_sp_coupled_modes "USE_YAC (YAC)")
+   endif()
+   if(ENABLE_IFS_INTERFACE)
+      list(APPEND _fesom_sp_coupled_modes "ENABLE_IFS_INTERFACE (IFS interface)")
+   endif()
+   if(_fesom_sp_coupled_modes)
+      string(REPLACE ";" ", " _fesom_sp_coupled_modes "${_fesom_sp_coupled_modes}")
+      message(FATAL_ERROR
+         "USE_SINGLE_PRECISION=ON is not supported together with: ${_fesom_sp_coupled_modes}.\n"
+         "The coupling interfaces still assume WP is real64 and pass "
+         "MPI_DOUBLE_PRECISION for real(kind=WP) buffers, which corrupts memory "
+         "when WP is real32. There is no coupled test to validate a fix against, "
+         "so this combination is refused rather than run silently.\n"
+         "Build coupled configurations in double precision (USE_SINGLE_PRECISION=OFF), "
+         "or set FESOM_ALLOW_SINGLE_PRECISION_COUPLED=ON if you are developing the fix.")
+   endif()
+endif()
+
+
 set(ENABLE_MULTIO_DEFAULT OFF)
 if(ENABLE_IFS_INTERFACE)
    if(USE_ICEPACK)
