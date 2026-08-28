@@ -59,6 +59,66 @@ if(BUILD_YAC)
     include(cmake/BuildYAC.cmake)
 endif()
 
+# Compile-time diagnostics. "strict" stops suppressing argument mismatches, which
+# gfortran >=10 then reports as errors.
+set(FESOM_BUILD_CHECKS "off" CACHE STRING "Compile-time diagnostics: off | warn | strict")
+set_property(CACHE FESOM_BUILD_CHECKS PROPERTY STRINGS off warn strict)
+
+set(FESOM_BUILD_CHECK_FLAGS "")
+set(FESOM_ALLOW_ARG_MISMATCH ON)
+if(NOT FESOM_BUILD_CHECKS STREQUAL "off")
+   if(NOT FESOM_BUILD_CHECKS MATCHES "^(warn|strict)$")
+      message(FATAL_ERROR "FESOM_BUILD_CHECKS must be one of: off, warn, strict (got '${FESOM_BUILD_CHECKS}')")
+   endif()
+   if(FESOM_BUILD_CHECKS STREQUAL "strict")
+      set(FESOM_ALLOW_ARG_MISMATCH OFF)
+   endif()
+
+   if(CMAKE_Fortran_COMPILER_ID STREQUAL GNU)
+      set(FESOM_BUILD_CHECK_FLAGS -Wall -Wextra -Wno-unused-dummy-argument -Wno-compare-reals)
+   elseif(CMAKE_Fortran_COMPILER_ID STREQUAL Intel OR CMAKE_Fortran_COMPILER_ID STREQUAL IntelLLVM)
+      set(FESOM_BUILD_CHECK_FLAGS -warn all,noexternals)
+   else()
+      message(WARNING "FESOM_BUILD_CHECKS=${FESOM_BUILD_CHECKS}: no flag mapping for compiler ${CMAKE_Fortran_COMPILER_ID}.")
+   endif()
+   message(STATUS "FESOM_BUILD_CHECKS=${FESOM_BUILD_CHECKS} (allow argument mismatch: ${FESOM_ALLOW_ARG_MISMATCH})")
+endif()
+
+# Runtime diagnostics for development builds. Appended after the production flags,
+# so they win on -O and -finit-*; must be set here to reach mesh_part too.
+set(FESOM_RUNTIME_CHECKS "off" CACHE STRING "Runtime diagnostics for development builds: off | checks | paranoid")
+set_property(CACHE FESOM_RUNTIME_CHECKS PROPERTY STRINGS off checks paranoid)
+
+set(FESOM_RUNTIME_CHECK_FLAGS "")
+if(NOT FESOM_RUNTIME_CHECKS STREQUAL "off")
+   if(NOT FESOM_RUNTIME_CHECKS MATCHES "^(checks|paranoid)$")
+      message(FATAL_ERROR "FESOM_RUNTIME_CHECKS must be one of: off, checks, paranoid (got '${FESOM_RUNTIME_CHECKS}')")
+   endif()
+
+   if(CMAKE_Fortran_COMPILER_ID STREQUAL GNU)
+      if(FESOM_RUNTIME_CHECKS STREQUAL "paranoid")
+         set(FESOM_RUNTIME_CHECK_FLAGS -fcheck=all -fbacktrace
+                                       -ffpe-trap=invalid,zero,overflow
+                                       -finit-real=snan -finit-integer=-9999)
+      else()
+         set(FESOM_RUNTIME_CHECK_FLAGS -fcheck=bounds -fbacktrace)
+      endif()
+   elseif(CMAKE_Fortran_COMPILER_ID STREQUAL Intel OR CMAKE_Fortran_COMPILER_ID STREQUAL IntelLLVM)
+      if(FESOM_RUNTIME_CHECKS STREQUAL "paranoid")
+         set(FESOM_RUNTIME_CHECK_FLAGS -check all -traceback -fpe0 -init=snan,arrays)
+      else()
+         set(FESOM_RUNTIME_CHECK_FLAGS -check bounds -traceback)
+      endif()
+   else()
+      message(WARNING "FESOM_RUNTIME_CHECKS=${FESOM_RUNTIME_CHECKS}: no flag mapping for compiler ${CMAKE_Fortran_COMPILER_ID}; building without runtime checks.")
+   endif()
+
+   if(FESOM_RUNTIME_CHECK_FLAGS)
+      string(REPLACE ";" " " _fesom_checks_pretty "${FESOM_RUNTIME_CHECK_FLAGS}")
+      message(STATUS "FESOM_RUNTIME_CHECKS=${FESOM_RUNTIME_CHECKS} -> ${_fesom_checks_pretty}")
+   endif()
+endif()
+
 #add_subdirectory(oasis3-mct/lib/psmile)
 add_subdirectory(src)
 

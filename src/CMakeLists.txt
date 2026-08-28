@@ -461,7 +461,7 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
    else()
       target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  ${_FESOM_GNU_RKIND} -ffree-line-length-none -cpp)
    endif()
-   if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+   if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU" AND FESOM_ALLOW_ARG_MISMATCH)
       if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
          target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
       else()
@@ -566,6 +566,8 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
    endif()
 endif()
 
+target_compile_options(${PROJECT_NAME} PRIVATE ${FESOM_RUNTIME_CHECK_FLAGS} ${FESOM_BUILD_CHECK_FLAGS})
+
 target_include_directories(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_INCLUDE_DIRECTORIES} ${OASIS_Fortran_INCLUDE_DIRECTORIES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTORIES} ${MPEU_Fortran_INCLUDE_DIRECTORIES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${SCRIP_Fortran_INCLUDE_DIRECTORIES})
@@ -602,11 +604,13 @@ endif()
    
 # fesom.x executable
 add_executable(${PROJECT_NAME}.x ${src_home}/fesom_main.F90)
+target_compile_options(${PROJECT_NAME}.x PRIVATE ${FESOM_RUNTIME_CHECK_FLAGS} ${FESOM_BUILD_CHECK_FLAGS})
 target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
 
 # fesom_meshdiag executable (optional)
 if(BUILD_MESHDIAG)
     add_executable(fesom_meshdiag ${src_home}/fesom_meshdiag.F90)
+    target_compile_options(fesom_meshdiag PRIVATE ${FESOM_RUNTIME_CHECK_FLAGS} ${FESOM_BUILD_CHECK_FLAGS})
     target_link_libraries(fesom_meshdiag PUBLIC ${PROJECT_NAME})
     target_link_libraries(fesom_meshdiag PRIVATE MPI::MPI_Fortran)
     
