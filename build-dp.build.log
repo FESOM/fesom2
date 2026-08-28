@@ -1,183 +1,121 @@
+[fesom]
+-- ASYNCHRONOUS I/O THREADS @ notset: OFF
+-- ENABLE_OPENACC: OFF
+-- ENABLE_OPENMP: OFF
+-- RECOM_COUPLED: OFF
+-- USE_ICEPACK: OFF
+-- USE_SINGLE_PRECISION: OFF
+-- ENABLE_IFS_INTERFACE: OFF
+-- ENABLE_MULTIO: OFF
+-- System NetCDF-Fortran is compatible with GNU compiler
+-- Found MPI: TRUE (found version "3.1") found components: C Fortran
+-- CVMIX: ON
+CMake Deprecation Warning at build-dp/_deps/cvmix-src/CMakeLists.txt:1 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+
+
+-- Turning SHARED builds OFF
+-- Mesh diagnostics utility will be built as fesom_meshdiag
+--  --> Final Compile options for fesom: -O3;-ffloat-store;-finit-local-zero;-finline-functions;-fimplicit-none;-fdefault-real-8;-fdefault-double-8;-ffree-line-length-none;-cpp;-fallow-argument-mismatch
+-- Found MPI: TRUE (found version "3.1")
+-- MPI testing setup complete:
+--   MPIEXEC_EXECUTABLE: /usr/bin/mpiexec
+--   MPIEXEC_NUMPROC_FLAG: -n
+-- FESOM2 Testing Configuration:
+--   MPI tests: ON
+--   Test timeout: 600s
+--   Test data directory: /tmp/claude-1000/-home-suvarchal-AWI-FESOM2-model-fesom2-support-sp-wt/99b4dfad-be65-4ace-97a9-599685cecae2/scratchpad/wt-supportsp-merge/tests/data
+--   MPI executable: /usr/bin/mpiexec
+-- Added FESOM test: integration_pi_mpi2 with mesh: pi, cavity: .false.
+-- Added FESOM test: integration_pi_mpi8 with mesh: pi, cavity: .false.
+-- Added FESOM test: integration_pi_cavity_mpi2 with mesh: pi_cavity, cavity: .true.
+-- Added FESOM test: integration_pi_cvmix_tke_mpi2 with mesh: pi, cavity: .false.
+-- Added FESOM test: integration_pi_cvmix_kpp_mpi2 with mesh: pi, cavity: .false.
+-- Added FESOM test: integration_pi_jra_mpi2 with mesh: pi, cavity: .false.
+-- Adding meshdiag tests...
+-- Added FESOM meshdiag test: integration_meshdiag_pi_mpi2 with mesh: pi, runid: fesom
+-- Added FESOM meshdiag test: integration_meshdiag_pi_mpi8 with mesh: pi, runid: fesom
+-- Adding mesh partitioner tests...
+-- Added mesh partitioner tests for local meshes
+-- Remote mesh pipeline component availability:
+--   Download capability: TRUE
+--     - wget: /usr/bin/wget
+--     - curl: /usr/bin/curl
+--   Mesh partitioner: ON
+--   Mesh diagnostics: ON
+-- Adding CORE2 remote mesh download test...
+-- Added mesh download fixture: remote_download_mesh_core2
+-- Added mesh partition fixture: remote_partition_mesh_core2_16
+-- Added complete mesh pipeline for 'core2' with process counts: 16
+-- Adding CORE2 mesh partitioning test...
+-- Adding CORE2 mesh diagnostics test...
+-- Added FESOM meshdiag test: remote_generate_meshdiag_core2_mpi16 with mesh: core2, runid: fesom
+-- Adding DARS remote mesh download test...
+-- Added mesh download fixture: remote_download_mesh_dars
+-- Added mesh partition fixture: remote_partition_mesh_dars_128
+-- Added complete mesh pipeline for 'dars' with process counts: 128
+-- Adding DARS mesh partitioning test...
+-- Adding DARS mesh diagnostics test...
+-- Added FESOM meshdiag test: remote_generate_meshdiag_dars_mpi128 with mesh: dars, runid: fesom
+-- Adding PI remote mesh download test...
+-- Added mesh download fixture: remote_download_mesh_pi_remote
+-- Added mesh partition fixture: remote_partition_mesh_pi_remote_8
+-- Added complete mesh pipeline for 'pi_remote' with process counts: 8
+-- Adding PI remote mesh partitioning test...
+-- Adding PI remote mesh diagnostics test...
+-- Added FESOM meshdiag test: remote_generate_meshdiag_pi_remote_mpi8 with mesh: pi_remote, runid: fesom
+-- Adding NG5 remote mesh download test...
+-- Added mesh download fixture: remote_download_mesh_ng5
+-- Added mesh partition fixture: remote_partition_mesh_ng5_128
+-- Added complete mesh pipeline for 'ng5' with process counts: 128
+-- Adding NG5 mesh partitioning test...
+-- Adding NG5 mesh diagnostics test...
+-- Added FESOM meshdiag test: remote_generate_meshdiag_ng5_mpi128 with mesh: ng5, runid: fesom
+-- Adding ORCA25 remote mesh download test...
+-- Added mesh download fixture: remote_download_mesh_orca25
+-- Added mesh partition fixture: remote_partition_mesh_orca25_128
+-- Added complete mesh pipeline for 'orca25' with process counts: 128
+-- Adding ORCA25 mesh partitioning test...
+-- Adding ORCA25 mesh diagnostics test...
+-- Added FESOM meshdiag test: remote_generate_meshdiag_orca25_mpi128 with mesh: orca25, runid: fesom
+-- Found ecbundle tools:
+--   ecbundle-create: /home/suvarchal/.local/bin/ecbundle-create
+--   ecbundle-build: /home/suvarchal/.local/bin/ecbundle-build
+-- Configuring mesh partitioner as part of the main build
+[fesom_meshpart]
+-- Building as part of FESOM main build
+-- Source directory: /tmp/claude-1000/-home-suvarchal-AWI-FESOM2-model-fesom2-support-sp-wt/99b4dfad-be65-4ace-97a9-599685cecae2/scratchpad/wt-supportsp-merge/mesh_part/../src
+-- METIS root: /tmp/claude-1000/-home-suvarchal-AWI-FESOM2-model-fesom2-support-sp-wt/99b4dfad-be65-4ace-97a9-599685cecae2/scratchpad/wt-supportsp-merge/mesh_part/../lib/metis-5.1.0
+-- Using METIS from: /tmp/claude-1000/-home-suvarchal-AWI-FESOM2-model-fesom2-support-sp-wt/99b4dfad-be65-4ace-97a9-599685cecae2/scratchpad/wt-supportsp-merge/mesh_part/../lib/metis-5.1.0
+-- checking for thread-local storage - found
+-- Mesh partitioner will be built as part of the main build
+-- Configuring done (6.2s)
+-- Generating done (0.1s)
+-- Build files have been written to: /tmp/claude-1000/-home-suvarchal-AWI-FESOM2-model-fesom2-support-sp-wt/99b4dfad-be65-4ace-97a9-599685cecae2/scratchpad/wt-supportsp-merge/build-dp
 [  1%] Determining fesom git SHA ...
-[  1%] Building CXX object src/async_threads_cpp/CMakeFiles/async_threads_cpp.dir/ThreadsManager.cpp.o
-[  1%] Building CXX object src/async_threads_cpp/CMakeFiles/async_threads_cpp.dir/ThreadsManagerFC.cpp.o
-[  1%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/error.c.o
-[  1%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/b64.c.o
-[  2%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/blas.c.o
-[  2%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/gkregex.c.o
-[  2%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/csr.c.o
-[  3%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/evaluate.c.o
-[  3%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/htable.c.o
-[  3%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/fkvkselect.c.o
-[  4%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/io.c.o
-[  5%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/fs.c.o
-[  5%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/getopt.c.o
-[  5%] Building Fortran object _deps/cvmix-build/src/CMakeFiles/cvmix_objects.dir/shared/cvmix_kinds_and_types.F90.o
-[  6%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/graph.c.o
-[  6%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/itemsets.c.o
-/tmp/claude-1000/-home-suvarchal-AWI-FESOM2-model-fesom2-support-sp-wt/99b4dfad-be65-4ace-97a9-599685cecae2/scratchpad/wt-supportsp-merge/lib/metis-5.1.0/GKlib/csr.c: In function ‘gk_csr_Normalize’:
-/tmp/claude-1000/-home-suvarchal-AWI-FESOM2-model-fesom2-support-sp-wt/99b4dfad-be65-4ace-97a9-599685cecae2/scratchpad/wt-supportsp-merge/lib/metis-5.1.0/GKlib/csr.c:1344:14: warning: this ‘if’ clause does not guard... [-Wmisleading-indentation]
- 1344 |         else if (norm == 1)
-      |              ^~
-/tmp/claude-1000/-home-suvarchal-AWI-FESOM2-model-fesom2-support-sp-wt/99b4dfad-be65-4ace-97a9-599685cecae2/scratchpad/wt-supportsp-merge/lib/metis-5.1.0/GKlib/csr.c:1346:11: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the ‘if’
- 1346 |           for (j=ptr[i]; j<ptr[i+1]; j++)
-      |           ^~~
-/tmp/claude-1000/-home-suvarchal-AWI-FESOM2-model-fesom2-support-sp-wt/99b4dfad-be65-4ace-97a9-599685cecae2/scratchpad/wt-supportsp-merge/lib/metis-5.1.0/GKlib/csr.c:1371:14: warning: this ‘if’ clause does not guard... [-Wmisleading-indentation]
- 1371 |         else if (norm == 1)
-      |              ^~
-/tmp/claude-1000/-home-suvarchal-AWI-FESOM2-model-fesom2-support-sp-wt/99b4dfad-be65-4ace-97a9-599685cecae2/scratchpad/wt-supportsp-merge/lib/metis-5.1.0/GKlib/csr.c:1373:11: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the ‘if’
- 1373 |           for (j=ptr[i]; j<ptr[i+1]; j++)
-      |           ^~~
-[  6%] Built target fesom_version_info-generated.F90
-[  6%] Building Fortran object _deps/cvmix-build/src/CMakeFiles/cvmix_objects.dir/shared/cvmix_utils.F90.o
-/tmp/claude-1000/-home-suvarchal-AWI-FESOM2-model-fesom2-support-sp-wt/99b4dfad-be65-4ace-97a9-599685cecae2/scratchpad/wt-supportsp-merge/lib/metis-5.1.0/GKlib/getopt.c: In function ‘gk_getopt_internal’:
-/tmp/claude-1000/-home-suvarchal-AWI-FESOM2-model-fesom2-support-sp-wt/99b4dfad-be65-4ace-97a9-599685cecae2/scratchpad/wt-supportsp-merge/lib/metis-5.1.0/GKlib/getopt.c:343:5: warning: this ‘if’ clause does not guard... [-Wmisleading-indentation]
-  343 |     if (gk_optind == 0)
-      |     ^~
-/tmp/claude-1000/-home-suvarchal-AWI-FESOM2-model-fesom2-support-sp-wt/99b4dfad-be65-4ace-97a9-599685cecae2/scratchpad/wt-supportsp-merge/lib/metis-5.1.0/GKlib/getopt.c:345:7: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the ‘if’
-  345 |       optstring = gk_getopt_initialize (argc, argv, optstring);
-      |       ^~~~~~~~~
-/tmp/claude-1000/-home-suvarchal-AWI-FESOM2-model-fesom2-support-sp-wt/99b4dfad-be65-4ace-97a9-599685cecae2/scratchpad/wt-supportsp-merge/lib/metis-5.1.0/GKlib/getopt.c:700:9: warning: this ‘else’ clause does not guard... [-Wmisleading-indentation]
-  700 |         else
-      |         ^~~~
-/tmp/claude-1000/-home-suvarchal-AWI-FESOM2-model-fesom2-support-sp-wt/99b4dfad-be65-4ace-97a9-599685cecae2/scratchpad/wt-supportsp-merge/lib/metis-5.1.0/GKlib/getopt.c:703:11: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the ‘else’
-  703 |           nextchar = NULL;
-      |           ^~~~~~~~
-[  6%] Building Fortran object _deps/cvmix-build/src/CMakeFiles/cvmix_objects.dir/shared/cvmix_math.F90.o
-[  6%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/mcore.c.o
-[  7%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/memory.c.o
-[  7%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/omp.c.o
-[  8%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/pdb.c.o
-[  8%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/pqueue.c.o
-[  9%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/random.c.o
-[ 10%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/sort.c.o
-[ 10%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/rw.c.o
-[ 10%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/seq.c.o
-[ 10%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/string.c.o
-[ 11%] Building Fortran object _deps/cvmix-build/src/CMakeFiles/cvmix_objects.dir/shared/cvmix_put_get.F90.o
-[ 12%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/timers.c.o
-[ 12%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/tokenizer.c.o
-[ 12%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/__/GKlib/util.c.o
-[ 13%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/auxapi.c.o
-[ 13%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/balance.c.o
-[ 14%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/bucketsort.c.o
-[ 14%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/checkgraph.c.o
-[ 14%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/coarsen.c.o
-[ 15%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/compress.c.o
-[ 15%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/contig.c.o
-[ 16%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/debug.c.o
-[ 16%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/fortran.c.o
-[ 16%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/fm.c.o
-[ 17%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/frename.c.o
-[ 17%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/gklib.c.o
-[ 18%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/graph.c.o
-[ 18%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/kmetis.c.o
-[ 18%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/initpart.c.o
-[ 19%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/kwayfm.c.o
-[ 19%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/kwayrefine.c.o
-[ 20%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/mcutil.c.o
-[ 20%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/mesh.c.o
-[ 20%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/meshpart.c.o
-[ 21%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/minconn.c.o
-[ 21%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/mincover.c.o
-[ 22%] Building Fortran object _deps/cvmix-build/src/CMakeFiles/cvmix_objects.dir/shared/cvmix_background.F90.o
-[ 23%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/mmd.c.o
-[ 23%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/ometis.c.o
-[ 25%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/options.c.o
-[ 25%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/parmetis.c.o
-[ 25%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/pmetis.c.o
-[ 26%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/refine.c.o
-[ 26%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/separator.c.o
-[ 27%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/sfm.c.o
-[ 27%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/srefine.c.o
-[ 27%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/stat.c.o
-[ 28%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/timing.c.o
-[ 28%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/util.c.o
-[ 28%] Built target async_threads_cpp
-[ 28%] Building Fortran object _deps/cvmix-build/src/CMakeFiles/cvmix_objects.dir/shared/cvmix_convection.F90.o
-[ 29%] Building C object mesh_part/metis/libmetis/CMakeFiles/metis.dir/wspace.c.o
-[ 30%] Building Fortran object _deps/cvmix-build/src/CMakeFiles/cvmix_objects.dir/shared/cvmix_ddiff.F90.o
-[ 30%] Building Fortran object _deps/cvmix-build/src/CMakeFiles/cvmix_objects.dir/shared/cvmix_kpp.F90.o
-[ 30%] Building Fortran object _deps/cvmix-build/src/CMakeFiles/cvmix_objects.dir/shared/cvmix_shear.F90.o
-[ 31%] Building Fortran object _deps/cvmix-build/src/CMakeFiles/cvmix_objects.dir/shared/cvmix_tidal.F90.o
-[ 31%] Linking C static library ../../../lib/libmetis.a
+[  1%] Built target async_threads_cpp
+[  5%] Built target cvmix_objects
+[  5%] Built target cvmix_static
+[  5%] Built target fesom_version_info-generated.F90
 [ 31%] Built target metis
-[ 33%] Building C object mesh_part/metis/programs/CMakeFiles/ndmetis.dir/cmdline_ndmetis.c.o
-[ 33%] Building C object mesh_part/metis/programs/CMakeFiles/gpmetis.dir/io.c.o
-[ 33%] Building C object mesh_part/metis/programs/CMakeFiles/mpmetis.dir/mpmetis.c.o
-[ 34%] Building C object mesh_part/CMakeFiles/fesom_meshpart_C.dir/__/src/fort_part.c.o
-[ 34%] Building C object mesh_part/metis/programs/CMakeFiles/gpmetis.dir/gpmetis.c.o
-[ 34%] Building C object mesh_part/metis/programs/CMakeFiles/gpmetis.dir/cmdline_gpmetis.c.o
-[ 34%] Building C object mesh_part/metis/programs/CMakeFiles/ndmetis.dir/ndmetis.c.o
-[ 34%] Building C object mesh_part/metis/programs/CMakeFiles/m2gmetis.dir/m2gmetis.c.o
-[ 34%] Building C object mesh_part/metis/programs/CMakeFiles/ndmetis.dir/io.c.o
-[ 34%] Building C object mesh_part/metis/programs/CMakeFiles/graphchk.dir/graphchk.c.o
-[ 35%] Building C object mesh_part/metis/programs/CMakeFiles/mpmetis.dir/cmdline_mpmetis.c.o
-[ 36%] Building C object mesh_part/metis/programs/CMakeFiles/m2gmetis.dir/cmdline_m2gmetis.c.o
-[ 36%] Building C object mesh_part/metis/programs/CMakeFiles/gpmetis.dir/stat.c.o
-[ 36%] Building C object mesh_part/metis/programs/CMakeFiles/mpmetis.dir/io.c.o
-[ 37%] Building C object mesh_part/metis/programs/CMakeFiles/cmpfillin.dir/cmpfillin.c.o
-[ 38%] Building C object mesh_part/metis/programs/CMakeFiles/mpmetis.dir/stat.c.o
-[ 38%] Building C object mesh_part/metis/programs/CMakeFiles/graphchk.dir/io.c.o
-[ 38%] Building C object mesh_part/metis/programs/CMakeFiles/m2gmetis.dir/io.c.o
-[ 38%] Building C object mesh_part/metis/programs/CMakeFiles/cmpfillin.dir/io.c.o
-[ 39%] Building C object mesh_part/metis/programs/CMakeFiles/cmpfillin.dir/smbfactor.c.o
-[ 40%] Building C object mesh_part/metis/programs/CMakeFiles/ndmetis.dir/smbfactor.c.o
-[ 40%] Linking C shared library ../lib/libfesom_meshpart_C.so
-[ 40%] Built target fesom_meshpart_C
-[ 40%] Building Fortran object mesh_part/CMakeFiles/fesom_meshpart.dir/__/src/oce_modules.F90.o
-[ 41%] Linking C executable ../../../bin/gpmetis
-[ 42%] Linking C executable ../../../bin/graphchk
-[ 42%] Linking C executable ../../../bin/mpmetis
-[ 42%] Linking C executable ../../../bin/cmpfillin
-[ 42%] Linking C executable ../../../bin/ndmetis
-[ 42%] Building Fortran object mesh_part/CMakeFiles/fesom_meshpart.dir/__/src/MOD_READ_BINARY_ARRAYS.F90.o
-[ 42%] Building Fortran object mesh_part/CMakeFiles/fesom_meshpart.dir/__/src/MOD_WRITE_BINARY_ARRAYS.F90.o
-[ 43%] Building Fortran object mesh_part/CMakeFiles/fesom_meshpart.dir/__/src/gen_modules_config.F90.o
-[ 43%] Built target graphchk
-[ 43%] Built target cmpfillin
-[ 43%] Built target mpmetis
-[ 43%] Built target gpmetis
-[ 43%] Built target ndmetis
-[ 43%] Linking C executable ../../../bin/m2gmetis
-[ 43%] Building Fortran object mesh_part/CMakeFiles/fesom_meshpart.dir/__/src/gen_modules_rotate_grid.F90.o
-[ 43%] Built target cvmix_objects
-[ 43%] Built target m2gmetis
-[ 43%] Linking Fortran static library ../../lib/libcvmix.a
-[ 43%] Built target cvmix_static
-[ 44%] Building Fortran object mesh_part/CMakeFiles/fesom_meshpart.dir/__/src/MOD_MESH.F90.o
-[ 45%] Building Fortran object mesh_part/CMakeFiles/fesom_meshpart.dir/__/src/MOD_PARTIT.F90.o
-[ 46%] Building Fortran object src/CMakeFiles/fesom.dir/oce_modules.F90.o
-[ 47%] Building Fortran object src/CMakeFiles/fesom.dir/async_threads_module.F90.o
-[ 48%] Building Fortran object src/CMakeFiles/fesom.dir/info_module.F90.o
-[ 50%] Building Fortran object src/CMakeFiles/fesom.dir/mpi_topology_module.F90.o
-[ 50%] Building Fortran object src/CMakeFiles/fesom.dir/cvmix_driver/cvmix_kinds_and_types_addon.F90.o
-[ 50%] Building Fortran object src/CMakeFiles/fesom.dir/cvmix_driver/cvmix_utils_addon.F90.o
-[ 51%] Building Fortran object src/CMakeFiles/fesom.dir/fortran_utils.F90.o
-[ 52%] Building Fortran object src/CMakeFiles/fesom.dir/io_netcdf_nf_interface.F90.o
-[ 52%] Building Fortran object src/CMakeFiles/fesom.dir/forcing_provider_netcdf_module.F90.o
-[ 52%] Building Fortran object src/CMakeFiles/fesom.dir/fesom_rtdiagnostics.F90.o
-[ 52%] Building Fortran object src/CMakeFiles/fesom.dir/io_netcdf_attribute_module.F90.o
-[ 52%] Building Fortran object src/CMakeFiles/fesom.dir/fesom_version_info-generated.F90.o
-[ 53%] Building Fortran object src/CMakeFiles/fesom.dir/nvfortran_subarray_workaround.F90.o
-[ 53%] Building Fortran object src/CMakeFiles/fesom.dir/ice_modules.F90.o
-[ 53%] Building Fortran object src/CMakeFiles/fesom.dir/io_netcdf_module.F90.o
-[ 53%] Building Fortran object src/CMakeFiles/fesom.dir/command_line_options.F90.o
-[ 53%] Building Fortran object src/CMakeFiles/fesom.dir/gen_modules_config.F90.o
-[ 53%] Building Fortran object src/CMakeFiles/fesom.dir/mod_transit.F90.o
-[ 53%] Building Fortran object src/CMakeFiles/fesom.dir/MOD_WRITE_BINARY_ARRAYS.F90.o
-[ 53%] Building Fortran object src/CMakeFiles/fesom.dir/MOD_READ_BINARY_ARRAYS.F90.o
-[ 53%] Building Fortran object src/CMakeFiles/fesom.dir/ice_meltponds.F90.o
-[ 53%] Building Fortran object src/CMakeFiles/fesom.dir/gen_modules_forcing.F90.o
-[ 53%] Building Fortran object src/CMakeFiles/fesom.dir/io_data_strategy.F90.o
-[ 54%] Building Fortran object src/CMakeFiles/fesom.dir/mod_tracks_geometry.F90.o
-[ 55%] Building Fortran object src/CMakeFiles/fesom.dir/gen_modules_rotate_grid.F90.o
-[ 56%] Building Fortran object src/CMakeFiles/fesom.dir/cvmix_driver/cvmix_idemix.F90.o
-[ 57%] Building Fortran object src/CMakeFiles/fesom.dir/cvmix_driver/cvmix_tke.F90.o
-[ 58%] Building Fortran object src/CMakeFiles/fesom.dir/fesom_profiler.F90.o
-[ 58%] Building Fortran object mesh_part/CMakeFiles/fesom_meshpart.dir/__/src/gen_modules_partitioning.F90.o
-[ 59%] Building Fortran object mesh_part/CMakeFiles/fesom_meshpart.dir/__/src/fvom_init.F90.o
-[ 60%] Building Fortran object src/CMakeFiles/fesom.dir/io_netcdf_file_module.F90.o
+[ 32%] Built target fesom_meshpart_C
+[ 33%] Built target m2gmetis
+[ 35%] Built target mpmetis
+[ 37%] Built target gpmetis
+[ 38%] Built target graphchk
+[ 40%] Built target ndmetis
+[ 42%] Built target cmpfillin
+[ 43%] Building Fortran object mesh_part/CMakeFiles/fesom_meshpart.dir/__/src/MOD_MESH.F90.o
+[ 44%] Building Fortran object src/CMakeFiles/fesom.dir/MOD_DYN.F90.o
+[ 45%] Building Fortran object src/CMakeFiles/fesom.dir/MOD_MESH.F90.o
+[ 45%] Building Fortran object src/CMakeFiles/fesom.dir/fesom_version_info-generated.F90.o
+[ 45%] Building Fortran object mesh_part/CMakeFiles/fesom_meshpart.dir/__/src/gen_modules_partitioning.F90.o
+[ 46%] Building Fortran object mesh_part/CMakeFiles/fesom_meshpart.dir/__/src/fvom_init.F90.o
 /tmp/claude-1000/-home-suvarchal-AWI-FESOM2-model-fesom2-support-sp-wt/99b4dfad-be65-4ace-97a9-599685cecae2/scratchpad/wt-supportsp-merge/src/fvom_init.F90:1693:0:
 
  1693 | #include "associate_part_ass.h" !only my
@@ -186,18 +124,10 @@ Warning: extra tokens at end of ‘#include’ directive
 
  1836 | #include "associate_part_ass.h" !just for partit%part
 Warning: extra tokens at end of ‘#include’ directive
-[ 61%] Building Fortran object src/CMakeFiles/fesom.dir/MOD_DYN.F90.o
-[ 62%] Building Fortran object src/CMakeFiles/fesom.dir/MOD_MESH.F90.o
-[ 62%] Building Fortran object src/CMakeFiles/fesom.dir/MOD_PARTIT.F90.o
-[ 63%] Building Fortran object src/CMakeFiles/fesom.dir/MOD_TRACER.F90.o
-[ 63%] Building Fortran object src/CMakeFiles/fesom.dir/forcing_lookahead_reader_module.F90.o
-[ 64%] Building Fortran object src/CMakeFiles/fesom.dir/forcing_provider_async_module.F90.o
-[ 65%] Building Fortran object src/CMakeFiles/fesom.dir/gen_modules_clock.F90.o
-[ 65%] Building Fortran object src/CMakeFiles/fesom.dir/gen_modules_partitioning.F90.o
-[ 66%] Building Fortran object src/CMakeFiles/fesom.dir/icb_modules.F90.o
-[ 67%] Building Fortran object src/CMakeFiles/fesom.dir/io_scatter.F90.o
-[ 67%] Building Fortran object mesh_part/CMakeFiles/fesom_meshpart.dir/__/src/oce_local.F90.o
-[ 68%] Building Fortran object mesh_part/CMakeFiles/fesom_meshpart.dir/__/src/gen_comm.F90.o
+[ 46%] Building Fortran object src/CMakeFiles/fesom.dir/gen_modules_partitioning.F90.o
+[ 47%] Building Fortran object src/CMakeFiles/fesom.dir/icb_modules.F90.o
+[ 48%] Building Fortran object mesh_part/CMakeFiles/fesom_meshpart.dir/__/src/gen_comm.F90.o
+[ 48%] Building Fortran object mesh_part/CMakeFiles/fesom_meshpart.dir/__/src/oce_local.F90.o
 /tmp/claude-1000/-home-suvarchal-AWI-FESOM2-model-fesom2-support-sp-wt/99b4dfad-be65-4ace-97a9-599685cecae2/scratchpad/wt-supportsp-merge/src/gen_comm.F90:22:0:
 
    22 | #include "associate_part_ass.h" !part only
@@ -206,83 +136,71 @@ Warning: extra tokens at end of ‘#include’ directive
 
   239 | #include "associate_part_ass.h" !part only
 Warning: extra tokens at end of ‘#include’ directive
-[ 68%] Building Fortran object src/CMakeFiles/fesom.dir/MOD_ICE.F90.o
-[ 69%] Building Fortran object src/CMakeFiles/fesom.dir/gen_halo_exchange.F90.o
-[ 69%] Building Fortran object src/CMakeFiles/fesom.dir/cpl_yac_driver.F90.o
-[ 69%] Building Fortran object src/CMakeFiles/fesom.dir/gen_modules_read_NetCDF.F90.o
-[ 69%] Building Fortran object src/CMakeFiles/fesom.dir/io_netcdf_workaround_module.F90.o
-[ 69%] Building Fortran object src/CMakeFiles/fesom.dir/io_gather.F90.o
-[ 69%] Building Fortran object src/CMakeFiles/fesom.dir/toy_channel_dbgyre.F90.o
-[ 70%] Building Fortran object src/CMakeFiles/fesom.dir/gen_modules_gpot.F90.o
-[ 70%] Building Fortran object src/CMakeFiles/fesom.dir/gen_events.F90.o
-[ 70%] Building Fortran object src/CMakeFiles/fesom.dir/gen_interpolation.F90.o
-[ 70%] Building Fortran object src/CMakeFiles/fesom.dir/oce_ale_mixing_pp.F90.o
-[ 70%] Linking Fortran executable ../bin/fesom_meshpart
-[ 70%] Built target fesom_meshpart
-[ 71%] Building Fortran object src/CMakeFiles/fesom.dir/io_fesom_file.F90.o
-[ 71%] Building Fortran object src/CMakeFiles/fesom.dir/cavity_param.F90.o
-[ 72%] Building Fortran object src/CMakeFiles/fesom.dir/icb_coupling.F90.o
-[ 72%] Building Fortran object src/CMakeFiles/fesom.dir/io_restart_derivedtype.F90.o
-[ 72%] Building Fortran object src/CMakeFiles/fesom.dir/io_restart_file_group.F90.o
-[ 73%] Building Fortran object src/CMakeFiles/fesom.dir/icb_thermo.F90.o
-[ 73%] Building Fortran object src/CMakeFiles/fesom.dir/icb_elem.F90.o
-[ 75%] Building Fortran object src/CMakeFiles/fesom.dir/cpl_driver.F90.o
-[ 75%] Building Fortran object src/CMakeFiles/fesom.dir/oce_tracer_mod.F90.o
-[ 75%] Building Fortran object src/CMakeFiles/fesom.dir/cvmix_driver/gen_modules_cvmix_idemix.F90.o
-[ 75%] Building Fortran object src/CMakeFiles/fesom.dir/gen_support.F90.o
-[ 75%] Building Fortran object src/CMakeFiles/fesom.dir/cvmix_driver/gen_modules_cvmix_pp.F90.o
-[ 76%] Building Fortran object src/CMakeFiles/fesom.dir/cvmix_driver/gen_modules_cvmix_tidal.F90.o
-[ 76%] Building Fortran object src/CMakeFiles/fesom.dir/oce_age_tracer.F90.o
-[ 76%] Building Fortran object src/CMakeFiles/fesom.dir/gen_modules_cmor_diag.F90.o
-[ 76%] Building Fortran object src/CMakeFiles/fesom.dir/toy_channel_soufflet.F90.o
-[ 77%] Building Fortran object src/CMakeFiles/fesom.dir/oce_adv_tra_ver.F90.o
-[ 77%] Building Fortran object src/CMakeFiles/fesom.dir/io_blowup.F90.o
-[ 77%] Building Fortran object src/CMakeFiles/fesom.dir/oce_adv_tra_fct.F90.o
-[ 77%] Building Fortran object src/CMakeFiles/fesom.dir/oce_adv_tra_hor.F90.o
-[ 78%] Building Fortran object src/CMakeFiles/fesom.dir/solver.F90.o
-[ 78%] Building Fortran object src/CMakeFiles/fesom.dir/ice_EVP.F90.o
+[ 48%] Building Fortran object src/CMakeFiles/fesom.dir/MOD_ICE.F90.o
+[ 50%] Building Fortran object src/CMakeFiles/fesom.dir/gen_halo_exchange.F90.o
+[ 50%] Building Fortran object src/CMakeFiles/fesom.dir/cpl_yac_driver.F90.o
+[ 50%] Building Fortran object src/CMakeFiles/fesom.dir/gen_interpolation.F90.o
+[ 50%] Building Fortran object src/CMakeFiles/fesom.dir/gen_modules_read_NetCDF.F90.o
+[ 50%] Building Fortran object src/CMakeFiles/fesom.dir/io_restart_file_group.F90.o
+[ 50%] Building Fortran object src/CMakeFiles/fesom.dir/toy_channel_dbgyre.F90.o
+[ 51%] Building Fortran object src/CMakeFiles/fesom.dir/gen_modules_gpot.F90.o
+[ 51%] Building Fortran object src/CMakeFiles/fesom.dir/oce_ale_mixing_pp.F90.o
+[ 51%] Linking Fortran executable ../bin/fesom_meshpart
+[ 53%] Built target fesom_meshpart
+[ 53%] Building Fortran object src/CMakeFiles/fesom.dir/cavity_param.F90.o
+[ 54%] Building Fortran object src/CMakeFiles/fesom.dir/io_restart_derivedtype.F90.o
+[ 54%] Building Fortran object src/CMakeFiles/fesom.dir/icb_coupling.F90.o
+[ 55%] Building Fortran object src/CMakeFiles/fesom.dir/icb_thermo.F90.o
+[ 55%] Building Fortran object src/CMakeFiles/fesom.dir/icb_elem.F90.o
+[ 56%] Building Fortran object src/CMakeFiles/fesom.dir/icb_dyn.F90.o
+[ 57%] Building Fortran object src/CMakeFiles/fesom.dir/cvmix_driver/gen_modules_cvmix_tidal.F90.o
+[ 58%] Building Fortran object src/CMakeFiles/fesom.dir/cpl_driver.F90.o
+[ 58%] Building Fortran object src/CMakeFiles/fesom.dir/cvmix_driver/gen_modules_cvmix_idemix.F90.o
+[ 58%] Building Fortran object src/CMakeFiles/fesom.dir/gen_support.F90.o
+[ 58%] Building Fortran object src/CMakeFiles/fesom.dir/toy_channel_soufflet.F90.o
+[ 58%] Building Fortran object src/CMakeFiles/fesom.dir/cvmix_driver/gen_modules_cvmix_pp.F90.o
+[ 58%] Building Fortran object src/CMakeFiles/fesom.dir/io_blowup.F90.o
+[ 58%] Building Fortran object src/CMakeFiles/fesom.dir/oce_age_tracer.F90.o
+[ 58%] Building Fortran object src/CMakeFiles/fesom.dir/oce_adv_tra_fct.F90.o
+[ 58%] Building Fortran object src/CMakeFiles/fesom.dir/oce_adv_tra_hor.F90.o
+[ 58%] Building Fortran object src/CMakeFiles/fesom.dir/gen_modules_cmor_diag.F90.o
+[ 58%] Building Fortran object src/CMakeFiles/fesom.dir/oce_tracer_mod.F90.o
+[ 59%] Building Fortran object src/CMakeFiles/fesom.dir/oce_adv_tra_ver.F90.o
+[ 60%] Building Fortran object src/CMakeFiles/fesom.dir/solver.F90.o
+[ 60%] Building Fortran object src/CMakeFiles/fesom.dir/ice_EVP.F90.o
 /tmp/claude-1000/-home-suvarchal-AWI-FESOM2-model-fesom2-support-sp-wt/99b4dfad-be65-4ace-97a9-599685cecae2/scratchpad/wt-supportsp-merge/src/gen_support.F90:791:22:
 
   791 |         !            \
 Warning: backslash and newline separated by space
-[ 78%] Building Fortran object src/CMakeFiles/fesom.dir/ice_fct.F90.o
-[ 79%] Building Fortran object src/CMakeFiles/fesom.dir/ice_maEVP.F90.o
-[ 79%] Building Fortran object src/CMakeFiles/fesom.dir/io_tracks.F90.o
-[ 79%] Building Fortran object src/CMakeFiles/fesom.dir/io_mesh_info.F90.o
-[ 80%] Building Fortran object src/CMakeFiles/fesom.dir/oce_landice_water.F90.o
-[ 80%] Building Fortran object src/CMakeFiles/fesom.dir/oce_mesh.F90.o
-[ 80%] Building Fortran object src/CMakeFiles/fesom.dir/icb_allocate.F90.o
-[ 80%] Building Fortran object src/CMakeFiles/fesom.dir/oce_muscl_adv.F90.o
-[ 81%] Building Fortran object src/CMakeFiles/fesom.dir/ice_thermo_cpl.F90.o
-[ 81%] Building Fortran object src/CMakeFiles/fesom.dir/oce_mo_conv.F90.o
-[ 81%] Building Fortran object src/CMakeFiles/fesom.dir/oce_shortwave_pene.F90.o
-[ 81%] Building Fortran object src/CMakeFiles/fesom.dir/oce_shortwave_pene_dbgyre.F90.o
-[ 82%] Building Fortran object src/CMakeFiles/fesom.dir/icb_dyn.F90.o
-[ 83%] Building Fortran object src/CMakeFiles/fesom.dir/oce_spp.F90.o
-[ 84%] Building Fortran object src/CMakeFiles/fesom.dir/fesom_meshdiag.F90.o
-[ 84%] Building Fortran object src/CMakeFiles/fesom.dir/cvmix_driver/gen_modules_cvmix_tke.F90.o
-[ 85%] Building Fortran object src/CMakeFiles/fesom.dir/oce_fer_gm.F90.o
-[ 85%] Building Fortran object src/CMakeFiles/fesom.dir/gen_modules_backscatter.F90.o
-[ 85%] Building Fortran object src/CMakeFiles/fesom.dir/oce_ale_mixing_kpp.F90.o
-[ 86%] Building Fortran object src/CMakeFiles/fesom.dir/toy_channel_neverworld2.F90.o
-[ 86%] Building Fortran object src/CMakeFiles/fesom.dir/oce_ale_ssh_splitexpl_subcycl.F90.o
-[ 87%] Building Fortran object src/CMakeFiles/fesom.dir/gen_surface_forcing.F90.o
-[ 87%] Building Fortran object src/CMakeFiles/fesom.dir/oce_hosing.F90.o
+[ 60%] Building Fortran object src/CMakeFiles/fesom.dir/ice_fct.F90.o
+[ 61%] Building Fortran object src/CMakeFiles/fesom.dir/ice_maEVP.F90.o
+[ 61%] Building Fortran object src/CMakeFiles/fesom.dir/io_tracks.F90.o
+[ 61%] Building Fortran object src/CMakeFiles/fesom.dir/io_mesh_info.F90.o
+[ 62%] Building Fortran object src/CMakeFiles/fesom.dir/oce_landice_water.F90.o
+[ 62%] Building Fortran object src/CMakeFiles/fesom.dir/oce_mesh.F90.o
+[ 62%] Building Fortran object src/CMakeFiles/fesom.dir/icb_allocate.F90.o
+[ 62%] Building Fortran object src/CMakeFiles/fesom.dir/oce_muscl_adv.F90.o
+[ 63%] Building Fortran object src/CMakeFiles/fesom.dir/ice_thermo_cpl.F90.o
+[ 63%] Building Fortran object src/CMakeFiles/fesom.dir/oce_mo_conv.F90.o
+[ 63%] Building Fortran object src/CMakeFiles/fesom.dir/oce_shortwave_pene.F90.o
+[ 63%] Building Fortran object src/CMakeFiles/fesom.dir/oce_shortwave_pene_dbgyre.F90.o
+[ 63%] Building Fortran object src/CMakeFiles/fesom.dir/cvmix_driver/gen_modules_cvmix_tke.F90.o
+[ 64%] Building Fortran object src/CMakeFiles/fesom.dir/oce_spp.F90.o
+[ 65%] Building Fortran object src/CMakeFiles/fesom.dir/fesom_meshdiag.F90.o
+[ 65%] Building Fortran object src/CMakeFiles/fesom.dir/icb_step.F90.o
+[ 65%] Building Fortran object src/CMakeFiles/fesom.dir/oce_ale_mixing_kpp.F90.o
+[ 65%] Building Fortran object src/CMakeFiles/fesom.dir/oce_ale_ssh_splitexpl_subcycl.F90.o
+[ 65%] Building Fortran object src/CMakeFiles/fesom.dir/gen_modules_backscatter.F90.o
+[ 65%] Building Fortran object src/CMakeFiles/fesom.dir/oce_hosing.F90.o
+[ 66%] Building Fortran object src/CMakeFiles/fesom.dir/toy_channel_neverworld2.F90.o
+[ 67%] Building Fortran object src/CMakeFiles/fesom.dir/gen_surface_forcing.F90.o
+[ 68%] Building Fortran object src/CMakeFiles/fesom.dir/oce_fer_gm.F90.o
 /tmp/claude-1000/-home-suvarchal-AWI-FESOM2-model-fesom2-support-sp-wt/99b4dfad-be65-4ace-97a9-599685cecae2/scratchpad/wt-supportsp-merge/src/toy_channel_neverworld2.F90:184:28:
 
   184 |     real(kind=WP), save :: Ly
       |                            1~
 Warning: Legacy Extension: Duplicate SAVE attribute specified at (1)
-[ 87%] Building Fortran object src/CMakeFiles/fesom.dir/ice_oce_coupling.F90.o
-[ 87%] Building Fortran object src/CMakeFiles/fesom.dir/oce_dyn.F90.o
-[ 87%] Building Fortran object src/CMakeFiles/fesom.dir/io_restart.F90.o
-[ 87%] Building Fortran object src/CMakeFiles/fesom.dir/icb_step.F90.o
-[ 88%] Building Fortran object src/CMakeFiles/fesom.dir/cvmix_driver/gen_modules_cvmix_kpp.F90.o
-[ 88%] Building Fortran object src/CMakeFiles/fesom.dir/gen_bulk_formulae.F90.o
-[ 88%] Building Fortran object src/CMakeFiles/fesom.dir/ice_thermo_oce.F90.o
-[ 88%] Building Fortran object src/CMakeFiles/fesom.dir/gen_forcing_init.F90.o
-[ 88%] Building Fortran object src/CMakeFiles/fesom.dir/oce_ale_vel_rhs.F90.o
-[ 89%] Building Fortran object src/CMakeFiles/fesom.dir/gen_forcing_couple.F90.o
+[ 68%] Building Fortran object src/CMakeFiles/fesom.dir/ice_oce_coupling.F90.o
 /tmp/claude-1000/-home-suvarchal-AWI-FESOM2-model-fesom2-support-sp-wt/99b4dfad-be65-4ace-97a9-599685cecae2/scratchpad/wt-supportsp-merge/src/icb_step.F90:2094:48:
 
  2086 |      status=nf_put_vara_double(ncid, time_varid, save_count_buoys, 1, prev_sec_in_year+sec_in_year)
@@ -859,24 +777,30 @@ Warning: Rank mismatch between actual argument at (1) and actual argument at (2)
  1737 |   status = nf_def_var(ncid, 'grounded', NF_DOUBLE, 2, dimids, grounded_id)
       |                                                      1
 Warning: Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)
-[ 89%] Building Fortran object src/CMakeFiles/fesom.dir/ice_setup_step.F90.o
-[ 90%] Building Fortran object src/CMakeFiles/fesom.dir/gen_modules_diag.F90.o
-[ 90%] Building Fortran object src/CMakeFiles/fesom.dir/io_xios.F90.o
-[ 91%] Building Fortran object src/CMakeFiles/fesom.dir/oce_ale_pressure_bv.F90.o
-[ 92%] Building Fortran object src/CMakeFiles/fesom.dir/oce_adv_tra_driver.F90.o
-[ 92%] Building Fortran object src/CMakeFiles/fesom.dir/write_step_info.F90.o
-[ 93%] Building Fortran object src/CMakeFiles/fesom.dir/io_meandata.F90.o
-[ 94%] Building Fortran object src/CMakeFiles/fesom.dir/oce_ale_tracer.F90.o
-[ 94%] Building Fortran object src/CMakeFiles/fesom.dir/gen_ic3d.F90.o
-[ 95%] Building Fortran object src/CMakeFiles/fesom.dir/oce_ale.F90.o
-[ 96%] Building Fortran object src/CMakeFiles/fesom.dir/gen_model_setup.F90.o
-[ 97%] Building Fortran object src/CMakeFiles/fesom.dir/oce_setup_step.F90.o
-[ 97%] Building Fortran object src/CMakeFiles/fesom.dir/fesom_module.F90.o
-[ 98%] Linking Fortran shared library ../lib/libfesom.so
+[ 68%] Building Fortran object src/CMakeFiles/fesom.dir/io_restart.F90.o
+[ 68%] Building Fortran object src/CMakeFiles/fesom.dir/oce_dyn.F90.o
+[ 69%] Building Fortran object src/CMakeFiles/fesom.dir/cvmix_driver/gen_modules_cvmix_kpp.F90.o
+[ 69%] Building Fortran object src/CMakeFiles/fesom.dir/oce_ale_vel_rhs.F90.o
+[ 69%] Building Fortran object src/CMakeFiles/fesom.dir/ice_thermo_oce.F90.o
+[ 69%] Building Fortran object src/CMakeFiles/fesom.dir/gen_bulk_formulae.F90.o
+[ 69%] Building Fortran object src/CMakeFiles/fesom.dir/gen_forcing_init.F90.o
+[ 70%] Building Fortran object src/CMakeFiles/fesom.dir/gen_forcing_couple.F90.o
+[ 71%] Building Fortran object src/CMakeFiles/fesom.dir/gen_modules_diag.F90.o
+[ 71%] Building Fortran object src/CMakeFiles/fesom.dir/ice_setup_step.F90.o
+[ 72%] Building Fortran object src/CMakeFiles/fesom.dir/oce_ale_pressure_bv.F90.o
+[ 73%] Building Fortran object src/CMakeFiles/fesom.dir/oce_adv_tra_driver.F90.o
+[ 73%] Building Fortran object src/CMakeFiles/fesom.dir/write_step_info.F90.o
+[ 73%] Building Fortran object src/CMakeFiles/fesom.dir/io_xios.F90.o
+[ 75%] Building Fortran object src/CMakeFiles/fesom.dir/io_meandata.F90.o
+[ 76%] Building Fortran object src/CMakeFiles/fesom.dir/oce_ale_tracer.F90.o
+[ 76%] Building Fortran object src/CMakeFiles/fesom.dir/gen_ic3d.F90.o
+[ 77%] Building Fortran object src/CMakeFiles/fesom.dir/oce_ale.F90.o
+[ 78%] Building Fortran object src/CMakeFiles/fesom.dir/gen_model_setup.F90.o
+[ 79%] Building Fortran object src/CMakeFiles/fesom.dir/oce_setup_step.F90.o
+[ 79%] Building Fortran object src/CMakeFiles/fesom.dir/fesom_module.F90.o
+[ 80%] Linking Fortran shared library ../lib/libfesom.so
 [ 98%] Built target fesom
-[ 98%] Building Fortran object src/CMakeFiles/fesom_meshdiag.dir/fesom_meshdiag.F90.o
-[ 98%] Building Fortran object src/CMakeFiles/fesom.x.dir/fesom_main.F90.o
-[100%] Linking Fortran executable ../bin/fesom.x
 [100%] Built target fesom.x
+[100%] Building Fortran object src/CMakeFiles/fesom_meshdiag.dir/fesom_meshdiag.F90.o
 [100%] Linking Fortran executable ../bin/fesom_meshdiag
 [100%] Built target fesom_meshdiag
