@@ -353,7 +353,7 @@ lval=0.0_WP_full
   gval=0.0_WP_full
   ! reduce into a WP_full buffer and round once: MPI must not write a real64
   ! into the caller's real(WP) argument when WP is single precision.
-  call MPI_AllREDUCE(lval, gval, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+  call MPI_AllREDUCE(lval, gval, 1, MPI_WP_FULL, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
   int2D=real(gval, WP)
 end subroutine integrate_nod_2D
@@ -404,7 +404,7 @@ subroutine integrate_nod_3D(data, int3D, partit, mesh)
   gval=0.0_WP_full
   ! reduce into a WP_full buffer and round once: MPI must not write a real64
   ! into the caller's real(WP) argument when WP is single precision.
-  call MPI_AllREDUCE(lval, gval, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+  call MPI_AllREDUCE(lval, gval, 1, MPI_WP_FULL, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
   int3D=real(gval, WP)
 end subroutine integrate_nod_3D
@@ -700,7 +700,7 @@ subroutine integrate_elem_3D(data, int3D, partit, mesh)
   gval=0.0_WP_full
   ! reduce into a WP_full buffer and round once: MPI must not write a real64
   ! into the caller's real(WP) argument when WP is single precision.
-  call MPI_AllREDUCE(lval, gval, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+  call MPI_AllREDUCE(lval, gval, 1, MPI_WP_FULL, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
   int3D=real(gval, WP)
 end subroutine integrate_elem_3D
@@ -746,7 +746,7 @@ subroutine integrate_elem_2D(data, int2D, partit, mesh)
   gval=0.0_WP_full
   ! reduce into a WP_full buffer and round once: MPI must not write a real64
   ! into the caller's real(WP) argument when WP is single precision.
-  call MPI_AllREDUCE(lval, gval, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+  call MPI_AllREDUCE(lval, gval, 1, MPI_WP_FULL, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
   int2D=real(gval, WP)
 end subroutine integrate_elem_2D
