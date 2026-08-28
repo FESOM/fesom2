@@ -20,3 +20,7 @@ cmake/cvmixConfig-release.cmake
 cmake/cvmixConfig.cmake
 .claude/
 build_*/
+
+# build/configure logs from out-of-source builds
+*.log
+build-*/
