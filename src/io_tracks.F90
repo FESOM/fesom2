@@ -38,7 +38,7 @@ module io_tracks_module
   use ixml_tree,           only: xios_add_axistogrid, xios_add_domaintogrid
   use mpi
   use mod_mesh,            only: t_mesh
-  use mod_partit,          only: t_partit
+  use mod_partit,          only: t_partit, MPI_WP
   use mod_tracer,          only: t_tracer
   use mod_dyn,             only: t_dyn
   use o_param,             only: WP, rad
@@ -78,9 +78,9 @@ module io_tracks_module
     ! ------- Node-side geometry (M-sized, used by temp/salt) -------
     integer              :: M          = 0            ! # crossed edges (global)
     integer, allocatable :: edge_cut_ni(:, :)         ! (2, M) global node ids
-    real(WP), allocatable :: edge_cut_lint(:)         ! (M)
-    real(WP), allocatable :: lon_mid(:), lat_mid(:)   ! (M) midpoint coords (deg)
-    real(WP), allocatable :: dist_km(:)               ! (M)
+    real(kind=8), allocatable :: edge_cut_lint(:)         ! (M)
+    real(kind=8), allocatable :: lon_mid(:), lat_mid(:)   ! (M) midpoint coords (deg)
+    real(kind=8), allocatable :: dist_km(:)               ! (M)
 
     ! Per-rank node lookups. lid_*(m) > 0 iff this rank strict-owns
     ! endpoint *; lid indexes nodal arrays in 1..myDim_nod2D.
@@ -95,9 +95,9 @@ module io_tracks_module
     ! ------- Path-side geometry (P-sized, used by u/v) -------
     integer              :: P          = 0            ! # path triangle steps (global)
     integer, allocatable :: path_ei(:)                ! (P) global elem ids, -1 = land
-    real(WP), allocatable :: path_dx(:), path_dy(:)   ! (P) midpoint->centroid (m)
-    real(WP), allocatable :: path_lon(:), path_lat(:) ! (P) centroid coords (deg)
-    real(WP), allocatable :: path_nvec_x(:), path_nvec_y(:) ! (P) section-normal unit vector
+    real(kind=8), allocatable :: path_dx(:), path_dy(:)   ! (P) midpoint->centroid (m)
+    real(kind=8), allocatable :: path_lon(:), path_lat(:) ! (P) centroid coords (deg)
+    real(kind=8), allocatable :: path_nvec_x(:), path_nvec_y(:) ! (P) section-normal unit vector
 
     ! Per-rank elem lookups. lid_elem(p) > 0 iff this rank strict-owns
     ! the path triangle; lid indexes elem arrays in 1..myDim_elem2D.
@@ -139,9 +139,9 @@ contains
     integer :: i, ierr
 
     ! Global mesh assembled on rank 0
-    real(WP), allocatable :: lon_glo(:), lat_glo(:)
+    real(kind=8), allocatable :: lon_glo(:), lat_glo(:)
     integer,  allocatable :: edges_glo(:, :), edge_tri_glo(:, :), elem_nodes_glo(:, :)
-    real(WP), allocatable :: edge_cross_dxdy_glo(:, :)
+    real(kind=8), allocatable :: edge_cross_dxdy_glo(:, :)
 
     if (.not. io_tracks_is_on()) return
     if (already) return
@@ -216,10 +216,10 @@ contains
                                 elem_nodes_glo, edge_cross_dxdy_glo)
     type(t_mesh),   intent(in)    :: mesh
     type(t_partit), intent(inout) :: partit
-    real(WP), allocatable, intent(out) :: lon_glo(:), lat_glo(:)
+    real(kind=8), allocatable, intent(out) :: lon_glo(:), lat_glo(:)
     integer,  allocatable, intent(out) :: edges_glo(:, :), edge_tri_glo(:, :)
     integer,  allocatable, intent(out) :: elem_nodes_glo(:, :)
-    real(WP), allocatable, intent(out) :: edge_cross_dxdy_glo(:, :)
+    real(kind=8), allocatable, intent(out) :: edge_cross_dxdy_glo(:, :)
 
     integer :: nod2D_g, edge2D_g, elem2D_g, k, j
     integer :: myDim_nod2D, myDim_edge2D, myDim_elem2D
@@ -335,12 +335,12 @@ contains
     type(t_partit), intent(inout) :: partit
     integer,        intent(in)    :: nz_cell
     type(track_t),  intent(inout) :: t
-    real(WP),       intent(in)    :: lon_glo(:), lat_glo(:)
+    real(kind=8),       intent(in)    :: lon_glo(:), lat_glo(:)
     integer,        intent(in)    :: edges_glo(:, :), edge_tri_glo(:, :)
     integer,        intent(in)    :: elem_nodes_glo(:, :)
-    real(WP),       intent(in)    :: edge_cross_dxdy_glo(:, :)
+    real(kind=8),       intent(in)    :: edge_cross_dxdy_glo(:, :)
 
-    real(WP), allocatable :: lon_csv(:), lat_csv(:)
+    real(kind=8), allocatable :: lon_csv(:), lat_csv(:)
     type(transect_t)      :: geom
     integer :: N_csv, ierr
 
@@ -701,9 +701,12 @@ contains
     end do
 
     allocate(sampled(nz_track, t%M), wsum_tot(nz_track, t%M))
-    call MPI_Allreduce(contrib, sampled,  nz_track*t%M, MPI_DOUBLE_PRECISION, &
+    ! contrib/sampled/wsum are real(WP) field data, so the MPI type must track WP
+    ! (MPI_WP), not a hardcoded double. The geom% broadcasts above stay
+    ! MPI_DOUBLE_PRECISION because transect_t geometry is always double (TG_WP).
+    call MPI_Allreduce(contrib, sampled,  nz_track*t%M, MPI_WP, &
                        MPI_SUM, partit%MPI_COMM_FESOM, ierr)
-    call MPI_Allreduce(wsum,    wsum_tot, nz_track*t%M, MPI_DOUBLE_PRECISION, &
+    call MPI_Allreduce(wsum,    wsum_tot, nz_track*t%M, MPI_WP, &
                        MPI_SUM, partit%MPI_COMM_FESOM, ierr)
     deallocate(contrib, wsum)
 
@@ -822,7 +825,7 @@ contains
     end do
 
     allocate(sampled(nz_track, t%P), nhit_tot(nz_track, t%P))
-    call MPI_Allreduce(contrib, sampled,  nz_track*t%P, MPI_DOUBLE_PRECISION, &
+    call MPI_Allreduce(contrib, sampled,  nz_track*t%P, MPI_WP, &
                        MPI_SUM, partit%MPI_COMM_FESOM, ierr)
     call MPI_Allreduce(nhit,    nhit_tot, nz_track*t%P, MPI_INTEGER,          &
                        MPI_SUM, partit%MPI_COMM_FESOM, ierr)
@@ -1037,7 +1040,12 @@ contains
     type(xios_field)       :: fld_in_file
     type(xios_duration)    :: freq
     character(len=64)      :: domain_id, grid_id, file_id, file_name
-    real(WP), allocatable  :: lon_loc(:), lat_loc(:)
+    ! XIOS domain coordinate attributes (lonvalue_1d/latvalue_1d in xios_set_attr
+    ! below) take real(kind=8); the generic has no real4 specific. Keep these
+    ! coordinate buffers double independent of WP, matching io_xios.F90's lon_n/lat_n,
+    ! so the tracks output compiles in a single-precision (USE_SINGLE_PRECISION) build.
+    ! The t%lon_mid/t%path_lon source arrays are real(WP); assignment converts.
+    real(kind=8), allocatable  :: lon_loc(:), lat_loc(:)
     integer :: k, ni_glo_d, ni_d
     character(len=64)      :: long_name
 
@@ -1135,16 +1143,16 @@ contains
   subroutine parse_csv(path, N, lon_out, lat_out, partit)
     character(len=*),              intent(in)  :: path
     integer,                       intent(out) :: N
-    real(WP), allocatable,         intent(out) :: lon_out(:), lat_out(:)
+    real(kind=8), allocatable,         intent(out) :: lon_out(:), lat_out(:)
     type(t_partit),                intent(in)  :: partit
 
     integer, parameter :: MAX_WPTS = 100000
-    real(WP) :: lon_buf(MAX_WPTS), lat_buf(MAX_WPTS)
+    real(kind=8) :: lon_buf(MAX_WPTS), lat_buf(MAX_WPTS)
     character(len=512) :: line
     integer :: u, ios, line_no, k
     integer :: comma1, ierr
     character(len=128) :: ftok, stok
-    real(WP) :: lon, lat
+    real(kind=8) :: lon, lat
 
     open(newunit=u, file=trim(path), status='old', action='read', iostat=ios)
     if (ios /= 0) then

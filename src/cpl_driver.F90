@@ -76,7 +76,14 @@ module cpl_driver
   integer                    :: o2a_call_count=0
   integer                    :: a2o_call_count=0
 
-  REAL(kind=WP), POINTER                          :: exfld(:)          ! buffer for receiving global exchange fields
+  ! The OASIS exchange buffer is kept always-double (WP_full), independent of the
+  ! model working precision WP. This matches the oasis_Double transient defined in
+  ! cpl_oasis3mct_define_unstr and keeps the FESOM<->atmosphere exchange in double
+  ! precision even in a single-precision (USE_SINGLE_PRECISION, WP=real32) build.
+  ! It mirrors OpenIFS, which couples through its dedicated double coupling kind
+  ! JPRO regardless of the model kind JPRB. cplsnd stays at WP (it accumulates model
+  ! fields); the WP->WP_full conversion happens on assignment to exfld.
+  REAL(kind=WP_full), POINTER                     :: exfld(:)          ! buffer for receiving global exchange fields
   real(kind=WP), allocatable, dimension(:,:)      :: cplsnd
 
 
@@ -605,27 +612,27 @@ include "associate_mesh_ass.h"
     if (mype .eq. 0) then 
       print *, 'FESOM before 1st GatherV', displs_from_all_pes(npes), counts_from_all_pes(npes), number_of_all_points
     endif
-    CALL MPI_GATHERV(my_x_coords, my_number_of_points, MPI_DOUBLE_PRECISION, all_x_coords,  &
-                    counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+    CALL MPI_GATHERV(my_x_coords, my_number_of_points, MPI_WP, all_x_coords,  &
+                    counts_from_all_pes, displs_from_all_pes, MPI_WP, localroot, MPI_COMM_FESOM, ierror)
 
     if (mype .eq. 0) then 
       print *, 'FESOM before 2nd GatherV'
     endif
-    CALL MPI_GATHERV(my_y_coords, my_number_of_points, MPI_DOUBLE_PRECISION, all_y_coords,  &
-                    counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+    CALL MPI_GATHERV(my_y_coords, my_number_of_points, MPI_WP, all_y_coords,  &
+                    counts_from_all_pes, displs_from_all_pes, MPI_WP, localroot, MPI_COMM_FESOM, ierror)
 
     if (mype .eq. 0) then 
       print *, 'FESOM before 3rd GatherV'
     endif
-    CALL MPI_GATHERV(area(1,:), my_number_of_points, MPI_DOUBLE_PRECISION, all_area,  &
-                    counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+    CALL MPI_GATHERV(area(1,:), my_number_of_points, MPI_WP, all_area,  &
+                    counts_from_all_pes, displs_from_all_pes, MPI_WP, localroot, MPI_COMM_FESOM, ierror)
 
     if (compute_oasis_corners) then
       do j = 1, 25
-        CALL MPI_GATHERV(my_x_corners(:,j), myDim_nod2D, MPI_DOUBLE_PRECISION, all_x_corners(:,:,j),  &
-                      counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
-        CALL MPI_GATHERV(my_y_corners(:,j), myDim_nod2D, MPI_DOUBLE_PRECISION, all_y_corners(:,:,j),  &
-                      counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+        CALL MPI_GATHERV(my_x_corners(:,j), myDim_nod2D, MPI_WP, all_x_corners(:,:,j),  &
+                      counts_from_all_pes, displs_from_all_pes, MPI_WP, localroot, MPI_COMM_FESOM, ierror)
+        CALL MPI_GATHERV(my_y_corners(:,j), myDim_nod2D, MPI_WP, all_y_corners(:,:,j),  &
+                      counts_from_all_pes, displs_from_all_pes, MPI_WP, localroot, MPI_COMM_FESOM, ierror)
       end do
     endif
 
@@ -985,7 +992,7 @@ include "associate_mesh_ass.h"
       end if
 
       if(num_fesom_groups > 1) then
-          call MPI_Bcast(data_array, partit%myDim_nod2d, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
+          call MPI_Bcast(data_array, partit%myDim_nod2d, MPI_WP, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
       end if
 #endif
 
