@@ -7,7 +7,7 @@ module io_MEANDATA
   use recom_ciso
 #endif
   USE g_clock
-  use o_PARAM, only : WP
+  use o_PARAM, only : WP, S_ref_anomaly
   use, intrinsic :: iso_fortran_env, only: real64, real32
   use io_data_strategy_module
   use async_threads_module
@@ -62,6 +62,7 @@ module io_MEANDATA
     integer                                            :: addcounter =0
     integer                                            :: lastcounter=0 ! before addcounter is set to 0
     real(kind=WP), pointer                             :: ptr3(:,:) ! todo: use netcdf types, not WP
+    real(kind=WP)                                      :: offset = 0.0_WP ! added to ptr3 at accumulation (use_salt_anomaly: salt/sss carry +S_ref_anomaly so output stays absolute)
     character(500)                                     :: filename
     character(100)                                     :: name
     character(500)                                     :: description
@@ -76,7 +77,7 @@ module io_MEANDATA
     real(kind=WP)                                      :: rtime_per_stream=0._WP   !< cumulative wall in this stream's write_mean dispatch over the run; printed sorted at finalize
     logical                                            :: is_in_use=.false.
     logical :: is_elem_based = .false.
-    logical :: flip
+    logical :: flip = .false.
     class(data_strategy_type), allocatable :: data_strategy
     integer :: comm
     type(thread_type) thread
@@ -130,6 +131,15 @@ module io_MEANDATA
   end type io_entry 
 
   type(io_entry), save, allocatable, target   :: io_list(:)
+
+  ! Fields whose requested output precision exceeds the working precision
+  ! (e.g. 8-byte output requested in a WP=4 single-precision build). Collected
+  ! during stream definition and reported once at the end of ini_mean_io so the
+  ! user is aware, without any per-stream or per-step printing.
+  integer, save                  :: n_wp_promoted = 0
+  character(len=20), save        :: wp_promoted_names(256)
+  ! Stream counts by requested output precision, for the same once-per-run report.
+  integer, save                  :: n_out_r4 = 0, n_out_r8 = 0
 !
 !--------------------------------------------------------------------------------------------
 ! Type for 0D (scalar) output streams - global values with time dimension only
@@ -225,6 +235,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
 
     implicit none
     integer                   :: i, j
+    integer                   :: wp_bytes    ! actual byte width of WP, for the I/O precision report
     integer, save             :: nm_io_unit  = 103       ! unit to open namelist file, skip 100-102 for cray
     integer                   :: iost
     integer,dimension(15)     :: sel_forcvar=0
@@ -397,7 +408,10 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
         end if
     end do
 
-!_______________________________________________________________________________    
+    n_wp_promoted = 0   ! reset the WP-vs-requested-precision awareness tallies
+    n_out_r4      = 0
+    n_out_r8      = 0
+!_______________________________________________________________________________
 DO i=1, io_listsize
 SELECT CASE (trim(io_list(i)%id))
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!2D streams!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -405,6 +419,7 @@ CASE ('sst       ')
     call def_stream(nod2D, myDim_nod2D, 'sst',      'sea surface temperature',        'C', tracers%data(1)%values(1,1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Sea surface temperature")
 CASE ('sss       ')
     call def_stream(nod2D, myDim_nod2D, 'sss',      'sea surface salinity',           'psu', tracers%data(2)%values(1,1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Sea surface salinity")
+    io_stream(io_NSTREAMS)%p%offset = S_ref_anomaly   ! state stores S-S_ref; output stays absolute (S_ref=0 unless use_salt_anomaly)
 CASE ('ssh       ')
     call def_stream(nod2D, myDim_nod2D, 'ssh',      'sea surface elevation',          'm',      dynamics%eta_n,                          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('vve_5     ')
@@ -800,6 +815,17 @@ CASE ('ice_rejectsalt')
     if (SPP) call def_stream(nod2D , myDim_nod2D , 'ice_rejectsalt' , 'salt flux from plum parameterisation ', 'm/s*psu', ice_rejected_salt(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     
 !___________________________________________________________________________________________________________________________________
+! output hosing experiment  
+CASE ('hfw       ')
+call def_stream(nod2D, myDim_nod2D,     'hfw',      'hosing water flux',               'm/s',    hosing_flux(:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('hfh       ')
+call def_stream(nod2D, myDim_nod2D,     'hfh',      'hosing heat flux',                'W',      hosing_heat_flux(:),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('hfw3D     ')
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'hfw3D',     'hosing water flux in 3D', 'm/s',    hosing_flux3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('hfh3D     ')
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'hfh3D',     'hosing heat flux in 3D',  'W',      hosing_heat_flux3D(:,:),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+!___________________________________________________________________________________________________________________________________
 ! output KPP vertical mixing schemes
 CASE ('kpp_obldepth   ')
     if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then! fesom KPP
@@ -1000,7 +1026,12 @@ CASE ('Chldegp  ')
     call def_stream(nod2D,  myDim_nod2D,   'ChlDegp','Chlorophyll degradation phaeocystis','1/d', Chldegp, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
     endif
 #endif
-    
+
+!___________________________________________________________________________________________________________________________________    
+CASE ('Tsurf    ')
+    call def_stream(nod2D , myDim_nod2D , 'tsurf' , 'virtual salt flux'          , '°C', Tsurf(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+
 !___________________________________________________________________________________________________________________________________    
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>   3D streams   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 !___________________________________________________________________________________________________________________________________
@@ -1008,6 +1039,7 @@ CASE ('temp      ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp',      'temperature', 'C',      tracers%data(1)%values(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('salt      ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt',      'salinity',    'psu',    tracers%data(2)%values(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    io_stream(io_NSTREAMS)%p%offset = S_ref_anomaly   ! state stores S-S_ref; output stays absolute (S_ref=0 unless use_salt_anomaly)
 
 #if defined(__recom)
 
@@ -1107,22 +1139,22 @@ CASE ('respp          ')
 
 CASE ('NPPn3D         ')
    if (use_REcoM) then
-   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPn3D','Net primary production of small phytoplankton', 'mmolC/m2/d', NPPn3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPn3D','Net primary production of small phytoplankton', 'mmolC/(m3*d)', NPPn3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
 
 CASE ('NPPd3D         ')
    if (use_REcoM) then
-   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPd3D','Net primary production of diatoms', 'mmolC/m2/d', NPPd3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPd3D','Net primary production of diatoms', 'mmolC/(m3*d)', NPPd3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
 
 CASE ('NPPc3D         ')
    if (use_REcoM) then
-   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPc3D','Net primary production of coccolithophores', 'mmolC/m2/d', NPPc3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPc3D','Net primary production of coccolithophores', 'mmolC/(m3*d)', NPPc3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
 
 CASE ('NPPp3D         ')
    if (use_REcoM) then
-   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPp3D','Net primary production of phaeocystis', 'mmolC/(m2*d)', NPPp3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPp3D','Net primary production of phaeocystis', 'mmolC/(m3*d)', NPPp3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
    endif
 
 CASE ('TTemp_diatoms          ')
@@ -2162,8 +2194,80 @@ END DO ! --> DO i=1, io_listsize
             write(*,*) '    Override via io_list entries in namelist.io'
         end if
     end if
-    
+
+    !___________________________________________________________________________
+    ! Output-precision summary, printed once per run so the precision of what
+    ! lands on disk is visible in the log rather than implied by the file.
+    ! See note_output_precision for why the two directions are not symmetric.
+    if (mype == 0 .and. (n_out_r4 + n_out_r8) > 0) then
+        wp_bytes = storage_size(1.0_WP) / 8
+        write(*,*)
+        write(*,'(a,i0,a)') ' FESOM I/O precision (model working precision = ', wp_bytes, ' bytes):'
+        write(*,'(a,i0,a)') '     4-byte streams : ', n_out_r4, '   running mean accumulated in real32'
+        write(*,'(a,i0,a)') '     8-byte streams : ', n_out_r8, '   running mean accumulated in real64'
+
+        if (n_out_r4 > 0 .and. wp_bytes > 4) then
+            write(*,'(a,i0,a)') '   NOTE: ', n_out_r4, ' stream(s) are written BELOW the model working'
+            write(*,'(a)')      '         precision, and accumulate their running mean in real32 as well.'
+            write(*,'(a)')      '         The stored mean therefore carries at least the float32 floor'
+            write(*,'(a)')      '         (~1.2e-07 relative) and, over a long averaging window, more than'
+            write(*,'(a)')      '         that: a naive real32 sum of N samples grows like eps*sqrt(N).'
+            write(*,'(a)')      '         A signal under that level is quantised away and shows up as a'
+            write(*,'(a)')      '         flat baseline rather than as noise. Raise the last io_list column'
+            write(*,'(a)')      '         to 8 in namelist.io for fields you need to trust below it.'
+        end if
+
+        if (n_wp_promoted > 0) then
+            write(*,'(a,i0,a)') '   NOTE: ', n_wp_promoted, ' stream(s) request 8-byte output in a build whose'
+            write(*,'(a)')      '         working precision is narrower. The request is honoured (NF_DOUBLE,'
+            write(*,'(a)')      '         real64-accumulated mean), but the samples are single-precision'
+            write(*,'(a)')      '         sourced: the extra digits come from averaging, not from the model'
+            write(*,'(a)')      '         state. Affected:'
+            write(*,'(9x,*(1x,a))') (trim(wp_promoted_names(j)), &
+                j=1, min(n_wp_promoted, size(wp_promoted_names)))
+            if (n_wp_promoted > size(wp_promoted_names)) &
+                write(*,'(9x,a)') '... (list truncated)'
+        end if
+        write(*,*)
+    end if
+
 end subroutine
+
+
+!_______________________________________________________________________________
+! Tally how a stream's requested output precision relates to the model's working
+! precision. Reported once per run at the end of ini_mean_io.
+!
+! `accuracy` (the last column of an io_list entry in namelist.io) selects BOTH
+! the on-disk NetCDF type AND the kind of the running-mean accumulator --
+! local_values_r8 for 8, local_values_r4 for 4. The two directions therefore are
+! not symmetric:
+!
+!   accuracy < WP  the stream is written, and averaged, below the precision the
+!                  model actually carries. This is the normal configuration (4-byte
+!                  output from a double-precision model) and is usually deliberate,
+!                  but it sets a resolution floor on the stored mean that is easy to
+!                  mistake for a physical signal -- a bias smaller than the floor
+!                  shows up as a flat baseline rather than as noise.
+!   accuracy > WP  the file and the accumulator are wider than the samples feeding
+!                  them. Nothing is lost, and the real64 mean of many float32
+!                  samples is genuinely better than a float32 mean -- but the extra
+!                  digits come from averaging, not from the model state.
+subroutine note_output_precision(name, accuracy)
+    character(len=*), intent(in) :: name
+    integer,          intent(in) :: accuracy
+
+    if (accuracy == i_real8) then
+      n_out_r8 = n_out_r8 + 1
+    else if (accuracy == i_real4) then
+      n_out_r4 = n_out_r4 + 1
+    end if
+
+    if (accuracy > WP) then
+      n_wp_promoted = n_wp_promoted + 1
+      if (n_wp_promoted <= size(wp_promoted_names)) wp_promoted_names(n_wp_promoted) = name
+    end if
+end subroutine note_output_precision
 
 
 !_______________________________________________________________________________
@@ -2292,14 +2396,21 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
             call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'long_name', 'sea-ice thickness class'), __LINE__)
         
         elseif (entry%dimname(1)=='ndens') then
-            call assert_nf( nf90_def_var(entry%ncid,  entry%dimname(1), nf90_int,   (/entry%dimID(1)/), entry%dimvarID(1)), __LINE__)
+            ! must be a float type: the axis values are the real sigma2 bin
+            ! edges from std_dens (e.g. 30.12) -- nf90_int silently truncates
+            ! them to whole numbers in the output file
+            call assert_nf( nf90_def_var(entry%ncid,  entry%dimname(1), nf90_double,   (/entry%dimID(1)/), entry%dimvarID(1)), __LINE__)
             call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'long_name', 'sigma2 density class'), __LINE__)
-        
+
         else
             if (partit%mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
-            
-        end if 
-        call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'units', 'm'), __LINE__)
+
+        end if
+        if (entry%dimname(1)=='ndens') then
+            call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'units', 'kg/m^3'), __LINE__)
+        else
+            call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'units', 'm'), __LINE__)
+        end if
         call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'positive', 'down'), __LINE__)
         call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'axis', 'Z'), __LINE__)
         
@@ -2323,7 +2434,25 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
 
     call assert_nf( nf90_def_var(entry%ncid, trim(entry%name), entry%data_strategy%netcdf_type(), (/entry%dimid(entry%ndim:1:-1), entry%recID/), entry%varID), __LINE__)
 
-    call assert_nf( nf90_def_var_deflate(entry%ncid, entry%varID, 0, 1, compression_level), __LINE__)
+    ! Compression filters. Two changes from the previous hardcoded
+    ! nf90_def_var_deflate(..., 0, 1, compression_level):
+    !
+    !   shuffle was 0. The HDF5 byte-shuffle filter groups the like-significance
+    !   bytes of neighbouring floats together, which is close to free and makes
+    !   deflate both faster and markedly more effective on geophysical float
+    !   fields. Measured on NG5 output: compression ratio 1.10-1.30x better and
+    !   writes 1.5-1.6x faster, with reads about 2x faster. Shuffle is core HDF5,
+    !   so every existing reader handles it with no plugin.
+    !
+    !   deflate was 1 unconditionally, so compression_level = 0 did not disable
+    !   compression at all -- it enabled the deflate filter at level 0. Files
+    !   written that way carry _DeflateLevel = 0 and pay the filter pipeline cost
+    !   for no benefit. Skipping the call entirely is what the namelist implies.
+    !   (The variable stays chunked either way: netCDF-4 always chunks a variable
+    !   with an unlimited dimension, and time is unlimited here.)
+    if (compression_level > 0) then
+        call assert_nf( nf90_def_var_deflate(entry%ncid, entry%varID, 1, 1, compression_level), __LINE__)
+    end if
     call assert_nf( nf90_put_att(entry%ncid, entry%varID, 'description', entry%description), __LINE__)
     call assert_nf( nf90_put_att(entry%ncid, entry%varID, 'long_name', entry%description), __LINE__)
     call assert_nf( nf90_put_att(entry%ncid, entry%varID, 'units', entry%units), __LINE__)
@@ -2701,7 +2830,7 @@ subroutine update_means
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
                 DO J=1, size(entry%local_values_r8,dim=2)
                     DO I=1, size(entry%local_values_r8,dim=1)
-                        entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+entry%ptr3(J,I)
+                        entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+entry%ptr3(J,I)+entry%offset
                     END DO
                 END DO
 !$OMP END PARALLEL DO
@@ -2709,7 +2838,7 @@ subroutine update_means
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
                 DO J=1, size(entry%local_values_r8,dim=2)
                     DO I=1, size(entry%local_values_r8,dim=1)
-                        entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+entry%ptr3(I,J)
+                        entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+entry%ptr3(I,J)+entry%offset
                     END DO
                 END DO
 !$OMP END PARALLEL DO
@@ -2721,7 +2850,7 @@ subroutine update_means
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
                 DO J=1, size(entry%local_values_r4,dim=2)
                     DO I=1, size(entry%local_values_r4,dim=1)
-                        entry%local_values_r4(I,J)=entry%local_values_r4(I,J)+real(entry%ptr3(J,I), real32)
+                        entry%local_values_r4(I,J)=entry%local_values_r4(I,J)+real(entry%ptr3(J,I)+entry%offset, real32)
                     END DO
                 END DO
 !$OMP END PARALLEL DO
@@ -2729,7 +2858,7 @@ subroutine update_means
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I, J)
                 DO J=1, size(entry%local_values_r4,dim=2)
                     DO I=1, size(entry%local_values_r4,dim=1)
-                        entry%local_values_r4(I,J)=entry%local_values_r4(I,J)+real(entry%ptr3(I,J), real32)
+                        entry%local_values_r4(I,J)=entry%local_values_r4(I,J)+real(entry%ptr3(I,J)+entry%offset, real32)
                     END DO
                 END DO
 !$OMP END PARALLEL DO
@@ -2748,7 +2877,46 @@ end subroutine
 !
 !
 !_______________________________________________________________________________
-! main output routine called at the end of each time step --> here is decided if 
+! Return the vertically valid (wet) index range [ul_loc, kmax_loc] for column j of
+! the given output stream. Cells with level index outside this range are below the
+! bottom topography or above a cavity and are the only ones written as _FillValue.
+! For 2D fields (nlev_loc==1) and non-spatial vertical axes (density / ice classes)
+! the whole column is valid, so a legitimate zero (e.g. ice-free a_ice or vanishing
+! IDEMIX energy) is kept as zero rather than turned into a missing value.
+subroutine get_wet_range(entry, mesh, nlev_loc, j, ul_loc, kmax_loc)
+    use mod_mesh
+    implicit none
+    type(Meandata), intent(in)  :: entry
+    type(t_mesh),   intent(in)  :: mesh
+    integer,        intent(in)  :: nlev_loc, j
+    integer,        intent(out) :: ul_loc, kmax_loc
+    integer                     :: nl_bot
+
+    if (nlev_loc == mesh%nl .or. nlev_loc == mesh%nl-1) then
+        ! genuine 3D field on the vertical grid --> mask by topography / cavity
+        if (entry%is_elem_based) then
+            ul_loc = mesh%ulevels(j)
+            nl_bot = mesh%nlevels(j)
+        else
+            ul_loc = mesh%ulevels_nod2D(j)
+            nl_bot = mesh%nlevels_nod2D(j)
+        end if
+        ! full levels (nz, interfaces) keep nl_bot levels, mid layers (nz1) keep nl_bot-1
+        if (nlev_loc == mesh%nl) then
+            kmax_loc = nl_bot
+        else
+            kmax_loc = nl_bot - 1
+        end if
+    else
+        ! 2D fields and non-spatial vertical axes: every entry is valid
+        ul_loc   = 1
+        kmax_loc = nlev_loc
+    end if
+end subroutine
+!
+!
+!_______________________________________________________________________________
+! main output routine called at the end of each time step --> here is decided if
 ! output event is triggered
 subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     use g_clock
@@ -2770,6 +2938,7 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     logical, save :: lfirst=.true.
     integer       :: n, k
     integer       :: i, j !for OMP loops
+    integer       :: nlev_loc, ul_loc, kmax_loc !for wet-cell masking of output
     logical       :: do_output
     type(Meandata), pointer :: entry
     type(t_mesh), intent(in) , target :: mesh
@@ -2942,40 +3111,59 @@ ctime=timeold+(dayold-1.)*86400
             ! data range wrecks GRIB packing precision (real ice values get
             ! quantized to ~0). Multio gets the clean mean (zeros stay zeros).
             if (entry%accuracy == i_real8) then
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
+                nlev_loc = size(entry%local_values_r8,dim=1)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J,ul_loc,kmax_loc)
                 DO J=1, size(entry%local_values_r8,dim=2)
-                    DO I=1, size(entry%local_values_r8,dim=1)
 #if defined(__MULTIO)
+                    ! multio ships the clean mean to GRIB; no _FillValue substitution
+                    ! (a 9.97e36 sentinel in the data range wrecks GRIB packing).
+                    DO I=1, nlev_loc
                         entry%local_values_r8_copy(I,J) = entry%local_values_r8(I,J) /real(entry%addcounter,real64)  ! compute_means
+                        entry%local_values_r8(I,J) = 0._real64 ! clean_meanarrays - reset to 0 for next accumulation
+                    END DO ! --> DO I=1, nlev_loc
 #else
-                        if (abs(entry%local_values_r8(I,J)) < 1.0e-30_real64) then
-                            entry%local_values_r8_copy(I,J) = NC_FILL_DOUBLE  ! No data - set to fill value
+                    ! Determine the vertically valid (wet) range for this column. Cells
+                    ! outside [ul_loc,kmax_loc] are below the bottom topography or above
+                    ! the cavity and have never been touched -> they are the only ones set
+                    ! to _FillValue. Wet cells keep their (averaged) value, even when it is
+                    ! a legitimate zero (e.g. ice-free a_ice or vanishing IDEMIX energy).
+                    call get_wet_range(entry, mesh, nlev_loc, J, ul_loc, kmax_loc)
+                    DO I=1, nlev_loc
+                        if (I < ul_loc .or. I > kmax_loc) then
+                            entry%local_values_r8_copy(I,J) = NC_FILL_DOUBLE  ! dry cell - set to fill value
                         else
                             entry%local_values_r8_copy(I,J) = entry%local_values_r8(I,J) /real(entry%addcounter,real64)  ! compute_means
                         end if
-#endif
                         entry%local_values_r8(I,J) = 0._real64 ! clean_meanarrays - reset to 0 for next accumulation
-                    END DO ! --> DO I=1, size(entry%local_values_r8,dim=1)
+                    END DO ! --> DO I=1, nlev_loc
+#endif
                 END DO ! --> DO J=1, size(entry%local_values_r8,dim=2)
 !$OMP END PARALLEL DO
 
             !___________________________________________________________________
             ! write single precision output
             else if (entry%accuracy == i_real4) then
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
+                nlev_loc = size(entry%local_values_r4,dim=1)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J,ul_loc,kmax_loc)
                 DO J=1, size(entry%local_values_r4,dim=2)
-                    DO I=1, size(entry%local_values_r4,dim=1)
 #if defined(__MULTIO)
+                    ! see comment in the double precision branch above
+                    DO I=1, nlev_loc
                         entry%local_values_r4_copy(I,J) = entry%local_values_r4(I,J) /real(entry%addcounter,real32)  ! compute_means
+                        entry%local_values_r4(I,J) = 0._real32 ! clean_meanarrays - reset to 0 for next accumulation
+                    END DO ! --> DO I=1, nlev_loc
 #else
-                        if (abs(entry%local_values_r4(I,J)) < 1.0e-30_real32) then
-                            entry%local_values_r4_copy(I,J) = NC_FILL_FLOAT  ! No data - set to fill value
+                    ! see comment in the double precision branch above
+                    call get_wet_range(entry, mesh, nlev_loc, J, ul_loc, kmax_loc)
+                    DO I=1, nlev_loc
+                        if (I < ul_loc .or. I > kmax_loc) then
+                            entry%local_values_r4_copy(I,J) = NC_FILL_FLOAT  ! dry cell - set to fill value
                         else
                             entry%local_values_r4_copy(I,J) = entry%local_values_r4(I,J) /real(entry%addcounter,real32)  ! compute_means
                         end if
-#endif
                         entry%local_values_r4(I,J) = 0._real32 ! clean_meanarrays - reset to 0 for next accumulation
-                    END DO ! --> DO I=1, size(entry%local_values_r4,dim=1)
+                    END DO ! --> DO I=1, nlev_loc
+#endif
                 END DO ! --> DO J=1, size(entry%local_values_r4,dim=2)
 !$OMP END PARALLEL DO
             end if ! --> if (entry%accuracy == i_real8) then
@@ -3318,8 +3506,9 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
 
  
     !___________________________________________________________________________
-#if !defined(__PGI)  
-    do i = 1, rank(data)
+    ! data is rank 2 here; the rank is hardcoded because nvfortran implements
+    ! the rank() intrinsic only since 25.1
+    do i = 1, 2
         if ((ubound(data, dim = i)<=0)) then
             if (partit%mype==0) then
                 write(*,*) 'WARNING: adding I/O stream for ', trim(name), ' failed (contains 0 dimension)'
@@ -3328,7 +3517,6 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
             return
         end if    
     end do
-#endif
 
     !___________________________________________________________________________
     if (partit%mype==0) then
@@ -3399,8 +3587,9 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   integer i
 
     !___________________________________________________________________________
-#if !defined(__PGI)   
-    do i = 1, rank(data)
+    ! data is rank 1 here; the rank is hardcoded because nvfortran implements
+    ! the rank() intrinsic only since 25.1
+    do i = 1, 1
         if ((ubound(data, dim = i)<=0)) then
         if (partit%mype==0) then
             write(*,*) 'WARNING: adding I/O stream for ', trim(name), ' failed (contains 0 dimension)'
@@ -3409,7 +3598,6 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
         return
         end if    
     end do
-#endif
 
     !___________________________________________________________________________
     if (partit%mype==0) then
@@ -3494,6 +3682,7 @@ subroutine def_stream0D(name, description, units, data, freq, freq_unit, accurac
     entry%local_value = 0._real64
     entry%addcounter = 0
     entry%accuracy = accuracy
+    call note_output_precision(name, accuracy)
     entry%freq = freq
     entry%freq_unit = freq_unit
     entry%is_in_use = .true.
@@ -3564,6 +3753,7 @@ subroutine def_stream_after_dimension_specific(entry, name, description, units, 
     
     !___________________________________________________________________________
     entry%accuracy = accuracy
+    call note_output_precision(name, accuracy)
 
     if (accuracy == i_real8) then
       allocate(data_strategy_nf_double_type :: entry%data_strategy)
@@ -3728,7 +3918,7 @@ subroutine io_r2g(n, partit, mesh)
 
     !___________________________________________________________________________
     IF ((entry_x%accuracy == i_real8) .AND. (entry_y%accuracy == i_real8)) THEN
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I, J, xmean, ymean)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I, J, temp_x, temp_y, xmean, ymean)
         DO J=1, size(entry_x%local_values_r8,dim=2)
             if (entry_x%is_elem_based) then
                 xmean=sum(mesh%coord_nod2D(1, mesh%elem2D_nodes(:, J)))/3._WP
@@ -3738,7 +3928,12 @@ subroutine io_r2g(n, partit, mesh)
                 ymean=mesh%coord_nod2D(2, J)
             end if
             DO I=1, size(entry_x%local_values_r8,dim=1)
-                call vector_r2g(entry_x%local_values_r8(I,J), entry_y%local_values_r8(I,J), xmean, ymean, 0)
+                ! vector_r2g works in WP; round-trip through WP temps so the on-disk r8 buffer rotates correctly at WP=4 and WP=8
+                temp_x=real(entry_x%local_values_r8(I,J), kind=WP)
+                temp_y=real(entry_y%local_values_r8(I,J), kind=WP)
+                call vector_r2g(temp_x, temp_y, xmean, ymean, 0)
+                entry_x%local_values_r8(I,J)=real(temp_x, real64)
+                entry_y%local_values_r8(I,J)=real(temp_y, real64)
             END DO
         END DO
 !$OMP END PARALLEL DO

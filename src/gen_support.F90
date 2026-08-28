@@ -327,13 +327,17 @@ subroutine integrate_nod_2D(data, int2D, partit, mesh)
   real(kind=WP), intent(inout)      :: int2D
 
   integer       :: row
-  real(kind=WP) :: lval
+  ! Accumulate in WP_full, not WP: this is an uncompensated sum over every
+  ! surface node in the domain (~1e5 on CORE2, ~7e6 on NG5). Its relative error
+  ! grows like eps*sqrt(N), and the result is used to *balance* global fluxes to
+  ! zero -- so any error here becomes a systematic net source, not noise.
+  real(kind=WP_full) :: lval, gval
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
 
-lval=0.0_WP
+lval=0.0_WP_full
 #if !defined(__openmp_reproducible)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row)
 !$OMP DO REDUCTION (+: lval)
@@ -346,8 +350,12 @@ lval=0.0_WP
 !$OMP END PARALLEL
 #endif
   int2D=0.0_WP
-  call MPI_AllREDUCE(lval, int2D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+  gval=0.0_WP_full
+  ! reduce into a WP_full buffer and round once: MPI must not write a real64
+  ! into the caller's real(WP) argument when WP is single precision.
+  call MPI_AllREDUCE(lval, gval, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
+  int2D=real(gval, WP)
 end subroutine integrate_nod_2D
 !
 !--------------------------------------------------------------------------------------------
@@ -364,8 +372,10 @@ subroutine integrate_nod_3D(data, int3D, partit, mesh)
   real(kind=WP), intent(inout)    :: int3D
 
   integer       :: k, row
-  real(kind=WP) :: lval
-  real(kind=WP) :: lval_row
+  ! See the note in the 2D version: global integrals accumulate in WP_full so
+  ! they cannot degrade with WP.
+  real(kind=WP_full) :: lval, gval
+  real(kind=WP_full) :: lval_row
 
 
 #include "associate_part_def.h"
@@ -373,10 +383,10 @@ subroutine integrate_nod_3D(data, int3D, partit, mesh)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
 
-  lval=0.0_WP
+  lval=0.0_WP_full
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row, k, lval_row) REDUCTION(+: lval)
   do row=1, myDim_nod2D
-     lval_row = 0.
+     lval_row = 0.0_WP_full
      do k=ulevels_nod2D(row), nlevels_nod2D(row)-1
         lval_row=lval_row+data(k, row)*areasvol(k,row)*hnode_new(k,row)  ! --> TEST_cavity
      end do
@@ -391,8 +401,12 @@ subroutine integrate_nod_3D(data, int3D, partit, mesh)
 !$OMP END PARALLEL DO
 
   int3D=0.0_WP
-  call MPI_AllREDUCE(lval, int3D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+  gval=0.0_WP_full
+  ! reduce into a WP_full buffer and round once: MPI must not write a real64
+  ! into the caller's real(WP) argument when WP is single precision.
+  call MPI_AllREDUCE(lval, gval, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
+  int3D=real(gval, WP)
 end subroutine integrate_nod_3D
 !
 !--------------------------------------------------------------------------------------------
@@ -421,7 +435,7 @@ subroutine extrap_nod3D(arr, partit, mesh)
     !___________________________________________________________________________
     loc_max=maxval(arr(1,:))
     glob_max=0._WP
-    call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
     glob_sum=-1
 
     !___________________________________________________________________________
@@ -485,7 +499,7 @@ subroutine extrap_nod3D(arr, partit, mesh)
         
         !_______________________________________________________________________
         loc_max=maxval(arr(1,:))
-        call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)   
+        call MPI_AllREDUCE(loc_max, glob_max, 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)   
         
     END DO ! -->  DO WHILE (glob_max>0.99_WP*dummy)  
     
@@ -654,19 +668,21 @@ subroutine integrate_elem_3D(data, int3D, partit, mesh)
   real(kind=WP), intent(inout)    :: int3D
 
   integer       :: k, row
-  real(kind=WP) :: lval
-  real(kind=WP) :: lval_row
+  ! See the note in the 2D version: global integrals accumulate in WP_full so
+  ! they cannot degrade with WP.
+  real(kind=WP_full) :: lval, gval
+  real(kind=WP_full) :: lval_row
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
 
-  lval=0.0_WP
+  lval=0.0_WP_full
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row, k, lval_row) REDUCTION(+: lval)
   do row=1, myDim_elem2D
      if(elem2D_nodes(1, row) > myDim_nod2D) cycle
-     lval_row = 0.
+     lval_row = 0.0_WP_full
      do k=ulevels(row), nlevels(row)-1
         lval_row=lval_row+data(k, row)*elem_area(row)*helem(k,row)
      end do
@@ -681,8 +697,12 @@ subroutine integrate_elem_3D(data, int3D, partit, mesh)
 !$OMP END PARALLEL DO
 
   int3D=0.0_WP
-  call MPI_AllREDUCE(lval, int3D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+  gval=0.0_WP_full
+  ! reduce into a WP_full buffer and round once: MPI must not write a real64
+  ! into the caller's real(WP) argument when WP is single precision.
+  call MPI_AllREDUCE(lval, gval, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
+  int3D=real(gval, WP)
 end subroutine integrate_elem_3D
 !
 !--------------------------------------------------------------------------------------------
@@ -699,14 +719,16 @@ subroutine integrate_elem_2D(data, int2D, partit, mesh)
   real(kind=WP), intent(inout)      :: int2D
 
   integer       :: row
-  real(kind=WP) :: lval
+  ! See the note in integrate_nod_2D: global integrals accumulate in WP_full so
+  ! they cannot degrade with WP.
+  real(kind=WP_full) :: lval, gval
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h" 
 
-  lval=0.0_WP
+  lval=0.0_WP_full
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) REDUCTION(+: lval)
   do row=1, myDim_elem2D
      if(elem2D_nodes(1, row) > myDim_nod2D) cycle
@@ -721,8 +743,12 @@ subroutine integrate_elem_2D(data, int2D, partit, mesh)
 !$OMP END PARALLEL DO
 
   int2D=0.0_WP
-  call MPI_AllREDUCE(lval, int2D, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+  gval=0.0_WP_full
+  ! reduce into a WP_full buffer and round once: MPI must not write a real64
+  ! into the caller's real(WP) argument when WP is single precision.
+  call MPI_AllREDUCE(lval, gval, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
+  int2D=real(gval, WP)
 end subroutine integrate_elem_2D
 
 

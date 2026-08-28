@@ -5,7 +5,9 @@
 *.o
 *.mod
 *.x
-#*.out
+# NOTE: do NOT enable "*.out" -- FESOM mesh files are .out (nod2d.out, elem2d.out,
+# aux3d.out, depth@elem.out, ...) and ~190 of them are tracked. Ignore run output
+# by exact name instead; see the block at the bottom.
 *~
 *.swp
 src/icepack_drivers/Icepack
@@ -15,4 +17,30 @@ lib/*.so
 Makefile.in
 mesh_part/build
 test/output_pi
+src/cvmix_driver/CVMix-src/
+cmake/cvmixConfig-release.cmake
+cmake/cvmixConfig.cmake
 .claude/
+build_*/
+
+# ---------------------------------------------------------------------------
+# Build trees, build output and run output.
+# Added after build-{dp,sp}.{build,cfg}.log were committed by accident.
+# Everything here is verified to match zero tracked files -- check with
+#   git ls-files -- '<pattern>'
+# before adding more. In particular *.out and *.nc are NOT safe: they match
+# tracked mesh files and test fixtures respectively.
+# ---------------------------------------------------------------------------
+build*/
+*.log
+*.err
+
+# fesom.x run output (exact names -- see the *.out note above)
+results/
+fesom.out
+fesom.out.done
+fesom2.0.out
+*.out.done
+fesom.clock
+slurm-*.out
+core.[0-9]*

@@ -79,6 +79,9 @@ message(STATUS "RECOM_COUPLED: ${RECOM_COUPLED}")
 option(USE_ICEPACK "Use ICEPACK" OFF)
 message(STATUS "USE_ICEPACK: ${USE_ICEPACK}")
 
+option(USE_SINGLE_PRECISION "Build FESOM in single precision (WP=4)" OFF)
+message(STATUS "USE_SINGLE_PRECISION: ${USE_SINGLE_PRECISION}")
+
 
 # option to trigger building a library version of FESOM
 # we do not always build the library along with the executable to avoid having two targets here in the CMakeLists.txt
@@ -93,6 +96,62 @@ if(DEFINED FESOM_ENABLE_IFS_INTERFACE)
   set(ENABLE_IFS_INTERFACE ${FESOM_ENABLE_IFS_INTERFACE}) # To distinguish option in a nested cmake project (bundle)
 endif()
 message(STATUS "ENABLE_IFS_INTERFACE: ${ENABLE_IFS_INTERFACE}")
+
+
+# ---------------------------------------------------------------------------
+# Single precision is not yet supported in any coupled configuration.
+#
+# The coupling and interface layers were written when WP was unconditionally
+# real64 and still assume it:
+#
+#   * cpl_driver.F90 and gen_forcing_couple.F90 pass MPI_DOUBLE_PRECISION for
+#     buffers declared real(kind=WP) (cpl_driver.F90:608,614,620,625,627,988
+#     and 8 further sites in gen_forcing_couple.F90). With WP=real32 MPI reads
+#     eight bytes out of a four-byte variable -- memory corruption, not a
+#     precision question, and invisible in a double-precision build because
+#     there real64 == WP.
+#
+#   * The OASIS exchange buffers exfld and cplsnd (cpl_driver.F90:79-80) are
+#     real(kind=WP), so a single-precision build would hand the coupler single
+#     precision where the partner model may expect double.
+#
+# None of this is exercised by any test: there is no coupled CTest, so a
+# single-precision coupled build would fail silently at runtime rather than
+# loudly at build time. Refuse it at configure time until the interfaces are
+# typed explicitly and a coupled test exists to validate them.
+#
+# Set FESOM_ALLOW_SINGLE_PRECISION_COUPLED=ON to override -- intended for
+# developing the fix itself, not for production runs.
+# ---------------------------------------------------------------------------
+option(FESOM_ALLOW_SINGLE_PRECISION_COUPLED
+       "Override the guard refusing single-precision coupled builds (unvalidated)" OFF)
+
+if(USE_SINGLE_PRECISION AND NOT FESOM_ALLOW_SINGLE_PRECISION_COUPLED)
+   set(_fesom_sp_coupled_modes "")
+   if(FESOM_COUPLED)
+      list(APPEND _fesom_sp_coupled_modes "FESOM_COUPLED (OASIS)")
+   endif()
+   if(OIFS_COUPLED)
+      list(APPEND _fesom_sp_coupled_modes "OIFS_COUPLED (OpenIFS)")
+   endif()
+   if(USE_YAC)
+      list(APPEND _fesom_sp_coupled_modes "USE_YAC (YAC)")
+   endif()
+   if(ENABLE_IFS_INTERFACE)
+      list(APPEND _fesom_sp_coupled_modes "ENABLE_IFS_INTERFACE (IFS interface)")
+   endif()
+   if(_fesom_sp_coupled_modes)
+      string(REPLACE ";" ", " _fesom_sp_coupled_modes "${_fesom_sp_coupled_modes}")
+      message(FATAL_ERROR
+         "USE_SINGLE_PRECISION=ON is not supported together with: ${_fesom_sp_coupled_modes}.\n"
+         "The coupling interfaces still assume WP is real64 and pass "
+         "MPI_DOUBLE_PRECISION for real(kind=WP) buffers, which corrupts memory "
+         "when WP is real32. There is no coupled test to validate a fix against, "
+         "so this combination is refused rather than run silently.\n"
+         "Build coupled configurations in double precision (USE_SINGLE_PRECISION=OFF), "
+         "or set FESOM_ALLOW_SINGLE_PRECISION_COUPLED=ON if you are developing the fix.")
+   endif()
+endif()
 
 
 set(ENABLE_MULTIO_DEFAULT OFF)
@@ -292,6 +351,10 @@ if(USE_ICEPACK)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __icepack)
 endif()
 
+if(USE_SINGLE_PRECISION)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE USE_SINGLE_PRECISION)
+endif()
+
 if(CVMIX)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __cvmix)
 endif()
@@ -309,7 +372,7 @@ if(OPENMP_REPRODUCIBLE)
 endif()
 
 if(${RECOM_COUPLED})
-   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2) # __3Zoo2Det __coccos)# __usetp)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2 __usetp) #__3Zoo2Det __coccos)
 endif()
 
 if(${CISO_COUPLED})
@@ -323,8 +386,12 @@ endif()
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} STREQUAL  IntelLLVM )
    
-   # Base compiler flags
-   target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0 -fpp)
+   # Base compiler flags (default real kind follows USE_SINGLE_PRECISION)
+   if(USE_SINGLE_PRECISION)
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r4 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0 -fpp -fPIC)
+   else()
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0 -fpp -fPIC)
+   endif()
    
    # compiler flags not supported by IntelLLVM
    if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
@@ -345,7 +412,7 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} 
       # | Intel/MPI | -O3                                                                 | 144s |
       # |*Intel/MPI | -03 -march=core-avx2 -mtune=core-avx2 -qopt-zmm-usage=low           | 140.95s |
       # |           | -align array64byte -unroll-aggressive -qopt-malloc-options=2        |         |
-      #target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2 -qopt-zmm-usage=low -align array64byte -unroll-aggressive -qopt-malloc-options=2)
+      #     target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2 -qopt-zmm-usage=low -align array64byte -unroll-aggressive -qopt-malloc-options=2 -g -traceback -check)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
       target_compile_options(${PROJECT_NAME} PRIVATE -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte -ipo)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL mn5-gpp )
@@ -381,11 +448,17 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} 
 
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 #    target_compile_options(${PROJECT_NAME} PRIVATE -O3 -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
+   # default real kind follows USE_SINGLE_PRECISION: promote to 8 for DP, leave at 4 for SP
+   if(USE_SINGLE_PRECISION)
+      set(_FESOM_GNU_RKIND "")
+   else()
+      set(_FESOM_GNU_RKIND -fdefault-real-8 -fdefault-double-8)
+   endif()
    if(${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu )
       message(STATUS "Allowing type mismatches on Ubuntu for CI Testing" )  # NOTE(PG): Would be nicer to grab the CI=True from the env variable
-      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -cpp)
+      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  ${_FESOM_GNU_RKIND} -ffree-line-length-none -cpp)
    else()
-      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -cpp)
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  ${_FESOM_GNU_RKIND} -ffree-line-length-none -cpp)
    endif()
    if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
       if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
@@ -423,7 +496,7 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
       # |             | -mno-fma4 -mavx2 -mfma                                            |      |
       # | GCC/openMPI | -O3 -march=znver3 -mtune=znver3 -ftree-vectorize -flto            | 280s | chatgpt recomendation
       # |             | -mcpu=znver3                                                      |      |
-      target_compile_options(${PROJECT_NAME} PRIVATE -march=znver3 -mtune=znver3 -ftree-vectorize -flto)      
+      target_compile_options(${PROJECT_NAME} PRIVATE -march=znver3 -mtune=znver3 -ftree-vectorize -flto -fPIC)      
    else()
       #[[if(NOT (${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu))
          target_compile_options(${PROJECT_NAME} PRIVATE -native)
@@ -450,7 +523,13 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
 	#target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -N 1023 -g -G2 -O3)
-   target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -N 1023 -g -G2 -O2 -hnoacc -M878)  #-hnoacc is a workaround for cray automatically activate -hacc, -M878 is to suppress ftn-878 warning
+   # default real kind follows USE_SINGLE_PRECISION
+   if(USE_SINGLE_PRECISION)
+      set(_FESOM_CRAY_RKIND real32)
+   else()
+      set(_FESOM_CRAY_RKIND real64)
+   endif()
+   target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s ${_FESOM_CRAY_RKIND} -N 1023 -g -G2 -O2 -hnoacc -M878)  #-hnoacc is a workaround for cray automatically activate -hacc, -M878 is to suppress ftn-878 warning
    if(${ENABLE_OPENMP})
       target_compile_options(${PROJECT_NAME} PRIVATE -homp)
    else()
@@ -464,10 +543,16 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
    endif()
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
    target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_NVHPC_WORKAROUNDS)
+   # default real kind follows USE_SINGLE_PRECISION
+   if(USE_SINGLE_PRECISION)
+      set(_FESOM_NVHPC_RKIND -Mr4)
+   else()
+      set(_FESOM_NVHPC_RKIND -Mr8)
+   endif()
    if(${ENABLE_OPENACC})
       target_compile_options(${PROJECT_NAME} PRIVATE
-      $<$<CONFIG:DEBUG>:-Mallocatable=95 -Mr8 -pgf90libs -Mnofma -Minfo=all -acc=verystrict -gpu=math_uniform,cuda12.2,cc80>
-      $<$<CONFIG:RELEASE>:-Mallocatable=95 -Mr8 -pgf90libs -Minfo=all -acc=verystrict -gpu=cc80>)
+      $<$<CONFIG:DEBUG>:-Mallocatable=95 ${_FESOM_NVHPC_RKIND} -pgf90libs -Mnofma -Minfo=all -acc=verystrict -gpu=math_uniform,cuda12.2,cc80>
+      $<$<CONFIG:RELEASE>:-Mallocatable=95 ${_FESOM_NVHPC_RKIND} -pgf90libs -Minfo=all -acc=verystrict -gpu=cc80>)
       set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-acc=verystrict -Mnofma -gpu=math_uniform,cuda12.2,cc80")
       set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-acc=verystrict -gpu=cc80")
       if(${DISABLE_OPENACC_ATOMICS})
@@ -475,8 +560,8 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
       endif()
    else()
       target_compile_options(${PROJECT_NAME} PRIVATE 
-      $<$<CONFIG:DEBUG>:-Mallocatable=95 -Mr8 -pgf90libs -Mnofma>
-      $<$<CONFIG:RELEASE>:-Mallocatable=95 -Mr8 -pgf90libs>)
+      $<$<CONFIG:DEBUG>:-Mallocatable=95 ${_FESOM_NVHPC_RKIND} -pgf90libs -Mnofma>
+      $<$<CONFIG:RELEASE>:-Mallocatable=95 ${_FESOM_NVHPC_RKIND} -pgf90libs>)
    endif()
 endif()
 
