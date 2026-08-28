@@ -77,12 +77,12 @@ if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED AND NOT USE_YAC)
         )
     endif()
 
-    # JRA55 atmospheric forcing: run the pi mesh for one day driven by the bundled
-    # JRA55-do dataset (tests/data/FORCING/JRA55, year 1958, 3-hourly) instead of the
-    # default CORE2 forcing. This exercises the JRA55 namelist wiring end to end:
+    # JRA55 atmospheric forcing: run the pi mesh for one day driven by a JRA55-do
+    # dataset (tests/data/FORCING/JRA55, year 1958, 3-hourly) instead of the default
+    # CORE2 forcing. This exercises the JRA55 namelist wiring end to end:
     #   * FORCING JRA        -> namelist.forcing from config/namelist.forcing.JRA,
-    #                           pool paths rewired to the bundled tree (CMOR var
-    #                           names uas/tas/prra/..., relative to ClimateDataPath)
+    #                           pool paths rewired to that tree (CMOR var names
+    #                           uas/tas/prra/..., relative to ClimateDataPath)
     #   * FORCING_YEAR 1958  -> fesom.clock start year, per-year forcing file, and
     #                           the required output artifact sst.fesom.1958.nc
     #   * LEAPYEAR .true.    -> include_fleapyear=.true., mandatory for JRA55's
@@ -91,15 +91,30 @@ if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED AND NOT USE_YAC)
     # NOTE: passes in BOTH double- and single-precision builds (verified on pi/1-day).
     # The JRA55 SP-NaN concern is specific to large meshes (e.g. ng5), not the finer
     # sub-daily cadence itself, so it does not surface on the small pi mesh here.
-    add_fesom_test(integration_pi_jra_mpi2
-        MPI_TEST
-        NP 2
-        TIMEOUT ${TEST_TIMEOUT}
-        LABEL jra
-        FORCING "JRA"
-        FORCING_YEAR "1958"
-        LEAPYEAR ".true."
-    )
+    #
+    # The dataset itself is NOT bundled: 13 files / ~120 MB is too much to carry in the
+    # repository, and it would land in git history permanently. It will be provided as a
+    # downloadable dataset instead, like the meshes the remote_ tests fetch.
+    #
+    # Until then this test is simply not registered. All of the harness wiring for it --
+    # FORCING/FORCING_YEAR/LEAPYEAR in add_fesom_test, configure_fesom_namelists_with_options
+    # selecting config/namelist.forcing.JRA, and the pool-path rewriting in
+    # cmake/FesomTesting.cmake -- is kept and unchanged, so dropping the data into
+    # tests/data/FORCING/JRA55/ (or having a fetch step put it there) re-enables the test
+    # with no further edits.
+    if(EXISTS "${TEST_DATA_DIR}/FORCING/JRA55")
+        add_fesom_test(integration_pi_jra_mpi2
+            MPI_TEST
+            NP 2
+            TIMEOUT ${TEST_TIMEOUT}
+            LABEL jra
+            FORCING "JRA"
+            FORCING_YEAR "1958"
+            LEAPYEAR ".true."
+        )
+    else()
+        message(STATUS "JRA55 forcing data not present (${TEST_DATA_DIR}/FORCING/JRA55) -- skipping integration_pi_jra_mpi2. Harness support for FORCING=JRA is unchanged; add the dataset to enable it.")
+    endif()
 
     # Note: there is no separate "SP" integration test. Precision is a property of
     # the build, not the test -- in a USE_SINGLE_PRECISION build every test above runs
