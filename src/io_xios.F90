@@ -574,7 +574,7 @@ contains
   logical function io_xios_is_ice_field(name) result(r)
     character(len=*), intent(in) :: name
     select case (trim(name))
-    case ('a_ice', 'm_ice', 'm_snow', 'h_ice', 'h_snow', 'ist', &
+    case ('a_ice', 'm_ice', 'm_snow', 'h_ice', 'h_snow', 'ist', 'alb', &
           'uice', 'vice', 'apnd', 'hpnd', 'ipnd', &
           'thdgrice', 'thdgrsnw', 'thdgrarea', 'dyngrice', 'dyngrarea', &
           'fw_ice', 'fw_snw', 'atmice_x', 'atmice_y', &
