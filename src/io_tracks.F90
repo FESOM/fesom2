@@ -701,9 +701,9 @@ contains
     end do
 
     allocate(sampled(nz_track, t%M), wsum_tot(nz_track, t%M))
-    call MPI_Allreduce(contrib, sampled,  nz_track*t%M, MPI_DOUBLE_PRECISION, &
+    call MPI_Allreduce(contrib, sampled,  nz_track*t%M, MPI_WP, &
                        MPI_SUM, partit%MPI_COMM_FESOM, ierr)
-    call MPI_Allreduce(wsum,    wsum_tot, nz_track*t%M, MPI_DOUBLE_PRECISION, &
+    call MPI_Allreduce(wsum,    wsum_tot, nz_track*t%M, MPI_WP, &
                        MPI_SUM, partit%MPI_COMM_FESOM, ierr)
     deallocate(contrib, wsum)
 
@@ -822,7 +822,7 @@ contains
     end do
 
     allocate(sampled(nz_track, t%P), nhit_tot(nz_track, t%P))
-    call MPI_Allreduce(contrib, sampled,  nz_track*t%P, MPI_DOUBLE_PRECISION, &
+    call MPI_Allreduce(contrib, sampled,  nz_track*t%P, MPI_WP, &
                        MPI_SUM, partit%MPI_COMM_FESOM, ierr)
     call MPI_Allreduce(nhit,    nhit_tot, nz_track*t%P, MPI_INTEGER,          &
                        MPI_SUM, partit%MPI_COMM_FESOM, ierr)
