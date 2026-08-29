@@ -144,7 +144,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   ! the stopping test -- so rounding here steers the iteration itself rather than
   ! just reporting on it. The vectors (rr/zz/pp/App) and the matrix stay WP: the
   ! bandwidth is theirs, the accuracy is these.
-  ! The MPI_Allreduce calls below already pass MPI_DOUBLE; declaring these
+  ! The MPI_Allreduce calls below pass MPI_WP_FULL to match; declaring these
   ! WP_full makes the buffer type and the declared type agree by construction
   ! rather than by WP happening to be real64.
   real(kind=WP_full)           :: sprod(2), s_old, s_aux, al, be, rtol
@@ -184,7 +184,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
  s_old = sum(real(rhs(1:myDim_nod2D), WP_full) * real(rhs(1:myDim_nod2D), WP_full))
 #endif
 
-  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
   rtol=solverinfo%soltol*sqrt(s_old/real(nod2D,WP_full))
   ! ==============
   ! Compute r0
@@ -224,7 +224,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   s_old = sum(real(rr(1:myDim_nod2D), WP_full) * real(zz(1:myDim_nod2D), WP_full))
 #endif
 
-  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
   
   ! ===============
   ! Iterations
@@ -256,7 +256,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
  s_aux = sum(real(pp(1:myDim_nod2D), WP_full) * real(App(1:myDim_nod2D), WP_full))
 #endif
 
-  call MPI_Allreduce(MPI_IN_PLACE, s_aux, 1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  call MPI_Allreduce(MPI_IN_PLACE, s_aux, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 
      ! ===========
      ! Breakdown guard. An equivalent check existed until 4eb2f21d ("Removed
@@ -313,7 +313,7 @@ sprod(1:2)=0.0_WP_full
     sprod(2) = sum(real(rr(1:myDim_nod2D), WP_full) * real(rr(1:myDim_nod2D), WP_full))
 #endif
   
-  call MPI_Allreduce(MPI_IN_PLACE, sprod, 2, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+  call MPI_Allreduce(MPI_IN_PLACE, sprod, 2, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 
 !$OMP BARRIER
      ! ===========

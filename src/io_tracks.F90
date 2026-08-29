@@ -38,7 +38,7 @@ module io_tracks_module
   use ixml_tree,           only: xios_add_axistogrid, xios_add_domaintogrid
   use mpi
   use mod_mesh,            only: t_mesh
-  use mod_partit,          only: t_partit, MPI_WP
+  use mod_partit,          only: t_partit, MPI_WP, MPI_WP_FULL
   use mod_tracer,          only: t_tracer
   use mod_dyn,             only: t_dyn
   use o_param,             only: WP, rad
@@ -495,9 +495,9 @@ contains
        geom%M = M_b
     end if
     call mpi_bcast(geom%edge_cut_ni,   2*M_b, MPI_INTEGER,          0, partit%MPI_COMM_FESOM, ierr)
-    call mpi_bcast(geom%edge_cut_lint, M_b,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierr)
-    call mpi_bcast(geom%edge_cut_midP, 2*M_b, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierr)
-    call mpi_bcast(geom%edge_cut_dist, M_b,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierr)
+    call mpi_bcast(geom%edge_cut_lint, M_b,   MPI_WP_FULL, 0, partit%MPI_COMM_FESOM, ierr)
+    call mpi_bcast(geom%edge_cut_midP, 2*M_b, MPI_WP_FULL, 0, partit%MPI_COMM_FESOM, ierr)
+    call mpi_bcast(geom%edge_cut_dist, M_b,   MPI_WP_FULL, 0, partit%MPI_COMM_FESOM, ierr)
 
     if (var_kind /= 2) return
 
@@ -521,10 +521,10 @@ contains
        geom%P = P_b
     end if
     call mpi_bcast(geom%path_ei,          P_b,   MPI_INTEGER,          0, partit%MPI_COMM_FESOM, ierr)
-    call mpi_bcast(geom%path_dx,          P_b,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierr)
-    call mpi_bcast(geom%path_dy,          P_b,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierr)
-    call mpi_bcast(geom%path_centroid_xy, 2*P_b, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierr)
-    call mpi_bcast(geom%path_nvec_cs,     2*P_b, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierr)
+    call mpi_bcast(geom%path_dx,          P_b,   MPI_WP_FULL, 0, partit%MPI_COMM_FESOM, ierr)
+    call mpi_bcast(geom%path_dy,          P_b,   MPI_WP_FULL, 0, partit%MPI_COMM_FESOM, ierr)
+    call mpi_bcast(geom%path_centroid_xy, 2*P_b, MPI_WP_FULL, 0, partit%MPI_COMM_FESOM, ierr)
+    call mpi_bcast(geom%path_nvec_cs,     2*P_b, MPI_WP_FULL, 0, partit%MPI_COMM_FESOM, ierr)
   end subroutine broadcast_transect
 
 
