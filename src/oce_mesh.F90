@@ -2429,9 +2429,9 @@ type(t_partit), intent(inout), target :: partit
     end do
     area_glob  = 0.0_WP_full
     area_glob2 = 0.0_WP_full
-    call MPI_AllREDUCE(area_acc,  area_glob,  1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+    call MPI_AllREDUCE(area_acc,  area_glob,  1, MPI_WP_FULL, MPI_SUM, &
         MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(area_acc2, area_glob2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+    call MPI_AllREDUCE(area_acc2, area_glob2, 1, MPI_WP_FULL, MPI_SUM, &
         MPI_COMM_FESOM, MPIerr)
     mesh%ocean_area        = real(area_glob,  WP)
     mesh%ocean_areawithcav = real(area_glob2, WP)

@@ -248,7 +248,7 @@ MODULE Toy_Neverworld2
         !___________________________________________________________________________
         ! determine latitudinal domain size from mesh
         loc_Ly=omp_min_max_sum1(geo_coord_nod2D(2,:), 1, myDim_nod2D, 'max', partit)
-        call MPI_AllREDUCE(loc_Ly, Ly, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        call MPI_AllREDUCE(loc_Ly, Ly, 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
         
         !___________________________________________________________________________
         ! Do windprofile input (momentum flux):

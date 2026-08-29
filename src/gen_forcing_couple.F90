@@ -1020,13 +1020,13 @@ SUBROUTINE integrate_2D(flux_global, flux_local, eff_vol, field2d, mask, partit,
   flux_local(1)=sum(lump2d_north*field2d(1:myDim_nod2D)*mask(1:myDim_nod2D))
   flux_local(2)=sum(lump2d_south*field2d(1:myDim_nod2D)*mask(1:myDim_nod2D))
   call MPI_AllREDUCE(flux_local, flux_global, 2, &
-  		     MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+  		     MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 		     
 		     
   eff_vol_local(1)=sum(lump2d_north*mask(1:myDim_nod2D))
   eff_vol_local(2)=sum(lump2d_south*mask(1:myDim_nod2D))
   call MPI_AllREDUCE(eff_vol_local, eff_vol,  2, & 
-  		     MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+  		     MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 		     
 END SUBROUTINE integrate_2D
 !
@@ -1107,22 +1107,22 @@ SUBROUTINE net_rec_from_atm(action, partit)
 #else
      if (my_global_rank==target_root) then
 #endif
-        CALL MPI_IRecv(atm_net_fluxes_north(1), nrecv, MPI_DOUBLE_PRECISION, source_root, 111, MPI_COMM_WORLD, request(1), partit%MPIerr)
-        CALL MPI_IRecv(atm_net_fluxes_south(1), nrecv, MPI_DOUBLE_PRECISION, source_root, 112, MPI_COMM_WORLD, request(2), partit%MPIerr)
+        CALL MPI_IRecv(atm_net_fluxes_north(1), nrecv, MPI_WP, source_root, 111, MPI_COMM_WORLD, request(1), partit%MPIerr)
+        CALL MPI_IRecv(atm_net_fluxes_south(1), nrecv, MPI_WP, source_root, 112, MPI_COMM_WORLD, request(2), partit%MPIerr)
         CALL MPI_Waitall(2, request, status, partit%MPIerr)
      end if
 
 #if defined(__recom) && defined(__usetp)
         if(num_fesom_groups > 1) then
-           call MPI_Bcast(atm_net_fluxes_north(1), nrecv, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
-           call MPI_Bcast(atm_net_fluxes_south(1), nrecv, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
+           call MPI_Bcast(atm_net_fluxes_north(1), nrecv, MPI_WP, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
+           call MPI_Bcast(atm_net_fluxes_south(1), nrecv, MPI_WP, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
         end if
      end if ! (my_global_rank_test==target_root) then
 #endif
   call MPI_Barrier(partit%MPI_COMM_FESOM, partit%MPIerr)     
-  call MPI_AllREDUCE(atm_net_fluxes_north(1), aux, nrecv, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+  call MPI_AllREDUCE(atm_net_fluxes_north(1), aux, nrecv, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
   atm_net_fluxes_north=aux
-  call MPI_AllREDUCE(atm_net_fluxes_south(1), aux, nrecv, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+  call MPI_AllREDUCE(atm_net_fluxes_south(1), aux, nrecv, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
   atm_net_fluxes_south=aux
   end if
 END SUBROUTINE net_rec_from_atm

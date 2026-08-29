@@ -17,6 +17,16 @@ integer, parameter   :: MPI_WP = MPI_REAL             ! single precision
 #else
 integer, parameter   :: MPI_WP = MPI_DOUBLE_PRECISION ! double precision (default)
 #endif
+! MPI datatype matching WP_full (see o_PARAM), which is real64 regardless of WP.
+! Pick the constant that matches how the buffer is DECLARED, for any MPI operation --
+! reduce, bcast, gather, scatter, send/recv alike:
+!   real(kind=WP)      -> MPI_WP
+!   real(kind=WP_full) -> MPI_WP_FULL
+! Buffers declared real(real64) independently of WP (the typed gather_*/scatter_*
+! routines with real4/int2 siblings) keep MPI_DOUBLE_PRECISION -- they do not track
+! WP_full. Mixing these up is invisible in a double-precision build, where
+! WP_full == WP, and corrupts memory in a single-precision one.
+integer, parameter   :: MPI_WP_FULL = MPI_DOUBLE_PRECISION
 integer, parameter   :: MAX_LAENDERECK=16
 integer, parameter   :: MAX_NEIGHBOR_PARTITIONS=32
 
