@@ -10,12 +10,12 @@ if(BUILD_MESHPARTITIONER)
     add_test(
         NAME meshpartitioner_partition_local_pi_mesh_4
         COMMAND ${CMAKE_COMMAND}
-            -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -DSOURCE_DIR=${FESOM_TESTING_ROOT}
             -DBUILD_DIR=${CMAKE_BINARY_DIR}
             -DMESH_NAME=pi
             -DNUM_PROCESSES=4
             -DMESH_WORKDIR=${CMAKE_BINARY_DIR}/tests/meshpartitioner/meshes/pi
-            -P ${CMAKE_SOURCE_DIR}/tests/integration/mesh_partition.cmake
+            -P ${FESOM_TESTING_ROOT}/tests/integration/mesh_partition.cmake
     )
 
     set_tests_properties(meshpartitioner_partition_local_pi_mesh_4 PROPERTIES
@@ -27,12 +27,12 @@ if(BUILD_MESHPARTITIONER)
     add_test(
         NAME meshpartitioner_partition_local_pi_cavity_mesh_4
         COMMAND ${CMAKE_COMMAND}
-            -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -DSOURCE_DIR=${FESOM_TESTING_ROOT}
             -DBUILD_DIR=${CMAKE_BINARY_DIR}
             -DMESH_NAME=pi_cavity
             -DNUM_PROCESSES=4
             -DMESH_WORKDIR=${CMAKE_BINARY_DIR}/tests/meshpartitioner/meshes/pi_cavity
-            -P ${CMAKE_SOURCE_DIR}/tests/integration/mesh_partition.cmake
+            -P ${FESOM_TESTING_ROOT}/tests/integration/mesh_partition.cmake
     )
     
     set_tests_properties(meshpartitioner_partition_local_pi_cavity_mesh_4 PROPERTIES
