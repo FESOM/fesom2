@@ -2235,23 +2235,29 @@ end subroutine write_buoy_props_netcdf
 ! files written before this patch remain readable.
 !========================================================================
 subroutine read_icb_iron_restart(path, n, mype)
- use g_config, only : icb_iron_const
  implicit none
  character(*), intent(in) :: path
  integer,      intent(in) :: n, mype
- integer :: ib, un
+ integer :: ib, un, io_error
  logical :: exists
 
  INQUIRE(FILE=path, EXIST=exists)
  if (.not. exists) then
-    iron_conc_ib = icb_iron_const
+    ! No iron restart yet (first restart after enabling the feature): keep the
+    ! values init_icebergs* already loaded (icb_iron.dat or icb_iron_const).
+    ! Do NOT reset to icb_iron_const here - that would clobber icb_iron.dat.
     if (mype==0) write(*,*) 'icb iron: ', trim(path),                          &
-                            ' not found -> using icb_iron_const for all icebergs'
+                            ' not found -> keeping values from icb_iron.dat/icb_iron_const'
     return
  end if
  open(newunit=un, file=path, status='old', action='read', form='formatted')
  do ib=1, n
-    read(un,*) iron_conc_ib(ib)
+    read(un,*,iostat=io_error) iron_conc_ib(ib)
+    if (io_error /= 0) then
+       write(*,*) 'ERROR while reading ', trim(path), ': expected ', n,        &
+                  ' values, failed at entry ', ib
+       stop 'ERROR while reading iceberg iron restart file'
+    end if
  end do
  close(un)
  if (mype==0) write(*,*) 'icb iron: restored ', n, ' values from ', trim(path)
