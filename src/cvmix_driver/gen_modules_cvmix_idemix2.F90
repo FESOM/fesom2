@@ -2619,7 +2619,12 @@ module g_cvmix_idemix2
         !_______________________________________________________________________
         ! Horizontal part
 #ifndef ENABLE_OPENACC
+#   if defined(__openmp_reproducible)
+       ! the ORDERED region below requires the clause on its worksharing loop
+       !$OMP DO ORDERED
+#   else
        !$OMP DO
+#   endif
 #else
 #   if !defined(DISABLE_OPENACC_ATOMICS)
        !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
