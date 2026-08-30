@@ -1744,7 +1744,9 @@ subroutine update_stiff_mat_ale(partit, mesh)
     ! loop over lcal edges
     factor=g*dt*alpha*theta
 
+#if !defined(__openmp_reproducible)
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, i, j, k, row, ed, n2, enodes, elnodes, el, elem, npos, offset, nini, nend, fx, fy)
+#endif
     do ed=1,myDim_edge2D   !! Attention
         ! enodes ... local node indices of nodes that edge ed
         enodes=edges(:,ed)        
@@ -1797,8 +1799,6 @@ subroutine update_stiff_mat_ale(partit, mesh)
                 ! npos... sparse matrix indices position of node points elnodes
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
                    call omp_set_lock  (partit%plock(row)) ! it shall be sufficient to block writing into the same row of SSH_stiff
-#else
-!$OMP ORDERED
 #endif
 #if defined(USE_SINGLE_PRECISION)
                    SSH_stiff%values_full(npos)=SSH_stiff%values_full(npos) + real(fy*factor, real64)
@@ -1810,13 +1810,13 @@ subroutine update_stiff_mat_ale(partit, mesh)
 #endif
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
                    call omp_unset_lock(partit%plock(row))
-#else
-!$OMP END ORDERED
 #endif                
             end do ! --> do i=1,2
         end do ! --> do j=1,2 
     end do ! --> do ed=1,myDim_edge2D 
+#if !defined(__openmp_reproducible)
 !$OMP END PARALLEL DO
+#endif
 #if defined(USE_SINGLE_PRECISION)
     !___________________________________________________________________________
     ! Refresh the working copy the CG solver and preconditioner read. The
@@ -1921,7 +1921,11 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ed, el, enodes, n, nz, nzmin, nzmax, c1, c2, deltaX1, deltaX2, deltaY1, deltaY2, &
 !$OMP                                                                                 dumc1_1, dumc1_2, dumc2_1, dumc2_2)
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     do ed=1, myDim_edge2D      
         ! local indice of nodes that span up edge ed
         enodes=edges(:,ed)
@@ -2073,7 +2077,11 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ed, el, enodes, elem, elnodes, n, nz, nzmin, nzmax, &
 !$OMP                                            c1, c2, deltaX1, deltaX2, deltaY1, deltaY2)
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     do ed=1, myDim_edge2D                     
         ! local indice of nodes that span up edge ed
         enodes=edges(:,ed)
@@ -2252,7 +2260,11 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
 !$OMP END PARALLEL DO
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ed, enodes, el, deltaX1, deltaY1, nz, nzmin, nzmax, deltaX2, deltaY2, c1, c2)
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     do ed=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         enodes=edges(:,ed)   
@@ -2806,7 +2818,11 @@ subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
     !___________________________________________________________________________
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ed, ednodes, edelem, nz, nzmin, nzmax, & 
 !$OMP                                  deltaX1, deltaY1, deltaX2, deltaY2, c1, c2)
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     do ed=1, myDim_edge2D
         ! local indice of nodes that span up edge ed
         ednodes=edges(:,ed)   
