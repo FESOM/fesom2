@@ -42,9 +42,15 @@ if missing:
 bits_equal = not missing and all(bitwise_equal(a[k], b[k]) for k in a)
 worst = 0.0
 nan = 0
+# A shape mismatch is a HARD failure, not a skip. It used to `continue` without
+# recording anything, so a run whose record count changed (say 4 time records
+# against 1) left worst=0 and reported VALUES-IDENTICAL with exit 0 -- the gate
+# passed a file it had never actually compared.
+shape_diff = []
 for k in sorted(set(a) & set(b)):
     if a[k].shape != b[k].shape:
         print(f"  SHAPE {k}: {a[k].shape} vs {b[k].shape}")
+        shape_diff.append(k)
         continue
     d = np.abs(a[k].astype(np.float64) - b[k].astype(np.float64))
     rel = (d / np.maximum(np.abs(b[k].astype(np.float64)), 1e-30)).max()
@@ -53,11 +59,13 @@ for k in sorted(set(a) & set(b)):
     if d.max() > 0 or nanc:
         print(f"  {k}: max|d|={d.max():.3e} maxrel={rel:.3e} nan={nanc}")
     worst = max(worst, rel)
-if bits_equal and nan == 0:
+if shape_diff or missing:
+    status = 'SHAPE/VARIABLE MISMATCH'
+elif bits_equal and nan == 0:
     status = 'BITWISE-IDENTICAL'
 elif worst == 0 and nan == 0:
     status = 'VALUES-IDENTICAL'
 else:
     status = 'DIFF'
 print(f"WORST_REL={worst:.3e}  NAN={nan}  ({status})")
-sys.exit(0 if (worst <= 1.2e-7 and nan == 0 and not missing) else 1)
+sys.exit(0 if (worst <= 1.2e-7 and nan == 0 and not missing and not shape_diff) else 1)
