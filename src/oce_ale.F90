@@ -1681,7 +1681,12 @@ end subroutine init_stiff_mat_ale
 !   = ssh_rhs                                                             in the update of the stiff matrix
 !
 subroutine update_stiff_mat_ale(partit, mesh)
+    use, intrinsic :: iso_fortran_env, only: real64
+#if defined(USE_SINGLE_PRECISION) && defined(DIAG_STIFF_DRIFT)
+    use g_config,only: dt, logfile_outfreq
+#else
     use g_config,only: dt
+#endif
     use o_PARAM
     use MOD_MESH
     use MOD_TRACER
@@ -1697,6 +1702,10 @@ subroutine update_stiff_mat_ale(partit, mesh)
     integer                             :: elem, npos(3), offset, nini, nend
     real(kind=WP)                       :: factor 
     real(kind=WP)                       :: fx(3), fy(3)
+#if defined(USE_SINGLE_PRECISION) && defined(DIAG_STIFF_DRIFT)
+    integer, save                       :: drift_ncall = 0
+    real(kind=real64)                   :: drift_d, drift_r, drift_s(4), drift_g(4)
+#endif
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -1705,6 +1714,31 @@ subroutine update_stiff_mat_ale(partit, mesh)
 #include "associate_mesh_ass.h"
 
     !___________________________________________________________________________
+#if defined(USE_SINGLE_PRECISION)
+    !___________________________________________________________________________
+    ! Seed the full-precision accumulator on first use. Deliberately here and not
+    ! in init_stiff_mat_ale: init runs on every start, but on a restart the
+    ! restored %values (which carries every increment the previous segment
+    ! accumulated -- it is in the binary dump, see MOD_MESH) overwrites what init
+    ! assembled. Seeding here, on the first update after all of that, is the one
+    ! point correct for a cold start and a restart alike.
+    !
+    ! SIZE: size(%values), NOT %nza. init_stiff_mat_ale sets %nza to the LOCAL nnz
+    ! and allocates %values with it, then later REPLACES %nza with the global sum
+    ! (sum(rpnza(1:npes))) because the solver wants a global count. Allocating
+    ! here with %nza would therefore over-allocate by ~npes per rank and make the
+    ! whole-array assignments below nonconforming -- reading past the end of
+    ! %values. size(%values) is the array we are shadowing, by construction.
+    if (.not. allocated(ssh_stiff%values_full)) then
+        allocate(ssh_stiff%values_full(size(ssh_stiff%values)))
+        ssh_stiff%values_full = real(ssh_stiff%values, real64)
+#if defined(DIAG_STIFF_DRIFT)
+        allocate(ssh_stiff%values_wp_drift(size(ssh_stiff%values)))
+        ssh_stiff%values_wp_drift = ssh_stiff%values
+#endif
+    end if
+#endif
+
     ! update secod term of lhs od equation (18) of "FESOM2 from finite element 
     ! to finite volumes" --> stiff matrix part
     ! loop over lcal edges
@@ -1766,7 +1800,14 @@ subroutine update_stiff_mat_ale(partit, mesh)
 #else
 !$OMP ORDERED
 #endif
+#if defined(USE_SINGLE_PRECISION)
+                   SSH_stiff%values_full(npos)=SSH_stiff%values_full(npos) + real(fy*factor, real64)
+#if defined(DIAG_STIFF_DRIFT)
+                   SSH_stiff%values_wp_drift(npos)=SSH_stiff%values_wp_drift(npos) + fy*factor
+#endif
+#else
                    SSH_stiff%values(npos)=SSH_stiff%values(npos) + fy*factor
+#endif
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
                    call omp_unset_lock(partit%plock(row))
 #else
@@ -1776,6 +1817,46 @@ subroutine update_stiff_mat_ale(partit, mesh)
         end do ! --> do j=1,2 
     end do ! --> do ed=1,myDim_edge2D 
 !$OMP END PARALLEL DO
+#if defined(USE_SINGLE_PRECISION)
+    !___________________________________________________________________________
+    ! Refresh the working copy the CG solver and preconditioner read. The
+    ! accumulation above ran in real64, so this rounds once per step instead of
+    ! letting the rounding compound over the run. The solver's SpMV keeps WP
+    ! bandwidth -- only the accumulator is wider.
+    SSH_stiff%values = real(SSH_stiff%values_full, WP)
+#if defined(DIAG_STIFF_DRIFT)
+    !___________________________________________________________________________
+    ! Instrument: how far has the WP-accumulated matrix drifted from the real64
+    ! one? Inlined rather than a subroutine because a separate routine needs an
+    ! explicit interface (target dummies), and CMake's Fortran dependency scanner
+    ! does not evaluate the preprocessor -- it would demand the interface .mod in
+    ! builds where the module is guarded out. In DP both accumulators are the same
+    ! arithmetic, so the drift is 0.0 by construction; that is the control, and it
+    ! is why this is single-precision only.
+    drift_ncall = drift_ncall + 1
+    if (mod(drift_ncall, max(1,logfile_outfreq)) == 0) then
+        drift_s = 0.0_real64
+        do n = 1, myDim_nod2D
+            do k = ssh_stiff%rowptr_loc(n), ssh_stiff%rowptr_loc(n+1)-1
+                drift_d = real(ssh_stiff%values_wp_drift(k), real64) - ssh_stiff%values_full(k)
+                drift_r = ssh_stiff%values_full(k)
+                if (ssh_stiff%colind_loc(k) == n) then
+                    drift_s(1) = drift_s(1) + drift_d*drift_d
+                    drift_s(2) = drift_s(2) + drift_r*drift_r
+                else
+                    drift_s(3) = drift_s(3) + drift_d*drift_d
+                    drift_s(4) = drift_s(4) + drift_r*drift_r
+                end if
+            end do
+        end do
+        call MPI_AllREDUCE(drift_s, drift_g, 4, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+        if (mype == 0) write(*,'(a,i8,a,es12.5,a,es12.5)') ' [STIFFDRIFT] update ', drift_ncall, &
+            '  relL2(diag)= ',    sqrt(drift_g(1)/max(drift_g(2), tiny(1.0_real64))),            &
+            '  relL2(offdiag)= ', sqrt(drift_g(3)/max(drift_g(4), tiny(1.0_real64)))
+    end if
+#endif
+#endif
+
 !DS this check will work only on 0pe because SSH_stiff%rowptr contains global pointers
 !if (mype==0) then
 !do row=1, myDim_nod2D

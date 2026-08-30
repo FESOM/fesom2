@@ -34,6 +34,7 @@ module fesom_main_storage_module
   use ice_setup_interface
   use ocean2ice_interface
   use oce_fluxes_interface
+  use hosing_interface
   use update_atm_forcing_interface
   use before_oce_step_interface
   use oce_timestep_ale_interface
@@ -156,6 +157,7 @@ contains
       ! EO parameters
       logical mpi_is_initialized
       integer              :: tr_num, n
+      real(kind=WP)        :: salt_max_loc, salt_max_glob   ! use_salt_anomaly restart detect
 
 #if defined (__recom)
       type(tracers_info_type)               :: tracers_info
@@ -350,6 +352,21 @@ contains
             print *,"FESOM2 git SHA: "//fesom_git_sha()
             call MPI_Get_library_version(f%mpi_version_txt, f%mpi_version_len, f%MPIERR)
             print *,"MPI library version: "//trim(f%mpi_version_txt)
+#if defined(USE_SINGLE_PRECISION)
+            print '(a,i0,a)'," FESOM working precision: WP=",WP," bytes (SINGLE PRECISION MODE)"
+#else
+            print '(a,i0,a)'," FESOM working precision: WP=",WP," bytes (DOUBLE PRECISION MODE)"
+#endif
+            ! Intrinsic characteristics of the DEFAULT working-precision kind (once,
+            ! root rank). Labelled "Default WP" because the model is mixed-precision:
+            ! some paths are fixed real64 (e.g. the forcing time axis) or run in double
+            ! (CVMix) regardless of WP. A stable reference if the toolchain changes.
+            print *, "   Default WP kind    :", WP
+            print *, "   Default WP storage :", storage_size(0.0_WP), "bits"
+            print *, "   Default WP digits  :", precision(0.0_WP)
+            ! spacing(1.0_WP) == machine epsilon on IEEE; the intrinsic epsilon() is
+            ! shadowed here by the AB2 offset variable 'epsilon' (oce_modules.F90).
+            print *, "   Default WP epsilon :", spacing(1.0_WP)
             print *, achar(27)//'[32m'  //'____________________________________________________________'//achar(27)//'[0m'
             print *, achar(27)//'[7;32m'//' --> FESOM BUILDS UP MODEL CONFIGURATION                    '//achar(27)//'[0m'
         end if
@@ -639,6 +656,27 @@ contains
         !___READ INITIAL CONDITIONS IF THIS IS A RESTART RUN________________________
         if (r_restart) then
             call read_initial_conditions(f%which_readr, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+            if (use_salt_anomaly) then
+            ! Restart files may hold ABSOLUTE salinity (migrating from a run
+            ! without use_salt_anomaly) or the anomaly (a chain of anomaly
+            ! runs writes the state as stored). Detect by the global maximum:
+            ! absolute salinity peaks near 41 psu, the anomaly near 41-S_ref.
+            ! Convert once when migrating; all AB history levels shift by the
+            ! same constant.
+            salt_max_loc = maxval(f%tracers%data(2)%values)
+            call MPI_AllREDUCE(salt_max_loc, salt_max_glob, 1, MPI_WP, MPI_MAX, &
+                               f%partit%MPI_COMM_FESOM, f%partit%MPIerr)
+            if (salt_max_glob > 20.0_WP) then
+                f%tracers%data(2)%values    = f%tracers%data(2)%values    - S_ref_anomaly
+                f%tracers%data(2)%valuesAB  = f%tracers%data(2)%valuesAB  - S_ref_anomaly
+                f%tracers%data(2)%valuesold = f%tracers%data(2)%valuesold - S_ref_anomaly
+                if (f%mype==0) write(*,*) &
+                    'use_salt_anomaly: absolute-salinity restart detected -> converted to S - S_ref'
+            else
+                if (f%mype==0) write(*,*) &
+                    'use_salt_anomaly: anomaly-salinity restart -> no conversion'
+            end if
+            end if
         end if
         if (f%mype==0) f%t7=MPI_Wtime()
         
@@ -824,7 +862,7 @@ contains
   subroutine fesom_runloop(current_nsteps)
     use fesom_main_storage_module
 !   use openacc_lib
-    integer, intent(in) :: current_nsteps 
+    integer, intent(in) :: current_nsteps
     ! EO parameters
     integer n, nstart, ntotal, tr_num, tracer_index
     logical :: do_cmor_0d_reset
@@ -1062,6 +1100,14 @@ contains
             call oce_fluxes_mom(f%ice, f%dynamics, f%partit, f%mesh) ! momentum only
             call oce_fluxes(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
             f%t_ice_e = MPI_Wtime()
+
+            !___freshwater depth hosing routine_______________________________________
+            !
+            if (use_hosing .and. trim(hosing_mode)=='depth') then
+                call fw_depth_anomaly(f%tracers%data(2)%values, f%tracers%data(1)%values, &
+                                      hosing_hSv, f%partit, f%mesh)
+            end if
+
         end if
         
         call before_oce_step(f%dynamics, f%tracers, f%partit, f%mesh) ! prepare the things if required

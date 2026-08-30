@@ -146,7 +146,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)         :: nod_array2D(:)
+real(kind=WP),   intent(inout)         :: nod_array2D(:)
 logical,        intent(in),optional   :: luse_g2g
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
@@ -166,7 +166,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)         :: nod_array2D(:)
+real(kind=WP),   intent(inout)         :: nod_array2D(:)
 integer                               :: n, sn, rn
 logical,        intent(in),optional   :: luse_g2g
 logical                               :: lg2g
@@ -227,8 +227,8 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)         :: nod1_array2D(:)
-real(real64),   intent(inout)         :: nod2_array2D(:)
+real(kind=WP),   intent(inout)         :: nod1_array2D(:)
+real(kind=WP),   intent(inout)         :: nod2_array2D(:)
 logical,        intent(in),optional   :: luse_g2g
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
@@ -248,8 +248,8 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)         :: nod1_array2D(:)
-real(real64),   intent(inout)         :: nod2_array2D(:)
+real(kind=WP),   intent(inout)         :: nod1_array2D(:)
+real(kind=WP),   intent(inout)         :: nod2_array2D(:)
 integer                               :: n, sn, rn
 logical,        intent(in),optional   :: luse_g2g
 logical                               :: lg2g
@@ -322,9 +322,9 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)         :: nod1_array2D(:)
-real(real64),   intent(inout)         :: nod2_array2D(:)
-real(real64),   intent(inout)         :: nod3_array2D(:)
+real(kind=WP),   intent(inout)         :: nod1_array2D(:)
+real(kind=WP),   intent(inout)         :: nod2_array2D(:)
+real(kind=WP),   intent(inout)         :: nod3_array2D(:)
 logical,        intent(in),optional   :: luse_g2g
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
@@ -345,9 +345,9 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)         :: nod1_array2D(:)
-real(real64),   intent(inout)         :: nod2_array2D(:)
-real(real64),   intent(inout)         :: nod3_array2D(:)
+real(kind=WP),   intent(inout)         :: nod1_array2D(:)
+real(kind=WP),   intent(inout)         :: nod2_array2D(:)
+real(kind=WP),   intent(inout)         :: nod3_array2D(:)
 integer                               :: n, sn, rn
 logical,        intent(in),optional   :: luse_g2g
 logical                               :: lg2g
@@ -435,7 +435,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)         :: nod_array3D(:,:)
+real(kind=WP),   intent(inout)         :: nod_array3D(:,:)
 logical,        intent(in),optional   :: luse_g2g
 
 if (partit%npes > 1) then
@@ -454,7 +454,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)         :: nod_array3D(:,:)
+real(kind=WP),   intent(inout)         :: nod_array3D(:,:)
 integer                               :: n, sn, rn
 integer                               :: nz, nl1
 logical,        intent(in),optional   :: luse_g2g
@@ -525,8 +525,8 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)         :: nod1_array3D(:,:)
-real(real64),   intent(inout)         :: nod2_array3D(:,:)
+real(kind=WP),   intent(inout)         :: nod1_array3D(:,:)
+real(kind=WP),   intent(inout)         :: nod2_array3D(:,:)
 logical,        intent(in),optional   :: luse_g2g
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
@@ -546,8 +546,8 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)         :: nod1_array3D(:,:)
-real(real64),   intent(inout)         :: nod2_array3D(:,:)
+real(kind=WP),   intent(inout)         :: nod1_array3D(:,:)
+real(kind=WP),   intent(inout)         :: nod2_array3D(:,:)
 integer                               :: n, sn, rn
 integer                               :: nz, nl1, nl2
 logical,        intent(in),optional   :: luse_g2g
@@ -638,7 +638,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
-real(real64),   intent(inout)          :: nod_array3D(:,:,:)
+real(kind=WP),   intent(inout)          :: nod_array3D(:,:,:)
 logical,        intent(in),optional    :: luse_g2g
 if (partit%npes>1) then
    call exchange_nod3D_n_begin(nod_array3D, partit, luse_g2g)
@@ -656,7 +656,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
-real(real64),   intent(inout)          :: nod_array3D(:,:,:)
+real(kind=WP),   intent(inout)          :: nod_array3D(:,:,:)
 integer                                :: n, sn, rn
 integer                                :: nz, nl1, n_val
 logical,        intent(in),optional    :: luse_g2g
@@ -772,7 +772,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
-real(real64),   intent(inout)          :: elem_array3D(:,:)
+real(kind=WP),   intent(inout)          :: elem_array3D(:,:)
 logical,        intent(in),optional    :: luse_g2g
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
@@ -790,7 +790,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
-real(real64),   intent(inout)       :: elem_array3D(:,:)
+real(kind=WP),   intent(inout)       :: elem_array3D(:,:)
 integer                             :: n, sn, rn, nl1
 logical                                :: lg2g
 logical,        intent(in),optional    :: luse_g2g
@@ -991,7 +991,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
-real(real64),   intent(inout)       :: elem_array3D(:,:,:)
+real(kind=WP),   intent(inout)       :: elem_array3D(:,:,:)
 logical,        intent(in),optional    :: luse_g2g
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
@@ -1010,7 +1010,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
-real(real64),   intent(inout)       :: elem_array3D(:,:,:)
+real(kind=WP),   intent(inout)       :: elem_array3D(:,:,:)
 integer                             :: n, sn, rn, n_val, nl1
 logical                                :: lg2g
 logical,        intent(in),optional    :: luse_g2g
@@ -1129,7 +1129,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
-real(real64),   intent(inout)       :: elem_array2D(:)
+real(kind=WP),   intent(inout)       :: elem_array2D(:)
 logical,        intent(in),optional    :: luse_g2g
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
@@ -1149,7 +1149,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
-real(real64),   intent(inout)       :: elem_array2D(:)
+real(kind=WP),   intent(inout)       :: elem_array2D(:)
 integer                             :: n, sn, rn
 logical                                :: lg2g
 logical,        intent(in),optional    :: luse_g2g
@@ -1338,11 +1338,11 @@ IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 INTEGER                             :: nz, counter,nl1
 integer                             ::  i, n, nTS, sender, status(MPI_STATUS_SIZE)
-real(real64)                        ::  arr3D(:,:)
-real(real64)                        ::  arr3Dglobal(:,:)
+real(kind=WP)                        ::  arr3D(:,:)
+real(kind=WP)                        ::  arr3Dglobal(:,:)
 integer                             :: node_size
 INTEGER,      ALLOCATABLE, DIMENSION(:) ::  irecvbuf
-real(real64), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
+real(kind=WP), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 
@@ -1368,7 +1368,7 @@ IF ( mype == 0 ) THEN
           ENDDO
        ENDDO
 
-       CALL MPI_SEND(sendbuf(1), nTS*nl1, MPI_DOUBLE_PRECISION, &
+       CALL MPI_SEND(sendbuf(1), nTS*nl1, MPI_WP, &
                    sender, 2, MPI_COMM_FESOM, MPIerr )
 
        DEALLOCATE(irecvbuf, sendbuf)
@@ -1379,7 +1379,7 @@ ELSE
                    MPI_COMM_FESOM, MPIerr )
 
     ALLOCATE(recvbuf(node_size*nl1))
-    CALL MPI_RECV( recvbuf(1), node_size*nl1, MPI_DOUBLE_PRECISION, 0, &
+    CALL MPI_RECV( recvbuf(1), node_size*nl1, MPI_WP, 0, &
                       2, MPI_COMM_FESOM, status, MPIerr )
     counter=0
     DO n = 1, node_size
@@ -1403,11 +1403,11 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(in), target       :: partit
-real(real64)                             :: arr2D(:)
-real(real64)                             :: arr2Dglobal(:)
+real(kind=WP)                             :: arr2D(:)
+real(kind=WP)                             :: arr2Dglobal(:)
 integer                                  :: i, n, nTS, sender, status(MPI_STATUS_SIZE)
 INTEGER,      ALLOCATABLE, DIMENSION(:)  :: irecvbuf
-real(real64), ALLOCATABLE, DIMENSION(:)  :: sendbuf
+real(kind=WP), ALLOCATABLE, DIMENSION(:)  :: sendbuf
 integer                                  :: node_size
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
@@ -1430,7 +1430,7 @@ IF ( mype == 0 ) THEN
              sendbuf(i) = arr2Dglobal(irecvbuf(i))
        ENDDO
 
-       CALL MPI_SEND(sendbuf(1), nTS, MPI_DOUBLE_PRECISION, &
+       CALL MPI_SEND(sendbuf(1), nTS, MPI_WP, &
                    sender, 2, MPI_COMM_FESOM, MPIerr )
 
        DEALLOCATE(irecvbuf, sendbuf)
@@ -1439,7 +1439,7 @@ ELSE
     CALL MPI_SEND( node_size, 1, MPI_INTEGER, 0, 0, MPI_COMM_FESOM, MPIerr )
     CALL MPI_SEND( myList_nod2D(1), node_size, MPI_INTEGER, 0, 1, &
                    MPI_COMM_FESOM, MPIerr )
-    CALL MPI_RECV( arr2D(1), node_size, MPI_DOUBLE_PRECISION, 0, &
+    CALL MPI_RECV( arr2D(1), node_size, MPI_WP, 0, &
                       2, MPI_COMM_FESOM, status, MPIerr )
 ENDIF
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
@@ -1456,12 +1456,12 @@ IMPLICIT NONE
 type(t_partit), intent(in), target      :: partit
 INTEGER                                 :: nz, counter,nl1
 integer                                 :: i, n, nTS, sender, status(MPI_STATUS_SIZE)
-real(real64)                            :: arr3D(:,:)
-real(real64)                            :: arr3Dglobal(:,:)
+real(kind=WP)                            :: arr3D(:,:)
+real(kind=WP)                            :: arr3Dglobal(:,:)
 integer                                 :: elem_size
 
 INTEGER,      ALLOCATABLE, DIMENSION(:) ::  irecvbuf
-real(real64), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
+real(kind=WP), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 
@@ -1488,7 +1488,7 @@ IF ( mype == 0 ) THEN
           ENDDO
        ENDDO
 
-       CALL MPI_SEND(sendbuf(1), nTS*nl1, MPI_DOUBLE_PRECISION, &
+       CALL MPI_SEND(sendbuf(1), nTS*nl1, MPI_WP, &
                    sender, 2, MPI_COMM_FESOM, MPIerr )
 
        DEALLOCATE(irecvbuf, sendbuf)
@@ -1499,7 +1499,7 @@ ELSE
                    MPI_COMM_FESOM, MPIerr )
 
     ALLOCATE(recvbuf(elem_size*nl1))
-    CALL MPI_RECV( recvbuf(1), elem_size*nl1, MPI_DOUBLE_PRECISION, 0, &
+    CALL MPI_RECV( recvbuf(1), elem_size*nl1, MPI_WP, 0, &
                       2, MPI_COMM_FESOM, status, MPIerr )
     counter=0
     DO n = 1, elem_size
@@ -1524,11 +1524,11 @@ USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(in), target      :: partit
 integer                                 :: i, n, nTS, sender, status(MPI_STATUS_SIZE)
-real(real64)                            :: arr2D(:)
-real(real64)                            :: arr2Dglobal(:)
+real(kind=WP)                            :: arr2D(:)
+real(kind=WP)                            :: arr2Dglobal(:)
 integer                                 :: elem_size
 INTEGER,      ALLOCATABLE, DIMENSION(:) :: irecvbuf
-real(real64), ALLOCATABLE, DIMENSION(:) :: sendbuf
+real(kind=WP), ALLOCATABLE, DIMENSION(:) :: sendbuf
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 
@@ -1550,7 +1550,7 @@ IF ( mype == 0 ) THEN
              sendbuf(i) = arr2Dglobal(irecvbuf(i))
        ENDDO
 
-       CALL MPI_SEND(sendbuf(1), nTS, MPI_DOUBLE_PRECISION, &
+       CALL MPI_SEND(sendbuf(1), nTS, MPI_WP, &
                    sender, 2, MPI_COMM_FESOM, MPIerr )
 
        DEALLOCATE(irecvbuf, sendbuf)
@@ -1559,7 +1559,7 @@ ELSE
     CALL MPI_SEND( elem_size, 1, MPI_INTEGER, 0, 0, MPI_COMM_FESOM, MPIerr )
     CALL MPI_SEND( myList_elem2D(1), elem_size, MPI_INTEGER, 0, 1, &
                    MPI_COMM_FESOM, MPIerr )
-    CALL MPI_RECV( arr2D(1), elem_size, MPI_DOUBLE_PRECISION, 0, &
+    CALL MPI_RECV( arr2D(1), elem_size, MPI_WP, 0, &
                       2, MPI_COMM_FESOM, status, MPIerr )
 ENDIF
 CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
@@ -2622,11 +2622,11 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(in), target      :: partit
-real(real64)                            :: arr2D(:)
-real(real64)                            :: arr2Dglobal(:)
+real(kind=WP)                            :: arr2D(:)
+real(kind=WP)                            :: arr2Dglobal(:)
 integer                                 ::  i, n, buf_size, sender, status(MPI_STATUS_SIZE)
 INTEGER, ALLOCATABLE, DIMENSION(:)      ::  ibuf
-REAL(real64), ALLOCATABLE, DIMENSION(:) ::  rbuf
+real(kind=WP), ALLOCATABLE, DIMENSION(:) ::  rbuf
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 
@@ -2640,12 +2640,12 @@ IF ( mype == 0 ) THEN
 
 !PS        CALL MPI_RECV(ibuf(1), buf_size, MPI_INTEGER, sender, &
 !PS                       1, MPI_COMM_FESOM, status, MPIerr )
-!PS        CALL MPI_RECV(rbuf(1), buf_size, MPI_DOUBLE_PRECISION, sender, &
+!PS        CALL MPI_RECV(rbuf(1), buf_size, MPI_WP, sender, &
 !PS                       2, MPI_COMM_FESOM, status, MPIerr )
                       
        CALL MPI_RECV(ibuf, buf_size, MPI_INTEGER, sender, &
                       1, MPI_COMM_FESOM, status, MPIerr )
-       CALL MPI_RECV(rbuf, buf_size, MPI_DOUBLE_PRECISION, sender, &
+       CALL MPI_RECV(rbuf, buf_size, MPI_WP, sender, &
                       2, MPI_COMM_FESOM, status, MPIerr )               
        arr2Dglobal(ibuf)=rbuf
        DEALLOCATE(ibuf, rbuf)
@@ -2654,13 +2654,13 @@ ELSE
 !PS     CALL MPI_SEND( myDim_edge2D, 1, MPI_INTEGER, 0, 0, MPI_COMM_FESOM, MPIerr )
 !PS     CALL MPI_SEND( myList_edge2D(1), myDim_edge2D, MPI_INTEGER, 0, 1, &
 !PS                    MPI_COMM_FESOM, MPIerr )
-!PS     CALL MPI_SEND( arr2D(1), myDim_edge2D, MPI_DOUBLE_PRECISION, 0, 2,&
+!PS     CALL MPI_SEND( arr2D(1), myDim_edge2D, MPI_WP, 0, 2,&
 !PS                    MPI_COMM_FESOM, MPIerr )
                    
     CALL MPI_SEND( myDim_edge2D, 1, MPI_INTEGER, 0, 0, MPI_COMM_FESOM, MPIerr )
     CALL MPI_SEND( myList_edge2D(1:myDim_edge2D), myDim_edge2D, MPI_INTEGER, 0, 1, &
                    MPI_COMM_FESOM, MPIerr )
-    CALL MPI_SEND( arr2D(1:myDim_edge2D), myDim_edge2D, MPI_DOUBLE_PRECISION, 0, 2,&
+    CALL MPI_SEND( arr2D(1:myDim_edge2D), myDim_edge2D, MPI_WP, 0, 2,&
                    MPI_COMM_FESOM, MPIerr )
                    
 ENDIF

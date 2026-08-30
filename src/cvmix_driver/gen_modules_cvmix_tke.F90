@@ -18,6 +18,8 @@ module g_cvmix_tke
     ! module calls from cvmix library
     use cvmix_tke,         only: init_tke, cvmix_coeffs_tke
     use cvmix_put_get,     only: cvmix_put
+    ! cvmix_kinds_and_types provides cvmix_r8 (CVMix's fixed real64 kind), used below to
+    ! convert WP<->cvmix_r8 at the CVMix call boundary for single-precision FESOM builds.
     use cvmix_kinds_and_types
     use g_cvmix_idemix,    only: iwe_n, iwe_Tdis_n, iwe_alpha_c_n
     use g_cvmix_idemix2,   only: iwe2_E_iw, iwe2_E_iw_diss, iwe2_alpha_c, iwe2_tip1, &
@@ -259,21 +261,21 @@ module g_cvmix_tke
         
         !_______________________________________________________________________
         ! call tke initialisation routine from cvmix library
-        call init_tke(c_k            = tke_c_k,            &
-                      c_eps          = tke_c_eps,          &
-                      cd             = tke_cd,             &
-                      alpha_tke      = tke_alpha,          &
-                      mxl_min        = tke_mxl_min,        &
-                      kappaM_min     = tke_kappaM_min,     &
-                      kappaM_max     = tke_kappaM_max,     &
+        call init_tke(c_k            = real(tke_c_k,        cvmix_r8), &
+                      c_eps          = real(tke_c_eps,      cvmix_r8), &
+                      cd             = real(tke_cd,         cvmix_r8), &
+                      alpha_tke      = real(tke_alpha,      cvmix_r8), &
+                      mxl_min        = real(tke_mxl_min,    cvmix_r8), &
+                      kappaM_min     = real(tke_kappaM_min, cvmix_r8), &
+                      kappaM_max     = real(tke_kappaM_max, cvmix_r8), &
                       tke_mxl_choice = tke_mxl_choice,     &
                       use_ubound_dirichlet = use_ubound_dirichlet, &
                       use_lbound_dirichlet = use_lbound_dirichlet, &
                       only_tke       = tke_only,           &
                       l_lc           = tke_dolangmuir,     &
-                      clc            = tke_clangmuir,      &
-                      tke_min        = tke_min,            &
-                      tke_surf_min   = tke_surf_min    )
+                      clc            = real(tke_clangmuir,  cvmix_r8), &
+                      tke_min        = real(tke_min,        cvmix_r8), &
+                      tke_surf_min   = real(tke_surf_min,   cvmix_r8) )
     end subroutine init_cvmix_tke
     !
     !
@@ -290,6 +292,22 @@ module g_cvmix_tke
         real(kind=WP) :: dz_trr(mesh%nl), bvfreq2(mesh%nl), vshear2(mesh%nl)
         real(kind=WP) :: tke_Av_old(mesh%nl), tke_Kv_old(mesh%nl), tke_old(mesh%nl)
         real(kind=WP), dimension(:,:,:), pointer :: UVnode
+        ! CVMix is a fixed double-precision library (kind cvmix_r8); FESOM's WP may be
+        ! real4. These buffers convert WP<->cvmix_r8 at the CVMix TKE call boundary so
+        ! CVMix always runs in double precision. In a DP build cvmix_r8==WP, so the
+        ! casts/copies are exact no-ops and the result is bit-identical.
+        ! input arrays (copy-in WP -> cvmix_r8 before the call):
+        real(cvmix_r8) :: dzw_r8(mesh%nl), dzt_r8(mesh%nl)
+        real(cvmix_r8) :: tke_old_r8(mesh%nl), av_old_r8(mesh%nl), kv_old_r8(mesh%nl)
+        real(cvmix_r8) :: ssqr_r8(mesh%nl), nsqr_r8(mesh%nl)
+        real(cvmix_r8) :: alphac_r8(mesh%nl), eiw_r8(mesh%nl), iwdis_r8(mesh%nl)
+        real(cvmix_r8) :: plc_r8(mesh%nl)
+        ! output arrays (copy-out cvmix_r8 -> WP after the call):
+        real(cvmix_r8) :: tke_new_r8(mesh%nl), kappam_r8(mesh%nl), kappah_r8(mesh%nl)
+        real(cvmix_r8) :: tbpr_r8(mesh%nl), tspr_r8(mesh%nl), tdif_r8(mesh%nl), tdis_r8(mesh%nl)
+        real(cvmix_r8) :: twin_r8(mesh%nl), tiwf_r8(mesh%nl), tbck_r8(mesh%nl), ttot_r8(mesh%nl)
+        real(cvmix_r8) :: lmix_r8(mesh%nl), pr_r8(mesh%nl)
+        real(cvmix_r8) :: int1_r8(mesh%nl), int2_r8(mesh%nl), int3_r8(mesh%nl)
     
 #include "../associate_part_def.h"
 #include "../associate_mesh_def.h"
@@ -449,54 +467,85 @@ module g_cvmix_tke
             tke_Av_old = tke_Av(:,node)
             tke_Kv_old = tke_Kv(:,node)
             tke_old    = tke(:,node)
-            
+
+            ! copy-in WP -> cvmix_r8 for the double-precision CVMix TKE call
+            dzw_r8(nun:nln)       = real(hnode(nun:nln,node),                cvmix_r8)
+            dzt_r8(nun:nln+1)     = real(dz_trr(nun:nln+1),                  cvmix_r8)
+            tke_old_r8(nun:nln+1) = real(tke_old(nun:nln+1),                 cvmix_r8)
+            av_old_r8(nun:nln+1)  = real(tke_Av_old(nun:nln+1),             cvmix_r8)
+            kv_old_r8(nun:nln+1)  = real(tke_Kv_old(nun:nln+1),             cvmix_r8)
+            ssqr_r8(nun:nln+1)    = real(vshear2(nun:nln+1),                 cvmix_r8)
+            nsqr_r8(nun:nln+1)    = real(bvfreq2(nun:nln+1),                 cvmix_r8)
+            alphac_r8(nun:nln+1)  = real(tke_in3d_iwealphac(nun:nln+1,node), cvmix_r8)
+            eiw_r8(nun:nln+1)     = real(tke_in3d_iwe(nun:nln+1,node),       cvmix_r8)
+            iwdis_r8(nun:nln+1)   = real(tke_in3d_iwdis(nun:nln+1,node),     cvmix_r8)
+            plc_r8(nun:nln+1)     = real(tke_langmuir(nun:nln+1,node),       cvmix_r8)
+
             call cvmix_coeffs_tke(&
                 ! parameter
-                dzw          = hnode(nun:nln,node),               & ! distance between layer interface --> hnode
-                dzt          = dz_trr(nun:nln+1),                   & ! distnace between tracer points
+                dzw          = dzw_r8(nun:nln),             & ! distance between layer interface --> hnode
+                dzt          = dzt_r8(nun:nln+1),           & ! distnace between tracer points
 !                 nlev         = nln,                         &
                 nlev         = nln-nun+1,                         &
                 max_nlev     = nl-1,                        &
-                dtime        = dt,                          &
-                rho_ref      = density_0,                   &
-                grav         = g,                           &
+                dtime        = real(dt,        cvmix_r8),   &
+                rho_ref      = real(density_0, cvmix_r8),   &
+                grav         = real(g,         cvmix_r8),   &
                 ! essentials
-                tke_new      = tke(       nun:nln+1,node),                 & ! out--> turbulent kinetic energy
-                KappaM_out   = tke_Av(    nun:nln+1,node),              & ! out
-                KappaH_out   = tke_Kv(    nun:nln+1,node),              & ! out
-                tke_old      = tke_old(   nun:nln+1),                  & ! in --> turbulent kinetic energy previous time step
-                old_KappaM   = tke_Av_old(nun:nln+1),               & ! in
-                old_KappaH   = tke_Kv_old(nun:nln+1),               & ! in
-                Ssqr         = vshear2(   nun:nln+1),                  & ! in --> square vert. vel. shear
-                Nsqr         = bvfreq2(   nun:nln+1),                  & ! in --> square brunt Väisälä freq
-                alpha_c      = tke_in3d_iwealphac(nun:nln+1,node),  & ! in for IDEMIX Ri
-                E_iw         = tke_in3d_iwe(nun:nln+1,node),        & ! in for IDEMIX Ri
+                tke_new      = tke_new_r8(nun:nln+1),       & ! out--> turbulent kinetic energy
+                KappaM_out   = kappam_r8(nun:nln+1),        & ! out
+                KappaH_out   = kappah_r8(nun:nln+1),        & ! out
+                tke_old      = tke_old_r8(nun:nln+1),       & ! in --> turbulent kinetic energy previous time step
+                old_KappaM   = av_old_r8(nun:nln+1),        & ! in
+                old_KappaH   = kv_old_r8(nun:nln+1),        & ! in
+                Ssqr         = ssqr_r8(nun:nln+1),          & ! in --> square vert. vel. shear
+                Nsqr         = nsqr_r8(nun:nln+1),          & ! in --> square brunt Väisälä freq
+                alpha_c      = alphac_r8(nun:nln+1),        & ! in for IDEMIX Ri
+                E_iw         = eiw_r8(nun:nln+1),           & ! in for IDEMIX Ri
                 ! forcing
-                forc_tke_surf= tke_forc2d_normstress(   node), & ! in --> wind stress  
-                forc_rho_surf= tke_forc2d_rhosurf(      node), & ! in
-                bottom_fric  = tke_forc2d_botfrict(     node), & ! in
-                iw_diss      = tke_in3d_iwdis(nun:nln+1,node), & ! in
+                forc_tke_surf= real(tke_forc2d_normstress(node), cvmix_r8), & ! in --> wind stress
+                forc_rho_surf= real(tke_forc2d_rhosurf(node),    cvmix_r8), & ! in
+                bottom_fric  = real(tke_forc2d_botfrict(node),   cvmix_r8), & ! in
+                iw_diss      = iwdis_r8(nun:nln+1),         & ! in
                 ! diagnostics
-                tke_plc      = tke_langmuir(nun:nln+1,node),   & ! in   
-                tke_Tbpr     = tke_Tbpr(nun:nln+1,node),            & ! buoyancy production
-                tke_Tspr     = tke_Tspr(nun:nln+1,node),            & ! shear production 
-                tke_Tdif     = tke_Tdif(nun:nln+1,node),            & ! vertical diffusion d/dz(k d/dz)TKE
-                tke_Tdis     = tke_Tdis(nun:nln+1,node),            & ! dissipation
-                tke_Twin     = tke_Twin(nun:nln+1,node),            & ! wind forcing
-                tke_Tiwf     = tke_Tiwf(nun:nln+1,node),            & ! internal wave forcing when idemix is used
-                tke_Tbck     = tke_Tbck(nun:nln+1,node),            & ! background forcing only active if IDEMIX is not active, forcing that results from resetting TKE to minimum background TKE value
-                tke_Ttot     = tke_Ttot(nun:nln+1,node),            & ! sum of all terms
-                tke_Lmix     = tke_Lmix(nun:nln+1,node),            & ! mixing length scale of the TKE scheme
-                tke_Pr       = tke_Pr(  nun:nln+1,node),              & ! Prantl number
+                tke_plc      = plc_r8(nun:nln+1),           & ! in
+                tke_Tbpr     = tbpr_r8(nun:nln+1),          & ! buoyancy production
+                tke_Tspr     = tspr_r8(nun:nln+1),          & ! shear production
+                tke_Tdif     = tdif_r8(nun:nln+1),          & ! vertical diffusion d/dz(k d/dz)TKE
+                tke_Tdis     = tdis_r8(nun:nln+1),          & ! dissipation
+                tke_Twin     = twin_r8(nun:nln+1),          & ! wind forcing
+                tke_Tiwf     = tiwf_r8(nun:nln+1),          & ! internal wave forcing when idemix is used
+                tke_Tbck     = tbck_r8(nun:nln+1),          & ! background forcing only active if IDEMIX is not active, forcing that results from resetting TKE to minimum background TKE value
+                tke_Ttot     = ttot_r8(nun:nln+1),          & ! sum of all terms
+                tke_Lmix     = lmix_r8(nun:nln+1),          & ! mixing length scale of the TKE scheme
+                tke_Pr       = pr_r8(nun:nln+1),            & ! Prantl number
                 ! debugging
-                cvmix_int_1  = cvmix_dummy_1(nun:nln+1,node),        & !
-                cvmix_int_2  = cvmix_dummy_2(nun:nln+1,node),        & !
-                cvmix_int_3  = cvmix_dummy_3(nun:nln+1,node),        & !
+                cvmix_int_1  = int1_r8(nun:nln+1),          & !
+                cvmix_int_2  = int2_r8(nun:nln+1),          & !
+                cvmix_int_3  = int3_r8(nun:nln+1),          & !
                 i = 1,                                       &
                 j = 1,                                       &
                 tstep_count = tstep_count                    &
                 )
-            
+
+            ! copy-out cvmix_r8 -> WP after the double-precision CVMix TKE call
+            tke(nun:nln+1,node)           = real(tke_new_r8(nun:nln+1), WP)
+            tke_Av(nun:nln+1,node)        = real(kappam_r8(nun:nln+1),  WP)
+            tke_Kv(nun:nln+1,node)        = real(kappah_r8(nun:nln+1),  WP)
+            tke_Tbpr(nun:nln+1,node)      = real(tbpr_r8(nun:nln+1),    WP)
+            tke_Tspr(nun:nln+1,node)      = real(tspr_r8(nun:nln+1),    WP)
+            tke_Tdif(nun:nln+1,node)      = real(tdif_r8(nun:nln+1),    WP)
+            tke_Tdis(nun:nln+1,node)      = real(tdis_r8(nun:nln+1),    WP)
+            tke_Twin(nun:nln+1,node)      = real(twin_r8(nun:nln+1),    WP)
+            tke_Tiwf(nun:nln+1,node)      = real(tiwf_r8(nun:nln+1),    WP)
+            tke_Tbck(nun:nln+1,node)      = real(tbck_r8(nun:nln+1),    WP)
+            tke_Ttot(nun:nln+1,node)      = real(ttot_r8(nun:nln+1),    WP)
+            tke_Lmix(nun:nln+1,node)      = real(lmix_r8(nun:nln+1),    WP)
+            tke_Pr(nun:nln+1,node)        = real(pr_r8(nun:nln+1),      WP)
+            cvmix_dummy_1(nun:nln+1,node) = real(int1_r8(nun:nln+1),    WP)
+            cvmix_dummy_2(nun:nln+1,node) = real(int2_r8(nun:nln+1),    WP)
+            cvmix_dummy_3(nun:nln+1,node) = real(int3_r8(nun:nln+1),    WP)
+
             tke_Av(nln+1,node)=0.0_WP
             tke_Kv(nln+1,node)=0.0_WP
             tke_Av(nun  ,node)=0.0_WP

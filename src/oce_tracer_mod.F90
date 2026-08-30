@@ -138,8 +138,6 @@ end do
     call fill_up_dn_grad(tracers%work, partit, mesh)
     call exchange_nod_end(partit)       ! tr_z halos should have arrived by now.
 
-    if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[38m'//'             --> call tracer_gradient_elements'//achar(27)//'[0m'
-    call tracer_gradient_elements(tracers%data(tr_num)%values, tr_xy, partit, mesh) !redefine tr_arr to the current timestep
     call exchange_elem(tr_xy, partit)
 
 END SUBROUTINE init_tracers_AB

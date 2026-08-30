@@ -10,6 +10,7 @@ subroutine setup_model(partit)
                          ldiag_dMOC, ldiag_DVD, diag_list
   use g_clock,     only: timenew, daynew, yearnew
   use g_ic3d
+  use Toy_Neverworld2
 #ifdef __recom
   use recom_config
   use recom_ciso
@@ -111,16 +112,27 @@ subroutine setup_model(partit)
   endif
   read (fileunit, NML=oce_dyn, iostat=istat)
   if (istat /= 0) call check_namelist_read(fileunit, 'oce_dyn', nmlfile, partit)
-  
-  read (fileunit, NML=tracer_init3d, iostat=istat)
-  if (istat /= 0) call check_namelist_read(fileunit, 'tracer_init3d', nmlfile, partit)
-  
+
   ! Optional reading of oce_perturb namelist for backward compatibility
   read (fileunit, NML=oce_perturb, iostat=istat)
   if (istat /= 0) then
     if (partit%mype==0) write(*,*) 'INFO: oce_perturb namelist not found, using defaults (no perturbations)'
   end if
-  
+
+  ! Optional, neverworld2-only: wind forcing, SST restoring, and temperature perturbation
+  ! parameters (Toy_Neverworld2 module). Read last from this file (nothing else is read
+  ! from namelist.oce afterwards) and tolerate a missing group so that older namelist.oce
+  ! files without it keep working with the compiled-in defaults. Rewind first: if the
+  ! optional &oce_perturb group above was absent, its failed scan left the file at EOF.
+  if (toy_ocean .and. trim(which_toy)=='neverworld2') then
+    rewind(fileunit)
+    read (fileunit, NML=oce_neverworld2, iostat=istat)
+    if (istat /= 0) then
+      if (partit%mype==0) write(*,*) &
+        'WARNING: could not read &oce_neverworld2 from ', trim(nmlfile), &
+        ' -- using defaults trelax_opt=', trelax_opt, ' gamma_restore=', gamma_restore
+    endif
+  endif
   close (fileunit)
 
   nmlfile ='namelist.tra'    ! name of ocean namelist file
