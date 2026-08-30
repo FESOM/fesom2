@@ -116,7 +116,7 @@ save
   real,dimension(:), allocatable:: arr_block
   integer,dimension(:), allocatable:: elem_block
   integer,dimension(:), allocatable:: pe_block
-  real(real64), dimension(:), allocatable:: elem_area_glob
+  real(kind=WP), dimension(:), allocatable:: elem_area_glob
   real,dimension(:), allocatable:: vl_block
 
   !array for output in netcdf

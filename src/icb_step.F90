@@ -53,9 +53,11 @@ subroutine iceberg_calculation(ice, mesh, partit, dynamics, istep)
  integer:: req, status(MPI_STATUS_SIZE)
  logical:: completed
  integer:: block_reduce_ierr
+ ! watchdog timers stay real(kind=8): MPI_Wtime returns double precision
+ ! regardless of the working precision WP
  real(kind=8) :: t_start_block
  real(kind=8), parameter :: block_reduce_timeout = 300.0
- real(kind=8) 	:: t0, t1, t2, t3, t4, t0_restart, t1_restart   	!=
+ real(kind=WP) 	:: t0, t1, t2, t3, t4, t0_restart, t1_restart   	!=
  logical	:: firstcall=.true. 					!=
  logical	:: lastsubstep  					!=
 
@@ -151,7 +153,7 @@ type(t_dyn)   , intent(inout), target :: dynamics
  vl_block_red = 0.0
 
 !$omp critical 
- call MPI_IAllREDUCE(arr_block, arr_block_red, 16*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM_IB, req, partit%MPIERR_IB)
+ call MPI_IAllREDUCE(arr_block, arr_block_red, 16*ib_num, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM_IB, req, partit%MPIERR_IB)
 !$omp end critical
 
  completed = .false.
@@ -214,7 +216,7 @@ completed = .false.
 
 
 !$omp critical 
- call MPI_IAllREDUCE(vl_block, vl_block_red, 4*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM_IB, req, partit%MPIERR_IB)
+ call MPI_IAllREDUCE(vl_block, vl_block_red, 4*ib_num, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM_IB, req, partit%MPIERR_IB)
 !$omp end critical
 
  completed = .false.
@@ -374,7 +376,7 @@ use iceberg_params, only: length_ib, width_ib, scaling, elem_block, elem_area_gl
  logical   			:: i_have_element					!=
  real	   			:: left_mype						!=
  integer   			:: old_element						!=
- real(kind=8) 			:: t0, t1, t2, t3, t4, t5, t6, t7, t8                   !=
+ real(kind=WP) 			:: t0, t1, t2, t3, t4, t5, t6, t7, t8                   !=
  											!=
  !for restart										!=
  logical, save   		:: firstcall=.true.					!=
@@ -753,8 +755,8 @@ use iceberg_params, only: length_ib, width_ib, scaling !, smallestvol_icb, arr_b
  integer status(MPI_STATUS_SIZE)
  integer                        :: num_ib_in_elem, idx
  real                           :: area_ib_tot
- !real(real64), dimension(:), allocatable    :: rbuffer, local_elem_area
- real(real64)                   :: elem_area_tmp
+ !real(kind=WP), dimension(:), allocatable    :: rbuffer, local_elem_area
+ real(kind=WP)                   :: elem_area_tmp
 
  !iceberg output 
  character 			:: ib_char*10
@@ -768,7 +770,7 @@ use iceberg_params, only: length_ib, width_ib, scaling !, smallestvol_icb, arr_b
  logical   			:: i_have_element					!=
  real	   			:: left_mype						!=
  integer   			:: old_element						!=
- real(kind=8) 			:: t0, t1, t2, t3, t4					!=
+ real(kind=WP) 			:: t0, t1, t2, t3, t4					!=
  											!=
  !for restart										!=
  logical, save   		:: firstcall=.true.					!=
@@ -2028,7 +2030,7 @@ subroutine write_buoy_props_netcdf(partit)
   integer                   :: height_id, length_id, width_id
   integer                   :: bvl_id, lvlv_id, lvle_id, lvlb_id, felem_id, grounded_id
   integer                   :: start(2), count(2)
-  real(kind=8)              :: sec_in_year
+  real(kind=WP)              :: sec_in_year
 type(t_partit), intent(inout), target :: partit
 !type(t_ice),    intent(inout), target :: ice
 #include "associate_part_def.h"
