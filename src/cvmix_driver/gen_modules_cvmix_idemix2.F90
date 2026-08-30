@@ -3799,24 +3799,25 @@ end subroutine prepare_idemix2_restart
 
 !_______________________________________________________________________________
 ! After loading restart: slot 1 holds saved E and div.
-! E: fill slot 2 for AB bootstrap (iwe2_ti=1,iwe2_tip1=2 at restart init).
-! Div: saved div goes to slot 2 (=tip1 at init, read as "previous" on first step);
-!      slot 1 (=ti) zeroed — it will be overwritten fresh in the first step.
+! The first step swaps to iwe2_ti=2, iwe2_tip1=1 (init is ti=1, tip1=2), then
+! computes the fresh divergence into slot ti=2 and reads the AB2 "previous"
+! divergence from slot tip1=1. So:
+! E:   copy into slot 2, which the first step reads as the current state.
+! Div: the SAVED divergence must STAY in slot 1 (it is the AB2 previous);
+!      slot 2 is zeroed and refilled with the fresh divergence in-step.
+!      (Moving the saved div to slot 2 and zeroing slot 1 would hand AB2 a
+!      zero previous divergence and discard the saved one unread.)
 subroutine apply_idemix2_restart()
     iwe2_E_iw(:, :, 2) = iwe2_E_iw(:, :, 1)
     if (allocated(iwe2_E_M2)) then
         iwe2_E_M2(:, :, 2)       = iwe2_E_M2(:, :, 1)
-        iwe2_E_M2_divh(:, :, 2)  = iwe2_E_M2_divh(:, :, 1)
-        iwe2_E_M2_divh(:, :, 1)  = 0.0_WP
-        iwe2_E_M2_divs(:, :, 2)  = iwe2_E_M2_divs(:, :, 1)
-        iwe2_E_M2_divs(:, :, 1)  = 0.0_WP
+        iwe2_E_M2_divh(:, :, 2)  = 0.0_WP
+        iwe2_E_M2_divs(:, :, 2)  = 0.0_WP
     end if
     if (allocated(iwe2_E_niw)) then
         iwe2_E_niw(:, :, 2)      = iwe2_E_niw(:, :, 1)
-        iwe2_E_niw_divh(:, :, 2) = iwe2_E_niw_divh(:, :, 1)
-        iwe2_E_niw_divh(:, :, 1) = 0.0_WP
-        iwe2_E_niw_divs(:, :, 2) = iwe2_E_niw_divs(:, :, 1)
-        iwe2_E_niw_divs(:, :, 1) = 0.0_WP
+        iwe2_E_niw_divh(:, :, 2) = 0.0_WP
+        iwe2_E_niw_divs(:, :, 2) = 0.0_WP
     end if
 end subroutine apply_idemix2_restart
 
