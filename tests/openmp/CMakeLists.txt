@@ -33,12 +33,17 @@ endif()
 
 set(OMP_ORDERED_CHECK "${CMAKE_CURRENT_SOURCE_DIR}/check_omp_ordered.py")
 
+# Fesom source root, derived from this file's location (tests/openmp/../..).
+# Do not use CMAKE_SOURCE_DIR: in a bundled build (ecbundle) that is the
+# bundle root, not the fesom tree, and src/ would not be found.
+get_filename_component(FESOM_OMP_TEST_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
+
 # name -> extra arguments
 function(add_omp_ordered_test TEST_NAME)
     add_test(
         NAME ${TEST_NAME}
         COMMAND ${Python3_EXECUTABLE} "${OMP_ORDERED_CHECK}"
-                --source-dir "${CMAKE_SOURCE_DIR}"
+                --source-dir "${FESOM_OMP_TEST_ROOT}"
                 --compiler "${CMAKE_Fortran_COMPILER}"
                 --preprocess-flags "${FORTRAN_PREPROCESS_FLAGS}"
                 ${ARGN}
