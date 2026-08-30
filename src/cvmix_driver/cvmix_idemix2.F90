@@ -8,16 +8,26 @@ module cvmix_idemix2
 ! Nonlinear Interaction, and Dissipation of Internal Gravity Waves , Journal of 
 ! Physical Oceanography, 44 (8), pp. 2093-2106 . doi: 10.1175/JPO-D-13-0224.1 
 
-use cvmix_kinds_and_types,       only : cvmix_r8                   , &
-                                        CVMIX_OVERWRITE_OLD_VAL    , &
+use cvmix_kinds_and_types,       only : CVMIX_OVERWRITE_OLD_VAL    , &
                                         CVMIX_SUM_OLD_AND_NEW_VALS , &
                                         CVMIX_MAX_OLD_AND_NEW_VALS , &
                                         cvmix_data_type            , &
-                                        cvmix_PI                   , & 
+                                        cvmix_PI                   , &
                                         cvmix_global_params_type
 use cvmix_kinds_and_types_addon, only : cvmix_data_type_addon
 use cvmix_utils_addon,           only : cvmix_update_tke, solve_tridiag
+use o_PARAM,                     only : WP
 implicit none
+
+!_______________________________________________________________________________
+! Unlike the external CVMix library (which is fixed double precision, see the
+! conversion boundary in gen_modules_cvmix_tke/idemix), this module is
+! FESOM-owned and runs in the model's working precision WP, so the driver in
+! gen_modules_cvmix_idemix2.F90 can pass its real(WP) fields directly in both
+! double- and single-precision builds. The kind keeps the historical name
+! cvmix_r8 to avoid touching every declaration; the one call into the fixed
+! real*8 library helper (solve_tridiag) converts at its call site.
+integer, parameter :: cvmix_r8 = WP
 
 !_______________________________________________________________________________
 private 
@@ -872,6 +882,9 @@ subroutine compute_vdiff_vdiss_Eiw( &
     real(cvmix_r8), dimension(nlev)                   :: dzmid
     real(cvmix_r8), dimension(nlev)                   :: a_dif, b_dif, c_dif
     real(cvmix_r8), dimension(nlev)                   :: a_tri, b_tri, c_tri, d_tri
+    ! double-precision staging for the fixed real*8 solve_tridiag library
+    ! helper; exact no-op copies when WP is double precision
+    real(kind=8),   dimension(nlev)                   :: a_tri8, b_tri8, c_tri8, d_tri8, x_tri8
     type(idemix2_type), pointer                       :: idemix2_const_in     
     
     ! do pointer into save variable or into user defined input variable 
@@ -1037,8 +1050,13 @@ subroutine compute_vdiff_vdiss_Eiw( &
     d_tri(1)   = d_tri(1) + dt*fsrf/dzmid(1)
     
     !___________________________________________________________________________
-    ! solve tridiagonal matrix
-    call solve_tridiag(a_tri, b_tri, c_tri, d_tri, Eiw_new, nlev)
+    ! solve tridiagonal matrix (real*8 library helper - convert at the boundary)
+    a_tri8 = real(a_tri, 8)
+    b_tri8 = real(b_tri, 8)
+    c_tri8 = real(c_tri, 8)
+    d_tri8 = real(d_tri, 8)
+    call solve_tridiag(a_tri8, b_tri8, c_tri8, d_tri8, x_tri8, nlev)
+    Eiw_new = real(x_tri8, cvmix_r8)
     
     !___________________________________________________________________________
     ! build in some upper lower Eiw bounds
