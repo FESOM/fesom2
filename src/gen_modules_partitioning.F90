@@ -599,14 +599,14 @@ subroutine init_mpi_types_fbin(nfbin, partit)
         ! 2D fbin type: full spectral column at once (nfbin per element)
         blocklen_tmp(1:nb) = blocklen(1:nb)*nfbin
         displace_tmp(1:nb) = displace(1:nb)*nfbin
-        call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
+        call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
             partit%r_mpitype_elem2D_fbin(n,nfbin), partit%MPIerr)
         call MPI_TYPE_COMMIT(partit%r_mpitype_elem2D_fbin(n,nfbin), partit%MPIerr)
         ! 3D fbin types: full spectral column, n_val values per bin
         DO n_val=1,4
             blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nfbin
             displace_tmp(1:nb) = displace(1:nb)*n_val*nfbin
-            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
                 partit%r_mpitype_elem3D_fbin(n,nfbin,n_val), partit%MPIerr)
             call MPI_TYPE_COMMIT(partit%r_mpitype_elem3D_fbin(n,nfbin,n_val), partit%MPIerr)
         ENDDO
@@ -631,14 +631,14 @@ subroutine init_mpi_types_fbin(nfbin, partit)
         ! 2D fbin type: full spectral column at once
         blocklen_tmp(1:nb) = blocklen(1:nb)*nfbin
         displace_tmp(1:nb) = displace(1:nb)*nfbin
-        call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
+        call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
             partit%s_mpitype_elem2D_fbin(n,nfbin), partit%MPIerr)
         call MPI_TYPE_COMMIT(partit%s_mpitype_elem2D_fbin(n,nfbin), partit%MPIerr)
         ! 3D fbin types: full spectral column, n_val values per bin
         DO n_val=1,4
             blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nfbin
             displace_tmp(1:nb) = displace(1:nb)*n_val*nfbin
-            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
                 partit%s_mpitype_elem3D_fbin(n,nfbin,n_val), partit%MPIerr)
             call MPI_TYPE_COMMIT(partit%s_mpitype_elem3D_fbin(n,nfbin,n_val), partit%MPIerr)
         ENDDO
@@ -666,14 +666,14 @@ subroutine init_mpi_types_fbin(nfbin, partit)
         ! 2D fbin type: full spectral column at once
         blocklen_tmp(1:nb) = blocklen(1:nb)*nfbin
         displace_tmp(1:nb) = displace(1:nb)*nfbin
-        call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
+        call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
             partit%r_mpitype_elem2D_full_fbin(n,nfbin), partit%MPIerr)
         call MPI_TYPE_COMMIT(partit%r_mpitype_elem2D_full_fbin(n,nfbin), partit%MPIerr)
         ! 3D fbin types: full spectral column, n_val values per bin
         DO n_val=1,4
             blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nfbin
             displace_tmp(1:nb) = displace(1:nb)*n_val*nfbin
-            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
                 partit%r_mpitype_elem3D_full_fbin(n,nfbin,n_val), partit%MPIerr)
             call MPI_TYPE_COMMIT(partit%r_mpitype_elem3D_full_fbin(n,nfbin,n_val), partit%MPIerr)
         ENDDO
@@ -698,14 +698,14 @@ subroutine init_mpi_types_fbin(nfbin, partit)
         ! 2D fbin type: full spectral column at once
         blocklen_tmp(1:nb) = blocklen(1:nb)*nfbin
         displace_tmp(1:nb) = displace(1:nb)*nfbin
-        call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
+        call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
             partit%s_mpitype_elem2D_full_fbin(n,nfbin), partit%MPIerr)
         call MPI_TYPE_COMMIT(partit%s_mpitype_elem2D_full_fbin(n,nfbin), partit%MPIerr)
         ! 3D fbin types: full spectral column, n_val values per bin
         DO n_val=1,4
             blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nfbin
             displace_tmp(1:nb) = displace(1:nb)*n_val*nfbin
-            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
                 partit%s_mpitype_elem3D_full_fbin(n,nfbin,n_val), partit%MPIerr)
             call MPI_TYPE_COMMIT(partit%s_mpitype_elem3D_full_fbin(n,nfbin,n_val), partit%MPIerr)
         ENDDO
@@ -743,7 +743,7 @@ subroutine init_mpi_types_fbin(nfbin, partit)
         DO n_val=1,3
             blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nfbin
             displace_tmp(1:nb) = displace(1:nb)*n_val*nfbin
-            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
                 partit%r_mpitype_nod3D_fbin(n,nfbin,n_val), partit%MPIerr)
             call MPI_TYPE_COMMIT(partit%r_mpitype_nod3D_fbin(n,nfbin,n_val), partit%MPIerr)
         ENDDO
@@ -769,7 +769,7 @@ subroutine init_mpi_types_fbin(nfbin, partit)
         DO n_val=1,3
             blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nfbin
             displace_tmp(1:nb) = displace(1:nb)*n_val*nfbin
-            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
                 partit%s_mpitype_nod3D_fbin(n,nfbin,n_val), partit%MPIerr)
             call MPI_TYPE_COMMIT(partit%s_mpitype_nod3D_fbin(n,nfbin,n_val), partit%MPIerr)
         ENDDO

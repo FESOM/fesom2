@@ -146,7 +146,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
     if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
     
     ! broadcast latitude array to all processes
-    call MPI_BCast(lat, latlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)  
+    call MPI_BCast(lat, latlen, MPI_WP, 0, MPI_COMM_FESOM, ierror)  
 
     !___________________________________________________________________________
     ! read longitude regular coordinates from netcdf file --> lat
@@ -174,7 +174,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
     if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
     
     ! broadcast longitude array to all processes
-    call MPI_BCast(lon, lonlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)  
+    call MPI_BCast(lon, lonlen, MPI_WP, 0, MPI_COMM_FESOM, ierror)  
 
     ! make sure range 0. - 360.
     do n=1,lonlen
@@ -220,8 +220,8 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
     if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
     
     ! broadcast 2d data array to all processes
-    call MPI_BCast(ncdata, lonlen*latlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-    call MPI_BCast(miss  ,             1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+    call MPI_BCast(ncdata, lonlen*latlen, MPI_WP, 0, MPI_COMM_FESOM, ierror)
+    call MPI_BCast(miss  ,             1, MPI_WP, 0, MPI_COMM_FESOM, ierror)
     
     ncdata_temp=ncdata
     do i=1,lonlen
@@ -464,7 +464,7 @@ subroutine read_other_NetCDF_3d(file, vname, zvname, model_3Darray, do_onvert, p
     if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
     
     ! broadcast latitude array to all processes
-    call MPI_BCast(lat, latlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)  
+    call MPI_BCast(lat, latlen, MPI_WP, 0, MPI_COMM_FESOM, ierror)  
 
     !___________________________________________________________________________
     ! read longitude regular coordinates from netcdf file --> lat
@@ -492,7 +492,7 @@ subroutine read_other_NetCDF_3d(file, vname, zvname, model_3Darray, do_onvert, p
     if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
     
     ! broadcast longitude array to all processes
-    call MPI_BCast(lon, lonlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)  
+    call MPI_BCast(lon, lonlen, MPI_WP, 0, MPI_COMM_FESOM, ierror)  
 
     ! make sure range 0. - 360.
     do n=1,lonlen
@@ -565,8 +565,8 @@ subroutine read_other_NetCDF_3d(file, vname, zvname, model_3Darray, do_onvert, p
     if (found_error) call par_ex(partit%MPI_COMM_FESOM, partit%mype)
     
     ! broadcast 2d data array to all processes
-    call MPI_BCast(ncdata   , lonlen*latlen*zlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-    call MPI_BCast(missvalue,                  1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+    call MPI_BCast(ncdata   , lonlen*latlen*zlen, MPI_WP, 0, MPI_COMM_FESOM, ierror)
+    call MPI_BCast(missvalue,                  1, MPI_WP, 0, MPI_COMM_FESOM, ierror)
     
     !___________________________________________________________________________
     ! size of input array should be 3d (nz, myDim_elem2D) or (nz, myDim_nod2D)

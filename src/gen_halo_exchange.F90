@@ -2976,7 +2976,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)         :: nod_array(:,:)
+real(kind=WP),   intent(inout)         :: nod_array(:,:)
 if (partit%npes > 1) then
    call exchange_nod2D_fbin_begin(nod_array, partit)
    call exchange_nod_end(partit)
@@ -2989,7 +2989,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)         :: nod_array(:,:)
+real(kind=WP),   intent(inout)         :: nod_array(:,:)
 integer                               :: n, sn, rn
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
@@ -3026,7 +3026,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)         :: nod_array(:,:,:)
+real(kind=WP),   intent(inout)         :: nod_array(:,:,:)
 if (partit%npes > 1) then
    call exchange_nod3D_fbin_begin(nod_array, partit)
    call exchange_nod_end(partit)
@@ -3039,7 +3039,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-real(real64),   intent(inout)         :: nod_array(:,:,:)
+real(kind=WP),   intent(inout)         :: nod_array(:,:,:)
 integer                               :: n, sn, rn, n_val
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
@@ -3083,7 +3083,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
-real(real64),   intent(inout)          :: elem_array(:,:)
+real(kind=WP),   intent(inout)          :: elem_array(:,:)
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 
@@ -3099,7 +3099,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
-real(real64),   intent(inout)          :: elem_array(:,:)
+real(kind=WP),   intent(inout)          :: elem_array(:,:)
 integer                                :: n, sn, rn
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
@@ -3157,7 +3157,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
-real(real64),   intent(inout)          :: elem_array(:,:,:)
+real(kind=WP),   intent(inout)          :: elem_array(:,:,:)
 #include "associate_part_def.h"
 #include "associate_part_ass.h"
 
@@ -3173,7 +3173,7 @@ USE MOD_PARTIT
 USE MOD_PARSUP
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
-real(real64),   intent(inout)          :: elem_array(:,:,:)
+real(kind=WP),   intent(inout)          :: elem_array(:,:,:)
 integer                                :: n, sn, rn, n_val
 #include "associate_part_def.h"
 #include "associate_part_ass.h"

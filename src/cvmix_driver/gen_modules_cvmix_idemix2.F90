@@ -775,7 +775,7 @@ module g_cvmix_idemix2
             do node=1, myDim_nod2D
                 loc_Etot = loc_Etot + area(1,node)*iwe2_fsrf(node)*density_0                    
             end do
-            call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+            call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
             
             if (idemix2_enable_niw) then
                 if (mype==0) write(*,*) '     ├> read IDEMIX2 niw wave forcing'
@@ -839,7 +839,7 @@ module g_cvmix_idemix2
                 do node=1, myDim_nod2D
                     loc_Etot = loc_Etot + area(1,node)*iwe2_fbot_n(node)
                 end do
-                call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+                call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
                 if (mype==0) write(*,*) "     │  └> IDEMIX2 total tidal energy Etot_bot =", glb_Etot*1.0e-12, ' TW'
 
                 ! normalize total tidal energy at bottom with respect to the total
@@ -853,7 +853,7 @@ module g_cvmix_idemix2
                     do node=1, myDim_nod2D
                         loc_Etot = loc_Etot + area(1,node)*iwe2_fbot_n(node)
                     end do
-                    call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+                    call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
                     if (mype==0) write(*,*) "     │  └> IDEMIX2 Etot_bot after normalizing =", glb_Etot*1.0e-12, ' TW'
                 end if
 
@@ -3525,8 +3525,8 @@ module g_cvmix_idemix2
         ! Sum across all MPI ranks
         glb_divh_sum = 0.0_WP
         glb_divs_sum = 0.0_WP
-        call MPI_Allreduce(lcl_divh_sum, glb_divh_sum, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-        call MPI_Allreduce(lcl_divs_sum, glb_divs_sum, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+        call MPI_Allreduce(lcl_divh_sum, glb_divh_sum, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+        call MPI_Allreduce(lcl_divs_sum, glb_divs_sum, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
         
         if (mype == 0) then
             write(*,*) ' debug: flux total conservation check (',trim(compartment_name),'):',&
@@ -3586,12 +3586,12 @@ module g_cvmix_idemix2
         glb_vol    = 0.0_WP
         glb_forc   = 0.0_WP
         glb_diss   = 0.0_WP
-        call MPI_Allreduce(lcl_energy, glb_energy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-        call MPI_Allreduce(lcl_vol   , glb_vol   , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-        call MPI_Allreduce(lcl_forc  , glb_forc  , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-        call MPI_Allreduce(lcl_diss  , glb_diss  , 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-        call MPI_Allreduce(lcl_minE  , glb_minE  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-        call MPI_Allreduce(lcl_maxE  , glb_maxE  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        call MPI_Allreduce(lcl_energy, glb_energy, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+        call MPI_Allreduce(lcl_vol   , glb_vol   , 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+        call MPI_Allreduce(lcl_forc  , glb_forc  , 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+        call MPI_Allreduce(lcl_diss  , glb_diss  , 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+        call MPI_Allreduce(lcl_minE  , glb_minE  , 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+        call MPI_Allreduce(lcl_maxE  , glb_maxE  , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
         
         
         ! Print on rank 0
@@ -3686,8 +3686,8 @@ module g_cvmix_idemix2
         ! Global max across MPI ranks
         glb_cfl_h  = 0.0_WP
         glb_cfl_cs = 0.0_WP
-        call MPI_Allreduce(lcl_cfl_h , glb_cfl_h , 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-        call MPI_Allreduce(lcl_cfl_cs, glb_cfl_cs, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        call MPI_Allreduce(lcl_cfl_h , glb_cfl_h , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+        call MPI_Allreduce(lcl_cfl_cs, glb_cfl_cs, 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
         
         if (mype == 0) then
             write(*,*) ' debug: CFL_max_horizontal(',trim(compartment_name),') = ', glb_cfl_h, &
