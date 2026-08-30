@@ -635,7 +635,7 @@ subroutine extrap_nod3D_det(arr, partit, mesh)
                 end if
             end do
             gdmax = dmax
-            call MPI_AllREDUCE(dmax, gdmax, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+            call MPI_AllREDUCE(dmax, gdmax, 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
             if (gdmax <= ic_extrap_tol) exit
             relax_sweeps = relax_sweeps + 1
             if (relax_sweeps >= relax_cap) then
@@ -667,14 +667,16 @@ contains
     subroutine det_ring_mean(n, nz, layer, val, cnt)
         ! multiplicity-weighted mean of the eligible valid neighbours of node
         ! n at level nz, summed in ascending global-id order (insertion sort;
-        ! the ring is at most a few tens of entries)
+        ! the ring is at most a few tens of entries). The automatic arrays are
+        ! sized by the exact bound (2 non-self vertices per ring element), so
+        ! no mesh valence can overrun them.
         integer,       intent(in)  :: n, nz
         real(kind=WP), intent(in)  :: layer(:)
         real(kind=WP), intent(out) :: val
         integer,       intent(out) :: cnt
         integer                    :: k, j, el, a, b, g
-        integer                    :: ngid(64)
-        real(kind=WP)              :: nval(64), w
+        integer                    :: ngid(2*nod_in_elem2D_num(n))
+        real(kind=WP)              :: nval(2*nod_in_elem2D_num(n)), w
         integer                    :: enodes(3)
         cnt = 0
         val = 0._WP
