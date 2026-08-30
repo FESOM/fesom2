@@ -29,7 +29,8 @@ MODULE g_ic3d
 
    public  do_ic3d, &
            n_ic3d, idlist, filelist, varlist, tracer_init3d, &
-           t_insitu, oce_perturb, lperturb, perturb_mode, perturb_method, perturb_seed, temp_perturb, salt_perturb
+           t_insitu, ic_extrap_det, ic_extrap_tol, &
+           oce_perturb, lperturb, perturb_mode, perturb_method, perturb_seed, temp_perturb, salt_perturb
    private
 
 ! namelists
@@ -43,7 +44,7 @@ MODULE g_ic3d
    character(MAX_PATH), save, dimension(ic_max) :: filelist
    character(50),  save,  dimension(ic_max)     :: varlist
 
-   namelist / tracer_init3d / n_ic3d, idlist, filelist, varlist, t_insitu
+   namelist / tracer_init3d / n_ic3d, idlist, filelist, varlist, t_insitu, ic_extrap_det, ic_extrap_tol
 
 !============= perturbation to IC variables ================
    logical                                      :: lperturb = .false.

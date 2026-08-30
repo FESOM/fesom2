@@ -100,16 +100,22 @@ jobs:
           echo "OMPI_MCA_btl_base_warn_component_unused=0" >> $GITHUB_ENV
       
       - name: Set up ecbundle bundle
+        env:
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.clone_url }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           echo "Setting up ecbundle bundle..."
 
           # Build the code under test, not upstream main: on pull_request
           # events retarget the fesom project in bundle.yml at the PR head
-          # branch. On push/workflow_dispatch GITHUB_HEAD_REF is empty and
-          # the committed 'version : main' stays in place.
-          if [ -n "${GITHUB_HEAD_REF}" ]; then
-            sed -i "s|version : main|version : ${GITHUB_HEAD_REF}|" bundle.yml
-            echo "bundle.yml retargeted at branch ${GITHUB_HEAD_REF}:"
+          # repository and pinned head SHA. Using the head repo (not a branch
+          # name in FESOM/fesom2) makes this work for PRs from forks too. On
+          # push/workflow_dispatch HEAD_REPO is empty and the committed
+          # 'version : main' stays in place.
+          if [ -n "${HEAD_REPO}" ]; then
+            sed -i "s|git     : https://github.com/FESOM/fesom2.git|git     : ${HEAD_REPO}|" bundle.yml
+            sed -i "s|version : main|version : ${HEAD_SHA}|" bundle.yml
+            echo "bundle.yml retargeted at ${HEAD_REPO} @ ${HEAD_SHA}:"
             grep -A2 'fesom :' bundle.yml
           fi
 
