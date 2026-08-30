@@ -170,9 +170,9 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
         case ('cvmix_IDEMIX'           ) ; mix_scheme_nmb = 6
         case ('cvmix_IDEMIX2'          ) ; mix_scheme_nmb = 7
         case ('cvmix_TIDAL'            ) ; mix_scheme_nmb = 8 
-        case ('KPP+cvmix_TIDAL'        ) ; mix_scheme_nmb = 17
-        case ('PP+cvmix_TIDAL'         ) ; mix_scheme_nmb = 27
-        case ('cvmix_KPP+cvmix_TIDAL'  ) ; mix_scheme_nmb = 37
+        case ('KPP+cvmix_TIDAL'        ) ; mix_scheme_nmb = 18
+        case ('PP+cvmix_TIDAL'         ) ; mix_scheme_nmb = 28
+        case ('cvmix_KPP+cvmix_TIDAL'  ) ; mix_scheme_nmb = 38
         case ('cvmix_PP+cvmix_TIDAL'   ) ; mix_scheme_nmb = 48
         case ('cvmix_TKE+cvmix_IDEMIX' ) ; mix_scheme_nmb = 56
         case ('cvmix_TKE+cvmix_IDEMIX2') ; mix_scheme_nmb = 57
@@ -184,15 +184,15 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     end select
 
     ! initialise fesom1.4 like KPP
-    if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
+    if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==18) then
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_kpp_init'//achar(27)//'[0m'
         call oce_mixing_kpp_init(partit, mesh)
         
     ! initialise fesom1.4 like PP
-    elseif (mix_scheme_nmb==2 .or. mix_scheme_nmb==27) then
+    elseif (mix_scheme_nmb==2 .or. mix_scheme_nmb==28) then
 #if defined (__cvmix)       
     ! initialise cvmix_KPP
-    elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
+    elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==38) then
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_kpp'//achar(27)//'[0m'
         call init_cvmix_kpp(partit, mesh)
         
@@ -1015,7 +1015,7 @@ nl              => mesh%nl
 
     Av=0.0_WP
     Kv=0.0_WP
-    if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
+    if (mix_scheme_nmb==1 .or. mix_scheme_nmb==18) then
     allocate(Kv_double(nl,node_size, num_tracers))
     Kv_double=0.0_WP
     !!PS call oce_mixing_kpp_init ! Setup constants, allocate arrays and construct look up table

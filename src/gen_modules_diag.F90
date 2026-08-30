@@ -3147,7 +3147,7 @@ subroutine dvd_add_difflux_sbc(do_SDdvd, tr_num, dvd_tot, tr, trstar, partit, me
             end if
             !___________________________________________________________________
             ! use fesom1.4 KPP
-            if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
+            if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==18) then
                 if     (tr_num==1) then ! temperature
                     do nz=nu1+1, nl1-1
                         Dflx(nz) = Dflx(nz) + MIN(ghats(nz, node)*blmc(nz, node, 2), 1.0_WP)*heat_flux(node)/vcpw*area(nz, node) 
@@ -3160,7 +3160,7 @@ subroutine dvd_add_difflux_sbc(do_SDdvd, tr_num, dvd_tot, tr, trstar, partit, me
 #if defined (__cvmix)                
             !___________________________________________________________________
             ! use cvmix KPP
-            elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
+            elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==38) then
                 if     (tr_num==1) then ! temperature
                     do nz=nu1+1, nl1-1
                         Dflx(nz) = Dflx(nz) + MIN(kpp_nonlcltranspT(nz, node)*kpp_oblmixc(nz, node, 2), 1.0_WP)*heat_flux(node)/vcpw*area(nz, node) 

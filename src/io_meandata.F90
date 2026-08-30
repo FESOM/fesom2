@@ -832,18 +832,18 @@ CASE ('hfh3D     ')
 !___________________________________________________________________________________________________________________________________
 ! output KPP vertical mixing schemes
 CASE ('kpp_obldepth   ')
-    if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then! fesom KPP
+    if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==18) then! fesom KPP
         call def_stream(nod2D, myDim_nod2D,    'kpp_obldepth',    'KPP ocean boundary layer depth', 'm',   hbl(:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 #if defined (__cvmix)    
-    elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then ! cvmix KPP
+    elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==38) then ! cvmix KPP
         call def_stream(nod2D, myDim_nod2D,    'kpp_obldepth',    'KPP ocean boundary layer depth', 'm',   kpp_obldepth(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 #endif        
     end if
 CASE ('kpp_sbuoyflx')
-    if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then ! fesom KPP
+    if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==18) then ! fesom KPP
         call def_stream(nod2D, myDim_nod2D,    'kpp_sbuoyflx',    'surface buoyancy flux',   'm2/s3',  Bo(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 #if defined (__cvmix)            
-    elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then ! cvmix KPP
+    elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==38) then ! cvmix KPP
         call def_stream(nod2D, myDim_nod2D,    'kpp_sbuoyflx',    'surface buoyancy flux',   'm2/s3',  kpp_sbuoyflx(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 #endif        
     end if
