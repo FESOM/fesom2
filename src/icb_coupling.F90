@@ -351,7 +351,7 @@ subroutine cap_ibhf_n(tracers, mesh, partit)
     end do
 !$OMP END PARALLEL DO
 
-    call MPI_AllReduce(heat_disc_loc,    heat_disc_glob,    1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, ierr_mpi)
+    call MPI_AllReduce(heat_disc_loc,    heat_disc_glob,    1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, ierr_mpi)
     call MPI_AllReduce(cells_capped_loc, cells_capped_glob, 1, MPI_INTEGER,          MPI_SUM, MPI_COMM_FESOM, ierr_mpi)
 
     if (mype == 0 .and. cells_capped_glob > 0) then

@@ -91,7 +91,14 @@ subroutine fer_solve_Gamma(partit, mesh)
         !!PS nzmin=maxval(ulevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
         nzmax=nlevels_nod2D_min(n)
         nzmin=ulevels_nod2D_max(n)
-        
+
+        ! No interior range to solve on: the sweeps below would run zero times
+        ! and tr(:,nzmax)=tp(:,nzmax) would publish an unassigned tp element.
+        if (nzmin >= nzmax) then
+            tr(:,:) = 0.0_WP
+            cycle
+        end if
+
         ! The first row
         !!PS c(1)=0.0_WP
         !!PS a(1)=0.0_WP

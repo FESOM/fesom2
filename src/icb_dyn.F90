@@ -969,10 +969,6 @@ type(t_partit), intent(inout), target :: partit
     ! Cavity check: use zbar_3d_n for geometric comparison
     if (use_cavity .AND. mesh%cavity_depth(elem2D_nodes(m,iceberg_elem)) /= 0.0 &
         .AND. abs(depth_ib) < abs(mesh%zbar_3d_n(k, n2))) then
-      ! Iceberg draft is above the ocean surface at this cavity node.
-      ! Clamp to shallowest valid ocean level (ulevels_nod2d) to avoid
-      ! reading ice-shelf level T/S which are never initialised by the
-      ! tracer solver and may be garbage / NaN.
       safe_lev = max(k-1, ulevels_nod2d(n2))
       uo_dz(m)=UV_ib(1,safe_lev,n2)*abs(depth_ib)
       vo_dz(m)=UV_ib(2,safe_lev,n2)*abs(depth_ib)

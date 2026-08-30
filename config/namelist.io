@@ -51,6 +51,10 @@ compression_level = 1        ! compression level for netCDF output (1=fastest, 9
 !   frequency  = output frequency (integer)
 !   unit       = 'y' (yearly), 'm' (monthly), 'd' (daily), 'h' (hourly), 's' (steps)
 !   precision  = 4 (single precision) or 8 (double precision)
+!   Note: in a single-precision build (WP=4) a field requesting precision 8 is
+!   still honoured (written as NF_DOUBLE; means accumulated in real64), but its
+!   samples are single-precision-sourced. FESOM prints one summary line at
+!   startup listing such fields.
 ! ============================================================================
 &nml_list
 io_list =  'sst       ',1, 'm', 4,
@@ -250,9 +254,9 @@ io_list =  'sst       ',1, 'm', 4,
 ! 'respn     ',1, 'm', 4,  ! Respiration by small phytoplankton [mmolC/m2/d]
 ! 'respd     ',1, 'm', 4,  ! Respiration by diatoms [mmolC/m2/d]
 ! 'respc     ',1, 'm', 4,  ! Respiration by coccolithophores [mmolC/(m2*d)]
-! 'NPPn3D    ',1, 'm', 4,  ! Net primary production of small phytoplankton [mmolC/m2/d]
-! 'NPPd3D    ',1, 'm', 4,  ! Net primary production of diatoms [mmolC/m2/d]
-! 'NPPc3D    ',1, 'm', 4,  ! Net primary production of coccolithophores [mmolC/m2/d]
+! 'NPPn3D    ',1, 'm', 4,  ! Net primary production of small phytoplankton [mmolC/(m3*d)]
+! 'NPPd3D    ',1, 'm', 4,  ! Net primary production of diatoms [mmolC/(m3*d)]
+! 'NPPc3D    ',1, 'm', 4,  ! Net primary production of coccolithophores [mmolC/(m3*d)]
 
 ! --- WATER ISOTOPES IN OCEAN (require lwiso=.true.) ---
 ! 'h2o18     ',1, 'm', 4,  ! h2o18 concentration [kmol/m**3]

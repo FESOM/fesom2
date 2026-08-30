@@ -2,17 +2,18 @@
 MODULE mod_transit
 ! Parameters, variables and functions for transient tracer simulations.
 ! By mbutzin, 2019-2021
+  use o_PARAM, only: WP
 
   implicit none
   save
 
 ! Atmospheric pressure, local (dummy) variable, global-mean SLP, and local wind speed at 10 m
-  real(kind=8) :: press_a, mean_slp = 1.01325e5, wind_2
+  real(kind=WP) :: press_a, mean_slp = 1.01325e5, wind_2
 
 ! Atmospheric trace gas (dummy) values used in air-sea flux calculations
 ! Isotopic ratios are normalized and fractionation-corrected,
 ! volume mixing ratios are mole fractions in dry air.
-  real(kind=8) :: r14c_a  = 1.0, &       ! 14CO2 / 12CO2 (may vary with latitude in transient runs)
+  real(kind=WP) :: r14c_a  = 1.0, &       ! 14CO2 / 12CO2 (may vary with latitude in transient runs)
                   r39ar_a = 1.0, &       ! 39Ar / 40 Ar (homogeneous)
                   xarg_a  = 9.34e-3, &   ! Argon (homogeneous)
                   xCO2_a  = 284.32e-6, & ! CO2 (CMIP6 & OMIP-BGC: 284.32e-6 for 1700-1850, PMIP4: 190.00e-6 for 21 ka BP)
@@ -21,7 +22,7 @@ MODULE mod_transit
                   xsf6_a  = 0.0          ! SF6 (latitude dependent)
 
 ! Transient values of atmospheric trace gases (1d-arrays of variable length to be specified in namelist.config -> length_transit)
-  real(kind=8), allocatable, dimension(:) :: r14c_nh, r14c_tz, r14c_sh, & ! 14CO2 / 12CO2, latitude-dependent (e.g., bomb 14C)
+  real(kind=WP), allocatable, dimension(:) :: r14c_nh, r14c_tz, r14c_sh, & ! 14CO2 / 12CO2, latitude-dependent (e.g., bomb 14C)
                                              r14c_ti, &                   ! 14CO2 / 12CO2, homogenous (e.g., IntCal)
                                              xCO2_ti, &                   ! CO2
                                              xf11_nh, xf11_sh, &          ! CFC-11, latitude-dependent
@@ -42,16 +43,16 @@ MODULE mod_transit
 
 ! Parameters which can be changed via namelist.oce (-> transit_param)
 ! Global-mean concentrations of DIC and Argon in the mixed layer (mol / m**3)
-  real(kind=8) :: dic_0 = 2.00, &        ! GLODAPv2, 0-50 m: TCO2 ~ 2050 umol / kg
+  real(kind=WP) :: dic_0 = 2.00, &        ! GLODAPv2, 0-50 m: TCO2 ~ 2050 umol / kg
                   arg_0 = 0.01           ! Hamme et al. 2019, doi:10.1146/annurev-marine-121916-063604
                   
 ! Radioactive decay constants (1 / s; default values assume that 1 year = 365.00 days)
-  real(kind=8) :: decay14 = 3.8561e-12 , & ! 14C; t1/2 = 5700 a following OMIP-BGC
+  real(kind=WP) :: decay14 = 3.8561e-12 , & ! 14C; t1/2 = 5700 a following OMIP-BGC
                   decay39 = 8.1708e-11     ! 39Ar; t1/2 = 269 a
 
 ! Further internal parameters
 ! Latitude of atmospheric boundary conditions and latitudinal interpolation weight
-  real(kind=8) :: y_abc, yy_nh
+  real(kind=WP) :: y_abc, yy_nh
 ! Tracer indices of transient tracers
   integer ::      id_r14c, id_r39ar, id_f11, id_f12, id_sf6, index_transit_r14c, index_transit_r39ar, index_transit_f11, index_transit_f12, index_transit_sf6
 ! Time index (=year) in transient simulations
@@ -83,11 +84,11 @@ MODULE mod_transit
 !     for the abundant isotopologue. Positive values mean oceanic uptake.
       implicit none
 
-      real(kind=8) :: iso_flux
+      real(kind=WP) :: iso_flux
 !     Input parameters
       character(len=3), intent(in) :: which_gas  ! trace gas name
 
-      real(kind=8), intent(in) :: temp_c, sal, &   ! SST (deg C) and SSS ("PSU" or permil)
+      real(kind=WP), intent(in) :: temp_c, sal, &   ! SST (deg C) and SSS ("PSU" or permil)
                                   wind_2, &        ! wind speed at 10 m heigth squared
                                   f_ice, &         ! sea-ice fractional coverage
                                   p_atm, &         ! total atmospheric pressure (Pa)
@@ -106,17 +107,17 @@ MODULE mod_transit
 !     Computes air-sea exchange gas fluxes in mol / (m**2 * s) , positive values mean oceanic uptake.
       implicit none
 
-      real(kind=8) :: gas_flux
+      real(kind=WP) :: gas_flux
 !     Input parameters
       character(len=3), intent(in) :: which_gas  ! trace gas name
-      real(kind=8), intent(in) :: temp_c, sal, & ! SST (deg C) and SSS ("PSU" or permil)
+      real(kind=WP), intent(in) :: temp_c, sal, & ! SST (deg C) and SSS ("PSU" or permil)
                                   wind_2,     &  ! wind speed at 10 m heigth squared
                                   f_ice, &       ! sea-ice fractional coverage
                                   p_atm, &       ! total atmospheric pressure (Pa)
                                   x_gas, &       ! atmospheric mole fraction
                                   c_surf         ! marine surface water concentration (mol / m**3)
 !     Internal variables
-      real(kind=8) :: c_sat                      ! marine saturation concentration (mol / m**3)
+      real(kind=WP) :: c_sat                      ! marine saturation concentration (mol / m**3)
       c_sat = solub(which_gas, temp_c, sal) * p_atm / 1.01325e5 * x_gas
       gas_flux = transfer_vel(which_gas, temp_c, wind_2) * (c_sat - c_surf) * (1. - f_ice)
 
@@ -128,12 +129,12 @@ MODULE mod_transit
 !     Computes the solubility of trace gases in seawater.
 !     This parametrization includes the effect of water vapor.
       implicit none
-      real(kind=8) :: solub                  ! solubility ((p)mol / (m**3 * atm))
+      real(kind=WP) :: solub                  ! solubility ((p)mol / (m**3 * atm))
 !     Input parameters
       character(len=3), intent(in) :: which_gas  ! tracer name
-      real(kind=8), intent(in) :: temp_c, &      ! temperature (deg C)
+      real(kind=WP), intent(in) :: temp_c, &      ! temperature (deg C)
                                   sal            ! salinity ("PSU" or permil)
-      real(kind=8) :: a1, a2, a3, a4, &          ! polynomial coefficients of the
+      real(kind=WP) :: a1, a2, a3, a4, &          ! polynomial coefficients of the
                       b1, b2, b3, b4, c1, &      ! solubility function
                       temp_k100, &               ! water temperature in K / 100
                       con2con                    ! concentration units conversion factor
@@ -182,12 +183,12 @@ MODULE mod_transit
 !     normalized to 20 degC (Sc(CO2) ~660; Wanninkhof 2014, tab. 1)).
       implicit none
 !     Result
-      real(kind=8) :: sc_660                       ! Schmidt number
+      real(kind=WP) :: sc_660                       ! Schmidt number
 !     Input parameters
       character(len=3), intent(in) :: which_gas    ! tracer name
-      real(kind=8), intent(in) :: temp_c           ! temperature (deg C)
+      real(kind=WP), intent(in) :: temp_c           ! temperature (deg C)
 !     Internal parameters and/or variables
-      real(kind=8) :: as, bs, cs, ds, es           ! polynomial coefficients
+      real(kind=WP) :: as, bs, cs, ds, es           ! polynomial coefficients
 
       select case (which_gas)
       case ("co2") ! CO2
@@ -212,10 +213,10 @@ MODULE mod_transit
 !     Compute gas transfer velocities of / for tracers
       implicit none
 !     Result
-      real(kind=8) :: transfer_vel                 ! transfer velocity (m / s)
+      real(kind=WP) :: transfer_vel                 ! transfer velocity (m / s)
 !     Input parameters
       character(len=3), intent(in) :: which_gas    ! tracer name
-      real(kind=8), intent(in) :: temp_c, &        ! temperature (deg C)
+      real(kind=WP), intent(in) :: temp_c, &        ! temperature (deg C)
                                   wind_2           ! wind speed squared at 10 m height (m / s)
 
 !     Wanninkhof (2014), eq. (4) with a = 0.251 (cm / h) / (m / s)**2 -> 6.9722e-7 s / m
@@ -232,20 +233,20 @@ MODULE mod_transit
 !     We follow Peixoto & Oort (1992, Eq. (10.28), (10,29)) and Charnock (1955);
 !     also see MPI report 349 (2003), Eq. (5.7).
       implicit none
-      real(kind=8) :: speed_2
+      real(kind=WP) :: speed_2
 
 !     Input
-      real(kind=8), intent(in) :: windstr_x, windstr_y
+      real(kind=WP), intent(in) :: windstr_x, windstr_y
 
 !     Internal variables and parameters
 !     Zonal and meridional velocities at 10 m height
-      real(kind=8) :: u_10, v_10
+      real(kind=WP) :: u_10, v_10
 !     Zonal and meridional friction velocities
-      real(kind=8) :: u_fric, v_fric
+      real(kind=WP) :: u_fric, v_fric
 !     Zonal and meridional roughness lengths
-      real(kind=8) :: l_rough_x, l_rough_y
+      real(kind=WP) :: l_rough_x, l_rough_y
 !     Inverse von-Karman constant (0.4), Charnock constant (0.018) divided by g, inverse density of air (1.3), log(10)
-      real(kind=8), parameter :: inv_karm = 2.5, charn_g = 0.00173, inv_dens_air = 0.76923, log_10 = 2.30258
+      real(kind=WP), parameter :: inv_karm = 2.5, charn_g = 0.00173, inv_dens_air = 0.76923, log_10 = 2.30258
 
 !     Calculate friction velocities (Peixoto & Oort, 1992, Eq. (10.28))
       u_fric = sqrt(abs(windstr_x) * inv_dens_air)
@@ -272,7 +273,7 @@ MODULE mod_transit
 !     Internal variables
       integer, intent(in) :: ifileunit
       integer :: jj
-      real(kind=8), allocatable, dimension(:) :: d14c_nh, d14c_tz, d14c_sh, d14c_ti, d13c_dummy
+      real(kind=WP), allocatable, dimension(:) :: d14c_nh, d14c_tz, d14c_sh, d14c_ti, d13c_dummy
 
       if (anthro_transit) then
 !       Anthropogenic input for 1850 - 2023 CE
