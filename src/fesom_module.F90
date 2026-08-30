@@ -1562,13 +1562,13 @@ contains
         if (.not. f%dynamics%use_ssh_se_subcycl .and. f%dynamics%solverinfo%nsolves > 0) then
             write(*,*)
             write(*,*) '___SSH CG SOLVER_____________________________________'
-            print 43, '    solves :                     ', f%dynamics%solverinfo%nsolves
-            print 45, '    iterations mean :            ',                                &
+            print 44, '    solves :                     ', f%dynamics%solverinfo%nsolves
+            print 46, '    iterations mean :            ',                                &
                  real(f%dynamics%solverinfo%iters_sum)/real(f%dynamics%solverinfo%nsolves), '    '
-            print 43, '    iterations max :             ', f%dynamics%solverinfo%iters_max
-            print 43, '    non-convergences (maxiter) : ', f%dynamics%solverinfo%nonconv
-            print 43, '    breakdowns (p.Ap<=0) :       ', f%dynamics%solverinfo%nbreakdown
-            print 43, '    iters with r.z<0 (not SPD) : ', f%dynamics%solverinfo%nnegrz
+            print 44, '    iterations max :             ', f%dynamics%solverinfo%iters_max
+            print 44, '    non-convergences (maxiter) : ', f%dynamics%solverinfo%nonconv
+            print 44, '    breakdowns (p.Ap<=0) :       ', f%dynamics%solverinfo%nbreakdown
+            print 44, '    iters with r.z<0 (not SPD) : ', f%dynamics%solverinfo%nnegrz
         end if
 
         write(*,*)
