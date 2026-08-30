@@ -1250,7 +1250,7 @@ end subroutine projection
 
 subroutine iceberg_restart(partit)
 ! use iceberg_params 
- use g_config, only : ib_num
+ use g_config, only : ib_num, use_icb_iron
 
  implicit none
  integer :: icbID, ib
@@ -1278,6 +1278,10 @@ type(t_partit), intent(inout), target :: partit
 
   end do
   close(icbID)
+
+  ! LA 2026 -- Fe concentration is a persistent per-iceberg property and lives
+  ! in a side-car file, so that iceberg.restart itself stays format-compatible.
+  if (use_icb_iron) call read_icb_iron_restart(IcebergRestartPath_iron, ib_num, mype)
 
   if(mype==0) then
   write(*,*) 'read iceberg restart file'
@@ -1313,7 +1317,7 @@ end subroutine iceberg_restart
 
 subroutine iceberg_restart_with_icesheet(partit)
 ! use iceberg_params 
- use g_config, only : ib_num
+ use g_config, only : ib_num, use_icb_iron
 
  implicit none
  integer :: icbID_ISM, icbID_non_melted_icb, ib, st
@@ -1345,6 +1349,10 @@ type(t_partit), intent(inout), target :: partit
 	f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), grounded(ib), scaling(ib), melted(ib)
   end do
   close(icbID_ISM)
+
+  ! LA 2026 -- survivors keep their Fe concentration; the newly seeded icebergs
+  ! get theirs from icb_iron.dat (or icb_iron_const) further below.
+  if (use_icb_iron) call read_icb_iron_restart(IcebergRestartPath_iron_ISM, num_non_melted_icb, mype)
 
   if(mype==0) then
   write(*,*) 'read iceberg restart file'
@@ -1381,6 +1389,7 @@ end subroutine iceberg_restart_with_icesheet
 subroutine iceberg_out(partit)
 ! use iceberg_params
  use g_clock		!for dayold
+ use g_config, only : use_icb_iron
  implicit none
  integer :: icbID, icbID_ISM, ib, istep
 type(t_partit), intent(inout), target :: partit
@@ -1430,6 +1439,12 @@ type(t_partit), intent(inout), target :: partit
   end do
   close(icbID_ISM)
   close(icbID)
+
+  ! LA 2026 -- mirror the two restart files for the Fe concentration
+  if (use_icb_iron) then
+     call write_icb_iron_restart(IcebergRestartPath_iron,     ib_num, .false.)
+     call write_icb_iron_restart(IcebergRestartPath_iron_ISM, ib_num, .true. )
+  end if
  end if
 end subroutine iceberg_out
 
@@ -1525,6 +1540,15 @@ subroutine init_icebergs
     read(98,*) scaling(i)
  end do
  close(98)
+!iron_icb_file > iron_conc_ib   (LA 2026, passive iron tracer)
+ if (use_icb_iron .and. l_icb_iron_file) then
+  open(unit=98, file=iron_icb_file,status='old',action='read',iostat=io_error)
+  if ( io_error.ne.0) stop 'ERROR while reading file iron_icb_file'
+  do i = 1, ib_num
+     read(98,*) iron_conc_ib(i)
+  end do
+  close(98)
+ end if
 !calving_day_file > calving_day
  open(unit=97, file=calving_day_file,status='old',action='read',iostat=io_error)
  if ( io_error.ne.0) stop 'ERROR while reading file calving_day_file'
@@ -1592,6 +1616,17 @@ subroutine init_icebergs_with_icesheet
     read(98,*) scaling(i)
  end do
  close(98)
+!iron_icb_file > iron_conc_ib   (LA 2026, passive iron tracer)
+!NOTE: like the other .dat files this holds ONLY the newly seeded icebergs;
+!      the survivors keep the value restored from the iron restart file.
+ if (use_icb_iron .and. l_icb_iron_file) then
+  open(unit=98, file=iron_icb_file,status='old',action='read',iostat=io_error)
+  if ( io_error.ne.0) stop 'ERROR while reading file iron_icb_file'
+  do i = 1+num_non_melted_icb, ib_num
+     read(98,*) iron_conc_ib(i)
+  end do
+  close(98)
+ end if
 !calving_day_file > calving_day
  open(unit=97, file=calving_day_file,status='old',action='read',iostat=io_error)
  if ( io_error.ne.0) stop 'ERROR while reading file calving_day_file'
@@ -2194,4 +2229,56 @@ type(t_partit), intent(inout), target :: partit
 
 
 end subroutine write_buoy_props_netcdf
+!========================================================================
+! LA 2026 -- passive iron tracer: read/write the per-iceberg Fe concentration.
+! Kept in its own file rather than appended to iceberg.restart so that restart
+! files written before this patch remain readable.
+!========================================================================
+subroutine read_icb_iron_restart(path, n, mype)
+ implicit none
+ character(*), intent(in) :: path
+ integer,      intent(in) :: n, mype
+ integer :: ib, un, io_error
+ logical :: exists
+
+ INQUIRE(FILE=path, EXIST=exists)
+ if (.not. exists) then
+    ! No iron restart yet (first restart after enabling the feature): keep the
+    ! values init_icebergs* already loaded (icb_iron.dat or icb_iron_const).
+    ! Do NOT reset to icb_iron_const here - that would clobber icb_iron.dat.
+    if (mype==0) write(*,*) 'icb iron: ', trim(path),                          &
+                            ' not found -> keeping values from icb_iron.dat/icb_iron_const'
+    return
+ end if
+ open(newunit=un, file=path, status='old', action='read', form='formatted')
+ do ib=1, n
+    read(un,*,iostat=io_error) iron_conc_ib(ib)
+    if (io_error /= 0) then
+       write(*,*) 'ERROR while reading ', trim(path), ': expected ', n,        &
+                  ' values, failed at entry ', ib
+       stop 'ERROR while reading iceberg iron restart file'
+    end if
+ end do
+ close(un)
+ if (mype==0) write(*,*) 'icb iron: restored ', n, ' values from ', trim(path)
+end subroutine read_icb_iron_restart
+
+
+subroutine write_icb_iron_restart(path, n, only_alive)
+ implicit none
+ character(*), intent(in) :: path
+ integer,      intent(in) :: n
+ logical,      intent(in) :: only_alive
+ integer :: ib, un
+
+ open(newunit=un, file=path, status='replace', action='write', form='formatted')
+ do ib=1, n
+    if (only_alive) then
+       if (melted(ib)) cycle
+    end if
+    write(un,'(e15.7)') iron_conc_ib(ib)
+ end do
+ close(un)
+end subroutine write_icb_iron_restart
+
 end module iceberg_step
