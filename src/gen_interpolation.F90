@@ -522,8 +522,8 @@ subroutine interp_e2n_3d(data_e, data_n, mesh, partit, do_overz_in)
                     vx = vx + data_e(1, nz, elem) * elem_area(elem)
                     vy = vy + data_e(2, nz, elem) * elem_area(elem)
                 end do
-                data_n(1, nz, node)=vx/3.0_WP/areasvol(1, node)
-                data_n(2, nz, node)=vy/3.0_WP/areasvol(1, node)
+                data_n(1, nz, node)=vx/3.0_WP/areasvol(ulevels_nod2D(node), node)
+                data_n(2, nz, node)=vy/3.0_WP/areasvol(ulevels_nod2D(node), node)
             end do
         end do
     end if 
@@ -571,8 +571,8 @@ subroutine interp_e2n_2d(data_e, data_n, mesh, partit, do_overz_in)
                 vx = vx + data_e(1, elem) * elem_area(elem)
                 vy = vy + data_e(2, elem) * elem_area(elem)
             end do    
-            data_n(1, node)=vx/3.0_WP/areasvol(1, node)
-            data_n(2, node)=vy/3.0_WP/areasvol(1, node)
+            data_n(1, node)=vx/3.0_WP/areasvol(ulevels_nod2D(node), node)
+            data_n(2, node)=vy/3.0_WP/areasvol(ulevels_nod2D(node), node)
         end do
     
     !___________________________________________________________________________
@@ -605,7 +605,7 @@ subroutine interp_e2n_2d(data_e, data_n, mesh, partit, do_overz_in)
                     elem = nod_in_elem2D(k, node)
                     vx = vx + data_e(nz, elem) * elem_area(elem)
                 end do
-                data_n(nz, node)=vx/3.0_WP/areasvol(1, node)
+                data_n(nz, node)=vx/3.0_WP/areasvol(ulevels_nod2D(node), node)
             end do
         end do
     end if 
@@ -643,7 +643,7 @@ subroutine interp_e2n_1d(data_e, data_n, mesh, partit)
         do k = 1, nod_in_elem2D_num(node)
             elem = nod_in_elem2D(k, node)
             vx = vx + data_e(elem) * elem_area(elem)
-            data_n(node)=vx/3.0_WP/areasvol(1, node)
+            data_n(node)=vx/3.0_WP/areasvol(ulevels_nod2D(node), node)
         end do
     end do    
 end subroutine interp_e2n_1d
