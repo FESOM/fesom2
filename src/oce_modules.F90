@@ -12,18 +12,34 @@ use, intrinsic :: iso_fortran_env, only: real32, real64
 private :: real32, real64
 ! Kind numbers come from iso_fortran_env rather than being spelled as the byte
 ! size. The standard does not require kind numbers to equal storage size (NAG,
-! for one, numbers real kinds 1,2,3), so WP=8 is only accidentally correct.
-! On GNU/Intel real64==8, making this a numerical no-op.
-integer, parameter            :: WP=real64   ! Working precision
+! for one, numbers real kinds 1,2,3), so WP=4/WP=8 is only accidentally correct.
+! Working precision is a build dimension, selected with -DUSE_SINGLE_PRECISION.
+#if defined(USE_SINGLE_PRECISION)
+integer, parameter            :: WP=real32   ! Working precision (single)
+#else
+integer, parameter            :: WP=real64   ! Working precision (double, default)
+#endif
 ! Always-double precision, independent of WP. Use for quantities that must not
 ! degrade if WP is ever narrowed (time axes, external double APIs, global
 ! reduction accumulators).
 integer, parameter            :: WP_full=real64
 integer, parameter            :: MAX_PATH=4096 ! Maximum file path length
 integer		                  :: mstep
-real(kind=WP), parameter      :: pi=3.14159265358979_WP
+real(kind=WP), parameter      :: pi=3.141592653589793238462643383279502884_WP
 real(kind=WP), parameter      :: rad=pi/180.0_WP
 real(kind=WP), parameter      :: density_0=1030.0_WP
+! use_salt_anomaly (namelist &oce_dyn): store the salinity state as the anomaly
+! S - S_ref_anomaly, so the float32 spacing at typical open-ocean values
+! (|S-35| < ~2) is 30-250x finer than at S~35 (ulp 1.9e-6 psu). S_ref_anomaly is
+! DERIVED in ocean_setup: 35.0 when the toggle is on, else 0.0 -- so every
+! absolute-salinity consumer can add it back unconditionally (`+ 0.0` is a
+! bit-identical no-op when the feature is off). See the S_ref_anomaly sites.
+! NOTE: enabling it is NOT exactly DP-neutral -- FESOM's free-surface advection
+! is not perfectly constancy-preserving, leaving a small (~8e-6/step, surface,
+! freshwater-driven) residual; see the note at the salinity surface BC in
+! oce_ale_tracer.F90 (and the PR description).
+logical                       :: use_salt_anomaly = .false.
+real(kind=WP)                 :: S_ref_anomaly = 0.0_WP
 real(kind=WP), parameter      :: density_0_r=1.0_WP/density_0 ! [m^3/kg]
 real(kind=WP), parameter      :: g=9.81_WP
 real(kind=WP), parameter      :: r_earth=6367500.0_WP
@@ -213,7 +229,8 @@ character(20)                  :: which_pgf='shchepetkin'
                     scaling_ODM95, ODM95_Scr, ODM95_Sd, &
                     scaling_LDD97, LDD97_c, LDD97_rmin, LDD97_rmax, &
                     scaling_GINsea, GINsea_fac, GMzexp_smin, &
-                    scaling_GMzexp, GMzexp_zref
+                    scaling_GMzexp, GMzexp_zref, &
+                    use_salt_anomaly
 
  NAMELIST /tracer_phys/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, &
             balance_salt_water, clim_relax, ref_sss_local, ref_sss, &
@@ -238,6 +255,8 @@ real(kind=WP), allocatable         :: heat_flux(:), Tsurf(:)
 real(kind=WP), allocatable         :: heat_flux_in(:) !to keep the unmodified (by SW penetration etc.) heat flux 
 real(kind=WP), allocatable         :: Tsurf_ib(:) ! kh 15.03.21 additional array for asynchronous iceberg computations
 real(kind=WP), allocatable    :: water_flux(:), fw_ice(:), fw_snw(:), Ssurf(:)
+real(kind=WP), allocatable    :: hosing_flux(:), hosing_heat_flux(:)
+real(kind=WP), allocatable    :: hosing_flux3D(:,:), hosing_heat_flux3D(:,:)
 real(kind=WP), allocatable    :: Ssurf_ib(:) ! kh 15.03.21 additional array for asynchronous iceberg computations
 real(kind=WP), allocatable    :: virtual_salt(:), relax_salt(:)
 real(kind=WP), allocatable    :: Tclim(:,:), Sclim(:,:)

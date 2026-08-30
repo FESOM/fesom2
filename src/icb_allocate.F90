@@ -135,7 +135,7 @@ type(t_mesh), intent(in), target :: mesh
   allocate(elem_area_glob(elem2D))
   elem_area_glob=0.0
   call gather_elem(elem_area(1:myDim_elem2D), elem_area_glob, partit)
-  call MPI_Bcast(elem_area_glob, elem2D, MPI_DOUBLE, 0, MPI_COMM_FESOM, MPIERR)
+  call MPI_Bcast(elem_area_glob, elem2D, MPI_WP, 0, MPI_COMM_FESOM, MPIERR)
 
   allocate(vl_block(4*ib_num))
   allocate(buoy_props(ib_num,14))

@@ -53,7 +53,7 @@ subroutine iceberg_meltrates(partit, mesh, M_b, M_v, M_e, M_bv, &
   implicit none
   
   ! LA: include latent heat 2023-04-04
-  real(kind=8),parameter ::  L                  = 334000.                   ! [J/Kg]
+  real(kind=WP),parameter ::  L                  = 334000.                   ! [J/Kg]
   
   real, intent(IN)	:: u_ib,v_ib, uo_ib,vo_ib,ua_ib,va_ib	!iceberg velo, (int.) ocean & atm velo
   real, intent(IN)	:: uo_keel_ib, vo_keel_ib		!ocean velo at iceberg's draft
@@ -220,7 +220,7 @@ subroutine iceberg_newdimensions(partit, ib, depth_ib,height_ib,length_ib,width_
   real, dimension(4)	:: arr
   integer               :: istep
   ! LA: include latent heat 2023-04-04
-  real(kind=8),parameter ::  L                  = 334000.                   ! [J/Kg]
+  real(kind=WP),parameter ::  L                  = 334000.                   ! [J/Kg]
 
 type(t_partit), intent(inout), target :: partit
 #include "associate_part_def.h"
@@ -407,42 +407,42 @@ subroutine iceberg_heat_water_fluxes_3eq(partit, ib, M_b, H_b, T_ib,S_ib,v_rel, 
   implicit none
 
   integer, INTENT(IN)	  :: ib
-  real(kind=8),INTENT(OUT) :: M_b, H_b, t_freeze
-  real(kind=8),INTENT(IN) :: T_ib, S_ib 	! ocean temperature & salinity (at depth 'depth_ib')
-  real(kind=8),INTENT(IN) :: v_rel, depth_ib 	! relative velocity iceberg-ocean (at depth 'depth_ib')
+  real(kind=WP),INTENT(OUT) :: M_b, H_b, t_freeze
+  real(kind=WP),INTENT(IN) :: T_ib, S_ib 	! ocean temperature & salinity (at depth 'depth_ib')
+  real(kind=WP),INTENT(IN) :: v_rel, depth_ib 	! relative velocity iceberg-ocean (at depth 'depth_ib')
 
-  real (kind=8)  :: temp,sal,tin,zice
-  real (kind=8)  :: rhow, rhor, rho
-  real (kind=8)  :: gats1, gats2, gas, gat
-  real (kind=8)  :: ep1,ep2,ep3,ep4,ep5,ep31
-  real (kind=8)  :: ex1,ex2,ex3,ex4,ex5,ex6
-  real (kind=8)  :: vt1,sr1,sr2,sf1,sf2,tf1,tf2,tf,sf,seta,re
+  real(kind=WP)  :: temp,sal,tin,zice
+  real(kind=WP)  :: rhow, rhor, rho
+  real(kind=WP)  :: gats1, gats2, gas, gat
+  real(kind=WP)  :: ep1,ep2,ep3,ep4,ep5,ep31
+  real(kind=WP)  :: ex1,ex2,ex3,ex4,ex5,ex6
+  real(kind=WP)  :: vt1,sr1,sr2,sf1,sf2,tf1,tf2,tf,sf,seta,re
   integer        :: n, n3, nk
 
-  real(kind=8),parameter ::  rp =   0.                        !reference pressure
-  real(kind=8),parameter ::  a   = -0.0575                    !Foldvik&Kvinge (1974)
-  real(kind=8),parameter ::  b   =  0.0901
-  real(kind=8),parameter ::  c   =  7.61e-4
+  real(kind=WP),parameter ::  rp =   0.                        !reference pressure
+  real(kind=WP),parameter ::  a   = -0.0575                    !Foldvik&Kvinge (1974)
+  real(kind=WP),parameter ::  b   =  0.0901
+  real(kind=WP),parameter ::  c   =  7.61e-4
 
-  real(kind=8),parameter ::  pr  =  13.8                      !Prandtl number      [dimensionless]
-  real(kind=8),parameter ::  sc  =  2432.                     !Schmidt number      [dimensionless]
-  real(kind=8),parameter ::  ak  =  2.50e-3                   !dimensionless drag coeff.
-  real(kind=8),parameter ::  sak1=  sqrt(ak)
-  real(kind=8),parameter ::  un  =  1.95e-6                   !kinematic viscosity [m2/s]
-  real(kind=8),parameter ::  pr1 =  pr**(2./3.)               !Jenkins (1991)
-  real(kind=8),parameter ::  sc1 =  sc**(2./3.)
+  real(kind=WP),parameter ::  pr  =  13.8                      !Prandtl number      [dimensionless]
+  real(kind=WP),parameter ::  sc  =  2432.                     !Schmidt number      [dimensionless]
+  real(kind=WP),parameter ::  ak  =  2.50e-3                   !dimensionless drag coeff.
+  real(kind=WP),parameter ::  sak1=  sqrt(ak)
+  real(kind=WP),parameter ::  un  =  1.95e-6                   !kinematic viscosity [m2/s]
+  real(kind=WP),parameter ::  pr1 =  pr**(2./3.)               !Jenkins (1991)
+  real(kind=WP),parameter ::  sc1 =  sc**(2./3.)
 
-  real(kind=8),parameter ::  tob=  -20.                       !temperatur at the ice surface
-  !real(kind=8),parameter ::  rhoi=  920.                      !mean ice density
-  !real(kind=8),parameter ::  rhoh2o=  1027.5		      !water density
-  real(kind=8),parameter ::  rhoi=  850.0 		      !mean ice(berg) density (see values in icb_modules.F90)
-  real(kind=8),parameter ::  cpw =  4180.0                    !Barnier et al. (1995)
-  real(kind=8),parameter ::  lhf =  3.33e+5                   !latent heat of fusion
-  real(kind=8),parameter ::  tdif=  1.54e-6                   !thermal conductivity of ice shelf !RG4190 / RG44027
-  real(kind=8),parameter ::  atk =  273.15                    !0 deg C in Kelvin
-  real(kind=8),parameter ::  cpi =  152.5+7.122*(atk+tob)     !Paterson:"The Physics of Glaciers"
+  real(kind=WP),parameter ::  tob=  -20.                       !temperatur at the ice surface
+  !real(kind=WP),parameter ::  rhoi=  920.                      !mean ice density
+  !real(kind=WP),parameter ::  rhoh2o=  1027.5		      !water density
+  real(kind=WP),parameter ::  rhoi=  850.0 		      !mean ice(berg) density (see values in icb_modules.F90)
+  real(kind=WP),parameter ::  cpw =  4180.0                    !Barnier et al. (1995)
+  real(kind=WP),parameter ::  lhf =  3.33e+5                   !latent heat of fusion
+  real(kind=WP),parameter ::  tdif=  1.54e-6                   !thermal conductivity of ice shelf !RG4190 / RG44027
+  real(kind=WP),parameter ::  atk =  273.15                    !0 deg C in Kelvin
+  real(kind=WP),parameter ::  cpi =  152.5+7.122*(atk+tob)     !Paterson:"The Physics of Glaciers"
 
-  real(kind=8),parameter ::  L    = 334000.                   ! [J/Kg]
+  real(kind=WP),parameter ::  L    = 334000.                   ! [J/Kg]
 type(t_partit), intent(inout), target :: partit
 !==================== MODULES & DECLARATIONS ==========================!= 
 #include "associate_part_def.h"
@@ -631,9 +631,9 @@ subroutine fcn_density(t,s,z,rho)
   use o_PARAM
   implicit none
 
-  real(kind=8), intent(IN)       :: t, s, z
-  real(kind=8), intent(OUT)      :: rho                 
-  real(kind=8)                   :: rhopot, bulk
+  real(kind=WP), intent(IN)       :: t, s, z
+  real(kind=WP), intent(OUT)      :: rho                 
+  real(kind=WP)                   :: rhopot, bulk
 
  bulk = 19092.56 + t*(209.8925 				&
       - t*(3.041638 - t*(-1.852732e-3			&
