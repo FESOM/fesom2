@@ -367,7 +367,18 @@ if(VERBOSE)
    target_compile_definitions(${PROJECT_NAME} PRIVATE VERBOSE)
 endif()
 
+# OPENMP_REPRODUCIBLE serializes the OpenMP loops whose lock-based scatter
+# updates would otherwise accumulate in a thread-dependent order. It only has
+# any meaning when OpenMP is actually enabled - see FESOM/fesom2#444.
 if(OPENMP_REPRODUCIBLE)
+   if(NOT ENABLE_OPENMP)
+      message(FATAL_ERROR
+         "OPENMP_REPRODUCIBLE=ON requires ENABLE_OPENMP=ON. "
+         "It only serializes OpenMP worksharing loops, so it does nothing "
+         "without OpenMP. Re-run with -DENABLE_OPENMP=ON, or drop "
+         "-DOPENMP_REPRODUCIBLE=ON.")
+   endif()
+   message(STATUS "OPENMP_REPRODUCIBLE: ON (OpenMP loops serialized for reproducibility)")
    target_compile_definitions(${PROJECT_NAME} PRIVATE __openmp_reproducible)
 endif()
 
