@@ -135,7 +135,16 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
   call oce_files%def_node_var('hbar', 'ALE surface elevation', 'm',   mesh%hbar, mesh, partit)
 !!PS   call oce_files%def_node_var('ssh_rhs', 'RHS for the elevation', '?',   ssh_rhs, mesh, partit)
   call oce_files%def_node_var('ssh_rhs_old', 'RHS for the elevation', '?',   dynamics%ssh_rhs_old, mesh, partit)
+  ! d_eta is passed to ssh_solve_cg as X: it is the CG initial guess as well as the solution.
+  ! The CG stops on a relative residual (soltol), not at machine precision, so the result
+  ! depends on the guess -> prognostic.
+  call oce_files%def_node_var_optional('d_eta', 'SSH increment / CG initial guess', 'm', dynamics%d_eta, mesh, partit)
   call oce_files%def_node_var('hnode', 'nodal layer thickness', 'm',   mesh%hnode, mesh, partit)
+  ! hnode_new is filled by vert_vel_ale, but fer_solve_Gamma and init_Redi_GM run EARLIER in
+  ! the step and read it (oce_fer_gm.F90:82, :266), so with Fer_GM they consume the previous
+  ! step's value -> prognostic across the step boundary. Also written by the binary path
+  ! (MOD_MESH.F90, write_bin_array(mesh%hnode_new)).
+  call oce_files%def_node_var_optional('hnode_new', 'nodal layer thickness, next step', 'm', mesh%hnode_new, mesh, partit)
   
   !___Define the netCDF variables for 3D fields_______________________________
 #ifdef ENABLE_NVHPC_WORKAROUNDS
@@ -227,7 +236,7 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
          write(longname,'(A15,i4.4)') 'passive tracer ', j
          units='none'
      END SELECT
-     if ((tracers%data(j)%ID==101) .or. (tracers%data(j)%ID==102) .or. (tracers%data(j)%ID==103)) then
+     if ((tracers%data(j)%ID==101) .or. (tracers%data(j)%ID==102) .or. (tracers%data(j)%ID==103) .or. (tracers%data(j)%ID==304)) then
         call oce_files%def_node_var_optional(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
 #if defined(__recom)
      else if (is_recom_tracer .and. .not. REcoM_restart) then
@@ -242,16 +251,10 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
      else
         call oce_files%def_node_var(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
      endif
+     ! NOTE: valuesAB is not part of the restart. init_tracers_AB recomputes it
+     ! from values and valuesold at the start of every tracer solve, before any
+     ! consumer reads it, so a restarted run reconstructs it from _M1 (and _M2).
      longname=trim(longname)//', Adams-Bashforth'
-     if ((tracers%data(j)%ID==101) .or. (tracers%data(j)%ID==102) .or. (tracers%data(j)%ID==103)) then
-        call oce_files%def_node_var_optional(trim(trname)//'_AB', trim(longname), trim(units), tracers%data(j)%valuesAB(:,:),    mesh, partit)
-#if defined(__recom)
-     else if (is_recom_tracer .and. .not. REcoM_restart) then
-        call oce_files%def_node_var_optional(trim(trname)//'_AB', trim(longname), trim(units), tracers%data(j)%valuesAB(:,:),    mesh, partit)
-#endif
-     else
-        call oce_files%def_node_var(trim(trname)//'_AB', trim(longname), trim(units), tracers%data(j)%valuesAB(:,:),    mesh, partit)
-     endif
      call oce_files%def_node_var_optional(trim(trname)//'_M1', trim(longname), trim(units), tracers%data(j)%valuesold(1,:,:), mesh, partit)
      if (tracers%data(j)%AB_order==3) &
      call oce_files%def_node_var_optional(trim(trname)//'_M2', trim(longname), trim(units), tracers%data(j)%valuesold(2,:,:), mesh, partit)
@@ -283,6 +286,16 @@ subroutine ini_ice_io(ice, partit, mesh)
   call ice_files%def_node_var('hsnow', 'effective snow thickness',  'm',   ice%data(3)%values(:), mesh, partit)
   call ice_files%def_node_var('uice', 'zonal velocity',             'm/s', ice%uice, mesh, partit)
   call ice_files%def_node_var('vice', 'meridional velocity',        'm',   ice%vice, mesh, partit)
+  ! EVP/mEVP carry the internal stress across time steps (ice_maEVP.F90:
+  ! sigma12 = det1*sigma12 + det2*r3), so the stress tensor is prognostic, not diagnostic.
+  ! Without it a restart re-spins the stresses from zero. Written by the binary path already.
+  call ice_files%def_elem_var_optional('sigma11', 'EVP internal stress sigma11', 'N/m', ice%work%sigma11, mesh, partit)
+  call ice_files%def_elem_var_optional('sigma12', 'EVP internal stress sigma12', 'N/m', ice%work%sigma12, mesh, partit)
+  call ice_files%def_elem_var_optional('sigma22', 'EVP internal stress sigma22', 'N/m', ice%work%sigma22, mesh, partit)
+  ! ice_thermo_oce.F90 seeds its Newton-Raphson solve for the ice surface temperature from
+  ! t_skin (:280, stored back at :321) and runs a fixed imax=5 iterations with no convergence
+  ! test (:713, :741), so the result depends on the seed -> prognostic. Binary path saves it.
+  call ice_files%def_node_var_optional('t_skin', 'ice skin temperature (Newton-Raphson seed)', 'C', ice%thermo%t_skin, mesh, partit)
 #if defined (__oifs) || defined (__ifsinterface)
   call ice_files%def_node_var_optional('ice_albedo', 'ice albedo',    '-',   ice%atmcoupl%ice_alb, mesh, partit)
   call ice_files%def_node_var_optional('ice_temp', 'ice surface temperature',  'K',   ice%data(4)%values, mesh, partit)
@@ -475,19 +488,38 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
   type(t_dyn)   , intent(inout), target :: dynamics
   type(t_ice)   , intent(inout), target :: ice
   integer, intent(in) :: which_readr
-  
+
   ! Local variables
   logical :: is_portable_restart_write, is_raw_restart_write, is_bin_restart_write
   logical, save :: initialized_raw = .false.
   logical, save :: initialized_bin = .false.
   logical, save :: initialized_io = .false.
-  integer :: mpierr
 
   character(:), allocatable :: write_raw_dirpath, write_raw_infopath
   character(:), allocatable :: write_bin_dirpath, write_bin_infopath
   character(:), allocatable :: write_oce_path, write_ice_path
   character(:), allocatable :: write_icepack_path, write_bio_path
+  
+#if defined(__recom) && defined(__usetp)
+  integer :: tr_arr_slice_count_fix_1
+  integer :: group_i
+  integer :: tr_num_start
+  integer :: tr_num_end
+  integer :: tr_num_in_group
+  logical :: has_one_added_tracer
+  integer :: num_tracers
+  integer :: tr_num
+#endif
 
+#if defined(__recom) && defined(__usetp)
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+  num_tracers = tracers%num_tracers
+#else
+  integer :: mpierr
+#endif
 
   ! Build paths for reading using RestartInPath
   write_raw_dirpath = build_raw_restart_dirpath(RestartOutPath)//"/np"//int_to_txt(partit%npes)
@@ -504,22 +536,36 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
   if(.not. initialized_raw) then
     initialized_raw = .true.
     if(raw_restart_length_unit /= "off") then
-      if(partit%mype == RAW_RESTART_METADATA_RANK) then
-        call mkdir(build_raw_restart_dirpath(RestartOutPath))
-        call mkdir(write_raw_dirpath)
+
+#if defined(__recom) && defined(__usetp)
+      if(partit%my_fesom_group == 0) then ! master rank creates the folder 
+#endif
+          if(partit%mype == RAW_RESTART_METADATA_RANK) then
+              call mkdir(build_raw_restart_dirpath(RestartOutPath))
+              call mkdir(write_raw_dirpath)
+          end if
+#if defined(__recom) && defined(__usetp)
       end if
-      call MPI_Barrier(partit%MPI_COMM_FESOM, mpierr)
+#endif
+      call MPI_Barrier(partit%MPI_COMM_FESOM, mpierr) 
     end if
   end if
 
   if(.not. initialized_bin) then
     initialized_bin = .true.
     if(bin_restart_length_unit /= "off") then
-        if(partit%mype == RAW_RESTART_METADATA_RANK) then
-            call mkdir(build_bin_restart_dirpath(RestartOutPath))
-            call mkdir(write_bin_dirpath)
-        end if
-        call MPI_Barrier(partit%MPI_COMM_FESOM, mpierr)
+
+#if defined(__recom) && defined(__usetp)
+      if(partit%my_fesom_group == 0) then 
+#endif
+          if(partit%mype == RAW_RESTART_METADATA_RANK) then
+              call mkdir(build_bin_restart_dirpath(RestartOutPath))
+              call mkdir(write_bin_dirpath)
+          end if
+#if defined(__recom) && defined(__usetp)
+      end if 
+#endif
+      call MPI_Barrier(partit%MPI_COMM_FESOM, mpierr)
     end if
   end if
   
@@ -537,8 +583,8 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
 #if defined(__recom)
     if (use_REcoM .or. REcoM_restart) call ini_bio_io(tracers, partit, mesh)  ! fix OG 23.04.2026
 #endif
-  end if
-  
+  end if 
+
   ! Skip writing on step 0
   if (istep==0) return
   
@@ -575,37 +621,88 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
 
   ! Write restart files
   if(is_portable_restart_write) then
-    ! Write OCEAN restart
-    if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: ocean'//achar(27)//'[0m'
-    call write_netcdf_restarts(write_oce_path, oce_files, istep)
-    
-    ! Write ICE/ICEPACK restart
-    if(use_ice) then
-#if defined(__icepack)        
-        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: icepack'//achar(27)//'[0m'
-        call write_netcdf_restarts(write_icepack_path, icepack_files, istep)
-#else
-        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: ice'//achar(27)//'[0m'
-        call write_netcdf_restarts(write_ice_path, ice_files, istep)
-#endif 
-    end if
 
-#if defined(__recom)
-    ! Write RECOM restart
-    if (REcoM_restart .or. use_REcoM) then
-        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: bio'//achar(27)//'[0m'
-        call write_netcdf_restarts(write_bio_path, bio_files, istep)
+  ! --> synchronizes tracer data within fesom groups
+
+! kh 09.01.26 merging of valuesold between all fesom groups is only necessary here, immediately before writing the corresponding restart files
+! this will give better performance than merging valuesold in each simulation step in the main loop over all tracers in solve_tracers_ale in oce_ale_tracers.F90
+
+#if defined(__recom) && defined(__usetp)
+    if(num_fesom_groups > 1) then
+        tr_arr_slice_count_fix_1 = 1 * (nl - 1) * (myDim_nod2D + eDim_nod2D)
+
+        do group_i = 0, num_fesom_groups - 1
+            call calc_slice(num_tracers, num_fesom_groups, group_i, tr_num_start, tr_num_end, tr_num_in_group, has_one_added_tracer)
+
+! kh 09.01.26 tracers%data(:)%valuesold(:,:,:) is not contigous in memory, so an explicit inner loop over the tracers of each group is required
+            do tr_num = tr_num_start, tr_num_end
+
+! kh 09.01.26 also handle additional dimension of valuesold for AB_order
+                call MPI_Bcast(tracers%data(tr_num)%valuesold(:,:,:), tr_arr_slice_count_fix_1 * (tracers%data(tr_num)%AB_order - 1), MPI_WP, group_i, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%mpierr)
+            end do
+        end do
     end if
 #endif
-  end if
+
+    ! write OCEAN restart
+#if defined(__recom) && defined(__usetp)
+    if(partit%my_fesom_group == 0) then
+#endif
+        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: ocean'//achar(27)//'[0m'
+        call write_netcdf_restarts(write_oce_path, oce_files, istep)
+#if defined(__recom) && defined(__usetp)
+    endif !(partit%my_fesom_group == 0) then
+#endif
+
+    ! write ICE/ICEPACK restart
+    if(use_ice) then
+#if defined(__recom) && defined(__usetp)
+        if(partit%my_fesom_group == 0) then
+#endif
+#if defined(__icepack)        
+            if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: icepack'//achar(27)//'[0m'
+            call write_netcdf_restarts(write_icepack_path, icepack_files, istep)
+#else
+            if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: ice'//achar(27)//'[0m'
+            call write_netcdf_restarts(write_ice_path, ice_files, istep)
+#endif
+#if defined(__recom) && defined(__usetp)
+        endif !(partit%my_fesom_group == 0) then
+#endif
+    end if
+    
+    ! write RECOM restart
+#if defined(__recom)
+        if (REcoM_restart .or. use_REcoM) then
+#if defined(__usetp)
+            if(partit%my_fesom_group == 0) then
+#endif
+                if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: bio'//achar(27)//'[0m'
+                call write_netcdf_restarts(write_bio_path, bio_files, istep)
+#if defined(__usetp)
+            endif 
+#endif 
+        end if
+#endif
+
+  end if !is_portable_restart_write
 
   ! Write core dump
   if(is_raw_restart_write) then
+#if defined(__recom) && defined(__usetp)
+        if(partit%my_fesom_group == 0) then
+#endif
     call write_all_raw_restarts(write_raw_dirpath, write_raw_infopath, istep, partit%MPI_COMM_FESOM, partit%mype)
+#if defined(__recom) && defined(__usetp)
+        endif !(partit%my_fesom_group == 0) then
+#endif
   end if
 
   ! Write derived type binary
   if(is_bin_restart_write) then
+#if defined(__recom) && defined(__usetp)
+        if(partit%my_fesom_group == 0) then
+#endif
     call write_all_bin_restarts((/globalstep+istep, int(ctime), yearnew/), &
                                 write_bin_dirpath,                   &
                                 write_bin_infopath,                  &
@@ -614,13 +711,23 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
                                 ice,                                 &
                                 dynamics,                            &
                                 tracers                              )
+
+#if defined(__recom) && defined(__usetp)
+        endif !(partit%my_fesom_group == 0) then
+#endif
   end if
 
   ! Update clock file to latest restart point
   if (partit%mype==0) then
     if(is_portable_restart_write .or. is_raw_restart_write .or. is_bin_restart_write) then
-        write(*,*) ' --> actualize clock file to latest restart point'
-        call clock_finish
+#if defined(__recom) && defined(__usetp)
+        if(partit%my_fesom_group == 0) then
+#endif
+            write(*,*) ' --> actualize clock file to latest restart point'
+            call clock_finish
+#if defined(__recom) && defined(__usetp)
+        end if
+#endif
     end if
   end if
 
