@@ -1176,11 +1176,14 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     DO i=3, tracers%num_tracers
         id=tracers%data(i)%ID
         SELECT CASE (id)
-        CASE (301)
+        !SH CASE (301)
+        CASE (301,310:319)
             ptracers_restore_total=ptracers_restore_total+1
-        CASE (302)
+        !SH CASE (302)
+        CASE (302,320:329)
             ptracers_restore_total=ptracers_restore_total+1
-        CASE (303)
+        !SH CASE (303)
+        CASE (303,330:339)
             ptracers_restore_total=ptracers_restore_total+1
 
         END SELECT
@@ -1310,7 +1313,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 ! Transient tracers end
 
         !_______________________________________________________________________            
-        CASE (301) !Fram Strait 3d restored passive tracer
+        !SH CASE (301) !Fram Strait 3d restored passive tracer
+        CASE (301,310:319)
             tracers%data(i)%values(:,:)=0.0_WP
             rcounter3    =rcounter3+1
             counter=0
@@ -1321,7 +1325,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 end if
             end do
             allocate(ptracers_restore(rcounter3)%ind2(counter))
-            ptracers_restore(rcounter3)%id   =301
+            !SH ptracers_restore(rcounter3)%id   =301
+            ptracers_restore(rcounter3)%id   =id
             ptracers_restore(rcounter3)%locid=i
             counter=0
             do k=1, myDim_nod2D+eDim_nod2D
@@ -1339,7 +1344,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             end if
             
         !_______________________________________________________________________
-        CASE (302) !Bering Strait 3d restored passive tracer
+        !SH CASE (302) !Bering Strait 3d restored passive tracer
+        CASE (302,320:329)
             tracers%data(i)%values(:,:)=0.0_WP
             rcounter3    =rcounter3+1
             counter=0
@@ -1350,7 +1356,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 end if
             end do
             allocate(ptracers_restore(rcounter3)%ind2(counter))
-            ptracers_restore(rcounter3)%id   =302
+            !SH ptracers_restore(rcounter3)%id   =302
+            ptracers_restore(rcounter3)%id   =id
             ptracers_restore(rcounter3)%locid=i
             counter=0
             do k=1, myDim_nod2D+eDim_nod2D
@@ -1368,7 +1375,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             end if
             
         !_______________________________________________________________________            
-        CASE (303) !BSO 3d restored passive tracer
+        !SH CASE (303) !BSO 3d restored passive tracer
+        CASE (303,330:339)
             tracers%data(i)%values(:,:)=0.0_WP
             rcounter3    =rcounter3+1
             counter=0
@@ -1379,7 +1387,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 end if
             end do
             allocate(ptracers_restore(rcounter3)%ind2(counter))
-            ptracers_restore(rcounter3)%id   =303
+            !SH ptracers_restore(rcounter3)%id   =303
+            ptracers_restore(rcounter3)%id   =id
             ptracers_restore(rcounter3)%locid=i
             counter=0
             do k=1, myDim_nod2D+eDim_nod2D

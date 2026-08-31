@@ -540,6 +540,7 @@ CONTAINS
    SUBROUTINE nc_sbc_ini_fillnames(yyyy)
       integer, intent(in)         :: yyyy
       character(len=4)            :: yyear
+      !SH logical :: enable_AWICM=.false.
 
       write(yyear,"(I4)") yyyy
       if (y_perpetual)    yyear = ''
@@ -1479,7 +1480,7 @@ endif
       real(wp)     :: rdate ! date
       integer      :: fld_idx, i
       logical      :: do_rotation_wind, do_rotation_stre, force_newcoeff, update_monthly_flag
-      logical      :: update_daily_flag ! enable_AWICM = .true.
+      logical      :: update_daily_flag !, enable_AWICM = .false.
       integer      :: yyyy, dd, mm, flag_flpyr=0
       integer,   pointer   :: nc_Ntime, t_indx, t_indx_p1
       real(wp),  pointer   :: nc_time(:)
