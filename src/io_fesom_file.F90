@@ -45,7 +45,8 @@ module io_fesom_file_module
     procedure, public :: read_variables_raw, write_variables_raw
     procedure, public :: close_file ! inherited procedures we overwrite
     procedure, public :: read_and_scatter_variables
-    generic, public :: specify_node_var => specify_node_var_2d, specify_node_var_2dicepack, specify_node_var_3d 
+    procedure, public :: broadcast_local_data
+    generic, public :: specify_node_var => specify_node_var_2d, specify_node_var_2dicepack, specify_node_var_3d
     generic, public :: specify_elem_var => specify_elem_var_2d, specify_elem_var_3d
     procedure, private :: specify_node_var_2d, specify_node_var_2dicepack, specify_node_var_3d
     procedure, private :: specify_elem_var_2d, specify_elem_var_3d
@@ -289,6 +290,27 @@ contains
       write(*,'(A)') '=================================='
     end if
   end subroutine
+
+
+  ! broadcast the local data of every variable registered on this file from the
+  ! rank with the same partition id in fesom group 'root' to all other fesom
+  ! groups (over the given inter-group communicator). Used to avoid reading and
+  ! scattering the same restart file redundantly in every fesom group when
+  ! running with tracer-parallelization (num_fesom_groups > 1): only group
+  ! 'root' actually reads the file via read_and_scatter_variables, the other
+  ! groups obtain the identical result via this broadcast instead.
+  subroutine broadcast_local_data(this, comm, root)
+    class(fesom_file_type), target :: this
+    integer, intent(in) :: comm, root
+    ! EO parameters
+    integer i, mpierr
+    type(var_info), pointer :: var
+
+    do i=1, this%nvar_infos
+      var => this%var_infos(i)
+      call MPI_Bcast(var%external_local_data_ptr, size(var%external_local_data_ptr), MPI_DOUBLE_PRECISION, root, comm, mpierr)
+    end do
+  end subroutine broadcast_local_data
 
 
   subroutine gather_and_write_variables(this)

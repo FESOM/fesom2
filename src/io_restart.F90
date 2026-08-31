@@ -353,10 +353,11 @@ subroutine read_initial_conditions(which_readr, ice, dynamics, tracers, partit, 
   ! Local variables
   logical :: rawfiles_exist, binfiles_exist
   integer :: mpierr
+  integer :: i
   character(:), allocatable :: read_raw_dirpath, read_raw_infopath
   character(:), allocatable :: read_bin_dirpath, read_bin_infopath
   character(:), allocatable :: read_oce_path, read_ice_path, read_bio_path
-  
+
   ! Build paths for reading using RestartInPath
   read_raw_dirpath = build_raw_restart_dirpath(RestartInPath)//"/np"//int_to_txt(partit%npes)
   read_raw_infopath = build_raw_restart_infopath(RestartInPath)//"/np"//int_to_txt(partit%npes)//".info"
@@ -419,27 +420,69 @@ subroutine read_initial_conditions(which_readr, ice, dynamics, tracers, partit, 
   else
     ! Read NetCDF restart
     which_readr = 0
-    
+
     ! Read OCEAN restart
-    if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: ocean'//achar(27)//'[0m'
-    call read_netcdf_restarts(read_oce_path, oce_files, partit%MPI_COMM_FESOM, partit%mype)
-    
+    ! --> with tracer-parallelization (num_fesom_groups > 1) every group reads
+    !     the exact same file(s), so only group 0 actually reads+scatters and
+    !     the result is broadcast to the other groups instead of re-reading it.
+#if defined(__recom) && defined(__usetp)
+    if (partit%my_fesom_group == 0) then
+#endif
+        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: ocean'//achar(27)//'[0m'
+        call read_netcdf_restarts(read_oce_path, oce_files, partit%MPI_COMM_FESOM, partit%mype)
+#if defined(__recom) && defined(__usetp)
+    end if
+    if (num_fesom_groups > 1) then
+        do i=1, oce_files%nfiles
+            call oce_files%files(i)%broadcast_local_data(partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, 0)
+        end do
+    end if
+#endif
+
     ! Read ICE/ICEPACK restart
     if (use_ice) then
-#if defined(__icepack)   
-        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: icepack'//achar(27)//'[0m'
-        call read_netcdf_restarts(nc_restart_path('icepack', yearold, RestartInPath), icepack_files, partit%MPI_COMM_FESOM, partit%mype)
-#else            
-        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: ice'//achar(27)//'[0m'
-        call read_netcdf_restarts(read_ice_path, ice_files, partit%MPI_COMM_FESOM, partit%mype)            
+#if defined(__recom) && defined(__usetp)
+        if (partit%my_fesom_group == 0) then
 #endif
-    end if 
+#if defined(__icepack)
+            if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: icepack'//achar(27)//'[0m'
+            call read_netcdf_restarts(nc_restart_path('icepack', yearold, RestartInPath), icepack_files, partit%MPI_COMM_FESOM, partit%mype)
+#else
+            if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: ice'//achar(27)//'[0m'
+            call read_netcdf_restarts(read_ice_path, ice_files, partit%MPI_COMM_FESOM, partit%mype)
+#endif
+#if defined(__recom) && defined(__usetp)
+        end if
+        if (num_fesom_groups > 1) then
+#if defined(__icepack)
+            do i=1, icepack_files%nfiles
+                call icepack_files%files(i)%broadcast_local_data(partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, 0)
+            end do
+#else
+            do i=1, ice_files%nfiles
+                call ice_files%files(i)%broadcast_local_data(partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, 0)
+            end do
+#endif
+        end if
+#endif
+    end if
 
 #if defined(__recom)
     ! Read RECOM restarts
     if (REcoM_restart) then
-        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: bio'//achar(27)//'[0m'
-        call read_netcdf_restarts(read_bio_path, bio_files, partit%MPI_COMM_FESOM, partit%mype)
+#if defined(__usetp)
+        if (partit%my_fesom_group == 0) then
+#endif
+            if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: bio'//achar(27)//'[0m'
+            call read_netcdf_restarts(read_bio_path, bio_files, partit%MPI_COMM_FESOM, partit%mype)
+#if defined(__usetp)
+        end if
+        if (num_fesom_groups > 1) then
+            do i=1, bio_files%nfiles
+                call bio_files%files(i)%broadcast_local_data(partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, 0)
+            end do
+        end if
+#endif
     end if
 #endif
 

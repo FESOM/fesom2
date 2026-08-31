@@ -1955,7 +1955,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif 
-        if (mype==0) write(*,*) 'Albani is switched off --> Check namelist.recom'
+        if (mype==0 .and. mstep==1) write(*,*) 'Albani is switched off --> Check namelist.recom'
 #if defined(__usetp)
         endif
 #endif
@@ -2253,7 +2253,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
-    if (mype==0) write(*,*) 'sedimentary input from MEDUSA not used!' !OG
+    if (mype==0 .and. mstep==1) write(*,*) 'sedimentary input from MEDUSA not used!' !OG
 #if defined(__usetp)
         endif
 #endif
