@@ -391,7 +391,11 @@ subroutine integrate_nod_3D(data, int3D, partit, mesh)
 #include "associate_mesh_ass.h" 
 
   lval=0.0_WP_full
+#if defined(__openmp_reproducible)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row, k, lval_row) ORDERED
+#else
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row, k, lval_row) REDUCTION(+: lval)
+#endif
   do row=1, myDim_nod2D
      lval_row = 0.0_WP_full
      do k=ulevels_nod2D(row), nlevels_nod2D(row)-1
@@ -875,7 +879,11 @@ subroutine integrate_elem_3D(data, int3D, partit, mesh)
 #include "associate_mesh_ass.h" 
 
   lval=0.0_WP_full
+#if defined(__openmp_reproducible)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row, k, lval_row) ORDERED
+#else
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row, k, lval_row) REDUCTION(+: lval)
+#endif
   do row=1, myDim_elem2D
      if(elem2D_nodes(1, row) > myDim_nod2D) cycle
      lval_row = 0.0_WP_full
@@ -925,7 +933,11 @@ subroutine integrate_elem_2D(data, int2D, partit, mesh)
 #include "associate_mesh_ass.h" 
 
   lval=0.0_WP_full
+#if defined(__openmp_reproducible)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) ORDERED
+#else
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) REDUCTION(+: lval)
+#endif
   do row=1, myDim_elem2D
      if(elem2D_nodes(1, row) > myDim_nod2D) cycle
 #if defined(__openmp_reproducible)
