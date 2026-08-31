@@ -1928,12 +1928,21 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
         !bc_surface=-dt*(sval*water_flux(n)*is_nonlinfs)
         bc_surface=0.0_WP
 !---age-code-end
-    CASE (301)
+!SH    CASE (301)
+!SH        bc_surface=0.0_WP
+!SH    CASE (302)
+!SH        bc_surface=0.0_WP
+!SH    CASE (303)
+!SH       bc_surface=0.0_WP
+
+!SH --- Copies of the cases 301-303
+    CASE (301,310:319)
         bc_surface=0.0_WP
-    CASE (302)
+    CASE (302,320:329)
         bc_surface=0.0_WP
-    CASE (303)
+    CASE (303,330:339)
         bc_surface=0.0_WP
+
     CASE (501) ! ice-shelf water due to basal melting
         if (nzmin==1) then
            bc_surface = 0.0_WP
