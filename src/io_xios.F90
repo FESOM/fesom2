@@ -380,8 +380,10 @@ contains
     end do
     call xios_set_axis_attr("nz",      n_glo = nz_cell,    value = z_mid)
     deallocate(z_mid)
-    call xios_set_axis_attr("nz1",     n_glo = mesh%nl,    value = -mesh%zbar(1:mesh%nl))
-    call xios_set_axis_attr("std_dens", n_glo = std_dens_N, value = std_dens)
+    ! xios_set_axis_attr's value= dummy is real(kind=8); mesh%zbar and std_dens are
+    ! real(WP), so convert explicitly (no-op in double, required when WP=real32).
+    call xios_set_axis_attr("nz1",     n_glo = mesh%nl,    value = real(-mesh%zbar(1:mesh%nl), kind=8))
+    call xios_set_axis_attr("std_dens", n_glo = std_dens_N, value = real(std_dens, kind=8))
 
     ! --- 7. timestep (required by XIOS before close_context_definition) -----
     call xios_set_timestep(timestep = xios_duration(second = dt))
