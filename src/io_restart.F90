@@ -617,7 +617,7 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
             do tr_num = tr_num_start, tr_num_end
 
 ! kh 09.01.26 also handle additional dimension of valuesold for AB_order
-                call MPI_Bcast(tracers%data(tr_num)%valuesold(:,:,:), tr_arr_slice_count_fix_1 * (tracers%data(tr_num)%AB_order - 1), MPI_DOUBLE_PRECISION, group_i, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%mpierr)
+                call MPI_Bcast(tracers%data(tr_num)%valuesold(:,:,:), tr_arr_slice_count_fix_1 * (tracers%data(tr_num)%AB_order - 1), MPI_WP, group_i, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%mpierr)
             end do
         end do
     end if

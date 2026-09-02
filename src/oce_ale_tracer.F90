@@ -134,7 +134,7 @@ end module solve_tracers_ale_interface
 ! Driving routine    Here with ALE changes!!!
 subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     use g_config
-    use o_PARAM, only: SPP, Fer_GM
+    use o_PARAM, only: SPP, Fer_GM, S_ref_anomaly
     use mod_mesh
     USE MOD_PARTIT
     USE MOD_PARSUP
@@ -373,7 +373,8 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
             
         elseif ((toy_ocean) .AND. ((TRIM(which_toy)=="neverworld2"))) then
             call relax_2_tsurf(tracers%data(1), partit, mesh)
-            
+            call relax_2_ssurf(tracers%data(2), partit, mesh)
+
         else
             call relax_to_clim(tr_num, tracers, partit, mesh)
             
@@ -400,14 +401,14 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
                     request_count = request_count + 1
 
 ! non-blocking communication overlapped with computation in loop
-                    call MPI_IBcast(tracers%data(tr_num_to_send)%values(:, :), tr_arr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                    call MPI_IBcast(tracers%data(tr_num_to_send)%values(:, :), tr_arr_slice_count_fix_1, MPI_WP, &
                                                 group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, tr_arr_requests(request_count),     MPIerr)
 
                     if(use_MEDUSA) then
-                        call MPI_IBcast(Sinkflx_tr (:, :, tr_num_to_send), Sinkflx_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                        call MPI_IBcast(Sinkflx_tr (:, :, tr_num_to_send), Sinkflx_tr_slice_count_fix_1, MPI_WP, &
                                                     group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, SinkFlx_tr_requests(request_count), MPIerr)
                     endif
-                        call MPI_IBcast(Benthos_tr (:, :, tr_num_to_send), Benthos_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                        call MPI_IBcast(Benthos_tr (:, :, tr_num_to_send), Benthos_tr_slice_count_fix_1, MPI_WP, &
                                                     group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, Benthos_tr_requests(request_count), MPIerr)
                 end if
             end do
@@ -425,13 +426,13 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 
                 request_count = request_count + 1
 
-                call MPI_IBcast(tracers%data(tr_num_end)%values(:, :), tr_arr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                call MPI_IBcast(tracers%data(tr_num_end)%values(:, :), tr_arr_slice_count_fix_1, MPI_WP, &
                                 group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, tr_arr_requests(request_count),     MPIerr)
                 if(use_MEDUSA) then
-                    call MPI_IBcast(Sinkflx_tr (:, :, tr_num_end), Sinkflx_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                    call MPI_IBcast(Sinkflx_tr (:, :, tr_num_end), Sinkflx_tr_slice_count_fix_1, MPI_WP, &
                                     group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, SinkFlx_tr_requests(request_count), MPIerr)
                 endif
-                    call MPI_IBcast(Benthos_tr (:, :, tr_num_end), Benthos_tr_slice_count_fix_1, MPI_DOUBLE_PRECISION, &
+                    call MPI_IBcast(Benthos_tr (:, :, tr_num_end), Benthos_tr_slice_count_fix_1, MPI_WP, &
                                     group_i, MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, Benthos_tr_requests(request_count), MPIerr)
             end if
         end do
@@ -503,12 +504,12 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     do node=1,myDim_nod2D+eDim_nod2D
         nzmax=nlevels_nod2D(node)-1
         nzmin=ulevels_nod2D(node)
-        where (tracers%data(2)%values(nzmin:nzmax,node) > 45._WP)
-               tracers%data(2)%values(nzmin:nzmax,node)=45._WP
+        ! clip bounds shifted to anomaly space (S_ref=0 unless use_salt_anomaly)
+        where (tracers%data(2)%values(nzmin:nzmax,node) > 45._WP - S_ref_anomaly)
+               tracers%data(2)%values(nzmin:nzmax,node)= 45._WP - S_ref_anomaly
         end where
-
-        where (tracers%data(2)%values(nzmin:nzmax,node) < 3._WP )
-               tracers%data(2)%values(nzmin:nzmax,node) = 3._WP
+        where (tracers%data(2)%values(nzmin:nzmax,node) < 3._WP - S_ref_anomaly )
+               tracers%data(2)%values(nzmin:nzmax,node) = 3._WP - S_ref_anomaly
         end where
     end do
 !$OMP END PARALLEL DO
@@ -839,6 +840,7 @@ end subroutine diff_tracers_ale
 !===============================================================================
 !Vertical diffusive flux(explicit scheme):
 subroutine diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
+    use o_PARAM, only: S_ref_anomaly
     use o_ARRAYS
     use g_forcing_arrays
     use MOD_MESH
@@ -877,7 +879,10 @@ subroutine diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
             rdata =  Tsurf(n)
             rlx   =  surf_relax_T
         elseif (tracers%data(tr_num)%ID==2) then
-            flux  =  virtual_salt(n)+relax_salt(n) + real_salt_flux(n)*is_nonlinfs
+            ! use_salt_anomaly background-dilution term (S_ref=0 unless enabled).
+            ! See bc_surface (implicit path) below for the derivation and the note
+            ! on the ~8e-6/step constancy-error residual it leaves.
+            flux  =  virtual_salt(n)+relax_salt(n) + (real_salt_flux(n) + S_ref_anomaly*water_flux(n))*is_nonlinfs
         else
             flux  = 0._WP
             rdata = 0._WP
@@ -1557,7 +1562,11 @@ subroutine diff_part_hor_redi(tracers, partit, mesh)
 !$OMP                   nl1, ul1, nl2, ul2, nl12, ul12, nz, el, elnodes, enodes, &
 !$OMP                             c, Fx, Fy, Tx, Ty, Tx_z, Ty_z, SxTz, SyTz, Tz, &
 !$OMP                                                          rhs1, rhs2, Kh, dz)
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     do edge=1, myDim_edge2D
         rhs1=0.0_WP
         rhs2=0.0_WP
@@ -1730,7 +1739,11 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, ed, el, en, k, elem, nzmin, nzmax, u1, v1, len, vi, tt, ww, &
 !$OMP elnodes1, elnodes2)
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     DO ed=1, myDim_edge2D!+eDim_edge2D
        if (myList_edge2D(ed) > edge2D_in) cycle
        el=edge_tri(:,ed)
@@ -1776,7 +1789,11 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
     ! ===========
     ! Second round:
     ! ===========
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     DO ed=1, myDim_edge2D!+eDim_edge2D
        if (myList_edge2D(ed)>edge2D_in) cycle
           el=edge_tri(:,ed)
@@ -1829,6 +1846,7 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
   use MOD_MESH
   USE MOD_PARTIT
   USE MOD_PARSUP
+  use o_PARAM, only: S_ref_anomaly
   USE o_ARRAYS
   USE g_forcing_arrays
   USE g_config
@@ -1877,8 +1895,26 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
     CASE (2)
         ! --> real_salt_flux(:): salt flux due to containment/releasing of salt
         !     by forming/melting of sea ice
+        ! use_salt_anomaly background-dilution term (S_ref=0 unless enabled, so
+        ! this reduces to the original salinity BC). WHY it is needed and where a
+        ! residual error comes from:
+        !   Storing S = S' + S_ref should be invisible in DP: advection is linear
+        !   and, by continuity, adv(S_ref) = -S_ref*dh/dt exactly cancels the
+        !   -S_ref*dh/dt from the anomaly transform, leaving the same equation in
+        !   S'. That holds ONLY if the free-surface advection preserves a constant
+        !   exactly. FESOM's does not: with no correction the DP anomaly-vs-absolute
+        !   salt error is ~1.3e-3, a constancy error for the offset S_ref localised
+        !   where the surface freshwater flux enters. The S_ref*water_flux term
+        !   below cancels ~99.4% of it, leaving a ~8e-6/step residual (the part not
+        !   proportional to water_flux: the grid-divergence / FCT-limiter part).
+        !   An exact fix would carry S'+S_ref in the surface ADVECTIVE flux across
+        !   all schemes, not add a surface source here (a per-layer thickness term
+        !   was tried and does not help; it makes it worse combined with this term).
+        ! real_salt_flux / relax_salt / virtual_salt are already anomaly-consistent
+        ! (real_salt_flux is built from the corrected absolute ice gather; relax_salt
+        ! subtracts S_ref from the absolute Ssurf; virtual_salt is 0 in zstar/zlevel).
         bc_surface= dt*(virtual_salt(n) & !--> is zeros for zlevel/zstar
-                    + relax_salt(n) + real_salt_flux(n)*is_nonlinfs)
+                    + relax_salt(n) + (real_salt_flux(n) + S_ref_anomaly*water_flux(n))*is_nonlinfs)
             
     !___Transient tracers (cases ##6,11,12,14,39)__________________________________
     CASE (6) ! SF6

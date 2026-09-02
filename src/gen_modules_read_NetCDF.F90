@@ -28,11 +28,11 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
   integer                    :: status, ncid, varid
   integer                    :: lonid, latid
   integer                    :: istart(3), icount(3), elnodes(3)
-  real(real64)               :: x, y, miss, aux, xmin, elnodes_x(3)
-  real(real64), allocatable  :: lon(:), lat(:)
-  real(real64), allocatable  :: ncdata(:,:), ncdata_temp(:,:)
-  real(real64), allocatable  :: temp_x(:), temp_y(:)
-  real(real64)               :: model_2Darray(partit%myDim_nod2d+partit%eDim_nod2D)   
+  real(kind=WP)               :: x, y, miss, aux, xmin, elnodes_x(3)
+  real(kind=WP), allocatable  :: lon(:), lat(:)
+  real(kind=WP), allocatable  :: ncdata(:,:), ncdata_temp(:,:)
+  real(kind=WP), allocatable  :: temp_x(:), temp_y(:)
+  real(kind=WP)               :: model_2Darray(partit%myDim_nod2d+partit%eDim_nod2D)   
   character(*)               :: vari
   character(*)               :: file
   logical                    :: check_dummy, do_onvert
@@ -74,7 +74,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
      status=nf90_inq_varid(ncid, 'lat', varid)
      status=nf90_get_var(ncid, varid, lat, start=(/1/), count=(/latlen/))
   end if
-  call MPI_BCast(lat, latlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)  
+  call MPI_BCast(lat, latlen, MPI_WP, 0, MPI_COMM_FESOM, ierror)  
 
   ! lon
   allocate(lon(lonlen))
@@ -82,7 +82,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
      status=nf90_inq_varid(ncid, 'lon', varid)
      status=nf90_get_var(ncid, varid, lon, start=(/1/), count=(/lonlen/))
   end if
-  call MPI_BCast(lon, lonlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)  
+  call MPI_BCast(lon, lonlen, MPI_WP, 0, MPI_COMM_FESOM, ierror)  
 
   ! make sure range 0. - 360.
   do n=1,lonlen
@@ -106,8 +106,8 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
     ! close file
     status=nf90_close(ncid)
   end if
-  call MPI_BCast(ncdata, lonlen*latlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-  call MPI_BCast(miss,               1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+  call MPI_BCast(ncdata, lonlen*latlen, MPI_WP, 0, MPI_COMM_FESOM, ierror)
+  call MPI_BCast(miss,               1, MPI_WP, 0, MPI_COMM_FESOM, ierror)
   !write(*,*)'miss', miss
   !write(*,*)'raw',minval(ncdata),maxval(ncdata)
   ncdata_temp=ncdata
@@ -209,11 +209,11 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
   integer                       :: status, ncid, varid
   integer                       :: lonid, latid, drain_num
   integer                       :: istart(4), icount(4)
-  real(real64)                  :: x, y, miss
-  real(real64), allocatable     :: lon(:), lat(:)
-  real(real64), allocatable     :: ncdata(:,:)
-  real(real64), allocatable     :: temp_x(:), temp_y(:)
-  real(real64)                  :: model_2Darray(partit%myDim_nod2d+partit%eDim_nod2D)   
+  real(kind=WP)                  :: x, y, miss
+  real(kind=WP), allocatable     :: lon(:), lat(:)
+  real(kind=WP), allocatable     :: ncdata(:,:)
+  real(kind=WP), allocatable     :: temp_x(:), temp_y(:)
+  real(kind=WP)                  :: model_2Darray(partit%myDim_nod2d+partit%eDim_nod2D)   
   character(15)                 :: vari
   character(300)                :: file
   logical                       :: check_dummy
@@ -252,7 +252,7 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
      status=nf90_inq_varid(ncid, 'lat', varid)
      status=nf90_get_var(ncid, varid, lat, start=(/1/), count=(/latlen/))
    end if
-  call MPI_BCast(lat, latlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)  
+  call MPI_BCast(lat, latlen, MPI_WP, 0, MPI_COMM_FESOM, ierror)  
 
   ! lon
   allocate(lon(lonlen))
@@ -260,7 +260,7 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
      status=nf90_inq_varid(ncid, 'lon', varid)
      status=nf90_get_var(ncid, varid, lon, start=(/1/), count=(/lonlen/))
   end if
-  call MPI_BCast(lon, lonlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)  
+  call MPI_BCast(lon, lonlen, MPI_WP, 0, MPI_COMM_FESOM, ierror)  
 
   ! make sure range 0. - 360.
   do n=1,lonlen
@@ -286,8 +286,8 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
      !close file
      status=nf90_close(ncid)
   end if
-  call MPI_BCast(ncdata, lonlen*latlen, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-  call MPI_BCast(miss,               1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+  call MPI_BCast(ncdata, lonlen*latlen, MPI_WP, 0, MPI_COMM_FESOM, ierror)
+  call MPI_BCast(miss,               1, MPI_WP, 0, MPI_COMM_FESOM, ierror)
   ! the next step is to interpolate data to model grids
   ! model grid coordinates
   num=myDim_nod2d+eDim_nod2d
@@ -331,8 +331,8 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, partit, 
   integer                       :: itime
   integer                       :: status, ncid, varid
   integer                       :: istart(2), icount(2)
-  real(real64)                  :: ncdata(mesh%nod2D)
-  real(real64),   intent(out)	:: model_2Darray(partit%myDim_nod2D+partit%eDim_nod2D)
+  real(kind=WP)                  :: ncdata(mesh%nod2D)
+  real(kind=WP),   intent(out)	:: model_2Darray(partit%myDim_nod2D+partit%eDim_nod2D)
   character(*),  intent(in) 	:: file
   character(*),  intent(in)     :: vari
   integer                       :: ierror           ! return error code
@@ -362,7 +362,7 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, partit, 
      status=nf90_get_var(ncid, varid, ncdata, start=istart, count=icount)
      status=nf90_close(ncid)
   end if      
-  call MPI_BCast(ncdata, nod2D, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+  call MPI_BCast(ncdata, nod2D, MPI_WP, 0, MPI_COMM_FESOM, ierror)
   model_2Darray=ncdata(myList_nod2D) 
 end subroutine read_2ddata_on_grid_NetCDF
 end module g_read_other_NetCDF

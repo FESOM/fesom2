@@ -182,6 +182,16 @@ module g_config
   integer                       :: ib_num=0
   integer                       :: steps_per_ib_step=8
 
+! LA 2026 -- passive iron tracer carried by icebergs
+! Each iceberg carries a fixed Fe concentration of its ice; melting releases
+! Fe in proportion to the meltwater flux.  Purely diagnostic: the resulting
+! ibiron field is written out but does not feed back on the ocean.
+  logical                       :: use_icb_iron=.false.      ! master switch
+  real(kind=WP)                 :: icb_iron_const=50.0e-6_WP ! Fe content of iceberg ice
+                                                             ! [mol m-3]; 50e-6 = 50 nmol L-1
+  logical                       :: l_icb_iron_file=.false.   ! read per-iceberg Fe from
+                                                             ! icb_iron.dat instead of the constant
+
 ! kh 02.02.21
 ! ib_async_mode == 0: original sequential behavior for both ice sections (for testing purposes, creating reference results etc.)
 ! ib_async_mode == 1: OpenMP code active to overlapped computations in first (ocean ice) and second (icebergs) parallel section
@@ -191,7 +201,7 @@ module g_config
 
   namelist /icebergs/   use_icebergs, turn_off_hf, turn_off_fw, use_icesheet_coupling, lbalance_fw, cell_saturation, lmin_latent_hf, &
                         ib_num, steps_per_ib_step, ib_async_mode, thread_support_level_required, lverbose_icb, l_allowgrounding, &
-                        l_cap_ibhf_n
+                        l_cap_ibhf_n, use_icb_iron, icb_iron_const, l_icb_iron_file
 
 !wiso-code!!!
   logical                       :: lwiso  =.false.  ! enable isotope?
