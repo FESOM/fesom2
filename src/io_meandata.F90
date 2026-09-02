@@ -3000,7 +3000,7 @@ ctime=timeold+(dayold-1.)*86400
                 do k=entry%rec_count, 1, -1
                     !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assert_nf B'//achar(27)//'[0m'//',  k=',k, ', rootpart=', entry%root_rank
                     ! determine rtime from exiting file
-                    call assert_nf( nf90_get_var(entry%ncid, entry%tID, rtime), __LINE__)
+                    call assert_nf( nf90_get_var(entry%ncid, entry%tID, rtime, start=(/k/)), __LINE__)
                     if (ctime > rtime) then
                         entry%rec_count=k+1
                         exit ! a proper rec_count detected, exit the loop
