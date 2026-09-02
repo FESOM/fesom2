@@ -2865,7 +2865,11 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     logical       :: trigger_flush
 #endif
 
-ctime=timeold+(dayold-1.)*86400
+! stamp records with the exact end of the averaging period (events fire when
+! timenew==86400., see gen_events.F90); timeold would shift the stamp by -dt,
+! producing duplicate "ghost" records when a run is repeated with a different
+! time step (github issue #123)
+ctime=timenew+(daynew-1.)*86400
     
     !___________________________________________________________________________
     if (lfirst) then
@@ -3000,7 +3004,7 @@ ctime=timeold+(dayold-1.)*86400
                 do k=entry%rec_count, 1, -1
                     !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assert_nf B'//achar(27)//'[0m'//',  k=',k, ', rootpart=', entry%root_rank
                     ! determine rtime from exiting file
-                    call assert_nf( nf90_get_var(entry%ncid, entry%tID, rtime), __LINE__)
+                    call assert_nf( nf90_get_var(entry%ncid, entry%tID, rtime, start=(/k/)), __LINE__)
                     if (ctime > rtime) then
                         entry%rec_count=k+1
                         exit ! a proper rec_count detected, exit the loop
