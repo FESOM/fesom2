@@ -47,6 +47,12 @@ if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED AND NOT USE_YAC)
         TIMEOUT ${TEST_TIMEOUT}
     )
     
+    # Regression test for ghost output records on time-step change (issue #123)
+    add_fesom_output_restamp_test(integration_pi_output_restamp
+        NP 2
+        TIMEOUT ${TEST_TIMEOUT}
+    )
+
     # Additional MPI test configurations can be added here
     # For example, testing different domain decompositions
 elseif(NOT ENABLE_MPI_TESTS)

@@ -505,6 +505,103 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
     message(STATUS "Added FESOM test: ${TEST_NAME} with mesh: ${MESH_NAME}, cavity: ${USE_CAVITY}")
 endfunction()
 
+# Regression test for github issue #123 (ghost records on time-step change):
+# run one day with step_per_day=96, then rewrite fesom.clock and re-run the SAME
+# day with step_per_day=144 without deleting the results. Records are stamped
+# with the exact averaging-period end, so the second run must land on the same
+# timestamp and overwrite the record: exactly 1 record afterwards. Code that
+# stamps period_end - dt appends a second, shifted record instead (the ghost),
+# which shows up here as "current mean I/O counter = 2".
+function(add_fesom_output_restamp_test TEST_NAME)
+    set(options "")
+    set(oneValueArgs NP TIMEOUT)
+    set(multiValueArgs "")
+    cmake_parse_arguments(FESOM_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+    if(NOT DEFINED FESOM_TEST_NP)
+        set(FESOM_TEST_NP 2)
+    endif()
+    if(NOT DEFINED FESOM_TEST_TIMEOUT)
+        set(FESOM_TEST_TIMEOUT 300)
+    endif()
+
+    set(TEST_RUN_DIR "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}")
+    set(TEST_DATA_DIR "${CMAKE_SOURCE_DIR}/tests/data")
+    set(RESULT_DIR "${TEST_RUN_DIR}/results")
+
+    generate_fesom_clock("${RESULT_DIR}")
+    configure_fesom_namelists("${TEST_RUN_DIR}" "${TEST_DATA_DIR}" "${RESULT_DIR}")
+
+    set(TEST_SCRIPT "${TEST_RUN_DIR}/run_test.cmake")
+    file(GENERATE OUTPUT ${TEST_SCRIPT} CONTENT "
+        file(MAKE_DIRECTORY \"${TEST_RUN_DIR}\")
+        file(MAKE_DIRECTORY \"${RESULT_DIR}\")
+
+        # see add_fesom_test_with_options for why these are safe unconditionally
+        set(ENV{OMPI_ALLOW_RUN_AS_ROOT} \"1\")
+        set(ENV{OMPI_ALLOW_RUN_AS_ROOT_CONFIRM} \"1\")
+        set(ENV{OMPI_MCA_rmaps_base_oversubscribe} \"1\")
+        set(ENV{PRTE_MCA_rmaps_default_mapping_policy} \":oversubscribe\")
+
+        # start from a clean slate: the point of the test is the SECOND run below
+        file(REMOVE_RECURSE \"${RESULT_DIR}\")
+        file(MAKE_DIRECTORY \"${RESULT_DIR}\")
+        file(WRITE \"${RESULT_DIR}/fesom.clock\" \"0 1 1948\\n0 1 1948\\n\")
+
+        # run A: one day at step_per_day=96 (dt=900s), as configured
+        execute_process(
+            COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${FESOM_TEST_NP} ${CMAKE_BINARY_DIR}/bin/fesom.x
+            WORKING_DIRECTORY \"${TEST_RUN_DIR}\"
+            RESULT_VARIABLE run_a_result
+            OUTPUT_VARIABLE run_a_output
+            ERROR_VARIABLE run_a_error
+            TIMEOUT ${FESOM_TEST_TIMEOUT}
+        )
+        file(WRITE \"${TEST_RUN_DIR}/test_output_run_a.log\" \"\${run_a_output}\")
+        file(WRITE \"${TEST_RUN_DIR}/test_error_run_a.log\" \"\${run_a_error}\")
+        if(NOT run_a_result EQUAL 0 OR NOT run_a_output MATCHES \"fesom should stop with exit status = 0\")
+            message(FATAL_ERROR \"Test ${TEST_NAME} FAILED: first run did not finish cleanly (exit \${run_a_result})\")
+        endif()
+
+        # re-run the SAME day with a different time step, keeping the output file
+        file(WRITE \"${RESULT_DIR}/fesom.clock\" \"0 1 1948\\n0 1 1948\\n\")
+        file(READ \"${TEST_RUN_DIR}/namelist.config\" _nml)
+        string(REGEX REPLACE \"([^A-Za-z0-9_])step_per_day[ \\t]*=[ \\t]*[0-9]+\" \"\\\\1step_per_day=144\" _nml \"\${_nml}\")
+        file(WRITE \"${TEST_RUN_DIR}/namelist.config\" \"\${_nml}\")
+
+        execute_process(
+            COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${FESOM_TEST_NP} ${CMAKE_BINARY_DIR}/bin/fesom.x
+            WORKING_DIRECTORY \"${TEST_RUN_DIR}\"
+            RESULT_VARIABLE run_b_result
+            OUTPUT_VARIABLE run_b_output
+            ERROR_VARIABLE run_b_error
+            TIMEOUT ${FESOM_TEST_TIMEOUT}
+        )
+        file(WRITE \"${TEST_RUN_DIR}/test_output.log\" \"\${run_b_output}\")
+        file(WRITE \"${TEST_RUN_DIR}/test_error.log\" \"\${run_b_error}\")
+        if(NOT run_b_result EQUAL 0 OR NOT run_b_output MATCHES \"fesom should stop with exit status = 0\")
+            message(FATAL_ERROR \"Test ${TEST_NAME} FAILED: second run did not finish cleanly (exit \${run_b_result})\")
+        endif()
+
+        # the second run must OVERWRITE the record from the first run, not append
+        # a ghost. The I/O layer prints the record position it decided on.
+        if(NOT run_b_output MATCHES \"sst: current mean I/O counter =[ \\t]*1[^0-9]\")
+            message(FATAL_ERROR \"Test ${TEST_NAME} FAILED: re-running a period with a different time step did not overwrite the existing record (ghost record, github issue #123). See ${TEST_RUN_DIR}/test_output.log\")
+        endif()
+        message(STATUS \"Test ${TEST_NAME} PASSED: record was overwritten in place on time-step change\")
+    ")
+
+    add_test(
+        NAME ${TEST_NAME}
+        COMMAND ${CMAKE_COMMAND} -P ${TEST_SCRIPT}
+    )
+    set_tests_properties(${TEST_NAME} PROPERTIES
+        TIMEOUT ${FESOM_TEST_TIMEOUT}
+        WORKING_DIRECTORY ${TEST_RUN_DIR}
+        PROCESSORS ${FESOM_TEST_NP}
+    )
+    message(STATUS "Added FESOM test: ${TEST_NAME} (output re-stamp regression, issue #123)")
+endfunction()
+
 # Function to find and validate MPI for testing
 function(setup_mpi_testing)
     find_package(MPI REQUIRED)
