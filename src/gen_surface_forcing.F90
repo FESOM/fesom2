@@ -33,7 +33,7 @@ MODULE g_sbf
    !!   sbc_ini  -- initialization atmpospheric forcing
    !!   sbc_do   -- provide a sbc (surface boundary conditions) each time step
    !!
-   USE iso_fortran_env, only: error_unit
+   USE iso_fortran_env, only: error_unit, real64
    USE MOD_MESH
    USE MOD_PARTIT
    USE MOD_PARSUP
@@ -42,7 +42,7 @@ MODULE g_sbf
    USE g_comm_auto
    USE g_support
    USE g_rotate_grid
-   USE g_config, only: dummy, ClimateDataPath, dt
+   USE g_config, only: dummy, ClimateDataPath, dt, flag_debug
    USE g_clock,  only: timeold, timenew, dayold, daynew, yearold, yearnew, cyearnew
    USE g_forcing_arrays,    only: runoff, chl
 #if defined (__recom)
@@ -190,8 +190,17 @@ MODULE g_sbf
 
    integer,save            :: warn       ! warning switch node/element coordinate out of forcing bounds
 
-   real(wp), allocatable, save, dimension(:,:)   :: coef_b ! time inerp coef. b (x=a*t+b)
-   real(wp), allocatable, save, dimension(:,:)   :: coef_a ! time inerp coef. a (x=a*t+b)
+   ! Time interpolation uses the point-slope (offset) form
+   !    atmdata = coef_b + (rdate - time_t0)*coef_a
+   ! coef_b holds the field VALUE at the bracket start (data-scale, WP is fine and
+   ! keeps the vector rotation in vector_g2r WP-compatible); coef_a is the slope.
+   ! time_t0 is the bracket-start time (an absolute Julian day ~2.4e6) held in
+   ! real64 -- see the note on nc_time below. The earlier form stored coef_b as the
+   ! affine intercept (data1 - coef_a*nc_time), which put a ~2.4e6-magnitude value
+   ! into a WP array and lost ~7 digits to cancellation in single precision.
+   real(wp),     allocatable, save, dimension(:,:) :: coef_b ! interp base value  (x = b + (t-t0)*a)
+   real(wp),     allocatable, save, dimension(:,:) :: coef_a ! interp slope        (x = b + (t-t0)*a)
+   real(real64), allocatable, save, dimension(:)   :: time_t0 ! per-field bracket-start time t0 [days]
 
    real(wp), allocatable, save, dimension(:,:)   :: atmdata ! atmosperic data for current time step
 
@@ -204,7 +213,14 @@ MODULE g_sbf
       integer                              :: nc_Nlon
       integer                              :: nc_Nlat
       integer                              :: nc_Ntime
-      real(wp), allocatable, dimension(:)  :: nc_lon, nc_lat, nc_time
+      real(wp),     allocatable, dimension(:)  :: nc_lon, nc_lat
+      ! The time axis holds an ABSOLUTE Julian day (~2.4e6 for modern dates). Its
+      ! float32 ulp at that magnitude is 0.25 d = 6 h, which collapses sub-6-hourly
+      ! forcing records onto a common grid (delta_t=0 -> division blow-up) and
+      ! quantises the model forcing-clock to 6 h (a silent staircase in the
+      ! interpolation). Time must therefore be real64 regardless of the working
+      ! precision WP; only the interpolated field VALUE is narrowed to WP.
+      real(real64), allocatable, dimension(:)  :: nc_time
       ! time index for NC time array
       integer                              :: t_indx    ! now time index in nc_time array
       integer                              :: t_indx_p1 ! now time index +1 in nc_time array
@@ -391,6 +407,7 @@ CONTAINS
         iost = nf90_get_var(ncid, id_time, flf%nc_time, start=(/1/), count=(/flf%nc_Ntime/))
         ! digg for calendar attribute in time axis variable         
     end if
+    ! nc_time is real64 (see its declaration) -> broadcast as double, not MPI_WP.
     call MPI_BCast(flf%nc_time, flf%nc_Ntime, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
     call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
     call check_nferr(iost,flf%file_name,partit)
@@ -515,8 +532,8 @@ CONTAINS
            flf%nc_time(flf%nc_Ntime) = flf%nc_time(flf%nc_Ntime) + (flf%nc_time(flf%nc_Ntime) - flf%nc_time(flf%nc_Ntime-1))/2.0
         end if
     end if
-    call MPI_BCast(flf%nc_lon,   flf%nc_Nlon,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
-    call MPI_BCast(flf%nc_lat,   flf%nc_Nlat,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+    call MPI_BCast(flf%nc_lon,   flf%nc_Nlon,   MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
+    call MPI_BCast(flf%nc_lat,   flf%nc_Nlat,   MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
     
     !___________________________________________________________________________
     !flip lat and data in case of lat from -90 to 90
@@ -611,7 +628,8 @@ CONTAINS
       !!----------------------------------------------------------------------
 
       IMPLICIT NONE
-      real(wp)            :: rdate ! initialization date
+      real(real64)        :: rdate ! initialization date (absolute Julian day, must be real64)
+      real(real64)        :: dbg_dt_hours, dbg_dd ! [debug] inferred forcing dt reporting
       integer             :: yyyy,mm,dd
 
       integer                  :: i
@@ -643,10 +661,35 @@ CONTAINS
       do fld_idx = 1, i_totfl
          call nc_readTimeGrid(sbc_flfi(fld_idx), partit)
       end do
-      
+
+      ! [debug] Report the temporal resolution inferred from each forcing file's
+      ! time axis (finest spacing between records). Printed once at setup (nc_sbc_ini
+      ! is called once per run) on the root rank only, gated by flag_debug -- matches
+      ! the "say what routine I'm in" debug convention. Useful to confirm e.g. JRA55
+      ! resolves as 3 h and CORE2 as 6 h, and that the axis is not float32-collapsed.
+      if (flag_debug .and. mype==0) then
+         write(*,*) ' --> [forcing] inferred temporal resolution per variable:'
+         do fld_idx = 1, i_totfl
+            flf => sbc_flfi(fld_idx)
+            ! Representative record spacing from the first interior interval. The
+            ! nm_nc_tmid midpoint shift (see nc_readTimeGrid) leaves interior spacings
+            ! intact but perturbs the very last one, so avoid min/last; the first
+            ! interval reflects the native cadence (e.g. 3 h JRA55, 6 h CORE2).
+            dbg_dt_hours = -1.0_real64
+            if (flf%nc_Ntime >= 2) &
+               dbg_dt_hours = ( flf%nc_time(2) - flf%nc_time(1) )*24.0_real64
+            write(*,'(a,a12,a,i6,a,f9.3,a)') '       var = ', adjustl(trim(flf%var_name)), &
+               '   records = ', flf%nc_Ntime, '   dt = ', dbg_dt_hours, ' h'
+         end do
+      end if
+
       ! compute model rdate at initial moment
-      rdate = real(julday(yearnew, 1, 1, sbc_flfi(1)%calendar ))
-      rdate = rdate+real(daynew-1,WP)+timenew/86400._WP 
+      ! Build in real64: in an SP build default real is real32, so casting every
+      ! term keeps the ~2.4e6 Julian day and the sub-day fraction from collapsing
+      ! onto the float32 6-hour grid. In a DP build (default real = real64) these
+      ! casts are no-ops, so the result is bit-identical.
+      rdate = real(julday(yearnew, 1, 1, sbc_flfi(1)%calendar ), real64)
+      rdate = rdate + real(daynew-1,real64) + real(timenew,real64)/86400._real64
       
       if (lfirst) then
       do fld_idx = 1, i_totfl
@@ -745,7 +788,7 @@ CONTAINS
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
       integer, intent(in)  :: fld_idx
-      real(wp),intent(in)  :: rdate ! initialization date
+      real(real64),intent(in)  :: rdate ! initialization date (absolute Julian day)
       integer              :: iost  !I/O status
       integer              :: ncid      ! netcdf file id
       ! ID dimensions and variables:
@@ -758,12 +801,12 @@ CONTAINS
       integer              :: sbc_alloc, itot
 
       real(wp)             :: denom, x1, x2, y1, y2, x, y
-      real(wp)             :: now_date
+      real(real64)         :: now_date
 
 !     real(wp), allocatable, dimension(:,:)  :: sbcdata1,sbcdata2
       real(wp)             :: data1,data2
-      real(wp)             :: delta_t   ! time(t_indx) - time(t_indx+1)
-      real(wp)             :: rdatep1 ! time(t_indx) - time(t_indx+1)
+      real(real64)         :: delta_t   ! time(t_indx) - time(t_indx+1)
+      real(real64)         :: rdatep1 ! time(t_indx) - time(t_indx+1)
       
       integer              :: elnodes(4) !4 nodes from one element
       integer              :: numnodes   ! nu,ber of nodes in elem (3 for triangle, 4 for ... )
@@ -773,7 +816,8 @@ CONTAINS
       integer,   pointer   :: nc_Ntime, nc_Nlon, nc_Nlat, t_indx, t_indx_p1
       character(len=MAX_PATH), pointer   :: file_name
       character(len=34) , pointer   :: var_name
-      real(wp),  pointer   :: nc_time(:), nc_lon(:), nc_lat(:)
+      real(real64), pointer :: nc_time(:)
+      real(wp),  pointer   :: nc_lon(:), nc_lat(:)
       real(4), dimension(:,:), pointer :: sbcdata1, sbcdata2
       logical sbcdata1_from_cache, sbcdata2_from_cache
       integer rootrank
@@ -807,7 +851,7 @@ CONTAINS
 
       ! find time index in files
       now_date = rdate
-      call binarysearch(nc_Ntime,nc_time,now_date,t_indx)
+      call binarysearch_r8(nc_Ntime,nc_time,now_date,t_indx)
       if ( (t_indx < nc_Ntime) .and. (t_indx > 0) ) then
       
         t_indx_p1 = t_indx + 1   
@@ -840,9 +884,9 @@ CONTAINS
                 if (mm==2 .and. dd==29) then 
                     ! --> go directly to the first time slice what represents the
                     !     1. March
-                    rdatep1 = real(julday(yearnew,1,1, sbc_flfi(fld_idx)%calendar ),WP)
-                    rdatep1 = rdatep1+real(60,WP) + delta_t*0.5_WP
-                    call binarysearch(nc_Ntime, nc_time, rdatep1, t_indx_p1)
+                    rdatep1 = real(julday(yearnew,1,1, sbc_flfi(fld_idx)%calendar ),real64)
+                    rdatep1 = rdatep1+real(60,real64) + delta_t*0.5_real64
+                    call binarysearch_r8(nc_Ntime, nc_time, rdatep1, t_indx_p1)
                     delta_t   = nc_time(t_indx_p1) - nc_time(t_indx)
                     if (partit%mype==0 .and. fld_idx==1) then 
                         call calendar_date(int(nc_time(t_indx_p1)), yyyy, mm, dd, sbc_flfi(fld_idx)%calendar )
@@ -855,7 +899,7 @@ CONTAINS
       elseif (t_indx > 0) then ! NO extrapolation to future
          t_indx    = nc_Ntime
          t_indx_p1 = t_indx
-         delta_t = 1.0_wp
+         delta_t = 1.0_real64
          if (mype==0) then
             write(error_unit,*) 'WARNING: no temporal extrapolation into future (nearest neighbour is used): ', trim(var_name), ' !'
             write(error_unit,*) trim(file_name)
@@ -865,7 +909,7 @@ CONTAINS
       elseif (t_indx < 1) then ! NO extrapolation back in time
          t_indx = 1
          t_indx_p1 = t_indx
-         delta_t = 1.0_wp
+         delta_t = 1.0_real64
          if (mype==0) then 
             write(error_unit,*) 'WARNING: no temporal extrapolation back in time (nearest neighbour is used): ', trim(var_name), ' !'
             write(error_unit,*) trim(file_name)
@@ -874,6 +918,10 @@ CONTAINS
          end if
       end if
 
+      ! Record the bracket-start time t0 for this field (same for all nodes). Held in
+      ! real64 and subtracted from rdate at evaluation time so no absolute ~2.4e6 day
+      ! ever enters the WP interpolation.
+      time_t0(fld_idx) = nc_time(t_indx)
 
       ! determine if we can use the broadcast cache
       if(yearold == yearnew) then ! todo: simplify if clause
@@ -1023,8 +1071,12 @@ CONTAINS
             data2 = sbcdata2(i,j)
          end if
          ! calculate new coefficients for interpolations
+         ! Point-slope (offset) form: store the slope and the base VALUE data1, and
+         ! evaluate later as coef_b + (rdate - time_t0)*coef_a. This keeps the huge
+         ! absolute time out of the WP coefficient arrays; delta_t is real64 so the
+         ! slope is formed in double.
          coef_a(fld_idx, ii) = ( data2 - data1 ) / delta_t !( nc_time(t_indx+1) - nc_time(t_indx) )
-         coef_b(fld_idx, ii) = data1 - coef_a(fld_idx, ii) * nc_time(t_indx)
+         coef_b(fld_idx, ii) = data1
 
       end do
 !$OMP END PARALLEL DO
@@ -1038,21 +1090,40 @@ CONTAINS
       !! ** Method  :
       !! ** Action  :
       !!----------------------------------------------------------------------
+#ifdef FESOM_PROFILING
+      use fesom_profiler, only: fesom_profiler_start, fesom_profiler_end
+#endif
       IMPLICIT NONE
       type(t_partit), intent(inout), target :: partit
-      real(wp),       intent(in)            :: rdate  ! seconds
+      real(real64),   intent(in)            :: rdate  ! absolute Julian day (real64)
 
      ! assign data from interpolation to taux and tauy
       integer            :: fld_idx, i,j,ii
+      real(wp)           :: dt_elapsed   ! elapsed time since bracket start [days], WP
 
+      ! Accumulated over the whole run (start/end sums into the named section on
+      ! every call), so the report shows total time-interpolation cost, not one step.
+#ifdef FESOM_PROFILING
+      call fesom_profiler_start("sbc_time_interp")
+#endif
       do fld_idx = 1, i_totfl
+         ! Elapsed time since this field's bracket start. Formed once per field: the
+         ! subtraction is done in real64 (so no absolute ~2.4e6 Julian day enters WP)
+         ! and narrowed to WP here -- (rdate - time_t0) <= one record interval, so it
+         ! is tiny and exact in WP. Hoisting it out of the node loop keeps the inner
+         ! loop a single fused multiply-add (coef_b + dt_elapsed*coef_a), identical in
+         ! cost to the previous rdate*coef_a + coef_b.
+         dt_elapsed = real(rdate - time_t0(fld_idx), WP)
 !$OMP PARALLEL DO
          do i = 1, partit%myDim_nod2D+partit%eDim_nod2D
-            ! store processed forcing data for fesom computation
-            atmdata(fld_idx,i) = rdate * coef_a(fld_idx,i) + coef_b(fld_idx,i)
+            ! store processed forcing data for fesom computation (point-slope form)
+            atmdata(fld_idx,i) = coef_b(fld_idx,i) + dt_elapsed * coef_a(fld_idx,i)
          end do !nod2D
 !$OMP END PARALLEL DO
       end do
+#ifdef FESOM_PROFILING
+      call fesom_profiler_end("sbc_time_interp")
+#endif
    END SUBROUTINE data_timeinterp
 
    SUBROUTINE sbc_ini(partit, mesh)
@@ -1214,11 +1285,12 @@ CONTAINS
       end if
 
       ALLOCATE( coef_a(i_totfl,myDim_nod2D+eDim_nod2D), coef_b(i_totfl,myDim_nod2D+eDim_nod2D), &
-              & atmdata(i_totfl,myDim_nod2D+eDim_nod2D), &
+              & atmdata(i_totfl,myDim_nod2D+eDim_nod2D), time_t0(i_totfl), &
                    &      STAT=sbc_alloc )
-      coef_a       = 0.0_WP             
+      coef_a       = 0.0_WP
       coef_b       = 0.0_WP
       atmdata      = 0.0_WP
+      time_t0      = 0.0_real64
 
       ALLOCATE( bilin_indx_i(i_totfl, myDim_nod2D+eDim_nod2D), bilin_indx_j(i_totfl, myDim_nod2D+eDim_nod2D), &
               & qns(myDim_nod2D+eDim_nod2D), emp(myDim_nod2D+eDim_nod2D), qsr(myDim_nod2D+eDim_nod2D),  &
@@ -1564,12 +1636,12 @@ CONTAINS
       IMPLICIT NONE
 
       include 'netcdf.inc'
-      real(wp)     :: rdate ! date
+      real(real64) :: rdate ! date (absolute Julian day, must be real64)
       integer      :: fld_idx, i
       logical      :: do_rotation_wind, do_rotation_stre, force_newcoeff, update_monthly_flag
       integer      :: yyyy, dd, mm, flag_flpyr=0
       integer,   pointer   :: nc_Ntime, t_indx, t_indx_p1
-      real(wp),  pointer   :: nc_time(:)
+      real(real64), pointer :: nc_time(:)
       character(len=MAX_PATH)               :: filename
       logical                               :: file_exist=.false.
 !#if defined (__recom)
@@ -1610,8 +1682,8 @@ CONTAINS
       do fld_idx = 1, i_totfl
         ! compute model rdate based on the calendar option of the forcing file so
         ! match up
-        rdate = real(julday(yearnew,1,1, sbc_flfi(fld_idx)%calendar ),WP)
-        rdate = rdate+real(daynew-1,WP)+timenew/86400._WP-dt/86400._WP/2._WP
+        rdate = real(julday(yearnew,1,1, sbc_flfi(fld_idx)%calendar ),real64)
+        rdate = rdate+real(daynew-1,real64)+real(timenew,real64)/86400._real64-real(dt,real64)/86400._real64/2._real64
 
         !_______________________________________________________________________
         ! special case if include_fleapyear==False but the calendar of the forcing 
@@ -1634,8 +1706,8 @@ CONTAINS
             ! go from 28.Feb directly to 1.Mar for the case the forcing file contains 
             ! a leapyear.
             if (flag_flpyr==1 .and. daynew>59) then 
-                rdate = real(julday(yearnew,1,1, sbc_flfi(fld_idx)%calendar ),WP)
-                rdate = rdate+real(daynew-1+1,WP)+timenew/86400._WP-dt/86400._WP/2._WP
+                rdate = real(julday(yearnew,1,1, sbc_flfi(fld_idx)%calendar ),real64)
+                rdate = rdate+real(daynew-1+1,real64)+real(timenew,real64)/86400._real64-real(dt,real64)/86400._real64/2._real64
             end if 
         end if 
 
@@ -2358,7 +2430,7 @@ END SUBROUTINE sbc_do_recom
          DEALLOCATE( sbc_flfi(fld_idx)%nc_lon, sbc_flfi(fld_idx)%nc_lat, sbc_flfi(fld_idx)%nc_time)
       end do
       DEALLOCATE( sbc_flfi )
-      DEALLOCATE( coef_a, coef_b, atmdata, &
+      DEALLOCATE( coef_a, coef_b, atmdata, time_t0, &
                   &  bilin_indx_i, bilin_indx_j,  &
                   &  qns, emp, qsr)
    END SUBROUTINE sbc_end
@@ -2421,6 +2493,39 @@ END SUBROUTINE sbc_do_recom
       end do
       ind = right
    END SUBROUTINE binarysearch
+
+   SUBROUTINE binarysearch_r8(length, array, value, ind)
+      ! real64 counterpart of binarysearch(), used for the forcing TIME axis.
+      ! The time axis must stay double (an absolute Julian day loses 6 h of
+      ! resolution in float32), so the search over it needs a real64 signature.
+      ! A generic interface cannot be used because in a DP build WP == real64 and
+      ! the two module procedures would be ambiguous; hence a distinct name.
+      IMPLICIT NONE
+      integer,      intent(in)  :: length
+      real(real64), dimension(length), intent(in) :: array
+      real(real64), intent(in)  :: value
+      integer,      intent(out) :: ind
+      integer :: left, middle, right
+      real(real64) :: d
+      d = 1e-9_real64
+      left = 1
+      right = length
+      do
+         if (left > right) then
+            exit
+         endif
+         middle = nint((left+right) / 2.0_real64)
+         if ( abs(array(middle) - value) <= d) then
+            ind = middle
+            return
+         else if (array(middle) > value) then
+            right = middle - 1
+         else
+            left = middle + 1
+         end if
+      end do
+      ind = right
+   END SUBROUTINE binarysearch_r8
 
 !-----------------------------------------------------------------------
 ! This subroutine taken from GOTM src, used to compare with our old fluxes,
@@ -3367,8 +3472,8 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
       end do
       deallocate(ncdata, lon, lat)
    end if
-   call MPI_BCast(lon_sparse,  number_arrival_points, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-   call MPI_BCast(lat_sparse,  number_arrival_points, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+   call MPI_BCast(lon_sparse,  number_arrival_points, MPI_WP, 0, MPI_COMM_FESOM, ierror)
+   call MPI_BCast(lat_sparse,  number_arrival_points, MPI_WP, 0, MPI_COMM_FESOM, ierror)
    call MPI_BCast(data_sparse, number_arrival_points, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
    drain_num=maxval(data_sparse)
    ALLOCATE(arrival_area(drain_num))
@@ -3393,7 +3498,7 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
    do i=1, number_arrival_points
       dist_min_glo(i)=dist_min(i)
    end do
-   call MPI_AllREDUCE(MPI_IN_PLACE , dist_min_glo , number_arrival_points, MPI_DOUBLE, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+   call MPI_AllREDUCE(MPI_IN_PLACE , dist_min_glo , number_arrival_points, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
 
    lon_sparse=0.0_WP
    lat_sparse=0.0_WP
@@ -3406,8 +3511,8 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
            status=status+1
       end if
    end do
-   call MPI_AllREDUCE(MPI_IN_PLACE , lon_sparse , number_arrival_points, MPI_DOUBLE, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-   call MPI_AllREDUCE(MPI_IN_PLACE , lat_sparse , number_arrival_points, MPI_DOUBLE, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+   call MPI_AllREDUCE(MPI_IN_PLACE , lon_sparse , number_arrival_points, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+   call MPI_AllREDUCE(MPI_IN_PLACE , lat_sparse , number_arrival_points, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
    call MPI_AllREDUCE(MPI_IN_PLACE , status ,     1, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 
    if (status/=number_arrival_points) then
@@ -3464,7 +3569,7 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
       end if
    END DO
 
-   call MPI_AllREDUCE(MPI_IN_PLACE , arrival_area, drain_num, MPI_DOUBLE, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+   call MPI_AllREDUCE(MPI_IN_PLACE , arrival_area, drain_num, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 
    DO i=1, drain_num
       where (RUNOFF_MAPPER%colind==i)
