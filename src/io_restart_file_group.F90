@@ -40,7 +40,7 @@ contains
     class(restart_file_group), target, intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
-    real(kind=8), target, intent(inout) :: local_data(:) ! todo: be able to set precision
+    real(kind=WP), target, intent(inout) :: local_data(:) ! todo: be able to set precision
     type(t_mesh), intent(in) :: mesh
     type(t_partit), intent(in) :: partit
     ! EO parameters
@@ -54,7 +54,7 @@ contains
     class(restart_file_group), intent(inout)           :: this
     character(len=*)         , intent(in)              :: name
     character(len=*)         , intent(in)              :: units, longname
-    real(kind=8)             , intent(inout), target   :: local_data(:,:) ! todo: be able to set precision
+    real(kind=WP)             , intent(inout), target   :: local_data(:,:) ! todo: be able to set precision
     type(t_mesh)             , intent(in)              :: mesh
     type(t_partit)           , intent(in)              :: partit
     integer                  , intent(in)   , optional :: ncat
@@ -78,7 +78,7 @@ contains
     class(restart_file_group), intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
-    real(kind=8), target, intent(inout) :: local_data(:) ! todo: be able to set precision
+    real(kind=WP), target, intent(inout) :: local_data(:) ! todo: be able to set precision
     type(t_mesh), intent(in) :: mesh
     type(t_partit), intent(in) :: partit
     ! EO parameters
@@ -93,7 +93,7 @@ contains
     class(restart_file_group), intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
-    real(kind=8), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
+    real(kind=WP), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
     type(t_mesh), intent(in) :: mesh
     type(t_partit), intent(in) :: partit
     ! EO parameters
@@ -143,7 +143,7 @@ contains
     class(restart_file_group), target, intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
-    real(kind=8), target, intent(inout) :: local_data(:) ! todo: be able to set precision
+    real(kind=WP), target, intent(inout) :: local_data(:) ! todo: be able to set precision
     type(t_mesh), intent(in) :: mesh
     type(t_partit), intent(in) :: partit
     ! EO parameters
@@ -157,7 +157,7 @@ contains
     class(restart_file_group), intent(inout)            :: this
     character(len=*)         , intent(in)               :: name
     character(len=*)         , intent(in)               :: units, longname
-    real(kind=8)             , intent(inout), target    :: local_data(:,:) ! todo: be able to set precision
+    real(kind=WP)             , intent(inout), target    :: local_data(:,:) ! todo: be able to set precision
     type(t_mesh)             , intent(in)               :: mesh
     type(t_partit)           , intent(in)               :: partit
     integer                  , intent(in)   , optional  :: ncat
@@ -181,7 +181,7 @@ contains
     class(restart_file_group), intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
-    real(kind=8), target, intent(inout) :: local_data(:) ! todo: be able to set precision
+    real(kind=WP), target, intent(inout) :: local_data(:) ! todo: be able to set precision
     type(t_mesh), intent(in) :: mesh
     type(t_partit), intent(in) :: partit
     ! EO parameters
@@ -196,7 +196,7 @@ contains
     class(restart_file_group), intent(inout) :: this
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: units, longname
-    real(kind=8), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
+    real(kind=WP), target, intent(inout) :: local_data(:,:) ! todo: be able to set precision
     type(t_mesh), intent(in) :: mesh
     type(t_partit), intent(in) :: partit
     ! EO parameters

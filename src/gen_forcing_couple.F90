@@ -378,7 +378,13 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
             elseif (i.eq.3) then
               exchange(:) = m_snow(:)                                 ! snow thickness
             elseif (i.eq.4) then
-              exchange(:) = ice_temp(:)                               ! ice surface temperature
+              ! Concentration-weighted ice surface temperature (ist*a_ice).
+              ! The o2a remap blend must be concentration-weighted so the
+              ! atmosphere's prescribed ice-tile skin is representative of the
+              ! ice actually present in the cell; PAIRED with
+              ! ECE_CPL_NEMO_WEIGHTED_ICE=.true. (OIFS divides by the received
+              ! ice fraction on ingest) and a weighted-convention rstos.nc.
+              exchange(:) = ice_temp(:)*a_ice(:)                      ! ice surface temperature * concentration
             elseif (i.eq.5) then
               exchange(:) = ice_alb(:)                                ! ice albedo
             elseif (i.eq.6) then
@@ -389,7 +395,13 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
               do n=1,myDim_nod2D+eDim_nod2D
                 exchange(n) = UVnode(2,1,n)
               end do
-            else    
+            elseif (i.eq.8) then
+              ! Effective (grid-mean = per-ice * concentration) sea-ice
+              ! thickness for the atmosphere's ice-tile slab conduction
+              ! (OIFS ECE_FESIM_GET_ICE_STATE divides by the received ice
+              ! fraction under LNEMOLIMTHK). Weighted convention as ist/alb.
+              exchange(:) = m_ice(:)                                  ! effective sea ice thickness
+            else
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
 #else
             ! AWI-CM2 outgoing state vectors
@@ -454,6 +466,14 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
          if(partit%my_fesom_group == 0) then
 #endif
          call cpl_oasis3mct_send(i, exchange, action, partit)
+#if defined (__oifs)
+         ! Anchor for the implicit ice surface-temperature solve
+         ! (ice_thermo_cpl.F90/ice_surftemp): remember the ist as ACTUALLY
+         ! transmitted -- the temperature OIFS evaluates its ice-tile fluxes
+         ! at for the coming coupling interval. `action` is only true on real
+         ! OASIS transmissions, so this stays frozen between coupling events.
+         if (i==4 .and. action) ice%atmcoupl%ist_ref(:) = exchange(:)
+#endif
 #if defined(__recom) && defined(__usetp)
          endif
 #endif
@@ -1000,13 +1020,13 @@ SUBROUTINE integrate_2D(flux_global, flux_local, eff_vol, field2d, mask, partit,
   flux_local(1)=sum(lump2d_north*field2d(1:myDim_nod2D)*mask(1:myDim_nod2D))
   flux_local(2)=sum(lump2d_south*field2d(1:myDim_nod2D)*mask(1:myDim_nod2D))
   call MPI_AllREDUCE(flux_local, flux_global, 2, &
-  		     MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+  		     MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 		     
 		     
   eff_vol_local(1)=sum(lump2d_north*mask(1:myDim_nod2D))
   eff_vol_local(2)=sum(lump2d_south*mask(1:myDim_nod2D))
   call MPI_AllREDUCE(eff_vol_local, eff_vol,  2, & 
-  		     MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+  		     MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 		     
 END SUBROUTINE integrate_2D
 !
@@ -1071,6 +1091,15 @@ SUBROUTINE net_rec_from_atm(action, partit)
 #if defined (__oifs)
   return  !OIFS-FESOM2 coupling uses OASIS3MCT conservative remapping and recieves no net fluxes here.
 #endif
+  ! NOTE (single precision): the MPI_DOUBLE_PRECISION calls below are a RAW
+  ! FESOM<->atmosphere root exchange over MPI_COMM_WORLD (source_root/target_root),
+  ! NOT routed through OASIS, so they are only used by the ECHAM/AWICM flux-correction
+  ! path -- the __oifs build returns above and never reaches them. They are left
+  ! hardcoded double on purpose: atm_net_fluxes_* are real(kind=WP), but the buffer
+  ! kind must match the ATMOSPHERE partner (double), not the local WP, so this is the
+  ! one coupling spot that MUST NOT be switched to MPI_WP. Making FESOM single
+  ! precision coupled to ECHAM would additionally require this exchange (and the
+  ! atmosphere side) to agree on a precision -- out of scope for the OIFS SP work.
 
   if (action) then
      CALL MPI_COMM_RANK(MPI_COMM_WORLD, my_global_rank, ierror)
@@ -1087,22 +1116,22 @@ SUBROUTINE net_rec_from_atm(action, partit)
 #else
      if (my_global_rank==target_root) then
 #endif
-        CALL MPI_IRecv(atm_net_fluxes_north(1), nrecv, MPI_DOUBLE_PRECISION, source_root, 111, MPI_COMM_WORLD, request(1), partit%MPIerr)
-        CALL MPI_IRecv(atm_net_fluxes_south(1), nrecv, MPI_DOUBLE_PRECISION, source_root, 112, MPI_COMM_WORLD, request(2), partit%MPIerr)
+        CALL MPI_IRecv(atm_net_fluxes_north(1), nrecv, MPI_WP, source_root, 111, MPI_COMM_WORLD, request(1), partit%MPIerr)
+        CALL MPI_IRecv(atm_net_fluxes_south(1), nrecv, MPI_WP, source_root, 112, MPI_COMM_WORLD, request(2), partit%MPIerr)
         CALL MPI_Waitall(2, request, status, partit%MPIerr)
      end if
 
 #if defined(__recom) && defined(__usetp)
         if(num_fesom_groups > 1) then
-           call MPI_Bcast(atm_net_fluxes_north(1), nrecv, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
-           call MPI_Bcast(atm_net_fluxes_south(1), nrecv, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
+           call MPI_Bcast(atm_net_fluxes_north(1), nrecv, MPI_WP, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
+           call MPI_Bcast(atm_net_fluxes_south(1), nrecv, MPI_WP, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
         end if
      end if ! (my_global_rank_test==target_root) then
 #endif
   call MPI_Barrier(partit%MPI_COMM_FESOM, partit%MPIerr)     
-  call MPI_AllREDUCE(atm_net_fluxes_north(1), aux, nrecv, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+  call MPI_AllREDUCE(atm_net_fluxes_north(1), aux, nrecv, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
   atm_net_fluxes_north=aux
-  call MPI_AllREDUCE(atm_net_fluxes_south(1), aux, nrecv, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+  call MPI_AllREDUCE(atm_net_fluxes_south(1), aux, nrecv, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
   atm_net_fluxes_south=aux
   end if
 END SUBROUTINE net_rec_from_atm

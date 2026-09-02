@@ -47,7 +47,17 @@ MODULE o_mixing_KPP_mod
   real(KIND=WP), dimension(:,:), allocatable    :: ghats    ! nonlocal transport (s/m^2)
   real(KIND=WP), dimension(:), allocatable      :: hbl      ! boundary layer depth
 
+  ! KPP divide-by-zero guard added to denominators (/(wm+epsln), /(hbl+epsln),
+  ! /(dVsq+Vtsq+epsln), (ws*hbl+epsln), ...). It MUST stay a NORMAL number in the
+  ! active working precision: 1.0e-40 is a denormal in real32 and Intel -O3 flushes
+  ! it to 0 (FTZ/DAZ), which defeats every guard -> 0/0 = NaN in single precision at
+  ! the cold start. Single precision therefore uses a value that survives FTZ; double
+  ! precision keeps 1.0e-40 so the default build is numerically unchanged.
+#if defined(USE_SINGLE_PRECISION)
+  real(KIND=WP), parameter :: epsln             = 1.0e-20_WP ! a small value (SP: normal, FTZ-safe)
+#else
   real(KIND=WP), parameter :: epsln             = 1.0e-40_WP ! a small value
+#endif
 
   real(KIND=WP), parameter :: epsilon_kpp       = 0.1_WP
   real(KIND=WP), parameter :: vonk              = 0.4_WP
@@ -347,8 +357,9 @@ contains
 ! Surface buoyancy forcing (eqns. A2c & A2d & A3b & A3d)
      !!PS Bo(node)  = -g * ( sw_alpha(1,node) * heat_flux(node)  / vcpw             &   !heat_flux & water_flux: positive up
      !!PS                  + sw_beta (1,node) * water_flux(node) * tr_arr(1,node,2))
+     ! buoyancy flux from the freshwater flux wants absolute S (S_ref=0 unless use_salt_anomaly)
      Bo(node)  = -g * ( sw_alpha(nzmin,node) * heat_flux(node)  / vcpw             &   !heat_flux & water_flux: positive up
-                      + sw_beta (nzmin,node) * water_flux(node) * tracers%data(2)%values(nzmin,node)) 
+                      + sw_beta (nzmin,node) * water_flux(node) * (tracers%data(2)%values(nzmin,node)+S_ref_anomaly))
   END DO
       
 ! compute interior mixing coefficients everywhere, due to constant 

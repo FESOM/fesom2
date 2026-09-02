@@ -247,14 +247,15 @@ subroutine pressure_bv(tracers, partit, mesh)
 
     !___________________________________________________________________________
     ! model explodes, no OpenMP parallelization !
-    if( a < 0.0_WP ) then
+    ! absolute S<0 <=> anomaly < -S_ref (S_ref=0 unless use_salt_anomaly)
+    if( a < -S_ref_anomaly ) then
         write (*,*)' --> pressure_bv: s<0 happens!', a
         pe_status=1
         do node=1, myDim_nod2D+eDim_nod2D
             nzmin = ulevels_nod2D(node)
             nzmax = nlevels_nod2D(node)
             do nz=nzmin, nzmax-1
-                if (salt(nz, node) < 0) write (*,*) 'the model blows up at n=', mylist_nod2D(node), ' ; ', 'nz=', nz
+                if (salt(nz, node) < -S_ref_anomaly) write (*,*) 'the model blows up at n=', mylist_nod2D(node), ' ; ', 'nz=', nz
             end do
         end do
     endif
@@ -2714,7 +2715,7 @@ IMPLICIT NONE
   
   real(kind=WP),  intent(IN)            :: t,s
   real(kind=WP),  intent(OUT)           :: bulk_0, bulk_pz, bulk_pz2, rhopot
-  real(kind=WP)                         :: s_sqrt
+  real(kind=WP)                         :: s_sqrt, s_abs
 
   real(kind=WP), parameter   :: a0    = 19092.56,     at   = 209.8925
   real(kind=WP), parameter   :: at2   = -3.041638,    at3  = -1.852732e-3
@@ -2743,22 +2744,23 @@ IMPLICIT NONE
 
   !compute secant bulk modulus
 
-  s_sqrt = sqrt(s)
+  s_abs = s + S_ref_anomaly   ! EOS needs absolute salinity (S_ref=0 unless use_salt_anomaly)
+  s_sqrt = sqrt(s_abs)
 
   bulk_0 =  a0      + t*(at   + t*(at2  + t*(at3 + t*at4)))      &
-          + s* (as  + t*(ast  + t*(ast2 + t*ast3))               &
+          + s_abs* (as  + t*(ast  + t*(ast2 + t*ast3))               &
                + s_sqrt*(ass  + t*(asst + t*asst2)))
 
   bulk_pz =  ap  + t*(apt  + t*(apt2 + t*apt3))                  &
-                  + s*(aps + t*(apst + t*apst2) + s_sqrt*apss)
+                  + s_abs*(aps + t*(apst + t*apst2) + s_sqrt*apss)
 
   bulk_pz2 = ap2 + t*(ap2t + t*ap2t2)		                 &
-                + s *(ap2s + t*(ap2st + t*ap2st2))
+                + s_abs *(ap2s + t*(ap2st + t*ap2st2))
 
   rhopot =  b0 + t*(bt + t*(bt2 + t*(bt3  + t*(bt4  + t*bt5))))	 &
-               + s*(bs + t*(bst + t*(bst2 + t*(bst3 + t*bst4)))  &
+               + s_abs*(bs + t*(bst + t*(bst2 + t*(bst3 + t*bst4)))  &
                   + s_sqrt*(bss + t*(bsst + t*bsst2))            &
-                       + s* bss2)
+                       + s_abs* bss2)
 end subroutine densityJM_components
 !
 !
@@ -2938,7 +2940,7 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
      end if
 
      t1 = TF1(nz,n)*1.00024_WP
-     s1 = SF1(nz,n)
+     s1 = SF1(nz,n) + S_ref_anomaly   ! McDougall polynomial wants absolute (S_ref=0 unless use_salt_anomaly)
     !!PS      p1 = abs(Z(nz))
      p1 = abs(Z_3d_n(nz,n))
 
@@ -3267,7 +3269,7 @@ use Toy_Neverworld2, only: thermal_alpha, do_cabbeling, cabbeling_Cb, do_thermob
 IMPLICIT NONE
   real(kind=WP),  intent(IN)             :: t,s
   real(kind=WP),  intent(OUT)            :: rho_out
-  real(kind=WP)                          :: rhopot, bulk
+  real(kind=WP)                          :: rhopot, bulk, s_abs
   real(kind=WP), intent(OUT)             :: bulk_0, bulk_pz, bulk_pz2
   real(kind=WP), intent(IN),    optional :: depth
   real(kind=WP)                          :: alpha_local
@@ -3278,11 +3280,13 @@ IMPLICIT NONE
   bulk_pz  = 0
   bulk_pz2 = 0
 
+  s_abs = s + S_ref_anomaly   ! linear EOS needs absolute S (S_ref=0 unless use_salt_anomaly)
+
   IF((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) THEN
       rho_out  = density_0 - 0.00025_WP*(t - 10.0_WP)*density_0
 
   ELSE IF((toy_ocean) .AND. (TRIM(which_toy)=="dbgyre")) THEN
-      rho_out  = density_0 - density_0*0.0002052_WP*(t - 10.0_WP) + density_0*0.00079_WP*(s - 35.0_WP)
+      rho_out  = density_0 - density_0*0.0002052_WP*(t - 10.0_WP) + density_0*0.00079_WP*(s_abs - 35.0_WP)
 
   ELSE IF((toy_ocean) .AND. (TRIM(which_toy)=="neverworld2")) THEN
       ! local thermal expansion slope: thermal_alpha, plus cabbeling's quadratic-in-T term
@@ -3298,11 +3302,11 @@ IMPLICIT NONE
       IF (do_haline) THEN
           ! Linear haline term, independent of do_cabbeling -- see the do_haline
           ! declaration in Toy_Neverworld2 for the physical rationale/caveats.
-          rho_out = rho_out + density_0*haline_beta*(s - 35.0_WP)
+          rho_out = rho_out + density_0*haline_beta*(s_abs - 35.0_WP)
       END IF
 
   ELSE
-      rho_out  = density_0 + 0.8_WP*(s - 34.0_WP) - 0.2*(t - 20.0_WP)
+      rho_out  = density_0 + 0.8_WP*(s_abs - 34.0_WP) - 0.2*(t - 20.0_WP)
   END IF
 
 end subroutine density_linear
@@ -3389,9 +3393,9 @@ subroutine init_ref_density_advanced(tracers, partit, mesh)
     type(t_tracer), intent(in),     target  :: tracers
     integer                                 :: node, nz, nzmin, nzmax
     real(kind=WP)                           :: rhopot, bulk_0, bulk_pz, bulk_pz2, rho
-    real(kind=8)                            :: T, S, auxz, x, y
+    real(kind=WP)                           :: T, S, auxz, x, y
     real(kind=WP),  dimension(:,:), pointer :: temp, salt
-    real(kind=8)                            :: ref_temp1D(mesh%nl-1), ref_salt1D(mesh%nl-1), vol1D(mesh%nl-1)
+    real(kind=WP)                           :: ref_temp1D(mesh%nl-1), ref_salt1D(mesh%nl-1), vol1D(mesh%nl-1)
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -3402,7 +3406,11 @@ salt=>tracers%data(2)%values(:,:)
 vol1D=0.0_WP
 ref_temp1D=0.0_WP
 ref_salt1D=0.0_WP
+#if !defined(__openmp_reproducible)
+! A "+" reduction combines the per-thread partial sums in a thread-count
+! dependent order, so it is not bit-reproducible: run the loop serially.
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax) REDUCTION(+:vol1D)
+#endif
 do node=1,myDim_nod2d
     x=geo_coord_nod2D(1,node)/rad
     y=geo_coord_nod2D(1,node)/rad
@@ -3416,10 +3424,14 @@ do node=1,myDim_nod2d
        vol1D(nz)=vol1D(nz)+areasvol(nz,node)
     end do
 end do
+#if !defined(__openmp_reproducible)
+! A "+" reduction combines the per-thread partial sums in a thread-count
+! dependent order, so it is not bit-reproducible: run the loop serially.
 !$OMP END PARALLEL DO
-call MPI_Allreduce(MPI_IN_PLACE, ref_temp1D, mesh%nl-1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
-call MPI_Allreduce(MPI_IN_PLACE, ref_salt1D, mesh%nl-1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
-call MPI_Allreduce(MPI_IN_PLACE,      vol1D, mesh%nl-1, MPI_DOUBLE, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+#endif
+call MPI_Allreduce(MPI_IN_PLACE, ref_temp1D, mesh%nl-1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+call MPI_Allreduce(MPI_IN_PLACE, ref_salt1D, mesh%nl-1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+call MPI_Allreduce(MPI_IN_PLACE,      vol1D, mesh%nl-1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 
 where( vol1D > 1.e-12_WP) !more than 0.!
      ref_temp1D=ref_temp1D/vol1D
