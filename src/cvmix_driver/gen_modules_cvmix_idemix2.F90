@@ -103,7 +103,7 @@ module g_cvmix_idemix2
     ! | pyOM2_fpohlmann   |  3 days     | fast dissipation, stays near source |
     ! | FESOM2 default    |  3 days     | matches pyOM2_fpohlmann             |
     real(kind=WP)      :: idemix2_tau_niw_shelf = 7.0_WP
-    real(kind=WP)      :: idemix2_tau_niw_oce   = 50.0_WP ! pyOM2_fpohlmann default; pyOM2_orig: 50.0
+    real(kind=WP)      :: idemix2_tau_niw_oce   = 3.0_WP  ! pyOM2_fpohlmann default; pyOM2_orig: 50.0
     real(kind=WP)      :: idemix2_tau_M2_shelf  = 7.0_WP
     real(kind=WP)      :: idemix2_tau_M2_oce    = 50.0_WP
 
@@ -140,10 +140,32 @@ module g_cvmix_idemix2
     ! amount of surface for2cing that is used
     real(kind=WP)      :: idemix2_fniw_usage   = 0.2
     
-    ! filelocation for idemix2 NIW forcing (near inertial waves)
-    character(MAX_PATH):: idemix2_niwforc_file = './dummy.nc'
-    character(MAX_PATH):: idemix2_niwforc_vname= 'dummy'
-    
+    ! filelocation for idemix2 wind/near-inertial forcing. ONE file/variable serves
+    ! BOTH roles, matching Carsten's original IDEMIX2 convention: it is the same
+    ! physical quantity (wind-driven near-inertial power input) either way --
+    !   idemix2_enable_niw = .true.  --> spread evenly over the spectral bins
+    !       (iwe2_fniw) and propagated/refracted/dissipated by the NIW compartment.
+    !   idemix2_enable_niw = .false. --> injected directly into the continuum E_iw
+    !       at the surface (iwe2_fsrf), standard IDEMIX1 behaviour.
+    ! (Earlier this had separate idemix2_niwforc_*/idemix2_srfforc_* entries, on the
+    ! mistaken assumption that the two roles needed different datasets. They don't --
+    ! the M2 double-counting concern that motivated the split is entirely a bottom-
+    ! forcing question, already handled via idemix2_botforc_file / idemix2_M2forc_file.)
+    ! Default is NOT fourier_smooth_2005_cfsr_inert_rgrid.nc/var706 (IDEMIX1's older
+    ! file) -- idemix_surface_forcing_0_global.nc/diss is explicitly near-inertial-only
+    ! and documents the same 20% (idemix2_fniw_usage) usage convention this code applies.
+    character(MAX_PATH):: idemix2_niwforc_file = './idemix_surface_forcing_0_global.nc'
+    character(MAX_PATH):: idemix2_niwforc_vname= 'diss'
+
+    ! master switch for ALL wind/near-inertial forcing, regardless of idemix2_enable_niw:
+    ! --> .true.  (default): idemix2_niwforc_* is read and applied as before
+    !     (required file, error+abort if missing) -- unchanged behaviour.
+    ! --> .false.: the file is not read; iwe2_fsrf and iwe2_fniw stay at their
+    !     zero-initialised state, i.e. zero surface/near-inertial energy input. Lets you
+    !     run with only the M2 compartment (and/or bottom tidal forcing) active, e.g.
+    !     idemix2_enable_M2=.true., idemix2_enable_niw=.false., idemix2_enable_srf=.false.
+    logical            :: idemix2_enable_srf   = .true.
+
     !___________________________________________________________________________
     ! filelocation for idemix2 bottom forcing
     logical            :: idemix2_enable_bot   = .true.
@@ -202,6 +224,7 @@ module g_cvmix_idemix2
                              idemix2_botforc_Etot, &
                              idemix2_enable_M2  , idemix2_M2forc_file  , idemix2_M2forc_vname  , idemix2_M2forc_zname, &
                              idemix2_enable_niw , idemix2_niwforc_file , idemix2_niwforc_vname , idemix2_fniw_usage, &
+                             idemix2_enable_srf, &
 !                              idemix2_enable_leew, idemix2_leewforc_file, idemix2_leewforc_vname, &
                              idemix2_enable_bot , idemix2_botforc_file , idemix2_botforc_vname , &
                              idemix2_hrmsforc_file, idemix2_hrmsforc_vname, &
@@ -245,6 +268,13 @@ module g_cvmix_idemix2
     ! --- Eiw - internal wave energy related variables ---
     real(kind=WP), allocatable, dimension(:,:,:):: iwe2_E_iw
     real(kind=WP), allocatable, dimension(:,:)  :: iwe2_E_iw_diss
+
+    ! pre-sweep snapshot for the iterative-implicit horizontal diffusion
+    ! (idemix2_enable_hor_diff_impl_iter): the gradient basis for an entire sweep
+    ! must stay FIXED while iwe2_E_iw(:,:,tip1) is being written -- a genuine Jacobi
+    ! sweep, refreshed once per iteration. NOT the same as IDEMIX1's own Gauss-Seidel
+    ! iwe_n propagator, which reads and writes a single array in place with no snapshot.
+    real(kind=WP), allocatable, dimension(:,:)  :: iwe2_E_iw_snap
     
     ! optional diagnostic
     real(kind=WP), allocatable, dimension(:,:)  :: iwe2_E_iw_dt, iwe2_E_iw_fbot, & 
@@ -306,6 +336,9 @@ module g_cvmix_idemix2
         type(t_partit), intent(inout), target :: partit
         
         character(len=cvmix_strlen) :: nmlfile
+        ! local copies of idemix2_niwforc_file/vname, used to build the error
+        ! message below without repeating trim() everywhere
+        character(MAX_PATH)         :: srfforc_file, srfforc_vname, srfforc_nmlkey
         logical                     :: file_exist=.False.
         integer                     :: node_size, elem_size, elem, node, nfbin, &
                                        fbin_i, elnodes(3), nzmax, nlu, nln, nz
@@ -366,9 +399,10 @@ module g_cvmix_idemix2
             write(*,*) "     │  └> idemix2_tau_M2_oce       = ", idemix2_tau_M2_oce,    " days"
             
             write(*,*) "     │                                "
-            write(*,*) "     ├> idemix2_enable_niw          = ", idemix2_enable_niw 
+            write(*,*) "     ├> idemix2_enable_srf          = ", idemix2_enable_srf, " (master switch: wind/near-inertial forcing on/off)"
+            write(*,*) "     ├> idemix2_enable_niw          = ", idemix2_enable_niw, " (routes it: compartment if T, continuum if F)"
             write(*,*) "     │  ┌──────────────────────────── "
-            write(*,*) "     │  ├> idemix2_fniw_usage       = ", idemix2_fniw_usage 
+            write(*,*) "     │  ├> idemix2_fniw_usage       = ", idemix2_fniw_usage
             write(*,*) "     │  ├> idemix2_niwforc_file     = ", trim(idemix2_niwforc_file)
             write(*,*) "     │  │  └> idemix2_niwforc_vname = ", trim(idemix2_niwforc_vname)
             write(*,*) "     │  ├> idemix2_tau_niw_shelf    = ", idemix2_tau_niw_shelf, " days"
@@ -438,8 +472,14 @@ module g_cvmix_idemix2
         iwe2_E_iw(     :,:,:)= 0.0_WP
         
         allocate(iwe2_E_iw_diss(nl, node_size))
-        iwe2_E_iw_diss(  :,:)= 0.0_WP ! Eiw production from disspation 
-        
+        iwe2_E_iw_diss(  :,:)= 0.0_WP ! Eiw production from disspation
+
+        ! pre-sweep snapshot for the iterative-implicit horizontal diffusion (Jacobi sweep)
+        if (idemix2_enable_hor_diff_impl_iter) then
+            allocate(iwe2_E_iw_snap(nl, node_size))
+            iwe2_E_iw_snap(:,:) = 0.0_WP
+        end if
+
         ! Diagnostics (sized myDim_nod2D: IO-only, never need halo)
         if (idemix2_diag_Eiw) then
             allocate( iwe2_E_iw_fbot(nl, myDim_nod2D) &
@@ -668,8 +708,15 @@ module g_cvmix_idemix2
         ! width of spectral frequency bins
         iwe2_dphit(:)   = 2.0_WP*pi/(nfbin-2)
         iwe2_dphiu(:)   = iwe2_dphit(:)
-        ! iwe2_phiu(k) represents the center of the k-th spectral bin
-        ! iwe2_phit(k) represents the edge of the k-th spectral bin
+        ! Standard Arakawa t/u staggering in spectral space (same as pyOM2):
+        ! iwe2_phit(k) = CENTRE of the k-th spectral bin  (0, dphi, 2*dphi, ... from -dphi)
+        !                --> where the compartment energy E lives, so the physical-space
+        !                    group velocities u_compart/v_compart are evaluated here.
+        ! iwe2_phiu(k) = FACE  of the k-th spectral bin  (offset by +dphi/2)
+        !                --> where the cross-spectral velocity w_compart is evaluated,
+        !                    feeding the staggered flux difference
+        !                    div_v(k) = (flx_v(k) - flx_v(k-1))/dphi.
+        ! (Do NOT swap these: the naming follows t=tracer-centre / u=velocity-face.)
         iwe2_phit(1) = -iwe2_dphit(1)
         iwe2_phiu(1 )= iwe2_phit(1)+iwe2_dphit(1)/2.0_WP
         do fbin_i=2,nfbin
@@ -745,65 +792,96 @@ module g_cvmix_idemix2
         end if ! --> if (idemix2_enable_M2) then
         
         !_______________________________________________________________________
-        ! read idemix niw or srf forcing from cfsr data --> file 
+        ! read idemix wind/near-inertial forcing --> file
+        ! ONE file/variable (idemix2_niwforc_file/vname) serves both roles -- the
+        ! same physical quantity either way, just routed differently:
+        !
+        !     idemix2_enable_niw = .true.  --> feeds the NIW compartment, spread
+        !         evenly over the spectral bins (iwe2_fniw), and is then
+        !         propagated/refracted/dissipated by the compartment.
+        !
+        !     idemix2_enable_niw = .false. --> injected directly into the continuum
+        !         E_iw at the surface (iwe2_fsrf), the standard IDEMIX1 behaviour.
+        !
+        ! idemix2_enable_srf gates the read entirely: when .false., the file is
+        ! neither required nor read, and iwe2_fsrf/iwe2_fniw stay at their
+        ! zero-initialised state -- e.g. to run with only the M2 compartment
+        ! (and/or bottom tidal forcing) active.
         t0=MPI_Wtime()
-        file_exist=.False.
-        inquire(file=trim(idemix2_niwforc_file),exist=file_exist) 
-        if (file_exist) then
-            call read_other_NetCDF(                                    &
-                                    trim(idemix2_niwforc_file)       , & 
-                                    trim(idemix2_niwforc_vname)      , &
-                                    1                                , & 
-                                    iwe2_fsrf                        , & 
-                                    .true.                           , & ! NN for missing values
-                                    .true.                           , & ! interpolate to vertices  
-                                    partit                           , & 
-                                    mesh                               &
-                                    )
-            
-            
-            ! only 20% (idemix2_fniw_usage) from the surface forcing goes into internal waves
-            ! iwe2_fsrf becomes surface forcing variable when idemix2_enable_niw=.false.
-            ! in this case standard idemix1 behaviour 
-            iwe2_fsrf = max(0.0_WP,iwe2_fsrf)
-            iwe2_fsrf = iwe2_fsrf/density_0*idemix2_fniw_usage
-            
-            ! check for total tidal energy that is infused through the surface, see how 
-            ! much is lossed during interpolation and compare with value of the 
-            ! original files
-            loc_Etot = 0.0_WP
-            do node=1, myDim_nod2D
-                loc_Etot = loc_Etot + area(1,node)*iwe2_fsrf(node)*density_0                    
-            end do
-            call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-            
-            if (idemix2_enable_niw) then
-                if (mype==0) write(*,*) '     ├> read IDEMIX2 niw wave forcing'
-                do fbin_i =2, nfbin-1
-                    iwe2_fniw(fbin_i, :) = iwe2_fsrf(:)/(2.0_WP*pi)
-                end do 
-                iwe2_fsrf(:) = 0.0_WP
-            else
-                if (mype==0) write(*,*) '     ├> read IDEMIX2 surface wave forcing'
-            end if
-            if (mype==0) write(*,*) '     ├> IDEMIX2 total srf. energy Etot_srf =', glb_Etot*1.0e-12, ' TW'
-            
-        else
+        if (.not. idemix2_enable_srf) then
             if (mype==0) then
-                print *, achar(27)//'[33m'
-                write(*,*) '____________________________________________________________________'
-                write(*,*) ' ERROR: IDEMIX2 NIW/Srf. forcing file not found! '
-                write(*,*) '        Required for srf. energy input even when idemix2_enable_niw=.false.!'
-                write(*,*) '        Cant apply IDEMIX2 vertical mixing parameterisation! '
-                write(*,*) '        ├> file: ', trim(idemix2_niwforc_file)
-                write(*,*) '        └> check: namelist.cvmix, idemix2_niwforc_file &  '
-                write(*,*) '____________________________________________________________________'
-                print *, achar(27)//'[0m'
-                write(*,*)
-                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                write(*,*) '     ├> idemix2_enable_srf=.false. -- skipping surface/NIW forcing read'
+                write(*,*) '     │  └> iwe2_fsrf / iwe2_fniw remain zero'
             end if
-        end if 
-        
+        else
+            srfforc_file   = idemix2_niwforc_file
+            srfforc_vname  = idemix2_niwforc_vname
+            srfforc_nmlkey = 'idemix2_niwforc_file'
+
+            file_exist=.False.
+            inquire(file=trim(srfforc_file),exist=file_exist)
+            if (file_exist) then
+                call read_other_NetCDF(                                    &
+                                        trim(srfforc_file)               , &
+                                        trim(srfforc_vname)              , &
+                                        1                                , &
+                                        iwe2_fsrf                        , &
+                                        .true.                           , & ! NN for missing values
+                                        .true.                           , & ! interpolate to vertices
+                                        partit                           , &
+                                        mesh                               &
+                                        )
+
+
+                ! only 20% (idemix2_fniw_usage) from the surface forcing goes into internal waves
+                ! iwe2_fsrf becomes surface forcing variable when idemix2_enable_niw=.false.
+                ! in this case standard idemix1 behaviour
+                iwe2_fsrf = max(0.0_WP,iwe2_fsrf)
+                iwe2_fsrf = iwe2_fsrf/density_0*idemix2_fniw_usage
+
+                ! check for total tidal energy that is infused through the surface, see how
+                ! much is lossed during interpolation and compare with value of the
+                ! original files
+                loc_Etot = 0.0_WP
+                do node=1, myDim_nod2D
+                    loc_Etot = loc_Etot + area(1,node)*iwe2_fsrf(node)*density_0
+                end do
+                call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+
+                if (idemix2_enable_niw) then
+                    if (mype==0) write(*,*) '     ├> read IDEMIX2 niw wave forcing'
+                    do fbin_i =2, nfbin-1
+                        iwe2_fniw(fbin_i, :) = iwe2_fsrf(:)/(2.0_WP*pi)
+                    end do
+                    iwe2_fsrf(:) = 0.0_WP
+                else
+                    if (mype==0) write(*,*) '     ├> read IDEMIX2 surface wave forcing'
+                end if
+                if (mype==0) write(*,*) '     ├> IDEMIX2 total srf. energy Etot_srf =', glb_Etot*1.0e-12, ' TW'
+
+            else
+                if (mype==0) then
+                    print *, achar(27)//'[33m'
+                    write(*,*) '____________________________________________________________________'
+                    write(*,*) ' ERROR: IDEMIX2 surface forcing file not found! '
+                    if (idemix2_enable_niw) then
+                        write(*,*) '        Required for the NIW compartment (idemix2_enable_niw=.true.)!'
+                    else
+                        write(*,*) '        Required for srf. energy input into the continuum E_iw'
+                        write(*,*) '        (idemix2_enable_niw=.false.)!'
+                    end if
+                    write(*,*) '        Cant apply IDEMIX2 vertical mixing parameterisation! '
+                    write(*,*) '        ├> file: ', trim(srfforc_file)
+                    write(*,*) '        └> check: namelist.cvmix, ', trim(srfforc_nmlkey)
+                    write(*,*) '        └> or set idemix2_enable_srf=.false. to disable this forcing entirely'
+                    write(*,*) '____________________________________________________________________'
+                    print *, achar(27)//'[0m'
+                    write(*,*)
+                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+                end if
+            end if
+        end if
+
         
         ! NIWs are super-inertial (ω_niw > |f|), which is essential for their propagation as internal waves.
         ! The factor 1.05 ensures the frequency is 5% above the local inertial frequency.
@@ -1714,10 +1792,8 @@ module g_cvmix_idemix2
         ! 5+6. Horizontal Eiw diffusion (explicit single-pass or iterative implicit)
         ! Eiw^(t+1) += div_h( v_0 * tau_h * grad_h(v_0 * Eiw) )
         t7 = MPI_Wtime()
-        ! Diagnostic: capture negated pre-diffusion iwe2_tip1 state.
-        ! The before/after approach is used for both modes because the iterative
-        ! implicit call aliases Eiw_old and Eiw to the same array, making any
-        ! in-subroutine Eiw-Eiw_old difference zero (Fortran aliasing bug).
+        ! Diagnostic: capture negated pre-diffusion iwe2_tip1 state, needed for both
+        ! modes since neither compute_hdiff_Eiw call below directly returns a tendency.
         if ((idemix2_enable_hor_diff_expl .or. idemix2_enable_hor_diff_impl_iter) .and. idemix2_diag_Eiw) then
             iwe2_E_iw_hdif = -iwe2_E_iw(:, 1:myDim_nod2D, iwe2_tip1)
         end if
@@ -1725,25 +1801,34 @@ module g_cvmix_idemix2
         if (idemix2_enable_hor_diff_expl) then
             ! Exchange E_iw(...,ti) halo - needed for explicit horizontal diffusion gradients
             call exchange_nod(iwe2_E_iw(:, :, iwe2_ti), partit)
-            call compute_hdiff_Eiw(         &
-                  iwe2_E_iw(:, :, iwe2_ti)  & ! IN:    IW energy at current time
-                , iwe2_E_iw(:, :, iwe2_tip1)& ! INOUT: IW energy updated by horizontal diffusion
-                , iwe2_v0                   & ! IN:    first baroclinic mode group speed (m/s)
-                , 1                         & ! IN:    number of horizontal diffusion iterations
-                , partit                    & ! INOUT
-                , mesh                      & ! IN
+            ! single Jacobi sweep: Eiw_old = E_iw(ti), a genuinely separate array from
+            ! Eiw = E_iw(tip1) -- every edge reads the same fixed pre-diffusion state.
+            call compute_hdiff_Eiw(                          &
+                  Eiw_old    = iwe2_E_iw(:, :, iwe2_ti)      & ! IN:    IW energy at current time (fixed for this sweep)
+                , Eiw        = iwe2_E_iw(:, :, iwe2_tip1)    & ! INOUT: IW energy updated by horizontal diffusion
+                , v0         = iwe2_v0                       & ! IN:    first baroclinic mode group speed (m/s)
+                , n_hor_iter = 1                             & ! IN:    number of horizontal diffusion iterations
+                , partit     = partit                        & ! INOUT
+                , mesh       = mesh                          & ! IN
                 )
         end if
 
         if (idemix2_enable_hor_diff_impl_iter) then
             do iter=1, idemix2_hor_diff_niter
-                call compute_hdiff_Eiw(             &
-                      iwe2_E_iw(:, :, iwe2_tip1)    & ! IN:    IW energy from previous iteration
-                    , iwe2_E_iw(:, :, iwe2_tip1)    & ! INOUT: IW energy updated in-place (iterative)
-                    , iwe2_v0                       & ! IN:    first baroclinic mode group speed (m/s)
-                    , idemix2_hor_diff_niter        & ! IN:    total number of diffusion iterations
-                    , partit                        & ! INOUT
-                    , mesh                          & ! IN
+                ! Jacobi sweep, repeated idemix2_hor_diff_niter times: freeze the
+                ! pre-sweep state in iwe2_E_iw_snap so the gradient basis used by every
+                ! edge in THIS sweep stays fixed while iwe2_E_iw(:,:,tip1) is written.
+                ! The snapshot is refreshed at the top of each iteration, so iteration
+                ! k+1 correctly builds on iteration k's converged sweep -- it is only
+                ! FIXED WITHIN one sweep, not across all niter of them.
+                iwe2_E_iw_snap(:,:) = iwe2_E_iw(:, :, iwe2_tip1)
+                call compute_hdiff_Eiw(                       &
+                      Eiw_old    = iwe2_E_iw_snap             & ! IN:    fixed pre-sweep snapshot
+                    , Eiw        = iwe2_E_iw(:, :, iwe2_tip1) & ! INOUT: updated by this sweep
+                    , v0         = iwe2_v0                    & ! IN:    first baroclinic mode group speed (m/s)
+                    , n_hor_iter = idemix2_hor_diff_niter     & ! IN:    total number of diffusion iterations
+                    , partit     = partit                     & ! INOUT
+                    , mesh       = mesh                       & ! IN
                     )
                 call exchange_nod(iwe2_E_iw(:, :, iwe2_tip1), partit)
             end do
@@ -1792,9 +1877,9 @@ module g_cvmix_idemix2
                             , E_niw_new     = iwe2_E_niw(:      , node, iwe2_tip1)    & !INOUT: NIW compartment energy updated
                             , E_niw_struct  = iwe2_E_niw_struct( uln:nln, node)  & !IN:    NIW vertical structure function
                             , tau_niw       = iwe2_niw_tau(                    node)  & !IN:    NIW interaction timescale (s)
-                            , E_iw_dt       = iwe2_E_iw_dt(           :      , node)  & !INOUT: optional diagnostic: IDEMIX1 tendency from wave-wave
-                            , E_iw_diss_M2  = iwe2_E_iw_diss_M2(      :      , node)  & !INOUT: optional diagnostic: IDEMIX1 dissipation from M2
-                            , E_iw_diss_niw = iwe2_E_iw_diss_niw(     :      , node)  & !INOUT: optional diagnostic: IDEMIX1 dissipation from NIW
+                            , E_iw_dt       = iwe2_E_iw_dt(           uln:nln, node)  & !INOUT: optional diagnostic: IDEMIX1 tendency from wave-wave
+                            , E_iw_diss_M2  = iwe2_E_iw_diss_M2(      uln:nln, node)  & !INOUT: optional diagnostic: IDEMIX1 dissipation from M2
+                            , E_iw_diss_niw = iwe2_E_iw_diss_niw(     uln:nln, node)  & !INOUT: optional diagnostic: IDEMIX1 dissipation from NIW
                             , E_M2_dt       = iwe2_E_M2_dt(           :      , node)  & !INOUT: optional diagnostic: M2 tendency from wave-wave
                             , E_M2_diss_wwi = iwe2_E_M2_diss_wwi(     :      , node)  & !INOUT: optional diagnostic: M2 dissipation from wave-wave
                             )
@@ -1836,8 +1921,8 @@ module g_cvmix_idemix2
                             , E_M2_struct   = iwe2_E_M2_struct( uln:nln, node)  & !IN:    M2 vertical structure function
                             , alpha_M2_c    = iwe2_alpha_M2_c(                 node)  & !IN:    M2 continuous dissipation rate
                             , tau_M2        = iwe2_M2_tau(                     node)  & !IN:    M2 interaction timescale (s)
-                            , E_iw_dt       = iwe2_E_iw_dt(           :      , node)  & !INOUT: optional diagnostic: IDEMIX1 tendency from wave-wave
-                            , E_iw_diss_M2  = iwe2_E_iw_diss_M2(      :      , node)  & !INOUT: optional diagnostic: IDEMIX1 dissipation from M2
+                            , E_iw_dt       = iwe2_E_iw_dt(           uln:nln, node)  & !INOUT: optional diagnostic: IDEMIX1 tendency from wave-wave
+                            , E_iw_diss_M2  = iwe2_E_iw_diss_M2(      uln:nln, node)  & !INOUT: optional diagnostic: IDEMIX1 dissipation from M2
                             , E_M2_dt       = iwe2_E_M2_dt(           :      , node)  & !INOUT: optional diagnostic: M2 tendency from wave-wave
                             , E_M2_diss_wwi = iwe2_E_M2_diss_wwi(     :      , node)  & !INOUT: optional diagnostic: M2 dissipation from wave-wave
                             )
@@ -1873,8 +1958,8 @@ module g_cvmix_idemix2
                             , E_niw_new     = iwe2_E_niw(:      , node, iwe2_tip1)    & !INOUT: NIW compartment energy updated
                             , E_niw_struct  = iwe2_E_niw_struct( uln:nln, node)  & !IN:    NIW vertical structure function
                             , tau_niw       = iwe2_niw_tau(                    node)  & !IN:    NIW interaction timescale (s)
-                            , E_iw_dt       = iwe2_E_iw_dt(           :      , node)  & !INOUT: optional diagnostic: IDEMIX1 tendency from wave-wave
-                            , E_iw_diss_niw = iwe2_E_iw_diss_niw(     :      , node)  & !INOUT: optional diagnostic: IDEMIX1 dissipation from NIW
+                            , E_iw_dt       = iwe2_E_iw_dt(           uln:nln, node)  & !INOUT: optional diagnostic: IDEMIX1 tendency from wave-wave
+                            , E_iw_diss_niw = iwe2_E_iw_diss_niw(     uln:nln, node)  & !INOUT: optional diagnostic: IDEMIX1 dissipation from NIW
                             )
                     else
                         call cvmix_idemix2_compute_Eiw_waveinteract(                  &
@@ -2833,9 +2918,7 @@ module g_cvmix_idemix2
 #include "../associate_mesh_ass.h"        
         !_______________________________________________________________________
         nfbin=idemix2_nfbin
-        iwe2_flx_uv(:,:)     = 0.0
-        iwe2_flx_w( :,:)     = 0.0
-        
+
         !_______________________________________________________________________
         ! Exchange current timelevel (contiguous with timelevel-last layout)
         call exchange_nod_fbin(E(:, :, ti), partit)
@@ -3177,6 +3260,25 @@ module g_cvmix_idemix2
     ! 
     ! use Gaussian integral satz ... int(div vec_A)dV = ringint(A*vec_n)dA
     !                                    div vec_A    = 1/V * sum_i=1...nface( A_i*vec_n_i)*A_i
+    ! Eiw_old and Eiw must be TWO DISTINCT ARRAYS, never the same actual argument:
+    !   - Numerically: this is a Jacobi sweep. Every edge's gradient must be computed
+    !     from the SAME fixed pre-sweep state (Eiw_old); Eiw is only ever written to,
+    !     never read from, inside this loop. If the two were the same array, an edge
+    !     processed later in the sweep would read a neighbour's value already updated
+    !     by an earlier edge in the SAME sweep -- i.e. the gradient basis would shift
+    !     while diffusing, which is exactly what must NOT happen here.
+    !     (Contrast IDEMIX1's own idemix.F90 horizontal propagator, which reads and
+    !     writes a single array "iwe_n" in place with no snapshot at all -- a
+    !     Gauss-Seidel-like scheme. That is a DIFFERENT, deliberately not replicated,
+    !     choice here.)
+    !   - Legally: aliasing an intent(in) and an intent(inout) dummy to the same
+    !     storage is undefined behaviour per the Fortran standard (F2008 12.5.2.13)
+    !     regardless of the numerics, so this would be wrong even if the ordering
+    !     dependence above were acceptable.
+    ! The caller in the iterative-implicit path (idemix2_enable_hor_diff_impl_iter)
+    ! is responsible for refreshing Eiw_old from Eiw ONCE PER ITERATION, before this
+    ! sweep starts and after the previous sweep finished -- see iwe2_E_iw_snap in
+    ! calc_cvmix_idemix2.
     subroutine compute_hdiff_Eiw(         &
                 Eiw_old                 , &
                 Eiw                     , &
@@ -3195,7 +3297,7 @@ module g_cvmix_idemix2
         integer         , intent(in   )         :: n_hor_iter
         !___LOCAL VARIABLES_____________________________________________________
         integer                                 :: edge, ednodes(2), edel(2),          &
-                                                   elnodes1(3), elnodes2(3),           & 
+                                                   elnodes1(3), elnodes2(3),           &
                                                    node, nz,                           &
                                                    nl1, nl2, nl12,                     &
                                                    nu1, nu2, nu12
@@ -3205,7 +3307,7 @@ module g_cvmix_idemix2
 #include "../associate_part_def.h"
 #include "../associate_mesh_def.h"
 #include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h" 
+#include "../associate_mesh_ass.h"
         !_______________________________________________________________________
         ! calculate horizontal diffusion term div( grad(Eiw*v0) * tau_h*v0) 
         do edge=1,myDim_edge2D
