@@ -1091,6 +1091,15 @@ SUBROUTINE net_rec_from_atm(action, partit)
 #if defined (__oifs)
   return  !OIFS-FESOM2 coupling uses OASIS3MCT conservative remapping and recieves no net fluxes here.
 #endif
+  ! NOTE (single precision): the MPI_DOUBLE_PRECISION calls below are a RAW
+  ! FESOM<->atmosphere root exchange over MPI_COMM_WORLD (source_root/target_root),
+  ! NOT routed through OASIS, so they are only used by the ECHAM/AWICM flux-correction
+  ! path -- the __oifs build returns above and never reaches them. They are left
+  ! hardcoded double on purpose: atm_net_fluxes_* are real(kind=WP), but the buffer
+  ! kind must match the ATMOSPHERE partner (double), not the local WP, so this is the
+  ! one coupling spot that MUST NOT be switched to MPI_WP. Making FESOM single
+  ! precision coupled to ECHAM would additionally require this exchange (and the
+  ! atmosphere side) to agree on a precision -- out of scope for the OIFS SP work.
 
   if (action) then
      CALL MPI_COMM_RANK(MPI_COMM_WORLD, my_global_rank, ierror)

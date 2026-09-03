@@ -76,7 +76,14 @@ module cpl_driver
   integer                    :: o2a_call_count=0
   integer                    :: a2o_call_count=0
 
-  REAL(kind=WP), POINTER                          :: exfld(:)          ! buffer for receiving global exchange fields
+  ! The OASIS exchange buffer is kept always-double (WP_full), independent of the
+  ! model working precision WP. This matches the oasis_Double transient defined in
+  ! cpl_oasis3mct_define_unstr and keeps the FESOM<->atmosphere exchange in double
+  ! precision even in a single-precision (USE_SINGLE_PRECISION, WP=real32) build.
+  ! It mirrors OpenIFS, which couples through its dedicated double coupling kind
+  ! JPRO regardless of the model kind JPRB. cplsnd stays at WP (it accumulates model
+  ! fields); the WP->WP_full conversion happens on assignment to exfld.
+  REAL(kind=WP_full), POINTER                     :: exfld(:)          ! buffer for receiving global exchange fields
   real(kind=WP), allocatable, dimension(:,:)      :: cplsnd
 
 

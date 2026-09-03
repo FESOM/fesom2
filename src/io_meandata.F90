@@ -11,6 +11,7 @@ module io_MEANDATA
   use, intrinsic :: iso_fortran_env, only: real64, real32
   use io_data_strategy_module
   use async_threads_module
+  use io_redistribute
   use netcdf
   use io_xios_module, only: io_xios_is_on, io_xios_field_is_active, &
                             io_xios_send_2d_r8, io_xios_send_2d_r4, &
@@ -124,6 +125,15 @@ module io_MEANDATA
   integer, save                  :: nlev_upper=1
   character(len=1), save         :: filesplit_freq='y'
   integer, save                  :: compression_level=0
+
+  ! --- collective output path ------------------------------------------------
+  ! Selected by &io_parallel/parallel_write in namelist.config (g_config). The
+  ! schedules are the same ones the restart path uses, but built here so this
+  ! module does not depend on io_fesom_file_module; they are pure functions of
+  ! the partition and the writer count, so the two agree by construction.
+  type(redist_type), save, target :: out_sched_nod, out_sched_elem
+  logical, save :: out_sched_ready = .false.
+  integer, save :: out_wcomm = -1
   ! Ship-track / mooring curtain output config: variables declared in
   ! io_tracks_module and pulled into ini_mean_io for namelist binding.
   type io_entry
@@ -179,6 +189,289 @@ module io_MEANDATA
   REAL(real64), DIMENSION(:), ALLOCATABLE, TARGET :: multio_temporary_array
 
   contains
+
+  !> Build the nodal and element redistribution schedules for output, once.
+  !> Elements use myInd_elem2D_shrinked, not myList_elem2D: an element belongs
+  !> to a PE if ANY of its nodes does, so sum(myDim_elem2D) > elem2D and there
+  !> is no bijection to build a schedule on.
+  !>
+  !> The two schedules MUST end up on the same ranks: one communicator opens the
+  !> file, and par_put_r4/r8 gate on out_is_writer(), which is the NODAL writer
+  !> set. See the element-count note at the redist_build call below.
+  subroutine ensure_out_schedules(partit, n_nod2d, n_elem2d)
+    use MOD_PARTIT
+    use mpi
+    type(t_partit), intent(in) :: partit
+    integer, intent(in) :: n_nod2d, n_elem2d
+    integer :: ierr, k
+    integer, allocatable :: gelem(:)
+
+    if (out_sched_ready) return
+
+    call redist_build(out_sched_nod, partit%myList_nod2D(1:partit%myDim_nod2D), &
+                      partit%myDim_nod2D, n_nod2d, n_writers, &
+                      partit%MPI_COMM_FESOM, partit%mype==0, ierr)
+    if (ierr /= 0) then
+       if (partit%mype==0) write(*,*) 'io_meandata: nodal redist_build failed, ierr=', ierr
+       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    end if
+
+    allocate(gelem(max(1, partit%myDim_elem2D_shrinked)))
+    do k = 1, partit%myDim_elem2D_shrinked
+       gelem(k) = partit%myList_elem2D( partit%myInd_elem2D_shrinked(k) )
+    end do
+    ! Hand the element schedule the count the NODAL schedule actually ended up
+    ! with, not the requested n_writers.
+    !
+    ! redist_effective_writers clamps the request to n_global/REDIST_MIN_BLOCK,
+    ! and elem2D is about twice nod2D on a triangular mesh, so the same request
+    ! can survive the element clamp while the nodal one is cut in half. The
+    ! schedules then place their writers with different strides, the file is
+    ! opened on the nodal set only, and every element block held by a rank
+    ! outside that set is silently never written -- about half of the element
+    ! field on core2 with n_writers > 30, which is nod2D/REDIST_MIN_BLOCK.
+    ! Reported by JanStreffing on #969 as "missing half the element output".
+    ! nod2D <= elem2D, so the nodal count always passes the element clamp
+    ! unchanged and the two sets coincide by construction.
+    call redist_build(out_sched_elem, gelem, partit%myDim_elem2D_shrinked, &
+                      n_elem2d, out_sched_nod%n_writers, partit%MPI_COMM_FESOM, .false., ierr)
+    if (ierr /= 0) then
+       if (partit%mype==0) write(*,*) 'io_meandata: element redist_build failed, ierr=', ierr
+       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    end if
+    deallocate(gelem)
+
+    ! ... and assert it rather than trust it. This is cheap, and it is the check
+    ! that would have turned the silent data loss above into a failed run.
+    if (out_sched_nod%n_writers /= out_sched_elem%n_writers .or. &
+        (out_sched_nod%is_writer .neqv. out_sched_elem%is_writer)) then
+       write(*,*) 'io_meandata: nodal and element writer sets disagree on rank ', partit%mype, &
+                  ' -- nodal writers ', out_sched_nod%n_writers, &
+                  ', element writers ', out_sched_elem%n_writers
+       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    end if
+
+    call MPI_Comm_split(partit%MPI_COMM_FESOM, merge(1,0,out_sched_nod%is_writer), &
+                        partit%mype, out_wcomm, ierr)
+    out_sched_ready = .true.
+  end subroutine ensure_out_schedules
+
+  logical function out_is_writer()
+    out_is_writer = out_sched_ready .and. out_sched_nod%is_writer
+  end function out_is_writer
+
+  !> Collective write of one stream: one MPI_Alltoallv moves the whole field
+  !> into block order, then each writer issues one put_var per level.
+  !> Every rank calls this; only writers reach the netCDF calls.
+  subroutine par_put_r8(entry, nlev)
+    type(Meandata), intent(inout) :: entry
+    integer, intent(in) :: nlev
+    type(redist_type), pointer :: s
+    real(kind=8), allocatable :: sbuf(:,:), blk(:,:), lvlbuf(:), flat(:,:)
+    real(kind=8) :: empty(0)
+    integer :: k, lev, ierr, nloc
+
+    if (entry%is_elem_based) then
+       s => out_sched_elem
+       nloc = entry%p_partit%myDim_elem2D_shrinked
+       allocate(sbuf(nlev, max(1,nloc)))
+       do k = 1, nloc
+          sbuf(1:nlev,k) = entry%local_values_r8_copy(1:nlev, entry%p_partit%myInd_elem2D_shrinked(k))
+       end do
+    else
+       s => out_sched_nod
+       nloc = entry%p_partit%myDim_nod2D
+       allocate(sbuf(nlev, max(1,nloc)))
+       do k = 1, nloc
+          sbuf(1:nlev,k) = entry%local_values_r8_copy(1:nlev, k)
+       end do
+    end if
+
+    allocate(blk(nlev, max(1, s%count)))
+
+    call redist_exchange(s, nlev, sbuf, blk, entry%p_partit%MPI_COMM_FESOM, ierr)
+
+    if (out_is_writer()) then
+       ! ONE put_var for the whole block, not one per level.
+       !
+       ! Writing level by level into a chunk that spans chunk_levels levels means
+       ! every call touches a fraction of a chunk, and for a compressed dataset
+       ! HDF5 must then decompress-modify-recompress that chunk once per level.
+       ! Measured on NG5/1024 with 256 writers: chunk_levels = 8 written level by
+       ! level cost 209 s against 53 s for chunk_levels = 1, a 4x regression for
+       ! 0.6% less volume. The chunk cache cannot absorb it, because a collective
+       ! filtered write has to settle each chunk within the call -- all ranks must
+       ! agree on chunk state.
+       !
+       ! The writer already holds every level of its block, so one call is both
+       ! correct and cheaper: it also collapses 69 collective calls into one.
+       ! The transpose is needed because the file is (node, level) in Fortran
+       ! order while blk is (level, node) to match FESOM's in-memory layout.
+       if (entry%ndim==1) then
+          if (s%count > 0) then
+             allocate(lvlbuf(s%count))
+             lvlbuf(1:s%count) = blk(1, 1:s%count)
+             call assert_nf( nf90_put_var(entry%ncid, entry%varID, lvlbuf, &
+                  start=(/s%first, entry%rec_count/), count=(/s%count, 1/)), __LINE__)
+             deallocate(lvlbuf)
+          else
+             call assert_nf( nf90_put_var(entry%ncid, entry%varID, empty, &
+                  start=(/1, entry%rec_count/), count=(/0, 1/)), __LINE__)
+          end if
+       else
+          if (s%count > 0) then
+             allocate(flat(s%count, nlev))
+             do lev = 1, nlev
+                flat(1:s%count, lev) = blk(lev, 1:s%count)
+             end do
+             call assert_nf( nf90_put_var(entry%ncid, entry%varID, flat, &
+                  start=(/s%first, 1, entry%rec_count/), &
+                  count=(/s%count, nlev, 1/)), __LINE__)
+             deallocate(flat)
+          else
+             call assert_nf( nf90_put_var(entry%ncid, entry%varID, empty, &
+                  start=(/1, 1, entry%rec_count/), count=(/0, nlev, 1/)), __LINE__)
+          end if
+       end if
+    end if
+
+    deallocate(sbuf, blk)
+  end subroutine par_put_r8
+
+
+  !> real4 counterpart of par_put_r8. Kept as a separate routine rather than
+  !> generic: the two differ only in kind, but the source arrays they read from
+  !> (local_values_r4_copy vs _r8_copy) are distinct members of Meandata.
+  subroutine par_put_r4(entry, nlev)
+    type(Meandata), intent(inout) :: entry
+    integer, intent(in) :: nlev
+    type(redist_type), pointer :: s
+    real(kind=4), allocatable :: sbuf(:,:), blk(:,:), lvlbuf(:), flat(:,:)
+    real(kind=4) :: empty(0)
+    integer :: k, lev, ierr, nloc
+
+    if (entry%is_elem_based) then
+       s => out_sched_elem
+       nloc = entry%p_partit%myDim_elem2D_shrinked
+       allocate(sbuf(nlev, max(1,nloc)))
+       do k = 1, nloc
+          sbuf(1:nlev,k) = entry%local_values_r4_copy(1:nlev, entry%p_partit%myInd_elem2D_shrinked(k))
+       end do
+    else
+       s => out_sched_nod
+       nloc = entry%p_partit%myDim_nod2D
+       allocate(sbuf(nlev, max(1,nloc)))
+       do k = 1, nloc
+          sbuf(1:nlev,k) = entry%local_values_r4_copy(1:nlev, k)
+       end do
+    end if
+
+    allocate(blk(nlev, max(1, s%count)))
+    call redist_exchange(s, nlev, sbuf, blk, entry%p_partit%MPI_COMM_FESOM, ierr)
+
+    if (out_is_writer()) then
+       ! One put_var for the whole block -- see the comment in par_put_r8.
+       if (entry%ndim==1) then
+          if (s%count > 0) then
+             allocate(lvlbuf(s%count))
+             lvlbuf(1:s%count) = blk(1, 1:s%count)
+             call assert_nf( nf90_put_var(entry%ncid, entry%varID, lvlbuf, &
+                  start=(/s%first, entry%rec_count/), count=(/s%count, 1/)), __LINE__)
+             deallocate(lvlbuf)
+          else
+             call assert_nf( nf90_put_var(entry%ncid, entry%varID, empty, &
+                  start=(/1, entry%rec_count/), count=(/0, 1/)), __LINE__)
+          end if
+       else
+          if (s%count > 0) then
+             allocate(flat(s%count, nlev))
+             do lev = 1, nlev
+                flat(1:s%count, lev) = blk(lev, 1:s%count)
+             end do
+             call assert_nf( nf90_put_var(entry%ncid, entry%varID, flat, &
+                  start=(/s%first, 1, entry%rec_count/), &
+                  count=(/s%count, nlev, 1/)), __LINE__)
+             deallocate(flat)
+          else
+             call assert_nf( nf90_put_var(entry%ncid, entry%varID, empty, &
+                  start=(/1, 1, entry%rec_count/), count=(/0, nlev, 1/)), __LINE__)
+          end if
+       end if
+    end if
+
+    deallocate(sbuf, blk)
+  end subroutine par_put_r4
+
+  logical function out_is_lead_writer()
+    out_is_lead_writer = out_sched_ready .and. (out_sched_nod%widx == 0)
+  end function out_is_lead_writer
+
+  integer function out_writer_comm()
+    out_writer_comm = out_wcomm
+  end function out_writer_comm
+
+  !> Open an existing output file for writing, collectively over the writer
+  !> communicator when the collective path is on. Returns the netCDF status so
+  !> the caller can use it to decide whether the file existed at all.
+  integer function par_open_existing(entry)
+    use mpi
+    type(Meandata), intent(inout) :: entry
+    if (parallel_write) then
+       par_open_existing = nf90_open_par(entry%filename, IOR(nf90_write, nf90_mpiio), &
+                                         out_writer_comm(), MPI_INFO_NULL, entry%ncid)
+    else
+       par_open_existing = nf90_open(entry%filename, nf90_write, entry%ncid)
+    end if
+  end function par_open_existing
+
+  !> Size the HDF5 chunk cache to hold the chunks a writer is filling.
+  !>
+  !> This is not optional once chunk_levels > 1. The default cache is 1 MB per
+  !> variable, and write_mean fills a chunk with chunk_levels successive
+  !> put_var calls, one level at a time. If the chunk does not fit in the cache
+  !> HDF5 evicts it half-filled, then reads it back -- with compression that is
+  !> decompress, modify, recompress, for every level. The chunking "improvement"
+  !> would then be a slowdown.
+  subroutine set_chunk_cache(entry, block, nlev_chunk)
+    type(Meandata), intent(in) :: entry
+    integer, intent(in) :: block, nlev_chunk
+    integer(kind=8) :: chunk_bytes
+    integer :: cache_bytes, nelems, bytes_per_value, st
+    ! netcdf-fortran 4.5.3 ships the symbol in libnetcdff but does NOT export
+    ! nf90_set_var_chunk_cache from the F90 `netcdf` module -- referencing it
+    ! fails with "This name does not have a type". The F77 entry point is
+    ! declared in netcdf.inc and works, so declare just that one externally
+    ! rather than pulling the whole F77 include into this module.
+    integer, external :: nf_set_var_chunk_cache
+
+    bytes_per_value = merge(8, 4, entry%accuracy == i_real8)
+    chunk_bytes = int(block,8) * int(nlev_chunk,8) * int(bytes_per_value,8)
+
+    ! Room for a few chunks, with a floor so small cases are not pathological
+    ! and a ceiling so a large chunk_levels does not reserve absurd memory on
+    ! every writer.
+    cache_bytes = int(min(max(4_8*chunk_bytes, 4194304_8), 268435456_8))
+    nelems = 101   ! prime, as HDF5 recommends for the hash table
+
+    st = nf_set_var_chunk_cache(entry%ncid, entry%varID, cache_bytes, nelems, 0.75)
+    ! Not fatal: a too-small cache costs performance, not correctness, and this
+    ! must not take down a run on a netCDF build that handles it differently.
+    if (st /= nf90_noerr .and. out_is_lead_writer()) then
+        write(*,*) 'io_meandata: could not set chunk cache for ', trim(entry%name), &
+                   ', status ', st, ' -- writes may be slower than expected'
+    end if
+  end subroutine set_chunk_cache
+
+  !> Chunk extent along the horizontal dimension: the writer block.
+  integer function out_block(is_elem)
+    logical, intent(in) :: is_elem
+    if (is_elem) then
+       out_block = out_sched_elem%block
+    else
+       out_block = out_sched_nod%block
+    end if
+  end function out_block
+
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -2460,20 +2753,38 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     type(t_ice)   , intent(in) :: ice
     
     type(Meandata), intent(inout) :: entry
-    character(len=*), parameter :: global_attributes_prefix = "FESOM_"    
+    character(len=*), parameter :: global_attributes_prefix = "FESOM_"
+    integer :: nlev_chunk
 #if defined(__icepack)
     integer, allocatable :: ncat_arr(:)
     integer              :: ii
 #endif
 
-    ! Serial output implemented so far
-    if (partit%mype/=entry%root_rank) return
+    ! Who defines the file: one root rank in the gather path, every writer in
+    ! the collective path (a parallel create is collective over its communicator).
+    if (parallel_write) then
+       call ensure_out_schedules(partit, mesh%nod2D, mesh%elem2D)
+       if (.not. out_is_writer()) return
+    else
+       if (partit%mype/=entry%root_rank) return
+    end if
     ! create an ocean output file
-    write(*,*) 'initializing I/O file for ', trim(entry%name)
-    
+    if (.not. parallel_write .or. out_is_lead_writer()) &
+       write(*,*) 'initializing I/O file for ', trim(entry%name)
+
     !___________________________________________________________________________
     ! Create file
-    call assert_nf( nf90_create(entry%filename, IOR(nf90_noclobber,IOR(nf90_netcdf4,nf90_classic_model)), entry%ncid), __LINE__)
+    if (parallel_write) then
+       ! nf90_clobber, not noclobber: with a collective create a leftover file
+       ! would fail on every writer at once and leave the rest hanging at the
+       ! next collective. nf90_classic_model is kept -- verified to survive
+       ! parallel mode, so the file stays what the serial writer produces.
+       call assert_nf( nf90_create_par(entry%filename, &
+            IOR(nf90_clobber,IOR(nf90_netcdf4,IOR(nf90_classic_model,nf90_mpiio))), &
+            out_writer_comm(), MPI_INFO_NULL, entry%ncid), __LINE__)
+    else
+       call assert_nf( nf90_create(entry%filename, IOR(nf90_noclobber,IOR(nf90_netcdf4,nf90_classic_model)), entry%ncid), __LINE__)
+    end if
 
     !___________________________________________________________________________
     ! Create mesh related dimensions
@@ -2553,6 +2864,25 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     !   for no benefit. Skipping the call entirely is what the namelist implies.
     !   (The variable stays chunked either way: netCDF-4 always chunks a variable
     !   with an unlimited dimension, and time is unlimited here.)
+    ! Chunk the node dimension to the writer block, so each chunk lies entirely
+    ! inside one writer's range and HDF5's filtered collective write has nothing
+    ! to hand between ranks. Must come before enddef.
+    if (parallel_write) then
+        if (entry%ndim==1) then
+            call assert_nf( nf90_def_var_chunking(entry%ncid, entry%varID, nf90_chunked, &
+                 [out_block(entry%is_elem_based), 1]), __LINE__)
+            call set_chunk_cache(entry, out_block(entry%is_elem_based), 1)
+        else
+            ! chunk_levels vertical extent, clamped to what the variable has.
+            ! 0 means "all levels".
+            nlev_chunk = chunk_levels
+            if (nlev_chunk <= 0) nlev_chunk = entry%glsize(1)
+            nlev_chunk = min(nlev_chunk, entry%glsize(1))
+            call assert_nf( nf90_def_var_chunking(entry%ncid, entry%varID, nf90_chunked, &
+                 [out_block(entry%is_elem_based), nlev_chunk, 1]), __LINE__)
+            call set_chunk_cache(entry, out_block(entry%is_elem_based), nlev_chunk)
+        end if
+    end if
     if (compression_level > 0) then
         call assert_nf( nf90_def_var_deflate(entry%ncid, entry%varID, 1, 1, compression_level), __LINE__)
     end if
@@ -2601,6 +2931,12 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     !___________________________________________________________________________
     ! This ends definition part of the file, below filling in variables is possible
     call assert_nf( nf90_enddef(entry%ncid), __LINE__)
+    ! Compressed variables in parallel netCDF-4 require collective access;
+    ! independent access with a filter attached is an error.
+    if (parallel_write) then
+        call assert_nf( nf90_var_par_access(entry%ncid, entry%varID, nf90_collective), __LINE__)
+        call assert_nf( nf90_var_par_access(entry%ncid, entry%tID,   nf90_collective), __LINE__)
+    end if
     if (entry%dimname(1)=='nz') then
         call assert_nf( nf90_put_var(entry%ncid, entry%dimvarID(1), abs(mesh%zbar)), __LINE__)
     elseif (entry%dimname(1)=='nz1') then
@@ -2647,6 +2983,17 @@ subroutine assoc_ids(entry)
     call assert_nf( nf90_inq_varid(entry%ncid, 'time', entry%tID), __LINE__)
     !___Associate physical variables____________________________________________
     call assert_nf( nf90_inq_varid(entry%ncid, entry%name, entry%varID), __LINE__)
+
+    ! Access mode is a property of the OPEN file handle, not of the variable
+    ! definition, so it resets to independent every time the file is reopened --
+    ! and FESOM reopens immediately after creating. Setting it only in
+    ! create_new_file therefore failed on the very first write with
+    !   NetCDF: Attempt to extend dataset during NC_INDEPENDENT I/O operation
+    ! on the time variable. assoc_ids runs after every open, so it belongs here.
+    if (parallel_write) then
+        call assert_nf( nf90_var_par_access(entry%ncid, entry%varID, nf90_collective), __LINE__)
+        call assert_nf( nf90_var_par_access(entry%ncid, entry%tID,   nf90_collective), __LINE__)
+    end if
 end subroutine
 !
 !
@@ -2831,8 +3178,13 @@ subroutine write_mean(entry, entry_index)
     ! Serial output implemented so far
     !___________________________________________________________________________
     ! write new time index ctime_copy to file --> expand time array in nc file
-    if (entry%p_partit%mype==entry%root_rank) then
-        write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count
+    ! Extending the unlimited dimension is collective, so in the parallel path
+    ! EVERY writer must issue this put -- they all write the same scalar to the
+    ! same record, which is what a collective write of a per-record scalar looks
+    ! like. Restricting it to one rank would hang the rest at the next collective.
+    if (merge(out_is_writer(), entry%p_partit%mype==entry%root_rank, parallel_write)) then
+        if (.not. parallel_write .or. out_is_lead_writer()) &
+            write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count
         call assert_nf( nf90_put_var(entry%ncid, entry%Tid, entry%ctime_copy, start = (/entry%rec_count/) ), __LINE__)
     end if
   
@@ -2853,10 +3205,14 @@ subroutine write_mean(entry, entry_index)
         end if
         
         !_______________________________________________________________________
-        ! loop over vertical layers or spectral bins --> do gather 3d variables layerwise in 2d slices
+        ! loop over vertical layers --> do gather 3d variables layerwise in 2d
+        ! slices
+        if (parallel_write) then
+            call par_put_r8(entry, size1)
+        else
         do lev=1, size1
             !___________________________________________________________________
-            ! local output variables are gathered in 2d shaped entry%aux_r8 
+            ! local output variables are gahtered in 2d shaped entry%aux_r8
             ! either for vertices or elements
             if (entry%is_fbin_based) then
                 ! Spectral bin arrays: gather bin by bin (same pattern as vertical levels)
@@ -2873,9 +3229,9 @@ subroutine write_mean(entry, entry_index)
                     call gather_elem2D(entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
                 end if
             end if
-            
+
             !___________________________________________________________________
-            ! use root_rank CPU/Task to write 2d slice into netcdf file for 3d 
+            ! use root_rank CPU/Task to write 2d slice into netcdf file for 3d
             ! variables into specific layer position lev
             if (entry%p_partit%mype==entry%root_rank) then
                 if (entry%ndim==1) then
@@ -2885,6 +3241,7 @@ subroutine write_mean(entry, entry_index)
                 end if
             end if
         end do ! --> do lev=1, size1
+        end if
 
     !___________writing 4 byte real ____________________________________________ 
     else if (entry%accuracy == i_real4) then
@@ -2898,9 +3255,14 @@ subroutine write_mean(entry, entry_index)
         end if
         
         !_______________________________________________________________________
-        ! loop over vertical layers or spectral bins --> do gather 3d variables layerwise in 2d slices
+        ! loop over vertical layers --> do gather 3d variables layerwise in 2d
+        ! slices
+        if (parallel_write) then
+            call par_put_r4(entry, size1)
+        else
+
         do lev=1, size1
-            !PS if (entry%p_partit%mype==entry%root_rank) t0=MPI_Wtime()  
+            !PS if (entry%p_partit%mype==entry%root_rank) t0=MPI_Wtime()
             !___________________________________________________________________
             ! local output variables are gathered in 2d shaped entry%aux_r4 
             ! either for vertices or elements
@@ -2935,6 +3297,7 @@ subroutine write_mean(entry, entry_index)
                 end if
             end if
         end do ! --> do lev=1, size1
+        end if ! --> if (parallel_write)
     end if ! --> if (entry%accuracy == i_real8) then
 end subroutine
 !
@@ -3160,11 +3523,20 @@ ctime=timeold+(dayold-1.)*86400
             endif
 
             !___________________________________________________________________
-            ! only root rank task does output
+            ! The redistribution schedules are collective and must be built by
+            ! EVERY rank, so they cannot live inside the root-only block below.
+            ! (Doing that was an MPI_ERR_TRUNCATE in Alltoallv: non-root ranks
+            ! reached the exchange with an unbuilt schedule.)
+            if (parallel_write) call ensure_out_schedules(partit, mesh%nod2D, mesh%elem2D)
+
+            ! In the gather path only the root rank opens and defines the file.
+            ! In the collective path every WRITER must, because the create and
+            ! every put_var are collective over the writer communicator.
 #if defined(__XIOS)
-            if(.not. io_xios_is_on() .and. partit%mype == entry%root_rank) then
+            if(.not. io_xios_is_on() .and. &
+               merge(out_is_writer(), partit%mype == entry%root_rank, parallel_write)) then
 #else
-            if(partit%mype == entry%root_rank) then
+            if(merge(out_is_writer(), partit%mype == entry%root_rank, parallel_write)) then
 #endif
                 !_______________________________________________________________
                 ! create new output file ?!
@@ -3173,12 +3545,12 @@ ctime=timeold+(dayold-1.)*86400
                     entry%filename = filepath
                     !___________________________________________________________
                     ! use any existing file with this name or create a new one
-                    if( nf90_open(entry%filename, nf90_write, entry%ncid) /= nf90_noerr ) then
+                    if( par_open_existing(entry) /= nf90_noerr ) then
                         !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call create_new_file'//achar(27)//'[0m'
                         call create_new_file(entry, ice, dynamics, partit, mesh)
 
                         !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assert_nf A'//achar(27)//'[0m'//',  k=',k, ', rootpart=', entry%root_rank
-                        call assert_nf( nf90_open(entry%filename, nf90_write, entry%ncid), __LINE__)
+                        call assert_nf( par_open_existing(entry), __LINE__)
                     end if
 
                     !___________________________________________________________
@@ -3195,18 +3567,27 @@ ctime=timeold+(dayold-1.)*86400
                 do k=entry%rec_count, 1, -1
                     !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assert_nf B'//achar(27)//'[0m'//',  k=',k, ', rootpart=', entry%root_rank
                     ! determine rtime from exiting file
-                    call assert_nf( nf90_get_var(entry%ncid, entry%tID, rtime), __LINE__)
+                    call assert_nf( nf90_get_var(entry%ncid, entry%tID, rtime, start=(/k/)), __LINE__)
                     if (ctime > rtime) then
                         entry%rec_count=k+1
                         exit ! a proper rec_count detected, exit the loop
                     end if
                     if (k==1) then
+                        if (merge(out_is_lead_writer(), .true., parallel_write)) &
                         write(*,*) 'I/O '//trim(entry%name)//' WARNING: the existing output file will be overwritten'//'; ', entry%rec_count, ' records in the file;'
                         entry%rec_count=1
                         exit ! no appropriate rec_count detected
                     end if
                 end do
                 entry%rec_count=max(entry%rec_count, 1)
+                ! One line per output event, not one per writer. The guard above
+                ! used to be `mype == entry%root_rank`, so exactly one CPU reached
+                ! these prints; widening it to the writer set is right for the
+                ! netCDF calls in this block and wrong for the diagnostics.
+                ! Measured at 8192 ranks with 512 writers: 512 lines per stream per
+                ! output event, ~250k lines per model month through a single
+                ! srun -l stdout. On the gather path the single root still prints.
+                if (merge(out_is_lead_writer(), .true., parallel_write)) &
                 write(*,*) trim(entry%name)//': current mean I/O counter = ', entry%rec_count
             end if ! --> if(partit%mype == entry%root_rank) then
 #endif
@@ -3497,7 +3878,10 @@ subroutine do_output_callback(entry_index)
     ! synchronize after writes:
     ! To minimize data loss in case of abnormal termination, or To make data 
     ! available to other processes for reading immediately after it is written. 
-    if(entry%p_partit%mype == entry%root_rank) then
+    ! In the collective path root_rank is not necessarily a writer and holds no
+    ! valid ncid -- syncing there fails with "NetCDF: Not a valid ID". The sync
+    ! is itself collective, so every writer performs it.
+    if(merge(out_is_writer(), entry%p_partit%mype == entry%root_rank, parallel_write)) then
         !PS if (entry%p_partit%flag_debug)  print *, achar(27)//'[31m'//' -I/O-> call nf_sync'//achar(27)//'[0m', entry%p_partit%mype
 #if defined(__XIOS)
         ! When XIOS drives output no legacy netCDF file was opened; entry%ncid
@@ -3933,6 +4317,14 @@ subroutine def_stream_after_dimension_specific(entry, name, description, units, 
     ! on cray-mpich we only get level 'MPI_THREAD_MULTIPLE' if 'MPICH_MAX_THREAD_SAFETY=multiple' is set in the environment
     call MPI_Query_thread(provided_mpi_thread_support_level, err)
     if(provided_mpi_thread_support_level < MPI_THREAD_MULTIPLE) call entry%thread%disable_async()
+
+    ! The collective path must run on the main thread. write_mean issues an
+    ! MPI_Alltoallv and collective netCDF calls; from a worker thread those race
+    ! the main thread's own collectives and deadlock, and HDF5 here reports
+    ! Threadsafety: OFF. This is the output-side counterpart of the same rule in
+    ! io_fesom_file.F90 -- missing it left rank 0 blocked inside Alltoallv while
+    ! the other ranks ran on.
+    if(parallel_write) call entry%thread%disable_async()
     
     entry%mype_workaround = partit%mype ! make a copy of the mype variable as there is an error with the cray compiler or environment which voids the global mype for our threads
     entry%p_partit=>partit
