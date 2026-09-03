@@ -188,3 +188,26 @@ files named ``<var>.<runid>.<year>.nc``. In an XIOS run the CMOR fields go
 through XIOS like any other field, and ``ldiag_cmor`` can be forced from
 ``context_fesom.xml``.
 
+.. _sec_output_time_axis:
+
+Output time axis
+================
+
+Since FESOM 2.8 the time axis of mean output follows CF conventions for time
+averages. Each record is stamped at the midpoint of its averaging interval, and
+every file carries a ``time_bounds(time, axis_nbounds)`` variable holding the
+exact start and end of the interval that was actually accumulated. The bounds
+are honest for partial intervals: the first record after a cold start or a
+restart into the middle of an output interval covers only the simulated part.
+Mean variables carry ``cell_methods = "time: mean"``, and the ``time`` variable
+carries a ``calendar`` attribute.
+
+Appending to a file written by an older FESOM version keeps working: new
+records get the new midpoint stamps, but no bounds variable is added to the old
+file, and a warning is printed.
+
+When a period is re-run, for example after restarting from an earlier restart
+file, the existing record for that period is overwritten in place instead of a
+duplicate being appended. The matching is done on the time stamp, so it also
+works when the time step changed between the runs. XIOS output already behaves
+this way, so both output paths deliver the same time axis.
