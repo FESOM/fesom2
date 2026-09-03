@@ -8,9 +8,19 @@ This section describes how to build and configure FESOM2 with the Regulated Ecos
 General information
 ===================
 
-REcoM3 is a marine ecosystem and biogeochemistry model of intermediate complexity that simulates the coupled cycles of carbon, nitrogen, silicic acid, iron and oxygen. The ecosystem is described by phytoplankton functional types with variable stoichiometry (small phytoplankton and diatoms in the base configuration, optionally extended by coccolithophores and phaeocystis), by up to three zooplankton groups and up to two detritus classes with different sinking speeds, and by a full carbonate chemistry solved with the mocsy package, which also provides the air-sea fluxes of CO2 and oxygen. All biogeochemical quantities are ordinary FESOM2 tracers: they are advected and mixed by the standard tracer machinery and only their sources, sinks and sinking are computed by REcoM. Depending on the configuration this adds between 22 and 36 tracers to the simulation, which increases the cost of a run accordingly.
+REcoM3 is a marine ecosystem and biogeochemistry model of intermediate complexity that simulates the coupled cycles of carbon, nitrogen, silicic acid, iron and oxygen. The ecosystem is described by phytoplankton functional types with variable stoichiometry (small phytoplankton and diatoms in the base configuration, optionally extended by coccolithophores and phaeocystis), by up to three zooplankton groups and up to two detritus classes with different sinking speeds, and by a full carbonate chemistry solved with the mocsy package, which also provides the air-sea fluxes of CO2 and oxygen. All biogeochemical quantities are ordinary FESOM2 tracers: they are advected and mixed by the standard tracer machinery and only their sources, sinks and sinking are computed by REcoM. Depending on the configuration this adds between 22 and 36 tracers to the simulation, which increases the cost of a run accordingly. :numref:`recom_structure` shows how the compartments are connected.
 
-.. planned figure: schematic of the REcoM3 ecosystem structure, showing the phytoplankton functional types (small phytoplankton, diatoms, coccolithophores, phaeocystis), the zooplankton groups grazing on them, the detritus pools with their sinking fluxes to the benthos, and the connection of the dissolved pools to the carbonate system and air-sea CO2 exchange.
+.. _recom_structure:
+
+.. figure:: img/fig_recom.png
+
+   Structure of the REcoM3 ecosystem. Phytoplankton functional types take up
+   the dissolved inorganic pools and are grazed by one to three zooplankton
+   groups. Mortality, aggregation and egestion feed two detritus classes that
+   sink towards the benthos, while remineralisation and the degradation of
+   dissolved organic matter return the nutrients to the dissolved pools. The
+   carbonate chemistry links the dissolved inorganic carbon and alkalinity
+   pools to the air-sea exchange of CO2.
 
 The REcoM source code lives in ``src/recom`` as a git submodule that points to the separate `REcoM repository <https://github.com/RECOM-Regulated-Ecosystem-Model/REcoM>`_. It contains the biogeochemical source-minus-sink routines, the sinking scheme, the carbonate chemistry driver and the mocsy library itself.
 

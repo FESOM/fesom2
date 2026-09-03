@@ -61,12 +61,18 @@ interpolation between the two grids. Every IFS time step then makes one step
 call, which advances FESOM by the required number of ocean substeps through
 ``fesom_runloop``, surrounded by get and update calls that exchange surface
 fields with the atmosphere. At the end of the run a finalize call wraps
-``fesom_finalize`` and shuts the IO servers down.
+``fesom_finalize`` and shuts the IO servers down. :numref:`ifs_fesom_callseq`
+summarises the sequence.
 
-.. planned figure: call-sequence schematic showing the IFS driver on the left
-   and the FESOM library on the right, with arrows for the init phase (IO
-   server setup, fesom_init, coupling init), the repeated step phase (field
-   exchange around fesom_runloop) and finalize.
+.. _ifs_fesom_callseq:
+
+.. figure:: img/fig_ifs_fesom_callseq.png
+
+   Call sequence of an IFS-FESOM run. IFS owns the time loop and calls into the
+   FESOM library, which is linked into the same executable: once to initialize,
+   then on every atmospheric time step to pass the surface fluxes, to advance
+   the ocean by a number of substeps and to receive the sea surface state, and
+   once more to finalize. AWI-CM3 does not work this way, as described above.
 
 Output through MultIO
 =====================

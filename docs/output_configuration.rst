@@ -91,8 +91,18 @@ Section &io_parallel
 
 The files produced by both paths are identical in layout (netCDF-4 classic
 model), so post-processing does not need to know which path wrote them.
+:numref:`parallel_io` contrasts the two.
 
-.. planned figure: schematic of compute ranks feeding a writer subset via redistribution, writers holding contiguous blocks of one shared netCDF file.
+.. _parallel_io:
+
+.. figure:: img/fig_parallel_io.png
+
+   Serial and parallel output paths. With ``parallel_write=.false.`` every rank
+   sends its part of the field to one writer, which assembles the global field
+   in its own memory and writes the file alone. With ``parallel_write=.true.``
+   the field is redistributed to ``n_writers`` writer ranks, which then write
+   their own parts of the same file collectively, so no rank has to hold the
+   global field.
 
 .. _sec_xios_output:
 
