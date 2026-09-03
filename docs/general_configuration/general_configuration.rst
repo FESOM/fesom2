@@ -100,7 +100,78 @@ Section &icebergs
 - **turn_off_hf=.false.**, **turn_off_fw=.false.** disable latent heat or freshwater fluxes from icebergs when needed for debugging.
 - **lbalance_fw=.true.**, **cell_saturation=2** controls for preventing excessive freshwater injection into small grid cells.
 - **lmin_latent_hf=.true.**, **lverbose_icb=.false.** control numerical safety and verbosity of iceberg thermodynamics.
-- **ib_num=0**, **steps_per_ib_step=8** number of iceberg classes and sub-cycling of iceberg dynamics relative to the ocean step.
-- **ib_async_mode=0**, **thread_support_level_required=3** OpenMP-assisted asynchronous iceberg computation; the default keeps iceberg calculations synchronous.
+- **ib_num=1** number of icebergs read from the seeding files described in :ref:`the iceberg module section<chap_general_configuration_icebergs>`. The shipped configuration pairs ``ib_num=1`` with ``use_icebergs=.false.``, so the single entry stays inactive until the module is switched on.
+- **steps_per_ib_step=8** number of ocean time steps per iceberg time step; iceberg dynamics and thermodynamics are evaluated with the longer time step ``dt*steps_per_ib_step``.
+- **l_allowgrounding=2** grounding mode: ``0`` free drift (grounding ignored), ``1`` slow drift with reduced velocity, ``2`` stationary (see :ref:`the iceberg module section<chap_general_configuration_icebergs>`).
+- **l_cap_ibhf_n=.false.** cap the iceberg heat flux applied to interior ocean cells at a safe temperature floor per cell and time step.
+- **use_icb_iron=.false.**, **icb_iron_const=50.0e-6**, **l_icb_iron_file=.false.** passive iron tracer carried by icebergs: melting releases iron in proportion to the meltwater flux, using either the constant concentration (mol per cubic metre) or per-iceberg values from ``icb_iron.dat``. The resulting flux field is diagnostic and does not feed back on the ocean.
+- **ib_async_mode=0**, **thread_support_level_required=3** OpenMP-assisted asynchronous iceberg computation: ``0`` keeps iceberg calculations synchronous (reference results), ``1`` overlaps them with the ocean and sea-ice computation, ``2`` keeps the OpenMP code active but serialized for testing. The thread support level requests ``MPI_THREAD_SERIALIZED`` (``2``) or ``MPI_THREAD_MULTIPLE`` (``3``) from the MPI library.
 
 
+.. _chap_general_configuration_icebergs:
+
+The iceberg module
+==================
+
+With ``use_icebergs=.true.`` FESOM carries a set of Lagrangian icebergs that
+drift over the mesh and melt, returning freshwater and latent heat to the
+ocean. The icebergs are point objects with a prescribed length, width and
+height. They do not occupy grid cells and do not block the flow, so the
+module is a source of meltwater and heat rather than a geometric obstacle.
+
+Each iceberg is advanced with its own momentum balance. The forces are the
+drag exerted by the ocean, the atmosphere and the sea ice, the force of
+waves radiating against the iceberg side, the Coriolis force and the sea
+surface slope. The Coriolis term and the water drag are treated
+semi-implicitly, which keeps the trajectories stable at the long iceberg
+time step. Melting is split into basal melt, computed with the same
+three-equation formulation used for ice-shelf cavities, lateral melt driven
+by buoyant convection, and wave erosion at the waterline. The melt fluxes
+enter the ocean as a freshwater flux and a latent heat flux, both of which
+can be switched off individually with ``turn_off_fw`` and ``turn_off_hf``
+when isolating one effect.
+
+Icebergs are advanced only every ``steps_per_ib_step`` ocean time steps.
+The default of 8 keeps the cost negligible against the ocean and sea ice.
+
+Seeding files
+"""""""""""""
+
+The initial iceberg population is read from plain text files in the run
+directory, one line per iceberg, all of them with ``ib_num`` entries:
+
+- ``icb_longitude.dat`` and ``icb_latitude.dat``, the release position in degrees.
+- ``icb_length.dat`` and ``icb_height.dat``, the iceberg dimensions in metres. The width defaults to the length file, so square icebergs are obtained by supplying only these two files.
+- ``icb_scaling.dat``, a scaling factor that lets one model iceberg represent many real ones.
+- ``icb_calving_day.dat``, the day of the year on which each iceberg enters the simulation, counted in days since the start of the run. A value of 2.5 releases the iceberg at noon on the third day. On restart the calving day is reduced by the number of days already simulated, so an unmodified file continues to work.
+- ``icb_iron.dat``, only read when ``l_icb_iron_file=.true.``, giving the iron concentration carried by each iceberg.
+
+``ib_num`` must match the number of lines in these files. The shipped
+``namelist.config`` pairs ``ib_num=1`` with ``use_icebergs=.false.``, so the
+single placeholder entry stays inactive until the module is switched on.
+Running with an empty iceberg population is supported and simply produces no
+iceberg fluxes. A realistic circum-Antarctic distribution derived from
+synthetic aperture radar imagery, as described by Wesche and Dierking (2014),
+is the dataset the module was developed against.
+
+Grounding
+"""""""""
+
+An iceberg whose scaled draft exceeds the local water depth is flagged as
+grounded. What happens then is controlled by ``l_allowgrounding``. With
+``0`` grounding is ignored and icebergs drift freely over shallow
+topography. With ``1`` a grounded iceberg keeps drifting at a reduced
+velocity, and with ``2``, the default, it is held stationary until it has
+melted enough to float again.
+
+Restarts and coupled runs
+"""""""""""""""""""""""""
+
+Iceberg positions and dimensions are written to and read from their own
+restart files, separate from the ocean restart. When
+``use_icesheet_coupling=.true.`` the restart also carries the state needed to
+exchange calving with an ice-sheet model. In coupled atmosphere-ocean runs
+the iceberg fluxes are added to the surface fields before they are passed on,
+so no extra configuration is needed on the coupler side. Setting
+``lverbose_icb=.true.`` prints per-iceberg diagnostics, which is the first
+thing to enable when trajectories look wrong.

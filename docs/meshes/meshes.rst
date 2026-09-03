@@ -119,3 +119,28 @@ Modularity
 ==========
 
 All arrays related to mesh are packed in a structure of derived type ``mesh``, which is passed as an argument to routines using mesh arrays (nearly all routines). In order to keep the array names in subroutines compatible with the old FESOM names (the names listed above), there are pointer associations between the fields of the structure and the names used above. Coding can rely on old names. The same logics is pursued with all other derived data types. This also reflects history of code development. The code was initially using global arrays, which prevented modularity.
+
+
+Standalone mesh tools
+=====================
+
+Two utilities can be built alongside the model to work on a mesh without
+running it. Both are off by default and are requested at configure time:
+
+::
+
+    cmake -DBUILD_MESHPARTITIONER=ON -DBUILD_MESHDIAG=ON ..
+
+- **BUILD_MESHPARTITIONER=OFF** builds ``fesom_meshpart``, the partitioner that reads ``nod2d.out``, ``elem2d.out`` and ``aux3d.out`` and writes the ``dist_XXXX`` directories a run needs. Building it separately is useful when preparing meshes on a machine where the full model is not needed, and when a mesh has to be repartitioned for a different number of MPI tasks.
+- **BUILD_MESHDIAG=OFF** builds ``fesom_meshdiag``, which performs the minimal initialization required to construct the mesh arrays, writes the diagnostics file and exits without running the model.
+
+``fesom_meshdiag`` is started like the model itself, from a run directory
+with a valid ``namelist.config``, and it uses the same ``MeshPath`` and
+``ResultPath``. It writes ``<runid>.mesh.diag.nc`` into ``ResultPath``,
+containing the geometric quantities of the discretization such as the
+control-volume areas, element areas and the vertical grid. The same file is
+produced by a normal model run, so the utility is a way to obtain it in
+seconds when only the mesh geometry is of interest, for instance when
+computing weights for post-processing or when checking a newly generated
+mesh. The routines that write it are documented in
+:doc:`/code_documentation/io_mesh_info`.

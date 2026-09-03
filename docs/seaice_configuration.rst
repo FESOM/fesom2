@@ -21,7 +21,7 @@ Section &ice_dyn
 - **alpha_evp=250**, **beta_evp=250**, **c_aevp=0.15** stability/tuning constants for mEVP/aEVP; use higher values on fine meshes to improve convergence.
 
 Section &ice_therm
-"""""""""""""""""
+""""""""""""""""""
 
 - **Sice=4.0** bulk ice salinity (ppt) used in freezing-point and enthalpy calculations.
 - **iclasses=7**, **new_iclasses=.false.**, **h_cutoff=3.0** number of ice thickness categories. When ``new_iclasses`` is true, an observationally derived distribution (Castro-Morales et al., 2013) with ``iclasses=15`` and cutoff ``h_cutoff`` is used instead of the default even spacing.
@@ -31,6 +31,6 @@ Section &ice_therm
 - **albsn=0.81**, **albsnm=0.77**, **albi=0.7**, **albim=0.68**, **albw=0.1**, **open_water_albedo=0** shortwave albedo parameters. ``open_water_albedo`` chooses the scheme: ``0`` fixed ``albw``, ``1`` Taylor et al., ``2`` Briegleb et al.
 - **con=2.1656**, **consn=0.31** thermal conductivities of ice and snow (W/m/K).
 - **snowdist=.true.** distribute snowfall across thickness categories instead of a single class.
-- **use_meltponds=.false.** enable the built-in melt-pond parameterization; when active, melt-pond diagnostics can be written from ``namelist.io``.
+- **use_meltponds=.false.** enable the built-in melt-pond parameterization; when active, melt-pond diagnostics can be written from ``namelist.io``. The pond physics is tuned in the separate ``&meltpond`` group of ``namelist.ice``, whose defaults reproduce the Icepack/CESM ``meltpond_lvl`` behaviour; see the commented group in ``config/namelist.ice`` for the individual parameters.
 - **c_melt=0.5** concentration decay rate during melting in the standard FESOM ice thermodynamics.
 - **h_ml=0.0** optional mixed-layer depth used in some simplified melt formulations (kept at 0 unless explicitly needed).
