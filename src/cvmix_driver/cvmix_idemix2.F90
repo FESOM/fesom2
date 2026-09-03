@@ -344,7 +344,12 @@ subroutine compute_param(             &
     real(cvmix_r8)    , intent(in)                    :: coriolis       , &
                                                          cn             
                                                          
-    real(cvmix_r8)    , intent(in) , dimension(nlev+1):: Nsqr 
+    ! matches alpha_c/c0/v0 below: caller passes bvfreq(uln:nln,node), i.e. exactly
+    ! nlev elements -- NOT nlev+1 (that was IDEMIX1's interface-centered convention;
+    ! IDEMIX2's per-node fields are all nlev-sized, so this must be too, or a
+    ! future edit that touches Nsqr(nlev+1) reads one element past bvfreq's
+    ! allocated (nl, node_size) for the deepest water column)
+    real(cvmix_r8)    , intent(in) , dimension(nlev)  :: Nsqr
     
     !___Output__________________________________________________________________
     real(cvmix_r8)    , intent(out), dimension(nlev)  :: alpha_c        , &
@@ -1163,7 +1168,7 @@ subroutine compute_Eiw_waveinteract(    &
     
     !___Local___________________________________________________________________
     integer                                             :: nz, fbini 
-    real(cvmix_r8)                                      :: vint, sint, aM2c, fmin, small=1.0e-12_cvmix_r8
+    real(cvmix_r8)                                      :: vint, sint, sint_new, aM2c, M2_diss_int, small=1.0e-12_cvmix_r8
     real(cvmix_r8), dimension(:)                        :: M2_diss(nfbin),  IW_diss(nlev)
     type(idemix2_type), pointer                         :: idemix2_const_in     
     
@@ -1185,13 +1190,30 @@ subroutine compute_Eiw_waveinteract(    &
     vint = vint + E_iw_old(nz)*dzw(nz-1)*0.5_cvmix_r8
     
     !___________________________________________________________________________
-    if (present(E_M2_old)) then 
-        ! spectrally integrate E_M2
-        sint = 0.0_cvmix_r8
+    if (present(E_M2_old)) then
+        ! spectrally integrate E_M2 at both time levels, they pair with different
+        ! loss channels of the M2 compartment:
+        !
+        !  sint     --> E_M2^(n)  : pairs with the alpha_M2_c continuum interaction,
+        !               which is removed from E_M2 explicitly further below using
+        !               E_M2_old  -->  removed = dt*aM2c*vint*E_M2^(n)
+        !
+        !  sint_new --> E_M2^(n+1): pairs with the tau_M2 dissipation, which has
+        !               ALREADY been removed IMPLICITLY in hsintegrate_Ecompart via
+        !               E^(n+1) = (E^n + dt*S)/(1+dt*tau_M2)
+        !               -->  removed = dt*tau_M2*E_M2^(n+1)
+        !               Using E_M2_old for this term (as pyOM2 does, where the
+        !               dissipation is EXPLICIT and E^n is the correct partner)
+        !               would inject a factor (1+dt*tau_M2) more energy into E_iw
+        !               than actually left the M2 compartment -- up to 1.5x where
+        !               topographic scattering hits the min(0.5/dt,..) cap.
+        sint     = 0.0_cvmix_r8
+        sint_new = 0.0_cvmix_r8
         do fbini = 2, nfbin-1
-            sint = sint + E_M2_old(fbini)*dphi(fbini)
+            sint     = sint     + E_M2_old(fbini)*dphi(fbini)
+            sint_new = sint_new + E_M2_new(fbini)*dphi(fbini)
         end do
-        
+
         ! initialise M2 WWI dissipation
         M2_diss = 0.0_cvmix_r8
         
@@ -1200,12 +1222,17 @@ subroutine compute_Eiw_waveinteract(    &
         aM2c = max(0.0_cvmix_r8,min(aM2c,1./max(small,dt*vint))) ! FP 2020
         aM2c = max(0.0_cvmix_r8,min(aM2c,1./max(small,dt*sint)))
         
+        ! M2_diss_int = spectral integral of the M2 energy ACTUALLY removed here,
+        ! accumulated AFTER the per-bin clip, so whatever the limiter does to the
+        ! removal is mirrored one-for-one in the E_iw injection further below.
+        M2_diss_int = 0.0_cvmix_r8
         do fbini = 2, nfbin-1
             M2_diss(fbini)  = aM2c*vint*E_M2_old(fbini)
             M2_diss(fbini)  = min(M2_diss(fbini), E_M2_new(fbini)/max(small,dt))
             E_M2_new(fbini) = E_M2_new(fbini)-dt*M2_diss(fbini)
             E_M2_new(fbini) = merge(max(0.0_cvmix_r8, E_M2_new(fbini)), E_M2_new(fbini), flag_posdef)
-        end do    
+            M2_diss_int     = M2_diss_int + M2_diss(fbini)*dphi(fbini)
+        end do
         
         ! optional M2 WWI diagnostic
         if (present(E_M2_dt))       E_M2_dt(:) = E_M2_dt(:) - M2_diss(:)
@@ -1214,9 +1241,12 @@ subroutine compute_Eiw_waveinteract(    &
         ! update E_iw from E_M2 through wave-wave-interaction
         IW_diss(:) = 0.0_cvmix_r8
         do nz = 1, nlev
-            fmin = min( 0.5_cvmix_r8/dt,aM2c*vint ) ! flux limiter
-            IW_diss(nz)  =   dt * tau_M2* sint * E_M2_struct(nz) &
-                           + dt * fmin  * sint * E_M2_struct(nz)
+            IW_diss(nz)  =   dt * tau_M2     * sint_new * E_M2_struct(nz) &
+                           + dt * M2_diss_int            * E_M2_struct(nz)
+            !                     |            |
+            !                     |            +-> E_M2^(n+1): tau_M2 removed implicitly upstream
+            !                     +-> exactly what the aM2c loop above took out of E_M2
+            !                         (replaces fmin*sint, which ignored the per-bin clip)
             E_iw_new(nz) =   E_iw_new(nz) + IW_diss(nz)
             E_iw_new(nz) = merge(max(0.0_cvmix_r8, E_iw_new(nz)), E_iw_new(nz), flag_posdef)
         end do
@@ -1228,17 +1258,22 @@ subroutine compute_Eiw_waveinteract(    &
     end if
     
     !___________________________________________________________________________
-    if (present(E_niw_old)) then 
-        ! spectrally integrate E_niw
-        sint = 0.0_cvmix_r8
+    if (present(E_niw_old)) then
+        ! spectrally integrate E_niw at time level (n+1). The NIW compartment has
+        ! no continuum (alpha) channel -- its only loss is tau_niw, and that was
+        ! already removed IMPLICITLY in hsintegrate_Ecompart via
+        ! E^(n+1) = (E^n + dt*S)/(1+dt*tau_niw)  -->  removed = dt*tau_niw*E^(n+1).
+        ! So E_niw^(n+1) is the correct partner here; using E_niw_old would inject
+        ! a factor (1+dt*tau_niw) too much energy into E_iw.
+        sint_new = 0.0_cvmix_r8
         do fbini = 2, nfbin-1
-            sint = sint + E_niw_old(fbini)*dphi(fbini)
+            sint_new = sint_new + E_niw_new(fbini)*dphi(fbini)
         end do
-        
+
         ! update E_iw from E_niw through wave-wave-interaction
         IW_diss(:) = 0.0_cvmix_r8
         do nz = 1, nlev
-            IW_diss(nz)  =   dt * tau_niw * sint * E_niw_struct(nz)
+            IW_diss(nz)  =   dt * tau_niw * sint_new * E_niw_struct(nz)
             E_iw_new(nz) =   E_iw_new(nz) + IW_diss(nz)
             E_iw_new(nz) = merge(max(0.0_cvmix_r8, E_iw_new(nz)), E_iw_new(nz), flag_posdef)
         end do
