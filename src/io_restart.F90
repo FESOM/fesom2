@@ -1,6 +1,6 @@
 MODULE io_RESTART
   use restart_file_group_module
-  use io_fesom_file_module, only: parallel_write_enabled, set_parallel_write
+  use io_fesom_file_module, only: parallel_write_enabled, set_parallel_write, fesom_file_type
   use restart_derivedtype_module
   use g_clock
   use g_config
@@ -20,6 +20,7 @@ MODULE io_RESTART
 #if defined (__cvmix)
   use g_cvmix_tke
   use g_cvmix_idemix
+  use g_cvmix_idemix2
 #endif  
 #if defined(__recom)
   use recom_glovar
@@ -55,17 +56,36 @@ MODULE io_RESTART
 ! Helper functions for constructing restart file paths
 !--------------------------------------------------------------------------------------------
 
-! Build NetCDF restart file path
-pure function nc_restart_path(component, year, root_path) result(path)
+! Build NetCDF restart file path: one restart instant per file, stamped with the
+! date of that instant (see calendar_stamp in fortran_utils for how the clock
+! state is turned into that stamp, and why the writer and a later reader agree
+! on it). The ".nc" suffix is chopped off again by the read and write routines to
+! get the directory that holds the per-variable files; it is kept here because
+! that is the name the rest of the code and the user see.
+function nc_restart_path(component, root_path) result(path)
+  use fortran_utils, only: calendar_stamp
+  implicit none
+  character(len=*), intent(in) :: component, root_path
+  character(:), allocatable :: path
+
+  path = trim(root_path) // trim(runid) // '.' // &
+         calendar_stamp(yearnew, daynew, nint(timenew), 365+fleapyear) // &
+         '.' // trim(component) // '.restart.nc'
+end function nc_restart_path
+
+! Pre-2.8 name of a restart file: one file per year, holding every restart
+! record written during that year. Only used to keep reading restarts written by
+! an older FESOM; nothing writes this layout any more.
+pure function nc_restart_path_legacy(component, year, root_path) result(path)
   implicit none
   character(len=*), intent(in) :: component, root_path
   integer, intent(in) :: year
   character(:), allocatable :: path
   character(4) :: cyear
-  
+
   write(cyear, '(i4)') year
   path = trim(root_path) // trim(runid) // '.' // cyear // '.' // trim(component) // '.restart.nc'
-end function nc_restart_path
+end function nc_restart_path_legacy
 
 ! Build raw restart directory path
 pure function build_raw_restart_dirpath(root_path) result(path)
@@ -170,7 +190,20 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
   endif
   if (mix_scheme_nmb==6 .or. mix_scheme_nmb==56) then
         call oce_files%def_elem_var_optional('iwe', 'Internal Wave Energy'    , 'm2/s2', iwe(:,:), mesh, partit)
-  endif 
+  endif
+  if (mod(mix_scheme_nmb,10)==7) then
+        call oce_files%def_node_var_optional('iwe2_Eiw'     , 'IDEMIX2 low-mode IW energy'     , 'm2/s2', iwe2_E_iw(:,:,1),       mesh, partit)
+        if (idemix2_enable_M2) then
+            call oce_files%def_node_var_optional('iwe2_EM2'     , 'IDEMIX2 M2 spectral energy'      , 'm2/s2', iwe2_E_M2(:,:,1),      mesh, partit, nfbin=idemix2_nfbin)
+            call oce_files%def_node_var_optional('iwe2_EM2divh' , 'IDEMIX2 M2 horiz div (AB2 prev)' , 'm2/s3', iwe2_E_M2_divh(:,:,1), mesh, partit, nfbin=idemix2_nfbin)
+            call oce_files%def_node_var_optional('iwe2_EM2divs' , 'IDEMIX2 M2 spec  div (AB2 prev)' , 'm2/s3', iwe2_E_M2_divs(:,:,1), mesh, partit, nfbin=idemix2_nfbin)
+        end if
+        if (idemix2_enable_niw) then
+            call oce_files%def_node_var_optional('iwe2_Eniw'    , 'IDEMIX2 NIW spectral energy'     , 'm2/s2', iwe2_E_niw(:,:,1),      mesh, partit, nfbin=idemix2_nfbin)
+            call oce_files%def_node_var_optional('iwe2_Eniwdivh', 'IDEMIX2 NIW horiz div (AB2 prev)', 'm2/s3', iwe2_E_niw_divh(:,:,1), mesh, partit, nfbin=idemix2_nfbin)
+            call oce_files%def_node_var_optional('iwe2_Eniwdivs', 'IDEMIX2 NIW spec  div (AB2 prev)', 'm2/s3', iwe2_E_niw_divs(:,:,1), mesh, partit, nfbin=idemix2_nfbin)
+        end if
+  endif
 #endif  
   if (dynamics%opt_visc==8) then
         call oce_files%def_elem_var_optional('uke', 'unresolved kinetic energy', 'm2/s2', uke(:,:), mesh, partit)
@@ -362,15 +395,23 @@ subroutine read_initial_conditions(which_readr, ice, dynamics, tracers, partit, 
   character(:), allocatable :: read_raw_dirpath, read_raw_infopath
   character(:), allocatable :: read_bin_dirpath, read_bin_infopath
   character(:), allocatable :: read_oce_path, read_ice_path, read_bio_path
+  character(:), allocatable :: legacy_oce_path, legacy_ice_path, legacy_bio_path
   
   ! Build paths for reading using RestartInPath
   read_raw_dirpath = build_raw_restart_dirpath(RestartInPath)//"/np"//int_to_txt(partit%npes)
   read_raw_infopath = build_raw_restart_infopath(RestartInPath)//"/np"//int_to_txt(partit%npes)//".info"
   read_bin_dirpath = build_bin_restart_dirpath(RestartInPath)//"/np"//int_to_txt(partit%npes)
   read_bin_infopath = build_bin_restart_infopath(RestartInPath)//"/np"//int_to_txt(partit%npes)//".info"
-  read_oce_path = nc_restart_path('oce', yearold, RestartInPath)
-  read_ice_path = nc_restart_path('ice', yearold, RestartInPath)
-  read_bio_path = nc_restart_path('bio', yearold, RestartInPath)
+  ! Restart to read: the file stamped with the instant the clock file points at.
+  ! yearold, not yearnew, addresses the legacy fallback, because a pre-2.8 restart
+  ! file is named after the year the record was written in, which for a restart at
+  ! a year boundary is the year that just ended.
+  read_oce_path = nc_restart_path('oce', RestartInPath)
+  read_ice_path = nc_restart_path('ice', RestartInPath)
+  read_bio_path = nc_restart_path('bio', RestartInPath)
+  legacy_oce_path = nc_restart_path_legacy('oce', yearold, RestartInPath)
+  legacy_ice_path = nc_restart_path_legacy('ice', yearold, RestartInPath)
+  legacy_bio_path = nc_restart_path_legacy('bio', yearold, RestartInPath)
 
   ! Initialize file groups for reading
   call ini_ocean_io(dynamics, tracers, partit, mesh)
@@ -428,16 +469,18 @@ subroutine read_initial_conditions(which_readr, ice, dynamics, tracers, partit, 
     
     ! Read OCEAN restart
     if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: ocean'//achar(27)//'[0m'
-    call read_netcdf_restarts(read_oce_path, oce_files, partit%MPI_COMM_FESOM, partit%mype)
+    call read_netcdf_restarts(read_oce_path, legacy_oce_path, oce_files, partit%MPI_COMM_FESOM, partit%mype)
     
     ! Read ICE/ICEPACK restart
     if (use_ice) then
 #if defined(__icepack)   
         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: icepack'//achar(27)//'[0m'
-        call read_netcdf_restarts(nc_restart_path('icepack', yearold, RestartInPath), icepack_files, partit%MPI_COMM_FESOM, partit%mype)
+        call read_netcdf_restarts(nc_restart_path('icepack', RestartInPath), &
+                                  nc_restart_path_legacy('icepack', yearold, RestartInPath), &
+                                  icepack_files, partit%MPI_COMM_FESOM, partit%mype)
 #else            
         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: ice'//achar(27)//'[0m'
-        call read_netcdf_restarts(read_ice_path, ice_files, partit%MPI_COMM_FESOM, partit%mype)            
+        call read_netcdf_restarts(read_ice_path, legacy_ice_path, ice_files, partit%MPI_COMM_FESOM, partit%mype)
 #endif
     end if 
 
@@ -445,12 +488,16 @@ subroutine read_initial_conditions(which_readr, ice, dynamics, tracers, partit, 
     ! Read RECOM restarts
     if (REcoM_restart) then
         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> read restarts from netcdf file: bio'//achar(27)//'[0m'
-        call read_netcdf_restarts(read_bio_path, bio_files, partit%MPI_COMM_FESOM, partit%mype)
+        call read_netcdf_restarts(read_bio_path, legacy_bio_path, bio_files, partit%MPI_COMM_FESOM, partit%mype)
     end if
 #endif
 
+#if defined (__cvmix)
+    if (mod(mix_scheme_nmb,10)==7) call apply_idemix2_restart()
+#endif
+
   end if
-  
+
 end subroutine read_initial_conditions
 
 !--------------------------------------------------------------------------------------------
@@ -505,10 +552,6 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
   write_raw_infopath = build_raw_restart_infopath(RestartOutPath)//"/np"//int_to_txt(partit%npes)//".info"
   write_bin_dirpath = build_bin_restart_dirpath(RestartOutPath)//"/np"//int_to_txt(partit%npes)
   write_bin_infopath = build_bin_restart_infopath(RestartOutPath)//"/np"//int_to_txt(partit%npes)//".info"
-  write_oce_path = nc_restart_path('oce', yearnew, RestartOutPath)
-  write_ice_path = nc_restart_path('ice', yearnew, RestartOutPath)
-  write_icepack_path = nc_restart_path('icepack', yearnew, RestartOutPath)
-  write_bio_path = nc_restart_path('bio', yearnew, RestartOutPath)
   
   !_____________________________________________________________________________
   ! Initialize output directories on first call
@@ -601,6 +644,14 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
   ! Write restart files
   if(is_portable_restart_write) then
 
+    ! Built here rather than once at the top of the routine: the stamp moves with
+    ! the clock, so every restart event in a run gets its own set of files, and
+    ! this is the only branch that needs them.
+    write_oce_path     = nc_restart_path('oce',     RestartOutPath)
+    write_ice_path     = nc_restart_path('ice',     RestartOutPath)
+    write_icepack_path = nc_restart_path('icepack', RestartOutPath)
+    write_bio_path     = nc_restart_path('bio',     RestartOutPath)
+
   ! --> synchronizes tracer data within fesom groups
 
 ! kh 09.01.26 merging of valuesold between all fesom groups is only necessary here, immediately before writing the corresponding restart files
@@ -626,6 +677,9 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
     ! write OCEAN restart
 #if defined(__recom) && defined(__usetp)
     if(partit%my_fesom_group == 0) then
+#endif
+#if defined (__cvmix)
+        if (mod(mix_scheme_nmb,10)==7) call prepare_idemix2_restart()
 #endif
         if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: ocean'//achar(27)//'[0m'
         call write_netcdf_restarts(write_oce_path, oce_files, istep)
@@ -714,6 +768,12 @@ end subroutine write_initial_conditions
 !
 !
 !_______________________________________________________________________________
+! One restart instant per file: `path` is stamped with the date of the instant
+! being written, so a set of files is created fresh on every restart event and
+! holds exactly one record. There is no create-versus-append decision left --
+! the only way to arrive at a file that already exists is to rerun the same
+! instant, which must overwrite. That is also why open_write_create clobbers:
+! a run resubmitted over the wreckage of a crashed one has to be able to write.
 subroutine write_netcdf_restarts(path, filegroup, istep)
   use fortran_utils
   character(len=*), intent(in) :: path
@@ -724,7 +784,6 @@ subroutine write_netcdf_restarts(path, filegroup, istep)
   integer i
   character(:), allocatable :: dirpath
   character(:), allocatable :: filepath
-  logical file_exists
   integer mpierr_par
 
   cstep = globalstep+istep
@@ -741,40 +800,24 @@ subroutine write_netcdf_restarts(path, filegroup, istep)
       ! take part in the create and in every put_var. Non-writers skip it and
       ! only join the redistribution inside the write call.
       !
-      ! The path/create-vs-append decision is taken identically on every writer:
-      ! they inspect the same filesystem and hold the same `path` state, so no
-      ! broadcast is needed. mkdir is idempotent and only rank 0 calls it, with
-      ! a barrier afterwards so no writer races ahead to create inside a
-      ! directory that does not exist yet.
+      ! mkdir is idempotent and only rank 0 calls it, with a barrier afterwards
+      ! so no writer races ahead to create inside a directory that does not
+      ! exist yet.
       if(filegroup%files(i)%is_writer()) then
         if(filegroup%files(i)%is_attached()) call filegroup%files(i)%close_file()
-
-        dirpath = path(1:len(path)-3)
-        filepath = dirpath//"/"//filegroup%files(i)%varname//".nc"
-
-        if(filegroup%files(i)%path == "" .or. (.not. filegroup%files(i)%must_exist_on_read)) then
-          inquire(file=filepath, exist=file_exists)
-          if(file_exists) then
-            filegroup%files(i)%path = filepath
-          else if(.not. filegroup%files(i)%must_exist_on_read) then
-            filegroup%files(i)%path = ""
-          end if
-        end if
       end if
 
-      if(filegroup%files(i)%is_lead_writer()) call mkdir(path(1:len(path)-3))
+      dirpath = path(1:len(path)-3)
+      filepath = dirpath//"/"//filegroup%files(i)%varname//".nc"
+
+      if(filegroup%files(i)%is_lead_writer()) call mkdir(dirpath)
       if(filegroup%files(i)%is_writer()) &
          call MPI_Barrier(filegroup%files(i)%writer_comm(), mpierr_par)
 
       if(filegroup%files(i)%is_writer()) then
-        if(filegroup%files(i)%path .ne. filepath) then
-          filegroup%files(i)%path = filepath
-          call filegroup%files(i)%open_write_create_par(filegroup%files(i)%path, &
-                                                        filegroup%files(i)%writer_comm())
-        else
-          call filegroup%files(i)%open_write_append_par(filegroup%files(i)%path, &
-                                                        filegroup%files(i)%writer_comm())
-        end if
+        filegroup%files(i)%path = filepath
+        call filegroup%files(i)%open_write_create_par(filegroup%files(i)%path, &
+                                                      filegroup%files(i)%writer_comm())
 
         ! iter and time are per-record scalars, but they are in COLLECTIVE access
         ! mode like every other variable, and writing them extends the unlimited
@@ -799,26 +842,12 @@ subroutine write_netcdf_restarts(path, filegroup, istep)
       dirpath = path(1:len(path)-3) ! chop of the ".nc" suffix
       filepath = dirpath//"/"//filegroup%files(i)%varname//".nc"
 
-      if(filegroup%files(i)%path == "" .or. (.not. filegroup%files(i)%must_exist_on_read)) then
-        ! the path to an existing restart file is not set in read_netcdf_restarts if we had a restart from a raw restart
-        ! OR we might have skipped the file when reading restarts and it does not exist at all
-        inquire(file=filepath, exist=file_exists)
-        if(file_exists) then
-          filegroup%files(i)%path = filepath
-        else if(.not. filegroup%files(i)%must_exist_on_read) then
-          filegroup%files(i)%path = ""
-        end if
-      end if
-      if(filegroup%files(i)%path .ne. filepath) then
-        ! execute_command_line with mkdir sometimes fails, use a custom implementation around mkdir from C instead
-        call mkdir(dirpath)
-        filegroup%files(i)%path = filepath
-        call filegroup%files(i)%open_write_create(filegroup%files(i)%path)
-      else
-        call filegroup%files(i)%open_write_append(filegroup%files(i)%path) ! todo: keep the file open between writes
-      end if
+      ! execute_command_line with mkdir sometimes fails, use a custom implementation around mkdir from C instead
+      call mkdir(dirpath)
+      filegroup%files(i)%path = filepath
+      call filegroup%files(i)%open_write_create(filegroup%files(i)%path)
 
-      write(*,*) 'writing restart record ', filegroup%files(i)%rec_count()+1, ' to ', filegroup%files(i)%path
+      write(*,*) 'writing restart to ', filegroup%files(i)%path
       call filegroup%files(i)%write_var(filegroup%files(i)%iter_varindex, [filegroup%files(i)%rec_count()+1], [1], [cstep])
       ! todo: write time via the fesom_file_type
       call filegroup%files(i)%write_var(filegroup%files(i)%time_varindex(), [filegroup%files(i)%rec_count()+1], [1], [ctime])
@@ -993,8 +1022,113 @@ end subroutine finalize_restart
 !
 !
 !_______________________________________________________________________________
-subroutine read_netcdf_restarts(path, filegroup, mpicomm, mype)
+! Which of the two restart layouts is actually on disk.
+!
+! Preferred is the date-stamped one this version writes. A restart directory
+! left behind by an older FESOM is named after the year instead and holds every
+! restart record of that year in one file per variable; those are still read, so
+! a chain of runs does not have to be broken to upgrade. Nothing writes that
+! layout any more.
+!
+! One rank inspects the filesystem and tells the others, rather than every rank
+! inquiring: the answer selects a collective open further down, so all ranks
+! have to agree on it even if the filesystem hands out different answers to
+! different clients while a directory is being created.
+function resolve_read_path(path, legacy_path, filegroup, mpicomm, mype) result(read_path)
+  character(len=*), intent(in) :: path, legacy_path
+  type(restart_file_group), intent(in) :: filegroup
+  integer, intent(in) :: mpicomm, mype
+  character(:), allocatable :: read_path
+  ! EO parameters
+
+  if(restart_group_exists(path, filegroup, mpicomm, mype)) then
+    read_path = path
+  else if(restart_group_exists(legacy_path, filegroup, mpicomm, mype)) then
+    read_path = legacy_path
+    if(mype == RAW_RESTART_METADATA_RANK) then
+      ! Report the directories, not the internal ".nc"-suffixed handles: what is
+      ! on disk, and what the user would look for, is the directory.
+      write(*,*) 'restart: no ', path(1:len(path)-3)
+      write(*,*) 'restart: falling back to the pre-2.8 yearly restart ', legacy_path(1:len(legacy_path)-3)
+    end if
+  else
+    ! Neither is there. Hand back the preferred name so the per-file handling
+    ! below reports the miss against the name the run actually asked for.
+    read_path = path
+  end if
+end function resolve_read_path
+!
+!_______________________________________________________________________________
+! Is a restart for this file group sitting at `path`?
+!
+! Probed with a file that has to be there if the restart is there at all: an
+! optional variable may legitimately be missing, and treating that as a missing
+! restart would send the run off to the wrong source. One rank inspects and
+! tells the others, for the reason given on resolve_read_path.
+function restart_group_exists(path, filegroup, mpicomm, mype) result(exists)
   character(len=*), intent(in) :: path
+  type(restart_file_group), intent(in) :: filegroup
+  integer, intent(in) :: mpicomm, mype
+  logical :: exists
+  ! EO parameters
+  integer :: probe, i, mpierr, found
+  logical :: file_exists
+
+  probe = 0
+  do i=1, filegroup%nfiles
+    if(filegroup%files(i)%must_exist_on_read) then
+      probe = i
+      exit
+    end if
+  end do
+
+  found = 0
+  if(probe > 0 .and. mype == RAW_RESTART_METADATA_RANK) then
+    inquire(file=path(1:len(path)-3)//"/"//filegroup%files(probe)%varname//".nc", exist=file_exists)
+    if(file_exists) found = 1
+  end if
+  call MPI_Bcast(found, 1, MPI_INTEGER, RAW_RESTART_METADATA_RANK, mpicomm, mpierr)
+  exists = (found == 1)
+end function restart_group_exists
+!
+!_______________________________________________________________________________
+! Pin the record this file is read from: the one whose time stamp matches the
+! clock, searched from the back.
+!
+! A restart file written by this version holds a single record and the search
+! ends immediately. A pre-2.8 file holds every restart of its year, and the read
+! used to take the last record unconditionally -- so setting the clock back to
+! an earlier restart point silently loaded the state of the latest one instead.
+! Falling back to the last record when nothing matches keeps that old behaviour
+! for the case it was tolerable in, restarting with a changed time step, but
+! says so.
+subroutine pin_restart_record(f, varname, report)
+  class(fesom_file_type), intent(inout) :: f
+  character(len=*), intent(in) :: varname
+  logical, intent(in) :: report
+  ! EO parameters
+  integer :: k
+  real(kind=WP) :: rtime
+
+  do k=f%rec_count(), 1, -1
+    call f%read_var1(f%time_varindex(), [k], rtime)
+    if(int(rtime) == int(ctime)) then
+      call f%set_read_record(k)
+      return
+    end if
+  end do
+
+  call f%set_read_record(f%rec_count())
+  if(report) then
+    write(*,*) 'restart '//trim(varname)//' WARNING: no record matches the clock time', ctime
+    write(*,*) '         using the last of ', f%rec_count(), ' records instead'
+  end if
+end subroutine pin_restart_record
+!
+!_______________________________________________________________________________
+subroutine read_netcdf_restarts(path, legacy_path, filegroup, mpicomm, mype)
+  character(len=*), intent(in) :: path        !< date-stamped restart, one instant per file
+  character(len=*), intent(in) :: legacy_path !< pre-2.8 name, tried only if `path` is not there
   type(restart_file_group), intent(inout) :: filegroup
   integer, intent(in) :: mpicomm
   integer, intent(in) :: mype
@@ -1002,6 +1136,7 @@ subroutine read_netcdf_restarts(path, filegroup, mpicomm, mype)
   real(kind=WP) rtime
   integer i
   character(:), allocatable :: dirpath
+  character(:), allocatable :: read_path
   integer mpistatus(MPI_STATUS_SIZE)
   logical file_exists
   logical, allocatable :: skip_file(:)
@@ -1011,6 +1146,8 @@ subroutine read_netcdf_restarts(path, filegroup, mpicomm, mype)
   
   ! Calculate current time from clock (seconds from beginning of year)
   ctime = timeold + (dayold - 1.0_WP) * 86400.0_WP
+
+  read_path = resolve_read_path(path, legacy_path, filegroup, mpicomm, mype)
   
   allocate(skip_file(filegroup%nfiles))
   skip_file = .false.
@@ -1019,7 +1156,7 @@ subroutine read_netcdf_restarts(path, filegroup, mpicomm, mype)
     current_iorank_snd = 0
     current_iorank_rcv = 0
     if( filegroup%files(i)%is_iorank() ) then
-      dirpath = path(1:len(path)-3) ! chop of the ".nc" suffix
+      dirpath = read_path(1:len(read_path)-3) ! chop of the ".nc" suffix
       if(filegroup%files(i)%path .ne. dirpath//"/"//filegroup%files(i)%varname//".nc") then
         filegroup%files(i)%path = dirpath//"/"//filegroup%files(i)%varname//".nc"
 
@@ -1052,11 +1189,10 @@ subroutine read_netcdf_restarts(path, filegroup, mpicomm, mype)
     end if
 
     ! Collective read: every reader opens the file for itself. The path is
-    ! derived from `path` and the file's own varname, both of which every rank
-    ! holds, so the readers agree without a broadcast -- the same argument the
-    ! collective write path makes about create-versus-append.
+    ! derived from `read_path` and the file's own varname, both of which every
+    ! rank holds, so the readers agree without a broadcast.
     if(parallel_write_enabled() .and. .not. skip_file(i)) then
-      dirpath = path(1:len(path)-3)                       ! chop the ".nc" suffix
+      dirpath = read_path(1:len(read_path)-3)             ! chop the ".nc" suffix
       filegroup%files(i)%path = dirpath//"/"//filegroup%files(i)%varname//".nc"
       if(filegroup%files(i)%is_reader()) then
         if(filegroup%files(i)%is_attached()) call filegroup%files(i)%close_file()
@@ -1099,6 +1235,19 @@ subroutine read_netcdf_restarts(path, filegroup, mpicomm, mype)
     !  https://github.com/FESOM/fesom2/pull/801                               !
     ! ========================================================================!
 
+    ! Choose the record BEFORE reading, on exactly the ranks that hold the file
+    ! open. They all inspect the same file and reach the same answer, so this
+    ! needs no broadcast -- the same argument the reader set uses for the record
+    ! count.
+    if(.not. skip_file(i)) then
+      if(merge(filegroup%files(i)%is_reader(), filegroup%files(i)%is_iorank(), &
+               parallel_write_enabled())) then
+        ! Report from the first file only: the record layout is the same for
+        ! every variable of a group, and a group has hundreds of them.
+        call pin_restart_record(filegroup%files(i), filegroup%files(i)%varname, i == 1)
+      end if
+    end if
+
     if(.not. skip_file(i)) then
       call filegroup%files(i)%read_and_scatter_variables()
     end if
@@ -1116,13 +1265,14 @@ subroutine read_netcdf_restarts(path, filegroup, mpicomm, mype)
     ! n_writers_restart -- so this must be is_lead_reader, not is_lead_writer.
     if(merge(filegroup%files(i)%is_lead_reader(), filegroup%files(i)%is_iorank(), &
              parallel_write_enabled())) then
-      write(*,*) 'restart from record ', filegroup%files(i)%rec_count(), ' of ', filegroup%files(i)%rec_count(), filegroup%files(i)%path
+      write(*,*) 'restart from record ', filegroup%files(i)%read_record(), ' of ', &
+                 filegroup%files(i)%rec_count(), filegroup%files(i)%path
 
-      ! read the last entry from the iter variable
-      call filegroup%files(i)%read_var1(filegroup%files(i)%iter_varindex, [filegroup%files(i)%rec_count()], globalstep)
+      ! read the selected record's iter variable
+      call filegroup%files(i)%read_var1(filegroup%files(i)%iter_varindex, [filegroup%files(i)%read_record()], globalstep)
 
-      ! read the last entry from the time variable
-      call filegroup%files(i)%read_var1(filegroup%files(i)%time_varindex(), [filegroup%files(i)%rec_count()], rtime)
+      ! read the selected record's time variable
+      call filegroup%files(i)%read_var1(filegroup%files(i)%time_varindex(), [filegroup%files(i)%read_record()], rtime)
       ! On the collective path the close is done below by the whole reader set.
       if(.not. parallel_write_enabled()) call filegroup%files(i)%close_file()
 
