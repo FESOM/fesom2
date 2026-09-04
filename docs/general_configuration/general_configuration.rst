@@ -120,25 +120,34 @@ height. They do not occupy grid cells and do not block the flow, so the
 module is a source of meltwater and heat rather than a geometric obstacle.
 
 Each iceberg is advanced with its own momentum balance. The forces are the
-drag exerted by the ocean, the atmosphere and the sea ice, the force of
-waves radiating against the iceberg side, the Coriolis force and the sea
-surface slope. The Coriolis term and the water drag are treated
-semi-implicitly, which keeps the trajectories stable at the long iceberg
-time step. Melting is split into basal melt, computed with the same
-three-equation formulation used for ice-shelf cavities, lateral melt driven
-by buoyant convection, and wave erosion at the waterline. The melt fluxes
-enter the ocean as a freshwater flux and a latent heat flux, both of which
-can be switched off individually with ``turn_off_fw`` and ``turn_off_hf``
-when isolating one effect.
+drag exerted by the ocean, the atmosphere and the sea ice, the radiation
+force of waves against the iceberg side, the Coriolis force and the sea
+surface slope. The wave force follows Bigg et al. (1997) and uses a wave
+amplitude estimated from the wind speed; it can be switched off per iceberg.
+The slope term is the gradient of the sea surface height and carries its own
+scaling factor. The Coriolis term is treated semi-implicitly and the water
+drag implicitly, which matters because an iceberg step spans several ocean
+steps.
 
-Icebergs are advanced only every ``steps_per_ib_step`` ocean time steps.
-The default of 8 keeps the cost negligible against the ocean and sea ice.
+Four melt terms are computed: melting at the base, lateral melting driven by
+buoyant convection, wave erosion, and a lateral melt rate that uses the
+three-equation formulation with the local temperature, salinity and velocity
+of the water column. The melt fluxes enter the ocean as a freshwater flux and
+a latent heat flux, both of which can be switched off individually with
+``turn_off_fw`` and ``turn_off_hf`` when isolating one effect. The heat flux
+is distributed over the depth range the iceberg occupies rather than applied
+at the surface alone.
+
+Icebergs are advanced only every ``steps_per_ib_step`` ocean time steps, so
+with the shipped value of 8 the iceberg module runs once per eight ocean
+steps.
 
 Seeding files
 """""""""""""
 
 The initial iceberg population is read from plain text files in the run
-directory, one line per iceberg, all of them with ``ib_num`` entries:
+directory. Each file holds one value per line and is read ``ib_num`` times,
+so every file must have at least ``ib_num`` lines:
 
 - ``icb_longitude.dat`` and ``icb_latitude.dat``, the release position in degrees.
 - ``icb_length.dat`` and ``icb_height.dat``, the iceberg dimensions in metres. The width defaults to the length file, so square icebergs are obtained by supplying only these two files.
@@ -150,9 +159,9 @@ directory, one line per iceberg, all of them with ``ib_num`` entries:
 ``namelist.config`` pairs ``ib_num=1`` with ``use_icebergs=.false.``, so the
 single placeholder entry stays inactive until the module is switched on.
 Running with an empty iceberg population is supported and simply produces no
-iceberg fluxes. A realistic circum-Antarctic distribution derived from
-synthetic aperture radar imagery, as described by Wesche and Dierking (2014),
-is the dataset the module was developed against.
+iceberg fluxes. A realistic circum-Antarctic
+distribution of nearly 7000 icebergs, derived from synthetic aperture radar
+imagery, is available from :cite:`wesche2015`.
 
 Grounding
 """""""""
@@ -167,11 +176,11 @@ melted enough to float again.
 Restarts and coupled runs
 """""""""""""""""""""""""
 
-Iceberg positions and dimensions are written to and read from their own
-restart files, separate from the ocean restart. When
+The per-iceberg state is written to and read from its own restart file,
+separate from the ocean restart. It is a text file with one record per
+iceberg holding the geometry, the position, the velocity, the drag
+coefficients and densities, the calving day and the grounded and melted
+flags. When
 ``use_icesheet_coupling=.true.`` the restart also carries the state needed to
-exchange calving with an ice-sheet model. In coupled atmosphere-ocean runs
-the iceberg fluxes are added to the surface fields before they are passed on,
-so no extra configuration is needed on the coupler side. Setting
-``lverbose_icb=.true.`` prints per-iceberg diagnostics, which is the first
-thing to enable when trajectories look wrong.
+exchange calving with an ice-sheet model. Setting ``lverbose_icb=.true.``
+prints per-iceberg diagnostics.

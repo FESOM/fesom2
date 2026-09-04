@@ -101,8 +101,9 @@ model), so post-processing does not need to know which path wrote them.
    sends its part of the field to one writer, which assembles the global field
    in its own memory and writes the file alone. With ``parallel_write=.true.``
    the field is redistributed to ``n_writers`` writer ranks, which then write
-   their own parts of the same file collectively, so no rank has to hold the
-   global field.
+   their own parts of the same file collectively, so the write is shared and
+   no rank has to hold the global field. The best number of writers is not
+   simply the largest one and has to be found per machine and mesh.
 
 .. _sec_xios_output:
 

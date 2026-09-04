@@ -17,8 +17,9 @@ REcoM3 is a marine ecosystem and biogeochemistry model of intermediate complexit
    Structure of the REcoM3 ecosystem. Phytoplankton functional types take up
    the dissolved inorganic pools and are grazed by one to three zooplankton
    groups. Mortality, aggregation and egestion feed two detritus classes that
-   sink towards the benthos, while remineralisation and the degradation of
-   dissolved organic matter return the nutrients to the dissolved pools. The
+   sink towards the benthos, while remineralisation, including that of the
+   material collected in the benthos, and the degradation of dissolved
+   organic matter return the nutrients to the dissolved pools. The
    carbonate chemistry links the dissolved inorganic carbon and alkalinity
    pools to the air-sea exchange of CO2.
 

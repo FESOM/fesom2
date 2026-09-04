@@ -131,16 +131,19 @@ running it. Both are off by default and are requested at configure time:
 
     cmake -DBUILD_MESHPARTITIONER=ON -DBUILD_MESHDIAG=ON ..
 
-- **BUILD_MESHPARTITIONER=OFF** builds ``fesom_meshpart``, the partitioner that reads ``nod2d.out``, ``elem2d.out`` and ``aux3d.out`` and writes the ``dist_XXXX`` directories a run needs. Building it separately is useful when preparing meshes on a machine where the full model is not needed, and when a mesh has to be repartitioned for a different number of MPI tasks.
+- **BUILD_MESHPARTITIONER=OFF** builds ``fesom_meshpart``, the partitioner that reads ``nod2d.out``, ``elem2d.out`` and ``aux3d.out`` and writes the ``dist_XXXX`` directories a run needs. This is the tool to build when all you need is to partition a mesh, for instance for a new mesh or for a different number of MPI tasks.
 - **BUILD_MESHDIAG=OFF** builds ``fesom_meshdiag``, which performs the minimal initialization required to construct the mesh arrays, writes the diagnostics file and exits without running the model.
 
 ``fesom_meshdiag`` is started like the model itself, from a run directory
 with a valid ``namelist.config``, and it uses the same ``MeshPath`` and
-``ResultPath``. It writes ``<runid>.mesh.diag.nc`` into ``ResultPath``,
-containing the geometric quantities of the discretization such as the
-control-volume areas, element areas and the vertical grid. The same file is
-produced by a normal model run, so the utility is a way to obtain it in
-seconds when only the mesh geometry is of interest, for instance when
-computing weights for post-processing or when checking a newly generated
-mesh. The routines that write it are documented in
-:doc:`/code_documentation/io_mesh_info`.
+``ResultPath``. It writes ``<runid>.mesh.diag.nc`` into ``ResultPath``. The
+file follows the UGRID conventions and holds the mesh connectivity, the
+scalar control volume and element areas, the gradient coefficients, the
+surface and bottom level indices and the layer depths, together with the
+partitioning of nodes and elements.
+
+A normal model run writes the same file through the same routine, but only
+when it starts from initial conditions; a run continued from a restart does
+not write it. The utility is therefore the way to obtain the file for an
+existing mesh without running the model. The routines that write it are
+documented in :doc:`/code_documentation/io_mesh_info`.
