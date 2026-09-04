@@ -264,17 +264,36 @@ Let's assume that we run the model with a timestep of 30 minutes (= 1800 seconds
     84600.0 365 1958
     0.0     1   1959
 
-where the first row is the second of the day of the last time step of the model, and the second row gives the time when the simulation is to be continued. The first row indicates that the model ran for 365 days (in 1958) and 84600 seconds, which is ``1 day - 1`` FESOM timestep in seconds. In the next run, FESOM2 will look for restart files for the year 1958 and continue the simulation at the 1st of January in 1959.
+where the first row is the second of the day of the last time step of the model, and the second row gives the time when the simulation is to be continued. The first row indicates that the model ran for 365 days (in 1958) and 84600 seconds, which is ``1 day - 1`` FESOM timestep in seconds. In the next run, FESOM2 will look for the restart written at the 1st of January 1959 and continue the simulation from there.
+
+Restart file naming
+-------------------
+Each restart holds a single model state, named after the date of that state:
+
+::
+
+    fesom.1959-01-01.oce.restart/
+    fesom.1959-01-01.ice.restart/
+
+Each of those is a directory holding one netCDF file per restart variable.
+
+The date is the instant the model state belongs to, which is why a run finishing at the end of 1958 leaves a restart called ``1959-01-01``: that is the moment the next run continues from, and the same moment the second row of the clock file names. To restart from an earlier point, set the clock file to that date and FESOM2 reads the restart carrying it.
+
+.. note::
+   Restarts written by FESOM2 before 2.8 are named after the year (``fesom.1958.oce.restart``) and hold every restart record of that year in one file per variable. Those are still read: if no date-stamped restart is found for the requested instant, FESOM2 falls back to the yearly file and picks the record matching the clock. Nothing writes that layout any more.
+
+.. attention::
+   The raw restart (``fesom_raw_restart``) is a core dump of the last write and is preferred over the netCDF restart whenever it is present. Setting the clock back to an earlier date therefore has no effect while a raw restart is lying around. Delete the ``fesom_raw_restart`` directory to make FESOM2 use the netCDF restart the clock asks for.
 
 
 Tricking FESOM2 into accepting existing restart files
 -----------------------------------------------------
-The simple time management of FESOM2 allows to easily trick FESOM2 to accept existing restart files. Let's assume that you have performed a full ``JRA55`` cycle until the year 2019 and you want to perform a second cycle, restarting from the last year of the first cycle. This can be done by (copying and) renaming the last year into:
+The simple time management of FESOM2 allows to easily trick FESOM2 to accept existing restart files. Let's assume that you have performed a full ``JRA55`` cycle until the year 2019 and you want to perform a second cycle, restarting from the last year of the first cycle. This can be done by (copying and) renaming the restart of the last year into:
 
 ::
 
-    mv fesom.2019.ice.nc fesom.1957.ice.nc
-    mv fesom.2019.oce.nc fesom.1957.oce.nc
+    mv fesom.2020-01-01.ice.restart fesom.1958-01-01.ice.restart
+    mv fesom.2020-01-01.oce.restart fesom.1958-01-01.oce.restart
 
 by changing the clock file into:
 
