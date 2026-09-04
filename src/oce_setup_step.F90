@@ -1194,7 +1194,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(in) ,   target :: mesh
     !___________________________________________________________________________
-    integer                  :: i, k, counter, rcounter3, id
+    integer                  :: i, k, counter, rcounter3, id, alk_check
     character(len=10)        :: i_string, id_string
     real(kind=WP)            :: loc, max_temp, min_temp, max_salt, min_salt
     !___________________________________________________________________________
@@ -1209,12 +1209,6 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     if (mype==0) write(*,*) 'tracer IDs are: ', tracers%data(1:tracers%num_tracers)%ID
     !
 #if defined(__recom)
-    ! read preindustrial DIC
-    if(DIC_PI) then
-        filelist(5) = 'GLODAPv2.2016b.PI_TCO2_fesom2_mmol_fix_z_Fillvalue.nc'
-        varlist(5)  = 'PI_TCO2_mmol'
-    end if
-
     if (mype==0) then
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
@@ -1287,15 +1281,31 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
-        if (mype==0) write(*,*)
-        if (mype==0) print *, achar(27)//'[46;1m'//' --> Set surface field for alkalinity restoring'//achar(27)//'[0m'
-        if (mype==0) write(*,*) 'Alkalinity restoring = true. Field is read.'
+        if (mype==0) then
+            write(*,*)
+            print *, achar(27)//'[46;1m'//' restore_alkalinity is true --> Set surface field for alkalinity restoring'//achar(27)//'[0m'
+            write(*,*)
+        end if
 #if defined(__usetp)
         endif !(partit%my_fesom_group==0) then
 #endif
-
-        Alk_surf = tracers%data(5)%values(1,:) ! alkalinity is the 5th tracer
-    endif
+        ! resolve the alkalinity tracer by its ID instead of a hardcoded index,
+        ! so every &parecomsetup combination finds the right field
+        alk_check=1
+        do i=3, tracers%num_tracers
+          id=tracers%data(i)%ID
+          SELECT CASE (id)
+            CASE (1003) ! alk
+                Alk_surf = tracers%data(i)%values(1,:) ! surface alkalinity
+                alk_check = 0
+            END SELECT
+        end do
+        if (alk_check /= 0) then
+            if (mype==0) write(*,*) 'not a single tracer ID = 1003 = alkalinity. this should not happen'
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            stop
+        end if
+    endif ! restore_alkalinity
 
 #endif
 

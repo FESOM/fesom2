@@ -119,6 +119,9 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
   type(t_tracer), target :: tracers
   type(t_dyn), target :: dynamics
   logical, save :: has_been_called = .false.
+#if defined(__recom)
+  logical :: is_recom_tracer
+#endif
 
   if(has_been_called) return
   has_been_called = .true.
@@ -179,7 +182,21 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
   
   do j=1,tracers%num_tracers
      id=tracers%data(j)%ID  !MB: Avoid hard-wired tracer assignments like SELECT CASE(j)
-     SELECT CASE (id) 
+
+     ! Determine if this tracer belongs to REcoM.
+     ! Physical/passive tracers with known IDs (1,2,6,11,12,14,39,101-103) are
+     ! never REcoM tracers. All others in the DEFAULT branch below are treated
+     ! as REcoM tracers when __recom is defined.
+#if defined(__recom)
+     SELECT CASE (id)
+       CASE(1,2,6,11,12,14,39,101,102,103)
+         is_recom_tracer = .false.
+       CASE DEFAULT
+         is_recom_tracer = .true.
+     END SELECT
+#endif
+
+     SELECT CASE (id)
        CASE(1)
          trname='temp'
          longname='potential temperature'
@@ -227,6 +244,16 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
      END SELECT
      if ((tracers%data(j)%ID==101) .or. (tracers%data(j)%ID==102) .or. (tracers%data(j)%ID==103) .or. (tracers%data(j)%ID==304)) then
         call oce_files%def_node_var_optional(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
+#if defined(__recom)
+     else if (is_recom_tracer .and. .not. REcoM_restart) then
+        ! REcoM tracer in a non-REcoM run: register as optional so the field is
+        ! skipped on read (if present in restart) and not written.
+        if (partit%mype == RAW_RESTART_METADATA_RANK) then
+           write(*,'(A,A,A)') ' --> ini_ocean_io: muting REcoM tracer "', &
+                trim(trname), '" (REcoM_restart=false, registered as optional)'
+        end if
+        call oce_files%def_node_var_optional(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
+#endif
      else
         call oce_files%def_node_var(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
      endif
@@ -560,7 +587,7 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
 #endif        
     end if     
 #if defined(__recom)
-    if (use_REcoM) call ini_bio_io(tracers, partit, mesh)
+    if (use_REcoM .or. REcoM_restart) call ini_bio_io(tracers, partit, mesh)  ! fix OG 23.04.2026
 #endif
   end if 
 
@@ -930,7 +957,9 @@ subroutine read_all_raw_restarts(dirpath, infopath, mpicomm, mype)
     call read_raw_restart_group(oce_files, fileunit)
     if(use_ice) call read_raw_restart_group(ice_files, fileunit)
 #if defined(__recom)
-    call read_raw_restart_group(bio_files, fileunit)
+    if (use_REcoM .or. REcoM_restart) then  !fix OG:23.04.2026
+      call read_raw_restart_group(bio_files, fileunit)
+    end if
 #endif
     close(fileunit)
   else
@@ -982,12 +1011,14 @@ subroutine finalize_restart()
     end do
   end if
 #if defined(__recom)
+  if (use_REcoM .or. REcoM_restart) then  !fix OG:23.04.2026
   do i=1, bio_files%nfiles
     call bio_files%files(i)%join()
     if(merge(bio_files%files(i)%is_writer(), bio_files%files(i)%is_iorank(), parallel_write_enabled())) then
       if(bio_files%files(i)%is_attached()) call bio_files%files(i)%close_file()
     end if
   end do
+  end if !fix OG:23.04.2026
 #endif
 end subroutine finalize_restart
 !

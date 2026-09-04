@@ -536,6 +536,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     use recom_glovar
     use recom_config
     use recom_ciso
+    use recom_declarations, only: tracer_ids   ! symbolic tracer ids (config-aware), see WI-5
 #endif
     use g_forcing_param, only: use_virt_salt, use_landice_water, use_age_tracer !---fwf-code, age-code
     use g_config, only : use_cavity, lwiso, use_icb_iron !---wiso-code
@@ -595,7 +596,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
           "benSi               ", "beta                ", "bolus_u             ", &
           "bolus_v             ", "bolus_w             ", "calcdiss            ", &
           "calcif              ", "cfl_z               ", "Chldegc             ", &
-          "Chldegd             ", "Chldegn             ", "CO2f                ", &
+          "Chldegd             ", "Chldegn             ", "CO2_aq              ", "CO2f                ", "CO3                 ", &
           "curl_surf           ", "dens_flux           ", "d_eta               ", &
           "dhe                 ", "dMOC                ", "docexc              ", &
           "docexd              ", "docexn              ", "dpCO2s              ", &
@@ -612,7 +613,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
           "GPPn                ", "h2o16               ", "h2o16_ice           ", &
           "h2o18               ", "h2o18_ice           ", "hbar                ", &
           "hbar_old            ", "hc                  ", "hc300m              ", &
-          "hc700m              ", "hDo16               ", "hDo16_ice           ", &
+          "hc700m              ", "HCO3                ", "hDo16               ", "hDo16_ice           ", &
           "helem               ", "h_ice               ", "hnode               ", &
           "hnode_new           ", "Hp                  ", "hpnd                ", &
           "h_snow              ", "icb                 ", "iceoce_x            ", &
@@ -624,11 +625,11 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
           "MLD3                ", "m_snow              ", "N2                  ", &
           "NNAc                ", "NNAd                ", "NNAn                ", &
           "NPPc                ", "NPPc3D              ", "NPPd                ", &
-          "NPPd3D              ", "NPPn                ", "O2f                 ", &
+          "NPPd3D              ", "NPPn                ", "NPPn3D              ", "O2f                 ", "OmegaC              ", &
           "opottempdiff        ", "opottemprmadvect    ", "opottemptend        ", &
           "osaltdiff           ", "osaltrmadvect       ", "osalttend           ", &
-          "otracers            ", "PAR                 ", "pbo                 ", &
-          "pCO2s               ", "pgf_x               ", "pgf_y               ", &
+          "otracers            ", "PAR                 ", "pbo                 ", "pCO2                ", &
+          "pCO2s               ", "pgf_x               ", "pgf_y               ", "pH                  ", &
           "prec                ", "qcon                ", "qres                ", &
           "qsi                 ", "qso                 ", "qsr                 ", &
           "realsalt            ", "redi_K              ", "relaxsalt           ", &
@@ -660,7 +661,18 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
           "virtsalt            ", "vnod                ", "vnod_sfc            ", &
           "volo                ", &
           "v_rhs_ice           ", "v_total_tend        ", "vve_5               ", &
-          "vwice               ", "vwind               ", "w                   " /)
+          "vwice               ", "vwind               ", "w                   ", &
+          "xCO2atm             ", &
+          ! WI-2: phaeocystis + T* physiology diagnostics. Registered here so XIOS
+          ! can send them; their actual output is gated in file_def_fesom.xml.j2
+          ! (coccos for phaeo*, ltra_diag for the T* family).
+          "NPPp", "NPPp3D", "GPPp", "NNAp", "Chldegp", &
+          "TPhyCO2", "TDiaCO2", "TCoccoCO2", "TPhaeoCO2", &
+          "TCphot_phyto", "TCphot_diatoms", "TCphot_cocco", "TCphot_phaeo", &
+          "TCphotLL_phyto", "TCphotLL_dia", "TCphotLL_cocco", "TCphotLL_phaeo", &
+          "TqLF_phyto", "TqLF_diatoms", "TqLF_cocco", "TqLF_phaeo", &
+          "TTemp_phyto", "TTemp_diatoms", "TTemp_cocco", "TTemp_phaeo", &
+          "TSi_assimDia" /)
         integer :: k
         if (mype==0) WRITE(*,*) 'XIOS mode: skipping namelist.io; registering all ', &
                                  size(xios_ids), ' known streams. XML decides output.'
@@ -1168,6 +1180,11 @@ CASE ('curl_surf ')
 ! output RECOM 2D
 #if defined(__recom)
 
+CASE ('xCO2atm    ')
+    if (use_REcoM) then
+    call def_stream(nod2D,  myDim_nod2D,   'xCO2atm',    'atmospheric CO2',  'ppm', x_co2atm(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
 CASE ('dpCO2s    ')
     if (use_REcoM) then
     call def_stream(nod2D,  myDim_nod2D,   'dpCO2s',    'Difference of oceanic pCO2 minus atmospheric pCO2',  'uatm', GlodPCO2surf(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -1343,7 +1360,7 @@ CASE ('Tsurf    ')
 
 
 !___________________________________________________________________________________________________________________________________    
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>   3D streams   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+!   3D streams
 !___________________________________________________________________________________________________________________________________
 CASE ('temp      ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp',      'temperature', 'C',      tracers%data(1)%values(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -1465,6 +1482,40 @@ CASE ('NPPc3D         ')
 CASE ('NPPp3D         ')
    if (use_REcoM) then
    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPp3D','Net primary production of phaeocystis', 'mmolC/(m3*d)', NPPp3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
+   endif
+
+!_______________________________________________________________________________
+! WI-4: 3D carbonate-system fields (MOCSY). Computed every step in recom_main but
+! previously not output. Units verbatim from the REcoM_GloVar declarations so XIOS
+! output is directly comparable to the legacy serial output.
+CASE ('CO2_aq         ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'CO2_aq', 'Aqueous CO2 concentration (MOCSY)', '[mol/m3]', CO23D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('pH             ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'pH', 'pH on total scale (MOCSY)', 'total_scale', pH3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('pCO2           ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'pCO2', 'CO2 partial pressure (MOCSY)', 'uatm', pCO23D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('HCO3           ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'HCO3', 'Bicarbonate ion concentration (MOCSY)', '[mol/m3]', HCO33D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('CO3            ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'CO3', 'Carbonate ion concentration', '[mol/m3]', CO33D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   endif
+
+CASE ('OmegaC         ')
+   if (use_REcoM) then
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'OmegaC', 'Calcite saturation state', 'none', OmegaC3D(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
 
 CASE ('TTemp_diatoms          ')
@@ -1720,72 +1771,72 @@ CASE ('otracers  ')
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'O2', 'O2', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
 
-      else if (tracers%data(j)%ID==1023) then
+      else if (tracers%data(j)%ID==tracer_ids%macrozooplankton_nitrogen) then
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Zoo2N', 'Intracellular conc of Nitrogen in second zooplankton', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
 
-      else if (tracers%data(j)%ID==1024) then
+      else if (tracers%data(j)%ID==tracer_ids%macrozooplankton_carbon) then
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Zoo2C', 'Intracellular conc of Carbon in second zooplankton', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
 
-      else if (tracers%data(j)%ID==1025) then
+      else if (tracers%data(j)%ID==tracer_ids%macrozooplankton_detrital_nitrogen) then
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'idetz2n', 'idetz2n', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
 
-      else if (tracers%data(j)%ID==1026) then
+      else if (tracers%data(j)%ID==tracer_ids%macrozooplankton_detrital_carbon) then
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'idetz2c', 'idetz2c', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
 
-      else if (tracers%data(j)%ID==1027) then
+      else if (tracers%data(j)%ID==tracer_ids%macrozooplankton_detrital_silica) then
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'idetz2si', 'idetz2si', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
 
-      else if (tracers%data(j)%ID==1028) then
+      else if (tracers%data(j)%ID==tracer_ids%macrozooplankton_detrital_calcite) then
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'idetz2calc', 'idetz2calc', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
 
-      else if (tracers%data(j)%ID==1029) then
+      else if (tracers%data(j)%ID==tracer_ids%coccolithophore_nitrogen) then
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'CoccoN', 'CoccoN', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
 
-      else if (tracers%data(j)%ID==1030) then
+      else if (tracers%data(j)%ID==tracer_ids%coccolithophore_carbon) then
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'CoccoC', 'CoccoC', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
 
-      else if (tracers%data(j)%ID==1031) then
+      else if (tracers%data(j)%ID==tracer_ids%coccolithophore_chlorophyll) then
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'CoccoChl', 'CoccoChl', '[mg/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
 
-      else if (tracers%data(j)%ID==1032) then
+      else if (tracers%data(j)%ID==tracer_ids%phaeocystis_nitrogen) then
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'PhaeoN', 'PhaeoN', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)         ! NEW
          endif
 
-      else if (tracers%data(j)%ID==1033) then
+      else if (tracers%data(j)%ID==tracer_ids%phaeocystis_carbon) then
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'PhaeoC', 'PhaeoC', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)         ! NEW
          endif
 
-      else if (tracers%data(j)%ID==1034) then
+      else if (tracers%data(j)%ID==tracer_ids%phaeocystis_chlorophyll) then
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'PhaeoChl', 'PhaeoChl', '[mg/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)       ! NEW
          endif
 
-      else if (tracers%data(j)%ID==1035) then
+      else if (tracers%data(j)%ID==tracer_ids%microzooplankton_nitrogen) then
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Zoo3N', 'Zoo3N', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
 
-      else if (tracers%data(j)%ID==1036) then
+      else if (tracers%data(j)%ID==tracer_ids%microzooplankton_carbon) then
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Zoo3C', 'Zoo3C', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
