@@ -7,7 +7,7 @@ subroutine setup_model(partit)
   use g_forcing_param
   use g_config
   use diagnostics, only: ldiag_solver,lcurt_stress_surf,lcurt_stress_surf, ldiag_Ri, ldiag_TurbFlux, ldiag_trflx, &
-                         ldiag_dMOC, ldiag_DVD, diag_list
+                         ldiag_dMOC, ldiag_DVD, diag_list, ldiag_diapmix
   use g_clock,     only: timenew, daynew, yearnew
   use g_ic3d
   use Toy_Neverworld2
@@ -210,6 +210,15 @@ subroutine setup_model(partit)
   read (fileunit, NML=diag_list, iostat=istat)
   if (istat /= 0) call check_namelist_read(fileunit, 'diag_list', nmlfile, partit)
   close (fileunit)
+
+  ! the diapycnal mixing diagnostic builds on the density classes and the
+  ! divergences of the density MOC diagnostic, and is only interpretable
+  ! together with them. Has to be settled here, before density_dmoc and the
+  ! diagnostic arrays are allocated.
+  if (ldiag_diapmix .and. .not. ldiag_dMOC) then
+     ldiag_dMOC = .true.
+     if (partit%mype==0) write(*,*) 'ldiag_diapmix=.true. requires ldiag_dMOC --> ldiag_dMOC switched on'
+  end if
 
 #if defined (__recom)
   nmlfile ='namelist.recom'    ! name of recom namelist file

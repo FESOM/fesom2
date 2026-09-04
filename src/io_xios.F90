@@ -31,6 +31,7 @@ module io_xios_module
                                   ldiag_extflds, ldiag_destine,          &
                                   ldiag_ice, ldiag_trflx,                &
                                   ldiag_uvw_sqr, ldiag_trgrd_xyz,        &
+                                  ldiag_diapmix,                         &
                                   std_dens_N, std_dens
   use cmor_variables_diag,  only: ldiag_cmor
   implicit none
@@ -192,6 +193,14 @@ contains
       if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_salt3D=',      ldiag_salt3D
       ov = xios_getvar("ldiag_dMOC",        ldiag_dMOC)
       if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_dMOC=',        ldiag_dMOC
+      ! this override runs after setup_model established ldiag_diapmix => ldiag_dMOC
+      ! and before arrays_init allocates density_dmoc under ldiag_dMOC, so restore
+      ! the implication here rather than leave the diagnostic reading an
+      ! unallocated density_dmoc
+      if (ldiag_diapmix .and. .not. ldiag_dMOC) then
+         ldiag_diapmix = .false.
+         if (partit%mype==0) write(*,*) '[XIOS] ldiag_dMOC=.false. --> ldiag_diapmix switched off'
+      end if
       ov = xios_getvar("ldiag_DVD",         ldiag_DVD)
       if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_DVD=',         ldiag_DVD
       ov = xios_getvar("ldiag_forc",        ldiag_forc)
