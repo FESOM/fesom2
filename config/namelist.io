@@ -28,7 +28,8 @@ ldiag_dMOC        = .false.  ! enables 'dMOC' output (density MOC diagnostics)
 ldiag_diapmix     = .false.  ! adds 'w_diap_diff', 'dV_diap_dT' to the 'dMOC' output: diapycnal velocity
                              ! and density class uplift induced by the parameterized vertical mixing,
                              ! from which the numerically induced diapycnal velocity and spurious MOC
-                             ! are formed in postprocessing. Requires ldiag_dMOC (switched on if unset)
+                             ! are formed in postprocessing. Requires ldiag_dMOC (ldiag_diapmix 
+                             ! is automatically switched off with a warning if ldiag_dMOC unset)
 diap_call_freq    = 1        ! evaluate ldiag_diapmix every N units of diap_call_freq_unit ...
 diap_call_freq_unit = 'd'    ! ... 's' (steps), 'h' (hours), 'd' (days) or 'm' (months)
 ldiag_DVD         = .false.  ! enables 'DVD' output (Discrete Variance Decay diagnostics)
