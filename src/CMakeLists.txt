@@ -14,62 +14,49 @@ else()
    set(FESOM_PLATFORM_STRATEGY "notset" CACHE STRING "switch to platform specific compile settings, this is usually determined via the env.sh script")
 endif()
 
-if(DEFINED ENV{ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS}) # be able to set the initial cache value from our env settings for aleph, not only via cmake command
-   option(ALEPH_CRAYMPICH_WORKAROUNDS "workaround for performance issues on aleph" ON)
-else()
-   option(ALEPH_CRAYMPICH_WORKAROUNDS "workaround for performance issues on aleph" OFF)
-endif()
-if(DEFINED ENV{ENABLE_ALBEDO_INTELMPI_WORKAROUNDS}) # be able to set the initial cache value from our env settings for aleph, not only via cmake command
-   option(ALBEDO_INTELMPI_WORKAROUNDS "workaround for performance issues on albedo" ON)
-else()
-   option(ALBEDO_INTELMPI_WORKAROUNDS "workaround for performance issues on albedo" OFF)
-endif()
-if(DEFINED ENV{ENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS}) # be able to set the initial cache value from our env settings for aleph, not only via cmake command
-   option(JUWELS_GNUOPENMPI_WORKAROUNDS "workaround for performance issues on juwels" ON)
-else()
-   option(JUWELS_GNUOPENMPI_WORKAROUNDS "workaround for performance issues on juwels" OFF)
-endif()
-
-#TODO: these machine specific changes must be done using cmake toolchain then here otherwise will make cmake another raps. 
-
-if(ALEPH_CRAYMPICH_WORKAROUNDS)
-   # todo: enable these options only for our targets
-   add_compile_options(-craympich-mt) # alternative cray-mpich library, about 5 % faster with cray-mpich/7.7.3 on aleph, not available for modules cray-mpich > 7.7.3; todo: test compiling and performance with cray-mpich > 7.7.3
-   # make sure to also set these variables in the runtime environment:
+# Cray compiler specific optimizations
+if(CMAKE_Fortran_COMPILER_ID STREQUAL "Cray")
+   # Make sure to also set these variables in the runtime environment:
    #    MPICH_MAX_THREAD_SAFETY=multiple # allows highest MPI thread level (i.e. MPI_THREAD_MULTIPLE)
    #    MPICH_CRAY_OPT_THREAD_SYNC=0 # the Cray MPICH library falls back to using the pthread_mutex-based thread-synchronization implementation
    #    MPICH_OPT_THREAD_SYNC=0 # seems to be a duplicate variable which also appears in some documentation instead of MPICH_CRAY_OPT_THREAD_SYNC (but this one brings a huge speed gain on aleph)
-   #add_compile_options(-DDISABLE_PARALLEL_RESTART_READ) # reading restarts is slow when doing it on parallel on aleph, switch it off for now
-   add_compile_options(-DENABLE_ALEPH_CRAYMPICH_WORKAROUNDS)
-endif()
-if(ALBEDO_INTELMPI_WORKAROUNDS)
-   add_compile_options(-DENABLE_ALBEDO_INTELMPI_WORKAROUNDS)
-   add_compile_options(-DDISABLE_PARALLEL_RESTART_READ)
-endif()
-if(JUWELS_GNUOPENMPI_WORKAROUNDS)
-   add_compile_options(-DENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS)
+   if(DEFINED ENV{CRAY_MPICH_VERSION})
+      if("$ENV{CRAY_MPICH_VERSION}" VERSION_LESS_EQUAL "7.7.3")
+         add_compile_options(-craympich-mt)
+      endif()
+   endif()
 endif()
 
-#TODO: this machine specific block can easyly go in  cmake toolchain.
-if    (${FESOM_PLATFORM_STRATEGY} STREQUAL levante.dkrz.de )
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL mn5-gpp )
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL albedo )
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL atosecmwf )
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
-elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL juwels )
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)   
-else()
-   option(DISABLE_MULTITHREADING "disable asynchronous operations" ON)
+# Backward compatibility: convert old DISABLE_MULTITHREADING to new ASYNCHRONOUS_IO_THREADS
+if(DEFINED DISABLE_MULTITHREADING)
+   if(DISABLE_MULTITHREADING)
+      set(ASYNCHRONOUS_IO_THREADS OFF CACHE BOOL "enable asynchronous I/O threads" FORCE)
+   else()
+      set(ASYNCHRONOUS_IO_THREADS ON CACHE BOOL "enable asynchronous I/O threads" FORCE)
+   endif()
+   message(STATUS "Converted legacy DISABLE_MULTITHREADING=${DISABLE_MULTITHREADING} to ASYNCHRONOUS_IO_THREADS=${ASYNCHRONOUS_IO_THREADS}")
 endif()
-if (DISABLE_MULTITHREADING)
-   message(STATUS "MULTITHREADING @ ${FESOM_PLATFORM_STRATEGY}: OFF")
+
+#TODO: these machine specific block can easyly go in cmake toolchain.
+if    (${FESOM_PLATFORM_STRATEGY} STREQUAL levante.dkrz.de )
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL mn5-gpp )
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL albedo )
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL atosecmwf )
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
+elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL juwels )
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)   
 else()
-   message(STATUS "MULTITHREADING @ ${FESOM_PLATFORM_STRATEGY}: ON")
+   option(ASYNCHRONOUS_IO_THREADS "enable asynchronous I/O threads" OFF)
+endif()
+if (ASYNCHRONOUS_IO_THREADS)
+   message(STATUS "ASYNCHRONOUS I/O THREADS @ ${FESOM_PLATFORM_STRATEGY}: ON")
+else()
+   message(STATUS "ASYNCHRONOUS I/O THREADS @ ${FESOM_PLATFORM_STRATEGY}: OFF")
 endif()
 
 
@@ -86,8 +73,14 @@ if(${ENABLE_OPENMP})
    find_package(OpenMP REQUIRED COMPONENTS Fortran)
 endif()
 
+option(RECOM_COUPLED "Use RECOM" OFF)
+message(STATUS "RECOM_COUPLED: ${RECOM_COUPLED}")
+
 option(USE_ICEPACK "Use ICEPACK" OFF)
 message(STATUS "USE_ICEPACK: ${USE_ICEPACK}")
+
+option(USE_SINGLE_PRECISION "Build FESOM in single precision (WP=4)" OFF)
+message(STATUS "USE_SINGLE_PRECISION: ${USE_SINGLE_PRECISION}")
 
 
 # option to trigger building a library version of FESOM
@@ -103,6 +96,63 @@ if(DEFINED FESOM_ENABLE_IFS_INTERFACE)
   set(ENABLE_IFS_INTERFACE ${FESOM_ENABLE_IFS_INTERFACE}) # To distinguish option in a nested cmake project (bundle)
 endif()
 message(STATUS "ENABLE_IFS_INTERFACE: ${ENABLE_IFS_INTERFACE}")
+
+
+# ---------------------------------------------------------------------------
+# Single precision in coupled configurations.
+#
+# OIFS-via-OASIS coupling (FESOM_COUPLED + OIFS_COUPLED, i.e. AWI-ESM3) is now
+# single-precision-safe:
+#
+#   * cpl_driver.F90 -- the OASIS exchange buffer exfld is typed WP_full
+#     (always real64, matching the oasis_Double transient), and every
+#     FESOM-internal MPI call in the coupling path (grid gather + same-rank
+#     bcast) uses MPI_WP instead of a hardcoded MPI_DOUBLE_PRECISION, so the
+#     MPI type tracks WP. OASIS itself accepts single-precision buffers (its
+#     oasis_put/get and grid-write interfaces are generic over real4/real8 and
+#     promote to double internally), so nothing is corrupted when WP=real32.
+#
+#   * gen_forcing_couple.F90 -- integrate_2D's internal reductions use MPI_WP.
+#     The raw FESOM<->atmosphere net-flux exchange in net_rec_from_atm is
+#     skipped for __oifs (early return), so its remaining hardcoded-double
+#     calls are not reached by an OIFS build.
+#
+# The other coupled modes are NOT yet converted and stay refused:
+#   * FESOM_COUPLED without OIFS (OASIS/ECHAM) -- net_rec_from_atm's raw
+#     double exchange IS reached and is still typed to WP; needs the partner
+#     precision reconciled.
+#   * USE_YAC (cpl_yac_driver.F90) and ENABLE_IFS_INTERFACE -- untouched.
+#
+# Set FESOM_ALLOW_SINGLE_PRECISION_COUPLED=ON to override the refusal for the
+# modes below (intended for developing those fixes, not for production).
+# ---------------------------------------------------------------------------
+option(FESOM_ALLOW_SINGLE_PRECISION_COUPLED
+       "Override the guard refusing the not-yet-converted single-precision coupled builds" OFF)
+
+if(USE_SINGLE_PRECISION AND NOT FESOM_ALLOW_SINGLE_PRECISION_COUPLED)
+   set(_fesom_sp_coupled_modes "")
+   # OIFS-via-OASIS is allowed. Pure OASIS/ECHAM (FESOM_COUPLED without OIFS) is not.
+   if(FESOM_COUPLED AND NOT OIFS_COUPLED)
+      list(APPEND _fesom_sp_coupled_modes "FESOM_COUPLED (OASIS/ECHAM, without OIFS)")
+   endif()
+   if(USE_YAC)
+      list(APPEND _fesom_sp_coupled_modes "USE_YAC (YAC)")
+   endif()
+   if(ENABLE_IFS_INTERFACE)
+      list(APPEND _fesom_sp_coupled_modes "ENABLE_IFS_INTERFACE (IFS interface)")
+   endif()
+   if(_fesom_sp_coupled_modes)
+      string(REPLACE ";" ", " _fesom_sp_coupled_modes "${_fesom_sp_coupled_modes}")
+      message(FATAL_ERROR
+         "USE_SINGLE_PRECISION=ON is not yet supported together with: ${_fesom_sp_coupled_modes}.\n"
+         "These coupling paths still pass MPI_DOUBLE_PRECISION for real(kind=WP) "
+         "buffers (or have not been reviewed), which corrupts memory when WP is "
+         "real32. OIFS-via-OASIS coupling (OIFS_COUPLED) has been converted and is "
+         "allowed.\n"
+         "Build these configurations in double precision (USE_SINGLE_PRECISION=OFF), "
+         "or set FESOM_ALLOW_SINGLE_PRECISION_COUPLED=ON if you are developing the fix.")
+   endif()
+endif()
 
 
 set(ENABLE_MULTIO_DEFAULT OFF)
@@ -140,11 +190,23 @@ set(FESOM_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/../.." CACHE FILEPATH "dir
 
 # get our source files
 set(src_home ${CMAKE_CURRENT_SOURCE_DIR}) # path to src directory starting from the dir containing our CMakeLists.txt
+
+# Link FESOM2 fortran code
 file(GLOB sources_Fortran ${src_home}/*.F90)
+
+# Link custom CVMix files and fesom2cvmix wrapper-interface files
+if(CVMIX)
+   file(GLOB sources_cvmix_addon ${src_home}/cvmix_driver/*.F90)
+   list(APPEND sources_Fortran ${sources_cvmix_addon})
+endif()
+
+# Link ICEPACK code
 if(USE_ICEPACK)
    file(GLOB sources_ice_pack ${src_home}/icepack_drivers/*.F90
                               ${src_home}/icepack_drivers/Icepack/columnphysics/*.F90)
    list(APPEND sources_Fortran ${sources_ice_pack})
+   
+# Link IFS-Interface code   
 elseif(ENABLE_IFS_INTERFACE) # ICEPACK + IFS_INTERFACE NOT SUPPORTED (YET)
    if(ENABLE_MULTIO)
       list(APPEND sources_Fortran ${src_home}/ifs_interface/iom.F90)
@@ -155,12 +217,6 @@ elseif(ENABLE_IFS_INTERFACE) # ICEPACK + IFS_INTERFACE NOT SUPPORTED (YET)
                                ${src_home}/ifs_interface/ifs_notused.F90
                                ${src_home}/ifs_interface/mpp_io.F90)
 endif()
-
-if(${RECOM_COUPLED})  # ADD RECOM FILES
-   file(GLOB sources_Fortran ${src_home}/*.F90
-                             ${src_home}/int_recom/*.F90
-                             ${src_home}/int_recom/recom/*.F90)
-endif()                             
 
 # generate a custom file from fesom_version_info.F90 which includes the current git SHA
 set(FESOM_ORIGINAL_VERSION_FILE ${src_home}/fesom_version_info.F90)
@@ -180,8 +236,8 @@ add_custom_target(fesom_version_info-generated.F90 ALL
 list(REMOVE_ITEM sources_Fortran ${src_home}/fvom_init.F90 ${src_home}/oce_local.F90 ${src_home}/gen_comm.F90)
 list(REMOVE_ITEM sources_Fortran ${src_home}/fesom_main.F90)
 
-find_package( MPI REQUIRED COMPONENTS C Fortran )
 find_package( NETCDF REQUIRED COMPONENTS C Fortran )
+find_package( MPI REQUIRED COMPONENTS C Fortran )
 
 # depends on the metis library
 #add_subdirectory(../lib/metis-5.1.0 ${PROJECT_BINARY_DIR}/metis)
@@ -194,14 +250,41 @@ add_subdirectory(async_threads_cpp)
 add_library(${PROJECT_NAME} ${sources_Fortran} $<TARGET_OBJECTS:async_threads_cpp>)
 add_dependencies(${PROJECT_NAME} fesom_version_info-generated.F90)
 
-# Add dependency on external NetCDF if BUILD_NETCDF is enabled
-if(BUILD_NETCDF)
-    add_dependencies(${PROJECT_NAME} build_netcdf)
-endif()
-
 target_include_directories(${PROJECT_NAME} PUBLIC $<BUILD_INTERFACE:${CMAKE_Fortran_MODULE_DIRECTORY}>)
 target_include_directories(${PROJECT_NAME} PUBLIC $<INSTALL_INTERFACE:module/fesom>)
 target_link_libraries(${PROJECT_NAME} PRIVATE MPI::MPI_Fortran)
+
+# Link RECOM code
+if(RECOM_COUPLED)  # ADD RECOM LIB
+   add_subdirectory(recom)
+   target_link_libraries(${PROJECT_NAME} PRIVATE recom)
+endif()
+
+# Pull CVMix in via FetchContent and build it as part of FESOM's build tree.
+# Offline workflow:
+#   - point at a manually placed checkout: -DFETCHCONTENT_SOURCE_DIR_CVMIX=/path/to/CVMix-src
+#   - or pre-populate <build>/_deps/cvmix-src and pass -DFETCHCONTENT_FULLY_DISCONNECTED=ON
+if(CVMIX)
+   message(STATUS "CVMIX: ${CVMIX}")
+
+   include(FetchContent)
+   set(CVMIX_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+   set(CVMIX_BUILD_DRIVER      OFF CACHE BOOL "" FORCE)
+   FetchContent_Declare(cvmix
+      GIT_REPOSITORY https://github.com/CVMix/CVMix-src.git
+      GIT_TAG        v1.0.0
+   )
+   FetchContent_MakeAvailable(cvmix)
+
+   # CVMix's own CMakeLists exposes its module dir only via INSTALL_INTERFACE and
+   # writes .mod files to ${CMAKE_BINARY_DIR}/modules (top-level build dir, set
+   # in the subdirectory scope). Expose that path on the BUILD_INTERFACE so
+   # FESOM's wrapper sources in cvmix_driver/ can find the CVMix .mod files.
+   target_include_directories(cvmix_static INTERFACE
+      $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/modules>)
+
+   target_link_libraries(${PROJECT_NAME} PRIVATE cvmix_static)
+endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
 if(${ENABLE_OPENMP})
@@ -213,8 +296,31 @@ if(ENABLE_MULTIO)
    target_link_libraries(${PROJECT_NAME} PRIVATE multio-fapi)
 endif()
 
-if(DISABLE_MULTITHREADING)
-   target_compile_definitions(${PROJECT_NAME} PRIVATE DISABLE_MULTITHREADING)
+option(FESOM_WITH_XIOS "Route FESOM output through XIOS async server ranks" OFF)
+if(FESOM_WITH_XIOS AND ASYNCHRONOUS_IO_THREADS)
+   message(STATUS "FESOM_WITH_XIOS=ON forces ASYNCHRONOUS_IO_THREADS=OFF: "
+                  "XIOS requires deterministic xios_send_field order across ranks, "
+                  "which per-stream pthreads break.")
+   set(ASYNCHRONOUS_IO_THREADS OFF CACHE BOOL "enable asynchronous I/O threads" FORCE)
+endif()
+
+if(ASYNCHRONOUS_IO_THREADS)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE ASYNCHRONOUS_IO_THREADS)
+endif()
+
+if(FESOM_WITH_XIOS)
+   find_path(XIOS_INCLUDE_DIR NAMES xios.mod
+             HINTS $ENV{XIOS_ROOT}/inc $ENV{XIOS_ROOT}/include)
+   find_library(XIOS_LIB NAMES xios
+                HINTS $ENV{XIOS_ROOT}/lib)
+   if(NOT XIOS_INCLUDE_DIR OR NOT XIOS_LIB)
+      message(FATAL_ERROR "FESOM_WITH_XIOS=ON but XIOS not found. Set XIOS_ROOT.")
+   endif()
+   message(STATUS "XIOS include: ${XIOS_INCLUDE_DIR}")
+   message(STATUS "XIOS lib    : ${XIOS_LIB}")
+   target_include_directories(${PROJECT_NAME} PRIVATE ${XIOS_INCLUDE_DIR})
+   target_link_libraries(${PROJECT_NAME} PRIVATE ${XIOS_LIB} stdc++)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __XIOS)
 endif()
 
 if(${FESOM_COUPLED})
@@ -231,12 +337,27 @@ endif()
 if(${ASYNC_ICEBERGS})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __async_icebergs)
 endif()
+
+if(${USE_YAC})
+  include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindYAC.cmake)
+  target_compile_definitions(${PROJECT_NAME} PRIVATE __yac __coupled)
+  list(APPEND sources_Fortran ${src_home}/cpl_yac_driver.F90)
+endif()
+
 if(${OIFS_COUPLED})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __oifs)
 endif()
 
 if(USE_ICEPACK)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __icepack)
+endif()
+
+if(USE_SINGLE_PRECISION)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE USE_SINGLE_PRECISION)
+endif()
+
+if(CVMIX)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __cvmix)
 endif()
 
 if(ENABLE_IFS_INTERFACE)
@@ -247,12 +368,23 @@ if(VERBOSE)
    target_compile_definitions(${PROJECT_NAME} PRIVATE VERBOSE)
 endif()
 
+# OPENMP_REPRODUCIBLE serializes the OpenMP loops whose lock-based scatter
+# updates would otherwise accumulate in a thread-dependent order. It only has
+# any meaning when OpenMP is actually enabled - see FESOM/fesom2#444.
 if(OPENMP_REPRODUCIBLE)
+   if(NOT ENABLE_OPENMP)
+      message(FATAL_ERROR
+         "OPENMP_REPRODUCIBLE=ON requires ENABLE_OPENMP=ON. "
+         "It only serializes OpenMP worksharing loops, so it does nothing "
+         "without OpenMP. Re-run with -DENABLE_OPENMP=ON, or drop "
+         "-DOPENMP_REPRODUCIBLE=ON.")
+   endif()
+   message(STATUS "OPENMP_REPRODUCIBLE: ON (OpenMP loops serialized for reproducibility)")
    target_compile_definitions(${PROJECT_NAME} PRIVATE __openmp_reproducible)
 endif()
 
 if(${RECOM_COUPLED})
-   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2 __3Zoo2Det __coccos)# __usetp)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __recom USE_PRECISION=2 __usetp) #__3Zoo2Det __coccos)
 endif()
 
 if(${CISO_COUPLED})
@@ -266,8 +398,12 @@ endif()
 # CMAKE_Fortran_COMPILER_ID will also work if a wrapper is being used (e.g. mpif90 wraps ifort -> compiler id is Intel)
 if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} STREQUAL  IntelLLVM )
    
-   # Base compiler flags
-   target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0 -fpp -g -traceback)# -check all,noarg_temp_created,bounds,uninit)
+   # Base compiler flags (default real kind follows USE_SINGLE_PRECISION)
+   if(USE_SINGLE_PRECISION)
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r4 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0 -fpp -fPIC)
+   else()
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -r8 -i4 -fp-model precise -no-prec-div -fimf-use-svml -init=zero -no-wrap-margin -fpe0 -fpp -fPIC)
+   endif()
    
    # compiler flags not supported by IntelLLVM
    if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
@@ -288,7 +424,7 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} 
       # | Intel/MPI | -O3                                                                 | 144s |
       # |*Intel/MPI | -03 -march=core-avx2 -mtune=core-avx2 -qopt-zmm-usage=low           | 140.95s |
       # |           | -align array64byte -unroll-aggressive -qopt-malloc-options=2        |         |
-      #target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2 -qopt-zmm-usage=low -align array64byte -unroll-aggressive -qopt-malloc-options=2)
+      #     target_compile_options(${PROJECT_NAME} PRIVATE -march=core-avx2 -mtune=core-avx2 -qopt-zmm-usage=low -align array64byte -unroll-aggressive -qopt-malloc-options=2 -g -traceback -check)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL leo-dcgp )
       target_compile_options(${PROJECT_NAME} PRIVATE -xCORE-AVX512 -qopt-zmm-usage=high -align array64byte -ipo)
    elseif(${FESOM_PLATFORM_STRATEGY} STREQUAL mn5-gpp )
@@ -324,14 +460,24 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} 
 
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
 #    target_compile_options(${PROJECT_NAME} PRIVATE -O3 -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -ffree-line-length-none)
+   # default real kind follows USE_SINGLE_PRECISION: promote to 8 for DP, leave at 4 for SP
+   if(USE_SINGLE_PRECISION)
+      set(_FESOM_GNU_RKIND "")
+   else()
+      set(_FESOM_GNU_RKIND -fdefault-real-8 -fdefault-double-8)
+   endif()
    if(${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu )
       message(STATUS "Allowing type mismatches on Ubuntu for CI Testing" )  # NOTE(PG): Would be nicer to grab the CI=True from the env variable
-      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -fallow-argument-mismatch -cpp)
+      target_compile_options(${PROJECT_NAME} PRIVATE -O2 -g -fbacktrace -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  ${_FESOM_GNU_RKIND} -ffree-line-length-none -cpp)
    else()
-      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  -fdefault-real-8 -fdefault-double-8 -ffree-line-length-none -cpp)
+      target_compile_options(${PROJECT_NAME} PRIVATE -O3 -ffloat-store -finit-local-zero  -finline-functions -fimplicit-none  ${_FESOM_GNU_RKIND} -ffree-line-length-none -cpp)
    endif()
-   if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10 )
-      target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
+   if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU" AND FESOM_ALLOW_ARG_MISMATCH)
+      if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
+         target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch) # gfortran v10 is strict about erroneous API calls: "Rank mismatch between actual argument at (1) and actual argument at (2) (scalar and rank-1)"
+      else()
+         target_compile_options(${PROJECT_NAME} PRIVATE -Wno-argument-mismatch)
+      endif()
    endif()
    
    # platform specific compiler flags
@@ -362,7 +508,7 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
       # |             | -mno-fma4 -mavx2 -mfma                                            |      |
       # | GCC/openMPI | -O3 -march=znver3 -mtune=znver3 -ftree-vectorize -flto            | 280s | chatgpt recomendation
       # |             | -mcpu=znver3                                                      |      |
-      target_compile_options(${PROJECT_NAME} PRIVATE -march=znver3 -mtune=znver3 -ftree-vectorize -flto)      
+      target_compile_options(${PROJECT_NAME} PRIVATE -march=znver3 -mtune=znver3 -ftree-vectorize -flto -fPIC)      
    else()
       #[[if(NOT (${FESOM_PLATFORM_STRATEGY} STREQUAL ubuntu))
          target_compile_options(${PROJECT_NAME} PRIVATE -native)
@@ -383,13 +529,19 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL  GNU )
                            #-finit-integer=-9999 
                            #-fsanitize=undefined,address
                         #)
-   ## if use -fsanitize=undefined,address you also need ... PRIVATE -lubsan)           
+   # if use -fsanitize=undefined,address you also need ... PRIVATE -lubsan)           
    #target_link_libraries(${PROJECT_NAME} PRIVATE -lubsan)
                      
 
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
 	#target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -N 1023 -g -G2 -O3)
-   target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s real64 -N 1023 -g -G2 -O2 -hnoacc -M878)  #-hnoacc is a workaround for cray automatically activate -hacc, -M878 is to suppress ftn-878 warning
+   # default real kind follows USE_SINGLE_PRECISION
+   if(USE_SINGLE_PRECISION)
+      set(_FESOM_CRAY_RKIND real32)
+   else()
+      set(_FESOM_CRAY_RKIND real64)
+   endif()
+   target_compile_options(${PROJECT_NAME} PRIVATE -c -emf -hbyteswapio -hflex_mp=conservative -hfp1 -hadd_paren -Ounroll0 -hipa0 -r am -s ${_FESOM_CRAY_RKIND} -N 1023 -g -G2 -O2 -hnoacc -M878)  #-hnoacc is a workaround for cray automatically activate -hacc, -M878 is to suppress ftn-878 warning
    if(${ENABLE_OPENMP})
       target_compile_options(${PROJECT_NAME} PRIVATE -homp)
    else()
@@ -403,10 +555,16 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL Cray )
    endif()
 elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
    target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_NVHPC_WORKAROUNDS)
+   # default real kind follows USE_SINGLE_PRECISION
+   if(USE_SINGLE_PRECISION)
+      set(_FESOM_NVHPC_RKIND -Mr4)
+   else()
+      set(_FESOM_NVHPC_RKIND -Mr8)
+   endif()
    if(${ENABLE_OPENACC})
       target_compile_options(${PROJECT_NAME} PRIVATE
-      $<$<CONFIG:DEBUG>:-Mallocatable=95 -Mr8 -pgf90libs -Mnofma -Minfo=all -acc=verystrict -gpu=math_uniform,cuda12.2,cc80>
-      $<$<CONFIG:RELEASE>:-Mallocatable=95 -Mr8 -pgf90libs -Minfo=all -acc=verystrict -gpu=cc80>)
+      $<$<CONFIG:DEBUG>:-Mallocatable=95 ${_FESOM_NVHPC_RKIND} -pgf90libs -Mnofma -Minfo=all -acc=verystrict -gpu=math_uniform,cuda12.2,cc80>
+      $<$<CONFIG:RELEASE>:-Mallocatable=95 ${_FESOM_NVHPC_RKIND} -pgf90libs -Minfo=all -acc=verystrict -gpu=cc80>)
       set(CMAKE_EXE_LINKER_FLAGS_DEBUG "-acc=verystrict -Mnofma -gpu=math_uniform,cuda12.2,cc80")
       set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-acc=verystrict -gpu=cc80")
       if(${DISABLE_OPENACC_ATOMICS})
@@ -414,10 +572,12 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
       endif()
    else()
       target_compile_options(${PROJECT_NAME} PRIVATE 
-      $<$<CONFIG:DEBUG>:-Mallocatable=95 -Mr8 -pgf90libs -Mnofma>
-      $<$<CONFIG:RELEASE>:-Mallocatable=95 -Mr8 -pgf90libs>)
+      $<$<CONFIG:DEBUG>:-Mallocatable=95 ${_FESOM_NVHPC_RKIND} -pgf90libs -Mnofma>
+      $<$<CONFIG:RELEASE>:-Mallocatable=95 ${_FESOM_NVHPC_RKIND} -pgf90libs>)
    endif()
 endif()
+
+target_compile_options(${PROJECT_NAME} PRIVATE ${FESOM_RUNTIME_CHECK_FLAGS} ${FESOM_BUILD_CHECK_FLAGS})
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${NETCDF_Fortran_INCLUDE_DIRECTORIES} ${OASIS_Fortran_INCLUDE_DIRECTORIES})
 target_include_directories(${PROJECT_NAME} PRIVATE ${MCT_Fortran_INCLUDE_DIRECTORIES} ${MPEU_Fortran_INCLUDE_DIRECTORIES})
@@ -430,6 +590,13 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${MCT_Fortran_LIBRARIES} ${MPEU_Fo
 # OASIS-YAK
 target_link_libraries(${PROJECT_NAME} PRIVATE ${YACUTILS_Fortran_LIBRARIES} ${YACCORE_Fortran_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} PRIVATE ${YAXT_Fortran_LIBRARIES} ${YAXTC_Fortran_LIBRARIES})
+# Use PUBLIC linkage for YAC when building from source (BUILD_YAC=ON)
+# This ensures transitive shared library dependencies (like libfyaml) are propagated to fesom.x
+if(BUILD_YAC)
+    target_link_libraries(${PROJECT_NAME} PUBLIC ${YAC_Fortran_LIBRARIES})
+else()
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${YAC_Fortran_LIBRARIES})
+endif()
 
 
 #set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
@@ -448,23 +615,13 @@ target_link_libraries(${PROJECT_NAME} PRIVATE ${YAXT_Fortran_LIBRARIES} ${YAXTC_
    
 # fesom.x executable
 add_executable(${PROJECT_NAME}.x ${src_home}/fesom_main.F90)
+target_compile_options(${PROJECT_NAME}.x PRIVATE ${FESOM_RUNTIME_CHECK_FLAGS} ${FESOM_BUILD_CHECK_FLAGS})
 target_link_libraries(${PROJECT_NAME}.x PUBLIC ${PROJECT_NAME})
-
-# When BUILD_NETCDF is enabled, explicitly link NetCDF libraries to the executable
-# This ensures proper dependency propagation from the shared library
-if(BUILD_NETCDF)
-    target_link_libraries(${PROJECT_NAME}.x PRIVATE ${NETCDF_Fortran_LIBRARIES} ${NETCDF_C_LIBRARIES})
-    # Set RPATH so the executable can find both FESOM and NetCDF libraries at runtime
-    set_target_properties(${PROJECT_NAME}.x PROPERTIES
-        INSTALL_RPATH "${CMAKE_BINARY_DIR}/external/netcdf/lib:${CMAKE_BINARY_DIR}/../lib"
-        BUILD_RPATH "${CMAKE_BINARY_DIR}/external/netcdf/lib:${CMAKE_BINARY_DIR}/../lib"
-    )
-    message(STATUS "NetCDF4 will be downloaded, built and used with fesom2")
-endif()
 
 # fesom_meshdiag executable (optional)
 if(BUILD_MESHDIAG)
     add_executable(fesom_meshdiag ${src_home}/fesom_meshdiag.F90)
+    target_compile_options(fesom_meshdiag PRIVATE ${FESOM_RUNTIME_CHECK_FLAGS} ${FESOM_BUILD_CHECK_FLAGS})
     target_link_libraries(fesom_meshdiag PUBLIC ${PROJECT_NAME})
     target_link_libraries(fesom_meshdiag PRIVATE MPI::MPI_Fortran)
     

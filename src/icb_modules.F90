@@ -48,7 +48,6 @@ save
   ! =========================================== !
   logical       :: l_melt = .true.              ! (use melting parametrization?)
   logical       :: l_weeksmellor = .true.       ! (use weeks & mellor stability criterion?)
-  logical       :: l_allowgrounding = .true.    ! (are icebergs allowed to ground?)
   real,dimension(:), allocatable:: draft_scale  ! (account for irregularities of draft
   ! =========================================== !
   logical       :: l_tides = .false.            ! (simulate sensitivity to tides? !!check for HLRN-III!!)
@@ -78,6 +77,10 @@ save
   character(100):: width_icb_file='icb_length.dat' !iceberg width [m]
   character(100):: height_icb_file='icb_height.dat' !iceberg height [m]
   character(100):: scaling_file='icb_scaling.dat' !scaling factor
+  character(100):: iron_icb_file='icb_iron.dat' !Fe concentration of each iceberg [mol m-3]
+  character(100):: IcebergRestartPath_iron='iceberg.restart.iron'
+  character(100):: IcebergRestartPath_iron_ISM='iceberg.restart.iron.ISM'
+  character(100):: calving_day_file='icb_calving_day.dat' !calving day for each iceberg
   
   !===== OUTPUT RELATED SETTINGS  =====
   integer :: icb_outfreq           ! 180; for FESOM_dt=2min this is 6 hourly output !120; for FESOM_dt=3min this is 6 hourly output
@@ -95,6 +98,8 @@ save
   real,dimension(:), allocatable:: bvl_mean, lvlv_mean, lvle_mean, lvlb_mean !averaged volume losses
   !real,dimension(:), allocatable:: fw_flux_ib, hfb_flux_ib
   real,dimension(:), allocatable:: fwe_flux_ib, fwl_flux_ib, fwb_flux_ib, fwbv_flux_ib
+  real,dimension(:), allocatable:: iron_conc_ib  !Fe concentration of the ice [mol m-3], constant per iceberg
+  real,dimension(:), allocatable:: iron_flux_ib  !Fe release rate of one iceberg [mol s-1]
   real,dimension(:), allocatable:: hfe_flux_ib, hfb_flux_ib, lhfb_flux_ib
   real,dimension(:,:), allocatable:: hfl_flux_ib, hfbv_flux_ib
   real,dimension(:), allocatable:: wave_erosion_potential
@@ -107,6 +112,7 @@ save
   real,dimension(:), allocatable:: ibfwbv   !freshwater flux into ocean from basal melting
   real,dimension(:), allocatable:: ibfwl   !freshwater flux into ocean from lateral melting
   real,dimension(:), allocatable:: ibfwe   !freshwater flux into ocean from erosion
+  real,dimension(:), allocatable:: ibiron  !iron flux into ocean from iceberg melting [mol m-2 s-1]
   integer,dimension(:), allocatable:: scaling   !scaling factor
 
   logical,dimension(:), allocatable::   melted  !1 if iceberg melted, 0 otherwise
@@ -116,7 +122,7 @@ save
   real,dimension(:), allocatable:: arr_block
   integer,dimension(:), allocatable:: elem_block
   integer,dimension(:), allocatable:: pe_block
-  real(real64), dimension(:), allocatable:: elem_area_glob
+  real(kind=WP), dimension(:), allocatable:: elem_area_glob
   real,dimension(:), allocatable:: vl_block
 
   !array for output in netcdf
@@ -141,8 +147,7 @@ type(t_partit), intent(in), target :: partit
 if (use_cavity) then
 ! kh 09.08.21 change index_nod2d -> bc_index_nod2d?
  if (.not. use_cavityonelem) then
-   reject_elem = any(mesh%cavity_depth(mesh%elem2D_nodes(:,elem))/=0.0) .OR. all(mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) 
-   !reject_elem = all( (mesh%cavity_depth(mesh%elem2D_nodes(:,elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
+   reject_elem = all( (mesh%cavity_depth(mesh%elem2D_nodes(:,elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
  !else
  end if
 else

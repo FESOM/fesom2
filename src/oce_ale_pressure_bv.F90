@@ -11,11 +11,12 @@ end module densityJM_components_interface
 
 module density_linear_interface
   interface
-    subroutine density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out)
+    subroutine density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out, depth)
       USE MOD_PARSUP
       USE o_param
       real(kind=WP),  intent(IN)             :: t,s
       real(kind=WP),  intent(OUT)            :: bulk_0, bulk_pz, bulk_pz2, rho_out
+      real(kind=WP),  intent(IN),   optional :: depth
     end subroutine density_linear
   end interface
 end module density_linear_interface
@@ -204,7 +205,7 @@ subroutine pressure_bv(tracers, partit, mesh)
     USE o_ARRAYS
     USE g_support
     USE o_mixing_KPP_mod, only: dbsfc
-    USE diagnostics,      only: ldiag_dMOC
+    USE diagnostics,      only: ldiag_dMOC, dmoc_is_due
     use densityJM_components_interface
     use density_linear_interface
     IMPLICIT NONE
@@ -218,7 +219,7 @@ subroutine pressure_bv(tracers, partit, mesh)
     real(kind=WP)                           :: sigma_theta_crit=0.125_WP   !kg/m3, Levitus threshold for computing MLD2
     real(kind=WP)                           :: sigma_theta_crit_cmor=0.03_WP   !kg/m3, Griffies threshold for computing MLD3
     logical                                 :: flag1, flag2, flag3, mixing_kpp
-    logical                                 :: smooth_bv_vertical=.false. ! smoothing Bv in vertical is sometimes necessary in order to avoid vertival noise in Kv/Av
+!PS     logical                                 :: smooth_bv_vertical=.false. ! smoothing Bv in vertical is sometimes necessary in order to avoid vertival noise in Kv/Av
     real(kind=WP),  dimension(:,:), pointer :: temp, salt
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -246,14 +247,15 @@ subroutine pressure_bv(tracers, partit, mesh)
 
     !___________________________________________________________________________
     ! model explodes, no OpenMP parallelization !
-    if( a < 0.0_WP ) then
+    ! absolute S<0 <=> anomaly < -S_ref (S_ref=0 unless use_salt_anomaly)
+    if( a < -S_ref_anomaly ) then
         write (*,*)' --> pressure_bv: s<0 happens!', a
         pe_status=1
         do node=1, myDim_nod2D+eDim_nod2D
             nzmin = ulevels_nod2D(node)
             nzmax = nlevels_nod2D(node)
             do nz=nzmin, nzmax-1
-                if (salt(nz, node) < 0) write (*,*) 'the model blows up at n=', mylist_nod2D(node), ' ; ', 'nz=', nz
+                if (salt(nz, node) < -S_ref_anomaly) write (*,*) 'the model blows up at n=', mylist_nod2D(node), ' ; ', 'nz=', nz
             end do
         end do
     endif
@@ -286,7 +288,9 @@ subroutine pressure_bv(tracers, partit, mesh)
             s=salt(nz, node)
             select case(state_equation)
                 case(0)
-                    call density_linear(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
+                    ! depth (positive-downward, [m]) is only used by the neverworld2 branch's
+                    ! optional do_thermobar term -- every other branch/config ignores it
+                    call density_linear(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz), depth=abs(Z_3d_n(nz,node)))
                 case(1)
                     call densityJM_components(t, s, bulk_0(nz), bulk_pz(nz), bulk_pz2(nz), rhopot(nz))
                 case default !unknown
@@ -299,25 +303,26 @@ subroutine pressure_bv(tracers, partit, mesh)
         !NR and did not vectorize the full loop.
         !_______________________________________________________________________
         ! calculate density for MOC
-        if (ldiag_dMOC) then
-            !!PS do nz=1, nl1
+        if (ldiag_dMOC .and. dmoc_is_due(mstep)) then
             do nz=nzmin, nzmax-1
                 rho(nz)              = bulk_0(nz) - 2000._WP*(bulk_pz(nz)   -2000._WP*bulk_pz2(nz))
-                density_dmoc(nz,node)= rho(nz)*rhopot(nz)/(rho(nz)-200._WP)
+                density_dmoc(nz,node)= rho(nz)*rhopot(nz)/(rho(nz)-200._WP*real(state_equation))
                         !           density_dmoc(nz,node)   = rhopot(nz)
             end do
-        end if
+        end if 
 
         !_______________________________________________________________________
         ! compute density for PGF
-        !!PS do nz=1, nl1
         do nz=nzmin, nzmax-1
             !___________________________________________________________________
+            ! compute institu-density at each depth layer (includes Temperature 
+            ! effects, Salinity effects, Pressure/compression effects 
             rho(nz) = bulk_0(nz) + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
             !!PS rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node))-density_0
             rho(nz) = rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node)*real(state_equation))-density_ref(nz,node)
             density_m_rho0(nz,node) = rho(nz)
-
+            density_sigma0(nz,node) = rhopot(nz)-density_ref(nz,node)
+            
             !___________________________________________________________________
             ! buoyancy difference between the surface and the grid points blow (adopted from FESOM 1.4)
             ! --> bring density of surface point adiabatically to the same
@@ -358,9 +363,12 @@ subroutine pressure_bv(tracers, partit, mesh)
                         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
                 end select
                 !_______________________________________________________________
+                ! compute institu-density in cavity at each depth layer (includes
+                ! Temperature effects, Salinity effects, Pressure/compression effects 
                 rho(nz)= bulk_0(nz)   + Z_3d_n(nz,node)*(bulk_pz(nz)   + Z_3d_n(nz,node)*bulk_pz2(nz))
                 rho(nz)=rho(nz)*rhopot(nz)/(rho(nz)+0.1_WP*Z_3d_n(nz,node)*real(state_equation))-density_ref(nz,node)
                 density_m_rho0(nz,node) = rho(nz)
+                density_sigma0(nz,node) = rhopot(nz)-density_ref(nz,node)
             end do
         end if
 
@@ -479,7 +487,7 @@ subroutine pressure_bv(tracers, partit, mesh)
         ! bv_ref
         !_______________________________________________________________________
         ! BV is defined on full levels except for the first and the last ones.
-        if (smooth_bv_vertical) then
+        if (N2smth_v) then
            do nz=nzmin+1,nzmax-1
               bv1(nz)=        (zbar_3d_n(nz-1,node)-zbar_3d_n(nz,  node))*(bvfreq(nz-1,node)+bvfreq(nz,  node))
               bv1(nz)=bv1(nz)+(zbar_3d_n(nz,  node)-zbar_3d_n(nz+1,node))*(bvfreq(nz,  node)+bvfreq(nz+1,node))
@@ -493,7 +501,11 @@ subroutine pressure_bv(tracers, partit, mesh)
 !$OMP END DO
 !$OMP BARRIER
 !$OMP END PARALLEL
-call smooth_nod (bvfreq, 1, partit, mesh)
+
+!_______________________________________________________________________________
+! apply horizontal smoothing of N2 bouyancy frequency
+if (N2smth_h) call smooth_nod (bvfreq, N2smth_hidx, partit, mesh)
+
 end subroutine pressure_bv
 !
 !
@@ -2559,6 +2571,46 @@ end subroutine pressure_force_4_zxxxx_easypgf
 !
 !
 !===============================================================================
+! Computes in-situ density anomaly at a specified pressure/depth using the 
+! Jackett-McDougall equation of state. This is a convenience wrapper that 
+! combines densityJM_components with the Taylor expansion in a single call.
+!
+! INPUT:
+!   t          - in-situ temperature (°C)
+!   s          - salinity (psu)
+!   pz         - depth (m, negative) OR pressure (dbar, positive)
+!                The sign convention depends on usage context
+!   partit     - partition structure
+!   mesh       - mesh structure
+!
+! OUTPUT:
+!   rho_out    - in-situ density anomaly: ρ_insitu - ρ₀, kg/m³
+!                where ρ₀ = 1000 kg/m³ (density_0)
+!
+! ALGORITHM:
+!   1. Call densityJM_components to get EOS components:
+!      bulk_0, bulk_pz, bulk_pz2, rhopot
+!
+!   2. Apply Taylor expansion for pressure/depth effects:
+!      bulk = bulk_0 + pz·(bulk_pz + pz·bulk_pz2)
+!
+!   3. Apply compressibility correction:
+!      ρ_insitu = bulk·rhopot / (bulk + 0.1·pz)
+!      
+!      The 0.1 factor converts depth [m] to pressure [dbar]: P ≈ 0.1·|z|
+!
+!   4. Subtract reference density (1000 kg/m³) to get anomaly:
+!      rho_out = ρ_insitu - 1000
+!
+! USE CASE:
+!   This routine is useful when you need in-situ density at a single point
+!   without storing intermediate EOS components. For bulk calculations over
+!   the entire domain, use densityJM_components directly (more efficient).
+!
+! NOTE:
+!   - Returns density ANOMALY (minus 1000 kg/m³), not absolute density
+!   - Includes full pressure/compressibility effects → in-situ density
+!   - Different from potential density (which has no pressure effects)
 SUBROUTINE densityJM_local(t, s, pz, rho_out, partit, mesh)
 USE MOD_MESH
 USE MOD_PARTIT
@@ -2598,6 +2650,51 @@ end subroutine densityJM_local
 !
 !
 !===============================================================================
+! Computes components of the Jackett-McDougall equation of state for seawater.
+! This split-form approach separates density into surface density and pressure
+! derivatives, enabling efficient computation of both potential and in-situ 
+! density from a single EOS call.
+!
+! INPUT:
+!   t          - in-situ temperature (°C)
+!   s          - salinity (psu)
+!
+! OUTPUT:
+!   bulk_0     - density at surface pressure (P=0 dbar), kg/m³
+!                This is approximately the potential density ρ₀(T,S,P=0)
+!   bulk_pz    - first derivative of density w.r.t. pressure: ∂ρ/∂P, kg/m³/dbar
+!   bulk_pz2   - second derivative of density w.r.t. pressure: ∂²ρ/∂P², kg/m³/dbar²
+!   rhopot     - potential density referenced to surface (σ₀), kg/m³
+!
+! USAGE - Computing In-Situ Density:
+!   In-situ density at depth z (negative, in meters) is computed via Taylor 
+!   expansion around surface pressure:
+!
+!   ρ_insitu(z) = bulk_0 + z·(bulk_pz + z·bulk_pz2)
+!
+!   This accounts for compressibility: water gets denser with increasing pressure.
+!   A compressibility correction is then applied:
+!
+!   ρ_insitu(z) = ρ_insitu·rhopot / (ρ_insitu + 0.1·z·state_eq)
+!
+!   The factor 0.1 is a UNIT CONVERSION from depth [m] to pressure [dbar]:
+!     P [dbar] ≈ 0.1 × |z| [m]
+!   Example: at z = -2000 m → P ≈ 200 dbar
+!   This ensures the pressure-dependent correction term has correct units, since
+!   bulk_pz and bulk_pz2 are derivatives w.r.t. pressure in decibars.
+!
+!   Finally, subtract reference density to get density anomaly:
+!
+!   density_m_rho0(z) = ρ_insitu(z) - density_ref(z)
+!
+! WHY SPLIT FORM?
+!   - Efficient: One EOS call provides both potential and in-situ density
+!   - Accurate: Taylor expansion reduces pressure gradient errors
+!   - Flexible: Can compute density at any depth without repeated EOS calls
+!
+! NOTE: 
+!   - Potential density (rhopot) has NO pressure effects → water mass properties
+!   - In-situ density includes pressure → used for dynamics and PGF calculations
 SUBROUTINE densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot)
 USE MOD_PARSUP !, only: par_ex,pe_status
 USE o_ARRAYS
@@ -2615,9 +2712,10 @@ IMPLICIT NONE
   !---------------------------------------------------------------------------
   ! N. Rakowski 2014 the split form
   !---------------------------------------------------------------------------
+  
   real(kind=WP),  intent(IN)            :: t,s
   real(kind=WP),  intent(OUT)           :: bulk_0, bulk_pz, bulk_pz2, rhopot
-  real(kind=WP)                         :: s_sqrt
+  real(kind=WP)                         :: s_sqrt, s_abs
 
   real(kind=WP), parameter   :: a0    = 19092.56,     at   = 209.8925
   real(kind=WP), parameter   :: at2   = -3.041638,    at3  = -1.852732e-3
@@ -2646,22 +2744,23 @@ IMPLICIT NONE
 
   !compute secant bulk modulus
 
-  s_sqrt = sqrt(s)
+  s_abs = s + S_ref_anomaly   ! EOS needs absolute salinity (S_ref=0 unless use_salt_anomaly)
+  s_sqrt = sqrt(s_abs)
 
   bulk_0 =  a0      + t*(at   + t*(at2  + t*(at3 + t*at4)))      &
-          + s* (as  + t*(ast  + t*(ast2 + t*ast3))               &
+          + s_abs* (as  + t*(ast  + t*(ast2 + t*ast3))               &
                + s_sqrt*(ass  + t*(asst + t*asst2)))
 
   bulk_pz =  ap  + t*(apt  + t*(apt2 + t*apt3))                  &
-                  + s*(aps + t*(apst + t*apst2) + s_sqrt*apss)
+                  + s_abs*(aps + t*(apst + t*apst2) + s_sqrt*apss)
 
   bulk_pz2 = ap2 + t*(ap2t + t*ap2t2)		                 &
-                + s *(ap2s + t*(ap2st + t*ap2st2))
+                + s_abs *(ap2s + t*(ap2st + t*ap2st2))
 
   rhopot =  b0 + t*(bt + t*(bt2 + t*(bt3  + t*(bt4  + t*bt5))))	 &
-               + s*(bs + t*(bst + t*(bst2 + t*(bst3 + t*bst4)))  &
+               + s_abs*(bs + t*(bst + t*(bst2 + t*(bst3 + t*bst4)))  &
                   + s_sqrt*(bss + t*(bsst + t*bsst2))            &
-                       + s* bss2)
+                       + s_abs* bss2)
 end subroutine densityJM_components
 !
 !
@@ -2773,21 +2872,48 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
   USE MOD_PARSUP
   use o_arrays
   use o_param
+  use g_config
   use g_comm_auto
-  use diagnostics, only: sw_alpha_diap, sw_beta_diap
+  use Toy_Neverworld2, only: thermal_alpha, do_cabbeling, cabbeling_Cb, do_thermobar, thermobaric_Th, do_haline, haline_beta
   implicit none
   !
   type(t_mesh),   intent(in) ,    target :: mesh
   type(t_partit), intent(inout),  target :: partit
   integer                                :: n, nz, nzmin, nzmax
   real(kind=WP)                          :: t1, t1_2, t1_3, t1_4, p1, p1_2, p1_3, s1, s35, s35_2
-  real(kind=WP)                          :: a_over_b, a, b
+  real(kind=WP)                          :: a_over_b
+  real(kind=WP)                          :: sw_alpha_lin, sw_beta_lin
   real(kind=WP)                          :: TF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D),SF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+
+  ! For state_equation==0 (linear EOS, "toy" configs) alpha/beta are constant
+  ! and must mirror the exact linear density law used in density_linear(),
+  ! not the McDougall (1987) nonlinear polynomial below -- otherwise the
+  ! neutral slopes fed into Redi/GM are inconsistent with the density that
+  ! actually drives the model.
+  if (state_equation==0) then
+     if ((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) then
+        sw_alpha_lin = 0.00025_WP
+        sw_beta_lin  = 0.0_WP
+     else if ((toy_ocean) .AND. (TRIM(which_toy)=="dbgyre")) then
+        sw_alpha_lin = 0.0002052_WP
+        sw_beta_lin  = 0.00079_WP
+     else if ((toy_ocean) .AND. (TRIM(which_toy)=="neverworld2")) then
+        sw_alpha_lin = thermal_alpha
+        if (do_haline) then
+           sw_beta_lin = haline_beta
+        else
+           sw_beta_lin = 0.0_WP
+        end if
+     else
+        sw_alpha_lin = 0.2_WP/density_0
+        sw_beta_lin  = 0.8_WP/density_0
+     end if
+  end if
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmin, nzmax, t1, t1_2, t1_3, t1_4, p1, p1_2, p1_3, s1, s35, s35_2, a_over_b)
 !$OMP DO
@@ -2797,8 +2923,24 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
      !!PS do nz=1, nlevels_nod2d(n) -1
      do nz=nzmin, nzmax-1
 
+     if (state_equation==0) then
+        if ((toy_ocean) .AND. (TRIM(which_toy)=="neverworld2") .AND. (do_cabbeling .OR. do_thermobar)) then
+           ! local alpha = -(1/rho0)*d(rho)/dT, mirroring density_linear()'s alpha_local:
+           ! thermal_alpha, plus cabbeling's cabbeling_Cb*(T-10) and/or thermobaricity's
+           ! thermobaric_Th*depth (depth positive-downward [m], via abs(Z_3d_n)) -- same
+           ! consistency requirement as the plain-linear/cabbeling-only cases above it.
+           sw_alpha(nz,n) = thermal_alpha
+           if (do_cabbeling) sw_alpha(nz,n) = sw_alpha(nz,n) + cabbeling_Cb*(TF1(nz,n)-10.0_WP)
+           if (do_thermobar) sw_alpha(nz,n) = sw_alpha(nz,n) + thermobaric_Th*abs(Z_3d_n(nz,n))
+        else
+           sw_alpha(nz,n) = sw_alpha_lin
+        end if
+        sw_beta(nz,n)  = sw_beta_lin
+        cycle
+     end if
+
      t1 = TF1(nz,n)*1.00024_WP
-     s1 = SF1(nz,n)
+     s1 = SF1(nz,n) + S_ref_anomaly   ! McDougall polynomial wants absolute (S_ref=0 unless use_salt_anomaly)
     !!PS      p1 = abs(Z(nz))
      p1 = abs(Z_3d_n(nz,n))
 
@@ -2833,33 +2975,6 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
 
      ! calculate alpha
      sw_alpha(nz,n) = a_over_b*sw_beta(nz,n)
-
-     p1 = 2000._WP
-     ! calculate beta
-     b = 0.785567e-3_WP - 0.301985e-5_WP*t1 &
-          + 0.555579e-7_WP*t1_2 - 0.415613e-9_WP*t1_3 &
-          + s35*(-0.356603e-6_WP + 0.788212e-8_WP*t1 &
-          + 0.408195e-10_WP*p1 - 0.602281e-15_WP*p1_2) &
-          + s35_2*(0.515032e-8_WP) &
-          + p1*(-0.121555e-7_WP + 0.192867e-9_WP*t1 - 0.213127e-11_WP*t1_2) &
-          + p1_2*(0.176621e-12_WP - 0.175379e-14_WP*t1) &
-          + p1_3*(0.121551e-17_WP)
-
-     ! calculate the thermal expansion / saline contraction ratio
-     a_over_b = 0.665157e-1_WP + 0.170907e-1_WP*t1 &
-          - 0.203814e-3_WP*t1_2 + 0.298357e-5_WP*t1_3 &
-          - 0.255019e-7_WP*t1_4 &
-          + s35*(0.378110e-2_WP - 0.846960e-4_WP*t1 &
-          - 0.164759e-6_WP*p1 - 0.251520e-11_WP*p1_2) &
-          + s35_2*(-0.678662e-5_WP) &
-          + p1*(0.380374e-4_WP - 0.933746e-6_WP*t1 + 0.791325e-8_WP*t1_2) &
-          + p1_2*t1_2*(0.512857e-12_WP) &
-          - p1_3*(0.302285e-13_WP)
-
-     ! calculate alpha
-      a = a_over_b*b
-sw_alpha_diap(nz,n)=sw_alpha_diap(nz,n)+a
-sw_beta_diap(nz,n)=sw_beta_diap(nz,n)+b
    end do
  end do
 !$OMP END DO
@@ -2984,7 +3099,10 @@ subroutine compute_neutral_slope(partit, mesh)
     integer                                :: edge
     real(kind=WP)                          :: deltaX1, deltaY1, deltaX2, deltaY2
     integer                                :: n, nz, nl1, ul1, el(2), elnodes(3), enodes(2)
-    real(kind=WP)                          :: c, ro_z_inv, eps, S_cr, S_d
+    real(kind=WP)                          :: c, ro_z_inv, eps !PS, S_cr, S_d
+    real(kind=WP)                          :: f_min=1.0e-6_WP, dep_scale, rssby
+    real(kind=WP), dimension(:)            :: c1(mesh%nl-1), c2(mesh%nl-1)
+    
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -2992,15 +3110,30 @@ subroutine compute_neutral_slope(partit, mesh)
 #include "associate_mesh_ass.h"
     !if sigma_xy is not computed
     eps=5.0e-6_WP
-    S_cr=1.0e-2_WP
-    S_d=1.0e-3_WP
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, n, nz, nl1, ul1, el, elnodes, enodes, c, ro_z_inv)
+!PS     S_cr=1.0e-2_WP
+!PS     S_d=1.0e-3_WP
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, n, nz, nl1, ul1, el, elnodes, enodes, c, ro_z_inv, dep_scale, rssby, c1, c2) FIRSTPRIVATE(f_min)
 !$OMP DO
     do n=1, myDim_nod2D
         slope_tapered(: , :, n)=0._WP
         nl1=nlevels_nod2d(n)-1
         ul1=ulevels_nod2d(n)
-        do nz = ul1+1, nl1
+!PS         do nz = ul1+1, nl1
+!PS             !without minus, because neutral slope S=-(nabla\rho)/(d\rho/dz)
+!PS             ! --> the minus sign is hidden within the definition of buoyancy
+!PS             ! --> N2 = -g*drho/dz
+!PS             ro_z_inv=2._WP*g/density_0/max(bvfreq(nz,n)+bvfreq(nz+1,n), eps**2) 
+!PS             neutral_slope(1,nz,n)=sigma_xy(1,nz,n)*ro_z_inv
+!PS             neutral_slope(2,nz,n)=sigma_xy(2,nz,n)*ro_z_inv
+!PS             neutral_slope(3,nz,n)=sqrt(neutral_slope(1,nz,n)**2+neutral_slope(2,nz,n)**2)
+!PS             !tapering
+!PS             c=1.0_WP
+!PS             c=0.5_WP*(1.0_WP + tanh((S_cr - neutral_slope(3,nz,n))/S_d))
+!PS             if ((bvfreq(nz,n) <= 0.0_WP) .or. (bvfreq(nz+1,n) <= 0.0_WP)) c=0.0_WP
+!PS             slope_tapered(:,nz,n)=neutral_slope(:,nz,n)*c
+!PS         enddo
+
+        do nz = ul1, nl1
             !without minus, because neutral slope S=-(nabla\rho)/(d\rho/dz)
             ! --> the minus sign is hidden within the definition of buoyancy
             ! --> N2 = -g*drho/dz
@@ -3008,12 +3141,62 @@ subroutine compute_neutral_slope(partit, mesh)
             neutral_slope(1,nz,n)=sigma_xy(1,nz,n)*ro_z_inv
             neutral_slope(2,nz,n)=sigma_xy(2,nz,n)*ro_z_inv
             neutral_slope(3,nz,n)=sqrt(neutral_slope(1,nz,n)**2+neutral_slope(2,nz,n)**2)
-            !tapering
-            c=1.0_WP
-            c=0.5_WP*(1.0_WP + tanh((S_cr - neutral_slope(3,nz,n))/S_d))
-            if ((bvfreq(nz,n) <= 0.0_WP) .or. (bvfreq(nz+1,n) <= 0.0_WP)) c=0.0_WP
-            slope_tapered(:,nz,n)=neutral_slope(:,nz,n)*c
-        enddo
+        end do
+        
+        ! in FESOM1.4 ODM95=True hyperbolic tangent slope tapering tapering
+        ! Danabasoglu and McWilliams, 1995, sensitivity of the global ocean circulation 
+        ! to parameterizations of mesoscale tracer transport, 
+        c1 = 1.0_WP
+        if (scaling_ODM95) then
+            do nz = ul1, nl1
+                c1(nz)=0.5_WP*(1.0_WP + tanh((ODM95_Scr - neutral_slope(3,nz,n))/ODM95_Sd))
+                if ((bvfreq(nz,n) <= 0.0_WP) .or. (bvfreq(nz+1,n) <= 0.0_WP)) c1(nz)=0.0_WP
+            enddo
+        end if     
+        
+        ! in FESOM1.4 LDD97=True
+        ! William G. Large, Gokhan Danabasoglu, Scott C. Doney, and James C. McWilliams, 
+        ! 1997, Sensitivity to Surface Forcing and Boundary Layer Mixing in a 
+        ! Global Ocean Model: Annual-Mean Climatology 
+        ! The second function f2 is designed to reduce the isopycnal mixing near 
+        ! the ocean surface if the isopycnal slopes are too large, thus limiting 
+        ! the competition with vertical mixing. Here, the idea is to compare the water
+        ! parcel depth d with the vertical displacement distance associated with a 
+        ! horizontal displacement equivalent to the Rossby radius of deformation 
+        ! R. Because this radius represents the preferred horizontal length scale
+        ! of the baroclinic eddies, the vertical displacement is given D = R*|S|,
+        ! where usually |S| << 1. The governing parameter becomes the ratio = r/D
+        ! A parcel traveling isopycnally can cover its full horizontal displacement 
+        ! without reaching the surface only for values of r greater than unity. 
+        ! For values of r less than unity the supposed encounter with the surface pre-
+        ! sumably reduces the isopycnal mixing.
+        c2 = 1.0_WP
+        if (scaling_LDD97) then 
+            ! rssby = c_speed(n)/max(abs(mesh%coriolis_node(n)), f_min)
+            rssby = LDD97_c/max(abs(mesh%coriolis_node(n)), f_min)
+            rssby = min(LDD97_rmax, max(LDD97_rmin, rssby))
+            
+            do nz = ul1, nl1
+                dep_scale = rssby*neutral_slope(3,nz,n)
+                if (abs(Z_3d_n(nz, n))< dep_scale) then 
+                    c2(nz) = 0.5_WP * (1.0_WP + sin(pi*abs(Z_3d_n(nz, n))/dep_scale - pi/2.0_WP    )) 
+                end if 
+            end do
+        end if
+        
+        ! now taper slope with c1 and c2
+        if (Fer_GM .and. Redi .and. Redi_Ktaper) then 
+            do nz = ul1, nl1
+                fer_tapfac(nz, n) = c1(nz) * c2(nz)
+                !PS slope_tapered(:, nz, n)=neutral_slope(:, nz, n) * c1(nz) * c2(nz)
+                slope_tapered(:, nz, n)=neutral_slope(:, nz, n) * sqrt(c1(nz) * c2(nz))
+            end do    
+        else   
+            do nz = ul1, nl1
+                slope_tapered(:, nz, n)=neutral_slope(:, nz, n) * c1(nz) * c2(nz)
+            end do
+        end if 
+
     enddo
 !$OMP END DO
 !$OMP BARRIER
@@ -3076,17 +3259,20 @@ end subroutine insitu2pot
 !
 !
 !===============================================================================
-SUBROUTINE density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out)
+SUBROUTINE density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out, depth)
 !coded by Margarita Smolentseva, 21.05.2020
 USE MOD_PARSUP !, only: par_ex,pe_status
 USE o_ARRAYS
 USE o_PARAM
 use g_config !, only: which_toy, toy_ocean
+use Toy_Neverworld2, only: thermal_alpha, do_cabbeling, cabbeling_Cb, do_thermobar, thermobaric_Th, do_haline, haline_beta
 IMPLICIT NONE
   real(kind=WP),  intent(IN)             :: t,s
   real(kind=WP),  intent(OUT)            :: rho_out
-  real(kind=WP)                          :: rhopot, bulk
+  real(kind=WP)                          :: rhopot, bulk, s_abs
   real(kind=WP), intent(OUT)             :: bulk_0, bulk_pz, bulk_pz2
+  real(kind=WP), intent(IN),    optional :: depth
+  real(kind=WP)                          :: alpha_local
 
   !compute secant bulk modulus
 
@@ -3094,12 +3280,33 @@ IMPLICIT NONE
   bulk_pz  = 0
   bulk_pz2 = 0
 
+  s_abs = s + S_ref_anomaly   ! linear EOS needs absolute S (S_ref=0 unless use_salt_anomaly)
+
   IF((toy_ocean) .AND. (TRIM(which_toy)=="soufflet")) THEN
       rho_out  = density_0 - 0.00025_WP*(t - 10.0_WP)*density_0
+
   ELSE IF((toy_ocean) .AND. (TRIM(which_toy)=="dbgyre")) THEN
-      rho_out  = density_0 - density_0*0.0002052_WP*(t - 10.0_WP) + density_0*0.00079_WP*(s - 35.0_WP)
+      rho_out  = density_0 - density_0*0.0002052_WP*(t - 10.0_WP) + density_0*0.00079_WP*(s_abs - 35.0_WP)
+
+  ELSE IF((toy_ocean) .AND. (TRIM(which_toy)=="neverworld2")) THEN
+      ! local thermal expansion slope: thermal_alpha, plus cabbeling's quadratic-in-T term
+      ! (do_cabbeling) and/or thermobaricity's depth term (do_thermobar) layered on top --
+      ! both optional, independent, and off by default so the plain linear slope is
+      ! reproduced exactly when neither is active. depth is only present when the caller
+      ! actually has it (see density_linear's optional depth arg) -- absent means 0, i.e.
+      ! surface, matching the pre-thermobaricity behavior for every other call site.
+      alpha_local = thermal_alpha
+      IF (do_cabbeling) alpha_local = alpha_local + 0.5_WP*cabbeling_Cb*(t-10.0_WP)
+      IF (do_thermobar .AND. present(depth)) alpha_local = alpha_local + thermobaric_Th*depth
+      rho_out = density_0 - alpha_local*density_0*(t-10.0_WP)
+      IF (do_haline) THEN
+          ! Linear haline term, independent of do_cabbeling -- see the do_haline
+          ! declaration in Toy_Neverworld2 for the physical rationale/caveats.
+          rho_out = rho_out + density_0*haline_beta*(s_abs - 35.0_WP)
+      END IF
+
   ELSE
-      rho_out  = density_0 + 0.8_WP*(s - 34.0_WP) - 0.2*(t - 20.0_WP)
+      rho_out  = density_0 + 0.8_WP*(s_abs - 34.0_WP) - 0.2*(t - 20.0_WP)
   END IF
 
 end subroutine density_linear
@@ -3118,6 +3325,7 @@ subroutine init_ref_density(partit, mesh)
     use o_PARAM
     use o_ARRAYS
     use densityJM_components_interface
+    use density_linear_interface
     implicit none
 
     !___________________________________________________________________________
@@ -3140,17 +3348,135 @@ subroutine init_ref_density(partit, mesh)
         auxz=min(0.0,Z_3d_n(nzmin,node))
 
         !_______________________________________________________________________
-        call densityJM_components(density_ref_T, density_ref_S, bulk_0, bulk_pz, bulk_pz2, rhopot)
-        rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
-        density_ref(nzmin, node) = rho*rhopot/(rho+0.1_WP*auxz)
+        select case(state_equation)
+            case(0)
+                call density_linear(density_ref_T, density_ref_S, bulk_0, bulk_pz, bulk_pz2, rhopot)
+            case(1)
+                call densityJM_components(density_ref_T, density_ref_S, bulk_0, bulk_pz, bulk_pz2, rhopot)
+            case default !unknown
+                if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        end select
+        rho = bulk_0 + auxz*bulk_pz + auxz*bulk_pz2
+        density_ref(nzmin, node) = rho*rhopot/(rho+0.1_WP*auxz*real(state_equation))
 
         !_______________________________________________________________________
         do nz=nzmin+1,nzmax
             auxz=Z_3d_n(nz,node)
-            rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
-            density_ref(nz,node) = rho*rhopot/(rho+0.1_WP*auxz)
+            rho = bulk_0 + auxz*bulk_pz + auxz*bulk_pz2
+            density_ref(nz,node) = rho*rhopot/(rho+0.1_WP*auxz*real(state_equation))
         end do
     end do
 !$OMP END PARALLEL DO
     if(mype==0) write(*,*) ' --> compute reference density'
 end subroutine init_ref_density
+!
+!===============================================================================
+subroutine init_ref_density_advanced(tracers, partit, mesh)
+    ! compute reference density
+    ! Coded by Qiang Wang
+    ! Reviewed by ??
+    !___________________________________________________________________________
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_TRACER
+    use o_PARAM
+    use o_ARRAYS
+    use densityJM_components_interface
+    use density_linear_interface
+    implicit none
+
+    !___________________________________________________________________________
+    type(t_mesh),   intent(in) ,    target  :: mesh
+    type(t_partit), intent(inout),  target  :: partit
+    type(t_tracer), intent(in),     target  :: tracers
+    integer                                 :: node, nz, nzmin, nzmax
+    real(kind=WP)                           :: rhopot, bulk_0, bulk_pz, bulk_pz2, rho
+    real(kind=WP)                           :: T, S, auxz, x, y
+    real(kind=WP),  dimension(:,:), pointer :: temp, salt
+    real(kind=WP)                           :: ref_temp1D(mesh%nl-1), ref_salt1D(mesh%nl-1), vol1D(mesh%nl-1)
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
+temp=>tracers%data(1)%values(:,:)
+salt=>tracers%data(2)%values(:,:)
+vol1D=0.0_WP
+ref_temp1D=0.0_WP
+ref_salt1D=0.0_WP
+#if !defined(__openmp_reproducible)
+! A "+" reduction combines the per-thread partial sums in a thread-count
+! dependent order, so it is not bit-reproducible: run the loop serially.
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax) REDUCTION(+:vol1D)
+#endif
+do node=1,myDim_nod2d
+    x=geo_coord_nod2D(1,node)/rad
+    y=geo_coord_nod2D(1,node)/rad
+    if ((x>=-6.) .AND. (x<=42) .AND. (y>=30.15) .AND. (y<=42)) CYCLE !exclude Mediterranean Sea
+    if ((x>= 2.) .AND. (x<=42) .AND. (y>=41)    .AND. (y<=48)) CYCLE !exclude Black Sea
+    nzmin = 1
+    nzmax = nlevels_nod2d(node)-1
+    do nz=nzmin,nzmax
+       ref_temp1D(nz)=ref_temp1D(nz)+areasvol(nz,node)*temp(nz,node)
+       ref_salt1D(nz)=ref_salt1D(nz)+areasvol(nz,node)*salt(nz,node)
+       vol1D(nz)=vol1D(nz)+areasvol(nz,node)
+    end do
+end do
+#if !defined(__openmp_reproducible)
+! A "+" reduction combines the per-thread partial sums in a thread-count
+! dependent order, so it is not bit-reproducible: run the loop serially.
+!$OMP END PARALLEL DO
+#endif
+call MPI_Allreduce(MPI_IN_PLACE, ref_temp1D, mesh%nl-1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+call MPI_Allreduce(MPI_IN_PLACE, ref_salt1D, mesh%nl-1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+call MPI_Allreduce(MPI_IN_PLACE,      vol1D, mesh%nl-1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
+
+where( vol1D > 1.e-12_WP) !more than 0.!
+     ref_temp1D=ref_temp1D/vol1D
+     ref_salt1D=ref_salt1D/vol1D
+end where
+! we better rewrite this loop (1) do nz...; (2) do node... later
+!___________________________________________________________________________
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, rhopot, bulk_0, bulk_pz, bulk_pz2, rho, T, S, auxz)
+    do node=1,myDim_nod2d+eDim_nod2d
+        density_ref(:, node) = 0.0_WP
+        nzmin = 1
+        nzmax = nlevels_nod2d(node)-1
+        auxz=min(0.0,Z_3d_n(nzmin,node))
+        do nz=nzmin,nzmax
+            select case(state_equation)
+            case(0)
+                call density_linear(ref_temp1D(nz), ref_salt1D(nz), bulk_0, bulk_pz, bulk_pz2, rhopot)
+            case(1)
+                call densityJM_components(ref_temp1D(nz), ref_salt1D(nz), bulk_0, bulk_pz, bulk_pz2, rhopot)
+            case default !unknown
+                if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+            end select    
+            auxz=Z_3d_n(nz,node)
+            rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
+            density_ref(nz,node) = rho*rhopot/(rho+0.1_WP*auxz*real(state_equation))
+        end do
+    end do
+!$OMP END PARALLEL DO
+if(mype==0) write(*,*) ' --> compute reference density'
+if(mype==0) then
+do nz=1,68
+    select case(state_equation)
+    case(0)
+        call density_linear(ref_temp1D(nz), ref_salt1D(nz), bulk_0, bulk_pz, bulk_pz2, rhopot)
+    case(1) 
+        call densityJM_components(ref_temp1D(nz), ref_salt1D(nz), bulk_0, bulk_pz, bulk_pz2, rhopot)
+    case default !unknown
+        if (mype==0) write(*,*) 'Wrong type of the equation of state. Check your namelists.'
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    end select    
+ auxz=Z(nz)
+ rho = bulk_0   + auxz*bulk_pz   + auxz*bulk_pz2
+ rho = rho*rhopot/(rho+0.1_WP*auxz*real(state_equation))
+ write(*,*) "mytest:", ref_temp1D(nz), ref_salt1D(nz), auxz, rho
+end do
+end if
+end subroutine init_ref_density_advanced

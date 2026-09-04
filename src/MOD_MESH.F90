@@ -3,7 +3,7 @@ MODULE MOD_MESH
 USE O_PARAM
 USE MOD_WRITE_BINARY_ARRAYS
 USE MOD_READ_BINARY_ARRAYS
-USE,     intrinsic    :: ISO_FORTRAN_ENV, only : int32
+USE,     intrinsic    :: ISO_FORTRAN_ENV, only : int32, real64
 IMPLICIT NONE
 SAVE
 integer, parameter    :: MAX_ADJACENT=32 ! Max allowed number of adjacent nodes
@@ -17,6 +17,19 @@ TYPE SPARSE_MATRIX
      integer(int32), allocatable,   dimension(:) :: colind_loc
      integer(int32), allocatable,   dimension(:) :: rowptr_loc
      real(kind=WP),  allocatable,   dimension(:) :: pr_values !preconditioner values
+#if defined(USE_SINGLE_PRECISION)
+     ! Full-precision accumulator for the SSH stiffness matrix, single precision only.
+     ! update_stiff_mat_ale adds a per-step increment whose size relative to the
+     ! entry is ~1e-7..1e-6 -- at or below float32 eps (1.19e-7), so in SP the
+     ! update is partly or wholly swallowed and the matrix drifts. Accumulate here
+     ! and round into %values once per step; the solver's SpMV keeps WP bandwidth.
+     ! Sized to size(%values) (the LOCAL nnz), never to %nza -- see the comment at
+     ! the allocation site in oce_ale.F90.
+     real(kind=real64), allocatable, dimension(:) :: values_full
+#if defined(DIAG_STIFF_DRIFT)
+     real(kind=WP),  allocatable,   dimension(:) :: values_wp_drift
+#endif
+#endif
 END TYPE SPARSE_MATRIX
 
 TYPE T_MESH
@@ -104,7 +117,7 @@ real(kind=WP), allocatable, dimension(:,:)  :: cavity_nrst_cavlpnt_xyz
 !___Elevation stiffness matrix__________________________________________________
 type(sparse_matrix)                         :: ssh_stiff
 
-!#if defined (__oasis)
+!#if defined (__coupled)
 real(kind=WP), allocatable, dimension(:)    :: lump2d_south
 real(kind=WP), allocatable, dimension(:)    :: lump2d_north
 integer,       allocatable, dimension(:)    :: ind_south

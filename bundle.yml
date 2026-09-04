@@ -17,7 +17,7 @@ projects :
         version : main
         cmake   : >
             ENABLE_IFS_INTERFACE=OFF
-            DISABLE_MULTITHREADING=ON
+            ASYNCHRONOUS_IO_THREADS=OFF
             ENABLE_OPENMP=OFF
             BUILD_MESHPARTITIONER=OFF
             BUILD_TESTING=OFF

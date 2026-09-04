@@ -111,25 +111,23 @@ type(t_dyn)   , intent(inout), target :: dynamics
   return !not my node
  end if 
 
- do node=1,myDim_nod2D
-   do k=1, nod_in_elem2D_num(node) 
-     elem  = nod_in_elem2D(k,node) 
+ do k=1, nod_in_elem2D_num(local_idx)
+   elem  = nod_in_elem2D(k,local_idx)
 
-     !do idx_elem = 1,  nod_in_elem2D(local_idx)%nmb
-     !elem = nod_in_elem2D(local_idx)%addresses(idx_elem)
-     !area_ = voltriangle(elem)
-     area_ = elem_area(elem)
-     patch= patch + area_
-     
-     !gradientx = gradientx + area * sum( ssh(elem2D_nodes(:,elem)) * bafux_2D(:,elem) )
-     !gradienty = gradienty + area * sum( ssh(elem2D_nodes(:,elem)) * bafuy_2D(:,elem) )
+   !do idx_elem = 1,  nod_in_elem2D(local_idx)%nmb
+   !elem = nod_in_elem2D(local_idx)%addresses(idx_elem)
+   !area_ = voltriangle(elem)
+   area_ = elem_area(elem)
+   patch= patch + area_
 
-!LA 2023-03-07
+   !gradientx = gradientx + area * sum( ssh(elem2D_nodes(:,elem)) * bafux_2D(:,elem) )
+   !gradienty = gradienty + area * sum( ssh(elem2D_nodes(:,elem)) * bafuy_2D(:,elem) )
+
+! 2023-03-07
 eta_n_ib => dynamics%eta_n_ib(:)
-! kh 18.03.21 use eta_n_ib buffered values here
-     gradientx = gradientx + area_ * sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(1:3, elem)) 
-     gradienty = gradienty + area_ * sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(4:6, elem)) 
-   end do
+!h 18.03.21 use eta_n_ib buffered values here
+   gradientx = gradientx + area_ * sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(1:3, elem))
+   gradienty = gradienty + area_ * sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(4:6, elem))
  end do
  
  gradientx = gradientx / patch
@@ -399,13 +397,12 @@ type(t_partit), intent(inout), target :: partit
   if(i_have_element) then
    i_have_element= elem2D_nodes(1,elem) <= myDim_nod2D !1 PE still .true.
    if (use_cavity) then 
-      !reject_tmp = all( (mesh%cavity_depth(elem2D_nodes(:,elem))/=0.0) .OR. (mesh%bc_index_nod2D(elem2D_nodes(:,elem))==0.0) )
-      reject_tmp = any(mesh%cavity_depth(elem2D_nodes(:,elem))/=0.0) .OR. all(mesh%bc_index_nod2D(elem2D_nodes(:,elem))==0.0)
+      reject_tmp = all( (mesh%cavity_depth(elem2D_nodes(:,elem))/=0.0) .OR. (mesh%bc_index_nod2D(elem2D_nodes(:,elem))==0.0) )
       if(reject_tmp) then
       !if( reject_elem(mesh, partit, elem) ) then
        elem=0 !reject element
        i_have_element=.false.
-       write(*,*) 'elem4all: iceberg found in shelf region: elem = 0'
+       !write(*,*) 'elem4all: iceberg found in shelf region: elem = 0'
       else 
        elem=myList_elem2D(elem) !global now
       end if 
@@ -462,12 +459,17 @@ do m=1, 3
    old_iceberg_elem=elem_containing_n2
    if (use_cavity) then 
       !if( reject_elem(mesh, partit, old_iceberg_elem) ) then
-      !reject_tmp = all( (mesh%cavity_depth(elem2D_nodes(:,ibelem_tmp))/=0.0) .OR. (mesh%bc_index_nod2D(elem2D_nodes(:,ibelem_tmp))==0.0) )
-      reject_tmp = any(mesh%cavity_depth(elem2D_nodes(:,ibelem_tmp))/=0.0) .OR. all(mesh%bc_index_nod2D(elem2D_nodes(:,ibelem_tmp))==0.0)
+      reject_tmp = all( (mesh%cavity_depth(elem2D_nodes(:,elem_containing_n2))/=0.0) .OR. (mesh%bc_index_nod2D(elem2D_nodes(:,elem_containing_n2))==0.0) )
       if(reject_tmp) then
          left_mype=1.0
-         write(*,*) 'iceberg found in shelf region: left_mype = 1'
+         !write(*,*) 'iceberg found in shelf region: left_mype = 1'
          old_iceberg_elem=ibelem_tmp
+         ! Do NOT return here.  At a cavity boundary the trajectory endpoint
+         ! can lie inside both the cavity element and an adjacent non-cavity
+         ! neighbour (shared edge).  If the cavity element is encountered
+         ! first in the search order, returning immediately would miss the
+         ! valid non-cavity alternative and trigger a spurious left_mype=1.
+         cycle
       end if
    endif
    RETURN 
@@ -650,16 +652,25 @@ end subroutine global2local
  !***************************************************************************************************************************
  !***************************************************************************************************************************
 
-subroutine com_integer(partit, i_have_element, iceberg_element)
+subroutine com_integer(partit, i_have_element, iceberg_element, ib)
  use MOD_PARTIT !for npes
  implicit none
  
  logical, intent(in):: i_have_element
  integer, intent(inout):: iceberg_element
  
+ integer, intent(in), optional :: ib
+
  integer:: status(MPI_STATUS_SIZE)
  integer:: req
+ integer:: ierr
  logical:: completed
+ real(kind=8) :: t_start
+ !bugfix 2026-08-12: see commit message. 5 min is far longer than a healthy
+ !MPI_IAllreduce over <=288 ranks should ever take, and short enough to still
+ !leave most of a 2h20 compute-job walltime for a rerun once the root cause
+ !is fixed, instead of burning the whole budget on a silent hang.
+ real(kind=8), parameter :: com_integer_timeout = 300.0
 type(t_partit), intent(inout), target :: partit
 !#include "associate_part_def.h"
 !#include "associate_part_ass.h"
@@ -675,15 +686,39 @@ type(t_partit), intent(inout), target :: partit
 !$omp end critical
  end if
 
+ !bugfix 2026-08-12: com_integer is a collective - every rank in
+ !MPI_COMM_FESOM_IB must reach this call for a given iceberg, or the ranks
+ !that did reach it wait here forever (production hang: spinup_20261108
+ !jobs 26882618 / 26893155, frozen here for the full walltime with zero
+ !further output and no error). Fail loudly with the state needed to find
+ !the diverging rank/iceberg instead of spinning silently until the batch
+ !scheduler kills the job on walltime.
  completed = .false.
+ t_start = MPI_Wtime()
  do while (.not. completed)
 !$omp critical
      CALL MPI_TEST(req, completed, status, partit%MPIERR_IB)
 !$omp end critical
+     if (.not. completed .and. (MPI_Wtime() - t_start) > com_integer_timeout) then
+      if (present(ib)) then
+       write(*,*) 'FATAL: com_integer deadlock on rank ', partit%mype, &
+            ' after ', com_integer_timeout, ' s waiting on iceberg ib=', ib, &
+            '; i_have_element=', i_have_element, ' iceberg_element=', iceberg_element
+      else
+       write(*,*) 'FATAL: com_integer deadlock on rank ', partit%mype, &
+            ' after ', com_integer_timeout, ' s; i_have_element=', i_have_element, &
+            ' iceberg_element=', iceberg_element
+      end if
+      call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
+     end if
  end do
 
  end subroutine com_integer
 
+
+
+ !***************************************************************************************************************************
+ !***************************************************************************************************************************
 
 
  !***************************************************************************************************************************
@@ -710,15 +745,15 @@ type(t_partit), intent(inout), target :: partit
 !       CALL MPI_RECV(he_has_element, 1, MPI_LOGICAL, MPI_ANY_SOURCE, 0, MPI_COMM_FESOM, status, MPIerr )		      
 !       sender = status(MPI_SOURCE)
 !       if (he_has_element) then
-!          CALL MPI_RECV(arr_r, 15, MPI_DOUBLE_PRECISION, sender, 1, MPI_COMM_FESOM, status, MPIerr )
-!	  CALL MPI_RECV(iceberg_element, 1, MPI_DOUBLE_PRECISION, sender, 2, MPI_COMM_FESOM, status, MPIerr )
+!          CALL MPI_RECV(arr_r, 15, MPI_WP, sender, 1, MPI_COMM_FESOM, status, MPIerr )
+!	  CALL MPI_RECV(iceberg_element, 1, MPI_WP, sender, 2, MPI_COMM_FESOM, status, MPIerr )
 !	  arr=arr_r
 !       end if
 !    end do
 ! else
 !       CALL MPI_SEND(i_have_element, 1, MPI_LOGICAL, 0, 0, MPI_COMM_FESOM, MPIerr )
 !       if (i_have_element) then
-!          CALL MPI_SEND(arr, 15, MPI_DOUBLE_PRECISION,0, 1, MPI_COMM_FESOM, MPIerr )
+!          CALL MPI_SEND(arr, 15, MPI_WP,0, 1, MPI_COMM_FESOM, MPIerr )
 !	  CALL MPI_SEND(iceberg_element, 1, MPI_INTEGER,0, 2, MPI_COMM_FESOM, MPIerr )
 !       end if 
 ! end if
@@ -728,15 +763,15 @@ type(t_partit), intent(inout), target :: partit
 !!       CALL MPI_RECV(he_has_element, 1, MPI_LOGICAL, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, status, MPIerr )		      
 !!       sender = status(MPI_SOURCE)
 !!       if (he_has_element) then
-!!          CALL MPI_RECV(arr_r, 15, MPI_DOUBLE_PRECISION, sender, 1, MPI_COMM_WORLD, status, MPIerr )
-!!	  CALL MPI_RECV(iceberg_element, 1, MPI_DOUBLE_PRECISION, sender, 2, MPI_COMM_WORLD, status, MPIerr )
+!!          CALL MPI_RECV(arr_r, 15, MPI_WP, sender, 1, MPI_COMM_WORLD, status, MPIerr )
+!!	  CALL MPI_RECV(iceberg_element, 1, MPI_WP, sender, 2, MPI_COMM_WORLD, status, MPIerr )
 !!	  arr=arr_r
 !!       end if
 !!    end do
 !! else
 !!       CALL MPI_SEND(i_have_element, 1, MPI_LOGICAL, 0, 0, MPI_COMM_WORLD, MPIerr )
 !!       if (i_have_element) then
-!!          CALL MPI_SEND(arr, 15, MPI_DOUBLE_PRECISION,0, 1, MPI_COMM_WORLD, MPIerr )
+!!          CALL MPI_SEND(arr, 15, MPI_WP,0, 1, MPI_COMM_WORLD, MPIerr )
 !!	  CALL MPI_SEND(iceberg_element, 1, MPI_INTEGER,0, 2, MPI_COMM_WORLD, MPIerr )
 !!       end if 
 !! end if
@@ -748,9 +783,9 @@ type(t_partit), intent(inout), target :: partit
 ! !3. datatype - Datentyp der Pufferelemente (handle)
 ! !4. root - Wurzelproze�; der, welcher sendet (integer)
 ! !5. comm - Kommunikator (handle) 
-! CALL MPI_BCAST(arr, 15, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, MPIerr)
+! CALL MPI_BCAST(arr, 15, MPI_WP, 0, MPI_COMM_FESOM, MPIerr)
 ! CALL MPI_BCAST(iceberg_element, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
-! !CALL MPI_BCAST(arr, 15, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, MPIerr)
+! !CALL MPI_BCAST(arr, 15, MPI_WP, 0, MPI_COMM_WORLD, MPIerr)
 ! !CALL MPI_BCAST(iceberg_element, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, MPIerr)
 ! 
 ! ! kh 10.02.21
@@ -862,9 +897,9 @@ subroutine  matrix_inverse_2x2 (A, AINV, DET, elem, coords)
   integer                                   :: elem
   REAL, DIMENSION(2), INTENT(IN) :: coords
   
-  real(kind=8), dimension(2,2), intent(IN)  :: A
-  real(kind=8), dimension(2,2), intent(OUT) :: AINV
-  real(kind=8), intent(OUT)                 :: DET
+  real(kind=WP), dimension(2,2), intent(IN)  :: A
+  real(kind=WP), dimension(2,2), intent(OUT) :: AINV
+  real(kind=WP), intent(OUT)                 :: DET
   integer                                   :: i,j
   
   DET  = A(1,1)*A(2,2) - A(1,2)*A(2,1)

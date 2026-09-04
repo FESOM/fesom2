@@ -9,7 +9,6 @@ time: "00:10:00"
 
 namelist.config:
     timestep:
-        step_per_day: 96
         run_length: 1
         run_length_unit: "d"
     geometry:
@@ -41,8 +40,6 @@ namelist.icepack:
                 prec: 8
 
 namelist.io:
-    diag_list:
-        ldiag_energy: False
     nml_list:
         io_list:
             "sst       ":
@@ -71,13 +68,13 @@ namelist.io:
                 prec: 8
 
 fcheck:
-    a_ice: 0.30599544390558286
-    aicen: 0.061199088781116566
-    salt: 23.866195697592563
-    sst: 8.725992728181598
-    temp: 1.717206734648259
-    u: -0.001444895079544947
-    v: 0.00018599946919795504
+    a_ice: 0.3047270055507339
+    aicen: 0.060945401110146784
+    salt: 34.7288294607061
+    sst: 8.829681276420063
+    temp: 2.479617236150039
+    u: -0.002078913221856313
+    v: 0.000248827373044792
 
  
 

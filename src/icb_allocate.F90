@@ -40,6 +40,8 @@ type(t_mesh), intent(in), target :: mesh
   ibfwl     = 0.0
   ibfwe     = 0.0
   ibfwbv    = 0.0
+  allocate(ibiron(n2))
+  ibiron    = 0.0
   allocate(ibhf_n(mesh%nl, n2))
   ibhf_n    = 0.0_WP
 
@@ -48,7 +50,7 @@ type(t_mesh), intent(in), target :: mesh
   linit_wave_erosion_pot = .true.
 
   allocate(calving_day(ib_num))
-  calving_day = 1   !28.0: September 29 for restart in 1 SEP 97 ! 271.0: September 29 for year 1997
+  calving_day = 0   !28.0: September 29 for restart in 1 SEP 97 ! 271.0: September 29 for year 1997
   allocate(height_ib(ib_num))
   height_ib = 1.0 ! 250.0 ! 360.0
   allocate(length_ib(ib_num))
@@ -114,6 +116,8 @@ type(t_mesh), intent(in), target :: mesh
   allocate(fwl_flux_ib(ib_num))
   allocate(fwb_flux_ib(ib_num))
   allocate(fwbv_flux_ib(ib_num))
+  allocate(iron_conc_ib(ib_num))
+  allocate(iron_flux_ib(ib_num))
   allocate(hfe_flux_ib(ib_num))
   allocate(hfl_flux_ib(ib_num,mesh%nl))
   allocate(hfb_flux_ib(ib_num))
@@ -123,22 +127,24 @@ type(t_mesh), intent(in), target :: mesh
   fwl_flux_ib = 0.0
   fwb_flux_ib = 0.0
   fwbv_flux_ib = 0.0
+  iron_conc_ib = icb_iron_const   ! overwritten by icb_iron.dat / the iron restart
+  iron_flux_ib = 0.0
   hfe_flux_ib = 0.0
   hfl_flux_ib = 0.0
   hfb_flux_ib = 0.0
   hfbv_flux_ib = 0.0
   lhfb_flux_ib = 0.0
-  allocate(arr_block(15*ib_num))
+  allocate(arr_block(16*ib_num))
   allocate(elem_block(ib_num))
   allocate(pe_block(ib_num))
 
   allocate(elem_area_glob(elem2D))
   elem_area_glob=0.0
   call gather_elem(elem_area(1:myDim_elem2D), elem_area_glob, partit)
-  call MPI_Bcast(elem_area_glob, elem2D, MPI_DOUBLE, 0, MPI_COMM_FESOM, MPIERR)
+  call MPI_Bcast(elem_area_glob, elem2D, MPI_WP, 0, MPI_COMM_FESOM, MPIERR)
 
   allocate(vl_block(4*ib_num))
-  allocate(buoy_props(ib_num,13))
+  allocate(buoy_props(ib_num,14))
   buoy_props = 0.0
   allocate(melted(ib_num))
   melted = .false.

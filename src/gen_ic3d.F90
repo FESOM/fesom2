@@ -16,18 +16,21 @@ MODULE g_ic3d
    USE MOD_PARTIT
    USE MOD_PARSUP
    USE MOD_TRACER
-   USE o_PARAM
+   USE o_PARAM, only: mstep, pi
    USE g_comm_auto
    USE g_support
    USE g_config, only: dummy, ClimateDataPath, use_cavity
+   USE g_clock, only: r_restart
+   USE io_netcdf_nf_interface, only: nf_get_vara_x
    
    IMPLICIT NONE
 
    include 'netcdf.inc'
 
-   public  do_ic3d, &                                       ! read and apply 3D initial conditions
-           n_ic3d, idlist, filelist, varlist, tracer_init3d, & ! to be read from the namelist
-           t_insitu
+   public  do_ic3d, &
+           n_ic3d, idlist, filelist, varlist, tracer_init3d, &
+           t_insitu, ic_extrap_det, ic_extrap_tol, &
+           oce_perturb, lperturb, perturb_mode, perturb_method, perturb_seed, temp_perturb, salt_perturb
    private
 
 ! namelists
@@ -41,7 +44,21 @@ MODULE g_ic3d
    character(MAX_PATH), save, dimension(ic_max) :: filelist
    character(50),  save,  dimension(ic_max)     :: varlist
 
-   namelist / tracer_init3d / n_ic3d, idlist, filelist, varlist, t_insitu
+   namelist / tracer_init3d / n_ic3d, idlist, filelist, varlist, t_insitu, ic_extrap_det, ic_extrap_tol
+
+!============= perturbation to IC variables ================
+   logical                                      :: lperturb = .false.
+   character(20)                                :: perturb_mode = 'initial_only'  ! 'initial_only', 'first_step'
+   character(20)                                :: perturb_method = 'uniform'     ! 'uniform', 'gaussian'
+   integer                                      :: perturb_seed = -1              ! Random seed (-1 = use system time)
+   type perturb_entry
+   real(WP)                 :: min_val          ! For uniform: min value
+   real(WP)                 :: max_val          ! For uniform: max value / For gaussian: std deviation
+   end type
+   type(perturb_entry),save   :: temp_perturb = perturb_entry(0.0,0.0)
+   type(perturb_entry),save   :: salt_perturb = perturb_entry(0.0,0.0)
+   namelist / oce_perturb / lperturb, perturb_mode, perturb_method, perturb_seed, temp_perturb, salt_perturb
+!==========================================================
 
    character(MAX_PATH), save                    :: filename
    character(50),  save                         :: varname
@@ -177,14 +194,14 @@ CONTAINS
       if (partit%mype==0) then
          nf_start(1)=1
          nf_edges(1)=nc_Nlat
-         iost = nf_get_vara_double(ncid, id_lat, nf_start, nf_edges, nc_lat)
+         iost = nf_get_vara_x(ncid, id_lat, nf_start, nf_edges, nc_lat)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename,partit)
       if (partit%mype==0) then
          nf_start(1)=1
          nf_edges(1)=nc_Nlon-2
-         iost = nf_get_vara_double(ncid, id_lon, nf_start, nf_edges, nc_lon(2:nc_Nlon-1))
+         iost = nf_get_vara_x(ncid, id_lon, nf_start, nf_edges, nc_lon(2:nc_Nlon-1))
          nc_lon(1)        =nc_lon(nc_Nlon-1)
          nc_lon(nc_Nlon)  =nc_lon(2)
       end if
@@ -194,15 +211,15 @@ CONTAINS
       if (partit%mype==0) then
          nf_start(1)=1
          nf_edges(1)=nc_Ndepth
-         iost = nf_get_vara_double(ncid, id_depth, nf_start, nf_edges,nc_depth)
+         iost = nf_get_vara_x(ncid, id_depth, nf_start, nf_edges,nc_depth)
          if (nc_depth(2) < 0.) nc_depth=-nc_depth
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)      
       call check_nferr(iost,filename,partit)
 
-      call MPI_BCast(nc_lon,   nc_Nlon,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
-      call MPI_BCast(nc_lat,   nc_Nlat,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
-      call MPI_BCast(nc_depth, nc_Ndepth, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+      call MPI_BCast(nc_lon,   nc_Nlon,   MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
+      call MPI_BCast(nc_lat,   nc_Nlat,   MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
+      call MPI_BCast(nc_depth, nc_Ndepth, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
 
       if (partit%mype==0) then
          iost = nf_close(ncid)
@@ -326,11 +343,13 @@ CONTAINS
       integer                                 :: nl1, ul1
       real(wp)                                :: denom, x1, x2, y1, y2, x, y, d1,d2, aux_z           
       real(wp), allocatable, dimension(:,:,:) :: ncdata
+      real(wp), allocatable, dimension(:)     :: ncdata_inner ! rank-1 read buffer (generic nf_get_vara_x only resolves rank-1 actuals)
       real(wp), allocatable, dimension(:)     :: data1d      
       integer                                 :: elnodes(3)
       integer                                 :: ierror              ! return error code
       integer				      :: NO_FILL	     ! 0=no fillval, 1=fillval
       real(wp)				      :: FILL_VALUE
+      real(8)				      :: FILL_VALUE_r8   ! double temp: file stores fill/missing as double
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -349,13 +368,24 @@ CONTAINS
       ! get variable id
       if (mype==0) then
          iost = nf_inq_varid(ncid, varname, id_data)
-         iost = nf_inq_var_fill(ncid, id_data, NO_FILL, FILL_VALUE) ! FillValue defined?
+         iost = nf_inq_var_fill(ncid, id_data, NO_FILL, FILL_VALUE_r8) ! FillValue defined?
          if (NO_FILL==1) then
-            print *, 'No _FillValue is set in ', trim(filename), ', trying dummy =', dummy, FILL_VALUE
+            ! No _FillValue attribute found, try missing_value attribute
+            iost = nf_get_att_double(ncid, id_data, 'missing_value', FILL_VALUE_r8)
+            if (iost /= NF_NOERR) then
+               ! Neither _FillValue nor missing_value found, use NetCDF default fill value
+               FILL_VALUE_r8 = NF_FILL_DOUBLE  ! 9.9692099683868690e+36
+               print *, 'No _FillValue or missing_value in ', trim(filename), ', using NetCDF default:', FILL_VALUE_r8
+            else
+               print *, 'Using missing_value from ', trim(filename), ':', FILL_VALUE_r8
+            end if
          else
-            print *, 'The FillValue in ', trim(filename), ' is set to ', FILL_VALUE ! should set dummy accordingly
+            print *, 'Using _FillValue from ', trim(filename), ':', FILL_VALUE_r8
          end if
+         ! cast to working precision; comparison below uses the same WP rounding as the data read
+         FILL_VALUE = real(FILL_VALUE_r8, WP)
       end if
+      call MPI_BCast(FILL_VALUE, 1, MPI_WP, 0, MPI_COMM_FESOM, ierror)
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename,partit)   
       !read data from file
@@ -366,7 +396,12 @@ CONTAINS
          nf_edges(2)=nc_Nlat
          nf_start(3)=1
          nf_edges(3)=nc_Ndepth         
-         iost = nf_get_vara_double(ncid, id_data, nf_start, nf_edges, ncdata(2:nc_Nlon-1,:,:))
+         ! read into a contiguous rank-1 WP buffer, then reshape into the strided destination
+         ! (generic nf_get_vara_x only resolves rank-1 actuals; NetCDF Fortran order has the first dim fastest)
+         allocate(ncdata_inner((nc_Nlon-2)*nc_Nlat*nc_Ndepth))
+         iost = nf_get_vara_x(ncid, id_data, nf_start, nf_edges, ncdata_inner)
+         ncdata(2:nc_Nlon-1,:,:) = reshape(ncdata_inner, [nc_Nlon-2, nc_Nlat, nc_Ndepth])
+         deallocate(ncdata_inner)
          ncdata(1,:,:)      =ncdata(nc_Nlon-1,:,:)
          ncdata(nc_Nlon,:,:)=ncdata(2,:,:)
 
@@ -386,7 +421,7 @@ CONTAINS
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename,partit)
-      call MPI_BCast(ncdata, nc_Nlon*nc_Nlat*nc_Ndepth, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+      call MPI_BCast(ncdata, nc_Nlon*nc_Nlat*nc_Ndepth, MPI_WP, 0, MPI_COMM_FESOM, ierror)
       ! bilinear space interpolation,  
       ! data is assumed to be sampled on a regular grid
       do ii = 1, myDim_nod2d
@@ -497,6 +532,7 @@ CONTAINS
       !! ** Purpose : read 3D initial conditions for tracers from netcdf and interpolate on model grid
       !!----------------------------------------------------------------------
       USE insitu2pot_interface
+      USE ieee_arithmetic
       IMPLICIT NONE
       type(t_mesh),   intent(in),    target   :: mesh
       type(t_partit), intent(inout), target   :: partit 
@@ -535,15 +571,14 @@ CONTAINS
 
       do current_tracer=1, tracers%num_tracers
          !_________________________________________________________________________
-         ! set remaining dummy values from bottom topography to 0.0_WP
-         where (tracers%data(current_tracer)%values > 0.9_WP*dummy)
-               tracers%data(current_tracer)%values=0.0_WP
-         end where
-
-         !_________________________________________________________________________
-         ! eliminate values within cavity that result from the extrapolation of 
-         ! initialisation
+         ! set remaining dummy values and NaN from interpolation to 0.0_WP
          do n=1,partit%myDim_nod2d + partit%eDim_nod2D
+            do i=1, mesh%nl-1
+               if (tracers%data(current_tracer)%values(i,n) > 0.9_WP*dummy .or. &
+                   ieee_is_nan(tracers%data(current_tracer)%values(i,n))) then
+                  tracers%data(current_tracer)%values(i,n) = 0.0_WP
+               end if
+            end do
             ! ensure cavity is zero
             if (use_cavity) tracers%data(current_tracer)%values(1:mesh%ulevels_nod2D(n)-1,n)=0.0_WP
             ! ensure bottom is zero
@@ -561,7 +596,7 @@ CONTAINS
          if (partit%mype==0) write(*,*) "converting insitu temperature to potential..."
          call insitu2pot(tracers, partit, mesh)
       end if
-      if (partit%mype==0) write(*,*) "DONE:  Initial conditions for tracers"             
+      if (partit%mype==0) write(*,*) "DONE:  Initial conditions for tracers"
       !_________________________________________________________________________
       ! check initial fields
       locTmax = -6666
@@ -604,44 +639,233 @@ CONTAINS
         locO2min  = min(locO2min,minval(tracers%data(24)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
 #endif
       end do
-      call MPI_AllREDUCE(locTmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locTmax , glo  , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal max init. temp. =', glo
-      call MPI_AllREDUCE(locTmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locTmin , glo  , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal min init. temp. =', glo
-      call MPI_AllREDUCE(locSmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locSmax , glo  , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal max init. salt. =', glo
-      call MPI_AllREDUCE(locSmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locSmin , glo  , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  `-> gobal min init. salt. =', glo      
 #if defined(__recom)
-
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
       if (partit%mype==0) write(*,*) "Sanity check for REcoM variables"
-      call MPI_AllREDUCE(locDINmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locDINmax , glo  , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal max init. DIN. =', glo
-      call MPI_AllREDUCE(locDINmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locDINmin , glo  , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal min init. DIN. =', glo
 
-      call MPI_AllREDUCE(locDICmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locDICmax , glo  , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal max init. DIC. =', glo
-      call MPI_AllREDUCE(locDICmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locDICmin , glo  , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal min init. DIC. =', glo
-      call MPI_AllREDUCE(locAlkmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locAlkmax , glo  , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal max init. Alk. =', glo
-      call MPI_AllREDUCE(locAlkmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locAlkmin , glo  , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal min init. Alk. =', glo
-      call MPI_AllREDUCE(locDSimax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locDSimax , glo  , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal max init. DSi. =', glo
-      call MPI_AllREDUCE(locDSimin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locDSimin , glo  , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal min init. DSi. =', glo
-      call MPI_AllREDUCE(locDFemax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locDFemax , glo  , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal max init. DFe. =', glo
-      call MPI_AllREDUCE(locDFemin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locDFemin , glo  , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  `-> gobal min init. DFe. =', glo
-      call MPI_AllREDUCE(locO2max , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locO2max , glo  , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal max init. O2. =', glo
-      call MPI_AllREDUCE(locO2min , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locO2min , glo  , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  `-> gobal min init. O2. =', glo
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
 #endif
+#endif
+      
+      ! Apply perturbations based on selected mode
+      if (lperturb) then 
+         select case (trim(perturb_mode))
+         case ('initial_only')
+            if (.not. r_restart) then 
+               if (partit%mype==0) then
+                   write(*,*) ''
+                   write(*,*) '*** FESOM2 PERTURBATION TRIGGER ***'
+                   write(*,*) 'Mode: INITIAL_ONLY - Applying perturbations (initial run detected)'
+                   write(*,*) ''
+               end if
+               call do_perturb(tracers, partit, mesh)
+            else
+               if (partit%mype==0) then
+                   write(*,*) ''
+                   write(*,*) '*** FESOM2 PERTURBATION SKIP ***'
+                   write(*,*) 'Mode: INITIAL_ONLY - Skipping perturbations (restart run detected)'
+                   write(*,*) ''
+               end if
+            end if
+         case ('first_step')
+            ! For first_step mode, apply perturbations during initialization (mstep=0) 
+            ! or during the actual first time step (mstep=1)
+            if (mstep <= 1) then
+               if (partit%mype==0) then
+                   write(*,*) ''
+                   write(*,*) '*** FESOM2 PERTURBATION TRIGGER ***'
+                   if (mstep == 0) then
+                       write(*,*) 'Mode: FIRST_STEP - Applying perturbations (initialization phase, mstep=0)'
+                   else
+                       write(*,*) 'Mode: FIRST_STEP - Applying perturbations (first time step, mstep=1)'
+                   end if
+                   write(*,*) ''
+               end if
+               call do_perturb(tracers, partit, mesh)
+            else
+               if (partit%mype==0) then
+                   write(*,*) ''
+                   write(*,*) '*** FESOM2 PERTURBATION SKIP ***'
+                   write(*,*) 'Mode: FIRST_STEP - Skipping perturbations (not first time step, mstep=', mstep, ')'
+                   write(*,*) ''
+               end if
+            end if
+         case default
+            if (partit%mype==0) then
+                write(*,*) ''
+                write(*,*) '*** FESOM2 PERTURBATION WARNING ***'
+                write(*,*) 'Unknown perturb_mode: ', trim(perturb_mode), ' - defaulting to INITIAL_ONLY'
+                write(*,*) ''
+            end if
+            if (.not. r_restart) then 
+               if (partit%mype==0) then
+                   write(*,*) '*** FESOM2 PERTURBATION TRIGGER ***'
+                   write(*,*) 'Mode: DEFAULT (initial_only) - Applying perturbations (initial run detected)'
+                   write(*,*) ''
+               end if
+               call do_perturb(tracers, partit, mesh)
+            end if
+         end select
+      else
+         if (partit%mype==0) then
+             write(*,*) ''
+             write(*,*) '*** FESOM2 PERTURBATION DISABLED ***'
+             write(*,*) 'lperturb = .false. - No perturbations will be applied'
+             write(*,*) ''
+         end if
+      end if
    END SUBROUTINE do_ic3d
+   
+   SUBROUTINE do_perturb(tracers, partit, mesh)
+        IMPLICIT NONE
+        type(t_tracer), intent(inout), target :: tracers
+        type(t_partit), intent(inout), target :: partit
+        type(t_mesh), intent(in), target :: mesh
+        integer                          :: n,ii,i
+        real(WP)                         :: rnum, min_val, max_val
+        integer                          :: seed_size, clock_time
+        integer, allocatable             :: seed_array(:)
+
+        ! Initialize random seed for reproducible perturbations
+        call random_seed(size=seed_size)
+        allocate(seed_array(seed_size))
+        
+        if (perturb_seed == -1) then
+            ! Use system time for random seed (different each run)
+            call system_clock(clock_time)
+            do i = 1, seed_size
+                seed_array(i) = clock_time + 37 * i
+            end do
+            if (partit%mype==0) write(*,*) 'Using system time-based random seed for perturbations'
+        else
+            ! Use specified seed for reproducible perturbations
+            do i = 1, seed_size
+                seed_array(i) = perturb_seed + partit%mype + 37 * i
+            end do
+            if (partit%mype==0) write(*,*) 'Using specified random seed for perturbations: ', perturb_seed
+        end if
+        
+        call random_seed(put=seed_array)
+        deallocate(seed_array)
+
+        ! ================================================================
+        ! PERTURBATION REPORTING - START
+        ! ================================================================
+        if (partit%mype==0) then
+            write(*,*) ''
+            write(*,*) '========================================================'
+            write(*,*) 'FESOM2 INITIAL CONDITION PERTURBATION REPORT'
+            write(*,*) '========================================================'
+            write(*,*) 'Perturbation Status    : ENABLED (lperturb = .true.)'
+            write(*,*) 'Perturbation Mode      : ', trim(perturb_mode)
+            write(*,*) 'Perturbation Method    : ', trim(perturb_method)
+            if (perturb_seed == -1) then
+                write(*,*) 'Random Seed            : SYSTEM TIME (non-reproducible)'
+            else
+                write(*,*) 'Random Seed            : ', perturb_seed, ' (reproducible)'
+            end if
+            write(*,*) '--------------------------------------------------------'
+        end if
+        
+        if (trim(perturb_method) == 'uniform') then
+            if (partit%mype==0) then
+                write(*,*) 'UNIFORM DISTRIBUTION PARAMETERS:'
+                write(*,'(A,E15.8,A,E15.8,A)') '  Temperature Range    : [', temp_perturb%min_val, ', ', temp_perturb%max_val, '] K'
+                write(*,'(A,E15.8,A,E15.8,A)') '  Salinity Range       : [', salt_perturb%min_val, ', ', salt_perturb%max_val, '] PSU'
+                write(*,*) '  Distribution Type    : Flat (equal probability)'
+            end if
+        else if (trim(perturb_method) == 'gaussian') then
+            if (partit%mype==0) then
+                write(*,*) 'GAUSSIAN DISTRIBUTION PARAMETERS:'
+                write(*,'(A,E15.8,A,E15.8,A)') '  Temperature          : mean=', temp_perturb%min_val, ', σ=', temp_perturb%max_val, ' K'
+                write(*,'(A,E15.8,A,E15.8,A)') '  Salinity             : mean=', salt_perturb%min_val, ', σ=', salt_perturb%max_val, ' PSU'
+                write(*,*) '  Distribution Type    : Bell curve (68% within ±1σ, 95% within ±2σ)'
+            end if
+        else
+            if (partit%mype==0) then
+                write(*,*) 'WARNING: Unknown perturbation method: ', trim(perturb_method)
+                write(*,*) 'DEFAULTING TO UNIFORM DISTRIBUTION:'
+                write(*,'(A,E15.8,A,E15.8,A)') '  Temperature Range    : [', temp_perturb%min_val, ', ', temp_perturb%max_val, '] K'
+                write(*,'(A,E15.8,A,E15.8,A)') '  Salinity Range       : [', salt_perturb%min_val, ', ', salt_perturb%max_val, '] PSU'
+            end if
+        end if
+        
+        if (partit%mype==0) then
+            write(*,*) '--------------------------------------------------------'
+            write(*,*) 'APPLYING PERTURBATIONS TO ALL VERTICAL LEVELS...'
+        end if
+
+        do ii=1, 2
+          do n=1,partit%myDim_nod2d
+            if (ii==1) then
+              min_val = temp_perturb%min_val
+              max_val = temp_perturb%max_val
+            else
+              if (ii==2) then
+               min_val = salt_perturb%min_val
+               max_val = salt_perturb%max_val
+              end if
+            end if
+            call gen_perturbation(rnum, perturb_method, min_val, max_val)
+            tracers%data(ii)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n) = &
+                                                tracers%data(ii)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n) + rnum
+          end do
+        end do
+        ! sync halos
+        !call exchange_nod3D(tracers%data(1)%values, partit)
+        !call exchange_nod3D(tracers%data(2)%values, partit)
+
+        ! ================================================================
+        ! PERTURBATION REPORTING - COMPLETION
+        ! ================================================================
+        if (partit%mype==0) then
+            write(*,*) 'PERTURBATION APPLICATION COMPLETED SUCCESSFULLY'
+            write(*,*) '--------------------------------------------------------'
+            write(*,'(A,I0,A)') '  Horizontal nodes processed : ', partit%myDim_nod2d, ' (per MPI process)'
+            write(*,*) '  Vertical levels            : ALL active levels per node'
+            write(*,*) '  Tracers perturbed          : Temperature and Salinity'
+            write(*,*) '  Perturbation applied to    : Initial field values'
+            write(*,*) '========================================================'
+            write(*,*) 'PERTURBATION REPORT COMPLETE'
+            write(*,*) '========================================================'
+            write(*,*) ''
+        end if
+   END SUBROUTINE do_perturb
     
    SUBROUTINE nc_end
 
@@ -701,4 +925,44 @@ CONTAINS
       ind = right
 
    END SUBROUTINE binarysearch
+
+   SUBROUTINE gen_perturbation(rnum, method, param1, param2)
+     real(WP), intent(out)     :: rnum
+     character(*), intent(in)  :: method
+     real(WP), intent(in)      :: param1, param2
+     real(WP)                  :: rtemp1, rtemp2
+     
+     select case (trim(method))
+     case ('uniform')
+         ! Uniform distribution: param1=min_val, param2=max_val
+         call random_number(rtemp1)
+         rnum = (param2 - param1) * rtemp1 + param1
+         
+     case ('gaussian')
+         ! Gaussian distribution: param1=mean (always 0), param2=std_dev
+         ! Box-Muller transformation for Gaussian random numbers
+         call random_number(rtemp1)
+         call random_number(rtemp2)
+         
+         ! Avoid log(0) by ensuring rtemp1 > 0
+         if (rtemp1 < 1.0e-10_WP) rtemp1 = 1.0e-10_WP
+         
+         ! Box-Muller: generate standard normal, then scale by std_dev
+         rnum = param2 * sqrt(-2.0_WP * log(rtemp1)) * cos(2.0_WP * pi * rtemp2)
+         
+     case default
+         ! Default to uniform if unknown method
+         call random_number(rtemp1)
+         rnum = (param2 - param1) * rtemp1 + param1
+     end select
+     
+   END SUBROUTINE gen_perturbation
+
+   ! Keep old gen_uniform for backward compatibility
+   SUBROUTINE gen_uniform(rnum, min_val, max_val )
+     real(WP), intent(out) :: rnum
+     real(WP), intent(in)  :: min_val, max_val
+     call gen_perturbation(rnum, 'uniform', min_val, max_val)
+   END SUBROUTINE gen_uniform
+
 END MODULE g_ic3d

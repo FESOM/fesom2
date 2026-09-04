@@ -31,12 +31,12 @@
 # Example usage for custom namelist configuration:
 # ```
 # # Copy and configure namelist.config with common paths
-# configure_file("${CMAKE_SOURCE_DIR}/config/namelist.config" "${TARGET_DIR}/namelist.config" COPYONLY)
+# configure_file("${FESOM_TESTING_ROOT}/config/namelist.config" "${TARGET_DIR}/namelist.config" COPYONLY)
 # update_common_paths("${TARGET_DIR}/namelist.config" "${TARGET_DIR}/namelist.config" "${TEST_DATA_DIR}" "${RESULT_DIR}")
 # update_namelist_config("${TARGET_DIR}/namelist.config" "${TARGET_DIR}/namelist.config")
 # 
 # # Copy and configure a specific namelist (e.g., tracer)
-# configure_file("${CMAKE_SOURCE_DIR}/config/namelist.tra" "${TARGET_DIR}/namelist.tra" COPYONLY)
+# configure_file("${FESOM_TESTING_ROOT}/config/namelist.tra" "${TARGET_DIR}/namelist.tra" COPYONLY)
 # update_tracer_init3d_filelist("${TARGET_DIR}/namelist.tra" "${TARGET_DIR}/namelist.tra" "${TEST_DATA_DIR}")
 # 
 # # Example: Custom test with pi_cavity mesh and cavity enabled
@@ -45,6 +45,13 @@
 # )
 # ```
 #
+
+# Root of the FESOM source tree, resolved relative to this file. Do NOT use
+# CMAKE_SOURCE_DIR here: in a bundled build (ecbundle) fesom is a subproject
+# and CMAKE_SOURCE_DIR is the bundle root, so config/ and tests/ paths built
+# from it silently point at nothing (see the EXISTS guard in
+# configure_fesom_namelists_with_options).
+get_filename_component(FESOM_TESTING_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
 
 # Function to update common paths in any namelist
 function(update_common_paths NAMELIST_IN NAMELIST_OUT TEST_DATA_DIR RESULT_DIR)
@@ -55,12 +62,17 @@ endfunction()
 function(update_common_paths_with_mesh NAMELIST_IN NAMELIST_OUT TEST_DATA_DIR RESULT_DIR MESH_NAME)
     file(READ "${NAMELIST_IN}" CONTENT)
     
-    # Replace common paths with test data paths for specific mesh
-    string(REGEX REPLACE "MeshPath='[^']*'" "MeshPath='${TEST_DATA_DIR}/MESHES/${MESH_NAME}/'" CONTENT "${CONTENT}")
-    string(REGEX REPLACE "ClimateDataPath='[^']*'" "ClimateDataPath='${TEST_DATA_DIR}/'" CONTENT "${CONTENT}")
-    string(REGEX REPLACE "ResultPath='[^']*'" "ResultPath='${RESULT_DIR}/'" CONTENT "${CONTENT}")
-    string(REGEX REPLACE "fwf_path='[^']*'" "fwf_path='${TEST_DATA_DIR}/meshes/${MESH_NAME}/'" CONTENT "${CONTENT}")
-    string(REGEX REPLACE "age_tracer_path='[^']*'" "age_tracer_path='${TEST_DATA_DIR}/meshes/${MESH_NAME}/'" CONTENT "${CONTENT}")
+    # Replace common paths with test data paths for specific mesh.
+    # NOTE: the namelists use aligned assignments with spaces around '=' (e.g.
+    # "ResultPath       = '...'"), so the regexes must tolerate optional
+    # whitespace. The leading "([^A-Za-z0-9_])" anchors the key on a non-word
+    # boundary so a key is not matched as a substring of a longer key, and is
+    # preserved via the "\\1" backreference.
+    string(REGEX REPLACE "([^A-Za-z0-9_])MeshPath[ \t]*=[ \t]*'[^']*'" "\\1MeshPath='${TEST_DATA_DIR}/MESHES/${MESH_NAME}/'" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "([^A-Za-z0-9_])ClimateDataPath[ \t]*=[ \t]*'[^']*'" "\\1ClimateDataPath='${TEST_DATA_DIR}/'" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "([^A-Za-z0-9_])ResultPath[ \t]*=[ \t]*'[^']*'" "\\1ResultPath='${RESULT_DIR}/'" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "([^A-Za-z0-9_])fwf_path[ \t]*=[ \t]*'[^']*'" "\\1fwf_path='${TEST_DATA_DIR}/MESHES/${MESH_NAME}/'" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "([^A-Za-z0-9_])age_tracer_path[ \t]*=[ \t]*'[^']*'" "\\1age_tracer_path='${TEST_DATA_DIR}/MESHES/${MESH_NAME}/'" CONTENT "${CONTENT}")
     
     file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
 endfunction()
@@ -74,20 +86,26 @@ endfunction()
 function(update_namelist_config_with_options NAMELIST_IN NAMELIST_OUT STEP_PER_DAY RUN_LENGTH RUN_LENGTH_UNIT RESTART_LENGTH RESTART_LENGTH_UNIT LOGFILE_OUTFREQ FORCE_ROTATION USE_CAVITY)
     file(READ "${NAMELIST_IN}" CONTENT)
     
+    # All assignments tolerate whitespace around '=' and are anchored on a
+    # non-word boundary ("\\1") so e.g. run_length does not match run_length_unit
+    # and restart_length does not match raw_restart_length / bin_restart_length.
     # Set step_per_day
-    string(REGEX REPLACE "step_per_day=[0-9]+" "step_per_day=${STEP_PER_DAY}" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "([^A-Za-z0-9_])step_per_day[ \t]*=[ \t]*[0-9]+" "\\1step_per_day=${STEP_PER_DAY}" CONTENT "${CONTENT}")
     # Set run_length
-    string(REGEX REPLACE "run_length=[0-9]+" "run_length=${RUN_LENGTH}" CONTENT "${CONTENT}")
-    string(REGEX REPLACE "run_length_unit='[^']*'" "run_length_unit='${RUN_LENGTH_UNIT}'" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "([^A-Za-z0-9_])run_length[ \t]*=[ \t]*[0-9]+" "\\1run_length=${RUN_LENGTH}" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "([^A-Za-z0-9_])run_length_unit[ \t]*=[ \t]*'[^']*'" "\\1run_length_unit='${RUN_LENGTH_UNIT}'" CONTENT "${CONTENT}")
     # Set restart_length
-    string(REGEX REPLACE "restart_length=[0-9]+" "restart_length=${RESTART_LENGTH}" CONTENT "${CONTENT}")
-    string(REGEX REPLACE "restart_length_unit='[^']*'" "restart_length_unit='${RESTART_LENGTH_UNIT}'" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "([^A-Za-z0-9_])restart_length[ \t]*=[ \t]*[0-9]+" "\\1restart_length=${RESTART_LENGTH}" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "([^A-Za-z0-9_])restart_length_unit[ \t]*=[ \t]*'[^']*'" "\\1restart_length_unit='${RESTART_LENGTH_UNIT}'" CONTENT "${CONTENT}")
     # Set logfile output frequency
-    string(REGEX REPLACE "logfile_outfreq=[0-9]+" "logfile_outfreq=${LOGFILE_OUTFREQ}" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "([^A-Za-z0-9_])logfile_outfreq[ \t]*=[ \t]*[0-9]+" "\\1logfile_outfreq=${LOGFILE_OUTFREQ}" CONTENT "${CONTENT}")
     # Force rotation for test geometry
-    string(REGEX REPLACE "force_rotation=\\.[a-zA-Z]+\\." "force_rotation=${FORCE_ROTATION}" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "([^A-Za-z0-9_])force_rotation[ \t]*=[ \t]*\\.[a-zA-Z]+\\." "\\1force_rotation=${FORCE_ROTATION}" CONTENT "${CONTENT}")
     # Set cavity usage
-    string(REGEX REPLACE "use_cavity=\\.[a-zA-Z]+\\." "use_cavity=${USE_CAVITY}" CONTENT "${CONTENT}")
+    string(REGEX REPLACE "([^A-Za-z0-9_])use_cavity[ \t]*=[ \t]*\\.[a-zA-Z]+\\." "\\1use_cavity=${USE_CAVITY}" CONTENT "${CONTENT}")
+    # CORE2 forcing (used by the tests) has no leap years, so the calendar must
+    # be a fixed 365-day year or FESOM aborts (see gen_surface_forcing.F90).
+    string(REGEX REPLACE "([^A-Za-z0-9_])include_fleapyear[ \t]*=[ \t]*\\.[a-zA-Z]+\\." "\\1include_fleapyear=.false." CONTENT "${CONTENT}")
     
     file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
 endfunction()
@@ -240,6 +258,34 @@ function(update_namelist_forcing NAMELIST_IN NAMELIST_OUT TEST_DATA_DIR)
     file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
 endfunction()
 
+# Function to configure namelist.forcing for the bundled JRA55 test dataset.
+# The stock config/namelist.forcing.JRA points at absolute Levante pool paths
+# (/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/...); this rewrites them to the
+# bundled tests/data/FORCING/JRA55 tree. Paths are made RELATIVE (no leading '/')
+# so FESOM's make_full_path() prepends ClimateDataPath (=tests/data/), exactly as
+# the CORE2 variant resolves 'FORCING/CORE2/...'. The forcing file names, variable
+# names, time-axis reference (nm_nc_iyear=1900, nm_nc_freq=1 -- the bundled axis is
+# already in days) and the .true. l_* switches are taken as-is from the config
+# variant. The paired include_fleapyear=.true. (gregorian calendar) is applied by
+# the caller via the LEAPYEAR option.
+function(update_namelist_forcing_jra NAMELIST_IN NAMELIST_OUT)
+    file(READ "${NAMELIST_IN}" CONTENT)
+
+    # Runoff climatology: the stock namelist names CORE2_runoff.nc, but the bundled
+    # JRA55 dataset ships runoff.nc -- rewrite this specific file before the blanket
+    # pool-prefix replacement below.
+    string(REGEX REPLACE
+        "/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1\\.4\\.0/CORE2_runoff\\.nc"
+        "FORCING/JRA55/runoff.nc" CONTENT "${CONTENT}")
+
+    # All remaining absolute pool paths -> bundled tree, relative to ClimateDataPath.
+    string(REGEX REPLACE
+        "/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1\\.4\\.0/"
+        "FORCING/JRA55/" CONTENT "${CONTENT}")
+
+    file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
+endfunction()
+
 # Function to update namelist.oce (placeholder for future customization)
 function(update_namelist_oce NAMELIST_IN NAMELIST_OUT)
     file(READ "${NAMELIST_IN}" CONTENT)
@@ -250,13 +296,19 @@ function(update_namelist_oce NAMELIST_IN NAMELIST_OUT)
     file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
 endfunction()
 
-# Function to update namelist.io (placeholder for future customization)
+# Function to update namelist.io
 function(update_namelist_io NAMELIST_IN NAMELIST_OUT)
     file(READ "${NAMELIST_IN}" CONTENT)
-    
-    # Add I/O-specific modifications here as needed
-    # For now, just copy the content as-is
-    
+
+    # The short integration runs (1 day) never reach a monthly/yearly output
+    # boundary, so the default 'sst' stream ('m') would never be written. Make
+    # 'sst' a daily mean so a single record is produced during the run and can
+    # be asserted as a real output artifact (results/sst.fesom.1948.nc).
+    string(REGEX REPLACE
+        "'sst[ ]*'[ \t]*,[ \t]*[0-9]+[ \t]*,[ \t]*'[a-zA-Z]'"
+        "'sst       ',1, 'd'"
+        CONTENT "${CONTENT}")
+
     file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
 endfunction()
 
@@ -290,10 +342,20 @@ function(configure_fesom_namelists_with_options TARGET_DIR TEST_DATA_DIR RESULT_
     )
     
     foreach(NAMELIST ${NAMELISTS})
-        if(EXISTS "${CMAKE_SOURCE_DIR}/config/${NAMELIST}")
+        if(EXISTS "${FESOM_TESTING_ROOT}/config/${NAMELIST}")
+            # Pick the source variant to copy. Tests use CORE2 forcing because the
+            # bundled tests/data/FORCING/CORE2 dataset matches it (its relative
+            # paths resolve under ClimateDataPath); the default namelist.forcing
+            # points at JRA55 data that is not bundled.
+            set(NAMELIST_SOURCE "${FESOM_TESTING_ROOT}/config/${NAMELIST}")
+            if("${NAMELIST}" STREQUAL "namelist.forcing"
+               AND EXISTS "${FESOM_TESTING_ROOT}/config/namelist.forcing.CORE2")
+                set(NAMELIST_SOURCE "${FESOM_TESTING_ROOT}/config/namelist.forcing.CORE2")
+            endif()
+
             # Copy the namelist to target directory first
             configure_file(
-                "${CMAKE_SOURCE_DIR}/config/${NAMELIST}"
+                "${NAMELIST_SOURCE}"
                 "${TARGET_DIR}/${NAMELIST}"
                 COPYONLY
             )
@@ -324,11 +386,20 @@ endfunction()
 
 # Function to generate fesom.clock file
 function(generate_fesom_clock OUTPUT_DIR)
+    # Optional 2nd arg: the start year (defaults to 1948, the CORE2 forcing year).
+    # The clock start year selects which per-year forcing file FESOM opens and
+    # names the output artifacts (sst.fesom.<year>.nc), so a non-CORE2 dataset
+    # (e.g. JRA55, bundled for year 1958) must pass its matching year.
+    set(_year 1948)
+    if(ARGC GREATER 1)
+        set(_year "${ARGV1}")
+    endif()
+
     # Create the output directory if it doesn't exist
     file(MAKE_DIRECTORY "${OUTPUT_DIR}")
-    
+
     # Create the fesom.clock file with the correct format
-    file(WRITE "${OUTPUT_DIR}/fesom.clock" "0 1 1948\n0 1 1948\n")
+    file(WRITE "${OUTPUT_DIR}/fesom.clock" "0 1 ${_year}\n0 1 ${_year}\n")
 endfunction()
 
 # Function to add a FESOM integration test
@@ -339,10 +410,14 @@ endfunction()
 # Function to add a FESOM integration test with custom options
 function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH RUN_LENGTH_UNIT RESTART_LENGTH RESTART_LENGTH_UNIT LOGFILE_OUTFREQ FORCE_ROTATION USE_CAVITY)
     set(options MPI_TEST)
-    set(oneValueArgs NP TIMEOUT)
-    set(multiValueArgs COMMAND_ARGS)
+    set(oneValueArgs NP TIMEOUT LABEL MIX_SCHEME FORCING FORCING_YEAR LEAPYEAR)
+    # EXTRA_SUCCESS_MARKERS: literal strings that must ALL appear in the run log for
+    # the test to pass, on top of the clean-exit marker. Use these to pin behaviour
+    # that would otherwise rot silently -- a diagnostic block that stops being
+    # printed is a regression no artifact check can see.
+    set(multiValueArgs COMMAND_ARGS EXTRA_SUCCESS_MARKERS)
     cmake_parse_arguments(FESOM_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
-    
+
     # Set defaults
     if(NOT DEFINED FESOM_TEST_NP)
         set(FESOM_TEST_NP 1)
@@ -350,15 +425,49 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
     if(NOT DEFINED FESOM_TEST_TIMEOUT)
         set(FESOM_TEST_TIMEOUT 300)  # 5 minutes default
     endif()
+    # Atmospheric forcing dataset. Default CORE2 is wired into the namelist config
+    # (see configure_fesom_namelists_with_options); other datasets are applied as a
+    # post-configure override below so the default path is untouched. FORCING_YEAR
+    # is the clock/forcing-file/output year (CORE2 data is 1948, bundled JRA55 is
+    # 1958). LEAPYEAR toggles include_fleapyear -- real-calendar forcing such as
+    # JRA55 (gregorian) requires .true. or fesom.x aborts at the calendar check.
+    if(NOT DEFINED FESOM_TEST_FORCING)
+        set(FESOM_TEST_FORCING "CORE2")
+    endif()
+    if(NOT DEFINED FESOM_TEST_FORCING_YEAR)
+        set(FESOM_TEST_FORCING_YEAR "1948")
+    endif()
+    if(NOT DEFINED FESOM_TEST_LEAPYEAR)
+        set(FESOM_TEST_LEAPYEAR ".false.")
+    endif()
+
+    # Assemble the success-marker list: the mandatory clean-exit marker plus any
+    # caller-supplied EXTRA_SUCCESS_MARKERS (e.g. the single-precision banner).
+    # Each is quoted so check_fesom_run() receives them as distinct list items.
+    set(_success_markers "\"fesom should stop with exit status = 0\"")
+    foreach(_m IN LISTS FESOM_TEST_EXTRA_SUCCESS_MARKERS)
+        string(APPEND _success_markers " \"${_m}\"")
+    endforeach()
+
+    # Self-certify the build precision: every fesom.x run prints a working-precision
+    # banner at startup. Appending the build's banner as a mandatory marker makes each
+    # integration test verify it actually ran at the intended precision -- so a
+    # mis-configured build (DP when SP was wanted, or vice versa) fails loudly on every
+    # test rather than silently running the wrong precision. Silent no-op in DP.
+    if(USE_SINGLE_PRECISION)
+        string(APPEND _success_markers " \"SINGLE PRECISION MODE\"")
+    else()
+        string(APPEND _success_markers " \"DOUBLE PRECISION MODE\"")
+    endif()
     
     # Create test run directory
     set(TEST_RUN_DIR "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}")
-    set(TEST_DATA_DIR "${CMAKE_SOURCE_DIR}/tests/data")
+    set(TEST_DATA_DIR "${FESOM_TESTING_ROOT}/tests/data")
     set(RESULT_DIR "${TEST_RUN_DIR}/results")
-    
-    # Generate fesom.clock file in the results directory
-    generate_fesom_clock("${RESULT_DIR}")
-    
+
+    # Generate fesom.clock file in the results directory (year matches the forcing)
+    generate_fesom_clock("${RESULT_DIR}" "${FESOM_TEST_FORCING_YEAR}")
+
     # Generate the test script
     set(TEST_SCRIPT "${TEST_RUN_DIR}/run_test.cmake")
     
@@ -368,10 +477,27 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
             # Create test directories
             file(MAKE_DIRECTORY \"${TEST_RUN_DIR}\")
             file(MAKE_DIRECTORY \"${RESULT_DIR}\")
-            
-            # Run FESOM with MPI
+
+            # Allow Open MPI to launch when the test runs as root (e.g. act or
+            # Docker-based CI containers). These variables are specific to Open MPI
+            # and are ignored by other MPI implementations and by non-root runs,
+            # so setting them unconditionally is safe.
+            set(ENV{OMPI_ALLOW_RUN_AS_ROOT} \"1\")
+            set(ENV{OMPI_ALLOW_RUN_AS_ROOT_CONFIRM} \"1\")
+
+            # Allow oversubscription so high-rank tests (e.g. NP=8) run on CI
+            # runners with fewer cores. Open MPI 4 reads OMPI_MCA_*, Open MPI 5
+            # (PRRTE) reads PRTE_MCA_*; both are ignored by other MPIs.
+            set(ENV{OMPI_MCA_rmaps_base_oversubscribe} \"1\")
+            set(ENV{PRTE_MCA_rmaps_default_mapping_policy} \":oversubscribe\")
+
+            # Run FESOM with MPI.
+            # Wrap the launch in a shell that raises the stack limit: Intel-compiled
+            # fesom.x puts large per-column automatic arrays on the stack and SIGSEGVs
+            # on global meshes (e.g. core2) under the default 8 MB limit. ulimit is
+            # inherited by mpiexec and the ranks it spawns locally. Harmless for GNU/CI.
             execute_process(
-                COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${FESOM_TEST_NP} ${CMAKE_BINARY_DIR}/bin/fesom.x
+                COMMAND /bin/sh -c \"ulimit -s unlimited 2>/dev/null || ulimit -s 1048576 2>/dev/null; exec '${MPIEXEC_EXECUTABLE}' ${MPIEXEC_NUMPROC_FLAG} ${FESOM_TEST_NP} '${CMAKE_BINARY_DIR}/bin/fesom.x'\"
                 WORKING_DIRECTORY \"${TEST_RUN_DIR}\"
                 RESULT_VARIABLE test_result
                 OUTPUT_VARIABLE test_output
@@ -383,12 +509,16 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
             file(WRITE \"${TEST_RUN_DIR}/test_output.log\" \"\${test_output}\")
             file(WRITE \"${TEST_RUN_DIR}/test_error.log\" \"\${test_error}\")
             
-            # Check result (accept certain error codes as success for initial setup tests)
-            if(test_result EQUAL 0 OR test_result EQUAL 1)
-                message(STATUS \"Test ${TEST_NAME} completed (exit code: \${test_result})\")
-            else()
-                message(FATAL_ERROR \"Test ${TEST_NAME} failed with exit code: \${test_result}\")
-            endif()
+            # Robust pass/fail check: exit code + success marker + failure signatures + artifacts
+            include(\"${FESOM_TESTING_ROOT}/cmake/CheckFesomRun.cmake\")
+            check_fesom_run(
+                NAME \"${TEST_NAME}\"
+                RESULT \"\${test_result}\"
+                OUTPUT_LOG \"${TEST_RUN_DIR}/test_output.log\"
+                ERROR_LOG \"${TEST_RUN_DIR}/test_error.log\"
+                SUCCESS_MARKERS ${_success_markers}
+                REQUIRED_ARTIFACTS \"${RESULT_DIR}/sst.fesom.${FESOM_TEST_FORCING_YEAR}.nc\"
+            )
         ")
     else()
         # Serial test
@@ -397,9 +527,10 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
             file(MAKE_DIRECTORY \"${TEST_RUN_DIR}\")
             file(MAKE_DIRECTORY \"${RESULT_DIR}\")
             
-            # Run FESOM
+            # Run FESOM (serial). Raise the stack limit as for the MPI case above
+            # (Intel fesom.x overflows the default 8 MB stack on large meshes).
             execute_process(
-                COMMAND ${CMAKE_BINARY_DIR}/bin/fesom.x
+                COMMAND /bin/sh -c \"ulimit -s unlimited 2>/dev/null || ulimit -s 1048576 2>/dev/null; exec '${CMAKE_BINARY_DIR}/bin/fesom.x'\"
                 WORKING_DIRECTORY \"${TEST_RUN_DIR}\"
                 RESULT_VARIABLE test_result
                 OUTPUT_VARIABLE test_output
@@ -411,18 +542,59 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
             file(WRITE \"${TEST_RUN_DIR}/test_output.log\" \"\${test_output}\")
             file(WRITE \"${TEST_RUN_DIR}/test_error.log\" \"\${test_error}\")
             
-            # Check result (accept certain error codes as success for initial setup tests)
-            if(test_result EQUAL 0 OR test_result EQUAL 1)
-                message(STATUS \"Test ${TEST_NAME} completed (exit code: \${test_result})\")
-            else()
-                message(FATAL_ERROR \"Test ${TEST_NAME} failed with exit code: \${test_result}\")
-            endif()
+            # Robust pass/fail check: exit code + success marker + failure signatures + artifacts
+            include(\"${FESOM_TESTING_ROOT}/cmake/CheckFesomRun.cmake\")
+            check_fesom_run(
+                NAME \"${TEST_NAME}\"
+                RESULT \"\${test_result}\"
+                OUTPUT_LOG \"${TEST_RUN_DIR}/test_output.log\"
+                ERROR_LOG \"${TEST_RUN_DIR}/test_error.log\"
+                SUCCESS_MARKERS ${_success_markers}
+                REQUIRED_ARTIFACTS \"${RESULT_DIR}/sst.fesom.${FESOM_TEST_FORCING_YEAR}.nc\"
+            )
         ")
     endif()
     
     # Configure namelists for this test with custom options
     configure_fesom_namelists_with_options("${TEST_RUN_DIR}" "${TEST_DATA_DIR}" "${RESULT_DIR}" "${MESH_NAME}" "${STEP_PER_DAY}" "${RUN_LENGTH}" "${RUN_LENGTH_UNIT}" "${RESTART_LENGTH}" "${RESTART_LENGTH_UNIT}" "${LOGFILE_OUTFREQ}" "${FORCE_ROTATION}" "${USE_CAVITY}")
-    
+
+    # Optional: override the vertical mixing scheme in namelist.oce (e.g. to
+    # exercise a CVMix scheme). Whitespace-tolerant and anchored on the char
+    # before the key, matching the harness's other namelist rewrites; the
+    # trailing comment is preserved.
+    if(DEFINED FESOM_TEST_MIX_SCHEME)
+        file(READ "${TEST_RUN_DIR}/namelist.oce" _oce_content)
+        string(REGEX REPLACE "([^A-Za-z0-9_]mix_scheme[ \t]*=[ \t]*)'[^']*'"
+               "\\1'${FESOM_TEST_MIX_SCHEME}'" _oce_content "${_oce_content}")
+        file(WRITE "${TEST_RUN_DIR}/namelist.oce" "${_oce_content}")
+    endif()
+
+    # Optional: swap the atmospheric forcing dataset away from the CORE2 default.
+    # configure_fesom_namelists_with_options() has already written a CORE2
+    # namelist.forcing; here we overwrite it from the matching config/ variant,
+    # rewiring its paths to the bundled tests/data/FORCING tree.
+    if(NOT "${FESOM_TEST_FORCING}" STREQUAL "CORE2")
+        if("${FESOM_TEST_FORCING}" STREQUAL "JRA")
+            update_namelist_forcing_jra(
+                "${FESOM_TESTING_ROOT}/config/namelist.forcing.JRA"
+                "${TEST_RUN_DIR}/namelist.forcing")
+        else()
+            message(FATAL_ERROR "add_fesom_test_with_options(${TEST_NAME}): unknown FORCING '${FESOM_TEST_FORCING}' (expected 'CORE2' or 'JRA')")
+        endif()
+    endif()
+
+    # Optional: include leap years. update_namelist_config_with_options() forces
+    # include_fleapyear=.false. for the (no-leap) CORE2 data; real-calendar forcing
+    # such as JRA55 (gregorian time axis) needs .true. or fesom.x aborts at the
+    # calendar-consistency check in gen_surface_forcing.F90. Anchored/whitespace-
+    # tolerant like the other namelist rewrites.
+    if("${FESOM_TEST_LEAPYEAR}" STREQUAL ".true.")
+        file(READ "${TEST_RUN_DIR}/namelist.config" _cfg_content)
+        string(REGEX REPLACE "([^A-Za-z0-9_])include_fleapyear[ \t]*=[ \t]*\\.[a-zA-Z]+\\."
+               "\\1include_fleapyear=.true." _cfg_content "${_cfg_content}")
+        file(WRITE "${TEST_RUN_DIR}/namelist.config" "${_cfg_content}")
+    endif()
+
     # Add the test
     add_test(
         NAME ${TEST_NAME}
@@ -434,7 +606,17 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
         TIMEOUT ${FESOM_TEST_TIMEOUT}
         WORKING_DIRECTORY ${TEST_RUN_DIR}
     )
-    
+
+    # Every fesom.x integration test carries the base label 'integration', plus any
+    # extra label passed via LABEL (e.g. cvmix). CTest LABELS is a list, so this yields
+    # e.g. "integration" for the base pi tests and "integration;cvmix" for CVMix tests:
+    # `ctest -L integration` runs the whole suite, `ctest -L cvmix` isolates CVMix.
+    set(_labels "integration")
+    if(DEFINED FESOM_TEST_LABEL)
+        list(APPEND _labels "${FESOM_TEST_LABEL}")
+    endif()
+    set_tests_properties(${TEST_NAME} PROPERTIES LABELS "${_labels}")
+
     # For MPI tests, set required properties
     if(FESOM_TEST_MPI_TEST AND FESOM_TEST_NP GREATER 1)
         set_tests_properties(${TEST_NAME} PROPERTIES
@@ -444,6 +626,103 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
     endif()
     
     message(STATUS "Added FESOM test: ${TEST_NAME} with mesh: ${MESH_NAME}, cavity: ${USE_CAVITY}")
+endfunction()
+
+# Regression test for ghost records on time-step change:
+# run one day with step_per_day=96, then rewrite fesom.clock and re-run the SAME
+# day with step_per_day=144 without deleting the results. Records are stamped
+# with the exact averaging-period end, so the second run must land on the same
+# timestamp and overwrite the record: exactly 1 record afterwards. Code that
+# stamps period_end - dt appends a second, shifted record instead (the ghost),
+# which shows up here as "current mean I/O counter = 2".
+function(add_fesom_output_restamp_test TEST_NAME)
+    set(options "")
+    set(oneValueArgs NP TIMEOUT)
+    set(multiValueArgs "")
+    cmake_parse_arguments(FESOM_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+    if(NOT DEFINED FESOM_TEST_NP)
+        set(FESOM_TEST_NP 2)
+    endif()
+    if(NOT DEFINED FESOM_TEST_TIMEOUT)
+        set(FESOM_TEST_TIMEOUT 300)
+    endif()
+
+    set(TEST_RUN_DIR "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}")
+    set(TEST_DATA_DIR "${CMAKE_SOURCE_DIR}/tests/data")
+    set(RESULT_DIR "${TEST_RUN_DIR}/results")
+
+    generate_fesom_clock("${RESULT_DIR}")
+    configure_fesom_namelists("${TEST_RUN_DIR}" "${TEST_DATA_DIR}" "${RESULT_DIR}")
+
+    set(TEST_SCRIPT "${TEST_RUN_DIR}/run_test.cmake")
+    file(GENERATE OUTPUT ${TEST_SCRIPT} CONTENT "
+        file(MAKE_DIRECTORY \"${TEST_RUN_DIR}\")
+        file(MAKE_DIRECTORY \"${RESULT_DIR}\")
+
+        # see add_fesom_test_with_options for why these are safe unconditionally
+        set(ENV{OMPI_ALLOW_RUN_AS_ROOT} \"1\")
+        set(ENV{OMPI_ALLOW_RUN_AS_ROOT_CONFIRM} \"1\")
+        set(ENV{OMPI_MCA_rmaps_base_oversubscribe} \"1\")
+        set(ENV{PRTE_MCA_rmaps_default_mapping_policy} \":oversubscribe\")
+
+        # start from a clean slate: the point of the test is the SECOND run below
+        file(REMOVE_RECURSE \"${RESULT_DIR}\")
+        file(MAKE_DIRECTORY \"${RESULT_DIR}\")
+        file(WRITE \"${RESULT_DIR}/fesom.clock\" \"0 1 1948\\n0 1 1948\\n\")
+
+        # run A: one day at step_per_day=96 (dt=900s), as configured
+        execute_process(
+            COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${FESOM_TEST_NP} ${CMAKE_BINARY_DIR}/bin/fesom.x
+            WORKING_DIRECTORY \"${TEST_RUN_DIR}\"
+            RESULT_VARIABLE run_a_result
+            OUTPUT_VARIABLE run_a_output
+            ERROR_VARIABLE run_a_error
+            TIMEOUT ${FESOM_TEST_TIMEOUT}
+        )
+        file(WRITE \"${TEST_RUN_DIR}/test_output_run_a.log\" \"\${run_a_output}\")
+        file(WRITE \"${TEST_RUN_DIR}/test_error_run_a.log\" \"\${run_a_error}\")
+        if(NOT run_a_result EQUAL 0 OR NOT run_a_output MATCHES \"fesom should stop with exit status = 0\")
+            message(FATAL_ERROR \"Test ${TEST_NAME} FAILED: first run did not finish cleanly (exit \${run_a_result})\")
+        endif()
+
+        # re-run the SAME day with a different time step, keeping the output file
+        file(WRITE \"${RESULT_DIR}/fesom.clock\" \"0 1 1948\\n0 1 1948\\n\")
+        file(READ \"${TEST_RUN_DIR}/namelist.config\" _nml)
+        string(REGEX REPLACE \"([^A-Za-z0-9_])step_per_day[ \\t]*=[ \\t]*[0-9]+\" \"\\\\1step_per_day=144\" _nml \"\${_nml}\")
+        file(WRITE \"${TEST_RUN_DIR}/namelist.config\" \"\${_nml}\")
+
+        execute_process(
+            COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${FESOM_TEST_NP} ${CMAKE_BINARY_DIR}/bin/fesom.x
+            WORKING_DIRECTORY \"${TEST_RUN_DIR}\"
+            RESULT_VARIABLE run_b_result
+            OUTPUT_VARIABLE run_b_output
+            ERROR_VARIABLE run_b_error
+            TIMEOUT ${FESOM_TEST_TIMEOUT}
+        )
+        file(WRITE \"${TEST_RUN_DIR}/test_output.log\" \"\${run_b_output}\")
+        file(WRITE \"${TEST_RUN_DIR}/test_error.log\" \"\${run_b_error}\")
+        if(NOT run_b_result EQUAL 0 OR NOT run_b_output MATCHES \"fesom should stop with exit status = 0\")
+            message(FATAL_ERROR \"Test ${TEST_NAME} FAILED: second run did not finish cleanly (exit \${run_b_result})\")
+        endif()
+
+        # the second run must OVERWRITE the record from the first run, not append
+        # a ghost. The I/O layer prints the record position it decided on.
+        if(NOT run_b_output MATCHES \"sst: current mean I/O counter =[ \\t]*1[^0-9]\")
+            message(FATAL_ERROR \"Test ${TEST_NAME} FAILED: re-running a period with a different time step did not overwrite the existing record (ghost record). See ${TEST_RUN_DIR}/test_output.log\")
+        endif()
+        message(STATUS \"Test ${TEST_NAME} PASSED: record was overwritten in place on time-step change\")
+    ")
+
+    add_test(
+        NAME ${TEST_NAME}
+        COMMAND ${CMAKE_COMMAND} -P ${TEST_SCRIPT}
+    )
+    set_tests_properties(${TEST_NAME} PROPERTIES
+        TIMEOUT ${FESOM_TEST_TIMEOUT}
+        WORKING_DIRECTORY ${TEST_RUN_DIR}
+        PROCESSORS ${FESOM_TEST_NP}
+    )
+    message(STATUS "Added FESOM test: ${TEST_NAME} (output re-stamp regression)")
 endfunction()
 
 # Function to find and validate MPI for testing
@@ -501,7 +780,7 @@ function(add_fesom_meshdiag_test_with_options TEST_NAME MESH_NAME RUNID)
     
     # Create test run directory
     set(TEST_RUN_DIR "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}")
-    set(TEST_DATA_DIR "${CMAKE_SOURCE_DIR}/tests/data")
+    set(TEST_DATA_DIR "${FESOM_TESTING_ROOT}/tests/data")
     set(RESULT_DIR "${TEST_RUN_DIR}/results")
     
     # Configure namelists with custom runid to avoid conflicts
@@ -524,10 +803,22 @@ function(add_fesom_meshdiag_test_with_options TEST_NAME MESH_NAME RUNID)
         # Create test directories
         file(MAKE_DIRECTORY \"${TEST_RUN_DIR}\")
         file(MAKE_DIRECTORY \"${RESULT_DIR}\")
-        
-        # Run fesom_meshdiag with MPI
+
+        # Allow Open MPI to launch when running as root (act / Docker CI). Specific
+        # to Open MPI; ignored by other MPIs and by non-root runs.
+        set(ENV{OMPI_ALLOW_RUN_AS_ROOT} \"1\")
+        set(ENV{OMPI_ALLOW_RUN_AS_ROOT_CONFIRM} \"1\")
+
+        # Allow oversubscription so high-rank tests (e.g. NP=8) run on CI
+        # runners with fewer cores. Open MPI 4 reads OMPI_MCA_*, Open MPI 5
+        # (PRRTE) reads PRTE_MCA_*; both are ignored by other MPIs.
+        set(ENV{OMPI_MCA_rmaps_base_oversubscribe} \"1\")
+        set(ENV{PRTE_MCA_rmaps_default_mapping_policy} \":oversubscribe\")
+
+        # Run fesom_meshdiag with MPI. Raise the stack limit (Intel builds overflow
+        # the default 8 MB stack on large meshes); inherited by mpiexec + ranks.
         execute_process(
-            COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${FESOM_TEST_NP} ${CMAKE_BINARY_DIR}/bin/fesom_meshdiag
+            COMMAND /bin/sh -c \"ulimit -s unlimited 2>/dev/null || ulimit -s 1048576 2>/dev/null; exec '${MPIEXEC_EXECUTABLE}' ${MPIEXEC_NUMPROC_FLAG} ${FESOM_TEST_NP} '${CMAKE_BINARY_DIR}/bin/fesom_meshdiag'\"
             WORKING_DIRECTORY \"${TEST_RUN_DIR}\"
             RESULT_VARIABLE test_result
             OUTPUT_VARIABLE test_output
@@ -539,20 +830,17 @@ function(add_fesom_meshdiag_test_with_options TEST_NAME MESH_NAME RUNID)
         file(WRITE \"${TEST_RUN_DIR}/test_output.log\" \"\${test_output}\")
         file(WRITE \"${TEST_RUN_DIR}/test_error.log\" \"\${test_error}\")
         
-        # Check if mesh.diag.nc file was created
-        set(EXPECTED_OUTPUT \"${RESULT_DIR}/${RUNID}.mesh.diag.nc\")
-        if(EXISTS \"\${EXPECTED_OUTPUT}\")
-            message(STATUS \"Test ${TEST_NAME} completed successfully - mesh diagnostics file created: \${EXPECTED_OUTPUT}\")
-        else()
-            message(FATAL_ERROR \"Test ${TEST_NAME} failed - mesh diagnostics file not created: \${EXPECTED_OUTPUT}\")
-        endif()
-        
-        # Check result
-        if(test_result EQUAL 0)
-            message(STATUS \"Test ${TEST_NAME} completed with exit code: \${test_result}\")
-        else()
-            message(FATAL_ERROR \"Test ${TEST_NAME} failed with exit code: \${test_result}\")
-        endif()
+        # Robust pass/fail check. fesom_meshdiag finalizes MPI directly (it does
+        # not print the standalone success marker), so verification relies on the
+        # exit code, absence of failure signatures, and the diagnostics artifact.
+        include(\"${FESOM_TESTING_ROOT}/cmake/CheckFesomRun.cmake\")
+        check_fesom_run(
+            NAME \"${TEST_NAME}\"
+            RESULT \"\${test_result}\"
+            OUTPUT_LOG \"${TEST_RUN_DIR}/test_output.log\"
+            ERROR_LOG \"${TEST_RUN_DIR}/test_error.log\"
+            REQUIRED_ARTIFACTS \"${RESULT_DIR}/${RUNID}.mesh.diag.nc\"
+        )
     ")
     
     # Add the test
@@ -591,9 +879,9 @@ function(add_mesh_download_fixture MESH_NAME)
     add_test(
         NAME ${DOWNLOAD_TEST_NAME}
         COMMAND ${CMAKE_COMMAND}
-            -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -DSOURCE_DIR=${FESOM_TESTING_ROOT}
             -DMESH_NAME=${MESH_NAME}
-            -P ${CMAKE_SOURCE_DIR}/tests/integration/mesh_download.cmake
+            -P ${FESOM_TESTING_ROOT}/tests/integration/mesh_download.cmake
     )
     
     set_tests_properties(${DOWNLOAD_TEST_NAME} PROPERTIES
@@ -620,11 +908,11 @@ function(add_mesh_partition_fixture MESH_NAME NUM_PROCESSES)
     add_test(
         NAME ${PARTITION_TEST_NAME}
         COMMAND ${CMAKE_COMMAND}
-            -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -DSOURCE_DIR=${FESOM_TESTING_ROOT}
             -DBUILD_DIR=${CMAKE_BINARY_DIR}
             -DMESH_NAME=${MESH_NAME}
             -DNUM_PROCESSES=${NUM_PROCESSES}
-            -P ${CMAKE_SOURCE_DIR}/tests/integration/mesh_partition.cmake
+            -P ${FESOM_TESTING_ROOT}/tests/integration/mesh_partition.cmake
     )
     
     set_tests_properties(${PARTITION_TEST_NAME} PROPERTIES
@@ -684,7 +972,7 @@ function(add_fesom_mesh_test TEST_NAME MESH_NAME NP)
     endif()
     
     # Parse mesh configuration from registry
-    set(MESH_REGISTRY "${CMAKE_SOURCE_DIR}/tests/mesh_registry.json")
+    set(MESH_REGISTRY "${FESOM_TESTING_ROOT}/tests/mesh_registry.json")
     if(EXISTS "${MESH_REGISTRY}")
         file(READ "${MESH_REGISTRY}" REGISTRY_CONTENT)
         

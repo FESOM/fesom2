@@ -323,7 +323,11 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
 
     !___________________________________________________________________________
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, nz, ed, el, nelem, k, elem, nzmin, nzmax, update_u, update_v)
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)
@@ -473,7 +477,11 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! Sum up velocity differences over edge with respect to elemtnal index
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, ed, el, nz, nzmin, nzmax)
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el    = edge_tri(:,ed)
@@ -533,7 +541,11 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
 !$OMP BARRIER
 
     !___________________________________________________________________________
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)
@@ -601,7 +613,7 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
-    real(kind=8)  :: u1, v1, len, vi
+    real(kind=8)  :: u1, v1, len, vi, viLapl
     integer       :: ed, el(2), nz, nzmin, nzmax, elem
     real(kind=8)  :: update_u(mesh%nl-1), update_v(mesh%nl-1)
     !___________________________________________________________________________
@@ -626,8 +638,12 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
 !$OMP END PARALLEL DO
 
     !___________________________________________________________________________
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, ed, el, nz, nzmin, nzmax, update_u, update_v)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, viLapl, ed, el, nz, nzmin, nzmax, update_u, update_v)
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)
@@ -675,7 +691,11 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
 !$OMP BARRIER
 
     !___________________________________________________________________________
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     DO ed=1, myDim_edge2D+eDim_edge2D
         if(myList_edge2D(ed)>edge2D_in) cycle
         el=edge_tri(:,ed)
@@ -695,10 +715,12 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
                             dynamics%visc_gamma2*vi)            &
                         )*len)
                 ! vi=-dt*sqrt(max(dynamics%visc_gamma0, dynamics%visc_gamma1*max(sqrt(vi), dynamics%visc_gamma2*vi))*len)
+                ! Optional Laplacian viscosity (active when visc_gamma0_h or visc_gamma1_h > 0)
+                viLapl=dt*max(dynamics%visc_gamma0_h, dynamics%visc_gamma1_h*sqrt(u1*u1+v1*v1))*len
                 !PS update_u(nz)=vi*(U_c(nz,el(1))-U_c(nz,el(2)))*(zbar(nz)-zbar(nz+1)) 
                 !PS update_v(nz)=vi*(V_c(nz,el(1))-V_c(nz,el(2)))*(zbar(nz)-zbar(nz+1)) 
-                update_u(nz)=vi*(U_c(nz,el(1))-U_c(nz,el(2)))*(helem(nz, el(1))+helem(nz, el(2)))*0.5_WP
-                update_v(nz)=vi*(V_c(nz,el(1))-V_c(nz,el(2)))*(helem(nz, el(1))+helem(nz, el(2)))*0.5_WP
+                update_u(nz)=(vi*(U_c(nz,el(1))-U_c(nz,el(2)))+viLapl*u1)*(helem(nz, el(1))+helem(nz, el(2)))*0.5_WP
+                update_v(nz)=(vi*(V_c(nz,el(1))-V_c(nz,el(2)))+viLapl*v1)*(helem(nz, el(1))+helem(nz, el(2)))*0.5_WP
             end do
         else
             do nz=nzmin,nzmax-1
@@ -710,8 +732,10 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
                             dynamics%visc_gamma2*vi)            &
                         )*len)
                 ! vi=-dt*sqrt(max(dynamics%visc_gamma0, dynamics%visc_gamma1*max(sqrt(vi), dynamics%visc_gamma2*vi))*len)
-                update_u(nz)=vi*(U_c(nz,el(1))-U_c(nz,el(2)))
-                update_v(nz)=vi*(V_c(nz,el(1))-V_c(nz,el(2)))
+                ! Optional Laplacian viscosity (active when visc_gamma0_h or visc_gamma1_h > 0)
+                viLapl=dt*max(dynamics%visc_gamma0_h, dynamics%visc_gamma1_h*sqrt(u1*u1+v1*v1))*len
+                update_u(nz)=vi*(U_c(nz,el(1))-U_c(nz,el(2)))+viLapl*u1
+                update_v(nz)=vi*(V_c(nz,el(1))-V_c(nz,el(2)))+viLapl*v1
             end do
         end if 
         
@@ -803,7 +827,7 @@ SUBROUTINE compute_apegen(dynamics, tracers, partit, mesh)
     type(t_mesh)  , intent(in)   , target   :: mesh
     real(kind=WP), dimension(:,:), pointer  :: salt
     !___________________________________________________________________________
-    integer        :: n, nzmin
+    integer        :: n, k, nzmin, nzmax
     real(kind=WP)  :: JS, GS, D
     !___________________________________________________________________________
 #include "associate_part_def.h"
@@ -815,6 +839,7 @@ salt   => tracers%data(2)%values(:,:)
 
   DO n=1, myDim_nod2D
      nzmin=ulevels_nod2D(n)
+     nzmax=nlevels_nod2D(n)
      ! heat and salinity fluxes at node=n
      JS= heat_flux_in(n) / vcpw
      GS=(relax_salt(n) + water_flux(n) * salt(nzmin,n))
@@ -823,7 +848,11 @@ salt   => tracers%data(2)%values(:,:)
      dynamics%ke_G   (n)=GS
      dynamics%ke_D   (n)=D
      dynamics%ke_D2  (n)=D**2
-     dynamics%ke_n0  (n)=-bvfreq (nzmin,n)*density_0/g
+     !this we need in 3D
+     !dynamics%ke_n0  (n)=-bvfreq (nzmin,n)*density_0/g
+     DO k=nzmin, nzmax-1
+        dynamics%ke_n0(k, n)=-bvfreq (k, n)*density_0/g
+     END DO
      dynamics%ke_JD(n)  =JS*D
      dynamics%ke_GD(n)  =GS*D
      dynamics%ke_D (n)  =D
@@ -843,8 +872,52 @@ salt   => tracers%data(2)%values(:,:)
   call exchange_nod(dynamics%ke_swA, partit)
   call exchange_nod(dynamics%ke_swB, partit)
 END SUBROUTINE compute_apegen
-
-
+! compute energy conversion (Pm<->Pe), as well as Pm & Pe
+SUBROUTINE compute_PePm(dynamics, tracers, partit, mesh)
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_TRACER
+    USE MOD_PARSUP
+    use MOD_DYN
+    USE o_PARAM
+    USE g_comm_auto
+    USE o_ARRAYS
+    IMPLICIT NONE
+    type(t_dyn)   , intent(inout), target   :: dynamics
+    type(t_tracer), intent(in)   , target   :: tracers
+    type(t_partit), intent(inout), target   :: partit
+    type(t_mesh)  , intent(in)   , target   :: mesh
+   !___________________________________________________________________________
+    real(kind=WP), dimension(:,:,:), pointer :: UV
+    integer        :: elem, k, nzmin, nzmax, elnodes(3)
+    real(kind=WP)  :: dens
+    !___________________________________________________________________________
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+  UV     => dynamics%uv(:,:,:)
+  DO elem=1, myDim_elem2D
+     elnodes=elem2D_nodes(:,elem)
+     nzmin = ulevels(elem)
+     nzmax = nlevels(elem)
+     DO k=nzmin, nzmax-1
+        dynamics%ke_Dx(k,elem)=sum(gradient_sca(1:3,elem)*density_m_rho0(k,elnodes))
+        dynamics%ke_Dy(k,elem)=sum(gradient_sca(4:6,elem)*density_m_rho0(k,elnodes))
+        dens=sum(density_m_rho0(k,elnodes))/3.0_WP
+        dynamics%ke_DU(k,elem)=dens*UV(1,k,elem)
+        dynamics%ke_DV(k,elem)=dens*UV(2,k,elem)
+        dynamics%ke_elemD (k,elem)=dens
+        dynamics%ke_elemD2(k,elem)=dens**2
+     END DO
+  END DO
+  call exchange_elem(dynamics%ke_Dx,   partit)
+  call exchange_elem(dynamics%ke_Dy,   partit)
+  call exchange_elem(dynamics%ke_DU,   partit)
+  call exchange_elem(dynamics%ke_DV,   partit)
+  call exchange_elem(dynamics%ke_elemD,  partit)
+  call exchange_elem(dynamics%ke_elemD2, partit)
+END SUBROUTINE compute_PePm
 !
 !
 !_______________________________________________________________________________
@@ -906,9 +979,13 @@ subroutine check_validviscopt_5(partit, mesh)
     loc_R = 0.0_WP
     loc_A = 0.0_WP
     
+#if !defined(__openmp_reproducible)
+! A "+" reduction combines the per-thread partial sums in a thread-count
+! dependent order, so it is not bit-reproducible: run the loop serially.
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmax, nzmin, c1, rossbyr_1barocl, &
 !$OMP                                  fac_ResR1barocl) REDUCTION(+:loc_R, loc_A)
 !$OMP DO
+#endif
     do node=1, myDim_nod2D
         !_______________________________________________________________________
         ! Exlude the equator |lat|<30° from checking the ration between resolution
@@ -943,15 +1020,19 @@ subroutine check_validviscopt_5(partit, mesh)
         loc_R   = loc_R + fac_ResR1barocl
         loc_A   = loc_A + 1.0_WP
     end do
+#if !defined(__openmp_reproducible)
+! A "+" reduction combines the per-thread partial sums in a thread-count
+! dependent order, so it is not bit-reproducible: run the loop serially.
 !$OMP END DO
 !$OMP END PARALLEL
+#endif
 !$OMP BARRIER
 
     !___________________________________________________________________________
     ! compute global mean ratio --> core2 Ratio=4.26 (eddy parameterizted), 
     ! dart Ratio=0.97 (eddy resolving/permitting)
-    call MPI_AllREDUCE(loc_R, glb_R, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(loc_A, glb_A, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(loc_R, glb_R, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(loc_A, glb_A, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
     glb_R  = glb_R/glb_A
     
     !___________________________________________________________________________

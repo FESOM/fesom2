@@ -17,10 +17,9 @@ namelist.config:
       steps_per_ib_step: 8
       ib_async_mode: 0
     run_config:
-      use_cavity: False
+      use_cavity: True
       use_cavity_partial_cell: False
     timestep:
-        step_per_day: 96
         run_length: 1
         run_length_unit: "d"
     geometry:
@@ -68,9 +67,9 @@ namelist.io:
                 prec: 8
 
 fcheck:
-    a_ice: 0.19109711397780874
-    salt: 22.54238316972114
-    sst: 12.51977989579855
-    temp: 1.8320760001820051
-    u: -0.0017879101463401837
-    v: -0.00015320233774158133
+    a_ice: 0.1797949703818951
+    salt: 34.71518235863598
+    sst: 12.627374041683792
+    temp: 2.8449698241303936
+    u: -0.0027270930665444114
+    v: -0.0002148347754136242

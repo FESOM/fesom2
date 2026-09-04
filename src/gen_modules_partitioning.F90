@@ -52,10 +52,10 @@ subroutine par_init(partit)    ! initializes MPI
   integer                               :: i
   integer                               :: provided_mpi_thread_support_level
   character(:), allocatable             :: provided_mpi_thread_support_level_name
-#if defined __oasis || defined  __ifsinterface
+#if defined __oasis || defined  __ifsinterface || defined  __yac
   ! use comm from coupler or ifs
 #else
-  partit%MPI_COMM_FESOM=MPI_COMM_WORLD ! use global comm if not coupled (e.g. no __oasis or __ifsinterface)
+  partit%MPI_COMM_FESOM=MPI_COMM_WORLD ! use global comm if not coupled (e.g. no __coupled or __ifsinterface)
 #endif
   call MPI_Comm_Size(partit%MPI_COMM_FESOM,partit%npes,i)
   call MPI_Comm_Rank(partit%MPI_COMM_FESOM,partit%mype,i) 
@@ -85,6 +85,7 @@ subroutine par_init(partit)    ! initializes MPI
 end subroutine par_init
 !=================================================================
 subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
+  use iso_fortran_env, only: output_unit, error_unit
   use MOD_PARTIT
 
 ! In case we are letting oasis orchestrate MPI, we need to shut down through
@@ -107,12 +108,16 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
   integer, optional, intent(in)   :: abort
   integer                         :: error
 
- 
+  ! flush stdout and stderr so that error messages are visible before MPI_ABORT
+  flush(output_unit)
+  flush(error_unit)
+
 ! For standalone runs we
 ! when there is error par_ex should be called with abort argument to abort abruptly,
 ! in all other cases model will be finalized here, call the MPI_barrier and MPI_finalize
 !---------------------------------------------------------------
-#ifndef __oasis
+!TODO: logic is convoluted here, not defined oasis and model needs to abort doesn't happen using par_ex 
+#if !defined(__oasis) && !defined(__yac)
   if (present(abort)) then
      if (mype==0) write(*,*) 'Run finished unexpectedly!'
      call MPI_ABORT(COMM, 1, error)
@@ -136,10 +141,19 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
   !For OpenIFS coupled runs we use the new OASIS nameing scheme (oasis)
   if (present(abort)) then
     if (mype==0) write(*,*) 'Run finished unexpectedly!'
+    !SLcall MPI_ABORT(COMM, 1 )
     call MPI_ABORT(MPI_COMM_WORLD, 1, error)
   else
+#ifdef __oasis
     call oasis_terminate
-  endif
+#elif __yac
+    CALL yac_ffinalize()
+    CALL MPI_Finalize(error)
+#endif
+ endif
+#elif defined(__yac)
+ CALL yac_ffinalize()
+ CALL MPI_Finalize(error)
 #else
   !For ECHAM coupled runs we use the old OASIS nameing scheme (prism / prism_proto)
   if (.not. present(abort)) then
@@ -152,10 +166,8 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
   
   if (mype==0) print *, 'FESOM calls MPI_Finalize'
   call MPI_Finalize(error)
-#endif
-         ! oifs/echam
-#endif
-         ! oasis
+#endif /* oifs or echam */
+#endif /* coupled: oasis&yac */
 
 ! Regardless of standalone, OpenIFS oder ECHAM coupling, if we reach to this point
 ! we should be fine shutting the whole model down
@@ -248,7 +260,7 @@ subroutine init_mpi_types(partit, mesh)
             blocklen_tmp(1:nb) = blocklen(1:nb)*n_val 
             displace_tmp(1:nb) = displace(1:nb)*n_val 
 
-            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
                  partit%r_mpitype_elem2D(n,n_val), partit%MPIerr)
 
             call MPI_TYPE_COMMIT(partit%r_mpitype_elem2D(n,n_val), partit%MPIerr) 
@@ -264,7 +276,7 @@ subroutine init_mpi_types(partit, mesh)
                print *,"out of bounds error, lbound:",lbound(partit%r_mpitype_elem3D), "indices:", n,nl1,n_val, "ubound:",ubound(partit%r_mpitype_elem3D), __FILE__,__LINE__
                stop 1
              end if
-               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, & 
                     partit%r_mpitype_elem3D(n,nl1,n_val),  partit%MPIerr)
 
                call MPI_TYPE_COMMIT(partit%r_mpitype_elem3D(n,nl1,n_val),  partit%MPIerr)  
@@ -294,7 +306,7 @@ subroutine init_mpi_types(partit, mesh)
             blocklen_tmp(1:nb) = blocklen(1:nb)*n_val 
             displace_tmp(1:nb) = displace(1:nb)*n_val 
 
-            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
                  partit%s_mpitype_elem2D(n, n_val), partit%MPIerr)
 
             call MPI_TYPE_COMMIT(partit%s_mpitype_elem2D(n, n_val),   partit%MPIerr) 
@@ -304,7 +316,7 @@ subroutine init_mpi_types(partit, mesh)
                blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nl1 
                displace_tmp(1:nb) = displace(1:nb)*n_val*nl1 
 
-               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, & 
                     partit%s_mpitype_elem3D(n,nl1,n_val),  partit%MPIerr)
 
                call MPI_TYPE_COMMIT(partit%s_mpitype_elem3D(n,nl1,n_val),  partit%MPIerr)  
@@ -335,7 +347,7 @@ subroutine init_mpi_types(partit, mesh)
 
          DO n_val=1,4
 
-            call MPI_TYPE_INDEXED(nb, blocklen, displace, MPI_DOUBLE_PRECISION, &
+            call MPI_TYPE_INDEXED(nb, blocklen, displace, MPI_WP, &
                  partit%r_mpitype_elem2D_full(n,n_val), partit%MPIerr)
             call MPI_TYPE_COMMIT(partit%r_mpitype_elem2D_full(n, n_val),   partit%MPIerr)
 
@@ -350,7 +362,7 @@ subroutine init_mpi_types(partit, mesh)
                print *,"out of bounds error, lbound:",lbound(partit%r_mpitype_elem3D_full), "indices:", n,nl1,n_val, "ubound:", ubound(partit%r_mpitype_elem3D_full), __FILE__,__LINE__
                stop 1
              end if
-               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, & 
                     partit%r_mpitype_elem3D_full(n,nl1,n_val),  partit%MPIerr)
 
                call MPI_TYPE_COMMIT(partit%r_mpitype_elem3D_full(n,nl1,n_val),  partit%MPIerr)  
@@ -380,7 +392,7 @@ subroutine init_mpi_types(partit, mesh)
          call MPI_TYPE_COMMIT(partit%s_mpitype_elem2D_full_i(n), partit%MPIerr)  
  
          DO n_val=1,4
-            call MPI_TYPE_INDEXED(nb, blocklen, displace, MPI_DOUBLE_PRECISION, &
+            call MPI_TYPE_INDEXED(nb, blocklen, displace, MPI_WP, &
                  partit%s_mpitype_elem2D_full(n,n_val), partit%MPIerr)
             call MPI_TYPE_COMMIT(partit%s_mpitype_elem2D_full(n,n_val),   partit%MPIerr)
   
@@ -389,7 +401,7 @@ subroutine init_mpi_types(partit, mesh)
                blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nl1 
                displace_tmp(1:nb) = displace(1:nb)*n_val*nl1 
 
-               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, & 
                     partit%s_mpitype_elem3D_full(n,nl1,n_val),  partit%MPIerr)
 
                call MPI_TYPE_COMMIT(partit%s_mpitype_elem3D_full(n,nl1,n_val),  partit%MPIerr)  
@@ -438,7 +450,7 @@ subroutine init_mpi_types(partit, mesh)
             endif
          enddo
 
-         call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_DOUBLE_PRECISION, & 
+         call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_WP, & 
               partit%r_mpitype_nod2D(n),     partit%MPIerr)
 
          call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_INTEGER, & 
@@ -453,7 +465,7 @@ subroutine init_mpi_types(partit, mesh)
                blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nl1 
                displace_tmp(1:nb) = displace(1:nb)*n_val*nl1 
 
-               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, & 
                     partit%r_mpitype_nod3D(n,nl1,n_val),  partit%MPIerr)
 
                call MPI_TYPE_COMMIT(partit%r_mpitype_nod3D(n,nl1,n_val),  partit%MPIerr)  
@@ -478,7 +490,7 @@ subroutine init_mpi_types(partit, mesh)
             endif
          enddo
 
-         call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_DOUBLE_PRECISION, & 
+         call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_WP, & 
               partit%s_mpitype_nod2D(n),     partit%MPIerr)
 
          call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_INTEGER, & 
@@ -493,7 +505,7 @@ subroutine init_mpi_types(partit, mesh)
                blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nl1 
                displace_tmp(1:nb) = displace(1:nb)*n_val*nl1 
 
-               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, & 
                     partit%s_mpitype_nod3D(n,nl1,n_val),  partit%MPIerr)
 
                call MPI_TYPE_COMMIT(partit%s_mpitype_nod3D(n,nl1,n_val),  partit%MPIerr)  

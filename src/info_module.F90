@@ -26,7 +26,17 @@ contains
       print '(g0)', '__oasis is ON'
 #else
       print '(g0)', '__oasis is OFF'
-#endif  
+#endif
+#ifdef __yac
+      print '(g0)', '__yac is ON'
+#else
+      print '(g0)', '__yac is OFF'
+#endif
+#ifdef __coupled
+      print '(g0)', '__coupled is ON'
+#else
+      print '(g0)', '__coupled is OFF'
+#endif
 #ifdef __oifs
       print '(g0)', '__oifs is ON'
 #else
@@ -37,10 +47,10 @@ contains
 #else
       print '(g0)', 'DEBUG is OFF'
 #endif  
-#ifdef DISABLE_MULTITHREADING
-      print '(g0)', 'DISABLE_MULTITHREADING is ON'
+#ifdef ASYNCHRONOUS_IO_THREADS
+      print '(g0)', 'ASYNCHRONOUS_IO_THREADS is ON'
 #else
-      print '(g0)', 'DISABLE_MULTITHREADING is OFF'
+      print '(g0)', 'ASYNCHRONOUS_IO_THREADS is OFF'
 #endif  
 #ifdef false
       print '(g0)', 'false is ON'
@@ -76,26 +86,6 @@ contains
       print '(g0)', 'VERBOSE is ON'
 #else
       print '(g0)', 'VERBOSE is OFF'
-#endif  
-#ifdef DISABLE_PARALLEL_RESTART_READ
-      print '(g0)', 'DISABLE_PARALLEL_RESTART_READ is ON'
-#else
-      print '(g0)', 'DISABLE_PARALLEL_RESTART_READ is OFF'
-#endif  
-#ifdef ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS
-      print '(g0)', 'ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS is ON'
-#else
-      print '(g0)', 'ENABLE_ALEPH_CRAYMPICH_WORKAROUNDS is OFF'
-#endif  
-#ifdef ENABLE_ALBEDO_INTELMPI_WORKAROUNDS
-      print '(g0)', 'ENABLE_ALBEDO_INTELMPI_WORKAROUNDS is ON'
-#else
-      print '(g0)', 'ENABLE_ALBEDO_INTELMPI_WORKAROUNDS is OFF'
-#endif 
-#ifdef ENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS
-      print '(g0)', 'ENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS is ON'
-#else
-      print '(g0)', 'ENABLE_JUWELS_GNUOPENMPI_WORKAROUNDS is OFF'
 #endif  
 #ifdef ENABLE_NVHPC_WORKAROUNDS
       print '(g0)', 'ENABLE_NVHPC_WORKAROUNDS is ON'
