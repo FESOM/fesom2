@@ -116,6 +116,52 @@ module g_config
   integer                :: n_levels = 1       ! Number of levels for hierarchic partitioning
   integer, dimension(10) :: n_part = RESHAPE((/0/), (/10/), (/0/)) ! Number of partitions on each hierarchy level
   namelist /machine/ n_levels, n_part
+
+  ! --- parallel output/restart writing -------------------------------------
+  ! Lives in namelist.config, NOT namelist.io: namelist.io is read by
+  ! ini_mean_io on the first call to output(), i.e. inside the timestep loop,
+  ! long after the restart file group has been built. A setting placed there
+  ! would silently have no effect on restarts.
+  logical :: parallel_write = .false.   !< collective writes instead of gather-to-one
+  integer :: n_writers     = 0          !< 0 = as many as the block-size guard allows
+  !> Vertical extent of an output chunk, in levels. 0 = all levels, 1 = one level.
+  !>
+  !> Chunk size = chunk_levels * block * bytes_per_value, where
+  !>   block = ceil(nod2D / n_writers) is one writer's share of the horizontal
+  !>   dimension. The horizontal extent is NOT free: a chunk wider than a
+  !>   writer's block would span two writers, and HDF5 would then have to ship
+  !>   and re-compress it between ranks -- exactly what this design avoids.
+  !>   The VERTICAL extent is free, because a writer owns every level of its
+  !>   own nodes, so raising chunk_levels costs no write performance at all.
+  !>
+  !> NG5 (nod2D = 7402886, nz = 69), float32:
+  !>   n_writers = 256, chunk_levels = 1   ->   0.12 MB
+  !>   n_writers = 256, chunk_levels = 8   ->   0.93 MB   (default)
+  !>   n_writers = 256, chunk_levels = 69  ->   8.0 MB
+  !>   n_writers =  64, chunk_levels = 69  ->  31.9 MB
+  !>   n_writers =  20, chunk_levels = 69  -> 102 MB
+  !>
+  !> Which value suits depends on how the data is read. Tall chunks (many
+  !> levels) favour profiles and time series at a point, and conversion to
+  !> zarr; flat chunks favour maps at a single depth, because reading one level
+  !> out of a chunk of k costs k times the bytes. Default 8 is a compromise
+  !> leaning toward maps, which are the more common access pattern here.
+  integer :: chunk_levels  = 8
+  !> Restart writers and restart readers, separately from the output writers.
+  !> -1 means "same as n_writers", which is what one knob used to give.
+  !>
+  !> The three want different values, measured on NG5/8192: output peaks near
+  !> 512 writers, restarts peak lower, and reading peaks lower still -- 128
+  !> readers beat 512 by a third (141.2 s gather -> 52.9 s at 512 -> 39.9 s at
+  !> 128). Output writes compressed chunks whose boundaries must coincide with
+  !> writer blocks, so its optimum is tied to chunk size; a read decompresses
+  !> whole chunks and has no such constraint, which is why its optimum sits
+  !> elsewhere. Zero keeps its meaning of "as many as the block-size guard
+  !> allows" for all three.
+  integer :: n_writers_restart = -1     !< -1 = use n_writers
+  integer :: n_readers_restart = -1     !< -1 = use n_writers
+  namelist /io_parallel/ parallel_write, n_writers, chunk_levels, &
+                         n_writers_restart, n_readers_restart
   
   !_____________________________________________________________________________
   ! *** configuration***
@@ -136,6 +182,16 @@ module g_config
   integer                       :: ib_num=0
   integer                       :: steps_per_ib_step=8
 
+! LA 2026 -- passive iron tracer carried by icebergs
+! Each iceberg carries a fixed Fe concentration of its ice; melting releases
+! Fe in proportion to the meltwater flux.  Purely diagnostic: the resulting
+! ibiron field is written out but does not feed back on the ocean.
+  logical                       :: use_icb_iron=.false.      ! master switch
+  real(kind=WP)                 :: icb_iron_const=50.0e-6_WP ! Fe content of iceberg ice
+                                                             ! [mol m-3]; 50e-6 = 50 nmol L-1
+  logical                       :: l_icb_iron_file=.false.   ! read per-iceberg Fe from
+                                                             ! icb_iron.dat instead of the constant
+
 ! kh 02.02.21
 ! ib_async_mode == 0: original sequential behavior for both ice sections (for testing purposes, creating reference results etc.)
 ! ib_async_mode == 1: OpenMP code active to overlapped computations in first (ocean ice) and second (icebergs) parallel section
@@ -145,7 +201,7 @@ module g_config
 
   namelist /icebergs/   use_icebergs, turn_off_hf, turn_off_fw, use_icesheet_coupling, lbalance_fw, cell_saturation, lmin_latent_hf, &
                         ib_num, steps_per_ib_step, ib_async_mode, thread_support_level_required, lverbose_icb, l_allowgrounding, &
-                        l_cap_ibhf_n
+                        l_cap_ibhf_n, use_icb_iron, icb_iron_const, l_icb_iron_file
 
 !wiso-code!!!
   logical                       :: lwiso  =.false.  ! enable isotope?
@@ -188,9 +244,9 @@ module g_config
   real(kind=WP)                 :: dt
   integer                       :: save_count_mean, save_count_restart
   logical                       :: r_restart
-  real(kind=WP)                 :: rtime_ice=0.0, rtime_tot=0.0
+  real(kind=WP)                 :: rtime_ice=0.0, rtime_tot=0.0, rtime_ice_evp=0.0, rtime_ice_adv=0.0, rtime_ice_therm=0.0
   real(kind=WP)                 :: rtime_oce=0.0, rtime_oce_dyn=0.0, rtime_oce_dynssh=0.0,  rtime_oce_solvessh=0.0
-  real(kind=WP)                 :: rtime_oce_solvetra=0.0, rtime_oce_GMRedi=0.0, rtime_oce_mixpres=0.0
+  real(kind=WP)                 :: rtime_oce_solvetra=0.0, rtime_oce_GMRedi=0.0, rtime_oce_presdens=0.0, rtime_oce_mixing=0.0
   real(kind=WP)                 :: dummy=1.e10
   
   

@@ -79,6 +79,8 @@ subroutine cut_off(ice, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_ice),    intent(inout), target :: ice
     integer                               :: n
+    integer                               :: n_coldice
+    integer, save                         :: n_coldwarn = 0
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
@@ -96,9 +98,11 @@ subroutine cut_off(ice, partit, mesh)
     ice_temp => ice%data(4)%values(:)
 #endif /* (__oifs) */
 
+    n_coldice = 0
+
     !___________________________________________________________________________
     ! upper cutoff: a_ice
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n) REDUCTION(+:n_coldice)
 DO n=1, myDim_nod2D+eDim_nod2D
    if (a_ice(n) > 1.0_WP)   a_ice(n)=1.0_WP
     ! lower cutoff: a_ice
@@ -128,10 +132,25 @@ DO n=1, myDim_nod2D+eDim_nod2D
 #endif /* (__oifs) */
 
 #if defined (__oifs) || defined (__ifsinterface)
-    if (ice_temp(n) < 173.15_WP .and. a_ice(n) >= 0.1e-8_WP) ice_temp(n)=271.35_WP
+    ! No lower clamp. A surface temperature this far below anything physical
+    ! means the skin solve has diverged, and silently resetting it to the
+    ! seawater freezing point hides the divergence instead of reporting it.
+    ! Count and report below.
+    if (ice_temp(n) < 173.15_WP .and. a_ice(n) >= 0.1e-8_WP) n_coldice = n_coldice + 1
 #endif /* (__oifs) */
 END DO
 !$OMP END PARALLEL DO
+
+#if defined (__oifs) || defined (__ifsinterface)
+    ! Rate limited: a diverging skin solve usually diverges every step.
+    if (n_coldice > 0) then
+        n_coldwarn = n_coldwarn + 1
+        if (n_coldwarn <= 5 .or. mod(n_coldwarn, 100) == 0) then
+            write(*,*) 'WARNING: ice_temp below 173.15 K on ', n_coldice, &
+                       ' node(s), rank ', mype, ', occurrence ', n_coldwarn
+        end if
+    end if
+#endif /* (__oifs) */
 end subroutine cut_off
 
 #if !defined (__oasis) && !defined (__ifsinterface) && !defined (__yac)

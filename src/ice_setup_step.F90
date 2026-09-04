@@ -333,21 +333,24 @@ subroutine ice_timestep(step, ice, partit, mesh)
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("ice_thermodynamics")
 #endif
-    rtime_ice = rtime_ice + (t3-t0)
+    rtime_ice       = rtime_ice       + (t3-t0)
+    rtime_ice_evp   = rtime_ice_evp   + t1-t0
+    rtime_ice_adv   = rtime_ice_adv   + t2-t1
+    rtime_ice_therm = rtime_ice_therm + t3-t2
     rtime_tot = rtime_tot + (t3-t0)
     if(mod(step,logfile_outfreq)==0 .and. mype==0) then
         write(*,*) '___ICE STEP EXECUTION TIMES____________________________'
 #if defined (__icepack)
-        write(*,"(A, ES10.3)") '	Ice Dyn.        :', time_evp
-                write(*,"(A, ES10.3)") '        Ice Advect.     :', time_advec
-                write(*,"(A, ES10.3)") '        Ice Thermodyn.  :', time_therm
+        write(*,"(A, ES10.3, A, F6.2, A)") '	Ice Dyn.        :', time_evp,  '  (', 100.0*time_evp/(t3-t0),  '%)'
+        write(*,"(A, ES10.3, A, F6.2, A)") '        Ice Advect.     :', time_advec,'  (', 100.0*time_advec/(t3-t0),'%)'
+        write(*,"(A, ES10.3, A, F6.2, A)") '        Ice Thermodyn.  :', time_therm,'  (', 100.0*time_therm/(t3-t0),'%)'
 #else
-        write(*,"(A, ES10.3)") '	Ice Dyn.        :', t1-t0
-        write(*,"(A, ES10.3)") '	Ice Advect.     :', t2-t1
-        write(*,"(A, ES10.3)") '	Ice Thermodyn.  :', t3-t2
+        write(*,"(A, ES10.3, A, F6.2, A)") '	Ice Dyn.        :', t1-t0, '  (', 100.0*(t1-t0)/(t3-t0), '%)'
+        write(*,"(A, ES10.3, A, F6.2, A)") '	Ice Advect.     :', t2-t1, '  (', 100.0*(t2-t1)/(t3-t0), '%)'
+        write(*,"(A, ES10.3, A, F6.2, A)") '	Ice Thermodyn.  :', t3-t2, '  (', 100.0*(t3-t2)/(t3-t0), '%)'
 #endif /* (__icepack) */
         write(*,*) '   _______________________________'
-        write(*,"(A, ES10.3)") '	Ice TOTAL       :', t3-t0
+        write(*,"(A, ES10.3)")             '	Ice TOTAL       :', t3-t0
         write(*,*)
      endif
 end subroutine ice_timestep

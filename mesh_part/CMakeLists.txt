@@ -111,11 +111,13 @@ elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     target_compile_options(${PROJECT_NAME} PRIVATE 
         -fdefault-real-8 -ffree-line-length-none
     )
-    if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10)
+    if(CMAKE_Fortran_COMPILER_VERSION VERSION_GREATER_EQUAL 10 AND FESOM_ALLOW_ARG_MISMATCH)
         target_compile_options(${PROJECT_NAME} PRIVATE -fallow-argument-mismatch)
     endif()
 endif()
 target_link_libraries(${PROJECT_NAME} PUBLIC ${PROJECT_NAME}_C MPI::MPI_Fortran)
+target_compile_options(${PROJECT_NAME} PRIVATE ${FESOM_RUNTIME_CHECK_FLAGS} ${FESOM_BUILD_CHECK_FLAGS})
+
 set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
 
 # Install the executable

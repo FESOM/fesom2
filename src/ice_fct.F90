@@ -759,7 +759,11 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #endif
 
 #ifndef ENABLE_OPENACC
+#if defined(__openmp_reproducible)
+!$OMP SINGLE
+#else
 !$OMP DO
+#endif
 #else
 #if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(elnodes) DEFAULT(PRESENT)
@@ -779,8 +783,6 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_set_lock  (partit%plock(n))
-#else
-!$OMP ORDERED
 #endif
 #endif
             if (flux>0) then
@@ -797,14 +799,16 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
         call omp_unset_lock(partit%plock(n))
-#else
-!$OMP END ORDERED
 #endif
 #endif
         end do
     end do
 #ifndef ENABLE_OPENACC
+#if defined(__openmp_reproducible)
+!$OMP END SINGLE
+#else
 !$OMP END DO
+#endif
 #else
 #if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC END PARALLEL LOOP
@@ -901,7 +905,11 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #endif
 
 #ifndef ENABLE_OPENACC
+#if defined(__openmp_reproducible)
+!$OMP SINGLE
+#else
 !$OMP DO
+#endif
 #else
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(elnodes) DEFAULT(PRESENT)
@@ -919,8 +927,6 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
                 call omp_set_lock  (partit%plock(n))
-#else
-!$OMP ORDERED
 #endif
 #endif
 #if !defined(DISABLE_OPENACC_ATOMICS)
@@ -930,14 +936,16 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
                 call omp_unset_lock(partit%plock(n))
-#else
-!$OMP END ORDERED
 #endif
 #endif
             end do
         end do
 #ifndef ENABLE_OPENACC
+#if defined(__openmp_reproducible)
+!$OMP END SINGLE
+#else
 !$OMP END DO
+#endif
 #else
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC END PARALLEL LOOP
@@ -959,7 +967,11 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         end do
 #ifndef ENABLE_OPENACC
 !$OMP END DO
+#if defined(__openmp_reproducible)
+!$OMP SINGLE
+#else
 !$OMP DO
+#endif
 #else
         !$ACC END PARALLEL LOOP
 #if !defined(DISABLE_OPENACC_ATOMICS)
@@ -978,8 +990,6 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
                 call omp_set_lock  (partit%plock(n))
-#else
-!$OMP ORDERED
 #endif
 #endif
 #if !defined(DISABLE_OPENACC_ATOMICS)
@@ -989,14 +999,16 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
                 call omp_unset_lock(partit%plock(n))
-#else
-!$OMP END ORDERED
 #endif
 #endif
             end do
         end do
 #ifndef ENABLE_OPENACC
+#if defined(__openmp_reproducible)
+!$OMP END SINGLE
+#else
 !$OMP END DO
+#endif
 #else
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC END PARALLEL LOOP
@@ -1018,7 +1030,11 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         end do
 #ifndef ENABLE_OPENACC
 !$OMP END DO
+#if defined(__openmp_reproducible)
+!$OMP SINGLE
+#else
 !$OMP DO
+#endif
 #else
         !$ACC END PARALLEL LOOP
 #if !defined(DISABLE_OPENACC_ATOMICS)
@@ -1037,8 +1053,6 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
                 call omp_set_lock  (partit%plock(n))
-#else
-!$OMP ORDERED
 #endif
 #endif
 #if !defined(DISABLE_OPENACC_ATOMICS)
@@ -1048,14 +1062,16 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
                 call omp_unset_lock(partit%plock(n))
-#else
-!$OMP END ORDERED
 #endif
 #endif
             end do
         end do
 #ifndef ENABLE_OPENACC
+#if defined(__openmp_reproducible)
+!$OMP END SINGLE
+#else
 !$OMP END DO
+#endif
 #else
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC END PARALLEL LOOP
@@ -1078,7 +1094,11 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         end do
 #ifndef ENABLE_OPENACC
 !$OMP END DO
+#if defined(__openmp_reproducible)
+!$OMP SINGLE
+#else
 !$OMP DO
+#endif
 #else
         !$ACC END PARALLEL LOOP
 #endif
@@ -1097,8 +1117,6 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
                 call omp_set_lock  (partit%plock(n))
-#else
-!$OMP ORDERED
 #endif
 #endif
 #if !defined(DISABLE_OPENACC_ATOMICS)
@@ -1108,8 +1126,6 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
                 call omp_unset_lock(partit%plock(n))
-#else
-!$OMP END ORDERED
 #endif
 #endif
             end do
@@ -1120,7 +1136,11 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         !$ACC UPDATE DEVICE(ice_temp)
 #endif
 #ifndef ENABLE_OPENACC
+#if defined(__openmp_reproducible)
+!$OMP END SINGLE
+#else
 !$OMP END DO
+#endif
 #endif
     end if
 #endif
@@ -1167,7 +1187,11 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
     !
     ! a)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, row, elem, elnodes, q, offset, ipos, aa)
+#if defined(__openmp_reproducible)
+!$OMP SINGLE
+#else
 !$OMP DO
+#endif
     DO elem=1,myDim_elem2D
         elnodes=elem2D_nodes(:,elem)
 
@@ -1193,8 +1217,6 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
                end do
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
                call omp_set_lock  (partit%plock(row)) ! it shall be sufficient to block writing into the same row of SSH_stiff
-#else
-!$OMP ORDERED
 #endif
                mass_matrix(ipos)=mass_matrix(ipos)+elem_area(elem)/12.0_WP
                if(q==n) then
@@ -1202,13 +1224,15 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
                end if
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
                call omp_unset_lock(partit%plock(row))
-#else
-!$OMP END ORDERED
 #endif
            END DO
         end do
     END DO
+#if defined(__openmp_reproducible)
+!$OMP END SINGLE
+#else
 !$OMP END DO
+#endif
     ! TEST: area==sum of row entries in mass_matrix:
 !$OMP DO
     DO q=1,myDim_nod2D
@@ -1326,7 +1350,11 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
 
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(diff, entries, um, vm, vol, dx, dy, n, q, row, elem, elnodes, c1, c2, c3, c4, cx1, cx2, cx3, cx4, entries2)
+#if defined(__openmp_reproducible)
+!$OMP SINGLE
+#else
 !$OMP DO
+#endif
 #else
 #if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(elnodes, dx, dy, entries, entries2) DEFAULT(PRESENT)
@@ -1377,8 +1405,6 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
                 call omp_set_lock  (partit%plock(row))
-#else
-!$OMP ORDERED
 #endif
 #endif
             tmp_sum = sum(entries*m_ice(elnodes))
@@ -1429,14 +1455,16 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
                 call omp_unset_lock(partit%plock(row))
-#else
-!$OMP END ORDERED
 #endif
 #endif
         end do
     end do
 #ifndef ENABLE_OPENACC
+#if defined(__openmp_reproducible)
+!$OMP END SINGLE
+#else
 !$OMP END DO
+#endif
 !$OMP END PARALLEL
 #else
 #if !defined(DISABLE_OPENACC_ATOMICS)
