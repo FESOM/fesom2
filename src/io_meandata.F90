@@ -98,6 +98,16 @@ module io_MEANDATA
     integer :: currentDate,  currentTime
     integer :: previousDate, previousTime
     integer :: startDate, startTime
+    ! CF interval tracking: model time at which the current
+    ! accumulation interval started, in seconds since the start of year
+    ! t_accum_year. Set at stream creation and after every write, so bounds
+    ! reflect what was actually averaged (partial intervals after cold starts
+    ! and restarts included).
+    real(kind=WP) :: t_accum_start = 0._WP
+    integer       :: t_accum_year  = -1
+    real(kind=WP) :: tbnds_copy(2) = 0._WP ! interval of the record being written
+    integer       :: tbndsID = -1
+    logical       :: has_bounds = .true.   ! .false. when appending to a pre-time_bounds file
   contains
     final destructor
   end type Meandata
@@ -173,6 +183,11 @@ module io_MEANDATA
     integer                                    :: varid, timeid, timedimid
     integer                                    :: rec_count = 0
     character(500)                             :: filename = ""  ! current output file path
+    ! CF interval tracking, same semantics as in type Meandata
+    real(kind=WP)                              :: t_accum_start = 0._WP
+    integer                                    :: t_accum_year  = -1
+    integer                                    :: tbndsid = -1
+    logical                                    :: has_bounds = .true.
   end type Meandata0D
 
   type(Meandata0D), save, target :: io_stream0D(50)
@@ -2732,6 +2747,29 @@ end function
 !
 !
 !_______________________________________________________________________________
+!_______________________________________________________________________________
+! Interval start of an output entry, in seconds since the start of the CURRENT
+! year (g_clock yearnew). An interval that started in the previous year (the
+! normal case for the first record of a new yearly file: the previous write was
+! at the old year's end) comes out as 0; a cold start late in the old year
+! yields a negative offset, still consistent with this year's time units.
+function accum_start_this_year(t_accum_start, t_accum_year) result(t_start)
+  use g_clock
+  implicit none
+  real(kind=WP), intent(in) :: t_accum_start
+  integer,       intent(in) :: t_accum_year
+  real(kind=WP)             :: t_start
+  integer                   :: y, flag
+  t_start = t_accum_start
+  if (t_accum_year < 0) return
+  do y = t_accum_year, yearnew-1
+     call check_fleapyr(y, flag)
+     t_start = t_start - real(365+flag, WP)*86400._WP
+  end do
+end function accum_start_this_year
+!
+!
+!_______________________________________________________________________________
 subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     use g_clock
     use mod_mesh
@@ -2755,6 +2793,7 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     type(Meandata), intent(inout) :: entry
     character(len=*), parameter :: global_attributes_prefix = "FESOM_"
     integer :: nlev_chunk
+    integer :: bnds_dimid
 #if defined(__icepack)
     integer, allocatable :: ncat_arr(:)
     integer              :: ii
@@ -2845,6 +2884,18 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     call assert_nf( nf90_put_att(entry%ncid, entry%tID, 'units', trim(att_text)), __LINE__)
     call assert_nf( nf90_put_att(entry%ncid, entry%tID, 'axis', 'T'), __LINE__)
     call assert_nf( nf90_put_att(entry%ncid, entry%tID, 'stored_direction', 'increasing'), __LINE__)
+    ! CF interval metadata; names and layout match what XIOS
+    ! writes so downstream tooling sees one convention across backends
+    if (include_fleapyear) then
+        call assert_nf( nf90_put_att(entry%ncid, entry%tID, 'calendar', 'standard'), __LINE__)
+    else
+        call assert_nf( nf90_put_att(entry%ncid, entry%tID, 'calendar', '365_day'), __LINE__)
+    end if
+    write(att_text, '(I4.4,a)') yearold, '-01-01 00:00:00'
+    call assert_nf( nf90_put_att(entry%ncid, entry%tID, 'time_origin', trim(att_text)), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, entry%tID, 'bounds', 'time_bounds'), __LINE__)
+    call assert_nf( nf90_def_dim(entry%ncid, 'axis_nbounds', 2, bnds_dimid), __LINE__)
+    call assert_nf( nf90_def_var(entry%ncid, 'time_bounds', nf90_double, (/bnds_dimid, entry%recID/), entry%tbndsID), __LINE__)
 
     call assert_nf( nf90_def_var(entry%ncid, trim(entry%name), entry%data_strategy%netcdf_type(), (/entry%dimid(entry%ndim:1:-1), entry%recID/), entry%varID), __LINE__)
 
@@ -2891,6 +2942,7 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     call assert_nf( nf90_put_att(entry%ncid, entry%varID, 'units', entry%units), __LINE__)
     call assert_nf( nf90_put_att(entry%ncid, entry%varID, 'location', entry%defined_on), __LINE__)
     call assert_nf( nf90_put_att(entry%ncid, entry%varID, 'mesh', entry%mesh), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, entry%varID, 'cell_methods', 'time: mean'), __LINE__)
 
     ! Add _FillValue attribute for missing/invalid data (CF-compliant)
     if (entry%accuracy == i_real8) then
@@ -2981,6 +3033,16 @@ subroutine assoc_ids(entry)
     call assert_nf( nf90_inquire_dimension(entry%ncid, entry%recID, len=entry%rec_count), __LINE__)
     !___Associate the time and iteration variables______________________________
     call assert_nf( nf90_inq_varid(entry%ncid, 'time', entry%tID), __LINE__)
+    !___Associate the interval bounds; a file written by older FESOM versions has
+    ! none. Such a legacy file keeps getting bounds-less records appended (one
+    ! write path for everybody); only new files carry time_bounds.
+    if (nf90_inq_varid(entry%ncid, 'time_bounds', entry%tbndsID) == nf90_noerr) then
+        entry%has_bounds = .true.
+    else
+        entry%has_bounds = .false.
+        entry%tbndsID = -1
+        write(*,*) 'I/O '//trim(entry%name)//' WARNING: appending to a pre-time_bounds file; new records get the new time stamps but no time_bounds'
+    end if
     !___Associate physical variables____________________________________________
     call assert_nf( nf90_inq_varid(entry%ncid, entry%name, entry%varID), __LINE__)
 
@@ -3186,6 +3248,9 @@ subroutine write_mean(entry, entry_index)
         if (.not. parallel_write .or. out_is_lead_writer()) &
             write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count
         call assert_nf( nf90_put_var(entry%ncid, entry%Tid, entry%ctime_copy, start = (/entry%rec_count/) ), __LINE__)
+        if (entry%has_bounds) then
+            call assert_nf( nf90_put_var(entry%ncid, entry%tbndsID, entry%tbnds_copy, start=(/1, entry%rec_count/), count=(/2, 1/) ), __LINE__)
+        end if
     end if
   
     !_______writing 2D and 3D fields____________________________________________
@@ -3418,12 +3483,18 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     type(t_ice)   , intent(inout), target :: ice
     character(:), allocatable             :: filepath
     real(real64)                          :: rtime !timestamp of the record
+    real(kind=WP)                         :: t_start !start of this entry's accumulation interval, seconds since start of current year
 #if defined(__MULTIO)
     logical       :: output_done
     logical       :: trigger_flush
 #endif
 
-ctime=timeold+(dayold-1.)*86400
+! End of the current step, i.e. the end of the accumulation interval when an
+! output event fires (events fire on timenew==86400., see gen_events.F90).
+! The record's time stamp is the interval MIDPOINT and the interval itself
+! goes to time_bounds; both are independent of the time step, so re-running
+! a period cannot produce shifted duplicate records.
+ctime=timenew+(daynew-1.)*86400
     
     !___________________________________________________________________________
     if (lfirst) then
@@ -3510,6 +3581,9 @@ ctime=timeold+(dayold-1.)*86400
         !_______________________________________________________________________
         ! if its time for output --> do_output==.true.
         if (do_output) then
+            ! start of this entry's accumulation interval, in this year's time
+            ! units; must be taken BEFORE the tracker is reset further down
+            t_start = accum_start_this_year(entry%t_accum_start, entry%t_accum_year)
             if (vec_autorotate) call io_r2g(n, partit, mesh) ! automatically detect if a vector field and rotate if makes sense!
 #if !defined(__MULTIO)
             if(entry%thread_running) call entry%thread%join()
@@ -3562,13 +3636,17 @@ ctime=timeold+(dayold-1.)*86400
                 end if ! --> if(filepath /= trim(entry%filename)) then
 
                 !_______________________________________________________________
-                ! if the time rtime at the rec_count is larger than ctime we
-                ! look for the closest record with the timestamp less than ctime
+                ! position rec_count in the (possibly pre-existing) file:
+                ! overwrite every record whose stamp lies AFTER the start of the
+                ! current accumulation interval. Any stamping convention places
+                ! a record's stamp inside (or at the end of) its own interval,
+                ! so this rule also dedups correctly against files written by
+                ! older code with time-step-dependent stamps.
                 do k=entry%rec_count, 1, -1
                     !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assert_nf B'//achar(27)//'[0m'//',  k=',k, ', rootpart=', entry%root_rank
                     ! determine rtime from exiting file
                     call assert_nf( nf90_get_var(entry%ncid, entry%tID, rtime, start=(/k/)), __LINE__)
-                    if (ctime > rtime) then
+                    if (rtime <= t_start) then
                         entry%rec_count=k+1
                         exit ! a proper rec_count detected, exit the loop
                     end if
@@ -3661,7 +3739,12 @@ ctime=timeold+(dayold-1.)*86400
             !___________________________________________________________________
             entry%lastcounter=entry%addcounter
             entry%addcounter   = 0  ! clean_meanarrays
-            entry%ctime_copy = ctime
+            ! stamp = interval midpoint, interval itself goes to time_bounds;
+            ! then start the next accumulation interval at the current time
+            entry%ctime_copy = 0.5_WP*(t_start + ctime)
+            entry%tbnds_copy = (/t_start, ctime/)
+            entry%t_accum_start = ctime
+            entry%t_accum_year  = yearnew
 
 #if defined(__MULTIO)
 !            if (n==1) then
@@ -3712,11 +3795,12 @@ subroutine output_0D_streams(istep, partit)
     integer, intent(in) :: istep
     type(t_partit), intent(inout) :: partit
 
-    integer :: n, ierr
+    integer :: n, ierr, k
     logical :: do_output
     type(Meandata0D), pointer :: entry0D
     character(500) :: filepath
     real(real64) :: mean_value, rtime
+    real(kind=WP) :: t_start !start of this entry's accumulation interval, seconds since start of current year
 
     ! When XIOS is the I/O driver, the 0D scalar fields are written via
     ! xios_send_field calls (see gen_modules_cmor_diag.F90's compute_cmor_diag)
@@ -3744,6 +3828,8 @@ subroutine output_0D_streams(istep, partit)
         endif
         
         if (do_output) then
+            ! start of this entry's accumulation interval (before the tracker reset below)
+            t_start = accum_start_this_year(entry0D%t_accum_start, entry0D%t_accum_year)
             ! Compute mean value
             if (entry0D%addcounter > 0) then
                 mean_value = entry0D%local_value / real(entry0D%addcounter, real64)
@@ -3782,21 +3868,39 @@ subroutine output_0D_streams(istep, partit)
                         call assert_nf(nf90_inq_varid(entry0D%ncid, 'time', entry0D%timeid), __LINE__)
                         call assert_nf(nf90_inq_varid(entry0D%ncid, trim(entry0D%name), entry0D%varid), __LINE__)
                         call assert_nf(nf90_inquire_dimension(entry0D%ncid, entry0D%timedimid, len=entry0D%rec_count), __LINE__)
+                        ! legacy file without time_bounds: keep appending bounds-less records
+                        if (nf90_inq_varid(entry0D%ncid, 'time_bounds', entry0D%tbndsid) == nf90_noerr) then
+                            entry0D%has_bounds = .true.
+                        else
+                            entry0D%has_bounds = .false.
+                            entry0D%tbndsid = -1
+                        endif
                     endif
                 endif
-                
-                ! Write data
-                entry0D%rec_count = entry0D%rec_count + 1
-                rtime = ctime
-                
+
+                ! Write data: position rec_count with the same rule as the
+                ! 2D/3D streams (overwrite records after the interval start),
+                ! stamp with the interval midpoint, store the interval itself
+                do k=entry0D%rec_count, 1, -1
+                    call assert_nf(nf90_get_var(entry0D%ncid, entry0D%timeid, rtime, start=(/k/)), __LINE__)
+                    if (rtime <= t_start) exit
+                end do
+                entry0D%rec_count = k + 1
+                rtime = 0.5_WP*(t_start + ctime)
+
                 call assert_nf(nf90_put_var(entry0D%ncid, entry0D%timeid, rtime, start=(/entry0D%rec_count/)), __LINE__)
+                if (entry0D%has_bounds) then
+                    call assert_nf(nf90_put_var(entry0D%ncid, entry0D%tbndsid, (/t_start, ctime/), start=(/1, entry0D%rec_count/), count=(/2, 1/)), __LINE__)
+                endif
                 call assert_nf(nf90_put_var(entry0D%ncid, entry0D%varid, mean_value, start=(/entry0D%rec_count/)), __LINE__)
                 call assert_nf(nf90_sync(entry0D%ncid), __LINE__)
             endif
-            
-            ! Reset accumulator
+
+            ! Reset accumulator and start the next accumulation interval
             entry0D%local_value = 0._real64
             entry0D%addcounter = 0
+            entry0D%t_accum_start = ctime
+            entry0D%t_accum_year  = yearnew
         endif
     end do
     
@@ -3807,24 +3911,33 @@ end subroutine output_0D_streams
 ! Create a new NetCDF file for 0D (scalar) output
 subroutine create_0D_file(entry0D, filepath)
     use g_clock
+    use g_config
     implicit none
     type(Meandata0D), intent(inout) :: entry0D
     character(len=*), intent(in) :: filepath
     
-    integer :: ierr
+    integer :: ierr, bnds_dimid
     character(100) :: time_units
-    
+
     ! Create file
     call assert_nf(nf90_create(trim(filepath), IOR(NF90_CLOBBER, NF90_NETCDF4), entry0D%ncid), __LINE__)
-    
+
     ! Define time dimension (unlimited)
     call assert_nf(nf90_def_dim(entry0D%ncid, 'time', NF90_UNLIMITED, entry0D%timedimid), __LINE__)
-    
+
     ! Define time variable
     call assert_nf(nf90_def_var(entry0D%ncid, 'time', NF90_DOUBLE, (/entry0D%timedimid/), entry0D%timeid), __LINE__)
     write(time_units, '(a,i4.4,a,i2.2,a,i2.2,a)') 'seconds since ', yearnew, '-01-01 00:00:00'
     call assert_nf(nf90_put_att(entry0D%ncid, entry0D%timeid, 'units', trim(time_units)), __LINE__)
-    call assert_nf(nf90_put_att(entry0D%ncid, entry0D%timeid, 'calendar', 'standard'), __LINE__)
+    if (include_fleapyear) then
+        call assert_nf(nf90_put_att(entry0D%ncid, entry0D%timeid, 'calendar', 'standard'), __LINE__)
+    else
+        call assert_nf(nf90_put_att(entry0D%ncid, entry0D%timeid, 'calendar', '365_day'), __LINE__)
+    endif
+    call assert_nf(nf90_put_att(entry0D%ncid, entry0D%timeid, 'bounds', 'time_bounds'), __LINE__)
+    call assert_nf(nf90_def_dim(entry0D%ncid, 'axis_nbounds', 2, bnds_dimid), __LINE__)
+    call assert_nf(nf90_def_var(entry0D%ncid, 'time_bounds', NF90_DOUBLE, (/bnds_dimid, entry0D%timedimid/), entry0D%tbndsid), __LINE__)
+    entry0D%has_bounds = .true.
     
     ! Define data variable
     if (entry0D%accuracy == i_real8) then
@@ -3839,6 +3952,7 @@ subroutine create_0D_file(entry0D, filepath)
     if (len_trim(entry0D%long_description) > 0) then
         call assert_nf(nf90_put_att(entry0D%ncid, entry0D%varid, 'long_name', trim(entry0D%long_description)), __LINE__)
     endif
+    call assert_nf(nf90_put_att(entry0D%ncid, entry0D%varid, 'cell_methods', 'time: mean'), __LINE__)
     
     ! End define mode
     call assert_nf(nf90_enddef(entry0D%ncid), __LINE__)
@@ -4027,6 +4141,11 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
     entry%currentTime=INT(INT(timeold / 3600) * 10000 + (INT(timeold / 60) - INT(timeold / 3600) * 60) * 100 + (timeold-INT(timeold / 60) * 60))
     entry%startDate=entry%currentDate
     entry%startTime=entry%currentTime
+    ! accumulation starts now: at the beginning of the step this stream is
+    ! created on (streams are created on the first output() call, i.e. before
+    ! the first sample of step 1 is folded in)
+    entry%t_accum_start = timeold + (dayold-1.)*86400._WP
+    entry%t_accum_year  = yearold
     !___________________________________________________________________________
     ! fill up 3d meandata streaming object
     ! 3d specific
@@ -4112,6 +4231,11 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
     entry%currentTime=INT(INT(timeold / 3600) * 10000 + (INT(timeold / 60) - INT(timeold / 3600) * 60) * 100 + (timeold-INT(timeold / 60) * 60))
     entry%startDate=entry%currentDate
     entry%startTime=entry%currentTime
+    ! accumulation starts now: at the beginning of the step this stream is
+    ! created on (streams are created on the first output() call, i.e. before
+    ! the first sample of step 1 is folded in)
+    entry%t_accum_start = timeold + (dayold-1.)*86400._WP
+    entry%t_accum_year  = yearold
     !___________________________________________________________________________
     ! fill up 3d meandata streaming object
     ! 2d specific
@@ -4137,6 +4261,7 @@ end subroutine
 subroutine def_stream0D(name, description, units, data, freq, freq_unit, accuracy, partit, long_description)
   USE MOD_PARTIT
   USE MOD_PARSUP
+  use g_clock
   implicit none
   character(len=*),      intent(in)    :: name, description, units
   real(kind=WP), target, intent(in)    :: data
@@ -4183,6 +4308,9 @@ subroutine def_stream0D(name, description, units, data, freq, freq_unit, accurac
     entry%is_in_use = .true.
     entry%ncid = -1
     entry%rec_count = 0
+    ! accumulation starts at the beginning of the step this stream is created on
+    entry%t_accum_start = timeold + (dayold-1.)*86400._WP
+    entry%t_accum_year  = yearold
     
     if (present(long_description)) then
         entry%long_description = long_description
