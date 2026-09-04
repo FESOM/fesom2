@@ -185,7 +185,10 @@ contains
     deallocate(this%gatts)
     call move_alloc(tmparr, this%gatts)
     
-    this%gatts( size(this%gatts) )%it = att_type_text(name=att_name, text=att_text)
+    ! sourced allocation instead of intrinsic polymorphic assignment: same
+    ! semantics (the element is freshly unallocated), matches add_var_att_text,
+    ! and avoids a gfortran 16.2 ICE on the assignment form
+    allocate( this%gatts( size(this%gatts) )%it, source=att_type_text(name=att_name, text=att_text) )
   end subroutine add_global_att_text
 
 
@@ -201,7 +204,8 @@ contains
     deallocate(this%gatts)
     call move_alloc(tmparr, this%gatts)
     
-    this%gatts( size(this%gatts) )%it = att_type_int(name=att_name, val=att_val)
+    ! see comment in add_global_att_text
+    allocate( this%gatts( size(this%gatts) )%it, source=att_type_int(name=att_name, val=att_val) )
   end subroutine add_global_att_int
 
 
