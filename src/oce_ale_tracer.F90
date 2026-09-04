@@ -156,7 +156,10 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     use recom_ciso
     use o_arrays
 #endif
-    use diagnostics, only: ldiag_DVD
+    use diagnostics, only: ldiag_DVD, ldiag_diapmix, density_dmoc_avg, diap_avg_count, &
+                           dmoc_avg_count, dmoc_is_due
+    use o_ARRAYS, only: density_dmoc
+    use o_PARAM,  only: mstep
     use g_forcing_param, only: use_age_tracer !---age-code
     use mod_transit, only: decay14, decay39
     use cmor_variables_diag, only: ldiag_cmor, save_cmor_advection
@@ -527,6 +530,19 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
     end if
     !---age-code-end
+
+    !___________________________________________________________________________
+    ! diapycnal mixing diagnostic: count the averaging window, and accumulate the
+    ! sigma2 density only on the steps where pressure_bv actually refreshed it
+    ! (same dmoc_is_due predicate, which is a pure function of mstep/the clock).
+    ! ts_diff2w_diap consumes and resets all three.
+    if (ldiag_diapmix) then
+        if (dmoc_is_due(mstep)) then
+            density_dmoc_avg = density_dmoc_avg + density_dmoc
+            dmoc_avg_count   = dmoc_avg_count   + 1.0_WP
+        end if
+        diap_avg_count   = diap_avg_count   + 1.0_WP
+    end if
 end subroutine solve_tracers_ale
 !
 !
@@ -553,6 +569,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 #endif
     use mod_ice
     use g_clock
+    use diagnostics, only: ldiag_diapmix, dT_diap, dS_diap, dd_diap
 
     implicit none
     integer       , intent(in)   , target :: tr_num
@@ -583,11 +600,17 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     vert_sink      = 0.0_WP
 #endif
 
-    ttf_rhs_bak = 0.0 
+    ttf_rhs_bak = 0.0
 
     if (tracers%data(tr_num)%ltra_diag) then
        call backup_ttf_rhs(del_ttf, ttf_rhs_bak, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D)
     end if
+
+    !___________________________________________________________________________
+    ! diapycnal mixing diagnostic: remember del_ttf before any diffusive operator
+    ! has touched it, so that the pure diffusion increment can be extracted below
+    if (ldiag_diapmix .and. tr_num<=2) dd_diap = del_ttf
+
     !___________________________________________________________________________
     ! do horizontal diffusion
     ! write there also horizontal diffusion rhs to del_ttf which is equal the R_T^n
@@ -627,6 +650,11 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
        call store_diag_component(del_ttf, ttf_rhs_bak, hnode_new, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D, &
                                  tracers%work%tra_diff_part_ver_redi_expl(:,:,tr_num))
     end if
+
+    !___________________________________________________________________________
+    ! diapycnal mixing diagnostic: del_ttf now carries the increment of all
+    ! explicit diffusive operators (horizontal + Redi + explicit vertical)
+    if (ldiag_diapmix .and. tr_num<=2) dd_diap = del_ttf - dd_diap
 
 !        if (recom_debug .and. mype==0)  print *, tracers%data(tr_num)%ID
 
@@ -752,6 +780,10 @@ endif
         ! equation has a 30% smaller nummerical drift
         ! tr_arr(1:nzmax,n,tr_num)=(hnode(1:nzmax,n)*tr_arr(1:nzmax,n,tr_num)+ &
         !                           del_ttf(1:nzmax,n))/hnode_new(1:nzmax,n)
+        ! diapycnal mixing diagnostic: same normalisation, turns the explicit
+        ! diffusion increment into a tracer change
+        if (ldiag_diapmix .and. tr_num<=2) &
+            dd_diap(nzmin:nzmax,n)=dd_diap(nzmin:nzmax,n)/hnode_new(nzmin:nzmax,n)
     end do
 !$OMP END PARALLEL DO
 
@@ -769,8 +801,17 @@ endif
            end do
         end if
 
+        ! diapycnal mixing diagnostic: subtract the tracer field before the
+        ! implicit solve; adding it back afterwards leaves the implicit vertical
+        ! diffusion increment on top of the explicit one already in dd_diap
+        if (ldiag_diapmix .and. tr_num<=2) &
+            dd_diap(:,1:myDim_nod2D) = dd_diap(:,1:myDim_nod2D) - tracers%data(tr_num)%values(:,1:myDim_nod2D)
+
         ! (w/out Redi)
         call diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
+
+        if (ldiag_diapmix .and. tr_num<=2) &
+            dd_diap(:,1:myDim_nod2D) = dd_diap(:,1:myDim_nod2D) + tracers%data(tr_num)%values(:,1:myDim_nod2D)
 
         ! vertical diffusion: implicit
         if (tracers%data(tr_num)%ltra_diag) then
@@ -785,7 +826,16 @@ endif
         end if
 
     end if
-    
+
+    !___________________________________________________________________________
+    ! diapycnal mixing diagnostic: dd_diap now holds the total change of this
+    ! tracer over this time step that is due to diffusion. Accumulate it over the
+    ! averaging window of ts_diff2w_diap, which consumes and resets it.
+    if (ldiag_diapmix) then
+        if (tr_num==1) dT_diap(:,1:myDim_nod2D) = dT_diap(:,1:myDim_nod2D) + dd_diap(:,1:myDim_nod2D)
+        if (tr_num==2) dS_diap(:,1:myDim_nod2D) = dS_diap(:,1:myDim_nod2D) + dd_diap(:,1:myDim_nod2D)
+    end if
+
     !We DO not set del_ttf to zero because it will not be used in this timestep anymore
     !init_tracers_AB will set it to zero for the next timestep
     if (tracers%data(tr_num)%smooth_bh_tra) then
