@@ -26,7 +26,7 @@ add_test(
     COMMAND ${CMAKE_COMMAND}
         -DECBUNDLE_CREATE=${ECBUNDLE_CREATE}
         -DECBUNDLE_BUILD=${ECBUNDLE_BUILD}
-        -DBUNDLE_FILE=${CMAKE_SOURCE_DIR}/bundle.yml
+        -DBUNDLE_FILE=${FESOM_TESTING_ROOT}/bundle.yml
         -DTEST_DIR=${ECBUNDLE_TEST_DIR}/basic
         -P ${CMAKE_CURRENT_SOURCE_DIR}/test_ecbundle_basic.cmake
 )
@@ -42,7 +42,7 @@ add_test(
     COMMAND ${CMAKE_COMMAND}
         -DECBUNDLE_CREATE=${ECBUNDLE_CREATE}
         -DECBUNDLE_BUILD=${ECBUNDLE_BUILD}
-        -DBUNDLE_FILE=${CMAKE_SOURCE_DIR}/bundle.yml
+        -DBUNDLE_FILE=${FESOM_TESTING_ROOT}/bundle.yml
         -DTEST_DIR=${ECBUNDLE_TEST_DIR}/meshpart
         -P ${CMAKE_CURRENT_SOURCE_DIR}/test_ecbundle_meshpart.cmake
 )
@@ -58,7 +58,7 @@ add_test(
     COMMAND ${CMAKE_COMMAND}
         -DECBUNDLE_CREATE=${ECBUNDLE_CREATE}
         -DECBUNDLE_BUILD=${ECBUNDLE_BUILD}
-        -DBUNDLE_FILE=${CMAKE_SOURCE_DIR}/bundle.yml
+        -DBUNDLE_FILE=${FESOM_TESTING_ROOT}/bundle.yml
         -DTEST_DIR=${ECBUNDLE_TEST_DIR}/omp
         -P ${CMAKE_CURRENT_SOURCE_DIR}/test_ecbundle_omp.cmake
 )
@@ -74,7 +74,7 @@ add_test(
     COMMAND ${CMAKE_COMMAND}
         -DECBUNDLE_CREATE=${ECBUNDLE_CREATE}
         -DECBUNDLE_BUILD=${ECBUNDLE_BUILD}
-        -DBUNDLE_FILE=${CMAKE_SOURCE_DIR}/bundle.yml
+        -DBUNDLE_FILE=${FESOM_TESTING_ROOT}/bundle.yml
         -DTEST_DIR=${ECBUNDLE_TEST_DIR}/testing
         -P ${CMAKE_CURRENT_SOURCE_DIR}/test_ecbundle_testing.cmake
 )

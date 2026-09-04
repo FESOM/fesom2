@@ -7,10 +7,11 @@ module io_MEANDATA
   use recom_ciso
 #endif
   USE g_clock
-  use o_PARAM, only : WP
+  use o_PARAM, only : WP, S_ref_anomaly
   use, intrinsic :: iso_fortran_env, only: real64, real32
   use io_data_strategy_module
   use async_threads_module
+  use io_redistribute
   use netcdf
   use io_xios_module, only: io_xios_is_on, io_xios_field_is_active, &
                             io_xios_send_2d_r8, io_xios_send_2d_r4, &
@@ -55,13 +56,16 @@ module io_MEANDATA
     integer                                            :: shrinked_size
     integer, allocatable, dimension(:)                 :: shrinked_indx
     integer                                            :: accuracy
+    ! The running sum is ALWAYS real64, whatever `accuracy` asks the file to be:
+    ! output precision and accumulation precision are separate concerns. Narrowing
+    ! happens once, into local_values_r4_copy, on the way to the file.
     real(real64), allocatable, dimension(:,:) :: local_values_r8
-    real(real32), allocatable, dimension(:,:) :: local_values_r4
     real(real64), allocatable :: aux_r8(:)
     real(real32), allocatable :: aux_r4(:)
     integer                                            :: addcounter =0
     integer                                            :: lastcounter=0 ! before addcounter is set to 0
     real(kind=WP), pointer                             :: ptr3(:,:) ! todo: use netcdf types, not WP
+    real(kind=WP)                                      :: offset = 0.0_WP ! added ONCE to the mean after the division, not per sample (use_salt_anomaly: salt/sss carry +S_ref_anomaly so output stays absolute)
     character(500)                                     :: filename
     character(100)                                     :: name
     character(500)                                     :: description
@@ -76,7 +80,8 @@ module io_MEANDATA
     real(kind=WP)                                      :: rtime_per_stream=0._WP   !< cumulative wall in this stream's write_mean dispatch over the run; printed sorted at finalize
     logical                                            :: is_in_use=.false.
     logical :: is_elem_based = .false.
-    logical :: flip
+    logical :: is_fbin_based = .false.
+    logical :: flip = .false.
     class(data_strategy_type), allocatable :: data_strategy
     integer :: comm
     type(thread_type) thread
@@ -93,6 +98,16 @@ module io_MEANDATA
     integer :: currentDate,  currentTime
     integer :: previousDate, previousTime
     integer :: startDate, startTime
+    ! CF interval tracking: model time at which the current
+    ! accumulation interval started, in seconds since the start of year
+    ! t_accum_year. Set at stream creation and after every write, so bounds
+    ! reflect what was actually averaged (partial intervals after cold starts
+    ! and restarts included).
+    real(kind=WP) :: t_accum_start = 0._WP
+    integer       :: t_accum_year  = -1
+    real(kind=WP) :: tbnds_copy(2) = 0._WP ! interval of the record being written
+    integer       :: tbndsID = -1
+    logical       :: has_bounds = .true.   ! .false. when appending to a pre-time_bounds file
   contains
     final destructor
   end type Meandata
@@ -120,6 +135,15 @@ module io_MEANDATA
   integer, save                  :: nlev_upper=1
   character(len=1), save         :: filesplit_freq='y'
   integer, save                  :: compression_level=0
+
+  ! --- collective output path ------------------------------------------------
+  ! Selected by &io_parallel/parallel_write in namelist.config (g_config). The
+  ! schedules are the same ones the restart path uses, but built here so this
+  ! module does not depend on io_fesom_file_module; they are pure functions of
+  ! the partition and the writer count, so the two agree by construction.
+  type(redist_type), save, target :: out_sched_nod, out_sched_elem
+  logical, save :: out_sched_ready = .false.
+  integer, save :: out_wcomm = -1
   ! Ship-track / mooring curtain output config: variables declared in
   ! io_tracks_module and pulled into ini_mean_io for namelist binding.
   type io_entry
@@ -130,6 +154,15 @@ module io_MEANDATA
   end type io_entry 
 
   type(io_entry), save, allocatable, target   :: io_list(:)
+
+  ! Fields whose requested output precision exceeds the working precision
+  ! (e.g. 8-byte output requested in a WP=4 single-precision build). Collected
+  ! during stream definition and reported once at the end of ini_mean_io so the
+  ! user is aware, without any per-stream or per-step printing.
+  integer, save                  :: n_wp_promoted = 0
+  character(len=20), save        :: wp_promoted_names(256)
+  ! Stream counts by requested output precision, for the same once-per-run report.
+  integer, save                  :: n_out_r4 = 0, n_out_r8 = 0
 !
 !--------------------------------------------------------------------------------------------
 ! Type for 0D (scalar) output streams - global values with time dimension only
@@ -150,6 +183,11 @@ module io_MEANDATA
     integer                                    :: varid, timeid, timedimid
     integer                                    :: rec_count = 0
     character(500)                             :: filename = ""  ! current output file path
+    ! CF interval tracking, same semantics as in type Meandata
+    real(kind=WP)                              :: t_accum_start = 0._WP
+    integer                                    :: t_accum_year  = -1
+    integer                                    :: tbndsid = -1
+    logical                                    :: has_bounds = .true.
   end type Meandata0D
 
   type(Meandata0D), save, target :: io_stream0D(50)
@@ -166,6 +204,289 @@ module io_MEANDATA
   REAL(real64), DIMENSION(:), ALLOCATABLE, TARGET :: multio_temporary_array
 
   contains
+
+  !> Build the nodal and element redistribution schedules for output, once.
+  !> Elements use myInd_elem2D_shrinked, not myList_elem2D: an element belongs
+  !> to a PE if ANY of its nodes does, so sum(myDim_elem2D) > elem2D and there
+  !> is no bijection to build a schedule on.
+  !>
+  !> The two schedules MUST end up on the same ranks: one communicator opens the
+  !> file, and par_put_r4/r8 gate on out_is_writer(), which is the NODAL writer
+  !> set. See the element-count note at the redist_build call below.
+  subroutine ensure_out_schedules(partit, n_nod2d, n_elem2d)
+    use MOD_PARTIT
+    use mpi
+    type(t_partit), intent(in) :: partit
+    integer, intent(in) :: n_nod2d, n_elem2d
+    integer :: ierr, k
+    integer, allocatable :: gelem(:)
+
+    if (out_sched_ready) return
+
+    call redist_build(out_sched_nod, partit%myList_nod2D(1:partit%myDim_nod2D), &
+                      partit%myDim_nod2D, n_nod2d, n_writers, &
+                      partit%MPI_COMM_FESOM, partit%mype==0, ierr)
+    if (ierr /= 0) then
+       if (partit%mype==0) write(*,*) 'io_meandata: nodal redist_build failed, ierr=', ierr
+       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    end if
+
+    allocate(gelem(max(1, partit%myDim_elem2D_shrinked)))
+    do k = 1, partit%myDim_elem2D_shrinked
+       gelem(k) = partit%myList_elem2D( partit%myInd_elem2D_shrinked(k) )
+    end do
+    ! Hand the element schedule the count the NODAL schedule actually ended up
+    ! with, not the requested n_writers.
+    !
+    ! redist_effective_writers clamps the request to n_global/REDIST_MIN_BLOCK,
+    ! and elem2D is about twice nod2D on a triangular mesh, so the same request
+    ! can survive the element clamp while the nodal one is cut in half. The
+    ! schedules then place their writers with different strides, the file is
+    ! opened on the nodal set only, and every element block held by a rank
+    ! outside that set is silently never written -- about half of the element
+    ! field on core2 with n_writers > 30, which is nod2D/REDIST_MIN_BLOCK.
+    ! Reported by JanStreffing on #969 as "missing half the element output".
+    ! nod2D <= elem2D, so the nodal count always passes the element clamp
+    ! unchanged and the two sets coincide by construction.
+    call redist_build(out_sched_elem, gelem, partit%myDim_elem2D_shrinked, &
+                      n_elem2d, out_sched_nod%n_writers, partit%MPI_COMM_FESOM, .false., ierr)
+    if (ierr /= 0) then
+       if (partit%mype==0) write(*,*) 'io_meandata: element redist_build failed, ierr=', ierr
+       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    end if
+    deallocate(gelem)
+
+    ! ... and assert it rather than trust it. This is cheap, and it is the check
+    ! that would have turned the silent data loss above into a failed run.
+    if (out_sched_nod%n_writers /= out_sched_elem%n_writers .or. &
+        (out_sched_nod%is_writer .neqv. out_sched_elem%is_writer)) then
+       write(*,*) 'io_meandata: nodal and element writer sets disagree on rank ', partit%mype, &
+                  ' -- nodal writers ', out_sched_nod%n_writers, &
+                  ', element writers ', out_sched_elem%n_writers
+       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    end if
+
+    call MPI_Comm_split(partit%MPI_COMM_FESOM, merge(1,0,out_sched_nod%is_writer), &
+                        partit%mype, out_wcomm, ierr)
+    out_sched_ready = .true.
+  end subroutine ensure_out_schedules
+
+  logical function out_is_writer()
+    out_is_writer = out_sched_ready .and. out_sched_nod%is_writer
+  end function out_is_writer
+
+  !> Collective write of one stream: one MPI_Alltoallv moves the whole field
+  !> into block order, then each writer issues one put_var per level.
+  !> Every rank calls this; only writers reach the netCDF calls.
+  subroutine par_put_r8(entry, nlev)
+    type(Meandata), intent(inout) :: entry
+    integer, intent(in) :: nlev
+    type(redist_type), pointer :: s
+    real(kind=8), allocatable :: sbuf(:,:), blk(:,:), lvlbuf(:), flat(:,:)
+    real(kind=8) :: empty(0)
+    integer :: k, lev, ierr, nloc
+
+    if (entry%is_elem_based) then
+       s => out_sched_elem
+       nloc = entry%p_partit%myDim_elem2D_shrinked
+       allocate(sbuf(nlev, max(1,nloc)))
+       do k = 1, nloc
+          sbuf(1:nlev,k) = entry%local_values_r8_copy(1:nlev, entry%p_partit%myInd_elem2D_shrinked(k))
+       end do
+    else
+       s => out_sched_nod
+       nloc = entry%p_partit%myDim_nod2D
+       allocate(sbuf(nlev, max(1,nloc)))
+       do k = 1, nloc
+          sbuf(1:nlev,k) = entry%local_values_r8_copy(1:nlev, k)
+       end do
+    end if
+
+    allocate(blk(nlev, max(1, s%count)))
+
+    call redist_exchange(s, nlev, sbuf, blk, entry%p_partit%MPI_COMM_FESOM, ierr)
+
+    if (out_is_writer()) then
+       ! ONE put_var for the whole block, not one per level.
+       !
+       ! Writing level by level into a chunk that spans chunk_levels levels means
+       ! every call touches a fraction of a chunk, and for a compressed dataset
+       ! HDF5 must then decompress-modify-recompress that chunk once per level.
+       ! Measured on NG5/1024 with 256 writers: chunk_levels = 8 written level by
+       ! level cost 209 s against 53 s for chunk_levels = 1, a 4x regression for
+       ! 0.6% less volume. The chunk cache cannot absorb it, because a collective
+       ! filtered write has to settle each chunk within the call -- all ranks must
+       ! agree on chunk state.
+       !
+       ! The writer already holds every level of its block, so one call is both
+       ! correct and cheaper: it also collapses 69 collective calls into one.
+       ! The transpose is needed because the file is (node, level) in Fortran
+       ! order while blk is (level, node) to match FESOM's in-memory layout.
+       if (entry%ndim==1) then
+          if (s%count > 0) then
+             allocate(lvlbuf(s%count))
+             lvlbuf(1:s%count) = blk(1, 1:s%count)
+             call assert_nf( nf90_put_var(entry%ncid, entry%varID, lvlbuf, &
+                  start=(/s%first, entry%rec_count/), count=(/s%count, 1/)), __LINE__)
+             deallocate(lvlbuf)
+          else
+             call assert_nf( nf90_put_var(entry%ncid, entry%varID, empty, &
+                  start=(/1, entry%rec_count/), count=(/0, 1/)), __LINE__)
+          end if
+       else
+          if (s%count > 0) then
+             allocate(flat(s%count, nlev))
+             do lev = 1, nlev
+                flat(1:s%count, lev) = blk(lev, 1:s%count)
+             end do
+             call assert_nf( nf90_put_var(entry%ncid, entry%varID, flat, &
+                  start=(/s%first, 1, entry%rec_count/), &
+                  count=(/s%count, nlev, 1/)), __LINE__)
+             deallocate(flat)
+          else
+             call assert_nf( nf90_put_var(entry%ncid, entry%varID, empty, &
+                  start=(/1, 1, entry%rec_count/), count=(/0, nlev, 1/)), __LINE__)
+          end if
+       end if
+    end if
+
+    deallocate(sbuf, blk)
+  end subroutine par_put_r8
+
+
+  !> real4 counterpart of par_put_r8. Kept as a separate routine rather than
+  !> generic: the two differ only in kind, but the source arrays they read from
+  !> (local_values_r4_copy vs _r8_copy) are distinct members of Meandata.
+  subroutine par_put_r4(entry, nlev)
+    type(Meandata), intent(inout) :: entry
+    integer, intent(in) :: nlev
+    type(redist_type), pointer :: s
+    real(kind=4), allocatable :: sbuf(:,:), blk(:,:), lvlbuf(:), flat(:,:)
+    real(kind=4) :: empty(0)
+    integer :: k, lev, ierr, nloc
+
+    if (entry%is_elem_based) then
+       s => out_sched_elem
+       nloc = entry%p_partit%myDim_elem2D_shrinked
+       allocate(sbuf(nlev, max(1,nloc)))
+       do k = 1, nloc
+          sbuf(1:nlev,k) = entry%local_values_r4_copy(1:nlev, entry%p_partit%myInd_elem2D_shrinked(k))
+       end do
+    else
+       s => out_sched_nod
+       nloc = entry%p_partit%myDim_nod2D
+       allocate(sbuf(nlev, max(1,nloc)))
+       do k = 1, nloc
+          sbuf(1:nlev,k) = entry%local_values_r4_copy(1:nlev, k)
+       end do
+    end if
+
+    allocate(blk(nlev, max(1, s%count)))
+    call redist_exchange(s, nlev, sbuf, blk, entry%p_partit%MPI_COMM_FESOM, ierr)
+
+    if (out_is_writer()) then
+       ! One put_var for the whole block -- see the comment in par_put_r8.
+       if (entry%ndim==1) then
+          if (s%count > 0) then
+             allocate(lvlbuf(s%count))
+             lvlbuf(1:s%count) = blk(1, 1:s%count)
+             call assert_nf( nf90_put_var(entry%ncid, entry%varID, lvlbuf, &
+                  start=(/s%first, entry%rec_count/), count=(/s%count, 1/)), __LINE__)
+             deallocate(lvlbuf)
+          else
+             call assert_nf( nf90_put_var(entry%ncid, entry%varID, empty, &
+                  start=(/1, entry%rec_count/), count=(/0, 1/)), __LINE__)
+          end if
+       else
+          if (s%count > 0) then
+             allocate(flat(s%count, nlev))
+             do lev = 1, nlev
+                flat(1:s%count, lev) = blk(lev, 1:s%count)
+             end do
+             call assert_nf( nf90_put_var(entry%ncid, entry%varID, flat, &
+                  start=(/s%first, 1, entry%rec_count/), &
+                  count=(/s%count, nlev, 1/)), __LINE__)
+             deallocate(flat)
+          else
+             call assert_nf( nf90_put_var(entry%ncid, entry%varID, empty, &
+                  start=(/1, 1, entry%rec_count/), count=(/0, nlev, 1/)), __LINE__)
+          end if
+       end if
+    end if
+
+    deallocate(sbuf, blk)
+  end subroutine par_put_r4
+
+  logical function out_is_lead_writer()
+    out_is_lead_writer = out_sched_ready .and. (out_sched_nod%widx == 0)
+  end function out_is_lead_writer
+
+  integer function out_writer_comm()
+    out_writer_comm = out_wcomm
+  end function out_writer_comm
+
+  !> Open an existing output file for writing, collectively over the writer
+  !> communicator when the collective path is on. Returns the netCDF status so
+  !> the caller can use it to decide whether the file existed at all.
+  integer function par_open_existing(entry)
+    use mpi
+    type(Meandata), intent(inout) :: entry
+    if (parallel_write) then
+       par_open_existing = nf90_open_par(entry%filename, IOR(nf90_write, nf90_mpiio), &
+                                         out_writer_comm(), MPI_INFO_NULL, entry%ncid)
+    else
+       par_open_existing = nf90_open(entry%filename, nf90_write, entry%ncid)
+    end if
+  end function par_open_existing
+
+  !> Size the HDF5 chunk cache to hold the chunks a writer is filling.
+  !>
+  !> This is not optional once chunk_levels > 1. The default cache is 1 MB per
+  !> variable, and write_mean fills a chunk with chunk_levels successive
+  !> put_var calls, one level at a time. If the chunk does not fit in the cache
+  !> HDF5 evicts it half-filled, then reads it back -- with compression that is
+  !> decompress, modify, recompress, for every level. The chunking "improvement"
+  !> would then be a slowdown.
+  subroutine set_chunk_cache(entry, block, nlev_chunk)
+    type(Meandata), intent(in) :: entry
+    integer, intent(in) :: block, nlev_chunk
+    integer(kind=8) :: chunk_bytes
+    integer :: cache_bytes, nelems, bytes_per_value, st
+    ! netcdf-fortran 4.5.3 ships the symbol in libnetcdff but does NOT export
+    ! nf90_set_var_chunk_cache from the F90 `netcdf` module -- referencing it
+    ! fails with "This name does not have a type". The F77 entry point is
+    ! declared in netcdf.inc and works, so declare just that one externally
+    ! rather than pulling the whole F77 include into this module.
+    integer, external :: nf_set_var_chunk_cache
+
+    bytes_per_value = merge(8, 4, entry%accuracy == i_real8)
+    chunk_bytes = int(block,8) * int(nlev_chunk,8) * int(bytes_per_value,8)
+
+    ! Room for a few chunks, with a floor so small cases are not pathological
+    ! and a ceiling so a large chunk_levels does not reserve absurd memory on
+    ! every writer.
+    cache_bytes = int(min(max(4_8*chunk_bytes, 4194304_8), 268435456_8))
+    nelems = 101   ! prime, as HDF5 recommends for the hash table
+
+    st = nf_set_var_chunk_cache(entry%ncid, entry%varID, cache_bytes, nelems, 0.75)
+    ! Not fatal: a too-small cache costs performance, not correctness, and this
+    ! must not take down a run on a netCDF build that handles it differently.
+    if (st /= nf90_noerr .and. out_is_lead_writer()) then
+        write(*,*) 'io_meandata: could not set chunk cache for ', trim(entry%name), &
+                   ', status ', st, ' -- writes may be slower than expected'
+    end if
+  end subroutine set_chunk_cache
+
+  !> Chunk extent along the horizontal dimension: the writer block.
+  integer function out_block(is_elem)
+    logical, intent(in) :: is_elem
+    if (is_elem) then
+       out_block = out_sched_elem%block
+    else
+       out_block = out_sched_nod%block
+    end if
+  end function out_block
+
 !
 !--------------------------------------------------------------------------------------------
 !
@@ -209,6 +530,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
 #if defined (__cvmix)    
     use g_cvmix_tke
     use g_cvmix_idemix
+    use g_cvmix_idemix2
     use g_cvmix_kpp
     use g_cvmix_tidal
 #endif    
@@ -218,13 +540,14 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     use recom_ciso
 #endif
     use g_forcing_param, only: use_virt_salt, use_landice_water, use_age_tracer !---fwf-code, age-code
-    use g_config, only : use_cavity, lwiso !---wiso-code
+    use g_config, only : use_cavity, lwiso, use_icb_iron !---wiso-code
     use mod_transit, only : index_transit_r14c, index_transit_r39ar, index_transit_f11, index_transit_f12, index_transit_sf6
     use io_tracks_module, only: ltracks, track_files, track_vars,        &
                                 track_names, track_output_freq
 
     implicit none
     integer                   :: i, j
+    integer                   :: wp_bytes    ! actual byte width of WP, for the I/O precision report
     integer, save             :: nm_io_unit  = 103       ! unit to open namelist file, skip 100-102 for cray
     integer                   :: iost
     integer,dimension(15)     :: sel_forcvar=0
@@ -397,7 +720,10 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
         end if
     end do
 
-!_______________________________________________________________________________    
+    n_wp_promoted = 0   ! reset the WP-vs-requested-precision awareness tallies
+    n_out_r4      = 0
+    n_out_r8      = 0
+!_______________________________________________________________________________
 DO i=1, io_listsize
 SELECT CASE (trim(io_list(i)%id))
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!2D streams!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -405,6 +731,7 @@ CASE ('sst       ')
     call def_stream(nod2D, myDim_nod2D, 'sst',      'sea surface temperature',        'C', tracers%data(1)%values(1,1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Sea surface temperature")
 CASE ('sss       ')
     call def_stream(nod2D, myDim_nod2D, 'sss',      'sea surface salinity',           'psu', tracers%data(2)%values(1,1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh, "Sea surface salinity")
+    io_stream(io_NSTREAMS)%p%offset = S_ref_anomaly   ! state stores S-S_ref; added once to the mean after averaging (S_ref=0 unless use_salt_anomaly)
 CASE ('ssh       ')
     call def_stream(nod2D, myDim_nod2D, 'ssh',      'sea surface elevation',          'm',      dynamics%eta_n,                          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('vve_5     ')
@@ -800,20 +1127,31 @@ CASE ('ice_rejectsalt')
     if (SPP) call def_stream(nod2D , myDim_nod2D , 'ice_rejectsalt' , 'salt flux from plum parameterisation ', 'm/s*psu', ice_rejected_salt(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     
 !___________________________________________________________________________________________________________________________________
+! output hosing experiment  
+CASE ('hfw       ')
+call def_stream(nod2D, myDim_nod2D,     'hfw',      'hosing water flux',               'm/s',    hosing_flux(:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('hfh       ')
+call def_stream(nod2D, myDim_nod2D,     'hfh',      'hosing heat flux',                'W',      hosing_heat_flux(:),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('hfw3D     ')
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'hfw3D',     'hosing water flux in 3D', 'm/s',    hosing_flux3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+CASE ('hfh3D     ')
+    call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'hfh3D',     'hosing heat flux in 3D',  'W',      hosing_heat_flux3D(:,:),     io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+!___________________________________________________________________________________________________________________________________
 ! output KPP vertical mixing schemes
 CASE ('kpp_obldepth   ')
-    if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then! fesom KPP
+    if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==18) then! fesom KPP
         call def_stream(nod2D, myDim_nod2D,    'kpp_obldepth',    'KPP ocean boundary layer depth', 'm',   hbl(:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 #if defined (__cvmix)    
-    elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then ! cvmix KPP
+    elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==38) then ! cvmix KPP
         call def_stream(nod2D, myDim_nod2D,    'kpp_obldepth',    'KPP ocean boundary layer depth', 'm',   kpp_obldepth(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 #endif        
     end if
 CASE ('kpp_sbuoyflx')
-    if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then ! fesom KPP
+    if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==18) then ! fesom KPP
         call def_stream(nod2D, myDim_nod2D,    'kpp_sbuoyflx',    'surface buoyancy flux',   'm2/s3',  Bo(:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 #if defined (__cvmix)            
-    elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then ! cvmix KPP
+    elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==38) then ! cvmix KPP
         call def_stream(nod2D, myDim_nod2D,    'kpp_sbuoyflx',    'surface buoyancy flux',   'm2/s3',  kpp_sbuoyflx(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 #endif        
     end if
@@ -1000,7 +1338,12 @@ CASE ('Chldegp  ')
     call def_stream(nod2D,  myDim_nod2D,   'ChlDegp','Chlorophyll degradation phaeocystis','1/d', Chldegp, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
     endif
 #endif
-    
+
+!___________________________________________________________________________________________________________________________________    
+CASE ('Tsurf    ')
+    call def_stream(nod2D , myDim_nod2D , 'tsurf' , 'virtual salt flux'          , '°C', Tsurf(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
+
 !___________________________________________________________________________________________________________________________________    
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>   3D streams   <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 !___________________________________________________________________________________________________________________________________
@@ -1008,6 +1351,7 @@ CASE ('temp      ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'temp',      'temperature', 'C',      tracers%data(1)%values(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('salt      ')
     call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'salt',      'salinity',    'psu',    tracers%data(2)%values(:,:),             io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    io_stream(io_NSTREAMS)%p%offset = S_ref_anomaly   ! state stores S-S_ref; added once to the mean after averaging (S_ref=0 unless use_salt_anomaly)
 
 #if defined(__recom)
 
@@ -1107,22 +1451,22 @@ CASE ('respp          ')
 
 CASE ('NPPn3D         ')
    if (use_REcoM) then
-   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPn3D','Net primary production of small phytoplankton', 'mmolC/m2/d', NPPn3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPn3D','Net primary production of small phytoplankton', 'mmolC/(m3*d)', NPPn3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
 
 CASE ('NPPd3D         ')
    if (use_REcoM) then
-   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPd3D','Net primary production of diatoms', 'mmolC/m2/d', NPPd3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPd3D','Net primary production of diatoms', 'mmolC/(m3*d)', NPPd3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
 
 CASE ('NPPc3D         ')
    if (use_REcoM) then
-   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPc3D','Net primary production of coccolithophores', 'mmolC/m2/d', NPPc3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPc3D','Net primary production of coccolithophores', 'mmolC/(m3*d)', NPPc3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
    endif
 
 CASE ('NPPp3D         ')
    if (use_REcoM) then
-   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPp3D','Net primary production of phaeocystis', 'mmolC/(m2*d)', NPPp3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
+   call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),   'NPPp3D','Net primary production of phaeocystis', 'mmolC/(m3*d)', NPPp3D(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh) ! Phaeocystis
    endif
 
 CASE ('TTemp_diatoms          ')
@@ -1681,13 +2025,19 @@ CASE ('icb       ')
     call def_stream(nod2D, myDim_nod2D, 'ibfwl',   'lateral iceberg melting',          'm/s',    ibfwl(:),         1, 'm', i_real4, partit, mesh)
     call def_stream(nod2D, myDim_nod2D, 'ibfwe',   'iceberg erosion',                  'm/s',    ibfwe(:),         1, 'm', i_real4, partit, mesh)
     call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'ibhf',    'heat flux from iceberg melting',   'W/m2',    ibhf_n(:,:),      1, 'm', i_real4, partit, mesh)
+    ! LA 2026 -- passive iron tracer released with the iceberg meltwater
+    if (use_icb_iron) then
+      call def_stream(nod2D, myDim_nod2D, 'ibiron',                                 &
+                      'iron flux from iceberg melting', 'mol/m2/s',              &
+                      ibiron(:), 1, 'm', i_real4, partit, mesh)
+    end if
   end if
 
 #if defined (__cvmix)    
 !_______________________________________________________________________________
 ! TKE mixing diagnostic 
 CASE ('TKE       ')
-    if (mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then
+    if (mix_scheme_nmb==5 .or. mix_scheme_nmb==56 .or. mix_scheme_nmb==57) then
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke'     , 'turbulent kinetic energy'                    , 'm^2/s^2', tke(:,:)     , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke_Ttot', 'total production of turbulent kinetic energy', 'm^2/s^3', tke_Ttot(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl,nod2D/), (/nl,myDim_nod2D/), 'tke_Tbpr', 'TKE production by buoyancy'                  , 'm^2/s^3', tke_Tbpr(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -1709,22 +2059,102 @@ CASE ('TKE       ')
 CASE ('IDEMIX    ')
     if (mod(mix_scheme_nmb,10)==6) then
         call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe'     , 'internal wave energy'                      , 'm^2/s^2', iwe(:,:)     , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-        call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_Ttot', 'total production of internal wave energy'  , 'm^2/s^2', iwe_Ttot(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_Ttot', 'total production of internal wave energy'  , 'm^2/s^3', iwe_Ttot(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_Tdif', 'IWE production by vertical diffusion'      , 'm^2/s^3', iwe_Tdif(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_Tdis', 'IWE production by dissipation'             , 'm^2/s^3', iwe_Tdis(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-        call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_Tsur', 'IWE production from surface forcing'       , 'm^2/s^2', iwe_Tsur(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-        call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_Tbot', 'IWE production from bottom forcing'        , 'm^2/s^2', iwe_Tbot(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-        call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_Thdi', 'IWE production from hori. diffusion'       , 'm^2/s^2', iwe_Thdi(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_Tsur', 'IWE production from surface forcing'       , 'm^2/s^3', iwe_Tsur(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_Tbot', 'IWE production from bottom forcing'        , 'm^2/s^3', iwe_Tbot(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_Thdi', 'IWE production from hori. diffusion'       , 'm^2/s^3', iwe_Thdi(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_c0'  , 'IWE vertical group velocity'               , 'm/s'    , iwe_c0(:,:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-        call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_v0'  , 'IWE horizontal group velocity'             , 'm/s'    , iwe_c0(:,:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'iwe_v0'  , 'IWE horizontal group velocity'             , 'm/s'    , iwe_v0(:,:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream(elem2D       , myDim_elem2D       , 'iwe_fbot', 'IDEMIX bottom forcing'                     , 'm^3/s^3', iwe_fbot(:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream(elem2D       , myDim_elem2D       , 'iwe_fsrf', 'IDEMIX surface forcing'                    , 'm^3/s^3', iwe_fsrf(:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if    
 
 !_______________________________________________________________________________
+! IDEMIX2 mixing Internal-Wave-Energy diagnostics
+CASE ('IDEMIX2   ')
+    if (mod(mix_scheme_nmb,10)==7) then
+        call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_Eiw'     , 'internal wave energy '          , 'm^2/s^2', iwe2_E_iw(:,:,iwe2_tip1)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_Eiw_diss', 'Eiw production from dissipation', 'm^2/s^3', iwe2_E_iw_diss( :,:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_c0'      , 'Eiw vertical group velocity'    , 'm/s'    , iwe2_c0(:,:)          , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_v0'      , 'Eiw horizontal group velocity'  , 'm/s'    , iwe2_v0(:,:)          , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_alpha_c' , 'Eiw dissipation coefficien'     , 's/m^2'  , iwe2_alpha_c(:,:)     , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream(     nod2d  ,      myDim_nod2D  , 'iwe2_fbot'    , 'bottom forcing'                 , 'm^3/s^3', iwe2_fbot_n(:)        , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream(     nod2d  ,      myDim_nod2D  , 'iwe2_fsrf'    , 'surface forcing'                , 'm^3/s^3', iwe2_fsrf(:)          , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream(     nod2d  ,      myDim_nod2D  , 'iwe2_cn'      , 'baroclinic velocity'            , 'm/s'    , iwe2_cn(:)            , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        ! optional diagnostic 
+        if (idemix2_diag_Eiw) then
+            if (allocated(iwe2_E_iw_dt  )) call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_Eiw_dt'  , 'Eiw total production '          , 'm^2/s^3', iwe2_E_iw_dt(   :,:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            if (allocated(iwe2_E_iw_hdif)) call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_Eiw_hdif', 'Eiw production from hor. diff.' , 'm^2/s^3', iwe2_E_iw_hdif( :,:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            if (allocated(iwe2_E_iw_vdif)) call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_Eiw_vdif', 'Eiw production from ver. diff.' , 'm^2/s^3', iwe2_E_iw_vdif( :,:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            if (allocated(iwe2_E_iw_fsrf)) call def_stream(     nod2d  ,      myDim_nod2D  , 'iwe2_Eiw_fsrf', 'Eiw production from srf. forc.' , 'm^2/s^3', iwe2_E_iw_fsrf(   :)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            if (allocated(iwe2_E_iw_fbot)) call def_stream((/nl,nod2d/), (/nl,myDim_nod2D/), 'iwe2_Eiw_fbot', 'Eiw production from bot. forc.' , 'm^2/s^3', iwe2_E_iw_fbot( :,:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        end if 
+        
+        if (idemix2_enable_M2) then 
+        
+            call def_stream(                 nod2d  ,                myDim_nod2D   , 'iwe2_m2_alphac'  , 'M2 energy dissipation'              , 's/m^2'    , iwe2_alpha_M2_c(:)       , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream(                 nod2d  ,                myDim_nod2D   , 'iwe2_m2_tau'     , 'M2 dissipation timescale'           , 's'        , iwe2_M2_tau(:)           , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_m2_forc'    , 'M2 forcing'                         , 'm^3/s^3/rad', iwe2_fM2(:,:)          , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_m2_w'       , 'M2 cross. spectr. propag.'          , 'rad/s'    , iwe2_M2_w(:,:)           , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin,elem2D/),(/idemix2_nfbin,myDim_elem2D/), 'iwe2_m2_u'       , 'M2 zonal propag.'                   , 'm/s'      , iwe2_M2_uv(1,:,:)        , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin,elem2D/),(/idemix2_nfbin,myDim_elem2D/), 'iwe2_m2_v'       , 'M2 merid. propag.'                  , 'm/s'      , iwe2_M2_uv(2,:,:)        , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Em2'        , 'M2 wave energy'                     , 'm^2/s^2'  , iwe2_E_M2(     :,:,iwe2_tip1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Em2_divh'   , 'EM2 horiz wave energy diverg.'      , 'm^2/s^2'  , iwe2_E_M2_divh(:,:,iwe2_ti   ), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Em2_divs'   , 'EM2 crss spctr wave energy diverg.' , 'm^2/s^2'  , iwe2_E_M2_divs(:,:,iwe2_ti   ), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/nl           , nod2d/),(/nl           ,myDim_nod2D /), 'iwe2_Em2_strct'  , 'EM2 structure function energy'      , 'm^2/s^2'  , iwe2_E_M2_struct(:,:)    , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            ! optional diagnostic
+            if (idemix2_diag_Ecompart) then
+                if (allocated(iwe2_E_M2_refl   )) call def_stream(nod2d, myDim_nod2D, 'iwe2_Em2_refl'   , 'EM2 coast-intercept. accumulated flux', 'm^2/s^3', iwe2_E_M2_refl(:)        , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                if (allocated(iwe2_E_M2_dt     )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Em2_dt'     , 'EM2 total tendency'                 , 'm^2/s^3'  , iwe2_E_M2_dt(  :,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                if (allocated(iwe2_E_M2_advh   )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Em2_advh'   , 'EM2 horizontal advection'           , 'm^2/s^3'  , iwe2_E_M2_advh(:,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                if (allocated(iwe2_E_M2_advs   )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Em2_advs'   , 'EM2 spectral advection'             , 'm^2/s^3'  , iwe2_E_M2_advs(:,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                if (allocated(iwe2_E_M2_diss   )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Em2_diss'   , 'EM2 dissipation'                    , 'm^2/s^3'  , iwe2_E_M2_diss(:,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                if (allocated(iwe2_E_M2_forc   )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Em2_forc'   , 'EM2 forcing tendency'               , 'm^2/s^3'  , iwe2_E_M2_forc(:,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            end if 
+            if (idemix2_diag_WWI) then
+                if (allocated(iwe2_E_iw_diss_M2)) call def_stream((/nl            ,nod2d/),(/nl           ,myDim_nod2D /), 'iwe2_Eiw_dissM2' , 'Eiw dissipation through M2 WWI'     , 'm^2/s^3'  , iwe2_E_iw_diss_M2(:,:)   , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                if (allocated(iwe2_E_M2_diss_wwi))call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Em2_dissWWI', 'EM2 dissipation through Eiw'        , 'm^2/s^3'  , iwe2_E_M2_diss_wwi(:,:)  , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            end if 
+        end if 
+        
+        if (idemix2_enable_niw) then 
+            call def_stream(                 nod2d  ,                myDim_nod2D   , 'iwe2_niw_omega'  , 'niw frequency'                      , '1/s'     , iwe2_omega_niw(:)         , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream(                 nod2d  ,                myDim_nod2D   , 'iwe2_niw_tau'    , 'niw dissipation timescale'          , 's'       , iwe2_niw_tau(:)           , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_niw_forc'   , 'niw forcing'                        , 'm^3/s^3/rad', iwe2_fniw(:,:)         , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_niw_w'      , 'niw cross. spectr. propag.'         , 'rad/s'   , iwe2_niw_w(:,:)           , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin,elem2D/),(/idemix2_nfbin,myDim_elem2D/), 'iwe2_niw_u'      , 'niw zonal propag.'                  , 'm/s'     , iwe2_niw_uv(1,:,:)        , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin,elem2D/),(/idemix2_nfbin,myDim_elem2D/), 'iwe2_niw_v'      , 'niw merid. propag.'                 , 'm/s'     , iwe2_niw_uv(2,:,:)        , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Eniw'       , 'niw wave energy'                    , 'm^2/s^2' , iwe2_E_niw(     :,:,iwe2_tip1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Eniw_divh'  , 'Eniw horz wave energy diverg.'      , 'm^2/s^2' , iwe2_E_niw_divh(:,:,iwe2_ti   ), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Eniw_divs'  , 'Eniw crss spctr wave energy diverg.', 'm^2/s^2' , iwe2_E_niw_divs(:,:,iwe2_ti   ), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            call def_stream((/nl           , nod2d/),(/nl           ,myDim_nod2D /), 'iwe2_Eniw_strct' , 'Eniw structure function energy'     , 'm^2/s^2' , iwe2_E_niw_struct(:,:)    , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            ! optional diagnostic
+            if (idemix2_diag_Ecompart) then
+                if (allocated(iwe2_E_niw_refl   )) call def_stream(nod2d, myDim_nod2D, 'iwe2_Eniw_refl'  , 'Eniw coast-intercept. accumulated flux', 'm^2/s^3', iwe2_E_niw_refl(:)       , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                if (allocated(iwe2_E_niw_dt     )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Eniw_dt'    , 'Eniw total tendency'                , 'm^2/s^3' , iwe2_E_niw_dt(  :,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                if (allocated(iwe2_E_niw_advh   )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Eniw_advh'  , 'Eniw horizontal advection'          , 'm^2/s^3' , iwe2_E_niw_advh(:,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                if (allocated(iwe2_E_niw_advs   )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Eniw_advs'  , 'Eniw spectral advection'            , 'm^2/s^3' , iwe2_E_niw_advs(:,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                if (allocated(iwe2_E_niw_diss   )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Eniw_diss'  , 'Eniw dissipation'                   , 'm^2/s^3' , iwe2_E_niw_diss(:,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+                if (allocated(iwe2_E_niw_forc   )) call def_stream((/idemix2_nfbin, nod2d/),(/idemix2_nfbin,myDim_nod2D /), 'iwe2_Eniw_forc'  , 'Eniw forcing tendency'              , 'm^2/s^3' , iwe2_E_niw_forc(:,:)      , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            end if 
+            if (idemix2_diag_WWI) then
+                if (allocated(iwe2_E_iw_diss_niw)) call def_stream((/nl            ,nod2d/),(/nl           ,myDim_nod2D /), 'iwe2_Eiw_dissniw', 'Eiw dissipation through niw WWI'    , 'm^2/s^3' , iwe2_E_iw_diss_niw(:,:)   , io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+            end if 
+        end if 
+        
+        if (idemix2_enable_M2 .or. idemix2_enable_niw) then 
+            call def_stream(nod2d, myDim_nod2D, 'topo_dist2c', 'distance from coast'               , 'm', iwe2_topo_dist, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)    
+            call def_stream(nod2d, myDim_nod2D, 'topo_hrms'  , 'Root Mean Square Topographic Heigh', 'm', iwe2_topo_hrms, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)    
+            call def_stream(nod2d, myDim_nod2D, 'topo_hlam'  , 'Topographic Wavelength'            , 'm', iwe2_topo_hlam, io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)    
+        end if 
+    end if     
+
+!_______________________________________________________________________________
 ! TIDAL mixing diagnostics
 CASE ('TIDAL     ')
-    if (mod(mix_scheme_nmb,10)==7) then
+    if (mod(mix_scheme_nmb,10)==8) then
         ! cvmix_TIDAL diagnostics
         call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'tidal_Kv'  , 'tidal diffusivity'                       , 'm^2/s'  , tidal_Kv(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
         call def_stream((/nl,elem2D/), (/nl,myDim_elem2D/), 'tidal_Av'  , 'tidal viscosity'                         , 'm^2/s'  , tidal_Av(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
@@ -2162,8 +2592,85 @@ END DO ! --> DO i=1, io_listsize
             write(*,*) '    Override via io_list entries in namelist.io'
         end if
     end if
-    
+
+    !___________________________________________________________________________
+    ! Output-precision summary, printed once per run so the precision of what
+    ! lands on disk is visible in the log rather than implied by the file.
+    ! See note_output_precision for why the two directions are not symmetric.
+    if (mype == 0 .and. (n_out_r4 + n_out_r8) > 0) then
+        wp_bytes = storage_size(1.0_WP) / 8
+        write(*,*)
+        write(*,'(a,i0,a)') ' FESOM I/O precision (model working precision = ', wp_bytes, ' bytes):'
+        write(*,'(a,i0,a)') '     4-byte streams : ', n_out_r4, '   stored as NF_FLOAT'
+        write(*,'(a,i0,a)') '     8-byte streams : ', n_out_r8, '   stored as NF_DOUBLE'
+        write(*,'(a)')      '     running means are accumulated in real64 for every stream'
+
+        if (n_out_r4 > 0 .and. wp_bytes > 4) then
+            write(*,'(a,i0,a)') '   NOTE: ', n_out_r4, ' stream(s) are stored BELOW the model working'
+            write(*,'(a)')      '         precision. The mean itself is computed in real64; what is left'
+            write(*,'(a)')      '         is the float32 storage floor (~1.2e-07 relative), and a signal'
+            write(*,'(a)')      '         under that level is quantised away -- it shows up as a flat'
+            write(*,'(a)')      '         baseline rather than as noise. Raise the last io_list column to'
+            write(*,'(a)')      '         8 in namelist.io only for fields you need to trust below it.'
+        end if
+
+        if (n_wp_promoted > 0) then
+            write(*,'(a,i0,a)') '   NOTE: ', n_wp_promoted, ' stream(s) request 8-byte output in a build whose'
+            write(*,'(a)')      '         working precision is narrower. The request is honoured (NF_DOUBLE),'
+            write(*,'(a)')      '         but the samples are single-precision sourced: the extra digits come'
+            write(*,'(a)')      '         from averaging, not from the model state. Since the mean is now'
+            write(*,'(a)')      '         accumulated in real64 regardless, 4 is usually the better choice.'
+            write(*,'(a)')      '         Affected:'
+            write(*,'(9x,*(1x,a))') (trim(wp_promoted_names(j)), &
+                j=1, min(n_wp_promoted, size(wp_promoted_names)))
+            if (n_wp_promoted > size(wp_promoted_names)) &
+                write(*,'(9x,a)') '... (list truncated)'
+        end if
+        write(*,*)
+    end if
+
 end subroutine
+
+
+!_______________________________________________________________________________
+! Tally how a stream's requested output precision relates to the model's working
+! precision. Reported once per run at the end of ini_mean_io.
+!
+! `accuracy` (the last column of an io_list entry in namelist.io) selects the
+! on-disk NetCDF type and NOTHING ELSE. The running mean is always accumulated and
+! divided in real64 and narrowed once, at the copy, on the way to the file.
+!
+! It used to select the accumulator kind too, which meant a 4-byte stream had its
+! whole averaging window summed in real32 even in a double-precision build. That
+! error grows with the number of samples N -- as sqrt(N) for a field that fluctuates
+! about its mean, and linearly for a positive-definite one like salinity, where the
+! roundings share a sign instead of cancelling. Measured on pi at dt=1800 s, a
+! monthly mean of salt carried ~300x the float32 storage floor it was written into,
+! which is why salt shipped at precision 8: the 8 was buying accumulator width, not
+! file width.
+!
+!   accuracy < WP  the stream is stored below the precision the model carries. This
+!                  is the normal configuration (4-byte output from a double-precision
+!                  model). It sets a resolution floor on the stored mean -- now the
+!                  ONLY floor -- that is easy to mistake for a physical signal: a bias
+!                  smaller than it shows up as a flat baseline rather than as noise.
+!   accuracy > WP  the file is wider than the samples feeding it. Nothing is lost, but
+!                  the extra digits come from averaging, not from the model state.
+subroutine note_output_precision(name, accuracy)
+    character(len=*), intent(in) :: name
+    integer,          intent(in) :: accuracy
+
+    if (accuracy == i_real8) then
+      n_out_r8 = n_out_r8 + 1
+    else if (accuracy == i_real4) then
+      n_out_r4 = n_out_r4 + 1
+    end if
+
+    if (accuracy > WP) then
+      n_wp_promoted = n_wp_promoted + 1
+      if (n_wp_promoted <= size(wp_promoted_names)) wp_promoted_names(n_wp_promoted) = name
+    end if
+end subroutine note_output_precision
 
 
 !_______________________________________________________________________________
@@ -2209,6 +2716,7 @@ function mesh_dimname_from_dimsize(size, partit, mesh) result(name)
 #if defined (__icepack)
     use icedrv_main,   only: ncat ! number of ice thickness cathegories
 #endif
+    use g_cvmix_idemix2, only: idemix2_nfbin
     implicit none
     integer       :: size
     type(t_mesh)  , intent(in) :: mesh
@@ -2229,11 +2737,36 @@ function mesh_dimname_from_dimsize(size, partit, mesh) result(name)
     elseif (size==ncat) then
         name='ncat'
 #endif
+    elseif (size==idemix2_nfbin) then
+        name='nfbin'
     else
         name='unknown'
         if (partit%mype==0) write(*,*) 'WARNING: unknown dimension in mean I/O with size of ', size
     end if
 end function
+!
+!
+!_______________________________________________________________________________
+!_______________________________________________________________________________
+! Interval start of an output entry, in seconds since the start of the CURRENT
+! year (g_clock yearnew). An interval that started in the previous year (the
+! normal case for the first record of a new yearly file: the previous write was
+! at the old year's end) comes out as 0; a cold start late in the old year
+! yields a negative offset, still consistent with this year's time units.
+function accum_start_this_year(t_accum_start, t_accum_year) result(t_start)
+  use g_clock
+  implicit none
+  real(kind=WP), intent(in) :: t_accum_start
+  integer,       intent(in) :: t_accum_year
+  real(kind=WP)             :: t_start
+  integer                   :: y, flag
+  t_start = t_accum_start
+  if (t_accum_year < 0) return
+  do y = t_accum_year, yearnew-1
+     call check_fleapyr(y, flag)
+     t_start = t_start - real(365+flag, WP)*86400._WP
+  end do
+end function accum_start_this_year
 !
 !
 !_______________________________________________________________________________
@@ -2247,6 +2780,7 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     use fesom_version_info_module
     use g_config
     use o_PARAM
+    use g_cvmix_idemix2, only: idemix2_nfbin, iwe2_phit
     use diagnostics, only: std_dens
 
     implicit none
@@ -2257,20 +2791,39 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     type(t_ice)   , intent(in) :: ice
     
     type(Meandata), intent(inout) :: entry
-    character(len=*), parameter :: global_attributes_prefix = "FESOM_"    
+    character(len=*), parameter :: global_attributes_prefix = "FESOM_"
+    integer :: nlev_chunk
+    integer :: bnds_dimid
 #if defined(__icepack)
     integer, allocatable :: ncat_arr(:)
     integer              :: ii
 #endif
 
-    ! Serial output implemented so far
-    if (partit%mype/=entry%root_rank) return
+    ! Who defines the file: one root rank in the gather path, every writer in
+    ! the collective path (a parallel create is collective over its communicator).
+    if (parallel_write) then
+       call ensure_out_schedules(partit, mesh%nod2D, mesh%elem2D)
+       if (.not. out_is_writer()) return
+    else
+       if (partit%mype/=entry%root_rank) return
+    end if
     ! create an ocean output file
-    write(*,*) 'initializing I/O file for ', trim(entry%name)
-    
+    if (.not. parallel_write .or. out_is_lead_writer()) &
+       write(*,*) 'initializing I/O file for ', trim(entry%name)
+
     !___________________________________________________________________________
     ! Create file
-    call assert_nf( nf90_create(entry%filename, IOR(nf90_noclobber,IOR(nf90_netcdf4,nf90_classic_model)), entry%ncid), __LINE__)
+    if (parallel_write) then
+       ! nf90_clobber, not noclobber: with a collective create a leftover file
+       ! would fail on every writer at once and leave the rest hanging at the
+       ! next collective. nf90_classic_model is kept -- verified to survive
+       ! parallel mode, so the file stays what the serial writer produces.
+       call assert_nf( nf90_create_par(entry%filename, &
+            IOR(nf90_clobber,IOR(nf90_netcdf4,IOR(nf90_classic_model,nf90_mpiio))), &
+            out_writer_comm(), MPI_INFO_NULL, entry%ncid), __LINE__)
+    else
+       call assert_nf( nf90_create(entry%filename, IOR(nf90_noclobber,IOR(nf90_netcdf4,nf90_classic_model)), entry%ncid), __LINE__)
+    end if
 
     !___________________________________________________________________________
     ! Create mesh related dimensions
@@ -2292,14 +2845,25 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
             call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'long_name', 'sea-ice thickness class'), __LINE__)
         
         elseif (entry%dimname(1)=='ndens') then
-            call assert_nf( nf90_def_var(entry%ncid,  entry%dimname(1), nf90_int,   (/entry%dimID(1)/), entry%dimvarID(1)), __LINE__)
+            ! must be a float type: the axis values are the real sigma2 bin
+            ! edges from std_dens (e.g. 30.12) -- nf90_int silently truncates
+            ! them to whole numbers in the output file
+            call assert_nf( nf90_def_var(entry%ncid,  entry%dimname(1), nf90_double,   (/entry%dimID(1)/), entry%dimvarID(1)), __LINE__)
             call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'long_name', 'sigma2 density class'), __LINE__)
+        
+        elseif (entry%dimname(1)=='nfbin') then
+            call assert_nf( nf90_def_var(entry%ncid,  entry%dimname(1), nf90_int,   (/entry%dimID(1)/), entry%dimvarID(1)), __LINE__)
+            call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'long_name', 'spectral bins'), __LINE__)
         
         else
             if (partit%mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
-            
-        end if 
-        call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'units', 'm'), __LINE__)
+
+        end if
+        if (entry%dimname(1)=='ndens') then
+            call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'units', 'kg/m^3'), __LINE__)
+        else
+            call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'units', 'm'), __LINE__)
+        end if
         call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'positive', 'down'), __LINE__)
         call assert_nf( nf90_put_att(entry%ncid, entry%dimvarID(1), 'axis', 'Z'), __LINE__)
         
@@ -2320,6 +2884,18 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     call assert_nf( nf90_put_att(entry%ncid, entry%tID, 'units', trim(att_text)), __LINE__)
     call assert_nf( nf90_put_att(entry%ncid, entry%tID, 'axis', 'T'), __LINE__)
     call assert_nf( nf90_put_att(entry%ncid, entry%tID, 'stored_direction', 'increasing'), __LINE__)
+    ! CF interval metadata; names and layout match what XIOS
+    ! writes so downstream tooling sees one convention across backends
+    if (include_fleapyear) then
+        call assert_nf( nf90_put_att(entry%ncid, entry%tID, 'calendar', 'standard'), __LINE__)
+    else
+        call assert_nf( nf90_put_att(entry%ncid, entry%tID, 'calendar', '365_day'), __LINE__)
+    end if
+    write(att_text, '(I4.4,a)') yearold, '-01-01 00:00:00'
+    call assert_nf( nf90_put_att(entry%ncid, entry%tID, 'time_origin', trim(att_text)), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, entry%tID, 'bounds', 'time_bounds'), __LINE__)
+    call assert_nf( nf90_def_dim(entry%ncid, 'axis_nbounds', 2, bnds_dimid), __LINE__)
+    call assert_nf( nf90_def_var(entry%ncid, 'time_bounds', nf90_double, (/bnds_dimid, entry%recID/), entry%tbndsID), __LINE__)
 
     call assert_nf( nf90_def_var(entry%ncid, trim(entry%name), entry%data_strategy%netcdf_type(), (/entry%dimid(entry%ndim:1:-1), entry%recID/), entry%varID), __LINE__)
 
@@ -2339,6 +2915,25 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     !   for no benefit. Skipping the call entirely is what the namelist implies.
     !   (The variable stays chunked either way: netCDF-4 always chunks a variable
     !   with an unlimited dimension, and time is unlimited here.)
+    ! Chunk the node dimension to the writer block, so each chunk lies entirely
+    ! inside one writer's range and HDF5's filtered collective write has nothing
+    ! to hand between ranks. Must come before enddef.
+    if (parallel_write) then
+        if (entry%ndim==1) then
+            call assert_nf( nf90_def_var_chunking(entry%ncid, entry%varID, nf90_chunked, &
+                 [out_block(entry%is_elem_based), 1]), __LINE__)
+            call set_chunk_cache(entry, out_block(entry%is_elem_based), 1)
+        else
+            ! chunk_levels vertical extent, clamped to what the variable has.
+            ! 0 means "all levels".
+            nlev_chunk = chunk_levels
+            if (nlev_chunk <= 0) nlev_chunk = entry%glsize(1)
+            nlev_chunk = min(nlev_chunk, entry%glsize(1))
+            call assert_nf( nf90_def_var_chunking(entry%ncid, entry%varID, nf90_chunked, &
+                 [out_block(entry%is_elem_based), nlev_chunk, 1]), __LINE__)
+            call set_chunk_cache(entry, out_block(entry%is_elem_based), nlev_chunk)
+        end if
+    end if
     if (compression_level > 0) then
         call assert_nf( nf90_def_var_deflate(entry%ncid, entry%varID, 1, 1, compression_level), __LINE__)
     end if
@@ -2347,6 +2942,7 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     call assert_nf( nf90_put_att(entry%ncid, entry%varID, 'units', entry%units), __LINE__)
     call assert_nf( nf90_put_att(entry%ncid, entry%varID, 'location', entry%defined_on), __LINE__)
     call assert_nf( nf90_put_att(entry%ncid, entry%varID, 'mesh', entry%mesh), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, entry%varID, 'cell_methods', 'time: mean'), __LINE__)
 
     ! Add _FillValue attribute for missing/invalid data (CF-compliant)
     if (entry%accuracy == i_real8) then
@@ -2387,6 +2983,12 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     !___________________________________________________________________________
     ! This ends definition part of the file, below filling in variables is possible
     call assert_nf( nf90_enddef(entry%ncid), __LINE__)
+    ! Compressed variables in parallel netCDF-4 require collective access;
+    ! independent access with a filter attached is an error.
+    if (parallel_write) then
+        call assert_nf( nf90_var_par_access(entry%ncid, entry%varID, nf90_collective), __LINE__)
+        call assert_nf( nf90_var_par_access(entry%ncid, entry%tID,   nf90_collective), __LINE__)
+    end if
     if (entry%dimname(1)=='nz') then
         call assert_nf( nf90_put_var(entry%ncid, entry%dimvarID(1), abs(mesh%zbar)), __LINE__)
     elseif (entry%dimname(1)=='nz1') then
@@ -2402,6 +3004,10 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
 #endif
     elseif (entry%dimname(1)=='ndens') then
         call assert_nf( nf90_put_var(entry%ncid, entry%dimvarID(1), std_dens), __LINE__)
+        
+    elseif (entry%dimname(1)=='nfbin') then
+        call assert_nf( nf90_put_var(entry%ncid, entry%dimvarID(1), iwe2_phit), __LINE__)
+        
     else
         if (partit%mype==0) write(*,*) 'WARNING: unknown first dimension in 2d mean I/O data'
     end if 
@@ -2427,8 +3033,29 @@ subroutine assoc_ids(entry)
     call assert_nf( nf90_inquire_dimension(entry%ncid, entry%recID, len=entry%rec_count), __LINE__)
     !___Associate the time and iteration variables______________________________
     call assert_nf( nf90_inq_varid(entry%ncid, 'time', entry%tID), __LINE__)
+    !___Associate the interval bounds; a file written by older FESOM versions has
+    ! none. Such a legacy file keeps getting bounds-less records appended (one
+    ! write path for everybody); only new files carry time_bounds.
+    if (nf90_inq_varid(entry%ncid, 'time_bounds', entry%tbndsID) == nf90_noerr) then
+        entry%has_bounds = .true.
+    else
+        entry%has_bounds = .false.
+        entry%tbndsID = -1
+        write(*,*) 'I/O '//trim(entry%name)//' WARNING: appending to a pre-time_bounds file; new records get the new time stamps but no time_bounds'
+    end if
     !___Associate physical variables____________________________________________
     call assert_nf( nf90_inq_varid(entry%ncid, entry%name, entry%varID), __LINE__)
+
+    ! Access mode is a property of the OPEN file handle, not of the variable
+    ! definition, so it resets to independent every time the file is reopened --
+    ! and FESOM reopens immediately after creating. Setting it only in
+    ! create_new_file therefore failed on the very first write with
+    !   NetCDF: Attempt to extend dataset during NC_INDEPENDENT I/O operation
+    ! on the time variable. assoc_ids runs after every open, so it belongs here.
+    if (parallel_write) then
+        call assert_nf( nf90_var_par_access(entry%ncid, entry%varID, nf90_collective), __LINE__)
+        call assert_nf( nf90_var_par_access(entry%ncid, entry%tID,   nf90_collective), __LINE__)
+    end if
 end subroutine
 !
 !
@@ -2613,9 +3240,17 @@ subroutine write_mean(entry, entry_index)
     ! Serial output implemented so far
     !___________________________________________________________________________
     ! write new time index ctime_copy to file --> expand time array in nc file
-    if (entry%p_partit%mype==entry%root_rank) then
-        write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count
+    ! Extending the unlimited dimension is collective, so in the parallel path
+    ! EVERY writer must issue this put -- they all write the same scalar to the
+    ! same record, which is what a collective write of a per-record scalar looks
+    ! like. Restricting it to one rank would hang the rest at the next collective.
+    if (merge(out_is_writer(), entry%p_partit%mype==entry%root_rank, parallel_write)) then
+        if (.not. parallel_write .or. out_is_lead_writer()) &
+            write(*,*) 'writing mean record for ', trim(entry%name), '; rec. count = ', entry%rec_count
         call assert_nf( nf90_put_var(entry%ncid, entry%Tid, entry%ctime_copy, start = (/entry%rec_count/) ), __LINE__)
+        if (entry%has_bounds) then
+            call assert_nf( nf90_put_var(entry%ncid, entry%tbndsID, entry%tbnds_copy, start=(/1, entry%rec_count/), count=(/2, 1/) ), __LINE__)
+        end if
     end if
   
     !_______writing 2D and 3D fields____________________________________________
@@ -2637,18 +3272,31 @@ subroutine write_mean(entry, entry_index)
         !_______________________________________________________________________
         ! loop over vertical layers --> do gather 3d variables layerwise in 2d
         ! slices
+        if (parallel_write) then
+            call par_put_r8(entry, size1)
+        else
         do lev=1, size1
             !___________________________________________________________________
-            ! local output variables are gahtered in 2d shaped entry%aux_r8 
+            ! local output variables are gahtered in 2d shaped entry%aux_r8
             ! either for vertices or elements
-            if(.not. entry%is_elem_based) then
-                call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
+            if (entry%is_fbin_based) then
+                ! Spectral bin arrays: gather bin by bin (same pattern as vertical levels)
+                if(.not. entry%is_elem_based) then
+                    call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
+                else
+                    call gather_elem2D(entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
+                end if
             else
-                call gather_elem2D(entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
+                ! Regular vertical-level arrays: gather layer by layer
+                if(.not. entry%is_elem_based) then
+                    call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
+                else
+                    call gather_elem2D(entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
+                end if
             end if
-            
+
             !___________________________________________________________________
-            ! use root_rank CPU/Task to write 2d slice into netcdf file for 3d 
+            ! use root_rank CPU/Task to write 2d slice into netcdf file for 3d
             ! variables into specific layer position lev
             if (entry%p_partit%mype==entry%root_rank) then
                 if (entry%ndim==1) then
@@ -2658,6 +3306,7 @@ subroutine write_mean(entry, entry_index)
                 end if
             end if
         end do ! --> do lev=1, size1
+        end if
 
     !___________writing 4 byte real ____________________________________________ 
     else if (entry%accuracy == i_real4) then
@@ -2673,15 +3322,29 @@ subroutine write_mean(entry, entry_index)
         !_______________________________________________________________________
         ! loop over vertical layers --> do gather 3d variables layerwise in 2d
         ! slices
+        if (parallel_write) then
+            call par_put_r4(entry, size1)
+        else
+
         do lev=1, size1
-            !PS if (entry%p_partit%mype==entry%root_rank) t0=MPI_Wtime()  
+            !PS if (entry%p_partit%mype==entry%root_rank) t0=MPI_Wtime()
             !___________________________________________________________________
-            ! local output variables are gahtered in 2d shaped entry%aux_r8 
+            ! local output variables are gathered in 2d shaped entry%aux_r4 
             ! either for vertices or elements
-            if(.not. entry%is_elem_based) then
-                call gather_real4_nod2D (entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
+            if (entry%is_fbin_based) then
+                ! Spectral bin arrays: gather bin by bin (same pattern as vertical levels)
+                if(.not. entry%is_elem_based) then
+                    call gather_real4_nod2D (entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
+                else
+                    call gather_real4_elem2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
+                end if
             else
-                call gather_real4_elem2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
+                ! Regular vertical-level arrays: gather layer by layer
+                if(.not. entry%is_elem_based) then
+                    call gather_real4_nod2D (entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
+                else
+                    call gather_real4_elem2D(entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
+                end if
             end if
             
             !___________________________________________________________________
@@ -2699,6 +3362,7 @@ subroutine write_mean(entry, entry_index)
                 end if
             end if
         end do ! --> do lev=1, size1
+        end if ! --> if (parallel_write)
     end if ! --> if (entry%accuracy == i_real8) then
 end subroutine
 !
@@ -2713,47 +3377,29 @@ subroutine update_means
     DO n=1, io_NSTREAMS
         entry=>io_stream(n)%p
 
-        !_____________ compute in 8 byte accuracy ______________________________
-        IF (entry%accuracy == i_real8) then
-            IF (entry%flip) then
+        !_____________ accumulate in real64, always _____________________________
+        ! `accuracy` selects the on-disk type only -- see note_output_precision.
+        ! entry%offset is NOT added here: it is a constant, so mean(x+c) == mean(x)+c,
+        ! and adding it once after the division keeps the sum on the (small) anomaly
+        ! scale instead of pushing it back onto ~35 psu.
+        IF (entry%flip) then
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
-                DO J=1, size(entry%local_values_r8,dim=2)
-                    DO I=1, size(entry%local_values_r8,dim=1)
-                        entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+entry%ptr3(J,I)
-                    END DO
+            DO J=1, size(entry%local_values_r8,dim=2)
+                DO I=1, size(entry%local_values_r8,dim=1)
+                    entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+real(entry%ptr3(J,I), real64)
                 END DO
+            END DO
 !$OMP END PARALLEL DO
-            ELSE
+        ELSE
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
-                DO J=1, size(entry%local_values_r8,dim=2)
-                    DO I=1, size(entry%local_values_r8,dim=1)
-                        entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+entry%ptr3(I,J)
-                    END DO
+            DO J=1, size(entry%local_values_r8,dim=2)
+                DO I=1, size(entry%local_values_r8,dim=1)
+                    entry%local_values_r8(I,J)=entry%local_values_r8(I,J)+real(entry%ptr3(I,J), real64)
                 END DO
+            END DO
 !$OMP END PARALLEL DO
-            END IF
-            
-        !_____________ compute in 4 byte accuracy ______________________________
-        ELSE IF (entry%accuracy == i_real4) then
-            IF (entry%flip) then
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
-                DO J=1, size(entry%local_values_r4,dim=2)
-                    DO I=1, size(entry%local_values_r4,dim=1)
-                        entry%local_values_r4(I,J)=entry%local_values_r4(I,J)+real(entry%ptr3(J,I), real32)
-                    END DO
-                END DO
-!$OMP END PARALLEL DO
-            ELSE
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I, J)
-                DO J=1, size(entry%local_values_r4,dim=2)
-                    DO I=1, size(entry%local_values_r4,dim=1)
-                        entry%local_values_r4(I,J)=entry%local_values_r4(I,J)+real(entry%ptr3(I,J), real32)
-                    END DO
-                END DO
-!$OMP END PARALLEL DO
-            END IF
-        END IF ! --> IF (entry%accuracy == i_real8) then
-        
+        END IF
+
         entry%addcounter=entry%addcounter+1
     END DO ! --> DO n=1, io_NSTREAMS
     
@@ -2766,7 +3412,46 @@ end subroutine
 !
 !
 !_______________________________________________________________________________
-! main output routine called at the end of each time step --> here is decided if 
+! Return the vertically valid (wet) index range [ul_loc, kmax_loc] for column j of
+! the given output stream. Cells with level index outside this range are below the
+! bottom topography or above a cavity and are the only ones written as _FillValue.
+! For 2D fields (nlev_loc==1) and non-spatial vertical axes (density / ice classes)
+! the whole column is valid, so a legitimate zero (e.g. ice-free a_ice or vanishing
+! IDEMIX energy) is kept as zero rather than turned into a missing value.
+subroutine get_wet_range(entry, mesh, nlev_loc, j, ul_loc, kmax_loc)
+    use mod_mesh
+    implicit none
+    type(Meandata), intent(in)  :: entry
+    type(t_mesh),   intent(in)  :: mesh
+    integer,        intent(in)  :: nlev_loc, j
+    integer,        intent(out) :: ul_loc, kmax_loc
+    integer                     :: nl_bot
+
+    if (nlev_loc == mesh%nl .or. nlev_loc == mesh%nl-1) then
+        ! genuine 3D field on the vertical grid --> mask by topography / cavity
+        if (entry%is_elem_based) then
+            ul_loc = mesh%ulevels(j)
+            nl_bot = mesh%nlevels(j)
+        else
+            ul_loc = mesh%ulevels_nod2D(j)
+            nl_bot = mesh%nlevels_nod2D(j)
+        end if
+        ! full levels (nz, interfaces) keep nl_bot levels, mid layers (nz1) keep nl_bot-1
+        if (nlev_loc == mesh%nl) then
+            kmax_loc = nl_bot
+        else
+            kmax_loc = nl_bot - 1
+        end if
+    else
+        ! 2D fields and non-spatial vertical axes: every entry is valid
+        ul_loc   = 1
+        kmax_loc = nlev_loc
+    end if
+end subroutine
+!
+!
+!_______________________________________________________________________________
+! main output routine called at the end of each time step --> here is decided if
 ! output event is triggered
 subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     use g_clock
@@ -2788,6 +3473,7 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     logical, save :: lfirst=.true.
     integer       :: n, k
     integer       :: i, j !for OMP loops
+    integer       :: nlev_loc, ul_loc, kmax_loc !for wet-cell masking of output
     logical       :: do_output
     type(Meandata), pointer :: entry
     type(t_mesh), intent(in) , target :: mesh
@@ -2797,12 +3483,18 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     type(t_ice)   , intent(inout), target :: ice
     character(:), allocatable             :: filepath
     real(real64)                          :: rtime !timestamp of the record
+    real(kind=WP)                         :: t_start !start of this entry's accumulation interval, seconds since start of current year
 #if defined(__MULTIO)
     logical       :: output_done
     logical       :: trigger_flush
 #endif
 
-ctime=timeold+(dayold-1.)*86400
+! End of the current step, i.e. the end of the accumulation interval when an
+! output event fires (events fire on timenew==86400., see gen_events.F90).
+! The record's time stamp is the interval MIDPOINT and the interval itself
+! goes to time_bounds; both are independent of the time step, so re-running
+! a period cannot produce shifted duplicate records.
+ctime=timenew+(daynew-1.)*86400
     
     !___________________________________________________________________________
     if (lfirst) then
@@ -2889,6 +3581,9 @@ ctime=timeold+(dayold-1.)*86400
         !_______________________________________________________________________
         ! if its time for output --> do_output==.true.
         if (do_output) then
+            ! start of this entry's accumulation interval, in this year's time
+            ! units; must be taken BEFORE the tracker is reset further down
+            t_start = accum_start_this_year(entry%t_accum_start, entry%t_accum_year)
             if (vec_autorotate) call io_r2g(n, partit, mesh) ! automatically detect if a vector field and rotate if makes sense!
 #if !defined(__MULTIO)
             if(entry%thread_running) call entry%thread%join()
@@ -2902,11 +3597,20 @@ ctime=timeold+(dayold-1.)*86400
             endif
 
             !___________________________________________________________________
-            ! only root rank task does output
+            ! The redistribution schedules are collective and must be built by
+            ! EVERY rank, so they cannot live inside the root-only block below.
+            ! (Doing that was an MPI_ERR_TRUNCATE in Alltoallv: non-root ranks
+            ! reached the exchange with an unbuilt schedule.)
+            if (parallel_write) call ensure_out_schedules(partit, mesh%nod2D, mesh%elem2D)
+
+            ! In the gather path only the root rank opens and defines the file.
+            ! In the collective path every WRITER must, because the create and
+            ! every put_var are collective over the writer communicator.
 #if defined(__XIOS)
-            if(.not. io_xios_is_on() .and. partit%mype == entry%root_rank) then
+            if(.not. io_xios_is_on() .and. &
+               merge(out_is_writer(), partit%mype == entry%root_rank, parallel_write)) then
 #else
-            if(partit%mype == entry%root_rank) then
+            if(merge(out_is_writer(), partit%mype == entry%root_rank, parallel_write)) then
 #endif
                 !_______________________________________________________________
                 ! create new output file ?!
@@ -2915,12 +3619,12 @@ ctime=timeold+(dayold-1.)*86400
                     entry%filename = filepath
                     !___________________________________________________________
                     ! use any existing file with this name or create a new one
-                    if( nf90_open(entry%filename, nf90_write, entry%ncid) /= nf90_noerr ) then
+                    if( par_open_existing(entry) /= nf90_noerr ) then
                         !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call create_new_file'//achar(27)//'[0m'
                         call create_new_file(entry, ice, dynamics, partit, mesh)
 
                         !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assert_nf A'//achar(27)//'[0m'//',  k=',k, ', rootpart=', entry%root_rank
-                        call assert_nf( nf90_open(entry%filename, nf90_write, entry%ncid), __LINE__)
+                        call assert_nf( par_open_existing(entry), __LINE__)
                     end if
 
                     !___________________________________________________________
@@ -2932,23 +3636,36 @@ ctime=timeold+(dayold-1.)*86400
                 end if ! --> if(filepath /= trim(entry%filename)) then
 
                 !_______________________________________________________________
-                ! if the time rtime at the rec_count is larger than ctime we
-                ! look for the closest record with the timestamp less than ctime
+                ! position rec_count in the (possibly pre-existing) file:
+                ! overwrite every record whose stamp lies AFTER the start of the
+                ! current accumulation interval. Any stamping convention places
+                ! a record's stamp inside (or at the end of) its own interval,
+                ! so this rule also dedups correctly against files written by
+                ! older code with time-step-dependent stamps.
                 do k=entry%rec_count, 1, -1
                     !PS if (partit%flag_debug)  print *, achar(27)//'[33m'//' -I/O-> call assert_nf B'//achar(27)//'[0m'//',  k=',k, ', rootpart=', entry%root_rank
                     ! determine rtime from exiting file
-                    call assert_nf( nf90_get_var(entry%ncid, entry%tID, rtime), __LINE__)
-                    if (ctime > rtime) then
+                    call assert_nf( nf90_get_var(entry%ncid, entry%tID, rtime, start=(/k/)), __LINE__)
+                    if (rtime <= t_start) then
                         entry%rec_count=k+1
                         exit ! a proper rec_count detected, exit the loop
                     end if
                     if (k==1) then
+                        if (merge(out_is_lead_writer(), .true., parallel_write)) &
                         write(*,*) 'I/O '//trim(entry%name)//' WARNING: the existing output file will be overwritten'//'; ', entry%rec_count, ' records in the file;'
                         entry%rec_count=1
                         exit ! no appropriate rec_count detected
                     end if
                 end do
                 entry%rec_count=max(entry%rec_count, 1)
+                ! One line per output event, not one per writer. The guard above
+                ! used to be `mype == entry%root_rank`, so exactly one CPU reached
+                ! these prints; widening it to the writer set is right for the
+                ! netCDF calls in this block and wrong for the diagnostics.
+                ! Measured at 8192 ranks with 512 writers: 512 lines per stream per
+                ! output event, ~250k lines per model month through a single
+                ! srun -l stdout. On the gather path the single root still prints.
+                if (merge(out_is_lead_writer(), .true., parallel_write)) &
                 write(*,*) trim(entry%name)//': current mean I/O counter = ', entry%rec_count
             end if ! --> if(partit%mype == entry%root_rank) then
 #endif
@@ -2959,48 +3676,75 @@ ctime=timeold+(dayold-1.)*86400
             ! ships the array straight to GRIB and a 9.97e36 sentinel in the
             ! data range wrecks GRIB packing precision (real ice values get
             ! quantized to ~0). Multio gets the clean mean (zeros stay zeros).
+            ! The mean is always computed in real64 from the real64 accumulator, and
+            ! entry%offset (a constant) is added once here rather than to every sample.
+            ! Only the DESTINATION differs by accuracy: a precision-4 stream narrows to
+            ! real32 exactly once, on the way into the copy the writer will gather.
+            nlev_loc = size(entry%local_values_r8,dim=1)
             if (entry%accuracy == i_real8) then
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J,ul_loc,kmax_loc)
                 DO J=1, size(entry%local_values_r8,dim=2)
-                    DO I=1, size(entry%local_values_r8,dim=1)
 #if defined(__MULTIO)
-                        entry%local_values_r8_copy(I,J) = entry%local_values_r8(I,J) /real(entry%addcounter,real64)  ! compute_means
-#else
-                        if (abs(entry%local_values_r8(I,J)) < 1.0e-30_real64) then
-                            entry%local_values_r8_copy(I,J) = NC_FILL_DOUBLE  ! No data - set to fill value
-                        else
-                            entry%local_values_r8_copy(I,J) = entry%local_values_r8(I,J) /real(entry%addcounter,real64)  ! compute_means
-                        end if
-#endif
+                    ! multio ships the clean mean to GRIB; no _FillValue substitution
+                    ! (a 9.97e36 sentinel in the data range wrecks GRIB packing).
+                    DO I=1, nlev_loc
+                        entry%local_values_r8_copy(I,J) = entry%local_values_r8(I,J) /real(entry%addcounter,real64) + real(entry%offset,real64)  ! compute_means
                         entry%local_values_r8(I,J) = 0._real64 ! clean_meanarrays - reset to 0 for next accumulation
-                    END DO ! --> DO I=1, size(entry%local_values_r8,dim=1)
+                    END DO ! --> DO I=1, nlev_loc
+#else
+                    ! Determine the vertically valid (wet) range for this column. Cells
+                    ! outside [ul_loc,kmax_loc] are below the bottom topography or above
+                    ! the cavity and have never been touched -> they are the only ones set
+                    ! to _FillValue. Wet cells keep their (averaged) value, even when it is
+                    ! a legitimate zero (e.g. ice-free a_ice or vanishing IDEMIX energy).
+                    call get_wet_range(entry, mesh, nlev_loc, J, ul_loc, kmax_loc)
+                    DO I=1, nlev_loc
+                        if (I < ul_loc .or. I > kmax_loc) then
+                            entry%local_values_r8_copy(I,J) = NC_FILL_DOUBLE  ! dry cell - set to fill value
+                        else
+                            entry%local_values_r8_copy(I,J) = entry%local_values_r8(I,J) /real(entry%addcounter,real64) + real(entry%offset,real64)  ! compute_means
+                        end if
+                        entry%local_values_r8(I,J) = 0._real64 ! clean_meanarrays - reset to 0 for next accumulation
+                    END DO ! --> DO I=1, nlev_loc
+#endif
                 END DO ! --> DO J=1, size(entry%local_values_r8,dim=2)
 !$OMP END PARALLEL DO
 
             !___________________________________________________________________
-            ! write single precision output
+            ! 4-byte output: divide in real64, narrow once into the real32 copy
             else if (entry%accuracy == i_real4) then
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J)
-                DO J=1, size(entry%local_values_r4,dim=2)
-                    DO I=1, size(entry%local_values_r4,dim=1)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I,J,ul_loc,kmax_loc)
+                DO J=1, size(entry%local_values_r8,dim=2)
 #if defined(__MULTIO)
-                        entry%local_values_r4_copy(I,J) = entry%local_values_r4(I,J) /real(entry%addcounter,real32)  ! compute_means
+                    ! see comment in the double precision branch above
+                    DO I=1, nlev_loc
+                        entry%local_values_r4_copy(I,J) = real(entry%local_values_r8(I,J) /real(entry%addcounter,real64) + real(entry%offset,real64), real32)  ! compute_means
+                        entry%local_values_r8(I,J) = 0._real64 ! clean_meanarrays - reset to 0 for next accumulation
+                    END DO ! --> DO I=1, nlev_loc
 #else
-                        if (abs(entry%local_values_r4(I,J)) < 1.0e-30_real32) then
-                            entry%local_values_r4_copy(I,J) = NC_FILL_FLOAT  ! No data - set to fill value
+                    ! see comment in the double precision branch above
+                    call get_wet_range(entry, mesh, nlev_loc, J, ul_loc, kmax_loc)
+                    DO I=1, nlev_loc
+                        if (I < ul_loc .or. I > kmax_loc) then
+                            entry%local_values_r4_copy(I,J) = NC_FILL_FLOAT  ! dry cell - set to fill value
                         else
-                            entry%local_values_r4_copy(I,J) = entry%local_values_r4(I,J) /real(entry%addcounter,real32)  ! compute_means
+                            entry%local_values_r4_copy(I,J) = real(entry%local_values_r8(I,J) /real(entry%addcounter,real64) + real(entry%offset,real64), real32)  ! compute_means
                         end if
+                        entry%local_values_r8(I,J) = 0._real64 ! clean_meanarrays - reset to 0 for next accumulation
+                    END DO ! --> DO I=1, nlev_loc
 #endif
-                        entry%local_values_r4(I,J) = 0._real32 ! clean_meanarrays - reset to 0 for next accumulation
-                    END DO ! --> DO I=1, size(entry%local_values_r4,dim=1)
-                END DO ! --> DO J=1, size(entry%local_values_r4,dim=2)
+                END DO ! --> DO J=1, size(entry%local_values_r8,dim=2)
 !$OMP END PARALLEL DO
             end if ! --> if (entry%accuracy == i_real8) then
             !___________________________________________________________________
             entry%lastcounter=entry%addcounter
             entry%addcounter   = 0  ! clean_meanarrays
-            entry%ctime_copy = ctime
+            ! stamp = interval midpoint, interval itself goes to time_bounds;
+            ! then start the next accumulation interval at the current time
+            entry%ctime_copy = 0.5_WP*(t_start + ctime)
+            entry%tbnds_copy = (/t_start, ctime/)
+            entry%t_accum_start = ctime
+            entry%t_accum_year  = yearnew
 
 #if defined(__MULTIO)
 !            if (n==1) then
@@ -3051,11 +3795,12 @@ subroutine output_0D_streams(istep, partit)
     integer, intent(in) :: istep
     type(t_partit), intent(inout) :: partit
 
-    integer :: n, ierr
+    integer :: n, ierr, k
     logical :: do_output
     type(Meandata0D), pointer :: entry0D
     character(500) :: filepath
     real(real64) :: mean_value, rtime
+    real(kind=WP) :: t_start !start of this entry's accumulation interval, seconds since start of current year
 
     ! When XIOS is the I/O driver, the 0D scalar fields are written via
     ! xios_send_field calls (see gen_modules_cmor_diag.F90's compute_cmor_diag)
@@ -3083,6 +3828,8 @@ subroutine output_0D_streams(istep, partit)
         endif
         
         if (do_output) then
+            ! start of this entry's accumulation interval (before the tracker reset below)
+            t_start = accum_start_this_year(entry0D%t_accum_start, entry0D%t_accum_year)
             ! Compute mean value
             if (entry0D%addcounter > 0) then
                 mean_value = entry0D%local_value / real(entry0D%addcounter, real64)
@@ -3121,21 +3868,39 @@ subroutine output_0D_streams(istep, partit)
                         call assert_nf(nf90_inq_varid(entry0D%ncid, 'time', entry0D%timeid), __LINE__)
                         call assert_nf(nf90_inq_varid(entry0D%ncid, trim(entry0D%name), entry0D%varid), __LINE__)
                         call assert_nf(nf90_inquire_dimension(entry0D%ncid, entry0D%timedimid, len=entry0D%rec_count), __LINE__)
+                        ! legacy file without time_bounds: keep appending bounds-less records
+                        if (nf90_inq_varid(entry0D%ncid, 'time_bounds', entry0D%tbndsid) == nf90_noerr) then
+                            entry0D%has_bounds = .true.
+                        else
+                            entry0D%has_bounds = .false.
+                            entry0D%tbndsid = -1
+                        endif
                     endif
                 endif
-                
-                ! Write data
-                entry0D%rec_count = entry0D%rec_count + 1
-                rtime = ctime
-                
+
+                ! Write data: position rec_count with the same rule as the
+                ! 2D/3D streams (overwrite records after the interval start),
+                ! stamp with the interval midpoint, store the interval itself
+                do k=entry0D%rec_count, 1, -1
+                    call assert_nf(nf90_get_var(entry0D%ncid, entry0D%timeid, rtime, start=(/k/)), __LINE__)
+                    if (rtime <= t_start) exit
+                end do
+                entry0D%rec_count = k + 1
+                rtime = 0.5_WP*(t_start + ctime)
+
                 call assert_nf(nf90_put_var(entry0D%ncid, entry0D%timeid, rtime, start=(/entry0D%rec_count/)), __LINE__)
+                if (entry0D%has_bounds) then
+                    call assert_nf(nf90_put_var(entry0D%ncid, entry0D%tbndsid, (/t_start, ctime/), start=(/1, entry0D%rec_count/), count=(/2, 1/)), __LINE__)
+                endif
                 call assert_nf(nf90_put_var(entry0D%ncid, entry0D%varid, mean_value, start=(/entry0D%rec_count/)), __LINE__)
                 call assert_nf(nf90_sync(entry0D%ncid), __LINE__)
             endif
-            
-            ! Reset accumulator
+
+            ! Reset accumulator and start the next accumulation interval
             entry0D%local_value = 0._real64
             entry0D%addcounter = 0
+            entry0D%t_accum_start = ctime
+            entry0D%t_accum_year  = yearnew
         endif
     end do
     
@@ -3146,24 +3911,33 @@ end subroutine output_0D_streams
 ! Create a new NetCDF file for 0D (scalar) output
 subroutine create_0D_file(entry0D, filepath)
     use g_clock
+    use g_config
     implicit none
     type(Meandata0D), intent(inout) :: entry0D
     character(len=*), intent(in) :: filepath
     
-    integer :: ierr
+    integer :: ierr, bnds_dimid
     character(100) :: time_units
-    
+
     ! Create file
     call assert_nf(nf90_create(trim(filepath), IOR(NF90_CLOBBER, NF90_NETCDF4), entry0D%ncid), __LINE__)
-    
+
     ! Define time dimension (unlimited)
     call assert_nf(nf90_def_dim(entry0D%ncid, 'time', NF90_UNLIMITED, entry0D%timedimid), __LINE__)
-    
+
     ! Define time variable
     call assert_nf(nf90_def_var(entry0D%ncid, 'time', NF90_DOUBLE, (/entry0D%timedimid/), entry0D%timeid), __LINE__)
     write(time_units, '(a,i4.4,a,i2.2,a,i2.2,a)') 'seconds since ', yearnew, '-01-01 00:00:00'
     call assert_nf(nf90_put_att(entry0D%ncid, entry0D%timeid, 'units', trim(time_units)), __LINE__)
-    call assert_nf(nf90_put_att(entry0D%ncid, entry0D%timeid, 'calendar', 'standard'), __LINE__)
+    if (include_fleapyear) then
+        call assert_nf(nf90_put_att(entry0D%ncid, entry0D%timeid, 'calendar', 'standard'), __LINE__)
+    else
+        call assert_nf(nf90_put_att(entry0D%ncid, entry0D%timeid, 'calendar', '365_day'), __LINE__)
+    endif
+    call assert_nf(nf90_put_att(entry0D%ncid, entry0D%timeid, 'bounds', 'time_bounds'), __LINE__)
+    call assert_nf(nf90_def_dim(entry0D%ncid, 'axis_nbounds', 2, bnds_dimid), __LINE__)
+    call assert_nf(nf90_def_var(entry0D%ncid, 'time_bounds', NF90_DOUBLE, (/bnds_dimid, entry0D%timedimid/), entry0D%tbndsid), __LINE__)
+    entry0D%has_bounds = .true.
     
     ! Define data variable
     if (entry0D%accuracy == i_real8) then
@@ -3178,6 +3952,7 @@ subroutine create_0D_file(entry0D, filepath)
     if (len_trim(entry0D%long_description) > 0) then
         call assert_nf(nf90_put_att(entry0D%ncid, entry0D%varid, 'long_name', trim(entry0D%long_description)), __LINE__)
     endif
+    call assert_nf(nf90_put_att(entry0D%ncid, entry0D%varid, 'cell_methods', 'time: mean'), __LINE__)
     
     ! End define mode
     call assert_nf(nf90_enddef(entry0D%ncid), __LINE__)
@@ -3217,7 +3992,10 @@ subroutine do_output_callback(entry_index)
     ! synchronize after writes:
     ! To minimize data loss in case of abnormal termination, or To make data 
     ! available to other processes for reading immediately after it is written. 
-    if(entry%p_partit%mype == entry%root_rank) then
+    ! In the collective path root_rank is not necessarily a writer and holds no
+    ! valid ncid -- syncing there fails with "NetCDF: Not a valid ID". The sync
+    ! is itself collective, so every writer performs it.
+    if(merge(out_is_writer(), entry%p_partit%mype == entry%root_rank, parallel_write)) then
         !PS if (entry%p_partit%flag_debug)  print *, achar(27)//'[31m'//' -I/O-> call nf_sync'//achar(27)//'[0m', entry%p_partit%mype
 #if defined(__XIOS)
         ! When XIOS drives output no legacy netCDF file was opened; entry%ncid
@@ -3319,6 +4097,7 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
   use mod_mesh
   USE MOD_PARTIT
   USE MOD_PARSUP
+  use g_cvmix_idemix2, only: idemix2_nfbin
   implicit none
   type(t_partit),        intent(inout), target :: partit
   integer,               intent(in)    :: glsize(2), lcsize(2)
@@ -3336,8 +4115,9 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
 
  
     !___________________________________________________________________________
-#if !defined(__PGI)  
-    do i = 1, rank(data)
+    ! data is rank 2 here; the rank is hardcoded because nvfortran implements
+    ! the rank() intrinsic only since 25.1
+    do i = 1, 2
         if ((ubound(data, dim = i)<=0)) then
             if (partit%mype==0) then
                 write(*,*) 'WARNING: adding I/O stream for ', trim(name), ' failed (contains 0 dimension)'
@@ -3346,7 +4126,6 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
             return
         end if    
     end do
-#endif
 
     !___________________________________________________________________________
     if (partit%mype==0) then
@@ -3362,6 +4141,11 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
     entry%currentTime=INT(INT(timeold / 3600) * 10000 + (INT(timeold / 60) - INT(timeold / 3600) * 60) * 100 + (timeold-INT(timeold / 60) * 60))
     entry%startDate=entry%currentDate
     entry%startTime=entry%currentTime
+    ! accumulation starts now: at the beginning of the step this stream is
+    ! created on (streams are created on the first output() call, i.e. before
+    ! the first sample of step 1 is folded in)
+    entry%t_accum_start = timeold + (dayold-1.)*86400._WP
+    entry%t_accum_year  = yearold
     !___________________________________________________________________________
     ! fill up 3d meandata streaming object
     ! 3d specific
@@ -3380,16 +4164,20 @@ subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, fr
     entry%ndim=2
     entry%glsize=glsize                     !2D! entry%glsize=(/1, glsize/)
 
-    if (accuracy == i_real8) then
-        allocate(entry%local_values_r8(lcsize(1), lcsize(2)))
-        entry%local_values_r8 = 0._real64
-    elseif (accuracy == i_real4) then
-        allocate(entry%local_values_r4(lcsize(1), lcsize(2)))
-        entry%local_values_r4 = 0._real32
-    end if
+    ! one accumulator, always real64 -- accuracy only picks the on-disk type
+    allocate(entry%local_values_r8(lcsize(1), lcsize(2)))
+    entry%local_values_r8 = 0._real64
 
     entry%dimname(1)=mesh_dimname_from_dimsize(glsize(1), partit, mesh)     !2D! mesh_dimname_from_dimsize(glsize, mesh)
     entry%dimname(2)=mesh_dimname_from_dimsize(glsize(2), partit, mesh)     !2D! entry%dimname(2)='unknown'
+    
+    ! Check if this is a spectral bin array based on dimension size
+    if (glsize(1) == idemix2_nfbin) then
+        entry%is_fbin_based = .true.
+    else
+        entry%is_fbin_based = .false.
+    end if
+    
     ! non dimension specific
     call def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh, long_description)
 
@@ -3417,8 +4205,9 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
   integer i
 
     !___________________________________________________________________________
-#if !defined(__PGI)   
-    do i = 1, rank(data)
+    ! data is rank 1 here; the rank is hardcoded because nvfortran implements
+    ! the rank() intrinsic only since 25.1
+    do i = 1, 1
         if ((ubound(data, dim = i)<=0)) then
         if (partit%mype==0) then
             write(*,*) 'WARNING: adding I/O stream for ', trim(name), ' failed (contains 0 dimension)'
@@ -3427,7 +4216,6 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
         return
         end if    
     end do
-#endif
 
     !___________________________________________________________________________
     if (partit%mype==0) then
@@ -3443,18 +4231,19 @@ subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, fr
     entry%currentTime=INT(INT(timeold / 3600) * 10000 + (INT(timeold / 60) - INT(timeold / 3600) * 60) * 100 + (timeold-INT(timeold / 60) * 60))
     entry%startDate=entry%currentDate
     entry%startTime=entry%currentTime
+    ! accumulation starts now: at the beginning of the step this stream is
+    ! created on (streams are created on the first output() call, i.e. before
+    ! the first sample of step 1 is folded in)
+    entry%t_accum_start = timeold + (dayold-1.)*86400._WP
+    entry%t_accum_year  = yearold
     !___________________________________________________________________________
     ! fill up 3d meandata streaming object
     ! 2d specific
     entry%ptr3(1:1,1:size(data)) => data(:)
 
-    if (accuracy == i_real8) then
-        allocate(entry%local_values_r8(1, lcsize))
-        entry%local_values_r8 = 0._real64
-    elseif (accuracy == i_real4) then
-        allocate(entry%local_values_r4(1, lcsize))
-        entry%local_values_r4 = 0._real32
-    end if
+    ! one accumulator, always real64 -- accuracy only picks the on-disk type
+    allocate(entry%local_values_r8(1, lcsize))
+    entry%local_values_r8 = 0._real64
 
     ! non dimension specific
     entry%ndim=1
@@ -3472,6 +4261,7 @@ end subroutine
 subroutine def_stream0D(name, description, units, data, freq, freq_unit, accuracy, partit, long_description)
   USE MOD_PARTIT
   USE MOD_PARSUP
+  use g_clock
   implicit none
   character(len=*),      intent(in)    :: name, description, units
   real(kind=WP), target, intent(in)    :: data
@@ -3512,11 +4302,15 @@ subroutine def_stream0D(name, description, units, data, freq, freq_unit, accurac
     entry%local_value = 0._real64
     entry%addcounter = 0
     entry%accuracy = accuracy
+    call note_output_precision(name, accuracy)
     entry%freq = freq
     entry%freq_unit = freq_unit
     entry%is_in_use = .true.
     entry%ncid = -1
     entry%rec_count = 0
+    ! accumulation starts at the beginning of the step this stream is created on
+    entry%t_accum_start = timeold + (dayold-1.)*86400._WP
+    entry%t_accum_year  = yearold
     
     if (present(long_description)) then
         entry%long_description = long_description
@@ -3582,6 +4376,7 @@ subroutine def_stream_after_dimension_specific(entry, name, description, units, 
     
     !___________________________________________________________________________
     entry%accuracy = accuracy
+    call note_output_precision(name, accuracy)
 
     if (accuracy == i_real8) then
       allocate(data_strategy_nf_double_type :: entry%data_strategy)
@@ -3631,7 +4426,8 @@ subroutine def_stream_after_dimension_specific(entry, name, description, units, 
     if (accuracy == i_real8) then
       allocate(entry%local_values_r8_copy(size(entry%local_values_r8, dim=1), size(entry%local_values_r8, dim=2)))
     else if (accuracy == i_real4) then
-      allocate(entry%local_values_r4_copy(size(entry%local_values_r4, dim=1), size(entry%local_values_r4, dim=2)))
+      ! the copy keeps the on-disk kind, but is sized from the (only) accumulator
+      allocate(entry%local_values_r4_copy(size(entry%local_values_r8, dim=1), size(entry%local_values_r8, dim=2)))
     end if
 
     !___________________________________________________________________________
@@ -3649,6 +4445,14 @@ subroutine def_stream_after_dimension_specific(entry, name, description, units, 
     ! on cray-mpich we only get level 'MPI_THREAD_MULTIPLE' if 'MPICH_MAX_THREAD_SAFETY=multiple' is set in the environment
     call MPI_Query_thread(provided_mpi_thread_support_level, err)
     if(provided_mpi_thread_support_level < MPI_THREAD_MULTIPLE) call entry%thread%disable_async()
+
+    ! The collective path must run on the main thread. write_mean issues an
+    ! MPI_Alltoallv and collective netCDF calls; from a worker thread those race
+    ! the main thread's own collectives and deadlock, and HDF5 here reports
+    ! Threadsafety: OFF. This is the output-side counterpart of the same rule in
+    ! io_fesom_file.F90 -- missing it left rank 0 blocked inside Alltoallv while
+    ! the other ranks ran on.
+    if(parallel_write) call entry%thread%disable_async()
     
     entry%mype_workaround = partit%mype ! make a copy of the mype variable as there is an error with the cray compiler or environment which voids the global mype for our threads
     entry%p_partit=>partit
@@ -3724,7 +4528,9 @@ subroutine io_r2g(n, partit, mesh)
     entry_x=>io_stream(n)%p
     entry_y=>io_stream(n+1)%p
     IF (.NOT. (entry_x%freq_unit==entry_y%freq_unit) .and. ((entry_x%freq==entry_y%freq))) RETURN
-    IF (entry_x%accuracy /= entry_y%accuracy) RETURN
+    ! (the accuracy-mismatch guard that used to sit here is gone: both components now
+    !  share one real64 accumulator, and skipping rotation for a u@4 / v@8 pair silently
+    !  wrote unrotated vectors)
     do_rotation=.FALSE.
 ! we need to improve the logistic here in order to use this routinely. a new argument in def_stream
 ! will be needed.
@@ -3745,44 +4551,30 @@ subroutine io_r2g(n, partit, mesh)
     END IF
 
     !___________________________________________________________________________
-    IF ((entry_x%accuracy == i_real8) .AND. (entry_y%accuracy == i_real8)) THEN
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I, J, xmean, ymean)
-        DO J=1, size(entry_x%local_values_r8,dim=2)
-            if (entry_x%is_elem_based) then
-                xmean=sum(mesh%coord_nod2D(1, mesh%elem2D_nodes(:, J)))/3._WP
-                ymean=sum(mesh%coord_nod2D(2, mesh%elem2D_nodes(:, J)))/3._WP
-            else
-                xmean=mesh%coord_nod2D(1, J)
-                ymean=mesh%coord_nod2D(2, J)
-            end if
-            DO I=1, size(entry_x%local_values_r8,dim=1)
-                call vector_r2g(entry_x%local_values_r8(I,J), entry_y%local_values_r8(I,J), xmean, ymean, 0)
-            END DO
-        END DO
-!$OMP END PARALLEL DO
-    END IF
-
-    !___________________________________________________________________________
-    IF ((entry_x%accuracy == i_real4) .AND. (entry_y%accuracy == i_real4)) THEN
+    ! Both components now share one real64 accumulator, so there is a single path --
+    ! and no reason to skip rotation when the two streams differ in on-disk precision.
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(I, J, temp_x, temp_y, xmean, ymean)
-        DO J=1, size(entry_x%local_values_r4,dim=2)
-            if (entry_x%is_elem_based) then
-                xmean=sum(mesh%coord_nod2D(1, mesh%elem2D_nodes(:, J)))/3._WP
-                ymean=sum(mesh%coord_nod2D(2, mesh%elem2D_nodes(:, J)))/3._WP
-            else
-                xmean=mesh%coord_nod2D(1, J)
-                ymean=mesh%coord_nod2D(2, J)
-            end if
-            DO I=1, size(entry_x%local_values_r4,dim=1)
-                temp_x=real(entry_x%local_values_r4(I,J), real64)
-                temp_y=real(entry_y%local_values_r4(I,J), real64)
-                call vector_r2g(temp_x, temp_y, xmean, ymean, 0)
-                entry_x%local_values_r4(I,J)=real(temp_x, real32)
-                entry_y%local_values_r4(I,J)=real(temp_y, real32)
-            END DO
+    DO J=1, size(entry_x%local_values_r8,dim=2)
+        if (entry_x%is_elem_based) then
+            xmean=sum(mesh%coord_nod2D(1, mesh%elem2D_nodes(:, J)))/3._WP
+            ymean=sum(mesh%coord_nod2D(2, mesh%elem2D_nodes(:, J)))/3._WP
+        else
+            xmean=mesh%coord_nod2D(1, J)
+            ymean=mesh%coord_nod2D(2, J)
+        end if
+        DO I=1, size(entry_x%local_values_r8,dim=1)
+            ! vector_r2g works in WP; round-trip through WP temps so the r8 accumulator
+            ! rotates correctly at WP=4 and WP=8. NOTE: at WP=4 this still narrows the
+            ! real64 sum to real32 and back -- a separate follow-up (a WP_full specific
+            ! for vector_r2g) is needed to close that in single-precision builds.
+            temp_x=real(entry_x%local_values_r8(I,J), kind=WP)
+            temp_y=real(entry_y%local_values_r8(I,J), kind=WP)
+            call vector_r2g(temp_x, temp_y, xmean, ymean, 0)
+            entry_x%local_values_r8(I,J)=real(temp_x, real64)
+            entry_y%local_values_r8(I,J)=real(temp_y, real64)
         END DO
+    END DO
 !$OMP END PARALLEL DO
-    END IF
 end subroutine
 
 #if defined(__MULTIO)

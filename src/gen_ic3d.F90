@@ -16,11 +16,12 @@ MODULE g_ic3d
    USE MOD_PARTIT
    USE MOD_PARSUP
    USE MOD_TRACER
-   USE o_PARAM, only: mstep
+   USE o_PARAM, only: mstep, pi
    USE g_comm_auto
    USE g_support
    USE g_config, only: dummy, ClimateDataPath, use_cavity
    USE g_clock, only: r_restart
+   USE io_netcdf_nf_interface, only: nf_get_vara_x
    
    IMPLICIT NONE
 
@@ -28,7 +29,8 @@ MODULE g_ic3d
 
    public  do_ic3d, &
            n_ic3d, idlist, filelist, varlist, tracer_init3d, &
-           t_insitu, oce_perturb, lperturb, perturb_mode, perturb_method, perturb_seed, temp_perturb, salt_perturb
+           t_insitu, ic_extrap_det, ic_extrap_tol, &
+           oce_perturb, lperturb, perturb_mode, perturb_method, perturb_seed, temp_perturb, salt_perturb
    private
 
 ! namelists
@@ -42,7 +44,7 @@ MODULE g_ic3d
    character(MAX_PATH), save, dimension(ic_max) :: filelist
    character(50),  save,  dimension(ic_max)     :: varlist
 
-   namelist / tracer_init3d / n_ic3d, idlist, filelist, varlist, t_insitu
+   namelist / tracer_init3d / n_ic3d, idlist, filelist, varlist, t_insitu, ic_extrap_det, ic_extrap_tol
 
 !============= perturbation to IC variables ================
    logical                                      :: lperturb = .false.
@@ -192,14 +194,14 @@ CONTAINS
       if (partit%mype==0) then
          nf_start(1)=1
          nf_edges(1)=nc_Nlat
-         iost = nf_get_vara_double(ncid, id_lat, nf_start, nf_edges, nc_lat)
+         iost = nf_get_vara_x(ncid, id_lat, nf_start, nf_edges, nc_lat)
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename,partit)
       if (partit%mype==0) then
          nf_start(1)=1
          nf_edges(1)=nc_Nlon-2
-         iost = nf_get_vara_double(ncid, id_lon, nf_start, nf_edges, nc_lon(2:nc_Nlon-1))
+         iost = nf_get_vara_x(ncid, id_lon, nf_start, nf_edges, nc_lon(2:nc_Nlon-1))
          nc_lon(1)        =nc_lon(nc_Nlon-1)
          nc_lon(nc_Nlon)  =nc_lon(2)
       end if
@@ -209,15 +211,15 @@ CONTAINS
       if (partit%mype==0) then
          nf_start(1)=1
          nf_edges(1)=nc_Ndepth
-         iost = nf_get_vara_double(ncid, id_depth, nf_start, nf_edges,nc_depth)
+         iost = nf_get_vara_x(ncid, id_depth, nf_start, nf_edges,nc_depth)
          if (nc_depth(2) < 0.) nc_depth=-nc_depth
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)      
       call check_nferr(iost,filename,partit)
 
-      call MPI_BCast(nc_lon,   nc_Nlon,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
-      call MPI_BCast(nc_lat,   nc_Nlat,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
-      call MPI_BCast(nc_depth, nc_Ndepth, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+      call MPI_BCast(nc_lon,   nc_Nlon,   MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
+      call MPI_BCast(nc_lat,   nc_Nlat,   MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
+      call MPI_BCast(nc_depth, nc_Ndepth, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
 
       if (partit%mype==0) then
          iost = nf_close(ncid)
@@ -341,11 +343,13 @@ CONTAINS
       integer                                 :: nl1, ul1
       real(wp)                                :: denom, x1, x2, y1, y2, x, y, d1,d2, aux_z           
       real(wp), allocatable, dimension(:,:,:) :: ncdata
+      real(wp), allocatable, dimension(:)     :: ncdata_inner ! rank-1 read buffer (generic nf_get_vara_x only resolves rank-1 actuals)
       real(wp), allocatable, dimension(:)     :: data1d      
       integer                                 :: elnodes(3)
       integer                                 :: ierror              ! return error code
       integer				      :: NO_FILL	     ! 0=no fillval, 1=fillval
       real(wp)				      :: FILL_VALUE
+      real(8)				      :: FILL_VALUE_r8   ! double temp: file stores fill/missing as double
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -364,22 +368,24 @@ CONTAINS
       ! get variable id
       if (mype==0) then
          iost = nf_inq_varid(ncid, varname, id_data)
-         iost = nf_inq_var_fill(ncid, id_data, NO_FILL, FILL_VALUE) ! FillValue defined?
+         iost = nf_inq_var_fill(ncid, id_data, NO_FILL, FILL_VALUE_r8) ! FillValue defined?
          if (NO_FILL==1) then
             ! No _FillValue attribute found, try missing_value attribute
-            iost = nf_get_att_double(ncid, id_data, 'missing_value', FILL_VALUE)
+            iost = nf_get_att_double(ncid, id_data, 'missing_value', FILL_VALUE_r8)
             if (iost /= NF_NOERR) then
                ! Neither _FillValue nor missing_value found, use NetCDF default fill value
-               FILL_VALUE = NF_FILL_DOUBLE  ! 9.9692099683868690e+36
-               print *, 'No _FillValue or missing_value in ', trim(filename), ', using NetCDF default:', FILL_VALUE
+               FILL_VALUE_r8 = NF_FILL_DOUBLE  ! 9.9692099683868690e+36
+               print *, 'No _FillValue or missing_value in ', trim(filename), ', using NetCDF default:', FILL_VALUE_r8
             else
-               print *, 'Using missing_value from ', trim(filename), ':', FILL_VALUE
+               print *, 'Using missing_value from ', trim(filename), ':', FILL_VALUE_r8
             end if
          else
-            print *, 'Using _FillValue from ', trim(filename), ':', FILL_VALUE
+            print *, 'Using _FillValue from ', trim(filename), ':', FILL_VALUE_r8
          end if
+         ! cast to working precision; comparison below uses the same WP rounding as the data read
+         FILL_VALUE = real(FILL_VALUE_r8, WP)
       end if
-      call MPI_BCast(FILL_VALUE, 1, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+      call MPI_BCast(FILL_VALUE, 1, MPI_WP, 0, MPI_COMM_FESOM, ierror)
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename,partit)   
       !read data from file
@@ -390,7 +396,12 @@ CONTAINS
          nf_edges(2)=nc_Nlat
          nf_start(3)=1
          nf_edges(3)=nc_Ndepth         
-         iost = nf_get_vara_double(ncid, id_data, nf_start, nf_edges, ncdata(2:nc_Nlon-1,:,:))
+         ! read into a contiguous rank-1 WP buffer, then reshape into the strided destination
+         ! (generic nf_get_vara_x only resolves rank-1 actuals; NetCDF Fortran order has the first dim fastest)
+         allocate(ncdata_inner((nc_Nlon-2)*nc_Nlat*nc_Ndepth))
+         iost = nf_get_vara_x(ncid, id_data, nf_start, nf_edges, ncdata_inner)
+         ncdata(2:nc_Nlon-1,:,:) = reshape(ncdata_inner, [nc_Nlon-2, nc_Nlat, nc_Ndepth])
+         deallocate(ncdata_inner)
          ncdata(1,:,:)      =ncdata(nc_Nlon-1,:,:)
          ncdata(nc_Nlon,:,:)=ncdata(2,:,:)
 
@@ -410,7 +421,7 @@ CONTAINS
       end if
       call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename,partit)
-      call MPI_BCast(ncdata, nc_Nlon*nc_Nlat*nc_Ndepth, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+      call MPI_BCast(ncdata, nc_Nlon*nc_Nlat*nc_Ndepth, MPI_WP, 0, MPI_COMM_FESOM, ierror)
       ! bilinear space interpolation,  
       ! data is assumed to be sampled on a regular grid
       do ii = 1, myDim_nod2d
@@ -628,42 +639,47 @@ CONTAINS
         locO2min  = min(locO2min,minval(tracers%data(24)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
 #endif
       end do
-      call MPI_AllREDUCE(locTmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locTmax , glo  , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal max init. temp. =', glo
-      call MPI_AllREDUCE(locTmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locTmin , glo  , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal min init. temp. =', glo
-      call MPI_AllREDUCE(locSmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locSmax , glo  , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal max init. salt. =', glo
-      call MPI_AllREDUCE(locSmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locSmin , glo  , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  `-> gobal min init. salt. =', glo      
 #if defined(__recom)
-
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
       if (partit%mype==0) write(*,*) "Sanity check for REcoM variables"
-      call MPI_AllREDUCE(locDINmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locDINmax , glo  , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal max init. DIN. =', glo
-      call MPI_AllREDUCE(locDINmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locDINmin , glo  , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal min init. DIN. =', glo
 
-      call MPI_AllREDUCE(locDICmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locDICmax , glo  , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal max init. DIC. =', glo
-      call MPI_AllREDUCE(locDICmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locDICmin , glo  , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal min init. DIC. =', glo
-      call MPI_AllREDUCE(locAlkmax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locAlkmax , glo  , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal max init. Alk. =', glo
-      call MPI_AllREDUCE(locAlkmin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locAlkmin , glo  , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal min init. Alk. =', glo
-      call MPI_AllREDUCE(locDSimax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locDSimax , glo  , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal max init. DSi. =', glo
-      call MPI_AllREDUCE(locDSimin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locDSimin , glo  , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal min init. DSi. =', glo
-      call MPI_AllREDUCE(locDFemax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locDFemax , glo  , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal max init. DFe. =', glo
-      call MPI_AllREDUCE(locDFemin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locDFemin , glo  , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  `-> gobal min init. DFe. =', glo
-      call MPI_AllREDUCE(locO2max , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locO2max , glo  , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  |-> gobal max init. O2. =', glo
-      call MPI_AllREDUCE(locO2min , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locO2min , glo  , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
       if (partit%mype==0) write(*,*) '  `-> gobal min init. O2. =', glo
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
 #endif
       
       ! Apply perturbations based on selected mode
@@ -932,7 +948,7 @@ CONTAINS
          if (rtemp1 < 1.0e-10_WP) rtemp1 = 1.0e-10_WP
          
          ! Box-Muller: generate standard normal, then scale by std_dev
-         rnum = param2 * sqrt(-2.0_WP * log(rtemp1)) * cos(2.0_WP * 3.14159265359_WP * rtemp2)
+         rnum = param2 * sqrt(-2.0_WP * log(rtemp1)) * cos(2.0_WP * pi * rtemp2)
          
      case default
          ! Default to uniform if unknown method

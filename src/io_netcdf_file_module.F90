@@ -41,6 +41,8 @@ module io_netcdf_file_module
     integer ncid
   contains
     procedure, public :: initialize, add_dim, add_dim_unlimited, add_var_double, add_var_real, add_var_int, open_read, flush_file, close_file, open_write_create, open_write_append
+    procedure, public :: open_write_create_par, open_write_append_par, set_var_chunking
+    procedure, public :: open_read_par
     procedure, public :: is_attached, read_var_shape
     procedure, public :: ndims
     generic, public :: read_var => read_var_r4, read_var_r8, read_var_integer
@@ -183,7 +185,10 @@ contains
     deallocate(this%gatts)
     call move_alloc(tmparr, this%gatts)
     
-    this%gatts( size(this%gatts) )%it = att_type_text(name=att_name, text=att_text)
+    ! sourced allocation instead of intrinsic polymorphic assignment: same
+    ! semantics (the element is freshly unallocated), matches add_var_att_text,
+    ! and avoids a gfortran 16.2 ICE on the assignment form
+    allocate( this%gatts( size(this%gatts) )%it, source=att_type_text(name=att_name, text=att_text) )
   end subroutine add_global_att_text
 
 
@@ -199,7 +204,8 @@ contains
     deallocate(this%gatts)
     call move_alloc(tmparr, this%gatts)
     
-    this%gatts( size(this%gatts) )%it = att_type_int(name=att_name, val=att_val)
+    ! see comment in add_global_att_text
+    allocate( this%gatts( size(this%gatts) )%it, source=att_type_int(name=att_name, val=att_val) )
   end subroutine add_global_att_int
 
 
@@ -263,6 +269,38 @@ contains
     ! attach our dims and vars to their counterparts in the file
     call this%attach_dims_vars_to_file()
   end subroutine open_read
+
+
+  ! Parallel counterpart of open_read: the file is opened collectively over
+  ! `comm`, which must contain the reading CPUs and only those.
+  !
+  ! Variable access is INDEPENDENT, unlike open_write_create_par. Collective
+  ! access is what makes compressed parallel WRITES work at all, so the write
+  ! side has no choice; a read has nothing equivalent to gain, since each reader
+  ! pulls a distinct chunk-aligned hyperslab and HDF5 decompresses per chunk
+  ! either way.
+  !
+  ! It also removes a deadlock rather than merely being equivalent. The restart
+  ! record scalars -- `iter` and the time axis -- are read by one CPU alone
+  ! (io_restart.F90, under is_iorank), and under collective access that single
+  ! get_var would wait forever for the other readers to join a call they never
+  ! make.
+  subroutine open_read_par(this, filepath, comm)
+    use mpi
+    class(netcdf_file_type), intent(inout) :: this
+    character(len=*), intent(in) :: filepath
+    integer, intent(in) :: comm
+    ! EO parameters
+    include "netcdf.inc"
+    integer i
+
+    this%filepath = filepath
+    call assert_nc( nf_open_par(this%filepath, ior(nf_nowrite, nf_mpiio), comm, MPI_INFO_NULL, this%ncid), __LINE__)
+    call this%attach_dims_vars_to_file()
+    do i=1, size(this%vars)
+      call assert_nc( nf_var_par_access(this%ncid, this%vars(i)%ncid, nf_independent), __LINE__)
+    end do
+  end subroutine open_read_par
 
 
   ! return an array with the dimension sizes for all dimensions of the given variable
@@ -449,6 +487,99 @@ contains
 
     call assert_nc( nf_enddef(this%ncid), __LINE__ )
   end subroutine open_write_create
+
+
+  ! Parallel counterpart of open_write_create: the file is created collectively
+  ! over `comm`, which must contain the writer ranks and only those. Every
+  ! variable is then put in collective access mode, which netCDF-4 requires for
+  ! compressed variables -- independent access with a filter attached is an error.
+  !
+  ! The cmode deliberately keeps nf_classic_model alongside nf_mpiio. Dropping it
+  ! would change the file data model, and the whole point of this path is that the
+  ! files stay byte-compatible with what the serial writer produces. Verified to
+  ! work in parallel mode on netcdf-c 4.8.1 / HDF5 1.12.1 (bench/parwrite_test.F90).
+  subroutine open_write_create_par(this, filepath, comm)
+    use mpi
+    class(netcdf_file_type), target, intent(inout) :: this
+    character(len=*), intent(in) :: filepath
+    integer, intent(in) :: comm
+    ! EO parameters
+    include "netcdf.inc"
+    integer cmode
+    integer i, ii
+    integer var_ndims
+    integer, allocatable :: var_dimids(:)
+
+    this%filepath = filepath
+
+    ! nf_clobber rather than nf_noclobber: a parallel create must not fail on a
+    ! leftover file from a previous, aborted write, because only some ranks would
+    ! see the failure and the others would hang in the next collective.
+    cmode = ior(nf_clobber, ior(nf_netcdf4, ior(nf_classic_model, nf_mpiio)))
+    call assert_nc( nf_create_par(filepath, cmode, comm, MPI_INFO_NULL, this%ncid), __LINE__)
+
+    do i=1, size(this%dims)
+      call assert_nc( nf_def_dim(this%ncid, this%dims(i)%name, this%dims(i)%len, this%dims(i)%ncid) , __LINE__)
+    end do
+
+    do i=1, size(this%gatts)
+      call this%gatts(i)%it%define_in_var(this%ncid, nf_global)
+    end do
+
+    do i=1, size(this%vars)
+      var_ndims = size(this%vars(i)%dim_indices)
+      if(allocated(var_dimids)) deallocate(var_dimids)
+      allocate(var_dimids(var_ndims))
+      do ii=1, var_ndims
+        var_dimids(ii) = this%dims( this%vars(i)%dim_indices(ii) )%ncid
+      end do
+      call assert_nc( nf_def_var(this%ncid, this%vars(i)%name, this%vars(i)%datatype, var_ndims, var_dimids, this%vars(i)%ncid) , __LINE__)
+
+      do ii=1, this%vars(i)%atts_count
+        call this%vars(i)%atts(ii)%it%define_in_var(this%ncid, this%vars(i)%ncid)
+      end do
+    end do
+
+    call assert_nc( nf_enddef(this%ncid), __LINE__ )
+
+    do i=1, size(this%vars)
+      call assert_nc( nf_var_par_access(this%ncid, this%vars(i)%ncid, nf_collective), __LINE__)
+    end do
+  end subroutine open_write_create_par
+
+
+  subroutine open_write_append_par(this, filepath, comm)
+    use mpi
+    class(netcdf_file_type), intent(inout) :: this
+    character(len=*), intent(in) :: filepath
+    integer, intent(in) :: comm
+    ! EO parameters
+    include "netcdf.inc"
+    integer i
+
+    this%filepath = filepath
+    call assert_nc( nf_open_par(filepath, ior(nf_write, nf_mpiio), comm, MPI_INFO_NULL, this%ncid), __LINE__)
+    call this%attach_dims_vars_to_file()
+    do i=1, size(this%vars)
+      call assert_nc( nf_var_par_access(this%ncid, this%vars(i)%ncid, nf_collective), __LINE__)
+    end do
+  end subroutine open_write_append_par
+
+
+  ! Set the chunk shape of one variable. Must be called between def_var and
+  ! enddef, so it is only useful from a caller that drives the create itself.
+  ! Setting the first (fastest-varying, i.e. node) chunk extent equal to the
+  ! writer block is what keeps each chunk inside a single writer's range, so a
+  ! compressed collective write needs no chunk redistribution inside HDF5.
+  subroutine set_var_chunking(this, varindex, chunksizes)
+    class(netcdf_file_type), intent(inout) :: this
+    integer, intent(in) :: varindex
+    integer, intent(in) :: chunksizes(:)
+    ! EO parameters
+    include "netcdf.inc"
+    call assert_nc( nf_def_var_chunking(this%ncid, this%vars(varindex)%ncid, &
+                                        nf_chunked, chunksizes), __LINE__)
+  end subroutine set_var_chunking
 
 
   ! open an existing file and prepare to write data to it

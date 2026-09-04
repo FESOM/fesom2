@@ -1,5 +1,6 @@
 MODULE io_RESTART
   use restart_file_group_module
+  use io_fesom_file_module, only: parallel_write_enabled, set_parallel_write
   use restart_derivedtype_module
   use g_clock
   use g_config
@@ -19,6 +20,7 @@ MODULE io_RESTART
 #if defined (__cvmix)
   use g_cvmix_tke
   use g_cvmix_idemix
+  use g_cvmix_idemix2
 #endif  
 #if defined(__recom)
   use recom_glovar
@@ -122,6 +124,11 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
   if(has_been_called) return
   has_been_called = .true.
 
+  ! Select the write path before any restart file is initialised: fesom_file's
+  ! init builds the redistribution schedules and the writer communicator, and
+  ! both must exist before the first collective create.
+  call set_parallel_write(parallel_write, n_writers_restart, n_readers_restart)
+
   !===========================================================================
   !===================== Definition part =====================================
   !===========================================================================
@@ -132,7 +139,16 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
   call oce_files%def_node_var('hbar', 'ALE surface elevation', 'm',   mesh%hbar, mesh, partit)
 !!PS   call oce_files%def_node_var('ssh_rhs', 'RHS for the elevation', '?',   ssh_rhs, mesh, partit)
   call oce_files%def_node_var('ssh_rhs_old', 'RHS for the elevation', '?',   dynamics%ssh_rhs_old, mesh, partit)
+  ! d_eta is passed to ssh_solve_cg as X: it is the CG initial guess as well as the solution.
+  ! The CG stops on a relative residual (soltol), not at machine precision, so the result
+  ! depends on the guess -> prognostic.
+  call oce_files%def_node_var_optional('d_eta', 'SSH increment / CG initial guess', 'm', dynamics%d_eta, mesh, partit)
   call oce_files%def_node_var('hnode', 'nodal layer thickness', 'm',   mesh%hnode, mesh, partit)
+  ! hnode_new is filled by vert_vel_ale, but fer_solve_Gamma and init_Redi_GM run EARLIER in
+  ! the step and read it (oce_fer_gm.F90:82, :266), so with Fer_GM they consume the previous
+  ! step's value -> prognostic across the step boundary. Also written by the binary path
+  ! (MOD_MESH.F90, write_bin_array(mesh%hnode_new)).
+  call oce_files%def_node_var_optional('hnode_new', 'nodal layer thickness, next step', 'm', mesh%hnode_new, mesh, partit)
   
   !___Define the netCDF variables for 3D fields_______________________________
 #ifdef ENABLE_NVHPC_WORKAROUNDS
@@ -155,7 +171,20 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
   endif
   if (mix_scheme_nmb==6 .or. mix_scheme_nmb==56) then
         call oce_files%def_elem_var_optional('iwe', 'Internal Wave Energy'    , 'm2/s2', iwe(:,:), mesh, partit)
-  endif 
+  endif
+  if (mod(mix_scheme_nmb,10)==7) then
+        call oce_files%def_node_var_optional('iwe2_Eiw'     , 'IDEMIX2 low-mode IW energy'     , 'm2/s2', iwe2_E_iw(:,:,1),       mesh, partit)
+        if (idemix2_enable_M2) then
+            call oce_files%def_node_var_optional('iwe2_EM2'     , 'IDEMIX2 M2 spectral energy'      , 'm2/s2', iwe2_E_M2(:,:,1),      mesh, partit, nfbin=idemix2_nfbin)
+            call oce_files%def_node_var_optional('iwe2_EM2divh' , 'IDEMIX2 M2 horiz div (AB2 prev)' , 'm2/s3', iwe2_E_M2_divh(:,:,1), mesh, partit, nfbin=idemix2_nfbin)
+            call oce_files%def_node_var_optional('iwe2_EM2divs' , 'IDEMIX2 M2 spec  div (AB2 prev)' , 'm2/s3', iwe2_E_M2_divs(:,:,1), mesh, partit, nfbin=idemix2_nfbin)
+        end if
+        if (idemix2_enable_niw) then
+            call oce_files%def_node_var_optional('iwe2_Eniw'    , 'IDEMIX2 NIW spectral energy'     , 'm2/s2', iwe2_E_niw(:,:,1),      mesh, partit, nfbin=idemix2_nfbin)
+            call oce_files%def_node_var_optional('iwe2_Eniwdivh', 'IDEMIX2 NIW horiz div (AB2 prev)', 'm2/s3', iwe2_E_niw_divh(:,:,1), mesh, partit, nfbin=idemix2_nfbin)
+            call oce_files%def_node_var_optional('iwe2_Eniwdivs', 'IDEMIX2 NIW spec  div (AB2 prev)', 'm2/s3', iwe2_E_niw_divs(:,:,1), mesh, partit, nfbin=idemix2_nfbin)
+        end if
+  endif
 #endif  
   if (dynamics%opt_visc==8) then
         call oce_files%def_elem_var_optional('uke', 'unresolved kinetic energy', 'm2/s2', uke(:,:), mesh, partit)
@@ -210,17 +239,15 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
          write(longname,'(A15,i4.4)') 'passive tracer ', j
          units='none'
      END SELECT
-     if ((tracers%data(j)%ID==101) .or. (tracers%data(j)%ID==102) .or. (tracers%data(j)%ID==103)) then
+     if ((tracers%data(j)%ID==101) .or. (tracers%data(j)%ID==102) .or. (tracers%data(j)%ID==103) .or. (tracers%data(j)%ID==304)) then
         call oce_files%def_node_var_optional(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
      else
         call oce_files%def_node_var(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
      endif
+     ! NOTE: valuesAB is not part of the restart. init_tracers_AB recomputes it
+     ! from values and valuesold at the start of every tracer solve, before any
+     ! consumer reads it, so a restarted run reconstructs it from _M1 (and _M2).
      longname=trim(longname)//', Adams-Bashforth'
-     if ((tracers%data(j)%ID==101) .or. (tracers%data(j)%ID==102) .or. (tracers%data(j)%ID==103)) then
-        call oce_files%def_node_var_optional(trim(trname)//'_AB', trim(longname), trim(units), tracers%data(j)%valuesAB(:,:),    mesh, partit)
-     else
-        call oce_files%def_node_var(trim(trname)//'_AB', trim(longname), trim(units), tracers%data(j)%valuesAB(:,:),    mesh, partit)
-     endif
      call oce_files%def_node_var_optional(trim(trname)//'_M1', trim(longname), trim(units), tracers%data(j)%valuesold(1,:,:), mesh, partit)
      if (tracers%data(j)%AB_order==3) &
      call oce_files%def_node_var_optional(trim(trname)//'_M2', trim(longname), trim(units), tracers%data(j)%valuesold(2,:,:), mesh, partit)
@@ -252,6 +279,16 @@ subroutine ini_ice_io(ice, partit, mesh)
   call ice_files%def_node_var('hsnow', 'effective snow thickness',  'm',   ice%data(3)%values(:), mesh, partit)
   call ice_files%def_node_var('uice', 'zonal velocity',             'm/s', ice%uice, mesh, partit)
   call ice_files%def_node_var('vice', 'meridional velocity',        'm',   ice%vice, mesh, partit)
+  ! EVP/mEVP carry the internal stress across time steps (ice_maEVP.F90:
+  ! sigma12 = det1*sigma12 + det2*r3), so the stress tensor is prognostic, not diagnostic.
+  ! Without it a restart re-spins the stresses from zero. Written by the binary path already.
+  call ice_files%def_elem_var_optional('sigma11', 'EVP internal stress sigma11', 'N/m', ice%work%sigma11, mesh, partit)
+  call ice_files%def_elem_var_optional('sigma12', 'EVP internal stress sigma12', 'N/m', ice%work%sigma12, mesh, partit)
+  call ice_files%def_elem_var_optional('sigma22', 'EVP internal stress sigma22', 'N/m', ice%work%sigma22, mesh, partit)
+  ! ice_thermo_oce.F90 seeds its Newton-Raphson solve for the ice surface temperature from
+  ! t_skin (:280, stored back at :321) and runs a fixed imax=5 iterations with no convergence
+  ! test (:713, :741), so the result depends on the seed -> prognostic. Binary path saves it.
+  call ice_files%def_node_var_optional('t_skin', 'ice skin temperature (Newton-Raphson seed)', 'C', ice%thermo%t_skin, mesh, partit)
 #if defined (__oifs) || defined (__ifsinterface)
   call ice_files%def_node_var_optional('ice_albedo', 'ice albedo',    '-',   ice%atmcoupl%ice_alb, mesh, partit)
   call ice_files%def_node_var_optional('ice_temp', 'ice surface temperature',  'K',   ice%data(4)%values, mesh, partit)
@@ -426,8 +463,12 @@ subroutine read_initial_conditions(which_readr, ice, dynamics, tracers, partit, 
     end if
 #endif
 
+#if defined (__cvmix)
+    if (mod(mix_scheme_nmb,10)==7) call apply_idemix2_restart()
+#endif
+
   end if
-  
+
 end subroutine read_initial_conditions
 
 !--------------------------------------------------------------------------------------------
@@ -444,19 +485,38 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
   type(t_dyn)   , intent(inout), target :: dynamics
   type(t_ice)   , intent(inout), target :: ice
   integer, intent(in) :: which_readr
-  
+
   ! Local variables
   logical :: is_portable_restart_write, is_raw_restart_write, is_bin_restart_write
   logical, save :: initialized_raw = .false.
   logical, save :: initialized_bin = .false.
   logical, save :: initialized_io = .false.
-  integer :: mpierr
 
   character(:), allocatable :: write_raw_dirpath, write_raw_infopath
   character(:), allocatable :: write_bin_dirpath, write_bin_infopath
   character(:), allocatable :: write_oce_path, write_ice_path
   character(:), allocatable :: write_icepack_path, write_bio_path
+  
+#if defined(__recom) && defined(__usetp)
+  integer :: tr_arr_slice_count_fix_1
+  integer :: group_i
+  integer :: tr_num_start
+  integer :: tr_num_end
+  integer :: tr_num_in_group
+  logical :: has_one_added_tracer
+  integer :: num_tracers
+  integer :: tr_num
+#endif
 
+#if defined(__recom) && defined(__usetp)
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+  num_tracers = tracers%num_tracers
+#else
+  integer :: mpierr
+#endif
 
   ! Build paths for reading using RestartInPath
   write_raw_dirpath = build_raw_restart_dirpath(RestartOutPath)//"/np"//int_to_txt(partit%npes)
@@ -473,22 +533,36 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
   if(.not. initialized_raw) then
     initialized_raw = .true.
     if(raw_restart_length_unit /= "off") then
-      if(partit%mype == RAW_RESTART_METADATA_RANK) then
-        call mkdir(build_raw_restart_dirpath(RestartOutPath))
-        call mkdir(write_raw_dirpath)
+
+#if defined(__recom) && defined(__usetp)
+      if(partit%my_fesom_group == 0) then ! master rank creates the folder 
+#endif
+          if(partit%mype == RAW_RESTART_METADATA_RANK) then
+              call mkdir(build_raw_restart_dirpath(RestartOutPath))
+              call mkdir(write_raw_dirpath)
+          end if
+#if defined(__recom) && defined(__usetp)
       end if
-      call MPI_Barrier(partit%MPI_COMM_FESOM, mpierr)
+#endif
+      call MPI_Barrier(partit%MPI_COMM_FESOM, mpierr) 
     end if
   end if
 
   if(.not. initialized_bin) then
     initialized_bin = .true.
     if(bin_restart_length_unit /= "off") then
-        if(partit%mype == RAW_RESTART_METADATA_RANK) then
-            call mkdir(build_bin_restart_dirpath(RestartOutPath))
-            call mkdir(write_bin_dirpath)
-        end if
-        call MPI_Barrier(partit%MPI_COMM_FESOM, mpierr)
+
+#if defined(__recom) && defined(__usetp)
+      if(partit%my_fesom_group == 0) then 
+#endif
+          if(partit%mype == RAW_RESTART_METADATA_RANK) then
+              call mkdir(build_bin_restart_dirpath(RestartOutPath))
+              call mkdir(write_bin_dirpath)
+          end if
+#if defined(__recom) && defined(__usetp)
+      end if 
+#endif
+      call MPI_Barrier(partit%MPI_COMM_FESOM, mpierr)
     end if
   end if
   
@@ -506,8 +580,8 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
 #if defined(__recom)
     if (use_REcoM) call ini_bio_io(tracers, partit, mesh)
 #endif
-  end if
-  
+  end if 
+
   ! Skip writing on step 0
   if (istep==0) return
   
@@ -544,37 +618,91 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
 
   ! Write restart files
   if(is_portable_restart_write) then
-    ! Write OCEAN restart
-    if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: ocean'//achar(27)//'[0m'
-    call write_netcdf_restarts(write_oce_path, oce_files, istep)
-    
-    ! Write ICE/ICEPACK restart
-    if(use_ice) then
-#if defined(__icepack)        
-        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: icepack'//achar(27)//'[0m'
-        call write_netcdf_restarts(write_icepack_path, icepack_files, istep)
-#else
-        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: ice'//achar(27)//'[0m'
-        call write_netcdf_restarts(write_ice_path, ice_files, istep)
-#endif 
-    end if
 
-#if defined(__recom)
-    ! Write RECOM restart
-    if (REcoM_restart .or. use_REcoM) then
-        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: bio'//achar(27)//'[0m'
-        call write_netcdf_restarts(write_bio_path, bio_files, istep)
+  ! --> synchronizes tracer data within fesom groups
+
+! kh 09.01.26 merging of valuesold between all fesom groups is only necessary here, immediately before writing the corresponding restart files
+! this will give better performance than merging valuesold in each simulation step in the main loop over all tracers in solve_tracers_ale in oce_ale_tracers.F90
+
+#if defined(__recom) && defined(__usetp)
+    if(num_fesom_groups > 1) then
+        tr_arr_slice_count_fix_1 = 1 * (nl - 1) * (myDim_nod2D + eDim_nod2D)
+
+        do group_i = 0, num_fesom_groups - 1
+            call calc_slice(num_tracers, num_fesom_groups, group_i, tr_num_start, tr_num_end, tr_num_in_group, has_one_added_tracer)
+
+! kh 09.01.26 tracers%data(:)%valuesold(:,:,:) is not contigous in memory, so an explicit inner loop over the tracers of each group is required
+            do tr_num = tr_num_start, tr_num_end
+
+! kh 09.01.26 also handle additional dimension of valuesold for AB_order
+                call MPI_Bcast(tracers%data(tr_num)%valuesold(:,:,:), tr_arr_slice_count_fix_1 * (tracers%data(tr_num)%AB_order - 1), MPI_WP, group_i, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%mpierr)
+            end do
+        end do
     end if
 #endif
-  end if
+
+    ! write OCEAN restart
+#if defined(__recom) && defined(__usetp)
+    if(partit%my_fesom_group == 0) then
+#endif
+#if defined (__cvmix)
+        if (mod(mix_scheme_nmb,10)==7) call prepare_idemix2_restart()
+#endif
+        if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: ocean'//achar(27)//'[0m'
+        call write_netcdf_restarts(write_oce_path, oce_files, istep)
+#if defined(__recom) && defined(__usetp)
+    endif !(partit%my_fesom_group == 0) then
+#endif
+
+    ! write ICE/ICEPACK restart
+    if(use_ice) then
+#if defined(__recom) && defined(__usetp)
+        if(partit%my_fesom_group == 0) then
+#endif
+#if defined(__icepack)        
+            if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: icepack'//achar(27)//'[0m'
+            call write_netcdf_restarts(write_icepack_path, icepack_files, istep)
+#else
+            if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: ice'//achar(27)//'[0m'
+            call write_netcdf_restarts(write_ice_path, ice_files, istep)
+#endif
+#if defined(__recom) && defined(__usetp)
+        endif !(partit%my_fesom_group == 0) then
+#endif
+    end if
+    
+    ! write RECOM restart
+#if defined(__recom)
+        if (REcoM_restart .or. use_REcoM) then
+#if defined(__usetp)
+            if(partit%my_fesom_group == 0) then
+#endif
+                if (partit%mype==RAW_RESTART_METADATA_RANK) print *, achar(27)//'[1;33m'//' --> write restarts to netcdf file: bio'//achar(27)//'[0m'
+                call write_netcdf_restarts(write_bio_path, bio_files, istep)
+#if defined(__usetp)
+            endif 
+#endif 
+        end if
+#endif
+
+  end if !is_portable_restart_write
 
   ! Write core dump
   if(is_raw_restart_write) then
+#if defined(__recom) && defined(__usetp)
+        if(partit%my_fesom_group == 0) then
+#endif
     call write_all_raw_restarts(write_raw_dirpath, write_raw_infopath, istep, partit%MPI_COMM_FESOM, partit%mype)
+#if defined(__recom) && defined(__usetp)
+        endif !(partit%my_fesom_group == 0) then
+#endif
   end if
 
   ! Write derived type binary
   if(is_bin_restart_write) then
+#if defined(__recom) && defined(__usetp)
+        if(partit%my_fesom_group == 0) then
+#endif
     call write_all_bin_restarts((/globalstep+istep, int(ctime), yearnew/), &
                                 write_bin_dirpath,                   &
                                 write_bin_infopath,                  &
@@ -583,13 +711,23 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
                                 ice,                                 &
                                 dynamics,                            &
                                 tracers                              )
+
+#if defined(__recom) && defined(__usetp)
+        endif !(partit%my_fesom_group == 0) then
+#endif
   end if
 
   ! Update clock file to latest restart point
   if (partit%mype==0) then
     if(is_portable_restart_write .or. is_raw_restart_write .or. is_bin_restart_write) then
-        write(*,*) ' --> actualize clock file to latest restart point'
-        call clock_finish
+#if defined(__recom) && defined(__usetp)
+        if(partit%my_fesom_group == 0) then
+#endif
+            write(*,*) ' --> actualize clock file to latest restart point'
+            call clock_finish
+#if defined(__recom) && defined(__usetp)
+        end if
+#endif
     end if
   end if
 
@@ -608,7 +746,8 @@ subroutine write_netcdf_restarts(path, filegroup, istep)
   character(:), allocatable :: dirpath
   character(:), allocatable :: filepath
   logical file_exists
-  
+  integer mpierr_par
+
   cstep = globalstep+istep
   
   ! Calculate current time from clock (seconds from beginning of year)
@@ -616,6 +755,64 @@ subroutine write_netcdf_restarts(path, filegroup, istep)
   
   do i=1, filegroup%nfiles
     call filegroup%files(i)%join() ! join the previous write (if required)
+
+    if(parallel_write_enabled()) then
+      ! Collective path. Everything below that the serial path does under
+      ! is_iorank() has to be done by every WRITER instead, because they all
+      ! take part in the create and in every put_var. Non-writers skip it and
+      ! only join the redistribution inside the write call.
+      !
+      ! The path/create-vs-append decision is taken identically on every writer:
+      ! they inspect the same filesystem and hold the same `path` state, so no
+      ! broadcast is needed. mkdir is idempotent and only rank 0 calls it, with
+      ! a barrier afterwards so no writer races ahead to create inside a
+      ! directory that does not exist yet.
+      if(filegroup%files(i)%is_writer()) then
+        if(filegroup%files(i)%is_attached()) call filegroup%files(i)%close_file()
+
+        dirpath = path(1:len(path)-3)
+        filepath = dirpath//"/"//filegroup%files(i)%varname//".nc"
+
+        if(filegroup%files(i)%path == "" .or. (.not. filegroup%files(i)%must_exist_on_read)) then
+          inquire(file=filepath, exist=file_exists)
+          if(file_exists) then
+            filegroup%files(i)%path = filepath
+          else if(.not. filegroup%files(i)%must_exist_on_read) then
+            filegroup%files(i)%path = ""
+          end if
+        end if
+      end if
+
+      if(filegroup%files(i)%is_lead_writer()) call mkdir(path(1:len(path)-3))
+      if(filegroup%files(i)%is_writer()) &
+         call MPI_Barrier(filegroup%files(i)%writer_comm(), mpierr_par)
+
+      if(filegroup%files(i)%is_writer()) then
+        if(filegroup%files(i)%path .ne. filepath) then
+          filegroup%files(i)%path = filepath
+          call filegroup%files(i)%open_write_create_par(filegroup%files(i)%path, &
+                                                        filegroup%files(i)%writer_comm())
+        else
+          call filegroup%files(i)%open_write_append_par(filegroup%files(i)%path, &
+                                                        filegroup%files(i)%writer_comm())
+        end if
+
+        ! iter and time are per-record scalars, but they are in COLLECTIVE access
+        ! mode like every other variable, and writing them extends the unlimited
+        ! time dimension -- which is a collective operation. So EVERY writer must
+        ! issue them, all writing the same value to the same record. Restricting
+        ! this to the lead writer deadlocked the other writers, which is what hung
+        ! core2 at 8 writers while pi (one writer) passed. Same rule as the output
+        ! path in io_meandata.F90.
+        call filegroup%files(i)%write_var(filegroup%files(i)%iter_varindex, &
+                                          [filegroup%files(i)%rec_count()+1], [1], [cstep])
+        call filegroup%files(i)%write_var(filegroup%files(i)%time_varindex(), &
+                                          [filegroup%files(i)%rec_count()+1], [1], [ctime])
+      end if
+
+      call filegroup%files(i)%async_gather_and_write_variables()
+      cycle
+    end if
 
     if(filegroup%files(i)%is_iorank()) then
       if(filegroup%files(i)%is_attached()) call filegroup%files(i)%close_file() ! close the file from previous write
@@ -784,10 +981,15 @@ subroutine finalize_restart()
 
   ! join all previous writes
   ! close all restart files
+  !
+  ! nf_close is COLLECTIVE in parallel netCDF-4, so in the collective path every
+  ! writer must close, not just the iorank. Closing on one rank only left the
+  ! other writers blocked after the restart had been written correctly -- the run
+  ! produced complete restart files and then hung in finalisation.
 
   do i=1, oce_files%nfiles
     call oce_files%files(i)%join()
-    if(oce_files%files(i)%is_iorank()) then
+    if(merge(oce_files%files(i)%is_writer(), oce_files%files(i)%is_iorank(), parallel_write_enabled())) then
       if(oce_files%files(i)%is_attached()) call oce_files%files(i)%close_file()
     end if
   end do
@@ -795,7 +997,7 @@ subroutine finalize_restart()
   if(use_ice) then
     do i=1, ice_files%nfiles
       call ice_files%files(i)%join()
-      if(ice_files%files(i)%is_iorank()) then
+      if(merge(ice_files%files(i)%is_writer(), ice_files%files(i)%is_iorank(), parallel_write_enabled())) then
         if(ice_files%files(i)%is_attached()) call ice_files%files(i)%close_file()
       end if
     end do
@@ -803,7 +1005,7 @@ subroutine finalize_restart()
 #if defined(__recom)
   do i=1, bio_files%nfiles
     call bio_files%files(i)%join()
-    if(bio_files%files(i)%is_iorank()) then
+    if(merge(bio_files%files(i)%is_writer(), bio_files%files(i)%is_iorank(), parallel_write_enabled())) then
       if(bio_files%files(i)%is_attached()) call bio_files%files(i)%close_file()
     end if
   end do
@@ -855,16 +1057,33 @@ subroutine read_netcdf_restarts(path, filegroup, mpicomm, mype)
           write(*,*) 'skipping reading restart for ', filegroup%files(i)%varname, ' at ', filegroup%files(i)%path
         end if
         
-        if(.not. skip_file(i)) call filegroup%files(i)%open_read(filegroup%files(i)%path) ! do we need to bother with read-only access?
+        ! On the collective path the open is done below by every reader, not
+        ! here by one CPU: each get_var is collective over the reader
+        ! communicator, and a file opened serially on one rank cannot take part.
+        if(.not. skip_file(i) .and. .not. parallel_write_enabled()) &
+             call filegroup%files(i)%open_read(filegroup%files(i)%path) ! do we need to bother with read-only access?
         ! todo: print a reasonable error message if the file does not exist
-      end if      
+      end if
     end if
 
     ! iorank already knows if we skip the file, tell the others
     if(.not. filegroup%files(i)%must_exist_on_read) then
       call MPI_Allreduce(current_iorank_snd, current_iorank_rcv, 1, MPI_INTEGER, MPI_SUM, mpicomm, mpierr)
       call MPI_Bcast(skip_file(i), 1, MPI_LOGICAL, current_iorank_rcv, mpicomm, mpierr)
-    end if      
+    end if
+
+    ! Collective read: every reader opens the file for itself. The path is
+    ! derived from `path` and the file's own varname, both of which every rank
+    ! holds, so the readers agree without a broadcast -- the same argument the
+    ! collective write path makes about create-versus-append.
+    if(parallel_write_enabled() .and. .not. skip_file(i)) then
+      dirpath = path(1:len(path)-3)                       ! chop the ".nc" suffix
+      filegroup%files(i)%path = dirpath//"/"//filegroup%files(i)%varname//".nc"
+      if(filegroup%files(i)%is_reader()) then
+        if(filegroup%files(i)%is_attached()) call filegroup%files(i)%close_file()
+        call filegroup%files(i)%open_read_par(filegroup%files(i)%path, filegroup%files(i)%reader_comm())
+      end if
+    end if
 
     ! ========================================================================!
     !                           _____________________                         !
@@ -907,7 +1126,17 @@ subroutine read_netcdf_restarts(path, filegroup, mpicomm, mype)
 
     if(skip_file(i)) cycle
 
-    if(filegroup%files(i)%is_iorank()) then
+    ! ⛔ On the collective path this block MUST NOT be selected by is_iorank().
+    ! That rank comes from the next_io_rank pool, which hands out one rank per
+    ! host in round robin -- on a single node it gives 1, 2, 3, ... -- while the
+    ! readers are chosen by redist_writer_rank, a fixed stride: 0, 4, 8, ... on
+    ! 128 ranks with 30 readers. The two sets barely overlap, so the iorank has
+    ! no file open and every call below fails with "NetCDF: Not a valid ID"
+    ! (job 26825609, rank 9). The lead reader is rank 0 by construction, and the
+    ! reader set is its own set now that n_readers_restart is separate from
+    ! n_writers_restart -- so this must be is_lead_reader, not is_lead_writer.
+    if(merge(filegroup%files(i)%is_lead_reader(), filegroup%files(i)%is_iorank(), &
+             parallel_write_enabled())) then
       write(*,*) 'restart from record ', filegroup%files(i)%rec_count(), ' of ', filegroup%files(i)%rec_count(), filegroup%files(i)%path
 
       ! read the last entry from the iter variable
@@ -915,7 +1144,8 @@ subroutine read_netcdf_restarts(path, filegroup, mpicomm, mype)
 
       ! read the last entry from the time variable
       call filegroup%files(i)%read_var1(filegroup%files(i)%time_varindex(), [filegroup%files(i)%rec_count()], rtime)
-      call filegroup%files(i)%close_file()
+      ! On the collective path the close is done below by the whole reader set.
+      if(.not. parallel_write_enabled()) call filegroup%files(i)%close_file()
 
      if (int(ctime)/=int(rtime)) then
         print *, achar(27)//'[33m'    //'____________________________________________________________'//achar(27)//'[0m'
@@ -928,6 +1158,26 @@ subroutine read_netcdf_restarts(path, filegroup, mpicomm, mype)
         write(*,*) 'WARNING: Please verify that this is the intended behavior for your simulation.'
         print *, achar(27)//'[33m'    //'____________________________________________________________'//achar(27)//'[0m'
       end if
+    end if
+
+    ! ⛔ nc_close on a file opened with nf_open_par is COLLECTIVE over the
+    ! communicator it was opened on. Leaving the close inside the is_iorank
+    ! block above is what hung job 26825509: one CPU entered nc_close and waited
+    ! for the other 29 readers, those 29 went on to open the next restart file
+    ! -- also collective -- and every non-reader piled up in the redistribution
+    ! Alltoallv behind them. No error, no message, just a stack trace pointing at
+    ! MPI_Alltoallv, which is nowhere near the actual mistake.
+    !
+    ! Same rule as the write path: on the collective path every netCDF operation
+    ! on a shared file belongs to exactly the reader set, never to one CPU.
+    if(parallel_write_enabled()) then
+      ! Only the lead reader read the record scalars, so globalstep has to be
+      ! spread before anything downstream uses it. Broadcasting from rank 0 is
+      ! valid because is_lead_writer is rank 0 by construction. The gather path
+      ! propagates globalstep only as far as RAW_RESTART_METADATA_RANK; giving it
+      ! to everyone here is a superset, so the send/recv below still works.
+      call MPI_Bcast(globalstep, 1, MPI_INTEGER, 0, mpicomm, mpierr)
+      if(filegroup%files(i)%is_reader()) call filegroup%files(i)%close_file()
     end if
   end do
 
