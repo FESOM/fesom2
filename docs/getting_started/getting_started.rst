@@ -60,7 +60,7 @@ Clone the GitHub repository with a git command:
     git clone https://github.com/FESOM/fesom2.git -b <release>
 
 
-The repository contains model code and two additional libraries: `Metis` (domain partitioner) and `Parms` (solver), necessary to run FESOM2. To build FESOM2 executable one have to compile Parms library and the code of the model (`src` folder). In order to build executable that is used for model domain partitioning (distribution of the model mesh between CPUs) one have to compile `Metis` library and also some code located in the src directory (see :ref:`partitioning`). Building of the model executable and the partitioner is usually done automatically with the use of CMake. If you going to build the code not on one of the supported platforms (ollie, DKRZ, HLRN, HAZELHEN, and BSC, general Ubuntu), you might need to do some (usually small) modifications described in `Adding new platform for compilation`_ section.
+The repository contains the model code (`src` folder) and the `Metis` library (domain partitioner) in the ``lib`` folder. No external solver library is required anymore: the sea surface height is computed with the split-explicit method, so the `Parms` solver library that older FESOM2 versions had to compile is gone. In order to build executable that is used for model domain partitioning (distribution of the model mesh between CPUs) one have to compile `Metis` library and also some code located in the src directory (see :ref:`partitioning`). Building of the model executable and the partitioner is usually done automatically with the use of CMake. If you going to build the code not on one of the supported platforms (ollie, DKRZ, HLRN, HAZELHEN, and BSC, general Ubuntu), you might need to do some (usually small) modifications described in `Adding new platform for compilation`_ section.
 
 Change to the `fesom2` folder and execute:
 
@@ -80,13 +80,77 @@ After confirming that the right FESOM2 branch is being used, compile the model w
     
     bash -l ./configure.sh
 
-In the best case scenario, your platform will be recognized and the Parms library and model executable will be built and copied to the bin directory. If something went wrong have a look at Troubleshooting_ section.
+In the best case scenario, your platform will be recognized and the model executable will be built and copied to the bin directory. If something went wrong have a look at Troubleshooting_ section.
 
 If you would like to select platform manually (which is necessary in the case of Ubuntu, for example), type:
 
 ::
 
     bash -l ./configure.sh ubuntu
+
+
+CMake build options
+-------------------
+
+``configure.sh`` passes every argument that starts with ``-`` on to ``cmake``, so build options are switched on like this:
+
+::
+
+    bash -l ./configure.sh -DENABLE_OPENMP=ON -DBUILD_MESHDIAG=ON
+
+The most useful options, all OFF by default unless stated otherwise:
+
+- **ENABLE_OPENMP** build hybrid MPI+OpenMP executable, see `Building with OpenMP`_.
+- **USE_ICEPACK** use the Icepack modules for sea ice column physics, see :ref:`icepack_in_fesom`.
+- **RECOM_COUPLED** include the REcoM3 biogeochemistry model.
+- **USE_SINGLE_PRECISION** build the model in single precision (working precision becomes 4 bytes).
+- **ENABLE_IFS_INTERFACE** build the interface used to couple FESOM2 to ECMWF's IFS/OpenIFS.
+- **ENABLE_MULTIO** write output through MultIO (requires an external MultIO installation, path given via ``MULTIO_INSTALL_PATH``).
+- **ENABLE_OPENACC** experimental OpenACC GPU port.
+- **DISABLE_OPENACC_ATOMICS** (default ON) avoid atomic GPU kernels so that results are reproducible.
+- **ASYNCHRONOUS_IO_THREADS** write output from separate I/O threads (replaces the old ``DISABLE_MULTITHREADING`` option, which is still accepted and translated).
+- **FESOM_PROFILING** enable the enhanced profiling output.
+- **BUILD_NETCDF** download and build NetCDF during configuration when the system libraries are incompatible.
+- **BUILD_TESTING** build the unit tests.
+- **BUILD_MESHPARTITIONER** build the mesh partitioner executable ``fesom_meshpart`` as part of the main build.
+- **BUILD_MESHDIAG** build the ``fesom_meshdiag`` mesh diagnostics utility.
+
+The resulting executable understands two command line options. ``./fesom.x --info`` prints compile-time definitions, including whether OpenMP was enabled, and ``./fesom.x --smoketest`` checks that the executable starts and its libraries load. With either option the model itself is not run, so both can be used on a login node.
+
+FESOM can also be built as part of an ECMWF ecbundle, which resolves and checks out the sources of several components before building them together. This is how the model is built when FESOM runs as a subroutine of IFS rather than as a standalone executable. The bundle files and a description of the workflow are in ``tests/ecbundle``, which also registers a test that exercises the bundle build when the ecbundle tools are available.
+
+
+Building with OpenMP
+--------------------
+
+FESOM2 can be built as a hybrid MPI+OpenMP code by passing the ``ENABLE_OPENMP`` option to cmake:
+
+::
+
+    bash -l ./configure.sh -DENABLE_OPENMP=ON
+
+Whether an existing executable was built with OpenMP can be checked with ``./fesom.x --info``, which prints ``_OPENMP is ON`` or ``_OPENMP is OFF``.
+
+At runtime the number of threads per MPI task is set with the ``OMP_NUM_THREADS`` environment variable. The number of MPI tasks must still match a ``dist_XXXX`` partitioning of your mesh: the threads work inside each MPI domain and are invisible to the partitioner, so a hybrid run needs a partitioning for the number of tasks, not for the number of cores.
+
+In a SLURM batch job the threads are requested with ``--cpus-per-task`` and should be pinned to cores. For example, to run 128 MPI tasks with 4 threads each on a machine with 128 cores per node:
+
+::
+
+    #SBATCH --nodes=4
+    #SBATCH --ntasks-per-node=32
+    #SBATCH --cpus-per-task=4
+
+    export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK}
+    export OMP_PLACES=cores
+    export OMP_PROC_BIND=close
+    srun --cpu-bind=cores ./fesom.x
+
+Some honest caveats:
+
+- Not all of the code is threaded. On the same number of cores a pure MPI run is usually as fast or faster, so use the hybrid mode when it solves a problem for you (for example memory per task, or MPI scaling limits on very large core counts), not by default.
+- Some threaded loops sum contributions in an order that depends on the number of threads, so results are bitwise reproducible only for a fixed thread count. Configure with ``-DOPENMP_REPRODUCIBLE=ON`` (requires ``ENABLE_OPENMP=ON``) to serialize these loops at some cost in speed.
+- If the executable was built with OpenMP but you run MPI-only, export ``OMP_NUM_THREADS=1`` as the standard job scripts do, otherwise spawned threads may oversubscribe the cores.
 
 
 Data and mesh files
@@ -113,7 +177,24 @@ The ``input`` folder contains files with initial conditions (``phc3.0``) and atm
 
 .. _DKRZ cloud: https://swiftbrowser.dkrz.de/download/FESOM2.0_tutorial/FESOM2_one_year_input.tar
 
-.. note::  The FESOM2 distribution contains minimal set of data to run the model in the ``test`` directory, namelly ``pi`` and ``soufflet`` (channel) meshes, WOA13 initial conditions and CORE2 forcing data for one day. Those are mainly used for testing, and require a bit more involved modification of namelists. For more details see instructions on `Docker based installation`_. 
+.. note::  The FESOM2 distribution contains minimal set of data to run the model in the ``test`` directory, namelly ``pi`` and ``soufflet`` (channel) meshes, WOA13 initial conditions and CORE2 forcing data for one day. Those are mainly used for testing, and require a bit more involved modification of namelists. For more details see instructions on `Docker based installation`_.
+
+
+The double-gyre idealized setup
+-------------------------------
+
+Besides the realistic setups, FESOM2 contains idealized `toy` configurations that run without any input data except a mesh, among them the ``soufflet`` channel mentioned in the note above and a double gyre. The double gyre follows the classical GYRE testcase of the NEMO model: a closed rectangular midlatitude basin of about 2120 by 3180 km and 4000 m depth. The wind stress and the surface heat flux are prescribed analytically in ``src/toy_channel_dbgyre.F90``, which also sets the initial temperature and salinity profiles, so no forcing or climatology files are read. The setup spins up a subtropical and a subpolar gyre with a western boundary current between them and is mainly used as a cheap testbed for the dynamical core and for eddy parameterization studies at low cost.
+
+The configuration is kept in four files in the ``config`` directory: ``namelist.config.toy_dbgyre``, ``namelist.oce.toy_dbgyre``, ``namelist.dyn.toy_dbgyre`` and ``namelist.tra.toy_dbgyre``. The switch that activates the analytic initial state and forcing is in the ``&run_config`` section:
+
+::
+
+    toy_ocean = .true.
+    which_toy = 'dbgyre'
+
+To run the setup, copy each of the four files over the corresponding regular namelist in your working directory, so that ``namelist.config.toy_dbgyre`` becomes ``namelist.config`` and so on. Then set ``MeshPath`` to a rectangular basin mesh that has a partitioning for your intended number of cores (the double-gyre mesh is not part of the repository, see the mesh collection linked above or generate one), create the ``fesom.clock`` file as usual and submit the normal job script.
+
+A second idealized configuration, ``neverworld2``, is selected the same way with ``which_toy = 'neverworld2'`` and the four ``*.toy_neverworld2`` namelists. It is the NeverWorld2 configuration: a wind-driven basin with a re-entrant channel in the south, used for eddying circulation studies. The domain is periodic in an artificial longitude coordinate with a cyclic length of 60 degrees rather than the full sphere, so it needs a mesh built for that geometry, which is not part of the repository. Unlike the double gyre it reads its wind stress from a file: ``wind_opt=2``, the default, expects the stress already interpolated to elements in ``windstress@elem.out``, while ``wind_opt=1`` interpolates it from a profile in ``windstress.out``. The surface temperature is restored rather than prescribed, either as a direct nudging of the tracer (``trelax_opt=1``, rate ``tau_inv``) or as a heat flux (``trelax_opt=2``, strength ``gamma_restore``). The remaining switches of the ``&oce_neverworld2`` section add an initial temperature perturbation to trigger instabilities and an optional cold patch in the north; they are documented by the comments in ``config/namelist.oce.toy_neverworld2``.
 
 
 Preparing the run

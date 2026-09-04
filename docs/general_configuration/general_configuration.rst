@@ -100,7 +100,87 @@ Section &icebergs
 - **turn_off_hf=.false.**, **turn_off_fw=.false.** disable latent heat or freshwater fluxes from icebergs when needed for debugging.
 - **lbalance_fw=.true.**, **cell_saturation=2** controls for preventing excessive freshwater injection into small grid cells.
 - **lmin_latent_hf=.true.**, **lverbose_icb=.false.** control numerical safety and verbosity of iceberg thermodynamics.
-- **ib_num=0**, **steps_per_ib_step=8** number of iceberg classes and sub-cycling of iceberg dynamics relative to the ocean step.
-- **ib_async_mode=0**, **thread_support_level_required=3** OpenMP-assisted asynchronous iceberg computation; the default keeps iceberg calculations synchronous.
+- **ib_num=1** number of icebergs read from the seeding files described in :ref:`the iceberg module section<chap_general_configuration_icebergs>`. The shipped configuration pairs ``ib_num=1`` with ``use_icebergs=.false.``, so the single entry stays inactive until the module is switched on.
+- **steps_per_ib_step=8** number of ocean time steps per iceberg time step; iceberg dynamics and thermodynamics are evaluated with the longer time step ``dt*steps_per_ib_step``.
+- **l_allowgrounding=2** grounding mode: ``0`` free drift (grounding ignored), ``1`` slow drift with reduced velocity, ``2`` stationary (see :ref:`the iceberg module section<chap_general_configuration_icebergs>`).
+- **l_cap_ibhf_n=.false.** cap the iceberg heat flux applied to interior ocean cells at a safe temperature floor per cell and time step.
+- **use_icb_iron=.false.**, **icb_iron_const=50.0e-6**, **l_icb_iron_file=.false.** passive iron tracer carried by icebergs: melting releases iron in proportion to the meltwater flux, using either the constant concentration (mol per cubic metre) or per-iceberg values from ``icb_iron.dat``. The resulting flux field is diagnostic and does not feed back on the ocean.
+- **ib_async_mode=0**, **thread_support_level_required=3** OpenMP-assisted asynchronous iceberg computation: ``0`` keeps iceberg calculations synchronous (reference results), ``1`` overlaps them with the ocean and sea-ice computation, ``2`` keeps the OpenMP code active but serialized for testing. The thread support level requests ``MPI_THREAD_SERIALIZED`` (``2``) or ``MPI_THREAD_MULTIPLE`` (``3``) from the MPI library.
 
 
+.. _chap_general_configuration_icebergs:
+
+The iceberg module
+==================
+
+With ``use_icebergs=.true.`` FESOM carries a set of Lagrangian icebergs that
+drift over the mesh and melt, returning freshwater and latent heat to the
+ocean. The icebergs are point objects with a prescribed length, width and
+height. They do not occupy grid cells and do not block the flow, so the
+module is a source of meltwater and heat rather than a geometric obstacle.
+
+Each iceberg is advanced with its own momentum balance. The forces are the
+drag exerted by the ocean, the atmosphere and the sea ice, the radiation
+force of waves against the iceberg side, the Coriolis force and the sea
+surface slope. The wave force follows Bigg et al. (1997) and uses a wave
+amplitude estimated from the wind speed; it can be switched off per iceberg.
+The slope term is the gradient of the sea surface height and carries its own
+scaling factor. The Coriolis term is treated semi-implicitly and the water
+drag implicitly, which matters because an iceberg step spans several ocean
+steps.
+
+Four melt terms are computed: melting at the base, lateral melting driven by
+buoyant convection, wave erosion, and a lateral melt rate that uses the
+three-equation formulation with the local temperature, salinity and velocity
+of the water column. The melt fluxes enter the ocean as a freshwater flux and
+a latent heat flux, both of which can be switched off individually with
+``turn_off_fw`` and ``turn_off_hf`` when isolating one effect. The heat flux
+is distributed over the depth range the iceberg occupies rather than applied
+at the surface alone.
+
+Icebergs are advanced only every ``steps_per_ib_step`` ocean time steps, so
+with the shipped value of 8 the iceberg module runs once per eight ocean
+steps.
+
+Seeding files
+"""""""""""""
+
+The initial iceberg population is read from plain text files in the run
+directory. Each file holds one value per line and is read ``ib_num`` times,
+so every file must have at least ``ib_num`` lines:
+
+- ``icb_longitude.dat`` and ``icb_latitude.dat``, the release position in degrees.
+- ``icb_length.dat`` and ``icb_height.dat``, the iceberg dimensions in metres. The width defaults to the length file, so square icebergs are obtained by supplying only these two files.
+- ``icb_scaling.dat``, a scaling factor that lets one model iceberg represent many real ones.
+- ``icb_calving_day.dat``, the day of the year on which each iceberg enters the simulation, counted in days since the start of the run. A value of 2.5 releases the iceberg at noon on the third day. On restart the calving day is reduced by the number of days already simulated, so an unmodified file continues to work.
+- ``icb_iron.dat``, only read when ``l_icb_iron_file=.true.``, giving the iron concentration carried by each iceberg.
+
+``ib_num`` must match the number of lines in these files. The shipped
+``namelist.config`` pairs ``ib_num=1`` with ``use_icebergs=.false.``, so the
+single placeholder entry stays inactive until the module is switched on.
+Running with an empty iceberg population is supported and simply produces no
+iceberg fluxes. A realistic circum-Antarctic
+distribution of nearly 7000 icebergs, derived from synthetic aperture radar
+imagery, is available from :cite:`wesche2015`.
+
+Grounding
+"""""""""
+
+An iceberg whose scaled draft exceeds the local water depth is flagged as
+grounded. What happens then is controlled by ``l_allowgrounding``. With
+``0`` grounding is ignored and icebergs drift freely over shallow
+topography. With ``1`` a grounded iceberg keeps drifting at a reduced
+velocity, and with ``2``, the default, it is held stationary until it has
+melted enough to float again.
+
+Restarts and coupled runs
+"""""""""""""""""""""""""
+
+The per-iceberg state is written to and read from its own restart file,
+separate from the ocean restart. It is a text file with one record per
+iceberg holding the geometry, the position, the velocity, the drag
+coefficients and densities, the calving day and the grounded and melted
+flags. When
+``use_icesheet_coupling=.true.`` the restart also carries the state needed to
+exchange calving with an ice-sheet model. Setting ``lverbose_icb=.true.``
+prints per-iceberg diagnostics.
