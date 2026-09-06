@@ -182,5 +182,15 @@ iceberg holding the geometry, the position, the velocity, the drag
 coefficients and densities, the calving day and the grounded and melted
 flags. When
 ``use_icesheet_coupling=.true.`` the restart also carries the state needed to
-exchange calving with an ice-sheet model. Setting ``lverbose_icb=.true.``
-prints per-iceberg diagnostics.
+exchange calving with an ice-sheet model.
+
+When a run looks wrong, for example because trajectories are implausible or
+the ocean temperature blows up near icebergs, the first things to look at are
+the three-dimensional iceberg heat flux, available as the ``ibhf`` output
+stream, and the two state flags that stop an iceberg from drifting: the
+grounded flag described above and the frozen-in flag, which is set when the
+surrounding sea ice is thick and compact enough to lock the iceberg in.
+Setting ``lverbose_icb=.true.`` prints per-iceberg diagnostics and is the way
+to check that the cell saturation mechanism set by ``cell_saturation`` is
+behaving, which is the usual cause when the freshwater input distorts a small
+coastal cell.
