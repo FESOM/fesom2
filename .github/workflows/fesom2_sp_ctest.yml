@@ -1,0 +1,148 @@
+name: FESOM2 SP CTests (single precision)
+
+# Single-precision (USE_SINGLE_PRECISION=ON) counterpart to the DP CTest runner.
+# Precision is a property of the BUILD, not the test: this job builds fesom.x (and
+# the mesh tools) in single precision with the SAME full config as the DP build, so
+# the whole local test suite -- integration (incl. the CVMix schemes) plus the local
+# meshpartitioner/meshdiag tests -- registers and runs in SP. Each fesom.x test
+# additionally self-asserts the "SINGLE PRECISION MODE" startup banner.
+#
+# It is OPTIONAL / non-blocking initially (continue-on-error + not a required check):
+# DP is already covered by fesom2_ctest_runner.yml and the `default` build preset, so
+# this only adds the previously-missing SP coverage. Promote to blocking later by
+# removing `continue-on-error`. Widening to SP meshpart/meshdiag/remote needs no build
+# change -- only relaxing the ctest selection below.
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+    branches: [ main ]
+
+  workflow_dispatch:
+    inputs:
+      test_timeout:
+        description: 'Test timeout in seconds'
+        required: false
+        default: '600'
+        type: string
+
+jobs:
+  sp_ctests:
+    runs-on: ubuntu-latest
+
+    # Optional / non-blocking while SP support is being stabilised. Remove this line
+    # (and add the job to branch-protection required checks) to make SP gate merges.
+    continue-on-error: true
+
+    env:
+      CC: gcc
+      CXX: g++
+      FC: gfortran
+      OMPI_MCA_rmaps_base_oversubscribe: yes
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          echo "Installing FESOM2 dependencies..."
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc \
+            gfortran \
+            g++ \
+            cmake \
+            make \
+            openmpi-bin \
+            libopenmpi-dev \
+            libnetcdf-dev \
+            libnetcdff-dev \
+            pkg-config \
+            git \
+            wget \
+            ca-certificates \
+            gnupg \
+            lsb-release
+
+          echo "Installing CMake 3.25+ from Kitware repository..."
+          wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | sudo tee /etc/apt/trusted.gpg.d/kitware.gpg >/dev/null
+          echo "deb https://apt.kitware.com/ubuntu/ $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/kitware.list >/dev/null
+          sudo apt-get update
+          sudo apt-get install -y cmake
+
+          echo "Verifying installations..."
+          gcc --version
+          gfortran --version
+          mpirun --version
+          cmake --version
+          pkg-config --modversion netcdf
+          pkg-config --modversion netcdf-fortran
+
+      - name: Set up environment variables
+        run: |
+          echo "NETCDF_ROOT=/usr" >> $GITHUB_ENV
+          echo "NETCDF_Fortran_ROOT=/usr" >> $GITHUB_ENV
+          echo "FCFLAGS=-fallow-argument-mismatch" >> $GITHUB_ENV
+          echo "FFLAGS=-fallow-argument-mismatch" >> $GITHUB_ENV
+          echo "OMPI_MCA_btl_vader_single_copy_mechanism=none" >> $GITHUB_ENV
+          echo "OMPI_MCA_rmaps_base_oversubscribe=yes" >> $GITHUB_ENV
+          echo "OMPI_MCA_btl_base_warn_component_unused=0" >> $GITHUB_ENV
+
+      - name: Configure FESOM2 (single precision, full config = mirrors DP)
+        run: |
+          echo "Configuring FESOM2 single-precision build..."
+          mkdir -p build
+          cd build
+          cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DUSE_SINGLE_PRECISION=ON \
+            -DBUILD_TESTING=ON \
+            -DENABLE_MPI_TESTS=ON \
+            -DBUILD_MESHDIAG=ON \
+            -DBUILD_MESHPARTITIONER=ON \
+            -DTEST_TIMEOUT=${{ github.event.inputs.test_timeout || '600' }} \
+            -DCMAKE_C_COMPILER=gcc \
+            -DCMAKE_CXX_COMPILER=g++ \
+            -DCMAKE_Fortran_COMPILER=gfortran \
+            -DMPI_C_COMPILER=mpicc \
+            -DMPI_CXX_COMPILER=mpicxx \
+            -DMPI_Fortran_COMPILER=mpifort \
+            -DNetCDF_ROOT=/usr \
+            -DNetCDF_Fortran_ROOT=/usr \
+            -DCMAKE_Fortran_FLAGS="-fallow-argument-mismatch" \
+            ..
+
+      - name: Build FESOM2
+        run: |
+          cd build
+          make -j$(nproc) VERBOSE=1
+          if [ -f "bin/fesom.x" ]; then
+            echo "✅ single-precision fesom.x created"
+            ls -la bin/fesom.x
+          else
+            echo "❌ fesom.x not found"
+            exit 1
+          fi
+
+      - name: List available tests
+        run: |
+          cd build
+          echo "=== Available Tests ==="
+          ctest -N
+          echo "=== Labels ==="
+          ctest --print-labels
+
+      - name: Run CTest (local suite, single precision)
+        run: |
+          cd build
+          echo "Running local tests in single precision (excluding remote + ecbundle)..."
+          # Local set only: integration_pi_* (incl. cvmix) + local meshpartitioner/meshdiag.
+          # Remote (network downloads) and ecbundle are excluded. The -E exclusion auto-
+          # includes any new local test without editing this line.
+          ctest -E '^(remote_|ecbundle_)' \
+                --output-on-failure \
+                --timeout ${{ github.event.inputs.test_timeout || '600' }}

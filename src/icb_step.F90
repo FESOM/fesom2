@@ -52,7 +52,12 @@ subroutine iceberg_calculation(ice, mesh, partit, dynamics, istep)
  integer	:: istep_end_synced
  integer:: req, status(MPI_STATUS_SIZE)
  logical:: completed
- real(kind=8) 	:: t0, t1, t2, t3, t4, t0_restart, t1_restart   	!=
+ integer:: block_reduce_ierr
+ ! watchdog timers stay real(kind=8): MPI_Wtime returns double precision
+ ! regardless of the working precision WP
+ real(kind=8) :: t_start_block
+ real(kind=8), parameter :: block_reduce_timeout = 300.0
+ real(kind=WP) 	:: t0, t1, t2, t3, t4, t0_restart, t1_restart   	!=
  logical	:: firstcall=.true. 					!=
  logical	:: lastsubstep  					!=
 
@@ -148,25 +153,37 @@ type(t_dyn)   , intent(inout), target :: dynamics
  vl_block_red = 0.0
 
 !$omp critical 
- call MPI_IAllREDUCE(arr_block, arr_block_red, 16*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM_IB, req, partit%MPIERR_IB)
+ call MPI_IAllREDUCE(arr_block, arr_block_red, 16*ib_num, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM_IB, req, partit%MPIERR_IB)
 !$omp end critical
 
  completed = .false.
+ t_start_block = MPI_Wtime()
  do while (.not. completed)
 !$omp critical
 CALL MPI_TEST(req, completed, status, partit%MPIERR_IB)
 !$omp end critical
+     if (.not. completed .and. (MPI_Wtime() - t_start_block) > block_reduce_timeout) then
+      write(*,*) 'FATAL: arr_block Allreduce deadlock on rank ', partit%mype, &
+           ' after ', block_reduce_timeout, ' s (iceberg_calculation, istep=', istep, ')'
+      call MPI_Abort(MPI_COMM_WORLD, 1, block_reduce_ierr)
+     end if
  end do
 
 !$omp critical 
- call MPI_IAllREDUCE(elem_block, elem_block_red, ib_num, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM_IB, req, partit%MPIERR_IB)  
+ call MPI_IAllREDUCE(elem_block, elem_block_red, ib_num, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM_IB, req, partit%MPIERR_IB)
 !$omp end critical
 
 completed = .false.
+ t_start_block = MPI_Wtime()
  do while (.not. completed)
 !$omp critical
   CALL MPI_TEST(req, completed, status, partit%MPIERR_IB)
 !$omp end critical
+     if (.not. completed .and. (MPI_Wtime() - t_start_block) > block_reduce_timeout) then
+      write(*,*) 'FATAL: elem_block Allreduce deadlock on rank ', partit%mype, &
+           ' after ', block_reduce_timeout, ' s (iceberg_calculation, istep=', istep, ')'
+      call MPI_Abort(MPI_COMM_WORLD, 1, block_reduce_ierr)
+     end if
  end do
 
 !$omp critical
@@ -174,10 +191,16 @@ completed = .false.
 !$omp end critical
 
 completed = .false.
+ t_start_block = MPI_Wtime()
  do while (.not. completed)
 !$omp critical
   CALL MPI_TEST(req, completed, status, partit%MPIERR_IB)
 !$omp end critical
+     if (.not. completed .and. (MPI_Wtime() - t_start_block) > block_reduce_timeout) then
+      write(*,*) 'FATAL: pe_block Allreduce deadlock on rank ', partit%mype, &
+           ' after ', block_reduce_timeout, ' s (iceberg_calculation, istep=', istep, ')'
+      call MPI_Abort(MPI_COMM_WORLD, 1, block_reduce_ierr)
+     end if
  end do
 
 !!$omp critical
@@ -193,14 +216,20 @@ completed = .false.
 
 
 !$omp critical 
- call MPI_IAllREDUCE(vl_block, vl_block_red, 4*ib_num, MPI_DOUBLE_PRECISION, MPI_SUM, partit%MPI_COMM_FESOM_IB, req, partit%MPIERR_IB)
+ call MPI_IAllREDUCE(vl_block, vl_block_red, 4*ib_num, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM_IB, req, partit%MPIERR_IB)
 !$omp end critical
 
  completed = .false.
+ t_start_block = MPI_Wtime()
  do while (.not. completed)
 !$omp critical
   CALL MPI_TEST(req, completed, status, partit%MPIERR_IB)
 !$omp end critical
+     if (.not. completed .and. (MPI_Wtime() - t_start_block) > block_reduce_timeout) then
+      write(*,*) 'FATAL: vl_block Allreduce deadlock on rank ', partit%mype, &
+           ' after ', block_reduce_timeout, ' s (iceberg_calculation, istep=', istep, ')'
+      call MPI_Abort(MPI_COMM_WORLD, 1, block_reduce_ierr)
+     end if
  end do
 
  buoy_props=0.
@@ -304,6 +333,7 @@ use iceberg_params, only: length_ib, width_ib, scaling, elem_block, elem_area_gl
  implicit none											!=
  
  logical                :: reject_tmp 
+ logical                :: melted_local
  integer, intent(in)	:: ib, istep
  real,    intent(inout)	:: height_ib_single,length_ib_single,width_ib_single
  real,    intent(inout)	:: lon_deg,lat_deg
@@ -346,7 +376,7 @@ use iceberg_params, only: length_ib, width_ib, scaling, elem_block, elem_area_gl
  logical   			:: i_have_element					!=
  real	   			:: left_mype						!=
  integer   			:: old_element						!=
- real(kind=8) 			:: t0, t1, t2, t3, t4, t5, t6, t7, t8                   !=
+ real(kind=WP) 			:: t0, t1, t2, t3, t4, t5, t6, t7, t8                   !=
  											!=
  !for restart										!=
  logical, save   		:: firstcall=.true.					!=
@@ -378,7 +408,8 @@ type(t_dyn)   , intent(inout), target :: dynamics
  lon_rad = lon_deg*rad
  lat_rad = lat_deg*rad
  
- if(volume_ib .le. smallestvol_icb) then
+ melted_local = (volume_ib .le. smallestvol_icb)
+ if(melted_local) then
   melted(ib) = .true.
 
   if (mod(istep_end_synced,logfile_outfreq)==0 .and. mype==0 .and. lastsubstep) then
@@ -431,11 +462,12 @@ type(t_dyn)   , intent(inout), target :: dynamics
       iceberg_elem=partit%myList_elem2D(iceberg_elem) !global now
    endif   
   end if
-  call com_integer(partit, i_have_element,iceberg_elem)
+  call com_integer(partit, i_have_element, iceberg_elem, ib=ib)
  
   if(iceberg_elem .EQ. 0) then
         write(*,*) 'IB ',ib,' rot. coords:', lon_deg, lat_deg !,lon_rad, lat_rad
-   	call par_ex (partit%MPI_COMM_FESOM, partit%mype)
+        write(*,*) 'FATAL: iceberg ', ib, ' outside model domain on rank ', partit%mype
+   	call par_ex (partit%MPI_COMM_FESOM, partit%mype, abort=1)
    	stop 'ICEBERG OUTSIDE MODEL DOMAIN OR IN ICE SHELF REGION'
   end if
   
@@ -462,7 +494,8 @@ type(t_dyn)   , intent(inout), target :: dynamics
   endif
  end if
  
- if (iceberg_elem < 1 .or. iceberg_elem > elem2D) then
+ melted_local = (iceberg_elem < 1 .or. iceberg_elem > elem2D)
+ if (melted_local) then
   if (mype==0) write(*,*) 'WARNING: iceberg ', ib, ' has invalid iceberg_elem = ', &
        iceberg_elem, ' (valid range 1..', elem2D, '). Marking as melted to avoid crash.'
   melted(ib) = .true.
@@ -722,8 +755,8 @@ use iceberg_params, only: length_ib, width_ib, scaling !, smallestvol_icb, arr_b
  integer status(MPI_STATUS_SIZE)
  integer                        :: num_ib_in_elem, idx
  real                           :: area_ib_tot
- !real(real64), dimension(:), allocatable    :: rbuffer, local_elem_area
- real(real64)                   :: elem_area_tmp
+ !real(kind=WP), dimension(:), allocatable    :: rbuffer, local_elem_area
+ real(kind=WP)                   :: elem_area_tmp
 
  !iceberg output 
  character 			:: ib_char*10
@@ -737,7 +770,7 @@ use iceberg_params, only: length_ib, width_ib, scaling !, smallestvol_icb, arr_b
  logical   			:: i_have_element					!=
  real	   			:: left_mype						!=
  integer   			:: old_element						!=
- real(kind=8) 			:: t0, t1, t2, t3, t4					!=
+ real(kind=WP) 			:: t0, t1, t2, t3, t4					!=
  											!=
  !for restart										!=
  logical, save   		:: firstcall=.true.					!=
@@ -978,7 +1011,7 @@ type(t_partit), intent(inout), target :: partit
 		v_ib = ini_v_rot	
 	else
    		!OCEAN VELOCITY uo_ib, voib is start velocity
-   		call iceberg_avvelo(mesh, partit, dynamics, startu,startv,depth_ib,localelem)
+   		call iceberg_avvelo(mesh, partit, dynamics, startu,startv,depth_ib,localelem, ib=ib)
         call FEM_3eval(mesh, partit,u_ib,v_ib,lon_rad,lat_rad,startu,startv,localelem)
 	end if
  end if
@@ -1217,7 +1250,7 @@ end subroutine projection
 
 subroutine iceberg_restart(partit)
 ! use iceberg_params 
- use g_config, only : ib_num
+ use g_config, only : ib_num, use_icb_iron
 
  implicit none
  integer :: icbID, ib
@@ -1245,6 +1278,10 @@ type(t_partit), intent(inout), target :: partit
 
   end do
   close(icbID)
+
+  ! LA 2026 -- Fe concentration is a persistent per-iceberg property and lives
+  ! in a side-car file, so that iceberg.restart itself stays format-compatible.
+  if (use_icb_iron) call read_icb_iron_restart(IcebergRestartPath_iron, ib_num, mype)
 
   if(mype==0) then
   write(*,*) 'read iceberg restart file'
@@ -1280,7 +1317,7 @@ end subroutine iceberg_restart
 
 subroutine iceberg_restart_with_icesheet(partit)
 ! use iceberg_params 
- use g_config, only : ib_num
+ use g_config, only : ib_num, use_icb_iron
 
  implicit none
  integer :: icbID_ISM, icbID_non_melted_icb, ib, st
@@ -1312,6 +1349,10 @@ type(t_partit), intent(inout), target :: partit
 	f_u_ib_old(ib), f_v_ib_old(ib), calving_day(ib), grounded(ib), scaling(ib), melted(ib)
   end do
   close(icbID_ISM)
+
+  ! LA 2026 -- survivors keep their Fe concentration; the newly seeded icebergs
+  ! get theirs from icb_iron.dat (or icb_iron_const) further below.
+  if (use_icb_iron) call read_icb_iron_restart(IcebergRestartPath_iron_ISM, num_non_melted_icb, mype)
 
   if(mype==0) then
   write(*,*) 'read iceberg restart file'
@@ -1348,6 +1389,7 @@ end subroutine iceberg_restart_with_icesheet
 subroutine iceberg_out(partit)
 ! use iceberg_params
  use g_clock		!for dayold
+ use g_config, only : use_icb_iron
  implicit none
  integer :: icbID, icbID_ISM, ib, istep
 type(t_partit), intent(inout), target :: partit
@@ -1397,6 +1439,12 @@ type(t_partit), intent(inout), target :: partit
   end do
   close(icbID_ISM)
   close(icbID)
+
+  ! LA 2026 -- mirror the two restart files for the Fe concentration
+  if (use_icb_iron) then
+     call write_icb_iron_restart(IcebergRestartPath_iron,     ib_num, .false.)
+     call write_icb_iron_restart(IcebergRestartPath_iron_ISM, ib_num, .true. )
+  end if
  end if
 end subroutine iceberg_out
 
@@ -1492,6 +1540,15 @@ subroutine init_icebergs
     read(98,*) scaling(i)
  end do
  close(98)
+!iron_icb_file > iron_conc_ib   (LA 2026, passive iron tracer)
+ if (use_icb_iron .and. l_icb_iron_file) then
+  open(unit=98, file=iron_icb_file,status='old',action='read',iostat=io_error)
+  if ( io_error.ne.0) stop 'ERROR while reading file iron_icb_file'
+  do i = 1, ib_num
+     read(98,*) iron_conc_ib(i)
+  end do
+  close(98)
+ end if
 !calving_day_file > calving_day
  open(unit=97, file=calving_day_file,status='old',action='read',iostat=io_error)
  if ( io_error.ne.0) stop 'ERROR while reading file calving_day_file'
@@ -1559,6 +1616,17 @@ subroutine init_icebergs_with_icesheet
     read(98,*) scaling(i)
  end do
  close(98)
+!iron_icb_file > iron_conc_ib   (LA 2026, passive iron tracer)
+!NOTE: like the other .dat files this holds ONLY the newly seeded icebergs;
+!      the survivors keep the value restored from the iron restart file.
+ if (use_icb_iron .and. l_icb_iron_file) then
+  open(unit=98, file=iron_icb_file,status='old',action='read',iostat=io_error)
+  if ( io_error.ne.0) stop 'ERROR while reading file iron_icb_file'
+  do i = 1+num_non_melted_icb, ib_num
+     read(98,*) iron_conc_ib(i)
+  end do
+  close(98)
+ end if
 !calving_day_file > calving_day
  open(unit=97, file=calving_day_file,status='old',action='read',iostat=io_error)
  if ( io_error.ne.0) stop 'ERROR while reading file calving_day_file'
@@ -1997,7 +2065,7 @@ subroutine write_buoy_props_netcdf(partit)
   integer                   :: height_id, length_id, width_id
   integer                   :: bvl_id, lvlv_id, lvle_id, lvlb_id, felem_id, grounded_id
   integer                   :: start(2), count(2)
-  real(kind=8)              :: sec_in_year
+  real(kind=WP)              :: sec_in_year
 type(t_partit), intent(inout), target :: partit
 !type(t_ice),    intent(inout), target :: ice
 #include "associate_part_def.h"
@@ -2161,4 +2229,56 @@ type(t_partit), intent(inout), target :: partit
 
 
 end subroutine write_buoy_props_netcdf
+!========================================================================
+! LA 2026 -- passive iron tracer: read/write the per-iceberg Fe concentration.
+! Kept in its own file rather than appended to iceberg.restart so that restart
+! files written before this patch remain readable.
+!========================================================================
+subroutine read_icb_iron_restart(path, n, mype)
+ implicit none
+ character(*), intent(in) :: path
+ integer,      intent(in) :: n, mype
+ integer :: ib, un, io_error
+ logical :: exists
+
+ INQUIRE(FILE=path, EXIST=exists)
+ if (.not. exists) then
+    ! No iron restart yet (first restart after enabling the feature): keep the
+    ! values init_icebergs* already loaded (icb_iron.dat or icb_iron_const).
+    ! Do NOT reset to icb_iron_const here - that would clobber icb_iron.dat.
+    if (mype==0) write(*,*) 'icb iron: ', trim(path),                          &
+                            ' not found -> keeping values from icb_iron.dat/icb_iron_const'
+    return
+ end if
+ open(newunit=un, file=path, status='old', action='read', form='formatted')
+ do ib=1, n
+    read(un,*,iostat=io_error) iron_conc_ib(ib)
+    if (io_error /= 0) then
+       write(*,*) 'ERROR while reading ', trim(path), ': expected ', n,        &
+                  ' values, failed at entry ', ib
+       stop 'ERROR while reading iceberg iron restart file'
+    end if
+ end do
+ close(un)
+ if (mype==0) write(*,*) 'icb iron: restored ', n, ' values from ', trim(path)
+end subroutine read_icb_iron_restart
+
+
+subroutine write_icb_iron_restart(path, n, only_alive)
+ implicit none
+ character(*), intent(in) :: path
+ integer,      intent(in) :: n
+ logical,      intent(in) :: only_alive
+ integer :: ib, un
+
+ open(newunit=un, file=path, status='replace', action='write', form='formatted')
+ do ib=1, n
+    if (only_alive) then
+       if (melted(ib)) cycle
+    end if
+    write(un,'(e15.7)') iron_conc_ib(ib)
+ end do
+ close(un)
+end subroutine write_icb_iron_restart
+
 end module iceberg_step

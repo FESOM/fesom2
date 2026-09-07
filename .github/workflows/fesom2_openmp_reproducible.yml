@@ -1,0 +1,51 @@
+name: FESOM2 OpenMP reproducible test
+
+# The -DOPENMP_REPRODUCIBLE=ON build dimension was CI-invisible for years and
+# rotted into 47 compile errors (issues #444/#528). This workflow keeps it
+# covered: the source-level ORDERED guards, a full build with the option ON,
+# and a 4-thread pi run. The runtime leg matters - it catches the class of bug
+# that compiles fine on both paths but breaks reproducibility at run time.
+on:
+  workflow_dispatch: {}
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+    branches:
+      - main
+
+jobs:
+  openmp_reproducible_test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    container: ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Git safe directory
+      run: |
+        git config --global --add safe.directory ${PWD}
+
+    - name: Compile model with OPENMP_REPRODUCIBLE
+      run: |
+        bash -l configure.sh ubuntu -DENABLE_OPENMP=ON -DOPENMP_REPRODUCIBLE=ON -DBUILD_TESTING=ON
+
+    - name: Run OpenMP ORDERED source guards
+      run: |
+        cd build
+        ctest -L openmp --output-on-failure
+
+    - name: Create global test run with 4 OpenMP threads
+      run: |
+        mkrun pi test_pi -m docker
+        cd work_pi
+        sed -i 's/THREADS=1/THREADS=4/g' job_docker_new
+        cd ../
+
+    - name: FESOM2 global test run
+      run: |
+        cd work_pi
+        chmod +x job_docker_new
+        ./job_docker_new

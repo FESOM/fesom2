@@ -624,7 +624,6 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! proceed with fields at nodes (cycle over edges to compute the divergence)...
     do edge=1, myDim_edge2D
-        if (myList_edge2D(edge) > edge2D_in) cycle
         enodes=edges(:,edge)
         eelems=edge_tri(:,edge)
         nzmax =nlevels(eelems(1))
@@ -649,7 +648,7 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
                             aux(nz-1)   * helem(nz,  elem))/sum(helem(nz-1:nz,elem))
             end do
             dens(nzmax)=dens(nzmax-1)+(dens(nzmax-1)-dens(nzmax-2))*helem(nzmax-1,elem)/helem(nzmax-2,elem)
-            dens(nzmin)    =dens(nzmin+1)      +(dens(nzmin+1)-dens(nzmin+2))            *helem(nzmin, elem)     /helem(nzmin+1,elem)       
+            dens(nzmin)    =dens(nzmin+1)      +(dens(nzmin+1)-dens(nzmin+2))            *helem(nzmin, elem)     /helem(nzmin+1,elem)
             is=minloc(abs(std_dens-dens(nzmin)),1)
             
             !___________________________________________________________________
@@ -3289,7 +3288,11 @@ subroutine dvd_add_difflux_bhvisc(do_SDdvd, tr_num, dvd_tot, tr, trstar, gamma0_
     ! first round 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, nz, ednodes, edelem, elnodes_l, elnodes_r, &
 !$OMP nu1, nl1, du, dv, dt, len, vi)
-!$OMP DO    
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
+!$OMP DO
+#endif
     do edge=1, myDim_edge2D!+eDim_edge2D
         ! skip boundary edges only consider inner edges 
         if (myList_edge2D(edge) > edge2D_in) cycle
@@ -3336,7 +3339,11 @@ subroutine dvd_add_difflux_bhvisc(do_SDdvd, tr_num, dvd_tot, tr, trstar, gamma0_
 
     !___________________________________________________________________________
     ! second round:
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
     do edge=1, myDim_edge2D!+eDim_edge2D
         ! skip boundary edges only consider inner edges 
         if (myList_edge2D(edge) > edge2D_in) cycle

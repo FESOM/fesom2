@@ -527,7 +527,10 @@ contains
     do j = 2, nv
        tmp_lon = blon(j); tmp_lat = blat(j); tmp_ang = angles(j)
        k = j - 1
-       do while (k >= 1 .and. angles(k) > tmp_ang)
+       ! .and. is not short-circuit in Fortran: split the test or angles(0)
+       ! is read at the end of the sweep.
+       do while (k >= 1)
+          if (angles(k) <= tmp_ang) exit
           blon(k+1) = blon(k); blat(k+1) = blat(k); angles(k+1) = angles(k)
           k = k - 1
        end do
@@ -571,7 +574,7 @@ contains
   logical function io_xios_is_ice_field(name) result(r)
     character(len=*), intent(in) :: name
     select case (trim(name))
-    case ('a_ice', 'm_ice', 'm_snow', 'h_ice', 'h_snow', 'ist', &
+    case ('a_ice', 'm_ice', 'm_snow', 'h_ice', 'h_snow', 'ist', 'alb', &
           'uice', 'vice', 'apnd', 'hpnd', 'ipnd', &
           'thdgrice', 'thdgrsnw', 'thdgrarea', 'dyngrice', 'dyngrarea', &
           'fw_ice', 'fw_snw', 'atmice_x', 'atmice_y', &

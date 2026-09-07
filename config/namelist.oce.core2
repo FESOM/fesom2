@@ -74,3 +74,9 @@ concv              = 1.6     ! constant for pure convection (eq. 23 in Large et 
 ! --- Tidal Forcing ---
 use_global_tides   = .false. ! enable global tidal potential forcing
 /
+
+! ============================================================================
+! NEVERWORLD2 (Toy_Neverworld2 module) -- only read if which_toy='neverworld2', unused here
+! ============================================================================
+&oce_neverworld2
+/

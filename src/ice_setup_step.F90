@@ -497,7 +497,16 @@ end if
     !___________________________________________________________________________
     ! switch for making sea-ice initialisation from regular gridded files and 
     ! do interpolation to fesom grid or to initialise them with a constant value
-    if (.not. ini_ice_from_file) then
+    if (r_restart) then
+        ! The ice arrays were zeroed above and read_initial_conditions overwrites
+        ! them from the restart a little later in fesom_runloop. Neither the
+        ! constant-value fill nor the interpolation from file would survive that,
+        ! so skip both and say what is actually happening. Zeroing still runs, so
+        ! any field the restart does not carry stays at zero rather than becoming
+        ! whatever the cold start would have guessed.
+        if(mype==0) write(*,*) 'initialize the sea ice: from restart'
+
+    else if (.not. ini_ice_from_file) then
         if(mype==0) write(*,*) 'initialize the sea ice: cold start'
         !___________________________________________________________________________
         do i=1,myDim_nod2D+eDim_nod2D

@@ -67,32 +67,27 @@ nml_tracer_list =
 /
 
 ! ============================================================================
-! 3D TRACER INITIAL CONDITIONS (OCEAN)
+! 3D TRACER INITIAL CONDITIONS
+! One file per tracer, same order as idlist.
+! IDs: 1=temperature, 2=salinity, 1001=nitrate, 1002=DIC, 1003=alkalinity,
+!      1018=silicate, 1019=iron, 1022=oxygen
+! DIC (1002) ships the preindustrial GLODAP field; for present-day runs use
+!      GLODAPv2.2016b.TCO2_fesom2_mmol_fix_z_Fillvalue.nc with varlist TCO2_mmol
+! NOTE: no inline "!" comments inside the value lists below - gfortran aborts
+!      the namelist read on them, silently leaving the remaining entries empty.
 ! ============================================================================
 &tracer_init3d
-n_ic3d   = 8                                       ! number of 3D tracers to initialize from files
-idlist   = 1, 2,                                   ! tracer IDs to initialize (1=temperature, 2=salinity)
-           1001,                                   ! nitrate in seawater
-           1002,                                   ! dissolved inorganic carbon in seawater 
-           1003,                                   ! seawater alkalinity
-           1018,                                   ! silicate in seawater
-           1019,                                   ! iron in seawater
-           1022,                                   ! dissolved molecular oxygen in seawater
-filelist = 'phc3.0_winter.nc', 'phc3.0_winter.nc',                  ! netCDF files in ClimateDataPath (one per tracer)
-           'woa13_all_n00_01_fesom2.nc'                             ! 1001
-           'GLODAPv2.2016b.PI_TCO2_fesom2_mmol_fix_z_Fillvalue.nc', ! 1002; for today: GLODAPv2.2016b.TCO2_fesom2_mmol_fix_z_Fillvalue.nc; for PI: GLODAPv2.2016b.PI_TCO2_fesom2_mmol_fix_z_Fillvalue.nc
-           'GLODAPv2.2016b.TAlk_fesom2_mmol_fix_z_Fillvalue.nc',    ! 1003
-           'woa13_all_i00_01_fesom2.nc',                            ! 1018
-           'fe_pisces_opa_eq_init_3D_changed_name.nc',              ! 1019
-           'woa18_all_o00_01_mmol_fesom2.nc',                       ! 1022
-varlist  = 'temp', 'salt',                         ! variable names in the netCDF files
-           'n_an'                                  ! 1001
-           'PI_TCO2_mmol',                         ! 1002; for today: TCO2_mmol; for PI: PI_TCO2_mmol
-           'TAlk_mmol',                            ! 1003
-           'i_an',                                 ! 1018
-           'Fe',                                   ! 1019
-           'oxygen_mmol',                          ! 1022
-t_insitu = .true.                                  ! if true, convert in-situ temperature to potential temperature
+n_ic3d   = 8
+idlist   = 1, 2, 1001, 1002, 1003, 1018, 1019, 1022
+filelist = 'phc3.0_winter.nc', 'phc3.0_winter.nc',
+           'woa13_all_n00_01_fesom2.nc',
+           'GLODAPv2.2016b.PI_TCO2_fesom2_mmol_fix_z_Fillvalue.nc',
+           'GLODAPv2.2016b.TAlk_fesom2_mmol_fix_z_Fillvalue.nc',
+           'woa13_all_i00_01_fesom2.nc',
+           'fe_pisces_opa_eq_init_3D_changed_name.nc',
+           'woa18_all_o00_01_mmol_fesom2.nc'
+varlist  = 'temp', 'salt', 'n_an', 'PI_TCO2_mmol', 'TAlk_mmol', 'i_an', 'Fe', 'oxygen_mmol'
+t_insitu = .true.
 /
 
 ! ============================================================================

@@ -136,6 +136,16 @@ module g_config
   integer                       :: ib_num=0
   integer                       :: steps_per_ib_step=8
 
+! LA 2026 -- passive iron tracer carried by icebergs
+! Each iceberg carries a fixed Fe concentration of its ice; melting releases
+! Fe in proportion to the meltwater flux.  Purely diagnostic: the resulting
+! ibiron field is written out but does not feed back on the ocean.
+  logical                       :: use_icb_iron=.false.      ! master switch
+  real(kind=WP)                 :: icb_iron_const=50.0e-6_WP ! Fe content of iceberg ice
+                                                             ! [mol m-3]; 50e-6 = 50 nmol L-1
+  logical                       :: l_icb_iron_file=.false.   ! read per-iceberg Fe from
+                                                             ! icb_iron.dat instead of the constant
+
 ! kh 02.02.21
 ! ib_async_mode == 0: original sequential behavior for both ice sections (for testing purposes, creating reference results etc.)
 ! ib_async_mode == 1: OpenMP code active to overlapped computations in first (ocean ice) and second (icebergs) parallel section
@@ -145,7 +155,7 @@ module g_config
 
   namelist /icebergs/   use_icebergs, turn_off_hf, turn_off_fw, use_icesheet_coupling, lbalance_fw, cell_saturation, lmin_latent_hf, &
                         ib_num, steps_per_ib_step, ib_async_mode, thread_support_level_required, lverbose_icb, l_allowgrounding, &
-                        l_cap_ibhf_n
+                        l_cap_ibhf_n, use_icb_iron, icb_iron_const, l_icb_iron_file
 
 !wiso-code!!!
   logical                       :: lwiso  =.false.  ! enable isotope?
@@ -160,6 +170,11 @@ module g_config
   logical                       :: flag_debug=.false.    ! prints name of actual subroutine he is in 
   logical                       :: flag_warn_cflz=.true. ! switches off cflz warning
   logical                       :: use_transit=.false.    ! switches off transient tracers
+  !_____________________________________________________________________________
+  ! *** freshwater hosing experiments ***
+  logical                       :: use_hosing=.false.     ! impose an Antarctic freshwater anomaly
+  character(10)                 :: hosing_mode='surf'     ! 'surf' = surface virtual salinity flux, 'depth' = distributed over depth
+  real(kind=WP)                 :: hosing_hSv=0.0_WP      ! freshwater anomaly magnitude [Sv]
   logical                       :: compute_oasis_corners=.false. ! switches on corner calculation for 1st order conserv remapping 
 
 #if defined(__recom) && defined(__usetp)
@@ -168,12 +183,14 @@ module g_config
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, &
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
                         use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
-                        use_transit, compute_oasis_corners, num_fesom_groups
+                        use_transit, compute_oasis_corners, num_fesom_groups, &
+                        use_hosing, hosing_mode, hosing_hSv
 #else
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
                         use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
-                        use_transit, compute_oasis_corners
+                        use_transit, compute_oasis_corners, &
+                        use_hosing, hosing_mode, hosing_hSv
 #endif
 
   !_____________________________________________________________________________
