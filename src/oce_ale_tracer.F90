@@ -710,7 +710,7 @@ if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
                                        mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
                                        mesh%zbar_3d_n, mesh%nod_in_elem2D_num, &
                                        mesh%nod_in_elem2D, mesh%nlevels,       &
-                                       mesh%area, tracers%data(tr_num)%ID,     &
+                                       mesh%area, mesh%areasvol, tracers%data(tr_num)%ID, &
                                        tracers%data(tr_num)%values(:,:),       &
                                        partit%myDim_nod2D, str_bf,             &
                                        partit%mype, partit%MPI_COMM_FESOM,   &
