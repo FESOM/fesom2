@@ -18,7 +18,7 @@ enable_coccos = .false.
 use_REcoM             =.true.
 REcoM_restart         =.true.
 
-bgc_num               = 30 !24 !38 !22
+bgc_num               = 31 !24 !38 !22
 diags3d_num           = 28          ! Number of diagnostic 3d tracers to be saved
 bgc_base_num          = 22          ! standard tracers
 VDet                  = 20.d0       ! Sinking velocity, constant through the water column and positive downwards
