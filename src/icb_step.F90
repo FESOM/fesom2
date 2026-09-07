@@ -1052,6 +1052,27 @@ subroutine trajectory( lon_rad,lat_rad, old_u,old_v, new_u,new_v, &
  lon_rad = lon_rad + (0.5*(deltax1 + deltax2) / (r_earth*cos_lat_safe) )
  lat_rad = lat_rad + (0.5*(deltay1 + deltay2) /  r_earth )
  lat_rad = max(-lat_rad_max, min(lat_rad_max, lat_rad))
+ ! Wrap longitude to (-pi,pi].  Latitude is clamped on the line above but
+ ! longitude was left unbounded, so lon_deg drifted out of [-180,180]: a berg
+ ! carried across several legs accumulates westward drift with nothing to reset
+ ! it (down to -268 deg in new_ism38 over 1900-1925).
+ !
+ ! This is PRECAUTIONARY, not a bug fix.  locbafu_2D re-centres the test point
+ ! on the element's first node with two if-statements, i.e. at most ONE +/-360
+ ! correction, which suffices for any |lon| < 360.  Every value this run
+ ! produced was inside that, and locbafu_2D returns identical basis functions
+ ! with and without this line (checked over the full observed range: 200000
+ ! cases, max discrepancy 3e-14 deg).  The unwrapped values were harmless and
+ ! removing this line would change no result today.
+ !
+ ! It is kept because the single correction DOES fail beyond |lon| = 360, and a
+ ! berg at ~3 cm/s near 60S laps Antarctica in roughly 20 years -- unreachable
+ ! in a 26-cycle run, reachable in the 50-cycle configuration.  It also keeps
+ ! iceberg.restart and buoys_track in a sane range for anything reading them.
+ ! Safe by construction: old_lon is intent(out), assigned before the move and
+ ! used only to restore position on the left_mype path, so nothing differences
+ ! longitude across steps and no spurious 360 deg jump can be manufactured.
+ lon_rad = modulo(lon_rad + pi, 2.0*pi) - pi
  lon_deg=lon_rad/rad
  lat_deg=lat_rad/rad
    
