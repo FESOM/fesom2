@@ -99,40 +99,41 @@ message(STATUS "ENABLE_IFS_INTERFACE: ${ENABLE_IFS_INTERFACE}")
 
 
 # ---------------------------------------------------------------------------
-# Single precision is not yet supported in any coupled configuration.
+# Single precision in coupled configurations.
 #
-# The coupling and interface layers were written when WP was unconditionally
-# real64 and still assume it:
+# OIFS-via-OASIS coupling (FESOM_COUPLED + OIFS_COUPLED, i.e. AWI-ESM3) is now
+# single-precision-safe:
 #
-#   * cpl_driver.F90 and gen_forcing_couple.F90 pass MPI_DOUBLE_PRECISION for
-#     buffers declared real(kind=WP) (cpl_driver.F90:608,614,620,625,627,988
-#     and 8 further sites in gen_forcing_couple.F90). With WP=real32 MPI reads
-#     eight bytes out of a four-byte variable -- memory corruption, not a
-#     precision question, and invisible in a double-precision build because
-#     there real64 == WP.
+#   * cpl_driver.F90 -- the OASIS exchange buffer exfld is typed WP_full
+#     (always real64, matching the oasis_Double transient), and every
+#     FESOM-internal MPI call in the coupling path (grid gather + same-rank
+#     bcast) uses MPI_WP instead of a hardcoded MPI_DOUBLE_PRECISION, so the
+#     MPI type tracks WP. OASIS itself accepts single-precision buffers (its
+#     oasis_put/get and grid-write interfaces are generic over real4/real8 and
+#     promote to double internally), so nothing is corrupted when WP=real32.
 #
-#   * The OASIS exchange buffers exfld and cplsnd (cpl_driver.F90:79-80) are
-#     real(kind=WP), so a single-precision build would hand the coupler single
-#     precision where the partner model may expect double.
+#   * gen_forcing_couple.F90 -- integrate_2D's internal reductions use MPI_WP.
+#     The raw FESOM<->atmosphere net-flux exchange in net_rec_from_atm is
+#     skipped for __oifs (early return), so its remaining hardcoded-double
+#     calls are not reached by an OIFS build.
 #
-# None of this is exercised by any test: there is no coupled CTest, so a
-# single-precision coupled build would fail silently at runtime rather than
-# loudly at build time. Refuse it at configure time until the interfaces are
-# typed explicitly and a coupled test exists to validate them.
+# The other coupled modes are NOT yet converted and stay refused:
+#   * FESOM_COUPLED without OIFS (OASIS/ECHAM) -- net_rec_from_atm's raw
+#     double exchange IS reached and is still typed to WP; needs the partner
+#     precision reconciled.
+#   * USE_YAC (cpl_yac_driver.F90) and ENABLE_IFS_INTERFACE -- untouched.
 #
-# Set FESOM_ALLOW_SINGLE_PRECISION_COUPLED=ON to override -- intended for
-# developing the fix itself, not for production runs.
+# Set FESOM_ALLOW_SINGLE_PRECISION_COUPLED=ON to override the refusal for the
+# modes below (intended for developing those fixes, not for production).
 # ---------------------------------------------------------------------------
 option(FESOM_ALLOW_SINGLE_PRECISION_COUPLED
-       "Override the guard refusing single-precision coupled builds (unvalidated)" OFF)
+       "Override the guard refusing the not-yet-converted single-precision coupled builds" OFF)
 
 if(USE_SINGLE_PRECISION AND NOT FESOM_ALLOW_SINGLE_PRECISION_COUPLED)
    set(_fesom_sp_coupled_modes "")
-   if(FESOM_COUPLED)
-      list(APPEND _fesom_sp_coupled_modes "FESOM_COUPLED (OASIS)")
-   endif()
-   if(OIFS_COUPLED)
-      list(APPEND _fesom_sp_coupled_modes "OIFS_COUPLED (OpenIFS)")
+   # OIFS-via-OASIS is allowed. Pure OASIS/ECHAM (FESOM_COUPLED without OIFS) is not.
+   if(FESOM_COUPLED AND NOT OIFS_COUPLED)
+      list(APPEND _fesom_sp_coupled_modes "FESOM_COUPLED (OASIS/ECHAM, without OIFS)")
    endif()
    if(USE_YAC)
       list(APPEND _fesom_sp_coupled_modes "USE_YAC (YAC)")
@@ -143,12 +144,12 @@ if(USE_SINGLE_PRECISION AND NOT FESOM_ALLOW_SINGLE_PRECISION_COUPLED)
    if(_fesom_sp_coupled_modes)
       string(REPLACE ";" ", " _fesom_sp_coupled_modes "${_fesom_sp_coupled_modes}")
       message(FATAL_ERROR
-         "USE_SINGLE_PRECISION=ON is not supported together with: ${_fesom_sp_coupled_modes}.\n"
-         "The coupling interfaces still assume WP is real64 and pass "
-         "MPI_DOUBLE_PRECISION for real(kind=WP) buffers, which corrupts memory "
-         "when WP is real32. There is no coupled test to validate a fix against, "
-         "so this combination is refused rather than run silently.\n"
-         "Build coupled configurations in double precision (USE_SINGLE_PRECISION=OFF), "
+         "USE_SINGLE_PRECISION=ON is not yet supported together with: ${_fesom_sp_coupled_modes}.\n"
+         "These coupling paths still pass MPI_DOUBLE_PRECISION for real(kind=WP) "
+         "buffers (or have not been reviewed), which corrupts memory when WP is "
+         "real32. OIFS-via-OASIS coupling (OIFS_COUPLED) has been converted and is "
+         "allowed.\n"
+         "Build these configurations in double precision (USE_SINGLE_PRECISION=OFF), "
          "or set FESOM_ALLOW_SINGLE_PRECISION_COUPLED=ON if you are developing the fix.")
    endif()
 endif()

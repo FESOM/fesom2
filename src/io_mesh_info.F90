@@ -5,6 +5,8 @@ USE MOD_PARSUP
 use g_config
 use g_comm_auto
 use o_PARAM
+use g_cvmix_idemix2, only: iwe2_refl_bin, iwe2_refl_sgn, iwe2_refl_node, iwe2_coast_node, &
+                           idemix2_enable_M2, idemix2_enable_niw
 
 use netcdf
 implicit none
@@ -46,6 +48,7 @@ implicit none
   integer                    :: lon_id, lat_id
   ! UGRID NAMES START HERE
   integer                    :: face_node_id, edge_nodes_id, face_edges_id, face_links_id, edge_face_links_id
+  integer                    :: iwe2_refl_bin_id, iwe2_refl_sgn_id, iwe2_refl_node_id, iwe2_coast_node_id
   character(100)             :: longname
   character(2000)            :: filename
   real(kind=WP), allocatable :: rbuffer(:), lrbuffer(:)
@@ -327,6 +330,12 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
   call my_def_var(ncid, 'gradient_sca_y',    NF90_DOUBLE, 2, (/elem_n_id, id_3/), gradient_sca_y_id,  'y component of a gradient at nodes of an element', partit)
   call my_def_var(ncid, 'gradient_vec_x',    NF90_DOUBLE, 2, (/elem_n_id, id_3/), gradient_vec_x_id,  'x component of a gradient at elements of an element', partit)
   call my_def_var(ncid, 'gradient_vec_y',    NF90_DOUBLE, 2, (/elem_n_id, id_3/), gradient_vec_y_id,  'y component of a gradient at elements of an element', partit)
+  if (mod(mix_scheme_nmb,10)==7 .and. (idemix2_enable_M2 .or. idemix2_enable_niw)) then
+    call my_def_var(ncid, 'iwe2_refl_bin',   NF90_INT, 1, (/edge_n_id/), iwe2_refl_bin_id,   'IDEMIX2 reflect BC: mirror spectral bin per coast edge (0=interior)', partit)
+    call my_def_var(ncid, 'iwe2_refl_sgn',   NF90_INT, 1, (/edge_n_id/), iwe2_refl_sgn_id,   'IDEMIX2 reflect BC: coast-node sign per edge (+1 node1 coast, -1 node2 coast)', partit)
+    call my_def_var(ncid, 'iwe2_refl_node',  NF90_INT, 1, (/nod_n_id/),  iwe2_refl_node_id,  'IDEMIX2 reflect BC: coast-adjacent interior node mask (0/1)', partit)
+    call my_def_var(ncid, 'iwe2_coast_node', NF90_INT, 1, (/nod_n_id/),  iwe2_coast_node_id, 'IDEMIX2 reflect BC: coast node mask after MPI halo exchange (0/1)', partit)
+  end if
   call my_nf90_enddef(ncid, partit)
 
   ! NOTE(PG): Same order as definition!
@@ -590,6 +599,25 @@ call my_def_var(ncid,                                         &  ! NetCDF Variab
     call my_put_vara(ncid, zbar_e_srf_id, 1, elem2D, rbuffer, partit)
     deallocate(rbuffer)
   endif
+
+  if (mod(mix_scheme_nmb,10)==7 .and. (idemix2_enable_M2 .or. idemix2_enable_niw)) then
+    allocate(ibuffer(edge2D))
+    call gather_edge(iwe2_refl_bin(1:myDim_edge2D), ibuffer, partit)
+    call my_put_vara(ncid, iwe2_refl_bin_id, 1, edge2D, ibuffer, partit)
+    call gather_edge(iwe2_refl_sgn(1:myDim_edge2D), ibuffer, partit)
+    call my_put_vara(ncid, iwe2_refl_sgn_id, 1, edge2D, ibuffer, partit)
+    deallocate(ibuffer)
+
+    allocate(ibuffer(nod2D))
+    allocate(lbuffer(myDim_nod2D))
+    lbuffer = merge(1, 0, iwe2_refl_node(1:myDim_nod2D))
+    call gather_nod(lbuffer, ibuffer, partit)
+    call my_put_vara(ncid, iwe2_refl_node_id, 1, nod2D, ibuffer, partit)
+    lbuffer = merge(1, 0, iwe2_coast_node(1:myDim_nod2D))
+    call gather_nod(lbuffer, ibuffer, partit)
+    call my_put_vara(ncid, iwe2_coast_node_id, 1, nod2D, ibuffer, partit)
+    deallocate(lbuffer, ibuffer)
+  end if
 
   call my_close(ncid, partit)
 

@@ -1247,7 +1247,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 
             !___________________________________________________________________
             ! use fesom1.4 KPP
-            if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
+            if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==18) then
                 if     (tracers%data(tr_num)%ID==1) then ! temperature
                     ! --> no fluxes to the top out of the surface, no fluxes
                     !     downwards out of the bottom
@@ -1293,7 +1293,7 @@ subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 #if defined (__cvmix)                   
             !___________________________________________________________________
             ! use cvmix KPP
-            elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
+            elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==38) then
                 if     (tracers%data(tr_num)%ID==1) then ! temperature
                     !___surface_________________________________________________
                     nz = nzmin

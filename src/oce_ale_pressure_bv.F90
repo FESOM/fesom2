@@ -229,7 +229,7 @@ subroutine pressure_bv(tracers, partit, mesh)
     salt=>tracers%data(2)%values(:,:)
     smallvalue=1.0e-20
     buoyancy_crit=0.0003_WP
-    mixing_kpp = (mix_scheme_nmb==1 .or. mix_scheme_nmb==17)
+    mixing_kpp = (mix_scheme_nmb==1 .or. mix_scheme_nmb==18)
     !___________________________________________________________________________
     ! Screen salinity
     a    =0.0_WP

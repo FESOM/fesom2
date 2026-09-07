@@ -90,6 +90,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
 #if defined (__cvmix)       
     use g_cvmix_tke
     use g_cvmix_idemix
+    use g_cvmix_idemix2
     use g_cvmix_pp
     use g_cvmix_kpp
     use g_cvmix_tidal
@@ -160,19 +161,21 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     ! here translate mix_scheme string into integer --> for later usage only 
     ! integer comparison is required
     select case (trim(mix_scheme))
-        case ('KPP'                   ) ; mix_scheme_nmb = 1
-        case ('PP'                    ) ; mix_scheme_nmb = 2
+        case ('KPP'                    ) ; mix_scheme_nmb = 1
+        case ('PP'                     ) ; mix_scheme_nmb = 2
 #if defined (__cvmix)           
-        case ('cvmix_KPP'             ) ; mix_scheme_nmb = 3
-        case ('cvmix_PP'              ) ; mix_scheme_nmb = 4
-        case ('cvmix_TKE'             ) ; mix_scheme_nmb = 5
-        case ('cvmix_IDEMIX'          ) ; mix_scheme_nmb = 6
-        case ('cvmix_TIDAL'           ) ; mix_scheme_nmb = 7 
-        case ('KPP+cvmix_TIDAL'       ) ; mix_scheme_nmb = 17
-        case ('PP+cvmix_TIDAL'        ) ; mix_scheme_nmb = 27
-        case ('cvmix_KPP+cvmix_TIDAL' ) ; mix_scheme_nmb = 37
-        case ('cvmix_PP+cvmix_TIDAL'  ) ; mix_scheme_nmb = 47
-        case ('cvmix_TKE+cvmix_IDEMIX') ; mix_scheme_nmb = 56
+        case ('cvmix_KPP'              ) ; mix_scheme_nmb = 3
+        case ('cvmix_PP'               ) ; mix_scheme_nmb = 4
+        case ('cvmix_TKE'              ) ; mix_scheme_nmb = 5
+        case ('cvmix_IDEMIX'           ) ; mix_scheme_nmb = 6
+        case ('cvmix_IDEMIX2'          ) ; mix_scheme_nmb = 7
+        case ('cvmix_TIDAL'            ) ; mix_scheme_nmb = 8 
+        case ('KPP+cvmix_TIDAL'        ) ; mix_scheme_nmb = 18
+        case ('PP+cvmix_TIDAL'         ) ; mix_scheme_nmb = 28
+        case ('cvmix_KPP+cvmix_TIDAL'  ) ; mix_scheme_nmb = 38
+        case ('cvmix_PP+cvmix_TIDAL'   ) ; mix_scheme_nmb = 48
+        case ('cvmix_TKE+cvmix_IDEMIX' ) ; mix_scheme_nmb = 56
+        case ('cvmix_TKE+cvmix_IDEMIX2') ; mix_scheme_nmb = 57
 #endif        
         case ('TOY'                   ) ; mix_scheme_nmb = 8
         case default 
@@ -181,25 +184,25 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     end select
 
     ! initialise fesom1.4 like KPP
-    if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
+    if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==18) then
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_kpp_init'//achar(27)//'[0m'
         call oce_mixing_kpp_init(partit, mesh)
         
     ! initialise fesom1.4 like PP
-    elseif (mix_scheme_nmb==2 .or. mix_scheme_nmb==27) then
+    elseif (mix_scheme_nmb==2 .or. mix_scheme_nmb==28) then
 #if defined (__cvmix)       
     ! initialise cvmix_KPP
-    elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
+    elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==38) then
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_kpp'//achar(27)//'[0m'
         call init_cvmix_kpp(partit, mesh)
         
     ! initialise cvmix_PP    
-    elseif (mix_scheme_nmb==4 .or. mix_scheme_nmb==47) then
+    elseif (mix_scheme_nmb==4 .or. mix_scheme_nmb==48) then
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_pp'//achar(27)//'[0m'
         call init_cvmix_pp(partit, mesh)
         
     ! initialise cvmix_TKE    
-    elseif (mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then
+    elseif (mix_scheme_nmb==5 .or. mix_scheme_nmb==56 .or. mix_scheme_nmb==57) then
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_tke'//achar(27)//'[0m'
         call init_cvmix_tke(partit, mesh)
 #endif        
@@ -211,11 +214,17 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     if     (mod(mix_scheme_nmb,10)==6) then
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_idemix'//achar(27)//'[0m'
         call init_cvmix_idemix(partit, mesh)
+    
+    ! initialise additional mixing cvmix_IDEMIX2 --> only in combination with 
+    ! cvmix_TKE+cvmix_IDEMIX2 or stand alone for debbuging as cvmix_TKE
+    elseif (mod(mix_scheme_nmb,10)==7) then
+        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_idemix2'//achar(27)//'[0m'
+        call init_cvmix_idemix2(partit, mesh)
         
     ! initialise additional mixing cvmix_TIDAL --> only in combination with 
     ! KPP+cvmix_TIDAL, PP+cvmix_TIDAL, cvmix_KPP+cvmix_TIDAL, cvmix_PP+cvmix_TIDAL 
     ! or stand alone for debbuging as cvmix_TIDAL   
-    elseif (mod(mix_scheme_nmb,10)==7) then
+    elseif (mod(mix_scheme_nmb,10)==8) then
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_tidal'//achar(27)//'[0m'
         call init_cvmix_tidal(partit, mesh)
     end if         
@@ -1006,7 +1015,7 @@ nl              => mesh%nl
 
     Av=0.0_WP
     Kv=0.0_WP
-    if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
+    if (mix_scheme_nmb==1 .or. mix_scheme_nmb==18) then
     allocate(Kv_double(nl,node_size, num_tracers))
     Kv_double=0.0_WP
     !!PS call oce_mixing_kpp_init ! Setup constants, allocate arrays and construct look up table

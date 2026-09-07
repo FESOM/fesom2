@@ -184,9 +184,9 @@ subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
         loc=omp_min_max_sum1(hbar-hbar_old, 1, myDim_nod2D, 'min', partit)
     end if 
     call MPI_AllREDUCE(loc , min_deta  , 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(hnode(1,:), 1, myDim_nod2D, 'min', partit)
+    loc=omp_min_max_sum1(hnode(1,1:myDim_nod2d), 1, myDim_nod2D, 'min', partit)
     call MPI_AllREDUCE(loc , min_hnode , 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(hnode(2,:), 1, myDim_nod2D, 'min', partit)
+    loc=omp_min_max_sum1(hnode(2,1:myDim_nod2d), 1, myDim_nod2D, 'min', partit)
     call MPI_AllREDUCE(loc , min_hnode2 , 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
     
     !_______________________________________________________________________
@@ -261,31 +261,31 @@ subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
        write(*,*) '   int(dhbar)-int(wflux)*dt =', int_dhbar-int_wflux*dt*(-1.0)
        write(*,*)
        write(*,*) '  ___global min/max/mean  --> mstep=',mstep,'____________'
-       write(*,"(A, ES10.3, A, ES10.3, A, A     )") '       eta= ', min_eta  ,' | ',max_eta  ,' | ','N.A.'
-       write(*,"(A, ES10.3, A, ES10.3, A, A     )") '      deta= ', min_deta ,' | ',max_deta ,' | ','N.A.'
-       write(*,"(A, ES10.3, A, ES10.3, A, A     )") '      hbar= ', min_hbar ,' | ',max_hbar ,' | ','N.A.'
-       write(*,"(A, ES10.3, A, ES10.3, A, ES10.3)") '     wflux= ', min_wflux,' | ',max_wflux,' | ',int_wflux
-       write(*,"(A, ES10.3, A, ES10.3, A, ES10.3)") '     hflux= ', min_hflux,' | ',max_hflux,' | ',int_hflux
-       write(*,"(A, ES10.3, A, ES10.3, A, ES10.3)") '      temp= ', min_temp ,' | ',max_temp ,' | ',int_temp
-       write(*,"(A, ES10.3, A, ES10.3, A, ES10.3)") '      salt= ', min_salt ,' | ',max_salt ,' | ',int_salt
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") '       eta= ', min_eta   , ' | ', max_eta   , ' | ', 'N.A.'
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") '      deta= ', min_deta  , ' | ', max_deta  , ' | ', 'N.A.'
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") '      hbar= ', min_hbar  , ' | ', max_hbar  , ' | ', 'N.A.'
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, ES10.3)") '     wflux= ', min_wflux , ' | ', max_wflux , ' | ', int_wflux
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, ES10.3)") '     hflux= ', min_hflux , ' | ', max_hflux , ' | ', int_hflux
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, ES10.3)") '      temp= ', min_temp  , ' | ', max_temp  , ' | ', int_temp
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, ES10.3)") '      salt= ', min_salt  , ' | ', max_salt  , ' | ', int_salt
        if (ldiag_dMOC) then
-           write(*,"(A, ES10.3, A, ES10.3, A, A     )") '      dens= ', min_dens-1000.0_WP ,' | ',max_dens-1000.0_WP ,' | ','N.A.'
+           write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") '      dens= ', min_dens-1000.0_WP, ' | ', max_dens-1000.0_WP, ' | ', 'N.A.'
        end if
-       write(*,"(A, ES10.3, A, ES10.3, A, A     )") '    wvel(1,:)= ', min_wvel ,' | ',max_wvel ,' | ','N.A.'
-       write(*,"(A, ES10.3, A, ES10.3, A, A     )") '    wvel(2,:)= ', min_wvel2,' | ',max_wvel2,' | ','N.A.'
-       write(*,"(A, ES10.3, A, ES10.3, A, A     )") '    uvel(1,:)= ', min_uvel ,' | ',max_uvel ,' | ','N.A.'
-       write(*,"(A, ES10.3, A, ES10.3, A, A     )") '    uvel(2,:)= ', min_uvel2,' | ',max_uvel2,' | ','N.A.'
-       write(*,"(A, ES10.3, A, ES10.3, A, A     )") '    vvel(1,:)= ', min_vvel ,' | ',max_vvel ,' | ','N.A.'
-       write(*,"(A, ES10.3, A, ES10.3, A, A     )") '    vvel(2,:)= ', min_vvel2,' | ',max_vvel2,' | ','N.A.'
-       write(*,"(A, ES10.3, A, ES10.3, A, A     )") '   hnode(1,:)= ', min_hnode,' | ',max_hnode,' | ','N.A.'
-       write(*,"(A, ES10.3, A, ES10.3, A, A     )") '   hnode(2,:)= ', min_hnode2,' | ',max_hnode2,' | ','N.A.'
-       write(*,"(A, A     , A, ES10.3, A, A     )") '     cfl_z= ',' N.A.     ',' | ',max_cfl_z  ,' | ','N.A.'
-       write(*,"(A, A     , A, ES10.3, A, A     )") '     pgf_x= ',' N.A.     ',' | ',max_pgfx  ,' | ','N.A.'
-       write(*,"(A, A     , A, ES10.3, A, A     )") '     pgf_y= ',' N.A.     ',' | ',max_pgfy  ,' | ','N.A.'
-       write(*,"(A, A     , A, ES10.3, A, A     )") '          Av= ',' N.A.     ',' | ',max_av    ,' | ','N.A.'
-       write(*,"(A, A     , A, ES10.3, A, A     )") '          Kv= ',' N.A.     ',' | ',max_kv    ,' | ','N.A.'
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") ' wvel(1,:)= ', min_wvel  , ' | ', max_wvel  , ' | ', 'N.A.'
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") ' wvel(2,:)= ', min_wvel2 , ' | ', max_wvel2 , ' | ', 'N.A.'
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") ' uvel(1,:)= ', min_uvel  , ' | ', max_uvel  , ' | ', 'N.A.'
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") ' uvel(2,:)= ', min_uvel2 , ' | ', max_uvel2 , ' | ', 'N.A.'
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") ' vvel(1,:)= ', min_vvel  , ' | ', max_vvel  , ' | ', 'N.A.'
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") ' vvel(2,:)= ', min_vvel2 , ' | ', max_vvel2 , ' | ', 'N.A.'
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") 'hnode(1,:)= ', min_hnode , ' | ', max_hnode , ' | ', 'N.A.'
+       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") 'hnode(2,:)= ', min_hnode2, ' | ', max_hnode2, ' | ', 'N.A.'
+       write(*,"(A15, A10   , A3, ES10.3, A3, A10   )") '     cfl_z= ', ' N.A.'   , ' | ', max_cfl_z , ' | ', 'N.A.'
+       write(*,"(A15, A10   , A3, ES10.3, A3, A10   )") '     pgf_x= ', ' N.A.'   , ' | ', max_pgfx  , ' | ', 'N.A.'
+       write(*,"(A15, A10   , A3, ES10.3, A3, A10   )") '     pgf_y= ', ' N.A.'   , ' | ', max_pgfy  , ' | ', 'N.A.'
+       write(*,"(A15, A10   , A3, ES10.3, A3, A10   )") '        Av= ', ' N.A.'   , ' | ', max_av    , ' | ', 'N.A.'
+       write(*,"(A15, A10   , A3, ES10.3, A3, A10   )") '        Kv= ', ' N.A.'   , ' | ', max_kv    , ' | ', 'N.A.'
        if (use_ice)  then
-       write(*,"(A, A     , A, ES10.3, A, A)")      '     m_ice= ',' N.A.     ',' | ',max_m_ice  ,' | ','N.A.'
+       write(*,"(A15, A10   , A3, ES10.3, A3, A10)")    '     m_ice= ', ' N.A.'   , ' | ', max_m_ice , ' | ', 'N.A.'
        end if
        !________________________________________________________________________
        ! SSH CG solver. A named quantity in every standard block, like cfl_z
@@ -346,6 +346,10 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
     real(kind=WP), dimension(:)    , pointer :: a_ice, m_ice, m_snow
     real(kind=WP), dimension(:)    , pointer :: a_ice_old, m_ice_old, m_snow_old
     real(kind=WP), dimension(:), allocatable, target :: dhbar
+    ! Saved, and the global-to-local map is fixed for the run, so it is built
+    ! on first use. Each of the five dump sites below used to allocate it
+    ! afresh and nothing ever deallocated it, so the second node to blow up
+    ! aborted here and took the blowup diagnostic with it.
     integer, dimension(:), save, allocatable :: local_idx_of
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -424,14 +428,21 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
           write(*,*) 'hnode(:, n)  = ',hnode(ulevels_nod2D(n):nlevels_nod2D(n),n)
           write(*,*)
           if (use_icebergs) then
-            allocate(local_idx_of(elem2D))
-            call global2local(mesh, partit, local_idx_of, elem2D)
+            if (.not. allocated(local_idx_of)) then
+              allocate(local_idx_of(elem2D))
+              call global2local(mesh, partit, local_idx_of, elem2D)
+            end if
             write(*,*) 'ibhf_n(:, n) = ',ibhf_n(ulevels_nod2D(n):nlevels_nod2D(n),n)
             write(*,*) 'ibfwb(n) = ',ibfwb(n)
             write(*,*) 'ibfwl(n) = ',ibfwl(n)
             write(*,*) 'ibfwe(n) = ',ibfwe(n)
             write(*,*) 'ibfwbv(n) = ',ibfwbv(n)
             do ib=1, ib_num
+                ! global2local zeroes every element this rank does not own, so an
+                ! iceberg living on another rank maps to 0 and indexing elem2d_nodes
+                ! with it runs off the array.
+                if (iceberg_elem(ib) < 1 .or. iceberg_elem(ib) > elem2D) cycle
+                if (local_idx_of(iceberg_elem(ib)) == 0) cycle
                 if (mesh%elem2d_nodes(1, local_idx_of(iceberg_elem(ib))) == n) then
                     write(*,*) 'ib = ',ib, ', length = ',length_ib(ib), ', height = ', height_ib(ib), ', scaling = ', scaling(ib) 
                     write(*,*) 'hfb_flux_ib(ib) = ',hfb_flux_ib(ib)
@@ -480,14 +491,21 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
           write(*,*) 'CFL_z(:,n)  = ',CFL_z(:,n)
           write(*,*)
           if (use_icebergs) then
-            allocate(local_idx_of(elem2D))
-            call global2local(mesh, partit, local_idx_of, elem2D)
+            if (.not. allocated(local_idx_of)) then
+              allocate(local_idx_of(elem2D))
+              call global2local(mesh, partit, local_idx_of, elem2D)
+            end if
             write(*,*) 'ibhf_n(:, n) = ',ibhf_n(ulevels_nod2D(n):nlevels_nod2D(n),n)
             write(*,*) 'ibfwb(n) = ',ibfwb(n)
             write(*,*) 'ibfwl(n) = ',ibfwl(n)
             write(*,*) 'ibfwe(n) = ',ibfwe(n)
             write(*,*) 'ibfwbv(n) = ',ibfwbv(n)
             do ib=1, ib_num
+                ! global2local zeroes every element this rank does not own, so an
+                ! iceberg living on another rank maps to 0 and indexing elem2d_nodes
+                ! with it runs off the array.
+                if (iceberg_elem(ib) < 1 .or. iceberg_elem(ib) > elem2D) cycle
+                if (local_idx_of(iceberg_elem(ib)) == 0) cycle
                 if (mesh%elem2d_nodes(1, local_idx_of(iceberg_elem(ib))) == n) then
                     write(*,*) 'ib = ',ib, ', length = ',length_ib(ib), ', height = ', height_ib(ib), ', scaling = ', scaling(ib) 
                     write(*,*) 'hfb_flux_ib(ib) = ',hfb_flux_ib(ib)
@@ -526,14 +544,21 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
           write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,n)/rad
           write(*,*)
           if (use_icebergs) then
-            allocate(local_idx_of(elem2D))
-            call global2local(mesh, partit, local_idx_of, elem2D)
+            if (.not. allocated(local_idx_of)) then
+              allocate(local_idx_of(elem2D))
+              call global2local(mesh, partit, local_idx_of, elem2D)
+            end if
             write(*,*) 'ibhf_n(:, n) = ',ibhf_n(ulevels_nod2D(n):nlevels_nod2D(n),n)
             write(*,*) 'ibfwb(n) = ',ibfwb(n)
             write(*,*) 'ibfwl(n) = ',ibfwl(n)
             write(*,*) 'ibfwe(n) = ',ibfwe(n)
             write(*,*) 'ibfwbv(n) = ',ibfwbv(n)
             do ib=1, ib_num
+                ! global2local zeroes every element this rank does not own, so an
+                ! iceberg living on another rank maps to 0 and indexing elem2d_nodes
+                ! with it runs off the array.
+                if (iceberg_elem(ib) < 1 .or. iceberg_elem(ib) > elem2D) cycle
+                if (local_idx_of(iceberg_elem(ib)) == 0) cycle
                 if (mesh%elem2d_nodes(1, local_idx_of(iceberg_elem(ib))) == n) then
                     write(*,*) 'ib = ',ib, ', length = ',length_ib(ib), ', height = ', height_ib(ib), ', scaling = ', scaling(ib) 
                     write(*,*) 'hfb_flux_ib(ib) = ',hfb_flux_ib(ib)
@@ -598,14 +623,21 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
              write(*,*) 'CFL_z(:,n)  = ',CFL_z(:,n)
              write(*,*)
           if (use_icebergs) then
-            allocate(local_idx_of(elem2D))
-            call global2local(mesh, partit, local_idx_of, elem2D)
+            if (.not. allocated(local_idx_of)) then
+              allocate(local_idx_of(elem2D))
+              call global2local(mesh, partit, local_idx_of, elem2D)
+            end if
             write(*,*) 'ibhf_n(:, n) = ',ibhf_n(ulevels_nod2D(n):nlevels_nod2D(n),n)
             write(*,*) 'ibfwb(n) = ',ibfwb(n)
             write(*,*) 'ibfwl(n) = ',ibfwl(n)
             write(*,*) 'ibfwe(n) = ',ibfwe(n)
             write(*,*) 'ibfwbv(n) = ',ibfwbv(n)
             do ib=1, ib_num
+                ! global2local zeroes every element this rank does not own, so an
+                ! iceberg living on another rank maps to 0 and indexing elem2d_nodes
+                ! with it runs off the array.
+                if (iceberg_elem(ib) < 1 .or. iceberg_elem(ib) > elem2D) cycle
+                if (local_idx_of(iceberg_elem(ib)) == 0) cycle
                 if (mesh%elem2d_nodes(1, local_idx_of(iceberg_elem(ib))) == n) then
                     write(*,*) 'ib = ',ib, ', length = ',length_ib(ib), ', height = ', height_ib(ib), ', scaling = ', scaling(ib) 
                     write(*,*) 'hfb_flux_ib(ib) = ',hfb_flux_ib(ib)
@@ -674,14 +706,21 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
              write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,n)/rad
              write(*,*)
           if (use_icebergs) then
-            allocate(local_idx_of(elem2D))
-            call global2local(mesh, partit, local_idx_of, elem2D)
+            if (.not. allocated(local_idx_of)) then
+              allocate(local_idx_of(elem2D))
+              call global2local(mesh, partit, local_idx_of, elem2D)
+            end if
             write(*,*) 'ibhf_n(:, n) = ',ibhf_n(ulevels_nod2D(n):nlevels_nod2D(n),n)
             write(*,*) 'ibfwb(n) = ',ibfwb(n)
             write(*,*) 'ibfwl(n) = ',ibfwl(n)
             write(*,*) 'ibfwe(n) = ',ibfwe(n)
             write(*,*) 'ibfwbv(n) = ',ibfwbv(n)
             do ib=1, ib_num
+                ! global2local zeroes every element this rank does not own, so an
+                ! iceberg living on another rank maps to 0 and indexing elem2d_nodes
+                ! with it runs off the array.
+                if (iceberg_elem(ib) < 1 .or. iceberg_elem(ib) > elem2D) cycle
+                if (local_idx_of(iceberg_elem(ib)) == 0) cycle
                 if (mesh%elem2d_nodes(1, local_idx_of(iceberg_elem(ib))) == n) then
                     write(*,*) 'ib = ',ib, ', length = ',length_ib(ib), ', height = ', height_ib(ib), ', scaling = ', scaling(ib) 
                     write(*,*) 'hfb_flux_ib(ib) = ',hfb_flux_ib(ib)
