@@ -1373,7 +1373,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 #if defined(__recom) && defined(__usetp)
     endif !(partit%my_fesom_group==0) then
 #endif
-        CASE (1023:1036)
+        CASE (1023:1037)
             tracers%data(i)%values(:,:)=0.0_WP
 #if defined(__recom) && defined(__usetp)
     if (partit%my_fesom_group==0) then
