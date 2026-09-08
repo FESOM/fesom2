@@ -37,8 +37,6 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP)  :: A, h, hsn, alb, t
   !---- atmospheric heat fluxes (provided by ECHAM)
   real(kind=WP)  :: a2ohf, a2ihf, qres, qcon
-  real(kind=WP)  :: t_before_skin
-  integer, save  :: n_skindiag = 0
   !---- tref: ist anchor the atmosphere evaluated a2ihf at, the linearization
   !---- anchor for the internal surface-temperature solve (see ice_surftemp).
   real(kind=WP)  :: tref
@@ -195,38 +193,7 @@ subroutine thermodynamics(ice, partit, mesh)
         ! instead: the linearization stays stiff and a diverged skin is pulled back
         ! within a couple of days.
         if (tref < 173.15_WP .or. tref > 400.0_WP) tref = 271.35_WP
-        ! EXPERIMENT E3a (not the final fix): pin the anchor to a fixed external
-        ! reference, on top of E2's recovery fix. E1 showed this collapses the
-        ! amplifier (8 solve-produced cold events against 209765), but E1 was
-        ! cancelled before a full year so its climate was never measured. The
-        ! freezing point is too warm for a real winter ice skin, which belongs
-        ! near 240-250 K, so this should show a warm bias. That bias is the price
-        ! of not knowing the temperature OpenIFS evaluated a2ihf at, and it sizes
-        ! what the proper OIFS anchor field (PSURF%PTSKTI(:,2)) would buy.
-        tref = 271.35_WP
-        t_before_skin = t
         call ice_surftemp(ice%thermo, max(h/(max(A,Aimin)),0.05), hsn/(max(A,Aimin)), a2ihf, tref, t)
-        ! Skin-solve divergence probe. The steady state of ice_surftemp is
-        !   t = [a2ihf + zlam*tref + (con/zsniced)*TFrezs] / (con/zsniced + zlam)
-        ! and zlam_turb=16.0 keeps the denominator near 20 W/m^2/K for every
-        ! observed snow and ice thickness, so the skin moves only ~0.05 K per
-        ! W/m^2. Reaching the observed sub-200 K excursions therefore demands
-        ! a2ihf near -1200 W/m^2, and nothing else in the balance is soft
-        ! enough to do it. Dump every term when the solve lands below 200 K so
-        ! that is a measurement rather than an inference. Rate limited the same
-        ! way as the cut_off cold-ice warning, and written to stdout on purpose:
-        ! this diagnostic has to survive the run being killed mid-flush.
-        if (t < 200.0_WP) then
-           n_skindiag = n_skindiag + 1
-           if (n_skindiag <= 20 .or. mod(n_skindiag, 200000) == 0) then
-              write(*,'(a,i9,a,i7,8(a,es13.5))')                              &
-                   ' SKINDIAG occ ', n_skindiag, ' rank ', partit%mype,              &
-                   ' a2ihf=',  a2ihf,  ' tref=',   tref,                      &
-                   ' t_in=',   t_before_skin, ' t_out=', t,                   &
-                   ' h_ice=',  h,     ' h_snow=', hsn,                        &
-                   ' a_ice=',  A,     ' istref_raw=', ist_ref(inod)
-           end if
-        end if
         ice_temp(inod)  = t
      else
         ! Freezing temp of saltwater in K
@@ -666,8 +633,30 @@ contains
   ! wherever the surface tracks the coupling temperature. In coupled-slab mode
   ! the growth budget is driven by the atmosphere flux (-a2ihf), so this solve
   ! only sets the internal skin temperature (albedo/melt-pond state).
+  ! Take the atmosphere's ice-tile skin directly (tref = A_Ice_tskin, recv 16).
+  !
+  ! This used to solve a second skin temperature here and linearize the
+  ! atmospheric flux about tref:
+  !     zlam = 4*emiss_ice*boltzmann*tref**3 + zlam_turb
+  !     t    = (zcpdte*t + a2ihf + zlam*tref + zicefl)/(zcpdte + con/zsniced + zlam)
+  ! Under LNEMOLIMTEMP=.false. OpenIFS owns the ice skin and evolves it from its
+  ! own surface energy balance, using the thickness, snow depth and concentration
+  ! FESOM sends it. Solving a second one here and then anchoring it on our own
+  ! previous value made it self-referential: with tref == t the zlam terms cancel
+  ! and the surface is held by snow-damped conduction alone, so any cold state was
+  ! self-consistent and it settled 70 K low.
+  !
+  ! Nothing in FESOM's budget needs a locally solved skin. Growth is driven by the
+  ! atmosphere flux (Qatmice = -a2ihf); qres and qcon have no consumers at all and
+  ! are output diagnostics only. The one functional user of t is ice_albedo, and
+  ! that is better served by the same skin the atmosphere used for its own
+  ! radiation than by an independently solved one. a2ihf is deliberately not used
+  ! here: OpenIFS already formed this skin from it, so applying it again would
+  ! double-count.
+  t=tref
+  ! zlam is no longer used to solve for t, but the qres melt-residual diagnostic
+  ! below is kept in its original form, so it is still needed there.
   zlam=4.0_WP*emiss_ice*boltzmann*tref**3 + zlam_turb
-  t=(zcpdte*t+a2ihf+zlam*tref+zicefl)/(zcpdte+con/zsniced+zlam) ! New sea ice surf temp [K]
   if (t>273.15_WP) then
      qres=(con/zsniced+zcpdte+zlam)*(t-273.15_WP)
      t=273.15_WP

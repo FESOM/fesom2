@@ -2014,16 +2014,6 @@ CASE ('qcon      ')
      call def_stream(nod2D, myDim_nod2D, 'qcon',  'conductive heat flux',   'W/m^2',    ice%atmcoupl%flx_qcon(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)  
 CASE ('qres      ')
      call def_stream(nod2D, myDim_nod2D, 'qres',  'residual heat flux',     'W/m^2',    ice%atmcoupl%flx_qres(:),           io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-  ! Diagnostics for the coupled-slab skin solve (ice_thermo_cpl.F90:ice_surftemp).
-  ! a2ihf is the atmosphere->ice heat flux the solve is driven by; istref is the
-  ! linearization anchor it is applied about, captured at the OASIS send
-  ! (gen_forcing_couple.F90:475). With LNEMOLIMTEMP=.false. the atmosphere solves its
-  ! own skin and ignores the transmitted ist, so the two need not agree -- which is the
-  ! hypothesis under test for the sub-200 K skin excursions over thick snow.
-  CASE ('a2ihf     ')
-       call def_stream(nod2D, myDim_nod2D, 'a2ihf', 'atmosphere to ice heat flux', 'W/m^2', ice%atmcoupl%ice_flx_h(:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-  CASE ('istref    ')
-       call def_stream(nod2D, myDim_nod2D, 'istref', 'ist linearization anchor',   'K',     ice%atmcoupl%ist_ref(:),            io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 #endif
 
 !------------------------------------------
