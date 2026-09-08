@@ -335,16 +335,18 @@ if(FESOM_COUPLING_IS_YAC)
    include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindYAC.cmake)
 endif()
 
-# Deprecated macro set, still emitted so that the guards in src/ keep working
-# unchanged. Retired by the guard rewrite that follows.
+# Transitional macros, each with a named reason to still exist:
+#
+#   __oasis -- the src/recom submodule still tests it (recom_main.F90, mean
+#     sea level pressure and 10m wind).
+#
+#   __oifs / __ifsinterface -- guard the partner field set and the prognostic
+#     ice surface temperature, converted in the commits that follow.
 if(FESOM_COUPLING_IS_OASIS)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __oasis)
 endif()
 if(FESOM_COUPLING STREQUAL "oasis50")
    target_compile_definitions(${PROJECT_NAME} PRIVATE __oifs)
-endif()
-if(FESOM_COUPLING_IS_YAC)
-   target_compile_definitions(${PROJECT_NAME} PRIVATE __yac __coupled)
 endif()
 if(${ASYNC_ICEBERGS})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __async_icebergs)

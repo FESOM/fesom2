@@ -2109,7 +2109,7 @@ END DO
 
     ! Voronoi-style control-volume corners (ring of element centres around
     ! each node). Used by OASIS coupling AND by XIOS conservative remap
-    ! (regular-grid output). Previously gated by #if defined(__oasis),
+    ! (regular-grid output). Previously gated by #if defined(__oasis) (now __cpl_oasis),
     ! which made the XIOS regrid path crash in standalone FESOM builds
     ! (io_xios.F90: size(mesh%x_corners,2) on an unallocated array).
     ! Always allocate now — cost is O(local_nodes * avg_nodal_valence),
@@ -2788,7 +2788,7 @@ deallocate(center_y, center_x)
      !   end do
      !end if
 
-#if defined (__oasis) || defined (__yac)
+#if defined (__cpl_coupler)
   nn=0
   ns=0  
   allocate(mesh%lump2d_north(myDim_nod2D), mesh%lump2d_south(myDim_nod2D))

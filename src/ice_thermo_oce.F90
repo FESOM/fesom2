@@ -153,7 +153,7 @@ END DO
 #endif /* (__oifs) */
 end subroutine cut_off
 
-#if !defined (__oasis) && !defined (__ifsinterface) && !defined (__yac)
+#if !defined (__cpl_enabled)
 !_______________________________________________________________________________
 ! Sea-ice thermodynamics routines
 !
@@ -1030,4 +1030,4 @@ end function compute_solar_zenith_angle
 !
 !
 !_______________________________________________________________________________
-#endif /* #if !defined (__coupled) && !defined (__ifsinterface) */
+#endif /* !defined (__cpl_enabled) */

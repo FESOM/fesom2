@@ -340,7 +340,7 @@ subroutine ini_ice_io(ice, partit, mesh)
   call ice_files%def_node_var_optional('ice_albedo', 'ice albedo',    '-',   ice%atmcoupl%ice_alb, mesh, partit)
   call ice_files%def_node_var_optional('ice_temp', 'ice surface temperature',  'K',   ice%data(4)%values, mesh, partit)
 #endif /* (__oifs) */
-#if defined (__oasis)
+#if defined (__cpl_oasis)
   !---wiso-code
   if (lwiso) then
     call ice_files%def_node_var_optional('h2o18_ice', 'h2o18 concentration in sea ice', 'kmol/m**3', tr_arr_ice(:,1), mesh, partit)
