@@ -335,18 +335,11 @@ if(FESOM_COUPLING_IS_YAC)
    include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindYAC.cmake)
 endif()
 
-# Transitional macros, each with a named reason to still exist:
-#
-#   __oasis -- the src/recom submodule still tests it (recom_main.F90, mean
-#     sea level pressure and 10m wind).
-#
-#   __oifs / __ifsinterface -- guard the partner field set and the prognostic
-#     ice surface temperature, converted in the commits that follow.
+# Transitional macro: the src/recom submodule still tests __oasis
+# (recom_main.F90, mean sea level pressure and 10m wind). Drop it here once
+# recom has been updated to __cpl_oasis and the submodule pointer bumped.
 if(FESOM_COUPLING_IS_OASIS)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __oasis)
-endif()
-if(FESOM_COUPLING STREQUAL "oasis50")
-   target_compile_definitions(${PROJECT_NAME} PRIVATE __oifs)
 endif()
 if(${ASYNC_ICEBERGS})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __async_icebergs)
@@ -364,9 +357,9 @@ if(CVMIX)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __cvmix)
 endif()
 
-if(ENABLE_IFS_INTERFACE)
-   target_compile_definitions(${PROJECT_NAME} PRIVATE __ifsinterface)
-endif()
+# ENABLE_IFS_INTERFACE no longer defines a macro: the source tests
+# __cpl_direct instead. It still selects the src/ifs_interface/ source list
+# and the fesom_HAVE_IFS_INTERFACE package export.
 
 if(VERBOSE)
    target_compile_definitions(${PROJECT_NAME} PRIVATE VERBOSE)

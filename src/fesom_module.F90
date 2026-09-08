@@ -58,7 +58,8 @@ module fesom_main_storage_module
 #endif
 
 #if defined (__cpl_enabled)
-  use cpl_config, only: read_cpl_namelist, check_cpl_config
+  use cpl_config, only: read_cpl_namelist, check_cpl_config, &
+                        is_coupled_to_echam
   ! Same entity as g_config's compute_oasis_corners (use'd wholesale above);
   ! the alias marks which of the two homonyms is meant at the call site.
   use g_config,   only: deprecated_oasis_corners => compute_oasis_corners
@@ -483,11 +484,10 @@ contains
           nrecv = nrecv + 6
         END IF
         !---wiso-code-end
-#if !defined (__oifs)
-        IF (use_icebergs) THEN
+        ! Iceberg wind fields are only in the ECHAM field set.
+        IF (is_coupled_to_echam .and. use_icebergs) THEN
           nrecv = nrecv + 2
         END IF
-#endif
 #endif
 
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call check_mesh_consistency'//achar(27)//'[0m'
