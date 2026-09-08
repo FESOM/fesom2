@@ -529,8 +529,20 @@ subroutine READ_T_ICE(ice, unit, iostat, iomsg)
     integer                                :: i
 
     !___________________________________________________________________________
+    ! The tracer layout is set by set_ice_tracer_layout before the restart is
+    ! read, so a stream written under a different layout does not fit the
+    ! allocated ice%data. Reading it would run past the end of the array.
     read(unit, iostat=iostat, iomsg=iomsg) ice%num_itracers
-    if (.not. allocated(ice%data)) allocate(ice%data(ice%num_itracers))
+    if (.not. allocated(ice%data)) then
+        allocate(ice%data(ice%num_itracers))
+    else if (size(ice%data) /= ice%num_itracers) then
+        write(iomsg, '(a,i0,a,i0,a)') &
+            'ice restart holds ', ice%num_itracers, ' tracers, this run has ',&
+            size(ice%data), '. Restart and run must use the same ice '// &
+            'tracer layout; see set_ice_tracer_layout.'
+        iostat = 1
+        return
+    end if
     do i=1, ice%num_itracers
        call ice%data(i)%READ_T_ICE_DATA(unit)
     end do
