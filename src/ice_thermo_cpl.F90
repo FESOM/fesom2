@@ -37,6 +37,8 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP)  :: A, h, hsn, alb, t
   !---- atmospheric heat fluxes (provided by ECHAM)
   real(kind=WP)  :: a2ohf, a2ihf, qres, qcon
+  real(kind=WP)  :: t_before_skin
+  integer, save  :: n_skindiag = 0
   !---- tref: ist anchor the atmosphere evaluated a2ihf at, the linearization
   !---- anchor for the internal surface-temperature solve (see ice_surftemp).
   real(kind=WP)  :: tref
@@ -182,8 +184,40 @@ subroutine thermodynamics(ice, partit, mesh)
         ! actually evaluated a2ihf at (captured at the OASIS send). Fall back
         ! to the local t before the first transmission (cold start / restart).
         tref = ist_ref(inod)
-        if (tref < 100.0_WP) tref = t
+        ! ist_ref is 0 before the first transmission of a leg, and a skin that has
+        ! already diverged makes it unphysical (values below -1e5 K were observed
+        ! once the capture started working). Falling back to `t` in either case is
+        ! what made this solve self-referential: with tref==t the zlam terms cancel
+        ! between the numerator and denominator of ice_surftemp, removing the only
+        ! stiff restoring term and leaving the surface held by snow-damped
+        ! conduction alone (~0.5 W/m^2/K), where an ordinary -45 W/m^2 buys -90 K
+        ! and a diverged point can never recover. Anchor on the freezing point
+        ! instead: the linearization stays stiff and a diverged skin is pulled back
+        ! within a couple of days.
+        if (tref < 173.15_WP .or. tref > 400.0_WP) tref = 271.35_WP
+        t_before_skin = t
         call ice_surftemp(ice%thermo, max(h/(max(A,Aimin)),0.05), hsn/(max(A,Aimin)), a2ihf, tref, t)
+        ! Skin-solve divergence probe. The steady state of ice_surftemp is
+        !   t = [a2ihf + zlam*tref + (con/zsniced)*TFrezs] / (con/zsniced + zlam)
+        ! and zlam_turb=16.0 keeps the denominator near 20 W/m^2/K for every
+        ! observed snow and ice thickness, so the skin moves only ~0.05 K per
+        ! W/m^2. Reaching the observed sub-200 K excursions therefore demands
+        ! a2ihf near -1200 W/m^2, and nothing else in the balance is soft
+        ! enough to do it. Dump every term when the solve lands below 200 K so
+        ! that is a measurement rather than an inference. Rate limited the same
+        ! way as the cut_off cold-ice warning, and written to stdout on purpose:
+        ! this diagnostic has to survive the run being killed mid-flush.
+        if (t < 200.0_WP) then
+           n_skindiag = n_skindiag + 1
+           if (n_skindiag <= 20 .or. mod(n_skindiag, 200000) == 0) then
+              write(*,'(a,i9,a,i7,8(a,es13.5))')                              &
+                   ' SKINDIAG occ ', n_skindiag, ' rank ', partit%mype,              &
+                   ' a2ihf=',  a2ihf,  ' tref=',   tref,                      &
+                   ' t_in=',   t_before_skin, ' t_out=', t,                   &
+                   ' h_ice=',  h,     ' h_snow=', hsn,                        &
+                   ' a_ice=',  A,     ' istref_raw=', ist_ref(inod)
+           end if
+        end if
         ice_temp(inod)  = t
      else
         ! Freezing temp of saltwater in K

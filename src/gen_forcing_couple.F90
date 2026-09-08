@@ -279,6 +279,9 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 
   implicit none
   integer,        intent(in)            :: istep
+    real(kind=WP)            :: fluxdbg_raw, fluxdbg_cor
+    integer                  :: fluxdbg_loc
+    integer, save            :: n_fluxdbg=0
   type(t_ice)   , intent(inout), target :: ice
   type(t_tracer), intent(in),    target :: tracers
   type(t_partit), intent(inout), target :: partit
@@ -472,7 +475,14 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
          ! transmitted -- the temperature OIFS evaluates its ice-tile fluxes
          ! at for the coming coupling interval. `action` is only true on real
          ! OASIS transmissions, so this stays frozen between coupling events.
-         if (i==4 .and. action) ice%atmcoupl%ist_ref(:) = exchange(:)
+         ! Field 4 goes on the wire concentration-weighted (ice_temp*a_ice), but
+         ! ist_ref is a TEMPERATURE: ice_thermo_cpl.F90 uses it as tref, the anchor
+         ! the implicit flux linearization is expanded about. Storing the weighted
+         ! product put a systematic (1-a_ice)*ist cold offset into the anchor every
+         ! coupling step, which acts as a spurious conductance zlam*(1-a_ice) toward
+         ! 0 K and collapses the solve's fixed point (143 K at a_ice=0.98). Store the
+         ! unweighted field. This was latent for as long as the capture never fired.
+         if (i==4 .and. action) ice%atmcoupl%ist_ref(:) = ice_temp(:)
 #endif
 #if defined(__recom) && defined(__usetp)
          endif
@@ -555,8 +565,27 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
             end if
             mask=a_ice
             ice_heat_flux(:)     =  tmp_ice_heat_flux(:)
+            fluxdbg_raw = maxval(abs(ice_heat_flux(1:partit%myDim_nod2D)))
             call force_flux_consv(ice_heat_flux, mask, i, 1,action, partit, mesh) ! Northern hemisphere
-            call force_flux_consv(ice_heat_flux, mask, i, 2,action, partit, mesh) ! Southern Hemisphere	     
+            call force_flux_consv(ice_heat_flux, mask, i, 2,action, partit, mesh) ! Southern Hemisphere
+            ! Probe: a2ihf reaches -1.46e5 W/m^2 in the skin solve, which no
+            ! atmosphere delivers. Separate what OASIS handed us from what this
+            ! conservation step manufactures. The redistribution weight is
+            ! |field|/int(|field|*a_ice*dA) and is only zeroed below a_ice<1e-10,
+            ! so a node with vanishing concentration keeps full weight while
+            ! contributing nothing to the normalising integral.
+            fluxdbg_cor = maxval(abs(ice_heat_flux(1:partit%myDim_nod2D)))
+            if (fluxdbg_cor > 1000.0_WP) then
+               n_fluxdbg = n_fluxdbg + 1
+               if (n_fluxdbg <= 30 .or. mod(n_fluxdbg, 20000) == 0) then
+                  fluxdbg_loc = maxloc(abs(ice_heat_flux(1:partit%myDim_nod2D)), 1)
+                  write(*,'(a,i8,a,i6,4(a,es13.5))')                              &
+                       ' FLUXDBG occ ', n_fluxdbg, ' rank ', partit%mype,         &
+                       ' raw_max=', fluxdbg_raw, ' corrected_max=', fluxdbg_cor,  &
+                       ' a_ice_there=', a_ice(fluxdbg_loc),                       &
+                       ' raw_there=', tmp_ice_heat_flux(fluxdbg_loc)
+               end if
+            end if	     
         elseif (i.eq.11) then
             if (action) then
                 shortwave(:)         =  exchange(:)		        ! heat_swr

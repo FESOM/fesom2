@@ -900,7 +900,18 @@ include "associate_mesh_ass.h"
     endif     
 #endif
     call oasis_put(send_id(ind), seconds_til_now, exfld, info)
-    action=(info==4 .OR. info==8)
+    ! OASIS3-MCT returns OASIS_Sent (4) only to the call that completes a coupling
+    ! group, and OASIS_Waitgroup (14) to every earlier field in that group: the data
+    ! is accepted and buffered, the transmission happens when the last field puts
+    ! (mod_oasis_advance.F90, the comm_now/status loop). Treating Waitgroup as "not
+    ! sent" silently drops the handoff for every field but the last. Here fields 1-6
+    ! returned 14 and only 7-8 returned 4, so ist_ref (captured on field 4 in
+    ! gen_forcing_couple.F90) was never written and stayed 0.0 for the whole run.
+    ! That cost the ice skin solve its linearization anchor: tref fell back to t,
+    ! which cancels zlam out of ice_surftemp and leaves the surface restrained only
+    ! by snow-damped conduction, so an ordinary -45 W/m^2 drove it to ~180 K.
+    ! Use the named constants; the numeric literals were the whole problem.
+    action=(info==OASIS_Sent .OR. info==OASIS_SentOut .OR. info==OASIS_Waitgroup)
     if (action) then
        if (ind==nsend) then
           cplsnd=0.
