@@ -3013,7 +3013,6 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
   real(kind=WP),  intent(IN)             :: TF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D), SF1(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
   real(kind=WP)                          :: tx(mesh%nl-1), ty(mesh%nl-1), sx(mesh%nl-1), sy(mesh%nl-1), vol(mesh%nl-1), testino(2)
   integer                                :: n, nz, elnodes(3),el, k, nln, uln, nle, ule
-  real(kind=WP)                          :: aux(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
 
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -3070,16 +3069,25 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
 !$OMP END DO
 !$OMP BARRIER
 !$OMP END PARALLEL
-! call exchange_nod(sigma_xy, partit)
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
-aux=sigma_xy(1,:,:)
-call exchange_nod(aux, partit)
-sigma_xy(1,:,:)=aux
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
-aux=sigma_xy(2,:,:)
-call exchange_nod(aux, partit)
-sigma_xy(2,:,:)=aux
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+! Single rank-3 exchange again. e7669b74 / 08e97027 (2023, neither with a commit
+! body or a measurement) split it into two component exchanges wrapped in three
+! MPI_COMM_FESOM barriers. The barriers add nothing: exchange_nod3D_n ends in
+! exchange_nod_end -> MPI_WAITALL, so the exchange is already complete on return,
+! and it is neighbour-only point-to-point. Two 2-year A/B pairs at 512 ranks give
+! -1.4 % and -3.0 %; run-to-run scatter there is ~1.7 %, so: a small gain, not
+! re-tested at the "high CPU numbers" the original commit mentions. See git log.
+! Old code below; restoring it also needs the deleted aux temporary back.
+!!PS ! call exchange_nod(sigma_xy, partit)
+!!PS CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+!!PS aux=sigma_xy(1,:,:)
+!!PS call exchange_nod(aux, partit)
+!!PS sigma_xy(1,:,:)=aux
+!!PS CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+!!PS aux=sigma_xy(2,:,:)
+!!PS call exchange_nod(aux, partit)
+!!PS sigma_xy(2,:,:)=aux
+!!PS CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+  call exchange_nod(sigma_xy, partit)
 end subroutine compute_sigma_xy
 !
 !
