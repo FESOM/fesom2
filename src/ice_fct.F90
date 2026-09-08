@@ -1175,6 +1175,10 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
     integer                             :: n, k, row
     integer                             :: elem, elnodes(3), q, offset, ipos
     real(kind=WP)                       :: aa
+    ! Row sum and area each accumulate O(nn_num) rounded terms, so the mismatch
+    ! scales with the area. An absolute tolerance is unreachable for WP=real32.
+    ! Not a parameter: nvfortran rejects spacing() in an initialization expression.
+    real(kind=WP)                       :: mass_matrix_rtol
     integer                             :: flag=0, iflag=0
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -1184,6 +1188,7 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     mass_matrix => ice%work%fct_massmatrix(:)
+    mass_matrix_rtol=100.0_WP*spacing(1.0_WP)
     !
     ! a)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, row, elem, elnodes, q, offset, ipos, aa)
@@ -1243,8 +1248,7 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
         offset=ssh_stiff%rowptr(q)-ssh_stiff%rowptr(1)+1
         n=ssh_stiff%rowptr(q+1)-ssh_stiff%rowptr(1)
         aa=sum(mass_matrix(offset:n))
-        !!PS if(abs(area(1,q)-aa)>.1_WP) then
-        if(abs(area(ulevels_nod2d(q),q)-aa)>.1_WP) then
+        if(abs(area(ulevels_nod2d(q),q)-aa)>mass_matrix_rtol*area(ulevels_nod2d(q),q)) then
 !$OMP CRITICAL
             iflag=q
             flag=1

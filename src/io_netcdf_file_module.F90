@@ -458,7 +458,12 @@ contains
 
     this%filepath = filepath
 
-    cmode = ior(nf_noclobber, ior(nf_netcdf4, nf_classic_model))
+    ! nf_clobber, not nf_noclobber: the callers (restart writing) name a file
+    ! after the instant it holds, so an existing file at that name is the debris
+    ! of an earlier attempt at the same instant and must be replaced. Refusing
+    ! made a job that had died mid-write -- out of disk quota, out of wall time --
+    ! unrestartable without hand-deleting files first.
+    cmode = ior(nf_clobber, ior(nf_netcdf4, nf_classic_model))
     call assert_nc( nf_create(filepath, cmode, this%ncid) , __LINE__)
         
     ! create our dims in the file

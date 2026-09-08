@@ -298,7 +298,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 #if defined(__recom)
         SinkingVel1 = 0.0d0 ! OG 16.03.23
         SinkingVel2 = 0.0d0 ! OG 16.03.23
-#endif
+#endif    
 
         ! do tracer AB (Adams-Bashfort) interpolation only for advectiv part
         ! needed
@@ -738,7 +738,7 @@ if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
                                        mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
                                        mesh%zbar_3d_n, mesh%nod_in_elem2D_num, &
                                        mesh%nod_in_elem2D, mesh%nlevels,       &
-                                       mesh%area, tracers%data(tr_num)%ID,     &
+                                       mesh%area, mesh%areasvol, tracers%data(tr_num)%ID, &
                                        tracers%data(tr_num)%values(:,:),       &
                                        partit%myDim_nod2D, str_bf,             &
                                        partit%mype, partit%MPI_COMM_FESOM,   &
@@ -2109,7 +2109,7 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
     CASE (1022) ! OXY
         bc_surface= dt*GloO2flux_seaicemask(n)
 !        bc_surface=0.0_WP
-    CASE (1023:1036)
+    CASE (1023:1037)
         bc_surface=0.0_WP  ! OG added bc for recom fields
     CASE (1302) ! Before (1037) ! DIC_13
 #if defined (__ciso)

@@ -35,6 +35,10 @@ module io_fesom_file_module
     type(var_info) var_infos(20); integer :: nvar_infos = 0 ! todo: allow dynamically allocated size without messing with shallow copied pointers
     type(dim_info), allocatable :: used_mesh_dims(:) ! the dims we add for our variables, we need to identify them when adding our mesh related variables
     integer :: rec_cnt = -1
+    !> Record to read from the attached file. 0 means "the last one", which is
+    !> the only sensible default for a file whose record count is all we know.
+    !> io_restart overrides it once it has matched a record against the clock.
+    integer :: read_rec = 0
     integer :: iorank = 0
     integer :: fesom_file_index
     type(thread_type) thread
@@ -44,6 +48,7 @@ module io_fesom_file_module
     logical gather_and_write
   contains
     procedure, public :: async_read_and_scatter_variables, async_gather_and_write_variables, join, init, is_iorank, rec_count, time_varindex, time_dimindex
+    procedure, public :: set_read_record, read_record
     procedure, public :: read_variables_raw, write_variables_raw
     procedure, public :: close_file ! inherited procedures we overwrite
     procedure, public :: read_and_scatter_variables
@@ -119,6 +124,30 @@ contains
     
     x = this%rec_cnt
   end function rec_count
+
+
+  !> Pin the record the next read takes its data from. Restart files written by
+  !> FESOM 2.8 and later hold a single record, so this is always 1 for them; it
+  !> exists for the files older versions wrote, which hold every restart of a
+  !> year and where the wanted record has to be matched against the clock
+  !> Reset by close_file, so it never leaks into the next file.
+  subroutine set_read_record(this, idx)
+    class(fesom_file_type), intent(inout) :: this
+    integer, intent(in) :: idx
+    this%read_rec = idx
+  end subroutine set_read_record
+
+
+  !> Record the next read uses: the pinned one, or the last in the file.
+  function read_record(this) result(x)
+    class(fesom_file_type), intent(inout) :: this
+    integer x
+    if(this%read_rec > 0) then
+      x = this%read_rec
+    else
+      x = this%rec_count()
+    end if
+  end function read_record
 
 
   function time_varindex(this) result(x)
@@ -255,7 +284,7 @@ contains
     total_scatter_time = 0.0d0
     total_barrier_time = 0.0d0
 
-    last_rec_idx = this%rec_count()
+    last_rec_idx = this%read_record()
     
     do i=1, this%nvar_infos
       var => this%var_infos(i)
@@ -612,7 +641,7 @@ contains
     ! Every reader has the same file open and reads the same record count, so
     ! they agree without a broadcast -- the same argument the write path uses.
     last_rec_idx = 0
-    if(this%is_reader()) last_rec_idx = this%rec_count()
+    if(this%is_reader()) last_rec_idx = this%read_record()
 
     do i=1, this%nvar_infos
       var => this%var_infos(i)
@@ -1113,6 +1142,7 @@ use nvfortran_subarray_workaround_module
     this%thread_running = .false.    
    
     this%rec_cnt = -1 ! reset state (should probably be done in all the open_ procedures, not here)
+    this%read_rec = 0
     call this%netcdf_file_type%close_file()
   end subroutine  
 

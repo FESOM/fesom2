@@ -50,7 +50,7 @@ module fesom_main_storage_module
   use mod_transit
   use iceberg_ocean_coupling
   use Toy_Channel_Soufflet, only: compute_zonal_mean
-
+  use ieee_arithmetic
   ! Define icepack module
 
 #if defined (__icepack)
