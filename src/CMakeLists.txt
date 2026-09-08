@@ -592,6 +592,21 @@ else()
     target_link_libraries(${PROJECT_NAME} PRIVATE ${YAC_Fortran_LIBRARIES})
 endif()
 
+# A YAC installation with shared libraries is recorded as a DT_NEEDED of
+# libfesom.so, so its directory has to be in the RPATH of that library:
+# both ld and the loader resolve those dependencies through the RPATH of
+# the object requiring them, so the executables need nothing themselves.
+# FindYAC.cmake reports the directories because they reach us as raw
+# pkg-config link flags, which CMAKE_INSTALL_RPATH_USE_LINK_PATH ignores.
+# INSTALL_RPATH is what the build tree uses with ENABLE_RELATIVE_RPATHS,
+# BUILD_RPATH is what it uses without it.
+if(YAC_LIBRARY_DIRECTORIES)
+    set_property(TARGET ${PROJECT_NAME} APPEND
+                 PROPERTY INSTALL_RPATH ${YAC_LIBRARY_DIRECTORIES})
+    set_property(TARGET ${PROJECT_NAME} APPEND
+                 PROPERTY BUILD_RPATH ${YAC_LIBRARY_DIRECTORIES})
+endif()
+
 
 #set_target_properties(${PROJECT_NAME} PROPERTIES LINKER_LANGUAGE Fortran)
 
