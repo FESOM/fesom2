@@ -18,15 +18,50 @@ ENDIF()
 
 set(ENV{PKG_CONFIG_PATH} "$ENV{PKG_CONFIG_PATH}:${yac_DIR}/lib/pkgconfig:${yac_DIR}/src/pkgconfig")
 
+# The Fortran driver uses the module "yac" (src/mci/yac_module.F90 in the
+# YAC sources) together with yac_fread_config_yaml, yac_fdef_calendar,
+# yac_fget_comp_comm and yac_fenddef. All of them require YAC 3.2.0 or
+# newer, which is also the release that added yac-mci.pc and deprecated
+# yac.pc.
+set(YAC_MIN_VERSION 3.2.0)
+
 find_package(PkgConfig QUIET)
-PKG_CHECK_MODULES(PC_yac yac)
 
 # newer versions of yac dont expose "yac" but "yac-mci"
-if ( NOT yac_FOUND )
-  PKG_CHECK_MODULES(PC_yac yac-mci)
+pkg_check_modules(PC_yac QUIET "yac-mci >= ${YAC_MIN_VERSION}")
+if(NOT PC_yac_FOUND)
+  pkg_check_modules(PC_yac QUIET "yac >= ${YAC_MIN_VERSION}")
 endif()
 
-find_path(YAC_Fortran_INCLUDE_DIRECTORIES yac.mod mo_yac_finterface.mod HINTS ${PC_yac_INCLUDE_DIRS} ${yac_DIR}/src/mci)
+if(NOT PC_yac_FOUND)
+  # diagnose the failure: no pkg-config, no YAC, or a YAC too old
+  if(NOT PKG_CONFIG_FOUND)
+    message(FATAL_ERROR
+        "FESOM_COUPLING=yac needs pkg-config to locate YAC "
+        "(or use -DBUILD_YAC=ON to build YAC from source)")
+  endif()
+  pkg_check_modules(PC_yac_unversioned QUIET yac-mci)
+  if(NOT PC_yac_unversioned_FOUND)
+    pkg_check_modules(PC_yac_unversioned QUIET yac)
+  endif()
+  if(PC_yac_unversioned_FOUND)
+    message(FATAL_ERROR
+        "FESOM_COUPLING=yac requires YAC >= ${YAC_MIN_VERSION}, "
+        "but found YAC ${PC_yac_unversioned_VERSION} in ${yac_DIR}")
+  else()
+    message(FATAL_ERROR
+        "FESOM_COUPLING=yac requires YAC >= ${YAC_MIN_VERSION}, but no "
+        "yac-mci.pc or yac.pc was found in PKG_CONFIG_PATH.\n"
+        "Please choose one approach:\n"
+        "  - Set the yac_DIR environment variable to a YAC installation, OR\n"
+        "  - Use BUILD_YAC=ON to build YAC from source")
+  endif()
+endif()
+
+message(STATUS "Found YAC ${PC_yac_VERSION}")
+
+find_path(YAC_Fortran_INCLUDE_DIRECTORIES NAMES yac.mod
+          HINTS ${PC_yac_INCLUDE_DIRS} ${yac_DIR}/src/mci)
 
 find_library(YAC_LIBRARY yac yac_mci HINTS ${PC_yac_LINK_LIBRARIES} ${yac_DIR}/src/mci ${yac_DIR}/src)
 #find_library(YAC_CLAPACK_LIBRARY yac_clapack HINTS ${PC_yac_LINK_LIBRARIES} ${yac_DIR}/clapack)
