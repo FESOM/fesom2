@@ -177,6 +177,9 @@ subroutine ice_init(ice, partit, mesh)
     ice%thermo%cl       =ice%thermo%rhoice*3.34e5  ! Volumetr. latent heat of ice fusion [J/m**3](cl=rhoice*Lf)
 
     !___________________________________________________________________________
+    call set_ice_tracer_layout(ice)
+
+    !___________________________________________________________________________
     ! define local vertice & elem array size
     elem_size=partit%myDim_elem2D+partit%eDim_elem2D
     node_size=partit%myDim_nod2D +partit%eDim_nod2D
@@ -331,7 +334,6 @@ subroutine ice_init(ice, partit, mesh)
     ice%atmcoupl%ice_flx_h     = 0.0_WP
     ice%atmcoupl%tmpoce_flx_h  = 0.0_WP
     ice%atmcoupl%tmpice_flx_h  = 0.0_WP
-#if defined (__oifs) || defined (__ifsinterface)
     allocate(ice%atmcoupl%ice_alb(       node_size))
     allocate(ice%atmcoupl%enthalpyoffuse(node_size))
     allocate(ice%atmcoupl%runoff_liquid(node_size))
@@ -348,7 +350,6 @@ subroutine ice_init(ice, partit, mesh)
     ! until the first actual OASIS transmission populates it.
     allocate(ice%atmcoupl%ist_ref(node_size))
     ice%atmcoupl%ist_ref       = 0.0_WP
-#endif /* (__oifs) */
 #endif /* (__cpl_enabled) */
 
     !___________________________________________________________________________
@@ -392,6 +393,9 @@ subroutine ice_init_toyocean_dummy(ice, partit, mesh)
     integer        :: node_size, n
     !___________________________________________________________________________
     ! pointer on necessary derived types
+
+    !___________________________________________________________________________
+    call set_ice_tracer_layout(ice)
 
     !___________________________________________________________________________
     ! define local vertice & elem array size
