@@ -13,7 +13,6 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake ${CMAKE_MODULE_PATH})
 set(BUILD_SHARED_LIBS ON CACHE BOOL "Default to using shared libs")
 set(TOPLEVEL_DIR ${CMAKE_CURRENT_LIST_DIR})
 set(CRAY                OFF CACHE BOOL "compile with cray ftn")
-set(ASYNC_ICEBERGS      ON  CACHE BOOL "compile fesom with or without support for asynchronous iceberg computations")
 set(USE_ICEPACK         OFF CACHE BOOL "compile fesom with the Iceapck modules for sea ice column physics.")
 set(OPENMP_REPRODUCIBLE OFF CACHE BOOL "serialize OpenMP loops that are critical for reproducible results")
 set(RECOM_COUPLED       OFF CACHE BOOL "compile fesom including biogeochemistry, REcoM3")
@@ -42,6 +41,14 @@ option(BUILD_NETCDF "Download and build NetCDF libraries when system libraries a
 
 # YAC build option
 option(BUILD_YAC "Download and build YAC, YAXT, and libfyaml libraries from source" OFF)
+
+# The iceberg tracers are now sized from the runtime use_icebergs switch in
+# set_ice_tracer_layout, so this build option no longer has an effect.
+if(DEFINED ASYNC_ICEBERGS)
+   message(DEPRECATION
+           "ASYNC_ICEBERGS no longer has an effect; the iceberg ice tracers "
+           "follow use_icebergs in namelist.config")
+endif()
 
 # Coupling interface. Declares FESOM_COUPLING, maps the deprecated boolean
 # switches onto it, and exports the FESOM_COUPLING_*/FESOM_CPL_MACROS
