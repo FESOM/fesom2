@@ -83,18 +83,12 @@ option(USE_SINGLE_PRECISION "Build FESOM in single precision (WP=4)" OFF)
 message(STATUS "USE_SINGLE_PRECISION: ${USE_SINGLE_PRECISION}")
 
 
-# option to trigger building a library version of FESOM
-# we do not always build the library along with the executable to avoid having two targets here in the CMakeLists.txt
-# two targets would allow e.g. setting different compiler options or preprocessor definition, which would be error prone.
-set( ENABLE_IFS_INTERFACE_DEFAULT OFF )
-if(DEFINED BUILD_FESOM_AS_LIBRARY AND NOT DEFINED ENABLE_IFS_INTERFACE)
-  message(DEPRECATION "Use ENABLE_IFS_INTERFACE instead of BUILD_FESOM_AS_LIBRARY")
-  set(ENABLE_IFS_INTERFACE_DEFAULT ${BUILD_FESOM_AS_LIBRARY})
-endif()
-option(ENABLE_IFS_INTERFACE   "Enable IFS interface" ${ENABLE_IFS_INTERFACE_DEFAULT})
-if(DEFINED FESOM_ENABLE_IFS_INTERFACE)
-  set(ENABLE_IFS_INTERFACE ${FESOM_ENABLE_IFS_INTERFACE}) # To distinguish option in a nested cmake project (bundle)
-endif()
+# We do not always build the library along with the executable, to avoid
+# having two targets here in the CMakeLists.txt: two targets would allow e.g.
+# setting different compiler options or preprocessor definitions, which would
+# be error prone. ENABLE_IFS_INTERFACE is derived from FESOM_COUPLING=direct
+# in cmake/FesomCoupling.cmake; it still drives the ifs_interface source list
+# and the fesom_HAVE_IFS_INTERFACE package export.
 message(STATUS "ENABLE_IFS_INTERFACE: ${ENABLE_IFS_INTERFACE}")
 
 
@@ -114,14 +108,15 @@ message(STATUS "ENABLE_IFS_INTERFACE: ${ENABLE_IFS_INTERFACE}")
 #
 #   * gen_forcing_couple.F90 -- integrate_2D's internal reductions use MPI_WP.
 #     The raw FESOM<->atmosphere net-flux exchange in net_rec_from_atm is
-#     skipped for __oifs (early return), so its remaining hardcoded-double
-#     calls are not reached by an OIFS build.
+#     skipped unless the partner is ECHAM (early return), so its remaining
+#     hardcoded-double calls are not reached by an OIFS build.
 #
 # The other coupled modes are NOT yet converted and stay refused:
-#   * FESOM_COUPLED without OIFS (OASIS/ECHAM) -- net_rec_from_atm's raw
-#     double exchange IS reached and is still typed to WP; needs the partner
+#   * FESOM_COUPLING=oasis28 (OASIS/ECHAM) -- net_rec_from_atm's raw double
+#     exchange IS reached and is still typed to WP; needs the partner
 #     precision reconciled.
-#   * USE_YAC (cpl_yac_driver.F90) and ENABLE_IFS_INTERFACE -- untouched.
+#   * FESOM_COUPLING=yac (cpl_yac_driver.F90) and FESOM_COUPLING=direct
+#     -- untouched.
 #
 # Set FESOM_ALLOW_SINGLE_PRECISION_COUPLED=ON to override the refusal for the
 # modes below (intended for developing those fixes, not for production).
@@ -131,24 +126,23 @@ option(FESOM_ALLOW_SINGLE_PRECISION_COUPLED
 
 if(USE_SINGLE_PRECISION AND NOT FESOM_ALLOW_SINGLE_PRECISION_COUPLED)
    set(_fesom_sp_coupled_modes "")
-   # OIFS-via-OASIS is allowed. Pure OASIS/ECHAM (FESOM_COUPLED without OIFS) is not.
-   if(FESOM_COUPLED AND NOT OIFS_COUPLED)
-      list(APPEND _fesom_sp_coupled_modes "FESOM_COUPLED (OASIS/ECHAM, without OIFS)")
-   endif()
-   if(USE_YAC)
-      list(APPEND _fesom_sp_coupled_modes "USE_YAC (YAC)")
-   endif()
-   if(ENABLE_IFS_INTERFACE)
-      list(APPEND _fesom_sp_coupled_modes "ENABLE_IFS_INTERFACE (IFS interface)")
+   # oasis50 (OIFS via OASIS) is allowed; the other coupled interfaces are not.
+   if(FESOM_COUPLING STREQUAL "oasis28")
+      list(APPEND _fesom_sp_coupled_modes "oasis28 (OASIS3-MCT 2.8, ECHAM)")
+   elseif(FESOM_COUPLING STREQUAL "yac")
+      list(APPEND _fesom_sp_coupled_modes "yac (YAC)")
+   elseif(FESOM_COUPLING STREQUAL "direct")
+      list(APPEND _fesom_sp_coupled_modes "direct (in-process IFS interface)")
    endif()
    if(_fesom_sp_coupled_modes)
       string(REPLACE ";" ", " _fesom_sp_coupled_modes "${_fesom_sp_coupled_modes}")
       message(FATAL_ERROR
-         "USE_SINGLE_PRECISION=ON is not yet supported together with: ${_fesom_sp_coupled_modes}.\n"
+         "USE_SINGLE_PRECISION=ON is not yet supported together with "
+         "FESOM_COUPLING=${_fesom_sp_coupled_modes}.\n"
          "These coupling paths still pass MPI_DOUBLE_PRECISION for real(kind=WP) "
          "buffers (or have not been reviewed), which corrupts memory when WP is "
-         "real32. OIFS-via-OASIS coupling (OIFS_COUPLED) has been converted and is "
-         "allowed.\n"
+         "real32. OIFS-via-OASIS coupling (FESOM_COUPLING=oasis50) has been "
+         "converted and is allowed.\n"
          "Build these configurations in double precision (USE_SINGLE_PRECISION=OFF), "
          "or set FESOM_ALLOW_SINGLE_PRECISION_COUPLED=ON if you are developing the fix.")
    endif()
@@ -323,8 +317,11 @@ if(FESOM_WITH_XIOS)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __XIOS)
 endif()
 
-if(${FESOM_COUPLED})
-   message(STATUS "FESOM is coupled")
+# Coupling interface. FESOM_CPL_MACROS carries the interface macro plus its
+# group predicates; see cmake/FesomCoupling.cmake.
+target_compile_definitions(${PROJECT_NAME} PRIVATE ${FESOM_CPL_MACROS})
+
+if(FESOM_COUPLING_IS_OASIS)
    if(${OASIS_WITH_YAC})
       message(STATUS "Looking for OASIS with YAC lib")
       include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindOASISYAC.cmake)
@@ -332,20 +329,25 @@ if(${FESOM_COUPLED})
       message(STATUS "Looking for OASIS")
       include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindOASIS.cmake)
    endif()
+endif()
+
+if(FESOM_COUPLING_IS_YAC)
+   include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindYAC.cmake)
+endif()
+
+# Deprecated macro set, still emitted so that the guards in src/ keep working
+# unchanged. Retired by the guard rewrite that follows.
+if(FESOM_COUPLING_IS_OASIS)
    target_compile_definitions(${PROJECT_NAME} PRIVATE __oasis)
+endif()
+if(FESOM_COUPLING STREQUAL "oasis50")
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __oifs)
+endif()
+if(FESOM_COUPLING_IS_YAC)
+   target_compile_definitions(${PROJECT_NAME} PRIVATE __yac __coupled)
 endif()
 if(${ASYNC_ICEBERGS})
    target_compile_definitions(${PROJECT_NAME} PRIVATE __async_icebergs)
-endif()
-
-if(${USE_YAC})
-  include(${CMAKE_CURRENT_LIST_DIR}/../cmake/FindYAC.cmake)
-  target_compile_definitions(${PROJECT_NAME} PRIVATE __yac __coupled)
-  list(APPEND sources_Fortran ${src_home}/cpl_yac_driver.F90)
-endif()
-
-if(${OIFS_COUPLED})
-   target_compile_definitions(${PROJECT_NAME} PRIVATE __oifs)
 endif()
 
 if(USE_ICEPACK)
