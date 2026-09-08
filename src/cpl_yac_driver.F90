@@ -96,7 +96,8 @@ contains
     real(kind=WP), allocatable :: x_vertices(:), y_vertices(:)
     real(kind=WP) :: mid(2)
     integer, allocatable :: nbr_vertices_per_cell(:), cell_to_vertex(:)
-    integer :: ierr, i, j, k, nbr_vertices, nbr_boundary_nodes, nbr_connections, vtx_idx, c2v_idx
+    integer :: i, j, k, nbr_vertices, nbr_boundary_nodes
+    integer :: nbr_connections, vtx_idx, c2v_idx
     integer :: curr_elem, curr_edge
     logical, allocatable :: node_is_boundary(:)
     character(len=8)           :: dt_str
@@ -273,7 +274,7 @@ contains
             dt_str, YAC_TIME_UNIT_MILLISECOND, recv_field_id(i))
     END DO
 
-    CALL yac_fenddef(ierr)
+    CALL yac_fenddef()
 
   end subroutine cpl_yac_define_unstr
 
