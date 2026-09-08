@@ -1462,10 +1462,25 @@ CONTAINS
 
       ! OPEN and read namelist for SBC REcoM
       open( unit=nm_sbc_unit+1, file='namelist.recom', form='formatted', access='sequential', status='old', iostat=iost )
+      if (iost == 0) then
       !call log_recom_namelist_open(partit%mype, iost)
-      if (iost /= 0) then
-         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-         stop
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
+          if (partit%mype==0) WRITE(*,*) '     file   : ', 'namelist.recom for sbc',' open ok'
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
+      else
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
+          if (partit%mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.recom for sbc',' ; iostat=',iost
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
+          call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+          stop
       endif
 
       READ( nm_sbc_unit+1, nml=nam_rsbc, iostat=iost )
@@ -1602,7 +1617,7 @@ CONTAINS
     end if
 
     !___________________________________________________________________________
-    ! read inCHL for applying shortwave penetration
+    ! read in CHL for applying shortwave penetration
     if (use_sw_pene) then
         if (chl_data_source=='Sweeney') then
             if (update_monthly_flag) then
@@ -1744,10 +1759,16 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
             ! Option A: Constant CO2 (spinup mode)
             if (constant_CO2) then
                 AtmCO2(:) = CO2_for_spinup
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
                 if (mype == 0) then
                     write(*,*) 'Constant_CO2   = ', CO2_for_spinup
                     write(*,*) 'Atm CO2        = ', AtmCO2
-                end if
+            end if
+#if defined(__usetp)
+        endif
+#endif
 
                 if (ciso) then
                     AtmCO2_13 = CO2_for_spinup * (1. + 0.001 * delta_co2_13)
@@ -1775,8 +1796,14 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
             ! Option B: Transient CO2 from file
             else
                 filename=trim(make_full_path(nm_co2_data_file))
-            !if (mype==0) write(*,*) 'Updating CO2 climatology for month       ', i,' from ', trim(filename)
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
 
+            if (mype==0) write(*,*) 'Updating CO2 climatology for month       ', i,' from ', trim(filename)
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
                 ! Compute the CO2 year corresponding to the current FESOM cycle
                 totnumyear                 = lastyearoffesomcycle - firstyearoffesomcycle + 1
                 firstyearofcurrentCO2cycle = lastyearoffesomcycle &
@@ -1785,10 +1812,14 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
 
                 currentCO2year = firstyearofcurrentCO2cycle &
                                + (yearnew - firstyearoffesomcycle) + 1
-
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif 
                 if (mype == 0) write(*,*) currentCO2year, firstyearofcurrentCO2cycle, &
                                           yearnew, firstyearoffesomcycle
-
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
                 write(currentCO2year_char, '(i4)') currentCO2year
                 CO2vari = 'AtmCO2_' // currentCO2year_char
 
@@ -1810,10 +1841,14 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
                                          start=(/CO2start/), count=(/CO2count/))
                 AtmCO2(:) = ncdata(:)
                 deallocate(ncdata)
-
-                !if (mype==0) write(*,*),'Current carbon year=',currentCO2year
-                !if (mype==0) write(*,*),'Atm CO2=', AtmCO2
-
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
+            if (mype==0) write(*,*) 'Current carbon year=',currentCO2year
+            if (mype==0) write(*,*) 'Atm CO2=', AtmCO2
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
                 status = nf90_close(ncid)
 
             end if  ! constant_CO2 / transient CO2
@@ -1822,9 +1857,15 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
 
 !   Control output of atmospheric CO2 values
         if (mype == 0 .and. ciso) then
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
             print *, '  AtmCO2_13 = ', AtmCO2_13(1)
             if (ciso_14) print *, '  AtmCO2_14 = ', AtmCO2_14(:,1)
             if (use_atbox) print *, '  use_atbox = .true.'
+#if defined(__usetp)
+        endif !(partit%my_fesom_group==0) then
+#endif
         end if
     end if  ! mstep == 1
     ! ----------------------------------------------------------------
@@ -1837,12 +1878,25 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
             if (i > 12)    i = 1
 
             filename = trim(make_full_path(nm_fe_data_file))
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif 
             if (mype==0) write(*,*) 'Updating iron climatology for month       ', i,' from ', trim(filename)
-            call read_2ddata_on_grid_NetCDF(filename, 'DustClim', i, GloFeDust, partit, mesh)
+#if defined(__usetp)
+        endif
+#endif
+            call read_2ddata_on_grid_NetCDF(filename,'DustClim', i, GloFeDust, partit, mesh)
         end if
     else
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif 
         if (mype == 0) write(*,*) 'Albani is switched off --> Check namelist.recom'
+#if defined(__usetp)
+        endif
+#endif
     end if
+
     ! ----------------------------------------------------------------
     !  Nitrogen (N) deposition
     ! ----------------------------------------------------------------
@@ -1852,7 +1906,14 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
 
             i        = month
             filename = trim(make_full_path(nm_aen_data_file))
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
 
+            if (mype==0) write(*,*) 'Updating nitrogen climatology for month   ', i,' from ', trim(filename)
+#if defined(__usetp)
+        endif
+#endif
             ! Select variable name based on year bounds
             if (yearnew > 2009) then
                 Nvari = 'NDep2009'
@@ -1866,7 +1927,13 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
         end if
     else
         GloNDust = 0.0_WP
-        !if (mstep==1 .and. mype==0) write(*,*) 'useAeolianN is switched off'
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
+        if (mstep==1 .and. mype==0) write(*,*) 'useAeolianN is switched off'
+#if defined(__usetp)
+        endif
+#endif
     end if
 
     !-----------------------------------------------------------------------------
@@ -1916,7 +1983,13 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
     else ! RIVERS DISABLED: zero out all riverine fluxes
 
         is_riverinput = 0.0d0
-
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
+        if (mype==0 .and. mstep==1) write(*,*) 'No riverine input'
+#if defined(__usetp)
+        endif
+#endif
     end if ! useRivers
 
     !-----------------------------------------------------------------------------
@@ -1973,7 +2046,13 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
     else ! EROSION DISABLED: zero out all erosion fluxes
 
         is_erosioninput = 0.0d0
-
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
+        if (mype==0 .and. mstep==1) write(*,*) 'No erosion input'
+#if defined(__usetp)
+        endif
+#endif
     end if ! useErosion
 
     !-----------------------------------------------------------------------------
@@ -1999,7 +2078,13 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> Atm_input'/
         !    if (do_read .and. mype==0) then
         !        i = month
         !        if (i > 12) i = 1
+#if defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
         !        write(*,*) 'Updating sedimentary input for month', i, 'from', trim(sedfilename)
+#if defined(__usetp)
+        endif
+#endif
         !    end if
         end if
 

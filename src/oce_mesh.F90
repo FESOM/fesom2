@@ -341,7 +341,13 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
     read(fileID,*) n      ! nod2D, we know it already
      error_status=0
      if (n/=mesh%nod2D) error_status=1 !set the error status for consistency between rpart and nod2D
+#if defined(__recom) && defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
     write(*,*) 'reading '// trim(file_name)   
+#if defined(__recom) && defined(__usetp)
+        end if
+#endif
   end if
   ! check the error status
   call MPI_BCast(error_status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
