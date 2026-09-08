@@ -3445,6 +3445,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     use solve_tracers_ale_interface
     use write_step_info_interface
     use check_blowup_interface
+    use ieee_arithmetic
     use fer_solve_interface
     use impl_vert_visc_ale_vtransp_interface
 #if defined (FESOM_PROFILING)
@@ -3462,6 +3463,8 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     real(kind=8)      :: t0, t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, t11, loc, glo
     integer           :: node
     integer           :: nz, elem, nzmin, nzmax !for KE diagnostic
+    integer           :: tr_num  ! for cavity NaN cleanup
+    integer           :: n_cavity_nan  ! NaN count reported by the cavity cleanup
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer :: eta_n
@@ -3921,6 +3924,31 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     call fesom_profiler_end("oce_tracer_solve")
     call fesom_profiler_start("oce_thickness_update")
 #endif 
+#if defined (__recom)
+    ! CAVITY FIX: Clean up NaN created by tracer advection/diffusion at cavity nodes
+    ! Cavity nodes can create NaN during numerical operations with zero/near-zero thickness
+    if (use_cavity) then
+        n_cavity_nan = 0
+        do node=1, partit%myDim_nod2D+partit%eDim_nod2D
+            if (mesh%ulevels_nod2D(node) > 1) then
+                ! Clean NaN in ALL levels for cavity nodes (not just cavity layers)
+                do tr_num=1, tracers%num_tracers
+                    n_cavity_nan = n_cavity_nan + &
+                            count(.not. ieee_is_finite(tracers%data(tr_num)%values(:, node)))
+                    where (.not. ieee_is_finite(tracers%data(tr_num)%values(:, node)))
+                        tracers%data(tr_num)%values(:, node) = 0.0_WP
+                    end where
+                enddo
+            endif
+        enddo
+        ! This scrub runs before check_blowup, so a genuine blow-up under a cavity
+        ! would be zeroed and never reported. Say so rather than hiding it.
+        if (n_cavity_nan > 0) then
+            write(*,'(A,I0,A,I0,A,I0)') ' WARNING: cavity NaN scrub zeroed ', n_cavity_nan, &
+                    ' tracer value(s) on rank ', mype, ' at step ', n
+        end if
+    endif
+#endif
      
     !___________________________________________________________________________
     ! Update hnode=hnode_new, helem
