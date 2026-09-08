@@ -10,7 +10,7 @@ module ice_setup_step_module
             ice_fem_fct, ice_TG_rhs_div, ice_TG_rhs, ice_update_for_div, ice_fct_solve
     USE ice_EVP_module, only: EVPdynamics
     USE ice_maEVP_module, only: EVPdynamics_a, EVPdynamics_m
-#if !defined (__oasis) && !defined (__ifsinterface) && !defined (__yac)
+#if !defined (__cpl_enabled)
     use ice_thermo_oce_module, only: thermodynamics, cut_off
 #ifdef ENABLE_OPENACC
     use ice_thermo_oce_module, only: thermodynamics_acc, thermo_device_ok
@@ -279,7 +279,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
     !___________________________________________________________________________
     ! ===== Thermodynamic part
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call thermodynamics...'//achar(27)//'[0m'
-#if defined(ENABLE_OPENACC) && !defined(__oasis) && !defined(__ifsinterface) && !defined(__yac)
+#if defined(ENABLE_OPENACC) && !defined (__cpl_enabled)
     if (thermo_device_ok(ice)) then
         call thermodynamics_acc(ice, partit, mesh)
     else

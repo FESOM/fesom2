@@ -80,10 +80,10 @@ use o_param
   integer, allocatable, dimension(:)               :: age_tracer_loc_index
   !---age-code-end
 
-#if defined (__oasis) || defined (__ifsinterface) || defined (__yac) /* todo:use a single shared definition  */
+#if defined (__cpl_enabled)
   real(kind=WP), target, allocatable, dimension(:) :: sublimation, evap_no_ifrac
 #endif
-#if defined (__oasis) || defined (__yac)
+#if defined (__cpl_coupler)
   real(kind=WP), target, allocatable, dimension(:) :: tmp_sublimation, tmp_evap_no_ifrac !temporary flux fields
   real(kind=WP), target, allocatable, dimension(:) :: tmp_shortwave 			!(for flux correction) 
   real(kind=WP), allocatable, dimension(:)         :: atm_net_fluxes_north, atm_net_fluxes_south
@@ -91,7 +91,11 @@ use o_param
   real(kind=WP), allocatable, dimension(:)         :: flux_correction_north, flux_correction_south, flux_correction_total
 #endif
 
-#if defined (__oasis) || defined (__ifsinterface)
+! TODO: __cpl_yac is absent here, as in the pre-rework guard. Declaration
+! and use agree, so this is self-consistent, but YAC does not get
+! residualifwflx or the rhofwt/rhowat freshwater conversion. Widening the
+! guard changes YAC results, so it is left to a separate change.
+#if defined (__cpl_oasis) || defined (__cpl_direct)
   real(kind=WP), allocatable, dimension(:)         :: residualifwflx
 #endif
 
