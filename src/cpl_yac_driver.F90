@@ -1,5 +1,5 @@
 module cpl_yac_driver
-#if defined(__yac)
+#if defined (__cpl_yac)
 
   USE yac
   USE o_PARAM

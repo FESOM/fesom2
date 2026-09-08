@@ -57,10 +57,10 @@ module fesom_main_storage_module
   use icedrv_main,          only: set_icepack, init_icepack, alloc_icepack
 #endif
 
-#if defined (__oasis)
+#if defined (__cpl_oasis)
   use cpl_driver
 #endif
-#if defined (__yac)
+#if defined (__cpl_yac)
 use cpl_yac_driver
 #endif
 
@@ -134,7 +134,7 @@ end module fesom_main_storage_module
 !           this way FESOM can e.g. be used as a library with an external time loop driver
 !           used with IFS-FESOM
 module fesom_module
-#if defined  __ifsinterface
+#if defined (__cpl_direct)
   use, intrinsic :: ieee_exceptions
 #endif
   ! Enhanced profiler integration
@@ -177,7 +177,7 @@ contains
       call read_namelist_run_config
 #endif
 
-#if !defined  __ifsinterface
+#if !defined (__cpl_direct)
       if(command_argument_count() > 0) then
         call command_line_options%parse()
         stop
@@ -196,7 +196,7 @@ contains
       mpi_is_initialized = .false.
       f%fesom_did_mpi_init = .false.
 
-#ifndef __oifs
+#ifndef __cpl_oasis50
         !ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
         !OIFS-FESOM2 coupling: does not require MPI_INIT here as this is done by OASIS
         call MPI_Initialized(mpi_is_initialized, f%i)
@@ -208,7 +208,7 @@ contains
 #endif
 
 
-#if defined (__oasis)
+#if defined (__cpl_oasis)
 
 #if defined(__recom) && defined(__usetp)
 ! pass num_fesom_groups to coupler
@@ -217,7 +217,7 @@ contains
         call cpl_oasis3mct_init(f%partit, f%partit%MPI_COMM_FESOM)
 #endif
 
-#elif defined (__yac)
+#elif defined (__cpl_yac)
         call cpl_yac_init(f%partit%MPI_COMM_FESOM)
 #endif
 
@@ -457,7 +457,7 @@ contains
         ! and additional arrays needed for 
         ! fancy advection etc.  
         !=====================
-#if defined (__oasis)
+#if defined (__cpl_oasis)
         !---wiso-code
         IF (lwiso) THEN
           nsend = nsend + 6       ! add number of water isotope tracers to coupling parameter nsend, nrecv
@@ -593,7 +593,7 @@ contains
             call age_tracer_init(f%partit, f%mesh)
         endif
         !---age-code-end
-#if defined (__oasis)
+#if defined (__cpl_oasis)
 
 ! only mype == 0 in my_fesom_group == 0 handles coupling with extern models
 #if defined(__recom) && defined(__usetp)
@@ -626,7 +626,7 @@ contains
     end if
 #endif
 
-#endif  ! defined (__oasis)
+#endif  ! defined (__cpl_oasis)
     
         ! --------------
         ! LA icebergs: 2023-05-17 
@@ -635,7 +635,7 @@ contains
         endif
         ! --------------
 
-#if defined (__yac)
+#if defined (__cpl_yac)
         call cpl_yac_define_unstr(f%partit, f%mesh)
         if(f%mype==0)  write(*,*) 'FESOM ---->     cpl_yac_define_unstr nsend, nrecv:',nsend, nrecv
 #endif
@@ -1003,7 +1003,7 @@ contains
         end if
 #endif 
 
-#if defined (__oifs) || defined (__oasis)
+#if defined (__cpl_oasis)
             seconds_til_now=INT(dt)*(n-1)
 #endif
         call clock      
@@ -1053,7 +1053,7 @@ contains
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("update_atm_forcing")
 #endif
-#if defined (__yac)
+#if defined (__cpl_yac)
             call update_atm_forcing_yac(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
 #else
             call update_atm_forcing(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
@@ -1531,7 +1531,7 @@ contains
     call io_xios_close()
 #endif
 
-#if defined (__oifs) 
+#if defined (__cpl_oasis50) 
     ! OpenIFS coupled version has to call oasis_terminate through par_ex
     call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
 #endif
@@ -1541,7 +1541,7 @@ contains
     end do ! i = num_fesom_groups - 1, 0, -1
 #endif
 
-#if defined(__MULTIO) && !defined(__ifsinterface) && !defined(__oasis)
+#if defined(__MULTIO) && !defined (__cpl_direct) && !defined (__cpl_oasis)
    call mpp_stop
 #endif
     ! Generate enhanced profiler report BEFORE MPI finalization

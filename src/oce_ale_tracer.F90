@@ -1922,7 +1922,7 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
   real(kind=WP), dimension(:), pointer :: a_ice  !! MB: where is this needed?
 
   if (use_transit) then
-#if defined (__oasis)
+#if defined (__cpl_oasis)
     ! SLP and wind speed in coupled setups. This is a makeshift solution
     ! as long as the true values are not provided by the AGCM / OASIS.
     press_a = mean_slp
@@ -2213,7 +2213,7 @@ FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit, mesh)
   !  --> is_nonlinfs=1.0 for zelvel,zstar ....
   !  --> is_nonlinfs=0.0 for linfs
 
-#if defined (__oasis)
+#if defined (__cpl_oasis)
 ! SLP and wind speed in coupled setups. This is a makeshift solution
 ! as long as the true values are not provided by the AGCM / OASIS.
   press_a = mean_slp
