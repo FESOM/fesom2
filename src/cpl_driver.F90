@@ -13,7 +13,9 @@ module cpl_driver
   ! Modules used
   !
   use mod_oasis                    ! oasis module
-  use g_config, only : dt, use_icebergs, lwiso, compute_oasis_corners
+  use g_config,   only : dt, use_icebergs, lwiso
+  use cpl_config, only : cpl_comp_name, cpl_grid_name, &
+                         compute_oasis_corners
 #if defined(__recom) && defined(__usetp)
   use g_config, only : num_fesom_groups 
 #endif
@@ -58,7 +60,6 @@ module cpl_driver
 
   !---wiso-code-end
 
-  character(len=16)          :: appl_name      ! application name for OASIS use
   character(len=16)          :: comp_name      ! name of this component
   character(len=11)          :: grid_name      ! name of the grid
 
@@ -366,10 +367,10 @@ include "node_contour_boundary.h"
       call fesom_flush
 #endif /* VERBOSE */
 
-    appl_name = 'ocean'
-    comp_name = 'fesom'
-    
-    grid_name = 'feom'
+    ! Assignment rather than trim(): OASIS expects the names blank-padded
+    ! to the declared lengths.
+    comp_name = cpl_comp_name
+    grid_name = cpl_grid_name
 
     !------------------------------------------------------------------
     ! 1st Initialize the OASIS3-MCT coupling system for the application

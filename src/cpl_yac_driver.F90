@@ -4,11 +4,11 @@ module cpl_yac_driver
   USE yac
   USE o_PARAM
   USE g_clock
+  USE cpl_config, only : cpl_comp_name, cpl_grid_name, cpl_config_file
 
   implicit none
   save
 
-  character(len=*), PARAMETER   :: comp_name = "fesom2"
   integer :: comp_id, grid_id, points_id
   integer :: send_field_id(4), recv_field_id(12)
   real(kind=WP), dimension(:,:),   allocatable   :: a2o_fcorr_stat  !flux correction statistics for the output
@@ -40,8 +40,8 @@ contains
 
     CALL yac_finit()
     CALL yac_fdef_calendar(YAC_PROLEPTIC_GREGORIAN)
-    CALL yac_fread_config_yaml ("coupling.yaml")
-    CALL yac_fdef_comp(comp_name, comp_id)
+    CALL yac_fread_config_yaml (trim(cpl_config_file))
+    CALL yac_fdef_comp(trim(cpl_comp_name), comp_id)
 
     CALL yac_fget_comp_comm(comp_id, localCommunicator)
 
@@ -220,7 +220,7 @@ contains
     END DO
 
     CALL yac_fdef_grid( &
-         "fesom_grid", & ! grid_name
+         trim(cpl_grid_name), &
          nbr_vertices, &   ! nbr_vertices
          myDim_nod2D, &  ! nbr_cells
          nbr_connections, & ! nbr_connections
