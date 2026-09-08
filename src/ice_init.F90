@@ -317,7 +317,7 @@ subroutine ice_init(ice, partit, mesh)
 
     !___________________________________________________________________________
     ! initialse coupling array of ice derived type 
-#if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
+#if defined (__cpl_enabled)
     allocate(ice%atmcoupl%oce_flx_h(     node_size))
     allocate(ice%atmcoupl%ice_flx_h(     node_size))
     allocate(ice%atmcoupl%tmpoce_flx_h(  node_size))
@@ -344,7 +344,7 @@ subroutine ice_init(ice, partit, mesh)
     allocate(ice%atmcoupl%ist_ref(node_size))
     ice%atmcoupl%ist_ref       = 0.0_WP
 #endif /* (__oifs) */
-#endif /* (__coupled: oasis or ifsinterface or yac) */
+#endif /* (__cpl_enabled) */
 
     !___________________________________________________________________________
     ! --> took from oce_mesh.F90 --> subroutine mesh_auxiliary_arrays(partit, mesh)

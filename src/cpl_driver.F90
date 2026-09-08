@@ -1,4 +1,4 @@
-#if defined (__oasis)
+#if defined (__cpl_oasis)
 module cpl_driver
   !======================================================================
   !
@@ -417,7 +417,7 @@ include "node_contour_boundary.h"
 
   subroutine cpl_oasis3mct_define_unstr(partit, mesh)
    
-#ifdef __oifs
+#ifdef __cpl_oasis50
     use mod_oasis_auxiliary_routines, ONLY:	oasis_get_debug, oasis_set_debug
 #else
     use mod_oasis_method, ONLY:	oasis_get_debug, oasis_set_debug

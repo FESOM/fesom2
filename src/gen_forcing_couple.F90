@@ -21,20 +21,20 @@ module gen_forcing_couple_module
 #if defined (__recom)
   use g_sbf, only: sbc_do_recom
 #endif
-#if defined (__oasis)
+#if defined (__cpl_oasis)
   use cpl_driver
 #endif
 #if defined (__recom)
   use REcoM_GloVar, only: x_co2atm, GloCO2flux_seaicemask
 #endif
-#if defined(__oasis)
+#if defined (__cpl_oasis)
   use cpl_driver,	 only : nrecv, cpl_recv, a2o_fcorr_stat
-#elif defined(__yac)
+#elif defined (__cpl_yac)
   use cpl_yac_driver,	 only : nrecv, cpl_recv, a2o_fcorr_stat
 #endif
-#if defined(__oasis)
+#if defined (__cpl_oasis)
   use cpl_driver
-#elif defined(__yac)
+#elif defined (__cpl_yac)
   use cpl_yac_driver
 #endif
 #if defined(__recom) && defined(__usetp)
@@ -44,12 +44,12 @@ module gen_forcing_couple_module
     implicit none
 
     private
-#if defined (__yac)
+#if defined (__cpl_yac)
     public :: update_atm_forcing_yac
-#else /* if not defined  __yac */
+#else /* if not defined  __cpl_yac */
     public :: update_atm_forcing
 #endif
-#if defined (__oasis) || defined (__yac)
+#if defined (__cpl_coupler)
     public :: force_flux_consv, compute_residual, integrate_2D, &
               net_rec_from_atm
 #endif
@@ -58,7 +58,7 @@ contains
 
 ! Routines for updating ocean surface forcing fields
 !-------------------------------------------------------------------------
-#if defined (__yac)
+#if defined (__cpl_yac)
 subroutine update_atm_forcing_yac(istep, ice, tracers, dynamics, partit, mesh)
 
   implicit none
@@ -209,7 +209,7 @@ subroutine update_atm_forcing_yac(istep, ice, tracers, dynamics, partit, mesh)
 
 end subroutine update_atm_forcing_yac
 
-#else /* if not defined  __yac */
+#else /* if not defined  __cpl_yac */
 
 subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 
@@ -229,7 +229,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   integer                  :: nt1, nt2
   real(kind=WP), parameter :: zwisomin = 1.e-6_WP
   !---wiso-code-end
-#if defined(__oasis)
+#if defined (__cpl_oasis)
   real(kind=WP)        				   :: flux_global(2), flux_local(2), eff_vol(2)
   real(kind=WP), dimension(:), allocatable , save  :: exchange
   real(kind=WP), dimension(:), allocatable , save  :: mask !, weight
@@ -250,7 +250,11 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, u_w, v_w
   real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
   real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
-#if defined (__oasis) || defined (__ifsinterface)
+! TODO: __cpl_yac is absent here, as in the pre-rework guard. Declaration
+! and use agree, so this is self-consistent, but YAC does not get
+! residualifwflx or the rhofwt/rhowat freshwater conversion. Widening the
+! guard changes YAC results, so it is left to a separate change.
+#if defined (__cpl_oasis) || defined (__cpl_direct)
   real(kind=WP), dimension(:), pointer  ::  oce_heat_flux, ice_heat_flux 
   real(kind=WP), dimension(:), pointer  ::  tmp_oce_heat_flux, tmp_ice_heat_flux 
 #endif 
@@ -282,7 +286,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   tmelt            => ice%thermo%tmelt
   UVnode           => dynamics%uvnode(:,:,:)
 #endif  
-#if defined (__oasis) || defined (__ifsinterface)
+#if defined (__cpl_oasis) || defined (__cpl_direct)
   oce_heat_flux    => ice%atmcoupl%oce_flx_h(:)
   ice_heat_flux    => ice%atmcoupl%ice_flx_h(:)
   tmp_oce_heat_flux=> ice%atmcoupl%tmpoce_flx_h(:)
@@ -292,7 +296,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   
   !_____________________________________________________________________________
   t1=MPI_Wtime()
-#if defined (__oasis)
+#if defined (__cpl_oasis)
      if (firstcall) then
         allocate(exchange(myDim_nod2D+eDim_nod2D), mask(myDim_nod2D+eDim_nod2D))
         allocate(a2o_fcorr_stat(nrecv,6))
@@ -657,7 +661,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
         do_rotate_ice_wind=.false.
     end if
 #else
-#ifndef __ifsinterface
+#ifndef __cpl_direct
   call sbc_do(partit, mesh)
 !$OMP PARALLEL DO
   DO n=1, myDim_nod2D+eDim_nod2D
@@ -749,8 +753,8 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   end do
 !$OMP END PARALLEL DO
   ! heat and fresh water fluxes are treated in i_therm and ice2ocean
-#endif /* skip all in case of __ifsinterface */
-#endif /* (__oasis) */
+#endif /* skip all in case of __cpl_direct */
+#endif /* (__cpl_oasis) */
 
 #if defined (__recom) /* consider in all cases */
   call sbc_do_recom(partit, mesh)
@@ -771,7 +775,7 @@ end subroutine update_atm_forcing
 !
 !------------------------------------------------------------------------------------
 !
-#if defined (__oasis) || defined (__yac)
+#if defined (__cpl_coupler)
 !
 !=================================================================
 !
@@ -1002,7 +1006,7 @@ SUBROUTINE net_rec_from_atm(action, partit)
   INTEGER 					  :: status(MPI_STATUS_SIZE,partit%npes) 
   INTEGER                                         :: request(2)
   real(kind=WP)                 		  :: aux(nrecv)
-!#if defined (__oifs) || defined(__yac)
+!#if defined (__oifs) || defined (__cpl_yac)
 #if defined (__oifs)
   return  !OIFS-FESOM2 coupling uses OASIS3MCT conservative remapping and recieves no net fluxes here.
 #endif

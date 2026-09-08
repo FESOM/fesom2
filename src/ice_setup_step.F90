@@ -10,7 +10,7 @@ module ice_setup_step_module
             ice_fem_fct, ice_TG_rhs_div, ice_TG_rhs, ice_update_for_div, ice_fct_solve
     USE ice_EVP_module, only: EVPdynamics
     USE ice_maEVP_module, only: EVPdynamics_a, EVPdynamics_m
-#if !defined (__oasis) && !defined (__ifsinterface) && !defined (__yac)
+#if !defined (__cpl_enabled)
     use ice_thermo_oce_module, only: thermodynamics, cut_off
 #else
     use ice_thermo_oce_module, only: cut_off
