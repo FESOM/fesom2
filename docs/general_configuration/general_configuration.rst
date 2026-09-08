@@ -86,7 +86,9 @@ Section &run_config
 - **flag_debug=.false.**, **flag_warn_cflz=.true.** runtime verbosity and vertical CFL warnings.
 - **lwiso=.false.** enable water isotope tracers (adds isotope tracers internally).
 - **use_transit=.false.** enable transient tracer package (CFCs, SF6, etc.; controlled via ``namelist.transit``).
-- **compute_oasis_corners=.false.** compute grid cell corners for conservative coupling through OASIS.
+- **compute_oasis_corners=.false.** *Deprecated here.* Moved to ``&coupling_oasis``
+  in ``namelist.cpl``; still honoured in this section for one release, and either
+  location switches it on.
 
 Section &machine
 """"""""""""""""

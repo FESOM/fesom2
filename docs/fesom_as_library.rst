@@ -23,8 +23,12 @@ The cmake build always creates a ``fesom`` library, and the standalone
 ``fesom.x`` is a thin executable linked against it. The switches below only
 control whether the IFS entry points are compiled into that library:
 
-- **ENABLE_IFS_INTERFACE=OFF** compile the ``src/ifs_interface/`` sources into
-  the library so IFS can call FESOM as a subroutine.
+- **FESOM_COUPLING=direct** compile the ``src/ifs_interface/`` sources into
+  the library so IFS can call FESOM as a subroutine. This defines
+  ``__cpl_direct``, the macro the source tests.
+- **ENABLE_IFS_INTERFACE=ON** deprecated alias for ``FESOM_COUPLING=direct``,
+  kept for older build scripts; it still selects the interface source list and
+  the ``fesom_HAVE_IFS_INTERFACE`` package export.
 - **BUILD_FESOM_AS_LIBRARY** deprecated alias for ``ENABLE_IFS_INTERFACE``,
   kept for older build scripts. It only sets the default of the new switch.
 - **BUILD_SHARED_LIBS=ON** build ``fesom`` as a shared library, which is what

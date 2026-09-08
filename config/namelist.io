@@ -312,7 +312,7 @@ io_list =  'sst       ',1, 'm', 4,
 ! 'hnode_new ',1, 'm', 4,  ! hnode_new [m]
 ! 'helem     ',1, 'm', 4,  ! elemental layer thickness [m]
 
-! --- OIFS/IFS INTERFACE (require __oifs or __ifsinterface) ---
+! --- OIFS/IFS INTERFACE (require FESOM_COUPLING=oasis50 or direct) ---
 ! 'alb       ',1, 'm', 4,  ! ice albedo [none]
 ! 'ist       ',1, 'm', 4,  ! ice surface temperature [K]
 ! 'qsi       ',1, 'm', 4,  ! ice heat flux [W/m^2]
