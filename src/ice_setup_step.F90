@@ -92,11 +92,10 @@ subroutine ice_timestep(step, ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
     !LA 2023-03-08
     real(kind=WP), dimension(:), pointer  :: u_ice_ib, v_ice_ib
-#if defined (__oifs) || defined (__ifsinterface)
     real(kind=WP), dimension(:), pointer  :: a_ice, ice_temp
     !LA 2023-03-08
     real(kind=WP), dimension(:), pointer  :: a_ice_ib
-#endif
+    logical                               :: l_ist
 
 !---------------------------------------------
   if (ib_async_mode == 0) then
@@ -124,10 +123,11 @@ subroutine ice_timestep(step, ice, partit, mesh)
 !$omp end parallel sections
   end if
 !---------------------------------------------
-#if defined (__oifs) || defined (__ifsinterface)
-    a_ice    => ice%data(1)%values(:)    
-    ice_temp => ice%data(4)%values(:)
-#endif
+    l_ist = ice%ist_itracer_idx > 0
+    if (l_ist) then
+       a_ice    => ice%data(1)%values(:)    
+       ice_temp => ice%data(ice%ist_itracer_idx)%values(:)
+    end if
     !___________________________________________________________________________
     t0=MPI_Wtime()
 #if defined (FESOM_PROFILING)
@@ -153,9 +153,13 @@ subroutine ice_timestep(step, ice, partit, mesh)
     !$ACC DEVICE (ice%data(1)%dvalues, ice%data(2)%dvalues, ice%data(3)%dvalues) &
     !$ACC DEVICE (ice%data(1)%values_rhs, ice%data(2)%values_rhs, ice%data(3)%values_rhs) &
     !$ACC DEVICE (ice%data(1)%values_div_rhs, ice%data(2)%values_div_rhs, ice%data(3)%values_div_rhs)
-#if defined (__oifs) || defined (__ifsinterface)
-    !$ACC UPDATE DEVICE (ice%data(4)%values, ice%data(4)%valuesl, ice%data(4)%dvalues, ice%data(4)%values_rhs, ice%data(4)%values_div_rhs)
-#endif
+    if (l_ist) then
+       !$ACC UPDATE DEVICE (ice%data(ice%ist_itracer_idx)%values) &
+       !$ACC DEVICE (ice%data(ice%ist_itracer_idx)%valuesl) &
+       !$ACC DEVICE (ice%data(ice%ist_itracer_idx)%dvalues) &
+       !$ACC DEVICE (ice%data(ice%ist_itracer_idx)%values_rhs) &
+       !$ACC DEVICE (ice%data(ice%ist_itracer_idx)%values_div_rhs)
+    end if
 
     !___________________________________________________________________________
     ! start compute dynamical growth rates of ice, snow and area. store variables before the 
@@ -200,21 +204,21 @@ subroutine ice_timestep(step, ice, partit, mesh)
     ! call ice_fct_solve
     ! call cut_off
     ! new FCT routines from Sergey Danilov 08.05.2018
-#if defined (__oifs) || defined (__ifsinterface)
+    if (l_ist) then
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DO
+   !$OMP PARALLEL DO
 #else
-!$ACC parallel loop present(ice_temp, a_ice)
+   !$ACC parallel loop present(ice_temp, a_ice)
 #endif
-    do i=1,partit%myDim_nod2D+partit%eDim_nod2D
-        ice_temp(i) = ice_temp(i)*a_ice(i)
-    end do
+       do i=1,partit%myDim_nod2D+partit%eDim_nod2D
+           ice_temp(i) = ice_temp(i)*a_ice(i)
+       end do
 #ifndef ENABLE_OPENACC
-!$OMP END PARALLEL DO
+   !$OMP END PARALLEL DO
 #else
-!$ACC END parallel loop
+   !$ACC END parallel loop
 #endif
-#endif /* (__oifs) */
+    end if
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call ice_TG_rhs_div...'//achar(27)//'[0m'
     call ice_TG_rhs    (ice, partit, mesh)
 
@@ -240,24 +244,28 @@ subroutine ice_timestep(step, ice, partit, mesh)
     !$ACC HOST (ice%data(1)%dvalues, ice%data(2)%dvalues, ice%data(3)%dvalues) &
     !$ACC HOST (ice%data(1)%values_rhs, ice%data(2)%values_rhs, ice%data(3)%values_rhs) &
     !$ACC HOST (ice%data(1)%values_div_rhs, ice%data(2)%values_div_rhs, ice%data(3)%values_div_rhs)
-#if defined (__oifs) || defined (__ifsinterface)
-    !$ACC UPDATE HOST (ice%data(4)%values, ice%data(4)%valuesl, ice%data(4)%dvalues, ice%data(4)%values_rhs, ice%data(4)%values_div_rhs)
-#endif
+    if (l_ist) then
+       !$ACC UPDATE HOST (ice%data(ice%ist_itracer_idx)%values) &
+       !$ACC HOST (ice%data(ice%ist_itracer_idx)%valuesl) &
+       !$ACC HOST (ice%data(ice%ist_itracer_idx)%dvalues) &
+       !$ACC HOST (ice%data(ice%ist_itracer_idx)%values_rhs) &
+       !$ACC HOST (ice%data(ice%ist_itracer_idx)%values_div_rhs)
+    end if
 
-#if defined (__oifs) || defined (__ifsinterface)
-!$OMP PARALLEL DO
-    do i=1,partit%myDim_nod2D+partit%eDim_nod2D
-        ! ice_temp was advected as ice_temp*a_ice. Where a_ice is (near) zero
-        ! there is no ice surface; use the freezing point rather than the
-        ! near-zero-Kelvin product.
-        if (a_ice(i) > 1.e-6_WP) then
-            ice_temp(i) = ice_temp(i)/a_ice(i)
-        else
-            ice_temp(i) = 271.35_WP
-        end if
-    end do
-!$OMP END PARALLEL DO
-#endif /* (__oifs) */
+    if (l_ist) then
+   !$OMP PARALLEL DO
+       do i=1,partit%myDim_nod2D+partit%eDim_nod2D
+           ! ice_temp was advected as ice_temp*a_ice. Where a_ice is (near) zero
+           ! there is no ice surface; use the freezing point rather than the
+           ! near-zero-Kelvin product.
+           if (a_ice(i) > 1.e-6_WP) then
+               ice_temp(i) = ice_temp(i)/a_ice(i)
+           else
+               ice_temp(i) = 271.35_WP
+           end if
+       end do
+   !$OMP END PARALLEL DO
+    end if
 
     if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call cut_off...'//achar(27)//'[0m'
     call cut_off(ice, partit, mesh)

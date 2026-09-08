@@ -77,12 +77,11 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP), dimension(:)  , pointer :: apnd, hpnd, ipnd 
   real(kind=WP), dimension(:)  , pointer :: S_oc_array, T_oc_array, u_w, v_w
   real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
-#if defined (__oifs) || defined (__ifsinterface)
   real(kind=WP), dimension(:) , pointer  :: ice_temp, ice_alb, enthalpyoffuse, ice_heat_qres, ice_heat_qcon, runoff_liquid, runoff_solid
 #if defined (__oifs)
   real(kind=WP), dimension(:) , pointer  :: ist_ref
 #endif
-#endif
+    logical                               :: l_ist
 #if defined (__cpl_enabled)
   real(kind=WP), dimension(:)  , pointer ::  oce_heat_flux, ice_heat_flux 
 #endif 
@@ -109,18 +108,19 @@ subroutine thermodynamics(ice, partit, mesh)
   v_w           => ice%srfoce_v(:)
   fresh_wa_flux => ice%flx_fw(:)
   net_heat_flux => ice%flx_h(:)
-#if defined (__oifs) || defined (__ifsinterface)
-  ice_temp      => ice%data(4)%values(:)
-  ice_alb       => ice%atmcoupl%ice_alb(:)
-  enthalpyoffuse=> ice%atmcoupl%enthalpyoffuse(:)
-  runoff_liquid => ice%atmcoupl%runoff_liquid(:)
-  runoff_solid  => ice%atmcoupl%runoff_solid(:)
-  ice_heat_qres => ice%atmcoupl%flx_qres(:)
-  ice_heat_qcon => ice%atmcoupl%flx_qcon(:)
+  l_ist = ice%ist_itracer_idx > 0
+  if (l_ist) then
+     ice_temp      => ice%data(ice%ist_itracer_idx)%values(:)
+     ice_alb       => ice%atmcoupl%ice_alb(:)
+     enthalpyoffuse=> ice%atmcoupl%enthalpyoffuse(:)
+     runoff_liquid => ice%atmcoupl%runoff_liquid(:)
+     runoff_solid  => ice%atmcoupl%runoff_solid(:)
+     ice_heat_qres => ice%atmcoupl%flx_qres(:)
+     ice_heat_qcon => ice%atmcoupl%flx_qcon(:)
 #if defined (__oifs)
-  ist_ref       => ice%atmcoupl%ist_ref(:)
+     ist_ref       => ice%atmcoupl%ist_ref(:)
 #endif
-#endif
+  end if
 #if defined (__cpl_enabled)
   oce_heat_flux => ice%atmcoupl%oce_flx_h(:)
   ice_heat_flux => ice%atmcoupl%ice_flx_h(:)
@@ -159,11 +159,11 @@ subroutine thermodynamics(ice, partit, mesh)
         h0min = ice%thermo%h0_s
      end if
 
-#if defined (__oifs) || defined (__ifsinterface)
-     a2ohf   = oce_heat_flux(inod) + shortwave(inod) + enthalpyoffuse(inod)
-#else
-     a2ohf   = oce_heat_flux(inod) + shortwave(inod)
-#endif
+     if (l_ist) then
+        a2ohf   = oce_heat_flux(inod) + shortwave(inod) + enthalpyoffuse(inod)
+     else
+        a2ohf   = oce_heat_flux(inod) + shortwave(inod)
+     end if
      a2ihf   = ice_heat_flux(inod)
      evap    = evap_no_ifrac(inod)
      subli   = sublimation(inod)
@@ -182,41 +182,41 @@ subroutine thermodynamics(ice, partit, mesh)
         rsf     = 0._WP
      end if
 
-#if defined (__oifs) || defined (__ifsinterface)
+     if (l_ist) then
 
-     !---- For AWI-CM3 we calculate ice surface temp and albedo in fesom,
-     ! then send those to OpenIFS where they are used to calucate the 
-     ! energy fluxes ---!
-     t                   = ice_temp(inod)
-     qres     = 0.0_WP
-     qcon     = 0.0_WP
-     if(A>Aimin) then
+        !---- For AWI-CM3 we calculate ice surface temp and albedo in fesom,
+        ! then send those to OpenIFS where they are used to calucate the 
+        ! energy fluxes ---!
+        t                   = ice_temp(inod)
+        qres     = 0.0_WP
+        qcon     = 0.0_WP
+        if(A>Aimin) then
 #if defined (__oifs)
-        if (use_atm_ice_tskin) then
-           ! Skin temperature received from the atmosphere (tsk_ico); freezing
-           ! point before the first receive.
-           tref = ist_ref(inod)
-           if (tref < 173.15_WP .or. tref > 400.0_WP) tref = 271.35_WP
-        else
-           tref = t
-        end if
-        call ice_surftemp(ice%thermo, max(h/(max(A,Aimin)),0.05), hsn/(max(A,Aimin)), a2ihf, tref, t)
+           if (use_atm_ice_tskin) then
+              ! Skin temperature received from the atmosphere (tsk_ico); freezing
+              ! point before the first receive.
+              tref = ist_ref(inod)
+              if (tref < 173.15_WP .or. tref > 400.0_WP) tref = 271.35_WP
+           else
+              tref = t
+           end if
+           call ice_surftemp(ice%thermo, max(h/(max(A,Aimin)),0.05), hsn/(max(A,Aimin)), a2ihf, tref, t)
 #else
-        ! The IFS interface does not provide the reference temperature used by
-        ! the OpenIFS coupled-slab solve. Keep its established local update
-        ! until that interface supplies a consistent temperature/flux pair.
-        call ice_surftemp(ice%thermo, max(h/(max(A,Aimin)),0.05), hsn/(max(A,Aimin)), a2ihf, t)
+           ! The IFS interface does not provide the reference temperature used by
+           ! the OpenIFS coupled-slab solve. Keep its established local update
+           ! until that interface supplies a consistent temperature/flux pair.
+           call ice_surftemp(ice%thermo, max(h/(max(A,Aimin)),0.05), hsn/(max(A,Aimin)), a2ihf, t)
 #endif
-        ice_temp(inod)  = t
-     else
-        ! Freezing temp of saltwater in K
-        ice_temp(inod) = -0.0575_WP*S_oc_array(inod) + 1.7105e-3_WP*sqrt(S_oc_array(inod)**3) -2.155e-4_WP*(S_oc_array(inod)**2)+273.15_WP        
-     endif
-     call ice_albedo(ice%thermo, h, hsn, t, apnd(inod), ipnd(inod), alb)
-     ice_alb(inod)       = alb
-     ice_heat_qres(inod) = qres
-     ice_heat_qcon(inod) = qcon
-#endif
+           ice_temp(inod)  = t
+        else
+           ! Freezing temp of saltwater in K
+           ice_temp(inod) = -0.0575_WP*S_oc_array(inod) + 1.7105e-3_WP*sqrt(S_oc_array(inod)**3) -2.155e-4_WP*(S_oc_array(inod)**2)+273.15_WP        
+        endif
+        call ice_albedo(ice%thermo, h, hsn, t, apnd(inod), ipnd(inod), alb)
+        ice_alb(inod)       = alb
+        ice_heat_qres(inod) = qres
+        ice_heat_qcon(inod) = qcon
+     end if
      call ice_growth
 
      !__________________________________________________________________________
@@ -406,21 +406,21 @@ contains
     !---- snow melt rate over sea ice (dsnow <= 0)
     !---- if there is atmospheric melting over sea ice, first melt any
     !---- snow that is present, but do not melt more snow than available
-#if defined (__oifs) || defined (__ifsinterface)
-    !---- new condition added - surface temperature must be
-    !----                       larger than 273K to melt snow
-    !---- (snowmelt_tgate=.false. drops the condition and melts snow on the
-    !----  energy budget alone, as the uncoupled branch below does)
-    if (t.gt.273_WP .or. .not. ice%thermo%snowmelt_tgate) then
-        dsnow = A*min(Qatmice-Qicecon,0._WP)
-        dsnow = max(dsnow*rhoice/rhosno,-hsn)
+    if (l_ist) then
+       !---- new condition added - surface temperature must be
+       !----                       larger than 273K to melt snow
+       !---- (snowmelt_tgate=.false. drops the condition and melts snow on the
+       !----  energy budget alone, as the uncoupled branch below does)
+       if (t.gt.273_WP .or. .not. ice%thermo%snowmelt_tgate) then
+           dsnow = A*min(Qatmice-Qicecon,0._WP)
+           dsnow = max(dsnow*rhoice/rhosno,-hsn)
+       else
+           dsnow = 0.0_WP
+       endif
     else
-        dsnow = 0.0_WP
-    endif
-#else
-    dsnow = A*min(Qatmice-Qicecon,0._WP)
-    dsnow = max(dsnow*rhoice/rhosno,-hsn)
-#endif 
+       dsnow = A*min(Qatmice-Qicecon,0._WP)
+       dsnow = max(dsnow*rhoice/rhosno,-hsn)
+    end if
 
     !---- update snow thickness after atmospheric snow melt
     hsn = hsn + dsnow

@@ -43,15 +43,15 @@ subroutine cut_off(ice, partit, mesh)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
-#if defined (__oifs) || defined (__ifsinterface)
     real(kind=WP), dimension(:), pointer  :: ice_temp
-#endif /* (__oifs) */
+    logical                               :: l_ist
     a_ice    => ice%data(1)%values(:)
     m_ice    => ice%data(2)%values(:)
     m_snow   => ice%data(3)%values(:)
-#if defined (__oifs) || defined (__ifsinterface)
-    ice_temp => ice%data(4)%values(:)
-#endif /* (__oifs) */
+    l_ist = ice%ist_itracer_idx > 0
+    if (l_ist) then
+       ice_temp => ice%data(ice%ist_itracer_idx)%values(:)
+    end if
 
 #if defined (__oifs)
     n_coldice = 0
@@ -71,10 +71,10 @@ DO n=1, partit%myDim_nod2D+partit%eDim_nod2D
        a_ice(n)=0.0_WP
        m_ice(n)   =0.0_WP
        m_snow(n)  =0.0_WP
-#if defined (__oifs) || defined (__ifsinterface)
+        if (l_ist) then
         
-        ice_temp(n)=273.15_WP
-#endif /* (__oifs) */
+           ice_temp(n)=273.15_WP
+        end if
    end if
     !___________________________________________________________________________
     ! lower cutoff: m_ice
@@ -82,15 +82,15 @@ DO n=1, partit%myDim_nod2D+partit%eDim_nod2D
         m_ice(n)=0.0_WP 
         m_snow(n)  =0.0_WP
         a_ice(n)   =0.0_WP
-#if defined (__oifs) || defined (__ifsinterface)
-        ice_temp(n)=273.15_WP
-#endif /* (__oifs) */
+        if (l_ist) then
+           ice_temp(n)=273.15_WP
+        end if
    end if
      
     !___________________________________________________________________________
-#if defined (__oifs) || defined (__ifsinterface)
-    if (ice_temp(n) > 273.15_WP) ice_temp(n)=273.15_WP
-#endif /* (__oifs) */
+    if (l_ist) then
+       if (ice_temp(n) > 273.15_WP) ice_temp(n)=273.15_WP
+    end if
 
 #if defined (__oifs)
     ! No lower clamp. A surface temperature this far below anything physical
