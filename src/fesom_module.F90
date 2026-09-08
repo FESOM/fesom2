@@ -57,6 +57,12 @@ module fesom_main_storage_module
   use icedrv_main,          only: set_icepack, init_icepack, alloc_icepack
 #endif
 
+#if defined (__cpl_enabled)
+  use cpl_config, only: read_cpl_namelist, check_cpl_config
+  ! Same entity as g_config's compute_oasis_corners (use'd wholesale above);
+  ! the alias marks which of the two homonyms is meant at the call site.
+  use g_config,   only: deprecated_oasis_corners => compute_oasis_corners
+#endif
 #if defined (__cpl_oasis)
   use cpl_driver
 #endif
@@ -195,6 +201,12 @@ contains
       
       mpi_is_initialized = .false.
       f%fesom_did_mpi_init = .false.
+
+#if defined (__cpl_enabled)
+        ! Must precede MPI_Init: under oasis50 OASIS performs it inside
+        ! cpl_oasis3mct_init, which needs cpl_comp_name.
+        call read_cpl_namelist()
+#endif
 
 #ifndef __cpl_oasis50
         !ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
@@ -385,6 +397,13 @@ contains
         call fesom_profiler_start("setup_model")
 #endif
         call setup_model(f%partit)  ! Read Namelists, always before clock_init
+
+#if defined (__cpl_enabled)
+        ! After setup_model: folds in the deprecated compute_oasis_corners
+        ! from &run_config of namelist.config.
+        call check_cpl_config(deprecated_oasis_corners, &
+                              f%partit%MPI_COMM_FESOM, f%mype)
+#endif
 
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("setup_model")
