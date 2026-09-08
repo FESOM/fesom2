@@ -1,4 +1,4 @@
-#if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
+#if defined (__cpl_enabled)
 subroutine thermodynamics(ice, partit, mesh)
 
   !===================================================================
@@ -83,7 +83,7 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP), dimension(:) , pointer  :: ist_ref
 #endif
 #endif
-#if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
+#if defined (__cpl_enabled)
   real(kind=WP), dimension(:)  , pointer ::  oce_heat_flux, ice_heat_flux 
 #endif 
   real(kind=WP)                , pointer :: rhoice, rhosno, rhowat, rhofwt, Sice, cl, cc, cpice, consn, con 
@@ -121,7 +121,7 @@ subroutine thermodynamics(ice, partit, mesh)
   ist_ref       => ice%atmcoupl%ist_ref(:)
 #endif
 #endif
-#if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
+#if defined (__cpl_enabled)
   oce_heat_flux => ice%atmcoupl%oce_flx_h(:)
   ice_heat_flux => ice%atmcoupl%ice_flx_h(:)
 #endif
@@ -246,7 +246,11 @@ subroutine thermodynamics(ice, partit, mesh)
      !---- total evaporation (needed in oce_salt_balance.F90) = evap+subli
      evaporation(inod)    = evap + subli
      ice_sublimation(inod)= subli
-#if defined (__oasis) || defined (__ifsinterface)
+! TODO: __cpl_yac is absent here, as in the pre-rework guard. Declaration
+! and use agree, so this is self-consistent, but YAC does not get
+! residualifwflx or the rhofwt/rhowat freshwater conversion. Widening the
+! guard changes YAC results, so it is left to a separate change.
+#if defined (__cpl_oasis) || defined (__cpl_direct)
      residualifwflx(inod) = resid
 #endif     
   enddo
@@ -357,7 +361,7 @@ contains
     !---- must be area-weighted (like the heat fluxes); in contrast,
     !---- precipitation (snow and rain) and runoff are effective fluxes
 !already weighted in IFS coupling
-#if !defined (__ifsinterface)
+#if !defined (__cpl_direct)
     subli  = A*subli
     evap   = (1._WP-A)*evap
 #endif

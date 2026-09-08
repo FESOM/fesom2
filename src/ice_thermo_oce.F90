@@ -15,7 +15,7 @@ module ice_thermo_oce_module
 
     private
     public :: cut_off
-#if !defined (__oasis) && !defined (__ifsinterface) && !defined (__yac)
+#if !defined (__cpl_enabled)
     public :: thermodynamics, therm_ice, budget, obudget, flooding, &
               TFrez, compute_solar_zenith_angle, albw_taylor, &
               albw_briegleb, open_water_albedo_at
@@ -118,7 +118,7 @@ END DO
 #endif /* (__oifs) */
 end subroutine cut_off
 
-#if !defined (__oasis) && !defined (__ifsinterface) && !defined (__yac)
+#if !defined (__cpl_enabled)
 !_______________________________________________________________________________
 ! Sea-ice thermodynamics routines
 !
@@ -1324,6 +1324,6 @@ subroutine thermodynamics_acc(ice, partit, mesh)
     end if
 end subroutine thermodynamics_acc
 #endif
-#endif /* #if !defined (__coupled) && !defined (__ifsinterface) */
+#endif /* !defined (__cpl_enabled) */
 
 end module ice_thermo_oce_module

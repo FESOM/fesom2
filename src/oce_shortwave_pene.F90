@@ -12,7 +12,7 @@ subroutine cal_shortwave_rad(ice, partit, mesh)
     USE g_CONFIG
     use g_forcing_arrays
     use g_comm_auto
-#if !defined (__oasis) && !defined (__ifsinterface) && !defined (__yac)
+#if !defined (__cpl_enabled)
     use ice_thermo_oce_module, only: open_water_albedo_at
 #endif
     IMPLICIT NONE
@@ -51,7 +51,7 @@ subroutine cal_shortwave_rad(ice, partit, mesh)
      !__________________________________________________________________________
      ! shortwave rad., with the same open water albedo as in the surface heat flux
      albw=ice%thermo%albw
-#if !defined (__oasis) && !defined (__ifsinterface) && !defined (__yac)
+#if !defined (__cpl_enabled)
      albw=open_water_albedo_at(ice%thermo, mesh%geo_coord_nod2D(1,n2), mesh%geo_coord_nod2D(2,n2))
 #endif
      swsurf=(1.0_WP-albw)*shortwave(n2)
