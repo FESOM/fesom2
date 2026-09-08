@@ -63,6 +63,12 @@ message(STATUS "Found YAC ${PC_yac_VERSION}")
 find_path(YAC_Fortran_INCLUDE_DIRECTORIES NAMES yac.mod
           HINTS ${PC_yac_INCLUDE_DIRS} ${yac_DIR}/src/mci)
 
+# pkg-config hands us YAC as raw -L/-l flags, from which
+# CMAKE_INSTALL_RPATH_USE_LINK_PATH cannot derive an RPATH entry. Export
+# the library directories so the caller can add them explicitly, which a
+# YAC installation with shared libraries needs both to link and to run.
+set(YAC_LIBRARY_DIRECTORIES ${PC_yac_LIBRARY_DIRS})
+
 find_library(YAC_LIBRARY yac yac_mci HINTS ${PC_yac_LINK_LIBRARIES} ${yac_DIR}/src/mci ${yac_DIR}/src)
 #find_library(YAC_CLAPACK_LIBRARY yac_clapack HINTS ${PC_yac_LINK_LIBRARIES} ${yac_DIR}/clapack)
 #find_library(YAC_MTIME_LIBRARY yac_mtime HINTS ${PC_yac_LINK_LIBRARIES} ${yac_DIR}/mtime)
