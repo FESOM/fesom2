@@ -19,6 +19,7 @@ mesh_part/build
 test/output_pi
 src/cvmix_driver/CVMix-src/
 cmake/cvmixConfig-release.cmake
+cmake/cvmixConfig-debug.cmake
 cmake/cvmixConfig.cmake
 .claude/
 build_*/
