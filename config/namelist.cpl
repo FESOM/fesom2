@@ -1,0 +1,52 @@
+! ============================================================================
+! ============ Namelist file for FESOM2 coupling configuration ===============
+! ============================================================================
+! Only needed by a coupled build. WHICH interface FESOM uses is a compile-time
+! choice (cmake -DFESOM_COUPLING=standalone|direct|oasis28|oasis50|yac); this
+! file says which external components it talks to over that interface, and
+! carries the interface-specific settings.
+!
+! Every entry has a compiled-in default, and the default partner is the one
+! implied by the compiled interface -- so this file is optional today. Keep
+! the groups in the order below: they are read sequentially.
+! ============================================================================
+
+! ============================================================================
+! EXTERNAL COMPONENTS
+! ============================================================================
+! Exactly one atmosphere must be selected -- the model aborts at startup if
+! none or several are, and also if the chosen partner does not match the
+! compiled interface. If this file is absent altogether, the partner implied
+! by the compiled interface is assumed, which is how run directories that
+! predate this file keep working.
+&coupling_partner
+is_coupled_to_echam  = .false.   ! ECHAM6 atmosphere   (needs oasis28)
+is_coupled_to_oifs   = .false.   ! OpenIFS atmosphere  (needs oasis50)
+is_coupled_to_icon_a = .false.   ! ICON-A atmosphere   (needs yac)
+is_coupled_to_ifs    = .false.   ! IFS atmosphere      (needs direct)
+/
+
+! ============================================================================
+! OASIS INTERFACE (read only for FESOM_COUPLING=oasis28 / oasis50)
+! ============================================================================
+&coupling_oasis
+cpl_comp_name         = 'fesom'  ! component name registered with OASIS;
+                                 ! must match the namcouple / SMIOC entry
+cpl_grid_name         = 'feom'   ! grid name written to the OASIS grid files
+compute_oasis_corners = .false.  ! also write grid corners. Required when the
+                                 ! namcouple asks for first-order conservative
+                                 ! remapping (CONSERV), otherwise wasted work.
+                                 ! Superseded the entry of the same name in
+                                 ! &run_config of namelist.config.
+/
+
+! ============================================================================
+! YAC INTERFACE (read only for FESOM_COUPLING=yac)
+! ============================================================================
+&coupling_yac
+cpl_comp_name   = 'fesom2'         ! component name registered with YAC;
+                                   ! must match coupling.yaml
+cpl_grid_name   = 'fesom_grid'     ! grid name passed to yac_fdef_grid
+cpl_config_file = 'coupling.yaml'  ! YAC configuration file, relative to the
+                                   ! run directory
+/
