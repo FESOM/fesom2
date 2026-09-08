@@ -24,7 +24,7 @@ module diagnostics
             ldiag_forc, ldiag_salt3D, ldiag_curl_vel3, diag_list, ldiag_extflds, ldiag_ice,      &
             compute_diagnostics, rhs_diag, curl_stress_surf, curl_vel3, shear, Ri, KvdTdZ, KvdSdZ,                & 
             std_dens_min, std_dens_max, std_dens_N, std_dens, ldiag_trflx, ldiag_destine,                                       &
-            std_dens_UVDZ, std_dens_DIV, std_dens_DIV_fer, std_dens_Z, std_dens_H, std_dens_dVdT, std_dens_flux,  &
+            std_dens_DIV, std_dens_DIV_fer, std_dens_flux,                                                        &
             dens_flux_e, zisotherm, tempzavg, saltzavg, heatcontent, vol_ice, vol_snow, compute_ice_diag, thetao,   &
             tuv, suv,                                                                                             &
             ldiag_DVD, compute_dvd, dvd_KK_tot, dvd_SD_tot, dvd_SD_chi_adv_h, dvd_SD_chi_adv_v, dvd_SD_chi_dif_he,&
@@ -33,8 +33,11 @@ module diagnostics
             ldiag_uvw_sqr, uv2, wvel2,                                                                            &
             ldiag_trgrd_xyz, trgrd_x, trgrd_y, trgrd_z,                                                           &
             ldiag_cmor,                                                                                            &
-            dmoc_call_freq, dmoc_call_freq_unit, dmoc_is_due
-             
+            dmoc_call_freq, dmoc_call_freq_unit, dmoc_is_due,                                                      &
+            ldiag_diapmix, diap_call_freq, diap_call_freq_unit, ts_diff2w_diap,                                    &
+            w_diap, dV_diap_dT, dT_diap, dS_diap, dd_diap, sw_alpha_diap, sw_beta_diap,                            &
+            density_dmoc_avg, diap_avg_count, dmoc_avg_count
+
 
   ! Arrays used for diagnostics, some shall be accessible to the I/O
   ! 1. solver diagnostics: A*x=rhs? 
@@ -66,13 +69,50 @@ module diagnostics
                                                             37.11979, 37.13630, 37.15257, 37.16861, 37.18441, 37.50000, 37.75000, 40.00000/)
   real(kind=WP),  save, target                   :: std_dd(std_dens_N-1)
   real(kind=WP),  save, target                   :: std_dens_min=1030., std_dens_max=1040.
-  real(kind=WP),  save, allocatable, target      :: std_dens_UVDZ(:,:,:), std_dens_flux(:,:,:), std_dens_dVdT(:,:), std_dens_DIV(:,:), std_dens_DIV_fer(:,:), std_dens_Z(:,:), std_dens_H(:,:)
+  real(kind=WP),  save, allocatable, target      :: std_dens_flux(:,:,:), std_dens_DIV(:,:), std_dens_DIV_fer(:,:)
   real(kind=WP),  save, allocatable, target      :: dens_flux_e(:)
   real(kind=WP),  save, allocatable, target      :: thetao(:) ! sst in K
   real(kind=WP),  save, allocatable, target      :: tuv(:,:,:), suv(:,:,:)
   real(kind=WP),  save, allocatable, target      :: uv2(:,:,:), wvel2(:,:)
   real(kind=WP),  save, allocatable, target      :: trgrd_x(:,:,:), trgrd_y(:,:,:), trgrd_z(:,:,:)
-  
+
+  !_____________________________________________________________________________
+  ! Diapycnal mixing diagnostic (ts_diff2w_diap), see ldiag_diapmix below.
+  ! w_diap     : diapycnal velocity at the std_dens classes induced by the
+  !              parameterized (explicit + implicit) vertical mixing        [m/s]
+  ! dV_diap_dT : uplift velocity of the density classes: the rate of change of
+  !              the mid-depth of the class interval, POSITIVE DOWNWARDS (depth
+  !              is measured from the surface, increasing downwards). It lives on
+  !              the same staggered density grid as w_diap                  [m/s]
+  ! dT_diap /
+  ! dS_diap    : T/S tendency due to the vertical mixing operators, accumulated
+  !              over diap_avg_count calls of solve_tracers_ale. NOTE this
+  !              includes the surface boundary condition that FESOM applies
+  !              through those operators (surface heat/freshwater/salt flux,
+  !              surface relaxation, shortwave penetration, KPP non-local
+  !              fluxes) and, with use_wsplit and a non-FCT limiter, the
+  !              implicit vertical advection solved in the same tridiagonal
+  !              system                                           [degC], [psu]
+  ! dd_diap    : scratch used to collect dT_diap/dS_diap within diff_tracers_ale
+  ! sw_alpha_diap /
+  ! sw_beta_diap: thermal expansion / haline contraction coefficients referenced
+  !              to 2000 dbar, i.e. consistent with the sigma2 density
+  !              density_dmoc that the density binning is based on
+  ! density_dmoc_avg: time average of density_dmoc over the same window
+  ! diap_avg_count  : number of time steps accumulated into the averages above
+  ! dmoc_avg_count  : number of steps accumulated into density_dmoc_avg. Counted
+  !              separately because pressure_bv only refreshes density_dmoc on
+  !              the steps where diag_densMOC itself is due (dmoc_call_freq), so
+  !              averaging it every step would average a stale field
+  real(kind=WP),  save, target                   :: diap_avg_count=0.0_WP
+  real(kind=WP),  save, target                   :: dmoc_avg_count=0.0_WP
+  real(kind=WP),  save, allocatable, target      :: w_diap(:,:), dV_diap_dT(:,:)
+  real(kind=WP),  save, allocatable, target      :: dT_diap(:,:), dS_diap(:,:), dd_diap(:,:)
+  real(kind=WP),  save, allocatable, target      :: sw_alpha_diap(:,:), sw_beta_diap(:,:), density_dmoc_avg(:,:)
+  ! class thickness of the previous and of the current diagnostic call, used to
+  ! form dV_diap_dT; not written out
+  real(kind=WP),  save, allocatable              :: dV_diap(:,:), dV_diap_bak(:,:)
+
   !_____________________________________________________________________________
   ! DVD diagnostics
   real(kind=WP),  save, allocatable, target      :: dvd_KK_tot(:,:,:), dvd_SD_tot(:,:,:), dvd_SD_chi_adv_h(:,:,:), &
@@ -90,11 +130,23 @@ module diagnostics
   logical                                       :: ldiag_TurbFlux   =.false.
   logical                                       :: ldiag_KE         =.false.
   logical                                       :: ldiag_salt3D     =.false.
-  ! this option activates writing the horizintal velocity transports within the density bins (U_rho_x_DZ and V_rho_x_DZ)
-  ! an additional field (RHO_Z) will be computed which allows for diagnosing the numerical diapycnal mixing after A. Megann 2018
+  ! this option activates the MOC in density space: the divergence of the horizontal
+  ! transports within the density bins (std_dens_DIV, and std_dens_DIVbolus with
+  ! Fer_GM) together with the surface bouyancy fluxes per density class, from which
+  ! the full velocities and the density MOC are reconstructed in postprocessing
   logical                                       :: ldiag_dMOC       =.false.
   integer                                       :: dmoc_call_freq      = 1    ! call diag_densMOC every N units
   character(3)                                  :: dmoc_call_freq_unit = 's'  ! unit: 's'=steps, 'h'=hours, 'd'=days, 'm'=months
+
+  ! this option activates the diagnostic of the diapycnal velocity w_diap induced by
+  ! the parameterized (explicit + implicit) vertical mixing and of the uplift velocity
+  ! dV_diap_dT of the density classes. Combined with the full velocities reconstructed
+  ! from the ldiag_dMOC output this yields the numerically induced diapycnal velocity
+  ! (w_full - w_diap - w_uplift) and the corresponding spurious MOC, both evaluated in
+  ! post-processing. Requires ldiag_dMOC=.true.
+  logical                                       :: ldiag_diapmix    =.false.
+  integer                                       :: diap_call_freq      = 1    ! call ts_diff2w_diap every N units
+  character(3)                                  :: diap_call_freq_unit = 'd'  ! unit: 's'=steps, 'h'=hours, 'd'=days, 'm'=months
 
   ! flag for calculating the Discrete Variance Decay --> estimator for numerical/
   ! spurious mixing in the advection schemes
@@ -112,7 +164,7 @@ module diagnostics
   namelist /diag_list/ ldiag_solver, lcurt_stress_surf, ldiag_curl_vel3, ldiag_Ri, &
                        ldiag_TurbFlux, ldiag_dMOC, dmoc_call_freq, dmoc_call_freq_unit, ldiag_DVD, ldiag_salt3D, ldiag_forc, &
                        ldiag_extflds, ldiag_destine, ldiag_trflx, ldiag_ice, ldiag_uvw_sqr, ldiag_trgrd_xyz, &
-                       ldiag_cmor
+                       ldiag_cmor, ldiag_diapmix, diap_call_freq, diap_call_freq_unit
   
   contains
 
@@ -127,6 +179,18 @@ logical function dmoc_is_due(istep)
     case default; dmoc_is_due = .true.
   end select
 end function dmoc_is_due
+
+logical function diap_is_due(istep)
+  integer, intent(in) :: istep
+  diap_is_due = .false.
+  select case (trim(diap_call_freq_unit))
+    case ('s'); call step_event  (diap_is_due, istep, diap_call_freq)
+    case ('h'); call hourly_event(diap_is_due,        diap_call_freq)
+    case ('d'); call daily_event (diap_is_due,        diap_call_freq)
+    case ('m'); call monthly_event(diap_is_due,       diap_call_freq)
+    case default; diap_is_due = .true.
+  end select
+end function diap_is_due
 
 ! ==============================================================
 !rhs_diag=ssh_rhs?
@@ -435,6 +499,57 @@ UVnode=>dynamics%uvnode(:,:,:)
   end do
 end subroutine diag_Ri
 ! ==============================================================
+! Binary searches into the (strictly increasing) std_dens array. They replace the
+! linear scans that used to walk all std_dens_N classes for every layer of every
+! edge, which dominated the cost of diag_densMOC on large meshes.
+!
+! find_density_lower_bound: first index with std_dens(idx) >  target
+!                           (std_dens_N if no such element exists)
+! find_density_upper_bound: last  index with std_dens(idx) <  target
+!                           (1          if no such element exists)
+integer function find_density_lower_bound(rho_target, std_dens_arr, n) result(idx)
+  implicit none
+  real(kind=WP), intent(in) :: rho_target
+  real(kind=WP), intent(in) :: std_dens_arr(:)
+  integer,       intent(in) :: n
+  integer                   :: left, right, mid
+
+  left  = 1
+  right = n
+  idx   = n
+  do while (left <= right)
+     mid = (left + right)/2
+     if (std_dens_arr(mid) > rho_target) then
+        idx   = mid
+        right = mid - 1
+     else
+        left  = mid + 1
+     end if
+  end do
+end function find_density_lower_bound
+
+integer function find_density_upper_bound(rho_target, std_dens_arr, n) result(idx)
+  implicit none
+  real(kind=WP), intent(in) :: rho_target
+  real(kind=WP), intent(in) :: std_dens_arr(:)
+  integer,       intent(in) :: n
+  integer                   :: left, right, mid
+
+  left  = 1
+  right = n
+  idx   = 1
+  do while (left <= right)
+     mid = (left + right)/2
+     if (std_dens_arr(mid) < rho_target) then
+        idx  = mid
+        left = mid + 1
+     else
+        right = mid - 1
+     end if
+  end do
+end function find_density_upper_bound
+
+! ==============================================================
 subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
   implicit none
   integer, intent(in)                     :: mode
@@ -442,16 +557,14 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
   type(t_partit), intent(inout), target   :: partit
   type(t_tracer), intent(in)   , target   :: tracers
   type(t_dyn)   , intent(in)   , target   :: dynamics
-  integer                                 :: nz, snz, elem, nzmax, nzmin, elnodes(3), is, ie, pos
+  integer                                 :: nz, snz, elem, nzmax, nzmin, elnodes(3), is, ie
   integer                                 :: e, edge, enodes(2), eelems(2)
-  real(kind=WP)                           :: div, deltaX, deltaY, locz
+  real(kind=WP)                           :: div, deltaX, deltaY
   integer                                 :: jj
   real(kind=WP), save                     :: dd
-  real(kind=WP)                           :: uvdz_el(2), rhoz_el, vol_el, dz, weight, dmin, dmax, ddiff, test, test1, test2, test3
-  real(kind=WP), save, allocatable        :: dens(:), aux(:), el_depth(:)
-  real(kind=WP), save, allocatable        :: std_dens_w(:,:), std_dens_VOL1(:,:), std_dens_VOL2(:,:)
+  real(kind=WP)                           :: weight, dmin, dmax, ddiff
+  real(kind=WP), save, allocatable        :: dens(:), aux(:)
   logical, save                           :: firstcall_s=.true., firstcall_e=.true.
-  real(kind=WP), save                     :: dmoc_dt_factor = 1.0_WP  ! steps between calls, used for dVdT divisor
   real(kind=WP), dimension(:,:), pointer  :: temp, salt
   real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
 #include "associate_part_def.h"
@@ -464,61 +577,27 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
   fer_UV => dynamics%fer_uv(:,:,:)
 
   if (firstcall_s) then !allocate the stuff at the first call
-     allocate(std_dens_UVDZ(2,std_dens_N, myDim_elem2D))
-     allocate(std_dens_w   (  std_dens_N, myDim_elem2D))
-     allocate(std_dens_dVdT(  std_dens_N, myDim_elem2D))
      allocate(std_dens_DIV (  std_dens_N, myDim_nod2D+eDim_nod2D))
      if (Fer_GM) allocate(std_dens_DIV_fer(  std_dens_N, myDim_nod2D+eDim_nod2D))
-     allocate(std_dens_VOL1(  std_dens_N, myDim_elem2D))
-     allocate(std_dens_VOL2(  std_dens_N, myDim_elem2D))
      allocate(std_dens_flux(3,std_dens_N, myDim_elem2D))
-     allocate(std_dens_Z   (  std_dens_N, myDim_elem2D))
-     allocate(std_dens_H   (  std_dens_N, myDim_elem2D))
      allocate(dens_flux_e(elem2D))
      allocate(aux  (nl-1))
      allocate(dens (nl))
-     allocate(el_depth(nl))
-!
-!std_dens(1)=0.
-!std_dens(2)=30.
-!do nz=3, std_dens_N-1
-!std_dens(nz)=std_dens(nz-1)+10.5/real(std_dens_N-2)
-!end do
-!std_dens(std_dens_N)=40.
-!
      std_dd(:)=std_dens(2:)-std_dens(:std_dens_N-1)
      dens         =0.
-     std_dens_UVDZ=0. !will be U & V transports within the density class
-     std_dens_dVdT=0. !rate of change of a bin volume (for estimating the 'model drift')
      std_dens_DIV =0. !meridional divergence within a density bin (for reconstruction of the diapycnal velocity) !TOP PRIORITY
      if (Fer_GM) std_dens_DIV_fer =0. !meridional divergence of bolus velocity within a density bin (for reconstruction of the diapycnal velocity) !TOP PRIORITY
-     std_dens_VOL1=0. !temporal arrays for computing std_dens_dVdT
-     std_dens_VOL2=0.
      std_dens_flux=0. !bouyancy flux for computation of surface bouyancy transformations
-     std_dens_Z   =0. !will be the vertical position of the density class (for convertion between dAMOC <-> zMOC)
-     std_dens_H   =0. !will be the vertical layerthickness of the density class (for convertion between dAMOC <-> zMOC)
      depth        =0.
-     el_depth     =0.
-     select case (trim(dmoc_call_freq_unit))
-       case ('s'); dmoc_dt_factor = real(dmoc_call_freq, WP)
-       case ('h'); dmoc_dt_factor = real(dmoc_call_freq, WP) * 3600.0_WP / dt
-       case ('d'); dmoc_dt_factor = real(dmoc_call_freq, WP) * 86400.0_WP / dt
-       case default; dmoc_dt_factor = 1.0_WP
-     end select
      firstcall_s=.false.
      if (mode==0) return
   end if
 
-  std_dens_UVDZ=0.
-  std_dens_w   =0.! temporat thing for wiighting (ageraging) mean fields within a bin
   std_dens_flux=0.
-  dens_flux_e    =0.
-  std_dens_VOL2=0.
+  dens_flux_e  =0.
   std_dens_DIV =0.
   if (Fer_GM) std_dens_DIV_fer =0. !meridional divergence of bolus velocity within a density bin (for reconstruction of the diapycnal velocity) !TOP PRIORITY
-  std_dens_Z   =0.
-  std_dens_H   =0.
-  
+
   ! proceed with fields at elements...
   do elem=1, myDim_elem2D
      elnodes=elem2D_nodes(:,elem)     
@@ -537,16 +616,13 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
         aux(nz)=sum(density_dmoc(nz, elnodes))/3.-1000.
      end do
 
-     ! dens will be the density within the column at nodes     
-     el_depth(nzmax)=zbar_e_bot(elem)
+     ! dens will be the density within the column at nodes
      do nz=nzmax-1,nzmin+1,-1
         dens(nz)       = (aux(nz)     * helem(nz-1,elem)+&
                           aux(nz-1)   * helem(nz,  elem))/sum(helem(nz-1:nz,elem))
-        el_depth(nz)   = el_depth(nz+1) + helem(nz, elem)
      end do
      dens(nzmax)=dens(nzmax-1)+(dens(nzmax-1)-dens(nzmax-2))*helem(nzmax-1,elem)/helem(nzmax-2,elem)
      dens(nzmin)    =dens(nzmin+1)      +(dens(nzmin+1)-dens(nzmin+2))            *helem(nzmin, elem)/helem(nzmin+1,elem)
-     el_depth(1)=0.
 
      ! heat, freshwater and restoring at density classes
      is=minloc(abs(std_dens-dens(1)),1)
@@ -558,67 +634,6 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
         dd = dd + (sw_beta (1,elnodes(jj)) * water_flux(elnodes(jj)) * salt(ulevels_nod2D(elnodes(jj)),  elnodes(jj)))
      end do
      std_dens_flux(3, is,elem)=std_dens_flux(3, is,elem)+elem_area(elem)*dd/3.
-     
-     do nz=nzmax-1,nzmin,-1
-        dmin=minval(dens(nz:nz+1))
-        dmax=maxval(dens(nz:nz+1))
-        ddiff=abs(dens(nz)-dens(nz+1))
-        ! do vertical  binning onto prescribed density classes
-        is=std_dens_N
-        do jj = 1, std_dens_N
-           if (std_dens(jj) > dmin) then
-              is = jj
-              exit
-           endif
-        end do
-
-        ie=1
-        do jj = std_dens_N,1,-1
-           if (std_dens(jj) < dmax) then
-              ie = jj
-              exit
-           endif
-        end do
-
-        if (std_dens(is)>=dmax) is=ie
-        if (std_dens(ie)<=dmin) ie=is
-        if (Fer_GM) then
-           uvdz_el=(UV(:,nz,elem)+fer_uv(:,nz,elem))*helem(nz,elem)
-        else
-           uvdz_el=UV(:,nz,elem)*helem(nz,elem)
-        end if
-        rhoz_el=(dens(nz)-dens(nz+1))/helem(nz,elem)
-        vol_el =helem(nz,elem)*elem_area(elem)
-        if (ie-is > 0) then
-           weight=(std_dens(is)-dmin)+std_dd(is)/2.
-           weight=max(weight, 0.)/ddiff
-           std_dens_UVDZ(:, is, elem)=std_dens_UVDZ(:, is, elem)+weight*uvdz_el
-           std_dens_VOL2(   is, elem)=std_dens_VOL2(   is, elem)+weight*vol_el
-           locz=el_depth(nz+1)+weight*helem(nz,elem)
-           std_dens_Z   (   is, elem)=std_dens_Z   (   is, elem)+locz*weight
-           std_dens_w(      is, elem)=std_dens_w   (   is, elem)+weight
-           do snz=is+1, ie-1
-              weight=(sum(std_dd(snz-1:snz))/2.)/ddiff
-              std_dens_UVDZ(:, snz, elem)=std_dens_UVDZ(:, snz, elem)+weight*uvdz_el
-              std_dens_VOL2(   snz, elem)=std_dens_VOL2(   snz, elem)+weight*vol_el
-              locz=locz+weight*helem(nz,elem)
-              std_dens_Z   (   snz, elem)=std_dens_Z   (   snz, elem)+locz*weight
-              std_dens_w   (   snz, elem)=std_dens_w   (   snz, elem)+weight
-           end do
-           weight=(dmax-std_dens(ie))+std_dd(ie-1)/2.
-           weight=max(weight, 0.)/ddiff
-           std_dens_UVDZ(:, ie, elem)=std_dens_UVDZ(:, ie, elem)+weight*uvdz_el
-           std_dens_VOL2(   ie, elem)=std_dens_VOL2(   ie, elem)+weight*vol_el
-           locz=locz+weight*helem(nz,elem)
-           std_dens_Z   (   ie, elem)=std_dens_Z   (   ie, elem)+locz*weight
-           std_dens_w   (   ie, elem)=std_dens_w   (   ie, elem)+weight
-        else
-           std_dens_UVDZ(:, is, elem)=std_dens_UVDZ(:, is, elem)+uvdz_el
-           std_dens_VOL2(   is, elem)=std_dens_VOL2(   is, elem)+vol_el
-           std_dens_Z   (   is, elem)=std_dens_Z   (   is, elem)+el_depth(nz+1)+helem(nz,elem)/2.
-           std_dens_w   (   is, elem)=std_dens_w   (   is, elem)+1._wp
-        end if
-     end do
   end do
 
     !___________________________________________________________________________
@@ -655,26 +670,20 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
             do nz=nzmax-1,nzmin,-1
                 div=(UV(2,nz,elem)*deltaX-UV(1,nz,elem)*deltaY)*helem(nz,elem)
                 if (e==2) div=-div
-                dmin =minval(dens(nz:nz+1))
-                dmax =maxval(dens(nz:nz+1))
-                ddiff=abs(dens(nz)-dens(nz+1))
-                
+                if (dens(nz) < dens(nz+1)) then
+                    dmin  = dens(nz)
+                    dmax  = dens(nz+1)
+                    ddiff = dens(nz+1) - dens(nz)
+                else
+                    dmin  = dens(nz+1)
+                    dmax  = dens(nz)
+                    ddiff = dens(nz)   - dens(nz+1)
+                end if
+
                 ! do vertical  binning onto prescribed density classes
-                is=std_dens_N
-                do jj = 1, std_dens_N
-                    if (std_dens(jj) > dmin) then
-                        is = jj
-                        exit
-                    endif
-                end do
-                ie=1
-                do jj = std_dens_N,1,-1
-                    if (std_dens(jj) < dmax) then
-                        ie = jj
-                        exit
-                    endif
-                end do
-                
+                is = find_density_lower_bound(dmin, std_dens, std_dens_N)
+                ie = find_density_upper_bound(dmax, std_dens, std_dens_N)
+
                 if (std_dens(is)>=dmax) is=ie
                 if (std_dens(ie)<=dmin) ie=is
                 if (ie-is > 0) then
@@ -683,7 +692,7 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
                     std_dens_DIV(is, enodes(1))=std_dens_DIV(is, enodes(1))+weight*div
                     std_dens_DIV(is, enodes(2))=std_dens_DIV(is, enodes(2))-weight*div
                     do snz=is+1, ie-1
-                        weight=(sum(std_dd(snz-1:snz))/2.)/ddiff
+                        weight=(std_dd(snz-1) + std_dd(snz))/(2.0_WP*ddiff)
                         std_dens_DIV(snz, enodes(1))=std_dens_DIV(snz, enodes(1))+weight*div
                         std_dens_DIV(snz, enodes(2))=std_dens_DIV(snz, enodes(2))-weight*div
                     end do
@@ -703,26 +712,20 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
                 do nz=nzmax-1,nzmin,-1
                     div=(fer_uv(2,nz,elem)*deltaX-fer_uv(1,nz,elem)*deltaY)*helem(nz,elem)
                     if (e==2) div=-div
-                    dmin =minval(dens(nz:nz+1))
-                    dmax =maxval(dens(nz:nz+1))
-                    ddiff=abs(dens(nz)-dens(nz+1))
-                    
+                    if (dens(nz) < dens(nz+1)) then
+                        dmin  = dens(nz)
+                        dmax  = dens(nz+1)
+                        ddiff = dens(nz+1) - dens(nz)
+                    else
+                        dmin  = dens(nz+1)
+                        dmax  = dens(nz)
+                        ddiff = dens(nz)   - dens(nz+1)
+                    end if
+
                     ! do vertical  binning onto prescribed density classes
-                    is=std_dens_N
-                    do jj = 1, std_dens_N
-                        if (std_dens(jj) > dmin) then
-                            is = jj
-                            exit
-                        endif
-                    end do
-                    ie=1
-                    do jj = std_dens_N,1,-1
-                        if (std_dens(jj) < dmax) then
-                            ie = jj
-                            exit
-                        endif
-                    end do
-                    
+                    is = find_density_lower_bound(dmin, std_dens, std_dens_N)
+                    ie = find_density_upper_bound(dmax, std_dens, std_dens_N)
+
                     if (std_dens(is)>=dmax) is=ie
                     if (std_dens(ie)<=dmin) ie=is
                     if (ie-is > 0) then
@@ -731,7 +734,7 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
                         std_dens_DIV_fer(is, enodes(1))=std_dens_DIV_fer(is, enodes(1))+weight*div
                         std_dens_DIV_fer(is, enodes(2))=std_dens_DIV_fer(is, enodes(2))-weight*div
                         do snz=is+1, ie-1
-                            weight=(sum(std_dd(snz-1:snz))/2.)/ddiff
+                            weight=(std_dd(snz-1) + std_dd(snz))/(2.0_WP*ddiff)
                             std_dens_DIV_fer(snz, enodes(1))=std_dens_DIV_fer(snz, enodes(1))+weight*div
                             std_dens_DIV_fer(snz, enodes(2))=std_dens_DIV_fer(snz, enodes(2))-weight*div
                         end do
@@ -747,27 +750,7 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
             end if ! --> if (Fer_GM) then
         end do ! --> do e=1,2
     end do ! --> do edge=1, myDim_edge2D
-  
-  !_____________________________________________________________________________
-  where (std_dens_w > 0.)
-        std_dens_Z   =std_dens_Z / std_dens_w
-  end where
-  
-  !_____________________________________________________________________________
-  ! compute density class volume change over time 
-  if (.not. firstcall_e) then
-     std_dens_dVdT=(std_dens_VOL2-std_dens_VOL1)/(dmoc_dt_factor*dt)
-  end if
-  std_dens_VOL1=std_dens_VOL2
-  
-  !_____________________________________________________________________________
-  ! compute mean thickness of density class, try to extract better vertical position
-  ! when do projection into zcoord. 
-  std_dens_H = std_dens_VOL2
-  do jj = 1, std_dens_N
-        std_dens_H(jj,1:myDim_elem2D) = std_dens_H(jj,1:myDim_elem2D)/elem_area(1:myDim_elem2D)
-  end do
-  
+
   firstcall_e=.false.
 end subroutine diag_densMOC
 
@@ -1126,7 +1109,12 @@ subroutine compute_diagnostics(mode, dynamics, tracers, ice, partit, mesh)
   ! 6. MOC in density coordinate
   if (ldiag_dMOC .and. dmoc_is_due(mstep)) &
       call diag_densMOC(mode, dynamics, tracers, partit, mesh)
-  
+
+  ! 6b. diapycnal velocity and density class uplift induced by the parameterized
+  ! vertical mixing --> together with 6. this gives the numerically induced
+  ! diapycnal velocity and the spurious MOC
+  if (ldiag_diapmix)     call ts_diff2w_diap(mode, dynamics, tracers, partit, mesh)
+
   ! 7. compute turbulent fluxes
   if (ldiag_turbflux)    call diag_turbflux(mode, dynamics, tracers, partit, mesh)
   
@@ -3518,5 +3506,276 @@ subroutine dvd_add_clim_relax(do_SDdvd, tr_num, dvd_tot, tr, partit, mesh)
         end if    
     end do
 end subroutine dvd_add_clim_relax
+
+!
+!
+!_______________________________________________________________________________
+! Diagnostic of the diapycnal velocity induced by the parameterized vertical
+! mixing (w_diap) and of the uplift velocity of the density classes (dV_diap_dT).
+!
+! The routine consumes the time averages that are accumulated elsewhere while
+! ldiag_diapmix is set:
+!   dT_diap, dS_diap        (oce_ale_tracer.F90,      diff_tracers_ale)
+!   density_dmoc_avg        (oce_ale_tracer.F90,      solve_tracers_ale)
+!   sw_alpha_diap, sw_beta_diap (oce_ale_pressure_bv.F90, sw_alpha_beta)
+!   diap_avg_count          (number of accumulated time steps)
+!
+! Per element it
+!   1) turns the averaged T/S diffusion tendencies into a density tendency
+!      drho/dt = rho_0*(-alpha*dT/dt + beta*dS/dt) and integrates it over depth,
+!   2) remaps that integral and the z-levels themselves onto the std_dens
+!      classes,
+!   3) differentiates the remapped integral with respect to density, which gives
+!      the diapycnal velocity w_diap of each class,
+!   4) forms dV_diap_dT from the change of the class mid-depth since the previous
+!      call (positive downwards).
+!
+! Together with the full velocities reconstructed from the ldiag_dMOC output the
+! numerically induced diapycnal velocity is then w_full - w_diap - w_uplift, and
+! the associated spurious MOC follows from it. Both are formed in postprocessing.
+!
+! Caveats the postprocessing has to be aware of:
+!  * dT_diap/dS_diap are read off the vertical mixing operators, which is also
+!    where FESOM applies the surface boundary condition, so w_diap contains the
+!    surface buoyancy forcing as well as the interior mixing. The routine prints
+!    this once at startup.
+!  * none of the accumulators is restart state, so the first window after a
+!    restart yields w_diap only at its end, and dV_diap_dT only at the end of the
+!    second window; a chunked run therefore differs slightly from a continuous
+!    one over the affected output periods.
+!_______________________________________________________________________________
+subroutine ts_diff2w_diap(mode, dynamics, tracers, partit, mesh)
+  implicit none
+  integer,        intent(in)               :: mode
+  type(t_mesh)  , intent(in)   , target    :: mesh
+  type(t_partit), intent(inout), target    :: partit
+  type(t_dyn)   , intent(in)   , target    :: dynamics
+  type(t_tracer), intent(in)   , target    :: tracers
+
+  integer                                  :: elem, nz, nzmin, nzmax, elnodes(3)
+  integer                                  :: node_size, elem_size
+  real(kind=WP)                            :: rT, rS, inv_dt_avg
+  real(kind=WP)                            :: dRHOz(mesh%nl-1), RHOz_mid(mesh%nl-1)
+  real(kind=WP)                            :: RHOz(mesh%nl), dRHOz_int(mesh%nl), zlev(mesh%nl)
+  real(kind=WP)                            :: dRHOd_int(std_dens_N), std_dens_heights(std_dens_N)
+  logical,       save                      :: firstcall=.true.
+  logical,       save                      :: have_previous_dV=.false.
+
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+
+  !_____________________________________________________________________________
+  if (firstcall) then
+     node_size = myDim_nod2D +eDim_nod2D
+     elem_size = myDim_elem2D+eDim_elem2D
+     allocate(w_diap          (std_dens_N  , elem_size))
+     allocate(dV_diap_dT      (std_dens_N  , elem_size))
+     allocate(dV_diap         (std_dens_N-1, elem_size))
+     allocate(dV_diap_bak     (std_dens_N-1, elem_size))
+     allocate(dT_diap         (nl-1        , node_size))
+     allocate(dS_diap         (nl-1        , node_size))
+     allocate(dd_diap         (nl-1        , node_size))
+     allocate(sw_alpha_diap   (nl-1        , node_size))
+     allocate(sw_beta_diap    (nl-1        , node_size))
+     allocate(density_dmoc_avg(nl-1        , node_size))
+     w_diap           = 0.0_WP
+     dV_diap_dT       = 0.0_WP
+     dV_diap          = 0.0_WP
+     dV_diap_bak      = 0.0_WP
+     dT_diap          = 0.0_WP
+     dS_diap          = 0.0_WP
+     dd_diap          = 0.0_WP
+     sw_alpha_diap    = 0.0_WP
+     sw_beta_diap     = 0.0_WP
+     density_dmoc_avg = 0.0_WP
+     diap_avg_count   = 0.0_WP
+     dmoc_avg_count   = 0.0_WP
+     firstcall        = .false.
+
+     !__________________________________________________________________________
+     ! dT_diap/dS_diap are read off del_ttf and off the implicit vertical solve,
+     ! which is where FESOM also applies the surface boundary condition and, with
+     ! use_wsplit and a non-FCT limiter, the implicit vertical advection. Say so
+     ! once, so nobody reads w_diap as pure interior mixing.
+     if (mype==0) then
+        write(*,*) 'ldiag_diapmix: w_diap contains the density tendency of all vertical'
+        write(*,*) '               mixing operators INCLUDING their surface boundary'
+        write(*,*) '               condition (heat/freshwater/salt flux, surface relaxation,'
+        write(*,*) '               shortwave penetration, KPP non-local fluxes).'
+        if (dynamics%use_wsplit) then
+           write(*,*) '    WARNING:   use_wsplit=.true. --> for tracers that do not use the FCT'
+           write(*,*) '               limiter the implicit vertical ADVECTION is solved together'
+           write(*,*) '               with the vertical diffusion and is therefore also counted'
+           write(*,*) '               in w_diap.'
+        end if
+     end if
+     if (mode==0) return
+  end if
+
+  !_____________________________________________________________________________
+  ! nothing to do unless the averaging window is complete and something has been
+  ! accumulated into it
+  if (.not. diap_is_due(mstep))  return
+  if (diap_avg_count < 0.5_WP)   return
+  ! density_dmoc is refreshed less often than every step when dmoc_call_freq is
+  ! coarse; if it has not been refreshed once within this window there is no
+  ! density axis to bin onto, so keep accumulating and close the window later
+  if (dmoc_avg_count < 0.5_WP)   return
+
+  inv_dt_avg       = 1.0_WP/(dt*diap_avg_count)
+  sw_alpha_diap    = sw_alpha_diap   /diap_avg_count
+  sw_beta_diap     = sw_beta_diap    /diap_avg_count
+  dT_diap          = dT_diap         /diap_avg_count
+  dS_diap          = dS_diap         /diap_avg_count
+  density_dmoc_avg = density_dmoc_avg/dmoc_avg_count
+
+  ! the accumulating loops run over myDim_nod2D only, so refresh the halo
+  call exchange_nod(dT_diap,          partit)
+  call exchange_nod(dS_diap,          partit)
+  call exchange_nod(sw_alpha_diap,    partit)
+  call exchange_nod(sw_beta_diap,     partit)
+  call exchange_nod(density_dmoc_avg, partit)
+
+  !_____________________________________________________________________________
+  do elem=1, myDim_elem2D
+     elnodes = elem2D_nodes(:,elem)
+     nzmax   = nlevels(elem)
+     nzmin   = ulevels(elem)
+     dRHOz_int(1:nzmin) = 0.0_WP
+     zlev     (1:nzmin) = 0.0_WP
+
+     ! density tendency of the layer, and its depth integral down to each face
+     do nz=nzmin, nzmax-1
+        rT = -sum(dT_diap(nz,elnodes)*sw_alpha_diap(nz,elnodes))/3.0_WP
+        rS =  sum(dS_diap(nz,elnodes)*sw_beta_diap (nz,elnodes))/3.0_WP
+        dRHOz(nz)       = (rT+rS)*density_0/dt
+        RHOz_mid(nz)    = sum(density_dmoc_avg(nz,elnodes)-1000.0_WP)/3.0_WP
+        dRHOz_int(nz+1) = dRHOz_int(nz) + dRHOz(nz)*helem(nz,elem)
+        zlev(nz+1)      = zlev(nz)      + helem(nz,elem)
+     end do
+
+     ! density at the faces: linear interpolation between the two adjacent layer
+     ! centres. The face lies helem(nz-1)/2 below the centre of layer nz-1 and
+     ! helem(nz)/2 above the centre of layer nz, so each centre is weighted by
+     ! the OTHER layer's thickness -- same convention as diag_densMOC above.
+     ! Top and bottom face take the value of the adjacent layer.
+     RHOz(nzmin) = RHOz_mid(nzmin)
+     RHOz(nzmax) = RHOz_mid(nzmax-1)
+     do nz=nzmin+1, nzmax-1
+        RHOz(nz) = (RHOz_mid(nz-1)*helem(nz,elem) + RHOz_mid(nz)*helem(nz-1,elem)) / &
+                   (helem(nz-1,elem) + helem(nz,elem))
+     end do
+
+     ! depth of each density class, then the mid-depth of the class interval
+     ! (positive downwards) -- w_diap below is a centred derivative living on the
+     ! same staggered density grid, so both outputs refer to the same isopycnal
+     call interp_z_to_dens(zlev, RHOz, std_dens_heights, nzmin, nzmax)
+     dV_diap(1:std_dens_N-1,elem) = 0.5_WP*(std_dens_heights(2:) + std_dens_heights(:std_dens_N-1))
+
+     ! depth integrated density tendency remapped onto the density classes,
+     ! differentiated with respect to density -> diapycnal velocity
+     call interp_z_to_dens(dRHOz_int, RHOz, dRHOd_int, nzmin, nzmax)
+     call calculate_w_diap(dRHOd_int, w_diap(:,elem))
+  end do
+
+  !_____________________________________________________________________________
+  ! uplift velocity of the density classes from the change of their mid-depth
+  if (have_previous_dV) then
+     dV_diap_dT(1:std_dens_N-1,:) = (dV_diap - dV_diap_bak)*inv_dt_avg
+  end if
+  dV_diap_bak      = dV_diap
+  have_previous_dV = .true.
+
+  !_____________________________________________________________________________
+  ! open the next averaging window
+  sw_alpha_diap    = 0.0_WP
+  sw_beta_diap     = 0.0_WP
+  dT_diap          = 0.0_WP
+  dS_diap          = 0.0_WP
+  density_dmoc_avg = 0.0_WP
+  diap_avg_count   = 0.0_WP
+  dmoc_avg_count   = 0.0_WP
+end subroutine ts_diff2w_diap
+
+!
+!
+!_______________________________________________________________________________
+! Remap a quantity given at the z-level faces of one element onto the std_dens
+! density classes. RHOz is the density at the same faces and need not be
+! monotonic: every z-interval that a class crosses contributes, and the
+! contributions are averaged. Classes lighter/denser than the whole column take
+! the surface/bottom value, which makes the remapped profile constant outside the
+! density range of the column (and hence w_diap zero there).
+subroutine interp_z_to_dens(fz, RHOz, fd, nzmin, nzmax)
+  implicit none
+  real(kind=WP), intent(in)    :: fz(:)     ! field at the z-level faces
+  real(kind=WP), intent(in)    :: RHOz(:)   ! density at the z-level faces
+  real(kind=WP), intent(out)   :: fd(:)     ! field at the density classes
+  integer,       intent(in)    :: nzmin, nzmax
+  integer                      :: nz, jd
+  real(kind=WP)                :: rho_class, crho_min, crho_max, weight, drho
+  real(kind=WP)                :: cnt_array(std_dens_N)
+
+  fd(:)        = 0.0_WP
+  cnt_array(:) = 0.0_WP
+
+  crho_min = minval(RHOz(nzmin:nzmax))
+  crho_max = maxval(RHOz(nzmin:nzmax))
+
+  ! z-levels outside, density classes inside: keeps the z-level data streaming
+  ! sequentially through cache
+  do nz=nzmin, nzmax-1
+     drho = RHOz(nz+1) - RHOz(nz)
+     do jd=1, std_dens_N
+        rho_class = std_dens(jd)
+        ! does this class cut the interval [RHOz(nz), RHOz(nz+1)]?
+        if ((rho_class-RHOz(nz))*(rho_class-RHOz(nz+1)) <= 0.0_WP) then
+           cnt_array(jd) = cnt_array(jd) + 1.0_WP
+           if (abs(drho) > 1.0e-5_WP) then
+              weight = (rho_class - RHOz(nz))/drho
+              fd(jd) = fd(jd) + (1.0_WP-weight)*fz(nz) + weight*fz(nz+1)
+           else
+              ! density is constant across the interval -> take its mean
+              fd(jd) = fd(jd) + 0.5_WP*(fz(nz) + fz(nz+1))
+           end if
+        end if
+     end do
+  end do
+
+  do jd=1, std_dens_N
+     if (std_dens(jd) <= crho_min) then
+        fd(jd) = fz(nzmin)
+     else if (std_dens(jd) >= crho_max) then
+        fd(jd) = fz(nzmax)
+     else if (cnt_array(jd) > 0.0_WP) then
+        fd(jd) = fd(jd)/cnt_array(jd)
+     end if
+  end do
+end subroutine interp_z_to_dens
+
+!
+!
+!_______________________________________________________________________________
+! Diapycnal velocity at the density classes: derivative of the depth integrated
+! density tendency with respect to density. The last class carries no forward
+! difference and stays zero, as does every class outside the density range of the
+! column, where interp_z_to_dens leaves the integral constant.
+subroutine calculate_w_diap(dRHOd_int, w_diap_elem)
+  implicit none
+  real(kind=WP), intent(in)  :: dRHOd_int(:)    ! depth integrated density tendency per class
+  real(kind=WP), intent(out) :: w_diap_elem(:)  ! diapycnal velocity per class
+  integer                    :: jd
+  real(kind=WP)              :: ddens
+
+  w_diap_elem(:) = 0.0_WP
+  do jd=1, std_dens_N-1
+     ddens = std_dens(jd+1) - std_dens(jd)
+     if (abs(ddens) > 1.0e-15_WP) then
+        w_diap_elem(jd) = (dRHOd_int(jd+1) - dRHOd_int(jd))/ddens
+     end if
+  end do
+end subroutine calculate_w_diap
 
 end module diagnostics

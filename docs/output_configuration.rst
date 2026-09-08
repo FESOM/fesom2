@@ -17,7 +17,8 @@ Section &diag_list
 - **ldiag_Ri** compute and output bulk Richardson number diagnostics (``shear``, ``Ri``).
 - **ldiag_TurbFlux** turbulent flux diagnostics (``KvdTdz``, ``KvdSdz``).
 - **ldiag_salt3D** extra 3-D salinity diagnostics.
-- **ldiag_dMOC** density-space MOC diagnostics (velocity transports in density bins).
+- **ldiag_dMOC** density-space MOC diagnostics: divergence of the horizontal transports within the density bins (``std_dens_DIV``, plus ``std_dens_DIVbolus`` with ``Fer_GM``) and the surface buoyancy fluxes per density class, from which the full velocities and the density MOC are reconstructed in postprocessing.
+- **ldiag_diapmix** adds ``w_diap_diff`` and ``dV_diap_dT`` to the ``dMOC`` stream: the diapycnal velocity and the density-class uplift velocity induced by the parameterized vertical mixing. Combined with the full velocities from ``ldiag_dMOC`` this gives the numerically induced diapycnal velocity ``w_full - w_diap - w_uplift`` and the corresponding spurious MOC. Requires ``ldiag_dMOC`` (switched on automatically if left unset). Evaluated every ``diap_call_freq`` units of ``diap_call_freq_unit`` (``'s'``, ``'h'``, ``'d'`` or ``'m'``); the diagnostic averages over the interval between calls.
 - **ldiag_DVD** Discrete Variance Decay diagnostics for numerical mixing estimates.
 - **ldiag_forc** comprehensive forcing diagnostics bundle (``FORC`` stream).
 - **ldiag_extflds** extended field diagnostics (additional helper fields used by some analyses).
