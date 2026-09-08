@@ -443,9 +443,9 @@ else
         v_ice_ib     => ice%vice_ib(:)
         v_ice_ib     = 0._WP
     end if
-    a_ice_ib     => ice%data(size(ice%data)-1)%values(:)
+    a_ice_ib     => ice%data(ice%a_ice_ib_itracer_idx)%values(:)
     a_ice_ib     = 0._WP
-    m_ice_ib     => ice%data(size(ice%data))%values(:)
+    m_ice_ib     => ice%data(ice%m_ice_ib_itracer_idx)%values(:)
     m_ice_ib     = 0._WP
   else
 ! kh 19.02.21 support "first touch" idea
@@ -474,8 +474,8 @@ else
       !end do
       u_ice_ib     => ice%uice_ib(:)
       v_ice_ib     => ice%vice_ib(:)
-      a_ice_ib     => ice%data(size(ice%data)-1)%values(:)
-      m_ice_ib     => ice%data(size(ice%data))%values(:)
+      a_ice_ib     => ice%data(ice%a_ice_ib_itracer_idx)%values(:)
+      m_ice_ib     => ice%data(ice%m_ice_ib_itracer_idx)%values(:)
       !allocate(m_ice(n_size), a_ice(n_size))
       !allocate(m_ice_ib(n_size), a_ice_ib(n_size))
       u_ice_ib     = 0._WP

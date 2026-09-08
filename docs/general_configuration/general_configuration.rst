@@ -98,7 +98,7 @@ Section &machine
 Section &icebergs
 """""""""""""""""
 
-- **use_icebergs=.false.**, **use_icesheet_coupling=.false.** toggle the iceberg module and coupling to an ice-sheet model.
+- **use_icebergs=.false.**, **use_icesheet_coupling=.false.** toggle the iceberg module and coupling to an ice-sheet model. ``use_icebergs`` also sizes the ice tracer array: switching it on adds an iceberg concentration and thickness tracer, which changes the binary restart layout, so a restart cannot be carried across a change of this switch.
 - **turn_off_hf=.false.**, **turn_off_fw=.false.** disable latent heat or freshwater fluxes from icebergs when needed for debugging.
 - **lbalance_fw=.true.**, **cell_saturation=2** controls for preventing excessive freshwater injection into small grid cells.
 - **lmin_latent_hf=.true.**, **lverbose_icb=.false.** control numerical safety and verbosity of iceberg thermodynamics.

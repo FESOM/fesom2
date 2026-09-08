@@ -165,15 +165,16 @@ TYPE T_ICE
 
     !___________________________________________________________________________
     ! Ice tracers: 1=area, 2=mice, 3=msnow, then the optional prognostic ice
-    ! surface temperature, then the two asynchronous-iceberg tracers (which
-    ! icb_dyn.F90 addresses as the last two slots, so they follow the count).
+    ! surface temperature, then the optional pair of iceberg tracers.
     !
-    ! Both are set in ice_init, from the partner atmosphere.
-    ! ist_itracer_idx is the slot holding the ice surface temperature, or 0
-    ! when the partner does not expect FESOM to carry one. The values here
-    ! only apply until then.
-    integer                                     :: num_itracers=3
+    ! set_ice_tracer_layout assigns all of these in ice_init. An index is 0
+    ! when the tracer is not present, so a consumer tests its own index
+    ! rather than rederiving the condition. The values here only apply until
+    ! ice_init runs.
+    integer                                     :: num_itracers=0
     integer                                     :: ist_itracer_idx=0
+    integer                                     :: a_ice_ib_itracer_idx=0
+    integer                                     :: m_ice_ib_itracer_idx=0
 
     ! put ice tracers data arrays
     type(t_ice_data), allocatable, dimension(:) :: data
@@ -235,29 +236,35 @@ contains
 
 !
 !_______________________________________________________________________________
-!> Ice tracer layout: how many tracers, and which slot (if any) carries the
-!> prognostic ice surface temperature.
+!> Ice tracer layout: how many tracers there are, and which slot each
+!> optional tracer occupies.
 !>
-!> The IFS-family atmospheres expect FESOM to carry that temperature and
-!> advect it; the others do not. The three counts reproduce what the
-!> preprocessor used to pick: 6 with the temperature tracer, otherwise 5 with
-!> the asynchronous iceberg tracers and 3 without. icb_dyn.F90 addresses the
-!> iceberg tracers as the last two slots, so they follow the count.
+!> Area, ice thickness and snow thickness are always present. The IFS-family
+!> atmospheres additionally expect FESOM to carry and advect an ice surface
+!> temperature. Icebergs add a concentration and a thickness tracer.
+!>
+!> Every slot is claimed here, so that consumers index by name instead of
+!> counting from the end of the array.
 subroutine set_ice_tracer_layout(ice)
     use cpl_config, only: is_coupled_to_oifs, is_coupled_to_ifs
+    use g_config,   only: use_icebergs
     implicit none
     type(t_ice), intent(inout) :: ice
 
+    ! Ice tracers: 1=area, 2=mice, 3=msnow
+    ice%num_itracers = 3
+
+    ! optional ice surface temperature tracer for IFS-family atmospheres
     if (is_coupled_to_oifs .or. is_coupled_to_ifs) then
-        ice%ist_itracer_idx = 4
-        ice%num_itracers    = 6
-    else
-        ice%ist_itracer_idx = 0
-#if defined(__async_icebergs)
-        ice%num_itracers    = 5
-#else
-        ice%num_itracers    = 3
-#endif
+        ice%ist_itracer_idx = ice%num_itracers + 1
+        ice%num_itracers    = ice%num_itracers + 1
+    end if
+
+    ! optional icebergs tracers
+    if (use_icebergs) then
+        ice%a_ice_ib_itracer_idx = ice%num_itracers + 1
+        ice%m_ice_ib_itracer_idx = ice%num_itracers + 2
+        ice%num_itracers         = ice%num_itracers + 2
     end if
 end subroutine set_ice_tracer_layout
 !
