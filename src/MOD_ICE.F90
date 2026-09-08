@@ -96,7 +96,7 @@ TYPE T_ICE_THERMO
     ! --- additional namelist parameters (Frank.Kauker(at)awi.de 2023/04/04)
     logical       :: snowdist=.true.   ! distribution of snow depth according to ice distribution
     logical       :: new_iclasses=.false. ! ice thickness distribution based on EM observations (Castro-Morales et al., JGR, 2013)
-    integer       :: open_water_albedo=0  ! 0=standard; 1=taylor; 2=briegleb        
+    integer       :: open_water_albedo=0  ! 0=standard; 1=taylor; 2=briegleb
     REAL(kind=WP) :: c_melt=0.5        ! constant in concentration equation for melting conditions
     ! --- melt pond parameters
     logical       :: use_meltponds=.false. ! enable melt pond parameterization
@@ -117,17 +117,17 @@ TYPE T_ICE_ATMCOUPL
 
     !___________________________________________________________________________
     real(kind=WP), allocatable, dimension(:)    :: oce_flx_h, ice_flx_h, tmpoce_flx_h, tmpice_flx_h
-#if defined (__oifs) || defined (__ifsinterface) || defined (__cpl_yac)
     !___________________________________________________________________________
+    ! Needed by the IFS-family partners. Declared and allocated for every
+    ! coupled build because the partner is chosen at run time.
     real(kind=WP), allocatable, dimension(:)    :: ice_alb, enthalpyoffuse, runoff_liquid, runoff_solid, flx_qres, flx_qcon
     ! ist anchor: ice surface temperature as ACTUALLY TRANSMITTED at the last
     ! OASIS send -- the temperature OIFS evaluates its ice-tile fluxes at for
     ! the coming coupling interval. Consumed by the implicit (dQ/dT-linearized)
     ! surface-temperature solve in ice_thermo_cpl.F90 (ice_surftemp).
     real(kind=WP), allocatable, dimension(:)    :: ist_ref
-    ! !!! DONT FORGET ice_temp rhs_tempdiv rhs_temp is advected for oifs !!! --> becomes additional ice
-    ! tracer in ice%data(4)%values
-#endif /* (__oifs)  */
+    ! ice_temp / rhs_temp / rhs_tempdiv are advected as the additional ice
+    ! tracer in ice%data(ist_itracer_idx)%values.
     !___________________________________________________________________________
     contains
         procedure WRITE_T_ICE_ATMCOUPL
@@ -164,20 +164,16 @@ TYPE T_ICE
     real(kind=WP), allocatable, dimension(:)    :: h_ice, h_snow    
 
     !___________________________________________________________________________
-    ! total number of ice tracers (default=3, 1=area, 2=mice, 3=msnow, (4=ice_temp)
-#if defined (__oifs) || defined (__ifsinterface)
-    integer                                     :: num_itracers=6
-#else
-!    integer                                     :: num_itracers=3
-    !------------------------------
-    ! LA 2023-01-31 add icebergs
-#if defined(__async_icebergs)
-    integer                                     :: num_itracers=5
-#else
+    ! Ice tracers: 1=area, 2=mice, 3=msnow, then the optional prognostic ice
+    ! surface temperature, then the two asynchronous-iceberg tracers (which
+    ! icb_dyn.F90 addresses as the last two slots, so they follow the count).
+    !
+    ! Both are set in ice_init, from the partner atmosphere.
+    ! ist_itracer_idx is the slot holding the ice surface temperature, or 0
+    ! when the partner does not expect FESOM to carry one. The values here
+    ! only apply until then.
     integer                                     :: num_itracers=3
-#endif 
-    !------------------------------
-#endif 
+    integer                                     :: ist_itracer_idx=0
 
     ! put ice tracers data arrays
     type(t_ice_data), allocatable, dimension(:) :: data
@@ -236,6 +232,34 @@ TYPE T_ICE
 END TYPE T_ICE
 
 contains
+
+!
+!_______________________________________________________________________________
+!> Ice tracer layout: how many tracers, and which slot (if any) carries the
+!> prognostic ice surface temperature.
+!>
+!> The IFS-family atmospheres expect FESOM to carry that temperature and
+!> advect it; the others do not. The three counts reproduce what the
+!> preprocessor used to pick: 6 with the temperature tracer, otherwise 5 with
+!> the asynchronous iceberg tracers and 3 without. icb_dyn.F90 addresses the
+!> iceberg tracers as the last two slots, so they follow the count.
+subroutine set_ice_tracer_layout(ice)
+    use cpl_config, only: is_coupled_to_oifs, is_coupled_to_ifs
+    implicit none
+    type(t_ice), intent(inout) :: ice
+
+    if (is_coupled_to_oifs .or. is_coupled_to_ifs) then
+        ice%ist_itracer_idx = 4
+        ice%num_itracers    = 6
+    else
+        ice%ist_itracer_idx = 0
+#if defined(__async_icebergs)
+        ice%num_itracers    = 5
+#else
+        ice%num_itracers    = 3
+#endif
+    end if
+end subroutine set_ice_tracer_layout
 !
 !
 !_______________________________________________________________________________
@@ -383,12 +407,16 @@ subroutine WRITE_T_ICE_ATMCOUPL(tcoupl, unit)
     call write_bin_array(tcoupl%ice_flx_h,      unit, iostat, iomsg)
     call write_bin_array(tcoupl%tmpoce_flx_h,   unit, iostat, iomsg)
     call write_bin_array(tcoupl%tmpice_flx_h,   unit, iostat, iomsg)
-#if defined (__oifs) || defined (__ifsinterface)
+! TODO: still compile-time, so the bin-restart stream layout is unchanged.
+! Making this follow ist_itracer_idx means writing a leading flag/count and
+! branching on it when reading -- a restart format change, handled
+! separately.
+#if defined (__cpl_direct) || defined (__cpl_oasis50)
     call write_bin_array(tcoupl%ice_alb,        unit, iostat, iomsg)
     call write_bin_array(tcoupl%enthalpyoffuse, unit, iostat, iomsg)
     call write_bin_array(tcoupl%runoff_liquid, unit, iostat, iomsg)
     call write_bin_array(tcoupl%runoff_solid, unit, iostat, iomsg)
-#endif /* (__oifs) */
+#endif /* IFS-family partners */
 
 end subroutine WRITE_T_ICE_ATMCOUPL  
 #endif /* (__cpl_enabled) */
@@ -405,12 +433,16 @@ subroutine READ_T_ICE_ATMCOUPL(tcoupl, unit)
     call read_bin_array(tcoupl%ice_flx_h, unit, iostat, iomsg)
     call read_bin_array(tcoupl%tmpoce_flx_h, unit, iostat, iomsg)
     call read_bin_array(tcoupl%tmpice_flx_h, unit, iostat, iomsg)
-#if defined (__oifs) || defined (__ifsinterface)
+! TODO: still compile-time, so the bin-restart stream layout is unchanged.
+! Making this follow ist_itracer_idx means writing a leading flag/count and
+! branching on it when reading -- a restart format change, handled
+! separately.
+#if defined (__cpl_direct) || defined (__cpl_oasis50)
     call read_bin_array(tcoupl%ice_alb, unit, iostat, iomsg)
     call read_bin_array(tcoupl%enthalpyoffuse, unit, iostat, iomsg)
     call read_bin_array(tcoupl%runoff_liquid, unit, iostat, iomsg)
     call read_bin_array(tcoupl%runoff_solid, unit, iostat, iomsg)
-#endif /* (__oifs) */
+#endif /* IFS-family partners */
 end subroutine READ_T_ICE_ATMCOUPL
 #endif /* (__cpl_enabled) */
 !
@@ -726,6 +758,9 @@ subroutine ice_init(ice, partit, mesh)
     ice%thermo%cl       =ice%thermo%rhoice*3.34e5  ! Volumetr. latent heat of ice fusion [J/m**3](cl=rhoice*Lf)
 
     !___________________________________________________________________________
+    call set_ice_tracer_layout(ice)
+
+    !___________________________________________________________________________
     ! define local vertice & elem array size
     elem_size=myDim_elem2D+eDim_elem2D
     node_size=myDim_nod2D +eDim_nod2D
@@ -880,7 +915,6 @@ subroutine ice_init(ice, partit, mesh)
     ice%atmcoupl%ice_flx_h     = 0.0_WP
     ice%atmcoupl%tmpoce_flx_h  = 0.0_WP
     ice%atmcoupl%tmpice_flx_h  = 0.0_WP
-#if defined (__oifs) || defined (__ifsinterface)
     allocate(ice%atmcoupl%ice_alb(       node_size))
     allocate(ice%atmcoupl%enthalpyoffuse(node_size))
     allocate(ice%atmcoupl%runoff_liquid(node_size))
@@ -897,7 +931,6 @@ subroutine ice_init(ice, partit, mesh)
     ! until the first actual OASIS transmission populates it.
     allocate(ice%atmcoupl%ist_ref(node_size))
     ice%atmcoupl%ist_ref       = 0.0_WP
-#endif /* (__oifs) */
 #endif /* (__cpl_enabled) */
 
     !___________________________________________________________________________
@@ -950,6 +983,9 @@ subroutine ice_init_toyocean_dummy(ice, partit, mesh)
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
+
+    !___________________________________________________________________________
+    call set_ice_tracer_layout(ice)
 
     !___________________________________________________________________________
     ! define local vertice & elem array size

@@ -59,10 +59,10 @@ endfunction()
 # compile error reported in issues #444 and #528.
 add_omp_ordered_test(openmp_ordered_reproducible --mode reproducible)
 
-# The same, for code that only the OpenIFS / IFS-interface builds compile
-# (e.g. the tr_array_id==4 block in ice_fct.F90).
-add_omp_ordered_test(openmp_ordered_reproducible_oifs
-    --mode reproducible --extra-defines "-D__oifs -D__ifsinterface")
+# The ice surface temperature blocks in ice_fct.F90 (tr_array_id==ist_id) used
+# to be reachable only with -D__oifs -D__ifsinterface, and needed a second
+# invocation to cover them. They are compiled unconditionally now and gated at
+# run time, so openmp_ordered_reproducible above already scans them.
 
 # The mirror invariant: neither ORDERED regions nor ORDERED clauses may leak
 # into the default build, where they would serialize loops that are supposed

@@ -192,7 +192,7 @@ contains
 
 !SUVI: disable overflow, underflow for entire model when used  in coupled with ifs
 !      bad practice, use it only in case of Emergency
-!#if defined  __ifsinterface
+!#if defined (__cpl_direct)
 !    call ieee_set_halting_mode(ieee_overflow, .false.)
 !    call ieee_set_halting_mode(ieee_underflow, .false.)
 !    call ieee_set_halting_mode(ieee_invalid, .false.)
@@ -213,7 +213,7 @@ contains
         !OIFS-FESOM2 coupling: does not require MPI_INIT here as this is done by OASIS
         call MPI_Initialized(mpi_is_initialized, f%i)
         if(.not. mpi_is_initialized) then
-            ! TODO: do not initialize MPI here if it has been initialized already, e.g. via IFS when fesom is called as library (__ifsinterface is defined)
+            ! TODO: do not initialize MPI here if it has been initialized already, e.g. via IFS when fesom is called as library (__cpl_direct)
             call MPI_INIT_THREAD(MPI_THREAD_MULTIPLE, f%provided, f%i)
             f%fesom_did_mpi_init = .true.
         end if
@@ -859,9 +859,13 @@ contains
     !$ACC ENTER DATA CREATE  (f%ice%data(1)%dvalues, f%ice%data(2)%dvalues, f%ice%data(3)%dvalues) 
     !$ACC ENTER DATA CREATE  (f%ice%data(1)%values_rhs, f%ice%data(2)%values_rhs, f%ice%data(3)%values_rhs) 
     !$ACC ENTER DATA CREATE  (f%ice%data(1)%values_div_rhs, f%ice%data(2)%values_div_rhs, f%ice%data(3)%values_div_rhs)
-#if defined (__oifs) || defined (__ifsinterface)
-    !$ACC ENTER DATA CREATE (f%ice%data(4)%values, f%ice%data(4)%valuesl, f%ice%data(4)%dvalues, f%ice%data(4)%values_rhs, f%ice%data(4)%values_div_rhs)
-#endif
+    if (f%ice%ist_itracer_idx > 0) then
+       !$ACC ENTER DATA CREATE (f%ice%data(f%ice%ist_itracer_idx)%values) &
+       !$ACC CREATE (f%ice%data(f%ice%ist_itracer_idx)%valuesl) &
+       !$ACC CREATE (f%ice%data(f%ice%ist_itracer_idx)%dvalues) &
+       !$ACC CREATE (f%ice%data(f%ice%ist_itracer_idx)%values_rhs) &
+       !$ACC CREATE (f%ice%data(f%ice%ist_itracer_idx)%values_div_rhs)
+    end if
     !$ACC ENTER DATA COPYIN (f%dynamics)
     !$ACC ENTER DATA CREATE (f%dynamics%w, f%dynamics%w_e, f%dynamics%uv)
     !$ACC ENTER DATA CREATE (f%tracers%work%del_ttf)
@@ -1304,7 +1308,7 @@ contains
         ! Pass f%total_nsteps (namelist run length) as the segment-end marker
         ! rather than the runloop-chunk end (ntotal). In standalone FESOM they
         ! are identical (fesom_runloop is called once with all steps), so the
-        ! year-boundary fix from PR #880 still fires. Under __ifsinterface,
+        ! year-boundary fix from PR #880 still fires. Under __cpl_direct,
         ! fesom_runloop is called per IFS coupling step with a small chunk, so
         ! ntotal == istep on every call; using it as the segment-end marker
         ! would force a restart every coupling timestep.
@@ -1438,9 +1442,13 @@ contains
     !$ACC EXIT DATA DELETE (f%ice%data(1)%dvalues, f%ice%data(2)%dvalues, f%ice%data(3)%dvalues)
     !$ACC EXIT DATA DELETE (f%ice%data(1)%values_rhs, f%ice%data(2)%values_rhs, f%ice%data(3)%values_rhs)
     !$ACC EXIT DATA DELETE (f%ice%data(1)%values_div_rhs, f%ice%data(2)%values_div_rhs, f%ice%data(3)%values_div_rhs)
-#if defined (__oifs) || defined (__ifsinterface)
-    !$ACC EXIT DATA DELETE (f%ice%data(4)%values, f%ice%data(4)%valuesl, f%ice%data(4)%dvalues, f%ice%data(4)%values_rhs, f%ice%data(4)%values_div_rhs)
-#endif
+    if (f%ice%ist_itracer_idx > 0) then
+       !$ACC EXIT DATA DELETE (f%ice%data(f%ice%ist_itracer_idx)%values) &
+       !$ACC DELETE (f%ice%data(f%ice%ist_itracer_idx)%valuesl) &
+       !$ACC DELETE (f%ice%data(f%ice%ist_itracer_idx)%dvalues) &
+       !$ACC DELETE (f%ice%data(f%ice%ist_itracer_idx)%values_rhs) &
+       !$ACC DELETE (f%ice%data(f%ice%ist_itracer_idx)%values_div_rhs)
+    end if
     !$ACC EXIT DATA DELETE (f%ice%data, f%ice%work, f%ice%work%fct_massmatrix)
     !$ACC EXIT DATA DELETE (f%ice)
     do tr_num=1, f%tracers%num_tracers

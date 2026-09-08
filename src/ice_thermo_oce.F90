@@ -84,9 +84,8 @@ subroutine cut_off(ice, partit, mesh)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
-#if defined (__oifs) || defined (__ifsinterface)
     real(kind=WP), dimension(:), pointer  :: ice_temp
-#endif /* (__oifs) */
+    logical                               :: l_ist
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
@@ -94,9 +93,10 @@ subroutine cut_off(ice, partit, mesh)
     a_ice    => ice%data(1)%values(:)
     m_ice    => ice%data(2)%values(:)
     m_snow   => ice%data(3)%values(:)
-#if defined (__oifs) || defined (__ifsinterface)
-    ice_temp => ice%data(4)%values(:)
-#endif /* (__oifs) */
+    l_ist = ice%ist_itracer_idx > 0
+    if (l_ist) then
+       ice_temp => ice%data(ice%ist_itracer_idx)%values(:)
+    end if
 
     n_coldice = 0
 
@@ -110,10 +110,10 @@ DO n=1, myDim_nod2D+eDim_nod2D
        a_ice(n)=0.0_WP
        m_ice(n)   =0.0_WP
        m_snow(n)  =0.0_WP
-#if defined (__oifs) || defined (__ifsinterface)
+        if (l_ist) then
         
-        ice_temp(n)=273.15_WP
-#endif /* (__oifs) */
+           ice_temp(n)=273.15_WP
+        end if
    end if
     !___________________________________________________________________________
     ! lower cutoff: m_ice
@@ -121,36 +121,36 @@ DO n=1, myDim_nod2D+eDim_nod2D
         m_ice(n)=0.0_WP 
         m_snow(n)  =0.0_WP
         a_ice(n)   =0.0_WP
-#if defined (__oifs) || defined (__ifsinterface)
-        ice_temp(n)=273.15_WP
-#endif /* (__oifs) */
+        if (l_ist) then
+           ice_temp(n)=273.15_WP
+        end if
    end if
      
     !___________________________________________________________________________
-#if defined (__oifs) || defined (__ifsinterface)
-    if (ice_temp(n) > 273.15_WP) ice_temp(n)=273.15_WP
-#endif /* (__oifs) */
+    if (l_ist) then
+       if (ice_temp(n) > 273.15_WP) ice_temp(n)=273.15_WP
+    end if
 
-#if defined (__oifs) || defined (__ifsinterface)
-    ! No lower clamp. A surface temperature this far below anything physical
-    ! means the skin solve has diverged, and silently resetting it to the
-    ! seawater freezing point hides the divergence instead of reporting it.
-    ! Count and report below.
-    if (ice_temp(n) < 173.15_WP .and. a_ice(n) >= 0.1e-8_WP) n_coldice = n_coldice + 1
-#endif /* (__oifs) */
+    if (l_ist) then
+       ! No lower clamp. A surface temperature this far below anything physical
+       ! means the skin solve has diverged, and silently resetting it to the
+       ! seawater freezing point hides the divergence instead of reporting it.
+       ! Count and report below.
+       if (ice_temp(n) < 173.15_WP .and. a_ice(n) >= 0.1e-8_WP) n_coldice = n_coldice + 1
+    end if
 END DO
 !$OMP END PARALLEL DO
 
-#if defined (__oifs) || defined (__ifsinterface)
-    ! Rate limited: a diverging skin solve usually diverges every step.
-    if (n_coldice > 0) then
-        n_coldwarn = n_coldwarn + 1
-        if (n_coldwarn <= 5 .or. mod(n_coldwarn, 100) == 0) then
-            write(*,*) 'WARNING: ice_temp below 173.15 K on ', n_coldice, &
-                       ' node(s), rank ', mype, ', occurrence ', n_coldwarn
-        end if
+    if (l_ist) then
+       ! Rate limited: a diverging skin solve usually diverges every step.
+       if (n_coldice > 0) then
+           n_coldwarn = n_coldwarn + 1
+           if (n_coldwarn <= 5 .or. mod(n_coldwarn, 100) == 0) then
+               write(*,*) 'WARNING: ice_temp below 173.15 K on ', n_coldice, &
+                          ' node(s), rank ', mype, ', occurrence ', n_coldwarn
+           end if
+       end if
     end if
-#endif /* (__oifs) */
 end subroutine cut_off
 
 #if !defined (__cpl_enabled)
