@@ -279,11 +279,12 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
         call oce_files%def_node_var_optional(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
 #if defined(__recom)
      else if (is_recom_tracer .and. .not. REcoM_restart) then
-        ! REcoM tracer in a non-REcoM run: register as optional so the field is
-        ! skipped on read (if present in restart) and not written.
+        ! REcoM tracer in a non-REcoM run: register as optional, i.e. the field is
+        ! still written and still read, but a restart file that does not contain it
+        ! is tolerated instead of aborting. See issue on making this a real mute.
         if (partit%mype == RAW_RESTART_METADATA_RANK) then
-           write(*,'(A,A,A)') ' --> ini_ocean_io: muting REcoM tracer "', &
-                trim(trname), '" (REcoM_restart=false, registered as optional)'
+           write(*,'(A,A,A)') ' --> ini_ocean_io: REcoM tracer "', &
+                trim(trname), '" not required on restart read (REcoM_restart=false)'
         end if
         call oce_files%def_node_var_optional(trim(trname), trim(longname), trim(units), tracers%data(j)%values(:,:), mesh, partit)
 #endif
