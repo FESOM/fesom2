@@ -74,7 +74,8 @@ module fesom_main_storage_module
 #endif
 
 #if defined (__cpl_enabled)
-  use cpl_config, only: read_cpl_namelist, check_cpl_config
+  use cpl_config, only: read_cpl_namelist, check_cpl_config, &
+                        is_coupled_to_echam, is_coupled_to_oifs
   ! Same entity as g_config's compute_oasis_corners (use'd wholesale above);
   ! the alias marks which of the two homonyms is meant at the call site.
   use g_config,   only: deprecated_oasis_corners => compute_oasis_corners
@@ -515,20 +516,21 @@ contains
           nrecv = nrecv + 6
         END IF
         !---wiso-code-end
-#if !defined (__oifs)
-        IF (use_icebergs) THEN
+        ! Iceberg wind fields are only in the ECHAM field set.
+        IF (is_coupled_to_echam .and. use_icebergs) THEN
           nrecv = nrecv + 2
         END IF
-#else
-        IF (use_atm_ice_tskin) THEN
-          nrecv = nrecv + 1
-          recv_tsk_ico = nrecv
+        ! tsk_ico and mslp_oce are OpenIFS-only extras.
+        IF (is_coupled_to_oifs) THEN
+          IF (use_atm_ice_tskin) THEN
+            nrecv = nrecv + 1
+            recv_tsk_ico = nrecv
+          END IF
+          IF (use_atm_mslp) THEN
+            nrecv = nrecv + 1
+            recv_mslp_oce = nrecv
+          END IF
         END IF
-        IF (use_atm_mslp) THEN
-          nrecv = nrecv + 1
-          recv_mslp_oce = nrecv
-        END IF
-#endif
 #endif
 
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call check_mesh_consistency'//achar(27)//'[0m'
@@ -1683,9 +1685,9 @@ contains
    call mpp_stop
 #endif
     
-#if defined(__recom) && defined(__usetp) && defined(__oifs)
+#if defined(__recom) && defined(__usetp) && defined (__cpl_oasis50)
     ! FESOM program group 0 already performed the OASIS-coordinated shutdown
-    ! (oasis_terminate, via the #if defined(__oifs) call par_finalize(...) block in the
+    ! (oasis_terminate, via the #if defined (__cpl_oasis50) call par_finalize(...) block in the
     ! per-group stats loop above) and is therefore already MPI-finalized at this
     ! point. Calling par_finalize/oasis_terminate a second time here would re-enter
     ! oasis_terminate's global MPI_Barrier(mpi_comm_global_world,...) + MPI_Finalize
@@ -1699,8 +1701,8 @@ contains
     ! Group 1 (and any further non-primary group) never took part in that inner
     ! call, so this remains its one and only finalize call. Call unconditionally
     ! here, matching group 0's own unconditional call above -- do NOT gate this on
-    ! `f%fesom_did_mpi_init`: that flag is only ever set (see #ifndef __oifs above)
-    ! when FESOM itself calls MPI_INIT, i.e. never in an __oifs build, so a guard
+    ! `f%fesom_did_mpi_init`: that flag is only ever set (see #ifndef __cpl_oasis50 above)
+    ! when FESOM itself calls MPI_INIT, i.e. never in an oasis50 build, so a guard
     ! on it here silently skips this call entirely. That was the actual bug: group
     ! 1 then never reaches oasis_terminate's global barrier at all, so everyone
     ! else who does (group 0, OIFS, XIOS, rnfmap, ...) hangs there indefinitely

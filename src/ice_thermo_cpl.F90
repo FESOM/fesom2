@@ -38,7 +38,13 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP)  :: a2ohf, a2ihf, qres, qcon
   !---- tref: ist anchor the atmosphere evaluated a2ihf at, the linearization
   !---- anchor for the OpenIFS coupled-slab surface-temperature solve.
-#if defined (__oifs)
+  ! TODO: the coupled-slab surface-temperature solve in this file is still
+  ! compile-time. Unlike the ice tracer layout, it changes ice_surftemp's
+  ! signature (the tref argument) and the Qatmice convention, so following
+  ! the partner at run time is a separate change. __cpl_oasis50 stands for
+  ! OpenIFS and __cpl_direct for the in-process IFS interface, exactly as
+  ! __oifs and __ifsinterface did.
+#if defined (__cpl_oasis50)
   real(kind=WP)  :: tref
 #endif
   !---- evaporation and sublimation (provided by ECHAM)
@@ -78,7 +84,7 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP), dimension(:)  , pointer :: S_oc_array, T_oc_array, u_w, v_w
   real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
   real(kind=WP), dimension(:) , pointer  :: ice_temp, ice_alb, enthalpyoffuse, ice_heat_qres, ice_heat_qcon, runoff_liquid, runoff_solid
-#if defined (__oifs)
+#if defined (__cpl_oasis50)
   real(kind=WP), dimension(:) , pointer  :: ist_ref
 #endif
     logical                               :: l_ist
@@ -117,7 +123,7 @@ subroutine thermodynamics(ice, partit, mesh)
      runoff_solid  => ice%atmcoupl%runoff_solid(:)
      ice_heat_qres => ice%atmcoupl%flx_qres(:)
      ice_heat_qcon => ice%atmcoupl%flx_qcon(:)
-#if defined (__oifs)
+#if defined (__cpl_oasis50)
      ist_ref       => ice%atmcoupl%ist_ref(:)
 #endif
   end if
@@ -191,7 +197,7 @@ subroutine thermodynamics(ice, partit, mesh)
         qres     = 0.0_WP
         qcon     = 0.0_WP
         if(A>Aimin) then
-#if defined (__oifs)
+#if defined (__cpl_oasis50)
            if (use_atm_ice_tskin) then
               ! Skin temperature received from the atmosphere (tsk_ico); freezing
               ! point before the first receive.
@@ -324,7 +330,7 @@ contains
     ! flux drives ice growth directly. The ice model's own surface-temperature
     ! solve is internal-only (albedo/melt-pond state) and does not enter the
     ! growth budget.
-#if defined (__ifsinterface)
+#if defined (__cpl_direct)
     ! Keep the classic IFS-FESOM energy-budget convention.  Its atmospheric
     ! interface has not been converted to the OpenIFS coupled-slab contract.
     Qatmice = -qres-qcon
@@ -586,7 +592,7 @@ contains
     return
   end subroutine ice_growth
 
-#if defined (__oifs)
+#if defined (__cpl_oasis50)
  subroutine ice_surftemp(ithermp, h,hsn,a2ihf,tref,t)
 #else
  subroutine ice_surftemp(ithermp, h,hsn,a2ihf,t)
@@ -596,7 +602,7 @@ contains
   ! A  - Ice fraction
   ! h  - Ice thickness
   ! hsn   - Snow thickness
-#if defined (__oifs)
+#if defined (__cpl_oasis50)
   ! tref  - linearization anchor for the implicit flux term; with
   !         use_atm_ice_tskin the atmosphere's ice-tile skin temperature
 #endif
@@ -611,11 +617,11 @@ contains
   !---- ocean variables (provided by FESOM)
   real(kind=WP)  h
   real(kind=WP)  hsn
-#if defined (__oifs)
+#if defined (__cpl_oasis50)
   real(kind=WP)  tref
 #endif
   real(kind=WP)  t
-#if defined (__oifs)
+#if defined (__cpl_oasis50)
   !---- flux-linearization coefficient dQ/dT [W/m2/K]
   real(kind=WP)  zlam
   !---- bulk near-neutral turbulent flux sensitivity rho*cp*C_H*|U| [W/m2/K]
@@ -637,7 +643,7 @@ contains
   !---- freezing temperature of sea-water [K]
   real(kind=WP)  :: TFrezs
   
-#if defined (__oifs)
+#if defined (__cpl_oasis50)
   real(kind=WP), pointer :: con, consn, cpsno, rhoice, rhosno, emiss_ice, boltzmann
 #else
   real(kind=WP), pointer :: con, consn, cpsno, rhoice, rhosno
@@ -647,7 +653,7 @@ contains
   cpsno  => ice%thermo%cpsno
   rhoice => ice%thermo%rhoice
   rhosno => ice%thermo%rhosno
-#if defined (__oifs)
+#if defined (__cpl_oasis50)
   emiss_ice => ice%thermo%emiss_ice
   boltzmann => ice%thermo%boltzmann
 #endif
@@ -663,7 +669,7 @@ contains
   zcprosn=rhosno*cpsno/dt               ! Specific Energy required to change temperature of 1m snow on ice [J/(sm³K)]
   zcpdte=zcpdt !+zcprosn*hsn            ! Combined Energy required to change temperature of snow + 0.05m of upper ice
 
-#if defined (__oifs)
+#if defined (__cpl_oasis50)
   !---- Implicit (dQ/dT-linearized) atmospheric flux.
   ! a2ihf was computed by the atmosphere at tref
   ! and is held constant over the coupling interval. As the surface departs
@@ -688,7 +694,7 @@ contains
   t=(zcpdte*t+a2ihf+zicefl)/(zcpdte+con/zsniced)
 #endif
   if (t>273.15_WP) then
-#if defined (__oifs)
+#if defined (__cpl_oasis50)
      qres=(con/zsniced+zcpdte+zlam)*(t-273.15_WP)
 #else
      qres=(con/zsniced+zcpdte)*(t-273.15_WP)
