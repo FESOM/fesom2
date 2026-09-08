@@ -286,7 +286,22 @@ subroutine ice_timestep(step, ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
 !$OMP PARALLEL DO
     do i=1,myDim_nod2D+eDim_nod2D
-        if (a_ice(i)>0.0_WP) ice_temp(i) = ice_temp(i)/max(a_ice(i), 1.e-6_WP)
+        ! ice_temp was multiplied by a_ice before advection so it travels as an
+        ! extensive quantity; this recovers the intensive temperature. Both parts
+        ! of the old guard injected near-zero Kelvin wherever the concentration
+        ! collapsed. Where a_ice was exactly 0 the division was skipped, so the
+        ! node kept the undivided product ice_temp*a_ice, i.e. ~0 K. Where a_ice
+        ! was small but nonzero, max(a_ice,1e-6) divided by the wrong number and
+        ! returned T*a_ice/1e-6, which is 0.27 K at a_ice=1e-9. develop's cut_off
+        ! clamp reset those to 271.35 and hid it; without the clamp they survive,
+        ! and the skin solve then locks them in. Below the threshold there is no
+        ! meaningful ice surface, so use the freezing point, which is what the
+        ! thermodynamics already does for A <= Aimin.
+        if (a_ice(i) > 1.e-6_WP) then
+            ice_temp(i) = ice_temp(i)/a_ice(i)
+        else
+            ice_temp(i) = 271.35_WP
+        end if
     end do
 !$OMP END PARALLEL DO
 #endif /* (__oifs) */

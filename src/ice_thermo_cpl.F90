@@ -195,6 +195,15 @@ subroutine thermodynamics(ice, partit, mesh)
         ! instead: the linearization stays stiff and a diverged skin is pulled back
         ! within a couple of days.
         if (tref < 173.15_WP .or. tref > 400.0_WP) tref = 271.35_WP
+        ! EXPERIMENT E3a (not the final fix): pin the anchor to a fixed external
+        ! reference, on top of E2's recovery fix. E1 showed this collapses the
+        ! amplifier (8 solve-produced cold events against 209765), but E1 was
+        ! cancelled before a full year so its climate was never measured. The
+        ! freezing point is too warm for a real winter ice skin, which belongs
+        ! near 240-250 K, so this should show a warm bias. That bias is the price
+        ! of not knowing the temperature OpenIFS evaluated a2ihf at, and it sizes
+        ! what the proper OIFS anchor field (PSURF%PTSKTI(:,2)) would buy.
+        tref = 271.35_WP
         t_before_skin = t
         call ice_surftemp(ice%thermo, max(h/(max(A,Aimin)),0.05), hsn/(max(A,Aimin)), a2ihf, tref, t)
         ! Skin-solve divergence probe. The steady state of ice_surftemp is

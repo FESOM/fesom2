@@ -482,7 +482,12 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
          ! coupling step, which acts as a spurious conductance zlam*(1-a_ice) toward
          ! 0 K and collapses the solve's fixed point (143 K at a_ice=0.98). Store the
          ! unweighted field. This was latent for as long as the capture never fired.
-         if (i==4 .and. action) ice%atmcoupl%ist_ref(:) = ice_temp(:)
+         ! ist_ref is no longer captured from our own send. It now arrives from
+         ! OpenIFS as recv field 16 (tsk_ico), the ice-tile skin temperature the
+         ! atmosphere actually evaluated heat_ico at. Anchoring the linearization
+         ! on the value WE transmitted made the solve self-referential, because
+         ! OpenIFS ignores the transmitted ist under LNEMOLIMTEMP=.false. and
+         ! evolves its own skin.
 #endif
 #if defined(__recom) && defined(__usetp)
          endif
@@ -623,6 +628,19 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
          elseif (i.eq.15) then
              if (action) then
                 v_wind(:)                     = exchange(:)        ! meridional wind
+             end if
+         elseif (i.eq.16) then
+             ! Anchor for the implicit ice surface-temperature solve: the ice-tile
+             ! skin temperature OpenIFS evaluated heat_ico at. FESOM previously had
+             ! no way to know this and reused its own last transmitted ist, which
+             ! made ice_surftemp self-referential. With tref == t the zlam terms
+             ! cancel between numerator and denominator, the only stiff restoring
+             ! term disappears, and the surface is held by snow-damped conduction
+             ! alone (~0.5 W/m^2/K), so any cold state is self-consistent: the solve
+             ! settled within 0.79 K of its own fixed point near 199 K while the same
+             ! measured flux against a real anchor gives 269 K.
+             if (action) then
+                ice%atmcoupl%ist_ref(:) = exchange(:)
              end if
 #else
          elseif (i.eq.13) then

@@ -33,7 +33,7 @@ module cpl_driver
 
 #if defined (__oifs)
   integer                    :: nsend = 8
-  integer                    :: nrecv = 15
+  integer                    :: nrecv = 16
 #else
   integer                    :: nsend = 4
   integer                    :: nrecv = 12
@@ -736,6 +736,9 @@ include "associate_mesh_ass.h"
     cpl_recv(13) = 'calv_oce'
     cpl_recv(14) = 'u10w_oce'
     cpl_recv(15) = 'v10w_oce'
+    ! Ice-tile skin temperature from OpenIFS: the temperature it evaluated
+    ! heat_ico at, used as the anchor of the implicit skin solve.
+    cpl_recv(16) = 'tsk_ico'
 #else
     cpl_recv(1)  = 'taux_oce'
     cpl_recv(2)  = 'tauy_oce'
