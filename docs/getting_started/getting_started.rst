@@ -295,6 +295,13 @@ In the job file, the changes are done based on the HPC you are using. For ``leva
 
 - ``#SBATCH -A <account>``: define your project account.
 
+.. note::
+   The job scripts also set the stack size with ``ulimit -s`` before launching the model.
+   Keep that line and keep the limit generous (``unlimited`` where the site allows it).
+   Some compilers put large array temporaries on the stack, and reading a high-resolution
+   initial-condition or forcing file can need a few hundred MiB of it. Too small a limit
+   shows up as a segmentation fault during initialisation, not as an out-of-memory error.
+
 
 On ``levante`` the submission of your job is done by executing the following command:
 
@@ -560,6 +567,16 @@ Model blows up
 --------------
 
 There could by many reasons for this, but the first thing to try is to reduce time step or/and increase model viscosity for short period of time. Have a look at `Model spinup / Cold start at higher resolutions`_ for instructions.
+
+Segmentation fault during initialisation
+----------------------------------------
+
+A segmentation fault while the model is still reading its input, with no out-of-memory
+message, is often just too small a stack. Some compilers place large array temporaries on
+the stack (ifort does, gfortran does not), so the same setup can run with one compiler and
+crash with another, or run with a coarse climatology and crash with a high-resolution one.
+Raise the limit in the job script, ``ulimit -s unlimited`` where the site allows it and a
+few hundred MiB otherwise, and resubmit.
 
 
 Docker based installation
