@@ -42,7 +42,7 @@ MODULE g_sbf
    USE g_comm_auto
    USE g_support
    USE g_rotate_grid
-   USE g_config, only: dummy, ForcingDataPath, dt, flag_debug
+   USE g_config, only: dummy, ClimateDataPath, ForcingDataPath, dt, flag_debug
    USE g_clock,  only: timeold, timenew, dayold, daynew, yearold, yearnew, cyearnew
    USE g_forcing_arrays,    only: runoff, chl
 #if defined (__recom)
@@ -617,18 +617,38 @@ CONTAINS
       if (l_cloud) sbc_flfi(i_cloud)%var_name=ADJUSTL(trim(nm_cloud_var))
    END SUBROUTINE nc_sbc_ini_fillnames
 
-   function make_full_path(filename) result(full_path)
-      character(len=*), intent(in) :: filename
+   function prepend_path(base, filename) result(full_path)
+      character(len=*), intent(in) :: base, filename
       character(len=MAX_PATH) :: full_path
-      
+
       if (len_trim(filename) > 0 .and. filename(1:1) /= '/') then
-         ! Relative path - prepend ForcingDataPath
-         full_path = trim(ForcingDataPath) // trim(filename)
+         ! Relative path - prepend the given base directory
+         full_path = trim(base) // trim(filename)
       else
          ! Absolute path or empty - use as is
          full_path = filename
       endif
+   end function prepend_path
+
+   ! Resolve a file name from the nam_sbc group of namelist.forcing, i.e. part
+   ! of an atmospheric forcing dataset. Relative names are taken from
+   ! ForcingDataPath.
+   function make_full_path(filename) result(full_path)
+      character(len=*), intent(in) :: filename
+      character(len=MAX_PATH) :: full_path
+
+      full_path = prepend_path(ForcingDataPath, filename)
    end function make_full_path
+
+   ! Resolve a file name from the nam_rsbc group of namelist.recom. These are
+   ! REcoM climatologies (dust, aeolian nitrogen, atmospheric CO2), not part of
+   ! the forcing dataset, so relative names stay on ClimateDataPath.
+   function make_clim_path(filename) result(full_path)
+      character(len=*), intent(in) :: filename
+      character(len=MAX_PATH) :: full_path
+
+      full_path = prepend_path(ClimateDataPath, filename)
+   end function make_clim_path
 
    SUBROUTINE nc_sbc_ini(partit, mesh)
       !!---------------------------------------------------------------------
@@ -1961,7 +1981,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
                 end if
 
         else !Transient CO2 from file        
-            filename=trim(make_full_path(nm_co2_data_file))
+            filename=trim(make_clim_path(nm_co2_data_file))
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
@@ -2041,7 +2061,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
             i=month
             if (mstep > 1) i=i+1
             if (i > 12) i=1
-            filename=trim(make_full_path(nm_fe_data_file))
+            filename=trim(make_clim_path(nm_fe_data_file))
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif 
@@ -2071,7 +2091,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 !            if (mstep > 1) i=i+1 
 !            if (i > 12) i=1
 !            if (mype==0) write(*,*) 'Updating iron climatology for month ', i 
-            filename=trim(make_full_path(nm_aen_data_file))
+            filename=trim(make_clim_path(nm_aen_data_file))
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
