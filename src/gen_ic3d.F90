@@ -398,6 +398,10 @@ CONTAINS
          nf_edges(3)=nc_Ndepth         
          ! read into a contiguous rank-1 WP buffer, then reshape into the strided destination
          ! (generic nf_get_vara_x only resolves rank-1 actuals; NetCDF Fortran order has the first dim fastest)
+         ! Keep the contiguous buffer. Passing ncdata(2:nc_Nlon-1,:,:) directly makes the compiler
+         ! build a copy-in/copy-out temporary of the whole field, which ifort puts on the stack:
+         ! EN4 (1440x720x42 doubles = 332 MiB) then overflows the 200 MiB stack our run scripts set
+         ! and segfaults on rank 0, while PHC (16 MiB) fits. gfortran heap-allocates it and survives.
          allocate(ncdata_inner((nc_Nlon-2)*nc_Nlat*nc_Ndepth))
          iost = nf_get_vara_x(ncid, id_data, nf_start, nf_edges, ncdata_inner)
          ncdata(2:nc_Nlon-1,:,:) = reshape(ncdata_inner, [nc_Nlon-2, nc_Nlat, nc_Ndepth])
