@@ -279,9 +279,6 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 
   implicit none
   integer,        intent(in)            :: istep
-    real(kind=WP)            :: fluxdbg_raw, fluxdbg_cor
-    integer                  :: fluxdbg_loc
-    integer, save            :: n_fluxdbg=0
   type(t_ice)   , intent(inout), target :: ice
   type(t_tracer), intent(in),    target :: tracers
   type(t_partit), intent(inout), target :: partit
@@ -570,27 +567,17 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
             end if
             mask=a_ice
             ice_heat_flux(:)     =  tmp_ice_heat_flux(:)
-            fluxdbg_raw = maxval(abs(ice_heat_flux(1:partit%myDim_nod2D)))
             call force_flux_consv(ice_heat_flux, mask, i, 1,action, partit, mesh) ! Northern hemisphere
             call force_flux_consv(ice_heat_flux, mask, i, 2,action, partit, mesh) ! Southern Hemisphere
-            ! Probe: a2ihf reaches -1.46e5 W/m^2 in the skin solve, which no
-            ! atmosphere delivers. Separate what OASIS handed us from what this
-            ! conservation step manufactures. The redistribution weight is
-            ! |field|/int(|field|*a_ice*dA) and is only zeroed below a_ice<1e-10,
-            ! so a node with vanishing concentration keeps full weight while
-            ! contributing nothing to the normalising integral.
-            fluxdbg_cor = maxval(abs(ice_heat_flux(1:partit%myDim_nod2D)))
-            if (fluxdbg_cor > 1000.0_WP) then
-               n_fluxdbg = n_fluxdbg + 1
-               if (n_fluxdbg <= 30 .or. mod(n_fluxdbg, 20000) == 0) then
-                  fluxdbg_loc = maxloc(abs(ice_heat_flux(1:partit%myDim_nod2D)), 1)
-                  write(*,'(a,i8,a,i6,4(a,es13.5))')                              &
-                       ' FLUXDBG occ ', n_fluxdbg, ' rank ', partit%mype,         &
-                       ' raw_max=', fluxdbg_raw, ' corrected_max=', fluxdbg_cor,  &
-                       ' a_ice_there=', a_ice(fluxdbg_loc),                       &
-                       ' raw_there=', tmp_ice_heat_flux(fluxdbg_loc)
-               end if
-            end if	     
+            ! a2ihf reaches -1.46e5 W/m^2 in the skin solve, which no atmosphere
+            ! delivers. The two force_flux_consv calls above were the suspect --
+            ! their redistribution weight is |field|/int(|field|*a_ice*dA), zeroed
+            ! only below a_ice<1e-10, so a node with vanishing concentration keeps
+            ! full weight while contributing nothing to the normalising integral.
+            ! A probe comparing the field before and after them found
+            ! raw_max == corrected_max in all 20760 samples of a full year: this
+            ! path is inert here, and the kilowatt excursions came from OASIS's
+            ! GSMART conservation on A_Q_ice instead (fixed by GSSMAR).
         elseif (i.eq.11) then
             if (action) then
                 shortwave(:)         =  exchange(:)		        ! heat_swr
