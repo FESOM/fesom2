@@ -254,6 +254,8 @@ In ``namelist.config``, the options that you might want to change for your first
 
 - ``ClimateDataPath``: path to the folder with the file with model temperature and salinity initial conditions (e.g. ``/youdir/FESOM2_one_year_input/input/phc3.0/``). The name of the file with initial conditions is defined in `namelist.oce`, but during first runs you probably don't want to change it;
 
+- ``ForcingDataPath``: path to the folder with the atmospheric forcing files (e.g. ``/youdir/FESOM2_one_year_input/forcing/``, slash at the end is important!). The file names in ``namelist.forcing`` are relative to it;
+
 - ``ResultPath``: path to your results folder. The output of the model will be stored there.
 
 More detailed explanation of options in the ``namelist.config`` is in the section :ref:`chap_general_configuration`.

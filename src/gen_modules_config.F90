@@ -26,12 +26,13 @@ module g_config
 ! kh 01.03.21 paths in test environments can easily become longer than 100 characters (the former value) 
   character(MAX_PATH)        :: MeshPath='./mesh/'
   character(MAX_PATH)        :: ClimateDataPath='./hydrography/'
+  character(MAX_PATH)        :: ForcingDataPath='./forcing/'
   character(MAX_PATH)        :: TideForcingPath='./tide_forcing/'
   character(MAX_PATH)        :: ResultPath='./result/'
   character(MAX_PATH)        :: RestartInPath=''
   character(MAX_PATH)        :: RestartOutPath=''
   character(20)              :: MeshId='NONE'
-  namelist /paths/  MeshPath, ClimateDataPath, &
+  namelist /paths/  MeshPath, ClimateDataPath, ForcingDataPath, &
        TideForcingPath, ResultPath, MeshId, &
        RestartInPath, RestartOutPath
        

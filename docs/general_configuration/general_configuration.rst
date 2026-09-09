@@ -30,6 +30,7 @@ Section &paths
 
 - **MeshPath** location of the unstructured grid description (``nod2d.out``, ``elem2d.out``, depth files, etc.).
 - **ClimateDataPath** directory containing initial hydrography and optional restoring climatologies.
+- **ForcingDataPath** directory containing the atmospheric forcing dataset. File names in ``namelist.forcing`` are given bare and resolved against this path; a name starting with ``/`` is used as given.
 - **TideForcingPath** directory for external tidal potential files if tides are used.
 - **ResultPath** root directory for all model output, including ``<runid>.clock``.
 - **RestartInPath**, **RestartOutPath** allow separating where restarts are read from and where they are written. If they are left empty, both default to ``ResultPath``; the setup routine adds trailing slashes automatically.

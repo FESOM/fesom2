@@ -70,6 +70,9 @@ function(update_common_paths_with_mesh NAMELIST_IN NAMELIST_OUT TEST_DATA_DIR RE
     # preserved via the "\\1" backreference.
     string(REGEX REPLACE "([^A-Za-z0-9_])MeshPath[ \t]*=[ \t]*'[^']*'" "\\1MeshPath='${TEST_DATA_DIR}/MESHES/${MESH_NAME}/'" CONTENT "${CONTENT}")
     string(REGEX REPLACE "([^A-Za-z0-9_])ClimateDataPath[ \t]*=[ \t]*'[^']*'" "\\1ClimateDataPath='${TEST_DATA_DIR}/'" CONTENT "${CONTENT}")
+    # Forcing file names in namelist.forcing are bare, so this must point at the
+    # dataset directory itself. CORE2 is the default; the JRA variant repoints it.
+    string(REGEX REPLACE "([^A-Za-z0-9_])ForcingDataPath[ \t]*=[ \t]*'[^']*'" "\\1ForcingDataPath='${TEST_DATA_DIR}/FORCING/CORE2/'" CONTENT "${CONTENT}")
     string(REGEX REPLACE "([^A-Za-z0-9_])ResultPath[ \t]*=[ \t]*'[^']*'" "\\1ResultPath='${RESULT_DIR}/'" CONTENT "${CONTENT}")
     string(REGEX REPLACE "([^A-Za-z0-9_])fwf_path[ \t]*=[ \t]*'[^']*'" "\\1fwf_path='${TEST_DATA_DIR}/MESHES/${MESH_NAME}/'" CONTENT "${CONTENT}")
     string(REGEX REPLACE "([^A-Za-z0-9_])age_tracer_path[ \t]*=[ \t]*'[^']*'" "\\1age_tracer_path='${TEST_DATA_DIR}/MESHES/${MESH_NAME}/'" CONTENT "${CONTENT}")
@@ -261,9 +264,9 @@ endfunction()
 # Function to configure namelist.forcing for the bundled JRA55 test dataset.
 # The stock config/namelist.forcing.JRA points at absolute Levante pool paths
 # (/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/...); this rewrites them to the
-# bundled tests/data/FORCING/JRA55 tree. Paths are made RELATIVE (no leading '/')
-# so FESOM's make_full_path() prepends ClimateDataPath (=tests/data/), exactly as
-# the CORE2 variant resolves 'FORCING/CORE2/...'. The forcing file names, variable
+# bundled tests/data/FORCING/JRA55 tree. Paths are reduced to BARE FILE NAMES so
+# FESOM's make_full_path() prepends ForcingDataPath, which the caller repoints at
+# tests/data/FORCING/JRA55/ below. The forcing file names, variable
 # names, time-axis reference (nm_nc_iyear=1900, nm_nc_freq=1 -- the bundled axis is
 # already in days) and the .true. l_* switches are taken as-is from the config
 # variant. The paired include_fleapyear=.true. (gregorian calendar) is applied by
@@ -276,12 +279,12 @@ function(update_namelist_forcing_jra NAMELIST_IN NAMELIST_OUT)
     # pool-prefix replacement below.
     string(REGEX REPLACE
         "/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1\\.4\\.0/CORE2_runoff\\.nc"
-        "FORCING/JRA55/runoff.nc" CONTENT "${CONTENT}")
+        "runoff.nc" CONTENT "${CONTENT}")
 
-    # All remaining absolute pool paths -> bundled tree, relative to ClimateDataPath.
+    # All remaining absolute pool paths -> bare names, resolved via ForcingDataPath.
     string(REGEX REPLACE
         "/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1\\.4\\.0/"
-        "FORCING/JRA55/" CONTENT "${CONTENT}")
+        "" CONTENT "${CONTENT}")
 
     file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
 endfunction()
@@ -578,6 +581,11 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
             update_namelist_forcing_jra(
                 "${FESOM_TESTING_ROOT}/config/namelist.forcing.JRA"
                 "${TEST_RUN_DIR}/namelist.forcing")
+            # The bare file names above resolve against ForcingDataPath, which
+            # configure_fesom_namelists_with_options() left pointing at CORE2.
+            file(READ "${TEST_RUN_DIR}/namelist.config" CONFIG_CONTENT)
+            string(REGEX REPLACE "([^A-Za-z0-9_])ForcingDataPath[ \t]*=[ \t]*'[^']*'" "\\1ForcingDataPath='${TEST_DATA_DIR}/FORCING/JRA55/'" CONFIG_CONTENT "${CONFIG_CONTENT}")
+            file(WRITE "${TEST_RUN_DIR}/namelist.config" "${CONFIG_CONTENT}")
         else()
             message(FATAL_ERROR "add_fesom_test_with_options(${TEST_NAME}): unknown FORCING '${FESOM_TEST_FORCING}' (expected 'CORE2' or 'JRA')")
         endif()
