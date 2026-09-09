@@ -42,7 +42,7 @@ MODULE g_sbf
    USE g_comm_auto
    USE g_support
    USE g_rotate_grid
-   USE g_config, only: dummy, ClimateDataPath, dt, flag_debug
+   USE g_config, only: dummy, ForcingDataPath, dt, flag_debug
    USE g_clock,  only: timeold, timenew, dayold, daynew, yearold, yearnew, cyearnew
    USE g_forcing_arrays,    only: runoff, chl
 #if defined (__recom)
@@ -622,8 +622,8 @@ CONTAINS
       character(len=MAX_PATH) :: full_path
       
       if (len_trim(filename) > 0 .and. filename(1:1) /= '/') then
-         ! Relative path - prepend ClimateDataPath
-         full_path = trim(ClimateDataPath) // trim(filename)
+         ! Relative path - prepend ForcingDataPath
+         full_path = trim(ForcingDataPath) // trim(filename)
       else
          ! Absolute path or empty - use as is
          full_path = filename
@@ -1430,7 +1430,7 @@ CONTAINS
                 write(error_unit,*) '            runoff_data_source = ', trim(runoff_data_source)
                 write(error_unit,*) '            nm_runoff_file     = ', trim(nm_runoff_file)
                 write(error_unit,*) '        a nm_runoff_file without a leading ''/'' is taken as relative and gets'
-                write(error_unit,*) '        ClimateDataPath prepended, which is why an unrelated path may appear'
+                write(error_unit,*) '        ForcingDataPath prepended, so check that it points at your forcing tree'
                 write(error_unit,*) '        above. give an absolute path to avoid this.'
                 write(error_unit,*) '____________________________________________________________________'
                 write(error_unit,*) achar(27)//'[0m'
@@ -1464,7 +1464,7 @@ CONTAINS
                 write(error_unit,*) '            runoff_data_source = ', trim(runoff_data_source)
                 write(error_unit,*) '            nm_runoff_file     = ', trim(nm_runoff_file)
                 write(error_unit,*) '        a nm_runoff_file without a leading ''/'' is taken as relative and gets'
-                write(error_unit,*) '        ClimateDataPath prepended, which is why an unrelated path may appear'
+                write(error_unit,*) '        ForcingDataPath prepended, so check that it points at your forcing tree'
                 write(error_unit,*) '        above. give an absolute path to avoid this.'
                 write(error_unit,*) '____________________________________________________________________'
                 write(error_unit,*) achar(27)//'[0m'

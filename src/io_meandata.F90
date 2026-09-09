@@ -3010,6 +3010,7 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'MeshPath', trim(MeshPath)), __LINE__)
     call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'mesh_representative_checksum', mesh%representative_checksum), __LINE__)
     call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'ClimateDataPath', trim(ClimateDataPath)), __LINE__)
+    call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'ForcingDataPath', trim(ForcingDataPath)), __LINE__)
     call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'which_ALE', trim(which_ALE)), __LINE__)
     call assert_nf( nf90_put_att(entry%ncid, nf90_global, global_attributes_prefix//'mix_scheme', trim(mix_scheme)), __LINE__)
     ! Global attributes already set above
