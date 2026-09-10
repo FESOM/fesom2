@@ -1226,7 +1226,7 @@ CONTAINS
          end if
       end if
 
-#if !defined __ifsinterface
+#if !defined (__cpl_direct)
 
       i_totfl=0
       if (l_xwind) then

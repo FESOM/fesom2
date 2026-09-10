@@ -568,11 +568,15 @@ subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
                   +prec_snow(n)*(1.0_WP-a_ice_old(n)) &
 #endif
 
-#if defined (__oasis) || defined (__ifsinterface)
+! TODO: __cpl_yac is absent here, as in the pre-rework guard. Declaration
+! and use agree, so this is self-consistent, but YAC does not get
+! residualifwflx or the rhofwt/rhowat freshwater conversion. Widening the
+! guard changes YAC results, so it is left to a separate change.
+#if defined (__cpl_oasis) || defined (__cpl_direct)
                   +residualifwflx(n)                  & ! balance residual ice flux only in coupled case
 #endif
                   +runoff(n)
-#if defined (__oasis) || defined (__ifsinterface)
+#if defined (__cpl_oasis) || defined (__cpl_direct)
 ! in the coupled mode the computation of freshwater flux takes into account the ratio between freshwater & salt water
         flux(n) = flux(n)*ice%thermo%rhofwt/ice%thermo%rhowat
 #endif

@@ -57,10 +57,17 @@ module fesom_main_storage_module
   use icedrv_main,          only: set_icepack, init_icepack, alloc_icepack
 #endif
 
-#if defined (__oasis)
+#if defined (__cpl_enabled)
+  use cpl_config, only: read_cpl_namelist, check_cpl_config, &
+                        is_coupled_to_echam
+  ! Same entity as g_config's compute_oasis_corners (use'd wholesale above);
+  ! the alias marks which of the two homonyms is meant at the call site.
+  use g_config,   only: deprecated_oasis_corners => compute_oasis_corners
+#endif
+#if defined (__cpl_oasis)
   use cpl_driver
 #endif
-#if defined (__yac)
+#if defined (__cpl_yac)
 use cpl_yac_driver
 #endif
 
@@ -134,7 +141,7 @@ end module fesom_main_storage_module
 !           this way FESOM can e.g. be used as a library with an external time loop driver
 !           used with IFS-FESOM
 module fesom_module
-#if defined  __ifsinterface
+#if defined (__cpl_direct)
   use, intrinsic :: ieee_exceptions
 #endif
   ! Enhanced profiler integration
@@ -177,7 +184,7 @@ contains
       call read_namelist_run_config
 #endif
 
-#if !defined  __ifsinterface
+#if !defined (__cpl_direct)
       if(command_argument_count() > 0) then
         call command_line_options%parse()
         stop
@@ -186,7 +193,7 @@ contains
 
 !SUVI: disable overflow, underflow for entire model when used  in coupled with ifs
 !      bad practice, use it only in case of Emergency
-!#if defined  __ifsinterface
+!#if defined (__cpl_direct)
 !    call ieee_set_halting_mode(ieee_overflow, .false.)
 !    call ieee_set_halting_mode(ieee_underflow, .false.)
 !    call ieee_set_halting_mode(ieee_invalid, .false.)
@@ -196,19 +203,25 @@ contains
       mpi_is_initialized = .false.
       f%fesom_did_mpi_init = .false.
 
-#ifndef __oifs
+#if defined (__cpl_enabled)
+        ! Must precede MPI_Init: under oasis50 OASIS performs it inside
+        ! cpl_oasis3mct_init, which needs cpl_comp_name.
+        call read_cpl_namelist()
+#endif
+
+#ifndef __cpl_oasis50
         !ECHAM6-FESOM2 coupling: cpl_oasis3mct_init is called here in order to avoid circular dependencies between modules (cpl_driver and g_PARSUP)
         !OIFS-FESOM2 coupling: does not require MPI_INIT here as this is done by OASIS
         call MPI_Initialized(mpi_is_initialized, f%i)
         if(.not. mpi_is_initialized) then
-            ! TODO: do not initialize MPI here if it has been initialized already, e.g. via IFS when fesom is called as library (__ifsinterface is defined)
+            ! TODO: do not initialize MPI here if it has been initialized already, e.g. via IFS when fesom is called as library (__cpl_direct)
             call MPI_INIT_THREAD(MPI_THREAD_MULTIPLE, f%provided, f%i)
             f%fesom_did_mpi_init = .true.
         end if
 #endif
 
 
-#if defined (__oasis)
+#if defined (__cpl_oasis)
 
 #if defined(__recom) && defined(__usetp)
 ! pass num_fesom_groups to coupler
@@ -217,7 +230,7 @@ contains
         call cpl_oasis3mct_init(f%partit, f%partit%MPI_COMM_FESOM)
 #endif
 
-#elif defined (__yac)
+#elif defined (__cpl_yac)
         call cpl_yac_init(f%partit%MPI_COMM_FESOM)
 #endif
 
@@ -386,6 +399,13 @@ contains
 #endif
         call setup_model(f%partit)  ! Read Namelists, always before clock_init
 
+#if defined (__cpl_enabled)
+        ! After setup_model: folds in the deprecated compute_oasis_corners
+        ! from &run_config of namelist.config.
+        call check_cpl_config(deprecated_oasis_corners, &
+                              f%partit%MPI_COMM_FESOM, f%mype)
+#endif
+
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("setup_model")
 #endif
@@ -457,18 +477,17 @@ contains
         ! and additional arrays needed for 
         ! fancy advection etc.  
         !=====================
-#if defined (__oasis)
+#if defined (__cpl_oasis)
         !---wiso-code
         IF (lwiso) THEN
           nsend = nsend + 6       ! add number of water isotope tracers to coupling parameter nsend, nrecv
           nrecv = nrecv + 6
         END IF
         !---wiso-code-end
-#if !defined (__oifs)
-        IF (use_icebergs) THEN
+        ! Iceberg wind fields are only in the ECHAM field set.
+        IF (is_coupled_to_echam .and. use_icebergs) THEN
           nrecv = nrecv + 2
         END IF
-#endif
 #endif
 
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call check_mesh_consistency'//achar(27)//'[0m'
@@ -593,7 +612,7 @@ contains
             call age_tracer_init(f%partit, f%mesh)
         endif
         !---age-code-end
-#if defined (__oasis)
+#if defined (__cpl_oasis)
 
 ! only mype == 0 in my_fesom_group == 0 handles coupling with extern models
 #if defined(__recom) && defined(__usetp)
@@ -626,7 +645,7 @@ contains
     end if
 #endif
 
-#endif  ! defined (__oasis)
+#endif  ! defined (__cpl_oasis)
     
         ! --------------
         ! LA icebergs: 2023-05-17 
@@ -635,7 +654,7 @@ contains
         endif
         ! --------------
 
-#if defined (__yac)
+#if defined (__cpl_yac)
         call cpl_yac_define_unstr(f%partit, f%mesh)
         if(f%mype==0)  write(*,*) 'FESOM ---->     cpl_yac_define_unstr nsend, nrecv:',nsend, nrecv
 #endif
@@ -840,9 +859,13 @@ contains
     !$ACC ENTER DATA CREATE  (f%ice%data(1)%dvalues, f%ice%data(2)%dvalues, f%ice%data(3)%dvalues) 
     !$ACC ENTER DATA CREATE  (f%ice%data(1)%values_rhs, f%ice%data(2)%values_rhs, f%ice%data(3)%values_rhs) 
     !$ACC ENTER DATA CREATE  (f%ice%data(1)%values_div_rhs, f%ice%data(2)%values_div_rhs, f%ice%data(3)%values_div_rhs)
-#if defined (__oifs) || defined (__ifsinterface)
-    !$ACC ENTER DATA CREATE (f%ice%data(4)%values, f%ice%data(4)%valuesl, f%ice%data(4)%dvalues, f%ice%data(4)%values_rhs, f%ice%data(4)%values_div_rhs)
-#endif
+    if (f%ice%ist_itracer_idx > 0) then
+       !$ACC ENTER DATA CREATE (f%ice%data(f%ice%ist_itracer_idx)%values) &
+       !$ACC CREATE (f%ice%data(f%ice%ist_itracer_idx)%valuesl) &
+       !$ACC CREATE (f%ice%data(f%ice%ist_itracer_idx)%dvalues) &
+       !$ACC CREATE (f%ice%data(f%ice%ist_itracer_idx)%values_rhs) &
+       !$ACC CREATE (f%ice%data(f%ice%ist_itracer_idx)%values_div_rhs)
+    end if
     !$ACC ENTER DATA COPYIN (f%dynamics)
     !$ACC ENTER DATA CREATE (f%dynamics%w, f%dynamics%w_e, f%dynamics%uv)
     !$ACC ENTER DATA CREATE (f%tracers%work%del_ttf)
@@ -938,10 +961,12 @@ contains
                 f%ice%vice_ib     = f%ice%vice
         
         ! LA - this causes the blowup !
-        !        f%ice%data(size(f%ice%data))      = f%ice%data(2)
-        !        f%ice%data(size(f%ice%data)-1)    = f%ice%data(1)
-                f%ice%data(size(f%ice%data))%values   = f%ice%data(2)%values   ! m_ice -> m_ice_ib
-                f%ice%data(size(f%ice%data)-1)%values = f%ice%data(1)%values   ! a_ice -> a_ice_ib
+        !        f%ice%data(f%ice%m_ice_ib_itracer_idx) = f%ice%data(2)
+        !        f%ice%data(f%ice%a_ice_ib_itracer_idx) = f%ice%data(1)
+                f%ice%data(f%ice%m_ice_ib_itracer_idx)%values = &
+                        f%ice%data(2)%values                  ! m_ice
+                f%ice%data(f%ice%a_ice_ib_itracer_idx)%values = &
+                        f%ice%data(1)%values                  ! a_ice
         !!!!!!!!!!!!!!!!!!
         
         
@@ -1003,7 +1028,7 @@ contains
         end if
 #endif 
 
-#if defined (__oifs) || defined (__oasis)
+#if defined (__cpl_oasis)
             seconds_til_now=INT(dt)*(n-1)
 #endif
         call clock      
@@ -1053,7 +1078,7 @@ contains
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("update_atm_forcing")
 #endif
-#if defined (__yac)
+#if defined (__cpl_yac)
             call update_atm_forcing_yac(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
 #else
             call update_atm_forcing(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
@@ -1285,7 +1310,7 @@ contains
         ! Pass f%total_nsteps (namelist run length) as the segment-end marker
         ! rather than the runloop-chunk end (ntotal). In standalone FESOM they
         ! are identical (fesom_runloop is called once with all steps), so the
-        ! year-boundary fix from PR #880 still fires. Under __ifsinterface,
+        ! year-boundary fix from PR #880 still fires. Under __cpl_direct,
         ! fesom_runloop is called per IFS coupling step with a small chunk, so
         ! ntotal == istep on every call; using it as the segment-end marker
         ! would force a restart every coupling timestep.
@@ -1419,9 +1444,13 @@ contains
     !$ACC EXIT DATA DELETE (f%ice%data(1)%dvalues, f%ice%data(2)%dvalues, f%ice%data(3)%dvalues)
     !$ACC EXIT DATA DELETE (f%ice%data(1)%values_rhs, f%ice%data(2)%values_rhs, f%ice%data(3)%values_rhs)
     !$ACC EXIT DATA DELETE (f%ice%data(1)%values_div_rhs, f%ice%data(2)%values_div_rhs, f%ice%data(3)%values_div_rhs)
-#if defined (__oifs) || defined (__ifsinterface)
-    !$ACC EXIT DATA DELETE (f%ice%data(4)%values, f%ice%data(4)%valuesl, f%ice%data(4)%dvalues, f%ice%data(4)%values_rhs, f%ice%data(4)%values_div_rhs)
-#endif
+    if (f%ice%ist_itracer_idx > 0) then
+       !$ACC EXIT DATA DELETE (f%ice%data(f%ice%ist_itracer_idx)%values) &
+       !$ACC DELETE (f%ice%data(f%ice%ist_itracer_idx)%valuesl) &
+       !$ACC DELETE (f%ice%data(f%ice%ist_itracer_idx)%dvalues) &
+       !$ACC DELETE (f%ice%data(f%ice%ist_itracer_idx)%values_rhs) &
+       !$ACC DELETE (f%ice%data(f%ice%ist_itracer_idx)%values_div_rhs)
+    end if
     !$ACC EXIT DATA DELETE (f%ice%data, f%ice%work, f%ice%work%fct_massmatrix)
     !$ACC EXIT DATA DELETE (f%ice)
     do tr_num=1, f%tracers%num_tracers
@@ -1531,7 +1560,7 @@ contains
     call io_xios_close()
 #endif
 
-#if defined (__oifs) 
+#if defined (__cpl_oasis50) 
     ! OpenIFS coupled version has to call oasis_terminate through par_ex
     call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
 #endif
@@ -1541,7 +1570,7 @@ contains
     end do ! i = num_fesom_groups - 1, 0, -1
 #endif
 
-#if defined(__MULTIO) && !defined(__ifsinterface) && !defined(__oasis)
+#if defined(__MULTIO) && !defined (__cpl_direct) && !defined (__cpl_oasis)
    call mpp_stop
 #endif
     ! Generate enhanced profiler report BEFORE MPI finalization
