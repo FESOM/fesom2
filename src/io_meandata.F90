@@ -597,6 +597,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
           "benC                ", "benCalc             ", "benN                ", &
           "benSi               ", "beta                ", "bolus_u             ", &
           "bolus_v             ", "bolus_w             ", "calcdiss            ", &
+          "mle_psi             ", &
           "calcif              ", "cfl_z               ", "Chldegc             ", &
           "Chldegd             ", "Chldegn             ", "CO2_aq              ", "CO2f                ", "CO3                 ", &
           "curl_surf           ", "dens_flux           ", "d_eta               ", &
@@ -1908,6 +1909,8 @@ CASE ('slope_y   ')
 CASE ('slope_z   ')
     call def_stream((/nl-1,  nod2D/), (/nl-1, myDim_nod2D/),  'slope_z',   'neutral slope Z',    'none', neutral_slope(3,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 
+CASE ('mle_psi   ')
+    call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'mle_psi',   'Fox-Kemper MLE streamfunction', 'm2/s', mle_psi(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('N2        ')
     call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'N2',        'brunt väisälä',      '1/s2', bvfreq(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('Kv        ')

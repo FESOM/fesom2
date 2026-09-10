@@ -93,6 +93,15 @@ logical                       :: Redi_Ktaper = .false.
 real(kind=WP)                 :: Redi_Kmax   = 3000.0_WP
 real(kind=WP)                 :: Redi_Kmin   = 2.0_WP
 
+!___mixed layer eddy restratification (Fox-Kemper et al. 2008, 2011, see oce_mle.F90)___
+logical                       :: use_mle = .false.        ! enable MLE restratification
+real(kind=WP)                 :: mle_Ce  = 0.06_WP        ! efficiency coefficient
+real(kind=WP)                 :: mle_Lf_min = 1000.0_WP   ! floor on the frontal width Lf = max(N*H/f, Lf_min)
+real(kind=WP)                 :: mle_tau = 86400.0_WP     ! frontal lifetime, regularises f towards the equator
+real(kind=WP)                 :: mle_hmax = 500.0_WP      ! max. mixed layer depth used, Psi scales with H^2
+real(kind=WP)                 :: mle_resscale_max = 20.0_WP ! max. resolution factor ds/Lf
+real(kind=WP)                 :: mle_ustar_max = 0.05_WP  ! max. induced bolus velocity
+real(kind=WP)                 :: mle_mld_decay_time = 0.0_WP ! running-mean decay time for H, 0 = off
 logical                       :: scaling_ODM95 =.true.    ! tapering based on critical slope
 real(kind=WP)                 :: ODM95_Scr = 1.0e-2_WP   ! Critical slope for tapering
 real(kind=WP)                 :: ODM95_Sd = 1.0e-3_WP   ! slope width of tapering smoothing zone
@@ -230,6 +239,8 @@ character(20)                  :: which_pgf='shchepetkin'
                     scaling_LDD97, LDD97_c, LDD97_rmin, LDD97_rmax, &
                     scaling_GINsea, GINsea_fac, GMzexp_smin, &
                     scaling_GMzexp, GMzexp_zref, &
+                    use_mle, mle_Ce, mle_Lf_min, mle_tau, mle_hmax, mle_resscale_max, &
+                    mle_ustar_max, mle_mld_decay_time, &
                     use_salt_anomaly
 
  NAMELIST /tracer_phys/ diff_sh_limit, Kv0_const, double_diffusion, K_ver, K_hor, surf_relax_T, surf_relax_S, &
@@ -273,6 +284,8 @@ real(kind=WP), allocatable    :: heat_flux_t(:,:), heat_rel_t(:,:), heat_rel(:)
 !!PS real(kind=WP), allocatable    :: coriolis(:), coriolis_node(:)
 real(kind=WP), allocatable    :: relax2clim(:)
 real(kind=WP), allocatable    :: MLD1(:), MLD2(:), MLD3(:)
+real(kind=WP), allocatable    :: mle_psi(:,:)   ! Fox-Kemper MLE streamfunction magnitude [m2/s]
+real(kind=WP), allocatable    :: mle_hbar(:)    ! running-mean mixed layer depth used by MLE [m]
 integer,       allocatable    :: MLD1_ind(:), MLD2_ind(:), MLD3_ind(:)
 real(kind=WP), allocatable    :: ssh_gp(:)
 !Tracer gradients&RHS
