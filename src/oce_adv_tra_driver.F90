@@ -1,3 +1,13 @@
+! Single precision cannot resolve the per-step change of the FCT low-order solution
+! LO, so LO*hnode_new - ttf*hnode loses it. The low-order tendency is kept in flux
+! form here instead.
+module adv_lo_tend_mod
+  use o_PARAM, only: WP
+  implicit none
+  real(kind=WP), allocatable, save :: lo_tend(:,:)
+  logical,                    save :: lo_flux_form = .false.
+end module adv_lo_tend_mod
+
 module oce_adv_tra_driver_interfaces
   interface
    subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit, mesh)
@@ -44,6 +54,7 @@ end module oce_tra_adv_flux2dtracer_interface
 !
 !===============================================================================
 subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit, mesh)
+    use adv_lo_tend_mod
     use MOD_MESH
     use MOD_TRACER
     USE MOD_PARTIT
@@ -94,6 +105,10 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     opth            =  tracers%data(tr_num)%tra_adv_ph
     optv            =  tracers%data(tr_num)%tra_adv_pv
     fct_LO          => tracers%work%fct_LO
+#if defined(USE_SINGLE_PRECISION)
+    if (.not. allocated(lo_tend)) allocate(lo_tend(size(fct_LO,1), size(fct_LO,2)))
+#endif
+    lo_flux_form = .false.
     adv_flux_ver    => tracers%work%adv_flux_ver
     adv_flux_hor    => tracers%work%adv_flux_hor
     edge_up_dn_grad => tracers%work%edge_up_dn_grad
@@ -250,7 +265,12 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
             !!PS do  nz=1, nlevels_nod2D(n)-1
             !$ACC LOOP VECTOR
             do  nz= nu1, nl1-1
+#if defined(USE_SINGLE_PRECISION)
+                lo_tend(nz,n)=(fct_LO(nz,n)+(adv_flux_ver(nz, n)-adv_flux_ver(nz+1, n)))*dt/areasvol(nz,n)
+                fct_LO(nz,n)=(ttf(nz,n)*hnode(nz,n)+lo_tend(nz,n))/hnode_new(nz,n)
+#else
                 fct_LO(nz,n)=(ttf(nz,n)*hnode(nz,n)+(fct_LO(nz,n)+(adv_flux_ver(nz, n)-adv_flux_ver(nz+1, n)))*dt/areasvol(nz,n))/hnode_new(nz,n)
+#endif
             end do
             !$ACC END LOOP
         end do
@@ -258,6 +278,9 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 !$OMP END PARALLEL DO
 #else
         !$ACC END PARALLEL LOOP
+#endif
+#if defined(USE_SINGLE_PRECISION)
+        lo_flux_form = .true.
 #endif
 
 
@@ -329,6 +352,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 !when adv_tra_vert_impl is ported to ACC the UPDATEs below wont be needed!
 !$ACC UPDATE HOST(fct_LO)
             call adv_tra_vert_impl(dt, wi, fct_LO, partit, mesh)
+            lo_flux_form = .false.   ! the implicit split updates LO itself
 !$ACC UPDATE DEVICE(fct_LO)
             ! compute the low order upwind vertical flux (full vertical velocity)
             ! zero the input/output flux before computation
@@ -496,6 +520,7 @@ end subroutine do_oce_adv_tra
 !
 !===============================================================================
 subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, mesh, use_lo, ttf, lo)
+    use adv_lo_tend_mod
     use MOD_MESH
     use o_ARRAYS
     USE MOD_PARTIT
@@ -536,7 +561,11 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
              !!PS do nz=1,nlevels_nod2D(n)-1
              !$ACC LOOP VECTOR
              do nz=nu1, nl1-1
-                dttf_v(nz,n)=dttf_v(nz,n)-ttf(nz,n)*hnode(nz,n)+LO(nz,n)*hnode_new(nz,n)
+                if (lo_flux_form) then
+                    dttf_v(nz,n)=dttf_v(nz,n)+lo_tend(nz,n)
+                else
+                    dttf_v(nz,n)=dttf_v(nz,n)-ttf(nz,n)*hnode(nz,n)+LO(nz,n)*hnode_new(nz,n)
+                end if
              end do
              !$ACC END LOOP
           end do
