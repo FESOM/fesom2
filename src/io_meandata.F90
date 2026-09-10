@@ -1910,7 +1910,9 @@ CASE ('slope_z   ')
     call def_stream((/nl-1,  nod2D/), (/nl-1, myDim_nod2D/),  'slope_z',   'neutral slope Z',    'none', neutral_slope(3,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 
 CASE ('mle_psi   ')
+    if (use_mle) then
     call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'mle_psi',   'Fox-Kemper MLE streamfunction', 'm2/s', mle_psi(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
 CASE ('N2        ')
     call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'N2',        'brunt väisälä',      '1/s2', bvfreq(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('Kv        ')
