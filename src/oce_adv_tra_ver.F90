@@ -1,17 +1,18 @@
 module oce_adv_tra_ver_interfaces
   interface
 ! implicit 1st order upwind vertical advection with to solve for fct_LO
-! updates the input tracer ttf
-    subroutine adv_tra_ver_impl(dt, w, ttf, partit, mesh)
+! updates the input tracer ttf and adds the change of ttf*hnode_new to tend
+    subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh, tend)
       use mod_mesh
       USE MOD_PARTIT
       USE MOD_PARSUP
       real(kind=WP), intent(in), target  :: dt
       type(t_partit),intent(in), target  :: partit
       type(t_mesh),  intent(in), target  :: mesh
-      real(kind=WP), intent(inout)       :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(in)          :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
-    end subroutine adv_tra_ver_impl
+      real(kind=WP), intent(inout)       :: ttf (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+      real(kind=WP), intent(in)          :: W   (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
+      real(kind=WP), intent(inout)       :: tend(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    end subroutine adv_tra_vert_impl
 !===============================================================================
 ! 1st order upwind (explicit)
 ! returns flux given at vertical interfaces of scalar volumes
@@ -106,7 +107,7 @@ module oce_adv_tra_ver_interfaces
   end interface
 end module oce_adv_tra_ver_interfaces
 !===============================================================================
-subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh)
+subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh, tend)
     use MOD_MESH
     use MOD_TRACER
     USE MOD_PARTIT
@@ -117,8 +118,9 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh)
     real(kind=WP), intent(in) , target :: dt
     type(t_partit),intent(in), target  :: partit
     type(t_mesh),  intent(in) , target :: mesh
-    real(kind=WP), intent(inout)       :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-    real(kind=WP), intent(in)          :: W  (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(inout)       :: ttf (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(in)          :: W   (mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
+    real(kind=WP), intent(inout)       :: tend(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
     real(kind=WP)                      :: a(mesh%nl), b(mesh%nl), c(mesh%nl), tr(mesh%nl)
     real(kind=WP)                      :: cp(mesh%nl), tp(mesh%nl)
     real(kind=WP)                      :: zbar_n(mesh%nl), z_n(mesh%nl-1)
@@ -251,6 +253,7 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh)
         ! update tracer
         do nz=nzmin,nzmax-1
             ttf(nz,n)=ttf(nz,n)+tr(nz)
+            tend(nz,n)=tend(nz,n)+tr(nz)*hnode_new(nz,n)
         end do
     end do ! --> do n=1,myDim_nod2D
 !$OMP END DO
