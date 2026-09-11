@@ -1,13 +1,13 @@
 ! ============================================================================
-! ========== Namelist file for FESOM2 momentum dynamics, DARS mesh ===========
+! ========== Namelist file for FESOM2 momentum dynamics ======================
 ! ============================================================================
 ! This file contains configuration for momentum equations and dynamics:
 ! - Horizontal viscosity schemes and parameters
 ! - Momentum advection options
 ! - Free-slip vs no-slip boundary conditions
 ! - Vertical velocity splitting
+! - Split-explicit barotropic subcycling
 ! - Energy diagnostics
-! Keys not set here take their built-in defaults.
 ! ============================================================================
 
 ! ============================================================================
@@ -22,13 +22,13 @@ visc_gamma1        = 0.2         ! flow-aware viscosity coefficient [dimensionle
 visc_gamma2        = 0.285       ! additional viscosity coefficient [s/m]
                                  ! only used for easy backscatter (opt_visc=5) and dynamic backscatter (opt_visc=8)
 visc_easybsreturn  = 1           ! energy return parameter for easy backscatter [dimensionless]
-                                 ! only used for easy backscatter (opt_visc=5)
 
 ! --- Viscosity Scheme Selection ---
 opt_visc           = 7           ! horizontal viscosity scheme:
                                  !   5 = Kinematic (easy) Backscatter
                                  !   6 = Biharmonic flow-aware (depends on velocity Laplacian)
                                  !   7 = Biharmonic flow-aware (depends on velocity differences)
+                                 !       + optional Laplacian when visc_gamma0_h or visc_gamma1_h > 0
                                  !   8 = Dynamic Backscatter
 
 ! --- Vertical Viscosity ---
@@ -54,5 +54,6 @@ wsplit_maxcfl      = 1.0         ! maximum allowed vertical CFL criterion (range
 ldiag_KE           = .false.     ! enable kinetic energy diagnostics (requires additional computation)
 
 ! --- Time Stepping ---
-AB_order           = 3           ! Adams-Bashforth time stepping order for momentum (2 or 3)
+AB_order           = 3           ! Adams-Bashforth time stepping order (2 or 3)
 /
+

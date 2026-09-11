@@ -1,5 +1,5 @@
 ! ============================================================================
-! ========= Namelist file for FESOM2 atmospheric forcing, DARS mesh ==========
+! ============= Namelist file for FESOM2 atmospheric forcing ================
 ! ============================================================================
 ! This file contains configuration for atmospheric forcing and surface boundary
 ! conditions, including:
@@ -11,6 +11,11 @@
 ! - Runoff and salinity restoring
 ! - Chlorophyll data for shortwave penetration
 ! ============================================================================
+! ----------------------------------------------------------------------------
+! File names below are relative to ForcingDataPath in namelist.config. A name
+! starting with '/' is used as given, which is how files outside the forcing
+! tree (for example the Sweeney chlorophyll climatology) are pointed at.
+! ----------------------------------------------------------------------------
 
 ! ============================================================================
 ! BULK FORMULAE EXCHANGE COEFFICIENTS
@@ -25,7 +30,7 @@ Cd_atm_oce = 0.001      ! drag coefficient between atmosphere and water (dimensi
 Ce_atm_ice = 0.00175    ! exchange coefficient of latent heat over ice (dimensionless)
 Ch_atm_ice = 0.00175    ! exchange coefficient of sensible heat over ice (dimensionless)
 Cd_atm_ice = 0.0012     ! drag coefficient between atmosphere and ice (dimensionless)
-Swind      = 0.0        ! parameterization for coupled current feedback (0.0 = disabled)
+Swind       = 0.0       ! parameterization for coupled current feedback (0.0 = disabled)
                         ! non-zero values reduce wind stress based on ocean surface currents
 /
 
@@ -36,7 +41,7 @@ Swind      = 0.0        ! parameterization for coupled current feedback (0.0 = d
 ! Reference heights must match the forcing data specifications.
 ! ============================================================================
 &forcing_bulk
-AOMIP_drag_coeff   = .false. ! use AOMIP drag coefficient formulation (false = use standard)
+AOMIP_drag_coeff  = .false.  ! use AOMIP drag coefficient formulation (false = use standard)
 ncar_bulk_formulae = .false. ! use NCAR bulk formulae (Large & Yeager 2004, 2009)
 ncar_bulk_z_wind   = 10.0    ! reference height for wind forcing [m]
                              ! CORE2, JRA55-do: 10m; JRA55, NCEP: 2m
@@ -67,7 +72,7 @@ landice_end_mon   = 10       ! end month for land ice forcing (1-12)
 &age_tracer
 use_age_tracer    = .false.  ! enable age tracer computation
 use_age_mask      = .false.  ! use spatial mask for age tracer initialization
-age_tracer_path   = './mesh/' ! path to age tracer mask file (if use_age_mask=.true.)
+age_tracer_path   = './mesh/'    ! path to age tracer mask file (if use_age_mask=.true.)
 age_start_year    = 2000     ! year to start age tracer (tracer age = 0 at this year)
 /
 
@@ -75,20 +80,19 @@ age_start_year    = 2000     ! year to start age tracer (tracer age = 0 at this 
 ! SURFACE BOUNDARY CONDITION (FORCING DATA)
 ! ============================================================================
 ! Specification of atmospheric forcing data files and variables.
-! All l_* switches are off and the file names are empty, so no atmospheric
-! field is read from file with these settings.
+! File paths are relative to the run directory.
 ! ============================================================================
 &nam_sbc
    ! --- Forcing file paths ---
-   nm_xwind_file = ''         ! name of file with zonal wind speeds
-   nm_ywind_file = ''         ! name of file with meridional wind speeds
-   nm_humi_file  = ''         ! name of file with air humidity
-   nm_qsr_file   = ''         ! name of file with short wave radiation
-   nm_qlw_file   = ''         ! name of file with long wave radiation
-   nm_tair_file  = ''         ! name of file with 2m air temperature
-   nm_prec_file  = ''         ! name of file with total precipitation
-   nm_snow_file  = ''         ! name of file with snow precipitation
-   nm_mslp_file  = ''         ! name of file with air pressure at sea level
+   nm_xwind_file = ''            ! name of file with zonal wind speeds
+   nm_ywind_file = ''            ! name of file with meridional wind speeds
+   nm_humi_file  = ''            ! name of file with air humidity
+   nm_qsr_file   = ''            ! name of file with short wave radiation
+   nm_qlw_file   = ''            ! name of file with long wave radiation
+   nm_tair_file  = ''            ! name of file with 2m air temperature
+   nm_prec_file  = ''            ! name of file with total precipitation
+   nm_snow_file  = ''            ! name of file with snow precipitation
+   nm_mslp_file  = ''            ! name of file with mean sea level pressure
 
    ! --- Variable names in netCDF forcing files ---
    nm_xwind_var  = 'u'        ! name of variable in file with zonal wind
@@ -99,16 +103,14 @@ age_start_year    = 2000     ! year to start age tracer (tracer age = 0 at this 
    nm_tair_var   = 't2m'      ! name of variable in file with 2m air temperature
    nm_prec_var   = 'rf'       ! name of variable in file with total precipitation
    nm_snow_var   = 'sf'       ! name of variable in file with snow precipitation
-   nm_mslp_var   = 'sp'       ! name of variable in file with air pressure at sea level
+   nm_mslp_var   = 'sp'       ! name of variable in file with air_pressure_at_sea_level
 
    ! --- Time axis configuration in forcing files ---
    nm_nc_iyear   = 1900       ! initial year of forcing data time axis (note, not the first year in the file!)
    nm_nc_imm     = 1          ! initial month of forcing data time axis (1-12)
    nm_nc_idd     = 1          ! initial day of forcing data time axis (1-31)
-   nm_nc_freq    = 1          ! divisor converting the file's time axis to days:
-                              !   1 = axis in days, 24 = in hours, 86400 = in seconds
+   nm_nc_freq    = 1          ! divisor converting the time axis of the forcing files to days (1 = days, 24 = hours, 86400 = seconds)
    nm_nc_tmid    = 0          ! time stamp position: 1=mid-point, 0=start of interval
-                              ! (1 in CORE1, CORE2; 0 in JRA55)
 
    ! --- Enable/disable individual forcing fields ---
    l_xwind       = .false.    ! use zonal wind forcing
@@ -123,21 +125,22 @@ age_start_year    = 2000     ! year to start age tracer (tracer age = 0 at this 
    l_snow        = .false.    ! use snow precipitation forcing
 
    ! --- Runoff configuration ---
-   runoff_data_source = 'CORE2'                      ! runoff data source: 'Dai09', 'JRA55', 'CORE1', 'CORE2' or 'NONE'
-   nm_runoff_file     = './forcing/CORE2/runoff.nc'  ! runoff data file
+   runoff_data_source = 'CORE2'       ! runoff data source: 'Dai09', 'JRA55', 'CORE1', 'CORE2' or 'NONE'
+   nm_runoff_file     = './forcing/CORE2/runoff.nc' ! CORE2 monthly climatology with runoff_climatology=.true.
+   !nm_runoff_file     = 'friver.'  ! Dai09/JRA55 with runoff_climatology=.false.: prefix, year and '.nc' are appended (friver.1958.nc).
 
    ! --- Sea surface salinity restoring ---
-   sss_data_source    = 'CORE2'                         ! SSS restoring data source: 'CORE2', 'WOA', or 'NONE'
-   nm_sss_data_file   = './forcing/CORE2/PHC2_salx.nc'  ! path to SSS restoring data file
+   sss_data_source  = 'CORE2'  ! SSS restoring data source: 'CORE2', 'WOA', or 'NONE'
+   nm_sss_data_file = './forcing/CORE2/PHC2_salx.nc' ! path to SSS restoring data file, e.g. PHC2_salx.nc
 
    ! --- Chlorophyll data for shortwave penetration ---
-   chl_data_source    = 'Sweeney'                    ! chlorophyll data source: 'Sweeney' (monthly climatology) or 'NONE' (constant)
-                                                     ! requires use_sw_pene=.true. in namelist.config
-   nm_chl_data_file   = './forcing/Sweeney_2005.nc'  ! chlorophyll data file (if Sweeney)
-   chl_const          = 0.1                          ! constant chlorophyll concentration [mg/m³] (if chl_data_source='NONE')
+   chl_data_source  = 'Sweeney'   ! chlorophyll data source: 'Sweeney' (monthly climatology) or 'None' (constant)
+                               ! requires use_sw_pene=.true. in namelist.config
+   nm_chl_data_file = './forcing/Sweeney_2005.nc'  ! chlorophyll data file (if Sweeney)
+   chl_const        = 0.1      ! constant chlorophyll concentration [mg/m³] (if chl_data_source='None')
 
    ! --- Runoff mapper (distributes runoff over coastal area) ---
-   use_runoff_mapper  = .TRUE.                     ! enable runoff mapper (spreads runoff spatially)
-   runoff_basins_file = 'runoff_maps_original.nc'  ! runoff basin mapping file
-   runoff_radius      = 500000.                    ! radius for runoff spreading [m] (if use_runoff_mapper=.true.)
+   use_runoff_mapper  = .TRUE.   ! enable runoff mapper (spreads runoff spatially)
+   runoff_basins_file = 'runoff_maps_original.nc' ! runoff basin mapping file
+   runoff_radius      = 500000.  ! radius for runoff spreading [m] (if use_runoff_mapper=.true.)
 /

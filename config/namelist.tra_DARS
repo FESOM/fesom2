@@ -1,5 +1,5 @@
 ! ============================================================================
-! ========= Namelist file for FESOM2 tracer configuration, DARS mesh =========
+! ============ Namelist file for FESOM2 tracer configuration =================
 ! ============================================================================
 ! This file contains configuration for ocean tracers (temperature, salinity,
 ! and passive tracers):
@@ -26,7 +26,7 @@ num_tracers = 100         ! number of tracers to allocate (must be ≥ actual nu
 ! Order switches   : hor./vert. Ord.=1.0 --> 4th order, =0.0 --> 3rd order, =0.5 --> mixed 3rd&4th order
 ! ============================================================================
 ! nml_tracer_list =
-! idx, hor. Adv, vert. Adv., use FCT, hor.Ord., vert. Ord.
+! idx, hor. Adv, vert. Adv., use FCT, hor.Ord., vert. Ord. 
 ! 1  , 'MFCT'  , 'QR4C'    , 'FCT ' , 1.      , 1.        ,   ! temperature
 ! 2  , 'MFCT'  , 'QR4C'    , 'FCT ' , 1.      , 1.        ,   ! salinity
 !101 , 'UPW1'  , 'UPW1'    , 'NON ' , 0.      , 0.            ! example passive tracer
@@ -72,7 +72,7 @@ gamma2_tra    = 0.            ! additional biharmonic diffusion coefficient [dim
 
 ! --- Vertical Diffusion and Time Stepping ---
 i_vert_diff   = .true.        ! use implicit vertical diffusion (recommended for stability)
-AB_order      = 2             ! Adams-Bashforth time stepping order for tracers (2 or 3)
+AB_order      = 2             ! Adams-Bashforth time stepping order (2 or 3)
 /
 
 ! ============================================================================
@@ -106,13 +106,11 @@ double_diffusion   = .false.           ! enable double diffusion parameterizatio
 
 ! --- Surface Restoring ---
 surf_relax_T       = 0.0               ! surface temperature restoring coefficient [m/s] (0 = disabled)
-surf_relax_S       = 0.0               ! surface salinity restoring coefficient [m/s] (0 = disabled)
-                                       ! e.g. 1.929e-06 = 50m/300days, 6.43e-07 = 10m/180days
+surf_relax_S       = 0.0               ! surface salinity restoring coefficient [m/s]
 balance_salt_water = .true.            ! balance virtual salt flux with freshwater flux
 
 ! --- Climatology Restoring ---
 clim_relax         = 0.0               ! 3D climatology restoring coefficient [1/s] (0 = disabled)
-                                       ! geometrical information has to be supplied
 
 ! --- Reference Salinity ---
 ref_sss_local      = .true.            ! use local reference SSS (true) or global constant (false)
