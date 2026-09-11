@@ -91,6 +91,13 @@ TYPE T_ICE_THERMO
     ! 0 (default) keeps the legacy step function at hsn > 1 mm.
     ! Typical CICE-style values are 0.02-0.05 m.
     real(kind=WP) :: h_snowscale = 0.0_WP
+    ! Coupled snow melt on sea ice requires a surface temperature above 273 K
+    ! (.true., legacy). .false. melts snow on the energy budget alone, as the
+    ! uncoupled branch does.
+    logical       :: snowmelt_tgate = .true.
+    ! Width [K] of a linear transition from frozen to melting snow and ice
+    ! albedo below 273.15 K. 0 (default) keeps the step at 273.15 K.
+    real(kind=WP) :: alb_tramp = 0.0_WP
     real(kind=WP) :: h_ml  = 2.5_WP    ! thickness of uppermost layer deacides how much heat is available
 
     ! --- additional namelist parameters (Frank.Kauker(at)awi.de 2023/04/04)
@@ -604,13 +611,13 @@ subroutine ice_init(ice, partit, mesh)
     namelist /ice_dyn/ whichEVP, Pstar, ellipse, c_pressure, delta_min, evp_rheol_steps, &
                        Cd_oce_ice, ice_gamma_fct, ice_diff, theta_io, ice_ave_steps, &
                        alpha_evp, beta_evp, c_aevp
-    logical        :: snowdist, new_iclasses, use_meltponds
+    logical        :: snowdist, new_iclasses, use_meltponds, snowmelt_tgate
     integer        :: open_water_albedo, iclasses
     real(kind=WP)  :: Sice, h0, h0_s, emiss_ice, emiss_wat, albsn, albsnm, albi, &
-                      albim, albw, con, consn, hmin, armin, c_melt, h_cutoff, h_ml, h_snowscale
+                      albim, albw, con, consn, hmin, armin, c_melt, h_cutoff, h_ml, h_snowscale, alb_tramp
     namelist /ice_therm/ Sice, iclasses, h0, h0_s, hmin, armin,  emiss_ice, emiss_wat, albsn, albsnm, albi, &
                          albim, albw, con, consn,  snowdist, new_iclasses, open_water_albedo, c_melt, h_cutoff, h_ml, use_meltponds, &
-                         h_snowscale
+                         h_snowscale, snowmelt_tgate, alb_tramp
 
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -654,6 +661,8 @@ subroutine ice_init(ice, partit, mesh)
     albw             = ice%thermo%albw
     h_ml             = ice%thermo%h_ml
     h_snowscale      = ice%thermo%h_snowscale
+    snowmelt_tgate   = ice%thermo%snowmelt_tgate
+    alb_tramp        = ice%thermo%alb_tramp
     snowdist         = ice%thermo%snowdist
     new_iclasses     = ice%thermo%new_iclasses
     open_water_albedo= ice%thermo%open_water_albedo
@@ -715,6 +724,8 @@ subroutine ice_init(ice, partit, mesh)
     ice%thermo%albw     = albw
     ice%thermo%h_ml     = h_ml
     ice%thermo%h_snowscale = h_snowscale
+    ice%thermo%snowmelt_tgate = snowmelt_tgate
+    ice%thermo%alb_tramp = alb_tramp
     ice%thermo%snowdist = snowdist
     ice%thermo%new_iclasses=new_iclasses
     ice%thermo%open_water_albedo=open_water_albedo
