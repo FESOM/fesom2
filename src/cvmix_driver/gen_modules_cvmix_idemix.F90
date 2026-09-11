@@ -18,9 +18,14 @@ module g_cvmix_idemix
     
     !___________________________________________________________________________
     ! module calls from cvmix library
-    use cvmix_idemix,  only :  init_idemix, calc_idemix_v0, cvmix_coeffs_idemix                 
+    use cvmix_idemix,  only :  init_idemix, calc_idemix_v0, cvmix_coeffs_idemix
     use cvmix_put_get, only : cvmix_put
-    use cvmix_kinds_and_types 
+    ! CVMix is a fixed double-precision library (kind cvmix_r8). FESOM's WP may be real4
+    ! (single precision); convert WP<->cvmix_r8 at the CVMix call boundary below so CVMix
+    ! always runs in double precision. In a double-precision FESOM build cvmix_r8==WP, so
+    ! the casts/temps are exact no-ops and the result is bit-identical. cvmix_r8 is provided
+    ! by the full use of cvmix_kinds_and_types below.
+    use cvmix_kinds_and_types
     
     !___________________________________________________________________________
     ! module calls from FESOM
@@ -133,7 +138,7 @@ module g_cvmix_idemix
         !_______________________________________________________________________
         if(mype==0) then
             write(*,*) '____________________________________________________________'
-            write(*,*) ' --> initialise IDEMIX'
+            write(*,*) ' --> initialise IDEMIX', mype
             write(*,*)
         end if
             
@@ -239,8 +244,18 @@ module g_cvmix_idemix
             
             ! only 20% of the niw-input are available to penetrate into the deeper ocean
             ! divide by density_0 --> convert from W/m^2 to m^3/s^3
-            iwe_fsrf = iwe_fsrf/density_0 * idemix_sforcusage 
-            
+            iwe_fsrf = iwe_fsrf/density_0 * idemix_sforcusage
+
+            ! check for total surface energy that is infused, compare with IDEMIX2 Etot_srf
+            loc_Etot = 0.0_WP
+            do elem=1, myDim_elem2D
+                if (elem2D_nodes(1,elem)<=myDim_nod2D) then
+                    loc_Etot = loc_Etot + elem_area(elem)*iwe_fsrf(elem)*density_0
+                end if
+            end do
+            call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+            if (mype==0) write(*,*) " --> IDEMIX total srf. energy Etot_srf =", glb_Etot*1.0e-12, ' TW'
+
         else
             if (mype==0) then
                 write(*,*) '____________________________________________________________________'
@@ -249,8 +264,8 @@ module g_cvmix_idemix
                 write(*,*) '        --> check your namelist.cvmix, idemix_surforc_file &  '
                 write(*,*) '            idemix_botforc_file'
                 write(*,*) '____________________________________________________________________'
+                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
             end if
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
         end if 
         
         !_______________________________________________________________________
@@ -301,7 +316,6 @@ module g_cvmix_idemix
             
             ! divide by density_0 --> convert from W/m^2 to m^3/s^3
             iwe_fbot  = iwe_fbot/density_0
-            
         else
             if (mype==0) then
                 write(*,*) '____________________________________________________________________'
@@ -310,13 +324,16 @@ module g_cvmix_idemix
                 write(*,*) '        --> check your namelist.cvmix, idemix_surforc_file &  '
                 write(*,*) '            idemix_botforc_file'
                 write(*,*) '____________________________________________________________________'
+                call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
             end if 
-            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 0)
+            
         end if 
         
         !_______________________________________________________________________
         ! initialise IDEMIX parameters
-        call init_idemix(idemix_tau_v,idemix_tau_h,idemix_gamma,idemix_jstar,idemix_mu0)! ,handle_old_vals)! ,idemix_userdef_constants)
+        call init_idemix(real(idemix_tau_v, cvmix_r8), real(idemix_tau_h, cvmix_r8), &
+                         real(idemix_gamma, cvmix_r8), real(idemix_jstar, cvmix_r8), &
+                         real(idemix_mu0, cvmix_r8))! ,handle_old_vals)! ,idemix_userdef_constants)
     end subroutine init_cvmix_idemix
     !
     !
@@ -334,6 +351,16 @@ module g_cvmix_idemix
         real(kind=WP) :: grad_v0Eiw(2), deltaX1, deltaY1, deltaX2, deltaY2
         real(kind=WP) :: tsum1, tsum2, tsum3, tsum4, tvol
         logical       :: debug=.false.
+        ! double-precision (cvmix_r8) buffers for the cvmix_coeffs_idemix call boundary.
+        ! One per array argument; sliced identically to the original WP actual arguments so
+        ! the sequence association is unchanged. Exact no-op when WP==cvmix_r8.
+        real(cvmix_r8) :: dzw_r8(mesh%nl), dzt_r8(mesh%nl), iwe_new_r8(mesh%nl)
+        real(cvmix_r8) :: iwe_old_r8(mesh%nl), alpha_c_r8(mesh%nl)
+        real(cvmix_r8) :: KappaM_r8(mesh%nl), KappaH_r8(mesh%nl), Nsqr_r8(mesh%nl)
+        real(cvmix_r8) :: iwe_Ttot_r8(mesh%nl), iwe_Tdif_r8(mesh%nl), iwe_Thdi_r8(mesh%nl)
+        real(cvmix_r8) :: iwe_Tdis_r8(mesh%nl), iwe_Tsur_r8(mesh%nl), iwe_Tbot_r8(mesh%nl)
+        real(cvmix_r8) :: c0_r8(mesh%nl), v0_r8(mesh%nl)
+        real(cvmix_r8) :: cvmix_int_1_r8(mesh%nl), cvmix_int_2_r8(mesh%nl), cvmix_int_3_r8(mesh%nl)
 
 #include "../associate_part_def.h"
 #include "../associate_mesh_def.h"
@@ -369,46 +396,72 @@ module g_cvmix_idemix
             !___________________________________________________________________
             ! main call to calculate idemix
             iwe_old = iwe(:,elem)
+            !___________________________________________________________________
+            ! copy WP input/inout arrays into cvmix_r8 temps before the call
+            ! (slices match the original actual arguments exactly)
+            dzw_r8(uln:nln)        = real(helem(uln:nln, elem),     cvmix_r8)
+            dzt_r8(uln:nln+1)      = real(dz_trr(uln:nln+1),        cvmix_r8)
+            iwe_old_r8(uln:nln+1)  = real(iwe_old(uln:nln+1),       cvmix_r8)
+            Nsqr_r8(uln:nln+1)     = real(bvfreq2(uln:nln+1),       cvmix_r8)
+            iwe_Thdi_r8(uln:nln+1) = real(iwe_Thdi(uln:nln+1,elem), cvmix_r8)
+            KappaM_r8(uln:nln+1)   = real(iwe_Av(uln:nln+1, elem),  cvmix_r8) ! inout
+            KappaH_r8(uln:nln+1)   = real(iwe_Kv(uln:nln+1, elem),  cvmix_r8) ! inout
             call cvmix_coeffs_idemix(&
                 ! parameter
-                dzw             = helem(uln:nln, elem),               &
-                dzt             = dz_trr(uln:nln+1),                  &
+                dzw             = dzw_r8(uln:nln),                   &
+                dzt             = dzt_r8(uln:nln+1),                 &
 !                 nlev            = nln,                                &
                 nlev            = nln-uln+1,                          &
-                max_nlev        = nl-1,                               &  
-                dtime           = dt,                                 &
-                coriolis        = mesh%coriolis(elem),                &
-                ! essentials 
-                iwe_new         = iwe(uln:nln+1,elem),                & ! out
-                iwe_old         = iwe_old(uln:nln+1),                 & ! in
-                forc_iw_surface = iwe_fsrf(elem),                     & ! in
-                forc_iw_bottom  = iwe_fbot(elem),                     & ! in
+                max_nlev        = nl-1,                               &
+                dtime           = real(dt, cvmix_r8),                 &
+                coriolis        = real(mesh%coriolis(elem), cvmix_r8),&
+                ! essentials
+                iwe_new         = iwe_new_r8(uln:nln+1),             & ! out
+                iwe_old         = iwe_old_r8(uln:nln+1),             & ! in
+                forc_iw_surface = real(iwe_fsrf(elem), cvmix_r8),     & ! in
+                forc_iw_bottom  = real(iwe_fbot(elem), cvmix_r8),     & ! in
                 ! FIXME: nils: better output IDEMIX Ri directly
-                alpha_c         = iwe_alpha_c(uln:nln+1, elem),       & ! out (for Ri IMIX)
-                ! only for Osborn shortcut 
+                alpha_c         = alpha_c_r8(uln:nln+1),             & ! out (for Ri IMIX)
+                ! only for Osborn shortcut
                 ! FIXME: nils: put this to cvmix_tke
-                KappaM_out      = iwe_Av(  uln:nln+1, elem),          & ! out
-                KappaH_out      = iwe_Kv(  uln:nln+1, elem),          & ! out
-                Nsqr            = bvfreq2( uln:nln+1),                & ! in
+                KappaM_out      = KappaM_r8(uln:nln+1),              & ! inout
+                KappaH_out      = KappaH_r8(uln:nln+1),              & ! inout
+                Nsqr            = Nsqr_r8(uln:nln+1),                & ! in
                 ! diagnostics
-                iwe_Ttot        = iwe_Ttot(uln:nln+1, elem),          &
-                iwe_Tdif        = iwe_Tdif(uln:nln+1, elem),          &
-                iwe_Thdi        = iwe_Thdi(uln:nln+1, elem),          &
-                iwe_Tdis        = iwe_Tdis(uln:nln+1, elem),          &
-                iwe_Tsur        = iwe_Tsur(uln:nln+1, elem),          &
-                iwe_Tbot        = iwe_Tbot(uln:nln+1, elem),          &
-                c0              = iwe_c0(  uln:nln+1, elem),          &
-                v0              = iwe_v0(  uln:nln+1, elem),          &
+                iwe_Ttot        = iwe_Ttot_r8(uln:nln+1),            &
+                iwe_Tdif        = iwe_Tdif_r8(uln:nln+1),            &
+                iwe_Thdi        = iwe_Thdi_r8(uln:nln+1),            &
+                iwe_Tdis        = iwe_Tdis_r8(uln:nln+1),            &
+                iwe_Tsur        = iwe_Tsur_r8(uln:nln+1),            &
+                iwe_Tbot        = iwe_Tbot_r8(uln:nln+1),            &
+                c0              = c0_r8(uln:nln+1),                  &
+                v0              = v0_r8(uln:nln+1),                  &
                 ! debugging
                 debug           = debug,                              &
                 !i = i,                                        &
                 !j = j,                                        &
                 !tstep_count = tstep_count,                    &
-                cvmix_int_1     = cvmix_dummy_1(uln:nln+1, elem),     &
-                cvmix_int_2     = cvmix_dummy_2(uln:nln+1, elem),     &
-                cvmix_int_3     = cvmix_dummy_3(uln:nln+1, elem)      &
+                cvmix_int_1     = cvmix_int_1_r8(uln:nln+1),         &
+                cvmix_int_2     = cvmix_int_2_r8(uln:nln+1),         &
+                cvmix_int_3     = cvmix_int_3_r8(uln:nln+1)          &
                 )
-            
+            !___________________________________________________________________
+            ! copy cvmix_r8 output/inout temps back into the WP FESOM arrays
+            iwe(uln:nln+1,elem)         = real(iwe_new_r8(uln:nln+1),     WP)
+            iwe_alpha_c(uln:nln+1,elem) = real(alpha_c_r8(uln:nln+1),     WP)
+            iwe_Av(uln:nln+1, elem)     = real(KappaM_r8(uln:nln+1),      WP)
+            iwe_Kv(uln:nln+1, elem)     = real(KappaH_r8(uln:nln+1),      WP)
+            iwe_Ttot(uln:nln+1, elem)   = real(iwe_Ttot_r8(uln:nln+1),    WP)
+            iwe_Tdif(uln:nln+1, elem)   = real(iwe_Tdif_r8(uln:nln+1),    WP)
+            iwe_Tdis(uln:nln+1, elem)   = real(iwe_Tdis_r8(uln:nln+1),    WP)
+            iwe_Tsur(uln:nln+1, elem)   = real(iwe_Tsur_r8(uln:nln+1),    WP)
+            iwe_Tbot(uln:nln+1, elem)   = real(iwe_Tbot_r8(uln:nln+1),    WP)
+            iwe_c0(uln:nln+1, elem)     = real(c0_r8(uln:nln+1),          WP)
+            iwe_v0(uln:nln+1, elem)     = real(v0_r8(uln:nln+1),          WP)
+            cvmix_dummy_1(uln:nln+1,elem) = real(cvmix_int_1_r8(uln:nln+1), WP)
+            cvmix_dummy_2(uln:nln+1,elem) = real(cvmix_int_2_r8(uln:nln+1), WP)
+            cvmix_dummy_3(uln:nln+1,elem) = real(cvmix_int_3_r8(uln:nln+1), WP)
+
         end do !-->do node = 1,node_size
         
         !_______________________________________________________________________
@@ -731,11 +784,11 @@ module g_cvmix_idemix
             end do
             
             !___________________________________________________________________
-            ! diagnostic: add horizontal propgation to the total production rate
-            ! of internal wave energy iwe_Tot
-            do node = 1,node_size
-                iwe_Thdi(:,node) = ( iwe(:,node) - iwe_Thdi(:,node) )/dt
-                iwe_Ttot(:,node) = iwe_Ttot(:,node) + iwe_Thdi(:,node)
+            ! diagnostic: add horizontal propagation to the total production rate
+            ! of internal wave energy iwe_Ttot
+            do elem = 1, elem_size
+                iwe_Thdi(:,elem) = ( iwe(:,elem) - iwe_Thdi(:,elem) )/dt
+                iwe_Ttot(:,elem) = iwe_Ttot(:,elem) + iwe_Thdi(:,elem)
             end do
         end if !-->if (idemix_n_hor_iwe_prop_iter>0) then
         

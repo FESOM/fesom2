@@ -25,6 +25,13 @@ ldiag_Ri          = .false.  ! enables Richardson number diagnostics ('shear', '
 ldiag_turbflux    = .false.  ! enables turbulent flux diagnostics ('KvdTdz', 'KvdSdz')
 ldiag_salt3D      = .false.  ! enables 3D salinity diagnostics
 ldiag_dMOC        = .false.  ! enables 'dMOC' output (density MOC diagnostics)
+ldiag_diapmix     = .false.  ! adds 'w_diap_diff', 'dV_diap_dT' to the 'dMOC' output: diapycnal velocity
+                             ! and density class uplift induced by the parameterized vertical mixing,
+                             ! from which the numerically induced diapycnal velocity and spurious MOC
+                             ! are formed in postprocessing. Requires ldiag_dMOC (ldiag_diapmix 
+                             ! is automatically switched off with a warning if ldiag_dMOC unset)
+diap_call_freq    = 1        ! evaluate ldiag_diapmix every N units of diap_call_freq_unit ...
+diap_call_freq_unit = 'd'    ! ... 's' (steps), 'h' (hours), 'd' (days) or 'm' (months)
 ldiag_DVD         = .false.  ! enables 'DVD' output (Discrete Variance Decay diagnostics)
 ldiag_forc        = .false.  ! enables 'FORC' output (comprehensive forcing diagnostics)
 ldiag_extflds     = .false.  ! enables extended field diagnostics
@@ -51,6 +58,10 @@ compression_level = 1        ! compression level for netCDF output (1=fastest, 9
 !   frequency  = output frequency (integer)
 !   unit       = 'y' (yearly), 'm' (monthly), 'd' (daily), 'h' (hourly), 's' (steps)
 !   precision  = 4 (single precision) or 8 (double precision)
+!   Note: in a single-precision build (WP=4) a field requesting precision 8 is
+!   still honoured (written as NF_DOUBLE; means accumulated in real64), but its
+!   samples are single-precision-sourced. FESOM prints one summary line at
+!   startup listing such fields.
 ! ============================================================================
 &nml_list
 io_list =  'sst       ',1, 'm', 4,
@@ -250,9 +261,9 @@ io_list =  'sst       ',1, 'm', 4,
 ! 'respn     ',1, 'm', 4,  ! Respiration by small phytoplankton [mmolC/m2/d]
 ! 'respd     ',1, 'm', 4,  ! Respiration by diatoms [mmolC/m2/d]
 ! 'respc     ',1, 'm', 4,  ! Respiration by coccolithophores [mmolC/(m2*d)]
-! 'NPPn3D    ',1, 'm', 4,  ! Net primary production of small phytoplankton [mmolC/m2/d]
-! 'NPPd3D    ',1, 'm', 4,  ! Net primary production of diatoms [mmolC/m2/d]
-! 'NPPc3D    ',1, 'm', 4,  ! Net primary production of coccolithophores [mmolC/m2/d]
+! 'NPPn3D    ',1, 'm', 4,  ! Net primary production of small phytoplankton [mmolC/(m3*d)]
+! 'NPPd3D    ',1, 'm', 4,  ! Net primary production of diatoms [mmolC/(m3*d)]
+! 'NPPc3D    ',1, 'm', 4,  ! Net primary production of coccolithophores [mmolC/(m3*d)]
 
 ! --- WATER ISOTOPES IN OCEAN (require lwiso=.true.) ---
 ! 'h2o18     ',1, 'm', 4,  ! h2o18 concentration [kmol/m**3]

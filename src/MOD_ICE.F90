@@ -120,6 +120,11 @@ TYPE T_ICE_ATMCOUPL
 #if defined (__oifs) || defined (__ifsinterface) || defined(__yac)
     !___________________________________________________________________________
     real(kind=WP), allocatable, dimension(:)    :: ice_alb, enthalpyoffuse, runoff_liquid, runoff_solid, flx_qres, flx_qcon
+    ! ist anchor: ice surface temperature as ACTUALLY TRANSMITTED at the last
+    ! OASIS send -- the temperature OIFS evaluates its ice-tile fluxes at for
+    ! the coming coupling interval. Consumed by the implicit (dQ/dT-linearized)
+    ! surface-temperature solve in ice_thermo_cpl.F90 (ice_surftemp).
+    real(kind=WP), allocatable, dimension(:)    :: ist_ref
     ! !!! DONT FORGET ice_temp rhs_tempdiv rhs_temp is advected for oifs !!! --> becomes additional ice
     ! tracer in ice%data(4)%values
 #endif /* (__oifs)  */
@@ -886,8 +891,12 @@ subroutine ice_init(ice, partit, mesh)
     ice%atmcoupl%runoff_solid= 0.0_WP
     allocate(ice%atmcoupl%flx_qres(node_size))
     allocate(ice%atmcoupl%flx_qcon(node_size))
-    ice%atmcoupl%flx_qres      = 0.0_WP    
+    ice%atmcoupl%flx_qres      = 0.0_WP
     ice%atmcoupl%flx_qcon      = 0.0_WP
+    ! 0 = "no send yet": ice_surftemp falls back to the local t as anchor
+    ! until the first actual OASIS transmission populates it.
+    allocate(ice%atmcoupl%ist_ref(node_size))
+    ice%atmcoupl%ist_ref       = 0.0_WP
 #endif /* (__oifs) */
 #endif /* (__coupled: oasis or ifsinterface or yac) */
 

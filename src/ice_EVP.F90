@@ -239,7 +239,11 @@ subroutine stress2rhs(ice, partit, mesh)
 #endif
 
 #ifndef ENABLE_OPENACC
+#if defined(__openmp_reproducible)
+!$OMP SINGLE
+#else
 !$OMP DO
+#endif
 #else
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #if !defined(DISABLE_OPENACC_ATOMICS)
@@ -264,8 +268,6 @@ subroutine stress2rhs(ice, partit, mesh)
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
         call omp_set_lock  (partit%plock(elem2D_nodes(k,el)))
-#else
-!$OMP ORDERED
 #endif
 #endif
 #ifdef ENABLE_OPENACC
@@ -291,8 +293,6 @@ subroutine stress2rhs(ice, partit, mesh)
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
         call omp_unset_lock(partit%plock(elem2D_nodes(k,el)))
-#else
-!$OMP END ORDERED
 #endif
 #endif
         END DO
@@ -304,7 +304,11 @@ subroutine stress2rhs(ice, partit, mesh)
 #endif
 
 #ifndef ENABLE_OPENACC
+#if defined(__openmp_reproducible)
+!$OMP END SINGLE
+#else
 !$OMP END DO
+#endif
 #else
     !$ACC END PARALLEL LOOP
 #endif
@@ -715,7 +719,11 @@ subroutine EVPdynamics(ice, partit, mesh)
         ! apply sea ice velocity boundary condition
 
 #ifndef ENABLE_OPENACC
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
 #else
         ! With the binary data of np2 goes only inside the first if
         !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)

@@ -7,9 +7,10 @@ subroutine setup_model(partit)
   use g_forcing_param
   use g_config
   use diagnostics, only: ldiag_solver,lcurt_stress_surf,lcurt_stress_surf, ldiag_Ri, ldiag_TurbFlux, ldiag_trflx, &
-                         ldiag_dMOC, ldiag_DVD, diag_list
+                         ldiag_dMOC, ldiag_DVD, diag_list, ldiag_diapmix
   use g_clock,     only: timenew, daynew, yearnew
   use g_ic3d
+  use Toy_Neverworld2
 #ifdef __recom
   use recom_config
   use recom_ciso
@@ -82,6 +83,29 @@ subroutine setup_model(partit)
   read (fileunit, NML=icebergs, iostat=istat)
   if (istat /= 0) call check_namelist_read(fileunit, 'icebergs', nmlfile, partit)
 
+  ! Optional group: absent in existing namelist.config files, which must keep
+  ! working, so a failed read is rewound and the compiled-in defaults stand.
+  read (fileunit, NML=io_parallel, iostat=istat)
+  if (istat /= 0) then
+     rewind(fileunit)
+     parallel_write    = .false.
+     n_writers         = 0
+     chunk_levels      = 8
+     n_writers_restart = -1
+     n_readers_restart = -1
+  end if
+  ! Resolve the "same as n_writers" sentinel once, here, so that every consumer
+  ! downstream sees a concrete count and none of them has to know about -1.
+  ! Zero is NOT the sentinel: it already means "as many as the block-size guard
+  ! allows" and stays a legitimate value for each of the three.
+  if (n_writers_restart < 0) n_writers_restart = n_writers
+  if (n_readers_restart < 0) n_readers_restart = n_writers
+  if (partit%mype == 0) then
+     write(*,*) 'parallel_write = ', parallel_write, '  n_writers = ', n_writers, &
+                '  n_writers_restart = ', n_writers_restart, &
+                '  n_readers_restart = ', n_readers_restart
+  end if
+
 !!$  read (fileunit, NML=machine)
   close (fileunit)
   
@@ -111,16 +135,27 @@ subroutine setup_model(partit)
   endif
   read (fileunit, NML=oce_dyn, iostat=istat)
   if (istat /= 0) call check_namelist_read(fileunit, 'oce_dyn', nmlfile, partit)
-  
-  read (fileunit, NML=tracer_init3d, iostat=istat)
-  if (istat /= 0) call check_namelist_read(fileunit, 'tracer_init3d', nmlfile, partit)
-  
+
   ! Optional reading of oce_perturb namelist for backward compatibility
   read (fileunit, NML=oce_perturb, iostat=istat)
   if (istat /= 0) then
     if (partit%mype==0) write(*,*) 'INFO: oce_perturb namelist not found, using defaults (no perturbations)'
   end if
-  
+
+  ! Optional, neverworld2-only: wind forcing, SST restoring, and temperature perturbation
+  ! parameters (Toy_Neverworld2 module). Read last from this file (nothing else is read
+  ! from namelist.oce afterwards) and tolerate a missing group so that older namelist.oce
+  ! files without it keep working with the compiled-in defaults. Rewind first: if the
+  ! optional &oce_perturb group above was absent, its failed scan left the file at EOF.
+  if (toy_ocean .and. trim(which_toy)=='neverworld2') then
+    rewind(fileunit)
+    read (fileunit, NML=oce_neverworld2, iostat=istat)
+    if (istat /= 0) then
+      if (partit%mype==0) write(*,*) &
+        'WARNING: could not read &oce_neverworld2 from ', trim(nmlfile), &
+        ' -- using defaults trelax_opt=', trelax_opt, ' gamma_restore=', gamma_restore
+    endif
+  endif
   close (fileunit)
 
   nmlfile ='namelist.tra'    ! name of ocean namelist file
@@ -175,6 +210,15 @@ subroutine setup_model(partit)
   read (fileunit, NML=diag_list, iostat=istat)
   if (istat /= 0) call check_namelist_read(fileunit, 'diag_list', nmlfile, partit)
   close (fileunit)
+
+  ! the diapycnal mixing diagnostic builds on the density classes and the
+  ! divergences of the density MOC diagnostic, and is only interpretable
+  ! together with them. Has to be settled here, before density_dmoc and the
+  ! diagnostic arrays are allocated.
+  if (ldiag_diapmix .and. .not. ldiag_dMOC) then
+     ldiag_dMOC = .true.
+     if (partit%mype==0) write(*,*) 'ldiag_diapmix=.true. requires ldiag_dMOC --> ldiag_dMOC switched on'
+  end if
 
 #if defined (__recom)
   nmlfile ='namelist.recom'    ! name of recom namelist file

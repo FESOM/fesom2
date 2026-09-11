@@ -46,9 +46,12 @@ on:
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   ecbundle_ctest_framework:
-    # Run directly on Ubuntu runner
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 12
+    # Image used by the ten mkrun-based workflows. It already provides gcc,
+    # gfortran, OpenMPI, netCDF under /usr and python3-pip, which is all this
+    # job installed by hand - see FESOM/FESOM2_Docker#7.
+    container: ghcr.io/fesom/fesom2_docker:fesom2_test_refactoring-master
     
     env:
       # Set environment variables for the build
@@ -62,44 +65,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      - name: Install system dependencies
-        timeout-minutes: 22
+      - name: Git safe directory
         run: |
-          cat > /tmp/install_deps.sh <<'SCRIPT'
-          set -eux
-          # Acquire::*::Timeout is the important part: the classic apt hang is a
-          # stalled connection that otherwise never times out at all.
-          APT_OPTS="-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30"
-          sudo apt-get $APT_OPTS update
-          sudo apt-get $APT_OPTS install -y \
-            gcc gfortran g++ cmake make \
-            openmpi-bin libopenmpi-dev \
-            libnetcdf-dev libnetcdff-dev \
-            pkg-config git wget ca-certificates \
-            python3 python3-pip
+          git config --global --add safe.directory ${PWD}
+
+      - name: Install ecbundle
+        timeout-minutes: 5
+        run: |
           pip install --retries 3 --timeout 30 ecbundle
-          SCRIPT
-
-          ok=0
-          for attempt in 1 2; do
-            echo "::group::dependency install attempt $attempt"
-            if timeout 10m bash /tmp/install_deps.sh; then ok=1; fi
-            echo "::endgroup::"
-            [ "$ok" = 1 ] && break
-            echo "::warning::dependency install attempt $attempt timed out or failed; retrying"
-            # a killed apt leaves locks and a half-configured dpkg behind,
-            # which would make the next attempt fail for a different reason
-            sudo pkill -9 -f apt-get 2>/dev/null || true
-            sudo rm -f /var/lib/apt/lists/lock /var/cache/apt/archives/lock \
-                       /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend || true
-            sudo dpkg --configure -a || true
-            sleep 20
-          done
-          if [ "$ok" != 1 ]; then
-            echo "::error::dependency install failed after 2 attempts of 10 min each"
-            exit 1
-          fi
-
           echo "Verifying installations..."
           gcc --version
           gfortran --version
@@ -108,6 +81,7 @@ jobs:
           pkg-config --modversion netcdf
           pkg-config --modversion netcdf-fortran
           ecbundle --version
+
       - name: Set up environment variables
         run: |
           echo "Setting up environment for FESOM2 build..."
@@ -126,9 +100,25 @@ jobs:
           echo "OMPI_MCA_btl_base_warn_component_unused=0" >> $GITHUB_ENV
       
       - name: Set up ecbundle bundle
+        env:
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.clone_url }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           echo "Setting up ecbundle bundle..."
-          
+
+          # Build the code under test, not upstream main: on pull_request
+          # events retarget the fesom project in bundle.yml at the PR head
+          # repository and pinned head SHA. Using the head repo (not a branch
+          # name in FESOM/fesom2) makes this work for PRs from forks too. On
+          # push/workflow_dispatch HEAD_REPO is empty and the committed
+          # 'version : main' stays in place.
+          if [ -n "${HEAD_REPO}" ]; then
+            sed -i "s|git     : https://github.com/FESOM/fesom2.git|git     : ${HEAD_REPO}|" bundle.yml
+            sed -i "s|version : main|version : ${HEAD_SHA}|" bundle.yml
+            echo "bundle.yml retargeted at ${HEAD_REPO} @ ${HEAD_SHA}:"
+            grep -A2 'fesom :' bundle.yml
+          fi
+
           # Create bundle
           ecbundle-create
           

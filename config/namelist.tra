@@ -46,6 +46,8 @@ idlist   = 2, 1                                    ! tracer IDs to initialize (1
 filelist = 'phc3.0_winter.nc', 'phc3.0_winter.nc'  ! netCDF files in ClimateDataPath (one per tracer)
 varlist  = 'salt', 'temp'                          ! variable names in the netCDF files
 t_insitu = .true.                                  ! if true, convert in-situ temperature to potential temperature
+ic_extrap_det = .false.                            ! deterministic decomposition-independent hole filling (default: historical fill, bit-for-bit)
+ic_extrap_tol = 1.e-3                              ! relaxation tolerance of the deterministic fill (used only with ic_extrap_det=.true.)
 /
 
 ! ============================================================================

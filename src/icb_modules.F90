@@ -77,6 +77,9 @@ save
   character(100):: width_icb_file='icb_length.dat' !iceberg width [m]
   character(100):: height_icb_file='icb_height.dat' !iceberg height [m]
   character(100):: scaling_file='icb_scaling.dat' !scaling factor
+  character(100):: iron_icb_file='icb_iron.dat' !Fe concentration of each iceberg [mol m-3]
+  character(100):: IcebergRestartPath_iron='iceberg.restart.iron'
+  character(100):: IcebergRestartPath_iron_ISM='iceberg.restart.iron.ISM'
   character(100):: calving_day_file='icb_calving_day.dat' !calving day for each iceberg
   
   !===== OUTPUT RELATED SETTINGS  =====
@@ -95,6 +98,8 @@ save
   real,dimension(:), allocatable:: bvl_mean, lvlv_mean, lvle_mean, lvlb_mean !averaged volume losses
   !real,dimension(:), allocatable:: fw_flux_ib, hfb_flux_ib
   real,dimension(:), allocatable:: fwe_flux_ib, fwl_flux_ib, fwb_flux_ib, fwbv_flux_ib
+  real,dimension(:), allocatable:: iron_conc_ib  !Fe concentration of the ice [mol m-3], constant per iceberg
+  real,dimension(:), allocatable:: iron_flux_ib  !Fe release rate of one iceberg [mol s-1]
   real,dimension(:), allocatable:: hfe_flux_ib, hfb_flux_ib, lhfb_flux_ib
   real,dimension(:,:), allocatable:: hfl_flux_ib, hfbv_flux_ib
   real,dimension(:), allocatable:: wave_erosion_potential
@@ -107,6 +112,7 @@ save
   real,dimension(:), allocatable:: ibfwbv   !freshwater flux into ocean from basal melting
   real,dimension(:), allocatable:: ibfwl   !freshwater flux into ocean from lateral melting
   real,dimension(:), allocatable:: ibfwe   !freshwater flux into ocean from erosion
+  real,dimension(:), allocatable:: ibiron  !iron flux into ocean from iceberg melting [mol m-2 s-1]
   integer,dimension(:), allocatable:: scaling   !scaling factor
 
   logical,dimension(:), allocatable::   melted  !1 if iceberg melted, 0 otherwise
@@ -116,7 +122,7 @@ save
   real,dimension(:), allocatable:: arr_block
   integer,dimension(:), allocatable:: elem_block
   integer,dimension(:), allocatable:: pe_block
-  real(real64), dimension(:), allocatable:: elem_area_glob
+  real(kind=WP), dimension(:), allocatable:: elem_area_glob
   real,dimension(:), allocatable:: vl_block
 
   !array for output in netcdf

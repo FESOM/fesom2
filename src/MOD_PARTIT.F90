@@ -11,6 +11,22 @@ USE mpi
 #endif
 IMPLICIT NONE
 SAVE
+! MPI datatype matching the working precision WP (see o_PARAM)
+#if defined(USE_SINGLE_PRECISION)
+integer, parameter   :: MPI_WP = MPI_REAL             ! single precision
+#else
+integer, parameter   :: MPI_WP = MPI_DOUBLE_PRECISION ! double precision (default)
+#endif
+! MPI datatype matching WP_full (see o_PARAM), which is real64 regardless of WP.
+! Pick the constant that matches how the buffer is DECLARED, for any MPI operation --
+! reduce, bcast, gather, scatter, send/recv alike:
+!   real(kind=WP)      -> MPI_WP
+!   real(kind=WP_full) -> MPI_WP_FULL
+! Buffers declared real(real64) independently of WP (the typed gather_*/scatter_*
+! routines with real4/int2 siblings) keep MPI_DOUBLE_PRECISION -- they do not track
+! WP_full. Mixing these up is invisible in a double-precision build, where
+! WP_full == WP, and corrupts memory in a single-precision one.
+integer, parameter   :: MPI_WP_FULL = MPI_DOUBLE_PRECISION
 integer, parameter   :: MAX_LAENDERECK=16
 integer, parameter   :: MAX_NEIGHBOR_PARTITIONS=32
 
@@ -91,6 +107,17 @@ TYPE T_PARTIT
   integer, allocatable       :: s_mpitype_nod2D(:),     r_mpitype_nod2D(:)
   integer, allocatable       :: s_mpitype_nod2D_i(:),   r_mpitype_nod2D_i(:)
   integer, allocatable       :: s_mpitype_nod3D(:,:,:), r_mpitype_nod3D(:,:,:)
+
+  ! Spectral bin (fbin) fields for IDEMIX2 halo exchange
+  ! Full spectral column exchanged at once (like standard nod3D exchanges full depth column).
+  ! Nodal fields: (peer, nfbin:nfbin, n_val) with n_val=1..3
+  ! Element fields: (peer, nfbin:nfbin) for 2D, (peer, nfbin:nfbin, n_val) for 3D with n_val=1..4
+  integer              :: nfbin_mpi = 0  ! number of spectral bins for MPI types (0 = not initialized)
+  integer, allocatable :: s_mpitype_nod3D_fbin(:,:,:),          r_mpitype_nod3D_fbin(:,:,:)
+  integer, allocatable :: s_mpitype_elem2D_fbin(:,:),           r_mpitype_elem2D_fbin(:,:)
+  integer, allocatable :: s_mpitype_elem2D_full_fbin(:,:),      r_mpitype_elem2D_full_fbin(:,:)
+  integer, allocatable :: s_mpitype_elem3D_fbin(:,:,:),         r_mpitype_elem3D_fbin(:,:,:)
+  integer, allocatable :: s_mpitype_elem3D_full_fbin(:,:,:),    r_mpitype_elem3D_full_fbin(:,:,:)
 
   integer            :: MPIERR
 

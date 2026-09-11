@@ -33,7 +33,7 @@ MODULE g_sbf
    !!   sbc_ini  -- initialization atmpospheric forcing
    !!   sbc_do   -- provide a sbc (surface boundary conditions) each time step
    !!
-   USE iso_fortran_env, only: error_unit
+   USE iso_fortran_env, only: error_unit, real64
    USE MOD_MESH
    USE MOD_PARTIT
    USE MOD_PARSUP
@@ -42,7 +42,7 @@ MODULE g_sbf
    USE g_comm_auto
    USE g_support
    USE g_rotate_grid
-   USE g_config, only: dummy, ClimateDataPath, dt
+   USE g_config, only: dummy, ClimateDataPath, ForcingDataPath, dt, flag_debug
    USE g_clock,  only: timeold, timenew, dayold, daynew, yearold, yearnew, cyearnew
    USE g_forcing_arrays,    only: runoff, chl
 #if defined (__recom)
@@ -131,6 +131,12 @@ MODULE g_sbf
 
    logical :: runoff_climatology =.false.
 
+   ! Ocean-only forcing: use only ocean points from forcing data, extrapolate into land
+   logical                         :: use_ocean_only_forcing = .false.
+   character(len=MAX_PATH), save   :: nm_ocean_mask_file     = ''
+   character(len=34),       save   :: nm_ocean_mask_var      = 'sftof'
+   real(wp),                save   :: ocean_mask_threshold   = 90.0_WP  ! ocean where sftof > threshold (%)
+
    real(wp), allocatable, save, dimension(:), public     :: qns   ! downward non solar heat over the ocean [W/m2]
    real(wp), allocatable, save, dimension(:), public     :: qsr   ! downward solar heat over the ocean [W/m2]
    real(wp), allocatable, save, dimension(:), public     :: emp   ! evaporation minus precipitation        [kg/m2/s]
@@ -190,8 +196,17 @@ MODULE g_sbf
 
    integer,save            :: warn       ! warning switch node/element coordinate out of forcing bounds
 
-   real(wp), allocatable, save, dimension(:,:)   :: coef_b ! time inerp coef. b (x=a*t+b)
-   real(wp), allocatable, save, dimension(:,:)   :: coef_a ! time inerp coef. a (x=a*t+b)
+   ! Time interpolation uses the point-slope (offset) form
+   !    atmdata = coef_b + (rdate - time_t0)*coef_a
+   ! coef_b holds the field VALUE at the bracket start (data-scale, WP is fine and
+   ! keeps the vector rotation in vector_g2r WP-compatible); coef_a is the slope.
+   ! time_t0 is the bracket-start time (an absolute Julian day ~2.4e6) held in
+   ! real64 -- see the note on nc_time below. The earlier form stored coef_b as the
+   ! affine intercept (data1 - coef_a*nc_time), which put a ~2.4e6-magnitude value
+   ! into a WP array and lost ~7 digits to cancellation in single precision.
+   real(wp),     allocatable, save, dimension(:,:) :: coef_b ! interp base value  (x = b + (t-t0)*a)
+   real(wp),     allocatable, save, dimension(:,:) :: coef_a ! interp slope        (x = b + (t-t0)*a)
+   real(real64), allocatable, save, dimension(:)   :: time_t0 ! per-field bracket-start time t0 [days]
 
    real(wp), allocatable, save, dimension(:,:)   :: atmdata ! atmosperic data for current time step
 
@@ -204,7 +219,14 @@ MODULE g_sbf
       integer                              :: nc_Nlon
       integer                              :: nc_Nlat
       integer                              :: nc_Ntime
-      real(wp), allocatable, dimension(:)  :: nc_lon, nc_lat, nc_time
+      real(wp),     allocatable, dimension(:)  :: nc_lon, nc_lat
+      ! The time axis holds an ABSOLUTE Julian day (~2.4e6 for modern dates). Its
+      ! float32 ulp at that magnitude is 0.25 d = 6 h, which collapses sub-6-hourly
+      ! forcing records onto a common grid (delta_t=0 -> division blow-up) and
+      ! quantises the model forcing-clock to 6 h (a silent staircase in the
+      ! interpolation). Time must therefore be real64 regardless of the working
+      ! precision WP; only the interpolated field VALUE is narrowed to WP.
+      real(real64), allocatable, dimension(:)  :: nc_time
       ! time index for NC time array
       integer                              :: t_indx    ! now time index in nc_time array
       integer                              :: t_indx_p1 ! now time index +1 in nc_time array
@@ -219,6 +241,8 @@ MODULE g_sbf
    type(flfi_type), allocatable, save, target :: sbc_flfi(:)  !array for information about flux files
    integer,  allocatable, dimension(:,:)     :: bilin_indx_i ! indexs i for interpolation
    integer,  allocatable, dimension(:,:)     :: bilin_indx_j ! indexs j for interpolation
+   ! Ocean-only forcing mask on the forcing grid (1=ocean, 0=land)
+   integer,  allocatable, save, dimension(:,:) :: forcing_ocean_mask
    !flip latitude from infiles (for example  NCEP-DOE Reanalysis 2 standart)
    integer, save              :: flip_lat ! 1 if we need to flip
 !============== NETCDF ==========================================
@@ -391,6 +415,7 @@ CONTAINS
         iost = nf90_get_var(ncid, id_time, flf%nc_time, start=(/1/), count=(/flf%nc_Ntime/))
         ! digg for calendar attribute in time axis variable         
     end if
+    ! nc_time is real64 (see its declaration) -> broadcast as double, not MPI_WP.
     call MPI_BCast(flf%nc_time, flf%nc_Ntime, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
     call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
     call check_nferr(iost,flf%file_name,partit)
@@ -515,8 +540,8 @@ CONTAINS
            flf%nc_time(flf%nc_Ntime) = flf%nc_time(flf%nc_Ntime) + (flf%nc_time(flf%nc_Ntime) - flf%nc_time(flf%nc_Ntime-1))/2.0
         end if
     end if
-    call MPI_BCast(flf%nc_lon,   flf%nc_Nlon,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
-    call MPI_BCast(flf%nc_lat,   flf%nc_Nlat,   MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM, ierror)
+    call MPI_BCast(flf%nc_lon,   flf%nc_Nlon,   MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
+    call MPI_BCast(flf%nc_lat,   flf%nc_Nlat,   MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
     
     !___________________________________________________________________________
     !flip lat and data in case of lat from -90 to 90
@@ -592,18 +617,38 @@ CONTAINS
       if (l_cloud) sbc_flfi(i_cloud)%var_name=ADJUSTL(trim(nm_cloud_var))
    END SUBROUTINE nc_sbc_ini_fillnames
 
-   function make_full_path(filename) result(full_path)
-      character(len=*), intent(in) :: filename
+   function prepend_path(base, filename) result(full_path)
+      character(len=*), intent(in) :: base, filename
       character(len=MAX_PATH) :: full_path
-      
+
       if (len_trim(filename) > 0 .and. filename(1:1) /= '/') then
-         ! Relative path - prepend ClimateDataPath
-         full_path = trim(ClimateDataPath) // trim(filename)
+         ! Relative path - prepend the given base directory
+         full_path = trim(base) // trim(filename)
       else
          ! Absolute path or empty - use as is
          full_path = filename
       endif
+   end function prepend_path
+
+   ! Resolve a file name from the nam_sbc group of namelist.forcing, i.e. part
+   ! of an atmospheric forcing dataset. Relative names are taken from
+   ! ForcingDataPath.
+   function make_full_path(filename) result(full_path)
+      character(len=*), intent(in) :: filename
+      character(len=MAX_PATH) :: full_path
+
+      full_path = prepend_path(ForcingDataPath, filename)
    end function make_full_path
+
+   ! Resolve a file name from the nam_rsbc group of namelist.recom. These are
+   ! REcoM climatologies (dust, aeolian nitrogen, atmospheric CO2), not part of
+   ! the forcing dataset, so relative names stay on ClimateDataPath.
+   function make_clim_path(filename) result(full_path)
+      character(len=*), intent(in) :: filename
+      character(len=MAX_PATH) :: full_path
+
+      full_path = prepend_path(ClimateDataPath, filename)
+   end function make_clim_path
 
    SUBROUTINE nc_sbc_ini(partit, mesh)
       !!---------------------------------------------------------------------
@@ -611,7 +656,8 @@ CONTAINS
       !!----------------------------------------------------------------------
 
       IMPLICIT NONE
-      real(wp)            :: rdate ! initialization date
+      real(real64)        :: rdate ! initialization date (absolute Julian day, must be real64)
+      real(real64)        :: dbg_dt_hours, dbg_dd ! [debug] inferred forcing dt reporting
       integer             :: yyyy,mm,dd
 
       integer                  :: i
@@ -643,10 +689,35 @@ CONTAINS
       do fld_idx = 1, i_totfl
          call nc_readTimeGrid(sbc_flfi(fld_idx), partit)
       end do
-      
+
+      ! [debug] Report the temporal resolution inferred from each forcing file's
+      ! time axis (finest spacing between records). Printed once at setup (nc_sbc_ini
+      ! is called once per run) on the root rank only, gated by flag_debug -- matches
+      ! the "say what routine I'm in" debug convention. Useful to confirm e.g. JRA55
+      ! resolves as 3 h and CORE2 as 6 h, and that the axis is not float32-collapsed.
+      if (flag_debug .and. mype==0) then
+         write(*,*) ' --> [forcing] inferred temporal resolution per variable:'
+         do fld_idx = 1, i_totfl
+            flf => sbc_flfi(fld_idx)
+            ! Representative record spacing from the first interior interval. The
+            ! nm_nc_tmid midpoint shift (see nc_readTimeGrid) leaves interior spacings
+            ! intact but perturbs the very last one, so avoid min/last; the first
+            ! interval reflects the native cadence (e.g. 3 h JRA55, 6 h CORE2).
+            dbg_dt_hours = -1.0_real64
+            if (flf%nc_Ntime >= 2) &
+               dbg_dt_hours = ( flf%nc_time(2) - flf%nc_time(1) )*24.0_real64
+            write(*,'(a,a12,a,i6,a,f9.3,a)') '       var = ', adjustl(trim(flf%var_name)), &
+               '   records = ', flf%nc_Ntime, '   dt = ', dbg_dt_hours, ' h'
+         end do
+      end if
+
       ! compute model rdate at initial moment
-      rdate = real(julday(yearnew, 1, 1, sbc_flfi(1)%calendar ))
-      rdate = rdate+real(daynew-1,WP)+timenew/86400._WP 
+      ! Build in real64: in an SP build default real is real32, so casting every
+      ! term keeps the ~2.4e6 Julian day and the sub-day fraction from collapsing
+      ! onto the float32 6-hour grid. In a DP build (default real = real64) these
+      ! casts are no-ops, so the result is bit-identical.
+      rdate = real(julday(yearnew, 1, 1, sbc_flfi(1)%calendar ), real64)
+      rdate = rdate + real(daynew-1,real64) + real(timenew,real64)/86400._real64
       
       if (lfirst) then
       do fld_idx = 1, i_totfl
@@ -691,6 +762,12 @@ CONTAINS
       end do
       lfirst=.false.
       end if
+
+      ! Read ocean mask for ocean-only forcing (once at initialization)
+      if (use_ocean_only_forcing .and. .not. allocated(forcing_ocean_mask)) then
+         call read_forcing_ocean_mask(partit)
+      end if
+
       do fld_idx = 1, i_totfl
          ! get first coefficients for time interpolation on model grid for all data
          call getcoeffld(fld_idx, rdate, partit, mesh)
@@ -745,7 +822,7 @@ CONTAINS
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
       integer, intent(in)  :: fld_idx
-      real(wp),intent(in)  :: rdate ! initialization date
+      real(real64),intent(in)  :: rdate ! initialization date (absolute Julian day)
       integer              :: iost  !I/O status
       integer              :: ncid      ! netcdf file id
       ! ID dimensions and variables:
@@ -758,12 +835,12 @@ CONTAINS
       integer              :: sbc_alloc, itot
 
       real(wp)             :: denom, x1, x2, y1, y2, x, y
-      real(wp)             :: now_date
+      real(real64)         :: now_date
 
 !     real(wp), allocatable, dimension(:,:)  :: sbcdata1,sbcdata2
       real(wp)             :: data1,data2
-      real(wp)             :: delta_t   ! time(t_indx) - time(t_indx+1)
-      real(wp)             :: rdatep1 ! time(t_indx) - time(t_indx+1)
+      real(real64)         :: delta_t   ! time(t_indx) - time(t_indx+1)
+      real(real64)         :: rdatep1 ! time(t_indx) - time(t_indx+1)
       
       integer              :: elnodes(4) !4 nodes from one element
       integer              :: numnodes   ! nu,ber of nodes in elem (3 for triangle, 4 for ... )
@@ -773,7 +850,8 @@ CONTAINS
       integer,   pointer   :: nc_Ntime, nc_Nlon, nc_Nlat, t_indx, t_indx_p1
       character(len=MAX_PATH), pointer   :: file_name
       character(len=34) , pointer   :: var_name
-      real(wp),  pointer   :: nc_time(:), nc_lon(:), nc_lat(:)
+      real(real64), pointer :: nc_time(:)
+      real(wp),  pointer   :: nc_lon(:), nc_lat(:)
       real(4), dimension(:,:), pointer :: sbcdata1, sbcdata2
       logical sbcdata1_from_cache, sbcdata2_from_cache
       integer rootrank
@@ -807,7 +885,7 @@ CONTAINS
 
       ! find time index in files
       now_date = rdate
-      call binarysearch(nc_Ntime,nc_time,now_date,t_indx)
+      call binarysearch_r8(nc_Ntime,nc_time,now_date,t_indx)
       if ( (t_indx < nc_Ntime) .and. (t_indx > 0) ) then
       
         t_indx_p1 = t_indx + 1   
@@ -840,9 +918,9 @@ CONTAINS
                 if (mm==2 .and. dd==29) then 
                     ! --> go directly to the first time slice what represents the
                     !     1. March
-                    rdatep1 = real(julday(yearnew,1,1, sbc_flfi(fld_idx)%calendar ),WP)
-                    rdatep1 = rdatep1+real(60,WP) + delta_t*0.5_WP
-                    call binarysearch(nc_Ntime, nc_time, rdatep1, t_indx_p1)
+                    rdatep1 = real(julday(yearnew,1,1, sbc_flfi(fld_idx)%calendar ),real64)
+                    rdatep1 = rdatep1+real(60,real64) + delta_t*0.5_real64
+                    call binarysearch_r8(nc_Ntime, nc_time, rdatep1, t_indx_p1)
                     delta_t   = nc_time(t_indx_p1) - nc_time(t_indx)
                     if (partit%mype==0 .and. fld_idx==1) then 
                         call calendar_date(int(nc_time(t_indx_p1)), yyyy, mm, dd, sbc_flfi(fld_idx)%calendar )
@@ -855,7 +933,7 @@ CONTAINS
       elseif (t_indx > 0) then ! NO extrapolation to future
          t_indx    = nc_Ntime
          t_indx_p1 = t_indx
-         delta_t = 1.0_wp
+         delta_t = 1.0_real64
          if (mype==0) then
             write(error_unit,*) 'WARNING: no temporal extrapolation into future (nearest neighbour is used): ', trim(var_name), ' !'
             write(error_unit,*) trim(file_name)
@@ -865,7 +943,7 @@ CONTAINS
       elseif (t_indx < 1) then ! NO extrapolation back in time
          t_indx = 1
          t_indx_p1 = t_indx
-         delta_t = 1.0_wp
+         delta_t = 1.0_real64
          if (mype==0) then 
             write(error_unit,*) 'WARNING: no temporal extrapolation back in time (nearest neighbour is used): ', trim(var_name), ' !'
             write(error_unit,*) trim(file_name)
@@ -874,6 +952,10 @@ CONTAINS
          end if
       end if
 
+      ! Record the bracket-start time t0 for this field (same for all nodes). Held in
+      ! real64 and subtracted from rdate at evaluation time so no absolute ~2.4e6 day
+      ! ever enters the WP interpolation.
+      time_t0(fld_idx) = nc_time(t_indx)
 
       ! determine if we can use the broadcast cache
       if(yearold == yearnew) then ! todo: simplify if clause
@@ -967,6 +1049,13 @@ CONTAINS
 !         sbcdata1=sbcdata1(1:nc_Nlon,nc_Nlat:1:-1)
 !         sbcdata2=sbcdata2(1:nc_Nlon,nc_Nlat:1:-1)
 !      end if
+
+      ! Ocean-only forcing: fill land cells with extrapolated ocean values
+      if (use_ocean_only_forcing) then
+         call fill_land_from_ocean(sbcdata1, forcing_ocean_mask, nc_Nlon, nc_Nlat)
+         call fill_land_from_ocean(sbcdata2, forcing_ocean_mask, nc_Nlon, nc_Nlat)
+      end if
+
       ! bilinear space interpolation, and time interpolation ,
       ! data is assumed to be sampled on a regular grid
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ii, i, j, ip1, jp1, x, y, extrp, x1, x2, y1, y2, denom, data1, data2)
@@ -1023,8 +1112,12 @@ CONTAINS
             data2 = sbcdata2(i,j)
          end if
          ! calculate new coefficients for interpolations
+         ! Point-slope (offset) form: store the slope and the base VALUE data1, and
+         ! evaluate later as coef_b + (rdate - time_t0)*coef_a. This keeps the huge
+         ! absolute time out of the WP coefficient arrays; delta_t is real64 so the
+         ! slope is formed in double.
          coef_a(fld_idx, ii) = ( data2 - data1 ) / delta_t !( nc_time(t_indx+1) - nc_time(t_indx) )
-         coef_b(fld_idx, ii) = data1 - coef_a(fld_idx, ii) * nc_time(t_indx)
+         coef_b(fld_idx, ii) = data1
 
       end do
 !$OMP END PARALLEL DO
@@ -1038,21 +1131,40 @@ CONTAINS
       !! ** Method  :
       !! ** Action  :
       !!----------------------------------------------------------------------
+#ifdef FESOM_PROFILING
+      use fesom_profiler, only: fesom_profiler_start, fesom_profiler_end
+#endif
       IMPLICIT NONE
       type(t_partit), intent(inout), target :: partit
-      real(wp),       intent(in)            :: rdate  ! seconds
+      real(real64),   intent(in)            :: rdate  ! absolute Julian day (real64)
 
      ! assign data from interpolation to taux and tauy
       integer            :: fld_idx, i,j,ii
+      real(wp)           :: dt_elapsed   ! elapsed time since bracket start [days], WP
 
+      ! Accumulated over the whole run (start/end sums into the named section on
+      ! every call), so the report shows total time-interpolation cost, not one step.
+#ifdef FESOM_PROFILING
+      call fesom_profiler_start("sbc_time_interp")
+#endif
       do fld_idx = 1, i_totfl
+         ! Elapsed time since this field's bracket start. Formed once per field: the
+         ! subtraction is done in real64 (so no absolute ~2.4e6 Julian day enters WP)
+         ! and narrowed to WP here -- (rdate - time_t0) <= one record interval, so it
+         ! is tiny and exact in WP. Hoisting it out of the node loop keeps the inner
+         ! loop a single fused multiply-add (coef_b + dt_elapsed*coef_a), identical in
+         ! cost to the previous rdate*coef_a + coef_b.
+         dt_elapsed = real(rdate - time_t0(fld_idx), WP)
 !$OMP PARALLEL DO
          do i = 1, partit%myDim_nod2D+partit%eDim_nod2D
-            ! store processed forcing data for fesom computation
-            atmdata(fld_idx,i) = rdate * coef_a(fld_idx,i) + coef_b(fld_idx,i)
+            ! store processed forcing data for fesom computation (point-slope form)
+            atmdata(fld_idx,i) = coef_b(fld_idx,i) + dt_elapsed * coef_a(fld_idx,i)
          end do !nod2D
 !$OMP END PARALLEL DO
       end do
+#ifdef FESOM_PROFILING
+      call fesom_profiler_end("sbc_time_interp")
+#endif
    END SUBROUTINE data_timeinterp
 
    SUBROUTINE sbc_ini(partit, mesh)
@@ -1080,7 +1192,8 @@ CONTAINS
                         nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_freq, nm_nc_tmid, y_perpetual, &
                         l_xwind, l_ywind, l_xstre, l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow, &
                         nm_runoff_file, runoff_data_source, runoff_climatology, nm_sss_data_file, sss_data_source, &
-                        chl_data_source, nm_chl_data_file, chl_const, use_runoff_mapper, runoff_basins_file, runoff_radius
+                        chl_data_source, nm_chl_data_file, chl_const, use_runoff_mapper, runoff_basins_file, runoff_radius, &
+                        use_ocean_only_forcing, nm_ocean_mask_file, nm_ocean_mask_var, ocean_mask_threshold
 
 !#if defined(__recom)
 !      namelist /nam_rsbc/ fe_data_source, nm_fe_data_file, nm_aen_data_file, nm_river_data_file, nm_erosion_data_file, nm_co2_data_file
@@ -1105,6 +1218,12 @@ CONTAINS
       if (mype==0) then
          write(*,*) "Start: Ocean forcing initialization."
          write(*,*) "Surface boundary conditions parameters:"
+         if (use_ocean_only_forcing) then
+            write(*,*) "  Ocean-only forcing ENABLED"
+            write(*,*) "    nm_ocean_mask_file   = ", trim(nm_ocean_mask_file)
+            write(*,*) "    nm_ocean_mask_var    = ", trim(nm_ocean_mask_var)
+            write(*,*) "    ocean_mask_threshold = ", ocean_mask_threshold
+         end if
       end if
 
 #if !defined __ifsinterface
@@ -1214,11 +1333,12 @@ CONTAINS
       end if
 
       ALLOCATE( coef_a(i_totfl,myDim_nod2D+eDim_nod2D), coef_b(i_totfl,myDim_nod2D+eDim_nod2D), &
-              & atmdata(i_totfl,myDim_nod2D+eDim_nod2D), &
+              & atmdata(i_totfl,myDim_nod2D+eDim_nod2D), time_t0(i_totfl), &
                    &      STAT=sbc_alloc )
-      coef_a       = 0.0_WP             
+      coef_a       = 0.0_WP
       coef_b       = 0.0_WP
       atmdata      = 0.0_WP
+      time_t0      = 0.0_real64
 
       ALLOCATE( bilin_indx_i(i_totfl, myDim_nod2D+eDim_nod2D), bilin_indx_j(i_totfl, myDim_nod2D+eDim_nod2D), &
               & qns(myDim_nod2D+eDim_nod2D), emp(myDim_nod2D+eDim_nod2D), qsr(myDim_nod2D+eDim_nod2D),  &
@@ -1297,7 +1417,14 @@ CONTAINS
     ! when used runoff_data_source='CORE1' or 'CORE2' we use a total climatological 
     ! runoff, so only one runoff time slice for the entire simulation is used. 
     ! This part is only read ones when the forcing is first time initialized
-    if (runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
+    if (runoff_data_source=='NONE') then
+        if (mype==0) then
+            write(*,*) ' --> river runoff is switched off (runoff_data_source=''NONE'') '
+            write(*,*)
+        end if
+        ! runoff was allocated and set to zero in forcing_array_setup, nothing to read
+
+    elseif (runoff_data_source=='CORE1' .or. runoff_data_source=='CORE2' ) then
         if (mype==0) then 
             write(*,*) ' --> using total longterm runoff climatology (only 1 time slice) '
             write(*,*) '     runoff_data_source = ', runoff_data_source
@@ -1318,11 +1445,13 @@ CONTAINS
                 write(error_unit,*)
                 write(error_unit,*) achar(27)//'[31m'
                 write(error_unit,*) '____________________________________________________________________'
-                write(error_unit,*) ' ERROR: file not found: ', trim(make_full_path(nm_runoff_file))
-                write(error_unit,*) '        --> check your namelist.focing'
-                write(error_unit,*) '            ...'
-                write(error_unit,*) '            nm_runoff_file    =...'
-                write(error_unit,*) '            ...'
+                write(error_unit,*) ' ERROR: runoff file not found: ', trim(make_full_path(nm_runoff_file))
+                write(error_unit,*) '        --> check your namelist.forcing'
+                write(error_unit,*) '            runoff_data_source = ', trim(runoff_data_source)
+                write(error_unit,*) '            nm_runoff_file     = ', trim(nm_runoff_file)
+                write(error_unit,*) '        a nm_runoff_file without a leading ''/'' is taken as relative and gets'
+                write(error_unit,*) '        ForcingDataPath prepended, so check that it points at your forcing tree'
+                write(error_unit,*) '        above. give an absolute path to avoid this.'
                 write(error_unit,*) '____________________________________________________________________'
                 write(error_unit,*) achar(27)//'[0m'
                 write(error_unit,*)
@@ -1350,11 +1479,13 @@ CONTAINS
                 write(error_unit,*)
                 write(error_unit,*) achar(27)//'[31m'
                 write(error_unit,*) '____________________________________________________________________'
-                write(error_unit,*) ' ERROR: file not found: ', trim(make_full_path(nm_runoff_file))
-                write(error_unit,*) '        --> check your namelist.focing'
-                write(error_unit,*) '            ...'
-                write(error_unit,*) '            nm_runoff_file    =...'
-                write(error_unit,*) '            ...'
+                write(error_unit,*) ' ERROR: runoff file not found: ', trim(make_full_path(nm_runoff_file))
+                write(error_unit,*) '        --> check your namelist.forcing'
+                write(error_unit,*) '            runoff_data_source = ', trim(runoff_data_source)
+                write(error_unit,*) '            nm_runoff_file     = ', trim(nm_runoff_file)
+                write(error_unit,*) '        a nm_runoff_file without a leading ''/'' is taken as relative and gets'
+                write(error_unit,*) '        ForcingDataPath prepended, so check that it points at your forcing tree'
+                write(error_unit,*) '        above. give an absolute path to avoid this.'
                 write(error_unit,*) '____________________________________________________________________'
                 write(error_unit,*) achar(27)//'[0m'
                 write(error_unit,*)
@@ -1375,6 +1506,7 @@ CONTAINS
             write(error_unit,*) '                                  this can be done as a monthly climatology (runoff_climatology=.true.) or '
             write(error_unit,*) '                                  as a transient monthly climatology (runoff_climatology=.false.) than each'
             write(error_unit,*) '                                  month and each year have differnt runoff'
+            write(error_unit,*) '        - ''NONE''             : no river runoff is applied                                 '
             write(error_unit,*) ''
             write(error_unit,*) '        --> please check your namelist.forcing'
             write(error_unit,*) '            ...'
@@ -1552,12 +1684,12 @@ CONTAINS
       IMPLICIT NONE
 
       include 'netcdf.inc'
-      real(wp)     :: rdate ! date
+      real(real64) :: rdate ! date (absolute Julian day, must be real64)
       integer      :: fld_idx, i
       logical      :: do_rotation_wind, do_rotation_stre, force_newcoeff, update_monthly_flag
       integer      :: yyyy, dd, mm, flag_flpyr=0
       integer,   pointer   :: nc_Ntime, t_indx, t_indx_p1
-      real(wp),  pointer   :: nc_time(:)
+      real(real64), pointer :: nc_time(:)
       character(len=MAX_PATH)               :: filename
       logical                               :: file_exist=.false.
 !#if defined (__recom)
@@ -1598,8 +1730,8 @@ CONTAINS
       do fld_idx = 1, i_totfl
         ! compute model rdate based on the calendar option of the forcing file so
         ! match up
-        rdate = real(julday(yearnew,1,1, sbc_flfi(fld_idx)%calendar ),WP)
-        rdate = rdate+real(daynew-1,WP)+timenew/86400._WP-dt/86400._WP/2._WP
+        rdate = real(julday(yearnew,1,1, sbc_flfi(fld_idx)%calendar ),real64)
+        rdate = rdate+real(daynew-1,real64)+real(timenew,real64)/86400._real64-real(dt,real64)/86400._real64/2._real64
 
         !_______________________________________________________________________
         ! special case if include_fleapyear==False but the calendar of the forcing 
@@ -1622,8 +1754,8 @@ CONTAINS
             ! go from 28.Feb directly to 1.Mar for the case the forcing file contains 
             ! a leapyear.
             if (flag_flpyr==1 .and. daynew>59) then 
-                rdate = real(julday(yearnew,1,1, sbc_flfi(fld_idx)%calendar ),WP)
-                rdate = rdate+real(daynew-1+1,WP)+timenew/86400._WP-dt/86400._WP/2._WP
+                rdate = real(julday(yearnew,1,1, sbc_flfi(fld_idx)%calendar ),real64)
+                rdate = rdate+real(daynew-1+1,real64)+real(timenew,real64)/86400._real64-real(dt,real64)/86400._real64/2._real64
             end if 
         end if 
 
@@ -1849,7 +1981,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
                 end if
 
         else !Transient CO2 from file        
-            filename=trim(make_full_path(nm_co2_data_file))
+            filename=trim(make_clim_path(nm_co2_data_file))
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
@@ -1929,7 +2061,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
             i=month
             if (mstep > 1) i=i+1
             if (i > 12) i=1
-            filename=trim(make_full_path(nm_fe_data_file))
+            filename=trim(make_clim_path(nm_fe_data_file))
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif 
@@ -1959,7 +2091,7 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 !            if (mstep > 1) i=i+1 
 !            if (i > 12) i=1
 !            if (mype==0) write(*,*) 'Updating iron climatology for month ', i 
-            filename=trim(make_full_path(nm_aen_data_file))
+            filename=trim(make_clim_path(nm_aen_data_file))
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
@@ -2346,7 +2478,7 @@ END SUBROUTINE sbc_do_recom
          DEALLOCATE( sbc_flfi(fld_idx)%nc_lon, sbc_flfi(fld_idx)%nc_lat, sbc_flfi(fld_idx)%nc_time)
       end do
       DEALLOCATE( sbc_flfi )
-      DEALLOCATE( coef_a, coef_b, atmdata, &
+      DEALLOCATE( coef_a, coef_b, atmdata, time_t0, &
                   &  bilin_indx_i, bilin_indx_j,  &
                   &  qns, emp, qsr)
    END SUBROUTINE sbc_end
@@ -2363,6 +2495,164 @@ END SUBROUTINE sbc_do_recom
          stop
       endif
    END SUBROUTINE check_nferr
+
+   !=========================================================================
+   ! Ocean-only forcing: read mask and fill land cells
+   !=========================================================================
+   SUBROUTINE read_forcing_ocean_mask(partit)
+      !! Read ocean fraction mask from a separate NetCDF file and convert
+      !! to integer mask (1=ocean, 0=land) based on ocean_mask_threshold.
+      !! The mask file must have the same lon/lat grid as the forcing files.
+      IMPLICIT NONE
+      type(t_partit), intent(inout), target :: partit
+      integer :: ncid, varid, dimid_lon, dimid_lat
+      integer :: nlon, nlat, iost, ierror
+      integer :: i, j
+      real(4), allocatable :: sftof(:,:)
+      real(4) :: miss
+      logical :: has_missing
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
+
+      ! Use grid dimensions from the first forcing field (all share the same grid)
+      nlon = sbc_flfi(1)%nc_Nlon   ! includes +2 halo
+      nlat = sbc_flfi(1)%nc_Nlat
+
+      if (.not. allocated(forcing_ocean_mask)) then
+         allocate(forcing_ocean_mask(nlon, nlat))
+      end if
+      forcing_ocean_mask = 1  ! default: all ocean (safe fallback)
+
+      allocate(sftof(nlon, nlat))
+      sftof = 0.0
+
+      if (mype == 0) then
+         write(*,*) 'Ocean-only forcing: reading mask from ', trim(nm_ocean_mask_file)
+         write(*,*) '  variable: ', trim(nm_ocean_mask_var), '  threshold: ', ocean_mask_threshold, '%'
+
+         iost = nf90_open(trim(nm_ocean_mask_file), NF90_NOWRITE, ncid)
+         if (iost /= NF90_NOERR) then
+            write(*,*) 'ERROR: cannot open ocean mask file: ', trim(nm_ocean_mask_file)
+            write(*,*) '       NetCDF error: ', trim(nf90_strerror(iost))
+         end if
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      if (iost /= NF90_NOERR) then
+         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+      end if
+
+      if (mype == 0) then
+         iost = nf90_inq_varid(ncid, trim(nm_ocean_mask_var), varid)
+      end if
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
+      if (iost /= NF90_NOERR) then
+         if (mype == 0) write(*,*) 'ERROR: variable not found in mask file: ', trim(nm_ocean_mask_var)
+         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+      end if
+
+      ! Read the data (nlon-2 x nlat, excluding halo columns)
+      if (mype == 0) then
+         ! Note: sftof in file is (lat, lon) but nf90_get_var maps to Fortran column-major
+         ! The forcing grid reading convention in this module uses (lon, lat) with halos at columns 1 and nlon
+         iost = nf90_get_var(ncid, varid, sftof(2:nlon-1, 1:nlat), &
+                             start=(/1, 1/), count=(/nlon-2, nlat/))
+
+         ! Check for missing_value attribute
+         has_missing = (nf90_get_att(ncid, varid, 'missing_value', miss) == NF90_NOERR)
+         if (.not. has_missing) then
+            has_missing = (nf90_get_att(ncid, varid, '_FillValue', miss) == NF90_NOERR)
+         end if
+
+         ! Apply periodic boundary halos (same as nc_readTimeGrid does for lon)
+         sftof(1, 1:nlat)    = sftof(nlon-1, 1:nlat)
+         sftof(nlon, 1:nlat) = sftof(2, 1:nlat)
+
+         iost = nf90_close(ncid)
+      end if
+
+      call MPI_BCast(sftof, nlon*nlat, MPI_REAL, 0, partit%MPI_COMM_FESOM, ierror)
+      call MPI_BCast(has_missing, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM, ierror)
+      if (has_missing) then
+         call MPI_BCast(miss, 1, MPI_REAL, 0, partit%MPI_COMM_FESOM, ierror)
+      end if
+
+      ! Convert to integer mask: 1=ocean, 0=land
+      do j = 1, nlat
+         do i = 1, nlon
+            if (has_missing .and. sftof(i,j) == miss) then
+               forcing_ocean_mask(i,j) = 0
+            else if (sftof(i,j) > real(ocean_mask_threshold, 4)) then
+               forcing_ocean_mask(i,j) = 1
+            else
+               forcing_ocean_mask(i,j) = 0
+            end if
+         end do
+      end do
+
+      if (mype == 0) then
+         write(*,*) 'Ocean-only forcing: mask loaded.'
+         write(*,*) '  Grid size (with halos): ', nlon, ' x ', nlat
+         write(*,*) '  Ocean points: ', sum(forcing_ocean_mask), ' / ', nlon*nlat
+      end if
+
+      deallocate(sftof)
+   END SUBROUTINE read_forcing_ocean_mask
+
+   SUBROUTINE fill_land_from_ocean(data, mask, nlon, nlat)
+      !! Iteratively fill land cells with extrapolated ocean values.
+      !! Each iteration, unfilled land cells that border filled cells
+      !! receive the average of their filled neighbors (4-connectivity).
+      !! Repeats until all cells are filled or max iterations reached.
+      IMPLICIT NONE
+      real(4),  intent(inout) :: data(nlon, nlat)
+      integer,  intent(in)    :: mask(nlon, nlat)  ! 1=ocean, 0=land
+      integer,  intent(in)    :: nlon, nlat
+
+      integer  :: filled(nlon, nlat)
+      real(4)  :: data_new(nlon, nlat)
+      integer  :: iter, i, j, cnt, max_iter, unfilled_count
+      real(4)  :: sum_val
+
+      max_iter = max(nlon, nlat)  ! upper bound, enough to fill any grid
+      filled = mask               ! initially, ocean cells are "filled"
+
+      do iter = 1, max_iter
+         unfilled_count = 0
+         data_new = data
+         do j = 1, nlat
+            do i = 1, nlon
+               if (filled(i,j) == 1) cycle  ! already has valid data
+               sum_val = 0.0
+               cnt = 0
+               ! 4-connected neighbors
+               if (i > 1    .and. filled(i-1,j) == 1) then
+                  sum_val = sum_val + data(i-1,j)
+                  cnt = cnt + 1
+               end if
+               if (i < nlon .and. filled(i+1,j) == 1) then
+                  sum_val = sum_val + data(i+1,j)
+                  cnt = cnt + 1
+               end if
+               if (j > 1    .and. filled(i,j-1) == 1) then
+                  sum_val = sum_val + data(i,j-1)
+                  cnt = cnt + 1
+               end if
+               if (j < nlat .and. filled(i,j+1) == 1) then
+                  sum_val = sum_val + data(i,j+1)
+                  cnt = cnt + 1
+               end if
+               if (cnt > 0) then
+                  data_new(i,j) = sum_val / real(cnt)
+                  filled(i,j) = 1
+               else
+                  unfilled_count = unfilled_count + 1
+               end if
+            end do
+         end do
+         data = data_new
+         if (unfilled_count == 0) exit
+      end do
+   END SUBROUTINE fill_land_from_ocean
 
    SUBROUTINE binarysearch(length, array, value, ind)!, delta)
       ! Given an array and a value, returns the index of the element that
@@ -2409,6 +2699,39 @@ END SUBROUTINE sbc_do_recom
       end do
       ind = right
    END SUBROUTINE binarysearch
+
+   SUBROUTINE binarysearch_r8(length, array, value, ind)
+      ! real64 counterpart of binarysearch(), used for the forcing TIME axis.
+      ! The time axis must stay double (an absolute Julian day loses 6 h of
+      ! resolution in float32), so the search over it needs a real64 signature.
+      ! A generic interface cannot be used because in a DP build WP == real64 and
+      ! the two module procedures would be ambiguous; hence a distinct name.
+      IMPLICIT NONE
+      integer,      intent(in)  :: length
+      real(real64), dimension(length), intent(in) :: array
+      real(real64), intent(in)  :: value
+      integer,      intent(out) :: ind
+      integer :: left, middle, right
+      real(real64) :: d
+      d = 1e-9_real64
+      left = 1
+      right = length
+      do
+         if (left > right) then
+            exit
+         endif
+         middle = nint((left+right) / 2.0_real64)
+         if ( abs(array(middle) - value) <= d) then
+            ind = middle
+            return
+         else if (array(middle) > value) then
+            right = middle - 1
+         else
+            left = middle + 1
+         end if
+      end do
+      ind = right
+   END SUBROUTINE binarysearch_r8
 
 !-----------------------------------------------------------------------
 ! This subroutine taken from GOTM src, used to compare with our old fluxes,
@@ -2866,7 +3189,6 @@ END SUBROUTINE sbc_do_recom
 !
    real(wp), parameter :: r3 = 1.0/3.0
    real(wp), parameter :: sqr3 = 1.7320508
-   real(wp), parameter :: pi=3.141592653589
    real(wp)            :: Fw, chic, chik, psic, psik
 
 !  Initialize for the zero "ZoL" case.
@@ -3049,7 +3371,6 @@ END SUBROUTINE sbc_do_recom
 !  Original author(s): Karsten Bolding
 !
 ! !LOCAL VARIABLES:
-   real(wp), parameter       :: pi=3.14159265358979323846
    real(wp), parameter       :: deg2rad=pi/180.
    real(wp), parameter       :: rad2deg=180./pi
 
@@ -3132,7 +3453,6 @@ END SUBROUTINE sbc_do_recom
 !  Original author(s): Karsten Bolding & Hans Burchard
 !
 ! !LOCAL VARIABLES:
-   real(wp), parameter       :: pi=3.14159265358979323846
    real(wp), parameter       :: deg2rad=pi/180.
    real(wp), parameter       :: rad2deg=180./pi
 
@@ -3358,8 +3678,8 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
       end do
       deallocate(ncdata, lon, lat)
    end if
-   call MPI_BCast(lon_sparse,  number_arrival_points, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-   call MPI_BCast(lat_sparse,  number_arrival_points, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+   call MPI_BCast(lon_sparse,  number_arrival_points, MPI_WP, 0, MPI_COMM_FESOM, ierror)
+   call MPI_BCast(lat_sparse,  number_arrival_points, MPI_WP, 0, MPI_COMM_FESOM, ierror)
    call MPI_BCast(data_sparse, number_arrival_points, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
    drain_num=maxval(data_sparse)
    ALLOCATE(arrival_area(drain_num))
@@ -3384,7 +3704,7 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
    do i=1, number_arrival_points
       dist_min_glo(i)=dist_min(i)
    end do
-   call MPI_AllREDUCE(MPI_IN_PLACE , dist_min_glo , number_arrival_points, MPI_DOUBLE, MPI_MIN, MPI_COMM_FESOM, MPIerr)
+   call MPI_AllREDUCE(MPI_IN_PLACE , dist_min_glo , number_arrival_points, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
 
    lon_sparse=0.0_WP
    lat_sparse=0.0_WP
@@ -3397,8 +3717,8 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
            status=status+1
       end if
    end do
-   call MPI_AllREDUCE(MPI_IN_PLACE , lon_sparse , number_arrival_points, MPI_DOUBLE, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-   call MPI_AllREDUCE(MPI_IN_PLACE , lat_sparse , number_arrival_points, MPI_DOUBLE, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+   call MPI_AllREDUCE(MPI_IN_PLACE , lon_sparse , number_arrival_points, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+   call MPI_AllREDUCE(MPI_IN_PLACE , lat_sparse , number_arrival_points, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
    call MPI_AllREDUCE(MPI_IN_PLACE , status ,     1, MPI_INTEGER, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 
    if (status/=number_arrival_points) then
@@ -3455,7 +3775,7 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
       end if
    END DO
 
-   call MPI_AllREDUCE(MPI_IN_PLACE , arrival_area, drain_num, MPI_DOUBLE, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+   call MPI_AllREDUCE(MPI_IN_PLACE , arrival_area, drain_num, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 
    DO i=1, drain_num
       where (RUNOFF_MAPPER%colind==i)

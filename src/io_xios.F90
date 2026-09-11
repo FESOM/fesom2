@@ -31,6 +31,7 @@ module io_xios_module
                                   ldiag_extflds, ldiag_destine,          &
                                   ldiag_ice, ldiag_trflx,                &
                                   ldiag_uvw_sqr, ldiag_trgrd_xyz,        &
+                                  ldiag_diapmix,                         &
                                   std_dens_N, std_dens
   use cmor_variables_diag,  only: ldiag_cmor
   implicit none
@@ -192,6 +193,14 @@ contains
       if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_salt3D=',      ldiag_salt3D
       ov = xios_getvar("ldiag_dMOC",        ldiag_dMOC)
       if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_dMOC=',        ldiag_dMOC
+      ! this override runs after setup_model established ldiag_diapmix => ldiag_dMOC
+      ! and before arrays_init allocates density_dmoc under ldiag_dMOC, so restore
+      ! the implication here rather than leave the diagnostic reading an
+      ! unallocated density_dmoc
+      if (ldiag_diapmix .and. .not. ldiag_dMOC) then
+         ldiag_diapmix = .false.
+         if (partit%mype==0) write(*,*) '[XIOS] ldiag_dMOC=.false. --> ldiag_diapmix switched off'
+      end if
       ov = xios_getvar("ldiag_DVD",         ldiag_DVD)
       if (ov .and. partit%mype==0) write(*,*) '[XIOS] ldiag_DVD=',         ldiag_DVD
       ov = xios_getvar("ldiag_forc",        ldiag_forc)
@@ -380,8 +389,10 @@ contains
     end do
     call xios_set_axis_attr("nz",      n_glo = nz_cell,    value = z_mid)
     deallocate(z_mid)
-    call xios_set_axis_attr("nz1",     n_glo = mesh%nl,    value = -mesh%zbar(1:mesh%nl))
-    call xios_set_axis_attr("std_dens", n_glo = std_dens_N, value = std_dens)
+    ! xios_set_axis_attr's value= dummy is real(kind=8); mesh%zbar and std_dens are
+    ! real(WP), so convert explicitly (no-op in double, required when WP=real32).
+    call xios_set_axis_attr("nz1",     n_glo = mesh%nl,    value = real(-mesh%zbar(1:mesh%nl), kind=8))
+    call xios_set_axis_attr("std_dens", n_glo = std_dens_N, value = real(std_dens, kind=8))
 
     ! --- 7. timestep (required by XIOS before close_context_definition) -----
     call xios_set_timestep(timestep = xios_duration(second = dt))
@@ -527,7 +538,10 @@ contains
     do j = 2, nv
        tmp_lon = blon(j); tmp_lat = blat(j); tmp_ang = angles(j)
        k = j - 1
-       do while (k >= 1 .and. angles(k) > tmp_ang)
+       ! .and. is not short-circuit in Fortran: split the test or angles(0)
+       ! is read at the end of the sweep.
+       do while (k >= 1)
+          if (angles(k) <= tmp_ang) exit
           blon(k+1) = blon(k); blat(k+1) = blat(k); angles(k+1) = angles(k)
           k = k - 1
        end do
@@ -571,7 +585,7 @@ contains
   logical function io_xios_is_ice_field(name) result(r)
     character(len=*), intent(in) :: name
     select case (trim(name))
-    case ('a_ice', 'm_ice', 'm_snow', 'h_ice', 'h_snow', 'ist', &
+    case ('a_ice', 'm_ice', 'm_snow', 'h_ice', 'h_snow', 'ist', 'alb', &
           'uice', 'vice', 'apnd', 'hpnd', 'ipnd', &
           'thdgrice', 'thdgrsnw', 'thdgrarea', 'dyngrice', 'dyngrarea', &
           'fw_ice', 'fw_snw', 'atmice_x', 'atmice_y', &

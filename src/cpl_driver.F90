@@ -21,6 +21,8 @@ module cpl_driver
   use o_param,  only : rad
   USE MOD_PARTIT
   use mpi
+
+
   implicit none
   save   
   !
@@ -32,8 +34,15 @@ module cpl_driver
   ! (final number of fields depends now on lwiso switch and is set in subroutine cpl_oasis3mct_define_unstr)
 
 #if defined (__oifs)
-  integer                    :: nsend = 7
+#if defined(__recom)
+  integer                    :: nsend = 9
+  integer                    :: nrecv = 16
+!With oifs, without recom:
+#else
+  integer                    :: nsend = 8
   integer                    :: nrecv = 15
+#endif
+!Without oifs
 #else
   integer                    :: nsend = 4
   integer                    :: nrecv = 12
@@ -76,7 +85,14 @@ module cpl_driver
   integer                    :: o2a_call_count=0
   integer                    :: a2o_call_count=0
 
-  REAL(kind=WP), POINTER                          :: exfld(:)          ! buffer for receiving global exchange fields
+  ! The OASIS exchange buffer is kept always-double (WP_full), independent of the
+  ! model working precision WP. This matches the oasis_Double transient defined in
+  ! cpl_oasis3mct_define_unstr and keeps the FESOM<->atmosphere exchange in double
+  ! precision even in a single-precision (USE_SINGLE_PRECISION, WP=real32) build.
+  ! It mirrors OpenIFS, which couples through its dedicated double coupling kind
+  ! JPRO regardless of the model kind JPRB. cplsnd stays at WP (it accumulates model
+  ! fields); the WP->WP_full conversion happens on assignment to exfld.
+  REAL(kind=WP_full), POINTER                     :: exfld(:)          ! buffer for receiving global exchange fields
   real(kind=WP), allocatable, dimension(:,:)      :: cplsnd
 
 
@@ -605,27 +621,27 @@ include "associate_mesh_ass.h"
     if (mype .eq. 0) then 
       print *, 'FESOM before 1st GatherV', displs_from_all_pes(npes), counts_from_all_pes(npes), number_of_all_points
     endif
-    CALL MPI_GATHERV(my_x_coords, my_number_of_points, MPI_DOUBLE_PRECISION, all_x_coords,  &
-                    counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+    CALL MPI_GATHERV(my_x_coords, my_number_of_points, MPI_WP, all_x_coords,  &
+                    counts_from_all_pes, displs_from_all_pes, MPI_WP, localroot, MPI_COMM_FESOM, ierror)
 
     if (mype .eq. 0) then 
       print *, 'FESOM before 2nd GatherV'
     endif
-    CALL MPI_GATHERV(my_y_coords, my_number_of_points, MPI_DOUBLE_PRECISION, all_y_coords,  &
-                    counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+    CALL MPI_GATHERV(my_y_coords, my_number_of_points, MPI_WP, all_y_coords,  &
+                    counts_from_all_pes, displs_from_all_pes, MPI_WP, localroot, MPI_COMM_FESOM, ierror)
 
     if (mype .eq. 0) then 
       print *, 'FESOM before 3rd GatherV'
     endif
-    CALL MPI_GATHERV(area(1,:), my_number_of_points, MPI_DOUBLE_PRECISION, all_area,  &
-                    counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+    CALL MPI_GATHERV(area(1,:), my_number_of_points, MPI_WP, all_area,  &
+                    counts_from_all_pes, displs_from_all_pes, MPI_WP, localroot, MPI_COMM_FESOM, ierror)
 
     if (compute_oasis_corners) then
       do j = 1, 25
-        CALL MPI_GATHERV(my_x_corners(:,j), myDim_nod2D, MPI_DOUBLE_PRECISION, all_x_corners(:,:,j),  &
-                      counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
-        CALL MPI_GATHERV(my_y_corners(:,j), myDim_nod2D, MPI_DOUBLE_PRECISION, all_y_corners(:,:,j),  &
-                      counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+        CALL MPI_GATHERV(my_x_corners(:,j), myDim_nod2D, MPI_WP, all_x_corners(:,:,j),  &
+                      counts_from_all_pes, displs_from_all_pes, MPI_WP, localroot, MPI_COMM_FESOM, ierror)
+        CALL MPI_GATHERV(my_y_corners(:,j), myDim_nod2D, MPI_WP, all_y_corners(:,:,j),  &
+                      counts_from_all_pes, displs_from_all_pes, MPI_WP, localroot, MPI_COMM_FESOM, ierror)
       end do
     endif
 
@@ -688,6 +704,10 @@ include "associate_mesh_ass.h"
     cpl_send( 5)='sia_feom' ! 5. sea ice albedo [%-100]            ->
     cpl_send( 6)='u_feom'   ! 6. eastward  surface velocity [m/s]  ->
     cpl_send( 7)='v_feom'   ! 7. northward surface velocity [m/s]  ->
+    cpl_send( 8)='sit_feom' ! 8. effective sea ice thickness [m]   ->
+#if defined (__recom)
+    cpl_send( 9)='FCO2_feom'! 9. CO2 flux [kgCO2 m-2 s-1]             ->
+#endif
 #else
     cpl_send( 1)='sst_feom' ! 1. sea surface temperature [°C]      ->
     cpl_send( 2)='sit_feom' ! 2. sea ice thickness [m]             ->
@@ -728,6 +748,10 @@ include "associate_mesh_ass.h"
     cpl_recv(13) = 'calv_oce'
     cpl_recv(14) = 'u10w_oce'
     cpl_recv(15) = 'v10w_oce'
+#if defined (__recom)
+    cpl_recv(16) = 'XCO2_oce'
+#endif
+!Not oifs
 #else
     cpl_recv(1)  = 'taux_oce'
     cpl_recv(2)  = 'tauy_oce'
@@ -985,7 +1009,7 @@ include "associate_mesh_ass.h"
       end if
 
       if(num_fesom_groups > 1) then
-          call MPI_Bcast(data_array, partit%myDim_nod2d, MPI_DOUBLE_PRECISION, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
+          call MPI_Bcast(data_array, partit%myDim_nod2d, MPI_WP, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
       end if
 #endif
 

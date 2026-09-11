@@ -83,11 +83,14 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     USE o_PARAM
     USE o_ARRAYS
     USE g_config
-    USE g_forcing_param, only: use_virt_salt
+    USE g_forcing_param, only: use_virt_salt, use_age_tracer
+    use diagnostics,         only: ldiag_extflds, ldiag_trflx, ldiag_salt3D, ldiag_DVD
+    use cmor_variables_diag, only: ldiag_cmor
     use o_mixing_KPP_mod
 #if defined (__cvmix)       
     use g_cvmix_tke
     use g_cvmix_idemix
+    use g_cvmix_idemix2
     use g_cvmix_pp
     use g_cvmix_kpp
     use g_cvmix_tidal
@@ -158,19 +161,21 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     ! here translate mix_scheme string into integer --> for later usage only 
     ! integer comparison is required
     select case (trim(mix_scheme))
-        case ('KPP'                   ) ; mix_scheme_nmb = 1
-        case ('PP'                    ) ; mix_scheme_nmb = 2
+        case ('KPP'                    ) ; mix_scheme_nmb = 1
+        case ('PP'                     ) ; mix_scheme_nmb = 2
 #if defined (__cvmix)           
-        case ('cvmix_KPP'             ) ; mix_scheme_nmb = 3
-        case ('cvmix_PP'              ) ; mix_scheme_nmb = 4
-        case ('cvmix_TKE'             ) ; mix_scheme_nmb = 5
-        case ('cvmix_IDEMIX'          ) ; mix_scheme_nmb = 6
-        case ('cvmix_TIDAL'           ) ; mix_scheme_nmb = 7 
-        case ('KPP+cvmix_TIDAL'       ) ; mix_scheme_nmb = 17
-        case ('PP+cvmix_TIDAL'        ) ; mix_scheme_nmb = 27
-        case ('cvmix_KPP+cvmix_TIDAL' ) ; mix_scheme_nmb = 37
-        case ('cvmix_PP+cvmix_TIDAL'  ) ; mix_scheme_nmb = 47
-        case ('cvmix_TKE+cvmix_IDEMIX') ; mix_scheme_nmb = 56
+        case ('cvmix_KPP'              ) ; mix_scheme_nmb = 3
+        case ('cvmix_PP'               ) ; mix_scheme_nmb = 4
+        case ('cvmix_TKE'              ) ; mix_scheme_nmb = 5
+        case ('cvmix_IDEMIX'           ) ; mix_scheme_nmb = 6
+        case ('cvmix_IDEMIX2'          ) ; mix_scheme_nmb = 7
+        case ('cvmix_TIDAL'            ) ; mix_scheme_nmb = 8 
+        case ('KPP+cvmix_TIDAL'        ) ; mix_scheme_nmb = 18
+        case ('PP+cvmix_TIDAL'         ) ; mix_scheme_nmb = 28
+        case ('cvmix_KPP+cvmix_TIDAL'  ) ; mix_scheme_nmb = 38
+        case ('cvmix_PP+cvmix_TIDAL'   ) ; mix_scheme_nmb = 48
+        case ('cvmix_TKE+cvmix_IDEMIX' ) ; mix_scheme_nmb = 56
+        case ('cvmix_TKE+cvmix_IDEMIX2') ; mix_scheme_nmb = 57
 #endif        
         case ('TOY'                   ) ; mix_scheme_nmb = 8
         case default 
@@ -179,25 +184,25 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     end select
 
     ! initialise fesom1.4 like KPP
-    if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
+    if     (mix_scheme_nmb==1 .or. mix_scheme_nmb==18) then
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_kpp_init'//achar(27)//'[0m'
         call oce_mixing_kpp_init(partit, mesh)
         
     ! initialise fesom1.4 like PP
-    elseif (mix_scheme_nmb==2 .or. mix_scheme_nmb==27) then
+    elseif (mix_scheme_nmb==2 .or. mix_scheme_nmb==28) then
 #if defined (__cvmix)       
     ! initialise cvmix_KPP
-    elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
+    elseif (mix_scheme_nmb==3 .or. mix_scheme_nmb==38) then
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_kpp'//achar(27)//'[0m'
         call init_cvmix_kpp(partit, mesh)
         
     ! initialise cvmix_PP    
-    elseif (mix_scheme_nmb==4 .or. mix_scheme_nmb==47) then
+    elseif (mix_scheme_nmb==4 .or. mix_scheme_nmb==48) then
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_pp'//achar(27)//'[0m'
         call init_cvmix_pp(partit, mesh)
         
     ! initialise cvmix_TKE    
-    elseif (mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then
+    elseif (mix_scheme_nmb==5 .or. mix_scheme_nmb==56 .or. mix_scheme_nmb==57) then
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_tke'//achar(27)//'[0m'
         call init_cvmix_tke(partit, mesh)
 #endif        
@@ -209,11 +214,17 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
     if     (mod(mix_scheme_nmb,10)==6) then
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_idemix'//achar(27)//'[0m'
         call init_cvmix_idemix(partit, mesh)
+    
+    ! initialise additional mixing cvmix_IDEMIX2 --> only in combination with 
+    ! cvmix_TKE+cvmix_IDEMIX2 or stand alone for debbuging as cvmix_TKE
+    elseif (mod(mix_scheme_nmb,10)==7) then
+        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_idemix2'//achar(27)//'[0m'
+        call init_cvmix_idemix2(partit, mesh)
         
     ! initialise additional mixing cvmix_TIDAL --> only in combination with 
     ! KPP+cvmix_TIDAL, PP+cvmix_TIDAL, cvmix_KPP+cvmix_TIDAL, cvmix_PP+cvmix_TIDAL 
     ! or stand alone for debbuging as cvmix_TIDAL   
-    elseif (mod(mix_scheme_nmb,10)==7) then
+    elseif (mod(mix_scheme_nmb,10)==8) then
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call init_cvmix_tidal'//achar(27)//'[0m'
         call init_cvmix_tidal(partit, mesh)
     end if         
@@ -265,6 +276,34 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
        call oce_initial_state(tracers, partit, mesh)   ! Use it if not running tests
     end if
 
+    !___________________________________________________________________________
+    ! use_salt_anomaly (namelist &oce_dyn): store the salinity state as the
+    ! anomaly S - S_ref_anomaly (finer float32 spacing where the ocean lives).
+    ! S_ref_anomaly stays 0 unless the toggle is on, so the subtraction and every
+    ! downstream `+ S_ref_anomaly` are bit-identical no-ops when off. Initial
+    ! conditions arrive absolute -> convert ONCE here, after oce_initial_state
+    ! (insitu2pot has already used absolute S), before the AB copies below.
+    ! Restart reads are converted in fesom_init. All absolute-S consumers carry
+    ! offset corrections (EOS, sw_alpha_beta, ice gather, rsss, SSS restoring,
+    ! KPP buoyancy/double-diffusion, surface dilution term); clip and blowup
+    ! bounds shifted accordingly.
+    if (use_salt_anomaly) then
+        S_ref_anomaly = 35.0_WP
+        tracers%data(2)%values = tracers%data(2)%values - S_ref_anomaly
+        if (partit%mype==0) write(*,*) 'use_salt_anomaly: salinity state = S - ', S_ref_anomaly
+        ! configurations with absolute-salinity consumers that carry NO offset
+        ! correction yet: refuse to start instead of silently computing wrong
+        ! physics (extend the offset corrections before lifting a guard)
+        if (SPP .or. use_cavity .or. use_icebergs .or. use_age_tracer .or. use_transit &
+            .or. use_kpp_nonlclflx .or. clim_relax > 1.e-8_WP &
+            .or. ldiag_extflds .or. ldiag_trflx .or. ldiag_salt3D .or. ldiag_DVD .or. ldiag_cmor) then
+            if (partit%mype==0) write(*,*) 'use_salt_anomaly does not support yet: ', &
+                'SPP, cavities, icebergs, age tracer, transient tracers, ', &
+                'KPP nonlocal fluxes, 3D climatology relaxation, ', &
+                'salinity diagnostics (extflds/trflx/salt3D/DVD/cmor)'
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        end if
+    end if
     if (.not.r_restart) then
        do n=1, tracers%num_tracers
           do i=1, tracers%data(n)%AB_order-1
@@ -558,7 +597,12 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     real(kind=WP)  :: wsplit_maxcfl
     real(kind=WP)  :: soltol = 1.e-5_WP  ! ssh CG rel. tolerance; default matches T_SOLVERINFO
     integer        :: maxiter = 2000     ! ssh CG iteration cap; default matches T_SOLVERINFO
-    integer        :: precond_variant = 0 ! ssh CG preconditioner formula; 0 keeps results unchanged
+    ! ssh CG preconditioner formula. -1 = auto: resolved below to 1 in a
+    ! single-precision build and 0 in double. An explicit namelist value wins in
+    ! either direction, so a DP run can opt in to 1 and an SP run can force 0 to
+    ! reproduce an older experiment.
+    integer        :: precond_variant = -1
+    logical        :: precond_auto = .false.  ! true if the auto default was applied
     logical        :: use_ssh_se_subcycl=.false.
     integer        :: se_BTsteps
     real(kind=WP)  :: se_BTtheta
@@ -675,8 +719,27 @@ nl => mesh%nl
     dynamics%solverinfo%maxiter = maxiter
     if (mype==0) write(*,*) '     ssh CG maxiter = ', dynamics%solverinfo%maxiter
 
+    ! Resolve the auto default. precision(0.0_WP) < precision(0.0d0) is true iff
+    ! WP is narrower than double -- a plain runtime test, so both variants stay
+    ! compiled and reachable in either build rather than one being preprocessed
+    ! out. In single precision the symmetric variant is not an optimisation but a
+    ! requirement: it costs 33-39% fewer CG iterations on every mesh measured up
+    ! to NG5, which is what keeps the SSH solve affordable when the working
+    ! precision is halved. Double precision keeps 0 until the long-run validation
+    ! of variant 1 completes.
+    if (precond_variant < 0) then
+        precond_variant = merge(1, 0, precision(0.0_WP) < precision(0.0d0))
+        precond_auto = .true.
+    end if
     dynamics%solverinfo%precond_variant = precond_variant
-    if (mype==0) write(*,*) '     ssh CG precond = ', dynamics%solverinfo%precond_variant
+    if (mype==0) then
+        if (precond_auto) then
+            write(*,*) '     ssh CG precond = ', dynamics%solverinfo%precond_variant, &
+                       ' (auto: ', trim(merge('single', 'double', precision(0.0_WP) < precision(0.0d0))), ' precision)'
+        else
+            write(*,*) '     ssh CG precond = ', dynamics%solverinfo%precond_variant, ' (from namelist)'
+        end if
+    end if
 
     !___________________________________________________________________________
     ! define local vertice & elem array size
@@ -915,6 +978,8 @@ nl              => mesh%nl
     allocate(relax2clim(node_size)) 
     allocate(heat_flux(node_size), Tsurf(node_size))
     allocate(water_flux(node_size), Ssurf(node_size))
+    allocate(hosing_flux(node_size), hosing_heat_flux(node_size))
+    allocate(hosing_flux3D(nl-1,node_size), hosing_heat_flux3D(nl-1,node_size))
     allocate(fw_ice(node_size), fw_snw(node_size))
     allocate(relax_salt(node_size))
     allocate(virtual_salt(node_size))
@@ -950,7 +1015,7 @@ nl              => mesh%nl
 
     Av=0.0_WP
     Kv=0.0_WP
-    if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
+    if (mix_scheme_nmb==1 .or. mix_scheme_nmb==18) then
     allocate(Kv_double(nl,node_size, num_tracers))
     Kv_double=0.0_WP
     !!PS call oce_mixing_kpp_init ! Setup constants, allocate arrays and construct look up table
@@ -1015,6 +1080,10 @@ nl              => mesh%nl
     Tsurf=0.0_WP
 
     water_flux=0.0_WP
+    hosing_flux=0.0_WP
+    hosing_heat_flux=0.0_WP
+    hosing_flux3D=0.0_WP
+    hosing_heat_flux3D=0.0_WP
     fw_ice    =0.0_WP
     fw_snw    =0.0_WP
     relax_salt=0.0_WP
@@ -1134,7 +1203,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(in) ,   target :: mesh
     !___________________________________________________________________________
-    integer                  :: i, k, counter, rcounter3, id
+    integer                  :: i, k, counter, rcounter3, id, alk_check
     character(len=10)        :: i_string, id_string
     real(kind=WP)            :: loc, max_temp, min_temp, max_salt, min_salt
     !___________________________________________________________________________
@@ -1149,12 +1218,6 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     if (mype==0) write(*,*) 'tracer IDs are: ', tracers%data(1:tracers%num_tracers)%ID
     !
 #if defined(__recom)
-    ! read preindustrial DIC
-    if(DIC_PI) then
-        filelist(5) = 'GLODAPv2.2016b.PI_TCO2_fesom2_mmol_fix_z_Fillvalue.nc'
-        varlist(5)  = 'PI_TCO2_mmol'
-    end if
-
     if (mype==0) then
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
@@ -1227,19 +1290,37 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
-        if (mype==0) write(*,*)
-        if (mype==0) print *, achar(27)//'[46;1m'//' --> Set surface field for alkalinity restoring'//achar(27)//'[0m'
-        if (mype==0) write(*,*) 'Alkalinity restoring = true. Field is read.'
+        if (mype==0) then
+            write(*,*)
+            print *, achar(27)//'[46;1m'//' restore_alkalinity is true --> Set surface field for alkalinity restoring'//achar(27)//'[0m'
+            write(*,*)
+        end if
 #if defined(__usetp)
         endif !(partit%my_fesom_group==0) then
 #endif
-
-        Alk_surf = tracers%data(5)%values(1,:) ! alkalinity is the 5th tracer
-    endif
+        ! resolve the alkalinity tracer by its ID instead of a hardcoded index,
+        ! so every &parecomsetup combination finds the right field
+        alk_check=1
+        do i=3, tracers%num_tracers
+          id=tracers%data(i)%ID
+          SELECT CASE (id)
+            CASE (1003) ! alk
+                Alk_surf = tracers%data(i)%values(1,:) ! surface alkalinity
+                alk_check = 0
+            END SELECT
+        end do
+        if (alk_check /= 0) then
+            if (mype==0) write(*,*) 'not a single tracer ID = 1003 = alkalinity. this should not happen'
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+            stop
+        end if
+    endif ! restore_alkalinity
 
 #endif
 
     ! count the passive tracers which require 3D source (ptracers_restore_total)
+    ! Every ID with a restoring box below has to be listed here too, or
+    ! ptracers_restore is allocated too short.
     ptracers_restore_total=0
     DO i=3, tracers%num_tracers
         id=tracers%data(i)%ID
@@ -1292,7 +1373,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 #if defined(__recom) && defined(__usetp)
     endif !(partit%my_fesom_group==0) then
 #endif
-        CASE (1023:1036)
+        CASE (1023:1037)
             tracers%data(i)%values(:,:)=0.0_WP
 #if defined(__recom) && defined(__usetp)
     if (partit%my_fesom_group==0) then
@@ -1453,7 +1534,13 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
          end if
 ! Transient tracers end
 
-        !_______________________________________________________________________            
+        !_______________________________________________________________________
+        ! Fram Strait 3d restored passive tracer. The box (77.5-78.0N, 0-10E)
+        ! marks the Atlantic inflow branch on purpose, not the full strait; a
+        ! whole-gateway tracer needs its own ID, see issue #846. The bounds
+        ! appear twice below, to count nodes and to fill ind2, and both copies
+        ! have to stay identical. oce_ale_tracer.F90 resets the box to 1.0 each
+        ! timestep, so the 1.0 here and the 0.0 in 302/303 behave alike.
         CASE (301) !Fram Strait 3d restored passive tracer
             tracers%data(i)%values(:,:)=0.0_WP
             rcounter3    =rcounter3+1
@@ -1483,6 +1570,8 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             end if
             
         !_______________________________________________________________________
+        ! Bering Strait 3d restored passive tracer. The box (65.6-66.0N,
+        ! 172-166W) spans the strait, unlike the inflow-only boxes 301 and 303.
         CASE (302) !Bering Strait 3d restored passive tracer
             tracers%data(i)%values(:,:)=0.0_WP
             rcounter3    =rcounter3+1
@@ -1511,7 +1600,10 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
             
-        !_______________________________________________________________________            
+        !_______________________________________________________________________
+        ! Barents Sea Opening 3d restored passive tracer. The box (69.5-74.5N,
+        ! 19-20E) covers the southern inflow part only, as in case 301; see
+        ! issue #846. The bounds appear twice below and must stay identical.
         CASE (303) !BSO 3d restored passive tracer
             tracers%data(i)%values(:,:)=0.0_WP
             rcounter3    =rcounter3+1
@@ -1539,7 +1631,16 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
                 write (id_string, "(I3)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
             end if
-            
+
+        !_______________________________________________________________________
+        CASE (304) ! passive tracer for water hosing experiment
+            tracers%data(i)%values(:,:)=0.0_WP
+            if (mype==0) then
+                write (i_string,  "(I3)") i
+                write (id_string, "(I3)") id
+                write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
+            end if
+
         !_______________________________________________________________________
         CASE (501) ! ice-shelf water due to basal melting
             tracers%data(i)%values(:,:)=0.0_WP

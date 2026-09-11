@@ -652,16 +652,25 @@ end subroutine global2local
  !***************************************************************************************************************************
  !***************************************************************************************************************************
 
-subroutine com_integer(partit, i_have_element, iceberg_element)
+subroutine com_integer(partit, i_have_element, iceberg_element, ib)
  use MOD_PARTIT !for npes
  implicit none
  
  logical, intent(in):: i_have_element
  integer, intent(inout):: iceberg_element
  
+ integer, intent(in), optional :: ib
+
  integer:: status(MPI_STATUS_SIZE)
  integer:: req
+ integer:: ierr
  logical:: completed
+ real(kind=8) :: t_start
+ !bugfix 2026-08-12: see commit message. 5 min is far longer than a healthy
+ !MPI_IAllreduce over <=288 ranks should ever take, and short enough to still
+ !leave most of a 2h20 compute-job walltime for a rerun once the root cause
+ !is fixed, instead of burning the whole budget on a silent hang.
+ real(kind=8), parameter :: com_integer_timeout = 300.0
 type(t_partit), intent(inout), target :: partit
 !#include "associate_part_def.h"
 !#include "associate_part_ass.h"
@@ -677,15 +686,39 @@ type(t_partit), intent(inout), target :: partit
 !$omp end critical
  end if
 
+ !bugfix 2026-08-12: com_integer is a collective - every rank in
+ !MPI_COMM_FESOM_IB must reach this call for a given iceberg, or the ranks
+ !that did reach it wait here forever (production hang: spinup_20261108
+ !jobs 26882618 / 26893155, frozen here for the full walltime with zero
+ !further output and no error). Fail loudly with the state needed to find
+ !the diverging rank/iceberg instead of spinning silently until the batch
+ !scheduler kills the job on walltime.
  completed = .false.
+ t_start = MPI_Wtime()
  do while (.not. completed)
 !$omp critical
      CALL MPI_TEST(req, completed, status, partit%MPIERR_IB)
 !$omp end critical
+     if (.not. completed .and. (MPI_Wtime() - t_start) > com_integer_timeout) then
+      if (present(ib)) then
+       write(*,*) 'FATAL: com_integer deadlock on rank ', partit%mype, &
+            ' after ', com_integer_timeout, ' s waiting on iceberg ib=', ib, &
+            '; i_have_element=', i_have_element, ' iceberg_element=', iceberg_element
+      else
+       write(*,*) 'FATAL: com_integer deadlock on rank ', partit%mype, &
+            ' after ', com_integer_timeout, ' s; i_have_element=', i_have_element, &
+            ' iceberg_element=', iceberg_element
+      end if
+      call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
+     end if
  end do
 
  end subroutine com_integer
 
+
+
+ !***************************************************************************************************************************
+ !***************************************************************************************************************************
 
 
  !***************************************************************************************************************************
@@ -712,15 +745,15 @@ type(t_partit), intent(inout), target :: partit
 !       CALL MPI_RECV(he_has_element, 1, MPI_LOGICAL, MPI_ANY_SOURCE, 0, MPI_COMM_FESOM, status, MPIerr )		      
 !       sender = status(MPI_SOURCE)
 !       if (he_has_element) then
-!          CALL MPI_RECV(arr_r, 15, MPI_DOUBLE_PRECISION, sender, 1, MPI_COMM_FESOM, status, MPIerr )
-!	  CALL MPI_RECV(iceberg_element, 1, MPI_DOUBLE_PRECISION, sender, 2, MPI_COMM_FESOM, status, MPIerr )
+!          CALL MPI_RECV(arr_r, 15, MPI_WP, sender, 1, MPI_COMM_FESOM, status, MPIerr )
+!	  CALL MPI_RECV(iceberg_element, 1, MPI_WP, sender, 2, MPI_COMM_FESOM, status, MPIerr )
 !	  arr=arr_r
 !       end if
 !    end do
 ! else
 !       CALL MPI_SEND(i_have_element, 1, MPI_LOGICAL, 0, 0, MPI_COMM_FESOM, MPIerr )
 !       if (i_have_element) then
-!          CALL MPI_SEND(arr, 15, MPI_DOUBLE_PRECISION,0, 1, MPI_COMM_FESOM, MPIerr )
+!          CALL MPI_SEND(arr, 15, MPI_WP,0, 1, MPI_COMM_FESOM, MPIerr )
 !	  CALL MPI_SEND(iceberg_element, 1, MPI_INTEGER,0, 2, MPI_COMM_FESOM, MPIerr )
 !       end if 
 ! end if
@@ -730,15 +763,15 @@ type(t_partit), intent(inout), target :: partit
 !!       CALL MPI_RECV(he_has_element, 1, MPI_LOGICAL, MPI_ANY_SOURCE, 0, MPI_COMM_WORLD, status, MPIerr )		      
 !!       sender = status(MPI_SOURCE)
 !!       if (he_has_element) then
-!!          CALL MPI_RECV(arr_r, 15, MPI_DOUBLE_PRECISION, sender, 1, MPI_COMM_WORLD, status, MPIerr )
-!!	  CALL MPI_RECV(iceberg_element, 1, MPI_DOUBLE_PRECISION, sender, 2, MPI_COMM_WORLD, status, MPIerr )
+!!          CALL MPI_RECV(arr_r, 15, MPI_WP, sender, 1, MPI_COMM_WORLD, status, MPIerr )
+!!	  CALL MPI_RECV(iceberg_element, 1, MPI_WP, sender, 2, MPI_COMM_WORLD, status, MPIerr )
 !!	  arr=arr_r
 !!       end if
 !!    end do
 !! else
 !!       CALL MPI_SEND(i_have_element, 1, MPI_LOGICAL, 0, 0, MPI_COMM_WORLD, MPIerr )
 !!       if (i_have_element) then
-!!          CALL MPI_SEND(arr, 15, MPI_DOUBLE_PRECISION,0, 1, MPI_COMM_WORLD, MPIerr )
+!!          CALL MPI_SEND(arr, 15, MPI_WP,0, 1, MPI_COMM_WORLD, MPIerr )
 !!	  CALL MPI_SEND(iceberg_element, 1, MPI_INTEGER,0, 2, MPI_COMM_WORLD, MPIerr )
 !!       end if 
 !! end if
@@ -750,9 +783,9 @@ type(t_partit), intent(inout), target :: partit
 ! !3. datatype - Datentyp der Pufferelemente (handle)
 ! !4. root - Wurzelproze�; der, welcher sendet (integer)
 ! !5. comm - Kommunikator (handle) 
-! CALL MPI_BCAST(arr, 15, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, MPIerr)
+! CALL MPI_BCAST(arr, 15, MPI_WP, 0, MPI_COMM_FESOM, MPIerr)
 ! CALL MPI_BCAST(iceberg_element, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, MPIerr)
-! !CALL MPI_BCAST(arr, 15, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, MPIerr)
+! !CALL MPI_BCAST(arr, 15, MPI_WP, 0, MPI_COMM_WORLD, MPIerr)
 ! !CALL MPI_BCAST(iceberg_element, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, MPIerr)
 ! 
 ! ! kh 10.02.21
@@ -864,9 +897,9 @@ subroutine  matrix_inverse_2x2 (A, AINV, DET, elem, coords)
   integer                                   :: elem
   REAL, DIMENSION(2), INTENT(IN) :: coords
   
-  real(kind=8), dimension(2,2), intent(IN)  :: A
-  real(kind=8), dimension(2,2), intent(OUT) :: AINV
-  real(kind=8), intent(OUT)                 :: DET
+  real(kind=WP), dimension(2,2), intent(IN)  :: A
+  real(kind=WP), dimension(2,2), intent(OUT) :: AINV
+  real(kind=WP), intent(OUT)                 :: DET
   integer                                   :: i,j
   
   DET  = A(1,1)*A(2,2) - A(1,2)*A(2,1)

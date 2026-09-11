@@ -102,7 +102,7 @@ contains
           volo_local = volo_local + areasvol(k, n2) * hnode(k, n2)
        end do
     end do
-    call MPI_AllREDUCE(volo_local, volo, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, ierr)
+    call MPI_AllREDUCE(volo_local, volo, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, ierr)
   
     ! Allocate 2D arrays (indexed by nod2D)
     allocate(opottemptend(myDim_nod2D))
@@ -295,8 +295,8 @@ contains
             thetaoga = thetaoga + temp(k, n2) * areasvol(k, n2) * hnode(k, n2)
         end do
     end do
-    call MPI_AllREDUCE(MPI_IN_PLACE, soga, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, ierr)
-    call MPI_AllREDUCE(MPI_IN_PLACE, thetaoga, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, ierr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, soga, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, ierr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, thetaoga, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, ierr)
     soga = soga / volo
     thetaoga = thetaoga / volo
   
@@ -338,12 +338,12 @@ contains
         end if
     end do
     
-    call MPI_AllREDUCE(MPI_IN_PLACE, siarean, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, ierr)
-    call MPI_AllREDUCE(MPI_IN_PLACE, siareas, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, ierr)
-    call MPI_AllREDUCE(MPI_IN_PLACE, siextentn, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, ierr)
-    call MPI_AllREDUCE(MPI_IN_PLACE, siextents, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, ierr)
-    call MPI_AllREDUCE(MPI_IN_PLACE, sivoln, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, ierr)
-    call MPI_AllREDUCE(MPI_IN_PLACE, sivols, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, ierr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, siarean, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, ierr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, siareas, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, ierr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, siextentn, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, ierr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, siextents, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, ierr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, sivoln, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, ierr)
+    call MPI_AllREDUCE(MPI_IN_PLACE, sivols, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, ierr)
     
     ! Convert to proper units
     siarean = siarean / 1.0e12_WP      ! to 10^12 m^2

@@ -11,6 +11,11 @@
 ! - Runoff and salinity restoring
 ! - Chlorophyll data for shortwave penetration
 ! ============================================================================
+! ----------------------------------------------------------------------------
+! File names below are relative to ForcingDataPath in namelist.config. A name
+! starting with '/' is used as given, which is how files outside the forcing
+! tree (for example the Sweeney chlorophyll climatology) are pointed at.
+! ----------------------------------------------------------------------------
 
 ! ============================================================================
 ! BULK FORMULAE EXCHANGE COEFFICIENTS
@@ -80,16 +85,16 @@ age_start_year    = 2000     ! year to start age tracer (tracer age = 0 at this 
 ! ============================================================================
 &nam_sbc
    ! --- Forcing file paths ---
-   nm_xwind_file = '/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/uas.'        ! name of file with zonal wind speeds
-   nm_ywind_file = '/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/vas.'        ! name of file with meridional wind speeds
-   nm_xstre_file = '/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/uas.'        ! name of file with zonal wind stress
-   nm_ystre_file = '/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/vas.'        ! name of file with meridional wind stress
-   nm_humi_file  = '/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/huss.'       ! name of file with air humidity
-   nm_qsr_file   = '/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/rsds.'       ! name of file with short wave radiation
-   nm_qlw_file   = '/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/rlds.'       ! name of file with long wave radiation
-   nm_tair_file  = '/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/tas.'        ! name of file with 2m air temperature
-   nm_prec_file  = '/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/prra.'       ! name of file with total precipitation
-   nm_snow_file  = '/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/prsn.'       ! name of file with snow precipitation
+   nm_xwind_file = 'uas.'        ! name of file with zonal wind speeds
+   nm_ywind_file = 'vas.'        ! name of file with meridional wind speeds
+   nm_xstre_file = 'uas.'        ! name of file with zonal wind stress
+   nm_ystre_file = 'vas.'        ! name of file with meridional wind stress
+   nm_humi_file  = 'huss.'       ! name of file with air humidity
+   nm_qsr_file   = 'rsds.'       ! name of file with short wave radiation
+   nm_qlw_file   = 'rlds.'       ! name of file with long wave radiation
+   nm_tair_file  = 'tas.'        ! name of file with 2m air temperature
+   nm_prec_file  = 'prra.'       ! name of file with total precipitation
+   nm_snow_file  = 'prsn.'       ! name of file with snow precipitation
 
    ! --- Variable names in netCDF forcing files ---
    nm_xwind_var  = 'uas'      ! name of variable in file with wind
@@ -125,12 +130,14 @@ age_start_year    = 2000     ! year to start age tracer (tracer age = 0 at this 
    l_snow        = .true.     ! use snow precipitation forcing
 
    ! --- Runoff configuration ---
-   runoff_data_source = 'JRA55'       ! runoff data source: 'Dai09', 'JRA55, 'CORE2', or 'NONE'
-   nm_runoff_file     = '<add path>'  ! path to runoff data
+   runoff_climatology=.true.
+   runoff_data_source = 'CORE2'       ! runoff data source: 'Dai09', 'JRA55', 'CORE1', 'CORE2' or 'NONE'
+   nm_runoff_file     = 'CORE2_runoff.nc'  ! CORE2 monthly climatology with runoff_climatology=.true.
+   !nm_runoff_file     = 'friver.'  ! Dai09/JRA55 with runoff_climatology=.false.: prefix, year and '.nc' are appended (friver.1958.nc).
 
    ! --- Sea surface salinity restoring ---
    sss_data_source  = 'CORE2'  ! SSS restoring data source: 'CORE2', 'WOA', or 'NONE'
-   nm_sss_data_file = '/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/PHC2_salx.nc'  ! path to SSS restoring data file, e.g. PHC2_salx.nc
+   nm_sss_data_file = 'PHC2_salx.nc'  ! path to SSS restoring data file, e.g. PHC2_salx.nc
 
    ! --- Chlorophyll data for shortwave penetration ---
    chl_data_source  = 'Sweeney'   ! chlorophyll data source: 'Sweeney' (monthly climatology) or 'None' (constant)

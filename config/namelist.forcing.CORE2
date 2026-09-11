@@ -1,4 +1,8 @@
 ! This is the namelist file for forcing
+!
+! File names below are relative to ForcingDataPath in namelist.config, which
+! for this setup should point at the CORE2 forcing directory. A name starting
+! with '/' is used as given.
 
 &forcing_exchange_coeff
 Ce_atm_oce=0.00175 ! exchange coeff. of latent heat over open water
@@ -36,15 +40,15 @@ age_start_year=2000
 /
 
 &nam_sbc
-   nm_xwind_file = 'FORCING/CORE2/u_10.'        ! name of file with winds
-   nm_ywind_file = 'FORCING/CORE2/v_10.'        ! name of file with winds
-   nm_humi_file  = 'FORCING/CORE2/q_10.'        ! name of file with humidity
-   nm_qsr_file   = 'FORCING/CORE2/ncar_rad.'    ! name of file with solar heat
-   nm_qlw_file   = 'FORCING/CORE2/ncar_rad.'    ! name of file with Long wave
-   nm_tair_file  = 'FORCING/CORE2/t_10.'        ! name of file with 2m air temperature
-   nm_prec_file  = 'FORCING/CORE2/ncar_precip.' ! name of file with total precipitation
-   nm_snow_file  = 'FORCING/CORE2/ncar_precip.' ! name of file with snow precipitation
-   nm_mslp_file  = 'FORCING/CORE2/slp.'         ! air_pressure_at_sea_level
+   nm_xwind_file = 'u_10.'        ! name of file with winds
+   nm_ywind_file = 'v_10.'        ! name of file with winds
+   nm_humi_file  = 'q_10.'        ! name of file with humidity
+   nm_qsr_file   = 'ncar_rad.'    ! name of file with solar heat
+   nm_qlw_file   = 'ncar_rad.'    ! name of file with Long wave
+   nm_tair_file  = 't_10.'        ! name of file with 2m air temperature
+   nm_prec_file  = 'ncar_precip.' ! name of file with total precipitation
+   nm_snow_file  = 'ncar_precip.' ! name of file with snow precipitation
+   nm_mslp_file  = 'slp.'         ! air_pressure_at_sea_level
    nm_xwind_var  = 'U_10_MOD'   ! name of variable in file with wind
    nm_ywind_var  = 'V_10_MOD'   ! name of variable in file with wind
    nm_humi_var   = 'Q_10_MOD'   ! name of variable in file with humidity
@@ -71,13 +75,13 @@ age_start_year=2000
    l_cloud=.false.
    l_snow=.true.
    runoff_data_source ='CORE2'  !Dai09, CORE2
-   nm_runoff_file     ='FORCING/CORE2/runoff.nc'
+   nm_runoff_file     ='runoff.nc'
    sss_data_source    ='CORE2'
-   nm_sss_data_file   ='FORCING/CORE2/PHC2_salx.nc'
+   nm_sss_data_file   ='PHC2_salx.nc'
    chl_data_source    ='None' !'Sweeney' monthly chlorophyll climatology or 'NONE' for constant chl_const (below). Make use_sw_pene=.TRUE. in namelist.config!
-   nm_chl_data_file   ='FORCING/Sweeney/Sweeney_2005.nc'
+   nm_chl_data_file   ='/pool/data/AWICM/FESOM2/FORCING/Sweeney/Sweeney_2005.nc'
    chl_const          = 0.1
    use_runoff_mapper  = .FALSE.
-   runoff_basins_file = 'FORCING/CORE2/runoff_maps_regular.nc'
+   runoff_basins_file = 'runoff_maps_regular.nc'
    runoff_radius      = 500000.
 /

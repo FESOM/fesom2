@@ -17,8 +17,10 @@ jobs:
     # Containers must run in Linux based operating systems
     runs-on: ubuntu-latest
     timeout-minutes: 12
-    # Intel compiler container
-    container: ghcr.io/suvarchal/fesom2-ci-intel
+    # FESOM-owned Intel image. Carries ifx + Intel MPI and the ifx-built
+    # HDF5/netCDF stack, without the rest of intel-hpckit that this build
+    # never invokes - see FESOM/FESOM2_Docker#8.
+    container: ghcr.io/fesom/fesom2_docker:fesom2_intel-master
 
     steps:
     # Checkout repository with latest git action
