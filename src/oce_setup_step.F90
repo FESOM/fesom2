@@ -756,7 +756,7 @@ nl => mesh%nl
     dynamics%uv_rhs          = 0.0_WP
     dynamics%uv_rhsAB        = 0.0_WP
     dynamics%uvnode          = 0.0_WP
-    if (Fer_GM) then
+    if (Fer_GM .or. use_mle) then
         allocate(dynamics%fer_uv(2, nl-1, elem_size))
         dynamics%fer_uv      = 0.0_WP
     end if 
@@ -774,7 +774,7 @@ nl => mesh%nl
     dynamics%w_e             = 0.0_WP
     dynamics%w_i             = 0.0_WP
     dynamics%cfl_z           = 0.0_WP
-    if (Fer_GM) then
+    if (Fer_GM .or. use_mle) then
         allocate(dynamics%fer_w(      nl, node_size))
         dynamics%fer_w       = 0.0_WP
     end if 
@@ -964,6 +964,12 @@ nl              => mesh%nl
     ! ================
     allocate( hpressure(nl,node_size))
     allocate(bvfreq(nl,node_size),mixlay_dep(node_size),bv_ref(node_size))
+    ! MLE streamfunction diagnostic, so the MLE bolus can be told apart from the GM one
+    if (use_mle) then
+        allocate(mle_psi(nl, node_size), mle_hbar(node_size))
+        mle_psi  = 0.0_WP
+        mle_hbar = 0.0_WP
+    end if
     ! ================
     ! Ocean forcing arrays
     ! ================
@@ -1056,7 +1062,9 @@ nl              => mesh%nl
     sw_alpha =0.0_WP
     dens_flux=0.0_WP
 
-    if (Fer_GM) then
+    ! MLE writes into fer_gamma and rides the GM plumbing, so these are needed
+    ! whenever either scheme is on.
+    if (Fer_GM .or. use_mle) then
     allocate(fer_c(node_size),fer_scal(node_size), fer_gamma(2, nl, node_size), fer_K(nl, node_size), fer_tapfac(nl, node_size))
     fer_gamma = 0.0_WP
     fer_K     = 500._WP

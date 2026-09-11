@@ -3447,6 +3447,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     use check_blowup_interface
     use ieee_arithmetic
     use fer_solve_interface
+    use mle_interface
     use impl_vert_visc_ale_vtransp_interface
 #if defined (FESOM_PROFILING)
     use fesom_profiler
@@ -3866,9 +3867,18 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     
     ! Implementation of Gent & McWiliams parameterization after R. Ferrari et al., 2010
     ! does not belong directly to ALE formalism
-    if (Fer_GM) then
-        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call fer_solve_Gamma'//achar(27)//'[0m'
-        call fer_solve_Gamma(partit, mesh)
+    if (Fer_GM .or. use_mle) then
+        if (Fer_GM) then
+            if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call fer_solve_Gamma'//achar(27)//'[0m'
+            call fer_solve_Gamma(partit, mesh)
+        end if
+        ! Fox-Kemper mixed-layer eddies add to the same streamfunction, so the bolus
+        ! velocity, the vertical velocity from continuity, tracer advection and the
+        ! diagnostics all pick them up unchanged. Resets fer_gamma itself when GM is off.
+        if (use_mle) then
+            if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call mle_add_gamma'//achar(27)//'[0m'
+            call mle_add_gamma(partit, mesh)
+        end if
         call fer_gamma2vel(dynamics, partit, mesh)
     end if
     t7=MPI_Wtime()
