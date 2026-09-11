@@ -18,6 +18,7 @@ namelist.config:
         restart_length_unit: "d"
         logfile_outfreq: 10
     run_config:
+        use_cavity: False
         use_floatice: True
 
 namelist.dyn:

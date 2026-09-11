@@ -8,6 +8,8 @@ ntasks: 2
 time: "00:10:00"
 
 namelist.config:
+    run_config:
+        use_cavity: False
     timestep:
         run_length: 1
         run_length_unit: "d"

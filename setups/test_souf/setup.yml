@@ -25,6 +25,7 @@ namelist.config:
         rotated_grid: False
         force_rotation: False
     run_config:
+        use_cavity: False
         use_ice: False
         toy_ocean: True
         which_toy: "soufflet"
