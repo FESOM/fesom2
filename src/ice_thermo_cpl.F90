@@ -376,7 +376,9 @@ contains
 #if defined (__oifs) || defined (__ifsinterface)
     !---- new condition added - surface temperature must be
     !----                       larger than 273K to melt snow
-    if (t.gt.273_WP) then
+    !---- (snowmelt_tgate=.false. drops the condition and melts snow on the
+    !----  energy budget alone, as the uncoupled branch below does)
+    if (t.gt.273_WP .or. .not. ice%thermo%snowmelt_tgate) then
         dsnow = A*min(Qatmice-Qicecon,0._WP)
         dsnow = max(dsnow*rhoice/rhosno,-hsn)
     else
@@ -656,6 +658,7 @@ contains
   real(kind=WP) :: alpha_snow          ! 0..1 snow-cover blend weight
   real(kind=WP) :: alb_snow, alb_bare  ! season-selected snow / bare-ice albedo
   real(kind=WP) :: h_snowscale         ! local copy of namelist tanh scale
+  real(kind=WP) :: fmelt               ! 0 frozen .. 1 melting albedo weight
 
   albsn       => ice%thermo%albsn
   albi        => ice%thermo%albi
@@ -665,7 +668,13 @@ contains
 
   ! Calculate standard albedo first (without pond effects)
   if (h>0.0_WP) then
-     if (t<273.15_WP) then     ! freezing surface
+     if (ice%thermo%alb_tramp > 0.0_WP) then
+        ! Linear transition over alb_tramp K below the melting point
+        fmelt    = min(1.0_WP, max(0.0_WP, &
+                   (t - 273.15_WP + ice%thermo%alb_tramp) / ice%thermo%alb_tramp))
+        alb_snow = albsn + fmelt*(albsnm - albsn)
+        alb_bare = albi  + fmelt*(albim  - albi)
+     else if (t<273.15_WP) then     ! freezing surface
         alb_snow = albsn
         alb_bare = albi
      else                      ! melting surface
