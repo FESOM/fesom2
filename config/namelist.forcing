@@ -97,23 +97,23 @@ age_start_year    = 2000     ! year to start age tracer (tracer age = 0 at this 
    nm_snow_file  = 'prsn.'       ! name of file with snow precipitation
 
    ! --- Variable names in netCDF forcing files ---
-   nm_xwind_var  = 'uas'      ! name of variable in file with wind
-   nm_ywind_var  = 'vas'      ! name of variable in file with wind
-   nm_xstre_var  = 'uas'      ! name of variable in file with wind
-   nm_ystre_var  = 'vas'      ! name of variable in file with wind
+   nm_xwind_var  = 'uas'      ! name of variable in file with zonal wind
+   nm_ywind_var  = 'vas'      ! name of variable in file with meridional wind
+   nm_xstre_var  = 'uas'      ! name of variable in file with zonal wind stress
+   nm_ystre_var  = 'vas'      ! name of variable in file with meridional wind stress
    nm_humi_var   = 'huss'     ! name of variable in file with humidity
    nm_qsr_var    = 'rsds'     ! name of variable in file with solar heat
    nm_qlw_var    = 'rlds'     ! name of variable in file with long wave
    nm_tair_var   = 'tas'      ! name of variable in file with 2m air temperature
    nm_prec_var   = 'prra'     ! name of variable in file with total precipitation
-   nm_snow_var   = 'prsn'     ! name of variable in file with total precipitation
+   nm_snow_var   = 'prsn'     ! name of variable in file with snow precipitation
    nm_mslp_var   = 'psl'      ! name of variable in file with air_pressure_at_sea_level
 
    ! --- Time axis configuration in forcing files ---
    nm_nc_iyear   = 1900       ! initial year of forcing data time axis (note, not the first year in the file!)
    nm_nc_imm     = 1          ! initial month of forcing data time axis (1-12)
    nm_nc_idd     = 1          ! initial day of forcing data time axis (1-31)
-   nm_nc_freq    = 1          ! do not touch! (number of data points per day (1=daily, 4=6-hourly, etc.))
+   nm_nc_freq    = 1          ! divisor converting the time axis of the forcing files to days (1 = days, 24 = hours, 86400 = seconds)
    nm_nc_tmid    = 0          ! time stamp position: 1=mid-point, 0=start of interval
    y_perpetual   = .false.    ! use perpetual year forcing (repeat single year)
 
