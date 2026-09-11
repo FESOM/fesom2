@@ -769,7 +769,7 @@ endfunction()
 
 # Function to add a FESOM meshdiag test with custom options
 function(add_fesom_meshdiag_test_with_options TEST_NAME MESH_NAME RUNID)
-    set(oneValueArgs NP TIMEOUT PREFIX)
+    set(oneValueArgs NP TIMEOUT PREFIX USE_CAVITY)
     set(multiValueArgs COMMAND_ARGS)
     cmake_parse_arguments(FESOM_TEST "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
     
@@ -785,6 +785,22 @@ function(add_fesom_meshdiag_test_with_options TEST_NAME MESH_NAME RUNID)
     if(NOT DEFINED FESOM_TEST_TIMEOUT)
         set(FESOM_TEST_TIMEOUT 120)  # 2 minutes default (much faster than full FESOM)
     endif()
+    # A mesh with cavity files must be read with use_cavity=.true., otherwise
+    # the model stops. Take it from the mesh registry unless given explicitly.
+    if(NOT DEFINED FESOM_TEST_USE_CAVITY)
+        set(FESOM_TEST_USE_CAVITY ".false.")
+        set(_registry "${FESOM_TESTING_ROOT}/tests/mesh_registry.json")
+        if(EXISTS "${_registry}")
+            file(READ "${_registry}" _registry_content)
+            string(REGEX MATCH "\"${MESH_NAME}\"[^}]*\"use_cavity\"[ ]*:[ ]*([^,}]+)" _cavity_match "${_registry_content}")
+            if(_cavity_match)
+                string(STRIP "${CMAKE_MATCH_1}" _cavity)
+                if(_cavity STREQUAL "true")
+                    set(FESOM_TEST_USE_CAVITY ".true.")
+                endif()
+            endif()
+        endif()
+    endif()
     
     # Create test run directory
     set(TEST_RUN_DIR "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}")
@@ -793,7 +809,7 @@ function(add_fesom_meshdiag_test_with_options TEST_NAME MESH_NAME RUNID)
     
     # Configure namelists with custom runid to avoid conflicts
     configure_fesom_namelists_with_options("${TEST_RUN_DIR}" "${TEST_DATA_DIR}" "${RESULT_DIR}"
-        "${MESH_NAME}" "96" "1" "d" "1" "d" "10" ".true." ".false.")
+        "${MESH_NAME}" "96" "1" "d" "1" "d" "10" ".true." "${FESOM_TEST_USE_CAVITY}")
     
     # Update runid in namelist.config to create unique output file
     file(READ "${TEST_RUN_DIR}/namelist.config" CONTENT)
@@ -865,7 +881,7 @@ function(add_fesom_meshdiag_test_with_options TEST_NAME MESH_NAME RUNID)
         RUN_SERIAL FALSE
     )
     
-    message(STATUS "Added FESOM meshdiag test: ${TEST_NAME} with mesh: ${MESH_NAME}, runid: ${RUNID}")
+    message(STATUS "Added FESOM meshdiag test: ${TEST_NAME} with mesh: ${MESH_NAME}, runid: ${RUNID}, cavity: ${FESOM_TEST_USE_CAVITY}")
 endfunction()
 
 #===============================================================================
