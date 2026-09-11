@@ -49,6 +49,7 @@ subroutine oce_adv_tra_fct_init(twork, partit, mesh)
 
     my_size=myDim_nod2D+eDim_nod2D
     allocate(twork%fct_LO(nl-1, my_size))        ! Low-order solution
+    allocate(twork%fct_LO_tend(nl-1, my_size))   ! Low-order tendency in flux form
     allocate(twork%adv_flux_hor(nl-1,partit%myDim_edge2D)) ! antidiffusive hor. contributions / from edges
     allocate(twork%adv_flux_ver(nl, partit%myDim_nod2D))   ! antidiffusive ver. fluxes / from nodes
 
@@ -56,6 +57,7 @@ subroutine oce_adv_tra_fct_init(twork, partit, mesh)
     allocate(twork%fct_plus(nl-1, my_size),   twork%fct_minus(nl-1, my_size))
     ! Initialize with zeros:
     twork%fct_LO=0.0_WP
+    twork%fct_LO_tend=0.0_WP
     twork%adv_flux_hor=0.0_WP
     twork%adv_flux_ver=0.0_WP
     twork%fct_ttf_max=0.0_WP

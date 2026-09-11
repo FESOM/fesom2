@@ -853,7 +853,7 @@ contains
     !$ACC ENTER DATA CREATE (f%tracers%data(tr_num)%tra_adv_ph, f%tracers%data(tr_num)%tra_adv_pv)
     end do
     !$ACC ENTER DATA CREATE (f%tracers%work%fct_ttf_min, f%tracers%work%fct_ttf_max, f%tracers%work%fct_plus, f%tracers%work%fct_minus)
-    !$ACC ENTER DATA CREATE (f%tracers%work%adv_flux_hor, f%tracers%work%adv_flux_ver, f%tracers%work%fct_LO)
+    !$ACC ENTER DATA CREATE (f%tracers%work%adv_flux_hor, f%tracers%work%adv_flux_ver, f%tracers%work%fct_LO, f%tracers%work%fct_LO_tend)
     !$ACC ENTER DATA CREATE (f%tracers%work%del_ttf_advvert, f%tracers%work%del_ttf_advhoriz, f%tracers%work%edge_up_dn_grad)
     !$ACC ENTER DATA CREATE (tr_xy, tr_z, relax2clim, Sclim, Tclim)
   end subroutine fesom_init
@@ -1429,7 +1429,7 @@ contains
     !$ACC EXIT DATA DELETE (f%tracers%data(tr_num)%valuesold)
     end do
     !$ACC EXIT DATA DELETE (f%tracers%work%fct_ttf_min, f%tracers%work%fct_ttf_max, f%tracers%work%fct_plus, f%tracers%work%fct_minus)
-    !$ACC EXIT DATA DELETE (f%tracers%work%adv_flux_hor, f%tracers%work%adv_flux_ver, f%tracers%work%fct_LO)
+    !$ACC EXIT DATA DELETE (f%tracers%work%adv_flux_hor, f%tracers%work%adv_flux_ver, f%tracers%work%fct_LO, f%tracers%work%fct_LO_tend)
     !$ACC EXIT DATA DELETE (f%tracers%work%del_ttf_advvert, f%tracers%work%del_ttf_advhoriz, f%tracers%work%edge_up_dn_grad)
     !$ACC EXIT DATA DELETE (f%tracers%work%del_ttf)
     !$ACC EXIT DATA DELETE (tr_xy, tr_z, relax2clim, Sclim, Tclim)
