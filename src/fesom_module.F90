@@ -468,6 +468,11 @@ contains
         IF (use_icebergs) THEN
           nrecv = nrecv + 2
         END IF
+#else
+        IF (use_atm_ice_tskin) THEN
+          nrecv = nrecv + 1
+          recv_tsk_ico = nrecv
+        END IF
 #endif
 #endif
 

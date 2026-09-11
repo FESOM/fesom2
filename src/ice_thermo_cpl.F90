@@ -178,11 +178,14 @@ subroutine thermodynamics(ice, partit, mesh)
      qres     = 0.0_WP
      qcon     = 0.0_WP
      if(A>Aimin) then
-        ! Anchor temperature for the implicit flux linearization: the ist OIFS
-        ! actually evaluated a2ihf at (captured at the OASIS send). Fall back
-        ! to the local t before the first transmission (cold start / restart).
-        tref = ist_ref(inod)
-        if (tref < 100.0_WP) tref = t
+        if (use_atm_ice_tskin) then
+           ! Skin temperature received from the atmosphere (tsk_ico); freezing
+           ! point before the first receive.
+           tref = ist_ref(inod)
+           if (tref < 173.15_WP .or. tref > 400.0_WP) tref = 271.35_WP
+        else
+           tref = t
+        end if
         call ice_surftemp(ice%thermo, max(h/(max(A,Aimin)),0.05), hsn/(max(A,Aimin)), a2ihf, tref, t)
         ice_temp(inod)  = t
      else
@@ -559,8 +562,8 @@ contains
   ! A  - Ice fraction
   ! h  - Ice thickness
   ! hsn   - Snow thickness
-  ! tref  - ist the atmosphere evaluated a2ihf at (last transmitted ist);
-  !         linearization anchor for the implicit flux term
+  ! tref  - linearization anchor for the implicit flux term; with
+  !         use_atm_ice_tskin the atmosphere's ice-tile skin temperature
   !
   ! INPUT/OUTPUT:
   ! t     - Ice surface temperature
@@ -615,7 +618,7 @@ contains
   zcpdte=zcpdt !+zcprosn*hsn            ! Combined Energy required to change temperature of snow + 0.05m of upper ice
 
   !---- Implicit (dQ/dT-linearized) atmospheric flux.
-  ! a2ihf was computed by the atmosphere at tref (the last transmitted ist)
+  ! a2ihf was computed by the atmosphere at tref
   ! and is held constant over the coupling interval. As the surface departs
   ! from tref, the flux's dominant temperature response is the surface's own
   ! longwave emission, linearized here:
@@ -625,8 +628,14 @@ contains
   ! wherever the surface tracks the coupling temperature. In coupled-slab mode
   ! the growth budget is driven by the atmosphere flux (-a2ihf), so this solve
   ! only sets the internal skin temperature (albedo/melt-pond state).
+  ! With use_atm_ice_tskin the atmosphere owns the skin and already formed it
+  ! from a2ihf, so it is taken as is.
   zlam=4.0_WP*emiss_ice*boltzmann*tref**3 + zlam_turb
-  t=(zcpdte*t+a2ihf+zlam*tref+zicefl)/(zcpdte+con/zsniced+zlam) ! New sea ice surf temp [K]
+  if (use_atm_ice_tskin) then
+     t=tref
+  else
+     t=(zcpdte*t+a2ihf+zlam*tref+zicefl)/(zcpdte+con/zsniced+zlam) ! New sea ice surf temp [K]
+  end if
   if (t>273.15_WP) then
      qres=(con/zsniced+zcpdte+zlam)*(t-273.15_WP)
      t=273.15_WP
