@@ -1962,14 +1962,16 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
 !< hetC: Zooplankton carbon concentration [mmol C m^-3 ]
 !< lossC_z: Zooplankton excretion of organic C [day^-1 ]
 !< hetRespFlux: Zooplankton respiration rate [day^-1]
-!< kScavFe: Scavenging rate of iron [m3 mmol C^-1 day^-1]
+!< kScavFe:      Scavenging rate of iron onto detrital organic carbon (DetC, DetZ2C) [m3 mmol C^-1 day^-1]
+!< kScavFe_calc: Scavenging rate of iron onto detrital calcite (DetCalc, DetZ2Calc) [m3 mmol CaCO3^-1 day^-1]
+!< kScavFe_si:   Scavenging rate of iron onto detrital silica/opal (DetSi, DetZ2Si) [m3 mmol Si^-1 day^-1]
 
     sms(k,ife) = ( Fe2N * (                         &
-        - N_assim                         * PhyC    & ! --> N assimilation Nanophytoplankton, [mmol N/(mmol C * day)] C specific N utilization rate  
+        - N_assim                         * PhyC    & ! --> N assimilation Nanophytoplankton, [mmol N/(mmol C * day)] C specific N utilization rate
         - N_assim_dia                     * DiaC    & ! --> N assimilation Diatom
 #if defined (__coccos)
-        - N_assim_cocco                   * CoccoC  & 
-        + lossN_c       * limitFacN_cocco * CoccoN  & 
+        - N_assim_cocco                   * CoccoC  &
+        + lossN_c       * limitFacN_cocco * CoccoN  &
 #endif
         + lossN         * limitFacN       * PhyN    & ! --> Excretion from small pythoplankton
         + lossN_d       * limitFacN_dia   * DiaN    & ! --> Excretion from diatom
@@ -1977,13 +1979,17 @@ subroutine REcoM_sms(n,Nn,state,thick,recipthick,SurfSR,sms,Temp, Sali_depth &
         + lossN_z                   * HetN          & ! --> Excretion from zooplankton
 #if defined (__3Zoo2Det)
         + reminN * arrFunc * O2Func * DetZ2N        & ! O2remin
-        + lossN_z2                        * Zoo2N   &         
+        + lossN_z2                        * Zoo2N   &
         + lossN_z3                        * MicZooN & ! 3Zoo
 #endif
                                               )     &
-        - kScavFe          * DetC   * FreeFe        & 
+        - kScavFe          * DetC      * FreeFe     &
+        - kScavFe_calc     * DetCalc   * FreeFe     &
+        - kScavFe_si       * DetSi     * FreeFe     &
 #if defined (__3Zoo2Det)
-        - kScavFe          * DetZ2C * FreeFe        &
+        - kScavFe          * DetZ2C    * FreeFe     &
+        - kScavFe_calc     * DetZ2Calc * FreeFe     &
+        - kScavFe_si       * DetZ2Si   * FreeFe     &
 #endif
                                                    ) * dt_b + sms(k,ife)
 

@@ -428,10 +428,12 @@ module recom_config
 !! *** Iron ***
   Real(kind=8)                 :: Fe2N           = 0.033d0       ! Fe2C * 6.625 (Fe2C = 0.005d0)
   Real(kind=8)                 :: Fe2N_benthos   = 0.15d0        ! default was 0.14 Fe2C_benthos (=0.02125=0.68d0/32.d0) * 6.625 - will have to be tuned. [umol/m2/day]
-  Real(kind=8)                 :: kScavFe        = 0.07d0
+  Real(kind=8)                 :: kScavFe        = 0.07d0        ! Fe scavenging rate onto detrital organic carbon (DetC, DetZ2C) [m3 mmol C^-1 day^-1]
+  Real(kind=8)                 :: kScavFe_calc   = 0.07d0        ! Fe scavenging rate onto detrital calcite (DetCalc, DetZ2Calc) [m3 mmol CaCO3^-1 day^-1]
+  Real(kind=8)                 :: kScavFe_si     = 0.07d0        ! Fe scavenging rate onto detrital silica/opal (DetSi, DetZ2Si) [m3 mmol Si^-1 day^-1]
   Real(kind=8)                 :: dust_sol       = 0.02d0        !Dissolution of Dust for bioavaliable
-  Real(kind=8)                 :: RiverFeConc   = 100d0        ! mean DFe concentration in rivers   
-  namelist /pairon/ Fe2N, Fe2N_benthos, kScavFe, dust_sol, RiverFeConc
+  Real(kind=8)                 :: RiverFeConc   = 100d0        ! mean DFe concentration in rivers
+  namelist /pairon/ Fe2N, Fe2N_benthos, kScavFe, kScavFe_calc, kScavFe_si, dust_sol, RiverFeConc
 !!------------------------------------------------------------------------------
 !! *** Calcification ***
   Real(kind=8)                 :: calc_prod_ratio = 0.02d0
