@@ -566,7 +566,6 @@ type(t_partit), intent(inout), target :: partit
         M_b          = 0.0
      end if
      !fw_flux_ib(ib) =          gas*(sf-sal)/sf   ! [m/s]   !
-     M_b 	    =          gas*(sf-sal)/sf   ! [m/s]   ! m freshwater per second
      !fw_flux_ib(ib) = M_b
      !fw = -M_b
      M_b = - (rhow / rhoi) * M_b 		 ! [m (ice) per second], positive for melting? NOW positive for melting
