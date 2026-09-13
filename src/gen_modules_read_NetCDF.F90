@@ -13,6 +13,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
   ! if check_dummy=.false., missing value is replaced with 0.0
 
   use, intrinsic :: ISO_FORTRAN_ENV, only: real64
+  use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
   use g_config
   use o_param
   USE MOD_MESH
@@ -113,14 +114,18 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
   ncdata_temp=ncdata
   do i=1,lonlen
      do j=1,latlen
-        if (ncdata(i,j)==miss .or. ncdata(i,j)==-99.0_WP) then  !!
+        !sl NaN is a gap too: the OASIM files mark missing cells with NaN (and _FillValue, not
+        !sl missing_value), and NaN never compares equal to miss, so without this those cells
+        !sl skipped the fill and reached the interpolation -- no light on the Antarctic shelf.
+        if (ncdata(i,j)==miss .or. ncdata(i,j)==-99.0_WP .or. ieee_is_nan(ncdata(i,j))) then  !!
            if (check_dummy) then
               aux=0.0_WP
               cnt=0
               do k=1,30
                  do ii=max(1,i-k),min(lonlen,i+k)
                     do jj=max(1,j-k),min(latlen,j+k)
-                       if (ncdata_temp(ii,jj)/=miss .and. ncdata_temp(ii,jj)/=-99.0_WP) then  !!
+                       if (ncdata_temp(ii,jj)/=miss .and. ncdata_temp(ii,jj)/=-99.0_WP &
+                           .and. .not. ieee_is_nan(ncdata_temp(ii,jj))) then  !!
                           aux=aux+ncdata_temp(ii,jj)
                           cnt=cnt+1                         
                        end if
@@ -137,6 +142,8 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
         end if
      end do
   end do
+    !sl a NaN with no valid neighbour within 30 cells (deep inland) must not reach the interpolation
+    where (ieee_is_nan(ncdata)) ncdata = 0.0_WP
     !write(*,*) 'post',minval(ncdata), maxval(ncdata)
     
     !___________________________________________________________________________

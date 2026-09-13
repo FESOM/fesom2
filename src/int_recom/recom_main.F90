@@ -427,8 +427,10 @@ endif
            , kspc_watercolumn                                    & ! NEW DISS stoichiometric solubility product for calcite [mol^2/kg^2]
            , rhoSW_watercolumn                                   & ! NEW DISS in-situ density of seawater [mol/m^3]
 #if defined(__RECOM_WAVEBANDS)
-           , oasim_ed2D(n,:)                                     &
-           , oasim_es2D(n,:)                                     &
+!sl sea ice shades the spectral light exactly as SW*(1-a_ice) shades the broadband path above.
+!sl Applied to the argument only: oasim_ed2D/es2D hold the monthly forcing and are reused every step.
+           , oasim_ed2D(n,:) * (1.d0 - a_ice(n))                 &
+           , oasim_es2D(n,:) * (1.d0 - a_ice(n))                 &
            , Light_watercolumn                                   & ! Light (Ed) variables
 #endif           
                            , PAR, ice, dynamics, tracers, partit, mesh)
