@@ -151,7 +151,7 @@ SiMaxSlope            = 1000.d0
 NCmax                 = 0.2d0       ! [mmol N/mmol C] Maximum cell quota of nitrogen (N:C)
 NCmax_d               = 0.2d0
 NCmax_c		      = 0.15d0      ! NEW
-NCmax_p               = 0.15d0       ! NEW for Phaeocystis (to be tuned)
+NCmax_p               = 0.2d0        ! Phaeocystis: = NCmax_d; REcoM has no colonial/solitary split
 SiCmax                = 0.8d0
 NCuptakeRatio         = 0.2d0       ! [mmol N/mmol C] Maximum uptake ratio of N:C
 NCUptakeRatio_d       = 0.2d0

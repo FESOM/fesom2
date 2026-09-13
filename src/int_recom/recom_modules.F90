@@ -291,7 +291,7 @@ module recom_config
   Real(kind=8)                 :: NCmax          = 0.2d0          ! [mmol N/mmol C] Maximum cell quota of nitrogen (N:C)
   Real(kind=8)                 :: NCmax_d        = 0.2d0
   Real(kind=8)                 :: NCmax_c        = 0.15d0         ! NEW
-  Real(kind=8)                 :: NCmax_p        = 0.1d0          ! Phaeocystis (to be tuned)
+  Real(kind=8)                 :: NCmax_p        = 0.2d0          ! Phaeocystis: = NCmax_d; REcoM has no colonial/solitary split (was 0.1)
   Real(kind=8)                 :: SiCmax         = 0.8d0
   Real(kind=8)                 :: NCuptakeRatio  = 0.2d0          ! [mmol N/mmol C] Maximum uptake ratio of N:C
   Real(kind=8)                 :: NCUptakeRatio_d = 0.2d0

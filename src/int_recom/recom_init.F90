@@ -424,7 +424,7 @@ subroutine recom_init(tracers, partit, mesh)
         ! Each phytoplankton class seeds N and C from ITS OWN quota parameters:
         !   N = tiny_chl/chl2N_max_X          C = tiny_chl/chl2N_max_X/NCmax_X
         ! Using the small-phyto chl2N_max/NCmax for every class (as this did before
-        ! Sep 2026) starts Phaeocystis at N:C = 0.2, i.e. 2x its own NCmax_p = 0.1.
+        ! Sep 2026) starts Phaeocystis at N:C = 0.2, i.e. 2x its then-default NCmax_p = 0.1.
         ! quota_phaeo is then clamped to the ceiling, dq = 0, and limitFacN_phaeo is
         ! exactly 0 -- no N uptake until photosynthesis doubles PhaeoC. Coccolithophores
         ! had a 1.33x version of the same. DiaSi below already used the _d parameters.
