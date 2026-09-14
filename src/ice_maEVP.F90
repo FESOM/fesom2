@@ -214,12 +214,12 @@ subroutine ssh2rhs(ice, partit, mesh)
             bb=bb*sum(dy*(elevation(elnodes)+p_ice))
             do n=1,3
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
-                call omp_set_lock  (partit%plock(elnodes(n)))
+                if (partit%plock_on) call omp_set_lock  (partit%plock(elnodes(n)))
 #endif
                rhs_a(elnodes(n))=rhs_a(elnodes(n))-aa
                rhs_m(elnodes(n))=rhs_m(elnodes(n))-bb
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
-               call omp_unset_lock(partit%plock(elnodes(n)))
+               if (partit%plock_on) call omp_unset_lock(partit%plock(elnodes(n)))
 #endif
             end do
         end do
@@ -248,12 +248,12 @@ subroutine ssh2rhs(ice, partit, mesh)
             bb=bb*sum(dy*elevation(elnodes))
             do n=1,3
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
-                call omp_set_lock  (partit%plock(elnodes(n)))
+                if (partit%plock_on) call omp_set_lock  (partit%plock(elnodes(n)))
 #endif
                rhs_a(elnodes(n))=rhs_a(elnodes(n))-aa
                rhs_m(elnodes(n))=rhs_m(elnodes(n))-bb
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
-               call omp_unset_lock(partit%plock(elnodes(n)))
+               if (partit%plock_on) call omp_unset_lock(partit%plock(elnodes(n)))
 #endif
             end do
         end do
@@ -334,7 +334,7 @@ subroutine stress2rhs_m(ice, partit, mesh)
         do k=1,3
             row=elnodes(k)
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
-            call omp_set_lock  (partit%plock(row))
+            if (partit%plock_on) call omp_set_lock  (partit%plock(row))
 #endif
             u_rhs_ice(row)=u_rhs_ice(row) - vol* &
                 (sigma11(elem)*dx(k)+sigma12(elem)*dy(k))    &
@@ -343,7 +343,7 @@ subroutine stress2rhs_m(ice, partit, mesh)
                 (sigma12(elem)*dx(k)+sigma22(elem)*dy(k))    &
         +vol*sigma11(elem)*val3*mf                         ! metrics
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(row))
+        if (partit%plock_on) call omp_unset_lock(partit%plock(row))
 #endif
         end do
     end do
@@ -528,12 +528,12 @@ subroutine EVPdynamics_m(ice, partit, mesh)
             bb=bb*sum(dy*(elevation(elnodes)+p_ice))
             do n=1, 3
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
-               call omp_set_lock  (partit%plock(elnodes(n)))
+               if (partit%plock_on) call omp_set_lock  (partit%plock(elnodes(n)))
 #endif
                rhs_a(elnodes(n))=rhs_a(elnodes(n))-aa
                rhs_m(elnodes(n))=rhs_m(elnodes(n))-bb
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
-               call omp_unset_lock(partit%plock(elnodes(n)))
+               if (partit%plock_on) call omp_unset_lock(partit%plock(elnodes(n)))
 #endif
             end do
         end do
@@ -564,12 +564,12 @@ subroutine EVPdynamics_m(ice, partit, mesh)
             bb=bb*sum(dy*elevation(elnodes))
             do n=1, 3
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
-            call omp_set_lock  (partit%plock(elnodes(n)))
+            if (partit%plock_on) call omp_set_lock  (partit%plock(elnodes(n)))
 #endif
                rhs_a(elnodes(n))=rhs_a(elnodes(n))-aa
                rhs_m(elnodes(n))=rhs_m(elnodes(n))-bb
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
-            call omp_unset_lock(partit%plock(elnodes(n)))
+            if (partit%plock_on) call omp_unset_lock(partit%plock(elnodes(n)))
 #endif
             end do
         end do
@@ -705,7 +705,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
                 !-----------------------------------------------------------------
                 if (elnodes(1) <= myDim_nod2D) then
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
-                    call omp_set_lock  (partit%plock(elnodes(1)))
+                    if (partit%plock_on) call omp_set_lock  (partit%plock(elnodes(1)))
 #else
 !$OMP ORDERED
 #endif
@@ -715,7 +715,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
                     v_rhs_ice(elnodes(1)) = v_rhs_ice(elnodes(1)) - elem_area(el)* &
                             (sigma12(el)*dx(1)+sigma22(el)*dy(1)  - sigma11(el)*meancos)               !metrics
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
-                    call omp_unset_lock(partit%plock(elnodes(1)))
+                    if (partit%plock_on) call omp_unset_lock(partit%plock(elnodes(1)))
 #else
 !$OMP END ORDERED
 #endif
@@ -723,7 +723,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
 
                 if (elnodes(2) <= myDim_nod2D) then
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
-                    call omp_set_lock  (partit%plock(elnodes(2)))
+                    if (partit%plock_on) call omp_set_lock  (partit%plock(elnodes(2)))
 #else
 !$OMP ORDERED
 #endif
@@ -732,7 +732,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
                     v_rhs_ice(elnodes(2)) = v_rhs_ice(elnodes(2)) - elem_area(el)* &
                             (sigma12(el)*dx(2)+sigma22(el)*dy(2)  - sigma11(el)*meancos)               !metrics
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
-                call omp_unset_lock(partit%plock(elnodes(2)))
+                if (partit%plock_on) call omp_unset_lock(partit%plock(elnodes(2)))
 #else
 !$OMP END ORDERED
 #endif
@@ -740,7 +740,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
 
                 if (elnodes(3) <= myDim_nod2D) then
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
-                    call omp_set_lock  (partit%plock(elnodes(3)))
+                    if (partit%plock_on) call omp_set_lock  (partit%plock(elnodes(3)))
 #else
 !$OMP ORDERED
 #endif
@@ -749,7 +749,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
                     v_rhs_ice(elnodes(3)) = v_rhs_ice(elnodes(3)) - elem_area(el)* &
                             (sigma12(el)*dx(3)+sigma22(el)*dy(3)  - sigma11(el)*meancos)               !metrics
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
-                   call omp_unset_lock(partit%plock(elnodes(3)))
+                   if (partit%plock_on) call omp_unset_lock(partit%plock(elnodes(3)))
 #else
 !$OMP END ORDERED
 #endif
@@ -793,12 +793,12 @@ subroutine EVPdynamics_m(ice, partit, mesh)
             if (myList_edge2D(ed) > edge2D_in) then
                do n=1, 2
 #if defined(_OPENMP)
-                call omp_set_lock  (partit%plock(edges(n, ed)))
+                if (partit%plock_on) call omp_set_lock  (partit%plock(edges(n, ed)))
 #endif
                 u_ice_aux(edges(n,ed))=0.0_WP
                 v_ice_aux(edges(n,ed))=0.0_WP
 #if defined(_OPENMP)
-                call omp_unset_lock(partit%plock(edges(n,ed)))
+                if (partit%plock_on) call omp_unset_lock(partit%plock(edges(n,ed)))
 #endif
                end do
             end if
@@ -815,12 +815,12 @@ subroutine EVPdynamics_m(ice, partit, mesh)
                 if (lcav_edge) then
                     do n=1, 2
 #if defined(_OPENMP)
-                       call omp_set_lock  (partit%plock(edges(n, ed)))
+                       if (partit%plock_on) call omp_set_lock  (partit%plock(edges(n, ed)))
 #endif
                        u_ice_aux(edges(n,ed))=0.0_WP
                        v_ice_aux(edges(n,ed))=0.0_WP
 #if defined(_OPENMP)
-                       call omp_unset_lock(partit%plock(edges(n,ed)))
+                       if (partit%plock_on) call omp_unset_lock(partit%plock(edges(n,ed)))
 #endif
                     end do
                 end if
