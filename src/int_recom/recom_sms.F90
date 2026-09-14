@@ -4136,6 +4136,21 @@ endif !/* RECOM_MARSHALL */
            aggregationrate = aggregationrate + agg_PP * CoccoN + agg_PP * PhaeoN
        endif
 
+       !---------------------------------------------------------------------------
+       ! Phaeocystis-specific aggregation rate
+       !---------------------------------------------------------------------------
+       ! Phaeocystis is removed by the same coagulation kernel as every other PFT,
+       ! which on the Antarctic shelf is dominated by agg_PD * DetN, i.e. detritus
+       ! from the diatom bloom. agg_fac_phaeo scales the rate that Phaeocystis
+       ! itself experiences, without touching the kernel the other PFTs see:
+       !   agg_fac_phaeo = 1.0  reproduces the previous behaviour exactly
+       !   agg_fac_phaeo < 1.0  Phaeocystis is scavenged into aggregates less readily
+       ! Its own (negligible) contribution to the kernel above is deliberately left
+       ! unscaled, so that this factor changes Phaeocystis and nothing else.
+       ! Mass is conserved: the same rate is used for the Phaeocystis loss terms and
+       ! for the matching detritus source terms.
+       aggregationrate_phaeo = agg_fac_phaeo * aggregationrate
+
        !===============================================================================
        ! MARINE CALCIFICATION
        !===============================================================================
@@ -4751,7 +4766,7 @@ endif  !/* RECOM_MARSHALL */
                     + aggregationRate    * PhyN                            &
                     + aggregationRate    * DiaN                            &
                     + aggregationRate    * CoccoN    * is_coccos           &
-                    + aggregationRate    * PhaeoN    * is_coccos           &
+                    + aggregationrate_phaeo    * PhaeoN    * is_coccos           &
                     !-----------------------------------------------------------------------
                     ! SOURCES: Zooplankton Mortality
                     !-----------------------------------------------------------------------
@@ -4785,7 +4800,7 @@ endif  !/* RECOM_MARSHALL */
                     + aggregationRate   * PhyN                             &
                     + aggregationRate   * DiaN                             &
                     + aggregationRate   * CoccoN    * is_coccos            &
-                    + aggregationRate   * PhaeoN    * is_coccos            &
+                    + aggregationrate_phaeo   * PhaeoN    * is_coccos            &
                     !-----------------------------------------------------------------------
                     ! SOURCES: Zooplankton Mortality
                     !-----------------------------------------------------------------------
@@ -4822,7 +4837,7 @@ endif  !/* RECOM_MARSHALL */
                     + aggregationRate    * PhyN                            &
                     + aggregationRate    * DiaN                            &
                     + aggregationRate    * CoccoN    * is_coccos           &
-                    + aggregationRate    * PhaeoN    * is_coccos           &
+                    + aggregationrate_phaeo    * PhaeoN    * is_coccos           &
                     !-----------------------------------------------------------------------
                     ! SOURCES: Zooplankton Mortality
                     !-----------------------------------------------------------------------
@@ -4855,7 +4870,7 @@ endif  !/* RECOM_MARSHALL */
                     + aggregationRate   * PhyN                             &
                     + aggregationRate   * DiaN                             &
                     + aggregationRate   * CoccoN     * is_coccos           &
-                    + aggregationRate   * PhaeoN     * is_coccos           &
+                    + aggregationrate_phaeo   * PhaeoN     * is_coccos           &
                     !-----------------------------------------------------------------------
                     ! SOURCES: Zooplankton Mortality
                     !-----------------------------------------------------------------------
@@ -4929,7 +4944,7 @@ endif  !/* RECOM_MARSHALL */
                     + aggregationRate    * PhyC                            &
                     + aggregationRate    * DiaC                            &
                     + aggregationRate    * CoccoC           * is_coccos    &
-                    + aggregationRate    * PhaeoC           * is_coccos    &
+                    + aggregationrate_phaeo    * PhaeoC           * is_coccos    &
                     !-----------------------------------------------------------------------
                     ! SOURCES: Zooplankton Mortality (C-basis)
                     !-----------------------------------------------------------------------
@@ -4963,7 +4978,7 @@ endif  !/* RECOM_MARSHALL */
                     + aggregationRate    * phyC                            &
                     + aggregationRate    * DiaC                            &
                     + aggregationRate    * CoccoC           * is_coccos    &
-                    + aggregationRate    * PhaeoC           * is_coccos    &
+                    + aggregationrate_phaeo    * PhaeoC           * is_coccos    &
                     !-----------------------------------------------------------------------
                     ! SOURCES: Zooplankton Mortality (C-basis)
                     !-----------------------------------------------------------------------
@@ -4999,7 +5014,7 @@ endif  !/* RECOM_MARSHALL */
                     + aggregationRate    * PhyC                            &
                     + aggregationRate    * DiaC                            &
                     + aggregationRate    * CoccoC           * is_coccos    &
-                    + aggregationRate    * PhaeoC           * is_coccos    &
+                    + aggregationrate_phaeo    * PhaeoC           * is_coccos    &
                     !-----------------------------------------------------------------------
                     ! SOURCES: Zooplankton Mortality (C-basis)
                     !-----------------------------------------------------------------------
@@ -5028,7 +5043,7 @@ endif  !/* RECOM_MARSHALL */
                     + aggregationRate    * phyC                            &
                     + aggregationRate    * DiaC                            &
                     + aggregationRate    * CoccoC           * is_coccos    &
-                    + aggregationRate    * PhaeoC           * is_coccos    &
+                    + aggregationrate_phaeo    * PhaeoC           * is_coccos    &
                     !-----------------------------------------------------------------------
                     ! SOURCES: Zooplankton Mortality (C-basis)
                     !-----------------------------------------------------------------------
@@ -5933,7 +5948,7 @@ endif
                 !-----------------------------------------------------------------------
                 ! SINKS: Aggregation
                 !-----------------------------------------------------------------------
-                - aggregationRate                 * PhaeoN                 &
+                - aggregationrate_phaeo                 * PhaeoN                 &
                 !-----------------------------------------------------------------------
                 ! SINKS: Grazing
                 !-----------------------------------------------------------------------
@@ -5970,7 +5985,7 @@ endif
                 !-----------------------------------------------------------------------
                 ! SINKS: Aggregation
                 !-----------------------------------------------------------------------
-                - aggregationRate                 * PhaeoC                 &
+                - aggregationrate_phaeo                 * PhaeoC                 &
                 !-----------------------------------------------------------------------
                 ! SINKS: Grazing (C-basis)
                 !-----------------------------------------------------------------------
@@ -6002,7 +6017,7 @@ endif
                 !-----------------------------------------------------------------------
                 ! SINKS: Aggregation
                 !-----------------------------------------------------------------------
-                - aggregationRate                 * PhaeoChl               &
+                - aggregationrate_phaeo                 * PhaeoChl               &
                 !-----------------------------------------------------------------------
                 ! SINKS: Grazing (Chl-basis)
                 !-----------------------------------------------------------------------
@@ -7261,7 +7276,7 @@ endif !/* RECOM_CDOM */
 
                     ! Phaeocystis aggregation
                     vertaggp(k) = vertaggp(k) + ( &
-                        + aggregationrate * PhaeoC &
+                        + aggregationrate_phaeo * PhaeoC &
                     ) * recipbiostep
                 endif
 

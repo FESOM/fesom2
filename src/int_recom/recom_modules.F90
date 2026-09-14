@@ -402,7 +402,8 @@ module recom_config
 !! *** Aggregation ***
   Real(kind=8)                 :: agg_PD        = 0.165d0         ! [m3/(mmol N * day)] Maximum aggregation loss parameter for DetN
   Real(kind=8)                 :: agg_PP        = 0.015d0         ! [m3/(mmol N * day)] Maximum aggregation loss parameter for PhyN and DiaN (plankton)
-  namelist /paaggregation/ agg_PD, agg_PP
+  Real(kind=8)                 :: agg_fac_phaeo = 1.0d0           ! [-] Phaeocystis-specific scaling of the shared aggregation rate (1.0 = as all other PFTs)
+  namelist /paaggregation/ agg_PD, agg_PP, agg_fac_phaeo
 !!------------------------------------------------------------------------------
 !! *** DIN ***
   Real(kind=8)                 :: rho_N         = 0.11d0          ! [1/day] Temperature dependent N degradation of extracellular organic N (EON) (Remineralization of DON)
@@ -1576,6 +1577,7 @@ Module REcoM_declarations
 !!------------------------------------------------------------------------------                                                                                
 !! *** Aggregation  ***
   Real(kind=8)  :: AggregationRate                   ! [1/day] AggregationRate (of nitrogen)
+  Real(kind=8)  :: AggregationRate_phaeo             ! [1/day] As AggregationRate, scaled by agg_fac_phaeo, applied to Phaeocystis only
 !!------------------------------------------------------------------------------                                                                                
 !! *** Calcification  ***
   Real(kind=8)  :: calc_prod_ratio_cocco             ! NEW (before it was defined as a fixed value, but now dependent on cocco and T)
