@@ -402,7 +402,13 @@ module recom_config
 !! *** Aggregation ***
   Real(kind=8)                 :: agg_PD        = 0.165d0         ! [m3/(mmol N * day)] Maximum aggregation loss parameter for DetN
   Real(kind=8)                 :: agg_PP        = 0.015d0         ! [m3/(mmol N * day)] Maximum aggregation loss parameter for PhyN and DiaN (plankton)
-  Real(kind=8)                 :: agg_fac_phaeo = 1.0d0           ! [-] Phaeocystis-specific scaling of the shared aggregation rate (1.0 = as all other PFTs)
+  ! [-] Phaeocystis-specific scaling of the shared aggregation rate. 1.0 = as all other PFTs.
+  ! TUNED: 0.85 makes Oct-Feb Phaeocystis carbon unbiased against MAREDAT south of 30S at no
+  ! measurable cost to diatoms or coccolithophores. Below ~0.70 the coupled system tips into a
+  ! much higher Phaeocystis state (less Phaeo aggregation -> fewer diatoms -> less DetN -> a
+  ! lower kernel for every class), which overshoots the observations threefold. Default left at
+  ! 1.0 so existing runs reproduce; set 0.85d0 in the namelist to use the tuned value.
+  Real(kind=8)                 :: agg_fac_phaeo = 1.0d0
   namelist /paaggregation/ agg_PD, agg_PP, agg_fac_phaeo
 !!------------------------------------------------------------------------------
 !! *** DIN ***
