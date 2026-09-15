@@ -409,7 +409,12 @@ module recom_config
   ! lower kernel for every class), which overshoots the observations threefold. Default left at
   ! 1.0 so existing runs reproduce; set 0.85d0 in the namelist to use the tuned value.
   Real(kind=8)                 :: agg_fac_phaeo = 1.0d0
-  namelist /paaggregation/ agg_PD, agg_PP, agg_fac_phaeo
+  ! [-] Scales, for Phaeocystis only, just the detritus part agg_PD*(DetN+DetZ2N) of the kernel it
+  ! sees (applied before agg_fac_phaeo). 1.0 = as all other PFTs. On the Ross shelf in Dec-Jan that
+  ! part is ~90% of the kernel, so there it acts like agg_fac_phaeo = 1 - 0.9*(1 - agg_fac_phaeo_det);
+  ! it differs in winter, when the detritus share falls to 0.1-0.6.
+  Real(kind=8)                 :: agg_fac_phaeo_det = 1.0d0
+  namelist /paaggregation/ agg_PD, agg_PP, agg_fac_phaeo, agg_fac_phaeo_det
 !!------------------------------------------------------------------------------
 !! *** DIN ***
   Real(kind=8)                 :: rho_N         = 0.11d0          ! [1/day] Temperature dependent N degradation of extracellular organic N (EON) (Remineralization of DON)
@@ -1584,6 +1589,7 @@ Module REcoM_declarations
 !! *** Aggregation  ***
   Real(kind=8)  :: AggregationRate                   ! [1/day] AggregationRate (of nitrogen)
   Real(kind=8)  :: AggregationRate_phaeo             ! [1/day] As AggregationRate, scaled by agg_fac_phaeo, applied to Phaeocystis only
+  Real(kind=8)  :: AggregationRate_det               ! [1/day] Detritus part agg_PD*(DetN+DetZ2N) of AggregationRate, scaled by agg_fac_phaeo_det for Phaeocystis
 !!------------------------------------------------------------------------------                                                                                
 !! *** Calcification  ***
   Real(kind=8)  :: calc_prod_ratio_cocco             ! NEW (before it was defined as a fixed value, but now dependent on cocco and T)

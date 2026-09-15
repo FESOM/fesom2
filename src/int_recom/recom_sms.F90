@@ -4149,7 +4149,19 @@ endif !/* RECOM_MARSHALL */
        ! unscaled, so that this factor changes Phaeocystis and nothing else.
        ! Mass is conserved: the same rate is used for the Phaeocystis loss terms and
        ! for the matching detritus source terms.
-       aggregationrate_phaeo = agg_fac_phaeo * aggregationrate
+       !
+       ! agg_fac_phaeo_det scales, for Phaeocystis only, just the detritus part of the
+       ! kernel, agg_PD * (DetN + DetZ2N): mm-scale mucilaginous colonies may be poorly
+       ! scavenged by small diatom-derived detritus while Phaeo-plankton coagulation is
+       ! unchanged. agg_fac_phaeo is applied on top. The guard keeps the 1.0 default
+       ! bit-identical.
+       aggregationrate_phaeo = aggregationrate
+       if (agg_fac_phaeo_det /= 1.0d0) then
+           aggregationrate_det = agg_PD * DetN
+           if (enable_3zoo2det) aggregationrate_det = aggregationrate_det + agg_PD * DetZ2N
+           aggregationrate_phaeo = aggregationrate - (1.0d0 - agg_fac_phaeo_det) * aggregationrate_det
+       endif
+       aggregationrate_phaeo = agg_fac_phaeo * aggregationrate_phaeo
 
        !===============================================================================
        ! MARINE CALCIFICATION
