@@ -24,7 +24,7 @@ set(USE_MULTIO          OFF CACHE BOOL "Use MULTIO for IO, either grib or binary
 set(OASIS_WITH_YAC      OFF CACHE BOOL "Useing a version of OASIS compiled with YAC instead of SCRIP for interpolation?")
 set(ASYNC_ICEBERGS      ON  CACHE BOOL "compile fesom with or without support for asynchronous iceberg computations")
 set(VERBOSE             OFF CACHE BOOL "toggle debug output")
-set(FESOM_PROFILING     OFF CACHE BOOL "Enable enhanced profiling system")
+set(FESOM_PROFILING     ON CACHE BOOL "Enable enhanced profiling system")
 set(CVMIX               ON  CACHE BOOL "Download/Compile/Install/Link CVMix libray")
 
 # CVMix is a fixed double-precision library (its kind is cvmix_r8 = real64). It is
