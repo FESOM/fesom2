@@ -1293,15 +1293,30 @@ subroutine restart_thickness_ale(partit, mesh)
         do n=1, myDim_nod2D+eDim_nod2D
             nzmin = ulevels_nod2D(n)
             nzmax = nlevels_nod2D(n)-1
-            
+
             !___________________________________________________________________
-            ! if there is a cavity layer thickness is not updated, its 
-            ! kept fixed 
-            if (nzmin > 1) cycle
-            
+            ! Cavity columns AND their open-ocean edge ring (any node touching
+            ! a cavity element, ulevels_nod2D_max>1 -- the same exclusion class
+            ! as the per-step hnode<->hnode_new sync loop) keep layer
+            ! thicknesses fixed at the mesh nominal (hnode_new from
+            ! init_thickness_ale, untouched by the restart read). A restart
+            ! hnode deviating from that nominal (e.g. remapped from a formerly
+            ! ice-free zstar column) would persist forever, and the tracer T*
+            ! update applies the mismatch as a multiplicative content drain
+            ! every step. Force restart hnode to the nominal and rebuild the
+            ! depth arrays.
+            if (ulevels_nod2D_max(n) > 1) then
+                hnode(nzmin:nzmax,n) = hnode_new(nzmin:nzmax,n)
+                do nz=nzmax,nzmin,-1
+                    zbar_3d_n(nz,n) = zbar_3d_n(nz+1,n) + hnode(nz,n)
+                    Z_3d_n(nz,n)    = zbar_3d_n(nz+1,n) + hnode(nz,n)/2.0_WP
+                end do
+                cycle
+            end if
+
             !___________________________________________________________________
             ! be sure that bottom layerthickness uses partial cell layer thickness
-            ! in case its activated, especially when you make a restart from a non 
+            ! in case its activated, especially when you make a restart from a non
             ! partiall cell runs towards a simulation with partial cells
             hnode(nzmax,n) = bottom_node_thickness(n)
             
