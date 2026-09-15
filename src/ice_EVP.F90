@@ -165,8 +165,8 @@ subroutine stress2rhs(ice, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
-    INTEGER                   :: n, el,  k
-    REAL(kind=WP)             :: val3
+    INTEGER                   :: n, el,  k, j
+    REAL(kind=WP)             :: val3, su, sv
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: sigma11, sigma12, sigma22
@@ -193,35 +193,51 @@ subroutine stress2rhs(ice, partit, mesh)
     val3=1/3.0_WP
 
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, el, k)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, el, k, j, elnodes, su, sv)
+    ! Node-owned gather: each owned node sums the stress divergence of its incident
+    ! elements in nod_in_elem2D order and writes only its own entry. No locks are
+    ! needed and the sum does not depend on the number of threads.
 !$OMP DO
+    DO n=1, myDim_nod2D
+        su = 0.0_WP
+        sv = 0.0_WP
+        do k=1, nod_in_elem2D_num(n)
+            el = nod_in_elem2D(k,n)
+            !___________________________________________________________________
+            ! if element contains cavity node skip it
+            if (ulevels(el) > 1) cycle
+            elnodes = elem2D_nodes(:,el)
+            if (any(m_ice(elnodes) <= 0._WP) .or. any(a_ice(elnodes) <= 0._WP)) cycle
+            !___________________________________________________________________
+            ! corner of element el that is node n
+            j = 3
+            if (elnodes(1) == n) j = 1
+            if (elnodes(2) == n) j = 2
+            su = su - elem_area(el) * &
+                 (sigma11(el)*gradient_sca(j,el) + sigma12(el)*gradient_sca(j+3,el) &
+                 +sigma12(el)*val3*metric_factor(el))            !metrics
+            sv = sv - elem_area(el) * &
+                 (sigma12(el)*gradient_sca(j,el) + sigma22(el)*gradient_sca(j+3,el) &
+                 -sigma11(el)*val3*metric_factor(el))
+        end do
+        U_rhs_ice(n) = su
+        V_rhs_ice(n) = sv
+    END DO
+!$OMP END DO
 #else
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
-#endif
     DO  n=1, myDim_nod2D
         U_rhs_ice(n)=0.0_WP
         V_rhs_ice(n)=0.0_WP
     END DO
 
-#ifndef ENABLE_OPENACC
-!$OMP END DO
-#else
     !$ACC END PARALLEL LOOP
-#endif
 
-#ifndef ENABLE_OPENACC
-#if defined(__openmp_reproducible)
-!$OMP SINGLE
-#else
-!$OMP DO
-#endif
-#else
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #if !defined(DISABLE_OPENACC_ATOMICS)
        !$ACC ATOMIC UPDAATE
 #else
     !$ACC UPDATE SELF(u_rhs_ice, v_rhs_ice, sigma11, sigma12, sigma22)
-#endif
 #endif
     do el=1,myDim_elem2D
         ! ===== Skip if ice is absent
@@ -236,11 +252,6 @@ subroutine stress2rhs(ice, partit, mesh)
 
         DO k=1,3
 
-#ifndef ENABLE_OPENACC
-#if defined(_OPENMP) && !defined(__openmp_reproducible)
-        call omp_set_lock  (partit%plock(elem2D_nodes(k,el)))
-#endif
-#endif
 #ifdef ENABLE_OPENACC
 #if !defined(DISABLE_OPENACC_ATOMICS)
                 !$ACC ATOMIC UPDATE
@@ -261,11 +272,6 @@ subroutine stress2rhs(ice, partit, mesh)
                     (sigma12(el)*gradient_sca(k,el) + sigma22(el)*gradient_sca(k+3,el) &
                     -sigma11(el)*val3*metric_factor(el))
 
-#ifndef ENABLE_OPENACC
-#if defined(_OPENMP) && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(elem2D_nodes(k,el)))
-#endif
-#endif
         END DO
     end do
 #ifdef ENABLE_OPENACC
@@ -274,13 +280,6 @@ subroutine stress2rhs(ice, partit, mesh)
 #endif
 #endif
 
-#ifndef ENABLE_OPENACC
-#if defined(__openmp_reproducible)
-!$OMP END SINGLE
-#else
-!$OMP END DO
-#endif
-#else
     !$ACC END PARALLEL LOOP
 #endif
 
