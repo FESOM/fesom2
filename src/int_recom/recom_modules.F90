@@ -429,7 +429,12 @@ module recom_config
   Real(kind=8)                 :: lossN_d       = 0.05d0
   Real(kind=8)                 :: lossN_c       = 0.05d0
   Real(kind=8)                 :: lossN_p       = 0.05d0          ! Phaeocystis
-  namelist /paphytoplankton_N/ lossN, lossN_d, lossN_c, lossN_p
+  ! [1/day] Phaeocystis linear mortality/lysis to detritus (N and C; Chl is lost), PhySyn/Darwin form:
+  ! mort_phaeo, multiplied by mort_fac_fe_phaeo where DFe < k_Fe_p (solitary cells, Bender et al. 2018).
+  ! No temperature dependence. 0 = off, and then the code path is unchanged.
+  Real(kind=8)                 :: mort_phaeo        = 0.0d0
+  Real(kind=8)                 :: mort_fac_fe_phaeo = 1.3d0
+  namelist /paphytoplankton_N/ lossN, lossN_d, lossN_c, lossN_p, mort_phaeo, mort_fac_fe_phaeo
 !!------------------------------------------------------------------------------
 !! *** Phytoplankton C ***
   Real(kind=8)                 :: lossC         = 0.10d0          ! [1/day] Phytoplankton loss of carbon 
@@ -1589,6 +1594,7 @@ Module REcoM_declarations
 !! *** Aggregation  ***
   Real(kind=8)  :: AggregationRate                   ! [1/day] AggregationRate (of nitrogen)
   Real(kind=8)  :: AggregationRate_phaeo             ! [1/day] As AggregationRate, scaled by agg_fac_phaeo, applied to Phaeocystis only
+  Real(kind=8)  :: MortRate_phaeo                    ! [1/day] Phaeocystis linear mortality to detritus (mort_phaeo, x mort_fac_fe_phaeo if DFe < k_Fe_p)
   Real(kind=8)  :: AggregationRate_det               ! [1/day] Detritus part agg_PD*(DetN+DetZ2N) of AggregationRate, scaled by agg_fac_phaeo_det for Phaeocystis
 !!------------------------------------------------------------------------------                                                                                
 !! *** Calcification  ***

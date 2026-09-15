@@ -4163,6 +4163,15 @@ endif !/* RECOM_MARSHALL */
        endif
        aggregationrate_phaeo = agg_fac_phaeo * aggregationrate_phaeo
 
+       ! Phaeocystis linear mortality/lysis (PhySyn/Darwin): mort_phaeo, x mort_fac_fe_phaeo
+       ! where iron is below k_Fe_p (solitary cells). Applied after the enable_coccos
+       ! tendencies below, as separate guarded statements, so mort_phaeo = 0 is bit-identical.
+       mortRate_phaeo = 0.0d0
+       if (mort_phaeo > 0.0d0) then
+           mortRate_phaeo = mort_phaeo
+           if (Fe < k_Fe_p) mortRate_phaeo = mort_fac_fe_phaeo * mort_phaeo
+       endif
+
        !===============================================================================
        ! MARINE CALCIFICATION
        !===============================================================================
@@ -6037,6 +6046,19 @@ endif
                 - grazingFlux_phaeo2 * Chl2N_phaeo           * is_3zoo2det & ! Macrozooplankton
                 - grazingFlux_phaeo3 * Chl2N_phaeo           * is_3zoo2det & ! Microzooplankton
                                                                           ) * dt_b + sms(k,iphachl)
+
+            !-----------------------------------------------------------------------
+            ! Phaeocystis mortality/lysis: N and C to detritus (the same pools that
+            ! receive Phaeocystis aggregation in all four detritus configurations),
+            ! chlorophyll is lost. Mass-conserving by construction.
+            !-----------------------------------------------------------------------
+            if (mort_phaeo > 0.0d0) then
+                sms(k,iphan)   = sms(k,iphan)   - mortRate_phaeo * PhaeoN   * dt_b
+                sms(k,iphac)   = sms(k,iphac)   - mortRate_phaeo * PhaeoC   * dt_b
+                sms(k,iphachl) = sms(k,iphachl) - mortRate_phaeo * PhaeoChl * dt_b
+                sms(k,idetn)   = sms(k,idetn)   + mortRate_phaeo * PhaeoN   * dt_b
+                sms(k,idetc)   = sms(k,idetc)   + mortRate_phaeo * PhaeoC   * dt_b
+            endif
 
         endif  ! enable_coccos
 
