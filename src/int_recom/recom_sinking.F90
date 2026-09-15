@@ -81,6 +81,9 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
     integer                   :: nlevels_nod2D_minimum
     real(kind=WP)             :: tv
     real(kind=WP), dimension(:,:), pointer :: trarr
+    logical                   :: phaeo_sinks        ! Phaeocystis tracer and VPhaeo > 0.1
+    integer                   :: i_fe, i            ! tracer index of DFe (ID 1019)
+    real(kind=WP)             :: fe_loc             ! DFe in the layer [umol/m3]
 
 #include "../associate_part_def.h"
 #include "../associate_mesh_def.h"
@@ -88,6 +91,22 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
 #include "../associate_mesh_ass.h"
 
     trarr=>tracers%data(tr_num)%values(:,:)
+
+    ! Phaeocystis sinking (VPhaeo > 0.1) is iron-dependent, as in ver_sinking_recom, and its
+    ! N and C go into the benthic N and C pools below. With VPhaeo <= 0.1 nothing here changes.
+    phaeo_sinks = enable_coccos .and. VPhaeo > 0.1 .and. &
+                  any(recom_phaeo_tracer_id == tracers%data(tr_num)%ID)
+    i_fe = 0
+    if (phaeo_sinks) then
+       do i = 1, tracers%num_tracers
+          if (tracers%data(i)%ID == 1019) i_fe = i
+       end do
+       if (i_fe == 0) then
+          if (partit%mype == 0) print *, 'FATAL: Phaeocystis sinking needs DFe (tracer ID 1019), not found'
+          call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+          stop
+       end if
+    end if
 
    do n=1, myDim_nod2D ! needs exchange_nod in the end
         nl1=nlevels_nod2D(n)-1
@@ -104,6 +123,15 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
           if (any(recom_dia_tracer_id == tracers%data(tr_num)%ID)) Vben = VDia
         if (allow_var_sinking) then
           Vben = Vdet_a * abs(zbar_3d_n(:,n)) + Vben
+        end if
+
+        ! Phaeocystis: PhySyn-type iron-dependent speed, no depth term (replaces the line above)
+        if (phaeo_sinks) then
+          Vben = 0._WP
+          do nz = ul1, nl1
+             fe_loc   = max(tracers%data(i_fe)%values(nz,n), 0._WP)
+             Vben(nz) = VPhaeo * (1.0_WP - fe_loc/(fe_loc + k_Fe_p))
+          end do
         end if
 
 ! Constant vertical sinking for the second detritus class
@@ -141,6 +169,7 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
         if( tracers%data(tr_num)%ID==1004 .or. &  !iphyn
             tracers%data(tr_num)%ID==1007 .or. &  !idetn
             tracers%data(tr_num)%ID==1013 .or. &  !idian
+            (phaeo_sinks .and. tracers%data(tr_num)%ID==recom_phaeo_tracer_id(1)) .or. &  !iphan
             tracers%data(tr_num)%ID==1025 ) then  !idetz2n
             Benthos(n,1)= Benthos(n,1) +  add_benthos_2d(n) ![mmol]
 
@@ -161,6 +190,7 @@ subroutine ver_sinking_recom_benthos(tr_num, tracers, partit, mesh)
         if( tracers%data(tr_num)%ID==1005 .or. &  !iphyc
             tracers%data(tr_num)%ID==1008 .or. &  !idetc
             tracers%data(tr_num)%ID==1014 .or. &  !idiac
+            (phaeo_sinks .and. tracers%data(tr_num)%ID==recom_phaeo_tracer_id(2)) .or. &  !iphac
             tracers%data(tr_num)%ID==1026 ) then  !idetz2c
             Benthos(n,2)= Benthos(n,2) + add_benthos_2d(n)
 
@@ -481,6 +511,9 @@ subroutine ver_sinking_recom(tr_num, tracers, partit, mesh)
     real(kind=8)                           :: dt_sink, c1, c2
     real(kind=8)                           :: Vsink, tv
     real(kind=8),dimension(mesh%nl)        :: Wvel_flux
+    logical                                :: is_phaeo          ! tracer is PhaeoN/PhaeoC/PhaeoChl
+    integer                                :: i_fe, i           ! tracer index of DFe (ID 1019)
+    real(kind=8)                           :: fe_up             ! DFe above the interface [umol/m3]
 
     real(kind=WP), dimension(:,:), pointer :: trarr
 
@@ -533,10 +566,8 @@ elseif (enable_coccos .and. &
     Vsink = VCocco
 
 ! Phaeocystis tracers (nitrogen, carbon, chlorophyll)
-elseif (enable_coccos .and. &
-        (tracers%data(tr_num)%ID == 1032 .or. &  ! iphan
-         tracers%data(tr_num)%ID == 1033 .or. &  ! iphac
-         tracers%data(tr_num)%ID == 1034)) then  ! iphachl
+! Keyed on recom_phaeo_tracer_id (zero unless enable_coccos), not on literal IDs
+elseif (enable_coccos .and. any(recom_phaeo_tracer_id == tracers%data(tr_num)%ID)) then
     Vsink = VPhaeo
 
 
@@ -556,6 +587,21 @@ elseif (enable_3zoo2det .and. &
          tracers%data(tr_num)%ID == 1028)) then  ! idetz2calc
     Vsink = VDet_zoo2
 
+end if
+
+! Phaeocystis sinks only where iron limits it (PhySyn): w = VPhaeo * (1 - Fe/(Fe + k_Fe_p)),
+! with no depth term. Growing colonies barely sink, iron-limited post-bloom colonies do.
+is_phaeo = enable_coccos .and. any(recom_phaeo_tracer_id == tracers%data(tr_num)%ID)
+i_fe = 0
+if (is_phaeo .and. Vsink .gt. 0.1) then
+   do i = 1, tracers%num_tracers
+      if (tracers%data(i)%ID == 1019) i_fe = i
+   end do
+   if (i_fe == 0) then
+      if (partit%mype == 0) print *, 'FATAL: Phaeocystis sinking needs DFe (tracer ID 1019), not found'
+      call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+      stop
+   end if
 end if
 
 
@@ -592,6 +638,13 @@ if (Vsink .gt. 0.1) then
                 !! * sinking velocity [m d-1] surface --> bottom (negative)* 
                 Wvel_flux(nz) = -1.0d0 * Wvel_flux(nz)/SecondsPerDay ! now in [m s-1]
             endif
+         end if
+
+         !! ---- Phaeocystis: iron-dependent speed replaces the constant and depth terms above.
+         !! DFe is taken from the layer above interface nz (upstream for downward sinking).
+         if (is_phaeo) then
+            fe_up = max(tracers%data(i_fe)%values(max(nzmin,nz-1),n), 0.0d0)
+            Wvel_flux(nz) = -VPhaeo * (1.0d0 - fe_up/(fe_up + k_Fe_p)) / SecondsPerDay
          end if
 
          !! ---- We assume *constant* sinking for second detritus
