@@ -554,7 +554,12 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> before main
              Euz3D    (1:nl-1,n,:) = Light_watercolumn(1:nl-1,:,3)
              Eutop3D  (1:nl-1,n,:) = Light_watercolumn(1:nl-1,:,4)
              Estop3D  (1:nl-1,n,:) = Light_watercolumn(1:nl-1,:,5)
-if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> after main Ed4D'//achar(27)//'[0m'            
+!sl just below the surface, for Rrs: the same quantities as Reflec in REcoM_Forcing (Eutop at kSurface = 1
+!sl over the ice-shaded OASIM arguments passed above)
+             Eu0_2D(n,:) = Light_watercolumn(1,:,iEutop)
+             Ed0_2D(n,:) = oasim_ed2D(n,:) * (1.d0 - a_ice(n))
+             Es0_2D(n,:) = oasim_es2D(n,:) * (1.d0 - a_ice(n))
+if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> after main Ed4D'//achar(27)//'[0m'
 #endif
 
 
@@ -650,6 +655,9 @@ if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> before exch
             call exchange_nod(Euz3D(:,:,tr_num), partit)
             call exchange_nod(Eutop3D(:,:,tr_num), partit)
             call exchange_nod(Estop3D(:,:,tr_num), partit)
+            call exchange_nod(Eu0_2D(:,tr_num), partit)
+            call exchange_nod(Ed0_2D(:,tr_num), partit)
+            call exchange_nod(Es0_2D(:,tr_num), partit)
        end do
 !sl    end do
 if (recom_debug .and. mype==0) print *, achar(27)//'[36m'//'     --> after exchange_nod Ed4D'//achar(27)//'[0m'    

@@ -938,6 +938,29 @@ CASE ('estop3d                 ')
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/), var_name, var_longname, 'W/m2', Estop3d(:,:,nlam), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
       enddo
    endif
+   ! 2-d surface radiation just below the sea surface, per waveband, for remote sensing
+   ! reflectance: R(0-) = eu0 / (ed0 + es0). Take the ratio of monthly means, not a mean ratio.
+CASE ('eu0                     ')
+   if (use_REcoM .and. RECOM_RADTRANS) then
+      do nlam=1,tlam
+         write(wavelen_str, "(i3.3)") pwaves(nlam)
+         call def_stream(nod2D, myDim_nod2D, 'eu0_'//wavelen_str, 'Upwelling irradiance just below the surface at '//wavelen_str//' nm', 'W/m2', Eu0_2D(:,nlam), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      enddo
+   endif
+CASE ('ed0                     ')
+   if (use_REcoM .and. RECOM_RADTRANS) then
+      do nlam=1,tlam
+         write(wavelen_str, "(i3.3)") pwaves(nlam)
+         call def_stream(nod2D, myDim_nod2D, 'ed0_'//wavelen_str, 'Direct downwelling irradiance just below the surface (after sea ice) at '//wavelen_str//' nm', 'W/m2', Ed0_2D(:,nlam), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      enddo
+   endif
+CASE ('es0                     ')
+   if (use_REcoM .and. RECOM_RADTRANS) then
+      do nlam=1,tlam
+         write(wavelen_str, "(i3.3)") pwaves(nlam)
+         call def_stream(nod2D, myDim_nod2D, 'es0_'//wavelen_str, 'Diffuse downwelling irradiance just below the surface (after sea ice) at '//wavelen_str//' nm', 'W/m2', Es0_2D(:,nlam), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      enddo
+   endif
 #endif /* __RECOM_WAVEBANDS */
 
 #endif

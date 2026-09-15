@@ -2502,6 +2502,9 @@ module REcoM_spectral
 !  Real(kind=8), allocatable, dimension(:,:,:,:)   ::  Ed4D
   integer, parameter :: iEdz=1, iEsz=2, iEuz=3, iEutop=4, iEstop=5, ed_num=5
   Real(kind=8), allocatable, dimension(:,:,:) :: Edz3D, Esz3D, Euz3D, Eutop3D, Estop3D
+  ! (node, waveband) just below the surface, for remote sensing reflectance R = Eu0/(Ed0+Es0):
+  ! Eu0 = Eutop at level 1; Ed0/Es0 = the OASIM irradiance after sea-ice shading, i.e. Edwsf/Eswsf in REcoM_Forcing
+  Real(kind=8), allocatable, dimension(:,:)   :: Eu0_2D, Ed0_2D, Es0_2D
 
 !sl -------------------- spectral wall-clock profiling (open item 2) --------------
 !sl Per-rank accumulators for the spectral light path, reduced and reported next to
