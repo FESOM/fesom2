@@ -2150,8 +2150,13 @@ subroutine write_mean(entry, entry_index)
         ! loop over vertical layers --> do gather 3d variables layerwise in 2d
         ! slices
         do lev=1, size1
+
+#ifdef ENABLE_ALBEDO_INTELMPI_WORKAROUNDS
+            call MPI_Barrier(entry%comm, mpierr)
+#endif
+
             !___________________________________________________________________
-            ! local output variables are gahtered in 2d shaped entry%aux_r8 
+            ! local output variables are gahtered in 2d shaped entry%aux_r8
             ! either for vertices or elements
             if(.not. entry%is_elem_based) then
                 call gather_nod2D (entry%local_values_r8_copy(lev,1:size(entry%local_values_r8_copy,dim=2)), entry%aux_r8, entry%root_rank, tag, entry%comm, entry%p_partit)
@@ -2186,9 +2191,14 @@ subroutine write_mean(entry, entry_index)
         ! loop over vertical layers --> do gather 3d variables layerwise in 2d
         ! slices
         do lev=1, size1
-            !PS if (entry%p_partit%mype==entry%root_rank) t0=MPI_Wtime()  
+
+#ifdef ENABLE_ALBEDO_INTELMPI_WORKAROUNDS
+            call MPI_Barrier(entry%comm, mpierr)
+#endif
+
+            !PS if (entry%p_partit%mype==entry%root_rank) t0=MPI_Wtime()
             !___________________________________________________________________
-            ! local output variables are gahtered in 2d shaped entry%aux_r8 
+            ! local output variables are gahtered in 2d shaped entry%aux_r8
             ! either for vertices or elements
             if(.not. entry%is_elem_based) then
                 call gather_real4_nod2D (entry%local_values_r4_copy(lev,1:size(entry%local_values_r4_copy,dim=2)), entry%aux_r4, entry%root_rank, tag, entry%comm, entry%p_partit)
