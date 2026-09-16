@@ -599,9 +599,31 @@ module recom_config
 !sl  integer, parameter     :: tlam = 13
   integer, dimension(4)  :: recom_spctrl_tracer_id    = (/1025, 1026, 1027, 1028/)
   integer, dimension(4)  :: recom_d1_tracer_id = (/1038, 1039, 1040, 1041/)
+! Phytoplankton backscattering: how bbphy_chl_X is obtained from the optics file.
+!   .false. (default) -- read the file's bb column (the last) directly as an absolute
+!                        chlorophyll-specific backscattering coefficient.
+!   .true.            -- read only as far as the b column (the one before) and form
+!                        bbphy_chl_X = bp(X,:) * darwin_bbphy(X), i.e. a prescribed
+!                        backward/forward scattering ratio per PFT. This is how
+!                        Dutkiewicz et al. (2015, Biogeosciences 12, 4447) DERIVED
+!                        their bbphy spectra (ratios from Stramski et al. 2001),
+!                        although their model then applies them as absolute spectra.
+!sl Both were compile-time-only and darwin_bbphy defaulted to 0.0, so switching
+!sl the flag on silently zeroed the backscatter of every PFT. Moved here so they
+!sl can go in &spectral, and given per-PFT defaults that are usable as they stand.
+!sl Order is Others, Diatom, Coccolithophore, Phaeocystis.
+!sl   Others 0.0020  file's own implied ratio (Darwin SmEuk/Syn 0.0029-0.0032)
+!sl   Diatom 0.0105  Whitmire et al. 2010 Opt.Express 18:15073, 8-diatom median
+!sl   Cocco  0.0200  REFINED v4 header, cell+PIC
+!sl   Phaeo  0.0020  file's own implied ratio
+  Integer, parameter     :: tnabp = 4   ! number of phyto spectra blocks the code knows
+  Logical                :: DAR_NONSPECTRAL_BACKSCATTERING_RATIO = .false.
+  Real(kind=8)           :: darwin_bbphy(tnabp) = (/ 0.0020d0, 0.0105d0, 0.0200d0, 0.0020d0 /)
+
   namelist /spectral/ RECOM_CDOM, RECOM_MARSHALL, RECOM_RADTRANS, OASIM, RECOM_BMASS, &
                       RECOM_CALC_ACDOM,  RECOM_CALC_APART, RECOM_CALC_APHYT,         &
                       RECOM_CALC_REFLEC, &
+                      DAR_NONSPECTRAL_BACKSCATTERING_RATIO, darwin_bbphy, &
                       QYmax, QYmax_d, QYmax_cocco, QYmax_phaeo, &
                       darwin_waterabsorbFile, &
                       darwin_surfacespecFile, &
@@ -2183,7 +2205,9 @@ module REcoM_spectral
 #if defined(__RECOM_WAVEBANDS)
 ! Module REcoM_constants: tracer indices
 !sl  integer :: icdom  ! moved to general recom_module
-  Logical :: DAR_NONSPECTRAL_BACKSCATTERING_RATIO =.false.
+!sl DAR_NONSPECTRAL_BACKSCATTERING_RATIO moved to module recom_config so it can
+!sl go in the &spectral namelist group; REcoM_spectral uses recom_config, so it
+!sl is still visible here. Same treatment as QYmax* -- see the note below.
   Logical :: DAR_RADTRANS_RMUS_PAR =.false.
   Logical :: DAR_RADTRANS_DECREASING =.false.
 !  integer :: ed_num = 5   ! number of light related diagnostic 
@@ -2253,7 +2277,10 @@ module REcoM_spectral
 !sl optics_phyto_recom_carbon_12_4pft_TEST.dat. A file with fewer blocks is
 !sl rejected by WAVEBANDS_INIT_FIXED regardless of enable_coccos.
 
-         Integer, parameter                      :: tnabp = 4
+!sl tnabp moved to module recom_config (it now also dimensions darwin_bbphy,
+!sl which is namelist-settable). Still a compile-time parameter, still 4, and
+!sl still visible here through use recom_config.
+!         Integer, parameter                      :: tnabp = 4
 !         PARAMETER (tnabp=2)
 ! Input and assigned data:
 ! pwaves       = actual values of wavebands (nm)
@@ -2449,7 +2476,10 @@ module REcoM_spectral
       Real(kind=8)                  :: darwin_rmus=1.204819277   ! inverse average cosine of downward diffuse radiation [dimensionless 1.0/0.83]
       Real(kind=8)                  :: darwin_rmuu=2.5           ! inverse average cosine of upward diffuse radiation [dimensionless 1.0/0.4]
       Real(kind=8)                  :: darwin_bbw=0.5            ! backscatter to forward scattering ratio for water
-      Real(kind=8)                  :: darwin_bbphy(tnabp)=0.0   ! double check
+!sl darwin_bbphy moved to module recom_config, where it is in &spectral and has
+!sl per-PFT defaults. It used to default to 0.0 here, which made
+!sl DAR_NONSPECTRAL_BACKSCATTERING_RATIO = .true. a silent zero for all PFTs.
+!      Real(kind=8)                  :: darwin_bbphy(tnabp)=0.0   ! double check
       Real(kind=8)                  :: darwin_bbmin=0.0002
 
 ! dependent/hardcoded parameters:
@@ -2792,6 +2822,17 @@ if (recom_debug) print *, achar(27)//'[36m'//'     --> end Water data file'//ach
 ! phyto data files
 ! ANNA phyto input data files must have a column for absorption by PS pigs
 ! ANNA easiest way to 'turn off' PS for growth is to put same values in both abs columns
+!sl Refuse the configuration that used to fail silently: the ratio branch with
+!sl no ratios set gives exactly zero backscatter for every PFT.
+      if (DAR_NONSPECTRAL_BACKSCATTERING_RATIO .and.                     &
+          maxval(abs(darwin_bbphy)) .le. 0.0d0) then
+         if (mype == 0) then
+            WRITE(*,*) 'WAVEBANDS_INIT_FIXED: DAR_NONSPECTRAL_BACKSCATTERING_RATIO'
+            WRITE(*,*) '  is .true. but every darwin_bbphy is zero, which would give'
+            WRITE(*,*) '  zero phytoplankton backscatter. Set darwin_bbphy in &spectral.'
+         end if
+         STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED (darwin_bbphy all zero)'
+      end if
       if (darwin_phytoabsorbFile.NE. ' '  ) THEN
  if (recom_debug) print *, achar(27)//'[36m'//'     --> phytoabsorb file'//achar(27)//'[0m'             
 !sl        CALL MDSFINDUNIT( iUnit, myThid )
@@ -2825,8 +2866,22 @@ if (recom_debug) print *, achar(27)//'[36m'//'     --> end Water data file'//ach
          if (mype==0) write(*,*) ' title = ', title
          do ilam  = 1,tlam
 if  (DAR_NONSPECTRAL_BACKSCATTERING_RATIO) then
-          read(iUnit,30)splambda,sap,sap_ps,sbp
-          write(*,*) ' DAR_NONSPECTRAL_BACKSCATTERING_RATIO ', splambda,sap,sap_ps,sbp
+!sl Format 30 is (i4,3f10.4): only the first four columns are read, so a
+!sl five-column optics file works here too and its bb column is ignored.
+!sl bbp is left at the 0.0d0 set above; bbphy_chl_X is built from bp*darwin_bbphy
+!sl in WAVEBANDS_INIT_VARI instead.
+          read(iUnit,30,iostat=ios)splambda,sap,sap_ps,sbp
+          if (ios .ne. 0) then
+             if (mype == 0) then
+                WRITE(*,*) 'WAVEBANDS_INIT_FIXED: bad or truncated phyto optics record'
+                WRITE(*,*) '  file: ', trim(darwin_phytoabsorbFile)
+                WRITE(*,*) '  block ', nabp, ' (', trim(title), ')'
+                WRITE(*,*) '  waveband ', ilam, ' of ', tlam, ', iostat ', ios
+             end if
+             STOP 'ABNORMAL END: S/R WAVEBANDS_INIT_FIXED (phyto optics read failed)'
+          end if
+          if (mype==0) write(*,*) ' DAR_NONSPECTRAL_BACKSCATTERING_RATIO ',      &
+                                    splambda,sap,sap_ps,sbp
 else
           read(iUnit,'(i4,3f10.4,f20.14)',iostat=ios)splambda,sap,sap_ps,sbp,sbbp
           if (ios .ne. 0) then
