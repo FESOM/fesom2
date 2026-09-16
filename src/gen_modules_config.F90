@@ -223,6 +223,7 @@ module g_config
   character(10)                 :: hosing_mode='surf'     ! 'surf' = surface virtual salinity flux, 'depth' = distributed over depth
   real(kind=WP)                 :: hosing_hSv=0.0_WP      ! freshwater anomaly magnitude [Sv]
   logical                       :: compute_oasis_corners=.false. ! switches on corner calculation for 1st order conserv remapping 
+  logical                       :: use_atm_ice_tskin=.false.  ! OpenIFS: receive the ice-tile skin temperature (tsk_ico) and use it as the ice surface temperature
 
 #if defined(__recom) && defined(__usetp)
 ! number of groups for multi FESOM group loop parallelization
@@ -230,13 +231,13 @@ module g_config
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, &
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
                         use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
-                        use_transit, compute_oasis_corners, num_fesom_groups, &
+                        use_transit, compute_oasis_corners, use_atm_ice_tskin, num_fesom_groups, &
                         use_hosing, hosing_mode, hosing_hSv
 #else
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
                         use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
-                        use_transit, compute_oasis_corners, &
+                        use_transit, compute_oasis_corners, use_atm_ice_tskin, &
                         use_hosing, hosing_mode, hosing_hSv
 #endif
 

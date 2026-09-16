@@ -115,6 +115,9 @@ module cpl_driver
   public seconds_til_now 
   public send_id, recv_id
   public nsend, nrecv, cpl_send, cpl_recv
+
+  ! position of tsk_ico in cpl_recv; 0 when use_atm_ice_tskin is off
+  integer, public            :: recv_tsk_ico = 0
   public source_root, target_root, commRank
   public a2o_fcorr_stat
 
@@ -751,6 +754,7 @@ include "associate_mesh_ass.h"
 #if defined (__recom)
     cpl_recv(16) = 'XCO2_oce'
 #endif
+    if (recv_tsk_ico > 0) cpl_recv(recv_tsk_ico) = 'tsk_ico'
 !Not oifs
 #else
     cpl_recv(1)  = 'taux_oce'
@@ -916,7 +920,9 @@ include "associate_mesh_ass.h"
     endif     
 #endif
     call oasis_put(send_id(ind), seconds_til_now, exfld, info)
-    action=(info==4 .OR. info==8)
+    ! Fields put before the last one of a coupling group return OASIS_Waitgroup;
+    ! they are buffered and transmitted together with the last one.
+    action=(info==OASIS_Sent .OR. info==OASIS_SentOut .OR. info==OASIS_Waitgroup)
     if (action) then
        if (ind==nsend) then
           cplsnd=0.
