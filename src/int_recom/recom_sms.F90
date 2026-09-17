@@ -1626,12 +1626,16 @@ if (RECOM_MARSHALL) then
       endif
 !
 !   Diatoms
-      qLimitFac = recom_limiter(NMinSlope,NCmin_d,quota_dia)
+!sl was assigned to qLimitFac, the small-phyto variable, while repair_dia below
+!sl reads qLimitFac_dia -- which was declared and never set (0.0 under -init=zero),
+!sl so diatom D1 repair was identically zero and diaD1 stayed at its tiny initial
+!sl value forever. Same shape and same fix as qLimitFac_cocco/_phaeo below.
+      qLimitFac_dia = recom_limiter(NMinSlope,NCmin_d,quota_dia)
       qLimitFacTmp = recom_limiter(SiMinSlope,SiCmin,qSiC)
-      qLimitFac    = min(qLimitFac,qLimitFacTmp)
+      qLimitFac_dia    = min(qLimitFac_dia,qLimitFacTmp)
       if (FeLimit) then
        feLimitFac = Fe/(k_Fe_d + Fe)
-       qLimitFac = min(qLimitFac,feLimitFac)
+       qLimitFac_dia = min(qLimitFac_dia,feLimitFac)
       end if
 
       if (diaD1 .gt. c1) then
