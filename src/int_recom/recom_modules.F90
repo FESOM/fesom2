@@ -581,6 +581,16 @@ module recom_config
   Real(kind=8)           :: QYmax_d               = 4.8e-4
   Real(kind=8)           :: QYmax_cocco           = 4.8e-4
   Real(kind=8)           :: QYmax_phaeo           = 4.8e-4
+!sl Slope and intercept of the linear PPC -> spectral-slope relation used by
+!sl RECOM_APHYTO to make aphy_chl variable with photoprotective pigment content
+!sl (Eisner et al. 2003 L&O 48, linear model on NOMAD data). The defaults are the
+!sl published per-PFT values: recom_aphyto_phy.F and recom_aphyto_dia.F of
+!sl Alvarez et al. (2022), ealvarez-s/code_recom_radtrans.
+!sl These act ONLY under RECOM_CALC_APHYT .and. RECOM_MARSHALL.
+  Real(kind=8)           :: aphyt_slope_phy       = -1.930d-3
+  Real(kind=8)           :: aphyt_icept_phy       = -1.011d-4
+  Real(kind=8)           :: aphyt_slope_dia       = -1.418d-3
+  Real(kind=8)           :: aphyt_icept_dia       = -5.800d-5
   character(80)           :: darwin_waterabsorbFile = 'abw25par.dat'
   character(80)           :: darwin_surfacespecFile = 'surfspec_13amt6.dat'
   character(80)           :: darwin_phytoabsorbFile = 'optics_phyto_recom_carbon_12.dat'
@@ -625,6 +635,8 @@ module recom_config
                       RECOM_CALC_REFLEC, &
                       DAR_NONSPECTRAL_BACKSCATTERING_RATIO, darwin_bbphy, &
                       QYmax, QYmax_d, QYmax_cocco, QYmax_phaeo, &
+                      aphyt_slope_phy, aphyt_icept_phy, &
+                      aphyt_slope_dia, aphyt_icept_dia, &
                       darwin_waterabsorbFile, &
                       darwin_surfacespecFile, &
                       darwin_phytoabsorbFile, &
@@ -1011,6 +1023,44 @@ subroutine validate_recom_tracers(num_tracers, mype)
       write(*,*) '=========================================================================='
       write(*,*) 'The MARSHALL tracers are only defined for the enable_3zoo2det'
       write(*,*) 'configurations. Set RECOM_MARSHALL = .false. in &spectral.'
+      write(*,*) ''
+    end if
+  end if
+
+!sl RECOM_CALC_APHYT has exactly two write paths for aphy_chl_k: the constant
+!sl fill under .not. RECOM_CALC_APHYT, and RECOM_APHYTO under
+!sl RECOM_CALC_APHYT .and. RECOM_MARSHALL. With APHYT on and MARSHALL off NEITHER
+!sl runs, so the phytoplankton absorption arrays stay at 0.0 (-init=zero) and the
+!sl model silently runs with no phytoplankton absorption at all.
+  if (RECOM_CALC_APHYT .and. .not. RECOM_MARSHALL) then
+    config_error = .true.
+    if (mype == 0) then
+      write(*,*) '=========================================================================='
+      write(*,*) 'ERROR: RECOM_CALC_APHYT REQUIRES RECOM_MARSHALL'
+      write(*,*) '=========================================================================='
+      write(*,*) 'The variable phytoplankton absorption spectrum is driven by the D1'
+      write(*,*) 'protein pool, which only exists under RECOM_MARSHALL. With APHYT on'
+      write(*,*) 'and MARSHALL off, aphy_chl_k is never assigned and phytoplankton'
+      write(*,*) 'absorption would be exactly zero everywhere.'
+      write(*,*) 'Set RECOM_MARSHALL = .true. (and bgc_num/namelist.tra to match),'
+      write(*,*) 'or RECOM_CALC_APHYT = .false., in &spectral.'
+      write(*,*) ''
+    end if
+  end if
+
+!sl id1c/id1p get indices in the coccos configuration but recom_sms has no D1
+!sl source terms for coccolithophores or Phaeocystis, so their D1 pools would
+!sl never evolve. The published scheme is two-group only (RECOM_2GROUPS).
+  if (RECOM_MARSHALL .and. enable_coccos) then
+    config_error = .true.
+    if (mype == 0) then
+      write(*,*) '=========================================================================='
+      write(*,*) 'ERROR: RECOM_MARSHALL IS NOT SUPPORTED WITH enable_coccos'
+      write(*,*) '=========================================================================='
+      write(*,*) 'Coccolithophore and Phaeocystis D1 pools have tracer indices but no'
+      write(*,*) 'damage/repair source terms in recom_sms, so they would stay at their'
+      write(*,*) 'initial value forever. The Marshall/APHYT scheme is 2-PFT only.'
+      write(*,*) 'Set RECOM_MARSHALL = .false. or enable_coccos = .false.'
       write(*,*) ''
     end if
   end if
@@ -2225,13 +2275,19 @@ module REcoM_spectral
 !     photoinhibition
    Real(kind=8)                :: Drel                 = 0.75      ! relative amount of D1 that keeps QY=QYmax  [rel]
    Real(kind=8)                :: astar                = 0.007     ! chlorophyll absortion cross section [m^{-2} (mg CHL)^{-1}]
-   Real(kind=8)                :: k_deg                = 8.0e-7    ! Target size for photoinhibition [m^{-2} (J)^{-1}]
-   Real(kind=8)                :: r_max                = 20.       ! Maximum repair rate [d^{-1}]
-   Real(kind=8)                :: k_rep                = 0.5
+!sl D1 damage/repair parameters (Marshall et al. 2000 photoinhibition). Defaults
+!sl are the published values of Alvarez et al. (2022), ealvarez-s/global_aphyt
+!sl namelist/data.recom lines 48-52 and 100-102; they were 8.0e-7 / 20. / 0.5 here,
+!sl which matched no published run. They are live ONLY under RECOM_MARSHALL, which
+!sl no run in this tree has ever enabled, so this is bit-identical for all of them.
+!sl NOT namelist-settable yet -- changing them needs a rebuild.
+   Real(kind=8)                :: k_deg                = 3.5e-7    ! Target size for photoinhibition [m^{-2} (J)^{-1}]
+   Real(kind=8)                :: r_max                = 12.0      ! Maximum repair rate [d^{-1}]
+   Real(kind=8)                :: k_rep                = 0.25
    Real(kind=8)                :: astar_d              = 0.007     ! chlorophyll absortion cross section [m^{-2} (mg CHL)^{-1}]
-   Real(kind=8)                :: k_deg_d              = 8.0e-7    ! Target size for photoinhibition [m^{-2} (J)^{-1}]
-   Real(kind=8)                :: r_max_d              = 20.       ! Maximum repair rate [d^{-1}]
-   Real(kind=8)                :: k_rep_d              = 0.5       ! half saturation constant for repair, [same as DD1]
+   Real(kind=8)                :: k_deg_d              = 1.5e-7    ! Target size for photoinhibition [m^{-2} (J)^{-1}]
+   Real(kind=8)                :: r_max_d              = 12.0      ! Maximum repair rate [d^{-1}]
+   Real(kind=8)                :: k_rep_d              = 0.25      ! half saturation constant for repair, [same as DD1]
    !sl if cocco
    Real(kind=8)                :: astar_cocco              = 0.007     ! chlorophyll absortion cross section [m^{-2} (mg CHL)^{-1}]
    Real(kind=8)                :: k_deg_cocco              = 8.0e-7    ! Target size for photoinhibition [m^{-2} (J)^{-1}]
@@ -4269,8 +4325,9 @@ endif !/* RECOM_RADTRANS */
 
 ! !INTERFACE: ==========================================================
       SUBROUTINE RECOM_APHYTO(                                  &
-                             Nr,                                &   
+                             Nr,                                &
                              D1,QYm,Drel,                       &
+                             aphyt_slope,aphyt_icept,           &
                              aphy_PSpigm,aphy_ALLpigm,          &
                              aphytolocal                        &
                              , mype)
@@ -4305,6 +4362,8 @@ endif !/* RECOM_RADTRANS */
       Real(kind=8),dimension(Nr)      :: D1(Nr)
       Real(kind=8)                    :: QYm
       Real(kind=8)                    :: Drel
+      Real(kind=8)                    :: aphyt_slope
+      Real(kind=8)                    :: aphyt_icept
       Real(kind=8),dimension(tlam)    :: aphy_PSpigm
       Real(kind=8),dimension(tlam)    :: aphy_ALLpigm
       Real(kind=8),dimension(Nr,tlam) :: aphytolocal
@@ -4343,7 +4402,15 @@ if (RECOM_CALC_APHYT) then
 
 ! Compute slopes from PPC
 ! Slope 488-532nm, (Eisner et al 2003 L&O 48) linear model with NOMAD data
-         slope1 = (-1.997d-3 * PPC) - 6.139d-5
+!sl The coefficients are PFT-specific and are now passed in rather than
+!sl hard-coded. The MITgcm original carries one routine per PFT --
+!sl recom_aphyto_phy.F  : (-1.93d-3 * PPC) - 1.011d-4
+!sl recom_aphyto_dia.F  : (-1.418d-3 * PPC) - 5.8d-5
+!sl (Alvarez et al. 2022, ealvarez-s/code_recom_radtrans), plus a generic
+!sl recom_aphyto_slopes.F written exactly as below. Merging the two routines
+!sl into this one had left a single hard-coded pair, (-1.997d-3, -6.139d-5),
+!sl that matches NEITHER published PFT.
+         slope1 = (aphyt_slope * PPC) + aphyt_icept
 
 ! Modify absorption spectra with slopes
 ! TO DO: make tlam indexes flexible, find wbs closest to 488 and 532        

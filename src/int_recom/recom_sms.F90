@@ -584,6 +584,25 @@ endif
             DiaChl = max(tiny_chl, state(k, idchl)  + sms(k, idchl))
             DiaSi  = max(tiny_si,  state(k, idiasi) + sms(k, idiasi))
 
+#if defined(__RECOM_WAVEBANDS)
+            !-----------------------------------------------------------------------
+            ! D1 PROTEIN POOLS (Marshall et al. 2000 photoinhibition)
+            !-----------------------------------------------------------------------
+            ! Relative amount of functional D1 [rel, 0-1]. Only RECOM_MARSHALL gives
+            ! id1/id1d a tracer index, so the fill is guarded by it.
+            !
+            !sl Without this, D1 and diaD1 were never assigned anywhere and read as
+            !sl 0.0 under -init=zero, so the damage/repair terms below integrated a
+            !sl source that never saw its own state: damage vanished and the tracer
+            !sl grew at the bare repair rate. Matches the MITgcm original
+            !sl (Alvarez et al. 2022, code_recom_radtrans/recom_sms.F:655-660).
+            !-----------------------------------------------------------------------
+            if (RECOM_MARSHALL) then
+                D1    = max(tiny, state(k, id1)  + sms(k, id1))
+                diaD1 = max(tiny, state(k, id1d) + sms(k, id1d))
+            endif
+#endif
+
             if (enable_coccos) then
 
                 !-------------------------------------------------------------------

@@ -326,6 +326,17 @@ endif
              Phy_k(3,k) = max(tiny_C_c, state(k,icocc))
              Phy_k(4,k) = max(tiny_C_p, state(k,iphac))
           endif
+!sl D1, the relative amount of functional D1 protein [rel], is what makes the
+!sl phytoplankton absorption spectrum variable under RECOM_CALC_APHYT. It was
+!sl declared above and never assigned, so RECOM_APHYTO saw D1 = 0 everywhere
+!sl (-init=zero) and returned one constant spectrum instead of the variable one.
+!sl Only RECOM_MARSHALL gives id1/id1d a tracer index, hence the guard.
+!sl Matches the MITgcm original (Alvarez et al. 2022,
+!sl code_recom_radtrans/recom_forcing.F:332-333).
+          if (RECOM_MARSHALL) then
+             phyD1_k(k) = max(tiny, state(k,id1))
+             diaD1_k(k) = max(tiny, state(k,id1d))
+          endif
 ! idetz2c is a fixed 26 but the second detritus class only exists with
 ! enable_3zoo2det: without it, index 26 is Phaeocystis N (iphan) in the coccos-only
 ! configuration and past the end of state() in the base one.
@@ -392,20 +403,29 @@ endif
      endif      !/* RECOM_CALC_ACDOM */
 ! ------------ COMPUTE aphy_chl_k & aphy_chl_dia_k ----------------
      if (RECOM_CALC_APHYT .and. RECOM_MARSHALL) then        
-        call RECOM_APHYTO(Nr,phyD1_k(1:Nr),QYmax,Drel,          & 
+        call RECOM_APHYTO(Nr,phyD1_k(1:Nr),QYmax,Drel,          &
+                          aphyt_slope_phy,aphyt_icept_phy,      &
                           aphy_chl_ps(1:tlam),aphy_chl(1:tlam), &
-                          aphy_chl_k(1:Nr, 1:tlam)              & 
+                          aphy_chl_k(1:Nr, 1:tlam)              &
                           , mype)
         call RECOM_APHYTO(Nr,diaD1_k(1:Nr),QYmax_d,Drel,                &
+                          aphyt_slope_dia,aphyt_icept_dia,              &
                           aphy_chl_ps_dia(1:tlam),aphy_chl_dia(1:tlam), &
                           aphy_chl_dia_k(1:Nr, 1:tlam)                  &
                           , mype)
+!sl Unreachable: validate_recom_tracers makes RECOM_MARSHALL .and. enable_coccos a
+!sl fatal error, because coccoD1/phaeoD1 have tracer indices (id1c/id1p) but NO
+!sl source terms in recom_sms, so their D1 would never evolve. The published code
+!sl is two-group only (RECOM_2GROUPS). Kept so the structure is visible; the slope
+!sl coefficients below are placeholders copied from small phyto / diatoms.
 if (enable_coccos) then
-        call RECOM_APHYTO(Nr, coccoD1_k(1:Nr),QYmax,Drel,               &
+        call RECOM_APHYTO(Nr, coccoD1_k(1:Nr),QYmax_cocco,Drel,         &
+                   aphyt_slope_phy,aphyt_icept_phy,                     &
                    aphy_chl_ps_cocco(1:tlam),aphy_chl_cocco(1:tlam),    &
                    aphy_chl_cocco_k(1:Nr, 1:tlam)                       &
                           , mype)
-        call RECOM_APHYTO(Nr, phaeoD1_k(1:Nr),QYmax_d,Drel,             &
+        call RECOM_APHYTO(Nr, phaeoD1_k(1:Nr),QYmax_phaeo,Drel,         &
+                   aphyt_slope_dia,aphyt_icept_dia,                     &
                    aphy_chl_ps_phaeo(1:tlam),aphy_chl_phaeo(1:tlam),    &
                    aphy_chl_phaeo_k(1:Nr, 1:tlam)                       &
                           , mype)
