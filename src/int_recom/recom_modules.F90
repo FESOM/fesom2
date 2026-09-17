@@ -591,6 +591,15 @@ module recom_config
   Real(kind=8)           :: aphyt_icept_phy       = -1.011d-4
   Real(kind=8)           :: aphyt_slope_dia       = -1.418d-3
   Real(kind=8)           :: aphyt_icept_dia       = -5.800d-5
+!sl No published counterpart: Alvarez et al. is two-group (RECOM_2GROUPS), so the
+!sl coccolithophore and Phaeocystis defaults below are PLACEHOLDERS copied from
+!sl small phyto and diatoms respectively. They became live when the cocco/phaeo D1
+!sl source terms were added; treat any 4-PFT variable-aPH* result as untuned until
+!sl these are derived from pigment data.
+  Real(kind=8)           :: aphyt_slope_cocco     = -1.930d-3
+  Real(kind=8)           :: aphyt_icept_cocco     = -1.011d-4
+  Real(kind=8)           :: aphyt_slope_phaeo     = -1.418d-3
+  Real(kind=8)           :: aphyt_icept_phaeo     = -5.800d-5
   character(80)           :: darwin_waterabsorbFile = 'abw25par.dat'
   character(80)           :: darwin_surfacespecFile = 'surfspec_13amt6.dat'
   character(80)           :: darwin_phytoabsorbFile = 'optics_phyto_recom_carbon_12.dat'
@@ -637,6 +646,8 @@ module recom_config
                       QYmax, QYmax_d, QYmax_cocco, QYmax_phaeo, &
                       aphyt_slope_phy, aphyt_icept_phy, &
                       aphyt_slope_dia, aphyt_icept_dia, &
+                      aphyt_slope_cocco, aphyt_icept_cocco, &
+                      aphyt_slope_phaeo, aphyt_icept_phaeo, &
                       darwin_waterabsorbFile, &
                       darwin_surfacespecFile, &
                       darwin_phytoabsorbFile, &
@@ -1048,22 +1059,11 @@ subroutine validate_recom_tracers(num_tracers, mype)
     end if
   end if
 
-!sl id1c/id1p get indices in the coccos configuration but recom_sms has no D1
-!sl source terms for coccolithophores or Phaeocystis, so their D1 pools would
-!sl never evolve. The published scheme is two-group only (RECOM_2GROUPS).
-  if (RECOM_MARSHALL .and. enable_coccos) then
-    config_error = .true.
-    if (mype == 0) then
-      write(*,*) '=========================================================================='
-      write(*,*) 'ERROR: RECOM_MARSHALL IS NOT SUPPORTED WITH enable_coccos'
-      write(*,*) '=========================================================================='
-      write(*,*) 'Coccolithophore and Phaeocystis D1 pools have tracer indices but no'
-      write(*,*) 'damage/repair source terms in recom_sms, so they would stay at their'
-      write(*,*) 'initial value forever. The Marshall/APHYT scheme is 2-PFT only.'
-      write(*,*) 'Set RECOM_MARSHALL = .false. or enable_coccos = .false.'
-      write(*,*) ''
-    end if
-  end if
+!sl RECOM_MARSHALL with enable_coccos was a fatal error until the cocco/phaeo D1
+!sl source terms were added (id1c/id1p had indices but nothing to evolve them).
+!sl It is now supported, with the caveat recorded at aphyt_slope_cocco: the
+!sl cocco/phaeo PPC->slope coefficients and D1 damage/repair constants have no
+!sl published counterpart and are placeholders.
 #endif /* __RECOM_WAVEBANDS */
 
   ! ===========================================================================

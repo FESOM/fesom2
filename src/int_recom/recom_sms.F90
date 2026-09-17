@@ -600,6 +600,10 @@ endif
             if (RECOM_MARSHALL) then
                 D1    = max(tiny, state(k, id1)  + sms(k, id1))
                 diaD1 = max(tiny, state(k, id1d) + sms(k, id1d))
+                if (enable_coccos) then
+                   coccoD1 = max(tiny, state(k, id1c)  + sms(k, id1c))
+                   phaeoD1 = max(tiny, state(k, id1p) + sms(k, id1p))        
+                endif
             endif
 #endif
 
@@ -1665,6 +1669,8 @@ if (RECOM_MARSHALL) then
 ! Proxy for non-photosynthetic pigments
       PPC = 1-(ALPHAmar / (astar * QYmax * SecondsPerDay) )
       diaPPC = 1-(ALPHAmar_dia / (astar_d * QYmax_d * SecondsPerDay) )
+!sl coccoPPC/phaeoPPC are computed after their ALPHAmar below, not here, so that
+!sl astar_cocco/astar_phaeo are already filled.
 if (enable_coccos) then
 !SL Work for Christoph        
 !SL Remember to declare respectively: coccoD1, phaeoD1, QY_cocco, QY_phaeo
@@ -1700,7 +1706,8 @@ if (enable_coccos) then
       if (PARave .lt. tiny) then
          damage_cocco = tiny
       else
-         damage_cocco = (PARave * k_deg_d) * coccoD1 &
+!sl was k_deg_d, the diatom constant, which left k_deg_cocco dead
+         damage_cocco = (PARave * k_deg_cocco) * coccoD1 &
                       * (c1-NPQ_cocco) * SecondsPerDay
       endif
       if (coccoD1 .gt. c1) then
@@ -1737,7 +1744,8 @@ if (enable_coccos) then
       if (PARave .lt. tiny) then
          damage_phaeo = tiny
       else
-         damage_phaeo = (PARave * k_deg_d) * phaeoD1 &
+!sl was k_deg_d, the diatom constant, which left k_deg_phaeo dead
+         damage_phaeo = (PARave * k_deg_phaeo) * phaeoD1 &
                       * (c1-NPQ_phaeo) * SecondsPerDay
       endif
       if (phaeoD1 .gt. c1) then
@@ -1747,6 +1755,11 @@ if (enable_coccos) then
                       / ( k_rep_phaeo + (c1 - phaeoD1) )    &
                       ) * qLimitFac_phaeo * arrFunc
       endif
+!sl declared alongside PPC/diaPPC and never assigned (0.0 under -init=zero).
+!sl Like PPC/diaPPC these are currently diagnostics with no consumer, but an
+!sl unassigned one is exactly the shape that has bitten this tree ten times.
+      coccoPPC = 1-(ALPHAmar_cocco / (astar_cocco * QYmax_cocco * SecondsPerDay) )
+      phaeoPPC = 1-(ALPHAmar_phaeo / (astar_phaeo * QYmax_phaeo * SecondsPerDay) )
 end if       
 endif !/* RECOM_MARSHALL */
 !SL RECOM_MARSHALL only within RECOM_WAVEBANDS
@@ -5795,6 +5808,17 @@ if (RECOM_MARSHALL) then
             + repair_dia                      * (1-diaD1)                  &
             - damage_dia                      * diaD1                      &
                           )  * dt_b           + sms(k,id1d)
+            if (enable_coccos) then
+            sms(k,id1c) = (                                                    &
+            + repair_cocco                      * (1-coccoD1)                  &
+            - damage_cocco                      * coccoD1                      &
+                          )  * dt_b             + sms(k,id1c)
+            sms(k,id1p) = (                                                    &
+            + repair_phaeo                      * (1-phaeoD1)                  &
+            - damage_phaeo                      * phaeoD1                      &
+                          )  * dt_b             + sms(k,id1p)
+        
+            endif          
 !__________________________________________________________________________
 endif
 #endif

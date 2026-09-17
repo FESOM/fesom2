@@ -336,6 +336,10 @@ endif
           if (RECOM_MARSHALL) then
              phyD1_k(k) = max(tiny, state(k,id1))
              diaD1_k(k) = max(tiny, state(k,id1d))
+             if (enable_coccos) then
+                coccoD1_k(k) = max(tiny, state(k,id1c))
+                phaeoD1_k(k) = max(tiny, state(k,id1p))
+             endif
           endif
 ! idetz2c is a fixed 26 but the second detritus class only exists with
 ! enable_3zoo2det: without it, index 26 is Phaeocystis N (iphan) in the coccos-only
@@ -413,19 +417,17 @@ endif
                           aphy_chl_ps_dia(1:tlam),aphy_chl_dia(1:tlam), &
                           aphy_chl_dia_k(1:Nr, 1:tlam)                  &
                           , mype)
-!sl Unreachable: validate_recom_tracers makes RECOM_MARSHALL .and. enable_coccos a
-!sl fatal error, because coccoD1/phaeoD1 have tracer indices (id1c/id1p) but NO
-!sl source terms in recom_sms, so their D1 would never evolve. The published code
-!sl is two-group only (RECOM_2GROUPS). Kept so the structure is visible; the slope
-!sl coefficients below are placeholders copied from small phyto / diatoms.
+!sl Reachable since the cocco/phaeo D1 source terms were added. The published
+!sl scheme is two-group (RECOM_2GROUPS), so aphyt_slope_cocco/_phaeo have no
+!sl literature value and default to the small-phyto / diatom coefficients.
 if (enable_coccos) then
         call RECOM_APHYTO(Nr, coccoD1_k(1:Nr),QYmax_cocco,Drel,         &
-                   aphyt_slope_phy,aphyt_icept_phy,                     &
+                   aphyt_slope_cocco,aphyt_icept_cocco,                 &
                    aphy_chl_ps_cocco(1:tlam),aphy_chl_cocco(1:tlam),    &
                    aphy_chl_cocco_k(1:Nr, 1:tlam)                       &
                           , mype)
         call RECOM_APHYTO(Nr, phaeoD1_k(1:Nr),QYmax_phaeo,Drel,         &
-                   aphyt_slope_dia,aphyt_icept_dia,                     &
+                   aphyt_slope_phaeo,aphyt_icept_phaeo,                 &
                    aphy_chl_ps_phaeo(1:tlam),aphy_chl_phaeo(1:tlam),    &
                    aphy_chl_phaeo_k(1:Nr, 1:tlam)                       &
                           , mype)
@@ -1024,9 +1026,19 @@ endif
 if (RECOM_CDOM) then
   state(1:nn,icdom)  = max(tiny,state(1:nn,icdom))
 endif
-if (RECOM_CALC_APHYT .and. RECOM_MARSHALL) then
+!sl was RECOM_CALC_APHYT .and. RECOM_MARSHALL: the D1 pools are advected and
+!sl integrated whenever RECOM_MARSHALL is on, whether or not APHYT reads them,
+!sl so they must be clamped on the same condition that creates them.
+if (RECOM_MARSHALL) then
   state(1:nn,id1)  = max(tiny,state(1:nn,id1)) !rel
   state(1:nn,id1d)  = max(tiny,state(1:nn,id1d)) !rel
+!sl the cocco/phaeo D1 pools need the same clamp as id1/id1d, or a transport
+!sl undershoot can push them negative and RECOM_APHYTO/recom_sms then read a
+!sl negative "fraction of functional D1".
+  if (enable_coccos) then
+     state(1:nn,id1c)  = max(tiny,state(1:nn,id1c)) !rel
+     state(1:nn,id1p)  = max(tiny,state(1:nn,id1p)) !rel
+  endif
 endif
 #endif /* __RECOM_WAVEBANDS */
 
