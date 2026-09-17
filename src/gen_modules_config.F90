@@ -211,6 +211,7 @@ module g_config
   logical                       :: use_cavity = .false. ! switch on/off cavity usage
   logical                       :: use_cavity_partial_cell = .false. ! switch on/off cavity usage
   logical                       :: use_cavity_fw2press = .true. ! switch on/off cavity+zstar input of freshwater leads to increase in pressure
+  real(kind=WP)                 :: cavity_gamma_scale = 1.0_WP ! factor on the ice-shelf turbulent heat and salt transfer velocities (gat, gas) of the three-equation melt model
   real(kind=WP)                 :: cavity_partial_cell_thresh=0.0_WP ! same as partial_cell_tresh but for surface
   logical                       :: toy_ocean=.false. ! Ersatz forcing has to be supplied
   character(100)                :: which_toy="soufflet" 
@@ -229,13 +230,13 @@ module g_config
   integer                       :: num_fesom_groups=1
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, &
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
-                        use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
+                        use_cavity_fw2press, cavity_gamma_scale, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
                         use_transit, compute_oasis_corners, num_fesom_groups, &
                         use_hosing, hosing_mode, hosing_hSv
 #else
   namelist /run_config/ use_ice,use_floatice, use_sw_pene, use_cavity, & 
                         use_cavity_partial_cell, cavity_partial_cell_thresh, &
-                        use_cavity_fw2press, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
+                        use_cavity_fw2press, cavity_gamma_scale, toy_ocean, which_toy, flag_debug, flag_warn_cflz, lwiso, &
                         use_transit, compute_oasis_corners, &
                         use_hosing, hosing_mode, hosing_hSv
 #endif

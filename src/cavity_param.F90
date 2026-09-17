@@ -194,6 +194,7 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
     use MOD_ICE
     use o_PARAM , only: density_0, WP
     use o_ARRAYS, only: heat_flux, water_flux, density_m_rho0, density_ref
+    use g_config, only: cavity_gamma_scale
     implicit none
     !___________________________________________________________________________
     type(t_partit), intent(inout), target :: partit
@@ -280,8 +281,8 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
         
         gats1= sak1*vt1
         gats2= 2.12_WP*log(gats1*re)-9._WP
-        gat  = gats1/(gats2+12.5_WP*pr1)
-        gas  = gats1/(gats2+12.5_WP*sc1)
+        gat  = cavity_gamma_scale*gats1/(gats2+12.5_WP*pr1)
+        gas  = cavity_gamma_scale*gats1/(gats2+12.5_WP*sc1)
             
         !RG3417 gat  = 1.00e-4   ![m/s]  RT: to be replaced by velocity-dependent equations later
         !RG3417 gas  = 5.05e-7   ![m/s]  RT: to be replaced by velocity-dependent equations later
