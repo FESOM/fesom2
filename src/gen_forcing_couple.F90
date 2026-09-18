@@ -809,8 +809,10 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
      dux=u_wind(i)-u_ice(i) 
      dvy=v_wind(i)-v_ice(i)
      aux=sqrt(dux**2+dvy**2)*rhoair
-     stress_atmice_x(i) = Cd_atm_ice_arr(i)*aux*dux
-     stress_atmice_y(i) = Cd_atm_ice_arr(i)*aux*dvy
+     if (use_ice) then
+        stress_atmice_x(i) = Cd_atm_ice_arr(i)*aux*dux
+        stress_atmice_y(i) = Cd_atm_ice_arr(i)*aux*dvy
+     end if
   end do
 !$OMP END PARALLEL DO
   ! heat and fresh water fluxes are treated in i_therm and ice2ocean

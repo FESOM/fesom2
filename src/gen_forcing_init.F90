@@ -43,7 +43,7 @@ type(t_mesh),   intent(in),    target :: mesh
 type(t_partit), intent(inout), target :: partit
 
   if (partit%mype==0) write(*,*) '****************************************************'
-  if (use_ice) then
+  if (use_ice .or. .not. toy_ocean) then
      call forcing_array_setup(partit, mesh)
 #if defined(__recom)
      call sbc_ini_recom(partit)         ! initialize forcing fields

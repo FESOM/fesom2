@@ -976,7 +976,36 @@ subroutine ice_init_toyocean_dummy(ice, partit, mesh)
     allocate(ice%data(ice%num_itracers))
     do n = 1, ice%num_itracers
         allocate(ice%data(n)%values(    node_size))
-        ice%data(n)%ID      = n
-        ice%data(n)%values  = 0.0_WP
+        allocate(ice%data(n)%values_old(node_size))
+        ice%data(n)%ID          = n
+        ice%data(n)%values      = 0.0_WP
+        ice%data(n)%values_old  = 0.0_WP
     end do
+
+    allocate(ice%srfoce_temp(           node_size))
+    allocate(ice%srfoce_salt(           node_size))
+    allocate(ice%srfoce_ssh(            node_size))
+    allocate(ice%srfoce_u(              node_size))
+    allocate(ice%srfoce_v(              node_size))
+    allocate(ice%stress_iceoce_x(       node_size))
+    allocate(ice%stress_iceoce_y(       node_size))
+    allocate(ice%stress_atmice_x(       node_size))
+    allocate(ice%stress_atmice_y(       node_size))
+    allocate(ice%flx_h(                 node_size))
+    allocate(ice%flx_fw(                node_size))
+    allocate(ice%thermo%thdgr(          node_size))
+    allocate(ice%thermo%thdgrsn(        node_size))
+    ice%srfoce_temp        = 0.0_WP
+    ice%srfoce_salt        = 0.0_WP
+    ice%srfoce_ssh         = 0.0_WP
+    ice%srfoce_u           = 0.0_WP
+    ice%srfoce_v           = 0.0_WP
+    ice%stress_iceoce_x    = 0.0_WP
+    ice%stress_iceoce_y    = 0.0_WP
+    ice%stress_atmice_x    = 0.0_WP
+    ice%stress_atmice_y    = 0.0_WP
+    ice%flx_h              = 0.0_WP
+    ice%flx_fw             = 0.0_WP
+    ice%thermo%thdgr       = 0.0_WP
+    ice%thermo%thdgrsn     = 0.0_WP
 end subroutine ice_init_toyocean_dummy
