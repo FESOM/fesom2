@@ -133,8 +133,12 @@ MODULE g_sbf
    logical            :: OASIM_time_interp = .true.
    logical            :: OASIM_wavelength_interp = .true.
    real(kind=8)       :: OASIM_missing_value = -1.d30
-   character(len=256) :: OASIM_path = '/albedo/work/projects/p_specbic/data/forcing/'
-   character(len=128) :: OASIM_file_pattern = 'filled_nan_land.nc'
+   !sl Default = forcing_oasim_v2 (18 Sep 2026): rebuilt from raw NOBM eds with the grid rolled to 0..360
+   !sl (p_specbic/data/forcing/ is displaced by 180 deg of longitude), Ed/Es averaged over the same years
+   !sl 1998-2012, Darwin convention: the full OASIM 387.5-412.5 nm band goes into the model's first band
+   !sl (the model-consistent set, scaled to 400-412.5 nm, is 'oasim_clim1998-2012.nc'). Method: README.txt there.
+   character(len=256) :: OASIM_path = '/albedo/work/projects/p_specbic/sloza/forcing_oasim_v2/'
+   character(len=128) :: OASIM_file_pattern = 'oasim_clim1998-2012_darwin400.nc'
    character(len=32)  :: OASIM_Ed_varname = 'Ed'
    character(len=32)  :: OASIM_Es_varname = 'Es'
 #endif /* __RECOM_WAVEBANDS */
