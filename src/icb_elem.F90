@@ -472,6 +472,14 @@ do m=1, 3
          cycle
       end if
    endif
+   ! A valid element WAS found.  Clear any left_mype raised by a cavity
+   ! element rejected earlier in this same search: the `cycle` above leaves
+   ! left_mype=1.0 set, and without this reset the routine returns a perfectly
+   ! good element while still reporting failure.  The caller then treats it as
+   ! "left the domain", resets the position and re-advects through
+   ! parallel2coast -- projecting the velocity along a coast the berg is not
+   ! near.  Only a search that finds nothing may report left_mype=1.0.
+   left_mype=0.0
    RETURN 
   end if
  end do
@@ -671,6 +679,17 @@ subroutine com_integer(partit, i_have_element, iceberg_element, ib)
  !leave most of a 2h20 compute-job walltime for a rerun once the root cause
  !is fixed, instead of burning the whole budget on a silent hang.
  real(kind=8), parameter :: com_integer_timeout = 300.0
+ ! Send buffer for the non-owning branch.  It MUST be a named variable, not the
+ ! literal 0 that used to be passed directly: MPI_IAllreduce is non-blocking, so
+ ! the send buffer has to stay valid until the MPI_TEST loop below completes, and
+ ! a literal may be passed via a compiler temporary that does not.  A non-owning
+ ! PE could therefore contribute garbage instead of 0, making the MPI_SUM
+ ! non-zero when NO PE owns the element.  iceberg_step2 then sees a non-zero
+ ! iceberg_elem, skips its "iceberg_elem == 0 -> restore old position" branch,
+ ! and the berg keeps a position no element contains -- observed in new_ism38 as
+ ! 22-30 % of bergs ending each year a median 620 km OUTSIDE the mesh, sitting
+ ! over grounded ice under ~2.5 km of ice.
+ integer:: zero_send
 type(t_partit), intent(inout), target :: partit
 !#include "associate_part_def.h"
 !#include "associate_part_ass.h"
@@ -682,7 +701,8 @@ type(t_partit), intent(inout), target :: partit
 !$omp end critical
  else
 !$omp critical
-     call MPI_IAllreduce(0,            iceberg_element, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM_IB, req, partit%MPIERR_IB)
+     zero_send = 0
+     call MPI_IAllreduce(zero_send,    iceberg_element, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM_IB, req, partit%MPIERR_IB)
 !$omp end critical
  end if
 
