@@ -22,26 +22,21 @@ contains
 #else
       print '(g0)', '__icepack is OFF'
 #endif  
-#ifdef __oasis
-      print '(g0)', '__oasis is ON'
+! Exactly one interface macro is defined; see cmake/FesomCoupling.cmake.
+#ifdef __standalone
+      print '(g0)', 'coupling interface: standalone'
+#elif defined (__cpl_direct)
+      print '(g0)', 'coupling interface: direct (in-process IFS)'
+#elif defined (__cpl_oasis28)
+      print '(g0)', 'coupling interface: oasis28 (OASIS3-MCT 2.8)'
+#elif defined (__cpl_oasis50)
+      print '(g0)', 'coupling interface: oasis50 (OASIS3-MCT 5.0)'
+#elif defined (__cpl_yac)
+      print '(g0)', 'coupling interface: yac'
 #else
-      print '(g0)', '__oasis is OFF'
+      print '(g0)', 'coupling interface: UNKNOWN -- no __cpl_* macro is '// &
+                    'defined, this build did not go through cmake'
 #endif
-#ifdef __yac
-      print '(g0)', '__yac is ON'
-#else
-      print '(g0)', '__yac is OFF'
-#endif
-#ifdef __coupled
-      print '(g0)', '__coupled is ON'
-#else
-      print '(g0)', '__coupled is OFF'
-#endif
-#ifdef __oifs
-      print '(g0)', '__oifs is ON'
-#else
-      print '(g0)', '__oifs is OFF'
-#endif  
 #ifdef DEBUG
       print '(g0)', 'DEBUG is ON'
 #else

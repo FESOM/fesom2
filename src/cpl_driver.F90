@@ -1,4 +1,4 @@
-#if defined (__oasis)
+#if defined (__cpl_oasis)
 module cpl_driver
   !======================================================================
   !
@@ -13,7 +13,10 @@ module cpl_driver
   ! Modules used
   !
   use mod_oasis                    ! oasis module
-  use g_config, only : dt, use_icebergs, lwiso, compute_oasis_corners
+  use g_config,   only : dt, use_icebergs, lwiso
+  use cpl_config, only : cpl_comp_name, cpl_grid_name, &
+                         compute_oasis_corners, &
+                         is_coupled_to_echam, is_coupled_to_oifs
 #if defined(__recom) && defined(__usetp)
   use g_config, only : num_fesom_groups 
 #endif
@@ -29,24 +32,12 @@ module cpl_driver
   ! Exchange parameters for coupling FESOM with ECHAM6
   !
 
-  !---wiso-code
-  ! define nsend and nrecv as variables instead of fixed parameters
-  ! (final number of fields depends now on lwiso switch and is set in subroutine cpl_oasis3mct_define_unstr)
-
-#if defined (__oifs)
-#if defined(__recom)
-  integer                    :: nsend = 9
-  integer                    :: nrecv = 16
-!With oifs, without recom:
-#else
-  integer                    :: nsend = 8
-  integer                    :: nrecv = 15
-#endif
-!Without oifs
-#else
-  integer                    :: nsend = 4
-  integer                    :: nrecv = 12
-#endif
+  ! nsend/nrecv are variables, not parameters: the field set depends on the
+  ! partner atmosphere (set from is_coupled_to_* in cpl_oasis3mct_init) and is
+  ! then adjusted for lwiso / use_icebergs in fesom_init. The values below are
+  ! only placeholders until cpl_oasis3mct_init runs.
+  integer                    :: nsend = 0
+  integer                    :: nrecv = 0
   
   ! define send_id and recv_id with variable dimension as nsend and nrecv are now variables)
   integer, allocatable, dimension(:) :: send_id
@@ -58,7 +49,6 @@ module cpl_driver
 
   !---wiso-code-end
 
-  character(len=16)          :: appl_name      ! application name for OASIS use
   character(len=16)          :: comp_name      ! name of this component
   character(len=11)          :: grid_name      ! name of the grid
 
@@ -366,10 +356,27 @@ include "node_contour_boundary.h"
       call fesom_flush
 #endif /* VERBOSE */
 
-    appl_name = 'ocean'
-    comp_name = 'fesom'
-    
-    grid_name = 'feom'
+    ! Assignment rather than trim(): OASIS expects the names blank-padded
+    ! to the declared lengths.
+    comp_name = cpl_comp_name
+    grid_name = cpl_grid_name
+
+    !------------------------------------------------------------------
+    ! Field set of the partner atmosphere. fesom_init adjusts these
+    ! afterwards for lwiso and use_icebergs.
+    !------------------------------------------------------------------
+    if (is_coupled_to_oifs) then
+#if defined (__recom)
+       nsend = 9      ! + FCO2_feom
+       nrecv = 16     ! + XCO2_oce
+#else
+       nsend = 8
+       nrecv = 15
+#endif
+    else
+       nsend = 4
+       nrecv = 12
+    end if
 
     !------------------------------------------------------------------
     ! 1st Initialize the OASIS3-MCT coupling system for the application
@@ -417,7 +424,7 @@ include "node_contour_boundary.h"
 
   subroutine cpl_oasis3mct_define_unstr(partit, mesh)
    
-#ifdef __oifs
+#ifdef __cpl_oasis50
     use mod_oasis_auxiliary_routines, ONLY:	oasis_get_debug, oasis_set_debug
 #else
     use mod_oasis_method, ONLY:	oasis_get_debug, oasis_set_debug
@@ -696,35 +703,35 @@ include "associate_mesh_ass.h"
 ! ... Define symbolic names for the transient fields send by the ocean
 !     These must be identical to the names specified in the SMIOC file.
 !
-#if defined (__oifs)
-    cpl_send( 1)='sst_feom' ! 1. sea surface temperature [K]       ->
-    cpl_send( 2)='sie_feom' ! 2. sea ice extent [%-100]            ->
-    cpl_send( 3)='snt_feom' ! 3. snow thickness [m]                ->
-    cpl_send( 4)='ist_feom' ! 4. sea ice surface temperature [K]   ->
-    cpl_send( 5)='sia_feom' ! 5. sea ice albedo [%-100]            ->
-    cpl_send( 6)='u_feom'   ! 6. eastward  surface velocity [m/s]  ->
-    cpl_send( 7)='v_feom'   ! 7. northward surface velocity [m/s]  ->
-    cpl_send( 8)='sit_feom' ! 8. effective sea ice thickness [m]   ->
+    IF (is_coupled_to_oifs) THEN
+      cpl_send( 1)='sst_feom' ! 1. sea surface temperature [K]       ->
+      cpl_send( 2)='sie_feom' ! 2. sea ice extent [%-100]            ->
+      cpl_send( 3)='snt_feom' ! 3. snow thickness [m]                ->
+      cpl_send( 4)='ist_feom' ! 4. sea ice surface temperature [K]   ->
+      cpl_send( 5)='sia_feom' ! 5. sea ice albedo [%-100]            ->
+      cpl_send( 6)='u_feom'   ! 6. eastward  surface velocity [m/s]  ->
+      cpl_send( 7)='v_feom'   ! 7. northward surface velocity [m/s]  ->
+      cpl_send( 8)='sit_feom' ! 8. effective sea ice thickness [m]   ->
 #if defined (__recom)
-    cpl_send( 9)='FCO2_feom'! 9. CO2 flux [kgCO2 m-2 s-1]             ->
+      cpl_send( 9)='FCO2_feom'! 9. CO2 flux [kgCO2 m-2 s-1]         ->
 #endif
-#else
-    cpl_send( 1)='sst_feom' ! 1. sea surface temperature [°C]      ->
-    cpl_send( 2)='sit_feom' ! 2. sea ice thickness [m]             ->
-    cpl_send( 3)='sie_feom' ! 3. sea ice extent [%-100]            ->
-    cpl_send( 4)='snt_feom' ! 4. snow thickness [m]                ->
+    ELSE
+      cpl_send( 1)='sst_feom' ! 1. sea surface temperature [°C]      ->
+      cpl_send( 2)='sit_feom' ! 2. sea ice thickness [m]             ->
+      cpl_send( 3)='sie_feom' ! 3. sea ice extent [%-100]            ->
+      cpl_send( 4)='snt_feom' ! 4. snow thickness [m]                ->
 !---wiso-code
 ! add isotope coupling fields
-    IF (lwiso) THEN
-      cpl_send( 5)='o18w_oce' !                 -> h2o18 of ocean water
-      cpl_send( 6)='hdow_oce' !                 -> hdo16 of ocean water
-      cpl_send( 7)='o16w_oce' !                 -> h2o16 of ocean water
-      cpl_send( 8)='o18i_oce' !                 -> h2o18 of sea ice
-      cpl_send( 9)='hdoi_oce' !                 -> hdo16 of sea ice
-      cpl_send(10)='o16i_oce' !                 -> h2o16 of sea ice
-    END IF
+      IF (lwiso) THEN
+        cpl_send( 5)='o18w_oce' !               -> h2o18 of ocean water
+        cpl_send( 6)='hdow_oce' !               -> hdo16 of ocean water
+        cpl_send( 7)='o16w_oce' !               -> h2o16 of ocean water
+        cpl_send( 8)='o18i_oce' !               -> h2o18 of sea ice
+        cpl_send( 9)='hdoi_oce' !               -> hdo16 of sea ice
+        cpl_send(10)='o16i_oce' !               -> h2o16 of sea ice
+      END IF
 !---wiso-code-end
-#endif
+    END IF
 
 
     
@@ -732,7 +739,7 @@ include "associate_mesh_ass.h"
 ! ...  Define symbolic names for transient fields received by the ocean.
 !      These must be identical to the names specified in the SMIOC file.
 !
-#if defined (__oifs)
+    ! The first twelve are common to both partners.
     cpl_recv(1)  = 'taux_oce'
     cpl_recv(2)  = 'tauy_oce'
     cpl_recv(3)  = 'taux_ico'
@@ -745,44 +752,33 @@ include "associate_mesh_ass.h"
     cpl_recv(10) = 'heat_ico'
     cpl_recv(11) = 'heat_swo'    
     cpl_recv(12) = 'hydr_oce'
-    cpl_recv(13) = 'calv_oce'
-    cpl_recv(14) = 'u10w_oce'
-    cpl_recv(15) = 'v10w_oce'
+
+    IF (is_coupled_to_oifs) THEN
+      cpl_recv(13) = 'calv_oce'
+      cpl_recv(14) = 'u10w_oce'
+      cpl_recv(15) = 'v10w_oce'
 #if defined (__recom)
-    cpl_recv(16) = 'XCO2_oce'
+      cpl_recv(16) = 'XCO2_oce'
 #endif
-!Not oifs
-#else
-    cpl_recv(1)  = 'taux_oce'
-    cpl_recv(2)  = 'tauy_oce'
-    cpl_recv(3)  = 'taux_ico'
-    cpl_recv(4)  = 'tauy_ico'    
-    cpl_recv(5)  = 'prec_oce'
-    cpl_recv(6)  = 'snow_oce'    
-    cpl_recv(7)  = 'evap_oce'
-    cpl_recv(8)  = 'subl_oce'
-    cpl_recv(9)  = 'heat_oce'
-    cpl_recv(10) = 'heat_ico'
-    cpl_recv(11) = 'heat_swo'    
-    cpl_recv(12) = 'hydr_oce'
+    ELSE
 ! --- icebergs ---
-    IF (lwiso) THEN
-      cpl_recv(13) = 'w1_oce'
-      cpl_recv(14) = 'w2_oce'
-      cpl_recv(15) = 'w3_oce'
-      cpl_recv(16) = 'i1_oce'
-      cpl_recv(17) = 'i2_oce'
-      cpl_recv(18) = 'i3_oce'
-      IF (use_icebergs) THEN
-        cpl_recv(19) = 'u10w_oce'
-        cpl_recv(20) = 'v10w_oce'
+      IF (lwiso) THEN
+        cpl_recv(13) = 'w1_oce'
+        cpl_recv(14) = 'w2_oce'
+        cpl_recv(15) = 'w3_oce'
+        cpl_recv(16) = 'i1_oce'
+        cpl_recv(17) = 'i2_oce'
+        cpl_recv(18) = 'i3_oce'
+        IF (use_icebergs) THEN
+          cpl_recv(19) = 'u10w_oce'
+          cpl_recv(20) = 'v10w_oce'
+        END IF
+      ELSE IF (use_icebergs) THEN
+        cpl_recv(13) = 'u10w_oce'
+        cpl_recv(14) = 'v10w_oce'
       END IF
-    ELSE IF (use_icebergs) THEN
-      cpl_recv(13) = 'u10w_oce'
-      cpl_recv(14) = 'v10w_oce'
-    END IF
 ! --- icebergs ---
-#endif
+    END IF
 
     if (mype .eq. 0) then 
        print *, 'FESOM after declaring the transient variables'
@@ -844,11 +840,13 @@ include "associate_mesh_ass.h"
 #endif
    call oasis_enddef(ierror)
    if (ierror .eq. oasis_ok) print *, 'fesom oasis_enddef: COMPLETED'
-#ifndef __oifs
-   if (ierror .eq. oasis_ok) print *, 'FESOM: calling exchange_roots'
-   call exchange_roots(source_root, target_root, 1, partit%MPI_COMM_FESOM, MPI_COMM_WORLD)
-   if (ierror .eq. oasis_ok) print *, 'FESOM source/target roots: ', source_root, target_root
-#endif
+   ! Only ECHAM uses the out-of-band net-flux exchange in net_rec_from_atm,
+   ! so only ECHAM needs the roots discovered.
+   if (is_coupled_to_echam) then
+     if (ierror .eq. oasis_ok) print *, 'FESOM: calling exchange_roots'
+     call exchange_roots(source_root, target_root, 1, partit%MPI_COMM_FESOM, MPI_COMM_WORLD)
+     if (ierror .eq. oasis_ok) print *, 'FESOM source/target roots: ', source_root, target_root
+   end if
 
    ! WAS VOM FOLGENDEN BRAUCHE ICH NOCH ??? 
 

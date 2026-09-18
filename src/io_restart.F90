@@ -336,11 +336,15 @@ subroutine ini_ice_io(ice, partit, mesh)
   ! t_skin (:280, stored back at :321) and runs a fixed imax=5 iterations with no convergence
   ! test (:713, :741), so the result depends on the seed -> prognostic. Binary path saves it.
   call ice_files%def_node_var_optional('t_skin', 'ice skin temperature (Newton-Raphson seed)', 'C', ice%thermo%t_skin, mesh, partit)
-#if defined (__oifs) || defined (__ifsinterface)
+! TODO: still compile-time. These field sets are only meaningful for the
+! IFS-family partners, and widening them would change the file layout for
+! the other partners -- decided together with the restart format.
+#if defined (__cpl_direct) || defined (__cpl_oasis50)
   call ice_files%def_node_var_optional('ice_albedo', 'ice albedo',    '-',   ice%atmcoupl%ice_alb, mesh, partit)
-  call ice_files%def_node_var_optional('ice_temp', 'ice surface temperature',  'K',   ice%data(4)%values, mesh, partit)
-#endif /* (__oifs) */
-#if defined (__oasis)
+  if (ice%ist_itracer_idx > 0) &
+    call ice_files%def_node_var_optional('ice_temp', 'ice surface temperature',  'K',   ice%data(ice%ist_itracer_idx)%values, mesh, partit)
+#endif /* IFS-family partners */
+#if defined (__cpl_oasis)
   !---wiso-code
   if (lwiso) then
     call ice_files%def_node_var_optional('h2o18_ice', 'h2o18 concentration in sea ice', 'kmol/m**3', tr_arr_ice(:,1), mesh, partit)

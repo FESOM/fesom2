@@ -142,8 +142,8 @@ arr_S_ave_ib = 0.0
  call FEM_eval(mesh, partit, ui_ib,vi_ib,lon,lat,ice%uice_ib,ice%vice_ib,iceberg_elem)    
   
  !ICE THICKNESS (CONCENTRATION) hi_ib, conci_ib
- hi_ib3    => ice%data(size(ice%data))%values(:) !ice%m_ice_ib(tmp_arr)
- conci_ib3 => ice%data(size(ice%data)-1)%values(:) !ice%a_ice_ib(tmp_arr) 
+ hi_ib3    => ice%data(ice%m_ice_ib_itracer_idx)%values(:)
+ conci_ib3 => ice%data(ice%a_ice_ib_itracer_idx)%values(:)
  call FEM_3eval(mesh, partit, hi_ib,conci_ib,lon,lat,hi_ib3,conci_ib3,iceberg_elem)
  P_ib = 20000. * hi_ib * exp(-20.*(1-conci_ib))
  

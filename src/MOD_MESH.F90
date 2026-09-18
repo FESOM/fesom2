@@ -118,12 +118,13 @@ real(kind=WP), allocatable, dimension(:,:)  :: cavity_nrst_cavlpnt_xyz
 !___Elevation stiffness matrix__________________________________________________
 type(sparse_matrix)                         :: ssh_stiff
 
-!#if defined (__coupled)
+! Hemispheric lumped masses / index lists for the coupled flux correction.
+! Allocated only under __cpl_coupler (oce_mesh.F90), but declared
+! unconditionally so that this derived type has one layout in every build.
 real(kind=WP), allocatable, dimension(:)    :: lump2d_south
 real(kind=WP), allocatable, dimension(:)    :: lump2d_north
 integer,       allocatable, dimension(:)    :: ind_south
 integer,       allocatable, dimension(:)    :: ind_north
-!#endif
 
 integer                                       :: nn_size
 integer, allocatable, dimension(:)            :: nn_num

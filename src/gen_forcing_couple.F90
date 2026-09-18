@@ -74,7 +74,7 @@ module net_rec_from_atm_interface
 end module net_rec_from_atm_interface
 ! Routines for updating ocean surface forcing fields
 !-------------------------------------------------------------------------
-#if defined (__yac)
+#if defined (__cpl_yac)
 subroutine update_atm_forcing_yac(istep, ice, tracers, dynamics, partit, mesh)
   use o_PARAM
   use MOD_MESH
@@ -247,7 +247,7 @@ subroutine update_atm_forcing_yac(istep, ice, tracers, dynamics, partit, mesh)
 
 end subroutine update_atm_forcing_yac
 
-#else /* if not defined  __yac */
+#else /* if not defined  __cpl_yac */
 
 subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   use o_PARAM
@@ -271,9 +271,10 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 #endif
   use g_sbf, only: atmdata, i_totfl, i_xwind, i_ywind, i_xstre, i_ystre, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_snow, &
                                      l_xwind, l_ywind, l_xstre, l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow
-#if defined (__oasis)
+#if defined (__cpl_oasis)
   use cpl_driver
 #endif
+  use cpl_config, only : is_coupled_to_echam, is_coupled_to_oifs
   use gen_bulk
   use force_flux_consv_interface
 #if defined (__recom)
@@ -296,7 +297,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   integer                  :: nt1, nt2
   real(kind=WP), parameter :: zwisomin = 1.e-6_WP
   !---wiso-code-end
-#if defined(__oasis)
+#if defined (__cpl_oasis)
   real(kind=WP)        				   :: flux_global(2), flux_local(2), eff_vol(2)
   real(kind=WP), dimension(:), allocatable , save  :: exchange
   real(kind=WP), dimension(:), allocatable , save  :: mask !, weight
@@ -317,15 +318,18 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   real(kind=WP), dimension(:), pointer  :: u_ice, v_ice, u_w, v_w
   real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
   real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
-#if defined (__oasis) || defined (__ifsinterface)
+! TODO: __cpl_yac is absent here, as in the pre-rework guard. Declaration
+! and use agree, so this is self-consistent, but YAC does not get
+! residualifwflx or the rhofwt/rhowat freshwater conversion. Widening the
+! guard changes YAC results, so it is left to a separate change.
+#if defined (__cpl_oasis) || defined (__cpl_direct)
   real(kind=WP), dimension(:), pointer  ::  oce_heat_flux, ice_heat_flux 
   real(kind=WP), dimension(:), pointer  ::  tmp_oce_heat_flux, tmp_ice_heat_flux 
 #endif 
-#if defined (__oifs) || defined (__ifsinterface)
   real(kind=WP), dimension(:), pointer  :: ice_temp, ice_alb, enthalpyoffuse, runoff_liquid, runoff_solid
   real(kind=WP),               pointer  :: tmelt
   real(kind=WP), dimension(:,:,:), pointer :: UVnode
-#endif
+  logical                               :: l_ist
   real(kind=WP)              , pointer  :: rhoair
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -340,16 +344,18 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   a_ice            => ice%data(1)%values(:)
   m_ice            => ice%data(2)%values(:)
   m_snow           => ice%data(3)%values(:)
-#if defined (__oifs) || defined (__ifsinterface)
-  ice_temp         => ice%data(4)%values(:)
+  tmelt            => ice%thermo%tmelt
+  UVnode           => dynamics%uvnode(:,:,:)
+  ! The ice surface temperature is only a tracer for the IFS-family partners.
+  l_ist = ice%ist_itracer_idx > 0
+  if (l_ist) ice_temp => ice%data(ice%ist_itracer_idx)%values(:)
+#if defined (__cpl_enabled)
   ice_alb          => ice%atmcoupl%ice_alb(:)
   enthalpyoffuse   => ice%atmcoupl%enthalpyoffuse(:)
   runoff_liquid    => ice%atmcoupl%runoff_liquid(:)
   runoff_solid     => ice%atmcoupl%runoff_solid(:)
-  tmelt            => ice%thermo%tmelt
-  UVnode           => dynamics%uvnode(:,:,:)
 #endif  
-#if defined (__oasis) || defined (__ifsinterface)
+#if defined (__cpl_oasis) || defined (__cpl_direct)
   oce_heat_flux    => ice%atmcoupl%oce_flx_h(:)
   ice_heat_flux    => ice%atmcoupl%ice_flx_h(:)
   tmp_oce_heat_flux=> ice%atmcoupl%tmpoce_flx_h(:)
@@ -359,7 +365,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   
   !_____________________________________________________________________________
   t1=MPI_Wtime()
-#if defined (__oasis)
+#if defined (__cpl_oasis)
      if (firstcall) then
         allocate(exchange(myDim_nod2D+eDim_nod2D), mask(myDim_nod2D+eDim_nod2D))
         allocate(a2o_fcorr_stat(nrecv,6))
@@ -370,8 +376,9 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
      end if
      do i=1,nsend
          exchange  =0.
-         if (i.eq.1) then
-#if defined (__oifs)
+         ! The sent field set depends on the partner.
+         if (is_coupled_to_oifs) then
+          if (i.eq.1) then
             ! AWI-CM3 outgoing state vectors
               do n=1,myDim_nod2D+eDim_nod2D
               exchange(n)=tracers%data(1)%values(1, n)+tmelt	           ! sea surface temperature [K]
@@ -414,7 +421,9 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 #endif
             else
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
-#else
+          endif
+         else
+          if (i.eq.1) then
             ! AWI-CM2 outgoing state vectors
             do n=1,myDim_nod2D+eDim_nod2D
                exchange(n)=tracers%data(1)%values(1, n)                     ! sea surface temperature [°C]
@@ -470,21 +479,22 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
 !---wiso-code-end
             else	    
             print *, 'not installed yet or error in cpl_oasis3mct_send', mype
-#endif
+          endif
          endif
 
 #if defined(__recom) && defined(__usetp)
          if(partit%my_fesom_group == 0) then
 #endif
          call cpl_oasis3mct_send(i, exchange, action, partit)
-#if defined (__oifs)
          ! Anchor for the implicit ice surface-temperature solve
          ! (ice_thermo_cpl.F90/ice_surftemp): remember the ist as ACTUALLY
          ! transmitted -- the temperature OIFS evaluates its ice-tile fluxes
          ! at for the coming coupling interval. `action` is only true on real
          ! OASIS transmissions, so this stays frozen between coupling events.
-         if (i==4 .and. action) ice%atmcoupl%ist_ref(:) = exchange(:)
-#endif
+         ! The compile-time guard is on ist_ref's existence, hence the ice
+         ! temperature tracer; the runtime one is on the partner.
+         if (is_coupled_to_oifs .and. i==4 .and. action) &
+            ice%atmcoupl%ist_ref(:) = exchange(:)
 #if defined(__recom) && defined(__usetp)
          endif
 #endif
@@ -583,9 +593,11 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
                 mask=1.
                 call force_flux_consv(runoff, mask, i, 0,action, partit, mesh)
             end if
-#if defined (__oifs)
+         elseif (i.ge.13) then
+          ! From here the received field set depends on the partner.
+          if (is_coupled_to_oifs) then
 
-         elseif (i.eq.13) then
+           if (i.eq.13) then
              if (action) then
                 runoff_solid(:)      =  exchange(:)        ! solid water discharge (excess snow --> calving)
                 enthalpyoffuse(:)            =  runoff_solid(:)*333.55*1000000.0        ! enthalpy of fusion of the solid water discharge from glaciers
@@ -615,8 +627,9 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
                 x_co2atm(:) = exchange(:) * ((28.9647_WP/44.0095_WP)*1e6_WP)  ! [ppm]
              end if
 #endif
-#else
-         elseif (i.eq.13) then
+           end if
+          else
+           if (i.eq.13) then
             if (action) then
                  if (lwiso) then         
                      www3(:)         =  exchange(:)
@@ -705,7 +718,8 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
              if (use_icebergs.and.lwiso) then    
                  call force_flux_consv(v_wind, mask, i, 0, action, partit, mesh)
              end if
-#endif
+           end if
+          end if
          end if
 
 #ifdef VERBOSE
@@ -724,7 +738,7 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
         do_rotate_ice_wind=.false.
     end if
 #else
-#ifndef __ifsinterface
+#ifndef __cpl_direct
   call sbc_do(partit, mesh)
 !$OMP PARALLEL DO
   DO n=1, myDim_nod2D+eDim_nod2D
@@ -814,8 +828,8 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   end do
 !$OMP END PARALLEL DO
   ! heat and fresh water fluxes are treated in i_therm and ice2ocean
-#endif /* skip all in case of __ifsinterface */
-#endif /* (__oasis) */
+#endif /* skip all in case of __cpl_direct */
+#endif /* (__cpl_oasis) */
 
 #if defined (__recom) /* consider in all cases */
   call sbc_do_recom(partit, mesh)
@@ -836,7 +850,7 @@ end subroutine update_atm_forcing
 !
 !------------------------------------------------------------------------------------
 !
-#if defined (__oasis) || defined (__yac)
+#if defined (__cpl_coupler)
 !
 !=================================================================
 !
@@ -860,11 +874,12 @@ SUBROUTINE force_flux_consv(field2d, mask, n, h, do_stats, partit, mesh)
   use mod_mesh
   USE MOD_PARTIT
   USE MOD_PARSUP
-#if defined(__oasis)
+#if defined (__cpl_oasis)
   use cpl_driver,	 only : nrecv, cpl_recv, a2o_fcorr_stat
-#elif defined(__yac)
+#elif defined (__cpl_yac)
   use cpl_yac_driver,	 only : nrecv, cpl_recv, a2o_fcorr_stat
 #endif
+  use cpl_config,        only : is_coupled_to_echam
   use o_PARAM,           only : mstep, WP
   use compute_residual_interface
   use integrate_2D_interface
@@ -886,9 +901,10 @@ SUBROUTINE force_flux_consv(field2d, mask, n, h, do_stats, partit, mesh)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-#if defined (__oifs)
-  return !OIFS-FESOM2 coupling uses OASIS3MCT conservative remapping instead
-#endif
+  ! Only the ECHAM coupling redistributes the flux residual. OIFS relies on
+  ! OASIS3-MCT conservative remapping instead, and the YAC path never calls
+  ! this routine at all.
+  if (.not. is_coupled_to_echam) return
 
   if (mstep==1) then
 	if (mype == 0) write(*,*) 'Do not apply a correction at first time step for ', trim(cpl_recv(n))
@@ -1082,11 +1098,12 @@ END SUBROUTINE integrate_2D
 SUBROUTINE net_rec_from_atm(action, partit)
 !
   use g_forcing_arrays
-#if defined(__oasis)
+#if defined (__cpl_oasis)
   use cpl_driver
-#elif defined(__yac)
+#elif defined (__cpl_yac)
   use cpl_yac_driver
 #endif
+  use cpl_config, only: is_coupled_to_echam
   use o_PARAM, only: WP
   USE MOD_PARTIT
   USE MOD_PARSUP
@@ -1107,14 +1124,13 @@ SUBROUTINE net_rec_from_atm(action, partit)
   INTEGER 					  :: status(MPI_STATUS_SIZE,partit%npes) 
   INTEGER                                         :: request(2)
   real(kind=WP)                 		  :: aux(nrecv)
-!#if defined (__oifs) || defined(__yac)
-#if defined (__oifs)
-  return  !OIFS-FESOM2 coupling uses OASIS3MCT conservative remapping and recieves no net fluxes here.
-#endif
+  ! Only the ECHAM coupling exchanges net fluxes out of band. OIFS relies on
+  ! OASIS3-MCT conservative remapping and receives no net fluxes here.
+  if (.not. is_coupled_to_echam) return
   ! NOTE (single precision): the MPI_DOUBLE_PRECISION calls below are a RAW
   ! FESOM<->atmosphere root exchange over MPI_COMM_WORLD (source_root/target_root),
   ! NOT routed through OASIS, so they are only used by the ECHAM/AWICM flux-correction
-  ! path -- the __oifs build returns above and never reaches them. They are left
+  ! path -- other partners return above and never reach them. They are left
   ! hardcoded double on purpose: atm_net_fluxes_* are real(kind=WP), but the buffer
   ! kind must match the ATMOSPHERE partner (double), not the local WP, so this is the
   ! one coupling spot that MUST NOT be switched to MPI_WP. Making FESOM single
