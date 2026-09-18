@@ -81,7 +81,7 @@ albsnm            = 0.77           ! albedo of melting snow (dimensionless, 0-1)
 albi              = 0.7            ! albedo of frozen ice (dimensionless, 0-1)
 albim             = 0.68           ! albedo of melting ice (dimensionless, 0-1)
 albw              = 0.1            ! albedo of open water (dimensionless, 0-1)
-open_water_albedo = 2              ! open water albedo scheme:
+open_water_albedo = 2           ! open water albedo scheme:
                                 !   0 = default (constant albw)
                                 !   1 = Taylor et al.
                                 !   2 = Briegleb et al.
@@ -96,4 +96,3 @@ snowdist       = .false.        ! distribute snow depth according to ice thickne
 ! --- Melting Parameters ---
 c_melt         = 0.3            ! constant in concentration equation for melting conditions (0-1)
 /
-

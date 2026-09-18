@@ -27,8 +27,8 @@ runid = 'fesom'        ! run identifier (used in output filenames)
 ! ============================================================================
 &timestep
 step_per_day      = 72         ! number of time steps per day (determines dt = 86400/step_per_day seconds)
-                               ! common values: 32 (45min), 48 (30min), 72 (20min), 96 (15min), 192 (7min 30sec), 
-                               ! 216 (6min 40sec), 240 (6min), 288 (5min), 360 (4min), 720 (2min), 1440 (1min), 2880 (30sec)
+                                ! common values: 32 (45min), 48 (30min), 72 (20min), 96 (15min), 192 (7min 30sec), 
+                                ! 216 (6min 40sec), 240 (6min), 288 (5min), 360 (4min), 720 (2min), 1440 (1min), 2880 (30sec)
 run_length        = 10         ! total length of simulation run
 run_length_unit   = 'd'        ! unit for run_length: 'y' (years), 'm' (months), 'd' (days), 's' (steps)
 /
@@ -46,9 +46,9 @@ yearnew = 1958                 ! initial year
 ! MESH, INITIALIZATION & OUTPUT PATHS
 ! ============================================================================
 &paths
-MeshPath         = '/albedo/home/pscholz/fesom2/test/meshes/soufflet/'   ! path to mesh files (nod2d.out, elem2d.out, etc.)
-ClimateDataPath  = '/albedo/work/projects/p_fesom/FROM-OLLIE/FESOM2/hydrography/phc3.0/'          ! path to initial conditions (temperature, salinity)
-ResultPath       = '../result_tmp/'               ! path for output files and fesom.clock file
+MeshPath         = '/albedo/home/pscholz/fesom2/test/meshes/soufflet/' ! path to mesh files (nod2d.out, elem2d.out, etc.)
+ClimateDataPath  = '/albedo/work/projects/p_fesom/FROM-OLLIE/FESOM2/hydrography/phc3.0/' ! path to initial conditions (temperature, salinity)
+ResultPath       = '../result_tmp/'  ! path for output files and fesom.clock file
 /
 
 ! ============================================================================
@@ -69,9 +69,9 @@ logfile_outfreq         = 72       ! log file output frequency [number of time s
 ! ============================================================================
 &ale_def
 which_ALE          = 'linfs'     ! vertical coordinate type:
-                                 !   'linfs'  = linear free surface
-                                 !   'zlevel' = z-level (fixed depth levels)
-                                 !   'zstar'  = z-star (terrain-following with SSH scaling)
+                                  !   'linfs'  = linear free surface
+                                  !   'zlevel' = z-level (fixed depth levels)
+                                  !   'zstar'  = z-star (terrain-following with SSH scaling)
 use_partial_cell   = .false.     ! use partial bottom cells for better topography representation (not recommended)
 /
 
@@ -87,14 +87,14 @@ force_rotation  = .false.        ! force grid rotation even if not coupled
 alphaEuler      = 50.            ! first Euler angle (rotation around z-axis) [degrees]
 betaEuler       = 15.            ! second Euler angle (rotation around new x-axis) [degrees]
 gammaEuler      = -90.           ! third Euler angle (rotation around new z-axis) [degrees]
-                                 ! Euler angle convention: rotate first around z, then around new x, then around new z
+                                  ! Euler angle convention: rotate first around z, then around new x, then around new z
 /
 
 ! ============================================================================
 ! CALENDAR SETTINGS
 ! ============================================================================
 &calendar
-include_fleapyear = .false.       ! include leap years in calendar (false = 365-day year, true = 365/366-day year)
+include_fleapyear = .false.      ! include leap years in calendar (false = 365-day year, true = 365/366-day year)
 /
 
 ! ============================================================================
@@ -133,4 +133,3 @@ use_icebergs          = .false.  ! enable iceberg module
 steps_per_ib_step     = 8        ! ocean time steps per iceberg time step (iceberg subcycling)
 ib_async_mode         = 0        ! iceberg asynchronous mode (0=synchronous, 1=asynchronous)
 /
-
