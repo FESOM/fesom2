@@ -117,8 +117,12 @@ endfunction()
 function(update_namelist_dyn NAMELIST_IN NAMELIST_OUT)
     file(READ "${NAMELIST_IN}" CONTENT)
     
-    # Enable wind stress splitting for test_pi dynamics
-    string(REGEX REPLACE "use_wsplit=.[a-zA-Z]." "use_wsplit=.true." CONTENT "${CONTENT}")
+    # Enable implicit/explicit splitting of vertical velocity, matching the
+    # use_wsplit: True that every setups/test_pi*/setup.yml sets. Anchored and
+    # whitespace-tolerant like the other namelist rewrites: the shipped
+    # namelist.dyn uses aligned assignment ("use_wsplit         = .false.").
+    string(REGEX REPLACE "([^A-Za-z0-9_])use_wsplit[ \t]*=[ \t]*\\.[a-zA-Z]+\\."
+           "\\1use_wsplit=.true." CONTENT "${CONTENT}")
     
     file(WRITE "${NAMELIST_OUT}" "${CONTENT}")
 endfunction()
