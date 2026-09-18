@@ -1042,8 +1042,8 @@ contains
         ! --------------
         
         !___model sea-ice step__________________________________________________
+        f%t_ice_s = MPI_Wtime()
         if(use_ice) then
-            f%t_ice_s = MPI_Wtime()
             !___compute fluxes from ocean to ice________________________________
 #if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
@@ -1054,7 +1054,9 @@ contains
 #endif
             f%t_ice_o2iflx_s = MPI_Wtime()
             call ocean2ice(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
-            
+        end if
+
+        if (use_ice .or. .not. toy_ocean) then
             !___compute update of atmospheric forcing____________________________
 #if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
@@ -1071,10 +1073,13 @@ contains
             call update_atm_forcing_yac(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
 #else
             call update_atm_forcing(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
-#endif 
+#endif
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("update_atm_forcing")
 #endif
+        end if
+
+        if(use_ice) then
             f%t_ice_step_s = MPI_Wtime()
             !___compute ice step________________________________________________
             if (f%ice%ice_steps_since_upd>=f%ice%ice_ave_steps-1) then
@@ -1101,7 +1106,9 @@ contains
         call fesom_profiler_end("ice_timestep")
 #endif
             endif
-        
+        end if
+
+        if (use_ice .or. .not. toy_ocean) then
             !___compute fluxes to the ocean: heat, freshwater, momentum_________
 #if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
@@ -1114,14 +1121,15 @@ contains
             call oce_fluxes_mom(f%ice, f%dynamics, f%partit, f%mesh) ! momentum only
             call oce_fluxes(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
             f%t_ice_e = MPI_Wtime()
+        end if
 
+        if(use_ice) then
             !___freshwater depth hosing routine_______________________________________
             !
             if (use_hosing .and. trim(hosing_mode)=='depth') then
                 call fw_depth_anomaly(f%tracers%data(2)%values, f%tracers%data(1)%values, &
                                       hosing_hSv, f%partit, f%mesh)
             end if
-
         end if
         
         call before_oce_step(f%dynamics, f%tracers, f%partit, f%mesh) ! prepare the things if required
