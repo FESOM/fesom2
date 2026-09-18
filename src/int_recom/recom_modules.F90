@@ -638,12 +638,19 @@ module recom_config
   Integer, parameter     :: tnabp = 4   ! number of phyto spectra blocks the code knows
   Logical                :: DAR_NONSPECTRAL_BACKSCATTERING_RATIO = .false.
   Real(kind=8)           :: darwin_bbphy(tnabp) = (/ 0.0020d0, 0.0105d0, 0.0200d0, 0.0020d0 /)
+!sl Specific CDOM absorption at darwin_lambda_aCDOM (450 nm) [m2 per unit CDOM tracer], used only under
+!sl RECOM_CALC_ACDOM with RECOM_CDOM: a_cdom(lambda) = cdomcoeff * CDOM * exp(-darwin_Sdom*(lambda-450)).
+!sl Moved here from REcoM_spectral (18 Sep 2026) so it can be set in &spectral. Default 0.18 is the original value.
+!sl Against OC-CCI a_dg(443) 2003-2012 the tracer gives the right pattern but ~1.3x too much absorption
+!sl (~1.9x S of 45S), which suggests ~0.10-0.13; see obs_data/cchl/adg_compare.txt.
+  Real(kind=8)           :: cdomcoeff = 0.18d0
 
   namelist /spectral/ RECOM_CDOM, RECOM_MARSHALL, RECOM_RADTRANS, OASIM, RECOM_BMASS, &
                       RECOM_CALC_ACDOM,  RECOM_CALC_APART, RECOM_CALC_APHYT,         &
                       RECOM_CALC_REFLEC, &
                       DAR_NONSPECTRAL_BACKSCATTERING_RATIO, darwin_bbphy, &
                       QYmax, QYmax_d, QYmax_cocco, QYmax_phaeo, &
+                      cdomcoeff, &
                       aphyt_slope_phy, aphyt_icept_phy, &
                       aphyt_slope_dia, aphyt_icept_dia, &
                       aphyt_slope_cocco, aphyt_icept_cocco, &
@@ -2458,7 +2465,7 @@ module REcoM_spectral
          Real(kind=8)                 :: darwin_Sdom=0.021          ! used in acdom calculations
          Real(kind=8)                 :: darwin_lambda_aCDOM=450.   ! wavelength where aCDOM is given
          Real(kind=8),dimension(tlam) :: excdom                     ! CDOM exponent
-         Real(kind=8)                 :: cdomcoeff= 0.18            ! specific CDOM absorption
+!sl      cdomcoeff moved to module recom_config (&spectral namelist); still visible here via use recom_config.
          Integer                      :: nlaCDOM                    ! nl number where aCDOM is given used in acdom calculations
 !sl if (RECOM_CDOM) then
          Real(kind=8)                 :: darwin_aCDOM_fac=0.2       ! ratio of aCDOM to (aphy+aw) at darwin_lambda_aCDOM
