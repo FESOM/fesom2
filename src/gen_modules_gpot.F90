@@ -163,7 +163,7 @@ MODULE mo_tidal
          hasp = rekts + geo_coord_nod2D(1,i)
 
          ! attention : mpiom uses a negative tidal potential due to negative factor rkomp
-         ssh_gp(i) = eef * erdrad * rkomp * crim3 &
+         ssh_gp(i) = eef * (erdrad * rkomp * crim3 &
               * (3._WP * (SIN(geo_coord_nod2D(2,i))**2 - 1._WP/3._WP) * (sidmq - 1._WP/3._WP)&
               &  + SIN(2._WP * geo_coord_nod2D(2,i)) * sidm2 * COS(hamp) &
               &  + COS(geo_coord_nod2D(2,i))**2 * codmq * COS(2._WP * hamp))        &
@@ -171,7 +171,7 @@ MODULE mo_tidal
               &    * (3._WP * (SIN(geo_coord_nod2D(2,i))**2 - 1._WP/3._WP) &
               &       * (sidsq - 1._WP/3._WP) &
               &       + SIN(2._WP * geo_coord_nod2D(2,i)) * sids2 * COS(hasp) &
-              &       + COS(geo_coord_nod2D(2,i))**2 * codsq * COS(2._WP * hasp))
+              &       + COS(geo_coord_nod2D(2,i))**2 * codsq * COS(2._WP * hasp)))
 
       END DO
 
