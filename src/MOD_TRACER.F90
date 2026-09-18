@@ -54,6 +54,7 @@ real(kind=WP), allocatable                    :: tra_recom_sms(:,:,:)
 
 ! The fct part
 real(kind=WP),allocatable,dimension(:,:)      :: fct_LO          ! Low-order solution
+real(kind=WP),allocatable,dimension(:,:)      :: fct_LO_tend     ! Low-order tendency in flux form (tracer*thickness per step)
 real(kind=WP),allocatable,dimension(:,:)      :: adv_flux_hor    ! Antidif. horiz. contrib. from edges / backup for iterafive fct scheme
 real(kind=WP),allocatable,dimension(:,:)      :: adv_flux_ver    ! Antidif. vert. fluxes from nodes    / backup for iterafive fct scheme
 
