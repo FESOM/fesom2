@@ -1,18 +1,18 @@
-module com_global2local_interface
-  interface
-    subroutine com_global2local(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine com_global2local
-  end interface
-end module com_global2local_interface
+module oce_local_module
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE g_CONFIG
+    USE o_ARRAYS
+
+    implicit none
+
+    private
+    public :: com_global2local, save_dist_mesh
+
+contains
 
 !=============================================================================
 SUBROUTINE com_global2local(partit, mesh)
-use MOD_MESH
-USE MOD_PARTIT
 IMPLICIT NONE
 
 type(t_mesh),   intent(in),    target :: mesh
@@ -123,11 +123,6 @@ deallocate(temp)
 END SUBROUTINE com_global2local       	  
 !=============================================================================
 SUBROUTINE save_dist_mesh(partit, mesh)
-  USE g_CONFIG
-  USE MOD_MESH
-  USE MOD_PARTIT
-  USE o_ARRAYS 
-  use com_global2local_interface
   IMPLICIT NONE
 
   type(t_mesh),   intent(in),    target :: mesh
@@ -324,3 +319,5 @@ SUBROUTINE save_dist_mesh(partit, mesh)
      close(fileID)
   end if
 END subroutine  save_dist_mesh
+
+end module oce_local_module
