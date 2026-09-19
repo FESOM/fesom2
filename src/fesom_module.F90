@@ -54,6 +54,7 @@ module fesom_main_storage_module
   use icb_allocate_module, only: allocate_icb
   use gen_forcing_init_module, only: forcing_setup
   use par_support_module, only: par_init
+  use write_step_info_module, only: plot_fesomlogo
   use, intrinsic :: iso_fortran_env, only : real32
   use g_forcing_param, only: use_landice_water, use_age_tracer
   use oce_landice_water_module, only: landice_water_init

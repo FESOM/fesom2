@@ -6,8 +6,8 @@ module oce_adv_tra_driver_module
     USE MOD_DYN
     USE g_comm_auto
     USE diagnostics, only: ldiag_DVD
-    USE oce_adv_tra_hor_interfaces
-    USE oce_adv_tra_ver_interfaces
+    use oce_adv_tra_hor_module, only: adv_tra_hor_upw1, adv_tra_hor_muscl, adv_tra_hor_mfct, adv_tra_hor_spbee
+    use oce_adv_tra_ver_module, only: adv_tra_vert_impl, adv_tra_ver_upw1, adv_tra_ver_qr4c, adv_tra_ver_ppm, adv_tra_ver_cdiff, adv_tra_ver_spbee
     USE oce_adv_tra_fct_module, only: oce_adv_tra_fct_init, oce_tra_adv_fct
     USE o_ARRAYS
 

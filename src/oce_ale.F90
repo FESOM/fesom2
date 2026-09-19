@@ -24,8 +24,8 @@ module oce_ale_module
             pressure_force_4_zxxxx
     USE oce_ale_vel_rhs_module, only: compute_vel_rhs
     USE oce_ale_tracer_module, only: solve_tracers_ale
-    USE write_step_info_interface
-    USE check_blowup_interface
+    use write_step_info_module, only: write_step_info, write_enegry_info
+    use write_step_info_module, only: check_blowup
     USE ieee_arithmetic
     use oce_fer_gm_module, only: fer_solve_Gamma, fer_gamma2vel, init_Redi_GM
     use oce_mle_module, only: mle_add_gamma
