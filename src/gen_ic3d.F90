@@ -14,7 +14,7 @@ MODULE g_ic3d
    USE o_ARRAYS
    USE MOD_MESH
    USE MOD_PARTIT
-   USE MOD_PARSUP
+   use par_support_module, only: par_ex
    USE MOD_TRACER
    USE o_PARAM, only: mstep, pi
    USE g_comm_auto

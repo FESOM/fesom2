@@ -13,7 +13,6 @@ use o_arrays
 USE MOD_ICE
 use mod_mesh
 USE MOD_PARTIT
-USE MOD_PARSUP
 use g_comm_auto
 use o_tracers
 use g_config,         only: dt
@@ -56,7 +55,6 @@ subroutine app_rejected_salt(ttf, partit, mesh)
   use o_param,  only: SPP_dep_N, SPP_dep_S, SPP_drhodz_cr_N, SPP_drhodz_cr_S, SPP_expon
   use mod_mesh
   USE MOD_PARTIT
-  USE MOD_PARSUP
   use o_tracers
   use g_comm_auto
   implicit none

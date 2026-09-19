@@ -3,7 +3,7 @@ module oce_ale_tracer_module
     USE o_PARAM
     USE mod_mesh
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     USE MOD_DYN
     USE MOD_ICE
     USE mod_tracer

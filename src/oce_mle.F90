@@ -1,7 +1,6 @@
 module oce_mle_module
     USE MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
     USE o_PARAM
     USE o_ARRAYS, only: sigma_xy, fer_gamma, MLD2, bvfreq, mle_psi, mle_hbar
     USE g_CONFIG

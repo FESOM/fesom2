@@ -1,7 +1,7 @@
 module oce_fer_gm_module
     USE MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     USE o_PARAM
     USE o_ARRAYS, only: sigma_xy, fer_gamma, bvfreq, fer_c, fer_K, fer_k, fer_scal, Ki, &
             MLD1_ind, neutral_slope, fer_tapfac, fer_GINsea_mask

@@ -1,7 +1,6 @@
 module mod_gen_comm
     USE MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
 
     implicit none
 

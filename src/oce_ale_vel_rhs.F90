@@ -2,7 +2,7 @@ module oce_ale_vel_rhs_module
     USE MOD_ICE
     USE MOD_DYN
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     USE MOD_MESH
     USE o_ARRAYS, only: ssh_gp, pgf_x, pgf_y
     USE o_PARAM

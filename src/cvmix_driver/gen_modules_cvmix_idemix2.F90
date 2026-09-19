@@ -35,7 +35,7 @@ module g_cvmix_idemix2
     use o_param           
     use MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     use o_arrays
     use o_tracers
     use g_comm_auto 
@@ -43,7 +43,7 @@ module g_cvmix_idemix2
     use g_read_other_NetCDF
     use g_dist2coast, only: compute_dist2coast
     use oce_muscl_adv_module, only: find_up_downwind_triangles
-    use par_support_interfaces, only: init_mpi_types_fbin
+    use par_support_module, only: init_mpi_types_fbin
     use g_support,              only: smooth_nod
     implicit none
     public

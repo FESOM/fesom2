@@ -1,7 +1,6 @@
 module ice_EVP_module
     USE MOD_ICE
     USE MOD_PARTIT
-    USE MOD_PARSUP
     USE MOD_MESH
     USE o_param
     USE g_CONFIG

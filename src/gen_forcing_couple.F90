@@ -2,7 +2,6 @@ module gen_forcing_couple_module
     USE o_PARAM
     USE MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
     USE MOD_TRACER
     USE MOD_ICE
     USE MOD_DYN

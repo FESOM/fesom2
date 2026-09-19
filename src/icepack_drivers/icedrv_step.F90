@@ -1157,6 +1157,7 @@ submodule (icedrv_main) icedrv_step
           use mod_ice    
           use ice_EVP_module, only: EVPdynamics
           use ice_maEVP_module, only: EVPdynamics_a, EVPdynamics_m
+          use par_support_module, only: par_ex
           implicit none
     
           integer (kind=int_kind) :: &

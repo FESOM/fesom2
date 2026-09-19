@@ -2,7 +2,7 @@ module oce_adv_tra_driver_module
     USE MOD_MESH
     USE MOD_TRACER
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     USE MOD_DYN
     USE g_comm_auto
     USE diagnostics, only: ldiag_DVD

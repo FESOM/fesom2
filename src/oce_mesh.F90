@@ -1,10 +1,10 @@
 module oce_mesh_module
     USE MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     USE g_config
     USE g_ROTATE_grid
-    USE par_support_interfaces
+    USE par_support_module, only: par_ex, init_mpi_types, init_gatherLists
     USE iso_fortran_env, only: error_unit
     USE o_PARAM
     USE o_ARRAYS

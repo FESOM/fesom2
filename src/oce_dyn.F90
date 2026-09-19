@@ -1,7 +1,7 @@
 module oce_dyn_module
     USE MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     USE MOD_DYN
     USE o_PARAM
     USE g_CONFIG

@@ -2,7 +2,6 @@ module ice_oce_coupling_module
     USE MOD_ICE
     USE MOD_DYN
     USE MOD_PARTIT
-    USE MOD_PARSUP
     USE MOD_MESH
     USE o_PARAM
     USE o_ARRAYS

@@ -1,7 +1,6 @@
 module solver_module
     USE MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
     USE MOD_DYN
     USE g_comm_auto
 #if defined(FESOM_PROFILING)

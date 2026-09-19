@@ -4,7 +4,7 @@ module oce_ale_pressure_bv_module
     USE MOD_MESH
     USE MOD_TRACER
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     USE o_ARRAYS
     USE g_support
     USE o_mixing_KPP_mod, only: dbsfc

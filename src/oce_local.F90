@@ -3,7 +3,6 @@ module com_global2local_interface
     subroutine com_global2local(partit, mesh)
       use mod_mesh
       USE MOD_PARTIT
-      USE MOD_PARSUP
       type(t_mesh),   intent(in),    target :: mesh
       type(t_partit), intent(inout), target :: partit
     end subroutine com_global2local
@@ -14,7 +13,6 @@ end module com_global2local_interface
 SUBROUTINE com_global2local(partit, mesh)
 use MOD_MESH
 USE MOD_PARTIT
-USE MOD_PARSUP
 IMPLICIT NONE
 
 type(t_mesh),   intent(in),    target :: mesh
@@ -128,7 +126,6 @@ SUBROUTINE save_dist_mesh(partit, mesh)
   USE g_CONFIG
   USE MOD_MESH
   USE MOD_PARTIT
-  USE MOD_PARSUP
   USE o_ARRAYS 
   use com_global2local_interface
   IMPLICIT NONE

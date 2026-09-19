@@ -16,7 +16,7 @@ module g_cvmix_tidal
     use o_param           
     use mod_mesh
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     use o_arrays
     use g_comm_auto 
     use g_read_other_NetCDF

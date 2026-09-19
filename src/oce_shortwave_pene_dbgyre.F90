@@ -8,7 +8,6 @@ subroutine cal_shortwave_rad_dbgyre(ice, tracers, partit, mesh)
   USE MOD_ICE
   USE o_PARAM
   USE o_ARRAYS
-  USE MOD_PARSUP
   USE MOD_PARTIT
   USE MOD_TRACER
   USE g_CONFIG
