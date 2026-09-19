@@ -8,13 +8,13 @@ module ice_oce_coupling_module
     USE o_ARRAYS
     USE g_CONFIG
     USE g_comm_auto
-    USE cavity_interfaces
+    use cavity_param_module, only: cavity_heat_water_fluxes_3eq, cavity_heat_water_fluxes_2eq, cavity_ice_clean_vel, cavity_ice_clean_ma, cavity_momentum_fluxes
     USE MOD_TRACER
     USE g_forcing_param, only: use_virt_salt, use_landice_water, use_age_tracer, use_age_mask, &
             age_start_year
     USE g_forcing_arrays
     USE g_support
-    USE hosing_interface
+    use oce_hosing_module, only: fw_surf_anomaly, fw_depth_anomaly
     USE iceberg_params
     USE iceberg_ocean_coupling
     USE g_clock

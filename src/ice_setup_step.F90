@@ -15,7 +15,7 @@ module ice_setup_step_module
 #else
     use ice_thermo_oce_module, only: cut_off
 #endif
-    USE cavity_interfaces
+    use cavity_param_module, only: cavity_heat_water_fluxes_3eq, cavity_heat_water_fluxes_2eq, cavity_ice_clean_vel, cavity_ice_clean_ma, cavity_momentum_fluxes
     USE o_arrays
     USE g_read_other_NetCDF, only: read_other_NetCDF
     use ice_init_module, only: ice_init

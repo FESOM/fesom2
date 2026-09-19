@@ -27,6 +27,8 @@ module oce_setup_step_module
     use oce_ale_module, only: init_stiff_mat_ale
     use oce_ale_pressure_bv_module, only: init_ref_density
     use oce_muscl_adv_module, only: muscl_adv_init
+    use cavity_param_module, only: compute_nrst_pnt2cavline
+    use oce_fer_gm_module, only: init_RediGM_GINsea_mask
 #if defined (__cvmix)
     use g_cvmix_tke
     use g_cvmix_idemix

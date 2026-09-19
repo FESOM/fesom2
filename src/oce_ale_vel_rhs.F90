@@ -11,7 +11,7 @@ module oce_ale_vel_rhs_module
     USE g_forcing_arrays, only: press_air
     USE g_comm_auto
     USE g_sbf, only: l_mslp
-    USE momentum_adv_scalar_transpv_interface
+    use oce_ale_ssh_splitexpl_subcycl_module, only: momentum_adv_scalar_transpv
     use oce_dyn_module, only: viscosity_filter
 
     implicit none

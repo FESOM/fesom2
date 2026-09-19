@@ -34,7 +34,7 @@ module fesom_main_storage_module
   use ice_setup_step_module, only: ice_setup, ice_timestep
   use ice_oce_coupling_module, only: ocean2ice
   use ice_oce_coupling_module, only: oce_fluxes, oce_fluxes_mom
-  use hosing_interface
+  use oce_hosing_module, only: fw_surf_anomaly, fw_depth_anomaly
 #if defined (__yac)
   use gen_forcing_couple_module, only: update_atm_forcing_yac
 #else
@@ -51,10 +51,12 @@ module fesom_main_storage_module
   use oce_ale_module, only: restart_thickness_ale
   use oce_ale_pressure_bv_module, only: init_ref_density_advanced
   use ice_init_module, only: ice_init_toyocean_dummy
+  use icb_allocate_module, only: allocate_icb
+  use gen_forcing_init_module, only: forcing_setup
   use, intrinsic :: iso_fortran_env, only : real32
   use g_forcing_param, only: use_landice_water, use_age_tracer
-  use landice_water_init_interface
-  use age_tracer_init_interface
+  use oce_landice_water_module, only: landice_water_init
+  use oce_age_tracer_module, only: age_tracer_init
   use iceberg_params
   use iceberg_step
   use mod_transit
