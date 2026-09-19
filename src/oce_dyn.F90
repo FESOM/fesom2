@@ -1,3 +1,24 @@
+module oce_dyn_module
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_DYN
+    USE o_PARAM
+    USE g_CONFIG
+    USE g_comm_auto
+    USE g_backscatter
+    USE o_ARRAYS
+    USE MOD_TRACER
+
+    implicit none
+
+    private
+    public :: update_vel, compute_vel_nodes, viscosity_filter, &
+              visc_filt_bcksct, visc_filt_bilapl, visc_filt_bidiff, &
+              compute_ke_wrho, compute_apegen, compute_PePm, &
+              check_viscopt, check_validviscopt_5
+
+contains
 
 ! A set of routines for computing the horizonlal viscosity
 ! the control parameters (their default values) are:
@@ -9,75 +30,11 @@
 !    We however, try to keep dynamics%visc_gamma1<0.1
 ! 3. dynamics%visc_gamma2 is dimensional (1/velocity). If it is 10, then the respective term dominates starting from |u|=0.1 m/s an so on. It is only used in: 
 !    (5) visc_filt_bcksct, (6) visc_filt_bilapl, (7) visc_filt_bidiff
-module visc_filt_bcksct_interface
-  interface
-    subroutine visc_filt_bcksct(dynamics, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_DYN
-      type(t_dyn)   , intent(inout), target :: dynamics
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh)  , intent(in)   , target :: mesh
-      
-    end subroutine visc_filt_bcksct
-  end interface
-end module visc_filt_bcksct_interface
-
-module visc_filt_bilapl_interface
-  interface
-    subroutine visc_filt_bilapl(dynamics, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_DYN
-      type(t_dyn)   , intent(inout), target :: dynamics
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh)  , intent(in)   , target :: mesh
-      
-    end subroutine visc_filt_bilapl
-  end interface
-end module visc_filt_bilapl_interface
-
-module visc_filt_bidiff_interface
-  interface
-    subroutine visc_filt_bidiff(dynamics, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_DYN
-      type(t_dyn)   , intent(inout), target :: dynamics
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh)  , intent(in)   , target :: mesh
-      
-    end subroutine visc_filt_bidiff
-  end interface
-end module visc_filt_bidiff_interface
-
-module check_validviscopt_interface
-    interface
-        subroutine check_validviscopt_5(partit, mesh)
-            USE MOD_MESH
-            USE MOD_PARTIT
-            USE MOD_PARSUP
-            type(t_partit), intent(inout), target :: partit
-            type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine check_validviscopt_5    
-    end interface
-end module check_validviscopt_interface 
-
 ! 
 ! Contains routines needed for computations of dynamics.
 ! includes: update_vel, compute_vel_nodes
 !_______________________________________________________________________________
 SUBROUTINE update_vel(dynamics, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    USE o_PARAM
-    USE g_CONFIG
-    use g_comm_auto
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -175,12 +132,6 @@ end subroutine update_vel
 !
 !_______________________________________________________________________________
 subroutine compute_vel_nodes(dynamics, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    USE o_PARAM
-    use g_comm_auto
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -228,15 +179,6 @@ end subroutine compute_vel_nodes
 !
 !_______________________________________________________________________________
 subroutine viscosity_filter(option, dynamics, partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_DYN
-    use visc_filt_bcksct_interface
-    use visc_filt_bilapl_interface
-    use visc_filt_bidiff_interface
-    use g_backscatter
     IMPLICIT NONE 
     integer                               :: option
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -276,13 +218,6 @@ end subroutine viscosity_filter
 !
 !_______________________________________________________________________________
 SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_DYN
-    USE o_PARAM
-    USE g_CONFIG
-    USE g_comm_auto
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -438,13 +373,6 @@ end subroutine visc_filt_bcksct
 ! in viscosity that is proportional to the velocity amplitude squared.
 ! The coefficient has to be selected experimentally.
 SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_DYN
-    USE o_PARAM
-    USE g_CONFIG
-    USE g_comm_auto
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -601,13 +529,6 @@ end subroutine visc_filt_bilapl
 ! The effect is \nu^2
 ! Quadratic in velocity term can be introduced if needed.
 SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_DYN
-    USE o_PARAM
-    USE g_CONFIG
-    USE g_comm_auto
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -766,14 +687,6 @@ end subroutine visc_filt_bidiff
 !
 !_______________________________________________________________________________
 SUBROUTINE compute_ke_wrho(dynamics, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_DYN
-    USE o_PARAM
-    USE g_CONFIG
-    USE g_comm_auto
-    USE o_ARRAYS
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -812,14 +725,6 @@ END SUBROUTINE compute_ke_wrho
 !_______________________________________________________________________________
 ! APE generation stuff
 SUBROUTINE compute_apegen(dynamics, tracers, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_TRACER
-    USE MOD_PARSUP
-    use MOD_DYN
-    USE o_PARAM
-    USE g_comm_auto
-    USE o_ARRAYS
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target   :: dynamics
     type(t_tracer), intent(in)   , target   :: tracers
@@ -874,14 +779,6 @@ salt   => tracers%data(2)%values(:,:)
 END SUBROUTINE compute_apegen
 ! compute energy conversion (Pm<->Pe), as well as Pm & Pe
 SUBROUTINE compute_PePm(dynamics, tracers, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_TRACER
-    USE MOD_PARSUP
-    use MOD_DYN
-    USE o_PARAM
-    USE g_comm_auto
-    USE o_ARRAYS
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target   :: dynamics
     type(t_tracer), intent(in)   , target   :: tracers
@@ -928,11 +825,6 @@ END SUBROUTINE compute_PePm
 ! Drake Passage throughflow (<80Sv). In this case better use visc_opt=7, 
 ! which is the flow aware viscosity option 
 subroutine check_viscopt(dynamics, partit, mesh)
-    USE MOD_DYN
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    USE check_validviscopt_interface
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -953,13 +845,6 @@ end subroutine check_viscopt
 !_______________________________________________________________________________
 ! check if viscopt=5 is a valid and recommended option for the used configuration
 subroutine check_validviscopt_5(partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE o_PARAM , ONLY: rad
-    USE o_ARRAYS, ONLY: bvfreq
-    USE g_CONFIG
-    USE g_comm_auto
     IMPLICIT NONE
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
@@ -1072,3 +957,5 @@ subroutine check_validviscopt_5(partit, mesh)
     end if     
     
 end subroutine check_validviscopt_5
+
+end module oce_dyn_module

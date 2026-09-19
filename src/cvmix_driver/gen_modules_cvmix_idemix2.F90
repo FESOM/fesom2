@@ -42,7 +42,7 @@ module g_cvmix_idemix2
     use g_interp
     use g_read_other_NetCDF
     use g_dist2coast, only: compute_dist2coast
-    use find_up_downwind_triangles_interface
+    use oce_muscl_adv_module, only: find_up_downwind_triangles
     use par_support_interfaces, only: init_mpi_types_fbin
     use g_support,              only: smooth_nod
     implicit none

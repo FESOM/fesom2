@@ -1,18 +1,20 @@
-module find_up_downwind_triangles_interface
-  interface
-    subroutine find_up_downwind_triangles(partit, mesh, edge_up_dn_tri, edge_up_dn_grad )
-      use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use MOD_TRACER
-      type(t_mesh),        intent(inout)  ,  target :: mesh
-      type(t_partit),      intent(inout), target :: partit
-!       type(t_tracer_work), intent(inout), target :: twork
-      integer      , intent(inout), allocatable,dimension(:,:)  :: edge_up_dn_tri
-      real(kind=WP), intent(inout), allocatable,dimension(:,:,:), optional :: edge_up_dn_grad
-    end subroutine find_up_downwind_triangles
-  end interface
-end module find_up_downwind_triangles_interface
+module oce_muscl_adv_module
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_TRACER
+    USE o_ARRAYS
+    USE o_PARAM
+    USE g_comm_auto
+    USE g_config
+
+    implicit none
+
+    private
+    public :: muscl_adv_init, find_up_downwind_triangles, &
+              fill_up_dn_grad
+
+contains
 
 ! A set of routines to implement MUSCL-type of advection
 ! For description, see Abalakin, I., Dervieux, A., Kozubskaya, T., 2002. A
@@ -32,15 +34,6 @@ end module find_up_downwind_triangles_interface
 !	fill_up_dn_grad
 !	adv_tracer_muscl
 subroutine muscl_adv_init(twork, partit, mesh)
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_TRACER
-    use o_ARRAYS
-    use o_PARAM
-    use g_comm_auto
-    use g_config
-    use find_up_downwind_triangles_interface
     IMPLICIT NONE
     integer     :: n, k, n1, n2
 
@@ -166,14 +159,6 @@ end SUBROUTINE muscl_adv_init
 !
 !_______________________________________________________________________________
 SUBROUTINE find_up_downwind_triangles(partit, mesh, edge_up_dn_tri, edge_up_dn_grad)
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP
-USE MOD_TRACER
-USE o_ARRAYS
-USE o_PARAM
-USE g_CONFIG
-use g_comm_auto
 IMPLICIT NONE
 integer                    :: n, k, ednodes(2), elem, el
 real(kind=WP)              :: x(2),b(2), c(2), cr, bx, by, xx, xy, ab, ax
@@ -368,12 +353,6 @@ end SUBROUTINE find_up_downwind_triangles
 !_______________________________________________________________________________
 SUBROUTINE fill_up_dn_grad(twork, partit, mesh)
 ! ttx, tty  elemental gradient of tracer 
-USE o_PARAM
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP
-USE MOD_TRACER
-USE o_ARRAYS
 IMPLICIT NONE
 integer                  :: edge, n, nz, elem, k, ednodes(2), nzmin, nzmax
 real(kind=WP)            :: tvol, tx, ty
@@ -536,3 +515,5 @@ type(t_tracer_work), intent(inout), target :: twork
 !$OMP END DO
 !$OMP END PARALLEL
 END SUBROUTINE fill_up_dn_grad
+
+end module oce_muscl_adv_module

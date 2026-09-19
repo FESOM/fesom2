@@ -29,18 +29,27 @@ module fesom_main_storage_module
                                  siarean, siareas, siextentn, siextents, &
                                  sivoln, sivols
   use mo_tidal
-  use tracer_init_interface
-  use ocean_setup_interface
+  use oce_setup_step_module, only: tracer_init
+  use oce_setup_step_module, only: ocean_setup
   use ice_setup_interface
   use ocean2ice_interface
   use oce_fluxes_interface
   use hosing_interface
-  use update_atm_forcing_interface
-  use before_oce_step_interface
-  use oce_timestep_ale_interface
-  use read_mesh_interface
+#if defined (__yac)
+  use gen_forcing_couple_module, only: update_atm_forcing_yac
+#else
+  use gen_forcing_couple_module, only: update_atm_forcing
+#endif
+  use oce_setup_step_module, only: before_oce_step
+  use oce_ale_module, only: oce_timestep_ale
+  use oce_mesh_module, only: read_mesh
   use fesom_version_info_module
   use command_line_options_module
+  use oce_mesh_module, only: mesh_setup, check_mesh_consistency
+  use oce_setup_step_module, only: dynamics_init, arrays_init
+  use oce_dyn_module, only: compute_vel_nodes, update_vel
+  use oce_ale_module, only: restart_thickness_ale
+  use oce_ale_pressure_bv_module, only: init_ref_density_advanced
   use, intrinsic :: iso_fortran_env, only : real32
   use g_forcing_param, only: use_landice_water, use_age_tracer
   use landice_water_init_interface
