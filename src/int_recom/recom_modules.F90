@@ -606,6 +606,30 @@ module recom_config
   Real(kind=8)           :: aphyt_icept_cocco     = -3.300d-4
   Real(kind=8)           :: aphyt_slope_phaeo     = -3.972d-3
   Real(kind=8)           :: aphyt_icept_phaeo     = -2.660d-4
+
+!sl D1 damage/repair constants for the coccolithophore and Phaeocystis classes,
+!sl moved here from module REcoM_spectral on 21 Sep 2026 so they can be set in
+!sl &spectral without a rebuild (the QYmax precedent, efd353d7). Defaults are
+!sl UNCHANGED (8.0e-7 / 20. / 0.5), so every existing run reproduces.
+!sl They are live ONLY under RECOM_MARSHALL, and they feed
+!sl   damage = PAR*k_deg*D1*(1-NPQ)*86400,  repair = r_max*(1-D1)/(k_rep+1-D1)*qLim*arr
+!sl whose steady state sets D1 and hence PPC = 1 - min(D1/Drel,1)**2, the only
+!sl quantity D1 feeds. NOTE these are NOT the published Alvarez values: 571ba53d
+!sl moved phy/dia to those and left this separate, unattributed set behind.
+!sl Literature status (obs_data/marshall/README.txt, 21 Sep 2026): for
+!sl P. antarctica the DIRECTION is supported -- it incurs more photoinhibition
+!sl than Southern Ocean diatoms, carries a much smaller xanthophyll pool and
+!sl relies heavily on D1 repair (Kropuenske 2010) -- so high k_deg with high
+!sl r_max is right in kind, but no measured value exists for either class. The
+!sl PSII photoinactivation cross-section is reportedly near-conserved across taxa
+!sl while repair capacity varies widely, which argues for bracketing r_max rather
+!sl than k_deg. Unverified: that source is paywalled from Albedo.
+  Real(kind=8)           :: k_deg_cocco = 8.0e-7    ! photoinhibition target size [m2 J-1]
+  Real(kind=8)           :: r_max_cocco = 20.0d0    ! maximum D1 repair rate [d-1]
+  Real(kind=8)           :: k_rep_cocco = 0.5d0     ! half-saturation for repair [same units as 1-D1]
+  Real(kind=8)           :: k_deg_phaeo = 8.0e-7    ! photoinhibition target size [m2 J-1]
+  Real(kind=8)           :: r_max_phaeo = 20.0d0    ! maximum D1 repair rate [d-1]
+  Real(kind=8)           :: k_rep_phaeo = 0.5d0     ! half-saturation for repair [same units as 1-D1]
   character(80)           :: darwin_waterabsorbFile = 'abw25par.dat'
   character(80)           :: darwin_surfacespecFile = 'surfspec_13amt6.dat'
   character(80)           :: darwin_phytoabsorbFile = 'optics_phyto_recom_carbon_12.dat'
@@ -661,6 +685,8 @@ module recom_config
                       aphyt_slope_dia, aphyt_icept_dia, &
                       aphyt_slope_cocco, aphyt_icept_cocco, &
                       aphyt_slope_phaeo, aphyt_icept_phaeo, &
+                      k_deg_cocco, r_max_cocco, k_rep_cocco, &
+                      k_deg_phaeo, r_max_phaeo, k_rep_phaeo, &
                       darwin_waterabsorbFile, &
                       darwin_surfacespecFile, &
                       darwin_phytoabsorbFile, &
@@ -2304,15 +2330,12 @@ module REcoM_spectral
    Real(kind=8)                :: k_deg_d              = 1.5e-7    ! Target size for photoinhibition [m^{-2} (J)^{-1}]
    Real(kind=8)                :: r_max_d              = 12.0      ! Maximum repair rate [d^{-1}]
    Real(kind=8)                :: k_rep_d              = 0.25      ! half saturation constant for repair, [same as DD1]
-   !sl if cocco
+   !sl if cocco. astar_cocco/astar_phaeo are SCRATCH, not parameters: recom_sms
+   !sl recomputes both from the optics file each step, so the 0.007 below is never
+   !sl read. The six cocco/phaeo k_deg/r_max/k_rep constants that used to sit here
+   !sl moved to module recom_config on 21 Sep 2026 so they can be set in &spectral.
    Real(kind=8)                :: astar_cocco              = 0.007     ! chlorophyll absortion cross section [m^{-2} (mg CHL)^{-1}]
-   Real(kind=8)                :: k_deg_cocco              = 8.0e-7    ! Target size for photoinhibition [m^{-2} (J)^{-1}]
-   Real(kind=8)                :: r_max_cocco              = 20.       ! Maximum repair rate [d^{-1}]
-   Real(kind=8)                :: k_rep_cocco              = 0.5       ! half saturation constant for repair, [same as DD1]
    Real(kind=8)                :: astar_phaeo              = 0.007     ! chlorophyll absortion cross section [m^{-2} (mg CHL)^{-1}]
-   Real(kind=8)                :: k_deg_phaeo              = 8.0e-7    ! Target size for photoinhibition [m^{-2} (J)^{-1}]
-   Real(kind=8)                :: r_max_phaeo              = 20.       ! Maximum repair rate [d^{-1}]
-   Real(kind=8)                :: k_rep_phaeo              = 0.5       ! half saturation constant for repair, [same as DD1]   
    !sl  
 !     photoinhibition
 ! QYmax, QYmax_d, QYmax_cocco and QYmax_phaeo moved to module recom_config so
