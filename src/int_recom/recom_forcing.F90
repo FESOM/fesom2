@@ -419,7 +419,8 @@ endif
                           , mype)
 !sl Reachable since the cocco/phaeo D1 source terms were added. The published
 !sl scheme is two-group (RECOM_2GROUPS), so aphyt_slope_cocco/_phaeo have no
-!sl literature value and default to the small-phyto / diatom coefficients.
+!sl literature value; they are estimates, not copies of phy/dia -- see the
+!sl comment at their declaration in recom_modules.F90.
 if (enable_coccos) then
         call RECOM_APHYTO(Nr, coccoD1_k(1:Nr),QYmax_cocco,Drel,         &
                    aphyt_slope_cocco,aphyt_icept_cocco,                 &

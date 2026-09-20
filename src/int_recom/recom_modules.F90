@@ -592,14 +592,20 @@ module recom_config
   Real(kind=8)           :: aphyt_slope_dia       = -1.418d-3
   Real(kind=8)           :: aphyt_icept_dia       = -5.800d-5
 !sl No published counterpart: Alvarez et al. is two-group (RECOM_2GROUPS), so the
-!sl coccolithophore and Phaeocystis defaults below are PLACEHOLDERS copied from
-!sl small phyto and diatoms respectively. They became live when the cocco/phaeo D1
-!sl source terms were added; treat any 4-PFT variable-aPH* result as untuned until
-!sl these are derived from pigment data.
-  Real(kind=8)           :: aphyt_slope_cocco     = -1.930d-3
-  Real(kind=8)           :: aphyt_icept_cocco     = -1.011d-4
-  Real(kind=8)           :: aphyt_slope_phaeo     = -1.418d-3
-  Real(kind=8)           :: aphyt_icept_phaeo     = -5.800d-5
+!sl coccolithophore and Phaeocystis values below have no literature source to take.
+!sl They were PLACEHOLDERS copied from small phyto and diatoms until Sep 2026; they
+!sl are now ESTIMATES supplied by S. Losa (provenance to be recorded here).
+!sl Relative to the published pair, they order the PPC response as
+!sl   cocco  flattest  (slope 0.29x phy, intercept 3.3x phy)
+!sl   phaeo  steepest  (slope 2.06x phy, 2.80x dia)
+!sl i.e. at PPC = 1 the 475 nm increment is +0.045 (cocco), +0.102 (phy, published),
+!sl +0.074 (dia, published) and +0.212 (phaeo) m2 (mg Chl)-1.
+!sl Still not derived from diadinoxanthin/diatoxanthin (and 19'-hex for coccos)
+!sl pigment-vs-D1 data, so treat any 4-PFT variable-aPH* result as untuned.
+  Real(kind=8)           :: aphyt_slope_cocco     = -5.600d-4
+  Real(kind=8)           :: aphyt_icept_cocco     = -3.300d-4
+  Real(kind=8)           :: aphyt_slope_phaeo     = -3.972d-3
+  Real(kind=8)           :: aphyt_icept_phaeo     = -2.660d-4
   character(80)           :: darwin_waterabsorbFile = 'abw25par.dat'
   character(80)           :: darwin_surfacespecFile = 'surfspec_13amt6.dat'
   character(80)           :: darwin_phytoabsorbFile = 'optics_phyto_recom_carbon_12.dat'
@@ -1070,7 +1076,10 @@ subroutine validate_recom_tracers(num_tracers, mype)
 !sl source terms were added (id1c/id1p had indices but nothing to evolve them).
 !sl It is now supported, with the caveat recorded at aphyt_slope_cocco: the
 !sl cocco/phaeo PPC->slope coefficients and D1 damage/repair constants have no
-!sl published counterpart and are placeholders.
+!sl published counterpart. The PPC->slope pairs are now estimates rather than
+!sl copies of the phy/dia values. The D1 damage/repair constants are a separate
+!sl unattributed set (8.0e-7 / 20. / 0.5, shared by cocco and phaeo) -- NOT copies
+!sl of phy/dia, which 571ba53d moved to the published Alvarez values.
 #endif /* __RECOM_WAVEBANDS */
 
   ! ===========================================================================
