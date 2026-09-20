@@ -25,7 +25,7 @@ module ice_setup_interface
         type(t_ice)   , intent(inout), target :: ice
         type(t_tracer), intent(in)   , target :: tracers
         type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
+        type(t_mesh)  , intent(inout), target :: mesh
         end subroutine ice_setup
     end interface
 end module ice_setup_interface
@@ -61,7 +61,7 @@ subroutine ice_setup(ice, tracers, partit, mesh)
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_tracer), intent(in)   , target :: tracers
-    type(t_mesh)  , intent(in)   , target :: mesh
+    type(t_mesh)  , intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
 
     !___________________________________________________________________________

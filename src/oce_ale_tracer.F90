@@ -180,10 +180,10 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 
     logical             :: has_one_added_tracer
     logical             :: has_one_added_tracer_local_dummy
-    logical             :: tr_num_end_local_dummy
-    logical             :: tr_num_in_group_local_dummy
+    integer             :: tr_num_end_local_dummy
+    integer             :: tr_num_in_group_local_dummy
     integer             :: tr_num_end
-    logical             :: tr_num_in_group_dummy
+    integer             :: tr_num_in_group_dummy
     integer             :: tr_arr_slice_count_fix_1
 
     integer             :: Sinkflx_tr_slice_count_fix_1
