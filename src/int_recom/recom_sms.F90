@@ -4212,6 +4212,20 @@ endif !/* RECOM_MARSHALL */
            if (Fe < k_Fe_p) mortRate_phaeo = mort_fac_fe_phaeo * mort_phaeo
        endif
 
+       ! Carbon overflow (f_ovf): photosynthate fixed beyond what the N quota supports is exuded
+       ! as DOC. Uses the N-only quota limiter (no Fe/Si), so it acts in N-starved cells and
+       ! vanishes as the quota approaches replete. Applied below as separate guarded statements,
+       ! so f_ovf = 0 is bit-identical.
+       ovfRate = 0.0d0; ovfRate_dia = 0.0d0; ovfRate_cocco = 0.0d0; ovfRate_phaeo = 0.0d0
+       if (f_ovf > 0.0d0) then
+           ovfRate     = f_ovf * (1.0d0 - recom_limiter(NMinSlope, NCmin,   quota))     * Cphot
+           ovfRate_dia = f_ovf * (1.0d0 - recom_limiter(NMinSlope, NCmin_d, quota_dia)) * Cphot_dia
+           if (enable_coccos) then
+               ovfRate_cocco = f_ovf * (1.0d0 - recom_limiter(NMinSlope, NCmin_c, quota_cocco)) * Cphot_cocco
+               ovfRate_phaeo = f_ovf * (1.0d0 - recom_limiter(NMinSlope, NCmin_p, quota_phaeo)) * Cphot_phaeo
+           endif
+       endif
+
        !===============================================================================
        ! MARINE CALCIFICATION
        !===============================================================================
@@ -6437,6 +6451,30 @@ if (RECOM_CDOM) then
 endif !/* RECOM_CDOM */
 #endif /* __RECOM_WAVEBANDS */
 
+        !-------------------------------------------------------------------------------
+        ! Carbon overflow (f_ovf > 0 only): PFT carbon -> DOC, split with CDOM exactly like
+        ! the regular excretion (fcdom to CDOM when RECOM_CDOM). Carbon-conserving; no O2 term,
+        ! as for the regular excretion.
+        !-------------------------------------------------------------------------------
+        if (f_ovf > 0.0d0) then
+            ovfFlux = ovfRate * PhyC + ovfRate_dia * DiaC
+            sms(k,iphyc) = sms(k,iphyc) - ovfRate     * PhyC * dt_b
+            sms(k,idiac) = sms(k,idiac) - ovfRate_dia * DiaC * dt_b
+            if (enable_coccos) then
+                ovfFlux = ovfFlux + ovfRate_cocco * CoccoC + ovfRate_phaeo * PhaeoC
+                sms(k,icocc) = sms(k,icocc) - ovfRate_cocco * CoccoC * dt_b
+                sms(k,iphac) = sms(k,iphac) - ovfRate_phaeo * PhaeoC * dt_b
+            endif
+            ovfFrac = 1.0d0
+#if defined(__RECOM_WAVEBANDS)
+            if (RECOM_CDOM) then
+                ovfFrac = 1.0d0 - fcdom
+                sms(k,icdom) = sms(k,icdom) + fcdom * ovfFlux * dt_b
+            endif
+#endif /* __RECOM_WAVEBANDS */
+            sms(k,idoc) = sms(k,idoc) + ovfFrac * ovfFlux * dt_b
+        endif
+
         !===============================================================================
         ! 36. DISSOLVED OXYGEN (O2)
         !===============================================================================
@@ -7412,23 +7450,23 @@ endif !/* RECOM_CDOM */
 
                 ! Small phytoplankton DOC excretion
                 vertdocexn(k) = vertdocexn(k) + ( &
-                    + lossC * limitFacN * phyC &  ! Stress-induced exudation
+                    + (lossC * limitFacN + ovfRate) * phyC &  ! Stress-induced exudation (+ carbon overflow)
                 ) * recipbiostep
 
                 ! Diatom DOC excretion
                 vertdocexd(k) = vertdocexd(k) + ( &
-                    + lossC_d * limitFacN_dia * DiaC &
+                    + (lossC_d * limitFacN_dia + ovfRate_dia) * DiaC &
                 ) * recipbiostep
 
                 if (enable_coccos) then
                     ! Coccolithophore DOC excretion
                     vertdocexc(k) = vertdocexc(k) + ( &
-                        + lossC_c * limitFacN_cocco * CoccoC &
+                        + (lossC_c * limitFacN_cocco + ovfRate_cocco) * CoccoC &
                     ) * recipbiostep
 
                     ! Phaeocystis DOC excretion
                     vertdocexp(k) = vertdocexp(k) + ( &
-                        + lossC_p * limitFacN_phaeo * PhaeoC &
+                        + (lossC_p * limitFacN_phaeo + ovfRate_phaeo) * PhaeoC &
                     ) * recipbiostep
                 endif
 

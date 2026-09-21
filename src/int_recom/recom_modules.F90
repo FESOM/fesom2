@@ -441,7 +441,11 @@ module recom_config
   Real(kind=8)                 :: lossC_d       = 0.10d0
   Real(kind=8)                 :: lossC_c       = 0.10d0          
   Real(kind=8)                 :: lossC_p       = 0.10d0          ! Phaeocystis
-  namelist /paphytoplankton_C/ lossC, lossC_d, lossC_c, lossC_p
+  Real(kind=8)                 :: f_ovf         = 0.0d0           !sl [-] Carbon overflow: extra DOC exudation f_ovf*(1-qN)*Cphot, all PFTs,
+                                                                    !   qN = N-quota limiter recom_limiter(NMinSlope,NCmin_X,quota_X), i.e.
+                                                                    !   photosynthate fixed beyond what the cell's N supports leaves as DOC
+                                                                    !   (carbon overconsumption, Schartau et al. 2007). 0 = off, bit-identical.
+  namelist /paphytoplankton_C/ lossC, lossC_d, lossC_c, lossC_p, f_ovf
 !!------------------------------------------------------------------------------
 !! *** Phytoplankton ChlA ***
   Real(8)                      :: deg_Chl       = 0.25d0          ! [1/day]
@@ -1712,6 +1716,8 @@ Module REcoM_declarations
 !! *** Aggregation  ***
   Real(kind=8)  :: AggregationRate                   ! [1/day] AggregationRate (of nitrogen)
   Real(kind=8)  :: AggregationRate_phaeo             ! [1/day] As AggregationRate, scaled by agg_fac_phaeo, applied to Phaeocystis only
+  Real(kind=8)  :: ovfRate, ovfRate_dia, ovfRate_cocco, ovfRate_phaeo  ! [1/day] carbon-overflow DOC exudation (f_ovf), per unit PFT carbon
+  Real(kind=8)  :: ovfFlux, ovfFrac                                  ! [mmol C m-3 day-1] total overflow DOC flux; share of it going to DOC (not CDOM)
   Real(kind=8)  :: MortRate_phaeo                    ! [1/day] Phaeocystis linear mortality to detritus (mort_phaeo, x mort_fac_fe_phaeo if DFe < k_Fe_p)
   Real(kind=8)  :: AggregationRate_det               ! [1/day] Detritus part agg_PD*(DetN+DetZ2N) of AggregationRate, scaled by agg_fac_phaeo_det for Phaeocystis
 !!------------------------------------------------------------------------------                                                                                
