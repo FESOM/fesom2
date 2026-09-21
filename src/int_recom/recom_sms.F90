@@ -4267,7 +4267,8 @@ endif !/* RECOM_MARSHALL */
        !   CO2_watercolumn : Dissolved CO2 concentration [mmolC m-3]
        !   pH_watercolumn  : Water column pH [-]
        !   DIN             : Dissolved inorganic nitrogen [mmolN m-3]
-       !   k_din_c         : Half-saturation for DIN effect on calcification [mmolN m-3]
+       !   k_din_calc      : Half-saturation for DIN effect on calcification [mmolN m-3]
+       !                     (< 0 = use k_din_c, the coccolithophore uptake half-saturation)
        !   a,b,c,d_co2_calc: CO2 effect parameters [-]
        !   Cunits          : Conversion factor for units [-]
        !
@@ -4335,7 +4336,12 @@ endif !/* RECOM_MARSHALL */
            ! allocate resources preferentially to organic carbon (growth) rather
            ! than calcite plates (protection)
 
-           PICPOCN = -0.31 * (DIN / (DIN + k_din_c)) + 1.31
+           !sl k_din_calc < 0 keeps the historical coupling to the uptake half-saturation k_din_c
+           if (k_din_calc >= 0.d0) then
+               PICPOCN = -0.31 * (DIN / (DIN + k_din_calc)) + 1.31
+           else
+               PICPOCN = -0.31 * (DIN / (DIN + k_din_c)) + 1.31
+           end if
            PICPOCN = max(tiny, PICPOCN)  ! Prevent negative values
 
            !---------------------------------------------------------------------------

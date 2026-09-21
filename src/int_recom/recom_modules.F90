@@ -520,7 +520,11 @@ module recom_config
   Real(kind=8)                 :: calc_diss_rate2 = 0.005714d0
   Real(kind=8)                 :: calc_diss_omegac = 0.197d0      ! NEW DISS value from Aumont et al. 2015, will be used with OmegaC_diss flag
   Real(kind=8)                 :: calc_diss_exp   = 1.d0          ! NEW DISS exponent in the dissolution rate of calcite, will be used with OmegaC_diss flag
-  namelist /pacalc/ calc_prod_ratio, calc_diss_guts, calc_diss_rate, calc_diss_rate2, calc_diss_omegac, calc_diss_exp  ! NEW DISS added calc_diss_omegac, calc_diss_exp
+  Real(kind=8)                 :: k_din_calc      = -1.d0         !sl [mmol N/m3] DIN half-saturation in the coccolithophore PIC:POC
+                                                                   !   nitrogen term (PICPOCN). < 0 (default) = use k_din_c, the uptake value,
+                                                                   !   as before; set >= 0 to change uptake (k_din_c) without moving calcification.
+  namelist /pacalc/ calc_prod_ratio, calc_diss_guts, calc_diss_rate, calc_diss_rate2, calc_diss_omegac, calc_diss_exp, &  ! NEW DISS added calc_diss_omegac, calc_diss_exp
+                    k_din_calc
 !!------------------------------------------------------------------------------
 !! *** Benthos ***
   Real(kind=8)                 :: decayRateBenN   = 0.005d0
