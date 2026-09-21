@@ -445,7 +445,10 @@ module recom_config
                                                                     !   qN = N-quota limiter recom_limiter(NMinSlope,NCmin_X,quota_X), i.e.
                                                                     !   photosynthate fixed beyond what the cell's N supports leaves as DOC
                                                                     !   (carbon overconsumption, Schartau et al. 2007). 0 = off, bit-identical.
-  namelist /paphytoplankton_C/ lossC, lossC_d, lossC_c, lossC_p, f_ovf
+  Logical                      :: ovf_to_cdom   = .true.          !sl if RECOM_CDOM: .true. = overflow DOC is split with CDOM by fcdom
+                                                                    !   like the regular excretion; .false. = all of it to DOC (overflow
+                                                                    !   exudates are mostly carbohydrate/TEP precursors, not chromophoric)
+  namelist /paphytoplankton_C/ lossC, lossC_d, lossC_c, lossC_p, f_ovf, ovf_to_cdom
 !!------------------------------------------------------------------------------
 !! *** Phytoplankton ChlA ***
   Real(8)                      :: deg_Chl       = 0.25d0          ! [1/day]

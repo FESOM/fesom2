@@ -6452,9 +6452,9 @@ endif !/* RECOM_CDOM */
 #endif /* __RECOM_WAVEBANDS */
 
         !-------------------------------------------------------------------------------
-        ! Carbon overflow (f_ovf > 0 only): PFT carbon -> DOC, split with CDOM exactly like
-        ! the regular excretion (fcdom to CDOM when RECOM_CDOM). Carbon-conserving; no O2 term,
-        ! as for the regular excretion.
+        ! Carbon overflow (f_ovf > 0 only): PFT carbon -> DOC. With RECOM_CDOM and ovf_to_cdom
+        ! (default) it is split with CDOM exactly like the regular excretion (fcdom to CDOM);
+        ! with ovf_to_cdom = .false. all of it goes to DOC. Carbon-conserving; no O2 term.
         !-------------------------------------------------------------------------------
         if (f_ovf > 0.0d0) then
             ovfFlux = ovfRate * PhyC + ovfRate_dia * DiaC
@@ -6467,7 +6467,7 @@ endif !/* RECOM_CDOM */
             endif
             ovfFrac = 1.0d0
 #if defined(__RECOM_WAVEBANDS)
-            if (RECOM_CDOM) then
+            if (RECOM_CDOM .and. ovf_to_cdom) then
                 ovfFrac = 1.0d0 - fcdom
                 sms(k,icdom) = sms(k,icdom) + fcdom * ovfFlux * dt_b
             endif
