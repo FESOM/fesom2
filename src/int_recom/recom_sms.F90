@@ -2374,6 +2374,7 @@ endif !/* RECOM_MARSHALL */
                 ! Use standard Arrhenius temperature function
                 pMax = P_cm * qlimitFac * arrFunc
             endif
+            VTqlimitFac_phyto(k) = qlimitFac   !sl output TqLF_phyto: was never assigned (silent zero)
 
             !-------------------------------------------------------------------------------
             ! Diatoms
@@ -2399,6 +2400,7 @@ endif !/* RECOM_MARSHALL */
             else
                 pMax_dia = P_cm_d * qlimitFac * arrFunc
             endif
+            VTqlimitFac_diatoms(k) = qlimitFac !sl output TqLF_diatoms: was never assigned (silent zero)
 
             !-------------------------------------------------------------------------------
             ! Coccolithophores (Optional)
@@ -2417,6 +2419,7 @@ endif !/* RECOM_MARSHALL */
 
                 ! Calculate maximum photosynthesis rate
                 pMax_cocco = qlimitFac * Temp_cocco
+                VTqlimitFac_cocco(k) = qlimitFac   !sl output TqLF_cocco: was never assigned
 
                 !---------------------------------------------------------------------------
                 ! Phaeocystis (Optional)
@@ -2433,6 +2436,7 @@ endif !/* RECOM_MARSHALL */
 
                 ! Calculate maximum photosynthesis rate
                 pMax_phaeo = qlimitFac * Temp_phaeo
+                VTqlimitFac_phaeo(k) = qlimitFac   !sl output TqLF_phaeo: was never assigned
 
             endif
 
