@@ -1,7 +1,7 @@
 module g_interp
     use MOD_MESH
     use MOD_PARTIT
-    use MOD_PARSUP
+    use par_support_module, only: par_ex
     use o_PARAM, only: WP
     implicit none
     
@@ -336,7 +336,7 @@ subroutine interp_3d_field(num_lon_reg, num_lat_reg, num_lay_reg, &
   !-------------------------------------------------------------------------------------
   use MOD_MESH
   USE MOD_PARTIT
-  USE MOD_PARSUP
+  use par_support_module, only: par_ex
   use o_param, only: WP
   implicit none
   integer             		:: n, i, flag,nz
@@ -538,7 +538,7 @@ end subroutine interp_e2n_3d
 subroutine interp_e2n_2d(data_e, data_n, mesh, partit, do_overz_in)
     use MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     use o_param, only: WP
     implicit none
     !___INPUT/OUTPUT VARIABLES______________________________________________
@@ -620,7 +620,7 @@ end subroutine interp_e2n_2d
 subroutine interp_e2n_1d(data_e, data_n, mesh, partit)
     use MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     use o_param, only: WP
     implicit none
     !___INPUT/OUTPUT VARIABLES______________________________________________

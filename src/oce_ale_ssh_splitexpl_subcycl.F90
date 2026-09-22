@@ -1,84 +1,36 @@
-!
-!
-!_______________________________________________________________________________
-module momentum_adv_scalar_transpv_interface
-    interface
-        subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine momentum_adv_scalar_transpv
-    end interface
-end module momentum_adv_scalar_transpv_interface
-!
-!
-!_______________________________________________________________________________
-module impl_vert_visc_ale_vtransp_interface
-    interface
-        subroutine impl_vert_visc_ale_vtransp(dynamics, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine impl_vert_visc_ale_vtransp
-    end interface
-end module impl_vert_visc_ale_vtransp_interface
-!
-!
-!_______________________________________________________________________________
-module compute_ssh_split_explicit_interface
-    interface
-        subroutine compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine compute_BT_rhs_SE_vtransp
+module oce_ale_ssh_splitexpl_subcycl_module
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_DYN
+    USE o_PARAM
+    USE g_comm_auto
+    USE o_ARRAYS, only: Av, stress_surf, water_flux
+    USE g_CONFIG, only: dt, r_restart, which_ALE, use_cavity_fw2press
+    USE g_support, only: integrate_nod
 
-        subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine compute_BT_step_SE_ale
-        
-        subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        integer       , intent(in)            :: mode
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine update_trim_vel_ale_vtransp
-        
-    end interface
-end module compute_ssh_split_explicit_interface
+    implicit none
+
+    private
+    public :: momentum_adv_scalar_transpv, impl_vert_visc_ale_vtransp, &
+              compute_BT_rhs_SE_vtransp, compute_BT_step_SE_ale, &
+              update_trim_vel_ale_vtransp, compute_thickness_zstar
+
+contains
+
+!
+!
+!_______________________________________________________________________________
+!
+!
+!_______________________________________________________________________________
+!
+!
+!_______________________________________________________________________________
 !
 !
 !_______________________________________________________________________________
 ! Transports are used instead of velocities, Urhs, Vrhs are also for transports. 
 subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    USE o_PARAM
-    USE g_comm_auto
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -502,13 +454,6 @@ end subroutine momentum_adv_scalar_transpv
 !     |              :         |   | :  |
 !
 subroutine impl_vert_visc_ale_vtransp(dynamics, partit, mesh)
-    USE MOD_MESH
-    USE o_PARAM
-    USE o_ARRAYS, only: Av, stress_surf
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    USE g_CONFIG, only: dt
     IMPLICIT NONE
     !___________________________________________________________________________
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -676,12 +621,6 @@ end subroutine impl_vert_visc_ale_vtransp
 !SD the elevation and Coriolis. The elevation and Coriolis are accounted for 
 !SD explicitly in BT equations, and should therefore be removed from the vertically integrated rhs.
 subroutine compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    USE MOD_DYN
-    USE g_config, only: dt, r_restart
-    USE g_comm_auto
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -791,14 +730,6 @@ end subroutine compute_BT_rhs_SE_vtransp
 ! eta^(n+(m+1)/M) = eta^(n+(m)/M) - dt/M * div_H * [(1+theta)*Ubt^(n+(m+1)/M) - theta*Ubt^(n+(m)/M)]
 !
 subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    USE MOD_DYN
-    USE g_comm_auto
-    USE g_config,  only: dt, which_ALE, use_cavity_fw2press
-    USE g_support, only: integrate_nod
-    use o_ARRAYS,  only: water_flux
     IMPLICIT NONE
     !___________________________________________________________________________
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -1226,11 +1157,6 @@ end subroutine compute_BT_step_SE_ale
 !_______________________________________________________________________________
 ! Trim U and Uh to be consistent with BT transport
 subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    USE MOD_DYN
-    use g_comm_auto
     IMPLICIT NONE
     !___________________________________________________________________________
     integer       , intent(in)            :: mode
@@ -1470,11 +1396,6 @@ end subroutine update_trim_vel_ale_vtransp
 !_______________________________________________________________________________
 ! Trim U and Uh to be consistent with BT transport
 subroutine compute_thickness_zstar(dynamics, partit, mesh)
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    USE MOD_DYN
-    use g_comm_auto
     implicit none
     !___________________________________________________________________________
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -1531,4 +1452,4 @@ subroutine compute_thickness_zstar(dynamics, partit, mesh)
 
 end subroutine compute_thickness_zstar
 
-
+end module oce_ale_ssh_splitexpl_subcycl_module

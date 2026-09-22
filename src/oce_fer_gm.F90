@@ -1,34 +1,22 @@
-module fer_solve_interface
-    interface
-        subroutine fer_solve_Gamma(partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        type(t_mesh)  , intent(in)   , target :: mesh
-        type(t_partit), intent(inout), target :: partit
-        end subroutine fer_solve_Gamma
-        
-        subroutine fer_gamma2vel(dynamics, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_mesh)  , intent(in)   , target :: mesh
-        type(t_partit), intent(inout), target :: partit
-        type(t_dyn)   , intent(inout), target :: dynamics
-        end subroutine fer_gamma2vel
+module oce_fer_gm_module
+    USE MOD_MESH
+    USE MOD_PARTIT
+    use par_support_module, only: par_ex
+    USE o_PARAM
+    USE o_ARRAYS, only: sigma_xy, fer_gamma, bvfreq, fer_c, fer_K, fer_k, fer_scal, Ki, &
+            MLD1_ind, neutral_slope, fer_tapfac, fer_GINsea_mask
+    USE g_CONFIG
+    USE g_comm_auto
+    USE MOD_DYN
+    USE g_support
 
-        subroutine init_Redi_GM(partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        type(t_mesh)  , intent(in)   , target :: mesh
-        type(t_partit), intent(inout), target :: partit
-        end subroutine init_Redi_GM
-    end interface
-end module fer_solve_interface
+    implicit none
 
+    private
+    public :: fer_solve_Gamma, fer_gamma2vel, init_Redi_GM, &
+              init_RediGM_GINsea_mask
 
+contains
 
 !---------------------------------------------------------------------------
 !Implementation of Gent & McWiliams parameterization after R. Ferrari et al., 2010
@@ -38,13 +26,6 @@ end module fer_solve_interface
 !  fer_compute_C_K ! this subroutine shall be a subject of future tuning (with respect to fer_k)
 !===========================================================================
 subroutine fer_solve_Gamma(partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE o_PARAM
-    USE o_ARRAYS, ONLY: sigma_xy, fer_gamma, bvfreq, fer_c, fer_K
-    USE g_CONFIG
-    use g_comm_auto
     IMPLICIT NONE
     type(t_partit), intent(inout), target  :: partit
     type(t_mesh),   intent(in),    target  :: mesh	
@@ -173,14 +154,6 @@ END subroutine fer_solve_Gamma
 !
 !====================================================================
 subroutine fer_gamma2vel(dynamics, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    USE o_PARAM
-    USE o_ARRAYS, ONLY: fer_gamma
-    USE g_CONFIG
-    use g_comm_auto
     IMPLICIT NONE
 
     integer                                :: nz, nzmax, el, elnod(3), nzmin
@@ -220,13 +193,6 @@ end subroutine fer_gamma2vel
 !
 !===============================================================================
 subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
-    USE MOD_MESH
-    USE o_PARAM
-    USE o_ARRAYS, ONLY: fer_c, fer_k, fer_scal, Ki, bvfreq, MLD1_ind, neutral_slope, fer_tapfac, fer_GINsea_mask
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE g_CONFIG
-    use g_comm_auto
     IMPLICIT NONE
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
@@ -517,12 +483,6 @@ end subroutine init_Redi_GM
 !_______________________________________________________________________________
 ! initialise GINsea mask 
 subroutine init_RediGM_GINsea_mask(partit, mesh)
-    use MOD_MESH
-    use MOD_PARTIT
-    use MOD_PARSUP
-    use o_PARAM
-    use o_ARRAYS, only: fer_GINsea_mask
-    use g_support
     implicit none 
     
     type(t_mesh),   intent(in),    target :: mesh
@@ -557,3 +517,5 @@ subroutine init_RediGM_GINsea_mask(partit, mesh)
     call smooth_nod(fer_GINsea_mask, 5, partit, mesh)
     
 end subroutine init_RediGM_GINsea_mask 
+
+end module oce_fer_gm_module

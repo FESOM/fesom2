@@ -1,19 +1,23 @@
+module oce_mle_module
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE o_PARAM
+    USE o_ARRAYS, only: sigma_xy, fer_gamma, MLD2, bvfreq, mle_psi, mle_hbar
+    USE g_CONFIG
+    USE g_comm_auto
+
+    implicit none
+
+    private
+    public :: mle_add_gamma
+
+contains
+
 !---------------------------------------------------------------------------
 !Implementation of mixed layer eddy restratification after Fox-Kemper et al., 2008, 2011
 !Contains:
 !  mle_add_gamma
 !===========================================================================
-module mle_interface
-    interface
-        subroutine mle_add_gamma(partit, mesh)
-            use mod_mesh
-            USE MOD_PARTIT
-            USE MOD_PARSUP
-            type(t_partit), intent(inout), target :: partit
-            type(t_mesh),   intent(in),    target :: mesh
-        end subroutine mle_add_gamma
-    end interface
-end module mle_interface
 !
 !===============================================================================
 !
@@ -57,13 +61,6 @@ subroutine mle_add_gamma(partit, mesh)
     !  grows as H**2 and as 1/f, so without this it is unbounded at the equator.
     !
     ! Output: fer_gamma(1:2,:,:) incremented, mle_psi(:,:) diagnostic
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE o_PARAM
-    USE o_ARRAYS, ONLY: sigma_xy, fer_gamma, MLD2, bvfreq, mle_psi, mle_hbar
-    USE g_CONFIG
-    use g_comm_auto
     IMPLICIT NONE
 
     type(t_partit), intent(inout), target  :: partit
@@ -188,3 +185,5 @@ subroutine mle_add_gamma(partit, mesh)
 
     call exchange_nod(fer_gamma, partit)
 end subroutine mle_add_gamma
+
+end module oce_mle_module

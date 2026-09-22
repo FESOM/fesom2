@@ -1,3 +1,14 @@
+module mod_gen_comm
+    USE MOD_MESH
+    USE MOD_PARTIT
+
+    implicit none
+
+    private
+    public :: communication_nodn, communication_elemn, mymesh
+
+contains
+
 ! Cell-vertex finite-volume version
 ! Contains: Routines that support parallelization
 ! set_par_support_ini run in the initialization phase.
@@ -6,9 +17,6 @@
 ! arrays, the rest is read together with mesh from saved files.
 !=======================================================================
 subroutine communication_nodn(partit, mesh)
-  use MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
   implicit none
   type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit
@@ -221,9 +229,6 @@ end subroutine communication_nodn
 
 !==========================================================================
 subroutine communication_elemn(partit, mesh)
-  use MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
   implicit none
 
   type(t_mesh),   intent(in),    target :: mesh
@@ -527,9 +532,6 @@ subroutine communication_elemn(partit, mesh)
 end subroutine communication_elemn
 !==========================================================================
 subroutine mymesh(partit, mesh)
-  use MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
   implicit none
 
   type(t_mesh),   intent(in),    target :: mesh
@@ -657,3 +659,5 @@ subroutine mymesh(partit, mesh)
   ! shared edges which mype updates
 end subroutine mymesh
 !=================================================================
+
+end module mod_gen_comm
