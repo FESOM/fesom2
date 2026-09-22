@@ -117,7 +117,7 @@ jobs:
 
                 git fetch origin
                 git rebase -i origin/${baseBranch}
-                # Change `pick` to `reword` for the affected commit(s), remove
+                # Change "pick" to "reword" for the affected commit(s), remove
                 # the attribution line when Git opens each commit message, then:
                 git push --force-with-lease
 
