@@ -1,7 +1,6 @@
 module oce_muscl_adv_module
     USE MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
     USE MOD_TRACER
     USE o_ARRAYS
     USE o_PARAM

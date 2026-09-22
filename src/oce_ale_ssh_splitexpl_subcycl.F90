@@ -1,7 +1,6 @@
 module oce_ale_ssh_splitexpl_subcycl_module
     USE MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
     USE MOD_DYN
     USE o_PARAM
     USE g_comm_auto

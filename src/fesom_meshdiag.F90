@@ -11,7 +11,6 @@
 program fesom_meshdiag
   use MOD_MESH
   use MOD_PARTIT
-  use MOD_PARSUP
   use MOD_DYN
   use MOD_TRACER
   use o_PARAM
@@ -21,6 +20,7 @@ program fesom_meshdiag
   use io_mesh_info
   use oce_mesh_module, only: mesh_setup, check_mesh_consistency
   use oce_setup_step_module, only: dynamics_init, tracer_init, arrays_init, ocean_setup
+  use par_support_module, only: par_init
   use, intrinsic :: iso_fortran_env, only : real32
 
   implicit none

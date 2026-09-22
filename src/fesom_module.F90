@@ -6,7 +6,7 @@ module fesom_main_storage_module
   USE MOD_ICE
   USE MOD_TRACER
   USE MOD_PARTIT
-  USE MOD_PARSUP
+  use par_support_module, only: par_ex
   USE MOD_DYN
   USE o_ARRAYS
   USE o_PARAM
@@ -53,6 +53,7 @@ module fesom_main_storage_module
   use ice_init_module, only: ice_init_toyocean_dummy
   use icb_allocate_module, only: allocate_icb
   use gen_forcing_init_module, only: forcing_setup
+  use par_support_module, only: par_init
   use, intrinsic :: iso_fortran_env, only : real32
   use g_forcing_param, only: use_landice_water, use_age_tracer
   use oce_landice_water_module, only: landice_water_init

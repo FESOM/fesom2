@@ -2,7 +2,7 @@ module oce_ale_module
     USE o_PARAM
     USE MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     USE MOD_DYN
     USE o_ARRAYS
     USE g_config
@@ -32,6 +32,7 @@ module oce_ale_module
     use oce_ale_ssh_splitexpl_subcycl_module, only: impl_vert_visc_ale_vtransp
     use oce_dyn_module, only: update_vel, viscosity_filter, check_viscopt, compute_ke_wrho, compute_apegen, compute_PePm
     use oce_ale_pressure_bv_module, only: sw_alpha_beta, compute_sigma_xy, compute_neutral_slope
+    use par_support_module, only: status_check
 #if defined (__cvmix)
     use g_cvmix_tke
     use g_cvmix_idemix
@@ -1492,7 +1493,7 @@ subroutine update_stiff_mat_ale(partit, mesh)
     use MOD_MESH
     use MOD_TRACER
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     use o_ARRAYS
     implicit none
     type(t_partit), intent(inout), target :: partit

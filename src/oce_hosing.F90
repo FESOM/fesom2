@@ -4,7 +4,6 @@ module oce_hosing_module
     USE MOD_TRACER
     USE MOD_PARTIT
     USE MOD_MESH
-    USE MOD_PARSUP
     USE g_CONFIG
     USE g_comm_auto
     USE g_support

@@ -9,7 +9,7 @@
 module ice_init_module
     USE MOD_ICE
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     USE MOD_MESH
     USE o_param, only: WP
     USE ice_meltponds, only: init_meltponds

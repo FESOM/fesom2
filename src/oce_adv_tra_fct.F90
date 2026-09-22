@@ -2,7 +2,6 @@ module oce_adv_tra_fct_module
     USE MOD_MESH
     USE MOD_TRACER
     USE MOD_PARTIT
-    USE MOD_PARSUP
     USE g_comm_auto
 
     implicit none

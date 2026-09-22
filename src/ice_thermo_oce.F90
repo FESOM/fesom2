@@ -2,7 +2,6 @@ module ice_thermo_oce_module
     USE o_param
     USE MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
     USE MOD_ICE
     USE g_config
     USE o_arrays, only: fw_ice, fw_snw

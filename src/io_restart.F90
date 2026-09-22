@@ -11,7 +11,6 @@ MODULE io_RESTART
   use MOD_DYN
   use MOD_MESH
   use MOD_PARTIT
-  use MOD_PARSUP
   use fortran_utils
   use mpi
 #if defined(__icepack)

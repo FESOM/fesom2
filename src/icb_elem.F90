@@ -2,7 +2,7 @@ module iceberg_element
  use MOD_PARTIT
  USE MOD_MESH
  USE MOD_DYN
- USE MOD_PARSUP
+ use par_support_module, only: par_ex
  use iceberg_params
  use iceberg_thermodynamics
  use iceberg_ocean_coupling

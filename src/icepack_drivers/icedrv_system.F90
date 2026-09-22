@@ -7,7 +7,7 @@
       module icedrv_system
 
       use icedrv_kinds
-      use mod_parsup,       only: par_ex
+      use par_support_module, only: par_ex
       use icedrv_constants, only: ice_stderr
       use icepack_intfc,    only: icepack_warnings_flush, icepack_warnings_aborted
       use mod_partit

@@ -3,7 +3,6 @@ module gen_forcing_init_module
     USE g_sbf, only: sbc_ini, l_mslp, l_cloud
     USE mod_mesh
     USE MOD_PARTIT
-    USE MOD_PARSUP
     USE g_forcing_arrays
     USE o_param
     USE g_forcing_param

@@ -4,7 +4,7 @@ module write_step_info_interface
     subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
       use MOD_MESH
       USE MOD_PARTIT
-      USE MOD_PARSUP
+      use par_support_module, only: par_ex
       use MOD_TRACER
       use MOD_DYN
       use MOD_ICE
@@ -18,7 +18,7 @@ module write_step_info_interface
     subroutine write_enegry_info(dynamics, partit, mesh)
       use MOD_MESH
       USE MOD_PARTIT
-      USE MOD_PARSUP
+      use par_support_module, only: par_ex
       use MOD_DYN
       use g_support
       type(t_mesh),   intent(in)   , target :: mesh
@@ -32,7 +32,7 @@ module check_blowup_interface
     subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
       use MOD_MESH
       USE MOD_PARTIT
-      USE MOD_PARSUP
+      use par_support_module, only: par_ex
       use MOD_TRACER
       use MOD_DYN
       use MOD_ICE
@@ -52,7 +52,7 @@ subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
   use g_config, only: dt, use_ice, use_icebergs, ib_num
   use MOD_MESH
   USE MOD_PARTIT
-  USE MOD_PARSUP
+  use par_support_module, only: par_ex
   use MOD_TRACER
   use MOD_DYN
   use MOD_ICE
@@ -313,7 +313,7 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
     USE MOD_DYN
     USE MOD_TRACER
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     USE MOD_MESH
     use g_config, only: logfile_outfreq, which_ALE, toy_ocean, use_ice, use_icebergs, ib_num
     use o_PARAM
@@ -758,7 +758,7 @@ end subroutine check_blowup
 subroutine write_enegry_info(dynamics, partit, mesh)
    use MOD_MESH
    USE MOD_PARTIT
-   USE MOD_PARSUP
+   use par_support_module, only: par_ex
    use MOD_DYN
    use g_support
    IMPLICIT NONE

@@ -1,7 +1,6 @@
 module cavity_param_module
     USE MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
     USE o_PARAM
     USE MOD_TRACER
     USE MOD_DYN
