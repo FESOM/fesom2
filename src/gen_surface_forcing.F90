@@ -2369,11 +2369,13 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 
       end if ! add_loopback
         end if ! mstep == 1
-    else
+    else ! if not use_MEDUSA or sedflx_num = 0
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
-    if (mype==0) write(*,*) 'sedimentary input from MEDUSA not used!' !OG
+            if (mstep == 1) then
+                if (mype==0) write(*,*) 'sedimentary input from MEDUSA not used!' !OG
+            endif
 #if defined(__usetp)
         endif
 #endif
