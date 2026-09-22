@@ -1044,12 +1044,34 @@ subroutine find_levels_cavity(mesh)
     integer, allocatable, dimension(:)   :: aux_arr, aux_idx
     integer, allocatable, dimension(:)   :: numelemtonode
     logical, allocatable, dimension(:)   :: elemreducelvl, elemfixlvl
+    ! DIG mode (env FESOM_CAVITY_DIG=1, offline test build): place the ice base where
+    ! the draft puts it and deepen the BOTTOM when fewer than 3 layers remain, instead
+    ! of lifting the ice base. Unset -> the original algorithm, bit for bit.
+    logical        :: dig_mode, icemean_mode
+    integer        :: n_icemean
+    character(len=16) :: envval
+    integer        :: u_nz, n_dug, n_dug_lev, n_bot, n_fill, n_lift_fill, i, exit_flag
+    integer, allocatable, dimension(:)   :: nlevels_in
     type(t_mesh), intent(inout), target  :: mesh
 #include "associate_mesh_ini.h"
     !___________________________________________________________________________
     print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
     print *, achar(27)//'[7;1m' //' -->: compute elem, vertice cavity depth index               '//achar(27)//'[0m'
-    
+    envval = ''
+    call get_environment_variable('FESOM_CAVITY_DIG', envval)
+    dig_mode = (trim(envval) == '1')
+    envval = ''
+    call get_environment_variable('FESOM_CAVITY_ICEMEAN', envval)
+    icemean_mode = (trim(envval) == '1')
+    n_icemean = 0
+    if (icemean_mode) print *, ' -[ICEM]->: FESOM_CAVITY_ICEMEAN=1: element ice base = mean over ice-covered nodes'
+    n_dug = 0; n_dug_lev = 0; n_bot = 0; n_fill = 0; n_lift_fill = 0
+    if (dig_mode) then
+        print *, ' -[DIG ]->: FESOM_CAVITY_DIG=1: deepen the bottom instead of lifting the ice base'
+        allocate(nlevels_in(elem2D))
+        nlevels_in = nlevels
+    end if
+
     !___________________________________________________________________________
     allocate(mesh%ulevels(elem2D))
     ulevels => mesh%ulevels 
@@ -1072,7 +1094,16 @@ subroutine find_levels_cavity(mesh)
             ! depth of element is deepest depth of sorounding vertices    
             elseif (trim(which_depth_n2e) .eq. 'max')  then ; dmean=minval(cavity_depth(nodes))
             ! DEFAULT: depth of element is  mean depth of sorounding vertices
-            elseif (trim(which_depth_n2e) .eq. 'mean') then ; dmean=sum(cavity_depth(nodes))/3.0
+            elseif (trim(which_depth_n2e) .eq. 'mean') then
+                if (icemean_mode .and. any(cavity_depth(nodes)<0.0_WP)) then
+                    ! ICEMEAN: average the ice base over the nodes that HAVE ice, so an
+                    ! ice-front element is not made shallower by its open-ocean node's 0
+                    dmean=sum(cavity_depth(nodes), mask=cavity_depth(nodes)<0.0_WP) &
+                         /real(count(cavity_depth(nodes)<0.0_WP),WP)
+                    if (count(cavity_depth(nodes)<0.0_WP)<3) n_icemean=n_icemean+1
+                else
+                    dmean=sum(cavity_depth(nodes))/3.0
+                end if
             end if 
         end if 
         
@@ -1080,16 +1111,108 @@ subroutine find_levels_cavity(mesh)
         ! vertical elem level index of cavity-ocean boundary
         ulevels(elem) = 1
         if (dmean<0.0_WP) ulevels(elem) = 2
-        
+
+        if (dig_mode .and. dmean<0.0_WP) then
+            ! ice base from the draft alone (first layer whose mid-depth is below it)
+            u_nz = nl-1
+            do nz=1,nl-1
+                if (Z(nz)<dmean) then
+                    u_nz = nz
+                    exit
+                end if
+            end do
+            ! fewer than 3 layers above the bottom -> deepen the bottom, keep the ice base
+            if (nlevels(elem)-u_nz<3) then
+                n_dug     = n_dug + 1
+                n_dug_lev = n_dug_lev + min(u_nz+3, nl) - nlevels(elem)
+                nlevels(elem) = min(u_nz+3, nl)
+            end if
+            ulevels(elem) = min(u_nz, nlevels(elem)-3)
+        else
         do nz=1,nlevels(elem)-1
             if (Z(nz)<dmean .or. nlevels(elem)-nz<=3) then
                 ulevels(elem)=nz         !    to compute shechpetkin PGF
                 exit
             end if
         end do
+        end if
         cavity_maxlev = max(cavity_maxlev,ulevels(elem))
     end do
-    
+
+    !___________________________________________________________________________
+    if (icemean_mode) write(*,*) ' -[ICEM]->: ice-front elements averaged over their ice nodes only: ', n_icemean
+    ! DIG mode: deepening single elements can leave isolated bottom cells (a pit
+    ! with fewer than 2 open neighbour faces), which find_levels removed before.
+    ! Same test as find_levels, but reconnect by deepening the shallower neighbours;
+    ! only if no neighbour can be deepened fall back to filling the pit (and then
+    ! lift the ice base to keep 3 layers -- counted).
+    if (dig_mode) then
+        do nz=thers_zbar_lev+1,nl
+            exit_flag=0
+            count_iter=0
+            do while((exit_flag==0).and.(count_iter<max_iter))
+                exit_flag=1
+                count_iter=count_iter+1
+                do elem=1,elem2D
+                    nneighb = merge(3,4,elem2D_nodes(1,elem) == elem2D_nodes(4,elem))
+                    if (nlevels(elem)>=nz) then
+                        count_neighb_open=0
+                        elems=elem_neighbors(1:3,elem)
+                        do i=1,nneighb
+                            if (elems(i)>0) then
+                                if (nlevels(elems(i))>=nz) count_neighb_open=count_neighb_open+1
+                            end if
+                        end do
+                        if (count_neighb_open<2) then
+                            ! deepen only as many neighbours as are missing (2 - open),
+                            ! each time the shallower neighbour that is already deepest
+                            ! (closest to nz) -> a minimal channel, not a flood
+                            val = 0
+                            do while (count_neighb_open + val < 2)
+                                idx = 0; val2 = -1
+                                do i=1,nneighb
+                                    if (elems(i)>0) then
+                                        if (nlevels(elems(i))<nz .and. nlevels(elems(i))>val2) then
+                                            val2 = nlevels(elems(i)); idx = i
+                                        end if
+                                    end if
+                                end do
+                                if (idx==0) exit
+                                nlevels(elems(idx)) = nz
+                                n_bot = n_bot + 1
+                                val = val + 1
+                            end do
+                            if (val>0 .and. count_neighb_open + val < 2) val = 0   ! could not reconnect
+                            if (val==0) then
+                                ! no neighbour to deepen (mesh boundary): fill the pit
+                                nlevels(elem) = nz-1
+                                n_fill = n_fill + 1
+                                if (nlevels(elem)-ulevels(elem)<3) then
+                                    ulevels(elem) = max(1, nlevels(elem)-3)
+                                    n_lift_fill = n_lift_fill + 1
+                                end if
+                            end if
+                            exit_flag=0
+                        end if
+                    end if
+                end do
+            end do
+        end do
+        ! the bottom changed: redo the vertex bottom index (as in find_levels)
+        nlevels_nod2D=0
+        do elem=1,elem2D
+            nneighb = merge(3,4,elem2D_nodes(1,elem) == elem2D_nodes(4,elem))
+            do j=1,nneighb
+                node=elem2D_nodes(j,elem)
+                nlevels_nod2D(node)=max(nlevels_nod2D(node),nlevels(elem))
+            end do
+        end do
+        cavity_maxlev = maxval(ulevels)
+        write(*,*) ' -[DIG ]->: elements deepened for 3 layers : ', n_dug, ' (levels added: ', n_dug_lev, ')'
+        write(*,*) ' -[DIG ]->: neighbour deepenings (bottom connectivity): ', n_bot
+        write(*,*) ' -[DIG ]->: pits filled (no neighbour to deepen): ', n_fill, ', of which ice base lifted: ', n_lift_fill
+    end if
+
     !___________________________________________________________________________
     ! write out cavity mesh files for vertice and elemental position of 
     ! vertical cavity-ocean boundary before the iterative geometric adaption to 
@@ -1465,6 +1588,27 @@ subroutine find_levels_cavity(mesh)
             write(20,*) ulevels_nod2D(node)
         enddo
         close(20)
+    end if
+
+    !___________________________________________________________________________
+    ! DIG mode: the bottom changed after find_levels wrote elvls.out/nlvls.out,
+    ! so overwrite them with the deepened levels the cavity files were built on.
+    if (dig_mode) then
+        write(*,*) ' -[DIG ]->: elements whose bottom was deepened in total: ', count(nlevels>nlevels_in), &
+                   ', levels added: ', sum(max(nlevels-nlevels_in,0))
+        file_name=trim(meshpath)//'elvls.out'
+        open(20, file=file_name)
+        do elem=1,elem2D
+            write(20,*) nlevels(elem)
+        enddo
+        close(20)
+        file_name=trim(meshpath)//'nlvls.out'
+        open(20, file=file_name)
+        do node=1,nod2D
+            write(20,*) nlevels_nod2D(node)
+        enddo
+        close(20)
+        deallocate(nlevels_in)
     end if
 
 end subroutine find_levels_cavity
