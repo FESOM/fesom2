@@ -1,20 +1,18 @@
-module age_tracer_init_interface
-  interface
-    subroutine age_tracer_init(partit, mesh)
-      use mod_partit
-      use mod_mesh
-      type(t_partit), intent(in), target :: partit
-      type(t_mesh),   intent(in), target :: mesh
-    end subroutine age_tracer_init
-  end interface
-end module age_tracer_init_interface
+module oce_age_tracer_module
+    USE MOD_PARTIT
+    USE MOD_MESH
+    USE g_comm_auto
+    USE g_forcing_param
+    USE g_forcing_arrays
+
+    implicit none
+
+    private
+    public :: age_tracer_init
+
+contains
 
 subroutine age_tracer_init(partit, mesh)
-  use MOD_PARTIT
-  use MOD_MESH
-  use g_comm_auto
-  use g_forcing_param
-  use g_forcing_arrays
 
   implicit none
 
@@ -61,3 +59,4 @@ subroutine age_tracer_init(partit, mesh)
 
 end subroutine age_tracer_init
 
+end module oce_age_tracer_module
