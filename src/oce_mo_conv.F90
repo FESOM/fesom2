@@ -5,7 +5,6 @@ subroutine mo_convect(ice, partit, mesh)
     USE o_PARAM
     USE MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
     USE MOD_ICE
     USE o_ARRAYS
     USE g_config

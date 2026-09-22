@@ -17,7 +17,6 @@ subroutine oce_mixing_pp(dynamics, partit, mesh)
     !      
 USE MOD_MESH
 USE MOD_PARTIT
-USE MOD_PARSUP
 USE MOD_DYN
 USE o_PARAM
 USE o_ARRAYS

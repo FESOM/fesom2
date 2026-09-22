@@ -36,7 +36,7 @@ MODULE g_sbf
    USE iso_fortran_env, only: error_unit, real64
    USE MOD_MESH
    USE MOD_PARTIT
-   USE MOD_PARSUP
+   use par_support_module, only: par_ex
    USE o_ARRAYS
    USE o_PARAM
    USE g_comm_auto
@@ -3564,7 +3564,7 @@ subroutine read_runoff_mapper(file, vari, R, partit, mesh)
    use o_param
    USE MOD_MESH
    USE MOD_PARTIT
-   USE MOD_PARSUP
+   use par_support_module, only: par_ex
    USE g_forcing_arrays,    only: runoff
    use g_support
    use netcdf

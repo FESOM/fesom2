@@ -1,43 +1,33 @@
-module forcing_array_setup_interfaces
-  interface
-    subroutine forcing_array_setup(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine forcing_array_setup
-  end interface
-end module forcing_array_setup_interfaces
+module gen_forcing_init_module
+    USE g_CONFIG
+    USE g_sbf, only: sbc_ini, l_mslp, l_cloud
+    USE mod_mesh
+    USE MOD_PARTIT
+    USE g_forcing_arrays
+    USE o_param
+    USE g_forcing_param
+#if defined(__recom)
+use g_sbf, only: sbc_ini_recom
+#endif
+#if defined (__oasis)
+  use cpl_driver, only : nrecv
+#elif defined(__yac)
+  use cpl_yac_driver, only : nrecv
+#endif
 
+    implicit none
 
-module forcing_array_setup_dbgyre_interfaces
-  interface
-    subroutine forcing_array_setup_dbgyre(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine forcing_array_setup_dbgyre
-  end interface
-end module forcing_array_setup_dbgyre_interfaces
+    private
+    public :: forcing_setup, forcing_array_setup_dbgyre, &
+              forcing_array_setup
+
+contains
 
 ! Adapted from FESOM code by Q. Wang. 
 ! Added the driving routine forcing_setup.
 ! S.D 05.04.12
 ! ==========================================================
 subroutine forcing_setup(partit, mesh)
-use g_CONFIG
-use g_sbf, only: sbc_ini
-#if defined(__recom)
-use g_sbf, only: sbc_ini_recom
-#endif
-use mod_mesh
-USE MOD_PARTIT
-USE MOD_PARSUP
-use forcing_array_setup_interfaces
-use forcing_array_setup_dbgyre_interfaces
 implicit none
 type(t_mesh),   intent(in),    target :: mesh
 type(t_partit), intent(inout), target :: partit
@@ -59,9 +49,6 @@ end subroutine forcing_setup
 
 ! ==========================================================
 subroutine forcing_array_setup_dbgyre(partit, mesh)
-  use g_forcing_arrays
-  use mod_mesh
-  USE MOD_PARTIT
   implicit none
   type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit
@@ -83,19 +70,6 @@ end subroutine forcing_array_setup_dbgyre
 ! ==========================================================
 subroutine forcing_array_setup(partit, mesh)
   !inializing forcing fields 
-  use o_param
-  use mod_mesh
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use g_forcing_arrays
-  use g_forcing_param
-  use g_config
-  use g_sbf, only: l_mslp, l_cloud
-#if defined (__oasis)
-  use cpl_driver, only : nrecv
-#elif defined(__yac)
-  use cpl_yac_driver, only : nrecv
-#endif
   implicit none
   type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit
@@ -271,3 +245,5 @@ end subroutine forcing_array_setup
 !
 !----------------------------------------------------------------------
 !
+
+end module gen_forcing_init_module

@@ -1,109 +1,65 @@
-module oce_initial_state_interface
-    interface
-        subroutine oce_initial_state(tracers, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        type(t_tracer), intent(inout), target :: tracers
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh),   intent(in)  ,  target :: mesh
-        end subroutine oce_initial_state
-    end interface
-end module oce_initial_state_interface
-
-module tracer_init_interface
-    interface
-        subroutine tracer_init(tracers, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        type(t_tracer), intent(inout), target :: tracers
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh),   intent(in)  ,  target :: mesh
-        end subroutine tracer_init
-    end interface
-end module tracer_init_interface
-
-module dynamics_init_interface
-    interface
-        subroutine dynamics_init(dynamics, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine dynamics_init
-    end interface
-end module dynamics_init_interface
-
-module ocean_setup_interface
-    interface
-        subroutine ocean_setup(dynamics, tracers, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        use MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_tracer), intent(inout), target :: tracers
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout)   , target :: mesh
-        end subroutine ocean_setup
-    end interface
-end module ocean_setup_interface
-
-module before_oce_step_interface
-    interface
-        subroutine before_oce_step(dynamics, tracers, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        use MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_tracer), intent(inout), target :: tracers
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine before_oce_step
-    end interface
-end module before_oce_step_interface
-!
-!
-!_______________________________________________________________________________
-subroutine ocean_setup(dynamics, tracers, partit, mesh)
+module oce_setup_step_module
     USE MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     USE MOD_TRACER
     USE MOD_DYN
     USE o_PARAM
     USE o_ARRAYS
     USE g_config
     USE g_forcing_param, only: use_virt_salt, use_age_tracer
-    use diagnostics,         only: ldiag_extflds, ldiag_trflx, ldiag_salt3D, ldiag_DVD
-    use cmor_variables_diag, only: ldiag_cmor
-    use o_mixing_KPP_mod
-#if defined (__cvmix)       
+    USE diagnostics, only: ldiag_extflds, ldiag_trflx, ldiag_salt3D, ldiag_DVD, ldiag_dMOC
+    USE cmor_variables_diag, only: ldiag_cmor
+    USE o_mixing_KPP_mod
+    USE g_backscatter
+    USE Toy_Channel_Soufflet
+    USE Toy_Channel_Dbgyre
+    USE Toy_Neverworld2
+    USE oce_adv_tra_fct_module, only: oce_adv_tra_fct_init, oce_tra_adv_fct
+    USE oce_ale_module, only: init_ale, init_thickness_ale
+    USE solver_module, only: ssh_solve_preconditioner
+    USE g_ic3d
+    USE mod_transit, only: index_transit_r14c, index_transit_r39ar, index_transit_f11, &
+            index_transit_f12, index_transit_sf6, l_r14c, l_r39ar, l_f11, l_f12, l_sf6, &
+            id_r14c, id_r39ar, id_f11, id_f12, id_sf6
+    USE g_comm_auto
+    USE g_forcing_arrays
+    use oce_ale_module, only: init_stiff_mat_ale
+    use oce_ale_pressure_bv_module, only: init_ref_density
+    use oce_muscl_adv_module, only: muscl_adv_init
+    use cavity_param_module, only: compute_nrst_pnt2cavline
+    use oce_fer_gm_module, only: init_RediGM_GINsea_mask
+#if defined (__cvmix)
     use g_cvmix_tke
     use g_cvmix_idemix
     use g_cvmix_idemix2
     use g_cvmix_pp
     use g_cvmix_kpp
     use g_cvmix_tidal
-#endif    
-    use g_backscatter
-    use Toy_Channel_Soufflet
-    use Toy_Channel_Dbgyre
-    use Toy_Neverworld2
-    use oce_initial_state_interface
-    use oce_adv_tra_fct_interfaces
-    use init_ale_interface
-    use init_thickness_ale_interface
-    use ssh_solve_preconditioner_interface
+#endif
+#if defined(__recom)
+    use recom_glovar
+    use recom_config
+    use recom_ciso
+#endif
+#if defined(__recom)
+    use recom_config
+    use recom_glovar
+    use recom_ciso
+#endif
+
+    implicit none
+
+    private
+    public :: ocean_setup, tracer_init, dynamics_init, arrays_init, &
+              oce_initial_state, before_oce_step
+
+contains
+
+!
+!
+!_______________________________________________________________________________
+subroutine ocean_setup(dynamics, tracers, partit, mesh)
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_tracer), intent(inout), target :: tracers
@@ -347,15 +303,6 @@ end subroutine ocean_setup
 !
 !_______________________________________________________________________________
 SUBROUTINE tracer_init(tracers, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_TRACER
-    USE DIAGNOSTICS, only: ldiag_DVD
-    USE g_ic3d
-    use g_forcing_param, only: use_age_tracer !---age-code
-    use g_config, only : lwiso, use_transit   ! add lwiso switch and switch for transient tracers
-    use mod_transit, only : index_transit_r14c, index_transit_r39ar, index_transit_f11, index_transit_f12, index_transit_sf6, l_r14c, l_r39ar, l_f11, l_f12, l_sf6
     IMPLICIT NONE
     type(t_tracer), intent(inout), target               :: tracers
     type(t_partit), intent(inout), target               :: partit
@@ -559,11 +506,6 @@ END SUBROUTINE tracer_init
 !
 !_______________________________________________________________________________
 SUBROUTINE dynamics_init(dynamics, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    USE o_param
     IMPLICIT NONE
     type(t_mesh)  , intent(in)   , target :: mesh
     type(t_partit), intent(inout), target :: partit
@@ -907,22 +849,6 @@ END SUBROUTINE dynamics_init
 !
 !_______________________________________________________________________________
 SUBROUTINE arrays_init(num_tracers, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE o_ARRAYS
-    USE o_PARAM
-    use g_comm_auto
-    use g_config
-    use g_forcing_arrays
-    use o_mixing_kpp_mod ! KPP
-    USE g_forcing_param, only: use_virt_salt
-    use diagnostics,     only: ldiag_dMOC, ldiag_DVD
-#if defined(__recom)
-    use recom_glovar
-    use recom_config
-    use recom_ciso
-#endif
 
     IMPLICIT NONE
     integer,        intent(in)            :: num_tracers
@@ -1192,20 +1118,7 @@ END SUBROUTINE arrays_init
 ! ID = 0 and 1 are reserved for temperature and salinity
 ! --> reads the initial state or the restart file for the ocean
 SUBROUTINE oce_initial_state(tracers, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_TRACER
-    USE o_ARRAYS
-    USE g_config
-    USE g_ic3d
-#if defined(__recom)
-    use recom_config
-    use recom_glovar
-    use recom_ciso
-#endif
     ! for additional (transient) tracers:
-    use mod_transit, only: id_r14c, id_r39ar, id_f11, id_f12, id_sf6
     implicit none
     type(t_tracer), intent(inout), target :: tracers
     type(t_partit), intent(inout), target :: partit
@@ -1676,14 +1589,6 @@ end subroutine oce_initial_state
 !==========================================================================
 ! Here we do things (if applicable) before the ocean timestep will be made
 SUBROUTINE before_oce_step(dynamics, tracers, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_TRACER
-    USE MOD_DYN
-    USE o_ARRAYS
-    USE g_config
-    USE Toy_Channel_Soufflet
     implicit none
     type(t_dyn)   , intent(inout), target  :: dynamics
     type(t_tracer), intent(inout), target  :: tracers
@@ -1709,3 +1614,5 @@ SUBROUTINE before_oce_step(dynamics, tracers, partit, mesh)
         END SELECT
     end if
 END SUBROUTINE before_oce_step
+
+end module oce_setup_step_module

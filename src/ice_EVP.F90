@@ -1,40 +1,25 @@
-module ice_EVP_interfaces
-    interface
-        subroutine stress_tensor(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine stress_tensor
+module ice_EVP_module
+    USE MOD_ICE
+    USE MOD_PARTIT
+    USE MOD_MESH
+    USE o_param
+    USE g_CONFIG
+    USE o_ARRAYS
+    USE g_comm_auto
+#if defined (__icepack)
+    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
+#endif
+#if defined (__icepack)
+    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
+    use icedrv_main,   only: icepack_to_fesom
+#endif
 
-        subroutine stress2rhs(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine stress2rhs
-    end interface
-end module ice_EVP_interfaces
+    implicit none
 
-module ice_EVPdynamics_interface
-    interface
-        subroutine EVPdynamics(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine EVPdynamics
-    end interface
-end module ice_EVPdynamics_interface
+    private
+    public :: stress_tensor, stress2rhs, EVPdynamics
+
+contains
 
 !
 ! Contains routines of EVP dynamics
@@ -44,15 +29,6 @@ end module ice_EVPdynamics_interface
 ! velocity field. They are stored as elemental arrays (sigma11, sigma22 and
 ! sigma12). The ocean velocity is at nodal locations.
 subroutine stress_tensor(ice, partit, mesh)
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use o_param
-    use g_CONFIG
-#if defined (__icepack)
-    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
-#endif
     implicit none
     type(t_partit), intent(inout), target :: partit
     type(t_ice)   , intent(inout), target :: ice
@@ -184,11 +160,6 @@ end subroutine stress_tensor
 ! Computes the divergence of stress tensor and puts the result into the
 ! rhs vectors
 subroutine stress2rhs(ice, partit, mesh)
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    USE o_PARAM
     IMPLICIT NONE
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -345,19 +316,6 @@ end subroutine stress2rhs
 ! EVP implementation. Does subcycling and boundary conditions.
 ! Velocities at nodes
 subroutine EVPdynamics(ice, partit, mesh)
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    USE o_PARAM
-    USE o_ARRAYS
-    USE g_CONFIG
-    USE g_comm_auto
-    use ice_EVP_interfaces
-#if defined (__icepack)
-    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
-    use icedrv_main,   only: icepack_to_fesom
-#endif
     IMPLICIT NONE
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -839,3 +797,5 @@ subroutine EVPdynamics(ice, partit, mesh)
     END DO !--> do shortstep=1, ice%evp_rheol_steps
 
 end subroutine EVPdynamics
+
+end module ice_EVP_module

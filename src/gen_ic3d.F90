@@ -14,7 +14,7 @@ MODULE g_ic3d
    USE o_ARRAYS
    USE MOD_MESH
    USE MOD_PARTIT
-   USE MOD_PARSUP
+   use par_support_module, only: par_ex
    USE MOD_TRACER
    USE o_PARAM, only: mstep, pi
    USE g_comm_auto
@@ -547,7 +547,7 @@ CONTAINS
       !!              
       !! ** Purpose : read 3D initial conditions for tracers from netcdf and interpolate on model grid
       !!----------------------------------------------------------------------
-      USE insitu2pot_interface
+      use oce_ale_pressure_bv_module, only: insitu2pot
       USE ieee_arithmetic
       IMPLICIT NONE
       type(t_mesh),   intent(in),    target   :: mesh

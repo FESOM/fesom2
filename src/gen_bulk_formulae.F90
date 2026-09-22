@@ -2,7 +2,6 @@ MODULE gen_bulk
     ! Compute heat and momentum exchange coefficients
     use mod_mesh
     USE MOD_PARTIT
-    USE MOD_PARSUP    
     USE MOD_ICE
     use g_forcing_arrays
     use g_forcing_param, only: ncar_bulk_z_wind, ncar_bulk_z_tair, ncar_bulk_z_shum

@@ -1,168 +1,68 @@
-module diff_part_hor_redi_interface
-    interface
-        subroutine diff_part_hor_redi(tracer, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        type(t_tracer), intent(inout), target :: tracer
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine diff_part_hor_redi
-    end interface
-end module diff_part_hor_redi_interface
-
-module diff_ver_part_expl_ale_interface
-    interface
-        subroutine diff_ver_part_expl_ale(tr_num, tracer, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        integer       , intent(in)   , target :: tr_num
-        type(t_tracer), intent(inout), target :: tracer
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine diff_ver_part_expl_ale
-    end interface
-end module diff_ver_part_expl_ale_interface
-
-module diff_ver_part_redi_expl_interface
-    interface
-        subroutine diff_ver_part_redi_expl(tracer, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        type(t_tracer), intent(inout), target :: tracer
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine diff_ver_part_redi_expl
-    end interface
-end module diff_ver_part_redi_expl_interface
-
-module diff_ver_part_impl_ale_interface
-    interface
-        subroutine diff_ver_part_impl_ale(tr_num, dynamics,  tracer, ice, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        use MOD_DYN
-        use mod_ice
-        integer       , intent(in)   , target :: tr_num
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_tracer), intent(inout), target :: tracer
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        type(t_ice)   , intent(in)   , target :: ice
-        end subroutine diff_ver_part_impl_ale
-    end interface
-end module diff_ver_part_impl_ale_interface
-
-module diff_tracers_ale_interface
-    interface
-        subroutine diff_tracers_ale(tr_num, dynamics, tracer, ice, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        use mod_ice
-        use MOD_DYN
-        integer       , intent(in),    target :: tr_num
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_tracer), intent(inout), target :: tracer
-        type(t_ice),    intent(in),    target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine diff_tracers_ale
-    end interface
-end module diff_tracers_ale_interface
-
-module bc_surface_interface
-    interface
-        function bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, a_ice)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        integer , intent(in)                  :: n, id, nzmin
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh), intent(in), target      :: mesh
-        real(kind=WP)                         :: bc_surface
-        real(kind=WP), intent(in)             :: sval, sst, sss, a_ice
-        end function bc_surface
-    end interface
-end module bc_surface_interface
-
-module diff_part_bh_interface
-    interface
-        subroutine diff_part_bh(tr_num, dynamics, tracer, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        use MOD_DYN
-        integer       , intent(in)   , target :: tr_num
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_tracer), intent(inout), target :: tracer
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine diff_part_bh
-    end interface
-end module diff_part_bh_interface
-
-module solve_tracers_ale_interface
-    interface
-        subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        use MOD_DYN
-        USE MOD_ICE
-        type(t_ice)   , intent(in),    target :: ice
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_tracer), intent(inout), target :: tracers
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine solve_tracers_ale
-    end interface
-end module solve_tracers_ale_interface
-!
-!
-!===============================================================================
-! Driving routine    Here with ALE changes!!!
-subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
-    use g_config
-    use o_PARAM, only: SPP, Fer_GM, S_ref_anomaly
-    use mod_mesh
+module oce_ale_tracer_module
+    USE g_config
+    USE o_PARAM
+    USE mod_mesh
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     USE MOD_DYN
     USE MOD_ICE
-    use mod_tracer
-    use g_comm_auto
-    use o_tracers
-    use Toy_Channel_Soufflet
-    use Toy_Channel_Dbgyre
-    use Toy_Neverworld2
-    use o_ARRAYS, only: heat_flux
-    use g_forcing_arrays, only: sw_3d
-    use diff_tracers_ale_interface
-    use oce_adv_tra_driver_interfaces
+    USE mod_tracer
+    USE g_comm_auto
+    USE o_tracers
+    USE Toy_Channel_Soufflet
+    USE Toy_Channel_Dbgyre
+    USE Toy_Neverworld2
+    USE o_ARRAYS
+    USE g_forcing_arrays
+    USE oce_adv_tra_driver_module, only: do_oce_adv_tra
+    USE diagnostics, only: ldiag_DVD, ldiag_diapmix, density_dmoc_avg, diap_avg_count, &
+            dmoc_avg_count, dmoc_is_due, dT_diap, dS_diap, dd_diap
+    USE g_forcing_param, only: use_age_tracer
+    USE mod_transit
+    USE cmor_variables_diag, only: ldiag_cmor, save_cmor_advection
+    USE g_clock
+    USE o_mixing_KPP_mod
+    USE iceberg_params
 #if defined(__recom)
     use recom_glovar
     use recom_config
     use recom_ciso
     use o_arrays
 #endif
-    use diagnostics, only: ldiag_DVD, ldiag_diapmix, density_dmoc_avg, diap_avg_count, &
-                           dmoc_avg_count, dmoc_is_due
-    use o_ARRAYS, only: density_dmoc
-    use o_PARAM,  only: mstep
-    use g_forcing_param, only: use_age_tracer !---age-code
-    use mod_transit, only: decay14, decay39
-    use cmor_variables_diag, only: ldiag_cmor, save_cmor_advection
+#if defined(__recom)
+    use recom_sinking
+    use recom_glovar
+    use recom_config
+    use g_comm_auto
+    use g_support
+#endif
+#if defined (__cvmix)
+    use g_cvmix_kpp, only: kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc
+#endif
+#if defined (__recom)
+   use recoM_declarations, only: is_erosioninput, is_riverinput
+   use recom_glovar
+   use recom_config
+#endif
+#if defined (__ciso)
+   use recom_ciso
+#endif
+
+    implicit none
+
+    private
+    public :: solve_tracers_ale, diff_tracers_ale, &
+              diff_ver_part_expl_ale, diff_ver_part_impl_ale, &
+              diff_ver_part_redi_expl, diff_part_hor_redi, &
+              diff_part_bh, bc_surface, transit_bc_surface, calc_slice
+
+contains
+
+!
+!
+!===============================================================================
+! Driving routine    Here with ALE changes!!!
+subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     implicit none
     type(t_ice)   , intent(in)   , target    :: ice
     type(t_dyn)   , intent(inout), target    :: dynamics
@@ -180,10 +80,10 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 
     logical             :: has_one_added_tracer
     logical             :: has_one_added_tracer_local_dummy
-    logical             :: tr_num_end_local_dummy
-    logical             :: tr_num_in_group_local_dummy
+    integer             :: tr_num_end_local_dummy
+    integer             :: tr_num_in_group_local_dummy
     integer             :: tr_num_end
-    logical             :: tr_num_in_group_dummy
+    integer             :: tr_num_in_group_dummy
     integer             :: tr_arr_slice_count_fix_1
 
     integer             :: Sinkflx_tr_slice_count_fix_1
@@ -548,28 +448,6 @@ end subroutine solve_tracers_ale
 !
 !===============================================================================
 subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
-    use mod_mesh
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use mod_tracer
-    use MOD_DYN
-    use o_arrays
-    use o_tracers
-    use diff_part_hor_redi_interface
-    use diff_ver_part_expl_ale_interface
-    use diff_ver_part_redi_expl_interface
-    use diff_ver_part_impl_ale_interface
-    use diff_part_bh_interface
-#if defined(__recom)
-    use recom_sinking
-    use recom_glovar
-    use recom_config
-    use g_comm_auto
-    use g_support
-#endif
-    use mod_ice
-    use g_clock
-    use diagnostics, only: ldiag_diapmix, dT_diap, dS_diap, dd_diap
 
     implicit none
     integer       , intent(in)   , target :: tr_num
@@ -890,14 +768,6 @@ end subroutine diff_tracers_ale
 !===============================================================================
 !Vertical diffusive flux(explicit scheme):
 subroutine diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
-    use o_PARAM, only: S_ref_anomaly
-    use o_ARRAYS
-    use g_forcing_arrays
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_TRACER
-    use g_config,only: dt
     implicit none
     integer       , intent(in)   , target :: tr_num
     type(t_tracer), intent(inout), target :: tracers
@@ -960,24 +830,6 @@ end subroutine diff_ver_part_expl_ale
 !===============================================================================
 ! vertical diffusivity augmented with Redi contribution [vertical flux of K(3,3)*d_zT]
 subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_TRACER
-    use MOD_DYN
-    use o_PARAM
-    use o_ARRAYS, only: Ki, Kv, heat_flux, water_flux, slope_tapered
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use g_CONFIG
-    use g_forcing_arrays
-    use o_mixing_KPP_mod !for ghats _GO_
-#if defined (__cvmix)       
-    use g_cvmix_kpp, only: kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc
-#endif    
-    use bc_surface_interface
-    use mod_ice
-    use iceberg_params
     implicit none
     integer       , intent(in)   , target :: tr_num
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -1492,14 +1344,6 @@ end subroutine diff_ver_part_impl_ale
 !
 !===============================================================================
 subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
-    use o_ARRAYS
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_TRACER
-    USE o_param
-    use g_config
-    use g_comm_auto
     IMPLICIT NONE
     type(t_tracer), intent(inout), target :: tracers
     type(t_partit), intent(inout), target :: partit
@@ -1579,13 +1423,6 @@ end subroutine diff_ver_part_redi_expl
 !
 !===============================================================================
 subroutine diff_part_hor_redi(tracers, partit, mesh)
-    use o_ARRAYS
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_TRACER
-    use o_param
-    use g_config
     IMPLICIT NONE
     type(t_tracer), intent(inout), target :: tracers
     type(t_partit), intent(inout), target :: partit
@@ -1750,15 +1587,6 @@ end subroutine diff_part_hor_redi
 !
 !===============================================================================
 SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
-    use o_ARRAYS, only:
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_TRACER
-    use MOD_DYN
-    use o_param
-    use g_config
-    use g_comm_auto
     IMPLICIT NONE
     integer,        intent(in),    target    :: tr_num
     type(t_dyn)   , intent(inout), target    :: dynamics
@@ -1893,23 +1721,6 @@ end subroutine diff_part_bh
 ! ID = 0 and 1 are reserved for temperature and salinity
 ! MB: mesh, sst, sss, and aice are only needed for transient tracers
 FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
-  use MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use o_PARAM, only: S_ref_anomaly
-  USE o_ARRAYS
-  USE g_forcing_arrays
-  USE g_config
-#if defined (__recom)
-   use recoM_declarations, only: is_erosioninput, is_riverinput
-   use recom_glovar
-   use recom_config
-#endif
-#if defined (__ciso)
-   use recom_ciso
-#endif
-  use mod_transit
-  use g_clock
   implicit none
 
   integer,       intent(in)            :: n, id, nzmin
@@ -2192,14 +2003,6 @@ END FUNCTION
 ! Different to function bc_surface, SST, SSS, and sea ice concentrations are always needed as
 ! auxiliary variable
 FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit, mesh)
-  use MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  USE o_ARRAYS
-  USE g_forcing_arrays
-  USE g_config
-  use g_clock
-  use mod_transit
   implicit none
 
   integer,       intent(in)            :: n, id, nzmin
@@ -2358,3 +2161,4 @@ subroutine calc_slice(index_count, fesom_group_count, fesom_group_id, start_inde
     end_index  = start_index + index_count_in_group - 1
 end subroutine calc_slice
 
+end module oce_ale_tracer_module

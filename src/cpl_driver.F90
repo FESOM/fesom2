@@ -123,11 +123,11 @@ contains
     subroutine node_contours(my_x_corners, my_y_corners, partit, mesh)
         USE MOD_MESH
         USE MOD_PARTIT
-        USE MOD_PARSUP
         USE o_PARAM
         use g_comm_auto
         use o_ARRAYS
         use g_rotate_grid
+        use oce_mesh_module, only: elem_center, edge_center
 
         IMPLICIT NONE
         type(t_mesh),   intent(in), target :: mesh
@@ -424,7 +424,6 @@ include "node_contour_boundary.h"
 #endif
     use mod_mesh
     USE MOD_PARTIT
-    USE MOD_PARSUP
     use g_rotate_grid
     use mod_oasis, only: oasis_write_area, oasis_write_mask
 #if defined (__XIOS)
@@ -871,7 +870,6 @@ include "associate_mesh_ass.h"
   subroutine cpl_oasis3mct_send(ind, data_array, action, partit)
     use o_param
     USE MOD_PARTIT
-    USE MOD_PARSUP
     implicit none
     save
     !---------------------------------------------------------------------
@@ -935,7 +933,6 @@ include "associate_mesh_ass.h"
     use o_param
     use g_comm_auto
     USE MOD_PARTIT
-    USE MOD_PARSUP
     implicit none
     save
     !---------------------------------------------------------------------

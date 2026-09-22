@@ -1,195 +1,64 @@
+module oce_ale_module
+    USE o_PARAM
+    USE MOD_MESH
+    USE MOD_PARTIT
+    use par_support_module, only: par_ex
+    USE MOD_DYN
+    USE o_ARRAYS
+    USE g_config
+    USE g_forcing_param, only: use_virt_salt
+    USE g_comm_auto
+    USE g_support
+    USE diagnostics, only: ldiag_DVD
+    USE io_RESTART
+    USE g_forcing_arrays
+    USE solver_module, only: ssh_solve_preconditioner, ssh_solve_cg
+    USE MOD_TRACER
+    USE MOD_ICE
+    USE o_mixing_KPP_mod
+    USE Toy_Channel_Soufflet
+    USE Toy_Neverworld2
+    use oce_ale_ssh_splitexpl_subcycl_module, only: compute_BT_rhs_SE_vtransp, &
+            compute_BT_step_SE_ale, update_trim_vel_ale_vtransp, compute_thickness_zstar
+    USE oce_ale_pressure_bv_module, only: pressure_bv, pressure_force_4_linfs, &
+            pressure_force_4_zxxxx
+    USE oce_ale_vel_rhs_module, only: compute_vel_rhs
+    USE oce_ale_tracer_module, only: solve_tracers_ale
+    use write_step_info_module, only: write_step_info, write_enegry_info
+    use write_step_info_module, only: check_blowup
+    USE ieee_arithmetic
+    use oce_fer_gm_module, only: fer_solve_Gamma, fer_gamma2vel, init_Redi_GM
+    use oce_mle_module, only: mle_add_gamma
+    use oce_ale_ssh_splitexpl_subcycl_module, only: impl_vert_visc_ale_vtransp
+    use oce_dyn_module, only: update_vel, viscosity_filter, check_viscopt, compute_ke_wrho, compute_apegen, compute_PePm
+    use oce_ale_pressure_bv_module, only: sw_alpha_beta, compute_sigma_xy, compute_neutral_slope
+    use par_support_module, only: status_check
+#if defined (__cvmix)
+    use g_cvmix_tke
+    use g_cvmix_idemix
+    use g_cvmix_idemix2
+    use g_cvmix_pp
+    use g_cvmix_kpp
+    use g_cvmix_tidal
+#endif
+#if defined (FESOM_PROFILING)
+    use fesom_profiler
+#endif
 
-module compute_CFLz_interface
-    interface
-        subroutine compute_CFLz(dynamics, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine compute_CFLz
-    end interface
-end module compute_CFLz_interface
+    implicit none
 
-module compute_Wvel_split_interface
-    interface
-        subroutine compute_Wvel_split(dynamics, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine compute_Wvel_split
-    end interface
-end module compute_Wvel_split_interface
+    private
+    public :: init_ale, init_bottom_elem_thickness, &
+              init_bottom_node_thickness, init_surface_elem_depth, &
+              init_surface_node_depth, init_thickness_ale, &
+              update_thickness_ale, restart_thickness_ale, &
+              init_stiff_mat_ale, update_stiff_mat_ale, &
+              compute_ssh_rhs_ale, compute_hbar_ale, vert_vel_ale, &
+              compute_vert_vel_transpv, compute_CFLz, &
+              compute_Wvel_split, solve_ssh_ale, impl_vert_visc_ale, &
+              oce_timestep_ale
 
-module compute_vert_vel_transpv_interface
-    interface        
-        subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine compute_vert_vel_transpv
-    end interface
-end module compute_vert_vel_transpv_interface
-
-module oce_ale_interfaces
-    interface
-        subroutine init_bottom_elem_thickness(partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine init_bottom_elem_thickness
-
-        subroutine init_bottom_node_thickness(partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine init_bottom_node_thickness
-        
-        subroutine init_surface_elem_depth(partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine init_surface_elem_depth
-
-        subroutine init_surface_node_depth(partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine init_surface_node_depth
-
-        subroutine impl_vert_visc_ale(dynamics, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine impl_vert_visc_ale
-
-        subroutine update_stiff_mat_ale(partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine update_stiff_mat_ale
-
-        subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine compute_ssh_rhs_ale
-
-        subroutine solve_ssh_ale(dynamics, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine solve_ssh_ale
-
-        subroutine compute_hbar_ale(dynamics, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine compute_hbar_ale
-
-        subroutine vert_vel_ale(dynamics, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine vert_vel_ale
-
-        subroutine update_thickness_ale(partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine update_thickness_ale
-    end interface
-end module oce_ale_interfaces
-
-module init_ale_interface
-    interface
-        subroutine init_ale(dynamics, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine init_ale
-    end interface
-end module init_ale_interface
-
-module init_thickness_ale_interface
-    interface
-        subroutine init_thickness_ale(dynamics, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine init_thickness_ale
-    end interface
-end module init_thickness_ale_interface
-
-module oce_timestep_ale_interface
-    interface
-        subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        use MOD_DYN
-        use MOD_ICE
-        integer       , intent(in)            :: n
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_ice), intent(inout), target :: ice
-        type(t_tracer), intent(inout), target :: tracers
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine oce_timestep_ale
-    end interface
-end module oce_timestep_ale_interface
-
+contains
 
 ! CONTENT:
 ! ------------
@@ -214,19 +83,10 @@ end module oce_timestep_ale_interface
 !===============================================================================
 ! allocate & initialise arrays for Arbitrary-Langrangian-Eularian (ALE) method
 subroutine init_ale(dynamics, partit, mesh)
-    USE o_PARAM
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    USE o_ARRAYS
 !    USE g_config, only: which_ale, use_cavity, use_partial_cell
 
 ! kh 18.03.21
-    USE g_config, only: which_ale, use_cavity, use_partial_cell, ib_async_mode
 
-    USE g_forcing_param, only: use_virt_salt
-    use oce_ale_interfaces
     Implicit NONE
      
 ! kh 18.03.21
@@ -379,14 +239,6 @@ end subroutine init_ale
 !
 !===============================================================================
 subroutine init_bottom_elem_thickness(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_ARRAYS
-    use g_config,only: use_partial_cell, partial_cell_thresh, use_depthonelem
-    use g_comm_auto
-    use g_support
     implicit none
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
@@ -510,14 +362,6 @@ end subroutine init_bottom_elem_thickness
 !
 !===============================================================================
 subroutine init_bottom_node_thickness(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_ARRAYS
-    use g_config,only: use_partial_cell
-    use g_comm_auto
-    use g_support
     implicit none
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
@@ -623,14 +467,6 @@ end subroutine init_bottom_node_thickness
 !
 !===============================================================================
 subroutine init_surface_elem_depth(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_ARRAYS
-    use g_config,only: use_cavity, use_cavity_partial_cell, cavity_partial_cell_thresh, use_cavityonelem
-    use g_comm_auto
-    use g_support
     implicit none
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
@@ -707,14 +543,6 @@ end subroutine init_surface_elem_depth
 !
 !===============================================================================
 subroutine init_surface_node_depth(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_ARRAYS
-    use g_config,only:  use_cavity, use_cavity_partial_cell
-    use g_comm_auto
-    use g_support
     implicit none
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
@@ -774,13 +602,6 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
 ! should not be touched if partial cell is implemented (it is).
 ! In lower layers scalar prisms are modified by the bottom.  
 ! Important: nlevels_nod2D_min has to be allocated and filled. 
-    use g_config,only: dt, which_ale
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    use g_comm_auto
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -1033,14 +854,6 @@ end subroutine init_thickness_ale
 !===============================================================================
 ! update thickness arrays based on the current hbar 
 subroutine update_thickness_ale(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_ARRAYS
-    use g_config,only: which_ale,lzstar_lev,min_hnode
-    use diagnostics, only: ldiag_DVD 
-    use g_comm_auto
 
     implicit none
     type(t_partit), intent(inout), target :: partit
@@ -1256,12 +1069,6 @@ end subroutine update_thickness_ale
 !===============================================================================
 ! update thickness arrays based on the current hbar 
 subroutine restart_thickness_ale(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_ARRAYS
-    use g_config,only: which_ale,lzstar_lev,min_hnode
     implicit none
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
@@ -1391,11 +1198,6 @@ end subroutine restart_thickness_ale
 ! To achive it we should use global arrays n_num and n_pos.
 ! Reserved for future. 
 subroutine init_stiff_mat_ale(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use g_CONFIG
     implicit none
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(inout), target :: mesh
@@ -1691,7 +1493,7 @@ subroutine update_stiff_mat_ale(partit, mesh)
     use MOD_MESH
     use MOD_TRACER
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     use o_ARRAYS
     implicit none
     type(t_partit), intent(inout), target :: partit
@@ -1882,14 +1684,6 @@ end subroutine update_stiff_mat_ale
 ! ssh_rhs=-alpha*\nabla\int(U_n+U_rhs)dz-(1-alpha)*...
 ! see "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (11) rhs
 subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
-    use g_config,only: which_ALE, dt, use_cavity_fw2press
-    use MOD_MESH
-    use o_ARRAYS, only: water_flux
-    use o_PARAM
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    use g_comm_auto
     implicit none
     type(t_mesh)  , intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
@@ -2039,14 +1833,6 @@ end subroutine compute_ssh_rhs_ale
 ! ssh_rhs_old=-\nabla\int(U_n)dz-water_flux*area (if free surface)
 ! Find new elevation hbar
 subroutine compute_hbar_ale(dynamics, partit, mesh)
-    use g_config,only: dt, which_ALE, use_cavity
-    use MOD_MESH
-    use o_ARRAYS, only: water_flux
-    use o_PARAM
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    use g_comm_auto
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -2194,18 +1980,6 @@ end subroutine compute_hbar_ale
 ! > for zstar : dh_k/dt_k=1...kbot-1 != 0
 !
 subroutine vert_vel_ale(dynamics, partit, mesh)
-    use g_config,only: dt, which_ALE, min_hnode, lzstar_lev, flag_warn_cflz
-    use MOD_MESH
-    use o_ARRAYS, only: water_flux
-    use o_PARAM
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    use g_comm_auto
-    use io_RESTART !!PS
-    use g_forcing_arrays !!PS
-    use compute_Wvel_split_interface
-    use compute_CFLz_interface
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -2771,15 +2545,6 @@ end subroutine vert_vel_ale
 !   w^t = w^b - dh_k/dt - grad(u*h)_k - water_flux=1
 !   --> do cumulativ summation from bottom to top
 subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    USE MOD_DYN
-    use o_ARRAYS, only: water_flux
-    use g_config, only: dt, which_ale
-    use g_comm_auto
-    use compute_Wvel_split_interface
-    use compute_CFLz_interface
     implicit none
     !___________________________________________________________________________
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -3005,13 +2770,6 @@ end subroutine compute_vert_vel_transpv
 ! compute vertical CFL_z criteria and print out warning when critical value over
 ! stepped
 subroutine compute_CFLz(dynamics, partit, mesh)
-    use g_config, only: dt, flag_warn_cflz
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    use o_PARAM
-    use g_comm_auto
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -3096,12 +2854,6 @@ end subroutine compute_CFLz
 !
 !_______________________________________________________________________________ 
 subroutine compute_Wvel_split(dynamics, partit, mesh)
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    use o_PARAM
-    use g_comm_auto
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -3151,16 +2903,6 @@ end subroutine compute_Wvel_split
 ! solve  eq.18 in S. Danilov et al. : FESOM2: from finite elements to finite volumes. 
 ! for (eta^(n+1)-eta^n) = d_eta
 subroutine solve_ssh_ale(dynamics, partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    use o_ARRAYS
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    use g_comm_auto
-    use g_config, only: which_ale
-    use ssh_solve_preconditioner_interface
-    use ssh_solve_cg_interface
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -3198,13 +2940,6 @@ end subroutine solve_ssh_ale
 !
 !===============================================================================
 subroutine impl_vert_visc_ale(dynamics, partit, mesh)
-    USE MOD_MESH
-    USE o_PARAM
-    USE o_ARRAYS, only: Av, stress_surf
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    USE g_CONFIG !,only: dt
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -3413,45 +3148,6 @@ end subroutine impl_vert_visc_ale
 !
 !===============================================================================
 subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
-    use g_config
-    use MOD_MESH
-    use MOD_TRACER
-    use MOD_DYN
-    USE MOD_ICE
-    use o_ARRAYS
-    use o_PARAM
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use g_comm_auto
-    use io_RESTART !PS
-    use o_mixing_KPP_mod
-#if defined (__cvmix)       
-    use g_cvmix_tke
-    use g_cvmix_idemix
-    use g_cvmix_idemix2
-    use g_cvmix_pp
-    use g_cvmix_kpp
-    use g_cvmix_tidal
-#endif    
-    use Toy_Channel_Soufflet
-    use Toy_Neverworld2
-    use oce_ale_interfaces
-    use compute_vert_vel_transpv_interface
-    use compute_ssh_split_explicit_interface
-    use pressure_bv_interface
-    use pressure_force_4_linfs_interface
-    use pressure_force_4_zxxxx_interface
-    use compute_vel_rhs_interface
-    use solve_tracers_ale_interface
-    use write_step_info_interface
-    use check_blowup_interface
-    use ieee_arithmetic
-    use fer_solve_interface
-    use mle_interface
-    use impl_vert_visc_ale_vtransp_interface
-#if defined (FESOM_PROFILING)
-    use fesom_profiler
-#endif
     
     IMPLICIT NONE
     integer       , intent(in)            :: n
@@ -4047,3 +3743,4 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 
 end subroutine oce_timestep_ale
 
+end module oce_ale_module

@@ -2,7 +2,7 @@ MODULE Toy_Neverworld2
     use mod_mesh
     use o_ARRAYS
     use o_PARAM
-    use MOD_PARSUP
+    use par_support_module, only: par_ex
     use MOD_PARTIT
     use MOD_TRACER
     use MOD_DYN
@@ -539,7 +539,7 @@ MODULE Toy_Neverworld2
     subroutine oce_mixing_TOY(partit, mesh)
         use MOD_MESH
         use MOD_PARTIT
-        use MOD_PARSUP
+        use par_support_module, only: par_ex
         use o_PARAM
         use o_ARRAYS
         use g_config

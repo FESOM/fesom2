@@ -1,7 +1,7 @@
 module iceberg_step
  USE MOD_MESH
  use MOD_PARTIT
- USE MOD_PARSUP
+ use par_support_module, only: par_ex
  use MOD_ICE
  USE MOD_DYN
  use iceberg_params

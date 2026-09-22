@@ -3,7 +3,6 @@ module diagnostics
   use g_config
   use mod_mesh
   USE MOD_PARTIT
-  USE MOD_PARSUP
   use MOD_TRACER
   use MOD_DYN
   use MOD_ICE
