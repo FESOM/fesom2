@@ -15,6 +15,7 @@ module mod_mesh_utils
     USE iso_c_binding, only: idx_t=>C_INT32_T
 
     use mod_gen_comm, only: communication_nodn, communication_elemn
+    use oce_local_module, only: save_dist_mesh
 
     implicit none
 
