@@ -1,63 +1,42 @@
-module ice_initial_state_interface
-    interface
-        subroutine ice_initial_state(ice, tracers, partit, mesh)
-        USE MOD_ICE
-        USE MOD_TRACER
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_tracer), intent(in)   , target :: tracers
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine ice_initial_state
-    end interface
-end module ice_initial_state_interface
-
-module ice_setup_interface
-    interface
-        subroutine ice_setup(ice, tracers, partit, mesh)
-        USE MOD_ICE
-        USE MOD_TRACER
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_tracer), intent(in)   , target :: tracers
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine ice_setup
-    end interface
-end module ice_setup_interface
-
-module ice_timestep_interface
-    interface
-        subroutine ice_timestep(istep, ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        integer       , intent(in)            :: istep
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine ice_timestep
-    end interface
-end module ice_timestep_interface
-
-!
-!_______________________________________________________________________________
-! ice initialization + array allocation + time stepping
-subroutine ice_setup(ice, tracers, partit, mesh)
+module ice_setup_step_module
     USE MOD_ICE
     USE MOD_TRACER
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_MESH
-    use o_param
-    use g_CONFIG
-    use ice_initial_state_interface
-    use ice_fct_interfaces
+    USE o_param
+    USE g_CONFIG
+    use ice_fct_module, only: ice_mass_matrix_fill, ice_solve_high_order, ice_solve_low_order, &
+            ice_fem_fct, ice_TG_rhs_div, ice_TG_rhs, ice_update_for_div, ice_fct_solve
+    USE ice_EVP_module, only: EVPdynamics
+    USE ice_maEVP_module, only: EVPdynamics_a, EVPdynamics_m
+#if !defined (__oasis) && !defined (__ifsinterface) && !defined (__yac)
+    use ice_thermo_oce_module, only: thermodynamics, cut_off
+#else
+    use ice_thermo_oce_module, only: cut_off
+#endif
+    use cavity_param_module, only: cavity_heat_water_fluxes_3eq, cavity_heat_water_fluxes_2eq, cavity_ice_clean_vel, cavity_ice_clean_ma, cavity_momentum_fluxes
+    USE o_arrays
+    USE g_read_other_NetCDF, only: read_other_NetCDF
+    use ice_init_module, only: ice_init
+#if defined (__icepack)
+    use icedrv_main,   only: step_icepack
+#endif
+#if defined (FESOM_PROFILING)
+    use fesom_profiler
+#endif
+
+    implicit none
+
+    private
+    public :: ice_setup, ice_timestep, ice_initial_state
+
+contains
+
+!
+!_______________________________________________________________________________
+! ice initialization + array allocation + time stepping
+subroutine ice_setup(ice, tracers, partit, mesh)
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_tracer), intent(in)   , target :: tracers
@@ -94,23 +73,6 @@ end subroutine ice_setup
 !_______________________________________________________________________________
 ! Sea ice model step
 subroutine ice_timestep(step, ice, partit, mesh)
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use o_param
-    use g_CONFIG
-    use ice_EVPdynamics_interface
-    use ice_maEVPdynamics_interface
-    use ice_fct_interfaces
-    use ice_thermodynamics_interfaces
-    use cavity_interfaces
-#if defined (__icepack)
-    use icedrv_main,   only: step_icepack
-#endif
-#if defined (FESOM_PROFILING)
-    use fesom_profiler
-#endif
     implicit none
     integer       , intent(in)            :: step
     type(t_ice)   , intent(inout), target :: ice
@@ -359,15 +321,6 @@ end subroutine ice_timestep
 !_______________________________________________________________________________
 ! sets inital values or reads restart file for ice model
 subroutine ice_initial_state(ice, tracers, partit, mesh)
-    USE MOD_ICE
-    USE MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use o_PARAM
-    use o_arrays
-    use g_CONFIG
-    USE g_read_other_NetCDF, only: read_other_NetCDF
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_tracer), intent(in)   , target :: tracers
@@ -376,7 +329,6 @@ subroutine ice_initial_state(ice, tracers, partit, mesh)
     !___________________________________________________________________________
     integer                               :: i
     character(MAX_PATH)                   :: filename
-    real(kind=WP), external               :: TFrez  ! Sea water freeze temperature.
 !============== namelistatmdata variables ================
    integer, save                                :: nm_ic_unit     = 107 ! unit to open namelist file
    integer                                      :: iost                 !I/O status
@@ -573,3 +525,5 @@ end if
         end do ! --> DO i=1, n_ic2d
     end if ! --> if (.not. ini_ice_from_file) then
 end subroutine ice_initial_state
+
+end module ice_setup_step_module

@@ -1,71 +1,43 @@
-module ocean2ice_interface
-    interface
-        subroutine ocean2ice(ice, dynamics, tracers, partit, mesh)
-        USE MOD_ICE
-        USE MOD_DYN
-        USE MOD_TRACER
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_dyn)   , intent(in)   , target :: dynamics
-        type(t_tracer), intent(inout), target :: tracers
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine ocean2ice
-    end interface
-end module ocean2ice_interface
+module ice_oce_coupling_module
+    USE MOD_ICE
+    USE MOD_DYN
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_MESH
+    USE o_PARAM
+    USE o_ARRAYS
+    USE g_CONFIG
+    USE g_comm_auto
+    use cavity_param_module, only: cavity_heat_water_fluxes_3eq, cavity_heat_water_fluxes_2eq, cavity_ice_clean_vel, cavity_ice_clean_ma, cavity_momentum_fluxes
+    USE MOD_TRACER
+    USE g_forcing_param, only: use_virt_salt, use_landice_water, use_age_tracer, use_age_mask, &
+            age_start_year
+    USE g_forcing_arrays
+    USE g_support
+    use oce_hosing_module, only: fw_surf_anomaly, fw_depth_anomaly
+    USE iceberg_params
+    USE iceberg_ocean_coupling
+    USE g_clock
+#if defined (__icepack)
+    use icedrv_main,   only: icepack_to_fesom
+#endif
+#if defined (__icepack)
+    use icedrv_main,   only: icepack_to_fesom,    &
+                            init_flux_atm_ocn
+#endif
 
-module oce_fluxes_interface
-    interface
-        subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
-        USE MOD_ICE
-        USE MOD_DYN
-        USE MOD_TRACER
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_dyn)   , intent(in)   , target :: dynamics
-        type(t_tracer), intent(inout), target :: tracers
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine oce_fluxes
-        
-        subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
-        USE MOD_ICE
-        USE MOD_DYN
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_dyn)   , intent(in)   , target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine oce_fluxes_mom
+    implicit none
 
+    private
+    public :: oce_fluxes_mom, ocean2ice, oce_fluxes
 
-    end interface
-end module oce_fluxes_interface
+contains
 
 !
 !
 !_______________________________________________________________________________
 ! transmits the relevant fields from the ice to the ocean model
 subroutine oce_fluxes_mom(ice, dynamics, partit, mesh)
-    USE MOD_ICE
-    USE MOD_DYN
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use o_PARAM
-    use o_ARRAYS
-    USE g_CONFIG
-    use g_comm_auto
-    use cavity_interfaces    
-#if defined (__icepack)
-    use icedrv_main,   only: icepack_to_fesom
-#endif
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_dyn)   , intent(in)   , target :: dynamics
@@ -154,15 +126,6 @@ end subroutine oce_fluxes_mom
 !_______________________________________________________________________________
 ! transmits the relevant fields from the ocean to the ice model
 subroutine ocean2ice(ice, dynamics, tracers, partit, mesh)
-    USE MOD_ICE
-    USE MOD_DYN
-    USE MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use o_PARAM
-    use g_CONFIG
-    use g_comm_auto
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_dyn)   , intent(in)   , target :: dynamics
@@ -249,29 +212,7 @@ end subroutine ocean2ice
 !
 !_______________________________________________________________________________
 subroutine oce_fluxes(ice, dynamics, tracers, partit, mesh)
-    USE MOD_ICE
-    USE MOD_DYN
-    USE MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use g_CONFIG
-    use o_ARRAYS
-    use g_comm_auto
-    use g_forcing_param, only: use_virt_salt, use_landice_water, use_age_tracer, use_age_mask, age_start_year !---fwf-code, age-code
-    use g_forcing_arrays
-    use g_support
-    use hosing_interface
-    use cavity_interfaces
-#if defined (__icepack)
-    use icedrv_main,   only: icepack_to_fesom,    &
-                            init_flux_atm_ocn
-#endif
-    use iceberg_params
-    use iceberg_ocean_coupling
-    use cavity_interfaces
     !---fwf-code
-    use g_clock
     !---fwf-code-end
 
     implicit none
@@ -856,3 +797,5 @@ end subroutine oce_fluxes
 !
 !
 !_______________________________________________________________________________
+
+end module ice_oce_coupling_module

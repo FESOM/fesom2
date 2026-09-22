@@ -1,80 +1,32 @@
-module ice_maEVP_interfaces
-    interface
-        subroutine ssh2rhs(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine ssh2rhs
+module ice_maEVP_module
+    USE MOD_ICE
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE MOD_MESH
+    USE o_param
+    USE g_config
+    USE o_arrays
+    USE g_comm_auto
+#if defined (__icepack)
+    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
+#endif
+#if defined (__icepack)
+    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
+    use icedrv_main,   only: icepack_to_fesom
+#endif
+#if defined (__icepack)
+    use icedrv_main,   only: strength
+#endif
 
-        subroutine stress_tensor_a(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine stress_tensor_a
+    implicit none
 
-        subroutine stress2rhs_m(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine stress2rhs_m
+    private
+    public :: stress_tensor_m, ssh2rhs, stress2rhs_m, EVPdynamics_m, &
+              find_alpha_field_a, stress_tensor_a, EVPdynamics_a, &
+              find_beta_field_a
 
-        subroutine find_alpha_field_a(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine find_alpha_field_a
+contains
 
-        subroutine find_beta_field_a(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine find_beta_field_a
-   end interface
-end module ice_maEVP_interfaces
-
-module ice_maEVPdynamics_interface
-    interface
-        subroutine EVPdynamics_a(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_mesh)  , intent(in)   , target :: mesh
-        type(t_partit), intent(inout), target :: partit
-        type(t_ice)   , intent(inout), target :: ice
-        end subroutine EVPdynamics_a
-
-        subroutine EVPdynamics_m(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_mesh)  , intent(in)   , target :: mesh
-        type(t_partit), intent(inout), target :: partit
-        type(t_ice)   , intent(inout), target :: ice
-        end subroutine EVPdynamics_m
-   end interface
-end module ice_maEVPdynamics_interface
 !
 !
 !_______________________________________________________________________________
@@ -84,16 +36,6 @@ end module ice_maEVPdynamics_interface
 ! New implementation following Boullion et al, Ocean Modelling 2013.
 ! SD, 30.07.2014
 subroutine stress_tensor_m(ice, partit, mesh)
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use o_param
-    use mod_mesh
-    use g_config
-#if defined (__icepack)
-    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
-#endif
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -203,12 +145,6 @@ end subroutine stress_tensor_m
 ! Compute the contribution from the elevation to the rhs
 ! S.D. 30.07.2014
 subroutine ssh2rhs(ice, partit, mesh)
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_param
-    use mod_mesh
-    use g_config
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -336,12 +272,6 @@ end subroutine ssh2rhs
 ! add internal stress to the rhs
 ! SD, 30.07.2014
 subroutine stress2rhs_m(ice, partit, mesh)
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_param
-    use mod_mesh
-    use g_config
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -445,18 +375,6 @@ end subroutine stress2rhs_m
 ! New implementation based on Bouillion et al. Ocean Modelling 2013
 ! SD 30.07.14
 subroutine EVPdynamics_m(ice, partit, mesh)
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use o_param
-    use g_config
-    use o_arrays
-    use g_comm_auto
-#if defined (__icepack)
-    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
-    use icedrv_main,   only: icepack_to_fesom
-#endif
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -943,15 +861,6 @@ end subroutine EVPdynamics_m
 ! aEVP implementation
 ! SD, 13.02.2017
 subroutine find_alpha_field_a(ice, partit, mesh)
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use o_param
-    use g_config
-#if defined (__icepack)
-    use icedrv_main,   only: strength
-#endif
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -1041,15 +950,6 @@ end subroutine find_alpha_field_a
 ! and Kimmritz et al., Ocean Modelling 2016
 ! SD, 14.02.2017
 subroutine stress_tensor_a(ice, partit, mesh)
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_param
-    use mod_mesh
-    use g_config
-#if defined (__icepack)
-    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
-#endif
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -1164,19 +1064,6 @@ end subroutine stress_tensor_a
 ! and Kimmritz et al., Ocean Modelling  2016
 ! SD 14.02.17
 subroutine EVPdynamics_a(ice, partit, mesh)
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use o_param
-    USE o_arrays
-    use o_PARAM
-    use g_config, only: use_cavity
-    use g_comm_auto
-    use ice_maEVP_interfaces
-#if defined (__icepack)
-    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
-#endif
     implicit none
     type(t_ice),    intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -1325,11 +1212,6 @@ end subroutine EVPdynamics_a
 ! alpha=beta, and keep different names for generality; mEVP can work with
 ! alpha \ne beta, but not aEVP).
 subroutine find_beta_field_a(ice, partit, mesh)
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    USE MOD_ICE
-    use o_param
     Implicit none
     type(t_mesh)  , intent(in)   , target :: mesh
     type(t_partit), intent(inout), target :: partit
@@ -1363,3 +1245,5 @@ end subroutine find_beta_field_a
 !
 ! ================================================================
 !
+
+end module ice_maEVP_module

@@ -1,3 +1,22 @@
+module oce_hosing_module
+    USE o_PARAM
+    USE o_ARRAYS
+    USE MOD_TRACER
+    USE MOD_PARTIT
+    USE MOD_MESH
+    USE MOD_PARSUP
+    USE g_CONFIG
+    USE g_comm_auto
+    USE g_support
+    USE o_tracers
+
+    implicit none
+
+    private
+    public :: fw_surf_anomaly, fw_depth_anomaly
+
+contains
+
 !
 ! Freshwater hosing experiments: impose a freshwater anomaly around Antarctica,
 ! either as a surface virtual salinity flux or distributed over a depth range.
@@ -5,43 +24,8 @@
 ! Both routines are opt-in and do nothing unless use_hosing is set in
 ! namelist.config. See &run_config: use_hosing, hosing_mode, hosing_hSv.
 !
-module hosing_interface
-    interface
-        subroutine fw_surf_anomaly(hSv, tracers, partit, mesh)
-        use o_PARAM
-        USE MOD_TRACER
-        USE MOD_PARTIT
-        use MOD_MESH
-        type(t_tracer), intent(in),    target :: tracers
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        real(kind=WP) , intent(in)            :: hSv
-        end subroutine fw_surf_anomaly
-
-        subroutine fw_depth_anomaly(tts, ttt, hSv, partit, mesh)
-        use o_PARAM
-        USE MOD_PARTIT
-        use MOD_MESH
-        type(t_mesh),   intent(in),    target :: mesh
-        type(t_partit), intent(inout), target :: partit
-        real(kind=WP),  intent(in)            :: hSv
-        real(kind=WP),  intent(inout)         :: tts(mesh%nl-1,partit%myDim_nod2D+partit%eDim_nod2D)
-        real(kind=WP),  intent(inout)         :: ttt(mesh%nl-1,partit%myDim_nod2D+partit%eDim_nod2D)
-        end subroutine fw_depth_anomaly
-    end interface
-end module hosing_interface
-
 subroutine fw_surf_anomaly(hSv, tracers, partit, mesh)  !!!! subroutine to apply freshwater at the surface
 
-    use o_PARAM
-    use o_ARRAYS
-    USE MOD_TRACER
-    USE MOD_PARTIT
-    use MOD_MESH
-    use MOD_PARSUP
-    USE g_CONFIG
-    use g_comm_auto
-    use g_support
     implicit none
 
     type(t_partit), intent(inout), target  :: partit
@@ -119,15 +103,6 @@ subroutine fw_surf_anomaly(hSv, tracers, partit, mesh)  !!!! subroutine to apply
 end subroutine fw_surf_anomaly
 
 subroutine fw_depth_anomaly(tts, ttt, hSv, partit, mesh) !!!! subroutine to apply freshwater at a chosen depth
-    use o_PARAM
-    use o_ARRAYS
-    USE MOD_PARTIT
-    use MOD_MESH
-    use MOD_PARSUP
-    use g_comm_auto
-    use g_support
-    use o_tracers
-    use g_config,         only: dt
     implicit none
 
     integer                               :: n, ed(2), row, k, nz, nlev1, nlev2, nzmin, nzmax, elem1, elem2
@@ -241,3 +216,5 @@ subroutine fw_depth_anomaly(tts, ttt, hSv, partit, mesh) !!!! subroutine to appl
     hosing_flux3D=mask3D*hSv
 
 end subroutine fw_depth_anomaly
+
+end module oce_hosing_module

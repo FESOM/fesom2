@@ -18,7 +18,8 @@ module oce_ale_module
     USE o_mixing_KPP_mod
     USE Toy_Channel_Soufflet
     USE Toy_Neverworld2
-    USE compute_ssh_split_explicit_interface
+    use oce_ale_ssh_splitexpl_subcycl_module, only: compute_BT_rhs_SE_vtransp, &
+            compute_BT_step_SE_ale, update_trim_vel_ale_vtransp, compute_thickness_zstar
     USE oce_ale_pressure_bv_module, only: pressure_bv, pressure_force_4_linfs, &
             pressure_force_4_zxxxx
     USE oce_ale_vel_rhs_module, only: compute_vel_rhs
@@ -26,9 +27,9 @@ module oce_ale_module
     USE write_step_info_interface
     USE check_blowup_interface
     USE ieee_arithmetic
-    USE fer_solve_interface
-    USE mle_interface
-    USE impl_vert_visc_ale_vtransp_interface
+    use oce_fer_gm_module, only: fer_solve_Gamma, fer_gamma2vel, init_Redi_GM
+    use oce_mle_module, only: mle_add_gamma
+    use oce_ale_ssh_splitexpl_subcycl_module, only: impl_vert_visc_ale_vtransp
     use oce_dyn_module, only: update_vel, viscosity_filter, check_viscopt, compute_ke_wrho, compute_apegen, compute_PePm
     use oce_ale_pressure_bv_module, only: sw_alpha_beta, compute_sigma_xy, compute_neutral_slope
 #if defined (__cvmix)
