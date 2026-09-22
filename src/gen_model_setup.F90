@@ -1,7 +1,7 @@
 ! ==============================================================
 subroutine setup_model(partit)
   USE MOD_PARTIT
-  USE MOD_PARSUP
+  use par_support_module, only: par_ex
   use o_param
 !   use i_therm_param
   use g_forcing_param
@@ -399,7 +399,7 @@ subroutine read_namelist_run_config
 
   !--------------------------------------------------------------
   USE MOD_PARTIT
-  USE MOD_PARSUP
+  use par_support_module, only: par_ex
   use g_config
   implicit none
 
@@ -424,7 +424,7 @@ subroutine get_run_steps(nsteps, partit)
   !--------------------------------------------------------------  
   use g_clock
   USE MOD_PARTIT
-  USE MOD_PARSUP
+  use par_support_module, only: par_ex
   implicit none
 
   type(t_partit), intent(inout) :: partit
@@ -473,7 +473,7 @@ end subroutine get_run_steps
 
 subroutine check_namelist_read(fileunit, nml_name, nmlfile, partit)
     use MOD_PARTIT
-    use MOD_PARSUP
+    use par_support_module, only: par_ex
     use, intrinsic :: iso_fortran_env, only: error_unit
     implicit none
     integer,          intent(in) :: fileunit

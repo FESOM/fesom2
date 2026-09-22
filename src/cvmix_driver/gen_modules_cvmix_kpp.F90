@@ -29,13 +29,14 @@ module g_cvmix_kpp
     USE MOD_DYN
     USE mod_tracer
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     USE MOD_MESH
     use o_arrays
     use g_comm_auto 
     use g_forcing_arrays
     use g_support
     use o_mixing_KPP_mod
+    use oce_density_kernels, only: densityJM_components
     implicit none
     
     !___Parameter for the init of KPP___________________________________________

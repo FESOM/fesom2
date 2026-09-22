@@ -17,7 +17,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
     use o_param
     USE MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     use g_interp
     use netcdf
     implicit none
@@ -318,7 +318,7 @@ subroutine read_other_NetCDF_3d(file, vname, zvname, model_3Darray, do_onvert, p
     use o_param
     USE MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     use g_interp
     use netcdf
     implicit none
@@ -655,7 +655,7 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
     use o_param
     USE MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     use g_rotate_grid
     use, intrinsic :: ISO_FORTRAN_ENV, only: real64
     use g_interp
@@ -780,7 +780,7 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, partit, 
   use o_param
   USE MOD_MESH
   USE MOD_PARTIT
-  USE MOD_PARSUP
+  use par_support_module, only: par_ex
   use g_rotate_grid
   use g_interp
   use netcdf

@@ -1,0 +1,177 @@
+name: PR attribution guard
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+# A pull request from a fork receives a read-only token.  The comment step is
+# explicitly limited to same-repository pull requests below.
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write
+
+concurrency:
+  group: pr-attribution-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  attribution:
+    name: Check PR commit attribution
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the trusted checker
+        uses: actions/checkout@v4
+        with:
+          # Do not execute checker code modified by the pull request itself.
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Confirm the trusted checker is available
+        id: trusted_checker
+        run: |
+          if [ -f tools/check_ai_attribution.py ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "The base branch does not yet contain the checker; this is the bootstrap PR."
+          fi
+
+      - name: Fetch pull request commit messages
+        if: steps.trusted_checker.outputs.available == 'true'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          git fetch --no-tags origin \
+            "+refs/pull/${PR_NUMBER}/head:refs/remotes/origin/pr-head"
+          merge_base=$(git merge-base "$BASE_SHA" origin/pr-head)
+          git log --format=%B%x00 "$merge_base..origin/pr-head" | tr '\0' '\n' \
+            > "$RUNNER_TEMP/pr-commit-messages"
+
+      - name: Check commit attribution
+        id: check_attribution
+        env:
+          CHECKER_AVAILABLE: ${{ steps.trusted_checker.outputs.available }}
+        run: |
+          if [ "$CHECKER_AVAILABLE" != "true" ]; then
+            echo "violation=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          set +e
+          python3 tools/check_ai_attribution.py "$RUNNER_TEMP/pr-commit-messages" \
+            2> "$RUNNER_TEMP/ai-attribution-result"
+          status=$?
+          set -e
+
+          if [ "$status" -eq 0 ]; then
+            echo "violation=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$status" -eq 1 ]; then
+            echo "violation=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          cat "$RUNNER_TEMP/ai-attribution-result" >&2
+          exit "$status"
+
+      - name: Explain how to fix the attribution
+        if: >-
+          steps.check_attribution.outputs.violation == 'true' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v7
+        env:
+          RESULT_FILE: ${{ runner.temp }}/ai-attribution-result
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- ai-attribution-guard -->';
+            const evidence = fs.readFileSync(process.env.RESULT_FILE, 'utf8')
+              .trim()
+              .split('\n')
+              .map((line) => `    ${line}`)
+              .join('\n');
+            const baseBranch = context.payload.pull_request.base.ref;
+            const body = `${marker}
+            ## Commit-message attribution needs changes
+
+            This pull request cannot be merged because one or more commit
+            messages contain attribution to an AI system. Mentions of AI tools
+            in ordinary commit text are allowed; only attribution must be
+            removed.
+
+            ### Fix it locally
+
+            If the affected commit is your latest commit:
+
+                git commit --amend
+                # Remove the prohibited attribution line, then save and close.
+                git push --force-with-lease
+
+            If the affected commit is earlier in the branch:
+
+                git fetch origin
+                git rebase -i origin/${baseBranch}
+                # Change "pick" to "reword" for the affected commit(s), remove
+                # the attribution line when Git opens each commit message, then:
+                git push --force-with-lease
+
+            To catch this before your next push, install the repository hook:
+
+                pre-commit install
+
+            ### Detected output
+
+            ${evidence}`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(
+              github.rest.issues.listComments,
+              { owner, repo, issue_number, per_page: 100 },
+            );
+            const existing = comments.find(
+              (comment) => comment.user.type === 'Bot' && comment.body.includes(marker),
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner, repo, comment_id: existing.id, body,
+              });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
+
+      - name: Remove resolved attribution notice
+        if: >-
+          steps.check_attribution.outputs.violation == 'false' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '<!-- ai-attribution-guard -->';
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const comments = await github.paginate(
+              github.rest.issues.listComments,
+              { owner, repo, issue_number, per_page: 100 },
+            );
+            const existing = comments.find(
+              (comment) => comment.user.type === 'Bot' && comment.body.includes(marker),
+            );
+
+            if (existing) {
+              await github.rest.issues.deleteComment({
+                owner, repo, comment_id: existing.id,
+              });
+            }
+
+      - name: Fail when prohibited attribution is present
+        if: steps.check_attribution.outputs.violation == 'true'
+        run: |
+          echo "Remove the prohibited AI attribution from the commit message and push again."
+          exit 1

@@ -1,77 +1,21 @@
-module ice_fct_interfaces
-    interface
-        subroutine ice_mass_matrix_fill(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice),    intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh),   intent(in),    target :: mesh
-        end subroutine ice_mass_matrix_fill
+module ice_fct_module
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_ICE
+    USE o_PARAM
+    USE g_CONFIG
+    USE g_comm_auto
+    USE MOD_TRACER
 
-        subroutine ice_solve_high_order(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice),    intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh),   intent(in),    target :: mesh
-        end subroutine ice_solve_high_order
+    implicit none
 
-        subroutine ice_solve_low_order(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice),    intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh),   intent(in),    target :: mesh
-        end subroutine ice_solve_low_order
+    private
+    public :: ice_TG_rhs, ice_fct_solve, ice_solve_low_order, &
+              ice_solve_high_order, ice_fem_fct, ice_mass_matrix_fill, &
+              ice_TG_rhs_div, ice_update_for_div
 
-        subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        integer   :: tr_array_id
-        type(t_ice),    intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh),   intent(in),    target :: mesh
-        end subroutine ice_fem_fct
+contains
 
-        subroutine ice_TG_rhs_div(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice),    intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh),   intent(in),    target :: mesh
-        end subroutine ice_TG_rhs_div
-
-        subroutine ice_TG_rhs(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice),    intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh),   intent(in),    target :: mesh
-        end subroutine ice_TG_rhs
-
-        subroutine ice_update_for_div(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice),    intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh),   intent(in),    target :: mesh
-        end subroutine ice_update_for_div
-    end interface
-end module ice_fct_interfaces
 !
 !
 !_______________________________________________________________________________
@@ -89,12 +33,6 @@ end module ice_fct_interfaces
 !
 !_______________________________________________________________________________
 subroutine ice_TG_rhs(ice, partit, mesh)
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_ICE
-    use o_PARAM
-    USE g_CONFIG
     implicit none
     type(t_ice),    intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -208,11 +146,6 @@ end subroutine ice_TG_rhs
 !
 !_______________________________________________________________________________
 subroutine ice_fct_solve(ice, partit, mesh)
-  USE MOD_ICE
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  USE MOD_MESH
-  use ice_fct_interfaces
   implicit none
   type(t_ice),    intent(inout), target :: ice
   type(t_partit), intent(inout), target :: partit
@@ -252,11 +185,6 @@ subroutine ice_solve_low_order(ice, partit, mesh)
     ! is implemented as the difference between the consistent and lumped mass
     ! matrices acting on the field from the previous time step. The consistent
     ! mass matrix on the lhs is replaced with the lumped one.
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use g_comm_auto
     implicit none
     type(t_ice),    intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -345,13 +273,6 @@ end subroutine ice_solve_low_order
 !
 !_______________________________________________________________________________
 subroutine ice_solve_high_order(ice, partit, mesh)
-    USE MOD_ICE
-    USE MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use o_PARAM
-    use g_comm_auto
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -496,12 +417,6 @@ end subroutine ice_solve_high_order
 ! Int. J. Numer. Meth. Fluids, 7 (1987), 1093--1109) as described by Kuzmin and
 ! Turek. (kuzmin@math.uni-dortmund.de)
 subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use o_PARAM
-    use g_comm_auto
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -1163,10 +1078,6 @@ end subroutine ice_fem_fct
 !_______________________________________________________________________________
 ! Used in ice_fct inherited from FESOM
 SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -1279,12 +1190,6 @@ END SUBROUTINE ice_mass_matrix_fill
 !
 !_______________________________________________________________________________
 subroutine ice_TG_rhs_div(ice, partit, mesh)
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use o_PARAM
-    USE g_CONFIG
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -1482,13 +1387,6 @@ end subroutine ice_TG_rhs_div
 !
 !_______________________________________________________________________________
 subroutine ice_update_for_div(ice, partit, mesh)
-    use MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use o_PARAM
-    use g_CONFIG
-    use g_comm_auto
     implicit none
     type(t_ice)   , intent(inout), target   :: ice
     type(t_partit), intent(inout), target   :: partit
@@ -1655,3 +1553,5 @@ subroutine ice_update_for_div(ice, partit, mesh)
 #endif
 end subroutine ice_update_for_div
 ! =============================================================
+
+end module ice_fct_module

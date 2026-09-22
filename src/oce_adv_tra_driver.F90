@@ -1,71 +1,33 @@
-! Single precision cannot resolve the per-step change of the FCT low-order solution
-! LO, so LO*hnode_new - ttf*hnode loses it. The low-order tendency is kept in flux
-! form here instead.
-module adv_lo_tend_mod
-  use o_PARAM, only: WP
-  implicit none
-  real(kind=WP), allocatable, save :: lo_tend(:,:)
-  logical,                    save :: lo_flux_form = .false.
-end module adv_lo_tend_mod
+module oce_adv_tra_driver_module
+    USE MOD_MESH
+    USE MOD_TRACER
+    USE MOD_PARTIT
+    use par_support_module, only: par_ex
+    USE MOD_DYN
+    USE g_comm_auto
+    USE diagnostics, only: ldiag_DVD
+    use oce_adv_tra_hor_module, only: adv_tra_hor_upw1, adv_tra_hor_muscl, adv_tra_hor_mfct, adv_tra_hor_spbee
+    use oce_adv_tra_ver_module, only: adv_tra_vert_impl, adv_tra_ver_upw1, adv_tra_ver_qr4c, adv_tra_ver_ppm, adv_tra_ver_cdiff, adv_tra_ver_spbee
+    USE oce_adv_tra_fct_module, only: oce_adv_tra_fct_init, oce_tra_adv_fct
+    USE o_ARRAYS
 
-module oce_adv_tra_driver_interfaces
-  interface
-   subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit, mesh)
-      use MOD_MESH
-      use MOD_TRACER
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_DYN
-      real(kind=WP),  intent(in),    target :: dt
-      integer,        intent(in)            :: tr_num
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh)  , intent(in)   , target :: mesh
-      type(t_tracer), intent(inout), target :: tracers
-      type(t_dyn)   , intent(inout), target :: dynamics
-      real(kind=WP),  intent(in)            :: vel(2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
-      real(kind=WP),  intent(in), target    :: W(mesh%nl,    partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP),  intent(in), target    :: WI(mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP),  intent(in), target    :: WE(mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
-    end subroutine do_oce_adv_tra
-  end interface
-end module oce_adv_tra_driver_interfaces
+    implicit none
 
-module oce_tra_adv_flux2dtracer_interface
-  interface
-    subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, mesh, use_lo, ttf, lo)
-      !update the solution for vertical and horizontal flux contributions
-      use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      real(kind=WP), intent(in),    target :: dt
-      type(t_partit),intent(inout), target :: partit
-      type(t_mesh),  intent(in),    target :: mesh
-      real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(inout)      :: dttf_v(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(inout)      :: flux_h(mesh%nl-1, partit%myDim_edge2D)
-      real(kind=WP), intent(inout)      :: flux_v(mesh%nl,   partit%myDim_nod2D)
-      logical,       optional           :: use_lo
-      real(kind=WP), optional           :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), optional           :: lo (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-    end subroutine oce_tra_adv_flux2dtracer
-  end interface
-end module oce_tra_adv_flux2dtracer_interface
+    ! Single precision cannot resolve the per-step change of the FCT low-order
+    ! solution LO, so LO*hnode_new - ttf*hnode loses it. The low-order tendency is
+    ! kept in flux form here instead.
+    real(kind=WP), allocatable, save :: lo_tend(:,:)
+    logical,                    save :: lo_flux_form = .false.
+
+    private
+    public :: do_oce_adv_tra, oce_tra_adv_flux2dtracer
+
+contains
+
 !
 !
 !===============================================================================
 subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit, mesh)
-    use adv_lo_tend_mod
-    use MOD_MESH
-    use MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    use g_comm_auto
-    use diagnostics, only: ldiag_DVD
-    use oce_adv_tra_hor_interfaces
-    use oce_adv_tra_ver_interfaces
-    use oce_adv_tra_fct_interfaces
-    use oce_tra_adv_flux2dtracer_interface
     implicit none
     real(kind=WP),  intent(in),    target :: dt
     integer,        intent(in)            :: tr_num
@@ -520,12 +482,6 @@ end subroutine do_oce_adv_tra
 !
 !===============================================================================
 subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, mesh, use_lo, ttf, lo)
-    use adv_lo_tend_mod
-    use MOD_MESH
-    use o_ARRAYS
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use g_comm_auto
     implicit none
     real(kind=WP), intent(in),    target :: dt
     type(t_partit),intent(inout), target :: partit
@@ -681,3 +637,5 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 #endif
 
 end subroutine oce_tra_adv_flux2dtracer
+
+end module oce_adv_tra_driver_module

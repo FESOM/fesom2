@@ -1155,8 +1155,9 @@ submodule (icedrv_main) icedrv_step
           use g_config,               only: dt
           use mod_mesh    
           use mod_ice    
-          use ice_EVPdynamics_interface
-          use ice_maEVPdynamics_interface
+          use ice_EVP_module, only: EVPdynamics
+          use ice_maEVP_module, only: EVPdynamics_a, EVPdynamics_m
+          use par_support_module, only: par_ex
           implicit none
     
           integer (kind=int_kind) :: &

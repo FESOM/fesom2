@@ -1,63 +1,23 @@
-module cavity_interfaces
-    interface
-        subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
-        USE MOD_ICE
-        USE MOD_DYN
-        USE MOD_TRACER
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_dyn)   , intent(in)   , target :: dynamics
-        type(t_tracer), intent(in)   , target :: tracers
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine cavity_heat_water_fluxes_3eq
-        
-        subroutine cavity_heat_water_fluxes_2eq(ice, tracers, partit, mesh)
-        USE MOD_ICE
-        USE MOD_TRACER
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_tracer), intent(in)   , target :: tracers
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine cavity_heat_water_fluxes_2eq
+module cavity_param_module
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE o_PARAM
+    USE MOD_TRACER
+    USE MOD_DYN
+    USE MOD_ICE
+    USE o_ARRAYS, only: heat_flux, water_flux, density_m_rho0, density_ref, stress_surf, &
+            stress_node_surf
+    USE g_config, only: cavity_gamma_scale
 
-        subroutine cavity_ice_clean_vel(ice, partit, mesh)
-        use MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice),    intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh),   intent(in),    target :: mesh
-        end subroutine cavity_ice_clean_vel
-        
-        subroutine cavity_ice_clean_ma(ice, partit, mesh)
-        use MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice),    intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh),   intent(in),    target :: mesh
-        end subroutine cavity_ice_clean_ma
-        
-        subroutine cavity_momentum_fluxes(dynamics, partit, mesh)
-        use MOD_DYN
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_dyn),    intent(in), target    :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh),   intent(in),    target :: mesh
-        end subroutine cavity_momentum_fluxes
-    end interface
-end module cavity_interfaces
+    implicit none
 
+    private
+    public :: compute_nrst_pnt2cavline, cavity_heat_water_fluxes_3eq, &
+              cavity_heat_water_fluxes_2eq, cavity_momentum_fluxes, &
+              cavity_ice_clean_vel, cavity_ice_clean_ma, &
+              dist_on_earth, potit, pttmpr, adlprt
+
+contains
 
 !
 !
@@ -67,10 +27,6 @@ end module cavity_interfaces
 ! Than compute for all cavity points (ulevels_nod2D>1), which is the closest
 ! cavity line point to that point --> use their coordinates and depth
 subroutine compute_nrst_pnt2cavline(partit, mesh)
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_PARAM , only: WP
     implicit none
 
     type(t_partit), intent(inout), target :: partit
@@ -186,14 +142,6 @@ end subroutine compute_nrst_pnt2cavline
 ! Reviewed by ?
 ! adapted by P. SCholz for FESOM2.0
 subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_TRACER
-    use MOD_DYN
-    use MOD_ICE
-    use o_PARAM , only: density_0, WP
-    use o_ARRAYS, only: heat_flux, water_flux, density_m_rho0, density_ref
     implicit none
     !___________________________________________________________________________
     type(t_partit), intent(inout), target :: partit
@@ -280,8 +228,8 @@ subroutine cavity_heat_water_fluxes_3eq(ice, dynamics, tracers, partit, mesh)
         
         gats1= sak1*vt1
         gats2= 2.12_WP*log(gats1*re)-9._WP
-        gat  = gats1/(gats2+12.5_WP*pr1)
-        gas  = gats1/(gats2+12.5_WP*sc1)
+        gat  = cavity_gamma_scale*gats1/(gats2+12.5_WP*pr1)
+        gas  = cavity_gamma_scale*gats1/(gats2+12.5_WP*sc1)
             
         !RG3417 gat  = 1.00e-4   ![m/s]  RT: to be replaced by velocity-dependent equations later
         !RG3417 gas  = 5.05e-7   ![m/s]  RT: to be replaced by velocity-dependent equations later
@@ -384,13 +332,6 @@ end subroutine cavity_heat_water_fluxes_3eq
 ! Coded by Adriana Huerta-Casas
 ! Reviewed by Qiang Wang
 subroutine cavity_heat_water_fluxes_2eq(ice, tracers, partit, mesh)
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_TRACER
-    use MOD_ICE
-    use o_PARAM , only: WP
-    use o_ARRAYS, only: heat_flux, water_flux
     implicit none
 
     type(t_partit), intent(inout), target :: partit
@@ -443,12 +384,6 @@ end subroutine cavity_heat_water_fluxes_2eq
 ! Compute the momentum fluxes under ice cavity
 ! Moved to this separated routine by Qiang, 20.1.2012
 subroutine cavity_momentum_fluxes(dynamics, partit, mesh)
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    use o_PARAM , only: density_0, C_d, WP
-    use o_ARRAYS, only: stress_surf, stress_node_surf
     implicit none
     
     !___________________________________________________________________________
@@ -497,10 +432,6 @@ end subroutine cavity_momentum_fluxes
 !
 !_______________________________________________________________________________
 subroutine cavity_ice_clean_vel(ice, partit, mesh)
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
     implicit none
     type(t_ice),    intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -529,10 +460,6 @@ end subroutine cavity_ice_clean_vel
 !
 !_______________________________________________________________________________
 subroutine cavity_ice_clean_ma(ice, partit, mesh)
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
     implicit none
     type(t_ice),    intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -566,7 +493,6 @@ subroutine dist_on_earth(lon1, lat1, lon2, lat2, dist)
   ! distance on the earth between two points
   ! input: lon1 lat2 and lon2 lat2 in radian
   ! output: dist in m
-  use o_param
   implicit none
   real(kind=WP)  :: lon1, lat1, lon2, lat2, alpha1, dist
 
@@ -581,10 +507,9 @@ end subroutine dist_on_earth
 ! [oC] (TIN) bezogen auf den in-situ Druck[dbar] (PRES) mit Hilfe
 ! eines Iterationsverfahrens aus.
 subroutine potit(salz,pt,pres,rfpres,tin)
-    use o_PARAM , only: WP
     integer iter
     real(kind=WP) :: salz,pt,pres,rfpres,tin
-    real(kind=WP) :: epsi, pt1,ptd,pttmpr
+    real(kind=WP) :: epsi, pt1,ptd
 
      real(kind=WP), parameter :: tpmd=0.001_WP
 
@@ -614,11 +539,9 @@ end subroutine potit
 !            PRES   = 10000.000 dbar
 !            RFPRES =     0.000 dbar
 real(kind=WP) function pttmpr(salz,temp,pres,rfpres)
-    use o_PARAM , only: WP
 
     real(kind=WP) :: salz,temp,pres,rfpres
     real(kind=WP) :: p,t,dp,dt,q
-    real(kind=WP) :: adlprt
     real(kind=WP), parameter :: ct2  =  0.29289322_WP
     real(kind=WP), parameter :: ct3  =  1.707106781_WP
     real(kind=WP), parameter :: cq2a =  0.58578644_WP
@@ -658,7 +581,6 @@ end function pttmpr
 !            PRES   = 10000.000 dbar
 real(kind=WP) function adlprt(salz,temp,pres)
   
-  use o_PARAM , only: WP
   real(kind=WP) :: salz,temp,pres, ds
   real(kind=WP), parameter :: s0 = 35.0
   real(kind=WP), parameter :: a0 =  3.5803E-5
@@ -683,3 +605,5 @@ real(kind=WP) function adlprt(salz,temp,pres)
        + ( (c3*temp + c2)*temp + c1 )*temp + c0 ) )*pres   &
        + (b1*temp + b0)*ds +  ( (a3*temp + a2)*temp + a1 )*temp + a0
 end function adlprt
+
+end module cavity_param_module

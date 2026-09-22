@@ -8,8 +8,7 @@ on:
       - opened
       - synchronize
       - reopened
-    branches:
-      - main
+    # No branch filter: runs on pull requests into main and on stacked ones.
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   general_test:

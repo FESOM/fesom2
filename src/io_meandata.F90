@@ -1,6 +1,6 @@
 module io_MEANDATA
   USE MOD_PARTIT
-  USE MOD_PARSUP
+  use par_support_module, only: par_ex
 #if defined(__recom)
   use recom_glovar
   use recom_config
@@ -518,7 +518,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     use MOD_MESH
     use MOD_TRACER
     use MOD_PARTIT
-    use MOD_PARSUP
+    use par_support_module, only: par_ex
     use MOD_DYN
     use MOD_ICE
     use o_ARRAYS       
@@ -597,6 +597,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
           "benC                ", "benCalc             ", "benN                ", &
           "benSi               ", "beta                ", "bolus_u             ", &
           "bolus_v             ", "bolus_w             ", "calcdiss            ", &
+          "mle_psi             ", &
           "calcif              ", "cfl_z               ", "Chldegc             ", &
           "Chldegd             ", "Chldegn             ", "CO2_aq              ", "CO2f                ", "CO3                 ", &
           "curl_surf           ", "dens_flux           ", "d_eta               ", &
@@ -1908,6 +1909,10 @@ CASE ('slope_y   ')
 CASE ('slope_z   ')
     call def_stream((/nl-1,  nod2D/), (/nl-1, myDim_nod2D/),  'slope_z',   'neutral slope Z',    'none', neutral_slope(3,:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 
+CASE ('mle_psi   ')
+    if (use_mle) then
+    call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'mle_psi',   'Fox-Kemper MLE streamfunction', 'm2/s', mle_psi(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
 CASE ('N2        ')
     call def_stream((/nl,    nod2D/), (/nl,   myDim_nod2D/),  'N2',        'brunt väisälä',      '1/s2', bvfreq(:,:),          io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 CASE ('Kv        ')
@@ -2760,7 +2765,7 @@ end function stream0D_already_defined
 function mesh_dimname_from_dimsize(size, partit, mesh) result(name)
     use mod_mesh
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     use diagnostics
 #if defined (__icepack)
     use icedrv_main,   only: ncat ! number of ice thickness cathegories
@@ -2823,7 +2828,7 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     use g_clock
     use mod_mesh
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     USE MOD_DYN
     USE MOD_ICE
     use fesom_version_info_module
@@ -3507,7 +3512,7 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     use g_clock
     use mod_mesh
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     use MOD_DYN
     use MOD_ICE
     use mod_tracer
@@ -3840,7 +3845,7 @@ end subroutine
 subroutine output_0D_streams(istep, partit)
     use g_clock
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     implicit none
     integer, intent(in) :: istep
     type(t_partit), intent(inout) :: partit
@@ -4023,7 +4028,7 @@ end subroutine create_0D_file
 subroutine do_output_callback(entry_index)
     use mod_mesh
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     integer, intent(in) :: entry_index ! index of variable in def_stream array 
     ! EO args
     type(Meandata), pointer :: entry
@@ -4146,7 +4151,7 @@ end subroutine
 subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, partit, mesh, flip_array, long_description)
   use mod_mesh
   USE MOD_PARTIT
-  USE MOD_PARSUP
+  use par_support_module, only: par_ex
   use g_cvmix_idemix2, only: idemix2_nfbin
   implicit none
   type(t_partit),        intent(inout), target :: partit
@@ -4239,7 +4244,7 @@ end subroutine
 subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, partit, mesh, long_description)
   use mod_mesh
   USE MOD_PARTIT
-  USE MOD_PARSUP
+  use par_support_module, only: par_ex
   implicit none
   integer,               intent(in)    :: glsize, lcsize
   character(len=*),      intent(in)    :: name, description, units
@@ -4310,7 +4315,7 @@ end subroutine
 ! build 0D (scalar) meandata streaming object for global values
 subroutine def_stream0D(name, description, units, data, freq, freq_unit, accuracy, partit, long_description)
   USE MOD_PARTIT
-  USE MOD_PARSUP
+  use par_support_module, only: par_ex
   use g_clock
   implicit none
   character(len=*),      intent(in)    :: name, description, units
@@ -4406,7 +4411,7 @@ end subroutine
 subroutine def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh, long_description)
     use mod_mesh
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     use io_netcdf_workaround_module
     type(Meandata), intent(inout) :: entry
     character(len=*),      intent(in)    :: name, description, units

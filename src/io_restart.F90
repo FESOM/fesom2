@@ -11,7 +11,6 @@ MODULE io_RESTART
   use MOD_DYN
   use MOD_MESH
   use MOD_PARTIT
-  use MOD_PARSUP
   use fortran_utils
   use mpi
 #if defined(__icepack)
@@ -26,6 +25,9 @@ MODULE io_RESTART
   use recom_glovar
   use recom_config
   use recom_ciso
+#endif
+#if defined(__recom) && defined(__usetp)
+  use oce_ale_tracer_module, only: calc_slice
 #endif
   
   implicit none
