@@ -128,6 +128,7 @@ contains
         use g_comm_auto
         use o_ARRAYS
         use g_rotate_grid
+        use oce_mesh_module, only: elem_center, edge_center
 
         IMPLICIT NONE
         type(t_mesh),   intent(in), target :: mesh

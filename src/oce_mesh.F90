@@ -1,148 +1,25 @@
-module read_mesh_interface
-  interface
-    subroutine read_mesh(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine read_mesh
-  end interface
-end module read_mesh_interface
-module find_levels_interface
-  interface
-    subroutine find_levels(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine find_levels
-  end interface
-end module find_levels_interface
-module find_levels_cavity_interface
-  interface
-    subroutine find_levels_cavity(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine find_levels_cavity
-  end interface
-end module find_levels_cavity_interface
-module test_tri_interface
-  interface
-    subroutine test_tri(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine test_tri
-  end interface
-end module test_tri_interface
-module load_edges_interface
-  interface
-    subroutine load_edges(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine load_edges
-  end interface
-end module load_edges_interface
-module find_neighbors_interface
-  interface
-    subroutine find_neighbors(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine find_neighbors
-  end interface
-end module find_neighbors_interface
-module mesh_areas_interface
-  interface
-    subroutine mesh_areas(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine mesh_areas
-  end interface
-end module mesh_areas_interface
-module elem_center_interface
-  interface
-    subroutine elem_center(elem, x, y, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      integer       :: elem    
-      real(kind=WP), intent(inout) :: x, y
-      type(t_mesh),  intent(in),    target :: mesh
-    end subroutine elem_center
-  end interface
-end module elem_center_interface
-module edge_center_interface
-  interface
-    subroutine edge_center(n1, n2, x, y, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      integer                     :: n1, n2
-      real(kind=WP), intent(inout):: x, y
-      type(t_mesh),  intent(in),    target :: mesh
-    end subroutine edge_center
-  end interface
-end module edge_center_interface
-module mesh_auxiliary_arrays_interface
-  interface
-    subroutine mesh_auxiliary_arrays(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine mesh_auxiliary_arrays
-  end interface
-end module mesh_auxiliary_arrays_interface
-module find_levels_min_e2n_interface
-  interface
-    subroutine find_levels_min_e2n(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine find_levels_min_e2n
-  end interface
-end module find_levels_min_e2n_interface
-module check_total_volume_interface
-  interface
-    subroutine check_total_volume(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine check_total_volume
-  end interface
-end module check_total_volume_interface
-module check_cavity_mesh_conflict_interface
-  interface
-    subroutine check_cavity_mesh_conflict(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine check_cavity_mesh_conflict
-  end interface
-end module check_cavity_mesh_conflict_interface
+module oce_mesh_module
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_PARSUP
+    USE g_config
+    USE g_ROTATE_grid
+    USE par_support_interfaces
+    USE iso_fortran_env, only: error_unit
+    USE o_PARAM
+    USE o_ARRAYS
+    USE g_comm_auto
+
+    implicit none
+
+    private
+    public :: mesh_setup, read_mesh, find_levels, find_levels_cavity, &
+              find_levels_min_e2n, test_tri, load_edges, &
+              find_neighbors, edge_center, elem_center, mesh_areas, &
+              mesh_auxiliary_arrays, check_mesh_consistency, &
+              check_total_volume, check_cavity_mesh_conflict
+
+contains
 
 ! Driving routine. The distributed mesh information and mesh proper 
 ! are read from files.
@@ -151,22 +28,6 @@ end module check_cavity_mesh_conflict_interface
 ! Array sizes vary (sometimes we need only myDim, yet sometimes more)! 
 ! S. Danilov, 2012
 SUBROUTINE mesh_setup(partit, mesh)
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP
-USE g_config, only: flag_debug
-USE g_ROTATE_grid
-use read_mesh_interface
-use find_levels_interface
-use check_cavity_mesh_conflict_interface
-use find_levels_cavity_interface
-use mesh_auxiliary_arrays_interface
-use test_tri_interface
-use load_edges_interface
-use find_levels_min_e2n_interface
-use find_neighbors_interface
-use mesh_areas_interface
-use par_support_interfaces
 IMPLICIT NONE
       type(t_mesh),   intent(inout)         :: mesh
       type(t_partit), intent(inout), target :: partit
@@ -219,14 +80,6 @@ END SUBROUTINE mesh_setup
 ! Reads distributed mesh
 ! The mesh will be read only by 0 proc and broadcasted to the others.
 SUBROUTINE read_mesh(partit, mesh)
-use iso_fortran_env, only: error_unit
-USE o_PARAM
-USE g_CONFIG
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP
-USE o_ARRAYS
-USE g_rotate_grid 
 IMPLICIT NONE
 type(t_mesh),   intent(inout), target :: mesh
 type(t_partit), intent(inout), target :: partit
@@ -939,11 +792,6 @@ CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
 ! partitioning
 !_______________________________________________________________________________
 subroutine find_levels(partit, mesh)
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_PARAM
-    use g_config
     !
     implicit none
     !
@@ -1141,11 +989,6 @@ end subroutine find_levels
 ! use_cavity=.True.
 !_______________________________________________________________________________
 subroutine find_levels_cavity(partit, mesh)
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_PARAM
-    use g_config
     !
     implicit none
     !
@@ -1654,12 +1497,6 @@ end subroutine find_levels_cavity
 ! use_cavity=.True.
 !_______________________________________________________________________________
 subroutine find_levels_min_e2n(partit, mesh)
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_PARAM
-    use g_config
-    use g_comm_auto
     !
     implicit none
     !
@@ -1697,12 +1534,6 @@ end subroutine find_levels_min_e2n
 !
 !===========================================================================
 SUBROUTINE test_tri(partit, mesh)
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP
-USE o_PARAM
-USE g_CONFIG
-use g_rotate_grid
 IMPLICIT NONE
 ! Check the order of nodes in triangles; correct it if necessary to make
 ! it same sense (clockwise) 
@@ -1749,11 +1580,6 @@ real(kind=WP)               :: t0, t1
 END SUBROUTINE  test_tri
 !=========================================================================
 SUBROUTINE load_edges(partit, mesh)
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP
-USE o_PARAM
-USE g_CONFIG
 IMPLICIT NONE
 type(t_mesh),   intent(inout), target :: mesh
 type(t_partit), intent(inout), target :: partit
@@ -1990,13 +1816,6 @@ SUBROUTINE find_neighbors(partit, mesh)
 ! nod_in_elem2D(:, myDim_nod2D)
 ! 
 
-USE o_PARAM
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP
-USE g_ROTATE_grid
-use g_comm_auto
-use elem_center_interface
 implicit none
 type(t_mesh),   intent(inout), target :: mesh
 type(t_partit), intent(inout), target :: partit
@@ -2139,9 +1958,6 @@ END SUBROUTINE find_neighbors
 !==========================================================================
 subroutine edge_center(n1, n2, x, y, mesh)
 
-USE MOD_MESH
-USE o_PARAM
-USE g_CONFIG 
 implicit none
 integer                        :: n1, n2   ! nodes of the edge
 real(kind=WP),  intent(inout)  :: x, y
@@ -2158,9 +1974,6 @@ y=0.5_WP*(a(2)+b(2))
 end subroutine edge_center
 !==========================================================================
 subroutine elem_center(elem, x, y, mesh)
-USE MOD_MESH
-USE o_PARAM
-USE g_CONFIG  
 implicit none
 real(kind=WP), intent(inout) :: x, y
 type(t_mesh),  intent(in),    target :: mesh
@@ -2180,13 +1993,6 @@ real(kind=WP)                ::  ax(3), amin
 end subroutine elem_center
 !==========================================================================
 SUBROUTINE mesh_areas(partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE o_PARAM
-    USE o_arrays, only: dum_3d_n
-    USE g_ROTATE_GRID
-    use g_comm_auto
     IMPLICIT NONE
     ! Collects auxilliary information on the mesh
     ! Allocated and filled in are:
@@ -2471,16 +2277,6 @@ SUBROUTINE mesh_auxiliary_arrays(partit, mesh)
 ! elem_cos(myDim_elem2D+eDim_elem2D)
 ! coriolis(myDim_elem2D)
 
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP
-USE o_PARAM
-USE o_ARRAYS
-USE g_CONFIG, only: rotated_grid, force_rotation, metric_factor_zero
-USE g_ROTATE_grid
-use g_comm_auto
-use elem_center_interface
-use edge_center_interface
 IMPLICIT NONE
 
 integer              :: n,j,q, elnodes(3), ed(2), elem, el(2), elnodes_(3),node
@@ -2830,12 +2626,6 @@ END SUBROUTINE mesh_auxiliary_arrays
 !
 !_______________________________________________________________________________
 SUBROUTINE check_mesh_consistency(partit, mesh)
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP
-USE o_PARAM
-USE g_ROTATE_GRID
-  use g_comm_auto
 IMPLICIT NONE
 ! Collects auxilliary information on the mesh
 ! Allocated and filled in are:
@@ -2886,12 +2676,6 @@ END SUBROUTINE check_mesh_consistency
 !
 !_______________________________________________________________________________
 subroutine check_total_volume(partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE o_PARAM
-    use g_comm_auto
-    use o_ARRAYS
     
     IMPLICIT NONE
     type(t_mesh),   intent(inout), target :: mesh
@@ -2946,10 +2730,6 @@ end subroutine check_total_volume
 ! likely unintended
 !_______________________________________________________________________________
 subroutine check_cavity_mesh_conflict(partit, mesh)
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use g_config
     implicit none
     type(t_mesh),   intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
@@ -2985,3 +2765,5 @@ end subroutine check_cavity_mesh_conflict
 !
 !
 !_______________________________________________________________________________
+
+end module oce_mesh_module

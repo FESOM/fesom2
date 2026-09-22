@@ -27,6 +27,9 @@ MODULE io_RESTART
   use recom_config
   use recom_ciso
 #endif
+#if defined(__recom) && defined(__usetp)
+  use oce_ale_tracer_module, only: calc_slice
+#endif
   
   implicit none
   public :: read_initial_conditions, write_initial_conditions, finalize_restart

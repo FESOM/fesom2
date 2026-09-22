@@ -1,52 +1,30 @@
-
-module compute_vel_rhs_interface
-    interface
-        subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
-        USE MOD_ICE
-        USE MOD_DYN
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine compute_vel_rhs
-    end interface
-end module compute_vel_rhs_interface
-
-module momentum_adv_scalar_interface
-    interface
-        subroutine momentum_adv_scalar(dynamics, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine momentum_adv_scalar
-    end interface
-end module momentum_adv_scalar_interface
-
-!
-!
-!_______________________________________________________________________________
-subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
+module oce_ale_vel_rhs_module
     USE MOD_ICE
     USE MOD_DYN
     USE MOD_PARTIT
     USE MOD_PARSUP
     USE MOD_MESH
-    use o_ARRAYS, only: ssh_gp, pgf_x, pgf_y
-    use o_PARAM
-    use g_CONFIG
-    use g_forcing_param, only: use_virt_salt
-    use g_forcing_arrays, only: press_air
-    use g_comm_auto
-    use g_sbf, only: l_mslp
-    use momentum_adv_scalar_interface
-    use momentum_adv_scalar_transpv_interface
+    USE o_ARRAYS, only: ssh_gp, pgf_x, pgf_y
+    USE o_PARAM
+    USE g_CONFIG
+    USE g_forcing_param, only: use_virt_salt
+    USE g_forcing_arrays, only: press_air
+    USE g_comm_auto
+    USE g_sbf, only: l_mslp
+    USE momentum_adv_scalar_transpv_interface
+    use oce_dyn_module, only: viscosity_filter
+
+    implicit none
+
+    private
+    public :: compute_vel_rhs, momentum_adv_scalar
+
+contains
+
+!
+!
+!_______________________________________________________________________________
+subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
     implicit none 
     type(t_ice)   , intent(inout), target :: ice
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -333,12 +311,6 @@ END SUBROUTINE compute_vel_rhs
 ! Momentum advection on scalar control volumes with ALE adaption--> exchange zinv(nz)
 ! against hnode(nz,node)
 subroutine momentum_adv_scalar(dynamics, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_DYN
-    USE o_PARAM
-    use g_comm_auto
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -601,3 +573,4 @@ end subroutine momentum_adv_scalar
 
 ! ===================================================================
 
+end module oce_ale_vel_rhs_module

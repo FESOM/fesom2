@@ -547,7 +547,7 @@ CONTAINS
       !!              
       !! ** Purpose : read 3D initial conditions for tracers from netcdf and interpolate on model grid
       !!----------------------------------------------------------------------
-      USE insitu2pot_interface
+      use oce_ale_pressure_bv_module, only: insitu2pot
       USE ieee_arithmetic
       IMPLICIT NONE
       type(t_mesh),   intent(in),    target   :: mesh

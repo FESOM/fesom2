@@ -36,6 +36,7 @@ module g_cvmix_kpp
     use g_forcing_arrays
     use g_support
     use o_mixing_KPP_mod
+    use oce_density_kernels, only: densityJM_components
     implicit none
     
     !___Parameter for the init of KPP___________________________________________
