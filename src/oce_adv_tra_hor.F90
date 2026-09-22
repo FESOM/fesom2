@@ -855,7 +855,7 @@ subroutine adv_tra_hor_spbee(             &
 !$OMP                                  nz, nl1, nl2, nl12, nu1, nu2, nu12, nzs, nze, &
 !$OMP                                  dx1, dy1, dx2, dy2, dxdy12, dx0, dy0, &
 !$OMP                                  vflux, cfl, dt_over_edlen, T12vflux,  &
-!$OMP                                  u1, u2, v1, v2, n_x, n_y, Ue)
+!$OMP                                  u1, u2, v1, v2, n_x, n_y, Ue, nlen, inv_nlen)
 !$OMP DO        
     do edge=1, myDim_edge2D
         !_______________________________________________________________________

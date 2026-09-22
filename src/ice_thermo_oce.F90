@@ -184,7 +184,7 @@ subroutine thermodynamics(ice, partit, mesh)
     ! Friction velocity 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, elem, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rsss, rsf, evap_in, ug, ustar, T_oc, S_oc, &
 !$OMP                                  h_ml, t, ch, ce, ch_i, ce_i, fw, ehf, evap, ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout,    &
-!$OMP                                  subli, lid_clo, lat, geolon, geolat, o2ihf)
+!$OMP                                  subli, lid_clo, lat, geolon, geolat, o2ihf, fwice, fwsnw, ithdgra)
 !$OMP DO
     do i=1, myDim_nod2D
         ustar=0.0_WP

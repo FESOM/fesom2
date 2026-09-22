@@ -345,17 +345,9 @@ subroutine integrate_nod_2D(data, int2D, partit, mesh)
 #include "associate_mesh_ass.h" 
 
 lval=0.0_WP_full
-#if !defined(__openmp_reproducible)
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row)
-!$OMP DO REDUCTION (+: lval)
-#endif
   do row=1, myDim_nod2D
      lval=lval+data(row)*areasvol(ulevels_nod2D(row),row)
   end do
-#if !defined(__openmp_reproducible) 
-!$OMP END DO
-!$OMP END PARALLEL
-#endif
   int2D=0.0_WP
   gval=0.0_WP_full
   ! reduce into a WP_full buffer and round once: MPI must not write a real64

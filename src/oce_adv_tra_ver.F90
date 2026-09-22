@@ -37,7 +37,7 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh)
 #include "associate_mesh_ass.h"
 
     dt_inv=1.0_WP/dt
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(a, b, c, tr, cp, tp, n, nz, nzmax, nzmin, m, zinv, dz, c1, v_adv)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(a, b, c, tr, cp, tp, n, nz, nzmax, nzmin, m, zinv, dz, c1, v_adv, zbar_n, z_n)
 !$OMP DO
     !___________________________________________________________________________
     ! loop over local nodes
