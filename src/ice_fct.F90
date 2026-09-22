@@ -39,7 +39,7 @@ subroutine ice_TG_rhs(ice, partit, mesh)
     type(t_mesh),   intent(in),    target :: mesh
     !___________________________________________________________________________
     real(kind=WP)   :: diff, entries(3),  um, vm, vol, dx(3), dy(3)
-    integer         :: n, q, row, elem, elnodes(3)
+    integer         :: n, q, j, row, elem, elnodes(3)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
@@ -67,7 +67,7 @@ subroutine ice_TG_rhs(ice, partit, mesh)
     !___________________________________________________________________________
     ! Taylor-Galerkin (Lax-Wendroff) rhs
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, q, row, elem, elnodes, diff, entries,  um, vm, vol, dx, dy)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, q, j, row, elem, elnodes, diff, entries,  um, vm, vol, dx, dy)
 !$OMP DO
 #else
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
@@ -89,11 +89,54 @@ subroutine ice_TG_rhs(ice, partit, mesh)
     ! Velocities at nodes
 
 
+    ! Each owned row gathers the contributions of its elements (nod_in_elem2D);
+    ! n is the corner of the element that the row is. No thread writes a row it
+    ! does not own, and the sums do not depend on the number of threads.
 #ifndef ENABLE_OPENACC
 !$OMP DO
+    do row=1, myDim_nod2D
+        do j=1, nod_in_elem2D_num(row)
+            elem=nod_in_elem2D(j,row)
+            elnodes=elem2D_nodes(:,elem)
+            !_______________________________________________________________________
+            ! if cavity element skip it
+            if (ulevels(elem)>1) cycle
+
+            !derivatives
+            dx=gradient_sca(1:3,elem)
+            dy=gradient_sca(4:6,elem)
+            vol=elem_area(elem)
+            !um=sum(U_ice(elnodes))/3.0_WP
+            !vm=sum(V_ice(elnodes))/3.0_WP
+            um=sum(U_ice(elnodes))
+            vm=sum(V_ice(elnodes))
+
+            !diffusivity
+            diff=ice%ice_diff*sqrt(elem_area(elem)/scale_area)
+            n=1
+            if (elnodes(2)==row) n=2
+            if (elnodes(3)==row) n=3
+            DO q = 1,3
+                !entries(q)= vol*dt*((dx(n)*um+dy(n)*vm)/3.0_WP - &
+                !            diff*(dx(n)*dx(q)+ dy(n)*dy(q))- &
+                !	       0.5*dt*(um*dx(n)+vm*dy(n))*(um*dx(q)+vm*dy(q)))
+                entries(q)= vol*ice%ice_dt*((dx(n)*(um+u_ice(elnodes(q)))+ &
+                            dy(n)*(vm+v_ice(elnodes(q))))/12.0_WP - &
+                            diff*(dx(n)*dx(q)+ dy(n)*dy(q))- &
+                            0.5_WP*ice%ice_dt*(um*dx(n)+vm*dy(n))*(um*dx(q)+vm*dy(q))/9.0_WP)
+            END DO
+            rhs_m(row)=rhs_m(row)+sum(entries*m_ice(elnodes))
+            rhs_a(row)=rhs_a(row)+sum(entries*a_ice(elnodes))
+            rhs_ms(row)=rhs_ms(row)+sum(entries*m_snow(elnodes))
+#if defined (__oifs) || defined (__ifsinterface)
+            rhs_temp(row)=rhs_temp(row)+sum(entries*ice_temp(elnodes))
+#endif
+        end do ! --> do j=1, nod_in_elem2D_num(row)
+    end do ! --> do row=1, myDim_nod2D
+!$OMP END DO
+!$OMP END PARALLEL
 #else
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) private(n, q, row, elem, elnodes, diff, entries,  um, vm, vol, dx, dy)
-#endif
     do elem=1,myDim_elem2D          !assembling rhs over elements
         elnodes=elem2D_nodes(:,elem)
         !_______________________________________________________________________
@@ -135,10 +178,6 @@ subroutine ice_TG_rhs(ice, partit, mesh)
 	!$ACC END LOOP
     end do
 
-#ifndef ENABLE_OPENACC
-!$OMP END DO
-!$OMP END PARALLEL
-#else
     !$ACC END PARALLEL LOOP
 #endif
 end subroutine ice_TG_rhs
