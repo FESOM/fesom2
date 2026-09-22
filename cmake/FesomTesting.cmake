@@ -413,7 +413,7 @@ endfunction()
 # Function to add a FESOM integration test with custom options
 function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH RUN_LENGTH_UNIT RESTART_LENGTH RESTART_LENGTH_UNIT LOGFILE_OUTFREQ FORCE_ROTATION USE_CAVITY)
     set(options MPI_TEST)
-    set(oneValueArgs NP TIMEOUT LABEL MIX_SCHEME FORCING FORCING_YEAR LEAPYEAR)
+    set(oneValueArgs NP TIMEOUT LABEL MIX_SCHEME FORCING FORCING_YEAR LEAPYEAR USE_ICE)
     # EXTRA_SUCCESS_MARKERS: literal strings that must ALL appear in the run log for
     # the test to pass, on top of the clean-exit marker. Use these to pin behaviour
     # that would otherwise rot silently -- a diagnostic block that stops being
@@ -600,6 +600,16 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
         file(READ "${TEST_RUN_DIR}/namelist.config" _cfg_content)
         string(REGEX REPLACE "([^A-Za-z0-9_])include_fleapyear[ \t]*=[ \t]*\\.[a-zA-Z]+\\."
                "\\1include_fleapyear=.true." _cfg_content "${_cfg_content}")
+        file(WRITE "${TEST_RUN_DIR}/namelist.config" "${_cfg_content}")
+    endif()
+
+    # Optional: run without the sea-ice model. The key is matched with the '='
+    # required, so the use_ice* keys in &icebergs (use_icebergs,
+    # use_icesheet_coupling) cannot match.
+    if(DEFINED FESOM_TEST_USE_ICE)
+        file(READ "${TEST_RUN_DIR}/namelist.config" _cfg_content)
+        string(REGEX REPLACE "([^A-Za-z0-9_])use_ice[ \t]*=[ \t]*\\.[a-zA-Z]+\\."
+               "\\1use_ice=${FESOM_TEST_USE_ICE}" _cfg_content "${_cfg_content}")
         file(WRITE "${TEST_RUN_DIR}/namelist.config" "${_cfg_content}")
     endif()
 
