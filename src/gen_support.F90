@@ -391,25 +391,13 @@ subroutine integrate_nod_3D(data, int3D, partit, mesh)
 #include "associate_mesh_ass.h" 
 
   lval=0.0_WP_full
-#if defined(__openmp_reproducible)
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row, k, lval_row) ORDERED
-#else
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row, k, lval_row) REDUCTION(+: lval)
-#endif
   do row=1, myDim_nod2D
      lval_row = 0.0_WP_full
      do k=ulevels_nod2D(row), nlevels_nod2D(row)-1
         lval_row=lval_row+data(k, row)*areasvol(k,row)*hnode_new(k,row)  ! --> TEST_cavity
      end do
-#if defined(__openmp_reproducible)
-!$OMP ORDERED
-#endif
      lval = lval + lval_row
-#if defined(__openmp_reproducible)
-!$OMP END ORDERED
-#endif
   end do
-!$OMP END PARALLEL DO
 
   int3D=0.0_WP
   gval=0.0_WP_full
@@ -739,17 +727,9 @@ FUNCTION omp_min_max_sum1(arr, pos1, pos2, what, partit, nan)
   SELECT CASE (trim(what))
     CASE ('sum')
        val=0.0_WP
-#if !defined(__openmp_reproducible)
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n)
-!$OMP DO REDUCTION(+: val)
-#endif
        do n=pos1, pos2
           val=val+arr(n)
        end do
-#if !defined(__openmp_reproducible)
-!$OMP END DO
-!$OMP END PARALLEL
-#endif
 
     CASE ('min')
        val=arr(1)
@@ -829,13 +809,11 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
       if (.not. present(nan)) vmasked=huge(vmasked) !just some crazy number
       val=0.
 #if  !defined(__openmp_reproducible)
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i, j) REDUCTION(+: val)
       do j=pos21, pos22
          do i=pos11, pos12
             if (arr(i,j)/=vmasked) val=val+arr(i,j)
          end do
       end do
-!$OMP END PARALLEL DO
 #else
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(j) 
       do j=pos21, pos22
@@ -879,26 +857,14 @@ subroutine integrate_elem_3D(data, int3D, partit, mesh)
 #include "associate_mesh_ass.h" 
 
   lval=0.0_WP_full
-#if defined(__openmp_reproducible)
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row, k, lval_row) ORDERED
-#else
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row, k, lval_row) REDUCTION(+: lval)
-#endif
   do row=1, myDim_elem2D
      if(elem2D_nodes(1, row) > myDim_nod2D) cycle
      lval_row = 0.0_WP_full
      do k=ulevels(row), nlevels(row)-1
         lval_row=lval_row+data(k, row)*elem_area(row)*helem(k,row)
      end do
-#if defined(__openmp_reproducible)
-!$OMP ORDERED
-#endif
      lval = lval + lval_row
-#if defined(__openmp_reproducible)
-!$OMP END ORDERED
-#endif
   end do
-!$OMP END PARALLEL DO
 
   int3D=0.0_WP
   gval=0.0_WP_full
@@ -933,22 +899,10 @@ subroutine integrate_elem_2D(data, int2D, partit, mesh)
 #include "associate_mesh_ass.h" 
 
   lval=0.0_WP_full
-#if defined(__openmp_reproducible)
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) ORDERED
-#else
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) REDUCTION(+: lval)
-#endif
   do row=1, myDim_elem2D
      if(elem2D_nodes(1, row) > myDim_nod2D) cycle
-#if defined(__openmp_reproducible)
-!$OMP ORDERED
-#endif
      lval = lval + data(row)*elem_area(row)
-#if defined(__openmp_reproducible)
-!$OMP END ORDERED
-#endif
   end do
-!$OMP END PARALLEL DO
 
   int2D=0.0_WP
   gval=0.0_WP_full
