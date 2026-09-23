@@ -551,19 +551,38 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 #else
     !$ACC END PARALLEL LOOP
 #endif
-    ! Horizontal
+    ! Horizontal: each node gathers the fluxes of its incident edges (mesh%nod_in_edge2D,
+    ! sign +1 for the edge's first node, -1 for its second). No two threads write the same
+    ! node, and the summation order per node is the ascending edge order at any thread count.
 #ifndef ENABLE_OPENACC
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
 !$OMP DO
-#endif
+    do n=1, myDim_nod2D+eDim_nod2D
+        do k=1, mesh%nod_in_edge2D_num(n)
+            edge=mesh%nod_in_edge2D(k,n)
+            el=edge_tri(:,edge)
+            nl1=nlevels(el(1))-1
+            nu1=ulevels(el(1))
+            nl2=0
+            nu2=0
+            if(el(2)>0) then
+                nl2=nlevels(el(2))-1
+                nu2=ulevels(el(2))
+            end if
+            nl12 = max(nl1,nl2)
+            nu12 = nu1
+            if (nu2>0) nu12 = min(nu1,nu2)
+            do nz=nu12, nl12
+                dttf_h(nz,n)=dttf_h(nz,n)+mesh%nod_in_edge2D_sgn(k,n)*flux_h(nz,edge)*dt/areasvol(nz,n)
+            end do
+        end do
+    end do
+!$OMP END DO
+!$OMP END PARALLEL
 #else
 #if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #else
     !$ACC UPDATE SELF(dttf_h, flux_h)
-#endif
 #endif
     do edge=1, myDim_edge2D
         enodes(1:2)=edges(:,edge)
@@ -625,10 +644,6 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 #endif
     end do
 
-#ifndef ENABLE_OPENACC
-!$OMP END DO
-!$OMP END PARALLEL
-#else
 #if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC END PARALLEL LOOP
 #else
