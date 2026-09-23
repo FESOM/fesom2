@@ -1907,6 +1907,33 @@ CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
  END DO
  deallocate(temp_i)
 
+ ! == edges incident to node n, in ascending edge order, with the orientation sign
+ ! (+1 if n is edges(1,ed), -1 if edges(2,ed)). Lets a node gather the contributions
+ ! of its own edges so that no two threads write the same node and the summation
+ ! order is fixed by the mesh. Edges 1..myDim_edge2D include every edge with an
+ ! owned node, so the list is complete for owned nodes and partial for halo nodes.
+ allocate(mesh%nod_in_edge2D_num(myDim_nod2D+eDim_nod2D))
+ mesh%nod_in_edge2D_num=0
+ do n=1,myDim_edge2D
+    do j=1,2
+       node=mesh%edges(j,n)
+       mesh%nod_in_edge2D_num(node)=mesh%nod_in_edge2D_num(node)+1
+    end do
+ end do
+ allocate(mesh%nod_in_edge2D    (maxval(mesh%nod_in_edge2D_num),myDim_nod2D+eDim_nod2D))
+ allocate(mesh%nod_in_edge2D_sgn(maxval(mesh%nod_in_edge2D_num),myDim_nod2D+eDim_nod2D))
+ mesh%nod_in_edge2D=0
+ mesh%nod_in_edge2D_sgn=0
+ mesh%nod_in_edge2D_num=0
+ do n=1,myDim_edge2D
+    do j=1,2
+       node=mesh%edges(j,n)
+       mesh%nod_in_edge2D_num(node)=mesh%nod_in_edge2D_num(node)+1
+       mesh%nod_in_edge2D    (mesh%nod_in_edge2D_num(node),node)=n
+       mesh%nod_in_edge2D_sgn(mesh%nod_in_edge2D_num(node),node)=3-2*j
+    end do
+ end do
+
  ! Among elem_neighbors there can be negative numbers. These correspond to 
  ! boundary elements for which neighbours are absent. However, an element 
  ! should have at least two valid neighbors
