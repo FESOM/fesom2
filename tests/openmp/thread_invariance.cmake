@@ -2,12 +2,16 @@
 # thread_invariance.cmake - OpenMP thread-count invariance on the pi mesh
 #===============================================================================
 #
-# The same 10-day pi run (2 MPI ranks) with 1, 4 and 8 OpenMP threads per rank,
-# and the 8-thread run repeated. All outputs must be bit-identical: the model's
-# threaded loops accumulate in a mesh-defined order, so neither the thread count
-# nor the thread scheduling may change the answer.
+# The same pi run (2 MPI ranks) with 1, 4 and 8 OpenMP threads per rank, and the
+# 8-thread run repeated. All outputs must be bit-identical: the model's threaded
+# loops accumulate in a mesh-defined order, so neither the thread count nor the
+# thread scheduling may change the answer.
 #
 #     ctest -L openmp
+#
+# FESOM_OPENMP_TEST_DAYS sets the run length. The default (1 day) is the pull-request
+# check: a scheduling-dependent sum already changes the first day at every node. The
+# manual workflow fesom2_openmp_invariance.yml runs longer (e.g. 10 or 30 days).
 #
 # Needs an OpenMP build (ENABLE_OPENMP=ON), MPI tests and ncdump.
 #===============================================================================
@@ -21,6 +25,9 @@ if(NOT NCDUMP_EXECUTABLE)
     message(WARNING "ncdump not found - the OpenMP thread-invariance tests will NOT be registered.")
     return()
 endif()
+
+set(FESOM_OPENMP_TEST_DAYS 1 CACHE STRING "Length in days of the OpenMP thread-invariance runs")
+math(EXPR _omp_timeout "300 + 120 * ${FESOM_OPENMP_TEST_DAYS}")
 
 set(_omp_fields sst sss ssh uice vice a_ice m_ice temp salt u v w)
 set(_omp_files "")
@@ -48,12 +55,12 @@ foreach(_run IN LISTS _omp_runs)
     string(REGEX REPLACE "_rerun$" "" _threads "${_run}")
     set(_name openmp_pi_mpi2_omp${_run})
     add_fesom_test_with_options(${_name}
-        "pi" "96" "10" "d" "10" "d" "96" ".true." ".false."
+        "pi" "96" "${FESOM_OPENMP_TEST_DAYS}" "d" "${FESOM_OPENMP_TEST_DAYS}" "d" "96" ".true." ".false."
         MPI_TEST
         NP 2
         OMP_THREADS ${_threads}
         LABEL openmp
-        TIMEOUT 1800
+        TIMEOUT ${_omp_timeout}
     )
     _omp_set_output("${CMAKE_CURRENT_BINARY_DIR}/${_name}")
     set_tests_properties(${_name} PROPERTIES FIXTURES_SETUP ${_name})
@@ -78,4 +85,4 @@ _omp_add_compare(1 4)
 _omp_add_compare(1 8)
 _omp_add_compare(8 8_rerun)
 
-message(STATUS "Added OpenMP thread-invariance tests (pi, 2 ranks x 1/4/8 threads)")
+message(STATUS "Added OpenMP thread-invariance tests (pi, 2 ranks x 1/4/8 threads, ${FESOM_OPENMP_TEST_DAYS} d)")
