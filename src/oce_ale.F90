@@ -1546,24 +1546,21 @@ subroutine update_stiff_mat_ale(partit, mesh)
     ! loop over lcal edges
     factor=g*dt*alpha*theta
 
-#if !defined(__openmp_reproducible)
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, i, j, k, row, ed, n2, enodes, elnodes, el, elem, npos, offset, nini, nend, fx, fy)
-#endif
-    do ed=1,myDim_edge2D   !! Attention
-        ! enodes ... local node indices of nodes that edge ed
-        enodes=edges(:,ed)        
-        ! el ... local element indices of the two elments that contribute to edge
-        ! el(1) or el(2) < 0 than edge is boundary edge
-        el=edge_tri(:,ed)
-        !_______________________________________________________________________
-        do j=1,2 
-            ! row ... local indice od edge node 1 or 2
-            row=enodes(j)
-            if(row>myDim_nod2D) cycle    !! Attention
-            
-            !___________________________________________________________________
-            ! sparse indice offset for node with index row
-            offset=SSH_stiff%rowptr(row)-ssh_stiff%rowptr(1)           
+    ! Each owned row gathers the contributions of its incident edges
+    ! (mesh%nod_in_edge2D) in ascending edge order; j says which end of the edge the
+    ! row is. No thread writes a row it does not own, and the sums do not depend on
+    ! the number of threads.
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, i, j, k, row, ed, n2, elnodes, el, elem, npos, offset, nini, nend, fx, fy)
+    do row=1, myDim_nod2D
+        ! sparse indice offset for node with index row
+        offset=SSH_stiff%rowptr(row)-ssh_stiff%rowptr(1)
+        do n2=1, mesh%nod_in_edge2D_num(row)
+            ed=mesh%nod_in_edge2D(n2,row)
+            ! el ... local element indices of the two elments that contribute to edge
+            el=edge_tri(:,ed)
+            ! j ... which end of the edge the row is
+            j=1
+            if (mesh%nod_in_edge2D_sgn(n2,row)<0) j=2
             !___________________________________________________________________
             do i=1, 2  ! Two elements related to the edge
                         ! It should be just grad on elements 
@@ -1599,9 +1596,6 @@ subroutine update_stiff_mat_ale(partit, mesh)
                 ! In the computation above, I've used rules from ssh_rhs (where it is 
                 ! on the rhs. So the sign is changed in the expression below.
                 ! npos... sparse matrix indices position of node points elnodes
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                   call omp_set_lock  (partit%plock(row)) ! it shall be sufficient to block writing into the same row of SSH_stiff
-#endif
 #if defined(USE_SINGLE_PRECISION)
                    SSH_stiff%values_full(npos)=SSH_stiff%values_full(npos) + real(fy*factor, real64)
 #if defined(DIAG_STIFF_DRIFT)
@@ -1610,15 +1604,10 @@ subroutine update_stiff_mat_ale(partit, mesh)
 #else
                    SSH_stiff%values(npos)=SSH_stiff%values(npos) + fy*factor
 #endif
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                   call omp_unset_lock(partit%plock(row))
-#endif                
             end do ! --> do i=1,2
-        end do ! --> do j=1,2 
-    end do ! --> do ed=1,myDim_edge2D 
-#if !defined(__openmp_reproducible)
+        end do ! --> do n2=1, mesh%nod_in_edge2D_num(row)
+    end do ! --> do row=1, myDim_nod2D
 !$OMP END PARALLEL DO
-#endif
 #if defined(USE_SINGLE_PRECISION)
     !___________________________________________________________________________
     ! Refresh the working copy the CG solver and preconditioner read. The
@@ -1689,7 +1678,7 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_dyn)   , intent(inout), target :: dynamics
     !___________________________________________________________________________
-    integer       :: ed, el(2), enodes(2), nz, n, nzmin, nzmax
+    integer       :: ed, el(2), enodes(2), nz, n, k, nzmin, nzmax
     real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2 
     real(kind=WP) :: dumc1_1, dumc1_2, dumc2_1, dumc2_2 !!PS
     !___________________________________________________________________________
@@ -1713,71 +1702,60 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ed, el, enodes, n, nz, nzmin, nzmax, c1, c2, deltaX1, deltaX2, deltaY1, deltaY2, &
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ed, el, enodes, n, k, nz, nzmin, nzmax, c1, c2, deltaX1, deltaX2, deltaY1, deltaY2, &
 !$OMP                                                                                 dumc1_1, dumc1_2, dumc2_1, dumc2_2)
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
+    ! Each node gathers the fluxes of its incident edges (mesh%nod_in_edge2D) in
+    ! ascending edge order, with the sign of the edge orientation; sums at halo nodes
+    ! are partial. No thread writes a node it does not own, and the sums do not
+    ! depend on the number of threads.
 !$OMP DO
-#endif
-    do ed=1, myDim_edge2D      
-        ! local indice of nodes that span up edge ed
-        enodes=edges(:,ed)
-        ! local index of element that contribute to edge
-        el=edge_tri(:,ed)
+    do n=1, myDim_nod2D+eDim_nod2D
+        do k=1, mesh%nod_in_edge2D_num(n)
+            ed=mesh%nod_in_edge2D(k,n)
+            ! local index of element that contribute to edge
+            el=edge_tri(:,ed)
         
-        !_______________________________________________________________________
-        ! calc depth integral: alpha*\nabla\int(U_n+U_rhs)dz for el(1)
-        c1=0.0_WP
-        ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to 
-        ! center of edge --> needed to calc flux perpedicular to edge from elem el(1)
-        deltaX1=edge_cross_dxdy(1,ed) 
-        deltaY1=edge_cross_dxdy(2,ed)
+            !_______________________________________________________________________
+            ! calc depth integral: alpha*\nabla\int(U_n+U_rhs)dz for el(1)
+            c1=0.0_WP
+            ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to 
+            ! center of edge --> needed to calc flux perpedicular to edge from elem el(1)
+            deltaX1=edge_cross_dxdy(1,ed) 
+            deltaY1=edge_cross_dxdy(2,ed)
         
-        nzmin = ulevels(el(1))
-        nzmax = nlevels(el(1))-1
-        do nz=nzmin, nzmax
-            c1=c1+alpha*((UV(2,nz,el(1))+UV_rhs(2,nz,el(1)))*deltaX1- &
-                         (UV(1,nz,el(1))+UV_rhs(1,nz,el(1)))*deltaY1)*helem(nz,el(1))
-        end do
-        
-        !_______________________________________________________________________
-        ! if ed is not a boundary edge --> calc depth integral: 
-        ! alpha*\nabla\int(U_n+U_rhs)dz for el(2) 
-        c2=0.0_WP
-        if(el(2)>0) then
-            ! edge_cross_dxdy(3:4,ed)... dx,dy distance from element centroid el(2) to 
-            ! center of edge --> needed to calc flux perpedicular to edge from elem el(2)
-            deltaX2=edge_cross_dxdy(3,ed)
-            deltaY2=edge_cross_dxdy(4,ed)
-            nzmin = ulevels(el(2))
-            nzmax = nlevels(el(2))-1
+            nzmin = ulevels(el(1))
+            nzmax = nlevels(el(1))-1
             do nz=nzmin, nzmax
-                c2=c2-alpha*((UV(2,nz,el(2))+UV_rhs(2,nz,el(2)))*deltaX2- &
-                             (UV(1,nz,el(2))+UV_rhs(1,nz,el(2)))*deltaY2)*helem(nz,el(2))
+                c1=c1+alpha*((UV(2,nz,el(1))+UV_rhs(2,nz,el(1)))*deltaX1- &
+                             (UV(1,nz,el(1))+UV_rhs(1,nz,el(1)))*deltaY1)*helem(nz,el(1))
             end do
-        end if
         
-        !_______________________________________________________________________
-        ! calc netto "flux"
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call   omp_set_lock(partit%plock(enodes(1)))
-#else
-!$OMP ORDERED
-#endif
-        ssh_rhs(enodes(1))=ssh_rhs(enodes(1))+(c1+c2)
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(enodes(1)))
-        call   omp_set_lock(partit%plock(enodes(2)))
-#endif
-        ssh_rhs(enodes(2))=ssh_rhs(enodes(2))-(c1+c2)
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(enodes(2)))
-#else
-!$OMP END ORDERED
-#endif
-
-    end do
+            !_______________________________________________________________________
+            ! if ed is not a boundary edge --> calc depth integral: 
+            ! alpha*\nabla\int(U_n+U_rhs)dz for el(2) 
+            c2=0.0_WP
+            if(el(2)>0) then
+                ! edge_cross_dxdy(3:4,ed)... dx,dy distance from element centroid el(2) to 
+                ! center of edge --> needed to calc flux perpedicular to edge from elem el(2)
+                deltaX2=edge_cross_dxdy(3,ed)
+                deltaY2=edge_cross_dxdy(4,ed)
+                nzmin = ulevels(el(2))
+                nzmax = nlevels(el(2))-1
+                do nz=nzmin, nzmax
+                    c2=c2-alpha*((UV(2,nz,el(2))+UV_rhs(2,nz,el(2)))*deltaX2- &
+                                 (UV(1,nz,el(2))+UV_rhs(1,nz,el(2)))*deltaY2)*helem(nz,el(2))
+                end do
+            end if
+        
+            !_______________________________________________________________________
+            ! calc netto "flux"
+            if (mesh%nod_in_edge2D_sgn(k,n)>0) then
+                ssh_rhs(n)=ssh_rhs(n)+(c1+c2)
+            else
+                ssh_rhs(n)=ssh_rhs(n)-(c1+c2)
+            end if
+        end do ! --> do k=1, mesh%nod_in_edge2D_num(n)
+    end do ! --> do n=1, myDim_nod2D+eDim_nod2D
 !$OMP END DO
 
     !___________________________________________________________________________
@@ -1838,7 +1816,7 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(inout), target :: mesh
     !___________________________________________________________________________
-    integer       :: ed, el(2), enodes(2), elem, elnodes(3), n, nz, nzmin, nzmax
+    integer       :: ed, el(2), enodes(2), elem, elnodes(3), n, k, nz, nzmin, nzmax
     real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2 
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -1861,65 +1839,55 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
     end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ed, el, enodes, elem, elnodes, n, nz, nzmin, nzmax, &
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ed, el, enodes, elem, elnodes, n, k, nz, nzmin, nzmax, &
 !$OMP                                            c1, c2, deltaX1, deltaX2, deltaY1, deltaY2)
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
+    ! Each node gathers the fluxes of its incident edges (mesh%nod_in_edge2D) in
+    ! ascending edge order, with the sign of the edge orientation; sums at halo nodes
+    ! are partial. No thread writes a node it does not own, and the sums do not
+    ! depend on the number of threads.
 !$OMP DO
-#endif
-    do ed=1, myDim_edge2D                     
-        ! local indice of nodes that span up edge ed
-        enodes=edges(:,ed)
-        ! local index of element that contribute to edge
-        el=edge_tri(:,ed)
+    do n=1, myDim_nod2D+eDim_nod2D
+        do k=1, mesh%nod_in_edge2D_num(n)
+            ed=mesh%nod_in_edge2D(k,n)
+            ! local index of element that contribute to edge
+            el=edge_tri(:,ed)
         
-        !_______________________________________________________________________
-        ! cal depth integal: \nabla\int(U_n)dz for el(1)
-        c1=0.0_WP
-        ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to 
-        ! center of edge --> needed to calc flux perpedicular to edge from elem el(1)
-        deltaX1=edge_cross_dxdy(1,ed)
-        deltaY1=edge_cross_dxdy(2,ed)
+            !_______________________________________________________________________
+            ! cal depth integal: \nabla\int(U_n)dz for el(1)
+            c1=0.0_WP
+            ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to 
+            ! center of edge --> needed to calc flux perpedicular to edge from elem el(1)
+            deltaX1=edge_cross_dxdy(1,ed)
+            deltaY1=edge_cross_dxdy(2,ed)
         
-        nzmin = ulevels(el(1))
-        nzmax = nlevels(el(1))-1
-        !!PS do nz=1, nlevels(el(1))-1
-        do nz=nzmin, nzmax 
-            c1=c1+(UV(2,nz,el(1))*deltaX1-UV(1,nz,el(1))*deltaY1)*helem(nz,el(1))
-        end do
-        !_______________________________________________________________________
-        ! if ed is not a boundary edge --> calc depth integral: \nabla\int(U_n)dz 
-        ! for el(2)
-        c2=0.0_WP
-        if(el(2)>0) then
-            deltaX2=edge_cross_dxdy(3,ed)
-            deltaY2=edge_cross_dxdy(4,ed)
-            nzmin = ulevels(el(2))
-            nzmax = nlevels(el(2))-1
-            !!PS do nz=1, nlevels(el(2))-1
-            do nz=nzmin, nzmax
-                c2=c2-(UV(2,nz,el(2))*deltaX2-UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+            nzmin = ulevels(el(1))
+            nzmax = nlevels(el(1))-1
+            !!PS do nz=1, nlevels(el(1))-1
+            do nz=nzmin, nzmax 
+                c1=c1+(UV(2,nz,el(1))*deltaX1-UV(1,nz,el(1))*deltaY1)*helem(nz,el(1))
             end do
-        end if
-        !_______________________________________________________________________
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call   omp_set_lock(partit%plock(enodes(1)))
-#else
-!$OMP ORDERED
-#endif
-        ssh_rhs_old(enodes(1))=ssh_rhs_old(enodes(1))+(c1+c2)
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(enodes(1)))
-        call   omp_set_lock(partit%plock(enodes(2)))
-#endif
-        ssh_rhs_old(enodes(2))=ssh_rhs_old(enodes(2))-(c1+c2)
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(enodes(2)))
-#else
-!$OMP END ORDERED
-#endif
-    end do
+            !_______________________________________________________________________
+            ! if ed is not a boundary edge --> calc depth integral: \nabla\int(U_n)dz 
+            ! for el(2)
+            c2=0.0_WP
+            if(el(2)>0) then
+                deltaX2=edge_cross_dxdy(3,ed)
+                deltaY2=edge_cross_dxdy(4,ed)
+                nzmin = ulevels(el(2))
+                nzmax = nlevels(el(2))-1
+                !!PS do nz=1, nlevels(el(2))-1
+                do nz=nzmin, nzmax
+                    c2=c2-(UV(2,nz,el(2))*deltaX2-UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+                end do
+            end if
+            !_______________________________________________________________________
+            if (mesh%nod_in_edge2D_sgn(k,n)>0) then
+                ssh_rhs_old(n)=ssh_rhs_old(n)+(c1+c2)
+            else
+                ssh_rhs_old(n)=ssh_rhs_old(n)-(c1+c2)
+            end if
+        end do ! --> do k=1, mesh%nod_in_edge2D_num(n)
+    end do ! --> do n=1, myDim_nod2D+eDim_nod2D
 !$OMP END DO
 !$OMP END PARALLEL
 
@@ -1985,7 +1953,7 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(inout), target :: mesh
     !___________________________________________________________________________
-    integer       :: el(2), enodes(2), n, nz, ed, nzmin, nzmax, uln1, uln2, nln1, nln2
+    integer       :: el(2), enodes(2), n, k, nz, ed, nzmin, nzmax, uln1, uln2, nln1, nln2
     real(kind=WP) :: deltaX1, deltaY1, deltaX2, deltaY2, dd, dd1, dddt, cflmax
     ! still to be understood but if you allocate these arrays statically the results will be different:
     real(kind=WP) :: c1(mesh%nl-1), c2(mesh%nl-1)
@@ -2033,103 +2001,82 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     END DO
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ed, enodes, el, deltaX1, deltaY1, nz, nzmin, nzmax, deltaX2, deltaY2, c1, c2)
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ed, enodes, el, n, k, deltaX1, deltaY1, nz, nzmin, nzmax, deltaX2, deltaY2, c1, c2)
+    ! Each node gathers the fluxes of its incident edges (mesh%nod_in_edge2D) in
+    ! ascending edge order, with the sign of the edge orientation; sums at halo nodes
+    ! are partial. No thread writes a node it does not own, and the sums do not
+    ! depend on the number of threads.
 !$OMP DO
-#endif
-    do ed=1, myDim_edge2D
-        ! local indice of nodes that span up edge ed
-        enodes=edges(:,ed)   
+    do n=1, myDim_nod2D+eDim_nod2D
+        do k=1, mesh%nod_in_edge2D_num(n)
+            ed=mesh%nod_in_edge2D(k,n)
         
-        ! local index of element that contribute to edge
-        el=edge_tri(:,ed)
+            ! local index of element that contribute to edge
+            el=edge_tri(:,ed)
         
-        ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to 
-        ! center of edge --> needed to calc flux perpedicular to edge from elem el(1)
-        deltaX1=edge_cross_dxdy(1,ed)
-        deltaY1=edge_cross_dxdy(2,ed)
+            ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to 
+            ! center of edge --> needed to calc flux perpedicular to edge from elem el(1)
+            deltaX1=edge_cross_dxdy(1,ed)
+            deltaY1=edge_cross_dxdy(2,ed)
         
-        !_______________________________________________________________________
-        ! calc div(u_vec*h) for every layer 
-        ! do it with gauss-law: int( div(u_vec)*dV) = int( u_vec * n_vec * dS )
-        nzmin = ulevels(el(1))
-        nzmax = nlevels(el(1))-1
-! we introduced c1 & c2 as arrays here to avoid deadlocks when in OpenMP mode
-        do nz = nzmax, nzmin, -1
-            ! --> h * u_vec * n_vec
-            ! --> e_vec = (dx,dy), n_vec = (-dy,dx);
-            ! --> h * u*(-dy) + v*dx
-            c1(nz)=( UV(2,nz,el(1))*deltaX1 - UV(1,nz,el(1))*deltaY1 )*helem(nz,el(1))
-            ! inflow(outflow) "flux" to control volume of node enodes1
-            ! is equal to outflow(inflow) "flux" to control volume of node enodes2
-            if (Fer_GM) then
-                c2(nz)=(fer_UV(2,nz,el(1))*deltaX1- fer_UV(1,nz,el(1))*deltaY1)*helem(nz,el(1))
-            end if
-        end do
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_set_lock  (partit%plock(enodes(1)))
-#else
-!$OMP ORDERED
-#endif
-        Wvel       (nzmin:nzmax, enodes(1))= Wvel    (nzmin:nzmax, enodes(1))+c1(nzmin:nzmax)
-        if (Fer_GM) then
-           fer_Wvel(nzmin:nzmax, enodes(1))= fer_Wvel(nzmin:nzmax, enodes(1))+c2(nzmin:nzmax)
-        end if
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(enodes(1)))
-        call omp_set_lock  (partit%plock(enodes(2)))
-#endif
-        Wvel       (nzmin:nzmax, enodes(2))= Wvel    (nzmin:nzmax, enodes(2))-c1(nzmin:nzmax)
-        if (Fer_GM) then
-           fer_Wvel(nzmin:nzmax, enodes(2))= fer_Wvel(nzmin:nzmax, enodes(2))-c2(nzmin:nzmax)
-        end if
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(enodes(2)))
-#else
-!$OMP END ORDERED
-#endif
-        !_______________________________________________________________________
-        ! if ed is not a boundary edge --> calc div(u_vec*h) for every layer
-        ! for el(2)
-        c1 = 0.0_WP
-        c2 = 0.0_WP
-        if(el(2)>0)then
-            deltaX2=edge_cross_dxdy(3,ed)
-            deltaY2=edge_cross_dxdy(4,ed)
-            nzmin = ulevels(el(2))
-            nzmax = nlevels(el(2))-1   
+            !_______________________________________________________________________
+            ! calc div(u_vec*h) for every layer 
+            ! do it with gauss-law: int( div(u_vec)*dV) = int( u_vec * n_vec * dS )
+            nzmin = ulevels(el(1))
+            nzmax = nlevels(el(1))-1
+    ! we introduced c1 & c2 as arrays here to avoid deadlocks when in OpenMP mode
             do nz = nzmax, nzmin, -1
-                c1(nz)=-(UV(2,nz,el(2))*deltaX2 - UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+                ! --> h * u_vec * n_vec
+                ! --> e_vec = (dx,dy), n_vec = (-dy,dx);
+                ! --> h * u*(-dy) + v*dx
+                c1(nz)=( UV(2,nz,el(1))*deltaX1 - UV(1,nz,el(1))*deltaY1 )*helem(nz,el(1))
+                ! inflow(outflow) "flux" to control volume of node enodes1
+                ! is equal to outflow(inflow) "flux" to control volume of node enodes2
                 if (Fer_GM) then
-                    c2(nz)=-(fer_UV(2,nz,el(2))*deltaX2-fer_UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+                    c2(nz)=(fer_UV(2,nz,el(1))*deltaX1- fer_UV(1,nz,el(1))*deltaY1)*helem(nz,el(1))
                 end if
             end do
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_set_lock  (partit%plock(enodes(1)))
-#else
-!$OMP ORDERED
-#endif
-            Wvel       (nzmin:nzmax, enodes(1))= Wvel    (nzmin:nzmax, enodes(1))+c1(nzmin:nzmax)
-            if (Fer_GM) then
-               fer_Wvel(nzmin:nzmax, enodes(1))= fer_Wvel(nzmin:nzmax, enodes(1))+c2(nzmin:nzmax)
+            if (mesh%nod_in_edge2D_sgn(k,n)>0) then
+                Wvel       (nzmin:nzmax, n)= Wvel    (nzmin:nzmax, n)+c1(nzmin:nzmax)
+                if (Fer_GM) then
+               fer_Wvel(nzmin:nzmax, n)= fer_Wvel(nzmin:nzmax, n)+c2(nzmin:nzmax)
             end if
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_unset_lock(partit%plock(enodes(1)))
-            call omp_set_lock  (partit%plock(enodes(2)))
-#endif
-            Wvel       (nzmin:nzmax, enodes(2))= Wvel    (nzmin:nzmax, enodes(2))-c1(nzmin:nzmax)
+            else
+            Wvel       (nzmin:nzmax, n)= Wvel    (nzmin:nzmax, n)-c1(nzmin:nzmax)
             if (Fer_GM) then
-               fer_Wvel(nzmin:nzmax, enodes(2))= fer_Wvel(nzmin:nzmax, enodes(2))-c2(nzmin:nzmax)
+               fer_Wvel(nzmin:nzmax, n)= fer_Wvel(nzmin:nzmax, n)-c2(nzmin:nzmax)
             end if
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_unset_lock(partit%plock(enodes(2)))
-#else
-!$OMP END ORDERED
-#endif
-        end if !~-> if(el(2)>0)then       
-    end do ! --> do ed=1, myDim_edge2D
+            end if
+            !_______________________________________________________________________
+            ! if ed is not a boundary edge --> calc div(u_vec*h) for every layer
+            ! for el(2)
+            c1 = 0.0_WP
+            c2 = 0.0_WP
+            if(el(2)>0)then
+                deltaX2=edge_cross_dxdy(3,ed)
+                deltaY2=edge_cross_dxdy(4,ed)
+                nzmin = ulevels(el(2))
+                nzmax = nlevels(el(2))-1   
+                do nz = nzmax, nzmin, -1
+                    c1(nz)=-(UV(2,nz,el(2))*deltaX2 - UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+                    if (Fer_GM) then
+                        c2(nz)=-(fer_UV(2,nz,el(2))*deltaX2-fer_UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+                    end if
+                end do
+                if (mesh%nod_in_edge2D_sgn(k,n)>0) then
+                    Wvel       (nzmin:nzmax, n)= Wvel    (nzmin:nzmax, n)+c1(nzmin:nzmax)
+                    if (Fer_GM) then
+                   fer_Wvel(nzmin:nzmax, n)= fer_Wvel(nzmin:nzmax, n)+c2(nzmin:nzmax)
+                end if
+                else
+                Wvel       (nzmin:nzmax, n)= Wvel    (nzmin:nzmax, n)-c1(nzmin:nzmax)
+                if (Fer_GM) then
+                   fer_Wvel(nzmin:nzmax, n)= fer_Wvel(nzmin:nzmax, n)-c2(nzmin:nzmax)
+                end if
+                end if
+            end if !~-> if(el(2)>0)then       
+        end do ! --> do k=1, mesh%nod_in_edge2D_num(n)
+    end do ! --> do n=1, myDim_nod2D+eDim_nod2D
 !$OMP END DO
 !$OMP END PARALLEL
     ! |
@@ -2550,7 +2497,7 @@ subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
-    integer                               :: node, elem, nz, ed, nzmin, nzmax, ednodes(2), edelem(2) 
+    integer                               :: node, elem, nz, ed, n, k, nzmin, nzmax, ednodes(2), edelem(2)
     real(kind=WP)                         :: hh_inv, deltaX1, deltaX2, deltaY1, deltaY2 
     real(kind=WP)                         :: c1(mesh%nl-1), c2(mesh%nl-1)
     
@@ -2581,110 +2528,89 @@ subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
 !$OMP END PARALLEL DO
 
     !___________________________________________________________________________
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ed, ednodes, edelem, nz, nzmin, nzmax, & 
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ed, ednodes, edelem, n, k, nz, nzmin, nzmax, &
 !$OMP                                  deltaX1, deltaY1, deltaX2, deltaY2, c1, c2)
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
+    ! Each node gathers the fluxes of its incident edges (mesh%nod_in_edge2D) in
+    ! ascending edge order, with the sign of the edge orientation; sums at halo nodes
+    ! are partial. No thread writes a node it does not own, and the sums do not
+    ! depend on the number of threads.
 !$OMP DO
-#endif
-    do ed=1, myDim_edge2D
-        ! local indice of nodes that span up edge ed
-        ednodes=edges(:,ed)   
+    do n=1, myDim_nod2D+eDim_nod2D
+        do k=1, mesh%nod_in_edge2D_num(n)
+            ed=mesh%nod_in_edge2D(k,n)
         
-        ! local index of element that contribute to edge
-        edelem=edge_tri(:,ed)
+            ! local index of element that contribute to edge
+            edelem=edge_tri(:,ed)
         
-        ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid edelem(1) to 
-        ! center of edge --> needed to calc flux perpedicular to edge from elem edelem(1)
-        deltaX1=edge_cross_dxdy(1,ed)
-        deltaY1=edge_cross_dxdy(2,ed)
+            ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid edelem(1) to 
+            ! center of edge --> needed to calc flux perpedicular to edge from elem edelem(1)
+            deltaX1=edge_cross_dxdy(1,ed)
+            deltaY1=edge_cross_dxdy(2,ed)
         
-        !_______________________________________________________________________
-        ! calc div(u_vec*h) for every layer 
-        ! do it with gauss-law: int( div(u_vec)*dV) = int( u_vec * n_vec * dS )
-        nzmin = ulevels(edelem(1))
-        nzmax = nlevels(edelem(1))-1
-        ! we introduced c1 & c2 as arrays here to avoid deadlocks when in OpenMP mode
-        do nz = nzmax, nzmin, -1
-            ! --> h * u_vec * n_vec
-            ! --> e_vec = (dx,dy), n_vec = (-dy,dx);
-            ! --> h * u*(-dy) + v*dx
-            c1(nz)=( UVh(2, nz, edelem(1))*deltaX1 - UVh(1, nz, edelem(1))*deltaY1 )
-            ! inflow(outflow) "flux" to control volume of node enodes1
-            ! is equal to outflow(inflow) "flux" to control volume of node enodes2
-        end do ! --> do nz=nzmax,nzmin,-1
-        if (Fer_GM) then
+            !_______________________________________________________________________
+            ! calc div(u_vec*h) for every layer 
+            ! do it with gauss-law: int( div(u_vec)*dV) = int( u_vec * n_vec * dS )
+            nzmin = ulevels(edelem(1))
+            nzmax = nlevels(edelem(1))-1
+            ! we introduced c1 & c2 as arrays here to avoid deadlocks when in OpenMP mode
             do nz = nzmax, nzmin, -1
-                c2(nz)=(fer_UV(2, nz, edelem(1))*deltaX1 - fer_UV(1, nz, edelem(1))*deltaY1)*helem(nz, edelem(1))
-            end do
-        end if 
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_set_lock  (partit%plock(ednodes(1)))
-#else
-!$OMP ORDERED
-#endif        
-        Wvel(nzmin:nzmax, ednodes(1))= Wvel(nzmin:nzmax, ednodes(1))+c1(nzmin:nzmax)
-        if (Fer_GM) then
-            fer_Wvel(nzmin:nzmax, ednodes(1))= fer_Wvel(nzmin:nzmax, ednodes(1))+c2(nzmin:nzmax)
-        end if
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(ednodes(1)))
-        call omp_set_lock  (partit%plock(ednodes(2)))
-#endif        
-        Wvel(nzmin:nzmax, ednodes(2))= Wvel(nzmin:nzmax, ednodes(2))-c1(nzmin:nzmax)
-        if (Fer_GM) then
-            fer_Wvel(nzmin:nzmax, ednodes(2))= fer_Wvel(nzmin:nzmax, ednodes(2))-c2(nzmin:nzmax)
-        end if
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(ednodes(2)))
-#else
-!$OMP END ORDERED
-#endif
-        
-        !_______________________________________________________________________
-        ! if ed is not a boundary edge --> calc div(u_vec*h) for every layer
-        ! for edelem(2)
-        c1 = 0.0_WP
-        c2 = 0.0_WP
-        if(edelem(2)>0)then
-            deltaX2=edge_cross_dxdy(3,ed)
-            deltaY2=edge_cross_dxdy(4,ed)
-            nzmin = ulevels(edelem(2))
-            nzmax = nlevels(edelem(2))-1   
-            do nz = nzmax, nzmin, -1
-                c1(nz)=-(UVh(2, nz, edelem(2))*deltaX2 - UVh(1, nz, edelem(2))*deltaY2)
+                ! --> h * u_vec * n_vec
+                ! --> e_vec = (dx,dy), n_vec = (-dy,dx);
+                ! --> h * u*(-dy) + v*dx
+                c1(nz)=( UVh(2, nz, edelem(1))*deltaX1 - UVh(1, nz, edelem(1))*deltaY1 )
+                ! inflow(outflow) "flux" to control volume of node enodes1
+                ! is equal to outflow(inflow) "flux" to control volume of node enodes2
             end do ! --> do nz=nzmax,nzmin,-1
             if (Fer_GM) then
                 do nz = nzmax, nzmin, -1
-                    c2(nz)=-(fer_UV(2, nz, edelem(2))*deltaX2-fer_UV(1, nz, edelem(2))*deltaY2)*helem(nz, edelem(2))
-                end do ! --> do nz=nzmax,nzmin,-1
+                    c2(nz)=(fer_UV(2, nz, edelem(1))*deltaX1 - fer_UV(1, nz, edelem(1))*deltaY1)*helem(nz, edelem(1))
+                end do
             end if 
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_set_lock  (partit%plock(ednodes(1)))
-#else
-!$OMP ORDERED
-#endif                
-            Wvel(nzmin:nzmax, ednodes(1))= Wvel(nzmin:nzmax, ednodes(1))+c1(nzmin:nzmax)
-            if (Fer_GM) then
-                fer_Wvel(nzmin:nzmax, ednodes(1))= fer_Wvel(nzmin:nzmax, ednodes(1))+c2(nzmin:nzmax)
-            end if 
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_unset_lock(partit%plock(ednodes(1)))
-            call omp_set_lock  (partit%plock(ednodes(2)))
-#endif            
-            Wvel(nzmin:nzmax, ednodes(2))= Wvel(nzmin:nzmax, ednodes(2))-c1(nzmin:nzmax)
-            if (Fer_GM) then
-                fer_Wvel(nzmin:nzmax, ednodes(2))= fer_Wvel(nzmin:nzmax, ednodes(2))-c2(nzmin:nzmax)
+            if (mesh%nod_in_edge2D_sgn(k,n)>0) then
+                Wvel(nzmin:nzmax, n)= Wvel(nzmin:nzmax, n)+c1(nzmin:nzmax)
+                if (Fer_GM) then
+                fer_Wvel(nzmin:nzmax, n)= fer_Wvel(nzmin:nzmax, n)+c2(nzmin:nzmax)
             end if
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_unset_lock(partit%plock(ednodes(2)))
-#else
-!$OMP END ORDERED
-#endif            
-        end if !--> if(edelem(2)>0)then
+            else
+            Wvel(nzmin:nzmax, n)= Wvel(nzmin:nzmax, n)-c1(nzmin:nzmax)
+            if (Fer_GM) then
+                fer_Wvel(nzmin:nzmax, n)= fer_Wvel(nzmin:nzmax, n)-c2(nzmin:nzmax)
+            end if
+            end if
         
-    end do ! --> do ed=1, myDim_edge2D
+            !_______________________________________________________________________
+            ! if ed is not a boundary edge --> calc div(u_vec*h) for every layer
+            ! for edelem(2)
+            c1 = 0.0_WP
+            c2 = 0.0_WP
+            if(edelem(2)>0)then
+                deltaX2=edge_cross_dxdy(3,ed)
+                deltaY2=edge_cross_dxdy(4,ed)
+                nzmin = ulevels(edelem(2))
+                nzmax = nlevels(edelem(2))-1   
+                do nz = nzmax, nzmin, -1
+                    c1(nz)=-(UVh(2, nz, edelem(2))*deltaX2 - UVh(1, nz, edelem(2))*deltaY2)
+                end do ! --> do nz=nzmax,nzmin,-1
+                if (Fer_GM) then
+                    do nz = nzmax, nzmin, -1
+                        c2(nz)=-(fer_UV(2, nz, edelem(2))*deltaX2-fer_UV(1, nz, edelem(2))*deltaY2)*helem(nz, edelem(2))
+                    end do ! --> do nz=nzmax,nzmin,-1
+                end if 
+                if (mesh%nod_in_edge2D_sgn(k,n)>0) then
+                    Wvel(nzmin:nzmax, n)= Wvel(nzmin:nzmax, n)+c1(nzmin:nzmax)
+                    if (Fer_GM) then
+                    fer_Wvel(nzmin:nzmax, n)= fer_Wvel(nzmin:nzmax, n)+c2(nzmin:nzmax)
+                end if 
+                else
+                Wvel(nzmin:nzmax, n)= Wvel(nzmin:nzmax, n)-c1(nzmin:nzmax)
+                if (Fer_GM) then
+                    fer_Wvel(nzmin:nzmax, n)= fer_Wvel(nzmin:nzmax, n)-c2(nzmin:nzmax)
+                end if
+                end if
+            end if !--> if(edelem(2)>0)then
+        
+        end do ! --> do k=1, mesh%nod_in_edge2D_num(n)
+    end do ! --> do n=1, myDim_nod2D+eDim_nod2D
 !$OMP END DO    
 !$OMP END PARALLEL
 

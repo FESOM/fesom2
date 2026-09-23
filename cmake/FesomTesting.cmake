@@ -413,7 +413,10 @@ endfunction()
 # Function to add a FESOM integration test with custom options
 function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH RUN_LENGTH_UNIT RESTART_LENGTH RESTART_LENGTH_UNIT LOGFILE_OUTFREQ FORCE_ROTATION USE_CAVITY)
     set(options MPI_TEST)
-    set(oneValueArgs NP TIMEOUT LABEL MIX_SCHEME FORCING FORCING_YEAR LEAPYEAR USE_ICE)
+    set(oneValueArgs NP TIMEOUT LABEL MIX_SCHEME FORCING FORCING_YEAR LEAPYEAR USE_ICE OMP_THREADS)
+    # OMP_THREADS: run with this many OpenMP threads per rank (OMP_NUM_THREADS), with
+    # the passive wait policy and without MPI core binding, so that all threads of a
+    # rank get to run even when the runner has fewer cores than threads.
     # EXTRA_SUCCESS_MARKERS: literal strings that must ALL appear in the run log for
     # the test to pass, on top of the clean-exit marker. Use these to pin behaviour
     # that would otherwise rot silently -- a diagnostic block that stops being
@@ -474,6 +477,16 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
     # Generate the test script
     set(TEST_SCRIPT "${TEST_RUN_DIR}/run_test.cmake")
     
+    set(_omp_env "")
+    if(DEFINED FESOM_TEST_OMP_THREADS)
+        set(_omp_env "
+            set(ENV{OMP_NUM_THREADS} \"${FESOM_TEST_OMP_THREADS}\")
+            set(ENV{OMP_WAIT_POLICY} \"PASSIVE\")
+            set(ENV{OMPI_MCA_hwloc_base_binding_policy} \"none\")
+            set(ENV{PRTE_MCA_hwloc_default_binding_policy} \"none\")
+")
+    endif()
+
     if(FESOM_TEST_MPI_TEST AND FESOM_TEST_NP GREATER 1)
         # MPI test
         file(GENERATE OUTPUT ${TEST_SCRIPT} CONTENT "
@@ -493,7 +506,7 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
             # (PRRTE) reads PRTE_MCA_*; both are ignored by other MPIs.
             set(ENV{OMPI_MCA_rmaps_base_oversubscribe} \"1\")
             set(ENV{PRTE_MCA_rmaps_default_mapping_policy} \":oversubscribe\")
-
+${_omp_env}
             # Run FESOM with MPI.
             # Wrap the launch in a shell that raises the stack limit: Intel-compiled
             # fesom.x puts large per-column automatic arrays on the stack and SIGSEGVs

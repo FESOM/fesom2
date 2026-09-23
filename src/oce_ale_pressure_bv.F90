@@ -98,7 +98,7 @@ subroutine pressure_bv(tracers, partit, mesh)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(zmean, dz_inv, bv,  a, rho_up, rho_dn, t, s, node, nz, nl1, nzmax, nzmin, &
 !$OMP                                  rhopot, bulk_0, bulk_pz, bulk_pz2, rho, dbsfc1, db_max, bulk_up, bulk_dn, &
-!$OMP                                  rho_surf, aux_rho, aux_rho1, flag1, flag2, bv1)
+!$OMP                                  rho_surf, aux_rho, aux_rho1, flag1, flag2, bv1, flag3)
 !$OMP DO
     do node=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2D(node)
@@ -2141,7 +2141,7 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
     ! loop over triangular elemments
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nle, ule, nlz, nln, ni, nlc, nlce, idx, int_dp_dx, drho_dx, drho_dy, dz_dx, dz_dy, aux_sum, dx10, dx20, dx21, &
 !$OMP                                  f0, df10, df21, t0, dt10, dt21, s0, ds10, ds21, rho_at_Zn, temp_at_Zn, salt_at_Zn, drho_dz, aux_dref, rhopot,                &
-!$OMP                                  bulk_0, bulk_pz, bulk_pz2, dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, zbar_n, z_n                                )
+!$OMP                                  bulk_0, bulk_pz, bulk_pz2, dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, zbar_n, z_n, layer_offset)
 !$OMP DO
     do elem = 1, myDim_elem2D
         !_______________________________________________________________________
@@ -3033,11 +3033,6 @@ salt=>tracers%data(2)%values(:,:)
 vol1D=0.0_WP
 ref_temp1D=0.0_WP
 ref_salt1D=0.0_WP
-#if !defined(__openmp_reproducible)
-! A "+" reduction combines the per-thread partial sums in a thread-count
-! dependent order, so it is not bit-reproducible: run the loop serially.
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax) REDUCTION(+:vol1D)
-#endif
 do node=1,myDim_nod2d
     x=geo_coord_nod2D(1,node)/rad
     y=geo_coord_nod2D(1,node)/rad
@@ -3051,11 +3046,6 @@ do node=1,myDim_nod2d
        vol1D(nz)=vol1D(nz)+areasvol(nz,node)
     end do
 end do
-#if !defined(__openmp_reproducible)
-! A "+" reduction combines the per-thread partial sums in a thread-count
-! dependent order, so it is not bit-reproducible: run the loop serially.
-!$OMP END PARALLEL DO
-#endif
 call MPI_Allreduce(MPI_IN_PLACE, ref_temp1D, mesh%nl-1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 call MPI_Allreduce(MPI_IN_PLACE, ref_salt1D, mesh%nl-1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 call MPI_Allreduce(MPI_IN_PLACE,      vol1D, mesh%nl-1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
