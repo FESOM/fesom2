@@ -85,71 +85,26 @@ subroutine muscl_adv_init(twork, partit, mesh)
     !___________________________________________________________________________
     allocate(twork%nboundary_lay(myDim_nod2D+eDim_nod2D)) !node n becomes a boundary node after layer twork%nboundary_lay(n)
     twork%nboundary_lay=nl-1
+    ! Each owned node lists the far ends of its incident edges (mesh%nod_in_edge2D) in
+    ! ascending edge order, so the neighbour list is the same for any number of threads. The boundary-layer index is the minimum over
+    ! the node's edges and needs no ordering. No thread writes a node it does not own.
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, n1, n2)
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
 !$OMP DO
-#endif
-    do n=1, myDim_edge2D
-        ! n1 and n2 are local indices 
-        n1=edges(1,n)
-        n2=edges(2,n)
-
-#if defined(__openmp_reproducible)
-!$OMP ORDERED
-#endif
-
-        ! ... if(n1<=myDim_nod2D) --> because dont use extended nodes
-        if(n1<=myDim_nod2D) then
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-           call omp_set_lock(partit%plock(n1))
-#endif
-            nn_pos(nn_num(n1)+1,n1)=n2
-            nn_num(n1)=nn_num(n1)+1
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-           call omp_unset_lock(partit%plock(n1))
-#endif
-        end if
-        
-        ! ... if(n2<=myDim_nod2D) --> because dont use extended nodes
-        if(n2<=myDim_nod2D) then
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-           call omp_set_lock(partit%plock(n2))
-#endif
-            nn_pos(nn_num(n2)+1,n2)=n1
-            nn_num(n2)=nn_num(n2)+1
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-           call omp_unset_lock(partit%plock(n2))
-#endif
-        end if
-        
-        if (any(edge_tri(:,n)<=0)) then
-            ! this edge nodes is already at the surface at the boundary ...
-            ! later here ...sign(1, twork%nboundary_lay(enodes(1))-nz) for nz=1 must be negativ
-            ! thats why here twork%nboundary_lay(edges(:,n))=0
-            twork%nboundary_lay(edges(:,n))=0
-        else
-            ! this edge nodes become boundary edge with increasing depth due to bottom topography
-            ! at the depth twork%nboundary_lay the edge (edgepoints) still has two valid ocean triangles
-            ! below that depth, edge becomes boundary edge
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-           call omp_set_lock  (partit%plock(edges(1,n)))
-#endif
-            twork%nboundary_lay(edges(1,n))=min(twork%nboundary_lay(edges(1,n)), minval(nlevels(edge_tri(:,n)))-1)
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-           call omp_unset_lock(partit%plock(edges(1,n)))
-           call omp_set_lock  (partit%plock(edges(2,n)))
-#endif
-            twork%nboundary_lay(edges(2,n))=min(twork%nboundary_lay(edges(2,n)), minval(nlevels(edge_tri(:,n)))-1)
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-           call omp_unset_lock(partit%plock(edges(2,n)))
-#endif
-        end if
-
-#if defined(__openmp_reproducible)
-!$OMP END ORDERED
-#endif
+    do n=1, myDim_nod2D+eDim_nod2D
+        do k=1, mesh%nod_in_edge2D_num(n)
+            n1=mesh%nod_in_edge2D(k,n)                 ! the edge
+            n2=edges(1,n1)                             ! its far end
+            if (n2==n) n2=edges(2,n1)
+            if (n<=myDim_nod2D) then
+                nn_pos(nn_num(n)+1,n)=n2
+                nn_num(n)=nn_num(n)+1
+            end if
+            if (any(edge_tri(:,n1)<=0)) then
+                twork%nboundary_lay(n)=0
+            else
+                twork%nboundary_lay(n)=min(twork%nboundary_lay(n), minval(nlevels(edge_tri(:,n1))))
+            end if
+        end do
     end do
 !$OMP END DO
 !$OMP END PARALLEL
