@@ -330,7 +330,7 @@ subroutine EVPdynamics(ice, partit, mesh)
     integer         :: use_pice
 
     real(kind=WP)   :: eta, delta
-    integer         :: k
+    integer         :: k, j
     real(kind=WP)   :: vale, dx(3), dy(3), val3
     real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2, dte
     real(kind=WP)   :: zeta, delta_inv, d1, d2
@@ -475,15 +475,42 @@ subroutine EVPdynamics(ice, partit, mesh)
         ! for full free surface include pressure from ice mass
 
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(el, elnodes, aa, p_ice, elevation_elem, elevation_dx, elevation_dy)
-!$OMP DO
+        ! Node-owned gather over nod_in_elem2D: each owned node sums the force of its
+        ! incident elements and writes only its own entry, so the sum does not depend on
+        ! the number of threads. Halo entries of rhs_a/rhs_m stay zero; only owned nodes
+        ! are read (stress2rhs).
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, k, j, el, elnodes, aa, p_ice, elevation_elem, elevation_dx, elevation_dy)
+        do n = 1, myDim_nod2D
+            do k = 1, nod_in_elem2D_num(n)
+                el = nod_in_elem2D(k,n)
+                !_______________________________________________________________
+                ! if element has any cavity node skip it
+                if (ulevels(el) > 1) cycle
+                elnodes = elem2D_nodes(:,el)
+                !_______________________________________________________________
+                ! skip if any node is ice-free
+                if (any(m_ice(elnodes) <= 0._WP) .or. &
+                    any(a_ice(elnodes) <= 0._WP)) cycle
+                aa = 9.81_WP*elem_area(el)/3.0_WP
+                !_______________________________________________________________
+                ! add and limit pressure from ice weight in case of floating ice
+                p_ice=(rhoice*m_ice(elnodes)+rhosno*m_snow(elnodes))*inv_rhowat
+                do j=1,3
+                    p_ice(j)=min(p_ice(j),max_ice_loading)
+                end do
+                elevation_elem = elevation(elnodes)
+                elevation_dx   = sum(gradient_sca(1:3,el)*(elevation_elem+p_ice*use_pice))
+                elevation_dy   = sum(gradient_sca(4:6,el)*(elevation_elem+p_ice*use_pice))
+                rhs_a(n) = rhs_a(n)-aa*elevation_dx
+                rhs_m(n) = rhs_m(n)-aa*elevation_dy
+            end do
+        end do
+!$OMP END PARALLEL DO
 #else
-
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(elnodes, elevation_elem, p_ice) DEFAULT(PRESENT)
 #else
         !$ACC UPDATE SELF(rhs_a, rhs_m, m_ice, a_ice)
-#endif
 #endif
         do el = 1,myDim_elem2D
             !___________________________________________________________________
@@ -527,10 +554,6 @@ subroutine EVPdynamics(ice, partit, mesh)
                 rhs_m(elnodes(k)) = rhs_m(elnodes(k))-aa*elevation_dy
             end do
         enddo
-#ifndef ENABLE_OPENACC
-!$OMP END DO
-!$OMP END PARALLEL
-#else
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC END PARALLEL LOOP
 #else
@@ -540,13 +563,28 @@ subroutine EVPdynamics(ice, partit, mesh)
     else
         ! for linear free surface
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnodes, aa, elevation_elem, elevation_dx, elevation_dy)
+        ! Same gather as above, without the floating-ice loading.
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, k, el, elnodes, aa, elevation_dx, elevation_dy)
+        do n = 1, myDim_nod2D
+            do k = 1, nod_in_elem2D_num(n)
+                el = nod_in_elem2D(k,n)
+                if (ulevels(el) > 1) cycle
+                elnodes = elem2D_nodes(:,el)
+                if (any(m_ice(elnodes) <= 0._WP) .or. &
+                    any(a_ice(elnodes) <= 0._WP)) cycle
+                aa = 9.81_WP*elem_area(el)/3.0_WP
+                elevation_dx = sum(gradient_sca(1:3,el)*elevation(elnodes))
+                elevation_dy = sum(gradient_sca(4:6,el)*elevation(elnodes))
+                rhs_a(n) = rhs_a(n)-aa*elevation_dx
+                rhs_m(n) = rhs_m(n)-aa*elevation_dy
+            end do
+        end do
+!$OMP END PARALLEL DO
 #else
 #if !defined(DISABLE_OPENACC_ATOMICS)
             !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(elnodes) DEFAULT(PRESENT)
 #else
             !$ACC UPDATE SELF(rhs_a, rhs_m, m_ice, a_ice)
-#endif
 #endif
         do el = 1,myDim_elem2D
             !___________________________________________________________________
@@ -576,9 +614,6 @@ subroutine EVPdynamics(ice, partit, mesh)
                 rhs_m(elnodes(k)) = rhs_m(elnodes(k))-aa*elevation_dy
             end do
         enddo
-#ifndef ENABLE_OPENACC
-!$OMP END PARALLEL DO
-#else
 #if !defined(DISABLE_OPENACC_ATOMICS)
             !$ACC END PARALLEL LOOP
 #else
