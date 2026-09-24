@@ -883,8 +883,8 @@ nl              => mesh%nl
     ! ================
     ! Monin-Obukhov
     ! ================
-    if (use_ice .and. use_momix) allocate(mo(nl,node_size),mixlength(node_size))
-    if (use_ice .and. use_momix) mixlength=0.
+    if (use_momix) allocate(mo(nl,node_size),mixlength(node_size))
+    if (use_momix) mixlength=0.
     ! ================
     ! Vertical velocity and pressure
     ! ================

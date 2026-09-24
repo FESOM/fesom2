@@ -272,12 +272,31 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     !$ACC END PARALLEL LOOP
 #endif
 
+    ! Limiter sums: each node gathers max(0, ±flux) / min(0, ±flux) over its incident edges
+    ! (mesh%nod_in_edge2D with sign) in ascending edge order.
 #ifndef ENABLE_OPENACC
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
 !$OMP DO
-#endif
+    do n=1, myDim_nod2D+eDim_nod2D
+       do k=1, mesh%nod_in_edge2D_num(n)
+          edge=mesh%nod_in_edge2D(k,n)
+          el=edge_tri(:,edge)
+          nl1=nlevels(el(1))-1
+          nu1=ulevels(el(1))
+          nl2=0
+          nu2=0
+          if (el(2)>0) then
+             nl2=nlevels(el(2))-1
+             nu2=ulevels(el(2))
+          end if
+          nl12 = max(nl1,nl2)
+          nu12 = nu1
+          if (nu2>0) nu12 = min(nu1,nu2)
+          do nz=nu12, nl12
+             fct_plus (nz,n)=fct_plus (nz,n) + max(0.0_WP, mesh%nod_in_edge2D_sgn(k,n)*adf_h(nz,edge))
+             fct_minus(nz,n)=fct_minus(nz,n) + min(0.0_WP, mesh%nod_in_edge2D_sgn(k,n)*adf_h(nz,edge))
+          end do
+       end do
+    end do
 #else
     !Horizontal
 #if !defined(DISABLE_OPENACC_ATOMICS)
@@ -285,7 +304,6 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 #else
     !$ACC UPDATE SELF(fct_plus, fct_minus, adf_h)
 #endif
-#endif 
     do edge=1, myDim_edge2D
        enodes(1:2)=edges(:,edge)
        el=edge_tri(:,edge)
@@ -352,6 +370,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 #endif
 #endif
     end do
+#endif
 #ifndef ENABLE_OPENACC
 !$OMP END DO
 #else
