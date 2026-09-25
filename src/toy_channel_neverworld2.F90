@@ -301,7 +301,7 @@ MODULE Toy_Neverworld2
                 allocate(val_tau(elem2d))
                 open(20, file=trim(meshpath)//'windstress@elem.out', status='old')
                 read(20, *) val_tau
-                stress_surf(1,:)=val_tau(myList_elem2D)
+                stress_surf(1,:)=val_tau(myList_elem2D(1:myDim_elem2D))
                 deallocate(val_tau)
 
             else

@@ -128,6 +128,31 @@ if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED AND NOT USE_YAC)
         TIMEOUT ${TEST_TIMEOUT}
     )
 
+    # Idealized (toy_ocean) configurations. They supply their own forcing and
+    # read only a mesh, so they need none of the bundled forcing or climatology
+    # data; the meshes are used in place from test/meshes/ via MESH_DIR. Values
+    # follow setups/test_souf and setups/test_neverworld2, i.e. what CI runs.
+    #
+    # Pass/fail is the clean run plus the sst artifact, so these show the
+    # configurations still start and complete. They do not compare answers: a
+    # numerical drift would go unnoticed. Adding that is designed in
+    # docs/pr/PLAN-ctest-coverage.md.
+    include(${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/FesomToyTest.cmake)
+
+    add_fesom_toy_test(integration_toy_soufflet_mpi8
+        WHICH_TOY "soufflet"
+        MESH_DIR "${FESOM_TESTING_ROOT}/test/meshes/soufflet"
+        CYCLIC_LENGTH "4.5"
+        NP 8
+        TIMEOUT ${TEST_TIMEOUT}
+    )
+
+    add_fesom_toy_test(integration_toy_neverworld2_mpi8
+        WHICH_TOY "neverworld2"
+        MESH_DIR "${FESOM_TESTING_ROOT}/test/meshes/neverworld2"
+        CYCLIC_LENGTH "60.0"
+        NP 8
+        TIMEOUT ${TEST_TIMEOUT}
     # Ocean-only run: the pi mesh with the sea-ice model switched off, otherwise
     # identical to integration_pi_mpi2 (CORE2 forcing, WOA18 initial state, 1 day).
     # This is the only ice-free configuration in the suite that is not a toy_ocean
