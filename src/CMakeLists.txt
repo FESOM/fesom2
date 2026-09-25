@@ -122,6 +122,14 @@ message(STATUS "ENABLE_IFS_INTERFACE: ${ENABLE_IFS_INTERFACE}")
 #     double exchange IS reached and is still typed to WP; needs the partner
 #     precision reconciled.
 #   * USE_YAC (cpl_yac_driver.F90) and ENABLE_IFS_INTERFACE -- untouched.
+#   * RECOM_COUPLED -- REcoM's own WP (REcoM_declarations, recom_modules.F90)
+#     is hardcoded to kind 8 and never follows this switch, while routines
+#     REcoM shares with the main model (e.g. read_2ddata_on_grid_NetCDF in
+#     gen_modules_read_NetCDF.F90, called from gen_surface_forcing.F90 for
+#     GloFeDust/GloNDust/River*2D/Erosion*2D/GloSed) type their buffers to the
+#     main model's WP. With USE_SINGLE_PRECISION=ON that's a real32/real64
+#     kind mismatch -- a compile-time type error there, not a silent runtime
+#     corruption, but still unconverted.
 #
 # Set FESOM_ALLOW_SINGLE_PRECISION_COUPLED=ON to override the refusal for the
 # modes below (intended for developing those fixes, not for production).
@@ -141,14 +149,18 @@ if(USE_SINGLE_PRECISION AND NOT FESOM_ALLOW_SINGLE_PRECISION_COUPLED)
    if(ENABLE_IFS_INTERFACE)
       list(APPEND _fesom_sp_coupled_modes "ENABLE_IFS_INTERFACE (IFS interface)")
    endif()
+   if(RECOM_COUPLED)
+      list(APPEND _fesom_sp_coupled_modes "RECOM_COUPLED (REcoM biogeochemistry)")
+   endif()
    if(_fesom_sp_coupled_modes)
       string(REPLACE ";" ", " _fesom_sp_coupled_modes "${_fesom_sp_coupled_modes}")
       message(FATAL_ERROR
          "USE_SINGLE_PRECISION=ON is not yet supported together with: ${_fesom_sp_coupled_modes}.\n"
          "These coupling paths still pass MPI_DOUBLE_PRECISION for real(kind=WP) "
-         "buffers (or have not been reviewed), which corrupts memory when WP is "
-         "real32. OIFS-via-OASIS coupling (OIFS_COUPLED) has been converted and is "
-         "allowed.\n"
+         "buffers (or have not been reviewed), or (RECOM_COUPLED) mix REcoM's own "
+         "always-double WP with the main model's WP, which corrupts memory or fails "
+         "to compile when WP is real32. OIFS-via-OASIS coupling (OIFS_COUPLED) has "
+         "been converted and is allowed.\n"
          "Build these configurations in double precision (USE_SINGLE_PRECISION=OFF), "
          "or set FESOM_ALLOW_SINGLE_PRECISION_COUPLED=ON if you are developing the fix.")
    endif()
