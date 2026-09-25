@@ -87,7 +87,9 @@ Section &run_config
 - **flag_debug=.false.**, **flag_warn_cflz=.true.** runtime verbosity and vertical CFL warnings.
 - **lwiso=.false.** enable water isotope tracers (adds isotope tracers internally).
 - **use_transit=.false.** enable transient tracer package (CFCs, SF6, etc.; controlled via ``namelist.transit``).
-- **compute_oasis_corners=.false.** compute grid cell corners for conservative coupling through OASIS.
+- **compute_oasis_corners=.false.** *Deprecated here.* Moved to ``&coupling_oasis``
+  in ``namelist.cpl``; still honoured in this section for one release, and either
+  location switches it on.
 
 Section &machine
 """"""""""""""""
@@ -97,7 +99,7 @@ Section &machine
 Section &icebergs
 """""""""""""""""
 
-- **use_icebergs=.false.**, **use_icesheet_coupling=.false.** toggle the iceberg module and coupling to an ice-sheet model.
+- **use_icebergs=.false.**, **use_icesheet_coupling=.false.** toggle the iceberg module and coupling to an ice-sheet model. ``use_icebergs`` also sizes the ice tracer array: switching it on adds an iceberg concentration and thickness tracer, which changes the binary restart layout, so a restart cannot be carried across a change of this switch.
 - **turn_off_hf=.false.**, **turn_off_fw=.false.** disable latent heat or freshwater fluxes from icebergs when needed for debugging.
 - **lbalance_fw=.true.**, **cell_saturation=2** controls for preventing excessive freshwater injection into small grid cells.
 - **lmin_latent_hf=.true.**, **lverbose_icb=.false.** control numerical safety and verbosity of iceberg thermodynamics.

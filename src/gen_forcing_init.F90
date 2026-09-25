@@ -9,9 +9,9 @@ module gen_forcing_init_module
 #if defined(__recom)
 use g_sbf, only: sbc_ini_recom
 #endif
-#if defined (__oasis)
+#if defined (__cpl_oasis)
   use cpl_driver, only : nrecv
-#elif defined(__yac)
+#elif defined (__cpl_yac)
   use cpl_yac_driver, only : nrecv
 #endif
 
@@ -38,7 +38,7 @@ type(t_partit), intent(inout), target :: partit
 #if defined(__recom)
      call sbc_ini_recom(partit)         ! initialize forcing fields
 #endif
-#if !defined(__oasis) && !defined(__yac)
+#if !defined (__cpl_coupler)
      call sbc_ini(partit, mesh)         ! initialize forcing fields
 #endif
   endif
@@ -123,12 +123,12 @@ subroutine forcing_array_setup(partit, mesh)
   runoff=0.0_WP
   evaporation = 0.0_WP
   ice_sublimation = 0.0_WP
-#if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
+#if defined (__cpl_enabled)
   allocate(sublimation(n2), evap_no_ifrac(n2))
   sublimation=0.0_WP
   evap_no_ifrac=0.0_WP
 #endif
-#if defined (__oasis) || defined (__yac)
+#if defined (__cpl_coupler)
   allocate(tmp_sublimation(n2),tmp_evap_no_ifrac(n2), tmp_shortwave(n2))
   allocate(atm_net_fluxes_north(nrecv), atm_net_fluxes_south(nrecv))
   allocate(oce_net_fluxes_north(nrecv), oce_net_fluxes_south(nrecv))
@@ -146,7 +146,11 @@ subroutine forcing_array_setup(partit, mesh)
   flux_correction_total=0.0_WP  
 #endif 
 
-#if defined (__oasis) || defined (__ifsinterface)
+! TODO: __cpl_yac is absent here, as in the pre-rework guard. Declaration
+! and use agree, so this is self-consistent, but YAC does not get
+! residualifwflx or the rhofwt/rhowat freshwater conversion. Widening the
+! guard changes YAC results, so it is left to a separate change.
+#if defined (__cpl_oasis) || defined (__cpl_direct)
   allocate(residualifwflx(n2))
   residualifwflx = 0.0_WP
 
