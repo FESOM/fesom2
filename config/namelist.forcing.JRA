@@ -64,6 +64,10 @@ age_start_year=2000
    nm_nc_freq    = 1            ! data points per day (i.e. 86400 if the time axis is in seconds)
    nm_nc_tmid    = 0            ! 1 if the time stamps are given at the mid points of the netcdf file, 0 otherwise (i.e. 1 in CORE1, CORE2; 0 in JRA55)
    l_xwind=.true. l_ywind=.true. l_xstre=.false. l_ystre=.false. l_humi=.true. l_qsr=.true. l_qlw=.true. l_tair=.true. l_prec=.true. l_mslp=.false. l_cloud=.false. l_snow=.true.
+   use_ocean_only_forcing = .true.
+   nm_ocean_mask_file     = '/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/sftof_input4MIPs_atmosphericState_OMIP_MRI-JRA55-do-1-6-0_gr.nc'
+   nm_ocean_mask_var      = 'sftof'
+   ocean_mask_threshold   = 90.0
    runoff_data_source ='CORE2'	!Dai09, CORE2
    nm_runoff_file     ='/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0/CORE2_runoff.nc'
    !nm_runoff_file     ='/work/ollie/qwang/FESOM2_input/mesh/CORE2_finaltopo_mean/forcing_data_on_grid/runoff_clim.nc'

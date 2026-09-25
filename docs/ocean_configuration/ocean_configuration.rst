@@ -16,7 +16,7 @@ Section &oce_dyn (namelist.oce)
 - **SPP=.false.**, **SPP_dep_N=-80.0**, **SPP_dep_S=-80.0**, **SPP_drhodz_cr_N=0.01**, **SPP_drhodz_cr_S=0.01**, **SPP_expon=5** brine rejection (“salt plume”) parameterization switches and shape parameters. When enabled, rejected salt is distributed with the given maximum depths and density-gradient thresholds per hemisphere.
 - **N2smth_v=.false.**, **N2smth_h=.true.**, **N2smth_hidx=1** smoothing of the buoyancy frequency used by Redi/GM; vertical smoothing is off by default, one horizontal smoothing pass is applied when enabled.
 - **visc_sh_limit=5.0e-3** ceiling for shear-induced viscosity in KPP; prevents runaway mixing when shear is strong.
-- **mix_scheme='KPP'**, **Ricr=0.3**, **concv=1.6** choose the vertical mixing scheme (``'KPP'``, ``'PP'``, or CVMix variants). ``Ricr`` and ``concv`` set the bulk Richardson number threshold and convection constant used by the schemes.
+- **mix_scheme='KPP'**, **Ricr=0.3**, **concv=1.6** choose the vertical mixing scheme; see :ref:`sec_mixing_scheme_selection` for the full list of accepted values. ``Ricr`` and ``concv`` set the bulk Richardson number threshold and convection constant used by the schemes.
 - **which_pgf='shchepetkin'**, **alpha=1.0**, **theta=1.0**, **use_density_ref=.false.** control the pressure-gradient formulation: Shchepetkin/Jacobian by default, with implicitness parameters ``alpha`` and ``theta``. ``use_density_ref`` switches between a constant reference density and the profile in ``density_ref_T/S`` (see ``o_param``).
 - **Fer_GM=.true.**, **K_GM_max=1000.0**, **K_GM_min=2.0**, **K_GM_bvref=1**, **K_GM_resscalorder=2**, **K_GM_rampmax=-1.0**, **K_GM_rampmin=-1.0**, **K_GM_cm=3.0**, **K_GM_cmin=0.1**, **K_GM_Ktaper=.false.** configure Gent–McWilliams thickness diffusivity. ``K_GM_resscalorder`` selects resolution vs area scaling, ``*_ramp*`` taper GM in coarse regions, ``K_GM_cm/K_GM_cmin`` bound the baroclinic wave speed used in scaling, and ``K_GM_Ktaper`` applies neutral-slope tapering to the coefficient itself.
 - **scaling_Ferreira=.false.**, **scaling_Rossby=.false.**, **scaling_resolution=.true.**, **scaling_FESOM14=.false.** optional spatial scalings for GM: vertical Ferreira scaling, Rossby-radius switch-off, resolution-based scaling (default), and a FESOM1.4-style near-surface taper in the Northern Hemisphere.
@@ -63,8 +63,20 @@ Section &dynamics_general
 - **momadv_opt=2** momentum advection choice (currently only option 2 is supported).
 - **use_freeslip=.false.** lateral boundary condition; ``.false.`` uses no-slip.
 - **use_wsplit=.false.**, **wsplit_maxcfl=1.0** toggles implicit/explicit splitting of vertical velocity; ``wsplit_maxcfl`` is the allowed explicit CFL number.
-- **ldiag_KE=.false.** enable kinetic-energy diagnostics (extra output/compute cost).
+- **ldiag_KE=.false.** enable kinetic-energy diagnostics (extra output/compute cost). When active, a set of ``ke_*`` output streams is defined in addition to the regular output:
+
+  - ``ke_adv_u_xVEL``/``ke_adv_v_xVEL`` and ``ke_wind_x_xVEL``/``ke_wind_y_xVEL`` record the work done by momentum advection and by the wind stress, and ``W_x_RHO`` the buoyancy work.
+  - ``ke_adv_u``/``ke_adv_v`` and ``ke_wind_x``/``ke_wind_y`` store the corresponding tendencies, together with the mean-flow fields ``ke_Umean``, ``ke_Vmean``, ``ke_U2mean`` and ``ke_V2mean``.
+  - auxiliary fields needed to close the budget offline are also written, among them ``ke_dW``, ``ke_PFULL``, the surface fluxes ``ke_J`` and ``ke_G`` and the density fields ``ke_D``, ``ke_Dx``, ``ke_Dy`` and ``ke_n0``.
+
 - **AB_order=2** Adams–Bashforth time-stepping order for momentum (2 or 3).
+- **soltol=1e-5** relative tolerance of the conjugate-gradient solver for the sea surface height. It takes effect on a cold start only: the value is carried in the derived-type restart dump, which is read after the namelist, so a restarted run keeps the tolerance the experiment was started with.
+- **maxiter=2000** iteration cap of the SSH solver, cold-start only like ``soltol``. Hitting the cap does not abort the run; it is counted as a non-convergence in the end-of-run solver summary.
+- **precond_variant=1** preconditioner formula of the SSH solver. ``1`` (the default) is a symmetric variant that needs roughly a third fewer iterations, ``0`` restores the formula used before release 2.8.0 and ``-1`` resolves to ``1`` in single-precision builds and ``0`` in double precision; the resolved value is echoed at startup. Unlike ``soltol`` and ``maxiter`` this parameter is re-read on restart.
+
+.. attention::
+   In single-precision builds do not set ``soltol`` below about ``1e-6``. The convergence test is a residual ratio and cannot see the float32 residual floor, so the solver would report success it has not achieved.
+
 - **use_ssh_se_subcycl=.false.**, **se_BTsteps=50**, **se_BTtheta=0.14**, **se_bottdrag=.true.**, **se_bdrag_si=.true.**, **se_visc=.true.**, **se_visc_gamma0=10**, **se_visc_gamma1=19500**, **se_visc_gamma2=0** controls for split-explicit barotropic subcycling. When enabled, ``se_*`` parameters define the implicitness, viscosity and bottom drag applied in the fast barotropic solver.
 
 Tracer transport (namelist.tra)
@@ -96,6 +108,31 @@ Section &tracer_general
 - **smooth_bh_tra=.false.**, **gamma0_tra=0.0005**, **gamma1_tra=0.0125**, **gamma2_tra=0.0** biharmonic diffusion settings for tracers (filter implementation). Recommended only at very high resolution; ``gamma2_tra`` is rarely used.
 - **i_vert_diff=.true.** implicit vertical diffusion for tracers.
 - **AB_order=2** Adams–Bashforth order for tracer advection (2 or 3).
+
+.. _sec_mixing_scheme_selection:
+
+Choosing the vertical mixing scheme
+"""""""""""""""""""""""""""""""""""
+
+The vertical mixing scheme is selected with ``mix_scheme`` in ``&oce_dyn`` of ``namelist.oce``. Two native schemes are available in every build and take their parameters from ``namelist.oce`` itself:
+
+- ``'KPP'`` the FESOM1.4-like K-Profile Parameterization.
+- ``'PP'`` the FESOM1.4-like Pacanowski and Philander scheme.
+
+When FESOM is compiled with the CVMix library (cpp key ``__cvmix``), the community implementations of these closures and several additional ones become available:
+
+- ``'cvmix_KPP'`` the CVMix K-Profile Parameterization.
+- ``'cvmix_PP'`` the CVMix Pacanowski and Philander scheme.
+- ``'cvmix_TKE'`` a prognostic turbulent kinetic energy closure.
+- ``'cvmix_IDEMIX'`` the internal wave energy model; as a stand-alone choice it is meant for debugging, in production it supplies energy to the TKE scheme.
+- ``'cvmix_TIDAL'`` Simmons-type tidal mixing, likewise mainly for stand-alone debugging.
+
+Schemes can be combined additively by joining two names with ``+`` in the same string. ``'cvmix_TKE+cvmix_IDEMIX'`` runs the TKE closure with internal-wave energy input from IDEMIX, and tidal mixing can be added to any base scheme as ``'KPP+cvmix_TIDAL'``, ``'PP+cvmix_TIDAL'``, ``'cvmix_KPP+cvmix_TIDAL'`` or ``'cvmix_PP+cvmix_TIDAL'``. The authoritative list of accepted strings is the ``select case`` block in ``src/oce_setup_step.F90``; an unrecognized string stops the model at startup.
+
+Every ``cvmix_`` scheme reads its parameters from ``namelist.cvmix``, whose sections are documented below: ``&param_tke`` and ``&param_idemix`` for the TKE and IDEMIX closures, ``&param_pp`` and ``&param_kpp`` for the CVMix flavours of PP and KPP, and ``&param_tidal`` for tidal mixing. The native ``'KPP'`` and ``'PP'`` schemes ignore ``namelist.cvmix`` entirely and use the settings from ``&oce_dyn`` and ``&tracer_phys`` instead (``Ricr``, ``concv``, the shear limits and the background diffusivities).
+
+.. note::
+   The stock ``config/namelist.oce`` selects the native ``'KPP'`` scheme, so CVMix is never used implicitly. To run with a CVMix closure, set ``mix_scheme`` to one of the ``cvmix_`` values explicitly and make sure the executable was built with CVMix support.
 
 Vertical mixing (namelist.cvmix)
 """""""""""""""""""""""""""""""""
@@ -155,3 +192,17 @@ Transient tracers (namelist.transit)
 - **r14c_a=1.0**, **r39ar_a=1.0**, **xarg_a=9.34e-3**, **xco2_a=284.32e-6** mean atmospheric ratios/mole fractions used when constant forcing is requested.
 - **dic_0=2.0**, **arg_0=0.01** initial mixed-layer concentrations for DIC and argon when transient tracers are enabled.
 - **decay14=3.8561e-12**, **decay39=8.1708e-11** radioactive decay constants (1/s) for 14C and 39Ar; used to age tracers during integration.
+
+Freshwater hosing experiments
+=============================
+
+FESOM can impose an idealised Antarctic meltwater anomaly (a hosing experiment). The switches live in ``&run_config`` of ``namelist.config``; the implementation is in ``src/oce_hosing.F90``:
+
+- **use_hosing=.false.** enable the freshwater anomaly. It is applied on coastal nodes south of 60S; the mask is built once at startup from the boundary edges of the mesh and normalized so that its area integral equals one.
+- **hosing_mode='surf'** how the anomaly enters the ocean. ``'surf'`` adds it to the surface freshwater flux as a virtual salinity flux and therefore works with the linear free surface only (``which_ALE='linfs'`` in ``namelist.config``). ``'depth'`` instead dilutes the salinity tracer directly over a fixed range of mid-depth model levels set in the code, distributing the anomaly proportionally to the cell volume.
+- **hosing_hSv=0.0** magnitude of the anomaly in Sverdrup. Because of the mask normalization the imposed flux integrates to exactly this value.
+
+The imposed flux can be written through the regular output list as ``hfw`` (surface mode) or ``hfw3D`` (depth mode), and a passive tracer with ID 304 can be added to ``nml_tracer_list`` to track the spreading of the hosing water.
+
+.. note::
+   Alternative masks (all surface nodes south of 60S, or a smoothed band of several node rows along the coast) and heat-flux corrections accounting for the meltwater temperature are prepared as commented code in ``src/oce_hosing.F90``.

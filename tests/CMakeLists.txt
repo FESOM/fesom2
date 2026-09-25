@@ -66,6 +66,9 @@ add_subdirectory(integration)
 # Add mesh partitioner tests
 add_subdirectory(meshpartitioner)
 
+# Add OpenMP source-level guards (issues #444/#528)
+add_subdirectory(openmp)
+
 
 # Add remote mesh pipeline tests
 add_subdirectory(remote)

@@ -899,7 +899,6 @@
               module subroutine ini_icepack_io(year, partit, mesh)
                   use mod_mesh
                   use mod_partit
-                  use mod_parsup
                   implicit none
                   type(t_mesh),           intent(in)   , target :: mesh
                   type(t_partit),         intent(inout), target :: partit

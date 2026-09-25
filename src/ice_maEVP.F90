@@ -1,80 +1,31 @@
-module ice_maEVP_interfaces
-    interface
-        subroutine ssh2rhs(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine ssh2rhs
+module ice_maEVP_module
+    USE MOD_ICE
+    USE MOD_PARTIT
+    USE MOD_MESH
+    USE o_param
+    USE g_config
+    USE o_arrays
+    USE g_comm_auto
+#if defined (__icepack)
+    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
+#endif
+#if defined (__icepack)
+    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
+    use icedrv_main,   only: icepack_to_fesom
+#endif
+#if defined (__icepack)
+    use icedrv_main,   only: strength
+#endif
 
-        subroutine stress_tensor_a(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine stress_tensor_a
+    implicit none
 
-        subroutine stress2rhs_m(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine stress2rhs_m
+    private
+    public :: stress_tensor_m, ssh2rhs, stress2rhs_m, EVPdynamics_m, &
+              find_alpha_field_a, stress_tensor_a, EVPdynamics_a, &
+              find_beta_field_a
 
-        subroutine find_alpha_field_a(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine find_alpha_field_a
+contains
 
-        subroutine find_beta_field_a(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine find_beta_field_a
-   end interface
-end module ice_maEVP_interfaces
-
-module ice_maEVPdynamics_interface
-    interface
-        subroutine EVPdynamics_a(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_mesh)  , intent(in)   , target :: mesh
-        type(t_partit), intent(inout), target :: partit
-        type(t_ice)   , intent(inout), target :: ice
-        end subroutine EVPdynamics_a
-
-        subroutine EVPdynamics_m(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_mesh)  , intent(in)   , target :: mesh
-        type(t_partit), intent(inout), target :: partit
-        type(t_ice)   , intent(inout), target :: ice
-        end subroutine EVPdynamics_m
-   end interface
-end module ice_maEVPdynamics_interface
 !
 !
 !_______________________________________________________________________________
@@ -84,16 +35,6 @@ end module ice_maEVPdynamics_interface
 ! New implementation following Boullion et al, Ocean Modelling 2013.
 ! SD, 30.07.2014
 subroutine stress_tensor_m(ice, partit, mesh)
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use o_param
-    use mod_mesh
-    use g_config
-#if defined (__icepack)
-    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
-#endif
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -138,7 +79,12 @@ subroutine stress_tensor_m(ice, partit, mesh)
         if (ulevels(elem) > 1) cycle
 
         msum=sum(m_ice(elnodes))*val3
-        if(msum<=0.01_WP) cycle !DS
+        if(msum<=0.01_WP) then
+            sigma11(elem) = 0.0_WP
+            sigma22(elem) = 0.0_WP
+            sigma12(elem) = 0.0_WP
+            cycle
+        end if
         asum=sum(a_ice(elnodes))*val3
 
         dx=gradient_sca(1:3,elem)
@@ -198,12 +144,6 @@ end subroutine stress_tensor_m
 ! Compute the contribution from the elevation to the rhs
 ! S.D. 30.07.2014
 subroutine ssh2rhs(ice, partit, mesh)
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_param
-    use mod_mesh
-    use g_config
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -245,7 +185,11 @@ subroutine ssh2rhs(ice, partit, mesh)
     !_____________________________________________________________________________
     ! use floating sea ice for zlevel and zstar
     if (use_floatice .and.  .not. trim(which_ale)=='linfs') then
+#if defined(__openmp_reproducible)
+!$OMP SINGLE
+#else
 !$OMP DO
+#endif
         do elem=1,myDim_elem2d
             elnodes=elem2D_nodes(:,elem)
             !_______________________________________________________________________
@@ -271,21 +215,25 @@ subroutine ssh2rhs(ice, partit, mesh)
             do n=1,3
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
                 call omp_set_lock  (partit%plock(elnodes(n)))
-#else
-!$OMP ORDERED
 #endif
                rhs_a(elnodes(n))=rhs_a(elnodes(n))-aa
                rhs_m(elnodes(n))=rhs_m(elnodes(n))-bb
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
                call omp_unset_lock(partit%plock(elnodes(n)))
-#else
-!$OMP END ORDERED
 #endif
             end do
         end do
+#if defined(__openmp_reproducible)
+!$OMP END SINGLE
+#else
 !$OMP END DO
+#endif
     else
+#if defined(__openmp_reproducible)
+!$OMP SINGLE
+#else
 !$OMP DO
+#endif
         do elem=1,myDim_elem2d
             elnodes=elem2D_nodes(:,elem)
             !_______________________________________________________________________
@@ -301,19 +249,19 @@ subroutine ssh2rhs(ice, partit, mesh)
             do n=1,3
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
                 call omp_set_lock  (partit%plock(elnodes(n)))
-#else
-!$OMP ORDERED
 #endif
                rhs_a(elnodes(n))=rhs_a(elnodes(n))-aa
                rhs_m(elnodes(n))=rhs_m(elnodes(n))-bb
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
                call omp_unset_lock(partit%plock(elnodes(n)))
-#else
-!$OMP END ORDERED
 #endif
             end do
         end do
+#if defined(__openmp_reproducible)
+!$OMP END SINGLE
+#else
 !$OMP END DO
+#endif
     end if
 !$OMP END PARALLEL
 end subroutine ssh2rhs
@@ -323,12 +271,6 @@ end subroutine ssh2rhs
 ! add internal stress to the rhs
 ! SD, 30.07.2014
 subroutine stress2rhs_m(ice, partit, mesh)
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_param
-    use mod_mesh
-    use g_config
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -371,7 +313,11 @@ subroutine stress2rhs_m(ice, partit, mesh)
 !$OMP END PARALLEL DO
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, k, row, dx, dy, vol, mf, aa, bb, mass, cluster_area, elevation_elem)
+#if defined(__openmp_reproducible)
+!$OMP SINGLE
+#else
 !$OMP DO
+#endif
     do elem=1,myDim_elem2d
         elnodes=elem2D_nodes(:,elem)
         !_______________________________________________________________________
@@ -389,8 +335,6 @@ subroutine stress2rhs_m(ice, partit, mesh)
             row=elnodes(k)
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
             call omp_set_lock  (partit%plock(row))
-#else
-!$OMP ORDERED
 #endif
             u_rhs_ice(row)=u_rhs_ice(row) - vol* &
                 (sigma11(elem)*dx(k)+sigma12(elem)*dy(k))    &
@@ -400,12 +344,14 @@ subroutine stress2rhs_m(ice, partit, mesh)
         +vol*sigma11(elem)*val3*mf                         ! metrics
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
         call omp_unset_lock(partit%plock(row))
-#else
-!$OMP END ORDERED
 #endif
         end do
     end do
+#if defined(__openmp_reproducible)
+!$OMP END SINGLE
+#else
 !$OMP END DO
+#endif
 !$OMP DO
     do row=1, myDim_nod2d
         !_______________________________________________________________________
@@ -413,7 +359,8 @@ subroutine stress2rhs_m(ice, partit, mesh)
         if ( ulevels_nod2d(row)>1 ) cycle
 
         mass=(m_ice(row)*rhoice+m_snow(row)*rhosno)
-        mass=mass/(1.0_WP+mass*mass)
+        mass=1.0_WP/max(mass, 9.0_WP)  ! 9.0 kg/m² per GRID area — numerical floor to prevent near-zero inertia
+        !mass=mass/(1.0_WP+mass*mass)   ! original: dimensionally inconsistent (1 + [kg/m²]²)
         u_rhs_ice(row)=(u_rhs_ice(row)*mass + rhs_a(row))/area(1,row)
         v_rhs_ice(row)=(v_rhs_ice(row)*mass + rhs_m(row))/area(1,row)
     end do
@@ -427,18 +374,6 @@ end subroutine stress2rhs_m
 ! New implementation based on Bouillion et al. Ocean Modelling 2013
 ! SD 30.07.14
 subroutine EVPdynamics_m(ice, partit, mesh)
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use o_param
-    use g_config
-    use o_arrays
-    use g_comm_auto
-#if defined (__icepack)
-    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
-    use icedrv_main,   only: icepack_to_fesom
-#endif
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -448,6 +383,7 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     real(kind=WP)    :: rdt, drag, det
     real(kind=WP)    :: inv_thickness(partit%myDim_nod2D), umod, rhsu, rhsv
     logical          :: ice_el(partit%myDim_elem2D), ice_nod(partit%myDim_nod2D)
+    logical          :: lcav_edge
     !NR for stress_tensor_m
     integer         :: el, elnodes(3)
     real(kind=WP)   :: dx(3), dy(3), msum, asum
@@ -562,7 +498,11 @@ subroutine EVPdynamics_m(ice, partit, mesh)
     ! use floating sea ice for zlevel and zstar
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(el, elnodes, vol, dx, dy, p_ice, n, bb, aa)
     if (use_floatice .and.  .not. trim(which_ale)=='linfs') then
+#if defined(__openmp_reproducible)
+!$OMP SINGLE
+#else
 !$OMP DO
+#endif
         do el=1,myDim_elem2d
             elnodes=elem2D_nodes(:,el)
 
@@ -589,23 +529,27 @@ subroutine EVPdynamics_m(ice, partit, mesh)
             do n=1, 3
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
                call omp_set_lock  (partit%plock(elnodes(n)))
-#else
-!$OMP ORDERED
 #endif
                rhs_a(elnodes(n))=rhs_a(elnodes(n))-aa
                rhs_m(elnodes(n))=rhs_m(elnodes(n))-bb
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
                call omp_unset_lock(partit%plock(elnodes(n)))
-#else
-!$OMP END ORDERED
 #endif
             end do
         end do
+#if defined(__openmp_reproducible)
+!$OMP END SINGLE
+#else
 !$OMP END DO
+#endif
     !_____________________________________________________________________________
     ! use levitating sea ice for linfs, zlevel and zstar
     else
+#if defined(__openmp_reproducible)
+!$OMP SINGLE
+#else
 !$OMP DO
+#endif
         do el=1,myDim_elem2d
             elnodes=elem2D_nodes(:,el)
             !_______________________________________________________________________
@@ -621,19 +565,19 @@ subroutine EVPdynamics_m(ice, partit, mesh)
             do n=1, 3
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
             call omp_set_lock  (partit%plock(elnodes(n)))
-#else
-!$OMP ORDERED
 #endif
                rhs_a(elnodes(n))=rhs_a(elnodes(n))-aa
                rhs_m(elnodes(n))=rhs_m(elnodes(n))-bb
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
             call omp_unset_lock(partit%plock(elnodes(n)))
-#else
-!$OMP END ORDERED
 #endif
             end do
         end do
+#if defined(__openmp_reproducible)
+!$OMP END SINGLE
+#else
 !$OMP END DO
+#endif
     end if
 !$OMP END PARALLEL
     !___________________________________________________________________________
@@ -649,10 +593,11 @@ subroutine EVPdynamics_m(ice, partit, mesh)
 
         if (a_ice(i) >= 0.01_WP) then
             inv_thickness(i) = (rhoice*m_ice(i)+rhosno*m_snow(i))/a_ice(i)
-            inv_thickness(i) = 1.0_WP/max(inv_thickness(i), 9.0_WP)  ! Limit the mass
+            inv_thickness(i) = 1.0_WP/max(inv_thickness(i), 9.0_WP)  ! 9.0 kg/m² per ICE area (≈1 cm ice per unit ice area)
 
             mass(i) = (m_ice(i)*rhoice+m_snow(i)*rhosno)
-            mass(i) = mass(i)/((1.0_WP+mass(i)*mass(i))*area(1,i))
+            mass(i) = 1.0_WP/(max(mass(i), 9.0_WP)*area(1,i))  ! 9.0 kg/m² per GRID area (different quantity; same floor for numerical safety)
+            !mass(i) = mass(i)/((1.0_WP+mass(i)*mass(i))*area(1,i))   ! original: dimensionally inconsistent
 
             ! scale rhs_a, rhs_m, too.
             rhs_a(i) = rhs_a(i)/area(1,i)
@@ -701,8 +646,12 @@ subroutine EVPdynamics_m(ice, partit, mesh)
         ! New implementation following Boullion et al, Ocean Modelling 2013.
         ! SD, 30.07.2014
         !_______________________________________________________________________
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(el, i, ed, row, elnodes, dx, dy, meancos, eps1, eps2, delta, pressure, umod, drag, rhsu, rhsv, det, n)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(el, i, ed, row, elnodes, dx, dy, meancos, eps1, eps2, delta, pressure, umod, drag, rhsu, rhsv, det, n, lcav_edge)
+#if defined(__openmp_reproducible)
+!$OMP DO ORDERED
+#else
 !$OMP DO
+#endif
         do el=1,myDim_elem2D
             if (ulevels(el)>1) cycle
 
@@ -857,8 +806,13 @@ subroutine EVPdynamics_m(ice, partit, mesh)
             !___________________________________________________________________
             ! apply sea ice velocity boundary conditions at cavity-ocean edge
             if (use_cavity) then
-                if ( (ulevels(edge_tri(1,ed))>1) .or. &
-                    ( edge_tri(2,ed)>0 .and. ulevels(edge_tri(2,ed))>1) ) then
+                ! .and. is not short-circuit in Fortran: guard edge_tri(2,ed)>0
+                ! separately or ulevels(0) is read at boundary edges.
+                lcav_edge = (ulevels(edge_tri(1,ed)) > 1)
+                if (.not. lcav_edge) then
+                    if (edge_tri(2,ed) > 0) lcav_edge = (ulevels(edge_tri(2,ed)) > 1)
+                end if
+                if (lcav_edge) then
                     do n=1, 2
 #if defined(_OPENMP)
                        call omp_set_lock  (partit%plock(edges(n, ed)))
@@ -906,15 +860,6 @@ end subroutine EVPdynamics_m
 ! aEVP implementation
 ! SD, 13.02.2017
 subroutine find_alpha_field_a(ice, partit, mesh)
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use o_param
-    use g_config
-#if defined (__icepack)
-    use icedrv_main,   only: strength
-#endif
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -1004,15 +949,6 @@ end subroutine find_alpha_field_a
 ! and Kimmritz et al., Ocean Modelling 2016
 ! SD, 14.02.2017
 subroutine stress_tensor_a(ice, partit, mesh)
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_param
-    use mod_mesh
-    use g_config
-#if defined (__icepack)
-    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
-#endif
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
@@ -1061,7 +997,12 @@ subroutine stress_tensor_a(ice, partit, mesh)
         elnodes=elem2D_nodes(:,elem)
 
         msum=sum(m_ice(elnodes))*val3
-        if(msum<=0.01_WP) cycle !DS
+        if(msum<=0.01_WP) then
+            sigma11(elem) = 0.0_WP
+            sigma22(elem) = 0.0_WP
+            sigma12(elem) = 0.0_WP
+            cycle
+        end if
         asum=sum(a_ice(elnodes))*val3
 
         dx=gradient_sca(1:3,elem)
@@ -1092,7 +1033,7 @@ subroutine stress_tensor_a(ice, partit, mesh)
         pressure=ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))/(delta+ice%delta_min)
 #endif
 
-        r1=pressure*(eps1-delta)
+        r1=pressure*(eps1-max(delta,ice%delta_min))
         r2=pressure*eps2*vale
         r3=pressure*eps12(elem)*vale
         si1=sigma11(elem)+sigma22(elem)
@@ -1122,25 +1063,13 @@ end subroutine stress_tensor_a
 ! and Kimmritz et al., Ocean Modelling  2016
 ! SD 14.02.17
 subroutine EVPdynamics_a(ice, partit, mesh)
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use o_param
-    USE o_arrays
-    use o_PARAM
-    use g_config, only: use_cavity
-    use g_comm_auto
-    use ice_maEVP_interfaces
-#if defined (__icepack)
-    use icedrv_main,   only: rdg_conv_elem, rdg_shear_elem, strength
-#endif
     implicit none
     type(t_ice),    intent(inout), target :: ice
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(in),    target :: mesh
     !___________________________________________________________________________
     integer          :: steps, shortstep, i, ed, n
+    logical          :: lcav_edge
     real(kind=WP)    :: rdt, drag, det, fc
     real(kind=WP)    :: thickness, inv_thickness, umod, rhsu, rhsv
     REAL(kind=WP)    :: t0,t1, t2, t3, t4, t5, t00, txx
@@ -1251,8 +1180,13 @@ subroutine EVPdynamics_a(ice, partit, mesh)
             !___________________________________________________________________
             ! apply sea ice velocity boundary conditions at cavity-ocean edge
             if (use_cavity) then
-                if ( (ulevels(edge_tri(1,ed))>1) .or. &
-                    ( edge_tri(2,ed)>0 .and. ulevels(edge_tri(2,ed))>1) ) then
+                ! .and. is not short-circuit in Fortran: guard edge_tri(2,ed)>0
+                ! separately or ulevels(0) is read at boundary edges.
+                lcav_edge = (ulevels(edge_tri(1,ed)) > 1)
+                if (.not. lcav_edge) then
+                    if (edge_tri(2,ed) > 0) lcav_edge = (ulevels(edge_tri(2,ed)) > 1)
+                end if
+                if (lcav_edge) then
                     u_ice_aux(edges(1:2,ed))=0.0_WP
                     v_ice_aux(edges(1:2,ed))=0.0_WP
                 end if
@@ -1277,11 +1211,6 @@ end subroutine EVPdynamics_a
 ! alpha=beta, and keep different names for generality; mEVP can work with
 ! alpha \ne beta, but not aEVP).
 subroutine find_beta_field_a(ice, partit, mesh)
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    USE MOD_ICE
-    use o_param
     Implicit none
     type(t_mesh)  , intent(in)   , target :: mesh
     type(t_partit), intent(inout), target :: partit
@@ -1315,3 +1244,5 @@ end subroutine find_beta_field_a
 !
 ! ================================================================
 !
+
+end module ice_maEVP_module

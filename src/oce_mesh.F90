@@ -1,137 +1,25 @@
-module read_mesh_interface
-  interface
-    subroutine read_mesh(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine read_mesh
-  end interface
-end module read_mesh_interface
-module find_levels_interface
-  interface
-    subroutine find_levels(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine find_levels
-  end interface
-end module find_levels_interface
-module find_levels_cavity_interface
-  interface
-    subroutine find_levels_cavity(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine find_levels_cavity
-  end interface
-end module find_levels_cavity_interface
-module test_tri_interface
-  interface
-    subroutine test_tri(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine test_tri
-  end interface
-end module test_tri_interface
-module load_edges_interface
-  interface
-    subroutine load_edges(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine load_edges
-  end interface
-end module load_edges_interface
-module find_neighbors_interface
-  interface
-    subroutine find_neighbors(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine find_neighbors
-  end interface
-end module find_neighbors_interface
-module mesh_areas_interface
-  interface
-    subroutine mesh_areas(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine mesh_areas
-  end interface
-end module mesh_areas_interface
-module elem_center_interface
-  interface
-    subroutine elem_center(elem, x, y, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      integer       :: elem    
-      real(kind=WP), intent(inout) :: x, y
-      type(t_mesh),  intent(inout), target :: mesh
-    end subroutine elem_center
-  end interface
-end module elem_center_interface
-module edge_center_interface
-  interface
-    subroutine edge_center(n1, n2, x, y, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      integer                     :: n1, n2
-      real(kind=WP), intent(inout):: x, y
-      type(t_mesh),  intent(inout), target :: mesh
-    end subroutine edge_center
-  end interface
-end module edge_center_interface
-module mesh_auxiliary_arrays_interface
-  interface
-    subroutine mesh_auxiliary_arrays(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine mesh_auxiliary_arrays
-  end interface
-end module mesh_auxiliary_arrays_interface
-module find_levels_min_e2n_interface
-  interface
-    subroutine find_levels_min_e2n(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine find_levels_min_e2n
-  end interface
-end module find_levels_min_e2n_interface
-module check_total_volume_interface
-  interface
-    subroutine check_total_volume(partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(inout), target :: mesh
-      type(t_partit), intent(inout), target :: partit
-    end subroutine check_total_volume
-  end interface
-end module check_total_volume_interface
+module oce_mesh_module
+    USE MOD_MESH
+    USE MOD_PARTIT
+    use par_support_module, only: par_ex
+    USE g_config
+    USE g_ROTATE_grid
+    USE par_support_module, only: par_ex, init_mpi_types, init_gatherLists
+    USE iso_fortran_env, only: error_unit
+    USE o_PARAM
+    USE o_ARRAYS
+    USE g_comm_auto
+
+    implicit none
+
+    private
+    public :: mesh_setup, read_mesh, find_levels, find_levels_cavity, &
+              find_levels_min_e2n, test_tri, load_edges, &
+              find_neighbors, edge_center, elem_center, mesh_areas, &
+              mesh_auxiliary_arrays, check_mesh_consistency, &
+              check_total_volume, check_cavity_mesh_conflict
+
+contains
 
 ! Driving routine. The distributed mesh information and mesh proper 
 ! are read from files.
@@ -140,21 +28,6 @@ end module check_total_volume_interface
 ! Array sizes vary (sometimes we need only myDim, yet sometimes more)! 
 ! S. Danilov, 2012
 SUBROUTINE mesh_setup(partit, mesh)
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP
-USE g_config, only: flag_debug
-USE g_ROTATE_grid
-use read_mesh_interface
-use find_levels_interface
-use find_levels_cavity_interface
-use mesh_auxiliary_arrays_interface
-use test_tri_interface
-use load_edges_interface
-use find_levels_min_e2n_interface
-use find_neighbors_interface
-use mesh_areas_interface
-use par_support_interfaces
 IMPLICIT NONE
       type(t_mesh),   intent(inout)         :: mesh
       type(t_partit), intent(inout), target :: partit
@@ -189,6 +62,8 @@ IMPLICIT NONE
       if (use_cavity) then
         if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call find_levels_cavity'//achar(27)//'[0m'
         call find_levels_cavity(partit, mesh)
+      else
+        call check_cavity_mesh_conflict(partit, mesh)
       end if 
       
       if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call find_levels_min_e2n'//achar(27)//'[0m'
@@ -205,14 +80,6 @@ END SUBROUTINE mesh_setup
 ! Reads distributed mesh
 ! The mesh will be read only by 0 proc and broadcasted to the others.
 SUBROUTINE read_mesh(partit, mesh)
-use iso_fortran_env, only: error_unit
-USE o_PARAM
-USE g_CONFIG
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP
-USE o_ARRAYS
-USE g_rotate_grid 
 IMPLICIT NONE
 type(t_mesh),   intent(inout), target :: mesh
 type(t_partit), intent(inout), target :: partit
@@ -341,7 +208,13 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
     read(fileID,*) n      ! nod2D, we know it already
      error_status=0
      if (n/=mesh%nod2D) error_status=1 !set the error status for consistency between rpart and nod2D
+#if defined(__recom) && defined(__usetp)
+        if (partit%my_fesom_group==0) then
+#endif
     write(*,*) 'reading '// trim(file_name)   
+#if defined(__recom) && defined(__usetp)
+        end if
+#endif
   end if
   ! check the error status
   call MPI_BCast(error_status, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
@@ -403,8 +276,8 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
             end if    
         end do
      end if
-     call MPI_BCast(rbuff(1:k,1), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
-     call MPI_BCast(rbuff(1:k,2), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+     call MPI_BCast(rbuff(1:k,1), k, MPI_WP, 0, MPI_COMM_FESOM, ierror)
+     call MPI_BCast(rbuff(1:k,2), k, MPI_WP, 0, MPI_COMM_FESOM, ierror)
      call MPI_BCast(ibuff(1:k,2), k, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
      ! fill the local arrays
      do n=1, k
@@ -574,7 +447,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
         end if
         allocate(mesh%zbar(mesh%nl))              ! allocate the array for storing the standard depths
         if (mype==0) read(fileID,*) mesh%zbar
-        call MPI_BCast(mesh%zbar, mesh%nl, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+        call MPI_BCast(mesh%zbar, mesh%nl, MPI_WP, 0, MPI_COMM_FESOM, ierror)
         if(mesh%zbar(2)>0) mesh%zbar=-mesh%zbar   ! zbar is negative 
         allocate(mesh%Z(mesh%nl-1))
         mesh%Z=mesh%zbar(1:mesh%nl-1)+mesh%zbar(2:mesh%nl)  ! mid-depths of cells
@@ -615,7 +488,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
         end if
         allocate(mesh%zbar(mesh%nl))              ! allocate the array for storing the standard depths
         if (mype==0) read(fileID,*) mesh%zbar
-        call MPI_BCast(mesh%zbar, mesh%nl, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+        call MPI_BCast(mesh%zbar, mesh%nl, MPI_WP, 0, MPI_COMM_FESOM, ierror)
         if(mesh%zbar(2)>0) mesh%zbar=-mesh%zbar   ! zbar is negative 
         allocate(mesh%Z(mesh%nl-1))
         mesh%Z=mesh%zbar(1:mesh%nl-1)+mesh%zbar(2:mesh%nl)  ! mid-depths of cells
@@ -693,7 +566,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
             ! the maximum depth on earth in marianen trench
             if ( flag_wrongaux3d==0 .and. any(abs(rbuff(1:k,1))>11000.0_WP) ) flag_wrongaux3d=1
         end if
-        call MPI_BCast(rbuff(1:k,1), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+        call MPI_BCast(rbuff(1:k,1), k, MPI_WP, 0, MPI_COMM_FESOM, ierror)
         
         do n=1, k
             x=rbuff(n,1)
@@ -746,7 +619,7 @@ MPI_COMM_FESOM=>partit%MPI_COMM_FESOM
             ! the maximum depth on earth in marianen trench
             if ( flag_wrongaux3d==0 .and. any(abs(rbuff(1:k,1))>11000.0_WP) ) flag_wrongaux3d=1
         end if
-        call MPI_BCast(rbuff(1:k,1), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+        call MPI_BCast(rbuff(1:k,1), k, MPI_WP, 0, MPI_COMM_FESOM, ierror)
         
         do n=1, k
             x=rbuff(n,1)
@@ -919,11 +792,6 @@ CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
 ! partitioning
 !_______________________________________________________________________________
 subroutine find_levels(partit, mesh)
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_PARAM
-    use g_config
     !
     implicit none
     !
@@ -1121,11 +989,6 @@ end subroutine find_levels
 ! use_cavity=.True.
 !_______________________________________________________________________________
 subroutine find_levels_cavity(partit, mesh)
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_PARAM
-    use g_config
     !
     implicit none
     !
@@ -1470,7 +1333,7 @@ subroutine find_levels_cavity(partit, mesh)
             
             !___________________________________________________________________
             ! broadcast chunk buffer to all other CPUs (k...size of buffer)
-            call MPI_BCast(rbuff(1:k), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+            call MPI_BCast(rbuff(1:k), k, MPI_WP, 0, MPI_COMM_FESOM, ierror)
             
             !___________________________________________________________________
             ! fill the local arrays
@@ -1543,7 +1406,7 @@ subroutine find_levels_cavity(partit, mesh)
             
             !___________________________________________________________________
             ! broadcast chunk buffer to all other CPUs (k...size of buffer)
-            call MPI_BCast(rbuff(1:k), k, MPI_DOUBLE_PRECISION, 0, MPI_COMM_FESOM, ierror)
+            call MPI_BCast(rbuff(1:k), k, MPI_WP, 0, MPI_COMM_FESOM, ierror)
             
             !___________________________________________________________________
             ! fill the local arrays
@@ -1634,12 +1497,6 @@ end subroutine find_levels_cavity
 ! use_cavity=.True.
 !_______________________________________________________________________________
 subroutine find_levels_min_e2n(partit, mesh)
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_PARAM
-    use g_config
-    use g_comm_auto
     !
     implicit none
     !
@@ -1677,12 +1534,6 @@ end subroutine find_levels_min_e2n
 !
 !===========================================================================
 SUBROUTINE test_tri(partit, mesh)
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP
-USE o_PARAM
-USE g_CONFIG
-use g_rotate_grid
 IMPLICIT NONE
 ! Check the order of nodes in triangles; correct it if necessary to make
 ! it same sense (clockwise) 
@@ -1729,11 +1580,6 @@ real(kind=WP)               :: t0, t1
 END SUBROUTINE  test_tri
 !=========================================================================
 SUBROUTINE load_edges(partit, mesh)
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP
-USE o_PARAM
-USE g_CONFIG
 IMPLICIT NONE
 type(t_mesh),   intent(inout), target :: mesh
 type(t_partit), intent(inout), target :: partit
@@ -1970,13 +1816,6 @@ SUBROUTINE find_neighbors(partit, mesh)
 ! nod_in_elem2D(:, myDim_nod2D)
 ! 
 
-USE o_PARAM
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP
-USE g_ROTATE_grid
-use g_comm_auto
-use elem_center_interface
 implicit none
 type(t_mesh),   intent(inout), target :: mesh
 type(t_partit), intent(inout), target :: partit
@@ -2068,6 +1907,33 @@ CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
  END DO
  deallocate(temp_i)
 
+ ! == edges incident to node n, in ascending edge order, with the orientation sign
+ ! (+1 if n is edges(1,ed), -1 if edges(2,ed)). Lets a node gather the contributions
+ ! of its own edges so that no two threads write the same node and the summation
+ ! order is fixed by the mesh. Edges 1..myDim_edge2D include every edge with an
+ ! owned node, so the list is complete for owned nodes and partial for halo nodes.
+ allocate(mesh%nod_in_edge2D_num(myDim_nod2D+eDim_nod2D))
+ mesh%nod_in_edge2D_num=0
+ do n=1,myDim_edge2D
+    do j=1,2
+       node=mesh%edges(j,n)
+       mesh%nod_in_edge2D_num(node)=mesh%nod_in_edge2D_num(node)+1
+    end do
+ end do
+ allocate(mesh%nod_in_edge2D    (maxval(mesh%nod_in_edge2D_num),myDim_nod2D+eDim_nod2D))
+ allocate(mesh%nod_in_edge2D_sgn(maxval(mesh%nod_in_edge2D_num),myDim_nod2D+eDim_nod2D))
+ mesh%nod_in_edge2D=0
+ mesh%nod_in_edge2D_sgn=0
+ mesh%nod_in_edge2D_num=0
+ do n=1,myDim_edge2D
+    do j=1,2
+       node=mesh%edges(j,n)
+       mesh%nod_in_edge2D_num(node)=mesh%nod_in_edge2D_num(node)+1
+       mesh%nod_in_edge2D    (mesh%nod_in_edge2D_num(node),node)=n
+       mesh%nod_in_edge2D_sgn(mesh%nod_in_edge2D_num(node),node)=3-2*j
+    end do
+ end do
+
  ! Among elem_neighbors there can be negative numbers. These correspond to 
  ! boundary elements for which neighbours are absent. However, an element 
  ! should have at least two valid neighbors
@@ -2119,13 +1985,10 @@ END SUBROUTINE find_neighbors
 !==========================================================================
 subroutine edge_center(n1, n2, x, y, mesh)
 
-USE MOD_MESH
-USE o_PARAM
-USE g_CONFIG 
 implicit none
 integer                        :: n1, n2   ! nodes of the edge
 real(kind=WP),  intent(inout)  :: x, y
-type(t_mesh),   intent(inout), target :: mesh
+type(t_mesh),   intent(in),    target :: mesh
 real(kind=WP)                  :: a(2), b(2)
 
 a=mesh%coord_nod2D(:,n1)
@@ -2138,12 +2001,9 @@ y=0.5_WP*(a(2)+b(2))
 end subroutine edge_center
 !==========================================================================
 subroutine elem_center(elem, x, y, mesh)
-USE MOD_MESH
-USE o_PARAM
-USE g_CONFIG  
 implicit none
 real(kind=WP), intent(inout) :: x, y
-type(t_mesh),  intent(inout), target :: mesh
+type(t_mesh),  intent(in),    target :: mesh
 integer                      :: elem, elnodes(3), k    
 real(kind=WP)                ::  ax(3), amin
 
@@ -2160,13 +2020,6 @@ real(kind=WP)                ::  ax(3), amin
 end subroutine elem_center
 !==========================================================================
 SUBROUTINE mesh_areas(partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE o_PARAM
-    USE o_arrays, only: dum_3d_n
-    USE g_ROTATE_GRID
-    use g_comm_auto
     IMPLICIT NONE
     ! Collects auxilliary information on the mesh
     ! Allocated and filled in are:
@@ -2175,6 +2028,8 @@ SUBROUTINE mesh_areas(partit, mesh)
 
     integer                                   :: n,j,q, elnodes(3), ed(2), elem, nz,nzmin, nzmax
     real(kind=WP)                             :: a(2), b(2), ax, ay, lon, lat, vol, vol2
+    ! full-precision accumulators for the total ocean areas (see below)
+    real(kind=WP_full)                        :: area_acc, area_acc2, area_glob, area_glob2
     real(kind=WP), allocatable,dimension(:)   :: work_array
     integer, allocatable,dimension(:,:)       :: cavity_contribut
     real(kind=WP)                             :: t0, t1
@@ -2383,22 +2238,36 @@ type(t_partit), intent(inout), target :: partit
     deallocate(work_array)
 
     !___compute total ocean areas with/without cavity___________________________
-    vol = 0.0_WP
-    vol2= 0.0_WP
+    ! Accumulate the total areas in WP_full rather than WP. These are sums over
+    ! every surface node in the domain (~1e5 on CORE2, ~7e6 on NG5) reaching
+    ! ~3.6e14 m^2, and they are the DENOMINATOR of every global-mean flux
+    ! correction: freshwater, virtual salt, SSS restoring, icebergs and water
+    ! isotopes all form net = integrate_nod(flux)/ocean_area and subtract it so
+    ! the domain integral vanishes. A relative error here is therefore a
+    ! systematic net source applied to every surface node, not noise that
+    ! averages out. In float32 a single ulp at 3.6e14 is ~3.4e7 m^2, and the
+    ! uncompensated sum's error is far larger than that.
+    ! Dedicated WP_full locals rather than retyping vol/vol2, which are shared
+    ! with the mesh-resolution loop above. mesh%ocean_area keeps its WP type, so
+    ! nothing ripples to its consumers.
+    area_acc  = 0.0_WP_full
+    area_acc2 = 0.0_WP_full
     do n=1, myDim_nod2D
 !!PS         vol2=vol2+mesh%area(mesh%ulevels_nod2D(n), n) ! area also under cavity
 !!PS         if (mesh%ulevels_nod2D(n)>1) cycle
 !!PS         vol=vol+mesh%area(1, n) ! area only surface
-        vol2=vol2+mesh%areasvol(mesh%ulevels_nod2D(n), n) ! area also under cavity
+        area_acc2 = area_acc2 + real(mesh%areasvol(mesh%ulevels_nod2D(n), n), WP_full) ! area also under cavity
         if (mesh%ulevels_nod2D(n)>1) cycle
-        vol=vol+mesh%areasvol(1, n) ! area only surface  
+        area_acc  = area_acc  + real(mesh%areasvol(1, n), WP_full) ! area only surface
     end do
-    mesh%ocean_area=0.0_WP
-    mesh%ocean_areawithcav=0.0_WP
-    call MPI_AllREDUCE(vol, mesh%ocean_area, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+    area_glob  = 0.0_WP_full
+    area_glob2 = 0.0_WP_full
+    call MPI_AllREDUCE(area_acc,  area_glob,  1, MPI_WP_FULL, MPI_SUM, &
         MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(vol2, mesh%ocean_areawithcav, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+    call MPI_AllREDUCE(area_acc2, area_glob2, 1, MPI_WP_FULL, MPI_SUM, &
         MPI_COMM_FESOM, MPIerr)
+    mesh%ocean_area        = real(area_glob,  WP)
+    mesh%ocean_areawithcav = real(area_glob2, WP)
     
     !___write mesh statistics___________________________________________________
     if (mype==0) then
@@ -2435,16 +2304,6 @@ SUBROUTINE mesh_auxiliary_arrays(partit, mesh)
 ! elem_cos(myDim_elem2D+eDim_elem2D)
 ! coriolis(myDim_elem2D)
 
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP
-USE o_PARAM
-USE o_ARRAYS
-USE g_CONFIG, only: rotated_grid, force_rotation, metric_factor_zero
-USE g_ROTATE_grid
-use g_comm_auto
-use elem_center_interface
-use edge_center_interface
 IMPLICIT NONE
 
 integer              :: n,j,q, elnodes(3), ed(2), elem, el(2), elnodes_(3),node
@@ -2794,12 +2653,6 @@ END SUBROUTINE mesh_auxiliary_arrays
 !
 !_______________________________________________________________________________
 SUBROUTINE check_mesh_consistency(partit, mesh)
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP
-USE o_PARAM
-USE g_ROTATE_GRID
-  use g_comm_auto
 IMPLICIT NONE
 ! Collects auxilliary information on the mesh
 ! Allocated and filled in are:
@@ -2821,7 +2674,7 @@ real(kind=WP)	            :: vol_n(mesh%nl), vol_e(mesh%nl), aux(mesh%nl)
          aux(nz)=aux(nz)+mesh%areasvol(nz, n)
       end do
    end do
-   call MPI_AllREDUCE(aux, vol_n, mesh%nl, MPI_DOUBLE_PRECISION, MPI_SUM, &
+   call MPI_AllREDUCE(aux, vol_n, mesh%nl, MPI_WP, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
 
    aux=0._WP
@@ -2832,7 +2685,7 @@ real(kind=WP)	            :: vol_n(mesh%nl), vol_e(mesh%nl), aux(mesh%nl)
          aux(nz)=aux(nz)+mesh%elem_area(elem)
       end do
    end do
-   call MPI_AllREDUCE(aux, vol_e, mesh%nl, MPI_DOUBLE_PRECISION, MPI_SUM, &
+   call MPI_AllREDUCE(aux, vol_e, mesh%nl, MPI_WP, MPI_SUM, &
        MPI_COMM_FESOM, MPIerr)
 
 if (mype==0) then
@@ -2850,12 +2703,6 @@ END SUBROUTINE check_mesh_consistency
 !
 !_______________________________________________________________________________
 subroutine check_total_volume(partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE o_PARAM
-    use g_comm_auto
-    use o_ARRAYS
     
     IMPLICIT NONE
     type(t_mesh),   intent(inout), target :: mesh
@@ -2879,7 +2726,7 @@ subroutine check_total_volume(partit, mesh)
             aux=aux+areasvol(nz, n)*hnode(nz,n)
         end do
     end do
-    call MPI_AllREDUCE(aux, vol_n, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(aux, vol_n, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
     !___________________________________________________________________________
     ! total ocean volume on elements
     aux=0._WP
@@ -2890,7 +2737,7 @@ subroutine check_total_volume(partit, mesh)
             aux=aux+elem_area(elem)*helem(nz,elem)
         end do
     end do
-    call MPI_AllREDUCE(aux, vol_e, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(aux, vol_e, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
 
     !___write mesh statistics___________________________________________________
     if (mype==0) then
@@ -2905,3 +2752,45 @@ end subroutine check_total_volume
 !
 !
 !_______________________________________________________________________________
+! Check if use_cavity=.false. but mesh contains cavity files
+! This would result in cavity cells being treated as open ocean which is 
+! likely unintended
+!_______________________________________________________________________________
+subroutine check_cavity_mesh_conflict(partit, mesh)
+    implicit none
+    type(t_mesh),   intent(inout), target :: mesh
+    type(t_partit), intent(inout), target :: partit
+    character(MAX_PATH)                   :: file_name
+    logical                               :: file_exist
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
+    
+    file_name=trim(meshpath)//'cavity_elvls.out'
+    inquire(file=trim(file_name), exist=file_exist)
+    
+    if (file_exist) then
+        if (mype==0) then
+            write(*,*)
+            print *, achar(27)//'[33m'
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: use_cavity=.false. but mesh contains cavity_elvls.out       '
+            write(*,*) '        This mesh was prepared for cavity-resolving simulations.    '
+            write(*,*) '        Running with use_cavity=.false. will treat cavity cells     '
+            write(*,*) '        as open ocean, which is likely unintended.                  '
+        write(*,*) '                                                                        '
+            write(*,*) '        --> Either set use_cavity=.true. in namelist.config to      '
+            write(*,*) '            enable cavities, or use a corresponding mesh            '
+            write(*,*) '            without cavity files (e.g. CORE2 instead of CORE2ice).  '
+            write(*,*) '____________________________________________________________________'
+            print *, achar(27)//'[0m'
+            write(*,*)
+        end if
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    end if
+    
+end subroutine check_cavity_mesh_conflict
+!
+!
+!_______________________________________________________________________________
+
+end module oce_mesh_module

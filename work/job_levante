@@ -2,19 +2,17 @@
 #SBATCH --job-name=ref
 #SBATCH -p compute
 #SBATCH --ntasks-per-node=128
-#SBATCH --ntasks=512
-#SBATCH --time=08:00:00
+#SBATCH --ntasks=288
+#SBATCH --time=00:05:00
 #SBATCH -o slurm-out.out
 #SBATCH -e slurm-err.out
 #SBATCH -A ab0995
+##SBATCH -A bk1341
 
 source /sw/etc/profile.levante
-#source ../env/levante.dkrz.de/shell
-read -r USED_SHELL < ../bin/current_shell_path
-source $USED_SHELL
-echo "using environment from" $USED_SHELL
+source ../env/levante.dkrz.de/shell
 
-ulimit -s 204800 # https://docs.dkrz.de/doc/levante/running-jobs/runtime-settings.html
+ulimit -s 102400
 
 echo Submitted job: $jobid
 squeue -u $USER
@@ -28,10 +26,6 @@ cp -n ../config/namelist.forcing .
 cp -n ../config/namelist.oce     .
 cp -n ../config/namelist.ice     .
 cp -n ../config/namelist.icepack .
-cp -n ../config/namelist.tra     .
-cp -n ../config/namelist.io      .
-cp -n ../config/namelist.cvmix   .
-cp -n ../config/namelist.dyn     .
 
 date
 srun -l fesom.x > "fesom2.0.out"

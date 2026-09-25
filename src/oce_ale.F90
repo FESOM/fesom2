@@ -1,195 +1,64 @@
+module oce_ale_module
+    USE o_PARAM
+    USE MOD_MESH
+    USE MOD_PARTIT
+    use par_support_module, only: par_ex
+    USE MOD_DYN
+    USE o_ARRAYS
+    USE g_config
+    USE g_forcing_param, only: use_virt_salt
+    USE g_comm_auto
+    USE g_support
+    USE diagnostics, only: ldiag_DVD
+    USE io_RESTART
+    USE g_forcing_arrays
+    USE solver_module, only: ssh_solve_preconditioner, ssh_solve_cg
+    USE MOD_TRACER
+    USE MOD_ICE
+    USE o_mixing_KPP_mod
+    USE Toy_Channel_Soufflet
+    USE Toy_Neverworld2
+    use oce_ale_ssh_splitexpl_subcycl_module, only: compute_BT_rhs_SE_vtransp, &
+            compute_BT_step_SE_ale, update_trim_vel_ale_vtransp, compute_thickness_zstar
+    USE oce_ale_pressure_bv_module, only: pressure_bv, pressure_force_4_linfs, &
+            pressure_force_4_zxxxx
+    USE oce_ale_vel_rhs_module, only: compute_vel_rhs
+    USE oce_ale_tracer_module, only: solve_tracers_ale
+    use write_step_info_module, only: write_step_info, write_enegry_info
+    use write_step_info_module, only: check_blowup
+    USE ieee_arithmetic
+    use oce_fer_gm_module, only: fer_solve_Gamma, fer_gamma2vel, init_Redi_GM
+    use oce_mle_module, only: mle_add_gamma
+    use oce_ale_ssh_splitexpl_subcycl_module, only: impl_vert_visc_ale_vtransp
+    use oce_dyn_module, only: update_vel, viscosity_filter, check_viscopt, compute_ke_wrho, compute_apegen, compute_PePm
+    use oce_ale_pressure_bv_module, only: sw_alpha_beta, compute_sigma_xy, compute_neutral_slope
+    use par_support_module, only: status_check
+#if defined (__cvmix)
+    use g_cvmix_tke
+    use g_cvmix_idemix
+    use g_cvmix_idemix2
+    use g_cvmix_pp
+    use g_cvmix_kpp
+    use g_cvmix_tidal
+#endif
+#if defined (FESOM_PROFILING)
+    use fesom_profiler
+#endif
 
-module compute_CFLz_interface
-    interface
-        subroutine compute_CFLz(dynamics, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine compute_CFLz
-    end interface
-end module compute_CFLz_interface
+    implicit none
 
-module compute_Wvel_split_interface
-    interface
-        subroutine compute_Wvel_split(dynamics, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine compute_Wvel_split
-    end interface
-end module compute_Wvel_split_interface
+    private
+    public :: init_ale, init_bottom_elem_thickness, &
+              init_bottom_node_thickness, init_surface_elem_depth, &
+              init_surface_node_depth, init_thickness_ale, &
+              update_thickness_ale, restart_thickness_ale, &
+              init_stiff_mat_ale, update_stiff_mat_ale, &
+              compute_ssh_rhs_ale, compute_hbar_ale, vert_vel_ale, &
+              compute_vert_vel_transpv, compute_CFLz, &
+              compute_Wvel_split, solve_ssh_ale, impl_vert_visc_ale, &
+              oce_timestep_ale
 
-module compute_vert_vel_transpv_interface
-    interface        
-        subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine compute_vert_vel_transpv
-    end interface
-end module compute_vert_vel_transpv_interface
-
-module oce_ale_interfaces
-    interface
-        subroutine init_bottom_elem_thickness(partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine init_bottom_elem_thickness
-
-        subroutine init_bottom_node_thickness(partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine init_bottom_node_thickness
-        
-        subroutine init_surface_elem_depth(partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine init_surface_elem_depth
-
-        subroutine init_surface_node_depth(partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine init_surface_node_depth
-
-        subroutine impl_vert_visc_ale(dynamics, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine impl_vert_visc_ale
-
-        subroutine update_stiff_mat_ale(partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine update_stiff_mat_ale
-
-        subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine compute_ssh_rhs_ale
-
-        subroutine solve_ssh_ale(dynamics, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine solve_ssh_ale
-
-        subroutine compute_hbar_ale(dynamics, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine compute_hbar_ale
-
-        subroutine vert_vel_ale(dynamics, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine vert_vel_ale
-
-        subroutine update_thickness_ale(partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine update_thickness_ale
-    end interface
-end module oce_ale_interfaces
-
-module init_ale_interface
-    interface
-        subroutine init_ale(dynamics, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine init_ale
-    end interface
-end module init_ale_interface
-
-module init_thickness_ale_interface
-    interface
-        subroutine init_thickness_ale(dynamics, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine init_thickness_ale
-    end interface
-end module init_thickness_ale_interface
-
-module oce_timestep_ale_interface
-    interface
-        subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        use MOD_DYN
-        use MOD_ICE
-        integer       , intent(in)            :: n
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_ice), intent(inout), target :: ice
-        type(t_tracer), intent(inout), target :: tracers
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine oce_timestep_ale
-    end interface
-end module oce_timestep_ale_interface
-
+contains
 
 ! CONTENT:
 ! ------------
@@ -214,19 +83,10 @@ end module oce_timestep_ale_interface
 !===============================================================================
 ! allocate & initialise arrays for Arbitrary-Langrangian-Eularian (ALE) method
 subroutine init_ale(dynamics, partit, mesh)
-    USE o_PARAM
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    USE o_ARRAYS
 !    USE g_config, only: which_ale, use_cavity, use_partial_cell
 
 ! kh 18.03.21
-    USE g_config, only: which_ale, use_cavity, use_partial_cell, ib_async_mode
 
-    USE g_forcing_param, only: use_virt_salt
-    use oce_ale_interfaces
     Implicit NONE
      
 ! kh 18.03.21
@@ -379,14 +239,6 @@ end subroutine init_ale
 !
 !===============================================================================
 subroutine init_bottom_elem_thickness(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_ARRAYS
-    use g_config,only: use_partial_cell, partial_cell_thresh, use_depthonelem
-    use g_comm_auto
-    use g_support
     implicit none
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
@@ -510,14 +362,6 @@ end subroutine init_bottom_elem_thickness
 !
 !===============================================================================
 subroutine init_bottom_node_thickness(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_ARRAYS
-    use g_config,only: use_partial_cell
-    use g_comm_auto
-    use g_support
     implicit none
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
@@ -623,14 +467,6 @@ end subroutine init_bottom_node_thickness
 !
 !===============================================================================
 subroutine init_surface_elem_depth(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_ARRAYS
-    use g_config,only: use_cavity, use_cavity_partial_cell, cavity_partial_cell_thresh, use_cavityonelem
-    use g_comm_auto
-    use g_support
     implicit none
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
@@ -707,14 +543,6 @@ end subroutine init_surface_elem_depth
 !
 !===============================================================================
 subroutine init_surface_node_depth(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_ARRAYS
-    use g_config,only:  use_cavity, use_cavity_partial_cell
-    use g_comm_auto
-    use g_support
     implicit none
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
@@ -774,13 +602,6 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
 ! should not be touched if partial cell is implemented (it is).
 ! In lower layers scalar prisms are modified by the bottom.  
 ! Important: nlevels_nod2D_min has to be allocated and filled. 
-    use g_config,only: dt, which_ale
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    use g_comm_auto
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -1033,14 +854,6 @@ end subroutine init_thickness_ale
 !===============================================================================
 ! update thickness arrays based on the current hbar 
 subroutine update_thickness_ale(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_ARRAYS
-    use g_config,only: which_ale,lzstar_lev,min_hnode
-    use diagnostics, only: ldiag_DVD 
-    use g_comm_auto
 
     implicit none
     type(t_partit), intent(inout), target :: partit
@@ -1256,12 +1069,6 @@ end subroutine update_thickness_ale
 !===============================================================================
 ! update thickness arrays based on the current hbar 
 subroutine restart_thickness_ale(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_ARRAYS
-    use g_config,only: which_ale,lzstar_lev,min_hnode
     implicit none
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
@@ -1391,11 +1198,6 @@ end subroutine restart_thickness_ale
 ! To achive it we should use global arrays n_num and n_pos.
 ! Reserved for future. 
 subroutine init_stiff_mat_ale(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use g_CONFIG
     implicit none
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(inout), target :: mesh
@@ -1681,12 +1483,17 @@ end subroutine init_stiff_mat_ale
 !   = ssh_rhs                                                             in the update of the stiff matrix
 !
 subroutine update_stiff_mat_ale(partit, mesh)
+    use, intrinsic :: iso_fortran_env, only: real64
+#if defined(USE_SINGLE_PRECISION) && defined(DIAG_STIFF_DRIFT)
+    use g_config,only: dt, logfile_outfreq
+#else
     use g_config,only: dt
+#endif
     use o_PARAM
     use MOD_MESH
     use MOD_TRACER
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     use o_ARRAYS
     implicit none
     type(t_partit), intent(inout), target :: partit
@@ -1697,6 +1504,10 @@ subroutine update_stiff_mat_ale(partit, mesh)
     integer                             :: elem, npos(3), offset, nini, nend
     real(kind=WP)                       :: factor 
     real(kind=WP)                       :: fx(3), fy(3)
+#if defined(USE_SINGLE_PRECISION) && defined(DIAG_STIFF_DRIFT)
+    integer, save                       :: drift_ncall = 0
+    real(kind=real64)                   :: drift_d, drift_r, drift_s(4), drift_g(4)
+#endif
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -1705,27 +1516,51 @@ subroutine update_stiff_mat_ale(partit, mesh)
 #include "associate_mesh_ass.h"
 
     !___________________________________________________________________________
+#if defined(USE_SINGLE_PRECISION)
+    !___________________________________________________________________________
+    ! Seed the full-precision accumulator on first use. Deliberately here and not
+    ! in init_stiff_mat_ale: init runs on every start, but on a restart the
+    ! restored %values (which carries every increment the previous segment
+    ! accumulated -- it is in the binary dump, see MOD_MESH) overwrites what init
+    ! assembled. Seeding here, on the first update after all of that, is the one
+    ! point correct for a cold start and a restart alike.
+    !
+    ! SIZE: size(%values), NOT %nza. init_stiff_mat_ale sets %nza to the LOCAL nnz
+    ! and allocates %values with it, then later REPLACES %nza with the global sum
+    ! (sum(rpnza(1:npes))) because the solver wants a global count. Allocating
+    ! here with %nza would therefore over-allocate by ~npes per rank and make the
+    ! whole-array assignments below nonconforming -- reading past the end of
+    ! %values. size(%values) is the array we are shadowing, by construction.
+    if (.not. allocated(ssh_stiff%values_full)) then
+        allocate(ssh_stiff%values_full(size(ssh_stiff%values)))
+        ssh_stiff%values_full = real(ssh_stiff%values, real64)
+#if defined(DIAG_STIFF_DRIFT)
+        allocate(ssh_stiff%values_wp_drift(size(ssh_stiff%values)))
+        ssh_stiff%values_wp_drift = ssh_stiff%values
+#endif
+    end if
+#endif
+
     ! update secod term of lhs od equation (18) of "FESOM2 from finite element 
     ! to finite volumes" --> stiff matrix part
     ! loop over lcal edges
     factor=g*dt*alpha*theta
 
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, i, j, k, row, ed, n2, enodes, elnodes, el, elem, npos, offset, nini, nend, fx, fy)
-    do ed=1,myDim_edge2D   !! Attention
-        ! enodes ... local node indices of nodes that edge ed
-        enodes=edges(:,ed)        
-        ! el ... local element indices of the two elments that contribute to edge
-        ! el(1) or el(2) < 0 than edge is boundary edge
-        el=edge_tri(:,ed)
-        !_______________________________________________________________________
-        do j=1,2 
-            ! row ... local indice od edge node 1 or 2
-            row=enodes(j)
-            if(row>myDim_nod2D) cycle    !! Attention
-            
-            !___________________________________________________________________
-            ! sparse indice offset for node with index row
-            offset=SSH_stiff%rowptr(row)-ssh_stiff%rowptr(1)           
+    ! Each owned row gathers the contributions of its incident edges
+    ! (mesh%nod_in_edge2D) in ascending edge order; j says which end of the edge the
+    ! row is. No thread writes a row it does not own, and the sums do not depend on
+    ! the number of threads.
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, i, j, k, row, ed, n2, elnodes, el, elem, npos, offset, nini, nend, fx, fy)
+    do row=1, myDim_nod2D
+        ! sparse indice offset for node with index row
+        offset=SSH_stiff%rowptr(row)-ssh_stiff%rowptr(1)
+        do n2=1, mesh%nod_in_edge2D_num(row)
+            ed=mesh%nod_in_edge2D(n2,row)
+            ! el ... local element indices of the two elments that contribute to edge
+            el=edge_tri(:,ed)
+            ! j ... which end of the edge the row is
+            j=1
+            if (mesh%nod_in_edge2D_sgn(n2,row)<0) j=2
             !___________________________________________________________________
             do i=1, 2  ! Two elements related to the edge
                         ! It should be just grad on elements 
@@ -1761,21 +1596,58 @@ subroutine update_stiff_mat_ale(partit, mesh)
                 ! In the computation above, I've used rules from ssh_rhs (where it is 
                 ! on the rhs. So the sign is changed in the expression below.
                 ! npos... sparse matrix indices position of node points elnodes
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                   call omp_set_lock  (partit%plock(row)) ! it shall be sufficient to block writing into the same row of SSH_stiff
-#else
-!$OMP ORDERED
+#if defined(USE_SINGLE_PRECISION)
+                   SSH_stiff%values_full(npos)=SSH_stiff%values_full(npos) + real(fy*factor, real64)
+#if defined(DIAG_STIFF_DRIFT)
+                   SSH_stiff%values_wp_drift(npos)=SSH_stiff%values_wp_drift(npos) + fy*factor
 #endif
-                   SSH_stiff%values(npos)=SSH_stiff%values(npos) + fy*factor
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                   call omp_unset_lock(partit%plock(row))
 #else
-!$OMP END ORDERED
-#endif                
+                   SSH_stiff%values(npos)=SSH_stiff%values(npos) + fy*factor
+#endif
             end do ! --> do i=1,2
-        end do ! --> do j=1,2 
-    end do ! --> do ed=1,myDim_edge2D 
+        end do ! --> do n2=1, mesh%nod_in_edge2D_num(row)
+    end do ! --> do row=1, myDim_nod2D
 !$OMP END PARALLEL DO
+#if defined(USE_SINGLE_PRECISION)
+    !___________________________________________________________________________
+    ! Refresh the working copy the CG solver and preconditioner read. The
+    ! accumulation above ran in real64, so this rounds once per step instead of
+    ! letting the rounding compound over the run. The solver's SpMV keeps WP
+    ! bandwidth -- only the accumulator is wider.
+    SSH_stiff%values = real(SSH_stiff%values_full, WP)
+#if defined(DIAG_STIFF_DRIFT)
+    !___________________________________________________________________________
+    ! Instrument: how far has the WP-accumulated matrix drifted from the real64
+    ! one? Inlined rather than a subroutine because a separate routine needs an
+    ! explicit interface (target dummies), and CMake's Fortran dependency scanner
+    ! does not evaluate the preprocessor -- it would demand the interface .mod in
+    ! builds where the module is guarded out. In DP both accumulators are the same
+    ! arithmetic, so the drift is 0.0 by construction; that is the control, and it
+    ! is why this is single-precision only.
+    drift_ncall = drift_ncall + 1
+    if (mod(drift_ncall, max(1,logfile_outfreq)) == 0) then
+        drift_s = 0.0_real64
+        do n = 1, myDim_nod2D
+            do k = ssh_stiff%rowptr_loc(n), ssh_stiff%rowptr_loc(n+1)-1
+                drift_d = real(ssh_stiff%values_wp_drift(k), real64) - ssh_stiff%values_full(k)
+                drift_r = ssh_stiff%values_full(k)
+                if (ssh_stiff%colind_loc(k) == n) then
+                    drift_s(1) = drift_s(1) + drift_d*drift_d
+                    drift_s(2) = drift_s(2) + drift_r*drift_r
+                else
+                    drift_s(3) = drift_s(3) + drift_d*drift_d
+                    drift_s(4) = drift_s(4) + drift_r*drift_r
+                end if
+            end do
+        end do
+        call MPI_AllREDUCE(drift_s, drift_g, 4, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+        if (mype == 0) write(*,'(a,i8,a,es12.5,a,es12.5)') ' [STIFFDRIFT] update ', drift_ncall, &
+            '  relL2(diag)= ',    sqrt(drift_g(1)/max(drift_g(2), tiny(1.0_real64))),            &
+            '  relL2(offdiag)= ', sqrt(drift_g(3)/max(drift_g(4), tiny(1.0_real64)))
+    end if
+#endif
+#endif
+
 !DS this check will work only on 0pe because SSH_stiff%rowptr contains global pointers
 !if (mype==0) then
 !do row=1, myDim_nod2D
@@ -1801,20 +1673,12 @@ end subroutine update_stiff_mat_ale
 ! ssh_rhs=-alpha*\nabla\int(U_n+U_rhs)dz-(1-alpha)*...
 ! see "FESOM2: from finite elements to finte volumes, S. Danilov..." eq. (11) rhs
 subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
-    use g_config,only: which_ALE, dt, use_cavity_fw2press
-    use MOD_MESH
-    use o_ARRAYS, only: water_flux
-    use o_PARAM
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    use g_comm_auto
     implicit none
     type(t_mesh)  , intent(inout), target :: mesh
     type(t_partit), intent(inout), target :: partit
     type(t_dyn)   , intent(inout), target :: dynamics
     !___________________________________________________________________________
-    integer       :: ed, el(2), enodes(2), nz, n, nzmin, nzmax
+    integer       :: ed, el(2), enodes(2), nz, n, k, nzmin, nzmax
     real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2 
     real(kind=WP) :: dumc1_1, dumc1_2, dumc2_1, dumc2_2 !!PS
     !___________________________________________________________________________
@@ -1838,67 +1702,60 @@ subroutine compute_ssh_rhs_ale(dynamics, partit, mesh)
     end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ed, el, enodes, n, nz, nzmin, nzmax, c1, c2, deltaX1, deltaX2, deltaY1, deltaY2, &
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ed, el, enodes, n, k, nz, nzmin, nzmax, c1, c2, deltaX1, deltaX2, deltaY1, deltaY2, &
 !$OMP                                                                                 dumc1_1, dumc1_2, dumc2_1, dumc2_2)
+    ! Each node gathers the fluxes of its incident edges (mesh%nod_in_edge2D) in
+    ! ascending edge order, with the sign of the edge orientation; sums at halo nodes
+    ! are partial. No thread writes a node it does not own, and the sums do not
+    ! depend on the number of threads.
 !$OMP DO
-    do ed=1, myDim_edge2D      
-        ! local indice of nodes that span up edge ed
-        enodes=edges(:,ed)
-        ! local index of element that contribute to edge
-        el=edge_tri(:,ed)
+    do n=1, myDim_nod2D+eDim_nod2D
+        do k=1, mesh%nod_in_edge2D_num(n)
+            ed=mesh%nod_in_edge2D(k,n)
+            ! local index of element that contribute to edge
+            el=edge_tri(:,ed)
         
-        !_______________________________________________________________________
-        ! calc depth integral: alpha*\nabla\int(U_n+U_rhs)dz for el(1)
-        c1=0.0_WP
-        ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to 
-        ! center of edge --> needed to calc flux perpedicular to edge from elem el(1)
-        deltaX1=edge_cross_dxdy(1,ed) 
-        deltaY1=edge_cross_dxdy(2,ed)
+            !_______________________________________________________________________
+            ! calc depth integral: alpha*\nabla\int(U_n+U_rhs)dz for el(1)
+            c1=0.0_WP
+            ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to 
+            ! center of edge --> needed to calc flux perpedicular to edge from elem el(1)
+            deltaX1=edge_cross_dxdy(1,ed) 
+            deltaY1=edge_cross_dxdy(2,ed)
         
-        nzmin = ulevels(el(1))
-        nzmax = nlevels(el(1))-1
-        do nz=nzmin, nzmax
-            c1=c1+alpha*((UV(2,nz,el(1))+UV_rhs(2,nz,el(1)))*deltaX1- &
-                         (UV(1,nz,el(1))+UV_rhs(1,nz,el(1)))*deltaY1)*helem(nz,el(1))
-        end do
-        
-        !_______________________________________________________________________
-        ! if ed is not a boundary edge --> calc depth integral: 
-        ! alpha*\nabla\int(U_n+U_rhs)dz for el(2) 
-        c2=0.0_WP
-        if(el(2)>0) then
-            ! edge_cross_dxdy(3:4,ed)... dx,dy distance from element centroid el(2) to 
-            ! center of edge --> needed to calc flux perpedicular to edge from elem el(2)
-            deltaX2=edge_cross_dxdy(3,ed)
-            deltaY2=edge_cross_dxdy(4,ed)
-            nzmin = ulevels(el(2))
-            nzmax = nlevels(el(2))-1
+            nzmin = ulevels(el(1))
+            nzmax = nlevels(el(1))-1
             do nz=nzmin, nzmax
-                c2=c2-alpha*((UV(2,nz,el(2))+UV_rhs(2,nz,el(2)))*deltaX2- &
-                             (UV(1,nz,el(2))+UV_rhs(1,nz,el(2)))*deltaY2)*helem(nz,el(2))
+                c1=c1+alpha*((UV(2,nz,el(1))+UV_rhs(2,nz,el(1)))*deltaX1- &
+                             (UV(1,nz,el(1))+UV_rhs(1,nz,el(1)))*deltaY1)*helem(nz,el(1))
             end do
-        end if
         
-        !_______________________________________________________________________
-        ! calc netto "flux"
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call   omp_set_lock(partit%plock(enodes(1)))
-#else
-!$OMP ORDERED
-#endif
-        ssh_rhs(enodes(1))=ssh_rhs(enodes(1))+(c1+c2)
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(enodes(1)))
-        call   omp_set_lock(partit%plock(enodes(2)))
-#endif
-        ssh_rhs(enodes(2))=ssh_rhs(enodes(2))-(c1+c2)
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(enodes(2)))
-#else
-!$OMP END ORDERED
-#endif
-
-    end do
+            !_______________________________________________________________________
+            ! if ed is not a boundary edge --> calc depth integral: 
+            ! alpha*\nabla\int(U_n+U_rhs)dz for el(2) 
+            c2=0.0_WP
+            if(el(2)>0) then
+                ! edge_cross_dxdy(3:4,ed)... dx,dy distance from element centroid el(2) to 
+                ! center of edge --> needed to calc flux perpedicular to edge from elem el(2)
+                deltaX2=edge_cross_dxdy(3,ed)
+                deltaY2=edge_cross_dxdy(4,ed)
+                nzmin = ulevels(el(2))
+                nzmax = nlevels(el(2))-1
+                do nz=nzmin, nzmax
+                    c2=c2-alpha*((UV(2,nz,el(2))+UV_rhs(2,nz,el(2)))*deltaX2- &
+                                 (UV(1,nz,el(2))+UV_rhs(1,nz,el(2)))*deltaY2)*helem(nz,el(2))
+                end do
+            end if
+        
+            !_______________________________________________________________________
+            ! calc netto "flux"
+            if (mesh%nod_in_edge2D_sgn(k,n)>0) then
+                ssh_rhs(n)=ssh_rhs(n)+(c1+c2)
+            else
+                ssh_rhs(n)=ssh_rhs(n)-(c1+c2)
+            end if
+        end do ! --> do k=1, mesh%nod_in_edge2D_num(n)
+    end do ! --> do n=1, myDim_nod2D+eDim_nod2D
 !$OMP END DO
 
     !___________________________________________________________________________
@@ -1954,20 +1811,12 @@ end subroutine compute_ssh_rhs_ale
 ! ssh_rhs_old=-\nabla\int(U_n)dz-water_flux*area (if free surface)
 ! Find new elevation hbar
 subroutine compute_hbar_ale(dynamics, partit, mesh)
-    use g_config,only: dt, which_ALE, use_cavity
-    use MOD_MESH
-    use o_ARRAYS, only: water_flux
-    use o_PARAM
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    use g_comm_auto
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(inout), target :: mesh
     !___________________________________________________________________________
-    integer       :: ed, el(2), enodes(2), elem, elnodes(3), n, nz, nzmin, nzmax
+    integer       :: ed, el(2), enodes(2), elem, elnodes(3), n, k, nz, nzmin, nzmax
     real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2 
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -1990,61 +1839,55 @@ subroutine compute_hbar_ale(dynamics, partit, mesh)
     end do
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ed, el, enodes, elem, elnodes, n, nz, nzmin, nzmax, &
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ed, el, enodes, elem, elnodes, n, k, nz, nzmin, nzmax, &
 !$OMP                                            c1, c2, deltaX1, deltaX2, deltaY1, deltaY2)
+    ! Each node gathers the fluxes of its incident edges (mesh%nod_in_edge2D) in
+    ! ascending edge order, with the sign of the edge orientation; sums at halo nodes
+    ! are partial. No thread writes a node it does not own, and the sums do not
+    ! depend on the number of threads.
 !$OMP DO
-    do ed=1, myDim_edge2D                     
-        ! local indice of nodes that span up edge ed
-        enodes=edges(:,ed)
-        ! local index of element that contribute to edge
-        el=edge_tri(:,ed)
+    do n=1, myDim_nod2D+eDim_nod2D
+        do k=1, mesh%nod_in_edge2D_num(n)
+            ed=mesh%nod_in_edge2D(k,n)
+            ! local index of element that contribute to edge
+            el=edge_tri(:,ed)
         
-        !_______________________________________________________________________
-        ! cal depth integal: \nabla\int(U_n)dz for el(1)
-        c1=0.0_WP
-        ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to 
-        ! center of edge --> needed to calc flux perpedicular to edge from elem el(1)
-        deltaX1=edge_cross_dxdy(1,ed)
-        deltaY1=edge_cross_dxdy(2,ed)
+            !_______________________________________________________________________
+            ! cal depth integal: \nabla\int(U_n)dz for el(1)
+            c1=0.0_WP
+            ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to 
+            ! center of edge --> needed to calc flux perpedicular to edge from elem el(1)
+            deltaX1=edge_cross_dxdy(1,ed)
+            deltaY1=edge_cross_dxdy(2,ed)
         
-        nzmin = ulevels(el(1))
-        nzmax = nlevels(el(1))-1
-        !!PS do nz=1, nlevels(el(1))-1
-        do nz=nzmin, nzmax 
-            c1=c1+(UV(2,nz,el(1))*deltaX1-UV(1,nz,el(1))*deltaY1)*helem(nz,el(1))
-        end do
-        !_______________________________________________________________________
-        ! if ed is not a boundary edge --> calc depth integral: \nabla\int(U_n)dz 
-        ! for el(2)
-        c2=0.0_WP
-        if(el(2)>0) then
-            deltaX2=edge_cross_dxdy(3,ed)
-            deltaY2=edge_cross_dxdy(4,ed)
-            nzmin = ulevels(el(2))
-            nzmax = nlevels(el(2))-1
-            !!PS do nz=1, nlevels(el(2))-1
-            do nz=nzmin, nzmax
-                c2=c2-(UV(2,nz,el(2))*deltaX2-UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+            nzmin = ulevels(el(1))
+            nzmax = nlevels(el(1))-1
+            !!PS do nz=1, nlevels(el(1))-1
+            do nz=nzmin, nzmax 
+                c1=c1+(UV(2,nz,el(1))*deltaX1-UV(1,nz,el(1))*deltaY1)*helem(nz,el(1))
             end do
-        end if
-        !_______________________________________________________________________
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call   omp_set_lock(partit%plock(enodes(1)))
-#else
-!$OMP ORDERED
-#endif
-        ssh_rhs_old(enodes(1))=ssh_rhs_old(enodes(1))+(c1+c2)
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(enodes(1)))
-        call   omp_set_lock(partit%plock(enodes(2)))
-#endif
-        ssh_rhs_old(enodes(2))=ssh_rhs_old(enodes(2))-(c1+c2)
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(enodes(2)))
-#else
-!$OMP END ORDERED
-#endif
-    end do
+            !_______________________________________________________________________
+            ! if ed is not a boundary edge --> calc depth integral: \nabla\int(U_n)dz 
+            ! for el(2)
+            c2=0.0_WP
+            if(el(2)>0) then
+                deltaX2=edge_cross_dxdy(3,ed)
+                deltaY2=edge_cross_dxdy(4,ed)
+                nzmin = ulevels(el(2))
+                nzmax = nlevels(el(2))-1
+                !!PS do nz=1, nlevels(el(2))-1
+                do nz=nzmin, nzmax
+                    c2=c2-(UV(2,nz,el(2))*deltaX2-UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+                end do
+            end if
+            !_______________________________________________________________________
+            if (mesh%nod_in_edge2D_sgn(k,n)>0) then
+                ssh_rhs_old(n)=ssh_rhs_old(n)+(c1+c2)
+            else
+                ssh_rhs_old(n)=ssh_rhs_old(n)-(c1+c2)
+            end if
+        end do ! --> do k=1, mesh%nod_in_edge2D_num(n)
+    end do ! --> do n=1, myDim_nod2D+eDim_nod2D
 !$OMP END DO
 !$OMP END PARALLEL
 
@@ -2105,24 +1948,12 @@ end subroutine compute_hbar_ale
 ! > for zstar : dh_k/dt_k=1...kbot-1 != 0
 !
 subroutine vert_vel_ale(dynamics, partit, mesh)
-    use g_config,only: dt, which_ALE, min_hnode, lzstar_lev, flag_warn_cflz
-    use MOD_MESH
-    use o_ARRAYS, only: water_flux
-    use o_PARAM
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    use g_comm_auto
-    use io_RESTART !!PS
-    use g_forcing_arrays !!PS
-    use compute_Wvel_split_interface
-    use compute_CFLz_interface
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(inout), target :: mesh
     !___________________________________________________________________________
-    integer       :: el(2), enodes(2), n, nz, ed, nzmin, nzmax, uln1, uln2, nln1, nln2
+    integer       :: el(2), enodes(2), n, k, nz, ed, nzmin, nzmax, uln1, uln2, nln1, nln2
     real(kind=WP) :: deltaX1, deltaY1, deltaX2, deltaY2, dd, dd1, dddt, cflmax
     ! still to be understood but if you allocate these arrays statically the results will be different:
     real(kind=WP) :: c1(mesh%nl-1), c2(mesh%nl-1)
@@ -2170,99 +2001,82 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
     END DO
 !$OMP END PARALLEL DO
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ed, enodes, el, deltaX1, deltaY1, nz, nzmin, nzmax, deltaX2, deltaY2, c1, c2)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ed, enodes, el, n, k, deltaX1, deltaY1, nz, nzmin, nzmax, deltaX2, deltaY2, c1, c2)
+    ! Each node gathers the fluxes of its incident edges (mesh%nod_in_edge2D) in
+    ! ascending edge order, with the sign of the edge orientation; sums at halo nodes
+    ! are partial. No thread writes a node it does not own, and the sums do not
+    ! depend on the number of threads.
 !$OMP DO
-    do ed=1, myDim_edge2D
-        ! local indice of nodes that span up edge ed
-        enodes=edges(:,ed)   
+    do n=1, myDim_nod2D+eDim_nod2D
+        do k=1, mesh%nod_in_edge2D_num(n)
+            ed=mesh%nod_in_edge2D(k,n)
         
-        ! local index of element that contribute to edge
-        el=edge_tri(:,ed)
+            ! local index of element that contribute to edge
+            el=edge_tri(:,ed)
         
-        ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to 
-        ! center of edge --> needed to calc flux perpedicular to edge from elem el(1)
-        deltaX1=edge_cross_dxdy(1,ed)
-        deltaY1=edge_cross_dxdy(2,ed)
+            ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid el(1) to 
+            ! center of edge --> needed to calc flux perpedicular to edge from elem el(1)
+            deltaX1=edge_cross_dxdy(1,ed)
+            deltaY1=edge_cross_dxdy(2,ed)
         
-        !_______________________________________________________________________
-        ! calc div(u_vec*h) for every layer 
-        ! do it with gauss-law: int( div(u_vec)*dV) = int( u_vec * n_vec * dS )
-        nzmin = ulevels(el(1))
-        nzmax = nlevels(el(1))-1
-! we introduced c1 & c2 as arrays here to avoid deadlocks when in OpenMP mode
-        do nz = nzmax, nzmin, -1
-            ! --> h * u_vec * n_vec
-            ! --> e_vec = (dx,dy), n_vec = (-dy,dx);
-            ! --> h * u*(-dy) + v*dx
-            c1(nz)=( UV(2,nz,el(1))*deltaX1 - UV(1,nz,el(1))*deltaY1 )*helem(nz,el(1))
-            ! inflow(outflow) "flux" to control volume of node enodes1
-            ! is equal to outflow(inflow) "flux" to control volume of node enodes2
-            if (Fer_GM) then
-                c2(nz)=(fer_UV(2,nz,el(1))*deltaX1- fer_UV(1,nz,el(1))*deltaY1)*helem(nz,el(1))
-            end if
-        end do
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_set_lock  (partit%plock(enodes(1)))
-#else
-!$OMP ORDERED
-#endif
-        Wvel       (nzmin:nzmax, enodes(1))= Wvel    (nzmin:nzmax, enodes(1))+c1(nzmin:nzmax)
-        if (Fer_GM) then
-           fer_Wvel(nzmin:nzmax, enodes(1))= fer_Wvel(nzmin:nzmax, enodes(1))+c2(nzmin:nzmax)
-        end if
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(enodes(1)))
-        call omp_set_lock  (partit%plock(enodes(2)))
-#endif
-        Wvel       (nzmin:nzmax, enodes(2))= Wvel    (nzmin:nzmax, enodes(2))-c1(nzmin:nzmax)
-        if (Fer_GM) then
-           fer_Wvel(nzmin:nzmax, enodes(2))= fer_Wvel(nzmin:nzmax, enodes(2))-c2(nzmin:nzmax)
-        end if
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(enodes(2)))
-#else
-!$OMP END ORDERED
-#endif
-        !_______________________________________________________________________
-        ! if ed is not a boundary edge --> calc div(u_vec*h) for every layer
-        ! for el(2)
-        c1 = 0.0_WP
-        c2 = 0.0_WP
-        if(el(2)>0)then
-            deltaX2=edge_cross_dxdy(3,ed)
-            deltaY2=edge_cross_dxdy(4,ed)
-            nzmin = ulevels(el(2))
-            nzmax = nlevels(el(2))-1   
+            !_______________________________________________________________________
+            ! calc div(u_vec*h) for every layer 
+            ! do it with gauss-law: int( div(u_vec)*dV) = int( u_vec * n_vec * dS )
+            nzmin = ulevels(el(1))
+            nzmax = nlevels(el(1))-1
+    ! we introduced c1 & c2 as arrays here to avoid deadlocks when in OpenMP mode
             do nz = nzmax, nzmin, -1
-                c1(nz)=-(UV(2,nz,el(2))*deltaX2 - UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+                ! --> h * u_vec * n_vec
+                ! --> e_vec = (dx,dy), n_vec = (-dy,dx);
+                ! --> h * u*(-dy) + v*dx
+                c1(nz)=( UV(2,nz,el(1))*deltaX1 - UV(1,nz,el(1))*deltaY1 )*helem(nz,el(1))
+                ! inflow(outflow) "flux" to control volume of node enodes1
+                ! is equal to outflow(inflow) "flux" to control volume of node enodes2
                 if (Fer_GM) then
-                    c2(nz)=-(fer_UV(2,nz,el(2))*deltaX2-fer_UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+                    c2(nz)=(fer_UV(2,nz,el(1))*deltaX1- fer_UV(1,nz,el(1))*deltaY1)*helem(nz,el(1))
                 end if
             end do
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_set_lock  (partit%plock(enodes(1)))
-#else
-!$OMP ORDERED
-#endif
-            Wvel       (nzmin:nzmax, enodes(1))= Wvel    (nzmin:nzmax, enodes(1))+c1(nzmin:nzmax)
-            if (Fer_GM) then
-               fer_Wvel(nzmin:nzmax, enodes(1))= fer_Wvel(nzmin:nzmax, enodes(1))+c2(nzmin:nzmax)
+            if (mesh%nod_in_edge2D_sgn(k,n)>0) then
+                Wvel       (nzmin:nzmax, n)= Wvel    (nzmin:nzmax, n)+c1(nzmin:nzmax)
+                if (Fer_GM) then
+               fer_Wvel(nzmin:nzmax, n)= fer_Wvel(nzmin:nzmax, n)+c2(nzmin:nzmax)
             end if
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_unset_lock(partit%plock(enodes(1)))
-            call omp_set_lock  (partit%plock(enodes(2)))
-#endif
-            Wvel       (nzmin:nzmax, enodes(2))= Wvel    (nzmin:nzmax, enodes(2))-c1(nzmin:nzmax)
+            else
+            Wvel       (nzmin:nzmax, n)= Wvel    (nzmin:nzmax, n)-c1(nzmin:nzmax)
             if (Fer_GM) then
-               fer_Wvel(nzmin:nzmax, enodes(2))= fer_Wvel(nzmin:nzmax, enodes(2))-c2(nzmin:nzmax)
+               fer_Wvel(nzmin:nzmax, n)= fer_Wvel(nzmin:nzmax, n)-c2(nzmin:nzmax)
             end if
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_unset_lock(partit%plock(enodes(2)))
-#else
-!$OMP END ORDERED
-#endif
-        end if !~-> if(el(2)>0)then       
-    end do ! --> do ed=1, myDim_edge2D
+            end if
+            !_______________________________________________________________________
+            ! if ed is not a boundary edge --> calc div(u_vec*h) for every layer
+            ! for el(2)
+            c1 = 0.0_WP
+            c2 = 0.0_WP
+            if(el(2)>0)then
+                deltaX2=edge_cross_dxdy(3,ed)
+                deltaY2=edge_cross_dxdy(4,ed)
+                nzmin = ulevels(el(2))
+                nzmax = nlevels(el(2))-1   
+                do nz = nzmax, nzmin, -1
+                    c1(nz)=-(UV(2,nz,el(2))*deltaX2 - UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+                    if (Fer_GM) then
+                        c2(nz)=-(fer_UV(2,nz,el(2))*deltaX2-fer_UV(1,nz,el(2))*deltaY2)*helem(nz,el(2))
+                    end if
+                end do
+                if (mesh%nod_in_edge2D_sgn(k,n)>0) then
+                    Wvel       (nzmin:nzmax, n)= Wvel    (nzmin:nzmax, n)+c1(nzmin:nzmax)
+                    if (Fer_GM) then
+                   fer_Wvel(nzmin:nzmax, n)= fer_Wvel(nzmin:nzmax, n)+c2(nzmin:nzmax)
+                end if
+                else
+                Wvel       (nzmin:nzmax, n)= Wvel    (nzmin:nzmax, n)-c1(nzmin:nzmax)
+                if (Fer_GM) then
+                   fer_Wvel(nzmin:nzmax, n)= fer_Wvel(nzmin:nzmax, n)-c2(nzmin:nzmax)
+                end if
+                end if
+            end if !~-> if(el(2)>0)then       
+        end do ! --> do k=1, mesh%nod_in_edge2D_num(n)
+    end do ! --> do n=1, myDim_nod2D+eDim_nod2D
 !$OMP END DO
 !$OMP END PARALLEL
     ! |
@@ -2678,21 +2492,12 @@ end subroutine vert_vel_ale
 !   w^t = w^b - dh_k/dt - grad(u*h)_k - water_flux=1
 !   --> do cumulativ summation from bottom to top
 subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    USE MOD_DYN
-    use o_ARRAYS, only: water_flux
-    use g_config, only: dt, which_ale
-    use g_comm_auto
-    use compute_Wvel_split_interface
-    use compute_CFLz_interface
     implicit none
     !___________________________________________________________________________
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
-    integer                               :: node, elem, nz, ed, nzmin, nzmax, ednodes(2), edelem(2) 
+    integer                               :: node, elem, nz, ed, n, k, nzmin, nzmax, ednodes(2), edelem(2)
     real(kind=WP)                         :: hh_inv, deltaX1, deltaX2, deltaY1, deltaY2 
     real(kind=WP)                         :: c1(mesh%nl-1), c2(mesh%nl-1)
     
@@ -2723,106 +2528,89 @@ subroutine compute_vert_vel_transpv(dynamics, partit, mesh)
 !$OMP END PARALLEL DO
 
     !___________________________________________________________________________
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ed, ednodes, edelem, nz, nzmin, nzmax, & 
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(ed, ednodes, edelem, n, k, nz, nzmin, nzmax, &
 !$OMP                                  deltaX1, deltaY1, deltaX2, deltaY2, c1, c2)
+    ! Each node gathers the fluxes of its incident edges (mesh%nod_in_edge2D) in
+    ! ascending edge order, with the sign of the edge orientation; sums at halo nodes
+    ! are partial. No thread writes a node it does not own, and the sums do not
+    ! depend on the number of threads.
 !$OMP DO
-    do ed=1, myDim_edge2D
-        ! local indice of nodes that span up edge ed
-        ednodes=edges(:,ed)   
+    do n=1, myDim_nod2D+eDim_nod2D
+        do k=1, mesh%nod_in_edge2D_num(n)
+            ed=mesh%nod_in_edge2D(k,n)
         
-        ! local index of element that contribute to edge
-        edelem=edge_tri(:,ed)
+            ! local index of element that contribute to edge
+            edelem=edge_tri(:,ed)
         
-        ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid edelem(1) to 
-        ! center of edge --> needed to calc flux perpedicular to edge from elem edelem(1)
-        deltaX1=edge_cross_dxdy(1,ed)
-        deltaY1=edge_cross_dxdy(2,ed)
+            ! edge_cross_dxdy(1:2,ed)... dx,dy distance from element centroid edelem(1) to 
+            ! center of edge --> needed to calc flux perpedicular to edge from elem edelem(1)
+            deltaX1=edge_cross_dxdy(1,ed)
+            deltaY1=edge_cross_dxdy(2,ed)
         
-        !_______________________________________________________________________
-        ! calc div(u_vec*h) for every layer 
-        ! do it with gauss-law: int( div(u_vec)*dV) = int( u_vec * n_vec * dS )
-        nzmin = ulevels(edelem(1))
-        nzmax = nlevels(edelem(1))-1
-        ! we introduced c1 & c2 as arrays here to avoid deadlocks when in OpenMP mode
-        do nz = nzmax, nzmin, -1
-            ! --> h * u_vec * n_vec
-            ! --> e_vec = (dx,dy), n_vec = (-dy,dx);
-            ! --> h * u*(-dy) + v*dx
-            c1(nz)=( UVh(2, nz, edelem(1))*deltaX1 - UVh(1, nz, edelem(1))*deltaY1 )
-            ! inflow(outflow) "flux" to control volume of node enodes1
-            ! is equal to outflow(inflow) "flux" to control volume of node enodes2
-        end do ! --> do nz=nzmax,nzmin,-1
-        if (Fer_GM) then
+            !_______________________________________________________________________
+            ! calc div(u_vec*h) for every layer 
+            ! do it with gauss-law: int( div(u_vec)*dV) = int( u_vec * n_vec * dS )
+            nzmin = ulevels(edelem(1))
+            nzmax = nlevels(edelem(1))-1
+            ! we introduced c1 & c2 as arrays here to avoid deadlocks when in OpenMP mode
             do nz = nzmax, nzmin, -1
-                c2(nz)=(fer_UV(2, nz, edelem(1))*deltaX1 - fer_UV(1, nz, edelem(1))*deltaY1)*helem(nz, edelem(1))
-            end do
-        end if 
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_set_lock  (partit%plock(ednodes(1)))
-#else
-!$OMP ORDERED
-#endif        
-        Wvel(nzmin:nzmax, ednodes(1))= Wvel(nzmin:nzmax, ednodes(1))+c1(nzmin:nzmax)
-        if (Fer_GM) then
-            fer_Wvel(nzmin:nzmax, ednodes(1))= fer_Wvel(nzmin:nzmax, ednodes(1))+c2(nzmin:nzmax)
-        end if
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(ednodes(1)))
-        call omp_set_lock  (partit%plock(ednodes(2)))
-#endif        
-        Wvel(nzmin:nzmax, ednodes(2))= Wvel(nzmin:nzmax, ednodes(2))-c1(nzmin:nzmax)
-        if (Fer_GM) then
-            fer_Wvel(nzmin:nzmax, ednodes(2))= fer_Wvel(nzmin:nzmax, ednodes(2))-c2(nzmin:nzmax)
-        end if
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(ednodes(2)))
-#else
-!$OMP END ORDERED
-#endif
-        
-        !_______________________________________________________________________
-        ! if ed is not a boundary edge --> calc div(u_vec*h) for every layer
-        ! for edelem(2)
-        c1 = 0.0_WP
-        c2 = 0.0_WP
-        if(edelem(2)>0)then
-            deltaX2=edge_cross_dxdy(3,ed)
-            deltaY2=edge_cross_dxdy(4,ed)
-            nzmin = ulevels(edelem(2))
-            nzmax = nlevels(edelem(2))-1   
-            do nz = nzmax, nzmin, -1
-                c1(nz)=-(UVh(2, nz, edelem(2))*deltaX2 - UVh(1, nz, edelem(2))*deltaY2)
+                ! --> h * u_vec * n_vec
+                ! --> e_vec = (dx,dy), n_vec = (-dy,dx);
+                ! --> h * u*(-dy) + v*dx
+                c1(nz)=( UVh(2, nz, edelem(1))*deltaX1 - UVh(1, nz, edelem(1))*deltaY1 )
+                ! inflow(outflow) "flux" to control volume of node enodes1
+                ! is equal to outflow(inflow) "flux" to control volume of node enodes2
             end do ! --> do nz=nzmax,nzmin,-1
             if (Fer_GM) then
                 do nz = nzmax, nzmin, -1
-                    c2(nz)=-(fer_UV(2, nz, edelem(2))*deltaX2-fer_UV(1, nz, edelem(2))*deltaY2)*helem(nz, edelem(2))
-                end do ! --> do nz=nzmax,nzmin,-1
+                    c2(nz)=(fer_UV(2, nz, edelem(1))*deltaX1 - fer_UV(1, nz, edelem(1))*deltaY1)*helem(nz, edelem(1))
+                end do
             end if 
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_set_lock  (partit%plock(ednodes(1)))
-#else
-!$OMP ORDERED
-#endif                
-            Wvel(nzmin:nzmax, ednodes(1))= Wvel(nzmin:nzmax, ednodes(1))+c1(nzmin:nzmax)
-            if (Fer_GM) then
-                fer_Wvel(nzmin:nzmax, ednodes(1))= fer_Wvel(nzmin:nzmax, ednodes(1))+c2(nzmin:nzmax)
-            end if 
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_unset_lock(partit%plock(ednodes(1)))
-            call omp_set_lock  (partit%plock(ednodes(2)))
-#endif            
-            Wvel(nzmin:nzmax, ednodes(2))= Wvel(nzmin:nzmax, ednodes(2))-c1(nzmin:nzmax)
-            if (Fer_GM) then
-                fer_Wvel(nzmin:nzmax, ednodes(2))= fer_Wvel(nzmin:nzmax, ednodes(2))-c2(nzmin:nzmax)
+            if (mesh%nod_in_edge2D_sgn(k,n)>0) then
+                Wvel(nzmin:nzmax, n)= Wvel(nzmin:nzmax, n)+c1(nzmin:nzmax)
+                if (Fer_GM) then
+                fer_Wvel(nzmin:nzmax, n)= fer_Wvel(nzmin:nzmax, n)+c2(nzmin:nzmax)
             end if
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_unset_lock(partit%plock(ednodes(2)))
-#else
-!$OMP END ORDERED
-#endif            
-        end if !--> if(edelem(2)>0)then
+            else
+            Wvel(nzmin:nzmax, n)= Wvel(nzmin:nzmax, n)-c1(nzmin:nzmax)
+            if (Fer_GM) then
+                fer_Wvel(nzmin:nzmax, n)= fer_Wvel(nzmin:nzmax, n)-c2(nzmin:nzmax)
+            end if
+            end if
         
-    end do ! --> do ed=1, myDim_edge2D
+            !_______________________________________________________________________
+            ! if ed is not a boundary edge --> calc div(u_vec*h) for every layer
+            ! for edelem(2)
+            c1 = 0.0_WP
+            c2 = 0.0_WP
+            if(edelem(2)>0)then
+                deltaX2=edge_cross_dxdy(3,ed)
+                deltaY2=edge_cross_dxdy(4,ed)
+                nzmin = ulevels(edelem(2))
+                nzmax = nlevels(edelem(2))-1   
+                do nz = nzmax, nzmin, -1
+                    c1(nz)=-(UVh(2, nz, edelem(2))*deltaX2 - UVh(1, nz, edelem(2))*deltaY2)
+                end do ! --> do nz=nzmax,nzmin,-1
+                if (Fer_GM) then
+                    do nz = nzmax, nzmin, -1
+                        c2(nz)=-(fer_UV(2, nz, edelem(2))*deltaX2-fer_UV(1, nz, edelem(2))*deltaY2)*helem(nz, edelem(2))
+                    end do ! --> do nz=nzmax,nzmin,-1
+                end if 
+                if (mesh%nod_in_edge2D_sgn(k,n)>0) then
+                    Wvel(nzmin:nzmax, n)= Wvel(nzmin:nzmax, n)+c1(nzmin:nzmax)
+                    if (Fer_GM) then
+                    fer_Wvel(nzmin:nzmax, n)= fer_Wvel(nzmin:nzmax, n)+c2(nzmin:nzmax)
+                end if 
+                else
+                Wvel(nzmin:nzmax, n)= Wvel(nzmin:nzmax, n)-c1(nzmin:nzmax)
+                if (Fer_GM) then
+                    fer_Wvel(nzmin:nzmax, n)= fer_Wvel(nzmin:nzmax, n)-c2(nzmin:nzmax)
+                end if
+                end if
+            end if !--> if(edelem(2)>0)then
+        
+        end do ! --> do k=1, mesh%nod_in_edge2D_num(n)
+    end do ! --> do n=1, myDim_nod2D+eDim_nod2D
 !$OMP END DO    
 !$OMP END PARALLEL
 
@@ -2908,13 +2696,6 @@ end subroutine compute_vert_vel_transpv
 ! compute vertical CFL_z criteria and print out warning when critical value over
 ! stepped
 subroutine compute_CFLz(dynamics, partit, mesh)
-    use g_config, only: dt, flag_warn_cflz
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    use o_PARAM
-    use g_comm_auto
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -2999,12 +2780,6 @@ end subroutine compute_CFLz
 !
 !_______________________________________________________________________________ 
 subroutine compute_Wvel_split(dynamics, partit, mesh)
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    use o_PARAM
-    use g_comm_auto
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -3054,22 +2829,11 @@ end subroutine compute_Wvel_split
 ! solve  eq.18 in S. Danilov et al. : FESOM2: from finite elements to finite volumes. 
 ! for (eta^(n+1)-eta^n) = d_eta
 subroutine solve_ssh_ale(dynamics, partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    use o_ARRAYS
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    use g_comm_auto
-    use g_config, only: which_ale
-    use ssh_solve_preconditioner_interface
-    use ssh_solve_cg_interface
     implicit none
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(inout), target :: mesh
     !___________________________________________________________________________
-    logical, save        :: lfirst=.true.
     integer              :: n
     
     ! pointer on necessary derived types
@@ -3087,23 +2851,21 @@ subroutine solve_ssh_ale(dynamics, partit, mesh)
     droptol => dynamics%solverinfo%droptol
     soltol  => dynamics%solverinfo%soltol
 
-    if (lfirst) call ssh_solve_preconditioner(dynamics%solverinfo, partit, mesh)
+    ! Normally already built in ocean_setup, from the unperturbed stiffness matrix. Keep a
+    ! fallback, but key it on whether the arrays exist rather than on a saved first-call flag:
+    ! a flag says nothing about how much elevation the cumulative matrix has already absorbed,
+    ! and it double-allocates on the binary restart path, which restores solverinfo%rr/zz/pp/App
+    ! and then aborts with "allocatable array is already allocated".
+    if (.not. allocated(mesh%ssh_stiff%pr_values)) &
+        call ssh_solve_preconditioner(dynamics%solverinfo, partit, mesh)
     call ssh_solve_cg(dynamics%d_eta, dynamics%ssh_rhs, dynamics%solverinfo, partit, mesh)
     call exchange_nod(dynamics%d_eta, partit) !is this required after calling psolve ?
-    lfirst=.false.
 
 end subroutine solve_ssh_ale
 !
 !
 !===============================================================================
 subroutine impl_vert_visc_ale(dynamics, partit, mesh)
-    USE MOD_MESH
-    USE o_PARAM
-    USE o_ARRAYS, only: Av, stress_surf
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    USE g_CONFIG !,only: dt
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -3312,42 +3074,6 @@ end subroutine impl_vert_visc_ale
 !
 !===============================================================================
 subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
-    use g_config
-    use MOD_MESH
-    use MOD_TRACER
-    use MOD_DYN
-    USE MOD_ICE
-    use o_ARRAYS
-    use o_PARAM
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use g_comm_auto
-    use io_RESTART !PS
-    use o_mixing_KPP_mod
-#if defined (__cvmix)       
-    use g_cvmix_tke
-    use g_cvmix_idemix
-    use g_cvmix_pp
-    use g_cvmix_kpp
-    use g_cvmix_tidal
-#endif    
-    use Toy_Channel_Soufflet
-    use Toy_Neverworld2
-    use oce_ale_interfaces
-    use compute_vert_vel_transpv_interface
-    use compute_ssh_split_explicit_interface
-    use pressure_bv_interface
-    use pressure_force_4_linfs_interface
-    use pressure_force_4_zxxxx_interface
-    use compute_vel_rhs_interface
-    use solve_tracers_ale_interface
-    use write_step_info_interface
-    use check_blowup_interface
-    use fer_solve_interface
-    use impl_vert_visc_ale_vtransp_interface
-#if defined (FESOM_PROFILING)
-    use fesom_profiler
-#endif
     
     IMPLICIT NONE
     integer       , intent(in)            :: n
@@ -3357,9 +3083,11 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     type(t_mesh)  , intent(inout), target :: mesh
     type(t_ice)   , intent(inout), target :: ice
     !___________________________________________________________________________
-    real(kind=8)      :: t0,t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, loc, glo
+    real(kind=8)      :: t0, t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, t11, loc, glo
     integer           :: node
     integer           :: nz, elem, nzmin, nzmax !for KE diagnostic
+    integer           :: tr_num  ! for cavity NaN cleanup
+    integer           :: n_cavity_nan  ! NaN count reported by the cavity cleanup
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer :: eta_n
@@ -3368,17 +3096,16 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     eta_n => dynamics%eta_n(:)
-    
-    !___________________________________________________________________________
-    t0=MPI_Wtime()
 !PS     water_flux = 0.0_WP
 !PS     heat_flux  = 0.0_WP
 !PS     stress_surf= 0.0_WP
 !PS     stress_node_surf= 0.0_WP
-
+    !___________________________________________________________________________
+    t0=MPI_Wtime()
 #if defined (FESOM_PROFILING)
-    call fesom_profiler_start("oce_mix_pres")
+    call fesom_profiler_start("oce_pressure_density")
 #endif
+
     !___________________________________________________________________________
     ! calculate equation of state, density, pressure and mixed layer depths
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call pressure_bv'//achar(27)//'[0m'
@@ -3413,6 +3140,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
  
     !___________________________________________________________________________
     call status_check(partit)
+    
+    t1 = MPI_Wtime()
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("oce_pressure_density")
+    call fesom_profiler_start("oce_mixing_scheme")
+#endif
+    
     !___________________________________________________________________________
     ! >>>>>>                                                             <<<<<<
     ! >>>>>>    calculate vertical mixing coefficients for tracer (Kv)   <<<<<<
@@ -3432,15 +3166,18 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! to be called prior to tke
     ! for debugging
 #if defined (__cvmix)       
-    if  (mod(mix_scheme_nmb,10)==6) then
+    if     (mod(mix_scheme_nmb,10)==6) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_idemix'//achar(27)//'[0m'
         call calc_cvmix_idemix(partit, mesh)
+    elseif (mod(mix_scheme_nmb,10)==7) then
+        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_idemix2'//achar(27)//'[0m'
+        call calc_cvmix_idemix2(n, partit, mesh)
     end if 
 #endif    
 
     !___MAIN MIXING SCHEMES_____________________________________________________
     ! use FESOM2.0 tuned k-profile parameterization for vertical mixing 
-    if (mix_scheme_nmb==1 .or. mix_scheme_nmb==17) then
+    if (mix_scheme_nmb==1 .or. mix_scheme_nmb==18 ) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_KPP'//achar(27)//'[0m' 
         call oce_mixing_KPP(Av, Kv_double, dynamics, tracers, partit, mesh)
 !$OMP PARALLEL DO
@@ -3453,13 +3190,13 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         
     ! use FESOM2.0 tuned pacanowski & philander parameterization for vertical 
     ! mixing     
-    else if(mix_scheme_nmb==2 .or. mix_scheme_nmb==27) then
+    else if(mix_scheme_nmb==2 .or. mix_scheme_nmb==28) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_PP'//achar(27)//'[0m' 
         call oce_mixing_PP(dynamics, partit, mesh)
         call mo_convect(ice, partit, mesh)
 #if defined (__cvmix)           
     ! use CVMIX KPP (Large at al. 1994) 
-    else if(mix_scheme_nmb==3 .or. mix_scheme_nmb==37) then
+    else if(mix_scheme_nmb==3 .or. mix_scheme_nmb==38) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_kpp'//achar(27)//'[0m'
         call calc_cvmix_kpp(ice, dynamics, tracers, partit, mesh)
         call mo_convect(ice, partit, mesh)
@@ -3467,7 +3204,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! use CVMIX PP (Pacanowski and Philander 1981) parameterisation for mixing
     ! based on Richardson number Ri = N^2/(du/dz)^2, using Brunt Väisälä frequency
     ! N^2 and vertical horizontal velocity shear dui/dz
-    else if(mix_scheme_nmb==4 .or. mix_scheme_nmb==47) then
+    else if(mix_scheme_nmb==4 .or. mix_scheme_nmb==48) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_pp'//achar(27)//'[0m'
         call calc_cvmix_pp(dynamics, partit, mesh)
         call mo_convect(ice, partit, mesh)
@@ -3476,7 +3213,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! vertical mixing with or without the IDEMIX (dissipation of energy by 
     ! internal gravity waves) extension from Olbers and Eden, 2013, "A global 
     ! Model for the diapycnal diffusivity induced by internal gravity waves" 
-    else if(mix_scheme_nmb==5 .or. mix_scheme_nmb==56) then    
+    else if(mix_scheme_nmb==5 .or. mix_scheme_nmb==56 .or. mix_scheme_nmb==57) then    
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_tke'//achar(27)//'[0m'
         call calc_cvmix_tke(dynamics, partit, mesh)
         call mo_convect(ice, partit, mesh)
@@ -3493,17 +3230,18 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! the already computed viscosities/diffusivities of KPP, PP, cvmix_KPP or 
     ! cvmix_PP --> use standalone for debugging --> needs to be called after main
     ! mixing schemes
-    if ( mod(mix_scheme_nmb,10)==7) then
+    if ( mod(mix_scheme_nmb,10)==8) then
         if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call calc_cvmix_tidal'//achar(27)//'[0m'
         call calc_cvmix_tidal(partit, mesh)
         
     end if
 #endif    
-    t1=MPI_Wtime()
+    
+    t2=MPI_Wtime()
 #if defined (FESOM_PROFILING)
-    call fesom_profiler_end("oce_mix_pres")
+    call fesom_profiler_end("oce_mixing_scheme")
     call fesom_profiler_start("oce_dyn_momentum")
-#endif    
+#endif
     
     !___________________________________________________________________________
     ! add contribution from momentum advection, coriolis and pressure gradient |
@@ -3631,7 +3369,8 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
             end do
         end if 
     end if
-    t2=MPI_Wtime()
+    
+    t3=MPI_Wtime()
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("oce_dyn_momentum")
     call fesom_profiler_start("oce_ssh_solve")
@@ -3659,10 +3398,10 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
             if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call relax_zonal_vel'//achar(27)//'[0m'
             call relax_zonal_vel(dynamics, partit, mesh)
         end if     
-        t3=MPI_Wtime()
+        t4=MPI_Wtime()
 #if defined (FESOM_PROFILING)
-    call fesom_profiler_end("oce_ssh_solve")
-    call fesom_profiler_start("oce_vel_update")
+        call fesom_profiler_end("oce_ssh_solve")
+        call fesom_profiler_start("oce_vel_update")
 #endif 
 
         ! estimate new horizontal velocity u^(n+1)
@@ -3672,10 +3411,10 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         call update_vel(dynamics, partit, mesh)
         
         ! --> eta_(n) --> eta_(n+1) = eta_(n) + deta = eta_(n) + (eta_(n+1) + eta_(n))
-        t4=MPI_Wtime()
+        t5=MPI_Wtime()
 #if defined (FESOM_PROFILING)
-    call fesom_profiler_end("oce_vel_update")
-    call fesom_profiler_start("oce_hbar_calc")
+        call fesom_profiler_end("oce_vel_update")
+        call fesom_profiler_start("oce_hbar_calc")
 #endif 
         
         ! Update to hbar(n+3/2) and compute dhe to be used on the next step
@@ -3700,10 +3439,10 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 !$OMP END PARALLEL DO
         ! --> eta_(n)
         ! call zero_dynamics !DS, zeros several dynamical variables; to be used for testing new implementations!
-        t5=MPI_Wtime()
+        t6=MPI_Wtime()
 #if defined (FESOM_PROFILING)
-    call fesom_profiler_end("oce_hbar_calc")
-    call fesom_profiler_start("oce_gm_redi")
+        call fesom_profiler_end("oce_hbar_calc")
+        call fesom_profiler_start("oce_gm_redi")
 #endif 
     
     !___________________________________________________________________________
@@ -3712,23 +3451,32 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         ! Compute vertical integral of transport velocity rhs omitting the contributions from
         ! the elevation and Coriolis. 
         t30=MPI_Wtime()
-        call compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
-        
-        ! Do barotropic step, get eta_{n+1} and BT transport 
-        call compute_BT_step_SE_ale(dynamics, partit, mesh)
-        t3=MPI_Wtime()
+        ! Sub-sections nested under oce_ssh_solve (the barotropic subcycle is the
+        ! split-explicit analogue of the CG SSH solve). oce_bt_step is the
+        ! se_BTsteps subcycle loop — the expensive, halo-heavy part.
 #if defined (FESOM_PROFILING)
+    call fesom_profiler_start("oce_bt_rhs")
+#endif
+        call compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("oce_bt_rhs")
+    call fesom_profiler_start("oce_bt_step")
+#endif
+        ! Do barotropic step, get eta_{n+1} and BT transport
+        call compute_BT_step_SE_ale(dynamics, partit, mesh)
+        t4=MPI_Wtime()
+#if defined (FESOM_PROFILING)
+    call fesom_profiler_end("oce_bt_step")
     call fesom_profiler_end("oce_ssh_solve")
     call fesom_profiler_start("oce_vel_update")
-#endif        
+#endif
         ! Trim U to be consistent with BT transport
         call update_trim_vel_ale_vtransp(1, dynamics, partit, mesh) 
-        t4=MPI_Wtime()
-        t5=t4
+        t5=MPI_Wtime()
+        t6=t5
 #if defined (FESOM_PROFILING)
+    ! no separate hbar step in split-explicit subcycling (t6=t5)
     call fesom_profiler_end("oce_vel_update")
-    call fesom_profiler_start("oce_hbar_calc")
-    call fesom_profiler_end("oce_hbar_calc")
     call fesom_profiler_start("oce_gm_redi")
 #endif
     end if ! --> if (.not. dynamics%use_ssh_se_subcycl) then
@@ -3741,12 +3489,21 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     
     ! Implementation of Gent & McWiliams parameterization after R. Ferrari et al., 2010
     ! does not belong directly to ALE formalism
-    if (Fer_GM) then
-        if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call fer_solve_Gamma'//achar(27)//'[0m'
-        call fer_solve_Gamma(partit, mesh)
+    if (Fer_GM .or. use_mle) then
+        if (Fer_GM) then
+            if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call fer_solve_Gamma'//achar(27)//'[0m'
+            call fer_solve_Gamma(partit, mesh)
+        end if
+        ! Fox-Kemper mixed-layer eddies add to the same streamfunction, so the bolus
+        ! velocity, the vertical velocity from continuity, tracer advection and the
+        ! diagnostics all pick them up unchanged. Resets fer_gamma itself when GM is off.
+        if (use_mle) then
+            if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call mle_add_gamma'//achar(27)//'[0m'
+            call mle_add_gamma(partit, mesh)
+        end if
         call fer_gamma2vel(dynamics, partit, mesh)
     end if
-    t6=MPI_Wtime()
+    t7=MPI_Wtime()
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("oce_gm_redi")
     call fesom_profiler_start("oce_vert_vel")
@@ -3776,7 +3533,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         end if 
         call compute_vert_vel_transpv(dynamics, partit, mesh)
     end if    
-    t7=MPI_Wtime()
+    t8=MPI_Wtime()
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("oce_vert_vel")
     call fesom_profiler_start("oce_tracer_solve")
@@ -3794,17 +3551,42 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! solve tracer equation
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call solve_tracers_ale'//achar(27)//'[0m'
     call solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
-    t8=MPI_Wtime()
+    t9=MPI_Wtime()
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("oce_tracer_solve")
     call fesom_profiler_start("oce_thickness_update")
 #endif 
+#if defined (__recom)
+    ! CAVITY FIX: Clean up NaN created by tracer advection/diffusion at cavity nodes
+    ! Cavity nodes can create NaN during numerical operations with zero/near-zero thickness
+    if (use_cavity) then
+        n_cavity_nan = 0
+        do node=1, partit%myDim_nod2D+partit%eDim_nod2D
+            if (mesh%ulevels_nod2D(node) > 1) then
+                ! Clean NaN in ALL levels for cavity nodes (not just cavity layers)
+                do tr_num=1, tracers%num_tracers
+                    n_cavity_nan = n_cavity_nan + &
+                            count(.not. ieee_is_finite(tracers%data(tr_num)%values(:, node)))
+                    where (.not. ieee_is_finite(tracers%data(tr_num)%values(:, node)))
+                        tracers%data(tr_num)%values(:, node) = 0.0_WP
+                    end where
+                enddo
+            endif
+        enddo
+        ! This scrub runs before check_blowup, so a genuine blow-up under a cavity
+        ! would be zeroed and never reported. Say so rather than hiding it.
+        if (n_cavity_nan > 0) then
+            write(*,'(A,I0,A,I0,A,I0)') ' WARNING: cavity NaN scrub zeroed ', n_cavity_nan, &
+                    ' tracer value(s) on rank ', mype, ' at step ', n
+        end if
+    endif
+#endif
      
     !___________________________________________________________________________
     ! Update hnode=hnode_new, helem
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call update_thickness_ale'//achar(27)//'[0m'
     call update_thickness_ale(partit, mesh)
-    t9=MPI_Wtime()
+    t10=MPI_Wtime()
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("oce_thickness_update")
     call fesom_profiler_start("oce_blowup_check")
@@ -3819,6 +3601,10 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     
     !___________________________________________________________________________
     ! write out global fields for debugging
+#if defined(__recom) && defined(__usetp)
+    if(partit%my_fesom_group == 0) then
+#endif
+
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call write_step_info'//achar(27)//'[0m'
     call write_step_info(n,logfile_outfreq, ice, dynamics, tracers, partit, mesh)
     
@@ -3832,39 +3618,55 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     ! togeather around 2.5% of model runtime
     if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call check_blowup'//achar(27)//'[0m'
     call check_blowup(n, ice, dynamics, tracers, partit, mesh)
-    t10=MPI_Wtime()
+    t11=MPI_Wtime()
+
+#if defined(__recom) && defined(__usetp)
+    endif
+#endif
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("oce_blowup_check")
 #endif
 
     !___________________________________________________________________________
     ! write out execution times for ocean step parts
-    rtime_oce          = rtime_oce + (t10-t0)-(t10-t9)
-    rtime_oce_mixpres  = rtime_oce_mixpres + (t1-t0)
-    rtime_oce_dyn      = rtime_oce_dyn + (t2-t1)+(t7-t6)+(t4-t3)
-    rtime_oce_dynssh   = rtime_oce_dynssh + (t3-t2)+(t5-t4)
-    rtime_oce_solvessh = rtime_oce_solvessh + (t3-t30)
-    rtime_oce_GMRedi   = rtime_oce_GMRedi + (t6-t5)
-    rtime_oce_solvetra = rtime_oce_solvetra + (t8-t7)
-    rtime_tot          = rtime_tot + (t10-t0)-(t10-t9)
+    rtime_oce          = rtime_oce          + (t11-t0)-(t11-t10)
+    rtime_oce_presdens = rtime_oce_presdens + (t1-t0)
+    rtime_oce_mixing   = rtime_oce_mixing   + (t2-t1)
+    rtime_oce_dyn      = rtime_oce_dyn      + (t3-t2)+(t8-t7)+(t5-t4)
+    rtime_oce_dynssh   = rtime_oce_dynssh   + (t4-t3)+(t6-t5)
+    rtime_oce_solvessh = rtime_oce_solvessh + (t4-t30)
+    rtime_oce_GMRedi   = rtime_oce_GMRedi   + (t7-t6)
+    rtime_oce_solvetra = rtime_oce_solvetra + (t9-t8)
+    rtime_tot          = rtime_tot          + (t11-t0)-(t11-t10)
+
+#if defined(__recom) && defined(__usetp)
+    if(partit%my_fesom_group == 0) then
+#endif    
     if(mod(n,logfile_outfreq)==0 .and. mype==0) then  
+        write(*,*)
         write(*,*) '___ALE OCEAN STEP EXECUTION TIMES______________________'
-        write(*,"(A, ES10.3)") '     Oce. Mix,Press.. :', t1-t0
-        write(*,"(A, ES10.3)") '     Oce. Dynamics    :', t2-t1
-        write(*,"(A, ES10.3)") '     Oce. Update Vel. :', t4-t3
-        write(*,"(A, ES10.3)") '     Oce. Fer-GM.     :', t6-t5
+        write(*,"(A, ES10.3, A, F6.2, A)") '     Oce. Press, Dens.:', t1-t0,    '  (', 100.0*(t1-t0)/(t11-t0),    '%)'
+        write(*,"(A, ES10.3, A, F6.2, A)") '     Oce. Mixing      :', t2-t1,    '  (', 100.0*(t2-t1)/(t11-t0),    '%)'
+        write(*,"(A, ES10.3, A, F6.2, A)") '     Oce. Dynamics    :', t3-t2,    '  (', 100.0*(t3-t2)/(t11-t0),    '%)'
+        write(*,"(A, ES10.3, A, F6.2, A)") '     Oce. Update Vel. :', t5-t4,    '  (', 100.0*(t5-t4)/(t11-t0),    '%)'
+        write(*,"(A, ES10.3, A, F6.2, A)") '     Oce. Fer-GM.     :', t7-t6,    '  (', 100.0*(t7-t6)/(t11-t0),    '%)'
         write(*,*) '    _______________________________'
-        write(*,"(A, ES10.3)") '     ALE-Solve SSH    :', t3-t2
-        write(*,"(A, ES10.3)") '     ALE-Calc. hbar   :', t5-t4
-        write(*,"(A, ES10.3)") '     ALE-Update+W     :', t7-t6
-        write(*,"(A, ES10.3)") '     ALE-Solve Tracer :', t8-t7
-        write(*,"(A, ES10.3)") '     ALE-Update hnode :', t9-t8
+        write(*,"(A, ES10.3, A, F6.2, A)") '     ALE-Solve SSH    :', t4-t3,    '  (', 100.0*(t4-t3)/(t11-t0),    '%)'
+        write(*,"(A, ES10.3, A, F6.2, A)") '     ALE-Calc. hbar   :', t6-t5,    '  (', 100.0*(t6-t5)/(t11-t0),    '%)'
+        write(*,"(A, ES10.3, A, F6.2, A)") '     ALE-Update+W     :', t8-t7,    '  (', 100.0*(t8-t7)/(t11-t0),    '%)'
+        write(*,"(A, ES10.3, A, F6.2, A)") '     ALE-Solve Tracer :', t9-t8,    '  (', 100.0*(t9-t8)/(t11-t0),    '%)'
+        write(*,"(A, ES10.3, A, F6.2, A)") '     ALE-Update hnode :', t10-t9,   '  (', 100.0*(t10-t9)/(t11-t0),   '%)'
         write(*,*) '    _______________________________'
-        write(*,"(A, ES10.3)") '     check for blowup :', t10-t9
+        write(*,"(A, ES10.3, A, F6.2, A)") '     check for blowup :', t11-t10,  '  (', 100.0*(t11-t10)/(t11-t0),  '%)'
         write(*,*) '    _______________________________'
-        write(*,"(A, ES10.3)") '     Oce. TOTAL       :', t10-t0
+        write(*,"(A, ES10.3)")             '     Oce. TOTAL       :', t11-t0
         write(*,*)
         write(*,*)
-    end if    
+    end if 
+#if defined(__recom) && defined(__usetp)
+    endif
+#endif
+
 end subroutine oce_timestep_ale
 
+end module oce_ale_module

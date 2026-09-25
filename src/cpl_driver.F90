@@ -14,9 +14,15 @@ module cpl_driver
   !
   use mod_oasis                    ! oasis module
   use g_config, only : dt, use_icebergs, lwiso, compute_oasis_corners
+#if defined(__recom) && defined(__usetp)
+  use g_config, only : num_fesom_groups 
+#endif
+
   use o_param,  only : rad
   USE MOD_PARTIT
   use mpi
+
+
   implicit none
   save   
   !
@@ -28,8 +34,15 @@ module cpl_driver
   ! (final number of fields depends now on lwiso switch and is set in subroutine cpl_oasis3mct_define_unstr)
 
 #if defined (__oifs)
-  integer                    :: nsend = 7
+#if defined(__recom)
+  integer                    :: nsend = 9
+  integer                    :: nrecv = 16
+!With oifs, without recom:
+#else
+  integer                    :: nsend = 8
   integer                    :: nrecv = 15
+#endif
+!Without oifs
 #else
   integer                    :: nsend = 4
   integer                    :: nrecv = 12
@@ -72,7 +85,14 @@ module cpl_driver
   integer                    :: o2a_call_count=0
   integer                    :: a2o_call_count=0
 
-  REAL(kind=WP), POINTER                          :: exfld(:)          ! buffer for receiving global exchange fields
+  ! The OASIS exchange buffer is kept always-double (WP_full), independent of the
+  ! model working precision WP. This matches the oasis_Double transient defined in
+  ! cpl_oasis3mct_define_unstr and keeps the FESOM<->atmosphere exchange in double
+  ! precision even in a single-precision (USE_SINGLE_PRECISION, WP=real32) build.
+  ! It mirrors OpenIFS, which couples through its dedicated double coupling kind
+  ! JPRO regardless of the model kind JPRB. cplsnd stays at WP (it accumulates model
+  ! fields); the WP->WP_full conversion happens on assignment to exfld.
+  REAL(kind=WP_full), POINTER                     :: exfld(:)          ! buffer for receiving global exchange fields
   real(kind=WP), allocatable, dimension(:,:)      :: cplsnd
 
 
@@ -103,11 +123,11 @@ contains
     subroutine node_contours(my_x_corners, my_y_corners, partit, mesh)
         USE MOD_MESH
         USE MOD_PARTIT
-        USE MOD_PARSUP
         USE o_PARAM
         use g_comm_auto
         use o_ARRAYS
         use g_rotate_grid
+        use oce_mesh_module, only: elem_center, edge_center
 
         IMPLICIT NONE
         type(t_mesh),   intent(in), target :: mesh
@@ -311,7 +331,12 @@ include "node_contour_boundary.h"
     my_y_corners=my_y_corners/rad
     end subroutine node_contours
 
-  subroutine cpl_oasis3mct_init(partit, localCommunicator )
+#if defined(__recom) && defined(__usetp)
+  subroutine cpl_oasis3mct_init(partit, localCommunicator, num_fesom_groups)
+#else
+  subroutine cpl_oasis3mct_init(partit, localCommunicator)
+#endif
+
     USE MOD_PARTIT
     implicit none   
     save
@@ -325,6 +350,9 @@ include "node_contour_boundary.h"
     !
     integer, intent(OUT)       :: localCommunicator
     type(t_partit), intent(inout), target :: partit
+#if defined(__recom) && defined(__usetp)
+    integer, intent(inout)     :: num_fesom_groups
+#endif
     !
     ! Local declarations
     !
@@ -346,7 +374,11 @@ include "node_contour_boundary.h"
     !------------------------------------------------------------------
     ! 1st Initialize the OASIS3-MCT coupling system for the application
     !------------------------------------------------------------------
+#if defined(__recom) && defined(__usetp)
+    CALL oasis_init_comp(comp_id, comp_name, ierror, num_program_groups = num_fesom_groups)
+#else
     CALL oasis_init_comp(comp_id, comp_name, ierror )
+#endif
     IF (ierror /= 0) THEN
         CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'Init_comp failed.')
     ENDIF
@@ -357,7 +389,11 @@ include "node_contour_boundary.h"
         CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'comm_rank failed.')
     ENDIF
 
+#if defined(__recom) && defined(__usetp)
+    CALL oasis_get_localcomm_all_groups( localCommunicator, ierror )
+#else
     CALL oasis_get_localcomm( localCommunicator, ierror )
+#endif
     IF (ierror /= 0) THEN
         CALL oasis_abort(comp_id, 'cpl_oasis3mct_init', 'get_local_comm failed.')
     ENDIF
@@ -388,7 +424,6 @@ include "node_contour_boundary.h"
 #endif
     use mod_mesh
     USE MOD_PARTIT
-    USE MOD_PARSUP
     use g_rotate_grid
     use mod_oasis, only: oasis_write_area, oasis_write_mask
 #if defined (__XIOS)
@@ -585,27 +620,27 @@ include "associate_mesh_ass.h"
     if (mype .eq. 0) then 
       print *, 'FESOM before 1st GatherV', displs_from_all_pes(npes), counts_from_all_pes(npes), number_of_all_points
     endif
-    CALL MPI_GATHERV(my_x_coords, my_number_of_points, MPI_DOUBLE_PRECISION, all_x_coords,  &
-                    counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+    CALL MPI_GATHERV(my_x_coords, my_number_of_points, MPI_WP, all_x_coords,  &
+                    counts_from_all_pes, displs_from_all_pes, MPI_WP, localroot, MPI_COMM_FESOM, ierror)
 
     if (mype .eq. 0) then 
       print *, 'FESOM before 2nd GatherV'
     endif
-    CALL MPI_GATHERV(my_y_coords, my_number_of_points, MPI_DOUBLE_PRECISION, all_y_coords,  &
-                    counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+    CALL MPI_GATHERV(my_y_coords, my_number_of_points, MPI_WP, all_y_coords,  &
+                    counts_from_all_pes, displs_from_all_pes, MPI_WP, localroot, MPI_COMM_FESOM, ierror)
 
     if (mype .eq. 0) then 
       print *, 'FESOM before 3rd GatherV'
     endif
-    CALL MPI_GATHERV(area(1,:), my_number_of_points, MPI_DOUBLE_PRECISION, all_area,  &
-                    counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+    CALL MPI_GATHERV(area(1,:), my_number_of_points, MPI_WP, all_area,  &
+                    counts_from_all_pes, displs_from_all_pes, MPI_WP, localroot, MPI_COMM_FESOM, ierror)
 
     if (compute_oasis_corners) then
       do j = 1, 25
-        CALL MPI_GATHERV(my_x_corners(:,j), myDim_nod2D, MPI_DOUBLE_PRECISION, all_x_corners(:,:,j),  &
-                      counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
-        CALL MPI_GATHERV(my_y_corners(:,j), myDim_nod2D, MPI_DOUBLE_PRECISION, all_y_corners(:,:,j),  &
-                      counts_from_all_pes, displs_from_all_pes, MPI_DOUBLE_PRECISION, localroot, MPI_COMM_FESOM, ierror)
+        CALL MPI_GATHERV(my_x_corners(:,j), myDim_nod2D, MPI_WP, all_x_corners(:,:,j),  &
+                      counts_from_all_pes, displs_from_all_pes, MPI_WP, localroot, MPI_COMM_FESOM, ierror)
+        CALL MPI_GATHERV(my_y_corners(:,j), myDim_nod2D, MPI_WP, all_y_corners(:,:,j),  &
+                      counts_from_all_pes, displs_from_all_pes, MPI_WP, localroot, MPI_COMM_FESOM, ierror)
       end do
     endif
 
@@ -613,6 +648,10 @@ include "associate_mesh_ass.h"
     if (mype .eq. 0) then 
       print *, 'FESOM after Barrier'
     endif
+
+#if defined(__recom) && defined(__usetp)
+    if(partit%my_fesom_group == 0) then
+#endif
 
     if (mype .eq. localroot) then
       print *, 'FESOM before grid writing to oasis grid files'
@@ -642,6 +681,9 @@ include "associate_mesh_ass.h"
       print *, 'FESOM after terminate_grids_writing'
     endif !localroot
      
+#if defined(__recom) && defined(__usetp)
+    end if !(partit%my_fesom_group == 0) then     
+#endif
 
 
     DEALLOCATE(all_x_coords, all_y_coords, my_x_coords, my_y_coords, displs_from_all_pes, counts_from_all_pes)
@@ -661,6 +703,10 @@ include "associate_mesh_ass.h"
     cpl_send( 5)='sia_feom' ! 5. sea ice albedo [%-100]            ->
     cpl_send( 6)='u_feom'   ! 6. eastward  surface velocity [m/s]  ->
     cpl_send( 7)='v_feom'   ! 7. northward surface velocity [m/s]  ->
+    cpl_send( 8)='sit_feom' ! 8. effective sea ice thickness [m]   ->
+#if defined (__recom)
+    cpl_send( 9)='FCO2_feom'! 9. CO2 flux [kgCO2 m-2 s-1]             ->
+#endif
 #else
     cpl_send( 1)='sst_feom' ! 1. sea surface temperature [°C]      ->
     cpl_send( 2)='sit_feom' ! 2. sea ice thickness [m]             ->
@@ -701,6 +747,10 @@ include "associate_mesh_ass.h"
     cpl_recv(13) = 'calv_oce'
     cpl_recv(14) = 'u10w_oce'
     cpl_recv(15) = 'v10w_oce'
+#if defined (__recom)
+    cpl_recv(16) = 'XCO2_oce'
+#endif
+!Not oifs
 #else
     cpl_recv(1)  = 'taux_oce'
     cpl_recv(2)  = 'tauy_oce'
@@ -820,7 +870,6 @@ include "associate_mesh_ass.h"
   subroutine cpl_oasis3mct_send(ind, data_array, action, partit)
     use o_param
     USE MOD_PARTIT
-    USE MOD_PARSUP
     implicit none
     save
     !---------------------------------------------------------------------
@@ -884,7 +933,6 @@ include "associate_mesh_ass.h"
     use o_param
     use g_comm_auto
     USE MOD_PARTIT
-    USE MOD_PARSUP
     implicit none
     save
     !---------------------------------------------------------------------
@@ -919,15 +967,49 @@ include "associate_mesh_ass.h"
     endif    
 #endif
 
+#if defined(__recom) && defined(__usetp)
+! the coupling is in principle as it was before, i.e. the fesom processes - in group 0 - receive their data from echam
+    if(partit%my_fesom_group == 0) then
+#endif
+
     call oasis_get(recv_id(ind), seconds_til_now, exfld,info)
+
+#if defined(__recom) && defined(__usetp)
+    else
+
+! defensive: assignment statement "action=(info==3 ..." below is "don't care" in this case, because the actual value for action
+! is received via MPI_Bcast anyway
+        info = 0
+
+    end if
+#endif
+
     t2=MPI_Wtime()
  !
  ! FESOM's interpolation routine interpolates structured
  ! VarStrLoc coming from OASIS3MCT to local unstructured data_array
  ! and delivered back to FESOM.
    action=(info==3 .OR. info==10 .OR. info==11 .OR. info==12 .OR. info==13)
+
+#if defined(__recom) && defined(__usetp)
+   if(num_fesom_groups > 1) then
+      call MPI_Bcast(action, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
+   end if
+#endif 
+
    if (action) then
+#if defined(__recom) && defined(__usetp)
+      if(partit%my_fesom_group == 0) then
+#endif
       data_array(1:partit%myDim_nod2d) = exfld
+#if defined(__recom) && defined(__usetp)
+      end if
+
+      if(num_fesom_groups > 1) then
+          call MPI_Bcast(data_array, partit%myDim_nod2d, MPI_WP, 0, partit%MPI_COMM_FESOM_SAME_RANK_IN_GROUPS, partit%MPIerr)
+      end if
+#endif
+
       call exchange_nod(data_array, partit)
    end if   
    t3=MPI_Wtime()

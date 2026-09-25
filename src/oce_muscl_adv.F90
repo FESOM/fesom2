@@ -1,16 +1,19 @@
-module find_up_downwind_triangles_interface
-  interface
-    subroutine find_up_downwind_triangles(twork, partit, mesh)
-      use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use MOD_TRACER
-      type(t_mesh),        intent(in)  ,  target :: mesh
-      type(t_partit),      intent(inout), target :: partit
-      type(t_tracer_work), intent(inout), target :: twork
-    end subroutine find_up_downwind_triangles
-  end interface
-end module find_up_downwind_triangles_interface
+module oce_muscl_adv_module
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_TRACER
+    USE o_ARRAYS
+    USE o_PARAM
+    USE g_comm_auto
+    USE g_config
+
+    implicit none
+
+    private
+    public :: muscl_adv_init, find_up_downwind_triangles, &
+              fill_up_dn_grad
+
+contains
 
 ! A set of routines to implement MUSCL-type of advection
 ! For description, see Abalakin, I., Dervieux, A., Kozubskaya, T., 2002. A
@@ -30,15 +33,6 @@ end module find_up_downwind_triangles_interface
 !	fill_up_dn_grad
 !	adv_tracer_muscl
 subroutine muscl_adv_init(twork, partit, mesh)
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_TRACER
-    use o_ARRAYS
-    use o_PARAM
-    use g_comm_auto
-    use g_config
-    use find_up_downwind_triangles_interface
     IMPLICIT NONE
     integer     :: n, k, n1, n2
 
@@ -53,7 +47,7 @@ subroutine muscl_adv_init(twork, partit, mesh)
 
     !___________________________________________________________________________
     ! find upwind and downwind triangle for each local edge 
-    call find_up_downwind_triangles(twork, partit, mesh)
+    call find_up_downwind_triangles(partit, mesh, twork%edge_up_dn_tri, twork%edge_up_dn_grad)
     
     !___________________________________________________________________________
     nn_size=0
@@ -91,67 +85,26 @@ subroutine muscl_adv_init(twork, partit, mesh)
     !___________________________________________________________________________
     allocate(twork%nboundary_lay(myDim_nod2D+eDim_nod2D)) !node n becomes a boundary node after layer twork%nboundary_lay(n)
     twork%nboundary_lay=nl-1
+    ! Each owned node lists the far ends of its incident edges (mesh%nod_in_edge2D) in
+    ! ascending edge order, so the neighbour list is the same for any number of threads. The boundary-layer index is the minimum over
+    ! the node's edges and needs no ordering. No thread writes a node it does not own.
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, n1, n2)
 !$OMP DO
-    do n=1, myDim_edge2D
-        ! n1 and n2 are local indices 
-        n1=edges(1,n)
-        n2=edges(2,n)
-
-#if defined(__openmp_reproducible)
-!$OMP ORDERED
-#endif
-
-        ! ... if(n1<=myDim_nod2D) --> because dont use extended nodes
-        if(n1<=myDim_nod2D) then
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-           call omp_set_lock(partit%plock(n1))
-#endif
-            nn_pos(nn_num(n1)+1,n1)=n2
-            nn_num(n1)=nn_num(n1)+1
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-           call omp_unset_lock(partit%plock(n1))
-#endif
-        end if
-        
-        ! ... if(n2<=myDim_nod2D) --> because dont use extended nodes
-        if(n2<=myDim_nod2D) then
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-           call omp_set_lock(partit%plock(n2))
-#endif
-            nn_pos(nn_num(n2)+1,n2)=n1
-            nn_num(n2)=nn_num(n2)+1
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-           call omp_unset_lock(partit%plock(n2))
-#endif
-        end if
-        
-        if (any(edge_tri(:,n)<=0)) then
-            ! this edge nodes is already at the surface at the boundary ...
-            ! later here ...sign(1, twork%nboundary_lay(enodes(1))-nz) for nz=1 must be negativ
-            ! thats why here twork%nboundary_lay(edges(:,n))=0
-            twork%nboundary_lay(edges(:,n))=0
-        else
-            ! this edge nodes become boundary edge with increasing depth due to bottom topography
-            ! at the depth twork%nboundary_lay the edge (edgepoints) still has two valid ocean triangles
-            ! below that depth, edge becomes boundary edge
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-           call omp_set_lock  (partit%plock(edges(1,n)))
-#endif
-            twork%nboundary_lay(edges(1,n))=min(twork%nboundary_lay(edges(1,n)), minval(nlevels(edge_tri(:,n)))-1)
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-           call omp_unset_lock(partit%plock(edges(1,n)))
-           call omp_set_lock  (partit%plock(edges(2,n)))
-#endif
-            twork%nboundary_lay(edges(2,n))=min(twork%nboundary_lay(edges(2,n)), minval(nlevels(edge_tri(:,n)))-1)
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-           call omp_unset_lock(partit%plock(edges(2,n)))
-#endif
-        end if
-
-#if defined(__openmp_reproducible)
-!$OMP END ORDERED
-#endif
+    do n=1, myDim_nod2D+eDim_nod2D
+        do k=1, mesh%nod_in_edge2D_num(n)
+            n1=mesh%nod_in_edge2D(k,n)                 ! the edge
+            n2=edges(1,n1)                             ! its far end
+            if (n2==n) n2=edges(2,n1)
+            if (n<=myDim_nod2D) then
+                nn_pos(nn_num(n)+1,n)=n2
+                nn_num(n)=nn_num(n)+1
+            end if
+            if (any(edge_tri(:,n1)<=0)) then
+                twork%nboundary_lay(n)=0
+            else
+                twork%nboundary_lay(n)=min(twork%nboundary_lay(n), minval(nlevels(edge_tri(:,n1))))
+            end if
+        end do
     end do
 !$OMP END DO
 !$OMP END PARALLEL
@@ -159,32 +112,26 @@ end SUBROUTINE muscl_adv_init
 !
 !
 !_______________________________________________________________________________
-SUBROUTINE find_up_downwind_triangles(twork, partit, mesh)
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP
-USE MOD_TRACER
-USE o_ARRAYS
-USE o_PARAM
-USE g_CONFIG
-use g_comm_auto
+SUBROUTINE find_up_downwind_triangles(partit, mesh, edge_up_dn_tri, edge_up_dn_grad)
 IMPLICIT NONE
 integer                    :: n, k, ednodes(2), elem, el
 real(kind=WP)              :: x(2),b(2), c(2), cr, bx, by, xx, xy, ab, ax
 real(kind=WP), allocatable :: coord_elem(:, :,:), temp(:)
 integer, allocatable       :: temp_i(:), e_nodes(:,:)
 
-type(t_mesh),        intent(in)   , target :: mesh
+type(t_mesh),        intent(inout), target :: mesh
 type(t_partit),      intent(inout), target :: partit
-type(t_tracer_work), intent(inout), target :: twork
+!       type(t_tracer_work), intent(inout), target :: twork
+integer      , intent(inout), allocatable, dimension(:,:)  :: edge_up_dn_tri
+real(kind=WP), intent(inout), allocatable, dimension(:,:,:), optional  :: edge_up_dn_grad
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
 
-allocate(twork%edge_up_dn_tri(2,myDim_edge2D))
-allocate(twork%edge_up_dn_grad(4,nl-1,myDim_edge2D))
-twork%edge_up_dn_tri=0
+allocate(edge_up_dn_tri(2,myDim_edge2D))
+edge_up_dn_tri=0
+
 ! =====
 ! In order that this procedure works, we need to know nodes and their coordinates 
 ! on the extended set of elements (not only my, but myDim+eDim+eXDim) 
@@ -275,15 +222,15 @@ DO n=1, myDim_edge2d
       ! Since b and c are the sides of triangle, |ab|<pi, and atan2 should 
       ! be what is needed
       if((ab>0.0_WP).and.(ax>0.0_WP).and.(ax<ab)) then
-      twork%edge_up_dn_tri(1,n)=elem
+      edge_up_dn_tri(1,n)=elem
       cycle
       endif
       if((ab<0.0_WP).and.(ax<0.0_WP).and.(ax>ab)) then
-      twork%edge_up_dn_tri(1,n)=elem
+      edge_up_dn_tri(1,n)=elem
       cycle
       endif
       if((ab==ax).or.(ax==0.0_WP)) then
-      twork%edge_up_dn_tri(1,n)=elem
+      edge_up_dn_tri(1,n)=elem
       cycle
       endif
    END DO
@@ -318,15 +265,15 @@ DO n=1, myDim_edge2d
       ! Since b and c are the sides of triangle, |ab|<pi, and atan2 should 
       ! be what is needed
       if((ab>0.0_WP).and.(ax>0.0_WP).and.(ax<ab)) then
-      twork%edge_up_dn_tri(2,n)=elem
+      edge_up_dn_tri(2,n)=elem
       cycle
       endif
       if((ab<0.0_WP).and.(ax<0.0_WP).and.(ax>ab)) then
-      twork%edge_up_dn_tri(2,n)=elem
+      edge_up_dn_tri(2,n)=elem
       cycle
       endif
       if((ab==ax).or.(ax==0.0)) then
-      twork%edge_up_dn_tri(2,n)=elem
+      edge_up_dn_tri(2,n)=elem
       cycle
       endif
    END DO
@@ -340,14 +287,19 @@ END DO
 ! Count the number of 'good' edges:
 !k=0
 !DO n=1, myDim_edge2D
-!   if((twork%edge_up_dn_tri(1,n).ne.0).and.(twork%edge_up_dn_tri(2,n).ne.0)) k=k+1
+!   if((edge_up_dn_tri(1,n).ne.0).and.(edge_up_dn_tri(2,n).ne.0)) k=k+1
 !END DO
 
+
+if (present(edge_up_dn_grad)) then 
+    allocate(edge_up_dn_grad(4,nl-1,myDim_edge2D))
 !$OMP PARALLEL DO
-DO n=1, myDim_edge2D
-   twork%edge_up_dn_grad(:, :, n)=0.0_WP
-END DO
+    DO n=1, myDim_edge2D
+        edge_up_dn_grad(:, :, n)=0.0_WP
+    END DO
 !$OMP END PARALLEL DO
+end if 
+
 deallocate(e_nodes, coord_elem)
 end SUBROUTINE find_up_downwind_triangles
 !
@@ -355,12 +307,6 @@ end SUBROUTINE find_up_downwind_triangles
 !_______________________________________________________________________________
 SUBROUTINE fill_up_dn_grad(twork, partit, mesh)
 ! ttx, tty  elemental gradient of tracer 
-USE o_PARAM
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP
-USE MOD_TRACER
-USE o_ARRAYS
 IMPLICIT NONE
 integer                  :: edge, n, nz, elem, k, ednodes(2), nzmin, nzmax
 real(kind=WP)            :: tvol, tx, ty
@@ -523,3 +469,5 @@ type(t_tracer_work), intent(inout), target :: twork
 !$OMP END DO
 !$OMP END PARALLEL
 END SUBROUTINE fill_up_dn_grad
+
+end module oce_muscl_adv_module

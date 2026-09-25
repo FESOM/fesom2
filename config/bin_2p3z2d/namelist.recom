@@ -18,7 +18,7 @@ enable_coccos = .false.
 use_REcoM             =.true.
 REcoM_restart         =.true.
 
-bgc_num               = 30 !24 !38 !22
+bgc_num               = 31 !24 !38 !22
 diags3d_num           = 28          ! Number of diagnostic 3d tracers to be saved
 bgc_base_num          = 22          ! standard tracers
 VDet                  = 20.d0       ! Sinking velocity, constant through the water column and positive downwards
@@ -57,7 +57,6 @@ firstyearoffesomcycle = 1958        ! The first year of the actual physical forc
 lastyearoffesomcycle  = 2024        ! Last year of the actual physical forcing used
 numofCO2cycles        = 1           ! Number of cycles of the forcing planned 
 currentCO2cycle       = 1           ! Which CO2 cycle we are currently running
-DIC_PI                = .true.
 Nmocsy                = 1           ! Length of the vector that is passed to mocsy (always one for recom)
 recom_debug           =.false.
 ciso                  =.false.     ! Main switch to enable/disable carbon isotopes (13|14C)

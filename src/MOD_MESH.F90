@@ -3,7 +3,7 @@ MODULE MOD_MESH
 USE O_PARAM
 USE MOD_WRITE_BINARY_ARRAYS
 USE MOD_READ_BINARY_ARRAYS
-USE,     intrinsic    :: ISO_FORTRAN_ENV, only : int32
+USE,     intrinsic    :: ISO_FORTRAN_ENV, only : int32, real64
 IMPLICIT NONE
 SAVE
 integer, parameter    :: MAX_ADJACENT=32 ! Max allowed number of adjacent nodes
@@ -17,6 +17,19 @@ TYPE SPARSE_MATRIX
      integer(int32), allocatable,   dimension(:) :: colind_loc
      integer(int32), allocatable,   dimension(:) :: rowptr_loc
      real(kind=WP),  allocatable,   dimension(:) :: pr_values !preconditioner values
+#if defined(USE_SINGLE_PRECISION)
+     ! Full-precision accumulator for the SSH stiffness matrix, single precision only.
+     ! update_stiff_mat_ale adds a per-step increment whose size relative to the
+     ! entry is ~1e-7..1e-6 -- at or below float32 eps (1.19e-7), so in SP the
+     ! update is partly or wholly swallowed and the matrix drifts. Accumulate here
+     ! and round into %values once per step; the solver's SpMV keeps WP bandwidth.
+     ! Sized to size(%values) (the LOCAL nnz), never to %nza -- see the comment at
+     ! the allocation site in oce_ale.F90.
+     real(kind=real64), allocatable, dimension(:) :: values_full
+#if defined(DIAG_STIFF_DRIFT)
+     real(kind=WP),  allocatable,   dimension(:) :: values_wp_drift
+#endif
+#endif
 END TYPE SPARSE_MATRIX
 
 TYPE T_MESH
@@ -37,6 +50,7 @@ integer,       allocatable, dimension(:,:)  :: elem_edges   ! elem_edges(:,n) ar
 real(kind=WP), allocatable, dimension(:)    :: elem_area
 real(kind=WP), allocatable, dimension(:,:)  :: edge_dxdy
 real(kind=WP), allocatable, dimension(:,:)  :: edge_cross_dxdy
+integer      , allocatable, dimension(:,:)  :: edge_up_dn_tri
 real(kind=WP), allocatable, dimension(:)    :: elem_cos
 real(kind=WP), allocatable, dimension(:)    :: metric_factor
 integer,       allocatable, dimension(:,:)  :: elem_neighbors
@@ -44,6 +58,9 @@ integer,       allocatable, dimension(:,:)  :: nod_in_elem2D
 real(kind=WP), allocatable, dimension(:,:)  :: x_corners
 real(kind=WP), allocatable, dimension(:,:)  :: y_corners ! cornes for the scalar points
 integer,       allocatable, dimension(:)    :: nod_in_elem2D_num
+integer,       allocatable, dimension(:)    :: nod_in_edge2D_num   ! number of edges (1..myDim_edge2D) incident to node n
+integer,       allocatable, dimension(:,:)  :: nod_in_edge2D       ! (k,n): k-th edge incident to node n
+integer,       allocatable, dimension(:,:)  :: nod_in_edge2D_sgn   ! (k,n): +1 if n is edges(1,edge), -1 if edges(2,edge)
 real(kind=WP), allocatable, dimension(:)    :: depth                ! depth(n) is the depths at node n
 real(kind=WP), allocatable, dimension(:,:)  :: gradient_vec
                                                            ! coefficients of linear reconstruction
@@ -198,6 +215,7 @@ subroutine write_t_mesh(mesh, unit, iostat, iomsg)
     call write_bin_array(mesh%elem_edges,   unit, iostat, iomsg)
     call write_bin_array(mesh%elem_area,    unit, iostat, iomsg)
     call write_bin_array(mesh%edge_dxdy,    unit, iostat, iomsg)
+    call write_bin_array(mesh%edge_up_dn_tri,unit, iostat, iomsg)
 
     call write_bin_array(mesh%edge_cross_dxdy,     unit, iostat, iomsg)
     call write_bin_array(mesh%elem_cos,            unit, iostat, iomsg)
@@ -207,6 +225,9 @@ subroutine write_t_mesh(mesh, unit, iostat, iomsg)
     call write_bin_array(mesh%x_corners,           unit, iostat, iomsg)
     call write_bin_array(mesh%y_corners,           unit, iostat, iomsg)
     call write_bin_array(mesh%nod_in_elem2D_num,   unit, iostat, iomsg)
+    call write_bin_array(mesh%nod_in_edge2D_num,   unit, iostat, iomsg)
+    call write_bin_array(mesh%nod_in_edge2D,       unit, iostat, iomsg)
+    call write_bin_array(mesh%nod_in_edge2D_sgn,   unit, iostat, iomsg)
     call write_bin_array(mesh%depth,               unit, iostat, iomsg)
     call write_bin_array(mesh%gradient_vec,        unit, iostat, iomsg)
     call write_bin_array(mesh%gradient_sca,        unit, iostat, iomsg)
@@ -295,7 +316,7 @@ subroutine read_t_mesh(mesh, unit, iostat, iomsg)
     call read_bin_array(mesh%elem_edges,   unit, iostat, iomsg)
     call read_bin_array(mesh%elem_area,    unit, iostat, iomsg)
     call read_bin_array(mesh%edge_dxdy,    unit, iostat, iomsg)
-
+    call read_bin_array(mesh%edge_up_dn_tri,unit, iostat, iomsg)
     call read_bin_array(mesh%edge_cross_dxdy,     unit, iostat, iomsg)
     call read_bin_array(mesh%elem_cos,            unit, iostat, iomsg)
     call read_bin_array(mesh%metric_factor,       unit, iostat, iomsg)
@@ -304,6 +325,9 @@ subroutine read_t_mesh(mesh, unit, iostat, iomsg)
     call read_bin_array(mesh%x_corners,           unit, iostat, iomsg)
     call read_bin_array(mesh%y_corners,           unit, iostat, iomsg)
     call read_bin_array(mesh%nod_in_elem2D_num,   unit, iostat, iomsg)
+    call read_bin_array(mesh%nod_in_edge2D_num,   unit, iostat, iomsg)
+    call read_bin_array(mesh%nod_in_edge2D,       unit, iostat, iomsg)
+    call read_bin_array(mesh%nod_in_edge2D_sgn,   unit, iostat, iomsg)
     call read_bin_array(mesh%depth,               unit, iostat, iomsg)
     call read_bin_array(mesh%gradient_vec,        unit, iostat, iomsg)
     call read_bin_array(mesh%gradient_sca,        unit, iostat, iomsg)

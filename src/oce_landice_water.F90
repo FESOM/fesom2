@@ -1,22 +1,20 @@
-module landice_water_init_interface
-  interface
-    subroutine landice_water_init(partit, mesh)
-      use mod_partit
-      use mod_mesh
-      type(t_partit), intent(in), target :: partit
-      type(t_mesh),   intent(in), target :: mesh
-    end subroutine landice_water_init
-  end interface
-end module landice_water_init_interface
+module oce_landice_water_module
+    USE MOD_PARTIT
+    USE MOD_MESH
+    USE o_PARAM, only: WP
+    USE g_comm_auto
+    USE g_forcing_param
+    USE g_forcing_arrays
+
+    implicit none
+
+    private
+    public :: landice_water_init
+
+contains
 
 subroutine landice_water_init(partit, mesh)
   ! init land ice melting rate
-  use MOD_PARTIT
-  use MOD_MESH
-  use o_PARAM , only: WP
-  use g_comm_auto
-  use g_forcing_param
-  use g_forcing_arrays
 
   implicit none
 
@@ -86,3 +84,4 @@ subroutine landice_water_init(partit, mesh)
 
 end subroutine landice_water_init
 
+end module oce_landice_water_module

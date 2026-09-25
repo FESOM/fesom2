@@ -52,6 +52,45 @@ function get_nml_var {
       | sed -E 's/!.*$//' \
       | sed -E "s/.*=[[:space:]]*['\"]?([^'\"]*)['\"]?/\1/"
 }
+# Reproduce calendar_stamp() from src/fortran_utils.F90: turn a clock instant
+# (year, day-of-year, seconds-in-day) into the YYYY-MM-DD a restart is named
+# after since FESOM 2.8. Keep in sync if the Fortran ever changes.
+function calendar_stamp {
+    local yy=$1 doy=$2 sec=$3 leap=$4
+    local mlen mm dd elapsed i
+    # end of a day is the start of the next one ...
+    [ "$sec" -ge 86400 ] && doy=$(( doy + 1 ))
+    # ... and the end of the last day of a year is 1 January
+    if [ "$doy" -gt $(( 365 + leap )) ]; then
+        doy=1 ; yy=$(( yy + 1 )) ; leap=0
+    fi
+    if [ "$leap" -eq 1 ]; then mlen=(31 29 31 30 31 30 31 31 30 31 30 31)
+    else                       mlen=(31 28 31 30 31 30 31 31 30 31 30 31) ; fi
+    mm=1 ; dd=$doy ; elapsed=0
+    for i in 0 1 2 3 4 5 6 7 8 9 10 11 ; do
+        if [ "$doy" -gt "$elapsed" ] && [ "$doy" -le $(( elapsed + mlen[i] )) ]; then
+            mm=$(( i + 1 )) ; dd=$(( doy - elapsed )) ; break
+        fi
+        elapsed=$(( elapsed + mlen[i] ))
+    done
+    printf "%04d-%02d-%02d" "$yy" "$mm" "$dd"
+}
+# leap-year flag as FESOM sees it (check_fleapyr): Gregorian, but only when
+# include_fleapyear is on.
+function fleapyr_flag {
+    local y=$1 inc
+    inc=$(get_nml_var namelist.config "include_fleapyear")
+    case "$inc" in *[tT]rue*) ;; *) echo 0 ; return ;; esac
+    if { [ $(( y % 4 )) -eq 0 ] && [ $(( y % 100 )) -ne 0 ] ; } || [ $(( y % 400 )) -eq 0 ]; then
+        echo 1
+    else
+        echo 0
+    fi
+}
+# read one line of a fesom.clock as "sec day year" (handles 0.0E+000 style)
+function read_clock_line {
+    awk -v n="$2" 'NR==n{printf "%d %d %d", int($1+0.5), $2+0, $3+0}' "$1"
+}
 # write variables back to namelist being string and number aware
 function set_nml_var {
     local file="$1"
@@ -328,36 +367,75 @@ if [ $is_newsimul -eq 1 ] ; then
         aux_sec=$(( 86400 - 86400 / $stepperday )) 
         aux_day=365
         aux_yr=$(( $year_s - 1 )) 
+        # the "new" instant of the warm start clock, i.e. where this cycle begins
+        new_sec=0
+        new_day=1
+        new_yr=${year_s}
         echo -e "\033[33m --> create warm start clock file \033[0m"
-        printf "${aux_sec} ${aux_day} ${aux_yr}\n0 1 ${year_s}" > $dname_result_link/fesom.clock
+        printf "${aux_sec} ${aux_day} ${aux_yr}\n${new_sec} ${new_day} ${new_yr}" > $dname_result_link/fesom.clock
         
         #_______________________________________________________________________
         # chain id from previous spinup cycle 
         prev_chain_id=$(( $chain_id - 1 ))
         
         #_______________________________________________________________________
-        # copy restart ocean files/directories from previous spinup cycle 
-        prev_rfile=${dname_result}${prev_chain_id}/fesom.${year_e}.oce.restart
-        if   [ -d "${prev_rfile}"    ]; then
-            cp -r ${prev_rfile} ${dname_result_link}/fesom.${aux_yr}.oce.restart
-        elif [ -f "${prev_rfile}.nc" ]; then
-            cp ${prev_rfile}.nc ${dname_result_link}/fesom.${aux_yr}.oce.restart.nc
+        # copy restart files/directories from the previous spinup cycle
+        #
+        # Restart naming changed with 2.8: one instant per file, stamped with the
+        # date of that instant (nc_restart_path in src/io_restart.F90); up to 2.7
+        # it was one file per year, fesom.${year}.<comp>.restart.
+        #
+        # Do not assume the cycle ends on 01 January. Take the instant from the
+        # previous cycle's fesom.clock (second line = timenew daynew yearnew, the
+        # same values the model stamped the restart with) and run it through the
+        # same calendar_stamp() the model uses. Likewise the destination stamp
+        # comes from the warm start clock written just above, so the two cannot
+        # drift apart. Only if that clock is missing do we fall back to assuming
+        # a year boundary.
+        prev_dir=${dname_result}${prev_chain_id}
+        prev_clock=${prev_dir}/fesom.clock
+        if [ -f "${prev_clock}" ]; then
+            read p_sec p_day p_yr <<< "$(read_clock_line ${prev_clock} 2)"
+            src_stamp_new=$(calendar_stamp ${p_yr} ${p_day} ${p_sec} $(fleapyr_flag ${p_yr}))
+            read o_sec o_day o_yr <<< "$(read_clock_line ${prev_clock} 1)"
+            src_stamp_old=${o_yr}
         else
-            echo -e "\033[1;31m --> ERROR: could not find ocean restart file \033[0m"
+            echo -e "\033[33m --> WARNING: no ${prev_clock}, assuming the cycle ended on 31 December \033[0m"
+            src_stamp_new=$(( year_e + 1 ))-01-01
+            src_stamp_old=${year_e}
+        fi
+        dst_stamp_new=$(calendar_stamp ${new_yr} ${new_day} ${new_sec} $(fleapyr_flag ${new_yr}))
+        dst_stamp_old=${aux_yr}
+
+        # decide the convention once, from the ocean restart, and use it for both
+        # components - the copy has to keep it too, because that is the name the
+        # model reading it builds from the warm start clock
+        if   [ -d "${prev_dir}/fesom.${src_stamp_new}.oce.restart"    ] || \
+             [ -f "${prev_dir}/fesom.${src_stamp_new}.oce.restart.nc" ]; then
+            src_stamp=${src_stamp_new} ; dst_stamp=${dst_stamp_new}   # 2.8 and later
+        elif [ -d "${prev_dir}/fesom.${src_stamp_old}.oce.restart"    ] || \
+             [ -f "${prev_dir}/fesom.${src_stamp_old}.oce.restart.nc" ]; then
+            src_stamp=${src_stamp_old} ; dst_stamp=${dst_stamp_old}   # 2.7 and earlier
+        else
+            echo -e "\033[1;31m --> ERROR: could not find ocean restart of chain cycle ${prev_chain_id} \033[0m"
+            echo -e "\033[1;31m -->        looked for ${prev_dir}/fesom.${src_stamp_new}.oce.restart \033[0m"
+            echo -e "\033[1;31m -->              and  ${prev_dir}/fesom.${src_stamp_old}.oce.restart \033[0m"
             exit
         fi
-        
-        # copy restart ice files/files/directories from previous spinup cycle 
-        prev_rfile=${dname_result}${prev_chain_id}/fesom.${year_e}.ice.restart
-        if   [ -d "${prev_rfile}"    ]; then
-            cp -r ${prev_rfile} ${dname_result_link}/fesom.${aux_yr}.ice.restart
-        elif [ -f "${prev_rfile}.nc" ]; then
-            cp ${prev_rfile}.nc ${dname_result_link}/fesom.${aux_yr}.ice.restart.nc
-        else
-            echo -e "\033[1;31m --> ERROR: could not find ice restart file \033[0m"
-            exit
-        fi
-        
+
+        for comp in oce ice; do
+            prev_rfile=${prev_dir}/fesom.${src_stamp}.${comp}.restart
+            new_rfile=${dname_result_link}/fesom.${dst_stamp}.${comp}.restart
+            if   [ -d "${prev_rfile}"    ]; then
+                cp -r ${prev_rfile} ${new_rfile}
+            elif [ -f "${prev_rfile}.nc" ]; then
+                cp ${prev_rfile}.nc ${new_rfile}.nc
+            else
+                echo -e "\033[1;31m --> ERROR: could not find ${comp} restart ${prev_rfile} \033[0m"
+                exit
+            fi
+        done
+
         #_______________________________________________________________________
         # adapt year new in namelist.config otherwise fesom is not doing a 
         # restart

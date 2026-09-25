@@ -1,51 +1,22 @@
-module mod_parsup
-  interface
-  subroutine par_ex(COMM, mype, abort)
-     USE MOD_PARTIT
-     implicit none
-     integer,           intent(in)   :: COMM
-     integer,           intent(in)   :: mype
-     integer, optional, intent(in)   :: abort
-  end subroutine par_ex
-  end interface
-end module mod_parsup
-
-module par_support_interfaces
-  interface
-  subroutine par_init(partit)
-     USE o_PARAM
-     USE MOD_PARTIT
-     USE MOD_PARSUP
-     implicit none
-     type(t_partit), intent(inout), target :: partit
-  end subroutine par_init
-
-  subroutine init_mpi_types(partit, mesh)
-     use MOD_MESH
-     USE MOD_PARTIT
-     USE MOD_PARSUP
-     implicit none
-     type(t_partit), intent(inout), target :: partit
-     type(t_mesh),   intent(in), target :: mesh
-  end subroutine init_mpi_types
-
-  subroutine init_gatherLists(partit)
-     USE MOD_PARTIT
-     USE MOD_PARSUP
-     implicit none
-     type(t_partit), intent(inout), target :: partit    
-  end subroutine init_gatherLists
-  end interface
-end module par_support_interfaces
-
-subroutine par_init(partit)    ! initializes MPI
-  USE o_PARAM
-  USE MOD_PARTIT
-  USE MOD_PARSUP
+module par_support_module
+    USE o_PARAM
+    USE MOD_PARTIT
+    USE iso_fortran_env, only: output_unit, error_unit
+    USE MOD_MESH
 #ifdef __MULTIO
   USE iom
   USE mpp_io
 #endif
+
+    implicit none
+
+    private
+    public :: par_init, par_ex, init_mpi_types, init_mpi_types_fbin, &
+              init_gatherLists, status_check
+
+contains
+
+subroutine par_init(partit)    ! initializes MPI
 
   implicit none
   type(t_partit), intent(inout), target :: partit
@@ -85,8 +56,6 @@ subroutine par_init(partit)    ! initializes MPI
 end subroutine par_init
 !=================================================================
 subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
-  use iso_fortran_env, only: output_unit, error_unit
-  use MOD_PARTIT
 
 ! In case we are letting oasis orchestrate MPI, we need to shut down through
 ! oasis as well, thus we are including it here.
@@ -96,7 +65,7 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
   use mod_oasis
 #else
   !For ECHAM coupled runs we use the old OASIS nameing scheme (prism / prism_proto)
-  use mod_prism 
+  use mod_prism
 #endif
          ! oifs/echam
 #endif
@@ -176,9 +145,6 @@ if (mype==0) print *, 'fesom should stop with exit status = 0'
 end subroutine par_ex
 !=======================================================================
 subroutine init_mpi_types(partit, mesh)
-  use MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
   implicit none
 
   type(t_partit), intent(inout), target :: partit
@@ -260,7 +226,7 @@ subroutine init_mpi_types(partit, mesh)
             blocklen_tmp(1:nb) = blocklen(1:nb)*n_val 
             displace_tmp(1:nb) = displace(1:nb)*n_val 
 
-            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
                  partit%r_mpitype_elem2D(n,n_val), partit%MPIerr)
 
             call MPI_TYPE_COMMIT(partit%r_mpitype_elem2D(n,n_val), partit%MPIerr) 
@@ -276,7 +242,7 @@ subroutine init_mpi_types(partit, mesh)
                print *,"out of bounds error, lbound:",lbound(partit%r_mpitype_elem3D), "indices:", n,nl1,n_val, "ubound:",ubound(partit%r_mpitype_elem3D), __FILE__,__LINE__
                stop 1
              end if
-               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, & 
                     partit%r_mpitype_elem3D(n,nl1,n_val),  partit%MPIerr)
 
                call MPI_TYPE_COMMIT(partit%r_mpitype_elem3D(n,nl1,n_val),  partit%MPIerr)  
@@ -306,7 +272,7 @@ subroutine init_mpi_types(partit, mesh)
             blocklen_tmp(1:nb) = blocklen(1:nb)*n_val 
             displace_tmp(1:nb) = displace(1:nb)*n_val 
 
-            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, &
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
                  partit%s_mpitype_elem2D(n, n_val), partit%MPIerr)
 
             call MPI_TYPE_COMMIT(partit%s_mpitype_elem2D(n, n_val),   partit%MPIerr) 
@@ -316,7 +282,7 @@ subroutine init_mpi_types(partit, mesh)
                blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nl1 
                displace_tmp(1:nb) = displace(1:nb)*n_val*nl1 
 
-               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, & 
                     partit%s_mpitype_elem3D(n,nl1,n_val),  partit%MPIerr)
 
                call MPI_TYPE_COMMIT(partit%s_mpitype_elem3D(n,nl1,n_val),  partit%MPIerr)  
@@ -347,7 +313,7 @@ subroutine init_mpi_types(partit, mesh)
 
          DO n_val=1,4
 
-            call MPI_TYPE_INDEXED(nb, blocklen, displace, MPI_DOUBLE_PRECISION, &
+            call MPI_TYPE_INDEXED(nb, blocklen, displace, MPI_WP, &
                  partit%r_mpitype_elem2D_full(n,n_val), partit%MPIerr)
             call MPI_TYPE_COMMIT(partit%r_mpitype_elem2D_full(n, n_val),   partit%MPIerr)
 
@@ -362,7 +328,7 @@ subroutine init_mpi_types(partit, mesh)
                print *,"out of bounds error, lbound:",lbound(partit%r_mpitype_elem3D_full), "indices:", n,nl1,n_val, "ubound:", ubound(partit%r_mpitype_elem3D_full), __FILE__,__LINE__
                stop 1
              end if
-               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, & 
                     partit%r_mpitype_elem3D_full(n,nl1,n_val),  partit%MPIerr)
 
                call MPI_TYPE_COMMIT(partit%r_mpitype_elem3D_full(n,nl1,n_val),  partit%MPIerr)  
@@ -392,7 +358,7 @@ subroutine init_mpi_types(partit, mesh)
          call MPI_TYPE_COMMIT(partit%s_mpitype_elem2D_full_i(n), partit%MPIerr)  
  
          DO n_val=1,4
-            call MPI_TYPE_INDEXED(nb, blocklen, displace, MPI_DOUBLE_PRECISION, &
+            call MPI_TYPE_INDEXED(nb, blocklen, displace, MPI_WP, &
                  partit%s_mpitype_elem2D_full(n,n_val), partit%MPIerr)
             call MPI_TYPE_COMMIT(partit%s_mpitype_elem2D_full(n,n_val),   partit%MPIerr)
   
@@ -401,7 +367,7 @@ subroutine init_mpi_types(partit, mesh)
                blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nl1 
                displace_tmp(1:nb) = displace(1:nb)*n_val*nl1 
 
-               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, & 
                     partit%s_mpitype_elem3D_full(n,nl1,n_val),  partit%MPIerr)
 
                call MPI_TYPE_COMMIT(partit%s_mpitype_elem3D_full(n,nl1,n_val),  partit%MPIerr)  
@@ -450,7 +416,7 @@ subroutine init_mpi_types(partit, mesh)
             endif
          enddo
 
-         call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_DOUBLE_PRECISION, & 
+         call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_WP, & 
               partit%r_mpitype_nod2D(n),     partit%MPIerr)
 
          call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_INTEGER, & 
@@ -465,7 +431,7 @@ subroutine init_mpi_types(partit, mesh)
                blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nl1 
                displace_tmp(1:nb) = displace(1:nb)*n_val*nl1 
 
-               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, & 
                     partit%r_mpitype_nod3D(n,nl1,n_val),  partit%MPIerr)
 
                call MPI_TYPE_COMMIT(partit%r_mpitype_nod3D(n,nl1,n_val),  partit%MPIerr)  
@@ -490,7 +456,7 @@ subroutine init_mpi_types(partit, mesh)
             endif
          enddo
 
-         call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_DOUBLE_PRECISION, & 
+         call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_WP, & 
               partit%s_mpitype_nod2D(n),     partit%MPIerr)
 
          call MPI_TYPE_INDEXED(nb, blocklen,      displace,      MPI_INTEGER, & 
@@ -505,7 +471,7 @@ subroutine init_mpi_types(partit, mesh)
                blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nl1 
                displace_tmp(1:nb) = displace(1:nb)*n_val*nl1 
 
-               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_DOUBLE_PRECISION, & 
+               call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, & 
                     partit%s_mpitype_nod3D(n,nl1,n_val),  partit%MPIerr)
 
                call MPI_TYPE_COMMIT(partit%s_mpitype_nod3D(n,nl1,n_val),  partit%MPIerr)  
@@ -517,10 +483,260 @@ subroutine init_mpi_types(partit, mesh)
       deallocate(blocklen_tmp, displace_tmp)
    endif
 end subroutine init_mpi_types
+
+
+
+!===================================================================
+! Build MPI Data types for halo exchange of spectral bin (fbin) fields.
+! These are used by IDEMIX2 where the first array dimension is nfbin
+! (number of spectral frequency bins) instead of nl (number of vertical levels).
+! Must be called after init_mpi_types and before first spectral bin exchange.
+subroutine init_mpi_types_fbin(nfbin, partit)
+    implicit none
+
+    integer,        intent(in)           :: nfbin
+    type(t_partit), intent(inout), target :: partit
+    integer                          :: n, n_val
+    integer                          :: i, max_nb, nb, nini, nend
+    integer, allocatable             :: blocklen(:),     displace(:)
+    integer, allocatable             :: blocklen_tmp(:), displace_tmp(:)
+
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
+
+    if (npes <= 1) return
+
+    ! Store nfbin for runtime checks in exchange routines
+    partit%nfbin_mpi = nfbin
+
+    !================================================================
+    ! Allocate MPI datatype arrays for spectral bin exchange
+    ! Full spectral column exchanged at once (mirroring standard nod3D/elem3D pattern)
+    !================================================================
+    allocate(partit%r_mpitype_nod3D_fbin(      com_nod2D%rPEnum      , nfbin:nfbin, 3)) ! nodes, nfbin bins, 1-3 values
+    allocate(partit%s_mpitype_nod3D_fbin(      com_nod2D%sPEnum      , nfbin:nfbin, 3))
+    allocate(partit%r_mpitype_elem2D_fbin(     com_elem2D%rPEnum     , nfbin:nfbin   )) ! elems 2D small halo
+    allocate(partit%s_mpitype_elem2D_fbin(     com_elem2D%sPEnum     , nfbin:nfbin   ))
+    allocate(partit%r_mpitype_elem2D_full_fbin(com_elem2D_full%rPEnum, nfbin:nfbin   )) ! elems 2D full halo
+    allocate(partit%s_mpitype_elem2D_full_fbin(com_elem2D_full%sPEnum, nfbin:nfbin   ))
+    allocate(partit%r_mpitype_elem3D_fbin(     com_elem2D%rPEnum     , nfbin:nfbin, 4)) ! elems 3D small halo, 1-4 values
+    allocate(partit%s_mpitype_elem3D_fbin(     com_elem2D%sPEnum     , nfbin:nfbin, 4))
+    allocate(partit%r_mpitype_elem3D_full_fbin(com_elem2D_full%rPEnum, nfbin:nfbin, 4)) ! elems 3D full halo
+    allocate(partit%s_mpitype_elem3D_full_fbin(com_elem2D_full%sPEnum, nfbin:nfbin, 4))
+
+    !================================================================
+    ! Build MPI Data types for element fields (small halo)
+    !================================================================
+    max_nb = max(  &
+                maxval(com_elem2D%rptr(     2:com_elem2D%rPEnum+1     ) - com_elem2D%rptr(     1:com_elem2D%rPEnum     )), &
+                maxval(com_elem2D%sptr(     2:com_elem2D%sPEnum+1     ) - com_elem2D%sptr(     1:com_elem2D%sPEnum     )), &
+                maxval(com_elem2D_full%rptr(2:com_elem2D_full%rPEnum+1) - com_elem2D_full%rptr(1:com_elem2D_full%rPEnum)), &
+                maxval(com_elem2D_full%sptr(2:com_elem2D_full%sPEnum+1) - com_elem2D_full%sptr(1:com_elem2D_full%sPEnum)))
+
+    allocate(displace(max_nb),     blocklen(max_nb))
+    allocate(displace_tmp(max_nb), blocklen_tmp(max_nb))
+
+    ! --- Receive types for elements (small halo) ---
+    do n=1,com_elem2D%rPEnum
+        nb = 1
+        nini = com_elem2D%rptr(n)
+        nend = com_elem2D%rptr(n+1) - 1
+        displace(:) = 0
+        displace(1) = com_elem2D%rlist(nini) -1
+        blocklen(:) = 1
+        do i=nini+1, nend
+            if (com_elem2D%rlist(i) /= com_elem2D%rlist(i-1) + 1) then
+            nb = nb+1
+            displace(nb) = com_elem2D%rlist(i) -1
+            else
+            blocklen(nb) = blocklen(nb)+1
+            endif
+        enddo
+        ! 2D fbin type: full spectral column at once (nfbin per element)
+        blocklen_tmp(1:nb) = blocklen(1:nb)*nfbin
+        displace_tmp(1:nb) = displace(1:nb)*nfbin
+        call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
+            partit%r_mpitype_elem2D_fbin(n,nfbin), partit%MPIerr)
+        call MPI_TYPE_COMMIT(partit%r_mpitype_elem2D_fbin(n,nfbin), partit%MPIerr)
+        ! 3D fbin types: full spectral column, n_val values per bin
+        DO n_val=1,4
+            blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nfbin
+            displace_tmp(1:nb) = displace(1:nb)*n_val*nfbin
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
+                partit%r_mpitype_elem3D_fbin(n,nfbin,n_val), partit%MPIerr)
+            call MPI_TYPE_COMMIT(partit%r_mpitype_elem3D_fbin(n,nfbin,n_val), partit%MPIerr)
+        ENDDO
+    enddo
+
+    ! --- Send types for elements (small halo) ---
+    do n=1,com_elem2D%sPEnum
+        nb = 1
+        nini = com_elem2D%sptr(n)
+        nend = com_elem2D%sptr(n+1) - 1
+        displace(:) = 0
+        displace(1) = com_elem2D%slist(nini) -1
+        blocklen(:) = 1
+        do i=nini+1, nend
+            if (com_elem2D%slist(i) /= com_elem2D%slist(i-1) + 1) then
+            nb = nb+1
+            displace(nb) = com_elem2D%slist(i) -1
+            else
+            blocklen(nb) = blocklen(nb)+1
+            endif
+        enddo
+        ! 2D fbin type: full spectral column at once
+        blocklen_tmp(1:nb) = blocklen(1:nb)*nfbin
+        displace_tmp(1:nb) = displace(1:nb)*nfbin
+        call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
+            partit%s_mpitype_elem2D_fbin(n,nfbin), partit%MPIerr)
+        call MPI_TYPE_COMMIT(partit%s_mpitype_elem2D_fbin(n,nfbin), partit%MPIerr)
+        ! 3D fbin types: full spectral column, n_val values per bin
+        DO n_val=1,4
+            blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nfbin
+            displace_tmp(1:nb) = displace(1:nb)*n_val*nfbin
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
+                partit%s_mpitype_elem3D_fbin(n,nfbin,n_val), partit%MPIerr)
+            call MPI_TYPE_COMMIT(partit%s_mpitype_elem3D_fbin(n,nfbin,n_val), partit%MPIerr)
+        ENDDO
+    enddo
+
+    !================================================================
+    ! Build MPI Data types for element fields (full halo)
+    !================================================================
+    ! --- Receive types for elements (full halo) ---
+    do n=1,com_elem2D_full%rPEnum
+        nb = 1
+        nini = com_elem2D_full%rptr(n)
+        nend = com_elem2D_full%rptr(n+1) - 1
+        displace(:) = 0
+        displace(1) = com_elem2D_full%rlist(nini) -1
+        blocklen(:) = 1
+        do i=nini+1, nend
+            if (com_elem2D_full%rlist(i) /= com_elem2D_full%rlist(i-1) + 1) then
+            nb = nb+1
+            displace(nb) = com_elem2D_full%rlist(i) -1
+            else
+            blocklen(nb) = blocklen(nb)+1
+            endif
+        enddo
+        ! 2D fbin type: full spectral column at once
+        blocklen_tmp(1:nb) = blocklen(1:nb)*nfbin
+        displace_tmp(1:nb) = displace(1:nb)*nfbin
+        call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
+            partit%r_mpitype_elem2D_full_fbin(n,nfbin), partit%MPIerr)
+        call MPI_TYPE_COMMIT(partit%r_mpitype_elem2D_full_fbin(n,nfbin), partit%MPIerr)
+        ! 3D fbin types: full spectral column, n_val values per bin
+        DO n_val=1,4
+            blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nfbin
+            displace_tmp(1:nb) = displace(1:nb)*n_val*nfbin
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
+                partit%r_mpitype_elem3D_full_fbin(n,nfbin,n_val), partit%MPIerr)
+            call MPI_TYPE_COMMIT(partit%r_mpitype_elem3D_full_fbin(n,nfbin,n_val), partit%MPIerr)
+        ENDDO
+    enddo
+
+    ! --- Send types for elements (full halo) ---
+    do n=1,com_elem2D_full%sPEnum
+        nb = 1
+        nini = com_elem2D_full%sptr(n)
+        nend = com_elem2D_full%sptr(n+1) - 1
+        displace(:) = 0
+        displace(1) = com_elem2D_full%slist(nini) -1
+        blocklen(:) = 1
+        do i=nini+1, nend
+            if (com_elem2D_full%slist(i) /= com_elem2D_full%slist(i-1) + 1) then
+            nb = nb+1
+            displace(nb) = com_elem2D_full%slist(i) -1
+            else
+            blocklen(nb) = blocklen(nb)+1
+            endif
+        enddo
+        ! 2D fbin type: full spectral column at once
+        blocklen_tmp(1:nb) = blocklen(1:nb)*nfbin
+        displace_tmp(1:nb) = displace(1:nb)*nfbin
+        call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
+            partit%s_mpitype_elem2D_full_fbin(n,nfbin), partit%MPIerr)
+        call MPI_TYPE_COMMIT(partit%s_mpitype_elem2D_full_fbin(n,nfbin), partit%MPIerr)
+        ! 3D fbin types: full spectral column, n_val values per bin
+        DO n_val=1,4
+            blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nfbin
+            displace_tmp(1:nb) = displace(1:nb)*n_val*nfbin
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
+                partit%s_mpitype_elem3D_full_fbin(n,nfbin,n_val), partit%MPIerr)
+            call MPI_TYPE_COMMIT(partit%s_mpitype_elem3D_full_fbin(n,nfbin,n_val), partit%MPIerr)
+        ENDDO
+    enddo
+
+    deallocate(displace,     blocklen)
+    deallocate(displace_tmp, blocklen_tmp)
+
+    !================================================================
+    ! Build MPI Data types for nodal fields
+    !================================================================
+    max_nb = max(maxval(com_nod2D%rptr(2:com_nod2D%rPEnum+1) - com_nod2D%rptr(1:com_nod2D%rPEnum)), &
+                 maxval(com_nod2D%sptr(2:com_nod2D%sPEnum+1) - com_nod2D%sptr(1:com_nod2D%sPEnum)))
+
+    allocate(displace(max_nb),     blocklen(max_nb))
+    allocate(displace_tmp(max_nb), blocklen_tmp(max_nb))
+
+    ! --- Receive types for nodes ---
+    do n=1,com_nod2D%rPEnum
+        nb = 1
+        nini = com_nod2D%rptr(n)
+        nend = com_nod2D%rptr(n+1) - 1
+        displace(:) = 0
+        displace(1) = com_nod2D%rlist(nini) -1
+        blocklen(:) = 1
+        do i=nini+1, nend
+            if (com_nod2D%rlist(i) /= com_nod2D%rlist(i-1) + 1) then
+            nb = nb+1
+            displace(nb) = com_nod2D%rlist(i) -1
+            else
+            blocklen(nb) = blocklen(nb)+1
+            endif
+        enddo
+        ! Full spectral column: n_val*nfbin contiguous elements per node
+        DO n_val=1,3
+            blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nfbin
+            displace_tmp(1:nb) = displace(1:nb)*n_val*nfbin
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
+                partit%r_mpitype_nod3D_fbin(n,nfbin,n_val), partit%MPIerr)
+            call MPI_TYPE_COMMIT(partit%r_mpitype_nod3D_fbin(n,nfbin,n_val), partit%MPIerr)
+        ENDDO
+    enddo
+
+    ! --- Send types for nodes ---
+    do n=1,com_nod2D%sPEnum
+        nb = 1
+        nini = com_nod2D%sptr(n)
+        nend = com_nod2D%sptr(n+1) - 1
+        displace(:) = 0
+        displace(1) = com_nod2D%slist(nini) -1
+        blocklen(:) = 1
+        do i=nini+1, nend
+            if (com_nod2D%slist(i) /= com_nod2D%slist(i-1) + 1) then
+            nb = nb+1
+            displace(nb) = com_nod2D%slist(i) -1
+            else
+            blocklen(nb) = blocklen(nb)+1
+            endif
+        enddo
+        ! Full spectral column: n_val*nfbin contiguous elements per node
+        DO n_val=1,3
+            blocklen_tmp(1:nb) = blocklen(1:nb)*n_val*nfbin
+            displace_tmp(1:nb) = displace(1:nb)*n_val*nfbin
+            call MPI_TYPE_INDEXED(nb, blocklen_tmp, displace_tmp, MPI_WP, &
+                partit%s_mpitype_nod3D_fbin(n,nfbin,n_val), partit%MPIerr)
+            call MPI_TYPE_COMMIT(partit%s_mpitype_nod3D_fbin(n,nfbin,n_val), partit%MPIerr)
+        ENDDO
+    enddo
+
+    deallocate(blocklen,     displace)
+    deallocate(blocklen_tmp, displace_tmp)
+
+end subroutine init_mpi_types_fbin
 !===================================================================
 subroutine init_gatherLists(partit)
-  USE MOD_PARTIT
-  USE MOD_PARSUP
   implicit none
   type(t_partit), intent(inout), target :: partit    
   integer                               :: n2D, e2D, sum_loc_elem2D
@@ -590,8 +806,6 @@ subroutine init_gatherLists(partit)
 end subroutine init_gatherLists
 !===================================================================
 subroutine status_check(partit)
-USE MOD_PARTIT
-USE MOD_PARSUP
 implicit none
 type(t_partit), intent(inout), target :: partit
 integer                               :: res
@@ -602,3 +816,5 @@ if (res /= 0 ) then
     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
 endif
 end subroutine status_check
+
+end module par_support_module

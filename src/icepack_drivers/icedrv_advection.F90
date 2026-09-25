@@ -145,6 +145,10 @@ submodule (icedrv_main) icedrv_advection
         integer(kind=int_kind)                 :: elem, elnodes(3), q, offset, col, ipos
         integer(kind=int_kind), allocatable    :: col_pos(:)
         real(kind=dbl_kind)                    :: aa
+        ! Row sum and area each accumulate O(nn_num) rounded terms, so the mismatch
+        ! scales with the area. An absolute tolerance is unreachable for WP=real32.
+        ! Not a parameter: nvfortran rejects spacing() in an initialization expression.
+        real(kind=WP)                          :: mass_matrix_rtol
         integer(kind=int_kind)                 :: flag=0 ,iflag=0
         type(t_mesh), intent(in), target       :: mesh
       
@@ -174,11 +178,12 @@ submodule (icedrv_main) icedrv_advection
         enddo
       
         ! TEST: area == sum of row entries in mass_matrix:
+        mass_matrix_rtol = 100.0_WP*spacing(1.0_WP)
         do q = 1, nx_nh
            offset = ssh_stiff%rowptr(q)   - ssh_stiff%rowptr(1) + 1
            n      = ssh_stiff%rowptr(q+1) - ssh_stiff%rowptr(1)
            aa     = sum(mass_matrix(offset:n))
-           if ( abs(area(1,q)-aa) > p1) then
+           if ( abs(area(1,q)-aa) > mass_matrix_rtol*area(1,q)) then
               iflag = q
               flag  = 1
            endif
