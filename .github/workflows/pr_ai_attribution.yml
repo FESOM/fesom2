@@ -26,7 +26,9 @@ jobs:
         with:
           # Do not execute checker code modified by the pull request itself.
           ref: ${{ github.event.pull_request.base.sha }}
-          fetch-depth: 1
+          # Full history: the range below excludes everything reachable from the
+          # base branch, which a shallow clone cannot answer.
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Confirm the trusted checker is available
@@ -42,13 +44,19 @@ jobs:
       - name: Fetch pull request commit messages
         if: steps.trusted_checker.outputs.available == 'true'
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           git fetch --no-tags origin \
-            "+refs/pull/${PR_NUMBER}/head:refs/remotes/origin/pr-head"
-          merge_base=$(git merge-base "$BASE_SHA" origin/pr-head)
-          git log --format=%B%x00 "$merge_base..origin/pr-head" | tr '\0' '\n' \
+            "+refs/pull/${PR_NUMBER}/head:refs/remotes/origin/pr-head" \
+            "+refs/heads/${BASE_REF}:refs/remotes/origin/pr-base"
+          # Check the commits this pull request adds, which is everything reachable
+          # from its head and not from the base branch. A two-dot range against a
+          # single merge base does not say that: once the branch merges the base in,
+          # the range reopens the base branch's own history, and commits that predate
+          # this guard are reported against a pull request that did not introduce
+          # them. --not takes the whole base branch out, merges included.
+          git log --format=%B%x00 origin/pr-head --not origin/pr-base | tr '\0' '\n' \
             > "$RUNNER_TEMP/pr-commit-messages"
 
       - name: Check commit attribution
