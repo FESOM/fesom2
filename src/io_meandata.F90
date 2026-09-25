@@ -1,6 +1,6 @@
 module io_MEANDATA
   USE MOD_PARTIT
-  USE MOD_PARSUP
+  use par_support_module, only: par_ex
 #if defined(__recom)
   use recom_glovar
   use recom_config
@@ -135,6 +135,12 @@ module io_MEANDATA
   integer, save                  :: nlev_upper=1
   character(len=1), save         :: filesplit_freq='y'
   integer, save                  :: compression_level=0
+  ! MultIO periodic flush/synchronize (see iom_synchronize in ifs_interface/iom.F90).
+  ! io_flush_sync enables a blocking MultIO synchronize every io_sync_freq model
+  ! time steps so that output is processed and persisted to disk mid-run. Both
+  ! default to off; set via the RAPS option --fesom-io-flush-freq (namelist.io).
+  logical, save                  :: io_flush_sync =.FALSE.
+  integer, save                  :: io_sync_freq  =0
 
   ! --- collective output path ------------------------------------------------
   ! Selected by &io_parallel/parallel_write in namelist.config (g_config). The
@@ -518,7 +524,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     use MOD_MESH
     use MOD_TRACER
     use MOD_PARTIT
-    use MOD_PARSUP
+    use par_support_module, only: par_ex
     use MOD_DYN
     use MOD_ICE
     use o_ARRAYS       
@@ -561,7 +567,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     type(t_dyn)   , intent(in)   , target :: dynamics
     type(t_ice)   , intent(in)   , target :: ice
     namelist /nml_general / io_listsize, vec_autorotate, lnextGEMS, nlev_upper, filesplit_freq, compression_level, &
-                            ltracks
+                            ltracks, io_flush_sync, io_sync_freq
     namelist /nml_list    / io_list
     namelist /nml_tracks  / track_files, track_vars, track_names,        &
                             track_output_freq
@@ -2765,7 +2771,7 @@ end function stream0D_already_defined
 function mesh_dimname_from_dimsize(size, partit, mesh) result(name)
     use mod_mesh
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     use diagnostics
 #if defined (__icepack)
     use icedrv_main,   only: ncat ! number of ice thickness cathegories
@@ -2828,7 +2834,7 @@ subroutine create_new_file(entry, ice, dynamics, partit, mesh)
     use g_clock
     use mod_mesh
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     USE MOD_DYN
     USE MOD_ICE
     use fesom_version_info_module
@@ -3512,7 +3518,7 @@ subroutine output(istep, ice, dynamics, tracers, partit, mesh)
     use g_clock
     use mod_mesh
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     use MOD_DYN
     use MOD_ICE
     use mod_tracer
@@ -3835,6 +3841,11 @@ ctime=timenew+(daynew-1.)*86400
     if (output_done) then
         call iom_flush('N grid', istep)
     end if
+    ! Periodic blocking MultIO synchronize (checkpoint): persist output to disk
+    ! every io_sync_freq model time steps when io_flush_sync is enabled.
+    if (io_flush_sync .and. io_sync_freq > 0) then
+        if (mod(istep, io_sync_freq) == 0) call iom_synchronize(istep)
+    end if
 #endif
 
 end subroutine
@@ -3845,7 +3856,7 @@ end subroutine
 subroutine output_0D_streams(istep, partit)
     use g_clock
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     implicit none
     integer, intent(in) :: istep
     type(t_partit), intent(inout) :: partit
@@ -4028,7 +4039,7 @@ end subroutine create_0D_file
 subroutine do_output_callback(entry_index)
     use mod_mesh
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     integer, intent(in) :: entry_index ! index of variable in def_stream array 
     ! EO args
     type(Meandata), pointer :: entry
@@ -4151,7 +4162,7 @@ end subroutine
 subroutine def_stream3D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, partit, mesh, flip_array, long_description)
   use mod_mesh
   USE MOD_PARTIT
-  USE MOD_PARSUP
+  use par_support_module, only: par_ex
   use g_cvmix_idemix2, only: idemix2_nfbin
   implicit none
   type(t_partit),        intent(inout), target :: partit
@@ -4244,7 +4255,7 @@ end subroutine
 subroutine def_stream2D(glsize, lcsize, name, description, units, data, freq, freq_unit, accuracy, partit, mesh, long_description)
   use mod_mesh
   USE MOD_PARTIT
-  USE MOD_PARSUP
+  use par_support_module, only: par_ex
   implicit none
   integer,               intent(in)    :: glsize, lcsize
   character(len=*),      intent(in)    :: name, description, units
@@ -4315,7 +4326,7 @@ end subroutine
 ! build 0D (scalar) meandata streaming object for global values
 subroutine def_stream0D(name, description, units, data, freq, freq_unit, accuracy, partit, long_description)
   USE MOD_PARTIT
-  USE MOD_PARSUP
+  use par_support_module, only: par_ex
   use g_clock
   implicit none
   character(len=*),      intent(in)    :: name, description, units
@@ -4411,7 +4422,7 @@ end subroutine
 subroutine def_stream_after_dimension_specific(entry, name, description, units, freq, freq_unit, accuracy, partit, mesh, long_description)
     use mod_mesh
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     use io_netcdf_workaround_module
     type(Meandata), intent(inout) :: entry
     character(len=*),      intent(in)    :: name, description, units

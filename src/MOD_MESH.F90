@@ -58,6 +58,9 @@ integer,       allocatable, dimension(:,:)  :: nod_in_elem2D
 real(kind=WP), allocatable, dimension(:,:)  :: x_corners
 real(kind=WP), allocatable, dimension(:,:)  :: y_corners ! cornes for the scalar points
 integer,       allocatable, dimension(:)    :: nod_in_elem2D_num
+integer,       allocatable, dimension(:)    :: nod_in_edge2D_num   ! number of edges (1..myDim_edge2D) incident to node n
+integer,       allocatable, dimension(:,:)  :: nod_in_edge2D       ! (k,n): k-th edge incident to node n
+integer,       allocatable, dimension(:,:)  :: nod_in_edge2D_sgn   ! (k,n): +1 if n is edges(1,edge), -1 if edges(2,edge)
 real(kind=WP), allocatable, dimension(:)    :: depth                ! depth(n) is the depths at node n
 real(kind=WP), allocatable, dimension(:,:)  :: gradient_vec
                                                            ! coefficients of linear reconstruction
@@ -222,6 +225,9 @@ subroutine write_t_mesh(mesh, unit, iostat, iomsg)
     call write_bin_array(mesh%x_corners,           unit, iostat, iomsg)
     call write_bin_array(mesh%y_corners,           unit, iostat, iomsg)
     call write_bin_array(mesh%nod_in_elem2D_num,   unit, iostat, iomsg)
+    call write_bin_array(mesh%nod_in_edge2D_num,   unit, iostat, iomsg)
+    call write_bin_array(mesh%nod_in_edge2D,       unit, iostat, iomsg)
+    call write_bin_array(mesh%nod_in_edge2D_sgn,   unit, iostat, iomsg)
     call write_bin_array(mesh%depth,               unit, iostat, iomsg)
     call write_bin_array(mesh%gradient_vec,        unit, iostat, iomsg)
     call write_bin_array(mesh%gradient_sca,        unit, iostat, iomsg)
@@ -319,6 +325,9 @@ subroutine read_t_mesh(mesh, unit, iostat, iomsg)
     call read_bin_array(mesh%x_corners,           unit, iostat, iomsg)
     call read_bin_array(mesh%y_corners,           unit, iostat, iomsg)
     call read_bin_array(mesh%nod_in_elem2D_num,   unit, iostat, iomsg)
+    call read_bin_array(mesh%nod_in_edge2D_num,   unit, iostat, iomsg)
+    call read_bin_array(mesh%nod_in_edge2D,       unit, iostat, iomsg)
+    call read_bin_array(mesh%nod_in_edge2D_sgn,   unit, iostat, iomsg)
     call read_bin_array(mesh%depth,               unit, iostat, iomsg)
     call read_bin_array(mesh%gradient_vec,        unit, iostat, iomsg)
     call read_bin_array(mesh%gradient_sca,        unit, iostat, iomsg)

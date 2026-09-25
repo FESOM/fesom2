@@ -18,7 +18,6 @@ subroutine thermodynamics(ice, partit, mesh)
   use o_param
   USE MOD_ICE
   USE MOD_PARTIT
-  USE MOD_PARSUP
   USE MOD_MESH
   use o_arrays, only: fw_ice, fw_snw
   use g_config

@@ -1,59 +1,22 @@
-module mod_parsup
-  interface
-  subroutine par_ex(COMM, mype, abort)
-     USE MOD_PARTIT
-     implicit none
-     integer,           intent(in)   :: COMM
-     integer,           intent(in)   :: mype
-     integer, optional, intent(in)   :: abort
-  end subroutine par_ex
-  end interface
-end module mod_parsup
-
-module par_support_interfaces
-  interface
-  subroutine par_init(partit)
-     USE o_PARAM
-     USE MOD_PARTIT
-     USE MOD_PARSUP
-     implicit none
-     type(t_partit), intent(inout), target :: partit
-  end subroutine par_init
-
-  subroutine init_mpi_types(partit, mesh)
-     use MOD_MESH
-     USE MOD_PARTIT
-     USE MOD_PARSUP
-     implicit none
-     type(t_partit), intent(inout), target :: partit
-     type(t_mesh),   intent(in), target :: mesh
-  end subroutine init_mpi_types
-
-  subroutine init_gatherLists(partit)
-     USE MOD_PARTIT
-     USE MOD_PARSUP
-     implicit none
-     type(t_partit), intent(inout), target :: partit    
-  end subroutine init_gatherLists
-
-  subroutine init_mpi_types_fbin(nfbin, partit)
-     USE MOD_PARTIT
-     USE MOD_PARSUP
-     implicit none
-     integer,        intent(in)           :: nfbin
-     type(t_partit), intent(inout), target :: partit
-  end subroutine init_mpi_types_fbin
-  end interface
-end module par_support_interfaces
-
-subroutine par_init(partit)    ! initializes MPI
-  USE o_PARAM
-  USE MOD_PARTIT
-  USE MOD_PARSUP
+module par_support_module
+    USE o_PARAM
+    USE MOD_PARTIT
+    USE iso_fortran_env, only: output_unit, error_unit
+    USE MOD_MESH
 #ifdef __MULTIO
   USE iom
   USE mpp_io
 #endif
+
+    implicit none
+
+    private
+    public :: par_init, par_ex, init_mpi_types, init_mpi_types_fbin, &
+              init_gatherLists, status_check
+
+contains
+
+subroutine par_init(partit)    ! initializes MPI
 
   implicit none
   type(t_partit), intent(inout), target :: partit
@@ -93,8 +56,6 @@ subroutine par_init(partit)    ! initializes MPI
 end subroutine par_init
 !=================================================================
 subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
-  use iso_fortran_env, only: output_unit, error_unit
-  use MOD_PARTIT
 
 ! In case we are letting oasis orchestrate MPI, we need to shut down through
 ! oasis as well, thus we are including it here.
@@ -104,7 +65,7 @@ subroutine par_ex(COMM, mype, abort)       ! finalizes MPI
   use mod_oasis
 #else
   !For ECHAM coupled runs we use the old OASIS nameing scheme (prism / prism_proto)
-  use mod_prism 
+  use mod_prism
 #endif
          ! oifs/echam
 #endif
@@ -184,9 +145,6 @@ if (mype==0) print *, 'fesom should stop with exit status = 0'
 end subroutine par_ex
 !=======================================================================
 subroutine init_mpi_types(partit, mesh)
-  use MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
   implicit none
 
   type(t_partit), intent(inout), target :: partit
@@ -534,8 +492,6 @@ end subroutine init_mpi_types
 ! (number of spectral frequency bins) instead of nl (number of vertical levels).
 ! Must be called after init_mpi_types and before first spectral bin exchange.
 subroutine init_mpi_types_fbin(nfbin, partit)
-    USE MOD_PARTIT
-    USE MOD_PARSUP
     implicit none
 
     integer,        intent(in)           :: nfbin
@@ -781,8 +737,6 @@ subroutine init_mpi_types_fbin(nfbin, partit)
 end subroutine init_mpi_types_fbin
 !===================================================================
 subroutine init_gatherLists(partit)
-  USE MOD_PARTIT
-  USE MOD_PARSUP
   implicit none
   type(t_partit), intent(inout), target :: partit    
   integer                               :: n2D, e2D, sum_loc_elem2D
@@ -852,8 +806,6 @@ subroutine init_gatherLists(partit)
 end subroutine init_gatherLists
 !===================================================================
 subroutine status_check(partit)
-USE MOD_PARTIT
-USE MOD_PARSUP
 implicit none
 type(t_partit), intent(inout), target :: partit
 integer                               :: res
@@ -864,3 +816,5 @@ if (res /= 0 ) then
     call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
 endif
 end subroutine status_check
+
+end module par_support_module

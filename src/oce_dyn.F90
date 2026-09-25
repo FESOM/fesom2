@@ -1,3 +1,24 @@
+module oce_dyn_module
+    USE MOD_MESH
+    USE MOD_PARTIT
+    use par_support_module, only: par_ex
+    USE MOD_DYN
+    USE o_PARAM
+    USE g_CONFIG
+    USE g_comm_auto
+    USE g_backscatter
+    USE o_ARRAYS
+    USE MOD_TRACER
+
+    implicit none
+
+    private
+    public :: update_vel, compute_vel_nodes, viscosity_filter, &
+              visc_filt_bcksct, visc_filt_bilapl, visc_filt_bidiff, &
+              compute_ke_wrho, compute_apegen, compute_PePm, &
+              check_viscopt, check_validviscopt_5
+
+contains
 
 ! A set of routines for computing the horizonlal viscosity
 ! the control parameters (their default values) are:
@@ -9,75 +30,11 @@
 !    We however, try to keep dynamics%visc_gamma1<0.1
 ! 3. dynamics%visc_gamma2 is dimensional (1/velocity). If it is 10, then the respective term dominates starting from |u|=0.1 m/s an so on. It is only used in: 
 !    (5) visc_filt_bcksct, (6) visc_filt_bilapl, (7) visc_filt_bidiff
-module visc_filt_bcksct_interface
-  interface
-    subroutine visc_filt_bcksct(dynamics, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_DYN
-      type(t_dyn)   , intent(inout), target :: dynamics
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh)  , intent(in)   , target :: mesh
-      
-    end subroutine visc_filt_bcksct
-  end interface
-end module visc_filt_bcksct_interface
-
-module visc_filt_bilapl_interface
-  interface
-    subroutine visc_filt_bilapl(dynamics, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_DYN
-      type(t_dyn)   , intent(inout), target :: dynamics
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh)  , intent(in)   , target :: mesh
-      
-    end subroutine visc_filt_bilapl
-  end interface
-end module visc_filt_bilapl_interface
-
-module visc_filt_bidiff_interface
-  interface
-    subroutine visc_filt_bidiff(dynamics, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_DYN
-      type(t_dyn)   , intent(inout), target :: dynamics
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh)  , intent(in)   , target :: mesh
-      
-    end subroutine visc_filt_bidiff
-  end interface
-end module visc_filt_bidiff_interface
-
-module check_validviscopt_interface
-    interface
-        subroutine check_validviscopt_5(partit, mesh)
-            USE MOD_MESH
-            USE MOD_PARTIT
-            USE MOD_PARSUP
-            type(t_partit), intent(inout), target :: partit
-            type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine check_validviscopt_5    
-    end interface
-end module check_validviscopt_interface 
-
 ! 
 ! Contains routines needed for computations of dynamics.
 ! includes: update_vel, compute_vel_nodes
 !_______________________________________________________________________________
 SUBROUTINE update_vel(dynamics, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    USE o_PARAM
-    USE g_CONFIG
-    use g_comm_auto
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -175,12 +132,6 @@ end subroutine update_vel
 !
 !_______________________________________________________________________________
 subroutine compute_vel_nodes(dynamics, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    USE o_PARAM
-    use g_comm_auto
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -228,15 +179,6 @@ end subroutine compute_vel_nodes
 !
 !_______________________________________________________________________________
 subroutine viscosity_filter(option, dynamics, partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_DYN
-    use visc_filt_bcksct_interface
-    use visc_filt_bilapl_interface
-    use visc_filt_bidiff_interface
-    use g_backscatter
     IMPLICIT NONE 
     integer                               :: option
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -276,20 +218,13 @@ end subroutine viscosity_filter
 !
 !_______________________________________________________________________________
 SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_DYN
-    USE o_PARAM
-    USE g_CONFIG
-    USE g_comm_auto
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
     real(kind=8)  :: u1, v1, len, vi
-    integer       :: nz, ed, el(2), nelem(3),k, elem, nzmin, nzmax
+    integer       :: nz, ed, el(2), nelem(3),k, elem, nzmin, nzmax, eledges(3), q
     ! still to be understood but if you allocate these arrays statically the results will be different:
     real(kind=8)  :: update_u(mesh%nl-1), update_v(mesh%nl-1)
     !___________________________________________________________________________
@@ -322,47 +257,42 @@ SUBROUTINE visc_filt_bcksct(dynamics, partit, mesh)
 !$OMP END PARALLEL DO
 
     !___________________________________________________________________________
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, nz, ed, el, nelem, k, elem, nzmin, nzmax, update_u, update_v)
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, nz, ed, el, nelem, k, elem, nzmin, nzmax, update_u, update_v, eledges, q)
+    ! Each owned element gathers the contributions of its three edges in ascending
+    ! edge order, with the sign of the edge orientation. No thread writes an element
+    ! it does not own, and the sum does not depend on the number of threads.
 !$OMP DO
-#endif
-    DO ed=1, myDim_edge2D+eDim_edge2D
-        if(myList_edge2D(ed)>edge2D_in) cycle
-        el=edge_tri(:,ed)
-        len=sqrt(sum(elem_area(el)))
-        nzmax = minval(nlevels(el))
-        nzmin = maxval(ulevels(el))
-        DO  nz=nzmin,nzmax-1
-            u1=UV(1,nz,el(1))-UV(1,nz,el(2))
-            v1=UV(2,nz,el(1))-UV(2,nz,el(2))
-            vi=dt*max(dynamics%visc_gamma0,                         &
-                      max(dynamics%visc_gamma1*sqrt(u1*u1+v1*v1),   &
-                      dynamics%visc_gamma2*(u1*u1+v1*v1))           &
-                    )*len
-            update_u(nz)=u1*vi
-            update_v(nz)=v1*vi
-        END DO 
-#if defined(_OPENMP) && !defined(__openmp_reproducible)
-        call omp_set_lock(partit%plock(el(1)))
-#else
-!$OMP ORDERED
-#endif
-        U_b(nzmin:nzmax-1, el(1))=U_b(nzmin:nzmax-1, el(1))-update_u(nzmin:nzmax-1)/elem_area(el(1))
-        V_b(nzmin:nzmax-1, el(1))=V_b(nzmin:nzmax-1, el(1))-update_v(nzmin:nzmax-1)/elem_area(el(1))
-#if defined(_OPENMP) && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(el(1)))
-        call omp_set_lock  (partit%plock(el(2)))
-#endif
-        U_b(nzmin:nzmax-1, el(2))=U_b(nzmin:nzmax-1, el(2))+update_u(nzmin:nzmax-1)/elem_area(el(2))
-        V_b(nzmin:nzmax-1, el(2))=V_b(nzmin:nzmax-1, el(2))+update_v(nzmin:nzmax-1)/elem_area(el(2))
-#if defined(_OPENMP) && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(el(2)))
-#else
-!$OMP END ORDERED 
-#endif
-    END DO
+    DO elem=1, myDim_elem2D
+        eledges=mesh%elem_edges(:,elem)
+        if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+        if (eledges(2)>eledges(3)) then; q=eledges(2); eledges(2)=eledges(3); eledges(3)=q; end if
+        if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+        DO q=1,3
+            ed=eledges(q)
+            if(myList_edge2D(ed)>edge2D_in) cycle
+            el=edge_tri(:,ed)
+            len=sqrt(sum(elem_area(el)))
+            nzmax = minval(nlevels(el))
+            nzmin = maxval(ulevels(el))
+            DO  nz=nzmin,nzmax-1
+                u1=UV(1,nz,el(1))-UV(1,nz,el(2))
+                v1=UV(2,nz,el(1))-UV(2,nz,el(2))
+                vi=dt*max(dynamics%visc_gamma0,                         &
+                          max(dynamics%visc_gamma1*sqrt(u1*u1+v1*v1),   &
+                          dynamics%visc_gamma2*(u1*u1+v1*v1))           &
+                        )*len
+                update_u(nz)=u1*vi
+                update_v(nz)=v1*vi
+            END DO 
+            if (el(1)==elem) then
+                U_b(nzmin:nzmax-1, elem)=U_b(nzmin:nzmax-1, elem)-update_u(nzmin:nzmax-1)/elem_area(elem)
+                V_b(nzmin:nzmax-1, elem)=V_b(nzmin:nzmax-1, elem)-update_v(nzmin:nzmax-1)/elem_area(elem)
+            else
+                U_b(nzmin:nzmax-1, elem)=U_b(nzmin:nzmax-1, elem)+update_u(nzmin:nzmax-1)/elem_area(elem)
+                V_b(nzmin:nzmax-1, elem)=V_b(nzmin:nzmax-1, elem)+update_v(nzmin:nzmax-1)/elem_area(elem)
+            end if
+        END DO ! --> DO q=1,3
+    END DO ! --> DO elem=1, myDim_elem2D
 !$OMP END DO
 
     !___________________________________________________________________________
@@ -438,20 +368,13 @@ end subroutine visc_filt_bcksct
 ! in viscosity that is proportional to the velocity amplitude squared.
 ! The coefficient has to be selected experimentally.
 SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_DYN
-    USE o_PARAM
-    USE g_CONFIG
-    USE g_comm_auto
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
     real(kind=8)  :: u1, v1, vi, len
-    integer       :: ed, el(2), elem, nz, nzmin, nzmax
+    integer       :: ed, el(2), elem, nz, nzmin, nzmax, eledges(3), q
     real(kind=8)  :: update_u(mesh%nl-1), update_v(mesh%nl-1)
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -476,40 +399,35 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
 
     !___________________________________________________________________________
     ! Sum up velocity differences over edge with respect to elemtnal index
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, ed, el, nz, nzmin, nzmax)
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, ed, el, nz, nzmin, nzmax, update_u, update_v, elem, eledges, q)
+    ! Each owned element gathers the contributions of its three edges in ascending
+    ! edge order, with the sign of the edge orientation. No thread writes an element
+    ! it does not own, and the sum does not depend on the number of threads.
 !$OMP DO
-#endif
-    DO ed=1, myDim_edge2D+eDim_edge2D
-        if(myList_edge2D(ed)>edge2D_in) cycle
-        el    = edge_tri(:,ed)
-        nzmin = maxval(ulevels(el))
-        nzmax = minval(nlevels(el))
-        DO  nz=nzmin, nzmax-1
-            update_u(nz)=(UV(1,nz,el(1))-UV(1,nz,el(2)))
-            update_v(nz)=(UV(2,nz,el(1))-UV(2,nz,el(2)))
-        END DO
-#if defined(_OPENMP) && !defined(__openmp_reproducible)
-        call omp_set_lock(partit%plock(el(1)))
-#else
-!$OMP ORDERED
-#endif
-        U_c(nzmin:nzmax-1, el(1))=U_c(nzmin:nzmax-1, el(1))-update_u(nzmin:nzmax-1)
-        V_c(nzmin:nzmax-1, el(1))=V_c(nzmin:nzmax-1, el(1))-update_v(nzmin:nzmax-1)
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(el(1)))
-        call omp_set_lock  (partit%plock(el(2)))
-#endif
-        U_c(nzmin:nzmax-1, el(2))=U_c(nzmin:nzmax-1, el(2))+update_u(nzmin:nzmax-1)
-        V_c(nzmin:nzmax-1, el(2))=V_c(nzmin:nzmax-1, el(2))+update_v(nzmin:nzmax-1)
-#if defined(_OPENMP) && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(el(2)))
-#else
-!$OMP END ORDERED
-#endif
-    END DO
+    DO elem=1, myDim_elem2D
+        eledges=mesh%elem_edges(:,elem)
+        if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+        if (eledges(2)>eledges(3)) then; q=eledges(2); eledges(2)=eledges(3); eledges(3)=q; end if
+        if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+        DO q=1,3
+            ed=eledges(q)
+            if(myList_edge2D(ed)>edge2D_in) cycle
+            el=edge_tri(:,ed)
+            nzmin = maxval(ulevels(el))
+            nzmax = minval(nlevels(el))
+            DO  nz=nzmin, nzmax-1
+                update_u(nz)=(UV(1,nz,el(1))-UV(1,nz,el(2)))
+                update_v(nz)=(UV(2,nz,el(1))-UV(2,nz,el(2)))
+            END DO
+            if (el(1)==elem) then
+                U_c(nzmin:nzmax-1, elem)=U_c(nzmin:nzmax-1, elem)-update_u(nzmin:nzmax-1)
+                V_c(nzmin:nzmax-1, elem)=V_c(nzmin:nzmax-1, elem)-update_v(nzmin:nzmax-1)
+            else
+                U_c(nzmin:nzmax-1, elem)=U_c(nzmin:nzmax-1, elem)+update_u(nzmin:nzmax-1)
+                V_c(nzmin:nzmax-1, elem)=V_c(nzmin:nzmax-1, elem)+update_v(nzmin:nzmax-1)
+            end if
+        END DO ! --> DO q=1,3
+    END DO ! --> DO elem=1, myDim_elem2D
 !$OMP END DO
 
     !___________________________________________________________________________
@@ -541,53 +459,48 @@ SUBROUTINE visc_filt_bilapl(dynamics, partit, mesh)
 !$OMP BARRIER
 
     !___________________________________________________________________________
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
+    ! Each owned element gathers the contributions of its three edges in ascending
+    ! edge order, with the sign of the edge orientation. No thread writes an element
+    ! it does not own, and the sum does not depend on the number of threads.
 !$OMP DO
-#endif
-    DO ed=1, myDim_edge2D+eDim_edge2D
-        if(myList_edge2D(ed)>edge2D_in) cycle
-        el=edge_tri(:,ed)
-        nzmin = maxval(ulevels(el))
-        nzmax = minval(nlevels(el))
-        !_______________________________________________________________________
-        if (dynamics%use_ssh_se_subcycl) then
-            !SD Approximate update for transports. We do not care about accuracy 
-            !SD here. --> of course, helem will be better.
-            do  nz=nzmin,nzmax-1
-                !PS update_u(nz)=(U_c(nz,el(1))-U_c(nz,el(2)))*(zbar(nz)-zbar(nz+1)) 
-                !PS update_v(nz)=(V_c(nz,el(1))-V_c(nz,el(2)))*(zbar(nz)-zbar(nz+1)) 
-                update_u(nz)=(U_c(nz,el(1))-U_c(nz,el(2))) * (helem(nz, el(1))+helem(nz, el(2)))*0.5_WP
-                update_v(nz)=(V_c(nz,el(1))-V_c(nz,el(2))) * (helem(nz, el(1))+helem(nz, el(2)))*0.5_WP
-            end do
-        else
-            do  nz=nzmin,nzmax-1
-                update_u(nz)=(U_c(nz,el(1))-U_c(nz,el(2)))
-                update_v(nz)=(V_c(nz,el(1))-V_c(nz,el(2)))
-            end do
-        end if
+    DO elem=1, myDim_elem2D
+        eledges=mesh%elem_edges(:,elem)
+        if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+        if (eledges(2)>eledges(3)) then; q=eledges(2); eledges(2)=eledges(3); eledges(3)=q; end if
+        if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+        DO q=1,3
+            ed=eledges(q)
+            if(myList_edge2D(ed)>edge2D_in) cycle
+            el=edge_tri(:,ed)
+            nzmin = maxval(ulevels(el))
+            nzmax = minval(nlevels(el))
+            !_______________________________________________________________________
+            if (dynamics%use_ssh_se_subcycl) then
+                !SD Approximate update for transports. We do not care about accuracy 
+                !SD here. --> of course, helem will be better.
+                do  nz=nzmin,nzmax-1
+                    !PS update_u(nz)=(U_c(nz,el(1))-U_c(nz,el(2)))*(zbar(nz)-zbar(nz+1)) 
+                    !PS update_v(nz)=(V_c(nz,el(1))-V_c(nz,el(2)))*(zbar(nz)-zbar(nz+1)) 
+                    update_u(nz)=(U_c(nz,el(1))-U_c(nz,el(2))) * (helem(nz, el(1))+helem(nz, el(2)))*0.5_WP
+                    update_v(nz)=(V_c(nz,el(1))-V_c(nz,el(2))) * (helem(nz, el(1))+helem(nz, el(2)))*0.5_WP
+                end do
+            else
+                do  nz=nzmin,nzmax-1
+                    update_u(nz)=(U_c(nz,el(1))-U_c(nz,el(2)))
+                    update_v(nz)=(V_c(nz,el(1))-V_c(nz,el(2)))
+                end do
+            end if
         
-        !_______________________________________________________________________
-#if defined(_OPENMP) && ! defined(__openmp_reproducible)
-        call omp_set_lock(partit%plock(el(1)))
-#else
-!$OMP ORDERED
-#endif
-        UV_rhs(1, nzmin:nzmax-1, el(1))=UV_rhs(1, nzmin:nzmax-1, el(1))-update_u(nzmin:nzmax-1)/elem_area(el(1))
-        UV_rhs(2, nzmin:nzmax-1, el(1))=UV_rhs(2, nzmin:nzmax-1, el(1))-update_v(nzmin:nzmax-1)/elem_area(el(1))
-#if defined(_OPENMP) && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(el(1)))
-        call omp_set_lock  (partit%plock(el(2)))
-#endif
-        UV_rhs(1, nzmin:nzmax-1, el(2))=UV_rhs(1, nzmin:nzmax-1, el(2))+update_u(nzmin:nzmax-1)/elem_area(el(2))
-        UV_rhs(2, nzmin:nzmax-1, el(2))=UV_rhs(2, nzmin:nzmax-1, el(2))+update_v(nzmin:nzmax-1)/elem_area(el(2))
-#if defined(_OPENMP) && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(el(2)))
-#else
-!$OMP END ORDERED
-#endif
-    END DO
+            !_______________________________________________________________________
+            if (el(1)==elem) then
+                UV_rhs(1, nzmin:nzmax-1, elem)=UV_rhs(1, nzmin:nzmax-1, elem)-update_u(nzmin:nzmax-1)/elem_area(elem)
+                UV_rhs(2, nzmin:nzmax-1, elem)=UV_rhs(2, nzmin:nzmax-1, elem)-update_v(nzmin:nzmax-1)/elem_area(elem)
+            else
+                UV_rhs(1, nzmin:nzmax-1, elem)=UV_rhs(1, nzmin:nzmax-1, elem)+update_u(nzmin:nzmax-1)/elem_area(elem)
+                UV_rhs(2, nzmin:nzmax-1, elem)=UV_rhs(2, nzmin:nzmax-1, elem)+update_v(nzmin:nzmax-1)/elem_area(elem)
+            end if
+        END DO ! --> DO q=1,3
+    END DO ! --> DO elem=1, myDim_elem2D
 !$OMP END DO
 !$OMP END PARALLEL
 end subroutine visc_filt_bilapl
@@ -601,20 +514,13 @@ end subroutine visc_filt_bilapl
 ! The effect is \nu^2
 ! Quadratic in velocity term can be introduced if needed.
 SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_DYN
-    USE o_PARAM
-    USE g_CONFIG
-    USE g_comm_auto
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
     real(kind=8)  :: u1, v1, len, vi, viLapl
-    integer       :: ed, el(2), nz, nzmin, nzmax, elem
+    integer       :: ed, el(2), nz, nzmin, nzmax, elem, eledges(3), q
     real(kind=8)  :: update_u(mesh%nl-1), update_v(mesh%nl-1)
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -638,49 +544,44 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
 !$OMP END PARALLEL DO
 
     !___________________________________________________________________________
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, viLapl, ed, el, nz, nzmin, nzmax, update_u, update_v)
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(u1, v1, len, vi, viLapl, ed, el, nz, nzmin, nzmax, update_u, update_v, elem, eledges, q)
+    ! Each owned element gathers the contributions of its three edges in ascending
+    ! edge order, with the sign of the edge orientation. No thread writes an element
+    ! it does not own, and the sum does not depend on the number of threads.
 !$OMP DO
-#endif
-    DO ed=1, myDim_edge2D+eDim_edge2D
-        if(myList_edge2D(ed)>edge2D_in) cycle
-        el=edge_tri(:,ed)
-        len=sqrt(sum(elem_area(el)))
-        nzmin = maxval(ulevels(el))
-        nzmax = minval(nlevels(el))
-        DO  nz=nzmin,nzmax-1
-            u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
-            v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
-            vi=u1*u1+v1*v1
-            vi=sqrt(max(dynamics%visc_gamma0,           &
-                    max(dynamics%visc_gamma1*sqrt(vi),  &
-                    dynamics%visc_gamma2*vi)            &
-                   )*len)
-            ! vi=sqrt(max(dynamics%visc_gamma0, dynamics%visc_gamma1*max(sqrt(vi), dynamics%visc_gamma2*vi))*len)
-            update_u(nz)=u1*vi
-            update_v(nz)=v1*vi
-        END DO
-#if defined(_OPENMP) && !defined(__openmp_reproducible)
-        call omp_set_lock(partit%plock(el(1)))
-#else
-!$OMP ORDERED
-#endif
-        U_c(nzmin:nzmax-1, el(1))=U_c(nzmin:nzmax-1, el(1))-update_u(nzmin:nzmax-1)
-        V_c(nzmin:nzmax-1, el(1))=V_c(nzmin:nzmax-1, el(1))-update_v(nzmin:nzmax-1)
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(el(1)))
-        call omp_set_lock  (partit%plock(el(2)))
-#endif
-        U_c(nzmin:nzmax-1, el(2))=U_c(nzmin:nzmax-1, el(2))+update_u(nzmin:nzmax-1)
-        V_c(nzmin:nzmax-1, el(2))=V_c(nzmin:nzmax-1, el(2))+update_v(nzmin:nzmax-1)
-#if defined(_OPENMP) && !defined(__openmp_reproducible) 
-        call omp_unset_lock(partit%plock(el(2)))
-#else
-!$OMP END ORDERED
-#endif
-    END DO
+    DO elem=1, myDim_elem2D
+        eledges=mesh%elem_edges(:,elem)
+        if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+        if (eledges(2)>eledges(3)) then; q=eledges(2); eledges(2)=eledges(3); eledges(3)=q; end if
+        if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+        DO q=1,3
+            ed=eledges(q)
+            if(myList_edge2D(ed)>edge2D_in) cycle
+            el=edge_tri(:,ed)
+            len=sqrt(sum(elem_area(el)))
+            nzmin = maxval(ulevels(el))
+            nzmax = minval(nlevels(el))
+            DO  nz=nzmin,nzmax-1
+                u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
+                v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
+                vi=u1*u1+v1*v1
+                vi=sqrt(max(dynamics%visc_gamma0,           &
+                        max(dynamics%visc_gamma1*sqrt(vi),  &
+                        dynamics%visc_gamma2*vi)            &
+                       )*len)
+                ! vi=sqrt(max(dynamics%visc_gamma0, dynamics%visc_gamma1*max(sqrt(vi), dynamics%visc_gamma2*vi))*len)
+                update_u(nz)=u1*vi
+                update_v(nz)=v1*vi
+            END DO
+            if (el(1)==elem) then
+                U_c(nzmin:nzmax-1, elem)=U_c(nzmin:nzmax-1, elem)-update_u(nzmin:nzmax-1)
+                V_c(nzmin:nzmax-1, elem)=V_c(nzmin:nzmax-1, elem)-update_v(nzmin:nzmax-1)
+            else
+                U_c(nzmin:nzmax-1, elem)=U_c(nzmin:nzmax-1, elem)+update_u(nzmin:nzmax-1)
+                V_c(nzmin:nzmax-1, elem)=V_c(nzmin:nzmax-1, elem)+update_v(nzmin:nzmax-1)
+            end if
+        END DO ! --> DO q=1,3
+    END DO ! --> DO elem=1, myDim_elem2D
 !$OMP END DO
 
     !___________________________________________________________________________
@@ -691,74 +592,69 @@ SUBROUTINE visc_filt_bidiff(dynamics, partit, mesh)
 !$OMP BARRIER
 
     !___________________________________________________________________________
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
+    ! Each owned element gathers the contributions of its three edges in ascending
+    ! edge order, with the sign of the edge orientation. No thread writes an element
+    ! it does not own, and the sum does not depend on the number of threads.
 !$OMP DO
-#endif
-    DO ed=1, myDim_edge2D+eDim_edge2D
-        if(myList_edge2D(ed)>edge2D_in) cycle
-        el=edge_tri(:,ed)
-        len=sqrt(sum(elem_area(el)))
-        nzmin = maxval(ulevels(el))
-        nzmax = minval(nlevels(el))
-        !_______________________________________________________________________
-        if (dynamics%use_ssh_se_subcycl) then
-            !SD Approximate update for transports. We do not care about accuracy 
-            !SD here. --> of course, helem will be better.
-            do nz=nzmin,nzmax-1
-                u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
-                v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
-                vi=u1*u1+v1*v1
-                vi=-dt*sqrt(max(dynamics%visc_gamma0,           &
-                            max(dynamics%visc_gamma1*sqrt(vi),  &
-                            dynamics%visc_gamma2*vi)            &
-                        )*len)
-                ! vi=-dt*sqrt(max(dynamics%visc_gamma0, dynamics%visc_gamma1*max(sqrt(vi), dynamics%visc_gamma2*vi))*len)
-                ! Optional Laplacian viscosity (active when visc_gamma0_h or visc_gamma1_h > 0)
-                viLapl=dt*max(dynamics%visc_gamma0_h, dynamics%visc_gamma1_h*sqrt(u1*u1+v1*v1))*len
-                !PS update_u(nz)=vi*(U_c(nz,el(1))-U_c(nz,el(2)))*(zbar(nz)-zbar(nz+1)) 
-                !PS update_v(nz)=vi*(V_c(nz,el(1))-V_c(nz,el(2)))*(zbar(nz)-zbar(nz+1)) 
-                update_u(nz)=(vi*(U_c(nz,el(1))-U_c(nz,el(2)))+viLapl*u1)*(helem(nz, el(1))+helem(nz, el(2)))*0.5_WP
-                update_v(nz)=(vi*(V_c(nz,el(1))-V_c(nz,el(2)))+viLapl*v1)*(helem(nz, el(1))+helem(nz, el(2)))*0.5_WP
-            end do
-        else
-            do nz=nzmin,nzmax-1
-                u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
-                v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
-                vi=u1*u1+v1*v1
-                vi=-dt*sqrt(max(dynamics%visc_gamma0,           &
-                            max(dynamics%visc_gamma1*sqrt(vi),  &
-                            dynamics%visc_gamma2*vi)            &
-                        )*len)
-                ! vi=-dt*sqrt(max(dynamics%visc_gamma0, dynamics%visc_gamma1*max(sqrt(vi), dynamics%visc_gamma2*vi))*len)
-                ! Optional Laplacian viscosity (active when visc_gamma0_h or visc_gamma1_h > 0)
-                viLapl=dt*max(dynamics%visc_gamma0_h, dynamics%visc_gamma1_h*sqrt(u1*u1+v1*v1))*len
-                update_u(nz)=vi*(U_c(nz,el(1))-U_c(nz,el(2)))+viLapl*u1
-                update_v(nz)=vi*(V_c(nz,el(1))-V_c(nz,el(2)))+viLapl*v1
-            end do
-        end if 
+    DO elem=1, myDim_elem2D
+        eledges=mesh%elem_edges(:,elem)
+        if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+        if (eledges(2)>eledges(3)) then; q=eledges(2); eledges(2)=eledges(3); eledges(3)=q; end if
+        if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+        DO q=1,3
+            ed=eledges(q)
+            if(myList_edge2D(ed)>edge2D_in) cycle
+            el=edge_tri(:,ed)
+            len=sqrt(sum(elem_area(el)))
+            nzmin = maxval(ulevels(el))
+            nzmax = minval(nlevels(el))
+            !_______________________________________________________________________
+            if (dynamics%use_ssh_se_subcycl) then
+                !SD Approximate update for transports. We do not care about accuracy 
+                !SD here. --> of course, helem will be better.
+                do nz=nzmin,nzmax-1
+                    u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
+                    v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
+                    vi=u1*u1+v1*v1
+                    vi=-dt*sqrt(max(dynamics%visc_gamma0,           &
+                                max(dynamics%visc_gamma1*sqrt(vi),  &
+                                dynamics%visc_gamma2*vi)            &
+                            )*len)
+                    ! vi=-dt*sqrt(max(dynamics%visc_gamma0, dynamics%visc_gamma1*max(sqrt(vi), dynamics%visc_gamma2*vi))*len)
+                    ! Optional Laplacian viscosity (active when visc_gamma0_h or visc_gamma1_h > 0)
+                    viLapl=dt*max(dynamics%visc_gamma0_h, dynamics%visc_gamma1_h*sqrt(u1*u1+v1*v1))*len
+                    !PS update_u(nz)=vi*(U_c(nz,el(1))-U_c(nz,el(2)))*(zbar(nz)-zbar(nz+1)) 
+                    !PS update_v(nz)=vi*(V_c(nz,el(1))-V_c(nz,el(2)))*(zbar(nz)-zbar(nz+1)) 
+                    update_u(nz)=(vi*(U_c(nz,el(1))-U_c(nz,el(2)))+viLapl*u1)*(helem(nz, el(1))+helem(nz, el(2)))*0.5_WP
+                    update_v(nz)=(vi*(V_c(nz,el(1))-V_c(nz,el(2)))+viLapl*v1)*(helem(nz, el(1))+helem(nz, el(2)))*0.5_WP
+                end do
+            else
+                do nz=nzmin,nzmax-1
+                    u1=(UV(1,nz,el(1))-UV(1,nz,el(2)))
+                    v1=(UV(2,nz,el(1))-UV(2,nz,el(2)))
+                    vi=u1*u1+v1*v1
+                    vi=-dt*sqrt(max(dynamics%visc_gamma0,           &
+                                max(dynamics%visc_gamma1*sqrt(vi),  &
+                                dynamics%visc_gamma2*vi)            &
+                            )*len)
+                    ! vi=-dt*sqrt(max(dynamics%visc_gamma0, dynamics%visc_gamma1*max(sqrt(vi), dynamics%visc_gamma2*vi))*len)
+                    ! Optional Laplacian viscosity (active when visc_gamma0_h or visc_gamma1_h > 0)
+                    viLapl=dt*max(dynamics%visc_gamma0_h, dynamics%visc_gamma1_h*sqrt(u1*u1+v1*v1))*len
+                    update_u(nz)=vi*(U_c(nz,el(1))-U_c(nz,el(2)))+viLapl*u1
+                    update_v(nz)=vi*(V_c(nz,el(1))-V_c(nz,el(2)))+viLapl*v1
+                end do
+            end if 
         
-        !_______________________________________________________________________
-#if defined(_OPENMP) && !defined(__openmp_reproducible)
-        call omp_set_lock(partit%plock(el(1)))
-#else
-!$OMP ORDERED
-#endif
-        UV_rhs(1, nzmin:nzmax-1, el(1))=UV_rhs(1, nzmin:nzmax-1, el(1))-update_u(nzmin:nzmax-1)/elem_area(el(1))
-        UV_rhs(2, nzmin:nzmax-1, el(1))=UV_rhs(2, nzmin:nzmax-1, el(1))-update_v(nzmin:nzmax-1)/elem_area(el(1))
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(el(1)))
-        call omp_set_lock  (partit%plock(el(2)))
-#endif
-        UV_rhs(1, nzmin:nzmax-1, el(2))=UV_rhs(1, nzmin:nzmax-1, el(2))+update_u(nzmin:nzmax-1)/elem_area(el(2))
-        UV_rhs(2, nzmin:nzmax-1, el(2))=UV_rhs(2, nzmin:nzmax-1, el(2))+update_v(nzmin:nzmax-1)/elem_area(el(2))
-#if defined(_OPENMP) && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(el(2)))
-#else
-!$OMP END ORDERED
-#endif
-    END DO
+            !_______________________________________________________________________
+            if (el(1)==elem) then
+                UV_rhs(1, nzmin:nzmax-1, elem)=UV_rhs(1, nzmin:nzmax-1, elem)-update_u(nzmin:nzmax-1)/elem_area(elem)
+                UV_rhs(2, nzmin:nzmax-1, elem)=UV_rhs(2, nzmin:nzmax-1, elem)-update_v(nzmin:nzmax-1)/elem_area(elem)
+            else
+                UV_rhs(1, nzmin:nzmax-1, elem)=UV_rhs(1, nzmin:nzmax-1, elem)+update_u(nzmin:nzmax-1)/elem_area(elem)
+                UV_rhs(2, nzmin:nzmax-1, elem)=UV_rhs(2, nzmin:nzmax-1, elem)+update_v(nzmin:nzmax-1)/elem_area(elem)
+            end if
+        END DO ! --> DO q=1,3
+    END DO ! --> DO elem=1, myDim_elem2D
 !$OMP END DO
 !$OMP END PARALLEL
 end subroutine visc_filt_bidiff
@@ -766,14 +662,6 @@ end subroutine visc_filt_bidiff
 !
 !_______________________________________________________________________________
 SUBROUTINE compute_ke_wrho(dynamics, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_DYN
-    USE o_PARAM
-    USE g_CONFIG
-    USE g_comm_auto
-    USE o_ARRAYS
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -812,14 +700,6 @@ END SUBROUTINE compute_ke_wrho
 !_______________________________________________________________________________
 ! APE generation stuff
 SUBROUTINE compute_apegen(dynamics, tracers, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_TRACER
-    USE MOD_PARSUP
-    use MOD_DYN
-    USE o_PARAM
-    USE g_comm_auto
-    USE o_ARRAYS
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target   :: dynamics
     type(t_tracer), intent(in)   , target   :: tracers
@@ -874,14 +754,6 @@ salt   => tracers%data(2)%values(:,:)
 END SUBROUTINE compute_apegen
 ! compute energy conversion (Pm<->Pe), as well as Pm & Pe
 SUBROUTINE compute_PePm(dynamics, tracers, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_TRACER
-    USE MOD_PARSUP
-    use MOD_DYN
-    USE o_PARAM
-    USE g_comm_auto
-    USE o_ARRAYS
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target   :: dynamics
     type(t_tracer), intent(in)   , target   :: tracers
@@ -928,11 +800,6 @@ END SUBROUTINE compute_PePm
 ! Drake Passage throughflow (<80Sv). In this case better use visc_opt=7, 
 ! which is the flow aware viscosity option 
 subroutine check_viscopt(dynamics, partit, mesh)
-    USE MOD_DYN
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    USE check_validviscopt_interface
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -953,13 +820,6 @@ end subroutine check_viscopt
 !_______________________________________________________________________________
 ! check if viscopt=5 is a valid and recommended option for the used configuration
 subroutine check_validviscopt_5(partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE o_PARAM , ONLY: rad
-    USE o_ARRAYS, ONLY: bvfreq
-    USE g_CONFIG
-    USE g_comm_auto
     IMPLICIT NONE
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
@@ -1072,3 +932,5 @@ subroutine check_validviscopt_5(partit, mesh)
     end if     
     
 end subroutine check_validviscopt_5
+
+end module oce_dyn_module

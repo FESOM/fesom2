@@ -26,6 +26,7 @@
 
         use mod_mesh
         use io_meandata,      only: def_stream
+        use par_support_module, only: par_ex
 
         implicit none
 
@@ -295,7 +296,7 @@
         
         use mod_mesh
         use mod_partit
-        use mod_parsup
+        use par_support_module, only: par_ex
         use g_config,     only: runid, ResultPath, RestartOutPath
         use io_restart,   only: icepack_files 
     

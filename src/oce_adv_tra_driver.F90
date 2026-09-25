@@ -1,71 +1,33 @@
-! Single precision cannot resolve the per-step change of the FCT low-order solution
-! LO, so LO*hnode_new - ttf*hnode loses it. The low-order tendency is kept in flux
-! form here instead.
-module adv_lo_tend_mod
-  use o_PARAM, only: WP
-  implicit none
-  real(kind=WP), allocatable, save :: lo_tend(:,:)
-  logical,                    save :: lo_flux_form = .false.
-end module adv_lo_tend_mod
+module oce_adv_tra_driver_module
+    USE MOD_MESH
+    USE MOD_TRACER
+    USE MOD_PARTIT
+    use par_support_module, only: par_ex
+    USE MOD_DYN
+    USE g_comm_auto
+    USE diagnostics, only: ldiag_DVD
+    use oce_adv_tra_hor_module, only: adv_tra_hor_upw1, adv_tra_hor_muscl, adv_tra_hor_mfct, adv_tra_hor_spbee
+    use oce_adv_tra_ver_module, only: adv_tra_vert_impl, adv_tra_ver_upw1, adv_tra_ver_qr4c, adv_tra_ver_ppm, adv_tra_ver_cdiff, adv_tra_ver_spbee
+    USE oce_adv_tra_fct_module, only: oce_adv_tra_fct_init, oce_tra_adv_fct
+    USE o_ARRAYS
 
-module oce_adv_tra_driver_interfaces
-  interface
-   subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit, mesh)
-      use MOD_MESH
-      use MOD_TRACER
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_DYN
-      real(kind=WP),  intent(in),    target :: dt
-      integer,        intent(in)            :: tr_num
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh)  , intent(in)   , target :: mesh
-      type(t_tracer), intent(inout), target :: tracers
-      type(t_dyn)   , intent(inout), target :: dynamics
-      real(kind=WP),  intent(in)            :: vel(2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
-      real(kind=WP),  intent(in), target    :: W(mesh%nl,    partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP),  intent(in), target    :: WI(mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP),  intent(in), target    :: WE(mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D)
-    end subroutine do_oce_adv_tra
-  end interface
-end module oce_adv_tra_driver_interfaces
+    implicit none
 
-module oce_tra_adv_flux2dtracer_interface
-  interface
-    subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, mesh, use_lo, ttf, lo)
-      !update the solution for vertical and horizontal flux contributions
-      use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      real(kind=WP), intent(in),    target :: dt
-      type(t_partit),intent(inout), target :: partit
-      type(t_mesh),  intent(in),    target :: mesh
-      real(kind=WP), intent(inout)      :: dttf_h(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(inout)      :: dttf_v(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(inout)      :: flux_h(mesh%nl-1, partit%myDim_edge2D)
-      real(kind=WP), intent(inout)      :: flux_v(mesh%nl,   partit%myDim_nod2D)
-      logical,       optional           :: use_lo
-      real(kind=WP), optional           :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), optional           :: lo (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-    end subroutine oce_tra_adv_flux2dtracer
-  end interface
-end module oce_tra_adv_flux2dtracer_interface
+    ! Single precision cannot resolve the per-step change of the FCT low-order
+    ! solution LO, so LO*hnode_new - ttf*hnode loses it. The low-order tendency is
+    ! kept in flux form here instead.
+    real(kind=WP), allocatable, save :: lo_tend(:,:)
+    logical,                    save :: lo_flux_form = .false.
+
+    private
+    public :: do_oce_adv_tra, oce_tra_adv_flux2dtracer
+
+contains
+
 !
 !
 !===============================================================================
 subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit, mesh)
-    use adv_lo_tend_mod
-    use MOD_MESH
-    use MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    use g_comm_auto
-    use diagnostics, only: ldiag_DVD
-    use oce_adv_tra_hor_interfaces
-    use oce_adv_tra_ver_interfaces
-    use oce_adv_tra_fct_interfaces
-    use oce_tra_adv_flux2dtracer_interface
     implicit none
     real(kind=WP),  intent(in),    target :: dt
     integer,        intent(in)            :: tr_num
@@ -87,7 +49,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     integer,        pointer, dimension (:)     :: nboundary_lay
     real(kind=WP),  pointer, dimension (:,:,:) :: edge_up_dn_grad
 
-    integer       :: el(2), enodes(2), nz, n, e
+    integer       :: el(2), enodes(2), nz, n, e, k, edge
     integer       :: nl12, nu12, nl1, nl2, nu1, nu2
     real(kind=WP) :: cLO, cHO, deltaX1, deltaY1, deltaX2, deltaY2
     real(kind=WP) :: qc, qu, qd
@@ -145,18 +107,37 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         !$ACC END PARALLEL LOOP
 #endif
 
+        ! Low-order tendency: each node gathers the horizontal fluxes of its incident edges
+        ! (mesh%nod_in_edge2D, sign +1 for the edge's first node, -1 for its second) in
+        ! ascending edge order, so the result does not depend on the number of threads.
 #ifndef ENABLE_OPENACC
-#if defined(__openmp_reproducible)
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(e, enodes, el, nl1, nu1, nl2, nu2, nu12, nl12, nz) ORDERED
-#else
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(e, enodes, el, nl1, nu1, nl2, nu2, nu12, nl12, nz)
-#endif
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, k, edge, el, nl1, nu1, nl2, nu2, nu12, nl12, nz)
+        do n=1, myDim_nod2D+eDim_nod2D
+            do k=1, mesh%nod_in_edge2D_num(n)
+                edge=mesh%nod_in_edge2D(k,n)
+                el=edge_tri(:,edge)
+                nl1=nlevels(el(1))-1
+                nu1=ulevels(el(1))
+                nl2=0
+                nu2=0
+                if(el(2)>0) then
+                    nl2=nlevels(el(2))-1
+                    nu2=ulevels(el(2))
+                end if
+                nl12 = max(nl1,nl2)
+                nu12 = nu1
+                if (nu2>0) nu12 = min(nu1,nu2)
+                do nz=nu12, nl12
+                    fct_LO(nz, n)=fct_LO(nz, n)+mesh%nod_in_edge2D_sgn(k,n)*adv_flux_hor(nz, edge)
+                end do
+            end do
+        end do
+!$OMP END PARALLEL DO
 #else
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #else
         !$ACC UPDATE SELF(fct_lo, adv_flux_hor)
-#endif
 #endif
         do e=1, myDim_edge2D
             enodes=edges(:,e)
@@ -218,9 +199,6 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 #endif
 #endif
         end do
-#ifndef ENABLE_OPENACC
-!$OMP END PARALLEL DO
-#else
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC END PARALLEL LOOP
 #else
@@ -520,12 +498,6 @@ end subroutine do_oce_adv_tra
 !
 !===============================================================================
 subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, mesh, use_lo, ttf, lo)
-    use adv_lo_tend_mod
-    use MOD_MESH
-    use o_ARRAYS
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use g_comm_auto
     implicit none
     real(kind=WP), intent(in),    target :: dt
     type(t_partit),intent(inout), target :: partit
@@ -595,19 +567,38 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 #else
     !$ACC END PARALLEL LOOP
 #endif
-    ! Horizontal
+    ! Horizontal: each node gathers the fluxes of its incident edges (mesh%nod_in_edge2D,
+    ! sign +1 for the edge's first node, -1 for its second). No two threads write the same
+    ! node, and the summation order per node is the ascending edge order at any thread count.
 #ifndef ENABLE_OPENACC
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
 !$OMP DO
-#endif
+    do n=1, myDim_nod2D+eDim_nod2D
+        do k=1, mesh%nod_in_edge2D_num(n)
+            edge=mesh%nod_in_edge2D(k,n)
+            el=edge_tri(:,edge)
+            nl1=nlevels(el(1))-1
+            nu1=ulevels(el(1))
+            nl2=0
+            nu2=0
+            if(el(2)>0) then
+                nl2=nlevels(el(2))-1
+                nu2=ulevels(el(2))
+            end if
+            nl12 = max(nl1,nl2)
+            nu12 = nu1
+            if (nu2>0) nu12 = min(nu1,nu2)
+            do nz=nu12, nl12
+                dttf_h(nz,n)=dttf_h(nz,n)+mesh%nod_in_edge2D_sgn(k,n)*flux_h(nz,edge)*dt/areasvol(nz,n)
+            end do
+        end do
+    end do
+!$OMP END DO
+!$OMP END PARALLEL
 #else
 #if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #else
     !$ACC UPDATE SELF(dttf_h, flux_h)
-#endif
 #endif
     do edge=1, myDim_edge2D
         enodes(1:2)=edges(:,edge)
@@ -669,10 +660,6 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 #endif
     end do
 
-#ifndef ENABLE_OPENACC
-!$OMP END DO
-!$OMP END PARALLEL
-#else
 #if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC END PARALLEL LOOP
 #else
@@ -681,3 +668,5 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 #endif
 
 end subroutine oce_tra_adv_flux2dtracer
+
+end module oce_adv_tra_driver_module

@@ -1,79 +1,32 @@
-module ice_thermodynamics_interfaces
-    interface
-        subroutine thermodynamics(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine thermodynamics
-        
-        subroutine cut_off(ice, partit, mesh)
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine cut_off
-    end interface  
-end module ice_thermodynamics_interfaces
+module ice_thermo_oce_module
+    USE o_param
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_ICE
+    USE g_config
+    USE o_arrays, only: fw_ice, fw_snw
+    USE g_forcing_param
+    USE g_forcing_arrays
+    USE g_comm_auto
+    USE g_sbf, only: l_snow
+    USE g_clock
 
-module ice_therm_interface
-    interface
-        subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rsss, &
-        ug, ustar, T_oc, S_oc, H_ML, t, ice_dt, ch, ce, ch_i, ce_i, evap_in, fw,  fwice, fwsnw, ehf, evap, &
-        rsf, dhgrowth, dhsngrowth, dAgrowth, iflice, hflatow, hfsenow, hflwrdout, hfswrow, &
-        hflwrow, hfradow, lid_clo, geolon, geolat, subli)
-        USE MOD_ICE
-        type(t_ice_thermo), intent(in), target :: ithermp
-        real(kind=WP)   h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rsss, &
-                        ug, ustar, T_oc, S_oc, H_ML, t, ice_dt, ch, ce, ch_i, ce_i, evap_in, fw, fwice, fwsnw, ehf, &
-                        dhgrowth, dhsngrowth, dAgrowth, ahf, prec, subli, subli_i, rsf, &
-                        rhow, show, rhice, shice, sh, thick, thact, lat, &
-                        rh, rA, qhst, sn, hsntmp, o2ihf, evap, iflice, hflatow, &
-                        hfsenow, hflwrdout, hfswrow, hflwrow, hfradow, lid_clo, geolon, geolat
-        end subroutine therm_ice
-    end interface
-end module ice_therm_interface
+    implicit none
 
-module ice_budget_interfaces
-    interface
-        subroutine budget(ithermp, hice, hsn, t, ta, qa, fsh, flo, ug, S_oc, ch_i, ce_i, fh, subli)
-        USE MOD_ICE
-        type(t_ice_thermo), intent(in), target :: ithermp
-        real(kind=WP)  hice, hsn, t, ta, qa, fsh, flo, ug, S_oc, ch_i, ce_i, fh, subli
-        end subroutine budget
-        
-        subroutine obudget(ithermp, qa, fsh, flo, t, ug, ta, ch, ce, geolon, & 
-                           geolat, fh, evap, hflatow, hfsenow, hflwrdout, hfswrow, &
-                           hflwrow, hfradow) 
-        USE MOD_ICE
-        type(t_ice_thermo), intent(in), target :: ithermp
-        real(kind=WP)   qa, t, ta, fsh, flo, ug, ch, ce, geolon, geolat, fh, evap, &
-                        hfsenow, hflatow, hflwrdout, hfswrow, hflwrow, hfradow
-        end subroutine obudget
-        
-        subroutine flooding(ithermp, h, hsn)
-        USE MOD_ICE
-        type(t_ice_thermo), intent(in), target :: ithermp
-        real(kind=WP)   h, hsn
-        end subroutine flooding
-    end interface
-end module ice_budget_interfaces
+    private
+    public :: cut_off
+#if !defined (__oasis) && !defined (__ifsinterface) && !defined (__yac)
+    public :: thermodynamics, therm_ice, budget, obudget, flooding, &
+              TFrez, compute_solar_zenith_angle, albw_taylor, &
+              albw_briegleb
+#endif
+
+contains
+
 !
 !
 !_______________________________________________________________________________
 subroutine cut_off(ice, partit, mesh)
-    use o_param
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_ICE
-    use g_config, only: use_cavity
     implicit none
     type(t_mesh),   intent(in),    target :: mesh
     type(t_partit), intent(inout), target :: partit
@@ -172,18 +125,6 @@ subroutine thermodynamics(ice, partit, mesh)
   ! variables.
   !------------------------------------------------------------------------
   
-    USE MOD_ICE
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use o_param
-    use o_arrays, only: fw_ice, fw_snw
-    use g_config
-    use g_forcing_param
-    use g_forcing_arrays
-    use g_comm_auto
-    use g_sbf, only: l_snow
-    use ice_therm_interface
     implicit none
     type(t_ice)   , intent(inout), target :: ice
     type(t_mesh)  , intent(in)   , target :: mesh
@@ -208,7 +149,6 @@ subroutine thermodynamics(ice, partit, mesh)
     real(kind=WP), dimension(:)  , pointer :: thdgr, thdgrsn, thdgra, thdgr_old, t_skin, ustar_aux
     real(kind=WP), dimension(:)  , pointer :: S_oc_array, T_oc_array, u_w, v_w
     real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
-    real(kind=WP), external  :: TFrez  ! Sea water freeze temperature
     myDim_nod2d   => partit%myDim_nod2D
     eDim_nod2D    => partit%eDim_nod2D
     ulevels_nod2D  (1    :myDim_nod2D+eDim_nod2D) => mesh%ulevels_nod2D(:)
@@ -244,7 +184,8 @@ subroutine thermodynamics(ice, partit, mesh)
     ! Friction velocity 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, elem, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rsss, rsf, evap_in, ug, ustar, T_oc, S_oc, &
 !$OMP                                  h_ml, t, ch, ce, ch_i, ce_i, fw, ehf, evap, ithdgr, ithdgrsn, iflice, hflatow, hfsenow, hflwrdout,    &
-!$OMP                                  subli, lid_clo, lat, geolon, geolat, o2ihf)
+!$OMP                                  subli, lid_clo, lat, geolon, geolat, o2ihf, fwice, fwsnw, ithdgra, &
+!$OMP                                  hfswrow, hflwrow, hfradow)
 !$OMP DO
     do i=1, myDim_nod2D
         ustar=0.0_WP
@@ -433,10 +374,6 @@ subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rss
     ! subli - sublimatione over ice
     ! o2ihf - ocean to ice heat flux [W/m2] 
 
-    USE MOD_ICE
-    use g_forcing_param,  only: use_virt_salt  
-    use o_param
-    use ice_budget_interfaces
     implicit none
     type(t_ice_thermo), intent(in), target :: ithermp
     integer k
@@ -446,7 +383,6 @@ subroutine therm_ice(ithermp, h, hsn, A, fsh, flo, Ta, qa, rain, snow, runo, rss
     real(kind=WP)  rhow,show,rhice,shice,sh,snthick,thick,thact,lat
     real(kind=WP)  rh,rA,qhst,sn,hsntmp,o2ihf,evap
     real(kind=WP)  iflice, hflatow, hfsenow, hflwrdout, hfswrow, hflwrow, hfradow
-    real(kind=WP), external  :: TFrez  ! Sea water freeze temperature.
     real(kind=WP)  lid_clo, geolon, geolat
     !___________________________________________________________________________
     logical      , pointer :: snowdist, new_iclasses
@@ -697,8 +633,6 @@ subroutine budget (ithermp, hice,hsn,t,ta,qa,fsh,flo,ug,S_oc,ch_i,ce_i,fh,subli)
     ! A similar change was also made for the obudget routine.
     ! It was found through experiments that the results are quite similar to that from the
     ! original code, and the simulated ice volume is only slightly larger after modification. 
-    use MOD_ICE
-    use o_param, only: WP
     implicit none
     type(t_ice_thermo), intent(in), target :: ithermp
     integer iter, imax      ! Number of iterations
@@ -707,7 +641,6 @@ subroutine budget (ithermp, hice,hsn,t,ta,qa,fsh,flo,ug,S_oc,ch_i,ce_i,fh,subli)
     real(kind=WP)  alb             ! Albedo of sea ice
     real(kind=WP)  q1, q2	  ! coefficients for saturated specific humidity
     real(kind=WP)  A1,A2,A3,B,C, d1, d2, d3   
-    real(kind=WP), external :: TFrez
     !___________________________________________________________________________
     real(kind=WP), pointer :: boltzmann, emiss_ice, tmelt, cl, clhi, con, cpair, &
                               inv_rhowat, inv_rhoair, rhoair, albim, albi, albsn, albsnm
@@ -811,17 +744,12 @@ subroutine obudget (ithermp, qa,fsh,flo,t,ug,ta,ch,ce,geolon, geolat, fh, evap, 
     !
     ! OUTPUT: fh - growth rate
     !         evap - evaporation
-    use MOD_ICE  
-    use MOD_MESH
-    use o_param, only: WP
-    use g_clock
     implicit none
     type(t_ice_thermo), intent(in), target :: ithermp
     real(kind=WP) qa,t,ta,fsh,flo,ug,ch,ce,fh,evap
     real(kind=WP) hfsenow, hfswrow, hflwrow, hfradow, hflatow, hftotow, hflwrdout,b
     real(kind=WP) q1, q2 		! coefficients for saturated specific humidity
     real(kind=WP) c1, c4, c5, coszen, geolon, geolat
-    real(kind=WP), external  :: compute_solar_zenith_angle, albw_taylor, albw_briegleb
     logical :: standard_saturation_shum_formula = .true.
     integer :: ii
     !___________________________________________________________________________
@@ -889,7 +817,6 @@ end subroutine obudget
 !
 !_______________________________________________________________________________
 subroutine flooding (ithermp, h, hsn)
-    use MOD_ICE
     type(t_ice_thermo), intent(in), target :: ithermp
     real(kind=WP) h,hsn,hdraft,hflood
     !___________________________________________________________________________
@@ -918,7 +845,6 @@ end subroutine flooding
 function TFrez(S)
     ! Nonlinear correlation for the water freezing temperature.
     ! Millero (1978) - UNESCO. Reference - See A. Gill, 1982.
-    use o_param, only: WP
     implicit none
     real(kind=WP) :: S, TFrez
 
@@ -948,7 +874,6 @@ function compute_solar_zenith_angle(day_of_year, hour_utc, longitude, latitude) 
     ! Written for Apache 2.0 licensed projects.
     !-----------------------------------------------------------------------
 
-    use o_param, only: WP, pi  ! Ensure precision consistency
 
     implicit none
 
@@ -999,7 +924,6 @@ end function compute_solar_zenith_angle
     !     method:   taylor et al. (1996)
     !     author:   frank kauker
     !     date:     26. april 2017
-    use o_param, only: WP
     implicit none
   
     real(kind=WP), intent(in)  :: coszen
@@ -1016,7 +940,6 @@ end function compute_solar_zenith_angle
     !     author:   frank kauker
     !     date:     26. april 2017
     
-    use o_param, only: WP
     implicit none
   
     real(kind=WP), intent(in)  :: coszen
@@ -1031,3 +954,5 @@ end function compute_solar_zenith_angle
 !
 !_______________________________________________________________________________
 #endif /* #if !defined (__coupled) && !defined (__ifsinterface) */
+
+end module ice_thermo_oce_module

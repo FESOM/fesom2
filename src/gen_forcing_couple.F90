@@ -1,103 +1,65 @@
-module force_flux_consv_interface
-  interface
-    subroutine force_flux_consv(field2d, mask, n, h, do_stats, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-      real(kind=WP), intent (inout) :: field2d(partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent (in)    :: mask(partit%myDim_nod2D+partit%eDim_nod2D)
-      integer, intent (in)          :: n, h
-      logical, intent (in)          :: do_stats
-    end subroutine force_flux_consv
-  end interface
-end module force_flux_consv_interface
-module compute_residual_interface
-  interface
-    subroutine compute_residual(field2d, mask, n, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-      real(kind=WP),  intent (in) :: field2d(partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP),  intent (in) :: mask(partit%myDim_nod2D+partit%eDim_nod2D)
-      integer, intent (in)       :: n
-    end subroutine compute_residual
-  end interface
-end module compute_residual_interface
-module integrate_2D_interface
-  interface
-    subroutine integrate_2D(flux_global, flux_local, eff_vol, field2d, mask, partit, mesh)
-      use mod_mesh
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(in), target :: partit
-      real(kind=WP), intent (out) :: flux_global(2), flux_local(2)
-      real(kind=WP), intent (out) :: eff_vol(2)
-      real(kind=WP), intent (in)  :: field2d(partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent (in)  :: mask(partit%myDim_nod2D   +partit%eDim_nod2D)
-    end subroutine integrate_2D
-  end interface
-end module integrate_2D_interface
+module gen_forcing_couple_module
+    USE o_PARAM
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_TRACER
+    USE MOD_ICE
+    USE MOD_DYN
+    USE o_arrays
+    USE g_forcing_param
+    USE g_forcing_arrays
+    USE g_clock
+    USE g_config
+    USE g_comm_auto
+    USE g_rotate_grid
+    USE g_sbf, only: sbc_do, atmdata, i_totfl, i_xwind, i_ywind, i_xstre, i_ystre, i_humi, &
+            i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_snow, l_xwind, l_ywind, l_xstre, &
+            l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow
+    USE cpl_yac_driver
+    USE gen_bulk
+    USE g_support, only: integrate_nod
+#if defined (__recom)
+  use g_sbf, only: sbc_do_recom
+#endif
+#if defined (__oasis)
+  use cpl_driver
+#endif
+#if defined (__recom)
+  use REcoM_GloVar, only: x_co2atm, GloCO2flux_seaicemask
+#endif
+#if defined(__oasis)
+  use cpl_driver,	 only : nrecv, cpl_recv, a2o_fcorr_stat
+#elif defined(__yac)
+  use cpl_yac_driver,	 only : nrecv, cpl_recv, a2o_fcorr_stat
+#endif
+#if defined(__oasis)
+  use cpl_driver
+#elif defined(__yac)
+  use cpl_yac_driver
+#endif
+#if defined(__recom) && defined(__usetp)
+  use g_config, only: num_fesom_groups
+#endif
 
-module update_atm_forcing_interface
-    interface
-        subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
-        USE MOD_TRACER
-        USE MOD_ICE
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        USE MOD_DYN
-        integer,        intent(in)            :: istep
-        type(t_ice),    intent(inout), target :: ice
-        type(t_tracer), intent(in),    target :: tracers
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh),   intent(in),    target :: mesh
-        type(t_dyn)   , intent(in),    target :: dynamics
-        end subroutine update_atm_forcing
-    end interface
-end module update_atm_forcing_interface
+    implicit none
 
-module net_rec_from_atm_interface
-  interface
-    subroutine net_rec_from_atm(action, partit)
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      logical,        intent(in)             :: action
-      type(t_partit), intent(inout), target  :: partit
-    end subroutine net_rec_from_atm
-  end interface
-end module net_rec_from_atm_interface
+    private
+#if defined (__yac)
+    public :: update_atm_forcing_yac
+#else /* if not defined  __yac */
+    public :: update_atm_forcing
+#endif
+#if defined (__oasis) || defined (__yac)
+    public :: force_flux_consv, compute_residual, integrate_2D, &
+              net_rec_from_atm
+#endif
+
+contains
+
 ! Routines for updating ocean surface forcing fields
 !-------------------------------------------------------------------------
 #if defined (__yac)
 subroutine update_atm_forcing_yac(istep, ice, tracers, dynamics, partit, mesh)
-  use o_PARAM
-  use MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use MOD_TRACER
-  use MOD_ICE
-  use MOD_DYN
-  use o_arrays
-  use g_forcing_param
-  use g_forcing_arrays
-  use g_clock
-  use g_config
-  use g_comm_auto
-  use g_rotate_grid
-  use net_rec_from_atm_interface
-  use g_sbf, only: sbc_do
-  use g_sbf, only: atmdata, i_totfl, i_xwind, i_ywind, i_xstre, i_ystre, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_snow, &
-                                     l_xwind, l_ywind, l_xstre, l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow
-  use cpl_yac_driver
-  use gen_bulk
-  use force_flux_consv_interface
-  USE g_support, only: integrate_nod
 
   implicit none
   integer,        intent(in)            :: istep
@@ -250,35 +212,6 @@ end subroutine update_atm_forcing_yac
 #else /* if not defined  __yac */
 
 subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
-  use o_PARAM
-  use MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use MOD_TRACER
-  use MOD_ICE
-  use MOD_DYN
-  use o_arrays
-  use g_forcing_param
-  use g_forcing_arrays
-  use g_clock
-  use g_config
-  use g_comm_auto
-  use g_rotate_grid
-  use net_rec_from_atm_interface
-  use g_sbf, only: sbc_do
-#if defined (__recom) 
-  use g_sbf, only: sbc_do_recom
-#endif
-  use g_sbf, only: atmdata, i_totfl, i_xwind, i_ywind, i_xstre, i_ystre, i_humi, i_qsr, i_qlw, i_tair, i_prec, i_mslp, i_cloud, i_snow, &
-                                     l_xwind, l_ywind, l_xstre, l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow
-#if defined (__oasis)
-  use cpl_driver
-#endif
-  use gen_bulk
-  use force_flux_consv_interface
-#if defined (__recom)
-  use REcoM_GloVar, only: x_co2atm, GloCO2flux_seaicemask
-#endif
 
   implicit none
   integer,        intent(in)            :: istep
@@ -805,8 +738,10 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
      dux=u_wind(i)-u_ice(i) 
      dvy=v_wind(i)-v_ice(i)
      aux=sqrt(dux**2+dvy**2)*rhoair
-     stress_atmice_x(i) = Cd_atm_ice_arr(i)*aux*dux
-     stress_atmice_y(i) = Cd_atm_ice_arr(i)*aux*dvy
+     if (use_ice) then
+        stress_atmice_x(i) = Cd_atm_ice_arr(i)*aux*dux
+        stress_atmice_y(i) = Cd_atm_ice_arr(i)*aux*dvy
+     end if
   end do
 !$OMP END PARALLEL DO
   ! heat and fresh water fluxes are treated in i_therm and ice2ocean
@@ -849,21 +784,6 @@ end subroutine update_atm_forcing
 !
 SUBROUTINE force_flux_consv(field2d, mask, n, h, do_stats, partit, mesh)
 
-  use g_forcing_arrays,	only : 	atm_net_fluxes_north, atm_net_fluxes_south, 	&
-  				oce_net_fluxes_north, oce_net_fluxes_south, 	&
-				flux_correction_north, flux_correction_south,	&
-				flux_correction_total
-  use mod_mesh
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-#if defined(__oasis)
-  use cpl_driver,	 only : nrecv, cpl_recv, a2o_fcorr_stat
-#elif defined(__yac)
-  use cpl_yac_driver,	 only : nrecv, cpl_recv, a2o_fcorr_stat
-#endif
-  use o_PARAM,           only : mstep, WP
-  use compute_residual_interface
-  use integrate_2D_interface
   IMPLICIT NONE
   type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(inout), target :: partit  
@@ -974,15 +894,6 @@ END SUBROUTINE force_flux_consv
 !
 SUBROUTINE compute_residual(field2d, mask, n, partit, mesh)
 
-  use g_forcing_arrays,	only : 	atm_net_fluxes_north, atm_net_fluxes_south, 	&
-  				oce_net_fluxes_north, oce_net_fluxes_south, 	&
-				flux_correction_north, flux_correction_south,	&
-				flux_correction_total
-  use o_PARAM, only : WP 
-  use MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use integrate_2D_interface
  
   IMPLICIT NONE
   type(t_mesh),   intent(in),    target :: mesh
@@ -1014,10 +925,6 @@ END SUBROUTINE compute_residual
 ! -flux_global (returned) is the communicated and summarized flux_local  
 !
 SUBROUTINE integrate_2D(flux_global, flux_local, eff_vol, field2d, mask, partit, mesh)
-  use MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use o_PARAM, only: WP 
   IMPLICIT NONE
   type(t_mesh),   intent(in),    target :: mesh
   type(t_partit), intent(in),    target :: partit
@@ -1077,19 +984,7 @@ END SUBROUTINE integrate_2D
 !
 SUBROUTINE net_rec_from_atm(action, partit)
 !
-  use g_forcing_arrays
-#if defined(__oasis)
-  use cpl_driver
-#elif defined(__yac)
-  use cpl_yac_driver
-#endif
-  use o_PARAM, only: WP
-  USE MOD_PARTIT
-  USE MOD_PARSUP
 
-#if defined(__recom) && defined(__usetp)
-  use g_config, only: num_fesom_groups
-#endif
 
   IMPLICIT NONE
 
@@ -1152,3 +1047,5 @@ SUBROUTINE net_rec_from_atm(action, partit)
   end if
 END SUBROUTINE net_rec_from_atm
 #endif
+
+end module gen_forcing_couple_module

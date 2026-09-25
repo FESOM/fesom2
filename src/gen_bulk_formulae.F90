@@ -2,7 +2,6 @@ MODULE gen_bulk
     ! Compute heat and momentum exchange coefficients
     use mod_mesh
     USE MOD_PARTIT
-    USE MOD_PARSUP    
     USE MOD_ICE
     use g_forcing_arrays
     use g_forcing_param, only: ncar_bulk_z_wind, ncar_bulk_z_tair, ncar_bulk_z_shum
@@ -176,7 +175,7 @@ subroutine ncar_ocean_fluxes_mode(ice, partit, mesh)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j, m, cd_n10, ce_n10, ch_n10, cd_n10_rt, hl1, cd, ce, ch, cd_rt, x2, x, stab, &
 !$OMP                                    zeta_u, zeta_t, zeta_q, psi_m_u, psi_h_u, psi_m_t, psi_h_t, psi_m_q, psi_h_q, &
-!$OMP                                                                 ts, qs, tv, xx, dux, dvy, t, t10, q, q10, u, u10 )
+!$OMP                                                                 ts, qs, tv, xx, dux, dvy, t, t10, q, q10, u, u10, cd_prev, ustar, tstar, qstar, bstar, test)
 !$OMP DO
     do i=1,partit%myDim_nod2d+partit%eDim_nod2d   
         if (mesh%ulevels_nod2d(i)>1) cycle

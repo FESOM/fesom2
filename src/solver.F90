@@ -1,32 +1,19 @@
-module ssh_solve_preconditioner_interface
-    interface
-        subroutine ssh_solve_preconditioner(solverinfo, partit, mesh)
-        use MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_solverinfo),  intent(inout), target :: solverinfo
-        type(t_partit),      intent(inout), target :: partit
-        type(t_mesh),        intent(inout), target :: mesh
-        end subroutine ssh_solve_preconditioner
-    end interface
-end module ssh_solve_preconditioner_interface
+module solver_module
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_DYN
+    USE g_comm_auto
+#if defined(FESOM_PROFILING)
+  USE fesom_rtdiagnostics, only: diag_count
+#endif
 
-module ssh_solve_cg_interface
-    interface
-        subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
-        use MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_solverinfo),  intent(inout), target :: solverinfo
-        type(t_partit),      intent(inout), target :: partit
-        type(t_mesh),        intent(inout), target :: mesh
-        real(kind=WP),       intent(inout) :: x(partit%myDim_nod2D+partit%eDim_nod2D)
-        real(kind=WP),       intent(in)    :: rhs(partit%myDim_nod2D+partit%eDim_nod2D)
-        end subroutine ssh_solve_cg
-    end interface
-end module ssh_solve_cg_interface
+    implicit none
+
+    private
+    public :: ssh_solve_preconditioner, ssh_solve_cg
+
+contains
+
 !=========================================================================
 subroutine ssh_solve_preconditioner(solverinfo, partit, mesh)
   ! Preconditioner follows MITgcm (JGR, 102,5753-5766, 1997)
@@ -40,11 +27,6 @@ subroutine ssh_solve_preconditioner(solverinfo, partit, mesh)
   ! paper cited) is, in reality, one iteration of the
   ! Jacobi method, with symmetrization. We need symmetrization to be able to use
   ! the conjugate gradient method.    
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    USE g_comm_auto
     IMPLICIT NONE
     type(t_solverinfo),  intent(inout), target :: solverinfo
     type(t_partit),      intent(inout), target :: partit
@@ -124,14 +106,6 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   ! 
   ! I tried first to follow the MITgcm paper, but I have doubts about
   ! their computations of beta. The variant below -- see Wikipedia.
-  USE MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  USE MOD_DYN
-  USE g_comm_auto
-#if defined(FESOM_PROFILING)
-  USE fesom_rtdiagnostics, only: diag_count
-#endif
   IMPLICIT NONE
   type(t_solverinfo),  intent(inout), target :: solverinfo
   type(t_partit),      intent(inout), target :: partit
@@ -173,16 +147,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   ! ============== 
   ! Define working tolerance: 
   ! ==============
-#if !defined(__openmp_reproducible)
-  s_old=0.0_WP_full
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) REDUCTION(+:s_old)
-  DO row=1, myDim_nod2D
-     s_old=s_old+real(rhs(row), WP_full)*real(rhs(row), WP_full)
-  END DO
-!$OMP END PARALLEL DO
-#else
  s_old = sum(real(rhs(1:myDim_nod2D), WP_full) * real(rhs(1:myDim_nod2D), WP_full))
-#endif
 
   call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
   rtol=solverinfo%soltol*sqrt(s_old/real(nod2D,WP_full))
@@ -213,16 +178,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   ! Scalar product of r*z
   ! ===============
 
-#if !defined(__openmp_reproducible)
-  s_old=0.0_WP_full
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) REDUCTION(+:s_old)
-  DO row=1, myDim_nod2D
-     s_old=s_old+real(rr(row), WP_full)*real(zz(row), WP_full)
-  END DO
-!$OMP END PARALLEL DO
-#else
   s_old = sum(real(rr(1:myDim_nod2D), WP_full) * real(zz(1:myDim_nod2D), WP_full))
-#endif
 
   call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
   
@@ -245,16 +201,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
      ! Scalar products for alpha
      ! ============
  
-#if !defined(__openmp_reproducible)
-  s_aux=0.0_WP_full
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) REDUCTION(+:s_aux)
-  DO row=1, myDim_nod2D
-     s_aux=s_aux+real(pp(row), WP_full)*real(App(row), WP_full)
-  END DO
-!$OMP END PARALLEL DO
-#else
  s_aux = sum(real(pp(1:myDim_nod2D), WP_full) * real(App(1:myDim_nod2D), WP_full))
-#endif
 
   call MPI_Allreduce(MPI_IN_PLACE, s_aux, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 
@@ -300,18 +247,8 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
      ! ===========
      ! Scalar products for beta
      ! ===========
-#if !defined(__openmp_reproducible)
-sprod(1:2)=0.0_WP_full
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) REDUCTION(+:sprod)
-  DO row=1, myDim_nod2D
-     sprod(1)=sprod(1)+real(rr(row), WP_full)*real(zz(row), WP_full)
-     sprod(2)=sprod(2)+real(rr(row), WP_full)*real(rr(row), WP_full)
-  END DO
-!$OMP END PARALLEL DO
-#else
     sprod(1) = sum(real(rr(1:myDim_nod2D), WP_full) * real(zz(1:myDim_nod2D), WP_full))
     sprod(2) = sum(real(rr(1:myDim_nod2D), WP_full) * real(rr(1:myDim_nod2D), WP_full))
-#endif
   
   call MPI_Allreduce(MPI_IN_PLACE, sprod, 2, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 
@@ -398,3 +335,4 @@ end subroutine ssh_solve_cg
 
 ! ===================================================================
 
+end module solver_module

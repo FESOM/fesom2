@@ -6,7 +6,7 @@ module fesom_main_storage_module
   USE MOD_ICE
   USE MOD_TRACER
   USE MOD_PARTIT
-  USE MOD_PARSUP
+  use par_support_module, only: par_ex
   USE MOD_DYN
   USE o_ARRAYS
   USE o_PARAM
@@ -29,22 +29,36 @@ module fesom_main_storage_module
                                  siarean, siareas, siextentn, siextents, &
                                  sivoln, sivols
   use mo_tidal
-  use tracer_init_interface
-  use ocean_setup_interface
-  use ice_setup_interface
-  use ocean2ice_interface
-  use oce_fluxes_interface
-  use hosing_interface
-  use update_atm_forcing_interface
-  use before_oce_step_interface
-  use oce_timestep_ale_interface
-  use read_mesh_interface
+  use oce_setup_step_module, only: tracer_init
+  use oce_setup_step_module, only: ocean_setup
+  use ice_setup_step_module, only: ice_setup, ice_timestep
+  use ice_oce_coupling_module, only: ocean2ice
+  use ice_oce_coupling_module, only: oce_fluxes, oce_fluxes_mom
+  use oce_hosing_module, only: fw_surf_anomaly, fw_depth_anomaly
+#if defined (__yac)
+  use gen_forcing_couple_module, only: update_atm_forcing_yac
+#else
+  use gen_forcing_couple_module, only: update_atm_forcing
+#endif
+  use oce_setup_step_module, only: before_oce_step
+  use oce_ale_module, only: oce_timestep_ale
+  use oce_mesh_module, only: read_mesh
   use fesom_version_info_module
   use command_line_options_module
+  use oce_mesh_module, only: mesh_setup, check_mesh_consistency
+  use oce_setup_step_module, only: dynamics_init, arrays_init
+  use oce_dyn_module, only: compute_vel_nodes, update_vel
+  use oce_ale_module, only: restart_thickness_ale
+  use oce_ale_pressure_bv_module, only: init_ref_density_advanced
+  use ice_init_module, only: ice_init_toyocean_dummy
+  use icb_allocate_module, only: allocate_icb
+  use gen_forcing_init_module, only: forcing_setup
+  use par_support_module, only: par_init
+  use write_step_info_module, only: plot_fesomlogo
   use, intrinsic :: iso_fortran_env, only : real32
   use g_forcing_param, only: use_landice_water, use_age_tracer
-  use landice_water_init_interface
-  use age_tracer_init_interface
+  use oce_landice_water_module, only: landice_water_init
+  use oce_age_tracer_module, only: age_tracer_init
   use iceberg_params
   use iceberg_step
   use mod_transit
@@ -1041,8 +1055,8 @@ contains
         ! --------------
         
         !___model sea-ice step__________________________________________________
+        f%t_ice_s = MPI_Wtime()
         if(use_ice) then
-            f%t_ice_s = MPI_Wtime()
             !___compute fluxes from ocean to ice________________________________
 #if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
@@ -1053,7 +1067,9 @@ contains
 #endif
             f%t_ice_o2iflx_s = MPI_Wtime()
             call ocean2ice(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
-            
+        end if
+
+        if (use_ice .or. .not. toy_ocean) then
             !___compute update of atmospheric forcing____________________________
 #if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
@@ -1070,10 +1086,13 @@ contains
             call update_atm_forcing_yac(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
 #else
             call update_atm_forcing(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
-#endif 
+#endif
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("update_atm_forcing")
 #endif
+        end if
+
+        if(use_ice) then
             f%t_ice_step_s = MPI_Wtime()
             !___compute ice step________________________________________________
             if (f%ice%ice_steps_since_upd>=f%ice%ice_ave_steps-1) then
@@ -1100,7 +1119,9 @@ contains
         call fesom_profiler_end("ice_timestep")
 #endif
             endif
-        
+        end if
+
+        if (use_ice .or. .not. toy_ocean) then
             !___compute fluxes to the ocean: heat, freshwater, momentum_________
 #if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
@@ -1113,14 +1134,15 @@ contains
             call oce_fluxes_mom(f%ice, f%dynamics, f%partit, f%mesh) ! momentum only
             call oce_fluxes(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
             f%t_ice_e = MPI_Wtime()
+        end if
 
+        if(use_ice) then
             !___freshwater depth hosing routine_______________________________________
             !
             if (use_hosing .and. trim(hosing_mode)=='depth') then
                 call fw_depth_anomaly(f%tracers%data(2)%values, f%tracers%data(1)%values, &
                                       hosing_hSv, f%partit, f%mesh)
             end if
-
         end if
         
         call before_oce_step(f%dynamics, f%tracers, f%partit, f%mesh) ! prepare the things if required
