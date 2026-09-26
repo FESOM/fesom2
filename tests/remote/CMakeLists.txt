@@ -75,6 +75,47 @@ else()
 endif()
 
 # =============================================================================
+# CORE3 Remote Mesh Tests
+# =============================================================================
+
+if(HAS_DOWNLOAD_CAPABILITY)
+    message(STATUS "Adding CORE3 remote mesh download test...")
+    
+    # Add mesh pipeline for core3 (download + partitioning for 16 processes);
+    # CORE3 has ice-shelf cavities, use_cavity comes from tests/mesh_registry.json
+    add_mesh_pipeline("core3" PREFIX remote PROCESS_COUNTS 16)
+    
+    if(BUILD_MESHPARTITIONER)
+        message(STATUS "Adding CORE3 mesh partitioning test...")
+        # Partitioning is included in add_mesh_pipeline above
+    else()
+        message(STATUS "CORE3 mesh partitioning test skipped - BUILD_MESHPARTITIONER=OFF")
+    endif()
+    
+    if(BUILD_MESHDIAG)
+        message(STATUS "Adding CORE3 mesh diagnostics test...")
+        
+        # Add meshdiag test that generates mesh diagnostics file
+        add_fesom_meshdiag_test_with_options(generate_meshdiag_core3_mpi16 "core3" "fesom"
+            NP 16
+            TIMEOUT 600
+            PREFIX remote
+        )
+        
+        # Make meshdiag test depend on mesh pipeline
+        set_tests_properties(remote_generate_meshdiag_core3_mpi16 PROPERTIES
+            FIXTURES_REQUIRED "mesh_core3_16"
+            LABELS "generate_meshdiag"
+        )
+    else()
+        message(STATUS "CORE3 mesh diagnostics test skipped - BUILD_MESHDIAG=OFF")
+    endif()
+    
+else()
+    message(STATUS "CORE3 remote mesh tests skipped - no download capability (wget or curl required)")
+endif()
+
+# =============================================================================
 # DARS Remote Mesh Tests
 # =============================================================================
 

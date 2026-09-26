@@ -9,6 +9,7 @@ time: "00:10:00"
 
 namelist.config:
     timestep:
+        step_per_day: 36
         run_length: 1
         run_length_unit: "d"
     geometry:
@@ -18,6 +19,7 @@ namelist.config:
         restart_length_unit: "d"
         logfile_outfreq: 10
     run_config:
+        use_cavity: False
         use_floatice: True
 
 namelist.dyn:
