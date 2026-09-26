@@ -2077,7 +2077,6 @@ SUBROUTINE sbc_do_recom(partit, mesh)
     !-----------------------------------------------------------------------------
 !-Checking if files need to be opened---------------------------------------------
     if(use_MEDUSA .and. (sedflx_num .ne. 0)) then
-            allocate(ncdata(9))
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
@@ -2087,14 +2086,12 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 #endif
             ! MEDUSA input needs to be renamed via jobscript
             filename=trim(make_full_path(nm_sed_data_file))
-        if (update_monthly_flag) then
-            i=month
-            if (mstep > 1) i=i+1
-            if (i > 12) i=1
+        ! MEDUSA fluxes are yearly: read once per year (first time step of each yearly run)
+        if (mstep == 1) then
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
-            if (mype==0) write(*,*) 'Updating sedimentary input for month', i, 'from', filename
+            if (mype==0) write(*,*) 'Updating sedimentary input for year', yearnew, 'from', filename
 #if defined(__usetp)
         endif !(partit%my_fesom_group==0) then
 #endif
@@ -2133,13 +2130,14 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
-        if (mype==0) write(*,*) 'add loopback fluxes through river runoff for month', i 
+        if (mype==0) write(*,*) 'add loopback fluxes through river runoff for year', yearnew
 #if defined(__usetp)
         endif !(partit%my_fesom_group==0) then
 #endif
 
         istart = (/1,1/)
         icount = (/1,1/)
+        allocate(ncdata(9))
         ncdata = 0.d0
 
         total_runoff = 8.76d5*86400
@@ -2205,14 +2203,14 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 
        end if ! ciso_14 .and. ciso_organic_14
       end if ! ciso
-        deallocate(ncdata)
         status=nf_close(ncid)
 
 ! calculating fluxes back to ocean surface through rivers (mmol/m2/s)
-! converting from fluxes out of sediment to fluxes into the ocean 
+! converting from fluxes out of sediment to fluxes into the ocean
         do n_lb = 1,9
            lb_flux(:,n_lb) = -runoff*ncdata(n_lb)/total_runoff*lb_tscale
         end do
+        deallocate(ncdata)
 
       else
 
@@ -2226,9 +2224,9 @@ SUBROUTINE sbc_do_recom(partit, mesh)
 
       end if ! add_loopback
 
-        end if ! update_monthly_flag
+        end if ! mstep == 1
 
-    else ! use_MEDUSA 
+    else ! use_MEDUSA
 
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
