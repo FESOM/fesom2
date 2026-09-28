@@ -66,7 +66,7 @@ subroutine stress_tensor(ice, partit, mesh)
     det2 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte) !*ellipse**2
 
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnodes, m_el, a_el, pelem, r1, r2, r3, si1, si2, zeta, delta, delta_inv, d1, d2)
+!$OMP DO PRIVATE(el, elnodes, m_el, a_el, pelem, r1, r2, r3, si1, si2, zeta, delta, delta_inv, d1, d2)
 #else
 !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(elnodes)
 #endif
@@ -148,7 +148,7 @@ subroutine stress_tensor(ice, partit, mesh)
 #endif
     end do
 #ifndef ENABLE_OPENACC
-!$OMP END PARALLEL DO
+!$OMP END DO
 #else
 !$ACC END PARALLEL LOOP
 #endif
@@ -193,11 +193,10 @@ subroutine stress2rhs(ice, partit, mesh)
     val3=1/3.0_WP
 
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, el, k, j, elnodes, su, sv)
     ! Node-owned gather: each owned node sums the stress divergence of its incident
     ! elements in nod_in_elem2D order and writes only its own entry. No locks are
     ! needed and the sum does not depend on the number of threads.
-!$OMP DO
+!$OMP DO PRIVATE(n, el, k, j, elnodes, su, sv)
     DO n=1, myDim_nod2D
         su = 0.0_WP
         sv = 0.0_WP
@@ -304,7 +303,6 @@ subroutine stress2rhs(ice, partit, mesh)
     END DO
 #ifndef ENABLE_OPENACC
 !$OMP END DO
-!$OMP END PARALLEL
 #else
     !$ACC END PARALLEL LOOP
 #endif
@@ -644,6 +642,11 @@ subroutine EVPdynamics(ice, partit, mesh)
     rdg_conv_elem(:)  = 0.0_WP
     rdg_shear_elem(:) = 0.0_WP
 #endif
+    ! stress_tensor and stress2rhs contain orphaned worksharing loops that bind to
+    ! this region; the halo exchange runs on the master thread between barriers.
+#ifndef ENABLE_OPENACC
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(shortstep, n, k, ed, umod, drag, rhsu, rhsv, r_a, r_b, det)
+#endif
     do shortstep=1, ice%evp_rheol_steps
         !_______________________________________________________________________
         !TODO: temporary workaround for cray16.0.1.1 bug
@@ -658,7 +661,6 @@ subroutine EVPdynamics(ice, partit, mesh)
 
         !_______________________________________________________________________
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, ed, umod, drag, rhsu, rhsv, r_a, r_b, det)
 !$OMP DO
 #else
         !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
@@ -743,19 +745,24 @@ subroutine EVPdynamics(ice, partit, mesh)
         END DO
 #ifndef ENABLE_OPENACC
 !$OMP END DO
-!$OMP END PARALLEL
 #else
         !$ACC END PARALLEL LOOP
 #endif
 
 !write(*,*) partit%mype, shortstep, 'CP4'
         !_______________________________________________________________________
+#ifndef ENABLE_OPENACC
+!$OMP MASTER
+#endif
         call exchange_nod(U_ice,V_ice,partit, luse_g2g = .true.)
-
-!ifndef ENABLE_OPENACC
+#ifndef ENABLE_OPENACC
+!$OMP END MASTER
 !$OMP BARRIER
-!endif
+#endif
     END DO !--> do shortstep=1, ice%evp_rheol_steps
+#ifndef ENABLE_OPENACC
+!$OMP END PARALLEL
+#endif
 
 end subroutine EVPdynamics
 
