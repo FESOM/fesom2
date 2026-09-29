@@ -158,7 +158,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
             !!PS do  nz=1, max(nl1, nl2)
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_set_lock(partit%plock(enodes(1)))
+            if (partit%plock_on) call omp_set_lock(partit%plock(enodes(1)))
 #else
 !$OMP ORDERED
 #endif
@@ -176,8 +176,8 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
             end do
-            call omp_unset_lock(partit%plock(enodes(1)))
-            call omp_set_lock  (partit%plock(enodes(2)))
+            if (partit%plock_on) call omp_unset_lock(partit%plock(enodes(1)))
+            if (partit%plock_on) call omp_set_lock  (partit%plock(enodes(2)))
             do nz=nu12, nl12
 #endif
 #else
@@ -189,7 +189,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
             end do
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_unset_lock(partit%plock(enodes(2)))
+            if (partit%plock_on) call omp_unset_lock(partit%plock(enodes(2)))
 #else
 !$OMP END ORDERED
 #endif
@@ -619,7 +619,7 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_set_lock(partit%plock(enodes(1)))
+        if (partit%plock_on) call omp_set_lock(partit%plock(enodes(1)))
 #else
 !$OMP ORDERED
 #endif
@@ -636,8 +636,8 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
         end do
-        call omp_unset_lock(partit%plock(enodes(1)))
-        call omp_set_lock  (partit%plock(enodes(2)))
+        if (partit%plock_on) call omp_unset_lock(partit%plock(enodes(1)))
+        if (partit%plock_on) call omp_set_lock  (partit%plock(enodes(2)))
         do nz=nu12, nl12
 #endif
 #else
@@ -649,7 +649,7 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
         end do
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(enodes(2)))
+        if (partit%plock_on) call omp_unset_lock(partit%plock(enodes(2)))
 #else
 !$OMP END ORDERED
 #endif

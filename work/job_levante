@@ -1,6 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=ref
 #SBATCH -p compute
+#SBATCH --hint=nomultithread
 #SBATCH --ntasks-per-node=128
 #SBATCH --ntasks=288
 #SBATCH --time=00:05:00
