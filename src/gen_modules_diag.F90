@@ -3302,18 +3302,18 @@ subroutine dvd_add_difflux_bhvisc(do_SDdvd, tr_num, dvd_tot, tr, trstar, gamma0_
             dtr(nz)=dtr(nz)*vi
         END DO
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_set_lock  (partit%plock(ednodes(1)))
+       if (partit%plock_on) call omp_set_lock  (partit%plock(ednodes(1)))
 #else
 !$OMP ORDERED
 #endif
        dump(nu1:nl1-1, ednodes(1)) = dump(nu1:nl1-1, ednodes(1))-dtr(nu1:nl1-1)
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_unset_lock(partit%plock(ednodes(1)))
-       call omp_set_lock  (partit%plock(ednodes(2)))
+       if (partit%plock_on) call omp_unset_lock(partit%plock(ednodes(1)))
+       if (partit%plock_on) call omp_set_lock  (partit%plock(ednodes(2)))
 #endif
        dump(nu1:nl1-1, ednodes(2)) = dump(nu1:nl1-1, ednodes(2))+dtr(nu1:nl1-1)
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_unset_lock(partit%plock(ednodes(2)))
+       if (partit%plock_on) call omp_unset_lock(partit%plock(ednodes(2)))
 #else
 !$OMP END ORDERED
 #endif
@@ -3364,20 +3364,20 @@ subroutine dvd_add_difflux_bhvisc(do_SDdvd, tr_num, dvd_tot, tr, trstar, gamma0_
             end do !-->do nz=nu1, nl1-1
             !___________________________________________________________________
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_set_lock  (partit%plock(ednodes(1)))
+            if (partit%plock_on) call omp_set_lock  (partit%plock(ednodes(1)))
 #else
 !$OMP ORDERED
 #endif
             dvd_tot(nu1:nl1-1, ednodes(1), tr_num) = dvd_tot(nu1:nl1-1, ednodes(1), tr_num) + & 
                                     trc(nu1:nl1-1)*dtr(nu1:nl1-1)/(areasvol(nu1:nl1-1,ednodes(1))) 
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_unset_lock(partit%plock(ednodes(1)))
-            call omp_set_lock  (partit%plock(ednodes(2)))
+            if (partit%plock_on) call omp_unset_lock(partit%plock(ednodes(1)))
+            if (partit%plock_on) call omp_set_lock  (partit%plock(ednodes(2)))
 #endif
             dvd_tot(nu1:nl1-1, ednodes(2), tr_num) = dvd_tot(nu1:nl1-1, ednodes(2), tr_num) - &
                                     trc(nu1:nl1-1)*dtr(nu1:nl1-1)/(areasvol(nu1:nl1-1,ednodes(2))) 
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_unset_lock(partit%plock(ednodes(2)))
+            if (partit%plock_on) call omp_unset_lock(partit%plock(ednodes(2)))
 #else
 !$OMP END ORDERED
 #endif
@@ -3394,20 +3394,20 @@ subroutine dvd_add_difflux_bhvisc(do_SDdvd, tr_num, dvd_tot, tr, trstar, gamma0_
             
             !___________________________________________________________________
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_set_lock  (partit%plock(ednodes(1)))
+            if (partit%plock_on) call omp_set_lock  (partit%plock(ednodes(1)))
 #else
 !$OMP ORDERED
 #endif
             dvd_tot(nu1:nl1-1, ednodes(1), tr_num) = dvd_tot(nu1:nl1-1, ednodes(1), tr_num) + & 
                                         trc(nu1:nl1-1)*dtr(nu1:nl1-1)  / ( areasvol(nu1:nl1-1,ednodes(1)) )                                     
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_unset_lock(partit%plock(ednodes(1)))
-            call omp_set_lock  (partit%plock(ednodes(2)))
+            if (partit%plock_on) call omp_unset_lock(partit%plock(ednodes(1)))
+            if (partit%plock_on) call omp_set_lock  (partit%plock(ednodes(2)))
 #endif
             dvd_tot(nu1:nl1-1, ednodes(2), tr_num) = dvd_tot(nu1:nl1-1, ednodes(2), tr_num) - &
                                         trc(nu1:nl1-1)*dtr(nu1:nl1-1)  / ( areasvol(nu1:nl1-1,ednodes(2)) )
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_unset_lock(partit%plock(ednodes(2)))
+            if (partit%plock_on) call omp_unset_lock(partit%plock(ednodes(2)))
 #else
 !$OMP END ORDERED
 #endif

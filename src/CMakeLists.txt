@@ -450,6 +450,9 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} 
       # |*Intel/Para...MPI-mt | -O3 -xCORE-AVX2                                           | 113s |
       target_compile_options(${PROJECT_NAME} PRIVATE -xCORE-AVX2)
    else()
+      message(WARNING "FESOM_PLATFORM_STRATEGY is '${FESOM_PLATFORM_STRATEGY}': no platform-specific Intel flags, "
+                      "falling back to -xHost. On AMD hosts (e.g. Levante) this runs about 2x slower per step than the "
+                      "platform branch; build through configure.sh/env.sh or export FESOM_PLATFORM_STRATEGY.")
       target_compile_options(${PROJECT_NAME} PRIVATE -xHost)
    endif()
    

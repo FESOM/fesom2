@@ -163,7 +163,7 @@ module g_cvmix_tidal
                     loc_Etot = loc_Etot + elem_area(elem)*tidal_fbot(elem)
                 end if     
             end do
-            call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+            call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
             if (mype==0) write(*,*) " --> TIDAL total tidal energy Etot_bot =", glb_Etot*1.0e-12, ' TW'
             
             ! normalize total tidal energy at bottom with respect to the total 
@@ -182,7 +182,7 @@ module g_cvmix_tidal
                         loc_Etot = loc_Etot + elem_area(elem)*tidal_fbot(elem)
                     end if     
                 end do
-                call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+                call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
                 if (mype==0) write(*,*) " --> TIDAL Etot_bot after normalizing =", glb_Etot*1.0e-12, ' TW'
             end if 
             

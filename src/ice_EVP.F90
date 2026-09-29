@@ -28,13 +28,14 @@ contains
 ! EVP rheology. The routine computes stress tensor components based on ice
 ! velocity field. They are stored as elemental arrays (sigma11, sigma22 and
 ! sigma12). The ocean velocity is at nodal locations.
-subroutine stress_tensor(ice, partit, mesh)
+subroutine stress_tensor(elist, ice, partit, mesh)
     implicit none
+    integer       , intent(in)            :: elist(:)
     type(t_partit), intent(inout), target :: partit
     type(t_ice)   , intent(inout), target :: ice
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
-    integer         :: el
+    integer         :: i, el
     real(kind=WP)   :: det1, det2, dte, vale, r1, r2, r3, si1, si2
     real(kind=WP)   :: zeta, delta, delta_inv, d1, d2
     !___________________________________________________________________________
@@ -66,11 +67,13 @@ subroutine stress_tensor(ice, partit, mesh)
     det2 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte) !*ellipse**2
 
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnodes, m_el, a_el, pelem, r1, r2, r3, si1, si2, zeta, delta, delta_inv, d1, d2)
+!$OMP DO PRIVATE(i, el, elnodes, m_el, a_el, pelem, r1, r2, r3, si1, si2, zeta, delta, delta_inv, d1, d2)
+    do i=1,size(elist)
+        el = elist(i)
 #else
 !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(elnodes)
-#endif
     do el=1,myDim_elem2D
+#endif
         !_______________________________________________________________________
         ! if element contains cavity node skip it
         if (ulevels(el) > 1) cycle
@@ -148,7 +151,7 @@ subroutine stress_tensor(ice, partit, mesh)
 #endif
     end do
 #ifndef ENABLE_OPENACC
-!$OMP END PARALLEL DO
+!$OMP END DO
 #else
 !$ACC END PARALLEL LOOP
 #endif
@@ -165,8 +168,8 @@ subroutine stress2rhs(ice, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
-    INTEGER                   :: n, el,  k
-    REAL(kind=WP)             :: val3
+    INTEGER                   :: n, el,  k, j
+    REAL(kind=WP)             :: val3, su, sv
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: sigma11, sigma12, sigma22
@@ -193,35 +196,50 @@ subroutine stress2rhs(ice, partit, mesh)
     val3=1/3.0_WP
 
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, el, k)
-!$OMP DO
+    ! Node-owned gather: each owned node sums the stress divergence of its incident
+    ! elements in nod_in_elem2D order and writes only its own entry. No locks are
+    ! needed and the sum does not depend on the number of threads.
+!$OMP DO PRIVATE(n, el, k, j, elnodes, su, sv)
+    DO n=1, myDim_nod2D
+        su = 0.0_WP
+        sv = 0.0_WP
+        do k=1, nod_in_elem2D_num(n)
+            el = nod_in_elem2D(k,n)
+            !___________________________________________________________________
+            ! if element contains cavity node skip it
+            if (ulevels(el) > 1) cycle
+            elnodes = elem2D_nodes(:,el)
+            if (any(m_ice(elnodes) <= 0._WP) .or. any(a_ice(elnodes) <= 0._WP)) cycle
+            !___________________________________________________________________
+            ! corner of element el that is node n
+            j = 3
+            if (elnodes(1) == n) j = 1
+            if (elnodes(2) == n) j = 2
+            su = su - elem_area(el) * &
+                 (sigma11(el)*gradient_sca(j,el) + sigma12(el)*gradient_sca(j+3,el) &
+                 +sigma12(el)*val3*metric_factor(el))            !metrics
+            sv = sv - elem_area(el) * &
+                 (sigma12(el)*gradient_sca(j,el) + sigma22(el)*gradient_sca(j+3,el) &
+                 -sigma11(el)*val3*metric_factor(el))
+        end do
+        U_rhs_ice(n) = su
+        V_rhs_ice(n) = sv
+    END DO
+!$OMP END DO
 #else
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
-#endif
     DO  n=1, myDim_nod2D
         U_rhs_ice(n)=0.0_WP
         V_rhs_ice(n)=0.0_WP
     END DO
 
-#ifndef ENABLE_OPENACC
-!$OMP END DO
-#else
     !$ACC END PARALLEL LOOP
-#endif
 
-#ifndef ENABLE_OPENACC
-#if defined(__openmp_reproducible)
-!$OMP SINGLE
-#else
-!$OMP DO
-#endif
-#else
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #if !defined(DISABLE_OPENACC_ATOMICS)
        !$ACC ATOMIC UPDAATE
 #else
     !$ACC UPDATE SELF(u_rhs_ice, v_rhs_ice, sigma11, sigma12, sigma22)
-#endif
 #endif
     do el=1,myDim_elem2D
         ! ===== Skip if ice is absent
@@ -236,11 +254,6 @@ subroutine stress2rhs(ice, partit, mesh)
 
         DO k=1,3
 
-#ifndef ENABLE_OPENACC
-#if defined(_OPENMP) && !defined(__openmp_reproducible)
-        call omp_set_lock  (partit%plock(elem2D_nodes(k,el)))
-#endif
-#endif
 #ifdef ENABLE_OPENACC
 #if !defined(DISABLE_OPENACC_ATOMICS)
                 !$ACC ATOMIC UPDATE
@@ -261,11 +274,6 @@ subroutine stress2rhs(ice, partit, mesh)
                     (sigma12(el)*gradient_sca(k,el) + sigma22(el)*gradient_sca(k+3,el) &
                     -sigma11(el)*val3*metric_factor(el))
 
-#ifndef ENABLE_OPENACC
-#if defined(_OPENMP) && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(elem2D_nodes(k,el)))
-#endif
-#endif
         END DO
     end do
 #ifdef ENABLE_OPENACC
@@ -274,13 +282,6 @@ subroutine stress2rhs(ice, partit, mesh)
 #endif
 #endif
 
-#ifndef ENABLE_OPENACC
-#if defined(__openmp_reproducible)
-!$OMP END SINGLE
-#else
-!$OMP END DO
-#endif
-#else
     !$ACC END PARALLEL LOOP
 #endif
 
@@ -305,7 +306,6 @@ subroutine stress2rhs(ice, partit, mesh)
     END DO
 #ifndef ENABLE_OPENACC
 !$OMP END DO
-!$OMP END PARALLEL
 #else
     !$ACC END PARALLEL LOOP
 #endif
@@ -331,11 +331,13 @@ subroutine EVPdynamics(ice, partit, mesh)
     integer         :: use_pice
 
     real(kind=WP)   :: eta, delta
-    integer         :: k
+    integer         :: k, j
     real(kind=WP)   :: vale, dx(3), dy(3), val3
     real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2, dte
     real(kind=WP)   :: zeta, delta_inv, d1, d2
     INTEGER         :: elem
+    integer         :: n_inner, n_halo
+    integer, allocatable :: elem_inner(:), elem_halo(:)
     !_______________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
@@ -476,15 +478,42 @@ subroutine EVPdynamics(ice, partit, mesh)
         ! for full free surface include pressure from ice mass
 
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(el, elnodes, aa, p_ice, elevation_elem, elevation_dx, elevation_dy)
-!$OMP DO
+        ! Node-owned gather over nod_in_elem2D: each owned node sums the force of its
+        ! incident elements and writes only its own entry, so the sum does not depend on
+        ! the number of threads. Halo entries of rhs_a/rhs_m stay zero; only owned nodes
+        ! are read (stress2rhs).
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, k, j, el, elnodes, aa, p_ice, elevation_elem, elevation_dx, elevation_dy)
+        do n = 1, myDim_nod2D
+            do k = 1, nod_in_elem2D_num(n)
+                el = nod_in_elem2D(k,n)
+                !_______________________________________________________________
+                ! if element has any cavity node skip it
+                if (ulevels(el) > 1) cycle
+                elnodes = elem2D_nodes(:,el)
+                !_______________________________________________________________
+                ! skip if any node is ice-free
+                if (any(m_ice(elnodes) <= 0._WP) .or. &
+                    any(a_ice(elnodes) <= 0._WP)) cycle
+                aa = 9.81_WP*elem_area(el)/3.0_WP
+                !_______________________________________________________________
+                ! add and limit pressure from ice weight in case of floating ice
+                p_ice=(rhoice*m_ice(elnodes)+rhosno*m_snow(elnodes))*inv_rhowat
+                do j=1,3
+                    p_ice(j)=min(p_ice(j),max_ice_loading)
+                end do
+                elevation_elem = elevation(elnodes)
+                elevation_dx   = sum(gradient_sca(1:3,el)*(elevation_elem+p_ice*use_pice))
+                elevation_dy   = sum(gradient_sca(4:6,el)*(elevation_elem+p_ice*use_pice))
+                rhs_a(n) = rhs_a(n)-aa*elevation_dx
+                rhs_m(n) = rhs_m(n)-aa*elevation_dy
+            end do
+        end do
+!$OMP END PARALLEL DO
 #else
-
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(elnodes, elevation_elem, p_ice) DEFAULT(PRESENT)
 #else
         !$ACC UPDATE SELF(rhs_a, rhs_m, m_ice, a_ice)
-#endif
 #endif
         do el = 1,myDim_elem2D
             !___________________________________________________________________
@@ -528,10 +557,6 @@ subroutine EVPdynamics(ice, partit, mesh)
                 rhs_m(elnodes(k)) = rhs_m(elnodes(k))-aa*elevation_dy
             end do
         enddo
-#ifndef ENABLE_OPENACC
-!$OMP END DO
-!$OMP END PARALLEL
-#else
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC END PARALLEL LOOP
 #else
@@ -541,13 +566,28 @@ subroutine EVPdynamics(ice, partit, mesh)
     else
         ! for linear free surface
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnodes, aa, elevation_elem, elevation_dx, elevation_dy)
+        ! Same gather as above, without the floating-ice loading.
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, k, el, elnodes, aa, elevation_dx, elevation_dy)
+        do n = 1, myDim_nod2D
+            do k = 1, nod_in_elem2D_num(n)
+                el = nod_in_elem2D(k,n)
+                if (ulevels(el) > 1) cycle
+                elnodes = elem2D_nodes(:,el)
+                if (any(m_ice(elnodes) <= 0._WP) .or. &
+                    any(a_ice(elnodes) <= 0._WP)) cycle
+                aa = 9.81_WP*elem_area(el)/3.0_WP
+                elevation_dx = sum(gradient_sca(1:3,el)*elevation(elnodes))
+                elevation_dy = sum(gradient_sca(4:6,el)*elevation(elnodes))
+                rhs_a(n) = rhs_a(n)-aa*elevation_dx
+                rhs_m(n) = rhs_m(n)-aa*elevation_dy
+            end do
+        end do
+!$OMP END PARALLEL DO
 #else
 #if !defined(DISABLE_OPENACC_ATOMICS)
             !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(elnodes) DEFAULT(PRESENT)
 #else
             !$ACC UPDATE SELF(rhs_a, rhs_m, m_ice, a_ice)
-#endif
 #endif
         do el = 1,myDim_elem2D
             !___________________________________________________________________
@@ -577,9 +617,6 @@ subroutine EVPdynamics(ice, partit, mesh)
                 rhs_m(elnodes(k)) = rhs_m(elnodes(k))-aa*elevation_dy
             end do
         enddo
-#ifndef ENABLE_OPENACC
-!$OMP END PARALLEL DO
-#else
 #if !defined(DISABLE_OPENACC_ATOMICS)
             !$ACC END PARALLEL LOOP
 #else
@@ -610,13 +647,44 @@ subroutine EVPdynamics(ice, partit, mesh)
     rdg_conv_elem(:)  = 0.0_WP
     rdg_shear_elem(:) = 0.0_WP
 #endif
+    !___________________________________________________________________________
+    ! Elements whose three nodes are all owned by this rank do not read halo
+    ! values of U_ice/V_ice; their stress is computed while the halo exchange
+    ! of the previous subcycle is in flight. The remaining elements wait for it.
+    allocate(elem_inner(myDim_elem2D), elem_halo(myDim_elem2D))
+    n_inner = 0
+    n_halo  = 0
+    do el=1, myDim_elem2D
+        if (all(elem2D_nodes(:,el) <= myDim_nod2D)) then
+            n_inner = n_inner+1
+            elem_inner(n_inner) = el
+        else
+            n_halo = n_halo+1
+            elem_halo(n_halo) = el
+        end if
+    end do
+
+    ! stress_tensor and stress2rhs contain orphaned worksharing loops that bind to
+    ! this region; the master thread starts and completes the halo exchange.
+#ifndef ENABLE_OPENACC
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(shortstep, n, k, ed, umod, drag, rhsu, rhsv, r_a, r_b, det)
+#endif
     do shortstep=1, ice%evp_rheol_steps
         !_______________________________________________________________________
         !TODO: temporary workaround for cray16.0.1.1 bug
 #if defined(_CRAYFTN)
 	!dir$ noinline
 #endif
-        call stress_tensor(ice, partit, mesh)
+#ifndef ENABLE_OPENACC
+        call stress_tensor(elem_inner(1:n_inner), ice, partit, mesh)
+!$OMP MASTER
+        if (shortstep > 1) call exchange_nod_end(partit)
+!$OMP END MASTER
+!$OMP BARRIER
+        call stress_tensor(elem_halo(1:n_halo), ice, partit, mesh)
+#else
+        call stress_tensor(elem_inner(1:0), ice, partit, mesh)
+#endif
 #if defined(_CRAYFTN)
 	!dir$ noinline
 #endif
@@ -624,7 +692,6 @@ subroutine EVPdynamics(ice, partit, mesh)
 
         !_______________________________________________________________________
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, ed, umod, drag, rhsu, rhsv, r_a, r_b, det)
 !$OMP DO
 #else
         !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
@@ -676,125 +743,60 @@ subroutine EVPdynamics(ice, partit, mesh)
         !_______________________________________________________________________
         ! apply sea ice velocity boundary condition
 
+        ! Each node zeroes its own velocity if one of its edges (nod_in_edge2D) is a
+        ! boundary edge or, with cavities, borders an element under the ice shelf.
 #ifndef ENABLE_OPENACC
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
 !$OMP DO
-#endif
 #else
-        ! With the binary data of np2 goes only inside the first if
         !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
-        DO  ed=1,myDim_edge2D
-            !___________________________________________________________________
-            ! apply coastal sea ice velocity boundary conditions
-            if(myList_edge2D(ed) > edge2D_in) then
-                U_ice(edges(1:2,ed))=0.0_WP
-                V_ice(edges(1:2,ed))=0.0_WP
-            endif
-
-            !___________________________________________________________________
-            ! apply sea ice velocity boundary conditions at cavity-ocean edge
-            if (use_cavity) then
-!                 if ( (ulevels(edge_tri(1,ed))>1) .or. &
-!                     ( edge_tri(2,ed)>0 .and. ulevels(edge_tri(2,ed))>1) ) then
-! #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-!                     call omp_set_lock  (partit%plock(edges(1,ed)))
-! #else
-! !$OMP ORDERED
-! #endif
-!                     U_ice(edges(1,ed))=0.0_WP
-!                     V_ice(edges(1,ed))=0.0_WP
-!
-! #if defined(_OPENMP) && !defined(__openmp_reproducible)
-!                     call omp_unset_lock(partit%plock(edges(1,ed)))
-!                     call omp_set_lock  (partit%plock(edges(2,ed)))
-! #endif
-!                     U_ice(edges(2,ed))=0.0_WP
-!                     V_ice(edges(2,ed))=0.0_WP
-!
-! #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-!                     call omp_unset_lock(partit%plock(edges(2,ed)))
-! #else
-! !$OMP END ORDERED
-! #endif
-!                 end if
-                if (ulevels(edge_tri(1,ed))>1) then
-#ifndef ENABLE_OPENACC
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                    call omp_set_lock  (partit%plock(edges(1,ed)))
-#else
-!$OMP ORDERED
-#endif
-#endif
-                    U_ice(edges(1,ed))=0.0_WP
-                    V_ice(edges(1,ed))=0.0_WP
-
-#ifndef ENABLE_OPENACC
-#if defined(_OPENMP) && !defined(__openmp_reproducible)
-                    call omp_unset_lock(partit%plock(edges(1,ed)))
-                    call omp_set_lock  (partit%plock(edges(2,ed)))
-#endif
-#endif
-                    U_ice(edges(2,ed))=0.0_WP
-                    V_ice(edges(2,ed))=0.0_WP
-
-#ifndef ENABLE_OPENACC
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                    call omp_unset_lock(partit%plock(edges(2,ed)))
-#else
-!$OMP END ORDERED
-#endif
-#endif 
-                elseif ( edge_tri(2,ed)>0) then
-                    if (ulevels(edge_tri(2,ed))>1) then
-#ifndef ENABLE_OPENACC
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                    call omp_set_lock  (partit%plock(edges(1,ed)))
-#else
-!$OMP ORDERED
-#endif
-#endif
-                    U_ice(edges(1,ed))=0.0_WP
-                    V_ice(edges(1,ed))=0.0_WP
-
-#ifndef ENABLE_OPENACC
-#if defined(_OPENMP) && !defined(__openmp_reproducible)
-                    call omp_unset_lock(partit%plock(edges(1,ed)))
-                    call omp_set_lock  (partit%plock(edges(2,ed)))
-#endif
-#endif
-                    U_ice(edges(2,ed))=0.0_WP
-                    V_ice(edges(2,ed))=0.0_WP
-
-#ifndef ENABLE_OPENACC
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                    call omp_unset_lock(partit%plock(edges(2,ed)))
-#else
-!$OMP END ORDERED
-#endif
-#endif
-
+        DO n=1, myDim_nod2D+eDim_nod2D
+            DO k=1, mesh%nod_in_edge2D_num(n)
+                ed=mesh%nod_in_edge2D(k,n)
+                !_______________________________________________________________
+                ! apply coastal sea ice velocity boundary conditions
+                if(myList_edge2D(ed) > edge2D_in) then
+                    U_ice(n)=0.0_WP
+                    V_ice(n)=0.0_WP
+                endif
+                !_______________________________________________________________
+                ! apply sea ice velocity boundary conditions at cavity-ocean edge
+                if (use_cavity) then
+                    if (ulevels(edge_tri(1,ed))>1) then
+                        U_ice(n)=0.0_WP
+                        V_ice(n)=0.0_WP
+                    elseif ( edge_tri(2,ed)>0) then
+                        if (ulevels(edge_tri(2,ed))>1) then
+                            U_ice(n)=0.0_WP
+                            V_ice(n)=0.0_WP
+                        end if
                     end if
                 end if
-            end if
-        end do
+            END DO
+        END DO
 #ifndef ENABLE_OPENACC
 !$OMP END DO
-!$OMP END PARALLEL
 #else
         !$ACC END PARALLEL LOOP
 #endif
 
 !write(*,*) partit%mype, shortstep, 'CP4'
         !_______________________________________________________________________
+#ifndef ENABLE_OPENACC
+!$OMP MASTER
+        call exchange_nod_begin(U_ice,V_ice,partit, luse_g2g = .true.)
+!$OMP END MASTER
+#else
         call exchange_nod(U_ice,V_ice,partit, luse_g2g = .true.)
-
-!ifndef ENABLE_OPENACC
-!$OMP BARRIER
-!endif
+#endif
     END DO !--> do shortstep=1, ice%evp_rheol_steps
+#ifndef ENABLE_OPENACC
+!$OMP MASTER
+    call exchange_nod_end(partit)
+!$OMP END MASTER
+!$OMP END PARALLEL
+#endif
+    deallocate(elem_inner, elem_halo)
 
 end subroutine EVPdynamics
 

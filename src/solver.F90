@@ -147,16 +147,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   ! ============== 
   ! Define working tolerance: 
   ! ==============
-#if !defined(__openmp_reproducible)
-  s_old=0.0_WP_full
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) REDUCTION(+:s_old)
-  DO row=1, myDim_nod2D
-     s_old=s_old+real(rhs(row), WP_full)*real(rhs(row), WP_full)
-  END DO
-!$OMP END PARALLEL DO
-#else
  s_old = sum(real(rhs(1:myDim_nod2D), WP_full) * real(rhs(1:myDim_nod2D), WP_full))
-#endif
 
   call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
   rtol=solverinfo%soltol*sqrt(s_old/real(nod2D,WP_full))
@@ -187,16 +178,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   ! Scalar product of r*z
   ! ===============
 
-#if !defined(__openmp_reproducible)
-  s_old=0.0_WP_full
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) REDUCTION(+:s_old)
-  DO row=1, myDim_nod2D
-     s_old=s_old+real(rr(row), WP_full)*real(zz(row), WP_full)
-  END DO
-!$OMP END PARALLEL DO
-#else
   s_old = sum(real(rr(1:myDim_nod2D), WP_full) * real(zz(1:myDim_nod2D), WP_full))
-#endif
 
   call MPI_Allreduce(MPI_IN_PLACE, s_old, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
   
@@ -219,16 +201,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
      ! Scalar products for alpha
      ! ============
  
-#if !defined(__openmp_reproducible)
-  s_aux=0.0_WP_full
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) REDUCTION(+:s_aux)
-  DO row=1, myDim_nod2D
-     s_aux=s_aux+real(pp(row), WP_full)*real(App(row), WP_full)
-  END DO
-!$OMP END PARALLEL DO
-#else
  s_aux = sum(real(pp(1:myDim_nod2D), WP_full) * real(App(1:myDim_nod2D), WP_full))
-#endif
 
   call MPI_Allreduce(MPI_IN_PLACE, s_aux, 1, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 
@@ -274,18 +247,8 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
      ! ===========
      ! Scalar products for beta
      ! ===========
-#if !defined(__openmp_reproducible)
-sprod(1:2)=0.0_WP_full
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row) REDUCTION(+:sprod)
-  DO row=1, myDim_nod2D
-     sprod(1)=sprod(1)+real(rr(row), WP_full)*real(zz(row), WP_full)
-     sprod(2)=sprod(2)+real(rr(row), WP_full)*real(rr(row), WP_full)
-  END DO
-!$OMP END PARALLEL DO
-#else
     sprod(1) = sum(real(rr(1:myDim_nod2D), WP_full) * real(zz(1:myDim_nod2D), WP_full))
     sprod(2) = sum(real(rr(1:myDim_nod2D), WP_full) * real(rr(1:myDim_nod2D), WP_full))
-#endif
   
   call MPI_Allreduce(MPI_IN_PLACE, sprod, 2, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 
