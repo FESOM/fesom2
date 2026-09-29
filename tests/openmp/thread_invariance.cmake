@@ -102,9 +102,11 @@ endfunction()
 # and 4 threads per rank and compared bit for bit:
 #   mevp  modified EVP sea-ice rheology (whichEVP=1)
 #   aevp  adaptive EVP sea-ice rheology (whichEVP=2)
-set(_omp_variants mevp aevp)
+#   se    split-explicit barotropic subcycling (use_ssh_se_subcycl)
+set(_omp_variants mevp aevp se)
 set(_omp_variant_mevp namelist.ice whichEVP 1)
 set(_omp_variant_aevp namelist.ice whichEVP 2)
+set(_omp_variant_se   namelist.dyn use_ssh_se_subcycl .true.)
 
 foreach(_v IN LISTS _omp_variants)
     foreach(_threads 1 4)
