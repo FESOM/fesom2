@@ -192,7 +192,7 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
             !NR The "if" is cheaper than the avoided computiations.
             if (ednodes(1) <= myDim_nod2d) then
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                call omp_set_lock(partit%plock(ednodes(1)))
+                if (partit%plock_on) call omp_set_lock(partit%plock(ednodes(1)))
 #endif          
                 ! cavity domain where only edelem(1) exist
                 do nz=ul1 , ul12-1
@@ -220,7 +220,7 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
                     UVnode_rhs(2, nz, ednodes(1)) = UVnode_rhs(2, nz, ednodes(1)) + un2(nz)*UV(2, nz, edelem(2))
                 end do
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                call omp_unset_lock(partit%plock(ednodes(1)))
+                if (partit%plock_on) call omp_unset_lock(partit%plock(ednodes(1)))
 #endif
             end if
             !___________________________________________________________________
@@ -229,7 +229,7 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
             !NR The "if" is cheaper than the avoided computiations.
             if (ednodes(2) <= myDim_nod2d) then
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                call omp_set_lock(partit%plock(ednodes(2)))
+                if (partit%plock_on) call omp_set_lock(partit%plock(ednodes(2)))
 #endif 
                 ! cavity domain where only edelem(1) exist
                 do nz=ul1 , ul12-1
@@ -257,7 +257,7 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
                     UVnode_rhs(2, nz, ednodes(2)) = UVnode_rhs(2, nz, ednodes(2)) - un2(nz)*UV(2, nz, edelem(2))
                 end do
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                call omp_unset_lock(partit%plock(ednodes(2)))
+                if (partit%plock_on) call omp_unset_lock(partit%plock(ednodes(2)))
 #endif
             end if 
         
@@ -270,7 +270,7 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
             !NR The "if" is cheaper than the avoided computiations.
             if (ednodes(1) <= myDim_nod2d) then
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                call omp_set_lock(partit%plock(ednodes(1)))
+                if (partit%plock_on) call omp_set_lock(partit%plock(ednodes(1)))
 #endif          
                 ! bulk domain where only edelem(1) exist
                 do nz=ul1 , nl1
@@ -278,7 +278,7 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
                     UVnode_rhs(2, nz, ednodes(1)) = UVnode_rhs(2, nz, ednodes(1)) + un1(nz)*UV(2, nz, edelem(1))
                 end do
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                call omp_unset_lock(partit%plock(ednodes(1)))
+                if (partit%plock_on) call omp_unset_lock(partit%plock(ednodes(1)))
 #endif
             end if
             !___________________________________________________________________
@@ -287,7 +287,7 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
             !NR The "if" is cheaper than the avoided computiations.
             if (ednodes(2) <= myDim_nod2d) then
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                call omp_set_lock(partit%plock(ednodes(2)))
+                if (partit%plock_on) call omp_set_lock(partit%plock(ednodes(2)))
 #endif 
                 ! bulk domain where only edelem(1) exist
                 do nz=ul1 , nl1
@@ -295,7 +295,7 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
                     UVnode_rhs(2, nz, ednodes(2)) = UVnode_rhs(2, nz, ednodes(2)) - un1(nz)*UV(2, nz, edelem(1))
                 end do
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                call omp_unset_lock(partit%plock(ednodes(2)))
+                if (partit%plock_on) call omp_unset_lock(partit%plock(ednodes(2)))
 #endif
             end if 
         end if ! --> if(edelem(2)>0) then
@@ -819,20 +819,20 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             
             !___________________________________________________________________
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
-            call omp_set_lock(partit%plock(edelem(1)))
+            if (partit%plock_on) call omp_set_lock(partit%plock(edelem(1)))
 #else
 !$OMP ORDERED
 #endif
             UVBT_rhs(1, edelem(1))=UVBT_rhs(1, edelem(1))-update_ubt/elem_area(edelem(1))*hh
             UVBT_rhs(2, edelem(1))=UVBT_rhs(2, edelem(1))-update_vbt/elem_area(edelem(1))*hh
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_unset_lock(partit%plock(edelem(1)))
-            call omp_set_lock  (partit%plock(edelem(2)))
+            if (partit%plock_on) call omp_unset_lock(partit%plock(edelem(1)))
+            if (partit%plock_on) call omp_set_lock  (partit%plock(edelem(2)))
 #endif
             UVBT_rhs(1, edelem(2))=UVBT_rhs(1, edelem(2))+update_ubt/elem_area(edelem(2))*hh
             UVBT_rhs(2, edelem(2))=UVBT_rhs(2, edelem(2))+update_vbt/elem_area(edelem(2))*hh
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
-            call omp_unset_lock(partit%plock(edelem(2)))
+            if (partit%plock_on) call omp_unset_lock(partit%plock(edelem(2)))
 #else
 !$OMP END ORDERED
 #endif
@@ -928,20 +928,20 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
                 
                 !_______________________________________________________________
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
-                call omp_set_lock(partit%plock(edelem(1)))
+                if (partit%plock_on) call omp_set_lock(partit%plock(edelem(1)))
 #else
 !$OMP ORDERED
 #endif
                 UVBT_harmvisc(1, edelem(1))=UVBT_harmvisc(1, edelem(1))-update_ubt/elem_area(edelem(1))*hh
                 UVBT_harmvisc(2, edelem(1))=UVBT_harmvisc(2, edelem(1))-update_vbt/elem_area(edelem(1))*hh
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                call omp_unset_lock(partit%plock(edelem(1)))
-                call omp_set_lock  (partit%plock(edelem(2)))
+                if (partit%plock_on) call omp_unset_lock(partit%plock(edelem(1)))
+                if (partit%plock_on) call omp_set_lock  (partit%plock(edelem(2)))
 #endif
                 UVBT_harmvisc(1, edelem(2))=UVBT_harmvisc(1, edelem(2))+update_ubt/elem_area(edelem(2))*hh
                 UVBT_harmvisc(2, edelem(2))=UVBT_harmvisc(2, edelem(2))+update_vbt/elem_area(edelem(2))*hh
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
-                call omp_unset_lock(partit%plock(edelem(2)))
+                if (partit%plock_on) call omp_unset_lock(partit%plock(edelem(2)))
 #else
 !$OMP END ORDERED
 #endif
@@ -1111,18 +1111,18 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             ! equation (6) in T. Banerjee et al.,Split-Explicite external
             ! mode solver in FESOM2, 
 #if defined(_OPENMP) && !defined(__openmp_reproducible)
-            call omp_set_lock(partit%plock(ednodes(1)))
+            if (partit%plock_on) call omp_set_lock(partit%plock(ednodes(1)))
 #else
 !$OMP ORDERED
 #endif            
             eta_n(ednodes(1))=eta_n(ednodes(1)) + (c1+c2)*dtBT/areasvol(1,ednodes(1))
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_unset_lock(partit%plock(ednodes(1)))
-            call omp_set_lock  (partit%plock(ednodes(2)))
+            if (partit%plock_on) call omp_unset_lock(partit%plock(ednodes(1)))
+            if (partit%plock_on) call omp_set_lock  (partit%plock(ednodes(2)))
 #endif            
             eta_n(ednodes(2))=eta_n(ednodes(2)) - (c1+c2)*dtBT/areasvol(1,ednodes(2))
 #if defined(_OPENMP) && !defined(__openmp_reproducible) 
-            call omp_unset_lock(partit%plock(ednodes(2)))
+            if (partit%plock_on) call omp_unset_lock(partit%plock(ednodes(2)))
 #else
 !$OMP END ORDERED
 #endif            

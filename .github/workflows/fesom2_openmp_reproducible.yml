@@ -32,7 +32,7 @@ jobs:
       run: |
         bash -l configure.sh ubuntu -DENABLE_OPENMP=ON -DOPENMP_REPRODUCIBLE=ON -DBUILD_TESTING=ON
 
-    - name: Run OpenMP ORDERED source guards
+    - name: Run OpenMP tests (ORDERED source guards, 1-day thread invariance)
       run: |
         cd build
         ctest -L openmp --output-on-failure

@@ -49,7 +49,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
     integer,        pointer, dimension (:)     :: nboundary_lay
     real(kind=WP),  pointer, dimension (:,:,:) :: edge_up_dn_grad
 
-    integer       :: el(2), enodes(2), nz, n, e
+    integer       :: el(2), enodes(2), nz, n, e, k, edge
     integer       :: nl12, nu12, nl1, nl2, nu1, nu2
     real(kind=WP) :: cLO, cHO, deltaX1, deltaY1, deltaX2, deltaY2
     real(kind=WP) :: qc, qu, qd
@@ -107,18 +107,37 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
         !$ACC END PARALLEL LOOP
 #endif
 
+        ! Low-order tendency: each node gathers the horizontal fluxes of its incident edges
+        ! (mesh%nod_in_edge2D, sign +1 for the edge's first node, -1 for its second) in
+        ! ascending edge order, so the result does not depend on the number of threads.
 #ifndef ENABLE_OPENACC
-#if defined(__openmp_reproducible)
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(e, enodes, el, nl1, nu1, nl2, nu2, nu12, nl12, nz) ORDERED
-#else
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(e, enodes, el, nl1, nu1, nl2, nu2, nu12, nl12, nz)
-#endif
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, k, edge, el, nl1, nu1, nl2, nu2, nu12, nl12, nz)
+        do n=1, myDim_nod2D+eDim_nod2D
+            do k=1, mesh%nod_in_edge2D_num(n)
+                edge=mesh%nod_in_edge2D(k,n)
+                el=edge_tri(:,edge)
+                nl1=nlevels(el(1))-1
+                nu1=ulevels(el(1))
+                nl2=0
+                nu2=0
+                if(el(2)>0) then
+                    nl2=nlevels(el(2))-1
+                    nu2=ulevels(el(2))
+                end if
+                nl12 = max(nl1,nl2)
+                nu12 = nu1
+                if (nu2>0) nu12 = min(nu1,nu2)
+                do nz=nu12, nl12
+                    fct_LO(nz, n)=fct_LO(nz, n)+mesh%nod_in_edge2D_sgn(k,n)*adv_flux_hor(nz, edge)
+                end do
+            end do
+        end do
+!$OMP END PARALLEL DO
 #else
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #else
         !$ACC UPDATE SELF(fct_lo, adv_flux_hor)
-#endif
 #endif
         do e=1, myDim_edge2D
             enodes=edges(:,e)
@@ -139,7 +158,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
             !!PS do  nz=1, max(nl1, nl2)
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_set_lock(partit%plock(enodes(1)))
+            if (partit%plock_on) call omp_set_lock(partit%plock(enodes(1)))
 #else
 !$OMP ORDERED
 #endif
@@ -157,8 +176,8 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
             end do
-            call omp_unset_lock(partit%plock(enodes(1)))
-            call omp_set_lock  (partit%plock(enodes(2)))
+            if (partit%plock_on) call omp_unset_lock(partit%plock(enodes(1)))
+            if (partit%plock_on) call omp_set_lock  (partit%plock(enodes(2)))
             do nz=nu12, nl12
 #endif
 #else
@@ -170,7 +189,7 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
             end do
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_unset_lock(partit%plock(enodes(2)))
+            if (partit%plock_on) call omp_unset_lock(partit%plock(enodes(2)))
 #else
 !$OMP END ORDERED
 #endif
@@ -180,9 +199,6 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 #endif
 #endif
         end do
-#ifndef ENABLE_OPENACC
-!$OMP END PARALLEL DO
-#else
 #if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC END PARALLEL LOOP
 #else
@@ -551,19 +567,38 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 #else
     !$ACC END PARALLEL LOOP
 #endif
-    ! Horizontal
+    ! Horizontal: each node gathers the fluxes of its incident edges (mesh%nod_in_edge2D,
+    ! sign +1 for the edge's first node, -1 for its second). No two threads write the same
+    ! node, and the summation order per node is the ascending edge order at any thread count.
 #ifndef ENABLE_OPENACC
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
 !$OMP DO
-#endif
+    do n=1, myDim_nod2D+eDim_nod2D
+        do k=1, mesh%nod_in_edge2D_num(n)
+            edge=mesh%nod_in_edge2D(k,n)
+            el=edge_tri(:,edge)
+            nl1=nlevels(el(1))-1
+            nu1=ulevels(el(1))
+            nl2=0
+            nu2=0
+            if(el(2)>0) then
+                nl2=nlevels(el(2))-1
+                nu2=ulevels(el(2))
+            end if
+            nl12 = max(nl1,nl2)
+            nu12 = nu1
+            if (nu2>0) nu12 = min(nu1,nu2)
+            do nz=nu12, nl12
+                dttf_h(nz,n)=dttf_h(nz,n)+mesh%nod_in_edge2D_sgn(k,n)*flux_h(nz,edge)*dt/areasvol(nz,n)
+            end do
+        end do
+    end do
+!$OMP END DO
+!$OMP END PARALLEL
 #else
 #if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #else
     !$ACC UPDATE SELF(dttf_h, flux_h)
-#endif
 #endif
     do edge=1, myDim_edge2D
         enodes(1:2)=edges(:,edge)
@@ -584,7 +619,7 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_set_lock(partit%plock(enodes(1)))
+        if (partit%plock_on) call omp_set_lock(partit%plock(enodes(1)))
 #else
 !$OMP ORDERED
 #endif
@@ -601,8 +636,8 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
         end do
-        call omp_unset_lock(partit%plock(enodes(1)))
-        call omp_set_lock  (partit%plock(enodes(2)))
+        if (partit%plock_on) call omp_unset_lock(partit%plock(enodes(1)))
+        if (partit%plock_on) call omp_set_lock  (partit%plock(enodes(2)))
         do nz=nu12, nl12
 #endif
 #else
@@ -614,7 +649,7 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
         end do
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(enodes(2)))
+        if (partit%plock_on) call omp_unset_lock(partit%plock(enodes(2)))
 #else
 !$OMP END ORDERED
 #endif
@@ -625,10 +660,6 @@ subroutine oce_tra_adv_flux2dtracer(dt, dttf_h, dttf_v, flux_h, flux_v, partit, 
 #endif
     end do
 
-#ifndef ENABLE_OPENACC
-!$OMP END DO
-!$OMP END PARALLEL
-#else
 #if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC END PARALLEL LOOP
 #else

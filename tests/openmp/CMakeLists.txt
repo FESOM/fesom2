@@ -1,8 +1,13 @@
 #===============================================================================
-# tests/openmp/CMakeLists.txt - OpenMP source-level guards
+# tests/openmp/CMakeLists.txt - OpenMP tests
 #===============================================================================
 #
-# These tests do NOT need fesom.x to be built - they only need a configured
+# Two groups, both labelled 'openmp':
+#   * runtime: thread-count invariance of an OpenMP build on the pi mesh
+#     (thread_invariance.cmake; needs fesom.x and ENABLE_OPENMP=ON)
+#   * static: the ORDERED source guards below.
+#
+# The static guards do NOT need fesom.x to be built - they only need a configured
 # tree and a Fortran compiler that can preprocess. That is deliberate: the
 # defect they guard (FESOM/fesom2#444, #528) is a *compile* failure of the
 # -DOPENMP_REPRODUCIBLE=ON build, so the guard has to be usable before and
@@ -12,6 +17,8 @@
 #     ctest --test-dir build -L openmp
 #
 #===============================================================================
+
+include(${CMAKE_CURRENT_SOURCE_DIR}/thread_invariance.cmake)
 
 find_package(Python3 COMPONENTS Interpreter QUIET)
 

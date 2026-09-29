@@ -395,135 +395,81 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! 2nd. compute horizontal advection component: u*du/dx, u*dv/dx & v*du/dy, v*dv/dy
     ! loop over triangle edges
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
+    ! Each owned node gathers the normal-velocity fluxes of its incident edges
+    ! (mesh%nod_in_edge2D, ascending edge order), with the sign of the edge
+    ! orientation. No thread writes a node it does not own, and the sum is
+    ! independent of the number of threads.
 !$OMP DO
-#endif
-    do ed=1, myDim_edge2D
-        nod = edges(:,ed)   
-        el1 = edge_tri(1,ed)   
-        el2 = edge_tri(2,ed)
-        nl1 = nlevels(el1)-1
-        ul1 = ulevels(el1)
-        
-        !_______________________________________________________________________
-        ! compute horizontal normal velocity with respect to the edge from triangle 
-        ! centroid towards triangel edge mid-pointe for element el1
-        !                     .o.    
-        !                   ./   \.                
-        !                 ./  el1  \.   
-        !               ./     x     \. 
-        !             ./       |-------\.-----------------edge_cross_dxdy(1:2,ed) --> (dx,dy)
-        !            /         |->n_vec  \
-        !    nod(1) o----------O----------o nod(2)   
-        !            \.        |->n_vec ./
-        !              \.      |------./------------------edge_cross_dxdy(3:4,ed) --> (dx,dy)
-        !                \.    x    ./
-        !                  \. el2 ./
-        !                    \. ./  
-        !                      °
-        un1(ul1:nl1) =   UV(2,ul1:nl1,el1)*edge_cross_dxdy(1,ed)   &
-                       - UV(1,ul1:nl1,el1)*edge_cross_dxdy(2,ed)  
-                       
-        !_______________________________________________________________________
-        ! compute horizontal normal velocity with respect to the edge from triangle 
-        ! centroid towards triangel edge mid-pointe for element el2 when it is valid
-        ! --> if its a boundary triangle el2 will be not valid
-        !_______________________________________________________________________
-        ! ensure openmp numerical reproducability
-        ! NOTE: an ordered region is a structured block, so it has to enclose the
-        ! whole if(el2>0) construct. Opening it inside the .true. branch and
-        ! closing it after the matching "endif" straddles the "else" and does not
-        ! compile.
-#if defined(__openmp_reproducible)
-!$OMP ORDERED
-#endif
-        if (el2>0) then ! --> el2 is valid element
-            nl2 = nlevels(el2)-1
-            ul2 = ulevels(el2)
-            
-            un2(ul2:nl2) = - UV(2,ul2:nl2,el2)*edge_cross_dxdy(3,ed) &
-                           + UV(1,ul2:nl2,el2)*edge_cross_dxdy(4,ed)
-            
-            ! fill with zeros to combine the loops
-            ! Usually, no or only a very few levels have to be filled. In this case, 
-            ! computing "zeros" is cheaper than the loop overhead.
-            un1(nl1+1:max(nl1,nl2)) = 0._WP
-            un2(nl2+1:max(nl1,nl2)) = 0._WP
-            un1(1:ul1-1)            = 0._WP
-            un2(1:ul2-1)            = 0._WP
+    do n=1, myDim_nod2D
+        do k=1, mesh%nod_in_edge2D_num(n)
+            ed  = mesh%nod_in_edge2D(k,n)
+            el1 = edge_tri(1,ed)
+            el2 = edge_tri(2,ed)
+            nl1 = nlevels(el1)-1
+            ul1 = ulevels(el1)
 
-            
-            ! first edge node
-            ! Do not calculate on Halo nodes, as the result will not be used. 
-            ! The "if" is cheaper than the avoided computiations.
-            if (nod(1) <= myDim_nod2d) then
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_set_lock(partit%plock(nod(1)))
-#endif
-                do nz=min(ul1,ul2), max(nl1,nl2)
-                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
-                    UVnode_rhs(1,nz,nod(1)) = UVnode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1) + un2(nz)*UV(1,nz,el2) 
-                    UVnode_rhs(2,nz,nod(1)) = UVnode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1) + un2(nz)*UV(2,nz,el2)
-                end do
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_unset_lock(partit%plock(nod(1)))
-#endif
-            endif
-            
-            ! second edge node
-            if (nod(2) <= myDim_nod2d) then
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_set_lock(partit%plock(nod(2)))
-#endif
-                do nz=min(ul1,ul2), max(nl1,nl2)
-                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
-                    UVnode_rhs(1,nz,nod(2)) = UVnode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1) - un2(nz)*UV(1,nz,el2)
-                    UVnode_rhs(2,nz,nod(2)) = UVnode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1) - un2(nz)*UV(2,nz,el2)
-                end do
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_unset_lock(partit%plock(nod(2)))
-#endif
-            endif
-            
-        else  ! el2 is not a valid element --> ed is a boundary edge, there is only the contribution from el1
-            ! first edge node
-            if (nod(1) <= myDim_nod2d) then
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_set_lock(partit%plock(nod(1)))
-#endif
-                do nz=ul1, nl1
-                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
-                    UVnode_rhs(1,nz,nod(1)) = UVnode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1)
-                    UVnode_rhs(2,nz,nod(1)) = UVnode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1)
-                end do ! --> do nz=ul1, nl1
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_unset_lock(partit%plock(nod(1)))
-#endif
-            endif 
-            
-            ! second edge node
-            if  (nod(2) <= myDim_nod2d) then
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_set_lock(partit%plock(nod(2)))
-#endif
-                do nz=ul1, nl1
-                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
-                    UVnode_rhs(1,nz,nod(2)) = UVnode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1)
-                    UVnode_rhs(2,nz,nod(2)) = UVnode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1)
-                end do ! --> do nz=ul1, nl1
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_unset_lock(partit%plock(nod(2)))
-#endif
-            endif
-        endif ! --> if (el2>0) then
+            !___________________________________________________________________
+            ! compute horizontal normal velocity with respect to the edge from triangle
+            ! centroid towards triangel edge mid-pointe for element el1
+            !                     .o.
+            !                   ./   \.
+            !                 ./  el1  \.
+            !               ./     x     \.
+            !             ./       |-------\.-----------------edge_cross_dxdy(1:2,ed) --> (dx,dy)
+            !            /         |->n_vec  \
+            !    nod(1) o----------O----------o nod(2)
+            !            \.        |->n_vec ./
+            !              \.      |------./------------------edge_cross_dxdy(3:4,ed) --> (dx,dy)
+            !                \.    x    ./
+            !                  \. el2 ./
+            !                    \. ./
+            !                      °
+            un1(ul1:nl1) =   UV(2,ul1:nl1,el1)*edge_cross_dxdy(1,ed)   &
+                           - UV(1,ul1:nl1,el1)*edge_cross_dxdy(2,ed)
 
-#if defined(__openmp_reproducible)
-!$OMP END ORDERED
-#endif
+            if (el2>0) then ! --> el2 is valid element
+                nl2 = nlevels(el2)-1
+                ul2 = ulevels(el2)
 
-    end do ! --> do ed=1, myDim_edge2D
+                un2(ul2:nl2) = - UV(2,ul2:nl2,el2)*edge_cross_dxdy(3,ed) &
+                               + UV(1,ul2:nl2,el2)*edge_cross_dxdy(4,ed)
+
+                ! fill with zeros to combine the loops
+                ! Usually, no or only a very few levels have to be filled. In this case,
+                ! computing "zeros" is cheaper than the loop overhead.
+                un1(nl1+1:max(nl1,nl2)) = 0._WP
+                un2(nl2+1:max(nl1,nl2)) = 0._WP
+                un1(1:ul1-1)            = 0._WP
+                un2(1:ul2-1)            = 0._WP
+
+                if (mesh%nod_in_edge2D_sgn(k,n) > 0) then ! n is the first edge node
+                    do nz=min(ul1,ul2), max(nl1,nl2)
+                        ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
+                        UVnode_rhs(1,nz,n) = UVnode_rhs(1,nz,n) + un1(nz)*UV(1,nz,el1) + un2(nz)*UV(1,nz,el2)
+                        UVnode_rhs(2,nz,n) = UVnode_rhs(2,nz,n) + un1(nz)*UV(2,nz,el1) + un2(nz)*UV(2,nz,el2)
+                    end do
+                else                                       ! n is the second edge node
+                    do nz=min(ul1,ul2), max(nl1,nl2)
+                        UVnode_rhs(1,nz,n) = UVnode_rhs(1,nz,n) - un1(nz)*UV(1,nz,el1) - un2(nz)*UV(1,nz,el2)
+                        UVnode_rhs(2,nz,n) = UVnode_rhs(2,nz,n) - un1(nz)*UV(2,nz,el1) - un2(nz)*UV(2,nz,el2)
+                    end do
+                end if
+
+            else  ! el2 is not a valid element --> ed is a boundary edge, there is only the contribution from el1
+                if (mesh%nod_in_edge2D_sgn(k,n) > 0) then
+                    do nz=ul1, nl1
+                        UVnode_rhs(1,nz,n) = UVnode_rhs(1,nz,n) + un1(nz)*UV(1,nz,el1)
+                        UVnode_rhs(2,nz,n) = UVnode_rhs(2,nz,n) + un1(nz)*UV(2,nz,el1)
+                    end do ! --> do nz=ul1, nl1
+                else
+                    do nz=ul1, nl1
+                        UVnode_rhs(1,nz,n) = UVnode_rhs(1,nz,n) - un1(nz)*UV(1,nz,el1)
+                        UVnode_rhs(2,nz,n) = UVnode_rhs(2,nz,n) - un1(nz)*UV(2,nz,el1)
+                    end do ! --> do nz=ul1, nl1
+                end if
+            endif ! --> if (el2>0) then
+        end do ! --> do k=1, mesh%nod_in_edge2D_num(n)
+    end do ! --> do n=1, myDim_nod2D
 !$OMP END DO
 
     !___________________________________________________________________________
