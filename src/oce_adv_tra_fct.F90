@@ -319,16 +319,8 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
        nl12 = max(nl1,nl2)
        nu12 = nu1
        if (nu2>0) nu12 = min(nu1,nu2)
-#ifndef ENABLE_OPENACC
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       if (partit%plock_on) call omp_set_lock(partit%plock(enodes(1)))
-#else
-!$OMP ORDERED
-#endif
-#else
 #if !defined(DISABLE_OPENACC_ATOMICS)
        !$ACC LOOP VECTOR
-#endif
 #endif
        do nz=nu12, nl12
 #if !defined(DISABLE_OPENACC_ATOMICS)
@@ -340,17 +332,8 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 #endif
           fct_minus(nz,enodes(1))=fct_minus(nz,enodes(1)) + min(0.0_WP, adf_h(nz,edge))
 
-#ifndef ENABLE_OPENACC
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       end do
-       if (partit%plock_on) call omp_unset_lock(partit%plock(enodes(1)))
-       if (partit%plock_on) call omp_set_lock  (partit%plock(enodes(2)))
-       do nz=nu12, nl12
-#endif
-#else
 #if !defined(DISABLE_OPENACC_ATOMICS)
           !$ACC ATOMIC UPDATE
-#endif
 #endif
           fct_plus (nz,enodes(2))=fct_plus (nz,enodes(2)) + max(0.0_WP,-adf_h(nz,edge))
 #if !defined(DISABLE_OPENACC_ATOMICS)
@@ -362,13 +345,6 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
        !$ACC END LOOP
 #endif
 
-#ifndef ENABLE_OPENACC
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       if (partit%plock_on) call omp_unset_lock(partit%plock(enodes(2)))
-#else
-!$OMP END ORDERED
-#endif
-#endif
     end do
 #endif
 #ifndef ENABLE_OPENACC
