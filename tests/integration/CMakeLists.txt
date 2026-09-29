@@ -153,6 +153,8 @@ if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED AND NOT USE_YAC)
         CYCLIC_LENGTH "60.0"
         NP 8
         TIMEOUT ${TEST_TIMEOUT}
+    )
+
     # Ocean-only run: the pi mesh with the sea-ice model switched off, otherwise
     # identical to integration_pi_mpi2 (CORE2 forcing, WOA18 initial state, 1 day).
     # This is the only ice-free configuration in the suite that is not a toy_ocean
