@@ -135,6 +135,12 @@ module io_MEANDATA
   integer, save                  :: nlev_upper=1
   character(len=1), save         :: filesplit_freq='y'
   integer, save                  :: compression_level=0
+  ! MultIO periodic flush/synchronize (see iom_synchronize in ifs_interface/iom.F90).
+  ! io_flush_sync enables a blocking MultIO synchronize every io_sync_freq model
+  ! time steps so that output is processed and persisted to disk mid-run. Both
+  ! default to off; set via the RAPS option --fesom-io-flush-freq (namelist.io).
+  logical, save                  :: io_flush_sync =.FALSE.
+  integer, save                  :: io_sync_freq  =0
 
   ! --- collective output path ------------------------------------------------
   ! Selected by &io_parallel/parallel_write in namelist.config (g_config). The
@@ -561,7 +567,7 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     type(t_dyn)   , intent(in)   , target :: dynamics
     type(t_ice)   , intent(in)   , target :: ice
     namelist /nml_general / io_listsize, vec_autorotate, lnextGEMS, nlev_upper, filesplit_freq, compression_level, &
-                            ltracks
+                            ltracks, io_flush_sync, io_sync_freq
     namelist /nml_list    / io_list
     namelist /nml_tracks  / track_files, track_vars, track_names,        &
                             track_output_freq
@@ -3834,6 +3840,11 @@ ctime=timenew+(daynew-1.)*86400
 #if defined(__MULTIO)
     if (output_done) then
         call iom_flush('N grid', istep)
+    end if
+    ! Periodic blocking MultIO synchronize (checkpoint): persist output to disk
+    ! every io_sync_freq model time steps when io_flush_sync is enabled.
+    if (io_flush_sync .and. io_sync_freq > 0) then
+        if (mod(istep, io_sync_freq) == 0) call iom_synchronize(istep)
     end if
 #endif
 

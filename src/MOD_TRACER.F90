@@ -54,6 +54,7 @@ real(kind=WP), allocatable                    :: tra_recom_sms(:,:,:)
 
 ! The fct part
 real(kind=WP),allocatable,dimension(:,:)      :: fct_LO          ! Low-order solution
+real(kind=WP),allocatable,dimension(:,:)      :: edge_flux       ! per-edge horizontal flux, staged so that nodes can gather it (diffusion)
 real(kind=WP),allocatable,dimension(:,:)      :: adv_flux_hor    ! Antidif. horiz. contrib. from edges / backup for iterafive fct scheme
 real(kind=WP),allocatable,dimension(:,:)      :: adv_flux_ver    ! Antidif. vert. fluxes from nodes    / backup for iterafive fct scheme
 
@@ -173,6 +174,7 @@ subroutine WRITE_T_TRACER_WORK(twork, unit)
     call write_bin_array(twork%dvd_trflx_ver,    unit, iostat, iomsg)
     call write_bin_array(twork%fct_LO,           unit, iostat, iomsg)
     call write_bin_array(twork%adv_flux_hor,     unit, iostat, iomsg)
+    call write_bin_array(twork%edge_flux,        unit, iostat, iomsg)
     call write_bin_array(twork%adv_flux_ver,     unit, iostat, iomsg)
     call write_bin_array(twork%fct_ttf_max,      unit, iostat, iomsg)
     call write_bin_array(twork%fct_ttf_min,      unit, iostat, iomsg)
@@ -198,6 +200,7 @@ subroutine READ_T_TRACER_WORK(twork, unit)
     call read_bin_array(twork%dvd_trflx_ver,    unit, iostat, iomsg)
     call read_bin_array(twork%fct_LO,           unit, iostat, iomsg)
     call read_bin_array(twork%adv_flux_hor,     unit, iostat, iomsg)
+    call read_bin_array(twork%edge_flux,        unit, iostat, iomsg)
     call read_bin_array(twork%adv_flux_ver,     unit, iostat, iomsg)
     call read_bin_array(twork%fct_ttf_max,      unit, iostat, iomsg)
     call read_bin_array(twork%fct_ttf_min,      unit, iostat, iomsg)
