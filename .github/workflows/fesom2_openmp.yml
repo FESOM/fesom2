@@ -8,8 +8,8 @@ on:
       - opened
       - synchronize
       - reopened
-    branches:
-      - main
+    # No branch filter: openmp_test is a required check, so it has to be able to
+    # report on a stacked pull request as well. Same reasoning as fesom2_main.yml.
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
   openmp_test:

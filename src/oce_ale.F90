@@ -1394,7 +1394,6 @@ subroutine init_stiff_mat_ale(partit, mesh)
     
     ! number of nonzero entries at every CPU
     pnza(mype+1)=ssh_stiff%nza
-    call MPI_Barrier(MPI_COMM_FESOM,MPIerr)
     !collect this number from all CPUs into rpnza
     call MPI_AllREDUCE( pnza, rpnza, &
         npes, MPI_INTEGER,MPI_SUM, &
