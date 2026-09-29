@@ -66,23 +66,64 @@ foreach(_run IN LISTS _omp_runs)
     set_tests_properties(${_name} PROPERTIES FIXTURES_SETUP ${_name})
 endforeach()
 
+# Compare the runs with A and B threads; an optional third argument names a solver
+# variant (run directories openmp_pi_mpi2_<variant>_omp<N>).
 function(_omp_add_compare A B)
-    set(_name openmp_pi_mpi2_identical_omp${A}_omp${B})
+    set(_v "")
+    if(ARGC GREATER 2)
+        set(_v "${ARGV2}_")
+    endif()
+    set(_name openmp_pi_mpi2_${_v}identical_omp${A}_omp${B})
     add_test(NAME ${_name}
         COMMAND ${CMAKE_COMMAND}
             -DNCDUMP=${NCDUMP_EXECUTABLE}
-            -DDIR_A=${CMAKE_CURRENT_BINARY_DIR}/openmp_pi_mpi2_omp${A}/results
-            -DDIR_B=${CMAKE_CURRENT_BINARY_DIR}/openmp_pi_mpi2_omp${B}/results
+            -DDIR_A=${CMAKE_CURRENT_BINARY_DIR}/openmp_pi_mpi2_${_v}omp${A}/results
+            -DDIR_B=${CMAKE_CURRENT_BINARY_DIR}/openmp_pi_mpi2_${_v}omp${B}/results
             "-DFILES=${_omp_files}"
             -P ${CMAKE_CURRENT_SOURCE_DIR}/compare_output_data.cmake)
     set_tests_properties(${_name} PROPERTIES
         LABELS "openmp"
         TIMEOUT 300
-        FIXTURES_REQUIRED "openmp_pi_mpi2_omp${A};openmp_pi_mpi2_omp${B}")
+        FIXTURES_REQUIRED "openmp_pi_mpi2_${_v}omp${A};openmp_pi_mpi2_${_v}omp${B}")
 endfunction()
 
 _omp_add_compare(1 4)
 _omp_add_compare(1 8)
 _omp_add_compare(8 8_rerun)
 
-message(STATUS "Added OpenMP thread-invariance tests (pi, 2 ranks x 1/4/8 threads, ${FESOM_OPENMP_TEST_DAYS} d)")
+# Set KEY = VALUE in one namelist of a configured run directory.
+function(_omp_set_namelist RUN_DIR FILE KEY VALUE)
+    file(READ "${RUN_DIR}/${FILE}" _nl)
+    string(REGEX REPLACE "(\n[ \t]*${KEY}[ \t]*=)[^!\n]*" "\\1 ${VALUE} " _nl "${_nl}")
+    file(WRITE "${RUN_DIR}/${FILE}" "${_nl}")
+endfunction()
+
+# Solver variants that the default configuration does not reach, each run with 1
+# and 4 threads per rank and compared bit for bit:
+#   mevp  modified EVP sea-ice rheology (whichEVP=1)
+#   aevp  adaptive EVP sea-ice rheology (whichEVP=2)
+#   se    split-explicit barotropic subcycling (use_ssh_se_subcycl)
+set(_omp_variants mevp aevp se)
+set(_omp_variant_mevp namelist.ice whichEVP 1)
+set(_omp_variant_aevp namelist.ice whichEVP 2)
+set(_omp_variant_se   namelist.dyn use_ssh_se_subcycl .true.)
+
+foreach(_v IN LISTS _omp_variants)
+    foreach(_threads 1 4)
+        set(_name openmp_pi_mpi2_${_v}_omp${_threads})
+        add_fesom_test_with_options(${_name}
+            "pi" "96" "${FESOM_OPENMP_TEST_DAYS}" "d" "${FESOM_OPENMP_TEST_DAYS}" "d" "96" ".true." ".false."
+            MPI_TEST
+            NP 2
+            OMP_THREADS ${_threads}
+            LABEL openmp
+            TIMEOUT ${_omp_timeout}
+        )
+        _omp_set_output("${CMAKE_CURRENT_BINARY_DIR}/${_name}")
+        _omp_set_namelist("${CMAKE_CURRENT_BINARY_DIR}/${_name}" ${_omp_variant_${_v}})
+        set_tests_properties(${_name} PROPERTIES FIXTURES_SETUP ${_name})
+    endforeach()
+    _omp_add_compare(1 4 ${_v})
+endforeach()
+
+message(STATUS "Added OpenMP thread-invariance tests (pi, 2 ranks x 1/4/8 threads, ${FESOM_OPENMP_TEST_DAYS} d; variants: ${_omp_variants})")

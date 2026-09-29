@@ -2642,7 +2642,7 @@ module g_cvmix_idemix2
         real(kind=WP) , intent(in   )         :: dphit(   idemix2_nfbin)
         real(kind=WP) , intent(in   )         :: vol_s(partit%myDim_nod2D+partit%eDim_nod2D)
         !___LOCAL VARIABLES_____________________________________________________
-        integer                               :: node, edge, fbini, nfbin, ednodes(2)
+        integer                               :: node, edge, fbini, nfbin, ednodes(2), k
         real(kind=WP)                         :: inv_dphi(idemix2_nfbin), ivols_lcl
         
 #include "../associate_part_def.h"
@@ -2678,7 +2678,7 @@ module g_cvmix_idemix2
         !_______________________________________________________________________
         ! Vertical part
 #ifndef ENABLE_OPENACC
-       !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, edge, ednodes, fbini)
+       !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, k, edge, ednodes, fbini)
        !$OMP DO
 #else
        !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
@@ -2704,32 +2704,38 @@ module g_cvmix_idemix2
         !_______________________________________________________________________
         ! Horizontal part
 #ifndef ENABLE_OPENACC
-#   if defined(__openmp_reproducible)
-       ! the ORDERED region below requires the clause on its worksharing loop
-       !$OMP DO ORDERED
-#   else
+        ! Each owned node gathers the fluxes of its incident edges in ascending
+        ! edge order (mesh%nod_in_edge2D): + where it is the first edge node,
+        ! - where it is the second.
        !$OMP DO
-#   endif
+        do node=1, myDim_nod2d
+            do k=1, mesh%nod_in_edge2D_num(node)
+                edge = mesh%nod_in_edge2D(k,node)
+                if (mesh%nod_in_edge2D_sgn(k,node) > 0) then
+                    do fbini=2, nfbin-1
+                        ! Horizontal divergence: flux/area (NO inv_dphi - that's only for cross-spectral!)
+                        div_h(fbini, node)=div_h(fbini, node)+flx_h(fbini, edge)
+                    end do
+                else
+                    do fbini=2, nfbin-1
+                        div_h(fbini, node)=div_h(fbini, node)-flx_h(fbini, edge)
+                    end do
+                end if
+            end do
+        end do
+       !$OMP END DO
+       !$OMP END PARALLEL
 #else
 #   if !defined(DISABLE_OPENACC_ATOMICS)
        !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #   else
        !$ACC UPDATE SELF(dttf_h, flux_h)
 #   endif
-#endif
         do edge=1, myDim_edge2D 
             ednodes  = edges(:,edge)
-#ifndef ENABLE_OPENACC
-#   if defined(_OPENMP) && !defined(__openmp_reproducible)
-           call omp_set_lock(partit%plock(ednodes(1)))
-#   else
-           !$OMP ORDERED
-#   endif 
-#else
 #   if !defined(DISABLE_OPENACC_ATOMICS)
            !$ACC LOOP VECTOR
 #   endif
-#endif      
             !
             !___________________________________________________________________
             ! horizontal flux contribution to ednode_1
@@ -2741,47 +2747,18 @@ module g_cvmix_idemix2
                 div_h(fbini, ednodes(1))=div_h(fbini, ednodes(1))+flx_h(fbini, edge)
                 
                 
-#ifndef ENABLE_OPENACC
-#   if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            ! if there is now __openmp or __openmp_reproducible assemble horizontal
-            ! divergence in one loop
-            end do
-            
-            !___________________________________________________________________
-            call omp_unset_lock(partit%plock(ednodes(1)))
-            call omp_set_lock  (partit%plock(ednodes(2)))
-            
-            !
-            !___________________________________________________________________
-            ! horizontal flux contribution to ednode_2
-            do fbini=2, nfbin-1
-#   endif    
-#else
 #   if !defined(DISABLE_OPENACC_ATOMICS)
                 !$ACC ATOMIC UPDATE
 #   endif                
-#endif
                 ! Horizontal divergence: flux/area (NO inv_dphi - that's only for cross-spectral!)
                 div_h(fbini,ednodes(2))=div_h(fbini,ednodes(2))-flx_h(fbini,edge)
             end do
             
-#ifndef ENABLE_OPENACC
-#   if defined(_OPENMP)  && !defined(__openmp_reproducible)
-           call omp_unset_lock(partit%plock(ednodes(2)))
-#   else
-            !$OMP END ORDERED
-#   endif
-#else
 #   if !defined(DISABLE_OPENACC_ATOMICS)
             !$ACC END LOOP
 #   endif
-#endif
         end do
 
-#ifndef ENABLE_OPENACC
-   !$OMP END DO
-   !$OMP END PARALLEL
-#else
 #   if !defined(DISABLE_OPENACC_ATOMICS)
    !$ACC END PARALLEL LOOP
 #   else

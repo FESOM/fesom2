@@ -1039,7 +1039,6 @@ SUBROUTINE net_rec_from_atm(action, partit)
         end if
      end if ! (my_global_rank_test==target_root) then
 #endif
-  call MPI_Barrier(partit%MPI_COMM_FESOM, partit%MPIerr)     
   call MPI_AllREDUCE(atm_net_fluxes_north(1), aux, nrecv, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
   atm_net_fluxes_north=aux
   call MPI_AllREDUCE(atm_net_fluxes_south(1), aux, nrecv, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
