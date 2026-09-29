@@ -6,6 +6,9 @@
 /*
 
 # except
+!/bin/
+/bin/*
+!/bin/.gitignore
 !/cmake/
 /cmake/cvmixConfig.cmake
 /cmake/cvmixConfig-debug.cmake
