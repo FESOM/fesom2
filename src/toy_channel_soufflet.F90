@@ -165,7 +165,6 @@ ztem=0.0
     zvel1D((m-1)*(nl-1)+1:m*(nl-1))=znum(:,m)
  END DO
     znum1D=0.0
- call MPI_Barrier(MPI_COMM_WORLD, MPIERR)
  call MPI_AllREDUCE( zvel1D, znum1D, nybins*(nl-1), MPI_DOUBLE_PRECISION,MPI_SUM, &
        MPI_COMM_WORLD, MPIerr) 
  ! fill them back in
@@ -212,7 +211,6 @@ subroutine compute_zonal_mean(dynamics, tracers, partit, mesh)
     zvel1D((m-1)*(nl-1)+1:m*(nl-1))=zvel(:,m)
  END DO
     znum1D=0.0
- call MPI_Barrier(MPI_COMM_WORLD, MPIERR)
  call MPI_AllREDUCE( zvel1D, znum1D, nybins*(nl-1), MPI_DOUBLE_PRECISION,MPI_SUM, &
        MPI_COMM_WORLD, MPIerr) 
  ! fill in back
@@ -224,7 +222,6 @@ subroutine compute_zonal_mean(dynamics, tracers, partit, mesh)
     zvel1D((m-1)*(nl-1)+1:m*(nl-1))=ztem(:,m)
  END DO
     znum1D=0.0
- call MPI_Barrier(MPI_COMM_WORLD, MPIERR)
  call MPI_AllREDUCE( zvel1D, znum1D, nybins*(nl-1), MPI_DOUBLE_PRECISION,MPI_SUM, &
        MPI_COMM_WORLD, MPIerr) 
  ! fill in back

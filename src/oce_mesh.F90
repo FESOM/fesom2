@@ -1861,7 +1861,6 @@ END DO
     mesh%nod_in_elem2D_num(node)=mesh%nod_in_elem2D_num(node)+1
     end do
  end do
-CALL MPI_BARRIER(MPI_COMM_FESOM, MPIerr)
 
  mymax=0
  rmax=0

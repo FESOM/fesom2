@@ -3257,7 +3257,7 @@ subroutine dvd_add_difflux_bhvisc(do_SDdvd, tr_num, dvd_tot, tr, trstar, gamma0_
         real(kind=WP) , intent(in)             :: gamma1_tra
         real(kind=WP) , intent(in)             :: gamma2_tra
         real(kind=WP) , intent(inout)          :: dump(   mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-        integer                                :: node, edge, nz, nu1, nl1
+        integer                                :: node, edge, nz, nu1, nl1, k
         integer                                :: ednodes(2), edelem(2), elnodes_l(3), elnodes_r(3)
         real(kind=WP)                          :: len, du, dv, vi, dtr(mesh%nl-1), trc(mesh%nl-1)
 #include "associate_part_def.h"
@@ -3266,58 +3266,45 @@ subroutine dvd_add_difflux_bhvisc(do_SDdvd, tr_num, dvd_tot, tr, trstar, gamma0_
 #include "associate_mesh_ass.h"    
     
     !___________________________________________________________________________
-    ! reuse here an already allocated working array --> initialise first 
-    do node=1, myDim_nod2D+eDim_nod2D
-        dump(:, node)=0.0_WP
-    end do
-
+    ! Each owned node gathers the contributions of its incident inner edges in
+    ! ascending edge order (mesh%nod_in_edge2D); dump reuses an already allocated
+    ! working array.
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, k, edge, nz, ednodes, edelem, elnodes_l, elnodes_r, &
+!$OMP nu1, nl1, du, dv, len, vi, dtr, trc)
     !___________________________________________________________________________
     ! first round 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, nz, ednodes, edelem, elnodes_l, elnodes_r, &
-!$OMP nu1, nl1, du, dv, dt, len, vi)
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
 !$OMP DO
-#endif
-    do edge=1, myDim_edge2D!+eDim_edge2D
-        ! skip boundary edges only consider inner edges 
-        if (myList_edge2D(edge) > edge2D_in) cycle
-        edelem   = edge_tri(:,edge)
-        ednodes  = edges(:,edge)
-        len      = sqrt(sum(elem_area(edelem)))
-        nl1      = minval(nlevels(edelem))
-        nu1      = maxval(ulevels(edelem))
-        elnodes_l= elem2d_nodes(:, edelem(1))
-        elnodes_r= elem2d_nodes(:, edelem(2))
-        do nz=nu1, nl1-1
-            du     = maxval(tr(nz, elnodes_l))-minval(tr(nz, elnodes_r))
-            dv     = minval(tr(nz, elnodes_l))-maxval(tr(nz, elnodes_r))
-            vi     = du*du+dv*dv
-            dtr(nz)= tr(nz, ednodes(1))-tr(nz, ednodes(2))
-            vi     = sqrt(max(gamma0_tra,           &
-                          max(gamma1_tra*sqrt(vi),   &
-                              gamma2_tra*     vi)    &
-                            )*len)
-            dtr(nz)=dtr(nz)*vi
-        END DO
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       if (partit%plock_on) call omp_set_lock  (partit%plock(ednodes(1)))
-#else
-!$OMP ORDERED
-#endif
-       dump(nu1:nl1-1, ednodes(1)) = dump(nu1:nl1-1, ednodes(1))-dtr(nu1:nl1-1)
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       if (partit%plock_on) call omp_unset_lock(partit%plock(ednodes(1)))
-       if (partit%plock_on) call omp_set_lock  (partit%plock(ednodes(2)))
-#endif
-       dump(nu1:nl1-1, ednodes(2)) = dump(nu1:nl1-1, ednodes(2))+dtr(nu1:nl1-1)
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       if (partit%plock_on) call omp_unset_lock(partit%plock(ednodes(2)))
-#else
-!$OMP END ORDERED
-#endif
-    end do !--> do edge=1, myDim_edge2D!+eDim_edge2D
+    do node=1, myDim_nod2D
+        dump(:, node)=0.0_WP
+        do k=1, mesh%nod_in_edge2D_num(node)
+            edge = mesh%nod_in_edge2D(k,node)
+            ! skip boundary edges only consider inner edges 
+            if (myList_edge2D(edge) > edge2D_in) cycle
+            edelem   = edge_tri(:,edge)
+            ednodes  = edges(:,edge)
+            len      = sqrt(sum(elem_area(edelem)))
+            nl1      = minval(nlevels(edelem))
+            nu1      = maxval(ulevels(edelem))
+            elnodes_l= elem2d_nodes(:, edelem(1))
+            elnodes_r= elem2d_nodes(:, edelem(2))
+            do nz=nu1, nl1-1
+                du     = maxval(tr(nz, elnodes_l))-minval(tr(nz, elnodes_r))
+                dv     = minval(tr(nz, elnodes_l))-maxval(tr(nz, elnodes_r))
+                vi     = du*du+dv*dv
+                dtr(nz)= tr(nz, ednodes(1))-tr(nz, ednodes(2))
+                vi     = sqrt(max(gamma0_tra,           &
+                              max(gamma1_tra*sqrt(vi),   &
+                                  gamma2_tra*     vi)    &
+                                )*len)
+                dtr(nz)=dtr(nz)*vi
+            END DO
+            if (mesh%nod_in_edge2D_sgn(k,node) > 0) then
+                dump(nu1:nl1-1, node) = dump(nu1:nl1-1, node)-dtr(nu1:nl1-1)
+            else
+                dump(nu1:nl1-1, node) = dump(nu1:nl1-1, node)+dtr(nu1:nl1-1)
+            end if
+        end do
+    end do !--> do node=1, myDim_nod2D
 !$OMP END DO
 !$OMP MASTER
     call exchange_nod(dump, partit)
@@ -3326,95 +3313,63 @@ subroutine dvd_add_difflux_bhvisc(do_SDdvd, tr_num, dvd_tot, tr, trstar, gamma0_
 
     !___________________________________________________________________________
     ! second round:
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
 !$OMP DO
-#endif
-    do edge=1, myDim_edge2D!+eDim_edge2D
-        ! skip boundary edges only consider inner edges 
-        if (myList_edge2D(edge) > edge2D_in) cycle
-        edelem   = edge_tri(:,edge)
-        ednodes  = edges(:,edge)
-        len      = sqrt(sum(elem_area(edelem)))
-        nl1      = minval(nlevels(edelem))
-        nu1      = maxval(ulevels(edelem))
-        elnodes_l= elem2d_nodes(:, edelem(1))
-        elnodes_r= elem2d_nodes(:, edelem(2))
-        do nz=nu1, nl1-1
-            du    = maxval(tr(nz, elnodes_l))-minval(tr(nz, elnodes_r))
-            dv    = minval(tr(nz, elnodes_l))-maxval(tr(nz, elnodes_r))
-            vi    = du*du+dv*dv
-            dtr(nz)= dump(nz, ednodes(1))-dump(nz, ednodes(2))
-            vi    = sqrt(max(gamma0_tra,            &
-                         max(gamma1_tra*sqrt(vi),   &
-                             gamma2_tra*     vi)    &
-                             )*len)
-            dtr(nz)=-dtr(nz)*vi
-        end do !-->do nz=nu1, nl1-1  
-        
-        !_______________________________________________________________________
-        ! make the difference between Sergeys and Knuts method
-        if (do_SDdvd) then
+    do node=1, myDim_nod2D
+        do k=1, mesh%nod_in_edge2D_num(node)
+            edge = mesh%nod_in_edge2D(k,node)
+            ! skip boundary edges only consider inner edges 
+            if (myList_edge2D(edge) > edge2D_in) cycle
+            edelem   = edge_tri(:,edge)
+            ednodes  = edges(:,edge)
+            len      = sqrt(sum(elem_area(edelem)))
+            nl1      = minval(nlevels(edelem))
+            nu1      = maxval(ulevels(edelem))
+            elnodes_l= elem2d_nodes(:, edelem(1))
+            elnodes_r= elem2d_nodes(:, edelem(2))
             do nz=nu1, nl1-1
-                !_______________________________________________________________
-                ! compute Tstar as in T. Banerjee et al. 2023 --> Tstar = (Tr^(n+1) + Tr^n)/2
-                ! compute net edge Tracer contribution with Tstar
-                trc(nz) = 2.0_WP*( trstar(nz, ednodes(1)) - trstar(nz, ednodes(2)) )
-            end do !-->do nz=nu1, nl1-1
-            !___________________________________________________________________
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            if (partit%plock_on) call omp_set_lock  (partit%plock(ednodes(1)))
-#else
-!$OMP ORDERED
-#endif
-            dvd_tot(nu1:nl1-1, ednodes(1), tr_num) = dvd_tot(nu1:nl1-1, ednodes(1), tr_num) + & 
-                                    trc(nu1:nl1-1)*dtr(nu1:nl1-1)/(areasvol(nu1:nl1-1,ednodes(1))) 
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            if (partit%plock_on) call omp_unset_lock(partit%plock(ednodes(1)))
-            if (partit%plock_on) call omp_set_lock  (partit%plock(ednodes(2)))
-#endif
-            dvd_tot(nu1:nl1-1, ednodes(2), tr_num) = dvd_tot(nu1:nl1-1, ednodes(2), tr_num) - &
-                                    trc(nu1:nl1-1)*dtr(nu1:nl1-1)/(areasvol(nu1:nl1-1,ednodes(2))) 
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            if (partit%plock_on) call omp_unset_lock(partit%plock(ednodes(2)))
-#else
-!$OMP END ORDERED
-#endif
-        else
-            do nz=nu1, nl1-1
-                !_______________________________________________________________
-                ! compute edge centered tracer value see Klingbeil et al 2014
-                trc(nz) = tr(nz, ednodes(1)) * hnode(nz, ednodes(1)) + tr(nz, ednodes(2)) * hnode(nz, ednodes(2))
-                trc(nz) = -2.0_WP*trc(nz)/(hnode(nz, ednodes(1))+hnode(nz, ednodes(2)))
-                !          |
-                !          +-> factor 2.0 comes here from Klingbeil et al. 2014
-                !              Dflux[ tr^2] = 2*tr*Dflux[tr]          
-            end do !-->do nz=nu1, nl1-1
+                du    = maxval(tr(nz, elnodes_l))-minval(tr(nz, elnodes_r))
+                dv    = minval(tr(nz, elnodes_l))-maxval(tr(nz, elnodes_r))
+                vi    = du*du+dv*dv
+                dtr(nz)= dump(nz, ednodes(1))-dump(nz, ednodes(2))
+                vi    = sqrt(max(gamma0_tra,            &
+                             max(gamma1_tra*sqrt(vi),   &
+                                 gamma2_tra*     vi)    &
+                                 )*len)
+                dtr(nz)=-dtr(nz)*vi
+            end do !-->do nz=nu1, nl1-1  
             
             !___________________________________________________________________
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            if (partit%plock_on) call omp_set_lock  (partit%plock(ednodes(1)))
-#else
-!$OMP ORDERED
-#endif
-            dvd_tot(nu1:nl1-1, ednodes(1), tr_num) = dvd_tot(nu1:nl1-1, ednodes(1), tr_num) + & 
-                                        trc(nu1:nl1-1)*dtr(nu1:nl1-1)  / ( areasvol(nu1:nl1-1,ednodes(1)) )                                     
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            if (partit%plock_on) call omp_unset_lock(partit%plock(ednodes(1)))
-            if (partit%plock_on) call omp_set_lock  (partit%plock(ednodes(2)))
-#endif
-            dvd_tot(nu1:nl1-1, ednodes(2), tr_num) = dvd_tot(nu1:nl1-1, ednodes(2), tr_num) - &
-                                        trc(nu1:nl1-1)*dtr(nu1:nl1-1)  / ( areasvol(nu1:nl1-1,ednodes(2)) )
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            if (partit%plock_on) call omp_unset_lock(partit%plock(ednodes(2)))
-#else
-!$OMP END ORDERED
-#endif
-        end if 
-        
-    end do !--> do edge=1, myDim_edge2D!+eDim_edge2D
-!$OMP END DO
+            ! make the difference between Sergeys and Knuts method
+            if (do_SDdvd) then
+                do nz=nu1, nl1-1
+                    !___________________________________________________________
+                    ! compute Tstar as in T. Banerjee et al. 2023 --> Tstar = (Tr^(n+1) + Tr^n)/2
+                    ! compute net edge Tracer contribution with Tstar
+                    trc(nz) = 2.0_WP*( trstar(nz, ednodes(1)) - trstar(nz, ednodes(2)) )
+                end do !-->do nz=nu1, nl1-1
+            else
+                do nz=nu1, nl1-1
+                    !___________________________________________________________
+                    ! compute edge centered tracer value see Klingbeil et al 2014
+                    trc(nz) = tr(nz, ednodes(1)) * hnode(nz, ednodes(1)) + tr(nz, ednodes(2)) * hnode(nz, ednodes(2))
+                    trc(nz) = -2.0_WP*trc(nz)/(hnode(nz, ednodes(1))+hnode(nz, ednodes(2)))
+                    !          |
+                    !          +-> factor 2.0 comes here from Klingbeil et al. 2014
+                    !              Dflux[ tr^2] = 2*tr*Dflux[tr]          
+                end do !-->do nz=nu1, nl1-1
+            end if 
+            
+            !___________________________________________________________________
+            if (mesh%nod_in_edge2D_sgn(k,node) > 0) then
+                dvd_tot(nu1:nl1-1, node, tr_num) = dvd_tot(nu1:nl1-1, node, tr_num) + & 
+                                        trc(nu1:nl1-1)*dtr(nu1:nl1-1)/(areasvol(nu1:nl1-1,node)) 
+            else
+                dvd_tot(nu1:nl1-1, node, tr_num) = dvd_tot(nu1:nl1-1, node, tr_num) - &
+                                        trc(nu1:nl1-1)*dtr(nu1:nl1-1)/(areasvol(nu1:nl1-1,node)) 
+            end if
+        end do
+    end do !--> do node=1, myDim_nod2D
+!$OMP END DO NOWAIT
 !$OMP END PARALLEL
 
 end subroutine dvd_add_difflux_bhvisc    
