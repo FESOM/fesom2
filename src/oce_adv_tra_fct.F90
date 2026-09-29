@@ -321,7 +321,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
        if (nu2>0) nu12 = min(nu1,nu2)
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_set_lock(partit%plock(enodes(1)))
+       if (partit%plock_on) call omp_set_lock(partit%plock(enodes(1)))
 #else
 !$OMP ORDERED
 #endif
@@ -343,8 +343,8 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
        end do
-       call omp_unset_lock(partit%plock(enodes(1)))
-       call omp_set_lock  (partit%plock(enodes(2)))
+       if (partit%plock_on) call omp_unset_lock(partit%plock(enodes(1)))
+       if (partit%plock_on) call omp_set_lock  (partit%plock(enodes(2)))
        do nz=nu12, nl12
 #endif
 #else
@@ -364,7 +364,7 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 
 #ifndef ENABLE_OPENACC
 #if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_unset_lock(partit%plock(enodes(2)))
+       if (partit%plock_on) call omp_unset_lock(partit%plock(enodes(2)))
 #else
 !$OMP END ORDERED
 #endif

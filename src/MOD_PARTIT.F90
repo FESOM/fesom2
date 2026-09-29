@@ -132,6 +132,9 @@ TYPE T_PARTIT
 #if defined(_OPENMP)
   !!! plock is constructed during the runtime and shall not be dumped!!!
     integer(omp_lock_kind), allocatable :: plock(:)
+    ! .false. when the run uses one thread per rank: every omp_set_lock/omp_unset_lock on
+    ! plock is then skipped (a lock pair per element corner costs even without contention)
+    logical :: plock_on = .true.
 #endif
 
   contains

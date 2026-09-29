@@ -216,7 +216,14 @@ contains
         call MPI_Initialized(mpi_is_initialized, f%i)
         if(.not. mpi_is_initialized) then
             ! TODO: do not initialize MPI here if it has been initialized already, e.g. via IFS when fesom is called as library (__ifsinterface is defined)
+#if defined(ASYNCHRONOUS_IO_THREADS)
+            ! I/O worker pthreads call MPI concurrently with the main thread
             call MPI_INIT_THREAD(MPI_THREAD_MULTIPLE, f%provided, f%i)
+#else
+            ! All MPI calls are issued by the main thread (halo exchanges sit in OMP MASTER
+            ! blocks), so FUNNELED is sufficient and avoids MPI-internal locking.
+            call MPI_INIT_THREAD(MPI_THREAD_FUNNELED, f%provided, f%i)
+#endif
             f%fesom_did_mpi_init = .true.
         end if
 #endif

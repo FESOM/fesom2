@@ -792,6 +792,7 @@ subroutine init_gatherLists(partit)
 !$OMP MASTER
 #if defined(_OPENMP)
     allocate(partit%plock(myDim_elem2D+eDim_elem2D)) !allocate with maximum dimention (nELEM> nNODE) 
+    partit%plock_on = (omp_get_max_threads() > 1)   ! one thread per rank -> no lock traffic
     do n=1, myDim_elem2D+eDim_elem2D
 !experiments showd that OPENMP5 implementation of the lock (201811) is >10% more efficient
 !make sure you use OPENMP v. 5.0

@@ -32,8 +32,10 @@ subroutine cut_off(ice, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_ice),    intent(inout), target :: ice
     integer                               :: n
+#if defined (__oifs)
     integer                               :: n_coldice
     integer, save                         :: n_coldwarn = 0
+#endif
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
@@ -51,11 +53,17 @@ subroutine cut_off(ice, partit, mesh)
     ice_temp => ice%data(4)%values(:)
 #endif /* (__oifs) */
 
+#if defined (__oifs)
     n_coldice = 0
+#endif
 
     !___________________________________________________________________________
     ! upper cutoff: a_ice
+#if defined (__oifs)
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n) REDUCTION(+:n_coldice)
+#else
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+#endif
 DO n=1, myDim_nod2D+eDim_nod2D
    if (a_ice(n) > 1.0_WP)   a_ice(n)=1.0_WP
     ! lower cutoff: a_ice
@@ -84,17 +92,21 @@ DO n=1, myDim_nod2D+eDim_nod2D
     if (ice_temp(n) > 273.15_WP) ice_temp(n)=273.15_WP
 #endif /* (__oifs) */
 
-#if defined (__oifs) || defined (__ifsinterface)
+#if defined (__oifs)
     ! No lower clamp. A surface temperature this far below anything physical
     ! means the skin solve has diverged, and silently resetting it to the
     ! seawater freezing point hides the divergence instead of reporting it.
     ! Count and report below.
     if (ice_temp(n) < 173.15_WP .and. a_ice(n) >= 0.1e-8_WP) n_coldice = n_coldice + 1
+#elif defined (__ifsinterface)
+    ! Preserve the 2.6.7.1 IFS-FESOM safeguard while its legacy surface
+    ! temperature scheme is in use.
+    if (ice_temp(n) < 173.15_WP .and. a_ice(n) >= 0.1e-8_WP) ice_temp(n)=271.35_WP
 #endif /* (__oifs) */
 END DO
 !$OMP END PARALLEL DO
 
-#if defined (__oifs) || defined (__ifsinterface)
+#if defined (__oifs)
     ! Rate limited: a diverging skin solve usually diverges every step.
     if (n_coldice > 0) then
         n_coldwarn = n_coldwarn + 1

@@ -37,8 +37,10 @@ subroutine thermodynamics(ice, partit, mesh)
   !---- atmospheric heat fluxes (provided by ECHAM)
   real(kind=WP)  :: a2ohf, a2ihf, qres, qcon
   !---- tref: ist anchor the atmosphere evaluated a2ihf at, the linearization
-  !---- anchor for the internal surface-temperature solve (see ice_surftemp).
+  !---- anchor for the OpenIFS coupled-slab surface-temperature solve.
+#if defined (__oifs)
   real(kind=WP)  :: tref
+#endif
   !---- evaporation and sublimation (provided by ECHAM)
   real(kind=WP)  :: evap, subli
   !---- add residual freshwater flux over ice to freshwater (setted in ice_growth)
@@ -76,7 +78,9 @@ subroutine thermodynamics(ice, partit, mesh)
   real(kind=WP), dimension(:)  , pointer :: fresh_wa_flux, net_heat_flux
 #if defined (__oifs) || defined (__ifsinterface)
   real(kind=WP), dimension(:) , pointer  :: ice_temp, ice_alb, enthalpyoffuse, ice_heat_qres, ice_heat_qcon, runoff_liquid, runoff_solid
+#if defined (__oifs)
   real(kind=WP), dimension(:) , pointer  :: ist_ref
+#endif
 #endif
 #if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
   real(kind=WP), dimension(:)  , pointer ::  oce_heat_flux, ice_heat_flux 
@@ -112,7 +116,9 @@ subroutine thermodynamics(ice, partit, mesh)
   runoff_solid  => ice%atmcoupl%runoff_solid(:)
   ice_heat_qres => ice%atmcoupl%flx_qres(:)
   ice_heat_qcon => ice%atmcoupl%flx_qcon(:)
+#if defined (__oifs)
   ist_ref       => ice%atmcoupl%ist_ref(:)
+#endif
 #endif
 #if defined (__oasis) || defined (__ifsinterface) || defined (__yac)
   oce_heat_flux => ice%atmcoupl%oce_flx_h(:)
@@ -177,6 +183,7 @@ subroutine thermodynamics(ice, partit, mesh)
      qres     = 0.0_WP
      qcon     = 0.0_WP
      if(A>Aimin) then
+#if defined (__oifs)
         if (use_atm_ice_tskin) then
            ! Skin temperature received from the atmosphere (tsk_ico); freezing
            ! point before the first receive.
@@ -186,6 +193,12 @@ subroutine thermodynamics(ice, partit, mesh)
            tref = t
         end if
         call ice_surftemp(ice%thermo, max(h/(max(A,Aimin)),0.05), hsn/(max(A,Aimin)), a2ihf, tref, t)
+#else
+        ! The IFS interface does not provide the reference temperature used by
+        ! the OpenIFS coupled-slab solve. Keep its established local update
+        ! until that interface supplies a consistent temperature/flux pair.
+        call ice_surftemp(ice%thermo, max(h/(max(A,Aimin)),0.05), hsn/(max(A,Aimin)), a2ihf, t)
+#endif
         ice_temp(inod)  = t
      else
         ! Freezing temp of saltwater in K
@@ -299,7 +312,13 @@ contains
     ! flux drives ice growth directly. The ice model's own surface-temperature
     ! solve is internal-only (albedo/melt-pond state) and does not enter the
     ! growth budget.
+#if defined (__ifsinterface)
+    ! Keep the classic IFS-FESOM energy-budget convention.  Its atmospheric
+    ! interface has not been converted to the OpenIFS coupled-slab contract.
+    Qatmice = -qres-qcon
+#else
     Qatmice = -a2ihf
+#endif
     Qatmocn = -a2ohf
 
     !---- oceanic heat fluxes
@@ -555,14 +574,20 @@ contains
     return
   end subroutine ice_growth
 
+#if defined (__oifs)
  subroutine ice_surftemp(ithermp, h,hsn,a2ihf,tref,t)
+#else
+ subroutine ice_surftemp(ithermp, h,hsn,a2ihf,t)
+#endif
   ! INPUT:
   ! a2ihf - Total atmo heat flux to ice
   ! A  - Ice fraction
   ! h  - Ice thickness
   ! hsn   - Snow thickness
+#if defined (__oifs)
   ! tref  - linearization anchor for the implicit flux term; with
   !         use_atm_ice_tskin the atmosphere's ice-tile skin temperature
+#endif
   !
   ! INPUT/OUTPUT:
   ! t     - Ice surface temperature
@@ -574,8 +599,11 @@ contains
   !---- ocean variables (provided by FESOM)
   real(kind=WP)  h
   real(kind=WP)  hsn
+#if defined (__oifs)
   real(kind=WP)  tref
+#endif
   real(kind=WP)  t
+#if defined (__oifs)
   !---- flux-linearization coefficient dQ/dT [W/m2/K]
   real(kind=WP)  zlam
   !---- bulk near-neutral turbulent flux sensitivity rho*cp*C_H*|U| [W/m2/K]
@@ -583,6 +611,7 @@ contains
   !---- ~20 W/m2/K, the standard fallback flux derivative used in
   !---- NEMO/SI3-family couplings when the atmosphere does not export dQ/dT.
   real(kind=WP), parameter :: zlam_turb = 16.0_WP
+#endif
   !---- local variables
   real(kind=WP)  snicecond
   real(kind=WP)  zsniced
@@ -596,14 +625,20 @@ contains
   !---- freezing temperature of sea-water [K]
   real(kind=WP)  :: TFrezs
   
+#if defined (__oifs)
   real(kind=WP), pointer :: con, consn, cpsno, rhoice, rhosno, emiss_ice, boltzmann
+#else
+  real(kind=WP), pointer :: con, consn, cpsno, rhoice, rhosno
+#endif
   con    => ice%thermo%con
   consn  => ice%thermo%consn
   cpsno  => ice%thermo%cpsno
   rhoice => ice%thermo%rhoice
   rhosno => ice%thermo%rhosno
+#if defined (__oifs)
   emiss_ice => ice%thermo%emiss_ice
   boltzmann => ice%thermo%boltzmann
+#endif
 
   !---- compute freezing temperature of sea-water from salinity
   TFrezs = -0.0575_WP*S_oc + 1.7105e-3_WP*sqrt(S_oc**3) - 2.155e-4_WP*(S_oc**2)+273.15
@@ -616,6 +651,7 @@ contains
   zcprosn=rhosno*cpsno/dt               ! Specific Energy required to change temperature of 1m snow on ice [J/(sm³K)]
   zcpdte=zcpdt !+zcprosn*hsn            ! Combined Energy required to change temperature of snow + 0.05m of upper ice
 
+#if defined (__oifs)
   !---- Implicit (dQ/dT-linearized) atmospheric flux.
   ! a2ihf was computed by the atmosphere at tref
   ! and is held constant over the coupling interval. As the surface departs
@@ -635,8 +671,16 @@ contains
   else
      t=(zcpdte*t+a2ihf+zlam*tref+zicefl)/(zcpdte+con/zsniced+zlam) ! New sea ice surf temp [K]
   end if
+#else
+  !---- Classic IFS-FESOM local surface-temperature update.
+  t=(zcpdte*t+a2ihf+zicefl)/(zcpdte+con/zsniced)
+#endif
   if (t>273.15_WP) then
+#if defined (__oifs)
      qres=(con/zsniced+zcpdte+zlam)*(t-273.15_WP)
+#else
+     qres=(con/zsniced+zcpdte)*(t-273.15_WP)
+#endif
      t=273.15_WP
   endif
   qcon=con*(t-TFrezs)/max(zsniced, himin)
