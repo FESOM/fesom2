@@ -20,7 +20,7 @@ module ice_maEVP_module
     implicit none
 
     private
-    public :: stress_tensor_m, ssh2rhs, stress2rhs_m, EVPdynamics_m, &
+    public :: stress_tensor_m, ssh2rhs, EVPdynamics_m, &
               find_alpha_field_a, stress_tensor_a, EVPdynamics_a, &
               find_beta_field_a
 
@@ -214,86 +214,6 @@ subroutine ssh2rhs(ice, partit, mesh)
 end subroutine ssh2rhs
 !
 !
-!_______________________________________________________________________________
-! add internal stress to the rhs
-! SD, 30.07.2014
-subroutine stress2rhs_m(ice, partit, mesh)
-    implicit none
-    type(t_ice)   , intent(inout), target :: ice
-    type(t_partit), intent(inout), target :: partit
-    type(t_mesh)  , intent(in)   , target :: mesh
-    !___________________________________________________________________________
-    integer                  :: k, j, row, elem, elnodes(3)
-    real(kind=WP)            :: vol
-    real(kind=WP)            :: val3, mf, su, sv
-    real(kind=WP)            :: mass
-    !___________________________________________________________________________
-    ! pointer on necessary derived types
-    real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
-    real(kind=WP), dimension(:), pointer  :: sigma11, sigma12, sigma22
-    real(kind=WP), dimension(:), pointer  :: u_rhs_ice, v_rhs_ice, rhs_a, rhs_m
-    real(kind=WP)              , pointer  :: rhoice, rhosno
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
-    a_ice        => ice%data(1)%values(:)
-    m_ice        => ice%data(2)%values(:)
-    m_snow       => ice%data(3)%values(:)
-    sigma11      => ice%work%sigma11(:)
-    sigma12      => ice%work%sigma12(:)
-    sigma22      => ice%work%sigma22(:)
-    u_rhs_ice    => ice%uice_rhs(:)
-    v_rhs_ice    => ice%vice_rhs(:)
-    rhs_a        => ice%data(1)%values_rhs(:)
-    rhs_m        => ice%data(2)%values_rhs(:)
-    rhoice       => ice%thermo%rhoice
-    rhosno       => ice%thermo%rhosno
-
-    !___________________________________________________________________________
-    val3=1.0_WP/3.0_WP
-    ! Each owned node sums the internal stress of its incident elements in
-    ! nod_in_elem2D order, then adds the elevation term and scales by its mass.
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(k, j, row, elem, elnodes, vol, mf, mass, su, sv)
-    do row=1, myDim_nod2d
-        su=0.0_WP
-        sv=0.0_WP
-        do k=1, nod_in_elem2D_num(row)
-            elem=nod_in_elem2D(k,row)
-            !___________________________________________________________________
-            ! if element has any cavity node skip it
-            if (ulevels(elem) > 1) cycle
-            elnodes=elem2D_nodes(:,elem)
-            if(sum(a_ice(elnodes)) < 0.01_WP) cycle !DS
-            vol=elem_area(elem)
-            mf=metric_factor(elem)                               !metrics
-            ! corner of element elem that is node row
-            j=3
-            if (elnodes(1) == row) j=1
-            if (elnodes(2) == row) j=2
-            su=su - vol* &
-                (sigma11(elem)*gradient_sca(j,elem)+sigma12(elem)*gradient_sca(j+3,elem))    &
-               -vol*sigma12(elem)*val3*mf                        !metrics
-            sv=sv - vol* &
-                (sigma12(elem)*gradient_sca(j,elem)+sigma22(elem)*gradient_sca(j+3,elem))    &
-               +vol*sigma11(elem)*val3*mf                        ! metrics
-        end do
-        !_______________________________________________________________________
-        ! if cavity node skip it
-        if ( ulevels_nod2d(row)>1 ) then
-            u_rhs_ice(row)=su
-            v_rhs_ice(row)=sv
-            cycle
-        end if
-
-        mass=(m_ice(row)*rhoice+m_snow(row)*rhosno)
-        mass=1.0_WP/max(mass, 9.0_WP)  ! 9.0 kg/m² per GRID area — numerical floor to prevent near-zero inertia
-        !mass=mass/(1.0_WP+mass*mass)   ! original: dimensionally inconsistent (1 + [kg/m²]²)
-        u_rhs_ice(row)=(su*mass + rhs_a(row))/area(1,row)
-        v_rhs_ice(row)=(sv*mass + rhs_m(row))/area(1,row)
-    end do
-!$OMP END PARALLEL DO
-end subroutine stress2rhs_m
 !
 !
 !_______________________________________________________________________________
@@ -695,6 +615,8 @@ subroutine find_alpha_field_a(ice, partit, mesh)
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
     vale=1.0_WP/(ice%ellipse**2)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, dx, dy, msum, asum, eps1, eps2, pressure, delta, &
+!$OMP                                     meancos, usum, vsum)
     do elem=1,myDim_elem2D
         elnodes=elem2D_nodes(:,elem)
         !_______________________________________________________________________
@@ -738,6 +660,7 @@ subroutine find_alpha_field_a(ice, partit, mesh)
         ! /voltriangle(elem) for FESOM1.4
         ! We do not allow alpha to be too small!
     end do !--> do elem=1,myDim_elem2D
+!$OMP END PARALLEL DO
 end subroutine find_alpha_field_a
 !
 !
@@ -783,6 +706,8 @@ subroutine stress_tensor_a(ice, partit, mesh)
     !___________________________________________________________________________
     val3=1.0_WP/3.0_WP
     vale=1.0_WP/(ice%ellipse**2)
+!$OMP DO PRIVATE(elem, elnodes, dx, dy, msum, asum, eps1, eps2, pressure, delta, meancos, usum, vsum, &
+!$OMP            det1, det2, r1, r2, r3, si1, si2)
     do elem=1,myDim_elem2D
         !_______________________________________________________________________
         ! if element has any cavity node skip it
@@ -848,6 +773,7 @@ subroutine stress_tensor_a(ice, partit, mesh)
         rdg_shear_elem(elem) = 0.5_WP*(delta - abs(eps11(elem)+eps22(elem)))
 #endif
     end do ! --> do elem=1,myDim_elem2D
+!$OMP END DO
     ! Equations solved in terms of si1, si2, eps1, eps2 are (43)-(45) of
     ! Boullion et al Ocean Modelling 2013, but in an implicit mode:
     ! si1_{p+1}=det1*si1_p+det2*r1, where det1=alpha/(1+alpha) and det2=1/(1+alpha),
@@ -866,16 +792,17 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     type(t_partit), intent(inout), target :: partit
     type(t_mesh),   intent(in),    target :: mesh
     !___________________________________________________________________________
-    integer          :: steps, shortstep, i, ed, n
+    integer          :: steps, shortstep, i, ed, n, k, j, el, elnodes(3)
     logical          :: lcav_edge
-    real(kind=WP)    :: rdt, drag, det, fc
+    real(kind=WP)    :: rdt, drag, det, fc, val3, vol, mf, mass, su, sv
     real(kind=WP)    :: thickness, inv_thickness, umod, rhsu, rhsv
-    REAL(kind=WP)    :: t0,t1, t2, t3, t4, t5, t00, txx
+    logical          :: ice_el(partit%myDim_elem2D), bc_zero(partit%myDim_nod2D)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
     real(kind=WP), dimension(:), pointer  :: a_ice, m_ice, m_snow
-    real(kind=WP), dimension(:), pointer  :: u_rhs_ice, v_rhs_ice
+    real(kind=WP), dimension(:), pointer  :: u_rhs_ice, v_rhs_ice, rhs_a, rhs_m
+    real(kind=WP), dimension(:), pointer  :: sigma11, sigma12, sigma22
     real(kind=WP), dimension(:), pointer  :: u_w, v_w
     real(kind=WP), dimension(:), pointer  :: stress_atmice_x, stress_atmice_y
     real(kind=WP), dimension(:), pointer  :: u_ice_aux, v_ice_aux
@@ -893,6 +820,11 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     m_snow          => ice%data(3)%values(:)
     u_rhs_ice       => ice%uice_rhs(:)
     v_rhs_ice       => ice%vice_rhs(:)
+    rhs_a           => ice%data(1)%values_rhs(:)
+    rhs_m           => ice%data(2)%values_rhs(:)
+    sigma11         => ice%work%sigma11(:)
+    sigma12         => ice%work%sigma12(:)
+    sigma22         => ice%work%sigma22(:)
     u_w             => ice%srfoce_u(:)
     v_w             => ice%srfoce_v(:)
     stress_atmice_x => ice%stress_atmice_x
@@ -935,48 +867,28 @@ subroutine EVPdynamics_a(ice, partit, mesh)
     rdg_shear_elem(:) = 0.0_WP
 #endif
 
-    do shortstep=1, steps
-        call stress_tensor_a(ice, partit, mesh)
-        call stress2rhs_m(ice, partit, mesh)    ! _m=_a, so no _m version is the only one!
-        do i=1,myDim_nod2D
-
+    !___________________________________________________________________________
+    ! Fixed for the whole call: the elements that carry ice (the stress of an
+    ! element is added to its nodes only if sum(a_ice) >= 0.01) and the nodes that
+    ! the coastal and cavity-edge velocity boundary conditions set to zero.
+    val3=1.0_WP/3.0_WP
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(el, elnodes, i, k, ed, lcav_edge)
+!$OMP DO
+    do el=1, myDim_elem2D
+        elnodes=elem2D_nodes(:,el)
+        ice_el(el) = (sum(a_ice(elnodes)) >= 0.01_WP) !DS
+    end do
+!$OMP END DO NOWAIT
+!$OMP DO
+    do i=1, myDim_nod2D
+        bc_zero(i) = .false.
+        do k=1, mesh%nod_in_edge2D_num(i)
+            ed=mesh%nod_in_edge2D(k,i)
             !___________________________________________________________________
-            ! if element has any cavity node skip it
-            if (ulevels_nod2d(i)>1) cycle
-
-            thickness=(rhoice*m_ice(i)+rhosno*m_snow(i))/max(a_ice(i),0.01_WP)
-            thickness=max(thickness, 9.0_WP)   ! Limit if it is too small (0.01 m)
-            inv_thickness=1.0_WP/thickness
-
-            umod=sqrt((u_ice_aux(i)-u_w(i))**2+(v_ice_aux(i)-v_w(i))**2)
-            drag=rdt*ice%cd_oce_ice*umod*density_0*inv_thickness
-
-            !rhs for water stress, air stress, and u_rhs_ice/v (internal stress + ssh)
-            rhsu=u_ice(i)+drag*u_w(i)+rdt*(inv_thickness*stress_atmice_x(i)+u_rhs_ice(i))
-            rhsv=v_ice(i)+drag*v_w(i)+rdt*(inv_thickness*stress_atmice_y(i)+v_rhs_ice(i))
-
-            rhsu=beta_evp_array(i)*u_ice_aux(i)+rhsu
-            rhsv=beta_evp_array(i)*v_ice_aux(i)+rhsv
-            !solve (Coriolis and water stress are treated implicitly)
-            fc=rdt*mesh%coriolis_node(i)
-            det=(1.0_WP+beta_evp_array(i)+drag)**2+fc**2
-            det=bc_index_nod2D(i)/det
-            u_ice_aux(i)=det*((1.0_WP+beta_evp_array(i)+drag)*rhsu+fc*rhsv)
-            v_ice_aux(i)=det*((1.0_WP+beta_evp_array(i)+drag)*rhsv-fc*rhsu)
-        end do
-
-        !_______________________________________________________________________
-        ! apply sea ice velocity boundary condition
-        do ed=1,myDim_edge2D
+            ! coastal sea ice velocity boundary condition
+            if (myList_edge2D(ed) > edge2D_in) bc_zero(i) = .true.
             !___________________________________________________________________
-            ! apply coastal sea ice velocity boundary conditions
-            if(myList_edge2D(ed) > edge2D_in) then
-                u_ice_aux(edges(:,ed))=0.0_WP
-                v_ice_aux(edges(:,ed))=0.0_WP
-            end if
-
-            !___________________________________________________________________
-            ! apply sea ice velocity boundary conditions at cavity-ocean edge
+            ! sea ice velocity boundary condition at cavity-ocean edge
             if (use_cavity) then
                 ! .and. is not short-circuit in Fortran: guard edge_tri(2,ed)>0
                 ! separately or ulevels(0) is read at boundary edges.
@@ -984,18 +896,104 @@ subroutine EVPdynamics_a(ice, partit, mesh)
                 if (.not. lcav_edge) then
                     if (edge_tri(2,ed) > 0) lcav_edge = (ulevels(edge_tri(2,ed)) > 1)
                 end if
-                if (lcav_edge) then
-                    u_ice_aux(edges(1:2,ed))=0.0_WP
-                    v_ice_aux(edges(1:2,ed))=0.0_WP
-                end if
+                if (lcav_edge) bc_zero(i) = .true.
             end if
-        end do ! --> do ed=1,myDim_edge2D
-
-        call exchange_nod(u_ice_aux, v_ice_aux, partit)
+        end do
     end do
+!$OMP END DO NOWAIT
+!$OMP END PARALLEL
 
-    u_ice=u_ice_aux
-    v_ice=v_ice_aux
+    !___________________________________________________________________________
+    ! One parallel region for all subcycles: stress_tensor_a is an orphaned
+    ! worksharing loop that binds to it, the halo exchange runs on the master
+    ! thread.
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(shortstep, i, k, j, el, elnodes, vol, mf, mass, su, sv, &
+!$OMP                                  thickness, inv_thickness, umod, drag, rhsu, rhsv, fc, det)
+    do shortstep=1, steps
+        call stress_tensor_a(ice, partit, mesh)
+!$OMP DO
+        do i=1,myDim_nod2D
+            !___________________________________________________________________
+            ! internal stress divergence (stress2rhs): the node sums its incident
+            ! elements in nod_in_elem2D order
+            su=0.0_WP
+            sv=0.0_WP
+            do k=1, nod_in_elem2D_num(i)
+                el=nod_in_elem2D(k,i)
+                !_______________________________________________________________
+                ! if element has any cavity node skip it
+                if (ulevels(el) > 1) cycle
+                if (.not. ice_el(el)) cycle
+                elnodes=elem2D_nodes(:,el)
+                vol=elem_area(el)
+                mf=metric_factor(el)                                 !metrics
+                ! corner of element el that is node i
+                j=3
+                if (elnodes(1) == i) j=1
+                if (elnodes(2) == i) j=2
+                su=su - vol* &
+                    (sigma11(el)*gradient_sca(j,el)+sigma12(el)*gradient_sca(j+3,el))    &
+                   -vol*sigma12(el)*val3*mf                          !metrics
+                sv=sv - vol* &
+                    (sigma12(el)*gradient_sca(j,el)+sigma22(el)*gradient_sca(j+3,el))    &
+                   +vol*sigma11(el)*val3*mf                          ! metrics
+            end do
+
+            !___________________________________________________________________
+            ! if cavity node skip it
+            if (ulevels_nod2d(i)>1) then
+                u_rhs_ice(i)=su
+                v_rhs_ice(i)=sv
+            else
+                mass=(m_ice(i)*rhoice+m_snow(i)*rhosno)
+                mass=1.0_WP/max(mass, 9.0_WP)  ! 9.0 kg/m² per GRID area — numerical floor to prevent near-zero inertia
+                u_rhs_ice(i)=(su*mass + rhs_a(i))/area(1,i)
+                v_rhs_ice(i)=(sv*mass + rhs_m(i))/area(1,i)
+
+                !_______________________________________________________________
+                ! velocity update
+                thickness=(rhoice*m_ice(i)+rhosno*m_snow(i))/max(a_ice(i),0.01_WP)
+                thickness=max(thickness, 9.0_WP)   ! Limit if it is too small (0.01 m)
+                inv_thickness=1.0_WP/thickness
+
+                umod=sqrt((u_ice_aux(i)-u_w(i))**2+(v_ice_aux(i)-v_w(i))**2)
+                drag=rdt*ice%cd_oce_ice*umod*density_0*inv_thickness
+
+                !rhs for water stress, air stress, and u_rhs_ice/v (internal stress + ssh)
+                rhsu=u_ice(i)+drag*u_w(i)+rdt*(inv_thickness*stress_atmice_x(i)+u_rhs_ice(i))
+                rhsv=v_ice(i)+drag*v_w(i)+rdt*(inv_thickness*stress_atmice_y(i)+v_rhs_ice(i))
+
+                rhsu=beta_evp_array(i)*u_ice_aux(i)+rhsu
+                rhsv=beta_evp_array(i)*v_ice_aux(i)+rhsv
+                !solve (Coriolis and water stress are treated implicitly)
+                fc=rdt*mesh%coriolis_node(i)
+                det=(1.0_WP+beta_evp_array(i)+drag)**2+fc**2
+                det=bc_index_nod2D(i)/det
+                u_ice_aux(i)=det*((1.0_WP+beta_evp_array(i)+drag)*rhsu+fc*rhsv)
+                v_ice_aux(i)=det*((1.0_WP+beta_evp_array(i)+drag)*rhsv-fc*rhsu)
+            end if
+
+            !___________________________________________________________________
+            ! apply sea ice velocity boundary condition
+            if (bc_zero(i)) then
+                u_ice_aux(i)=0.0_WP
+                v_ice_aux(i)=0.0_WP
+            end if
+        end do
+!$OMP END DO
+!$OMP MASTER
+        call exchange_nod(u_ice_aux, v_ice_aux, partit)
+!$OMP END MASTER
+!$OMP BARRIER
+    end do ! --> do shortstep=1, steps
+!$OMP END PARALLEL
+
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
+    do n=1, myDim_nod2D+eDim_nod2D
+        u_ice(n)=u_ice_aux(n)
+        v_ice(n)=v_ice_aux(n)
+    end do
+!$OMP END PARALLEL DO
 
     call find_alpha_field_a(ice, partit, mesh)             ! alpha_evp_array is initialized with alpha_evp;
                                         ! At this stage we already have non-trivial velocities.
@@ -1026,6 +1024,7 @@ subroutine find_beta_field_a(ice, partit, mesh)
     beta_evp_array  => ice%beta_evp_array(:)
 
     !___________________________________________________________________________
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
     DO n=1, myDim_nod2D
        !________________________________________________________________________
        ! if element has any cavity node skip it
@@ -1038,6 +1037,7 @@ subroutine find_beta_field_a(ice, partit, mesh)
        ! FESOM2.0
        beta_evp_array(n) =  maxval(alpha_evp_array(nod_in_elem2D(1:nod_in_elem2D_num(n),n)))
     END DO
+!$OMP END PARALLEL DO
 end subroutine find_beta_field_a
 !
 ! ================================================================
