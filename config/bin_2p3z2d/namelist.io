@@ -53,12 +53,12 @@ compression_level = 1        ! compression level for netCDF output (1=fastest, 9
 !   precision  = 4 (single precision) or 8 (double precision)
 ! ============================================================================
 &nml_list
-io_list =  'sst       ',6, 'h', 4,
-           'sss       ',6, 'h', 4,
+io_list =  'sst       ',1, 'm', 4,
+           'sss       ',1, 'm', 4,
            'ssh       ',1, 'm', 4,
            'uice      ',1, 'm', 4,
            'vice      ',1, 'm', 4,
-           'a_ice     ',6, 'h', 4,
+           'a_ice     ',1, 'm', 4,
            'm_ice     ',1, 'm', 4,
            'm_snow    ',1, 'm', 4,
            'MLD1      ',1, 'm', 4,
@@ -83,8 +83,8 @@ io_list =  'sst       ',6, 'h', 4,
            'fh        ',1, 'm', 4,
            'otracers  ',1, 'm', 4,
            'dpCO2s    ',1, 'm', 4,
-           'pCO2s     ',6, 'h', 4,
-           'CO2f      ',6, 'h', 4,
+           'pCO2s     ',1, 'm', 4,
+           'CO2f      ',1, 'm', 4,
            'Hp        ',1, 'm', 4,
            'aFe       ',1, 'm', 4,
            'aN        ',1, 'm', 4,
@@ -113,7 +113,7 @@ io_list =  'sst       ',6, 'h', 4,
            'docexd    ',1, 'm', 4,
            'respn     ',1, 'm', 4,
            'respd     ',1, 'm', 4,
-           'xCO2atm   ',6, 'h', 4,
+           'xCO2atm   ',1, 'm', 4,
 /
 
 ! ============================================================================

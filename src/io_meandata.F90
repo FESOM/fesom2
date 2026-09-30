@@ -13,6 +13,7 @@ module io_MEANDATA
   use async_threads_module
   use io_redistribute
   use netcdf
+  use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
   use io_xios_module, only: io_xios_is_on, io_xios_field_is_active, &
                             io_xios_send_2d_r8, io_xios_send_2d_r4, &
                             io_xios_send_3d_r8, io_xios_send_3d_r4, &
@@ -48,6 +49,17 @@ module io_MEANDATA
   real(real32), parameter :: NC_FILL_FLOAT  = 9.9692099683868690e+36_real32
   real(real64), parameter :: NC_FILL_DOUBLE = 9.9692099683868690e+36_real64
 
+  ! 2D surface-only fields that are undefined under an ice shelf: written as _FillValue
+  ! at cavity nodes/elements (ulevels > 1) by the native NetCDF output. Other 2D 
+  ! fields (pbo, fw, fh, benthos, MLD, vertical integrals, forcing, ...) are defined
+  ! there and stay untouched.
+  character(len=16), parameter :: cavity_masked_2d(*) = [character(len=16) :: &
+      'sst', 'sss', 'tos', 'sos', 'ssh', 'unod_sfc', 'vnod_sfc', &
+      'a_ice', 'm_ice', 'm_snow', 'h_ice', 'h_snow', 'vol_ice', 'vol_snow', &
+      'uice', 'vice', 'ist', 'alb', 'strength_ice', 'apnd', 'hpnd', 'ipnd', &
+      'thdgrarea', 'thdgrice', 'thdgrsnw', 'dyngrarea', 'dyngrice', 'dyngrsnw', &
+      'atmice_x', 'atmice_y', 'iceoce_x', 'iceoce_y']
+
   type Meandata
     private
     type(t_partit), pointer                            :: p_partit
@@ -82,6 +94,7 @@ module io_MEANDATA
     logical :: is_elem_based = .false.
     logical :: is_fbin_based = .false.
     logical :: flip = .false.
+    logical :: mask_cavity_2d = .false. ! name in cavity_masked_2d --> _FillValue at cavity columns
     class(data_strategy_type), allocatable :: data_strategy
     integer :: comm
     type(thread_type) thread
@@ -1200,12 +1213,12 @@ CASE ('pCO2s     ')
 
 CASE ('CO2f      ')
     if (use_REcoM) then
-    call def_stream(nod2D,  myDim_nod2D,   'CO2f',      'CO2-flux into the surface water',  'mmolC/m2/d', GloCO2flux(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D,  myDim_nod2D,   'CO2f',      'Air-to-sea CO2 flux into the surface water (positive: ocean uptake, negative: outgassing)',  'mmolC/m2/d', GloCO2flux(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 
 CASE ('O2f       ')
     if (use_REcoM) then
-    call def_stream(nod2D,  myDim_nod2D,   'O2f',      'O2-flux into the surface water',  'mmolO/m2/d', GloO2flux(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(nod2D,  myDim_nod2D,   'O2f',      'Air-to-sea O2 flux into the surface water (positive: ocean uptake, negative: outgassing)',  'mmolO/m2/d', GloO2flux(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 
 CASE ('Hp        ')
@@ -3472,7 +3485,8 @@ end subroutine
 ! bottom topography or above a cavity and are the only ones written as _FillValue.
 ! For 2D fields (nlev_loc==1) and non-spatial vertical axes (density / ice classes)
 ! the whole column is valid, so a legitimate zero (e.g. ice-free a_ice or vanishing
-! IDEMIX energy) is kept as zero rather than turned into a missing value.
+! IDEMIX energy) is kept as zero rather than turned into a missing value. Exception:
+! surface-only 2D fields in cavity_masked_2d are _FillValue under an ice shelf.
 subroutine get_wet_range(entry, mesh, nlev_loc, j, ul_loc, kmax_loc)
     use mod_mesh
     implicit none
@@ -3497,6 +3511,15 @@ subroutine get_wet_range(entry, mesh, nlev_loc, j, ul_loc, kmax_loc)
         else
             kmax_loc = nl_bot - 1
         end if
+    else if (nlev_loc == 1 .and. entry%mask_cavity_2d) then
+        ! surface-only 2D field: level 1 lies inside the ice shelf at cavity columns
+        ! (ul_loc > 1) --> the single entry falls outside [ul_loc, kmax_loc]
+        if (entry%is_elem_based) then
+            ul_loc = mesh%ulevels(j)
+        else
+            ul_loc = mesh%ulevels_nod2D(j)
+        end if
+        kmax_loc = 1
     else
         ! 2D fields and non-spatial vertical axes: every entry is valid
         ul_loc   = 1
@@ -3758,6 +3781,8 @@ ctime=timenew+(daynew-1.)*86400
                             entry%local_values_r8_copy(I,J) = NC_FILL_DOUBLE  ! dry cell - set to fill value
                         else
                             entry%local_values_r8_copy(I,J) = entry%local_values_r8(I,J) /real(entry%addcounter,real64) + real(entry%offset,real64)  ! compute_means
+                            ! NaN as fill value in the model (e.g. REcoM air-sea fields at cavity nodes) -> _FillValue
+                            if (ieee_is_nan(entry%local_values_r8_copy(I,J))) entry%local_values_r8_copy(I,J) = NC_FILL_DOUBLE
                         end if
                         entry%local_values_r8(I,J) = 0._real64 ! clean_meanarrays - reset to 0 for next accumulation
                     END DO ! --> DO I=1, nlev_loc
@@ -3784,6 +3809,8 @@ ctime=timenew+(daynew-1.)*86400
                             entry%local_values_r4_copy(I,J) = NC_FILL_FLOAT  ! dry cell - set to fill value
                         else
                             entry%local_values_r4_copy(I,J) = real(entry%local_values_r8(I,J) /real(entry%addcounter,real64) + real(entry%offset,real64), real32)  ! compute_means
+                            ! see comment in the double precision branch above
+                            if (ieee_is_nan(entry%local_values_r4_copy(I,J))) entry%local_values_r4_copy(I,J) = NC_FILL_FLOAT
                         end if
                         entry%local_values_r8(I,J) = 0._real64 ! clean_meanarrays - reset to 0 for next accumulation
                     END DO ! --> DO I=1, nlev_loc
@@ -4445,6 +4472,7 @@ subroutine def_stream_after_dimension_specific(entry, name, description, units, 
 
     !___________________________________________________________________________
     entry%name = name
+    entry%mask_cavity_2d = any(cavity_masked_2d == name)
     entry%description = description
     entry%long_description = long_description
     entry%mesh = "fesom_mesh";

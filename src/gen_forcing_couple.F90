@@ -306,6 +306,10 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   logical                                          :: do_rotate_ice_wind=.false.
   INTEGER                                          :: my_global_rank, ierror
   INTEGER 					   :: status(MPI_STATUS_SIZE)
+#if defined (__recom)
+  integer                                          :: nneg_loc, nneg          ! nodes with xCO2atm <= 0 from OpenIFS
+  real(kind=WP)                                    :: xco2_min_loc, xco2_min
+#endif
 #endif
   !character(15)                         :: vari, filevari
   !character(4)                          :: fileyear
@@ -609,6 +613,23 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
                 ! MW_CO2 = 44.0095 g/mol (NIST 2018)
                 ! MW_dry_air = 28.9647 g/mol (standard atmosphere composition)
                 x_co2atm(:) = exchange(:) * ((28.9647_WP/44.0095_WP)*1e6_WP)  ! [ppm]
+
+                ! stop if OpenIFS sends xCO2atm <= 0: REcoM would compute the air-sea
+                ! CO2 flux from an unphysical atmospheric pCO2
+                nneg_loc     = count(x_co2atm(1:myDim_nod2D) <= 0.0_WP)
+                xco2_min_loc = minval(x_co2atm(1:myDim_nod2D))
+                call MPI_AllREDUCE(nneg_loc,     nneg,     1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+                call MPI_AllREDUCE(xco2_min_loc, xco2_min, 1, MPI_WP,      MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+                if (nneg > 0) then
+                    if (xco2_min_loc == xco2_min) then ! rank(s) holding the minimum report its location
+                        n = minloc(x_co2atm(1:myDim_nod2D), 1)
+                        write(*,*) 'xCO2atm from OpenIFS <= 0 ppm at ', nneg, ' nodes, min = ', xco2_min, &
+                                   ' ppm at lon/lat = ', geo_coord_nod2D(:, n) / rad, ' (mype ', partit%mype, &
+                                   ', istep ', istep, ')'
+                    end if
+                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                    stop
+                end if
              end if
 #endif
 #else
