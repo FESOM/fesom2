@@ -1420,6 +1420,17 @@ contains
 ! multi FESOM group loop parallelization    
     call MPI_Barrier(f%MPI_COMM_FESOM, f%MPIERR)
 #endif
+    ! Enhanced profiler report. It reduces over MPI_COMM_FESOM, so every rank has to
+    ! call it once while MPI is still up: here, before the REcoM group loop and before
+    ! par_ex. In the OpenIFS-coupled build par_ex calls oasis_terminate, which finalizes
+    ! MPI, so a report after it aborts every rank ("MPI_Comm_f2c() was called after
+    ! MPI_FINALIZE") once the run is otherwise complete.
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("fesom_finalize_total")
+        call fesom_profiler_report(f%MPI_COMM_FESOM, f%mype)
+        ! Note: Do NOT call fesom_profiler_finalize here as it would duplicate the report
+#endif
+
 #if defined(__recom) && defined (__usetp) 
 ! list statistics for all fesom_groups 
 ! fesom groups are listed backwards, so info for the main fesom group 0 is at the end in the log
@@ -1572,12 +1583,6 @@ contains
 
 #if defined(__MULTIO) && !defined(__ifsinterface) && !defined(__oasis)
    call mpp_stop
-#endif
-    ! Generate enhanced profiler report BEFORE MPI finalization
-#if defined (FESOM_PROFILING)
-        call fesom_profiler_end("fesom_finalize_total")
-        call fesom_profiler_report(f%MPI_COMM_FESOM, f%mype)
-        ! Note: Do NOT call fesom_profiler_finalize here as it would duplicate the report
 #endif
     
     if(f%fesom_did_mpi_init) call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype) ! finalize MPI before FESOM prints its stats block, otherwise there is sometimes output from other processes from an earlier time in the programm AFTER the starts block (with parastationMPI)
