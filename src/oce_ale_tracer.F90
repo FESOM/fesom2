@@ -101,6 +101,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     integer                                  :: i, tr_num, node, elem, nzmax, nzmin
     real(kind=WP)                            :: ttf_rhs_bak (mesh%nl-1, partit%myDim_nod2D+partit%eDim_elem2D) ! local variable
     integer                                  :: nz, n, nu1, nl1
+    real(kind=WP)                            :: tt0, sink0 ! sub-timers of the tracer step
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:,:,:), pointer :: UV, fer_UV
@@ -212,7 +213,9 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         !$ACC  UPDATE DEVICE(tracers%work%edge_up_dn_grad) !!&
         ! it will update del_ttf with contributions from horizontal and vertical advection parts (del_ttf_advhoriz and del_ttf_advvert)
 	!$ACC wait(1)
+        tt0 = MPI_Wtime()
         call do_oce_adv_tra(dt, UV, Wvel, Wvel_i, Wvel_e, tr_num, dynamics, tracers, partit, mesh)
+        rtime_tra_adv = rtime_tra_adv + (MPI_Wtime()-tt0)
 
         !$ACC UPDATE HOST(tracers%work%del_ttf, tracers%work%del_ttf_advhoriz, tracers%work%del_ttf_advvert)
         !___________________________________________________________________________
@@ -251,7 +254,11 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         !___________________________________________________________________________
         ! diffuse tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
+        sink0 = rtime_tra_sink
+        tt0   = MPI_Wtime()
         call diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
+        ! REcoM sinking/benthos runs inside diff_tracers_ale and is timed there separately
+        rtime_tra_diff = rtime_tra_diff + (MPI_Wtime()-tt0) - (rtime_tra_sink-sink0)
 
         !___________________________________________________________________________
         ! Radioactive decay of 14C and 39Ar
@@ -283,6 +290,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
             
         end if
 
+        tt0 = MPI_Wtime()
         call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
 !$OMP BARRIER
 
@@ -317,10 +325,12 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
             end do
         end if ! (num_fesom_groups > 1) then
 #endif
+        rtime_tra_exch = rtime_tra_exch + (MPI_Wtime()-tt0)
     end do ! EITHER: tr_num = tr_num_start, tr_num_end OR 1, tracers%num_tracers, depending on __usetp
     
 #if defined(__recom) && defined(__usetp)
 ! if tracer in group was added to compensate for fragmentation its broadcast of the last index is handled here
+    tt0 = MPI_Wtime()
     if(num_fesom_groups > 1) then
         do group_i = 0, num_fesom_groups - 1
             call calc_slice(num_tracers, num_fesom_groups, group_i, tr_num_start, tr_num_end, tr_num_in_group_dummy, has_one_added_tracer)
@@ -340,7 +350,10 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
             end if
         end do
     end if !(num_fesom_groups > 1) then
+    rtime_tra_exch = rtime_tra_exch + (MPI_Wtime()-tt0)
 
+    ! wait until the tracers of the other fesom groups have arrived
+    tt0 = MPI_Wtime()
     if(num_fesom_groups > 1) then
         completed = .false.
         do while (.not. completed)
@@ -359,6 +372,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
                 call MPI_TESTALL(request_count, Benthos_tr_requests(:), completed, MPI_STATUSES_IGNORE, MPIerr)
             end do
     end if ! (num_fesom_groups > 1) then
+    rtime_tra_tpwait = rtime_tra_tpwait + (MPI_Wtime()-tt0)
 #endif
 
 #if defined(__recom) && defined(__usetp)
@@ -451,6 +465,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 
     implicit none
     integer       , intent(in)   , target :: tr_num
+    real(kind=WP)                         :: tsink0 ! timer REcoM sinking/benthos
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_tracer), intent(inout), target :: tracers
     type(t_ice)   , intent(in)   , target :: ice
@@ -537,6 +552,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 !        if (recom_debug .and. mype==0)  print *, tracers%data(tr_num)%ID
 
 #if defined(__recom)
+    tsink0 = MPI_Wtime()
 ! 1) Remineralization from the benthos
 !    Nutrient fluxes come from the bottom boundary
 !    Unit [mmol/m2/s]
@@ -642,6 +658,7 @@ if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
                                                 str_bf(nzmin:nzmax,n)
         end do
 endif
+    rtime_tra_sink = rtime_tra_sink + (MPI_Wtime()-tsink0)
 #endif
     !___________________________________________________________________________
     ! Update tracers --> calculate T* see Danilov et al. (2017)
