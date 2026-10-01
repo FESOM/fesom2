@@ -1,194 +1,40 @@
-module densityJM_components_interface
-  interface
-    subroutine densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot)
-      USE MOD_PARSUP
-      USE o_param
-      real(kind=WP),  intent(IN)             :: t,s
-      real(kind=WP),  intent(OUT)            :: bulk_0, bulk_pz, bulk_pz2, rhopot
-    end subroutine densityJM_components
-  end interface
-end module densityJM_components_interface
+module oce_ale_pressure_bv_module
+    USE g_config
+    USE o_PARAM
+    USE MOD_MESH
+    USE MOD_TRACER
+    USE MOD_PARTIT
+    use par_support_module, only: par_ex
+    USE o_ARRAYS
+    USE g_support
+    USE o_mixing_KPP_mod, only: dbsfc
+    USE diagnostics, only: ldiag_dMOC, dmoc_is_due, ldiag_diapmix, sw_alpha_diap, sw_beta_diap
+    USE g_comm_auto
+    USE Toy_Neverworld2, only: thermal_alpha, do_cabbeling, cabbeling_Cb, do_thermobar, &
+            thermobaric_Th, do_haline, haline_beta
 
-module density_linear_interface
-  interface
-    subroutine density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out, depth)
-      USE MOD_PARSUP
-      USE o_param
-      real(kind=WP),  intent(IN)             :: t,s
-      real(kind=WP),  intent(OUT)            :: bulk_0, bulk_pz, bulk_pz2, rho_out
-      real(kind=WP),  intent(IN),   optional :: depth
-    end subroutine density_linear
-  end interface
-end module density_linear_interface
+    USE oce_density_kernels, only: densityJM_components
 
-module pressure_force_4_linfs_fullcell_interface
-  interface
-    subroutine pressure_force_4_linfs_fullcell(partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-    end subroutine pressure_force_4_linfs_fullcell
-  end interface
-end module pressure_force_4_linfs_fullcell_interface
-module pressure_force_4_linfs_nemo_interface
-  interface
-    subroutine pressure_force_4_linfs_nemo(tracers, partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_TRACER
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-      type(t_tracer), intent(in),     target :: tracers
-    end subroutine pressure_force_4_linfs_nemo
-  end interface
-end module pressure_force_4_linfs_nemo_interface
-module pressure_force_4_linfs_shchepetkin_interface
-  interface
-    subroutine pressure_force_4_linfs_shchepetkin(partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-    end subroutine pressure_force_4_linfs_shchepetkin
-  end interface
-end module pressure_force_4_linfs_shchepetkin_interface
-module pressure_force_4_linfs_easypgf_interface
-  interface
-    subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_TRACER
-      type(t_tracer), intent(in),     target :: tracers
-      type(t_partit), intent(inout),  target :: partit
-      type(t_mesh),   intent(in),     target :: mesh
-    end subroutine pressure_force_4_linfs_easypgf
-  end interface
-end module pressure_force_4_linfs_easypgf_interface
-module pressure_force_4_linfs_cubicspline_interface
-  interface
-    subroutine pressure_force_4_linfs_cubicspline(partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-    end subroutine pressure_force_4_linfs_cubicspline
-  end interface
-end module pressure_force_4_linfs_cubicspline_interface
-module pressure_force_4_linfs_cavity_interface
-  interface
-    subroutine pressure_force_4_linfs_cavity(partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-    end subroutine pressure_force_4_linfs_cavity
-  end interface
-end module pressure_force_4_linfs_cavity_interface
-module pressure_force_4_zxxxx_shchepetkin_interface
-  interface
-    subroutine pressure_force_4_zxxxx_shchepetkin(partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-    end subroutine pressure_force_4_zxxxx_shchepetkin
-  end interface
-end module pressure_force_4_zxxxx_shchepetkin_interface
-module pressure_force_4_zxxxx_easypgf_interface
-  interface
-    subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_TRACER
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-      type(t_tracer), intent(in),     target :: tracers
-    end subroutine pressure_force_4_zxxxx_easypgf
-  end interface
-end module pressure_force_4_zxxxx_easypgf_interface
-module pressure_force_4_zxxxx_cubicspline_interface
-  interface
-    subroutine pressure_force_4_zxxxx_cubicspline(partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-    end subroutine pressure_force_4_zxxxx_cubicspline
-  end interface
-end module pressure_force_4_zxxxx_cubicspline_interface
-module init_ref_density_interface
-  interface
-    subroutine init_ref_density(partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-    end subroutine init_ref_density
-  end interface
-end module init_ref_density_interface
-module insitu2pot_interface
-  interface
-    subroutine insitu2pot(tracers, partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_TRACER
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-      type(t_tracer), intent(in),     target :: tracers
-    end subroutine insitu2pot
-  end interface
-end module insitu2pot_interface
-module pressure_bv_interface
-  interface
-    subroutine pressure_bv(tracers, partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_TRACER
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-      type(t_tracer), intent(in),     target :: tracers
-    end subroutine pressure_bv
-  end interface
-end module pressure_bv_interface
-module pressure_force_4_linfs_interface
-  interface
-    subroutine pressure_force_4_linfs(tracers, partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_TRACER
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-      type(t_tracer), intent(in),     target :: tracers
-    end subroutine pressure_force_4_linfs
-  end interface
-end module pressure_force_4_linfs_interface
-module pressure_force_4_zxxxx_interface
-  interface
-    subroutine pressure_force_4_zxxxx(tracers, partit, mesh)
-      USE MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      USE MOD_TRACER
-      type(t_mesh),   intent(in) ,    target :: mesh
-      type(t_partit), intent(inout),  target :: partit
-      type(t_tracer), intent(in),     target :: tracers
-    end subroutine pressure_force_4_zxxxx
-  end interface
-end module pressure_force_4_zxxxx_interface
+    implicit none
+
+    private
+    public :: pressure_bv, pressure_force_4_linfs, &
+              pressure_force_4_linfs_fullcell, &
+              pressure_force_4_linfs_nemo, &
+              pressure_force_4_linfs_shchepetkin, &
+              pressure_force_4_linfs_easypgf, &
+              pressure_force_4_linfs_cubicspline, &
+              pressure_force_4_linfs_cavity, pressure_force_4_zxxxx, &
+              pressure_force_4_zxxxx_cubicspline, &
+              pressure_force_4_zxxxx_shchepetkin, &
+              pressure_force_4_zxxxx_easypgf, densityJM_local, &
+              ptheta, atg, sw_alpha_beta, &
+              compute_sigma_xy, compute_neutral_slope, insitu2pot, &
+              density_linear, init_ref_density, &
+              init_ref_density_advanced
+
+contains
+
 !
 !
 !===============================================================================
@@ -196,18 +42,6 @@ subroutine pressure_bv(tracers, partit, mesh)
 ! fill in the hydrostatic pressure and the Brunt-Vaisala frequency
 ! in a single pass the using split form of the equation of state
 ! as proposed by NR
-    use g_config
-    USE o_PARAM
-    USE MOD_MESH
-    USE MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE o_ARRAYS
-    USE g_support
-    USE o_mixing_KPP_mod, only: dbsfc
-    USE diagnostics,      only: ldiag_dMOC, dmoc_is_due
-    use densityJM_components_interface
-    use density_linear_interface
     IMPLICIT NONE
     type(t_mesh),   intent(in) ,    target  :: mesh
     type(t_partit), intent(inout),  target  :: partit
@@ -264,7 +98,7 @@ subroutine pressure_bv(tracers, partit, mesh)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(zmean, dz_inv, bv,  a, rho_up, rho_dn, t, s, node, nz, nl1, nzmax, nzmin, &
 !$OMP                                  rhopot, bulk_0, bulk_pz, bulk_pz2, rho, dbsfc1, db_max, bulk_up, bulk_dn, &
-!$OMP                                  rho_surf, aux_rho, aux_rho1, flag1, flag2, bv1)
+!$OMP                                  rho_surf, aux_rho, aux_rho1, flag1, flag2, bv1, flag3)
 !$OMP DO
     do node=1, myDim_nod2D+eDim_nod2D
         nzmin = ulevels_nod2D(node)
@@ -513,17 +347,6 @@ end subroutine pressure_bv
 !===============================================================================
 ! Calculate pressure gradient force (PGF) for linear free surface case
 subroutine pressure_force_4_linfs(tracers, partit, mesh)
-    use g_config
-    use mod_mesh
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use mod_tracer
-    use pressure_force_4_linfs_fullcell_interface
-    use pressure_force_4_linfs_nemo_interface
-    use pressure_force_4_linfs_shchepetkin_interface
-    use pressure_force_4_linfs_cubicspline_interface
-    use pressure_force_4_linfs_cavity_interface
-    use pressure_force_4_linfs_easypgf_interface
     implicit none
     type(t_mesh),   intent(in) ,    target  :: mesh
     type(t_partit), intent(inout),  target  :: partit
@@ -581,12 +404,6 @@ end subroutine pressure_force_4_linfs
 !===============================================================================
 ! calculate pressure gradient force for linfs in case full cells
 subroutine pressure_force_4_linfs_fullcell(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_ARRAYS
-    use g_config
     implicit none
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit
@@ -633,15 +450,6 @@ end subroutine pressure_force_4_linfs_fullcell
 ! Gurvan Madec, and the NEMO team gurvan.madec@locean-ipsl.umpc.fr, nemo st@locean-ipsl.umpc.fr
 ! November 2015, – version 3.6 stable –
 subroutine pressure_force_4_linfs_nemo(tracers, partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_TRACER
-    use o_ARRAYS
-    use g_config
-    use densityJM_components_interface
-    use density_linear_interface
     implicit none
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit
@@ -818,12 +626,6 @@ end subroutine pressure_force_4_linfs_nemo
 ! calculate PGF for linfs with partiell cell on/off
 ! First coded by P. Scholz for FESOM2.0, 08.02.2019
 subroutine pressure_force_4_linfs_shchepetkin(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_ARRAYS
-    use g_config
     implicit none
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit
@@ -1079,15 +881,6 @@ end subroutine pressure_force_4_linfs_shchepetkin
 ! Calculate pressure gradient force (PGF)
 ! First coded by P. Scholz for FESOM2.0, 08.02.2019
 subroutine pressure_force_4_linfs_easypgf(tracers, partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_TRACER
-    use o_ARRAYS
-    use g_config
-    use densityJM_components_interface
-    use density_linear_interface
     implicit none
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit
@@ -1449,12 +1242,6 @@ end subroutine pressure_force_4_linfs_easypgf
 ! Calculate pressure gradient force (PGF) via cubicspline used in FEOSM1.4
 ! First coded by Q. Wang for FESOM1.4, adapted by P. Scholz for FESOM2.0, 08.02.2019
 subroutine pressure_force_4_linfs_cubicspline(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_ARRAYS
-    use g_config
     implicit none
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit
@@ -1659,12 +1446,6 @@ end subroutine pressure_force_4_linfs_cubicspline
 ! calculate pressure gradient force for linfs in case cavities are used with
 ! surface partial cells or bottom partial cells
 subroutine pressure_force_4_linfs_cavity(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_ARRAYS
-    use g_config
     implicit none
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit
@@ -1879,14 +1660,6 @@ end subroutine pressure_force_4_linfs_cavity
 !===============================================================================
 ! Calculate pressure gradient force (PGF) for full free surface case zlevel and zstar
 subroutine pressure_force_4_zxxxx(tracers, partit, mesh)
-    use mod_mesh
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use mod_tracer
-    use g_config
-    use pressure_force_4_zxxxx_shchepetkin_interface
-    use pressure_force_4_zxxxx_cubicspline_interface
-    use pressure_force_4_zxxxx_easypgf_interface
     implicit none
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit
@@ -1919,12 +1692,6 @@ end subroutine pressure_force_4_zxxxx
 ! First coded by Q. Wang for FESOM1.4, adapted by P. Scholz for FESOM2.0
 ! 26.04.2018
 subroutine pressure_force_4_zxxxx_cubicspline(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_ARRAYS
-    use g_config
     implicit none
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit
@@ -2110,14 +1877,6 @@ end subroutine pressure_force_4_zxxxx_cubicspline
 ! calculate PGF for linfs with partiell cell on/off
 ! First coded by P. Scholz for FESOM2.0, 08.02.2019
 subroutine pressure_force_4_zxxxx_shchepetkin(partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_ARRAYS
-    use g_config
-    use densityJM_components_interface
-    use density_linear_interface
     implicit none
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit
@@ -2357,15 +2116,6 @@ end subroutine pressure_force_4_zxxxx_shchepetkin
 ! calculate PGF for linfs with partiell cell on/off
 ! First coded by P. Scholz for FESOM2.0, 08.02.2019
 subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
-    use o_PARAM
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_TRACER
-    use o_ARRAYS
-    use g_config
-    use densityJM_components_interface
-    use density_linear_interface
     implicit none
     type(t_mesh),   intent(in) ,    target  :: mesh
     type(t_partit), intent(inout),  target  :: partit
@@ -2391,7 +2141,7 @@ subroutine pressure_force_4_zxxxx_easypgf(tracers, partit, mesh)
     ! loop over triangular elemments
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nle, ule, nlz, nln, ni, nlc, nlce, idx, int_dp_dx, drho_dx, drho_dy, dz_dx, dz_dy, aux_sum, dx10, dx20, dx21, &
 !$OMP                                  f0, df10, df21, t0, dt10, dt21, s0, ds10, ds21, rho_at_Zn, temp_at_Zn, salt_at_Zn, drho_dz, aux_dref, rhopot,                &
-!$OMP                                  bulk_0, bulk_pz, bulk_pz2, dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, zbar_n, z_n                                )
+!$OMP                                  bulk_0, bulk_pz, bulk_pz2, dref_rhopot, dref_bulk_0, dref_bulk_pz, dref_bulk_pz2, zbar_n, z_n, layer_offset)
 !$OMP DO
     do elem = 1, myDim_elem2D
         !_______________________________________________________________________
@@ -2612,12 +2362,6 @@ end subroutine pressure_force_4_zxxxx_easypgf
 !   - Includes full pressure/compressibility effects → in-situ density
 !   - Different from potential density (which has no pressure effects)
 SUBROUTINE densityJM_local(t, s, pz, rho_out, partit, mesh)
-USE MOD_MESH
-USE MOD_PARTIT
-USE MOD_PARSUP !, only: par_ex,pe_status
-USE o_ARRAYS
-USE o_PARAM
-use densityJM_components_interface
 IMPLICIT NONE
 
   !
@@ -2649,119 +2393,6 @@ end subroutine densityJM_local
 !
 !
 !
-!===============================================================================
-! Computes components of the Jackett-McDougall equation of state for seawater.
-! This split-form approach separates density into surface density and pressure
-! derivatives, enabling efficient computation of both potential and in-situ 
-! density from a single EOS call.
-!
-! INPUT:
-!   t          - in-situ temperature (°C)
-!   s          - salinity (psu)
-!
-! OUTPUT:
-!   bulk_0     - density at surface pressure (P=0 dbar), kg/m³
-!                This is approximately the potential density ρ₀(T,S,P=0)
-!   bulk_pz    - first derivative of density w.r.t. pressure: ∂ρ/∂P, kg/m³/dbar
-!   bulk_pz2   - second derivative of density w.r.t. pressure: ∂²ρ/∂P², kg/m³/dbar²
-!   rhopot     - potential density referenced to surface (σ₀), kg/m³
-!
-! USAGE - Computing In-Situ Density:
-!   In-situ density at depth z (negative, in meters) is computed via Taylor 
-!   expansion around surface pressure:
-!
-!   ρ_insitu(z) = bulk_0 + z·(bulk_pz + z·bulk_pz2)
-!
-!   This accounts for compressibility: water gets denser with increasing pressure.
-!   A compressibility correction is then applied:
-!
-!   ρ_insitu(z) = ρ_insitu·rhopot / (ρ_insitu + 0.1·z·state_eq)
-!
-!   The factor 0.1 is a UNIT CONVERSION from depth [m] to pressure [dbar]:
-!     P [dbar] ≈ 0.1 × |z| [m]
-!   Example: at z = -2000 m → P ≈ 200 dbar
-!   This ensures the pressure-dependent correction term has correct units, since
-!   bulk_pz and bulk_pz2 are derivatives w.r.t. pressure in decibars.
-!
-!   Finally, subtract reference density to get density anomaly:
-!
-!   density_m_rho0(z) = ρ_insitu(z) - density_ref(z)
-!
-! WHY SPLIT FORM?
-!   - Efficient: One EOS call provides both potential and in-situ density
-!   - Accurate: Taylor expansion reduces pressure gradient errors
-!   - Flexible: Can compute density at any depth without repeated EOS calls
-!
-! NOTE: 
-!   - Potential density (rhopot) has NO pressure effects → water mass properties
-!   - In-situ density includes pressure → used for dynamics and PGF calculations
-SUBROUTINE densityJM_components(t, s, bulk_0, bulk_pz, bulk_pz2, rhopot)
-USE MOD_PARSUP !, only: par_ex,pe_status
-USE o_ARRAYS
-USE o_PARAM
-IMPLICIT NONE
-
-  !
-  ! - calculates in-situ density as a function of potential temperature
-  !   (relative to the surface)
-  !   using the Jackett and McDougall equation of state
-  !   (Copyright (c) 1992, CSIRO, Australia)
-  ! - has been derived from the SPEM subroutine rhocal
-  !
-  ! Ralph Timmermann, August 2005
-  !---------------------------------------------------------------------------
-  ! N. Rakowski 2014 the split form
-  !---------------------------------------------------------------------------
-  
-  real(kind=WP),  intent(IN)            :: t,s
-  real(kind=WP),  intent(OUT)           :: bulk_0, bulk_pz, bulk_pz2, rhopot
-  real(kind=WP)                         :: s_sqrt, s_abs
-
-  real(kind=WP), parameter   :: a0    = 19092.56,     at   = 209.8925
-  real(kind=WP), parameter   :: at2   = -3.041638,    at3  = -1.852732e-3
-  real(kind=WP), parameter   :: at4   = -1.361629e-5
-  real(kind=WP), parameter   :: as    = 104.4077,     ast  = -6.500517
-  real(kind=WP), parameter   :: ast2  = .1553190,     ast3 = 2.326469e-4
-  real(kind=WP), parameter   :: ass   = -5.587545,    asst = 0.7390729
-  real(kind=WP), parameter   :: asst2 = -1.909078e-2
-  real(kind=WP), parameter   :: ap    = -4.721788e-1, apt  = -1.028859e-2
-  real(kind=WP), parameter   :: apt2  = 2.512549e-4,  apt3 = 5.939910e-7
-  real(kind=WP), parameter   :: aps   = 1.571896e-2,  apst = 2.598241e-4
-  real(kind=WP), parameter   :: apst2 = -7.267926e-6, apss = -2.042967e-3
-  real(kind=WP), parameter   :: ap2   = 1.045941e-5,  ap2t = -5.782165e-10
-  real(kind=WP), parameter   :: ap2t2 = 1.296821e-7
-  real(kind=WP), parameter   :: ap2s  = -2.595994e-7,ap2st = -1.248266e-9
-  real(kind=WP), parameter   :: ap2st2= -3.508914e-9
-
-  real(kind=WP), parameter   :: b0 = 999.842594,    bt  = 6.793952e-2
-  real(kind=WP), parameter   :: bt2 = -9.095290e-3, bt3 = 1.001685e-4
-  real(kind=WP), parameter   :: bt4 = -1.120083e-6, bt5 = 6.536332e-9
-  real(kind=WP), parameter   :: bs = 0.824493,      bst = -4.08990e-3
-  real(kind=WP), parameter   :: bst2 = 7.64380e-5,  bst3 = -8.24670e-7
-  real(kind=WP), parameter   :: bst4 = 5.38750e-9
-  real(kind=WP), parameter   :: bss = -5.72466e-3,  bsst = 1.02270e-4
-  real(kind=WP), parameter   :: bsst2 = -1.65460e-6,bss2 = 4.8314e-4
-
-  !compute secant bulk modulus
-
-  s_abs = s + S_ref_anomaly   ! EOS needs absolute salinity (S_ref=0 unless use_salt_anomaly)
-  s_sqrt = sqrt(s_abs)
-
-  bulk_0 =  a0      + t*(at   + t*(at2  + t*(at3 + t*at4)))      &
-          + s_abs* (as  + t*(ast  + t*(ast2 + t*ast3))               &
-               + s_sqrt*(ass  + t*(asst + t*asst2)))
-
-  bulk_pz =  ap  + t*(apt  + t*(apt2 + t*apt3))                  &
-                  + s_abs*(aps + t*(apst + t*apst2) + s_sqrt*apss)
-
-  bulk_pz2 = ap2 + t*(ap2t + t*ap2t2)		                 &
-                + s_abs *(ap2s + t*(ap2st + t*ap2st2))
-
-  rhopot =  b0 + t*(bt + t*(bt2 + t*(bt3  + t*(bt4  + t*bt5))))	 &
-               + s_abs*(bs + t*(bst + t*(bst2 + t*(bst3 + t*bst4)))  &
-                  + s_sqrt*(bss + t*(bsst + t*bsst2))            &
-                       + s_abs* bss2)
-end subroutine densityJM_components
 !
 !
 !
@@ -2785,11 +2416,9 @@ function ptheta(s,t,p,pr)
   ! Reviewed by ??
   !--------------------------------------------------------
 
-  use o_param, only: WP
   implicit none
   real(kind=WP) 			:: ptheta, s, t, p, pr
   real(kind=WP) 			:: h, xk, q
-  real(kind=WP), external	        :: atg
 
   h = pr - p
   xk = h*atg(s,t,p)
@@ -2826,7 +2455,6 @@ function atg(s,t,p)
   ! Reviewed by ??
   !--------------------------------------------------------
 
-  use o_param, only: WP
   implicit none
   real(kind=WP)  atg, s, t, p, ds
 
@@ -2867,15 +2495,6 @@ subroutine sw_alpha_beta(TF1,SF1, partit, mesh)
   !    sw_beta=0.72088e-3 psu^-1 @ S=40.0psu, ptmp=10.0C (ITS-90), p=4000db
   !    a_over_b=0.34765 psu*C^-1 @ S=40.0psu, ptmp=10.0C, p=4000db
   !-----------------------------------------------------------------
-  use mod_mesh
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use o_arrays
-  use o_param
-  use g_config
-  use g_comm_auto
-  use Toy_Neverworld2, only: thermal_alpha, do_cabbeling, cabbeling_Cb, do_thermobar, thermobaric_Th, do_haline, haline_beta
-  use diagnostics, only: ldiag_diapmix, sw_alpha_diap, sw_beta_diap
   implicit none
   !
   type(t_mesh),   intent(in) ,    target :: mesh
@@ -3041,12 +2660,6 @@ subroutine compute_sigma_xy(TF1,SF1, partit, mesh)
   ! based on thermal expansion and saline contraction coefficients
   ! computes density gradient sigma_xy
   !-------------------------------------------------------------------
-  use mod_mesh
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use o_param
-  use o_arrays
-  use g_comm_auto
   implicit none
   !
   type(t_mesh),   intent(in) ,    target :: mesh
@@ -3135,13 +2748,6 @@ end subroutine compute_sigma_xy
 !
 !===============================================================================
 subroutine compute_neutral_slope(partit, mesh)
-    use o_ARRAYS
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_MESH
-    use o_param
-    use g_config
-    use g_comm_auto
     IMPLICIT NONE
     type(t_mesh),   intent(in) ,    target :: mesh
     type(t_partit), intent(inout),  target :: partit
@@ -3260,18 +2866,10 @@ end subroutine compute_neutral_slope
 !converts insitu temperature to a potential one
 !               tracers%data(1)%values will be modified!
 subroutine insitu2pot(tracers, partit, mesh)
-  use mod_mesh
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use mod_tracer
-  use o_param
-  use o_arrays
-  use g_config
   implicit none
   type(t_mesh),   intent(in) ,   target   :: mesh
   type(t_partit), intent(inout), target   :: partit
   type(t_tracer), intent(in),    target   :: tracers
-  real(kind=WP),  external                :: ptheta
   real(kind=WP)                           :: pp, pr, tt, ss
   integer                                 :: n, nz, nzmin, nzmax
   real(kind=WP),  dimension(:,:), pointer :: temp, salt
@@ -3310,11 +2908,6 @@ end subroutine insitu2pot
 !===============================================================================
 SUBROUTINE density_linear(t, s, bulk_0, bulk_pz, bulk_pz2, rho_out, depth)
 !coded by Margarita Smolentseva, 21.05.2020
-USE MOD_PARSUP !, only: par_ex,pe_status
-USE o_ARRAYS
-USE o_PARAM
-use g_config !, only: which_toy, toy_ocean
-use Toy_Neverworld2, only: thermal_alpha, do_cabbeling, cabbeling_Cb, do_thermobar, thermobaric_Th, do_haline, haline_beta
 IMPLICIT NONE
   real(kind=WP),  intent(IN)             :: t,s
   real(kind=WP),  intent(OUT)            :: rho_out
@@ -3368,13 +2961,6 @@ subroutine init_ref_density(partit, mesh)
     ! Coded by Qiang Wang
     ! Reviewed by ??
     !___________________________________________________________________________
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use o_PARAM
-    use o_ARRAYS
-    use densityJM_components_interface
-    use density_linear_interface
     implicit none
 
     !___________________________________________________________________________
@@ -3426,14 +3012,6 @@ subroutine init_ref_density_advanced(tracers, partit, mesh)
     ! Coded by Qiang Wang
     ! Reviewed by ??
     !___________________________________________________________________________
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_TRACER
-    use o_PARAM
-    use o_ARRAYS
-    use densityJM_components_interface
-    use density_linear_interface
     implicit none
 
     !___________________________________________________________________________
@@ -3455,11 +3033,6 @@ salt=>tracers%data(2)%values(:,:)
 vol1D=0.0_WP
 ref_temp1D=0.0_WP
 ref_salt1D=0.0_WP
-#if !defined(__openmp_reproducible)
-! A "+" reduction combines the per-thread partial sums in a thread-count
-! dependent order, so it is not bit-reproducible: run the loop serially.
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax) REDUCTION(+:vol1D)
-#endif
 do node=1,myDim_nod2d
     x=geo_coord_nod2D(1,node)/rad
     y=geo_coord_nod2D(1,node)/rad
@@ -3473,11 +3046,6 @@ do node=1,myDim_nod2d
        vol1D(nz)=vol1D(nz)+areasvol(nz,node)
     end do
 end do
-#if !defined(__openmp_reproducible)
-! A "+" reduction combines the per-thread partial sums in a thread-count
-! dependent order, so it is not bit-reproducible: run the loop serially.
-!$OMP END PARALLEL DO
-#endif
 call MPI_Allreduce(MPI_IN_PLACE, ref_temp1D, mesh%nl-1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 call MPI_Allreduce(MPI_IN_PLACE, ref_salt1D, mesh%nl-1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
 call MPI_Allreduce(MPI_IN_PLACE,      vol1D, mesh%nl-1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, MPIerr)
@@ -3529,3 +3097,5 @@ do nz=1,68
 end do
 end if
 end subroutine init_ref_density_advanced
+
+end module oce_ale_pressure_bv_module

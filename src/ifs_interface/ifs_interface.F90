@@ -1185,7 +1185,7 @@ subroutine ocean_update_runoff(NBASIN_RUNOFF, BASIN_RUNOFF)
    USE fesom_main_storage_module, only: fesom => f
    USE MOD_MESH
    USE MOD_PARTIT
-   USE MOD_PARSUP
+   use par_support_module, only: par_ex
    USE g_forcing_arrays,    only: runoff
    USE g_sbf,               only: RUNOFF_MAPPER
    use g_support

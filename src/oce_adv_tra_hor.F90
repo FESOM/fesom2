@@ -1,88 +1,24 @@
+module oce_adv_tra_hor_module
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE g_comm_auto
+    USE MOD_TRACER
+    USE g_config, only: dt
+
+    implicit none
+
+    private
+    public :: adv_tra_hor_upw1, adv_tra_hor_muscl, adv_tra_hor_mfct, &
+              adv_tra_hor_spbee
+
+contains
+
 !===============================================================================================================================
 !**************** routines for horizontal tracer advection ***********************
-module oce_adv_tra_hor_interfaces
-  interface
-! (low order upwind)
-! returns flux given at edges which contributes with
-! plus sign into 1st. node and with the minus sign into the 2nd node
-! IF init_zero=.TRUE.  : flux will be set to zero before computation
-! IF init_zero=.FALSE. : flux=flux-input flux
-! flux is not multiplied with dt
-    subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
-      use MOD_MESH
-      use MOD_TRACER
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_partit),intent(in), target :: partit
-      type(t_mesh),  intent(in), target :: mesh
-      real(kind=WP), intent(in)         :: ttf(   mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
-      real(kind=WP), intent(inout)      :: flux(  mesh%nl-1, partit%myDim_edge2D)
-      logical, optional                 :: o_init_zero
-    end subroutine adv_tra_hor_upw1
-!===============================================================================
-! MUSCL
-! returns flux given at edges which contributes with
-! plus sign into 1st. node and with the minus sign into the 2nd node
-! IF init_zero=.TRUE.  : flux will be set to zero before computation
-! IF init_zero=.FALSE. : flux=flux-input flux
-! flux is not multiplied with dt
-    subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad, nboundary_lay, o_init_zero)
-      use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_partit),intent(in), target :: partit
-      type(t_mesh),  intent(in), target :: mesh
-      real(kind=WP), intent(in)         :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
-      real(kind=WP), intent(in)         :: ttf(   mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
-      real(kind=WP), intent(inout)      :: flux(  mesh%nl-1, partit%myDim_edge2D)
-      integer,       intent(in)         :: nboundary_lay(partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(in)         :: edge_up_dn_grad(4, mesh%nl-1, partit%myDim_edge2D)
-      logical, optional                 :: o_init_zero
-    end subroutine adv_tra_hor_muscl
-! a not stable version of MUSCL (reconstruction in the vicinity of bottom topography is not upwind)
-! it runs with FCT option only
-    subroutine adv_tra_hor_mfct(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad,                 o_init_zero)
-      use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_partit),intent(inout), target :: partit
-      type(t_mesh),  intent(in), target :: mesh
-      real(kind=WP), intent(in)         :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
-      real(kind=WP), intent(in)         :: ttf(   mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(in)         :: vel(2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
-      real(kind=WP), intent(inout)      :: flux(  mesh%nl-1, partit%myDim_edge2D)
-      real(kind=WP), intent(in)         :: edge_up_dn_grad(4, mesh%nl-1, partit%myDim_edge2D)
-      logical, optional                 :: o_init_zero
-    end subroutine adv_tra_hor_mfct
-    
-    ! superbee advection num_ord=0: 2nd order in space num_ord=1: 2nd order in space
-    ! and time through  Direct space-time scheme
-    subroutine adv_tra_hor_spbee(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad, flag_posdef, o_init_zero)
-      use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_partit), intent(inout), target :: partit
-      type(t_mesh)  , intent(in)   , target :: mesh
-      real(kind=WP) , intent(in)            :: num_ord    ! num_ord is the fraction of fourth-order contribution in the solution
-      real(kind=WP) , intent(in)            :: ttf(   mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP) , intent(in)            :: vel(2, mesh%nl-1, partit%myDim_elem2D+partit%eDim_elem2D)
-      real(kind=WP) , intent(inout)         :: flux(  mesh%nl-1, partit%myDim_edge2D)
-      real(kind=WP) , intent(in)            :: edge_up_dn_grad(4, mesh%nl-1, partit%myDim_edge2D)
-      logical       , intent(in)            :: flag_posdef
-      logical       , optional              :: o_init_zero
-    end subroutine adv_tra_hor_spbee
-  end interface
-end module oce_adv_tra_hor_interfaces
 !
 !
 !===============================================================================
 subroutine adv_tra_hor_upw1(vel, ttf, partit, mesh, flux, o_init_zero)
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use g_comm_auto
     implicit none
     type(t_partit),intent(in), target :: partit
     type(t_mesh),  intent(in), target :: mesh
@@ -276,11 +212,6 @@ end subroutine adv_tra_hor_upw1
 !
 !===============================================================================
 subroutine adv_tra_hor_muscl(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad, nboundary_lay, o_init_zero)
-    use MOD_MESH
-    use MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use g_comm_auto
     implicit none
     type(t_partit),intent(in), target :: partit
     type(t_mesh),  intent(in), target :: mesh
@@ -561,11 +492,6 @@ end subroutine adv_tra_hor_muscl
 !
 !===============================================================================
     subroutine adv_tra_hor_mfct(vel, ttf, partit, mesh, num_ord, flux, edge_up_dn_grad,                 o_init_zero)
-    use MOD_MESH
-    use MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use g_comm_auto
     implicit none
     type(t_partit),intent(inout), target :: partit
     type(t_mesh),  intent(in), target :: mesh
@@ -870,12 +796,6 @@ subroutine adv_tra_hor_spbee(             &
             flag_posdef                 , &
             o_init_zero                   &
             )
-    use MOD_MESH
-    use MOD_TRACER
-    use MOD_PARTIT
-    use MOD_PARSUP
-    use g_config, only: dt
-    use g_comm_auto
     implicit none
     !___INPUT/OUTPUT VARIABLES__________________________________________________
     type(t_partit)  , intent(inout), target :: partit
@@ -935,7 +855,7 @@ subroutine adv_tra_hor_spbee(             &
 !$OMP                                  nz, nl1, nl2, nl12, nu1, nu2, nu12, nzs, nze, &
 !$OMP                                  dx1, dy1, dx2, dy2, dxdy12, dx0, dy0, &
 !$OMP                                  vflux, cfl, dt_over_edlen, T12vflux,  &
-!$OMP                                  u1, u2, v1, v2, n_x, n_y, Ue)
+!$OMP                                  u1, u2, v1, v2, n_x, n_y, Ue, nlen, inv_nlen)
 !$OMP DO        
     do edge=1, myDim_edge2D
         !_______________________________________________________________________
@@ -1253,3 +1173,5 @@ subroutine adv_tra_hor_spbee(             &
 end subroutine adv_tra_hor_spbee
     
     
+
+end module oce_adv_tra_hor_module

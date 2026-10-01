@@ -2,7 +2,7 @@ MODULE Toy_Neverworld2
     use mod_mesh
     use o_ARRAYS
     use o_PARAM
-    use MOD_PARSUP
+    use par_support_module, only: par_ex
     use MOD_PARTIT
     use MOD_TRACER
     use MOD_DYN
@@ -301,7 +301,7 @@ MODULE Toy_Neverworld2
                 allocate(val_tau(elem2d))
                 open(20, file=trim(meshpath)//'windstress@elem.out', status='old')
                 read(20, *) val_tau
-                stress_surf(1,:)=val_tau(myList_elem2D)
+                stress_surf(1,:)=val_tau(myList_elem2D(1:myDim_elem2D))
                 deallocate(val_tau)
 
             else
@@ -539,7 +539,7 @@ MODULE Toy_Neverworld2
     subroutine oce_mixing_TOY(partit, mesh)
         use MOD_MESH
         use MOD_PARTIT
-        use MOD_PARSUP
+        use par_support_module, only: par_ex
         use o_PARAM
         use o_ARRAYS
         use g_config

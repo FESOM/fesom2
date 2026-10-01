@@ -47,6 +47,16 @@ scaling_GMzexp     = .true.  ! do downscaling of GM & Redi over depth by exp(-z/
 GMzexp_zref        = 500.0   ! reference for vertical exp GM scaling 
 GMzexp_smin        = 0.6     ! minimum scaling factor
 
+! --- Mixed Layer Eddy Restratification (Fox-Kemper et al. 2008, 2011) ---
+use_mle            = .false. ! enable MLE restratification (GM is tapered out of the mixed layer by ODM95)
+mle_Ce             = 0.06    ! efficiency coefficient
+mle_Lf_min         = 1000.0  ! floor on the frontal width (m), Lf = max(N*H/f, Lf_min)
+mle_tau            = 86400.0 ! frontal lifetime (s), regularises f towards the equator
+mle_hmax           = 500.0   ! max. mixed layer depth used (m), Psi scales with H^2
+mle_resscale_max   = 20.0    ! max. resolution factor ds/Lf
+mle_ustar_max      = 0.05    ! max. induced bolus velocity (m/s), column scaled to satisfy it
+mle_mld_decay_time = 0.0     ! running-mean decay time for H (s), 0 = use instantaneous MLD
+
 scaling_GINsea     = .false. ! Increase K_GM resolution scaling only in the GIN sea by factor 
 GINsea_fac         = 2.0     ! GIN sea K_GM upscaling factor 
 

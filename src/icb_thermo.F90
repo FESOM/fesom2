@@ -7,6 +7,7 @@ module iceberg_thermodynamics
  !use iceberg_element
  !use iceberg_step
  use iceberg_ocean_coupling
+ use cavity_param_module, only: pttmpr
 
  implicit none
 
@@ -602,7 +603,7 @@ subroutine potit_ib(ib,salz,pt,pres,rfpres,tin)
   integer ib
   integer iter
   real salz,pt,pres,rfpres,tin
-  real epsi,tpmd,pt1,ptd,pttmpr
+  real epsi,tpmd,pt1,ptd
 
   data tpmd / 0.001 /
 

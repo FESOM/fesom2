@@ -33,7 +33,7 @@ module g_cvmix_idemix
     use o_param           
     use mod_mesh
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     use o_arrays
     use g_comm_auto 
     use g_read_other_NetCDF
@@ -253,7 +253,7 @@ module g_cvmix_idemix
                     loc_Etot = loc_Etot + elem_area(elem)*iwe_fsrf(elem)*density_0
                 end if
             end do
-            call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+            call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
             if (mype==0) write(*,*) " --> IDEMIX total srf. energy Etot_srf =", glb_Etot*1.0e-12, ' TW'
 
         else
@@ -291,7 +291,7 @@ module g_cvmix_idemix
                     loc_Etot = loc_Etot + elem_area(elem)*iwe_fbot(elem)
                 end if     
             end do
-            call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+            call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
             if (mype==0) write(*,*) " --> IDEMIX total tidal energy Etot_bot =", glb_Etot*1.0e-12, ' TW'
             
             ! normalize total tidal energy at bottom with respect to the total 
@@ -310,7 +310,7 @@ module g_cvmix_idemix
                         loc_Etot = loc_Etot + elem_area(elem)*iwe_fbot(elem)
                     end if     
                 end do
-                call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_DOUBLE_PRECISION, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+                call MPI_AllREDUCE(loc_Etot, glb_Etot, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
                 if (mype==0) write(*,*) " --> IDEMIX Etot_bot after normalizing =", glb_Etot*1.0e-12, ' TW'
             end if 
             

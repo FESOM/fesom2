@@ -6,7 +6,7 @@ module fesom_main_storage_module
   USE MOD_ICE
   USE MOD_TRACER
   USE MOD_PARTIT
-  USE MOD_PARSUP
+  use par_support_module, only: par_ex
   USE MOD_DYN
   USE o_ARRAYS
   USE o_PARAM
@@ -29,22 +29,36 @@ module fesom_main_storage_module
                                  siarean, siareas, siextentn, siextents, &
                                  sivoln, sivols
   use mo_tidal
-  use tracer_init_interface
-  use ocean_setup_interface
-  use ice_setup_interface
-  use ocean2ice_interface
-  use oce_fluxes_interface
-  use hosing_interface
-  use update_atm_forcing_interface
-  use before_oce_step_interface
-  use oce_timestep_ale_interface
-  use read_mesh_interface
+  use oce_setup_step_module, only: tracer_init
+  use oce_setup_step_module, only: ocean_setup
+  use ice_setup_step_module, only: ice_setup, ice_timestep
+  use ice_oce_coupling_module, only: ocean2ice
+  use ice_oce_coupling_module, only: oce_fluxes, oce_fluxes_mom
+  use oce_hosing_module, only: fw_surf_anomaly, fw_depth_anomaly
+#if defined (__yac)
+  use gen_forcing_couple_module, only: update_atm_forcing_yac
+#else
+  use gen_forcing_couple_module, only: update_atm_forcing
+#endif
+  use oce_setup_step_module, only: before_oce_step
+  use oce_ale_module, only: oce_timestep_ale
+  use oce_mesh_module, only: read_mesh
   use fesom_version_info_module
   use command_line_options_module
+  use oce_mesh_module, only: mesh_setup, check_mesh_consistency
+  use oce_setup_step_module, only: dynamics_init, arrays_init
+  use oce_dyn_module, only: compute_vel_nodes, update_vel
+  use oce_ale_module, only: restart_thickness_ale
+  use oce_ale_pressure_bv_module, only: init_ref_density_advanced
+  use ice_init_module, only: ice_init_toyocean_dummy
+  use icb_allocate_module, only: allocate_icb
+  use gen_forcing_init_module, only: forcing_setup
+  use par_support_module, only: par_init
+  use write_step_info_module, only: plot_fesomlogo
   use, intrinsic :: iso_fortran_env, only : real32
   use g_forcing_param, only: use_landice_water, use_age_tracer
-  use landice_water_init_interface
-  use age_tracer_init_interface
+  use oce_landice_water_module, only: landice_water_init
+  use oce_age_tracer_module, only: age_tracer_init
   use iceberg_params
   use iceberg_step
   use mod_transit
@@ -202,7 +216,14 @@ contains
         call MPI_Initialized(mpi_is_initialized, f%i)
         if(.not. mpi_is_initialized) then
             ! TODO: do not initialize MPI here if it has been initialized already, e.g. via IFS when fesom is called as library (__ifsinterface is defined)
+#if defined(ASYNCHRONOUS_IO_THREADS)
+            ! I/O worker pthreads call MPI concurrently with the main thread
             call MPI_INIT_THREAD(MPI_THREAD_MULTIPLE, f%provided, f%i)
+#else
+            ! All MPI calls are issued by the main thread (halo exchanges sit in OMP MASTER
+            ! blocks), so FUNNELED is sufficient and avoids MPI-internal locking.
+            call MPI_INIT_THREAD(MPI_THREAD_FUNNELED, f%provided, f%i)
+#endif
             f%fesom_did_mpi_init = .true.
         end if
 #endif
@@ -412,15 +433,7 @@ contains
         call fesom_profiler_end("mesh_setup")
 #endif
 
-#if defined(__recom) && defined(__usetp)
-        if (f%my_fesom_group==0) then
-#endif 
-
         if (f%mype==0) write(*,*) 'FESOM mesh_setup... complete'
-
-#if defined(__recom) && defined(__usetp)
-        end if
-#endif
 
 #if defined (__XIOS)
         ! XIOS client init (NEMO/OIFS pattern). xios_initialize is called with
@@ -432,10 +445,26 @@ contains
         ! matches the EC-Earth-proven NEMO ordering (OASIS -> XIOS on OASIS
         ! local comm). Called here after mesh_setup so coord_nod2D /
         ! elem2D_nodes / zbar / myList_* are populated.
+        !
+        ! Multi-FESOM-group builds: only group 0 registers with OASIS/XIOS,
+        ! matching the write_netcdf_restarts pattern in io_restart.F90 (group
+        ! 1's data is merged into group 0 rather than performing its own I/O).
+        ! Without this guard, every group independently calls
+        ! MPI_Intercomm_create against the single xios_server.exe and the
+        ! rendezvous fails (MPI_ERR_ARG in MPI_Intercomm_create). This guard
+        ! used to wrap the harmless status print above instead of this block
+        ! -- misplaced, so it never actually prevented the double
+        ! registration; moved here to guard the call it was meant to guard.
+#if defined(__recom) && defined(__usetp)
+        if (f%my_fesom_group==0) then
+#endif
         block
           integer :: xios_client_comm
           call io_xios_init(f%mesh, f%partit, f%partit%MPI_COMM_FESOM, xios_client_comm)
         end block
+#if defined(__recom) && defined(__usetp)
+        end if
+#endif
 #endif
 
 !       Transient tracers: control output of initial input values
@@ -467,6 +496,11 @@ contains
 #if !defined (__oifs)
         IF (use_icebergs) THEN
           nrecv = nrecv + 2
+        END IF
+#else
+        IF (use_atm_ice_tskin) THEN
+          nrecv = nrecv + 1
+          recv_tsk_ico = nrecv
         END IF
 #endif
 #endif
@@ -1028,8 +1062,8 @@ contains
         ! --------------
         
         !___model sea-ice step__________________________________________________
+        f%t_ice_s = MPI_Wtime()
         if(use_ice) then
-            f%t_ice_s = MPI_Wtime()
             !___compute fluxes from ocean to ice________________________________
 #if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
@@ -1040,7 +1074,9 @@ contains
 #endif
             f%t_ice_o2iflx_s = MPI_Wtime()
             call ocean2ice(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
-            
+        end if
+
+        if (use_ice .or. .not. toy_ocean) then
             !___compute update of atmospheric forcing____________________________
 #if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
@@ -1057,10 +1093,13 @@ contains
             call update_atm_forcing_yac(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
 #else
             call update_atm_forcing(n, f%ice, f%tracers, f%dynamics, f%partit, f%mesh)
-#endif 
+#endif
 #if defined (FESOM_PROFILING)
         call fesom_profiler_end("update_atm_forcing")
 #endif
+        end if
+
+        if(use_ice) then
             f%t_ice_step_s = MPI_Wtime()
             !___compute ice step________________________________________________
             if (f%ice%ice_steps_since_upd>=f%ice%ice_ave_steps-1) then
@@ -1087,7 +1126,9 @@ contains
         call fesom_profiler_end("ice_timestep")
 #endif
             endif
-        
+        end if
+
+        if (use_ice .or. .not. toy_ocean) then
             !___compute fluxes to the ocean: heat, freshwater, momentum_________
 #if defined(__recom) && defined(__usetp)
         if (f%my_fesom_group==0) then
@@ -1100,14 +1141,15 @@ contains
             call oce_fluxes_mom(f%ice, f%dynamics, f%partit, f%mesh) ! momentum only
             call oce_fluxes(f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
             f%t_ice_e = MPI_Wtime()
+        end if
 
+        if(use_ice) then
             !___freshwater depth hosing routine_______________________________________
             !
             if (use_hosing .and. trim(hosing_mode)=='depth') then
                 call fw_depth_anomaly(f%tracers%data(2)%values, f%tracers%data(1)%values, &
                                       hosing_hSv, f%partit, f%mesh)
             end if
-
         end if
         
         call before_oce_step(f%dynamics, f%tracers, f%partit, f%mesh) ! prepare the things if required
@@ -1391,6 +1433,17 @@ contains
 ! multi FESOM group loop parallelization    
     call MPI_Barrier(f%MPI_COMM_FESOM, f%MPIERR)
 #endif
+    ! Enhanced profiler report. It reduces over MPI_COMM_FESOM, so every rank has to
+    ! call it once while MPI is still up: here, before the REcoM group loop and before
+    ! par_ex. In the OpenIFS-coupled build par_ex calls oasis_terminate, which finalizes
+    ! MPI, so a report after it aborts every rank ("MPI_Comm_f2c() was called after
+    ! MPI_FINALIZE") once the run is otherwise complete.
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("fesom_finalize_total")
+        call fesom_profiler_report(f%MPI_COMM_FESOM, f%mype)
+        ! Note: Do NOT call fesom_profiler_finalize here as it would duplicate the report
+#endif
+
 #if defined(__recom) && defined (__usetp) 
 ! list statistics for all fesom_groups 
 ! fesom groups are listed backwards, so info for the main fesom group 0 is at the end in the log
@@ -1544,14 +1597,37 @@ contains
 #if defined(__MULTIO) && !defined(__ifsinterface) && !defined(__oasis)
    call mpp_stop
 #endif
-    ! Generate enhanced profiler report BEFORE MPI finalization
-#if defined (FESOM_PROFILING)
-        call fesom_profiler_end("fesom_finalize_total")
-        call fesom_profiler_report(f%MPI_COMM_FESOM, f%mype)
-        ! Note: Do NOT call fesom_profiler_finalize here as it would duplicate the report
-#endif
     
+#if defined(__recom) && defined(__usetp) && defined(__oifs)
+    ! FESOM program group 0 already performed the OASIS-coordinated shutdown
+    ! (oasis_terminate, via the #if defined(__oifs) call par_ex(...) block in the
+    ! per-group stats loop above) and is therefore already MPI-finalized at this
+    ! point. Calling par_ex/oasis_terminate a second time here would re-enter
+    ! oasis_terminate's global MPI_Barrier(mpi_comm_global_world,...) + MPI_Finalize
+    ! sequence on an already-finalized MPI session -- undefined behaviour that
+    ! aborts group 0's ranks while group 1 (and OIFS/rnfmap/lpj_guess/xios, whose
+    ! own single finalize call is synchronized with group 0's *first* oasis_terminate
+    ! call via that same global barrier) are still alive. This mismatch is what
+    ! produced the reproducible mpi/pmix_v3 "Error handler invoked" step
+    ! cancellation seen with num_fesom_groups>1 coupled OpenIFS runs, independent
+    ! of whether XIOS output was enabled.
+    ! Group 1 (and any further non-primary group) never took part in that inner
+    ! call, so this remains its one and only finalize call. Call unconditionally
+    ! here, matching group 0's own unconditional call above -- do NOT gate this on
+    ! `f%fesom_did_mpi_init`: that flag is only ever set (see #ifndef __oifs above)
+    ! when FESOM itself calls MPI_INIT, i.e. never in an __oifs build, so a guard
+    ! on it here silently skips this call entirely. That was the actual bug: group
+    ! 1 then never reaches oasis_terminate's global barrier at all, so everyone
+    ! else who does (group 0, OIFS, XIOS, rnfmap, ...) hangs there indefinitely
+    ! until SLURM eventually kills the stuck step -- the deadlock behind the
+    ! mpi/pmix_v3 "Error handler invoked" step cancellation above, independent of
+    ! any PMIx/UCX tuning.
+    if (f%my_fesom_group /= 0) then
+        call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype)
+    end if
+#else
     if(f%fesom_did_mpi_init) call par_ex(f%partit%MPI_COMM_FESOM, f%partit%mype) ! finalize MPI before FESOM prints its stats block, otherwise there is sometimes output from other processes from an earlier time in the programm AFTER the starts block (with parastationMPI)
+#endif
 
 #if defined(__recom) && defined(__usetp)
 ! kh 07.11.25 produce output currently for all groups

@@ -4,6 +4,7 @@
 module g_read_other_NetCDF
 contains
 subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_onvert, partit, mesh)
+    use ieee_arithmetic
     ! Read 2D data and interpolate to the model grid.
     ! Currently used to read runoff and SSS.
     ! First, missing values are filled in on the raw regular grid;
@@ -17,7 +18,7 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
     use o_param
     USE MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     use g_interp
     use netcdf
     implicit none
@@ -210,6 +211,8 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
         
         ! missing value
         status= nf90_get_att(ncid, varid, 'missing_value', miss)
+        if (status /= nf90_noerr) status = nf90_get_att(ncid, varid, '_FillValue', miss)
+        if (status /= nf90_noerr) miss = real(nf90_fill_float, WP)
         
         ! close file
         status=nf90_close(ncid)
@@ -227,7 +230,8 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
     do i=1,lonlen
         do j=1,latlen
             ! check for missing value
-            if (ncdata(i,j)==miss .or. ncdata(i,j)==-99.0_WP) then
+            if (ncdata(i,j)==miss .or. ncdata(i,j)==-99.0_WP .or. &
+                .not. ieee_is_finite(ncdata(i,j)) .or. abs(ncdata(i,j))>=1.0e30_WP) then
                 ! check_dummy=.true.,  missing value is replaced with a 
                 ! meaningful value nearby make sure that near coastal 
                 ! interpoaltion is valid
@@ -238,7 +242,9 @@ subroutine read_other_NetCDF(file, vari, itime, model_2Darray, check_dummy, do_o
                     do k=1,30
                         do ii=max(1,i-k),min(lonlen,i+k)
                             do jj=max(1,j-k),min(latlen,j+k)
-                                if (ncdata_temp(ii,jj)/=miss .and. ncdata_temp(ii,jj)/=-99.0_WP) then  !!
+                                if (ncdata_temp(ii,jj)/=miss .and. ncdata_temp(ii,jj)/=-99.0_WP &
+                                    .and. ieee_is_finite(ncdata_temp(ii,jj)) &
+                                    .and. abs(ncdata_temp(ii,jj))<1.0e30_WP) then  !!
                                     aux=aux+ncdata_temp(ii,jj)
                                     cnt=cnt+1                         
                                 end if
@@ -318,7 +324,7 @@ subroutine read_other_NetCDF_3d(file, vname, zvname, model_3Darray, do_onvert, p
     use o_param
     USE MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     use g_interp
     use netcdf
     implicit none
@@ -655,7 +661,7 @@ subroutine read_surf_hydrography_NetCDF(file, vari, itime, model_2Darray, partit
     use o_param
     USE MOD_MESH
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     use g_rotate_grid
     use, intrinsic :: ISO_FORTRAN_ENV, only: real64
     use g_interp
@@ -780,7 +786,7 @@ subroutine read_2ddata_on_grid_NetCDF(file, vari, itime, model_2Darray, partit, 
   use o_param
   USE MOD_MESH
   USE MOD_PARTIT
-  USE MOD_PARSUP
+  use par_support_module, only: par_ex
   use g_rotate_grid
   use g_interp
   use netcdf

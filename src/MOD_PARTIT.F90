@@ -129,10 +129,6 @@ TYPE T_PARTIT
   integer, allocatable ::  remPtr_elem2D(:), remList_elem2D(:)
 
   logical :: elem_full_flag
-#if defined(_OPENMP)
-  !!! plock is constructed during the runtime and shall not be dumped!!!
-    integer(omp_lock_kind), allocatable :: plock(:)
-#endif
 
   contains
 #if defined(__PGI)

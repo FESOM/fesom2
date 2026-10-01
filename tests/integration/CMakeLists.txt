@@ -128,6 +128,53 @@ if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED AND NOT USE_YAC)
         TIMEOUT ${TEST_TIMEOUT}
     )
 
+    # Idealized (toy_ocean) configurations. They supply their own forcing and
+    # read only a mesh, so they need none of the bundled forcing or climatology
+    # data; the meshes are used in place from test/meshes/ via MESH_DIR. Values
+    # follow setups/test_souf and setups/test_neverworld2, i.e. what CI runs.
+    #
+    # Pass/fail is the clean run plus the sst artifact, so these show the
+    # configurations still start and complete. They do not compare answers: a
+    # numerical drift would go unnoticed. Adding that is designed in
+    # docs/pr/PLAN-ctest-coverage.md.
+    include(${CMAKE_CURRENT_SOURCE_DIR}/../../cmake/FesomToyTest.cmake)
+
+    add_fesom_toy_test(integration_toy_soufflet_mpi8
+        WHICH_TOY "soufflet"
+        MESH_DIR "${FESOM_TESTING_ROOT}/test/meshes/soufflet"
+        CYCLIC_LENGTH "4.5"
+        NP 8
+        TIMEOUT ${TEST_TIMEOUT}
+    )
+
+    add_fesom_toy_test(integration_toy_neverworld2_mpi8
+        WHICH_TOY "neverworld2"
+        MESH_DIR "${FESOM_TESTING_ROOT}/test/meshes/neverworld2"
+        CYCLIC_LENGTH "60.0"
+        NP 8
+        TIMEOUT ${TEST_TIMEOUT}
+    )
+
+    # Ocean-only run: the pi mesh with the sea-ice model switched off, otherwise
+    # identical to integration_pi_mpi2 (CORE2 forcing, WOA18 initial state, 1 day).
+    # This is the only ice-free configuration in the suite that is not a toy_ocean
+    # setup, so it is the only one exercising the ocean-side setup and forcing paths
+    # with use_ice=.false.
+    #
+    # Pass/fail is the clean run plus the sst artifact. That detects a crash or an
+    # abort in the ice-free path; it does NOT detect an ice-free run that completes
+    # while the ocean receives no surface forcing at all. Checking for that needs a
+    # non-zero assertion on the forcing diagnostics (tx_sur/fh/fw) and an ice-on
+    # control run to keep the ice-output absence checks meaningful; see
+    # docs/pr/PLAN-ctest-coverage.md.
+    add_fesom_test(integration_pi_ice_free_mpi2
+        MPI_TEST
+        NP 2
+        TIMEOUT ${TEST_TIMEOUT}
+        LABEL ice_free
+        USE_ICE ".false."
+    )
+
     # Additional MPI test configurations can be added here
     # For example, testing different domain decompositions
 elseif(NOT ENABLE_MPI_TESTS)

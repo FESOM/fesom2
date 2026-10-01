@@ -6,7 +6,6 @@ module cmor_variables_diag
   use o_PARAM
   use MOD_MESH
   use MOD_PARTIT
-  use MOD_PARSUP
   use MOD_TRACER
   use MOD_DYN
   use MOD_ICE
