@@ -39,16 +39,16 @@ run_length_unit   = 'd'        ! unit for run_length: 'y' (years), 'm' (months),
 &clockinit
 timenew = 0.0                  ! initial time within the day [seconds] (0.0 = midnight)
 daynew  = 1                    ! initial day of the month (1-31)
-yearnew = 1900                 ! initial year
+yearnew = 1900  ! initial year
 /
 
 ! ============================================================================
 ! MESH, INITIALIZATION & OUTPUT PATHS
 ! ============================================================================
 &paths
-MeshPath         = ''                                           ! path to mesh files (nod2d.out, elem2d.out, etc.)
-ClimateDataPath  = '/pool/data/AWICM/FESOM2/INITIAL/phc3.0/'    ! path to initial conditions (temperature, salinity)
-ResultPath       = '../results_tmp/'                            ! path for output files and fesom.clock file
+MeshPath         = ''  ! path to mesh files (nod2d.out, elem2d.out, etc.)
+ClimateDataPath  = '/pool/data/AWICM/FESOM2/INITIAL/phc3.0/'          ! path to initial conditions (temperature, salinity)
+ResultPath       = '../results_tmp/'  ! path for output files and fesom.clock file
 /
 
 ! ============================================================================
@@ -61,7 +61,7 @@ raw_restart_length      = 1        ! frequency for raw core dump restart files
 raw_restart_length_unit = 'off'    ! unit: 'y', 'm', 'd', 'h', 's', 'off'
 bin_restart_length      = 1        ! frequency for binary derived type restart files
 bin_restart_length_unit = 'off'    ! unit: 'y', 'm', 'd', 'h', 's', 'off'
-logfile_outfreq         = 450       ! log file output frequency [number of time steps]
+logfile_outfreq         = 450      ! log file output frequency [number of time steps]
 /
 
 ! ============================================================================
@@ -69,9 +69,9 @@ logfile_outfreq         = 450       ! log file output frequency [number of time 
 ! ============================================================================
 &ale_def
 which_ALE          = 'linfs'     ! vertical coordinate type:
-                                 !   'linfs'  = linear free surface
-                                 !   'zlevel' = z-level (fixed depth levels)
-                                 !   'zstar'  = z-star (terrain-following with SSH scaling)
+                                  !   'linfs'  = linear free surface
+                                  !   'zlevel' = z-level (fixed depth levels)
+                                  !   'zstar'  = z-star (terrain-following with SSH scaling)
 use_partial_cell   = .false.     ! use partial bottom cells for better topography representation (not recommended)
 /
 
@@ -87,14 +87,14 @@ force_rotation  = .false.        ! force grid rotation even if not coupled
 alphaEuler      = 0.             ! first Euler angle (rotation around z-axis) [degrees]
 betaEuler       = 0.             ! second Euler angle (rotation around new x-axis) [degrees]
 gammaEuler      = 0.             ! third Euler angle (rotation around new z-axis) [degrees]
-                                 ! Euler angle convention: rotate first around z, then around new x, then around new z
+                                  ! Euler angle convention: rotate first around z, then around new x, then around new z
 /
 
 ! ============================================================================
 ! CALENDAR SETTINGS
 ! ============================================================================
 &calendar
-include_fleapyear = .false.       ! include leap years in calendar (false = 365-day year, true = 365/366-day year)
+include_fleapyear = .false.      ! include leap years in calendar (false = 365-day year, true = 365/366-day year)
 /
 
 ! ============================================================================
@@ -105,7 +105,7 @@ use_ice                  = .false.       ! enable sea ice model
 use_cavity               = .false.       ! enable ice shelf cavities
 use_cavity_partial_cell  = .false.       ! use partial cells in ice shelf cavities (not recommended)
 use_floatice             = .false.       ! enable floating ice (icebergs)
-use_sw_pene              = .false.        ! enable shortwave radiation penetration into ocean
+use_sw_pene              = .false.       ! enable shortwave radiation penetration into ocean
 flag_debug               = .false.       ! enable debug output (verbose logging)
 use_transit              = .false.       ! enable transient tracer module (CFCs, SF6, etc.)
 toy_ocean                = .true.        ! enable toy configuration
@@ -133,4 +133,3 @@ use_icebergs          = .false.  ! enable iceberg module
 steps_per_ib_step     = 8        ! ocean time steps per iceberg time step (iceberg subcycling)
 ib_async_mode         = 0        ! iceberg asynchronous mode (0=synchronous, 1=asynchronous)
 /
-
