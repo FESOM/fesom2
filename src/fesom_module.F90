@@ -548,7 +548,10 @@ contains
 #if defined (__usetp)
         if(f%my_fesom_group==0) then
 #endif
-        if (f%mype==0) write(*,*) 'RECOM recom_init... complete'
+        if (f%mype==0) then
+            write(*,'(a)') ' ------------------------------------------------------------'
+            write(*,'(a,f8.2,a)') ' RECOM recom_init... complete (', f%t_recom_e - f%t_recom_s, ' s)'
+        end if
 #if defined (__usetp)
         end if
 #endif

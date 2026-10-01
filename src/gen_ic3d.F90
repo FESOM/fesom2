@@ -252,11 +252,8 @@ CONTAINS
       
       warn = 0
 
-      if (mype==0) then
-         write(*,*) 'variable ', trim(varname)
-         write(*,*) 'from     ', trim(filename)
-      end if
-      
+      if (mype==0) write(*,'(5x,a,t20,"<- ",a)') trim(varname), trim(filename)
+
       call nc_readGrid(partit)
 
       ! prepare nearest coordinates in INfile, save to bilin_indx_i/j
@@ -375,12 +372,13 @@ CONTAINS
             if (iost /= NF_NOERR) then
                ! Neither _FillValue nor missing_value found, use NetCDF default fill value
                FILL_VALUE_r8 = NF_FILL_DOUBLE  ! 9.9692099683868690e+36
-               print *, 'No _FillValue or missing_value in ', trim(filename), ', using NetCDF default:', FILL_VALUE_r8
+               write(*,'(t23,a,es12.4)') 'fill: NetCDF default   = ', FILL_VALUE_r8
+
             else
-               print *, 'Using missing_value from ', trim(filename), ':', FILL_VALUE_r8
+               write(*,'(t23,a,es12.4)') 'fill: missing_value    = ', FILL_VALUE_r8
             end if
          else
-            print *, 'Using _FillValue from ', trim(filename), ':', FILL_VALUE_r8
+            write(*,'(t23,a,es12.4)') 'fill: _FillValue       = ', FILL_VALUE_r8
          end if
          ! cast to working precision; comparison below uses the same WP rounding as the data read
          FILL_VALUE = real(FILL_VALUE_r8, WP)
@@ -556,15 +554,11 @@ CONTAINS
       type(t_mesh),   intent(in),    target   :: mesh
       type(t_partit), intent(inout), target   :: partit 
       type(t_tracer), intent(inout), target   :: tracers  
-      integer                                 :: n, i, id
-      real(kind=WP)                           :: locTmax, locTmin, locSmax, locSmin, glo   
-      real(kind=WP)                           :: locDINmax, locDINmin, locDICmax, locDICmin, locAlkmax !OG
-      real(kind=WP)                           :: locAlkmin, locDSimax, locDSimin, locDFemax, locDFemin
-      real(kind=WP)                           :: locO2min,  locO2max
-      real(kind=WP)                           :: locDICremax, locDICremin ! DICremin tracer (added by Sina)
+      integer                                 :: n, i
+      real(kind=WP)                           :: locTmax, locTmin, locSmax, locSmin, gmin, gmax
 
+      if (partit%mype==0) write(*,*) "Initial conditions for tracers (3D netcdf):"
 
-      if (partit%mype==0) write(*,*) "Start: Initial conditions  for tracers"
 
       ALLOCATE(bilin_indx_i(partit%myDim_nod2d+partit%eDim_nod2D), bilin_indx_j(partit%myDim_nod2d+partit%eDim_nod2D))
       DO n=1, n_ic3d
@@ -630,7 +624,7 @@ CONTAINS
       
       !_________________________________________________________________________
       if (t_insitu) then
-         if (partit%mype==0) write(*,*) "converting insitu temperature to potential..."
+         if (partit%mype==0) write(*,*) "  converting in-situ temperature to potential temperature"
          call insitu2pot(tracers, partit, mesh)
       end if
       if (partit%mype==0) write(*,*) "DONE:  Initial conditions for tracers"
@@ -647,109 +641,16 @@ CONTAINS
         locSmax = max(locSmax,maxval(tracers%data(2)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
         locSmin = min(locSmin,minval(tracers%data(2)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
       end do
-      call MPI_AllREDUCE(locTmax , glo  , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
-      if (partit%mype==0) write(*,*) '  |-> gobal max init. temp. =', glo
-      call MPI_AllREDUCE(locTmin , glo  , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
-      if (partit%mype==0) write(*,*) '  |-> gobal min init. temp. =', glo
-      call MPI_AllREDUCE(locSmax , glo  , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
-      if (partit%mype==0) write(*,*) '  |-> gobal max init. salt. =', glo
-      call MPI_AllREDUCE(locSmin , glo  , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
-      if (partit%mype==0) write(*,*) '  `-> gobal min init. salt. =', glo      
 
-#if defined(__recom)
-      locDINmax = -66666
-      locDINmin = 66666
-      locDICmax = locDINmax
-      locDICmin = locDINmin
-      locAlkmax = locDINmax
-      locAlkmin = locDINmin
-      locDSimax = locDINmax
-      locDSimin = locDINmin
-      locDFemax = locDINmax
-      locDFemin = locDINmin
-      locO2max  = locDINmax
-      locO2min  = locDINmin
-      locDICremax = locDINmax
-      locDICremin = locDINmin
-
-      do i=3, tracers%num_tracers
-        id=tracers%data(i)%ID
-        SELECT CASE (id)
-          CASE (1001) ! din
-            do n=1, partit%myDim_nod2d
-              locDINmax = max(locDINmax,maxval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-              locDINmin = min(locDINmin,minval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-            end do
-          CASE (1002) ! dic
-            do n=1, partit%myDim_nod2d
-              locDICmax = max(locDICmax,maxval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-              locDICmin = min(locDICmin,minval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-            end do
-          CASE (1003) ! alk
-            do n=1, partit%myDim_nod2d
-              locAlkmax = max(locAlkmax,maxval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-              locAlkmin = min(locAlkmin,minval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-            end do
-          CASE (1018) ! si
-            do n=1, partit%myDim_nod2d
-              locDSimax = max(locDSimax,maxval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-              locDSimin = min(locDSimin,minval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-            end do
-          CASE (1019) ! fe
-            do n=1, partit%myDim_nod2d
-              locDFemax = max(locDFemax,maxval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-              locDFemin = min(locDFemin,minval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-            end do
-          CASE (1022) ! o2
-            do n=1, partit%myDim_nod2d
-              locO2max  = max(locO2max,maxval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-              locO2min  = min(locO2min,minval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-            end do
-          CASE (1037) ! dicremin
-            do n=1, partit%myDim_nod2d
-              locDICremax  = max(locDICremax,maxval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-              locDICremin  = min(locDICremin,minval(tracers%data(i)%values(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n)-1,n)) )
-            end do
-        END SELECT
-      end do ! i num_tracers
-#if defined(__usetp)
-        if (partit%my_fesom_group==0) then
-#endif
-      if (partit%mype==0) write(*,*) "Sanity check for REcoM variables"
-      call MPI_AllREDUCE(locDINmax , glo  , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
-      if (partit%mype==0) write(*,*) '  |-> gobal max init. DIN. =', glo
-      call MPI_AllREDUCE(locDINmin , glo  , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
-      if (partit%mype==0) write(*,*) '  |-> gobal min init. DIN. =', glo
-      call MPI_AllREDUCE(locDICmax , glo  , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
-      if (partit%mype==0) write(*,*) '  |-> gobal max init. DIC. =', glo
-      call MPI_AllREDUCE(locDICmin , glo  , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
-      if (partit%mype==0) write(*,*) '  |-> gobal min init. DIC. =', glo
-      call MPI_AllREDUCE(locAlkmax , glo  , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
-      if (partit%mype==0) write(*,*) '  |-> gobal max init. Alk. =', glo
-      call MPI_AllREDUCE(locAlkmin , glo  , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
-      if (partit%mype==0) write(*,*) '  |-> gobal min init. Alk. =', glo
-      call MPI_AllREDUCE(locDSimax , glo  , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
-      if (partit%mype==0) write(*,*) '  |-> gobal max init. DSi. =', glo
-      call MPI_AllREDUCE(locDSimin , glo  , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
-      if (partit%mype==0) write(*,*) '  |-> gobal min init. DSi. =', glo
-      call MPI_AllREDUCE(locDFemax , glo  , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
-      if (partit%mype==0) write(*,*) '  |-> gobal max init. DFe. =', glo
-      call MPI_AllREDUCE(locDFemin , glo  , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
-      if (partit%mype==0) write(*,*) '  `-> gobal min init. DFe. =', glo
-      call MPI_AllREDUCE(locO2max , glo  , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
-      if (partit%mype==0) write(*,*) '  |-> gobal max init. O2. =', glo
-      call MPI_AllREDUCE(locO2min , glo  , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
-      if (partit%mype==0) write(*,*) '  `-> gobal min init. O2. =', glo
-      call MPI_AllREDUCE(locDICremax , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
-      if (partit%mype==0) write(*,*) '  |-> gobal max init. DICremin. =', glo
-      call MPI_AllREDUCE(locDICremin , glo  , 1, MPI_DOUBLE_PRECISION, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
-      if (partit%mype==0) write(*,*) '  |-> gobal min init. DICremin. =', glo
-
-#if defined(__usetp)
-        endif !(partit%my_fesom_group==0) then
-#endif
-
-#endif
+      call MPI_AllREDUCE(locTmax , gmax , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locTmin , gmin , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+      if (partit%mype==0) then
+         write(*,'(3x,a,t43,"min",t57,"max")') 'T/S initial fields (global):'
+         write(*,'(5x,a,t32,2es14.5)') 'temp [degC]', gmin, gmax
+      end if
+      call MPI_AllREDUCE(locSmax , gmax , 1, MPI_WP, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+      call MPI_AllREDUCE(locSmin , gmin , 1, MPI_WP, MPI_MIN, partit%MPI_COMM_FESOM, partit%MPIerr)
+      if (partit%mype==0) write(*,'(5x,a,t32,2es14.5)') 'salt [psu]', gmin, gmax
       
       ! Apply perturbations based on selected mode
       if (lperturb) then 
@@ -811,12 +712,7 @@ CONTAINS
             end if
          end select
       else
-         if (partit%mype==0) then
-             write(*,*) ''
-             write(*,*) '*** FESOM2 PERTURBATION DISABLED ***'
-             write(*,*) 'lperturb = .false. - No perturbations will be applied'
-             write(*,*) ''
-         end if
+         if (partit%mype==0) write(*,'(3x,a)') 'T/S perturbation: OFF (lperturb = .false.)'
       end if
    END SUBROUTINE do_ic3d
    
