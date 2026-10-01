@@ -250,6 +250,10 @@ module g_config
   real(kind=WP)                 :: rtime_ice=0.0, rtime_tot=0.0, rtime_ice_evp=0.0, rtime_ice_adv=0.0, rtime_ice_therm=0.0
   real(kind=WP)                 :: rtime_oce=0.0, rtime_oce_dyn=0.0, rtime_oce_dynssh=0.0,  rtime_oce_solvessh=0.0
   real(kind=WP)                 :: rtime_oce_solvetra=0.0, rtime_oce_GMRedi=0.0, rtime_oce_presdens=0.0, rtime_oce_mixing=0.0
+  ! sub-timers of rtime_oce_solvetra (solve_tracers_ale): advection, diffusion (without
+  ! REcoM sinking), REcoM sinking+benthos, halo exchange (+__usetp send), __usetp wait
+  real(kind=WP)                 :: rtime_tra_adv=0.0, rtime_tra_diff=0.0, rtime_tra_sink=0.0, &
+                                   rtime_tra_exch=0.0, rtime_tra_tpwait=0.0
   real(kind=WP)                 :: dummy=1.e10
   
   

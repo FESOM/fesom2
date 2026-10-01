@@ -1372,7 +1372,9 @@ contains
     ! 1..19 are the existing FESOM timers (ocean components, ice, output, etc.)
     ! 20..24 are the io_meandata sub-decomposition: update_means, streamloop,
     ! pack, mask, xsend (see rtime_om_* in io_meandata.F90).
-    integer           :: tr_num, n_rtime=27
+    ! 25 restart, 26 total, 27..32 sub-decomposition of the tracer step (8),
+    ! n_rtime (last) recom
+    integer           :: tr_num, n_rtime=33
     integer           :: i 
     real(kind=real32), allocatable :: mean_rtime(:), max_rtime(:), min_rtime(:)
     allocate(mean_rtime(n_rtime), max_rtime(n_rtime), min_rtime(n_rtime))
@@ -1511,6 +1513,14 @@ contains
     
     ! total runtime
     mean_rtime(26) = f%runtime_alltimesteps
+
+    ! sub-decomposition of the tracer step (8); 32 = rest (init AB, relaxation, ...)
+    mean_rtime(27) = rtime_tra_adv
+    mean_rtime(28) = rtime_tra_diff
+    mean_rtime(29) = rtime_tra_sink
+    mean_rtime(30) = rtime_tra_exch
+    mean_rtime(31) = rtime_tra_tpwait
+    mean_rtime(32) = rtime_oce_solvetra - sum(mean_rtime(27:31))
     
 #if defined (__recom)
     ! recom timing
@@ -1615,6 +1625,12 @@ contains
         write(*,42) '   │  └> runtime oce. slv ssh:',  mean_rtime(6),  min_rtime(6),  max_rtime(6),  100.*mean_rtime(6) /mean_rtime(26),'%',100.*mean_rtime(6) /mean_rtime(17),'%'
         write(*,42) '   ├> runtime oce. GM/Redi   :',  mean_rtime(7),  min_rtime(7),  max_rtime(7),  100.*mean_rtime(7) /mean_rtime(26),'%',100.*mean_rtime(7) /mean_rtime(17),'%'
         write(*,42) '   └> runtime oce. tracer    :',  mean_rtime(8),  min_rtime(8),  max_rtime(8),  100.*mean_rtime(8) /mean_rtime(26),'%',100.*mean_rtime(8) /mean_rtime(17),'%'
+        write(*,42) '      ├> runtime tra. adv.   :',  mean_rtime(27), min_rtime(27), max_rtime(27), 100.*mean_rtime(27)/mean_rtime(26),'%',100.*mean_rtime(27)/mean_rtime(17),'%'
+        write(*,42) '      ├> runtime tra. diff.  :',  mean_rtime(28), min_rtime(28), max_rtime(28), 100.*mean_rtime(28)/mean_rtime(26),'%',100.*mean_rtime(28)/mean_rtime(17),'%'
+        write(*,42) '      ├> runtime tra. sinking:',  mean_rtime(29), min_rtime(29), max_rtime(29), 100.*mean_rtime(29)/mean_rtime(26),'%',100.*mean_rtime(29)/mean_rtime(17),'%'
+        write(*,42) '      ├> runtime tra. halo   :',  mean_rtime(30), min_rtime(30), max_rtime(30), 100.*mean_rtime(30)/mean_rtime(26),'%',100.*mean_rtime(30)/mean_rtime(17),'%'
+        write(*,42) '      ├> runtime tra. TP wait:',  mean_rtime(31), min_rtime(31), max_rtime(31), 100.*mean_rtime(31)/mean_rtime(26),'%',100.*mean_rtime(31)/mean_rtime(17),'%'
+        write(*,42) '      └> runtime tra. other  :',  mean_rtime(32), min_rtime(32), max_rtime(32), 100.*mean_rtime(32)/mean_rtime(26),'%',100.*mean_rtime(32)/mean_rtime(17),'%'
         write(*,42) ' > runtime ice               :',  mean_rtime(9),  min_rtime(9),  max_rtime(9),  100.*mean_rtime(9) /mean_rtime(26),'%',100.*mean_rtime(9) /mean_rtime(17),'%'
         write(*,42) '   ├> runtime ice o2iflx     :',  mean_rtime(10), min_rtime(10), max_rtime(10), 100.*mean_rtime(10)/mean_rtime(26),'%',100.*mean_rtime(10)/mean_rtime(17),'%'
         write(*,42) '   ├> runtime ice read forc  :',  mean_rtime(11), min_rtime(11), max_rtime(11), 100.*mean_rtime(11)/mean_rtime(26),'%',100.*mean_rtime(11)/mean_rtime(17),'%'
@@ -1634,7 +1650,7 @@ contains
         write(*,43) ' > runtime restart           :',  mean_rtime(25), min_rtime(25), max_rtime(25), 100.*mean_rtime(25)/mean_rtime(26),'%'
 
 #if defined (__recom)
-        print 43, '  runtime recom:              ',  mean_rtime(n_rtime), min_rtime(n_rtime), max_rtime(n_rtime), 100.*mean_rtime(n_rtime)/mean_rtime(21),'%'
+        write(*,43) ' > runtime recom             :',  mean_rtime(n_rtime), min_rtime(n_rtime), max_rtime(n_rtime), 100.*mean_rtime(n_rtime)/mean_rtime(26),'%'
 #endif
 
         44 format (a33,i15)        !Format Ncores
