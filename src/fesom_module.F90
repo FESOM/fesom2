@@ -56,7 +56,7 @@ module fesom_main_storage_module
   use par_support_module, only: par_init
   use write_step_info_module, only: plot_fesomlogo
   use, intrinsic :: iso_fortran_env, only : real32
-  use g_forcing_param, only: use_landice_water, use_age_tracer
+  use g_forcing_param, only: use_landice_water, use_age_tracer, use_virt_salt
   use oce_landice_water_module, only: landice_water_init
   use oce_age_tracer_module, only: age_tracer_init
   use iceberg_params
@@ -83,6 +83,7 @@ use cpl_yac_driver
   use recom_init_interface
   use recom_interface
   use recom_glovar
+  use recom_virtual_fluxes, only: recom_virtual_fluxes_all
 #endif
 
 ! Transient tracers
@@ -1171,6 +1172,13 @@ contains
                    dt, daynew, month, mstep, ndpyr, yearold, timenew, rad, kappa,            &
                    press_air, u_wind, v_wind, shortwave, use_age_tracer, use_transit, l_sf6, &
                    l_f11, l_f12, l_r14c, l_r39ar)
+
+        ! virtual BGC surface fluxes from the (already balanced) water_flux
+        ! computed in oce_fluxes -> used in bc_surface (oce_ale_tracer.F90)
+        call recom_virtual_fluxes_all(tracers_info, f%tracers%num_tracers, water_flux, &
+                   use_virt_salt, use_cavity, f%mesh%ulevels_nod2D, f%mesh%areasvol,     &
+                   f%mesh%ocean_area, f%partit%myDim_nod2D, f%partit%eDim_nod2D,         &
+                   f%partit%MPI_COMM_FESOM, f%partit%mype)
         f%t_recom_e = MPI_Wtime()
 
         deallocate(tracers_info%ids)

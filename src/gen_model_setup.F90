@@ -328,6 +328,12 @@ subroutine setup_model(partit)
   read (fileunit, NML=paciso, iostat=istat)
   if (istat /= 0) call check_namelist_read(fileunit, 'paciso', nmlfile, partit)
 
+  ! optional group: missing in old namelist.recom files -> keep defaults (off)
+  rewind (fileunit)
+  read (fileunit, NML=pavirtual_fluxes, iostat=istat)
+  if (istat > 0) call check_namelist_read(fileunit, 'pavirtual_fluxes', nmlfile, partit)
+
+
   close (fileunit)
 #endif
 

@@ -1266,6 +1266,36 @@ CASE ('O2f       ')
                        io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 
+CASE ('virtdin   ')
+    if (use_REcoM .and. use_virt_bgc) then
+    call def_stream(nod2D,  myDim_nod2D,   'virtdin',   'virtual DIN flux (freshwater)',  'mmolN/m2/s', virtual_din(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('virtdic   ')
+    if (use_REcoM .and. use_virt_bgc) then
+    call def_stream(nod2D,  myDim_nod2D,   'virtdic',   'virtual DIC flux (freshwater)',  'mmolC/m2/s', virtual_dic(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('virtalk   ')
+    if (use_REcoM .and. use_virt_bgc) then
+    call def_stream(nod2D,  myDim_nod2D,   'virtalk',   'virtual alkalinity flux (freshwater)',  'mmol/m2/s', virtual_alk(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('virtdsi   ')
+    if (use_REcoM .and. use_virt_bgc) then
+    call def_stream(nod2D,  myDim_nod2D,   'virtdsi',   'virtual DSi flux (freshwater)',  'mmolSi/m2/s', virtual_dsi(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('virtdfe   ')
+    if (use_REcoM .and. use_virt_bgc) then
+    call def_stream(nod2D,  myDim_nod2D,   'virtdfe',   'virtual DFe flux (freshwater)',  'umolFe/m2/s', virtual_dfe(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
+CASE ('virtoxy   ')
+    if (use_REcoM .and. use_virt_bgc) then
+    call def_stream(nod2D,  myDim_nod2D,   'virtoxy',   'virtual O2 flux (freshwater)',  'mmolO2/m2/s', virtual_oxy(:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+
 CASE ('Hp        ')
     ! =====================================================================
     ! Variable: Hp (H⁺ concentration)

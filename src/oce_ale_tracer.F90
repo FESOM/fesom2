@@ -1868,10 +1868,12 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
     CASE (1001) ! DIN
         if (use_MEDUSA .and. add_loopback) then  ! OG: add is_MEDUSA_loopback flag is_MEDUSA_loopback flag * lb_flux(n,1)
             bc_surface= dt*(AtmNInput(n) + RiverDIN2D(n)   * is_riverinput                &
-                                         + ErosionTON2D(n) * is_erosioninput + lb_flux(n,1))
+                                         + ErosionTON2D(n) * is_erosioninput + lb_flux(n,1) &
+                                         + virtual_din(n))
         else
             bc_surface= dt*(AtmNInput(n) + RiverDIN2D(n)   * is_riverinput                &
-                                         + ErosionTON2D(n) * is_erosioninput)
+                                         + ErosionTON2D(n) * is_erosioninput             &
+                                         + virtual_din(n))
         end if
 
     CASE (1002) ! DIC
@@ -1879,11 +1881,13 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
             bc_surface= dt*(GloCO2flux_seaicemask(n)                &
                                 + RiverDIC2D(n)   * is_riverinput   &
                                 + ErosionTOC2D(n) * is_erosioninput &
-                                + lb_flux(n,2) + lb_flux(n,5))
+                                + lb_flux(n,2) + lb_flux(n,5)    &
+                                + virtual_dic(n))
         else
             bc_surface= dt*(GloCO2flux_seaicemask(n)                &
                                 + RiverDIC2D(n)   * is_riverinput   &
-                                + ErosionTOC2D(n) * is_erosioninput)
+                                + ErosionTOC2D(n) * is_erosioninput &
+                                + virtual_dic(n))
        end if
 
     CASE (1003) ! Alk
@@ -1907,21 +1911,22 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
         if (use_MEDUSA .and. add_loopback) then
            bc_surface=dt*(RiverDSi2D(n)   * is_riverinput        &
                         + ErosionTSi2D(n) * is_erosioninput      &
-                        + lb_flux(n,4))
+                        + lb_flux(n,4) + virtual_dsi(n))
         else
-            bc_surface=dt*(RiverDSi2D(n) * is_riverinput + ErosionTSi2D(n) * is_erosioninput)
+            bc_surface=dt*(RiverDSi2D(n) * is_riverinput + ErosionTSi2D(n) * is_erosioninput &
+                           + virtual_dsi(n))
         end if
 
     CASE (1019) ! Fe
         if (useRivFe) then
-            bc_surface= dt*(AtmFeInput(n) + RiverFe(n))
+            bc_surface= dt*(AtmFeInput(n) + RiverFe(n) + virtual_dfe(n))
         else
            bc_surface= dt*AtmFeInput(n)
         end if
     CASE (1020:1021) ! Cal
         bc_surface=0.0_WP
     CASE (1022) ! OXY
-        bc_surface= dt*GloO2flux_seaicemask(n)
+        bc_surface= dt*(GloO2flux_seaicemask(n) + virtual_oxy(n))
 !        bc_surface=0.0_WP
     CASE (1023:1037)
         bc_surface=0.0_WP  ! OG added bc for recom fields
