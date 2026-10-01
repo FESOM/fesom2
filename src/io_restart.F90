@@ -11,7 +11,6 @@ MODULE io_RESTART
   use MOD_DYN
   use MOD_MESH
   use MOD_PARTIT
-  use MOD_PARSUP
   use fortran_utils
   use mpi
 #if defined(__icepack)
@@ -26,6 +25,9 @@ MODULE io_RESTART
   use recom_glovar
   use recom_config
   use recom_ciso
+#endif
+#if defined(__recom) && defined(__usetp)
+  use oce_ale_tracer_module, only: calc_slice
 #endif
   
   implicit none
@@ -164,6 +166,8 @@ subroutine ini_ocean_io(dynamics, tracers, partit, mesh)
   ! d_eta is passed to ssh_solve_cg as X: it is the CG initial guess as well as the solution.
   ! The CG stops on a relative residual (soltol), not at machine precision, so the result
   ! depends on the guess -> prognostic.
+  ! Not allocated with split-explicit subcycling (use_ssh_se_subcycl), which does not use the CG solver.
+  if (allocated(dynamics%d_eta)) &
   call oce_files%def_node_var_optional('d_eta', 'SSH increment / CG initial guess', 'm', dynamics%d_eta, mesh, partit)
   call oce_files%def_node_var('hnode', 'nodal layer thickness', 'm',   mesh%hnode, mesh, partit)
   ! hnode_new is filled by vert_vel_ale, but fer_solve_Gamma and init_Redi_GM run EARLIER in

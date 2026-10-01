@@ -1,93 +1,48 @@
-!
-!
-!_______________________________________________________________________________
-module momentum_adv_scalar_transpv_interface
-    interface
-        subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine momentum_adv_scalar_transpv
-    end interface
-end module momentum_adv_scalar_transpv_interface
-!
-!
-!_______________________________________________________________________________
-module impl_vert_visc_ale_vtransp_interface
-    interface
-        subroutine impl_vert_visc_ale_vtransp(dynamics, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine impl_vert_visc_ale_vtransp
-    end interface
-end module impl_vert_visc_ale_vtransp_interface
-!
-!
-!_______________________________________________________________________________
-module compute_ssh_split_explicit_interface
-    interface
-        subroutine compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine compute_BT_rhs_SE_vtransp
+module oce_ale_ssh_splitexpl_subcycl_module
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE MOD_DYN
+    USE o_PARAM
+    USE g_comm_auto
+    USE o_ARRAYS, only: Av, stress_surf, water_flux
+    USE g_CONFIG, only: dt, r_restart, which_ALE, use_cavity_fw2press
+    USE g_support, only: integrate_nod
 
-        subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine compute_BT_step_SE_ale
-        
-        subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
-        USE MOD_MESH
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        integer       , intent(in)            :: mode
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(inout), target :: mesh
-        end subroutine update_trim_vel_ale_vtransp
-        
-    end interface
-end module compute_ssh_split_explicit_interface
+    implicit none
+
+    private
+    public :: momentum_adv_scalar_transpv, impl_vert_visc_ale_vtransp, &
+              compute_BT_rhs_SE_vtransp, compute_BT_step_SE_ale, &
+              update_trim_vel_ale_vtransp, compute_thickness_zstar
+
+contains
+
+!
+!
+!_______________________________________________________________________________
+!
+!
+!_______________________________________________________________________________
+!
+!
+!_______________________________________________________________________________
 !
 !
 !_______________________________________________________________________________
 ! Transports are used instead of velocities, Urhs, Vrhs are also for transports. 
 subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    USE o_PARAM
-    USE g_comm_auto
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
-    integer                  :: node, elem, ed, nz
-    integer                  :: nl1, ul1, nl2, ul2, nl12, ul12
+    integer                  :: node, elem, ed, k, nz
+    integer                  :: nl1, ul1, nl2, ul2, nl12, ul12, lo, hi
     real(kind=WP)            :: uv12, uv1, uv2, qc, qu, qd, num_ord=0.95_WP
-    integer                  :: ednodes(2), edelem(2)
+    integer                  :: edelem(2)
+    ! horizontal advection contribution of each edge to its first node (the second
+    ! node receives the negative), levels min(ul1,ul2):max(nl1,nl2)
+    real(kind=WP), allocatable, save :: edge_adv(:,:,:)
     real(kind=WP)            :: wu(mesh%nl), wv(mesh%nl), un1(mesh%nl), un2(mesh%nl)
 
     !___________________________________________________________________________
@@ -105,11 +60,86 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
     UVnode    =>dynamics%uvnode(:,:,:)
     Wvel_e    =>dynamics%w_e(:,:)
     UVh       =>dynamics%se_uvh(:,:,:)
+    if (.not. allocated(edge_adv)) allocate(edge_adv(2, mesh%nl-1, myDim_edge2D))
+
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, elem, ed, k, nz, nl1, ul1, nl2, ul2, nl12, ul12, lo, hi, &
+!$OMP                                  uv1, uv2, uv12, qc, qu, qd, wu, wv, &
+!$OMP                                  edelem, un1, un2)
+    !___________________________________________________________________________
+    ! horizontal advection component: u*du/dx, u*dv/dx & v*du/dy, v*dv/dy
+    ! per edge, stored for the node gather below
+!$OMP DO
+    do ed=1, myDim_edge2D
+        ! local index of element that contribute to edge
+        edelem  = edge_tri(1:2,ed)
+
+        !_______________________________________________________________________
+        ! index off surface layer in case of cavity !=1 and index of mid depth 
+        ! bottom layer
+        ul1     = ulevels(edelem(1))
+        nl1     = nlevels(edelem(1))-1
+
+        !_______________________________________________________________________
+        !NR --> Natalja Style
+        un1          = 0.0_WP
+        un1(ul1:nl1) = (  UVh(2, ul1:nl1, edelem(1))*edge_cross_dxdy(1,ed) & 
+                        - UVh(1, ul1:nl1, edelem(1))*edge_cross_dxdy(2,ed)) 
+
+        !_______________________________________________________________________
+        ! if edelem(2)==0 than edge is boundary edge
+        if(edelem(2)>0) then
+            ul2 = ulevels(edelem(2))
+            nl2 = nlevels(edelem(2))-1
+
+            !___________________________________________________________________
+            !NR --> Natalja Style
+            un2          = 0.0_WP
+            un2(ul2:nl2) = -(  UVh(2, ul2:nl2, edelem(2))*edge_cross_dxdy(3,ed) & 
+                             - UVh(1, ul2:nl2, edelem(2))*edge_cross_dxdy(4,ed)) 
+
+            !___________________________________________________________________
+            ! nl12 ... minimum number of layers -1 between element edelem(1) & edelem(2) that 
+            ! contribute to edge ed
+            ! nu12 ... upper index of layers between element edelem(1) & edelem(2) that 
+            ! contribute to edge ed
+            ! be carefull !!! --> if ed is a boundary edge than edelem(1)~=0 and edelem(2)==0
+            !                     that means nl1>0, nl2==0, nl12=min(nl1,nl2)=0 !!!
+            ul12 = max(ul1, ul2)
+            nl12 = min(nl1, nl2)
+
+            ! cavity domain where only edelem(1) exist
+            do nz=ul1 , ul12-1
+                edge_adv(1:2, nz, ed) = un1(nz)*UV(1:2, nz, edelem(1))
+            end do
+            ! cavity domain where only edelem(2) exist
+            do nz=ul2 , ul12-1
+                edge_adv(1:2, nz, ed) = un2(nz)*UV(1:2, nz, edelem(2))
+            end do
+            ! bulk domain where edelem(1) and edelem(2) exist
+            do nz=ul12, nl12
+                edge_adv(1:2, nz, ed) = (un1(nz) + un2(nz))*(UV(1:2, nz, edelem(1))+UV(1:2, nz, edelem(2)))*0.5_WP
+            end do
+            ! bottom domain where only edelem(1) exist
+            do nz=nl12+1, nl1
+                edge_adv(1:2, nz, ed) = un1(nz)*UV(1:2, nz, edelem(1))
+            end do
+            ! bottom domain where only edelem(2) exist
+            do nz=nl12+1, nl2
+                edge_adv(1:2, nz, ed) = un2(nz)*UV(1:2, nz, edelem(2))
+            end do
+        !_______________________________________________________________________
+        ! if edelem(2)==0 than edge is boundary edge
+        else ! --> if(edelem(2)>0) then
+            ! bulk domain where only edelem(1) exist
+            do nz=ul1 , nl1
+                edge_adv(1:2, nz, ed) = un1(nz)*UV(1:2, nz, edelem(1))
+            end do
+        end if ! --> if(edelem(2)>0) then
+    end do ! --> do ed=1, myDim_edge2D
+!$OMP END DO
+
     !___________________________________________________________________________
     ! 1st. compute vertical momentum advection component: w * du/dz, w*dv/dz
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, elem, ed, nz, nl1, ul1, nl2, ul2, nl12, ul12, &
-!$OMP                                  uv1, uv2, uv12, qc, qu, qd, wu, wv, &
-!$OMP                                  ednodes, edelem, un1, un2)
 !$OMP DO    
     do node=1, myDim_nod2D
         ul1 = ulevels_nod2D(node)
@@ -171,199 +201,40 @@ subroutine momentum_adv_scalar_transpv(dynamics, partit, mesh)
             UVnode_rhs(1, nz, node)= UVnode_rhs(1, nz, node) - (wu(nz)-wu(nz+1))
             UVnode_rhs(2, nz, node)= UVnode_rhs(2, nz, node) - (wv(nz)-wv(nz+1))
         end do
-        
-    end do ! --> do node=1, myDim_nod2D
-!$OMP END DO
 
-
-    !___________________________________________________________________________
-    ! 2nd. compute horizontal advection component: u*du/dx, u*dv/dx & v*du/dy, v*dv/dy
-    ! loop over triangle edges
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
-!$OMP DO
-#endif
-    do ed=1, myDim_edge2D
-        ! local indice of nodes that span up edge ed
-        ednodes = edges(:,ed)   
-        
-        ! local index of element that contribute to edge
-        edelem  = edge_tri(1:2,ed)   
-        
         !_______________________________________________________________________
-        ! index off surface layer in case of cavity !=1 and index of mid depth 
-        ! bottom layer
-        ul1     = ulevels(edelem(1))
-        nl1     = nlevels(edelem(1))-1
-        
-        !_______________________________________________________________________
-        !NR --> Natalja Style
-        un1          = 0.0_WP
-        un1(ul1:nl1) = (  UVh(2, ul1:nl1, edelem(1))*edge_cross_dxdy(1,ed) & 
-                        - UVh(1, ul1:nl1, edelem(1))*edge_cross_dxdy(2,ed)) 
-        
-        !_______________________________________________________________________
-        ! if edelem(2)==0 than edge is boundary edge
-        !_______________________________________________________________________
-        ! ensure openmp numerical reproducability
-        ! NOTE: an ordered region is a structured block, so it has to enclose the
-        ! whole if(edelem(2)>0) construct. Opening it inside the .true. branch and
-        ! closing it after the matching "end if" straddles the "else" and does not
-        ! compile.
-#if defined(__openmp_reproducible)
-!$OMP ORDERED
-#endif
-        if(edelem(2)>0) then
-            ul2 = ulevels(edelem(2))
-            nl2 = nlevels(edelem(2))-1
-            
-            !___________________________________________________________________
-            !NR --> Natalja Style
-            un2          = 0.0_WP
-            un2(ul2:nl2) = -(  UVh(2, ul2:nl2, edelem(2))*edge_cross_dxdy(3,ed) & 
-                             - UVh(1, ul2:nl2, edelem(2))*edge_cross_dxdy(4,ed)) 
-            
-            !___________________________________________________________________
-            ! nl12 ... minimum number of layers -1 between element edelem(1) & edelem(2) that 
-            ! contribute to edge ed
-            ! nu12 ... upper index of layers between element edelem(1) & edelem(2) that 
-            ! contribute to edge ed
-            ! be carefull !!! --> if ed is a boundary edge than edelem(1)~=0 and edelem(2)==0
-            !                     that means nl1>0, nl2==0, nl12=min(nl1,nl2)=0 !!!
-            ul12 = max(ul1, ul2)
-            nl12 = min(nl1, nl2)
-            
-            !___________________________________________________________________
-            !NR add contribution to first edge node --> ednodes(1)
-            !NR Do not calculate on Halo nodes, as the result will not be used. 
-            !NR The "if" is cheaper than the avoided computiations.
-            if (ednodes(1) <= myDim_nod2d) then
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                call omp_set_lock(partit%plock(ednodes(1)))
-#endif          
-                ! cavity domain where only edelem(1) exist
-                do nz=ul1 , ul12-1
-                    UVnode_rhs(1, nz, ednodes(1)) = UVnode_rhs(1, nz, ednodes(1)) + un1(nz)*UV(1, nz, edelem(1))
-                    UVnode_rhs(2, nz, ednodes(1)) = UVnode_rhs(2, nz, ednodes(1)) + un1(nz)*UV(2, nz, edelem(1))
-                end do
-                ! cavity domain where only edelem(2) exist
-                do nz=ul2 , ul12-1
-                    UVnode_rhs(1, nz, ednodes(1)) = UVnode_rhs(1, nz, ednodes(1)) + un2(nz)*UV(1, nz, edelem(2))
-                    UVnode_rhs(2, nz, ednodes(1)) = UVnode_rhs(2, nz, ednodes(1)) + un2(nz)*UV(2, nz, edelem(2))
-                end do
-                ! bulk domain where edelem(1) and edelem(2) exist
-                do nz=ul12, nl12
-                    UVnode_rhs(1, nz, ednodes(1)) = UVnode_rhs(1, nz, ednodes(1)) + (un1(nz) + un2(nz))*(UV(1, nz, edelem(1))+UV(1, nz, edelem(2)))*0.5_WP
-                    UVnode_rhs(2, nz, ednodes(1)) = UVnode_rhs(2, nz, ednodes(1)) + (un1(nz) + un2(nz))*(UV(2, nz, edelem(1))+UV(2, nz, edelem(2)))*0.5_WP
-                end do
-                ! bottom domain where only edelem(1) exist
-                do nz=nl12+1, nl1
-                    UVnode_rhs(1, nz, ednodes(1)) = UVnode_rhs(1, nz, ednodes(1)) + un1(nz)*UV(1, nz, edelem(1))
-                    UVnode_rhs(2, nz, ednodes(1)) = UVnode_rhs(2, nz, ednodes(1)) + un1(nz)*UV(2, nz, edelem(1))
-                end do
-                ! bottom domain where only edelem(2) exist
-                do nz=nl12+1, nl2
-                    UVnode_rhs(1, nz, ednodes(1)) = UVnode_rhs(1, nz, ednodes(1)) + un2(nz)*UV(1, nz, edelem(2))
-                    UVnode_rhs(2, nz, ednodes(1)) = UVnode_rhs(2, nz, ednodes(1)) + un2(nz)*UV(2, nz, edelem(2))
-                end do
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                call omp_unset_lock(partit%plock(ednodes(1)))
-#endif
+        ! 2nd. add the horizontal advection of the incident edges
+        ! (mesh%nod_in_edge2D, ascending edge order): + where the node is the
+        ! first edge node, - where it is the second.
+        do k=1, mesh%nod_in_edge2D_num(node)
+            ed = mesh%nod_in_edge2D(k,node)
+            edelem = edge_tri(1:2,ed)
+            lo = ulevels(edelem(1))
+            hi = nlevels(edelem(1))-1
+            if (edelem(2)>0) then
+                lo = min(lo, ulevels(edelem(2)))
+                hi = max(hi, nlevels(edelem(2))-1)
             end if
-            !___________________________________________________________________
-            !NR add contribution to second edge node --> ednodes(2)
-            !NR Do not calculate on Halo nodes, as the result will not be used. 
-            !NR The "if" is cheaper than the avoided computiations.
-            if (ednodes(2) <= myDim_nod2d) then
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                call omp_set_lock(partit%plock(ednodes(2)))
-#endif 
-                ! cavity domain where only edelem(1) exist
-                do nz=ul1 , ul12-1
-                    UVnode_rhs(1, nz, ednodes(2)) = UVnode_rhs(1, nz, ednodes(2)) - un1(nz)*UV(1, nz, edelem(1))
-                    UVnode_rhs(2, nz, ednodes(2)) = UVnode_rhs(2, nz, ednodes(2)) - un1(nz)*UV(2, nz, edelem(1))
+            if (mesh%nod_in_edge2D_sgn(k,node) > 0) then
+                do nz=lo, hi
+                    UVnode_rhs(1, nz, node) = UVnode_rhs(1, nz, node) + edge_adv(1, nz, ed)
+                    UVnode_rhs(2, nz, node) = UVnode_rhs(2, nz, node) + edge_adv(2, nz, ed)
                 end do
-                ! cavity domain where only edelem(2) exist
-                do nz=ul2 , ul12-1
-                    UVnode_rhs(1, nz, ednodes(2)) = UVnode_rhs(1, nz, ednodes(2)) - un2(nz)*UV(1, nz, edelem(2))
-                    UVnode_rhs(2, nz, ednodes(2)) = UVnode_rhs(2, nz, ednodes(2)) - un2(nz)*UV(2, nz, edelem(2))
+            else
+                do nz=lo, hi
+                    UVnode_rhs(1, nz, node) = UVnode_rhs(1, nz, node) - edge_adv(1, nz, ed)
+                    UVnode_rhs(2, nz, node) = UVnode_rhs(2, nz, node) - edge_adv(2, nz, ed)
                 end do
-                ! bulk domain where edelem(1) and edelem(2) exist
-                do nz=ul12, nl12
-                    UVnode_rhs(1, nz, ednodes(2)) = UVnode_rhs(1, nz, ednodes(2)) - (un1(nz) + un2(nz))*(UV(1, nz, edelem(1))+UV(1, nz, edelem(2)))*0.5_WP
-                    UVnode_rhs(2, nz, ednodes(2)) = UVnode_rhs(2, nz, ednodes(2)) - (un1(nz) + un2(nz))*(UV(2, nz, edelem(1))+UV(2, nz, edelem(2)))*0.5_WP
-                end do
-                ! bottom domain where only edelem(1) exist
-                do nz=nl12+1, nl1
-                    UVnode_rhs(1, nz, ednodes(2)) = UVnode_rhs(1, nz, ednodes(2)) - un1(nz)*UV(1, nz, edelem(1))
-                    UVnode_rhs(2, nz, ednodes(2)) = UVnode_rhs(2, nz, ednodes(2)) - un1(nz)*UV(2, nz, edelem(1))
-                end do
-                ! bottom domain where only edelem(2) exist
-                do nz=nl12+1, nl2
-                    UVnode_rhs(1, nz, ednodes(2)) = UVnode_rhs(1, nz, ednodes(2)) - un2(nz)*UV(1, nz, edelem(2))
-                    UVnode_rhs(2, nz, ednodes(2)) = UVnode_rhs(2, nz, ednodes(2)) - un2(nz)*UV(2, nz, edelem(2))
-                end do
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                call omp_unset_lock(partit%plock(ednodes(2)))
-#endif
-            end if 
-        
-        !_______________________________________________________________________
-        ! if edelem(2)==0 than edge is boundary edge
-        else ! --> if(edelem(2)>0) then
-            !___________________________________________________________________
-            !NR add contribution to first edge node --> ednodes(1)
-            !NR Do not calculate on Halo nodes, as the result will not be used. 
-            !NR The "if" is cheaper than the avoided computiations.
-            if (ednodes(1) <= myDim_nod2d) then
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                call omp_set_lock(partit%plock(ednodes(1)))
-#endif          
-                ! bulk domain where only edelem(1) exist
-                do nz=ul1 , nl1
-                    UVnode_rhs(1, nz, ednodes(1)) = UVnode_rhs(1, nz, ednodes(1)) + un1(nz)*UV(1, nz, edelem(1))
-                    UVnode_rhs(2, nz, ednodes(1)) = UVnode_rhs(2, nz, ednodes(1)) + un1(nz)*UV(2, nz, edelem(1))
-                end do
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                call omp_unset_lock(partit%plock(ednodes(1)))
-#endif
             end if
-            !___________________________________________________________________
-            !NR add contribution to second edge node --> ednodes(2)
-            !NR Do not calculate on Halo nodes, as the result will not be used. 
-            !NR The "if" is cheaper than the avoided computiations.
-            if (ednodes(2) <= myDim_nod2d) then
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                call omp_set_lock(partit%plock(ednodes(2)))
-#endif 
-                ! bulk domain where only edelem(1) exist
-                do nz=ul1 , nl1
-                    UVnode_rhs(1, nz, ednodes(2)) = UVnode_rhs(1, nz, ednodes(2)) - un1(nz)*UV(1, nz, edelem(1))
-                    UVnode_rhs(2, nz, ednodes(2)) = UVnode_rhs(2, nz, ednodes(2)) - un1(nz)*UV(2, nz, edelem(1))
-                end do
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                call omp_unset_lock(partit%plock(ednodes(2)))
-#endif
-            end if 
-        end if ! --> if(edelem(2)>0) then
-        
-#if defined(__openmp_reproducible)
-!$OMP END ORDERED
-#endif
+        end do ! --> do k=1, mesh%nod_in_edge2D_num(node)
 
-    end do ! --> do ed=1, myDim_edge2D  
-!$OMP END DO 
-
-    !___________________________________________________________________________
-    ! divide total nodal momentum advection by scalar area
-!$OMP DO    
-    do node=1,myDim_nod2d
+        !_______________________________________________________________________
+        ! divide total nodal momentum advection by scalar area
         ul1 = ulevels_nod2D(node)
         nl1 = nlevels_nod2D(node)-1
         UVnode_rhs(1, ul1:nl1, node) = UVnode_rhs(1, ul1:nl1, node) * areasvol_inv(ul1:nl1, node)
         UVnode_rhs(2, ul1:nl1, node) = UVnode_rhs(2, ul1:nl1, node) * areasvol_inv(ul1:nl1, node)
-    end do ! --> do node=1,myDim_nod2d
+    end do ! --> do node=1, myDim_nod2D
 !$OMP END DO
 
     !___________________________________________________________________________
@@ -502,13 +373,6 @@ end subroutine momentum_adv_scalar_transpv
 !     |              :         |   | :  |
 !
 subroutine impl_vert_visc_ale_vtransp(dynamics, partit, mesh)
-    USE MOD_MESH
-    USE o_PARAM
-    USE o_ARRAYS, only: Av, stress_surf
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_DYN
-    USE g_CONFIG, only: dt
     IMPLICIT NONE
     !___________________________________________________________________________
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -676,12 +540,6 @@ end subroutine impl_vert_visc_ale_vtransp
 !SD the elevation and Coriolis. The elevation and Coriolis are accounted for 
 !SD explicitly in BT equations, and should therefore be removed from the vertically integrated rhs.
 subroutine compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    USE MOD_DYN
-    USE g_config, only: dt, r_restart
-    USE g_comm_auto
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -791,14 +649,6 @@ end subroutine compute_BT_rhs_SE_vtransp
 ! eta^(n+(m+1)/M) = eta^(n+(m)/M) - dt/M * div_H * [(1+theta)*Ubt^(n+(m+1)/M) - theta*Ubt^(n+(m)/M)]
 !
 subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    USE MOD_DYN
-    USE g_comm_auto
-    USE g_config,  only: dt, which_ALE, use_cavity_fw2press
-    USE g_support, only: integrate_nod
-    use o_ARRAYS,  only: water_flux
     IMPLICIT NONE
     !___________________________________________________________________________
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -808,7 +658,9 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     real(kind=WP)                   :: dtBT, BT_inv, hh, ff, rx, ry, a, b, d, c1, c2, ax, ay
     real(kind=WP)                   :: deltaX1, deltaY1, deltaX2, deltaY2, thetaBT
     integer                         :: step, elem, edge, node, elnodes(3), ednodes(2), edelem(2), nzmax
-    real(kind=WP)                   :: update_ubt, update_vbt, vi, len
+    integer                         :: q, k, eledges(3)
+    real(kind=WP)                   :: update_ubt, update_vbt, vi, len, eta_loc, visc_u, visc_v
+    logical                         :: lfreshwater
     
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -850,88 +702,70 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     ! compute_BT_step_SE_ale)
     ! --> use only harmonmic viscosity operator applied to the barotropic
     !     velocity
-    if (dynamics%se_visc) then 
-        !_______________________________________________________________________
-        ! remove viscosity
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, edelem, ednodes, hh, len, &
-!$OMP                                  vi, update_ubt, update_vbt)
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
+    if (dynamics%se_visc .or. dynamics%se_bottdrag) then
+        ! --> remove viscosity: each owned element gathers the contributions of
+        !     its three edges in ascending edge order
+        ! --> remove bottom drag
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, q, edge, eledges, edelem, ednodes, elnodes, nzmax, &
+!$OMP                                  hh, len, vi, update_ubt, update_vbt)
 !$OMP DO
-#endif
-        do edge=1, myDim_edge2D+eDim_edge2D
-                
-            ! if ed is an outer boundary edge, skip it
-            if(myList_edge2D(edge)>edge2D_in) cycle
-                
-            ! elem indices that participate in edge
-            edelem  = edge_tri(:,edge)
-            ednodes = edges(:,edge) 
-            
-            ! total ocean depth H
-            !PS nzmax = minval(nlevels(edelem))
-            !PS hh    = -zbar(nzmax)
-            !PS hh      = minval(-zbar_e_bot(edelem))
-            hh    = -sum(zbar_e_bot(edelem))*0.5_WP + sum(hbar(ednodes))*0.5_WP
-            
-            len     = sqrt(sum(elem_area(edelem)))
-            update_ubt=(UVBT(1, edelem(1))-UVBT(1, edelem(2)))/hh
-            update_vbt=(UVBT(2, edelem(1))-UVBT(2, edelem(2)))/hh
-            vi=update_ubt*update_ubt + update_vbt*update_vbt
-            vi=-dt*sqrt(max(dynamics%se_visc_gamma0,           &
-                        max(dynamics%se_visc_gamma1*sqrt(vi),  &
-                            dynamics%se_visc_gamma2*vi)        &
-                    )*len)
-            update_ubt=update_ubt*vi
-            update_vbt=update_vbt*vi
-            
-            !___________________________________________________________________
-#if defined(_OPENMP) && !defined(__openmp_reproducible)
-            call omp_set_lock(partit%plock(edelem(1)))
-#else
-!$OMP ORDERED
-#endif
-            UVBT_rhs(1, edelem(1))=UVBT_rhs(1, edelem(1))-update_ubt/elem_area(edelem(1))*hh
-            UVBT_rhs(2, edelem(1))=UVBT_rhs(2, edelem(1))-update_vbt/elem_area(edelem(1))*hh
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_unset_lock(partit%plock(edelem(1)))
-            call omp_set_lock  (partit%plock(edelem(2)))
-#endif
-            UVBT_rhs(1, edelem(2))=UVBT_rhs(1, edelem(2))+update_ubt/elem_area(edelem(2))*hh
-            UVBT_rhs(2, edelem(2))=UVBT_rhs(2, edelem(2))+update_vbt/elem_area(edelem(2))*hh
-#if defined(_OPENMP) && !defined(__openmp_reproducible)
-            call omp_unset_lock(partit%plock(edelem(2)))
-#else
-!$OMP END ORDERED
-#endif
-        end do ! --> do edge=1, myDim_edge2D+eDim_edge2D
-!$OMP END DO       
-!$OMP END PARALLEL 
-    end if ! --> if (dynamics%se_visc) then     
-    
-    !___________________________________________________________________________
-    ! remove bottom drag
-    if (dynamics%se_bottdrag) then
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, nzmax, hh)
-!$OMP DO    
         do elem=1, myDim_elem2D
-            elnodes= elem2D_nodes(:,elem)
-            nzmax  = nlevels(elem)
+            if (dynamics%se_visc) then
+                eledges=mesh%elem_edges(:,elem)
+                if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+                if (eledges(2)>eledges(3)) then; q=eledges(2); eledges(2)=eledges(3); eledges(3)=q; end if
+                if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+                do q=1,3
+                    edge=eledges(q)
+                    ! if ed is an outer boundary edge, skip it
+                    if(myList_edge2D(edge)>edge2D_in) cycle
+
+                    ! elem indices that participate in edge
+                    edelem  = edge_tri(:,edge)
+                    ednodes = edges(:,edge)
+
+                    ! total ocean depth H
+                    hh    = -sum(zbar_e_bot(edelem))*0.5_WP + sum(hbar(ednodes))*0.5_WP
+
+                    len     = sqrt(sum(elem_area(edelem)))
+                    update_ubt=(UVBT(1, edelem(1))-UVBT(1, edelem(2)))/hh
+                    update_vbt=(UVBT(2, edelem(1))-UVBT(2, edelem(2)))/hh
+                    vi=update_ubt*update_ubt + update_vbt*update_vbt
+                    vi=-dt*sqrt(max(dynamics%se_visc_gamma0,           &
+                                max(dynamics%se_visc_gamma1*sqrt(vi),  &
+                                    dynamics%se_visc_gamma2*vi)        &
+                            )*len)
+                    update_ubt=update_ubt*vi
+                    update_vbt=update_vbt*vi
+
+                    if (edelem(1)==elem) then
+                        UVBT_rhs(1, elem)=UVBT_rhs(1, elem)-update_ubt/elem_area(elem)*hh
+                        UVBT_rhs(2, elem)=UVBT_rhs(2, elem)-update_vbt/elem_area(elem)*hh
+                    else
+                        UVBT_rhs(1, elem)=UVBT_rhs(1, elem)+update_ubt/elem_area(elem)*hh
+                        UVBT_rhs(2, elem)=UVBT_rhs(2, elem)+update_vbt/elem_area(elem)*hh
+                    end if
+                end do ! --> do q=1,3
+            end if ! --> if (dynamics%se_visc) then
+
+            if (dynamics%se_bottdrag) then
+                elnodes= elem2D_nodes(:,elem)
+                nzmax  = nlevels(elem)
             
-            ! total ocean depth H
-            !PS hh     = -zbar(nzmax)+sum(eta_n(elnodes))/3.0_WP
-            !PS hh     = -zbar(nzmax)
-            !PS hh     = -zbar_e_bot(elem)
-            hh     = -zbar_e_bot(elem) + sum(hbar(elnodes))/3.0_WP
+                ! total ocean depth H
+                !PS hh     = -zbar(nzmax)+sum(eta_n(elnodes))/3.0_WP
+                !PS hh     = -zbar(nzmax)
+                !PS hh     = -zbar_e_bot(elem)
+                hh     = -zbar_e_bot(elem) + sum(hbar(elnodes))/3.0_WP
             
-            bottomdrag(elem) = dt*C_d*sqrt(UV(1, nzmax-1, elem)**2 + UV(2, nzmax-1, elem)**2)
-            UVBT_rhs(1, elem)=UVBT_rhs(1, elem) + bottomdrag(elem)*UVBT(1, elem)/hh
-            UVBT_rhs(2, elem)=UVBT_rhs(2, elem) + bottomdrag(elem)*UVBT(2, elem)/hh
+                bottomdrag(elem) = dt*C_d*sqrt(UV(1, nzmax-1, elem)**2 + UV(2, nzmax-1, elem)**2)
+                UVBT_rhs(1, elem)=UVBT_rhs(1, elem) + bottomdrag(elem)*UVBT(1, elem)/hh
+                UVBT_rhs(2, elem)=UVBT_rhs(2, elem) + bottomdrag(elem)*UVBT(2, elem)/hh
+            end if ! --> if (dynamics%se_bottdrag) then
         end do
-!$OMP END DO       
-!$OMP END PARALLEL        
-    end if ! --> if (dynamics%se_bottdrag) then
+!$OMP END DO
+!$OMP END PARALLEL
+    end if ! --> if (dynamics%se_visc .or. dynamics%se_bottdrag) then
     
     !___________________________________________________________________________
     ! initialise UVBT_mean with zeros --> OMP style
@@ -944,85 +778,68 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! eta_n   elevation used in BT stepping, it is just a copy of eta_n
     ! UBT and VBT are transport velocities
+    ! One parallel region for all barotropic steps; the halo exchanges run on the
+    ! master thread.
+    lfreshwater = .not. trim(which_ALE)=='linfs'
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(step, elem, node, q, k, edge, eledges, edelem, ednodes, elnodes, &
+!$OMP                                  hh, len, vi, update_ubt, update_vbt, ff, rx, ry, a, b, d, ax, ay, &
+!$OMP                                  c1, c2, deltaX1, deltaX2, deltaY1, deltaY2, eta_loc, visc_u, visc_v)
     do step=1, dynamics%se_BTsteps
         !#######################################################################
         !##########    Dissipative forward--backward time stepping    ##########
         !#######################################################################
         
         !_______________________________________________________________________
-        ! compute harmonic viscosity for stability
+        ! compute harmonic viscosity for stability: each owned element gathers
+        ! the contributions of its three edges in ascending edge order
         if (dynamics%se_visc) then 
-            
-            !___________________________________________________________________
-            ! initialise UVBT_harmvisc with zeros --> OMP style
-!$OMP PARALLEL DO
-            do elem=1, myDim_elem2D+eDim_elem2D
-                UVBT_harmvisc(:, elem) = 0.0_WP
-            end do
-!$OMP END PARALLEL DO
-            
-            !___________________________________________________________________
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, edelem, ednodes, hh, len, &
-!$OMP                                  vi, update_ubt, update_vbt)
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
 !$OMP DO
-#endif
-            do edge=1, myDim_edge2D+eDim_edge2D
-                    
-                ! if ed is an outer boundary edge, skip it
-                if(myList_edge2D(edge)>edge2D_in) cycle
-                    
-                ! elem indices that participate in edge
-                edelem  = edge_tri(:, edge)
-                ednodes = edges(:, edge)
-                
-                ! total ocean depth H
-                !PS nzmax = minval(nlevels(edelem))
-                !PS hh    = -zbar(nzmax)
-                !PS hh    = minval(-zbar_e_bot(edelem))
-                hh      = -sum(zbar_e_bot(edelem))*0.5_WP + sum(hbar(ednodes))*0.5_WP
-                
-                len     = sqrt(sum(elem_area(edelem)))
-                update_ubt=(UVBT(1, edelem(1))-UVBT(1, edelem(2)))/hh
-                update_vbt=(UVBT(2, edelem(1))-UVBT(2, edelem(2)))/hh
-                vi=update_ubt*update_ubt + update_vbt*update_vbt
-                vi=dt*sqrt(max(dynamics%se_visc_gamma0,           &
-                           max(dynamics%se_visc_gamma1*sqrt(vi),   &
-                               dynamics%se_visc_gamma2*vi)         &
-                        )*len)
-                update_ubt=update_ubt*vi
-                update_vbt=update_vbt*vi
-                
-                !_______________________________________________________________
-#if defined(_OPENMP) && !defined(__openmp_reproducible)
-                call omp_set_lock(partit%plock(edelem(1)))
-#else
-!$OMP ORDERED
-#endif
-                UVBT_harmvisc(1, edelem(1))=UVBT_harmvisc(1, edelem(1))-update_ubt/elem_area(edelem(1))*hh
-                UVBT_harmvisc(2, edelem(1))=UVBT_harmvisc(2, edelem(1))-update_vbt/elem_area(edelem(1))*hh
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-                call omp_unset_lock(partit%plock(edelem(1)))
-                call omp_set_lock  (partit%plock(edelem(2)))
-#endif
-                UVBT_harmvisc(1, edelem(2))=UVBT_harmvisc(1, edelem(2))+update_ubt/elem_area(edelem(2))*hh
-                UVBT_harmvisc(2, edelem(2))=UVBT_harmvisc(2, edelem(2))+update_vbt/elem_area(edelem(2))*hh
-#if defined(_OPENMP) && !defined(__openmp_reproducible)
-                call omp_unset_lock(partit%plock(edelem(2)))
-#else
-!$OMP END ORDERED
-#endif
-            end do ! --> do edge=1, myDim_edge2D+eDim_edge2D
-!$OMP END DO       
-!$OMP END PARALLEL 
+            do elem=1, myDim_elem2D
+                visc_u = 0.0_WP
+                visc_v = 0.0_WP
+                eledges=mesh%elem_edges(:,elem)
+                if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+                if (eledges(2)>eledges(3)) then; q=eledges(2); eledges(2)=eledges(3); eledges(3)=q; end if
+                if (eledges(1)>eledges(2)) then; q=eledges(1); eledges(1)=eledges(2); eledges(2)=q; end if
+                do q=1,3
+                    edge=eledges(q)
+                    ! if ed is an outer boundary edge, skip it
+                    if(myList_edge2D(edge)>edge2D_in) cycle
+
+                    ! elem indices that participate in edge
+                    edelem  = edge_tri(:,edge)
+                    ednodes = edges(:,edge)
+
+                    ! total ocean depth H
+                    hh    = -sum(zbar_e_bot(edelem))*0.5_WP + sum(hbar(ednodes))*0.5_WP
+
+                    len     = sqrt(sum(elem_area(edelem)))
+                    update_ubt=(UVBT(1, edelem(1))-UVBT(1, edelem(2)))/hh
+                    update_vbt=(UVBT(2, edelem(1))-UVBT(2, edelem(2)))/hh
+                    vi=update_ubt*update_ubt + update_vbt*update_vbt
+                    vi=dt*sqrt(max(dynamics%se_visc_gamma0,           &
+                                max(dynamics%se_visc_gamma1*sqrt(vi),  &
+                                    dynamics%se_visc_gamma2*vi)        &
+                            )*len)
+                    update_ubt=update_ubt*vi
+                    update_vbt=update_vbt*vi
+
+                    if (edelem(1)==elem) then
+                        visc_u=visc_u-update_ubt/elem_area(elem)*hh
+                        visc_v=visc_v-update_vbt/elem_area(elem)*hh
+                    else
+                        visc_u=visc_u+update_ubt/elem_area(elem)*hh
+                        visc_v=visc_v+update_vbt/elem_area(elem)*hh
+                    end if
+                end do ! --> do q=1,3
+                UVBT_harmvisc(1, elem) = visc_u
+                UVBT_harmvisc(2, elem) = visc_v
+            end do
+!$OMP END DO
         end if ! -> if (dynamics%se_visc) then 
         
         !_______________________________________________________________________
         ! Advance velocities. I use SI stepping for the Coriolis
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(elem, elnodes, hh, ff, rx, ry, a, b,  &
-!$OMP                                  d, ax, ay)
 !$OMP DO           
         do elem=1, myDim_elem2D
             elnodes=elem2D_nodes(:,elem)
@@ -1133,82 +950,62 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
             
         end do
 !$OMP END DO       
-!$OMP END PARALLEL 
         
         !_______________________________________________________________________
 !$OMP MASTER
         call exchange_elem_begin(UVBT, partit)
         call exchange_elem_end(partit)
-!$OMP END MASTER
-!$OMP BARRIER
 
         !_______________________________________________________________________
         ! Store mid-step velocity (to trim 3D velocities in momentum)
         if(step==dynamics%se_BTsteps/2) then
             UVBT_12=UVBT
         end if 
+!$OMP END MASTER
         
         !_______________________________________________________________________
         ! Advance thickness
         ! compute: dt/M * div_H * [(1+theta)*Ubt^(n+(m+1)/M) - theta*Ubt^(n+(m)/M)]
         ! and advance ssh --> eta^(n+(m+1)/M) = eta^(n+(m)/M) - dt/M * div_H * [...]
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, ednodes, edelem, c1, c2, &
-!$OMP                                  deltaX1, deltaX2, deltaY1, deltaY2)
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
+        ! Each owned node adds the divergence of its incident edges in ascending
+        ! edge order (mesh%nod_in_edge2D), then the freshwater flux.
 !$OMP DO
-#endif
-        do edge=1, myDim_edge2D
-            ednodes = edges(:,edge)
-            edelem  = edge_tri(:,edge)
-            
-            !___________________________________________________________________
-            ! compute divergence div_H * [(1+theta)*Ubt^(n+(m+1)/M) - theta*Ubt^(n+(m)/M)]
-            deltaX1 = edge_cross_dxdy(1,edge)
-            deltaY1 = edge_cross_dxdy(2,edge)
-            c1 = UVBT_theta(2, edelem(1))*deltaX1 - UVBT_theta(1, edelem(1))*deltaY1
-            c2 = 0.0_WP
-            if(edelem(2)>0) then
-                deltaX2=edge_cross_dxdy(3,edge)
-                deltaY2=edge_cross_dxdy(4,edge)
-                c2=-(UVBT_theta(2, edelem(2))*deltaX2 - UVBT_theta(1, edelem(2))*deltaY2)
-            end if
-            
-            !___________________________________________________________________
-            ! advance ssh --> eta^(n+(m+1)/M) = eta^(n+(m)/M) - dt/M * div_H * [...]
-            ! equation (6) in T. Banerjee et al.,Split-Explicite external
-            ! mode solver in FESOM2, 
-#if defined(_OPENMP) && !defined(__openmp_reproducible)
-            call omp_set_lock(partit%plock(ednodes(1)))
-#else
-!$OMP ORDERED
-#endif            
-            eta_n(ednodes(1))=eta_n(ednodes(1)) + (c1+c2)*dtBT/areasvol(1,ednodes(1))
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-            call omp_unset_lock(partit%plock(ednodes(1)))
-            call omp_set_lock  (partit%plock(ednodes(2)))
-#endif            
-            eta_n(ednodes(2))=eta_n(ednodes(2)) - (c1+c2)*dtBT/areasvol(1,ednodes(2))
-#if defined(_OPENMP) && !defined(__openmp_reproducible) 
-            call omp_unset_lock(partit%plock(ednodes(2)))
-#else
-!$OMP END ORDERED
-#endif            
-        end do
-!$OMP END DO       
-!$OMP END PARALLEL 
-
-        !_______________________________________________________________________
-        ! Apply freshwater boundary condition 
-        if ( .not. trim(which_ALE)=='linfs') then
-!$OMP PARALLEL DO
-            do node=1,myDim_nod2D
-                eta_n(node)=eta_n(node) - dtBT*water_flux(node)
+        do node=1, myDim_nod2D
+            eta_loc = eta_n(node)
+            do k=1, mesh%nod_in_edge2D_num(node)
+                edge    = mesh%nod_in_edge2D(k,node)
+                edelem  = edge_tri(:,edge)
+                
+                !_______________________________________________________________
+                ! compute divergence div_H * [(1+theta)*Ubt^(n+(m+1)/M) - theta*Ubt^(n+(m)/M)]
+                deltaX1 = edge_cross_dxdy(1,edge)
+                deltaY1 = edge_cross_dxdy(2,edge)
+                c1 = UVBT_theta(2, edelem(1))*deltaX1 - UVBT_theta(1, edelem(1))*deltaY1
+                c2 = 0.0_WP
+                if(edelem(2)>0) then
+                    deltaX2=edge_cross_dxdy(3,edge)
+                    deltaY2=edge_cross_dxdy(4,edge)
+                    c2=-(UVBT_theta(2, edelem(2))*deltaX2 - UVBT_theta(1, edelem(2))*deltaY2)
+                end if
+                
+                !_______________________________________________________________
+                ! advance ssh --> eta^(n+(m+1)/M) = eta^(n+(m)/M) - dt/M * div_H * [...]
+                ! equation (6) in T. Banerjee et al.,Split-Explicite external
+                ! mode solver in FESOM2, 
+                if (mesh%nod_in_edge2D_sgn(k,node) > 0) then
+                    eta_loc = eta_loc + (c1+c2)*dtBT/areasvol(1,node)
+                else
+                    eta_loc = eta_loc - (c1+c2)*dtBT/areasvol(1,node)
+                end if
             end do
-!$OMP END PARALLEL DO            
-        end if 
-        
+            
+            !___________________________________________________________________
+            ! Apply freshwater boundary condition 
+            if (lfreshwater) eta_loc = eta_loc - dtBT*water_flux(node)
+            eta_n(node) = eta_loc
+        end do
+!$OMP END DO
+
         !_______________________________________________________________________
 !$OMP MASTER        
         call exchange_nod(eta_n, partit)
@@ -1216,6 +1013,7 @@ subroutine compute_BT_step_SE_ale(dynamics, partit, mesh)
 !$OMP BARRIER
 
     end do ! --> do step=1, dynamics%se_BTsteps
+!$OMP END PARALLEL
     
     !___________________________________________________________________________
     hbar_old = hbar
@@ -1226,11 +1024,6 @@ end subroutine compute_BT_step_SE_ale
 !_______________________________________________________________________________
 ! Trim U and Uh to be consistent with BT transport
 subroutine update_trim_vel_ale_vtransp(mode, dynamics, partit, mesh)
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    USE MOD_DYN
-    use g_comm_auto
     IMPLICIT NONE
     !___________________________________________________________________________
     integer       , intent(in)            :: mode
@@ -1470,11 +1263,6 @@ end subroutine update_trim_vel_ale_vtransp
 !_______________________________________________________________________________
 ! Trim U and Uh to be consistent with BT transport
 subroutine compute_thickness_zstar(dynamics, partit, mesh)
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    USE MOD_DYN
-    use g_comm_auto
     implicit none
     !___________________________________________________________________________
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -1531,4 +1319,4 @@ subroutine compute_thickness_zstar(dynamics, partit, mesh)
 
 end subroutine compute_thickness_zstar
 
-
+end module oce_ale_ssh_splitexpl_subcycl_module

@@ -1,168 +1,68 @@
-module diff_part_hor_redi_interface
-    interface
-        subroutine diff_part_hor_redi(tracer, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        type(t_tracer), intent(inout), target :: tracer
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine diff_part_hor_redi
-    end interface
-end module diff_part_hor_redi_interface
-
-module diff_ver_part_expl_ale_interface
-    interface
-        subroutine diff_ver_part_expl_ale(tr_num, tracer, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        integer       , intent(in)   , target :: tr_num
-        type(t_tracer), intent(inout), target :: tracer
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine diff_ver_part_expl_ale
-    end interface
-end module diff_ver_part_expl_ale_interface
-
-module diff_ver_part_redi_expl_interface
-    interface
-        subroutine diff_ver_part_redi_expl(tracer, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        type(t_tracer), intent(inout), target :: tracer
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine diff_ver_part_redi_expl
-    end interface
-end module diff_ver_part_redi_expl_interface
-
-module diff_ver_part_impl_ale_interface
-    interface
-        subroutine diff_ver_part_impl_ale(tr_num, dynamics,  tracer, ice, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        use MOD_DYN
-        use mod_ice
-        integer       , intent(in)   , target :: tr_num
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_tracer), intent(inout), target :: tracer
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        type(t_ice)   , intent(in)   , target :: ice
-        end subroutine diff_ver_part_impl_ale
-    end interface
-end module diff_ver_part_impl_ale_interface
-
-module diff_tracers_ale_interface
-    interface
-        subroutine diff_tracers_ale(tr_num, dynamics, tracer, ice, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        use mod_ice
-        use MOD_DYN
-        integer       , intent(in),    target :: tr_num
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_tracer), intent(inout), target :: tracer
-        type(t_ice),    intent(in),    target :: ice
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine diff_tracers_ale
-    end interface
-end module diff_tracers_ale_interface
-
-module bc_surface_interface
-    interface
-        function bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, a_ice)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        integer , intent(in)                  :: n, id, nzmin
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh), intent(in), target      :: mesh
-        real(kind=WP)                         :: bc_surface
-        real(kind=WP), intent(in)             :: sval, sst, sss, a_ice
-        end function bc_surface
-    end interface
-end module bc_surface_interface
-
-module diff_part_bh_interface
-    interface
-        subroutine diff_part_bh(tr_num, dynamics, tracer, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        use MOD_DYN
-        integer       , intent(in)   , target :: tr_num
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_tracer), intent(inout), target :: tracer
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine diff_part_bh
-    end interface
-end module diff_part_bh_interface
-
-module solve_tracers_ale_interface
-    interface
-        subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        use mod_tracer
-        use MOD_DYN
-        USE MOD_ICE
-        type(t_ice)   , intent(in),    target :: ice
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_tracer), intent(inout), target :: tracers
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine solve_tracers_ale
-    end interface
-end module solve_tracers_ale_interface
-!
-!
-!===============================================================================
-! Driving routine    Here with ALE changes!!!
-subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
-    use g_config
-    use o_PARAM, only: SPP, Fer_GM, S_ref_anomaly
-    use mod_mesh
+module oce_ale_tracer_module
+    USE g_config
+    USE o_PARAM
+    USE mod_mesh
     USE MOD_PARTIT
-    USE MOD_PARSUP
+    use par_support_module, only: par_ex
     USE MOD_DYN
     USE MOD_ICE
-    use mod_tracer
-    use g_comm_auto
-    use o_tracers
-    use Toy_Channel_Soufflet
-    use Toy_Channel_Dbgyre
-    use Toy_Neverworld2
-    use o_ARRAYS, only: heat_flux
-    use g_forcing_arrays, only: sw_3d
-    use diff_tracers_ale_interface
-    use oce_adv_tra_driver_interfaces
+    USE mod_tracer
+    USE g_comm_auto
+    USE o_tracers
+    USE Toy_Channel_Soufflet
+    USE Toy_Channel_Dbgyre
+    USE Toy_Neverworld2
+    USE o_ARRAYS
+    USE g_forcing_arrays
+    USE oce_adv_tra_driver_module, only: do_oce_adv_tra
+    USE diagnostics, only: ldiag_DVD, ldiag_diapmix, density_dmoc_avg, diap_avg_count, &
+            dmoc_avg_count, dmoc_is_due, dT_diap, dS_diap, dd_diap
+    USE g_forcing_param, only: use_age_tracer
+    USE mod_transit
+    USE cmor_variables_diag, only: ldiag_cmor, save_cmor_advection
+    USE g_clock
+    USE o_mixing_KPP_mod
+    USE iceberg_params
 #if defined(__recom)
     use recom_glovar
     use recom_config
     use recom_ciso
     use o_arrays
 #endif
-    use diagnostics, only: ldiag_DVD, ldiag_diapmix, density_dmoc_avg, diap_avg_count, &
-                           dmoc_avg_count, dmoc_is_due
-    use o_ARRAYS, only: density_dmoc
-    use o_PARAM,  only: mstep
-    use g_forcing_param, only: use_age_tracer !---age-code
-    use mod_transit, only: decay14, decay39
-    use cmor_variables_diag, only: ldiag_cmor, save_cmor_advection
+#if defined(__recom)
+    use recom_sinking
+    use recom_glovar
+    use recom_config
+    use g_comm_auto
+    use g_support
+#endif
+#if defined (__cvmix)
+    use g_cvmix_kpp, only: kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc
+#endif
+#if defined (__recom)
+   use recoM_declarations, only: is_erosioninput, is_riverinput
+   use recom_glovar
+   use recom_config
+#endif
+#if defined (__ciso)
+   use recom_ciso
+#endif
+
+    implicit none
+
+    private
+    public :: solve_tracers_ale, diff_tracers_ale, &
+              diff_ver_part_expl_ale, diff_ver_part_impl_ale, &
+              diff_ver_part_redi_expl, diff_part_hor_redi, &
+              diff_part_bh, bc_surface, transit_bc_surface, calc_slice
+
+contains
+
+!
+!
+!===============================================================================
+! Driving routine    Here with ALE changes!!!
+subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
     implicit none
     type(t_ice)   , intent(in)   , target    :: ice
     type(t_dyn)   , intent(inout), target    :: dynamics
@@ -180,10 +80,10 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 
     logical             :: has_one_added_tracer
     logical             :: has_one_added_tracer_local_dummy
-    logical             :: tr_num_end_local_dummy
-    logical             :: tr_num_in_group_local_dummy
+    integer             :: tr_num_end_local_dummy
+    integer             :: tr_num_in_group_local_dummy
     integer             :: tr_num_end
-    logical             :: tr_num_in_group_dummy
+    integer             :: tr_num_in_group_dummy
     integer             :: tr_arr_slice_count_fix_1
 
     integer             :: Sinkflx_tr_slice_count_fix_1
@@ -548,28 +448,6 @@ end subroutine solve_tracers_ale
 !
 !===============================================================================
 subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
-    use mod_mesh
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use mod_tracer
-    use MOD_DYN
-    use o_arrays
-    use o_tracers
-    use diff_part_hor_redi_interface
-    use diff_ver_part_expl_ale_interface
-    use diff_ver_part_redi_expl_interface
-    use diff_ver_part_impl_ale_interface
-    use diff_part_bh_interface
-#if defined(__recom)
-    use recom_sinking
-    use recom_glovar
-    use recom_config
-    use g_comm_auto
-    use g_support
-#endif
-    use mod_ice
-    use g_clock
-    use diagnostics, only: ldiag_diapmix, dT_diap, dS_diap, dd_diap
 
     implicit none
     integer       , intent(in)   , target :: tr_num
@@ -890,14 +768,6 @@ end subroutine diff_tracers_ale
 !===============================================================================
 !Vertical diffusive flux(explicit scheme):
 subroutine diff_ver_part_expl_ale(tr_num, tracers, partit, mesh)
-    use o_PARAM, only: S_ref_anomaly
-    use o_ARRAYS
-    use g_forcing_arrays
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_TRACER
-    use g_config,only: dt
     implicit none
     integer       , intent(in)   , target :: tr_num
     type(t_tracer), intent(inout), target :: tracers
@@ -960,24 +830,6 @@ end subroutine diff_ver_part_expl_ale
 !===============================================================================
 ! vertical diffusivity augmented with Redi contribution [vertical flux of K(3,3)*d_zT]
 subroutine diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_TRACER
-    use MOD_DYN
-    use o_PARAM
-    use o_ARRAYS, only: Ki, Kv, heat_flux, water_flux, slope_tapered
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use g_CONFIG
-    use g_forcing_arrays
-    use o_mixing_KPP_mod !for ghats _GO_
-#if defined (__cvmix)       
-    use g_cvmix_kpp, only: kpp_nonlcltranspT, kpp_nonlcltranspS, kpp_oblmixc
-#endif    
-    use bc_surface_interface
-    use mod_ice
-    use iceberg_params
     implicit none
     integer       , intent(in)   , target :: tr_num
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -1492,14 +1344,6 @@ end subroutine diff_ver_part_impl_ale
 !
 !===============================================================================
 subroutine diff_ver_part_redi_expl(tracers, partit, mesh)
-    use o_ARRAYS
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_TRACER
-    USE o_param
-    use g_config
-    use g_comm_auto
     IMPLICIT NONE
     type(t_tracer), intent(inout), target :: tracers
     type(t_partit), intent(inout), target :: partit
@@ -1579,21 +1423,15 @@ end subroutine diff_ver_part_redi_expl
 !
 !===============================================================================
 subroutine diff_part_hor_redi(tracers, partit, mesh)
-    use o_ARRAYS
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_TRACER
-    use o_param
-    use g_config
     IMPLICIT NONE
     type(t_tracer), intent(inout), target :: tracers
     type(t_partit), intent(inout), target :: partit
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
-    integer                  :: edge
+    integer                  :: edge, n, k
     real(kind=WP)            :: deltaX1, deltaY1, deltaX2, deltaY2
     integer                  :: nl1, ul1, nl2, ul2, nl12, ul12, nz, el(2), elnodes(3), enodes(2)
+    real(kind=WP), pointer   :: edge_flux(:,:)
     real(kind=WP)            :: c, Fx, Fy, Tx, Ty, Tx_z, Ty_z, SxTz, SyTz, Tz(2)
     real(kind=WP)            :: rhs1(mesh%nl-1), rhs2(mesh%nl-1), Kh, dz
     real(kind=WP)            :: isredi=0._WP
@@ -1605,18 +1443,17 @@ subroutine diff_part_hor_redi(tracers, partit, mesh)
 #include "associate_part_ass.h"
 #include "associate_mesh_ass.h"
     del_ttf => tracers%work%del_ttf
+    if (.not. allocated(tracers%work%edge_flux)) allocate(tracers%work%edge_flux(mesh%nl-1, partit%myDim_edge2D))
+    edge_flux => tracers%work%edge_flux
 
     !___________________________________________________________________________
     if (Redi) isredi=1._WP
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, deltaX1, deltaY1, deltaX2, deltaY2, &
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(edge, n, k, deltaX1, deltaY1, deltaX2, deltaY2, &
 !$OMP                   nl1, ul1, nl2, ul2, nl12, ul12, nz, el, elnodes, enodes, &
 !$OMP                             c, Fx, Fy, Tx, Ty, Tx_z, Ty_z, SxTz, SyTz, Tz, &
 !$OMP                                                          rhs1, rhs2, Kh, dz)
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
+    ! Pass 1: the flux through every edge (rhs1; the second node's rhs2 is exactly -rhs1).
 !$OMP DO
-#endif
     do edge=1, myDim_edge2D
         rhs1=0.0_WP
         rhs2=0.0_WP
@@ -1726,22 +1563,31 @@ subroutine diff_part_hor_redi(tracers, partit, mesh)
         nl12=max(nl1,nl2)
         ul12 = ul1
         if (ul2>0) ul12=min(ul1,ul2)
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_set_lock(partit%plock(enodes(1)))
-#else
-!$OMP ORDERED
-#endif
-        del_ttf(ul12:nl12,enodes(1))=del_ttf(ul12:nl12,enodes(1))+rhs1(ul12:nl12)*dt/areasvol(ul12:nl12,enodes(1))
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(enodes(1)))
-        call omp_set_lock  (partit%plock(enodes(2)))
-#endif
-        del_ttf(ul12:nl12,enodes(2))=del_ttf(ul12:nl12,enodes(2))+rhs2(ul12:nl12)*dt/areasvol(ul12:nl12,enodes(2))
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-        call omp_unset_lock(partit%plock(enodes(2)))
-#else
-!$OMP END ORDERED
-#endif
+        edge_flux(ul12:nl12,edge)=rhs1(ul12:nl12)
+    end do
+!$OMP END DO
+    ! Pass 2: each node gathers its edges' fluxes (mesh%nod_in_edge2D with sign; the first
+    ! node gets +rhs1, the second -rhs1) in ascending edge order.
+!$OMP DO
+    do n=1, myDim_nod2D+eDim_nod2D
+        do k=1, mesh%nod_in_edge2D_num(n)
+            edge=mesh%nod_in_edge2D(k,n)
+            el=edge_tri(:,edge)
+            nl1=nlevels(el(1))-1
+            ul1=ulevels(el(1))
+            nl2=0
+            ul2=0
+            if (el(2)>0) then
+                nl2=nlevels(el(2))-1
+                ul2=ulevels(el(2))
+            endif
+            nl12=max(nl1,nl2)
+            ul12 = ul1
+            if (ul2>0) ul12=min(ul1,ul2)
+            do nz=ul12, nl12
+                del_ttf(nz,n)=del_ttf(nz,n)+mesh%nod_in_edge2D_sgn(k,n)*edge_flux(nz,edge)*dt/areasvol(nz,n)
+            end do
+        end do
     end do
 !$OMP END DO
 !$OMP END PARALLEL
@@ -1750,15 +1596,6 @@ end subroutine diff_part_hor_redi
 !
 !===============================================================================
 SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
-    use o_ARRAYS, only:
-    use MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_TRACER
-    use MOD_DYN
-    use o_param
-    use g_config
-    use g_comm_auto
     IMPLICIT NONE
     integer,        intent(in),    target    :: tr_num
     type(t_dyn)   , intent(inout), target    :: dynamics
@@ -1769,6 +1606,7 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
     integer                                  :: elnodes1(3), elnodes2(3)
     real(kind=WP)                            :: u1, v1, len, vi, ww, tt(mesh%nl-1)
     real(kind=WP), pointer                   :: temporary_ttf(:,:)
+    real(kind=WP), pointer                   :: edge_flux(:,:)
     real(kind=WP), pointer                   :: UV(:,:,:)
     real(kind=WP), pointer                   :: ttf(:,:)
 #include "associate_part_def.h"
@@ -1780,6 +1618,8 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
     UV            => dynamics%uv(:,:,:)
     ttf           => tracers%data(tr_num)%values
     temporary_ttf => tracers%work%del_ttf !use already allocated working array. could be fct_LO instead etc.
+    if (.not. allocated(tracers%work%edge_flux)) allocate(tracers%work%edge_flux(mesh%nl-1, partit%myDim_edge2D))
+    edge_flux => tracers%work%edge_flux
 
 !$OMP PARALLEL DO
         do n=1, myDim_nod2D+eDim_nod2D
@@ -1789,11 +1629,7 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, ed, el, en, k, elem, nzmin, nzmax, u1, v1, len, vi, tt, ww, &
 !$OMP elnodes1, elnodes2)
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
 !$OMP DO
-#endif
     DO ed=1, myDim_edge2D!+eDim_edge2D
        if (myList_edge2D(ed) > edge2D_in) cycle
        el=edge_tri(:,ed)
@@ -1814,23 +1650,23 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
                                                          )*len)
            tt(nz)=tt(nz)*vi
        END DO
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_set_lock  (partit%plock(en(1)))
-#else
-!$OMP ORDERED
-#endif
-       temporary_ttf(nzmin:nzmax-1,en(1))=temporary_ttf(nzmin:nzmax-1,en(1))-tt(nzmin:nzmax-1)
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_unset_lock(partit%plock(en(1)))
-       call omp_set_lock  (partit%plock(en(2)))
-#endif
-       temporary_ttf(nzmin:nzmax-1,en(2))=temporary_ttf(nzmin:nzmax-1,en(2))+tt(nzmin:nzmax-1)
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_unset_lock(partit%plock(en(2)))
-#else
-!$OMP END ORDERED
-#endif
+       edge_flux(nzmin:nzmax-1,ed)=tt(nzmin:nzmax-1)
     END DO
+!$OMP END DO
+    ! node gather (first node -tt, second node +tt), ascending edge order
+!$OMP DO
+    do n=1, myDim_nod2D+eDim_nod2D
+       do k=1, mesh%nod_in_edge2D_num(n)
+          ed=mesh%nod_in_edge2D(k,n)
+          if (myList_edge2D(ed) > edge2D_in) cycle
+          el=edge_tri(:,ed)
+          nzmax = minval(nlevels(el))
+          nzmin = maxval(ulevels(el))
+          do nz=nzmin, nzmax-1
+             temporary_ttf(nz,n)=temporary_ttf(nz,n)-mesh%nod_in_edge2D_sgn(k,n)*edge_flux(nz,ed)
+          end do
+       end do
+    end do
 !$OMP END DO
 !$OMP MASTER
     call exchange_nod(temporary_ttf, partit)
@@ -1839,11 +1675,7 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
     ! ===========
     ! Second round:
     ! ===========
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
 !$OMP DO
-#endif
     DO ed=1, myDim_edge2D!+eDim_edge2D
        if (myList_edge2D(ed)>edge2D_in) cycle
           el=edge_tri(:,ed)
@@ -1864,23 +1696,22 @@ SUBROUTINE diff_part_bh(tr_num, dynamics, tracers, partit, mesh)
                                                             )*len)
               tt(nz)=-tt(nz)*vi*dt
           END DO
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-          call omp_set_lock  (partit%plock(en(1)))
-#else
-!$OMP ORDERED
-#endif
-          ttf(nzmin:nzmax-1,en(1))=ttf(nzmin:nzmax-1,en(1))-tt(nzmin:nzmax-1)/area(nzmin:nzmax-1,en(1))
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-          call omp_unset_lock(partit%plock(en(1)))
-          call omp_set_lock  (partit%plock(en(2)))
-#endif
-          ttf(nzmin:nzmax-1,en(2))=ttf(nzmin:nzmax-1,en(2))+tt(nzmin:nzmax-1)/area(nzmin:nzmax-1,en(2))
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-          call omp_unset_lock(partit%plock(en(2)))
-#else
-!$OMP END ORDERED
-#endif
+          edge_flux(nzmin:nzmax-1,ed)=tt(nzmin:nzmax-1)
     END DO
+!$OMP END DO
+!$OMP DO
+    do n=1, myDim_nod2D+eDim_nod2D
+       do k=1, mesh%nod_in_edge2D_num(n)
+          ed=mesh%nod_in_edge2D(k,n)
+          if (myList_edge2D(ed) > edge2D_in) cycle
+          el=edge_tri(:,ed)
+          nzmax = minval(nlevels(el))
+          nzmin = maxval(ulevels(el))
+          do nz=nzmin, nzmax-1
+             ttf(nz,n)=ttf(nz,n)-mesh%nod_in_edge2D_sgn(k,n)*edge_flux(nz,ed)/area(nz,n)
+          end do
+       end do
+    end do
 !$OMP END DO
 !$OMP END PARALLEL
 call exchange_nod(ttf, partit)
@@ -1893,23 +1724,6 @@ end subroutine diff_part_bh
 ! ID = 0 and 1 are reserved for temperature and salinity
 ! MB: mesh, sst, sss, and aice are only needed for transient tracers
 FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
-  use MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use o_PARAM, only: S_ref_anomaly
-  USE o_ARRAYS
-  USE g_forcing_arrays
-  USE g_config
-#if defined (__recom)
-   use recoM_declarations, only: is_erosioninput, is_riverinput
-   use recom_glovar
-   use recom_config
-#endif
-#if defined (__ciso)
-   use recom_ciso
-#endif
-  use mod_transit
-  use g_clock
   implicit none
 
   integer,       intent(in)            :: n, id, nzmin
@@ -2192,14 +2006,6 @@ END FUNCTION
 ! Different to function bc_surface, SST, SSS, and sea ice concentrations are always needed as
 ! auxiliary variable
 FUNCTION transit_bc_surface(n, id, sst, sss, aice, sval, nzmin, partit, mesh)
-  use MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  USE o_ARRAYS
-  USE g_forcing_arrays
-  USE g_config
-  use g_clock
-  use mod_transit
   implicit none
 
   integer,       intent(in)            :: n, id, nzmin
@@ -2358,3 +2164,4 @@ subroutine calc_slice(index_count, fesom_group_count, fesom_group_id, start_inde
     end_index  = start_index + index_count_in_group - 1
 end subroutine calc_slice
 
+end module oce_ale_tracer_module

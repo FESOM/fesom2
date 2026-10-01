@@ -2,7 +2,6 @@ module g_dist2coast
     !___________________________________________________________________________
     use MOD_MESH
     use MOD_PARTIT
-    use MOD_PARSUP
     use g_config, only: flag_debug, cyclic_length
     use o_param           
     use o_arrays

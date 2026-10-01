@@ -1,52 +1,30 @@
+module oce_ale_vel_rhs_module
+    USE MOD_ICE
+    USE MOD_DYN
+    USE MOD_PARTIT
+    use par_support_module, only: par_ex
+    USE MOD_MESH
+    USE o_ARRAYS, only: ssh_gp, pgf_x, pgf_y
+    USE o_PARAM
+    USE g_CONFIG
+    USE g_forcing_param, only: use_virt_salt
+    USE g_forcing_arrays, only: press_air
+    USE g_comm_auto
+    USE g_sbf, only: l_mslp
+    use oce_ale_ssh_splitexpl_subcycl_module, only: momentum_adv_scalar_transpv
+    use oce_dyn_module, only: viscosity_filter
 
-module compute_vel_rhs_interface
-    interface
-        subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
-        USE MOD_ICE
-        USE MOD_DYN
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_MESH
-        type(t_ice)   , intent(inout), target :: ice
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine compute_vel_rhs
-    end interface
-end module compute_vel_rhs_interface
+    implicit none
 
-module momentum_adv_scalar_interface
-    interface
-        subroutine momentum_adv_scalar(dynamics, partit, mesh)
-        use mod_mesh
-        USE MOD_PARTIT
-        USE MOD_PARSUP
-        USE MOD_DYN
-        type(t_dyn)   , intent(inout), target :: dynamics
-        type(t_partit), intent(inout), target :: partit
-        type(t_mesh)  , intent(in)   , target :: mesh
-        end subroutine momentum_adv_scalar
-    end interface
-end module momentum_adv_scalar_interface
+    private
+    public :: compute_vel_rhs, momentum_adv_scalar
+
+contains
 
 !
 !
 !_______________________________________________________________________________
 subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
-    USE MOD_ICE
-    USE MOD_DYN
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use o_ARRAYS, only: ssh_gp, pgf_x, pgf_y
-    use o_PARAM
-    use g_CONFIG
-    use g_forcing_param, only: use_virt_salt
-    use g_forcing_arrays, only: press_air
-    use g_comm_auto
-    use g_sbf, only: l_mslp
-    use momentum_adv_scalar_interface
-    use momentum_adv_scalar_transpv_interface
     implicit none 
     type(t_ice)   , intent(inout), target :: ice
     type(t_dyn)   , intent(inout), target :: dynamics
@@ -333,12 +311,6 @@ END SUBROUTINE compute_vel_rhs
 ! Momentum advection on scalar control volumes with ALE adaption--> exchange zinv(nz)
 ! against hnode(nz,node)
 subroutine momentum_adv_scalar(dynamics, partit, mesh)
-    USE MOD_MESH
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    use MOD_DYN
-    USE o_PARAM
-    use g_comm_auto
     IMPLICIT NONE
     type(t_dyn)   , intent(inout), target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -423,135 +395,81 @@ subroutine momentum_adv_scalar(dynamics, partit, mesh)
     !___________________________________________________________________________
     ! 2nd. compute horizontal advection component: u*du/dx, u*dv/dx & v*du/dy, v*dv/dy
     ! loop over triangle edges
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
+    ! Each owned node gathers the normal-velocity fluxes of its incident edges
+    ! (mesh%nod_in_edge2D, ascending edge order), with the sign of the edge
+    ! orientation. No thread writes a node it does not own, and the sum is
+    ! independent of the number of threads.
 !$OMP DO
-#endif
-    do ed=1, myDim_edge2D
-        nod = edges(:,ed)   
-        el1 = edge_tri(1,ed)   
-        el2 = edge_tri(2,ed)
-        nl1 = nlevels(el1)-1
-        ul1 = ulevels(el1)
-        
-        !_______________________________________________________________________
-        ! compute horizontal normal velocity with respect to the edge from triangle 
-        ! centroid towards triangel edge mid-pointe for element el1
-        !                     .o.    
-        !                   ./   \.                
-        !                 ./  el1  \.   
-        !               ./     x     \. 
-        !             ./       |-------\.-----------------edge_cross_dxdy(1:2,ed) --> (dx,dy)
-        !            /         |->n_vec  \
-        !    nod(1) o----------O----------o nod(2)   
-        !            \.        |->n_vec ./
-        !              \.      |------./------------------edge_cross_dxdy(3:4,ed) --> (dx,dy)
-        !                \.    x    ./
-        !                  \. el2 ./
-        !                    \. ./  
-        !                      °
-        un1(ul1:nl1) =   UV(2,ul1:nl1,el1)*edge_cross_dxdy(1,ed)   &
-                       - UV(1,ul1:nl1,el1)*edge_cross_dxdy(2,ed)  
-                       
-        !_______________________________________________________________________
-        ! compute horizontal normal velocity with respect to the edge from triangle 
-        ! centroid towards triangel edge mid-pointe for element el2 when it is valid
-        ! --> if its a boundary triangle el2 will be not valid
-        !_______________________________________________________________________
-        ! ensure openmp numerical reproducability
-        ! NOTE: an ordered region is a structured block, so it has to enclose the
-        ! whole if(el2>0) construct. Opening it inside the .true. branch and
-        ! closing it after the matching "endif" straddles the "else" and does not
-        ! compile.
-#if defined(__openmp_reproducible)
-!$OMP ORDERED
-#endif
-        if (el2>0) then ! --> el2 is valid element
-            nl2 = nlevels(el2)-1
-            ul2 = ulevels(el2)
-            
-            un2(ul2:nl2) = - UV(2,ul2:nl2,el2)*edge_cross_dxdy(3,ed) &
-                           + UV(1,ul2:nl2,el2)*edge_cross_dxdy(4,ed)
-            
-            ! fill with zeros to combine the loops
-            ! Usually, no or only a very few levels have to be filled. In this case, 
-            ! computing "zeros" is cheaper than the loop overhead.
-            un1(nl1+1:max(nl1,nl2)) = 0._WP
-            un2(nl2+1:max(nl1,nl2)) = 0._WP
-            un1(1:ul1-1)            = 0._WP
-            un2(1:ul2-1)            = 0._WP
+    do n=1, myDim_nod2D
+        do k=1, mesh%nod_in_edge2D_num(n)
+            ed  = mesh%nod_in_edge2D(k,n)
+            el1 = edge_tri(1,ed)
+            el2 = edge_tri(2,ed)
+            nl1 = nlevels(el1)-1
+            ul1 = ulevels(el1)
 
-            
-            ! first edge node
-            ! Do not calculate on Halo nodes, as the result will not be used. 
-            ! The "if" is cheaper than the avoided computiations.
-            if (nod(1) <= myDim_nod2d) then
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_set_lock(partit%plock(nod(1)))
-#endif
-                do nz=min(ul1,ul2), max(nl1,nl2)
-                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
-                    UVnode_rhs(1,nz,nod(1)) = UVnode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1) + un2(nz)*UV(1,nz,el2) 
-                    UVnode_rhs(2,nz,nod(1)) = UVnode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1) + un2(nz)*UV(2,nz,el2)
-                end do
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_unset_lock(partit%plock(nod(1)))
-#endif
-            endif
-            
-            ! second edge node
-            if (nod(2) <= myDim_nod2d) then
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_set_lock(partit%plock(nod(2)))
-#endif
-                do nz=min(ul1,ul2), max(nl1,nl2)
-                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
-                    UVnode_rhs(1,nz,nod(2)) = UVnode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1) - un2(nz)*UV(1,nz,el2)
-                    UVnode_rhs(2,nz,nod(2)) = UVnode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1) - un2(nz)*UV(2,nz,el2)
-                end do
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_unset_lock(partit%plock(nod(2)))
-#endif
-            endif
-            
-        else  ! el2 is not a valid element --> ed is a boundary edge, there is only the contribution from el1
-            ! first edge node
-            if (nod(1) <= myDim_nod2d) then
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_set_lock(partit%plock(nod(1)))
-#endif
-                do nz=ul1, nl1
-                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
-                    UVnode_rhs(1,nz,nod(1)) = UVnode_rhs(1,nz,nod(1)) + un1(nz)*UV(1,nz,el1)
-                    UVnode_rhs(2,nz,nod(1)) = UVnode_rhs(2,nz,nod(1)) + un1(nz)*UV(2,nz,el1)
-                end do ! --> do nz=ul1, nl1
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_unset_lock(partit%plock(nod(1)))
-#endif
-            endif 
-            
-            ! second edge node
-            if  (nod(2) <= myDim_nod2d) then
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_set_lock(partit%plock(nod(2)))
-#endif
-                do nz=ul1, nl1
-                    ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
-                    UVnode_rhs(1,nz,nod(2)) = UVnode_rhs(1,nz,nod(2)) - un1(nz)*UV(1,nz,el1)
-                    UVnode_rhs(2,nz,nod(2)) = UVnode_rhs(2,nz,nod(2)) - un1(nz)*UV(2,nz,el1)
-                end do ! --> do nz=ul1, nl1
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_unset_lock(partit%plock(nod(2)))
-#endif
-            endif
-        endif ! --> if (el2>0) then
+            !___________________________________________________________________
+            ! compute horizontal normal velocity with respect to the edge from triangle
+            ! centroid towards triangel edge mid-pointe for element el1
+            !                     .o.
+            !                   ./   \.
+            !                 ./  el1  \.
+            !               ./     x     \.
+            !             ./       |-------\.-----------------edge_cross_dxdy(1:2,ed) --> (dx,dy)
+            !            /         |->n_vec  \
+            !    nod(1) o----------O----------o nod(2)
+            !            \.        |->n_vec ./
+            !              \.      |------./------------------edge_cross_dxdy(3:4,ed) --> (dx,dy)
+            !                \.    x    ./
+            !                  \. el2 ./
+            !                    \. ./
+            !                      °
+            un1(ul1:nl1) =   UV(2,ul1:nl1,el1)*edge_cross_dxdy(1,ed)   &
+                           - UV(1,ul1:nl1,el1)*edge_cross_dxdy(2,ed)
 
-#if defined(__openmp_reproducible)
-!$OMP END ORDERED
-#endif
+            if (el2>0) then ! --> el2 is valid element
+                nl2 = nlevels(el2)-1
+                ul2 = ulevels(el2)
 
-    end do ! --> do ed=1, myDim_edge2D
+                un2(ul2:nl2) = - UV(2,ul2:nl2,el2)*edge_cross_dxdy(3,ed) &
+                               + UV(1,ul2:nl2,el2)*edge_cross_dxdy(4,ed)
+
+                ! fill with zeros to combine the loops
+                ! Usually, no or only a very few levels have to be filled. In this case,
+                ! computing "zeros" is cheaper than the loop overhead.
+                un1(nl1+1:max(nl1,nl2)) = 0._WP
+                un2(nl2+1:max(nl1,nl2)) = 0._WP
+                un1(1:ul1-1)            = 0._WP
+                un2(1:ul2-1)            = 0._WP
+
+                if (mesh%nod_in_edge2D_sgn(k,n) > 0) then ! n is the first edge node
+                    do nz=min(ul1,ul2), max(nl1,nl2)
+                        ! add w*du/dz+(u*du/dx+v*du/dy) & w*dv/dz+(u*dv/dx+v*dv/dy)
+                        UVnode_rhs(1,nz,n) = UVnode_rhs(1,nz,n) + un1(nz)*UV(1,nz,el1) + un2(nz)*UV(1,nz,el2)
+                        UVnode_rhs(2,nz,n) = UVnode_rhs(2,nz,n) + un1(nz)*UV(2,nz,el1) + un2(nz)*UV(2,nz,el2)
+                    end do
+                else                                       ! n is the second edge node
+                    do nz=min(ul1,ul2), max(nl1,nl2)
+                        UVnode_rhs(1,nz,n) = UVnode_rhs(1,nz,n) - un1(nz)*UV(1,nz,el1) - un2(nz)*UV(1,nz,el2)
+                        UVnode_rhs(2,nz,n) = UVnode_rhs(2,nz,n) - un1(nz)*UV(2,nz,el1) - un2(nz)*UV(2,nz,el2)
+                    end do
+                end if
+
+            else  ! el2 is not a valid element --> ed is a boundary edge, there is only the contribution from el1
+                if (mesh%nod_in_edge2D_sgn(k,n) > 0) then
+                    do nz=ul1, nl1
+                        UVnode_rhs(1,nz,n) = UVnode_rhs(1,nz,n) + un1(nz)*UV(1,nz,el1)
+                        UVnode_rhs(2,nz,n) = UVnode_rhs(2,nz,n) + un1(nz)*UV(2,nz,el1)
+                    end do ! --> do nz=ul1, nl1
+                else
+                    do nz=ul1, nl1
+                        UVnode_rhs(1,nz,n) = UVnode_rhs(1,nz,n) - un1(nz)*UV(1,nz,el1)
+                        UVnode_rhs(2,nz,n) = UVnode_rhs(2,nz,n) - un1(nz)*UV(2,nz,el1)
+                    end do ! --> do nz=ul1, nl1
+                end if
+            endif ! --> if (el2>0) then
+        end do ! --> do k=1, mesh%nod_in_edge2D_num(n)
+    end do ! --> do n=1, myDim_nod2D
 !$OMP END DO
 
     !___________________________________________________________________________
@@ -601,3 +519,4 @@ end subroutine momentum_adv_scalar
 
 ! ===================================================================
 
+end module oce_ale_vel_rhs_module

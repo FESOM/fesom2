@@ -85,7 +85,6 @@ contains
   subroutine cpl_yac_define_unstr(partit, mesh)
     use mod_mesh
     USE MOD_PARTIT
-    USE MOD_PARSUP
     use g_rotate_grid
     use g_config, only: dt
 

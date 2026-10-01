@@ -2,7 +2,6 @@ MODULE Toy_Channel_Dbgyre
   use mod_mesh
   USE o_ARRAYS
   USE o_PARAM
-  USE MOD_PARSUP
   USE MOD_PARTIT
   USE MOD_TRACER
   USE MOD_DYN

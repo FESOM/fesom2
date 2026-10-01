@@ -1,42 +1,20 @@
-module oce_adv_tra_fct_interfaces
-  interface
-    subroutine oce_adv_tra_fct_init(twork, partit, mesh)
-      use MOD_MESH
-      use MOD_TRACER
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      type(t_mesh),  intent(in),    target        :: mesh
-      type(t_partit),intent(inout), target        :: partit
-      type(t_tracer_work), intent(inout), target  :: twork
-    end subroutine oce_adv_tra_fct_init
+module oce_adv_tra_fct_module
+    USE MOD_MESH
+    USE MOD_TRACER
+    USE MOD_PARTIT
+    USE g_comm_auto
 
-    subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, fct_plus, fct_minus, AUX, partit, mesh)
-      use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      real(kind=WP), intent(in),    target :: dt
-      type(t_partit),intent(inout), target :: partit
-      type(t_mesh),  intent(in),    target :: mesh
-      real(kind=WP), intent(inout)      :: fct_ttf_min(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(inout)      :: fct_ttf_max(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(in)         :: ttf(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(in)         :: lo (mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D)
-      real(kind=WP), intent(inout)      :: adf_h(mesh%nl-1, partit%myDim_edge2D)
-      real(kind=WP), intent(inout)      :: adf_v(mesh%nl,   partit%myDim_nod2D)
-      real(kind=WP), intent(inout)      :: fct_plus(mesh%nl-1, partit%myDim_nod2D)
-      real(kind=WP), intent(inout)      :: fct_minus(mesh%nl,  partit%myDim_nod2D)
-      real(kind=WP), intent(inout)      :: AUX(:,:,:) !a large auxuary array
-    end subroutine oce_tra_adv_fct
- end interface
-end module oce_adv_tra_fct_interfaces
+    implicit none
+
+    private
+    public :: oce_adv_tra_fct_init, oce_tra_adv_fct
+
+contains
+
 !
 !
 !===============================================================================
 subroutine oce_adv_tra_fct_init(twork, partit, mesh)
-    use MOD_MESH
-    use MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
     implicit none
     integer                                    :: my_size
     type(t_mesh),        intent(in) ,   target :: mesh
@@ -78,11 +56,6 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     ! LO ==Low-order  (first-order upwind)
     ! HO ==High-order (3rd/4th order gradient reconstruction method)
     ! Adds limited fluxes to the LO solution
-    use MOD_MESH
-    use MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE g_comm_auto
     implicit none
     real(kind=WP), intent(in),    target :: dt
     type(t_mesh),  intent(in),    target :: mesh
@@ -301,12 +274,31 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
     !$ACC END PARALLEL LOOP
 #endif
 
+    ! Limiter sums: each node gathers max(0, ±flux) / min(0, ±flux) over its incident edges
+    ! (mesh%nod_in_edge2D with sign) in ascending edge order.
 #ifndef ENABLE_OPENACC
-#if defined(__openmp_reproducible)
-!$OMP DO ORDERED
-#else
 !$OMP DO
-#endif
+    do n=1, myDim_nod2D+eDim_nod2D
+       do k=1, mesh%nod_in_edge2D_num(n)
+          edge=mesh%nod_in_edge2D(k,n)
+          el=edge_tri(:,edge)
+          nl1=nlevels(el(1))-1
+          nu1=ulevels(el(1))
+          nl2=0
+          nu2=0
+          if (el(2)>0) then
+             nl2=nlevels(el(2))-1
+             nu2=ulevels(el(2))
+          end if
+          nl12 = max(nl1,nl2)
+          nu12 = nu1
+          if (nu2>0) nu12 = min(nu1,nu2)
+          do nz=nu12, nl12
+             fct_plus (nz,n)=fct_plus (nz,n) + max(0.0_WP, mesh%nod_in_edge2D_sgn(k,n)*adf_h(nz,edge))
+             fct_minus(nz,n)=fct_minus(nz,n) + min(0.0_WP, mesh%nod_in_edge2D_sgn(k,n)*adf_h(nz,edge))
+          end do
+       end do
+    end do
 #else
     !Horizontal
 #if !defined(DISABLE_OPENACC_ATOMICS)
@@ -314,7 +306,6 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 #else
     !$ACC UPDATE SELF(fct_plus, fct_minus, adf_h)
 #endif
-#endif 
     do edge=1, myDim_edge2D
        enodes(1:2)=edges(:,edge)
        el=edge_tri(:,edge)
@@ -330,16 +321,8 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
        nl12 = max(nl1,nl2)
        nu12 = nu1
        if (nu2>0) nu12 = min(nu1,nu2)
-#ifndef ENABLE_OPENACC
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_set_lock(partit%plock(enodes(1)))
-#else
-!$OMP ORDERED
-#endif
-#else
 #if !defined(DISABLE_OPENACC_ATOMICS)
        !$ACC LOOP VECTOR
-#endif
 #endif
        do nz=nu12, nl12
 #if !defined(DISABLE_OPENACC_ATOMICS)
@@ -351,17 +334,8 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 #endif
           fct_minus(nz,enodes(1))=fct_minus(nz,enodes(1)) + min(0.0_WP, adf_h(nz,edge))
 
-#ifndef ENABLE_OPENACC
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       end do
-       call omp_unset_lock(partit%plock(enodes(1)))
-       call omp_set_lock  (partit%plock(enodes(2)))
-       do nz=nu12, nl12
-#endif
-#else
 #if !defined(DISABLE_OPENACC_ATOMICS)
           !$ACC ATOMIC UPDATE
-#endif
 #endif
           fct_plus (nz,enodes(2))=fct_plus (nz,enodes(2)) + max(0.0_WP,-adf_h(nz,edge))
 #if !defined(DISABLE_OPENACC_ATOMICS)
@@ -373,14 +347,8 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
        !$ACC END LOOP
 #endif
 
-#ifndef ENABLE_OPENACC
-#if defined(_OPENMP)  && !defined(__openmp_reproducible)
-       call omp_unset_lock(partit%plock(enodes(2)))
-#else
-!$OMP END ORDERED
-#endif
-#endif
     end do
+#endif
 #ifndef ENABLE_OPENACC
 !$OMP END DO
 #else
@@ -516,3 +484,5 @@ subroutine oce_tra_adv_fct(dt, ttf, lo, adf_h, adf_v, fct_ttf_min, fct_ttf_max, 
 !$ACC END DATA
 #endif
 end subroutine oce_tra_adv_fct
+
+end module oce_adv_tra_fct_module

@@ -1,7 +1,6 @@
 module io_mesh_info
 USE MOD_MESH
 USE MOD_PARTIT
-USE MOD_PARSUP
 use g_config
 use g_comm_auto
 use o_PARAM

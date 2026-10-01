@@ -1,68 +1,35 @@
+module write_step_info_module
+    USE g_config, only: dt, use_ice, use_icebergs, ib_num, logfile_outfreq, which_ALE, &
+            toy_ocean
+    USE MOD_MESH
+    USE MOD_PARTIT
+    USE par_support_module, only: par_ex
+    USE MOD_TRACER
+    USE MOD_DYN
+    USE MOD_ICE
+    USE o_PARAM
+    USE o_ARRAYS, only: water_flux, heat_flux, pgf_x, pgf_y, Av, Kv, density_dmoc, stress_surf
+    USE diagnostics
+    USE g_comm_auto
+    USE g_support
+    USE iceberg_params
+    USE io_BLOWUP
+    USE g_forcing_arrays
+    USE iceberg_element
 
-module write_step_info_interface
-  interface
-    subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
-      use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use MOD_TRACER
-      use MOD_DYN
-      use MOD_ICE
-      integer                               :: istep,outfreq
-      type(t_mesh),   intent(in)   , target :: mesh
-      type(t_partit), intent(inout), target :: partit
-      type(t_tracer), intent(in)   , target :: tracers
-      type(t_dyn)   , intent(in)   , target :: dynamics
-      type(t_ice)   , intent(in)   , target :: ice
-    end subroutine write_step_info
-    subroutine write_enegry_info(dynamics, partit, mesh)
-      use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use MOD_DYN
-      use g_support
-      type(t_mesh),   intent(in)   , target :: mesh
-      type(t_partit), intent(inout), target :: partit
-      type(t_dyn)   , intent(in)   , target :: dynamics
-    end subroutine write_enegry_info
-  end interface
-end module write_step_info_interface
-module check_blowup_interface
-  interface
-    subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
-      use MOD_MESH
-      USE MOD_PARTIT
-      USE MOD_PARSUP
-      use MOD_TRACER
-      use MOD_DYN
-      use MOD_ICE
-      integer              :: istep
-      type(t_mesh),   intent(in),    target :: mesh
-      type(t_partit), intent(inout), target :: partit
-      type(t_tracer), intent(in),    target :: tracers
-      type(t_dyn)   , intent(in)   , target :: dynamics
-      type(t_ice)   , intent(in)   , target :: ice
-    end subroutine check_blowup
-  end interface
-end module check_blowup_interface
+    implicit none
+
+    private
+    public :: write_step_info, check_blowup, write_enegry_info, &
+              plot_fesomlogo, plot_fesomlogo_lildevil, &
+              plot_fesomlogo_expl
+
+contains
+
 !
 !
 !===============================================================================
 subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
-  use g_config, only: dt, use_ice, use_icebergs, ib_num
-  use MOD_MESH
-  USE MOD_PARTIT
-  USE MOD_PARSUP
-  use MOD_TRACER
-  use MOD_DYN
-  use MOD_ICE
-  use o_PARAM
-  use o_ARRAYS, only: water_flux, heat_flux, &
-                 pgf_x, pgf_y, Av, Kv, density_dmoc
-  use diagnostics, only: ldiag_dMOC
-  use g_comm_auto
-  use g_support
-  use iceberg_params
   implicit none
   
   integer                    :: n, istep,outfreq
@@ -115,7 +82,7 @@ subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
     
     !_______________________________________________________________________
 #if !defined(__openmp_reproducible)
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n) REDUCTION(+:loc_eta, loc_hbar, loc_dhbar, loc_wflux)
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n) REDUCTION(+:loc_eta, loc_hbar, loc_dhbar, loc_deta, loc_wflux)
 #endif
     do n=1, myDim_nod2D
        loc_eta   = loc_eta   + areasvol(ulevels_nod2D(n), n)*eta_n(n)
@@ -309,23 +276,6 @@ end subroutine write_step_info
 !
 !===============================================================================
 subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
-    USE MOD_ICE
-    USE MOD_DYN
-    USE MOD_TRACER
-    USE MOD_PARTIT
-    USE MOD_PARSUP
-    USE MOD_MESH
-    use g_config, only: logfile_outfreq, which_ALE, toy_ocean, use_ice, use_icebergs, ib_num
-    use o_PARAM
-    use o_ARRAYS, only: water_flux, stress_surf, &
-                    heat_flux, Kv, Av
-    use g_comm_auto
-    use io_BLOWUP
-    use g_forcing_arrays
-    use diagnostics
-    use write_step_info_interface
-    use iceberg_params
-    use iceberg_element
     implicit none
   
     type(t_ice)   , intent(in)   , target :: ice
@@ -756,11 +706,6 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
 end subroutine check_blowup
 !===============================================================================
 subroutine write_enegry_info(dynamics, partit, mesh)
-   use MOD_MESH
-   USE MOD_PARTIT
-   USE MOD_PARSUP
-   use MOD_DYN
-   use g_support
    IMPLICIT NONE
    type(t_mesh),   intent(in)   , target :: mesh
    type(t_partit), intent(inout), target :: partit
@@ -934,3 +879,5 @@ subroutine plot_fesomlogo_expl()
     write(*,*)
 end subroutine plot_fesomlogo_expl
  
+
+end module write_step_info_module

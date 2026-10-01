@@ -1,7 +1,6 @@
 module iceberg_dynamics
  USE MOD_MESH
  use MOD_PARTIT
- USE MOD_PARSUP
  use MOD_ICE
  USE MOD_DYN
  use iceberg_params
