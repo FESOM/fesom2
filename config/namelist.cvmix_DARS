@@ -58,6 +58,7 @@ idemix_mu0       = 1.33333333   ! dissipation parameter [dimensionless]
 ! --- Energy Forcing ---
 idemix_sforcusage = 0.2         ! fraction of surface forcing used [dimensionless]
 idemix_n_hor_iwe_prop_iter = 5  ! iterations for horizontal wave propagation
+idemix_hor_smooth_dtref = 0.0  ! >0: per-day elem-node-elem smoothing of iwe as at dt=this [s]; 0 = once per step (legacy)
 
 ! --- Surface Forcing (Wind-Generated Internal Waves) ---
 idemix_surforc_file  = '/pool/data/AWICM/FESOM2/FORCING/IDEMIX/fourier_smooth_2005_cfsr_inert_rgrid.nc'  ! path to surface forcing file

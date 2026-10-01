@@ -77,9 +77,19 @@ module g_cvmix_idemix
     ! total global Energy input that should be conserved if 0.0 no conservation is applied
     real(kind=WP)      :: idemix_botforc_Etot = 0.0_WP ! units W
     
+    ! With horizontal propagation on, iwe goes element -> node (area mean) -> element
+    ! (mean of 3 nodes) once per time step. That round trip is a grid-scale smoother
+    ! that does not scale with dt, so its strength per day goes as 1/dt.
+    ! If >0, the smoother is applied dt/idemix_hor_smooth_dtref times per step (the
+    ! fractional rest as a relaxed pass) and the propagation is added as an increment,
+    ! so the smoothing per day is that of a run at dt = idemix_hor_smooth_dtref.
+    ! 0 = legacy: one pass per step, whatever dt is.
+    real(kind=WP)      :: idemix_hor_smooth_dtref = 0.0_WP
+    
     namelist /param_idemix/ idemix_tau_v, idemix_tau_h, idemix_gamma, idemix_jstar, idemix_mu0, idemix_n_hor_iwe_prop_iter, &
                             idemix_sforcusage, idemix_surforc_file, idemix_surforc_vname, &
-                            idemix_botforc_file, idemix_botforc_vname, idemix_botforc_Etot
+                            idemix_botforc_file, idemix_botforc_vname, idemix_botforc_Etot, &
+                            idemix_hor_smooth_dtref
                             
                             
     
@@ -105,6 +115,9 @@ module g_cvmix_idemix
     real(kind=WP), allocatable, dimension(:,:) :: iwe_Kv
     
     real(kind=WP), allocatable, dimension(:,:) :: vol_wcelli
+    ! node average of iwe before propagation, and the propagation increment
+    ! (only with idemix_hor_smooth_dtref>0)
+    real(kind=WP), allocatable, dimension(:,:) :: iwe_n0, iwe_dn
     
     real(kind=WP), allocatable, dimension(:)   :: iwe_fbot
     real(kind=WP), allocatable, dimension(:)   :: iwe_fsrf
@@ -165,6 +178,12 @@ module g_cvmix_idemix
         
         allocate(vol_wcelli(nl,node_size))
         vol_wcelli(:,:)     = 0.0_WP        
+        
+        if (idemix_hor_smooth_dtref>0.0_WP) then
+            allocate(iwe_n0(nl,node_size), iwe_dn(nl,node_size))
+            iwe_n0(:,:)     = 0.0_WP
+            iwe_dn(:,:)     = 0.0_WP
+        end if
         
         allocate(cvmix_dummy_1(nl,elem_size))
         allocate(cvmix_dummy_2(nl,elem_size))
@@ -228,6 +247,7 @@ module g_cvmix_idemix
             write(*,*) "     idemix_surforc_file = ", trim(idemix_surforc_file)
             write(*,*) "     idemix_botforc_file = ", trim(idemix_botforc_file)
             write(*,*) "     idemix_botforc_Etot = ", idemix_botforc_Etot
+            write(*,*) "     idemix_hor_smooth_dtref = ", idemix_hor_smooth_dtref
             write(*,*)
         end if
         
@@ -516,6 +536,7 @@ module g_cvmix_idemix
         
             ! temporarily store old iwe values for diag
             iwe_Thdi = iwe
+            if (idemix_hor_smooth_dtref>0.0_WP) iwe_n0 = iwe_n
                 
             !___________________________________________________________________
             ! calculate inverse volume and restrict iwe_v0 to fullfill stability 
@@ -776,12 +797,16 @@ module g_cvmix_idemix
             !___________________________________________________________________
             ! convert: iwe_n (nodes) --> iwe (elem)
             call exchange_nod(iwe_n, partit) !Warning: don't forget to communicate before averaging on elements!!!
-            do elem=1, elem_size
-                elnodes1=elem2D_nodes(:,elem)
-                do nz=ulevels(elem),nlevels(elem)-1
-                    iwe(nz,elem) = sum(iwe_n(nz,elnodes1))/3.0_WP    ! (elementwise)                
+            if (idemix_hor_smooth_dtref>0.0_WP) then
+                call idemix_smooth_and_increment(partit, mesh)
+            else
+                do elem=1, elem_size
+                    elnodes1=elem2D_nodes(:,elem)
+                    do nz=ulevels(elem),nlevels(elem)-1
+                        iwe(nz,elem) = sum(iwe_n(nz,elnodes1))/3.0_WP    ! (elementwise)                
+                    end do
                 end do
-            end do
+            end if
             
             !___________________________________________________________________
             ! diagnostic: add horizontal propagation to the total production rate
@@ -823,4 +848,68 @@ module g_cvmix_idemix
             
         end if 
     end subroutine calc_cvmix_idemix
+    !
+    !
+    !
+    !===========================================================================
+    ! iwe <- S^w(iwe) + avg3(iwe_n - iwe_n0), with w = dt/idemix_hor_smooth_dtref and
+    ! S = element mean of the area-weighted node mean (the legacy round trip). With
+    ! w = 1 this is the legacy update up to round-off. A fractional pass relaxes
+    ! towards S, so every pass is a convex combination and keeps iwe >= 0.
+    ! On entry iwe_n0 holds the node mean of iwe before propagation and iwe_n the
+    ! node field after it, both valid on the halo.
+    subroutine idemix_smooth_and_increment(partit, mesh)
+        implicit none
+        type(t_mesh),   intent(in),    target :: mesh
+        type(t_partit), intent(inout), target :: partit
+        integer       :: node, elem, nz, k, uln, nln, nu1, nl1, elnodes(3)
+        real(kind=WP) :: wrem, wpass, tvol, tsum
+#include "../associate_part_def.h"
+#include "../associate_mesh_def.h"
+#include "../associate_part_ass.h"
+#include "../associate_mesh_ass.h"
+        iwe_dn = iwe_n - iwe_n0
+        
+        wrem = dt/idemix_hor_smooth_dtref
+        do while (wrem > 0.0_WP)
+            wpass = min(wrem, 1.0_WP)
+            do elem=1, myDim_elem2D
+                elnodes = elem2D_nodes(:,elem)
+                do nz=ulevels(elem),nlevels(elem)-1
+                    iwe(nz,elem) = (1.0_WP-wpass)*iwe(nz,elem) + wpass*sum(iwe_n0(nz,elnodes))/3.0_WP
+                end do
+            end do
+            wrem = wrem - wpass
+            if (wrem <= 0.0_WP) exit
+            
+            ! node mean of the smoothed iwe for the next pass
+            call exchange_elem(iwe, partit)
+            do node=1, myDim_nod2D
+                uln = ulevels_nod2D(node)
+                nln = nlevels_nod2D(node)-1
+                do nz=uln, nln
+                    tvol = 0.0_WP
+                    tsum = 0.0_WP
+                    do k=1, nod_in_elem2D_num(node)
+                        elem = nod_in_elem2D(k,node)
+                        nu1  = ulevels(elem)
+                        nl1  = nlevels(elem)-1
+                        if (nl1<nz .or. nz<nu1) cycle
+                        tvol = tvol + elem_area(elem)
+                        tsum = tsum + iwe(nz,elem)*elem_area(elem)
+                    end do
+                    iwe_n0(nz,node) = tsum/tvol
+                end do
+            end do
+            call exchange_nod(iwe_n0, partit)
+        end do
+        
+        ! add the propagation increment
+        do elem=1, myDim_elem2D
+            elnodes = elem2D_nodes(:,elem)
+            do nz=ulevels(elem),nlevels(elem)-1
+                iwe(nz,elem) = max(iwe(nz,elem) + sum(iwe_dn(nz,elnodes))/3.0_WP, 0.0_WP)
+            end do
+        end do
+    end subroutine idemix_smooth_and_increment
 end module g_cvmix_idemix
