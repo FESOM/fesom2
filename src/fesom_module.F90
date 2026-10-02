@@ -41,7 +41,7 @@ module fesom_main_storage_module
   use gen_forcing_couple_module, only: update_atm_forcing
 #endif
   use oce_setup_step_module, only: before_oce_step
-  use oce_ale_module, only: oce_timestep_ale
+  use oce_ale_module, only: oce_timestep_ale, write_oce_step_times
   use oce_mesh_module, only: read_mesh
   use fesom_version_info_module
   use command_line_options_module
@@ -54,7 +54,7 @@ module fesom_main_storage_module
   use icb_allocate_module, only: allocate_icb
   use gen_forcing_init_module, only: forcing_setup
   use par_support_module, only: par_init
-  use write_step_info_module, only: plot_fesomlogo
+  use write_step_info_module, only: plot_fesomlogo, write_step_info, write_enegry_info, check_blowup
   use, intrinsic :: iso_fortran_env, only : real32
   use g_forcing_param, only: use_landice_water, use_age_tracer
   use oce_landice_water_module, only: landice_water_init
@@ -904,6 +904,7 @@ contains
     ! EO parameters
     integer n, nstart, ntotal, tr_num, tracer_index
     logical :: do_cmor_0d_reset
+    real(kind=WP_full) :: t_check
 
 #if defined (__recom)
     type(tracers_info_type)               :: tracers_info
@@ -1229,6 +1230,30 @@ contains
             end if
           end do
         end if ! use_transit
+
+        !___post-step: step log and blow-up check______________________________
+#if defined(__recom) && defined(__usetp)
+        if (f%my_fesom_group==0) then
+#endif
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_start("oce_blowup_check")
+#endif
+        t_check = MPI_Wtime()
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call write_step_info'//achar(27)//'[0m'
+        call write_step_info(n, logfile_outfreq, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        if ( (f%dynamics%ldiag_ke) .and. (mod(n,logfile_outfreq)==0) ) then
+            call write_enegry_info(f%dynamics, f%partit, f%mesh)
+        end if
+        if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call check_blowup'//achar(27)//'[0m'
+        call check_blowup(n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
+        t_check = MPI_Wtime() - t_check
+#if defined (FESOM_PROFILING)
+        call fesom_profiler_end("oce_blowup_check")
+#endif
+        call write_oce_step_times(n, t_check, f%partit)
+#if defined(__recom) && defined(__usetp)
+        end if
+#endif
         f%t_oce_e = MPI_Wtime()
         
         !___compute energy diagnostics..._______________________________________
