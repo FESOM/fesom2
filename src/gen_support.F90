@@ -773,7 +773,9 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
   SELECT CASE (trim(what))
     CASE ('min')
       if (.not. present(nan)) vmasked=huge(vmasked) !just some crazy number
-      val=arr(1,1)
+      ! Only unmasked values inside the range can become the result; with
+      ! none, the result is the mask value. Same for 'max' below.
+      val=huge(val)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j)
 !$OMP DO REDUCTION(min: val)
       do j=pos21, pos22
@@ -783,10 +785,11 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
       end do
 !$OMP END DO
 !$OMP END PARALLEL
+      if (val==huge(val)) val=vmasked
 
     CASE ('max')
       if (.not. present(nan)) vmasked=tiny(vmasked) !just some crazy number
-      val=arr(1,1)
+      val=-huge(val)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, j)
 !$OMP DO REDUCTION(max: val)
       do j=pos21, pos22
@@ -796,6 +799,7 @@ FUNCTION omp_min_max_sum2(arr, pos11, pos12, pos21, pos22, what, partit, nan)
       end do
 !$OMP END DO
 !$OMP END PARALLEL
+      if (val==-huge(val)) val=vmasked
 
     CASE ('sum')
       if (.not. present(nan)) vmasked=huge(vmasked) !just some crazy number

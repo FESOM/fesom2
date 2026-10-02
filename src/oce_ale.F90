@@ -24,8 +24,6 @@ module oce_ale_module
             pressure_force_4_zxxxx
     USE oce_ale_vel_rhs_module, only: compute_vel_rhs
     USE oce_ale_tracer_module, only: solve_tracers_ale
-    use write_step_info_module, only: write_step_info, write_enegry_info
-    use write_step_info_module, only: check_blowup
     USE ieee_arithmetic
     use oce_fer_gm_module, only: fer_solve_Gamma, fer_gamma2vel, init_Redi_GM
     use oce_mle_module, only: mle_add_gamma
@@ -56,7 +54,11 @@ module oce_ale_module
               compute_ssh_rhs_ale, compute_hbar_ale, vert_vel_ale, &
               compute_vert_vel_transpv, compute_CFLz, &
               compute_Wvel_split, solve_ssh_ale, impl_vert_visc_ale, &
-              oce_timestep_ale
+              oce_timestep_ale, write_oce_step_times
+
+    ! Stage end times of the last oce_timestep_ale (t0..t10), printed by
+    ! write_oce_step_times after the driver's post-step checks.
+    real(kind=WP_full), save :: oce_t(0:10)
 
 contains
 
@@ -3082,7 +3084,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     type(t_mesh)  , intent(inout), target :: mesh
     type(t_ice)   , intent(inout), target :: ice
     !___________________________________________________________________________
-    real(kind=8)      :: t0, t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10, t11, loc, glo
+    real(kind=WP_full) :: t0, t1, t2, t30, t3, t4, t5, t6, t7, t8, t9, t10
     integer           :: node
     integer           :: nz, elem, nzmin, nzmax !for KE diagnostic
     integer           :: tr_num  ! for cavity NaN cleanup
@@ -3588,8 +3590,7 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     t10=MPI_Wtime()
 #if defined (FESOM_PROFILING)
     call fesom_profiler_end("oce_thickness_update")
-    call fesom_profiler_start("oce_blowup_check")
-#endif 
+#endif
     
 !PS     !___________________________________________________________________________
 !PS     ! Trim to make velocity consistent with BT velocity at n+1/2
@@ -3597,38 +3598,10 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
 !PS     if (dynamics%use_ssh_se_subcycl) then
 !PS         call update_trim_vel_ale_vtransp(2, dynamics, partit, mesh)   
 !PS     end if
-    
-    !___________________________________________________________________________
-    ! write out global fields for debugging
-#if defined(__recom) && defined(__usetp)
-    if(partit%my_fesom_group == 0) then
-#endif
-
-    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call write_step_info'//achar(27)//'[0m'
-    call write_step_info(n,logfile_outfreq, ice, dynamics, tracers, partit, mesh)
-    
-    !___________________________________________________________________________
-    ! write energy diagnostic info (dynamics%ldiag_ke = .true.)
-    if ( (dynamics%ldiag_ke) .and. (mod(n,logfile_outfreq)==0) ) then
-        call write_enegry_info(dynamics, partit, mesh)
-    end if
-    
-    ! check model for blowup --> ! write_step_info and check_blowup require 
-    ! togeather around 2.5% of model runtime
-    if (flag_debug .and. mype==0)  print *, achar(27)//'[36m'//'     --> call check_blowup'//achar(27)//'[0m'
-    call check_blowup(n, ice, dynamics, tracers, partit, mesh)
-    t11=MPI_Wtime()
-
-#if defined(__recom) && defined(__usetp)
-    endif
-#endif
-#if defined (FESOM_PROFILING)
-    call fesom_profiler_end("oce_blowup_check")
-#endif
 
     !___________________________________________________________________________
-    ! write out execution times for ocean step parts
-    rtime_oce          = rtime_oce          + (t11-t0)-(t11-t10)
+    ! accumulate execution times for ocean step parts
+    rtime_oce          = rtime_oce          + (t10-t0)
     rtime_oce_presdens = rtime_oce_presdens + (t1-t0)
     rtime_oce_mixing   = rtime_oce_mixing   + (t2-t1)
     rtime_oce_dyn      = rtime_oce_dyn      + (t3-t2)+(t8-t7)+(t5-t4)
@@ -3636,36 +3609,45 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
     rtime_oce_solvessh = rtime_oce_solvessh + (t4-t30)
     rtime_oce_GMRedi   = rtime_oce_GMRedi   + (t7-t6)
     rtime_oce_solvetra = rtime_oce_solvetra + (t9-t8)
-    rtime_tot          = rtime_tot          + (t11-t0)-(t11-t10)
-
-#if defined(__recom) && defined(__usetp)
-    if(partit%my_fesom_group == 0) then
-#endif    
-    if(mod(n,logfile_outfreq)==0 .and. mype==0) then  
-        write(*,*)
-        write(*,*) '___ALE OCEAN STEP EXECUTION TIMES______________________'
-        write(*,"(A, ES10.3, A, F6.2, A)") '     Oce. Press, Dens.:', t1-t0,    '  (', 100.0*(t1-t0)/(t11-t0),    '%)'
-        write(*,"(A, ES10.3, A, F6.2, A)") '     Oce. Mixing      :', t2-t1,    '  (', 100.0*(t2-t1)/(t11-t0),    '%)'
-        write(*,"(A, ES10.3, A, F6.2, A)") '     Oce. Dynamics    :', t3-t2,    '  (', 100.0*(t3-t2)/(t11-t0),    '%)'
-        write(*,"(A, ES10.3, A, F6.2, A)") '     Oce. Update Vel. :', t5-t4,    '  (', 100.0*(t5-t4)/(t11-t0),    '%)'
-        write(*,"(A, ES10.3, A, F6.2, A)") '     Oce. Fer-GM.     :', t7-t6,    '  (', 100.0*(t7-t6)/(t11-t0),    '%)'
-        write(*,*) '    _______________________________'
-        write(*,"(A, ES10.3, A, F6.2, A)") '     ALE-Solve SSH    :', t4-t3,    '  (', 100.0*(t4-t3)/(t11-t0),    '%)'
-        write(*,"(A, ES10.3, A, F6.2, A)") '     ALE-Calc. hbar   :', t6-t5,    '  (', 100.0*(t6-t5)/(t11-t0),    '%)'
-        write(*,"(A, ES10.3, A, F6.2, A)") '     ALE-Update+W     :', t8-t7,    '  (', 100.0*(t8-t7)/(t11-t0),    '%)'
-        write(*,"(A, ES10.3, A, F6.2, A)") '     ALE-Solve Tracer :', t9-t8,    '  (', 100.0*(t9-t8)/(t11-t0),    '%)'
-        write(*,"(A, ES10.3, A, F6.2, A)") '     ALE-Update hnode :', t10-t9,   '  (', 100.0*(t10-t9)/(t11-t0),   '%)'
-        write(*,*) '    _______________________________'
-        write(*,"(A, ES10.3, A, F6.2, A)") '     check for blowup :', t11-t10,  '  (', 100.0*(t11-t10)/(t11-t0),  '%)'
-        write(*,*) '    _______________________________'
-        write(*,"(A, ES10.3)")             '     Oce. TOTAL       :', t11-t0
-        write(*,*)
-        write(*,*)
-    end if 
-#if defined(__recom) && defined(__usetp)
-    endif
-#endif
+    rtime_tot          = rtime_tot          + (t10-t0)
+    oce_t = (/ t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10 /)
 
 end subroutine oce_timestep_ale
+!
+!
+!===============================================================================
+! Ocean step execution times of step n. t_check is the time the driver spent
+! in the step log and blow-up check after oce_timestep_ale.
+subroutine write_oce_step_times(n, t_check, partit)
+    IMPLICIT NONE
+    integer           , intent(in)            :: n
+    real(kind=WP_full), intent(in)            :: t_check
+    type(t_partit)    , intent(inout), target :: partit
+    real(kind=WP_full)                        :: t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11
+
+    if (mod(n,logfile_outfreq)/=0 .or. partit%mype/=0) return
+    t0=oce_t(0); t1=oce_t(1); t2=oce_t(2); t3=oce_t(3); t4=oce_t(4); t5=oce_t(5)
+    t6=oce_t(6); t7=oce_t(7); t8=oce_t(8); t9=oce_t(9); t10=oce_t(10)
+    t11=t10+t_check
+    write(*,*)
+    write(*,*) '___ALE OCEAN STEP EXECUTION TIMES______________________'
+    write(*,"(A, ES10.3, A, F6.2, A)") '     Oce. Press, Dens.:', t1-t0,    '  (', 100.0*(t1-t0)/(t11-t0),    '%)'
+    write(*,"(A, ES10.3, A, F6.2, A)") '     Oce. Mixing      :', t2-t1,    '  (', 100.0*(t2-t1)/(t11-t0),    '%)'
+    write(*,"(A, ES10.3, A, F6.2, A)") '     Oce. Dynamics    :', t3-t2,    '  (', 100.0*(t3-t2)/(t11-t0),    '%)'
+    write(*,"(A, ES10.3, A, F6.2, A)") '     Oce. Update Vel. :', t5-t4,    '  (', 100.0*(t5-t4)/(t11-t0),    '%)'
+    write(*,"(A, ES10.3, A, F6.2, A)") '     Oce. Fer-GM.     :', t7-t6,    '  (', 100.0*(t7-t6)/(t11-t0),    '%)'
+    write(*,*) '    _______________________________'
+    write(*,"(A, ES10.3, A, F6.2, A)") '     ALE-Solve SSH    :', t4-t3,    '  (', 100.0*(t4-t3)/(t11-t0),    '%)'
+    write(*,"(A, ES10.3, A, F6.2, A)") '     ALE-Calc. hbar   :', t6-t5,    '  (', 100.0*(t6-t5)/(t11-t0),    '%)'
+    write(*,"(A, ES10.3, A, F6.2, A)") '     ALE-Update+W     :', t8-t7,    '  (', 100.0*(t8-t7)/(t11-t0),    '%)'
+    write(*,"(A, ES10.3, A, F6.2, A)") '     ALE-Solve Tracer :', t9-t8,    '  (', 100.0*(t9-t8)/(t11-t0),    '%)'
+    write(*,"(A, ES10.3, A, F6.2, A)") '     ALE-Update hnode :', t10-t9,   '  (', 100.0*(t10-t9)/(t11-t0),   '%)'
+    write(*,*) '    _______________________________'
+    write(*,"(A, ES10.3, A, F6.2, A)") '     check for blowup :', t11-t10,  '  (', 100.0*(t11-t10)/(t11-t0),  '%)'
+    write(*,*) '    _______________________________'
+    write(*,"(A, ES10.3)")             '     Oce. TOTAL       :', t11-t0
+    write(*,*)
+    write(*,*)
+end subroutine write_oce_step_times
 
 end module oce_ale_module
