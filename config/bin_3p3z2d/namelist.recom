@@ -105,6 +105,7 @@ constant_CO2          = .true.      ! use CO2_for_spinup instead of the time ser
 DIC_PI                = .true.      ! initialize DIC with the preindustrial GLODAP field
 restore_alkalinity    = .true.      ! restore surface alkalinity (surf_relax_Alk)
 use_atbox             = .false.     ! atmospheric box model for CO2
+use_virt_tracers      = .true.      ! globally balanced virtual freshwater bgc fluxes (as virtual_salt); only active if which_ALE='linfs' (use_virt_salt=.true.); with zstar the real volume change dilutes the tracers
 firstyearoffesomcycle = 1958        ! first year of the physical forcing used (e.g. JRA55)
 lastyearoffesomcycle  = 2024        ! last year of the physical forcing used
 numofCO2cycles        = 1           ! number of forcing cycles planned
