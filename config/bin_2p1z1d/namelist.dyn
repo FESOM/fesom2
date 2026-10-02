@@ -1,24 +1,56 @@
+! ============================================================================
+! ========== Namelist file for FESOM2 momentum dynamics ======================
+! ============================================================================
+! This file contains configuration for momentum equations and dynamics:
+! - Horizontal viscosity schemes and parameters
+! - Momentum advection options
+! - Free-slip vs no-slip boundary conditions
+! - Vertical velocity splitting
+! - Split-explicit barotropic subcycling
+! - Energy diagnostics
+! ============================================================================
+
+! ============================================================================
+! HORIZONTAL VISCOSITY
+! ============================================================================
 &dynamics_visc
-visc_gamma0  = 0.003 ! [m/s],   backgroung viscosity= gamma0*len, it should be as small a s possible (keep it < 0.01 m/s).
-visc_gamma1  = 0.1   ! [nodim], for computation of the flow aware viscosity
-visc_gamma2  = 0.285 ! [s/m],   is only used in easy backscatter option
-visc_easybsreturn= 1.5
+! --- Biharmonic Viscosity Coefficients ---
+visc_gamma0        = 0.003       ! background viscosity coefficient [m/s]
+                                 ! viscosity = gamma0 × element_length
+                                 ! keep < 0.01 m/s for numerical stability
+visc_gamma1        = 0.1         ! flow-aware viscosity coefficient [dimensionless]
+visc_gamma2        = 0.285       ! additional viscosity coefficient [s/m]
+                                 ! only used for easy backscatter (opt_visc=5) and dynamic backscatter (opt_visc=8)
+visc_easybsreturn  = 1.5         ! energy return parameter for easy backscatter [dimensionless]
 
-opt_visc     = 5          
-! 5=Kinematic (easy) Backscatter
-! 6=Biharmonic flow aware (viscosity depends on velocity Laplacian)
-! 7=Biharmonic flow aware (viscosity depends on velocity differences)
-! 8=Dynamic Backscatter
+! --- Viscosity Scheme Selection ---
+opt_visc           = 5           ! horizontal viscosity scheme:
+                                 !   5 = Kinematic (easy) Backscatter
+                                 !   6 = Biharmonic flow-aware (depends on velocity Laplacian)
+                                 !   7 = Biharmonic flow-aware (depends on velocity differences)
+                                 !       + optional Laplacian when visc_gamma0_h or visc_gamma1_h > 0
+                                 !   8 = Dynamic Backscatter
 
-use_ivertvisc= .true.  
+! --- Vertical Viscosity ---
+use_ivertvisc      = .true.      ! use implicit vertical viscosity (recommended for stability)
 /
 
+! ============================================================================
+! GENERAL DYNAMICS SETTINGS
+! ============================================================================
 &dynamics_general
-momadv_opt   = 2       ! option for momentum advection in moment only =2
-use_freeslip = .false. ! Switch on free slip
-use_wsplit   = .false. ! Switch for implicite/explicte splitting of vert. velocity
-wsplit_maxcfl= 1.0     ! maximum allowed CFL criteria in vertical (0.5 < w_max_cfl < 1.) 
-                       ! in older FESOM it used to be w_exp_max=1.e-3
-ldiag_KE=.false.       ! activates energy diagnostics
+! --- Momentum Advection ---
+momadv_opt         = 2           ! momentum advection option (only 2 is currently supported)
+
+! --- Boundary Conditions ---
+use_freeslip       = .false.     ! enable free-slip lateral boundary conditions (false = no-slip)
+
+! --- Vertical Velocity Splitting ---
+use_wsplit         = .false.     ! enable implicit/explicit splitting of vertical velocity
+wsplit_maxcfl      = 1.0         ! maximum allowed vertical CFL criterion (range: 0.5-1.0)
+                                 ! in older FESOM versions this was w_exp_max=1.e-3
+
+! --- Energy Diagnostics ---
+ldiag_KE           = .false.     ! enable kinetic energy diagnostics (requires additional computation)
 /
 

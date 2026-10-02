@@ -410,14 +410,6 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
          if(partit%my_fesom_group == 0) then
 #endif
          call cpl_oasis3mct_send(i, exchange, action, partit)
-#if defined (__oifs)
-         ! Anchor for the implicit ice surface-temperature solve
-         ! (ice_thermo_cpl.F90/ice_surftemp): remember the ist as ACTUALLY
-         ! transmitted -- the temperature OIFS evaluates its ice-tile fluxes
-         ! at for the coming coupling interval. `action` is only true on real
-         ! OASIS transmissions, so this stays frozen between coupling events.
-         if (i==4 .and. action) ice%atmcoupl%ist_ref(:) = exchange(:)
-#endif
 #if defined(__recom) && defined(__usetp)
          endif
 #endif
@@ -538,6 +530,10 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
          elseif (i.eq.15) then
              if (action) then
                 v_wind(:)                     = exchange(:)        ! meridional wind
+             end if
+         elseif (i.eq.recv_tsk_ico) then
+             if (action) then
+                ice%atmcoupl%ist_ref(:)       = exchange(:)        ! ice-tile skin temperature
              end if
 #if defined (__recom)
          elseif (i.eq.16) then
@@ -1043,7 +1039,6 @@ SUBROUTINE net_rec_from_atm(action, partit)
         end if
      end if ! (my_global_rank_test==target_root) then
 #endif
-  call MPI_Barrier(partit%MPI_COMM_FESOM, partit%MPIerr)     
   call MPI_AllREDUCE(atm_net_fluxes_north(1), aux, nrecv, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
   atm_net_fluxes_north=aux
   call MPI_AllREDUCE(atm_net_fluxes_south(1), aux, nrecv, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)

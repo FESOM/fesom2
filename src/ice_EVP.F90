@@ -28,13 +28,14 @@ contains
 ! EVP rheology. The routine computes stress tensor components based on ice
 ! velocity field. They are stored as elemental arrays (sigma11, sigma22 and
 ! sigma12). The ocean velocity is at nodal locations.
-subroutine stress_tensor(ice, partit, mesh)
+subroutine stress_tensor(elist, ice, partit, mesh)
     implicit none
+    integer       , intent(in)            :: elist(:)
     type(t_partit), intent(inout), target :: partit
     type(t_ice)   , intent(inout), target :: ice
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
-    integer         :: el
+    integer         :: i, el
     real(kind=WP)   :: det1, det2, dte, vale, r1, r2, r3, si1, si2
     real(kind=WP)   :: zeta, delta, delta_inv, d1, d2
     !___________________________________________________________________________
@@ -66,11 +67,13 @@ subroutine stress_tensor(ice, partit, mesh)
     det2 = 1.0_WP/(1.0_WP + 0.5_WP*ice%Tevp_inv*dte) !*ellipse**2
 
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnodes, m_el, a_el, pelem, r1, r2, r3, si1, si2, zeta, delta, delta_inv, d1, d2)
+!$OMP DO PRIVATE(i, el, elnodes, m_el, a_el, pelem, r1, r2, r3, si1, si2, zeta, delta, delta_inv, d1, d2)
+    do i=1,size(elist)
+        el = elist(i)
 #else
 !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(elnodes)
-#endif
     do el=1,myDim_elem2D
+#endif
         !_______________________________________________________________________
         ! if element contains cavity node skip it
         if (ulevels(el) > 1) cycle
@@ -148,7 +151,7 @@ subroutine stress_tensor(ice, partit, mesh)
 #endif
     end do
 #ifndef ENABLE_OPENACC
-!$OMP END PARALLEL DO
+!$OMP END DO
 #else
 !$ACC END PARALLEL LOOP
 #endif
@@ -193,11 +196,10 @@ subroutine stress2rhs(ice, partit, mesh)
     val3=1/3.0_WP
 
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, el, k, j, elnodes, su, sv)
     ! Node-owned gather: each owned node sums the stress divergence of its incident
     ! elements in nod_in_elem2D order and writes only its own entry. No locks are
     ! needed and the sum does not depend on the number of threads.
-!$OMP DO
+!$OMP DO PRIVATE(n, el, k, j, elnodes, su, sv)
     DO n=1, myDim_nod2D
         su = 0.0_WP
         sv = 0.0_WP
@@ -304,7 +306,6 @@ subroutine stress2rhs(ice, partit, mesh)
     END DO
 #ifndef ENABLE_OPENACC
 !$OMP END DO
-!$OMP END PARALLEL
 #else
     !$ACC END PARALLEL LOOP
 #endif
@@ -335,6 +336,8 @@ subroutine EVPdynamics(ice, partit, mesh)
     real(kind=WP)   :: det1, det2, r1, r2, r3, si1, si2, dte
     real(kind=WP)   :: zeta, delta_inv, d1, d2
     INTEGER         :: elem
+    integer         :: n_inner, n_halo
+    integer, allocatable :: elem_inner(:), elem_halo(:)
     !_______________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: u_ice, v_ice
@@ -644,13 +647,44 @@ subroutine EVPdynamics(ice, partit, mesh)
     rdg_conv_elem(:)  = 0.0_WP
     rdg_shear_elem(:) = 0.0_WP
 #endif
+    !___________________________________________________________________________
+    ! Elements whose three nodes are all owned by this rank do not read halo
+    ! values of U_ice/V_ice; their stress is computed while the halo exchange
+    ! of the previous subcycle is in flight. The remaining elements wait for it.
+    allocate(elem_inner(myDim_elem2D), elem_halo(myDim_elem2D))
+    n_inner = 0
+    n_halo  = 0
+    do el=1, myDim_elem2D
+        if (all(elem2D_nodes(:,el) <= myDim_nod2D)) then
+            n_inner = n_inner+1
+            elem_inner(n_inner) = el
+        else
+            n_halo = n_halo+1
+            elem_halo(n_halo) = el
+        end if
+    end do
+
+    ! stress_tensor and stress2rhs contain orphaned worksharing loops that bind to
+    ! this region; the master thread starts and completes the halo exchange.
+#ifndef ENABLE_OPENACC
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(shortstep, n, k, ed, umod, drag, rhsu, rhsv, r_a, r_b, det)
+#endif
     do shortstep=1, ice%evp_rheol_steps
         !_______________________________________________________________________
         !TODO: temporary workaround for cray16.0.1.1 bug
 #if defined(_CRAYFTN)
 	!dir$ noinline
 #endif
-        call stress_tensor(ice, partit, mesh)
+#ifndef ENABLE_OPENACC
+        call stress_tensor(elem_inner(1:n_inner), ice, partit, mesh)
+!$OMP MASTER
+        if (shortstep > 1) call exchange_nod_end(partit)
+!$OMP END MASTER
+!$OMP BARRIER
+        call stress_tensor(elem_halo(1:n_halo), ice, partit, mesh)
+#else
+        call stress_tensor(elem_inner(1:0), ice, partit, mesh)
+#endif
 #if defined(_CRAYFTN)
 	!dir$ noinline
 #endif
@@ -658,7 +692,6 @@ subroutine EVPdynamics(ice, partit, mesh)
 
         !_______________________________________________________________________
 #ifndef ENABLE_OPENACC
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, ed, umod, drag, rhsu, rhsv, r_a, r_b, det)
 !$OMP DO
 #else
         !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
@@ -743,19 +776,27 @@ subroutine EVPdynamics(ice, partit, mesh)
         END DO
 #ifndef ENABLE_OPENACC
 !$OMP END DO
-!$OMP END PARALLEL
 #else
         !$ACC END PARALLEL LOOP
 #endif
 
 !write(*,*) partit%mype, shortstep, 'CP4'
         !_______________________________________________________________________
+#ifndef ENABLE_OPENACC
+!$OMP MASTER
+        call exchange_nod_begin(U_ice,V_ice,partit, luse_g2g = .true.)
+!$OMP END MASTER
+#else
         call exchange_nod(U_ice,V_ice,partit, luse_g2g = .true.)
-
-!ifndef ENABLE_OPENACC
-!$OMP BARRIER
-!endif
+#endif
     END DO !--> do shortstep=1, ice%evp_rheol_steps
+#ifndef ENABLE_OPENACC
+!$OMP MASTER
+    call exchange_nod_end(partit)
+!$OMP END MASTER
+!$OMP END PARALLEL
+#endif
+    deallocate(elem_inner, elem_halo)
 
 end subroutine EVPdynamics
 
