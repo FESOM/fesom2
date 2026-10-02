@@ -547,7 +547,7 @@ if (any(recom_remin_tracer_id == tracers%data(tr_num)%ID)) then
       call diff_ver_recom_expl(mesh%nl, &  !--- vert_sink ---
                                mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
                                mesh%nod_in_elem2D_num, &
-                               mesh%nod_in_elem2D, mesh%nlevels,       &
+                               mesh%nod_in_elem2D, mesh%nlevels, mesh%elem_area, &
                                mesh%area, mesh%areasvol, mesh%hnode_new, &
                                tracers%data(tr_num)%ID,  &
                                partit%myDim_nod2D, partit%eDim_nod2D, &
@@ -615,7 +615,7 @@ if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
         call ver_sinking_recom_benthos(tr_num, mesh%nl, &
                                        mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
                                        mesh%zbar_3d_n, mesh%nod_in_elem2D_num, &
-                                       mesh%nod_in_elem2D, mesh%nlevels,       &
+                                       mesh%nod_in_elem2D, mesh%nlevels, mesh%elem_area, &
                                        mesh%area, mesh%areasvol, tracers%data(tr_num)%ID, &
                                        tracers%data(tr_num)%values(:,:),       &
                                        partit%myDim_nod2D, str_bf,             &
