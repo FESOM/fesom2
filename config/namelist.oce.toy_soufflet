@@ -26,6 +26,8 @@ SPP                = .false. ! enable Salt Plume Parameterization (for brine rej
 ! --- Gent-McWilliams (GM) Eddy Parameterization ---
 Fer_GM             = .false. ! to swith on/off GM after Ferrari et al. 2010
 K_GM_max           = 1000.0  ! max. GM thickness diffusivity (m2/s)
+K_GM_max_NH        = -1.0    ! K_GM_max north of the transition zone (m2/s); <0: same as K_GM_max
+K_GM_hemi_trans    = 10.0    ! width (deg) of the linear SH->NH transition, centred on the equator
 K_GM_min           = 2.0     ! min. GM thickness diffusivity (m2/s)
 K_GM_bvref         = 2       ! def of bvref in ferreira scaling 0=srf,1=bot mld,2=mean over mld,3=weighted mean over mld
 K_GM_rampmax       = -1.0    ! Resol >K_GM_rampmax[km] GM on

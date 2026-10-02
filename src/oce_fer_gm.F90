@@ -202,6 +202,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
     real(kind=WP)            :: c_min=0.5_WP, f_min=1.e-6_WP, r_max=200000._WP
     real(kind=WP)            :: zscaling(mesh%nl)
     real(kind=WP)            :: bvref
+    real(kind=WP)            :: kmax_n, wnh, latd
     real(kind=WP)            :: refscalresol = 100000._WP ! 100km 
 
 #include "associate_part_def.h"
@@ -216,7 +217,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
 
     ! fill arrays for 3D Redi and GM coefficients: F1(xy)*F2(z)
     !******************************* F1(x,y) ***********************************
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, nz, nzmax, nzmin, reso, c1, cm, rosb, scaling, rr_ratio, aux, aux_zz, zscaling, bvref)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, nz, nzmax, nzmin, reso, c1, cm, rosb, scaling, rr_ratio, aux, aux_zz, zscaling, bvref, kmax_n, wnh, latd)
 !$OMP DO
     do n=1, myDim_nod2D
        !nzmax=minval(nlevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
@@ -298,7 +299,16 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
             
             !___________________________________________________________________
             ! finaly scale GM coefficient K_GM_max --> fer_K
-            fer_k(nzmin,n)  = fer_scal(n)*K_GM_max
+            ! Optional hemispheric maximum: K_GM_max south of the transition zone, K_GM_max_NH
+            ! north of it, linear in latitude across K_GM_hemi_trans degrees centred on the equator.
+            kmax_n = K_GM_max
+            if (K_GM_max_NH >= 0.0_WP) then
+                latd   = geo_coord_nod2D(2, n)/rad
+                wnh    = (latd + 0.5_WP*K_GM_hemi_trans)/max(K_GM_hemi_trans, 1.e-6_WP)
+                wnh    = min(max(wnh, 0.0_WP), 1.0_WP)
+                kmax_n = (1.0_WP-wnh)*K_GM_max + wnh*K_GM_max_NH
+            end if
+            fer_k(nzmin,n)  = fer_scal(n)*kmax_n
             ! limit lower values to K_GM_min
             fer_k(nzmin,n)  = max(fer_k(nzmin,n),K_GM_min)
             fer_c(n)    = cm*cm                          !put to repo
