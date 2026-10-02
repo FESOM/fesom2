@@ -15,7 +15,7 @@ module write_step_info_module
     USE iceberg_params
     USE io_BLOWUP
     USE g_forcing_arrays
-    USE fesom_monitor_module, only: t_monitor, monitor_fill_ocean, monitor_value
+    USE fesom_monitor_module, only: t_monitor, monitor_fill_ocean, monitor_value, monitor_nonfinite
     USE iceberg_element
 
     implicit none
@@ -130,7 +130,8 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
     type(t_tracer), intent(in)   , target :: tracers
     type(t_mesh)  , intent(in)   , target :: mesh
     !___________________________________________________________________________
-    integer                       :: n, nz, istep, found_blowup_loc=0, found_blowup=0, ib
+    integer                       :: n, nz, istep, ib
+    logical                       :: tripped
     integer                       :: el, elidx
     !___________________________________________________________________________
     ! pointer on necessary derived types
@@ -175,13 +176,30 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
     end if 
     
     !___________________________________________________________________________
+    ! Decide from the ocean record of this step (global, so every rank agrees):
+    ! eta and the surface layer, temperature and salinity on the wet levels.
+    tripped = monitor_nonfinite(mon, 'eta')  > 0     .or. &
+              monitor_value(mon, 'eta', 'min') < -10.0 .or. monitor_value(mon, 'eta', 'max') > 10.0 .or. &
+              monitor_nonfinite(mon, 'deta') > 0
+    if ( .not. trim(which_ALE)=='linfs') then
+        tripped = tripped .or. monitor_nonfinite(mon, 'wvel1') > 0 .or. &
+                  monitor_nonfinite(mon, 'hnode1') > 0 .or. monitor_value(mon, 'hnode1', 'min') < 0
+    end if
+    tripped = tripped .or. monitor_nonfinite(mon, 'temp') > 0 .or. &
+              monitor_value(mon, 'temp', 'min') < -5.0 .or. monitor_value(mon, 'temp', 'max') > 60 .or. &
+              monitor_nonfinite(mon, 'salt') > 0 .or. &
+              monitor_value(mon, 'salt', 'min') < 3.0_WP - S_ref_anomaly .or. &
+              monitor_value(mon, 'salt', 'max') > 45.0_WP - S_ref_anomaly
+    if (.not. tripped) return
+
+    !___________________________________________________________________________
+    ! Report every offending node.
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz)
     do n=1, myDim_nod2d       
        !___________________________________________________________________
        ! check ssh
        if ( ((eta_n(n) /= eta_n(n)) .or. eta_n(n)<-10.0 .or. eta_n(n)>10.0 .or. (d_eta(n) /= d_eta(n)) ) ) then
 !$OMP CRITICAL
-          found_blowup_loc=1
           write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
           write(*,*) ' --STOP--> found eta_n become NaN or <-10.0, >10.0'
           write(*,*) 'mype     = ',mype
@@ -258,7 +276,6 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
        ! Wvel(1,n)~maschine preccision
        if ( .not. trim(which_ALE)=='linfs' .and. ( Wvel(1, n) /= Wvel(1, n)  )) then
 !$OMP CRITICAL
-          found_blowup_loc=1
           write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
           write(*,*) ' --STOP--> found surface layer vertical velocity becomes NaN or >1e-12'
           write(*,*) 'mype     = ',mype
@@ -319,7 +336,6 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
        ! check surface layer thinknesss
        if ( .not. trim(which_ALE)=='linfs' .and. ( hnode(1, n) /= hnode(1, n)  .or. hnode(1,n)< 0 )) then
 !$OMP CRITICAL
-          found_blowup_loc=1
           write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
           write(*,*) ' --STOP--> found surface layer thickness becomes NaN or <0'
           write(*,*) 'mype     = ',mype
@@ -375,7 +391,6 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
           if ( (tracers%data(1)%values(nz, n) /= tracers%data(1)%values(nz, n)) .or. &
              tracers%data(1)%values(nz, n) < -5.0 .or. tracers%data(1)%values(nz, n)>60) then
 !$OMP CRITICAL
-             found_blowup_loc=1
              write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
              write(*,*) ' --STOP--> found temperture becomes NaN or <-5.0, >60'
              write(*,*) 'mype     = ',mype
@@ -455,7 +470,6 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
           if ( (tracers%data(2)%values(nz, n) /= tracers%data(2)%values(nz, n)) .or.  &
              tracers%data(2)%values(nz, n) < 3.0_WP - S_ref_anomaly .or. tracers%data(2)%values(nz, n) > 45.0_WP - S_ref_anomaly ) then
 !$OMP CRITICAL
-             found_blowup_loc=1
              write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
              write(*,*) ' --STOP--> found salinity becomes NaN or <=3.0, >=45.0'
              write(*,*) 'mype     = ',mype
@@ -533,23 +547,17 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
     end do ! --> do n=1, myDim_nod2d
 !$OMP END PARALLEL DO
     !_______________________________________________________________________
-    ! check globally if one of the cpus hat a blowup situation. if its the
-    ! case CPU mype==0 needs to write out the stuff. Write out occurs in 
-    ! moment only over CPU mype==0
-    call MPI_AllREDUCE(found_blowup_loc  , found_blowup  , 1, MPI_INTEGER, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    if (found_blowup==1) then
-        call monitor_fill_ocean(mon, istep, ice, dynamics, tracers, partit, mesh)
-        call write_step_info(istep, 1, mon, dynamics, partit)
-        if (mype==0) then
-            call sleep(1)
-            call plot_fesomlogo_expl()
-            call plot_fesomlogo_lildevil()
+    call monitor_fill_ocean(mon, istep, .true., ice, dynamics, tracers, partit, mesh)
+    call write_step_info(istep, 1, mon, dynamics, partit)
+    if (mype==0) then
+        call sleep(1)
+        call plot_fesomlogo_expl()
+        call plot_fesomlogo_lildevil()
 
-        end if
-        call blowup(istep, ice, dynamics, tracers, partit, mesh)
-        if (mype==0) write(*,*) ' --> finished writing blow up file'
-        call par_ex(partit%MPI_COMM_FESOM, partit%mype, abort=1)
-    endif 
+    end if
+    call blowup(istep, ice, dynamics, tracers, partit, mesh)
+    if (mype==0) write(*,*) ' --> finished writing blow up file'
+    call par_ex(partit%MPI_COMM_FESOM, partit%mype, abort=1)
 end subroutine check_blowup
 !===============================================================================
 subroutine write_enegry_info(dynamics, partit, mesh)
