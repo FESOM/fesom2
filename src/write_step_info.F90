@@ -15,6 +15,7 @@ module write_step_info_module
     USE iceberg_params
     USE io_BLOWUP
     USE g_forcing_arrays
+    USE fesom_monitor_module, only: t_monitor, monitor_fill_ocean, monitor_value
     USE iceberg_element
 
     implicit none
@@ -29,255 +30,100 @@ contains
 !
 !
 !===============================================================================
-subroutine write_step_info(istep, outfreq, ice, dynamics, tracers, partit, mesh)
+subroutine write_step_info(istep, outfreq, mon, dynamics, partit)
   implicit none
-  
-  integer                    :: n, istep,outfreq
-  real(kind=WP)              :: int_eta, int_hbar, int_wflux, int_hflux, int_temp, int_salt
-  real(kind=WP)              :: min_eta, min_hbar, min_wflux, min_hflux, min_temp, min_salt, &
-                               min_wvel,min_hnode,min_deta,min_wvel2,min_hnode2, &
-                               min_vvel, min_vvel2, min_uvel, min_uvel2, min_dens
-  real(kind=WP)              :: max_eta, max_hbar, max_wflux, max_hflux, max_temp, max_salt, &
-                               max_wvel, max_hnode, max_deta, max_wvel2, max_hnode2, max_m_ice, &
-                               max_vvel, max_vvel2, max_uvel, max_uvel2, &
-                               max_cfl_z, max_pgfx, max_pgfy, max_kv, max_av, max_dens
-  real(kind=WP)              :: int_deta , int_dhbar
-  real(kind=WP)              :: loc, loc_eta, loc_hbar, loc_deta, loc_dhbar, loc_wflux,loc_hflux, loc_temp, loc_salt
-    type(t_mesh),   intent(in)   , target :: mesh
-    type(t_partit), intent(inout), target :: partit
-    type(t_tracer), intent(in)   , target :: tracers
-    type(t_dyn)   , intent(in)   , target :: dynamics
-    type(t_ice)   , intent(in)   , target :: ice
-    real(kind=WP), dimension(:,:,:), pointer :: UV, UVnode
-    real(kind=WP), dimension(:,:)  , pointer :: Wvel, CFL_z
-    real(kind=WP), dimension(:)    , pointer :: eta_n, d_eta, m_ice
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
-    UV     => dynamics%uv(:,:,:)
-    UVnode => dynamics%uvnode(:,:,:)
-    Wvel   => dynamics%w(:,:)
-    CFL_z  => dynamics%cfl_z(:,:)
-    eta_n  => dynamics%eta_n(:)
-    if ( .not. dynamics%use_ssh_se_subcycl) d_eta => dynamics%d_eta(:)
-    m_ice  => ice%data(2)%values(:)
-    if (mod(istep,outfreq)==0) then
-    
-    !_______________________________________________________________________
-    int_eta   =0.
-    int_hbar  =0.
-    int_deta  =0.
-    int_dhbar =0.
-    int_wflux =0.
-    int_hflux =0.
-    int_temp  =0.
-    int_salt  =0.
-    loc_eta   =0.
-    loc_hbar  =0.
-    loc_deta  =0.
-    loc_dhbar =0.
-    loc_wflux =0.
-    loc       =0.
-    
-    !_______________________________________________________________________
-#if !defined(__openmp_reproducible)
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n) REDUCTION(+:loc_eta, loc_hbar, loc_dhbar, loc_deta, loc_wflux)
-#endif
-    do n=1, myDim_nod2D
-       loc_eta   = loc_eta   + areasvol(ulevels_nod2D(n), n)*eta_n(n)
-       loc_hbar  = loc_hbar  + areasvol(ulevels_nod2D(n), n)*hbar(n)
-       loc_dhbar = loc_dhbar + areasvol(ulevels_nod2D(n), n)*(hbar(n)-hbar_old(n))
-       if ( .not. dynamics%use_ssh_se_subcycl) then 
-            loc_deta  = loc_deta  + areasvol(ulevels_nod2D(n), n)*d_eta(n)
-       end if 
-       loc_wflux = loc_wflux + areasvol(ulevels_nod2D(n), n)*water_flux(n)
-    end do
-#if !defined(__openmp_reproducible)
-!$OMP END PARALLEL DO     
-#endif
-    if (dynamics%use_ssh_se_subcycl) then
-        loc_deta=loc_dhbar
-    end if
-    
-    !_______________________________________________________________________
-    call MPI_AllREDUCE(loc_eta  , int_eta  , 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(loc_hbar , int_hbar , 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-!PS     call MPI_AllREDUCE(loc_deta , int_deta , 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(loc_dhbar, int_dhbar, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(loc_wflux, int_wflux, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)     
+  integer        , intent(in)            :: istep, outfreq
+  type(t_monitor), intent(in)            :: mon
+  type(t_dyn)    , intent(in)   , target :: dynamics
+  type(t_partit) , intent(inout), target :: partit
+  real(kind=WP)                          :: int_eta, int_hbar, int_deta, int_dhbar, int_wflux, &
+                                            int_hflux, int_temp, int_salt
 
-    int_eta  = int_eta  /ocean_areawithcav
-    int_hbar = int_hbar /ocean_areawithcav
-!PS     int_deta = int_deta /ocean_areawithcav
-    int_dhbar= int_dhbar/ocean_areawithcav
-    int_wflux= int_wflux/ocean_areawithcav      
-    !_______________________________________________________________________
-    loc=omp_min_max_sum1(eta_n,       1, myDim_nod2D, 'min', partit) 
-    call MPI_AllREDUCE(loc , min_eta  , 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(hbar,        1, myDim_nod2D, 'min', partit) 
-    call MPI_AllREDUCE(loc , min_hbar , 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(water_flux,  1, myDim_nod2D, 'min', partit) 
-    call MPI_AllREDUCE(loc , min_wflux, 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(heat_flux,   1, myDim_nod2D, 'min', partit) 
-    call MPI_AllREDUCE(loc , min_hflux, 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum2(tracers%data(1)%values, 1, nl-1, 1, myDim_nod2D, 'min', partit, 0.0_WP) 
-    call MPI_AllREDUCE(loc , min_temp , 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum2(tracers%data(2)%values, 1, nl-1, 1, myDim_nod2D, 'min', partit, 0.0_WP)
-    call MPI_AllREDUCE(loc , min_salt , 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-    ! density_dmoc is only computed when ldiag_dMOC is on (oce_ale_pressure_bv.F90) --
-    ! otherwise it's unallocated/stale, so guard the check the same way.
-    ! It is raw (sigma2+1000) density, offset like everywhere else that reads it
-    ! (gen_modules_diag.F90); report as sigma2 by subtracting 1000 below.
-    if (ldiag_dMOC) then
-        loc=omp_min_max_sum2(density_dmoc, 1, nl-1, 1, myDim_nod2D, 'min', partit, 0.0_WP)
-        call MPI_AllREDUCE(loc , min_dens , 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-    end if
-    loc=omp_min_max_sum1(Wvel(1,:), 1, myDim_nod2D, 'min', partit)
-    call MPI_AllREDUCE(loc , min_wvel , 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(Wvel(2,:), 1, myDim_nod2D, 'min', partit)
-    call MPI_AllREDUCE(loc , min_wvel2 , 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(UVnode(1,1,:), 1, myDim_nod2D, 'min', partit)
-    call MPI_AllREDUCE(loc , min_uvel , 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(UVnode(1,2,:), 1, myDim_nod2D, 'min', partit)
-    call MPI_AllREDUCE(loc , min_uvel2, 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(UVnode(2,1,:), 1, myDim_nod2D, 'min', partit)
-    call MPI_AllREDUCE(loc , min_vvel , 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(UVnode(2,2,:), 1, myDim_nod2D, 'min', partit)
-    call MPI_AllREDUCE(loc , min_vvel2 , 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-    if ( .not. dynamics%use_ssh_se_subcycl) then
-        loc=omp_min_max_sum1(d_eta, 1, myDim_nod2D, 'min', partit)
-    else
-        loc=omp_min_max_sum1(hbar-hbar_old, 1, myDim_nod2D, 'min', partit)
-    end if 
-    call MPI_AllREDUCE(loc , min_deta  , 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(hnode(1,1:myDim_nod2d), 1, myDim_nod2D, 'min', partit)
-    call MPI_AllREDUCE(loc , min_hnode , 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(hnode(2,1:myDim_nod2d), 1, myDim_nod2D, 'min', partit)
-    call MPI_AllREDUCE(loc , min_hnode2 , 1, MPI_WP, MPI_MIN, MPI_COMM_FESOM, MPIerr)
-    
-    !_______________________________________________________________________
-    loc=omp_min_max_sum1(eta_n, 1, myDim_nod2D, 'max', partit)
-    call MPI_AllREDUCE(loc , max_eta  , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(hbar, 1, myDim_nod2D, 'max', partit)
-    call MPI_AllREDUCE(loc , max_hbar , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(water_flux, 1, myDim_nod2D, 'max', partit)
-    call MPI_AllREDUCE(loc , max_wflux, 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(heat_flux, 1, myDim_nod2D, 'max', partit)
-    call MPI_AllREDUCE(loc , max_hflux, 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum2(tracers%data(1)%values, 1, nl-1, 1, myDim_nod2D, 'max', partit, 0.0_WP) 
-    call MPI_AllREDUCE(loc , max_temp , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum2(tracers%data(2)%values, 1, nl-1, 1, myDim_nod2D, 'max', partit, 0.0_WP)
-    call MPI_AllREDUCE(loc , max_salt , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    if (ldiag_dMOC) then
-        loc=omp_min_max_sum2(density_dmoc, 1, nl-1, 1, myDim_nod2D, 'max', partit, 0.0_WP)
-        call MPI_AllREDUCE(loc , max_dens , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    end if
-    loc=omp_min_max_sum1(Wvel(1,:), 1, myDim_nod2D, 'max', partit)
-    call MPI_AllREDUCE(loc , max_wvel , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(Wvel(2,:), 1, myDim_nod2D, 'max', partit)
-    call MPI_AllREDUCE(loc , max_wvel2 , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(UVnode(1,1,:), 1, myDim_nod2D, 'max', partit)
-    call MPI_AllREDUCE(loc , max_uvel , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(UVnode(1,2,:), 1, myDim_nod2D, 'max', partit)
-    call MPI_AllREDUCE(loc , max_uvel2 , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(UVnode(2,1,:), 1, myDim_nod2D, 'max', partit)
-    call MPI_AllREDUCE(loc , max_vvel , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(UVnode(2,2,:), 1, myDim_nod2D, 'max', partit)
-    call MPI_AllREDUCE(loc , max_vvel2 , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    if ( .not. dynamics%use_ssh_se_subcycl) then
-        loc=omp_min_max_sum1(d_eta, 1, myDim_nod2D, 'max', partit)
-    else
-        loc=omp_min_max_sum1(hbar-hbar_old, 1, myDim_nod2D, 'max', partit)
-    end if 
-    call MPI_AllREDUCE(loc , max_deta  , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(hnode(1, :), 1, myDim_nod2D, 'max', partit)
-    call MPI_AllREDUCE(loc , max_hnode , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum1(hnode(2, :), 1, myDim_nod2D, 'max', partit)
-    call MPI_AllREDUCE(loc , max_hnode2 , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum2(CFL_z, 1, nl-1, 1, myDim_nod2D, 'max', partit) 
-    call MPI_AllREDUCE(loc , max_cfl_z , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum2(pgf_x, 1, nl-1, 1, myDim_nod2D, 'max', partit)
-    call MPI_AllREDUCE(loc , max_pgfx , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum2(pgf_y, 1, nl-1, 1, myDim_nod2D, 'max', partit)
-    call MPI_AllREDUCE(loc , max_pgfy , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    if (use_ice) then
-       loc=omp_min_max_sum1(m_ice, 1, myDim_nod2D, 'max', partit)
-       call MPI_AllREDUCE(loc , max_m_ice , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    end if
-    loc=omp_min_max_sum2(Av, 1, nl, 1, myDim_elem2D, 'max', partit) 
-    call MPI_AllREDUCE(loc , max_av , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    loc=omp_min_max_sum2(Kv, 1, nl, 1, myDim_nod2D, 'max', partit) 
-    call MPI_AllREDUCE(loc , max_kv , 1, MPI_WP, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    !_______________________________________________________________________
-    if (mype==0) then
-       write(*,*) '___CHECK GLOBAL OCEAN VARIABLES --> mstep=',mstep
-       write(*,*) '  ___global estimat of eta & hbar____________________'
-       write(*,*) '   int(eta), int(hbar)      =', int_eta, int_hbar
-       write(*,*) '    --> error(eta-hbar)     =', int_eta-int_hbar
-       write(*,*) '   min(eta) , max(eta)      =', min_eta, max_eta
-       write(*,*) '   max(hbar), max(hbar)     =', min_hbar, max_hbar
-       write(*,*)
-       write(*,*) '   int(deta), int(dhbar)    =', int_deta, int_dhbar
-       write(*,*) '    --> error(deta-dhbar)   =', int_deta-int_dhbar
-       write(*,*) '    --> error(deta-wflux)   =', int_deta-int_wflux
-       write(*,*) '    --> error(dhbar-wflux)  =', int_dhbar-int_wflux
-       write(*,*)
-       write(*,*) '   -int(wflux)*dt          =', int_wflux*dt*(-1.0)
-       write(*,*) '   int(deta )-int(wflux)*dt =', int_deta-int_wflux*dt*(-1.0)
-       write(*,*) '   int(dhbar)-int(wflux)*dt =', int_dhbar-int_wflux*dt*(-1.0)
-       write(*,*)
-       write(*,*) '  ___global min/max/mean  --> mstep=',mstep,'____________'
-       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") '       eta= ', min_eta   , ' | ', max_eta   , ' | ', 'N.A.'
-       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") '      deta= ', min_deta  , ' | ', max_deta  , ' | ', 'N.A.'
-       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") '      hbar= ', min_hbar  , ' | ', max_hbar  , ' | ', 'N.A.'
-       write(*,"(A15, ES10.3, A3, ES10.3, A3, ES10.3)") '     wflux= ', min_wflux , ' | ', max_wflux , ' | ', int_wflux
-       write(*,"(A15, ES10.3, A3, ES10.3, A3, ES10.3)") '     hflux= ', min_hflux , ' | ', max_hflux , ' | ', int_hflux
-       write(*,"(A15, ES10.3, A3, ES10.3, A3, ES10.3)") '      temp= ', min_temp  , ' | ', max_temp  , ' | ', int_temp
-       write(*,"(A15, ES10.3, A3, ES10.3, A3, ES10.3)") '      salt= ', min_salt  , ' | ', max_salt  , ' | ', int_salt
-       if (ldiag_dMOC) then
-           write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") '      dens= ', min_dens-1000.0_WP, ' | ', max_dens-1000.0_WP, ' | ', 'N.A.'
-       end if
-       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") ' wvel(1,:)= ', min_wvel  , ' | ', max_wvel  , ' | ', 'N.A.'
-       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") ' wvel(2,:)= ', min_wvel2 , ' | ', max_wvel2 , ' | ', 'N.A.'
-       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") ' uvel(1,:)= ', min_uvel  , ' | ', max_uvel  , ' | ', 'N.A.'
-       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") ' uvel(2,:)= ', min_uvel2 , ' | ', max_uvel2 , ' | ', 'N.A.'
-       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") ' vvel(1,:)= ', min_vvel  , ' | ', max_vvel  , ' | ', 'N.A.'
-       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") ' vvel(2,:)= ', min_vvel2 , ' | ', max_vvel2 , ' | ', 'N.A.'
-       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") 'hnode(1,:)= ', min_hnode , ' | ', max_hnode , ' | ', 'N.A.'
-       write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") 'hnode(2,:)= ', min_hnode2, ' | ', max_hnode2, ' | ', 'N.A.'
-       write(*,"(A15, A10   , A3, ES10.3, A3, A10   )") '     cfl_z= ', ' N.A.'   , ' | ', max_cfl_z , ' | ', 'N.A.'
-       write(*,"(A15, A10   , A3, ES10.3, A3, A10   )") '     pgf_x= ', ' N.A.'   , ' | ', max_pgfx  , ' | ', 'N.A.'
-       write(*,"(A15, A10   , A3, ES10.3, A3, A10   )") '     pgf_y= ', ' N.A.'   , ' | ', max_pgfy  , ' | ', 'N.A.'
-       write(*,"(A15, A10   , A3, ES10.3, A3, A10   )") '        Av= ', ' N.A.'   , ' | ', max_av    , ' | ', 'N.A.'
-       write(*,"(A15, A10   , A3, ES10.3, A3, A10   )") '        Kv= ', ' N.A.'   , ' | ', max_kv    , ' | ', 'N.A.'
-       if (use_ice)  then
-       write(*,"(A15, A10   , A3, ES10.3, A3, A10)")    '     m_ice= ', ' N.A.'   , ' | ', max_m_ice , ' | ', 'N.A.'
-       end if
-       !________________________________________________________________________
-       ! SSH CG solver. A named quantity in every standard block, like cfl_z
-       ! above -- not something that only shows up when it misbehaves. The
-       ! cumulative non-convergence count is here so a run that is quietly
-       ! stalling is visible in a log people already read.
-       ! Skipped on the split-explicit barotropic path, which has no solver.
-       if (.not. dynamics%use_ssh_se_subcycl) then
-       write(*,*)
-       write(*,"(A, I6, A, I6, A, F8.2)")           '   ssh_cg iters= ', dynamics%solverinfo%iters_last, &
-            '  | max= ', dynamics%solverinfo%iters_max,                                                  &
-            '  | mean= ', real(dynamics%solverinfo%iters_sum)/real(max(dynamics%solverinfo%nsolves,1))
-       write(*,"(A, ES10.3, A, ES10.3, A, I6)")     '   ssh_cg rms(r)= ', dynamics%solverinfo%resid_last, &
-            '  | rtol= ', dynamics%solverinfo%rtol_last,                                                 &
-            '  | nonconv= ', dynamics%solverinfo%nonconv
-       end if
-     end if
-     endif ! --> if (mod(istep,logfile_outfreq)==0) then
+  if (mod(istep,outfreq)/=0 .or. partit%mype/=0) return
+
+  int_eta   = monitor_value(mon, 'eta',   'int')
+  int_hbar  = monitor_value(mon, 'hbar',  'int')
+  int_deta  = monitor_value(mon, 'deta',  'int')
+  int_dhbar = monitor_value(mon, 'dhbar', 'int')
+  int_wflux = monitor_value(mon, 'wflux', 'int')
+  int_hflux = monitor_value(mon, 'hflux', 'int')
+  int_temp  = monitor_value(mon, 'temp',  'int')
+  int_salt  = monitor_value(mon, 'salt',  'int')
+
+  write(*,*) '___CHECK GLOBAL OCEAN VARIABLES --> mstep=',mstep
+  write(*,*) '  ___global estimat of eta & hbar____________________'
+  write(*,*) '   int(eta), int(hbar)      =', int_eta, int_hbar
+  write(*,*) '    --> error(eta-hbar)     =', int_eta-int_hbar
+  write(*,*) '   min(eta) , max(eta)      =', mv('eta','min'), mv('eta','max')
+  write(*,*) '   max(hbar), max(hbar)     =', mv('hbar','min'), mv('hbar','max')
+  write(*,*)
+  write(*,*) '   int(deta), int(dhbar)    =', int_deta, int_dhbar
+  write(*,*) '    --> error(deta-dhbar)   =', int_deta-int_dhbar
+  write(*,*) '    --> error(deta-wflux)   =', int_deta-int_wflux
+  write(*,*) '    --> error(dhbar-wflux)  =', int_dhbar-int_wflux
+  write(*,*)
+  write(*,*) '   -int(wflux)*dt          =', int_wflux*dt*(-1.0)
+  write(*,*) '   int(deta )-int(wflux)*dt =', int_deta-int_wflux*dt*(-1.0)
+  write(*,*) '   int(dhbar)-int(wflux)*dt =', int_dhbar-int_wflux*dt*(-1.0)
+  write(*,*)
+  write(*,*) '  ___global min/max/mean  --> mstep=',mstep,'____________'
+  write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") '       eta= ', mv('eta','min')   , ' | ', mv('eta','max')   , ' | ', 'N.A.'
+  write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") '      deta= ', mv('deta','min')  , ' | ', mv('deta','max')  , ' | ', 'N.A.'
+  write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") '      hbar= ', mv('hbar','min')  , ' | ', mv('hbar','max')  , ' | ', 'N.A.'
+  write(*,"(A15, ES10.3, A3, ES10.3, A3, ES10.3)") '     wflux= ', mv('wflux','min') , ' | ', mv('wflux','max') , ' | ', int_wflux
+  write(*,"(A15, ES10.3, A3, ES10.3, A3, ES10.3)") '     hflux= ', mv('hflux','min') , ' | ', mv('hflux','max') , ' | ', int_hflux
+  write(*,"(A15, ES10.3, A3, ES10.3, A3, ES10.3)") '      temp= ', mv('temp','min')  , ' | ', mv('temp','max')  , ' | ', int_temp
+  write(*,"(A15, ES10.3, A3, ES10.3, A3, ES10.3)") '      salt= ', mv('salt','min')  , ' | ', mv('salt','max')  , ' | ', int_salt
+  if (ldiag_dMOC) then
+      write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") '      dens= ', mv('dens','min')-1000.0_WP, ' | ', mv('dens','max')-1000.0_WP, ' | ', 'N.A.'
+  end if
+  write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") ' wvel(1,:)= ', mv('wvel1','min') , ' | ', mv('wvel1','max') , ' | ', 'N.A.'
+  write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") ' wvel(2,:)= ', mv('wvel2','min') , ' | ', mv('wvel2','max') , ' | ', 'N.A.'
+  write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") ' uvel(1,:)= ', mv('uvel1','min') , ' | ', mv('uvel1','max') , ' | ', 'N.A.'
+  write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") ' uvel(2,:)= ', mv('uvel2','min') , ' | ', mv('uvel2','max') , ' | ', 'N.A.'
+  write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") ' vvel(1,:)= ', mv('vvel1','min') , ' | ', mv('vvel1','max') , ' | ', 'N.A.'
+  write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") ' vvel(2,:)= ', mv('vvel2','min') , ' | ', mv('vvel2','max') , ' | ', 'N.A.'
+  write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") 'hnode(1,:)= ', mv('hnode1','min'), ' | ', mv('hnode1','max'), ' | ', 'N.A.'
+  write(*,"(A15, ES10.3, A3, ES10.3, A3, A10   )") 'hnode(2,:)= ', mv('hnode2','min'), ' | ', mv('hnode2','max'), ' | ', 'N.A.'
+  write(*,"(A15, A10   , A3, ES10.3, A3, A10   )") '     cfl_z= ', ' N.A.'   , ' | ', mv('cfl_z','max') , ' | ', 'N.A.'
+  write(*,"(A15, A10   , A3, ES10.3, A3, A10   )") '     pgf_x= ', ' N.A.'   , ' | ', mv('pgf_x','max') , ' | ', 'N.A.'
+  write(*,"(A15, A10   , A3, ES10.3, A3, A10   )") '     pgf_y= ', ' N.A.'   , ' | ', mv('pgf_y','max') , ' | ', 'N.A.'
+  write(*,"(A15, A10   , A3, ES10.3, A3, A10   )") '        Av= ', ' N.A.'   , ' | ', mv('Av','max')    , ' | ', 'N.A.'
+  write(*,"(A15, A10   , A3, ES10.3, A3, A10   )") '        Kv= ', ' N.A.'   , ' | ', mv('Kv','max')    , ' | ', 'N.A.'
+  if (use_ice)  then
+  write(*,"(A15, A10   , A3, ES10.3, A3, A10)")    '     m_ice= ', ' N.A.'   , ' | ', mv('m_ice','max') , ' | ', 'N.A.'
+  end if
+  !________________________________________________________________________
+  ! SSH CG solver. A named quantity in every standard block, like cfl_z
+  ! above -- not something that only shows up when it misbehaves. The
+  ! cumulative non-convergence count is here so a run that is quietly
+  ! stalling is visible in a log people already read.
+  ! Skipped on the split-explicit barotropic path, which has no solver.
+  if (.not. dynamics%use_ssh_se_subcycl) then
+  write(*,*)
+  write(*,"(A, I6, A, I6, A, F8.2)")           '   ssh_cg iters= ', dynamics%solverinfo%iters_last, &
+       '  | max= ', dynamics%solverinfo%iters_max,                                                  &
+       '  | mean= ', real(dynamics%solverinfo%iters_sum)/real(max(dynamics%solverinfo%nsolves,1))
+  write(*,"(A, ES10.3, A, ES10.3, A, I6)")     '   ssh_cg rms(r)= ', dynamics%solverinfo%resid_last, &
+       '  | rtol= ', dynamics%solverinfo%rtol_last,                                                 &
+       '  | nonconv= ', dynamics%solverinfo%nonconv
+  end if
+
+contains
+
+  real(kind=WP) function mv(name, what)
+    character(len=*), intent(in) :: name, what
+    mv = monitor_value(mon, name, what)
+  end function mv
+
 end subroutine write_step_info
 !
 !
 !===============================================================================
-subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
+subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
     implicit none
   
+    type(t_monitor), intent(inout)       :: mon
     type(t_ice)   , intent(in)   , target :: ice
     type(t_dyn)   , intent(in)   , target :: dynamics
     type(t_partit), intent(inout), target :: partit
@@ -692,7 +538,8 @@ subroutine check_blowup(istep, ice, dynamics, tracers, partit, mesh)
     ! moment only over CPU mype==0
     call MPI_AllREDUCE(found_blowup_loc  , found_blowup  , 1, MPI_INTEGER, MPI_MAX, MPI_COMM_FESOM, MPIerr)
     if (found_blowup==1) then
-        call write_step_info(istep, 1, ice, dynamics, tracers, partit, mesh)
+        call monitor_fill_ocean(mon, istep, ice, dynamics, tracers, partit, mesh)
+        call write_step_info(istep, 1, mon, dynamics, partit)
         if (mype==0) then
             call sleep(1)
             call plot_fesomlogo_expl()
