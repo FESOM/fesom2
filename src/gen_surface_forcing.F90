@@ -101,6 +101,9 @@ MODULE g_sbf
 
    character(10),           save   :: runoff_data_source   ='CORE2'
    character(len=MAX_PATH), save   :: nm_runoff_file       ='runoff.nc'
+   ! AWICM: daily runoff in yearly files <nm_runoff_file><yyyy><nm_runoff_suffix>,
+   ! variable 'runoff' in [m/s], one record per day of the year
+   character(len=64),       save   :: nm_runoff_suffix     ='0101_redistributed.nc'
 
    character(10),           save   :: sss_data_source      ='CORE2'
    character(len=MAX_PATH), save   :: nm_sss_data_file     ='PHC2_salx.nc'
@@ -193,6 +196,13 @@ MODULE g_sbf
    real,    save :: nm_nc_freq  = 86400.0 ! time units coef (86400 CoastDat, 24 NCEP)
    integer, save :: nm_nc_tmid  = 1       ! 1 if the time stamps are given at the mid points of the netcdf file, 0 otherwise!
    logical, save :: y_perpetual=.false.
+
+   ! source of the atmospheric forcing files (namelist.forcing, &nam_sbc),
+   ! selects the file naming <nm_*_file><yyyy><suffix>:
+   !   'CORE2' (default), 'CORE1', 'JRA55' : <nm_*_file><yyyy>.nc
+   !   'AWICM'                             : <nm_*_file><yyyy>01_reduced.nc (AWI-CM output)
+   character(10),     save :: forcing_data_source = 'CORE2'
+   character(len=64), save :: nm_nc_suffix        = '.nc'   ! set from forcing_data_source
 
    integer,save            :: warn       ! warning switch node/element coordinate out of forcing bounds
 
@@ -576,19 +586,20 @@ CONTAINS
 
       !! ** Purpose : Fill names of sbc_flfi array (file names and variable names)
 
-      !prepare proper nc file (add year and .nc to the end of the file name from namelist
-      if (l_xwind) write(sbc_flfi(i_xwind)%file_name, *) trim(make_full_path(nm_xwind_file)),trim(yyear),'.nc'
-      if (l_ywind) write(sbc_flfi(i_ywind)%file_name, *) trim(make_full_path(nm_ywind_file)),trim(yyear),'.nc'
-      if (l_xstre) write(sbc_flfi(i_xstre)%file_name, *) trim(make_full_path(nm_xstre_file)),trim(yyear),'.nc'
-      if (l_ystre) write(sbc_flfi(i_ystre)%file_name, *) trim(make_full_path(nm_ystre_file)),trim(yyear),'.nc'
-      if (l_humi)  write(sbc_flfi(i_humi)%file_name,  *) trim(make_full_path(nm_humi_file)), trim(yyear),'.nc'
-      if (l_qsr)   write(sbc_flfi(i_qsr)%file_name,   *) trim(make_full_path(nm_qsr_file)),  trim(yyear),'.nc'
-      if (l_qlw)   write(sbc_flfi(i_qlw)%file_name,   *) trim(make_full_path(nm_qlw_file)),  trim(yyear),'.nc'
-      if (l_tair)  write(sbc_flfi(i_tair)%file_name,  *) trim(make_full_path(nm_tair_file)), trim(yyear),'.nc'
-      if (l_prec)  write(sbc_flfi(i_prec)%file_name,  *) trim(make_full_path(nm_prec_file)), trim(yyear),'.nc'
-      if (l_snow)  write(sbc_flfi(i_snow)%file_name,  *) trim(make_full_path(nm_snow_file)), trim(yyear),'.nc'
-      if (l_mslp)  write(sbc_flfi(i_mslp)%file_name,  *) trim(make_full_path(nm_mslp_file)), trim(yyear),'.nc'
-      if (l_cloud) write(sbc_flfi(i_cloud)%file_name, *) trim(make_full_path(nm_cloud_file)),trim(yyear),'.nc'
+      !prepare proper nc file: add year and the suffix given by forcing_data_source
+      !('.nc', or '01_reduced.nc' for AWICM) to the file name from namelist
+      if (l_xwind) write(sbc_flfi(i_xwind)%file_name, *) trim(make_full_path(nm_xwind_file)),trim(yyear),trim(nm_nc_suffix)
+      if (l_ywind) write(sbc_flfi(i_ywind)%file_name, *) trim(make_full_path(nm_ywind_file)),trim(yyear),trim(nm_nc_suffix)
+      if (l_xstre) write(sbc_flfi(i_xstre)%file_name, *) trim(make_full_path(nm_xstre_file)),trim(yyear),trim(nm_nc_suffix)
+      if (l_ystre) write(sbc_flfi(i_ystre)%file_name, *) trim(make_full_path(nm_ystre_file)),trim(yyear),trim(nm_nc_suffix)
+      if (l_humi)  write(sbc_flfi(i_humi)%file_name,  *) trim(make_full_path(nm_humi_file)), trim(yyear),trim(nm_nc_suffix)
+      if (l_qsr)   write(sbc_flfi(i_qsr)%file_name,   *) trim(make_full_path(nm_qsr_file)),  trim(yyear),trim(nm_nc_suffix)
+      if (l_qlw)   write(sbc_flfi(i_qlw)%file_name,   *) trim(make_full_path(nm_qlw_file)),  trim(yyear),trim(nm_nc_suffix)
+      if (l_tair)  write(sbc_flfi(i_tair)%file_name,  *) trim(make_full_path(nm_tair_file)), trim(yyear),trim(nm_nc_suffix)
+      if (l_prec)  write(sbc_flfi(i_prec)%file_name,  *) trim(make_full_path(nm_prec_file)), trim(yyear),trim(nm_nc_suffix)
+      if (l_snow)  write(sbc_flfi(i_snow)%file_name,  *) trim(make_full_path(nm_snow_file)), trim(yyear),trim(nm_nc_suffix)
+      if (l_mslp)  write(sbc_flfi(i_mslp)%file_name,  *) trim(make_full_path(nm_mslp_file)), trim(yyear),trim(nm_nc_suffix)
+      if (l_cloud) write(sbc_flfi(i_cloud)%file_name, *) trim(make_full_path(nm_cloud_file)),trim(yyear),trim(nm_nc_suffix)
 
       if (l_xwind) sbc_flfi(i_xwind)%file_name=ADJUSTL(trim(sbc_flfi(i_xwind)%file_name))
       if (l_ywind) sbc_flfi(i_ywind)%file_name=ADJUSTL(trim(sbc_flfi(i_ywind)%file_name))
@@ -639,6 +650,16 @@ CONTAINS
 
       full_path = prepend_path(ForcingDataPath, filename)
    end function make_full_path
+
+   ! AWICM daily runoff file for a given year: <nm_runoff_file><yyyy><nm_runoff_suffix>
+   function awicm_runoff_file(yyyy) result(fname)
+      integer, intent(in)     :: yyyy
+      character(len=MAX_PATH) :: fname
+      character(len=4)        :: cyyyy
+
+      write(cyyyy,'(i4.4)') yyyy
+      fname = trim(make_full_path(nm_runoff_file))//cyyyy//trim(nm_runoff_suffix)
+   end function awicm_runoff_file
 
    ! Resolve a file name from the nam_rsbc group of namelist.recom. These are
    ! REcoM climatologies (dust, aeolian nitrogen, atmospheric CO2), not part of
@@ -1184,12 +1205,14 @@ CONTAINS
       type(t_mesh),   intent(in)   , target :: mesh
       type(t_partit), intent(inout), target :: partit
       logical            :: file_exist=.false.
+      character(len=MAX_PATH) :: filename
 
       namelist /nam_sbc/ nm_xwind_file, nm_ywind_file, nm_xstre_file, nm_ystre_file, nm_humi_file, nm_qsr_file, &
                         nm_qlw_file, nm_tair_file, nm_prec_file, nm_snow_file, &
                         nm_mslp_file, nm_xwind_var, nm_ywind_var, nm_xstre_var, nm_ystre_var, nm_humi_var, &
                         nm_qsr_var, nm_qlw_var, nm_tair_var, nm_prec_var, nm_snow_var, &
                         nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_freq, nm_nc_tmid, y_perpetual, &
+                        forcing_data_source, nm_runoff_suffix, &
                         l_xwind, l_ywind, l_xstre, l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow, &
                         nm_runoff_file, runoff_data_source, runoff_climatology, nm_sss_data_file, sss_data_source, &
                         chl_data_source, nm_chl_data_file, chl_const, use_runoff_mapper, runoff_basins_file, runoff_radius, &
@@ -1215,9 +1238,34 @@ CONTAINS
       READ( nm_sbc_unit, nml=nam_sbc, iostat=iost )
       close( nm_sbc_unit )
       
+      ! file naming of the atmospheric forcing, like runoff_data_source/sss_data_source
+      select case (trim(forcing_data_source))
+      case ('CORE1', 'CORE2', 'JRA55')
+         nm_nc_suffix = '.nc'
+      case ('AWICM')
+         nm_nc_suffix = '01_reduced.nc'
+      case default
+         if (mype==0) then
+            write(error_unit,*)
+            write(error_unit,*) achar(27)//'[31m'
+            write(error_unit,*) '____________________________________________________________________'
+            write(error_unit,*) ' ERROR: you choose an unknown forcing_data_source = ', trim(forcing_data_source)
+            write(error_unit,*) '        supported is forcing_data_source=:'
+            write(error_unit,*) '        - ''CORE1'', ''CORE2'', ''JRA55'' : files <nm_*_file><yyyy>.nc (default CORE2)'
+            write(error_unit,*) '        - ''AWICM''                 : files <nm_*_file><yyyy>01_reduced.nc'
+            write(error_unit,*) '        --> please check &nam_sbc in your namelist.forcing'
+            write(error_unit,*) '____________________________________________________________________'
+            write(error_unit,*) achar(27)//'[0m'
+            write(error_unit,*)
+         end if
+         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+      end select
+
       if (mype==0) then
          write(*,*) "Start: Ocean forcing initialization."
          write(*,*) "Surface boundary conditions parameters:"
+         write(*,*) "      forcing_data_source = ", trim(forcing_data_source), &
+                    "  (files <nm_*_file><yyyy>", trim(nm_nc_suffix), ")"
          if (use_ocean_only_forcing) then
             write(*,*) "  Ocean-only forcing ENABLED"
             write(*,*) "    nm_ocean_mask_file   = ", trim(nm_ocean_mask_file)
@@ -1460,6 +1508,36 @@ CONTAINS
 
         end if
 
+    elseif (runoff_data_source=='AWICM') then
+        ! daily runoff from AWI-CM output, one file per year; read in sbc_do
+        filename = awicm_runoff_file(yearnew)
+        if (mype==0) then
+            write(*,*) ' --> using daily AWICM river runoff (one file per year)'
+            write(*,*) '     runoff_data_source = ', runoff_data_source
+            write(*,*) '     first file         = ', trim(filename)
+            write(*,*)
+        end if
+
+        file_exist=.false.
+        inquire(file=trim(filename), exist=file_exist)
+        if (.not. file_exist) then
+            if (mype==0) then
+                write(error_unit,*)
+                write(error_unit,*) achar(27)//'[31m'
+                write(error_unit,*) '____________________________________________________________________'
+                write(error_unit,*) ' ERROR: AWICM runoff file not found: ', trim(filename)
+                write(error_unit,*) '        --> check your namelist.forcing'
+                write(error_unit,*) '            runoff_data_source = ', trim(runoff_data_source)
+                write(error_unit,*) '            nm_runoff_file     = ', trim(nm_runoff_file)
+                write(error_unit,*) '            nm_runoff_suffix   = ', trim(nm_runoff_suffix)
+                write(error_unit,*) '        expected <nm_runoff_file><yyyy><nm_runoff_suffix>'
+                write(error_unit,*) '____________________________________________________________________'
+                write(error_unit,*) achar(27)//'[0m'
+                write(error_unit,*)
+            end if
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        end if
+
     elseif (runoff_data_source=='Dai09' .or. runoff_data_source=='JRA55') then 
         if (mype==0) then 
             write(*,*) ' --> using monthly runoff climatology (12 time slices) '
@@ -1506,6 +1584,8 @@ CONTAINS
             write(error_unit,*) '                                  this can be done as a monthly climatology (runoff_climatology=.true.) or '
             write(error_unit,*) '                                  as a transient monthly climatology (runoff_climatology=.false.) than each'
             write(error_unit,*) '                                  month and each year have differnt runoff'
+            write(error_unit,*) '        - ''AWICM''            : daily runoff, one file per year                            '
+            write(error_unit,*) '                                  <nm_runoff_file><yyyy><nm_runoff_suffix>, var runoff [m/s]'
             write(error_unit,*) '        - ''NONE''             : no river runoff is applied                                 '
             write(error_unit,*) ''
             write(error_unit,*) '        --> please check your namelist.forcing'
@@ -1879,6 +1959,36 @@ CONTAINS
             
         end if ! --> if(update_monthly_flag) then
     end if ! --> if(runoff_data_source=='Dai09' .or. ... 
+
+    !___________________________________________________________________________
+    ! runoff AWICM --> daily fields, one file per year, already in [m/s]
+    ! Read at the first step and then at the last step of each day (timenew==86400),
+    ! like the monthly fields above: at that step daynew is still the ending day,
+    ! so the record of the NEXT day is read (next year's file after the last day).
+    if (runoff_data_source=='AWICM') then
+        if (mstep==1 .or. timenew==86400._WP) then
+            yyyy = yearnew
+            i    = daynew
+            if (mstep > 1) then
+                i = i + 1
+                if (i > ndpyr) then
+                    i    = 1
+                    yyyy = yearnew + 1
+                end if
+            end if
+            filename = awicm_runoff_file(yyyy)
+            if (i==1 .or. mstep==1) then
+                file_exist=.false.
+                inquire(file=trim(filename), exist=file_exist)
+                if (.not. file_exist) then
+                    if (mype==0) write(error_unit,*) ' ERROR: AWICM runoff file not found: ', trim(filename)
+                    call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+                end if
+                if (mype==0) write(*,*) 'Updating AWICM daily runoff from ', trim(filename)
+            end if
+            call read_2ddata_on_grid_NetCDF(filename, 'runoff', i, runoff, partit, mesh)
+        end if
+    end if
 
       call data_timeinterp(rdate, partit)
    END SUBROUTINE sbc_do
