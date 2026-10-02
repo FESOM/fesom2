@@ -1238,9 +1238,8 @@ contains
 #endif
         t_check = MPI_Wtime()
         if (flag_debug .and. f%mype==0)  print *, achar(27)//'[34m'//' --> call write_step_info'//achar(27)//'[0m'
-        if (mod(n,logfile_outfreq)==0) then
-            call monitor_fill_ocean(f%ocean_monitor, n, f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
-        end if
+        call monitor_fill_ocean(f%ocean_monitor, n, mod(n,logfile_outfreq)==0, &
+                                f%ice, f%dynamics, f%tracers, f%partit, f%mesh)
         call write_step_info(n, logfile_outfreq, f%ocean_monitor, f%dynamics, f%partit)
         if ( (f%dynamics%ldiag_ke) .and. (mod(n,logfile_outfreq)==0) ) then
             call write_enegry_info(f%dynamics, f%partit, f%mesh)
