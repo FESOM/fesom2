@@ -16,7 +16,7 @@ Section &modelname
 Section &timestep
 """""""""""""""""
 
-- **step_per_day=36** number of baroclinic steps per day. The code enforces that ``86400 mod step_per_day == 0`` and prints the supported values when the check fails. It sets the fundamental time step ``dt = 86400/step_per_day`` seconds that is shared by ocean and ice components. Valid values are, for example: 32(45min), 36(40min), 48(30min), 60(24min), 72(20min), 144(10min), 288(5min), 1440(1min).
+- **step_per_day=48** number of baroclinic steps per day. The code enforces that ``86400 mod step_per_day == 0`` and prints the supported values when the check fails. It sets the fundamental time step ``dt = 86400/step_per_day`` seconds that is shared by ocean and ice components. Valid values are, for example: 32(45min), 36(40min), 48(30min), 60(24min), 72(20min), 144(10min), 288(5min), 1440(1min).
 - **run_length=1** length of the submitted integration segment.
 - **run_length_unit='y'** unit for ``run_length``; one of ``'y'`` (years), ``'m'`` (months), ``'d'`` (days), or ``'s'`` (time steps). The calendar in :ref:`Section &calendar<chap_general_configuration_calendar>` determines how months/years are counted.
 
@@ -80,7 +80,8 @@ Section &run_config
 - **use_ice=.true.** enable the dynamic/thermodynamic sea ice model.
 - **use_floatice=.false.** allow floating ice above the ocean (ice shelf/iceberg loading); requires ``zlevel`` or ``zstar`` ALE.
 - **use_sw_pene=.true.** apply shortwave penetration below the surface; requires chlorophyll data or a constant value (see ``namelist.forcing``).
-- **use_cavity=.false.**, **use_cavity_partial_cell=.false.** activate ice-shelf cavities and optional surface partial cells inside cavities.
+- **use_cavity=.true.**, **use_cavity_partial_cell=.false.** activate ice-shelf cavities and optional surface partial cells inside cavities.
+- The default mesh, CORE3, resolves the Antarctic ice-shelf cavities, so ``use_cavity`` is ``.true.`` by default. Meshes without cavity files (``cavity_depth@node.out``), such as CORE2 or pi, need ``use_cavity=.false.``.
 - **cavity_partial_cell_thresh=0.0** minimum cavity layer thickness before applying surface partial cells (prevents extremely thin top cavity layers).
 - **use_cavity_fw2press=.true.** whether freshwater fluxes in cavities affect the hydrostatic pressure field.
 - **toy_ocean=.false.**, **which_toy='soufflet'** enable idealised “toy” forcing/geometry setups.
