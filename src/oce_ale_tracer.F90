@@ -357,7 +357,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
 
 !YY: C14 seems to be calculated both in fesom and recom
 !YY: decay differently calculated???
-#if defined(__ciso)
+#if defined(__recom)
         ! radioactive decay of 14C
         if (ciso_14 .and. any(c14_tracer_id == tracers%data(tr_num)%ID)) then
           tracers%data(tr_num)%values(:,:) = tracers%data(tr_num)%values(:,:) * (1 - lambda_14 * dt)
@@ -709,7 +709,7 @@ if (any(recom_sinking_tracer_id == tracers%data(tr_num)%ID)) then
                                        mesh%ulevels_nod2D, mesh%nlevels_nod2D, &
                                        mesh%zbar_3d_n, mesh%nod_in_elem2D_num, &
                                        mesh%nod_in_elem2D, mesh%nlevels,       &
-                                       mesh%area, tracers%data(tr_num)%ID,     &
+                                       mesh%area, mesh%areasvol, tracers%data(tr_num)%ID, &
                                        tracers%data(tr_num)%values(:,:),       &
                                        partit%myDim_nod2D, str_bf,             &
                                        partit%mype, partit%MPI_COMM_FESOM,   &
@@ -1837,7 +1837,7 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
    use recom_glovar
    use recom_config
 #endif
-#if defined (__ciso)
+#if defined(__recom)
    use recom_ciso
 #endif
   use mod_transit
@@ -2026,7 +2026,6 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
     CASE (1023:1036)
         bc_surface=0.0_WP  ! OG added bc for recom fields
     CASE (1302) ! Before (1037) ! DIC_13
-#if defined (__ciso)
          if (ciso) then
             if (use_MEDUSA .and. add_loopback) then
                bc_surface= dt*(GloCO2flux_seaicemask_13(n) &
@@ -2037,11 +2036,9 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
          else
             bc_surface=0.0_WP
          end if
-#endif
     CASE (1305:1321)
          bc_surface=0.0_WP ! organic 13C
     CASE (1402) ! Before (1034) ! DIC_14
-#if defined (__ciso)
          if (ciso .and. ciso_14) then
              if (use_MEDUSA .and. add_loopback .and. ciso_organic_14) then
                  bc_surface= dt*(GloCO2flux_seaicemask_14(n) &
@@ -2052,7 +2049,6 @@ FUNCTION bc_surface(n, id, sval, nzmin, partit, mesh, sst, sss, aice)
          else
              bc_surface=0.0_WP
          end if
-#endif
     CASE (1405:1421)
          bc_surface=0.0_WP ! organic 14C
 #endif

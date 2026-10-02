@@ -901,26 +901,82 @@ CASE ('benCalc   ')
 CASE ('benC_13   ')
     if (use_REcoM) then
       if (ciso) then
-         call def_stream(nod2D,  myDim_nod2D,   'benC_13','Benthos Carbon-13','mmol/m2', Benthos(:,5), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
-      end if
-    end if
-CASE ('benC_14   ')
-    if (use_REcoM) then
-      if (ciso) then
-        call def_stream(nod2D,  myDim_nod2D,   'benC_14','Benthos Carbon-14','mmol/m2', Benthos(:,6), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream(nod2D,  myDim_nod2D,   'benC_13','Benthos Carbon-13','mmol/m2', Benthos(:,5), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
       end if
     end if
 CASE ('benCalc_13')
     if (use_REcoM) then
       if (ciso) then
-        call def_stream(nod2D,  myDim_nod2D,   'benCalc_13','Benthos calcite-13','mmol/m2', Benthos(:,7), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+        call def_stream(nod2D,  myDim_nod2D,   'benCalc_13','Benthos calcite-13','mmol/m2', Benthos(:,6), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      end if
+    end if
+CASE ('benC_14   ')
+    if (use_REcoM) then
+      if (ciso .and. ciso_14) then
+        call def_stream(nod2D,  myDim_nod2D,   'benC_14','Benthos Carbon-14','mmol/m2', Benthos(:,7), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
       end if
     end if
 CASE ('benCalc_14')
     if (use_REcoM) then
-      if (ciso) then
+      if (ciso .and. ciso_14) then
         call def_stream(nod2D,  myDim_nod2D,   'benCalc_14','Benthos calcite-14','mmol/m2', Benthos(:,8), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
       end if
+    end if
+CASE ('sinkPON   ')
+    if (use_REcoM)  then
+      if (use_MEDUSA) then
+        call def_stream(nod2D,  myDim_nod2D,   'sinkPON','sinking flux of particulate organic nitrogen','mmolN/(m2*s)', SinkFlx(:,1), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      end if
+    end if
+CASE ('sinkPOC   ')
+    if (use_REcoM)  then
+      if (use_MEDUSA) then
+        call def_stream(nod2D,  myDim_nod2D,   'sinkPOC','sinking flux of particulate organic carbon','mmolC/(m2*s)', SinkFlx(:,2), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      end if
+    end if
+CASE ('sinkOpal  ')
+    if (use_REcoM)  then
+      if (use_MEDUSA) then
+        call def_stream(nod2D,  myDim_nod2D,   'sinkOpal','sinking flux of opal','mmol/(m2*s)', SinkFlx(:,3), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      end if
+    end if
+CASE ('sinkCalc  ')
+    if (use_REcoM)  then
+      if (use_MEDUSA) then
+        call def_stream(nod2D,  myDim_nod2D,   'sinkCalc','sinking flux of CaCO3','mmol/(m2*s)', SinkFlx(:,4), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+      end if
+    end if
+CASE ('sinkC13   ')
+    if (use_REcoM) then
+    if (use_MEDUSA) then
+    if (ciso) then
+    call def_stream(nod2D,  myDim_nod2D,   'sinkC13','sinking flux of particulate organic carbon-13','mmol/(m2*s)', SinkFlx(:,5), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+    end if
+    end if
+CASE ('sinkCal13 ')
+    if (use_REcoM) then
+    if (use_MEDUSA) then
+    if (ciso) then
+    call def_stream(nod2D,  myDim_nod2D,   'sinkCal13','sinking flux of CaCO3-13','mmol/(m2*s)', SinkFlx(:,6), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+    end if
+    end if
+CASE ('sinkC14   ')
+    if (use_REcoM) then
+    if (use_MEDUSA) then
+    if (ciso .and. ciso_14) then
+    call def_stream(nod2D,  myDim_nod2D,   'sinkC14','sinking flux of particulate organic carbon-14','mmol/(m2*s)', SinkFlx(:,7), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+    end if
+    end if
+CASE ('sinkCal14 ')
+    if (use_REcoM) then
+    if (use_MEDUSA) then
+    if (ciso .and. ciso_14) then
+    call def_stream(nod2D,  myDim_nod2D,   'sinkCal14','sinking flux of CaCO3-14','mmol/(m2*s)', SinkFlx(:,8), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+    end if
     end if
 !ciso
 CASE ('NPPn      ')
@@ -1457,6 +1513,70 @@ CASE ('otracers  ')
       else if (tracers%data(j)%ID==1036) then
          if (use_REcoM) then
          call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'Zoo3C', 'Zoo3C', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         endif
+      else if (tracers%data(j)%ID==1302) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_13', 'Dissolved Inorganic C-13', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         endif
+      else if (tracers%data(j)%ID==1305) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'PhyC_13', 'Conc of C-13 in small phytoplankton', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         endif
+      else if (tracers%data(j)%ID==1308) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DetC_13', 'Conc of C-13 in Detritus', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         endif
+      else if (tracers%data(j)%ID==1310) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'HetC_13', 'Conc of C-13 in heterotrophs', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         endif
+      else if (tracers%data(j)%ID==1312) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DOC_13', 'Dissolved Organic C-13 in the water', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         endif
+      else if (tracers%data(j)%ID==1314) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DiaC_13', 'Conc of C-13 in diatoms', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         endif
+      else if (tracers%data(j)%ID==1320) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'PhyCalc_13', 'C-13 conc in phytoplankton calcite', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         endif
+      else if (tracers%data(j)%ID==1321) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DetCalc_13', 'C-13 conc in detritus calcite', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         endif
+      else if (tracers%data(j)%ID==1402) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DIC_14', 'Dissolved Inorganic C-14', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         endif
+      else if (tracers%data(j)%ID==1405) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'PhyC_14', 'Conc of C-14 in small phytoplankton', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         endif
+      else if (tracers%data(j)%ID==1408) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DetC_14', 'Conc of C-14 in Detritus', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         endif
+      else if (tracers%data(j)%ID==1410) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'HetC_14', 'Conc of C-14 in heterotrophs', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         endif
+      else if (tracers%data(j)%ID==1412) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DOC_14', 'Dissolved Organic C-14 in the water', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         endif
+      else if (tracers%data(j)%ID==1414) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DiaC_14', 'Conc of C-14 in diatoms', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         endif
+      else if (tracers%data(j)%ID==1420) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'PhyCalc_14', 'C-14 conc in phytoplankton calcite', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+         endif
+      else if (tracers%data(j)%ID==1421) then
+         if (use_REcoM) then
+         call def_stream((/nl-1, nod2D/),  (/nl-1, myDim_nod2D/),  'DetCalc_14', 'C-14 conc in detritus calcite', '[mmol/m3]', tracers%data(j)%values(:,:), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
          endif
       else
 #endif
