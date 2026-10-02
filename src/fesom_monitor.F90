@@ -20,7 +20,7 @@ module fesom_monitor_module
 
     implicit none
     private
-    public :: t_monitor, monitor_fill_ocean, monitor_value, monitor_nonfinite
+    public :: t_monitor, monitor_fill_ocean, monitor_value, monitor_integral, monitor_nonfinite
 
     integer, parameter :: MON_NAME_LEN = 16
     integer, parameter :: MON_MAX_ENTRIES = 32
@@ -46,7 +46,7 @@ contains
 !
 !
 !===============================================================================
-! Value of statistic `what` ('int', 'min' or 'max') of entry `name`, in WP.
+! Value of statistic `what` ('min' or 'max') of entry `name`, in WP.
 function monitor_value(mon, name, what) result(v)
     type(t_monitor), intent(in) :: mon
     character(len=*), intent(in) :: name, what
@@ -59,8 +59,6 @@ function monitor_value(mon, name, what) result(v)
         return
     end if
     select case (what)
-    case ('int')
-        v = real(mon%e(i)%integral, WP)
     case ('min')
         v = real(mon%e(i)%vmin, WP)
     case ('max')
@@ -69,6 +67,20 @@ function monitor_value(mon, name, what) result(v)
         v = 0.0_WP
     end select
 end function monitor_value
+!
+!
+!===============================================================================
+! Integral of entry `name` in WP_full (0 if it has none).
+function monitor_integral(mon, name) result(v)
+    type(t_monitor), intent(in)  :: mon
+    character(len=*), intent(in) :: name
+    real(kind=WP_full)           :: v
+    integer                      :: i
+
+    i = entry_index(mon, name)
+    v = 0.0_WP_full
+    if (i > 0) v = mon%e(i)%integral
+end function monitor_integral
 !
 !
 !===============================================================================
@@ -105,7 +117,8 @@ end function entry_index
 subroutine set_entry(mon, name, integral, vmin, vmax, nonfinite)
     type(t_monitor), intent(inout) :: mon
     character(len=*), intent(in)   :: name
-    real(kind=WP), intent(in), optional :: integral, vmin, vmax
+    real(kind=WP_full), intent(in), optional :: integral
+    real(kind=WP), intent(in), optional :: vmin, vmax
     integer(kind=int64), intent(in), optional :: nonfinite
     integer                        :: i
 
@@ -116,7 +129,7 @@ subroutine set_entry(mon, name, integral, vmin, vmax, nonfinite)
         mon%e(i) = t_mon_entry()
         mon%e(i)%name = name
     end if
-    if (present(integral)) mon%e(i)%integral = real(integral, WP_full)
+    if (present(integral)) mon%e(i)%integral = integral
     if (present(vmin))     mon%e(i)%vmin     = real(vmin, WP_full)
     if (present(vmax))     mon%e(i)%vmax     = real(vmax, WP_full)
     if (present(nonfinite)) mon%e(i)%nonfinite = nonfinite
@@ -152,8 +165,9 @@ subroutine monitor_fill_ocean(mon, istep, full, ice, dynamics, tracers, partit, 
     integer(kind=int64) :: snf(NS), gnf(NS)
     real(kind=WP_full)  :: sbuf(2*NS), gbuf(2*NS)
     real(kind=WP), dimension(:,:), pointer :: temp, salt
-    real(kind=WP)  :: loc_eta, loc_hbar, loc_dhbar, loc_wflux
-    real(kind=WP)  :: int_eta, int_hbar, int_dhbar, int_wflux
+    real(kind=WP_full) :: wgt
+    real(kind=WP_full) :: loc_eta, loc_hbar, loc_dhbar, loc_wflux
+    real(kind=WP_full) :: int_eta, int_hbar, int_dhbar, int_wflux
     real(kind=WP)  :: vmin, vmax
     real(kind=WP), dimension(:,:,:), pointer :: UVnode
     real(kind=WP), dimension(:,:)  , pointer :: Wvel, CFL_z
@@ -238,31 +252,28 @@ subroutine monitor_fill_ocean(mon, istep, full, ice, dynamics, tracers, partit, 
     if (.not. full) return
 
     !___________________________________________________________________________
-    ! area integrals of the surface fields
-    loc_eta   = 0.
-    loc_hbar  = 0.
-    loc_dhbar = 0.
-    loc_wflux = 0.
-#if !defined(__openmp_reproducible)
-!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n) REDUCTION(+:loc_eta, loc_hbar, loc_dhbar, loc_wflux)
-#endif
+    ! area integrals of the surface fields: in WP_full and in node order, so
+    ! they neither degrade with WP nor depend on the number of threads
+    loc_eta   = 0.0_WP_full
+    loc_hbar  = 0.0_WP_full
+    loc_dhbar = 0.0_WP_full
+    loc_wflux = 0.0_WP_full
     do n=1, myDim_nod2D
-       loc_eta   = loc_eta   + areasvol(ulevels_nod2D(n), n)*eta_n(n)
-       loc_hbar  = loc_hbar  + areasvol(ulevels_nod2D(n), n)*hbar(n)
-       loc_dhbar = loc_dhbar + areasvol(ulevels_nod2D(n), n)*(hbar(n)-hbar_old(n))
-       loc_wflux = loc_wflux + areasvol(ulevels_nod2D(n), n)*water_flux(n)
+       wgt       = real(areasvol(ulevels_nod2D(n), n), WP_full)
+       loc_eta   = loc_eta   + wgt*real(eta_n(n), WP_full)
+       loc_hbar  = loc_hbar  + wgt*real(hbar(n), WP_full)
+       loc_dhbar = loc_dhbar + wgt*(real(hbar(n), WP_full)-real(hbar_old(n), WP_full))
+       loc_wflux = loc_wflux + wgt*real(water_flux(n), WP_full)
     end do
-#if !defined(__openmp_reproducible)
-!$OMP END PARALLEL DO
-#endif
-    call MPI_AllREDUCE(loc_eta  , int_eta  , 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(loc_hbar , int_hbar , 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(loc_dhbar, int_dhbar, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(loc_wflux, int_wflux, 1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    int_eta  = int_eta  /ocean_areawithcav
-    int_hbar = int_hbar /ocean_areawithcav
-    int_dhbar= int_dhbar/ocean_areawithcav
-    int_wflux= int_wflux/ocean_areawithcav
+    call MPI_AllREDUCE(loc_eta  , int_eta  , 1, MPI_WP_FULL, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(loc_hbar , int_hbar , 1, MPI_WP_FULL, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(loc_dhbar, int_dhbar, 1, MPI_WP_FULL, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(loc_wflux, int_wflux, 1, MPI_WP_FULL, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    wgt      = real(ocean_areawithcav, WP_full)
+    int_eta  = int_eta  /wgt
+    int_hbar = int_hbar /wgt
+    int_dhbar= int_dhbar/wgt
+    int_wflux= int_wflux/wgt
 
     !___________________________________________________________________________
     ! 2D node fields

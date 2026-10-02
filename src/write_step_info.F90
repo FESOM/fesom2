@@ -15,7 +15,7 @@ module write_step_info_module
     USE iceberg_params
     USE io_BLOWUP
     USE g_forcing_arrays
-    USE fesom_monitor_module, only: t_monitor, monitor_fill_ocean, monitor_value, monitor_nonfinite
+    USE fesom_monitor_module, only: t_monitor, monitor_fill_ocean, monitor_value, monitor_integral, monitor_nonfinite
     USE iceberg_element
 
     implicit none
@@ -36,19 +36,19 @@ subroutine write_step_info(istep, outfreq, mon, dynamics, partit)
   type(t_monitor), intent(in)            :: mon
   type(t_dyn)    , intent(in)   , target :: dynamics
   type(t_partit) , intent(inout), target :: partit
-  real(kind=WP)                          :: int_eta, int_hbar, int_deta, int_dhbar, int_wflux, &
+  real(kind=WP_full)                     :: int_eta, int_hbar, int_deta, int_dhbar, int_wflux, &
                                             int_hflux, int_temp, int_salt
 
   if (mod(istep,outfreq)/=0 .or. partit%mype/=0) return
 
-  int_eta   = monitor_value(mon, 'eta',   'int')
-  int_hbar  = monitor_value(mon, 'hbar',  'int')
-  int_deta  = monitor_value(mon, 'deta',  'int')
-  int_dhbar = monitor_value(mon, 'dhbar', 'int')
-  int_wflux = monitor_value(mon, 'wflux', 'int')
-  int_hflux = monitor_value(mon, 'hflux', 'int')
-  int_temp  = monitor_value(mon, 'temp',  'int')
-  int_salt  = monitor_value(mon, 'salt',  'int')
+  int_eta   = monitor_integral(mon, 'eta')
+  int_hbar  = monitor_integral(mon, 'hbar')
+  int_deta  = monitor_integral(mon, 'deta')
+  int_dhbar = monitor_integral(mon, 'dhbar')
+  int_wflux = monitor_integral(mon, 'wflux')
+  int_hflux = monitor_integral(mon, 'hflux')
+  int_temp  = monitor_integral(mon, 'temp')
+  int_salt  = monitor_integral(mon, 'salt')
 
   write(*,*) '___CHECK GLOBAL OCEAN VARIABLES --> mstep=',mstep
   write(*,*) '  ___global estimat of eta & hbar____________________'
