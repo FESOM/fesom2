@@ -423,41 +423,13 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} 
    endif()   
 
    # -no-prec-sqrt above, combined with -qopt-zmm-usage=high from the mn5-gpp
-   # and leo-dcgp platform blocks below, makes ifort compile a vectorised
+   #  platform blocks below, makes ifort compile a vectorised
    # sqrt() as vrsqrt14pd plus an *unmasked* Newton-Raphson refinement. The
    # refined value is blended back under a write mask, so results stay correct
    # -- but on a lane whose argument is exactly 0 the refinement evaluates
    # 0*Inf, which raises the IEEE invalid flag, and -fpe0 (also above) turns
    # that into SIGFPE. So the arithmetic is fine and only the trap is wrong.
    #
-   # Three sites reach a vectorised sqrt with an exactly-zero argument, in each
-   # case because the zero is *assigned* rather than computed (a computed
-   # quantity essentially never lands on exactly 0.0, which is why the other
-   # ~370 approximate-reciprocal sites in this library are quiet):
-   #
-   #   cvmix_driver/cvmix_tke.F90:668  sqrt(max(0d0,tke_old)); tke is set to 0
-   #                                   in gen_modules_cvmix_tke.F90:190, so
-   #                                   this fires on the first step of every
-   #                                   cvmix_TKE run
-   #   oce_ale_pressure_bv.F90:2847    sqrt(c1*c2); c1 is set to 0 at :2808
-   #                                   where the column is unstable
-   #   oce_fer_gm.F90:444,468          sqrt(fer_tapfac), i.e. the same c1*c2
-   #
-   # Restoring the IEEE instruction for just these files costs nothing on any
-   # other platform: below 512-bit zmm, ifort emits a true vsqrtpd whether or
-   # not -no-prec-sqrt is given, and every other platform block here is AVX2 or
-   # lower. Measured -- these three files compile to byte-identical object code
-   # at -xCORE-AVX2 with and without -prec-sqrt. Hence no platform guard: it
-   # would buy nothing and would be one more thing for a future AVX-512 block
-   # to forget.
-   #
-   # -prec-div is deliberately NOT added here. Unlike -prec-sqrt it changes
-   # codegen at every architecture -- -no-prec-div's reciprocal-multiply for a
-   # loop-invariant divisor is worth ~3x even at -xSSE2 -- and no confirmed
-   # site needs it.
-   #
-   # The flag has to be on the compile rather than the link: with -ipo the
-   # choice of instruction sequence is baked into the IR.
    if(${CMAKE_Fortran_COMPILER_ID} STREQUAL Intel)
       set_source_files_properties(
          ${src_home}/cvmix_driver/cvmix_tke.F90
