@@ -421,6 +421,22 @@ if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel OR ${CMAKE_Fortran_COMPILER_ID} 
    if(${CMAKE_Fortran_COMPILER_ID} STREQUAL  Intel )
       target_compile_options(${PROJECT_NAME} PRIVATE -no-prec-sqrt -ip )
    endif()   
+
+   # -no-prec-sqrt above, combined with -qopt-zmm-usage=high from the mn5-gpp
+   #  platform blocks below, makes ifort compile a vectorised
+   # sqrt() as vrsqrt14pd plus an *unmasked* Newton-Raphson refinement. The
+   # refined value is blended back under a write mask, so results stay correct
+   # -- but on a lane whose argument is exactly 0 the refinement evaluates
+   # 0*Inf, which raises the IEEE invalid flag, and -fpe0 (also above) turns
+   # that into SIGFPE. So the arithmetic is fine and only the trap is wrong.
+   #
+   if(${CMAKE_Fortran_COMPILER_ID} STREQUAL Intel)
+      set_source_files_properties(
+         ${src_home}/cvmix_driver/cvmix_tke.F90
+         ${src_home}/oce_fer_gm.F90
+         ${src_home}/oce_ale_pressure_bv.F90
+         PROPERTIES COMPILE_OPTIONS -prec-sqrt)
+   endif()
    
    if(ENABLE_OPENMP)
       target_compile_options(${PROJECT_NAME} PRIVATE -qopenmp)
