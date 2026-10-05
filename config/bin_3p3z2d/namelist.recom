@@ -102,7 +102,6 @@ REcoMDataPath         = '/albedo/work/projects/MarESys/ogurses/input/mesh_CORE2_
 
 ! --- Carbon Chemistry and Atmospheric CO2 ---
 constant_CO2          = .true.      ! use CO2_for_spinup instead of the time series in nm_co2_data_file
-DIC_PI                = .true.      ! initialize DIC with the preindustrial GLODAP field
 restore_alkalinity    = .true.      ! restore surface alkalinity (surf_relax_Alk)
 use_atbox             = .false.     ! atmospheric box model for CO2
 use_virt_tracers      = .true.      ! globally balanced virtual freshwater bgc fluxes (as virtual_salt); only active if which_ALE='linfs' (use_virt_salt=.true.); with zstar the real volume change dilutes the tracers
