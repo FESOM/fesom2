@@ -1140,7 +1140,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
-            call print_recom_setup()
+            call print_recom_setup(partit)
 #if defined(__usetp)
         end if ! (partit%my_fesom_group==0) then
 #endif
@@ -1497,12 +1497,19 @@ end subroutine print_id_ranges
 !
 !==========================================================================
 ! One block with all switches that shape the REcoM run, printed once by mype=0
-subroutine print_recom_setup()
+subroutine print_recom_setup(partit)
+    use mpi
     implicit none
     character(len=64) :: eco, vflux
     character(len=*), parameter :: rule = &
         ' ============================================================'
     character(len=*), parameter :: fmt = '(3x,a,t40,": ",a)'
+    character(len=512) :: fname
+    logical :: file_exists
+    integer :: ierr
+
+
+    type(t_partit), intent(inout), target  :: partit
 
     if (enable_3zoo2det .and. enable_coccos) then
         eco = 'full (4 phyto, 3 zoo, 2 detritus)'
@@ -1524,6 +1531,17 @@ subroutine print_recom_setup()
         vflux = 'ON  (inactive: no linfs, no cavities)'
     end if
 
+    fname = trim(ClimateDataPath)//trim('GLODAPv2.2016b.PI_TCO2_fesom2_mmol_fix_z_Fillvalue.nc')
+    if (partit%mype == 0) then
+        inquire(file=trim(fname), exist=file_exists)
+    end if
+    call MPI_Bcast(file_exists, 1, MPI_LOGICAL, 0, partit%MPI_COMM_FESOM, ierr)
+    if (.not. file_exists) then
+        if (partit%mype == 0) write(*,*) 'ERROR: file not found: ', trim(fname)
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+        stop
+    end if
+
     write(*,*)
     write(*,'(a)') rule
     write(*,'(a)') achar(27)//'[36m'//'  REcoM biogeochemistry'//achar(27)//'[0m'
@@ -1532,7 +1550,7 @@ subroutine print_recom_setup()
     write(*,fmt) 'ice-shelf cavities   (use_cavity)', onoff(use_cavity)
     write(*,fmt) 'ecosystem configuration', trim(eco)
     write(*,fmt) 'carbon isotopes      (ciso)', onoff(ciso)
-    write(*,fmt) 'preindustrial DIC    (DIC_PI)', onoff(DIC_PI)
+    write(*,fmt) 'preindustrial DIC    (DIC_PI)', onoff(file_exists)
     write(*,fmt) 'alkalinity restoring', onoff(restore_alkalinity)
     write(*,fmt) 'virtual BGC fluxes   (use_virt_bgc)', trim(vflux)
     write(*,'(a)') rule
