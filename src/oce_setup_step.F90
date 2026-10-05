@@ -1151,9 +1151,6 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             else
                 print *, achar(27)//'[36m'//' --> CISO OFF'//achar(27)//'[0m'
             endif
-            if(DIC_PI) then
-                print *, achar(27)//'[36m'// ' --> Preindustrial DIC will be used'//achar(27)//'[0m'
-            end if
             if (restore_alkalinity)  then
                print *, achar(27)//'[36m'//' --> Alkalinity restoring = .true.'//achar(27)//'[0m'
             endif

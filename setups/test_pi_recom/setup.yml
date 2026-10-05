@@ -96,7 +96,6 @@ namelist.recom:
         lastyearoffesomcycle: 1948
         numofCO2cycles: 1
         currentCO2cycle: 1
-        DIC_PI: True
         Nmocsy: 1
         recom_debug: False
         ciso: False
