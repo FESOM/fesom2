@@ -186,8 +186,9 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
               nu1 = ulevels_nod2D(n)
               nl1 = nlevels_nod2D(n)
               do nz = nu1, nl1-1
-                 ! Horizontal advection part for LO (FCT is .TRUE.)
-                 tracers%work%tra_advhoriz(nz,n,tr_num) = fct_LO(nz,n) * dt/areasvol(nz,n)/hnode_new(nz,n)
+                 ! Horizontal advection part for LO (FCT is .TRUE.) [mmol/m2/s];
+                 ! the anti-diffusive part is added at the end of do_oce_adv_tra
+                 tracers%work%tra_advhoriz(nz,n,tr_num) = fct_LO(nz,n)/areasvol(nz,n)
               end do
            end do
         end if
@@ -269,18 +270,8 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 ! vertical contribution  
 
 !#if defined (__recom)
-        if (tracers%data(tr_num)%ltra_diag) then
-           ! NOTE: adv_flux_ver is only allocated over myDim_nod2D (no halo, see
-           ! oce_adv_tra_fct.F90), so this loop must not extend into eDim_nod2D.
-           do n=1, myDim_nod2D
-              nu1 = ulevels_nod2D(n)
-              nl1 = nlevels_nod2D(n)
-              do nz = nu1, nl1-1
-                 ! Vertical advection part for LO (FCT is .TRUE.)
-                 tracers%work%tra_advvert (nz,n,tr_num) = (adv_flux_ver(nz, n)-adv_flux_ver(nz+1, n))*dt/areasvol(nz,n)/hnode_new(nz,n)
-              end do
-           end do
-        end if
+        ! The vertical LO part is not stored separately: it is contained in
+        ! fct_LO_tend --> dttf_v and is taken from there at the end of do_oce_adv_tra
 !#endif
 
         !_______________________________________________________________________
@@ -428,24 +419,30 @@ subroutine do_oce_adv_tra(dt, vel, w, wi, we, tr_num, dynamics, tracers, partit,
 !#if defined (__recom)
         if (tracers%data(tr_num)%ltra_diag) then
         !_______________________________________________________________________
+           ! Budget terms in [mmol/m2/s]; hor_adv + ver_adv = total advective change.
+           ! With FCT, dttf_v = fct_LO_tend (the full LO change: horizontal + vertical,
+           ! incl. the w_split implicit part) + vertical anti-diffusive flux divergence,
+           ! and dttf_h = horizontal anti-diffusive flux divergence. tra_advhoriz holds
+           ! the horizontal LO rate from above, so
+           !    ver_adv = dttf_v/dt - LO_hor        hor_adv = LO_hor + dttf_h/dt
+           ! (dttf_v is only complete on myDim_nod2D)
            if (trim(tracers%data(tr_num)%tra_adv_lim)=='FCT') then
-              do n=1, myDim_nod2D+eDim_nod2D
+              do n=1, myDim_nod2D
                  nu1 = ulevels_nod2D(n)
                  nl1 = nlevels_nod2D(n)
                  do nz = nu1, nl1-1
-                    ! part for LO + antidiffusive (FCT is .TRUE.)
-                    tracers%work%tra_advhoriz(nz,n,tr_num) = tracers%work%tra_advhoriz(nz,n,tr_num) + dttf_h(nz,n)/hnode_new(nz,n)
-                    tracers%work%tra_advvert(nz,n,tr_num)  = tracers%work%tra_advvert(nz,n,tr_num)  + dttf_v(nz,n)/hnode_new(nz,n)
+                    tracers%work%tra_advvert(nz,n,tr_num)  = dttf_v(nz,n)/dt - tracers%work%tra_advhoriz(nz,n,tr_num)
+                    tracers%work%tra_advhoriz(nz,n,tr_num) = tracers%work%tra_advhoriz(nz,n,tr_num) + dttf_h(nz,n)/dt
                  end do
               end do
            else
-              do n=1, myDim_nod2D+eDim_nod2D
+              do n=1, myDim_nod2D
                  nu1 = ulevels_nod2D(n)
                  nl1 = nlevels_nod2D(n)
                  do nz = nu1, nl1-1
                     ! (FCT .FALSE.)
-                    tracers%work%tra_advhoriz(nz,n,tr_num) = dttf_h(nz,n)/hnode_new(nz,n)
-                    tracers%work%tra_advvert (nz,n,tr_num) = dttf_v(nz,n)/hnode_new(nz,n)
+                    tracers%work%tra_advhoriz(nz,n,tr_num) = dttf_h(nz,n)/dt
+                    tracers%work%tra_advvert (nz,n,tr_num) = dttf_v(nz,n)/dt
                  end do
               end do
            end if

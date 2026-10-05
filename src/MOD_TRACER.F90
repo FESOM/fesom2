@@ -44,13 +44,17 @@ real(kind=WP), allocatable         :: del_ttf_advhoriz(:,:), del_ttf_advvert(:,:
 !                              compute Tstar = 0.5*( T^(n+1) + T^n)
 real(kind=WP), allocatable, dimension(:,:,:)  :: dvd_trflx_hor, dvd_trflx_ver
 
-! in case ltra_diag=.true. --> calculate tracer diags
+! in case ltra_diag=.true. --> calculate tracer diags (all budget terms in [mmol/m2/s],
+! i.e. tracer*layer thickness per second)
 real(kind=WP), allocatable                    :: tra_advhoriz(:,:,:), tra_advvert(:,:,:)
 real(kind=WP), allocatable                    :: tra_diff_part_hor_redi(:,:,:)
 real(kind=WP), allocatable                    :: tra_diff_part_ver_expl(:,:,:)
 real(kind=WP), allocatable                    :: tra_diff_part_ver_redi_expl(:,:,:)
 real(kind=WP), allocatable                    :: tra_diff_part_ver_impl(:,:,:)
 real(kind=WP), allocatable                    :: tra_recom_sms(:,:,:)
+real(kind=WP), allocatable                    :: tra_benthic(:,:,:)   ! benthic (bottom) flux into the water column
+real(kind=WP), allocatable                    :: tracer_old(:,:,:)    ! c*h at the start of the step
+real(kind=WP), allocatable                    :: tra_tendency(:,:,:)  ! total tendency over the step
 
 ! The fct part
 real(kind=WP),allocatable,dimension(:,:)      :: fct_LO          ! Low-order solution

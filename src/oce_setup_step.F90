@@ -317,11 +317,13 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     ! define tracer namelist parameter
     integer        :: num_tracers
     logical        :: i_vert_diff, smooth_bh_tra , ltra_diag
+    integer        :: ltra_diag_ids(20)   ! tracer IDs that get the ltra_diag budget diagnostics;
+                                          ! unset (all -1) = every tracer, as before
     real(kind=WP)  :: gamma0_tra, gamma1_tra, gamma2_tra
     integer        :: AB_order = 2
     namelist /tracer_listsize/ num_tracers
     namelist /tracer_list    / nml_tracer_list
-    namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff, AB_order, ltra_diag
+    namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff, AB_order, ltra_diag, ltra_diag_ids
     !___________________________________________________________________________
     ! pointer on necessary derived types
 #include "associate_part_def.h"
@@ -345,7 +347,13 @@ nl => mesh%nl
     allocate(nml_tracer_list(num_tracers))
     READ(nm_unit, nml=tracer_list,     iostat=iost)
     read(nm_unit, nml=tracer_init3d,   iostat=iost)
+    ltra_diag     = .false.   ! default when not given in namelist.tra
+    ltra_diag_ids = -1        ! default: unset; the READ only overwrites entries given in namelist.tra
     READ(nm_unit, nml=tracer_general,  iostat=iost)
+    if (iost > 0) then        ! e.g. more than 20 ltra_diag_ids or a typo; would otherwise silently keep defaults
+        if (mype==0) WRITE(*,*) 'ERROR: --> bad read of &tracer_general in namelist.tra ; iostat=', iost
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+    end if
     close(nm_unit)
 
     do n=1, num_tracers
@@ -474,7 +482,11 @@ nl => mesh%nl
         tracers%data(n)%valuesAB      = 0.
         tracers%data(n)%valuesold     = 0.
         tracers%data(n)%i_vert_diff   = i_vert_diff
-        tracers%data(n)%ltra_diag   = ltra_diag
+        ! per-tracer ltra_diag: with ltra_diag_ids unset (all -1) the scalar ltra_diag
+        ! applies to every tracer; otherwise only to the listed tracer IDs
+        tracers%data(n)%ltra_diag   = ltra_diag .and. &
+            (ALL(ltra_diag_ids < 0) .or. ANY(ltra_diag_ids == nml_tracer_list(n)%id))
+        if (mype==0 .and. tracers%data(n)%ltra_diag) write(*,*) 'ltra_diag: budget diagnostics on for tracer ID ', nml_tracer_list(n)%id
     end do
     allocate(tracers%work%del_ttf(nl-1,node_size))
     allocate(tracers%work%del_ttf_advhoriz(nl-1,node_size),tracers%work%del_ttf_advvert(nl-1,node_size))
@@ -499,7 +511,11 @@ nl => mesh%nl
         tracers%work%tra_diff_part_ver_redi_expl = 0.0_WP
         tracers%work%tra_diff_part_ver_impl = 0.0_WP
         tracers%work%tra_recom_sms = 0.0_WP
-
+        allocate(tracers%work%tra_benthic(nl-1,node_size,num_tracers))
+        allocate(tracers%work%tracer_old(nl-1,node_size,num_tracers), tracers%work%tra_tendency(nl-1,node_size,num_tracers))
+        tracers%work%tra_benthic  = 0.0_WP
+        tracers%work%tracer_old   = 0.0_WP
+        tracers%work%tra_tendency = 0.0_WP
     end if
 END SUBROUTINE tracer_init
 !
