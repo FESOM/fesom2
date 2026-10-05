@@ -535,6 +535,12 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
              if (action) then
                 ice%atmcoupl%ist_ref(:)       = exchange(:)        ! ice-tile skin temperature
              end if
+         elseif (i.eq.recv_mslp_oce) then
+             if (action) then
+                ! Mean sea-level pressure [Pa]. Only the gas exchange reads it here:
+                ! the pressure term of the momentum equation stays under l_mslp.
+                press_air(:)                  = exchange(:)
+             end if
 #if defined (__recom)
          elseif (i.eq.16) then
              if (action) then
