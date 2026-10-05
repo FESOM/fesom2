@@ -66,6 +66,8 @@ logical                       :: ref_sss_local=.false.
 real(kind=WP)                 :: ref_sss=34.7_WP
 logical                       :: Fer_GM =.false.  !flag for Ferrari et al. (2010) GM scheme
 real(kind=WP)                 :: K_GM_max = 3000._WP
+real(kind=WP)                 :: K_GM_max_NH = -1.0_WP  ! K_GM_max north of the transition; <0: same as K_GM_max
+real(kind=WP)                 :: K_GM_hemi_trans = 10.0_WP ! width [deg] of the linear SH->NH transition centred on the equator
 real(kind=WP)                 :: K_GM_min = 2.0_WP
 integer                       :: K_GM_bvref = 2 ! 0...surface, 1...bottom mixlay, 2...mean over mixlay
 real(kind=WP)                 :: K_GM_resscalorder = 2.0_WP
@@ -232,7 +234,7 @@ character(20)                  :: which_pgf='shchepetkin'
                     SPP, SPP_dep_N, SPP_dep_S, SPP_drhodz_cr_N, SPP_drhodz_cr_S, SPP_expon,  &
                     N2smth_v, N2smth_h, N2smth_hidx, &
                     visc_sh_limit, mix_scheme, Ricr, concv, which_pgf, alpha, theta, use_density_ref, &
-                    Fer_GM, K_GM_max, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, K_GM_cm, K_GM_cmin, K_GM_Ktaper, &
+                    Fer_GM, K_GM_max, K_GM_max_NH, K_GM_hemi_trans, K_GM_min, K_GM_bvref, K_GM_resscalorder, K_GM_rampmax, K_GM_rampmin, K_GM_cm, K_GM_cmin, K_GM_Ktaper, &
                     Redi, Redi_Ktaper, Redi_Kmax, Redi_Kmin, use_global_tides, &
                     scaling_Ferreira, scaling_Rossby, scaling_resolution, scaling_FESOM14, &
                     scaling_ODM95, ODM95_Scr, ODM95_Sd, &
