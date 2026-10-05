@@ -163,7 +163,7 @@ subroutine monitor_fill_ocean(mon, istep, full, ice, dynamics, tracers, partit, 
         [character(len=MON_NAME_LEN) :: 'eta', 'deta', 'wvel1', 'hnode1', 'temp', 'salt']
     real(kind=WP)       :: smin(NS), smax(NS)
     integer(kind=int64) :: snf(NS), gnf(NS)
-    real(kind=WP_full)  :: sbuf(2*NS), gbuf(2*NS)
+    real(kind=WP_full)  :: sbuf(3*NS), gbuf(3*NS)
     real(kind=WP), dimension(:,:), pointer :: temp, salt
     real(kind=WP_full) :: wgt
     real(kind=WP_full) :: loc_eta, loc_hbar, loc_dhbar, loc_wflux
@@ -240,11 +240,18 @@ subroutine monitor_fill_ocean(mon, istep, full, ice, dynamics, tracers, partit, 
         end do
     end do
 !$OMP END PARALLEL DO
-    ! min as max of the negated value: one reduction for both, exact in WP_full
-    sbuf(1:NS)      = -real(smin, WP_full)
-    sbuf(NS+1:2*NS) =  real(smax, WP_full)
-    call MPI_AllREDUCE(sbuf, gbuf, 2*NS, MPI_WP_FULL, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(snf, gnf, NS, MPI_INTEGER8, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    ! One reduction per step: min as max of the negated value, and the largest
+    ! per-rank non-finite count, all exact in WP_full. The global counts are
+    ! summed only when some rank has a non-finite value, which every rank sees.
+    sbuf(1:NS)        = -real(smin, WP_full)
+    sbuf(NS+1:2*NS)   =  real(smax, WP_full)
+    sbuf(2*NS+1:3*NS) =  real(snf,  WP_full)
+    call MPI_AllREDUCE(sbuf, gbuf, 3*NS, MPI_WP_FULL, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+    if (any(gbuf(2*NS+1:3*NS) > 0.0_WP_full)) then
+        call MPI_AllREDUCE(snf, gnf, NS, MPI_INTEGER8, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+    else
+        gnf = 0
+    end if
     do n=1, NS
         call set_entry(mon, trim(sname(n)), vmin=real(-gbuf(n), WP), vmax=real(gbuf(NS+n), WP), &
                        nonfinite=gnf(n))
