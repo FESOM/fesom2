@@ -20,7 +20,7 @@ module ice_setup_step_module
 #endif
     use cavity_param_module, only: cavity_heat_water_fluxes_3eq, cavity_heat_water_fluxes_2eq, cavity_ice_clean_vel, cavity_ice_clean_ma, cavity_momentum_fluxes
     USE o_arrays
-    use g_forcing_arrays, only: sidm_dyn, sidm_cut, sidm_mpre, sisn_dyn, sisn_spre, sidc_dyn, sidc_cut, sidc_apre
+    use g_forcing_arrays, only: sidm_dyn, sidm_cut, sidm_mpre, sisn_dyn, sisn_cut, sisn_spre, sidc_dyn, sidc_cut, sidc_apre
     USE g_read_other_NetCDF, only: read_other_NetCDF
     use ice_init_module, only: ice_init
 #if defined (__icepack)
@@ -274,6 +274,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
 !$OMP PARALLEL DO
     do i=1,partit%myDim_nod2D+partit%eDim_nod2D
         sidm_dyn(i) = (ice%data(2)%values(i)-sidm_mpre(i))*ice%thermo%rhoice/ice%ice_dt
+        sisn_dyn(i) = (ice%data(3)%values(i)-sisn_spre(i))*ice%thermo%rhosno/ice%ice_dt
         sidc_dyn(i) = (ice%data(1)%values(i)-sidc_apre(i))/ice%ice_dt
     end do
 !$OMP END PARALLEL DO
@@ -287,8 +288,7 @@ subroutine ice_timestep(step, ice, partit, mesh)
 !$OMP PARALLEL DO
     do i=1,partit%myDim_nod2D+partit%eDim_nod2D
         sidm_cut(i) = (ice%data(2)%values(i)-sidm_mpre(i))*ice%thermo%rhoice/ice%ice_dt - sidm_dyn(i)
-        ! snow: advection and cut_off are not separated (snow mass tendency by dynamics incl. numerical cut-off)
-        sisn_dyn(i) = (ice%data(3)%values(i)-sisn_spre(i))*ice%thermo%rhosno/ice%ice_dt
+        sisn_cut(i) = (ice%data(3)%values(i)-sisn_spre(i))*ice%thermo%rhosno/ice%ice_dt - sisn_dyn(i)
         sidc_cut(i) = (ice%data(1)%values(i)-sidc_apre(i))/ice%ice_dt - sidc_dyn(i)
     end do
 !$OMP END PARALLEL DO

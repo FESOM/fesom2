@@ -233,8 +233,9 @@ subroutine forcing_array_setup(partit, mesh)
     sidm_si=0.0_WP
     sidm_th=0.0_WP
     sidm_mpre=0.0_WP
-    allocate(sisn_dyn(n2), sisn_snf(n2), sisn_sbl(n2), sisn_mlt(n2), sisn_si(n2), sisn_th(n2), sisn_spre(n2))
+    allocate(sisn_dyn(n2), sisn_cut(n2), sisn_snf(n2), sisn_sbl(n2), sisn_mlt(n2), sisn_si(n2), sisn_th(n2), sisn_spre(n2))
     sisn_dyn=0.0_WP
+    sisn_cut=0.0_WP
     sisn_snf=0.0_WP
     sisn_sbl=0.0_WP
     sisn_mlt=0.0_WP

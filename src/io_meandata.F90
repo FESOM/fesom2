@@ -610,9 +610,6 @@ subroutine ini_mean_io(ice, dynamics, tracers, partit, mesh)
     use mod_transit, only : index_transit_r14c, index_transit_r39ar, index_transit_f11, index_transit_f12, index_transit_sf6
     use io_tracks_module, only: ltracks, track_files, track_vars,        &
                                 track_names, track_output_freq
-    use g_forcing_arrays, only : sidm_dyn, sidm_cut, sidm_gwat, sidm_gbot, sidm_mtop, sidm_mbot, sidm_subl, sidm_si, sidm_th, &
-                                         sisn_dyn, sisn_snf, sisn_sbl, sisn_mlt, sisn_si, sisn_th, &
-                                         sidc_dyn, sidc_cut, sidc_th
 
     implicit none
     integer                   :: i, j
@@ -986,75 +983,79 @@ CASE ('flice     ')
     end if
 CASE ('sidm_dyn  ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'sidm_dyn', 'sea ice mass tendency due to sea ice dynamics (advection)', 'kg m-2 s-1', sidm_dyn(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'sidm_dyn', 'sea ice mass tendency due to sea ice dynamics (advection)', 'kg m-2 s-1', sidm_dyn(1:partit%myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('sidm_cut  ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'sidm_cut', 'sea ice mass tendency due to numerical cut-off after advection', 'kg m-2 s-1', sidm_cut(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'sidm_cut', 'sea ice mass tendency due to numerical cut-off after advection', 'kg m-2 s-1', sidm_cut(1:partit%myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('sidm_gwat ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'sidm_gwat', 'sea ice mass tendency due to frazil growth in supercooled water', 'kg m-2 s-1', sidm_gwat(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'sidm_gwat', 'sea ice mass tendency due to frazil growth in supercooled water', 'kg m-2 s-1', sidm_gwat(1:partit%myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('sidm_gbot ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'sidm_gbot', 'sea ice mass tendency due to congelation growth at the ice base', 'kg m-2 s-1', sidm_gbot(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'sidm_gbot', 'sea ice mass tendency due to congelation growth at the ice base', 'kg m-2 s-1', sidm_gbot(1:partit%myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('sidm_mtop ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'sidm_mtop', 'sea ice mass tendency due to surface melting', 'kg m-2 s-1', sidm_mtop(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'sidm_mtop', 'sea ice mass tendency due to surface melting', 'kg m-2 s-1', sidm_mtop(1:partit%myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('sidm_mbot ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'sidm_mbot', 'sea ice mass tendency due to basal melting', 'kg m-2 s-1', sidm_mbot(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'sidm_mbot', 'sea ice mass tendency due to basal melting', 'kg m-2 s-1', sidm_mbot(1:partit%myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('sidm_subl ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'sidm_subl', 'sea ice mass tendency due to sublimation of ice', 'kg m-2 s-1', sidm_subl(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'sidm_subl', 'sea ice mass tendency due to sublimation of ice', 'kg m-2 s-1', sidm_subl(1:partit%myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('sidm_si   ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'sidm_si', 'sea ice mass tendency due to snow-ice formation (flooding)', 'kg m-2 s-1', sidm_si(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'sidm_si', 'sea ice mass tendency due to snow-ice formation (flooding)', 'kg m-2 s-1', sidm_si(1:partit%myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('sidm_th   ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'sidm_th', 'sea ice mass tendency due to thermodynamics (sum of terms)', 'kg m-2 s-1', sidm_th(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'sidm_th', 'sea ice mass tendency due to thermodynamics (sum of terms)', 'kg m-2 s-1', sidm_th(1:partit%myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('sisn_dyn  ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'sisn_dyn', 'snow mass tendency due to sea ice dynamics (advection and cut-off)', 'kg m-2 s-1', sisn_dyn(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'sisn_dyn', 'snow mass tendency due to sea ice dynamics (advection)', 'kg m-2 s-1', sisn_dyn(1:partit%myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    end if
+CASE ('sisn_cut  ')
+    if (use_ice) then
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'sisn_cut', 'snow mass tendency due to cut-off (and cavity cleaning)', 'kg m-2 s-1', sisn_cut(1:partit%myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('sisn_snf  ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'sisn_snf', 'snow mass tendency due to snowfall onto sea ice', 'kg m-2 s-1', sisn_snf(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'sisn_snf', 'snow mass tendency due to snowfall onto sea ice', 'kg m-2 s-1', sisn_snf(1:partit%myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('sisn_sbl  ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'sisn_sbl', 'snow mass tendency due to sublimation of snow', 'kg m-2 s-1', sisn_sbl(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'sisn_sbl', 'snow mass tendency due to sublimation of snow', 'kg m-2 s-1', sisn_sbl(1:partit%myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('sisn_mlt  ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'sisn_mlt', 'snow mass tendency due to snow melt', 'kg m-2 s-1', sisn_mlt(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'sisn_mlt', 'snow mass tendency due to snow melt', 'kg m-2 s-1', sisn_mlt(1:partit%myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('sisn_si   ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'sisn_si', 'snow mass tendency due to snow-to-ice conversion (flooding)', 'kg m-2 s-1', sisn_si(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'sisn_si', 'snow mass tendency due to snow-to-ice conversion (flooding)', 'kg m-2 s-1', sisn_si(1:partit%myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('sisn_th   ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'sisn_th', 'snow mass tendency due to thermodynamics (sum of terms)', 'kg m-2 s-1', sisn_th(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'sisn_th', 'snow mass tendency due to thermodynamics (sum of terms)', 'kg m-2 s-1', sisn_th(1:partit%myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('sidc_dyn  ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'sidc_dyn', 'sea ice concentration tendency due to dynamics (advection)', 's-1', sidc_dyn(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'sidc_dyn', 'sea ice concentration tendency due to dynamics (advection)', 's-1', sidc_dyn(1:partit%myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('sidc_cut  ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'sidc_cut', 'sea ice concentration tendency due to numerical cut-off after advection', 's-1', sidc_cut(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'sidc_cut', 'sea ice concentration tendency due to numerical cut-off after advection', 's-1', sidc_cut(1:partit%myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('sidc_th   ')
     if (use_ice) then
-    call def_stream(nod2D, myDim_nod2D, 'sidc_th', 'sea ice concentration tendency due to thermodynamics', 's-1', sidc_th(1:myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'sidc_th', 'sea ice concentration tendency due to thermodynamics', 's-1', sidc_th(1:partit%myDim_nod2D), io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
     end if
 CASE ('m_snow    ')
     if (use_ice) then

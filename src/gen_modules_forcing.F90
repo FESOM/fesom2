@@ -111,7 +111,7 @@ use o_param
   ! snow mass budget diagnostics (output only), kg m-2 s-1, grid-cell mean
   ! sea-ice concentration tendency diagnostics (output only), 1/s (area fraction per second)
   real(kind=WP), allocatable, target, dimension(:) :: sidc_dyn, sidc_cut, sidc_th, sidc_apre
-  real(kind=WP), allocatable, target, dimension(:) :: sisn_dyn, sisn_snf, sisn_sbl, sisn_mlt, sisn_si, sisn_th, sisn_spre
+  real(kind=WP), allocatable, target, dimension(:) :: sisn_dyn, sisn_cut, sisn_snf, sisn_sbl, sisn_mlt, sisn_si, sisn_th, sisn_spre
   real(kind=WP), allocatable, dimension(:)         :: real_salt_flux !PS
 
   ! drag coefficient Cd_atm_oce and transfer coefficients for evaporation

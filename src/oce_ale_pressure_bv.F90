@@ -325,7 +325,7 @@ subroutine pressure_bv(tracers, partit, mesh)
 
         if (flag2) MLD2_ind(node)=nzmax-1
         if (flag3) MLD3_ind(node)=nzmax-1
-        call mld_ref10m(MLD4(node), Z_3d_n(:,node), rhopot, nzmin, nzmax, sigma_theta_crit_cmor)
+        call mld_ref10m(MLD4(node), mesh%Z_3d_n(:,node), rhopot, nzmin, nzmax, sigma_theta_crit_cmor)
 
         bvfreq(nzmin,node)=bvfreq(nzmin+1,node)
         bvfreq(nzmax,node)=bvfreq(nzmax-1,node)
