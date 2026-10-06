@@ -502,6 +502,10 @@ contains
           nrecv = nrecv + 1
           recv_tsk_ico = nrecv
         END IF
+        IF (use_atm_mslp) THEN
+          nrecv = nrecv + 1
+          recv_mslp_oce = nrecv
+        END IF
 #endif
 #endif
 

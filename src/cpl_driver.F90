@@ -118,6 +118,8 @@ module cpl_driver
 
   ! position of tsk_ico in cpl_recv; 0 when use_atm_ice_tskin is off
   integer, public            :: recv_tsk_ico = 0
+  ! position of mslp_oce in cpl_recv; 0 when use_atm_mslp is off
+  integer, public            :: recv_mslp_oce = 0
   public source_root, target_root, commRank
   public a2o_fcorr_stat
 
@@ -754,6 +756,7 @@ include "associate_mesh_ass.h"
     cpl_recv(16) = 'XCO2_oce'
 #endif
     if (recv_tsk_ico > 0) cpl_recv(recv_tsk_ico) = 'tsk_ico'
+    if (recv_mslp_oce > 0) cpl_recv(recv_mslp_oce) = 'mslp_oce'
 !Not oifs
 #else
     cpl_recv(1)  = 'taux_oce'
