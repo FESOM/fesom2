@@ -1164,6 +1164,9 @@ CASE ('MLD2      ')
 CASE ('MLD3      ')
     call def_stream(mesh%nod2D, partit%myDim_nod2D, 'MLD3',     'Mixed Layer Depth',               'm',      MLD3(1:partit%myDim_nod2D),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
 
+CASE ('MLD4      ')
+    call def_stream(mesh%nod2D, partit%myDim_nod2D, 'MLD4',     'Mixed Layer Depth (0.03 kg/m3, ref. 10 m)', 'm',      MLD4(1:partit%myDim_nod2D),       io_list(i)%freq, io_list(i)%unit, io_list(i)%precision, partit, mesh)
+
 !_______________________________________________________________________________
 ! output heat content (for destine)
 CASE ('hc300m')
