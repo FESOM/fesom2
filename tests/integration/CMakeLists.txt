@@ -227,6 +227,56 @@ if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED AND NOT USE_YAC)
         set_tests_properties(integration_pi_fresh_hier_1x2_mpi2_omp2 PROPERTIES FIXTURES_REQUIRED "partition_pi_hier_1x2")
     endif()
 
+    # Conservation budgets: the pi set-ups rerun with conservation_freq=4, and
+    # tools/check_conservation.py judges the residual of volume, heat and salt at the
+    # end of the day against the integral (volume and salt 1e-12; heat 3e-10, as the
+    # implicit vertical mixing leaves up to ~8e-11 per day). A single-precision build
+    # does not close the budgets (~4e-9 of the volume, ~3e-8 of heat, ~5e-9 of salt
+    # per day); its tolerances record that state. Registered only with
+    # ENABLE_CONSERVATION_TESTS=ON.
+    if(ENABLE_CONSERVATION_TESTS)
+        find_package(Python3 COMPONENTS Interpreter QUIET)
+    endif()
+    if(ENABLE_CONSERVATION_TESTS AND Python3_Interpreter_FOUND)
+        set(_cons_args --rtol-heat 3e-10)
+        set(_cons_args_cavity --rtol-volume 3e-8 --rtol-heat 3e-9 --rtol-salt 3e-9)
+        if(USE_SINGLE_PRECISION)
+            set(_cons_args --rtol-volume 1.5e-8 --rtol-heat 1.5e-7 --rtol-salt 2e-8)
+            set(_cons_args_cavity --rtol-volume 3e-8 --rtol-heat 7e-7 --rtol-salt 1.2e-7)
+        endif()
+        add_fesom_test(conservation_pi_mpi2
+            MPI_TEST
+            NP 2
+            TIMEOUT ${TEST_TIMEOUT}
+            LABEL conservation
+            CONSERVATION_FREQ 4
+            CONSERVATION_CHECK_ARGS ${_cons_args}
+        )
+        add_fesom_test(conservation_pi_ice_free_mpi2
+            MPI_TEST
+            NP 2
+            TIMEOUT ${TEST_TIMEOUT}
+            LABEL conservation
+            USE_ICE ".false."
+            CONSERVATION_FREQ 4
+            CONSERVATION_CHECK_ARGS ${_cons_args}
+        )
+        # The cavity set-up does not close in double precision either: it loses ~8e-9 of
+        # the volume and ~1e-9 of heat and salt per day under the ice shelf. These
+        # tolerances record that state so that a change is noticed.
+        add_fesom_test_with_options(conservation_pi_cavity_mpi2
+            "pi_cavity" "96" "1" "d" "1" "d" "10" ".true." ".true."
+            MPI_TEST
+            NP 2
+            TIMEOUT ${TEST_TIMEOUT}
+            LABEL conservation
+            CONSERVATION_FREQ 4
+            CONSERVATION_CHECK_ARGS ${_cons_args_cavity}
+        )
+    elseif(ENABLE_CONSERVATION_TESTS)
+        message(STATUS "Python 3 not found -- skipping the conservation_* tests.")
+    endif()
+
     # Additional MPI test configurations can be added here
     # For example, testing different domain decompositions
 elseif(NOT ENABLE_MPI_TESTS)
