@@ -15,6 +15,7 @@ module oce_ale_tracer_module
     USE o_ARRAYS
     USE g_forcing_arrays
     USE oce_adv_tra_driver_module, only: do_oce_adv_tra
+    USE fesom_conservation_module, only: conservation_probe
     USE diagnostics, only: ldiag_DVD, ldiag_diapmix, density_dmoc_avg, diap_avg_count, &
             dmoc_avg_count, dmoc_is_due, dT_diap, dS_diap, dd_diap
     USE g_forcing_param, only: use_age_tracer
@@ -204,6 +205,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         ! needed
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call init_tracers_AB'//achar(27)//'[0m'
         call init_tracers_AB(tr_num, tracers, partit, mesh)
+        if (conservation_freq > 0) call conservation_probe('start', 'a', tr_num, tracers, partit, mesh)
  
         ! advect tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call adv_tracers_ale'//achar(27)//'[0m'
@@ -251,6 +253,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
         !___________________________________________________________________________
         ! diffuse tracers
         if (flag_debug .and. mype==0)  print *, achar(27)//'[37m'//'         --> call diff_tracers_ale'//achar(27)//'[0m'
+        if (conservation_freq > 0) call conservation_probe('advection', 'a', tr_num, tracers, partit, mesh)
         call diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
 
         !___________________________________________________________________________
@@ -282,6 +285,7 @@ subroutine solve_tracers_ale(ice, dynamics, tracers, partit, mesh)
             call relax_to_clim(tr_num, tracers, partit, mesh)
             
         end if
+        if (conservation_freq > 0) call conservation_probe('relaxation', 'b', tr_num, tracers, partit, mesh)
 
         call exchange_nod(tracers%data(tr_num)%values(:,:), partit)
 !$OMP BARRIER
@@ -495,6 +499,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     ! in danilovs srcipt
     ! includes Redi diffusivity if Redi=.true.
     call diff_part_hor_redi(tracers, partit, mesh)  ! seems to be ~9% faster than diff_part_hor
+    if (conservation_freq > 0) call conservation_probe('hor_diff', 'a', tr_num, tracers, partit, mesh)
 
     if (tracers%data(tr_num)%ltra_diag) then
        call store_diag_component(del_ttf, ttf_rhs_bak, hnode_new, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D, &
@@ -523,6 +528,7 @@ subroutine diff_tracers_ale(tr_num, dynamics, tracers, ice, partit, mesh)
     end if
 
     if (Redi) call diff_ver_part_redi_expl(tracers, partit, mesh)
+    if (conservation_freq > 0) call conservation_probe('vert_expl', 'a', tr_num, tracers, partit, mesh)
 
     if (tracers%data(tr_num)%ltra_diag .and. Redi) then
        call store_diag_component(del_ttf, ttf_rhs_bak, hnode_new, ulevels_nod2D, nlevels_nod2D, myDim_nod2D, eDim_nod2D, &
@@ -686,7 +692,9 @@ endif
             dd_diap(:,1:myDim_nod2D) = dd_diap(:,1:myDim_nod2D) - tracers%data(tr_num)%values(:,1:myDim_nod2D)
 
         ! (w/out Redi)
+        if (conservation_freq > 0) call conservation_probe('divided', 'b', tr_num, tracers, partit, mesh)
         call diff_ver_part_impl_ale(tr_num, dynamics, tracers, ice, partit, mesh)
+        if (conservation_freq > 0) call conservation_probe('vert_impl+bc', 'b', tr_num, tracers, partit, mesh)
 
         if (ldiag_diapmix .and. tr_num<=2) &
             dd_diap(:,1:myDim_nod2D) = dd_diap(:,1:myDim_nod2D) + tracers%data(tr_num)%values(:,1:myDim_nod2D)
@@ -719,6 +727,7 @@ endif
     if (tracers%data(tr_num)%smooth_bh_tra) then
        call diff_part_bh(tr_num, dynamics, tracers, partit, mesh)  ! alpply biharmonic diffusion (implemented as filter)
     end if
+    if (conservation_freq > 0) call conservation_probe('bh_filter', 'b', tr_num, tracers, partit, mesh)
 
 contains
 

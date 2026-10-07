@@ -56,6 +56,7 @@ module fesom_main_storage_module
   use par_support_module, only: par_init
   use write_step_info_module, only: plot_fesomlogo, write_step_info, write_enegry_info, check_blowup
   use fesom_monitor_module, only: t_monitor, monitor_fill_ocean
+  use fesom_conservation_module, only: conservation_before_step, conservation_after_step
   use, intrinsic :: iso_fortran_env, only : real32
   use g_forcing_param, only: use_landice_water, use_age_tracer
   use oce_landice_water_module, only: landice_water_init
@@ -1216,6 +1217,7 @@ contains
         end if
 #endif
 
+        if (conservation_freq > 0) call conservation_before_step(f%partit, f%tracers, f%mesh)
         f%t_oce_s = MPI_Wtime()
 #if defined (FESOM_PROFILING)
         call fesom_profiler_start("oce_timestep_ale")
@@ -1258,6 +1260,7 @@ contains
 #if defined(__recom) && defined(__usetp)
         end if
 #endif
+        if (conservation_freq > 0) call conservation_after_step(n, f%partit, f%tracers, f%mesh)
         f%t_oce_e = MPI_Wtime()
         
         !___compute energy diagnostics..._______________________________________
