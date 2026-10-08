@@ -1500,7 +1500,7 @@ free-running × many-steps*, and it immediately exposed two latent bugs the sing
   single-copy mechanism for large messages; on levante it falls back to **KNEM** (CMA needs ptrace, blocked by
   `kernel.yama.ptrace_scope=3`), and KNEM here CORRUPTS messages above the eager limit. Proof: same binary, same
   buffers — under `--mca btl self,tcp` `total-diff=0`; under `--mca btl_vader_single_copy_mechanism none` (forces the
-  copy-in/copy-out two-copy path) `total-diff=0`; only default `vader`+KNEM corrupts. **Fix:** `env.sh` exports
+  copy-in/copy-out two-copy path) `total-diff=0`; only default `vader`+KNEM corrupts. (Mechanism found in L61: the knem registration cache misses glibc heap trims -> stale pages.) **Fix:** `env.sh` exports
   `OMPI_MCA_btl_vader_single_copy_mechanism=none` (levante branch) → the CORE2 dist_2 free-running lifecycle is
   `max|Δ|=0` (195 records), with no 1-rank/pi regression (ctest 13/13, step gates 65/65 `=0`). RULED OUT (correctly, in
   the end): eXDim halo ordering (`myList_elem2D` is read VERBATIM from the same `my_list*.out` as FESOM2 — identical
@@ -2603,24 +2603,57 @@ frozen binary itself differed between pi np 1 and np 2 at step 1 (density 4.7e-3
   before suspecting halo bugs; compare decompositions from ONE checkpoint (restart at np 1 and
   np N) -- then np 1/2/8 agree to 1e-14 at step 1.
 
-## L61 — Login-node MPI (Open MPI 4.1.2, vader + knem single-copy) delivered STALE halo payloads: right count, old data
+
+## L61 — Login-node MPI (Open MPI 4.1.2, ob1 + vader + knem) delivered STALE payloads: its knem registration cache misses glibc heap trims (an MPI-library bug, not a halo-code bug)
 
 **Context.** Hybrid-mesh plan, Task 10. `test_vinv` on the NEMO quad cut-out at np 2 failed
 V9b/V11/V12 with garbage-sized errors while np 1, the mixed cut-out and pi passed; a
-bounds-checked build was clean and the failure was deterministic.
+bounds-checked build was clean and the failure was deterministic. Per-call logging of
+`core_3D_r` showed every count matching and the sender's buffer correct, yet the receiver got
+the payload of the exchange FOUR calls earlier (the previous KE exchange).
+
+**Root cause (Task 10 follow-up, proven).** `pml ob1` sends a message above 32 KB
+(`btl_vader_rndv_eager_limit`) as a copied 32 KB prefix plus a single-copy RGET of the rest; with
+knem the receiver's kernel copies from a knem region the SENDER registered. vader caches these
+registrations in an rcache keyed by virtual address (`mpi_leave_pinned` = auto -> on, because the
+memory patcher claims hook support) and relies on memory hooks to invalidate them. glibc's
+`free()` shrinks the heap top with `brk` (trim threshold), the next `allocate` re-grows it at the
+SAME virtual address with fresh pages -- and the cache still hands out the old region, whose
+pages knem keeps pinned with the data of the last message sent from there. Right count, correct
+first 32 KB, stale tail. Evidence:
+- `tools/run_mpi_knem_stale_repro.sh` (standalone, `tools/mpi_knem_stale_repro.F90`: contiguous
+  allocatable buffers passed by first element, `MPI_Waitall` before `deallocate`, one message per
+  pair and call): with `MALLOC_TRIM_THRESHOLD_=0 MALLOC_TOP_PAD_=0` 788 of 800 receives are stale
+  under knem; 0 without the trim, 0 with `single_copy_mechanism none` or `emulated`, 0 with knem
+  and `--mca mpi_leave_pinned 0` (no cache), 0 under `pml ucx` (`UCX_TLS` mm,knem / mm,cma,
+  `UCX_RNDV_THRESH=1024`). An explicit `madvise(MADV_DONTNEED)` from user code IS caught (0 stale);
+  strace shows the FESOM test does 45 `brk` and no `madvise` per rank.
+- `test_vinv` nemo025q_cut np 2 under knem: FAILS by default, PASSES (1e-16) with
+  `MALLOC_TRIM_THRESHOLD_=100000000000`, with `--mca mpi_leave_pinned 0`, with `--mca memory
+  ^patcher`, with single-copy `none`/`emulated`, and under `pml ucx` (incl. knem, rndv 1 KB).
+  (`cma` is not offered on Levante: `kernel.yama.ptrace_scope`; the value is ignored -> knem.)
+- The code is clean: every non-blocking call in `src/` is in `mod_halo`'s four cores (contiguous
+  local buffers passed by element, alive until after `MPI_Waitall(nreq, ...)` over exactly the
+  posted requests, no exchange overlaps another, so the shared tag is matched in order). A build
+  with `-check arg_temp_created -warn interfaces` creates NO argument temporary anywhere while
+  running `test_vinv` np 2 and the production driver on pi np 2 and CORE2 np 8.
 
 **Lessons.**
-- **Log the exchange sequence before suspecting the kernel or the lists.** Printing, per
-  `core_3D_r` call and rank, the receive count, `rbuf(1,1)` and the peer's `sbuf(1,1)` showed
-  every count matching and the send buffer correct, yet the receiver got the payload of the
-  exchange FOUR calls earlier (the previous KE exchange). The halo lists (`check_dist`,
-  `test_halo`) and the code were right.
-- **Cause: vader's single-copy mechanism** (`btl_vader_single_copy_mechanism`, default `knem` on
-  Levante) for messages above the eager limit (~4 KB): `core_*` allocates its send buffer per
-  call, the allocator hands back the same heap address, and the receiver copied stale pages.
-  With `--mca btl_vader_single_copy_mechanism none` (copy-in/copy-out through the shared
-  segment) the test passes to 1e-16. Since then the ctest launcher
-  (`FESOM3_MPI_LAUNCH_FLAGS`) and `tools/run_tri_regression.sh` set it; any other login-node
-  `mpiexec ... --mca btl self,vader` run needs it too. Batch runs (UCX) are not affected.
-- **It hid for months** because small payloads (2-D fields, pi np 2) stay below the eager limit
-  or happen to reuse fresh pages; earlier "transient MPI failures" in ctest may have been this.
+- **"Right count, payload of an earlier message of the same size" has two classic causes**: a
+  copy-in temporary at a non-blocking call (code) or a stale registration cache (library). Tell
+  them apart with `-check arg_temp_created` and with the transport knobs that disable only the
+  cache (`mpi_leave_pinned 0`, `MALLOC_TRIM_THRESHOLD_` huge) -- a code bug survives those.
+- **Every login-node `mpiexec --mca pml ob1 --mca btl self,vader` run needs
+  `--mca btl_vader_single_copy_mechanism none`** (or `OMPI_MCA_btl_vader_single_copy_mechanism=none`,
+  which `env.sh` has exported since M2.12 for the SAME bug: L35's `tr_xy` "correct for 134656
+  bytes, then garbage" was this stale tail). The ctest launcher (`FESOM3_MPI_LAUNCH_FLAGS`),
+  `tools/run_tri_regression.sh`, `run_conserve_pi.sh` and `run_bottom_audit.sh` pass it
+  explicitly because they run without `env.sh`. `mpi_leave_pinned 0` is an
+  equivalent alternative. It hits ANY point-to-point or collective payload above 32 KB, not only
+  halos; reusing persistent buffers in `mod_halo` would hide it there only.
+- **Batch runs are not affected**: `env.sh`/`env/levante.dkrz.de/shell.intel` select `pml ucx`
+  (vader unused, `btl self`), and UCX's own memory hooks catch the trim (tested intra-node with
+  its knem and cma transports; inter-node IB not testable on a login node).
+- **It hid for months** because whether a buffer lands on trimmed-and-regrown heap pages depends
+  on the allocation history of the whole program (2-D fields, pi np 2 rarely hit it); earlier
+  "transient MPI failures" of login-node ctest runs without `env.sh` may have been this.

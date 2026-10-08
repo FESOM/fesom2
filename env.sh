@@ -29,8 +29,11 @@ if [[ "$_host" =~ ^levante ]] || [[ "$_host" =~ \.lvt\.dkrz\.de$ ]]; then
     export FESOM_PLATFORM_STRATEGY="levante.dkrz.de"
     # Runtime MPI workaround (levante): the OpenMPI 4.1.2 vader BTL's single-copy path
     # (KNEM here — CMA is unavailable under kernel.yama.ptrace_scope=3) CORRUPTS large
-    # shared-memory messages (>~131 KB) on this host: a contiguous nonblocking Isend/Irecv
-    # delivers the eager prefix correctly then fills the tail with garbage. This silently
+    # shared-memory messages on this host: a contiguous nonblocking Isend/Irecv delivers
+    # the eager prefix (32 KB) correctly, then fills the tail with STALE data. Root cause
+    # (LESSONS L61, tools/run_mpi_knem_stale_repro.sh): the knem registration cache keys
+    # on the virtual address and misses glibc heap trims (brk), so a buffer re-allocated
+    # at the same address is read from the old pinned pages. This silently
     # broke FESOM3's manual-pack halo exchange (mod_halo core_blk_r) for the CORE2-scale
     # tr_xy element-block exchange (478 KB) — the FIRST live F3 message above the threshold;
     # every pi-mesh gate stayed under it, and FESOM2's MPI_TYPE_INDEXED exchange uses a

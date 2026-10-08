@@ -80,7 +80,9 @@ SSH_SOLTOL=${SSH_SOLTOL:-1e-14}
 TOL_CONS=${TOL_CONS:-1e-12}
 COMPARE_ONLY=${COMPARE_ONLY:-0}
 SRC=$(cd "$(dirname "$0")/.." && pwd)
-# btl_vader_single_copy_mechanism none: knem single-copy can deliver stale halo data (LESSONS L61)
+# btl_vader_single_copy_mechanism none: Open MPI 4.1.2's knem registration cache misses glibc heap
+# trims and then delivers the stale payload of an earlier message (LESSONS L61,
+# tools/run_mpi_knem_stale_repro.sh)
 MPI="/sw/spack-levante/openmpi-4.1.2-yfwe6t/bin/mpiexec --mca pml ob1 --mca btl self,vader --mca btl_vader_single_copy_mechanism none --oversubscribe"
 POOL=/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0
 IC=/pool/data/AWICM/FESOM2/INITIAL/phc3.0/phc3.0_winter.nc

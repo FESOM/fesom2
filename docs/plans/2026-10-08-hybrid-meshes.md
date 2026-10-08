@@ -630,6 +630,19 @@ fluxes and nonlinear terms can. Asserted in a test (Task 9), measured in the sho
   cut np2; `--mca btl_vader_single_copy_mechanism none` added to `FESOM3_MPI_LAUNCH_FLAGS` and
   `run_tri_regression.sh` (LESSONS L61). Batch (UCX) runs are not affected; other login-node
   scripts with `--mca btl self,vader` need the flag too
+- [x] ➕ follow-up: root cause of the stale halo payload — code bug (non-blocking MPI on a
+      temporary / freed buffer) or MPI library? — **Open MPI 4.1.2 bug, code clean.** vader's knem
+      registration cache (keyed by virtual address) misses glibc heap trims (`brk`), so a buffer
+      re-allocated at the same address is read from the old pinned pages. Standalone reproducer
+      `tools/mpi_knem_stale_repro.F90` + `tools/run_mpi_knem_stale_repro.sh` (correct contiguous
+      Isend/Irecv/Waitall): 788/800 stale under knem with heap trimming; 0 with single-copy
+      `none`/`emulated`, `mpi_leave_pinned 0`, no trim, or `pml ucx`; `test_vinv` quad cut np2
+      likewise passes under knem once trimming or the cache is off. `mod_halo` audit + an
+      `-check arg_temp_created` build: no argument temporaries anywhere (test_vinv, prod pi np2,
+      CORE2 np8). Workaround kept (also added to `run_conserve_pi.sh`, `run_bottom_audit.sh`),
+      comments in `CMakeLists.txt`/`env.sh`/`run_tri_regression.sh` corrected, L61 rewritten (L35
+      was the same bug), HANDOFF: production (UCX + `env.sh`) not affected, not a cause of the
+      dotty `w`. ctest 99/99, `run_tri_regression.sh` 7/7
 
 ### Task 11: Tracer kernels and MUSCL up/downwind elements for quads
 

@@ -24,7 +24,7 @@ RUN="${1:-${RUN:-/tmp/bottom_audit_$USER}}"
 PY="${PY:-python3}"
 PIMESH="${PIMESH:-/home/a/a270088/port2/fesom2/tests/data/MESHES/pi}"
 COREMESH="${COREMESH:-/pool/data/AWICM/FESOM2/MESHES_FESOM2.1/core2}"
-MPIFLAGS="${MPIFLAGS:---mca pml ob1 --mca btl self,vader --oversubscribe}"
+MPIFLAGS="${MPIFLAGS:---mca pml ob1 --mca btl self,vader --mca btl_vader_single_copy_mechanism none --oversubscribe}"  # LESSONS L61
 
 [ -x "$BIN" ] || { echo "run_bottom_audit: missing $BIN (build first)"; exit 1; }
 mkdir -p "$RUN"

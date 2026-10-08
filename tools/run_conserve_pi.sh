@@ -54,7 +54,7 @@ PIMESH="${PIMESH:-/home/a/a270088/port2/fesom2/tests/data/MESHES/pi}"
 ICFILE="${ICFILE:-/pool/data/AWICM/FESOM2/INITIAL/phc3.0/phc3.0_winter.nc}"
 NSTEPS="${1:-20}"
 TOL="${TOL:-1e-12}"
-MPIFLAGS="${MPIFLAGS:---mca pml ob1 --mca btl self,vader --oversubscribe}"
+MPIFLAGS="${MPIFLAGS:---mca pml ob1 --mca btl self,vader --mca btl_vader_single_copy_mechanism none --oversubscribe}"  # LESSONS L61
 # the tuned wsplit triple (header); re-tune the cap here AND in test/CMakeLists.txt
 WSPLIT_CFG="${WSPLIT_CFG:-FESOM3_WSPLIT=1 FESOM3_WSPLIT_MAXCFL=0.005 FESOM3_WSPLIT_EXPECT_SPLIT=1000}"
 

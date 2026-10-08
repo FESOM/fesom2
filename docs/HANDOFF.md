@@ -1428,6 +1428,22 @@ ice step + `oce_fluxes` into a forced lifecycle, drop the prescribed fluxes, the
 
 ## Open notes / risks
 
+- **Stale MPI payloads on the login node = an Open MPI 4.1.2 bug, NOT a halo-code bug (2026-10-08,
+  hybrid plan Task 10 follow-up, LESSONS L61; supersedes the "corrupts >131 KB" reading of L35).**
+  `pml ob1` + `btl vader` + knem single-copy caches knem registrations by virtual address and misses
+  glibc heap trims (`brk`); a buffer re-allocated at the same address is then read from the OLD pinned
+  pages (right count, correct first 32 KB, payload of an earlier message). Standalone proof:
+  `tools/run_mpi_knem_stale_repro.sh` (stale only under knem + heap trim; clean with single-copy
+  `none`/`emulated`, `mpi_leave_pinned 0`, or `pml ucx`). `mod_halo` was audited: contiguous buffers
+  alive until `MPI_Waitall`, exact request counts, no overlapping exchanges, and an
+  `-check arg_temp_created` build creates no argument temporary in `test_vinv` or the production
+  driver (pi np 2, CORE2 np 8). **Production is not affected**: `work/job_levante` sources `env.sh`
+  → `shell.intel` sets `OMPI_MCA_pml=ucx` (vader unused; UCX tested clean with its knem/cma
+  transports), and `env.sh` has also exported `OMPI_MCA_btl_vader_single_copy_mechanism=none` since
+  M2.12. Hence this bug **cannot explain the dotty `w` near topography** in the CORE2 batch runs.
+  Exposed are only login-node `mpiexec --mca btl self,vader` runs WITHOUT `env.sh` and without the
+  flag (ctest gets it from `FESOM3_MPI_LAUNCH_FLAGS`; `run_tri_regression.sh`, `run_conserve_pi.sh`,
+  `run_bottom_audit.sh` pass it; the other `tools/run_*.sh` source `env.sh`).
 - The FESOM2 oracle is built + PROVEN (M0.7 geometry + M1.1–M1.4 advection + M2.1–M2.9a
   pressure/EOS/N²/PGF/vel_rhs/momadv/viscosity/ivertvisc/SSH/ALE-update/PP-mixing/convective-adjustment/tracer-solve gates
   all `max|Δ|=0`, **57 fields**, `tools/run_pressure_gate.sh`) + M2.9b the WHOLE assembled `oce_timestep_ale`
