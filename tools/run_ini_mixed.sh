@@ -10,8 +10,8 @@
 #    Since Task 5 check_dist.py also checks the appended sections (dist_N/format.out:
 #    double-halo nodes, com_nod2D_full, com_edge2D); the 4-part cut-outs must have edges
 #    in overlapping owned ranges (an edge in 1..myDim_edge2D of two ranks).
-# 2. check_dist.py on the triangle meshes: the writable copies pi_w (dist_1/2/8), core2_w
-#    (dist_1/2/8/128) (made by tools/run_ini_compare.sh) and, read-only, the existing
+# 2. check_dist.py on the triangle meshes: the writable copies pi_w (dist_1/2/4/8), core2_w
+#    (dist_1/2/4/8/128) (made by tools/run_ini_compare.sh) and, read-only, the existing
 #    dist_N of the original pi (dist_2, dist_8) and CORE2 (dist_8) made by older fesom_ini
 #    versions (FESOM2 layout only).
 # 3. Error cases (on copies under WORK_ROOT):
@@ -101,7 +101,7 @@ for spec in nemo025q_cut:2,4,8 nemo025mix_cut:2,4,8 nemo025q_fesom:2,8,128 nemo0
 done
 
 echo "[2/3] check_dist on the triangle meshes"
-for spec in "$MESH_ROOT/pi_w:1,2,8" "$MESH_ROOT/core2_w:1,2,8,128" "$PI_SRC:2,8" "$CORE2_SRC:8"; do
+for spec in "$MESH_ROOT/pi_w:1,2,4,8" "$MESH_ROOT/core2_w:1,2,4,8,128" "$PI_SRC:2,8" "$CORE2_SRC:8"; do
     d=${spec%%:*}; parts=${spec#*:}
     if [ -f "$d/dist_${parts%%,*}/rpart.out" ]; then
         check "$d" ${parts//,/ }

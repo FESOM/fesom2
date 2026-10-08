@@ -50,23 +50,28 @@ contains
         nElemO = mesh%elem2D; nElemL = mesh%elem2D; nElemF = mesh%elem2D
     end subroutine local_dims
 
-    pure subroutine owned_bounds(mesh, nNodO, nNodL, nEdgeO, nElemO, partit)
+    pure subroutine owned_bounds(mesh, nNodO, nNodL, nEdgeO, nElemO, partit, nNodX)
         ! nNodO  = owned nodes ; nNodL = owned+halo nodes
         ! nEdgeO = owned edges ; nElemO = owned elements
+        ! nNodX  = owned+halo+double-halo nodes (myDim+eDim+eXDim_nod2D): the size of the
+        !          fields refreshed by exchange_nod_full (= nNodL without dist_N/format.out)
         type(t_mesh),   intent(in)  :: mesh
         integer,        intent(out) :: nNodO, nNodL, nEdgeO, nElemO
         type(t_partit), intent(in), optional :: partit
+        integer,        intent(out), optional :: nNodX
         if (present(partit)) then
             if (partit%npes > 1) then
                 nNodO  = partit%myDim_nod2D
                 nNodL  = partit%myDim_nod2D + partit%eDim_nod2D
                 nEdgeO = partit%myDim_edge2D
                 nElemO = partit%myDim_elem2D
+                if (present(nNodX)) nNodX = nNodL + partit%eXDim_nod2D
                 return
             end if
         end if
         nNodO  = mesh%nod2D;  nNodL  = mesh%nod2D
         nEdgeO = mesh%edge2D; nElemO = mesh%elem2D
+        if (present(nNodX)) nNodX = mesh%nod2D
     end subroutine owned_bounds
 
     pure logical function is_multirank(partit)

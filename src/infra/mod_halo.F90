@@ -15,6 +15,7 @@ module mod_halo
     implicit none
     private
     public :: exchange_nod, exchange_elem, exchange_elem_full, &
+              exchange_edge, exchange_nod_full, &
               allreduce_sum, allreduce_max, stale_halo_max_nod, stale_halo_max_elem
 
     interface exchange_nod
@@ -53,6 +54,20 @@ module mod_halo
     interface exchange_elem_full
         module procedure exchange_elem_full_2D_r, exchange_elem_full_2D_i, &
                          exchange_elem_full_3D_r
+    end interface
+
+    ! Hybrid meshes (dist_N/format.out): edge halo and double node halo. exchange_edge
+    ! refreshes every held edge 1..myDim+eDim_edge2D that another rank owns uniquely (owner
+    ! of edges(1,edge)) -- also edges in this rank's own 1..myDim_edge2D range;
+    ! exchange_nod_full refreshes the halo nodes 1..eDim+eXDim_nod2D (arrays sized
+    ! myDim+eDim+eXDim = nNodX, owned_bounds). Same broadcast-only cores as exchange_nod;
+    ! a dist_N without format.out has no such lists and the call stops with a message.
+    interface exchange_edge
+        module procedure exchange_edge_2D_r, exchange_edge_3D_r
+    end interface
+
+    interface exchange_nod_full
+        module procedure exchange_nod_full_2D_r, exchange_nod_full_3D_r
     end interface
 
     integer, parameter :: HALO_TAG = 1
@@ -140,6 +155,52 @@ contains
         logical, optional, intent(in) :: luse_g2g
         call core_blk_r(arr, partit%com_elem2D_full, partit%MPI_COMM_FESOM)
     end subroutine
+
+    ! --------------- hybrid-mesh wrappers (com_edge2D, com_nod2D_full) -----------
+    subroutine exchange_edge_2D_r(arr, partit, luse_g2g)
+        real(kind=WP),  intent(inout) :: arr(:)     ! (myDim+eDim_edge2D)
+        type(t_partit), intent(in)    :: partit
+        logical, optional, intent(in) :: luse_g2g
+        call require_dist_format(partit, 'exchange_edge', 'com_edge2D')
+        call core_2D_r(arr, partit%com_edge2D, partit%MPI_COMM_FESOM)
+    end subroutine
+
+    subroutine exchange_edge_3D_r(arr, partit, luse_g2g)
+        real(kind=WP),  intent(inout) :: arr(:,:)   ! (nl, myDim+eDim_edge2D)
+        type(t_partit), intent(in)    :: partit
+        logical, optional, intent(in) :: luse_g2g
+        call require_dist_format(partit, 'exchange_edge', 'com_edge2D')
+        call core_3D_r(arr, partit%com_edge2D, partit%MPI_COMM_FESOM)
+    end subroutine
+
+    subroutine exchange_nod_full_2D_r(arr, partit, luse_g2g)
+        real(kind=WP),  intent(inout) :: arr(:)     ! (nNodX)
+        type(t_partit), intent(in)    :: partit
+        logical, optional, intent(in) :: luse_g2g
+        call require_dist_format(partit, 'exchange_nod_full', 'com_nod2D_full')
+        call core_2D_r(arr, partit%com_nod2D_full, partit%MPI_COMM_FESOM)
+    end subroutine
+
+    subroutine exchange_nod_full_3D_r(arr, partit, luse_g2g)
+        real(kind=WP),  intent(inout) :: arr(:,:)   ! (nl, nNodX)
+        type(t_partit), intent(in)    :: partit
+        logical, optional, intent(in) :: luse_g2g
+        call require_dist_format(partit, 'exchange_nod_full', 'com_nod2D_full')
+        call core_3D_r(arr, partit%com_nod2D_full, partit%MPI_COMM_FESOM)
+    end subroutine
+
+    subroutine require_dist_format(partit, caller, list)
+        ! The appended lists exist only with dist_N/format.out (the 1-rank synthesis
+        ! provides them empty); otherwise stop with a message instead of a silent no-op.
+        type(t_partit),   intent(in) :: partit
+        character(len=*), intent(in) :: caller, list
+        integer :: ierr
+        if (partit%dist_format >= 1) return
+        write(*,'(a,i0,a)') caller//' [rank ', partit%mype, ']: '//list// &
+            ' is not available: dist_N has no format.out (FESOM2 layout); '// &
+            'regenerate dist_N with the fesom_ini of this repository'
+        call MPI_Abort(partit%MPI_COMM_FESOM, 1, ierr)
+    end subroutine require_dist_format
 
     ! ===================== allreduce (CG dot-products) =======
     subroutine allreduce_sum_r0(s, partit)

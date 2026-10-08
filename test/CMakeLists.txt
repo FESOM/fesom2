@@ -69,6 +69,30 @@ foreach(_np 1 2)
         ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/pi_w;FESOM3_TEST_ROTATE=1"
         SKIP_REGULAR_EXPRESSION "cannot open;No such file")
 endforeach()
+# Task 8: edge exchange (com_edge2D) and double node halo exchange (com_nod2D_full) round
+# trips; default mesh = the NEMO quad cut-out (np 1 = the synthesis, empty lists).
+add_fesom_test(test_halo_ext 1)
+foreach(_case quad:nemo025q_cut:2,4,8 mixed:nemo025mix_cut:4 pi_w:pi_w:2,4,8 core2_w:core2_w:2,4,8)
+    string(REPLACE ":" ";" _trip ${_case})
+    list(GET _trip 0 _tag)
+    list(GET _trip 1 _mesh)
+    list(GET _trip 2 _nps)
+    string(REPLACE "," ";" _nps ${_nps})
+    foreach(_np ${_nps})
+        add_test(NAME test_halo_ext_${_tag}_np${_np}
+                 COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np ${_np} $<TARGET_FILE:test_halo_ext>)
+        set_tests_properties(test_halo_ext_${_tag}_np${_np} PROPERTIES
+            ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/${_mesh}"
+            SKIP_REGULAR_EXPRESSION "cannot open;No such file")
+    endforeach()
+endforeach()
+# without dist_N/format.out (the original pi dist_2) exchange_edge stops with a message
+add_test(NAME test_halo_ext_noformat_np2
+         COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np 2 $<TARGET_FILE:test_halo_ext>)
+set_tests_properties(test_halo_ext_noformat_np2 PROPERTIES
+    ENVIRONMENT "FESOM3_MESH_DIR=/home/a/a270088/port2/fesom2/tests/data/MESHES/pi"
+    PASS_REGULAR_EXPRESSION "com_edge2D is not available: dist_N has no format.out"
+    FAIL_REGULAR_EXPRESSION "did NOT stop")
 # the old pi dist_2 (no format.out, FESOM2 layout only) is still read
 add_test(NAME test_mesh_read_pi_np2
          COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np 2 $<TARGET_FILE:test_mesh_read>)

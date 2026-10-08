@@ -13,7 +13,7 @@
 #      elvls.out, elvls_raw.out, nlvls.out, dist_N/*). This is the port check.
 #   2. The files in the original mesh directories. Byte-identical are the ones produced by
 #      this FESOM2 version: edges.out, edge_tri.out, edgenum.out (pi, CORE2), CORE2
-#      elvls/nlvls.out.20260528_regenerated, CORE2 dist_2 and dist_128. Made by older
+#      elvls/nlvls.out.20260528_regenerated, CORE2 dist_2, dist_4 and dist_128. Made by older
 #      fesom_ini versions and therefore NOT reproducible (reported, not gated):
 #        - pi elvls.out/nlvls.out (3 element levels differ) and pi dist_2/dist_8, CORE2
 #          dist_8 (2023), CORE2 elvls.out/nlvls.out (the 2021 originals): their partitions
@@ -26,6 +26,8 @@
 #   (double-halo nodes, com_nod2D_full, com_edge2D) and writes dist_N/format.out: these
 #   files are compared as "FESOM2 file + appended part" (the FESOM2 part byte-identical,
 #   checked by check_dist.py in tools/run_ini_mixed.sh), rpart.out exactly.
+#   dist_4 (Task 8: the exchange tests at 4 ranks) is identical to the existing CORE2 dist_4
+#   (gated); the original pi has no dist_4 (compared with FESOM2's build only).
 # 3. dist_1 of pi_w and core2_w is written by tools/make_dist1.py (empty appended sections).
 # 4. The model's existing dist_N reader (FESOM2's read sequence; it ignores the appended
 #    sections) reads the new pi_w dist_2/8: test_partit and test_halo of the build with
@@ -138,6 +140,7 @@ compare_mesh() {
                                                || bad "$name: ${f%%=*} differs from existing ${f##*=}"
     done
     for np in "$@"; do
+        [ -d "$src/dist_$np" ] || continue
         files=$(cd "$src/dist_$np" && ls)
         n=$(ndist "$dst/dist_$np" "$src/dist_$np" $files)
         if [[ " $exact_dists " == *" $np "* ]]; then
@@ -160,10 +163,10 @@ compare_mesh() {
 
 compare_mesh pi "$PI_SRC" \
     "edges.out=edges.out edge_tri.out=edge_tri.out edgenum.out=edgenum.out" \
-    "" 2 8
+    "" 2 4 8
 compare_mesh core2 "$CORE2_SRC" \
     "edges.out=edges.out edge_tri.out=edge_tri.out edgenum.out=edgenum.out elvls.out=elvls.out.20260528_regenerated nlvls.out=nlvls.out.20260528_regenerated elvls_raw.out=elvls_raw.out" \
-    "2 128" 2 8 128
+    "2 4 128" 2 4 8 128
 
 # 4. the model's existing reader on the new dist_N of pi_w
 echo "== existing dist_N reader on $MESH_ROOT/pi_w"
