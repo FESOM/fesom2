@@ -24,8 +24,9 @@ contains
         real(kind=WP),    intent(in)    :: alpha_deg, beta_deg, gamma_deg, cyclic_deg
         logical,          intent(in)    :: force_rotation
         integer,          intent(out)   :: n_cw_swaps
-        integer :: u, ios, i, n, id, n1, n2, n3, bnd
+        integer :: u, ios, i, n, id, bnd, ncol
         real(kind=WP) :: lon, lat, gx, gy
+        logical :: nemo
 
         if (partit%npes /= 1) then
             ! M2.12a: multi-rank local-mesh remap (needs set_partition to have run).
@@ -57,15 +58,14 @@ contains
                      mesh%coord_nod2D(1,i), mesh%coord_nod2D(2,i))
         end do
 
-        ! ---- elements: elem2d.out (n1 n2 n3) ----
+        ! ---- elements: elem2d.out (3 or 4 node ids per line, see read_elem_line) ----
         open(newunit=u, file=trim(mesh_dir)//'/elem2d.out', status='old', action='read', iostat=ios)
         read(u,*) mesh%elem2D
         allocate(mesh%elem2D_nodes(MAX_NV, mesh%elem2D), mesh%elem2D_nnodes(mesh%elem2D))
         mesh%elem2D_nodes = 0
+        ncol = 0
         do i = 1, mesh%elem2D
-            read(u,*) n1, n2, n3
-            mesh%elem2D_nodes(1, i) = n1; mesh%elem2D_nodes(2, i) = n2; mesh%elem2D_nodes(3, i) = n3
-            mesh%elem2D_nnodes(i) = 3
+            call read_elem_line(u, i, mesh%nod2D, ncol, mesh%elem2D_nodes(:, i), mesh%elem2D_nnodes(i))
         end do
         close(u)
 
@@ -100,16 +100,13 @@ contains
         end do
         close(u)
 
-        ! ---- aux3d.out: nl, zbar(nl), per-node depth ----
-        open(newunit=u, file=trim(mesh_dir)//'/aux3d.out', status='old', action='read', iostat=ios)
-        read(u,*) mesh%nl
-        allocate(mesh%zbar(mesh%nl), mesh%Z(mesh%nl-1), mesh%depth(mesh%nod2D))
-        read(u,*) mesh%zbar
-        if (mesh%zbar(2) > 0.0_MP) mesh%zbar = -mesh%zbar            ! oce_mesh.F90:578
-        mesh%Z = 0.5_MP * (mesh%zbar(1:mesh%nl-1) + mesh%zbar(2:mesh%nl))  ! :580-581
+        ! ---- aux3d.out (or depth.out): nl, zbar(nl), per-node depth ----
+        call open_depth_file(mesh, mesh_dir, u, nemo)
+        allocate(mesh%depth(mesh%nod2D))
         do i = 1, mesh%nod2D
             read(u,*, iostat=ios) mesh%depth(i)
             if (ios /= 0) then; mesh%depth(i) = 0.0_MP; end if
+            if (nemo) mesh%depth(i) = -mesh%depth(i)
         end do
         close(u)
 
@@ -118,6 +115,83 @@ contains
         call enforce_cw_orientation(mesh, n_cw_swaps)
         call setup_vertical(mesh)
     end subroutine read_mesh
+
+    subroutine read_elem_line(u, iel, nod2D, ncol, nodes, nv)
+        ! Element iel from its line of elem2d.out: 3 node ids (FESOM2) or 4 (hybrid
+        ! meshes; a triangle repeats its 1st vertex as the 4th). The column count is
+        ! detected on the first element line (ncol = 0 on entry) and every later line must
+        ! have it; 3 columns -> 4th := 1st. nv = 3 if the 4th vertex is the 1st, else 4.
+        ! A line with another number of values, a non-integer or a node id outside
+        ! 1..nod2D stops with a message.
+        integer, intent(in)    :: u, iel, nod2D
+        integer, intent(inout) :: ncol
+        integer, intent(out)   :: nodes(MAX_NV), nv
+        character(len=256) :: line
+        integer :: ios, ntok, k
+        logical :: blank_prev
+        read(u, '(a)', iostat=ios) line
+        if (ios /= 0) call elem_line_error(iel, 'missing', '')
+        ntok = 0; blank_prev = .true.
+        do k = 1, len_trim(line)
+            if (line(k:k) == ' ' .or. line(k:k) == char(9)) then
+                blank_prev = .true.
+            else
+                if (blank_prev) ntok = ntok + 1
+                blank_prev = .false.
+            end if
+        end do
+        if (ncol == 0) then
+            if (ntok /= 3 .and. ntok /= 4) &
+                call elem_line_error(iel, 'has neither 3 nor 4 node ids:', line)
+            ncol = ntok
+        end if
+        if (ntok /= ncol) call elem_line_error(iel, 'has a wrong number of node ids:', line)
+        read(line, *, iostat=ios) nodes(1:ncol)
+        if (ios /= 0) call elem_line_error(iel, 'is not a list of integers:', line)
+        if (ncol == 3) nodes(4) = nodes(1)
+        if (any(nodes < 1) .or. any(nodes > nod2D)) &
+            call elem_line_error(iel, 'has a node id outside 1..nod2D:', line)
+        nv = 4
+        if (nodes(4) == nodes(1)) nv = 3
+    end subroutine read_elem_line
+
+    subroutine elem_line_error(iel, what, line)
+        integer,          intent(in) :: iel
+        character(len=*), intent(in) :: what, line
+        write(*,'(a,i0,a)') 'read_mesh: elem2d.out: the line of element ', iel, &
+            ' '//what//' "'//trim(line)//'"'
+        error stop 1
+    end subroutine elem_line_error
+
+    subroutine open_depth_file(mesh, mesh_dir, u, nemo)
+        ! zbar (nl levels, made negative if given positive) and Z from aux3d.out (nl,
+        ! zbar(nl), node depths) or, if aux3d.out is absent, from the NEMO depth.out (nl,
+        ! positive zbar(nl), positive node depths, node layer counts -- the counts are not
+        ! read: node levels come from nlvls.out only). Returns the unit u positioned at
+        ! the node depths; nemo = depth.out (its depths are positive: callers negate).
+        type(t_mesh),     intent(inout) :: mesh
+        character(len=*), intent(in)    :: mesh_dir
+        integer,          intent(out)   :: u
+        logical,          intent(out)   :: nemo
+        integer :: ios
+        logical :: has_aux3d
+        inquire(file=trim(mesh_dir)//'/aux3d.out', exist=has_aux3d)
+        nemo = .not. has_aux3d
+        if (nemo) then
+            open(newunit=u, file=trim(mesh_dir)//'/depth.out', status='old', action='read', iostat=ios)
+            if (ios /= 0) then
+                write(*,'(a)') 'read_mesh: neither aux3d.out nor depth.out in '//trim(mesh_dir)
+                error stop 1
+            end if
+        else
+            open(newunit=u, file=trim(mesh_dir)//'/aux3d.out', status='old', action='read', iostat=ios)
+        end if
+        read(u,*) mesh%nl
+        allocate(mesh%zbar(mesh%nl), mesh%Z(mesh%nl-1))
+        read(u,*) mesh%zbar
+        if (mesh%zbar(2) > 0.0_MP) mesh%zbar = -mesh%zbar            ! oce_mesh.F90:578
+        mesh%Z = 0.5_MP * (mesh%zbar(1:mesh%nl-1) + mesh%zbar(2:mesh%nl))  ! :580-581
+    end subroutine open_depth_file
 
     subroutine build_nod_in_elem(mesh)
         ! node->element adjacency, dense (oce_mesh.F90:2010-2044), 2-pass.
@@ -150,6 +224,8 @@ contains
 
     subroutine enforce_cw_orientation(mesh, n_swaps, nelem)
         ! test_tri (oce_mesh.F90:1679-1729): r = b1*c2 - b2*c1; if r>0 swap nodes 2,3.
+        ! A quad is tested on its sub-triangle (1,2,3) and turned by swapping nodes 2,4
+        ! (as fesom_ini does; it has already oriented and checked every quad).
         ! nelem (optional): number of elements to process (multi-rank: owned only,
         ! myDim_elem2D). Defaults to mesh%elem2D (the 1-rank global path, unchanged).
         type(t_mesh),      intent(inout) :: mesh
@@ -171,9 +247,15 @@ contains
             call trim_cyclic(c1)
             r = b1*c2 - b2*c1
             if (r > 0.0_WP) then
-                tmp = mesh%elem2D_nodes(2, n)
-                mesh%elem2D_nodes(2, n) = mesh%elem2D_nodes(3, n)
-                mesh%elem2D_nodes(3, n) = tmp
+                if (mesh%elem2D_nnodes(n) == 4) then
+                    tmp = mesh%elem2D_nodes(2, n)
+                    mesh%elem2D_nodes(2, n) = mesh%elem2D_nodes(4, n)
+                    mesh%elem2D_nodes(4, n) = tmp
+                else
+                    tmp = mesh%elem2D_nodes(2, n)
+                    mesh%elem2D_nodes(2, n) = mesh%elem2D_nodes(3, n)
+                    mesh%elem2D_nodes(3, n) = tmp
+                end if
                 n_swaps = n_swaps + 1
             end if
         end do
@@ -327,15 +409,21 @@ contains
         real(kind=WP),    intent(in)    :: alpha_deg, beta_deg, gamma_deg, cyclic_deg
         logical,          intent(in)    :: force_rotation
         integer,          intent(out)   :: n_cw_swaps
-        integer :: u, ios, i, g, lid, bnd, gn1, gn2, gn3, ge1, ge2, lev
+        integer :: u, ios, i, g, lid, bnd, gn1, gn2, ge1, ge2, lev, ncol, nv
+        integer :: gnodes(MAX_NV)
         integer :: nNodG, nElemG, nEdgeG, edge2D_in_g
-        integer :: nNodL, nElemO, nElemF, nEdgeL
+        integer :: nNodL, nNodX, nElemO, nElemF, nEdgeL
         real(kind=WP) :: lon, lat, gx, gy, dval
         integer, allocatable :: imap_nod(:), imap_elem(:), imap_edge(:), nlvls_g(:)
+        logical :: nemo
 
         call init_mesh_rotation(alpha_deg, beta_deg, gamma_deg, cyclic_deg)
 
+        ! Node arrays of the mesh FILES (coordinates, boundary index, depth, levels) also
+        ! hold the double-halo nodes myDim+eDim+1..nNodX (eXDim_nod2D, dist_N/format.out);
+        ! everything derived from the elements keeps nNodL.
         nNodL  = partit%myDim_nod2D  + partit%eDim_nod2D
+        nNodX  = nNodL + partit%eXDim_nod2D
         nElemO = partit%myDim_elem2D
         nElemF = partit%myDim_elem2D + partit%eDim_elem2D + partit%eXDim_elem2D
         nEdgeL = partit%myDim_edge2D + partit%eDim_edge2D
@@ -348,13 +436,13 @@ contains
         ! ---- global->local inverse maps (0 = not local) ----
         allocate(imap_nod(nNodG), imap_elem(nElemG), imap_edge(nEdgeG))
         imap_nod = 0; imap_elem = 0; imap_edge = 0
-        do i = 1, nNodL;  imap_nod(partit%myList_nod2D(i))   = i; end do
+        do i = 1, nNodX;  imap_nod(partit%myList_nod2D(i))   = i; end do
         do i = 1, nElemF; imap_elem(partit%myList_elem2D(i)) = i; end do
         do i = 1, nEdgeL; imap_edge(partit%myList_edge2D(i)) = i; end do
 
-        ! ---- nodes: nod2d.out (id lon lat bnd); scatter owned+halo coords ----
-        allocate(mesh%coord_nod2D(2, nNodL), mesh%geo_coord_nod2D(2, nNodL))
-        allocate(mesh%bc_index_nod2D(nNodL))
+        ! ---- nodes: nod2d.out (id lon lat bnd); scatter owned+halo(+double-halo) coords ----
+        allocate(mesh%coord_nod2D(2, nNodX), mesh%geo_coord_nod2D(2, nNodX))
+        allocate(mesh%bc_index_nod2D(nNodX))
         open(newunit=u, file=trim(mesh_dir)//'/nod2d.out', status='old', action='read', iostat=ios)
         read(u,*) g                                  ! header == nNodG (line k => global node k)
         do g = 1, nNodG
@@ -371,7 +459,7 @@ contains
             end if
         end do
         close(u)
-        do i = 1, nNodL
+        do i = 1, nNodX
             call r2g(mesh%geo_coord_nod2D(1,i), mesh%geo_coord_nod2D(2,i), &
                      mesh%coord_nod2D(1,i), mesh%coord_nod2D(2,i))
         end do
@@ -379,8 +467,8 @@ contains
         ! ---- vertex level counts: nlvls.out (node) ONLY ----
         ! FESOM3 bottom at vertices: the vertex column is authoritative and elvls.out is
         ! NOT read. Kept here in a GLOBAL temp because the element derivation below needs
-        ! the levels of an element's three nodes by their GLOBAL ids.
-        allocate(mesh%nlevels(nElemF), mesh%nlevels_nod2D(nNodL), mesh%ulevels(nElemF))
+        ! the levels of an element's vertices by their GLOBAL ids.
+        allocate(mesh%nlevels(nElemF), mesh%nlevels_nod2D(nNodX), mesh%ulevels(nElemF))
         mesh%nlevels = 0; mesh%nlevels_nod2D = 0; mesh%ulevels = 0
         allocate(nlvls_g(nNodG))
         nlvls_g = 0
@@ -404,18 +492,17 @@ contains
         mesh%elem2D_nodes = 0
         open(newunit=u, file=trim(mesh_dir)//'/elem2d.out', status='old', action='read', iostat=ios)
         read(u,*) g                                  ! header
+        ncol = 0
         do g = 1, nElemG
-            read(u,*) gn1, gn2, gn3
+            call read_elem_line(u, g, nNodG, ncol, gnodes, nv)
             lid = imap_elem(g)
             if (lid > 0) then                         ! ANY local element (owned or halo)
-                mesh%nlevels(lid) = min(nlvls_g(gn1), min(nlvls_g(gn2), nlvls_g(gn3)))
+                mesh%nlevels(lid) = minval(nlvls_g(gnodes(1:nv)))
                 mesh%ulevels(lid) = 1
             end if
             if (lid > 0 .and. lid <= nElemO) then     ! owned element: also the node list
-                mesh%elem2D_nodes(1, lid) = imap_nod(gn1)
-                mesh%elem2D_nodes(2, lid) = imap_nod(gn2)
-                mesh%elem2D_nodes(3, lid) = imap_nod(gn3)
-                mesh%elem2D_nnodes(lid)   = 3
+                mesh%elem2D_nodes(:, lid) = imap_nod(gnodes)
+                mesh%elem2D_nnodes(lid)   = nv
             end if
         end do
         close(u)
@@ -448,17 +535,14 @@ contains
         end do
         close(u)
 
-        ! ---- aux3d.out: nl, zbar(nl) [global], per-node depth [scatter] ----
-        open(newunit=u, file=trim(mesh_dir)//'/aux3d.out', status='old', action='read', iostat=ios)
-        read(u,*) mesh%nl
-        allocate(mesh%zbar(mesh%nl), mesh%Z(mesh%nl-1), mesh%depth(nNodL))
-        read(u,*) mesh%zbar
-        if (mesh%zbar(2) > 0.0_MP) mesh%zbar = -mesh%zbar
-        mesh%Z = 0.5_MP * (mesh%zbar(1:mesh%nl-1) + mesh%zbar(2:mesh%nl))
+        ! ---- aux3d.out (or depth.out): nl, zbar(nl) [global], per-node depth [scatter] ----
+        call open_depth_file(mesh, mesh_dir, u, nemo)
+        allocate(mesh%depth(nNodX))
         mesh%depth = 0.0_MP
         do g = 1, nNodG
             read(u,*, iostat=ios) dval
             if (ios /= 0) exit
+            if (nemo) dval = -dval
             lid = imap_nod(g); if (lid > 0) mesh%depth(lid) = dval
         end do
         close(u)

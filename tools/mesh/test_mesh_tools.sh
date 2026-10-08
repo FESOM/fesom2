@@ -10,7 +10,8 @@
 #   - the cleaned, mixed and cut meshes pass check_mesh (0 dead ends);
 #   - split: element count = elements + split count, triangles = 2 x split count,
 #     total area preserved to roundoff, nod2d.out and depth.out unchanged;
-#   - cut-outs: a few thousand nodes, the mixed cut-out holds quads and triangles;
+#   - cut-outs: a few thousand nodes, the mixed cut-out holds quads and triangles, every
+#     node layer count = max over its elements (the model's bottom invariant);
 #   - error cases: flipped quad, flipped triangle, bow-tie quad, repeated vertex are reported.
 #
 # Usage: tools/mesh/test_mesh_tools.sh [nemo_dir] [out_root]
@@ -90,13 +91,29 @@ fi
 echo "[4/5] cut_region -> $ROOT/nemo025q_cut, $ROOT/nemo025mix_cut"
 for m in nemo025q_fesom:nemo025q_cut nemo025mix:nemo025mix_cut; do
     src=${m%%:*}; dst=${m##*:}
-    python3 "$HERE/cut_region.py" "$ROOT/$src" "$ROOT/$dst" --lon -20 -5 --lat -2 12
+    python3 "$HERE/cut_region.py" "$ROOT/$src" "$ROOT/$dst" --lon -20 -5 --lat -2 12 \
+        | tee "$SCR/${dst}_cut.log"
     expect_pass "$ROOT/$dst" "$dst"
     n=$(val "$SCR/$dst.log" nodes)
     if [ "$n" -ge 1000 ] && [ "$n" -le 10000 ]; then
         ok "$dst: $n nodes"
     else
         bad "$dst: $n nodes (a few thousand expected)"
+    fi
+    # the model's bottom invariant: node count = max over its elements of the element
+    # count (min over the vertices), also for the nodes on the cut
+    if python3 -c '
+import sys, numpy as np
+sys.path.insert(0, sys.argv[1]); import mesh_io
+m = mesh_io.read_mesh(sys.argv[2])
+c = np.array([int(s) for s in m.depth["depth.out"][1][1]])
+emin = c[m.elem].min(axis=1); mx = np.zeros(m.n2d, dtype=np.int64)
+for k in range(4): np.maximum.at(mx, m.elem[:, k], emin)
+print("    %d node(s) violate the bottom invariant" % (mx != c).sum()); sys.exit(int((mx != c).any()))' \
+         "$HERE" "$ROOT/$dst"; then
+        ok "$dst: node layer counts = max over the elements ($(grep -o '[0-9]* node layer count' "$SCR/${dst}_cut.log" | cut -d' ' -f1) lowered by the cut)"
+    else
+        bad "$dst: bottom invariant violated"
     fi
 done
 if [ "$(val "$SCR/nemo025mix_cut.log" quads)" -gt 0 ] && [ "$(val "$SCR/nemo025mix_cut.log" tris)" -gt 0 ]; then

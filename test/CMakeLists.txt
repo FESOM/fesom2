@@ -34,6 +34,43 @@ add_fesom_test(test_io_posix 1)
 add_fesom_test(test_vector_rotate 1)
 add_fesom_test(test_io_means 1)
 
+# Hybrid meshes (docs/plans/2026-10-08-hybrid-meshes.md, Task 6): mesh + extended dist_N
+# reading. test_mesh_read checks read_mesh against the mesh files (vertex counts, levels,
+# double-halo nodes); default mesh = the NEMO-mixed cut-out. test_partit checks the
+# appended dist_N sections (dist_N/format.out). The writable meshes live under
+# /work/ab0995/a270029/meshes; a missing mesh skips the test.
+set(_hyb_meshes /work/ab0995/a270029/meshes)
+add_fesom_test(test_mesh_read 1)
+add_fesom_test(test_mesh_read 2)
+foreach(_case quad:nemo025q_cut mixed:nemo025mix_cut pi_w:pi_w)
+    string(REPLACE ":" ";" _pair ${_case})
+    list(GET _pair 0 _tag)
+    list(GET _pair 1 _mesh)
+    foreach(_np 1 2)
+        foreach(_t test_mesh_read test_partit)
+            add_test(NAME ${_t}_${_tag}_np${_np}
+                     COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np ${_np}
+                             $<TARGET_FILE:${_t}>)
+            set_tests_properties(${_t}_${_tag}_np${_np} PROPERTIES
+                ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/${_mesh}"
+                SKIP_REGULAR_EXPRESSION "cannot open;No such file")
+        endforeach()
+    endforeach()
+endforeach()
+# the old pi dist_2 (no format.out, FESOM2 layout only) is still read
+add_test(NAME test_mesh_read_pi_np2
+         COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np 2 $<TARGET_FILE:test_mesh_read>)
+set_tests_properties(test_mesh_read_pi_np2 PROPERTIES
+    ENVIRONMENT "FESOM3_MESH_DIR=/home/a/a270088/port2/fesom2/tests/data/MESHES/pi"
+    SKIP_REGULAR_EXPRESSION "cannot open;No such file")
+# a malformed element line stops read_mesh with a message (regex pair as test_minlayers)
+add_test(NAME test_mesh_read_malformed_np1
+         COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np 1 $<TARGET_FILE:test_mesh_read>)
+set_tests_properties(test_mesh_read_malformed_np1 PROPERTIES
+    ENVIRONMENT "FESOM3_TEST_MALFORMED=1"
+    PASS_REGULAR_EXPRESSION "the line of element 3 has a wrong number of node ids: \"2 4\""
+    FAIL_REGULAR_EXPRESSION "did NOT stop")
+
 # dump_diff.py self-check (pure python; no external data needed).
 add_test(NAME dump_diff_selftest
          COMMAND python3 ${CMAKE_SOURCE_DIR}/tools/dump_diff.py --selftest)

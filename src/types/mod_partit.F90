@@ -36,11 +36,20 @@ module mod_partit
         type(com_struct) :: com_nod2D
         type(com_struct) :: com_elem2D
         type(com_struct) :: com_elem2D_full
+        ! Hybrid meshes, read only when dist_N/format.out exists (dist_format >= 1):
+        ! com_nod2D_full receives every halo node 1..eDim+eXDim_nod2D from its owner,
+        ! com_edge2D every held edge from its unique owner (owner of edges(1,edge)).
+        type(com_struct) :: com_nod2D_full
+        type(com_struct) :: com_edge2D
+        integer :: dist_format = 0          ! dist_N/format.out version (0: FESOM2 layout only)
 
         integer, allocatable, dimension(:) :: part   ! global owner map (nod2D)
 
         ! Local dimensions and global-id lists (1-based local -> global).
-        integer :: myDim_nod2D = 0, eDim_nod2D = 0
+        ! myList_nod2D holds myDim+eDim+eXDim_nod2D ids; eXDim_nod2D (double halo: the
+        ! vertices of the local elements 1..myDim+eDim+eXDim_elem2D that are no owned or
+        ! halo node) is 0 without dist_N/format.out.
+        integer :: myDim_nod2D = 0, eDim_nod2D = 0, eXDim_nod2D = 0
         integer, allocatable, dimension(:) :: myList_nod2D
         integer :: myDim_elem2D = 0, eDim_elem2D = 0, eXDim_elem2D = 0
         integer, allocatable, dimension(:) :: myList_elem2D
@@ -107,11 +116,15 @@ contains
         call partit%com_nod2D%write_com(unit)
         call partit%com_elem2D%write_com(unit)
         call partit%com_elem2D_full%write_com(unit)
+        call partit%com_nod2D_full%write_com(unit)
+        call partit%com_edge2D%write_com(unit)
+        write(unit, iostat=iostat, iomsg=iomsg) partit%dist_format
         write(unit, iostat=iostat, iomsg=iomsg) partit%npes
         write(unit, iostat=iostat, iomsg=iomsg) partit%mype
         call write_bin_array(partit%part, unit, iostat, iomsg)
         write(unit, iostat=iostat, iomsg=iomsg) partit%myDim_nod2D
         write(unit, iostat=iostat, iomsg=iomsg) partit%eDim_nod2D
+        write(unit, iostat=iostat, iomsg=iomsg) partit%eXDim_nod2D
         call write_bin_array(partit%myList_nod2D, unit, iostat, iomsg)
         write(unit, iostat=iostat, iomsg=iomsg) partit%myDim_elem2D
         write(unit, iostat=iostat, iomsg=iomsg) partit%eDim_elem2D
@@ -131,11 +144,15 @@ contains
         call partit%com_nod2D%read_com(unit)
         call partit%com_elem2D%read_com(unit)
         call partit%com_elem2D_full%read_com(unit)
+        call partit%com_nod2D_full%read_com(unit)
+        call partit%com_edge2D%read_com(unit)
+        read(unit, iostat=iostat, iomsg=iomsg) partit%dist_format
         read(unit, iostat=iostat, iomsg=iomsg) partit%npes
         read(unit, iostat=iostat, iomsg=iomsg) partit%mype
         call read_bin_array(partit%part, unit, iostat, iomsg)
         read(unit, iostat=iostat, iomsg=iomsg) partit%myDim_nod2D
         read(unit, iostat=iostat, iomsg=iomsg) partit%eDim_nod2D
+        read(unit, iostat=iostat, iomsg=iomsg) partit%eXDim_nod2D
         call read_bin_array(partit%myList_nod2D, unit, iostat, iomsg)
         read(unit, iostat=iostat, iomsg=iomsg) partit%myDim_elem2D
         read(unit, iostat=iostat, iomsg=iomsg) partit%eDim_elem2D

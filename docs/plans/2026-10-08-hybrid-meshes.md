@@ -416,18 +416,39 @@ fluxes and nonlinear terms can. Asserted in a test (Task 9), measured in the sho
 - Modify: `src/infra/mod_partitioning.F90` (incl. `synthesize_1rank`), `src/types/mod_partit.F90`
 - Modify: `src/types/mod_mesh.F90`
 - Modify: `test/test_mesh.F90`, `test/test_partit.F90`, `test/CMakeLists.txt`
+- ➕ Create: `test/test_mesh_read.F90`; Modify: `test/test_halo.F90`, `test/test_types.F90`
+- ➕ Modify: `tools/mesh/cut_region.py`, `tools/mesh/test_mesh_tools.sh` (see ⚠️ below)
 
-- [ ] 3/4-column `elem2d.out` (column detection), `elem2D_nnodes` from 4th = 1st, element levels
+- [x] 3/4-column `elem2d.out` (column detection), `elem2D_nnodes` from 4th = 1st, element levels
       min/max over 4 slots; node levels only from `nlvls.out`
-- [ ] zbar from `aux3d.out`, or `depth.out` if `aux3d.out` is absent (positive accepted)
-- [ ] `edge_tri` keeps the on-disk encoding in this task (convention change is Task 7)
-- [ ] `format.out` present → read `eXDim_nod2D` list (+ coordinates/levels of those nodes),
+      — `read_elem_line` (both paths): columns from the first line, every line must match,
+      3 columns → 4th := 1st, ids checked in 1..nod2D; triangles now store slot 4 = slot 1
+      (was 0); `enforce_cw_orientation` turns a quad by swapping 2↔4 (triangles unchanged)
+- [x] zbar from `aux3d.out`, or `depth.out` if `aux3d.out` is absent (positive accepted)
+      — `open_depth_file`; depth.out node depths stored negated (aux3d sign; never used)
+- [x] `edge_tri` keeps the on-disk encoding in this task (convention change is Task 7)
+- [x] `format.out` present → read `eXDim_nod2D` list (+ coordinates/levels of those nodes),
       `com_nod2D_full`, `com_edge2D`; `synthesize_1rank` provides empty lists
-- [ ] tests: read the NEMO and mixed cut-outs at np 1/2 (counts, nnodes histogram, levels vs
+      — `partit%dist_format` (0 = FESOM2 layout), `eXDim_nod2D`, ids appended to
+      `myList_nod2D`; `coord_nod2D`, `geo_coord_nod2D`, `bc_index_nod2D`, `depth`,
+      `nlevels_nod2D` sized myDim+eDim+eXDim (everything element-derived stays nNodL);
+      1-rank: dist_format = 1 with empty structs
+- [x] tests: read the NEMO and mixed cut-outs at np 1/2 (counts, nnodes histogram, levels vs
       `nlvls.out`); old pi `dist_N` still read; a malformed element line stops with a message
       (error case); pi and CORE2 runs BIT-IDENTICAL to the binary before this task
-- [ ] freeze the binary of this task's commit as the triangle-regression reference
-- [ ] run ctest — must pass before Task 7
+      — `test_mesh_read` (+ `test_partit`) on nemo025q_cut, nemo025mix_cut, pi_w at np 1/2,
+      original pi dist_2, malformed case; bit-identity vs 9b0d3a6: production driver
+      (production config, 4 steps, all-node dumps + every-step output) on pi np 1/2, pi_w np
+      2/8, CORE2 np 2/8, core2_w np 8, and `fesom_conserve` (zstar+Redi+TKE, 20 steps) on pi
+      np 1/2, pi_w np 2: every dump/output file and the log identical.
+      ⚠️ The cut-outs violated the model's bottom invariant (23 / 17 nodes on the cut kept
+      a layer count above every element left around them → `read_mesh` stops):
+      `cut_region.py` now lowers such counts (and the node depth) to the deepest remaining
+      element; cut-outs regenerated, `run_ini_mixed.sh` re-run (PASS)
+- [x] freeze the binary of this task's commit as the triangle-regression reference
+      — `/work/ab0995/a270029/fesom3_hybrid/frozen_task6/` (all 54 binaries + README)
+- [x] run ctest — must pass before Task 7 — scratch ctest 64/64; `run_ini_compare.sh`,
+      `run_ini_mixed.sh`, `test_mesh_tools.sh`, `test_nemo_meshq.sh` PASS
 
 ### Task 7: Mixed-mesh geometry, conventions, node-gather weights, analytic mixed patch
 

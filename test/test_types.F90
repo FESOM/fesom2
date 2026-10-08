@@ -106,6 +106,10 @@ contains
         allocate(a%com_nod2D%rlist(4), a%com_nod2D%slist(2))
         a%com_nod2D%rlist = [10, 11, 12, 13]
         a%com_nod2D%slist = [20, 21]
+        a%eXDim_nod2D = 1; a%dist_format = 1
+        a%com_edge2D%rPEnum = 1; a%com_edge2D%rptr(1:2) = [1, 3]
+        allocate(a%com_edge2D%rlist(2), a%com_edge2D%slist(0))
+        a%com_edge2D%rlist = [5, 7]
 
         u = scratch_write_open(); write(u, iostat=ios) a; close(u)
         u = scratch_read_open();  read(u,  iostat=ios) b; close(u)
@@ -120,6 +124,9 @@ contains
         if (any(b%com_nod2D%rptr(1:3) /= a%com_nod2D%rptr(1:3))) call fail('partit com rptr')
         if (any(b%com_nod2D%rlist /= a%com_nod2D%rlist)) call fail('partit com rlist')
         if (any(b%com_nod2D%slist /= a%com_nod2D%slist)) call fail('partit com slist')
+        if (b%eXDim_nod2D /= a%eXDim_nod2D .or. b%dist_format /= a%dist_format) &
+            call fail('partit eXDim_nod2D/dist_format')
+        if (any(b%com_edge2D%rlist /= a%com_edge2D%rlist)) call fail('partit com_edge2D rlist')
     end subroutine
 
     subroutine test_dyn()

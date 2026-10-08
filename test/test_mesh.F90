@@ -51,6 +51,10 @@ program test_mesh
     call check(max_grad_const(mesh) < 1.0e-6_WP, 'pi: gradient_sca annihilates constant')
     call check(all(mesh%nlevels >= 1 .and. mesh%nlevels <= mesh%nl), 'pi: nlevels in range')
     call check(adjacency_consistent(mesh), 'pi: nod_in_elem2D consistent')
+    ! 3-column elem2d.out: every element a triangle, its 4th slot repeating the 1st vertex
+    call check(all(mesh%elem2D_nnodes == 3) .and. &
+               all(mesh%elem2D_nodes(4,:) == mesh%elem2D_nodes(1,:)), &
+               'pi: triangles with elem2D_nodes(4,:) == elem2D_nodes(1,:)')
     ! FESOM3 bottom at vertices: area/areasvol(+inv) are 1-D -- a scalar column's
     ! horizontal area does not vary with depth, so depth-independence is now structural
     ! rather than something to assert. What is left to check is that every column has a

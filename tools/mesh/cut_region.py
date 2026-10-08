@@ -7,6 +7,10 @@ largest connected piece (elements connected over sides) is kept, and dead ends a
 removed as in remove_deadends.py. Nodes are renumbered (original order kept), the
 boundary flag is recomputed as "lies on a boundary edge" -- the open-ocean sides of the
 box become coast like the land boundary -- and the depth file is subset to the kept nodes.
+In depth.out a node on the cut may have lost the elements that carried its layer count:
+the model requires every node count to be the maximum over its elements (element count =
+min over its vertices), so such a count is lowered to that maximum and the node depth to
+the matching level.
 
 Usage: cut_region.py <mesh_dir> <out_dir> --lon LONMIN LONMAX --lat LATMIN LATMAX
 """
@@ -32,6 +36,27 @@ def cut(m, lon, lat):
     return c, ncomp - 1
 
 
+def fit_layers(m):
+    """depth.out: lowers every node layer count above max over its elements of (min over
+    the element vertices) to that value, and the node depth to levels(count+1) (the
+    relation nemo_meshq writes). Returns the number of nodes changed."""
+    if 'depth.out' not in m.depth:
+        return 0
+    head, (dep, cnt) = m.depth['depth.out']
+    c = np.array([int(s) for s in cnt], dtype=np.int64)
+    emin = c[m.elem].min(axis=1)
+    mx = np.zeros(m.n2d, dtype=np.int64)
+    for k in range(m.elem.shape[1]):
+        np.maximum.at(mx, m.elem[:, k], emin)
+    low = np.nonzero(mx < c)[0]
+    dep, cnt = dep.copy(), cnt.copy()
+    for i in low:
+        cnt[i] = '%9i ' % mx[i]
+        dep[i] = head[mx[i] + 1]
+    m.depth['depth.out'] = (head, [dep, cnt])
+    return len(low)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("mesh_dir")
@@ -43,12 +68,13 @@ def main():
         ap.error("need LONMIN < LONMAX <= LONMIN+360 and LATMIN < LATMAX")
     m = mesh_io.read_mesh(a.mesh_dir)
     c, dropped = cut(m, a.lon, a.lat)
+    nfit = fit_layers(c)
     mesh_io.write_mesh(c, a.out_dir)
     nv = c.nnodes()
     print("cut_region: lon [%g, %g] lat [%g, %g]: %d nodes, %d elements (%d quads, "
-          "%d triangles), %d smaller piece(s) dropped -> %s"
+          "%d triangles), %d smaller piece(s) dropped, %d node layer count(s) lowered -> %s"
           % (a.lon[0], a.lon[1], a.lat[0], a.lat[1], c.n2d, c.e2d, int((nv == 4).sum()),
-             int((nv == 3).sum()), dropped, a.out_dir))
+             int((nv == 3).sum()), dropped, nfit, a.out_dir))
 
 
 if __name__ == "__main__":

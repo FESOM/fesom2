@@ -8,6 +8,11 @@ module mod_mesh
     ! elem_edges / elem_neighbors are allocated (MAX_NV, elem2D) and a per-element
     ! vertex count elem2D_nnodes(:) is added; gradient_sca is (2*MAX_NV, elem2D).
     ! For triangles elem2D_nnodes==3 everywhere, so the anchor build is unchanged.
+    ! Hybrid meshes (mod_mesh_read): a triangle stores its 1st vertex again as the 4th
+    ! (elem2D_nodes(4,e) == elem2D_nodes(1,e) <=> elem2D_nnodes(e) == 3), a quad 4
+    ! distinct vertices, clockwise. In the multi-rank mesh coord_nod2D, geo_coord_nod2D,
+    ! bc_index_nod2D, depth and nlevels_nod2D also hold the double-halo nodes
+    ! (myDim+eDim+1 .. +eXDim_nod2D, when dist_N/format.out exists).
     !
     ! Geometry/coordinate arrays are MP (mesh precision, D3); == WP at the DP anchor.
     use mod_precision, only: WP, MP

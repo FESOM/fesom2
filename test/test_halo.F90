@@ -24,15 +24,15 @@ program test_halo
     nfail = 0
     call par_init(partit)
     call set_partition(partit, trim(mesh_dir))
-    nn = partit%myDim_nod2D + partit%eDim_nod2D
-    ne = partit%myDim_elem2D + partit%eDim_elem2D + partit%eXDim_elem2D
+    nn = partit%myDim_nod2D + partit%eDim_nod2D   ! (myList_nod2D may hold eXDim_nod2D more)
+    ne =partit%myDim_elem2D + partit%eDim_elem2D + partit%eXDim_elem2D
 
     ! ---- node 2D real halo-identity ----
     allocate(a(nn))
     a = -999.0_WP
     a(1:partit%myDim_nod2D) = real(partit%myList_nod2D(1:partit%myDim_nod2D), WP)
     call exchange_nod(a, partit)
-    call check(maxval(abs(a - real(partit%myList_nod2D, WP))) == 0.0_WP, 'node 2D halo-identity')
+    call check(maxval(abs(a - real(partit%myList_nod2D(1:nn), WP))) == 0.0_WP, 'node 2D halo-identity')
 
     ! ---- stale-halo probe ----
     d = stale_halo_max_nod(a, partit)
@@ -51,7 +51,7 @@ program test_halo
     ai = -999
     ai(1:partit%myDim_nod2D) = partit%myList_nod2D(1:partit%myDim_nod2D)
     call exchange_nod(ai, partit)
-    call check(all(ai == partit%myList_nod2D), 'node 2D int halo-identity')
+    call check(all(ai == partit%myList_nod2D(1:nn)), 'node 2D int halo-identity')
 
     ! ---- node 3D real halo-identity (each level = gid) ----
     allocate(a3(NL, nn))
