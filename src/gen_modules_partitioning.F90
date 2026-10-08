@@ -745,7 +745,8 @@ subroutine init_gatherLists(partit)
 #include "associate_part_ass.h"
   if (mype==0) then
 
-     if (npes > 1) then
+     ! also on a single rank: the I/O gathers index remPtr_nod2D(npes) unconditionally
+     if (npes >= 1) then
 
         allocate(partit%remPtr_nod2D(npes))
         allocate(partit%remPtr_elem2D(npes))

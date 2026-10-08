@@ -417,7 +417,7 @@ endfunction()
 # Function to add a FESOM integration test with custom options
 function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH RUN_LENGTH_UNIT RESTART_LENGTH RESTART_LENGTH_UNIT LOGFILE_OUTFREQ FORCE_ROTATION USE_CAVITY)
     set(options MPI_TEST)
-    set(oneValueArgs NP TIMEOUT LABEL MIX_SCHEME FORCING FORCING_YEAR LEAPYEAR USE_ICE OMP_THREADS)
+    set(oneValueArgs NP TIMEOUT LABEL MIX_SCHEME FORCING FORCING_YEAR LEAPYEAR USE_ICE OMP_THREADS DATA_DIR)
     # OMP_THREADS: run with this many OpenMP threads per rank (OMP_NUM_THREADS), with
     # the passive wait policy and without MPI core binding, so that all threads of a
     # rank get to run even when the runner has fewer cores than threads.
@@ -472,7 +472,11 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
     
     # Create test run directory
     set(TEST_RUN_DIR "${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}")
-    set(TEST_DATA_DIR "${FESOM_TESTING_ROOT}/tests/data")
+    if(DEFINED FESOM_TEST_DATA_DIR)
+        set(TEST_DATA_DIR "${FESOM_TEST_DATA_DIR}")
+    else()
+        set(TEST_DATA_DIR "${FESOM_TESTING_ROOT}/tests/data")
+    endif()
     set(RESULT_DIR "${TEST_RUN_DIR}/results")
 
     # Generate fesom.clock file in the results directory (year matches the forcing)
@@ -549,6 +553,7 @@ ${_omp_env}
             
             # Run FESOM (serial). Raise the stack limit as for the MPI case above
             # (Intel fesom.x overflows the default 8 MB stack on large meshes).
+${_omp_env}
             execute_process(
                 COMMAND /bin/sh -c \"ulimit -s unlimited 2>/dev/null || ulimit -s 1048576 2>/dev/null; exec '${CMAKE_BINARY_DIR}/bin/fesom.x'\"
                 WORKING_DIRECTORY \"${TEST_RUN_DIR}\"
