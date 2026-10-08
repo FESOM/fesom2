@@ -587,17 +587,49 @@ fluxes and nonlinear terms can. Asserted in a test (Task 9), measured in the sho
   `src/oce/oce_dyn_ivertvisc.F90`, `src/oce/oce_dyn_vinv.F90`, `src/oce/oce_dyn_visc.F90`
 - Modify: `test/test_vinv.F90`, `test/test_ivertvisc.F90`
 - Create: `test/test_pgf_mixed.F90`
+- ➕ Modify: `test/CMakeLists.txt`, `CMakeLists.txt` + `tools/run_tri_regression.sh` (MPI launch
+  flag, see the ⚠️ finding below), `docs/LESSONS.md` (L61)
 
-- [ ] element means via `elem_w`; gradients over 4 slots; vertex loops over 4 slots / `nv`
-- [ ] node gathers via `nod_in_elem2D_w`: `UVnode` (`oce_ale.F90:96-109`), `w·du/dz`
-      (`oce_dyn_velrhs.F90:209-231`)
-- [ ] `oce_pgf`: per-vertex arrays and loops (`idx`, `dx10`, `do ni`, `sum(drho_dz)/3`) to 4 slots
-- [ ] `oce_dyn_vinv`: KE and vorticity node↔element with `elem_w`; `rvo_upwind` over
+- [x] element means via `elem_w`; gradients over 4 slots; vertex loops over 4 slots / `nv`
+      — `update_vel`, `compute_vel_rhs` (SSH gradient, `gradient_sca(1:4|5:8)`), `dhe` and the
+      zstar `helem` (`sum(elem_w*…)`), `impl_vert_visc_ale` face means of `w_i`, the scalar
+      momentum vertice→element mean; `oce_dyn_visc` needed no change (edge-based, boundary by
+      `edge2D_in`, `len = sqrt(sum(elem_area(el)))`)
+- [x] node gathers via `nod_in_elem2D_w`: `UVnode` (`oce_ale.F90:96-109`), `w·du/dz`
+      (`oce_dyn_velrhs.F90:209-231`) — `Σ A_e·w·x / area` (the hidden `3·` removed)
+- [x] `oce_pgf`: per-vertex arrays and loops (`idx`, `dx10`, `do ni`, `sum(drho_dz)/3`) to 4 slots
+      — full-cell and Shchepetkin; vertex `drho_dz` mean with `elem_w`; FESOM2's
+      `(/1.0,1.0,1.0/)*z_n` → the scalar `z_n`
+- [x] `oce_dyn_vinv`: KE and vorticity node↔element with `elem_w`; `rvo_upwind` over
       `elem_neighbors(1:4)` and `nv` side normals oriented by the centroid
-- [ ] tests: existing exact tests (uniform flow, linear shear) on triangle and mixed patches;
+      — KE scatter as a scalar 4-slot loop (a triangle's repeated slot); side normals over 4
+      slots (a triangle's side 4 is degenerate → normal 0, never weighted), inward = toward the
+      area-weighted centroid of (1,3,4)+(1,2,3)
+- [x] tests: existing exact tests (uniform flow, linear shear) on triangle and mixed patches;
       `test_pgf_mixed`: resting stratified ocean gives zero pressure-gradient force on the mixed patch
-- [ ] `run_tri_regression.sh` — roundoff level
-- [ ] run ctest — must pass before Task 11
+      — `test_vinv`/`test_ivertvisc` generalised to 4 slots + `FESOM3_TEST_PATCH=mixed|quad` /
+      `FESOM3_TEST_ROTATE=0`; new ctests: vinv on the mixed and parallelogram patches, NEMO-mixed
+      cut np1/2, NEMO-quad cut np2; ivertvisc on the mixed patch and NEMO-mixed cut np2. Finding:
+      the median-dual circulation with element-constant velocity is exact for linear fields on
+      triangles and PARALLELOGRAMS only (V2 3.9e-15 on the skewed parallelogram patch, 3.7e-14 on
+      the NEMO cut-outs = lon/lat rectangles; 6e-2 on the jittered general quads, first order) —
+      V2/V9a assert roundoff at "exact" nodes, first-order consistency (< 0.1) elsewhere; V9a
+      normalised by the vorticity term (a pure shear's tendency is itself 0 on planar meshes).
+      `test_pgf_mixed` (NEMO-mixed cut np1/2 + patch, NEMO-quad cut np2, pi_w np1): P1 resting
+      linfs PGF = 0, P2 linear pressure exact, P3 Shchepetkin on tilted levels with linear
+      stratification = 0, P4 horizontal density gradient exact, N1 uniform-velocity node gather
+      exact, N2 `update_vel` SSH gradient exact — all ≤ 5e-13; mutation check: the old `/3`
+      forms fail P3 (0.12) and N1 (0.33)
+- [x] `run_tri_regression.sh` — roundoff level — 7/7 PASS, levels as after Task 7 (pi PRE 6.3e-15,
+      EARLY 9.2e-13, OCEAN 1.0e-7; CORE2 EARLY 2.1e-9, OCEAN 2.5e-5, ICE 1.2e-4, MIX 2.4e-4;
+      decomp np1 vs np2/8 OCEAN 6.4e-10; conservation ≤ 3e-14)
+- [x] run ctest — must pass before Task 11 — scratch ctest 99/99
+- ⚠️ (fixed in the test launchers) the login-node Open MPI 4.1.2 `vader` single-copy mechanism
+  (`knem`, default) delivered STALE halo payloads (right count, data of an earlier exchange) when
+  the per-call send buffer reused a heap address — seen as `test_vinv` failures on the NEMO quad
+  cut np2; `--mca btl_vader_single_copy_mechanism none` added to `FESOM3_MPI_LAUNCH_FLAGS` and
+  `run_tri_regression.sh` (LESSONS L61). Batch (UCX) runs are not affected; other login-node
+  scripts with `--mca btl self,vader` need the flag too
 
 ### Task 11: Tracer kernels and MUSCL up/downwind elements for quads
 

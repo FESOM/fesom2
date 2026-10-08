@@ -80,7 +80,8 @@ SSH_SOLTOL=${SSH_SOLTOL:-1e-14}
 TOL_CONS=${TOL_CONS:-1e-12}
 COMPARE_ONLY=${COMPARE_ONLY:-0}
 SRC=$(cd "$(dirname "$0")/.." && pwd)
-MPI="/sw/spack-levante/openmpi-4.1.2-yfwe6t/bin/mpiexec --mca pml ob1 --mca btl self,vader --oversubscribe"
+# btl_vader_single_copy_mechanism none: knem single-copy can deliver stale halo data (LESSONS L61)
+MPI="/sw/spack-levante/openmpi-4.1.2-yfwe6t/bin/mpiexec --mca pml ob1 --mca btl self,vader --mca btl_vader_single_copy_mechanism none --oversubscribe"
 POOL=/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0
 IC=/pool/data/AWICM/FESOM2/INITIAL/phc3.0/phc3.0_winter.nc
 cases=("$@")

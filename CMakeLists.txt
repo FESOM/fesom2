@@ -149,7 +149,10 @@ endif()
 # The DKRZ UCX runtime settings (env/levante shells) target compute-node
 # InfiniBand and fail on login nodes. Self-tests are tiny single-node runs, so
 # default to the ob1/vader (shared-memory) path. Override for batch if needed.
-set(FESOM3_MPI_LAUNCH_FLAGS "--mca;pml;ob1;--mca;btl;self,vader;--oversubscribe"
+# vader's single-copy mechanism (knem, the Levante default) is switched off: it
+# delivered STALE payloads of an earlier halo exchange when the (re-allocated) send
+# buffer reused a heap address -- right count, old data (LESSONS L61).
+set(FESOM3_MPI_LAUNCH_FLAGS "--mca;pml;ob1;--mca;btl;self,vader;--mca;btl_vader_single_copy_mechanism;none;--oversubscribe"
     CACHE STRING "Extra mpirun flags for ctest self-tests")
 
 function(add_fesom_test test_name nranks)

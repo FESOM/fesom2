@@ -22,8 +22,7 @@ module oce_dyn_vinv
     !   qq                                   -> here                  why
     !   dz = zbar(1:nl-1)-zbar(2:nl) global  -> mesh%helem(nz,elem)   ALE: per-elem/step
     !   area(nz,n)                           -> mesh%area(n)          collapsed to 1-D
-    !   w_cv(:,elem)                         -> 1/3                   absent; triangles
-    !   elnodes(4), gradient_sca(1:4)/(5:8)  -> (1:3), (1:3)/(5:7)    3-vertex slices
+    !   w_cv(:,elem)                         -> mesh%elem_w(:,elem)   kite weights
     !   exchange_nod3D(x)                    -> exchange_nod(x,partit) halo API
     !   loops from 1                         -> ulevels..nlevels-1    cavity bounds
     !   Wvel                                 -> dynamics%w_e          match momadv_opt==2
@@ -32,7 +31,7 @@ module oce_dyn_vinv
     ! friction=0.005 "Soufflet" replacing the real bottom drag) is NOT transcribed; we
     ! take its i_vert_visc=.true. branch, whose own comment reads "Do only advection".
     use mod_precision,   only: WP
-    use mod_mesh,        only: t_mesh
+    use mod_mesh,        only: t_mesh, MAX_NV
     use mod_dyn,         only: t_dyn
     use mod_partit,      only: t_partit
     use mod_param_phys,  only: rvo_upwind
@@ -128,8 +127,9 @@ contains
         end do
 
         ! circulation -> vorticity.
-        !   area(n): the full median-dual area, sum over the node's elements of
-        !            elem_area/3 (DEVIATION: qq divides by area(nz,n)).
+        !   area(n): the full median-dual area, sum over the node's elements of the
+        !            kite shares elem_area*nod_in_elem2D_w (DEVIATION: qq divides by
+        !            area(nz,n)).
         !   SIGN   : qq's combination c1 = d1.u(el1) - d2.u(el2), added to enodes(1) and
         !            subtracted from enodes(2), traverses the dual contour in the sense that
         !            matches OUR edge_tri left/right convention -- no flip needed.
@@ -137,8 +137,9 @@ contains
         !            relative 5e-13 over 81729 node-levels, i.e. exactly
         !            curl(u) = dv/dx - du/dy. That same exactness also PROVES the
         !            area(nz,n) -> area(n) deviation is right: zeta = circulation/area
-        !            only reproduces -alpha if area(n) equals the sum of elem_area/3 over
-        !            the node's WET adjacent elements.
+        !            only reproduces -alpha if area(n) equals the sum of the kite shares
+        !            over the node's WET adjacent elements. On quads the exactness holds
+        !            for parallelograms only (general quads: first order -- test_vinv header).
         do n = 1, nNodO
             do nz = mesh%ulevels_nod2D(n), mesh%nlevels_nod2D(n)-1
                 vort(nz,n) = vort(nz,n)/real(mesh%area(n), WP)
@@ -153,17 +154,17 @@ contains
         type(t_mesh),   intent(in)              :: mesh
         type(t_dyn),    intent(inout), target   :: dynamics
         type(t_partit), intent(in),    optional :: partit
-        integer       :: n, nz, elem, ed, elnodes(3), ul, nl1, k, k2, k3, nb, nElemF
+        integer       :: n, nz, elem, ed, elnodes(MAX_NV), ul, nl1, k, k2, nb, nElemF
         integer       :: nNodO, nNodL, nEdgeO, nElemO
-        real(kind=WP) :: ea, pre(3), Fx, Fy, zb, w, umean, vmean, h1, h2, da, hinv
-        real(kind=WP) :: xv(3), yv(3), tx, ty, px, py, dref, nxk(3), nyk(3)
-        real(kind=WP) :: d, wk, sumw, zup
+        real(kind=WP) :: ea, pre(MAX_NV), Fx, Fy, zb, w, umean, vmean, h1, h2, da, hinv, ke_e
+        real(kind=WP) :: xv(MAX_NV), yv(MAX_NV), tx, ty, px, py, dref, nxk(MAX_NV), nyk(MAX_NV)
+        real(kind=WP) :: d, wk, sumw, zup, s1, s2, xc, yc
+        real(kind=WP) :: we(MAX_NV)
         real(kind=WP) :: uvert(2, mesh%nl)
         real(kind=WP), allocatable :: KE(:,:), omega_e(:,:)
         real(kind=WP), dimension(:,:),     pointer :: vort, Wv
         real(kind=WP), dimension(:,:,:),   pointer :: UV
         real(kind=WP), dimension(:,:,:,:), pointer :: UV_rhsAB
-        real(kind=WP), parameter :: onethird = 1.0_WP/3.0_WP   ! = qq's w_cv for triangles
 
         vort     => dynamics%work%vorticity
         UV       => dynamics%uv
@@ -175,7 +176,7 @@ contains
 
         !___________________________________________________________________
         ! rvo_upwind: element-centre vorticity for the upwind face reconstruction.
-        ! omega_e(nz,e) = the SAME 3-vertex average Block B2 uses as its face value; one
+        ! omega_e(nz,e) = the SAME kite-weighted vertex mean Block B2 uses as its face value; one
         ! STANDARD exchange_elem (eDim ring) makes every halo neighbour id readable, so a
         ! neighbour's VALUE is available without ever needing its vertex list
         ! (elem2D_nodes is owned-only). The eDim ring suffices because an edge neighbour
@@ -190,25 +191,30 @@ contains
             allocate(omega_e(mesh%nl-1, nElemF))
             omega_e = 0.0_WP
             do elem = 1, nElemO
-                elnodes = mesh%elem2D_nodes(1:3, elem)
+                elnodes = mesh%elem2D_nodes(:, elem)
+                we      = real(mesh%elem_w(:, elem), WP)
                 do nz = mesh%ulevels(elem), mesh%nlevels(elem)-1
-                    omega_e(nz, elem) = onethird*(vort(nz,elnodes(1)) &
-                                      + vort(nz,elnodes(2)) + vort(nz,elnodes(3)))
+                    omega_e(nz, elem) = sum(we*vort(nz,elnodes))
                 end do
             end do
             if (is_multirank(partit)) call exchange_elem(omega_e, partit)
         end if
 
         !___________________________________________________________________
-        ! Block B1: kinetic energy at nodes (qq :78-115)
+        ! Block B1: kinetic energy at nodes (qq :78-115), the node gather with the kite
+        ! shares elem_w*elem_area. Scalar scatter over the 4 slots: a triangle's slot 4
+        ! repeats slot 1 (with weight 0), so a vector-subscript update would be many-one.
         allocate(KE(mesh%nl-1, nNodL))
         KE = 0.0_WP                       ! full local range: the scatter writes halo rows
         do elem = 1, nElemO
-            elnodes = mesh%elem2D_nodes(1:3, elem)
+            elnodes = mesh%elem2D_nodes(:, elem)
+            we      = real(mesh%elem_w(:, elem), WP)
             ea      = real(mesh%elem_area(elem), WP)
             do nz = mesh%ulevels(elem), mesh%nlevels(elem)-1
-                KE(nz, elnodes) = KE(nz, elnodes) &
-                    + 0.5_WP*(UV(1,nz,elem)**2 + UV(2,nz,elem)**2)*onethird*ea
+                ke_e = 0.5_WP*(UV(1,nz,elem)**2 + UV(2,nz,elem)**2)
+                do k = 1, MAX_NV
+                    KE(nz, elnodes(k)) = KE(nz, elnodes(k)) + ke_e*we(k)*ea
+                end do
             end do
         end do
         do n = 1, nNodO
@@ -233,35 +239,43 @@ contains
         ! DEVIATION: qq averages coriolis_node(elnodes) TOGETHER with vorticity using the
         ! same w_cv weights. Here f comes from compute_vel_rhs step (3) as the element-
         ! centre mesh%coriolis(elem), so f and zeta are weighted differently:
-        ! coriolis(elem) + sum(zeta)/3 rather than sum(coriolis_node + zeta)/3. Deliberate:
+        ! coriolis(elem) + sum(w*zeta) rather than sum(w*(coriolis_node + zeta)). Deliberate:
         ! it keeps momadv_opt==2 bit-identical and uses FESOM2's standard Coriolis.
         do elem = 1, nElemO
-            elnodes = mesh%elem2D_nodes(1:3, elem)
+            elnodes = mesh%elem2D_nodes(:, elem)
+            we      = real(mesh%elem_w(:, elem), WP)
             ea      = real(mesh%elem_area(elem), WP)
 
             if (rvo_upwind > 0.0_WP) then
-                ! The three INWARD edge normals, rebuilt from the element's OWN vertices:
+                ! The INWARD side normals, rebuilt from the element's OWN vertices:
                 ! per-edge geometry (edge_dxdy) exists for OWNED edges only and an owned
-                ! element can carry one HALO edge, so edge arrays are unusable here. Edge k
-                ! connects elnodes(k) and elnodes(k+1); of the two perpendiculars of
-                ! t = (dlon*elem_cos*r_earth, dlat*r_earth), the INWARD one points toward
-                ! the third vertex -- a local, convention-free orientation (no edge_tri
-                ! left/right branch; proven geometrically by test_vinv V10: the slot-k
-                ! neighbour always lies on the outward side).
-                do k = 1, 3
+                ! element can carry one HALO edge, so edge arrays are unusable here. Side k
+                ! connects elnodes(k) and elnodes(k+1) (slot 4 -> slot 1; a triangle's side
+                ! 4 has zero length, so its normal is 0 and it never gets weight); of the two
+                ! perpendiculars of t = (dlon*elem_cos*r_earth, dlat*r_earth), the INWARD one
+                ! points toward the element centroid (the area-weighted centroid of the
+                ! sub-triangles (1,3,4) and (1,2,3), as in mod_mesh_areas) -- a local,
+                ! convention-free orientation (no edge_tri left/right branch; proven
+                ! geometrically by test_vinv V10: the slot-k neighbour always lies on the
+                ! outward side).
+                do k = 1, MAX_NV
                     xv(k) = real(mesh%coord_nod2D(1, elnodes(k)), WP)
                     yv(k) = real(mesh%coord_nod2D(2, elnodes(k)), WP)
                 end do
-                do k = 2, 3
+                do k = 2, MAX_NV
                     tx = xv(k) - xv(1); call trim_cyclic(tx); xv(k) = xv(1) + tx
                 end do
-                do k = 1, 3
-                    k2 = mod(k,3)+1; k3 = mod(k+1,3)+1
+                s1 = abs((xv(3)-xv(4))*(yv(1)-yv(4)) - (yv(3)-yv(4))*(xv(1)-xv(4)))   ! 2*A(1,3,4)
+                s2 = abs((xv(3)-xv(2))*(yv(1)-yv(2)) - (yv(3)-yv(2))*(xv(1)-xv(2)))   ! 2*A(1,2,3)
+                xc = ((xv(1)+xv(3)+xv(4))*s1 + (xv(1)+xv(2)+xv(3))*s2) / (3.0_WP*(s1+s2))
+                yc = ((yv(1)+yv(3)+yv(4))*s1 + (yv(1)+yv(2)+yv(3))*s2) / (3.0_WP*(s1+s2))
+                do k = 1, MAX_NV
+                    k2 = mod(k,MAX_NV)+1
                     tx = (xv(k2)-xv(k))*real(mesh%elem_cos(elem),WP)*r_earth
                     ty = (yv(k2)-yv(k))*r_earth
                     px =  ty; py = -tx
-                    dref = px*(xv(k3)-xv(k))*real(mesh%elem_cos(elem),WP)*r_earth &
-                         + py*(yv(k3)-yv(k))*r_earth
+                    dref = px*(xc-xv(k))*real(mesh%elem_cos(elem),WP)*r_earth &
+                         + py*(yc-yv(k))*r_earth
                     if (dref < 0.0_WP) then
                         px = -px; py = -py
                     end if
@@ -271,9 +285,9 @@ contains
 
             do nz = mesh%ulevels(elem), mesh%nlevels(elem)-1
                 pre = -KE(nz, elnodes)
-                Fx  = sum(real(mesh%gradient_sca(1:3, elem), WP)*pre)
-                Fy  = sum(real(mesh%gradient_sca(5:7, elem), WP)*pre)
-                zb  = onethird*(vort(nz,elnodes(1)) + vort(nz,elnodes(2)) + vort(nz,elnodes(3)))
+                Fx  = sum(real(mesh%gradient_sca(1:4, elem), WP)*pre)
+                Fy  = sum(real(mesh%gradient_sca(5:8, elem), WP)*pre)
+                zb  = sum(we*vort(nz,elnodes))
 
                 ! rvo_upwind face blend:  zb += rvo*(zb_upwind - zb).
                 !  - d = u . n_in  (own-element velocity): d > 0 means flow ENTERS through
@@ -289,7 +303,7 @@ contains
                 if (rvo_upwind > 0.0_WP) then
                     sumw = 0.0_WP
                     zup  = 0.0_WP
-                    do k = 1, 3
+                    do k = 1, MAX_NV
                         nb = mesh%elem_neighbors(k, elem)
                         if (nb == elem) cycle
                         if (nz < mesh%ulevels(nb) .or. nz > mesh%nlevels(nb)-1) cycle
@@ -313,18 +327,19 @@ contains
         ! NO Av term: FESOM3 solves vertical viscosity implicitly in impl_vert_visc_ale,
         ! so transcribing qq's Av*(du/dz) here would apply it twice.
         do elem = 1, nElemO
-            elnodes = mesh%elem2D_nodes(1:3, elem)
+            elnodes = mesh%elem2D_nodes(:, elem)
+            we      = real(mesh%elem_w(:, elem), WP)
             ul      = mesh%ulevels(elem)
             nl1     = mesh%nlevels(elem)-1
             ea      = real(mesh%elem_area(elem), WP)
             if (nl1 < ul) cycle
 
-            w = onethird*sum(Wv(ul, elnodes))
+            w = sum(we*Wv(ul, elnodes))
             uvert(1,ul) = -w*UV(1,ul,elem)
             uvert(2,ul) = -w*UV(2,ul,elem)
 
             do nz = ul+1, nl1
-                w  = onethird*sum(Wv(nz, elnodes))
+                w  = sum(we*Wv(nz, elnodes))
                 h1 = real(mesh%helem(nz-1,elem), WP)      ! qq's dz(nz-1), now ALE
                 h2 = real(mesh%helem(nz,  elem), WP)      ! qq's dz(nz)
                 umean = (UV(1,nz-1,elem)*h2 + UV(1,nz,elem)*h1)/(h1+h2)
@@ -341,12 +356,12 @@ contains
             ! a spurious -w_bot*U/helem in its bottom layer. Treating the bottom face like
             ! the surface restores exact cancellation for a uniform u and keeps the real
             ! bottom flux. test_vinv V6 is the net for this.
-            w = onethird*sum(Wv(nl1+1, elnodes))
+            w = sum(we*Wv(nl1+1, elnodes))
             uvert(1,nl1+1) = -w*UV(1,nl1,elem)
             uvert(2,nl1+1) = -w*UV(2,nl1,elem)
 
             do nz = ul, nl1
-                da   = onethird*(sum(Wv(nz,elnodes)) - sum(Wv(nz+1,elnodes)))
+                da   = sum(we*(Wv(nz,elnodes) - Wv(nz+1,elnodes)))
                 hinv = 1.0_WP/real(mesh%helem(nz,elem), WP)
                 UV_rhsAB(1,1,nz,elem) = UV_rhsAB(1,1,nz,elem) &
                     + (uvert(1,nz) - uvert(1,nz+1) + da*UV(1,nz,elem))*ea*hinv

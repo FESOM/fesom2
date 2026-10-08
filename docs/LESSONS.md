@@ -2602,3 +2602,25 @@ frozen binary itself differed between pi np 1 and np 2 at step 1 (density 4.7e-3
   (pi: 513 (node, level), all of them dummy after the bilinear step). Check the step-0 fields
   before suspecting halo bugs; compare decompositions from ONE checkpoint (restart at np 1 and
   np N) -- then np 1/2/8 agree to 1e-14 at step 1.
+
+## L61 — Login-node MPI (Open MPI 4.1.2, vader + knem single-copy) delivered STALE halo payloads: right count, old data
+
+**Context.** Hybrid-mesh plan, Task 10. `test_vinv` on the NEMO quad cut-out at np 2 failed
+V9b/V11/V12 with garbage-sized errors while np 1, the mixed cut-out and pi passed; a
+bounds-checked build was clean and the failure was deterministic.
+
+**Lessons.**
+- **Log the exchange sequence before suspecting the kernel or the lists.** Printing, per
+  `core_3D_r` call and rank, the receive count, `rbuf(1,1)` and the peer's `sbuf(1,1)` showed
+  every count matching and the send buffer correct, yet the receiver got the payload of the
+  exchange FOUR calls earlier (the previous KE exchange). The halo lists (`check_dist`,
+  `test_halo`) and the code were right.
+- **Cause: vader's single-copy mechanism** (`btl_vader_single_copy_mechanism`, default `knem` on
+  Levante) for messages above the eager limit (~4 KB): `core_*` allocates its send buffer per
+  call, the allocator hands back the same heap address, and the receiver copied stale pages.
+  With `--mca btl_vader_single_copy_mechanism none` (copy-in/copy-out through the shared
+  segment) the test passes to 1e-16. Since then the ctest launcher
+  (`FESOM3_MPI_LAUNCH_FLAGS`) and `tools/run_tri_regression.sh` set it; any other login-node
+  `mpiexec ... --mca btl self,vader` run needs it too. Batch runs (UCX) are not affected.
+- **It hid for months** because small payloads (2-D fields, pi np 2) stay below the eager limit
+  or happen to reuse fresh pages; earlier "transient MPI failures" in ctest may have been this.

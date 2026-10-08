@@ -26,7 +26,8 @@ program test_vinv
     !                          edge.
     !   V2 linear shear     -> u = alpha*y, v = 0  =>  zeta == -alpha to ROUND-OFF.
     !                          THE load-bearing test. Getting -alpha exactly requires
-    !                          area(n) == sum over wet adjacent elements of (1/3)*elem_area,
+    !                          area(n) == sum over wet adjacent elements of the kite shares
+    !                          elem_w*elem_area (1/3 on a triangle),
     !                          so this is what pins the area(nz,n) -> area(n) deviation.
     !                          The field depends on LATITUDE ONLY, so it is continuous
     !                          across pi's cyclic seam (a field linear in longitude would
@@ -35,6 +36,24 @@ program test_vinv
     !   V4 non-degeneracy   -> zeta /= 0 somewhere. Catches a stub or a no-op (the whole
     !                          point of writing this test before the implementation).
     !   V5 finiteness       -> no NaN/Inf anywhere, including at bathymetry steps.
+    !
+    ! MESHES (hybrid meshes, Task 10): FESOM3_MESH_DIR (default pi, rotated 50/15/-90;
+    ! FESOM3_TEST_ROTATE=0 reads it unrotated, e.g. the NEMO-mixed cut-out), or, with
+    ! FESOM3_TEST_PATCH=mixed at np 1, the analytic mixed triangle/quad patch
+    ! (generate_mixed_patch). All element loops run over the 4 vertex slots (a triangle's
+    ! slot 4 repeats slot 1 with kite weight 0); element values of the analytic fields
+    ! are taken at the element CENTROID (area-weighted, as mod_mesh_areas), which is
+    ! where the element velocity of a linear field must sit for V2 to be exact.
+    !
+    ! EXACTNESS ON QUADS. The median-dual circulation with an element-constant velocity
+    ! u_e = u(centroid) is exact for linear fields on triangles and PARALLELOGRAMS only:
+    ! per element the residual against the exact contour integral telescopes around the
+    ! node iff the centroid is the midpoint of the diagonal opposite the node (always
+    ! true on a triangle, true for both diagonals only on a parallelogram). So V2 and V9a
+    ! assert round-off only at "exact" nodes (every adjacent element a triangle or a
+    ! parallelogram: pi, the NEMO cut-outs -- lon/lat rectangles -- and the parallelogram
+    ! patch); at the other interior nodes (the jittered mixed patch) V2 asserts first-order
+    ! consistency, |zeta/(-alpha) - 1| < 0.1 (measured 6e-2 with 15% jitter).
     !
     ! RESTRICTIONS on every assertion: INTERIOR nodes only (the dual contour is open at a
     ! boundary node, so zeta there is not curl(u) -- pi has ~455 boundary edges), and only
@@ -45,7 +64,7 @@ program test_vinv
     use mpi
     use mod_precision,     only: WP, MP
     use mod_constants,     only: r_earth
-    use mod_mesh,          only: t_mesh
+    use mod_mesh,          only: t_mesh, MAX_NV
     use mod_dyn,           only: t_dyn
     use mod_partit,        only: t_partit
     use mod_partitioning,  only: par_init, par_ex, set_partition
@@ -53,20 +72,21 @@ program test_vinv
     use mod_mesh_rotate,   only: trim_cyclic
     use mod_mesh_read,     only: read_mesh
     use mod_mesh_areas,    only: compute_geometry
+    use mod_mesh_analytic, only: generate_mixed_patch, generate_quad_patch
     use mod_part_bounds,   only: owned_bounds
     use oce_dyn_vinv,      only: relative_vorticity, momentum_adv_vinv
     use mod_halo,          only: exchange_elem
     implicit none
 
-    character(len=512) :: mesh_dir
+    character(len=512) :: mesh_dir, cbuf
     type(t_partit) :: partit
     type(t_mesh)   :: mesh
     type(t_dyn)    :: dyn
     integer :: nfail, nsw, ierr
     integer :: nNodO, nNodL, nEdgeO, nElemO, nElemF, nl, n, nz
-    real(kind=WP) :: zmax
+    real(kind=WP) :: zmax, zmax2
     real(kind=WP), allocatable :: zsave(:,:)
-    logical,       allocatable :: interior(:), elem_int(:), elem_int2(:)
+    logical,       allocatable :: interior(:), elem_int(:), elem_int2(:), exact(:)
     real(kind=WP) :: scal
     integer       :: nzall
     real(kind=WP), allocatable :: rhsA(:,:,:,:)
@@ -78,11 +98,35 @@ program test_vinv
         mesh_dir = '/home/a/a270088/port2/fesom2/tests/data/MESHES/pi'
     call par_init(partit)
 
-    if (partit%npes > 1) call set_partition(partit, trim(mesh_dir))
-    call read_mesh(mesh, partit, trim(mesh_dir), 50.0_WP, 15.0_WP, -90.0_WP, 360.0_WP, &
-                   force_rotation=.true., n_cw_swaps=nsw)
-    ! cartesian: makes the discrete curl exact for a linear field (see header)
-    call compute_geometry(mesh, partit, cartesian=.true.)
+    cbuf = ''
+    call get_environment_variable('FESOM3_TEST_PATCH', cbuf)
+    if (trim(cbuf) == 'mixed') then
+        if (partit%npes /= 1) error stop 'test_vinv: FESOM3_TEST_PATCH needs np 1'
+        ! analytic mixed patch (cartesian geometry built by the generator)
+        call generate_mixed_patch(mesh, partit, nx=13, ny=11, nl=6, &
+                                  Lx=12000.0_WP, Ly=10000.0_WP, max_depth=100.0_WP)
+        write(*,'(a,i0,a,i0)') '  analytic mixed patch: triangles=', count(mesh%elem2D_nnodes == 3), &
+                               ' quads=', count(mesh%elem2D_nnodes == 4)
+    else if (trim(cbuf) == 'quad') then
+        if (partit%npes /= 1) error stop 'test_vinv: FESOM3_TEST_PATCH needs np 1'
+        ! analytic all-quad patch of (skewed) parallelograms
+        call generate_quad_patch(mesh, partit, nx=11, ny=9, nl=6, Lx=10000.0_WP, &
+                                 Ly=8000.0_WP, max_depth=100.0_WP, skew=0.35_WP)
+        write(*,'(a,i0)') '  analytic parallelogram patch: quads=', count(mesh%elem2D_nnodes == 4)
+    else
+        if (partit%npes > 1) call set_partition(partit, trim(mesh_dir))
+        cbuf = ''
+        call get_environment_variable('FESOM3_TEST_ROTATE', cbuf)
+        if (trim(cbuf) == '0') then
+            call read_mesh(mesh, partit, trim(mesh_dir), 0.0_WP, 0.0_WP, 0.0_WP, 360.0_WP, &
+                           force_rotation=.false., n_cw_swaps=nsw)
+        else
+            call read_mesh(mesh, partit, trim(mesh_dir), 50.0_WP, 15.0_WP, -90.0_WP, 360.0_WP, &
+                           force_rotation=.true., n_cw_swaps=nsw)
+        end if
+        ! cartesian: makes the discrete curl exact for a linear field (see header)
+        call compute_geometry(mesh, partit, cartesian=.true.)
+    end if
     call owned_bounds(mesh, nNodO, nNodL, nEdgeO, nElemO, partit)
     if (partit%npes == 1) then
         nElemF = mesh%elem2D
@@ -108,17 +152,34 @@ program test_vinv
     end do
     write(*,'(a,i7,a,i7)') '  interior nodes: ', count(interior(1:nNodO)), ' of ', nNodO
 
+    ! exact = every adjacent element a triangle or a parallelogram (see header); the
+    ! elements around an owned node are owned, so their vertex lists are local
+    allocate(exact(nNodL))
+    exact = .false.
+    do n = 1, nNodO
+        exact(n) = .true.
+        do nz = 1, mesh%nod_in_elem2D_num(n)
+            if (.not. is_parallelogram(mesh%nod_in_elem2D(nz, n))) exact(n) = .false.
+        end do
+    end do
+    write(*,'(a,i7,a,i7)') '  exact interior nodes (triangles/parallelograms only): ', &
+        count(interior(1:nNodO) .and. exact(1:nNodO)), ' of ', count(interior(1:nNodO))
+
     !=========================================================================
     ! A - elem_neighbors adjacency (build_elem_adjacency, Task 1 of rvo_upwind)
     !=========================================================================
     call check_true('A1 elem_neighbors allocated+resolved', &
                     allocated(mesh%elem_neighbors) .and. all(mesh%elem_neighbors(:,1:nElemO) >= 1))
     block
-        integer :: e, k, nb, nshared, i, j, nbnd_slots, nbnd_edges
+        integer :: e, k, nb, nshared, i, j, nbnd_slots, nbnd_edges, nv
         logical :: mutual
         nbnd_slots = 0
         do e = 1, nElemO
-            do k = 1, 3
+            nv = mesh%elem2D_nnodes(e)
+            ! a triangle's slot 4 repeats slot 1 (checked here, then skipped)
+            if (nv == 3 .and. mesh%elem_neighbors(4, e) /= mesh%elem_neighbors(1, e)) &
+                call check_true('A4 triangle neighbour slot 4 repeats slot 1', .false.)
+            do k = 1, nv
                 nb = mesh%elem_neighbors(k, e)
                 if (nb == e) then
                     nbnd_slots = nbnd_slots + 1
@@ -130,14 +191,14 @@ program test_vinv
                 if (.not. mutual) call check_true('A2 neighbour relation mutual', .false.)
                 ! A4 slot alignment: e and nb share EXACTLY the slot-k vertex pair
                 nshared = 0
-                do i = 1, 3
-                    do j = 1, 3
+                do i = 1, nv
+                    do j = 1, mesh%elem2D_nnodes(nb)
                         if (mesh%elem2D_nodes(i, e) == mesh%elem2D_nodes(j, nb)) nshared = nshared + 1
                     end do
                 end do
                 if (nshared /= 2) call check_true('A4 neighbours share exactly 2 vertices', .false.)
                 if (.not. (any(mesh%elem2D_nodes(:, nb) == mesh%elem2D_nodes(k, e)) .and. &
-                           any(mesh%elem2D_nodes(:, nb) == mesh%elem2D_nodes(mod(k,3)+1, e)))) &
+                           any(mesh%elem2D_nodes(:, nb) == mesh%elem2D_nodes(mod(k,nv)+1, e)))) &
                     call check_true('A4 slot k matches the shared vertex pair', .false.)
             end do
         end do
@@ -192,7 +253,7 @@ program test_vinv
         if (partit%npes > 1) call exchange_elem(f, partit)
         nhalo = 0; nbad = 0
         do e = 1, nElemO
-            do k = 1, 3
+            do k = 1, mesh%elem2D_nnodes(e)
                 nb = mesh%elem_neighbors(k, e)
                 if (nb == e) cycle
                 if (nb > nElemO) nhalo = nhalo + 1
@@ -214,6 +275,16 @@ program test_vinv
             call check_true('A5 not vacuous: this rank has halo neighbour slots', nhalo > 0)
         deallocate(f, gid)
     end block
+
+    !-------------------------------------------------------------------------
+    ! A6 - the node halo assumption of every element->node and node->element operator
+    ! here: all vertices of an owned element (4 slots on a quad) lie in owned+halo
+    ! (1..nNodL), never in the double halo, so vort/KE/w_e are readable there after the
+    ! standard exchange_nod.
+    write(*,'(a,i7,a,i7)') '  A6 max vertex id of owned elements = ', &
+        maxval(mesh%elem2D_nodes(:, 1:nElemO)), '  nNodL = ', nNodL
+    call check_true('A6 owned-element vertices inside owned+halo nodes', &
+                    maxval(mesh%elem2D_nodes(:, 1:nElemO)) <= nNodL)
 
     !=========================================================================
     ! V1 - uniform flow must give zeta == 0 EXACTLY
@@ -243,16 +314,21 @@ program test_vinv
     write(*,'(a,es12.4)') '  V4 non-degeneracy : max|zeta| = ', zmax
     call check_true('V4 zeta /= 0 somewhere (operator is not a no-op)', zmax > 1.0e-12_WP)
 
-    zmax = 0.0_WP
+    zmax = 0.0_WP; zmax2 = 0.0_WP
     do n = 1, nNodO
         if (.not. interior(n)) cycle
         do nz = mesh%ulevels_nod2D(n), mesh%nlevels_nod2D_min(n)-1
-            zmax = max(zmax, abs(dyn%work%vorticity(nz,n) + ALPHA))
+            if (exact(n)) then
+                zmax = max(zmax, abs(dyn%work%vorticity(nz,n) + ALPHA))
+            else
+                zmax2 = max(zmax2, abs(dyn%work%vorticity(nz,n) + ALPHA))
+            end if
         end do
     end do
-    call max_all(zmax)
+    call max_all(zmax); call max_all(zmax2)
     write(*,'(a,es12.4,a,es12.4)') '  V2 linear shear   : max|zeta-(-alpha)| = ', zmax, &
                                    '   relative = ', zmax/ALPHA
+    write(*,'(a,es12.4)') '  V2 (general quads): relative = ', zmax2/ALPHA
     ! DIAGNOSTIC: is the error systematic (a factor) or localised (a few bad nodes)?
     block
         integer :: nok, nbad, nworst
@@ -276,8 +352,10 @@ program test_vinv
                 '  off-by->1%=', nbad, '  worst ratio off=', rworst, ' at lat=', latw
         end if
     end block
-    call check_true('V2 u=alpha*y -> zeta == -alpha to round-off (interior, all-wet)', &
+    call check_true('V2 u=alpha*y -> zeta == -alpha to round-off (interior, all-wet, exact nodes)', &
                     zmax/ALPHA < 1.0e-11_WP)
+    call check_true('V2 u=alpha*y -> zeta == -alpha to first order at general quads', &
+                    zmax2/ALPHA < 0.1_WP)
 
     call check_true('V5 finite', all(dyn%work%vorticity == dyn%work%vorticity) .and. &
                                  all(abs(dyn%work%vorticity) < huge(1.0_WP)))
@@ -312,7 +390,7 @@ program test_vinv
         end do
     end do
     do n = 1, nElemO
-        elem_int(n) = all(interior(mesh%elem2D_nodes(1:3,n)))
+        elem_int(n) = all(interior(mesh%elem2D_nodes(:,n)))
     end do
     ! one ring deeper: the upwind blend reads the NEIGHBOURS' vertex vorticity, so a
     ! constant-field inertness assertion must exclude elements whose neighbours touch the
@@ -321,7 +399,7 @@ program test_vinv
     allocate(elem_int2(nElemO))
     do n = 1, nElemO
         elem_int2(n) = elem_int(n)
-        do nz = 1, 3
+        do nz = 1, MAX_NV
             block
                 integer :: nbb
                 nbb = mesh%elem_neighbors(nz, n)
@@ -339,14 +417,14 @@ program test_vinv
     dyn%uv_rhsAB  = 0.0_WP
     call momentum_adv_vinv(dyn, mesh, partit)
 
-    ! Restricted to levels where ALL elements adjacent to ALL THREE nodes are wet. Below
+    ! Restricted to levels where ALL elements adjacent to ALL the element's nodes are wet. Below
     ! that, KE(nz,n) sums only over the elements wet at nz while dividing by the FULL
     ! area(n) -- the zero-with-full-weight rule -- so KE is deliberately not uniform there
     ! and grad(KE) /= 0 even for a uniform u. That is intended, not an error.
     zmax = 0.0_WP; scal = 0.0_WP
     do n = 1, nElemO
         if (.not. elem_int(n)) cycle
-        nzall = minval(mesh%nlevels_nod2D_min(mesh%elem2D_nodes(1:3,n))) - 1
+        nzall = minval(mesh%nlevels_nod2D_min(mesh%elem2D_nodes(:,n))) - 1
         do nz = mesh%ulevels(n), min(mesh%nlevels(n)-1, nzall)
             zmax = max(zmax, abs(dyn%uv_rhsAB(1,1,nz,n)), abs(dyn%uv_rhsAB(1,2,nz,n)))
             ! scale of the individual vertical terms, so the tolerance is relative
@@ -391,22 +469,28 @@ program test_vinv
     call check_true('V8 rvo_upwind=0 bit-identical', all(dyn%uv_rhsAB == rhsA))
 
     ! V9a: constant zeta (linear shear) -> blend inert at rvo_upwind=1 (weighted average
-    ! of equal values re-forms the same value up to round-off)
+    ! of equal values re-forms the same value up to round-off). Elements whose own and
+    ! neighbours' vertices are exact nodes only (zeta is constant only there), and
+    ! normalised by the size of the vorticity term |u|*alpha*area: the full tendency of a
+    ! pure shear is itself zero (zeta x u cancels grad KE) on a planar mesh.
     rvo_upwind = 1.0_WP
     dyn%uv_rhsAB = 0.0_WP
     call momentum_adv_vinv(dyn, mesh, partit)
     zmax = 0.0_WP; scal = 0.0_WP
     do n = 1, nElemO
         if (.not. elem_int2(n)) cycle
-        nzall = minval(mesh%nlevels_nod2D_min(mesh%elem2D_nodes(1:3,n))) - 1
-        do nz = 1, 3
+        if (.not. all(exact(mesh%elem2D_nodes(:,n)))) cycle
+        if (.not. all([(all(exact(mesh%elem2D_nodes(:, mesh%elem_neighbors(nz,n)))), nz = 1, MAX_NV)])) cycle
+        nzall = minval(mesh%nlevels_nod2D_min(mesh%elem2D_nodes(:,n))) - 1
+        do nz = 1, MAX_NV
             nzall = min(nzall, minval(mesh%nlevels_nod2D_min( &
-                        mesh%elem2D_nodes(1:3, mesh%elem_neighbors(nz,n)))) - 1)
+                        mesh%elem2D_nodes(:, mesh%elem_neighbors(nz,n)))) - 1)
         end do
         do nz = mesh%ulevels(n), min(mesh%nlevels(n)-1, nzall)
             zmax = max(zmax, abs(dyn%uv_rhsAB(1,1,nz,n)-rhsA(1,1,nz,n)), &
                              abs(dyn%uv_rhsAB(1,2,nz,n)-rhsA(1,2,nz,n)))
-            scal = max(scal, abs(rhsA(1,1,nz,n)), abs(rhsA(1,2,nz,n)))
+            scal = max(scal, sqrt(dyn%uv(1,nz,n)**2 + dyn%uv(2,nz,n)**2)*ALPHA &
+                             *real(mesh%elem_area(n),WP))
         end do
     end do
     call max_all(zmax); call max_all(scal)
@@ -422,10 +506,10 @@ program test_vinv
     zmax = 0.0_WP; scal = 0.0_WP
     do n = 1, nElemO
         if (.not. elem_int2(n)) cycle
-        nzall = minval(mesh%nlevels_nod2D_min(mesh%elem2D_nodes(1:3,n))) - 1
-        do nz = 1, 3
+        nzall = minval(mesh%nlevels_nod2D_min(mesh%elem2D_nodes(:,n))) - 1
+        do nz = 1, MAX_NV
             nzall = min(nzall, minval(mesh%nlevels_nod2D_min( &
-                        mesh%elem2D_nodes(1:3, mesh%elem_neighbors(nz,n)))) - 1)
+                        mesh%elem2D_nodes(:, mesh%elem_neighbors(nz,n)))) - 1)
         end do
         do nz = mesh%ulevels(n), min(mesh%nlevels(n)-1, nzall)
             zmax = max(zmax, abs(dyn%uv_rhsAB(1,1,nz,n)), abs(dyn%uv_rhsAB(1,2,nz,n)))
@@ -465,15 +549,14 @@ contains
         ! neighbours: exactly one -> equality to round-off; several -> max principle.
         real(kind=WP), parameter :: CU = 0.3_WP, U0x = 0.31_WP, U0y = 0.17_WP
         ! (rhsB allocated on first assignment via sourced allocation below)
-        real(kind=WP) :: nxk(3), nyk(3), dk(3), wk(3), cex, cey, cnx, cny
+        real(kind=WP) :: nxk(MAX_NV), nyk(MAX_NV), dk(MAX_NV), wk(MAX_NV), cex, cey, cnx, cny
         real(kind=WP) :: latm, u_e, v_e, zb0, dzb, ea, sumw, zup, zlo, zhi, err, errmax
         real(kind=WP), allocatable :: rhsB(:,:,:,:)
-        integer :: e, k, nb, nwet, nupw(1), nz1b, n1, n2, n3, nbad10, none_cnt
+        integer :: e, k, nb, nwet, nupw(1), nz1b, nbad10, none_cnt
         ! --- fields: u = CU*lat^2, v = 0 (rotated frame) ---
         do e = 1, nElemO
-            latm = (real(mesh%coord_nod2D(2,mesh%elem2D_nodes(1,e)),WP) + &
-                    real(mesh%coord_nod2D(2,mesh%elem2D_nodes(2,e)),WP) + &
-                    real(mesh%coord_nod2D(2,mesh%elem2D_nodes(3,e)),WP))/3.0_WP
+            call elem_centroid(e, real(mesh%coord_nod2D(1,mesh%elem2D_nodes(1,e)),WP), &
+                               0.0_WP, cnx, latm)
             dyn%uv(1,:,e) = CU*latm*latm
             dyn%uv(2,:,e) = 0.0_WP
         end do
@@ -488,7 +571,6 @@ contains
 
         nbad10 = 0; errmax = 0.0_WP; none_cnt = 0
         do e = 1, nElemO
-            n1 = mesh%elem2D_nodes(1,e); n2 = mesh%elem2D_nodes(2,e); n3 = mesh%elem2D_nodes(3,e)
             call elem_normals(e, nxk, nyk, cex, cey)
             u_e = dyn%uv(1,1,e); v_e = dyn%uv(2,1,e)
             ! ---- V10, velocity-free: the slot-k neighbour must lie on the OUTWARD side
@@ -498,7 +580,7 @@ contains
             ! of the centroid offset, so ~20% of irregular-triangle edges legitimately
             ! violated it. The velocity-free form is the actual orientation property;
             ! d = u.n_in is then correct by construction.) ----
-            do k = 1, 3
+            do k = 1, mesh%elem2D_nnodes(e)
                 nb = mesh%elem_neighbors(k, e)
                 if (nb == e .or. nb > nElemO) cycle
                 call elem_centroid(nb, cex, cey, cnx, cny)
@@ -507,13 +589,12 @@ contains
             end do
             ! ---- V11 at the surface level of all-wet elements ----
             nz1b = mesh%ulevels(e)
-            if (nz1b > minval(mesh%nlevels_nod2D_min(mesh%elem2D_nodes(1:3,e))) - 1) cycle
+            if (nz1b > minval(mesh%nlevels_nod2D_min(mesh%elem2D_nodes(:,e))) - 1) cycle
             if (u_e*u_e + v_e*v_e < 1.0e-12_WP) cycle
-            zb0 = (dyn%work%vorticity(nz1b,n1)+dyn%work%vorticity(nz1b,n2) &
-                  +dyn%work%vorticity(nz1b,n3))/3.0_WP
+            zb0 = omega_of(e, nz1b)
             sumw = 0.0_WP; zup = 0.0_WP; nwet = 0
             zlo = zb0; zhi = zb0
-            do k = 1, 3
+            do k = 1, MAX_NV
                 nb = mesh%elem_neighbors(k, e)
                 if (nb == e .or. nb > nElemO) then
                     if (nb /= e) nwet = -999       ! halo neighbour: skip this element
@@ -568,54 +649,79 @@ contains
         call check_true('V11 single-neighbour blend equals upwind omega', errmax < 1.0e-9_WP)
     end subroutine upwind_checks
 
+    logical function is_parallelogram(e)
+        ! a triangle, or a quad whose diagonals bisect each other (to 1e-9 of its size)
+        integer, intent(in) :: e
+        real(kind=WP) :: x(MAX_NV), y(MAX_NV)
+        integer :: k
+        is_parallelogram = .true.
+        if (mesh%elem2D_nnodes(e) == 3) return
+        do k = 1, MAX_NV
+            x(k) = real(mesh%coord_nod2D(1,mesh%elem2D_nodes(k,e)),WP) - &
+                   real(mesh%coord_nod2D(1,mesh%elem2D_nodes(1,e)),WP)
+            call trim_cyclic(x(k))
+            y(k) = real(mesh%coord_nod2D(2,mesh%elem2D_nodes(k,e)),WP) - &
+                   real(mesh%coord_nod2D(2,mesh%elem2D_nodes(1,e)),WP)
+        end do
+        is_parallelogram = abs(x(1)+x(3)-x(2)-x(4)) + abs(y(1)+y(3)-y(2)-y(4)) &
+                           <= 1.0e-9_WP*(maxval(abs(x)) + maxval(abs(y)))
+    end function is_parallelogram
+
     real(kind=WP) function omega_of(e, nz)
+        ! the kite-weighted vertex mean, as the model's face vorticity
         integer, intent(in) :: e, nz
-        omega_of = (dyn%work%vorticity(nz, mesh%elem2D_nodes(1,e)) &
-                  + dyn%work%vorticity(nz, mesh%elem2D_nodes(2,e)) &
-                  + dyn%work%vorticity(nz, mesh%elem2D_nodes(3,e)))/3.0_WP
+        integer :: k
+        omega_of = 0.0_WP
+        do k = 1, MAX_NV
+            omega_of = omega_of + real(mesh%elem_w(k,e),WP)*dyn%work%vorticity(nz, mesh%elem2D_nodes(k,e))
+        end do
     end function omega_of
 
     subroutine elem_centroid(e, refx, refy, cx, cy)
-        ! centroid in the metre-scaled plane about (refx,refy) to stay cyclic-safe
+        ! area-weighted centroid of the sub-triangles (1,3,4) and (1,2,3) (a triangle:
+        ! the vertex mean), built from the vertex offsets to (refx,refy) -- the lon
+        ! offsets trimmed, so it is cyclic-safe -- and returned as refx/refy + offset
         integer,       intent(in)  :: e
         real(kind=WP), intent(in)  :: refx, refy
         real(kind=WP), intent(out) :: cx, cy
-        real(kind=WP) :: dxs, dys
+        real(kind=WP) :: x(MAX_NV), y(MAX_NV), s1, s2
         integer :: k
-        cx = 0.0_WP; cy = 0.0_WP
-        do k = 1, 3
-            dxs = real(mesh%coord_nod2D(1,mesh%elem2D_nodes(k,e)),WP) - refx
-            call trim_cyclic(dxs)
-            dys = real(mesh%coord_nod2D(2,mesh%elem2D_nodes(k,e)),WP) - refy
-            cx = cx + dxs; cy = cy + dys
+        do k = 1, MAX_NV
+            x(k) = real(mesh%coord_nod2D(1,mesh%elem2D_nodes(k,e)),WP) - refx
+            call trim_cyclic(x(k))
+            y(k) = real(mesh%coord_nod2D(2,mesh%elem2D_nodes(k,e)),WP) - refy
         end do
-        cx = refx + cx/3.0_WP; cy = refy + cy/3.0_WP
+        s1 = abs((x(3)-x(4))*(y(1)-y(4)) - (y(3)-y(4))*(x(1)-x(4)))
+        s2 = abs((x(3)-x(2))*(y(1)-y(2)) - (y(3)-y(2))*(x(1)-x(2)))
+        cx = refx + ((x(1)+x(3)+x(4))*s1 + (x(1)+x(2)+x(3))*s2)/(3.0_WP*(s1+s2))
+        cy = refy + ((y(1)+y(3)+y(4))*s1 + (y(1)+y(2)+y(3))*s2)/(3.0_WP*(s1+s2))
     end subroutine elem_centroid
 
     subroutine elem_normals(e, nxk, nyk, cex, cey)
-        ! the three INWARD edge normals of element e, metre-scaled with elem_cos(e);
-        ! edge k connects elnodes(k), elnodes(k+1); inward = toward elnodes(k+2).
+        ! the INWARD side normals of element e (4 slots), metre-scaled with elem_cos(e);
+        ! side k connects elnodes(k), elnodes(k+1) (slot 4 -> 1; a triangle's side 4 is
+        ! degenerate, normal 0); inward = toward the centroid (cex, cey).
         ! Mirrors the model's convention; V10 then checks the convention against
         ! geometry, so it is proven rather than shared-by-copy.
         integer,       intent(in)  :: e
-        real(kind=WP), intent(out) :: nxk(3), nyk(3), cex, cey
-        real(kind=WP) :: x(3), y(3), tx, ty, px, py, dref
-        integer :: k, k2, k3
-        do k = 1, 3
+        real(kind=WP), intent(out) :: nxk(MAX_NV), nyk(MAX_NV), cex, cey
+        real(kind=WP) :: x(MAX_NV), y(MAX_NV), tx, ty, px, py, dref
+        integer :: k, k2
+        do k = 1, MAX_NV
             x(k) = real(mesh%coord_nod2D(1, mesh%elem2D_nodes(k,e)), WP)
             y(k) = real(mesh%coord_nod2D(2, mesh%elem2D_nodes(k,e)), WP)
         end do
         ! cyclic-safe local frame about vertex 1
-        do k = 2, 3
+        do k = 2, MAX_NV
             tx = x(k) - x(1); call trim_cyclic(tx); x(k) = x(1) + tx
         end do
-        cex = sum(x)/3.0_WP; cey = sum(y)/3.0_WP
-        do k = 1, 3
-            k2 = mod(k,3)+1; k3 = mod(k+1,3)+1
+        call elem_centroid(e, x(1), 0.0_WP, cex, cey)
+        do k = 1, MAX_NV
+            k2 = mod(k,MAX_NV)+1
             tx = (x(k2)-x(k))*real(mesh%elem_cos(e),WP)*r_earth
             ty = (y(k2)-y(k))*r_earth
             px =  ty; py = -tx
-            dref = px*(x(k3)-x(k))*real(mesh%elem_cos(e),WP)*r_earth + py*(y(k3)-y(k))*r_earth
+            dref = px*(cex-x(k))*real(mesh%elem_cos(e),WP)*r_earth + py*(cey-y(k))*r_earth
             if (dref < 0.0_WP) then
                 px = -px; py = -py
             end if
@@ -626,8 +732,8 @@ contains
     subroutine set_shear(sgn)
         ! u = sgn*ALPHA*y, v = 0 with y = r_earth*lat : LINEAR in the cartesian metric, so
         ! the discrete curl is exact and zeta == -sgn*ALPHA. Depends on latitude only, so
-        ! it is continuous across pi's cyclic seam. Element value from the mean of its 3
-        ! corner latitudes (exact for a linear field).
+        ! it is continuous across pi's cyclic seam. Element value at the element centroid
+        ! (a triangle: the mean of its 3 corner latitudes).
         !
         ! coord_nod2D, NOT geo_coord_nod2D: the mesh is read with force_rotation=.true., so
         ! the geometry (elem_area, edge_cross_dxdy, element centres) lives in the ROTATED
@@ -635,16 +741,13 @@ contains
         ! frame, and the test then fails worst near the rotated pole -- which is exactly how
         ! this was found (mean zeta/(-alpha) = 0.836, worst at rotated lat 84 deg).
         real(kind=WP), intent(in) :: sgn
-        integer :: el, k
-        real(kind=WP) :: latm
+        integer :: el
+        real(kind=WP) :: latm, lonm
         ! 1..nElemO, NOT nElemF: elem2D_nodes is owned-only, and both triangles of an
         ! owned edge are owned (LESSONS L31), so the edge loop never reads a halo element.
         do el = 1, nElemO
-            latm = 0.0_WP
-            do k = 1, 3
-                latm = latm + real(mesh%coord_nod2D(2, mesh%elem2D_nodes(k,el)), WP)
-            end do
-            latm = latm/3.0_WP
+            call elem_centroid(el, real(mesh%coord_nod2D(1,mesh%elem2D_nodes(1,el)),WP), &
+                               0.0_WP, lonm, latm)
             dyn%uv(1,:,el) = sgn*ALPHA*r_earth*latm
             dyn%uv(2,:,el) = 0.0_WP
         end do

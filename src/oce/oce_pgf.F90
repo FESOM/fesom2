@@ -16,6 +16,7 @@ module oce_pgf
     !
     !   pgf_x(nz,elem) = Σ_k gradient_sca(k,  elem) * hpressure(nz, elnodes(k)) / density_0
     !   pgf_y(nz,elem) = Σ_k gradient_sca(4+k,elem) * hpressure(nz, elnodes(k)) / density_0
+    !   (k = 1..4; a triangle's slot 4 repeats slot 1 with gradient 0)
     !
     ! BIT-IDENTITY NOTES:
     !  - density_0 is a RUNTIME divisor, but byte-identical on both sides (= 1030),
@@ -24,14 +25,16 @@ module oce_pgf
     !    then summed) — NOT sum(...)/density_0.
     !  - gradient_sca and the elem2D_nodes order are geometry-gate-proven (L9); the
     !    same gradient_sca contraction already byte-matched in oce_tracer_grad (M1.1).
-    !  - v1 = triangles only (the gradient_sca 1:3 / 5:7 slices are triangle-specific).
+    !  - Hybrid meshes: unified 4-slot formulas (gradient_sca 1:4 / 5:8, element means
+    !    with the kite weights elem_w), triangles equal to the former 3-slot code to
+    !    roundoff, not bitwise.
     !
     ! 1-rank only: the element loop runs to elem2D (== myDim_elem2D at 1-rank);
     ! pgf_x/pgf_y are element-local (no halo dependency, FESOM2 does not exchange
     ! them). The outputs are intent(inout) and NOT zeroed inside (FESOM2 leaves
     ! below-bottom entries at their allocation-zero) — the CALLER pre-zeros them.
     use mod_precision, only: WP
-    use mod_mesh,      only: t_mesh
+    use mod_mesh,      only: t_mesh, MAX_NV
     use mod_constants, only: density_0, g
     use mod_partit,    only: t_partit
     use mod_part_bounds, only: owned_bounds
@@ -54,12 +57,12 @@ contains
         real(kind=WP), intent(inout) :: pgf_x(mesh%nl-1, mesh%elem2D)
         real(kind=WP), intent(inout) :: pgf_y(mesh%nl-1, mesh%elem2D)
         type(t_partit), intent(in), optional :: partit
-        integer :: elem, elnodes(3), nle, ule, nlz
+        integer :: elem, elnodes(MAX_NV), nle, ule, nlz
         integer :: nNodO, nNodL, nEdgeO, nElemO
 
         call owned_bounds(mesh, nNodO, nNodL, nEdgeO, nElemO, partit)
         !_______________________________________________________________________
-        ! loop over triangular elements
+        ! loop over elements
         do elem=1, nElemO
             !___________________________________________________________________
             ! number of levels at elem
@@ -68,14 +71,14 @@ contains
 
             !___________________________________________________________________
             ! node indices of elem
-            elnodes = mesh%elem2D_nodes(1:3, elem)
+            elnodes = mesh%elem2D_nodes(:, elem)
 
             !___________________________________________________________________
             ! loop over mid-depth levels to calculate the pressure gradient force
             ! (pgf) --> from top to bottom
             do nlz=ule,nle
-                pgf_x(nlz,elem) = sum(mesh%gradient_sca(1:3,elem)*hpressure(nlz,elnodes)/density_0)
-                pgf_y(nlz,elem) = sum(mesh%gradient_sca(5:7,elem)*hpressure(nlz,elnodes)/density_0)
+                pgf_x(nlz,elem) = sum(mesh%gradient_sca(1:4,elem)*hpressure(nlz,elnodes)/density_0)
+                pgf_y(nlz,elem) = sum(mesh%gradient_sca(5:8,elem)*hpressure(nlz,elnodes)/density_0)
             end do
         end do
     end subroutine pressure_force_4_linfs_fullcell
@@ -97,11 +100,12 @@ contains
         !
         ! BIT-IDENTITY NOTES:
         !  - g/density_0 are runtime divisors, byte-identical on both sides (L7/L10).
-        !  - The `(/1.0,1.0,1.0/)` default-real literals are kept VERBATIM (1.0 is exact
-        !    in both kinds; *z_n is exact) so the expression tree matches the oracle.
-        !  - L29 watch: the subsurface bulk loop does length-3 array divides; both sides
-        !    operate on LOCAL arrays (same aliasing -> same codegen), so no NOVECTOR is
-        !    expected, but this field is byte-gated.
+        !  - Hybrid meshes: per-vertex arrays over the 4 slots (a triangle's slot 4 repeats
+        !    slot 1), gradients over gradient_sca 1:4 / 5:8, and the element mean of the
+        !    vertex drho_dz with the kite weights elem_w (FESOM2: sum(drho_dz)/3). FESOM2's
+        !    `(/1.0,1.0,1.0/)*z_n(nlz)` is the scalar z_n(nlz) (1.0 exact).
+        !  - L29 watch: the subsurface bulk loop does length-4 array divides on LOCAL
+        !    arrays.
         !  - M6a-1: optional partit -> owned element loop; pgf is element-local (no
         !    halo dependency, FESOM2 does not exchange it).
         type(t_mesh),  intent(in)    :: mesh
@@ -109,20 +113,20 @@ contains
         real(kind=WP), intent(inout) :: pgf_x(mesh%nl-1, mesh%elem2D)
         real(kind=WP), intent(inout) :: pgf_y(mesh%nl-1, mesh%elem2D)
         type(t_partit), intent(in), optional :: partit
-        integer :: elem, elnodes(3), nle, ule, nlz, ni, idx(3)
+        integer :: elem, elnodes(MAX_NV), nle, ule, nlz, ni, idx(MAX_NV)
         integer :: nNodO, nNodL, nEdgeO, nElemO
-        real(kind=WP) :: int_dp_dx(2), drho_dx, drho_dy, drho_dz(3), dz_dx, dz_dy, aux_sum
-        real(kind=WP) :: dx10(3), dx20(3), dx21(3), df10(3), df21(3)
+        real(kind=WP) :: int_dp_dx(2), drho_dx, drho_dy, drho_dz(MAX_NV), dz_dx, dz_dy, aux_sum
+        real(kind=WP) :: dx10(MAX_NV), dx20(MAX_NV), dx21(MAX_NV), df10(MAX_NV), df21(MAX_NV)
         real(kind=WP) :: zbar_n(mesh%nl), z_n(mesh%nl-1)
 
         call owned_bounds(mesh, nNodO, nNodL, nEdgeO, nElemO, partit)
         !_______________________________________________________________________
-        ! loop over triangular elements
+        ! loop over elements
         do elem=1, nElemO
             ! nle...number of mid-depth levels at elem
             nle           = mesh%nlevels(elem)-1
             ule           = mesh%ulevels(elem)
-            elnodes       = mesh%elem2D_nodes(1:3, elem)
+            elnodes       = mesh%elem2D_nodes(:, elem)
 
             !___________________________________________________________________
             ! mid-depth element levels Z_n (from helem + zbar_e_bot)
@@ -139,9 +143,8 @@ contains
             !___________________________________________________________________
             ! surface layer pressure gradient
             nlz = ule
-            idx = (/1, 1, 1/)*nlz
-            idx = idx - mesh%ulevels_nod2D(elnodes)
-            do ni=1,3
+            idx = nlz - mesh%ulevels_nod2D(elnodes)
+            do ni=1,MAX_NV
                 if (idx(ni)==0) then
                     ! elemental surface index nlz is also surface index of vertice ni
                     dx10(ni)   = mesh%Z_3d_n(nlz+1,elnodes(ni))-mesh%Z_3d_n(nlz  ,elnodes(ni))
@@ -166,16 +169,16 @@ contains
             end do
 
             ! zonal surface pressure gradient
-            drho_dx         = sum(mesh%gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
-            dz_dx           = sum(mesh%gradient_sca(1:3,elem)*mesh%Z_3d_n(nlz,elnodes))
-            aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*mesh%helem(nlz,elem)*g/density_0
+            drho_dx         = sum(mesh%gradient_sca(1:4,elem)*density_m_rho0(nlz,elnodes))
+            dz_dx           = sum(mesh%gradient_sca(1:4,elem)*mesh%Z_3d_n(nlz,elnodes))
+            aux_sum         = (drho_dx-sum(mesh%elem_w(:,elem)*drho_dz)*dz_dx)*mesh%helem(nlz,elem)*g/density_0
             pgf_x(nlz,elem) = aux_sum*0.5_WP
             int_dp_dx(1)    = aux_sum
 
             ! meridional surface pressure gradient
-            drho_dy         = sum(mesh%gradient_sca(5:7,elem)*density_m_rho0(nlz,elnodes))
-            dz_dy           = sum(mesh%gradient_sca(5:7,elem)*mesh%Z_3d_n(nlz,elnodes))
-            aux_sum         = (drho_dy-sum(drho_dz)/3.0_WP*dz_dy)*mesh%helem(nlz,elem)*g/density_0
+            drho_dy         = sum(mesh%gradient_sca(5:8,elem)*density_m_rho0(nlz,elnodes))
+            dz_dy           = sum(mesh%gradient_sca(5:8,elem)*mesh%Z_3d_n(nlz,elnodes))
+            aux_sum         = (drho_dy-sum(mesh%elem_w(:,elem)*drho_dz)*dz_dy)*mesh%helem(nlz,elem)*g/density_0
             pgf_y(nlz,elem) = aux_sum*0.5_WP
             int_dp_dx(2)    = aux_sum
 
@@ -188,20 +191,20 @@ contains
                 df10            = density_m_rho0(nlz  ,elnodes)-density_m_rho0(nlz-1,elnodes)
                 df21            = density_m_rho0(nlz+1,elnodes)-density_m_rho0(nlz  ,elnodes)
                 drho_dz         = df10/dx10 + (dx10*df21-dx21*df10)/(dx20*dx21*dx10)&
-                                  *(((/1.0,1.0,1.0/)*z_n(nlz)-mesh%Z_3d_n(nlz,elnodes)) + &
-                                    ((/1.0,1.0,1.0/)*z_n(nlz)-mesh%Z_3d_n(nlz-1,elnodes)))
+                                  *((z_n(nlz)-mesh%Z_3d_n(nlz,elnodes)) + &
+                                    (z_n(nlz)-mesh%Z_3d_n(nlz-1,elnodes)))
 
                 ! zonal bulk pressure gradient
-                drho_dx         = sum(mesh%gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
-                dz_dx           = sum(mesh%gradient_sca(1:3,elem)*mesh%Z_3d_n(nlz,elnodes))
-                aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*mesh%helem(nlz,elem)*g/density_0
+                drho_dx         = sum(mesh%gradient_sca(1:4,elem)*density_m_rho0(nlz,elnodes))
+                dz_dx           = sum(mesh%gradient_sca(1:4,elem)*mesh%Z_3d_n(nlz,elnodes))
+                aux_sum         = (drho_dx-sum(mesh%elem_w(:,elem)*drho_dz)*dz_dx)*mesh%helem(nlz,elem)*g/density_0
                 pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum*0.5_WP
                 int_dp_dx(1)    = int_dp_dx(1) + aux_sum
 
                 ! meridional bulk pressure gradient
-                drho_dy         = sum(mesh%gradient_sca(5:7,elem)*density_m_rho0(nlz,elnodes))
-                dz_dy           = sum(mesh%gradient_sca(5:7,elem)*mesh%Z_3d_n(nlz,elnodes))
-                aux_sum         = (drho_dy-sum(drho_dz)/3.0_WP*dz_dy)*mesh%helem(nlz,elem)*g/density_0
+                drho_dy         = sum(mesh%gradient_sca(5:8,elem)*density_m_rho0(nlz,elnodes))
+                dz_dy           = sum(mesh%gradient_sca(5:8,elem)*mesh%Z_3d_n(nlz,elnodes))
+                aux_sum         = (drho_dy-sum(mesh%elem_w(:,elem)*drho_dz)*dz_dy)*mesh%helem(nlz,elem)*g/density_0
                 pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
                 int_dp_dx(2)    = int_dp_dx(2) + aux_sum
             end do
@@ -209,9 +212,8 @@ contains
             !___________________________________________________________________
             ! bottom layer pressure gradient
             nlz = nle
-            idx = (/1, 1, 1/)*nlz
-            idx = mesh%nlevels_nod2D(elnodes)-1 - idx
-            do ni=1,3
+            idx = mesh%nlevels_nod2D(elnodes)-1 - nlz
+            do ni=1,MAX_NV
                 if (idx(ni)==0) then
                     ! elemental bottom index nlz is also bottom index of vertice ni
                     dx10(ni)   = mesh%Z_3d_n(nlz-1,elnodes(ni))-mesh%Z_3d_n(nlz-2,elnodes(ni))
@@ -236,15 +238,15 @@ contains
             end do
 
             ! zonal bottom pressure gradient
-            drho_dx         = sum(mesh%gradient_sca(1:3,elem)*density_m_rho0(nlz,elnodes))
-            dz_dx           = sum(mesh%gradient_sca(1:3,elem)*(mesh%Z_3d_n(nlz,elnodes)))
-            aux_sum         = (drho_dx-sum(drho_dz)/3.0_WP*dz_dx)*mesh%helem(nlz,elem)*g/density_0
+            drho_dx         = sum(mesh%gradient_sca(1:4,elem)*density_m_rho0(nlz,elnodes))
+            dz_dx           = sum(mesh%gradient_sca(1:4,elem)*(mesh%Z_3d_n(nlz,elnodes)))
+            aux_sum         = (drho_dx-sum(mesh%elem_w(:,elem)*drho_dz)*dz_dx)*mesh%helem(nlz,elem)*g/density_0
             pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum*0.5_WP
 
             ! meridional bottom pressure gradient
-            drho_dy         = sum(mesh%gradient_sca(5:7,elem)*density_m_rho0(nlz,elnodes))
-            dz_dy           = sum(mesh%gradient_sca(5:7,elem)*(mesh%Z_3d_n(nlz,elnodes)))
-            aux_sum         = (drho_dy-sum(drho_dz)/3.0_WP*dz_dy)*mesh%helem(nlz,elem)*g/density_0
+            drho_dy         = sum(mesh%gradient_sca(5:8,elem)*density_m_rho0(nlz,elnodes))
+            dz_dy           = sum(mesh%gradient_sca(5:8,elem)*(mesh%Z_3d_n(nlz,elnodes)))
+            aux_sum         = (drho_dy-sum(mesh%elem_w(:,elem)*drho_dz)*dz_dy)*mesh%helem(nlz,elem)*g/density_0
             pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
         end do
     end subroutine pressure_force_4_zxxxx_shchepetkin

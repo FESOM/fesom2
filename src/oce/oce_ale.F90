@@ -32,7 +32,7 @@ module oce_ale
     use mod_precision,  only: WP, MP
     use mod_constants,  only: g
     use mod_param_phys, only: alpha, theta, Fer_GM
-    use mod_mesh,       only: t_mesh
+    use mod_mesh,       only: t_mesh, MAX_NV
     use mod_dyn,        only: t_dyn
     use mod_partit,     only: t_partit
     use mod_part_bounds, only: owned_bounds, is_multirank
@@ -80,7 +80,8 @@ contains
         ! dropped from the average: its velocity there is genuinely ZERO -- that is what
         ! "velocities touching topography are zero" means -- so it contributes zero while
         ! still carrying its FULL area weight. The denominator is therefore the full
-        ! median-dual area (3*area(n)), not the area of the elements that happen to be wet.
+        ! median-dual area area(n) = sum_k nod_in_elem2D_w(k,n)*elem_area (the kite share of
+        ! every adjacent element), not the area of the elements that happen to be wet.
         ! This is the same statement that makes the scalar column's area depth-independent,
         ! and it is why area/areasvol are 1-D.
         !
@@ -91,7 +92,7 @@ contains
         do n = 1, nNodO
             uln = mesh%ulevels_nod2D(n)
             nln = mesh%nlevels_nod2D(n)
-            tvol = 3.0_WP*real(mesh%area(n), WP)      ! full median-dual area at this vertex
+            tvol = real(mesh%area(n), WP)             ! full median-dual area at this vertex
             do nz = uln, nln-1
                 tx = 0.0_WP; ty = 0.0_WP
                 do k = 1, mesh%nod_in_elem2D_num(n)
@@ -99,8 +100,8 @@ contains
                     ule  = mesh%ulevels(elem)
                     nle  = mesh%nlevels(elem)
                     if (nle-1 < nz .or. nz < ule) cycle   ! dry: contributes 0, weight kept
-                    tx   = tx   + UV(1,nz,elem)*mesh%elem_area(elem)
-                    ty   = ty   + UV(2,nz,elem)*mesh%elem_area(elem)
+                    tx   = tx   + UV(1,nz,elem)*mesh%elem_area(elem)*mesh%nod_in_elem2D_w(k,n)
+                    ty   = ty   + UV(2,nz,elem)*mesh%elem_area(elem)*mesh%nod_in_elem2D_w(k,n)
                 end do
                 UVnode(1,nz,n) = tx/tvol
                 UVnode(2,nz,n) = ty/tvol
@@ -114,12 +115,12 @@ contains
         ! FESOM2 oce_dyn.F90:88-173. New horizontal velocity after the SSH solve:
         !   u^(n+1) = u* + UV_rhs + [-g*theta*dt*grad(d_eta)]
         ! The SSH-gradient correction is a gradient_sca contraction of -g*theta*dt*d_eta
-        ! over the element's three nodes (same shape as the M2.3 vel_rhs SSH-gradient and
+        ! over the element's 4 vertex slots (a triangle's slot 4 has coefficient 0) (same shape as the M2.3 vel_rhs SSH-gradient and
         ! the M2.2 PGF). UV_rhs here is the post-TDMA value (M2.5; the CG solve does not
         ! touch it).
         ! M2.12c-3: optional partit -> OWNED element loop (FESOM2 :105 do elem=1,
         ! myDim_elem2D), then exchange_elem(UV) (:172). d_eta is read at the owned element's
-        ! 3 nodes (within owned+halo, invariant iii) — valid from the CG's exchange_nod(x).
+        ! vertices (within owned+halo, invariant iii) — valid from the CG's exchange_nod(x).
         ! The UV halo is refreshed owner->halo for the NEXT step (compute_vel_nodes/advection);
         ! the owned UV the post-update kernels read is computed directly here. The rank-3
         ! (2,nl-1,elem) UV exchanges over the eDim com_elem2D (exchange_elem_blk_r) — EXACTLY
@@ -131,9 +132,9 @@ contains
         real(kind=WP), intent(in) :: dt
         type(t_partit), intent(in), optional :: partit
         !______________________________________________________________________
-        integer       :: elem, nz, nzmin, nzmax, elnodes(3)
+        integer       :: elem, nz, nzmin, nzmax, elnodes(MAX_NV)
         integer       :: nNodO, nNodL, nEdgeO, nElemO
-        real(kind=WP) :: eta(3), Fx, Fy
+        real(kind=WP) :: eta(MAX_NV), Fx, Fy
         real(kind=WP), dimension(:,:,:), pointer :: UV, UV_rhs
         real(kind=WP), dimension(:),     pointer :: d_eta
 
@@ -143,10 +144,10 @@ contains
         call owned_bounds(mesh, nNodO, nNodL, nEdgeO, nElemO, partit)
 
         do elem = 1, nElemO
-            elnodes = mesh%elem2D_nodes(1:3, elem)        ! triangles (elem2D_nodes is MAX_NV=4) — L15
+            elnodes = mesh%elem2D_nodes(:, elem)
             eta = -g*theta*dt*d_eta(elnodes)
-            Fx  = sum(mesh%gradient_sca(1:3, elem)*eta)
-            Fy  = sum(mesh%gradient_sca(5:7, elem)*eta)
+            Fx  = sum(mesh%gradient_sca(1:4, elem)*eta)
+            Fy  = sum(mesh%gradient_sca(5:8, elem)*eta)
             nzmin = mesh%ulevels(elem)
             nzmax = mesh%nlevels(elem)
             do nz = nzmin, nzmax-1
@@ -164,7 +165,7 @@ contains
         !   ssh_rhs_old = div_h( int(UV) dz )        (edge-scatter, NO alpha here)
         !   hbar_old    = hbar
         !   hbar        = hbar_old + ssh_rhs_old * dt / areasvol
-        !   dhe         = sum(hbar - hbar_old)/3     (per element; feeds update_stiff,
+        !   dhe         = sum(elem_w*(hbar - hbar_old)) (per element; feeds update_stiff,
         !                 which linfs never calls — gated anyway)
         ! Same edge-divergence structure as M2.6 compute_ssh_rhs_ale (same edge order,
         ! gated). linfs skips the water_flux term + its exchange_nod. Writes mesh%hbar/
@@ -173,7 +174,7 @@ contains
         ! the edge-divergence over OWNED edges (owned-node ssh_rhs_old complete, invariant i),
         ! hbar_old=hbar owned+halo, the hbar update OWNED, then exchange_nod(hbar) (:2293,
         ! ALWAYS — outside the linfs water_flux guard) so the dhe loop over OWNED elements can
-        ! read hbar at the element's 3 nodes (within owned+halo). The linfs water_flux term +
+        ! read hbar at the element's vertices (within owned+halo). The linfs water_flux term +
         ! its exchange_nod(ssh_rhs_old) stay skipped.
         type(t_dyn),  intent(inout), target :: dynamics
         type(t_mesh), intent(inout), target :: mesh
@@ -181,7 +182,7 @@ contains
         type(t_partit), intent(in), optional :: partit
         real(kind=WP),  intent(in), optional :: water_flux(:)   ! M6a-3: non-linfs freshwater (zstar)
         !______________________________________________________________________
-        integer       :: ed, el(2), enodes(2), elem, elnodes(3), n, nz, nzmin, nzmax
+        integer       :: ed, el(2), enodes(2), elem, elnodes(MAX_NV), n, nz, nzmin, nzmax
         integer       :: nNodO, nNodL, nEdgeO, nElemO
         real(kind=WP) :: c1, c2, deltaX1, deltaX2, deltaY1, deltaY2
         real(kind=WP), dimension(:,:,:), pointer :: UV
@@ -251,11 +252,11 @@ contains
         if (is_multirank(partit)) call exchange_nod(mesh%hbar, partit)   ! FESOM2 :2293
 
         do elem = 1, nElemO
-            elnodes = mesh%elem2D_nodes(1:3, elem)         ! L15
+            elnodes = mesh%elem2D_nodes(:, elem)
             if (mesh%ulevels(elem) > 1) then
                 mesh%dhe(elem) = 0.0_WP
             else
-                mesh%dhe(elem) = sum(mesh%hbar(elnodes) - mesh%hbar_old(elnodes))/3.0_WP
+                mesh%dhe(elem) = sum(mesh%elem_w(:, elem)*(mesh%hbar(elnodes) - mesh%hbar_old(elnodes)))
             end if
         end do
     end subroutine compute_hbar_ale
@@ -575,7 +576,7 @@ contains
         !    (not a target — see docs/plans/2026-06-24-m6-zstar.md).
         type(t_mesh),   intent(inout), target :: mesh
         type(t_partit), intent(in), optional  :: partit
-        integer :: n, nz, elem, elnodes(3), nzmin, nzmax
+        integer :: n, nz, elem, elnodes(MAX_NV), nzmin, nzmax
         integer :: nNodO, nNodL, nEdgeO, nElemO
 
         if (trim(which_ALE)=='linfs') return   ! no-op (helem unchanged + full-halo-valid)
@@ -595,22 +596,22 @@ contains
                 end do
             end do
             !__________________________________________________________________
-            ! mean layer thickness at element (owned)
+            ! mean layer thickness at element (owned): kite-weighted mean of hnode
             do elem = 1, nElemO
                 nzmin = mesh%ulevels(elem)
                 nzmax = mesh%nlevels(elem) - 1
                 if (nzmin > 1) cycle                       ! cavity (dead)
-                elnodes = mesh%elem2D_nodes(1:3, elem)
+                elnodes = mesh%elem2D_nodes(:, elem)
                 ! FULL element range. FESOM2 stopped one layer short (nzmax-1) and was
                 ! safe: nlevels_nod2D_min(n) <= nlevels(e) for every e adjacent to n, so
                 ! no node ever stretched layer nlevels(e)-1 and the frozen helem there
                 ! still matched. Under the vertex bottom that flips to nlevels(e) <=
                 ! nlevels_nod2D(n) -- the element's deepest layer IS stretched at its
-                ! deeper nodes, so a frozen helem would break helem == sum(hnode)/3, and
+                ! deeper nodes, so a frozen helem would break helem == sum(elem_w*hnode), and
                 ! helem is the thickness compute_hbar_ale, vert_vel_ale and adv_tra_hor
                 ! all use: the SSH/continuity budget and the tracer volume would disagree.
                 do nz = nzmin, nzmax
-                    mesh%helem(nz,elem) = sum(mesh%hnode(nz,elnodes))/3.0_WP
+                    mesh%helem(nz,elem) = sum(mesh%elem_w(:,elem)*mesh%hnode(nz,elnodes))
                 end do
             end do
         end if

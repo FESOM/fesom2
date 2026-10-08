@@ -30,8 +30,14 @@ program test_ivertvisc
     !        d(nz0-1) =  (u0+D)*r1/(1+r2);  all other cells 0
     !   I5 finiteness
     ! The closed forms hold per element column because w_i is set to w0 at EVERY node of
-    ! face nz0 (3-node average == w0 to 1 ulp) and helem is what the solver rebuilds zinv
-    ! from. Both velocity components are checked (v = -u/2 on input, so d_v = -d_u/2).
+    ! face nz0 (the kite-weighted element mean sum(elem_w*w_i) == w0 to 1 ulp on triangles
+    ! AND quads -- a 3-node /3 mean over the 4 slots of a quad would give 4/3*w0) and helem
+    ! is what the solver rebuilds zinv from. Both velocity components are checked (v = -u/2
+    ! on input, so d_v = -d_u/2).
+    !
+    ! MESHES (hybrid meshes, Task 10): FESOM3_MESH_DIR (default pi, rotated; with
+    ! FESOM3_TEST_ROTATE=0 read unrotated, e.g. the NEMO-mixed cut-out) or, with
+    ! FESOM3_TEST_PATCH=mixed at np 1, the analytic mixed triangle/quad patch.
     use mpi
     use mod_precision,     only: WP, MP
     use mod_mesh,          only: t_mesh
@@ -41,11 +47,12 @@ program test_ivertvisc
     use mod_param_phys,    only: C_d
     use mod_mesh_read,     only: read_mesh
     use mod_mesh_areas,    only: compute_geometry
+    use mod_mesh_analytic, only: generate_mixed_patch
     use mod_part_bounds,   only: owned_bounds
     use oce_dyn_ivertvisc, only: impl_vert_visc_ale
     implicit none
 
-    character(len=512) :: mesh_dir
+    character(len=512) :: mesh_dir, cbuf
     type(t_partit) :: partit
     type(t_mesh)   :: mesh
     type(t_dyn)    :: dyn
@@ -64,11 +71,28 @@ program test_ivertvisc
     if (len_trim(mesh_dir) == 0) &
         mesh_dir = '/home/a/a270088/port2/fesom2/tests/data/MESHES/pi'
     call par_init(partit)
-    if (partit%npes > 1) call set_partition(partit, trim(mesh_dir))
-    call read_mesh(mesh, partit, trim(mesh_dir), 50.0_WP, 15.0_WP, -90.0_WP, 360.0_WP, &
-                   force_rotation=.true., n_cw_swaps=nsw)
-    call compute_geometry(mesh, partit, cartesian=.true.)
+    cbuf = ''
+    call get_environment_variable('FESOM3_TEST_PATCH', cbuf)
+    if (trim(cbuf) == 'mixed') then
+        if (partit%npes /= 1) error stop 'test_ivertvisc: FESOM3_TEST_PATCH needs np 1'
+        call generate_mixed_patch(mesh, partit, nx=13, ny=11, nl=6, &
+                                  Lx=12000.0_WP, Ly=10000.0_WP, max_depth=100.0_WP)
+    else
+        if (partit%npes > 1) call set_partition(partit, trim(mesh_dir))
+        cbuf = ''
+        call get_environment_variable('FESOM3_TEST_ROTATE', cbuf)
+        if (trim(cbuf) == '0') then
+            call read_mesh(mesh, partit, trim(mesh_dir), 0.0_WP, 0.0_WP, 0.0_WP, 360.0_WP, &
+                           force_rotation=.false., n_cw_swaps=nsw)
+        else
+            call read_mesh(mesh, partit, trim(mesh_dir), 50.0_WP, 15.0_WP, -90.0_WP, 360.0_WP, &
+                           force_rotation=.true., n_cw_swaps=nsw)
+        end if
+        call compute_geometry(mesh, partit, cartesian=.true.)
+    end if
     call owned_bounds(mesh, nNodO, nNodL, nEdgeO, nElemO, partit)
+    write(*,'(a,i0,a,i0)') '  owned triangles=', count(mesh%elem2D_nnodes(1:nElemO) == 3), &
+                           ' quads=', count(mesh%elem2D_nnodes(1:nElemO) == 4)
     if (partit%npes == 1) then
         nElemF = mesh%elem2D
     else
