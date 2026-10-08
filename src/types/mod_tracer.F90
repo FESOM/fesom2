@@ -36,7 +36,6 @@ module mod_tracer
         real(kind=MP), allocatable, dimension(:,:) :: fct_ttf_max, fct_ttf_min
         real(kind=MP), allocatable, dimension(:,:) :: fct_plus, fct_minus
         ! MUSCL reconstruction
-        integer,       allocatable, dimension(:)   :: nboundary_lay
         integer,       allocatable, dimension(:,:) :: edge_up_dn_tri
         ! Elemental gradient of values over the FULL element halo, rebuilt per tracer by
         ! init_tracers_AB: the MUSCL kernels form the up/downwind reconstruction from it on
@@ -122,7 +121,6 @@ contains
         call write_bin_array(tw%fct_ttf_min,      unit, iostat, iomsg)
         call write_bin_array(tw%fct_plus,         unit, iostat, iomsg)
         call write_bin_array(tw%fct_minus,        unit, iostat, iomsg)
-        call write_bin_array(tw%nboundary_lay,    unit, iostat, iomsg)
         call write_bin_array(tw%edge_up_dn_tri,   unit, iostat, iomsg)
     end subroutine write_t_tracer_work
 
@@ -141,7 +139,6 @@ contains
         call read_bin_array(tw%fct_ttf_min,      unit, iostat, iomsg)
         call read_bin_array(tw%fct_plus,         unit, iostat, iomsg)
         call read_bin_array(tw%fct_minus,        unit, iostat, iomsg)
-        call read_bin_array(tw%nboundary_lay,    unit, iostat, iomsg)
         call read_bin_array(tw%edge_up_dn_tri,   unit, iostat, iomsg)
     end subroutine read_t_tracer_work
 

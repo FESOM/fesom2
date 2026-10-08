@@ -1,7 +1,7 @@
 module muscl_oracle
-    ! THE STORED-ARRAY KERNELS: FESOM3's MUSCL / MFCT horizontal-flux kernels as they were
-    ! before the on-the-fly refactor (verbatim, commit 48cc272: they read a per-edge
-    ! up/downwind gradient array edge_up_dn_grad). Fed with the array of a given rule they
+    ! THE STORED-ARRAY KERNEL: FESOM3's MUSCL horizontal-flux kernel (FESOM2's MFCT, no
+    ! boundary clamp) as it was before the on-the-fly refactor (verbatim, commit 48cc272: it
+    ! reads a per-edge up/downwind gradient array edge_up_dn_grad). Fed with the array of a given rule it
     ! give that rule's fluxes: test_muscl_onthefly uses them with the reference RK3 rule
     ! (part R, the specification of the production kernels) and with FESOM2's fill_up_dn_grad
     ! (part S, agreement with FESOM2 where the two rules coincide).
@@ -11,110 +11,11 @@ module muscl_oracle
     use mod_part_bounds, only: owned_bounds
     implicit none
     private
-    public :: oracle_muscl, oracle_mfct
+    public :: oracle_muscl
 contains
 
-    subroutine oracle_muscl(vel, ttf, mesh, num_ord, flux, edge_up_dn_grad, nboundary_lay, o_init_zero, partit)
-        ! MUSCL horizontal flux (oce_adv_tra_hor.F90:261-542). num_ord = fraction of
-        ! 4th-order (centered) contribution; (1-num_ord) is 3rd-order upwind. The
-        ! per-node clamp c_lo = max(sign(1,nboundary_lay-nz),0) switches off the
-        ! linear-reconstruction increment below a node's boundary layer.
-        ! M2.12b: optional partit -> loop over OWNED edges (myDim_edge2D).
-        type(t_mesh),  intent(in)    :: mesh
-        real(kind=WP), intent(in)    :: num_ord
-        real(kind=WP), intent(in)    :: ttf(mesh%nl-1, mesh%nod2D)
-        real(kind=WP), intent(in)    :: vel(2, mesh%nl-1, mesh%elem2D)
-        real(kind=WP), intent(inout) :: flux(mesh%nl-1, mesh%edge2D)
-        integer,       intent(in)    :: nboundary_lay(mesh%nod2D)
-        real(kind=WP), intent(in)    :: edge_up_dn_grad(4, mesh%nl-1, mesh%edge2D)
-        logical, optional, intent(in) :: o_init_zero
-        type(t_partit), intent(in), optional :: partit
-        logical       :: l_init_zero
-        real(kind=WP) :: deltaX1, deltaY1, deltaX2, deltaY2, vflux
-        integer       :: el(2), enodes(2), nz, edge, nu12, nl12, nl1, nl2, nu1, nu2
-        integer       :: nNodO, nNodL, nEdgeO, nElemO
-
-        call owned_bounds(mesh, nNodO, nNodL, nEdgeO, nElemO, partit)
-        l_init_zero = .true.
-        if (present(o_init_zero)) l_init_zero = o_init_zero
-        if (l_init_zero) then
-            do edge = 1, nEdgeO
-                flux(:, edge) = 0.0_WP
-            end do
-        end if
-
-        do edge = 1, nEdgeO
-            enodes = mesh%edges(:, edge)
-            el     = mesh%edge_tri(:, edge)
-            nl1    = mesh%nlevels(el(1)) - 1
-            nu1    = mesh%ulevels(el(1))
-            deltaX1 = mesh%edge_cross_dxdy(1, edge)
-            deltaY1 = mesh%edge_cross_dxdy(2, edge)
-            nl2 = 0; nu2 = 0
-            if (el(2) > 0) then
-                deltaX2 = mesh%edge_cross_dxdy(3, edge)
-                deltaY2 = mesh%edge_cross_dxdy(4, edge)
-                nl2 = mesh%nlevels(el(2)) - 1
-                nu2 = mesh%ulevels(el(2))
-            end if
-            nl12 = min(nl1, nl2)
-            nu12 = max(nu1, nu2)
-            ! (A)
-            do nz = nu1, nu12-1
-                vflux = (-vel(2,nz,el(1))*deltaX1 + vel(1,nz,el(1))*deltaY1) * mesh%helem(nz,el(1))
-                call flux_ho(nz, clof(enodes(1),nz), clof(enodes(2),nz), vflux)
-            end do
-            ! (B)
-            if (nu2 > 0) then
-                do nz = nu2, nu12-1
-                    vflux = (vel(2,nz,el(2))*deltaX2 - vel(1,nz,el(2))*deltaY2) * mesh%helem(nz,el(2))
-                    call flux_ho(nz, clof(enodes(1),nz), clof(enodes(2),nz), vflux)
-                end do
-            end if
-            ! (C)
-            do nz = nu12, nl12
-                vflux = (-vel(2,nz,el(1))*deltaX1 + vel(1,nz,el(1))*deltaY1) * mesh%helem(nz,el(1)) &
-                      + ( vel(2,nz,el(2))*deltaX2 - vel(1,nz,el(2))*deltaY2) * mesh%helem(nz,el(2))
-                call flux_ho(nz, clof(enodes(1),nz), clof(enodes(2),nz), vflux)
-            end do
-            ! (D)
-            do nz = nl12+1, nl1
-                vflux = (-vel(2,nz,el(1))*deltaX1 + vel(1,nz,el(1))*deltaY1) * mesh%helem(nz,el(1))
-                call flux_ho(nz, clof(enodes(1),nz), clof(enodes(2),nz), vflux)
-            end do
-            ! (E)
-            do nz = nl12+1, nl2
-                vflux = (vel(2,nz,el(2))*deltaX2 - vel(1,nz,el(2))*deltaY2) * mesh%helem(nz,el(2))
-                call flux_ho(nz, clof(enodes(1),nz), clof(enodes(2),nz), vflux)
-            end do
-        end do
-
-    contains
-        real(kind=WP) function clof(node, nz)
-            integer, intent(in) :: node, nz
-            clof = real(max(sign(1, nboundary_lay(node)-nz), 0), WP)
-        end function clof
-        subroutine flux_ho(nz, clo1, clo2, vflux)
-            integer,       intent(in) :: nz
-            real(kind=WP), intent(in) :: clo1, clo2, vflux
-            real(kind=WP) :: Tmean1, Tmean2, cHO
-            Tmean2 = ttf(nz, enodes(2)) - &
-                     (2.0_WP*(ttf(nz, enodes(2))-ttf(nz, enodes(1))) + &
-                      mesh%edge_dxdy(1,edge)*edge_up_dn_grad(2,nz,edge) + &
-                      mesh%edge_dxdy(2,edge)*edge_up_dn_grad(4,nz,edge))/6.0_WP*clo2
-            Tmean1 = ttf(nz, enodes(1)) + &
-                     (2.0_WP*(ttf(nz, enodes(2))-ttf(nz, enodes(1))) + &
-                      mesh%edge_dxdy(1,edge)*edge_up_dn_grad(1,nz,edge) + &
-                      mesh%edge_dxdy(2,edge)*edge_up_dn_grad(3,nz,edge))/6.0_WP*clo1
-            cHO = (vflux+abs(vflux))*Tmean1 + (vflux-abs(vflux))*Tmean2
-            flux(nz,edge) = -0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2) - flux(nz,edge)
-        end subroutine flux_ho
-    end subroutine oracle_muscl
-
-    subroutine oracle_mfct(vel, ttf, mesh, num_ord, flux, edge_up_dn_grad, o_init_zero, partit)
-        ! MUSCL for the FCT path (oce_adv_tra_hor.F90:546-834). Same as
-        ! adv_tra_hor_muscl but WITHOUT the c_lo bottom-boundary clamp (the
-        ! reconstruction near bottom topography is not upwind; runs with FCT only).
+    subroutine oracle_muscl(vel, ttf, mesh, num_ord, flux, edge_up_dn_grad, o_init_zero, partit)
+        ! MUSCL (FESOM2 adv_tra_hor_mfct, oce_adv_tra_hor.F90:546-834), no boundary clamp.
         ! M2.12b: optional partit -> loop over OWNED edges (myDim_edge2D).
         type(t_mesh),  intent(in)    :: mesh
         real(kind=WP), intent(in)    :: num_ord
@@ -200,7 +101,7 @@ contains
             cHO = (vflux+abs(vflux))*Tmean1 + (vflux-abs(vflux))*Tmean2
             flux(nz,edge) = -0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2) - flux(nz,edge)
         end subroutine flux_ho
-    end subroutine oracle_mfct
+    end subroutine oracle_muscl
 
 end module muscl_oracle
 
@@ -218,17 +119,17 @@ program test_muscl_onthefly
     ! the others and at edges without both triangles -- so the two schemes coincide on the
     ! shared levels and differ (by design) near coasts and bathymetry/cavity steps.
     !
-    ! PART R - the specification: adv_tra_hor_muscl / adv_tra_hor_mfct == the stored-array
-    !   kernels (module muscl_oracle) fed with the array built by the rule above, every owned
+    ! PART R - the specification: adv_tra_hor_muscl == the stored-array
+    !   kernel (module muscl_oracle) fed with the array built by the rule above, every owned
     !   edge and level, both velocity signs, BITWISE; on pi as read (R1) and with synthesised
     !   cavity columns (R2: ulevels_nod2D = 3 on every 10th global node with >= 14 levels,
     !   element ulevels and ulevels_nod2D(_max) rebuilt consistently and exchanged).
     ! PART S - agreement with FESOM2: the production fluxes equal FESOM2's (stored-array
-    !   kernels fed with fill_up_dn_grad) BITWISE on every (edge, level) where both edge
+    !   kernel fed with fill_up_dn_grad) BITWISE on every (edge, level) where both edge
     !   triangles exist and the level is shared; elsewhere they may differ, and must at some
     !   (teeth: the scheme did change there). The size of the difference is printed.
-    ! PART T - timing, printed only: FESOM2's path (fill_up_dn_grad + stored-array MFCT
-    !   kernel) vs the on-the-fly MFCT kernel, max over ranks, and the memory of the dropped
+    ! PART T - timing, printed only: FESOM2's path (fill_up_dn_grad + stored-array MUSCL
+    !   kernel) vs the on-the-fly MUSCL kernel, max over ranks, and the memory of the dropped
     !   array. Run the binary on the core2 mesh (FESOM3_MESH_DIR, ulimit -s unlimited) for
     !   meaningful numbers.
     use mpi
@@ -243,8 +144,8 @@ program test_muscl_onthefly
     use mod_halo,          only: exchange_elem_full, exchange_nod
     use oce_tracer_grad,   only: tracer_gradient_elements
     use oce_muscl_adv,     only: muscl_adv_init, fill_up_dn_grad
-    use oce_adv_tra_hor,   only: adv_tra_hor_muscl, adv_tra_hor_mfct
-    use muscl_oracle,      only: oracle_muscl, oracle_mfct
+    use oce_adv_tra_hor,   only: adv_tra_hor_muscl
+    use muscl_oracle,      only: oracle_muscl
     implicit none
 
     character(len=512) :: mesh_dir
@@ -278,7 +179,7 @@ program test_muscl_onthefly
     allocate(vel(2, nl-1, nElemF), eref(4, nl-1, nEdgeO), ef2(4, nl-1, nEdgeO))
     allocate(f_ref(nl-1, nEdgeO), f_new(nl-1, nEdgeO), f_f2(nl-1, nEdgeO))
     allocate(mesh%helem(nl-1, nElemF))
-    call muscl_adv_init(twork, mesh, partit)      ! edge_up_dn_tri, nboundary_lay
+    call muscl_adv_init(twork, mesh, partit)      ! edge_up_dn_tri
     call build_flow()
 
     call build_gradient()
@@ -376,28 +277,22 @@ contains
     !=========================================================================
     subroutine part_r(label)
         character(len=*), intent(in) :: label
-        integer :: isign, n_bad_m, n_bad_f, n_flux
+        integer :: isign, n_bad_m, n_flux
         call build_ref_array()
-        n_bad_m = 0; n_bad_f = 0; n_flux = 0
+        n_bad_m = 0; n_flux = 0
         do isign = 1, 2
             if (isign == 2) vel = -vel
-            call oracle_muscl(vel, ttf, mesh, num_ord, f_ref, eref, twork%nboundary_lay, &
-                              o_init_zero=.true., partit=partit)
+            call oracle_muscl(vel, ttf, mesh, num_ord, f_ref, eref, o_init_zero=.true., partit=partit)
             call adv_tra_hor_muscl(vel, ttf, mesh, num_ord, f_new, tr_xy, twork%edge_up_dn_tri, &
-                                   twork%nboundary_lay, o_init_zero=.true., partit=partit)
+                                   o_init_zero=.true., partit=partit)
             n_bad_m = n_bad_m + count(transfer(f_ref, 0_8, size(f_ref)) /= transfer(f_new, 0_8, size(f_new)))
             n_flux  = n_flux  + count(f_ref /= 0.0_WP)
-            call oracle_mfct(vel, ttf, mesh, num_ord, f_ref, eref, o_init_zero=.true., partit=partit)
-            call adv_tra_hor_mfct(vel, ttf, mesh, num_ord, f_new, tr_xy, twork%edge_up_dn_tri, &
-                                  o_init_zero=.true., partit=partit)
-            n_bad_f = n_bad_f + count(transfer(f_ref, 0_8, size(f_ref)) /= transfer(f_new, 0_8, size(f_new)))
         end do
         vel = -vel                                   ! restore
-        n_bad_m = gsum(n_bad_m); n_bad_f = gsum(n_bad_f); n_flux = gsum(n_flux)
-        if (partit%mype == 0) write(*,'(2a,i0,a,i0,a,i0)') '  ', label//': nonzero fluxes ', n_flux, &
-            '  bitwise mismatches vs reference rule: muscl ', n_bad_m, '  mfct ', n_bad_f
+        n_bad_m = gsum(n_bad_m); n_flux = gsum(n_flux)
+        if (partit%mype == 0) write(*,'(2a,i0,a,i0)') '  ', label//': nonzero fluxes ', n_flux, &
+            '  bitwise mismatches vs reference rule: ', n_bad_m
         call check_true(trim(label)//': adv_tra_hor_muscl == reference rule bitwise', n_bad_m == 0)
-        call check_true(trim(label)//': adv_tra_hor_mfct == reference rule bitwise', n_bad_f == 0)
         call check_true(trim(label)//': fluxes nonzero (not vacuous)', n_flux > 0)
     end subroutine part_r
 
@@ -410,8 +305,8 @@ contains
         logical :: both
         real(kind=WP) :: dmax, fmax
         call fill_up_dn_grad(ef2, twork, tr_xy, mesh, partit)        ! FESOM2's array
-        call oracle_mfct(vel, ttf, mesh, num_ord, f_f2, ef2, o_init_zero=.true., partit=partit)
-        call adv_tra_hor_mfct(vel, ttf, mesh, num_ord, f_new, tr_xy, twork%edge_up_dn_tri, &
+        call oracle_muscl(vel, ttf, mesh, num_ord, f_f2, ef2, o_init_zero=.true., partit=partit)
+        call adv_tra_hor_muscl(vel, ttf, mesh, num_ord, f_new, tr_xy, twork%edge_up_dn_tri, &
                               o_init_zero=.true., partit=partit)
         n_shared = 0; n_bad_sh = 0; n_diff_else = 0; dmax = 0.0_WP
         do edge = 1, nEdgeO
@@ -461,12 +356,12 @@ contains
         end do
         t(2) = MPI_Wtime()
         do r = 1, nrep
-            call oracle_mfct(vel, ttf, mesh, num_ord, f_f2, ef2, o_init_zero=.true., partit=partit)
+            call oracle_muscl(vel, ttf, mesh, num_ord, f_f2, ef2, o_init_zero=.true., partit=partit)
         end do
         t(3) = MPI_Wtime()
         do r = 1, nrep
-            call adv_tra_hor_mfct(vel, ttf, mesh, num_ord, f_new, tr_xy, twork%edge_up_dn_tri, &
-                                  o_init_zero=.true., partit=partit)
+            call adv_tra_hor_muscl(vel, ttf, mesh, num_ord, f_new, tr_xy, twork%edge_up_dn_tri, &
+                                   o_init_zero=.true., partit=partit)
         end do
         t(4) = MPI_Wtime()
         tmax = (t(2:4) - t(1:3))/real(nrep, WP)*1.0e3_WP
@@ -476,9 +371,9 @@ contains
         if (partit%npes > 1) call MPI_Allreduce(MPI_IN_PLACE, bb, 1, MPI_INTEGER8, MPI_SUM, &
                                                 partit%MPI_COMM_FESOM, ierr)
         if (partit%mype == 0) then
-            write(*,'(a,f9.2,a,f9.2,a,f9.2)') '  T FESOM2: fill_up_dn_grad ', tmax(1), ' ms + MFCT kernel ', tmax(2), &
+            write(*,'(a,f9.2,a,f9.2,a,f9.2)') '  T FESOM2: fill_up_dn_grad ', tmax(1), ' ms + MUSCL kernel ', tmax(2), &
                 ' ms = ', tmax(1) + tmax(2)
-            write(*,'(a,f9.2,a)') '  T on the fly: MFCT kernel ', tmax(3), ' ms (tr_xy is built in both paths)'
+            write(*,'(a,f9.2,a)') '  T on the fly: MUSCL kernel ', tmax(3), ' ms (tr_xy is built in both paths)'
             write(*,'(a,f8.1,a)') '  T memory (all ranks): dropped edge_up_dn_grad ', real(bb)/2.0**20, ' MiB'
         end if
     end subroutine part_t

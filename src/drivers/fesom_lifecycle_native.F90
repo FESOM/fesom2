@@ -277,12 +277,12 @@ program fesom_lifecycle_native
         '  S=', minval(tracers%data(2)%values), maxval(tracers%data(2)%values)
 
     !===========================================================================
-    ! tracer advection machinery (cold start = values; MFCT/QR4C/FCT, opth=0/optv=1).
+    ! tracer advection machinery (cold start = values; MUSCL/QR4C/FCT, opth=0/optv=1).
     do tr_num = 1, 2
         allocate(tracers%data(tr_num)%valuesAB(nl-1, mesh%nod2D))
         allocate(tracers%data(tr_num)%valuesold(2, nl-1, mesh%nod2D))
         tracers%data(tr_num)%AB_order   = 2
-        tracers%data(tr_num)%tra_adv_hor = 'MFCT'
+        tracers%data(tr_num)%tra_adv_hor = 'MUSCL'
         tracers%data(tr_num)%tra_adv_ver = 'QR4C'
         tracers%data(tr_num)%tra_adv_lim = 'FCT'
         tracers%data(tr_num)%tra_adv_ph  = 0.0_WP

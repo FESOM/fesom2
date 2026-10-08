@@ -211,17 +211,17 @@ program fesom_stepfull_mr
     do tr_num = 1, 2
         tracers%data(tr_num)%ID          = tr_num
         tracers%data(tr_num)%AB_order    = 2
-        tracers%data(tr_num)%tra_adv_hor = 'MFCT'
+        tracers%data(tr_num)%tra_adv_hor = 'MUSCL'
         tracers%data(tr_num)%tra_adv_ver = 'QR4C'
         tracers%data(tr_num)%tra_adv_lim = 'FCT'
-        tracers%data(tr_num)%tra_adv_ph  = 0.0_WP    ! MFCT
+        tracers%data(tr_num)%tra_adv_ph  = 0.0_WP    ! MUSCL
         tracers%data(tr_num)%tra_adv_pv  = 1.0_WP    ! QR4C
         tracers%data(tr_num)%i_vert_diff = .true.
         tracers%data(tr_num)%valuesAB        = 0.0_WP
         tracers%data(tr_num)%valuesold(1,:,:) = tracers%data(tr_num)%values   ! cold start
         tracers%data(tr_num)%valuesold(2,:,:) = tracers%data(tr_num)%values
     end do
-    call muscl_adv_init(tracers%work, mesh, partit)   ! nboundary_lay / edge_up_dn_tri / _grad
+    call muscl_adv_init(tracers%work, mesh, partit)   ! edge_up_dn_tri
 
     !===========================================================================
     ! forcing inputs (D7 explicit args) at owned+halo — Ki is read at owned edges' nodes

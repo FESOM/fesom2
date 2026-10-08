@@ -2,9 +2,10 @@ module oce_adv_tra_hor
     ! Horizontal tracer advection — edge finite-volume fluxes, transcribed from
     ! FESOM2 v2.7.3 oce_adv_tra_hor.F90:
     !   adv_tra_hor_upw1  (64-257)  low-order upwind
-    !   adv_tra_hor_muscl (261-542) MUSCL (3rd/4th-order, bottom-stable via nboundary_lay)
-    !   adv_tra_hor_mfct  (546-834) MUSCL for the FCT path (no bottom-boundary clamp)
-    ! The MUSCL kernels form the up/downwind reconstruction ON THE FLY, as the reference RK3
+    !   adv_tra_hor_muscl (546-834) MUSCL (3rd/4th-order) = FESOM2's adv_tra_hor_mfct.
+    !     FESOM2's clamped adv_tra_hor_muscl (261-542, nboundary_lay) is not ported: as in
+    !     the reference RK3 code there is a single MUSCL kernel without a boundary clamp.
+    ! The MUSCL kernel forms the up/downwind reconstruction ON THE FLY, as the reference RK3
     ! code (qq/oce_stepRK3.F90, t_hor_adv_muscl_RK3): the elemental gradient tr_xy of the
     ! upwind / downwind triangle (edge_up_dn_tri) where that triangle is wet at the level,
     ! a zero increment where it is missing or dry. FESOM2 instead stores a per-edge array
@@ -31,7 +32,7 @@ module oce_adv_tra_hor
     use mod_part_bounds, only: owned_bounds
     implicit none
     private
-    public :: adv_tra_hor_upw1, adv_tra_hor_muscl, adv_tra_hor_mfct
+    public :: adv_tra_hor_upw1, adv_tra_hor_muscl
 
 contains
 
@@ -119,125 +120,11 @@ contains
 
 
     !===========================================================================
-    subroutine adv_tra_hor_muscl(vel, ttf, mesh, num_ord, flux, tr_xy, edge_up_dn_tri, nboundary_lay, o_init_zero, partit)
-        ! MUSCL horizontal flux (oce_adv_tra_hor.F90:261-542). num_ord = fraction of
-        ! 4th-order (centered) contribution; (1-num_ord) is 3rd-order upwind. The
-        ! per-node clamp c_lo = max(sign(1,nboundary_lay-nz),0) switches off the
-        ! linear-reconstruction increment below a node's boundary layer.
-        ! M2.12b: optional partit -> loop over OWNED edges (myDim_edge2D).
-        type(t_mesh),  intent(in)    :: mesh
-        real(kind=WP), intent(in)    :: num_ord
-        real(kind=WP), intent(in)    :: ttf(mesh%nl-1, mesh%nod2D)
-        real(kind=WP), intent(in)    :: vel(2, mesh%nl-1, mesh%elem2D)
-        real(kind=WP), intent(inout) :: flux(mesh%nl-1, mesh%edge2D)
-        integer,       intent(in)    :: nboundary_lay(mesh%nod2D)
-        real(kind=WP), intent(in)    :: tr_xy(2, mesh%nl-1, mesh%elem2D)   ! elemental gradient, full halo
-        integer,       intent(in)    :: edge_up_dn_tri(2, mesh%edge2D)
-        logical, optional, intent(in) :: o_init_zero
-        type(t_partit), intent(in), optional :: partit
-        logical       :: l_init_zero
-        real(kind=WP) :: deltaX1, deltaY1, deltaX2, deltaY2, vflux
-        integer       :: el(2), enodes(2), nz, edge, nu12, nl12, nl1, nl2, nu1, nu2
-        integer       :: nNodO, nNodL, nEdgeO, nElemO
-        integer       :: tri1, tri2, u1, l1, u2, l2   ! up/dn triangles and their wet level ranges
-
-        call owned_bounds(mesh, nNodO, nNodL, nEdgeO, nElemO, partit)
-        l_init_zero = .true.
-        if (present(o_init_zero)) l_init_zero = o_init_zero
-        if (l_init_zero) then
-            do edge = 1, nEdgeO
-                flux(:, edge) = 0.0_WP
-            end do
-        end if
-
-        do edge = 1, nEdgeO
-            enodes = mesh%edges(:, edge)
-            el     = mesh%edge_tri(:, edge)
-            ! up/downwind triangle of this edge and the levels on which it is wet; a missing
-            ! triangle gets an empty range (u = 1, l = 0)
-            tri1 = edge_up_dn_tri(1, edge); u1 = 1; l1 = 0
-            tri2 = edge_up_dn_tri(2, edge); u2 = 1; l2 = 0
-            if (tri1 > 0) then
-                u1 = mesh%ulevels(tri1); l1 = mesh%nlevels(tri1) - 1
-            end if
-            if (tri2 > 0) then
-                u2 = mesh%ulevels(tri2); l2 = mesh%nlevels(tri2) - 1
-            end if
-            nl1    = mesh%nlevels(el(1)) - 1
-            nu1    = mesh%ulevels(el(1))
-            deltaX1 = mesh%edge_cross_dxdy(1, edge)
-            deltaY1 = mesh%edge_cross_dxdy(2, edge)
-            nl2 = 0; nu2 = 0
-            if (el(2) > 0) then
-                deltaX2 = mesh%edge_cross_dxdy(3, edge)
-                deltaY2 = mesh%edge_cross_dxdy(4, edge)
-                nl2 = mesh%nlevels(el(2)) - 1
-                nu2 = mesh%ulevels(el(2))
-            end if
-            nl12 = min(nl1, nl2)
-            nu12 = max(nu1, nu2)
-            ! (A)
-            do nz = nu1, nu12-1
-                vflux = (-vel(2,nz,el(1))*deltaX1 + vel(1,nz,el(1))*deltaY1) * mesh%helem(nz,el(1))
-                call flux_ho(nz, clof(enodes(1),nz), clof(enodes(2),nz), vflux)
-            end do
-            ! (B)
-            if (nu2 > 0) then
-                do nz = nu2, nu12-1
-                    vflux = (vel(2,nz,el(2))*deltaX2 - vel(1,nz,el(2))*deltaY2) * mesh%helem(nz,el(2))
-                    call flux_ho(nz, clof(enodes(1),nz), clof(enodes(2),nz), vflux)
-                end do
-            end if
-            ! (C)
-            do nz = nu12, nl12
-                vflux = (-vel(2,nz,el(1))*deltaX1 + vel(1,nz,el(1))*deltaY1) * mesh%helem(nz,el(1)) &
-                      + ( vel(2,nz,el(2))*deltaX2 - vel(1,nz,el(2))*deltaY2) * mesh%helem(nz,el(2))
-                call flux_ho(nz, clof(enodes(1),nz), clof(enodes(2),nz), vflux)
-            end do
-            ! (D)
-            do nz = nl12+1, nl1
-                vflux = (-vel(2,nz,el(1))*deltaX1 + vel(1,nz,el(1))*deltaY1) * mesh%helem(nz,el(1))
-                call flux_ho(nz, clof(enodes(1),nz), clof(enodes(2),nz), vflux)
-            end do
-            ! (E)
-            do nz = nl12+1, nl2
-                vflux = (vel(2,nz,el(2))*deltaX2 - vel(1,nz,el(2))*deltaY2) * mesh%helem(nz,el(2))
-                call flux_ho(nz, clof(enodes(1),nz), clof(enodes(2),nz), vflux)
-            end do
-        end do
-
-    contains
-        real(kind=WP) function clof(node, nz)
-            integer, intent(in) :: node, nz
-            clof = real(max(sign(1, nboundary_lay(node)-nz), 0), WP)
-        end function clof
-        subroutine flux_ho(nz, clo1, clo2, vflux)
-            integer,       intent(in) :: nz
-            real(kind=WP), intent(in) :: clo1, clo2, vflux
-            real(kind=WP) :: Tmean1, Tmean2, cHO, g1(2), g2(2)
-            ! the reference RK3 rule (qq/oce_stepRK3.F90 t_hor_adv_muscl_RK3): the
-            ! up/downwind triangle's elemental gradient where that triangle is wet, else 0
-            g1 = 0.0_WP; g2 = 0.0_WP
-            if (nz >= u1 .and. nz <= l1) g1 = tr_xy(:, nz, tri1)
-            if (nz >= u2 .and. nz <= l2) g2 = tr_xy(:, nz, tri2)
-            Tmean2 = ttf(nz, enodes(2)) - &
-                     (2.0_WP*(ttf(nz, enodes(2))-ttf(nz, enodes(1))) + &
-                      mesh%edge_dxdy(1,edge)*g2(1) + &
-                      mesh%edge_dxdy(2,edge)*g2(2))/6.0_WP*clo2
-            Tmean1 = ttf(nz, enodes(1)) + &
-                     (2.0_WP*(ttf(nz, enodes(2))-ttf(nz, enodes(1))) + &
-                      mesh%edge_dxdy(1,edge)*g1(1) + &
-                      mesh%edge_dxdy(2,edge)*g1(2))/6.0_WP*clo1
-            cHO = (vflux+abs(vflux))*Tmean1 + (vflux-abs(vflux))*Tmean2
-            flux(nz,edge) = -0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2) - flux(nz,edge)
-        end subroutine flux_ho
-    end subroutine adv_tra_hor_muscl
-
-    !===========================================================================
-    subroutine adv_tra_hor_mfct(vel, ttf, mesh, num_ord, flux, tr_xy, edge_up_dn_tri, o_init_zero, partit)
-        ! MUSCL for the FCT path (oce_adv_tra_hor.F90:546-834). Same as
-        ! adv_tra_hor_muscl but WITHOUT the c_lo bottom-boundary clamp (the
-        ! reconstruction near bottom topography is not upwind; runs with FCT only).
+    subroutine adv_tra_hor_muscl(vel, ttf, mesh, num_ord, flux, tr_xy, edge_up_dn_tri, o_init_zero, partit)
+        ! MUSCL horizontal flux (FESOM2 adv_tra_hor_mfct, oce_adv_tra_hor.F90:546-834).
+        ! num_ord = fraction of 4th-order (centered) contribution; (1-num_ord) is
+        ! 3rd-order upwind. No boundary clamp: where the up/downwind triangle is missing
+        ! or dry the face value is 2/3*T_up + 1/3*T_dn. Not monotone; usually run under FCT.
         ! M2.12b: optional partit -> loop over OWNED edges (myDim_edge2D).
         type(t_mesh),  intent(in)    :: mesh
         real(kind=WP), intent(in)    :: num_ord
@@ -340,6 +227,6 @@ contains
             cHO = (vflux+abs(vflux))*Tmean1 + (vflux-abs(vflux))*Tmean2
             flux(nz,edge) = -0.5_WP*(1.0_WP-num_ord)*cHO - vflux*num_ord*0.5_WP*(Tmean1+Tmean2) - flux(nz,edge)
         end subroutine flux_ho
-    end subroutine adv_tra_hor_mfct
+    end subroutine adv_tra_hor_muscl
 
 end module oce_adv_tra_hor

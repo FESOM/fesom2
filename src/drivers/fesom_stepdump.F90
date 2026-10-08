@@ -205,17 +205,17 @@ program fesom_stepdump
 
     !===========================================================================
     ! tracer advection machinery: valuesAB / valuesold (cold start = values) + the FCT
-    ! work arrays + muscl_adv_init, and the pi FCT config (MFCT/QR4C/FCT, opth=0/optv=1).
+    ! work arrays + muscl_adv_init, and the pi FCT config (MUSCL/QR4C/FCT, opth=0/optv=1).
     tracers%num_tracers = 2
     do tr_num = 1, 2
         allocate(tracers%data(tr_num)%valuesAB(nl-1, mesh%nod2D))
         allocate(tracers%data(tr_num)%valuesold(2, nl-1, mesh%nod2D))
         tracers%data(tr_num)%ID         = tr_num
         tracers%data(tr_num)%AB_order   = 2
-        tracers%data(tr_num)%tra_adv_hor = 'MFCT'
+        tracers%data(tr_num)%tra_adv_hor = 'MUSCL'
         tracers%data(tr_num)%tra_adv_ver = 'QR4C'
         tracers%data(tr_num)%tra_adv_lim = 'FCT'
-        tracers%data(tr_num)%tra_adv_ph  = 0.0_WP    ! MFCT
+        tracers%data(tr_num)%tra_adv_ph  = 0.0_WP    ! MUSCL
         tracers%data(tr_num)%tra_adv_pv  = 1.0_WP    ! QR4C
         tracers%data(tr_num)%i_vert_diff = .true.
         tracers%data(tr_num)%valuesAB        = 0.0_WP
@@ -232,7 +232,7 @@ program fesom_stepdump
     allocate(tracers%work%del_ttf         (nl-1, mesh%nod2D))
     allocate(tracers%work%del_ttf_advhoriz(nl-1, mesh%nod2D))
     allocate(tracers%work%del_ttf_advvert (nl-1, mesh%nod2D))
-    call muscl_adv_init(tracers%work, mesh)     ! nboundary_lay, edge_up_dn_tri
+    call muscl_adv_init(tracers%work, mesh)     ! edge_up_dn_tri
 
     !===========================================================================
     ! forcing inputs (D7 explicit args; M2.10 forcing / M4 resolution will source them).

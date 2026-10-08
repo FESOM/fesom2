@@ -739,9 +739,9 @@ contains
         allocate(tracers%work%del_ttf_advhoriz(nl-1, nNodL), tracers%work%del_ttf_advvert(nl-1, nNodL))
         ! MUSCL gradients off: no up/downwind triangles make every on-the-fly up/dn
         ! increment 0 (the C6 closed forms assume the 2*dT-only reconstruction)
-        allocate(tracers%work%nboundary_lay(nNodL), tracers%work%edge_up_dn_tri(2, nEdgeO))
+        allocate(tracers%work%edge_up_dn_tri(2, nEdgeO))
         allocate(tracers%work%tr_xy(2, nl-1, nElemF))
-        tracers%work%nboundary_lay = 0; tracers%work%edge_up_dn_tri = 0
+        tracers%work%edge_up_dn_tri = 0
         tracers%work%tr_xy = 0.0_WP
         allocate(vel(2, nl-1, nElemF)); vel = 0.0_WP
         allocate(mesh%helem(nl-1, nElemF)); mesh%helem = real(h0, MP)   ! read by adv_tra_hor_upw1 (x vel = 0)

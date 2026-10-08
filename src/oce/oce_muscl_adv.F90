@@ -1,6 +1,6 @@
 module oce_muscl_adv
     ! MUSCL-type advection setup, transcribed from FESOM2 v2.7.3 oce_muscl_adv.F90.
-    !   muscl_adv_init            -> nboundary_lay (per-node bottom-boundary layer)
+    !   muscl_adv_init            -> calls find_up_downwind_triangles
     !   find_up_downwind_triangles-> edge_up_dn_tri (upwind/downwind tri per edge)
     !   fill_up_dn_grad           -> per-edge up/dn gradient (ORACLE only, see the routine)
     !
@@ -17,7 +17,8 @@ module oce_muscl_adv
     !  * muscl_adv_init's nn_num/nn_pos block (FESOM2 oce_muscl_adv.F90:59-90,106-127)
     !    is OMITTED: those node-neighbour arrays size off SSH_stiff (not built until
     !    M2.6) and are used only by quadratic reconstruction, NOT by horizontal
-    !    advection. Only the nboundary_lay loop is kept.
+    !    advection. FESOM2's nboundary_lay loop is also dropped: it fed only the clamp of
+    !    FESOM2's adv_tra_hor_muscl, which FESOM3 does not port (single unclamped kernel).
     !  * tr_xy is an explicit argument to fill_up_dn_grad (FESOM2 reads global o_ARRAYS).
     use mod_precision,   only: WP
     use mod_mesh,        only: t_mesh
@@ -34,40 +35,12 @@ contains
 
     !---------------------------------------------------------------------------
     subroutine muscl_adv_init(twork, mesh, partit)
-        ! oce_muscl_adv.F90:32-158 (nboundary_lay part only — see module header).
-        ! M2.12b: optional partit. nboundary_lay is sized OWNED+HALO and built from
-        ! OWNED edges with NO exchange — exactly as FESOM2 (muscl_adv_init:92-155); the
-        ! halo entries are the partition-local min, identical on both codes for the same
-        ! partition, so the owned-edge MUSCL flux byte-matches.
+        ! oce_muscl_adv.F90:32-158 (up/downwind triangles only — see module header).
         type(t_mesh),        intent(in)    :: mesh
         type(t_tracer_work), intent(inout) :: twork
         type(t_partit),      intent(in), optional :: partit
-        integer :: n
-        integer :: nNodO, nNodL, nEdgeO, nElemO
-
-        call owned_bounds(mesh, nNodO, nNodL, nEdgeO, nElemO, partit)
-
         ! find upwind and downwind triangle for each local edge
         call find_up_downwind_triangles(twork, mesh, partit)
-
-        ! node n becomes a boundary node below layer twork%nboundary_lay(n)
-        if (.not. allocated(twork%nboundary_lay)) allocate(twork%nboundary_lay(nNodL))
-        twork%nboundary_lay = mesh%nl - 1
-        do n = 1, nEdgeO
-            if (any(mesh%edge_tri(:, n) <= 0)) then
-                ! edge nodes already at the surface boundary: sign(1, nboundary_lay-nz)
-                ! must be negative at nz=1, so set nboundary_lay(edge nodes)=0.
-                twork%nboundary_lay(mesh%edges(:, n)) = 0
-            else
-                ! edge becomes a boundary edge with depth (bottom topography): at depth
-                ! nboundary_lay the edge still has two valid ocean triangles; below it
-                ! the edge is a boundary edge.
-                twork%nboundary_lay(mesh%edges(1, n)) = min(twork%nboundary_lay(mesh%edges(1, n)), &
-                    minval(mesh%nlevels(mesh%edge_tri(:, n))) - 1)
-                twork%nboundary_lay(mesh%edges(2, n)) = min(twork%nboundary_lay(mesh%edges(2, n)), &
-                    minval(mesh%nlevels(mesh%edge_tri(:, n))) - 1)
-            end if
-        end do
     end subroutine muscl_adv_init
 
 

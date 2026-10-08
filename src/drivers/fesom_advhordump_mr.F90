@@ -30,7 +30,7 @@ program fesom_advhordump_mr
     implicit none
 
     real(kind=WP), parameter :: dt   = 1800.0_WP
-    real(kind=WP), parameter :: opth = 0.0_WP    ! MFCT 4th-order fraction (FCT config)
+    real(kind=WP), parameter :: opth = 0.0_WP    ! MUSCL 4th-order fraction (FCT config)
     real(kind=WP), parameter :: optv = 1.0_WP    ! QR4C 4th-order fraction (FCT config)
 
     character(len=512) :: mesh_dir, out_prefix, out_path
@@ -158,11 +158,11 @@ program fesom_advhordump_mr
 
     call muscl_adv_init(tr%work, mesh, partit)
 
-    ! --- FCT config (MFCT/QR4C/FCT, AB2) -------------------------------------------
+    ! --- FCT config (MUSCL/QR4C/FCT, AB2) -------------------------------------------
     tr%data(1)%values(:,:)      = ttf
     tr%data(1)%valuesold(1,:,:) = ttfAB
     tr%data(1)%AB_order    = 2
-    tr%data(1)%tra_adv_hor = 'MFCT'
+    tr%data(1)%tra_adv_hor = 'MUSCL'
     tr%data(1)%tra_adv_ver = 'QR4C'
     tr%data(1)%tra_adv_lim = 'FCT'
     tr%data(1)%tra_adv_ph  = opth

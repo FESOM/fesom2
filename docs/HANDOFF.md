@@ -1410,12 +1410,11 @@ FESOM3 follows the reference RK3 code (`qq/oce_stepRK3.F90`, `t_hor_adv_muscl_RK
 
 - `init_tracers_AB` builds `twork%tr_xy` (elemental gradient of `values`, full element halo),
   persistent scratch; `solve_tracers_ale` reuses it for the horizontal diffusion / Redi.
-- `adv_tra_hor_muscl` / `adv_tra_hor_mfct(…, tr_xy, edge_up_dn_tri, …)`: side 1 takes `tr_xy` of
+- `adv_tra_hor_muscl(…, tr_xy, edge_up_dn_tri, …)`: side 1 takes `tr_xy` of
   the upwind triangle, side 2 that of the downwind triangle, on the levels where that triangle
   is wet; a missing or dry triangle gives a **zero** increment. No stored array, no node
   average. Kept from FESOM3 (not from the reference): `edge_dxdy` with the folded metric, edge
-  flux output for FCT, cavities (`ulevels`), the `nboundary_lay` clamp of `adv_tra_hor_muscl`,
-  the gradient of `values` (not of the advected `valuesAB`, as FESOM2).
+  flux output for FCT, cavities (`ulevels`), the gradient of `values` (not of the advected `valuesAB`, as FESOM2).
 - **Not bit-identical to FESOM2 any more**: identical on every (edge, level) where both edge
   triangles exist and the level is shared by both edge nodes; different at coasts and
   bathymetry / cavity steps (core2: 0.8 M of 10.9 M edge-levels, max |Δflux| 0.4 % of max
@@ -1429,6 +1428,13 @@ velocity signs; part S = equal to FESOM2 bitwise on the shared levels, different
 (teeth); part T = timing. core2 (login node, one MFCT call incl. the gradient preparation):
 np 4 42 vs 74 ms, np 1 180 vs 316 ms (~43 % faster than FESOM2's fill + kernel); memory
 -535 MiB in total (~1 MiB/rank at 512). Run the test on core2 with `ulimit -s unlimited`.
+
+**Single MUSCL kernel (2026-10-08)**: as in the reference RK3 code there is ONE MUSCL kernel,
+`adv_tra_hor_muscl` = FESOM2's `adv_tra_hor_mfct` (no boundary clamp; where the up/downwind
+triangle is missing or dry the face value is ⅔·T_up + ⅓·T_dn). FESOM2's clamped MUSCL and
+everything of `nboundary_lay` (init, `t_tracer_work` field, dump record) are removed;
+`tra_adv_hor` is `UPW1` or `MUSCL` (`'MFCT'` is no longer accepted). The production FCT
+path is unchanged bitwise (only the name). Without FCT the scheme runs but is not monotone.
 
 ## Momentum advection options (`momadv_opt`)
 

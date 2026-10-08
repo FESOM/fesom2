@@ -426,7 +426,7 @@ program fesom_lifecycle_native_mr
         allocate(tracers%data(tr_num)%valuesAB(nl-1, nNodL))
         allocate(tracers%data(tr_num)%valuesold(2, nl-1, nNodL))
         tracers%data(tr_num)%AB_order   = 2
-        tracers%data(tr_num)%tra_adv_hor = 'MFCT'
+        tracers%data(tr_num)%tra_adv_hor = 'MUSCL'
         tracers%data(tr_num)%tra_adv_ver = 'QR4C'
         tracers%data(tr_num)%tra_adv_lim = 'FCT'
         tracers%data(tr_num)%tra_adv_ph  = 0.0_WP

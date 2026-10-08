@@ -229,15 +229,15 @@ program fesom_lifecycle
 
     !===========================================================================
     ! tracer advection machinery: valuesAB / valuesold (cold start = values) +
-    ! FCT work arrays + muscl_adv_init, pi/CORE2 FCT config (MFCT/QR4C/FCT, opth=0/optv=1).
+    ! FCT work arrays + muscl_adv_init, pi/CORE2 FCT config (MUSCL/QR4C/FCT, opth=0/optv=1).
     do tr_num = 1, 2
         allocate(tracers%data(tr_num)%valuesAB(nl-1, mesh%nod2D))
         allocate(tracers%data(tr_num)%valuesold(2, nl-1, mesh%nod2D))
         tracers%data(tr_num)%AB_order   = 2
-        tracers%data(tr_num)%tra_adv_hor = 'MFCT'
+        tracers%data(tr_num)%tra_adv_hor = 'MUSCL'
         tracers%data(tr_num)%tra_adv_ver = 'QR4C'
         tracers%data(tr_num)%tra_adv_lim = 'FCT'
-        tracers%data(tr_num)%tra_adv_ph  = 0.0_WP    ! MFCT
+        tracers%data(tr_num)%tra_adv_ph  = 0.0_WP    ! MUSCL
         tracers%data(tr_num)%tra_adv_pv  = 1.0_WP    ! QR4C
         tracers%data(tr_num)%i_vert_diff = .true.
         tracers%data(tr_num)%valuesAB        = 0.0_WP

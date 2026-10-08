@@ -9,7 +9,7 @@ program fesom_advhordump
     ! max|delta|=0.
     !
     ! Pipeline (per FESOM2 do_oce_adv_tra horizontal path):
-    !   muscl_adv_init -> nboundary_lay, edge_up_dn_tri
+    !   muscl_adv_init -> edge_up_dn_tri
     !   tracer_gradient_elements -> tr_xy (the kernels take the up/dn reconstruction on
     !   the fly); fill_up_dn_grad -> the FESOM2 edge_up_dn_grad record (dump only)
     !   adv_tra_hor_upw1/_muscl -> adv_flux_hor (edge) ; scatter -> del_ttf_advhoriz
@@ -27,7 +27,7 @@ program fesom_advhordump
     use mod_dyn,          only: t_dyn
     use oce_tracer_grad,  only: tracer_gradient_elements
     use oce_muscl_adv,    only: muscl_adv_init, fill_up_dn_grad
-    use oce_adv_tra_hor,  only: adv_tra_hor_upw1, adv_tra_hor_muscl, adv_tra_hor_mfct
+    use oce_adv_tra_hor,  only: adv_tra_hor_upw1, adv_tra_hor_muscl
     use oce_adv_tra_ver,  only: adv_tra_ver_upw1, adv_tra_ver_qr4c
     use oce_adv_tra_flux, only: oce_tra_adv_flux2dtracer
     use oce_adv_tra_fct,  only: oce_tra_adv_fct
@@ -37,8 +37,8 @@ program fesom_advhordump
 
     ! Controlled-input parameters (must equal the FESOM2 oracle's)
     real(kind=WP), parameter :: dt      = 1800.0_WP   ! time step [s]
-    real(kind=WP), parameter :: num_ord = 0.75_WP     ! MUSCL/QR4C/MFCT 4th-order fraction (exercises both terms)
-    real(kind=WP), parameter :: opth    = 0.0_WP      ! MFCT 4th-order fraction in the pi FCT config (hor.Ord=0 -> 3rd order)
+    real(kind=WP), parameter :: num_ord = 0.75_WP     ! MUSCL/QR4C 4th-order fraction (exercises both terms)
+    real(kind=WP), parameter :: opth    = 0.0_WP      ! MUSCL 4th-order fraction in the pi FCT config (hor.Ord=0 -> 3rd order)
     real(kind=WP), parameter :: optv    = 1.0_WP      ! QR4C 4th-order fraction in the pi FCT config (vert.Ord=1 -> 4th order)
 
     character(len=512) :: mesh_dir, out_path
@@ -47,8 +47,8 @@ program fesom_advhordump
     type(t_tracer_work) :: twork
     integer :: nsw, e, n, nz, nl, u, nzmin, nzmax
     real(kind=WP), allocatable :: vel(:,:,:), ttf(:,:), tr_xy(:,:,:), eudg(:,:,:)
-    real(kind=WP), allocatable :: aflux_u(:,:), aflux_m(:,:)
-    real(kind=WP), allocatable :: dttf_u(:,:), dttf_m(:,:), dttf_v(:,:), flux_v(:,:)
+    real(kind=WP), allocatable :: aflux_u(:,:)
+    real(kind=WP), allocatable :: dttf_u(:,:), dttf_v(:,:), flux_v(:,:)
     real(kind=WP), allocatable :: wvel(:,:), aflux_vu(:,:), aflux_vq(:,:)
     real(kind=WP), allocatable :: dttf_vu(:,:), dttf_vq(:,:), zero_h(:,:)
     ! --- M1.3 FCT path ---
@@ -184,7 +184,7 @@ program fesom_advhordump
         end do
     end do
 
-    ! MUSCL setup: nboundary_lay + edge_up_dn_tri (+ zero edge_up_dn_grad)
+    ! MUSCL setup: edge_up_dn_tri
     call muscl_adv_init(twork, mesh)
 
     ! Elemental tracer gradient, then per-edge up/downwind gradient
@@ -193,8 +193,8 @@ program fesom_advhordump
     allocate(eudg(4, nl-1, mesh%edge2D))
     call fill_up_dn_grad(eudg, twork, tr_xy, mesh)     ! only for the FESOM2 dump record
 
-    allocate(aflux_u(nl-1, mesh%edge2D), aflux_m(nl-1, mesh%edge2D))
-    allocate(dttf_u(nl-1, mesh%nod2D), dttf_m(nl-1, mesh%nod2D))
+    allocate(aflux_u(nl-1, mesh%edge2D))
+    allocate(dttf_u(nl-1, mesh%nod2D))
     allocate(dttf_v(nl-1, mesh%nod2D), flux_v(nl, mesh%nod2D))
     flux_v = 0.0_WP
 
@@ -203,10 +203,8 @@ program fesom_advhordump
     dttf_u = 0.0_WP; dttf_v = 0.0_WP
     call oce_tra_adv_flux2dtracer(dt, dttf_u, dttf_v, aflux_u, flux_v, mesh)
 
-    ! --- MUSCL horizontal flux + scatter -> del_ttf_advhoriz ---
-    call adv_tra_hor_muscl(vel, ttf, mesh, num_ord, aflux_m, tr_xy, twork%edge_up_dn_tri, twork%nboundary_lay, o_init_zero=.true.)
-    dttf_m = 0.0_WP; dttf_v = 0.0_WP
-    call oce_tra_adv_flux2dtracer(dt, dttf_m, dttf_v, aflux_m, flux_v, mesh)
+    ! FESOM2's clamped MUSCL (adv_flux_hor_muscl / del_ttf_advhoriz_muscl) is not ported:
+    ! FESOM3's single MUSCL kernel is FESOM2's MFCT (adv_flux_hor_mfct below).
 
     ! --- VERTICAL advection: upw1 + qr4c, scatter -> del_ttf_advvert ---
     ! Scatter with a zero horizontal flux so only the vertical branch contributes;
@@ -227,7 +225,7 @@ program fesom_advhordump
 
     ! =====================================================================
     ! M1.3 FCT (Zalesak) path. pi namelist.tra tracers 1/2:
-    !   tra_adv_hor='MFCT'(opth=0.0), tra_adv_ver='QR4C'(optv=1.0), tra_adv_lim='FCT'.
+    !   tra_adv_hor='MFCT'(opth=0.0; FESOM3: 'MUSCL'), tra_adv_ver='QR4C'(optv=1.0), tra_adv_lim='FCT'.
     ! Mirror do_oce_adv_tra's FCT branch (oce_adv_tra_driver.F90:111-347):
     !   LO = UPW1(ttf) horiz + vert -> fct_LO ; HO antidiffusive = {MFCT(ttfAB)-LO,
     !   QR4C(ttfAB)-LO} ; oce_tra_adv_fct clips ; oce_tra_adv_flux2dtracer(use_lo).
@@ -243,9 +241,9 @@ program fesom_advhordump
     allocate(aflux_h_ho(nl-1, mesh%edge2D), aflux_v_ho(nl, mesh%nod2D))
     allocate(dttf_h_fct(nl-1, mesh%nod2D), dttf_v_fct(nl-1, mesh%nod2D))
 
-    ! standalone MFCT high-order horizontal flux from ttf (num_ord=0.75): gates the
-    ! MFCT kernel (no bottom clamp) independently of FCT (mirrors the MUSCL standalone).
-    call adv_tra_hor_mfct(vel, ttf, mesh, num_ord, aflux_mfct, tr_xy, twork%edge_up_dn_tri, o_init_zero=.true.)
+    ! standalone MUSCL high-order horizontal flux from ttf (num_ord=0.75), dumped under
+    ! FESOM2's name adv_flux_hor_mfct: gates the kernel independently of FCT.
+    call adv_tra_hor_muscl(vel, ttf, mesh, num_ord, aflux_mfct, tr_xy, twork%edge_up_dn_tri, o_init_zero=.true.)
 
     ! (1) low-order upwind horizontal flux from ttf -> adf_h
     call adv_tra_hor_upw1(vel, ttf, mesh, adf_h, o_init_zero=.true.)
@@ -277,8 +275,8 @@ program fesom_advhordump
         end do
     end do
     ! (exchange_nod(fct_LO) — no-op at 1 rank)
-    ! (5) high-order antidiffusive horizontal flux: MFCT(ttfAB)-LO (opth, o_init_zero=.false.)
-    call adv_tra_hor_mfct(vel, ttfAB, mesh, opth, adf_h, tr_xy, twork%edge_up_dn_tri, o_init_zero=.false.)
+    ! (5) high-order antidiffusive horizontal flux: MUSCL(ttfAB)-LO (opth, o_init_zero=.false.)
+    call adv_tra_hor_muscl(vel, ttfAB, mesh, opth, adf_h, tr_xy, twork%edge_up_dn_tri, o_init_zero=.false.)
     ! (6) high-order antidiffusive vertical flux: QR4C(ttfAB)-LO (optv, o_init_zero=.false.)
     call adv_tra_ver_qr4c(wvel, ttfAB, mesh, optv, adf_v, o_init_zero=.false.)
     aflux_h_ho = adf_h; aflux_v_ho = adf_v          ! capture pre-clip antidiffusive fluxes
@@ -297,7 +295,7 @@ program fesom_advhordump
     !   valuesold (sharp)  = ttfAB  (the M1.3 field)
     ! so init_tracers_AB's AB(2) interpolation valuesAB = -(0.5+eps)*valuesold +
     ! (1.5+eps)*values (eps=0.1) is exercised + byte-gated. Two configs: FCT
-    ! (MFCT/QR4C/FCT, opth=0/optv=1, the pi production config) and non-FCT
+    ! (MUSCL/QR4C/FCT, opth=0/optv=1, the pi production config) and non-FCT
     ! (MUSCL/QR4C/NON, ph=pv=0.75) which exercises do_zero_flux + the order knobs.
     ! =====================================================================
     tr%num_tracers = 1
@@ -315,7 +313,7 @@ program fesom_advhordump
     allocate(tr%work%del_ttf         (nl-1, mesh%nod2D))
     allocate(tr%work%del_ttf_advhoriz(nl-1, mesh%nod2D))
     allocate(tr%work%del_ttf_advvert (nl-1, mesh%nod2D))
-    call muscl_adv_init(tr%work, mesh)     ! nboundary_lay, edge_up_dn_tri
+    call muscl_adv_init(tr%work, mesh)     ! edge_up_dn_tri
     allocate(dyn%uv(2, nl-1, mesh%elem2D))
     allocate(dyn%w(nl, mesh%nod2D), dyn%w_e(nl, mesh%nod2D), dyn%w_i(nl, mesh%nod2D))
     dyn%uv = vel
@@ -325,11 +323,11 @@ program fesom_advhordump
     allocate(dttf_h_s(nl-1, mesh%nod2D),  dttf_v_s(nl-1, mesh%nod2D),  dttf_s(nl-1, mesh%nod2D))
     allocate(dttf_h_sn(nl-1, mesh%nod2D), dttf_v_sn(nl-1, mesh%nod2D), dttf_sn(nl-1, mesh%nod2D))
 
-    ! --- FCT config (pi tracer 1: MFCT/QR4C/FCT, opth=0/optv=1, AB2) ---
+    ! --- FCT config (pi tracer 1: MUSCL/QR4C/FCT, opth=0/optv=1, AB2) ---
     tr%data(1)%values(:,:)      = ttf
     tr%data(1)%valuesold(1,:,:) = ttfAB
     tr%data(1)%AB_order    = 2
-    tr%data(1)%tra_adv_hor = 'MFCT'
+    tr%data(1)%tra_adv_hor = 'MUSCL'
     tr%data(1)%tra_adv_ver = 'QR4C'
     tr%data(1)%tra_adv_lim = 'FCT'
     tr%data(1)%tra_adv_ph  = opth
@@ -358,14 +356,11 @@ program fesom_advhordump
     call wr_r2(u, 'ttf',                    real(ttf, MP))
     call wr_r3(u, 'vel',                    real(vel, MP))
     call wr_r2(u, 'helem',                  mesh%helem(1:nl-1, 1:mesh%elem2D))
-    call wr_i1(u, 'nboundary_lay',          twork%nboundary_lay(1:mesh%nod2D))
     call wr_i2(u, 'edge_up_dn_tri',         twork%edge_up_dn_tri(1:2, 1:mesh%edge2D))
     call wr_r3(u, 'tr_xy',                  real(tr_xy, MP))
     call wr_r3(u, 'edge_up_dn_grad',        real(eudg(1:4, 1:nl-1, 1:mesh%edge2D), MP))
     call wr_r2(u, 'adv_flux_hor_upw1',      real(aflux_u, MP))
     call wr_r2(u, 'del_ttf_advhoriz_upw1',  real(dttf_u, MP))
-    call wr_r2(u, 'adv_flux_hor_muscl',     real(aflux_m, MP))
-    call wr_r2(u, 'del_ttf_advhoriz_muscl', real(dttf_m, MP))
     call wr_r2(u, 'wvel',                   real(wvel, MP))
     call wr_r2(u, 'zbar_3d_n',              mesh%zbar_3d_n(1:nl,   1:mesh%nod2D))
     call wr_r2(u, 'Z_3d_n',                 mesh%Z_3d_n(1:nl-1,    1:mesh%nod2D))

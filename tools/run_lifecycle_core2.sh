@@ -16,7 +16,7 @@
 #                    run_length 50->N, ResultPath ./   (step_per_day=48 -> dt=1800 kept)
 #   namelist.oce:    mix_scheme KPP->PP, Fer_GM/Redi .true.->.false.
 #   namelist.dyn/tra already match (opt_visc=7, momadv_opt=2, use_wsplit=.false., AB_order=2,
-#                    MFCT/QR4C/FCT, i_vert_diff=.true., K_hor=0, use_instabmix, ...)
+#                    MUSCL/QR4C/FCT, i_vert_diff=.true., K_hor=0, use_instabmix, ...)
 # Needs the hand-crafted CORE2 dist_1/ (tools/make_dist1.py, M2.11a).
 #
 #   tools/run_lifecycle_core2.sh [run_dir] [dump_prefix] [nsteps] [nranks]

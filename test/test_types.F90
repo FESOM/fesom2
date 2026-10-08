@@ -169,14 +169,13 @@ contains
         allocate(a%data(2))
         allocate(a%data(1)%values(nl-1, nn), a%data(2)%values(nl-1, nn))
         allocate(a%data(2)%valuesold(nl-1, nn, 2))
-        allocate(a%work%del_ttf(nl-1, nn), a%work%nboundary_lay(nn))
+        allocate(a%work%del_ttf(nl-1, nn))
         a%data(1)%ID = 1; a%data(1)%tra_adv_hor = 'MUSCL'; a%data(1)%tra_adv_lim = 'FCT'
         a%data(2)%ID = 2; a%data(2)%tra_adv_ver = 'QR4C'
         a%data(1)%values = reshape([(real(i, WP)*0.4_WP, i=1, (nl-1)*nn)], [nl-1, nn])
         a%data(2)%values = a%data(1)%values * (-1.0_WP)
         a%data(2)%valuesold = reshape([(real(i, WP)*0.05_WP, i=1, (nl-1)*nn*2)], [nl-1, nn, 2])
         a%work%del_ttf = a%data(1)%values + 100.0_WP
-        a%work%nboundary_lay = [(i, i=1, nn)]
 
         u = scratch_write_open(); write(u, iostat=ios) a; close(u)
         u = scratch_read_open();  read(u,  iostat=ios) b; close(u)
@@ -189,7 +188,6 @@ contains
         if (maxval(abs(b%data(1)%values - a%data(1)%values)) /= 0.0_WP) call fail('tracer data(1)%values')
         if (maxval(abs(b%data(2)%valuesold - a%data(2)%valuesold)) /= 0.0_WP) call fail('tracer data(2)%valuesold (3D)')
         if (maxval(abs(b%work%del_ttf - a%work%del_ttf)) /= 0.0_MP) call fail('tracer work%del_ttf')
-        if (any(b%work%nboundary_lay /= a%work%nboundary_lay)) call fail('tracer work%nboundary_lay')
     end subroutine
 
     subroutine test_ice()
