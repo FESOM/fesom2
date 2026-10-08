@@ -32,13 +32,14 @@ module oce_ale_mixing_pp
     ! 1..elem2D (FESOM2 myDim, no halo elements on 1-rank). oce_mixing_pp has NO halo
     ! exchange (purely local per-node/per-element), so nothing is dropped here. Byte-
     ! identical to FESOM2 by L9 transitivity: every operand is pinned (bvfreq M2.1; uvnode/
-    ! Z_3d_n/geometry geom-gated), and sum(Kv(nz,elnodes)**2) is a fixed 3-element array
-    ! order. elem2D_nodes is MAX_NV=4 in FESOM3 -> slice (1:3) (the L15 trap).
+    ! Z_3d_n/geometry geom-gated). The element mean of Kv**2 is the kite-weighted one over
+    ! the 4 vertex slots (sum(elem_w*Kv(nz,elnodes)**2); FESOM2: plain /3), so triangles
+    ! now agree with FESOM2 to roundoff only.
     !
     ! Kv0_const=.false. (Kv0_background_qiang) and the cavity nzmin>1 path are transcribed
     ! faithfully but UNGATED on pi (Kv0_const=.true., no cavity) — re-gated at M2.11.
     use mod_precision,  only: WP
-    use mod_mesh,       only: t_mesh
+    use mod_mesh,       only: t_mesh, MAX_NV
     use mod_dyn,        only: t_dyn
     use mod_constants,  only: rad
     use mod_param_phys, only: mix_coeff_PP, A_ver, K_ver, Kv0_const
@@ -54,14 +55,14 @@ contains
     subroutine oce_mixing_pp(dyn, mesh, partit)
         ! M2.12c: optional partit -> the FESOM2 bounds (oce_ale_mixing_pp.F90): the two
         ! node passes run 1..myDim_nod2D+eDim_nod2D (the elem pass reads the factor at the
-        ! element's 3 corner nodes, which can be halo, so the factor must be valid on the
+        ! element's vertices, which can be halo, so the factor must be valid on the
         ! halo — uvnode is halo-exchanged by compute_vel_nodes, bvfreq computed on the
         ! halo by pressure_bv, so no exchange is needed here); the elem pass runs
         ! 1..myDim_elem2D (Av is consumed at owned elements by impl_vert_visc_ale).
         type(t_mesh), intent(in)            :: mesh
         type(t_dyn),  intent(inout), target :: dyn
         type(t_partit), intent(in), optional :: partit
-        integer       :: node, nz, nzmax, nzmin, elem, elnodes(3)
+        integer       :: node, nz, nzmax, nzmin, elem, elnodes(MAX_NV)
         integer       :: nNodO, nNodL, nEdgeO, nElemO
         real(kind=WP) :: shear, Kv0_b
         real(kind=WP), dimension(:,:),   pointer :: Kv, Av, bvfreq, shear2
@@ -88,13 +89,13 @@ contains
         end do
 
         !_______________________________________________________________________
-        ! viscosity (elements): Av = mix_coeff_PP*mean(factor^2) + A_ver.
+        ! viscosity (elements): Av = mix_coeff_PP*mean(factor^2) + A_ver (kite-weighted mean).
         do elem = 1, nElemO
-            elnodes = mesh%elem2D_nodes(1:3,elem)
+            elnodes = mesh%elem2D_nodes(:,elem)
             nzmin = mesh%ulevels(elem)
             nzmax = mesh%nlevels(elem)
             do nz = nzmin+1, nzmax-1
-                Av(nz,elem) = mix_coeff_PP*sum(Kv(nz,elnodes)**2)/3.0_WP + A_ver
+                Av(nz,elem) = mix_coeff_PP*sum(mesh%elem_w(:,elem)*Kv(nz,elnodes)**2) + A_ver
             end do
         end do
 

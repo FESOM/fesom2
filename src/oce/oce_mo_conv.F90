@@ -18,10 +18,10 @@ module oce_mo_conv
     !     cff    = max(N2, n2ref);  cff = min(1, (n2ref - cff)/n2ref)
     !     nu_sxc = (1 - cff^2)^3                    ! 0 at N2 = 0, 1 at N2 <= n2ref
     !     Kv     = Kv + instabmix_kv*nu_sxc         ! ADDITIVE, as in ROMS
-    !     Av     = Av + instabmix_kv*maxval(nu_sxc over the element's 3 nodes)
+    !     Av     = Av + instabmix_kv*maxval(nu_sxc over the element's vertices)
     ! Continuous in N^2, so no discontinuous coefficient enters the implicit vertical
     ! solve; additive rather than max() so there is no second kink where the incoming
-    ! scheme value crosses the floor; maxval over the 3 corner nodes is the continuous
+    ! scheme value crosses the floor; maxval over the corner nodes is the continuous
     ! generalisation of FESOM2's any(... < 0). A stable cell gets nu_sxc = 0 EXACTLY, so
     ! stable columns are bit-unchanged. In the saturated limit under PP the net effect is
     ! Kv = 0.010 + 0.1 instead of max(0.010, 0.1) — a 10% increase, not a regime change.
@@ -62,10 +62,10 @@ module oce_mo_conv
     ! bottom, so no FESOM2 run shares this mesh discretisation. The live net is
     ! tools/run_conserve_pi.sh, which is unaffected: vertical diffusion is conservative for
     ! ANY Kv, so changing the coefficient cannot move the heat/salt/volume budgets.
-    ! elem2D_nodes MAX_NV=4 in FESOM3 -> slice (1:3) (the L15 trap). cavity nzmin>1 path
-    ! transcribed, ungated on pi.
+    ! The maxval runs over all 4 vertex slots (a triangle's repeated 4th slot leaves the
+    ! max unchanged). cavity nzmin>1 path transcribed, ungated on pi.
     use mod_precision,  only: WP
-    use mod_mesh,       only: t_mesh
+    use mod_mesh,       only: t_mesh, MAX_NV
     use mod_dyn,        only: t_dyn
     use mod_param_phys, only: use_instabmix, instabmix_kv, instabmix_n2ref, &
                               use_windmix, windmix_kv, windmix_nl
@@ -91,13 +91,13 @@ contains
 
     subroutine mo_convect(dyn, mesh, partit)
         ! M2.12c: optional partit -> the FESOM2 bounds (oce_mo_conv.F90): the node pass
-        ! runs 1..myDim_nod2D+eDim_nod2D (the elem pass reads bvfreq at the element's 3
+        ! runs 1..myDim_nod2D+eDim_nod2D (the elem pass reads bvfreq at the element's
         ! corner nodes, halo-valid from pressure_bv, so no exchange) and the elem pass
         ! runs 1..myDim_elem2D (Av consumed at owned elements).
         type(t_mesh), intent(in)            :: mesh
         type(t_dyn),  intent(inout), target :: dyn
         type(t_partit), intent(in), optional :: partit
-        integer       :: node, elem, nz, nzmin, nzmax, elnodes(3)
+        integer       :: node, elem, nz, nzmin, nzmax, elnodes(MAX_NV)
         integer       :: nNodO, nNodL, nEdgeO, nElemO
         real(kind=WP) :: n2ref, n2ref_inv
         real(kind=WP), dimension(:,:), pointer :: Kv, Av, bvf
@@ -137,11 +137,11 @@ contains
         ! enhance vertical VISCOSITY (elements): convective adjustment + wind mixing.
         ! (the use_momix Monin-Obukhov viscosity term is DEFERRED to M2.10 — see header.)
         do elem = 1, nElemO
-            elnodes = mesh%elem2D_nodes(1:3,elem)
+            elnodes = mesh%elem2D_nodes(:,elem)
             nzmax = mesh%nlevels(elem)
             nzmin = mesh%ulevels(elem)
             do nz = nzmin+1, nzmax-1
-                ! convection: strongest of the element's 3 corner ramps (was any(N^2<0))
+                ! convection: strongest of the element's corner ramps (was any(N^2<0))
                 if (use_instabmix) Av(nz,elem) = Av(nz,elem) &
                     + instabmix_kv*maxval(convec_ramp(bvf(nz,elnodes), n2ref, n2ref_inv))
                 ! cavity: no Monin-Obukhov / wind mixing

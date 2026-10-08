@@ -18,11 +18,11 @@ module oce_fer_gm
     !    Thomas-sweep divides keep the same (scalar) codegen as the oracle (the L29 trap:
     !    a derived-type/explicit array the compiler can prove distinct may vectorize a
     !    divide the oracle compiles scalar). The TDMA is a serial recurrence anyway.
-    !  - fer_gamma2vel `zinv=onethird/helem` and init_Redi_GM `bvfreq/bvref` (dead) /
+    !  - fer_gamma2vel `zinv=1/helem` and init_Redi_GM `bvfreq/bvref` (dead) /
     !    GMzexp exp-divide are scalar per node/level; gated, add !DIR$ NOVECTOR only if a
     !    field drifts ~1 ULP.
     use mod_precision,   only: WP
-    use mod_mesh,        only: t_mesh
+    use mod_mesh,        only: t_mesh, MAX_NV
     use mod_constants,   only: density_0, g, pi
     use mod_param_phys,  only: Fer_GM, Redi, Redi_Kmax, Redi_Kmin, Redi_Ktaper, K_hor, &
                                K_GM_max, K_GM_min, K_GM_cm, K_GM_cmin, K_GM_resscalorder, &
@@ -290,27 +290,27 @@ contains
 
     !===========================================================================
     subroutine fer_gamma2vel(mesh, fer_gamma, fer_uv, partit)
-        ! GM bolus horizontal velocity fer_uv(1:2,nz,el) = (1/3h)*sum_nodes(Gamma_nz-Gamma_nz+1)
-        ! (FESOM2 oce_fer_gm.F90:168). fer_uv MUST enter zeroed below-bottom (only nzmin..nzmax-1
-        ! written). zinv=onethird/helem is the SIMD-divide watch item.
+        ! GM bolus horizontal velocity fer_uv(1:2,nz,el) = (1/h)*sum_k elem_w(k)*(Gamma_nz-Gamma_nz+1)
+        ! over the 4 vertex slots (FESOM2 oce_fer_gm.F90:168 had the plain 1/3 mean). fer_uv MUST
+        ! enter zeroed below-bottom (only nzmin..nzmax-1 written). zinv=1/helem is the
+        ! SIMD-divide watch item.
         type(t_mesh),   intent(in)    :: mesh
         real(kind=WP),  intent(in)    :: fer_gamma(2, mesh%nl, mesh%nod2D)
         real(kind=WP),  intent(inout) :: fer_uv(2, mesh%nl-1, mesh%elem2D)
         type(t_partit), intent(in), optional :: partit
-        integer       :: nz, nzmax, nzmin, el, elnod(3), nNodO, nNodL, nEdgeO, nElemO
+        integer       :: nz, nzmax, nzmin, el, elnod(MAX_NV), nNodO, nNodL, nEdgeO, nElemO
         real(kind=WP) :: zinv
-        real(kind=WP) :: onethird = 1._WP/3._WP
 
         call owned_bounds(mesh, nNodO, nNodL, nEdgeO, nElemO, partit)
 
         do el = 1, nElemO
-            elnod = mesh%elem2D_nodes(1:3,el)
+            elnod = mesh%elem2D_nodes(:,el)
             nzmax = mesh%nlevels(el)
             nzmin = mesh%ulevels(el)
             do nz = nzmin, nzmax-1
-                zinv = onethird/mesh%helem(nz,el)
-                fer_uv(1,nz,el) = sum(fer_gamma(1,nz,elnod)-fer_gamma(1,nz+1,elnod))*zinv
-                fer_uv(2,nz,el) = sum(fer_gamma(2,nz,elnod)-fer_gamma(2,nz+1,elnod))*zinv
+                zinv = 1.0_WP/mesh%helem(nz,el)
+                fer_uv(1,nz,el) = sum(mesh%elem_w(:,el)*(fer_gamma(1,nz,elnod)-fer_gamma(1,nz+1,elnod)))*zinv
+                fer_uv(2,nz,el) = sum(mesh%elem_w(:,el)*(fer_gamma(2,nz,elnod)-fer_gamma(2,nz+1,elnod)))*zinv
             end do
         end do
 

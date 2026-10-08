@@ -234,6 +234,29 @@ foreach(_mix KPP TKE)
         SKIP_REGULAR_EXPRESSION "cannot open;No such file")
 endforeach()
 
+# Task 12 (hybrid meshes): the mixing / GM kernels (PP default, KPP, TKE, GM, Redi) on the
+# NEMO-mixed cut-out (closed regional boundaries, triangles + quads), np 1 and 2. The
+# element means of Av/viscAE/fer_uv are kite-weighted (elem_w); the driver's helem
+# invariant checks the same elem_w mean on every element.
+foreach(_np 1 2)
+    foreach(_mix PP KPP:FESOM3_MIX_KPP TKE:FESOM3_MIX_TKE GM:FESOM3_FER_GM REDI:FESOM3_REDI)
+        string(REPLACE ":" ";" _pair ${_mix})
+        list(GET _pair 0 _tag)
+        set(_knob "")
+        list(LENGTH _pair _len)
+        if(_len GREATER 1)
+            list(GET _pair 1 _var)
+            set(_knob "${_var}=1;")
+        endif()
+        add_test(NAME fesom_conserve_mixcut_${_tag}_np${_np}
+                 COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np ${_np}
+                         $<TARGET_FILE:fesom_conserve>)
+        set_tests_properties(fesom_conserve_mixcut_${_tag}_np${_np} PROPERTIES
+            ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/nemo025mix_cut;FESOM3_IC_FILE=/pool/data/AWICM/FESOM2/INITIAL/phc3.0/phc3.0_winter.nc;FESOM3_NSTEPS=20;FESOM3_WHICH_ALE=zstar;${_knob}FESOM3_CONSERVE_TOL=1e-12"
+            SKIP_REGULAR_EXPRESSION "cannot open;No such file")
+    endforeach()
+endforeach()
+
 # Smooth w = w_e + w_i split (use_wsplit, docs/plans/completed/2026-10-02-wsplit-smooth.md) with all
 # its consumers live: momentum TDMA + advection, the tracer-diffusion TDMA and the FCT
 # adv_tra_vert_impl. The 20-step cold start never reaches CFL_z ~ 1 (measured max

@@ -17,7 +17,7 @@ program fesom_conserve
     !   2. NO VELOCITY LEAKAGE (spec T10). UV(:,nz,e) must be exactly 0 for
     !      nz >= nlevels(e): velocity DOF in partly-land prisms must never be assembled.
     !
-    !   3. THICKNESS CONSISTENCY. helem(nz,e) == sum(hnode(nz,elnodes))/3 over the FULL
+    !   3. THICKNESS CONSISTENCY. helem(nz,e) == sum(elem_w*hnode(nz,elnodes)) over the FULL
     !      element range nz in [ulevels(e), nlevels(e)-1], and zbar_e_bot(e) ==
     !      zbar(nlevels(e)). Catches the zstar helem bottom-layer bound: today the node
     !      hnode commit stops at nlevels_nod2D_min(n)-2 <= nlevels(e)-2 so the element's
@@ -69,7 +69,7 @@ program fesom_conserve
     use mod_config,         only: use_sw_pene
     use oce_mixing_kpp,     only: oce_mixing_kpp_init
     use oce_mixing_tke,     only: tke_init
-    use mod_mesh,           only: t_mesh
+    use mod_mesh,           only: t_mesh, MAX_NV
     use mod_partit,         only: t_partit
     use mod_partitioning,   only: par_init, par_ex, set_partition
     use mod_mesh_read,      only: read_mesh
@@ -581,7 +581,7 @@ contains
     subroutine check_invariants(step)
         ! Contents (1=heat, 2=salt) into `content`, plus the three hard invariants.
         integer, intent(in) :: step
-        integer       :: i, j, k, kmin, kmax, elnodes(3)
+        integer       :: i, j, k, kmin, kmax, elnodes(MAX_NV)
         real(kind=WP) :: acc, hmean, tol
 
         !______________________________________________________________________
@@ -628,9 +628,9 @@ contains
         end do
 
         !______________________________________________________________________
-        ! 3. helem == mean of the three nodal hnode over the FULL element range, and the
-        !    element bottom depth is the derived one. Relative tolerance: the mean is a
-        !    sum-of-three divided by 3, which is not exact even when all three agree.
+        ! 3. helem == kite-weighted (elem_w) mean of the vertex hnode over the FULL element
+        !    range, and the element bottom depth is the derived one. Relative tolerance: the
+        !    weighted sum is not exact even when all vertices agree.
         tol = 1.0e-13_WP
         do j = 1, nElemO
             if (mesh%nlevels(j) <= 0) cycle
@@ -639,10 +639,10 @@ contains
                     step, ' rank ', partit%mype, ' elem ', j
                 error stop 1
             end if
-            elnodes = mesh%elem2D_nodes(1:3, j)
+            elnodes = mesh%elem2D_nodes(:, j)
             kmin = mesh%ulevels(j); kmax = mesh%nlevels(j)-1
             do k = kmin, kmax
-                hmean = real(sum(mesh%hnode(k, elnodes)), WP) / 3.0_WP
+                hmean = sum(mesh%elem_w(:, j)*real(mesh%hnode(k, elnodes), WP))
                 if (abs(real(mesh%helem(k,j), WP) - hmean) > tol*max(abs(hmean), 1.0_WP)) then
                     write(*,'(a,i0,a,i0,a,i0,a,i0,a,2es24.16)') &
                         'fesom_conserve: helem VIOLATED at step ', step, ' rank ', partit%mype, &

@@ -703,9 +703,27 @@ fluxes and nonlinear terms can. Asserted in a test (Task 9), measured in the sho
 - Modify: `src/oce/oce_fer_gm.F90`, `src/oce/oce_mixing_kpp.F90`, `src/oce/oce_mixing_tke.F90`,
   `src/oce/oce_ale_mixing_pp.F90`, `src/oce/oce_mo_conv.F90`
 
-- [ ] element means via `elem_w` (incl. `fer_uv`, `oce_fer_gm.F90:296-318`)
-- [ ] tests: KPP/TKE/PP/GM conservation variants (`fesom_conserve`) on the mixed cut-out
-- [ ] run ctest — must pass before Task 13
+- ➕ Modify: `src/drivers/fesom_conserve.F90` (helem invariant = `elem_w` mean), `test/CMakeLists.txt`
+
+- [x] element means via `elem_w` (incl. `fer_uv`, `oce_fer_gm.F90:296-318`)
+      — `fer_gamma2vel` `sum(elem_w*(Γ_nz−Γ_nz+1))/helem` (the `onethird` constant gone);
+      KPP `viscAE`, TKE `Av`, PP `Av = mix_coeff_PP·sum(elem_w·Kv²) + A_ver`; `mo_convect`
+      maxval of the convective ramp over all 4 slots (a triangle's repeated slot leaves the max
+      unchanged); `elnodes(MAX_NV)` everywhere, comments "3 corner nodes" → vertices. Not
+      changed: the GM/Redi resolution scaling `(area(n)·2/refres²)^(1/2)` (FESOM2 tuning; the
+      factor 2 = element/node area ratio of triangles — on all-quad meshes it overstates the
+      resolution by √2; a user decision, recorded in the progress file); the KPP blmc smoothing
+      already goes through `smooth_nod` (Task 11)
+- [x] tests: KPP/TKE/PP/GM conservation variants (`fesom_conserve`) on the mixed cut-out
+      — 10 new ctests `fesom_conserve_mixcut_{PP,KPP,TKE,GM,REDI}_np{1,2}` (zstar, 20 steps,
+      PHC IC on the closed NEMO-mixed cut-out, tol 1e-12): measured |drift| ≤ 1.3e-14 heat/salt,
+      ≤ 9.3e-15 volume; the driver's helem invariant now checks the `elem_w` mean (with the old
+      `/3` check it is wrong on quads)
+- [x] run ctest — must pass before Task 13 — scratch ctest 117/117; `run_tri_regression.sh` 7/7
+      (pi PRE 4.3e-11 (Kv; was 6.3e-15 — the TKE/PP Av element mean now goes through elem_w,
+      thresholds amplify), EARLY 3.2e-12, OCEAN 7.4e-8; CORE2 EARLY 7.5e-9, OCEAN 2.8e-5, ICE
+      1.0e-4, MIX 6.6e-4; decomp OCEAN 6.4e-10 dumps/7.0e-9 float32 w; conservation totals
+      ≤ 4.3e-16)
 
 ### Task 13: Forcing and ice–ocean coupling
 

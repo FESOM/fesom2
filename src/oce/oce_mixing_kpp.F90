@@ -68,7 +68,8 @@ contains
     !   blmix_kpp BL mixing coeffs blmc(3) + dkm1(3) + nonlocal ghats (M5a-4)
     !   enhance   kbl-1 interface blend (M5a-4)
     !   combine   within the BL take max(interior, blmc); outside zero ghats (in place)
-    !   average   node viscA -> element viscAE (Av), minmix=3e-3 surface floor
+    !   average   node viscA -> element viscAE (Av, kite-weighted elem_w mean), minmix=3e-3
+    !             surface floor
     ! Outputs: dynamics%work%Av (element momentum viscosity; impl_vert_visc_ale reads it,
     ! UNCHANGED) + dynamics%work%Kv_double (node T/S diffusivity; step_oce copies (:,:,1)
     ! -> Kv for the tracer TDMA, UNCHANGED). Kv_double(:,:,2) (S channel) is a dead output
@@ -81,7 +82,7 @@ contains
     ! .F90:347-413 dVsq/ustar/Bo and the combine + node->elem average is :452-492 — both
     ! already byte-proven inline in the M5a-3/a-4 CORE2+pi pressure gate.
     subroutine oce_mixing_kpp_driver(dynamics, tracers, stress_node_surf, heat_flux, water_flux, mesh, partit)
-        use mod_mesh,        only: t_mesh
+        use mod_mesh,        only: t_mesh, MAX_NV
         use mod_dyn,         only: t_dyn
         use mod_tracer,      only: t_tracer
         use mod_partit,      only: t_partit
@@ -98,7 +99,7 @@ contains
         type(t_partit), intent(in),    optional :: partit
 
         real(kind=WP), parameter :: minmix = 3.0e-3_WP  ! surface viscAE floor (avoids huge surf vel)
-        integer :: node, nz, nzmin, nzmax, elem, elnodes(3)
+        integer :: node, nz, nzmin, nzmax, elem, elnodes(MAX_NV)
         integer :: nNodO, nNodL, nEdgeO, nElemO
         real(kind=WP) :: usurf, vsurf, u_loc, v_loc
         real(kind=WP), pointer :: viscAE(:,:), viscA(:,:), Kv_double(:,:,:)
@@ -215,12 +216,13 @@ contains
 
         !_______________________________________________________________________
         ! node viscA -> element viscAE (Av), with the minmix surface floor. :478-492.
+        ! Element mean = kite-weighted sum over the 4 vertex slots (FESOM2: plain /3).
         do elem = 1, nElemO
-            elnodes = mesh%elem2D_nodes(1:3,elem)
+            elnodes = mesh%elem2D_nodes(:,elem)
             nzmin   = mesh%ulevels(elem)
             nzmax   = mesh%nlevels(elem)
             do nz = nzmin, nzmax-1
-                viscAE(nz,elem) = sum(viscA(nz,elnodes))/3.0_WP
+                viscAE(nz,elem) = sum(mesh%elem_w(:,elem)*viscA(nz,elnodes))
             end do
             viscAE(nzmax,elem) = viscAE(nzmax-1,elem)
             if (viscAE(nzmin,elem) < minmix) viscAE(nzmin,elem) = minmix
