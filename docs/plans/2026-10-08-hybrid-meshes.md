@@ -1110,10 +1110,21 @@ All runs below use ONE build: a clean clone of the committed HEAD 98b5164
       tri_regression_core2w,cutout_short}.log`)
 
 ### Task 20: [Final] Update documentation
-- [ ] `docs/HANDOFF.md`: mixed-mesh section (formats, arrays, conventions, setup workflow,
+- [x] `docs/HANDOFF.md`: mixed-mesh section (formats, arrays, conventions, setup workflow,
       exchanges, retired gates, checkerboard property, ice FCT lumped mass)
-- [ ] `docs/LESSONS.md`: lessons learned
-- [ ] move this plan to `docs/plans/completed/`
+      — one section "Hybrid (mixed triangle + quad) meshes": new subsections File formats, Mesh
+      arrays and conventions, Geometry, Kernels, Exchanges and halo rings, SSH stiffness matrix and
+      the checkerboard null mode, Sea ice, Tests and tools; the Task-18 subsections (setup workflow,
+      CORE2 throughput, NEMO job) kept in it; "Gate migration for hybrid meshes" MOVED into it from
+      "Gate recipes (archived)" (pointer left there; CORE2 EARLY 1e-7 and the end-of-plan levels
+      added); new "Known findings / open questions for the user" (15 items). "Where we are" status
+      line; the SSH-solver line (Jacobi preconditioner `28af61c`, `FESOM3_SSH_SOLTOL`/`MAXITER`) under
+      the M2.12c-2 milestone
+- [x] `docs/LESSONS.md`: lessons learned — L62–L69 (MATLAB precision port, 4-slot slot-use
+      classification, frozen reference + amplifier control runs, checkerboard null mode, exact
+      ingredients vs assembled tendency, FCT lumped mass, wrapped element embedding, verify setup
+      outputs against the reader)
+- [x] move this plan to `docs/plans/completed/` (moved by the orchestrator after the review phases)
 
 ## Post-Completion
 *Items requiring manual intervention or external systems - no checkboxes, informational only*

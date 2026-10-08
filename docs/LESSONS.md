@@ -2657,3 +2657,186 @@ first 32 KB, stale tail. Evidence:
 - **It hid for months** because whether a buffer lands on trimmed-and-regrown heap pages depends
   on the allocation history of the whole program (2-D fields, pi np 2 rarely hit it); earlier
   "transient MPI failures" of login-node ctest runs without `env.sh` may have been this.
+
+
+## L62 — A faithful port of a MATLAB mesh script is only byte-checkable if it keeps MATLAB's precision rules: float32 inputs stay float32 and every single/double mix is computed in single ("single wins")
+
+**Context.** Hybrid-mesh plan, Task 1 (`tools/mesh/nemo_meshq.py`, commit `d4c6f8d`). The MATLAB
+outputs of `nemo_meshq.m` (`nod2d.out`, `elem2d.out`, `depth.out`, saved to
+`/work/ab0995/a270029/meshes/nemo025q/ref_matlab/` before anything could overwrite them) were the
+byte oracle. The NEMO inputs are float32 (`nav_lon/lat/lev`, `glamf/gphif`), int16 (`mbathy`) and int8.
+
+**Lessons.**
+- **Port the arithmetic types, not only the statements.** In MATLAB `single op double` is single, so
+  the `levels` recursion and the f-point corrections run in float32; numpy promotes to float64 and
+  prints different 4th decimals. Emulating "single wins" made `elem2d.out` and `depth.out`
+  byte-identical and left ONE line of `nod2d.out` (node 711389, a fold point: -83.6347 vs -83.6348).
+- **The last ulp of a transcendental function is not portable -- list it, do not chase it.** That
+  line is 1 float32 ulp of `atan2` straddling the print rounding; correctly-rounded cos/atan2/acos
+  variants and double-precision semantics matched WORSE. The test (`tools/mesh/test_nemo_meshq.sh`)
+  allows <= 20 listed coordinate lines differing by <= 1e-4 and requires the rest byte-identical.
+- **Save the oracle first and keep order-dependent loops sequential.** Land removal edits `bathy`
+  while scanning; quad creation and node compaction define the numbering -- vectorising them changes
+  the mesh, not just the speed. Order-independent loops may be vectorised.
+
+
+## L63 — One code path for triangles and quads (4 slots, triangle 4th = 1st) removes every branch only if each USE of the repeated slot is classified: weighted sums and max/min are safe, counts and per-vertex updates are not -- and the boundary convention changes everywhere in one commit
+
+**Context.** Hybrid-mesh plan, Tasks 6-16. Storage: `elem2D_nodes(4,·)` with a triangle repeating
+its 1st vertex; degenerate-slot conventions so that no kernel needs `if (nv == 3)`: gradient slot 4 =
+0, kite weight `elem_w(4)` = 0, a missing neighbour = the element itself, a missing `edge_tri(2)` =
+`edge_tri(1)` with `edge_cross_dxdy(3:4) = 0`, a triangle's side 4 has zero length (normal 0).
+
+**What it took.**
+- **Weighted sums are safe** (slot 4 adds exactly 0: gradients, `elem_w` means, the SSH and ice-TG
+  scatters, `stress2rhs`), **max/min are safe** (the repeated value changes nothing: FCT bounds,
+  `mo_convect`), but **anything that counts or updates per vertex is not**: the ice FCT limiter over 4
+  slots visits vertex 1 twice (mutation check: `test_ice_mass` F5 fails by 0.15-0.25), the IC
+  extrapolation would average vertex 1 twice. Those loops run over `elem2D_nnodes` (Task 16, Task 11).
+- **The boundary tests must change in the SAME commit as the convention** (Task 7): every
+  `el(2) > 0`, `el(i) < 1`, `nb <= 0` in src AND tests became `el(2) /= el(1)` / `nb == el`;
+  half-converted, a boundary edge counts twice. The grep afterwards must find only the convention
+  builders.
+- **A grep for element means (`/3`, `1:3`) does not find node gathers.** FESOM2 writes the node gather
+  as `sum(A_e*x_e)/(3*area)` -- the 1/3 is the triangle kite weight hidden in a `3*` (`UVnode`,
+  `w*du/dz`, `tr_xynodes`, `compute_sigma_xy`, `smooth_nod`, the node area itself). The discovery
+  grep had to look for `3*` and `/(3` too; they became `nod_in_elem2D_w` gathers.
+- **Invariant checks in drivers are formulas too**: `fesom_conserve` asserted `helem == sum(hnode)/3`,
+  wrong on quads once zstar `helem` is the `elem_w` mean (Task 12); the coupling assigned the 4-slot
+  `elem2D_nodes(:,e)` to `elnodes(3)` (shape bug, Task 13).
+
+**How to apply.** For a unified-slot data structure write the per-use rule down (sum / extremum /
+count) and review each loop against it; add a mutation test that runs the "wrong" variant on a quad
+or mixed patch -- the triangle patch alone does not see these bugs.
+
+
+## L64 — When bit-identity is retired, freeze the reference at the last bit-identical commit, and raise a tolerance only after a control run without the amplifier (mEVP for EVP, PP for TKE)
+
+**Context.** Hybrid-mesh plan, Tasks 6-17. From Task 7 on triangle results change at roundoff, so
+the FESOM2 byte gates were retired and `tools/run_tri_regression.sh` compares against a frozen
+binary. Twice a level had to move: CORE2 EARLY 2.1e-9 -> 2.2e-8 when the EVP became 4-slot (Task 15),
+and the cut-out 1-vs-N reached 1e-4 after 5 days with TKE (Task 17).
+
+**Lessons.**
+- **Freeze before you change the arithmetic, and change the reference only by the test knob.**
+  `frozen_task6` = all binaries of `5b2a7f3` (last bit-identical state, proven by every dump and log
+  of pi/CORE2 runs being byte-identical to the previous commit); `frozen_task6_soltol` = the same tree
+  + ONLY the `FESOM3_SSH_SOLTOL` patch, checked byte-identical to `frozen_task6` with the knob unset.
+  Build everything in scratch trees; the user's `build_intel_dp` runs production jobs directly from
+  `bin/` and was never touched.
+- **A tolerance increase needs a control that removes the suspected amplifier.** Same case with mEVP
+  in both runs: CORE2 EARLY 1.1e-15 (vs EVP 2.2e-8) -- the converted ice code is right, the standard
+  EVP (unstable for ice at rest, Task 15) amplifies roundoff that now enters inside each of the 120
+  subcycles. Same case with PP instead of TKE: 1-vs-N <= 1.1e-7 over 5 days (vs 1e-4) -- TKE
+  thresholds switch on roundoff. Only then raise the tier, keeping the same margin (x5 in Task 15).
+- **Keep the per-mesh tolerance table and the measured levels in the gate's header** and update them
+  with each change (`run_tri_regression.sh` header, HANDOFF "Gate migration for hybrid meshes"); a
+  gate whose measured level is not recorded cannot tell a regression from noise.
+
+
+## L65 — An exact null mode passes every consistency test: test the operator's kernel directly -- the Green-Gauss checkerboard is a null mode on EVERY all-quad mesh, not only on parallelograms
+
+**Context.** Hybrid-mesh plan, Task 9 (`test_ssh_stiff` S8) and Task 17. The plan expected an
+"almost exact" checkerboard null mode of the SSH operator on the nearly rectangular ORCA quads.
+
+**What the kernel test showed.** The Green-Gauss coefficient of vertex j is proportional to
+x_{j+1} - x_{j-1}, so c1 = -c3 and c2 = -c4 on ANY quad: the pattern (+1,-1,+1,-1) has zero gradient
+in every quad, and on any 2-colourable all-quad mesh it is an EXACT null mode of the stiffness part
+(|K f|/|K| = 1.8e-16 on the NEMO quad cut-out, not just on the parallelogram patch). Linear-exactness,
+symmetry, row-sum and convergence tests (S1-S7) all pass for such an operator. Only the mass part
+controls the mode. In the 10-day cut-out runs the SSH null mode stayed flat, but the TRACER grid-scale
+energy grew (SST x6, SSS x11-12, faster at quad and interface nodes) -- a design question for the user.
+
+**How to apply.** For every new discrete operator on a new element type, apply it to the candidate
+spurious patterns (checkerboard, stripes, per-element alternation) on a real mesh of that class and
+assert the result, so the property is known and cannot change silently; then measure the same
+patterns in a run (`tools/cutout_diag.py checker`: global 2-colouring projection, per-quad energy,
+linear-exact neighbour residual by node class).
+
+
+## L66 — Exact ingredients do not make an exact scheme on mixed meshes: test the ASSEMBLED node tendency per node class (all-triangle, all-parallelogram, interface, general quad)
+
+**Context.** Hybrid-mesh plan, Tasks 10-11. The plan asked for "linear tracer advected exactly" and
+"exact linear shear" on mixed patches. Every ingredient was exact: element gradients (<= 1.2e-13), the
+MUSCL face values at the edge midpoints on every edge (<= 2.2e-12), the element velocities.
+
+**What happened.** The median-dual edge scheme assembles the node tendency from face values at the
+edge MIDPOINT, while the dual face runs midpoint -> centroid; the errors cancel edge by edge only when
+the dual cell is all triangles (Galerkin-P1 equivalence) or all parallelograms. At triangle-quad
+interface nodes and on general quads the node tendency of a linear tracer in uniform flow has an O(1)
+local relative error (0.22 NEMO-mixed interface, 0.24 jittered patch). Same for the vorticity of a
+linear shear: exact on triangles and parallelograms, 6e-2 (first order) on jittered quads.
+
+**Lessons.**
+- **Split exactness tests by node class** and assert roundoff only where the scheme is exact
+  (`test_updown_mixed` L2, `test_vinv` V2/V9a), with a first-order bound elsewhere -- one global
+  tolerance either fails for a scheme property or hides a kernel bug.
+- **Test patches must contain the irregular case on purpose**: the NEMO quads are lon/lat rectangles,
+  so the real meshes alone never show it; the jittered `generate_mixed_patch` does.
+- A scheme property found this way is a finding for the user (remedy = design decision, e.g. face
+  values at the dual-segment midpoints), not something to "fix" inside a conversion task.
+
+
+## L67 — A consistent mass matrix brings its own lumped mass: an FCT must divide by the row sums in EVERY step and conservation must be measured with the same weights -- on quads they are not the geometric node area
+
+**Context.** Hybrid-mesh plan, Tasks 16-17 (the user's specification). Ice FCT element mass
+contributions: triangle S/6 diagonal, S/12 off-diagonal; quad (S/36)(4,2,1,2) rotated per row. Row
+sums: S/3 per triangle vertex (= the kite node area), S/4 per quad vertex (NOT the kite share of a
+non-square quad). FESOM2 divided by the node area `mesh%area` in the low-order step, the high-order
+iteration and the antidiffusive fluxes.
+
+**Lessons.**
+- **Store the row sums once (`ice%work%fct_lumpedmass`) and use them in all FCT steps**; the
+  antidiffusive operator is consistent - lumped (`ice_acoef`: triangle (-2,1,1)/12, quad (-5,2,1,2)/36),
+  as compile-time tables per vertex count, so both element types share one code path and no runtime
+  `/12`, `/36` appears (L7). Exchange it to the halo: owned elements divide by it at halo vertices.
+- **Conserved is sum(lumped*m), not sum(area*m).** The conservation gate (`fesom_conserve` with
+  `FESOM3_CONSERVE_ICE`, seeded ice) measures the lumped sums; the mutation "low-order step with
+  `mesh%area`" drifts by 1e-6 to 7e-6 and fails, the correct code drifts <= 2.8e-15. For triangles
+  lumped == node area, so triangle meshes could never have shown the difference.
+- **Check the CSR column search**: the mass matrix lives on the SSH pattern, and a missing column used
+  to be silent; it now stops with global ids (`test_ice_mass_missing_col_np1`).
+
+
+## L68 — Element geometry in lon/lat needs ONE cyclic-wrapped embedding per element (relative to vertex 1): per-pair trimming and FESOM2's plain vertex mean are wrong across the rotated dateline and at the pole
+
+**Context.** Hybrid-mesh plan, Tasks 7 and 14. The 4-slot geometry (`src/mesh/mod_mesh_areas.F90`)
+computes centroids, areas, kite weights and Green-Gauss gradients in rotated lon/lat.
+
+**What happened.**
+- Trimming each vertex-pair difference separately gave inconsistent embeddings for elements spanning
+  > 180 deg in longitude; taking all longitudes relative to vertex 1 (one planar embedding, as FESOM2's
+  gradient did) keeps the gradient exact for linear fields and consistent with `elem_area`.
+- FESOM2's output element coordinate was the plain unwrapped mean of the 3 rotated vertices: on the
+  wrong side of the globe for the 77 (pi) / 566 (CORE2) elements across the rotated dateline, and the
+  element velocities there were rotated to geographic with the wrong angle. Output now uses
+  `elem_center` (area-weighted, wrapped); the regression compares element vectors there by speed.
+- The UNROTATED pi has elements around the geographic pole, where no lon/lat embedding is meaningful:
+  geometry tests (`test_geom_mixed`) read pi rotated (`FESOM3_TEST_ROTATE=1`, as the model does);
+  the NEMO cut-outs are read unrotated.
+
+**How to apply.** One helper for the element centroid used by geometry AND output; test geometry on
+a mesh that crosses the (rotated) dateline; when an output coordinate changes, check that the change
+is a > 1 deg jump at a few % of elements and < 1e-10 deg elsewhere before calling it roundoff.
+
+
+## L69 — A setup tool's exit status and the reader's array sizes are not checks: verify every derived mesh and partition against the MODEL's invariants and limits
+
+**Context.** Hybrid-mesh plan, Tasks 2-6 and 18.
+
+**What happened.**
+- `fesom_ini` (FESOM2's `mesh_part`) STOPs with exit status 0 also on errors; only `Total time` in its
+  log and `dist_N/rpart.out` tell success. It also KEEPS existing edge/level files, so a changed mesh
+  needs them deleted first. `tools/mesh/check_dist.py` re-derives ownership, halos, edge order and
+  every communication list (incl. the appended hybrid ones) independently.
+- The model reads com lists into fixed `MAX_NEIGHBOR_PARTITIONS = 32` arrays and `read_com` has no
+  guard; fesom_ini's new lists are allocatable and unchecked too. ORCA025 needs <= 16 at 128 and 1024
+  parts -- fine, but only because it was counted (Task 18).
+- Derived meshes broke model invariants the generating tool did not know: the cut-outs left 23/17
+  nodes with a layer count above every remaining element (the model's bottom invariant stops in
+  `read_mesh`; Task 6 fixed `cut_region.py`), and splitting coastal quads along the shorter diagonal
+  made 838 dead-end triangles that FESOM's setup rejects (`split_quads.py` takes the other diagonal).
+
+**How to apply.** After producing a mesh or partition, run `check_mesh.py`, `check_dist.py` AND the
+model's own reader on it (ctest `test_mesh_read`); count neighbours against the reader's fixed limits
+before using very high part counts; do not trust exit codes of ported Fortran setup tools.
