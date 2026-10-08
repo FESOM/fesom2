@@ -80,10 +80,42 @@ contains
         logical, save :: lfirst = .true.
 
         if (lfirst) call ssh_solve_preconditioner(dynamics, mesh, partit)
+        if (lfirst) call ssh_solve_env_overrides(dynamics, partit)
         call ssh_solve_cg(dynamics%d_eta, dynamics%ssh_rhs, dynamics, mesh, n_iter, partit)
         if (is_multirank(partit)) call exchange_nod(dynamics%d_eta, partit)  ! FESOM2 :3308
         lfirst = .false.
     end subroutine solve_ssh_ale
+
+    !===========================================================================
+    subroutine ssh_solve_env_overrides(dynamics, partit)
+        ! Test/diagnostic knobs, read once at the first solve (unset => defaults unchanged:
+        ! soltol 1e-5, maxiter 2000):
+        !   FESOM3_SSH_SOLTOL   relative CG tolerance soltol (rtol = soltol*rms(rhs))
+        !   FESOM3_SSH_MAXITER  CG iteration cap
+        ! Used by tools/run_tri_regression.sh to solve to roundoff, so that two builds that
+        ! differ only at roundoff stay at roundoff after the solve (with 1e-5 the iterate
+        ! differences, ~1e-5 of eta, swamp the roundoff).
+        type(t_dyn),    intent(inout)        :: dynamics
+        type(t_partit), intent(in), optional :: partit
+        character(len=64) :: env
+        integer :: env_len, ios
+        logical :: root
+
+        root = .true.
+        if (present(partit)) root = (partit%mype == 0)
+        call get_environment_variable('FESOM3_SSH_SOLTOL', env, length=env_len, status=ios)
+        if (ios == 0 .and. env_len > 0) then
+            read(env, *) dynamics%solverinfo%soltol
+            if (root) write(*,'(a,es10.3)') ' solve_ssh_ale: FESOM3_SSH_SOLTOL soltol=', &
+                dynamics%solverinfo%soltol
+        end if
+        call get_environment_variable('FESOM3_SSH_MAXITER', env, length=env_len, status=ios)
+        if (ios == 0 .and. env_len > 0) then
+            read(env, *) dynamics%solverinfo%maxiter
+            if (root) write(*,'(a,i0)') ' solve_ssh_ale: FESOM3_SSH_MAXITER maxiter=', &
+                dynamics%solverinfo%maxiter
+        end if
+    end subroutine ssh_solve_env_overrides
 
     !===========================================================================
     subroutine ssh_solve_preconditioner(dynamics, mesh, partit)
