@@ -22,8 +22,11 @@ module mod_ice_oce_coupling
     !  - ocean_area (the balancing divisor net/ocean_area) is mesh%ocean_area, now built by
     !    the same sequential areasvol(1,n) loop FESOM2 uses (mod_mesh_areas.F90).
     !  - the per-node arithmetic + the left-to-right additive order of the freshwater flux are
-    !    transcribed VERBATIM; the /3.0_WP (stress_surf) and /ocean_area divides match (literal
-    !    and shared-runtime-operand respectively, L7/L10).
+    !    transcribed VERBATIM; the /ocean_area divide matches (shared runtime operand, L10).
+    !  - hybrid meshes: the node->element stress_surf mean is the kite-weighted one over the
+    !    4 vertex slots (sum(elem_w*stress_node_surf); FESOM2: plain /3 over 3 nodes), so
+    !    triangles agree with FESOM2 to roundoff only. Area-consistent: sum_e elem_area*
+    !    stress_surf == sum_n area*stress_node_surf (area = sum elem_area*elem_w).
     !
     ! M2.12 optional-partit pattern: partit absent OR npes==1 -> the proven 1-rank path
     ! VERBATIM (owned_bounds returns global counts, is_multirank=.false.); present+npes>1 ->
@@ -34,7 +37,7 @@ module mod_ice_oce_coupling
     ! codegen — and the byte-match — is preserved.
     use mod_precision,   only: WP
     use mod_constants,   only: density_0
-    use mod_mesh,        only: t_mesh
+    use mod_mesh,        only: t_mesh, MAX_NV
     use mod_ice,         only: t_ice
     use mod_ice_thermo,  only: t_atmflux
     use mod_tracer,      only: t_tracer
@@ -58,7 +61,7 @@ contains
         type(t_atmflux), intent(inout), target :: atm
         real(kind=WP),   intent(inout)         :: stress_surf(2, mesh%elem2D)
         type(t_partit),  intent(in),    optional :: partit
-        integer :: n, elem, elnodes(3), nNodO, nNodL, nEdgeO, nElemO
+        integer :: n, elem, elnodes(MAX_NV), nNodO, nNodL, nEdgeO, nElemO
         real(kind=WP) :: aux
         real(kind=WP), dimension(:),   pointer :: u_ice, v_ice, a_ice, u_w, v_w
         real(kind=WP), dimension(:),   pointer :: stress_iceoce_x, stress_iceoce_y
@@ -97,14 +100,14 @@ contains
         end do
 
         !_______________________________________________________________________
-        ! total surface stress (iceoce+atmoce) on elements (owned)
+        ! total surface stress (iceoce+atmoce) on elements (owned), kite-weighted mean
         do elem = 1, nElemO
             ! if cavity element skip it
             if (mesh%ulevels(elem) > 1) cycle
 
             elnodes = mesh%elem2D_nodes(:,elem)
-            stress_surf(1,elem) = sum(stress_node_surf(1,elnodes))/3.0_WP
-            stress_surf(2,elem) = sum(stress_node_surf(2,elnodes))/3.0_WP
+            stress_surf(1,elem) = sum(mesh%elem_w(:,elem)*stress_node_surf(1,elnodes))
+            stress_surf(2,elem) = sum(mesh%elem_w(:,elem)*stress_node_surf(2,elnodes))
         end do
     end subroutine oce_fluxes_mom
 

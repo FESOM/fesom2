@@ -729,10 +729,27 @@ fluxes and nonlinear terms can. Asserted in a test (Task 9), measured in the sho
 
 **Files:**
 - Modify: `src/forcing/mod_forcing_bulk.F90`, `src/ice/mod_ice_oce_coupling.F90`
+- ➕ Create: `test/test_coupling_mixed.F90`; Modify: `test/CMakeLists.txt`
 
-- [ ] element means via `elem_w`; fix the `elnodes(3)` shape bug in the coupling (:105)
-- [ ] tests: forcing/coupling self-tests on CORE2 (roundoff) and the mixed cut-out
-- [ ] run ctest — must pass before Task 14
+- [x] element means via `elem_w`; fix the `elnodes(3)` shape bug in the coupling (:105)
+      — `oce_fluxes_mom` and `forcing_stress_surf`: `stress_surf = sum(elem_w*stress_node_surf)`
+      over the 4 slots, `elnodes(MAX_NV)` (the coupling assigned the 4-slot `elem2D_nodes(:,e)`
+      to `elnodes(3)`); comments updated. The rest of the forcing (bulk coefficients, wind/ice
+      stress, JRA55 interpolation) and `oce_fluxes` are per node — no change
+- [x] tests: forcing/coupling self-tests on CORE2 (roundoff) and the mixed cut-out
+      — `test_coupling_mixed` (node fields = hashes of the global node id): C1 uniform node stress
+      → same element stress (the former /3 mean gives 1/3 error on quads, asserted as mutation
+      check); C2 momentum input Σ_e A_e·stress_surf == Σ_n area·stress_node_surf with partial ice
+      and ice-ocean drag (each element counted once, on the owner of its 1st vertex); C3 triangles
+      == the former sum/3 (≤ 3e-16 rel.); C4 `forcing_stress_surf` == `oce_fluxes_mom` at a_ice = 0
+      (bitwise, np 1); C5 `oce_fluxes` balancing (∫virtual_salt = ∫relax_salt = 0, freshwater
+      balance, ocean_area = Σ areasvol) — NEMO-mixed cut np1/2 (+ analytic mixed patch at np1),
+      NEMO-quad cut np2, pi_w np1, core2_w np8 (rotated): all ≤ 9e-15. CORE2 roundoff:
+      `run_tri_regression.sh` 7/7 (its prod cases run JRA55 + sea ice + this coupling; CORE2
+      EARLY 2.1e-9, OCEAN 2.5e-5, ICE 1.2e-4, MIX 2.5e-4; pi PRE 6.3e-15, EARLY 9.2e-13, OCEAN
+      1.1e-7; decomp OCEAN 2.5e-9; conservation totals ≤ 3.5e-16). A forcing+ice RUN on the
+      cut-out waits for Tasks 15/16 (ice dynamics/FCT still triangle-only) — Task 17
+- [x] run ctest — must pass before Task 14 — scratch ctest 122/122 (wiped + reconfigured)
 
 ### Task 14: IO, mesh diagnostics and dump drivers
 

@@ -7,7 +7,8 @@ module mod_forcing_bulk
     !   wind stress             (gen_forcing_couple.F90:749-756) stress_atmoce =
     !       Cd*(rho_air*|du|)*du,  du = u_wind-(1-Swind)*u_w.
     !   node->element stress    (ice_oce_coupling.F90:128-149)   with a_ice=0 ->
-    !       stress_node_surf=stress_atmoce; stress_surf(elem)=sum(node,elnodes)/3.
+    !       stress_node_surf=stress_atmoce; stress_surf(elem)=sum(elem_w*node) (kite-
+    !       weighted mean over the 4 vertex slots; FESOM2: sum(node,elnodes)/3).
     !
     ! BIT-IDENTITY NOTES (every literal transcribed VERBATIM — same build flags):
     ! * inc_ratio=1.0e-4 (NO _WP), inv_rhoair=1./1.3, tmelt=273.15, rhoair=1.3 are
@@ -19,13 +20,14 @@ module mod_forcing_bulk
     ! * The drag is Large-2009 eq.11 (the u10**6 term + 33 m/s -> 2.34e-3 cap), NOT
     !   the L-Y2004 6a form (commented out). cd_n10_rt (neutral), not cd_rt, in 9a/10.
     ! * The stress + node->elem are gated against the trivial REAL formulas; Cd/Ch/Ce
-    !   are gated against the REAL ncar_ocean_fluxes_mode. elnodes = (1:3) slice (L15).
+    !   are gated against the REAL ncar_ocean_fluxes_mode. The node->element mean is the
+    !   kite-weighted one (hybrid meshes), so it equals FESOM2 to roundoff only.
     !
     ! SCOPE: transfer coefficients + wind stress only. heat/water flux (obudget,
     ! ice_thermo_oce.F90) is M3. SST + surface ocean velocity are PRESCRIBED inputs
     ! (the M2.5/M2.8 pattern; they come from the ocean/ice state, not ported here).
     use mod_precision, only: WP
-    use mod_mesh, only: t_mesh
+    use mod_mesh, only: t_mesh, MAX_NV
     use mod_partit, only: t_partit
     use mod_part_bounds, only: owned_bounds
     implicit none
@@ -222,16 +224,17 @@ contains
     end subroutine forcing_ice_stress
 
     ! ---- node->element surface stress, a_ice=0 (ice_oce_coupling.F90:128-149) -----
+    ! 1-rank (fesom_forcingdump): elem2D == the owned elements elem_w is allocated for.
     subroutine forcing_stress_surf(stress_x, stress_y, stress_surf, mesh)
         real(kind=WP), intent(in)  :: stress_x(:), stress_y(:)   ! = stress_node_surf (a_ice=0)
         real(kind=WP), intent(out) :: stress_surf(:,:)           ! (2, elem2D)
         type(t_mesh),  intent(in)  :: mesh
-        integer :: elem, elnodes(3)
+        integer :: elem, elnodes(MAX_NV)
         do elem = 1, mesh%elem2D
             if (mesh%ulevels(elem) > 1) cycle
-            elnodes = mesh%elem2D_nodes(1:3, elem)
-            stress_surf(1, elem) = sum(stress_x(elnodes)) / 3.0_WP
-            stress_surf(2, elem) = sum(stress_y(elnodes)) / 3.0_WP
+            elnodes = mesh%elem2D_nodes(:, elem)
+            stress_surf(1, elem) = sum(mesh%elem_w(:, elem)*stress_x(elnodes))
+            stress_surf(2, elem) = sum(mesh%elem_w(:, elem)*stress_y(elnodes))
         end do
     end subroutine forcing_stress_surf
 
