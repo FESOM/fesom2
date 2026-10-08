@@ -2578,3 +2578,27 @@ results differ from FESOM2 only at coast/step levels (core2: max |Δflux| 0.4 % 
 - **A bit-identity test on synthesised cavities caught a wrong claim within minutes:**
   FESOM2's `nl12 = 0` at boundary edges makes segment (D) start at level 1, above a cavity
   roof (the velocity is 0 there).
+
+## L60 — A "roundoff" regression gate must make the solver converge to roundoff, and a cross-np comparison must start from one common state: the CG tolerance and the IC extrapolation each hid the roundoff behind 1e-4..1e-2 differences
+
+**Context.** Hybrid-mesh plan, Task 7 follow-up. The first triangle regression gate (new
+geometry vs frozen pre-Task-7 binary) could only be 1e-2 after the first SSH solve, and the
+frozen binary itself differed between pi np 1 and np 2 at step 1 (density 4.7e-3).
+
+**Lessons.**
+- **An iterative solver stopped at a relative residual turns roundoff into tolerance-sized
+  noise.** The SSH CG stops at soltol = 1e-5: the SAME binary at 1e-5 vs 1e-14 differs by
+  3.5e-4 in d_eta on pi. Solve both runs to 1e-14 (env `FESOM3_SSH_SOLTOL`, ~3x iterations)
+  and pi steps 1-3 agree to <= 1e-12. Before trusting a "roundoff" gate, run the reference
+  against itself with the tolerance changed: that shows the noise floor the gate can see.
+- **What is left is physics amplifying roundoff, and it is local in time and space.** CORE2
+  T differs by 2e-9 after step 1 only at ice-covered nodes (EVP at rest is stiff); pi jumps at
+  step 4, the first forcing record refresh. Find the event, then tier the gate (early steps
+  tight, later steps / ice / TKE-driven fields at their measured floors) instead of one loose
+  tolerance for everything.
+- **A cold start is not partition-independent when the IC is built by an order-dependent
+  sweep.** FESOM2's `extrap_nod3D` Gauss-Seidel fills land-masked IC points with per-rank halo
+  snapshots, so np 1 and np N start from different T/S at exactly the extrapolated points
+  (pi: 513 (node, level), all of them dummy after the bilinear step). Check the step-0 fields
+  before suspecting halo bugs; compare decompositions from ONE checkpoint (restart at np 1 and
+  np N) -- then np 1/2/8 agree to 1e-14 at step 1.

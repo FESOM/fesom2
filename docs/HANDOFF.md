@@ -340,17 +340,47 @@ roundoff, so no FESOM2-oracle byte gate (`max|Δ|=0`) can pass any more.
 - **Kept** (FESOM3-only, unaffected): `run_restart_gate_core2.sh`, `run_restart_gate_multirank.sh`
   (split vs straight), `run_output_gate.sh` (writer vs generator), `run_conserve_pi.sh` and the
   ctest suite.
-- **Replacement:** `tools/run_tri_regression.sh` — the frozen Task-6 binaries
-  (`/work/ab0995/a270029/fesom3_hybrid/frozen_task6`, commit `5b2a7f3`) vs the current build on pi
-  (np 1, 2) and CORE2 (np 8), production driver with the job_levante physics for 4 steps, plus
-  `fesom_conserve` (zstar+Redi+TKE, 20 steps). Metric per field `max|new−ref|/max|ref|`: step 1 before
-  the first SSH solve ≤ 1e-9 (pure roundoff; measured ≤ 1.3e-11), everything after it ≤ 1e-2 (the CG
-  stops at relative residual 1e-5, which lifts the roundoff seed to ~1e-5 in eta; measured after 4
-  steps: pi ≤ 6e-9, CORE2 ≤ 5.4e-4 in Kv/Av); conservation drift ≤ 1e-12 and final totals equal to
-  1e-12. Run after Tasks 7, 10, 14 and 16.
-- Observation (pre-existing, not investigated): the frozen binary itself differs between pi np 1
-  and np 2 already at step 1 before the solve (density 4.7e-3 relative), so a cross-partition
-  comparison is not a roundoff yardstick on the original pi mesh.
+- **Replacement:** `tools/run_tri_regression.sh` (Task 7, tightened in the Task-7 follow-up) — run
+  after Tasks 7, 10, 14 and 16. Reference = `/work/ab0995/a270029/fesom3_hybrid/frozen_task6_soltol`:
+  commit `5b2a7f3` (the last bit-identical state) + ONLY the SSH-solver tolerance knob (README there;
+  with the knob unset it is byte-identical to the original `frozen_task6`, which is kept). Cases:
+  `prod:pi:1`, `prod:pi:2`, `prod:core2:8` (production driver, job_levante physics, 4 steps, all
+  substep node dumps in double + float32 output every step, ref vs new), `decomp:pi_w:2`,
+  `decomp:pi_w:8` (new build np 1 vs np N, both restarted from one 0-step np-1 checkpoint — see the
+  next bullet), `conserve:pi:1/2` (`fesom_conserve` zstar+Redi+TKE 20 steps, drift and final totals
+  ≤ 1e-12).
+  - **Solver:** every prod/decomp run sets `FESOM3_SSH_SOLTOL=1e-14` (new env knob in
+    `oce_ssh_solve.F90`, also `FESOM3_SSH_MAXITER`; unset = production soltol 1e-5 / maxiter 2000;
+    ~3× CG iterations). With 1e-5 the iterate differences swamp the roundoff: the same binary at 1e-5
+    vs 1e-14 differs by 3.5e-4 in `d_eta` at step 1 on pi — that is why the first gate could only be 1e-2.
+  - **Metric** per field `d = max|a−b|/max|a|` over nodes/elements, levels, steps/records; tiers and
+    classes (pi / core2 tolerance): PRE = step 1 before the first solve (1e-9 / 1e-9; measured 6e-15 /
+    1.3e-11); EARLY = every double dump except Kv over steps 1..3 on pi, step 1 on core2 (1e-10 / 1e-8;
+    measured 9.2e-13 / 2.1e-9); OCEAN = all steps of the double dumps (T, S, eta, d_eta, w, ssh_rhs,
+    density, …) and all float32 output records of temp/salt/ssh/sst/sss/u/v/w/unod/vnod/bolus
+    (1e-6 / 2e-4, float32 +2^-21; measured 3.3e-8 dumps, 1.0e-7 u/v / 4.4e-6 dumps, 2.2e-5 u/v); ICE =
+    a_ice/m_ice/m_snow (1e-5 / 2e-3; measured 3.9e-7 / 1.2e-4); MIX = Kv, Av (1e-6 / 1e-2; measured
+    2.2e-9 / 2.4e-4). decomp measured: PRE 0, EARLY ≤ 4.3e-13, OCEAN ≤ 2.5e-11 (dumps).
+  - **Why not tighter:** the remaining floor is amplification of roundoff by stiff/discontinuous
+    physics, not roundoff: on CORE2 the sea ice (EVP at rest, Δ_min-regularised viscosity) lifts T at
+    ice-covered nodes to 2e-9 already in step 1 and to ~1e-6..1e-5 after 4 steps; on pi the jump
+    comes at step 4 (first JRA55 record refresh moves the ice; the same jump appears in np1 vs npN
+    from a common state and with the summer IC); TKE thresholds drive Kv/Av. Steps 1–3 on pi are
+    pure roundoff (≤ 1e-12), hence the EARLY tier.
+- **Decomposition dependence on the original pi (resolved, by design, not a bug):** a COLD START
+  differs between np 1 and np N (frozen and pre-hybrid 9b0d3a6 binaries alike; density 4.7e-3 at step
+  1, pi_w too: 5.5e-3) because the INITIAL CONDITION does. `oce_initial_state::extrap_nod3D` (FESOM2
+  `gen_support.F90` extrap_nod3D, transcribed for byte-identity) fills land-masked PHC points by a
+  Gauss–Seidel neighbour average over OWNED nodes, reading halo values that are refreshed only after
+  each full sweep — the result depends on the partition and node order. Proven on pi: all 513
+  (node, level) density differences at step 1 (34 nodes) are points that `getcoeffld` leaves as dummy
+  (2175 of 3140 nodes need extrapolation at some level); nothing else differs. From a common state
+  (one checkpoint written by a 0-step np-1 cold start, restarted at np 1/2/8, tight solver) the model
+  is decomposition-independent to roundoff (original pi and pi_w, frozen and current build: step 1
+  ≤ 1.2e-14, steps 2–3 ≤ 2e-13). Not changed: a partition-independent extrapolation (Jacobi sweep,
+  or extrapolate on the global mesh) would change every production IC and break the FESOM2 byte
+  heritage — a design decision for the user. Consequence: compare np 1 vs np N only from a common
+  restart (as `decomp:` does), never from two cold starts.
 
 ## Next task
 

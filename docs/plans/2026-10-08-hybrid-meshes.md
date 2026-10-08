@@ -505,6 +505,16 @@ fluxes and nonlinear terms can. Asserted in a test (Task 9), measured in the sho
       ≤ 6e-9, CORE2 ≤ 5.4e-4 in Kv/Av), conservation 1e-12
 - [x] run ctest — must pass before Task 8 — scratch ctest 68/68; `run_ini_compare.sh`,
       `run_ini_mixed.sh`, `test_mesh_tools.sh`, `test_nemo_meshq.sh` PASS
+- [x] ➕ follow-up: tighten `run_tri_regression.sh` to roundoff and explain the pi np1≠np2
+      difference — env knob `FESOM3_SSH_SOLTOL`/`FESOM3_SSH_MAXITER` in `oce_ssh_solve.F90`
+      (default unchanged); reference rebuilt as `frozen_task6_soltol` (5b2a7f3 + only the knob,
+      byte-identical to `frozen_task6` with the knob unset); all runs solve to 1e-14; tiered
+      metric `max|Δ|/max|ref|` (pi / core2): PRE 1e-9, EARLY (steps 1–3 pi, 1 core2) 1e-10 / 1e-8,
+      OCEAN 1e-6 / 2e-4, ICE 1e-5 / 2e-3, MIX (Kv, Av) 1e-6 / 1e-2; measured pi EARLY ≤ 9.2e-13,
+      OCEAN ≤ 3.3e-8, CORE2 EARLY 2.1e-9 (ice), OCEAN 4.4e-6 dumps / 2.2e-5 float32 u/v. np1≠np2 on
+      pi = IC extrapolation (`extrap_nod3D` Gauss–Seidel with per-rank halo snapshot, FESOM2 design,
+      not fixed); new `decomp:pi_w:2/8` cases compare np 1 vs np N from one checkpoint (≤ 2.5e-11).
+      HANDOFF + LESSONS L60
 
 ### Task 8: Edge exchange and double-halo node exchange
 
