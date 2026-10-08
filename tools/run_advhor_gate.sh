@@ -3,7 +3,7 @@
 # fields (1-rank pi, real kernels on a prescribed velocity/tracer), dump FESOM3's
 # (1-rank pi, transcribed kernels on the identical prescribed field), and compare
 # for max|delta|=0 on adv_flux_hor + del_ttf_advhoriz (upw1 + muscl) and every
-# intermediate (helem, edge_up_dn_tri, tr_xy, edge_up_dn_grad).
+# intermediate (helem, edge_up_dn_tri, tr_xy).
 #
 # Prereqs (one-time, see docs/HANDOFF.md):
 #   - FESOM2 rebuilt with src/fesom_advhor_dump.F90 wired into ocean_setup

@@ -23,7 +23,7 @@ program fesom_advhordump_mr
     use mod_halo,         only: exchange_elem_full
     use mod_tracer,       only: t_tracer
     use mod_dyn,          only: t_dyn
-    use oce_muscl_adv,    only: muscl_adv_init, fill_up_dn_grad
+    use oce_muscl_adv,    only: muscl_adv_init
     use oce_tracer_mod,   only: init_tracers_AB
     use oce_adv_tra_driver, only: do_oce_adv_tra
     use mod_advhor_dump,  only: advhor_dump_open, advhor_dump_close, wr_r2, wr_r3
@@ -45,8 +45,7 @@ program fesom_advhordump_mr
     real(kind=MP) :: zbar_srf, zbar_bot
     real(kind=WP), allocatable :: ttf(:,:), ttfAB(:,:), wvel(:,:)
     ! captured FCT-config fields (overwritten by the non-FCT advect call)
-    real(kind=MP), allocatable :: valuesAB_s(:,:), eudg_s(:,:,:), fctLO_s(:,:)
-    real(kind=WP), allocatable :: eudg_w(:,:,:)
+    real(kind=MP), allocatable :: valuesAB_s(:,:), fctLO_s(:,:)
     real(kind=MP), allocatable :: fmax_s(:,:), fmin_s(:,:), fplus_s(:,:), fminus_s(:,:)
     real(kind=MP), allocatable :: dh_s(:,:), dv_s(:,:), dt_s(:,:)
     real(kind=MP), allocatable :: dh_n(:,:), dv_n(:,:), dt_n(:,:)
@@ -168,17 +167,10 @@ program fesom_advhordump_mr
     tr%data(1)%tra_adv_ph  = opth
     tr%data(1)%tra_adv_pv  = optv
     call init_tracers_AB(1, tr, mesh, partit)
-    ! capture edge_up_dn_grad NOW — do_oce_adv_tra's FCT limiter reuses it as AUX
-    ! scratch in FESOM2 (bignumber fill), so it is only meaningful pre-advection.
-    allocate(valuesAB_s(nl-1, nNodO), eudg_s(4, nl-1, nEdgeO), fctLO_s(nl-1, nNodO))
+    allocate(valuesAB_s(nl-1, nNodO), fctLO_s(nl-1, nNodO))
     allocate(fmax_s(nl-1, nNodO), fmin_s(nl-1, nNodO), fplus_s(nl-1, nNodO), fminus_s(nl-1, nNodO))
     allocate(dh_s(nl-1, nNodO), dv_s(nl-1, nNodO), dt_s(nl-1, nNodO))
     valuesAB_s = real(tr%data(1)%valuesAB(1:nl-1, 1:nNodO),   MP)
-    ! FESOM2's stored edge_up_dn_grad record, rebuilt by the oracle from the same tr_xy
-    ! (FESOM3 itself looks these values up on the fly)
-    allocate(eudg_w(4, nl-1, nEdgeO))
-    call fill_up_dn_grad(eudg_w, tr%work, tr%work%tr_xy, mesh, partit)
-    eudg_s     = real(eudg_w, MP)
     call do_oce_adv_tra(dt, dyn%uv, dyn%w, dyn%w_i, dyn%w_e, 1, dyn, tr, mesh, partit)
     do n = 1, nNodO
         tr%work%del_ttf(:,n) = tr%work%del_ttf(:,n) &
@@ -220,7 +212,6 @@ program fesom_advhordump_mr
     end if
     call advhor_dump_open(u, trim(out_path), nNodO, nElemO, nEdgeO, nl)
     call wr_r2(u, 'valuesAB',             valuesAB_s)
-    call wr_r3(u, 'edge_up_dn_grad',      eudg_s)
     call wr_r2(u, 'fct_LO',               fctLO_s)
     call wr_r2(u, 'fct_ttf_max',          fmax_s)
     call wr_r2(u, 'fct_ttf_min',          fmin_s)

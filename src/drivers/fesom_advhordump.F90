@@ -11,7 +11,7 @@ program fesom_advhordump
     ! Pipeline (per FESOM2 do_oce_adv_tra horizontal path):
     !   muscl_adv_init -> edge_up_dn_tri
     !   tracer_gradient_elements -> tr_xy (the kernels take the up/dn reconstruction on
-    !   the fly); fill_up_dn_grad -> the FESOM2 edge_up_dn_grad record (dump only)
+    !   the fly; FESOM2's edge_up_dn_grad record is not written)
     !   adv_tra_hor_upw1/_muscl -> adv_flux_hor (edge) ; scatter -> del_ttf_advhoriz
     !
     !   FESOM3_MESH_DIR    mesh dir   (default: pi)
@@ -26,7 +26,7 @@ program fesom_advhordump
     use mod_tracer,       only: t_tracer_work, t_tracer
     use mod_dyn,          only: t_dyn
     use oce_tracer_grad,  only: tracer_gradient_elements
-    use oce_muscl_adv,    only: muscl_adv_init, fill_up_dn_grad
+    use oce_muscl_adv,    only: muscl_adv_init
     use oce_adv_tra_hor,  only: adv_tra_hor_upw1, adv_tra_hor_muscl
     use oce_adv_tra_ver,  only: adv_tra_ver_upw1, adv_tra_ver_qr4c
     use oce_adv_tra_flux, only: oce_tra_adv_flux2dtracer
@@ -46,7 +46,7 @@ program fesom_advhordump
     type(t_mesh)        :: mesh
     type(t_tracer_work) :: twork
     integer :: nsw, e, n, nz, nl, u, nzmin, nzmax
-    real(kind=WP), allocatable :: vel(:,:,:), ttf(:,:), tr_xy(:,:,:), eudg(:,:,:)
+    real(kind=WP), allocatable :: vel(:,:,:), ttf(:,:), tr_xy(:,:,:)
     real(kind=WP), allocatable :: aflux_u(:,:)
     real(kind=WP), allocatable :: dttf_u(:,:), dttf_v(:,:), flux_v(:,:)
     real(kind=WP), allocatable :: wvel(:,:), aflux_vu(:,:), aflux_vq(:,:)
@@ -187,11 +187,9 @@ program fesom_advhordump
     ! MUSCL setup: edge_up_dn_tri
     call muscl_adv_init(twork, mesh)
 
-    ! Elemental tracer gradient, then per-edge up/downwind gradient
+    ! Elemental tracer gradient
     allocate(tr_xy(2, nl-1, mesh%elem2D))
     call tracer_gradient_elements(ttf, tr_xy, mesh)
-    allocate(eudg(4, nl-1, mesh%edge2D))
-    call fill_up_dn_grad(eudg, twork, tr_xy, mesh)     ! only for the FESOM2 dump record
 
     allocate(aflux_u(nl-1, mesh%edge2D))
     allocate(dttf_u(nl-1, mesh%nod2D))
@@ -229,10 +227,9 @@ program fesom_advhordump
     ! Mirror do_oce_adv_tra's FCT branch (oce_adv_tra_driver.F90:111-347):
     !   LO = UPW1(ttf) horiz + vert -> fct_LO ; HO antidiffusive = {MFCT(ttfAB)-LO,
     !   QR4C(ttfAB)-LO} ; oce_tra_adv_fct clips ; oce_tra_adv_flux2dtracer(use_lo).
-    ! edge_up_dn_grad (eudg) is the gradient of TTF (values), NOT ttfAB — FESOM2
-    ! init_tracers_AB fills it from values (oce_tracer_mod.F90:127, the valuesAB
-    ! variant is commented out), then MFCTs valuesAB with it. So eudg=grad(ttf) is
-    ! reused for the MFCT(ttfAB) reconstruction.
+    ! tr_xy is the gradient of TTF (values), NOT ttfAB — as FESOM2's init_tracers_AB
+    ! (oce_tracer_mod.F90:127, the valuesAB variant is commented out); it is reused for
+    ! the MUSCL(ttfAB) reconstruction.
     ! =====================================================================
     allocate(aflux_mfct(nl-1, mesh%edge2D))
     allocate(fct_LO(nl-1, mesh%nod2D), fct_ttf_max(nl-1, mesh%nod2D), fct_ttf_min(nl-1, mesh%nod2D))
@@ -358,7 +355,6 @@ program fesom_advhordump
     call wr_r2(u, 'helem',                  mesh%helem(1:nl-1, 1:mesh%elem2D))
     call wr_i2(u, 'edge_up_dn_tri',         twork%edge_up_dn_tri(1:2, 1:mesh%edge2D))
     call wr_r3(u, 'tr_xy',                  real(tr_xy, MP))
-    call wr_r3(u, 'edge_up_dn_grad',        real(eudg(1:4, 1:nl-1, 1:mesh%edge2D), MP))
     call wr_r2(u, 'adv_flux_hor_upw1',      real(aflux_u, MP))
     call wr_r2(u, 'del_ttf_advhoriz_upw1',  real(dttf_u, MP))
     call wr_r2(u, 'wvel',                   real(wvel, MP))

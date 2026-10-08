@@ -1419,8 +1419,9 @@ FESOM3 follows the reference RK3 code (`qq/oce_stepRK3.F90`, `t_hor_adv_muscl_RK
   triangles exist and the level is shared by both edge nodes; different at coasts and
   bathymetry / cavity steps (core2: 0.8 M of 10.9 M edge-levels, max |Δflux| 0.4 % of max
   |flux|; pi 1.3-1.5 %).
-- `fill_up_dn_grad` survives only as FESOM2's reference (writes a caller-owned array):
-  `test_muscl_onthefly` part S and the legacy dump drivers `fesom_advhordump(_mr)`.
+- `fill_up_dn_grad` is removed (2026-10-08) together with the FESOM2-comparison parts S/T of
+  `test_muscl_onthefly` and the `edge_up_dn_grad` dump record; the numbers below are from
+  before the removal.
 
 Net: `test_muscl_onthefly` (np 1/2; pi as read and with synthesised cavities): part R = the
 production kernels equal the stored-array kernels fed with the reference rule, bitwise, both

@@ -93,8 +93,8 @@ contains
         call compute_node_areas(mesh, nNodO, nNodL, partit)             ! accumulate area, then scale
         call build_elem_adjacency(mesh, nElemO, nEdgeL)                 ! elem_neighbors (rvo_upwind)
         if (partit%npes > 1) then
-            ! M2.12b: halo elem_area (FULL halo) for MUSCL fill_up_dn_grad's area
-            ! weighting at the halo elements reached through a halo node's element list,
+            ! M2.12b: halo elem_area (FULL halo; FESOM2 used it for the area weighting of
+            ! fill_up_dn_grad at halo elements reached through a halo node's element list),
             ! and halo node areas owner->halo (FESOM2 mesh_areas:2220 + 2322-2323). The
             ! accumulation stays owned-only (an owned node's element neighbourhood is
             ! complete) so OWNED area is unchanged; the exchange fills only the halo

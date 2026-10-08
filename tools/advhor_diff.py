@@ -18,7 +18,7 @@ node thicknesses hnode/hnode_new. The M1.4 assembled-step fields gate the REAL
 driver: valuesAB (init_tracers_AB AB(2) interpolation), del_ttf_{advhoriz,advvert,}
 _step (do_oce_adv_tra FCT path + the del_ttf accumulation) and ..._step{non,_non}
 (the non-FCT do_zero_flux path + per-tracer order knobs). The intermediates (ttf,
-ttfAB, vel, helem, edge_up_dn_tri, tr_xy, edge_up_dn_grad, wvel,
+ttfAB, vel, helem, edge_up_dn_tri, tr_xy, wvel,
 zbar_3d_n, Z_3d_n, area) are dumped too so any divergence is localised.
 
 Usage:  advhor_diff.py <fesom2.bin> <fesom3.bin> [--signal 0.0]

@@ -2,7 +2,6 @@ module oce_muscl_adv
     ! MUSCL-type advection setup, transcribed from FESOM2 v2.7.3 oce_muscl_adv.F90.
     !   muscl_adv_init            -> calls find_up_downwind_triangles
     !   find_up_downwind_triangles-> edge_up_dn_tri (upwind/downwind tri per edge)
-    !   fill_up_dn_grad           -> per-edge up/dn gradient (ORACLE only, see the routine)
     !
     ! Reference: Abalakin, Dervieux, Kozubskaya (2002), INRIA RR-4459; the concept
     ! of upwind/downwind triangles to a given edge (sergey.danilov@awi.de 2012).
@@ -19,7 +18,8 @@ module oce_muscl_adv
     !    M2.6) and are used only by quadratic reconstruction, NOT by horizontal
     !    advection. FESOM2's nboundary_lay loop is also dropped: it fed only the clamp of
     !    FESOM2's adv_tra_hor_muscl, which FESOM3 does not port (single unclamped kernel).
-    !  * tr_xy is an explicit argument to fill_up_dn_grad (FESOM2 reads global o_ARRAYS).
+    !  * FESOM2's fill_up_dn_grad (per-edge stored up/dn gradient) is not ported: the MUSCL
+    !    kernel takes the up/downwind triangle gradient on the fly (oce_adv_tra_hor).
     use mod_precision,   only: WP
     use mod_mesh,        only: t_mesh
     use mod_partit,      only: t_partit
@@ -29,7 +29,7 @@ module oce_muscl_adv
     use mod_halo,        only: exchange_elem_full
     implicit none
     private
-    public :: muscl_adv_init, find_up_downwind_triangles, fill_up_dn_grad
+    public :: muscl_adv_init, find_up_downwind_triangles
 
 contains
 
@@ -217,132 +217,5 @@ contains
             c = mesh%coord_nod2D(:, e2) - mesh%coord_nod2D(:, e3)
         end if
     end subroutine tri_sides
-
-    !---------------------------------------------------------------------------
-    subroutine fill_up_dn_grad(eudg, twork, tr_xy, mesh, partit)
-        ! oce_muscl_adv.F90:356-525. Per edge, build the up/downwind elemental tracer
-        ! gradient eudg(1:4,nz,edge): (1,3)=upwind (x,y), (2,4)=downwind.
-        ! NOT USED BY THE MODEL: FESOM2 stores this array in twork%edge_up_dn_grad; FESOM3
-        ! forms the reconstruction on the fly from tr_xy of the up/downwind triangle (the
-        ! reference RK3 rule, no Miura node average). Kept as FESOM2's reference for
-        ! test_muscl_onthefly (part R) and for the legacy FESOM2 dump drivers
-        ! (fesom_advhordump*). eudg is zeroed here, so levels the fill does not write are
-        ! 0, as in FESOM2's once-zeroed array.
-        ! On shared levels take the gradient straight from edge_up_dn_tri; on
-        ! not-shared levels (and on boundary edges) area-weighted-average tr_xy over
-        ! the triangles around each edge node (standard Miura).
-        ! M2.12b: optional partit -> loop OWNED edges. The body reads nod_in_elem2D
-        ! (completed for halo nodes by the find_neighbors dance), tr_xy and elem_area
-        ! at halo elements (both halo-exchanged by the caller / compute_geometry).
-        type(t_mesh),        intent(in)    :: mesh
-        real(kind=WP),       intent(out)   :: eudg(4, mesh%nl-1, *)   ! (4, nl-1, nEdgeO)
-        type(t_tracer_work), intent(in)    :: twork
-        real(kind=WP),       intent(in)    :: tr_xy(2, mesh%nl-1, mesh%elem2D)
-        type(t_partit),      intent(in), optional :: partit
-        integer       :: edge, nz, elem, k, ednodes(2), nzmin, nzmax
-        real(kind=WP) :: tvol, tx, ty
-        integer       :: nNodO, nNodL, nEdgeO, nElemO
-
-        call owned_bounds(mesh, nNodO, nNodL, nEdgeO, nElemO, partit)
-        eudg(:, :, 1:nEdgeO) = 0.0_WP
-        do edge = 1, nEdgeO
-            ednodes = mesh%edges(:, edge)
-            !___ edge has both upwind and downwind triangle on the surface __________
-            if ((twork%edge_up_dn_tri(1, edge) /= 0) .and. (twork%edge_up_dn_tri(2, edge) /= 0)) then
-                nzmin = maxval(mesh%ulevels_nod2D_max(ednodes))
-                nzmax = minval(mesh%nlevels_nod2D_min(ednodes))
-
-                ! not-shared upper levels of edge node 1
-                do nz = mesh%ulevels_nod2D(ednodes(1)), nzmin-1
-                    tvol = 0.0_WP; tx = 0.0_WP; ty = 0.0_WP
-                    do k = 1, mesh%nod_in_elem2D_num(ednodes(1))
-                        elem = mesh%nod_in_elem2D(k, ednodes(1))
-                        if (mesh%nlevels(elem)-1 < nz .or. nz < mesh%ulevels(elem)) cycle
-                        tvol = tvol + mesh%elem_area(elem)
-                        tx = tx + tr_xy(1, nz, elem)*mesh%elem_area(elem)
-                        ty = ty + tr_xy(2, nz, elem)*mesh%elem_area(elem)
-                    end do
-                    eudg(1, nz, edge) = tx/tvol
-                    eudg(3, nz, edge) = ty/tvol
-                end do
-                ! not-shared upper levels of edge node 2
-                do nz = mesh%ulevels_nod2D(ednodes(2)), nzmin-1
-                    tvol = 0.0_WP; tx = 0.0_WP; ty = 0.0_WP
-                    do k = 1, mesh%nod_in_elem2D_num(ednodes(2))
-                        elem = mesh%nod_in_elem2D(k, ednodes(2))
-                        if (mesh%nlevels(elem)-1 < nz .or. nz < mesh%ulevels(elem)) cycle
-                        tvol = tvol + mesh%elem_area(elem)
-                        tx = tx + tr_xy(1, nz, elem)*mesh%elem_area(elem)
-                        ty = ty + tr_xy(2, nz, elem)*mesh%elem_area(elem)
-                    end do
-                    eudg(2, nz, edge) = tx/tvol
-                    eudg(4, nz, edge) = ty/tvol
-                end do
-                ! shared levels: take gradient straight from up/downwind triangle
-                do nz = nzmin, nzmax-1
-                    eudg(1:2, nz, edge) = tr_xy(1, nz, twork%edge_up_dn_tri(:, edge))
-                    eudg(3:4, nz, edge) = tr_xy(2, nz, twork%edge_up_dn_tri(:, edge))
-                end do
-                ! not-shared lower levels of edge node 1
-                do nz = nzmax, mesh%nlevels_nod2D(ednodes(1))-1
-                    tvol = 0.0_WP; tx = 0.0_WP; ty = 0.0_WP
-                    do k = 1, mesh%nod_in_elem2D_num(ednodes(1))
-                        elem = mesh%nod_in_elem2D(k, ednodes(1))
-                        if (mesh%nlevels(elem)-1 < nz .or. nz < mesh%ulevels(elem)) cycle
-                        tvol = tvol + mesh%elem_area(elem)
-                        tx = tx + tr_xy(1, nz, elem)*mesh%elem_area(elem)
-                        ty = ty + tr_xy(2, nz, elem)*mesh%elem_area(elem)
-                    end do
-                    eudg(1, nz, edge) = tx/tvol
-                    eudg(3, nz, edge) = ty/tvol
-                end do
-                ! not-shared lower levels of edge node 2
-                do nz = nzmax, mesh%nlevels_nod2D(ednodes(2))-1
-                    tvol = 0.0_WP; tx = 0.0_WP; ty = 0.0_WP
-                    do k = 1, mesh%nod_in_elem2D_num(ednodes(2))
-                        elem = mesh%nod_in_elem2D(k, ednodes(2))
-                        if (mesh%nlevels(elem)-1 < nz .or. nz < mesh%ulevels(elem)) cycle
-                        tvol = tvol + mesh%elem_area(elem)
-                        tx = tx + tr_xy(1, nz, elem)*mesh%elem_area(elem)
-                        ty = ty + tr_xy(2, nz, elem)*mesh%elem_area(elem)
-                    end do
-                    eudg(2, nz, edge) = tx/tvol
-                    eudg(4, nz, edge) = ty/tvol
-                end do
-            !___ edge has only one triangle on the surface (boundary edge) __________
-            else
-                ! Only linear reconstruction part (standard Miura at both nodes)
-                nzmin = mesh%ulevels_nod2D(ednodes(1))
-                nzmax = mesh%nlevels_nod2D(ednodes(1))
-                do nz = nzmin, nzmax-1
-                    tvol = 0.0_WP; tx = 0.0_WP; ty = 0.0_WP
-                    do k = 1, mesh%nod_in_elem2D_num(ednodes(1))
-                        elem = mesh%nod_in_elem2D(k, ednodes(1))
-                        if (mesh%nlevels(elem)-1 < nz .or. nz < mesh%ulevels(elem)) cycle
-                        tvol = tvol + mesh%elem_area(elem)
-                        tx = tx + tr_xy(1, nz, elem)*mesh%elem_area(elem)
-                        ty = ty + tr_xy(2, nz, elem)*mesh%elem_area(elem)
-                    end do
-                    eudg(1, nz, edge) = tx/tvol
-                    eudg(3, nz, edge) = ty/tvol
-                end do
-                nzmin = mesh%ulevels_nod2D(ednodes(2))
-                nzmax = mesh%nlevels_nod2D(ednodes(2))
-                do nz = nzmin, nzmax-1
-                    tvol = 0.0_WP; tx = 0.0_WP; ty = 0.0_WP
-                    do k = 1, mesh%nod_in_elem2D_num(ednodes(2))
-                        elem = mesh%nod_in_elem2D(k, ednodes(2))
-                        if (mesh%nlevels(elem)-1 < nz .or. nz < mesh%ulevels(elem)) cycle
-                        tvol = tvol + mesh%elem_area(elem)
-                        tx = tx + tr_xy(1, nz, elem)*mesh%elem_area(elem)
-                        ty = ty + tr_xy(2, nz, elem)*mesh%elem_area(elem)
-                    end do
-                    eudg(2, nz, edge) = tx/tvol
-                    eudg(4, nz, edge) = ty/tvol
-                end do
-            end if
-        end do
-    end subroutine fill_up_dn_grad
-
 
 end module oce_muscl_adv

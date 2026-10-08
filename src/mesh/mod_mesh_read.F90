@@ -468,7 +468,7 @@ contains
         ! ---- topology + orientation + vertical structure (LOCAL) ----
         call build_nod_in_elem_local(mesh, partit)
         ! M2.12b: complete nod_in_elem2D for HALO nodes (the find_neighbors halo dance)
-        ! — needed by MUSCL fill_up_dn_grad / find_up_downwind_triangles, which read a
+        ! — needed by MUSCL find_up_downwind_triangles, which reads a
         ! halo node's full element list (reaching eXDim). imap_elem is the full-halo
         ! global->local inverse map (1..nElemF) used to re-localize.
         call complete_nod_in_elem_halo(mesh, partit, imap_elem)
