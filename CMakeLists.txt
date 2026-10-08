@@ -130,6 +130,12 @@ foreach(_drv ${fesom3_drivers})
 endforeach()
 
 # ----------------------------------------------------------------------
+# fesom_ini: FESOM2's mesh partitioner (mesh_part/, METIS in lib/metis-5.1.0).
+# Writes edges/levels and dist_N/ into the mesh directory; see mesh_part/CMakeLists.txt.
+# ----------------------------------------------------------------------
+add_subdirectory(mesh_part)
+
+# ----------------------------------------------------------------------
 # Tests: one executable per test/test_*.F90, registered with ctest.
 # add_fesom_test(<name> <nranks>) builds + runs under mpirun.
 # ----------------------------------------------------------------------

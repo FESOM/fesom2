@@ -61,6 +61,8 @@ echo "configure.sh: cmake -> ${build_dir} (compiler=${compiler} precision=${prec
 cmake -S "${src_dir}" -B "${build_dir}" \
     -DCMAKE_BUILD_TYPE="${build_type}" \
     -DCMAKE_Fortran_COMPILER="${FC}" \
+    -DCMAKE_C_COMPILER="${CC}" \
+    -DCMAKE_CXX_COMPILER="${CXX}" \
     ${prec_flag} \
     "${extra_cmake[@]}"
 

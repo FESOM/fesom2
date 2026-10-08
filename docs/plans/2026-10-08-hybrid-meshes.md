@@ -303,17 +303,35 @@ fluxes and nonlinear terms can. Asserted in a test (Task 9), measured in the sho
 - Modify: `CMakeLists.txt` (`add_subdirectory(mesh_part)`, target `fesom_ini`), `configure.sh`
 - Create: `tools/run_ini_compare.sh`
 
-- [ ] copy the subproject; keep FESOM2's `namelist.config` semantics (paths, geometry,
-      run_config, machine: n_part); build it in the scratch build
-- [ ] `run_ini_compare.sh` (TDD): make writable copies of pi and CORE2 (`nod2d.out`,
+- [x] copy the subproject; keep FESOM2's `namelist.config` semantics (paths, geometry,
+      run_config, machine: n_part); build it in the scratch build — sources from
+      `/home/a/a270029/fesom2.0` (incl. its 5 `associate_*.h` headers) unchanged; private module
+      dir `<build>/mesh_part/module`; METIS added `EXCLUDE_FROM_ALL` (only libmetis is built);
+      FESOM2's mesh_part Fortran flags and C definitions; `configure.sh` passes `CC`/`CXX`;
+      binary `<build>/bin/fesom_ini`
+- [x] `run_ini_compare.sh` (TDD): make writable copies of pi and CORE2 (`nod2d.out`,
       `elem2d.out`, `aux3d.out` + a `namelist.config`) under `/work/ab0995/a270029/meshes/`, run
       the ported `fesom_ini` for pi (2, 8 parts) and CORE2 (8, 128 parts) and `cmp` every output
       (`edges.out`, `edge_tri.out`, `edgenum.out`, `nlvls.out`, `elvls.out`, `dist_N/*`) against the
       existing files the model uses today; second reference: FESOM2's own `mesh_part` built in
       scratch; if METIS output differs only because of the build, fall back to structural
-      equality via `check_dist.py` (Task 4) and record why
-- [ ] fix until identical on triangle meshes
-- [ ] run the comparison — must pass before Task 4
+      equality via `check_dist.py` (Task 4) and record why — writable copies
+      `/work/ab0995/a270029/meshes/pi_w/` and `core2_w/` (+ CORE2 2 parts); FESOM2's build in
+      `/work/ab0995/a270029/fesom3_hybrid/f2_meshpart_build/`, its runs on separate copies under
+      `/work/ab0995/a270029/fesom3_hybrid/ini_compare/`
+- [x] fix until identical on triangle meshes — nothing to fix: EVERY output (edges, levels,
+      `dist_2/8/128`) is byte-identical to FESOM2's own build; against the existing mesh files:
+      `edges.out`, `edge_tri.out`, `edgenum.out` (pi, CORE2), CORE2 `elvls/nlvls.out.20260528_regenerated`
+      + `elvls_raw.out`, CORE2 `dist_2` and `dist_128` identical.
+      ⚠️ Not reproducible (made by OLDER fesom_ini versions, not by the build): pi `dist_2/8` and
+      `elvls/nlvls.out` (3 element levels differ), CORE2 `dist_8` (2023) and its current
+      `elvls/nlvls.out` (2021 originals, hash = the mesh git LFS). These partitions are almost
+      perfectly node-balanced (CORE2 dist_8: 15857/15858 per part), which suggests METIS was called
+      without the node-level weights; a scratch probe with the reference levels, and one with unit weights, as
+      weights did not reproduce them either (unit weights: pi dist_2 part sizes match, labels
+      swapped). Reported as `info` by the script, structure to be checked by `check_dist.py` (Task 4)
+- [x] run the comparison — must pass before Task 4 — `tools/run_ini_compare.sh` PASS (~30 s);
+      ctest 48/48 in the scratch build
 
 ### Task 4: fesom_ini mixed-mesh capable
 
