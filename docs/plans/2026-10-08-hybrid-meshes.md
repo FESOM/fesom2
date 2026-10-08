@@ -911,12 +911,69 @@ fluxes and nonlinear terms can. Asserted in a test (Task 9), measured in the sho
 **Files:**
 - Modify: `test/CMakeLists.txt` (NEMO and mixed cut-out variants of `fesom_conserve`)
 - Create: `tools/run_cutout_short.sh`
+- ➕ Modify: `src/drivers/fesom_conserve.F90` (sea-ice option `FESOM3_CONSERVE_ICE`)
+- ➕ Create: `tools/cutout_diag.py` (1-vs-N checkpoint comparison, checkerboard measures, self-test)
 
-- [ ] conservation tests (heat/salt 1e-12) on the NEMO and mixed cut-outs, np 1/2, with ice on
-- [ ] short runs (a few days) on the cut-outs at 1 vs 2/8 ranks: stable, conserving, N vs 1
+- [x] conservation tests (heat/salt 1e-12) on the NEMO and mixed cut-outs, np 1/2, with ice on
+      — `fesom_conserve` had no sea ice: new presence knob `FESOM3_CONSERVE_ICE` runs, every step
+      as in the production runloop, ocean2ice → EVP/mEVP (`FESOM3_WHICHEVP`) → ice TG rhs → ice FCT
+      → `oce_fluxes_mom` (ice-ocean drag into `stress_surf`/`stress_node_surf`); the cut-outs are
+      tropical (a cold start has no ice), so the ice is SEEDED analytically (a_ice
+      0.45·(1 + sin(k·lon)·cos(k·lat)), 5° wavelength, ice-free troughs so the limiter acts; m_ice,
+      m_snow ∝ a_ice) and driven by a uniform wind-on-ice stress (0.1, −0.05) N/m²; no cut_off /
+      thermodynamics (they exchange heat/salt/water with the ocean — a budget, not a conserved
+      quantity). Gated: heat, salt, volume and the ice masses Σ fct_lumpedmass·f (a, m, m_snow)
+      within 1e-12. 6 ctests `fesom_conserve_{q,mix}cut_ice_np{1,2}` + `_ice_mevp_np2`, zstar with
+      the production ocean physics the driver supports (TKE, GM + Redi, splines, vector invariant,
+      rvo_upwind 1, w split), 20 steps: |drift| ≤ 1.2e-14 (ocean) and ≤ 2.8e-15 (ice), max|uice|
+      0.35–0.39 m/s. Mutation (ice low-order step with `mesh%area` instead of the lumped mass): ice
+      drift 1.3e-6–7e-6 → CONSERVATION VIOLATED
+- [x] short runs (a few days) on the cut-outs at 1 vs 2/8 ranks: stable, conserving, N vs 1
       within roundoff; checkerboard energy of SSH and of a tracer measured and reported
-- [ ] ⚠️ if the checkerboard energy grows, stop and ask the user before continuing
-- [ ] run ctest + short runs — must pass before Task 18
+      — `tools/run_cutout_short.sh` (6/6 PASS, ~25 min): 5 days (240 steps) on both cut-outs, np 1
+      vs 2 and 8, each restarted from ONE np-1 0-step checkpoint (L60), SSH soltol 1e-14.
+      **prod** (= the run_tri_regression prod physics: linfs, JRA55 1958, EVP ice, GM + Redi, TKE,
+      splines, vinv, rvo_upwind 1, SW penetration, w split): stable on all np (max|eta| 0.27 m at
+      the cold-start adjustment, max|uv| 0.67 m/s quad / 0.65 mixed; 10-day run 0.75 m/s), ice-free
+      (tropics, a_ice = 0 — the ice is exercised in the cons case). 1 vs N per field every 6 h
+      from the restart checkpoints (double, `cutout_diag.py compare`): first day ≤ 1.9e-10 (all
+      fields, both meshes, np 2 and 8); 5 days: quad cut-out v 1.0e-4, tke 7.1e-5, T 1.5e-6, S
+      6.4e-7, eta 1.8e-6; mixed cut-out v 3.8e-9, tke 2.2e-9, T 6.5e-11, S 2.7e-11, eta 4.0e-11. The growth
+      on the quad cut-out starts at day ~3.9 near (−7°E, −1°N), where the equatorial flow runs
+      against the artificial closed southern wall of the cut (np 2 vs np 8 grows the same way:
+      1e-10 → 9e-6), amplified by TKE's thresholds: **prodpp** (same with PP instead of TKE, the
+      clean diagnostic like mEVP for the EVP) stays ≤ 1.1e-7 over 5 days on both meshes. A
+      second TKE effect: its thresholds turn roundoff into a local O(1e-9) jump within hours,
+      and whether it fires depends on the arithmetic (np, build, dump probes on/off): one
+      exploratory np-1 run gave 4.4e-9 at step 12 (6e-12 without TKE; same in a -O0 -check
+      bounds,uninit build, no out-of-bounds or uninitialised read) and 7.9e-3 after 5 days. Gates:
+      EARLY (first day, all fields) 1e-6, whole run 5e-2 (OCEAN/MIX), margins ≥ 200×
+      resp. 6× over the worst exploratory run. **cons** (fesom_conserve with ice, 5 days, np
+      1/2/8): heat/salt/volume |drift| ≤ 1.3e-14, ice masses ≤ 8.2e-15, max|uice| 1.12 m/s.
+      Checkerboard (`cutout_diag.py checker`, ssh/sst/sss snapshots every step of the np-1 prod
+      run; E_glob = projection on the global 2-colouring of the quad-side graph = the exact SSH
+      null mode, E_loc = per-quad (+1,−1,+1,−1) energy, both normalised by the variance over the
+      quad vertices; R_tri/R_quad/R_iface = rms of the linear-exact neighbour residual / std at
+      triangle-only, quad-only and interface nodes), daily means of the 10-day run: **SSH** E_glob
+      no growth (quad cut-out 1e-16…4e-15, mixed 1e-7…3e-6 fluctuating), E_loc rises during the
+      spin-up (day 1→3: 8e-5 → 1.8e-4 quad, 1.1e-4 → 2.4e-4 mixed) and then saturates/declines
+      (day 10: 1.3e-4 / 2.8e-4). **Tracers** grow over the whole 10 days: SST E_loc 7.3e-6 →
+      4.3e-5 (quad) and 9.2e-6 → 6.1e-5 (mixed), SSS E_loc 9.8e-6 → 1.2e-4 / 3.0e-5 → 3.3e-4
+      (E_glob stays ≤ 7e-7); on the mixed cut-out the grid-scale residual grows at quad and
+      interface nodes more than at triangle nodes (SSS day 1 → 10: R_quad 9.9e-3 → 4.4e-2,
+      R_iface 9.5e-3 → 5.7e-2, R_tri 1.2e-2 → 2.0e-2; SST R_iface 1.0e-2 → 2.7e-2, R_tri 9.0e-3 →
+      1.5e-2) — consistent with the Task-11 finding (linear tracer not advected exactly at
+      interface nodes and irregular quads). Time series: `cutout_short{,_10d}/prod_*/checker.csv`
+- ⚠️ the tracer checkerboard / grid-scale energy GROWS (SST ×6, SSS ×11–12 in E_loc over 10
+      days, faster at quad and triangle–quad interface nodes than at triangle nodes); the SSH
+      null mode does not grow. Not an exponential instability within 10 days, but no saturation
+      either — a remedy (e.g. hourglass control or the dual-segment face values of Task 11) is
+      the user's design decision; nothing implemented
+- [x] ⚠️ if the checkerboard energy grows, stop and ask the user before continuing
+      (user ordered uninterrupted execution — reported, not asked)
+- [x] run ctest + short runs — must pass before Task 18 — scratch ctest 142/142 (wiped +
+      reconfigured), `run_cutout_short.sh` 6/6, `run_tri_regression.sh conserve:pi:1
+      conserve:pi:2` PASS (the only cases using the changed driver; ice off = unchanged path)
 
 ### Task 18: CORE2 throughput, setup workflow and example job for the NEMO mesh
 

@@ -39,6 +39,23 @@ program fesom_conserve
     !   FESOM3_WSPLIT_MAXCFL  explicit CFL_z cap (maxcfl)      default: 1.0
     !   FESOM3_WSPLIT_MINCFL  onset of the split (mincfl)      default: 0.5*maxcfl
     !   FESOM3_WSPLIT_EXPECT_SPLIT=N  error stop unless >= N owned faces split (hook comment)
+    !   FESOM3_CONSERVE_ICE  presence -> sea ice ON (see below)
+    !   FESOM3_WHICHEVP    0=EVP / 1=mEVP (with FESOM3_CONSERVE_ICE)    default: 0
+    !
+    ! SEA ICE (FESOM3_CONSERVE_ICE, hybrid-mesh Task 17). The ice dynamics (EVP/mEVP) and the
+    ! ice TG/FCT advection run every step, coupled to the ocean both ways as in the production
+    ! runloop: ocean2ice (surface velocity, hbar) -> EVPdynamics_solve -> ice_TG_rhs ->
+    ! ice_fct_solve -> oce_fluxes_mom (ice-ocean drag -> stress_surf, stress_node_surf). The ice
+    ! is SEEDED analytically (a cold start puts ice only where SST < 0, i.e. none on a tropical
+    ! cut-out): a_ice = 0.45*(1 + sin(k*lon)*cos(k*lat)) with a 5 deg wavelength (geographic
+    ! coordinates; ice-free troughs, so the FCT limiter acts), m_ice = a_ice*(1.5 + 0.5*cos(k*lon)),
+    ! m_snow = 0.1*a_ice*(1 + sin(k*lat)), driven by a uniform wind-on-ice stress (0.1, -0.05)
+    ! N/m^2 (model frame); the atmosphere-ocean stress stays 0. cut_off and the thermodynamics are
+    ! NOT run: they exchange heat, salt and water with the ocean (a budget, not a conserved
+    ! quantity) and cut_off removes ice by design. The ocean heat/salt/volume gate is unchanged
+    ! (the drag moves momentum only), and the ice masses sum(fct_lumpedmass*f) of a_ice, m_ice
+    ! and m_snow over owned nodes (the FCT lumped mass, Task 16) are gated with the same
+    ! FESOM3_CONSERVE_TOL.
     !
     ! NOTE ON linfs. The linear free surface is NOT tracer-conserving by construction:
     ! hnode is frozen, so the surface vertical advective flux -w*T*area at nzmin is a real
@@ -83,6 +100,12 @@ program fesom_conserve
     use mod_config,         only: which_ALE
     use mod_halo,           only: allreduce_sum, allreduce_max
     use oce_wsplit,         only: wsplit_assert_params
+    use mod_ice,            only: t_ice
+    use mod_ice_setup,      only: ice_setup
+    use mod_ice_dyn,        only: ocean2ice, EVPdynamics_solve
+    use mod_ice_fct,        only: ice_TG_rhs, ice_fct_solve
+    use mod_ice_thermo,     only: t_atmflux
+    use mod_ice_oce_coupling, only: oce_fluxes_mom
     implicit none
 
     ! CORE2 namelist timestep: dt = 86400/step_per_day, step_per_day=48 -> 1800 s. Computed
@@ -95,7 +118,7 @@ program fesom_conserve
     type(t_dyn)        :: dyn
     type(t_tracer)     :: tracers
     type(t_ic3d_config):: ic
-    integer :: n, nz, nl, nzmin, nzmax, e, tr_num, nsteps, ios, env_len
+    integer :: n, nz, nl, nzmin, nzmax, e, tr_num, nsteps, ios, env_len, i_ice
     integer :: nNodO, nNodL, nEdgeO, nElemO, nElemF
     real(kind=MP) :: zbar_srf, zbar_bot
     real(kind=WP), allocatable :: Ki(:,:), heat_flux(:), water_flux(:), virtual_salt(:)
@@ -109,6 +132,11 @@ program fesom_conserve
     real(kind=WP) :: volume0, volume, vdrift
     logical :: use_fer_gm, use_redi, use_kpp, use_tke
     real(kind=WP), allocatable :: stress_node_surf(:,:)
+    logical         :: use_ice                 ! FESOM3_CONSERVE_ICE
+    integer         :: whichevp                ! FESOM3_WHICHEVP
+    type(t_ice)     :: ice
+    type(t_atmflux) :: atm
+    real(kind=WP)   :: icemass0(3), icemass(3), idrift(3), klon, kwave
 
     call get_environment_variable('FESOM3_MESH_DIR', mesh_dir)
     if (len_trim(mesh_dir) == 0) &
@@ -184,6 +212,11 @@ program fesom_conserve
     ! which no -- or only a handful of -- owned faces split at the last step, or none
     ! reaches the implicit-dominated range f >= 0.5, proves nothing about the split
     ! consumers, so it must FAIL, not pass.
+    call get_environment_variable('FESOM3_CONSERVE_ICE', env, length=env_len, status=ios)
+    use_ice = (ios == 0 .and. env_len > 0)
+    whichevp = 0
+    call get_environment_variable('FESOM3_WHICHEVP', env, length=env_len, status=ios)
+    if (ios == 0 .and. env_len > 0) read(env, *, iostat=ios) whichevp
     call get_environment_variable('FESOM3_WSPLIT_EXPECT_SPLIT', env, length=env_len, status=ios)
     wsplit_expect_split = (ios == 0 .and. env_len > 0)
     wsplit_expect_min   = 1
@@ -462,12 +495,50 @@ program fesom_conserve
     call init_stiff_mat_ale(mesh, dt, partit)
 
     !===========================================================================
+    ! sea ice (FESOM3_CONSERVE_ICE): setup on the SSH CSR pattern (mass matrix + lumped mass),
+    ! the production &ice_dyn config (fesom_lifecycle_native_mr), the analytic seed and the
+    ! wind-on-ice stress described in the header. Pointwise formulas over owned+halo nodes, so
+    ! the halo needs no exchange.
+    if (use_ice) then
+        call ice_setup(ice, tracers, mesh, dt, partit)
+        ice%whichEVP      = whichevp
+        ice%cd_oce_ice    = 0.0055_WP
+        ice%delta_min     = 1.0e-11_WP
+        ice%ice_diff      = 0.0_WP
+        ice%ice_gamma_fct = 0.5_WP
+        kwave = 2.0_WP*acos(-1.0_WP)/(5.0_WP*acos(-1.0_WP)/180.0_WP)   ! 5 deg wavelength
+        do n = 1, nNodL
+            if (mesh%ulevels_nod2D(n) > 1) cycle
+            klon = kwave*mesh%geo_coord_nod2D(1, n)
+            ice%data(1)%values(n) = 0.45_WP*(1.0_WP + sin(klon)*cos(kwave*mesh%geo_coord_nod2D(2, n)))
+            ice%data(2)%values(n) = ice%data(1)%values(n)*(1.5_WP + 0.5_WP*cos(klon))
+            ice%data(3)%values(n) = 0.1_WP*ice%data(1)%values(n) &
+                                    *(1.0_WP + sin(kwave*mesh%geo_coord_nod2D(2, n)))
+        end do
+        ice%stress_atmice_x = 0.10_WP
+        ice%stress_atmice_y = -0.05_WP
+        allocate(atm%stress_node_surf(2, nNodL), atm%stress_atmoce_x(nNodL), atm%stress_atmoce_y(nNodL))
+        atm%stress_node_surf = 0.0_WP; atm%stress_atmoce_x = 0.0_WP; atm%stress_atmoce_y = 0.0_WP
+        if (partit%mype == 0) write(*,'(a,i0,a)') 'fesom_conserve: sea ice ON (whichEVP=', whichevp, &
+            '; seeded, dynamics + FCT advection + ice-ocean drag, no thermodynamics)'
+    end if
+
+    !===========================================================================
     ! runloop: N steps, state persists (multi-step AB2 evolution). lfirst=(n==1).
     ! Invariants are checked BEFORE the first step (the IC baseline) and after each step.
     call check_invariants(0)
     content0 = content
     volume0  = volume
+    if (use_ice) icemass0 = icemass
     do n = 1, nsteps
+        if (use_ice) then
+            call ocean2ice(ice, dyn, tracers, mesh, partit)
+            call EVPdynamics_solve(ice, mesh, partit)
+            call ice_TG_rhs(ice, mesh, partit)
+            call ice_fct_solve(ice, mesh, partit)
+            call oce_fluxes_mom(ice, atm, stress_surf, mesh, partit)
+            if (allocated(stress_node_surf)) stress_node_surf = atm%stress_node_surf
+        end if
         if (allocated(stress_node_surf)) then
             call step_oce(n, dt, (n == 1), dyn, tracers, mesh, Ki, &
                           heat_flux, water_flux, virtual_salt, relax_salt, &
@@ -488,17 +559,24 @@ program fesom_conserve
     drift(1) = reldrift(content(1), content0(1))
     drift(2) = reldrift(content(2), content0(2))
     vdrift   = reldrift(volume, volume0)
+    idrift   = 0.0_WP
+    if (use_ice) then
+        do i_ice = 1, 3
+            idrift(i_ice) = reldrift(icemass(i_ice), icemass0(i_ice))
+        end do
+    end if
     if (partit%mype == 0) then
         write(*,'(a)') 'fesom_conserve: relative drift over the run'
         write(*,'(a,es24.16)') '  heat: ', drift(1)
         write(*,'(a,es24.16)') '  salt: ', drift(2)
         write(*,'(a,es24.16)') '  vol : ', vdrift
+        if (use_ice) write(*,'(a,3es24.16)') '  ice a/m/m_snow: ', idrift
         write(*,'(a,i0,a,a,a)') 'fesom_conserve: done (', nsteps, ' steps, which_ALE=', &
             trim(which_ALE), ').'
     end if
     if (conserve_tol > 0.0_WP) then
         if (abs(drift(1)) > conserve_tol .or. abs(drift(2)) > conserve_tol .or. &
-            abs(vdrift)   > conserve_tol) then
+            abs(vdrift)   > conserve_tol .or. any(abs(idrift) > conserve_tol)) then
             if (partit%mype == 0) &
                 write(*,'(a,es12.4)') 'fesom_conserve: CONSERVATION VIOLATED, tol=', conserve_tol
             call par_ex(partit%MPI_COMM_FESOM, partit%mype)
@@ -582,7 +660,7 @@ contains
         ! Contents (1=heat, 2=salt) into `content`, plus the three hard invariants.
         integer, intent(in) :: step
         integer       :: i, j, k, kmin, kmax, elnodes(MAX_NV)
-        real(kind=WP) :: acc, hmean, tol
+        real(kind=WP) :: acc, hmean, tol, uicemax
 
         !______________________________________________________________________
         ! 1. total tracer content over OWNED scalar cells (allreduced at npes>1)
@@ -653,6 +731,29 @@ contains
         end do
 
         !______________________________________________________________________
+        ! 1c. sea-ice masses sum(fct_lumpedmass*f) over owned nodes (a_ice, m_ice, m_snow) --
+        !     the quantity the ice FCT conserves (Task 16); finite ice velocity
+        if (use_ice) then
+            do i = 1, 3
+                acc = 0.0_WP
+                do j = 1, nNodO
+                    acc = acc + ice%work%fct_lumpedmass(j)*ice%data(i)%values(j)
+                end do
+                if (partit%npes > 1) call allreduce_sum(acc, partit)
+                icemass(i) = acc
+            end do
+            do j = 1, nNodO
+                if (.not. finite(ice%uice(j)) .or. .not. finite(ice%vice(j))) then
+                    write(*,'(a,i0,a,i0,a,i0)') 'fesom_conserve: non-finite ice velocity at step ', &
+                        step, ' rank ', partit%mype, ' node ', j
+                    error stop 1
+                end if
+            end do
+            uicemax = maxval(sqrt(ice%uice(1:nNodO)**2 + ice%vice(1:nNodO)**2))
+            if (partit%npes > 1) call allreduce_max(uicemax, partit)
+        end if
+
+        !______________________________________________________________________
         ! 4. finiteness of the live state (catch a NaN at its own step)
         do j = 1, nElemO
             do k = 1, nl-1
@@ -686,6 +787,9 @@ contains
         if (partit%mype == 0) &
             write(*,'(a,i0,a,es24.16,a,es24.16)') 'fesom_conserve: step ', step, &
                 '  heat=', content(1), '  salt=', content(2)
+        if (use_ice .and. partit%mype == 0) &
+            write(*,'(a,i0,a,3es24.16,a,es10.3)') 'fesom_conserve: ice step ', step, &
+                '  a/m/m_snow=', icemass, '  max|uice|=', uicemax
     end subroutine check_invariants
 
 end program fesom_conserve

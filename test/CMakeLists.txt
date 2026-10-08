@@ -336,6 +336,36 @@ foreach(_np 1 2)
     endforeach()
 endforeach()
 
+# Task 17 (hybrid meshes): conservation with SEA ICE ON on the NEMO-quad and NEMO-mixed
+# cut-outs, np 1 and 2 (EVP) + mEVP at np 2. The ocean physics is the production set the
+# driver supports (TKE, GM + Redi, splines, vector-invariant momentum with rvo_upwind 1, w
+# split) on zstar (linfs does not conserve); the ice is seeded and driven by a wind-on-ice
+# stress, dynamics + FCT advection + ice-ocean drag every step, no thermodynamics
+# (FESOM3_CONSERVE_ICE, fesom_conserve header). Heat/salt/volume and the three ice masses
+# sum(fct_lumpedmass*f) within 1e-12; measured <= 1.2e-14 (max|uice| 0.35-0.39 m/s).
+set(_prod_ocean "FESOM3_MIX_TKE=1;FESOM3_REDI=1;FESOM3_FER_GM=1;FESOM3_SHEAR_SPLINES=1;FESOM3_N2_SPLINES=1;FESOM3_MOMADV_OPT=1;FESOM3_RVO_UPWIND=1.0;FESOM3_WSPLIT=1")
+foreach(_cut q:nemo025q_cut mix:nemo025mix_cut)
+    string(REPLACE ":" ";" _pair ${_cut})
+    list(GET _pair 0 _tag)
+    list(GET _pair 1 _mesh)
+    foreach(_case 1:0 2:0 2:1)
+        string(REPLACE ":" ";" _c ${_case})
+        list(GET _c 0 _np)
+        list(GET _c 1 _evp)
+        set(_name fesom_conserve_${_tag}cut_ice_np${_np})
+        if(_evp EQUAL 1)
+            set(_name fesom_conserve_${_tag}cut_ice_mevp_np${_np})
+        endif()
+        add_test(NAME ${_name}
+                 COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np ${_np}
+                         $<TARGET_FILE:fesom_conserve>)
+        set_tests_properties(${_name} PROPERTIES
+            ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/${_mesh};FESOM3_IC_FILE=/pool/data/AWICM/FESOM2/INITIAL/phc3.0/phc3.0_winter.nc;FESOM3_NSTEPS=20;FESOM3_WHICH_ALE=zstar;${_prod_ocean};FESOM3_CONSERVE_ICE=1;FESOM3_WHICHEVP=${_evp};FESOM3_CONSERVE_TOL=1e-12"
+            PASS_REGULAR_EXPRESSION "sea ice ON.*CONSERVATION OK"
+            SKIP_REGULAR_EXPRESSION "cannot open;No such file")
+    endforeach()
+endforeach()
+
 # Smooth w = w_e + w_i split (use_wsplit, docs/plans/completed/2026-10-02-wsplit-smooth.md) with all
 # its consumers live: momentum TDMA + advection, the tracer-diffusion TDMA and the FCT
 # adv_tra_vert_impl. The 20-step cold start never reaches CFL_z ~ 1 (measured max
