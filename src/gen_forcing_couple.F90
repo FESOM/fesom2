@@ -698,9 +698,8 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
             Tair(i)     = 0.0_WP
             prec_rain(i)= 0.0_WP
             prec_snow(i)= 0.0_WP
-            if (l_mslp) then
-               press_air(i)= 0.0_WP 
-            end if
+            ! press_air is kept: a floating ice shelf passes the atmospheric pressure on to
+            ! the water below, and zeroing it here made a pressure step at the ice-shelf front
             runoff(i)   = 0.0_WP
         end if
     end do
