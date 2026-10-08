@@ -212,6 +212,7 @@ end subroutine update_atm_forcing_yac
 #else /* if not defined  __yac */
 
 subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
+  use fesom_profiler, only: fesom_profiler_start, fesom_profiler_end
 
   implicit none
   integer,        intent(in)            :: istep
@@ -660,7 +661,9 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
     end if
 #else
 #ifndef __ifsinterface
+  call fesom_profiler_start("forc_sbc_do")
   call sbc_do(partit, mesh)
+  call fesom_profiler_end("forc_sbc_do")
 !$OMP PARALLEL DO
   DO n=1, myDim_nod2D+eDim_nod2D
      u_wind(n)    = atmdata(i_xwind,n)
@@ -706,14 +709,18 @@ subroutine update_atm_forcing(istep, ice, tracers, dynamics, partit, mesh)
   ! second, compute exchange coefficients
   ! 1) drag coefficient 
   if(AOMIP_drag_coeff) then
+     call fesom_profiler_start("forc_wind_drag")
      call cal_wind_drag_coeff(partit)
+     call fesom_profiler_end("forc_wind_drag")
   end if
   ! 2) drag coeff. and heat exchange coeff. over ocean in case using ncar formulae
   if(ncar_bulk_formulae) then
 !     cd_atm_oce_arr=0.0_WP
 !     ch_atm_oce_arr=0.0_WP
 !     ce_atm_oce_arr=0.0_WP
+     call fesom_profiler_start("forc_ncar_fluxes")
      call ncar_ocean_fluxes_mode(ice, partit, mesh)
+     call fesom_profiler_end("forc_ncar_fluxes")
   elseif(AOMIP_drag_coeff) then
      cd_atm_oce_arr=cd_atm_ice_arr
   end if

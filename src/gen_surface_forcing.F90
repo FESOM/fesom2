@@ -160,6 +160,7 @@ MODULE g_sbf
    integer, save  :: nm_sbc_unit     = 103       ! unit to open namelist file, skip 100-102 for cray fortran
    logical        :: ic_cyclic=.true.
   !============== namelistatmdata variables ================
+   character(len=10), save    :: forcing_distribution = 'bcast' ! 'bcast' or 'scatter' (each rank receives only its interpolation box)
    character(len=256), save   :: nm_xwind_file = 'xwind.dat' ! name of file with winds, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
    character(len=256), save   :: nm_ywind_file = 'ywind.dat' ! name of file with winds, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
    character(len=256), save   :: nm_xstre_file = 'xstre.dat' ! name of file with stress, if netcdf file then provide only name from "nameyyyy.nc" yyyy.nc will be added by model
@@ -236,6 +237,12 @@ MODULE g_sbf
       integer sbcdata_a_t_index
       real(4), allocatable, dimension(:,:)     :: sbcdata_b
       integer sbcdata_b_t_index
+      ! ========== forcing_distribution='scatter': sbcdata_a/b are allocated with the box bounds
+      integer :: box(4) = (/1, 0, 1, 0/)                 ! i0, i1, j0, j1
+      integer,  allocatable, dimension(:,:)    :: all_box      ! (4, 0:npes-1), I/O rank only
+      integer,  allocatable, dimension(:)      :: scat_counts, scat_displs ! I/O rank only
+      real(4),  allocatable, dimension(:)      :: scat_pack    ! I/O rank only
+      real(4),  allocatable, dimension(:,:)    :: readbuf      ! full grid, I/O rank only
       ! ========== interpolation coeficients
    end type flfi_type
    type(flfi_type), allocatable, save, target :: sbc_flfi(:)  !array for information about flux files
@@ -759,6 +766,7 @@ CONTAINS
          end do
 !$OMP END DO
 !$OMP END PARALLEL
+         call sbc_box_setup(fld_idx, partit)
       end do
       lfirst=.false.
       end if
@@ -809,6 +817,7 @@ CONTAINS
 
    SUBROUTINE getcoeffld(fld_idx, rdate, partit, mesh)
       use forcing_provider_async_module
+      use fesom_profiler, only: fesom_profiler_start, fesom_profiler_end
       use io_netcdf_workaround_module
       use g_clock
       !!---------------------------------------------------------------------
@@ -873,11 +882,15 @@ CONTAINS
       nc_lat   =>sbc_flfi(fld_idx)%nc_lat
 
       if(.not. allocated(sbc_flfi(fld_idx)%sbcdata_a)) then
-        allocate(sbc_flfi(fld_idx)%sbcdata_a(nc_Nlon,nc_Nlat))
-        sbc_flfi(fld_idx)%sbcdata_a_t_index = -1
-        allocate(sbc_flfi(fld_idx)%sbcdata_b(nc_Nlon,nc_Nlat))
-        sbc_flfi(fld_idx)%sbcdata_b_t_index = -1
         sbc_flfi(fld_idx)%read_forcing_rootrank = next_io_rank(MPI_COMM_FESOM, sbc_flfi(fld_idx)%async_netcdf_allowed, partit)
+        if (trim(forcing_distribution)=='scatter') then
+          call sbc_box_alloc(fld_idx, partit)
+        else
+          allocate(sbc_flfi(fld_idx)%sbcdata_a(nc_Nlon,nc_Nlat))
+          allocate(sbc_flfi(fld_idx)%sbcdata_b(nc_Nlon,nc_Nlat))
+        end if
+        sbc_flfi(fld_idx)%sbcdata_a_t_index = -1
+        sbc_flfi(fld_idx)%sbcdata_b_t_index = -1
       end if
       rootrank = sbc_flfi(fld_idx)%read_forcing_rootrank
 
@@ -996,6 +1009,11 @@ CONTAINS
          !write(*,*) 'check: ', trim(file_name)
       end if
 
+      call fesom_profiler_start("sbc_read_distribute")
+      if (trim(forcing_distribution)=='scatter') then
+        if (.not. sbcdata1_from_cache) call sbc_box_distribute(fld_idx, t_indx,    sbcdata1, partit)
+        if (.not. sbcdata2_from_cache) call sbc_box_distribute(fld_idx, t_indx_p1, sbcdata2, partit)
+      else
       !read data from file
       if (mype==rootrank) then
          nf_start(1)=1
@@ -1055,7 +1073,10 @@ CONTAINS
          call fill_land_from_ocean(sbcdata1, forcing_ocean_mask, nc_Nlon, nc_Nlat)
          call fill_land_from_ocean(sbcdata2, forcing_ocean_mask, nc_Nlon, nc_Nlat)
       end if
+      end if
 
+      call fesom_profiler_end("sbc_read_distribute")
+      call fesom_profiler_start("sbc_interp")
       ! bilinear space interpolation, and time interpolation ,
       ! data is assumed to be sampled on a regular grid
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ii, i, j, ip1, jp1, x, y, extrp, x1, x2, y1, y2, denom, data1, data2)
@@ -1121,6 +1142,7 @@ CONTAINS
 
       end do
 !$OMP END PARALLEL DO
+      call fesom_profiler_end("sbc_interp")
    END SUBROUTINE getcoeffld
 
    SUBROUTINE data_timeinterp(rdate, partit)
@@ -1190,6 +1212,7 @@ CONTAINS
                         nm_mslp_file, nm_xwind_var, nm_ywind_var, nm_xstre_var, nm_ystre_var, nm_humi_var, &
                         nm_qsr_var, nm_qlw_var, nm_tair_var, nm_prec_var, nm_snow_var, &
                         nm_mslp_var, nm_cloud_var, nm_cloud_file, nm_nc_iyear, nm_nc_imm, nm_nc_idd, nm_nc_freq, nm_nc_tmid, y_perpetual, &
+                        forcing_distribution, &
                         l_xwind, l_ywind, l_xstre, l_ystre, l_humi, l_qsr, l_qlw, l_tair, l_prec, l_mslp, l_cloud, l_snow, &
                         nm_runoff_file, runoff_data_source, runoff_climatology, nm_sss_data_file, sss_data_source, &
                         chl_data_source, nm_chl_data_file, chl_const, use_runoff_mapper, runoff_basins_file, runoff_radius, &
@@ -1668,6 +1691,7 @@ CONTAINS
 #endif
 
    SUBROUTINE sbc_do(partit, mesh)
+      use fesom_profiler, only: fesom_profiler_start, fesom_profiler_end
       !!---------------------------------------------------------------------
       !!                    ***  ROUTINE sbc_do ***
       !!
@@ -1766,7 +1790,9 @@ CONTAINS
          nc_Ntime =>sbc_flfi(fld_idx)%nc_Ntime
          if ( ((rdate > nc_time(t_indx_p1)) .and. (nc_time(t_indx) < nc_time(nc_Ntime))) .or. force_newcoeff) then
             ! get new coefficients for time interpolation on model grid for all data
+            call fesom_profiler_start("sbc_getcoeff")
             call getcoeffld(fld_idx, rdate, partit, mesh)
+            call fesom_profiler_end("sbc_getcoeff")
             if ((l_xwind .and. (fld_idx==i_xwind)) .and. rotated_grid) do_rotation_wind=.true.
             if ((l_xstre .and. (fld_idx==i_xstre)) .and. rotated_grid) do_rotation_stre=.true.
          endif
@@ -2599,6 +2625,103 @@ END SUBROUTINE sbc_do_recom
 
       deallocate(sftof)
    END SUBROUTINE read_forcing_ocean_mask
+
+   SUBROUTINE sbc_box_setup(fld_idx, partit)
+      ! bounding box of the forcing cells the bilinear interpolation in getcoeffld touches on this rank
+      IMPLICIT NONE
+      integer,        intent(in)            :: fld_idx
+      type(t_partit), intent(inout), target :: partit
+      integer :: ii, i, j, ip1, jp1, i0, i1, j0, j1, nlon, nlat
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
+      nlon = sbc_flfi(fld_idx)%nc_Nlon
+      nlat = sbc_flfi(fld_idx)%nc_Nlat
+      i0 = nlon; i1 = 1; j0 = nlat; j1 = 1
+      do ii = 1, myDim_nod2D+eDim_nod2D
+         i = bilin_indx_i(fld_idx, ii); j = bilin_indx_j(fld_idx, ii)
+         ip1 = i + 1; jp1 = j + 1
+         if (i ==  0) then; i = nlon; ip1 = i; end if
+         if (i == -1) then; i = 1;    ip1 = i; end if
+         if (j ==  0) then; j = nlat; jp1 = j; end if
+         if (j == -1) then; j = 1;    jp1 = j; end if
+         i0 = min(i0, i); i1 = max(i1, ip1); j0 = min(j0, j); j1 = max(j1, jp1)
+      end do
+      sbc_flfi(fld_idx)%box = (/i0, i1, j0, j1/)
+   END SUBROUTINE sbc_box_setup
+
+   SUBROUTINE sbc_box_alloc(fld_idx, partit)
+      IMPLICIT NONE
+      integer,        intent(in)            :: fld_idx
+      type(t_partit), intent(inout), target :: partit
+      type(flfi_type), pointer :: flf
+      integer :: r, ierror, b(4)
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
+      flf => sbc_flfi(fld_idx)
+      b = flf%box
+      allocate(flf%sbcdata_a(b(1):b(2), b(3):b(4)))
+      allocate(flf%sbcdata_b(b(1):b(2), b(3):b(4)))
+      if (mype == flf%read_forcing_rootrank) then
+         allocate(flf%all_box(4, 0:npes-1))
+      else
+         allocate(flf%all_box(4, 0:0), flf%scat_counts(0:0), flf%scat_displs(0:0), flf%scat_pack(1))
+      end if
+      call MPI_Gather(b, 4, MPI_INTEGER, flf%all_box, 4, MPI_INTEGER, flf%read_forcing_rootrank, MPI_COMM_FESOM, ierror)
+      if (mype == flf%read_forcing_rootrank) then
+         allocate(flf%scat_counts(0:npes-1), flf%scat_displs(0:npes-1))
+         do r = 0, npes-1
+            flf%scat_counts(r) = (flf%all_box(2,r)-flf%all_box(1,r)+1)*(flf%all_box(4,r)-flf%all_box(3,r)+1)
+         end do
+         flf%scat_displs(0) = 0
+         do r = 1, npes-1
+            flf%scat_displs(r) = flf%scat_displs(r-1) + flf%scat_counts(r-1)
+         end do
+         allocate(flf%scat_pack(sum(flf%scat_counts)))
+         allocate(flf%readbuf(flf%nc_Nlon, flf%nc_Nlat))
+         if (mype==0 .and. flag_debug) write(*,*) ' --> [forcing] box scatter: field ', fld_idx, ' cells sent per record ', &
+                                                   sum(flf%scat_counts), ' of ', flf%nc_Nlon*flf%nc_Nlat*npes, ' broadcast'
+      end if
+   END SUBROUTINE sbc_box_alloc
+
+   SUBROUTINE sbc_box_distribute(fld_idx, time_index, boxdata, partit)
+      use forcing_provider_async_module
+      use fesom_profiler, only: fesom_profiler_start, fesom_profiler_end
+      IMPLICIT NONE
+      integer,        intent(in)            :: fld_idx, time_index
+      real(4), dimension(:,:), pointer      :: boxdata
+      type(t_partit), intent(inout), target :: partit
+      type(flfi_type), pointer :: flf
+      integer :: r, ii, jj, p, nlon, nlat, ierror, nbox
+#include "associate_part_def.h"
+#include "associate_part_ass.h"
+      flf => sbc_flfi(fld_idx)
+      nlon = flf%nc_Nlon; nlat = flf%nc_Nlat
+      call fesom_profiler_start("sbc_ioread")
+      if (mype == flf%read_forcing_rootrank) then
+         call forcing_provider%get_forcingdata(i_totfl, fld_idx, flf%async_netcdf_allowed, trim(flf%file_name), yearnew, &
+                                               trim(flf%var_name), time_index, flf%readbuf(2:nlon-1, 1:nlat))
+      end if
+      call fesom_profiler_end("sbc_ioread")
+      if (mype == flf%read_forcing_rootrank) then
+         flf%readbuf(1,    1:nlat) = flf%readbuf(nlon-1, 1:nlat)
+         flf%readbuf(nlon, 1:nlat) = flf%readbuf(2,      1:nlat)
+         if (use_ocean_only_forcing) call fill_land_from_ocean(flf%readbuf, forcing_ocean_mask, nlon, nlat)
+         p = 0
+         do r = 0, npes-1
+            do jj = flf%all_box(3,r), flf%all_box(4,r)
+               do ii = flf%all_box(1,r), flf%all_box(2,r)
+                  p = p + 1
+                  flf%scat_pack(p) = flf%readbuf(ii, jj)
+               end do
+            end do
+         end do
+      end if
+      nbox = size(boxdata)
+      call fesom_profiler_start("sbc_scatterv")
+      call MPI_Scatterv(flf%scat_pack, flf%scat_counts, flf%scat_displs, MPI_REAL, boxdata, nbox, MPI_REAL, &
+                        flf%read_forcing_rootrank, MPI_COMM_FESOM, ierror)
+      call fesom_profiler_end("sbc_scatterv")
+   END SUBROUTINE sbc_box_distribute
 
    SUBROUTINE fill_land_from_ocean(data, mask, nlon, nlat)
       !! Iteratively fill land cells with extrapolated ocean values.

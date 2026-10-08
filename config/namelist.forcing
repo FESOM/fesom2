@@ -84,6 +84,7 @@ age_start_year    = 2000     ! year to start age tracer (tracer age = 0 at this 
 ! File paths are relative to the run directory.
 ! ============================================================================
 &nam_sbc
+   forcing_distribution = 'bcast'  ! 'bcast': full forcing grid to every rank; 'scatter': each rank receives only its interpolation box
    ! --- Forcing file paths ---
    nm_xwind_file = 'uas.'        ! name of file with zonal wind speeds
    nm_ywind_file = 'vas.'        ! name of file with meridional wind speeds
