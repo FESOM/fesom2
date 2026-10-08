@@ -4,15 +4,15 @@ module oce_ssh_solve
     ! built by oce_ssh_rhs. Run in the timestep after compute_ssh_rhs_ale (FESOM2
     ! oce_ale.F90:3930 -> solve_ssh_ale). Transcribed from FESOM2 v2.7.3:
     !   solve_ssh_ale            (oce_ale.F90:3272-3311) — driver (precond once, then CG)
-    !   ssh_solve_preconditioner (solver.F90:31-95)      — MITgcm Jacobi-symmetrised M^-1
+    !   ssh_solve_preconditioner — diagonal (Jacobi) M^-1 (FESOM2 solver.F90:31-95 uses MITgcm's)
     !   ssh_solve_cg             (solver.F90:98-281)      — the CG iteration
     !
-    ! PRECONDITIONER (MITgcm JGR 102,5753-5766,1997): the inverse-preconditioner matrix
-    ! K (one symmetrised Jacobi sweep) shares the ssh_stiff CSR pattern; row r has
-    !   diagonal  K_rr = 1/a_rr
-    !   off-diag  K_ri = -0.5*(a_ri/a_rr)/(a_rr + a_ii)
-    ! where a_** are ssh_stiff entries and a_ii the diagonal in the neighbour row i.
-    ! Symmetrisation (the 0.5 + the a_ii) makes K SPD so CG applies.
+    ! PRECONDITIONER: diagonal (Jacobi), M^-1 = diag(1/a_rr), stored in pr_values(nNodO).
+    ! FESOM2 uses the MITgcm one (JGR 102,5753-5766,1997: one symmetrised Jacobi sweep,
+    ! off-diagonals K_ri = -0.5*(a_ri/a_rr)/(a_rr + a_ii) on the ssh_stiff pattern); the
+    ! diagonal one was faster in FESOM3 runs: M^-1 r is local, so the per-iteration halo
+    ! exchange of r is gone (one exchange_nod(pp) + two allreduces per iteration remain).
+    ! Not bit-identical to FESOM2 any more (different iterates and iteration count).
     !
     ! CG (standard preconditioned CG; the FESOM2 comment notes it follows Wikipedia,
     ! not the MITgcm beta): solves A x = b for x = d_eta, x0 = the incoming d_eta.
@@ -34,25 +34,21 @@ module oce_ssh_solve
     !    intrinsic (which the compiler may reduce in a different order). The matrix-vector
     !    products DO use the sum() intrinsic over a CSR slice, exactly as FESOM2 — both
     !    codes use sum() there, same flags, byte-identical operands -> byte-identical.
-    !  - The many runtime divisors (1/a_rr in the precond, al=rho/s_aux, be) are
-    !    byte-identical on both sides (same operands), so -no-prec-div matches (L7/L14)
-    !    -- BUT the precond off-diagonal divide also needs the !DIR$ NOVECTOR below to
-    !    stay scalar like the oracle: packed divpd != scalar divsd at ~1 ULP, which was
-    !    THE seed of the CORE2 d_eta "CG floor" (L28 -> RESOLVED in L29). See the note
-    !    at the divide. A divide byte-matches only when BOTH operands AND the SIMD width
-    !    match the oracle.
+    !  - (historical, with FESOM2's preconditioner) the off-diagonal precond divide needed
+    !    a NOVECTOR directive to stay scalar like the oracle: packed divpd != scalar divsd at
+    !    ~1 ULP was THE seed of the CORE2 d_eta "CG floor" (L28 -> RESOLVED in L29).
     !
     ! 1-RANK SCOPE (multi-rank lifted at M2.12):
-    !  - exchange_nod(diag_values/rr/pp/x/d_eta) are halo broadcasts -> no-ops at 1-rank,
+    !  - exchange_nod(pp/x/d_eta) are halo broadcasts -> no-ops at 1-rank,
     !    dropped. The MPI_Allreduce of s_old/s_aux/sprod over 1 rank is the identity (the
     !    local serial sum IS the global sum), dropped. So the CG here is purely local +
     !    deterministic, matching the FESOM2 1-rank reduction order. The new multi-rank
     !    bit-identity risk (the cross-rank dot-product reduction order) is an M2.12 concern.
     !  - rr/zz/pp/App sized nod2D (no eDim halo); CSR via colind_loc/rowptr_loc (local).
     !
-    ! MULTI-RANK (M2.12c-2, OPTIONAL partit): arrays rr/zz/pp/App + diag_values sized
-    ! owned+halo (nNodL); owned loops 1..nNodO; exchange_nod(diag_values) in the precond
-    ! and exchange_nod(rr/pp/x) in the CG fill the halo COLUMNS the local mat-vec reads;
+    ! MULTI-RANK (M2.12c-2, OPTIONAL partit): arrays rr/zz/pp/App sized owned+halo
+    ! (nNodL); owned loops 1..nNodO; exchange_nod(pp/x) in the CG fill the halo COLUMNS
+    ! the local mat-vec reads;
     ! the dot-products sum OWNED entries (1..nNodO) then allreduce_sum across ranks
     ! (= the FESOM2 oracle solver.F90). rtol / the convergence test divide by the GLOBAL
     ! nod2D (mesh%nod2D, which is global at npes>1). partit absent OR npes==1 => the
@@ -91,53 +87,23 @@ contains
 
     !===========================================================================
     subroutine ssh_solve_preconditioner(dynamics, mesh, partit)
+        ! Diagonal (Jacobi) preconditioner: pr_values(row) = 1/a_rr over the OWNED rows.
+        ! M^-1 r is then purely local (no halo columns), so neither the diagonal nor r
+        ! needs a halo exchange.
         type(t_dyn),  intent(inout), target :: dynamics
         type(t_mesh), intent(inout), target :: mesh
         type(t_partit), intent(in), optional :: partit
-        integer                    :: nend, row, node, n, offset
-        integer                    :: nNodO, nNodL, nEdgeO, nElemO
-        real(kind=WP), allocatable :: diag_values(:)
+        integer :: row, n
+        integer :: nNodO, nNodL, nEdgeO, nElemO
 
         call owned_bounds(mesh, nNodO, nNodL, nEdgeO, nElemO, partit)
 
         associate(ssh_stiff => mesh%ssh_stiff)
-        nend = ssh_stiff%rowptr_loc(nNodO+1) - ssh_stiff%rowptr_loc(1)
-        allocate(ssh_stiff%pr_values(nend))
-        allocate(diag_values(nNodL))   ! owned+halo: the off-diag precond reads a HALO diag
-
-        ! diagonal of A (the first CSR entry of each owned row)
+        allocate(ssh_stiff%pr_values(nNodO))
+        ! the diagonal of A is the first CSR entry of each owned row
         do row = 1, nNodO
-            offset = ssh_stiff%rowptr_loc(row) - ssh_stiff%rowptr_loc(1) + 1
-            diag_values(row) = ssh_stiff%values(offset)
+            ssh_stiff%pr_values(row) = 1.0_WP/ssh_stiff%values(ssh_stiff%rowptr_loc(row) - ssh_stiff%rowptr_loc(1) + 1)
         end do
-        ! fill the HALO diag values (a halo node's diagonal lives on its owner rank)
-        if (is_multirank(partit)) call exchange_nod(diag_values, partit)  ! FESOM2 solver.F90:73
-
-        ! fill the inverse-preconditioner values
-        do row = 1, nNodO
-            offset = ssh_stiff%rowptr_loc(row) - ssh_stiff%rowptr_loc(1)
-            nend   = ssh_stiff%rowptr_loc(row+1) - ssh_stiff%rowptr_loc(row)
-            ssh_stiff%pr_values(offset+1) = 1.0_WP/ssh_stiff%values(offset+1)
-            ! BIT-IDENTITY (L29): force SCALAR codegen to match the FESOM2 oracle.
-            ! The oracle (solver.F90:81) writes this off-diagonal via the LOCAL pointer
-            ! pr_values, which the compiler can't prove non-aliasing against the
-            ! ssh_stiff%values reads -> it stays SCALAR (divsd). We write the component
-            ! ssh_stiff%pr_values (provably distinct from %values) -> the compiler AUTO-
-            ! VECTORISES the divide (divpd). Packed and scalar division differ by ~1 ULP
-            ! under -no-prec-div/-fimf-use-svml, so ~1299/870146 pr_values entries drift,
-            ! seeding z=M^-1 r; the seed is sub-ULP in the early CG dot-products but
-            ! surfaces in the residual at ~iter 6 and breaks d_eta byte-identity on CORE2
-            ! (126858 nodes, 136 iters). It stayed below the last bit on pi (37 iters).
-            ! NOVECTOR makes the divide scalar, so pr_values is byte-identical to FESOM2.
-            !DIR$ NOVECTOR
-            do n = 2, nend
-                node = ssh_stiff%colind_loc(offset+n)
-                ssh_stiff%pr_values(n+offset) =                                          &
-                    -0.5_WP*(ssh_stiff%values(n+offset)/ssh_stiff%values(1+offset))      &
-                    / (ssh_stiff%values(1+offset) + diag_values(node))
-            end do
-        end do
-        deallocate(diag_values)
 
         n = nNodL   ! owned+halo: halo columns hold the exchanged owner values
         allocate(dynamics%solverinfo%rr(n),  dynamics%solverinfo%zz(n),  &
@@ -184,23 +150,14 @@ contains
         rtol = dynamics%solverinfo%soltol*sqrt(s_old/real(mesh%nod2D,WP))
 
         !__________________________________________________________________
-        ! r0 = b - A x0  (owned rows; x's halo columns are the prescribed x0 halo)
-        do row = 1, nNodO
-            rr(row) = rhs(row) - sum(values(rptr(row):rptr(row+1)-1)*x(cind(rptr(row):rptr(row+1)-1)))
-        end do
-        if (is_multirank(partit)) call exchange_nod(rr, partit)
-
-        !__________________________________________________________________
-        ! z0 = M^-1 r0 ; search direction pp = z0
-        do row = 1, nNodO
-            zz(row) = sum(pr_values(rptr(row):rptr(row+1)-1)*rr(cind(rptr(row):rptr(row+1)-1)))
-            pp(row) = zz(row)
-        end do
-
-        ! rho = r0.z0
+        ! r0 = b - A x0  (owned rows; x's halo columns are the prescribed x0 halo);
+        ! z0 = M^-1 r0 (diagonal: local) ; search direction pp = z0 ; rho = r0.z0
         s_old = 0.0_WP
         do row = 1, nNodO
-            s_old = s_old + rr(row)*zz(row)
+            rr(row) = rhs(row) - sum(values(rptr(row):rptr(row+1)-1)*x(cind(rptr(row):rptr(row+1)-1)))
+            zz(row) = pr_values(row)*rr(row)
+            pp(row) = zz(row)
+            s_old   = s_old + rr(row)*zz(row)
         end do
         if (is_multirank(partit)) call allreduce_sum(s_old, partit)
 
@@ -209,29 +166,20 @@ contains
         if (present(n_iter)) n_iter = dynamics%solverinfo%maxiter   ! fallback: no convergence
         do iter = 1, dynamics%solverinfo%maxiter
             if (is_multirank(partit)) call exchange_nod(pp, partit)   ! halo cols for A*pp
-            do row = 1, nNodO
-                App(row) = sum(values(rptr(row):rptr(row+1)-1)*pp(cind(rptr(row):rptr(row+1)-1)))
-            end do
-
             s_aux = 0.0_WP
             do row = 1, nNodO
-                s_aux = s_aux + pp(row)*App(row)
+                App(row) = sum(values(rptr(row):rptr(row+1)-1)*pp(cind(rptr(row):rptr(row+1)-1)))
+                s_aux    = s_aux + pp(row)*App(row)
             end do
             if (is_multirank(partit)) call allreduce_sum(s_aux, partit)
             al = s_old/s_aux
 
-            do row = 1, nNodO
-                x(row)  = x(row)  + al*pp(row)
-                rr(row) = rr(row) - al*App(row)
-            end do
-            if (is_multirank(partit)) call exchange_nod(rr, partit)   ! halo cols for M^-1 r
-
-            do row = 1, nNodO
-                zz(row) = sum(pr_values(rptr(row):rptr(row+1)-1)*rr(cind(rptr(row):rptr(row+1)-1)))
-            end do
-
+            ! x += al p ; r -= al Ap ; z = M^-1 r (diagonal: local, no halo exchange)
             sprod(1:2) = 0.0_WP
             do row = 1, nNodO
+                x(row)   = x(row)  + al*pp(row)
+                rr(row)  = rr(row) - al*App(row)
+                zz(row)  = pr_values(row)*rr(row)
                 sprod(1) = sprod(1) + rr(row)*zz(row)
                 sprod(2) = sprod(2) + rr(row)*rr(row)
             end do

@@ -29,7 +29,7 @@ module mod_mesh
         integer(int32), allocatable, dimension(:) :: rowptr
         integer(int32), allocatable, dimension(:) :: colind_loc
         integer(int32), allocatable, dimension(:) :: rowptr_loc
-        real(kind=MP),  allocatable, dimension(:) :: pr_values   ! preconditioner
+        real(kind=MP),  allocatable, dimension(:) :: pr_values   ! inverse diagonal (Jacobi preconditioner), owned rows
     end type sparse_matrix
 
     type t_mesh
