@@ -11,6 +11,11 @@ program fesom_icefctdump
     ! t_ice single->WP defaults (10.0 / 0.25) — the M3a precision note (the oracle reads the
     ! namelist). cd_oce_ice / delta_min are the namelist doubles (as in fesom_evpdump).
     !
+    ! Hybrid meshes (plan docs/plans/2026-10-08-hybrid-meshes.md, Task 14): the FESOM2-oracle
+    ! byte gate is retired (docs/HANDOFF.md "Gate migration"). The driver has no triangle-
+    ! specific code of its own; the ice kernels it runs are converted in Tasks 15/16. It stays
+    ! a diagnostic dump.
+    !
     !   FESOM3_MESH_DIR  mesh dir   (default: CORE2)
     !   FESOM3_IC_FILE   IC netcdf  (default: pool phc3.0_winter.nc — same file the oracle reads)
     !   FESOM3_WHICHEVP  0=EVP / 1=mEVP (default 0)

@@ -4,6 +4,11 @@ program fesom_meshdiagdump
     ! (same pi rotation 50/15/-90, cyclic 360, force_rotation) so geo_coord_nod2D matches the
     ! FESOM2 oracle. tools/zarr_diff.py --meshdiag then compares vs FESOM2 fesom.mesh.diag.nc.
     !
+    ! Hybrid meshes (plan docs/plans/2026-10-08-hybrid-meshes.md, Task 14): REMAPPED: the
+    ! store has the hybrid layout (4-column face_nodes/face_edges/face_links/gradient_sca_x/y,
+    ! a triangle's 4th = _FillValue). tools/check_meshdiag.py checks it (ctest meshdiag_*);
+    ! the zarr_diff.py --meshdiag FESOM2 gate is retired.
+    !
     !   FESOM3_MESH_DIR      mesh dir (default: pi)
     !   FESOM3_MESHDIAG_OUT  output store path (default: ./fesom.mesh.diag.zarr)
     !   FESOM3_CHUNK_HORIZ   horizontal chunk size (default 500000; clamp to N)

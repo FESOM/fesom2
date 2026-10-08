@@ -13,6 +13,15 @@ module mod_io_meshdiag
     !                                                           identical at 1-rank where local==global)
     !   face_links       elem_neighbors/=self ? myList_elem2D : -999 (FESOM2 RAW :469; global here)
     !   edge_face_links  edge_tri(2)/=edge_tri(1) ? myList_elem2D : -999 (:488; slot 1 always)
+    !
+    ! Hybrid meshes (plan docs/plans/2026-10-08-hybrid-meshes.md, Task 14): every per-face array
+    ! has 4 columns (dim n4) in the slot order of the model (clockwise; edge k joins vertices k and
+    ! k+1). A triangle has only 3: its 4th column holds the array's UGRID _FillValue (the Zarr
+    ! fill_value) -- face_nodes / face_edges -1, face_links -999 (FESOM2's missing-neighbour value,
+    ! used for both) -- while the model itself repeats the 1st vertex/edge/neighbour (user
+    ! decision). gradient_sca_x/y: the 4 Green-Gauss coefficients (x = slots 1:4, y = 5:8 of
+    ! gradient_sca), 0 in a triangle's 4th column. xarray decodes a declared _FillValue: with
+    ! mask_and_scale (the default) these integer arrays come back as float with NaN.
     !   nod_in_elem2D    num>=i ? myList_elem2D : 0            (:508; N=max num; fill 0)
     !   nod_part/elem_part  mype stamp                         (:379/:387; partition-DEPENDENT by design)
     !
@@ -47,12 +56,12 @@ contains
         type(t_io_decomp)  :: Dn, De, Dg            ! node / elem / edge decomps
         type(t_zarr_attrs) :: gat
         logical :: mr
-        integer :: mype, comm, ierr, C, nw, nl, N_max, i, c3
+        integer :: mype, comm, ierr, C, nw, nl, N_max, i, c3, nv, nb
         integer :: nNodO, nNodL, nEdgeO, nEdgeL, nElemO, nElemL, nElemF
         ! zarr array handles (init on all ranks; defined on rank 0; used by writers)
         type(t_zarr_array) :: a_lon, a_lat, a_nz, a_nz1, a_elem_area, a_nlev_n, a_nlev_e, &
             a_nie_num, a_nod_part, a_elem_part, a_zbe_bot, a_zbn_bot, a_nod_area, &
-            a_face_nodes, a_edge_nodes, a_edge_face_links, &
+            a_face_nodes, a_edge_nodes, a_edge_face_links, a_face_edges, a_face_links, &
             a_nod_in_elem, a_edge_cross, a_grad_x, a_grad_y, a_fmesh
         ! local field buffers
         real(WP), allocatable :: r1(:), r3(:,:)
@@ -102,20 +111,25 @@ contains
         call def2(store, a_zbe_bot, 'zbar_e_bottom', De, '<f8', 'elem', 'element bottom dep', '')
         call def2(store, a_zbn_bot, 'zbar_n_bottom', Dn, '<f8', 'nod2', 'nodal bottom depth', '')
         call def3(store, a_nod_area, 'nod_area', nl, Dn, '<f8', 'nz', 'nod2', 'nodal areas', '')
-        call def3(store, a_face_nodes, 'face_nodes', 3, De, '<i4', 'n3', 'elem', &
-            'Maps every triangular face to its three corner nodes.', '', cf='face_node_connectivity', sidx=.true.)
+        call def3(store, a_face_nodes, 'face_nodes', 4, De, '<i4', 'n4', 'elem', &
+            'Maps every face to its corner nodes (a triangle: 3, then _FillValue).', '', &
+            cf='face_node_connectivity', sidx=.true., fillv=-1.0_real64, hasfill=.true.)
         call def3(store, a_edge_nodes, 'edge_nodes', 2, Dg, '<i4', 'n2', 'edg_n', &
             'Maps every edge to the two nodes that it connects', '', cf='edge_node_connectivity', sidx=.true.)
-        ! elem_edges and elem_neighbors ARE built (build_elem_adjacency, 4 slots) but the face_edges /
-        ! face_links output is still deferred (hybrid-mesh plan, Task 14), as gradient_vec is.
+        call def3(store, a_face_edges, 'face_edges', 4, De, '<i4', 'n4', 'elem', &
+            'Maps every face to its edges (edge k joins nodes k and k+1; a triangle: 3, then _FillValue).', &
+            '', cf='face_edge_connectivity', sidx=.true., fillv=-1.0_real64, hasfill=.true.)
+        call def3(store, a_face_links, 'face_links', 4, De, '<i4', 'n4', 'elem', &
+            'neighbor faces for faces (across edge k; missing neighbor and a triangle 4th: _FillValue)', &
+            '', cf='face_face_connectivity', sidx=.true., fillv=-999.0_real64, hasfill=.true.)
         call def3(store, a_edge_face_links, 'edge_face_links', 2, Dg, '<i4', 'n2', 'edg_n', &
             'neighbor faces for edges', '', cf='edge_face_connectivity')
         call def3(store, a_nod_in_elem, 'nod_in_elem2D', N_max, Dn, '<i4', 'N', 'nod2', &
             'elements containing the node', '')
         call def3(store, a_edge_cross, 'edge_cross_dxdy', 4, Dg, '<f8', 'n4', 'edg_n', 'edge cross distancess', '')
-        call def3(store, a_grad_x, 'gradient_sca_x', 3, De, '<f8', 'n3', 'elem', &
+        call def3(store, a_grad_x, 'gradient_sca_x', 4, De, '<f8', 'n4', 'elem', &
             'x component of a gradient at nodes of an element', '')
-        call def3(store, a_grad_y, 'gradient_sca_y', 3, De, '<f8', 'n3', 'elem', &
+        call def3(store, a_grad_y, 'gradient_sca_y', 4, De, '<f8', 'n4', 'elem', &
             'y component of a gradient at nodes of an element', '')
 
         if (mr) call MPI_Barrier(comm, ierr)
@@ -170,16 +184,41 @@ contains
         call wr3_r(store, a_nod_area, Dn, r3, nl, 0.0_WP)
         deallocate(r3)
 
-        ! face_nodes + gradient_sca_x/y (elem, 3 levels). face_edges/face_links deferred (see above).
-        allocate(i3(3, max(1,nElemO)))
-        do i = 1, nElemO; do c3 = 1, 3; i3(c3,i) = gid_n(mesh%elem2D_nodes(c3,i)); end do; end do
-        call wr3_i(store, a_face_nodes, De, i3, 3, 0)
+        ! face_nodes / face_edges / face_links + gradient_sca_x/y (elem, 4 columns). Columns beyond
+        ! the element's nv vertices get the array's fill value (a triangle's 4th).
+        allocate(i3(4, max(1,nElemO)))
+        do i = 1, nElemO
+            nv = mesh%elem2D_nnodes(i)
+            do c3 = 1, 4
+                if (c3 <= nv) then; i3(c3,i) = gid_n(mesh%elem2D_nodes(c3,i))
+                else;               i3(c3,i) = -1; end if
+            end do
+        end do
+        call wr3_i(store, a_face_nodes, De, i3, 4, -1)
+        do i = 1, nElemO
+            nv = mesh%elem2D_nnodes(i)
+            do c3 = 1, 4
+                if (c3 <= nv) then; i3(c3,i) = gid_g(mesh%elem_edges(c3,i))
+                else;               i3(c3,i) = -1; end if
+            end do
+        end do
+        call wr3_i(store, a_face_edges, De, i3, 4, -1)
+        do i = 1, nElemO
+            nv = mesh%elem2D_nnodes(i)
+            do c3 = 1, 4
+                nb = mesh%elem_neighbors(c3,i)
+                ! a boundary side stores the element itself (no zero index)
+                if (c3 <= nv .and. nb /= i) then; i3(c3,i) = gid_e(nb)
+                else;                             i3(c3,i) = -999; end if
+            end do
+        end do
+        call wr3_i(store, a_face_links, De, i3, 4, -999)
         deallocate(i3)
-        allocate(r3(3, max(1,nElemO)))
-        do i = 1, nElemO; r3(1:3, i) = real(mesh%gradient_sca(1:3, i),   WP); end do
-        call wr3_r(store, a_grad_x, De, r3, 3, 0.0_WP)
-        do i = 1, nElemO; r3(1:3, i) = real(mesh%gradient_sca(5:7, i),   WP); end do
-        call wr3_r(store, a_grad_y, De, r3, 3, 0.0_WP)
+        allocate(r3(4, max(1,nElemO)))
+        do i = 1, nElemO; r3(1:4, i) = real(mesh%gradient_sca(1:4, i), WP); end do
+        call wr3_r(store, a_grad_x, De, r3, 4, 0.0_WP)
+        do i = 1, nElemO; r3(1:4, i) = real(mesh%gradient_sca(5:8, i), WP); end do
+        call wr3_r(store, a_grad_y, De, r3, 4, 0.0_WP)
         deallocate(r3)
 
         ! edge_nodes / edge_face_links (edge, 2 levels) + edge_cross_dxdy (edge, 4 levels, real)
@@ -313,8 +352,8 @@ contains
             call zattr_str(at, 'face_node_connectivity', 'face_nodes')
             call zattr_str(at, 'edge_node_connectivity', 'edge_nodes')
             call zattr_str(at, 'edge_face_connectivity', 'edge_face_links')
-            ! face_edge_connectivity / face_face_connectivity deferred (face_edges / face_links
-            ! are not written yet)
+            call zattr_str(at, 'face_edge_connectivity', 'face_edges')
+            call zattr_str(at, 'face_face_connectivity', 'face_links')
             call zarr_define_array(st, a_fmesh, at)
         end subroutine add_topology
 

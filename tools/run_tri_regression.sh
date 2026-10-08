@@ -56,6 +56,18 @@
 #         the original pi); decomp <= 2.5e-11 dumps, 6.4e-10 output; CORE2 <= 4.4e-6 dumps (T),
 #         2.2e-5 float32 u/v
 #   ICE   pi <= 3.9e-7, CORE2 1.2e-4;  MIX pi <= 2.2e-9, decomp 1.9e-11, CORE2 2.4e-4 (TKE)
+# ELEMENT COORDINATES (Task 14). The element coordinate of the output (and the point at which the
+# element vectors u/v and bolus_u/bolus_v are r2g-rotated) is now the area-weighted, cyclic-wrapped
+# centroid (mod_mesh_areas elem_center); the reference took the plain mean of the 3 rotated vertices
+# without the wrap, which lies on the wrong side of the globe for the elements across the rotated
+# dateline (pi 77, CORE2 566 elements; every other element agrees to < 1e-10 deg). For a vector pair
+# the comparison therefore (a) finds those elements as the ones whose embedded lon/lat moved by more
+# than 1e-6 deg -- every moved element must have moved by more than 1 deg (the wrap fix, not a
+# drift) and at most 5 % may move, else FAIL; (b) compares the components on all other elements
+# and the rotation-invariant speed hypot(u, v) on the moved ones (normalised by max|speed|), both
+# in the field's usual tier. Scalars are not rotated and are compared everywhere. Measured after
+# Task 14: pi u/v 1.1e-7 elsewhere, speed 2.7e-8 at the moved elements; CORE2 2.5e-5 / 6.6e-6.
+#
 # Why these levels: below them the differences are no longer roundoff but its amplification by
 # stiff / discontinuous physics (sea ice above all, TKE), so they are the tightest defensible ones
 # (margins ~10-100x). For scale: the SAME binary with the production SSH tolerance 1e-5 vs 1e-14
@@ -149,6 +161,7 @@ from dump_diff import parse_tree
 PRE_SUBSTEPS = (1, 4, 8)          # PRESSURE_BV, MIXING, SSH_RHS: step 1, before the first SSH solve
 F32 = 2.0 ** -21                  # 4 float32 ulps of max|a|: rounding of the output to float32
 MIX_DUMP, MIX_OUT, ICE_OUT = {"Kv"}, {"Av"}, {"a_ice", "m_ice", "m_snow"}
+VEC_PAIR = {"u": "v", "v": "u", "bolus_u": "bolus_v", "bolus_v": "bolus_u"}   # element vectors
 
 def dist(ra, rb):
     return float(np.max(np.abs(rb - ra)) / max(np.max(np.abs(ra)), 1e-300))
@@ -175,7 +188,7 @@ for nm in sorted({k[3] for k in a}):
 
 # (2) output stores (float32): every record of every float array both runs wrote; fill values masked
 def stores(d):
-    out = {}
+    out, elon = {}, {}
     for p in glob.glob(os.path.join(d, "**", "*.zarr"), recursive=True):
         try:
             g = zarr.open(p, mode="r")
@@ -189,15 +202,39 @@ def stores(d):
             if arr.fill_value is not None:
                 x[x == np.float64(np.asarray(arr.fill_value, dtype=arr.dtype))] = np.nan
             out[k] = x
-    return out
-sa, sb = stores(os.path.join(da, "out")), stores(os.path.join(db, "out"))
+            if "elem" in arr.attrs.get("_ARRAY_DIMENSIONS", []) and "lon" in g and "lat" in g:
+                elon[k] = (np.asarray(g["lon"][:], dtype=np.float64), np.asarray(g["lat"][:], dtype=np.float64))
+    return out, elon
+(sa, ca), (sb, cb) = stores(os.path.join(da, "out")), stores(os.path.join(db, "out"))
 common = sorted(set(sa) & set(sb))
 for k in common:
     ra, rb = sa[k], sb[k]
     if ra.shape != rb.shape or not np.array_equal(np.isfinite(ra), np.isfinite(rb)):
         print(f"  output {k}: shapes or masks differ"); sys.exit(1)
     m = np.isfinite(ra)
-    d = dist(ra[m], rb[m]) if m.any() else 0.0
+    mv = None
+    if k in VEC_PAIR and VEC_PAIR[k] in common and k in ca and k in cb:
+        dlon = np.abs((cb[k][0] - ca[k][0] + 180.0) % 360.0 - 180.0)
+        dlat = np.abs(cb[k][1] - ca[k][1])
+        mv = (dlon > 1e-6) | (dlat > 1e-6)              # element coordinate moved (Task 14)
+        if not mv.any():
+            mv = None
+        elif (mv & (dlon <= 1.0) & (dlat <= 1.0)).any() or mv.sum() > 0.05 * mv.size:
+            print(f"  output {k}: {int(mv.sum())} element coordinates moved, not all by > 1 deg"
+                  " or more than 5 % (expected: only the elements across the rotated dateline)")
+            sys.exit(1)
+    if mv is None:
+        d = dist(ra[m], rb[m]) if m.any() else 0.0
+    else:
+        keep = m & ~mv
+        pa, pb = sa[VEC_PAIR[k]], sb[VEC_PAIR[k]]
+        spa, spb = np.hypot(ra, pa), np.hypot(rb, pb)
+        mm = m & mv
+        d_comp = dist(ra[keep], rb[keep]) if keep.any() else 0.0
+        d_speed = float(np.max(np.abs(spb[mm] - spa[mm])) / max(np.max(spa[m]), 1e-300)) if mm.any() else 0.0
+        d = max(d_comp, d_speed)
+        print(f"  output {k}: {int(mv.sum())} element coordinates moved (rotated-dateline centroids):"
+              f" components elsewhere {d_comp:.3e}, speed there {d_speed:.3e}")
     if k in ICE_OUT:   put("ICE", "out:" + k, d, F32)
     elif k in MIX_OUT: put("MIX", "out:" + k, d, F32)
     else:              put("OCEAN", "out:" + k, d, F32)

@@ -41,7 +41,7 @@ module mod_mesh_areas
     use mod_mesh_rotate, only: trim_cyclic, get_cyclic_length, r2g
     implicit none
     private
-    public :: compute_geometry
+    public :: compute_geometry, elem_center
 
 contains
 
@@ -186,7 +186,8 @@ contains
         ! the symmetric trim_cyclic). s (optional) = the element's lon/lat area (radians^2,
         ! no cosine) = the sum of the two sub-triangle areas. A triangle repeats vertex 1
         ! as vertex 4, so its (1,3,4) part has area exactly 0 and (cx,cy) is the vertex
-        ! mean up to roundoff.
+        ! mean up to roundoff. Public: also the element coordinate of the output stores
+        ! (mod_io_coords).
         type(t_mesh), intent(in)  :: mesh
         integer,      intent(in)  :: n
         real(kind=WP), intent(out) :: cx, cy

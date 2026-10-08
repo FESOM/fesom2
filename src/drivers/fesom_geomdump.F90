@@ -5,6 +5,10 @@ program fesom_geomdump
     ! oracle's format. tools/geom_diff.py then compares vs the FESOM2 geom dump
     ! (tools/run_geomdump_pi.sh) for max|delta|=0.
     !
+    ! Hybrid meshes (plan docs/plans/2026-10-08-hybrid-meshes.md, Task 14): the byte gate is
+    ! retired; mod_geom_dump is REMAPPED to the FESOM2 layout (triangle meshes only, stops on
+    ! quads) so geom_diff.py --signal=<tol> remains a roundoff diagnostic.
+    !
     !   FESOM3_MESH_DIR  mesh dir   (default: pi)
     !   FESOM3_GEOM_OUT  out path   (default: geom_f3.bin)
     use mpi

@@ -156,7 +156,8 @@ module mod_io_means
         real(WP), allocatable :: rlon_owned(:), rlat_owned(:)! cached owned ROTATED node coords (rad) for r2g
         integer,  allocatable :: nlev_owned(:)               ! cached owned nlevels_nod2D (3-D node mask)
         ! Task 2.7 element coords: geographic centroid (deg, embed) + ROTATED centroid (rad, r2g) +
-        ! element nlevels. The centroid = simple mean of the 3 ROTATED node coords (FESOM2 io_r2g:3004).
+        ! element nlevels. The centroid = mod_mesh_areas elem_center of the ROTATED vertices (area-
+        ! weighted, cyclic-wrapped; FESOM2 io_r2g:3004 took the plain 3-vertex mean, see mod_io_coords).
         real(WP), allocatable :: elon_owned(:), elat_owned(:)
         real(WP), allocatable :: relon_owned(:), relat_owned(:)
         integer,  allocatable :: enlev_owned(:)              ! cached owned nlevels (3-D element mask)
@@ -267,9 +268,9 @@ contains
                  io%nlev_owned(max(1,io%nNodO)))
         call io_coords_compute(DECOMP_NODE, mesh, io%nNodO, io%lon_owned, io%lat_owned, &
                                io%rlon_owned, io%rlat_owned, io%nlev_owned)
-        ! Task 2.7: owned ELEMENT-centroid coords. ROTATED centroid = simple mean of the 3 rotated node
-        ! coords (FESOM2 io_r2g:3004 sum(coord_nod2D(1:2,elem2D_nodes(1:3,e)))/3); embedded GEOGRAPHIC
-        ! centroid = its r2g image (deg). Element nlevels drives the 3-D below-bottom mask.
+        ! Task 2.7: owned ELEMENT-centroid coords. ROTATED centroid = elem_center (area-weighted
+        ! centroid of the sub-triangles (1,3,4)+(1,2,3), cyclic-wrapped; hybrid-mesh plan Task 14);
+        ! embedded GEOGRAPHIC centroid = its r2g image (deg). Element nlevels drives the 3-D mask.
         allocate(io%elon_owned(max(1,io%nElemO)),  io%elat_owned(max(1,io%nElemO)), &
                  io%relon_owned(max(1,io%nElemO)), io%relat_owned(max(1,io%nElemO)), &
                  io%enlev_owned(max(1,io%nElemO)))
@@ -611,7 +612,7 @@ contains
     ! THEN divide. <f8: rotate the r8 sum, divide in r8. <f4: promote the r4 sum to WP(=r8), rotate,
     ! demote to r4 (io_r2g r4 branch L3028-3033), divide in r4. Below-bottom (nlevels mask) -> NC_FILL,
     ! not rotated. native frame (autorotate=.false.) skips rotation. rlon/rlat = the ROTATED entity
-    ! coords (node coord_nod2D, or element centroid sum/3 — io_r2g flag_coord=0).
+    ! coords (node coord_nod2D, or the element centroid elem_center — io_r2g flag_coord=0).
     subroutine write_vec_pair(io, kx, ky, time_sec, D, nO, nlevown, rlon, rlat)
         type(t_io_means),   intent(inout) :: io
         integer,            intent(in)    :: kx, ky, nO, nlevown(:)

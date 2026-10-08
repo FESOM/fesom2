@@ -758,16 +758,51 @@ fluxes and nonlinear terms can. Asserted in a test (Task 9), measured in the sho
   `src/drivers/fesom_pressuredump.F90`, `src/drivers/fesom_conserve.F90`,
   `src/drivers/fesom_advhordump.F90`, `fesom_geomdump`, `fesom_meshdiagdump`, `fesom_evpdump`,
   `fesom_icefctdump` drivers
+- ➕ Modify: `src/mesh/mod_mesh_areas.F90` (`elem_center` public), `src/infra/mod_geom_dump.F90`,
+  `src/drivers/fesom_advhordump_mr.F90` (status note), `test/CMakeLists.txt`,
+  `tools/run_tri_regression.sh` (element-vector comparison), `docs/HANDOFF.md`;
+  Create: `tools/check_meshdiag.py`
 
-- [ ] element coordinates = centroids; mesh diagnostic output with 4-column `face_nodes`
+- [x] element coordinates = centroids; mesh diagnostic output with 4-column `face_nodes`
       (triangle 4th = UGRID `_FillValue` −1), `face_edges`/`face_links` from the now-built
       `elem_edges`/`elem_neighbors`
-- [ ] dump drivers follow the gate decision of Task 7 (retired or remapped)
-- [ ] grep check: no `elem2D_nodes(1:3`, `gradient_sca(1:3`, `(5:7`, element `/3` average or
+      — `io_coords_compute` (means + restart stores, and the r2g point of element vectors) uses
+      `mod_mesh_areas elem_center` (area-weighted, cyclic-wrapped; FESOM2's plain unwrapped 3-vertex
+      mean was on the wrong side of the globe for the elements across the rotated dateline: pi 77,
+      CORE2 566; all others agree to < 1e-10 deg). Meshdiag: `face_nodes`, `face_edges` (fill −1),
+      `face_links` (missing neighbour and triangle 4th −999 = FESOM2's fill), `gradient_sca_x/y` (4
+      coefficients, triangle 4th 0), all dim `n4`, Zarr `fill_value` declared; topology gains
+      `face_edge_connectivity`/`face_face_connectivity`; global ids (partition-independent)
+- [x] dump drivers follow the gate decision of Task 7 (retired or remapped)
+      — none deleted, each a diagnostic dump with its byte gate retired (status note in each header,
+      table in HANDOFF): `mod_geom_dump` FESOM2 layout incl. `edge_tri(2)=0`, triangle-only (stops
+      on quads); `fesom_meshdiagdump` = hybrid layout; `fesom_pressuredump` 4-slot `elem_w` means
+      (KPP `viscAE`, unstable-element count); advhordump(_mr)/evpdump/icefctdump have no
+      triangle code of their own; `fesom_conserve` already converted (Task 12)
+- [x] grep check: no `elem2D_nodes(1:3`, `gradient_sca(1:3`, `(5:7`, element `/3` average or
       hidden-1/3 node gather left in `src/` (documented exceptions only, e.g. the spline
       coefficient `oce_adv_tra_ver.F90:134`, KPP's cube roots)
-- [ ] tests: meshdiag file has 4 columns with −1 for triangles; `run_tri_regression.sh` — roundoff
-- [ ] run ctest — must pass before Task 15
+      — left outside the ice: `mod_geom_dump` (FESOM2 oracle layout, triangle-only guard),
+      `mod_mesh_analytic:122-138` (the generator builds triangles, slot 4 set after),
+      `mod_mesh_areas:208-209` + `oce_dyn_vinv:270-271` (sub-triangle centroid `/(3(s1+s2))`),
+      `mod_mesh_areas:283` (triangle kite weights 1/3), spline `oce_adv_tra_ver:134-135`, KPP cube
+      roots. Pending Task 15/16 (not converted here): `mod_ice_dyn.F90` (:160-167 strain rates,
+      :219/:514 val3, :269/:468 `elnodes(3)`, :342-361 msum/asum/aa/elevation gradient, :530-535,
+      :570, :596-598), `mod_ice_fct.F90` (:73, :96-102, :292 `icoef(3,3)`, :335, :414, :454, :474,
+      :488, :502), `mod_ice_setup.F90` (:179, :186)
+- [x] tests: meshdiag file has 4 columns with −1 for triangles; `run_tri_regression.sh` — roundoff
+      — ctests `meshdiag_{mixed,quad,pi_w}` (`tools/check_meshdiag.py`, stdlib python: runs
+      `fesom_meshdiagdump` at np 1,2,8 / 1,2 / 1,2; M1 shapes/dims/fill/topology, M2 face_nodes ==
+      elem2d.out vertex sets with −1 4th for triangles, M3 face_edges join nodes k,k+1 per
+      edge_nodes, M4 face_links == other element of edge_face_links and mutual, M5 triangle 4th
+      gradient 0 and Σ coefficients ≈ 0 (≤ 1.9e-16); np N store == np 1 (ints exact, reals
+      1e-12); mutation check: a repeated 1st vertex or swapped links fail). `run_tri_regression.sh`
+      7/7 — element vectors compared by component away from the moved (rotated-dateline)
+      centroids and by speed on them (documented in its header; the moved set must be > 1 deg
+      jumps and ≤ 5 %): pi PRE 6.3e-15, EARLY 9.2e-13, OCEAN 1.1e-7 (u/v elsewhere; speed at the 77
+      moved 2.7e-8); CORE2 EARLY 2.1e-9, OCEAN 2.5e-5 (speed at the 566 moved 6.6e-6), ICE 1.2e-4,
+      MIX 2.5e-4; decomp OCEAN ≤ 2.5e-9; conservation ≤ 3.5e-16
+- [x] run ctest — must pass before Task 15 — scratch ctest 125/125
 
 ### Task 15: Sea-ice dynamics (EVP / mEVP)
 

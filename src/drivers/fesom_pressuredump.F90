@@ -9,6 +9,11 @@ program fesom_pressuredump
     ! dumps density_m_rho0 / hpressure / bvfreq / pgf_x/pgf_y / coriolis / uv_rhs* in
     ! the oracle's FADVHDMP format. tools/pressure_diff.py compares for max|delta|=0.
     !
+    ! Hybrid meshes (plan docs/plans/2026-10-08-hybrid-meshes.md, Task 14): the FESOM2-oracle
+    ! byte gate is retired (docs/HANDOFF.md "Gate migration"). REMAPPED: the driver's own
+    ! node->element means (KPP viscAE, unstable-element count) run over the 4 slots with the
+    ! kite weights elem_w like the kernels; it stays a diagnostic dump (roundoff vs FESOM2).
+    !
     !   FESOM3_MESH_DIR      mesh dir   (default: pi)
     !   FESOM3_PRESSURE_OUT  out path   (default: pressure_f3.bin)
     use mpi
@@ -16,7 +21,7 @@ program fesom_pressuredump
     use mod_constants,    only: density_0
     use mod_param_phys,   only: N2smth_h
     use mod_param_phys,   only: Fer_GM, Redi, Redi_Ktaper, scaling_ODM95, ODM95_Scr, ODM95_Sd, scaling_LDD97
-    use mod_mesh,         only: t_mesh
+    use mod_mesh,         only: t_mesh, MAX_NV
     use mod_partit,       only: t_partit
     use mod_partitioning, only: par_init, par_ex
     use mod_mesh_read,    only: read_mesh
@@ -132,7 +137,7 @@ program fesom_pressuredump
     real(kind=WP), allocatable :: blmc_kpp(:,:,:), ghats_kpp(:,:), dkm1_kpp(:,:)
     real(kind=WP), allocatable :: viscA_fin(:,:), diffK_fin(:,:,:), viscAE_kpp(:,:)
     real(kind=WP)              :: minmix
-    integer                    :: elem, elnodes(3)
+    integer                    :: elem, elnodes(MAX_NV)
     real(kind=WP)              :: usurf, vsurf, u_loc, v_loc, sw0
     real(kind=WP), allocatable :: heat_flux(:), water_flux(:), virtual_salt(:), relax_salt(:)
     real(kind=WP), allocatable :: real_salt_flux(:)
@@ -756,11 +761,11 @@ program fesom_pressuredump
     ! node->elem viscAE average (minmix=3e-3 surface floor). 1-rank: no pre-average exchange.
     minmix = 3.0e-3_WP
     do elem = 1, mesh%elem2D
-        elnodes = mesh%elem2D_nodes(1:3,elem)
+        elnodes = mesh%elem2D_nodes(:,elem)
         nzmin   = mesh%ulevels(elem)
         nzmax   = mesh%nlevels(elem)
         do nz = nzmin, nzmax-1
-            viscAE_kpp(nz,elem) = sum(viscA_fin(nz,elnodes))/3.0_WP
+            viscAE_kpp(nz,elem) = sum(mesh%elem_w(:,elem)*viscA_fin(nz,elnodes))
         end do
         viscAE_kpp(nzmax,elem) = viscAE_kpp(nzmax-1,elem)
         if (viscAE_kpp(nzmin,elem) < minmix) viscAE_kpp(nzmin,elem) = minmix
@@ -795,7 +800,7 @@ program fesom_pressuredump
     end do
     do e = 1, mesh%elem2D
         do nz = mesh%ulevels(e)+1, mesh%nlevels(e)-1
-            if (any(bvfreq(nz, mesh%elem2D_nodes(1:3,e)) < 0.0_WP)) n_unstab_e = n_unstab_e + 1
+            if (any(bvfreq(nz, mesh%elem2D_nodes(:,e)) < 0.0_WP)) n_unstab_e = n_unstab_e + 1
         end do
     end do
     write(*,'(a,i0,a,i0,a,es10.3,a,es10.3)') &

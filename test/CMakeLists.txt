@@ -189,6 +189,22 @@ foreach(_case quad:nemo025q_cut:2:0 pi_w:pi_w:1:1 core2_w:core2_w:8:1)
         ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/${_mesh};FESOM3_TEST_ROTATE=${_rot}"
         SKIP_REGULAR_EXPRESSION "cannot open;No such file")
 endforeach()
+# Task 14: mesh diagnostics store in the hybrid layout (4-column face_nodes/face_edges/face_links/
+# gradient_sca_x/y, a triangle's 4th = _FillValue -1 / -1 / -999), checked against elem2d.out and
+# edge_nodes/edge_face_links, and partition-independent (np 1 == np N). Standard-library python.
+foreach(_case mixed:nemo025mix_cut:1,2,8 quad:nemo025q_cut:1,2 pi_w:pi_w:1,2)
+    string(REPLACE ":" ";" _triple ${_case})
+    list(GET _triple 0 _tag)
+    list(GET _triple 1 _mesh)
+    list(GET _triple 2 _nps)
+    add_test(NAME meshdiag_${_tag}
+             COMMAND python3 ${CMAKE_SOURCE_DIR}/tools/check_meshdiag.py ${_hyb_meshes}/${_mesh}
+                     ${CMAKE_CURRENT_BINARY_DIR}/meshdiag_${_tag} $<TARGET_FILE:fesom_meshdiagdump> ${_nps}
+                     ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS})
+    set_tests_properties(meshdiag_${_tag} PROPERTIES
+        PASS_REGULAR_EXPRESSION "MESHDIAG CHECK PASS"
+        SKIP_REGULAR_EXPRESSION "No such file")
+endforeach()
 # without dist_N/format.out (the original pi dist_2) exchange_edge stops with a message
 add_test(NAME test_halo_ext_noformat_np2
          COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np 2 $<TARGET_FILE:test_halo_ext>)

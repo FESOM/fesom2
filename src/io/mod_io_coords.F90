@@ -15,8 +15,12 @@ module mod_io_coords
     !
     ! The horizontal entity is selected by `entity` (DECOMP_NODE / DECOMP_ELEM): nodes embed the
     ! geographic node coords (geo_coord_nod2D) and write data on the node decomp; elements embed
-    ! the element-CENTROID coords (the simple mean of the 3 rotated node coords, r2g-rotated to
-    ! geographic — FESOM2 io_r2g:3004) and write on the element decomp. The owned-entity count
+    ! the element-CENTROID coords (mod_mesh_areas elem_center: the area-weighted centroid of the
+    ! sub-triangles (1,3,4)+(1,2,3) of the rotated vertices, cyclic-wrapped, r2g-rotated to
+    ! geographic; hybrid-mesh plan Task 14) and write on the element decomp. FESOM2 io_r2g:3004
+    ! took the plain mean of the 3 rotated vertices WITHOUT the cyclic wrap; for triangles the two
+    ! agree to roundoff except on elements across the rotated dateline, where the plain mean lies
+    ! on the wrong side of the globe (wrong coordinate and wrong vector rotation). The owned-entity count
     ! `nO` is the caller's partit-derived local count (means_init/mod_io_restart from local_dims).
     !
     ! The data-variable `_ARRAY_DIMENSIONS` (which differ by store shape: a growing time dim for
@@ -26,6 +30,7 @@ module mod_io_coords
     use mod_constants,   only: rad
     use mod_mesh,        only: t_mesh
     use mod_mesh_rotate, only: r2g
+    use mod_mesh_areas,  only: elem_center
     use mod_io_zarr
     use mod_io_decomp
     implicit none
@@ -37,10 +42,11 @@ contains
 
     ! Compute the owned-entity coordinates embedded into each store, for entity = DECOMP_NODE or
     ! DECOMP_ELEM (lon/lat = GEOGRAPHIC degrees for the embed; rlon/rlat = ROTATED radians for a
-    ! later vector_r2g; nlev = the 3-D below-bottom mask count). VERBATIM from means_init:
+    ! later vector_r2g; nlev = the 3-D below-bottom mask count). Formerly means_init:
     !   NODE: lon/lat = geo_coord_nod2D/rad; rlon/rlat = coord_nod2D; nlev = nlevels_nod2D.
-    !   ELEM: rotated centroid = sum(coord_nod2D(1:2, elem2D_nodes(1:3,e)))/3 (rlon/rlat), its r2g
-    !         image /rad (lon/lat), nlev = nlevels(e).
+    !   ELEM: rotated centroid = elem_center (rlon/rlat; the longitude may lie outside
+    !         [-pi, pi] after the wrap, r2g does not care), its r2g image /rad (lon/lat),
+    !         nlev = nlevels(e).
     ! The caller pre-allocates the output arrays to (at least) nO and only 1..nO is written.
     subroutine io_coords_compute(entity, mesh, nO, lon, lat, rlon, rlat, nlev)
         integer,      intent(in)  :: entity, nO
@@ -51,8 +57,7 @@ contains
         real(WP) :: rcx, rcy, gcx, gcy
         if (entity == DECOMP_ELEM) then
             do e = 1, nO
-                rcx = sum(mesh%coord_nod2D(1, mesh%elem2D_nodes(1:3,e))) / 3.0_WP
-                rcy = sum(mesh%coord_nod2D(2, mesh%elem2D_nodes(1:3,e))) / 3.0_WP
+                call elem_center(mesh, e, rcx, rcy)
                 rlon(e) = rcx; rlat(e) = rcy
                 call r2g(gcx, gcy, rcx, rcy)               ! rotated centroid -> geographic (rad)
                 lon(e) = real(gcx/rad, WP); lat(e) = real(gcy/rad, WP)

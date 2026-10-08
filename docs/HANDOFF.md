@@ -337,6 +337,32 @@ roundoff, so no FESOM2-oracle byte gate (`max|Δ|=0`) can pass any more.
   1:3, y = slots 5:7), so `fesom_geomdump` + `tools/geom_diff.py --signal=<tol>` remain usable as a
   roundoff-level diagnostic. The other dump drivers build and run unchanged; Task 14 retires or
   remaps each of them.
+- **Dump drivers (Task 14):** none deleted — each stays a buildable diagnostic dump whose FESOM2
+  byte gate is retired (a status note heads every driver). `fesom_geomdump`/`mod_geom_dump`:
+  REMAPPED to the FESOM2 layout (3 vertices, 6-row `gradient_sca`, `edge_tri(2) = 0` on boundary
+  edges as FESOM2 stores it), triangle meshes only — a mesh with quads stops with a message.
+  `fesom_meshdiagdump`: REMAPPED to the hybrid store layout (next bullet), checked by the ctests
+  `meshdiag_{mixed,quad,pi_w}` (`tools/check_meshdiag.py`); `zarr_diff.py --meshdiag` vs FESOM2 is
+  retired. `fesom_pressuredump`: REMAPPED — its own node→element means (KPP `viscAE`, the unstable-
+  element count) run over the 4 slots with `elem_w` like the kernels. `fesom_advhordump{,_mr}`,
+  `fesom_evpdump`, `fesom_icefctdump`: no triangle-specific code of their own (they run the
+  converted kernels; the ice kernels convert in Tasks 15/16), unchanged. `fesom_conserve` is a kept
+  ctest gate (its `helem` invariant was converted in Task 12).
+- **Output format changes (Task 14) — check notebooks/scripts that read FESOM3 stores:**
+  `fesom.mesh.diag.zarr` (`FESOM3_MESHDIAG`) now has 4-column per-face arrays, dim `n4`:
+  `face_nodes` (a triangle's 4th = `_FillValue` −1, i.e. Zarr `fill_value` −1), the new
+  `face_edges` (edge k joins nodes k, k+1; triangle 4th −1) and `face_links` (neighbour across edge
+  k; missing neighbour AND a triangle's 4th = −999, FESOM2's value), `gradient_sca_x/y` (4
+  coefficients, triangle 4th = 0); the topology names `face_edge_connectivity`/
+  `face_face_connectivity`. xarray decodes a declared `_FillValue`, so with the default
+  `mask_and_scale=True` these integer arrays come back as float with NaN (`mask_and_scale=False`
+  keeps the integers). The element coordinates `lon`/`lat` of the field-output and restart stores
+  (and the point where element vectors u/v/bolus are r2g-rotated) are now the area-weighted,
+  cyclic-wrapped centroid (`elem_center`) instead of FESOM2's plain unwrapped 3-vertex mean: equal
+  to < 1e-10 deg everywhere except the elements across the ROTATED dateline (pi 77, CORE2 566),
+  where the old coordinate was on the wrong side of the globe and the old geographic u/v were
+  rotated with the wrong angle. `run_tri_regression.sh` compares element vectors there by speed
+  (see its header). The user's notebooks in `work/` read FESOM2's `fesom.mesh.diag.nc` — unaffected.
 - **Kept** (FESOM3-only, unaffected): `run_restart_gate_core2.sh`, `run_restart_gate_multirank.sh`
   (split vs straight), `run_output_gate.sh` (writer vs generator), `run_conserve_pi.sh` and the
   ctest suite.

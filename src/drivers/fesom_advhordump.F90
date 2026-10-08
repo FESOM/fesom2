@@ -14,6 +14,10 @@ program fesom_advhordump
     !   the fly; FESOM2's edge_up_dn_grad record is not written)
     !   adv_tra_hor_upw1/_muscl -> adv_flux_hor (edge) ; scatter -> del_ttf_advhoriz
     !
+    ! Hybrid meshes (plan docs/plans/2026-10-08-hybrid-meshes.md, Task 14): the FESOM2-oracle
+    ! byte gate is retired (docs/HANDOFF.md "Gate migration"). The driver has no triangle-
+    ! specific code of its own (it runs the converted kernels) and stays a diagnostic dump.
+    !
     !   FESOM3_MESH_DIR    mesh dir   (default: pi)
     !   FESOM3_ADVHOR_OUT  out path   (default: advhor_f3.bin)
     use mpi
