@@ -3,15 +3,16 @@ module oce_tracer_grad
     ! oce_tracer_mod.F90:149-190 (SUBROUTINE tracer_gradient_elements).
     !
     ! tr_xy(1:2, nz, elem) is the horizontal gradient of the tracer field ttf,
-    ! reconstructed per element from the linear shape-function coefficients
-    ! gradient_sca (built in mod_mesh_areas). It feeds the MUSCL kernels (on the fly) and the horizontal diffusion.
+    ! reconstructed per element from the Green-Gauss coefficients gradient_sca over the 4
+    ! vertex slots (x 1:4, y 5:8; a triangle's slot 4 has coefficient 0; built in
+    ! mod_mesh_areas). It feeds the MUSCL kernels (on the fly) and the horizontal diffusion.
     !
     ! Clean-architecture change vs FESOM2 (D7, plan "USE-globals -> explicit type
     ! arguments"): FESOM2 writes the module-global tr_xy (o_ARRAYS); here tr_xy is
     ! an explicit intent(out) argument. 1-rank only (myDim_elem2D == elem2D); the
     ! multi-rank loop bounds + halo exchange of tr_xy are deferred to M1.5/M2.12.
     use mod_precision,    only: WP
-    use mod_mesh,         only: t_mesh
+    use mod_mesh,         only: t_mesh, MAX_NV
     use mod_partit,       only: t_partit
     use mod_part_bounds,  only: owned_bounds
     implicit none
@@ -55,17 +56,17 @@ contains
         real(kind=WP), intent(in)  :: ttf(mesh%nl-1, mesh%nod2D)
         real(kind=WP), intent(out) :: tr_xy(2, mesh%nl-1, mesh%elem2D)
         type(t_partit), intent(in), optional :: partit
-        integer :: elem, elnodes(3), nz, nzmin, nzmax
+        integer :: elem, elnodes(MAX_NV), nz, nzmin, nzmax
         integer :: nNodO, nNodL, nEdgeO, nElemO
 
         call owned_bounds(mesh, nNodO, nNodL, nEdgeO, nElemO, partit)
         do elem = 1, nElemO
-            elnodes = mesh%elem2D_nodes(1:3, elem)
+            elnodes = mesh%elem2D_nodes(:, elem)
             nzmin = mesh%ulevels(elem)
             nzmax = mesh%nlevels(elem)
             do nz = nzmin, nzmax-1
-                tr_xy(1, nz, elem) = sum(mesh%gradient_sca(1:3, elem) * ttf(nz, elnodes))
-                tr_xy(2, nz, elem) = sum(mesh%gradient_sca(5:7, elem) * ttf(nz, elnodes))
+                tr_xy(1, nz, elem) = sum(mesh%gradient_sca(1:4, elem) * ttf(nz, elnodes))
+                tr_xy(2, nz, elem) = sum(mesh%gradient_sca(5:8, elem) * ttf(nz, elnodes))
             end do
         end do
     end subroutine tracer_gradient_elements

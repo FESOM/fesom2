@@ -6,7 +6,7 @@ module oce_adv_tra_fct
     ! adf_v by the o_init_zero=.false. HO kernel calls) so that adding them to the
     ! low-order solution `lo` does not create new extrema. Steps (FESOM2 labels):
     !   a1  per-node max/min of (lo, ttf)                         -> fct_ttf_max/min
-    !   a2  per-element admissible bounds over its 3 nodes        -> AUX(1:2,nz,elem)
+    !   a2  per-element admissible bounds over its 4 vertex slots -> AUX(1:2,nz,elem)
     !       (layers at/below the element bottom set to -/+bignumber: unconstrained)
     !   a3  cluster (node + vertical nz-1:nz+1) bounds            -> tvert_max/min
     !       then admissible increment w.r.t. lo                   -> fct_ttf_max/min
@@ -36,7 +36,7 @@ module oce_adv_tra_fct
     ! Runtime divisors areasvol / hnode_new (b2) match FESOM2 because both codes divide
     ! by byte-identical operands (geom-proven areasvol; gated hnode_new); cf. LESSONS L7.
     use mod_precision,   only: WP
-    use mod_mesh,        only: t_mesh
+    use mod_mesh,        only: t_mesh, MAX_NV
     use mod_partit,      only: t_partit
     use mod_part_bounds, only: owned_bounds, is_multirank
     use mod_halo,        only: exchange_nod
@@ -64,7 +64,7 @@ contains
         real(kind=WP), intent(inout) :: fct_minus(mesh%nl-1, mesh%nod2D)
         type(t_partit), intent(in), optional :: partit
 
-        integer :: n, nz, elem, enodes(3), el(2), nl1, nl2, nu1, nu2, nl12, nu12, edge
+        integer :: n, nz, elem, enodes(MAX_NV), el(2), nl1, nl2, nu1, nu2, nl12, nu12, edge
         real(kind=WP) :: flux, ae
         real(kind=WP), allocatable :: tvert_max(:,:), tvert_min(:,:), AUX(:,:,:)
         real(kind=WP) :: flux_eps=1e-16
@@ -93,7 +93,7 @@ contains
         !     at/below the element bottom (nz>=nlevels(elem)-1) are set to -/+bignumber
         !     so a shallow element does not constrain a deeper node's bounds.
         do elem=1, nElemO
-            enodes = mesh%elem2D_nodes(1:3, elem)
+            enodes = mesh%elem2D_nodes(:, elem)   ! a triangle's slot 4 repeats slot 1 (no effect on max/min)
             nu1 = mesh%ulevels(elem)
             nl1 = mesh%nlevels(elem)
             ! FESOM2 d8dcdfb: pad ABOVE a cavity element as well as below it. a3 reads
@@ -108,8 +108,10 @@ contains
                 AUX(2,nz,elem)= bignumber
             end do
             do nz=nu1, nl1-1
-                AUX(1,nz,elem)=max(fct_ttf_max(nz,enodes(1)), fct_ttf_max(nz,enodes(2)), fct_ttf_max(nz,enodes(3)))
-                AUX(2,nz,elem)=min(fct_ttf_min(nz,enodes(1)), fct_ttf_min(nz,enodes(2)), fct_ttf_min(nz,enodes(3)))
+                AUX(1,nz,elem)=max(fct_ttf_max(nz,enodes(1)), fct_ttf_max(nz,enodes(2)), fct_ttf_max(nz,enodes(3)), &
+                                   fct_ttf_max(nz,enodes(4)))
+                AUX(2,nz,elem)=min(fct_ttf_min(nz,enodes(1)), fct_ttf_min(nz,enodes(2)), fct_ttf_min(nz,enodes(3)), &
+                                   fct_ttf_min(nz,enodes(4)))
             end do
             if (nl1<=mesh%nl-1) then
                 do nz=nl1, mesh%nl-1

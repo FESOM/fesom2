@@ -652,17 +652,50 @@ fluxes and nonlinear terms can. Asserted in a test (Task 9), measured in the sho
   `src/oce/oce_muscl_adv.F90`, `src/oce/oce_pressure_bv.F90`, `src/oce/oce_initial_state.F90`
 - Modify: `test/test_muscl_onthefly.F90`
 - Create: `test/test_updown_mixed.F90`
+- ➕ Modify: `test/CMakeLists.txt`; `src/mesh/mod_mesh_read.F90` (comment: subroutine rename)
 
-- [ ] element gradients/means over 4 slots; FCT element bounds over 4 slots
-- [ ] node gathers via `nod_in_elem2D_w`: `tr_xynodes`, `compute_sigma_xy`, `smooth_nod`
-- [ ] `find_up_downwind_triangles` → elements: at vertex k the angle spanned by the two adjacent
+- [x] element gradients/means over 4 slots; FCT element bounds over 4 slots
+      — `tracer_gradient_elements` `gradient_sca(1:4|5:8)`; FCT a2 max/min over 4 slots (a
+      triangle's repeated slot leaves max/min unchanged); `oce_adv_tra_hor/flux/driver` needed
+      no code change (edge-based, boundary tests from Task 7) — comments triangle → element
+- [x] node gathers via `nod_in_elem2D_w`: `tr_xynodes`, `compute_sigma_xy`, `smooth_nod`
+      — `tr_xynodes` `Σ A·w·g / areasvol` (hidden `/3` removed); `compute_sigma_xy` weights
+      and `vol` = kite shares `elem_area·nod_in_elem2D_w`, gradients over 4 slots; `smooth_nod`
+      = kite-share-weighted mean of the `elem_w` element means (triangles: FESOM2's
+      `ΣA(a1+a2+a3)/(3ΣA)` to roundoff)
+- [x] `find_up_downwind_triangles` → elements: at vertex k the angle spanned by the two adjacent
       sides (next/previous vertex), triangles and quads (qq `oce_muscl_adv.F90:56-255`); the
       multi-rank `coord_elem(2,3,·)` / `e_nodes(3,·)` exchange becomes 4 vertices
-- [ ] `oce_initial_state` extrapolation averages over the element's UNIQUE vertices (`nv`)
-- [ ] tests: `test_updown_mixed` — up/downwind element found for every interior edge of the mixed
+      — renamed `find_up_downwind_elements`; one helper `elem_sides` (nv from slot 4 == slot 1,
+      b = next, c = previous) for the 1-rank and multi-rank paths; the exact "x along a side"
+      compares (`ab == ax`, `ax == 0`) became `|·| < 1e-10` rad (on structured quad grids the
+      edge direction is often collinear with a neighbour's side; qq uses 0.01); the array name
+      `edge_up_dn_tri` kept (t_tracer_work binary layout, drivers)
+- [x] `oce_initial_state` extrapolation averages over the element's UNIQUE vertices (`nv`)
+- [x] tests: `test_updown_mixed` — up/downwind element found for every interior edge of the mixed
       patch and the edge direction lies in its vertex angle; MUSCL equals the reference rule;
       linear tracer advected exactly on uniform flow (interior)
-- [ ] run ctest — must pass before Task 12
+      — `test_updown_mixed` (NEMO-mixed cut np1/2/8 + analytic mixed and parallelogram patches
+      at np1, NEMO-quad cut np2, pi_w rotated np2): U1 element found at every interior edge node
+      (interior = vertex angles sum to 2π; 0 missing), U2 found element around the anchor and the
+      direction inside its vertex angle by cross products (0 outside), L1 linear tracer: element
+      gradient exact (≤ 1.2e-13) and the MUSCL face values = the exact edge-midpoint value on
+      every edge with both elements, both flow signs (≤ 2.2e-12), L2 node tendency = −u·∇T at
+      all-triangle (≤ 8e-14) and all-parallelogram (≤ 4.3e-14) interior nodes; MUSCL == reference
+      rule: `test_muscl_onthefly` part R (bitwise) now also on the unrotated NEMO-mixed cut
+      np1/2 and NEMO-quad cut np2 (`FESOM3_TEST_ROTATE=0`; synth_cavity over 4 slots)
+- ⚠️ finding (scheme property, not a kernel bug; relevant for Task 17): the median-dual edge
+  scheme is linearly exact only where the dual cell is all triangles (Galerkin-P1 equivalence)
+  or all rectilinear parallelograms. At triangle–quad interface nodes and on general quads the
+  node tendency of a linear tracer in uniform flow has an O(1) LOCAL relative error although
+  the MUSCL face values are exact: 0.22 at the NEMO-mixed interface nodes, 0.24 on the jittered
+  mixed patch (the face value is taken at the edge midpoint, but the dual face runs
+  midpoint→centroid; the errors cancel edge by edge only for those two shapes). Asserted
+  bounded (< 0.5) in L2; a remedy (e.g. face values at the dual-segment midpoints) is a design
+  decision for the user
+- [x] run ctest — must pass before Task 12 — scratch ctest 107/107; `run_tri_regression.sh` 7/7
+      (pi PRE 6.3e-15, EARLY 9.2e-13, OCEAN 1.0e-7 as after Task 10; CORE2 EARLY 2.1e-9, OCEAN
+      3.9e-5, ICE 1.2e-4, MIX 2.4e-4; decomp OCEAN 6.4e-10; conservation <= 4.3e-16 totals)
 
 ### Task 12: Mixing and GM/Redi
 

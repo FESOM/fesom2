@@ -125,7 +125,7 @@ contains
         ! The elemental tracer gradient for the horizontal diffusion / Redi is
         ! tracers%work%tr_xy, built by init_tracers_AB (called inside advect_tracer) from
         ! the same values (advection writes only del_ttf), so it is not recomputed here;
-        ! diff_part_hor_redi reads it only at the (owned) triangles of owned edges.
+        ! diff_part_hor_redi reads it only at the (owned) elements of owned edges.
         call local_dims(mesh, partit, nNodO, nNodL, nEdgeO, nEdgeL, nElemO, nElemL, nElemF)
 
         ! M4c GM bolus ADD (FESOM2 oce_ale_tracer.F90:199-211): advect with the residual-mean
@@ -263,7 +263,7 @@ contains
         ! del_ttf at the two edge nodes. The Redi isoneutral-slope terms (slope_tapered/tr_z,
         ! x isredi) vanish for Redi=off; they are deferred to a future Redi gate.
         ! M2.12c-3: optional partit -> OWNED edge loop (FESOM2 :1208 do edge=1, myDim_edge2D).
-        ! For owned edges both triangles are owned (invariant ii) so tr_xy/helem read in the
+        ! For owned edges both elements are owned (invariant ii) so tr_xy/helem read in the
         ! owned-only element range; Ki/areasvol are read at the edge's two nodes (one may be a
         ! halo node — Ki is prescribed owned+halo, areasvol is M2.12b-exchanged). The owned-
         ! node del_ttf scatter is complete (invariant i).
@@ -450,6 +450,9 @@ contains
         ! share and the dry ones nothing. In FESOM2 the same expression was correct for the
         ! same reason -- areasvol was then the depth-gathered (wet) area, and the two /3
         ! cancelled; only the definition of areasvol changed, not the intent.
+        ! Hybrid meshes: each element contributes its kite share elem_area*nod_in_elem2D_w
+        ! (FESOM2's hidden 1/3 = the triangle kite weight), so areasvol = the sum of those
+        ! shares and a uniform gradient gathers to itself on triangles and quads alike.
         do n = 1, nNodO
             nl1 = mesh%nlevels_nod2D(n)-1
             ul1 = mesh%ulevels_nod2D(n)
@@ -459,12 +462,12 @@ contains
                 do k = 1, mesh%nod_in_elem2D_num(n)
                     elem = mesh%nod_in_elem2D(k,n)
                     if (nz <= (mesh%nlevels(elem)-1) .and. nz >= mesh%ulevels(elem)) then
-                        Tx = Tx + tr_xy(1,nz,elem)*mesh%elem_area(elem)
-                        Ty = Ty + tr_xy(2,nz,elem)*mesh%elem_area(elem)
+                        Tx = Tx + tr_xy(1,nz,elem)*mesh%elem_area(elem)*mesh%nod_in_elem2D_w(k,n)
+                        Ty = Ty + tr_xy(2,nz,elem)*mesh%elem_area(elem)*mesh%nod_in_elem2D_w(k,n)
                     end if
                 end do
-                tr_xynodes(1,nz,n) = Tx/3.0_WP/mesh%areasvol(n)
-                tr_xynodes(2,nz,n) = Ty/3.0_WP/mesh%areasvol(n)
+                tr_xynodes(1,nz,n) = Tx/mesh%areasvol(n)
+                tr_xynodes(2,nz,n) = Ty/mesh%areasvol(n)
             end do
         end do
 

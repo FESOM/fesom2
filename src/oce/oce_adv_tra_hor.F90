@@ -7,7 +7,7 @@ module oce_adv_tra_hor
     !     the reference RK3 code there is a single MUSCL kernel without a boundary clamp.
     ! The MUSCL kernel forms the up/downwind reconstruction ON THE FLY, as the reference RK3
     ! code (qq/oce_stepRK3.F90, t_hor_adv_muscl_RK3): the elemental gradient tr_xy of the
-    ! upwind / downwind triangle (edge_up_dn_tri) where that triangle is wet at the level,
+    ! upwind / downwind element (edge_up_dn_tri; triangle or quad) where it is wet at the level,
     ! a zero increment where it is missing or dry. FESOM2 instead stores a per-edge array
     ! edge_up_dn_grad with a Miura node-averaged gradient on those levels; FESOM3 dropped
     ! both (docs/plans/completed/2026-10-06-muscl-onthefly.md). Identical to FESOM2 on the
@@ -123,7 +123,7 @@ contains
     subroutine adv_tra_hor_muscl(vel, ttf, mesh, num_ord, flux, tr_xy, edge_up_dn_tri, o_init_zero, partit)
         ! MUSCL horizontal flux (FESOM2 adv_tra_hor_mfct, oce_adv_tra_hor.F90:546-834).
         ! num_ord = fraction of 4th-order (centered) contribution; (1-num_ord) is
-        ! 3rd-order upwind. No boundary clamp: where the up/downwind triangle is missing
+        ! 3rd-order upwind. No boundary clamp: where the up/downwind element is missing
         ! or dry the face value is 2/3*T_up + 1/3*T_dn. Not monotone; usually run under FCT.
         ! M2.12b: optional partit -> loop over OWNED edges (myDim_edge2D).
         type(t_mesh),  intent(in)    :: mesh
@@ -139,7 +139,7 @@ contains
         real(kind=WP) :: deltaX1, deltaY1, deltaX2, deltaY2, vflux
         integer       :: el(2), enodes(2), nz, edge, nu12, nl12, nl1, nl2, nu1, nu2
         integer       :: nNodO, nNodL, nEdgeO, nElemO
-        integer       :: tri1, tri2, u1, l1, u2, l2   ! up/dn triangles and their wet level ranges
+        integer       :: tri1, tri2, u1, l1, u2, l2   ! up/dn elements and their wet level ranges
 
         call owned_bounds(mesh, nNodO, nNodL, nEdgeO, nElemO, partit)
         l_init_zero = .true.
@@ -153,8 +153,8 @@ contains
         do edge = 1, nEdgeO
             enodes = mesh%edges(:, edge)
             el     = mesh%edge_tri(:, edge)
-            ! up/downwind triangle of this edge and the levels on which it is wet; a missing
-            ! triangle gets an empty range (u = 1, l = 0)
+            ! up/downwind element of this edge and the levels on which it is wet; a missing
+            ! element gets an empty range (u = 1, l = 0)
             tri1 = edge_up_dn_tri(1, edge); u1 = 1; l1 = 0
             tri2 = edge_up_dn_tri(2, edge); u2 = 1; l2 = 0
             if (tri1 > 0) then
@@ -212,7 +212,7 @@ contains
             real(kind=WP), intent(in) :: vflux
             real(kind=WP) :: Tmean1, Tmean2, cHO, g1(2), g2(2)
             ! the reference RK3 rule (qq/oce_stepRK3.F90 t_hor_adv_muscl_RK3): the
-            ! up/downwind triangle's elemental gradient where that triangle is wet, else 0
+            ! up/downwind element's gradient where that element is wet, else 0
             g1 = 0.0_WP; g2 = 0.0_WP
             if (nz >= u1 .and. nz <= l1) g1 = tr_xy(:, nz, tri1)
             if (nz >= u2 .and. nz <= l2) g2 = tr_xy(:, nz, tri2)

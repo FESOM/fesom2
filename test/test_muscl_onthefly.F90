@@ -120,6 +120,9 @@ program test_muscl_onthefly
     !   edge and level, both velocity signs, BITWISE; on pi as read (R1) and with synthesised
     !   cavity columns (R2: ulevels_nod2D = 3 on every 10th global node with >= 14 levels,
     !   element ulevels and ulevels_nod2D(_max) rebuilt consistently and exchanged).
+    !   Hybrid meshes (Task 11): FESOM3_MESH_DIR selects the mesh (default pi, rotated);
+    !   FESOM3_TEST_ROTATE=0 reads it unrotated (the NEMO quad / mixed cut-outs), where the
+    !   up/downwind elements are triangles and quads (find_up_downwind_elements).
     use mpi
     use mod_precision,     only: WP, MP
     use mod_mesh,          only: t_mesh
@@ -136,7 +139,7 @@ program test_muscl_onthefly
     use muscl_oracle,      only: oracle_muscl
     implicit none
 
-    character(len=512) :: mesh_dir
+    character(len=512) :: mesh_dir, cbuf
     type(t_partit)      :: partit
     type(t_mesh)        :: mesh
     type(t_tracer_work) :: twork
@@ -156,10 +159,19 @@ program test_muscl_onthefly
         mesh_dir = '/home/a/a270088/port2/fesom2/tests/data/MESHES/pi'
     call par_init(partit)
     if (partit%npes > 1) call set_partition(partit, trim(mesh_dir))
-    call read_mesh(mesh, partit, trim(mesh_dir), 50.0_WP, 15.0_WP, -90.0_WP, 360.0_WP, &
-                   force_rotation=.true., n_cw_swaps=nsw)
+    cbuf = ''
+    call get_environment_variable('FESOM3_TEST_ROTATE', cbuf)
+    if (trim(cbuf) == '0') then
+        call read_mesh(mesh, partit, trim(mesh_dir), 0.0_WP, 0.0_WP, 0.0_WP, 360.0_WP, &
+                       force_rotation=.false., n_cw_swaps=nsw)
+    else
+        call read_mesh(mesh, partit, trim(mesh_dir), 50.0_WP, 15.0_WP, -90.0_WP, 360.0_WP, &
+                       force_rotation=.true., n_cw_swaps=nsw)
+    end if
     call compute_geometry(mesh, partit, cartesian=.false.)
     call owned_bounds(mesh, nNodO, nNodL, nEdgeO, nElemO, partit)
+    if (partit%mype == 0) write(*,'(a,i0,a,i0)') '  owned elements on rank 0: triangles=', &
+        count(mesh%elem2D_nnodes(1:nElemO) == 3), ' quads=', count(mesh%elem2D_nnodes(1:nElemO) == 4)
     nElemF = mesh%elem2D
     if (partit%npes > 1) nElemF = partit%myDim_elem2D + partit%eDim_elem2D + partit%eXDim_elem2D
     nl = mesh%nl
@@ -171,10 +183,10 @@ program test_muscl_onthefly
     call build_flow()
 
     call build_gradient()
-    call part_r('R1 pi as read      ')
+    call part_r('R1 mesh as read      ')
     call synth_cavity()
     call build_gradient()
-    call part_r('R2 pi with cavities')
+    call part_r('R2 mesh with cavities')
 
     if (partit%mype == 0) then
         if (nfail == 0) then
@@ -300,7 +312,7 @@ contains
             end if
         end do
         do e = 1, nElemO
-            mesh%ulevels(e) = maxval(mesh%ulevels_nod2D(mesh%elem2D_nodes(1:3, e)))
+            mesh%ulevels(e) = maxval(mesh%ulevels_nod2D(mesh%elem2D_nodes(:, e)))   ! 4 slots
         end do
         if (is_multirank(partit)) call exchange_elem_full(mesh%ulevels, partit)
         ! FESOM2's cavity convention: a node's surface is the SHALLOWEST surface of its

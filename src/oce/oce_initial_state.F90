@@ -45,7 +45,7 @@ module oce_initial_state
     use, intrinsic :: iso_fortran_env, only: real64
     use mod_precision,    only: WP
     use mod_constants,    only: rad
-    use mod_mesh,         only: t_mesh
+    use mod_mesh,         only: t_mesh, MAX_NV
     use mod_partit,       only: t_partit
     use mod_tracer,       only: t_tracer
     use mod_io_netcdf,    only: nc_open_read, nc_close, nc_dimlen, nc_get_axis_dp, &
@@ -247,7 +247,7 @@ contains
         type(t_partit),      intent(in), optional :: partit
         integer  :: n, nl1, nz, k, j, el, cnt
         integer  :: nNodO, nNodL, nEdgeO, nElemO
-        integer  :: enodes(3)
+        integer  :: enodes(MAX_NV)
         logical  :: success
         real(WP) :: val, glob_max, dummy
         real(WP), allocatable :: work_array(:)
@@ -276,8 +276,8 @@ contains
                             do k = 1, mesh%nod_in_elem2D_num(n)
                                 el = mesh%nod_in_elem2D(k, n)
                                 if (nz > mesh%nlevels(el)) cycle
-                                enodes = mesh%elem2D_nodes(1:3, el)
-                                do j = 1, 3
+                                enodes = mesh%elem2D_nodes(:, el)
+                                do j = 1, mesh%elem2D_nnodes(el)   ! UNIQUE vertices (a triangle's slot 4 repeats slot 1)
                                     if (enodes(j) == 0) cycle
                                     if ((work_array(enodes(j)) < 0.99_WP*dummy) .and. &
                                         (mesh%nlevels_nod2D(enodes(j)) > nz)) then

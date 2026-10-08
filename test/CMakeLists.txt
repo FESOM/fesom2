@@ -147,6 +147,29 @@ foreach(_case test_vinv:mixed:nemo025mix_cut:1 test_vinv:mixed:nemo025mix_cut:2
         ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/${_mesh};FESOM3_TEST_ROTATE=0"
         SKIP_REGULAR_EXPRESSION "cannot open;No such file")
 endforeach()
+# Task 11: tracer kernels on mixed meshes. test_updown_mixed (MUSCL up/downwind element
+# search, linear-tracer exactness of the reconstruction and of the advection; default mesh =
+# the NEMO-mixed cut-out, the np 1 run also checks the analytic mixed and parallelogram
+# patches); test_muscl_onthefly part R (kernel == the reference RK3 rule) on the unrotated
+# NEMO cut-outs.
+add_fesom_test(test_updown_mixed 1)
+add_fesom_test(test_updown_mixed 2)
+foreach(_case test_updown_mixed:quad:nemo025q_cut:2:0 test_updown_mixed:mixed:nemo025mix_cut:8:0
+              test_updown_mixed:pi_w:pi_w:2:1
+              test_muscl_onthefly:mixed:nemo025mix_cut:1:0 test_muscl_onthefly:mixed:nemo025mix_cut:2:0
+              test_muscl_onthefly:quad:nemo025q_cut:2:0)
+    string(REPLACE ":" ";" _quint ${_case})
+    list(GET _quint 0 _t)
+    list(GET _quint 1 _tag)
+    list(GET _quint 2 _mesh)
+    list(GET _quint 3 _np)
+    list(GET _quint 4 _rot)
+    add_test(NAME ${_t}_${_tag}_np${_np}
+             COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np ${_np} $<TARGET_FILE:${_t}>)
+    set_tests_properties(${_t}_${_tag}_np${_np} PROPERTIES
+        ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/${_mesh};FESOM3_TEST_ROTATE=${_rot}"
+        SKIP_REGULAR_EXPRESSION "cannot open;No such file")
+endforeach()
 # without dist_N/format.out (the original pi dist_2) exchange_edge stops with a message
 add_test(NAME test_halo_ext_noformat_np2
          COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np 2 $<TARGET_FILE:test_halo_ext>)
