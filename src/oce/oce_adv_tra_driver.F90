@@ -115,7 +115,7 @@ contains
                 nl1 = mesh%nlevels(el(1))-1
                 nu1 = mesh%ulevels(el(1))
                 nl2 = 0; nu2 = 0
-                if (el(2) > 0) then
+                if (el(2) /= el(1)) then
                     nl2 = mesh%nlevels(el(2))-1
                     nu2 = mesh%ulevels(el(2))
                 end if

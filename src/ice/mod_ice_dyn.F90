@@ -160,9 +160,9 @@ contains
                 eps11(el) = sum(mesh%gradient_sca(1:3,el)*u_ice(mesh%elem2D_nodes(1:3,el))) &
                     - mesh%metric_factor(el) * sum(v_ice(mesh%elem2D_nodes(1:3,el)))/3.0_WP
 
-                eps22(el) = sum(mesh%gradient_sca(4:6,el)*v_ice(mesh%elem2D_nodes(1:3,el)))
+                eps22(el) = sum(mesh%gradient_sca(5:7,el)*v_ice(mesh%elem2D_nodes(1:3,el)))
 
-                eps12(el) = 0.5_WP*(sum(mesh%gradient_sca(4:6,el)*u_ice(mesh%elem2D_nodes(1:3,el))) &
+                eps12(el) = 0.5_WP*(sum(mesh%gradient_sca(5:7,el)*u_ice(mesh%elem2D_nodes(1:3,el))) &
                             + sum(mesh%gradient_sca(1:3,el)*v_ice(mesh%elem2D_nodes(1:3,el))) &
                             + mesh%metric_factor(el) * sum(u_ice(mesh%elem2D_nodes(1:3,el)))/3.0_WP)
 
@@ -231,12 +231,12 @@ contains
                 do k = 1, 3
                     u_rhs_ice(mesh%elem2D_nodes(k,el)) = u_rhs_ice(mesh%elem2D_nodes(k,el)) &
                         - mesh%elem_area(el) * &
-                          (sigma11(el)*mesh%gradient_sca(k,el) + sigma12(el)*mesh%gradient_sca(k+3,el) &
+                          (sigma11(el)*mesh%gradient_sca(k,el) + sigma12(el)*mesh%gradient_sca(k+4,el) &
                            + sigma12(el)*val3*mesh%metric_factor(el))            ! metrics
 
                     v_rhs_ice(mesh%elem2D_nodes(k,el)) = v_rhs_ice(mesh%elem2D_nodes(k,el)) &
                         - mesh%elem_area(el) * &
-                          (sigma12(el)*mesh%gradient_sca(k,el) + sigma22(el)*mesh%gradient_sca(k+3,el) &
+                          (sigma12(el)*mesh%gradient_sca(k,el) + sigma22(el)*mesh%gradient_sca(k+4,el) &
                            - sigma11(el)*val3*mesh%metric_factor(el))
                 end do
             end if
@@ -358,7 +358,7 @@ contains
                 ! use rhs_m and rhs_a for storing the contribution from elevation
                 aa = 9.81_WP*mesh%elem_area(el)/3.0_WP
                 elevation_dx = sum(mesh%gradient_sca(1:3,el)*elevation(elnodes))
-                elevation_dy = sum(mesh%gradient_sca(4:6,el)*elevation(elnodes))
+                elevation_dy = sum(mesh%gradient_sca(5:7,el)*elevation(elnodes))
 
                 do k = 1, 3
                     rhs_a(elnodes(k)) = rhs_a(elnodes(k)) - aa*elevation_dx
@@ -532,7 +532,7 @@ contains
             if (mesh%ulevels(el) > 1) cycle
             vol = mesh%elem_area(el)
             dx  = mesh%gradient_sca(1:3,el)
-            dy  = mesh%gradient_sca(4:6,el)
+            dy  = mesh%gradient_sca(5:7,el)
             bb  = g*val3*vol
             aa  = bb*sum(dx*elevation(elnodes))
             bb  = bb*sum(dy*elevation(elnodes))
@@ -595,7 +595,7 @@ contains
                 if (ice_el(el)) then
                     elnodes = mesh%elem2D_nodes(1:3,el)
                     dx = mesh%gradient_sca(1:3,el)
-                    dy = mesh%gradient_sca(4:6,el)
+                    dy = mesh%gradient_sca(5:7,el)
                     meancos = val3*mesh%metric_factor(el)        ! metrics
 
                     ! deformation rate tensor on element el

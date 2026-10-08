@@ -7,11 +7,15 @@ module mod_mesh
     ! nod_in_elem2D, ...) so kernels transcribe verbatim, but elem2D_nodes /
     ! elem_edges / elem_neighbors are allocated (MAX_NV, elem2D) and a per-element
     ! vertex count elem2D_nnodes(:) is added; gradient_sca is (2*MAX_NV, elem2D).
-    ! For triangles elem2D_nnodes==3 everywhere, so the anchor build is unchanged.
     ! Hybrid meshes (mod_mesh_read): a triangle stores its 1st vertex again as the 4th
     ! (elem2D_nodes(4,e) == elem2D_nodes(1,e) <=> elem2D_nnodes(e) == 3), a quad 4
-    ! distinct vertices, clockwise. In the multi-rank mesh coord_nod2D, geo_coord_nod2D,
-    ! bc_index_nod2D, depth and nlevels_nod2D also hold the double-halo nodes
+    ! distinct vertices, clockwise. Conventions without zero indices: elem_edges(k,e) is the
+    ! edge between slots k and k+1 (1-2, 2-3, 3-4, 4-1; a triangle's 4th = its 1st),
+    ! elem_neighbors(k,e) the element across it (missing = e itself; triangle 4th = 1st),
+    ! edge_tri(2,ed) == edge_tri(1,ed) on a boundary edge (edge_cross_dxdy(3:4,ed) = 0),
+    ! gradient_sca x in 1:4, y in 5:8 (a triangle's slots 4 and 8 are 0). In the
+    ! multi-rank mesh coord_nod2D, geo_coord_nod2D, bc_index_nod2D, depth and
+    ! nlevels_nod2D also hold the double-halo nodes
     ! (myDim+eDim+1 .. +eXDim_nod2D, when dist_N/format.out exists).
     !
     ! Geometry/coordinate arrays are MP (mesh precision, D3); == WP at the DP anchor.
@@ -74,6 +78,13 @@ module mod_mesh
         real(kind=MP), allocatable, dimension(:)   :: depth
         real(kind=MP), allocatable, dimension(:,:) :: gradient_vec  ! velocity reconstruction
         real(kind=MP), allocatable, dimension(:,:) :: gradient_sca  ! (2*MAX_NV,elem2D) scalar gradient
+        ! Kite (median-dual) weights: elem_w(k,e) = the share of the area of element e that
+        ! belongs to its vertex k (sum 1; triangle 1/3,1/3,1/3,0), so an element mean is
+        ! sum(elem_w(:,e)*f(elem2D_nodes(:,e))). nod_in_elem2D_w(k,n) = the weight of node n
+        ! in its k-th element nod_in_elem2D(k,n), for node gathers
+        ! sum_k nod_in_elem2D_w(k,n)*elem_area(e_k)*x(e_k) / area(n).
+        real(kind=MP), allocatable, dimension(:,:) :: elem_w           ! (MAX_NV,owned elems)
+        real(kind=MP), allocatable, dimension(:,:) :: nod_in_elem2D_w  ! (MAX_ADJACENT,nod2D)
         integer,       allocatable, dimension(:)   :: bc_index_nod2D
 
         ! ---- vertical structure ----
@@ -207,6 +218,8 @@ contains
         call write_bin_array(mesh%depth,              unit, iostat, iomsg)
         call write_bin_array(mesh%gradient_vec,       unit, iostat, iomsg)
         call write_bin_array(mesh%gradient_sca,       unit, iostat, iomsg)
+        call write_bin_array(mesh%elem_w,             unit, iostat, iomsg)
+        call write_bin_array(mesh%nod_in_elem2D_w,    unit, iostat, iomsg)
         call write_bin_array(mesh%bc_index_nod2D,     unit, iostat, iomsg)
         write(unit, iostat=iostat, iomsg=iomsg) mesh%nl
         call write_bin_array(mesh%zbar,               unit, iostat, iomsg)
@@ -274,6 +287,8 @@ contains
         call read_bin_array(mesh%depth,              unit, iostat, iomsg)
         call read_bin_array(mesh%gradient_vec,       unit, iostat, iomsg)
         call read_bin_array(mesh%gradient_sca,       unit, iostat, iomsg)
+        call read_bin_array(mesh%elem_w,             unit, iostat, iomsg)
+        call read_bin_array(mesh%nod_in_elem2D_w,    unit, iostat, iomsg)
         call read_bin_array(mesh%bc_index_nod2D,     unit, iostat, iomsg)
         read(unit, iostat=iostat, iomsg=iomsg) mesh%nl
         call read_bin_array(mesh%zbar,               unit, iostat, iomsg)

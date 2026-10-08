@@ -162,12 +162,12 @@ contains
         do ed = 1, nEdgeO
             el = mesh%edge_tri(:, ed)
             do i = 1, 2   ! the two triangles sharing edge ed (both OWNED, invariant ii)
-                if (el(i) < 1) cycle   ! boundary edge has only one triangle
+                if (i == 2 .and. el(2) == el(1)) cycle   ! boundary edge has only one element
                 elnodes = mesh%elem2D_nodes(1:3, el(i))
                 zsrf    = mesh%zbar(mesh%ulevels(el(i)))   ! zbar_e_srf (=0, no cavity)
                 fy(1:3) = (mesh%zbar_e_bot(el(i)) - zsrf) * &
                           ( mesh%gradient_sca(1:3,el(i)) * mesh%edge_cross_dxdy(2*i  ,ed)  &
-                           -mesh%gradient_sca(4:6,el(i)) * mesh%edge_cross_dxdy(2*i-1,ed) )
+                           -mesh%gradient_sca(5:7,el(i)) * mesh%edge_cross_dxdy(2*i-1,ed) )
                 if (i==2) fy = -fy
 
                 row = mesh%edges(1, ed)
@@ -236,11 +236,11 @@ contains
         do ed = 1, nEdgeO
             el = mesh%edge_tri(:, ed)
             do i = 1, 2   ! the two triangles sharing edge ed (both OWNED, invariant ii)
-                if (el(i) < 1) cycle   ! boundary edge has only one triangle
+                if (i == 2 .and. el(2) == el(1)) cycle   ! boundary edge has only one element
                 elnodes = mesh%elem2D_nodes(1:3, el(i))
                 fy(1:3) = -mesh%dhe(el(i)) * &
                           ( mesh%gradient_sca(1:3,el(i)) * mesh%edge_cross_dxdy(2*i  ,ed)  &
-                           -mesh%gradient_sca(4:6,el(i)) * mesh%edge_cross_dxdy(2*i-1,ed) )
+                           -mesh%gradient_sca(5:7,el(i)) * mesh%edge_cross_dxdy(2*i-1,ed) )
                 if (i==2) fy = -fy
 
                 row = mesh%edges(1, ed)
@@ -318,7 +318,7 @@ contains
             !__________________________________________________________________
             ! ... and from el(2), unless ed is a boundary edge
             c2 = 0.0_WP
-            if (el(2) > 0) then
+            if (el(2) /= el(1)) then
                 deltaX2 = mesh%edge_cross_dxdy(3, ed)
                 deltaY2 = mesh%edge_cross_dxdy(4, ed)
                 nzmin   = mesh%ulevels(el(2))

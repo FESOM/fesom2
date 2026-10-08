@@ -194,7 +194,7 @@ contains
             gx = 0.0_WP; gy = 0.0_WP
             do j = 1, 3
                 gx = gx + 1.0_WP * real(m%gradient_sca(j,   e), WP)
-                gy = gy + 1.0_WP * real(m%gradient_sca(3+j, e), WP)
+                gy = gy + 1.0_WP * real(m%gradient_sca(4+j, e), WP)
             end do
             max_grad_const = max(max_grad_const, abs(gx), abs(gy))
         end do
@@ -215,7 +215,7 @@ contains
                 fnode = a*real(m%coord_nod2D(1, nd), WP)*r_earth &
                       + b*real(m%coord_nod2D(2, nd), WP)*r_earth
                 gx = gx + fnode * real(m%gradient_sca(j,   e), WP)
-                gy = gy + fnode * real(m%gradient_sca(3+j, e), WP)
+                gy = gy + fnode * real(m%gradient_sca(4+j, e), WP)
             end do
             linear_gradient_exact = max(linear_gradient_exact, abs(gx-a), abs(gy-b))
         end do

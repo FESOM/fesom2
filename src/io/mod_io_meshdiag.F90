@@ -11,8 +11,8 @@ module mod_io_meshdiag
     !   face_edges       myList_edge2D(elem_edges)             (FESOM2 writes RAW=local :456; we write
     !                                                           GLOBAL so the store is partition-INDEP;
     !                                                           identical at 1-rank where local==global)
-    !   face_links       elem_neighbors>0 ? myList_elem2D : -999  (FESOM2 RAW :469; global here)
-    !   edge_face_links  edge_tri>0 ? myList_elem2D : -999     (:488)
+    !   face_links       elem_neighbors/=self ? myList_elem2D : -999 (FESOM2 RAW :469; global here)
+    !   edge_face_links  edge_tri(2)/=edge_tri(1) ? myList_elem2D : -999 (:488; slot 1 always)
     !   nod_in_elem2D    num>=i ? myList_elem2D : 0            (:508; N=max num; fill 0)
     !   nod_part/elem_part  mype stamp                         (:379/:387; partition-DEPENDENT by design)
     !
@@ -106,9 +106,8 @@ contains
             'Maps every triangular face to its three corner nodes.', '', cf='face_node_connectivity', sidx=.true.)
         call def3(store, a_edge_nodes, 'edge_nodes', 2, Dg, '<i4', 'n2', 'edg_n', &
             'Maps every edge to the two nodes that it connects', '', cf='edge_node_connectivity', sidx=.true.)
-        ! face_edges (elem_edges) stays DEFERRED (never built). elem_neighbors IS now built
-        ! (build_elem_adjacency, for rvo_upwind) but face_links output remains deferred; FESOM3's kernels never
-        ! build elem_edges/elem_neighbors (only edges/edge_tri), exactly as gradient_vec is deferred.
+        ! elem_edges and elem_neighbors ARE built (build_elem_adjacency, 4 slots) but the face_edges /
+        ! face_links output is still deferred (hybrid-mesh plan, Task 14), as gradient_vec is.
         call def3(store, a_edge_face_links, 'edge_face_links', 2, Dg, '<i4', 'n2', 'edg_n', &
             'neighbor faces for edges', '', cf='edge_face_connectivity')
         call def3(store, a_nod_in_elem, 'nod_in_elem2D', N_max, Dn, '<i4', 'N', 'nod2', &
@@ -179,7 +178,7 @@ contains
         allocate(r3(3, max(1,nElemO)))
         do i = 1, nElemO; r3(1:3, i) = real(mesh%gradient_sca(1:3, i),   WP); end do
         call wr3_r(store, a_grad_x, De, r3, 3, 0.0_WP)
-        do i = 1, nElemO; r3(1:3, i) = real(mesh%gradient_sca(4:6, i),   WP); end do
+        do i = 1, nElemO; r3(1:3, i) = real(mesh%gradient_sca(5:7, i),   WP); end do
         call wr3_r(store, a_grad_y, De, r3, 3, 0.0_WP)
         deallocate(r3)
 
@@ -189,8 +188,12 @@ contains
         call wr3_i(store, a_edge_nodes, Dg, i3, 2, 0)
         do i = 1, nEdgeO
             do c3 = 1, 2
-                if (mesh%edge_tri(c3,i) > 0) then; i3(c3,i) = gid_e(mesh%edge_tri(c3,i))
-                else;                              i3(c3,i) = -999; end if
+                ! a boundary edge stores its one element twice (edge_tri(2) == edge_tri(1))
+                if (c3 == 1 .or. mesh%edge_tri(2,i) /= mesh%edge_tri(1,i)) then
+                    i3(c3,i) = gid_e(mesh%edge_tri(c3,i))
+                else
+                    i3(c3,i) = -999
+                end if
             end do
         end do
         call wr3_i(store, a_edge_face_links, Dg, i3, 2, -999)
@@ -310,8 +313,8 @@ contains
             call zattr_str(at, 'face_node_connectivity', 'face_nodes')
             call zattr_str(at, 'edge_node_connectivity', 'edge_nodes')
             call zattr_str(at, 'edge_face_connectivity', 'edge_face_links')
-            ! face_edge_connectivity / face_face_connectivity deferred (elem_edges/elem_neighbors
-            ! not built in FESOM3)
+            ! face_edge_connectivity / face_face_connectivity deferred (face_edges / face_links
+            ! are not written yet)
             call zarr_define_array(st, a_fmesh, at)
         end subroutine add_topology
 

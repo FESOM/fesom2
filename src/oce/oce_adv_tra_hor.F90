@@ -19,8 +19,8 @@ module oce_adv_tra_hor
     ! (so a HO call after an LO call yields the antidiffusive flux). flux is NOT
     ! multiplied by dt.
     !
-    ! 1-rank only (myDim_edge2D == edge2D; el(2)==0 marks a boundary edge — its
-    ! el(2)-using depth segments have empty ranges so el(2) is never indexed).
+    ! 1-rank only (myDim_edge2D == edge2D; el(2)==el(1) marks a boundary edge — its
+    ! el(2)-using depth segments have empty ranges so el(2) is never used).
     ! Multi-rank loop bounds are deferred to M1.5. The volume flux scales the edge
     ! velocity by helem (layer thickness at element); a = mean r_earth*elem_cos over
     ! the edge's two elements (used by the MUSCL reconstruction, dead in upw1 — kept
@@ -70,7 +70,7 @@ contains
             deltaX1 = mesh%edge_cross_dxdy(1, edge)
             deltaY1 = mesh%edge_cross_dxdy(2, edge)
             nl2 = 0; nu2 = 0
-            if (el(2) > 0) then
+            if (el(2) /= el(1)) then
                 deltaX2 = mesh%edge_cross_dxdy(3, edge)
                 deltaY2 = mesh%edge_cross_dxdy(4, edge)
                 nl2 = mesh%nlevels(el(2)) - 1
@@ -168,7 +168,7 @@ contains
             deltaX1 = mesh%edge_cross_dxdy(1, edge)
             deltaY1 = mesh%edge_cross_dxdy(2, edge)
             nl2 = 0; nu2 = 0
-            if (el(2) > 0) then
+            if (el(2) /= el(1)) then
                 deltaX2 = mesh%edge_cross_dxdy(3, edge)
                 deltaY2 = mesh%edge_cross_dxdy(4, edge)
                 nl2 = mesh%nlevels(el(2)) - 1

@@ -57,6 +57,18 @@ foreach(_case quad:nemo025q_cut mixed:nemo025mix_cut pi_w:pi_w)
         endforeach()
     endforeach()
 endforeach()
+# Task 7: mixed-mesh geometry identities (kite weights, Green-Gauss gradient, conventions,
+# triangles == the previous P1 formulas); default mesh = the NEMO-mixed cut-out, the np 1
+# run also checks the analytic mixed patch. pi_w at np 1/2 for the triangle comparison.
+add_fesom_test(test_geom_mixed 1)
+add_fesom_test(test_geom_mixed 2)
+foreach(_np 1 2)
+    add_test(NAME test_geom_mixed_pi_w_np${_np}
+             COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np ${_np} $<TARGET_FILE:test_geom_mixed>)
+    set_tests_properties(test_geom_mixed_pi_w_np${_np} PROPERTIES
+        ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/pi_w;FESOM3_TEST_ROTATE=1"
+        SKIP_REGULAR_EXPRESSION "cannot open;No such file")
+endforeach()
 # the old pi dist_2 (no format.out, FESOM2 layout only) is still read
 add_test(NAME test_mesh_read_pi_np2
          COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np 2 $<TARGET_FILE:test_mesh_read>)

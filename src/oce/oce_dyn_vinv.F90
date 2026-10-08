@@ -23,7 +23,7 @@ module oce_dyn_vinv
     !   dz = zbar(1:nl-1)-zbar(2:nl) global  -> mesh%helem(nz,elem)   ALE: per-elem/step
     !   area(nz,n)                           -> mesh%area(n)          collapsed to 1-D
     !   w_cv(:,elem)                         -> 1/3                   absent; triangles
-    !   elnodes(4), gradient_sca(1:4)/(5:8)  -> (1:3), (1:3)/(4:6)    MAX_NV=4 (L15 trap)
+    !   elnodes(4), gradient_sca(1:4)/(5:8)  -> (1:3), (1:3)/(5:7)    3-vertex slices
     !   exchange_nod3D(x)                    -> exchange_nod(x,partit) halo API
     !   loops from 1                         -> ulevels..nlevels-1    cavity bounds
     !   Wvel                                 -> dynamics%w_e          match momadv_opt==2
@@ -97,7 +97,7 @@ contains
             nl2    = 0
             dx2    = 0.0_WP
             dy2    = 0.0_WP
-            if (el(2) > 0) then
+            if (el(2) /= el(1)) then
                 dx2 = real(mesh%edge_cross_dxdy(3, edge), WP)
                 dy2 = real(mesh%edge_cross_dxdy(4, edge), WP)
                 ul2 = mesh%ulevels(el(2))
@@ -216,13 +216,13 @@ contains
                 KE(nz,n) = KE(nz,n)/real(mesh%area(n), WP)
             end do
         end do
-        ! Lateral-wall BC (qq :106-112): KE = 0 at boundary nodes. edge_tri(2,ed) <= 0 is
-        ! the partition-robust boundary test; qq's `myList_edge2D(n) <= edge2D_in` form
+        ! Lateral-wall BC (qq :106-112): KE = 0 at boundary nodes. edge_tri(2,ed) ==
+        ! edge_tri(1,ed) is the partition-robust boundary test; qq's `myList_edge2D(n) <= edge2D_in` form
         ! needs the GLOBAL edge id and is silently wrong on local indices at npes>1.
         ! NOTE this makes grad(KE) nonzero along every coastline even for a uniform flow --
         ! it is qq's idealised-channel choice, transcribed as-is.
         do ed = 1, nEdgeO
-            if (mesh%edge_tri(2, ed) > 0) cycle
+            if (mesh%edge_tri(2, ed) /= mesh%edge_tri(1, ed)) cycle
             KE(:, mesh%edges(1, ed)) = 0.0_WP
             KE(:, mesh%edges(2, ed)) = 0.0_WP
         end do
@@ -272,7 +272,7 @@ contains
             do nz = mesh%ulevels(elem), mesh%nlevels(elem)-1
                 pre = -KE(nz, elnodes)
                 Fx  = sum(real(mesh%gradient_sca(1:3, elem), WP)*pre)
-                Fy  = sum(real(mesh%gradient_sca(4:6, elem), WP)*pre)
+                Fy  = sum(real(mesh%gradient_sca(5:7, elem), WP)*pre)
                 zb  = onethird*(vort(nz,elnodes(1)) + vort(nz,elnodes(2)) + vort(nz,elnodes(3)))
 
                 ! rvo_upwind face blend:  zb += rvo*(zb_upwind - zb).
@@ -291,7 +291,7 @@ contains
                     zup  = 0.0_WP
                     do k = 1, 3
                         nb = mesh%elem_neighbors(k, elem)
-                        if (nb <= 0) cycle
+                        if (nb == elem) cycle
                         if (nz < mesh%ulevels(nb) .or. nz > mesh%nlevels(nb)-1) cycle
                         d  = UV(1,nz,elem)*nxk(k) + UV(2,nz,elem)*nyk(k)
                         wk = d + abs(d)

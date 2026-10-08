@@ -46,7 +46,7 @@ contains
             deltaX1 = mesh%edge_cross_dxdy(1, edge)
             deltaY1 = mesh%edge_cross_dxdy(2, edge)
             nl2 = 0; nu2 = 0
-            if (el(2) > 0) then
+            if (el(2) /= el(1)) then
                 deltaX2 = mesh%edge_cross_dxdy(3, edge)
                 deltaY2 = mesh%edge_cross_dxdy(4, edge)
                 nl2 = mesh%nlevels(el(2)) - 1

@@ -214,7 +214,7 @@ contains
             nl12 = 0
             do i = 1, 2
                 el = m%edge_tri(i, ed)
-                if (el < 1) cycle
+                if (i == 2 .and. el == m%edge_tri(1, ed)) cycle   ! boundary edge: one element
                 if (m%nlevels(el) <= 0) cycle
                 nl12 = max(nl12, m%nlevels(el)-1)
             end do
@@ -292,7 +292,7 @@ contains
             el1 = m%edge_tri(1, ed); el2 = m%edge_tri(2, ed)
             if (el1 < 1) cycle
             cosm = real(m%elem_cos(el1), WP)
-            if (el2 > 0) cosm = 0.5_WP*(cosm + real(m%elem_cos(el2), WP))
+            if (el2 /= el1) cosm = 0.5_WP*(cosm + real(m%elem_cos(el2), WP))
             wantx = a1 * cosm * r_earth
             wanty = a2 * r_earth
             rel = max(abs(real(m%edge_dxdy(1,ed),WP) - wantx)/max(abs(wantx), 1.0_WP), &
@@ -318,7 +318,7 @@ contains
             ubound_edge = min(m%nlevels_nod2D(m%edges(1,ed)), m%nlevels_nod2D(m%edges(2,ed)))
             do i = 1, 2
                 el = m%edge_tri(i, ed)
-                if (el < 1) cycle
+                if (i == 2 .and. el == m%edge_tri(1, ed)) cycle   ! boundary edge: one element
                 if (m%nlevels(el) <= 0) cycle
                 if (m%nlevels(el) > ubound_edge) then
                     edge_interval_contains_elements = .false.; return

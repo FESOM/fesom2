@@ -463,21 +463,48 @@ fluxes and nonlinear terms can. Asserted in a test (Task 9), measured in the sho
 - Modify: `src/infra/mod_geom_dump.F90`, gate tools under `tools/` (see below)
 - Create: `test/test_geom_mixed.F90`, `tools/run_tri_regression.sh`
 
-- [ ] geometry: centroid, area, kite weights `elem_w`, node area, `gradient_sca` (Green–Gauss),
+- [x] geometry: centroid, area, kite weights `elem_w`, node area, `gradient_sca` (Green–Gauss),
       `elem_edges`, `elem_neighbors` (missing = self), `edge_tri` missing 2nd = 1st with
       `edge_cross_dxdy(3:4) = 0`, `compute_mesh_resolution` with kite weights
-- [ ] `nod_in_elem2D_w(k,n)`: kite weight of node n in element `nod_in_elem2D(k,n)`
-- [ ] boundary tests converted in the same change (`el(2) /= el(1)`, `nb == el`); grep shows none left
-- [ ] `mod_mesh_analytic`: edges over `nv` sides, new conventions, generator for a small mixed patch
-- [ ] gate migration decision recorded in HANDOFF: FESOM2-oracle byte gates (`tools/run_*_gate*.sh`,
+      — `mod_mesh_areas`: centroid/lon-lat area from the sub-triangles (1,3,4)+(1,2,3) (qq),
+      `elem_area` = that area × `elem_cos`; kite weights normalised by the sum of the 4 side
+      triangles (triangles exactly 1/3); Green–Gauss with the longitudes relative to vertex 1
+      (one planar embedding, as FESOM2); `edge_tri` converted at read time (both paths) and in
+      the analytic builder; `elem_w`/`nod_in_elem2D_w` added to the binary mesh layout.
+      `mod_mesh_rotate` needed no change (the existing wrap helpers suffice)
+- [x] `nod_in_elem2D_w(k,n)`: kite weight of node n in element `nod_in_elem2D(k,n)`
+      — owned nodes computed, halo nodes by `exchange_nod` (the halo slot order is the owner's)
+- [x] boundary tests converted in the same change (`el(2) /= el(1)`, `nb == el`); grep shows none left
+      — all sites of Context + `test_bottom`, `test_vinv`, `test_muscl_onthefly`, meshdiag
+      `edge_face_links`; the grep finds only the convention builders themselves (`edge_tri.out`
+      encoding at read, the analytic builder) and the `-1` invariant check
+- [x] `mod_mesh_analytic`: edges over `nv` sides, new conventions, generator for a small mixed patch
+      — `generate_mixed_patch` (quads + triangle pairs, jittered interior nodes, convex);
+      `build_edges` over nv sides, boundary edge_tri(2)=edge_tri(1), interior edges first
+      (`edge2D_in`); triangles store slot 4 = slot 1
+- [x] gate migration decision recorded in HANDOFF: FESOM2-oracle byte gates (`tools/run_*_gate*.sh`,
       `geom_diff.py`, `mod_geom_dump`) are retired or remapped to the new layout and listed
-- [ ] `test_geom_mixed` (TDD): on pi, the NEMO-mixed cut-out and the analytic mixed patch —
+      — HANDOFF "Gate migration for hybrid meshes": all FESOM2-oracle gates + oracle-dump helpers
+      retired (listed); `mod_geom_dump` remapped (FESOM2 6-row `gradient_sca` from slots 1:3/5:7);
+      FESOM3-only gates (restart, output, conserve, ctest) kept
+- [x] `test_geom_mixed` (TDD): on pi, the NEMO-mixed cut-out and the analytic mixed patch —
       Σ node area = Σ element area; Σ `elem_w` = 1 per element; Σ_k `nod_in_elem2D_w`·A_e = node
       area; `gradient_sca` exact for linear fields on triangles and quads; cross-edge vectors
       close around each element; triangle geometry equals the previous formulas to roundoff
-- [ ] adapt existing tests whose bitwise reference was the old triangle arithmetic to tolerances
-- [ ] `run_tri_regression.sh` (pi, CORE2: a few steps vs the frozen Task-6 binary, roundoff) — run
-- [ ] run ctest — must pass before Task 8
+      — np 1/2 on `nemo025mix_cut` (+ the patch at np 1) and `pi_w` (rotated 50/15/-90; the
+      unrotated pi has elements around the geographic pole); closure tested as
+      A·g_j = rot(d_j − d_{j−1}) with the stored `edge_cross_dxdy`; conventions checked too;
+      errors ≤ 1.4e-14 (G1–G3), ≤ 8e-15 (G4), ≤ 1.3e-13 (G5), triangles vs P1 ≤ 8e-15
+- [x] adapt existing tests whose bitwise reference was the old triangle arithmetic to tolerances
+      — none needed: every existing test passes with the new geometry (only the convention
+      changes above were needed)
+- [x] `run_tri_regression.sh` (pi, CORE2: a few steps vs the frozen Task-6 binary, roundoff) — run
+      — pi np 1/2 + CORE2 np 8 production config 4 steps, `fesom_conserve` pi np 1/2: PASS. Metric
+      max|new−ref|/max|ref| per field: step 1 before the first SSH solve ≤ 1e-9 (measured ≤
+      1.3e-11), all substeps/outputs ≤ 1e-2 (the CG stops at relative residual 1e-5; measured pi
+      ≤ 6e-9, CORE2 ≤ 5.4e-4 in Kv/Av), conservation 1e-12
+- [x] run ctest — must pass before Task 8 — scratch ctest 68/68; `run_ini_compare.sh`,
+      `run_ini_mixed.sh`, `test_mesh_tools.sh`, `test_nemo_meshq.sh` PASS
 
 ### Task 8: Edge exchange and double-halo node exchange
 

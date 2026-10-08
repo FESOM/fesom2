@@ -299,7 +299,7 @@ contains
             ul1     = mesh%ulevels(el(1))
             nl2 = 0
             ul2 = 0
-            if (el(2) > 0) then
+            if (el(2) /= el(1)) then
                 nl2 = mesh%nlevels(el(2)) - 1
                 ul2 = mesh%ulevels(el(2))
                 deltaX2 = mesh%edge_cross_dxdy(3,edge)

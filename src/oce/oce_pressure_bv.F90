@@ -560,15 +560,15 @@ contains
                     tx(nz) = tx(nz) + (mesh%gradient_sca(1,el)*temp(nz,mesh%elem2D_nodes(1,el)) &
                                      + mesh%gradient_sca(2,el)*temp(nz,mesh%elem2D_nodes(2,el)) &
                                      + mesh%gradient_sca(3,el)*temp(nz,mesh%elem2D_nodes(3,el)))*mesh%elem_area(el)
-                    ty(nz) = ty(nz) + (mesh%gradient_sca(4,el)*temp(nz,mesh%elem2D_nodes(1,el)) &
-                                     + mesh%gradient_sca(5,el)*temp(nz,mesh%elem2D_nodes(2,el)) &
-                                     + mesh%gradient_sca(6,el)*temp(nz,mesh%elem2D_nodes(3,el)))*mesh%elem_area(el)
+                    ty(nz) = ty(nz) + (mesh%gradient_sca(5,el)*temp(nz,mesh%elem2D_nodes(1,el)) &
+                                     + mesh%gradient_sca(6,el)*temp(nz,mesh%elem2D_nodes(2,el)) &
+                                     + mesh%gradient_sca(7,el)*temp(nz,mesh%elem2D_nodes(3,el)))*mesh%elem_area(el)
                     sx(nz) = sx(nz) + (mesh%gradient_sca(1,el)*salt(nz,mesh%elem2D_nodes(1,el)) &
                                      + mesh%gradient_sca(2,el)*salt(nz,mesh%elem2D_nodes(2,el)) &
                                      + mesh%gradient_sca(3,el)*salt(nz,mesh%elem2D_nodes(3,el)))*mesh%elem_area(el)
-                    sy(nz) = sy(nz) + (mesh%gradient_sca(4,el)*salt(nz,mesh%elem2D_nodes(1,el)) &
-                                     + mesh%gradient_sca(5,el)*salt(nz,mesh%elem2D_nodes(2,el)) &
-                                     + mesh%gradient_sca(6,el)*salt(nz,mesh%elem2D_nodes(3,el)))*mesh%elem_area(el)
+                    sy(nz) = sy(nz) + (mesh%gradient_sca(5,el)*salt(nz,mesh%elem2D_nodes(1,el)) &
+                                     + mesh%gradient_sca(6,el)*salt(nz,mesh%elem2D_nodes(2,el)) &
+                                     + mesh%gradient_sca(7,el)*salt(nz,mesh%elem2D_nodes(3,el)))*mesh%elem_area(el)
                 end do
             end do
             sigma_xy(1,uln:nln,n) = (-sw_alpha(uln:nln,n)*tx(uln:nln)+sw_beta(uln:nln,n)*sx(uln:nln))/vol(uln:nln)*density_0

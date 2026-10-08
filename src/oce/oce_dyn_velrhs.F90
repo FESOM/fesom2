@@ -21,7 +21,7 @@ module oce_dyn_velrhs
     ! ALGORITHM (per element, mid-depth levels nz = ulevels..nlevels-1):
     !   ab1 = -(0.5 + eps),  ab2 = (1.5 + eps)          [eps = ab_epsilon = 0.1]
     !   (1) AB-init :  UV_rhs(:,nz)  = ab1 * UV_rhsAB_prev(:,nz)
-    !   (2) SSH grad:  pre = -g*eta_n(elnodes) ; Fx/Fy = gradient_sca(1:3/4:6) . pre
+    !   (2) SSH grad:  pre = -g*eta_n(elnodes) ; Fx/Fy = gradient_sca(1:3/5:7) . pre
     !                  ff  = coriolis(elem) * elem_area(elem)
     !   (3) PGF+Cor :  UV_rhs(1,nz) += (Fx - pgf_x(nz)) * elem_area
     !                  UV_rhs(2,nz) += (Fy - pgf_y(nz)) * elem_area
@@ -109,7 +109,7 @@ contains
             ff      = mesh%coriolis(elem)*mesh%elem_area(elem)
             pre = -(p_eta)
             Fx  = sum(mesh%gradient_sca(1:3, elem)*pre)
-            Fy  = sum(mesh%gradient_sca(4:6, elem)*pre)
+            Fy  = sum(mesh%gradient_sca(5:7, elem)*pre)
 
             ! (3) add PGF + SSH-gradient to UV_rhs; init this step's AB array with
             !     the Coriolis term
@@ -159,7 +159,7 @@ contains
         !      divergence -(wu(nz)-wu(nz+1))/(3*hnode(nz,n)) -> UVnode_rhs.
         !   2. horizontal u*du/dx + v*du/dy : per edge, the edge-normal velocity
         !      un1/un2 from edge_cross_dxdy, scatter +-un*UV into UVnode_rhs at the two
-        !      edge nodes (the boundary el2<0 branch keeps only the el1 contribution).
+        !      edge nodes (the boundary el2==el1 branch keeps only the el1 contribution).
         !   3. UVnode_rhs *= areasvol_inv ; exchange_nod (1-rank no-op) ; vertice->element
         !      /3 ADD into UV_rhsAB(1,1:2,ul:nl-1,el).
         !
@@ -250,7 +250,7 @@ contains
             un1(ul1:nl1) =   UV(2,ul1:nl1,el1)*mesh%edge_cross_dxdy(1,ed) &
                            - UV(1,ul1:nl1,el1)*mesh%edge_cross_dxdy(2,ed)
 
-            if (el2 > 0) then  ! interior edge: el2 is a valid element
+            if (el2 /= el1) then  ! interior edge: el2 is the other element
                 nl2 = mesh%nlevels(el2) - 1
                 ul2 = mesh%ulevels(el2)
 

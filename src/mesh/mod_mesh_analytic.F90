@@ -3,6 +3,10 @@ module mod_mesh_analytic
     ! fesom_analytic driver. A regular nx*ny Cartesian grid, 2 triangles per cell,
     ! nl uniform levels. cartesian=.true. so the metric is off. Synthesizes a
     ! 1-rank identity partition too. (Doubly-periodic variant deferred; closed only.)
+    ! generate_mixed_patch: the same grid with jittered interior nodes and a mix of
+    ! quads and triangle pairs (hybrid meshes). Both use the 4-slot conventions of
+    ! mod_mesh (triangle 4th vertex = 1st, boundary edge_tri(2) = edge_tri(1)) and
+    ! FESOM's edge order (interior edges first, edge2D_in).
     use mod_precision, only: WP, MP
     use mod_constants, only: r_earth
     use mod_mesh,      only: t_mesh, MAX_NV, MAX_ADJACENT
@@ -12,7 +16,7 @@ module mod_mesh_analytic
     use mod_mesh_read,   only: enforce_cw_orientation, derive_vertical_bounds
     implicit none
     private
-    public :: generate_analytic_mesh, build_edges
+    public :: generate_analytic_mesh, generate_mixed_patch, build_edges
 
 contains
 
@@ -21,11 +25,41 @@ contains
         type(t_partit), intent(inout) :: partit
         integer,        intent(in)    :: nx, ny, nl
         real(kind=WP),  intent(in)    :: Lx, Ly, max_depth
-        integer :: i, j, nod, el, k
+        call build_patch(mesh, partit, nx, ny, nl, Lx, Ly, max_depth, .false.)
+    end subroutine generate_analytic_mesh
+
+    subroutine generate_mixed_patch(mesh, partit, nx, ny, nl, Lx, Ly, max_depth)
+        ! Mixed triangle/quad patch: cell (i,j) is a quad unless mod(i+2*j,3) == 0, then
+        ! it is cut into two triangles (diagonal alternating with i); interior nodes are
+        ! displaced by up to 0.15 of the spacing (deterministic), so the quads are general
+        ! convex quadrilaterals, not parallelograms.
+        type(t_mesh),   intent(inout) :: mesh
+        type(t_partit), intent(inout) :: partit
+        integer,        intent(in)    :: nx, ny, nl
+        real(kind=WP),  intent(in)    :: Lx, Ly, max_depth
+        call build_patch(mesh, partit, nx, ny, nl, Lx, Ly, max_depth, .true.)
+    end subroutine generate_mixed_patch
+
+    subroutine build_patch(mesh, partit, nx, ny, nl, Lx, Ly, max_depth, mixed)
+        type(t_mesh),   intent(inout) :: mesh
+        type(t_partit), intent(inout) :: partit
+        integer,        intent(in)    :: nx, ny, nl
+        real(kind=WP),  intent(in)    :: Lx, Ly, max_depth
+        logical,        intent(in)    :: mixed
+        integer :: i, j, nod, el, k, sw, se, nw, ne
         real(kind=WP) :: dx, dy
 
         mesh%nod2D  = nx * ny
-        mesh%elem2D = 2 * (nx-1) * (ny-1)
+        if (mixed) then
+            mesh%elem2D = 0
+            do j = 1, ny-1
+                do i = 1, nx-1
+                    mesh%elem2D = mesh%elem2D + merge(2, 1, is_split(i, j))
+                end do
+            end do
+        else
+            mesh%elem2D = 2 * (nx-1) * (ny-1)
+        end if
         mesh%nl     = nl
         ! Coords stored radians-like (physical metres / r_earth) so the shared
         ! geometry pipeline's `*r_earth^2` (sphere convention) yields physical m^2.
@@ -40,25 +74,48 @@ contains
                 nod = (j-1)*nx + i
                 mesh%coord_nod2D(1, nod) = real(i-1, WP) * dx
                 mesh%coord_nod2D(2, nod) = real(j-1, WP) * dy
+                if (mixed .and. i > 1 .and. i < nx .and. j > 1 .and. j < ny) then
+                    mesh%coord_nod2D(1, nod) = mesh%coord_nod2D(1, nod) &
+                        + 0.15_WP * dx * sin(12.9898_WP*real(i, WP) + 78.233_WP*real(j, WP))
+                    mesh%coord_nod2D(2, nod) = mesh%coord_nod2D(2, nod) &
+                        + 0.15_WP * dy * cos(39.346_WP*real(i, WP) + 11.135_WP*real(j, WP))
+                end if
             end do
         end do
         mesh%geo_coord_nod2D = mesh%coord_nod2D
 
-        ! ---- elements (2 triangles per cell) ----
+        ! ---- elements (2 triangles per cell; mixed: quads and triangle pairs) ----
+        ! A triangle stores its 1st vertex again as the 4th (mod_mesh convention).
         allocate(mesh%elem2D_nodes(MAX_NV, mesh%elem2D), mesh%elem2D_nnodes(mesh%elem2D))
         mesh%elem2D_nodes = 0; mesh%elem2D_nnodes = 3
         el = 0
         do j = 1, ny-1
             do i = 1, nx-1
-                el = el + 1
-                mesh%elem2D_nodes(1, el) = (j-1)*nx + i
-                mesh%elem2D_nodes(2, el) = (j-1)*nx + i + 1
-                mesh%elem2D_nodes(3, el) = j*nx + i
-                el = el + 1
-                mesh%elem2D_nodes(1, el) = (j-1)*nx + i + 1
-                mesh%elem2D_nodes(2, el) = j*nx + i + 1
-                mesh%elem2D_nodes(3, el) = j*nx + i
+                sw = (j-1)*nx + i; se = sw + 1; nw = j*nx + i; ne = nw + 1
+                if (.not. mixed) then
+                    el = el + 1
+                    mesh%elem2D_nodes(1:3, el) = [sw, se, nw]
+                    el = el + 1
+                    mesh%elem2D_nodes(1:3, el) = [se, ne, nw]
+                else if (.not. is_split(i, j)) then
+                    el = el + 1                                 ! quad, clockwise
+                    mesh%elem2D_nodes(:, el) = [sw, nw, ne, se]
+                    mesh%elem2D_nnodes(el)   = 4
+                else if (mod(i, 2) == 0) then
+                    el = el + 1
+                    mesh%elem2D_nodes(1:3, el) = [sw, nw, ne]
+                    el = el + 1
+                    mesh%elem2D_nodes(1:3, el) = [sw, ne, se]
+                else
+                    el = el + 1
+                    mesh%elem2D_nodes(1:3, el) = [sw, nw, se]
+                    el = el + 1
+                    mesh%elem2D_nodes(1:3, el) = [se, nw, ne]
+                end if
             end do
+        end do
+        do el = 1, mesh%elem2D
+            if (mesh%elem2D_nnodes(el) == 3) mesh%elem2D_nodes(4, el) = mesh%elem2D_nodes(1, el)
         end do
 
         ! ---- vertical: uniform levels 0 .. -max_depth ----
@@ -91,7 +148,13 @@ contains
         call build_edges(mesh)
         call synth_partit(mesh, partit)
         call compute_geometry(mesh, partit, cartesian=.true.)
-    end subroutine generate_analytic_mesh
+    end subroutine build_patch
+
+    pure logical function is_split(i, j)
+        ! mixed patch: cell (i,j) is cut into two triangles
+        integer, intent(in) :: i, j
+        is_split = mod(i + 2*j, 3) == 0
+    end function is_split
 
     subroutine build_nod_in_elem_local(mesh)
         type(t_mesh), intent(inout) :: mesh
@@ -109,22 +172,26 @@ contains
     end subroutine build_nod_in_elem_local
 
     subroutine build_edges(mesh)
-        ! Generic edge + edge_tri builder from elem2D_nodes (triangles). edges(:,e)
-        ! directed lo->hi; edge_tri(1)=first elem seen, edge_tri(2)=second (or 0 at
-        ! boundary). Exact left/right orientation is not FESOM2's (analytic only).
+        ! Generic edge + edge_tri builder from elem2D_nodes: edge k of an element joins
+        ! its slots k and k+1 over the nv vertices. edges(:,e) directed lo->hi;
+        ! edge_tri(1) = first element seen, edge_tri(2) = the second, or the first again
+        ! on a boundary edge (mod_mesh convention). Interior edges first, boundary edges
+        ! last (FESOM's order, edge2D_in = number of interior edges). Exact left/right
+        ! orientation is not FESOM2's (analytic only).
         type(t_mesh), intent(inout) :: mesh
-        integer, allocatable :: head_hi(:,:), head_eid(:,:), head_n(:)
-        integer :: n, j, a, b, lo, hi, k, eid, nedge
-        integer, parameter :: PAIR(2,3) = reshape([1,2, 2,3, 3,1], [2,3])
+        integer, allocatable :: head_hi(:,:), head_eid(:,:), head_n(:), perm(:)
+        integer, allocatable :: edges(:,:), edge_tri(:,:)
+        integer :: n, j, a, b, lo, hi, k, eid, nedge, nv, nin, nbd
         allocate(head_hi(MAX_ADJACENT, mesh%nod2D), head_eid(MAX_ADJACENT, mesh%nod2D))
         allocate(head_n(mesh%nod2D))
         head_n = 0
-        allocate(mesh%edges(2, 3*mesh%elem2D), mesh%edge_tri(2, 3*mesh%elem2D))
-        mesh%edge_tri = 0
+        allocate(edges(2, MAX_NV*mesh%elem2D), edge_tri(2, MAX_NV*mesh%elem2D))
+        edge_tri = 0
         nedge = 0
         do n = 1, mesh%elem2D
-            do j = 1, 3
-                a = mesh%elem2D_nodes(PAIR(1,j), n); b = mesh%elem2D_nodes(PAIR(2,j), n)
+            nv = mesh%elem2D_nnodes(n)
+            do j = 1, nv
+                a = mesh%elem2D_nodes(j, n); b = mesh%elem2D_nodes(mod(j,nv)+1, n)
                 lo = min(a,b); hi = max(a,b)
                 eid = 0
                 do k = 1, head_n(lo)
@@ -132,20 +199,35 @@ contains
                 end do
                 if (eid == 0) then
                     nedge = nedge + 1
-                    mesh%edges(1, nedge) = lo; mesh%edges(2, nedge) = hi
-                    mesh%edge_tri(1, nedge) = n
+                    edges(1, nedge) = lo; edges(2, nedge) = hi
+                    edge_tri(1, nedge) = n
                     head_n(lo) = head_n(lo) + 1
                     head_hi(head_n(lo), lo) = hi; head_eid(head_n(lo), lo) = nedge
                 else
-                    mesh%edge_tri(2, eid) = n
+                    edge_tri(2, eid) = n
                 end if
             end do
         end do
-        mesh%edge2D = nedge; mesh%edge2D_in = count(mesh%edge_tri(2, 1:nedge) > 0)
-        ! shrink to actual edge count
-        mesh%edges     = mesh%edges(:, 1:nedge)
-        mesh%edge_tri  = mesh%edge_tri(:, 1:nedge)
-        deallocate(head_hi, head_eid, head_n)
+        ! interior edges first, boundary edges last (stable); a boundary edge stores its
+        ! one element twice
+        allocate(perm(nedge))
+        nin = count(edge_tri(2, 1:nedge) > 0)
+        k = 0; nbd = nin
+        do n = 1, nedge
+            if (edge_tri(2, n) > 0) then
+                k = k + 1; perm(k) = n
+            else
+                nbd = nbd + 1; perm(nbd) = n
+                edge_tri(2, n) = edge_tri(1, n)
+            end if
+        end do
+        mesh%edge2D = nedge; mesh%edge2D_in = nin
+        if (allocated(mesh%edges))    deallocate(mesh%edges)
+        if (allocated(mesh%edge_tri)) deallocate(mesh%edge_tri)
+        allocate(mesh%edges(2, nedge), mesh%edge_tri(2, nedge))
+        mesh%edges    = edges(:, perm)
+        mesh%edge_tri = edge_tri(:, perm)
+        deallocate(head_hi, head_eid, head_n, perm, edges, edge_tri)
     end subroutine build_edges
 
     subroutine synth_partit(mesh, partit)

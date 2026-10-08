@@ -28,6 +28,7 @@ contains
         character(len=6)  :: rsuf
         character(len=:), allocatable :: fpath
         integer :: u, ios, ne, nn, n2, nl
+        real(kind=MP), allocatable :: g6(:,:)
         ne = partit%myDim_elem2D; nn = partit%myDim_nod2D; n2 = partit%myDim_edge2D; nl = mesh%nl
         fpath = trim(path)
         if (partit%npes /= 1) then
@@ -47,7 +48,11 @@ contains
         call wr_r1(u, 'elem_area',         mesh%elem_area(1:ne))
         call wr_r1(u, 'elem_cos',          mesh%elem_cos(1:ne))
         call wr_r1(u, 'metric_factor',     mesh%metric_factor(1:ne))
-        call wr_r2(u, 'gradient_sca',      mesh%gradient_sca(1:6, 1:ne))
+        ! FESOM2 layout (x 1:3, y 4:6), remapped from the 4-slot one (x 1:4, y 5:8)
+        allocate(g6(6, ne))
+        g6(1:3, :) = mesh%gradient_sca(1:3, 1:ne); g6(4:6, :) = mesh%gradient_sca(5:7, 1:ne)
+        call wr_r2(u, 'gradient_sca',      g6)
+        deallocate(g6)
         call wr_r2(u, 'edge_dxdy',         mesh%edge_dxdy(1:2, 1:n2))    ! R7: METRES
         call wr_r1(u, 'edge_len',          mesh%edge_len(1:n2))          ! R7: METRES
         call wr_r2(u, 'edge_cross_dxdy',   mesh%edge_cross_dxdy(1:4, 1:n2))

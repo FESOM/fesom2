@@ -97,11 +97,11 @@ program test_vinv
     allocate(interior(nNodL))
     dyn%uv = 0.0_WP; dyn%work%vorticity = 0.0_WP
 
-    ! interior = touched by no boundary edge (edge_tri(2,ed) <= 0 is the partition-robust
-    ! boundary test; the ed > edge2D_in form needs myList_edge2D at npes>1)
+    ! interior = touched by no boundary edge (edge_tri(2,ed) == edge_tri(1,ed) is the
+    ! partition-robust boundary test;the ed > edge2D_in form needs myList_edge2D at npes>1)
     interior = .true.
     do n = 1, nEdgeO                 ! LOCAL owned edges; mesh%edge2D is the GLOBAL count
-        if (mesh%edge_tri(2,n) <= 0) then
+        if (mesh%edge_tri(2,n) == mesh%edge_tri(1,n)) then
             if (mesh%edges(1,n) <= nNodL) interior(mesh%edges(1,n)) = .false.
             if (mesh%edges(2,n) <= nNodL) interior(mesh%edges(2,n)) = .false.
         end if
@@ -112,7 +112,7 @@ program test_vinv
     ! A - elem_neighbors adjacency (build_elem_adjacency, Task 1 of rvo_upwind)
     !=========================================================================
     call check_true('A1 elem_neighbors allocated+resolved', &
-                    allocated(mesh%elem_neighbors) .and. all(mesh%elem_neighbors(:,1:nElemO) >= 0))
+                    allocated(mesh%elem_neighbors) .and. all(mesh%elem_neighbors(:,1:nElemO) >= 1))
     block
         integer :: e, k, nb, nshared, i, j, nbnd_slots, nbnd_edges
         logical :: mutual
@@ -120,7 +120,7 @@ program test_vinv
         do e = 1, nElemO
             do k = 1, 3
                 nb = mesh%elem_neighbors(k, e)
-                if (nb == 0) then
+                if (nb == e) then
                     nbnd_slots = nbnd_slots + 1
                     cycle
                 end if
@@ -141,14 +141,14 @@ program test_vinv
                     call check_true('A4 slot k matches the shared vertex pair', .false.)
             end do
         end do
-        ! A3 boundary accounting, PER RANK: zero-slots of owned elements == boundary edges
+        ! A3 boundary accounting, PER RANK: self-slots of owned elements == boundary edges
         ! whose el1 is owned. Do NOT expect the cross-rank sum to equal the global boundary
         ! count: FESOM2 element ownership OVERLAPS at partition seams (myDim elements =
         ! elements touching an owned node), so a boundary-strip element -- and hence its
         ! boundary edge -- is legitimately counted by several ranks (pi dist_2: 6 such).
         nbnd_edges = 0
         do i = 1, size(mesh%edge_tri, 2)
-            if (mesh%edge_tri(2, i) <= 0 .and. mesh%edge_tri(1, i) >= 1 .and. &
+            if (mesh%edge_tri(2, i) == mesh%edge_tri(1, i) .and. mesh%edge_tri(1, i) >= 1 .and. &
                 mesh%edge_tri(1, i) <= nElemO) nbnd_edges = nbnd_edges + 1
         end do
         write(*,'(a,i6,a,i6)') '  A3 boundary slots = ', nbnd_slots, '  boundary edges = ', nbnd_edges
@@ -194,7 +194,7 @@ program test_vinv
         do e = 1, nElemO
             do k = 1, 3
                 nb = mesh%elem_neighbors(k, e)
-                if (nb <= 0) cycle
+                if (nb == e) cycle
                 if (nb > nElemO) nhalo = nhalo + 1
                 if (f(1, nb)    /= real(gid(nb), WP) .or. &
                     f(nl-1, nb) /= real(gid(nb), WP)) nbad = nbad + 1
@@ -325,7 +325,7 @@ program test_vinv
             block
                 integer :: nbb
                 nbb = mesh%elem_neighbors(nz, n)
-                if (nbb <= 0 .or. nbb > nElemO) then
+                if (nbb == n .or. nbb > nElemO) then
                     elem_int2(n) = .false.
                 else if (.not. elem_int(nbb)) then
                     elem_int2(n) = .false.
@@ -500,7 +500,7 @@ contains
             ! d = u.n_in is then correct by construction.) ----
             do k = 1, 3
                 nb = mesh%elem_neighbors(k, e)
-                if (nb <= 0 .or. nb > nElemO) cycle
+                if (nb == e .or. nb > nElemO) cycle
                 call elem_centroid(nb, cex, cey, cnx, cny)
                 if ( ((cnx-cex)*real(mesh%elem_cos(e),WP)*r_earth)*nxk(k) &
                    + ((cny-cey)*r_earth)*nyk(k) >= 0.0_WP ) nbad10 = nbad10 + 1
@@ -515,8 +515,8 @@ contains
             zlo = zb0; zhi = zb0
             do k = 1, 3
                 nb = mesh%elem_neighbors(k, e)
-                if (nb <= 0 .or. nb > nElemO) then
-                    if (nb > 0) nwet = -999        ! halo neighbour: skip this element
+                if (nb == e .or. nb > nElemO) then
+                    if (nb /= e) nwet = -999       ! halo neighbour: skip this element
                     cycle
                 end if
                 if (nz1b < mesh%ulevels(nb) .or. nz1b > mesh%nlevels(nb)-1) cycle

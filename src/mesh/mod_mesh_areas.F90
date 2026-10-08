@@ -1,30 +1,27 @@
 module mod_mesh_areas
-    ! Core 2D mesh geometry, transcribed from FESOM2 v2.7.3 oce_mesh.F90 (cites
-    ! inline). Arity-general: every FESOM2 `/3.0` vertex average becomes `/nv`
-    ! (nv = elem2D_nnodes(elem)); for triangles nv==3 so the anchor is unchanged.
+    ! Core 2D mesh geometry for mixed triangle/quad meshes (hybrid-mesh plan, Task 7),
+    ! derived from FESOM2 v2.7.3 oce_mesh.F90 and the qq prototype (oce_mesh.F90
+    ! elem_center / mesh_arrays). Every element has 4 slots; a triangle repeats its 1st
+    ! vertex as the 4th (elem2D_nnodes == 3). Unified formulas (radians with elem_cos, then
+    ! r_earth; cyclic wrap on all vertices):
+    !   centroid       area-weighted centroid of the sub-triangles (1,3,4) and (1,2,3)
+    !   elem_area      their summed lon/lat area * elem_cos (cos of the centroid latitude)
+    !   elem_w         kite weights 1/2*[A(j,j-1,c) + A(j,j+1,c)] / A (triangle 1/3,1/3,1/3,0)
+    !   area           sum over elements and slots of elem_area*elem_w(k)
+    !   gradient_sca   Green-Gauss: vertex j ~ (x_{j+1}-x_{j-1})/(2A) over the nv vertices,
+    !                  x in 1:4, y in 5:8 (triangle slots 4/8 = 0)
+    ! For triangles all of them equal FESOM2's P1 formulas up to roundoff (not bitwise:
+    ! the FESOM2-oracle geometry byte-gate is retired, docs/HANDOFF.md).
     !
-    ! Provides what M1 (tracer advection) needs: elem_cos, metric_factor, elem_area,
-    ! gradient_sca, edge_dxdy, edge_cross_dxdy, area/areasvol(+inv). FESOM3 bottom at
-    ! vertices: area/areasvol(+inv) are 1-D (per vertex) -- a scalar column's horizontal
-    ! area does not vary with depth. See the contract in mod_mesh.F90. M2.3 adds
-    ! coriolis (f=2*omega*sin(lat_geo) at elements + nodes). gradient_vec (M2 momentum
-    ! advection) is still deferred. M4 (GM/Redi) adds mesh_resolution (scalar cell
-    ! resolution + 3 mass-matrix smoothing sweeps, compute_mesh_resolution) — consumed by
-    ! the GM/Redi K scaling (init_Redi_GM).
+    ! Provides elem_cos, metric_factor, elem_area, elem_w, nod_in_elem2D_w, gradient_sca,
+    ! edge_dxdy, edge_cross_dxdy, elem_edges, elem_neighbors, area/areasvol(+inv),
+    ! coriolis and mesh_resolution. FESOM3 bottom at vertices: area/areasvol(+inv) are 1-D
+    ! (per vertex) -- a scalar column's horizontal area does not vary with depth. See the
+    ! contract in mod_mesh.F90. gradient_vec is still deferred.
     !
-    ! BYTE-FAITHFULNESS (M1 geometry byte-gate). FESOM2 splits this work across two
-    ! routines whose ORDER of operations the bits depend on:
-    !   mesh_areas (oce_mesh.F90:2162)         -> elem_area (UNSCALED), area accumulate
-    !                                             (still UNSCALED), THEN one *r_earth^2
-    !                                             on elem_area/area/areasvol together,
-    !                                             then area_inv/areasvol_inv.
-    !   mesh_auxiliary_arrays (oce_mesh.F90:2425) -> elem_cos/metric_factor (via
-    !                                             elem_center), edge_dxdy,
-    !                                             edge_cross_dxdy, gradient_sca
-    !                                             (the latter uses the *scaled*
-    !                                             elem_area). We reproduce that exact
-    !                                             ordering and the elem_center /
-    !                                             edge_center wrap arithmetic verbatim.
+    ! ORDER (kept from FESOM2 mesh_areas + mesh_auxiliary_arrays): elem_area and the node
+    ! areas accumulate UNSCALED, then one *r_earth^2 on elem_area/area/areasvol together,
+    ! then area_inv/areasvol_inv; gradient_sca uses the SCALED elem_area.
     !
     ! MULTI-RANK (M2.12a). The geometry is partition-agnostic in arithmetic; only the
     ! loop bounds + allocation sizes become LOCAL. local_bounds() returns mesh global
@@ -76,14 +73,16 @@ contains
         type(t_partit), intent(in)    :: partit
         logical,        intent(in)    :: cartesian
         integer :: nNodO, nNodL, nElemO, nElemF, nEdgeO, nEdgeL
-        real(kind=WP), allocatable :: center_x(:), center_y(:)
+        real(kind=WP), allocatable :: center_x(:), center_y(:), sarea(:)
         call local_bounds(mesh, partit, nNodO, nNodL, nElemO, nElemF, nEdgeO, nEdgeL)
-        allocate(center_x(nElemF), center_y(nElemF))
+        allocate(center_x(nElemF), center_y(nElemF), sarea(nElemO))
         center_x = 0.0_WP; center_y = 0.0_WP
-        call compute_centers(mesh, nElemO, center_x, center_y)          ! owned element centers
+        call compute_centers(mesh, nElemO, center_x, center_y, sarea)   ! owned centroids + lon/lat areas
         call compute_elem_metric(mesh, cartesian, nElemO, nElemF, center_y) ! elem_cos, metric_factor
         call compute_coriolis(mesh, cartesian, nNodL, nElemO)           ! coriolis, coriolis_node (M2.3)
-        call compute_elem_area(mesh, cartesian, nElemO, nElemF)         ! elem_area (UNSCALED radians^2)
+        call compute_elem_area(mesh, nElemO, nElemF, sarea)             ! elem_area (UNSCALED radians^2)
+        call compute_elem_weights(mesh, nElemO, center_x, center_y)     ! elem_w (kite weights)
+        call compute_nod_weights(mesh, nNodO, nNodL, partit)            ! nod_in_elem2D_w
         if (partit%npes > 1) then
             ! Halo element centers for owned-edge edge_cross_dxdy (FESOM2:2528-2529).
             call exchange_elem(center_x, partit)
@@ -91,7 +90,7 @@ contains
             call exchange_elem_cos(mesh, partit, nElemF)
         end if
         call compute_node_areas(mesh, nNodO, nNodL, partit)             ! accumulate area, then scale
-        call build_elem_adjacency(mesh, nElemO, nEdgeL)                 ! elem_neighbors (rvo_upwind)
+        call build_elem_adjacency(mesh, nElemO, nEdgeL)                 ! elem_edges, elem_neighbors
         if (partit%npes > 1) then
             ! M2.12b: halo elem_area (FULL halo; FESOM2 used it for the area weighting of
             ! fill_up_dn_grad at halo elements reached through a halo node's element list),
@@ -108,7 +107,7 @@ contains
         call compute_mesh_resolution(mesh, nNodO, nNodL, partit)        ! M4 GM: scalar cell resolution
         call compute_edge_geometry(mesh, nEdgeO, center_x, center_y)    ! edge_dxdy, edge_cross_dxdy
         call compute_gradient_sca(mesh, nElemO)                         ! uses SCALED elem_area + elem_cos
-        deallocate(center_x, center_y)
+        deallocate(center_x, center_y, sarea)
     end subroutine compute_geometry
 
     subroutine exchange_elem_cos(mesh, partit, nElemF)
@@ -124,17 +123,18 @@ contains
         deallocate(tmp)
     end subroutine exchange_elem_cos
 
-    subroutine compute_centers(mesh, nElemO, cx, cy)
-        ! Element centers for OWNED elements (elem_center needs elem2D_nodes, stored
-        ! owned-only). The halo entries are filled by exchange in compute_geometry.
+    subroutine compute_centers(mesh, nElemO, cx, cy, sa)
+        ! Element centroids and lon/lat areas (radians^2, no cosine) for OWNED elements
+        ! (elem_center needs elem2D_nodes, stored owned-only). The halo centroids are
+        ! filled by exchange in compute_geometry.
         type(t_mesh),  intent(in)  :: mesh
         integer,       intent(in)  :: nElemO
-        real(kind=WP), intent(out) :: cx(:), cy(:)
+        real(kind=WP), intent(out) :: cx(:), cy(:), sa(:)
         integer :: n
-        real(kind=WP) :: ax, ay
+        real(kind=WP) :: ax, ay, s
         do n = 1, nElemO
-            call elem_center(mesh, n, ax, ay)
-            cx(n) = ax; cy(n) = ay
+            call elem_center(mesh, n, ax, ay, s)
+            cx(n) = ax; cy(n) = ay; sa(n) = s
         end do
     end subroutine compute_centers
 
@@ -178,32 +178,36 @@ contains
     end subroutine compute_coriolis
 
     !--------------------------------------------------------------------------
-    pure subroutine elem_center(mesh, n, cx, cy)
-        ! FESOM2 oce_mesh.F90:2135-2155: wrap each vertex longitude relative to the
-        ! element's MINIMUM longitude (amin), then cx = sum(lon)/nv ; cy = sum(lat)/nv.
-        ! The wrap uses >= / < against cyclic_length/2 (NOT the symmetric trim_cyclic).
+    pure subroutine elem_center(mesh, n, cx, cy, s)
+        ! Centroid of element n (qq oce_mesh.F90 elem_center): the area-weighted mean of
+        ! the centroids of the sub-triangles (1,3,4) and (1,2,3), in (rotated) lon/lat.
+        ! Each vertex longitude is first wrapped relative to the element's MINIMUM
+        ! longitude (FESOM2 oce_mesh.F90:2135-2155: >= / < against cyclic_length/2, NOT
+        ! the symmetric trim_cyclic). s (optional) = the element's lon/lat area (radians^2,
+        ! no cosine) = the sum of the two sub-triangle areas. A triangle repeats vertex 1
+        ! as vertex 4, so its (1,3,4) part has area exactly 0 and (cx,cy) is the vertex
+        ! mean up to roundoff.
         type(t_mesh), intent(in)  :: mesh
         integer,      intent(in)  :: n
         real(kind=WP), intent(out) :: cx, cy
-        integer :: j, nv
-        real(kind=WP) :: ax(size(mesh%elem2D_nodes,1)), amin, cl
-        nv = mesh%elem2D_nnodes(n)
-        do j = 1, nv
+        real(kind=WP), intent(out), optional :: s
+        integer :: j
+        real(kind=WP) :: ax(MAX_NV), ay(MAX_NV), amin, cl, s1, s2
+        do j = 1, MAX_NV
             ax(j) = mesh%coord_nod2D(1, mesh%elem2D_nodes(j, n))
+            ay(j) = mesh%coord_nod2D(2, mesh%elem2D_nodes(j, n))
         end do
-        amin = minval(ax(1:nv))
+        amin = minval(ax)
         cl = get_cyclic_length()
-        do j = 1, nv
+        do j = 1, MAX_NV
             if (ax(j) - amin >=  cl/2.0_WP) ax(j) = ax(j) - cl
             if (ax(j) - amin <  -cl/2.0_WP) ax(j) = ax(j) + cl
         end do
-        ! Divide by the LITERAL 3.0_WP, NOT real(nv,WP): under -no-prec-div a runtime
-        ! divisor uses a reciprocal approximation that differs from the compile-time
-        ! 1/3 by 1 ULP -> breaks the geometry byte-gate. (Arity caveat, per the plan:
-        ! the /3 -> /n_vert generalization is NOT bit-safe here. Quads must branch on
-        ! nv with the matching literal; v1 is triangles only, nv==3 everywhere.)
-        cx = sum(ax(1:nv)) / 3.0_WP
-        cy = sum(mesh%coord_nod2D(2, mesh%elem2D_nodes(1:nv, n))) / 3.0_WP
+        s1 = abs((ax(3)-ax(4))*(ay(1)-ay(4)) - (ay(3)-ay(4))*(ax(1)-ax(4)))   ! 2*A(1,3,4)
+        s2 = abs((ax(3)-ax(2))*(ay(1)-ay(2)) - (ay(3)-ay(2))*(ax(1)-ax(2)))   ! 2*A(1,2,3)
+        cx = ((ax(1)+ax(3)+ax(4))*s1 + (ax(1)+ax(2)+ax(3))*s2) / (3.0_WP*(s1+s2))
+        cy = ((ay(1)+ay(3)+ay(4))*s1 + (ay(1)+ay(2)+ay(3))*s2) / (3.0_WP*(s1+s2))
+        if (present(s)) s = 0.5_WP*(s1+s2)
     end subroutine elem_center
 
     pure subroutine edge_center(mesh, e, cx, cy)
@@ -242,67 +246,121 @@ contains
         end if
     end subroutine compute_elem_metric
 
-    subroutine compute_elem_area(mesh, cartesian, nElemO, nElemF)
-        ! oce_mesh.F90:2202-2214. ay = cos(sum(lat)/nv). elem_area is left UNSCALED
-        ! here (radians^2); the *r_earth^2 happens in compute_node_areas, matching
-        ! FESOM2's mesh_areas where the scaling is deferred to after area accumulation.
-        type(t_mesh), intent(inout) :: mesh
-        logical,      intent(in)    :: cartesian
-        integer,      intent(in)    :: nElemO, nElemF
-        integer :: n, nv, n1
-        real(kind=WP) :: ay, a1, a2, b1, b2
+    subroutine compute_elem_area(mesh, nElemO, nElemF, sa)
+        ! elem_area = lon/lat area (elem_center) * elem_cos, i.e. the planar area in
+        ! (lon*cos(lat_c), lat) with lat_c the centroid latitude (elem_cos = 1 for a
+        ! cartesian mesh). This is the area the Green-Gauss gradient needs to be exact for
+        ! linear fields. elem_area is left UNSCALED here (radians^2); the *r_earth^2
+        ! happens in compute_node_areas (FESOM2's deferred scaling, mesh_areas).
+        type(t_mesh),  intent(inout) :: mesh
+        integer,       intent(in)    :: nElemO, nElemF
+        real(kind=WP), intent(in)    :: sa(:)
+        integer :: n
         allocate(mesh%elem_area(nElemF))
         mesh%elem_area = 0.0_MP
         do n = 1, nElemO
-            nv = mesh%elem2D_nnodes(n)
-            n1 = mesh%elem2D_nodes(1, n)
-            ! literal 3.0_WP divisor (see elem_center: -no-prec-div arity caveat)
-            ay = sum(mesh%coord_nod2D(2, mesh%elem2D_nodes(1:nv, n))) / 3.0_WP
-            ay = cos(ay)
-            if (cartesian) ay = 1.0_WP
-            a1 = mesh%coord_nod2D(1, mesh%elem2D_nodes(2, n)) - mesh%coord_nod2D(1, n1)
-            a2 = mesh%coord_nod2D(2, mesh%elem2D_nodes(2, n)) - mesh%coord_nod2D(2, n1)
-            b1 = mesh%coord_nod2D(1, mesh%elem2D_nodes(3, n)) - mesh%coord_nod2D(1, n1)
-            b2 = mesh%coord_nod2D(2, mesh%elem2D_nodes(3, n)) - mesh%coord_nod2D(2, n1)
-            call trim_cyclic(a1); call trim_cyclic(b1)
-            a1 = a1 * ay; b1 = b1 * ay
-            mesh%elem_area(n) = 0.5_WP * abs(a1*b2 - b1*a2)
+            mesh%elem_area(n) = sa(n) * mesh%elem_cos(n)
         end do
     end subroutine compute_elem_area
 
+    subroutine compute_elem_weights(mesh, nElemO, cx, cy)
+        ! Kite (median-dual) weights of OWNED elements: the share of vertex j is half the
+        ! areas of the triangles (j, j-1, c) and (j, j+1, c), c = the centroid, i.e. the
+        ! kite between vertex j, its two mid-edges and c (qq w_cv). Normalised by the sum
+        ! of the four side triangles (= the element area for a convex element), so the
+        ! weights sum to 1 to roundoff. Lon/lat areas: the cosine factor cancels. Triangles
+        ! take the exact 1/3 (slot 4 = 0).
+        type(t_mesh),  intent(inout) :: mesh
+        integer,       intent(in)    :: nElemO
+        real(kind=WP), intent(in)    :: cx(:), cy(:)
+        integer :: e, j, jp
+        real(kind=WP) :: dx(MAX_NV), dy(MAX_NV), t(MAX_NV)
+        allocate(mesh%elem_w(MAX_NV, nElemO))
+        mesh%elem_w = 0.0_MP
+        do e = 1, nElemO
+            if (mesh%elem2D_nnodes(e) == 3) then
+                mesh%elem_w(1:3, e) = 1.0_WP/3.0_WP
+                cycle
+            end if
+            do j = 1, MAX_NV
+                dx(j) = mesh%coord_nod2D(1, mesh%elem2D_nodes(j, e)) - cx(e)
+                call trim_cyclic(dx(j))
+                dy(j) = mesh%coord_nod2D(2, mesh%elem2D_nodes(j, e)) - cy(e)
+            end do
+            do j = 1, MAX_NV                           ! t(j) = 2*A(j, j+1, c)
+                jp = mod(j, MAX_NV) + 1
+                t(j) = abs(dx(j)*dy(jp) - dy(j)*dx(jp))
+            end do
+            do j = 1, MAX_NV
+                mesh%elem_w(j, e) = 0.5_WP*(t(mod(j+2, MAX_NV)+1) + t(j)) / sum(t)
+            end do
+        end do
+    end subroutine compute_elem_weights
+
+    subroutine compute_nod_weights(mesh, nNodO, nNodL, partit)
+        ! nod_in_elem2D_w(k,n) = elem_w of node n in its k-th element nod_in_elem2D(k,n)
+        ! (the slot among the element's nv vertices). Owned nodes from their (owned)
+        ! elements; halo nodes by exchange -- complete_nod_in_elem_halo copied the owner's
+        ! slot order, so the owner's weights are the halo node's.
+        type(t_mesh),   intent(inout) :: mesh
+        integer,        intent(in)    :: nNodO, nNodL
+        type(t_partit), intent(in)    :: partit
+        integer :: n, j, k, e
+        allocate(mesh%nod_in_elem2D_w(size(mesh%nod_in_elem2D, 1), nNodL))
+        mesh%nod_in_elem2D_w = 0.0_MP
+        do n = 1, nNodO
+            do j = 1, mesh%nod_in_elem2D_num(n)
+                e = mesh%nod_in_elem2D(j, n)
+                do k = 1, mesh%elem2D_nnodes(e)
+                    if (mesh%elem2D_nodes(k, e) == n) then
+                        mesh%nod_in_elem2D_w(j, n) = mesh%elem_w(k, e)
+                        exit
+                    end if
+                end do
+            end do
+        end do
+        if (partit%npes > 1) call exchange_nod(mesh%nod_in_elem2D_w, partit)
+    end subroutine compute_nod_weights
+
     subroutine compute_gradient_sca(mesh, nElemO)
-        ! Linear shape-function gradient coefficients (oce_mesh.F90:2619-2641).
-        ! Uses the SCALED elem_area (dfactor = -0.5*r_earth/elem_area). Owned elements.
+        ! Green-Gauss gradient coefficients over the element's nv vertices (qq
+        ! mesh_arrays; FESOM2's P1 coefficients for a triangle, up to roundoff): with the
+        ! vertices clockwise, vertex j gets (-(y_{j+1}-y_{j-1}), (x_{j+1}-x_{j-1})*elem_cos)
+        ! * r_earth/(2*elem_area). x in slots 1:4, y in 5:8; a triangle's slots 4/8 stay 0.
+        ! The longitudes are taken relative to vertex 1 (trim_cyclic, as FESOM2), so all
+        ! differences come from one planar embedding of the element. Uses the SCALED
+        ! elem_area. Owned elements.
         type(t_mesh), intent(inout) :: mesh
         integer,      intent(in)    :: nElemO
-        integer :: e, n1, n2, n3
-        real(kind=WP) :: dX31, dX21, dY31, dY21, dfac
+        integer :: e, j, nv, jp, jm
+        real(kind=WP) :: x(MAX_NV), y(MAX_NV), dfac
         allocate(mesh%gradient_sca(2*MAX_NV, nElemO))   ! (2*MAX_NV, owned elems)
         mesh%gradient_sca = 0.0_MP
         do e = 1, nElemO
-            n1 = mesh%elem2D_nodes(1, e); n2 = mesh%elem2D_nodes(2, e); n3 = mesh%elem2D_nodes(3, e)
-            dX31 = mesh%coord_nod2D(1, n3) - mesh%coord_nod2D(1, n1); call trim_cyclic(dX31)
-            dX31 = mesh%elem_cos(e) * dX31
-            dX21 = mesh%coord_nod2D(1, n2) - mesh%coord_nod2D(1, n1); call trim_cyclic(dX21)
-            dX21 = mesh%elem_cos(e) * dX21
-            dY31 = mesh%coord_nod2D(2, n3) - mesh%coord_nod2D(2, n1)
-            dY21 = mesh%coord_nod2D(2, n2) - mesh%coord_nod2D(2, n1)
-            dfac = -0.5_WP * r_earth / mesh%elem_area(e)
-            mesh%gradient_sca(1, e) = (-dY31 + dY21) * dfac
-            mesh%gradient_sca(2, e) = dY31 * dfac
-            mesh%gradient_sca(3, e) = -dY21 * dfac
-            mesh%gradient_sca(4, e) = (dX31 - dX21) * dfac
-            mesh%gradient_sca(5, e) = -dX31 * dfac
-            mesh%gradient_sca(6, e) = dX21 * dfac
+            nv   = mesh%elem2D_nnodes(e)
+            dfac = 0.5_WP * r_earth / mesh%elem_area(e)
+            do j = 1, nv
+                x(j) = mesh%coord_nod2D(1, mesh%elem2D_nodes(j, e)) &
+                     - mesh%coord_nod2D(1, mesh%elem2D_nodes(1, e))
+                call trim_cyclic(x(j))
+                y(j) = mesh%coord_nod2D(2, mesh%elem2D_nodes(j, e))
+            end do
+            do j = 1, nv
+                jp = mod(j, nv) + 1
+                jm = mod(j+nv-2, nv) + 1
+                mesh%gradient_sca(j,          e) = -(y(jp) - y(jm)) * dfac
+                mesh%gradient_sca(j + MAX_NV, e) =  mesh%elem_cos(e) * (x(jp) - x(jm)) * dfac
+            end do
         end do
     end subroutine compute_gradient_sca
 
     subroutine build_elem_adjacency(mesh, nElemO, nEdgeL)
-        ! mesh%elem_neighbors(k, e): the element across edge k of OWNED element e, where
-        ! edge k connects vertices elnodes(k) and elnodes(k+1) (cyclic). 0 = domain
-        ! boundary. Built ONCE from edges/edge_tri -- the neighbour across an edge is just
-        ! "the other edge_tri entry"; only the INVERSE map (element -> its edges) needs a
-        ! cache, and that cache is these 3 ints per element. elem_edges stays unbuilt.
+        ! mesh%elem_edges(k, e) / mesh%elem_neighbors(k, e): the edge k of OWNED element
+        ! e, connecting slots k and k+1 (1-2, 2-3, 3-4, 4-1 over the nv vertices), and the
+        ! element across it -- e ITSELF on a domain boundary (no zero index). A triangle's
+        ! 4th entry repeats its 1st (as elem2D_nodes). Built ONCE from edges/edge_tri: the
+        ! neighbour across an edge is "the other edge_tri entry", which on a boundary edge
+        ! (edge_tri(2) == edge_tri(1)) is the element itself.
         ! Neighbour ids may be HALO element ids, and then ALWAYS from the eDim ring: by
         ! construction (FESOM2 gen_comm.F90) com_elem2D holds exactly the non-owned elements
         ! sharing an EDGE with an owned one, while eXDim (com_elem2D_full minus com_elem2D)
@@ -317,35 +375,43 @@ contains
         ! edge_dxdy/edge_cross_dxdy exist for OWNED edges only (see their allocation), so
         ! consumers rebuild edge vectors from the element's own vertices instead.
         ! The -1 init + post-sweep check turns the partition assumption "an owned element
-        ! sees all three of its edges locally" into a hard invariant (same style as
+        ! sees all of its edges locally" into a hard invariant (same style as
         ! assert_bottom_invariant).
         type(t_mesh), intent(inout) :: mesh
         integer,      intent(in)    :: nElemO, nEdgeL
-        integer :: ed, s, e, k, a, b, v1, v2, other
+        integer :: ed, s, e, k, nv, a, b, v1, v2
 
-        allocate(mesh%elem_neighbors(3, nElemO))
+        allocate(mesh%elem_neighbors(MAX_NV, nElemO), mesh%elem_edges(MAX_NV, nElemO))
         mesh%elem_neighbors = -1
+        mesh%elem_edges     = -1
         do ed = 1, nEdgeL
             a = mesh%edges(1, ed)
             b = mesh%edges(2, ed)
             do s = 1, 2
                 e = mesh%edge_tri(s, ed)
-                if (e < 1 .or. e > nElemO) cycle          ! boundary side or halo element
-                other = mesh%edge_tri(3-s, ed)            ! halo id ok; <=0 on a boundary
-                do k = 1, 3
+                if (s == 2 .and. e == mesh%edge_tri(1, ed)) cycle   ! boundary edge: one element
+                if (e < 1 .or. e > nElemO) cycle                     ! halo element
+                nv = mesh%elem2D_nnodes(e)
+                do k = 1, nv
                     v1 = mesh%elem2D_nodes(k, e)
-                    v2 = mesh%elem2D_nodes(mod(k,3)+1, e)
+                    v2 = mesh%elem2D_nodes(mod(k,nv)+1, e)
                     if ((v1 == a .and. v2 == b) .or. (v1 == b .and. v2 == a)) then
-                        mesh%elem_neighbors(k, e) = max(other, 0)
+                        mesh%elem_neighbors(k, e) = mesh%edge_tri(3-s, ed)   ! = e on a boundary
+                        mesh%elem_edges(k, e)     = ed
                         exit
                     end if
                 end do
             end do
         end do
         do e = 1, nElemO
-            if (any(mesh%elem_neighbors(:, e) < 0)) then
+            nv = mesh%elem2D_nnodes(e)
+            if (any(mesh%elem_neighbors(1:nv, e) < 0)) then
                 write(*,'(a,i0)') 'build_elem_adjacency: unresolved edge slot at owned element ', e
                 error stop 'build_elem_adjacency: local edge list does not cover an owned element'
+            end if
+            if (nv == 3) then                                          ! triangle: 4th = 1st
+                mesh%elem_neighbors(4, e) = mesh%elem_neighbors(1, e)
+                mesh%elem_edges(4, e)     = mesh%elem_edges(1, e)
             end if
         end do
     end subroutine build_elem_adjacency
@@ -382,7 +448,7 @@ contains
             a2 = mesh%coord_nod2D(2, mesh%edges(2, n)) - mesh%coord_nod2D(2, mesh%edges(1, n))
             call trim_cyclic(a1)
             cosm = mesh%elem_cos(el1)
-            if (el2 > 0) cosm = 0.5_WP*(cosm + mesh%elem_cos(el2))
+            if (el2 /= el1) cosm = 0.5_WP*(cosm + mesh%elem_cos(el2))
             mesh%edge_dxdy(1, n) = a1 * cosm * r_earth                ! [m]
             mesh%edge_dxdy(2, n) = a2 * r_earth                       ! [m]
             mesh%edge_len(n)     = sqrt(real(mesh%edge_dxdy(1,n),WP)**2 &
@@ -391,7 +457,7 @@ contains
             b1 = b1 * mesh%elem_cos(el1)
             mesh%edge_cross_dxdy(1, n) = b1 * r_earth
             mesh%edge_cross_dxdy(2, n) = b2 * r_earth
-            if (el2 > 0) then
+            if (el2 /= el1) then
                 b1 = center_x(el2) - ecx; b2 = center_y(el2) - ecy; call trim_cyclic(b1)
                 b1 = b1 * mesh%elem_cos(el2)
                 mesh%edge_cross_dxdy(3, n) = b1 * r_earth
@@ -415,7 +481,7 @@ contains
         ! depth-independent over the vertex's wet range, which is the design note's
         ! `area(1:myDim+eDim)`.
         !
-        ! FESOM2 instead gathered elem_area/nv only from elements deep enough to reach
+        ! FESOM2 instead gathered elem_area/3 only from elements deep enough to reach
         ! level nz (oce_mesh.F90:2252-2351), so the cell narrowed with depth as its
         ! elements bottomed out. That is exactly what a vertex-defined bottom removes:
         ! with nlevels(e) = min over the element's nodes, every adjacent element is at
@@ -437,12 +503,10 @@ contains
         allocate(mesh%areasvol(nNodL), mesh%areasvol_inv(nNodL))
         mesh%area = 0.0_MP
         do n = 1, nNodO
-            ! full median-dual area: EVERY adjacent element, no depth test.
+            ! full median-dual area: EVERY adjacent element (its kite share), no depth test.
             acell = 0.0_MP
             do j = 1, mesh%nod_in_elem2D_num(n)
-                ! literal 3.0_MP divisor (FESOM2 mesh_areas:2266; -no-prec-div
-                ! arity caveat — see elem_center). Triangles only at the anchor.
-                acell = acell + mesh%elem_area(mesh%nod_in_elem2D(j, n)) / 3.0_MP
+                acell = acell + mesh%elem_area(mesh%nod_in_elem2D(j, n)) * mesh%nod_in_elem2D_w(j, n)
             end do
             mesh%area(n) = acell
         end do
@@ -494,13 +558,12 @@ contains
         ! sweeps: area-weighted neighbour average over nod_in_elem2D, each followed by
         ! exchange_nod so the next sweep's halo reads are valid (FESOM2:2381). Runs after
         ! compute_node_areas + its halo exchange (so areasvol is SCALED and halo-valid).
-        ! Consumed by the M4 GM/Redi K scaling (init_Redi_GM, oce_fer_gm.F90:258). Byte-
-        ! neutral to every pre-M4 gate (no consumer yet). The /3.0_WP is the literal divisor
-        ! (FESOM2:2373; -no-prec-div arity caveat, see elem_center — triangles only here).
+        ! Consumed by the M4 GM/Redi K scaling (init_Redi_GM, oce_fer_gm.F90:258). The
+        ! element mean is the kite-weighted one over the 4 slots (FESOM2:2373 had /3).
         type(t_mesh),   intent(inout) :: mesh
         integer,        intent(in)    :: nNodO, nNodL
         type(t_partit), intent(in)    :: partit
-        integer :: n, j, q, elem, nv
+        integer :: n, j, q, elem
         integer :: elnodes(MAX_NV)
         real(kind=WP) :: vol, acc
         real(kind=WP), allocatable :: work_array(:)
@@ -515,9 +578,8 @@ contains
                 acc = 0.0_WP
                 do j = 1, mesh%nod_in_elem2D_num(n)
                     elem = mesh%nod_in_elem2D(j, n)
-                    nv   = mesh%elem2D_nnodes(elem)
-                    elnodes(1:nv) = mesh%elem2D_nodes(1:nv, elem)
-                    acc = acc + sum(mesh%mesh_resolution(elnodes(1:nv))) / 3.0_WP * mesh%elem_area(elem)
+                    elnodes = mesh%elem2D_nodes(:, elem)
+                    acc = acc + sum(mesh%elem_w(:, elem)*mesh%mesh_resolution(elnodes)) * mesh%elem_area(elem)
                     vol = vol + mesh%elem_area(elem)
                 end do
                 work_array(n) = acc / vol

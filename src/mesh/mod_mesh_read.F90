@@ -86,9 +86,12 @@ contains
             read(u,*) mesh%edge_tri(1, i), mesh%edge_tri(2, i)
         end do
         close(u)
-        ! Boundary edges store -999 (no 2nd triangle) on disk; FESOM2 load_edges
-        ! (oce_mesh.F90:1885-1887) zeroes the negatives. el(2)==0 marks a boundary edge.
-        where (mesh%edge_tri < 0) mesh%edge_tri = 0
+        ! Boundary edges store -999 (no 2nd element) on disk. FESOM3 convention (hybrid
+        ! meshes): a missing 2nd element is the 1st one, so el(2) == el(1) marks a
+        ! boundary edge and no index is ever zero (edge_cross_dxdy(3:4) = 0 there).
+        do i = 1, mesh%edge2D
+            if (mesh%edge_tri(2, i) <= 0) mesh%edge_tri(2, i) = mesh%edge_tri(1, i)
+        end do
 
         ! ---- vertical level counts: nlvls.out (node) ONLY ----
         ! FESOM3 bottom at vertices: the vertex column is authoritative, so elvls.out is
@@ -528,8 +531,8 @@ contains
                 mesh%edge_tri(1, lid) = imap_elem(ge1)
                 if (ge2 > 0) then
                     mesh%edge_tri(2, lid) = imap_elem(ge2)
-                else
-                    mesh%edge_tri(2, lid) = 0
+                else                                  ! boundary: missing 2nd = 1st
+                    mesh%edge_tri(2, lid) = mesh%edge_tri(1, lid)
                 end if
             end if
         end do

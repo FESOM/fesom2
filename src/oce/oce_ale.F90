@@ -146,7 +146,7 @@ contains
             elnodes = mesh%elem2D_nodes(1:3, elem)        ! triangles (elem2D_nodes is MAX_NV=4) — L15
             eta = -g*theta*dt*d_eta(elnodes)
             Fx  = sum(mesh%gradient_sca(1:3, elem)*eta)
-            Fy  = sum(mesh%gradient_sca(4:6, elem)*eta)
+            Fy  = sum(mesh%gradient_sca(5:7, elem)*eta)
             nzmin = mesh%ulevels(elem)
             nzmax = mesh%nlevels(elem)
             do nz = nzmin, nzmax-1
@@ -213,7 +213,7 @@ contains
             !__________________________________________________________________
             ! ... and for el(2), unless ed is a boundary edge
             c2 = 0.0_WP
-            if (el(2) > 0) then
+            if (el(2) /= el(1)) then
                 deltaX2 = mesh%edge_cross_dxdy(3, ed)
                 deltaY2 = mesh%edge_cross_dxdy(4, ed)
                 nzmin   = mesh%ulevels(el(2))
@@ -356,7 +356,7 @@ contains
 
             c1 = 0.0_WP
             if (Fer_GM) c2 = 0.0_WP
-            if (el(2) > 0) then
+            if (el(2) /= el(1)) then
                 deltaX2 = mesh%edge_cross_dxdy(3, ed)
                 deltaY2 = mesh%edge_cross_dxdy(4, ed)
                 nzmin   = mesh%ulevels(el(2))

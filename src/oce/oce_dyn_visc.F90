@@ -43,7 +43,7 @@ module oce_dyn_visc
     !    `/elem_area(el)` are RUNTIME divisors/operands but byte-identical on both sides
     !    (geom-proven), so the -no-prec-div reciprocal matches (L7/L10/L14).
     !  - edge_tri(:,ed) is (2,edge2D) — the `:` is the size-2 left/right slot, NOT a
-    !    MAX_NV dim, so no L15 shape trap. For interior edges both el(1),el(2)>0.
+    !    MAX_NV dim, so no L15 shape trap. Interior edges: el(2) /= el(1).
     !  - 1-rank only: exchange_elem(U_c/V_c) is a no-op (lifted at M2.12). The two passes
     !    are separate serial loops, so pass 1 fully fills U_c before pass 2 reads it
     !    (FESOM2 uses an !$OMP BARRIER for the same effect).

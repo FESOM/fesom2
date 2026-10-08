@@ -15,7 +15,7 @@ module oce_pgf
     ! dispatcher itself is pure namelist branching (no numerics) so it is not ported.
     !
     !   pgf_x(nz,elem) = Σ_k gradient_sca(k,  elem) * hpressure(nz, elnodes(k)) / density_0
-    !   pgf_y(nz,elem) = Σ_k gradient_sca(3+k,elem) * hpressure(nz, elnodes(k)) / density_0
+    !   pgf_y(nz,elem) = Σ_k gradient_sca(4+k,elem) * hpressure(nz, elnodes(k)) / density_0
     !
     ! BIT-IDENTITY NOTES:
     !  - density_0 is a RUNTIME divisor, but byte-identical on both sides (= 1030),
@@ -24,7 +24,7 @@ module oce_pgf
     !    then summed) — NOT sum(...)/density_0.
     !  - gradient_sca and the elem2D_nodes order are geometry-gate-proven (L9); the
     !    same gradient_sca contraction already byte-matched in oce_tracer_grad (M1.1).
-    !  - v1 = triangles only (the gradient_sca 1:3 / 4:6 slices are triangle-specific).
+    !  - v1 = triangles only (the gradient_sca 1:3 / 5:7 slices are triangle-specific).
     !
     ! 1-rank only: the element loop runs to elem2D (== myDim_elem2D at 1-rank);
     ! pgf_x/pgf_y are element-local (no halo dependency, FESOM2 does not exchange
@@ -75,7 +75,7 @@ contains
             ! (pgf) --> from top to bottom
             do nlz=ule,nle
                 pgf_x(nlz,elem) = sum(mesh%gradient_sca(1:3,elem)*hpressure(nlz,elnodes)/density_0)
-                pgf_y(nlz,elem) = sum(mesh%gradient_sca(4:6,elem)*hpressure(nlz,elnodes)/density_0)
+                pgf_y(nlz,elem) = sum(mesh%gradient_sca(5:7,elem)*hpressure(nlz,elnodes)/density_0)
             end do
         end do
     end subroutine pressure_force_4_linfs_fullcell
@@ -173,8 +173,8 @@ contains
             int_dp_dx(1)    = aux_sum
 
             ! meridional surface pressure gradient
-            drho_dy         = sum(mesh%gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
-            dz_dy           = sum(mesh%gradient_sca(4:6,elem)*mesh%Z_3d_n(nlz,elnodes))
+            drho_dy         = sum(mesh%gradient_sca(5:7,elem)*density_m_rho0(nlz,elnodes))
+            dz_dy           = sum(mesh%gradient_sca(5:7,elem)*mesh%Z_3d_n(nlz,elnodes))
             aux_sum         = (drho_dy-sum(drho_dz)/3.0_WP*dz_dy)*mesh%helem(nlz,elem)*g/density_0
             pgf_y(nlz,elem) = aux_sum*0.5_WP
             int_dp_dx(2)    = aux_sum
@@ -199,8 +199,8 @@ contains
                 int_dp_dx(1)    = int_dp_dx(1) + aux_sum
 
                 ! meridional bulk pressure gradient
-                drho_dy         = sum(mesh%gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
-                dz_dy           = sum(mesh%gradient_sca(4:6,elem)*mesh%Z_3d_n(nlz,elnodes))
+                drho_dy         = sum(mesh%gradient_sca(5:7,elem)*density_m_rho0(nlz,elnodes))
+                dz_dy           = sum(mesh%gradient_sca(5:7,elem)*mesh%Z_3d_n(nlz,elnodes))
                 aux_sum         = (drho_dy-sum(drho_dz)/3.0_WP*dz_dy)*mesh%helem(nlz,elem)*g/density_0
                 pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
                 int_dp_dx(2)    = int_dp_dx(2) + aux_sum
@@ -242,8 +242,8 @@ contains
             pgf_x(nlz,elem) = int_dp_dx(1) + aux_sum*0.5_WP
 
             ! meridional bottom pressure gradient
-            drho_dy         = sum(mesh%gradient_sca(4:6,elem)*density_m_rho0(nlz,elnodes))
-            dz_dy           = sum(mesh%gradient_sca(4:6,elem)*(mesh%Z_3d_n(nlz,elnodes)))
+            drho_dy         = sum(mesh%gradient_sca(5:7,elem)*density_m_rho0(nlz,elnodes))
+            dz_dy           = sum(mesh%gradient_sca(5:7,elem)*(mesh%Z_3d_n(nlz,elnodes)))
             aux_sum         = (drho_dy-sum(drho_dz)/3.0_WP*dz_dy)*mesh%helem(nlz,elem)*g/density_0
             pgf_y(nlz,elem) = int_dp_dx(2) + aux_sum*0.5_WP
         end do

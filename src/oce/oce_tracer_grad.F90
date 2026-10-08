@@ -65,7 +65,7 @@ contains
             nzmax = mesh%nlevels(elem)
             do nz = nzmin, nzmax-1
                 tr_xy(1, nz, elem) = sum(mesh%gradient_sca(1:3, elem) * ttf(nz, elnodes))
-                tr_xy(2, nz, elem) = sum(mesh%gradient_sca(4:6, elem) * ttf(nz, elnodes))
+                tr_xy(2, nz, elem) = sum(mesh%gradient_sca(5:7, elem) * ttf(nz, elnodes))
             end do
         end do
     end subroutine tracer_gradient_elements

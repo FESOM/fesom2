@@ -318,6 +318,40 @@ kernel-gate recipe, the M2.1–M2.9a dynamics-kernel recipe (+ every per-kernel 
 M2.10 forcing gate, and the M2.11b IC gate — are in [`HANDOFF-archive.md`](HANDOFF-archive.md).
 The live "Oracle" section above + the "M2.12 entry notes" below cover what the current work needs.
 
+### Gate migration for hybrid meshes (decision, 2026-10-08, plan `plans/2026-10-08-hybrid-meshes.md` Task 7)
+
+From Task 7 on the mesh geometry is the unified 4-slot one (area-weighted centroid, kite weights
+`elem_w`, Green–Gauss `gradient_sca(8)` with x in 1:4 / y in 5:8, `edge_tri(2) == edge_tri(1)` and
+`elem_neighbors == self` on the boundary). For triangles it equals FESOM2's P1 geometry only up to
+roundoff, so no FESOM2-oracle byte gate (`max|Δ|=0`) can pass any more.
+- **Retired** (kept in `tools/` as the record of how M0–M10 were proven; not to be run as gates):
+  every FESOM2-oracle byte gate — `run_geom_gate{,_core2,_multirank}.sh` (+ `geom_diff.py` as a gate),
+  `run_advhor_gate{,_multirank}.sh`, `run_pressure_gate{,_core2}.sh`, `run_step_gate{,_multirank}.sh`,
+  `run_stepdyn_gate_multirank.sh`, `run_forcing_gate.sh`, `run_ic_gate_core2.sh`,
+  `run_ice_gate_core2.sh`, `run_evp_gate_core2.sh`, `run_icefct_gate_core2.sh`,
+  `run_iceflux_gate_core2.sh`, `run_icethermo_gate_core2.sh`, `run_tke_replay_gate_core2.sh`,
+  `run_meshdiag_gate.sh`, and all `run_lifecycle_*gate*` scripts (`.sh` and `.sbatch`), plus the
+  oracle-dump helpers they call (`run_*dump*.sh`, `run_oracle_pi.sh`, `run_kppinit_oracle.sh`,
+  `run_tkedump_oracle.sh`).
+- **Remapped:** `src/infra/mod_geom_dump.F90` still writes FESOM2's 6-row `gradient_sca` (x = slots
+  1:3, y = slots 5:7), so `fesom_geomdump` + `tools/geom_diff.py --signal=<tol>` remain usable as a
+  roundoff-level diagnostic. The other dump drivers build and run unchanged; Task 14 retires or
+  remaps each of them.
+- **Kept** (FESOM3-only, unaffected): `run_restart_gate_core2.sh`, `run_restart_gate_multirank.sh`
+  (split vs straight), `run_output_gate.sh` (writer vs generator), `run_conserve_pi.sh` and the
+  ctest suite.
+- **Replacement:** `tools/run_tri_regression.sh` — the frozen Task-6 binaries
+  (`/work/ab0995/a270029/fesom3_hybrid/frozen_task6`, commit `5b2a7f3`) vs the current build on pi
+  (np 1, 2) and CORE2 (np 8), production driver with the job_levante physics for 4 steps, plus
+  `fesom_conserve` (zstar+Redi+TKE, 20 steps). Metric per field `max|new−ref|/max|ref|`: step 1 before
+  the first SSH solve ≤ 1e-9 (pure roundoff; measured ≤ 1.3e-11), everything after it ≤ 1e-2 (the CG
+  stops at relative residual 1e-5, which lifts the roundoff seed to ~1e-5 in eta; measured after 4
+  steps: pi ≤ 6e-9, CORE2 ≤ 5.4e-4 in Kv/Av); conservation drift ≤ 1e-12 and final totals equal to
+  1e-12. Run after Tasks 7, 10, 14 and 16.
+- Observation (pre-existing, not investigated): the frozen binary itself differs between pi np 1
+  and np 2 already at step 1 before the solve (density 4.7e-3 relative), so a cross-partition
+  comparison is not a roundoff yardstick on the original pi mesh.
+
 ## Next task
 
 ### ✅ RESTART / CHECKPOINT — **COMPLETE & tagged `m10` (2026-06-29).** Partition-independent Zarr checkpoints (full prognostic state incl. sea ice + EVP sigma), written periodically + at end-of-run, read at startup on `r_restart`, resuming byte-exactly. Built on the M9 Zarr stack (`mod_io_zarr` + `mod_io_decomp` + new `decomp_gather` inverse); new `src/io/mod_io_restart.F90` (writer+reader, atomic tmp→rename finalize + `restart.latest` + keep-N prune), `mod_io_posix.F90` (bind(C) rename/unlink/fsync/rmtree — no `execute_command_line`), `mod_io_coords.F90` (shared coord helper). Lifecycle wiring in `fesom_lifecycle_native_mr` (detect/read/AB-guard/write/cadence + `clock_finish`).

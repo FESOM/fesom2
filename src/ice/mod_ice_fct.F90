@@ -99,7 +99,7 @@ contains
 
             ! derivatives
             dx  = mesh%gradient_sca(1:3, elem)
-            dy  = mesh%gradient_sca(4:6, elem)
+            dy  = mesh%gradient_sca(5:7, elem)
             vol = mesh%elem_area(elem)
             um  = sum(u_ice(elnodes))
             vm  = sum(v_ice(elnodes))
