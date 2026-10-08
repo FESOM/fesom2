@@ -235,23 +235,26 @@ fluxes and nonlinear terms can. Asserted in a test (Task 9), measured in the sho
 - Create: `tools/mesh/nemo_meshq.py`
 - Create: `tools/mesh/test_nemo_meshq.sh`
 
-- [ ] copy the three `.m` outputs (`nod2d.out`, `elem2d.out`, `depth.out`) to a reference
+- [x] copy the three `.m` outputs (`nod2d.out`, `elem2d.out`, `depth.out`) to a reference
       directory (`/work/ab0995/a270029/meshes/nemo025q/ref_matlab/`) before anything writes there
-- [ ] write `test_nemo_meshq.sh` (runs under `module load python3`): runs the port into a scratch
+- [x] write `test_nemo_meshq.sh` (runs under `module load python3`): runs the port into a scratch
       dir and `cmp`s the three files against the reference (TDD: fails first)
-- [ ] port Steps 1–6 statement by statement, emulating MATLAB semantics: float32 inputs stay
+- [x] port Steps 1–6 statement by statement, emulating MATLAB semantics: float32 inputs stay
       float32 and every single/double mix is computed in float32 (MATLAB "single wins") — the
       `levels` recursion and the f-point corrections in particular; `mbathy` stays integer;
       1-based → 0-based indices with the MATLAB index kept in a comment at each manual fix
-- [ ] keep the order-dependent loops sequential (single-cell land removal modifies `bathy` while
+- [x] keep the order-dependent loops sequential (single-cell land removal modifies `bathy` while
       scanning; quad creation and node compaction define the numbering)
-- [ ] ASCII output with the same formats (`'%9i \n'` headers incl. the trailing space,
+- [x] ASCII output with the same formats (`'%9i \n'` headers incl. the trailing space,
       `'%9i %8.4f %8.4f %8i\n'`, `'%9i %9i %9i %9i\n'`, `'%8.4f\n'`, `'%9i \n'`)
-- [ ] acceptance: `elem2d.out` and `depth.out` byte-identical; `nod2d.out` byte-identical except
+- [x] acceptance: `elem2d.out` and `depth.out` byte-identical; `nod2d.out` byte-identical except
       possibly the ~20 fold points corrected with single-precision cos/atan2/acos (MATLAB vs
       numpy may differ by one unit in the last place there) — any such difference listed and
-      ≤ 1e-4
-- [ ] run the test — must pass before Task 2
+      ≤ 1e-4 — result: elem2d.out and depth.out identical; nod2d.out differs in ONE line
+      (node 711389, fold point of MATLAB row 1020/1021: port -83.6347, MATLAB -83.6348, i.e.
+      1 float32 ulp of the atan2 result straddling the print rounding; correctly-rounded
+      cos/atan2/acos variants were tried and match worse)
+- [x] run the test — must pass before Task 2
 
 ### Task 2: Mesh tools — dead-end cleanup, quad splitting, cut-outs
 
