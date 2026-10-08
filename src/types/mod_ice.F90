@@ -34,6 +34,7 @@ module mod_ice
         real(kind=WP), allocatable, dimension(:)   :: fct_plus, fct_minus
         real(kind=WP), allocatable, dimension(:,:) :: fct_fluxes
         real(kind=WP), allocatable, dimension(:)   :: fct_massmatrix   ! sized ssh_stiff%nza
+        real(kind=WP), allocatable, dimension(:)   :: fct_lumpedmass   ! row sums of fct_massmatrix (nodes)
         real(kind=WP), allocatable, dimension(:)   :: sigma11, sigma12, sigma22  ! EVP stress (elem)
         real(kind=WP), allocatable, dimension(:)   :: eps11, eps12, eps22        ! strain rate (elem)
         real(kind=WP), allocatable, dimension(:)   :: ice_strength, inv_areamass, inv_mass

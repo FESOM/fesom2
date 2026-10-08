@@ -224,6 +224,31 @@ foreach(_case quad:nemo025q_cut:2:0 pi_w:pi_w:1:1 core2_w:core2_w:8:1)
         ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/${_mesh};FESOM3_TEST_ROTATE=${_rot}"
         SKIP_REGULAR_EXPRESSION "cannot open;No such file")
 endforeach()
+# Task 16: sea-ice FCT mass matrix and lumped mass (user's specification). test_ice_mass
+# (matrix entries vs the element contributions, row sums == lumped mass == sum S/nv, total ==
+# area, constant field stays constant, sum(lumped*f) conserved, triangles == the former FCT;
+# default mesh = the NEMO-mixed cut-out, the np 1 run also checks the analytic triangle, mixed
+# and parallelogram patches); a missing CSR column stops the mass-matrix fill.
+add_fesom_test(test_ice_mass 1)
+add_fesom_test(test_ice_mass 2)
+foreach(_case quad:nemo025q_cut:2:0 pi_w:pi_w:1:1 core2_w:core2_w:8:1)
+    string(REPLACE ":" ";" _quad ${_case})
+    list(GET _quad 0 _tag)
+    list(GET _quad 1 _mesh)
+    list(GET _quad 2 _np)
+    list(GET _quad 3 _rot)
+    add_test(NAME test_ice_mass_${_tag}_np${_np}
+             COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np ${_np} $<TARGET_FILE:test_ice_mass>)
+    set_tests_properties(test_ice_mass_${_tag}_np${_np} PROPERTIES
+        ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/${_mesh};FESOM3_TEST_ROTATE=${_rot}"
+        SKIP_REGULAR_EXPRESSION "cannot open;No such file")
+endforeach()
+add_test(NAME test_ice_mass_missing_col_np1
+         COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np 1 $<TARGET_FILE:test_ice_mass>)
+set_tests_properties(test_ice_mass_missing_col_np1 PROPERTIES
+    ENVIRONMENT "FESOM3_TEST_MISSING_COL=1"
+    PASS_REGULAR_EXPRESSION "not found in the ssh_stiff CSR row of node"
+    FAIL_REGULAR_EXPRESSION "did NOT stop")
 # without dist_N/format.out (the original pi dist_2) exchange_edge stops with a message
 add_test(NAME test_halo_ext_noformat_np2
          COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np 2 $<TARGET_FILE:test_halo_ext>)

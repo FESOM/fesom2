@@ -786,7 +786,7 @@ fluxes and nonlinear terms can. Asserted in a test (Task 9), measured in the sho
       `mod_mesh_analytic:122-138` (the generator builds triangles, slot 4 set after),
       `mod_mesh_areas:208-209` + `oce_dyn_vinv:270-271` (sub-triangle centroid `/(3(s1+s2))`),
       `mod_mesh_areas:283` (triangle kite weights 1/3), spline `oce_adv_tra_ver:134-135`, KPP cube
-      roots. Pending Task 15/16 (not converted here; the `mod_ice_dyn` ones cleared in Task 15): `mod_ice_dyn.F90` (:160-167 strain rates,
+      roots. Pending Task 15/16 (not converted here; the `mod_ice_dyn` ones cleared in Task 15, the `mod_ice_fct`/`mod_ice_setup` ones in Task 16): `mod_ice_dyn.F90` (:160-167 strain rates,
       :219/:514 val3, :269/:468 `elnodes(3)`, :342-361 msum/asum/aa/elevation gradient, :530-535,
       :570, :596-598), `mod_ice_fct.F90` (:73, :96-102, :292 `icoef(3,3)`, :335, :414, :454, :474,
       :488, :502), `mod_ice_setup.F90` (:179, :186)
@@ -861,20 +861,50 @@ fluxes and nonlinear terms can. Asserted in a test (Task 9), measured in the sho
 - Modify: `src/ice/mod_ice_setup.F90` (`ice_mass_matrix_fill`, loops at :187/:192,
   `fct_fluxes` allocation :137), `src/ice/mod_ice_fct.F90`, `src/types` ice work type (lumped mass)
 - Create: `test/test_ice_mass.F90`
+- ➕ Modify: `test/CMakeLists.txt`
 
-- [ ] `ice_mass_matrix_fill`: triangle S/6, S/12; quad (S/36)(4,2,1,2) rotated per row; on the new
+- [x] `ice_mass_matrix_fill`: triangle S/6, S/12; quad (S/36)(4,2,1,2) rotated per row; on the new
       SSH pattern; not-found column stops with an error
-- [ ] FCT lumped mass = row sums (S/3, S/4) stored once; it replaces `mesh%area` in the
+      — element contributions `elem_area·ice_mcoef(n,q,nv)` over the `nv` unique vertices; the
+      coefficient tables `ice_mcoef`/`ice_acoef(MAX_NV,MAX_NV,3:4)` are parameters in `mod_ice_fct`
+      (triangle slot 4 = 0, one code path for both element types); a column missing from the CSR
+      row → message (global ids) + `MPI_Abort`
+- [x] FCT lumped mass = row sums (S/3, S/4) stored once; it replaces `mesh%area` in the
       low-order step, the high-order iteration and the antidiffusive fluxes
-- [ ] antidiffusive coefficients consistent − lumped per element (triangle (−2,1,1)·S/12, quad
+      — `ice%work%fct_lumpedmass` (nodes) = row sums of `fct_massmatrix`, exchanged to the halo
+      (the fluxes of owned elements divide by it at halo vertices); a row without wet elements
+      (all cavity) keeps the node area (FESOM2 behaviour, keeps the divides finite)
+- [x] antidiffusive coefficients consistent − lumped per element (triangle (−2,1,1)·S/12, quad
       (−5,2,1,2)·S/36); `fct_fluxes(elem, 4)`; limiter loops over `nv`
-- [ ] TG rhs as in Technical Details (advection via the element mass contributions, diffusion
+      — `ice_acoef`; flux computation, ±sums, limiting and the update loop over
+      `elem2D_nnodes` (a 4-slot limiter on triangles would take the min at vertex 1 twice:
+      mutation check fails F5 by 0.15–0.25)
+- [x] TG rhs as in Technical Details (advection via the element mass contributions, diffusion
       with 4-slot gradients, TG term with the kite-weighted mean velocity)
-- [ ] tests: row sums = lumped mass, total = total area; a constant ice field stays constant
+      — `dt·(dx(n)·(M_e u)_q + dy(n)·(M_e v)_q) − dt·S·diff·∇n·∇q − ½dt²·S·(ū·∇n)(ū·∇q)` with
+      `ū = Σ elem_w·u`, over 4 slots (a triangle's slot 4 adds exactly 0)
+- [x] tests: row sums = lumped mass, total = total area; a constant ice field stays constant
       (low and high order); Σ lumped·m conserved on the mixed patch; triangles equal today's FCT to
       roundoff; missing column triggers the error (error case)
-- [ ] `run_tri_regression.sh` — roundoff
-- [ ] run ctest — must pass before Task 17
+      — `test_ice_mass` (NEMO-mixed cut np1/2 + analytic triangle, mixed and parallelogram
+      patches at np1, NEMO-quad cut np2, pi_w np1 and core2_w np8 rotated): F0 tables ==
+      cyclic-distance coefficients, row sums 1/3, 1/4, acoef = mcoef − diag(rowsum) (≤ 2.8e-17);
+      F1 `fct_massmatrix` == an independent assembly (0); F2 row sums == lumped == Σ S/nv on owned
+      and halo nodes (≤ 5.3e-16), Σ lumped == total wet area (≤ 1.4e-14), triangles: lumped ==
+      node area (≤ 6.7e-16); F3 constant field at rest with ice_diff = 10: TG rhs ≤ 2e-18, low
+      order, high order and final == c (≤ 3.4e-16), uniform drift on the patches: nodes ≥ 3 rings
+      from the boundary stay c (≤ 3.2e-16); F4 Σ lumped·f conserved for a/m/m_snow with a
+      non-uniform velocity and limiter-active fields (≤ 2.3e-15, fields change by up to 0.25);
+      F5 triangles: TG rhs, high order, low order, final == the former FCT (FESOM2 formulas, in
+      the test) ≤ 7.4e-16 (pi_w, core2_w np8, triangle patch); ctest
+      `test_ice_mass_missing_col_np1` (a CSR column removed → the message, regex pair).
+      `fesom_icefctdump` CORE2 1 rank new vs the pre-task binary: rhs ≤ 6.2e-16, a/m/m_snow ≤
+      1.8e-15 (EVP), ≤ 2.4e-15 (mEVP)
+- [x] `run_tri_regression.sh` — roundoff
+      — 7/7: pi PRE 6.3e-15, EARLY 9.2e-13, OCEAN 1.1e-7, ICE 5.9e-7, MIX 4.4e-9; CORE2 PRE
+      2.5e-11, EARLY 2.2e-8, OCEAN 3.1e-5, ICE 9.7e-5, MIX 7.8e-4 (the Task-15 levels); decomp
+      OCEAN ≤ 8.8e-10; conservation ≤ 2.8e-14
+- [x] run ctest — must pass before Task 17 — scratch ctest 136/136 (wiped + reconfigured)
 
 ### Task 17: Conservation and 1-vs-N runs on the cut-out meshes
 

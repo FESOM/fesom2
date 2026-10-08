@@ -32,7 +32,7 @@ module mod_ice_fct
     !    FESOM2 exactly (M3a pinned elem2D_nodes order; M3b's stress2rhs proved the same
     !    accumulation pattern byte-matches; the oracle build is ENABLE_OPENMP=OFF so the !$OMP
     !    ORDERED/atomic scatters run serially in element order = FESOM3's serial path).
-    !  - the runtime divides (rhs/area, vol/area, tmax/max(flux,1e-12)) are scalar with byte-
+    !  - the runtime divides (rhs/lumped, vol/lumped, tmax/max(flux,1e-12)) are scalar with byte-
     !    identical operands (-no-prec-div reciprocals agree, L7/L29). Pointers mirror the
     !    oracle's access pattern (mass_matrix => ice%work%fct_massmatrix) to keep codegen.
     !  - ice_diff=0.0 / ice_gamma_fct=0.5 are set by the driver to the CORE2 namelist values
@@ -45,9 +45,21 @@ module mod_ice_fct
     !    at ice_diff/=0 that would make this diffusion sqrt(5.8e9/2.0e8) = 5.4x the
     !    reference's. The native drivers now pin scale_area = 5.8e9 with the rest of the
     !    CORE2 namelist values.
-    !  - elem2D_nodes(1:3,el) sliced 1:3 (MAX_NV=4) to avoid the L15 shape trap.
+    !  - hybrid meshes (plan docs/plans/2026-10-08-hybrid-meshes.md, Task 16, the user's
+    !    specification): unified 4-slot formulas, so triangles agree with FESOM2 to roundoff
+    !    only. The consistent mass matrix is assembled from the element contributions
+    !    elem_area*ice_mcoef(:,:,nv) (triangle S/6 diagonal, S/12 off-diagonal; quad, regular-
+    !    square simplification, row j (S/36)*(4,2,1,2) rotated); its row sums (S/3 per
+    !    triangle vertex, S/4 per quad vertex) are the lumped mass ice%work%fct_lumpedmass,
+    !    which replaces the node area in the low-order step, the high-order iteration and
+    !    the antidiffusive fluxes (ice mass is conserved as sum(lumped*m)). Antidiffusive
+    !    element operator = consistent - lumped (ice_acoef: triangle (-2,1,1)*S/12, quad
+    !    (-5,2,1,2)*S/36). TG rhs: advection dx(n)*(M_e u)_q, diffusion over the 4 gradient
+    !    slots, TG term with the kite-weighted element-mean velocity sum(elem_w*u). A
+    !    triangle's slot 4 (repeated 1st vertex) has coefficient 0 in every table and in
+    !    gradient_sca; the limiter loops run over the elem2D_nnodes unique vertices.
     use mod_precision,    only: WP
-    use mod_mesh,         only: t_mesh
+    use mod_mesh,         only: t_mesh, MAX_NV
     use mod_ice,          only: t_ice
     use mod_partit,       only: t_partit
     use mod_part_bounds,  only: owned_bounds, is_multirank
@@ -56,6 +68,33 @@ module mod_ice_fct
     implicit none
     private
     public :: ice_TG_rhs, ice_fct_solve
+    public :: ice_mcoef, ice_acoef
+
+    ! Element mass contributions per unit element area, ice_mcoef(j,k,nv) (symmetric):
+    ! triangle (nv=3) 1/6 diagonal, 1/12 off-diagonal, slot 4 = 0; quad (nv=4) row j
+    ! (4,2,1,2)/36 rotated so that the 4 sits on the diagonal. Row sums 1/3 and 1/4.
+    real(kind=WP), parameter :: ice_mcoef(MAX_NV, MAX_NV, 3:4) = reshape([ &
+        2.0_WP/12.0_WP, 1.0_WP/12.0_WP, 1.0_WP/12.0_WP, 0.0_WP,         &
+        1.0_WP/12.0_WP, 2.0_WP/12.0_WP, 1.0_WP/12.0_WP, 0.0_WP,         &
+        1.0_WP/12.0_WP, 1.0_WP/12.0_WP, 2.0_WP/12.0_WP, 0.0_WP,         &
+        0.0_WP,         0.0_WP,         0.0_WP,         0.0_WP,         &
+        4.0_WP/36.0_WP, 2.0_WP/36.0_WP, 1.0_WP/36.0_WP, 2.0_WP/36.0_WP, &
+        2.0_WP/36.0_WP, 4.0_WP/36.0_WP, 2.0_WP/36.0_WP, 1.0_WP/36.0_WP, &
+        1.0_WP/36.0_WP, 2.0_WP/36.0_WP, 4.0_WP/36.0_WP, 2.0_WP/36.0_WP, &
+        2.0_WP/36.0_WP, 1.0_WP/36.0_WP, 2.0_WP/36.0_WP, 4.0_WP/36.0_WP], &
+        [MAX_NV, MAX_NV, 2])
+    ! Antidiffusive element operator = consistent - lumped (ice_mcoef minus its row sums on
+    ! the diagonal): triangle (-2,1,1)/12, quad (-5,2,1,2)/36, rotated per row.
+    real(kind=WP), parameter :: ice_acoef(MAX_NV, MAX_NV, 3:4) = reshape([ &
+        -2.0_WP/12.0_WP,  1.0_WP/12.0_WP,  1.0_WP/12.0_WP,  0.0_WP,         &
+         1.0_WP/12.0_WP, -2.0_WP/12.0_WP,  1.0_WP/12.0_WP,  0.0_WP,         &
+         1.0_WP/12.0_WP,  1.0_WP/12.0_WP, -2.0_WP/12.0_WP,  0.0_WP,         &
+         0.0_WP,          0.0_WP,          0.0_WP,          0.0_WP,         &
+        -5.0_WP/36.0_WP,  2.0_WP/36.0_WP,  1.0_WP/36.0_WP,  2.0_WP/36.0_WP, &
+         2.0_WP/36.0_WP, -5.0_WP/36.0_WP,  2.0_WP/36.0_WP,  1.0_WP/36.0_WP, &
+         1.0_WP/36.0_WP,  2.0_WP/36.0_WP, -5.0_WP/36.0_WP,  2.0_WP/36.0_WP, &
+         2.0_WP/36.0_WP,  1.0_WP/36.0_WP,  2.0_WP/36.0_WP, -5.0_WP/36.0_WP], &
+        [MAX_NV, MAX_NV, 2])
 
 contains
 
@@ -64,13 +103,17 @@ contains
     ! over elements into the nodal rhs (values_rhs of each ice tracer), with an ice_diff
     ! stabilising diffusion. The advection velocity is uice/vice. Skip cavity elements
     ! (ulevels>1). No exchange in FESOM2 (the rhs at the halo is each rank's own; the
-    ! downstream solves exchange).
+    ! downstream solves exchange). Per element (4 slots): advection dx(n)*(M_e u)_q with
+    ! the element mass contributions (FESOM2 S*dx(n)*(sum(u)+u_q)/12 = the triangle case),
+    ! diffusion S*diff*grad(n).grad(q), TG term with the kite-weighted mean velocity
+    ! (FESOM2 sum(u)/3).
     subroutine ice_TG_rhs(ice, mesh, partit)
         type(t_ice),    intent(inout), target :: ice
         type(t_mesh),   intent(in),    target :: mesh
         type(t_partit), intent(in), optional  :: partit
-        real(kind=WP) :: diff, entries(3), um, vm, vol, dx(3), dy(3)
-        integer       :: n, q, row, elem, elnodes(3)
+        real(kind=WP) :: diff, entries(MAX_NV), um, vm, vol, dx(MAX_NV), dy(MAX_NV)
+        real(kind=WP) :: mu(MAX_NV), mv(MAX_NV)
+        integer       :: n, q, nv, row, elem, elnodes(MAX_NV)
         integer       :: nNodO, nNodL, nEdgeO, nElemO
         real(kind=WP), dimension(:), pointer :: u_ice, v_ice
         real(kind=WP), dimension(:), pointer :: a_ice, m_ice, m_snow
@@ -93,26 +136,32 @@ contains
         end do
 
         do elem = 1, nElemO          ! assembling rhs over elements
-            elnodes = mesh%elem2D_nodes(1:3, elem)
+            elnodes = mesh%elem2D_nodes(:, elem)
             ! if cavity element skip it
             if (mesh%ulevels(elem) > 1) cycle
+            nv  = mesh%elem2D_nnodes(elem)
 
-            ! derivatives
-            dx  = mesh%gradient_sca(1:3, elem)
-            dy  = mesh%gradient_sca(5:7, elem)
+            ! derivatives (4 slots; a triangle's slot 4 is 0)
+            dx  = mesh%gradient_sca(1:4, elem)
+            dy  = mesh%gradient_sca(5:8, elem)
             vol = mesh%elem_area(elem)
-            um  = sum(u_ice(elnodes))
-            vm  = sum(v_ice(elnodes))
+            ! element mass contributions applied to the velocity, (M_e u)_q (ice_mcoef is
+            ! symmetric), and the kite-weighted element-mean velocity
+            do q = 1, MAX_NV
+                mu(q) = vol*sum(ice_mcoef(:,q,nv)*u_ice(elnodes))
+                mv(q) = vol*sum(ice_mcoef(:,q,nv)*v_ice(elnodes))
+            end do
+            um  = sum(mesh%elem_w(:,elem)*u_ice(elnodes))
+            vm  = sum(mesh%elem_w(:,elem)*v_ice(elnodes))
 
             ! diffusivity
             diff = ice%ice_diff*sqrt(mesh%elem_area(elem)/scale_area)
-            do n = 1, 3
+            do n = 1, MAX_NV
                 row = elnodes(n)
-                do q = 1, 3
-                    entries(q) = vol*ice%ice_dt*((dx(n)*(um+u_ice(elnodes(q))) + &
-                                 dy(n)*(vm+v_ice(elnodes(q))))/12.0_WP - &
-                                 diff*(dx(n)*dx(q) + dy(n)*dy(q)) - &
-                                 0.5_WP*ice%ice_dt*(um*dx(n)+vm*dy(n))*(um*dx(q)+vm*dy(q))/9.0_WP)
+                do q = 1, MAX_NV
+                    entries(q) = ice%ice_dt*(dx(n)*mu(q) + dy(n)*mv(q) - &
+                                 vol*diff*(dx(n)*dx(q) + dy(n)*dy(q)) - &
+                                 0.5_WP*ice%ice_dt*vol*(um*dx(n)+vm*dy(n))*(um*dx(q)+vm*dy(q)))
                 end do
                 rhs_m(row)  = rhs_m(row)  + sum(entries*m_ice(elnodes))
                 rhs_a(row)  = rhs_a(row)  + sum(entries*a_ice(elnodes))
@@ -141,8 +190,8 @@ contains
     !___________________________________________________________________________
     ! ice_solve_low_order (FESOM2 ice_fct.F90:243). Low-order solution: add the diffusive
     ! contribution (consistent - lumped mass matrix acting on the previous field) to the
-    ! rhs, with the lumped mass matrix on the lhs. gamma=ice_gamma_fct. Result in valuesl
-    ! (a_icel/m_icel/m_snowl), exchanged to the halo.
+    ! rhs, with the lumped mass matrix (fct_lumpedmass; FESOM2: the node area) on the lhs.
+    ! gamma=ice_gamma_fct. Result in valuesl (a_icel/m_icel/m_snowl), exchanged to the halo.
     subroutine ice_solve_low_order(ice, mesh, partit)
         type(t_ice),    intent(inout), target :: ice
         type(t_mesh),   intent(in),    target :: mesh
@@ -154,7 +203,7 @@ contains
         real(kind=WP), dimension(:), pointer :: a_ice, m_ice, m_snow
         real(kind=WP), dimension(:), pointer :: rhs_a, rhs_m, rhs_ms
         real(kind=WP), dimension(:), pointer :: a_icel, m_icel, m_snowl
-        real(kind=WP), dimension(:), pointer :: mass_matrix
+        real(kind=WP), dimension(:), pointer :: mass_matrix, lumped
 
         a_ice       => ice%data(1)%values(:)
         m_ice       => ice%data(2)%values(:)
@@ -166,6 +215,7 @@ contains
         m_icel      => ice%data(2)%valuesl(:)
         m_snowl     => ice%data(3)%valuesl(:)
         mass_matrix => ice%work%fct_massmatrix(:)
+        lumped      => ice%work%fct_lumpedmass(:)
         call owned_bounds(mesh, nNodO, nNodL, nEdgeO, nElemO, partit)
         lmr = is_multirank(partit)
 
@@ -181,13 +231,13 @@ contains
             cn   = clo2 - clo + 1
             location(1:cn) = ssh_stiff%colind_loc(clo:clo2)
             m_icel(row)  = (rhs_m(row) +gamma*sum(mass_matrix(clo:clo2)* &
-                            m_ice(location(1:cn))))/mesh%area(row) + &
+                            m_ice(location(1:cn))))/lumped(row) + &
                            (1.0_WP-gamma)*m_ice(row)
             a_icel(row)  = (rhs_a(row) +gamma*sum(mass_matrix(clo:clo2)* &
-                            a_ice(location(1:cn))))/mesh%area(row) + &
+                            a_ice(location(1:cn))))/lumped(row) + &
                            (1.0_WP-gamma)*a_ice(row)
             m_snowl(row) = (rhs_ms(row)+gamma*sum(mass_matrix(clo:clo2)* &
-                            m_snow(location(1:cn))))/mesh%area(row) + &
+                            m_snow(location(1:cn))))/lumped(row) + &
                            (1.0_WP-gamma)*m_snow(row)
         end do
         end associate
@@ -203,8 +253,8 @@ contains
     !___________________________________________________________________________
     ! ice_solve_high_order (FESOM2 ice_fct.F90:347). Taylor-Galerkin high-order solution
     ! by num_iter_solve=3 Jacobi-style iterations of the consistent mass matrix (the
-    ! difference correction). Result in dvalues (da_ice/dm_ice/dm_snow), with valuesl used
-    ! as the per-iteration temp.
+    ! difference correction) preconditioned by the lumped mass (fct_lumpedmass). Result in
+    ! dvalues (da_ice/dm_ice/dm_snow), with valuesl used as the per-iteration temp.
     subroutine ice_solve_high_order(ice, mesh, partit)
         type(t_ice),    intent(inout), target :: ice
         type(t_mesh),   intent(in),    target :: mesh
@@ -217,7 +267,7 @@ contains
         real(kind=WP), dimension(:), pointer :: rhs_a, rhs_m, rhs_ms
         real(kind=WP), dimension(:), pointer :: a_icel, m_icel, m_snowl
         real(kind=WP), dimension(:), pointer :: da_ice, dm_ice, dm_snow
-        real(kind=WP), dimension(:), pointer :: mass_matrix
+        real(kind=WP), dimension(:), pointer :: mass_matrix, lumped
 
         rhs_a       => ice%data(1)%values_rhs(:)
         rhs_m       => ice%data(2)%values_rhs(:)
@@ -229,15 +279,16 @@ contains
         dm_ice      => ice%data(2)%dvalues(:)
         dm_snow     => ice%data(3)%dvalues(:)
         mass_matrix => ice%work%fct_massmatrix(:)
+        lumped      => ice%work%fct_lumpedmass(:)
         call owned_bounds(mesh, nNodO, nNodL, nEdgeO, nElemO, partit)
         lmr = is_multirank(partit)
 
         ! the first approximation
         do row = 1, nNodO
             if (mesh%ulevels_nod2D(row) > 1) cycle
-            dm_ice(row)  = rhs_m(row) /mesh%area(row)
-            da_ice(row)  = rhs_a(row) /mesh%area(row)
-            dm_snow(row) = rhs_ms(row)/mesh%area(row)
+            dm_ice(row)  = rhs_m(row) /lumped(row)
+            da_ice(row)  = rhs_a(row) /lumped(row)
+            dm_snow(row) = rhs_ms(row)/lumped(row)
         end do
         if (lmr) then
             call exchange_nod(dm_ice,  partit)
@@ -255,11 +306,11 @@ contains
                 cn   = clo2 - clo + 1
                 location(1:cn) = ssh_stiff%colind_loc(clo:clo2)
                 rhs_new      = rhs_m(row)  - sum(mass_matrix(clo:clo2)*dm_ice(location(1:cn)))
-                m_icel(row)  = dm_ice(row) + rhs_new/mesh%area(row)
+                m_icel(row)  = dm_ice(row) + rhs_new/lumped(row)
                 rhs_new      = rhs_a(row)  - sum(mass_matrix(clo:clo2)*da_ice(location(1:cn)))
-                a_icel(row)  = da_ice(row) + rhs_new/mesh%area(row)
+                a_icel(row)  = da_ice(row) + rhs_new/lumped(row)
                 rhs_new      = rhs_ms(row) - sum(mass_matrix(clo:clo2)*dm_snow(location(1:cn)))
-                m_snowl(row) = dm_snow(row)+ rhs_new/mesh%area(row)
+                m_snowl(row) = dm_snow(row)+ rhs_new/lumped(row)
             end do
 
             do row = 1, nNodO
@@ -289,14 +340,14 @@ contains
         type(t_ice),    intent(inout), target :: ice
         type(t_mesh),   intent(in),    target :: mesh
         type(t_partit), intent(in), optional  :: partit
-        integer       :: icoef(3,3), n, q, elem, elnodes(3), row, clo, clo2
+        integer       :: n, q, nv, elem, elnodes(MAX_NV), row, clo, clo2
         integer       :: nNodO, nNodL, nEdgeO, nElemO
         logical       :: lmr
         real(kind=WP) :: vol, flux, ae, gamma
         real(kind=WP), dimension(:),   pointer :: a_ice, m_ice, m_snow
         real(kind=WP), dimension(:),   pointer :: a_icel, m_icel, m_snowl
         real(kind=WP), dimension(:),   pointer :: da_ice, dm_ice, dm_snow
-        real(kind=WP), dimension(:),   pointer :: icepplus, icepminus, tmax, tmin
+        real(kind=WP), dimension(:),   pointer :: icepplus, icepminus, tmax, tmin, lumped
         real(kind=WP), dimension(:,:), pointer :: icefluxes
 
         a_ice     => ice%data(1)%values(:)
@@ -313,6 +364,7 @@ contains
         icepminus => ice%work%fct_minus(:)
         tmax      => ice%work%fct_tmax(:)
         tmin      => ice%work%fct_tmin(:)
+        lumped    => ice%work%fct_lumpedmass(:)
         call owned_bounds(mesh, nNodO, nNodL, nEdgeO, nElemO, partit)
         lmr = is_multirank(partit)
 
@@ -325,34 +377,31 @@ contains
             tmax(n) = 0.0_WP
             tmin(n) = 0.0_WP
         end do
-        ! Auxiliary elemental operator (mass matrix - lumped mass matrix)
-        icoef = 1
-        do n = 1, 3   ! three upper nodes
-            icoef(n,n) = -2
-        end do
-
+        ! Auxiliary elemental operator (mass matrix - lumped mass matrix) = ice_acoef,
+        ! applied at the nv unique vertices (ice_acoef is symmetric)
         do elem = 1, nElemO
-            elnodes = mesh%elem2D_nodes(1:3, elem)
+            elnodes = mesh%elem2D_nodes(:, elem)
             ! if cavity cycle over
             if (mesh%ulevels(elem) > 1) cycle
 
+            nv  = mesh%elem2D_nnodes(elem)
             vol = mesh%elem_area(elem)
             if (tr_array_id == 1) then
-                do q = 1, 3
-                    icefluxes(elem,q) = -sum(icoef(:,q)*(gamma*m_ice(elnodes) + &
-                                dm_ice(elnodes)))*(vol/mesh%area(elnodes(q)))/12.0_WP
+                do q = 1, nv
+                    icefluxes(elem,q) = -sum(ice_acoef(:,q,nv)*(gamma*m_ice(elnodes) + &
+                                dm_ice(elnodes)))*(vol/lumped(elnodes(q)))
                 end do
             end if
             if (tr_array_id == 2) then
-                do q = 1, 3
-                    icefluxes(elem,q) = -sum(icoef(:,q)*(gamma*a_ice(elnodes) + &
-                                da_ice(elnodes)))*(vol/mesh%area(elnodes(q)))/12.0_WP
+                do q = 1, nv
+                    icefluxes(elem,q) = -sum(ice_acoef(:,q,nv)*(gamma*a_ice(elnodes) + &
+                                da_ice(elnodes)))*(vol/lumped(elnodes(q)))
                 end do
             end if
             if (tr_array_id == 3) then
-                do q = 1, 3
-                    icefluxes(elem,q) = -sum(icoef(:,q)*(gamma*m_snow(elnodes) + &
-                                dm_snow(elnodes)))*(vol/mesh%area(elnodes(q)))/12.0_WP
+                do q = 1, nv
+                    icefluxes(elem,q) = -sum(ice_acoef(:,q,nv)*(gamma*m_snow(elnodes) + &
+                                dm_snow(elnodes)))*(vol/lumped(elnodes(q)))
                 end do
             end if
         end do
@@ -411,8 +460,8 @@ contains
 
         do elem = 1, nElemO
             if (mesh%ulevels(elem) > 1) cycle
-            elnodes = mesh%elem2D_nodes(1:3, elem)
-            do q = 1, 3
+            elnodes = mesh%elem2D_nodes(:, elem)
+            do q = 1, mesh%elem2D_nnodes(elem)
                 n    = elnodes(q)
                 flux = icefluxes(elem,q)
                 if (flux > 0) then
@@ -451,9 +500,9 @@ contains
         ! Limiting
         do elem = 1, nElemO
             if (mesh%ulevels(elem) > 1) cycle
-            elnodes = mesh%elem2D_nodes(1:3, elem)
+            elnodes = mesh%elem2D_nodes(:, elem)
             ae = 1.0_WP
-            do q = 1, 3
+            do q = 1, mesh%elem2D_nnodes(elem)
                 n    = elnodes(q)
                 flux = icefluxes(elem,q)
                 if (flux >= 0._WP) ae = min(ae, icepplus(n))
@@ -471,8 +520,8 @@ contains
             end do
             do elem = 1, nElemO
                 if (mesh%ulevels(elem) > 1) cycle
-                elnodes = mesh%elem2D_nodes(1:3, elem)
-                do q = 1, 3
+                elnodes = mesh%elem2D_nodes(:, elem)
+                do q = 1, mesh%elem2D_nnodes(elem)
                     n = elnodes(q)
                     m_ice(n) = m_ice(n) + icefluxes(elem,q)
                 end do
@@ -485,8 +534,8 @@ contains
             end do
             do elem = 1, nElemO
                 if (mesh%ulevels(elem) > 1) cycle
-                elnodes = mesh%elem2D_nodes(1:3, elem)
-                do q = 1, 3
+                elnodes = mesh%elem2D_nodes(:, elem)
+                do q = 1, mesh%elem2D_nnodes(elem)
                     n = elnodes(q)
                     a_ice(n) = a_ice(n) + icefluxes(elem,q)
                 end do
@@ -499,8 +548,8 @@ contains
             end do
             do elem = 1, nElemO
                 if (mesh%ulevels(elem) > 1) cycle
-                elnodes = mesh%elem2D_nodes(1:3, elem)
-                do q = 1, 3
+                elnodes = mesh%elem2D_nodes(:, elem)
+                do q = 1, mesh%elem2D_nnodes(elem)
                     n = elnodes(q)
                     m_snow(n) = m_snow(n) + icefluxes(elem,q)
                 end do

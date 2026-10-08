@@ -8,12 +8,20 @@ module mod_ice_setup
     ! VERBATIM (owned_bounds returns the global mesh counts). The ice mass matrix rides
     ! the M2.6 ssh_stiff CSR (rowptr_loc/colind_loc) exactly like FESOM2 rides ssh_stiff
     ! (rowptr/nn_num/nn_pos) — same sparsity, same nza, so fct_massmatrix is byte-identical.
+    !
+    ! Hybrid meshes (plan docs/plans/2026-10-08-hybrid-meshes.md, Task 16): the mass matrix
+    ! uses the user's element contributions (mod_ice_fct ice_mcoef: triangle S/6, S/12;
+    ! quad (S/36)(4,2,1,2) rotated per row) on the SSH sparsity incl. quad diagonals, and
+    ! its row sums are stored once as the FCT lumped mass (fct_lumpedmass).
+    use mpi
     use mod_precision,    only: WP
-    use mod_mesh,         only: t_mesh
+    use mod_mesh,         only: t_mesh, MAX_NV
     use mod_partit,       only: t_partit
     use mod_tracer,       only: t_tracer
     use mod_ice,          only: t_ice
     use mod_part_bounds,  only: owned_bounds, local_dims, is_multirank
+    use mod_halo,         only: exchange_nod
+    use mod_ice_fct,      only: ice_mcoef
     implicit none
     private
     public :: ice_setup, ice_allocate, ice_mass_matrix_fill, ice_initial_state
@@ -134,13 +142,13 @@ contains
         ! work arrays: FCT (nodes) + mass matrix (CSR) + stress/strain (elements)
         allocate(ice%work%fct_tmax(node_size), ice%work%fct_tmin(node_size))
         allocate(ice%work%fct_plus(node_size), ice%work%fct_minus(node_size))
-        allocate(ice%work%fct_fluxes(elem_size, 3))
+        allocate(ice%work%fct_fluxes(elem_size, MAX_NV))
         ice%work%fct_tmax = 0.0_WP; ice%work%fct_tmin = 0.0_WP
         ice%work%fct_plus = 0.0_WP; ice%work%fct_minus = 0.0_WP
         ice%work%fct_fluxes = 0.0_WP
 
-        allocate(ice%work%fct_massmatrix(mesh%ssh_stiff%nza))
-        ice%work%fct_massmatrix = 0.0_WP
+        allocate(ice%work%fct_massmatrix(mesh%ssh_stiff%nza), ice%work%fct_lumpedmass(node_size))
+        ice%work%fct_massmatrix = 0.0_WP; ice%work%fct_lumpedmass = 0.0_WP
 
         allocate(ice%work%sigma11(elem_size), ice%work%sigma12(elem_size), ice%work%sigma22(elem_size))
         allocate(ice%work%eps11(elem_size), ice%work%eps12(elem_size), ice%work%eps22(elem_size))
@@ -165,43 +173,78 @@ contains
     end subroutine ice_allocate
 
     !___________________________________________________________________________
-    ! ice_mass_matrix_fill (FESOM2 ice_fct.F90:1145). Builds the lumped/consistent ice
-    ! FCT mass matrix on the ssh_stiff CSR sparsity. FESOM2 locates the CSR slot for the
-    ! (row, elnodes(q)) pair via nn_num/nn_pos; here we scan the equivalent
-    ! ssh_stiff%colind_loc(rowptr_loc(row):rowptr_loc(row+1)-1) — the SAME ordered
-    ! neighbour list (init_stiff_mat_ale fills colind_loc = n_pos(1:n_num,row)). The
-    ! area==row-sum diagnostic (FESOM2:1212-1248) is omitted — it only prints a warning
-    ! and never modifies fct_massmatrix, so the gated values are unaffected.
+    ! ice_mass_matrix_fill (FESOM2 ice_fct.F90:1145). Builds the consistent ice FCT mass
+    ! matrix on the ssh_stiff CSR sparsity and its row sums, the lumped mass. FESOM2 locates
+    ! the CSR slot for the (row, elnodes(q)) pair via nn_num/nn_pos; here we scan the
+    ! equivalent ssh_stiff%colind_loc(rowptr_loc(row):rowptr_loc(row+1)-1) — the SAME
+    ! ordered neighbour list (init_stiff_mat_ale fills colind_loc = n_pos(1:n_num,row)).
+    ! A column that is not in the row stops the run (the sparsity does not match the mesh).
+    ! Element contributions elem_area*ice_mcoef(:,:,nv) over the nv unique vertices
+    ! (FESOM2: S/12 off-diagonal, S/6 diagonal = the triangle case). The lumped mass
+    ! fct_lumpedmass = row sums (S/3 per triangle vertex, S/4 per quad vertex; FESOM2 used
+    ! the node area instead and only warned where they differ) is exchanged to the halo
+    ! (the antidiffusive fluxes of owned elements divide by it at halo vertices). A node
+    ! with no wet element (all its elements cavity) has a zero row; it keeps the node area
+    ! there (FESOM2 behaviour) so that the FCT divides stay finite.
     subroutine ice_mass_matrix_fill(ice, mesh, partit)
         type(t_ice),    intent(inout)         :: ice
         type(t_mesh),   intent(in)            :: mesh
         type(t_partit), intent(in), optional  :: partit
-        integer :: n, row, elem, elnodes(3), q, ipos, nini, nend
+        integer :: n, row, elem, elnodes(MAX_NV), nv, q, ipos, nini, nend
         integer :: nNodO, nNodL, nEdgeO, nElemO
 
         call owned_bounds(mesh, nNodO, nNodL, nEdgeO, nElemO, partit)
 
         associate(ssh_stiff => mesh%ssh_stiff)
         do elem = 1, nElemO
-            elnodes = mesh%elem2D_nodes(1:3, elem)
-            do n = 1, 3
+            if (mesh%ulevels(elem) > 1) cycle   ! cavity element -> no mass
+            elnodes = mesh%elem2D_nodes(:, elem)
+            nv      = mesh%elem2D_nnodes(elem)
+            do n = 1, nv
                 row = elnodes(n)
                 if (row > nNodO) cycle
                 nini = ssh_stiff%rowptr_loc(row)
                 nend = ssh_stiff%rowptr_loc(row+1) - 1
-                do q = 1, 3
-                    if (mesh%ulevels(elem) > 1) cycle   ! cavity element -> no mass
+                do q = 1, nv
                     do ipos = nini, nend
                         if (ssh_stiff%colind_loc(ipos) == elnodes(q)) exit
                     end do
-                    ice%work%fct_massmatrix(ipos) = ice%work%fct_massmatrix(ipos) + mesh%elem_area(elem)/12.0_WP
-                    if (q == n) then
-                        ice%work%fct_massmatrix(ipos) = ice%work%fct_massmatrix(ipos) + mesh%elem_area(elem)/12.0_WP
-                    end if
+                    if (ipos > nend) call column_not_found(row, elnodes(q), elem)
+                    ice%work%fct_massmatrix(ipos) = ice%work%fct_massmatrix(ipos) + &
+                                                    mesh%elem_area(elem)*ice_mcoef(n,q,nv)
                 end do
             end do
         end do
+
+        ! lumped mass = row sums
+        do row = 1, nNodO
+            nini = ssh_stiff%rowptr_loc(row)
+            nend = ssh_stiff%rowptr_loc(row+1) - 1
+            ice%work%fct_lumpedmass(row) = sum(ice%work%fct_massmatrix(nini:nend))
+            if (ice%work%fct_lumpedmass(row) <= 0.0_WP) ice%work%fct_lumpedmass(row) = mesh%area(row)
+        end do
         end associate
+        if (is_multirank(partit)) call exchange_nod(ice%work%fct_lumpedmass, partit)
+
+    contains
+
+        subroutine column_not_found(row, col, elem)
+            integer, intent(in) :: row, col, elem
+            integer :: grow, gcol, gelem, comm, ierr
+            grow = row; gcol = col; gelem = elem; comm = MPI_COMM_WORLD
+            if (present(partit)) then
+                comm = partit%MPI_COMM_FESOM
+                if (is_multirank(partit)) then
+                    grow  = partit%myList_nod2D(row)
+                    gcol  = partit%myList_nod2D(col)
+                    gelem = partit%myList_elem2D(elem)
+                end if
+            end if
+            write(*,'(a,i0,a,i0,a,i0,a)') 'ice_mass_matrix_fill: column of node ', gcol, &
+                ' (element ', gelem, ') not found in the ssh_stiff CSR row of node ', grow, &
+                ': the SSH sparsity does not match the mesh'
+            call MPI_Abort(comm, 1, ierr)
+        end subroutine column_not_found
     end subroutine ice_mass_matrix_fill
 
     !___________________________________________________________________________
