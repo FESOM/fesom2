@@ -786,7 +786,7 @@ fluxes and nonlinear terms can. Asserted in a test (Task 9), measured in the sho
       `mod_mesh_analytic:122-138` (the generator builds triangles, slot 4 set after),
       `mod_mesh_areas:208-209` + `oce_dyn_vinv:270-271` (sub-triangle centroid `/(3(s1+s2))`),
       `mod_mesh_areas:283` (triangle kite weights 1/3), spline `oce_adv_tra_ver:134-135`, KPP cube
-      roots. Pending Task 15/16 (not converted here): `mod_ice_dyn.F90` (:160-167 strain rates,
+      roots. Pending Task 15/16 (not converted here; the `mod_ice_dyn` ones cleared in Task 15): `mod_ice_dyn.F90` (:160-167 strain rates,
       :219/:514 val3, :269/:468 `elnodes(3)`, :342-361 msum/asum/aa/elevation gradient, :530-535,
       :570, :596-598), `mod_ice_fct.F90` (:73, :96-102, :292 `icoef(3,3)`, :335, :414, :454, :474,
       :488, :502), `mod_ice_setup.F90` (:179, :186)
@@ -809,15 +809,51 @@ fluxes and nonlinear terms can. Asserted in a test (Task 9), measured in the sho
 **Files:**
 - Modify: `src/ice/mod_ice_dyn.F90`
 - Create: `test/test_ice_dyn_mixed.F90`
+- ➕ Modify: `test/CMakeLists.txt`, `tools/run_tri_regression.sh` (CORE2 EARLY tolerance, header)
 
-- [ ] strain rates over 4 slots of `gradient_sca`; metric term with the `elem_w` mean
-- [ ] `stress2rhs` (EVP and the fused mEVP loop): node shares `elem_area·elem_w(k)` and
+- [x] strain rates over 4 slots of `gradient_sca`; metric term with the `elem_w` mean
+      — `stress_tensor` and the fused mEVP loop: `gradient_sca(1:4|5:8)` over `elem2D_nodes(:,el)`,
+      metric terms `metric_factor·sum(elem_w·v)` (FESOM2 `sum(v)/3`)
+- [x] `stress2rhs` (EVP and the fused mEVP loop): node shares `elem_area·elem_w(k)` and
       `gradient_sca(k|k+4)`; SSH-tilt terms (`aa = g·elem_area/3`, mEVP `bb`) → `elem_area·elem_w(k)`;
       `msum`/`asum` via `elem_w`
-- [ ] ocean-velocity node gather (`mod_ice_dyn.F90:100-110`) via `nod_in_elem2D_w`
-- [ ] tests: `test_ice_dyn_mixed` — zero strain rate for uniform drift and rigid rotation on
+      — scatter loops over `MAX_NV` (a triangle's slot 4 has gradient and kite weight 0, adds
+      exactly 0), metric share `sigma·elem_w(k)·metric_factor`; `any(m_ice/a_ice <= 0)` over 4
+      slots (repeated slot unchanged); `elnodes(MAX_NV)`, `val3`/`meancos` gone; the mod_ice_dyn
+      grep hits listed under Task 14 are cleared. `stress_tensor`/`stress2rhs` made public (test)
+- [x] ocean-velocity node gather (`mod_ice_dyn.F90:100-110`) via `nod_in_elem2D_w`
+      — `Σ A·w·UV / Σ A·w` over the wet elements (FESOM2 `Σ A·UV / Σ A`, no hidden 1/3: the
+      normalisation by the wet shares keeps the cavity partial-patch behaviour)
+- [x] tests: `test_ice_dyn_mixed` — zero strain rate for uniform drift and rigid rotation on
       triangle and mixed patches; CORE2 ice step at roundoff vs before
-- [ ] run ctest — must pass before Task 16
+      — `test_ice_dyn_mixed` (NEMO-mixed cut np1/2 + analytic triangle, mixed and parallelogram
+      patches at np1, NEMO-quad cut np2, pi_w np1 and core2_w np8 rotated): D1 uniform drift /
+      rigid rotation zero strain (≤ 1.7e-15), linear deformation exact (≤ 3.7e-15); on the sphere
+      rigid rotation about the pole: the metric terms cancel du/dy (max|eps|/Ω 3.6e-4 NEMO-mixed,
+      1.5e-7 NEMO-quad, 3.3e-2 pi, 7.4e-3 CORE2 vs 0.10–0.50 without metric — discretisation
+      error, identical to FESOM2 on triangles); triangles == former P1 strain formulas ≤ 1.1e-16;
+      D2 `stress2rhs` = exact negative adjoint of the strain rates (Σ u·R = −Σ A σ:ε, ≤ 2.3e-17)
+      and == the former formula at all-triangle nodes (0); D3 SSH tilt EVP/mEVP: Σ area·rhs_a =
+      −gΣAη_x (global) and rhs_a = −g·a for a linear η on the patches (≤ 2.6e-15); D4 uniform
+      strain is force-free at interior nodes after one subcycle, EVP and mEVP (≤ 1.4e-13; stress
+      861/5.7 Pa); D5 ocean2ice uniform velocity exact, triangles == former gather (≤ 4.2e-16).
+      Mutation: the former 3-slot scatter fails D2/D3/D4 on the mixed and quad patches and the
+      NEMO-mixed cut (13 failures), triangle patch unaffected. CORE2 ice step: `fesom_evpdump`
+      (CORE2 1 rank, 120 subcycles, prescribed forcing) new vs a build of 5b7dae1 (before this
+      task): EVP uice 1.7e-6, sigma ≤ 2.0e-4; mEVP uice 3.8e-11, sigma ≤ 5.6e-9 — the same floor
+      as the frozen Task-6 binary vs 5b7dae1 (identical ice code, Task-7 geometry roundoff only):
+      EVP uice 8.8e-7, sigma ≤ 1.0e-4, mEVP 1.5e-11 / 2.1e-9 — roundoff amplified by the stiff
+      EVP; srfoce_u/v ≤ 7.4e-16. `run_tri_regression.sh` 7/7 after raising the CORE2 EARLY
+      tolerance 1e-8 → 1e-7: CORE2 EARLY T 2.2e-8 (was 2.1e-9; roundoff now enters inside every EVP
+      subcycle), OCEAN 3.1e-5, ICE 8.9e-5, MIX 7.9e-4; the same case with mEVP in both runs gives
+      EARLY T 1.1e-15, ICE 6.9e-6 (amplification by the standard EVP, not a kernel error); pi PRE
+      6.3e-15, EARLY 9.2e-13, OCEAN 1.1e-7, ICE 6.6e-7; decomp OCEAN ≤ 4.4e-10; conservation totals
+      ≤ 3.5e-16
+- ⚠️ finding (pre-existing FESOM2 property, not a kernel bug): uniform ice AT REST is not a
+  numerically stable state of the standard EVP (delta_min-regularised viscosity): on the plain
+  triangle patch roundoff grows to O(1e-2) m/s within 120 subcycles; mEVP has zero stress at rest.
+  It is the amplifier behind the CORE2 ICE regression tier (and the EVP dump floor above)
+- [x] run ctest — must pass before Task 16 — scratch ctest 130/130 (wiped + reconfigured)
 
 ### Task 16: Sea-ice FCT and mass matrix (user's specification)
 

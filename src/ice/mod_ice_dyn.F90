@@ -35,9 +35,17 @@ module mod_ice_dyn
     !  - cd_oce_ice / delta_min are set by the driver to the namelist DOUBLES (0.0055_WP /
     !    1.0e-11_WP) NOT the t_ice single->WP defaults (the M3a precision note); the EVP
     !    arithmetic reads ice%cd_oce_ice / ice%delta_min so the override propagates.
-    !  - elem2D_nodes(1:3,el) sliced 1:3 (MAX_NV=4) to avoid the L15 shape trap.
+    !  - hybrid meshes (plan docs/plans/2026-10-08-hybrid-meshes.md, Task 15): unified 4-slot
+    !    formulas, so triangles agree with FESOM2 to roundoff only. Strain rates and the
+    !    stress divergence use gradient_sca over the 4 vertex slots (x 1:4, y 5:8; a
+    !    triangle's slot 4 has coefficient 0); every element mean (metric terms, msum/asum)
+    !    is the kite-weighted sum(elem_w*f) and every element->node share (metric terms of
+    !    stress2rhs, SSH tilt) is elem_area*elem_w(k) (FESOM2: elem_area/3). The shares sum
+    !    to the node area (area = sum elem_area*elem_w), and stress2rhs stays the exact
+    !    negative adjoint of the strain rates (sum_n u.rhs = -sum_e elem_area*sigma:eps).
+    !    The ocean-velocity node gather is kite-share weighted (sum A*w*UV / sum A*w).
     use mod_precision,   only: WP
-    use mod_mesh,        only: t_mesh
+    use mod_mesh,        only: t_mesh, MAX_NV
     use mod_dyn,         only: t_dyn
     use mod_tracer,      only: t_tracer
     use mod_ice,         only: t_ice
@@ -48,14 +56,16 @@ module mod_ice_dyn
     implicit none
     private
     public :: ocean2ice, EVPdynamics, EVPdynamics_m, EVPdynamics_solve
+    public :: stress_tensor, stress2rhs          ! for test_ice_dyn_mixed
 
 contains
 
     !___________________________________________________________________________
     ! ocean2ice (FESOM2 ice_oce_coupling.F90:194). Transmits the ocean surface state
     ! to the ice model: srfoce_temp/salt/ssh = surface tracer / hbar (owned+halo, no
-    ! exchange — already valid at the halo), srfoce_u/v = area-weighted node average of
-    ! the surface element velocity UV(:,1,:) over nod_in_elem2D (owned, then exchange_nod).
+    ! exchange — already valid at the halo), srfoce_u/v = kite-share-weighted node average
+    ! (elem_area*nod_in_elem2D_w) of the surface element velocity UV(:,1,:) over the wet
+    ! elements of nod_in_elem2D (owned, then exchange_nod).
     ! ice_update=.true. branch (ice_steps_since_upd averaging is the ice_ave_steps>1 path).
     subroutine ocean2ice(ice, dynamics, tracers, mesh, partit)
         type(t_ice),    intent(inout), target :: ice
@@ -65,7 +75,7 @@ contains
         type(t_partit), intent(in), optional  :: partit
         integer :: n, elem, k
         integer :: nNodO, nNodL, nEdgeO, nElemO
-        real(kind=WP) :: uw, vw, vol
+        real(kind=WP) :: uw, vw, vol, wa
         real(kind=WP), dimension(:,:),   pointer :: temp, salt
         real(kind=WP), dimension(:,:,:), pointer :: UV
         real(kind=WP), dimension(:),     pointer :: u_w, v_w, T_oc_array, S_oc_array, elevation
@@ -102,9 +112,10 @@ contains
             do k = 1, mesh%nod_in_elem2D_num(n)
                 elem = mesh%nod_in_elem2D(k, n)
                 if (mesh%ulevels(elem) > 1) cycle
-                vol = vol + mesh%elem_area(elem)
-                uw  = uw  + UV(1,1,elem)*mesh%elem_area(elem)
-                vw  = vw  + UV(2,1,elem)*mesh%elem_area(elem)
+                wa  = mesh%elem_area(elem)*mesh%nod_in_elem2D_w(k, n)
+                vol = vol + wa
+                uw  = uw  + UV(1,1,elem)*wa
+                vw  = vw  + UV(2,1,elem)*wa
             end do
             uw = uw/vol
             vw = vw/vol
@@ -156,15 +167,16 @@ contains
             if (mesh%ulevels(el) > 1) cycle
 
             if (ice_strength(el) > 0.0_WP) then
-                ! deformation rate tensor on element el
-                eps11(el) = sum(mesh%gradient_sca(1:3,el)*u_ice(mesh%elem2D_nodes(1:3,el))) &
-                    - mesh%metric_factor(el) * sum(v_ice(mesh%elem2D_nodes(1:3,el)))/3.0_WP
+                ! deformation rate tensor on element el (4 vertex slots; metric terms with
+                ! the kite-weighted element mean)
+                eps11(el) = sum(mesh%gradient_sca(1:4,el)*u_ice(mesh%elem2D_nodes(:,el))) &
+                    - mesh%metric_factor(el) * sum(mesh%elem_w(:,el)*v_ice(mesh%elem2D_nodes(:,el)))
 
-                eps22(el) = sum(mesh%gradient_sca(5:7,el)*v_ice(mesh%elem2D_nodes(1:3,el)))
+                eps22(el) = sum(mesh%gradient_sca(5:8,el)*v_ice(mesh%elem2D_nodes(:,el)))
 
-                eps12(el) = 0.5_WP*(sum(mesh%gradient_sca(5:7,el)*u_ice(mesh%elem2D_nodes(1:3,el))) &
-                            + sum(mesh%gradient_sca(1:3,el)*v_ice(mesh%elem2D_nodes(1:3,el))) &
-                            + mesh%metric_factor(el) * sum(u_ice(mesh%elem2D_nodes(1:3,el)))/3.0_WP)
+                eps12(el) = 0.5_WP*(sum(mesh%gradient_sca(5:8,el)*u_ice(mesh%elem2D_nodes(:,el))) &
+                            + sum(mesh%gradient_sca(1:4,el)*v_ice(mesh%elem2D_nodes(:,el))) &
+                            + mesh%metric_factor(el) * sum(mesh%elem_w(:,el)*u_ice(mesh%elem2D_nodes(:,el))))
 
                 ! moduli
                 delta = sqrt((eps11(el)*eps11(el) + eps22(el)*eps22(el))*(1.0_WP+vale) &
@@ -193,14 +205,14 @@ contains
     !___________________________________________________________________________
     ! stress2rhs (FESOM2 ice_EVP.F90:261). Divergence of the stress tensor -> the
     ! momentum rhs (u_rhs_ice/v_rhs_ice). Accumulates the elemental stress divergence
-    ! into the element nodes (owned elements), then scales by inv_areamass and adds the
-    ! elevation contribution (rhs_a/rhs_m). Nodes with no ice mass -> rhs 0.
+    ! into the element vertices (owned elements; 4 slots, metric term with the node share
+    ! elem_area*elem_w(k)), then scales by inv_areamass and adds the elevation
+    ! contribution (rhs_a/rhs_m). Nodes with no ice mass -> rhs 0.
     subroutine stress2rhs(ice, mesh, partit)
         type(t_ice),    intent(inout), target :: ice
         type(t_mesh),   intent(in),    target :: mesh
         type(t_partit), intent(in), optional  :: partit
         integer :: n, el, k, nNodO, nNodL, nEdgeO, nElemO
-        real(kind=WP) :: val3
         real(kind=WP), dimension(:), pointer :: sigma11, sigma12, sigma22
         real(kind=WP), dimension(:), pointer :: u_rhs_ice, v_rhs_ice, rhs_a, rhs_m
         real(kind=WP), dimension(:), pointer :: inv_areamass, ice_strength
@@ -216,8 +228,6 @@ contains
         ice_strength => ice%work%ice_strength(:)
         call owned_bounds(mesh, nNodO, nNodL, nEdgeO, nElemO, partit)
 
-        val3 = 1.0_WP/3.0_WP
-
         do n = 1, nNodO
             u_rhs_ice(n) = 0.0_WP
             v_rhs_ice(n) = 0.0_WP
@@ -228,16 +238,18 @@ contains
             if (mesh%ulevels(el) > 1) cycle
 
             if (ice_strength(el) > 0.0_WP) then
-                do k = 1, 3
+                ! 4 vertex slots: a triangle's slot 4 (= its 1st vertex) has gradient and
+                ! kite weight 0, so it adds exactly 0
+                do k = 1, MAX_NV
                     u_rhs_ice(mesh%elem2D_nodes(k,el)) = u_rhs_ice(mesh%elem2D_nodes(k,el)) &
                         - mesh%elem_area(el) * &
                           (sigma11(el)*mesh%gradient_sca(k,el) + sigma12(el)*mesh%gradient_sca(k+4,el) &
-                           + sigma12(el)*val3*mesh%metric_factor(el))            ! metrics
+                           + sigma12(el)*mesh%elem_w(k,el)*mesh%metric_factor(el))   ! metrics
 
                     v_rhs_ice(mesh%elem2D_nodes(k,el)) = v_rhs_ice(mesh%elem2D_nodes(k,el)) &
                         - mesh%elem_area(el) * &
                           (sigma12(el)*mesh%gradient_sca(k,el) + sigma22(el)*mesh%gradient_sca(k+4,el) &
-                           - sigma11(el)*val3*mesh%metric_factor(el))
+                           - sigma11(el)*mesh%elem_w(k,el)*mesh%metric_factor(el))
                 end do
             end if
         end do
@@ -266,7 +278,7 @@ contains
         type(t_ice),    intent(inout), target :: ice
         type(t_mesh),   intent(in),    target :: mesh
         type(t_partit), intent(in), optional  :: partit
-        integer :: shortstep, n, ed, el, k, elnodes(3)
+        integer :: shortstep, n, ed, el, k, elnodes(MAX_NV)
         integer :: nNodO, nNodL, nEdgeO, nElemO
         logical :: lmr, is_bnd
         real(kind=WP) :: rdt, asum, msum, r_a, r_b, drag, det, umod, rhsu, rhsv
@@ -339,30 +351,32 @@ contains
         ! floating-ice loading p_ice term is dropped (the FESOM2 `else` linfs branch).
         do el = 1, nElemO
             ice_strength(el) = 0.0_WP
-            elnodes = mesh%elem2D_nodes(1:3,el)
+            elnodes = mesh%elem2D_nodes(:,el)
             ! if element has any cavity node skip it
             if (mesh%ulevels(el) > 1) cycle
 
+            ! (a triangle's repeated 4th slot leaves any() unchanged)
             if (any(m_ice(elnodes) <= 0.0_WP) .or. &
                 any(a_ice(elnodes) <= 0.0_WP)) then
                 ! There is no ice in elem
                 ice_strength(el) = 0.0_WP
             else
-                msum = sum(m_ice(elnodes))/3.0_WP
-                asum = sum(a_ice(elnodes))/3.0_WP
+                msum = sum(mesh%elem_w(:,el)*m_ice(elnodes))
+                asum = sum(mesh%elem_w(:,el)*a_ice(elnodes))
 
                 ! Hunke and Dukowicz c*h*p*
                 ice_strength(el) = ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
                 ice_strength(el) = 0.5_WP*ice_strength(el)
 
-                ! use rhs_m and rhs_a for storing the contribution from elevation
-                aa = 9.81_WP*mesh%elem_area(el)/3.0_WP
-                elevation_dx = sum(mesh%gradient_sca(1:3,el)*elevation(elnodes))
-                elevation_dy = sum(mesh%gradient_sca(5:7,el)*elevation(elnodes))
+                ! use rhs_m and rhs_a for storing the contribution from elevation; node
+                ! share elem_area*elem_w(k) (a triangle's slot 4 has weight 0)
+                aa = 9.81_WP*mesh%elem_area(el)
+                elevation_dx = sum(mesh%gradient_sca(1:4,el)*elevation(elnodes))
+                elevation_dy = sum(mesh%gradient_sca(5:8,el)*elevation(elnodes))
 
-                do k = 1, 3
-                    rhs_a(elnodes(k)) = rhs_a(elnodes(k)) - aa*elevation_dx
-                    rhs_m(elnodes(k)) = rhs_m(elnodes(k)) - aa*elevation_dy
+                do k = 1, MAX_NV
+                    rhs_a(elnodes(k)) = rhs_a(elnodes(k)) - aa*mesh%elem_w(k,el)*elevation_dx
+                    rhs_m(elnodes(k)) = rhs_m(elnodes(k)) - aa*mesh%elem_w(k,el)*elevation_dy
                 end do
             end if
         end do
@@ -465,11 +479,11 @@ contains
         type(t_ice),    intent(inout), target :: ice
         type(t_mesh),   intent(in),    target :: mesh
         type(t_partit), intent(in), optional  :: partit
-        integer :: shortstep, steps, n, ed, el, i, k, row, elnodes(3)
+        integer :: shortstep, steps, n, ed, el, i, k, row, elnodes(MAX_NV)
         integer :: nNodO, nNodL, nEdgeO, nElemO
         logical :: lmr, is_bnd
-        real(kind=WP) :: val3, vale, det1, det2, rdt
-        real(kind=WP) :: dx(3), dy(3), msum, asum, meancos
+        real(kind=WP) :: vale, det1, det2, rdt
+        real(kind=WP) :: dx(MAX_NV), dy(MAX_NV), w(MAX_NV), msum, asum, metric
         real(kind=WP) :: eps1, eps2, delta, pressure, vol, aa, bb
         real(kind=WP) :: umod, drag, det, rhsu, rhsv
         real(kind=WP), allocatable :: inv_thickness(:), mass(:), pressure_fac(:)
@@ -511,7 +525,6 @@ contains
         allocate(inv_thickness(nNodO), mass(nNodO), ice_nod(nNodO))
         allocate(pressure_fac(nElemO), ice_el(nElemO))
 
-        val3 = 1.0_WP/3.0_WP
         vale = 1.0_WP/(ice%ellipse**2)
         det2 = 1.0_WP/(1.0_WP+ice%alpha_evp)
         det1 = ice%alpha_evp*det2
@@ -521,24 +534,25 @@ contains
         u_ice_aux = u_ice        ! Initialize solver variables
         v_ice_aux = v_ice
 
-        ! ssh2rhs (inlined, linfs branch): elevation contribution to rhs_a/rhs_m.
+        ! ssh2rhs (inlined, linfs branch): elevation contribution to rhs_a/rhs_m, node
+        ! share elem_area*elem_w(n) (a triangle's slot 4 has weight 0).
         do row = 1, nNodO
             rhs_a(row) = 0.0_WP
             rhs_m(row) = 0.0_WP
         end do
         do el = 1, nElemO
-            elnodes = mesh%elem2D_nodes(1:3,el)
+            elnodes = mesh%elem2D_nodes(:,el)
             ! if element has any cavity node skip it
             if (mesh%ulevels(el) > 1) cycle
             vol = mesh%elem_area(el)
-            dx  = mesh%gradient_sca(1:3,el)
-            dy  = mesh%gradient_sca(5:7,el)
-            bb  = g*val3*vol
+            dx  = mesh%gradient_sca(1:4,el)
+            dy  = mesh%gradient_sca(5:8,el)
+            bb  = g*vol
             aa  = bb*sum(dx*elevation(elnodes))
             bb  = bb*sum(dy*elevation(elnodes))
-            do n = 1, 3
-                rhs_a(elnodes(n)) = rhs_a(elnodes(n)) - aa
-                rhs_m(elnodes(n)) = rhs_m(elnodes(n)) - bb
+            do n = 1, MAX_NV
+                rhs_a(elnodes(n)) = rhs_a(elnodes(n)) - aa*mesh%elem_w(n,el)
+                rhs_m(elnodes(n)) = rhs_m(elnodes(n)) - bb*mesh%elem_w(n,el)
             end do
         end do
 
@@ -567,16 +581,16 @@ contains
 
         ! precompute pressure factor (det2 folded in) + ice_el flag.
         do el = 1, nElemO
-            elnodes = mesh%elem2D_nodes(1:3,el)
+            elnodes = mesh%elem2D_nodes(:,el)
             pressure_fac(el) = 0.0_WP
             ice_el(el)       = .false.
             ! if element has any cavity node skip it
             if (mesh%ulevels(el) > 1) cycle
 
-            msum = sum(m_ice(elnodes))*val3
+            msum = sum(mesh%elem_w(:,el)*m_ice(elnodes))
             if (msum > 0.01_WP) then
                 ice_el(el) = .true.
-                asum = sum(a_ice(elnodes))*val3
+                asum = sum(mesh%elem_w(:,el)*a_ice(elnodes))
                 pressure_fac(el) = det2*ice%pstar*msum*exp(-ice%c_pressure*(1.0_WP-asum))
             end if
         end do
@@ -593,16 +607,18 @@ contains
             do el = 1, nElemO
                 if (mesh%ulevels(el) > 1) cycle
                 if (ice_el(el)) then
-                    elnodes = mesh%elem2D_nodes(1:3,el)
-                    dx = mesh%gradient_sca(1:3,el)
-                    dy = mesh%gradient_sca(5:7,el)
-                    meancos = val3*mesh%metric_factor(el)        ! metrics
+                    elnodes = mesh%elem2D_nodes(:,el)
+                    dx = mesh%gradient_sca(1:4,el)
+                    dy = mesh%gradient_sca(5:8,el)
+                    w  = mesh%elem_w(:,el)
+                    metric = mesh%metric_factor(el)              ! metrics
 
-                    ! deformation rate tensor on element el
-                    eps11(el) = sum(dx*u_ice_aux(elnodes)) - sum(v_ice_aux(elnodes))*meancos
+                    ! deformation rate tensor on element el (metric terms with the
+                    ! kite-weighted element mean)
+                    eps11(el) = sum(dx*u_ice_aux(elnodes)) - sum(w*v_ice_aux(elnodes))*metric
                     eps22(el) = sum(dy*v_ice_aux(elnodes))
                     eps12(el) = 0.5_WP*(sum(dy*u_ice_aux(elnodes) + dx*v_ice_aux(elnodes)) &
-                                    + sum(u_ice_aux(elnodes))*meancos)
+                                    + sum(w*u_ice_aux(elnodes))*metric)
 
                     eps1 = eps11(el) + eps22(el)
                     eps2 = eps11(el) - eps22(el)
@@ -613,13 +629,14 @@ contains
                     sigma11(el) = det1*sigma11(el) + 0.5_WP*pressure*(eps1 - delta + eps2*vale)
                     sigma22(el) = det1*sigma22(el) + 0.5_WP*pressure*(eps1 - delta - eps2*vale)
 
-                    ! scatter the stress divergence into the rhs (owned nodes only)
-                    do k = 1, 3
+                    ! scatter the stress divergence into the rhs (owned nodes only; metric
+                    ! term with the node share elem_area*elem_w(k); a triangle's slot 4 adds 0)
+                    do k = 1, MAX_NV
                         if (elnodes(k) <= nNodO) then
                             u_rhs_ice(elnodes(k)) = u_rhs_ice(elnodes(k)) - mesh%elem_area(el)* &
-                                    (sigma11(el)*dx(k)+sigma12(el)*dy(k) + sigma12(el)*meancos)
+                                    (sigma11(el)*dx(k)+sigma12(el)*dy(k) + sigma12(el)*w(k)*metric)
                             v_rhs_ice(elnodes(k)) = v_rhs_ice(elnodes(k)) - mesh%elem_area(el)* &
-                                    (sigma12(el)*dx(k)+sigma22(el)*dy(k) - sigma11(el)*meancos)
+                                    (sigma12(el)*dx(k)+sigma22(el)*dy(k) - sigma11(el)*w(k)*metric)
                         end if
                     end do
                 end if

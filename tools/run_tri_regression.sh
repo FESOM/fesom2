@@ -38,7 +38,7 @@
 #   tier/class  fields                                                    pi      core2
 #   PRE         step 1 before the first SSH solve: density, pressure,     1e-9    1e-9
 #               bvfreq, Kv, ssh_rhs (the whole momentum rhs)
-#   EARLY       every double dump field except Kv, every substep of       1e-10   1e-8
+#   EARLY       every double dump field except Kv, every substep of       1e-10   1e-7
 #               steps 1..N_EARLY (pi 3, core2 1)
 #   OCEAN       double dumps of all steps except Kv (T, S, eta_n, hbar,   1e-6    2e-4
 #               d_eta, ssh_rhs, w, density, pressure, bvfreq, hnode) and
@@ -67,6 +67,14 @@
 # and the rotation-invariant speed hypot(u, v) on the moved ones (normalised by max|speed|), both
 # in the field's usual tier. Scalars are not rotated and are compared everywhere. Measured after
 # Task 14: pi u/v 1.1e-7 elsewhere, speed 2.7e-8 at the moved elements; CORE2 2.5e-5 / 6.6e-6.
+# SEA-ICE DYNAMICS (Task 15). The EVP/mEVP kernels now use the 4-slot formulas (kite-weighted metric
+# means and node shares), so roundoff enters INSIDE each of the 120 EVP subcycles, not only through
+# the geometry. The standard EVP amplifies it: CORE2 EARLY T 2.2e-8 at step 1 (was 2.1e-9), so the
+# CORE2 EARLY tolerance went 1e-8 -> 1e-7 (same ~5x margin); the other tiers stayed at their levels
+# (OCEAN 3.1e-5, ICE 8.9e-5, MIX 7.9e-4). Evidence that this is amplification, not a kernel error:
+# the same case with mEVP (FESOM3_WHICHEVP=1 in both runs; mEVP runs the same converted ocean2ice,
+# SSH-tilt, ice-strength and metric code) gives EARLY T 1.1e-15 and ICE 6.9e-6; triangles equal the
+# former EVP formulas to <= 1.1e-16 element by element (test_ice_dyn_mixed on core2_w np8).
 #
 # Why these levels: below them the differences are no longer roundoff but its amplification by
 # stiff / discontinuous physics (sea ice above all, TKE), so they are the tightest defensible ones
@@ -115,7 +123,7 @@ mesh_dir() {
 
 tolerances() {   # tolerances <mesh> -> "PRE N_EARLY EARLY OCEAN ICE MIX"
     local t
-    case $1 in pi*) t=(1e-9 3 1e-10 1e-6 1e-5 1e-6) ;; *) t=(1e-9 1 1e-8 2e-4 2e-3 1e-2) ;; esac
+    case $1 in pi*) t=(1e-9 3 1e-10 1e-6 1e-5 1e-6) ;; *) t=(1e-9 1 1e-7 2e-4 2e-3 1e-2) ;; esac
     echo "${TOL_PRE:-${t[0]}} ${N_EARLY:-${t[1]}} ${TOL_EARLY:-${t[2]}} ${TOL_OCEAN:-${t[3]}}" \
          "${TOL_ICE:-${t[4]}} ${TOL_MIX:-${t[5]}}"
 }

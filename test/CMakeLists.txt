@@ -205,6 +205,25 @@ foreach(_case mixed:nemo025mix_cut:1,2,8 quad:nemo025q_cut:1,2 pi_w:pi_w:1,2)
         PASS_REGULAR_EXPRESSION "MESHDIAG CHECK PASS"
         SKIP_REGULAR_EXPRESSION "No such file")
 endforeach()
+# Task 15: sea-ice EVP / mEVP dynamics with the unified 4-slot formulas. test_ice_dyn_mixed
+# (strain rates of uniform drift / rigid rotation / linear deformation, stress2rhs = -adjoint of
+# the strain rates, SSH-tilt node shares, rest state of uniform ice, ocean2ice gather; default
+# mesh = the NEMO-mixed cut-out, the np 1 run also checks the analytic triangle, mixed and
+# parallelogram patches); triangles == the former P1 formulas on pi_w and core2_w (rotated).
+add_fesom_test(test_ice_dyn_mixed 1)
+add_fesom_test(test_ice_dyn_mixed 2)
+foreach(_case quad:nemo025q_cut:2:0 pi_w:pi_w:1:1 core2_w:core2_w:8:1)
+    string(REPLACE ":" ";" _quad ${_case})
+    list(GET _quad 0 _tag)
+    list(GET _quad 1 _mesh)
+    list(GET _quad 2 _np)
+    list(GET _quad 3 _rot)
+    add_test(NAME test_ice_dyn_mixed_${_tag}_np${_np}
+             COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np ${_np} $<TARGET_FILE:test_ice_dyn_mixed>)
+    set_tests_properties(test_ice_dyn_mixed_${_tag}_np${_np} PROPERTIES
+        ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/${_mesh};FESOM3_TEST_ROTATE=${_rot}"
+        SKIP_REGULAR_EXPRESSION "cannot open;No such file")
+endforeach()
 # without dist_N/format.out (the original pi dist_2) exchange_edge stops with a message
 add_test(NAME test_halo_ext_noformat_np2
          COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np 2 $<TARGET_FILE:test_halo_ext>)
