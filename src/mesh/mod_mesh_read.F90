@@ -369,8 +369,8 @@ contains
         ! i.e. every vertex's deepest scalar cell has at least one wet adjacent element.
         ! It holds whenever the mesh's nlvls.out is the max over adjacent elvls.out
         ! (verified on pi and core2). This is NOT a quality metric: three UNGUARDED
-        ! divides depend on it -- oce_ale.F90:88 (tx/tvol), oce_ale.F90:377 (Wvel/area)
-        ! and oce_pressure_bv.F90:310 (1/(3*vol)) -- so a mesh that violates it produces
+        ! divides depend on it -- oce_ale.F90 compute_vel_nodes (tx/tvol), vert_vel_ale
+        ! (Wvel/area) and oce_pressure_bv.F90 smooth_nod (1/vol) -- so a mesh that violates it produces
         ! NaN rather than a wrong-but-finite answer. Fail loudly at setup instead.
         type(t_mesh),     intent(in) :: mesh
         integer,          intent(in) :: nNod
