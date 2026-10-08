@@ -408,6 +408,160 @@ roundoff, so no FESOM2-oracle byte gate (`max|Δ|=0`) can pass any more.
   heritage — a design decision for the user. Consequence: compare np 1 vs np N only from a common
   restart (as `decomp:` does), never from two cold starts.
 
+## Hybrid meshes: setup workflow, CORE2 throughput, NEMO 0.25° job (plan `plans/2026-10-08-hybrid-meshes.md` Task 18)
+
+### Mixed-mesh setup workflow (triangle, quad and mixed meshes)
+
+Every command below was run as written on 2026-10-09 (scratch copy, script
+`/work/ab0995/a270029/fesom3_hybrid/t18_workflow/run_workflow.sh`, log `t18_workflow.log` there);
+times and peak memory are login-node values for the full ORCA025 mesh. The Python tools need numpy:
+`source /usr/share/Modules/init/bash; module load python3; hash -r` (the system `python3` has none).
+
+1. **NEMO → FESOM quad mesh** — `python3 tools/mesh/nemo_meshq.py <nemo_dir> <out_dir>`, e.g.
+   `python3 tools/mesh/nemo_meshq.py /work/ab0995/a270029/meshes/nemo025q <scratch>/nemo025q_py`.
+   Reads `mesh_hgr.nc`, `mesh_zgr.nc`, `mask.nc`; writes `nod2d.out` (4th column = land-boundary
+   flag), `elem2d.out` (4 columns, SW-NW-NE-SE), `depth.out` (47 positive levels, node depths, layer
+   counts). Faithful port of `nemo_meshq.m` (identical to the MATLAB output except one fold point,
+   1 float32 ulp; `tools/mesh/test_nemo_meshq.sh`). 5 s, 0.7 GB. The output still holds 40 dead-end
+   quads, which fesom_ini rejects.
+2. **Dead ends** — `python3 tools/mesh/remove_deadends.py <in_dir> <out_dir>`: iterative, 46
+   elements / 90 nodes removed → 915 866 nodes, 902 408 quads (`nemo025q_fesom`). 12 s, 0.9 GB.
+3. **Mixed mesh (optional)** — `python3 tools/mesh/split_quads.py <in_dir> <out_dir> --band -5 5
+   --every 5`: every quad with centroid latitude in the band plus every 5th other quad split into two
+   triangles (shorter diagonal; the longer one where the shorter leaves a dead-end triangle) →
+   `nemo025mix`, 685 452 quads + 433 912 triangles, same nodes and `depth.out`. 5 s, 0.8 GB.
+4. **Regional cut-out for tests (optional)** — `python3 tools/mesh/cut_region.py <in_dir> <out_dir>
+   --lon -20 -5 --lat -2 12` → `nemo025q_cut` / `nemo025mix_cut` (2 509 nodes; largest connected
+   piece, dead ends removed, boundary flag recomputed, layer counts at the cut lowered to keep the
+   model's bottom invariant). 3 s.
+5. **Check every mesh** — `python3 tools/mesh/check_mesh.py <mesh_dir>`: prints a `SUMMARY` line
+   (nodes, elems, quads, tris, edges, bedges, ccw, nonconvex, degenerate, unused, multiedge,
+   deadends, area); exit 1 on any error incl. dead ends (the raw `nemo_meshq.py` output fails with
+   `deadends=40`). 4 s, 0.9 GB.
+6. **Partition: `fesom_ini`** (FESOM2's `mesh_part`, ported: sources `mesh_part/src/`, METIS 5.1.0 in
+   `lib/metis-5.1.0/`). Built together with the model by `./configure.sh` / `cmake --build` as
+   `<build>/bin/fesom_ini` (`build_intel_dp/bin/fesom_ini` once the user rebuilds from this branch;
+   scratch: `/work/ab0995/a270029/fesom3_hybrid/build/bin/fesom_ini`). Serial; run it in a work
+   directory holding `namelist.config`:
+   ```
+   &paths
+   MeshPath="<mesh_dir>/"
+   /
+   &geometry
+   use_depthfile="nemo"
+   /
+   &run_config
+   /
+   &machine
+   n_levels=1
+   n_part=<N>
+   /
+   ```
+   (`use_depthfile="nemo"` = NEMO `depth.out`; FESOM triangle meshes leave it out = `'aux3d'`; the
+   rotation defaults 50/15/−90 equal the model's hard-coded ones), then
+   `cd <work_dir> && <build>/bin/fesom_ini > fesom_ini.out 2>&1` (inside a batch job
+   `srun -n 1 -N 1 …`). It STOPs with exit status 0 also on errors — judge by `Total time` in the log
+   and `dist_<N>/rpart.out`. It writes INTO `MeshPath`: `edges.out`, `edge_tri.out`, `edgenum.out`
+   (edge2D, edge2D_in), `nlvls.out`, `elvls.out`, `elvls_raw.out` and `dist_<N>/` = `rpart.out`,
+   `my_list%05d.out`, `com_info%05d.out` in the FESOM2 layout plus the appended hybrid sections
+   (double-halo nodes, `com_nod2D_full`, `com_edge2D`) announced by `dist_<N>/format.out` (version 1).
+   It KEEPS existing edge/level files: delete `edges.out edge_tri.out edgenum.out elvls.out
+   elvls_raw.out nlvls.out dist_*` first when the mesh changed (`clean()` in `tools/run_ini_mixed.sh`).
+   One run per N. ORCA025: 128 parts 31 s; 1024 parts 83 s (METIS 42 s, writing 34 s), peak 0.3 GB;
+   at most 16 neighbour ranks per communication list for 128 and 1024 parts (the model's
+   `com_struct` holds `MAX_NEIGHBOR_PARTITIONS = 32` and `read_com` does not check it — count with
+   `/work/ab0995/a270029/fesom3_hybrid/t18_workflow/max_neighbours.py <mesh_dir> <N>` for very high
+   N). `dist_1`: `python3 tools/make_dist1.py <mesh_dir>` (only for `check_dist.py`/FESOM2 tools; the
+   model builds its 1-rank partition itself).
+7. **Check the partition** — `python3 tools/mesh/check_dist.py <mesh_dir> <N> [<N> …]` (edges, edge
+   order, levels, ownership, halos, all communication lists incl. the appended sections) → `PASS`;
+   1024 parts of ORCA025: 73 s, 0.9 GB.
+8. **Model** — `FESOM3_MESH_DIR=<mesh_dir>/` and exactly N ranks (the driver reads
+   `dist_<number of ranks>/`). `elem2d.out` with 3 or 4 columns is detected; zbar comes from
+   `aux3d.out`, or from `depth.out` when `aux3d.out` is absent; node levels only from `nlvls.out`.
+   No other mesh setting exists (rotation hard-coded); IC, forcing, runoff, SSS and chlorophyll are
+   regular-grid files interpolated at run time. Only `FESOM3_STEP_PER_DAY` is resolution-dependent.
+   Smoke test: the mixed cut-out made by the commands above, production physics, 4 ranks, 8 steps.
+9. **Mesh diagnostics (optional)** — `FESOM3_MESHDIAG_OUT=<store> fesom_meshdiagdump`, checked by
+   `tools/check_meshdiag.py <mesh_dir> <work_dir> <fesom_meshdiagdump> <np[,np…]> [launcher …]`
+   (ctests `meshdiag_{mixed,quad,pi_w}`).
+
+Regression scripts of the workflow: `tools/mesh/test_nemo_meshq.sh`, `tools/mesh/test_mesh_tools.sh
+[nemo_dir] [out_root]` (steps 2–5; `out_root=/work/ab0995/a270029/meshes` made the persistent test
+meshes), `tools/run_ini_mixed.sh` (step 6–7 on all NEMO meshes + error cases), `tools/run_ini_compare.sh`
+(triangle meshes byte-identical to FESOM2's own mesh_part build). Test meshes in
+`/work/ab0995/a270029/meshes/`: `nemo025q_fesom`, `nemo025mix` (dist_1/2/8/128), `nemo025q_cut`,
+`nemo025mix_cut` (dist_1/2/4/8), `pi_w` (dist_1/2/4/8), `core2_w` (dist_1/2/4/8/128) — the NEMO ones
+were made from the MATLAB output in `nemo025q/`; from the Python port, `elem2d.out`/`depth.out` and all
+cut-out files are identical, `nod2d.out` differs in the one fold point and `nemo025mix` in the two
+triangles of the quad at that point (its diagonal choice flips). `work/README.md` ("FESOM3 has no
+partitioner") predates `fesom_ini` (the user's file, not edited).
+
+### CORE2 throughput of the 4-slot code (login-node timing, 2026-10-09)
+
+- **Setup:** old = `/work/ab0995/a270029/fesom3_hybrid/frozen_task6` (commit `5b2a7f3`, before the
+  4-slot kernels, triangle results bit-identical to the pre-hybrid code), new = scratch build at
+  `ec099ea`; both Release `-O3`. Original CORE2 mesh (`dist_16`, `dist_8`), production driver with the
+  `job_levante` physics (linfs, JRA55, EVP, GM+Redi, TKE, splines, vinv, rvo_upwind 1, SW pene,
+  w split), DEFAULT SSH tolerance, no output, no restart, `FESOM3_TIMING_EVERY=20`; cost per step =
+  the model's loop timers (`LOOP TOTAL`) over steps 21..N from the cumulative reports (setup, the
+  first 20 steps and I/O excluded). Old/new interleaved; np 16: 4 runs each of 200 steps, np 8: 3
+  each of 120 steps. Scripts and logs: `/work/ab0995/a270029/fesom3_hybrid/t18_timing/`
+  (`run_one.sh`, `series.sh`, `parse.py`, `t18_timing_np{16,8}.txt`, `log_*.txt`).
+- **Result:** `LOOP TOTAL` ms/step — np 16: old min 456.5 / median 458.0, new min 492.8 / median
+  499.1 → **new/old 1.079 (min) / 1.090 (median)**; np 8: old 850.9 / 853.9, new 926.9 / 931.9 →
+  **1.089 / 1.091**. Noise: run-to-run spread of the loop time 2.5 % (old) / 3.3 % (new) at np 16,
+  0.8 % / 1.7 % at np 8; 20-step blocks give the same ratio (1.08–1.10). Whole-run wall clock agrees
+  (np 16 old 93.7–95.7 s, new 101.0–104.3 s).
+- **Per component** (np 16 median, ms/step old → new): ice 88.4 → 113.8 (**×1.29**), GM/Redi
+  36.1 → 39.0 (×1.08), dynamics u,v,w 75.5 → 82.2 (×1.09), mix/pres/EOS 52.0 → 55.1 (×1.06), tracer
+  148.5 → 149.8 (×1.01), SSH 32.8 → 33.5, forcing/fluxes unchanged; np 8 the same pattern (ice ×1.29).
+- **Hot spot (only component > 20 %): the sea-ice EVP.** `perf` over all 16 ranks (80 steps,
+  `t18_perf_cmp.txt`): `evpdynamics` (stress_tensor/stress2rhs inlined, 120 subcycles over 4 slots)
+  1.24× summed over ranks and 1.33× on the most ice-loaded rank, which sets the pace — the other ranks
+  wait in MPI (`mca_btl_vader_component_progress` +19 %); ice FCT `ice_fem_fct` 1.28×, `ice_TG_rhs`
+  1.62× (small in absolute terms). Ocean: `smooth_nod` now a separate routine (+0.7 % of the step),
+  `fer_gamma2vel` 1.72×, `momentum_adv_vinv` 1.15×, `impl_vert_visc_ale` 1.19×. All compute outside
+  MPI: ×1.048. Not optimised (Task 18 reports only).
+- **Scaled:** 14 min per model year on 512 ranks (results17, pre-hybrid binary) × 1.08–1.09 ≈
+  **15.1–15.3 min per model year**. Indicative only: login-node ratios at np 8–16 (shared node, MPI
+  over shared memory); at 512 ranks communication weighs more and the ice-rank imbalance may differ.
+
+### NEMO 0.25° example job: `work/job_levante_nemo025`
+
+- New file next to `work/job_levante` (untracked like everything in `work/`; never `git add`ed).
+  Same header style, modules (`env.sh intel`), limits and FESOM3_* physics as `job_levante` (copied);
+  changed: mesh `/work/ab0995/a270029/meshes/nemo025q_fesom` (comment: `nemo025mix` as alternative),
+  8 nodes × 128 = 1024 ranks (`NPART`, must match `dist_1024`), 1 h, output tree
+  `results_nemo025/<mesh>_1958_1m`.
+- **Setup part:** checks `nod2d.out`, `elem2d.out`, the depth file (picks `use_depthfile` 'aux3d' or
+  'nemo'), the model binary, `SLURM_NTASKS == NPART`, and that the edge/level files and a complete
+  `dist_<NPART>/` (rpart, format.out, NPART my_list + com_info) exist; if not, writes the
+  `namelist.config` above into `work/ini_<mesh>_<NPART>/` and runs `srun -l -n 1 -N 1 fesom_ini`
+  there, then re-checks. `DRYRUN=1 bash job_levante_nemo025` runs the checks and prints the would-be
+  `namelist.config`, the fesom_ini and the srun lines and the FESOM3 environment, launches nothing;
+  `DRYRUN=1 DRYRUN_INI=1` also runs fesom_ini on the login node (prepares `dist_N` before
+  submission). Overrides `MESH`, `NPART`, `BIN`, `INIDIR` for tests.
+- **Dry runs (2026-10-09):** as is → stops with `ERROR: missing build_intel_dp/bin/fesom_ini` (the
+  user's binary of 2026-10-08 predates the hybrid branch; **rebuild `build_intel_dp` from this branch
+  before use** — the old model binary cannot read quad meshes) and `dist_1024` missing → prints the
+  fesom_ini call. With `BIN` = scratch build and a scratch mesh that has `dist_1024`: all checks ok,
+  prints `srun -l -n 1024 …/fesom_lifecycle_native_mr`. With `NPART=8 DRYRUN_INI=1` on a scratch
+  `nemo025mix`: fesom_ini ran (21 s), `check_dist.py` PASS afterwards.
+- **USER: choose** (conservative placeholders): `FESOM3_STEP_PER_DAY=96` (900 s; ORCA025 cells
+  shrink to ~10 km at high latitudes; the cut-outs ran 10 days stable at 48), run length 1 month
+  (`FESOM3_RUN_LENGTH=1`, `FESOM3_RUN_UNIT=m`), nodes / wall time (8 nodes, 1 h), `RUNID` / output
+  tree. Restart settings as `job_levante` (yearly; a shorter run writes its end-of-run checkpoint).
+- **Wall-time ESTIMATE (not measured):** work per step relative to CORE2 from the mesh counts —
+  nodes 7.2× (915 866 vs 126 858), wet node-levels 8.4× (31.1 M vs 3.7 M), element-levels 4.3×
+  (quad mesh; mixed 5.3×), edges 4.9× (mixed 5.5×) → factor 4.3–8.4; × 2 steps (900 s) × 1.09 (4-slot
+  cost) × 14 min per CORE2 year on 512 ranks → **2.2–4.3 h per model year on 512 ranks, 1.1–2.1 h on
+  1024 ranks (8 nodes)**, assuming linear scaling (1024 ranks still hold 3.6× more nodes per rank than
+  CORE2 on 512) → one month ≈ 6–11 min + startup (mesh read and IC for 0.9 M nodes, minutes) +
+  fesom_ini 1.5 min on the first run; 1 h leaves ≥ 4× margin; a model year on 8 nodes: ask for ~3 h.
+  Unknowns: more CG iterations of the SSH solve at 0.25° (CG ≈ 4 % of the CORE2 step), a larger ice share
+  (dense ORCA grid in the Arctic; the EVP is the 4-slot hot spot), startup time at 1024 ranks.
+
 ## Next task
 
 ### ✅ RESTART / CHECKPOINT — **COMPLETE & tagged `m10` (2026-06-29).** Partition-independent Zarr checkpoints (full prognostic state incl. sea ice + EVP sigma), written periodically + at end-of-run, read at startup on `r_restart`, resuming byte-exactly. Built on the M9 Zarr stack (`mod_io_zarr` + `mod_io_decomp` + new `decomp_gather` inverse); new `src/io/mod_io_restart.F90` (writer+reader, atomic tmp→rename finalize + `restart.latest` + keep-N prune), `mod_io_posix.F90` (bind(C) rename/unlink/fsync/rmtree — no `execute_command_line`), `mod_io_coords.F90` (shared coord helper). Lifecycle wiring in `fesom_lifecycle_native_mr` (detect/read/AB-guard/write/cadence + `clock_finish`).

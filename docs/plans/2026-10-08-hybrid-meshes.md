@@ -981,11 +981,43 @@ fluxes and nonlinear terms can. Asserted in a test (Task 9), measured in the sho
 - Create: `work/job_levante_nemo025` (new file; `work/job_levante` untouched)
 - Modify: `docs/HANDOFF.md`
 
-- [ ] CORE2 throughput with 4-slot loops vs ~14 min per model year, reported (user's run or a
+- [x] CORE2 throughput with 4-slot loops vs ~14 min per model year, reported (user's run or a
       short timing run on the cut-out scaled — no production submission by us)
-- [ ] document the workflow: `nemo_meshq.py` → `remove_deadends.py` → (optional `split_quads.py`)
+      — no user run of the hybrid code yet → login-node timing, old `frozen_task6` (5b2a7f3, pre
+      4-slot) vs new scratch build (ec099ea), original CORE2, production driver with the job_levante
+      physics, DEFAULT SSH tolerance, no output/restart, loop timers over steps 21..N (setup and
+      first steps excluded), interleaved. np 16 (4 + 4 runs, 200 steps): LOOP TOTAL old min 456.5 /
+      median 458.0 ms/step, new 492.8 / 499.1 → **new/old 1.079 (min) / 1.090 (median)**; np 8 (3 + 3,
+      120 steps): 850.9 / 853.9 vs 926.9 / 931.9 → **1.089 / 1.091**; run-to-run noise 0.8–3.3 %.
+      Only component above 20 %: sea ice ×1.29 (88 → 114 ms/step at np 16); `perf` (all ranks): EVP
+      subcycles 1.33× on the most ice-loaded rank, the others wait in MPI; ocean ×1.01–1.09.
+      **Scaled: 14 min × 1.08–1.09 ≈ 15.1–15.3 min per model year on 512 ranks** (indicative; np 8–16
+      on a shared login node). NEMO 0.25° ESTIMATE (mesh counts 4.3–8.4× the CORE2 work per step,
+      900 s step): 2.2–4.3 h per model year on 512 ranks, 1.1–2.1 h on 1024. Not optimised. Details
+      and scripts: `docs/HANDOFF.md` "CORE2 throughput of the 4-slot code",
+      `/work/ab0995/a270029/fesom3_hybrid/t18_timing/`
+- [x] document the workflow: `nemo_meshq.py` → `remove_deadends.py` → (optional `split_quads.py`)
       → `fesom_ini` → model
-- [ ] example job script for NEMO 0.25° next to `job_levante`; dry-run its setup part (no submission)
+      — `docs/HANDOFF.md` "Mixed-mesh setup workflow": exact commands, inputs/outputs, fesom_ini
+      (build location, namelist.config, files written, keeps old edge/level files, exit status),
+      checkers (check_mesh, check_dist, check_meshdiag, make_dist1), model env, runtime/memory on
+      ORCA025. Every command run end to end in a scratch dir (`t18_workflow/run_workflow.sh`):
+      nemo_meshq 5 s/0.7 GB, remove_deadends 12 s, split 5 s, cut 3 s, check_mesh 4 s/0.9 GB,
+      fesom_ini 1024 parts 83 s/0.3 GB (max 16 neighbour ranks, limit 32), check_dist 1024 PASS 73 s;
+      results identical to the persistent test meshes except the known fold point (nod2d.out, and one
+      split diagonal in nemo025mix); model smoke run on the regenerated mixed cut-out (np 4, 8 steps)
+- [x] example job script for NEMO 0.25° next to `job_levante`; dry-run its setup part (no submission)
+      — `work/job_levante_nemo025` (untracked like `work/`): job_levante physics copied; mesh
+      nemo025q_fesom (nemo025mix in a comment), 8 nodes × 128 = 1024 ranks, 1 h; setup checks mesh,
+      depth file, binary, NPART == SLURM_NTASKS, edge/level files + complete dist_NPART, runs
+      `srun -n 1 -N 1 fesom_ini` if missing; `DRYRUN=1` prints, `DRYRUN_INI=1` also runs fesom_ini.
+      USER: choose — STEP_PER_DAY 96, run length 1 month, nodes/wall time, RUNID/output tree.
+      Dry run as is: `setup: ERROR: missing …/build_intel_dp/bin/fesom_ini (rebuild build_intel_dp
+      from bottom-at-vertices)` + would-run fesom_ini line for dist_1024 (exit 1, correct: the user's
+      binary predates the branch); with the scratch build + a mesh with dist_1024: `ok dist_1024:
+      rpart.out, format.out (version 1), 1024 my_list + com_info` … `would run: srun -l -n 1024
+      …/fesom_lifecycle_native_mr` `DRY RUN done`; `NPART=8 DRYRUN_INI=1` on a scratch nemo025mix:
+      fesom_ini 21 s, check_dist PASS (logs `t18_workflow/t18_dryrun_*.log`)
 
 ### Task 19: Verify acceptance criteria
 - [ ] mixed meshes read, partitioned and run on the cut-outs (NEMO, mixed) and full CORE2/pi
