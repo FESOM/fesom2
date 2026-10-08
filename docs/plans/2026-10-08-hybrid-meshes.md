@@ -339,23 +339,38 @@ fluxes and nonlinear terms can. Asserted in a test (Task 9), measured in the sho
 - Modify: `mesh_part/src/fvom_init.F90` (and `gen_comm.F90` / `oce_local.F90` only if an audit
   finds a gap)
 - Create: `tools/mesh/check_dist.py`
+- ➕ Create: `tools/run_ini_mixed.sh` (fesom_ini + check_dist on the NEMO meshes, error cases)
 
-- [ ] `test_tri_ini` → orientation test for triangles and quads (as qq `test_elem`: both
+- [x] `test_tri_ini` → orientation test for triangles and quads (as qq `test_elem`: both
       sub-triangles clockwise, swap 2↔4 if anticlockwise, stop on a self-intersecting quad)
-- [ ] `find_levels` / `find_levels_cavity` element loops, `elem_center`,
+      — sub-triangles (1,2,3), (1,3,4) in (rotated) lon/lat; flips reported (first 10 + count),
+      fixed in memory only; no element of the NEMO meshes is flipped or self-intersecting
+- [x] `find_levels` / `find_levels_cavity` element loops, `elem_center`,
       `find_elem_neighbors_ini` (4 sides, `elem_edges` 1-2/2-3/3-4/4-1; the "≥ 2 neighbours"
       stop kept for all element types) and the `nod_in_elem2D` build → `nv` vertices
-- [ ] keep (audit only) the parts that are already quad-aware: `stiff_mat_ini` METIS graph with
+      — element-mean divisors stay literals (`/3.0` triangles, `/4.0` quads: LESSONS L7,
+      `-no-prec-div`); `elem_center` = vertex mean (only orients `edge_tri`)
+- [x] keep (audit only) the parts that are already quad-aware: `stiff_mat_ini` METIS graph with
       quad diagonals, `find_edges_ini` node neighbours, `gen_comm`
-- [ ] depth: `use_depthfile='nemo'` reads `depth.out` (positive values); trailing layer counts
+      — audit: no gap (`gen_comm` node/element halos and `mymesh`, `oce_local` `save_dist_mesh`
+      edge lists all use `merge(3,4,…)` / 4 slots; `find_edges_ini` edges and `elem_edges` generic)
+- [x] depth: `use_depthfile='nemo'` reads `depth.out` (positive values); trailing layer counts
       taken as given, no further level adjustment; `nlvls.out` written from them
-- [ ] edge order interior-first / boundary-last and `edge2D_in` correct for mixed meshes
-- [ ] `check_dist.py`: every element owned once, halos symmetric between ranks, node/element/edge
+      — `elvls.out` = min over the vertices (no isolated-cell iteration, no thresholding)
+- [x] edge order interior-first / boundary-last and `edge2D_in` correct for mixed meshes
+- [x] `check_dist.py`: every element owned once, halos symmetric between ranks, node/element/edge
       lists complete, `nlvls.out` equal to the depth-file counts, edge order + `edge2D_in`
-- [ ] tests: `run_ini_compare.sh` still identical for triangles; `check_dist.py` on the cleaned
+      — also edges == element sides, `edge_tri`, receive lists from the owner; triangle meshes:
+      `nlvls` == max of `elvls` around the node
+- [x] tests: `run_ini_compare.sh` still identical for triangles; `check_dist.py` on the cleaned
       NEMO, mixed and cut meshes for 2, 8, 128 parts; the original NEMO mesh stops with the
       dead-end message (error case); a flipped element is fixed and reported
-- [ ] run tests — must pass before Task 5
+      — `tools/run_ini_mixed.sh`: cut meshes 2/8 parts, full NEMO + mixed 2/8/128; also
+      `pi_w`, `core2_w` and (read-only) the old pi `dist_2/8` and CORE2 `dist_8` of Task 3:
+      structurally correct; error cases: dead end, flipped quad + triangle (outputs identical
+      to the unflipped mesh), bow-tie quad stops, check_dist detects a corrupted `dist_2`
+- [x] run tests — must pass before Task 5 — `run_ini_compare.sh` PASS (triangles still
+      byte-identical), `run_ini_mixed.sh` PASS (~3 min), scratch ctest 48/48
 
 ### Task 5: fesom_ini writes edge communication and double-halo nodes
 

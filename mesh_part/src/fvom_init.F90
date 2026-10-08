@@ -297,43 +297,77 @@ end subroutine read_mesh_cavity
 
 !=======================================================================
 !> @brief 
-!> Check the order of nodes in triangles; correct it if necessary to make
-!! it same sense (clockwise) 
+!> Check the order of nodes in elements; correct it if necessary to make
+!! it same sense (clockwise). Triangles: the 2nd and 3rd node are exchanged.
+!! Quads (as test_elem of the qq prototype): both sub-triangles (1,2,3) and
+!! (1,3,4) must have the same sense; if anticlockwise, the 2nd and 4th node
+!! are exchanged (the 1st node stays); a self-intersecting quad stops.
 SUBROUTINE test_tri_ini(mesh)
 USE MOD_MESH
 USE o_PARAM
 USE g_CONFIG
 IMPLICIT NONE
 
-real(kind=WP)                       ::  a(2), b(2), c(2),  r
-integer                             ::  n, nx, elnodes(3)
+real(kind=WP)                       ::  a(2), b(2), c(2), d(2), r, r1
+integer                             ::  n, nx, elnodes(4), nflip
 type(t_mesh), intent(inout), target :: mesh
 #include "associate_mesh_ini.h"
-   
+
+   nflip=0
    DO n=1, elem2D
-      elnodes=elem2D_nodes(1:3,n)
-	  
+      elnodes=elem2D_nodes(:,n)
+
           a=coord_nod2D(:,elnodes(1))
 	  b=coord_nod2D(:,elnodes(2))-a
 	  c=coord_nod2D(:,elnodes(3))-a
-          
+
 	  if(b(1)>cyclic_length/2.) b(1)=b(1)-cyclic_length
           if(b(1)<-cyclic_length/2.) b(1)=b(1)+cyclic_length
 	  if(c(1)>cyclic_length/2.) c(1)=c(1)-cyclic_length
           if(c(1)<-cyclic_length/2.) c(1)=c(1)+cyclic_length
-	  
-	    
+
+
 	  r=b(1)*c(2)-b(2)*c(1)
+      if (elnodes(1)==elnodes(4)) then   ! triangle
 	  if (r>0) then
 	  ! Vector b is to right of c
 	  ! Exchange second and third nodes:
-	  
+
 	  nx=elnodes(2)
 	  elnodes(2)=elnodes(3)
 	  elnodes(3)=nx
-	  elem2D_nodes(1:3,n)=elnodes
+	  elem2D_nodes(1:3,n)=elnodes(1:3)
+          nflip=nflip+1
+          if (nflip<=10) write(*,*) 'test_tri_ini: vertices exchanged for triangle ', n
+          end if
+      else                               ! quad
+          d=coord_nod2D(:,elnodes(4))-a
+          if(d(1)>cyclic_length/2.) d(1)=d(1)-cyclic_length
+          if(d(1)<-cyclic_length/2.) d(1)=d(1)+cyclic_length
+          r1=c(1)*d(2)-c(2)*d(1)
+          if (r*r1<=0) then
+          ! Sub-triangles (1,2,3) and (1,3,4) have opposite sense (or one is
+          ! degenerate): the quad is self-intersecting or its diagonal 1-3
+          ! lies outside.
+             write(*,*) '____________________________________________________________________'
+             write(*,*) ' ERROR: test_tri_ini: self-intersecting or degenerate quad ', n
+             write(*,*) '        nodes ', elnodes
+             write(*,*) '        --> fix the mesh; stop partitioning here !'
+             write(*,*) '____________________________________________________________________'
+             STOP
+          end if
+          if (r>0) then
+          ! Both sub-triangles anticlockwise: exchange second and fourth nodes
+             nx=elnodes(2)
+             elnodes(2)=elnodes(4)
+             elnodes(4)=nx
+             elem2D_nodes(:,n)=elnodes
+             nflip=nflip+1
+             if (nflip<=10) write(*,*) 'test_tri_ini: vertices exchanged for quad ', n
+          end if
       end if
    END DO
+   if (nflip>0) write(*,*) 'test_tri_ini: vertex order made clockwise for ', nflip, ' elements'
 END SUBROUTINE  test_tri_ini
 !=========================================================================
 !> @brief
@@ -689,15 +723,19 @@ END SUBROUTINE find_edges_ini
 !> Does some thresholding: if (depth>zbar(4)) x=zbar(4)
 !> Fixes rough topography, by converting some oceans cells to ground cell(reflected by changing levels arrays)
 !> Creates 2 files: elvls.out, nlvls.out
+!> use_depthfile='nemo': depth.out (nl, positive zbar(nl), positive node depths,
+!> node layer counts) as written by tools/mesh/nemo_meshq.py; the node levels are
+!> taken as given (layer count + 1, no thresholding or adjustment), element
+!> levels = min over the element's vertices.
 subroutine find_levels(mesh)
     use g_config
     use mod_mesh
     implicit none
-    INTEGER :: nodes(3), elems(3), eledges(3)
+    INTEGER :: nodes(4), elems(4), eledges(3)
     integer :: elem1, j, n, nneighb, q, node, i, nz, auxi
     integer :: count_iter, count_neighb_open, exit_flag, fileID=111
     real(kind=WP) :: x, dmean
-    logical :: file_exist
+    logical :: file_exist, nemo_levels
     integer :: max_iter=1000
     character(MAX_PATH) :: file_name
     type(t_mesh), intent(inout), target :: mesh
@@ -706,16 +744,25 @@ subroutine find_levels(mesh)
 
     print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
     print *, achar(27)//'[7;1m' //' -->: read bottom depth                                     '//achar(27)//'[0m'
-    
+
+    nemo_levels = (trim(use_depthfile)=='nemo')
+    if (nemo_levels .and. use_depthonelem) then
+        write(*,*) ' ERROR: use_depthfile="nemo" holds node depths; set use_depthonelem=.false.'
+        stop
+    end if
     !___________________________________________________________________________
     ! allocate depth
-    if (use_depthonelem) then 
+    if (use_depthonelem) then
         allocate(mesh%depth(elem2D))
-    else    
+    else
         allocate(mesh%depth(nod2D))
-    end if     
+    end if
     depth => mesh%depth !required after the allocation, otherwise the pointer remains undefined
-    
+    allocate(mesh%nlevels(elem2D))
+    nlevels => mesh%nlevels             !required after the allocation, otherwise the pointer remains undefined
+    allocate(mesh%nlevels_nod2D(nod2D))
+    nlevels_nod2D => mesh%nlevels_nod2D !required after the allocation, otherwise the pointer remains undefined
+
     !______________________________________________________________________________
     ! read depth from aux3d.out
     if (trim(use_depthfile)=='aux3d') then
@@ -819,53 +866,98 @@ subroutine find_levels(mesh)
             write(*,*) '        --> model stops here'
             write(*,*) '____________________________________________________________________'
             stop
-        end if 
-    end if 
-    
+        end if
+    !___________________________________________________________________________
+    ! read zbar, node depths and node layer counts from depth.out (NEMO mesh)
+    elseif (nemo_levels) then
+        file_name=trim(meshpath)//'depth.out'
+        inquire(file=trim(file_name),exist=file_exist)
+        if (file_exist) then
+            write(*," (A, A)") ' read file:',trim(file_name)
+            open(fileID, file=file_name)
+            read(fileID,*) nl
+            allocate(mesh%zbar(nl))         ! their standard depths
+            zbar => mesh%zbar !required after the allocation, otherwise the pointer remains undefined
+            read(fileID,*) zbar
+            if(zbar(2)>0) zbar=-zbar   ! zbar is negative
+            allocate(mesh%Z(nl-1))
+            Z => mesh%Z !required after the allocation, otherwise the pointer remains undefined
+            Z=zbar(1:nl-1)+zbar(2:nl)  ! mid-depths of cells
+            Z=0.5_WP*Z
+        else
+            write(*,*) '____________________________________________________________________'
+            write(*,*) ' ERROR: use_depthfile="nemo" needs the file ', trim(file_name)
+            write(*,*) '        --> model stops here'
+            write(*,*) '____________________________________________________________________'
+            stop
+        end if
+    end if
+
     !___________________________________________________________________________
     ! read topography from file
     auxi = nod2d
     if (use_depthonelem) auxi = elem2d
 !     write(*,*) ' use_depthonelem = ',use_depthonelem
-!     write(*,*)  ' auxi =',auxi 
+!     write(*,*)  ' auxi =',auxi
     DO n = 1, auxi
         read(fileID,*) x
         if (x>0) x=-x
+        if (.not. nemo_levels) then
         if (x>zbar(thers_zbar_lev)) x=zbar(thers_zbar_lev) !TODO KK thresholding for depth
+        end if
         depth(n)=x
     END DO
+    if (nemo_levels) then
+        ! node layer counts, taken as given: node levels = count + 1
+        DO n = 1, nod2D
+            read(fileID,*) nlevels_nod2D(n)
+        END DO
+        nlevels_nod2D=nlevels_nod2D+1
+        if (minval(nlevels_nod2D)<2 .or. maxval(nlevels_nod2D)>nl) then
+            write(*,*) ' ERROR: depth.out layer counts outside 1..nl-1: ', &
+                       minval(nlevels_nod2D)-1, maxval(nlevels_nod2D)-1, ', nl=', nl
+            stop
+        end if
+    end if
     close(fileID)
     if(depth(2)>0) depth=-depth  ! depth is negative
 
     !___________________________________________________________________________
     print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
     print *, achar(27)//'[7;1m' //' -->: compute elem, vertice bottom depth index              '//achar(27)//'[0m'
-     
-    allocate(mesh%nlevels(elem2D))
-    nlevels => mesh%nlevels             !required after the allocation, otherwise the pointer remains undefined
-    allocate(mesh%nlevels_nod2D(nod2D))
-    nlevels_nod2D => mesh%nlevels_nod2D !required after the allocation, otherwise the pointer remains undefined
 
     !___________________________________________________________________________
     ! Compute the initial number number of elementa levels, based on the vertice
-    ! depth information 
+    ! depth information
     do n=1, elem2D
-        
+
+        nneighb = merge(3,4,elem2D_nodes(1,n) == elem2D_nodes(4,n))
+        nodes=elem2D_nodes(:,n)
+        if (nemo_levels) then
+            ! element levels = min over the vertices (node levels as given)
+            nlevels(n)=minval(nlevels_nod2D(nodes(1:nneighb)))
+            cycle
+        end if
         !_______________________________________________________________________
-        if (use_depthonelem) then 
-            dmean = depth(n) ! depth is already defined on elements 
+        if (use_depthonelem) then
+            dmean = depth(n) ! depth is already defined on elements
         else
-            nodes=elem2D_nodes(1:3,n)
             !___________________________________________________________________
             ! depth of element is  shallowest depth of sorounding vertices
-            if     (trim(which_depth_n2e) .eq. 'min') then ; dmean=maxval(depth(nodes))
-            ! depth of element is deepest depth of sorounding vertices    
-            elseif (trim(which_depth_n2e) .eq. 'max') then ; dmean=minval(depth(nodes))
+            if     (trim(which_depth_n2e) .eq. 'min') then ; dmean=maxval(depth(nodes(1:nneighb)))
+            ! depth of element is deepest depth of sorounding vertices
+            elseif (trim(which_depth_n2e) .eq. 'max') then ; dmean=minval(depth(nodes(1:nneighb)))
             ! DEFAULT: depth of element is  mean depth of sorounding vertices
-            elseif (trim(which_depth_n2e) .eq. 'mean') then; dmean=sum(depth(nodes))/3.0
-            end if 
-        end if 
-        
+            ! (literal divisors: under -no-prec-div x/real(nv) differs by 1 ulp)
+            elseif (trim(which_depth_n2e) .eq. 'mean') then
+                if (nneighb==3) then
+                    dmean=sum(depth(nodes(1:3)))/3.0
+                else
+                    dmean=sum(depth(nodes(1:4)))/4.0
+                end if
+            end if
+        end if
+
         !_______________________________________________________________________
         exit_flag=0
         do nz=1,nl-1
@@ -901,8 +993,8 @@ subroutine find_levels(mesh)
     !___________________________________________________________________________
     ! check for isolated cells (cells with at least two boundary faces or three 
     ! boundary vertices) and eliminate them --> FESOM2.0 doesn't like these kind
-    ! of cells 
-    do nz=thers_zbar_lev+1,nl
+    ! of cells (not for depth.out of a NEMO mesh: its levels are taken as given)
+    do nz=thers_zbar_lev+1,merge(thers_zbar_lev,nl,nemo_levels)
         exit_flag=0
         count_iter=0
         
@@ -930,7 +1022,7 @@ subroutine find_levels(mesh)
                 !
                 if (nlevels(n)>=nz) then
                     count_neighb_open=0
-                    elems=elem_neighbors(1:3,n)
+                    elems=elem_neighbors(1:4,n)
                     !___________________________________________________________
                     ! loop over neighbouring triangles
                     do i=1,nneighb
@@ -975,7 +1067,7 @@ subroutine find_levels(mesh)
     !___________________________________________________________________________
     ! vertical vertice level index of ocean bottom boundary
     write(*,"(A)"                  ) '  -[compu]->: nlevels_nod2D '
-    nlevels_nod2D=0
+    if (.not. nemo_levels) nlevels_nod2D=0   ! NEMO: node levels from depth.out
     do n=1,elem2D
         q = merge(3,4,elem2D_nodes(1,n) == elem2D_nodes(4,n))
         do j=1,q
@@ -1033,8 +1125,8 @@ subroutine find_levels_cavity(mesh)
     use mod_mesh
     use g_config
     implicit none
-    integer        :: nodes(3), elems(3)
-    integer        :: elem, node, nz, j
+    integer        :: nodes(4), elems(4)
+    integer        :: elem, node, nz, j, nv
     integer        :: min_nlvl, max_ulvl, idx, idx2, val, val2
     integer        :: count_neighb_open, nneighb, cavity_maxlev, count_isoelem
     integer        :: exit_flag1, count_iter, max_iter=1000, exit_flag2, count_iter2, max_iter2=25
@@ -1065,16 +1157,23 @@ subroutine find_levels_cavity(mesh)
         if (use_cavityonelem) then 
             dmean = cavity_depth(elem)
         else
-            nodes=elem2D_nodes(1:3,elem)
+            nv=merge(3,4,elem2D_nodes(1,elem) == elem2D_nodes(4,elem))
+            nodes=elem2D_nodes(:,elem)
             !_______________________________________________________________________
             ! depth of element is  shallowest depth of sorounding vertices
-            if     (trim(which_depth_n2e) .eq. 'min')  then ; dmean=maxval(cavity_depth(nodes))
-            ! depth of element is deepest depth of sorounding vertices    
-            elseif (trim(which_depth_n2e) .eq. 'max')  then ; dmean=minval(cavity_depth(nodes))
+            if     (trim(which_depth_n2e) .eq. 'min')  then ; dmean=maxval(cavity_depth(nodes(1:nv)))
+            ! depth of element is deepest depth of sorounding vertices
+            elseif (trim(which_depth_n2e) .eq. 'max')  then ; dmean=minval(cavity_depth(nodes(1:nv)))
             ! DEFAULT: depth of element is  mean depth of sorounding vertices
-            elseif (trim(which_depth_n2e) .eq. 'mean') then ; dmean=sum(cavity_depth(nodes))/3.0
-            end if 
-        end if 
+            ! (literal divisors: under -no-prec-div x/real(nv) differs by 1 ulp)
+            elseif (trim(which_depth_n2e) .eq. 'mean') then
+                if (nv==3) then
+                    dmean=sum(cavity_depth(nodes(1:3)))/3.0
+                else
+                    dmean=sum(cavity_depth(nodes(1:4)))/4.0
+                end if
+            end if
+        end if
         
         !_______________________________________________________________________
         ! vertical elem level index of cavity-ocean boundary
@@ -1138,7 +1237,7 @@ subroutine find_levels_cavity(mesh)
                 do elem=1,elem2D
                     ! nneighb = 3 --> tri mesh, nneighb = 4 --> quad mesh
                     nneighb = merge(3,4,elem2D_nodes(1,elem) == elem2D_nodes(4,elem))
-                    elems   = elem_neighbors(1:3,elem)
+                    elems   = elem_neighbors(1:4,elem)
                     !
                     !   .___________________________.~~~~~~~~~~~~~~~~~~~~~~~~~~
                     !   |###|###|###|###|###|###|###|
@@ -1199,7 +1298,7 @@ subroutine find_levels_cavity(mesh)
                                 !PS not possible 
                                 !PS idx = minloc(ulevels(elems)-nz, 1, MASK=( (elems>0) .and. ((ulevels(elems)-nz)>0) ) )
                                 val=nl
-                                do j = 1, 3
+                                do j = 1, nneighb
                                     if (elems(j)>0) then ! if its a valid boundary triangle, 0=missing value
                                         if (ulevels(elems(j))-nz>0 .and. ulevels(elems(j))-nz<val) then
                                             val=ulevels(elems(j))-nz
@@ -1500,28 +1599,37 @@ USE MOD_MESH
 USE g_CONFIG
 implicit none
 integer, intent(in)  :: elem
-integer              ::  elnodes(3), k    
+integer              ::  elnodes(4), k, nv
 real(kind=WP), intent(out) :: x, y
-real(kind=WP)        ::  ax(3), amin
+real(kind=WP)        ::  ax(4), amin
 type(t_mesh), intent(in), target :: mesh
 #include "associate_mesh_ini.h"
 
-   elnodes=elem2D_nodes(1:3,elem)
-   ax=coord_nod2D(1, elnodes)
-   amin=minval(ax)
-   DO k=1,3
+   ! vertex mean over the nv distinct vertices (triangle: 4th = 1st). The
+   ! divisor stays a literal: under -no-prec-div x/real(nv) differs by 1 ulp.
+   nv=merge(3,4,elem2D_nodes(1,elem) == elem2D_nodes(4,elem))
+   elnodes=elem2D_nodes(:,elem)
+   ax(1:nv)=coord_nod2D(1, elnodes(1:nv))
+   amin=minval(ax(1:nv))
+   DO k=1,nv
    if(ax(k)-amin>cyclic_length/2.0) ax(k)=ax(k)-cyclic_length
    END DO
-   x=sum(ax)/3.0_WP
-   y=sum(coord_nod2D(2,elnodes))/3.0_WP
-   
+   if (nv==3) then
+      x=sum(ax(1:3))/3.0_WP
+      y=sum(coord_nod2D(2,elnodes(1:3)))/3.0_WP
+   else
+      x=sum(ax(1:4))/4.0_WP
+      y=sum(coord_nod2D(2,elnodes(1:4)))/4.0_WP
+   end if
+
 end subroutine elem_center
 !=======================================================================
 SUBROUTINE find_elem_neighbors_ini(mesh)
-! For each element three its element neighbors are found
+! For each element its element neighbors (across its nv = 3 or 4 sides,
+! elem_edges order 1-2, 2-3, 3-4, 4-1) are found; a triangle's 4th stays 0
 USE MOD_MESH
 implicit none
-integer    :: elem, eledges(3), elem1, j, n, elnodes(3)
+integer    :: elem, eledges(4), elem1, j, n, nv, elnodes(4)
 type(t_mesh), intent(inout), target :: mesh
 #include "associate_mesh_ini.h"
 
@@ -1529,24 +1637,25 @@ allocate(mesh%elem_neighbors(4,elem2D))
 elem_neighbors => mesh%elem_neighbors !required after the allocation, otherwise the pointer remains undefined
 elem_neighbors=0
 DO elem=1,elem2D
-   
-   eledges=elem_edges(1:3,elem)
-   DO j=1,3
+
+   nv=merge(3,4,elem2D_nodes(1,elem) == elem2D_nodes(4,elem))
+   eledges=elem_edges(:,elem)
+   DO j=1,nv
    elem1=edge_tri(1,eledges(j))
    if(elem1==elem) elem1=edge_tri(2,eledges(j))
    elem_neighbors(j,elem)=elem1
    END DO
-   
+
 END DO
- ! Among elem_neighbors there can be negative numbers. These correspond to 
- ! boundary elements for which neighbours are absent. However, an element 
- ! should have at least two valid neighbors
+ ! Among elem_neighbors there can be negative numbers. These correspond to
+ ! boundary elements for which neighbours are absent. However, an element
+ ! should have at least two valid neighbors (triangles and quads alike)
 
  ! Test that there are at least two neighbors at the surface:
 
 DO elem=1,elem2D
    elem1=0
-   DO j=1,3
+   DO j=1,4
    if(elem_neighbors(j,elem)>0) elem1=elem1+1
    END DO
    if (elem1<2) then
@@ -1588,21 +1697,23 @@ END DO
  nod_in_elem2D_num => mesh%nod_in_elem2D_num !required after the allocation, otherwise the pointer remains undefined
  nod_in_elem2D_num=0
  do n=1,elem2D
-    elnodes=elem2D_nodes(1:3,n)
-    nod_in_elem2D_num(elnodes)=nod_in_elem2D_num(elnodes)+1
+    nv=merge(3,4,elem2D_nodes(1,n) == elem2D_nodes(4,n))
+    elnodes=elem2D_nodes(:,n)
+    nod_in_elem2D_num(elnodes(1:nv))=nod_in_elem2D_num(elnodes(1:nv))+1
  end do
  allocate(mesh%nod_in_elem2D(maxval(nod_in_elem2D_num),nod2D))
  nod_in_elem2D => mesh%nod_in_elem2D
  nod_in_elem2D=0
- 
+
  nod_in_elem2D_num=0
- do n=1,elem2D   
-    elnodes=elem2D_nodes(1:3,n)
-    nod_in_elem2D_num(elnodes)=nod_in_elem2D_num(elnodes)+1
-    do j=1, 3
+ do n=1,elem2D
+    nv=merge(3,4,elem2D_nodes(1,n) == elem2D_nodes(4,n))
+    elnodes=elem2D_nodes(:,n)
+    nod_in_elem2D_num(elnodes(1:nv))=nod_in_elem2D_num(elnodes(1:nv))+1
+    do j=1, nv
        nod_in_elem2D(nod_in_elem2D_num(elnodes(j)),elnodes(j))=n
     end do
- end do  
+ end do
 END SUBROUTINE find_elem_neighbors_ini
 !===================================================================
 ! Stiffness matrix for the elevation
