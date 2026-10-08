@@ -15,7 +15,14 @@ contains
     ! EO args
     integer rank_use_count
     integer rank
-    
+
+    ! a single rank has no other rank to hand the read to (next_io_rank_helper would never return)
+    if(partit%npes == 1) then
+      result = SEQUENTIAL_IO_RANK
+      async_netcdf_allowed = .false.
+      return
+    end if
+
     result = next_io_rank_helper(communicator, rank_use_count)
     if(rank_use_count > 1) then
       if(partit%mype == SEQUENTIAL_IO_RANK) print *,"rejecting additional async NetCDF for process:",result, "use count:", rank_use_count, "falling back to sequential I/O on process ",SEQUENTIAL_IO_RANK
