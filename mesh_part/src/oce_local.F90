@@ -11,6 +11,278 @@ module com_global2local_interface
 end module com_global2local_interface
 
 !=============================================================================
+! Hybrid meshes: sections appended to dist_N, announced by dist_N/format.out
+! (version DIST_FORMAT_VERSION). The FESOM2 part of my_list*.out and com_info*.out
+! stays as it is; appended are
+!   my_list : eXDim_nod2D and the global ids of the double-halo nodes = vertices of
+!             the elements 1..myDim+eDim+eXDim_elem2D that are not among the nodes
+!             1..myDim+eDim_nod2D (grouped by owner, ascending within);
+!   com_info: com_nod2D_full (every halo node 1..eDim+eXDim_nod2D, received from its
+!             owner) and com_edge2D (an edge is sent by its unique owner, the owner of
+!             edges(1,edge), to every other PE holding it in 1..myDim+eDim_edge2D,
+!             also where it lies in that PE's 1..myDim_edge2D).
+! Lists are in local numbering (nodes 1..myDim+eDim+eXDim_nod2D, edges = position in
+! myList_edge2D); for one peer both sides are ordered by global id.
+module dist_ext
+  use MOD_MESH
+  use MOD_PARTIT
+  implicit none
+  integer, parameter :: DIST_FORMAT_VERSION = 1
+
+  type dist_com
+     integer              :: rPEnum, sPEnum
+     integer, allocatable :: rPE(:), rptr(:), rlist(:), sPE(:), sptr(:), slist(:)
+  end type dist_com
+
+contains
+!=============================================================================
+! eXDim_nod2D list (global ids) and com_nod2D_full. Needs the global numbering
+! (call before com_global2local).
+subroutine nod_full_lists(partit, mesh, xlist, com)
+  type(t_mesh),   intent(in)        :: mesh
+  type(t_partit), intent(in)        :: partit
+  integer, allocatable, intent(out) :: xlist(:)
+  type(dist_com), intent(out)       :: com
+  integer, allocatable :: loc(:), pes(:,:), pos(:)
+  integer              :: num_recv(0:partit%npes-1), num_send(0:partit%npes-1)
+  integer              :: myd, ed, nel, n, m, k, i, j, q, q2, el, el2, p, nx, counter
+  logical              :: too_small
+
+  myd = partit%myDim_nod2D
+  ed  = partit%eDim_nod2D
+  allocate(loc(mesh%nod2D), pos(0:partit%npes-1))
+  loc = 0
+  do k=1, myd
+     loc(partit%myList_nod2D(k)) = k
+  end do
+  do k=1, ed
+     loc(partit%com_nod2D%rlist(k)) = myd+k
+  end do
+  ! vertices of the local elements (owned + com_elem2D_full receive list) not yet local
+  nel = partit%com_elem2D_full%rptr(partit%com_elem2D_full%rPEnum+1)-1
+  do k=1, partit%myDim_elem2D+nel
+     if (k <= partit%myDim_elem2D) then
+        el = partit%myList_elem2D(k)
+     else
+        el = partit%com_elem2D_full%rlist(k-partit%myDim_elem2D)
+     end if
+     do q=1,4
+        n = mesh%elem2D_nodes(q,el)
+        if (loc(n) == 0) loc(n) = -1
+     end do
+  end do
+  ! double-halo nodes grouped by owner, ascending within
+  num_recv = 0
+  do n=1, mesh%nod2D
+     if (loc(n) == -1) num_recv(partit%part(n)) = num_recv(partit%part(n))+1
+  end do
+  nx = sum(num_recv)
+  allocate(xlist(nx))
+  call first_pos(num_recv, pos)
+  do n=1, mesh%nod2D
+     if (loc(n) /= -1) cycle
+     p = partit%part(n)
+     xlist(pos(p)) = n
+     pos(p) = pos(p)+1
+  end do
+  do k=1, nx
+     loc(xlist(k)) = myd+ed+k
+  end do
+
+  ! receive: every halo node (eDim + eXDim) from its owner
+  num_recv = 0
+  do n=1, mesh%nod2D
+     if (loc(n) > myd) num_recv(partit%part(n)) = num_recv(partit%part(n))+1
+  end do
+  call set_pe_ptr(num_recv, com%rPEnum, com%rPE, com%rptr)
+  allocate(com%rlist(com%rptr(com%rPEnum+1)-1))
+  call first_pos(num_recv, pos)
+  do n=1, mesh%nod2D
+     if (loc(n) <= myd) cycle
+     p = partit%part(n)
+     com%rlist(pos(p)) = loc(n)
+     pos(p) = pos(p)+1
+  end do
+
+  ! send: an owned node n is local to PE p if it is a vertex of an element el that
+  ! shares a vertex m with an element el2 having a vertex owned by p
+  allocate(pes(MAX_LAENDERECK, myd))
+  pes = -1
+  num_send = 0
+  too_small = .false.
+  do k=1, myd
+     n = partit%myList_nod2D(k)
+     do i=1, mesh%nod_in_elem2D_num(n)
+        el = mesh%nod_in_elem2D(i,n)
+        do q=1,4
+           m = mesh%elem2D_nodes(q,el)
+           do j=1, mesh%nod_in_elem2D_num(m)
+              el2 = mesh%nod_in_elem2D(j,m)
+              do q2=1,4
+                 p = partit%part(mesh%elem2D_nodes(q2,el2))
+                 if (p /= partit%mype) call add_pe(pes(:,k), p, num_send, too_small)
+              end do
+           end do
+        end do
+     end do
+  end do
+  if (too_small) then
+     print *,'Increase MAX_LAENDERECK in MOD_PARTIT.F90 and recompile'
+     stop
+  endif
+  call set_pe_ptr(num_send, com%sPEnum, com%sPE, com%sptr)
+  allocate(com%slist(com%sptr(com%sPEnum+1)-1))
+  counter = 0
+  do i=1, com%sPEnum
+     do k=1, myd
+        if (any(pes(:,k) == com%sPE(i))) then
+           counter = counter+1
+           com%slist(counter) = k
+        end if
+     end do
+  end do
+  deallocate(loc, pes, pos)
+end subroutine nod_full_lists
+!=============================================================================
+! com_edge2D from myList_edge2D(1:nedges) (global ids, myDim_edge2D + eDim_edge2D).
+subroutine edge_lists(partit, mesh, nedges, com)
+  type(t_mesh),   intent(in)  :: mesh
+  type(t_partit), intent(in)  :: partit
+  integer,        intent(in)  :: nedges
+  type(dist_com), intent(out) :: com
+  integer, allocatable :: loc(:), pes(:,:), pos(:)
+  integer              :: num_recv(0:partit%npes-1), num_send(0:partit%npes-1)
+  integer              :: e, k, i, q, n, el, p, counter
+  logical              :: too_small
+
+  allocate(loc(mesh%edge2D), pos(0:partit%npes-1))
+  loc = 0
+  do k=1, nedges
+     loc(partit%myList_edge2D(k)) = k
+  end do
+
+  ! receive: every edge I hold whose unique owner is another PE
+  num_recv = 0
+  do e=1, mesh%edge2D
+     if (loc(e) == 0) cycle
+     p = partit%part(mesh%edges(1,e))
+     if (p /= partit%mype) num_recv(p) = num_recv(p)+1
+  end do
+  call set_pe_ptr(num_recv, com%rPEnum, com%rPE, com%rptr)
+  allocate(com%rlist(com%rptr(com%rPEnum+1)-1))
+  call first_pos(num_recv, pos)
+  do e=1, mesh%edge2D
+     if (loc(e) == 0) cycle
+     p = partit%part(mesh%edges(1,e))
+     if (p == partit%mype) cycle
+     com%rlist(pos(p)) = loc(e)
+     pos(p) = pos(p)+1
+  end do
+
+  ! send: a uniquely owned edge goes to the PEs of the vertices of its elements (a PE
+  ! holds an edge iff the edge is a side of an element with a vertex owned by it)
+  allocate(pes(MAX_LAENDERECK, nedges))
+  pes = -1
+  num_send = 0
+  too_small = .false.
+  do k=1, nedges
+     e = partit%myList_edge2D(k)
+     n = mesh%edges(1,e)
+     if (partit%part(n) /= partit%mype) cycle
+     do i=1, mesh%nod_in_elem2D_num(n)
+        el = mesh%nod_in_elem2D(i,n)
+        if (all(mesh%elem_edges(:,el) /= e)) cycle
+        do q=1,4
+           p = partit%part(mesh%elem2D_nodes(q,el))
+           if (p /= partit%mype) call add_pe(pes(:,k), p, num_send, too_small)
+        end do
+     end do
+  end do
+  if (too_small) then
+     print *,'Increase MAX_LAENDERECK in MOD_PARTIT.F90 and recompile'
+     stop
+  endif
+  call set_pe_ptr(num_send, com%sPEnum, com%sPE, com%sptr)
+  allocate(com%slist(com%sptr(com%sPEnum+1)-1))
+  ! uniquely owned edges lie in 1..myDim_edge2D, which is ascending in global id
+  counter = 0
+  do i=1, com%sPEnum
+     do k=1, nedges
+        if (any(pes(:,k) == com%sPE(i))) then
+           counter = counter+1
+           com%slist(counter) = k
+        end if
+     end do
+  end do
+  deallocate(loc, pes, pos)
+end subroutine edge_lists
+!=============================================================================
+! PEs with num(p) > 0 (ascending) and the pointers into their lists
+subroutine set_pe_ptr(num, npe, pe, ptr)
+  integer,              intent(in)  :: num(0:)
+  integer,              intent(out) :: npe
+  integer, allocatable, intent(out) :: pe(:), ptr(:)
+  integer :: p
+
+  npe = count(num > 0)
+  allocate(pe(npe), ptr(npe+1))
+  npe = 0
+  ptr(1) = 1
+  do p=0, size(num)-1
+     if (num(p) == 0) cycle
+     npe = npe+1
+     pe(npe) = p
+     ptr(npe+1) = ptr(npe)+num(p)
+  end do
+end subroutine set_pe_ptr
+!=============================================================================
+! position of the first entry of PE p in a list grouped by PE (counting sort)
+subroutine first_pos(num, pos)
+  integer, intent(in)  :: num(0:)
+  integer, intent(out) :: pos(0:)
+  integer :: p
+
+  pos(0) = 1
+  do p=1, size(num)-1
+     pos(p) = pos(p-1)+num(p-1)
+  end do
+end subroutine first_pos
+!=============================================================================
+! adds PE p to the send list pes of one node/edge (once)
+subroutine add_pe(pes, p, num_send, too_small)
+  integer, intent(inout) :: pes(:), num_send(0:)
+  integer, intent(in)    :: p
+  logical, intent(inout) :: too_small
+  integer :: k
+
+  do k=1, size(pes)
+     if (pes(k) == p) then
+        return
+     elseif (pes(k) == -1) then
+        pes(k) = p
+        num_send(p) = num_send(p)+1
+        return
+     end if
+  end do
+  too_small = .true.
+end subroutine add_pe
+!=============================================================================
+subroutine write_dist_com(fileID, com)
+  integer,        intent(in) :: fileID
+  type(dist_com), intent(in) :: com
+
+  write(fileID,*) com%rPEnum
+  write(fileID,*) com%rPE
+  write(fileID,*) com%rptr
+  write(fileID,*) com%rlist
+  write(fileID,*) com%sPEnum
+  write(fileID,*) com%sPE
+  write(fileID,*) com%sptr
+  write(fileID,*) com%slist
+end subroutine write_dist_com
+end module dist_ext
+
+!=============================================================================
 SUBROUTINE com_global2local(partit, mesh)
 use MOD_MESH
 USE MOD_PARTIT
@@ -131,6 +403,7 @@ SUBROUTINE save_dist_mesh(partit, mesh)
   USE MOD_PARSUP
   USE o_ARRAYS 
   use com_global2local_interface
+  use dist_ext
   IMPLICIT NONE
 
   type(t_mesh),   intent(in),    target :: mesh
@@ -141,6 +414,8 @@ SUBROUTINE save_dist_mesh(partit, mesh)
   character(MAX_PATH) dist_mesh_dir
   integer, allocatable, dimension(:)  :: temp, ncount
   integer   n1, n2, flag, eledges(4)
+  integer, allocatable, dimension(:)  :: xlist_nod2D
+  type(dist_com) com_nod2D_full, com_edge2D
 
 #include "associate_part_def.h"
 #include "associate_mesh_ini.h"
@@ -230,6 +505,13 @@ SUBROUTINE save_dist_mesh(partit, mesh)
   write(fileID,*) myDim_edge2D
   write(fileID,*) eDim_edge2D 	 
   write(fileID,*) myList_edge2D(1:myDim_edge2D +eDim_edge2D)
+
+  ! hybrid meshes (dist_N/format.out): double-halo nodes, appended
+  call nod_full_lists(partit, mesh, xlist_nod2D, com_nod2D_full)
+  call edge_lists(partit, mesh, myDim_edge2D+eDim_edge2D, com_edge2D)
+  write(fileID,*) size(xlist_nod2D)
+  write(fileID,*) xlist_nod2D
+  deallocate(xlist_nod2D)
   deallocate(partit%myList_edge2D)
   close(fileID)       
 
@@ -288,6 +570,10 @@ SUBROUTINE save_dist_mesh(partit, mesh)
 !!$  deallocate(com_elem2D_full%sPE)
 !!$  deallocate(com_elem2D_full%sptr)
   deallocate(partit%com_elem2D_full%slist)
+
+  ! hybrid meshes (dist_N/format.out): com_nod2D_full, com_edge2D, appended
+  call write_dist_com(fileID, com_nod2D_full)
+  call write_dist_com(fileID, com_edge2D)
   close(fileID)
   ! ================================
   ! mapping ( PE contiguous 2D numbering) 	 
@@ -324,6 +610,12 @@ SUBROUTINE save_dist_mesh(partit, mesh)
      end do
 
      deallocate(ncount, temp)
+     close(fileID)
+
+     ! marker: the appended sections of my_list*.out / com_info*.out are present
+     file_name=trim(dist_mesh_dir)//'format.out'
+     open(fileID, file=file_name)
+     write(fileID,*) DIST_FORMAT_VERSION
      close(fileID)
   end if
 END subroutine  save_dist_mesh

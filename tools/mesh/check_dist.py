@@ -22,6 +22,14 @@ dist_N (per number of parts):
   - com_info: node / element / full-element halos symmetric between ranks (what r receives
     from p == what p sends to r, same order), received from their owner (node: part,
     element: part of the 1st vertex), receive lists in local numbering.
+  - appended sections (hybrid meshes; only if dist_N/format.out, version 1, is present):
+    my_list eXDim_nod2D == vertices of the local elements 1..myDim+eDim+eXDim not among
+    the nodes 1..myDim+eDim, grouped by owner, ascending within; com_nod2D_full receives
+    every halo node (eDim + eXDim) exactly once, from its owner; com_edge2D receives every
+    held edge whose unique owner (owner of edges(1,edge)) is another rank exactly once, from
+    that owner -- incl. the edges that also lie in the receiving rank's 1..myDim_edge2D
+    (owned edge ranges overlap: counted); both symmetric between ranks, ordered by global
+    id. Without format.out the files must end after the FESOM2 part.
 
 Usage: check_dist.py <mesh_dir> <npart> [<npart> ...]
   exit status 0 if every check passes, 1 otherwise; last line "check_dist: PASS|FAIL".
@@ -167,7 +175,15 @@ def check_dist(c, d, npart, m, nv, side_edge, count, ed, elem_edges):
     send = {}
     bad = {'nodes': 0, 'halo nodes': 0, 'elements': 0, 'eDim elements': 0,
            'eXDim elements': 0, 'edges': 0, 'eDim edges': 0, 'files': 0,
-           'receive lists': 0, 'owners': 0}
+           'receive lists': 0, 'owners': 0, 'eXDim nodes': 0, 'nod_full': 0, 'edge com': 0}
+    fpath = os.path.join(dd, 'format.out')
+    fmt = int(ints(fpath)[0]) if os.path.exists(fpath) else 0
+    if fmt:
+        c.check(fmt == 1, 'format.out: version %d' % fmt)
+    else:
+        print('  info: no format.out (FESOM2 layout only): appended sections not checked')
+    uowner = part[ed[:, 0]]                                 # unique owner of every edge
+    n_overlap = 0
     for r in range(npart):
         t = Tokens(os.path.join(dd, 'my_list%05d.out' % r))
         if t.take() != r:
@@ -178,6 +194,9 @@ def check_dist(c, d, npart, m, nv, side_edge, count, ed, elem_edges):
         elems = t.take(myde + ede + exde) - 1
         mydg, edg = t.take(), t.take()
         edges_l = t.take(mydg + edg) - 1
+        if fmt:
+            exdn = t.take()
+            xnodes = t.take(exdn) - 1
         if not t.done():
             bad['files'] += 1
         own = part == r
@@ -216,6 +235,9 @@ def check_dist(c, d, npart, m, nv, side_edge, count, ed, elem_edges):
         cn = read_com(t)
         ce = read_com(t)
         cf = read_com(t)
+        if fmt:
+            cnf = read_com(t)
+            cg = read_com(t)
         if not t.done():
             bad['files'] += 1
         # receive lists: local numbering, owner = peer
@@ -242,6 +264,50 @@ def check_dist(c, d, npart, m, nv, side_edge, count, ed, elem_edges):
             if cf[0] else np.zeros(0, np.int64)
         if not np.array_equal(full, np.sort(elems[myde:])):
             bad['receive lists'] += 1
+        if fmt:
+            # double-halo nodes: vertices of all local elements not among the local nodes
+            vx = np.setdiff1d(np.unique(en[elems]), nodes)
+            vx = vx[np.lexsort((vx, part[vx]))]                 # by owner, ascending within
+            if not np.array_equal(xnodes, vx):
+                bad['eXDim nodes'] += 1
+            alln = np.concatenate([nodes, xnodes])
+            nloc = mydn + edn + exdn
+            # com_nod2D_full: every halo node once, from its owner, ordered by global id
+            rl = np.sort(np.concatenate([v for v in cnf[0].values()])) if cnf[0] \
+                else np.zeros(0, np.int64)
+            if not np.array_equal(rl, np.arange(mydn + 1, nloc + 1)):
+                bad['nod_full'] += 1
+            for p, v in cnf[0].items():
+                g = alln[v - 1]
+                if np.any(part[g] != p) or np.any(np.diff(g) <= 0):
+                    bad['nod_full'] += 1
+                recv[('nod_full', r, p)] = g
+            for p, v in cnf[1].items():
+                if np.any(v < 1) or np.any(v > mydn):
+                    bad['nod_full'] += 1
+                send[('nod_full', r, p)] = alln[np.clip(v, 1, nloc) - 1]
+            # com_edge2D: every held edge of another unique owner once, from that owner
+            nedl = mydg + edg
+            want = np.nonzero(uowner[edges_l] != r)[0] + 1
+            rl = np.sort(np.concatenate([v for v in cg[0].values()])) if cg[0] \
+                else np.zeros(0, np.int64)
+            if not np.array_equal(rl, want):
+                bad['edge com'] += 1
+            for p, v in cg[0].items():
+                g = edges_l[v - 1]
+                if np.any(uowner[g] != p) or np.any(np.diff(g) <= 0):
+                    bad['edge com'] += 1
+                recv[('edge', r, p)] = g
+            for p, v in cg[1].items():
+                g = edges_l[np.clip(v, 1, nedl) - 1]
+                if np.any(v < 1) or np.any(v > nedl) or np.any(uowner[g] != r):
+                    bad['edge com'] += 1
+                send[('edge', r, p)] = g
+            # owned edge ranges overlap: edges in 1..myDim_edge2D of another unique owner
+            ovl = np.nonzero(uowner[edges_l[:mydg]] != r)[0] + 1
+            n_overlap += len(ovl)
+            if not np.all(np.isin(ovl, rl)):
+                bad['edge com'] += 1
 
     c.check(bad['files'] == 0, 'my_list/com_info files: rank ids and lengths')
     c.check(np.all(nod_owned == 1) and bad['nodes'] == 0,
@@ -257,11 +323,20 @@ def check_dist(c, d, npart, m, nv, side_edge, count, ed, elem_edges):
     c.check(bad['eDim edges'] == 0, 'halo edges == sides of owned elements without an owned node')
     c.check(bad['receive lists'] == 0 and bad['owners'] == 0,
             'receive lists in local numbering, received from the owner')
+    if fmt:
+        c.check(bad['eXDim nodes'] == 0,
+                'eXDim_nod2D == vertices of the local elements not among the local nodes, '
+                'grouped by owner')
+        c.check(bad['nod_full'] == 0,
+                'com_nod2D_full: every halo node (eDim + eXDim) received once, from its owner')
+        c.check(bad['edge com'] == 0,
+                'com_edge2D: every held edge of another unique owner received once, from it '
+                '(%d edges in overlapping owned ranges)' % n_overlap)
     asym = [k for k in set(recv) | set(send)
             if not np.array_equal(recv.get(k, []), send.get((k[0], k[2], k[1]), []))]
-    c.check(not asym, 'node / element / full-element halos symmetric between ranks '
-                      '(%d receive lists%s)' % (len(recv), '' if not asym else
-                                                ', asymmetric: %s' % asym[:5]))
+    c.check(not asym, 'node / element / full-element%s halos symmetric between ranks '
+                      '(%d receive lists%s)' % (' / full-node / edge' if fmt else '', len(recv),
+                                                '' if not asym else ', asymmetric: %s' % asym[:5]))
 
 
 def main():

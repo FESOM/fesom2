@@ -4,19 +4,25 @@
 # 1. Runs fesom_ini (use_depthfile='nemo': depth.out) on the writable NEMO test meshes under
 #    MESH_ROOT and checks every output with tools/mesh/check_dist.py (edges, edge order and
 #    edge2D_in, levels == depth.out counts, dist_N ownership, halos, communication):
-#      nemo025q_cut, nemo025mix_cut (2, 8 parts), nemo025q_fesom, nemo025mix (2, 8, 128).
-#    Old outputs (edges, levels, dist_*) are removed first: fesom_ini keeps existing
-#    edge/level files instead of rewriting them.
-# 2. check_dist.py on the triangle meshes: the writable copies pi_w, core2_w (made by
-#    tools/run_ini_compare.sh) and, read-only, the existing dist_N of the original pi
-#    (dist_2, dist_8) and CORE2 (dist_8) made by older fesom_ini versions.
+#      nemo025q_cut, nemo025mix_cut (2, 4, 8 parts), nemo025q_fesom, nemo025mix (2, 8, 128),
+#    plus dist_1 of each (tools/make_dist1.py). Old outputs (edges, levels, dist_*) are
+#    removed first: fesom_ini keeps existing edge/level files instead of rewriting them.
+#    Since Task 5 check_dist.py also checks the appended sections (dist_N/format.out:
+#    double-halo nodes, com_nod2D_full, com_edge2D); the 4-part cut-outs must have edges
+#    in overlapping owned ranges (an edge in 1..myDim_edge2D of two ranks).
+# 2. check_dist.py on the triangle meshes: the writable copies pi_w (dist_1/2/8), core2_w
+#    (dist_1/2/8/128) (made by tools/run_ini_compare.sh) and, read-only, the existing
+#    dist_N of the original pi (dist_2, dist_8) and CORE2 (dist_8) made by older fesom_ini
+#    versions (FESOM2 layout only).
 # 3. Error cases (on copies under WORK_ROOT):
 #    - the original NEMO mesh (40 dead-end quads) stops with the "Insufficient number of
 #      neighbors" message and writes no dist_N;
 #    - a mixed cut-out with one anticlockwise quad and one anticlockwise triangle: both are
 #      fixed and reported, and every output equals that of the unflipped mesh;
 #    - a self-intersecting (bow-tie) quad stops;
-#    - check_dist.py fails on a dist_2 with an owned and a halo node exchanged.
+#    - check_dist.py fails on a dist_2 with an owned and a halo node exchanged, and on a
+#      dist_4 with two double-halo nodes exchanged, a com_nod2D_full or a com_edge2D
+#      receive entry duplicated.
 # tools/run_ini_compare.sh (triangles byte-identical to FESOM2's build) is run separately.
 #
 # Usage: tools/run_ini_mixed.sh [build_dir]
@@ -74,7 +80,7 @@ check() {
 }
 
 echo "[1/3] fesom_ini + check_dist on the NEMO quad and mixed meshes"
-for spec in nemo025q_cut:2,8 nemo025mix_cut:2,8 nemo025q_fesom:2,8,128 nemo025mix:2,8,128; do
+for spec in nemo025q_cut:2,4,8 nemo025mix_cut:2,4,8 nemo025q_fesom:2,8,128 nemo025mix:2,8,128; do
     name=${spec%%:*}; parts=${spec#*:}; d="$MESH_ROOT/$name"
     clean "$d"
     for np in ${parts//,/ }; do
@@ -83,11 +89,19 @@ for spec in nemo025q_cut:2,8 nemo025mix_cut:2,8 nemo025q_fesom:2,8,128 nemo025mi
         [ -f "$d/dist_$np/rpart.out" ] && grep -q 'Total time' "$log" \
             || bad "fesom_ini $name np=$np (log $log)"
     done
-    check "$d" ${parts//,/ }
+    python3 "$HERE/make_dist1.py" "$d" > "$WORK_ROOT/log/${name}_1.log" 2>&1 \
+        || bad "make_dist1.py $name (log $WORK_ROOT/log/${name}_1.log)"
+    check "$d" 1 ${parts//,/ }
+    if [[ ",$parts," == *",4,"* ]]; then
+        n=$(sed -n '/dist_4$/,/^==\|check_dist:/p' "$WORK_ROOT/log/check_${name}.log" \
+            | sed -n 's/.*(\([0-9]*\) edges in overlapping owned ranges).*/\1/p')
+        [ "${n:-0}" -gt 0 ] && ok "$name dist_4: $n edges in overlapping owned ranges, received from their unique owner" \
+                            || bad "$name dist_4: no edges in overlapping owned ranges"
+    fi
 done
 
 echo "[2/3] check_dist on the triangle meshes"
-for spec in "$MESH_ROOT/pi_w:2,8" "$MESH_ROOT/core2_w:2,8,128" "$PI_SRC:2,8" "$CORE2_SRC:8"; do
+for spec in "$MESH_ROOT/pi_w:1,2,8" "$MESH_ROOT/core2_w:1,2,8,128" "$PI_SRC:2,8" "$CORE2_SRC:8"; do
     d=${spec%%:*}; parts=${spec#*:}
     if [ -f "$d/dist_${parts%%,*}/rpart.out" ]; then
         check "$d" ${parts//,/ }
@@ -163,5 +177,47 @@ if python3 "$HERE/mesh/check_dist.py" "$d" 2 > "$WORK_ROOT/log/check_corrupt.log
 else
     ok "check_dist detects a corrupted dist_2 ($(grep -c FAILED "$WORK_ROOT/log/check_corrupt.log") failed checks)"
 fi
+
+# check_dist must fail on corrupted appended sections (copies of the mixed cut-out dist_4)
+for what in xnodes nod_full edge; do
+    d="$WORK_ROOT/corrupt_$what"; mkdir -p "$d"; clean "$d"
+    for f in nod2d.out elem2d.out depth.out $OUTS; do cp "$ref/$f" "$d/"; done
+    cp -r "$ref/dist_4" "$d/"
+    python3 - "$d/dist_4" "$what" <<'EOF'
+import sys
+d, what = sys.argv[1], sys.argv[2]
+def load(f):
+    return open(f).read().split()
+def save(f, tok):
+    open(f, 'w').write('\n'.join(tok) + '\n')
+if what == 'xnodes':                   # exchange the first two double-halo nodes of rank 0
+    f = d + '/my_list00000.out'
+    tok = load(f)
+    i = 3 + int(tok[1]) + int(tok[2])                     # myDim_elem2D
+    i += 3 + sum(int(x) for x in tok[i:i + 3])            # myDim_edge2D
+    i += 2 + int(tok[i]) + int(tok[i + 1])                # eXDim_nod2D
+    assert int(tok[i]) >= 2
+    tok[i + 1], tok[i + 2] = tok[i + 2], tok[i + 1]
+else:                                  # duplicate a receive entry of rank 1
+    f = d + '/com_info00001.out'
+    tok = load(f)
+    i = 1
+    for s in range(4 if what == 'nod_full' else 5):       # skip to the wanted structure
+        start = i
+        for _ in range(2):                                 # receive, send
+            npe = int(tok[i]); ptr_end = int(tok[i + 2 * npe + 1]) if npe else 1
+            i += 1 + npe + npe + 1 + ptr_end - 1
+    npe = int(tok[start])
+    r0 = start + 1 + npe + npe + 1                         # first rlist entry
+    assert npe > 0 and int(tok[start + 2 * npe + 1]) > 2
+    tok[r0 + 1] = tok[r0]
+save(f, tok)
+EOF
+    if python3 "$HERE/mesh/check_dist.py" "$d" 4 > "$WORK_ROOT/log/check_corrupt_$what.log" 2>&1; then
+        bad "check_dist passes a dist_4 with corrupted $what"
+    else
+        ok "check_dist detects corrupted $what in dist_4 ($(grep FAILED "$WORK_ROOT/log/check_corrupt_$what.log" | head -1 | cut -c1-70)...)"
+    fi
+done
 
 if [ "$fail" = 0 ]; then echo "run_ini_mixed: PASS"; else echo "run_ini_mixed: FAIL"; exit 1; fi

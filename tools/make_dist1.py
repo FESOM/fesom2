@@ -19,6 +19,9 @@ Format (from the FESOM2 reader oce_mesh.F90 read_mesh):
                        list read spans records until it has all its values).
   com_info00000.out  : empty np=1 comm structs (rPEnum=sPEnum=0, blank zero-size
                        arrays, rptr=sptr=1) — MESH-INDEPENDENT, copied from pi.
+Hybrid meshes (fesom_ini's dist_N/format.out, version 1): the marker format.out is
+written and the appended sections are empty — my_list gets eXDim_nod2D(0) and its
+(blank) list, com_info gets two more empty structs (com_nod2D_full, com_edge2D).
 
 Usage: tools/make_dist1.py <mesh_dir> [pi_template_dir]
 """
@@ -26,6 +29,8 @@ import os, sys
 
 PI_TEMPLATE = "/home/a/a270088/port2/fesom2/tests/data/MESHES/pi/dist_1"
 WRAP = 30  # values per line in the identity lists (wrap-safe; avoids MB-long lines)
+FORMAT_VERSION = 1  # dist_N/format.out (appended sections present)
+EMPTY_COM = "0\n\n1\n\n0\n\n1\n\n"  # one empty comm struct (rPEnum .. slist)
 
 
 def first_int(path):
@@ -49,7 +54,8 @@ def build_my_list(nod2D, elem2D, edge2D):
     lines = ["0",
              str(nod2D), "0", *wrapped(nod2D),
              str(elem2D), "0", "0", *wrapped(elem2D),
-             str(edge2D), "0", *wrapped(edge2D)]
+             str(edge2D), "0", *wrapped(edge2D),
+             "0", ""]                       # eXDim_nod2D, its (empty) list
     return "\n".join(lines) + "\n"
 
 
@@ -104,8 +110,10 @@ def main():
     with open(os.path.join(pi_dir, "com_info00000.out")) as f:
         com = f.read()
     with open(os.path.join(out, "com_info00000.out"), "w") as f:
-        f.write(com)
-    print(f"  wrote {out}/{{rpart.out, my_list00000.out, com_info00000.out}}")
+        f.write(com + 2 * EMPTY_COM)        # + com_nod2D_full, com_edge2D
+    with open(os.path.join(out, "format.out"), "w") as f:
+        f.write(f"{FORMAT_VERSION}\n")
+    print(f"  wrote {out}/{{rpart.out, my_list00000.out, com_info00000.out, format.out}}")
 
 
 if __name__ == "__main__":

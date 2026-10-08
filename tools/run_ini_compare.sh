@@ -22,6 +22,14 @@
 #          dist_2 part sizes but not the node lists (part labels swapped), one with the
 #          existing levels as weights matches nothing either.
 #      Their structure is checked by check_dist.py (Task 4).
+#   Since Task 5 the port appends sections to dist_N/my_list*.out and com_info*.out
+#   (double-halo nodes, com_nod2D_full, com_edge2D) and writes dist_N/format.out: these
+#   files are compared as "FESOM2 file + appended part" (the FESOM2 part byte-identical,
+#   checked by check_dist.py in tools/run_ini_mixed.sh), rpart.out exactly.
+# 3. dist_1 of pi_w and core2_w is written by tools/make_dist1.py (empty appended sections).
+# 4. The model's existing dist_N reader (FESOM2's read sequence; it ignores the appended
+#    sections) reads the new pi_w dist_2/8: test_partit and test_halo of the build with
+#    FESOM3_MESH_DIR=pi_w.
 #
 # FESOM2's mesh_part is built once (scratch) with
 #   cmake -S /home/a/a270029/fesom2.0/mesh_part -B <dir> -DCMAKE_BUILD_TYPE=Release \
@@ -39,10 +47,15 @@ WORK_ROOT="${WORK_ROOT:-/work/ab0995/a270029/fesom3_hybrid/ini_compare}"
 PI_SRC=/home/a/a270088/port2/fesom2/tests/data/MESHES/pi
 CORE2_SRC=/pool/data/AWICM/FESOM2/MESHES_FESOM2.1/core2
 
-for x in "$INI" "$F2_INI"; do
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MPIEXEC="${MPIEXEC:-/sw/spack-levante/openmpi-4.1.2-yfwe6t/bin/mpiexec --mca pml ob1 --mca btl self,vader}"
+for x in "$INI" "$F2_INI" "$BUILD/bin/test_partit" "$BUILD/bin/test_halo"; do
     [ -x "$x" ] || { echo "run_ini_compare: missing executable $x" >&2; exit 2; }
 done
 ulimit -s unlimited
+source /usr/share/Modules/init/bash
+module load python3 >/dev/null 2>&1
+hash -r
 
 fail=0
 ok()  { echo "  ok: $*"; }
@@ -80,6 +93,23 @@ ndiff() {
 }
 dist_files() { (cd "$1/dist_$2" && ls); }
 
+# ndist <new_dist> <old_dist> <files...>: number of files of old_dist that new_dist does not
+# reproduce: rpart.out byte-identical, my_list/com_info = the old file + appended sections
+ndist() {
+    local a="$1" b="$2" n=0 f sz; shift 2
+    [ -f "$a/format.out" ] || n=$((n+1))
+    for f in "$@"; do
+        if [ "$f" = rpart.out ]; then
+            cmp -s "$a/$f" "$b/$f" || n=$((n+1))
+        else
+            sz=$(stat -c%s "$b/$f")
+            [ -f "$a/$f" ] && [ "$(stat -c%s "$a/$f")" -gt "$sz" ] \
+                && head -c "$sz" "$a/$f" | cmp -s - "$b/$f" || n=$((n+1))
+        fi
+    done
+    echo "$n"
+}
+
 # compare_mesh <name> <src> <exact_vs_src_files> <exact_vs_src_dists> <nparts...>
 compare_mesh() {
     local name="$1" src="$2" exact_files="$3" exact_dists="$4"; shift 4
@@ -98,8 +128,8 @@ compare_mesh() {
                  || bad "$name: $n of the edge/level files differ from FESOM2's build"
     for np in "$@"; do
         files=$(dist_files "$ref" "$np")
-        n=$(ndiff "$dst/dist_$np" "$ref/dist_$np" $files)
-        [ "$n" = 0 ] && ok "$name dist_$np: $(echo $files | wc -w) files identical to FESOM2's build" \
+        n=$(ndist "$dst/dist_$np" "$ref/dist_$np" $files)
+        [ "$n" = 0 ] && ok "$name dist_$np: $(echo $files | wc -w) files == FESOM2's build (+ appended sections, format.out)" \
                      || bad "$name dist_$np: $n files differ from FESOM2's build"
     done
     # 2. port vs the files in the original mesh directory
@@ -109,9 +139,9 @@ compare_mesh() {
     done
     for np in "$@"; do
         files=$(cd "$src/dist_$np" && ls)
-        n=$(ndiff "$dst/dist_$np" "$src/dist_$np" $files)
+        n=$(ndist "$dst/dist_$np" "$src/dist_$np" $files)
         if [[ " $exact_dists " == *" $np "* ]]; then
-            [ "$n" = 0 ] && ok "$name dist_$np: identical to existing" \
+            [ "$n" = 0 ] && ok "$name dist_$np: identical to existing (+ appended sections)" \
                          || bad "$name dist_$np: $n files differ from existing"
         else
             echo "  info: $name dist_$np: $n of $(echo $files | wc -w) files differ from existing (older fesom_ini, not gated)"
@@ -120,6 +150,12 @@ compare_mesh() {
     for f in elvls.out nlvls.out; do
         cmp -s "$dst/$f" "$src/$f" || echo "  info: $name $f differs from existing (older level finder, not gated)"
     done
+    # 3. dist_1 (one rank, no METIS)
+    if python3 "$HERE/make_dist1.py" "$dst" > "$WORK_ROOT/log/${name}_dist1.log" 2>&1; then
+        ok "$name dist_1 written by make_dist1.py"
+    else
+        bad "$name: make_dist1.py (log $WORK_ROOT/log/${name}_dist1.log)"
+    fi
 }
 
 compare_mesh pi "$PI_SRC" \
@@ -128,5 +164,19 @@ compare_mesh pi "$PI_SRC" \
 compare_mesh core2 "$CORE2_SRC" \
     "edges.out=edges.out edge_tri.out=edge_tri.out edgenum.out=edgenum.out elvls.out=elvls.out.20260528_regenerated nlvls.out=nlvls.out.20260528_regenerated elvls_raw.out=elvls_raw.out" \
     "2 128" 2 8 128
+
+# 4. the model's existing reader on the new dist_N of pi_w
+echo "== existing dist_N reader on $MESH_ROOT/pi_w"
+for t in test_partit test_halo; do
+    for np in 2 8; do
+        log="$WORK_ROOT/log/${t}_pi_w_np$np.log"
+        if FESOM3_MESH_DIR="$MESH_ROOT/pi_w" $MPIEXEC -np "$np" "$BUILD/bin/$t" > "$log" 2>&1 \
+           && grep -q 'ALL PASS' "$log"; then
+            ok "$t np=$np reads pi_w/dist_$np"
+        else
+            bad "$t np=$np on pi_w (log $log)"
+        fi
+    done
+done
 
 if [ "$fail" = 0 ]; then echo "run_ini_compare: PASS"; else echo "run_ini_compare: FAIL"; exit 1; fi

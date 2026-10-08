@@ -377,19 +377,37 @@ fluxes and nonlinear terms can. Asserted in a test (Task 9), measured in the sho
 **Files:**
 - Modify: `mesh_part/src/oce_local.F90` (save_dist_mesh) + new list builders
 - Modify: `tools/mesh/check_dist.py`, `tools/make_dist1.py`
+- ➕ Modify: `tools/run_ini_compare.sh`, `tools/run_ini_mixed.sh` (appended sections, dist_1/4,
+  reader and corruption tests)
 
-- [ ] marker file `dist_N/format.out` (version); existing files keep their FESOM2 layout
-- [ ] `eXDim_nod2D`: vertices of elements 1..myDim+eDim+eXDim not among 1..myDim+eDim nodes;
+- [x] marker file `dist_N/format.out` (version); existing files keep their FESOM2 layout
+      — `format.out` = version 1 (written with `rpart.out`); the FESOM2 part of every
+      `my_list*.out` / `com_info*.out` is byte-identical, the new lists are appended
+      (module `dist_ext` in `oce_local.F90`)
+- [x] `eXDim_nod2D`: vertices of elements 1..myDim+eDim+eXDim not among 1..myDim+eDim nodes;
       appended to `my_list*.out`; `com_nod2D_full` appended to `com_info*.out`
-- [ ] `com_edge2D`: unique owner = owner of `edges(1,edge)`, sends to every other rank holding the
+      — eXDim list grouped by owner, ascending within (local numbers myDim+eDim+1..);
+      `com_nod2D_full` receives every halo node (eDim + eXDim) from its owner; per peer both
+      sides ordered by global id
+- [x] `com_edge2D`: unique owner = owner of `edges(1,edge)`, sends to every other rank holding the
       edge (also where it lies in that rank's 1..myDim_edge2D); appended to `com_info*.out`
-- [ ] `make_dist1.py` writes the marker and empty new lists
-- [ ] regenerate `dist_1/2/8` (+ 128 for CORE2, NEMO) in all writable test meshes
-- [ ] tests: `check_dist.py` verifies the new lists (send/receive symmetric, every halo edge and
+      — holders = ranks of the vertices of the elements on the edge; local edge number =
+      position in `myList_edge2D`; per peer ordered by global id
+- [x] `make_dist1.py` writes the marker and empty new lists
+- [x] regenerate `dist_1/2/8` (+ 128 for CORE2, NEMO) in all writable test meshes
+      — pi_w 1/2/8, core2_w 1/2/8/128, nemo025q_fesom + nemo025mix 1/2/8/128, the cut-outs
+      1/2/4/8 (dist_1 by `make_dist1.py`; made by `run_ini_compare.sh` / `run_ini_mixed.sh`)
+- [x] tests: `check_dist.py` verifies the new lists (send/receive symmetric, every halo edge and
       double-halo node has exactly one owner; 4-rank case where owned edge ranges overlap) on
       pi, CORE2, NEMO, mixed and the cut-outs; FESOM2's reader still reads a new `dist_N`
       (existing files unchanged)
-- [ ] run tests — must pass before Task 6
+      — `run_ini_mixed.sh`: dist_4 of the cut-outs has 148 (quad) / 239 (mixed) edges in
+      overlapping owned ranges, all received from the unique owner; corrupted eXDim list,
+      `com_nod2D_full`, `com_edge2D` detected. `run_ini_compare.sh`: `rpart.out` identical and
+      `my_list`/`com_info` = FESOM2 build's file + appended part; the model's existing
+      FESOM2-sequence reader (`test_partit`, `test_halo`, np 2/8) reads the new pi_w dist_N
+- [x] run tests — must pass before Task 6 — `run_ini_compare.sh` PASS, `run_ini_mixed.sh` PASS,
+      `test_nemo_meshq.sh`, `test_mesh_tools.sh` PASS, scratch ctest 48/48
 
 ### Task 6: Model reads mixed meshes and the extended dist_N (triangles bit-identical)
 
