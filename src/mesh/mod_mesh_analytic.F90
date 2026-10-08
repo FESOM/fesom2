@@ -4,7 +4,9 @@ module mod_mesh_analytic
     ! nl uniform levels. cartesian=.true. so the metric is off. Synthesizes a
     ! 1-rank identity partition too. (Doubly-periodic variant deferred; closed only.)
     ! generate_mixed_patch: the same grid with jittered interior nodes and a mix of
-    ! quads and triangle pairs (hybrid meshes). Both use the 4-slot conventions of
+    ! quads and triangle pairs (hybrid meshes). generate_quad_patch: all quads, the
+    ! grid sheared into parallelograms (checkerboard test of the SSH matrix). All use
+    ! the 4-slot conventions of
     ! mod_mesh (triangle 4th vertex = 1st, boundary edge_tri(2) = edge_tri(1)) and
     ! FESOM's edge order (interior edges first, edge2D_in).
     use mod_precision, only: WP, MP
@@ -16,7 +18,8 @@ module mod_mesh_analytic
     use mod_mesh_read,   only: enforce_cw_orientation, derive_vertical_bounds
     implicit none
     private
-    public :: generate_analytic_mesh, generate_mixed_patch, build_edges
+    public :: generate_analytic_mesh, generate_mixed_patch, generate_quad_patch, build_edges
+    integer, parameter :: PATCH_TRI = 0, PATCH_MIXED = 1, PATCH_QUAD = 2
 
 contains
 
@@ -25,7 +28,7 @@ contains
         type(t_partit), intent(inout) :: partit
         integer,        intent(in)    :: nx, ny, nl
         real(kind=WP),  intent(in)    :: Lx, Ly, max_depth
-        call build_patch(mesh, partit, nx, ny, nl, Lx, Ly, max_depth, .false.)
+        call build_patch(mesh, partit, nx, ny, nl, Lx, Ly, max_depth, PATCH_TRI, 0.0_WP)
     end subroutine generate_analytic_mesh
 
     subroutine generate_mixed_patch(mesh, partit, nx, ny, nl, Lx, Ly, max_depth)
@@ -37,20 +40,36 @@ contains
         type(t_partit), intent(inout) :: partit
         integer,        intent(in)    :: nx, ny, nl
         real(kind=WP),  intent(in)    :: Lx, Ly, max_depth
-        call build_patch(mesh, partit, nx, ny, nl, Lx, Ly, max_depth, .true.)
+        call build_patch(mesh, partit, nx, ny, nl, Lx, Ly, max_depth, PATCH_MIXED, 0.0_WP)
     end subroutine generate_mixed_patch
 
-    subroutine build_patch(mesh, partit, nx, ny, nl, Lx, Ly, max_depth, mixed)
+    subroutine generate_quad_patch(mesh, partit, nx, ny, nl, Lx, Ly, max_depth, skew)
+        ! All-quad patch of parallelograms: node (i,j) at ((i-1)+skew*(j-1))*dx, (j-1)*dy,
+        ! cell (i,j) = quad (sw, nw, ne, se). Node (i,j) has colour (-1)**(i+j), so the
+        ! vertices of every quad carry (+1,-1,+1,-1).
+        type(t_mesh),   intent(inout) :: mesh
+        type(t_partit), intent(inout) :: partit
+        integer,        intent(in)    :: nx, ny, nl
+        real(kind=WP),  intent(in)    :: Lx, Ly, max_depth, skew
+        call build_patch(mesh, partit, nx, ny, nl, Lx, Ly, max_depth, PATCH_QUAD, skew)
+    end subroutine generate_quad_patch
+
+    subroutine build_patch(mesh, partit, nx, ny, nl, Lx, Ly, max_depth, ptype, skew)
         type(t_mesh),   intent(inout) :: mesh
         type(t_partit), intent(inout) :: partit
         integer,        intent(in)    :: nx, ny, nl
         real(kind=WP),  intent(in)    :: Lx, Ly, max_depth
-        logical,        intent(in)    :: mixed
+        integer,        intent(in)    :: ptype    ! PATCH_TRI / PATCH_MIXED / PATCH_QUAD
+        real(kind=WP),  intent(in)    :: skew     ! PATCH_QUAD: x shift per row, in dx
         integer :: i, j, nod, el, k, sw, se, nw, ne
+        logical :: mixed
         real(kind=WP) :: dx, dy
 
+        mixed = ptype == PATCH_MIXED
         mesh%nod2D  = nx * ny
-        if (mixed) then
+        if (ptype == PATCH_QUAD) then
+            mesh%elem2D = (nx-1) * (ny-1)
+        else if (mixed) then
             mesh%elem2D = 0
             do j = 1, ny-1
                 do i = 1, nx-1
@@ -74,6 +93,8 @@ contains
                 nod = (j-1)*nx + i
                 mesh%coord_nod2D(1, nod) = real(i-1, WP) * dx
                 mesh%coord_nod2D(2, nod) = real(j-1, WP) * dy
+                if (ptype == PATCH_QUAD) mesh%coord_nod2D(1, nod) = &
+                    (real(i-1, WP) + skew * real(j-1, WP)) * dx
                 if (mixed .and. i > 1 .and. i < nx .and. j > 1 .and. j < ny) then
                     mesh%coord_nod2D(1, nod) = mesh%coord_nod2D(1, nod) &
                         + 0.15_WP * dx * sin(12.9898_WP*real(i, WP) + 78.233_WP*real(j, WP))
@@ -92,7 +113,11 @@ contains
         do j = 1, ny-1
             do i = 1, nx-1
                 sw = (j-1)*nx + i; se = sw + 1; nw = j*nx + i; ne = nw + 1
-                if (.not. mixed) then
+                if (ptype == PATCH_QUAD) then
+                    el = el + 1                                 ! parallelogram, clockwise
+                    mesh%elem2D_nodes(:, el) = [sw, nw, ne, se]
+                    mesh%elem2D_nnodes(el)   = 4
+                else if (.not. mixed) then
                     el = el + 1
                     mesh%elem2D_nodes(1:3, el) = [sw, se, nw]
                     el = el + 1
@@ -173,11 +198,12 @@ contains
 
     subroutine build_edges(mesh)
         ! Generic edge + edge_tri builder from elem2D_nodes: edge k of an element joins
-        ! its slots k and k+1 over the nv vertices. edges(:,e) directed lo->hi;
-        ! edge_tri(1) = first element seen, edge_tri(2) = the second, or the first again
-        ! on a boundary edge (mod_mesh convention). Interior edges first, boundary edges
-        ! last (FESOM's order, edge2D_in = number of interior edges). Exact left/right
-        ! orientation is not FESOM2's (analytic only).
+        ! its slots k and k+1 over the nv vertices. edge_tri(1) = first element seen,
+        ! edge_tri(2) = the second, or the first again on a boundary edge (mod_mesh
+        ! convention). FESOM's orientation: edge_tri(1) lies LEFT of edges(1)->edges(2)
+        ! (the elements are clockwise, so the first element's side a->b is stored b->a);
+        ! the SSH stiffness/rhs dual-face fluxes rely on it. Interior edges first,
+        ! boundary edges last (FESOM's order, edge2D_in = number of interior edges).
         type(t_mesh), intent(inout) :: mesh
         integer, allocatable :: head_hi(:,:), head_eid(:,:), head_n(:), perm(:)
         integer, allocatable :: edges(:,:), edge_tri(:,:)
@@ -199,7 +225,7 @@ contains
                 end do
                 if (eid == 0) then
                     nedge = nedge + 1
-                    edges(1, nedge) = lo; edges(2, nedge) = hi
+                    edges(1, nedge) = b; edges(2, nedge) = a
                     edge_tri(1, nedge) = n
                     head_n(lo) = head_n(lo) + 1
                     head_hi(head_n(lo), lo) = hi; head_eid(head_n(lo), lo) = nedge

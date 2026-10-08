@@ -86,6 +86,27 @@ foreach(_case quad:nemo025q_cut:2,4,8 mixed:nemo025mix_cut:4 pi_w:pi_w:2,4,8 cor
             SKIP_REGULAR_EXPRESSION "cannot open;No such file")
     endforeach()
 endforeach()
+# Task 9: SSH stiffness matrix on mixed meshes (sparsity with quad diagonals, row sums,
+# symmetry, update, CG, checkerboard null mode); default mesh = the NEMO quad cut-out, the
+# np 1 run also checks the analytic mixed and parallelogram patches. Triangle meshes
+# (rotated) compare against the previous assembly.
+add_fesom_test(test_ssh_stiff 1)
+add_fesom_test(test_ssh_stiff 2)
+foreach(_case mixed:nemo025mix_cut:1,2,8:0 pi_w:pi_w:1,2:1 core2_w:core2_w:8:1)
+    string(REPLACE ":" ";" _quad ${_case})
+    list(GET _quad 0 _tag)
+    list(GET _quad 1 _mesh)
+    list(GET _quad 2 _nps)
+    list(GET _quad 3 _rot)
+    string(REPLACE "," ";" _nps ${_nps})
+    foreach(_np ${_nps})
+        add_test(NAME test_ssh_stiff_${_tag}_np${_np}
+                 COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np ${_np} $<TARGET_FILE:test_ssh_stiff>)
+        set_tests_properties(test_ssh_stiff_${_tag}_np${_np} PROPERTIES
+            ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/${_mesh};FESOM3_TEST_ROTATE=${_rot}"
+            SKIP_REGULAR_EXPRESSION "cannot open;No such file")
+    endforeach()
+endforeach()
 # without dist_N/format.out (the original pi dist_2) exchange_edge stops with a message
 add_test(NAME test_halo_ext_noformat_np2
          COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np 2 $<TARGET_FILE:test_halo_ext>)

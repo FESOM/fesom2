@@ -14,11 +14,21 @@ module oce_ssh_rhs
     ! (init_stiff_mat_ale) and the right-hand side (compute_ssh_rhs_ale).
     !
     ! STIFFNESS MATRIX (init_stiff_mat_ale):
-    !  - CSR sparsity from the node neighbourhood (self + edge-connected nodes); the
-    !    diagonal (self) is the FIRST entry of every row (n_pos(1,n)=n).
+    !  - CSR sparsity from the node neighbourhood: self, the edge-connected nodes (in
+    !    edge order, as before), then the remaining vertices of the elements around the
+    !    node (the quad diagonals; none on a triangle mesh, whose CSR is unchanged). Row
+    !    lengths are dynamic. The diagonal (self) is the FIRST entry of every row
+    !    (n_pos(1,n)=n) -- the Jacobi preconditioner in oce_ssh_solve relies on it.
     !  - Stiffness part (loop over edges, both adjacent elements): the H*div operator
     !    factor*(zbar_e_bot-zbar_e_srf)*(gradient_sca_x*edge_cross_dy - gradient_sca_y*
-    !    edge_cross_dx), scattered +/- into the two edge-node rows, factor=g*dt*alpha*theta.
+    !    edge_cross_dx) over the 4 vertex slots (x 1:4, y 5:8; a triangle's slot 4 is 0
+    !    and repeats vertex 1, so it adds an exact zero), scattered +/- into the two
+    !    edge-node rows, factor=g*dt*alpha*theta. With the Green-Gauss coefficients the
+    !    matrix stays symmetric on quads (dual-face normals ~ gradient coefficients).
+    !  - Checkerboard: the Green-Gauss quad gradient vanishes for (+1,-1,+1,-1) on the
+    !    vertices of ANY quad (coefficient j ~ x_{j+1}-x_{j-1}, so c_1=-c_3, c_2=-c_4),
+    !    so on an all-quad mesh with a consistent 2-colouring the stiffness part has that
+    !    null mode (asserted in test/test_ssh_stiff.F90); only the mass part sees it.
     !  - Mass part: + areasvol(surf)/dt added to each row diagonal.
     !  - For which_ale=='linfs' the matrix is built ONCE here with the unperturbed depth
     !    and never updated (FESOM2 oce_ale.F90:3921 calls update_stiff_mat_ale only for
@@ -47,7 +57,8 @@ module oce_ssh_rhs
     !  - zbar_e_srf = zbar(ulevels(elem)) = zbar(1) = 0 on pi (no cavity; FESOM2 default
     !    oce_ale.F90:525). Computed inline (no new mesh field): faithful to the non-cavity
     !    formula, and 0 on pi.
-    !  - elem2D_nodes(1:3,el) sliced per the L15 MAX_NV=4-vs-3 trap.
+    !  - elem2D_nodes(1:4,el) and gradient_sca(1:4|5:8): unified 4-slot form (hybrid
+    !    meshes); the scatter is a scalar loop because a triangle's npos(4)=npos(1).
     !
     ! 1-RANK SCOPE (multi-rank lifted at M2.12):
     !  - The CSR is built in LOCAL numbering (rowptr_loc/colind_loc, used by the CG); at
@@ -95,12 +106,12 @@ contains
         real(kind=WP), intent(in)            :: dt
         type(t_partit), intent(in), optional :: partit
         !______________________________________________________________________
-        integer              :: n, n1, n2, i, row, ed
-        integer              :: elnodes(3), el(2), npos(3)
-        integer              :: offset, nini, nend
+        integer              :: n, n1, n2, i, k, j, row, ed, el1
+        integer              :: elnodes(4), el(2), npos(4)
+        integer              :: offset, nini, nend, maxrow
         integer              :: nNodO, nNodL, nEdgeO, nElemO
-        real(kind=WP)        :: factor, fy(3), zsrf
-        integer, allocatable :: n_num(:), n_pos(:,:)
+        real(kind=WP)        :: factor, fy(4), zsrf
+        integer, allocatable :: n_num(:), n_pos(:,:), mark(:)
 
         call owned_bounds(mesh, nNodO, nNodL, nEdgeO, nElemO, partit)
 
@@ -108,9 +119,24 @@ contains
         !__________________________________________________________________
         ! a) neighbourhood: n_num(n) = #neighbours of OWNED node n (incl. self),
         !    n_pos(:,n) = their local indices (a neighbour may be a HALO node),
-        !    n_pos(1,n)=n (self -> diagonal first). n_num is sized owned+halo because
-        !    it is reused below as the reverse-map indexed by a (possibly halo) colind.
-        allocate(n_num(nNodL), n_pos(12, nNodO))
+        !    n_pos(1,n)=n (self -> diagonal first), then the edge neighbours in edge
+        !    order, then the other vertices of the elements around n (quad diagonals).
+        !    Row length <= 1 + #edges + #elements (a quad adds at most its diagonal
+        !    vertex), counted first. n_num is sized owned+halo because it is reused
+        !    below as the reverse-map indexed by a (possibly halo) colind.
+        allocate(n_num(nNodL), mark(nNodL))
+        n_num = 0
+        do n = 1, nEdgeO
+            n1 = mesh%edges(1,n)
+            n2 = mesh%edges(2,n)
+            if (n1 <= nNodO) n_num(n1) = n_num(n1)+1
+            if (n2 <= nNodO) n_num(n2) = n_num(n2)+1
+        end do
+        maxrow = 0
+        do n = 1, nNodO
+            maxrow = max(maxrow, 1 + n_num(n) + mesh%nod_in_elem2D_num(n))
+        end do
+        allocate(n_pos(maxrow, nNodO))
         n_pos = 0
         do n = 1, nNodO
             n_num(n)   = 1
@@ -127,6 +153,20 @@ contains
                 n_pos(n_num(n2)+1, n2) = n1
                 n_num(n2) = n_num(n2)+1
             end if
+        end do
+        mark = 0
+        do n = 1, nNodO
+            mark(n_pos(1:n_num(n), n)) = n
+            do k = 1, mesh%nod_in_elem2D_num(n)
+                el1 = mesh%nod_in_elem2D(k, n)
+                do j = 1, mesh%elem2D_nnodes(el1)
+                    n1 = mesh%elem2D_nodes(j, el1)
+                    if (mark(n1) == n) cycle
+                    mark(n1) = n
+                    n_num(n) = n_num(n)+1
+                    n_pos(n_num(n), n) = n1
+                end do
+            end do
         end do
 
         !__________________________________________________________________
@@ -163,11 +203,11 @@ contains
             el = mesh%edge_tri(:, ed)
             do i = 1, 2   ! the two triangles sharing edge ed (both OWNED, invariant ii)
                 if (i == 2 .and. el(2) == el(1)) cycle   ! boundary edge has only one element
-                elnodes = mesh%elem2D_nodes(1:3, el(i))
+                elnodes = mesh%elem2D_nodes(1:4, el(i))
                 zsrf    = mesh%zbar(mesh%ulevels(el(i)))   ! zbar_e_srf (=0, no cavity)
-                fy(1:3) = (mesh%zbar_e_bot(el(i)) - zsrf) * &
-                          ( mesh%gradient_sca(1:3,el(i)) * mesh%edge_cross_dxdy(2*i  ,ed)  &
-                           -mesh%gradient_sca(5:7,el(i)) * mesh%edge_cross_dxdy(2*i-1,ed) )
+                fy(1:4) = (mesh%zbar_e_bot(el(i)) - zsrf) * &
+                          ( mesh%gradient_sca(1:4,el(i)) * mesh%edge_cross_dxdy(2*i  ,ed)  &
+                           -mesh%gradient_sca(5:8,el(i)) * mesh%edge_cross_dxdy(2*i-1,ed) )
                 if (i==2) fy = -fy
 
                 row = mesh%edges(1, ed)
@@ -176,7 +216,9 @@ contains
                         n_num(ssh_stiff%colind_loc(n)) = n
                     end do
                     npos = n_num(elnodes)
-                    ssh_stiff%values(npos) = ssh_stiff%values(npos) + fy*factor
+                    do k = 1, 4
+                        ssh_stiff%values(npos(k)) = ssh_stiff%values(npos(k)) + fy(k)*factor
+                    end do
                 end if
 
                 row = mesh%edges(2, ed)
@@ -185,7 +227,9 @@ contains
                         n_num(ssh_stiff%colind_loc(n)) = n
                     end do
                     npos = n_num(elnodes)
-                    ssh_stiff%values(npos) = ssh_stiff%values(npos) - fy*factor
+                    do k = 1, 4
+                        ssh_stiff%values(npos(k)) = ssh_stiff%values(npos(k)) - fy(k)*factor
+                    end do
                 end if
             end do
         end do
@@ -200,7 +244,7 @@ contains
                                      + mesh%areasvol(row)/dt
         end do
 
-        deallocate(n_pos, n_num)
+        deallocate(n_pos, n_num, mark)
         end associate
     end subroutine init_stiff_mat_ale
 
@@ -224,9 +268,9 @@ contains
         type(t_mesh),   intent(inout), target :: mesh
         real(kind=WP),  intent(in)            :: dt
         type(t_partit), intent(in), optional  :: partit
-        integer       :: ed, el(2), elnodes(3), i, n, row, npos(3)
+        integer       :: ed, el(2), elnodes(4), i, k, n, row, npos(4)
         integer       :: nNodO, nNodL, nEdgeO, nElemO
-        real(kind=WP) :: factor, fy(3)
+        real(kind=WP) :: factor, fy(4)
         integer, allocatable :: rev(:)   ! reverse-map local-node -> CSR position (init's n_num reuse)
 
         call owned_bounds(mesh, nNodO, nNodL, nEdgeO, nElemO, partit)
@@ -237,10 +281,10 @@ contains
             el = mesh%edge_tri(:, ed)
             do i = 1, 2   ! the two triangles sharing edge ed (both OWNED, invariant ii)
                 if (i == 2 .and. el(2) == el(1)) cycle   ! boundary edge has only one element
-                elnodes = mesh%elem2D_nodes(1:3, el(i))
-                fy(1:3) = -mesh%dhe(el(i)) * &
-                          ( mesh%gradient_sca(1:3,el(i)) * mesh%edge_cross_dxdy(2*i  ,ed)  &
-                           -mesh%gradient_sca(5:7,el(i)) * mesh%edge_cross_dxdy(2*i-1,ed) )
+                elnodes = mesh%elem2D_nodes(1:4, el(i))
+                fy(1:4) = -mesh%dhe(el(i)) * &
+                          ( mesh%gradient_sca(1:4,el(i)) * mesh%edge_cross_dxdy(2*i  ,ed)  &
+                           -mesh%gradient_sca(5:8,el(i)) * mesh%edge_cross_dxdy(2*i-1,ed) )
                 if (i==2) fy = -fy
 
                 row = mesh%edges(1, ed)
@@ -249,7 +293,9 @@ contains
                         rev(ssh_stiff%colind_loc(n)) = n
                     end do
                     npos = rev(elnodes)
-                    ssh_stiff%values(npos) = ssh_stiff%values(npos) + fy*factor
+                    do k = 1, 4
+                        ssh_stiff%values(npos(k)) = ssh_stiff%values(npos(k)) + fy(k)*factor
+                    end do
                 end if
 
                 row = mesh%edges(2, ed)
@@ -258,7 +304,9 @@ contains
                         rev(ssh_stiff%colind_loc(n)) = n
                     end do
                     npos = rev(elnodes)
-                    ssh_stiff%values(npos) = ssh_stiff%values(npos) - fy*factor
+                    do k = 1, 4
+                        ssh_stiff%values(npos(k)) = ssh_stiff%values(npos(k)) - fy(k)*factor
+                    end do
                 end if
             end do
         end do

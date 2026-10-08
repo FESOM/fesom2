@@ -553,15 +553,32 @@ fluxes and nonlinear terms can. Asserted in a test (Task 9), measured in the sho
 **Files:**
 - Modify: `src/oce/oce_ssh_rhs.F90` (`init_stiff_mat_ale`, `update_stiff_mat_ale`)
 - Create: `test/test_ssh_stiff.F90`
+- ➕ Modify: `test/CMakeLists.txt`, `src/mesh/mod_mesh_analytic.F90` (`generate_quad_patch`,
+  FESOM edge orientation in `build_edges`)
 
-- [ ] sparsity = node plus all vertices of all elements around it (dynamic, no fixed 12); the
+- [x] sparsity = node plus all vertices of all elements around it (dynamic, no fixed 12); the
       diagonal stays the first CSR entry (Jacobi preconditioner relies on it)
-- [ ] assembly over edges with 4 coefficients (`gradient_sca(1:4|5:8)`, `npos(4)`)
-- [ ] tests: matrix symmetric; row sums = `area/dt` term; quad diagonal entries present and
+      — row = self, edge neighbours in edge order (as before), then the remaining vertices of
+      the elements around the node (`nod_in_elem2D`, marker array); row length counted first
+      (≤ 1 + #edges + #elements); triangle meshes keep the identical CSR
+- [x] assembly over edges with 4 coefficients (`gradient_sca(1:4|5:8)`, `npos(4)`)
+      — init and `update_stiff_mat_ale`; scalar scatter loop over the 4 slots (a triangle's
+      npos(4)=npos(1) with coefficient 0 — a vector-subscript assignment would be many-one)
+- [x] tests: matrix symmetric; row sums = `area/dt` term; quad diagonal entries present and
       nonzero; triangle-mesh matrix equals the previous one to roundoff; CG converges on the NEMO
       cut-out; checkerboard (+1,−1,+1,−1) on a parallelogram quad patch is in the null space of
       the stiffness part (documented property, asserted so it can't change silently)
-- [ ] run ctest — must pass before Task 10
+      — `test_ssh_stiff` S1–S8 on nemo025q_cut np1/2, nemo025mix_cut np1/2/8, pi_w np1/2, core2_w
+      np8 (+ analytic mixed and parallelogram patches at np1): sym ≤ 1.4e-13 (CORE2), row sums
+      ≤ 3.4e-16, quad diagonal ≥ 1.4e-2 of the row's largest off-diagonal, triangles (pi_w,
+      core2_w) CSR identical and values BITWISE equal to the previous assembly, update with
+      dhe = −H/2 adds K/2 (≤ 3e-15), CG 224 its (np1) to 2.5e-13. Checkerboard: |K f|/|K| ≈ 1e-16
+      on the parallelogram patch AND on the (2-colourable) NEMO quad cut-out — the Green–Gauss
+      coefficient of vertex j ∝ x_{j+1}−x_{j−1}, so c₁ = −c₃, c₂ = −c₄ on ANY quad: the mode is an
+      exact null mode of K on every all-quad mesh, not only on parallelograms (input for Task 17).
+      ➕ `build_edges` of the analytic generator now orients edges as FESOM (edge_tri(1) left of
+      edges(1)→edges(2)); the old lo→hi order made the patch matrices non-symmetric
+- [x] run ctest — must pass before Task 10 — scratch ctest 88/88; `run_tri_regression.sh` 7/7
 
 ### Task 10: Ocean dynamics kernels
 
