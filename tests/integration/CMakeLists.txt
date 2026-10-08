@@ -196,7 +196,7 @@ if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED AND NOT USE_YAC)
         endforeach()
 
         add_fesom_test_with_options(integration_pi_fresh_flat_1_mpi1_omp2
-            "pi_flat_1" "96" "1" "s" "1" "s" "10" ".true." ".false."
+            "pi_flat_1" "96" "1" "d" "1" "d" "10" ".true." ".false."
             NP 1
             OMP_THREADS 2
             TIMEOUT ${TEST_TIMEOUT}
@@ -206,7 +206,7 @@ if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED AND NOT USE_YAC)
         set_tests_properties(integration_pi_fresh_flat_1_mpi1_omp2 PROPERTIES FIXTURES_REQUIRED "partition_pi_flat_1")
 
         add_fesom_test_with_options(integration_pi_fresh_hier_1x1_mpi1_omp2
-            "pi_hier_1x1" "96" "1" "s" "1" "s" "10" ".true." ".false."
+            "pi_hier_1x1" "96" "1" "d" "1" "d" "10" ".true." ".false."
             NP 1
             OMP_THREADS 2
             TIMEOUT ${TEST_TIMEOUT}
@@ -216,7 +216,7 @@ if(ENABLE_MPI_TESTS AND NOT FESOM_COUPLED AND NOT OIFS_COUPLED AND NOT USE_YAC)
         set_tests_properties(integration_pi_fresh_hier_1x1_mpi1_omp2 PROPERTIES FIXTURES_REQUIRED "partition_pi_hier_1x1")
 
         add_fesom_test_with_options(integration_pi_fresh_hier_1x2_mpi2_omp2
-            "pi_hier_1x2" "96" "1" "s" "1" "s" "10" ".true." ".false."
+            "pi_hier_1x2" "96" "1" "d" "1" "d" "10" ".true." ".false."
             MPI_TEST
             NP 2
             OMP_THREADS 2
