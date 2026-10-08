@@ -262,23 +262,36 @@ fluxes and nonlinear terms can. Asserted in a test (Task 9), measured in the sho
 - Create: `tools/mesh/check_mesh.py`, `tools/mesh/remove_deadends.py`,
   `tools/mesh/split_quads.py`, `tools/mesh/cut_region.py`
 - Create: `tools/mesh/test_mesh_tools.sh`
+- ➕ Create: `tools/mesh/mesh_io.py` (shared read/write, edges, neighbours, dead-end removal)
 
-- [ ] `check_mesh.py`: validity checks for any 3/4-column mesh — every element clockwise and
+- [x] `check_mesh.py`: validity checks for any 3/4-column mesh — every element clockwise and
       convex on the sphere, no degenerate element, every node used, triangle 4th = 1st, every
       edge in ≤ 2 elements, count of elements with < 2 neighbours, total spherical area
-- [ ] `remove_deadends.py`: removes elements with fewer than two neighbours, iterating until none
+- [x] `remove_deadends.py`: removes elements with fewer than two neighbours, iterating until none
       are left, drops orphan nodes, renumbers, keeps the depth file consistent (FESOM2's rule;
       `nemo_meshq.py` stays faithful) → cleaned NEMO mesh `/work/ab0995/a270029/meshes/nemo025q_fesom/`
-- [ ] `split_quads.py`: split selected quads (a latitude band + every k-th quad elsewhere,
+      — result: 6 passes remove 46 elements (40 + 6 new dead ends), 90 nodes: 915 866 nodes,
+      902 408 quads; nodes of removed elements get boundary flag 1 (the cell is land now)
+- [x] `split_quads.py`: split selected quads (a latitude band + every k-th quad elsewhere,
       parameters on the command line) along the shorter diagonal into two clockwise triangles
       written as 4 columns; nodes and depth file unchanged → `/work/ab0995/a270029/meshes/nemo025mix/`
-- [ ] `cut_region.py`: cut a lon/lat box out of a mesh (elements fully inside), renumber, recompute
+      — result (`--band -5 5 --every 5`): 216 956 quads split → 685 452 quads + 433 912 triangles;
+      ➕ at the coast the shorter diagonal can leave a triangle whose only neighbour is its twin
+      (838 cases = dead ends) → such quads are cut along the other diagonal (a quad is left whole
+      only if both diagonals make a dead end: 0 cases)
+- [x] `cut_region.py`: cut a lon/lat box out of a mesh (elements fully inside), renumber, recompute
       the boundary flag, subset the depth file → small test meshes `nemo025q_cut/`, `nemo025mix_cut/`
-      (a few thousand nodes, with land and open-ocean boundaries closed as coast)
-- [ ] tests: `check_mesh` passes on the cleaned, mixed and cut meshes (0 dead ends); the original
+      (a few thousand nodes, with land and open-ocean boundaries closed as coast) — result: box
+      lon −20…−5, lat −2…12 (Gulf of Guinea / West African coast): 2 509 nodes; `nemo025q_cut`
+      2 391 quads, `nemo025mix_cut` 609 quads + 3 564 triangles; the cut keeps the largest
+      connected piece and removes dead ends; flag = node on a boundary edge
+- [x] tests: `check_mesh` passes on the cleaned, mixed and cut meshes (0 dead ends); the original
       NEMO mesh reports exactly the 40 dead ends; split preserves total area to roundoff and
       element count = quads + split count; a deliberately flipped element is reported (error case)
-- [ ] run tests — must pass before Task 3
+      — `tools/mesh/test_mesh_tools.sh [nemo_dir] [out_root]` (shared helpers in
+      `tools/mesh/mesh_io.py`); also a bow-tie quad and a repeated vertex are reported
+- [x] run tests — must pass before Task 3 — PASS (~35 s; area rel. change of the split 6.9e-16);
+      the persistent test meshes were made with out_root `/work/ab0995/a270029/meshes`
 
 ### Task 3: Port FESOM2's mesh_part (fesom_ini) into FESOM3, triangle meshes unchanged
 
