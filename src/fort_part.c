@@ -63,7 +63,17 @@ void do_partit(idx_t *n, idx_t *ptr, idx_t *adj, idx_t *wgt, idx_t *np, idx_t *p
     exit(1);
   }
 
-  if (np[current_level]==1) { for(i=0;i<*n;i++) part[i]=0; return;}
+  if (np[current_level] == 1) {
+    for (n_levels = current_level + 1; n_levels < MAX_HIER_LEVELS; n_levels++)
+      if (np[n_levels] == 0)
+        break;
+    for (i = 0; i < *n; i++)
+      part[i] = 0;
+    if (current_level < n_levels - 1)
+      do_partit(n, ptr, adj, wgt, np, part);
+    current_level--;
+    return;
+  }
 
   for (n_levels=current_level+1; n_levels<MAX_HIER_LEVELS; n_levels++)
   {

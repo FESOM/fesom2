@@ -1605,7 +1605,7 @@ subroutine set_par_support_ini(partit, mesh)
   part=0
 
   npes = PRODUCT(np(1:n_levels))
-  if(npes<2) then
+  if(npes<1) then
      print *,'Total number of parallel partitions is less than one! Aborting...'
      stop
   end if
