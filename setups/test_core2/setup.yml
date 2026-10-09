@@ -8,6 +8,8 @@ ntasks: 288
 time: "00:30:00"
 
 namelist.config:
+    run_config:
+        use_cavity: False
     timestep:
         step_per_day: 32
         run_length: 1
