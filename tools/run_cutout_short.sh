@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SHORT RUNS ON THE CUT-OUT MESHES (hybrid-mesh plan docs/plans/2026-10-08-hybrid-meshes.md, Task 17):
+# SHORT RUNS ON THE CUT-OUT MESHES (hybrid-mesh plan docs/plans/completed/2026-10-08-hybrid-meshes.md, Task 17):
 # the first multi-day runs of the mixed-mesh model, on the regional NEMO cut-outs (lon -20..-5,
 # lat -2..12, closed boundaries; nemo025q_cut = all quads, nemo025mix_cut = quads + triangles).
 #
@@ -26,7 +26,8 @@
 #                     R_quad / R_iface (definitions in tools/cutout_diag.py) as time series. REPORTED,
 #                     not gated: growth is a design question for the user (plan Technical Details).
 #   prodpp prod with PP vertical mixing instead of TKE (FESOM3_MIX_TKE unset), 1 vs N only: the
-#          diagnostic that removes the threshold amplifier, as mEVP does for the EVP (Task 15)
+#          diagnostic that removes the threshold amplifier, as mEVP does for the EVP (Task 15). Its
+#          whole run is gated at the tight TOL_PP (OCEAN, MIX and ICE classes)
 #   cons   fesom_conserve, unforced, zstar + the production ocean physics the driver supports (TKE,
 #          GM + Redi, splines, vector invariant, rvo_upwind 1, w split) with SEA ICE ON (seeded ice,
 #          wind on ice, EVP + FCT advection + ice-ocean drag; FESOM3_CONSERVE_ICE), NDAYS days: the
@@ -39,14 +40,21 @@
 # quad cut-out v 1.0e-4, tke 7.1e-5, T 1.5e-6 (growth from day ~3.9 at the equatorial wall),
 # mixed cut-out v 3.8e-9; prodpp <= 1.1e-7 on both; one exploratory np-1 run in which the TKE
 # switch fired early reached 7.9e-3 (quad). cons |drift| <= 1.3e-14 (ocean), 8.2e-15 (ice).
+# The ICE class of 1 vs N is vacuous here (a_ice = 0 in prod and prodpp). Ice seeded into the
+# common checkpoint does not help: the tropical forcing melts it within 2 steps (a_ice 0.48 -> 0 by
+# step 3, review fixes 2026-10-09) and the melt event lifts OCEAN 1 vs N to 1e-2. A non-vacuous
+# ice compare needs a run that keeps ice (no switch for the ice thermodynamics exists).
 #
 # usage: tools/run_cutout_short.sh [mesh ...]       (default: nemo025q_cut nemo025mix_cut)
 #   env: BIN (default /work/ab0995/a270029/fesom3_hybrid/build/bin), ROOT (run directory, default
 #        /work/ab0995/a270029/fesom3_hybrid/cutout_short), NDAYS (default 5), NPS (default "2 8"),
-#        CKPT_STEPS (default 12 = 6 h), SSH_SOLTOL (default 1e-14), TOL_EARLY/TOL_OCEAN/TOL_MIX/
-#        TOL_ICE (1 vs N, see the measured levels below), TOL_CONS (default 1e-12), ETA_MAX (default
-#        3 m), UV_MAX (default 3 m/s), CASES (default "prod prodpp cons"), KEEP=1 keeps the checkpoints (default:
-#        removed after the comparison; logs, csv tables and the np-1 output stay), COMPARE_ONLY=1
+#        CKPT_STEPS (default 12 = 6 h), SSH_SOLTOL (default 1e-14), 1 vs N tolerances (see the
+#        measured levels above) TOL_EARLY (default 1e-6), TOL_OCEAN / TOL_MIX (prod whole run,
+#        default 5e-2), TOL_ICE (prod whole run, default 1e-6), TOL_PP (prodpp whole run,
+#        default 1e-5; prodpp: measured <= 1.1e-7), TOL_CONS (default 1e-12),
+#        ETA_MAX (default 3 m), UV_MAX (default 3 m/s), CASES (default "prod prodpp cons"),
+#        KEEP=1 keeps the checkpoints (default: removed after the comparison; logs, csv tables and
+#        the np-1 output stay), COMPARE_ONLY=1
 # Exit 0 iff every check passes. Login-node sized (np <= 8; ~25 min for the defaults).
 set -uo pipefail
 HYB=/work/ab0995/a270029/fesom3_hybrid
@@ -60,6 +68,7 @@ TOL_EARLY=${TOL_EARLY:-1e-6}
 TOL_OCEAN=${TOL_OCEAN:-5e-2}
 TOL_MIX=${TOL_MIX:-5e-2}
 TOL_ICE=${TOL_ICE:-1e-6}
+TOL_PP=${TOL_PP:-1e-5}
 TOL_CONS=${TOL_CONS:-1e-12}
 ETA_MAX=${ETA_MAX:-3}
 UV_MAX=${UV_MAX:-3}
@@ -70,8 +79,8 @@ SRC=$(cd "$(dirname "$0")/.." && pwd)
 # btl_vader_single_copy_mechanism none: Open MPI 4.1.2's knem registration cache misses glibc heap
 # trims and then delivers the stale payload of an earlier message (LESSONS L61)
 MPI="/sw/spack-levante/openmpi-4.1.2-yfwe6t/bin/mpiexec --mca pml ob1 --mca btl self,vader --mca btl_vader_single_copy_mechanism none --oversubscribe"
-POOL=/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0
-IC=/pool/data/AWICM/FESOM2/INITIAL/phc3.0/phc3.0_winter.nc
+source "$SRC/tools/prod_env.sh"          # prod_env / prod_ocean_env (work/job_levante physics)
+IC=$PROD_IC
 DT=1800
 NSTEPS=$((NDAYS * 86400 / DT))
 meshes=("$@")
@@ -81,14 +90,9 @@ source "$SRC/env.sh" intel >/dev/null 2>&1
 ulimit -s unlimited
 PY="source /usr/share/Modules/init/bash; module load python3; hash -r; python3"
 
-prod_env() {   # the run_tri_regression.sh prod physics (work/job_levante), SSH solved tightly
-    export FESOM3_IC_FILE=$IC FESOM3_FORCING_DIR=$POOL FESOM3_FORCING=JRA55 \
-        FESOM3_RUNOFF_FILE=$POOL/CORE2_runoff.nc FESOM3_SSS_FILE=$POOL/PHC2_salx.nc \
-        FESOM3_START_CLOCK="0 1 1958" FESOM3_WHICH_ALE=linfs FESOM3_WHICHEVP=0 FESOM3_FER_GM=1 \
-        FESOM3_REDI=1 FESOM3_MIX_TKE=1 FESOM3_SHEAR_SPLINES=1 FESOM3_N2_SPLINES=1 FESOM3_MOMADV_OPT=1 \
-        FESOM3_RVO_UPWIND=1.0 FESOM3_SW_PENE=1 FESOM3_CHL_SWEENEY=1 FESOM3_STEP_DIAG=1 FESOM3_WSPLIT=1 \
-        FESOM3_SSH_SOLTOL=$SSH_SOLTOL FESOM3_SSH_MAXITER=20000
-    [ "$1" = prodpp ] && unset FESOM3_MIX_TKE
+case_env() {   # case_env <prod|prodpp>: the prod physics, SSH solved tightly; PP mixing for prodpp
+    prod_env $SSH_SOLTOL
+    [ "$1" != prod ] && unset FESOM3_MIX_TKE
     return 0
 }
 
@@ -99,7 +103,7 @@ run_prod() {   # run_prod <mesh> <case_dir> [prodpp]: checkpoint, then np 1 and 
     printf "&nml_list\n  io_list = 'ssh   ', 1, 's', 8, 'snap',\n            'sst   ', 1, 's', 8, 'snap',\n            'sss   ', 1, 's', 8, 'snap',\n/\n" > "$cd_/namelist.io"
     (
         cd "$cd_/w0" || exit 1
-        prod_env $kind
+        case_env $kind
         export FESOM3_MESH_DIR=/work/ab0995/a270029/meshes/$mesh FESOM3_NSTEPS=0 FESOM3_RESTART=$cd_/ckpt \
             FESOM3_RESTART_IN=$cd_/ckpt FESOM3_RESTART_UNIT=off FESOM3_RESTART_LENGTH=1 \
             FESOM3_NAMELIST_IO=$cd_/none
@@ -110,7 +114,7 @@ run_prod() {   # run_prod <mesh> <case_dir> [prodpp]: checkpoint, then np 1 and 
         mkdir -p "$cd_/np$n" "$cd_/ck$n"
         (
             cd "$cd_/np$n" || exit 1
-            prod_env $kind
+            case_env $kind
             export FESOM3_MESH_DIR=/work/ab0995/a270029/meshes/$mesh FESOM3_NSTEPS=$NSTEPS \
                 FESOM3_RESTART=$cd_/ck$n FESOM3_RESTART_IN=$cd_/ckpt FESOM3_RESTART_UNIT=s \
                 FESOM3_RESTART_LENGTH=$CKPT_STEPS FESOM3_NAMELIST_IO=$cd_/none
@@ -133,14 +137,15 @@ check_stable() {   # check_stable <log>: max|eta|, max|uv| over all steps from t
 }
 
 check_prod() {   # check_prod <mesh> <case_dir> [prodpp]
-    local mesh=$1 cd_=$2 kind=${3:-prod} n rc=0
+    local mesh=$1 cd_=$2 kind=${3:-prod} n rc=0 tols="$TOL_OCEAN $TOL_MIX $TOL_ICE"
+    [ $kind = prodpp ] && tols="$TOL_PP $TOL_PP $TOL_PP"
     for n in 1 $NPS; do
         echo "  STABLE np $n:"
         check_stable "$cd_/np$n/log" || { echo "    ABOVE the bounds (ETA_MAX $ETA_MAX, UV_MAX $UV_MAX) or not finished"; rc=1; }
     done
     for n in $NPS; do
         echo "  1 vs $n (restart checkpoints every $CKPT_STEPS steps):"
-        bash -c "$PY '$SRC/tools/cutout_diag.py' compare '$cd_/ck1' '$cd_/ck$n' $DT $((86400 / DT)) $TOL_EARLY $TOL_OCEAN $TOL_MIX $TOL_ICE '$cd_/d_1vs$n.csv'" || rc=1
+        bash -c "$PY '$SRC/tools/cutout_diag.py' compare '$cd_/ck1' '$cd_/ck$n' $DT $((86400 / DT)) $TOL_EARLY $tols '$cd_/d_1vs$n.csv'" || rc=1
     done
     if [ $kind = prod ]; then
         echo "  CHECKERBOARD (np 1, reported, not gated):"
@@ -157,10 +162,9 @@ run_cons() {   # run_cons <mesh> <case_dir>: fesom_conserve with ice, np 1 and N
         mkdir -p "$cd_/np$n"
         (
             cd "$cd_/np$n" || exit 1
+            prod_ocean_env
             export FESOM3_MESH_DIR=/work/ab0995/a270029/meshes/$mesh FESOM3_IC_FILE=$IC FESOM3_NSTEPS=$NSTEPS \
-                FESOM3_WHICH_ALE=zstar FESOM3_MIX_TKE=1 FESOM3_REDI=1 FESOM3_FER_GM=1 FESOM3_SHEAR_SPLINES=1 \
-                FESOM3_N2_SPLINES=1 FESOM3_MOMADV_OPT=1 FESOM3_RVO_UPWIND=1.0 FESOM3_WSPLIT=1 \
-                FESOM3_CONSERVE_ICE=1 FESOM3_WHICHEVP=0 FESOM3_CONSERVE_TOL=$TOL_CONS
+                FESOM3_WHICH_ALE=zstar FESOM3_CONSERVE_ICE=1 FESOM3_WHICHEVP=0 FESOM3_CONSERVE_TOL=$TOL_CONS
             $MPI -np $n "$BIN/fesom_conserve" > log 2>&1
         )
     done
@@ -197,5 +201,6 @@ for mesh in "${meshes[@]}"; do
 done
 ncase=$((${#meshes[@]} * $(echo $CASES | wc -w)))
 echo "run_cutout_short: $((ncase-nfail))/$ncase cases pass (NDAYS=$NDAYS, SSH_SOLTOL=$SSH_SOLTOL," \
-     "TOL_EARLY=$TOL_EARLY TOL_OCEAN=$TOL_OCEAN TOL_MIX=$TOL_MIX TOL_ICE=$TOL_ICE TOL_CONS=$TOL_CONS)"
+     "TOL_EARLY=$TOL_EARLY TOL_OCEAN=$TOL_OCEAN TOL_MIX=$TOL_MIX TOL_ICE=$TOL_ICE TOL_PP=$TOL_PP" \
+     "TOL_CONS=$TOL_CONS)"
 [ $nfail -eq 0 ]

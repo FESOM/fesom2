@@ -110,11 +110,8 @@ class Geo:
                 continue
             self.comp[order] = c
         # node classes and edge-neighbour graph
-        nb = mesh_io.Mesh.__new__(mesh_io.Mesh)
-        nb.elem, nb.flag = elem, np.zeros(self.n2d, dtype=np.int64)
-        ed, _, count = mesh_io.edges(nb)
-        bnd = np.zeros(self.n2d, dtype=bool)
-        bnd[ed[count == 1].ravel()] = True
+        ed, _, count = mesh_io.side_edges(elem, self.n2d)
+        bnd = mesh_io.boundary_mask(self.n2d, ed, count)
         has_tri = np.zeros(self.n2d, dtype=bool)
         has_quad = np.zeros(self.n2d, dtype=bool)
         for k in range(4):

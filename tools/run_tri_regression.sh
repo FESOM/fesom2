@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# TRIANGLE REGRESSION at ROUNDOFF level (hybrid-mesh plan docs/plans/2026-10-08-hybrid-meshes.md,
+# TRIANGLE REGRESSION at ROUNDOFF level (hybrid-mesh plan docs/plans/completed/2026-10-08-hybrid-meshes.md,
 # from Task 7 on). The mixed-mesh geometry and the unified 4-slot kernels change triangle results at
 # roundoff level, so the bitwise identity of Task 6 is replaced by this script: it runs the FROZEN
 # reference binaries and the current build side by side on pi and CORE2 for a few steps and compares.
@@ -34,7 +34,7 @@
 # Metric, per field: d = max|a - b| / max|a| over all nodes/elements, levels and records compared.
 # Fields are checked in tiers and classes, each with its own tolerance (pi / core2 meshes; meshes
 # whose name starts with "pi" use the pi column, every other mesh the core2 column; env overrides
-# N_EARLY TOL_PRE TOL_EARLY TOL_OCEAN TOL_ICE TOL_MIX apply to all meshes):
+# N_EARLY TOL_PRE TOL_EARLY TOL_OCEAN TOL_ICE TOL_MIX TOL_ICE_EARLY apply to all meshes):
 #   tier/class  fields                                                    pi      core2
 #   PRE         step 1 before the first SSH solve: density, pressure,     1e-9    1e-9
 #               bvfreq, Kv, ssh_rhs (the whole momentum rhs)
@@ -46,6 +46,9 @@
 #               vnod bolus_u bolus_v (float32: + 2^-21, 4 float32 ulps)
 #   ICE         output records of a_ice m_ice m_snow (float32 + 2^-21)    1e-5    2e-3
 #   MIX         Kv (all steps), Av (output) -- TKE thresholds             1e-6    1e-2
+#   ICE_EARLY   the ICE output records of steps 1..N_EARLY (float32       1e-6    1e-5
+#               + 2^-21): an ice-only kernel error shows at step 1, below
+#               the ICE / MIX levels that the later amplification needs
 # Measured 2026-10-08 (Task-7 build vs reference, 4 steps; decomp = np1 vs np2/np8 on pi_w):
 #   PRE   pi <= 6.3e-15, CORE2 1.3e-11 (ssh_rhs); decomp exactly 0
 #   EARLY pi <= 9.2e-13 (w, steps 1-3), decomp <= 4.3e-13; CORE2 step 1 <= 2.1e-9 (T at
@@ -56,6 +59,8 @@
 #         the original pi); decomp <= 2.5e-11 dumps, 6.4e-10 output; CORE2 <= 4.4e-6 dumps (T),
 #         2.2e-5 float32 u/v
 #   ICE   pi <= 3.9e-7, CORE2 1.2e-4;  MIX pi <= 2.2e-9, decomp 1.9e-11, CORE2 2.4e-4 (TKE)
+#   ICE_EARLY (2026-10-09, review fixes): pi steps 1-3 and decomp exactly 0 in float32, CORE2
+#         step 1 <= 1.4e-6 (m_ice)
 # ELEMENT COORDINATES (Task 14). The element coordinate of the output (and the point at which the
 # element vectors u/v and bolus_u/bolus_v are r2g-rotated) is now the area-weighted, cyclic-wrapped
 # centroid (mod_mesh_areas elem_center); the reference took the plain mean of the 3 rotated vertices
@@ -104,8 +109,8 @@ SRC=$(cd "$(dirname "$0")/.." && pwd)
 # trims and then delivers the stale payload of an earlier message (LESSONS L61,
 # tools/run_mpi_knem_stale_repro.sh)
 MPI="/sw/spack-levante/openmpi-4.1.2-yfwe6t/bin/mpiexec --mca pml ob1 --mca btl self,vader --mca btl_vader_single_copy_mechanism none --oversubscribe"
-POOL=/pool/data/AWICM/FESOM2/FORCING/JRA55-do-v1.4.0
-IC=/pool/data/AWICM/FESOM2/INITIAL/phc3.0/phc3.0_winter.nc
+source "$SRC/tools/prod_env.sh"          # prod_env: the production physics (work/job_levante)
+IC=$PROD_IC
 cases=("$@")
 [ ${#cases[@]} -eq 0 ] && cases=(prod:pi:1 prod:pi:2 prod:core2:8 decomp:pi_w:2 decomp:pi_w:8 \
                                  conserve:pi:1 conserve:pi:2)
@@ -121,11 +126,11 @@ mesh_dir() {
     esac
 }
 
-tolerances() {   # tolerances <mesh> -> "PRE N_EARLY EARLY OCEAN ICE MIX"
+tolerances() {   # tolerances <mesh> -> "PRE N_EARLY EARLY OCEAN ICE MIX ICE_EARLY"
     local t
-    case $1 in pi*) t=(1e-9 3 1e-10 1e-6 1e-5 1e-6) ;; *) t=(1e-9 1 1e-7 2e-4 2e-3 1e-2) ;; esac
+    case $1 in pi*) t=(1e-9 3 1e-10 1e-6 1e-5 1e-6 1e-6) ;; *) t=(1e-9 1 1e-7 2e-4 2e-3 1e-2 1e-5) ;; esac
     echo "${TOL_PRE:-${t[0]}} ${N_EARLY:-${t[1]}} ${TOL_EARLY:-${t[2]}} ${TOL_OCEAN:-${t[3]}}" \
-         "${TOL_ICE:-${t[4]}} ${TOL_MIX:-${t[5]}}"
+         "${TOL_ICE:-${t[4]}} ${TOL_MIX:-${t[5]}} ${TOL_ICE_EARLY:-${t[6]}}"
 }
 
 run_one() {   # run_one <kind> <mesh> <np> <bin_dir> <run_dir> [nsteps] [extra env ...]
@@ -137,14 +142,10 @@ run_one() {   # run_one <kind> <mesh> <np> <bin_dir> <run_dir> [nsteps] [extra e
         export FESOM3_MESH_DIR=$(mesh_dir $mesh) FESOM3_IC_FILE=$IC
         for v in "$@"; do export "$v"; done
         if [ "$kind" = prod ]; then
-            export FESOM3_FORCING_DIR=$POOL FESOM3_FORCING=JRA55 FESOM3_RUNOFF_FILE=$POOL/CORE2_runoff.nc \
-                FESOM3_SSS_FILE=$POOL/PHC2_salx.nc FESOM3_START_CLOCK="0 1 1958" FESOM3_WHICH_ALE=linfs \
-                FESOM3_WHICHEVP=0 FESOM3_FER_GM=1 FESOM3_REDI=1 FESOM3_MIX_TKE=1 FESOM3_SHEAR_SPLINES=1 \
-                FESOM3_N2_SPLINES=1 FESOM3_MOMADV_OPT=1 FESOM3_RVO_UPWIND=1.0 FESOM3_SW_PENE=1 \
-                FESOM3_CHL_SWEENEY=1 FESOM3_STEP_DIAG=1 FESOM3_WSPLIT=1 FESOM3_NSTEPS=$ns \
-                FESOM3_OUTPUT=$rd/out FESOM3_OUTPUT_EVERY=1 FESOM3_NAMELIST_IO=$rd/none \
-                FESOM_DUMP_FILE=$rd/dn FESOM_DUMP_ALL=1 FESOM_DUMP_MAXSTEPS=$ns \
-                FESOM3_SSH_SOLTOL=$SSH_SOLTOL FESOM3_SSH_MAXITER=20000
+            prod_env $SSH_SOLTOL
+            export FESOM3_NSTEPS=$ns FESOM3_OUTPUT=$rd/out FESOM3_OUTPUT_EVERY=1 \
+                FESOM3_NAMELIST_IO=$rd/none FESOM_DUMP_FILE=$rd/dn FESOM_DUMP_ALL=1 \
+                FESOM_DUMP_MAXSTEPS=$ns
             case $mesh in core2*) export FESOM3_STEP_PER_DAY=48 ;; esac
             $MPI -np $np "$bin/fesom_lifecycle_native_mr" > log 2>&1
         else
@@ -163,8 +164,8 @@ import numpy as np
 import zarr
 da, db = sys.argv[1], sys.argv[2]
 n_early = int(sys.argv[4])
-tol = dict(zip(("PRE", "EARLY", "OCEAN", "ICE", "MIX"), map(float, [sys.argv[3]] + sys.argv[5:9])))
-sys.path.insert(0, sys.argv[9])
+tol = dict(zip(("PRE", "EARLY", "OCEAN", "ICE", "MIX", "ICE_EARLY"), map(float, [sys.argv[3]] + sys.argv[5:10])))
+sys.path.insert(0, sys.argv[10])
 from dump_diff import parse_tree
 PRE_SUBSTEPS = (1, 4, 8)          # PRESSURE_BV, MIXING, SSH_RHS: step 1, before the first SSH solve
 F32 = 2.0 ** -21                  # 4 float32 ulps of max|a|: rounding of the output to float32
@@ -200,8 +201,8 @@ def stores(d):
     for p in glob.glob(os.path.join(d, "**", "*.zarr"), recursive=True):
         try:
             g = zarr.open(p, mode="r")
-        except Exception:
-            continue
+        except Exception as e:
+            print(f"  output store {p}: cannot open ({e})"); sys.exit(1)
         for k in g.array_keys():
             arr = g[k]
             if arr.dtype.kind != "f" or k in ("lon", "lat", "nz", "nz1", "time"):
@@ -214,7 +215,10 @@ def stores(d):
                 elon[k] = (np.asarray(g["lon"][:], dtype=np.float64), np.asarray(g["lat"][:], dtype=np.float64))
     return out, elon
 (sa, ca), (sb, cb) = stores(os.path.join(da, "out")), stores(os.path.join(db, "out"))
-common = sorted(set(sa) & set(sb))
+if set(sa) != set(sb):
+    print(f"  output variables differ: only in {da}: {sorted(set(sa) - set(sb))},"
+          f" only in {db}: {sorted(set(sb) - set(sa))}"); sys.exit(1)
+common = sorted(sa)
 for k in common:
     ra, rb = sa[k], sb[k]
     if ra.shape != rb.shape or not np.array_equal(np.isfinite(ra), np.isfinite(rb)):
@@ -243,7 +247,10 @@ for k in common:
         d = max(d_comp, d_speed)
         print(f"  output {k}: {int(mv.sum())} element coordinates moved (rotated-dateline centroids):"
               f" components elsewhere {d_comp:.3e}, speed there {d_speed:.3e}")
-    if k in ICE_OUT:   put("ICE", "out:" + k, d, F32)
+    if k in ICE_OUT:
+        put("ICE", "out:" + k, d, F32)
+        e = m.copy(); e[n_early:] = False          # the records of steps 1..N_EARLY
+        put("ICE_EARLY", "out:" + k, dist(ra[e], rb[e]) if e.any() else 0.0, F32)
     elif k in MIX_OUT: put("MIX", "out:" + k, d, F32)
     else:              put("OCEAN", "out:" + k, d, F32)
 
@@ -251,9 +258,10 @@ fail = False
 title = {"PRE": "step 1 before the first SSH solve",
          "EARLY": f"all substeps of steps 1..{n_early}, Kv excluded",
          "OCEAN": "all steps / records", "ICE": "sea ice, all records",
-         "MIX": "threshold-driven mixing, all steps / records"}
-for t in ("PRE", "EARLY", "OCEAN", "ICE", "MIX"):
-    print(f"  {t} ({title[t]}), TOL {tol[t]:g}" + (" (+2^-21 for float32 output)" if t in ("OCEAN", "ICE", "MIX") else "") + ":")
+         "MIX": "threshold-driven mixing, all steps / records",
+         "ICE_EARLY": f"sea ice, the records of steps 1..{n_early}"}
+for t in ("PRE", "EARLY", "OCEAN", "ICE", "MIX", "ICE_EARLY"):
+    print(f"  {t} ({title[t]}), TOL {tol[t]:g}" + (" (+2^-21 for float32 output)" if t in ("OCEAN", "ICE", "MIX", "ICE_EARLY") else "") + ":")
     for k, d in sorted(res[t].items(), key=lambda x: -x[1]):
         bad = d > lim[t][k]
         print(f"    {k:<16s} {d:.3e}" + ("   ABOVE" if bad else ""))
