@@ -25,6 +25,7 @@ module mod_ice_setup
     implicit none
     private
     public :: ice_setup, ice_allocate, ice_mass_matrix_fill, ice_initial_state
+    public :: build_bc_index_nod2D   ! also used by test_ice_dyn_mixed
 
 contains
 

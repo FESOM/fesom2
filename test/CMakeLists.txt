@@ -1,6 +1,12 @@
 # FESOM3 self-tests. add_fesom_test(<name> <nranks>) is defined in the top-level
 # CMakeLists; each builds test/<name>.F90 against libfesom3 and registers a ctest.
 
+# test_util.F90: scaffolding shared by the hybrid-mesh tests (mesh setup, check/finish,
+# reductions, hval, set_depths); add_fesom_test links it into every test.
+add_library(fesom3_test_util STATIC ${CMAKE_CURRENT_SOURCE_DIR}/test_util.F90)
+apply_fesom_compile_flags(fesom3_test_util)
+target_link_libraries(fesom3_test_util PUBLIC fesom3)
+
 add_fesom_test(test_params 1)
 add_fesom_test(test_types  1)
 add_fesom_test(test_partit 1)
@@ -220,6 +226,26 @@ foreach(_case "1:element 3 has a wrong number of node ids: \"2 4\""
         PASS_REGULAR_EXPRESSION "the line of ${_msg}"
         FAIL_REGULAR_EXPRESSION "did NOT stop")
 endforeach()
+# fesom_ini (mesh_part/) on a copy of the NEMO quad cut-out in the build tree
+# (tools/check_fesom_ini.sh): the FESOM2 level finder on quads (aux3d.out) and the error
+# stops of use_depthfile="nemo", the >= 2-layer rule and the non-convex quad check.
+foreach(_case "aux3d:check_fesom_ini: aux3d OK"
+              "nodepth:use_depthfile=\"nemo\" needs the file"
+              "onelem:set use_depthonelem=.false."
+              "count1:depth.out layer counts outside 2..nl-1"
+              "nonconvex:test_tri_ini: non-convex quad")
+    string(FIND "${_case}" ":" _colon)
+    string(SUBSTRING "${_case}" 0 ${_colon} _c)
+    math(EXPR _colon "${_colon} + 1")
+    string(SUBSTRING "${_case}" ${_colon} -1 _msg)
+    add_test(NAME fesom_ini_${_c}
+             COMMAND bash ${CMAKE_SOURCE_DIR}/tools/check_fesom_ini.sh $<TARGET_FILE:fesom_ini>
+                     ${_mesh_q} ${CMAKE_CURRENT_BINARY_DIR}/fesom_ini_${_c} ${_c})
+    set_tests_properties(fesom_ini_${_c} PROPERTIES
+        PASS_REGULAR_EXPRESSION "${_msg}"
+        FAIL_REGULAR_EXPRESSION "check_fesom_ini: dist_2 written;check_fesom_ini: aux3d FAILED")
+    require_files(fesom_ini_${_c} ${_mesh_q}/nod2d.out ${_mesh_q}/depth.out)
+endforeach()
 
 # dump_diff.py self-check (pure python; no external data needed).
 add_test(NAME dump_diff_selftest
@@ -294,6 +320,7 @@ endforeach()
 # stress, dynamics + FCT advection + ice-ocean drag every step, no thermodynamics
 # (FESOM3_CONSERVE_ICE, fesom_conserve header). Heat/salt/volume and the three ice masses
 # sum(fct_lumpedmass*f) within 1e-12; measured <= 1.2e-14 (max|uice| 0.35-0.39 m/s).
+# _prod_ocean = prod_ocean_env of tools/prod_env.sh (keep the two lists equal).
 set(_prod_ocean "FESOM3_MIX_TKE=1;FESOM3_REDI=1;FESOM3_FER_GM=1;FESOM3_SHEAR_SPLINES=1;FESOM3_N2_SPLINES=1;FESOM3_MOMADV_OPT=1;FESOM3_RVO_UPWIND=1.0;FESOM3_WSPLIT=1")
 foreach(_cut q:nemo025q_cut mix:nemo025mix_cut)
     string(REPLACE ":" ";" _pair ${_cut})

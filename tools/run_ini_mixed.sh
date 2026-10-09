@@ -40,14 +40,7 @@ CORE2_SRC=/pool/data/AWICM/FESOM2/MESHES_FESOM2.1/core2
 
 [ -x "$INI" ] || { echo "run_ini_mixed: missing executable $INI" >&2; exit 2; }
 ulimit -s unlimited
-source /usr/share/Modules/init/bash
-module load python3 >/dev/null 2>&1
-hash -r
-
-fail=0
-ok()  { echo "  ok: $*"; }
-bad() { echo "  FAILED: $*"; fail=1; }
-OUTS="edges.out edge_tri.out edgenum.out elvls.out elvls_raw.out nlvls.out"
+source "$HERE/lib_ini.sh"          # python3 module, ok/bad/fail, OUTS, ini_namelist
 mkdir -p "$WORK_ROOT/log"
 
 # clean <mesh_dir>: removes the fesom_ini outputs
@@ -63,8 +56,7 @@ run_ini() {
     local mesh="$1" np="$2" log="$3" rd
     rd="$WORK_ROOT/run/$(basename "$mesh")_$np"
     mkdir -p "$rd"
-    printf '&paths\nMeshPath="%s/"\n/\n&geometry\nuse_depthfile="nemo"\n/\n&run_config\n/\n&machine\nn_levels=1\nn_part=%s\n/\n' \
-        "$mesh" "$np" > "$rd/namelist.config"
+    ini_namelist "$rd/namelist.config" "$mesh" "$np" nemo
     (cd "$rd" && "$INI" > "$log" 2>&1) || true
 }
 
@@ -174,8 +166,10 @@ open(sys.argv[1], 'w').write('\n'.join(tok) + '\n')
 EOF
 if python3 "$HERE/mesh/check_dist.py" "$d" 2 > "$WORK_ROOT/log/check_corrupt.log" 2>&1; then
     bad "check_dist passes a corrupted dist_2"
-else
+elif grep -q 'FAILED: every node owned by exactly one rank' "$WORK_ROOT/log/check_corrupt.log"; then
     ok "check_dist detects a corrupted dist_2 ($(grep -c FAILED "$WORK_ROOT/log/check_corrupt.log") failed checks)"
+else
+    bad "check_dist fails a corrupted dist_2 for another reason (log $WORK_ROOT/log/check_corrupt.log)"
 fi
 
 # check_dist must fail on corrupted appended sections (copies of the mixed cut-out dist_4)
@@ -213,10 +207,17 @@ else:                                  # duplicate a receive entry of rank 1
     tok[r0 + 1] = tok[r0]
 save(f, tok)
 EOF
+    case $what in
+        xnodes)   want='FAILED: eXDim_nod2D == vertices of the local elements' ;;
+        nod_full) want='FAILED: com_nod2D_full: every halo node' ;;
+        edge)     want='FAILED: com_edge2D: every held edge' ;;
+    esac
     if python3 "$HERE/mesh/check_dist.py" "$d" 4 > "$WORK_ROOT/log/check_corrupt_$what.log" 2>&1; then
         bad "check_dist passes a dist_4 with corrupted $what"
-    else
+    elif grep -q "$want" "$WORK_ROOT/log/check_corrupt_$what.log"; then
         ok "check_dist detects corrupted $what in dist_4 ($(grep FAILED "$WORK_ROOT/log/check_corrupt_$what.log" | head -1 | cut -c1-70)...)"
+    else
+        bad "check_dist fails corrupted $what for another reason (log $WORK_ROOT/log/check_corrupt_$what.log)"
     fi
 done
 

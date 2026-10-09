@@ -27,41 +27,31 @@ program test_geom_mixed
     !      the 3 kite-weighted smoothing sweeps equals the raw value of the uniform cells at
     !      the nodes 4+ rings from the rim (their 3-ring neighbourhood has no rim node), and
     !      the rim-near nodes differ (non-vacuity)
+    !   G10 output element coordinates (mod_io_coords io_coords_compute, the lon/lat of every
+    !      element store): the geographic image (r2g) of the shoelace polygon centroid in the
+    !      rotated lon/lat plane, to 1e-9 degrees (on the rotated pi_w across the dateline too)
     use mpi
+    use test_util,         only: setup_test_mesh, check, finish, max_all
     use mod_precision,     only: WP, MP
-    use mod_constants,     only: r_earth
+    use mod_constants,     only: r_earth, rad
     use mod_mesh,          only: t_mesh, MAX_NV
     use mod_partit,        only: t_partit
-    use mod_partitioning,  only: par_init, par_ex, set_partition
-    use mod_mesh_read,     only: read_mesh
-    use mod_mesh_areas,    only: compute_geometry, elem_center
+    use mod_partitioning,  only: par_init
+    use mod_mesh_areas,    only: elem_center
     use mod_mesh_analytic, only: generate_mixed_patch, generate_quad_patch
-    use mod_mesh_rotate,   only: trim_cyclic, get_cyclic_length
+    use mod_mesh_rotate,   only: trim_cyclic, get_cyclic_length, r2g
+    use mod_io_coords,     only: io_coords_compute
+    use mod_io_decomp,     only: DECOMP_ELEM
+    use mod_part_bounds,   only: owned_bounds
     implicit none
 
-    character(len=512) :: mesh_dir, cbuf
     type(t_partit) :: partit, apartit, qpartit
     type(t_mesh)   :: mesh, amesh, qmesh
-    integer :: ierr, nfail, nfail_g, nsw
 
     call par_init(partit)
-    nfail = 0
-    call get_environment_variable('FESOM3_MESH_DIR', mesh_dir)
-    if (len_trim(mesh_dir) == 0) mesh_dir = '/work/ab0995/a270029/meshes/nemo025mix_cut'
-    call set_partition(partit, trim(mesh_dir))
-    ! FESOM3_TEST_ROTATE=1: the standard rotation 50/15/-90 (pi, CORE2 -- the unrotated
-    ! pi has elements around the geographic pole, which have no planar lon/lat embedding)
-    cbuf = ''
-    call get_environment_variable('FESOM3_TEST_ROTATE', cbuf)
-    if (trim(cbuf) == '1') then
-        call read_mesh(mesh, partit, trim(mesh_dir), 50.0_WP, 15.0_WP, -90.0_WP, 360.0_WP, &
-                       force_rotation=.true., n_cw_swaps=nsw)
-    else
-        call read_mesh(mesh, partit, trim(mesh_dir), 0.0_WP, 0.0_WP, 0.0_WP, 360.0_WP, &
-                       force_rotation=.false., n_cw_swaps=nsw)
-    end if
-    call compute_geometry(mesh, partit, cartesian=.false.)
+    call setup_test_mesh(mesh, partit, '/work/ab0995/a270029/meshes/nemo025mix_cut', cartesian=.false., partition_np1=.true.)
     call check_mesh(mesh, partit, 'mesh', .false.)
+    call check_output_coords(mesh, partit)
 
     if (partit%npes == 1) then
         ! analytic mixed patch (1-rank identity partition of its own)
@@ -81,28 +71,9 @@ program test_geom_mixed
         call check_resolution(qmesh, 11, 11)
     end if
 
-    call MPI_Allreduce(nfail, nfail_g, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
-    if (partit%mype == 0) then
-        if (nfail_g == 0) then
-            write(*,'(a,i0,a)') 'test_geom_mixed (npes=', partit%npes, '): ALL PASS'
-        else
-            write(*,'(a,i0,a,i0,a)') 'test_geom_mixed (npes=', partit%npes, '): ', nfail_g, ' FAILURE(S)'
-        end if
-    end if
-    call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-    if (nfail_g /= 0) error stop 1
+    call finish(partit, 'test_geom_mixed')
 
 contains
-
-    subroutine check(cond, name, mype)
-        logical,          intent(in) :: cond
-        character(len=*), intent(in) :: name
-        integer,          intent(in) :: mype
-        if (.not. cond) then
-            nfail = nfail + 1
-            write(*,'(a,i0,a)') '  FAIL [rank ', mype, ']: '//name
-        end if
-    end subroutine
 
     subroutine check_mesh(m, p, tag, cartesian)
         type(t_mesh),     intent(in) :: m
@@ -153,16 +124,6 @@ contains
             call check(e6(1) < 1.0e-13_WP .and. e6(2) < 1.0e-12_WP .and. e6(3) < 1.0e-10_WP &
                        .and. e6(4) < 1.0e-12_WP, tag//': G7 triangles equal the previous formulas', p%mype)
         end if
-    end subroutine
-
-    subroutine max_all(x, p)
-        real(kind=WP),  intent(inout) :: x
-        type(t_partit), intent(in)    :: p
-        real(kind=WP) :: y
-        integer :: ierr2
-        if (p%npes == 1) return
-        call MPI_Allreduce(x, y, 1, MPI_DOUBLE_PRECISION, MPI_MAX, p%MPI_COMM_FESOM, ierr2)
-        x = y
     end subroutine
 
     real(kind=WP) function area_balance(m, p, nNodO, nElemO)
@@ -355,6 +316,42 @@ contains
             if (alltri) err(4) = max(err(4), abs(m%area(n) - s) / s)
         end do
     end subroutine
+
+    subroutine check_output_coords(m, p)
+        ! G10 over the owned elements
+        type(t_mesh),   intent(in) :: m
+        type(t_partit), intent(in) :: p
+        integer :: nNodO, nNodL, nEdgeO, nElemO, e, j, jp, nv
+        integer,  allocatable :: nlev(:)
+        real(kind=WP), allocatable :: lon(:), lat(:), rlon(:), rlat(:)
+        real(kind=WP) :: x(4), y(4), a, cx, cy, cr, glon, glat, dlon, err
+        call owned_bounds(m, nNodO, nNodL, nEdgeO, nElemO, p)
+        allocate(lon(nElemO), lat(nElemO), rlon(nElemO), rlat(nElemO), nlev(nElemO))
+        call io_coords_compute(DECOMP_ELEM, m, nElemO, lon, lat, rlon, rlat, nlev)
+        err = 0.0_WP
+        do e = 1, nElemO
+            nv = m%elem2D_nnodes(e)
+            do j = 1, nv
+                x(j) = m%coord_nod2D(1, m%elem2D_nodes(j, e)) - m%coord_nod2D(1, m%elem2D_nodes(1, e))
+                call trim_cyclic(x(j))
+                y(j) = m%coord_nod2D(2, m%elem2D_nodes(j, e))
+            end do
+            a = 0.0_WP; cx = 0.0_WP; cy = 0.0_WP
+            do j = 1, nv
+                jp = mod(j, nv) + 1
+                cr = x(j)*y(jp) - x(jp)*y(j)
+                a = a + 0.5_WP*cr
+                cx = cx + (x(j) + x(jp))*cr; cy = cy + (y(j) + y(jp))*cr
+            end do
+            cx = cx/(6.0_WP*a) + m%coord_nod2D(1, m%elem2D_nodes(1, e)); cy = cy/(6.0_WP*a)
+            call r2g(glon, glat, cx, cy)
+            dlon = modulo(lon(e) - glon/rad + 180.0_WP, 360.0_WP) - 180.0_WP
+            err = max(err, abs(dlon), abs(lat(e) - glat/rad))
+        end do
+        call max_all(err, p)
+        if (p%mype == 0) write(*,'(a,es10.2)') 'mesh: G10 output element lon/lat vs r2g(shoelace centroid), deg:', err
+        call check(err < 1.0e-9_WP, 'mesh: G10 output element coordinates == the polygon centroid', p%mype)
+    end subroutine check_output_coords
 
     subroutine check_resolution(m, nx, ny)
         ! G9: node (i,j) of the nx x ny parallelogram patch; ring = distance to the rim

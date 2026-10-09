@@ -12,7 +12,8 @@
 #     total area preserved to roundoff, nod2d.out and depth.out unchanged;
 #   - cut-outs: a few thousand nodes, the mixed cut-out holds quads and triangles, every
 #     node layer count = max over its elements (the model's bottom invariant);
-#   - error cases: flipped quad, flipped triangle, bow-tie quad, repeated vertex are reported.
+#   - error cases: flipped quad, flipped triangle, bow-tie quad, repeated vertex and a node
+#     layer count above the bottom invariant are reported.
 #
 # Usage: tools/mesh/test_mesh_tools.sh [nemo_dir] [out_root]
 #   out_root defaults to a scratch dir (removed at exit); /work/ab0995/a270029/meshes makes the test meshes.
@@ -101,16 +102,8 @@ for m in nemo025q_fesom:nemo025q_cut nemo025mix:nemo025mix_cut; do
         bad "$dst: $n nodes (a few thousand expected)"
     fi
     # the model's bottom invariant: node count = max over its elements of the element
-    # count (min over the vertices), also for the nodes on the cut
-    if python3 -c '
-import sys, numpy as np
-sys.path.insert(0, sys.argv[1]); import mesh_io
-m = mesh_io.read_mesh(sys.argv[2])
-c = np.array([int(s) for s in m.depth["depth.out"][1][1]])
-emin = c[m.elem].min(axis=1); mx = np.zeros(m.n2d, dtype=np.int64)
-for k in range(4): np.maximum.at(mx, m.elem[:, k], emin)
-print("    %d node(s) violate the bottom invariant" % (mx != c).sum()); sys.exit(int((mx != c).any()))' \
-         "$HERE" "$ROOT/$dst"; then
+    # count (min over the vertices), also for the nodes on the cut (check_mesh layers=)
+    if [ "$(val "$SCR/$dst.log" layers)" = 0 ]; then
         ok "$dst: node layer counts = max over the elements ($(grep -o '[0-9]* node layer count' "$SCR/${dst}_cut.log" | cut -d' ' -f1) lowered by the cut)"
     else
         bad "$dst: bottom invariant violated"
@@ -156,6 +149,17 @@ mutate bowtie 'e[q, [1, 2]] = e[q, [2, 1]]'
 expect_error bowtie nonconvex 1
 mutate repeated 'e[q, 2] = e[q, 1]'
 expect_error repeated degenerate 1
+# one node layer count raised above the max over its elements (depth.out block 2)
+mutate deeper 'pass'
+python3 - "$SCR/deeper/depth.out" <<'EOF'
+import sys
+lines = open(sys.argv[1]).read().split('\n')
+nl = int(lines[0]); n2d = (len([l for l in lines if l != '']) - 1 - nl) // 2
+i = 1 + nl + n2d                    # the layer count of node 1
+lines[i] = '%9i ' % (int(lines[i]) + 1)
+open(sys.argv[1], 'w').write('\n'.join(lines))
+EOF
+expect_error deeper layers 1
 
 if [ "$fail" -ne 0 ]; then
     echo "FAIL"; exit 1

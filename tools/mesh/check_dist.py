@@ -7,7 +7,9 @@ Mesh files (once per mesh directory):
   - edges.out: the edges are exactly the element sides (1-2, 2-3, 3-4, 4-1; a triangle's
     degenerate side 4-1 dropped), each once; edgenum.out: edge2D and edge2D_in;
   - edge order: edges 1..edge2D_in lie in two elements, edge2D_in+1..edge2D in one;
-  - edge_tri.out: the element(s) holding the edge (2nd <= 0 on the boundary);
+  - edge_tri.out: the element(s) holding the edge (2nd <= 0 on the boundary), the 1st
+    left of edges(1) -> edges(2) on the sphere and the 2nd right of it (the model's
+    convention: the SSH stiffness matrix is symmetric only with it);
   - levels: with depth.out (NEMO) nlvls.out == layer counts + 1 and elvls.out == min over
     the element's vertices; otherwise (FESOM2 level finder) nlvls.out == max of elvls.out
     over the elements around the node.
@@ -100,9 +102,8 @@ def check_mesh_files(c, d, m, nv, side_edge, count):
     c.check(len(ed) == e2d_n == nsides and len(et) == e2d_n,
             'edge count: edges.out %d, edgenum.out %d, element sides %d'
             % (len(ed), e2d_n, nsides))
-    key = np.minimum(ed[:, 0], ed[:, 1]) * np.int64(m.n2d) + np.maximum(ed[:, 0], ed[:, 1])
-    a, b = m.elem, np.roll(m.elem, -1, axis=1)
-    skey = np.minimum(a, b) * np.int64(m.n2d) + np.maximum(a, b)
+    key = mesh_io.edge_key(ed[:, 0], ed[:, 1], m.n2d)
+    skey = mesh_io.edge_key(m.elem, np.roll(m.elem, -1, axis=1), m.n2d)
     uk = np.unique(skey[side_edge >= 0])
     c.check(len(np.unique(key)) == len(key) and np.array_equal(np.sort(key), uk),
             'edges.out == element sides, each once')
@@ -131,6 +132,17 @@ def check_mesh_files(c, d, m, nv, side_edge, count):
                    == np.stack([first, second], 1)[:e2d_in])
     ok_bd = np.all(t1[e2d_in:] == first[e2d_in:]) and np.all(et[e2d_in:, 1] <= 0)
     c.check(ok_in and ok_bd, 'edge_tri.out == elements holding each edge (2nd <= 0 on the boundary)')
+    # orientation: the element centre (vertex mean) against the great circle of the edge
+    p = mesh_io.xyz(m.lon, m.lat)
+    nv = m.nnodes()
+    cen = sum(np.where((k < nv)[:, None], p[m.elem[:, k]], 0.0) for k in range(4)) / nv[:, None]
+    nrm = np.cross(p[ed[:, 0]], p[ed[:, 1]])
+    inner = et[:, 1] > 0
+    left1 = np.einsum('ij,ij->i', nrm, cen[t1]) > 0
+    right2 = np.einsum('ij,ij->i', nrm[inner], cen[t2[inner]]) < 0
+    c.check(bool(left1.all() and right2.all()),
+            'edge_tri.out: 1st element left of edges(1) -> edges(2), 2nd right (%d, %d wrong)'
+            % (int((~left1).sum()), int((~right2).sum())))
 
     nlv = ints(os.path.join(d, 'nlvls.out'))
     elv = ints(os.path.join(d, 'elvls.out'))

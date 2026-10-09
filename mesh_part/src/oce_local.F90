@@ -45,7 +45,7 @@ subroutine nod_full_lists(partit, mesh, xlist, com)
   type(dist_com), intent(out)       :: com
   integer, allocatable :: loc(:), pes(:,:), pos(:)
   integer              :: num_recv(0:partit%npes-1), num_send(0:partit%npes-1)
-  integer              :: myd, ed, nel, n, m, k, i, j, q, q2, el, el2, p, nx, counter
+  integer              :: myd, ed, nel, n, m, k, i, j, q, q2, el, el2, p, nx
   logical              :: too_small
 
   myd = partit%myDim_nod2D
@@ -126,21 +126,7 @@ subroutine nod_full_lists(partit, mesh, xlist, com)
         end do
      end do
   end do
-  if (too_small) then
-     print *,'Increase MAX_LAENDERECK in MOD_PARTIT.F90 and recompile'
-     stop
-  endif
-  call set_pe_ptr(num_send, com%sPEnum, com%sPE, com%sptr)
-  allocate(com%slist(com%sptr(com%sPEnum+1)-1))
-  counter = 0
-  do i=1, com%sPEnum
-     do k=1, myd
-        if (any(pes(:,k) == com%sPE(i))) then
-           counter = counter+1
-           com%slist(counter) = k
-        end if
-     end do
-  end do
+  call set_send(pes, num_send, too_small, com)
   deallocate(loc, pes, pos)
 end subroutine nod_full_lists
 !=============================================================================
@@ -152,7 +138,7 @@ subroutine edge_lists(partit, mesh, nedges, com)
   type(dist_com), intent(out) :: com
   integer, allocatable :: loc(:), pes(:,:), pos(:)
   integer              :: num_recv(0:partit%npes-1), num_send(0:partit%npes-1)
-  integer              :: e, k, i, q, n, el, p, counter
+  integer              :: e, k, i, q, n, el, p
   logical              :: too_small
 
   allocate(loc(mesh%edge2D), pos(0:partit%npes-1))
@@ -198,24 +184,36 @@ subroutine edge_lists(partit, mesh, nedges, com)
         end do
      end do
   end do
+  ! uniquely owned edges lie in 1..myDim_edge2D, which is ascending in global id
+  call set_send(pes, num_send, too_small, com)
+  deallocate(loc, pes, pos)
+end subroutine edge_lists
+!=============================================================================
+! The send side of nod_full_lists / edge_lists: pes(:,k) = the PEs local item k goes to
+! (-1 = none), num_send(p) = the number of items for PE p; slist = for each PE
+! (ascending) its items in local order
+subroutine set_send(pes, num_send, too_small, com)
+  integer,        intent(in)    :: pes(:,:), num_send(0:)
+  logical,        intent(in)    :: too_small
+  type(dist_com), intent(inout) :: com
+  integer :: i, k, counter
+
   if (too_small) then
      print *,'Increase MAX_LAENDERECK in MOD_PARTIT.F90 and recompile'
      stop
   endif
   call set_pe_ptr(num_send, com%sPEnum, com%sPE, com%sptr)
   allocate(com%slist(com%sptr(com%sPEnum+1)-1))
-  ! uniquely owned edges lie in 1..myDim_edge2D, which is ascending in global id
   counter = 0
   do i=1, com%sPEnum
-     do k=1, nedges
+     do k=1, size(pes, 2)
         if (any(pes(:,k) == com%sPE(i))) then
            counter = counter+1
            com%slist(counter) = k
         end if
      end do
   end do
-  deallocate(loc, pes, pos)
-end subroutine edge_lists
+end subroutine set_send
 !=============================================================================
 ! PEs with num(p) > 0 (ascending) and the pointers into their lists
 subroutine set_pe_ptr(num, npe, pe, ptr)

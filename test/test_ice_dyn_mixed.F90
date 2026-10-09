@@ -27,41 +27,26 @@ program test_ice_dyn_mixed
     !      triangles: the kite-share gather == the former area-weighted mean at all-triangle
     !      nodes
     use mpi
+    use test_util,         only: setup_test_mesh, check, finish, max_all, sum_all, hval
     use mod_precision,     only: WP
     use mod_constants,     only: r_earth, g
     use mod_mesh,          only: t_mesh, MAX_NV
     use mod_partit,        only: t_partit
-    use mod_partitioning,  only: par_init, par_ex, set_partition
-    use mod_mesh_read,     only: read_mesh
-    use mod_mesh_areas,    only: compute_geometry
+    use mod_partitioning,  only: par_init
     use mod_mesh_analytic, only: generate_analytic_mesh, generate_mixed_patch, generate_quad_patch
-    use mod_part_bounds,   only: owned_bounds, is_multirank
+    use mod_part_bounds,   only: owned_bounds
     use mod_ice,           only: t_ice
     use mod_dyn,           only: t_dyn
     use mod_tracer,        only: t_tracer
     use mod_ice_dyn,       only: ocean2ice, EVPdynamics_solve, stress_tensor, stress2rhs
+    use mod_ice_setup,     only: build_bc_index_nod2D
     implicit none
 
-    character(len=512) :: mesh_dir, cbuf
     type(t_partit) :: partit, tpartit, apartit, qpartit
     type(t_mesh)   :: mesh, tmesh, amesh, qmesh
-    integer :: ierr, nfail, nfail_g, nsw
 
     call par_init(partit)
-    nfail = 0
-    call get_environment_variable('FESOM3_MESH_DIR', mesh_dir)
-    if (len_trim(mesh_dir) == 0) mesh_dir = '/work/ab0995/a270029/meshes/nemo025mix_cut'
-    if (partit%npes > 1) call set_partition(partit, trim(mesh_dir))
-    cbuf = ''
-    call get_environment_variable('FESOM3_TEST_ROTATE', cbuf)
-    if (trim(cbuf) == '1') then
-        call read_mesh(mesh, partit, trim(mesh_dir), 50.0_WP, 15.0_WP, -90.0_WP, 360.0_WP, &
-                       force_rotation=.true., n_cw_swaps=nsw)
-    else
-        call read_mesh(mesh, partit, trim(mesh_dir), 0.0_WP, 0.0_WP, 0.0_WP, 360.0_WP, &
-                       force_rotation=.false., n_cw_swaps=nsw)
-    end if
-    call compute_geometry(mesh, partit, cartesian=.false.)
+    call setup_test_mesh(mesh, partit, '/work/ab0995/a270029/meshes/nemo025mix_cut', cartesian=.false., partition_np1=.false.)
     call check_ice(mesh, partit, 'mesh', .false.)
 
     if (partit%npes == 1) then
@@ -76,34 +61,9 @@ program test_ice_dyn_mixed
         call check_ice(qmesh, qpartit, 'patch_quad', .true.)
     end if
 
-    call MPI_Allreduce(nfail, nfail_g, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
-    if (partit%mype == 0) then
-        if (nfail_g == 0) then
-            write(*,'(a,i0,a)') 'test_ice_dyn_mixed (npes=', partit%npes, '): ALL PASS'
-        else
-            write(*,'(a,i0,a,i0,a)') 'test_ice_dyn_mixed (npes=', partit%npes, '): ', nfail_g, ' FAILURE(S)'
-        end if
-    end if
-    call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-    if (nfail_g /= 0) error stop 1
+    call finish(partit, 'test_ice_dyn_mixed')
 
 contains
-
-    subroutine check(cond, name, mype)
-        logical,          intent(in) :: cond
-        character(len=*), intent(in) :: name
-        integer,          intent(in) :: mype
-        if (.not. cond) then
-            nfail = nfail + 1
-            write(*,'(a,i0,a)') '  FAIL [rank ', mype, ']: '//name
-        end if
-    end subroutine
-
-    ! deterministic value from a global id (same on every rank's copy)
-    real(kind=WP) function hval(gid, k)
-        integer, intent(in) :: gid, k
-        hval = sin(1.7_WP*real(gid, WP) + 0.9_WP*real(k, WP))
-    end function hval
 
     subroutine check_ice(m, p, tag, planar)
         type(t_mesh),     intent(inout) :: m
@@ -141,7 +101,7 @@ contains
         do n = 1, nNodO
             alltri(n) = all(m%elem2D_nnodes(m%nod_in_elem2D(1:m%nod_in_elem2D_num(n), n)) == 3)
         end do
-        call alloc_ice(ice, m, p, nNodL, ne, nEdgeO)
+        call alloc_ice(ice, m, p, nNodL, ne)
 
         !--- D1: strain rates ---
         ice%work%ice_strength = 0.0_WP
@@ -444,14 +404,15 @@ contains
         ice%work%sigma11 = 0.0_WP; ice%work%sigma12 = 0.0_WP; ice%work%sigma22 = 0.0_WP
     end subroutine ice_state_uniform
 
-    subroutine alloc_ice(ice, m, p, nn, ne, nEdgeO)
+    subroutine alloc_ice(ice, m, p, nn, ne)
         ! the EVP/mEVP subset of ice_allocate + ice_setup (ice_dt = the CORE2 1800 s,
         ! namelist doubles for cd_oce_ice / delta_min) and the mEVP boundary mask
+        ! (mod_ice_setup build_bc_index_nod2D)
         type(t_ice),    intent(inout) :: ice
         type(t_mesh),   intent(in)    :: m
         type(t_partit), intent(in)    :: p
-        integer,        intent(in)    :: nn, ne, nEdgeO
-        integer :: k, ed
+        integer,        intent(in)    :: nn, ne
+        integer :: k
         allocate(ice%uice(nn), ice%vice(nn), ice%uice_old(nn), ice%vice_old(nn))
         allocate(ice%uice_rhs(nn), ice%vice_rhs(nn), ice%uice_aux(nn), ice%vice_aux(nn))
         allocate(ice%stress_atmice_x(nn), ice%stress_atmice_y(nn), ice%bc_index_nod2D(nn))
@@ -476,37 +437,7 @@ contains
         ice%Tevp_inv   = 3.0_WP/ice%ice_dt
         ice%cd_oce_ice = 0.0055_WP
         ice%delta_min  = 1.0e-11_WP
-        ice%bc_index_nod2D = 1.0_WP
-        do ed = 1, nEdgeO
-            if (is_multirank(p)) then
-                if (p%myList_edge2D(ed) <= m%edge2D_in) cycle
-            else
-                if (ed <= m%edge2D_in) cycle
-            end if
-            ice%bc_index_nod2D(m%edges(1:2, ed)) = 0.0_WP
-        end do
+        call build_bc_index_nod2D(ice, m, p)
     end subroutine alloc_ice
-
-    subroutine max_all(x, p)
-        real(kind=WP),  intent(inout) :: x
-        type(t_partit), intent(in)    :: p
-        real(kind=WP) :: y
-        integer :: ie
-        if (p%npes > 1) then
-            call MPI_Allreduce(x, y, 1, MPI_DOUBLE_PRECISION, MPI_MAX, p%MPI_COMM_FESOM, ie)
-            x = y
-        end if
-    end subroutine max_all
-
-    subroutine sum_all(x, p)
-        real(kind=WP),  intent(inout) :: x(:)
-        type(t_partit), intent(in)    :: p
-        real(kind=WP) :: y(size(x))
-        integer :: ie
-        if (p%npes > 1) then
-            call MPI_Allreduce(x, y, size(x), MPI_DOUBLE_PRECISION, MPI_SUM, p%MPI_COMM_FESOM, ie)
-            x = y
-        end if
-    end subroutine sum_all
 
 end program test_ice_dyn_mixed

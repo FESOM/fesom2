@@ -26,12 +26,11 @@ program test_ice_mass
     ! FESOM3_TEST_MISSING_COL=1: a column removed from the CSR must stop
     ! ice_mass_matrix_fill with a message (ctest regex; reaching the end = 'did NOT stop').
     use mpi
+    use test_util,         only: setup_test_mesh, check, finish, max_all, sum_all, hval, set_depths
     use mod_precision,     only: WP, MP
     use mod_mesh,          only: t_mesh, MAX_NV
     use mod_partit,        only: t_partit
-    use mod_partitioning,  only: par_init, par_ex, set_partition
-    use mod_mesh_read,     only: read_mesh
-    use mod_mesh_areas,    only: compute_geometry
+    use mod_partitioning,  only: par_init, par_ex
     use mod_mesh_analytic, only: generate_analytic_mesh, generate_mixed_patch, generate_quad_patch
     use mod_part_bounds,   only: owned_bounds, is_multirank
     use mod_halo,          only: exchange_nod
@@ -43,26 +42,12 @@ program test_ice_mass
     implicit none
 
     real(kind=WP), parameter :: dt = 1800.0_WP
-    character(len=512) :: mesh_dir, cbuf
+    character(len=512) :: cbuf
     type(t_partit) :: partit, tpartit, apartit, qpartit
     type(t_mesh)   :: mesh, tmesh, amesh, qmesh
-    integer :: ierr, nfail, nfail_g, nsw
 
     call par_init(partit)
-    nfail = 0
-    call get_environment_variable('FESOM3_MESH_DIR', mesh_dir)
-    if (len_trim(mesh_dir) == 0) mesh_dir = '/work/ab0995/a270029/meshes/nemo025mix_cut'
-    if (partit%npes > 1) call set_partition(partit, trim(mesh_dir))
-    cbuf = ''
-    call get_environment_variable('FESOM3_TEST_ROTATE', cbuf)
-    if (trim(cbuf) == '1') then
-        call read_mesh(mesh, partit, trim(mesh_dir), 50.0_WP, 15.0_WP, -90.0_WP, 360.0_WP, &
-                       force_rotation=.true., n_cw_swaps=nsw)
-    else
-        call read_mesh(mesh, partit, trim(mesh_dir), 0.0_WP, 0.0_WP, 0.0_WP, 360.0_WP, &
-                       force_rotation=.false., n_cw_swaps=nsw)
-    end if
-    call compute_geometry(mesh, partit, cartesian=.false.)
+    call setup_test_mesh(mesh, partit, '/work/ab0995/a270029/meshes/nemo025mix_cut', cartesian=.false., partition_np1=.false.)
 
     cbuf = ''
     call get_environment_variable('FESOM3_TEST_MISSING_COL', cbuf)
@@ -82,34 +67,9 @@ program test_ice_mass
         call check_fct(qmesh, qpartit, 'patch_quad', .true.)
     end if
 
-    call MPI_Allreduce(nfail, nfail_g, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
-    if (partit%mype == 0) then
-        if (nfail_g == 0) then
-            write(*,'(a,i0,a)') 'test_ice_mass (npes=', partit%npes, '): ALL PASS'
-        else
-            write(*,'(a,i0,a,i0,a)') 'test_ice_mass (npes=', partit%npes, '): ', nfail_g, ' FAILURE(S)'
-        end if
-    end if
-    call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-    if (nfail_g /= 0) error stop 1
+    call finish(partit, 'test_ice_mass')
 
 contains
-
-    subroutine check(cond, name, mype)
-        logical,          intent(in) :: cond
-        character(len=*), intent(in) :: name
-        integer,          intent(in) :: mype
-        if (.not. cond) then
-            nfail = nfail + 1
-            write(*,'(a,i0,a)') '  FAIL [rank ', mype, ']: '//name
-        end if
-    end subroutine
-
-    ! deterministic value from a global id (same on every rank's copy)
-    real(kind=WP) function hval(gid, k)
-        integer, intent(in) :: gid, k
-        hval = sin(1.7_WP*real(gid, WP) + 0.9_WP*real(k, WP))
-    end function hval
 
     ! element mass coefficient (per unit area) of the vertex pair (j,k), by the cyclic
     ! vertex distance -- independent of the mod_ice_fct table
@@ -152,19 +112,6 @@ contains
         if (partit%mype == 0) write(*,'(a,3es9.2)') '  F0 tables mcoef/rowsum/acoef ', e0
     end subroutine check_tables
 
-    subroutine set_depths(m, p)
-        ! full-cell bottom depth and a zero SSH change (init_stiff_mat_ale inputs)
-        type(t_mesh),   intent(inout) :: m
-        type(t_partit), intent(in)    :: p
-        integer :: nNodO, nNodL, nEdgeO, nElemO, e
-        call owned_bounds(m, nNodO, nNodL, nEdgeO, nElemO, p)
-        allocate(m%zbar_e_bot(nElemO), m%dhe(nElemO))
-        do e = 1, nElemO
-            m%zbar_e_bot(e) = m%zbar(m%nlevels(e))
-        end do
-        m%dhe = 0.0_MP
-    end subroutine
-
     subroutine setup_ice(ice, m, p)
         type(t_ice),    intent(inout) :: ice
         type(t_mesh),   intent(inout) :: m
@@ -202,7 +149,7 @@ contains
         end do
         ntri  = count(m%elem2D_nnodes(1:nElemO) == 3 .and. m%elem2D_nodes(1, 1:nElemO) <= nNodO)
         nquad = count(m%elem2D_nnodes(1:nElemO) == 4 .and. m%elem2D_nodes(1, 1:nElemO) <= nNodO)
-        call isum_all(nquad, p); call isum_all(ntri, p)
+        call sum_all(nquad, p); call sum_all(ntri, p)
         alltri = (nquad == 0)
 
         !--- F1: matrix entries vs an independent assembly ---
@@ -569,37 +516,5 @@ contains
         call par_ex(p%MPI_COMM_FESOM, p%mype)
         error stop 1
     end subroutine missing_column_case
-
-    subroutine max_all(x, p)
-        real(kind=WP),  intent(inout) :: x
-        type(t_partit), intent(in)    :: p
-        real(kind=WP) :: y
-        integer :: ie
-        if (p%npes > 1) then
-            call MPI_Allreduce(x, y, 1, MPI_DOUBLE_PRECISION, MPI_MAX, p%MPI_COMM_FESOM, ie)
-            x = y
-        end if
-    end subroutine max_all
-
-    subroutine sum_all(x, p)
-        real(kind=WP),  intent(inout) :: x(:)
-        type(t_partit), intent(in)    :: p
-        real(kind=WP) :: y(size(x))
-        integer :: ie
-        if (p%npes > 1) then
-            call MPI_Allreduce(x, y, size(x), MPI_DOUBLE_PRECISION, MPI_SUM, p%MPI_COMM_FESOM, ie)
-            x = y
-        end if
-    end subroutine sum_all
-
-    subroutine isum_all(k, p)
-        integer,        intent(inout) :: k
-        type(t_partit), intent(in)    :: p
-        integer :: k2, ie
-        if (p%npes > 1) then
-            call MPI_Allreduce(k, k2, 1, MPI_INTEGER, MPI_SUM, p%MPI_COMM_FESOM, ie)
-            k = k2
-        end if
-    end subroutine isum_all
 
 end program test_ice_mass

@@ -32,15 +32,14 @@ program test_pgf_mixed
     ! On a global mesh (pi_w, rotated) a field linear in longitude jumps across the cyclic
     ! seam, so elements whose vertices span more than pi in longitude are skipped.
     use mpi
+    use test_util,         only: setup_test_mesh, check, finish, max_all
     use mod_precision,     only: WP, MP
     use mod_constants,     only: r_earth, g, density_0
     use mod_mesh,          only: t_mesh
     use mod_dyn,           only: t_dyn
     use mod_partit,        only: t_partit
-    use mod_partitioning,  only: par_init, par_ex, set_partition
+    use mod_partitioning,  only: par_init
     use mod_param_phys,    only: theta
-    use mod_mesh_read,     only: read_mesh
-    use mod_mesh_areas,    only: compute_geometry
     use mod_mesh_analytic, only: generate_mixed_patch
     use mod_part_bounds,   only: owned_bounds
     use oce_pgf,           only: pressure_force_4_linfs_fullcell, pressure_force_4_zxxxx_shchepetkin
@@ -50,28 +49,12 @@ program test_pgf_mixed
     use oce_initial_state, only: t_ic3d_config, extrap_nod3D
     implicit none
 
-    character(len=512) :: mesh_dir, cbuf
     type(t_partit) :: partit, apartit
     type(t_mesh)   :: mesh, amesh
-    integer :: ierr, nfail, nfail_g, nsw
     logical, allocatable :: use_el(:)     ! owned element off the cyclic seam
 
     call par_init(partit)
-    nfail = 0
-    call get_environment_variable('FESOM3_MESH_DIR', mesh_dir)
-    if (len_trim(mesh_dir) == 0) mesh_dir = '/work/ab0995/a270029/meshes/nemo025mix_cut'
-    if (partit%npes > 1) call set_partition(partit, trim(mesh_dir))
-    ! FESOM3_TEST_ROTATE=1: the standard rotation 50/15/-90 (pi, CORE2)
-    cbuf = ''
-    call get_environment_variable('FESOM3_TEST_ROTATE', cbuf)
-    if (trim(cbuf) == '1') then
-        call read_mesh(mesh, partit, trim(mesh_dir), 50.0_WP, 15.0_WP, -90.0_WP, 360.0_WP, &
-                       force_rotation=.true., n_cw_swaps=nsw)
-    else
-        call read_mesh(mesh, partit, trim(mesh_dir), 0.0_WP, 0.0_WP, 0.0_WP, 360.0_WP, &
-                       force_rotation=.false., n_cw_swaps=nsw)
-    end if
-    call compute_geometry(mesh, partit, cartesian=.true.)
+    call setup_test_mesh(mesh, partit, '/work/ab0995/a270029/meshes/nemo025mix_cut', cartesian=.true., partition_np1=.false.)
     call check_kernels(mesh, partit, 'mesh')
 
     if (partit%npes == 1) then
@@ -81,28 +64,9 @@ program test_pgf_mixed
         call check_kernels(amesh, apartit, 'patch')
     end if
 
-    call MPI_Allreduce(nfail, nfail_g, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
-    if (partit%mype == 0) then
-        if (nfail_g == 0) then
-            write(*,'(a,i0,a)') 'test_pgf_mixed (npes=', partit%npes, '): ALL PASS'
-        else
-            write(*,'(a,i0,a,i0,a)') 'test_pgf_mixed (npes=', partit%npes, '): ', nfail_g, ' FAILURE(S)'
-        end if
-    end if
-    call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-    if (nfail_g /= 0) error stop 1
+    call finish(partit, 'test_pgf_mixed')
 
 contains
-
-    subroutine check(cond, name, mype)
-        logical,          intent(in) :: cond
-        character(len=*), intent(in) :: name
-        integer,          intent(in) :: mype
-        if (.not. cond) then
-            nfail = nfail + 1
-            write(*,'(a,i0,a)') '  FAIL [rank ', mype, ']: '//name
-        end if
-    end subroutine
 
     subroutine check_kernels(m, p, tag)
         type(t_mesh),     intent(inout) :: m
@@ -385,16 +349,5 @@ contains
         end do
         call max_all(owned_max, p)
     end function owned_max
-
-    subroutine max_all(v, p)
-        real(kind=WP),  intent(inout) :: v
-        type(t_partit), intent(in)    :: p
-        real(kind=WP) :: w
-        integer :: ie
-        if (p%npes > 1) then
-            call MPI_Allreduce(v, w, 1, MPI_DOUBLE_PRECISION, MPI_MAX, p%MPI_COMM_FESOM, ie)
-            v = w
-        end if
-    end subroutine max_all
 
 end program test_pgf_mixed

@@ -172,6 +172,9 @@ function(add_fesom_test test_name nranks)
         add_executable(${test_name} ${CMAKE_SOURCE_DIR}/test/${test_name}.F90)
         apply_fesom_compile_flags(${test_name})
         target_link_libraries(${test_name} PUBLIC fesom3)
+        if(TARGET fesom3_test_util)
+            target_link_libraries(${test_name} PUBLIC fesom3_test_util)
+        endif()
         set_target_properties(${test_name} PROPERTIES
             LINKER_LANGUAGE Fortran
             RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)

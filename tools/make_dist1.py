@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """Hand-craft a SINGLE-RANK (dist_1) FESOM2 partition for a mesh.
 
-METIS cannot emit a 1-PE partition, but the 1-rank oracle is required for every
-byte-gate (it makes per-node/element accumulation order == FESOM3's global order;
-see HANDOFF "Geometry byte-gate" + LESSONS L8). For np=1 the partition is trivial:
-every node/elem/edge is owned, there is no halo, and the communication structure is
-empty. This script mirrors FESOM2's `save_dist_mesh` np=1 output, validated against
-the proven pi dist_1 template.
+METIS cannot emit a 1-PE partition. The FESOM3 model does not need one (at 1 rank it
+builds its own identity partition, synthesize_1rank); dist_1 is for tools/mesh/check_dist.py
+and the FESOM2 tools and 1-rank oracle runs (per-node/element accumulation order ==
+FESOM3's global order; HANDOFF "Geometry byte-gate" + LESSONS L8). For np=1 the partition
+is trivial: every node/elem/edge is owned, there is no halo, and the communication
+structure is empty. The FESOM2 part mirrors FESOM2's `save_dist_mesh` np=1 output,
+validated against the proven pi dist_1 template; format.out and the empty appended
+sections (below) are always written.
 
 Format (from the FESOM2 reader oce_mesh.F90 read_mesh):
   rpart.out          : line1 = npes(1); line2 = count = nod2D; then the contiguous
@@ -17,8 +19,9 @@ Format (from the FESOM2 reader oce_mesh.F90 read_mesh):
                        Each SCALAR on its own line; each LIST list-directed (any
                        wrapping is safe — each read() starts a fresh record, and a
                        list read spans records until it has all its values).
-  com_info00000.out  : empty np=1 comm structs (rPEnum=sPEnum=0, blank zero-size
-                       arrays, rptr=sptr=1) — MESH-INDEPENDENT, copied from pi.
+  com_info00000.out  : rank (0), then empty np=1 comm structs (rPEnum=sPEnum=0, blank
+                       zero-size arrays, rptr=sptr=1) — MESH-INDEPENDENT (the pi
+                       template is checked to be rank + 3 of them).
 Hybrid meshes (fesom_ini's dist_N/format.out, version 1): the marker format.out is
 written and the appended sections are empty — my_list gets eXDim_nod2D(0) and its
 (blank) list, com_info gets two more empty structs (com_nod2D_full, com_edge2D).
@@ -83,6 +86,9 @@ def validate_against_pi(pi_dir):
     except StopIteration:
         pass
     print(f"  [validate] pi my_list OK: nod2D={myd_n} elem2D={myd_e} edge2D={myd_g}")
+    com = open(os.path.join(pi_dir, "com_info00000.out")).read()
+    assert com == "0\n" + 3 * EMPTY_COM, "pi com_info is not rank + 3 empty structs"
+    print("  [validate] pi com_info OK: rank + 3 empty comm structs")
     return myd_n, myd_e, myd_g
 
 
@@ -106,11 +112,10 @@ def main():
         f.write(build_rpart(nod2D))
     with open(os.path.join(out, "my_list00000.out"), "w") as f:
         f.write(build_my_list(nod2D, elem2D, edge2D))
-    # com_info is mesh-independent for np=1 -> copy the proven pi template verbatim.
-    with open(os.path.join(pi_dir, "com_info00000.out")) as f:
-        com = f.read()
+    # com_info is mesh-independent for np=1: rank 0, then the empty com_nod2D,
+    # com_elem2D, com_elem2D_full (FESOM2) and com_nod2D_full, com_edge2D (appended)
     with open(os.path.join(out, "com_info00000.out"), "w") as f:
-        f.write(com + 2 * EMPTY_COM)        # + com_nod2D_full, com_edge2D
+        f.write("0\n" + 5 * EMPTY_COM)
     with open(os.path.join(out, "format.out"), "w") as f:
         f.write(f"{FORMAT_VERSION}\n")
     print(f"  wrote {out}/{{rpart.out, my_list00000.out, com_info00000.out, format.out}}")

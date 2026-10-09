@@ -29,9 +29,9 @@
 #   dist_4 (Task 8: the exchange tests at 4 ranks) is identical to the existing CORE2 dist_4
 #   (gated); the original pi has no dist_4 (compared with FESOM2's build only).
 # 3. dist_1 of pi_w and core2_w is written by tools/make_dist1.py (empty appended sections).
-# 4. The model's existing dist_N reader (FESOM2's read sequence; it ignores the appended
-#    sections) reads the new pi_w dist_2/8: test_partit and test_halo of the build with
-#    FESOM3_MESH_DIR=pi_w.
+# 4. The model's dist_N reader (FESOM2's read sequence, plus the appended sections
+#    whenever dist_N/format.out exists: partit%dist_format) reads the new pi_w dist_2/8:
+#    test_partit and test_halo of the build with FESOM3_MESH_DIR=pi_w.
 #
 # FESOM2's mesh_part is built once (scratch) with
 #   cmake -S /home/a/a270029/fesom2.0/mesh_part -B <dir> -DCMAKE_BUILD_TYPE=Release \
@@ -50,19 +50,12 @@ PI_SRC=/home/a/a270088/port2/fesom2/tests/data/MESHES/pi
 CORE2_SRC=/pool/data/AWICM/FESOM2/MESHES_FESOM2.1/core2
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-MPIEXEC="${MPIEXEC:-/sw/spack-levante/openmpi-4.1.2-yfwe6t/bin/mpiexec --mca pml ob1 --mca btl self,vader}"
+MPIEXEC="${MPIEXEC:-/sw/spack-levante/openmpi-4.1.2-yfwe6t/bin/mpiexec --mca pml ob1 --mca btl self,vader --mca btl_vader_single_copy_mechanism none}"
 for x in "$INI" "$F2_INI" "$BUILD/bin/test_partit" "$BUILD/bin/test_halo"; do
     [ -x "$x" ] || { echo "run_ini_compare: missing executable $x" >&2; exit 2; }
 done
 ulimit -s unlimited
-source /usr/share/Modules/init/bash
-module load python3 >/dev/null 2>&1
-hash -r
-
-fail=0
-ok()  { echo "  ok: $*"; }
-bad() { echo "  FAILED: $*"; fail=1; }
-OUTS="edges.out edge_tri.out edgenum.out elvls.out elvls_raw.out nlvls.out"
+source "$HERE/lib_ini.sh"          # python3 module, ok/bad/fail, OUTS, ini_namelist
 
 # prepare <src> <dst>: dst holds the three input files of src and no fesom_ini output
 prepare() {
@@ -80,8 +73,7 @@ run_ini() {
     local exe="$1" mesh="$2" np="$3" log="$4" rd
     rd="$WORK_ROOT/run/$(basename "$mesh")_$(basename "$exe")_$np"
     mkdir -p "$rd"
-    printf '&paths\nMeshPath="%s/"\n/\n&geometry\n/\n&run_config\n/\n&machine\nn_levels=1\nn_part=%s\n/\n' \
-        "$mesh" "$np" > "$rd/namelist.config"
+    ini_namelist "$rd/namelist.config" "$mesh" "$np"
     if ! (cd "$rd" && "$exe" > "$log" 2>&1); then
         bad "$exe on $(basename "$mesh") np=$np (log $log)"
     fi

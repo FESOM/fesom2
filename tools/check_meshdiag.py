@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Check the hybrid-mesh layout of fesom.mesh.diag.zarr (hybrid-mesh plan
-docs/plans/2026-10-08-hybrid-meshes.md, Task 14). Standard library only (the ctest runs it with
+docs/plans/completed/2026-10-08-hybrid-meshes.md, Task 14). Standard library only (the ctest runs it with
 the system python3, which has no numpy); the store is uncompressed Zarr v2 (mod_io_meshdiag).
 
 usage: check_meshdiag.py <mesh_dir> <work_dir> <fesom_meshdiagdump> <np[,np...]> [launcher ...]

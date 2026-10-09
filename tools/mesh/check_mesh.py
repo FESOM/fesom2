@@ -7,13 +7,17 @@ Errors (exit status 1):
     triangle's 4th == 1st;
   - node not used by any element;
   - edge shared by more than two elements;
-  - dead end: element with fewer than two neighbours (FESOM's setup stops on them).
+  - dead end: element with fewer than two neighbours (FESOM's setup stops on them);
+  - depth.out only: node layer count above the max over its elements of the element
+    count (min over its vertices) -- the model's bottom invariant (node levels come from
+    depth.out unchanged, so fesom_ini would pass the count on and the model stop).
 Information: element types, edges (boundary edges), connected components, nodes whose
 boundary flag differs from "lies on a boundary edge", total spherical area.
 
-The last line is a machine-readable summary
+The second-to-last line is a machine-readable summary
   SUMMARY nodes=.. elems=.. quads=.. tris=.. edges=.. bedges=.. ccw=.. nonconvex=..
-          degenerate=.. unused=.. multiedge=.. deadends=.. area=<m^2, %.15e>
+          degenerate=.. unused=.. multiedge=.. deadends=.. layers=.. area=<m^2, %.15e>
+and the last line PASS or FAIL.
 
 Usage: check_mesh.py <mesh_dir>
 """
@@ -94,16 +98,20 @@ def check(m):
     onb = mesh_io.boundary_nodes(m, ed, count)
     r['flag_mismatch'] = int(((m.flag != 0) != onb).sum())
     r['area'] = float(spherical_area(m).sum()) * mesh_io.R_EARTH ** 2
+    lc = mesh_io.layer_counts(m)
+    above = np.nonzero(lc[0] > lc[1])[0] if lc is not None else np.zeros(0, dtype=np.int64)
+    r['layers'] = len(above)
 
     r['_lists'] = {'degenerate': np.nonzero(bad)[0],
                    'ccw': np.nonzero(~bad & ccw)[0],
                    'nonconvex': np.nonzero(~bad & ~cw & ~ccw)[0],
                    'unused': np.nonzero(~used)[0],
-                   'deadends': np.nonzero(nb < 2)[0]}
+                   'deadends': np.nonzero(nb < 2)[0],
+                   'layers': above}
     return r
 
 
-ERRORS = ('ccw', 'nonconvex', 'degenerate', 'unused', 'multiedge', 'deadends')
+ERRORS = ('ccw', 'nonconvex', 'degenerate', 'unused', 'multiedge', 'deadends', 'layers')
 
 
 def main(d):
@@ -123,7 +131,8 @@ def main(d):
                     ('degenerate', 'degenerate elements'),
                     ('unused', 'unused nodes'),
                     ('multiedge', 'edges in more than two elements'),
-                    ('deadends', 'elements with fewer than two neighbours')):
+                    ('deadends', 'elements with fewer than two neighbours'),
+                    ('layers', 'nodes above the bottom invariant')):
         n = r[k]
         ids = r['_lists'].get(k)
         more = ''
@@ -139,6 +148,7 @@ def main(d):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        sys.exit(__doc__)
+    if len(sys.argv) != 2 or sys.argv[1] in ('-h', '--help'):
+        print(__doc__)
+        sys.exit(0 if len(sys.argv) == 2 else 2)
     sys.exit(main(sys.argv[1]))

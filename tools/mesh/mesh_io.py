@@ -9,7 +9,9 @@ and optionally a depth file, which is subset line by line (kept lines byte-ident
   aux3d.out  : nl, nl zbar, n2d node depths                      (FESOM2)
 Coordinates are kept as the original text tokens, so kept nodes are written unchanged.
 """
+import glob
 import os
+import shutil
 
 import numpy as np
 import scipy.sparse
@@ -17,6 +19,9 @@ import scipy.sparse.csgraph
 
 R_EARTH = 6367500.0                 # FESOM r_earth (m)
 DEPTH_FILES = ('depth.out', 'aux3d.out')
+# fesom_ini outputs, derived from elem2d.out: stale once the elements change
+INI_OUTPUTS = ('edges.out', 'edge_tri.out', 'edgenum.out', 'nlvls.out', 'elvls.out',
+               'elvls_raw.out')
 
 
 class Mesh:
@@ -90,8 +95,20 @@ def read_mesh(d):
 
 
 def write_mesh(m, d):
-    """Writes nod2d.out, elem2d.out (4 columns) and the depth files of m into d."""
+    """Writes nod2d.out, elem2d.out (4 columns) and the depth files of m into d. fesom_ini
+    outputs already in d (edge and level files, dist_*/) belong to the old elements and are
+    removed: fesom_ini keeps existing edge files, so it would pair them with new dist_N."""
     os.makedirs(d, exist_ok=True)
+    stale = [p for p in [os.path.join(d, f) for f in INI_OUTPUTS] if os.path.exists(p)] \
+        + sorted(glob.glob(os.path.join(d, 'dist_*')))
+    for p in stale:
+        if os.path.isdir(p):
+            shutil.rmtree(p)
+        else:
+            os.remove(p)
+    if stale:
+        print('  write_mesh: removed the stale fesom_ini output in %s: %s (rerun fesom_ini)'
+              % (d, ' '.join(os.path.basename(p) for p in stale)))
     with open(os.path.join(d, 'nod2d.out'), 'w') as f:
         f.write('%9i \n' % m.n2d)
         f.write(''.join('%9i %8s %8s %8i\n' % (i + 1, x, y, g) for i, (x, y, g) in
@@ -120,39 +137,57 @@ def subset(m, keep_elem):
     return Mesh(m.ctok[used], m.flag[used], new[elem], m.ncol, depth)
 
 
+def edge_key(a, b, n2d):
+    """Orientation-free key of the node pairs (a, b): min * n2d + max."""
+    return np.minimum(a, b) * np.int64(n2d) + np.maximum(a, b)
+
+
+def side_edges(elem, n2d):
+    """edges() of the elements elem (e2d, 4) over n2d nodes."""
+    a, b = elem, np.roll(elem, -1, axis=1)
+    key = edge_key(a, b, n2d)
+    real = a != b
+    uk, inv, count = np.unique(key[real], return_inverse=True, return_counts=True)
+    side_edge = np.full(a.shape, -1, dtype=np.int64)
+    side_edge[real] = inv
+    ed = np.stack([uk // n2d, uk % n2d], axis=1)
+    return ed, side_edge, count
+
+
 def edges(m):
     """Unique edges over the element sides 1-2, 2-3, 3-4, 4-1 (the degenerate side 4-1 of a
     triangle is dropped). Returns (ed (ned, 2) sorted node pairs, side_edge (e2d, 4) edge
     index of each side or -1, count (ned,) number of elements per edge)."""
-    a = m.elem
-    b = np.roll(m.elem, -1, axis=1)
-    lo, hi = np.minimum(a, b), np.maximum(a, b)
-    key = lo * np.int64(m.n2d) + hi
-    real = lo != hi
-    uk, inv, count = np.unique(key[real], return_inverse=True, return_counts=True)
-    side_edge = np.full(a.shape, -1, dtype=np.int64)
-    side_edge[real] = inv
-    ed = np.stack([uk // m.n2d, uk % m.n2d], axis=1)
-    return ed, side_edge, count
+    return side_edges(m.elem, m.n2d)
 
 
-def neighbour_count(m, side_edge=None, count=None):
-    """Number of elements sharing a side with each element (sides of edges in 2 elements)."""
+def shared_sides(m, side_edge=None, count=None):
+    """(e2d, 4) bool: the side is shared with another element (its edge is in 2)."""
     if side_edge is None:
         _, side_edge, count = edges(m)
     shared = np.zeros(side_edge.shape, dtype=bool)
     real = side_edge >= 0
     shared[real] = count[side_edge[real]] >= 2
-    return shared.sum(axis=1)
+    return shared
+
+
+def neighbour_count(m, side_edge=None, count=None):
+    """Number of elements sharing a side with each element (sides of edges in 2 elements)."""
+    return shared_sides(m, side_edge, count).sum(axis=1)
+
+
+def boundary_mask(n2d, ed, count):
+    """Nodes (of n2d) on an edge of ed that belongs to one element only (count == 1)."""
+    on = np.zeros(n2d, dtype=bool)
+    on[ed[count == 1].ravel()] = True
+    return on
 
 
 def boundary_nodes(m, ed=None, count=None):
     """Nodes on an edge that belongs to one element only."""
     if ed is None:
         ed, _, count = edges(m)
-    on = np.zeros(m.n2d, dtype=bool)
-    on[ed[count == 1].ravel()] = True
-    return on
+    return boundary_mask(m.n2d, ed, count)
 
 
 def components(m, side_edge=None, count=None):
@@ -166,6 +201,20 @@ def components(m, side_edge=None, count=None):
                                 shape=(m.e2d, len(count))).tocsr()
     adj = g @ g.T
     return scipy.sparse.csgraph.connected_components(adj, directed=False)
+
+
+def layer_counts(m):
+    """depth.out only (else None): (c, mx), c = the node layer counts, mx = max over a
+    node's elements of the element count (min over its vertices). The model's bottom
+    invariant is c == mx; c >= mx always, so a node with c > mx violates it."""
+    if 'depth.out' not in m.depth:
+        return None
+    c = np.array([int(s) for s in m.depth['depth.out'][1][1]], dtype=np.int64)
+    emin = c[m.elem].min(axis=1)
+    mx = np.zeros(m.n2d, dtype=np.int64)
+    for k in range(m.elem.shape[1]):
+        np.maximum.at(mx, m.elem[:, k], emin)
+    return c, mx
 
 
 def xyz(lon, lat):

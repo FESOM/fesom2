@@ -40,9 +40,7 @@ def split(m, band=None, every=0):
     d24 = np.linalg.norm(p[:, 1] - p[:, 3], axis=1)
     # a triangle needs a neighbour across one of its two quad sides (sides 1-2, 2-3,
     # 3-4, 4-1); splitting a neighbour does not change which sides are shared
-    _, side_edge, count = mesh_io.edges(m)
-    sh = np.zeros(side_edge.shape, dtype=bool)
-    sh[side_edge >= 0] = count[side_edge[side_edge >= 0]] >= 2
+    sh = mesh_io.shared_sides(m)
     ok13 = (sh[:, 0] | sh[:, 1]) & (sh[:, 2] | sh[:, 3])
     ok24 = (sh[:, 0] | sh[:, 3]) & (sh[:, 1] | sh[:, 2])
     pref13 = d13 <= d24
@@ -66,11 +64,14 @@ def split(m, band=None, every=0):
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("mesh_dir")
     ap.add_argument("out_dir")
-    ap.add_argument("--band", nargs=2, type=float, metavar=("LATMIN", "LATMAX"))
-    ap.add_argument("--every", type=int, default=0, metavar="K")
+    ap.add_argument("--band", nargs=2, type=float, metavar=("LATMIN", "LATMAX"),
+                    help="split every quad in this latitude band (default: none)")
+    ap.add_argument("--every", type=int, default=0, metavar="K",
+                    help="split every K-th quad outside the band (default 0: none)")
     a = ap.parse_args()
     m = mesh_io.read_mesh(a.mesh_dir)
     q0 = int((m.nnodes() == 4).sum())

@@ -40,14 +40,11 @@ def fit_layers(m):
     """depth.out: lowers every node layer count above max over its elements of (min over
     the element vertices) to that value, and the node depth to levels(count+1) (the
     relation nemo_meshq writes). Returns the number of nodes changed."""
-    if 'depth.out' not in m.depth:
+    lc = mesh_io.layer_counts(m)
+    if lc is None:
         return 0
+    c, mx = lc
     head, (dep, cnt) = m.depth['depth.out']
-    c = np.array([int(s) for s in cnt], dtype=np.int64)
-    emin = c[m.elem].min(axis=1)
-    mx = np.zeros(m.n2d, dtype=np.int64)
-    for k in range(m.elem.shape[1]):
-        np.maximum.at(mx, m.elem[:, k], emin)
     low = np.nonzero(mx < c)[0]
     dep, cnt = dep.copy(), cnt.copy()
     for i in low:
@@ -58,7 +55,8 @@ def fit_layers(m):
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("mesh_dir")
     ap.add_argument("out_dir")
     ap.add_argument("--lon", nargs=2, type=float, required=True, metavar=("LONMIN", "LONMAX"))

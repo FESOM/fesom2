@@ -24,13 +24,12 @@ program test_ssh_stiff
     !      the interior nodes for quadratic f (the scale of the quad contributions; S2/S4/
     !      S6/S8 are blind to a per-element factor)
     use mpi
+    use test_util,         only: setup_test_mesh, check, finish, max_all, sum_all, set_depths
     use mod_precision,     only: WP, MP
     use mod_mesh,          only: t_mesh
     use mod_partit,        only: t_partit
     use mod_dyn,           only: t_dyn
-    use mod_partitioning,  only: par_init, par_ex, set_partition
-    use mod_mesh_read,     only: read_mesh
-    use mod_mesh_areas,    only: compute_geometry
+    use mod_partitioning,  only: par_init
     use mod_mesh_analytic, only: generate_mixed_patch, generate_quad_patch
     use mod_part_bounds,   only: owned_bounds
     use mod_constants,     only: g, r_earth
@@ -40,27 +39,12 @@ program test_ssh_stiff
     implicit none
 
     real(kind=WP), parameter :: dt = 1200.0_WP
-    character(len=512) :: mesh_dir, cbuf
     type(t_partit) :: partit, ppartit, qpartit
     type(t_mesh)   :: mesh, pmesh, qmesh
     type(t_dyn)    :: dyn
-    integer :: ierr, nfail, nfail_g, nsw
 
     call par_init(partit)
-    nfail = 0
-    call get_environment_variable('FESOM3_MESH_DIR', mesh_dir)
-    if (len_trim(mesh_dir) == 0) mesh_dir = '/work/ab0995/a270029/meshes/nemo025q_cut'
-    call set_partition(partit, trim(mesh_dir))
-    cbuf = ''
-    call get_environment_variable('FESOM3_TEST_ROTATE', cbuf)
-    if (trim(cbuf) == '1') then
-        call read_mesh(mesh, partit, trim(mesh_dir), 50.0_WP, 15.0_WP, -90.0_WP, 360.0_WP, &
-                       force_rotation=.true., n_cw_swaps=nsw)
-    else
-        call read_mesh(mesh, partit, trim(mesh_dir), 0.0_WP, 0.0_WP, 0.0_WP, 360.0_WP, &
-                       force_rotation=.false., n_cw_swaps=nsw)
-    end if
-    call compute_geometry(mesh, partit, cartesian=.false.)
+    call setup_test_mesh(mesh, partit, '/work/ab0995/a270029/meshes/nemo025q_cut', cartesian=.false., partition_np1=.true.)
     call set_depths(mesh, partit)
     call init_stiff_mat_ale(mesh, dt, partit)
     call check_matrix(mesh, partit, 'mesh')
@@ -87,47 +71,9 @@ program test_ssh_stiff
         call check_quadratic_patch(qmesh, 11, 9, 'parallelogram patch')
     end if
 
-    call MPI_Allreduce(nfail, nfail_g, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
-    if (partit%mype == 0) then
-        if (nfail_g == 0) then
-            write(*,'(a,i0,a)') 'test_ssh_stiff (npes=', partit%npes, '): ALL PASS'
-        else
-            write(*,'(a,i0,a,i0,a)') 'test_ssh_stiff (npes=', partit%npes, '): ', nfail_g, ' FAILURE(S)'
-        end if
-    end if
-    call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-    if (nfail_g /= 0) error stop 1
+    call finish(partit, 'test_ssh_stiff')
 
 contains
-
-    subroutine check(cond, name, mype)
-        logical,          intent(in) :: cond
-        character(len=*), intent(in) :: name
-        integer,          intent(in) :: mype
-        if (.not. cond) then
-            nfail = nfail + 1
-            write(*,'(a,i0,a)') '  FAIL [rank ', mype, ']: '//name
-        end if
-    end subroutine
-
-    subroutine max_all(x, p)
-        real(kind=WP),  intent(inout) :: x
-        type(t_partit), intent(in)    :: p
-        real(kind=WP) :: y
-        integer :: ierr2
-        if (p%npes == 1) return
-        call MPI_Allreduce(x, y, 1, MPI_DOUBLE_PRECISION, MPI_MAX, p%MPI_COMM_FESOM, ierr2)
-        x = y
-    end subroutine
-
-    subroutine sum_all(k, p)
-        integer,        intent(inout) :: k
-        type(t_partit), intent(in)    :: p
-        integer :: k2, ierr2
-        if (p%npes == 1) return
-        call MPI_Allreduce(k, k2, 1, MPI_INTEGER, MPI_SUM, p%MPI_COMM_FESOM, ierr2)
-        k = k2
-    end subroutine
 
     integer function gid(p, n)
         type(t_partit), intent(in) :: p
@@ -138,19 +84,6 @@ contains
             gid = p%myList_nod2D(n)
         end if
     end function
-
-    subroutine set_depths(m, p)
-        ! full-cell bottom depth and a zero SSH change, as the drivers set them
-        type(t_mesh),   intent(inout) :: m
-        type(t_partit), intent(in)    :: p
-        integer :: nNodO, nNodL, nEdgeO, nElemO, e
-        call owned_bounds(m, nNodO, nNodL, nEdgeO, nElemO, p)
-        allocate(m%zbar_e_bot(nElemO), m%dhe(nElemO))
-        do e = 1, nElemO
-            m%zbar_e_bot(e) = m%zbar(m%nlevels(e))
-        end do
-        m%dhe = 0.0_MP
-    end subroutine
 
     real(kind=WP) function mass(m, row)
         type(t_mesh), intent(in) :: m

@@ -22,14 +22,13 @@ program test_updown_mixed
     !      order on general quads (reported, bounded)
     ! "MUSCL equals the reference rule" is test_muscl_onthefly (part R) on the same meshes.
     use mpi
+    use test_util,         only: setup_test_mesh, check, finish, max_all, sum_all
     use mod_precision,     only: WP, MP
     use mod_constants,     only: r_earth
     use mod_mesh,          only: t_mesh, MAX_NV
     use mod_partit,        only: t_partit
     use mod_tracer,        only: t_tracer_work
-    use mod_partitioning,  only: par_init, par_ex, set_partition
-    use mod_mesh_read,     only: read_mesh
-    use mod_mesh_areas,    only: compute_geometry
+    use mod_partitioning,  only: par_init
     use mod_mesh_analytic, only: generate_mixed_patch, generate_quad_patch
     use mod_mesh_rotate,   only: get_cyclic_length
     use mod_part_bounds,   only: owned_bounds, is_multirank
@@ -39,27 +38,12 @@ program test_updown_mixed
     use oce_adv_tra_hor,   only: adv_tra_hor_upw1, adv_tra_hor_muscl
     implicit none
 
-    character(len=512) :: mesh_dir, cbuf
     type(t_partit) :: partit, apartit, qpartit
     type(t_mesh)   :: mesh, amesh, qmesh
-    integer :: ierr, nfail, nfail_g, nsw
     real(kind=WP), parameter :: pi2 = 2.0_WP*3.141592653589793_WP
 
     call par_init(partit)
-    nfail = 0
-    call get_environment_variable('FESOM3_MESH_DIR', mesh_dir)
-    if (len_trim(mesh_dir) == 0) mesh_dir = '/work/ab0995/a270029/meshes/nemo025mix_cut'
-    if (partit%npes > 1) call set_partition(partit, trim(mesh_dir))
-    cbuf = ''
-    call get_environment_variable('FESOM3_TEST_ROTATE', cbuf)
-    if (trim(cbuf) == '1') then
-        call read_mesh(mesh, partit, trim(mesh_dir), 50.0_WP, 15.0_WP, -90.0_WP, 360.0_WP, &
-                       force_rotation=.true., n_cw_swaps=nsw)
-    else
-        call read_mesh(mesh, partit, trim(mesh_dir), 0.0_WP, 0.0_WP, 0.0_WP, 360.0_WP, &
-                       force_rotation=.false., n_cw_swaps=nsw)
-    end if
-    call compute_geometry(mesh, partit, cartesian=.true.)
+    call setup_test_mesh(mesh, partit, '/work/ab0995/a270029/meshes/nemo025mix_cut', cartesian=.true., partition_np1=.false.)
     call check_mesh(mesh, partit, 'mesh')
 
     if (partit%npes == 1) then
@@ -71,44 +55,9 @@ program test_updown_mixed
         call check_mesh(qmesh, qpartit, 'parallelogram patch')
     end if
 
-    call MPI_Allreduce(nfail, nfail_g, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
-    if (partit%mype == 0) then
-        if (nfail_g == 0) then
-            write(*,'(a,i0,a)') 'test_updown_mixed (npes=', partit%npes, '): ALL PASS'
-        else
-            write(*,'(a,i0,a,i0,a)') 'test_updown_mixed (npes=', partit%npes, '): ', nfail_g, ' FAILURE(S)'
-        end if
-    end if
-    call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-    if (nfail_g /= 0) error stop 1
+    call finish(partit, 'test_updown_mixed')
 
 contains
-
-    subroutine check(cond, name, mype)
-        logical,          intent(in) :: cond
-        character(len=*), intent(in) :: name
-        integer,          intent(in) :: mype
-        if (.not. cond) then
-            nfail = nfail + 1
-            write(*,'(a,i0,a)') '  FAIL [rank ', mype, ']: '//name
-        end if
-    end subroutine check
-
-    integer function isum(i, p)
-        integer,        intent(in) :: i
-        type(t_partit), intent(in) :: p
-        integer :: ie
-        isum = i
-        if (p%npes > 1) call MPI_Allreduce(i, isum, 1, MPI_INTEGER, MPI_SUM, p%MPI_COMM_FESOM, ie)
-    end function isum
-
-    real(kind=WP) function rmax(r, p)
-        real(kind=WP),  intent(in) :: r
-        type(t_partit), intent(in) :: p
-        integer :: ie
-        rmax = r
-        if (p%npes > 1) call MPI_Allreduce(r, rmax, 1, MPI_DOUBLE_PRECISION, MPI_MAX, p%MPI_COMM_FESOM, ie)
-    end function rmax
 
     pure function wrap(v, cl) result(w)
         real(kind=WP), intent(in) :: v(2), cl
@@ -148,8 +97,8 @@ contains
         if (lmr) nElemF = p%myDim_elem2D + p%eDim_elem2D + p%eXDim_elem2D
         nl = m%nl
         cl = get_cyclic_length()
-        ntri  = isum(count(m%elem2D_nnodes(1:nElemO) == 3), p)
-        nquad = isum(count(m%elem2D_nnodes(1:nElemO) == 4), p)
+        ntri  = count(m%elem2D_nnodes(1:nElemO) == 3); call sum_all(ntri, p)
+        nquad = count(m%elem2D_nnodes(1:nElemO) == 4); call sum_all(nquad, p)
         if (p%mype == 0) write(*,'(3a,i0,a,i0)') '  [', tag, '] owned triangles=', ntri, ' quads=', nquad
 
         if (allocated(twork%edge_up_dn_tri)) deallocate(twork%edge_up_dn_tri)
@@ -233,8 +182,8 @@ contains
                 if (.not. inside) n_bad = n_bad + 1
             end do
         end do
-        n_int = isum(n_int, p); n_miss = isum(n_miss, p); n_bad = isum(n_bad, p)
-        n_found = isum(n_found, p)
+        call sum_all(n_int, p); call sum_all(n_miss, p); call sum_all(n_bad, p)
+        call sum_all(n_found, p)
         if (p%mype == 0) write(*,'(3a,i0,a,i0,a,i0,a,i0)') '  [', tag, '] edge sides at interior nodes=', &
             n_int, ' missing=', n_miss, '  found=', n_found, ' outside the vertex angle=', n_bad
         call check(n_int > 0,   tag//' U1: interior edge nodes exist', p%mype)
@@ -277,7 +226,7 @@ contains
                 err_g = max(err_g, abs(tr_xy(1, nz, e) - A), abs(tr_xy(2, nz, e) - B))
             end do
         end do
-        err_g = rmax(err_g, p)/abs(B)
+        call max_all(err_g, p); err_g = err_g/abs(B)
 
         err_f = 0.0_WP; err_tt = 0.0_WP; err_tp = 0.0_WP; err_tg = 0.0_WP
         n_lin = 0; n_tri = 0; n_par = 0; n_gen = 0
@@ -330,8 +279,8 @@ contains
                 end if
             end do
         end do
-        err_f = rmax(err_f, p); err_tt = rmax(err_tt, p); err_tp = rmax(err_tp, p); err_tg = rmax(err_tg, p)
-        n_lin = isum(n_lin, p); n_tri = isum(n_tri, p); n_par = isum(n_par, p); n_gen = isum(n_gen, p)
+        call max_all(err_f, p); call max_all(err_tt, p); call max_all(err_tp, p); call max_all(err_tg, p)
+        call sum_all(n_lin, p); call sum_all(n_tri, p); call sum_all(n_par, p); call sum_all(n_gen, p)
         if (p%mype == 0) then
             write(*,'(3a,es10.3)') '  [', tag, '] L1 linear tracer: gradient rel err ', err_g
             write(*,'(3a,i0,a,es10.3)') '  [', tag, '] L1 MUSCL face value == midpoint value: edge-levels ', &

@@ -21,12 +21,11 @@ program test_coupling_mixed
     ! A mutation check prints the error of the former /3 element mean on the quads (C1 must
     ! fail with it on a mesh that has quads).
     use mpi
+    use test_util,         only: setup_test_mesh, check, finish, max_all, sum_all, hval
     use mod_precision,        only: WP
     use mod_mesh,             only: t_mesh
     use mod_partit,           only: t_partit
-    use mod_partitioning,     only: par_init, par_ex, set_partition
-    use mod_mesh_read,        only: read_mesh
-    use mod_mesh_areas,       only: compute_geometry
+    use mod_partitioning,     only: par_init
     use mod_mesh_analytic,    only: generate_mixed_patch
     use mod_part_bounds,      only: owned_bounds
     use mod_ice,              only: t_ice
@@ -36,26 +35,11 @@ program test_coupling_mixed
     use mod_forcing_bulk,     only: forcing_stress_surf
     implicit none
 
-    character(len=512) :: mesh_dir, cbuf
     type(t_partit) :: partit, apartit
     type(t_mesh)   :: mesh, amesh
-    integer :: ierr, nfail, nfail_g, nsw
 
     call par_init(partit)
-    nfail = 0
-    call get_environment_variable('FESOM3_MESH_DIR', mesh_dir)
-    if (len_trim(mesh_dir) == 0) mesh_dir = '/work/ab0995/a270029/meshes/nemo025mix_cut'
-    if (partit%npes > 1) call set_partition(partit, trim(mesh_dir))
-    cbuf = ''
-    call get_environment_variable('FESOM3_TEST_ROTATE', cbuf)
-    if (trim(cbuf) == '1') then
-        call read_mesh(mesh, partit, trim(mesh_dir), 50.0_WP, 15.0_WP, -90.0_WP, 360.0_WP, &
-                       force_rotation=.true., n_cw_swaps=nsw)
-    else
-        call read_mesh(mesh, partit, trim(mesh_dir), 0.0_WP, 0.0_WP, 0.0_WP, 360.0_WP, &
-                       force_rotation=.false., n_cw_swaps=nsw)
-    end if
-    call compute_geometry(mesh, partit, cartesian=.false.)
+    call setup_test_mesh(mesh, partit, '/work/ab0995/a270029/meshes/nemo025mix_cut', cartesian=.false., partition_np1=.false.)
     call check_coupling(mesh, partit, 'mesh')
 
     if (partit%npes == 1) then
@@ -64,34 +48,9 @@ program test_coupling_mixed
         call check_coupling(amesh, apartit, 'patch')
     end if
 
-    call MPI_Allreduce(nfail, nfail_g, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
-    if (partit%mype == 0) then
-        if (nfail_g == 0) then
-            write(*,'(a,i0,a)') 'test_coupling_mixed (npes=', partit%npes, '): ALL PASS'
-        else
-            write(*,'(a,i0,a,i0,a)') 'test_coupling_mixed (npes=', partit%npes, '): ', nfail_g, ' FAILURE(S)'
-        end if
-    end if
-    call par_ex(partit%MPI_COMM_FESOM, partit%mype)
-    if (nfail_g /= 0) error stop 1
+    call finish(partit, 'test_coupling_mixed')
 
 contains
-
-    subroutine check(cond, name, mype)
-        logical,          intent(in) :: cond
-        character(len=*), intent(in) :: name
-        integer,          intent(in) :: mype
-        if (.not. cond) then
-            nfail = nfail + 1
-            write(*,'(a,i0,a)') '  FAIL [rank ', mype, ']: '//name
-        end if
-    end subroutine
-
-    ! deterministic node value from the global node id (same on every rank's copy)
-    real(kind=WP) function hval(gid, k)
-        integer, intent(in) :: gid, k
-        hval = sin(1.7_WP*real(gid, WP) + 0.9_WP*real(k, WP))
-    end function hval
 
     subroutine check_coupling(m, p, tag)
         type(t_mesh),     intent(inout) :: m
@@ -241,27 +200,5 @@ contains
         atm%heat_flux_in = 0.0_WP; atm%virtual_salt = 0.0_WP; atm%relax_salt = 0.0_WP
         tracers%data(2)%values = 0.0_WP
     end subroutine alloc_fields
-
-    subroutine max_all(v, p)
-        real(kind=WP),  intent(inout) :: v
-        type(t_partit), intent(in)    :: p
-        real(kind=WP) :: w
-        integer :: ie
-        if (p%npes > 1) then
-            call MPI_Allreduce(v, w, 1, MPI_DOUBLE_PRECISION, MPI_MAX, p%MPI_COMM_FESOM, ie)
-            v = w
-        end if
-    end subroutine max_all
-
-    subroutine sum_all(v, p)
-        real(kind=WP),  intent(inout) :: v(:)
-        type(t_partit), intent(in)    :: p
-        real(kind=WP) :: w(size(v))
-        integer :: ie
-        if (p%npes > 1) then
-            call MPI_Allreduce(v, w, size(v), MPI_DOUBLE_PRECISION, MPI_SUM, p%MPI_COMM_FESOM, ie)
-            v = w
-        end if
-    end subroutine sum_all
 
 end program test_coupling_mixed

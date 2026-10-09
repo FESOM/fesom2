@@ -308,7 +308,7 @@ USE o_PARAM
 USE g_CONFIG
 IMPLICIT NONE
 
-real(kind=WP)                       ::  a(2), b(2), c(2), d(2), r, r1
+real(kind=WP)                       ::  a(2), b(2), c(2), d(2), r, r1, r2, r3
 integer                             ::  n, nx, elnodes(4), nflip
 type(t_mesh), intent(inout), target :: mesh
 #include "associate_mesh_ini.h"
@@ -345,12 +345,26 @@ type(t_mesh), intent(inout), target :: mesh
           if(d(1)>cyclic_length/2.) d(1)=d(1)-cyclic_length
           if(d(1)<-cyclic_length/2.) d(1)=d(1)+cyclic_length
           r1=c(1)*d(2)-c(2)*d(1)
+          ! the other diagonal: sub-triangles (1,2,4) and (2,3,4)
+          r2=b(1)*d(2)-b(2)*d(1)
+          r3=(c(1)-b(1))*(d(2)-b(2))-(c(2)-b(2))*(d(1)-b(1))
           if (r*r1<=0) then
           ! Sub-triangles (1,2,3) and (1,3,4) have opposite sense (or one is
           ! degenerate): the quad is self-intersecting or its diagonal 1-3
           ! lies outside.
              write(*,*) '____________________________________________________________________'
              write(*,*) ' ERROR: test_tri_ini: self-intersecting or degenerate quad ', n
+             write(*,*) '        nodes ', elnodes
+             write(*,*) '        --> fix the mesh; stop partitioning here !'
+             write(*,*) '____________________________________________________________________'
+             STOP
+          end if
+          if (r*r2<=0 .or. r*r3<=0) then
+          ! Sub-triangles (1,2,4) and (2,3,4) disagree with (1,2,3): a reflex corner
+          ! at vertex 1 or 3 (the up/downwind search and the centroid-based side
+          ! normals of the model need convex elements).
+             write(*,*) '____________________________________________________________________'
+             write(*,*) ' ERROR: test_tri_ini: non-convex quad ', n
              write(*,*) '        nodes ', elnodes
              write(*,*) '        --> fix the mesh; stop partitioning here !'
              write(*,*) '____________________________________________________________________'
@@ -796,7 +810,8 @@ subroutine find_levels(mesh)
             write(*,*) ' ERROR: You want to use aux3d.out file to define your depth, but '
             write(*,*) '        the file seems not to exist'
             write(*,*) '        --> check in namelist.config, the flag use_depthfile must be'
-            write(*,*) '            use_depthfile= "aux3d" or "depth@" '
+            write(*,*) '            use_depthfile= "aux3d" or "depth@" (or "nemo" for a depth.out'
+            write(*,*) '            mesh from tools/mesh/nemo_meshq.py, which has no aux3d.out)'
             write(*,*) '        --> model stops here'
             write(*,*) '____________________________________________________________________'
             stop
@@ -839,7 +854,8 @@ subroutine find_levels(mesh)
             write(*,*) '        number of layers and the depth of model levels. This file seems '
             write(*,*) '        not to exist'
             write(*,*) '        --> check in namelist.config, the flag use_depthfile must be'
-            write(*,*) '            use_depthfile= "aux3d" or "depth@" and your meshfolder'
+            write(*,*) '            use_depthfile= "aux3d" or "depth@" (or "nemo" for a depth.out'
+            write(*,*) '            mesh) and your meshfolder'
             write(*,*) '        --> model stops here'
             write(*,*) '____________________________________________________________________'
             stop
@@ -862,7 +878,8 @@ subroutine find_levels(mesh)
             write(*,*) ' ERROR: You want to use depth@elem.out or depth@node.out file to '
             write(*,*) '        define your depth, but the file seems not to exist'
             write(*,*) '        --> check in namelist.config, the flag use_depthfile must be'
-            write(*,*) '            use_depthfile= "aux3d" or "depth@" and your meshfolder '
+            write(*,*) '            use_depthfile= "aux3d" or "depth@" (or "nemo" for a depth.out'
+            write(*,*) '            mesh) and your meshfolder '
             write(*,*) '        --> model stops here'
             write(*,*) '____________________________________________________________________'
             stop
@@ -913,8 +930,9 @@ subroutine find_levels(mesh)
             read(fileID,*) nlevels_nod2D(n)
         END DO
         nlevels_nod2D=nlevels_nod2D+1
-        if (minval(nlevels_nod2D)<2 .or. maxval(nlevels_nod2D)>nl) then
-            write(*,*) ' ERROR: depth.out layer counts outside 1..nl-1: ', &
+        if (minval(nlevels_nod2D)<3 .or. maxval(nlevels_nod2D)>nl) then
+            ! the model needs at least 2 layers in every column (assert_min_layers)
+            write(*,*) ' ERROR: depth.out layer counts outside 2..nl-1: ', &
                        minval(nlevels_nod2D)-1, maxval(nlevels_nod2D)-1, ', nl=', nl
             stop
         end if
