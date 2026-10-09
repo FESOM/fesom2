@@ -7,6 +7,8 @@ program test_partit
     ! synthesis provides them empty. The global counts come from the mesh headers, so
     ! FESOM3_MESH_DIR may point to any mesh (default pi). FESOM3_EXPECT_FORMAT=1: the
     ! appended sections are required (dist_N/format.out must be read).
+    ! FESOM3_TEST_MANY_NEIGHBOURS=recv|send (np 2): a synthetic dist_2 with 33 neighbour PEs
+    ! in com_nod2D_full must stop set_partition (the failure is 'did NOT stop').
     use mpi
     use mod_partit,        only: t_partit, com_struct
     use mod_partitioning,  only: par_init, par_ex, set_partition, read_mesh_dims
@@ -25,6 +27,9 @@ program test_partit
 
     nfail = 0
     call par_init(partit)
+    cbuf = ''
+    call get_environment_variable('FESOM3_TEST_MANY_NEIGHBOURS', cbuf)
+    if (len_trim(cbuf) > 0) call many_neighbours_case(trim(cbuf))
     call set_partition(partit, trim(mesh_dir))
     call read_mesh_dims(trim(mesh_dir), nod2D, elem2D, edge2D, edge2D_in)
     nNodL  = partit%myDim_nod2D + partit%eDim_nod2D
@@ -106,6 +111,58 @@ program test_partit
     if (nfail_g /= 0) error stop 1
 
 contains
+    subroutine many_neighbours_case(which)
+        ! FESOM3_TEST_MANY_NEIGHBOURS=recv|send: a synthetic dist_2 (one node, element and
+        ! edge per PE, written into the run directory) whose com_nod2D_full has 33 receive
+        ! (or send) PEs; read_com must stop at the count, before reading past the
+        ! com_struct arrays rPE/sPE(MAX_NEIGHBOR_PARTITIONS).
+        character(len=*), intent(in) :: which
+        character(len=*), parameter :: d = 'test_partit_many_neighbours'
+        ! an empty com_struct: rPEnum, rPE, rptr, rlist, sPEnum, sPE, sptr, slist
+        character(len=1), parameter :: empty(8) = ['0', ' ', '1', ' ', '0', ' ', '1', ' ']
+        character(len=8) :: cpe
+        integer :: u, p
+        if (partit%npes /= 2) then
+            write(*,'(a)') 'test_partit: the many-neighbours case needs 2 ranks'
+            error stop 1
+        end if
+        if (which /= 'recv' .and. which /= 'send') then
+            write(*,'(a)') 'test_partit: unknown FESOM3_TEST_MANY_NEIGHBOURS='//which
+            error stop 1
+        end if
+        if (partit%mype == 0) then
+            call execute_command_line('mkdir -p '//d//'/dist_2')
+            open(newunit=u, file=d//'/dist_2/rpart.out', status='replace')
+            write(u,'(a)') '2', '1 1'
+            close(u)
+            open(newunit=u, file=d//'/dist_2/format.out', status='replace')
+            write(u,'(a)') '1'
+            close(u)
+            do p = 0, 1
+                write(cpe,'(i5.5)') p
+                ! my_list: header, nodes (myDim, eDim, list), elements (myDim, eDim, eXDim,
+                ! list), edges (myDim, eDim, list), eXDim_nod2D and its (empty) list
+                open(newunit=u, file=d//'/dist_2/my_list'//trim(cpe)//'.out', status='replace')
+                write(u,'(i0)') p, 1, 0, p+1, 1, 0, 0, p+1, 1, 0, p+1, 0
+                write(u,'(a)') ' '
+                close(u)
+                ! com_info: header, com_nod2D, com_elem2D, com_elem2D_full (empty), then
+                ! com_nod2D_full with 33 receive PEs (or none received and 33 send PEs)
+                open(newunit=u, file=d//'/dist_2/com_info'//trim(cpe)//'.out', status='replace')
+                write(u,'(i0)') p
+                write(u,'(a)') empty, empty, empty
+                if (which == 'send') write(u,'(a)') empty(1:4)
+                write(u,'(a)') '33', repeat(' 1', 33)
+                close(u)
+            end do
+        end if
+        call MPI_Barrier(partit%MPI_COMM_FESOM, ierr)
+        call set_partition(partit, d)
+        write(*,'(a)') 'test_partit: set_partition did NOT stop on 33 neighbour PEs'
+        call par_ex(partit%MPI_COMM_FESOM, partit%mype)
+        error stop 1
+    end subroutine
+
     subroutine check(cond, name)
         logical,          intent(in) :: cond
         character(len=*), intent(in) :: name

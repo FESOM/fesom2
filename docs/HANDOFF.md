@@ -599,7 +599,7 @@ times and peak memory are login-node values for the full ORCA025 mesh. The Pytho
    elvls_raw.out nlvls.out dist_*` first when the mesh changed (`clean()` in `tools/run_ini_mixed.sh`).
    One run per N. ORCA025: 128 parts 31 s; 1024 parts 83 s (METIS 42 s, writing 34 s), peak 0.3 GB;
    at most 16 neighbour ranks per communication list for 128 and 1024 parts (the model's
-   `com_struct` holds `MAX_NEIGHBOR_PARTITIONS = 32` and `read_com` does not check it — count with
+   `com_struct` holds `MAX_NEIGHBOR_PARTITIONS = 32`; `fesom_ini` and `read_com` stop above it — count with
    `/work/ab0995/a270029/fesom3_hybrid/t18_workflow/max_neighbours.py <mesh_dir> <N>` for very high
    N). `dist_1`: `python3 tools/make_dist1.py <mesh_dir>` (only for `check_dist.py`/FESOM2 tools; the
    model builds its 1-rank partition itself).
@@ -837,10 +837,11 @@ marked **decide** need a design decision.
    affected (see "Open notes / risks").
 10. **Cost of the 4-slot code**: CORE2 ×1.08–1.09 per step (≈ 15.1–15.3 min per model year on 512
     ranks), the sea-ice EVP ×1.29 is the hot spot; not optimised.
-11. **`read_com` has no guard against more than `MAX_NEIGHBOR_PARTITIONS = 32` neighbour ranks**
-    (`src/infra/mod_partitioning.F90:220`, `src/types/mod_partit.F90:12`; `fesom_ini`'s `dist_ext` lists
-    are not checked either). ORCA025 at 128 and 1024 parts: at most 16. Count before going to very high
-    N (`max_neighbours.py`, setup workflow step 6).
+11. **At most `MAX_NEIGHBOR_PARTITIONS = 32` neighbour ranks per communication list**
+    (`src/types/mod_partit.F90:12`, `mesh_part/src/MOD_PARTIT.F90`): `fesom_ini` stops ("Increase
+    MAX_NEIGHBOR_PARTITIONS") for all five lists, the model's `read_com` dies with the list name and count
+    (ctest `test_partit_many_neighbours_*`). ORCA025 at 128 and 1024 parts: at most 16. Count before going
+    to very high N (`max_neighbours.py`, setup workflow step 6).
 12. **Full NEMO 0.25° cold start** (Task 19, production physics, 900 s, np 8, 2 days): finite, but
     max|eta| 2.55 / 2.52 m and max|uv| 2.42 / 2.60 m/s (quad / mixed mesh) within the first day, bounded
     afterwards (day 2: 1.8 m, 2.1–2.2 m/s) — global cold-start adjustment on a mesh never run before; to

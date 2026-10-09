@@ -213,12 +213,14 @@ contains
         open(newunit=u, file=trim(fname), status='old', action='read', iostat=ios)
         if (ios /= 0) call die('cannot open '//trim(fname), partit)
         read(u,*) n   ! header
-        call read_com(u, partit%com_nod2D,       partit%eDim_nod2D)
-        call read_com(u, partit%com_elem2D,      partit%eDim_elem2D)
-        call read_com(u, partit%com_elem2D_full, partit%eDim_elem2D + partit%eXDim_elem2D)
+        call read_com(u, partit%com_nod2D,       partit%eDim_nod2D, 'com_nod2D', fname, partit)
+        call read_com(u, partit%com_elem2D,      partit%eDim_elem2D, 'com_elem2D', fname, partit)
+        call read_com(u, partit%com_elem2D_full, partit%eDim_elem2D + partit%eXDim_elem2D, &
+                      'com_elem2D_full', fname, partit)
         if (partit%dist_format >= 1) then
-            call read_com(u, partit%com_nod2D_full, partit%eDim_nod2D + partit%eXDim_nod2D)
-            call read_com(u, partit%com_edge2D, -1)
+            call read_com(u, partit%com_nod2D_full, partit%eDim_nod2D + partit%eXDim_nod2D, &
+                          'com_nod2D_full', fname, partit)
+            call read_com(u, partit%com_edge2D, -1, 'com_edge2D', fname, partit)
             if (partit%com_nod2D_full%rptr(partit%com_nod2D_full%rPEnum+1) - 1 /= &
                 partit%eDim_nod2D + partit%eXDim_nod2D) &
                 call die('com_nod2D_full does not cover the eDim+eXDim halo nodes in '// &
@@ -228,14 +230,18 @@ contains
         partit%pe_status = 0
     end subroutine read_dist_partition
 
-    subroutine read_com(u, com, rlist_size)
+    subroutine read_com(u, com, rlist_size, name, fname, partit)
         ! One com_struct from an open com_info unit (oce_mesh.F90:804-828 pattern).
         ! rlist_size < 0: the receive-list length is taken from rptr (com_edge2D).
+        ! rPE/rptr/sPE/sptr are fixed-size: stop on more than MAX_NEIGHBOR_PARTITIONS PEs.
         integer,          intent(in)    :: u
         type(com_struct), intent(inout) :: com
         integer,          intent(in)    :: rlist_size
+        character(len=*), intent(in)    :: name, fname
+        type(t_partit),   intent(in)    :: partit
         integer :: n
         read(u,*) com%rPEnum
+        call check_pe_count(com%rPEnum, 'receive')
         read(u,*) com%rPE(1:com%rPEnum)
         read(u,*) com%rptr(1:com%rPEnum+1)
         n = rlist_size
@@ -243,11 +249,24 @@ contains
         allocate(com%rlist(n))
         read(u,*) com%rlist
         read(u,*) com%sPEnum
+        call check_pe_count(com%sPEnum, 'send')
         read(u,*) com%sPE(1:com%sPEnum)
         read(u,*) com%sptr(1:com%sPEnum+1)
         n = com%sptr(com%sPEnum+1) - 1
         allocate(com%slist(n))
         read(u,*) com%slist
+    contains
+        subroutine check_pe_count(npe, side)
+            integer,          intent(in) :: npe
+            character(len=*), intent(in) :: side
+            character(len=16) :: cnum, cmax
+            if (npe >= 0 .and. npe <= MAX_NEIGHBOR_PARTITIONS) return
+            write(cnum,'(i0)') npe
+            write(cmax,'(i0)') MAX_NEIGHBOR_PARTITIONS
+            call die(name//': '//trim(cnum)//' '//side//' PEs, outside 0..MAX_NEIGHBOR_PARTITIONS='// &
+                     trim(cmax)//' in '//trim(fname)//' (increase MAX_NEIGHBOR_PARTITIONS in '// &
+                     'src/types/mod_partit.F90 and in fesom_ini, then recompile)', partit)
+        end subroutine check_pe_count
     end subroutine read_com
 
     subroutine die(msg, partit)

@@ -215,7 +215,8 @@ subroutine set_send(pes, num_send, too_small, com)
   end do
 end subroutine set_send
 !=============================================================================
-! PEs with num(p) > 0 (ascending) and the pointers into their lists
+! PEs with num(p) > 0 (ascending) and the pointers into their lists; stops on more than
+! MAX_NEIGHBOR_PARTITIONS PEs (as gen_comm.F90 for com_nod2D/com_elem2D)
 subroutine set_pe_ptr(num, npe, pe, ptr)
   integer,              intent(in)  :: num(0:)
   integer,              intent(out) :: npe
@@ -223,6 +224,11 @@ subroutine set_pe_ptr(num, npe, pe, ptr)
   integer :: p
 
   npe = count(num > 0)
+  ! the model reads the lists into com_struct arrays of size MAX_NEIGHBOR_PARTITIONS
+  if (npe > MAX_NEIGHBOR_PARTITIONS) then
+     print *,'Increase MAX_NEIGHBOR_PARTITIONS in MOD_PARTIT.F90 (and in the model''s src/types/mod_partit.F90) and recompile'
+     stop
+  endif
   allocate(pe(npe), ptr(npe+1))
   npe = 0
   ptr(1) = 1

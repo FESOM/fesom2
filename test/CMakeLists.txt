@@ -202,6 +202,19 @@ add_mesh_test(test_halo_ext_noformat_np2 test_halo_ext ${_mesh_pi} 2)
 set_tests_properties(test_halo_ext_noformat_np2 PROPERTIES
     PASS_REGULAR_EXPRESSION "com_edge2D is not available: dist_N has no format.out"
     FAIL_REGULAR_EXPRESSION "did NOT stop")
+# more than MAX_NEIGHBOR_PARTITIONS (32) receive/send PEs in a com list stop read_com
+# (synthetic dist_2 in the build tree, no mesh needed)
+foreach(_side recv:receive send:send)
+    string(REPLACE ":" ";" _pair ${_side})
+    list(GET _pair 0 _s)
+    list(GET _pair 1 _word)
+    add_test(NAME test_partit_many_neighbours_${_s}_np2
+             COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np 2 $<TARGET_FILE:test_partit>)
+    set_tests_properties(test_partit_many_neighbours_${_s}_np2 PROPERTIES
+        ENVIRONMENT "FESOM3_TEST_MANY_NEIGHBOURS=${_s}"
+        PASS_REGULAR_EXPRESSION "com_nod2D_full: 33 ${_word} PEs, outside 0..MAX_NEIGHBOR_PARTITIONS=32"
+        FAIL_REGULAR_EXPRESSION "did NOT stop")
+endforeach()
 # the old pi dist_2 (no format.out, FESOM2 layout only) is still read
 add_mesh_test(test_mesh_read_pi_np2 test_mesh_read ${_mesh_pi} 2)
 # a malformed elem2d.out stops read_mesh with a message (regex pair as test_minlayers);
