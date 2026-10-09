@@ -19,9 +19,9 @@ tolerance to be accepted.
 
 Validation rests on two pillars:
 
-1. **Automated self-tests** (`ctest`) — 21 cases over the infrastructure (types, partitioning, halo
-   exchange, I/O decomposition, restart redistribution, …), run on 1, 2, and 8 ranks, on both the
-   Intel and GNU toolchains.
+1. **Automated self-tests** (`ctest`) — 153 cases over the infrastructure (types, partitioning, halo
+   exchange, I/O decomposition, restart redistribution, …), the kernels and conservation, on triangle,
+   quad and mixed meshes, run on 1 to 8 ranks, on both the Intel and GNU toolchains.
 2. **Byte-gates against the FESOM2 oracle** — an instrumented FESOM2 v2.7.3 and FESOM_F are run on
    identical input and their internal fields are compared substep by substep, demanding `max|Δ| = 0`.
    Gates exist for every subsystem, on single and multiple ranks, on a small test mesh and on the
@@ -107,8 +107,8 @@ assembled step — data flow and dispatch — is byte-faithful, not just the ker
 
 ### 5. The `ctest` self-test suite
 
-`test/CMakeLists.txt` registers **26 ctest cases** across 15 test programs, run on the Intel and GNU
-builds:
+`test/CMakeLists.txt` registers **153 ctest cases**, run on the Intel and GNU builds. The core
+infrastructure cases:
 
 | Test | Ranks | Checks |
 |---|---|---|
@@ -127,7 +127,33 @@ builds:
 | `dump_diff_selftest` | — | the comparison tool itself (synthetic perturbation detection) |
 | `fesom_analytic` | 1, 2 | end-to-end analytic driver runs clean |
 
-These run in seconds on a login node:
+Kernel tests from the bottom-at-vertices and momentum work (`test_vert_spline`, `test_vinv`,
+`test_muscl_onthefly`, `test_ivertvisc`, `test_wsplit`, `test_wimpl_tra`, `test_minlayers`, the
+`fesom_conserve_zstar_*` variants) complete the pre-hybrid set. **Hybrid (triangle + quad) meshes**
+add (details: `docs/HANDOFF.md` → "Hybrid (mixed triangle + quad) meshes" → "Tests and tools of the
+plan"):
+
+| Test | Meshes | Checks |
+|---|---|---|
+| `test_mesh_read` (+ `_malformed[2-5]`) | quad/mixed cut-outs, pi_w | 3/4-column `elem2d.out`, orientation (flipped quad/triangle turned clockwise), levels, `dist_N/format.out`; each malformed-file case stops |
+| `test_partit` (hybrid cases) | quad/mixed cut-outs, pi_w | appended `dist_N` sections, `format.out` required (`FESOM3_EXPECT_FORMAT=1`) |
+| `test_geom_mixed` | analytic patches, pi_w | centroids, kite weights `elem_w` (vs independent shoelace kites), Green–Gauss `gradient_sca`, node areas, `mesh_resolution` |
+| `test_halo_ext` (+ `_noformat`) | cut-outs, pi_w, core2_w at np 2/4/8 | `exchange_edge` / `exchange_nod_full` round trips; FESOM2-layout `dist_N` error |
+| `test_ssh_stiff` | patches, mixed cut-out, pi_w, core2_w | SSH matrix pattern and values (quadratic field on the parallelogram patch), symmetry, triangle bit-identity, quad checkerboard null mode |
+| `test_pgf_mixed`, `test_updown_mixed`, `test_coupling_mixed` | patches, cut-outs, pi_w, core2_w | pressure gradient, density gradient / smoother / GM bolus / IC extrapolation, MUSCL up/downwind elements, surface-stress gather |
+| `test_ice_dyn_mixed`, `test_ice_mass` (+ `_missing_col`) | patches, quad cut-out, pi_w, core2_w | EVP strain/stress adjoint, ice FCT mass matrix, lumped mass, conservation and bounds |
+| `fesom_ini_{aux3d,nodepth,onelem,count1,nonconvex}` | copies of the quad cut-out | `fesom_ini` level finder on quads, its error stops (`tools/check_fesom_ini.sh`) |
+| mixed/quad cases of `test_vinv`, `test_ivertvisc`, `test_muscl_onthefly` | patches, cut-outs | the converted ocean kernels |
+| `meshdiag_{mixed,quad,pi_w}` | cut-outs, pi_w | 4-column mesh-diagnostics store (`tools/check_meshdiag.py`) |
+| `fesom_conserve_mixcut_*`, `fesom_conserve_{q,mix}cut_ice_*` | cut-outs, np 1/2 | conservation (PP/KPP/TKE/GM/Redi; with sea ice, EVP and mEVP) |
+
+The mesh-dependent hybrid cases read meshes from the hard-coded root `/work/ab0995/a270029/meshes`
+(`test/CMakeLists.txt`). Whether a mesh exists is decided at configure time
+(`if(EXISTS <meshes>/<mesh>/nod2d.out)`): a case whose mesh is absent is registered as DISABLED
+(ctest prints "Not Run (Disabled)"); a missing `dist_N`/`com_info` file in an existing mesh
+directory FAILS. "153/153 passed" therefore holds on a filesystem that has these meshes.
+
+These run in under a minute on a login node (`ctest -j 8`):
 
 ```bash
 cd build_intel_dp && ctest --output-on-failure
@@ -214,6 +240,28 @@ written, so the code answers back to the prediction rather than defining it:
 Zero stagnant bottom cells is a hard requirement, not a quality metric: three unguarded divides
 (`oce_ale.F90:88`, `oce_ale.F90:377`, `oce_pressure_bv.F90:310`) produce NaN without it, which is
 why the mesh setup also asserts it at runtime.
+
+### 6b. The hybrid-mesh gates
+
+With every kernel on 4-slot formulas, triangle results changed at roundoff, so bit-identity with the
+pre-hybrid code is replaced by tiered roundoff gates (rationale: `docs/HANDOFF.md` → "Gate migration
+for hybrid meshes"):
+
+- **`tools/run_tri_regression.sh`** — runs a FROZEN reference build (the last bit-identical state)
+  and the current build side by side on pi and CORE2 for a few steps (SSH solved to `1e-14`) and
+  compares per field in tiers PRE / EARLY / OCEAN / ICE / MIX / ICE_EARLY with per-mesh tolerances (the
+  table is in the script header); `decomp:` cases compare np 1 vs np N restarted from one checkpoint,
+  `conserve:` cases run `fesom_conserve`.
+- **`tools/run_cutout_short.sh`** — 5-day production (`prod`, `prodpp`) and conservation-with-ice
+  (`cons`) runs on the quad and mixed NEMO cut-outs, np 1 vs 2/8 from one checkpoint, plus the
+  checkerboard time series (`tools/cutout_diag.py`).
+- **`tools/run_ini_compare.sh`** — the ported `fesom_ini` against FESOM2's own `mesh_part` build on
+  pi and CORE2 (byte-identical outputs).
+- **`tools/run_ini_mixed.sh`** — `fesom_ini` on the NEMO quad/mixed meshes, every output checked by
+  `tools/mesh/check_dist.py`, plus error cases (dead ends, flipped and bow-tie elements, corrupted
+  partitions).
+- The Python mesh tools have their own suites: `tools/mesh/test_nemo_meshq.sh`,
+  `tools/mesh/test_mesh_tools.sh`.
 
 ### 7. Multi-rank and partition independence
 
@@ -323,9 +371,13 @@ On a Levante login node:
 
 ```bash
 ./configure.sh --compiler intel --precision dp --clean --build   # build the anchor
-cd build_intel_dp && ctest --output-on-failure                   # 21 self-tests
-cd .. && bash tools/run_step_gate.sh                             # one byte-gate vs FESOM2 → max|Δ| = 0
+cd build_intel_dp && ctest -j 8 --output-on-failure              # 153 self-tests
+cd .. && bash tools/run_conserve_pi.sh                           # conservation gate → GATE OK
+bash tools/run_tri_regression.sh                                 # triangle roundoff gate (§6b)
 ```
+
+(`ulimit -s unlimited` first: the CORE2 ctest cases need it.) The FESOM2 byte-gates such as
+`tools/run_step_gate.sh` are retired (§6).
 
 Multi-rank and CORE2 gates (and the dist_512/dist_864 SLURM jobs) are the `tools/run_*_gate*.sh` and
 `tools/*.sbatch` scripts. The development log `docs/HANDOFF.md` records the exact command and

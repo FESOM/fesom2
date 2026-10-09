@@ -1,11 +1,15 @@
 # ----------------------------------------------------------------------
-# fesom_ini — FESOM2's mesh partitioner (mesh_part subproject), ported as is.
+# fesom_ini — FESOM2's mesh partitioner (mesh_part subproject), ported and made
+# mixed-mesh capable (triangle + quad elements, use_depthfile='nemo', the
+# appended dist_N sections; see docs/HANDOFF.md "Hybrid (mixed triangle + quad)
+# meshes").
 #
 # Reads namelist.config (paths, geometry, run_config, machine) from the working
 # directory and writes edges.out, edge_tri.out, edgenum.out, elvls.out,
-# nlvls.out and dist_N/ INTO the mesh directory (MeshPath).
+# elvls_raw.out, nlvls.out and dist_N/ (incl. dist_N/format.out) INTO the mesh
+# directory (MeshPath).
 #
-# The sources under src/ are FESOM2's (/home/a/a270029/fesom2.0/src). They define
+# The sources under src/ derive from FESOM2's (/home/a/a270029/fesom2.0/src). They define
 # their own MOD_MESH / MOD_PARTIT / o_PARAM ..., so they get a private module
 # directory and never see (or clash with) FESOM3's modules. Compile flags and
 # the C definitions of fort_part.c are FESOM2's mesh_part/CMakeLists.txt.

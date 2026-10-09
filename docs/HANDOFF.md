@@ -5,11 +5,11 @@ Full pre-M2.12 milestone detail + the per-gate recipes live in [`HANDOFF-archive
 
 ## Where we are
 
-- **Hybrid (mixed triangle + quad) meshes ✅ DONE (2026-10-09, plan `plans/2026-10-08-hybrid-meshes.md`,
+- **Hybrid (mixed triangle + quad) meshes ✅ DONE (2026-10-09, plan `plans/completed/2026-10-08-hybrid-meshes.md`,
   commits `d4c6f8d`…`d07f44f` + the docs commit, on `bottom-at-vertices`, unpushed):** model, `fesom_ini`
   (FESOM2's `mesh_part`, ported) and the Python mesh tools run triangle, quad and mixed meshes (NEMO
   ORCA025 → `nemo025q_fesom`, `nemo025mix`); unified 4-slot kernels, so triangle runs are no longer
-  bit-identical (roundoff gate `tools/run_tri_regression.sh`); ctest 142/142; full NEMO 0.25° 2-day runs
+  bit-identical (roundoff gate `tools/run_tri_regression.sh`); ctest 153/153 (after the review fixes); full NEMO 0.25° 2-day runs
   at np 8 finite. Next for the user: rebuild `build_intel_dp` from this branch, first full-size NEMO run
   (`work/job_levante_nemo025`), the open design questions → section "Hybrid (mixed triangle + quad)
   meshes" → "Known findings / open questions for the user".
@@ -330,7 +330,7 @@ The hybrid-mesh gate migration (which FESOM2-oracle gates are retired, the round
 `tools/run_tri_regression.sh` that replaces them) is in "Hybrid (mixed triangle + quad) meshes" →
 "Gate migration for hybrid meshes" below.
 
-## Hybrid (mixed triangle + quad) meshes (plan `plans/2026-10-08-hybrid-meshes.md`, 2026-10-08/09)
+## Hybrid (mixed triangle + quad) meshes (plan `plans/completed/2026-10-08-hybrid-meshes.md`, 2026-10-08/09)
 
 The model, its setup tool `fesom_ini` and the Python mesh tools handle triangle, quad and mixed meshes
 in ONE code path: every element has 4 vertex slots (a triangle repeats its 1st vertex), clockwise, and
@@ -504,21 +504,36 @@ the boundary-test conversion. Exceptions left in `src/` (Task 19 greps, all docu
 
 ### Tests and tools of the plan
 
-- **ctest** (142 in all, ~50 s with `-j 8`): `test_mesh_read`, `test_geom_mixed`, `test_halo_ext`,
-  `test_ssh_stiff`, `test_pgf_mixed`, `test_updown_mixed`, `test_coupling_mixed`, `test_ice_dyn_mixed`,
-  `test_ice_mass`, `meshdiag_{mixed,quad,pi_w}`, `fesom_conserve_mixcut_*` (PP/KPP/TKE/GM/REDI) and
+- **ctest** (153 in all, ~50 s with `-j 8`): `test_mesh_read` (+ flipped elements, 5 malformed
+  `elem2d.out` cases), `test_geom_mixed` (+ quad kite weights / centroid vs independent shoelace
+  formulas, `mesh_resolution`), `test_halo_ext`, `test_ssh_stiff` (+ quadratic-field values on the
+  parallelogram patch), `test_pgf_mixed` (+ `compute_sigma_xy`, `smooth_nod`, `fer_gamma2vel`,
+  `extrap_nod3D`), `test_updown_mixed`, `test_coupling_mixed`, `test_ice_dyn_mixed`, `test_ice_mass`
+  (+ FCT bounds), `test_partit_*` (`FESOM3_EXPECT_FORMAT=1`), `fesom_ini_*` (`tools/check_fesom_ini.sh`:
+  FESOM2 level finder on quads, the 'nemo' error stops, non-convex quad),
+  `meshdiag_{mixed,quad,pi_w}`, `fesom_conserve_mixcut_*` (PP/KPP/TKE/GM/REDI) and
   `fesom_conserve_{q,mix}cut_ice_*` (driver knobs `FESOM3_CONSERVE_ICE`, `FESOM3_WHICHEVP`), plus mixed
-  and quad cases of `test_vinv`, `test_ivertvisc`, `test_muscl_onthefly`. Kernel tests pick the mesh with
+  and quad cases of `test_vinv`, `test_ivertvisc`, `test_muscl_onthefly`. The hybrid tests share
+  `test/test_util.F90` (mesh setup, check/finish, reductions). Kernel tests pick the mesh with
   `FESOM3_MESH_DIR`, the analytic patches with `FESOM3_TEST_PATCH=mixed|quad`, and `FESOM3_TEST_ROTATE`
   (0: NEMO cut-outs unrotated; 1: pi_w rotated — the unrotated pi has elements around the geographic
   pole). The launcher flags `FESOM3_MPI_LAUNCH_FLAGS` (`CMakeLists.txt:157`) include the knem workaround
-  (L61).
+  (L61). Every mesh-dependent hybrid ctest reads its mesh from the HARD-CODED root
+  `/work/ab0995/a270029/meshes` (`test/CMakeLists.txt`, not a cache variable); a case whose mesh is
+  absent at configure time (`if(EXISTS <meshes>/<mesh>/nod2d.out)`) is registered DISABLED ("Not Run
+  (Disabled)"), and a missing `dist_N`/`com_info` file in an existing mesh directory FAILS — so
+  "153/153" holds only on a filesystem with these meshes (this account's).
 - **Scripts:** `tools/mesh/test_nemo_meshq.sh`, `tools/mesh/test_mesh_tools.sh`,
   `tools/run_ini_compare.sh` (fesom_ini == FESOM2's own mesh_part build on pi/CORE2),
   `tools/run_ini_mixed.sh` (NEMO meshes + `tools/mesh/check_dist.py` + error cases),
-  `tools/run_tri_regression.sh` (triangle roundoff gate), `tools/run_cutout_short.sh` (5-day
-  prod/prodpp/cons runs on both cut-outs, np 1 vs 2/8 from one checkpoint, checkerboard time series via
-  `tools/cutout_diag.py`), `tools/check_meshdiag.py`, `tools/run_mpi_knem_stale_repro.sh` (L61).
+  `tools/run_tri_regression.sh` (triangle roundoff gate; tiers incl. ICE_EARLY = the sea-ice output
+  of the first steps), `tools/run_cutout_short.sh` (5-day prod/prodpp/cons runs on both
+  cut-outs, np 1 vs 2/8 from one checkpoint, prodpp gated at the tight TOL_PP = 1e-5, checkerboard
+  time series via `tools/cutout_diag.py`; its ICE class is vacuous -- the tropical cut-outs stay
+  ice-free and ice seeded into the checkpoint melts within 2 steps, so a 1-vs-N sea-ice compare on
+  quads needs a run that keeps ice, which no driver switch provides yet),
+  `tools/check_meshdiag.py`, `tools/run_mpi_knem_stale_repro.sh` (L61). Shared: `tools/prod_env.sh`
+  (the production physics env of the two run scripts), `tools/lib_ini.sh` (the run_ini harness).
 
 ### Mixed-mesh setup workflow (triangle, quad and mixed meshes)
 
@@ -536,6 +551,9 @@ times and peak memory are login-node values for the full ORCA025 mesh. The Pytho
    quads, which fesom_ini rejects.
 2. **Dead ends** — `python3 tools/mesh/remove_deadends.py <in_dir> <out_dir>`: iterative, 46
    elements / 90 nodes removed → 915 866 nodes, 902 408 quads (`nemo025q_fesom`). 12 s, 0.9 GB.
+   `depth.out` layer counts are kept; a node left above the bottom invariant is reported (none here).
+   The mesh tools write into `<out_dir>` and remove fesom_ini outputs already there (edge/level files,
+   `dist_*`), which belong to the old elements.
 3. **Mixed mesh (optional)** — `python3 tools/mesh/split_quads.py <in_dir> <out_dir> --band -5 5
    --every 5`: every quad with centroid latitude in the band plus every 5th other quad split into two
    triangles (shorter diagonal; the longer one where the shorter leaves a dead-end triangle) →
@@ -546,8 +564,9 @@ times and peak memory are login-node values for the full ORCA025 mesh. The Pytho
    model's bottom invariant). 3 s.
 5. **Check every mesh** — `python3 tools/mesh/check_mesh.py <mesh_dir>`: prints a `SUMMARY` line
    (nodes, elems, quads, tris, edges, bedges, ccw, nonconvex, degenerate, unused, multiedge,
-   deadends, area); exit 1 on any error incl. dead ends (the raw `nemo_meshq.py` output fails with
-   `deadends=40`). 4 s, 0.9 GB.
+   deadends, layers, area; `layers` = `depth.out` nodes above the bottom invariant) and PASS/FAIL;
+   exit 1 on any error incl. dead ends (the raw `nemo_meshq.py` output fails with `deadends=40`).
+   4 s, 0.9 GB.
 6. **Partition: `fesom_ini`** (FESOM2's `mesh_part`, ported: sources `mesh_part/src/`, METIS 5.1.0 in
    `lib/metis-5.1.0/`). Built together with the model by `./configure.sh` / `cmake --build` as
    `<build>/bin/fesom_ini` (`build_intel_dp/bin/fesom_ini` once the user rebuilds from this branch;
@@ -571,7 +590,8 @@ times and peak memory are login-node values for the full ORCA025 mesh. The Pytho
    rotation defaults 50/15/−90 equal the model's hard-coded ones), then
    `cd <work_dir> && <build>/bin/fesom_ini > fesom_ini.out 2>&1` (inside a batch job
    `srun -n 1 -N 1 …`). It STOPs with exit status 0 also on errors — judge by `Total time` in the log
-   and `dist_<N>/rpart.out`. It writes INTO `MeshPath`: `edges.out`, `edge_tri.out`, `edgenum.out`
+   and `dist_<N>/rpart.out`. It stops on a self-intersecting or non-convex quad and on a `depth.out`
+   layer count outside 2..nl−1 (the model needs ≥ 2 layers per column). It writes INTO `MeshPath`: `edges.out`, `edge_tri.out`, `edgenum.out`
    (edge2D, edge2D_in), `nlvls.out`, `elvls.out`, `elvls_raw.out` and `dist_<N>/` = `rpart.out`,
    `my_list%05d.out`, `com_info%05d.out` in the FESOM2 layout plus the appended hybrid sections
    (double-halo nodes, `com_nod2D_full`, `com_edge2D`) announced by `dist_<N>/format.out` (version 1).
@@ -672,7 +692,7 @@ partitioner") predates `fesom_ini` (the user's file, not edited).
   Unknowns: more CG iterations of the SSH solve at 0.25° (CG ≈ 4 % of the CORE2 step), a larger ice share
   (dense ORCA grid in the Arctic; the EVP is the 4-slot hot spot), startup time at 1024 ranks.
 
-### Gate migration for hybrid meshes (decision, 2026-10-08, plan `plans/2026-10-08-hybrid-meshes.md` Task 7)
+### Gate migration for hybrid meshes (decision, 2026-10-08, plan `plans/completed/2026-10-08-hybrid-meshes.md` Task 7)
 
 From Task 7 on the mesh geometry is the unified 4-slot one (area-weighted centroid, kite weights
 `elem_w`, Green–Gauss `gradient_sca(8)` with x in 1:4 / y in 5:8, `edge_tri(2) == edge_tri(1)` and
@@ -795,6 +815,14 @@ marked **decide** need a design decision.
    (`src/oce/oce_fer_gm.F90:103`, `:126`) — **decide**: the factor 2 is the triangle element/node area
    ratio; on all-quad meshes it overstates the resolution by √2 (larger `fer_scal`). FESOM2 tuning, left
    unchanged.
+   - **Same question for the viscosity length on quads** (code review 2026-10-09) — **decide**:
+     `visc_filt_bidiff` (`src/oce/oce_dyn_visc.F90:132`, `:168`) uses `len =
+     sqrt(sum(elem_area(el)))` of the edge's elements; a quad has about twice a triangle's area at
+     the same node spacing, so `len` is ≈ √2 larger, and the `/elem_area` divisor and the 4-side
+     stencil change the effective coefficient too. On all-quad and mixed meshes the effective
+     viscosity therefore differs by an O(1) factor from what the triangle-tuned `visc_gamma0/1/2`
+     give. Formula left unchanged (physics tuning); an element-type-independent resolution length
+     would be the alternative.
 6. **Output element coordinates changed at the rotated-dateline elements** (Task 14): pi 77, CORE2 566
    elements now carry the wrapped centroid; their lon/lat and the geographic u/v/bolus_u/bolus_v change
    by O(1) (the old values were wrong). Notebooks comparing old and new output see this.

@@ -95,7 +95,7 @@ module g_config
   character(len=5)       :: which_depth_n2e='mean'    
   
   logical                :: use_depthonelem =.false.
-  character(len=10)      :: use_depthfile='aux3d'   ! 'aux3d', 'depth@'        
+  character(len=10)      :: use_depthfile='aux3d'   ! 'aux3d', 'depth@', 'nemo' (depth.out of tools/mesh/nemo_meshq.py)
   logical                :: use_cavityonelem=.false.
   logical                :: metric_factor_zero=.false. ! if true, set metric_factor to zero
   

@@ -11,7 +11,7 @@ configuration, I/O) is redesigned for clarity and future flexibility. The guidin
 runs, Zarr output, and restart/checkpoint. Through M10 the model was byte-exact against FESOM2.
 
 > **The bottom now sits at vertices**, which makes FESOM_F deliberately different from FESOM2 —
-> `nlvls.out` is authoritative and each element's bottom is derived as the shallowest of its three
+> `nlvls.out` is authoritative and each element's bottom is derived as the shallowest of its 3 or 4
 > vertices, so velocities touching topography vanish by construction. Bit-identity with the oracle
 > is therefore retired, and conservation, mesh-delta and self-consistency gates take its place.
 > See [IMPLEMENTATION.md](IMPLEMENTATION.md) §Bottom at vertices and [TESTING.md](TESTING.md) §6a.
@@ -42,6 +42,11 @@ through environment modules, loaded automatically by `env.sh`:
   `nf-config` is not on the `PATH`.
 - **liblz4 is optional** — it enables the LZ4 output compressor; without it the writer is
   uncompressed-only.
+- **A C compiler is required** for the mesh partitioner `fesom_ini` (`mesh_part/`, with METIS 5.1.0
+  vendored in `lib/metis-5.1.0/`); `env.sh` sets `CC=mpicc CXX=mpicxx` and `configure.sh` passes them
+  to CMake. Builds that bypass `configure.sh` must configure a C compiler themselves.
+- **The Python mesh tools** (`tools/mesh/*.py`, `tools/make_dist1.py`) need numpy/scipy:
+  `module load python3` (the system `python3` has neither).
 - The **Intel + double-precision** build is the *anchor*: its compiler flags are copied verbatim
   from FESOM2 v2.7.3, which is what makes bit-identical results possible. The GNU build is for
   portability testing.
@@ -57,7 +62,9 @@ CMake, and builds:
 ./configure.sh --compiler intel --precision dp --clean --build   # anchor build
 ```
 
-Binaries land in `build_intel_dp/bin/`, Fortran modules in `build_intel_dp/module/`. The portability
+Binaries land in `build_intel_dp/bin/` — the model drivers and the mesh partitioner `fesom_ini`
+(§5) — and Fortran modules in `build_intel_dp/module/`. A binary built before the hybrid-mesh work
+cannot read quad meshes and has no `fesom_ini`: rebuild before using a NEMO/quad mesh. The portability
 build is the same with `--compiler gnu` (→ `build_gnu_dp/`):
 
 ```bash
@@ -124,9 +131,9 @@ export FESOM3_FER_GM=1 FESOM3_REDI=1 FESOM3_MIX_TKE=1 FESOM3_SW_PENE=1 FESOM3_CH
 srun -l -n 864 ./build_intel_dp/bin/fesom_lifecycle_native_mr > run.log 2>&1
 ```
 
-**Where the knobs are defined.** The authoritative, always-current list of variables is the
+**Where the knobs are defined.** The authoritative, always-current list of run variables is the
 environment block at the top of **`src/drivers/fesom_lifecycle_native_mr.F90`** (each is read with
-`get_environment_variable`). The `tools/*.sbatch` and `tools/run_lifecycle_*.sh` scripts are working
+`get_environment_variable`); the SSH solver knobs in the table below are read by the solver itself. The `tools/*.sbatch` and `tools/run_lifecycle_*.sh` scripts are working
 examples. The most common variables:
 
 | Variable | Meaning |
@@ -144,6 +151,7 @@ examples. The most common variables:
 | `FESOM3_MIX_KPP`, `FESOM3_MIX_TKE`, `FESOM3_SW_PENE` | vertical mixing and shortwave penetration |
 | `FESOM3_OUTPUT`, `FESOM3_OUTPUT_EVERY` | output directory (enables output) and step cadence |
 | `FESOM3_RESTART`, `FESOM3_RESTART_LENGTH`, `FESOM3_RESTART_UNIT` | checkpoint directory and cadence |
+| `FESOM3_SSH_SOLTOL`, `FESOM3_SSH_MAXITER` | SSH solver tolerance and iteration cap — test/diagnostic only, read in `src/oce/oce_ssh_solve.F90` (defaults `1e-5`, `2000`) |
 
 > **Configuration today vs. intent.** The production drivers are configured by these `FESOM3_*`
 > variables plus in-code defaults. A write-once configuration *module* (`mod_config`, reading a
@@ -169,9 +177,14 @@ core2/
   dist_1/  dist_2/  dist_8/  dist_864/   ...      # one per rank count (partition files)
 ```
 
+**Triangle, quad and mixed meshes.** `elem2d.out` may have 3 or 4 node ids per line (the column count
+is taken from the first line; a triangle in a 4-column file repeats its 1st vertex). Meshes made from
+NEMO grids carry a `depth.out` instead of `aux3d.out`; the model reads the levels from `depth.out`
+when `aux3d.out` is absent.
+
 > **`elvls.out` is no longer read.** FESOM_F places the bottom at **vertices**: `nlvls.out`
 > (the per-vertex level count) is authoritative and each element's bottom is *derived* as the
-> shallowest of its three vertices, so an element is wet only where all three of its corners
+> shallowest of its 3 or 4 vertices, so an element is wet only where all of its corners
 > are. The file can stay in the mesh directory; nothing opens it. See
 > [IMPLEMENTATION.md](IMPLEMENTATION.md) §Bottom at vertices.
 
@@ -189,8 +202,18 @@ Two meshes are used routinely:
 - **CORE2** — the global ~1° production mesh (242 917 nodes) at
   `/pool/data/AWICM/FESOM2/MESHES_FESOM2.1/core2`, with partitions up to `dist_864`.
 
-To run on a new mesh, create its `dist_<NP>/` partition for your target rank count (FESOM2's mesh
-partitioner produces these), then point `FESOM3_MESH_DIR` at the mesh directory.
+To run on a new mesh, create its `dist_<NP>/` partition for your target rank count with the in-tree
+partitioner **`build_*/bin/fesom_ini`** (FESOM2's `mesh_part`, ported): run it in a work directory
+whose `namelist.config` sets `MeshPath`, `n_part=<NP>` and, for a NEMO mesh with `depth.out`,
+`use_depthfile="nemo"`. It writes the edge and level files and `dist_<NP>/` into the mesh directory,
+including `dist_<NP>/format.out`, which announces the appended halo lists needed by
+`exchange_edge`/`exchange_nod_full`. Then point `FESOM3_MESH_DIR` at the mesh directory.
+
+A mesh made from a NEMO grid goes through
+`tools/mesh/nemo_meshq.py` → `remove_deadends.py` → [`split_quads.py` for a mixed mesh,
+`cut_region.py` for a regional cut-out] → `check_mesh.py` → `fesom_ini` → `check_dist.py`. The exact
+commands, the `namelist.config` and the pitfalls are in `docs/HANDOFF.md`, section "Hybrid (mixed
+triangle + quad) meshes" → "Mixed-mesh setup workflow".
 
 ---
 
@@ -215,6 +238,13 @@ import xarray as xr
 ds = xr.open_zarr("ssh.fesom.1958.zarr")   # CF time axis, embedded lon/lat
 ```
 
+> **Format change (hybrid meshes).** `fesom.mesh.diag.zarr` now holds 4-column per-face arrays
+> (dim `n4`: `face_nodes`, `face_edges`, `face_links`, `gradient_sca_x/y`). A triangle's 4th slot is
+> the `_FillValue` (−1; −999 in `face_links`; coefficient 0 in `gradient_sca_x/y`), so xarray returns
+> the integer arrays as float with NaN unless opened with `mask_and_scale=False`. Element `lon`/`lat` are now the cyclic-wrapped centroid (elements across
+> the rotated dateline moved). Details: `docs/HANDOFF.md` → "Gate migration for hybrid meshes" →
+> "Output format changes".
+
 ---
 
 ## 7. Repository layout
@@ -231,11 +261,15 @@ src/            Fortran source
   io/             Zarr output, decomposition, restart            (8)
   step/           timestep orchestration                         (2)
   drivers/        program entry points + byte-gate drivers       (32)
+mesh_part/      fesom_ini sources (FESOM2's mesh partitioner, mixed-mesh capable)
+lib/metis-5.1.0/  vendored METIS used by fesom_ini
 cmake/          compiler-flag and helper modules
 config/         namelist.io (output configuration)
 env/            per-host module/setup files (levante.dkrz.de)
 test/           ctest self-tests
 tools/          byte-gate scripts, oracle runner, diff tools, sbatch jobs
+  mesh/           Python mesh tools (nemo_meshq, remove_deadends, split_quads,
+                  cut_region, check_mesh, check_dist) + test_*.sh
 docs/           HANDOFF, LESSONS, plans (internal working logs)
 configure.sh    build helper          env.sh   environment loader
 ```

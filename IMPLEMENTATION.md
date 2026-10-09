@@ -37,12 +37,12 @@ configuration, and a distributed Zarr I/O stack.
 | Aspect | FESOM2 v2.7.3 | FESOM_F |
 |---|---|---|
 | Numerical kernels | reference | transcribed verbatim → bit-identical through M10 |
-| Bottom / topography | defined at **elements** (`elvls.out`); a scalar cell has its bottom at several levels | defined at **vertices** (`nlvls.out`); the element bottom is derived as the shallowest of its three corners (§13) |
+| Bottom / topography | defined at **elements** (`elvls.out`); a scalar cell has its bottom at several levels | defined at **vertices** (`nlvls.out`); the element bottom is derived as the shallowest of its 3 or 4 corners (§13) |
 | State | global module arrays (`MOD_DYN`, `o_ARRAYS`, …), `use`d everywhere | derived types (`t_mesh`, `t_dyn`, `t_tracer`, `t_ice`, `t_partit`) passed as arguments |
 | Parallelism | per-kernel multi-rank code throughout | one code path; an **optional** `partit` argument adds the parallel case |
 | Halo exchange | many hand-written per-array routines | generic `exchange_nod` / `exchange_elem` + `allreduce_*` |
 | Precision | hardcoded double | compile-time `WP` (+ mesh precision `MP`); double is the anchor |
-| Element arity | triangles, loops hardcoded `1:3` | `MAX_NV=4` + per-element vertex count (quad-ready) |
+| Element arity | triangles, loops hardcoded `1:3` | `MAX_NV=4`, 4 vertex slots (triangle 4th = 1st): triangle, quad and mixed meshes (§7) |
 | Configuration | namelists spread across modules | write-once `mod_config` (today: drivers use `FESOM3_*` env vars) |
 | Output | gather to rank 0 → netCDF | distributed Zarr writers, no rank-0 gather, partition-independent |
 | Restart | rank-0 gather → netCDF | partition-independent Zarr checkpoints (same I/O stack) |
@@ -56,8 +56,12 @@ Zarr output, and restart/checkpoint — all byte-exact against FESOM2, on 1 rank
 **After M10:** the bottom moved from elements to vertices (§13). That is a deliberate departure
 from FESOM2, so bit-identity no longer applies to the ocean; §13 explains what replaces it.
 
-**Deferred (foundations laid, not exercised):** mixed/reduced precision, non-triangular meshes,
-performance tuning, and ports to other languages. These are discussed in §12.
+**Hybrid meshes:** triangle, quad and mixed triangle+quad meshes (e.g. converted NEMO grids) run
+through the same code path (§7); every kernel was converted to 4-slot formulas, so triangle results
+are no longer bit-identical to FESOM2 either (roundoff-gated).
+
+**Deferred (foundations laid, not exercised):** mixed/reduced precision, performance tuning, and
+ports to other languages. These are discussed in §12.
 
 ---
 
@@ -218,10 +222,27 @@ integer, allocatable :: elem2D_nodes(:,:)    ! (MAX_NV, elem2D)
 integer, allocatable :: elem2D_nnodes(:)     ! (elem2D) vertices per element
 ```
 
-Connectivity arrays are dimensioned `(MAX_NV, elem2D)` and carry a per-element vertex count. For a
-triangular mesh `elem2D_nnodes == 3` everywhere, so the anchor build is unchanged; the scaffolding
-leaves room for quad or mixed-polygon meshes without touching the kernel code. (Geometry arrays are
-`MP`, per §6.)
+Connectivity arrays are dimensioned `(MAX_NV, elem2D)` and carry a per-element vertex count
+(3 or 4). **Mixed triangle + quad meshes are supported** (plan
+`docs/plans/completed/2026-10-08-hybrid-meshes.md`), in one code path with no triangle/quad branch in
+any kernel:
+
+- **4-slot convention.** Every element has 4 vertex slots, clockwise; a triangle repeats its 1st
+  vertex in slot 4. `elem2d.out` may have 3 or 4 columns.
+- **Kite weights.** `elem_w(MAX_NV,·)` (median-dual share of each vertex, a triangle exactly
+  1/3,1/3,1/3,0) and `nod_in_elem2D_w`; element means are `sum(elem_w*f)`, node gathers weight each
+  element by `elem_area·nod_in_elem2D_w` instead of FESOM2's `/3`.
+- **Gradients.** Green–Gauss `gradient_sca(8,·)` (x in rows 1:4, y in 5:8; a triangle's slot 4 = 0),
+  exact for linear fields on convex elements, equal to P1 on triangles.
+- **Missing neighbour = self.** `elem_neighbors`/`elem_edges` and `edge_tri` never hold a zero: on a
+  boundary edge `edge_tri(2) == edge_tri(1)` and boundary tests compare the two.
+
+Every kernel (ocean dynamics, tracers, mixing, GM/Redi, forcing/coupling, sea-ice EVP and FCT) was
+converted, so triangle meshes are **no longer bit-identical** to FESOM2 or to the pre-hybrid code:
+they agree to roundoff, gated by `tools/run_tri_regression.sh` ([TESTING.md](TESTING.md) §6b). The
+details (file formats, `fesom_ini`, exchanges, the SSH matrix, sea-ice mass matrix, open findings) are
+in `docs/HANDOFF.md`, section "Hybrid (mixed triangle + quad) meshes". (Geometry arrays are `MP`, per
+§6.)
 
 ### 8. Configuration
 
@@ -328,14 +349,13 @@ ones:
 **Done (M0–M10, tagged `m0`, `m1`, `m2-mvp`, `m3` … `m10`):** dynamical core; sea-ice EVP/mEVP;
 GM/Redi; KPP and TKE mixing; the zstar vertical coordinate; multi-year forced runs (CORE2,
 JRA55-do); Zarr output; restart/checkpoint. All byte-exact against FESOM2 on 1 rank and up to 864
-ranks. The next milestone is open.
+ranks. After M10: bottom at vertices (§13) and triangle/quad/mixed meshes (§7). The next milestone is
+open.
 
 **Foundations in place but not yet exercised:**
 
 - **Mixed / reduced precision.** The `WP`/`MP` split (§6) is built for it; the next step is to flip
   `WP` to single and protect the cancellation-sensitive computations.
-- **Non-triangular meshes.** `MAX_NV` and the per-element vertex count (§7) allow quad/mixed meshes;
-  no such mesh is run in v1.
 - **Performance.** The "reproduce exactly" phase deliberately preceded optimization; one targeted
   win (the surface-forcing read) is already done. Systematic profiling and throughput (SYPD) work
   are future.
@@ -371,7 +391,7 @@ ulevels(e) = maxval(ulevels_nod2D(elem2D_nodes(:,e)))
 nlevels(e) = minval(nlevels_nod2D(elem2D_nodes(:,e)))
 ```
 
-An element is wet only where **all three** of its corners are, so its layer range is exactly its
+An element is wet only where **all** of its 3 or 4 corners are, so its layer range is exactly its
 fully wet prisms. The design note's `tlayer`/`blayer` are `ulevels_nod2D`/`nlevels_nod2D-1`, and
 `tlayer_elem`/`blayer_elem` are `ulevels`/`nlevels-1`; the FESOM2 names were kept, so no kernel was
 renamed. Level (not layer) indexing was kept too. The full contract is written out at the vertical
@@ -403,9 +423,9 @@ and confines the stiffness integration to the full element interval — with no 
 **A trap worth knowing.** `nlevels_nod2D_min` and `ulevels_nod2D_max` look like aliases of the
 vertex column under this scheme and are not — they are 2-ring quantities bounding work that reaches
 *adjacent elements* from a node, and they sit several levels away from the vertex column over most
-of a real mesh. In particular `oce_muscl_adv.F90:303` reads `tr_xy` at the up/downwind triangles
-with no wetness test of its own; `nlevels_nod2D_min` is that read's only guard, and `tr_xy` is
-uninitialised below an element's bottom.
+of a real mesh. In particular the MUSCL scheme (`adv_tra_hor_muscl`, `oce_adv_tra_hor.F90`) reads
+`tr_xy` at the up/downwind elements of an edge, and `tr_xy` is uninitialised below an element's
+bottom; that read therefore tests the up/downwind element's own wet range (`ulevels..nlevels-1`).
 
 **The required invariant**, asserted at mesh setup:
 
@@ -424,6 +444,6 @@ elements deepen, mean `+0.067` levels, `+0.38 %` ocean volume, concentrated at i
 shelf breaks rather than at overflow sills. The alternative `blayer = min over adjacent elvls` is a
 double erosion with nothing to undo it (`-9.27 %` volume, 3966 dead bottom cells) and was rejected.
 
-**Deferred.** `edge_tri` → `edge_elem` with boundary self-duplication, element self-neighbours
-(`elem_neighbors` is allocated but never populated), horizontal diffusion, the Redi adjustment, and
-the optional inflation of boundary scalar-cell areas.
+**Deferred.** Horizontal diffusion, the Redi adjustment, and the optional inflation of boundary
+scalar-cell areas. (The boundary self-duplication of `edge_tri` and the element self-neighbours are
+done — §7.)
