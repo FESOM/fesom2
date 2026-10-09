@@ -12,6 +12,7 @@ program test_partit
     use mpi
     use mod_partit,        only: t_partit, com_struct
     use mod_partitioning,  only: par_init, par_ex, set_partition, read_mesh_dims
+    use mod_io_zarr,       only: zarr_mkdir
     implicit none
 
     character(len=512) :: mesh_dir, cbuf
@@ -113,11 +114,12 @@ program test_partit
 contains
     subroutine many_neighbours_case(which)
         ! FESOM3_TEST_MANY_NEIGHBOURS=recv|send: a synthetic dist_2 (one node, element and
-        ! edge per PE, written into the run directory) whose com_nod2D_full has 33 receive
-        ! (or send) PEs; read_com must stop at the count, before reading past the
-        ! com_struct arrays rPE/sPE(MAX_NEIGHBOR_PARTITIONS).
+        ! edge per PE, written into test_partit_many_neighbours_<which>/ of the run directory:
+        ! one directory per variant, so the two ctests can run concurrently) whose
+        ! com_nod2D_full has 33 receive (or send) PEs; read_com must stop at the count, before
+        ! reading past the com_struct arrays rPE/sPE(MAX_NEIGHBOR_PARTITIONS).
         character(len=*), intent(in) :: which
-        character(len=*), parameter :: d = 'test_partit_many_neighbours'
+        character(len=:), allocatable :: d
         ! an empty com_struct: rPEnum, rPE, rptr, rlist, sPEnum, sPE, sptr, slist
         character(len=1), parameter :: empty(8) = ['0', ' ', '1', ' ', '0', ' ', '1', ' ']
         character(len=8) :: cpe
@@ -130,8 +132,9 @@ contains
             write(*,'(a)') 'test_partit: unknown FESOM3_TEST_MANY_NEIGHBOURS='//which
             error stop 1
         end if
+        d = 'test_partit_many_neighbours_'//which
         if (partit%mype == 0) then
-            call execute_command_line('mkdir -p '//d//'/dist_2')
+            call zarr_mkdir(d//'/dist_2')   ! POSIX mkdir: no fork after MPI_Init
             open(newunit=u, file=d//'/dist_2/rpart.out', status='replace')
             write(u,'(a)') '2', '1 1'
             close(u)

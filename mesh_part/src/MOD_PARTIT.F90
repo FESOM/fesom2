@@ -38,7 +38,7 @@ type com_struct
      integer, dimension(:), allocatable            :: rlist  ! the list of nodes
      integer                                       :: sPEnum ! send part
      integer, dimension(MAX_NEIGHBOR_PARTITIONS)   :: sPE
-     integer, dimension(MAX_NEIGHBOR_PARTITIONS)   :: sptr
+     integer, dimension(MAX_NEIGHBOR_PARTITIONS+1) :: sptr
      integer, dimension(:), allocatable            :: slist
      integer, dimension(:), allocatable            :: req    ! request for MPI_Wait
      integer                                       :: nreq   ! number of requests for MPI_Wait

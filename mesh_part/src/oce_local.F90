@@ -216,7 +216,7 @@ subroutine set_send(pes, num_send, too_small, com)
 end subroutine set_send
 !=============================================================================
 ! PEs with num(p) > 0 (ascending) and the pointers into their lists; stops on more than
-! MAX_NEIGHBOR_PARTITIONS PEs (as gen_comm.F90 for com_nod2D/com_elem2D)
+! MAX_NEIGHBOR_PARTITIONS PEs (as gen_comm.F90 for com_nod2D/com_elem2D/com_elem2D_full)
 subroutine set_pe_ptr(num, npe, pe, ptr)
   integer,              intent(in)  :: num(0:)
   integer,              intent(out) :: npe

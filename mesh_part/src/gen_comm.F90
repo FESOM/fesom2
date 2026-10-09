@@ -116,6 +116,13 @@ subroutine communication_nodn(partit, mesh)
 !!$  allocate(com_nod2D%rPE(com_nod2D%rPEnum))
 !!$  allocate(com_nod2D%sPE(com_nod2D%sPEnum))
 
+  ! Stop BEFORE the fill loop: rPE/sPE hold MAX_NEIGHBOR_PARTITIONS entries, rptr/sptr one more
+  if (count(num_recv(0:npes-1) > 0) > MAX_NEIGHBOR_PARTITIONS .or.  &
+       count(num_send(0:npes-1) > 0) > MAX_NEIGHBOR_PARTITIONS) then
+     print *,'Increase MAX_NEIGHBOR_PARTITIONS in gen_modules_partitioning.F90 and recompile'
+     stop
+  endif
+
   r_count = 0
   s_count = 0
   com_nod2D%rptr(1) = 1
@@ -135,11 +142,6 @@ subroutine communication_nodn(partit, mesh)
   enddo
   com_nod2D%rPEnum = r_count
   com_nod2D%sPEnum = s_count
-  if (com_nod2D%rPEnum > MAX_NEIGHBOR_PARTITIONS .or.  &
-       com_nod2D%sPEnum > MAX_NEIGHBOR_PARTITIONS) then
-     print *,'Increase MAX_NEIGHBOR_PARTITIONS in gen_modules_partitioning.F90 and recompile'
-     stop
-  endif
 
   ! Counts the number of node for each partition PE mype has to send/receive
   ! In ascending order of PE number
@@ -344,6 +346,13 @@ subroutine communication_elemn(partit, mesh)
   endif
     
 ! Now, build the send and recv communication data structure
+  ! Stop BEFORE the fill loop: rPE/sPE hold MAX_NEIGHBOR_PARTITIONS entries, rptr/sptr one more
+  if (count(num_recv(0:npes-1) > 0) > MAX_NEIGHBOR_PARTITIONS .or.  &
+       count(num_send(0:npes-1) > 0) > MAX_NEIGHBOR_PARTITIONS) then
+     print *,'Increase MAX_NEIGHBOR_PARTITIONS in gen_modules_partitioning.F90 and recompile'
+     stop
+  endif
+
   r_count = 0
   s_count = 0
   com_elem2D%rptr(1) = 1
@@ -364,11 +373,6 @@ subroutine communication_elemn(partit, mesh)
 
   com_elem2D%rPEnum = r_count
   com_elem2D%sPEnum = s_count
-  if (com_elem2D%rPEnum > MAX_NEIGHBOR_PARTITIONS .or.  &
-       com_elem2D%sPEnum > MAX_NEIGHBOR_PARTITIONS) then
-     print *,'Increase MAX_NEIGHBOR_PARTITIONS in gen_modules_partitioning.F90 and recompile'
-     stop
-  endif
 
   ! Lists themselves
 
@@ -474,6 +478,13 @@ subroutine communication_elemn(partit, mesh)
   endif
 
   ! Now, build the send and recv communication data structure
+
+  ! Stop BEFORE the fill loop: rPE/sPE hold MAX_NEIGHBOR_PARTITIONS entries, rptr/sptr one more
+  if (count(num_recv(0:npes-1) > 0) > MAX_NEIGHBOR_PARTITIONS .or.  &
+       count(num_send(0:npes-1) > 0) > MAX_NEIGHBOR_PARTITIONS) then
+     print *,'Increase MAX_NEIGHBOR_PARTITIONS in gen_modules_partitioning.F90 and recompile'
+     stop
+  endif
 
   r_count = 0
   s_count = 0
