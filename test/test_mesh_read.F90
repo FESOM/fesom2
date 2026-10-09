@@ -10,17 +10,21 @@ program test_mesh_read
     !   - zbar == -(levels of depth.out) if there is no aux3d.out;
     !   - dist_N/format.out: the double-halo nodes (eXDim_nod2D) are vertices of local
     !     elements and no owned/halo node, and carry their coordinates and levels;
-    !   - no clockwise swap on a mesh with quads (fesom_ini oriented every element).
-    ! FESOM3_TEST_MALFORMED=1 (1 rank): writes a small mesh whose 3rd element line has
-    ! a wrong number of node ids and reads it: read_mesh must stop with a message (ctest
-    ! PASS_REGULAR_EXPRESSION); reaching the end is the failure ('did NOT stop').
+    !   - no clockwise swap on a mesh with quads (fesom_ini oriented every element);
+    !   - enforce_cw_orientation on anticlockwise and clockwise triangles and quads (an
+    !     in-memory mesh): turned ones are clockwise with the cycle reversed at vertex 1.
+    ! FESOM3_TEST_MALFORMED=k (1 rank): writes a small mesh with a defective elem2d.out
+    ! and reads it: 1 = a line with a wrong number of node ids, 2 = a 1st line with
+    ! neither 3 nor 4 ids, 3 = a non-integer id, 4 = an id outside 1..nod2D, 5 = a missing
+    ! line. read_mesh must stop with a message (ctest PASS_REGULAR_EXPRESSION); reaching
+    ! the end is the failure ('did NOT stop').
     use mpi
     use mod_precision,    only: WP, MP
     use mod_constants,    only: rad
     use mod_mesh,         only: t_mesh, MAX_NV
     use mod_partit,       only: t_partit
     use mod_partitioning, only: par_init, par_ex, set_partition, read_mesh_dims
-    use mod_mesh_read,    only: read_mesh
+    use mod_mesh_read,    only: read_mesh, enforce_cw_orientation
     implicit none
 
     character(len=512) :: mesh_dir, cbuf
@@ -36,7 +40,8 @@ program test_mesh_read
     nfail = 0
     cbuf = ''
     call get_environment_variable('FESOM3_TEST_MALFORMED', cbuf)
-    if (trim(cbuf) == '1') call malformed_case()
+    if (len_trim(cbuf) > 0) call malformed_case(trim(cbuf))
+    call orientation_case()
 
     call get_environment_variable('FESOM3_MESH_DIR', mesh_dir)
     if (len_trim(mesh_dir) == 0) mesh_dir = '/work/ab0995/a270029/meshes/nemo025mix_cut'
@@ -199,24 +204,69 @@ contains
         end if
     end function
 
-    subroutine malformed_case()
-        ! 4 nodes, 3 elements; the 3rd element line holds 2 ids in a 3-column file
-        character(len=*), parameter :: d = 'test_mesh_read_malformed'
+    subroutine orientation_case()
+        ! 7 nodes, 4 elements: an anticlockwise quad and triangle (turned) and their
+        ! clockwise copies (kept); after enforce_cw_orientation every element has the
+        ! signed area -1 or -1/2 (clockwise, a valid cycle) and slot 1 unchanged
+        type(t_mesh) :: tm
+        integer :: e, k, ns
+        real(kind=WP) :: a, x(MAX_NV), y(MAX_NV)
+        real(kind=WP), parameter :: area_ref(4) = [-1.0_WP, -0.5_WP, -1.0_WP, -0.5_WP]
+        tm%nod2D = 7; tm%elem2D = 4
+        allocate(tm%coord_nod2D(2, 7), tm%elem2D_nodes(MAX_NV, 4), tm%elem2D_nnodes(4))
+        tm%coord_nod2D(1, :) = [0.0_WP, 1.0_WP, 1.0_WP, 0.0_WP, 2.0_WP, 2.0_WP, 1.5_WP]
+        tm%coord_nod2D(2, :) = [0.0_WP, 0.0_WP, 1.0_WP, 1.0_WP, 0.0_WP, 1.0_WP, 2.0_WP]
+        tm%elem2D_nodes(:, 1) = [1, 2, 3, 4]      ! quad, anticlockwise
+        tm%elem2D_nodes(:, 2) = [2, 5, 6, 2]      ! triangle, anticlockwise (4th = 1st)
+        tm%elem2D_nodes(:, 3) = [1, 4, 3, 2]      ! quad, clockwise
+        tm%elem2D_nodes(:, 4) = [2, 6, 5, 2]      ! triangle, clockwise
+        tm%elem2D_nnodes = [4, 3, 4, 3]
+        call enforce_cw_orientation(tm, ns)
+        call check(ns == 2, 'enforce_cw_orientation: 2 swaps (the anticlockwise quad and triangle)')
+        call check(all(tm%elem2D_nodes(:, 1) == [1, 4, 3, 2]) .and. &
+                   all(tm%elem2D_nodes(:, 2) == [2, 6, 5, 2]) .and. &
+                   all(tm%elem2D_nodes(:, 3) == [1, 4, 3, 2]) .and. &
+                   all(tm%elem2D_nodes(:, 4) == [2, 6, 5, 2]), 'enforce_cw_orientation: cycles')
+        do e = 1, 4
+            x = tm%coord_nod2D(1, tm%elem2D_nodes(:, e)); y = tm%coord_nod2D(2, tm%elem2D_nodes(:, e))
+            a = 0.0_WP
+            do k = 1, tm%elem2D_nnodes(e)
+                a = a + 0.5_WP * (x(k) * y(mod(k, tm%elem2D_nnodes(e)) + 1) &
+                                - x(mod(k, tm%elem2D_nnodes(e)) + 1) * y(k))
+            end do
+            if (a /= area_ref(e)) call check(.false., 'enforce_cw_orientation: clockwise signed area')
+        end do
+    end subroutine
+
+    subroutine malformed_case(kind)
+        ! 4 nodes, 3 elements with one defect (FESOM3_TEST_MALFORMED, see the header)
+        character(len=*), intent(in) :: kind
+        character(len=:), allocatable :: d
         integer :: u
         if (partit%npes /= 1) then
             write(*,'(a)') 'test_mesh_read: the malformed case needs 1 rank'
             error stop 1
         end if
+        d = 'test_mesh_read_malformed'//kind
         call execute_command_line('mkdir -p '//d)
         open(newunit=u, file=d//'/nod2d.out', status='replace')
         write(u,'(a)') '4', '1 0.0 0.0 1', '2 1.0 0.0 1', '3 1.0 1.0 1', '4 0.0 1.0 1'
         close(u)
         open(newunit=u, file=d//'/elem2d.out', status='replace')
-        write(u,'(a)') '3', '1 2 3', '1 3 4', '2 4'
+        select case (kind)
+        case ('1'); write(u,'(a)') '3', '1 2 3', '1 3 4', '2 4'
+        case ('2'); write(u,'(a)') '3', '1 2', '1 3 4', '2 3 4'
+        case ('3'); write(u,'(a)') '3', '1 2 3', '1 3 x', '2 3 4'
+        case ('4'); write(u,'(a)') '3', '1 2 3', '1 3 9', '2 3 4'
+        case ('5'); write(u,'(a)') '3', '1 2 3', '1 3 4'
+        case default
+            write(*,'(a)') 'test_mesh_read: unknown FESOM3_TEST_MALFORMED='//kind
+            error stop 1
+        end select
         close(u)
         call read_mesh(mesh, partit, d, 0.0_WP, 0.0_WP, 0.0_WP, 360.0_WP, &
                        force_rotation=.false., n_cw_swaps=nsw)
-        write(*,'(a)') 'test_mesh_read: read_mesh did NOT stop on a malformed element line'
+        write(*,'(a)') 'test_mesh_read: read_mesh did NOT stop on a malformed elem2d.out'
         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
         error stop 1
     end subroutine

@@ -5,13 +5,14 @@ program test_partit
     ! Hybrid meshes: with dist_N/format.out the appended sections are read
     ! (eXDim_nod2D appended to myList_nod2D, com_nod2D_full, com_edge2D); the 1-rank
     ! synthesis provides them empty. The global counts come from the mesh headers, so
-    ! FESOM3_MESH_DIR may point to any mesh (default pi).
+    ! FESOM3_MESH_DIR may point to any mesh (default pi). FESOM3_EXPECT_FORMAT=1: the
+    ! appended sections are required (dist_N/format.out must be read).
     use mpi
     use mod_partit,        only: t_partit, com_struct
     use mod_partitioning,  only: par_init, par_ex, set_partition, read_mesh_dims
     implicit none
 
-    character(len=512) :: mesh_dir
+    character(len=512) :: mesh_dir, cbuf
     type(t_partit) :: partit
     integer :: ierr, nfail, nfail_g
     integer :: sum_nod, sum_elem, sum_edge
@@ -46,6 +47,10 @@ program test_partit
     call check(size(partit%myList_nod2D) == nNodX, 'myList_nod2D size == myDim+eDim+eXDim')
     call check(all(partit%myList_nod2D >= 1 .and. partit%myList_nod2D <= nod2D), 'node gids in range')
     call check(all(partit%myList_elem2D >= 1 .and. partit%myList_elem2D <= elem2D), 'elem gids in range')
+
+    cbuf = ''
+    call get_environment_variable('FESOM3_EXPECT_FORMAT', cbuf)
+    if (trim(cbuf) == '1') call check(partit%dist_format >= 1, 'FESOM3_EXPECT_FORMAT: appended sections read')
 
     ! ---- 1-rank synthesis specifics ----
     if (partit%npes == 1) then

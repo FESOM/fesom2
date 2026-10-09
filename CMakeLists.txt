@@ -156,6 +156,14 @@ endif()
 # evidence: tools/run_mpi_knem_stale_repro.sh). env.sh sets the same for all runs.
 set(FESOM3_MPI_LAUNCH_FLAGS "--mca;pml;ob1;--mca;btl;self,vader;--mca;btl_vader_single_copy_mechanism;none;--oversubscribe"
     CACHE STRING "Extra mpirun flags for ctest self-tests")
+# a build tree configured before the single-copy switch keeps its cached vader flags:
+# add the switch there (a cache without vader, e.g. a UCX override, is left alone)
+if(FESOM3_MPI_LAUNCH_FLAGS MATCHES "vader" AND NOT FESOM3_MPI_LAUNCH_FLAGS MATCHES "single_copy_mechanism")
+    list(INSERT FESOM3_MPI_LAUNCH_FLAGS 0 --mca btl_vader_single_copy_mechanism none)
+    set(FESOM3_MPI_LAUNCH_FLAGS "${FESOM3_MPI_LAUNCH_FLAGS}" CACHE STRING
+        "Extra mpirun flags for ctest self-tests" FORCE)
+    message(STATUS "FESOM3_MPI_LAUNCH_FLAGS: added btl_vader_single_copy_mechanism none")
+endif()
 
 function(add_fesom_test test_name nranks)
     # Build the executable once; allow registering the same test at several rank

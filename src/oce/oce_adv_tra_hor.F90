@@ -11,7 +11,7 @@ module oce_adv_tra_hor
     ! a zero increment where it is missing or dry. FESOM2 instead stores a per-edge array
     ! edge_up_dn_grad with a Miura node-averaged gradient on those levels; FESOM3 dropped
     ! both (docs/plans/completed/2026-10-06-muscl-onthefly.md). Identical to FESOM2 on the
-    ! levels where both edge nodes share both triangles (test_muscl_onthefly part R).
+    ! levels where both edge nodes share both elements (test_muscl_onthefly part R).
     !
     ! Each returns an EDGE flux that contributes with +sign to the 1st edge node and
     ! -sign to the 2nd (the driver scatters it to nodes). o_init_zero=.true. zeroes

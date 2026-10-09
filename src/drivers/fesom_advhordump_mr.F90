@@ -11,7 +11,7 @@ program fesom_advhordump_mr
     ! the oracle on the same partition) — node fields directly, the element velocity at
     ! owned elements then exchange_elem_full'd (halo elements have no local elem2D_nodes).
     !
-    ! Hybrid meshes (plan docs/plans/2026-10-08-hybrid-meshes.md, Task 14): the FESOM2-oracle
+    ! Hybrid meshes (plan docs/plans/completed/2026-10-08-hybrid-meshes.md, Task 14): the FESOM2-oracle
     ! byte gate is retired (docs/HANDOFF.md "Gate migration"). The driver has no triangle-
     ! specific code of its own (it runs the converted kernels) and stays a diagnostic dump.
     !

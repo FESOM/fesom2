@@ -1,8 +1,17 @@
 module mod_mesh_read
-    ! Read a partitioned FESOM mesh into t_mesh (1-rank: local == global; the
-    ! multi-rank remap is deferred to M2.12). File formats + topology transcribed
-    ! from FESOM2 v2.7.3 oce_mesh.F90 (file:line cites inline). Builds nod_in_elem2D,
-    ! enforces clockwise element orientation (test_tri), sets up the vertical levels.
+    ! Read a partitioned FESOM mesh into t_mesh (read_mesh: 1 rank, local == global;
+    ! read_mesh_local: multi-rank). File formats + topology transcribed from FESOM2
+    ! v2.7.3 oce_mesh.F90 (file:line cites inline). Builds nod_in_elem2D, enforces
+    ! clockwise element orientation (test_tri), sets up the vertical levels.
+    ! Hybrid meshes (docs/HANDOFF.md "Hybrid (mixed triangle + quad) meshes"):
+    !  - elem2d.out with 3 or 4 node ids per line, detected on the first element line
+    !    (read_elem_line; a triangle repeats its 1st vertex as the 4th);
+    !  - zbar and node depths from the NEMO depth.out when aux3d.out is absent
+    !    (open_depth_file; node levels still come from nlvls.out only);
+    !  - with dist_N/format.out the double-halo nodes (eXDim_nod2D) are read too, with
+    !    their coordinates and levels (read_mesh_local);
+    !  - an anticlockwise element is turned by swapping slots 2 and nv (a quad 2<->4,
+    !    enforce_cw_orientation).
     use mod_precision,   only: WP, MP
     use mod_constants,   only: rad
     use mod_mesh,        only: t_mesh, MAX_NV, MAX_ADJACENT
@@ -133,7 +142,7 @@ contains
         integer :: ios, ntok, k
         logical :: blank_prev
         read(u, '(a)', iostat=ios) line
-        if (ios /= 0) call elem_line_error(iel, 'missing', '')
+        if (ios /= 0) call elem_line_error(iel, 'is missing', '')
         ntok = 0; blank_prev = .true.
         do k = 1, len_trim(line)
             if (line(k:k) == ' ' .or. line(k:k) == char(9)) then
@@ -234,7 +243,7 @@ contains
         type(t_mesh),      intent(inout) :: mesh
         integer,           intent(out)   :: n_swaps
         integer, optional, intent(in)    :: nelem
-        integer :: n, tmp, ne_
+        integer :: n, k, tmp, ne_
         real(kind=WP) :: a1, a2, b1, b2, c1, c2, r
         ne_ = mesh%elem2D
         if (present(nelem)) ne_ = nelem
@@ -250,15 +259,12 @@ contains
             call trim_cyclic(c1)
             r = b1*c2 - b2*c1
             if (r > 0.0_WP) then
-                if (mesh%elem2D_nnodes(n) == 4) then
-                    tmp = mesh%elem2D_nodes(2, n)
-                    mesh%elem2D_nodes(2, n) = mesh%elem2D_nodes(4, n)
-                    mesh%elem2D_nodes(4, n) = tmp
-                else
-                    tmp = mesh%elem2D_nodes(2, n)
-                    mesh%elem2D_nodes(2, n) = mesh%elem2D_nodes(3, n)
-                    mesh%elem2D_nodes(3, n) = tmp
-                end if
+                ! reverse the cycle keeping vertex 1: swap slots 2 and nv (a triangle
+                ! 2<->3, a quad 2<->4; a triangle's 4th slot stays == the 1st)
+                k = mesh%elem2D_nnodes(n)
+                tmp = mesh%elem2D_nodes(2, n)
+                mesh%elem2D_nodes(2, n) = mesh%elem2D_nodes(k, n)
+                mesh%elem2D_nodes(k, n) = tmp
                 n_swaps = n_swaps + 1
             end if
         end do

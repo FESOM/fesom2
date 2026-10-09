@@ -9,7 +9,7 @@ module mod_ice_setup
     ! the M2.6 ssh_stiff CSR (rowptr_loc/colind_loc) exactly like FESOM2 rides ssh_stiff
     ! (rowptr/nn_num/nn_pos) — same sparsity, same nza, so fct_massmatrix is byte-identical.
     !
-    ! Hybrid meshes (plan docs/plans/2026-10-08-hybrid-meshes.md, Task 16): the mass matrix
+    ! Hybrid meshes (plan docs/plans/completed/2026-10-08-hybrid-meshes.md, Task 16): the mass matrix
     ! uses the user's element contributions (mod_ice_fct ice_mcoef: triangle S/6, S/12;
     ! quad (S/36)(4,2,1,2) rotated per row) on the SSH sparsity incl. quad diagonals, and
     ! its row sums are stored once as the FCT lumped mass (fct_lumpedmass).

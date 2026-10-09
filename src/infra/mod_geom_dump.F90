@@ -4,7 +4,7 @@ module mod_geom_dump
     ! compares them field-by-field for the M1 geometry byte-gate (closes deferred
     ! M0.7). Single-rank only (local == global), matching FESOM2's 1-rank geom run.
     !
-    ! Hybrid meshes (plan docs/plans/2026-10-08-hybrid-meshes.md, Tasks 7/14): the byte gate is
+    ! Hybrid meshes (plan docs/plans/completed/2026-10-08-hybrid-meshes.md, Tasks 7/14): the byte gate is
     ! retired (docs/HANDOFF.md "Gate migration"); the dump is REMAPPED to the FESOM2 layout so
     ! geom_diff.py --signal=<tol> stays usable as a roundoff diagnostic on TRIANGLE meshes:
     ! elem2D_nodes(1:3), gradient_sca x = slots 1:3 / y = slots 5:7 (6 rows), edge_tri with

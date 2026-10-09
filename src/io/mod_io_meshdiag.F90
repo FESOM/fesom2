@@ -14,7 +14,7 @@ module mod_io_meshdiag
     !   face_links       elem_neighbors/=self ? myList_elem2D : -999 (FESOM2 RAW :469; global here)
     !   edge_face_links  edge_tri(2)/=edge_tri(1) ? myList_elem2D : -999 (:488; slot 1 always)
     !
-    ! Hybrid meshes (plan docs/plans/2026-10-08-hybrid-meshes.md, Task 14): every per-face array
+    ! Hybrid meshes (plan docs/plans/completed/2026-10-08-hybrid-meshes.md, Task 14): every per-face array
     ! has 4 columns (dim n4) in the slot order of the model (clockwise; edge k joins vertices k and
     ! k+1). A triangle has only 3: its 4th column holds the array's UGRID _FillValue (the Zarr
     ! fill_value) -- face_nodes / face_edges -1, face_links -999 (FESOM2's missing-neighbour value,

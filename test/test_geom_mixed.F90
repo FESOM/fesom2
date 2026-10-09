@@ -19,6 +19,14 @@ program test_geom_mixed
     !   G7 triangles: centroid (elem_cos), elem_area, gradient_sca and the node area of
     !      all-triangle nodes equal FESOM2's P1 formulas (the previous FESOM3 code) to
     !      roundoff
+    !   G8 quads: elem_w == the kite areas (vertex, its two mid-edges, centroid) by the
+    !      shoelace formula / the shoelace polygon area, and elem_center == the shoelace
+    !      polygon centroid (independent of the sub-triangle code); on the jittered patch
+    !      the weights must differ from 1/4 (no vacuous pass)
+    !   G9 compute_mesh_resolution (np 1, parallelogram patch): 2*sqrt(areasvol/pi) after
+    !      the 3 kite-weighted smoothing sweeps equals the raw value of the uniform cells at
+    !      the nodes 4+ rings from the rim (their 3-ring neighbourhood has no rim node), and
+    !      the rim-near nodes differ (non-vacuity)
     use mpi
     use mod_precision,     only: WP, MP
     use mod_constants,     only: r_earth
@@ -26,14 +34,14 @@ program test_geom_mixed
     use mod_partit,        only: t_partit
     use mod_partitioning,  only: par_init, par_ex, set_partition
     use mod_mesh_read,     only: read_mesh
-    use mod_mesh_areas,    only: compute_geometry
-    use mod_mesh_analytic, only: generate_mixed_patch
+    use mod_mesh_areas,    only: compute_geometry, elem_center
+    use mod_mesh_analytic, only: generate_mixed_patch, generate_quad_patch
     use mod_mesh_rotate,   only: trim_cyclic, get_cyclic_length
     implicit none
 
     character(len=512) :: mesh_dir, cbuf
-    type(t_partit) :: partit, apartit
-    type(t_mesh)   :: mesh, amesh
+    type(t_partit) :: partit, apartit, qpartit
+    type(t_mesh)   :: mesh, amesh, qmesh
     integer :: ierr, nfail, nfail_g, nsw
 
     call par_init(partit)
@@ -67,6 +75,10 @@ program test_geom_mixed
                    all(amesh%edge_tri(2, amesh%edge2D_in+1:) == amesh%edge_tri(1, amesh%edge2D_in+1:)), &
                    'patch: interior edges first, boundary edges last', 0)
         call check_mesh(amesh, apartit, 'patch', .true.)
+        ! parallelogram patch: mesh_resolution of the uniform cells
+        call generate_quad_patch(qmesh, qpartit, nx=11, ny=11, nl=4, &
+                                 Lx=10000.0_WP, Ly=10000.0_WP, max_depth=100.0_WP, skew=0.4_WP)
+        call check_resolution(qmesh, 11, 11)
     end if
 
     call MPI_Allreduce(nfail, nfail_g, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
@@ -124,6 +136,15 @@ contains
         call check(e5 < 1.0e-9_WP,  tag//': G5 cross-edge vectors close around each element', p%mype)
         call check(conventions_ok(m, nElemO, nElemF, nEdgeO, nEdgeL), &
                    tag//': G6 edge_tri / elem_edges / elem_neighbors conventions', p%mype)
+        if (nquad > 0) then
+            call quad_kite_error(m, nElemO, e6(1:3))
+            call max_all(e6(1), p); call max_all(e6(2), p); call max_all(e6(3), p)
+            if (p%mype == 0) write(*,'(a,a,3es10.2)') tag, ': G8 quads vs shoelace kites ' // &
+                '(elem_w, centroid, max|w-1/4|):', e6(1:3)
+            call check(e6(1) < 1.0e-12_WP .and. e6(2) < 1.0e-12_WP, &
+                       tag//': G8 quad kite weights and centroid == shoelace formulas', p%mype)
+            if (cartesian) call check(e6(3) > 1.0e-3_WP, tag//': G8 weights differ from 1/4', p%mype)
+        end if
         if (ntri > 0 .and. .not. cartesian) then
             call previous_triangle_formulas(m, nNodO, nElemO, e6)
             call max_all(e6(1), p); call max_all(e6(2), p); call max_all(e6(3), p); call max_all(e6(4), p)
@@ -332,6 +353,71 @@ contains
                 if (alltri) s = s + aold_e(e) / 3.0_WP
             end do
             if (alltri) err(4) = max(err(4), abs(m%area(n) - s) / s)
+        end do
+    end subroutine
+
+    subroutine check_resolution(m, nx, ny)
+        ! G9: node (i,j) of the nx x ny parallelogram patch; ring = distance to the rim
+        type(t_mesh), intent(in) :: m
+        integer,      intent(in) :: nx, ny
+        integer :: n, i, j, ring, nin
+        real(kind=WP) :: r0, err, dev
+        n = (ny/2)*nx + nx/2 + 1                      ! the centre node
+        r0 = 2.0_WP*sqrt(real(m%areasvol(n), WP)/acos(-1.0_WP))
+        err = 0.0_WP; dev = 0.0_WP; nin = 0
+        do n = 1, m%nod2D
+            i = mod(n-1, nx) + 1; j = (n-1)/nx + 1
+            ring = min(i-1, nx-i, j-1, ny-j)
+            if (ring >= 4) then
+                err = max(err, abs(real(m%mesh_resolution(n), WP) - r0)/r0); nin = nin + 1
+            else if (ring == 1) then
+                dev = max(dev, abs(real(m%mesh_resolution(n), WP) - r0)/r0)
+            end if
+        end do
+        write(*,'(a,i0,a,2es10.2)') 'parallelogram patch: G9 mesh_resolution, ', nin, &
+            ' deep nodes rel. err, rim-near deviation:', err, dev
+        call check(nin > 0 .and. err < 1.0e-13_WP, 'parallelogram patch: G9 mesh_resolution of uniform cells', 0)
+        call check(dev > 1.0e-3_WP, 'parallelogram patch: G9 rim-near nodes differ (non-vacuity)', 0)
+    end subroutine
+
+    subroutine quad_kite_error(m, nElemO, err)
+        ! G8 for owned quads, in lon/lat relative to vertex 1 (trim_cyclic): polygon area
+        ! A and centroid c by the shoelace formulas; kite j = (p_j, mid(j,j+1), c,
+        ! mid(j-1,j)) by the shoelace formula; err = (max|elem_w - kite/A|, max distance
+        ! elem_center - c relative to sqrt(A), max|elem_w - 1/4|)
+        type(t_mesh),  intent(in)  :: m
+        integer,       intent(in)  :: nElemO
+        real(kind=WP), intent(out) :: err(3)
+        integer :: e, j, jp, jm
+        real(kind=WP) :: x(4), y(4), cr, a, cx, cy, ex, ey, kx(4), ky(4), kite
+        err = 0.0_WP
+        do e = 1, nElemO
+            if (m%elem2D_nnodes(e) /= 4) cycle
+            do j = 1, 4
+                x(j) = m%coord_nod2D(1, m%elem2D_nodes(j, e)) - m%coord_nod2D(1, m%elem2D_nodes(1, e))
+                call trim_cyclic(x(j))
+                y(j) = m%coord_nod2D(2, m%elem2D_nodes(j, e)) - m%coord_nod2D(2, m%elem2D_nodes(1, e))
+            end do
+            a = 0.0_WP; cx = 0.0_WP; cy = 0.0_WP
+            do j = 1, 4
+                jp = mod(j, 4) + 1
+                cr = x(j)*y(jp) - x(jp)*y(j)
+                a = a + 0.5_WP*cr
+                cx = cx + (x(j) + x(jp))*cr; cy = cy + (y(j) + y(jp))*cr
+            end do
+            cx = cx / (6.0_WP*a); cy = cy / (6.0_WP*a)
+            do j = 1, 4
+                jp = mod(j, 4) + 1; jm = mod(j+2, 4) + 1
+                kx = [x(j), 0.5_WP*(x(j)+x(jp)), cx, 0.5_WP*(x(j)+x(jm))]
+                ky = [y(j), 0.5_WP*(y(j)+y(jp)), cy, 0.5_WP*(y(j)+y(jm))]
+                kite = 0.5_WP*(sum(kx*cshift(ky, 1)) - sum(cshift(kx, 1)*ky))
+                err(1) = max(err(1), abs(m%elem_w(j, e) - kite/a))
+                err(3) = max(err(3), abs(m%elem_w(j, e) - 0.25_WP))
+            end do
+            call elem_center(m, e, ex, ey)
+            ex = ex - m%coord_nod2D(1, m%elem2D_nodes(1, e)); call trim_cyclic(ex)
+            ey = ey - m%coord_nod2D(2, m%elem2D_nodes(1, e))
+            err(2) = max(err(2), sqrt((ex - cx)**2 + (ey - cy)**2) / sqrt(abs(a)))
         end do
     end subroutine
 

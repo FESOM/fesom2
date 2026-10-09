@@ -13,6 +13,7 @@ module mod_mesh_analytic
     use mod_constants, only: r_earth
     use mod_mesh,      only: t_mesh, MAX_NV, MAX_ADJACENT
     use mod_partit,    only: t_partit
+    use mod_partitioning, only: set_empty_comms
     use mod_mesh_areas,  only: compute_geometry
     use mod_mesh_rotate, only: init_mesh_rotation
     use mod_mesh_read,   only: enforce_cw_orientation, derive_vertical_bounds
@@ -260,14 +261,12 @@ contains
         type(t_mesh),   intent(in)    :: mesh
         type(t_partit), intent(inout) :: partit
         integer :: i
-        partit%myDim_nod2D = mesh%nod2D; partit%eDim_nod2D = 0
+        partit%myDim_nod2D = mesh%nod2D; partit%eDim_nod2D = 0; partit%eXDim_nod2D = 0
         partit%myDim_elem2D = mesh%elem2D; partit%eDim_elem2D = 0; partit%eXDim_elem2D = 0
         partit%myDim_edge2D = mesh%edge2D; partit%eDim_edge2D = 0
         if (allocated(partit%myList_nod2D)) deallocate(partit%myList_nod2D)
         allocate(partit%myList_nod2D(mesh%nod2D)); partit%myList_nod2D = [(i, i=1, mesh%nod2D)]
-        partit%com_nod2D%rPEnum = 0; partit%com_nod2D%sPEnum = 0
-        partit%com_elem2D%rPEnum = 0; partit%com_elem2D%sPEnum = 0
-        partit%com_elem2D_full%rPEnum = 0; partit%com_elem2D_full%sPEnum = 0
+        call set_empty_comms(partit)      ! as synthesize_1rank: the exchanges are no-ops
     end subroutine synth_partit
 
 end module mod_mesh_analytic

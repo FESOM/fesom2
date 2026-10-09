@@ -575,8 +575,9 @@ program fesom_conserve
             trim(which_ALE), ').'
     end if
     if (conserve_tol > 0.0_WP) then
-        if (abs(drift(1)) > conserve_tol .or. abs(drift(2)) > conserve_tol .or. &
-            abs(vdrift)   > conserve_tol .or. any(abs(idrift) > conserve_tol)) then
+        ! written as .not.(<= tol) so that a NaN drift fails the gate
+        if (.not. (abs(drift(1)) <= conserve_tol .and. abs(drift(2)) <= conserve_tol .and. &
+                   abs(vdrift)   <= conserve_tol .and. all(abs(idrift) <= conserve_tol))) then
             if (partit%mype == 0) &
                 write(*,'(a,es12.4)') 'fesom_conserve: CONSERVATION VIOLATED, tol=', conserve_tol
             call par_ex(partit%MPI_COMM_FESOM, partit%mype)
@@ -732,7 +733,7 @@ contains
 
         !______________________________________________________________________
         ! 1c. sea-ice masses sum(fct_lumpedmass*f) over owned nodes (a_ice, m_ice, m_snow) --
-        !     the quantity the ice FCT conserves (Task 16); finite ice velocity
+        !     the quantity the ice FCT conserves (Task 16); finite ice velocity and tracers
         if (use_ice) then
             do i = 1, 3
                 acc = 0.0_WP
@@ -745,6 +746,12 @@ contains
             do j = 1, nNodO
                 if (.not. finite(ice%uice(j)) .or. .not. finite(ice%vice(j))) then
                     write(*,'(a,i0,a,i0,a,i0)') 'fesom_conserve: non-finite ice velocity at step ', &
+                        step, ' rank ', partit%mype, ' node ', j
+                    error stop 1
+                end if
+                if (.not. finite(ice%data(1)%values(j)) .or. .not. finite(ice%data(2)%values(j)) .or. &
+                    .not. finite(ice%data(3)%values(j))) then
+                    write(*,'(a,i0,a,i0,a,i0)') 'fesom_conserve: non-finite a/m_ice/m_snow at step ', &
                         step, ' rank ', partit%mype, ' node ', j
                     error stop 1
                 end if

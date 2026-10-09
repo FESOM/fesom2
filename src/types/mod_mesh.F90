@@ -123,9 +123,9 @@ module mod_mesh
         ! These bound work that reaches ADJACENT ELEMENTS from a node, not the node's own
         ! cell, and they are several levels away from the vertex column over most of a
         ! real mesh (pi: mean -3.4, min -28). Do NOT substitute nlevels_nod2D for them.
-        ! In particular oce_muscl_adv.F90:303 reads tr_xy at the up/downwind triangles
-        ! with NO wetness test of its own -- nlevels_nod2D_min is that read's only guard,
-        ! and tr_xy is uninitialized below an element's bottom.
+        ! (The MUSCL read of tr_xy at the up/downwind elements, adv_tra_hor_muscl in
+        ! oce_adv_tra_hor.F90, tests the up/downwind element's own wet range: tr_xy is
+        ! uninitialized below an element's bottom.)
         !
         ! REQUIRED INVARIANT, asserted in setup_vertical / setup_vertical_local:
         !     maxval over e in adj(n) of nlevels(e) == nlevels_nod2D(n)

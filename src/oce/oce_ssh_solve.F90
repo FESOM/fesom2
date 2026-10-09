@@ -105,13 +105,21 @@ contains
         if (present(partit)) root = (partit%mype == 0)
         call get_environment_variable('FESOM3_SSH_SOLTOL', env, length=env_len, status=ios)
         if (ios == 0 .and. env_len > 0) then
-            read(env, *) dynamics%solverinfo%soltol
+            read(env, *, iostat=ios) dynamics%solverinfo%soltol
+            if (ios /= 0) then
+                write(*,'(a)') 'solve_ssh_ale: FESOM3_SSH_SOLTOL: not a real: "'//env(1:min(env_len,64))//'"'
+                error stop 1
+            end if
             if (root) write(*,'(a,es10.3)') ' solve_ssh_ale: FESOM3_SSH_SOLTOL soltol=', &
                 dynamics%solverinfo%soltol
         end if
         call get_environment_variable('FESOM3_SSH_MAXITER', env, length=env_len, status=ios)
         if (ios == 0 .and. env_len > 0) then
-            read(env, *) dynamics%solverinfo%maxiter
+            read(env, *, iostat=ios) dynamics%solverinfo%maxiter
+            if (ios /= 0) then
+                write(*,'(a)') 'solve_ssh_ale: FESOM3_SSH_MAXITER: not an integer: "'//env(1:min(env_len,64))//'"'
+                error stop 1
+            end if
             if (root) write(*,'(a,i0)') ' solve_ssh_ale: FESOM3_SSH_MAXITER maxiter=', &
                 dynamics%solverinfo%maxiter
         end if

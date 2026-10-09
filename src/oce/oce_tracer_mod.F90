@@ -49,7 +49,7 @@ contains
         ! run over OWNED+HALO nodes (values/valuesold are halo-consistent so valuesAB is
         ! valid at the halo the HO kernels read). tr_xy is built on OWNED elements then
         ! exchanged over the FULL element halo (FESOM2 init_tracers_AB:128-132): the MUSCL
-        ! kernels read it at the up/downwind triangles of owned edges (halo elements of a halo node's
+        ! kernels read it at the up/downwind elements of owned edges (halo elements of a halo node's
         ! element list.
         integer,        intent(in)    :: tr_num
         type(t_mesh),   intent(in)    :: mesh

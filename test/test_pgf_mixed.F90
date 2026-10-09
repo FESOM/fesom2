@@ -19,6 +19,16 @@ program test_pgf_mixed
     !      level where all adjacent elements are wet (sum_k nod_in_elem2D_w*elem_area ==
     !      area; the former 3*area denominator gives 4/3 at an all-quad node)
     !   N2 update_vel: d_eta = a*x + b*y -> UV increment = -g*theta*dt*(a, b)
+    !   R1 compute_sigma_xy (kite-share node gather of the 4-slot element gradients): T and
+    !      S linear in (x, y) -> sigma_xy = (-alpha*grad T + beta*grad S)*density_0 at every
+    !      owned node level (each wet element gradient is exact, the shares sum to vol)
+    !   R2 smooth_nod (kite-weighted element means, kite-share node means): a constant
+    !      field stays constant over 3 sweeps
+    !   R3 fer_gamma2vel: Gamma linear in zbar, horizontally uniform -> fer_uv = the
+    !      vertical derivative (elem_w sums to 1 over the 4 slots)
+    !   E1 extrap_nod3D (analytic patch, np 1): one missing node next to a triangle gets
+    !      the mean over its elements' DISTINCT vertices (a triangle's repeated slot 4
+    !      counted once); the mean with slot 4 counted twice differs (non-vacuity)
     ! On a global mesh (pi_w, rotated) a field linear in longitude jumps across the cyclic
     ! seam, so elements whose vertices span more than pi in longitude are skipped.
     use mpi
@@ -35,6 +45,9 @@ program test_pgf_mixed
     use mod_part_bounds,   only: owned_bounds
     use oce_pgf,           only: pressure_force_4_linfs_fullcell, pressure_force_4_zxxxx_shchepetkin
     use oce_ale,           only: compute_vel_nodes, update_vel
+    use oce_pressure_bv,   only: compute_sigma_xy, smooth_nod
+    use oce_fer_gm,        only: fer_gamma2vel
+    use oce_initial_state, only: t_ic3d_config, extrap_nod3D
     implicit none
 
     character(len=512) :: mesh_dir, cbuf
@@ -98,7 +111,12 @@ contains
         type(t_dyn) :: dyn
         integer :: nNodO, nNodL, nEdgeO, nElemO, nElemF, nl, n, nz, e, ntri, nquad
         real(kind=WP), allocatable :: x(:), y(:), hp(:,:), rho(:,:), pgx(:,:), pgy(:,:)
-        real(kind=WP) :: pz, err(6), scal, dep, expx
+        real(kind=WP) :: pz, err(6), scal, dep, expx, rerr(3)
+        real(kind=WP), allocatable :: tt(:,:), ss(:,:), swa(:,:), swb(:,:), sxy(:,:,:), gam(:,:,:), fuv(:,:,:)
+        real(kind=WP), parameter :: GT = 2.0e-5_WP, GS = -1.0e-5_WP   ! R1 dT/dx, dS/dy
+        real(kind=WP), parameter :: SWA0 = 2.0e-4_WP, SWB0 = 7.5e-4_WP, GG = 3.0e-3_WP
+        logical :: allel
+        integer :: k
         real(kind=WP), parameter :: A = 2.0_WP, B = -3.0_WP      ! P2 pressure gradient [Pa/m]
         real(kind=WP), parameter :: TX = 1.0e-6_WP, TY = -0.5e-6_WP  ! P3 level tilt [1/m]
         real(kind=WP), parameter :: RZ = 2.0e-3_WP                ! P3 d(rho)/dz [kg/m^4]
@@ -233,6 +251,61 @@ contains
         call max_all(err(6), p)
         err(6) = err(6)/(g*theta*DT*EY)
 
+        !--- R1: sigma_xy of linear T, S ---
+        allocate(tt(nl-1, m%nod2D), ss(nl-1, m%nod2D), swa(nl-1, m%nod2D), swb(nl-1, m%nod2D), &
+                 sxy(2, nl-1, m%nod2D))
+        tt = 0.0_WP; ss = 0.0_WP; sxy = 0.0_WP
+        swa = SWA0; swb = SWB0
+        do n = 1, nNodL
+            tt(:, n) = 10.0_WP + GT*x(n)
+            ss(:, n) = 35.0_WP + GS*y(n)
+        end do
+        call compute_sigma_xy(tt, ss, swa, swb, m, sxy, p)
+        rerr = 0.0_WP
+        do n = 1, nNodO
+            allel = .true.
+            do k = 1, m%nod_in_elem2D_num(n)
+                if (.not. use_el(m%nod_in_elem2D(k, n))) allel = .false.
+            end do
+            if (.not. allel) cycle
+            do nz = m%ulevels_nod2D(n), m%nlevels_nod2D(n)-1
+                rerr(1) = max(rerr(1), abs(sxy(1, nz, n) + SWA0*GT*density_0), &
+                                       abs(sxy(2, nz, n) - SWB0*GS*density_0))
+            end do
+        end do
+        call max_all(rerr(1), p)
+        rerr(1) = rerr(1)/(SWB0*abs(GS)*density_0)
+        !--- R2: smooth_nod keeps a constant ---
+        tt = 3.7_WP
+        call smooth_nod(tt, 3, m, p)
+        do n = 1, nNodO
+            do nz = m%ulevels_nod2D(n), min(nl-1, m%nlevels_nod2D(n))
+                rerr(2) = max(rerr(2), abs(tt(nz, n) - 3.7_WP)/3.7_WP)
+            end do
+        end do
+        call max_all(rerr(2), p)
+        !--- R3: fer_gamma2vel of a horizontally uniform Gamma linear in zbar ---
+        allocate(gam(2, nl, m%nod2D), fuv(2, nl-1, m%elem2D))
+        gam = 0.0_WP; fuv = 0.0_WP
+        do n = 1, nNodL
+            gam(1, :, n) =  GG*real(m%zbar(1:nl), WP)
+            gam(2, :, n) = -GG*real(m%zbar(1:nl), WP)
+        end do
+        call fer_gamma2vel(m, gam, fuv, p)
+        do e = 1, nElemO
+            do nz = m%ulevels(e), m%nlevels(e)-1
+                rerr(3) = max(rerr(3), abs(fuv(1, nz, e) - GG), abs(fuv(2, nz, e) + GG))
+            end do
+        end do
+        call max_all(rerr(3), p)
+        rerr(3) = rerr(3)/GG
+        if (p%mype == 0) write(*,'(a,a,3es10.2)') tag, ': R1 sigma_xy, R2 smooth_nod, R3 fer_gamma2vel rel. errors:', rerr
+        call check(rerr(1) < 1.0e-10_WP, tag//': R1 sigma_xy of linear T, S exact', p%mype)
+        call check(rerr(2) < 1.0e-13_WP, tag//': R2 smooth_nod keeps a constant', p%mype)
+        call check(rerr(3) < 1.0e-12_WP, tag//': R3 fer_gamma2vel of a uniform Gamma exact', p%mype)
+        if (tag == 'patch') call check_extrap(m, x, y)
+        deallocate(tt, ss, swa, swb, sxy, gam, fuv)
+
         if (p%mype == 0) write(*,'(a,a,i0,a,i0,a,i0,a,6es10.2)') tag, ': owned triangles=', ntri, &
             ' quads=', nquad, ' (seam skipped: ', count(.not. use_el), ')  P1 P2 P3 P4 N1 N2 rel. errors:', err
         call check(err(1) < 1.0e-12_WP, tag//': P1 linfs PGF of a resting ocean == 0', p%mype)
@@ -243,6 +316,58 @@ contains
         call check(err(6) < 1.0e-10_WP, tag//': N2 update_vel SSH gradient exact', p%mype)
         deallocate(x, y, hp, rho, pgx, pgy)
     end subroutine check_kernels
+
+    subroutine check_extrap(m, x, y)
+        ! E1 on the analytic patch (1 rank): the first node off the patch rim (2 rings)
+        ! with a triangle around it is set missing at the surface; expected = mean of f
+        ! over the distinct vertices (slot k skipped if it repeats an earlier slot) of
+        ! its elements, the node itself excluded
+        type(t_mesh),  intent(in) :: m
+        real(kind=WP), intent(in) :: x(:), y(:)
+        type(t_ic3d_config) :: ic
+        real(kind=WP), allocatable :: arr(:,:)
+        real(kind=WP) :: want, dup, xmin, xmax, ymin, ymax, hx, hy
+        integer :: n0, n, k, j, e, v, cnt, cntd
+        logical :: tri
+        xmin = minval(x); xmax = maxval(x); ymin = minval(y); ymax = maxval(y)
+        hx = 0.2_WP*(xmax - xmin); hy = 0.2_WP*(ymax - ymin)
+        n0 = 0
+        do n = 1, m%nod2D
+            if (x(n) < xmin + hx .or. x(n) > xmax - hx .or. y(n) < ymin + hy .or. y(n) > ymax - hy) cycle
+            tri = .false.
+            do k = 1, m%nod_in_elem2D_num(n)
+                if (m%elem2D_nnodes(m%nod_in_elem2D(k, n)) == 3) tri = .true.
+            end do
+            if (tri) then
+                n0 = n; exit
+            end if
+        end do
+        call check(n0 > 0, 'patch: E1 interior node next to a triangle found', 0)
+        if (n0 == 0) return
+        allocate(arr(m%nl-1, m%nod2D))
+        do n = 1, m%nod2D
+            arr(:, n) = 1.0_WP + 1.0e-4_WP*x(n) - 2.0e-4_WP*y(n)
+        end do
+        arr(1, n0) = ic%dummy
+        want = 0.0_WP; dup = 0.0_WP; cnt = 0; cntd = 0
+        do k = 1, m%nod_in_elem2D_num(n0)
+            e = m%nod_in_elem2D(k, n0)
+            do j = 1, 4
+                v = m%elem2D_nodes(j, e)
+                if (v == n0) cycle
+                dup = dup + arr(1, v); cntd = cntd + 1
+                if (any(m%elem2D_nodes(1:j-1, e) == v)) cycle
+                want = want + arr(1, v); cnt = cnt + 1
+            end do
+        end do
+        want = want/real(cnt, WP); dup = dup/real(cntd, WP)
+        call extrap_nod3D(arr, ic, m)
+        write(*,'(a,i0,a,3es12.4)') 'patch: E1 extrap_nod3D at node ', n0, ': got, distinct-vertex mean, ' // &
+            'slot-4-twice mean:', arr(1, n0), want, dup
+        call check(abs(arr(1, n0) - want) < 1.0e-13_WP*abs(want), &
+                   'patch: E1 extrap_nod3D = mean over the distinct element vertices', 0)
+        call check(abs(dup - want) > 1.0e-8_WP*abs(want), 'patch: E1 slot-4-twice mean differs (non-vacuity)', 0)
+    end subroutine check_extrap
 
     real(kind=WP) function owned_max(f, m, p, nElemO)
         ! max over the owned elements and their wet levels of a (nl-1, elem) field

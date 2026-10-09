@@ -35,7 +35,7 @@ module mod_ice_dyn
     !  - cd_oce_ice / delta_min are set by the driver to the namelist DOUBLES (0.0055_WP /
     !    1.0e-11_WP) NOT the t_ice single->WP defaults (the M3a precision note); the EVP
     !    arithmetic reads ice%cd_oce_ice / ice%delta_min so the override propagates.
-    !  - hybrid meshes (plan docs/plans/2026-10-08-hybrid-meshes.md, Task 15): unified 4-slot
+    !  - hybrid meshes (plan docs/plans/completed/2026-10-08-hybrid-meshes.md, Task 15): unified 4-slot
     !    formulas, so triangles agree with FESOM2 to roundoff only. Strain rates and the
     !    stress divergence use gradient_sca over the 4 vertex slots (x 1:4, y 5:8; a
     !    triangle's slot 4 has coefficient 0); every element mean (metric terms, msum/asum)

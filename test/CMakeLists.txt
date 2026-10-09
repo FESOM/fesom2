@@ -34,98 +34,97 @@ add_fesom_test(test_io_posix 1)
 add_fesom_test(test_vector_rotate 1)
 add_fesom_test(test_io_means 1)
 
-# Hybrid meshes (docs/plans/2026-10-08-hybrid-meshes.md, Task 6): mesh + extended dist_N
-# reading. test_mesh_read checks read_mesh against the mesh files (vertex counts, levels,
-# double-halo nodes); default mesh = the NEMO-mixed cut-out. test_partit checks the
-# appended dist_N sections (dist_N/format.out). The writable meshes live under
-# /work/ab0995/a270029/meshes; a missing mesh skips the test.
+# Hybrid meshes (docs/plans/completed/2026-10-08-hybrid-meshes.md). The writable meshes live
+# under /work/ab0995/a270029/meshes. A test whose mesh (or IC file) is absent at configure
+# time is registered DISABLED (ctest: "Not Run (Disabled)", reconfigure after adding a
+# mesh); a present mesh with a missing dist_N/com file, or any failing file open, FAILS.
 set(_hyb_meshes /work/ab0995/a270029/meshes)
-add_fesom_test(test_mesh_read 1)
-add_fesom_test(test_mesh_read 2)
-foreach(_case quad:nemo025q_cut mixed:nemo025mix_cut pi_w:pi_w)
+set(_mesh_q   ${_hyb_meshes}/nemo025q_cut)
+set(_mesh_mix ${_hyb_meshes}/nemo025mix_cut)
+set(_mesh_piw ${_hyb_meshes}/pi_w)
+set(_mesh_c2w ${_hyb_meshes}/core2_w)
+set(_mesh_pi  /home/a/a270088/port2/fesom2/tests/data/MESHES/pi)
+set(_icf  /pool/data/AWICM/FESOM2/INITIAL/phc3.0/phc3.0_winter.nc)
+# require_files(<test> <file>...): disable <test> unless every file exists
+function(require_files test)
+    foreach(_f ${ARGN})
+        if(NOT EXISTS ${_f})
+            set_tests_properties(${test} PROPERTIES DISABLED TRUE)
+            message(STATUS "${test}: ${_f} not found, test disabled")
+            return()
+        endif()
+    endforeach()
+endfunction()
+# add_mesh_test(<test> <target> <mesh dir> <nranks> [env...]): <target> on <nranks> ranks
+# with FESOM3_MESH_DIR=<mesh dir> and the extra environment entries
+function(add_mesh_test test target mesh np)
+    add_test(NAME ${test}
+             COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np ${np} $<TARGET_FILE:${target}>)
+    set(_env "FESOM3_MESH_DIR=${mesh}" ${ARGN})
+    set_tests_properties(${test} PROPERTIES ENVIRONMENT "${_env}")
+    require_files(${test} ${mesh}/nod2d.out)
+endfunction()
+# add_default_mesh_test(<target> <mesh dir> <nranks>...): add_fesom_test at each rank
+# count; <mesh dir> is the test's built-in default mesh
+function(add_default_mesh_test target mesh)
+    foreach(_np ${ARGN})
+        add_fesom_test(${target} ${_np})
+        require_files(${target}_np${_np} ${mesh}/nod2d.out)
+    endforeach()
+endfunction()
+
+# Task 6: mesh + extended dist_N reading. test_mesh_read checks read_mesh against the mesh
+# files (vertex counts, levels, double-halo nodes) and enforce_cw_orientation on flipped
+# elements; default mesh = the NEMO-mixed cut-out. test_partit checks the appended dist_N
+# sections (FESOM3_EXPECT_FORMAT=1: dist_N/format.out must be there).
+add_default_mesh_test(test_mesh_read ${_mesh_mix} 1 2)
+foreach(_case quad:${_mesh_q} mixed:${_mesh_mix} pi_w:${_mesh_piw})
     string(REPLACE ":" ";" _pair ${_case})
     list(GET _pair 0 _tag)
     list(GET _pair 1 _mesh)
     foreach(_np 1 2)
-        foreach(_t test_mesh_read test_partit)
-            add_test(NAME ${_t}_${_tag}_np${_np}
-                     COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np ${_np}
-                             $<TARGET_FILE:${_t}>)
-            set_tests_properties(${_t}_${_tag}_np${_np} PROPERTIES
-                ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/${_mesh}"
-                SKIP_REGULAR_EXPRESSION "cannot open;No such file")
-        endforeach()
+        add_mesh_test(test_mesh_read_${_tag}_np${_np} test_mesh_read ${_mesh} ${_np})
+        add_mesh_test(test_partit_${_tag}_np${_np} test_partit ${_mesh} ${_np} FESOM3_EXPECT_FORMAT=1)
     endforeach()
 endforeach()
 # Task 7: mixed-mesh geometry identities (kite weights, Green-Gauss gradient, conventions,
 # triangles == the previous P1 formulas); default mesh = the NEMO-mixed cut-out, the np 1
 # run also checks the analytic mixed patch. pi_w at np 1/2 for the triangle comparison.
-add_fesom_test(test_geom_mixed 1)
-add_fesom_test(test_geom_mixed 2)
-foreach(_np 1 2)
-    add_test(NAME test_geom_mixed_pi_w_np${_np}
-             COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np ${_np} $<TARGET_FILE:test_geom_mixed>)
-    set_tests_properties(test_geom_mixed_pi_w_np${_np} PROPERTIES
-        ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/pi_w;FESOM3_TEST_ROTATE=1"
-        SKIP_REGULAR_EXPRESSION "cannot open;No such file")
-endforeach()
+add_default_mesh_test(test_geom_mixed ${_mesh_mix} 1 2)
+add_mesh_test(test_geom_mixed_pi_w_np1 test_geom_mixed ${_mesh_piw} 1 FESOM3_TEST_ROTATE=1)
+add_mesh_test(test_geom_mixed_pi_w_np2 test_geom_mixed ${_mesh_piw} 2 FESOM3_TEST_ROTATE=1)
 # Task 8: edge exchange (com_edge2D) and double node halo exchange (com_nod2D_full) round
 # trips; default mesh = the NEMO quad cut-out (np 1 = the synthesis, empty lists).
-add_fesom_test(test_halo_ext 1)
-foreach(_case quad:nemo025q_cut:2,4,8 mixed:nemo025mix_cut:4 pi_w:pi_w:2,4,8 core2_w:core2_w:2,4,8)
-    string(REPLACE ":" ";" _trip ${_case})
-    list(GET _trip 0 _tag)
-    list(GET _trip 1 _mesh)
-    list(GET _trip 2 _nps)
-    string(REPLACE "," ";" _nps ${_nps})
-    foreach(_np ${_nps})
-        add_test(NAME test_halo_ext_${_tag}_np${_np}
-                 COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np ${_np} $<TARGET_FILE:test_halo_ext>)
-        set_tests_properties(test_halo_ext_${_tag}_np${_np} PROPERTIES
-            ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/${_mesh}"
-            SKIP_REGULAR_EXPRESSION "cannot open;No such file")
+add_default_mesh_test(test_halo_ext ${_mesh_q} 1)
+foreach(_case quad:${_mesh_q} mixed:${_mesh_mix} pi_w:${_mesh_piw} core2_w:${_mesh_c2w})
+    string(REPLACE ":" ";" _pair ${_case})
+    list(GET _pair 0 _tag)
+    list(GET _pair 1 _mesh)
+    foreach(_np 2 4 8)
+        add_mesh_test(test_halo_ext_${_tag}_np${_np} test_halo_ext ${_mesh} ${_np})
     endforeach()
 endforeach()
 # Task 9: SSH stiffness matrix on mixed meshes (sparsity with quad diagonals, row sums,
-# symmetry, update, CG, checkerboard null mode); default mesh = the NEMO quad cut-out, the
-# np 1 run also checks the analytic mixed and parallelogram patches. Triangle meshes
-# (rotated) compare against the previous assembly.
-add_fesom_test(test_ssh_stiff 1)
-add_fesom_test(test_ssh_stiff 2)
-foreach(_case mixed:nemo025mix_cut:1,2,8:0 pi_w:pi_w:1,2:1 core2_w:core2_w:8:1)
-    string(REPLACE ":" ";" _quad ${_case})
-    list(GET _quad 0 _tag)
-    list(GET _quad 1 _mesh)
-    list(GET _quad 2 _nps)
-    list(GET _quad 3 _rot)
-    string(REPLACE "," ";" _nps ${_nps})
-    foreach(_np ${_nps})
-        add_test(NAME test_ssh_stiff_${_tag}_np${_np}
-                 COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np ${_np} $<TARGET_FILE:test_ssh_stiff>)
-        set_tests_properties(test_ssh_stiff_${_tag}_np${_np} PROPERTIES
-            ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/${_mesh};FESOM3_TEST_ROTATE=${_rot}"
-            SKIP_REGULAR_EXPRESSION "cannot open;No such file")
-    endforeach()
+# symmetry, update, CG, checkerboard null mode, quadratic-field Laplacian on the
+# parallelogram patch); default mesh = the NEMO quad cut-out, the np 1 run also checks the
+# analytic mixed and parallelogram patches. Triangle meshes (rotated) compare against the
+# previous assembly.
+add_default_mesh_test(test_ssh_stiff ${_mesh_q} 1 2)
+set_tests_properties(test_ssh_stiff_np1 PROPERTIES ENVIRONMENT "FESOM3_EXPECT_CHECKERBOARD=1")
+foreach(_np 1 2 8)
+    add_mesh_test(test_ssh_stiff_mixed_np${_np} test_ssh_stiff ${_mesh_mix} ${_np} FESOM3_TEST_ROTATE=0)
 endforeach()
+add_mesh_test(test_ssh_stiff_pi_w_np1    test_ssh_stiff ${_mesh_piw} 1 FESOM3_TEST_ROTATE=1)
+add_mesh_test(test_ssh_stiff_pi_w_np2    test_ssh_stiff ${_mesh_piw} 2 FESOM3_TEST_ROTATE=1)
+add_mesh_test(test_ssh_stiff_core2_w_np8 test_ssh_stiff ${_mesh_c2w} 8 FESOM3_TEST_ROTATE=1)
 # Task 10: ocean dynamics kernels with the unified 4-slot formulas. test_pgf_mixed (PGF of a
 # resting/linear state, node gather, SSH-gradient update; default mesh = the NEMO-mixed
 # cut-out, the np 1 run also checks the analytic mixed patch); test_vinv / test_ivertvisc
 # (exact uniform-flow / linear-shear / closed-form tests) on the analytic patches
 # (FESOM3_TEST_PATCH=mixed|quad, np 1) and the unrotated NEMO cut-outs.
-add_fesom_test(test_pgf_mixed 1)
-add_fesom_test(test_pgf_mixed 2)
-foreach(_case quad:nemo025q_cut:2:0 pi_w:pi_w:1:1)
-    string(REPLACE ":" ";" _quad ${_case})
-    list(GET _quad 0 _tag)
-    list(GET _quad 1 _mesh)
-    list(GET _quad 2 _np)
-    list(GET _quad 3 _rot)
-    add_test(NAME test_pgf_mixed_${_tag}_np${_np}
-             COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np ${_np} $<TARGET_FILE:test_pgf_mixed>)
-    set_tests_properties(test_pgf_mixed_${_tag}_np${_np} PROPERTIES
-        ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/${_mesh};FESOM3_TEST_ROTATE=${_rot}"
-        SKIP_REGULAR_EXPRESSION "cannot open;No such file")
-endforeach()
+add_default_mesh_test(test_pgf_mixed ${_mesh_mix} 1 2)
+add_mesh_test(test_pgf_mixed_quad_np2 test_pgf_mixed ${_mesh_q}   2 FESOM3_TEST_ROTATE=0)
+add_mesh_test(test_pgf_mixed_pi_w_np1 test_pgf_mixed ${_mesh_piw} 1 FESOM3_TEST_ROTATE=1)
 foreach(_t test_vinv test_ivertvisc)
     add_test(NAME ${_t}_patch_mixed_np1
              COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np 1 $<TARGET_FILE:${_t}>)
@@ -134,114 +133,42 @@ endforeach()
 add_test(NAME test_vinv_patch_quad_np1
          COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np 1 $<TARGET_FILE:test_vinv>)
 set_tests_properties(test_vinv_patch_quad_np1 PROPERTIES ENVIRONMENT "FESOM3_TEST_PATCH=quad")
-foreach(_case test_vinv:mixed:nemo025mix_cut:1 test_vinv:mixed:nemo025mix_cut:2
-              test_vinv:quad:nemo025q_cut:2 test_ivertvisc:mixed:nemo025mix_cut:2)
-    string(REPLACE ":" ";" _quad ${_case})
-    list(GET _quad 0 _t)
-    list(GET _quad 1 _tag)
-    list(GET _quad 2 _mesh)
-    list(GET _quad 3 _np)
-    add_test(NAME ${_t}_${_tag}_np${_np}
-             COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np ${_np} $<TARGET_FILE:${_t}>)
-    set_tests_properties(${_t}_${_tag}_np${_np} PROPERTIES
-        ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/${_mesh};FESOM3_TEST_ROTATE=0"
-        SKIP_REGULAR_EXPRESSION "cannot open;No such file")
-endforeach()
+add_mesh_test(test_vinv_mixed_np1       test_vinv      ${_mesh_mix} 1 FESOM3_TEST_ROTATE=0)
+add_mesh_test(test_vinv_mixed_np2       test_vinv      ${_mesh_mix} 2 FESOM3_TEST_ROTATE=0)
+add_mesh_test(test_vinv_quad_np2        test_vinv      ${_mesh_q}   2 FESOM3_TEST_ROTATE=0)
+add_mesh_test(test_ivertvisc_mixed_np2  test_ivertvisc ${_mesh_mix} 2 FESOM3_TEST_ROTATE=0)
 # Task 11: tracer kernels on mixed meshes. test_updown_mixed (MUSCL up/downwind element
 # search, linear-tracer exactness of the reconstruction and of the advection; default mesh =
 # the NEMO-mixed cut-out, the np 1 run also checks the analytic mixed and parallelogram
 # patches); test_muscl_onthefly part R (kernel == the reference RK3 rule) on the unrotated
 # NEMO cut-outs.
-add_fesom_test(test_updown_mixed 1)
-add_fesom_test(test_updown_mixed 2)
-foreach(_case test_updown_mixed:quad:nemo025q_cut:2:0 test_updown_mixed:mixed:nemo025mix_cut:8:0
-              test_updown_mixed:pi_w:pi_w:2:1
-              test_muscl_onthefly:mixed:nemo025mix_cut:1:0 test_muscl_onthefly:mixed:nemo025mix_cut:2:0
-              test_muscl_onthefly:quad:nemo025q_cut:2:0)
-    string(REPLACE ":" ";" _quint ${_case})
-    list(GET _quint 0 _t)
-    list(GET _quint 1 _tag)
-    list(GET _quint 2 _mesh)
-    list(GET _quint 3 _np)
-    list(GET _quint 4 _rot)
-    add_test(NAME ${_t}_${_tag}_np${_np}
-             COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np ${_np} $<TARGET_FILE:${_t}>)
-    set_tests_properties(${_t}_${_tag}_np${_np} PROPERTIES
-        ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/${_mesh};FESOM3_TEST_ROTATE=${_rot}"
-        SKIP_REGULAR_EXPRESSION "cannot open;No such file")
-endforeach()
-# Task 13: forcing and ice-ocean coupling. test_coupling_mixed (kite-weighted node->element
-# surface stress of oce_fluxes_mom / forcing_stress_surf, momentum input equal on nodes and
-# elements, oce_fluxes balancing; default mesh = the NEMO-mixed cut-out, the np 1 run also
-# checks the analytic mixed patch); triangles == the former sum/3 to roundoff on pi_w and
-# core2_w (rotated).
-add_fesom_test(test_coupling_mixed 1)
-add_fesom_test(test_coupling_mixed 2)
-foreach(_case quad:nemo025q_cut:2:0 pi_w:pi_w:1:1 core2_w:core2_w:8:1)
-    string(REPLACE ":" ";" _quad ${_case})
-    list(GET _quad 0 _tag)
-    list(GET _quad 1 _mesh)
-    list(GET _quad 2 _np)
-    list(GET _quad 3 _rot)
-    add_test(NAME test_coupling_mixed_${_tag}_np${_np}
-             COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np ${_np} $<TARGET_FILE:test_coupling_mixed>)
-    set_tests_properties(test_coupling_mixed_${_tag}_np${_np} PROPERTIES
-        ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/${_mesh};FESOM3_TEST_ROTATE=${_rot}"
-        SKIP_REGULAR_EXPRESSION "cannot open;No such file")
-endforeach()
-# Task 14: mesh diagnostics store in the hybrid layout (4-column face_nodes/face_edges/face_links/
-# gradient_sca_x/y, a triangle's 4th = _FillValue -1 / -1 / -999), checked against elem2d.out and
-# edge_nodes/edge_face_links, and partition-independent (np 1 == np N). Standard-library python.
-foreach(_case mixed:nemo025mix_cut:1,2,8 quad:nemo025q_cut:1,2 pi_w:pi_w:1,2)
-    string(REPLACE ":" ";" _triple ${_case})
-    list(GET _triple 0 _tag)
-    list(GET _triple 1 _mesh)
-    list(GET _triple 2 _nps)
-    add_test(NAME meshdiag_${_tag}
-             COMMAND python3 ${CMAKE_SOURCE_DIR}/tools/check_meshdiag.py ${_hyb_meshes}/${_mesh}
-                     ${CMAKE_CURRENT_BINARY_DIR}/meshdiag_${_tag} $<TARGET_FILE:fesom_meshdiagdump> ${_nps}
-                     ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS})
-    set_tests_properties(meshdiag_${_tag} PROPERTIES
-        PASS_REGULAR_EXPRESSION "MESHDIAG CHECK PASS"
-        SKIP_REGULAR_EXPRESSION "No such file")
-endforeach()
-# Task 15: sea-ice EVP / mEVP dynamics with the unified 4-slot formulas. test_ice_dyn_mixed
-# (strain rates of uniform drift / rigid rotation / linear deformation, stress2rhs = -adjoint of
-# the strain rates, SSH-tilt node shares, rest state of uniform ice, ocean2ice gather; default
-# mesh = the NEMO-mixed cut-out, the np 1 run also checks the analytic triangle, mixed and
-# parallelogram patches); triangles == the former P1 formulas on pi_w and core2_w (rotated).
-add_fesom_test(test_ice_dyn_mixed 1)
-add_fesom_test(test_ice_dyn_mixed 2)
-foreach(_case quad:nemo025q_cut:2:0 pi_w:pi_w:1:1 core2_w:core2_w:8:1)
-    string(REPLACE ":" ";" _quad ${_case})
-    list(GET _quad 0 _tag)
-    list(GET _quad 1 _mesh)
-    list(GET _quad 2 _np)
-    list(GET _quad 3 _rot)
-    add_test(NAME test_ice_dyn_mixed_${_tag}_np${_np}
-             COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np ${_np} $<TARGET_FILE:test_ice_dyn_mixed>)
-    set_tests_properties(test_ice_dyn_mixed_${_tag}_np${_np} PROPERTIES
-        ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/${_mesh};FESOM3_TEST_ROTATE=${_rot}"
-        SKIP_REGULAR_EXPRESSION "cannot open;No such file")
-endforeach()
-# Task 16: sea-ice FCT mass matrix and lumped mass (user's specification). test_ice_mass
-# (matrix entries vs the element contributions, row sums == lumped mass == sum S/nv, total ==
-# area, constant field stays constant, sum(lumped*f) conserved, triangles == the former FCT;
-# default mesh = the NEMO-mixed cut-out, the np 1 run also checks the analytic triangle, mixed
-# and parallelogram patches); a missing CSR column stops the mass-matrix fill.
-add_fesom_test(test_ice_mass 1)
-add_fesom_test(test_ice_mass 2)
-foreach(_case quad:nemo025q_cut:2:0 pi_w:pi_w:1:1 core2_w:core2_w:8:1)
-    string(REPLACE ":" ";" _quad ${_case})
-    list(GET _quad 0 _tag)
-    list(GET _quad 1 _mesh)
-    list(GET _quad 2 _np)
-    list(GET _quad 3 _rot)
-    add_test(NAME test_ice_mass_${_tag}_np${_np}
-             COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np ${_np} $<TARGET_FILE:test_ice_mass>)
-    set_tests_properties(test_ice_mass_${_tag}_np${_np} PROPERTIES
-        ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/${_mesh};FESOM3_TEST_ROTATE=${_rot}"
-        SKIP_REGULAR_EXPRESSION "cannot open;No such file")
+add_default_mesh_test(test_updown_mixed ${_mesh_mix} 1 2)
+add_mesh_test(test_updown_mixed_quad_np2    test_updown_mixed   ${_mesh_q}   2 FESOM3_TEST_ROTATE=0)
+add_mesh_test(test_updown_mixed_mixed_np8   test_updown_mixed   ${_mesh_mix} 8 FESOM3_TEST_ROTATE=0)
+add_mesh_test(test_updown_mixed_pi_w_np2    test_updown_mixed   ${_mesh_piw} 2 FESOM3_TEST_ROTATE=1)
+add_mesh_test(test_muscl_onthefly_mixed_np1 test_muscl_onthefly ${_mesh_mix} 1 FESOM3_TEST_ROTATE=0)
+add_mesh_test(test_muscl_onthefly_mixed_np2 test_muscl_onthefly ${_mesh_mix} 2 FESOM3_TEST_ROTATE=0)
+add_mesh_test(test_muscl_onthefly_quad_np2  test_muscl_onthefly ${_mesh_q}   2 FESOM3_TEST_ROTATE=0)
+# Tasks 13, 15, 16, each with the default mesh = the NEMO-mixed cut-out at np 1/2 (the np 1
+# run also checks the analytic patches), the NEMO quad cut-out at np 2 and the triangle
+# meshes pi_w / core2_w rotated (triangles == the former formulas to roundoff):
+#  - Task 13, test_coupling_mixed: forcing and ice-ocean coupling (kite-weighted
+#    node->element surface stress of oce_fluxes_mom / forcing_stress_surf, momentum input
+#    equal on nodes and elements, oce_fluxes balancing);
+#  - Task 15, test_ice_dyn_mixed: sea-ice EVP / mEVP dynamics with the unified 4-slot
+#    formulas (strain rates of uniform drift / rigid rotation / linear deformation,
+#    stress2rhs = -adjoint of the strain rates, SSH-tilt node shares, rest state of uniform
+#    ice, ocean2ice gather; analytic triangle, mixed and parallelogram patches);
+#  - Task 16, test_ice_mass: sea-ice FCT mass matrix and lumped mass (user's specification:
+#    matrix entries vs the element contributions, row sums == lumped mass == sum S/nv,
+#    total == area, constant field stays constant, sum(lumped*f) conserved, FCT result
+#    within the low-order bounds, triangles == the former FCT); a missing CSR column stops
+#    the mass-matrix fill.
+foreach(_t test_coupling_mixed test_ice_dyn_mixed test_ice_mass)
+    add_default_mesh_test(${_t} ${_mesh_mix} 1 2)
+    add_mesh_test(${_t}_quad_np2    ${_t} ${_mesh_q}   2 FESOM3_TEST_ROTATE=0)
+    add_mesh_test(${_t}_pi_w_np1    ${_t} ${_mesh_piw} 1 FESOM3_TEST_ROTATE=1)
+    add_mesh_test(${_t}_core2_w_np8 ${_t} ${_mesh_c2w} 8 FESOM3_TEST_ROTATE=1)
 endforeach()
 add_test(NAME test_ice_mass_missing_col_np1
          COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np 1 $<TARGET_FILE:test_ice_mass>)
@@ -249,26 +176,50 @@ set_tests_properties(test_ice_mass_missing_col_np1 PROPERTIES
     ENVIRONMENT "FESOM3_TEST_MISSING_COL=1"
     PASS_REGULAR_EXPRESSION "not found in the ssh_stiff CSR row of node"
     FAIL_REGULAR_EXPRESSION "did NOT stop")
+# Task 14: mesh diagnostics store in the hybrid layout (4-column face_nodes/face_edges/face_links/
+# gradient_sca_x/y, a triangle's 4th = _FillValue -1 / -1 / -999), checked against elem2d.out and
+# edge_nodes/edge_face_links, and partition-independent (np 1 == np N). Standard-library python.
+foreach(_case mixed:${_mesh_mix}:1,2,8 quad:${_mesh_q}:1,2 pi_w:${_mesh_piw}:1,2)
+    string(REPLACE ":" ";" _triple ${_case})
+    list(GET _triple 0 _tag)
+    list(GET _triple 1 _mesh)
+    list(GET _triple 2 _nps)
+    add_test(NAME meshdiag_${_tag}
+             COMMAND python3 ${CMAKE_SOURCE_DIR}/tools/check_meshdiag.py ${_mesh}
+                     ${CMAKE_CURRENT_BINARY_DIR}/meshdiag_${_tag} $<TARGET_FILE:fesom_meshdiagdump> ${_nps}
+                     ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS})
+    set_tests_properties(meshdiag_${_tag} PROPERTIES PASS_REGULAR_EXPRESSION "MESHDIAG CHECK PASS")
+    require_files(meshdiag_${_tag} ${_mesh}/nod2d.out)
+endforeach()
 # without dist_N/format.out (the original pi dist_2) exchange_edge stops with a message
-add_test(NAME test_halo_ext_noformat_np2
-         COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np 2 $<TARGET_FILE:test_halo_ext>)
+add_mesh_test(test_halo_ext_noformat_np2 test_halo_ext ${_mesh_pi} 2)
 set_tests_properties(test_halo_ext_noformat_np2 PROPERTIES
-    ENVIRONMENT "FESOM3_MESH_DIR=/home/a/a270088/port2/fesom2/tests/data/MESHES/pi"
     PASS_REGULAR_EXPRESSION "com_edge2D is not available: dist_N has no format.out"
     FAIL_REGULAR_EXPRESSION "did NOT stop")
 # the old pi dist_2 (no format.out, FESOM2 layout only) is still read
-add_test(NAME test_mesh_read_pi_np2
-         COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np 2 $<TARGET_FILE:test_mesh_read>)
-set_tests_properties(test_mesh_read_pi_np2 PROPERTIES
-    ENVIRONMENT "FESOM3_MESH_DIR=/home/a/a270088/port2/fesom2/tests/data/MESHES/pi"
-    SKIP_REGULAR_EXPRESSION "cannot open;No such file")
-# a malformed element line stops read_mesh with a message (regex pair as test_minlayers)
-add_test(NAME test_mesh_read_malformed_np1
-         COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np 1 $<TARGET_FILE:test_mesh_read>)
-set_tests_properties(test_mesh_read_malformed_np1 PROPERTIES
-    ENVIRONMENT "FESOM3_TEST_MALFORMED=1"
-    PASS_REGULAR_EXPRESSION "the line of element 3 has a wrong number of node ids: \"2 4\""
-    FAIL_REGULAR_EXPRESSION "did NOT stop")
+add_mesh_test(test_mesh_read_pi_np2 test_mesh_read ${_mesh_pi} 2)
+# a malformed elem2d.out stops read_mesh with a message (regex pair as test_minlayers);
+# FESOM3_TEST_MALFORMED selects the defect
+foreach(_case "1:element 3 has a wrong number of node ids: \"2 4\""
+              "2:element 1 has neither 3 nor 4 node ids: \"1 2\""
+              "3:element 2 is not a list of integers: \"1 3 x\""
+              "4:element 2 has a node id outside 1..nod2D: \"1 3 9\""
+              "5:element 3 is missing")
+    string(FIND "${_case}" ":" _colon)
+    string(SUBSTRING "${_case}" 0 ${_colon} _k)
+    math(EXPR _colon "${_colon} + 1")
+    string(SUBSTRING "${_case}" ${_colon} -1 _msg)
+    set(_name test_mesh_read_malformed_np1)
+    if(NOT _k EQUAL 1)
+        set(_name test_mesh_read_malformed${_k}_np1)
+    endif()
+    add_test(NAME ${_name}
+             COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np 1 $<TARGET_FILE:test_mesh_read>)
+    set_tests_properties(${_name} PROPERTIES
+        ENVIRONMENT "FESOM3_TEST_MALFORMED=${_k}"
+        PASS_REGULAR_EXPRESSION "the line of ${_msg}"
+        FAIL_REGULAR_EXPRESSION "did NOT stop")
+endforeach()
 
 # dump_diff.py self-check (pure python; no external data needed).
 add_test(NAME dump_diff_selftest
@@ -318,8 +269,8 @@ endforeach()
 # element means of Av/viscAE/fer_uv are kite-weighted (elem_w); the driver's helem
 # invariant checks the same elem_w mean on every element.
 foreach(_np 1 2)
-    foreach(_mix PP KPP:FESOM3_MIX_KPP TKE:FESOM3_MIX_TKE GM:FESOM3_FER_GM REDI:FESOM3_REDI)
-        string(REPLACE ":" ";" _pair ${_mix})
+    foreach(_mixcase PP KPP:FESOM3_MIX_KPP TKE:FESOM3_MIX_TKE GM:FESOM3_FER_GM REDI:FESOM3_REDI)
+        string(REPLACE ":" ";" _pair ${_mixcase})
         list(GET _pair 0 _tag)
         set(_knob "")
         list(LENGTH _pair _len)
@@ -331,8 +282,8 @@ foreach(_np 1 2)
                  COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np ${_np}
                          $<TARGET_FILE:fesom_conserve>)
         set_tests_properties(fesom_conserve_mixcut_${_tag}_np${_np} PROPERTIES
-            ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/nemo025mix_cut;FESOM3_IC_FILE=/pool/data/AWICM/FESOM2/INITIAL/phc3.0/phc3.0_winter.nc;FESOM3_NSTEPS=20;FESOM3_WHICH_ALE=zstar;${_knob}FESOM3_CONSERVE_TOL=1e-12"
-            SKIP_REGULAR_EXPRESSION "cannot open;No such file")
+            ENVIRONMENT "FESOM3_MESH_DIR=${_mesh_mix};FESOM3_IC_FILE=${_icf};FESOM3_NSTEPS=20;FESOM3_WHICH_ALE=zstar;${_knob}FESOM3_CONSERVE_TOL=1e-12")
+        require_files(fesom_conserve_mixcut_${_tag}_np${_np} ${_mesh_mix}/nod2d.out ${_icf})
     endforeach()
 endforeach()
 
@@ -360,9 +311,9 @@ foreach(_cut q:nemo025q_cut mix:nemo025mix_cut)
                  COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np ${_np}
                          $<TARGET_FILE:fesom_conserve>)
         set_tests_properties(${_name} PROPERTIES
-            ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/${_mesh};FESOM3_IC_FILE=/pool/data/AWICM/FESOM2/INITIAL/phc3.0/phc3.0_winter.nc;FESOM3_NSTEPS=20;FESOM3_WHICH_ALE=zstar;${_prod_ocean};FESOM3_CONSERVE_ICE=1;FESOM3_WHICHEVP=${_evp};FESOM3_CONSERVE_TOL=1e-12"
-            PASS_REGULAR_EXPRESSION "sea ice ON.*CONSERVATION OK"
-            SKIP_REGULAR_EXPRESSION "cannot open;No such file")
+            ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/${_mesh};FESOM3_IC_FILE=${_icf};FESOM3_NSTEPS=20;FESOM3_WHICH_ALE=zstar;${_prod_ocean};FESOM3_CONSERVE_ICE=1;FESOM3_WHICHEVP=${_evp};FESOM3_CONSERVE_TOL=1e-12"
+            PASS_REGULAR_EXPRESSION "sea ice ON.*CONSERVATION OK")
+        require_files(${_name} ${_hyb_meshes}/${_mesh}/nod2d.out ${_icf})
     endforeach()
 endforeach()
 

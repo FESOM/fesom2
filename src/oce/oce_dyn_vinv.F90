@@ -37,6 +37,7 @@ module oce_dyn_vinv
     use mod_param_phys,  only: rvo_upwind
     use mod_constants,   only: r_earth
     use mod_mesh_rotate, only: trim_cyclic
+    use mod_mesh_areas,  only: elem_center
     use mod_part_bounds, only: owned_bounds, is_multirank
     use mod_halo,        only: exchange_nod, exchange_elem
     implicit none
@@ -59,7 +60,7 @@ contains
         ! the bottom-at-vertices rule (mod_mesh.F90), so area(nz,n) -> area(n) and the
         ! one-sided ranges are mutually consistent, not two independent choices.
         !
-        ! Halo: every edge incident to an owned node is owned, and both triangles of an
+        ! Halo: every edge incident to an owned node is owned, and both elements of an
         ! owned edge are owned (LESSONS L31), so the loop over 1..nEdgeO is complete for
         ! owned rows and UV needs NO element exchange. One exchange_nod publishes zeta to
         ! the halo, which the per-element (f+zeta) average then reads.
@@ -158,7 +159,7 @@ contains
         integer       :: nNodO, nNodL, nEdgeO, nElemO
         real(kind=WP) :: ea, pre(MAX_NV), Fx, Fy, zb, w, umean, vmean, h1, h2, da, hinv, ke_e
         real(kind=WP) :: xv(MAX_NV), yv(MAX_NV), tx, ty, px, py, dref, nxk(MAX_NV), nyk(MAX_NV)
-        real(kind=WP) :: d, wk, sumw, zup, s1, s2, xc, yc
+        real(kind=WP) :: d, wk, sumw, zup, xc, yc, dx
         real(kind=WP) :: we(MAX_NV)
         real(kind=WP) :: uvert(2, mesh%nl)
         real(kind=WP), allocatable :: KE(:,:), omega_e(:,:)
@@ -253,8 +254,8 @@ contains
                 ! connects elnodes(k) and elnodes(k+1) (slot 4 -> slot 1; a triangle's side
                 ! 4 has zero length, so its normal is 0 and it never gets weight); of the two
                 ! perpendiculars of t = (dlon*elem_cos*r_earth, dlat*r_earth), the INWARD one
-                ! points toward the element centroid (the area-weighted centroid of the
-                ! sub-triangles (1,3,4) and (1,2,3), as in mod_mesh_areas) -- a local,
+                ! points toward the element centroid (mod_mesh_areas elem_center; its
+                ! longitude wrapped to the side's start vertex) -- a local,
                 ! convention-free orientation (no edge_tri left/right branch; proven
                 ! geometrically by test_vinv V10: the slot-k neighbour always lies on the
                 ! outward side).
@@ -265,16 +266,14 @@ contains
                 do k = 2, MAX_NV
                     tx = xv(k) - xv(1); call trim_cyclic(tx); xv(k) = xv(1) + tx
                 end do
-                s1 = abs((xv(3)-xv(4))*(yv(1)-yv(4)) - (yv(3)-yv(4))*(xv(1)-xv(4)))   ! 2*A(1,3,4)
-                s2 = abs((xv(3)-xv(2))*(yv(1)-yv(2)) - (yv(3)-yv(2))*(xv(1)-xv(2)))   ! 2*A(1,2,3)
-                xc = ((xv(1)+xv(3)+xv(4))*s1 + (xv(1)+xv(2)+xv(3))*s2) / (3.0_WP*(s1+s2))
-                yc = ((yv(1)+yv(3)+yv(4))*s1 + (yv(1)+yv(2)+yv(3))*s2) / (3.0_WP*(s1+s2))
+                call elem_center(mesh, elem, xc, yc)
                 do k = 1, MAX_NV
                     k2 = mod(k,MAX_NV)+1
                     tx = (xv(k2)-xv(k))*real(mesh%elem_cos(elem),WP)*r_earth
                     ty = (yv(k2)-yv(k))*r_earth
                     px =  ty; py = -tx
-                    dref = px*(xc-xv(k))*real(mesh%elem_cos(elem),WP)*r_earth &
+                    dx = xc - xv(k); call trim_cyclic(dx)
+                    dref = px*dx*real(mesh%elem_cos(elem),WP)*r_earth &
                          + py*(yc-yv(k))*r_earth
                     if (dref < 0.0_WP) then
                         px = -px; py = -py

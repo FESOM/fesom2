@@ -20,7 +20,7 @@ module mod_partitioning
     use mod_partit, only: t_partit, com_struct, MAX_NEIGHBOR_PARTITIONS
     implicit none
     private
-    public :: par_init, par_ex, set_partition, read_mesh_dims
+    public :: par_init, par_ex, set_partition, read_mesh_dims, set_empty_comms
 
     integer, parameter :: DIST_FORMAT_VERSION = 1
 
@@ -104,17 +104,28 @@ contains
 
         allocate(partit%part(2)); partit%part = [1, nod2D+1]   ! cumulative, npes+1
 
-        ! No neighbours: empty com_structs (rPEnum=sPEnum=0; halo is a no-op).
+        call set_empty_comms(partit)
+        partit%pe_status = 0
+    end subroutine synthesize_1rank
+
+    subroutine set_empty_comms(partit)
+        ! No neighbours: empty com_structs (rPEnum=sPEnum=0; halo is a no-op), the
+        ! appended lists (com_nod2D_full, com_edge2D) present and empty. Also used by the
+        ! analytic patches' 1-rank partition (mod_mesh_analytic synth_partit).
+        type(t_partit), intent(inout) :: partit
         call clear_com(partit%com_nod2D)
         call clear_com(partit%com_elem2D)
         call clear_com(partit%com_elem2D_full)
         call clear_com(partit%com_nod2D_full)
         call clear_com(partit%com_edge2D)
+        if (allocated(partit%com_nod2D_full%rlist)) deallocate(partit%com_nod2D_full%rlist)
+        if (allocated(partit%com_nod2D_full%slist)) deallocate(partit%com_nod2D_full%slist)
+        if (allocated(partit%com_edge2D%rlist))     deallocate(partit%com_edge2D%rlist)
+        if (allocated(partit%com_edge2D%slist))     deallocate(partit%com_edge2D%slist)
         allocate(partit%com_nod2D_full%rlist(0), partit%com_nod2D_full%slist(0))
         allocate(partit%com_edge2D%rlist(0), partit%com_edge2D%slist(0))
         partit%dist_format = DIST_FORMAT_VERSION          ! the new lists exist (empty)
-        partit%pe_status = 0
-    end subroutine synthesize_1rank
+    end subroutine set_empty_comms
 
     subroutine clear_com(com)
         type(com_struct), intent(inout) :: com

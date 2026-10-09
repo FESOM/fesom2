@@ -9,7 +9,7 @@ program fesom_pressuredump
     ! dumps density_m_rho0 / hpressure / bvfreq / pgf_x/pgf_y / coriolis / uv_rhs* in
     ! the oracle's FADVHDMP format. tools/pressure_diff.py compares for max|delta|=0.
     !
-    ! Hybrid meshes (plan docs/plans/2026-10-08-hybrid-meshes.md, Task 14): the FESOM2-oracle
+    ! Hybrid meshes (plan docs/plans/completed/2026-10-08-hybrid-meshes.md, Task 14): the FESOM2-oracle
     ! byte gate is retired (docs/HANDOFF.md "Gate migration"). REMAPPED: the driver's own
     ! node->element means (KPP viscAE, unstable-element count) run over the 4 slots with the
     ! kite weights elem_w like the kernels; it stays a diagnostic dump (roundoff vs FESOM2).

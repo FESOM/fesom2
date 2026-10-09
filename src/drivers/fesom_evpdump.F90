@@ -13,7 +13,7 @@ program fesom_evpdump
     ! 1.0e-11_WP), NOT the t_ice single->WP defaults — the M3a precision note (the oracle's
     ! namelist read parses the literals as doubles).
     !
-    ! Hybrid meshes (plan docs/plans/2026-10-08-hybrid-meshes.md, Task 14): the FESOM2-oracle
+    ! Hybrid meshes (plan docs/plans/completed/2026-10-08-hybrid-meshes.md, Task 14): the FESOM2-oracle
     ! byte gate is retired (docs/HANDOFF.md "Gate migration"). The driver has no triangle-
     ! specific code of its own; the EVP kernels it runs are converted in Task 15. It stays a
     ! diagnostic dump.

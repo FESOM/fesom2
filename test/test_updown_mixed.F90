@@ -346,6 +346,11 @@ contains
         call check(err_tt < 1.0e-9_WP, tag//' L2: exact advection at all-triangle nodes', p%mype)
         call check(err_tp < 1.0e-9_WP, tag//' L2: exact advection at all-parallelogram nodes', p%mype)
         call check(err_tg < 0.5_WP,    tag//' L2: bounded error at triangle-quad / general-quad nodes', p%mype)
+        ! non-vacuity: every case has L2 nodes; all but the jittered mixed patch (general
+        ! quads only, by design) have nodes with the exact expectation
+        call check(n_tri + n_par + n_gen > 0, tag//' L2: nodes checked (non-vacuity)', p%mype)
+        if (tag /= 'mixed patch') &
+            call check(n_tri + n_par > 0, tag//' L2: all-triangle / all-parallelogram nodes checked', p%mype)
 
         deallocate(xe, ide, nvf, gid, angsum, xn, yn, seam, shape_e, ttf, one, tr_xy, vel, f_lo, f_ho, tend, full)
         deallocate(twork%edge_up_dn_tri)

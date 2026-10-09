@@ -82,7 +82,8 @@ program test_vinv
     type(t_partit) :: partit
     type(t_mesh)   :: mesh
     type(t_dyn)    :: dyn
-    integer :: nfail, nsw, ierr
+    integer :: nfail, nsw, ierr, nex, ngen, nv9
+    logical :: jittered
     integer :: nNodO, nNodL, nEdgeO, nElemO, nElemF, nl, n, nz
     real(kind=WP) :: zmax, zmax2
     real(kind=WP), allocatable :: zsave(:,:)
@@ -100,6 +101,7 @@ program test_vinv
 
     cbuf = ''
     call get_environment_variable('FESOM3_TEST_PATCH', cbuf)
+    jittered = trim(cbuf) == 'mixed'      ! no exact interior node by design (see header)
     if (trim(cbuf) == 'mixed') then
         if (partit%npes /= 1) error stop 'test_vinv: FESOM3_TEST_PATCH needs np 1'
         ! analytic mixed patch (cartesian geometry built by the generator)
@@ -314,18 +316,26 @@ program test_vinv
     write(*,'(a,es12.4)') '  V4 non-degeneracy : max|zeta| = ', zmax
     call check_true('V4 zeta /= 0 somewhere (operator is not a no-op)', zmax > 1.0e-12_WP)
 
-    zmax = 0.0_WP; zmax2 = 0.0_WP
+    zmax = 0.0_WP; zmax2 = 0.0_WP; nex = 0; ngen = 0
     do n = 1, nNodO
         if (.not. interior(n)) cycle
         do nz = mesh%ulevels_nod2D(n), mesh%nlevels_nod2D_min(n)-1
             if (exact(n)) then
-                zmax = max(zmax, abs(dyn%work%vorticity(nz,n) + ALPHA))
+                zmax = max(zmax, abs(dyn%work%vorticity(nz,n) + ALPHA)); nex = nex + 1
             else
-                zmax2 = max(zmax2, abs(dyn%work%vorticity(nz,n) + ALPHA))
+                zmax2 = max(zmax2, abs(dyn%work%vorticity(nz,n) + ALPHA)); ngen = ngen + 1
             end if
         end do
     end do
-    call max_all(zmax); call max_all(zmax2)
+    call max_all(zmax); call max_all(zmax2); call sum_int(nex); call sum_int(ngen)
+    write(*,'(a,i0,a,i0)') '  V2 levels checked: exact nodes ', nex, ', general quads ', ngen
+    ! non-vacuity: the round-off set on every mesh but the jittered patch, the first-order
+    ! set there
+    if (jittered) then
+        call check_true('V2 general-quad levels checked (non-vacuity)', ngen > 0)
+    else
+        call check_true('V2 exact-node levels checked (non-vacuity)', nex > 0)
+    end if
     write(*,'(a,es12.4,a,es12.4)') '  V2 linear shear   : max|zeta-(-alpha)| = ', zmax, &
                                    '   relative = ', zmax/ALPHA
     write(*,'(a,es12.4)') '  V2 (general quads): relative = ', zmax2/ALPHA
@@ -476,11 +486,12 @@ program test_vinv
     rvo_upwind = 1.0_WP
     dyn%uv_rhsAB = 0.0_WP
     call momentum_adv_vinv(dyn, mesh, partit)
-    zmax = 0.0_WP; scal = 0.0_WP
+    zmax = 0.0_WP; scal = 0.0_WP; nv9 = 0
     do n = 1, nElemO
         if (.not. elem_int2(n)) cycle
         if (.not. all(exact(mesh%elem2D_nodes(:,n)))) cycle
         if (.not. all([(all(exact(mesh%elem2D_nodes(:, mesh%elem_neighbors(nz,n)))), nz = 1, MAX_NV)])) cycle
+        nv9 = nv9 + 1
         nzall = minval(mesh%nlevels_nod2D_min(mesh%elem2D_nodes(:,n))) - 1
         do nz = 1, MAX_NV
             nzall = min(nzall, minval(mesh%nlevels_nod2D_min( &
@@ -493,8 +504,10 @@ program test_vinv
                              *real(mesh%elem_area(n),WP))
         end do
     end do
-    call max_all(zmax); call max_all(scal)
-    write(*,'(a,es12.4)') '  V9a const-zeta blend inertness: rel = ', zmax/max(scal,tiny(1.0_WP))
+    call max_all(zmax); call max_all(scal); call sum_int(nv9)
+    write(*,'(a,es12.4,a,i0)') '  V9a const-zeta blend inertness: rel = ', zmax/max(scal,tiny(1.0_WP)), &
+                               '  elements ', nv9
+    if (.not. jittered) call check_true('V9a elements checked (non-vacuity)', nv9 > 0)
     call check_true('V9a constant zeta -> blend inert at rvo_upwind=1', &
                     zmax/max(scal,tiny(1.0_WP)) < 1.0e-12_WP)
 

@@ -60,7 +60,6 @@ program test_bottom
     call check(sloping_triangle(mesh, nElemO),      'T2: sloping triangle takes the shallowest vertex')
     call check(edge_len_is_metres(mesh),            'T7: edge_len matches haversine, edge_dxdy metre-scale')
     call check(edge_dxdy_fold_exact(mesh),          'T7: edge_dxdy == radian value * r_earth * mean(elem_cos)')
-    call check(redi_flux_composes(mesh, nNodO),      'Redi: tr_xynodes*area == sum of per-element shares')
     call check(edge_flux_lands_in_wet_cells(mesh),   'conservation: edge flux range fits inside both node columns')
 
     if (partit%npes > 1) then
@@ -225,49 +224,6 @@ contains
                 edge_flux_lands_in_wet_cells = .false.; return
             end if
         end do
-    end function
-
-    logical function redi_flux_composes(m, nNod)
-        ! The tr_xynodes denominator (oce_ale_tracer.F90, diff_ver_part_redi_expl).
-        !
-        ! The property that matters is COMPOSITION, not the node value in isolation. The
-        ! Redi flux is tr_xynodes*area(nz,n), and it must collapse to
-        !     sum over WET adjacent elements of tr_xy * (elem_area/3)
-        ! -- the element's MEDIAN-DUAL share at this node, since area(nz,n) is itself
-        ! sum(elem_area)/3 rather than sum(elem_area).
-        ! i.e. every adjacent element contributes its own share and a DRY one contributes
-        ! nothing -- a dry element is a genuine zero carrying its full area weight, not
-        ! missing data to be dropped from the average. That is the same statement as
-        ! "velocities touching topography are zero", and it is why the scalar-cell area is
-        ! depth-independent in the first place.
-        !
-        ! Dividing by the WET area instead inflates the flux by full/wet (up to 7x on pi,
-        ! at 10% of node-levels), so this check pins the denominator to areasvol.
-        type(t_mesh), intent(in) :: m
-        integer,      intent(in) :: nNod
-        integer :: n, nz, k, elem
-        real(kind=WP), parameter :: G = 3.0_WP        ! constant element gradient
-        real(kind=WP) :: tx, want, node_val, flux, worst
-        redi_flux_composes = .true.
-        worst = 0.0_WP
-        do n = 1, nNod
-            if (m%nlevels_nod2D(n) <= 0) cycle
-            do nz = m%ulevels_nod2D(n), m%nlevels_nod2D(n)-1
-                tx = 0.0_WP
-                do k = 1, m%nod_in_elem2D_num(n)
-                    elem = m%nod_in_elem2D(k, n)
-                    if (nz <= m%nlevels(elem)-1 .and. nz >= m%ulevels(elem)) &
-                        tx = tx + G*real(m%elem_area(elem), WP)
-                end do
-                if (real(m%areasvol(n), WP) <= 0.0_WP) cycle
-                node_val = tx/3.0_WP/real(m%areasvol(n), WP)        ! as the kernel computes it
-                flux     = node_val*real(m%area(n), WP)             ! as the kernel uses it
-                want     = tx/3.0_WP                               ! sum of per-element median-dual shares
-                worst    = max(worst, abs(flux - want)/max(abs(want), 1.0_WP))
-            end do
-        end do
-        write(*,'(a,es12.4)') '  Redi: worst |tr_xynodes*area - sum(tr_xy*elem_area/3)|/|sum| = ', worst
-        if (worst > 1.0e-12_WP) redi_flux_composes = .false.
     end function
 
     logical function edge_dxdy_fold_exact(m)

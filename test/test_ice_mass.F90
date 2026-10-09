@@ -20,6 +20,9 @@ program test_ice_mass
     !      non-uniform velocity and fields with zeros (limiter active)
     !   F5 triangle meshes: TG rhs, high order, low order and the final fields == the
     !      former FCT (FESOM2 formulas: S/12 mass, node area, (-2,1,1)/12, sum(u)/3)
+    !   F6 boundedness of the F4 run (all meshes): the final field of every owned node
+    !      lies within the min/max of the low-order and the old field over its CSR row
+    !      (the node and its element neighbours, the limiter's cluster)
     ! FESOM3_TEST_MISSING_COL=1: a column removed from the CSR must stop
     ! ice_mass_matrix_fill with a message (ctest regex; reaching the end = 'did NOT stop').
     use mpi
@@ -185,7 +188,7 @@ contains
         logical :: found, alltri
         real(kind=WP), allocatable :: ex(:), lex(:), f0(:,:), rhs(:,:), fl(:,:), df(:,:), f1(:,:)
         real(kind=WP), allocatable :: rrhs(:), rdf(:), rfl(:), rf1(:)
-        real(kind=WP) :: f1e, f2(4), f3(5), f4(3), f4m, f5(4), s(2), cmax, sc, tmp(1)
+        real(kind=WP) :: f1e, f2(4), f3(5), f4(3), f4m, f5(4), s(2), cmax, sc, tmp(1), f6, bmin, bmax
         real(kind=WP), parameter :: cst(3) = [0.7_WP, 1.3_WP, 0.2_WP]
 
         call owned_bounds(m, nNodO, nNodL, nEdgeO, nElemO, p)
@@ -354,6 +357,24 @@ contains
         call check(maxval(f4) <= 1.0e-13_WP, tag//' F4 sum(lumped*f) conserved (a, m, m_snow)', p%mype)
         call check(f4m > 1.0e-6_WP, tag//' F4 fields advected (non-vacuity)', p%mype)
 
+        !--- F6: the FCT result within the low-order / old-field bounds of its cluster ---
+        f6 = 0.0_WP
+        associate(st => m%ssh_stiff)
+        do k = 1, 3
+            sc = maxval(abs(f0(1:nNodO,k))); tmp(1) = sc; call max_all(tmp(1), p); sc = tmp(1)
+            do n = 1, nNodO
+                if (m%ulevels_nod2D(n) > 1) cycle
+                nini = st%rowptr_loc(n) - st%rowptr_loc(1) + 1
+                nend = st%rowptr_loc(n+1) - st%rowptr_loc(1)
+                bmax = max(maxval(fl(st%colind_loc(nini:nend),k)), maxval(f0(st%colind_loc(nini:nend),k)))
+                bmin = min(minval(fl(st%colind_loc(nini:nend),k)), minval(f0(st%colind_loc(nini:nend),k)))
+                f6 = max(f6, (f1(n,k) - bmax)/sc, (bmin - f1(n,k))/sc)
+            end do
+        end do
+        end associate
+        call max_all(f6, p)
+        call check(f6 <= 1.0e-13_WP, tag//' F6 FCT result within the low-order/old bounds (a, m, m_snow)', p%mype)
+
         !--- F5: triangle meshes == the former FCT ---
         f5 = 0.0_WP
         if (alltri) then
@@ -381,6 +402,7 @@ contains
             write(*,'(a,es9.2,a,4es9.2)') '    F1 entries ', f1e, '  F2 rowsum/lumped/total/area ', f2
             write(*,'(a,5es9.2)') '    F3 rest rhs/low/high/final, drift interior ', f3
             write(*,'(a,3es9.2,a,es9.2)') '    F4 conservation a/m/s ', f4, '  max|change| ', f4m
+            write(*,'(a,es9.2)') '    F6 max bound excess (<= 0 when bounded) ', f6
             if (alltri) write(*,'(a,4es9.2)') '    F5 vs former rhs/high/low/final ', f5
         end if
     end subroutine check_fct

@@ -45,7 +45,7 @@ module mod_ice_fct
     !    at ice_diff/=0 that would make this diffusion sqrt(5.8e9/2.0e8) = 5.4x the
     !    reference's. The native drivers now pin scale_area = 5.8e9 with the rest of the
     !    CORE2 namelist values.
-    !  - hybrid meshes (plan docs/plans/2026-10-08-hybrid-meshes.md, Task 16, the user's
+    !  - hybrid meshes (plan docs/plans/completed/2026-10-08-hybrid-meshes.md, Task 16, the user's
     !    specification): unified 4-slot formulas, so triangles agree with FESOM2 to roundoff
     !    only. The consistent mass matrix is assembled from the element contributions
     !    elem_area*ice_mcoef(:,:,nv) (triangle S/6 diagonal, S/12 off-diagonal; quad, regular-

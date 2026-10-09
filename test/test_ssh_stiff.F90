@@ -16,9 +16,13 @@ program test_ssh_stiff
     !   S7 the CG (solve_ssh_ale) converges to x for b = A x, x smooth
     !   S8 checkerboard: f = (+1,-1,+1,-1) on the vertices of every quad is in the null
     !      space of K -- on the parallelogram patch (the documented property) and, when
-    !      the mesh is all-quad and 2-colourable along its edges, on the mesh read (np 1);
+    !      the mesh is all-quad and 2-colourable along its edges, on the mesh read (np 1;
+    !      FESOM3_EXPECT_CHECKERBOARD=1: a mesh that is not is a failure, not a skip);
     !      a stripe pattern is NOT (non-vacuity). The Green-Gauss quad gradient vanishes
     !      for it on any quad, so only the mass part controls this mode.
+    !   S9 values: on the parallelogram patch K f == -g*dt*alpha*theta*H*lap(f)*area(n) at
+    !      the interior nodes for quadratic f (the scale of the quad contributions; S2/S4/
+    !      S6/S8 are blind to a per-element factor)
     use mpi
     use mod_precision,     only: WP, MP
     use mod_mesh,          only: t_mesh
@@ -29,7 +33,7 @@ program test_ssh_stiff
     use mod_mesh_areas,    only: compute_geometry
     use mod_mesh_analytic, only: generate_mixed_patch, generate_quad_patch
     use mod_part_bounds,   only: owned_bounds
-    use mod_constants,     only: g
+    use mod_constants,     only: g, r_earth
     use mod_param_phys,    only: alpha, theta
     use oce_ssh_rhs,       only: init_stiff_mat_ale, update_stiff_mat_ale
     use oce_ssh_solve,     only: solve_ssh_ale
@@ -80,6 +84,7 @@ program test_ssh_stiff
         call init_stiff_mat_ale(qmesh, dt, qpartit)
         call check_matrix(qmesh, qpartit, 'parallelogram patch')
         call check_checkerboard_patch(qmesh, 11, 'parallelogram patch')
+        call check_quadratic_patch(qmesh, 11, 9, 'parallelogram patch')
     end if
 
     call MPI_Allreduce(nfail, nfail_g, 1, MPI_INTEGER, MPI_SUM, partit%MPI_COMM_FESOM, ierr)
@@ -494,6 +499,35 @@ contains
         call check(e_st > 1.0e-2_WP,  tag//': S8 stripes are not (non-vacuity)', 0)
     end subroutine
 
+    subroutine check_quadratic_patch(m, nx, ny, tag)
+        ! S9: f = a*x^2 + b*x*y + c*y^2 (x, y in metres); interior node (i,j), 1 < i < nx,
+        ! 1 < j < ny; H = the (flat) element depth -zbar_e_bot
+        type(t_mesh),     intent(in) :: m
+        integer,          intent(in) :: nx, ny
+        character(len=*), intent(in) :: tag
+        real(kind=WP), parameter :: a = 1.3e-6_WP, b = -0.7e-6_WP, c = 0.4e-6_WP
+        integer :: n, i, j
+        real(kind=WP), allocatable :: f(:), kf(:)
+        real(kind=WP) :: x, y, kmax, ex, err, h
+        allocate(f(m%nod2D), kf(m%nod2D))
+        do n = 1, m%nod2D
+            x = m%coord_nod2D(1, n)*r_earth; y = m%coord_nod2D(2, n)*r_earth
+            f(n) = a*x*x + b*x*y + c*y*y
+        end do
+        h = -real(m%zbar_e_bot(1), WP)
+        call check(all(m%zbar_e_bot == m%zbar_e_bot(1)), tag//': S9 flat bottom', 0)
+        call stiffness_apply(m, f, m%nod2D, kf, kmax)
+        err = 0.0_WP
+        do n = 1, m%nod2D
+            i = mod(n-1, nx) + 1; j = (n-1)/nx + 1
+            if (i == 1 .or. i == nx .or. j == 1 .or. j == ny) cycle
+            ex = -g*dt*alpha*theta*h*(2.0_WP*a + 2.0_WP*c)*real(m%area(n), WP)
+            err = max(err, abs(kf(n) - ex)/abs(ex))
+        end do
+        write(*,'(a,a,es10.2)') tag, ': S9 interior K f vs -g*dt*alpha*theta*H*lap(f)*area, rel:', err
+        call check(err < 1.0e-10_WP, tag//': S9 K f == -g*dt*alpha*theta*H*lap(f)*area (quadratic f)', 0)
+    end subroutine
+
     subroutine check_checkerboard_mesh(m, p, tag)
         ! S8 on the mesh read (np 1): 2-colour the nodes along the edges (breadth first);
         ! when every element is a quad and the colouring is consistent, K f = 0
@@ -503,9 +537,16 @@ contains
         integer, allocatable :: col(:), queue(:), nptr(:), nadj(:), fillp(:)
         real(kind=WP), allocatable :: f(:), kf(:)
         integer :: n, ed, a, b, head, tail, k, start
-        logical :: bip
+        logical :: bip, expect
+        character(len=8) :: ebuf
         real(kind=WP) :: kmax, e_cb
-        if (any(m%elem2D_nnodes /= 4)) return
+        ebuf = ''
+        call get_environment_variable('FESOM3_EXPECT_CHECKERBOARD', ebuf)
+        expect = trim(ebuf) == '1'
+        if (any(m%elem2D_nnodes /= 4)) then
+            if (expect) call check(.false., tag//': S8 expected an all-quad mesh', p%mype)
+            return
+        end if
         allocate(nptr(m%nod2D+1), fillp(m%nod2D), nadj(2*m%edge2D))
         nptr = 0
         do ed = 1, m%edge2D
@@ -541,6 +582,7 @@ contains
         end do
         if (.not. bip) then
             write(*,'(a,a)') tag, ': S8 all-quad mesh is not 2-colourable along its edges (skipped)'
+            if (expect) call check(.false., tag//': S8 expected a 2-colourable all-quad mesh', p%mype)
             return
         end if
         allocate(f(m%nod2D), kf(m%nod2D))

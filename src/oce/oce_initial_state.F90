@@ -57,6 +57,7 @@ module oce_initial_state
     implicit none
     private
     public :: t_ic3d_config, do_ic3d
+    public :: extrap_nod3D   ! also exercised by test_pgf_mixed (E1)
 
     integer, parameter :: IC_MAX = 10
 
