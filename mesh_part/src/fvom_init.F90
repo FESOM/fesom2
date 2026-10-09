@@ -312,27 +312,27 @@ real(kind=WP)                       ::  a(2), b(2), c(2), d(2), r, r1, r2, r3
 integer                             ::  n, nx, elnodes(4), nflip
 type(t_mesh), intent(inout), target :: mesh
 #include "associate_mesh_ini.h"
-
+   
    nflip=0
    DO n=1, elem2D
       elnodes=elem2D_nodes(:,n)
-
+	  
           a=coord_nod2D(:,elnodes(1))
 	  b=coord_nod2D(:,elnodes(2))-a
 	  c=coord_nod2D(:,elnodes(3))-a
-
+          
 	  if(b(1)>cyclic_length/2.) b(1)=b(1)-cyclic_length
           if(b(1)<-cyclic_length/2.) b(1)=b(1)+cyclic_length
 	  if(c(1)>cyclic_length/2.) c(1)=c(1)-cyclic_length
           if(c(1)<-cyclic_length/2.) c(1)=c(1)+cyclic_length
-
-
+	  
+	    
 	  r=b(1)*c(2)-b(2)*c(1)
       if (elnodes(1)==elnodes(4)) then   ! triangle
 	  if (r>0) then
 	  ! Vector b is to right of c
 	  ! Exchange second and third nodes:
-
+	  
 	  nx=elnodes(2)
 	  elnodes(2)=elnodes(3)
 	  elnodes(3)=nx
@@ -758,7 +758,7 @@ subroutine find_levels(mesh)
 
     print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
     print *, achar(27)//'[7;1m' //' -->: read bottom depth                                     '//achar(27)//'[0m'
-
+    
     nemo_levels = (trim(use_depthfile)=='nemo')
     if (nemo_levels .and. use_depthonelem) then
         write(*,*) ' ERROR: use_depthfile="nemo" holds node depths; set use_depthonelem=.false.'
@@ -766,17 +766,17 @@ subroutine find_levels(mesh)
     end if
     !___________________________________________________________________________
     ! allocate depth
-    if (use_depthonelem) then
+    if (use_depthonelem) then 
         allocate(mesh%depth(elem2D))
-    else
+    else    
         allocate(mesh%depth(nod2D))
-    end if
+    end if     
     depth => mesh%depth !required after the allocation, otherwise the pointer remains undefined
     allocate(mesh%nlevels(elem2D))
     nlevels => mesh%nlevels             !required after the allocation, otherwise the pointer remains undefined
     allocate(mesh%nlevels_nod2D(nod2D))
     nlevels_nod2D => mesh%nlevels_nod2D !required after the allocation, otherwise the pointer remains undefined
-
+    
     !______________________________________________________________________________
     ! read depth from aux3d.out
     if (trim(use_depthfile)=='aux3d') then
@@ -907,20 +907,20 @@ subroutine find_levels(mesh)
             write(*,*) '        --> model stops here'
             write(*,*) '____________________________________________________________________'
             stop
-        end if
-    end if
-
+        end if 
+    end if 
+    
     !___________________________________________________________________________
     ! read topography from file
     auxi = nod2d
     if (use_depthonelem) auxi = elem2d
 !     write(*,*) ' use_depthonelem = ',use_depthonelem
-!     write(*,*)  ' auxi =',auxi
+!     write(*,*)  ' auxi =',auxi 
     DO n = 1, auxi
         read(fileID,*) x
         if (x>0) x=-x
         if (.not. nemo_levels) then
-        if (x>zbar(thers_zbar_lev)) x=zbar(thers_zbar_lev) !TODO KK thresholding for depth
+            if (x>zbar(thers_zbar_lev)) x=zbar(thers_zbar_lev) !TODO KK thresholding for depth
         end if
         depth(n)=x
     END DO
@@ -943,12 +943,12 @@ subroutine find_levels(mesh)
     !___________________________________________________________________________
     print *, achar(27)//'[1m'  //'____________________________________________________________'//achar(27)//'[0m'
     print *, achar(27)//'[7;1m' //' -->: compute elem, vertice bottom depth index              '//achar(27)//'[0m'
-
+     
     !___________________________________________________________________________
     ! Compute the initial number number of elementa levels, based on the vertice
-    ! depth information
+    ! depth information 
     do n=1, elem2D
-
+        
         nneighb = merge(3,4,elem2D_nodes(1,n) == elem2D_nodes(4,n))
         nodes=elem2D_nodes(:,n)
         if (nemo_levels) then
@@ -957,13 +957,13 @@ subroutine find_levels(mesh)
             cycle
         end if
         !_______________________________________________________________________
-        if (use_depthonelem) then
-            dmean = depth(n) ! depth is already defined on elements
+        if (use_depthonelem) then 
+            dmean = depth(n) ! depth is already defined on elements 
         else
             !___________________________________________________________________
             ! depth of element is  shallowest depth of sorounding vertices
             if     (trim(which_depth_n2e) .eq. 'min') then ; dmean=maxval(depth(nodes(1:nneighb)))
-            ! depth of element is deepest depth of sorounding vertices
+            ! depth of element is deepest depth of sorounding vertices    
             elseif (trim(which_depth_n2e) .eq. 'max') then ; dmean=minval(depth(nodes(1:nneighb)))
             ! DEFAULT: depth of element is  mean depth of sorounding vertices
             ! (literal divisors: under -no-prec-div x/real(nv) differs by 1 ulp)
@@ -973,9 +973,9 @@ subroutine find_levels(mesh)
                 else
                     dmean=sum(depth(nodes(1:4)))/4.0
                 end if
-            end if
-        end if
-
+            end if 
+        end if 
+        
         !_______________________________________________________________________
         exit_flag=0
         do nz=1,nl-1
@@ -1180,7 +1180,7 @@ subroutine find_levels_cavity(mesh)
             !_______________________________________________________________________
             ! depth of element is  shallowest depth of sorounding vertices
             if     (trim(which_depth_n2e) .eq. 'min')  then ; dmean=maxval(cavity_depth(nodes(1:nv)))
-            ! depth of element is deepest depth of sorounding vertices
+            ! depth of element is deepest depth of sorounding vertices    
             elseif (trim(which_depth_n2e) .eq. 'max')  then ; dmean=minval(cavity_depth(nodes(1:nv)))
             ! DEFAULT: depth of element is  mean depth of sorounding vertices
             ! (literal divisors: under -no-prec-div x/real(nv) differs by 1 ulp)
@@ -1190,8 +1190,8 @@ subroutine find_levels_cavity(mesh)
                 else
                     dmean=sum(cavity_depth(nodes(1:4)))/4.0
                 end if
-            end if
-        end if
+            end if 
+        end if 
         
         !_______________________________________________________________________
         ! vertical elem level index of cavity-ocean boundary
@@ -1639,7 +1639,7 @@ type(t_mesh), intent(in), target :: mesh
       x=sum(ax(1:4))/4.0_WP
       y=sum(coord_nod2D(2,elnodes(1:4)))/4.0_WP
    end if
-
+   
 end subroutine elem_center
 !=======================================================================
 SUBROUTINE find_elem_neighbors_ini(mesh)
@@ -1655,7 +1655,7 @@ allocate(mesh%elem_neighbors(4,elem2D))
 elem_neighbors => mesh%elem_neighbors !required after the allocation, otherwise the pointer remains undefined
 elem_neighbors=0
 DO elem=1,elem2D
-
+   
    nv=merge(3,4,elem2D_nodes(1,elem) == elem2D_nodes(4,elem))
    eledges=elem_edges(:,elem)
    DO j=1,nv
@@ -1663,10 +1663,10 @@ DO elem=1,elem2D
    if(elem1==elem) elem1=edge_tri(2,eledges(j))
    elem_neighbors(j,elem)=elem1
    END DO
-
+   
 END DO
- ! Among elem_neighbors there can be negative numbers. These correspond to
- ! boundary elements for which neighbours are absent. However, an element
+ ! Among elem_neighbors there can be negative numbers. These correspond to 
+ ! boundary elements for which neighbours are absent. However, an element 
  ! should have at least two valid neighbors (triangles and quads alike)
 
  ! Test that there are at least two neighbors at the surface:
@@ -1722,16 +1722,16 @@ END DO
  allocate(mesh%nod_in_elem2D(maxval(nod_in_elem2D_num),nod2D))
  nod_in_elem2D => mesh%nod_in_elem2D
  nod_in_elem2D=0
-
+ 
  nod_in_elem2D_num=0
- do n=1,elem2D
+ do n=1,elem2D   
     nv=merge(3,4,elem2D_nodes(1,n) == elem2D_nodes(4,n))
     elnodes=elem2D_nodes(:,n)
     nod_in_elem2D_num(elnodes(1:nv))=nod_in_elem2D_num(elnodes(1:nv))+1
     do j=1, nv
        nod_in_elem2D(nod_in_elem2D_num(elnodes(j)),elnodes(j))=n
     end do
- end do
+ end do  
 END SUBROUTINE find_elem_neighbors_ini
 !===================================================================
 ! Stiffness matrix for the elevation

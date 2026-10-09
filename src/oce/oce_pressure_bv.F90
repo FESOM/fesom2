@@ -317,9 +317,10 @@ contains
         ! N_smooth times. Hybrid meshes: node value = the kite-share-weighted mean
         ! (elem_area*nod_in_elem2D_w) of the kite-weighted element means (elem_w) of the
         ! wet elements around the node -- FESOM2's sum(A*(a1+a2+a3))/(3*sum(A)) on
-        ! triangles (weights 1/3), equal to roundoff. M2.12c: optional partit -> owned-node loops + the per-sweep
-        ! exchange_nod(arr) (the patch accumulation reads arr at an owned node's owned-
-        ! element nodes, which can be halo nodes, so arr must be halo-valid each sweep).
+        ! triangles (weights 1/3), equal to roundoff. M2.12c: optional partit ->
+        ! owned-node loops + the per-sweep exchange_nod(arr) (the patch accumulation
+        ! reads arr at an owned node's owned-element nodes, which can be halo nodes, so
+        ! arr must be halo-valid each sweep).
         ! Per-level patch areas vary with the bathymetry (a deep node's shallower
         ! neighbour elements drop out level by level). elem_area is geom-proven; the
         ! nod_in_elem2D / elem2D_nodes order is area-gate-proven (L9).

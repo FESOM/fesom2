@@ -20,7 +20,8 @@ FESOM3_MESHDIAG_OUT=<work_dir>/md_np<np>.zarr), then checks every store:
      a constant) to roundoff
 and compares every store with the first one (the store is partition-independent): integer arrays
 identical (except nod_part / elem_part), real arrays to 1e-12 relative.
-Exit 0 iff all checks pass; a missing mesh prints "No such file" and exits 0 (ctest SKIP regex).
+Exit 0 iff all checks pass; a missing mesh prints "ERROR: mesh not found" and exits 1 (the
+meshdiag_* ctests are registered DISABLED at configure time when the mesh is absent).
 """
 import json
 import os
@@ -192,8 +193,8 @@ def main():
     mesh_dir, work, exe, nps = sys.argv[1:5]
     launcher = sys.argv[5:]
     if not os.path.exists(os.path.join(mesh_dir, "elem2d.out")):
-        print(f"SKIP: No such file {mesh_dir}/elem2d.out")
-        return 0
+        print(f"ERROR: mesh not found: no {mesh_dir}/elem2d.out")
+        return 1
     nps = [int(x) for x in nps.split(",")]
     elems = read_elem2d(mesh_dir)
     shutil.rmtree(work, ignore_errors=True)

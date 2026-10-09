@@ -72,7 +72,7 @@ module oce_ssh_rhs
     use mod_constants,  only: g
     use mod_param_phys, only: alpha, theta
     use mod_config,     only: which_ALE          ! M6a-3: 'linfs'/'zlevel'/'zstar'
-    use mod_mesh,       only: t_mesh
+    use mod_mesh,       only: t_mesh, MAX_NV
     use mod_dyn,        only: t_dyn
     use mod_partit,     only: t_partit
     use mod_part_bounds, only: owned_bounds, is_multirank
@@ -107,7 +107,7 @@ contains
         type(t_partit), intent(in), optional :: partit
         !______________________________________________________________________
         integer              :: n, n1, n2, i, k, j, row, ed, el1
-        integer              :: elnodes(4), el(2), npos(4)
+        integer              :: elnodes(MAX_NV), el(2), npos(MAX_NV)
         integer              :: offset, nini, nend, maxrow
         integer              :: nNodO, nNodL, nEdgeO, nElemO
         real(kind=WP)        :: zsrf
@@ -262,18 +262,18 @@ contains
         integer,       intent(in)            :: nNodO, nEdgeO
         real(kind=WP), intent(in)            :: depth_e(:), factor
         integer,       intent(inout)         :: rev(:)
-        integer       :: ed, el(2), elnodes(4), i, j, k, n, row, npos(4)
-        real(kind=WP) :: fy(4)
+        integer       :: ed, el(2), elnodes(MAX_NV), i, j, k, n, row, npos(MAX_NV)
+        real(kind=WP) :: fy(MAX_NV)
         associate(ssh_stiff => mesh%ssh_stiff)
         rev = 0
         do ed = 1, nEdgeO
             el = mesh%edge_tri(:, ed)
             do i = 1, 2   ! the two elements sharing edge ed (both OWNED, invariant ii)
                 if (i == 2 .and. el(2) == el(1)) cycle   ! boundary edge has only one element
-                elnodes = mesh%elem2D_nodes(1:4, el(i))
-                fy(1:4) = depth_e(el(i)) * &
-                          ( mesh%gradient_sca(1:4,el(i)) * mesh%edge_cross_dxdy(2*i  ,ed)  &
-                           -mesh%gradient_sca(5:8,el(i)) * mesh%edge_cross_dxdy(2*i-1,ed) )
+                elnodes = mesh%elem2D_nodes(1:MAX_NV, el(i))
+                fy = depth_e(el(i)) * &
+                     ( mesh%gradient_sca(1:4,el(i)) * mesh%edge_cross_dxdy(2*i  ,ed)  &
+                      -mesh%gradient_sca(5:8,el(i)) * mesh%edge_cross_dxdy(2*i-1,ed) )
                 if (i==2) fy = -fy
                 do j = 1, 2   ! the rows of the edge's two nodes: +fy, -fy
                     row = mesh%edges(j, ed)
@@ -283,11 +283,11 @@ contains
                     end do
                     npos = rev(elnodes)
                     if (j == 1) then
-                        do k = 1, 4
+                        do k = 1, MAX_NV
                             ssh_stiff%values(npos(k)) = ssh_stiff%values(npos(k)) + fy(k)*factor
                         end do
                     else
-                        do k = 1, 4
+                        do k = 1, MAX_NV
                             ssh_stiff%values(npos(k)) = ssh_stiff%values(npos(k)) - fy(k)*factor
                         end do
                     end if

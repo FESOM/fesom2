@@ -46,12 +46,12 @@ import numpy as np
 import scipy.sparse
 import scipy.sparse.csgraph
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mesh'))
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "mesh"))
 import mesh_io  # noqa: E402
 
-MIX = {'tke'}
-ICE = {'area', 'hice', 'hsnow', 'uice', 'vice', 't_skin', 'sigma11', 'sigma12', 'sigma22'}
-COORDS = {'lon', 'lat', 'nz', 'nz1', 'time'}
+MIX = {"tke"}
+ICE = {"area", "hice", "hsnow", "uice", "vice", "t_skin", "sigma11", "sigma12", "sigma22"}
+COORDS = {"lon", "lat", "nz", "nz1", "time"}
 
 
 # ----------------------------------------------------------------------------- geometry
@@ -117,8 +117,8 @@ class Geo:
         for k in range(4):
             has_tri[elem[~self.quad, k]] = True
             has_quad[elem[self.quad, k]] = True
-        self.cls = {'tri': has_tri & ~has_quad & ~bnd, 'quad': has_quad & ~has_tri & ~bnd,
-                    'iface': has_tri & has_quad & ~bnd}
+        self.cls = {"tri": has_tri & ~has_quad & ~bnd, "quad": has_quad & ~has_tri & ~bnd,
+                    "iface": has_tri & has_quad & ~bnd}
         # linear-exact neighbour prediction: row n of W evaluates the least-squares plane through
         # the edge neighbours of n at x_n (interior nodes only; other rows stay 0)
         e1, e2 = ed[:, 0], ed[:, 1]
@@ -136,14 +136,14 @@ class Geo:
         self.W = scipy.sparse.coo_matrix((wv, (wr, wc)), shape=(self.n2d, self.n2d)).tocsr()
 
     def measures(self, f):
-        """{'E_loc', 'E_glob', 'R_tri', 'R_quad', 'R_iface'} of the node field f (NaN if undefined)."""
+        """{"E_loc", "E_glob", "R_tri", "R_quad", "R_iface"} of the node field f (NaN if undefined)."""
         out = {}
         w = self.area_q[self.vq]
         fq = f[self.vq]
         var = np.sum(w * (fq - np.sum(w * fq) / np.sum(w)) ** 2)
         q = self.elem[self.quad]
         qe = (f[q[:, 0]] - f[q[:, 1]] + f[q[:, 2]] - f[q[:, 3]]) / 4.0
-        out['E_loc'] = np.sum(self.area_e[self.quad] * qe ** 2) / var if var > 0 else np.nan
+        out["E_loc"] = np.sum(self.area_e[self.quad] * qe ** 2) / var if var > 0 else np.nan
         eg = 0.0
         for c in np.unique(self.comp[self.comp >= 0]):
             m = self.comp == c
@@ -152,24 +152,24 @@ class Geo:
             den = np.sum(wa * cc ** 2)
             if den > 0:
                 eg += np.sum(wa * cc * f[m]) ** 2 / den
-        out['E_glob'] = eg / var if var > 0 else np.nan
+        out["E_glob"] = eg / var if var > 0 else np.nan
         sd = np.sqrt(np.sum(self.area_n * (f - np.sum(self.area_n * f) / np.sum(self.area_n)) ** 2)
                      / np.sum(self.area_n))
         r = f - self.W @ f
         for k, m in self.cls.items():
-            out['R_' + k] = np.sqrt(np.mean(r[m] ** 2)) / sd if (m.any() and sd > 0) else np.nan
+            out["R_" + k] = np.sqrt(np.mean(r[m] ** 2)) / sd if (m.any() and sd > 0) else np.nan
         return out
 
 
 # ----------------------------------------------------------------------------- compare
 def ckpt_folders(d):
-    return {os.path.basename(p): p for p in glob.glob(os.path.join(d, 'fesom.*.*.*'))
-            if os.path.isdir(p) and not p.endswith('.tmp')}
+    return {os.path.basename(p): p for p in glob.glob(os.path.join(d, "fesom.*.*.*"))
+            if os.path.isdir(p) and not p.endswith(".tmp")}
 
 
 def read_store(p):
     import zarr
-    g = zarr.open(p, mode='r')
+    g = zarr.open(p, mode="r")
     k = [n for n in g.array_keys() if n not in COORDS]
     return np.asarray(g[k[0]][:], dtype=np.float64)
 
@@ -178,25 +178,25 @@ def compare(dref, dnew, dt, early_steps, tol_early, tol_ocean, tol_mix, tol_ice,
     fa, fb = ckpt_folders(dref), ckpt_folders(dnew)
     tags = sorted(set(fa) & set(fb))
     if not tags:
-        print('  no common checkpoints in %s and %s' % (dref, dnew))
+        print(f"  no common checkpoints in {dref} and {dnew}")
         return 1
     t0 = None
     res = {}                                     # field -> [d per tag]
     hours = []
     for tag in tags:
-        _, y, day, sec = tag.split('.')
+        _, y, day, sec = tag.split(".")
         t = (int(day) - 1) * 86400 + int(sec)
         t0 = t if t0 is None else t0
         hours.append(t)
-        names = sorted(os.path.basename(p)[:-5] for p in glob.glob(os.path.join(fa[tag], '*.zarr')))
+        names = sorted(os.path.basename(p)[:-5] for p in glob.glob(os.path.join(fa[tag], "*.zarr")))
         for nm in names:
-            pb = os.path.join(fb[tag], nm + '.zarr')
+            pb = os.path.join(fb[tag], nm + ".zarr")
             if not os.path.isdir(pb):
-                print('  %s: %s missing in %s' % (tag, nm, dnew))
+                print(f"  {tag}: {nm} missing in {dnew}")
                 return 1
-            a, b = read_store(os.path.join(fa[tag], nm + '.zarr')), read_store(pb)
+            a, b = read_store(os.path.join(fa[tag], nm + ".zarr")), read_store(pb)
             if a.shape != b.shape:
-                print('  %s: %s shapes differ %s %s' % (tag, nm, a.shape, b.shape))
+                print(f"  {tag}: {nm} shapes differ {a.shape} {b.shape}")
                 return 1
             ma = np.max(np.abs(a))
             d = float(np.max(np.abs(b - a)) / ma) if ma > 0 else float(np.max(np.abs(b)))
@@ -205,30 +205,30 @@ def compare(dref, dnew, dt, early_steps, tol_early, tol_ocean, tol_mix, tol_ice,
     show = list(range(len(tags)))
     if len(show) > 10:                           # at most 10 columns on screen (all in the csv)
         show = sorted(set(np.linspace(0, len(tags) - 1, 10).round().astype(int)))
-    print('  d = max|N - 1| / max|1| per field and checkpoint (step of the run; ckpt every %d steps)'
-          % (steps[1] - steps[0] if len(steps) > 1 else steps[0]))
-    print('  %-12s' % 'step' + ''.join('%9d' % steps[i] for i in show) + '      max  class')
-    worst = {'OCEAN': 0.0, 'MIX': 0.0, 'ICE': 0.0}
+    every = steps[1] - steps[0] if len(steps) > 1 else steps[0]
+    print(f"  d = max|N - 1| / max|1| per field and checkpoint (step of the run; ckpt every {every} steps)")
+    print(f"  {'step':<12}" + "".join(f"{steps[i]:9d}" for i in show) + "      max  class")
+    worst = {"OCEAN": 0.0, "MIX": 0.0, "ICE": 0.0}
     for nm in sorted(res, key=lambda k: -max(res[k])):
-        cl = 'MIX' if nm in MIX else 'ICE' if nm in ICE else 'OCEAN'
+        cl = "MIX" if nm in MIX else "ICE" if nm in ICE else "OCEAN"
         worst[cl] = max(worst[cl], max(res[nm]))
-        print('  %-12s' % nm + ''.join('%9.1e' % res[nm][i] for i in show)
-              + '  %9.2e  %s' % (max(res[nm]), cl))
+        print(f"  {nm:<12}" + "".join(f"{res[nm][i]:9.1e}" for i in show)
+              + f"  {max(res[nm]):9.2e}  {cl}")
     if csv:
-        with open(csv, 'w') as f:
-            f.write('field,' + ','.join(str(s) for s in steps) + '\n')
+        with open(csv, "w") as f:
+            f.write("field," + ",".join(str(s) for s in steps) + "\n")
             for nm in sorted(res):
-                f.write(nm + ',' + ','.join('%.3e' % v for v in res[nm]) + '\n')
-    tol = {'OCEAN': tol_ocean, 'MIX': tol_mix, 'ICE': tol_ice}
+                f.write(nm + "," + ",".join(f"{v:.3e}" for v in res[nm]) + "\n")
+    tol = {"OCEAN": tol_ocean, "MIX": tol_mix, "ICE": tol_ice}
     early = [i for i, s in enumerate(steps) if s <= early_steps]
     d_early = max([res[nm][i] for nm in res for i in early], default=0.0)
     fail = d_early > tol_early
-    print('  EARLY (steps <= %d, all fields) max d %.3e  (TOL %g)%s'
-          % (early_steps, d_early, tol_early, '   ABOVE' if fail else ''))
-    for cl in ('OCEAN', 'MIX', 'ICE'):
+    print(f"  EARLY (steps <= {early_steps}, all fields) max d {d_early:.3e}  (TOL {tol_early:g})"
+          + ("   ABOVE" if fail else ""))
+    for cl in ("OCEAN", "MIX", "ICE"):
         bad = worst[cl] > tol[cl]
         fail |= bad
-        print('  %-5s max d %.3e  (TOL %g)%s' % (cl, worst[cl], tol[cl], '   ABOVE' if bad else ''))
+        print(f"  {cl:<5} max d {worst[cl]:.3e}  (TOL {tol[cl]:g})" + ("   ABOVE" if bad else ""))
     return 1 if fail else 0
 
 
@@ -237,24 +237,24 @@ def checker(mesh_dir, out_dir, names, csv=None):
     import zarr
     m = mesh_io.read_mesh(mesh_dir)
     geo = Geo(m.lon, m.lat, m.elem)
-    print('  mesh %s: %d nodes, %d quads, %d triangles; quad-side graph: %d component(s), %d without a '
-          '2-colouring (left out of E_glob); interior nodes tri/quad/iface = %d/%d/%d'
-          % (os.path.basename(mesh_dir.rstrip('/')), m.n2d, int(geo.quad.sum()), int((~geo.quad).sum()),
-             geo.components, geo.odd_components, int(geo.cls['tri'].sum()), int(geo.cls['quad'].sum()),
-             int(geo.cls['iface'].sum())))
-    keys = ('E_loc', 'E_glob', 'R_tri', 'R_quad', 'R_iface')
+    name = os.path.basename(mesh_dir.rstrip("/"))
+    ntri, nquad, nif = (int(geo.cls[k].sum()) for k in ("tri", "quad", "iface"))
+    print(f"  mesh {name}: {m.n2d} nodes, {int(geo.quad.sum())} quads, {int((~geo.quad).sum())} triangles; "
+          f"quad-side graph: {geo.components} component(s), {geo.odd_components} without a 2-colouring "
+          f"(left out of E_glob); interior nodes tri/quad/iface = {ntri}/{nquad}/{nif}")
+    keys = ("E_loc", "E_glob", "R_tri", "R_quad", "R_iface")
     rows = []
     summary = {}
     for nm in names:
-        stores = sorted(glob.glob(os.path.join(out_dir, nm + '.fesom.*.zarr')))
+        stores = sorted(glob.glob(os.path.join(out_dir, nm + ".fesom.*.zarr")))
         if not stores:
-            print('  no output store for %s in %s' % (nm, out_dir))
+            print(f"  no output store for {nm} in {out_dir}")
             return 1
         recs, times = [], []
         for p in stores:
-            g = zarr.open(p, mode='r')
+            g = zarr.open(p, mode="r")
             recs.append(np.asarray(g[nm][:], dtype=np.float64))
-            times.append(np.asarray(g['time'][:], dtype=np.float64))
+            times.append(np.asarray(g["time"][:], dtype=np.float64))
         x, t = np.concatenate(recs), np.concatenate(times)
         ser = {k: np.full(len(t), np.nan) for k in keys}
         for i in range(len(t)):
@@ -265,26 +265,27 @@ def checker(mesh_dir, out_dir, names, csv=None):
         summary[nm] = (t, ser)
     # on screen: every 6 h of model time, first and last record
     for nm, (t, ser) in summary.items():
-        print('  %s: time series (h, every 6 h)' % nm)
-        print('    %8s' % 'hour' + ''.join('%11s' % k for k in keys))
+        print(f"  {nm}: time series (h, every 6 h)")
+        print(f"    {'hour':>8}" + "".join(f"{k:>11}" for k in keys))
         h = t / 3600.0
         pick = [i for i in range(len(t)) if i == 0 or i == len(t) - 1 or abs(h[i] / 6 - round(h[i] / 6)) < 1e-9]
         for i in pick:
-            print('    %8.1f' % h[i] + ''.join('%11.3e' % ser[k][i] for k in keys))
+            print(f"    {h[i]:8.1f}" + "".join(f"{ser[k][i]:11.3e}" for k in keys))
         n = len(t)
         day = max(1, int(round(86400.0 / (t[1] - t[0])))) if n > 1 else 1
-        for k in ('E_loc', 'E_glob', 'R_iface', 'R_quad'):
+        for k in ("E_loc", "E_glob", "R_iface", "R_quad"):
             s = ser[k]
             if np.all(np.isnan(s)):
                 continue
             first, last = np.nanmean(s[:day]), np.nanmean(s[-day:])
-            print('    %s %-7s first-day mean %.3e  last-day mean %.3e  ratio %.2f  max %.3e'
-                  % (nm, k, first, last, last / first if first > 0 else np.nan, np.nanmax(s)))
+            ratio = last / first if first > 0 else np.nan
+            print(f"    {nm} {k:<7} first-day mean {first:.3e}  last-day mean {last:.3e}  ratio {ratio:.2f}"
+                  f"  max {np.nanmax(s):.3e}")
     if csv:
-        with open(csv, 'w') as f:
-            f.write('var,time_s,' + ','.join(keys) + '\n')
+        with open(csv, "w") as f:
+            f.write("var,time_s," + ",".join(keys) + "\n")
             for nm, tt, v in rows:
-                f.write('%s,%.1f,' % (nm, tt) + ','.join('%.4e' % z for z in v) + '\n')
+                f.write(f"{nm},{tt:.1f}," + ",".join(f"{z:.4e}" for z in v) + "\n")
     return 0
 
 
@@ -292,7 +293,7 @@ def checker(mesh_dir, out_dir, names, csv=None):
 def grid_mesh(ni, nj, split=None, dx=0.25):
     """Structured lon/lat quad grid (ni x nj nodes, clockwise quads SW-NW-NE-SE as nemo_meshq);
     split: boolean (ni-1, nj-1) mask of quads cut into two triangles."""
-    lon, lat = np.meshgrid(np.arange(ni) * dx - 10.0, np.arange(nj) * dx + 2.0, indexing='ij')
+    lon, lat = np.meshgrid(np.arange(ni) * dx - 10.0, np.arange(nj) * dx + 2.0, indexing="ij")
     idx = np.arange(ni * nj).reshape(ni, nj)
     el = []
     for i in range(ni - 1):
@@ -310,49 +311,49 @@ def selftest():
 
     def check(cond, msg):
         nonlocal ok
-        print('  %-70s %s' % (msg, 'ok' if cond else 'FAILED'))
+        print(f"  {msg:<70} " + ("ok" if cond else "FAILED"))
         ok &= bool(cond)
 
     lon, lat, el, idx = grid_mesh(24, 18)
     g = Geo(lon, lat, el)
-    ii, jj = np.meshgrid(np.arange(24), np.arange(18), indexing='ij')
+    ii, jj = np.meshgrid(np.arange(24), np.arange(18), indexing="ij")
     cb = np.where((ii + jj) % 2 == 0, 1.0, -1.0).ravel()
     mm = g.measures(cb)
-    check(abs(mm['E_loc'] - 1) < 1e-2 and abs(mm['E_glob'] - 1) < 1e-12,
-          'pure checkerboard: E_loc %.4f, E_glob %.15f' % (mm['E_loc'], mm['E_glob']))
+    check(abs(mm["E_loc"] - 1) < 1e-2 and abs(mm["E_glob"] - 1) < 1e-12,
+          f"pure checkerboard: E_loc {mm['E_loc']:.4f}, E_glob {mm['E_glob']:.15f}")
     lin = 0.3 + 2.0 * lon - 1.5 * lat
     mm = g.measures(lin)
-    check(mm['E_loc'] < 1e-24 and mm['E_glob'] < 1e-3,
-          'linear field: E_loc %.1e, E_glob %.1e' % (mm['E_loc'], mm['E_glob']))
+    check(mm["E_loc"] < 1e-24 and mm["E_glob"] < 1e-3,
+          f"linear field: E_loc {mm['E_loc']:.1e}, E_glob {mm['E_glob']:.1e}")
     smooth = np.sin(np.radians(lon) * 40) * np.cos(np.radians(lat) * 30)
-    e = [g.measures(smooth + eps * cb)['E_glob'] for eps in (0.0, 1e-3, 1e-2)]
+    e = [g.measures(smooth + eps * cb)["E_glob"] for eps in (0.0, 1e-3, 1e-2)]
     check(e[0] < e[1] < e[2] and abs(e[2] / e[1] - 100) < 5,
-          'smooth + eps*checkerboard: E_glob grows as eps^2 (%.1e %.1e %.1e)' % tuple(e))
+          f"smooth + eps*checkerboard: E_glob grows as eps^2 ({e[0]:.1e} {e[1]:.1e} {e[2]:.1e})")
     mod = cb * (1 + 0.5 * np.sin(np.radians(lon) * 20))          # modulated checkerboard
     mm = g.measures(smooth + 1e-2 * mod)
-    check(mm['E_loc'] > 0.5 * g.measures(smooth + 1e-2 * cb)['E_loc'],
-          'modulated checkerboard seen by E_loc (%.2e)' % mm['E_loc'])
+    check(mm["E_loc"] > 0.5 * g.measures(smooth + 1e-2 * cb)["E_loc"],
+          f"modulated checkerboard seen by E_loc ({mm['E_loc']:.2e})")
     rr = g.measures(cb)
-    check(rr['R_quad'] > 1.0 and np.isnan(rr['R_tri']) and np.isnan(rr['R_iface']),
-          'all-quad grid: node classes quad only, checkerboard roughness %.2f' % rr['R_quad'])
+    check(rr["R_quad"] > 1.0 and np.isnan(rr["R_tri"]) and np.isnan(rr["R_iface"]),
+          f"all-quad grid: node classes quad only, checkerboard roughness {rr['R_quad']:.2f}")
     # mixed grid: the left half split into triangles -> quad patch on the right, interface column
     split = np.zeros((23, 17), dtype=bool)
     split[:11, :] = True
     lon, lat, el, idx = grid_mesh(24, 18, split)
     g = Geo(lon, lat, el)
-    check(g.cls['iface'].sum() == 16 and g.cls['tri'].sum() > 0 and g.cls['quad'].sum() > 0,
-          'mixed grid: %d interface nodes (16 expected)' % g.cls['iface'].sum())
+    check(g.cls["iface"].sum() == 16 and g.cls["tri"].sum() > 0 and g.cls["quad"].sum() > 0,
+          f"mixed grid: {g.cls['iface'].sum()} interface nodes (16 expected)")
     cbq = np.where(g.vq, cb, 0.0)
     mm = g.measures(cbq)
-    check(abs(mm['E_glob'] - 1) < 1e-12 and g.components == 1 and g.odd_components == 0,
-          'mixed grid: checkerboard on the quad patch E_glob %.15f' % mm['E_glob'])
+    check(abs(mm["E_glob"] - 1) < 1e-12 and g.components == 1 and g.odd_components == 0,
+          f"mixed grid: checkerboard on the quad patch E_glob {mm['E_glob']:.15f}")
     mm = g.measures(0.3 + 2.0 * lon - 1.5 * lat)
-    check(mm['E_loc'] < 1e-24 and max(mm['R_tri'], mm['R_quad'], mm['R_iface']) < 1e-12,
-          'mixed grid: linear field E_loc %.1e, R tri/quad/iface %.1e %.1e %.1e'
-          % (mm['E_loc'], mm['R_tri'], mm['R_quad'], mm['R_iface']))
+    check(mm["E_loc"] < 1e-24 and max(mm["R_tri"], mm["R_quad"], mm["R_iface"]) < 1e-12,
+          f"mixed grid: linear field E_loc {mm['E_loc']:.1e}, "
+          f"R tri/quad/iface {mm['R_tri']:.1e} {mm['R_quad']:.1e} {mm['R_iface']:.1e}")
     q2 = g.measures(smooth)
-    check(q2['R_iface'] < 0.1 and q2['R_quad'] < 0.1,
-          'mixed grid: smooth field R quad/iface %.1e %.1e (O(h^2))' % (q2['R_quad'], q2['R_iface']))
+    check(q2["R_iface"] < 0.1 and q2["R_quad"] < 0.1,
+          f"mixed grid: smooth field R quad/iface {q2['R_quad']:.1e} {q2['R_iface']:.1e} (O(h^2))")
     # odd ring of 7 quads around a hole: no 2-colouring -> left out of E_glob
     ang = np.arange(7) * 2 * np.pi / 7
     lon = np.r_[np.cos(ang), 2 * np.cos(ang)]
@@ -360,22 +361,22 @@ def selftest():
     el = np.array([[k, 7 + k, 7 + (k + 1) % 7, (k + 1) % 7] for k in range(7)], dtype=np.int64)
     g = Geo(lon, lat, el)
     mm = g.measures(np.arange(14, dtype=float))
-    check(g.odd_components == 1 and mm['E_glob'] == 0.0,
-          'odd ring of 7 quads: %d component without 2-colouring, E_glob 0' % g.odd_components)
-    print('cutout_diag selftest: %s' % ('PASS' if ok else 'FAIL'))
+    check(g.odd_components == 1 and mm["E_glob"] == 0.0,
+          f"odd ring of 7 quads: {g.odd_components} component without 2-colouring, E_glob 0")
+    print("cutout_diag selftest: " + ("PASS" if ok else "FAIL"))
     return 0 if ok else 1
 
 
 def main(argv):
-    if len(argv) >= 1 and argv[0] == 'selftest':
+    if len(argv) >= 1 and argv[0] == "selftest":
         return selftest()
-    if len(argv) >= 9 and argv[0] == 'compare':
+    if len(argv) >= 9 and argv[0] == "compare":
         return compare(argv[1], argv[2], float(argv[3]), int(argv[4]), float(argv[5]),
                        float(argv[6]), float(argv[7]), float(argv[8]), argv[9] if len(argv) > 9 else None)
-    if len(argv) >= 4 and argv[0] == 'checker':
+    if len(argv) >= 4 and argv[0] == "checker":
         csv = None
-        if '--csv' in argv:
-            k = argv.index('--csv')
+        if "--csv" in argv:
+            k = argv.index("--csv")
             csv = argv[k + 1]
             argv = argv[:k] + argv[k + 2:]
         return checker(argv[1], argv[2], argv[3:], csv)
@@ -383,5 +384,5 @@ def main(argv):
     return 2
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))

@@ -335,7 +335,7 @@ endforeach()
 # sum(fct_lumpedmass*f) within 1e-12; measured <= 1.2e-14 (max|uice| 0.35-0.39 m/s).
 # _prod_ocean = prod_ocean_env of tools/prod_env.sh (keep the two lists equal).
 set(_prod_ocean "FESOM3_MIX_TKE=1;FESOM3_REDI=1;FESOM3_FER_GM=1;FESOM3_SHEAR_SPLINES=1;FESOM3_N2_SPLINES=1;FESOM3_MOMADV_OPT=1;FESOM3_RVO_UPWIND=1.0;FESOM3_WSPLIT=1")
-foreach(_cut q:nemo025q_cut mix:nemo025mix_cut)
+foreach(_cut q:${_mesh_q} mix:${_mesh_mix})
     string(REPLACE ":" ";" _pair ${_cut})
     list(GET _pair 0 _tag)
     list(GET _pair 1 _mesh)
@@ -351,9 +351,9 @@ foreach(_cut q:nemo025q_cut mix:nemo025mix_cut)
                  COMMAND ${FESOM3_MPIEXEC} ${FESOM3_MPI_LAUNCH_FLAGS} -np ${_np}
                          $<TARGET_FILE:fesom_conserve>)
         set_tests_properties(${_name} PROPERTIES
-            ENVIRONMENT "FESOM3_MESH_DIR=${_hyb_meshes}/${_mesh};FESOM3_IC_FILE=${_icf};FESOM3_NSTEPS=20;FESOM3_WHICH_ALE=zstar;${_prod_ocean};FESOM3_CONSERVE_ICE=1;FESOM3_WHICHEVP=${_evp};FESOM3_CONSERVE_TOL=1e-12"
+            ENVIRONMENT "FESOM3_MESH_DIR=${_mesh};FESOM3_IC_FILE=${_icf};FESOM3_NSTEPS=20;FESOM3_WHICH_ALE=zstar;${_prod_ocean};FESOM3_CONSERVE_ICE=1;FESOM3_WHICHEVP=${_evp};FESOM3_CONSERVE_TOL=1e-12"
             PASS_REGULAR_EXPRESSION "sea ice ON.*CONSERVATION OK")
-        require_files(${_name} ${_hyb_meshes}/${_mesh}/nod2d.out ${_icf})
+        require_files(${_name} ${_mesh}/nod2d.out ${_icf})
     endforeach()
 endforeach()
 

@@ -67,7 +67,7 @@ program fesom_conserve
     use mpi
     use, intrinsic :: iso_fortran_env, only: int32
     use mod_precision,      only: WP, MP
-    use mod_constants,      only: density_0
+    use mod_constants,      only: density_0, pi, rad
     use mod_param_phys,     only: N2smth_h, alpha, theta, shear_splines, N2_splines, rvo_upwind
     use mod_param_phys,     only: mix_coeff_PP, A_ver, K_ver, Kv0_const, mix_scheme_nmb
     use mod_param_phys,     only: use_instabmix, instabmix_kv, use_momix, use_windmix
@@ -506,7 +506,7 @@ program fesom_conserve
         ice%delta_min     = 1.0e-11_WP
         ice%ice_diff      = 0.0_WP
         ice%ice_gamma_fct = 0.5_WP
-        kwave = 2.0_WP*acos(-1.0_WP)/(5.0_WP*acos(-1.0_WP)/180.0_WP)   ! 5 deg wavelength
+        kwave = 2.0_WP*pi/(5.0_WP*rad)   ! 5 deg wavelength
         do n = 1, nNodL
             if (mesh%ulevels_nod2D(n) > 1) cycle
             klon = kwave*mesh%geo_coord_nod2D(1, n)

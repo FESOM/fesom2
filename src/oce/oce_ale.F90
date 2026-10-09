@@ -115,9 +115,9 @@ contains
         ! FESOM2 oce_dyn.F90:88-173. New horizontal velocity after the SSH solve:
         !   u^(n+1) = u* + UV_rhs + [-g*theta*dt*grad(d_eta)]
         ! The SSH-gradient correction is a gradient_sca contraction of -g*theta*dt*d_eta
-        ! over the element's 4 vertex slots (a triangle's slot 4 has coefficient 0) (same shape as the M2.3 vel_rhs SSH-gradient and
-        ! the M2.2 PGF). UV_rhs here is the post-TDMA value (M2.5; the CG solve does not
-        ! touch it).
+        ! over the element's 4 vertex slots (same shape as the M2.3 vel_rhs SSH-gradient
+        ! and the M2.2 PGF; a triangle's slot 4 has coefficient 0). UV_rhs here is the
+        ! post-TDMA value (M2.5; the CG solve does not touch it).
         ! M2.12c-3: optional partit -> OWNED element loop (FESOM2 :105 do elem=1,
         ! myDim_elem2D), then exchange_elem(UV) (:172). d_eta is read at the owned element's
         ! vertices (within owned+halo, invariant iii) — valid from the CG's exchange_nod(x).

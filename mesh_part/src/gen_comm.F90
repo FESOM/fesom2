@@ -119,7 +119,7 @@ subroutine communication_nodn(partit, mesh)
   ! Stop BEFORE the fill loop: rPE/sPE hold MAX_NEIGHBOR_PARTITIONS entries, rptr/sptr one more
   if (count(num_recv(0:npes-1) > 0) > MAX_NEIGHBOR_PARTITIONS .or.  &
        count(num_send(0:npes-1) > 0) > MAX_NEIGHBOR_PARTITIONS) then
-     print *,'Increase MAX_NEIGHBOR_PARTITIONS in gen_modules_partitioning.F90 and recompile'
+     print *,'Increase MAX_NEIGHBOR_PARTITIONS in MOD_PARTIT.F90 (and in the model''s src/types/mod_partit.F90) and recompile'
      stop
   endif
 
@@ -349,7 +349,7 @@ subroutine communication_elemn(partit, mesh)
   ! Stop BEFORE the fill loop: rPE/sPE hold MAX_NEIGHBOR_PARTITIONS entries, rptr/sptr one more
   if (count(num_recv(0:npes-1) > 0) > MAX_NEIGHBOR_PARTITIONS .or.  &
        count(num_send(0:npes-1) > 0) > MAX_NEIGHBOR_PARTITIONS) then
-     print *,'Increase MAX_NEIGHBOR_PARTITIONS in gen_modules_partitioning.F90 and recompile'
+     print *,'Increase MAX_NEIGHBOR_PARTITIONS in MOD_PARTIT.F90 (and in the model''s src/types/mod_partit.F90) and recompile'
      stop
   endif
 
@@ -482,7 +482,7 @@ subroutine communication_elemn(partit, mesh)
   ! Stop BEFORE the fill loop: rPE/sPE hold MAX_NEIGHBOR_PARTITIONS entries, rptr/sptr one more
   if (count(num_recv(0:npes-1) > 0) > MAX_NEIGHBOR_PARTITIONS .or.  &
        count(num_send(0:npes-1) > 0) > MAX_NEIGHBOR_PARTITIONS) then
-     print *,'Increase MAX_NEIGHBOR_PARTITIONS in gen_modules_partitioning.F90 and recompile'
+     print *,'Increase MAX_NEIGHBOR_PARTITIONS in MOD_PARTIT.F90 (and in the model''s src/types/mod_partit.F90) and recompile'
      stop
   endif
 
