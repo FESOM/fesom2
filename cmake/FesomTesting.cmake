@@ -417,7 +417,7 @@ endfunction()
 # Function to add a FESOM integration test with custom options
 function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH RUN_LENGTH_UNIT RESTART_LENGTH RESTART_LENGTH_UNIT LOGFILE_OUTFREQ FORCE_ROTATION USE_CAVITY)
     set(options MPI_TEST)
-    set(oneValueArgs NP TIMEOUT LABEL MIX_SCHEME FORCING FORCING_YEAR LEAPYEAR USE_ICE OMP_THREADS DATA_DIR)
+    set(oneValueArgs NP TIMEOUT LABEL MIX_SCHEME FORCING FORCING_YEAR LEAPYEAR USE_ICE OMP_THREADS DATA_DIR CONSERVATION_FREQ)
     # OMP_THREADS: run with this many OpenMP threads per rank (OMP_NUM_THREADS), with
     # the passive wait policy and without MPI core binding, so that all threads of a
     # rank get to run even when the runner has fewer cores than threads.
@@ -425,7 +425,10 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
     # the test to pass, on top of the clean-exit marker. Use these to pin behaviour
     # that would otherwise rot silently -- a diagnostic block that stops being
     # printed is a regression no artifact check can see.
-    set(multiValueArgs COMMAND_ARGS EXTRA_SUCCESS_MARKERS)
+    # CONSERVATION_FREQ: run with conservation_freq set to this value and, after the
+    # run checks, judge the CONS lines of the log with tools/check_conservation.py;
+    # CONSERVATION_CHECK_ARGS are passed to it (e.g. --rtol-heat 1e-9).
+    set(multiValueArgs COMMAND_ARGS EXTRA_SUCCESS_MARKERS CONSERVATION_CHECK_ARGS)
     cmake_parse_arguments(FESOM_TEST "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
     # Set defaults
@@ -485,6 +488,34 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
     # Generate the test script
     set(TEST_SCRIPT "${TEST_RUN_DIR}/run_test.cmake")
     
+    # A conservation test starts from rest every time: without this a rerun would
+    # restart from the previous run's restart files and judge a different day.
+    set(_pre_run "")
+    set(_post_checks "")
+    if(DEFINED FESOM_TEST_CONSERVATION_FREQ)
+        set(_pre_run "
+            file(REMOVE_RECURSE \"${RESULT_DIR}\")
+            file(MAKE_DIRECTORY \"${RESULT_DIR}\")
+            file(WRITE \"${RESULT_DIR}/fesom.clock\" \"0 1 ${FESOM_TEST_FORCING_YEAR}\\n0 1 ${FESOM_TEST_FORCING_YEAR}\\n\")
+")
+        if(NOT Python3_EXECUTABLE)
+            message(FATAL_ERROR "add_fesom_test_with_options(${TEST_NAME}): CONSERVATION_FREQ needs a Python 3 interpreter")
+        endif()
+        set(_post_checks "
+            execute_process(
+                COMMAND \"${Python3_EXECUTABLE}\" \"${FESOM_TESTING_ROOT}/tools/check_conservation.py\"
+                        \"${TEST_RUN_DIR}/test_output.log\" ${FESOM_TEST_CONSERVATION_CHECK_ARGS}
+                        --json \"${TEST_RUN_DIR}/conservation.json\"
+                RESULT_VARIABLE _cons_result
+                OUTPUT_VARIABLE _cons_output
+                ERROR_VARIABLE _cons_output)
+            message(\"\${_cons_output}\")
+            if(NOT _cons_result EQUAL 0)
+                message(FATAL_ERROR \"Test ${TEST_NAME} FAILED: conservation budgets do not close (${TEST_RUN_DIR}/test_output.log)\")
+            endif()
+")
+    endif()
+
     set(_omp_env "")
     if(DEFINED FESOM_TEST_OMP_THREADS)
         set(_omp_env "
@@ -501,7 +532,7 @@ function(add_fesom_test_with_options TEST_NAME MESH_NAME STEP_PER_DAY RUN_LENGTH
             # Create test directories
             file(MAKE_DIRECTORY \"${TEST_RUN_DIR}\")
             file(MAKE_DIRECTORY \"${RESULT_DIR}\")
-
+${_pre_run}
             # Allow Open MPI to launch when the test runs as root (e.g. act or
             # Docker-based CI containers). These variables are specific to Open MPI
             # and are ignored by other MPI implementations and by non-root runs,
@@ -542,7 +573,7 @@ ${_omp_env}
                 ERROR_LOG \"${TEST_RUN_DIR}/test_error.log\"
                 SUCCESS_MARKERS ${_success_markers}
                 REQUIRED_ARTIFACTS \"${RESULT_DIR}/sst.fesom.${FESOM_TEST_FORCING_YEAR}.nc\"
-            )
+            )${_post_checks}
         ")
     else()
         # Serial test
@@ -550,7 +581,7 @@ ${_omp_env}
             # Create test directories
             file(MAKE_DIRECTORY \"${TEST_RUN_DIR}\")
             file(MAKE_DIRECTORY \"${RESULT_DIR}\")
-            
+${_pre_run}            
             # Run FESOM (serial). Raise the stack limit as for the MPI case above
             # (Intel fesom.x overflows the default 8 MB stack on large meshes).
 ${_omp_env}
@@ -576,7 +607,7 @@ ${_omp_env}
                 ERROR_LOG \"${TEST_RUN_DIR}/test_error.log\"
                 SUCCESS_MARKERS ${_success_markers}
                 REQUIRED_ARTIFACTS \"${RESULT_DIR}/sst.fesom.${FESOM_TEST_FORCING_YEAR}.nc\"
-            )
+            )${_post_checks}
         ")
     endif()
     
@@ -632,6 +663,20 @@ ${_omp_env}
         file(READ "${TEST_RUN_DIR}/namelist.config" _cfg_content)
         string(REGEX REPLACE "([^A-Za-z0-9_])use_ice[ \t]*=[ \t]*\\.[a-zA-Z]+\\."
                "\\1use_ice=${FESOM_TEST_USE_ICE}" _cfg_content "${_cfg_content}")
+        file(WRITE "${TEST_RUN_DIR}/namelist.config" "${_cfg_content}")
+    endif()
+
+    # Optional: print the conservation budgets (CONS lines) every
+    # CONSERVATION_FREQ steps; set in &run_config, or added first in it.
+    if(DEFINED FESOM_TEST_CONSERVATION_FREQ)
+        file(READ "${TEST_RUN_DIR}/namelist.config" _cfg_content)
+        if(_cfg_content MATCHES "[^A-Za-z0-9_]conservation_freq[ \t]*=")
+            string(REGEX REPLACE "([^A-Za-z0-9_])conservation_freq[ \t]*=[ \t]*[0-9]+"
+                   "\\1conservation_freq=${FESOM_TEST_CONSERVATION_FREQ}" _cfg_content "${_cfg_content}")
+        else()
+            string(REGEX REPLACE "(&run_config[^\n]*\n)"
+                   "\\1conservation_freq=${FESOM_TEST_CONSERVATION_FREQ}\n" _cfg_content "${_cfg_content}")
+        endif()
         file(WRITE "${TEST_RUN_DIR}/namelist.config" "${_cfg_content}")
     endif()
 
