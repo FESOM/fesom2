@@ -914,7 +914,19 @@ module g_cvmix_kpp
             dvsqr_r8(nun:nln)  = real(kpp_dvsurf2(nun:nln),       cvmix_r8)
             ws_r8(nun:nln)     = real(kpp_ws_cntr(nun:nln),       cvmix_r8)
             nsqr_r8(nun:nln+1) = real(bvfreq(    nun:nln+1,node), cvmix_r8)
-            buoy_r8(nun:nln)   = real(kpp_buoyflx_nl(nun:nln),    cvmix_r8)
+            ! bfsfc is only used in CVMix's LF17 unresolved-shear term:
+            !   Vtc = sqrt( (c_CT*bfsfc(k)*zt(k) + c_ST*u*^3 + c_LT*u*^3*La^-pLT)/ws(k) )
+            ! CVMix gates LF17 only on bfsfc(1)<0, but with sw_pene bfsfc(k) includes
+            ! the SW absorbed above level k and can turn >0 (stabilising) at depth.
+            ! With zt<0 the convective term then becomes negative --> sqrt(<0)=NaN
+            ! --> Ri_bulk=NaN --> OBL search never exits --> OBL hits the bottom.
+            ! Keep only the destabilising (convective) part, as CVMix itself does in
+            ! its StokesMOST branch via MAX(0, zt*bfsfc):
+            !   bfsfc(k) < 0 : unchanged
+            !   bfsfc(k) > 0 : convective contribution = 0
+            ! The LF17 gate is unaffected (min(x,0)<0 <=> x<0); NONE/LWF16/StokesMOST
+            ! do not use bfsfc here. kpp_buoyflx_nl itself is not modified.
+            buoy_r8(nun:nln)   = real(min(kpp_buoyflx_nl(nun:nln), 0.0_WP), cvmix_r8)
             ! NOTE: LHS section nun:nln+1 kept identical to the original to preserve behavior
             bulkRi_r8(nun:nln+1) = cvmix_kpp_compute_bulk_Richardson(   &
                 zt_cntr         = zcntr_r8(nun:nln),            & ! (in) Depth of cell center (m)
