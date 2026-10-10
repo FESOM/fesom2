@@ -28,16 +28,12 @@ subroutine cal_shortwave_rad_dbgyre(ice, tracers, partit, mesh)
   real(kind=WP), pointer :: albw
 
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
   sw_3d=0.0_WP
   albw => ice%thermo%albw  
 
   
-  do n2=1, myDim_nod2D+eDim_nod2D     
+  do n2=1, partit%myDim_nod2D+partit%eDim_nod2D     
      
      !calculate heat flux
      zTstar    = 28.3      ! intensity from 28.3 a -5 deg
