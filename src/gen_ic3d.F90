@@ -245,14 +245,10 @@ CONTAINS
       integer                                   :: elnodes(3)
       real(wp)                                  :: x, y       ! coordinates of elements
       real(kind=WP), allocatable,dimension(:,:) :: cav_nrst_xyz
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
       
       warn = 0
 
-      if (mype==0) then
+      if (partit%mype==0) then
          write(*,*) 'variable ', trim(varname)
          write(*,*) 'from     ', trim(filename)
       end if
@@ -264,19 +260,19 @@ CONTAINS
       ! cavity case
       if (use_cavity) then
         ! compute bilinear index
-        do i = 1, myDim_nod2d
+        do i = 1, partit%myDim_nod2d
     !       ! its a cavity node use extrapolation points of closest cavity line point
             ! exchange the coordinates of the cavity node with the coordinates of the 
             ! closest cavity-line point --> use than these coordinates to estimate 
             ! bilinear interpolation index
-            if (ulevels_nod2D(i)>1) then
+            if (mesh%ulevels_nod2D(i)>1) then
                 x = mesh%cavity_nrst_cavlpnt_xyz(1,i)/rad
                 y = mesh%cavity_nrst_cavlpnt_xyz(2,i)/rad
                 !!PS if (mype==0) write(*,*) 'xold, yold, xnew, ynew = ',geo_coord_nod2D(1,i),geo_coord_nod2D(2,i),mesh%cavity_nrst_cavlpnt_xyz(1,i),mesh%cavity_nrst_cavlpnt_xyz(2,i)
             ! its no cavity use normal vertice points    
             else
-                x = geo_coord_nod2D(1,i)/rad
-                y = geo_coord_nod2D(2,i)/rad
+                x = mesh%geo_coord_nod2D(1,i)/rad
+                y = mesh%geo_coord_nod2D(2,i)/rad
             end if 
             if (x<0.)   x=x+360.
             if (x>360.) x=x-360.
@@ -296,10 +292,10 @@ CONTAINS
       !_________________________________________________________________________ 
       ! standard non-cavity case
       else ! use_cavity==.false.
-        do i = 1, myDim_nod2d
+        do i = 1, partit%myDim_nod2d
     !       ! get coordinates of elements
-            x  = geo_coord_nod2D(1,i)/rad
-            y  = geo_coord_nod2D(2,i)/rad
+            x  = mesh%geo_coord_nod2D(1,i)/rad
+            y  = mesh%geo_coord_nod2D(2,i)/rad
             if (x<0.)   x=x+360.
             if (x>360.) x=x-360.
             ! find nearest
@@ -350,23 +346,19 @@ CONTAINS
       integer				      :: NO_FILL	     ! 0=no fillval, 1=fillval
       real(wp)				      :: FILL_VALUE
       real(8)				      :: FILL_VALUE_r8   ! double temp: file stores fill/missing as double
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
       ALLOCATE(ncdata(nc_Nlon,nc_Nlat,nc_Ndepth), data1d(nc_Ndepth))
       ncdata=0.0_WP
       data1d=0.0_WP
       tracers%data(current_tracer)%values(:,:)=dummy
       !open NETCDF file on 0 core     
-      if (mype==0) then
+      if (partit%mype==0) then
          iost = nf_open(filename,NF_NOWRITE,ncid)
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename,partit)
       ! get variable id
-      if (mype==0) then
+      if (partit%mype==0) then
          iost = nf_inq_varid(ncid, varname, id_data)
          iost = nf_inq_var_fill(ncid, id_data, NO_FILL, FILL_VALUE_r8) ! FillValue defined?
          if (NO_FILL==1) then
@@ -385,11 +377,11 @@ CONTAINS
          ! cast to working precision; comparison below uses the same WP rounding as the data read
          FILL_VALUE = real(FILL_VALUE_r8, WP)
       end if
-      call MPI_BCast(FILL_VALUE, 1, MPI_WP, 0, MPI_COMM_FESOM, ierror)
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+      call MPI_BCast(FILL_VALUE, 1, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename,partit)   
       !read data from file
-      if (mype==0) then
+      if (partit%mype==0) then
          nf_start(1)=1
          nf_edges(1)=nc_Nlon-2
          nf_start(2)=1
@@ -423,14 +415,14 @@ CONTAINS
             end do
          end do
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
       call check_nferr(iost,filename,partit)
-      call MPI_BCast(ncdata, nc_Nlon*nc_Nlat*nc_Ndepth, MPI_WP, 0, MPI_COMM_FESOM, ierror)
+      call MPI_BCast(ncdata, nc_Nlon*nc_Nlat*nc_Ndepth, MPI_WP, 0, partit%MPI_COMM_FESOM, ierror)
       ! bilinear space interpolation,  
       ! data is assumed to be sampled on a regular grid
-      do ii = 1, myDim_nod2d
-         nl1 = nlevels_nod2D(ii)-1
-         ul1 = ulevels_nod2D(ii)
+      do ii = 1, partit%myDim_nod2d
+         nl1 = mesh%nlevels_nod2D(ii)-1
+         ul1 = mesh%ulevels_nod2D(ii)
          i = bilin_indx_i(ii)
          j = bilin_indx_j(ii)
          ip1 = i + 1   
@@ -445,8 +437,8 @@ CONTAINS
             y = mesh%cavity_nrst_cavlpnt_xyz(2,ii)/rad
          ! its no cavity use normal vertice points    
          else
-            x = geo_coord_nod2D(1,ii)/rad
-            y = geo_coord_nod2D(2,ii)/rad
+            x = mesh%geo_coord_nod2D(1,ii)/rad
+            y = mesh%geo_coord_nod2D(2,ii)/rad
          end if 
          if (x<0.)   x=x+360.
          if (x>360.) x=x-360.
@@ -475,10 +467,10 @@ CONTAINS
             if (use_cavity) then
                 !!PS do k= 1, nl1
                 do k= ul1, nl1
-                    if (ul1>1 .and. Z_3d_n(k,ii)<mesh%cavity_nrst_cavlpnt_xyz(3,ii)) then
+                    if (ul1>1 .and. mesh%Z_3d_n(k,ii)<mesh%cavity_nrst_cavlpnt_xyz(3,ii)) then
                         aux_z = mesh%cavity_nrst_cavlpnt_xyz(3,ii)
                     else
-                        aux_z = Z_3d_n(k,ii)
+                        aux_z = mesh%Z_3d_n(k,ii)
                     end if 
                     call binarysearch(nc_Ndepth,nc_depth,-aux_z,d_indx)
                     
@@ -505,7 +497,7 @@ CONTAINS
             else
                 !!PS do k= 1, nl1
                 do k= ul1, nl1
-                    call binarysearch(nc_Ndepth,nc_depth,-Z_3d_n(k,ii),d_indx)
+                    call binarysearch(nc_Ndepth,nc_depth,-mesh%Z_3d_n(k,ii),d_indx)
                     if ( d_indx < nc_Ndepth .and. d_indx > 0) then
                         d_indx_p1 = d_indx+1
                         delta_d = nc_depth(d_indx+1)-nc_depth(d_indx)
@@ -517,7 +509,7 @@ CONTAINS
                             cf_a  = (d2 - d1)/ delta_d
                             ! value of interpolated OB data on Z from model
                             cf_b  = d1 - cf_a * nc_depth(d_indx)
-                            tracers%data(current_tracer)%values(k,ii) = -cf_a * Z_3d_n(k,ii) + cf_b
+                            tracers%data(current_tracer)%values(k,ii) = -cf_a * mesh%Z_3d_n(k,ii) + cf_b
                         end if
                     elseif (d_indx==0) then
                         tracers%data(current_tracer)%values(k,ii)=data1d(1)
@@ -534,10 +526,10 @@ CONTAINS
             enddo
          end if ! --> if ( min(i,j)>0 ) then
       end do !ii
-      if (mype==0) then
+      if (partit%mype==0) then
          iost = nf_close(ncid)
       end if
-      call MPI_BCast(iost, 1, MPI_INTEGER, 0, MPI_COMM_FESOM, ierror)
+      call MPI_BCast(iost, 1, MPI_INTEGER, 0, partit%MPI_COMM_FESOM, ierror)
       DEALLOCATE( ncdata, data1d )
    END SUBROUTINE getcoeffld  
    
