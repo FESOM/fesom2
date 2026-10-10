@@ -56,10 +56,6 @@ subroutine ice_init(ice, partit, mesh)
 
     !___________________________________________________________________________
     ! pointer on necessary derived types
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     
     !___________________________________________________________________________
     ! pre initialise namelist parameters with the defaults, for the case they are not 
@@ -113,9 +109,9 @@ subroutine ice_init(ice, partit, mesh)
     ! open and read namelist.ice for I/O
         open(unit=nm_unit, file='namelist.ice', form='formatted', access='sequential', status='old', iostat=iost )
     if (iost == 0) then
-        if (mype==0) write(*,*) '     file   : ', 'namelist.ice',' open ok'
+        if (partit%mype==0) write(*,*) '     file   : ', 'namelist.ice',' open ok'
     else
-        if (mype==0) write(*,*) 'ERROR: --> bad opening file   : ', 'namelist.ice',' ; iostat=',iost
+        if (partit%mype==0) write(*,*) 'ERROR: --> bad opening file   : ', 'namelist.ice',' ; iostat=',iost
         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
         stop
     end if
@@ -173,8 +169,8 @@ subroutine ice_init(ice, partit, mesh)
 
     !___________________________________________________________________________
     ! define local vertice & elem array size
-    elem_size=myDim_elem2D+eDim_elem2D
-    node_size=myDim_nod2D +eDim_nod2D
+    elem_size=partit%myDim_elem2D+partit%eDim_elem2D
+    node_size=partit%myDim_nod2D +partit%eDim_nod2D
 
     !___________________________________________________________________________
     ! allocate/initialise arrays in ice derived type
@@ -269,7 +265,7 @@ subroutine ice_init(ice, partit, mesh)
     ice%work%fct_minus   = 0.0_WP
     ice%work%fct_fluxes  = 0.0_WP
 
-    allocate(ice%work%fct_massmatrix(sum(nn_num(1:myDim_nod2D))))
+    allocate(ice%work%fct_massmatrix(sum(mesh%nn_num(1:partit%myDim_nod2D))))
     ice%work%fct_massmatrix = 0.0_WP
 
     allocate(ice%work%sigma11(         elem_size))
@@ -353,11 +349,11 @@ subroutine ice_init(ice, partit, mesh)
     !array of 2D boundary conditions is used in ice_maEVP
     
     ! LA 2023-05-24 initiate bc_index_nod2D also for whichEVP==0
-        allocate(mesh%bc_index_nod2D(myDim_nod2D+eDim_nod2D))
+        allocate(mesh%bc_index_nod2D(partit%myDim_nod2D+partit%eDim_nod2D))
         mesh%bc_index_nod2D=1._WP
-        do n=1, myDim_edge2D
+        do n=1, partit%myDim_edge2D
             ed=mesh%edges(:, n)
-            if (myList_edge2D(n) <= mesh%edge2D_in) cycle
+            if (partit%myList_edge2D(n) <= mesh%edge2D_in) cycle
             mesh%bc_index_nod2D(ed)=0._WP
         end do
         
@@ -387,14 +383,10 @@ subroutine ice_init_toyocean_dummy(ice, partit, mesh)
     integer        :: node_size, n
     !___________________________________________________________________________
     ! pointer on necessary derived types
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     !___________________________________________________________________________
     ! define local vertice & elem array size
-    node_size=myDim_nod2D+eDim_nod2D
+    node_size=partit%myDim_nod2D+partit%eDim_nod2D
 
     !___________________________________________________________________________
     ! allocate/initialise arrays in ice derived type
