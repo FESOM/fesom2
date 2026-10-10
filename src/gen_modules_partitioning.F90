@@ -154,8 +154,6 @@ subroutine init_mpi_types(partit, mesh)
   integer, allocatable             :: blocklen(:),     displace(:)
   integer, allocatable             :: blocklen_tmp(:), displace_tmp(:)
 
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 !#include "associate_mesh_def.h"
 !#include "associate_mesh_ass.h"
 !PS npes            => partit%npes
@@ -168,54 +166,54 @@ subroutine init_mpi_types(partit, mesh)
   ! at the initialization phase and is taken into account in read_mesh
   ! routine. Here, MPI datatypes are built and buffers for MPI wait requests
   ! are allocated. 
-  if (npes > 1) then
+  if (partit%npes > 1) then
 
 !================================================
 ! MPI REQUEST BUFFERS
 !================================================
-      if (.not. allocated(com_nod2D%req))        allocate(com_nod2D%req(            3*com_nod2D%rPEnum  + 3*com_nod2D%sPEnum))
-      if (.not. allocated(com_elem2D%req))       allocate(com_elem2D%req(           3*com_elem2D%rPEnum + 3*com_elem2D%sPEnum))
-      if (.not. allocated(com_elem2D_full%req))  allocate(com_elem2D_full%req(3*com_elem2D_full%rPEnum  + 3*com_elem2D_full%sPEnum))
+      if (.not. allocated(partit%com_nod2D%req))        allocate(partit%com_nod2D%req(            3*partit%com_nod2D%rPEnum  + 3*partit%com_nod2D%sPEnum))
+      if (.not. allocated(partit%com_elem2D%req))       allocate(partit%com_elem2D%req(           3*partit%com_elem2D%rPEnum + 3*partit%com_elem2D%sPEnum))
+      if (.not. allocated(partit%com_elem2D_full%req))  allocate(partit%com_elem2D_full%req(3*partit%com_elem2D_full%rPEnum  + 3*partit%com_elem2D_full%sPEnum))
 
 !================================================
 ! MPI DATATYPES
 !================================================
       ! Build MPI Data types for halo exchange: Elements
-      allocate(partit%r_mpitype_elem2D(com_elem2D%rPEnum,4))     ! 2D, small halo
-      allocate(partit%s_mpitype_elem2D(com_elem2D%sPEnum,4))
-      allocate(partit%r_mpitype_elem2D_full_i(com_elem2D_full%rPEnum))   ! 2D, wide halo, integer
-      allocate(partit%s_mpitype_elem2D_full_i(com_elem2D_full%sPEnum))
-      allocate(partit%r_mpitype_elem2D_full(com_elem2D_full%rPEnum,4))     ! 2D, wide halo 
-      allocate(partit%s_mpitype_elem2D_full(com_elem2D_full%sPEnum,4))
-      allocate(partit%r_mpitype_elem3D(com_elem2D%rPEnum, mesh%nl-1:mesh%nl,4))     ! 3D, small halo 
-      allocate(partit%s_mpitype_elem3D(com_elem2D%sPEnum, mesh%nl-1:mesh%nl,4))
-      allocate(partit%r_mpitype_elem3D_full(com_elem2D_full%rPEnum, mesh%nl-1:mesh%nl,4))     ! 3D, wide halo
-      allocate(partit%s_mpitype_elem3D_full(com_elem2D_full%sPEnum, mesh%nl-1:mesh%nl,4))
+      allocate(partit%r_mpitype_elem2D(partit%com_elem2D%rPEnum,4))     ! 2D, small halo
+      allocate(partit%s_mpitype_elem2D(partit%com_elem2D%sPEnum,4))
+      allocate(partit%r_mpitype_elem2D_full_i(partit%com_elem2D_full%rPEnum))   ! 2D, wide halo, integer
+      allocate(partit%s_mpitype_elem2D_full_i(partit%com_elem2D_full%sPEnum))
+      allocate(partit%r_mpitype_elem2D_full(partit%com_elem2D_full%rPEnum,4))     ! 2D, wide halo 
+      allocate(partit%s_mpitype_elem2D_full(partit%com_elem2D_full%sPEnum,4))
+      allocate(partit%r_mpitype_elem3D(partit%com_elem2D%rPEnum, mesh%nl-1:mesh%nl,4))     ! 3D, small halo 
+      allocate(partit%s_mpitype_elem3D(partit%com_elem2D%sPEnum, mesh%nl-1:mesh%nl,4))
+      allocate(partit%r_mpitype_elem3D_full(partit%com_elem2D_full%rPEnum, mesh%nl-1:mesh%nl,4))     ! 3D, wide halo
+      allocate(partit%s_mpitype_elem3D_full(partit%com_elem2D_full%sPEnum, mesh%nl-1:mesh%nl,4))
 
 !after the allocation we just reassotiate ALL pointers again here
 ! #include "associate_part_ass.h"
       ! Upper limit for the length of the local interface between the neighbor PEs 
       max_nb = max(  &
-           maxval(com_elem2D%rptr(2:com_elem2D%rPEnum+1) - com_elem2D%rptr(1:com_elem2D%rPEnum)), &
-           maxval(com_elem2D%sptr(2:com_elem2D%sPEnum+1) - com_elem2D%sptr(1:com_elem2D%sPEnum)), &
-           maxval(com_elem2D_full%rptr(2:com_elem2D_full%rPEnum+1) - com_elem2D_full%rptr(1:com_elem2D_full%rPEnum)), &
-           maxval(com_elem2D_full%sptr(2:com_elem2D_full%sPEnum+1) - com_elem2D_full%sptr(1:com_elem2D_full%sPEnum)))
+           maxval(partit%com_elem2D%rptr(2:partit%com_elem2D%rPEnum+1) - partit%com_elem2D%rptr(1:partit%com_elem2D%rPEnum)), &
+           maxval(partit%com_elem2D%sptr(2:partit%com_elem2D%sPEnum+1) - partit%com_elem2D%sptr(1:partit%com_elem2D%sPEnum)), &
+           maxval(partit%com_elem2D_full%rptr(2:partit%com_elem2D_full%rPEnum+1) - partit%com_elem2D_full%rptr(1:partit%com_elem2D_full%rPEnum)), &
+           maxval(partit%com_elem2D_full%sptr(2:partit%com_elem2D_full%sPEnum+1) - partit%com_elem2D_full%sptr(1:partit%com_elem2D_full%sPEnum)))
       
       allocate(displace(max_nb),     blocklen(max_nb))
       allocate(displace_tmp(max_nb), blocklen_tmp(max_nb))
 
-      do n=1,com_elem2D%rPEnum
+      do n=1,partit%com_elem2D%rPEnum
          nb = 1
-         nini = com_elem2D%rptr(n)
-         nend = com_elem2D%rptr(n+1) - 1
+         nini = partit%com_elem2D%rptr(n)
+         nend = partit%com_elem2D%rptr(n+1) - 1
          displace(:) = 0
-         displace(1) = com_elem2D%rlist(nini) -1  ! C counting, start at 0
+         displace(1) = partit%com_elem2D%rlist(nini) -1  ! C counting, start at 0
          blocklen(:) = 1
          do i=nini+1, nend
-            if (com_elem2D%rlist(i) /= com_elem2D%rlist(i-1) + 1) then  
+            if (partit%com_elem2D%rlist(i) /= partit%com_elem2D%rlist(i-1) + 1) then  
                ! New block
                nb = nb+1
-               displace(nb) = com_elem2D%rlist(i) -1
+               displace(nb) = partit%com_elem2D%rlist(i) -1
             else
                blocklen(nb) = blocklen(nb)+1
             endif
@@ -250,18 +248,18 @@ subroutine init_mpi_types(partit, mesh)
          ENDDO  
       enddo
 
-      do n=1,com_elem2D%sPEnum
+      do n=1,partit%com_elem2D%sPEnum
          nb = 1
-         nini = com_elem2D%sptr(n)
-         nend = com_elem2D%sptr(n+1) - 1
+         nini = partit%com_elem2D%sptr(n)
+         nend = partit%com_elem2D%sptr(n+1) - 1
          displace(:) = 0
-         displace(1) = com_elem2D%slist(nini) -1  ! C counting, start at 0
+         displace(1) = partit%com_elem2D%slist(nini) -1  ! C counting, start at 0
          blocklen(:) = 1
          do i=nini+1, nend
-            if (com_elem2D%slist(i) /= com_elem2D%slist(i-1) + 1) then  
+            if (partit%com_elem2D%slist(i) /= partit%com_elem2D%slist(i-1) + 1) then  
                ! New block
                nb = nb+1
-               displace(nb) = com_elem2D%slist(i) -1
+               displace(nb) = partit%com_elem2D%slist(i) -1
             else
                blocklen(nb) = blocklen(nb)+1
             endif
@@ -290,18 +288,18 @@ subroutine init_mpi_types(partit, mesh)
          ENDDO  
       enddo
       
-      do n=1,com_elem2D_full%rPEnum
+      do n=1,partit%com_elem2D_full%rPEnum
          nb = 1
-         nini = com_elem2D_full%rptr(n)
-         nend = com_elem2D_full%rptr(n+1) - 1
+         nini = partit%com_elem2D_full%rptr(n)
+         nend = partit%com_elem2D_full%rptr(n+1) - 1
          displace(:) = 0
-         displace(1) = com_elem2D_full%rlist(nini) -1  ! C counting, start at 0
+         displace(1) = partit%com_elem2D_full%rlist(nini) -1  ! C counting, start at 0
          blocklen(:) = 1
          do i=nini+1, nend
-            if (com_elem2D_full%rlist(i) /= com_elem2D_full%rlist(i-1) + 1) then  
+            if (partit%com_elem2D_full%rlist(i) /= partit%com_elem2D_full%rlist(i-1) + 1) then  
                ! New block
                nb = nb+1
-               displace(nb) = com_elem2D_full%rlist(i) -1
+               displace(nb) = partit%com_elem2D_full%rlist(i) -1
             else
                blocklen(nb) = blocklen(nb)+1
             endif
@@ -336,18 +334,18 @@ subroutine init_mpi_types(partit, mesh)
          ENDDO   
       enddo
 
-      do n=1,com_elem2D_full%sPEnum
+      do n=1,partit%com_elem2D_full%sPEnum
          nb = 1
-         nini = com_elem2D_full%sptr(n)
-         nend = com_elem2D_full%sptr(n+1) - 1
+         nini = partit%com_elem2D_full%sptr(n)
+         nend = partit%com_elem2D_full%sptr(n+1) - 1
          displace(:) = 0
-         displace(1) = com_elem2D_full%slist(nini) -1  ! C counting, start at 0
+         displace(1) = partit%com_elem2D_full%slist(nini) -1  ! C counting, start at 0
          blocklen(:) = 1
          do i=nini+1, nend
-            if (com_elem2D_full%slist(i) /= com_elem2D_full%slist(i-1) + 1) then  
+            if (partit%com_elem2D_full%slist(i) /= partit%com_elem2D_full%slist(i-1) + 1) then  
                ! New block
                nb = nb+1
-               displace(nb) = com_elem2D_full%slist(i) -1
+               displace(nb) = partit%com_elem2D_full%slist(i) -1
             else
                blocklen(nb) = blocklen(nb)+1
             endif
@@ -381,36 +379,36 @@ subroutine init_mpi_types(partit, mesh)
 
    ! Build MPI Data types for halo exchange: Nodes
 
-      allocate(partit%r_mpitype_nod2D(com_nod2D%rPEnum))     ! 2D
-      allocate(partit%s_mpitype_nod2D(com_nod2D%sPEnum))
-      allocate(partit%r_mpitype_nod2D_i(com_nod2D%rPEnum))   ! 2D integer
-      allocate(partit%s_mpitype_nod2D_i(com_nod2D%sPEnum))   
+      allocate(partit%r_mpitype_nod2D(partit%com_nod2D%rPEnum))     ! 2D
+      allocate(partit%s_mpitype_nod2D(partit%com_nod2D%sPEnum))
+      allocate(partit%r_mpitype_nod2D_i(partit%com_nod2D%rPEnum))   ! 2D integer
+      allocate(partit%s_mpitype_nod2D_i(partit%com_nod2D%sPEnum))   
 
-      allocate(partit%r_mpitype_nod3D(com_nod2D%rPEnum,mesh%nl-1:mesh%nl,3))  ! 3D with nl-1 or nl layers, 1-3 values 
-      allocate(partit%s_mpitype_nod3D(com_nod2D%sPEnum,mesh%nl-1:mesh%nl,3))
+      allocate(partit%r_mpitype_nod3D(partit%com_nod2D%rPEnum,mesh%nl-1:mesh%nl,3))  ! 3D with nl-1 or nl layers, 1-3 values 
+      allocate(partit%s_mpitype_nod3D(partit%com_nod2D%sPEnum,mesh%nl-1:mesh%nl,3))
 
 !after the allocation we just reassotiate ALL pointers again here
 ! #include "associate_part_ass.h"
   
       ! Upper limit for the length of the local interface between the neighbor PEs 
-      max_nb = max(maxval(com_nod2D%rptr(2:com_nod2D%rPEnum+1) - com_nod2D%rptr(1:com_nod2D%rPEnum)), &
-                   maxval(com_nod2D%sptr(2:com_nod2D%sPEnum+1) - com_nod2D%sptr(1:com_nod2D%sPEnum)))
+      max_nb = max(maxval(partit%com_nod2D%rptr(2:partit%com_nod2D%rPEnum+1) - partit%com_nod2D%rptr(1:partit%com_nod2D%rPEnum)), &
+                   maxval(partit%com_nod2D%sptr(2:partit%com_nod2D%sPEnum+1) - partit%com_nod2D%sptr(1:partit%com_nod2D%sPEnum)))
 
       allocate(displace(max_nb),     blocklen(max_nb))
       allocate(displace_tmp(max_nb), blocklen_tmp(max_nb))
 
-      do n=1,com_nod2D%rPEnum
+      do n=1,partit%com_nod2D%rPEnum
          nb = 1
-         nini = com_nod2D%rptr(n)
-         nend = com_nod2D%rptr(n+1) - 1
+         nini = partit%com_nod2D%rptr(n)
+         nend = partit%com_nod2D%rptr(n+1) - 1
          displace(:) = 0
-         displace(1) = com_nod2D%rlist(nini) -1  ! C counting, start at 0
+         displace(1) = partit%com_nod2D%rlist(nini) -1  ! C counting, start at 0
          blocklen(:) = 1
          do i=nini+1, nend
-            if (com_nod2D%rlist(i) /= com_nod2D%rlist(i-1) + 1) then  
+            if (partit%com_nod2D%rlist(i) /= partit%com_nod2D%rlist(i-1) + 1) then  
                ! New block
                nb = nb+1
-               displace(nb) = com_nod2D%rlist(i) -1
+               displace(nb) = partit%com_nod2D%rlist(i) -1
             else
                blocklen(nb) = blocklen(nb)+1
             endif
@@ -439,18 +437,18 @@ subroutine init_mpi_types(partit, mesh)
          ENDDO
       enddo
 
-      do n=1,com_nod2D%sPEnum
+      do n=1,partit%com_nod2D%sPEnum
          nb = 1
-         nini = com_nod2D%sptr(n)
-         nend = com_nod2D%sptr(n+1) - 1
+         nini = partit%com_nod2D%sptr(n)
+         nend = partit%com_nod2D%sptr(n+1) - 1
          displace(:) = 0
-         displace(1) = com_nod2D%slist(nini) -1  ! C counting, start at 0
+         displace(1) = partit%com_nod2D%slist(nini) -1  ! C counting, start at 0
          blocklen(:) = 1
          do i=nini+1, nend
-            if (com_nod2D%slist(i) /= com_nod2D%slist(i-1) + 1) then  
+            if (partit%com_nod2D%slist(i) /= partit%com_nod2D%slist(i-1) + 1) then  
                ! New block
                nb = nb+1
-               displace(nb) = com_nod2D%slist(i) -1
+               displace(nb) = partit%com_nod2D%slist(i) -1
             else
                blocklen(nb) = blocklen(nb)+1
             endif
@@ -501,10 +499,8 @@ subroutine init_mpi_types_fbin(nfbin, partit)
     integer, allocatable             :: blocklen(:),     displace(:)
     integer, allocatable             :: blocklen_tmp(:), displace_tmp(:)
 
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-    if (npes <= 1) return
+    if (partit%npes <= 1) return
 
     ! Store nfbin for runtime checks in exchange routines
     partit%nfbin_mpi = nfbin
@@ -513,41 +509,41 @@ subroutine init_mpi_types_fbin(nfbin, partit)
     ! Allocate MPI datatype arrays for spectral bin exchange
     ! Full spectral column exchanged at once (mirroring standard nod3D/elem3D pattern)
     !================================================================
-    allocate(partit%r_mpitype_nod3D_fbin(      com_nod2D%rPEnum      , nfbin:nfbin, 3)) ! nodes, nfbin bins, 1-3 values
-    allocate(partit%s_mpitype_nod3D_fbin(      com_nod2D%sPEnum      , nfbin:nfbin, 3))
-    allocate(partit%r_mpitype_elem2D_fbin(     com_elem2D%rPEnum     , nfbin:nfbin   )) ! elems 2D small halo
-    allocate(partit%s_mpitype_elem2D_fbin(     com_elem2D%sPEnum     , nfbin:nfbin   ))
-    allocate(partit%r_mpitype_elem2D_full_fbin(com_elem2D_full%rPEnum, nfbin:nfbin   )) ! elems 2D full halo
-    allocate(partit%s_mpitype_elem2D_full_fbin(com_elem2D_full%sPEnum, nfbin:nfbin   ))
-    allocate(partit%r_mpitype_elem3D_fbin(     com_elem2D%rPEnum     , nfbin:nfbin, 4)) ! elems 3D small halo, 1-4 values
-    allocate(partit%s_mpitype_elem3D_fbin(     com_elem2D%sPEnum     , nfbin:nfbin, 4))
-    allocate(partit%r_mpitype_elem3D_full_fbin(com_elem2D_full%rPEnum, nfbin:nfbin, 4)) ! elems 3D full halo
-    allocate(partit%s_mpitype_elem3D_full_fbin(com_elem2D_full%sPEnum, nfbin:nfbin, 4))
+    allocate(partit%r_mpitype_nod3D_fbin(      partit%com_nod2D%rPEnum      , nfbin:nfbin, 3)) ! nodes, nfbin bins, 1-3 values
+    allocate(partit%s_mpitype_nod3D_fbin(      partit%com_nod2D%sPEnum      , nfbin:nfbin, 3))
+    allocate(partit%r_mpitype_elem2D_fbin(     partit%com_elem2D%rPEnum     , nfbin:nfbin   )) ! elems 2D small halo
+    allocate(partit%s_mpitype_elem2D_fbin(     partit%com_elem2D%sPEnum     , nfbin:nfbin   ))
+    allocate(partit%r_mpitype_elem2D_full_fbin(partit%com_elem2D_full%rPEnum, nfbin:nfbin   )) ! elems 2D full halo
+    allocate(partit%s_mpitype_elem2D_full_fbin(partit%com_elem2D_full%sPEnum, nfbin:nfbin   ))
+    allocate(partit%r_mpitype_elem3D_fbin(     partit%com_elem2D%rPEnum     , nfbin:nfbin, 4)) ! elems 3D small halo, 1-4 values
+    allocate(partit%s_mpitype_elem3D_fbin(     partit%com_elem2D%sPEnum     , nfbin:nfbin, 4))
+    allocate(partit%r_mpitype_elem3D_full_fbin(partit%com_elem2D_full%rPEnum, nfbin:nfbin, 4)) ! elems 3D full halo
+    allocate(partit%s_mpitype_elem3D_full_fbin(partit%com_elem2D_full%sPEnum, nfbin:nfbin, 4))
 
     !================================================================
     ! Build MPI Data types for element fields (small halo)
     !================================================================
     max_nb = max(  &
-                maxval(com_elem2D%rptr(     2:com_elem2D%rPEnum+1     ) - com_elem2D%rptr(     1:com_elem2D%rPEnum     )), &
-                maxval(com_elem2D%sptr(     2:com_elem2D%sPEnum+1     ) - com_elem2D%sptr(     1:com_elem2D%sPEnum     )), &
-                maxval(com_elem2D_full%rptr(2:com_elem2D_full%rPEnum+1) - com_elem2D_full%rptr(1:com_elem2D_full%rPEnum)), &
-                maxval(com_elem2D_full%sptr(2:com_elem2D_full%sPEnum+1) - com_elem2D_full%sptr(1:com_elem2D_full%sPEnum)))
+                maxval(partit%com_elem2D%rptr(     2:partit%com_elem2D%rPEnum+1     ) - partit%com_elem2D%rptr(     1:partit%com_elem2D%rPEnum     )), &
+                maxval(partit%com_elem2D%sptr(     2:partit%com_elem2D%sPEnum+1     ) - partit%com_elem2D%sptr(     1:partit%com_elem2D%sPEnum     )), &
+                maxval(partit%com_elem2D_full%rptr(2:partit%com_elem2D_full%rPEnum+1) - partit%com_elem2D_full%rptr(1:partit%com_elem2D_full%rPEnum)), &
+                maxval(partit%com_elem2D_full%sptr(2:partit%com_elem2D_full%sPEnum+1) - partit%com_elem2D_full%sptr(1:partit%com_elem2D_full%sPEnum)))
 
     allocate(displace(max_nb),     blocklen(max_nb))
     allocate(displace_tmp(max_nb), blocklen_tmp(max_nb))
 
     ! --- Receive types for elements (small halo) ---
-    do n=1,com_elem2D%rPEnum
+    do n=1,partit%com_elem2D%rPEnum
         nb = 1
-        nini = com_elem2D%rptr(n)
-        nend = com_elem2D%rptr(n+1) - 1
+        nini = partit%com_elem2D%rptr(n)
+        nend = partit%com_elem2D%rptr(n+1) - 1
         displace(:) = 0
-        displace(1) = com_elem2D%rlist(nini) -1
+        displace(1) = partit%com_elem2D%rlist(nini) -1
         blocklen(:) = 1
         do i=nini+1, nend
-            if (com_elem2D%rlist(i) /= com_elem2D%rlist(i-1) + 1) then
+            if (partit%com_elem2D%rlist(i) /= partit%com_elem2D%rlist(i-1) + 1) then
             nb = nb+1
-            displace(nb) = com_elem2D%rlist(i) -1
+            displace(nb) = partit%com_elem2D%rlist(i) -1
             else
             blocklen(nb) = blocklen(nb)+1
             endif
@@ -569,17 +565,17 @@ subroutine init_mpi_types_fbin(nfbin, partit)
     enddo
 
     ! --- Send types for elements (small halo) ---
-    do n=1,com_elem2D%sPEnum
+    do n=1,partit%com_elem2D%sPEnum
         nb = 1
-        nini = com_elem2D%sptr(n)
-        nend = com_elem2D%sptr(n+1) - 1
+        nini = partit%com_elem2D%sptr(n)
+        nend = partit%com_elem2D%sptr(n+1) - 1
         displace(:) = 0
-        displace(1) = com_elem2D%slist(nini) -1
+        displace(1) = partit%com_elem2D%slist(nini) -1
         blocklen(:) = 1
         do i=nini+1, nend
-            if (com_elem2D%slist(i) /= com_elem2D%slist(i-1) + 1) then
+            if (partit%com_elem2D%slist(i) /= partit%com_elem2D%slist(i-1) + 1) then
             nb = nb+1
-            displace(nb) = com_elem2D%slist(i) -1
+            displace(nb) = partit%com_elem2D%slist(i) -1
             else
             blocklen(nb) = blocklen(nb)+1
             endif
@@ -604,17 +600,17 @@ subroutine init_mpi_types_fbin(nfbin, partit)
     ! Build MPI Data types for element fields (full halo)
     !================================================================
     ! --- Receive types for elements (full halo) ---
-    do n=1,com_elem2D_full%rPEnum
+    do n=1,partit%com_elem2D_full%rPEnum
         nb = 1
-        nini = com_elem2D_full%rptr(n)
-        nend = com_elem2D_full%rptr(n+1) - 1
+        nini = partit%com_elem2D_full%rptr(n)
+        nend = partit%com_elem2D_full%rptr(n+1) - 1
         displace(:) = 0
-        displace(1) = com_elem2D_full%rlist(nini) -1
+        displace(1) = partit%com_elem2D_full%rlist(nini) -1
         blocklen(:) = 1
         do i=nini+1, nend
-            if (com_elem2D_full%rlist(i) /= com_elem2D_full%rlist(i-1) + 1) then
+            if (partit%com_elem2D_full%rlist(i) /= partit%com_elem2D_full%rlist(i-1) + 1) then
             nb = nb+1
-            displace(nb) = com_elem2D_full%rlist(i) -1
+            displace(nb) = partit%com_elem2D_full%rlist(i) -1
             else
             blocklen(nb) = blocklen(nb)+1
             endif
@@ -636,17 +632,17 @@ subroutine init_mpi_types_fbin(nfbin, partit)
     enddo
 
     ! --- Send types for elements (full halo) ---
-    do n=1,com_elem2D_full%sPEnum
+    do n=1,partit%com_elem2D_full%sPEnum
         nb = 1
-        nini = com_elem2D_full%sptr(n)
-        nend = com_elem2D_full%sptr(n+1) - 1
+        nini = partit%com_elem2D_full%sptr(n)
+        nend = partit%com_elem2D_full%sptr(n+1) - 1
         displace(:) = 0
-        displace(1) = com_elem2D_full%slist(nini) -1
+        displace(1) = partit%com_elem2D_full%slist(nini) -1
         blocklen(:) = 1
         do i=nini+1, nend
-            if (com_elem2D_full%slist(i) /= com_elem2D_full%slist(i-1) + 1) then
+            if (partit%com_elem2D_full%slist(i) /= partit%com_elem2D_full%slist(i-1) + 1) then
             nb = nb+1
-            displace(nb) = com_elem2D_full%slist(i) -1
+            displace(nb) = partit%com_elem2D_full%slist(i) -1
             else
             blocklen(nb) = blocklen(nb)+1
             endif
@@ -673,24 +669,24 @@ subroutine init_mpi_types_fbin(nfbin, partit)
     !================================================================
     ! Build MPI Data types for nodal fields
     !================================================================
-    max_nb = max(maxval(com_nod2D%rptr(2:com_nod2D%rPEnum+1) - com_nod2D%rptr(1:com_nod2D%rPEnum)), &
-                 maxval(com_nod2D%sptr(2:com_nod2D%sPEnum+1) - com_nod2D%sptr(1:com_nod2D%sPEnum)))
+    max_nb = max(maxval(partit%com_nod2D%rptr(2:partit%com_nod2D%rPEnum+1) - partit%com_nod2D%rptr(1:partit%com_nod2D%rPEnum)), &
+                 maxval(partit%com_nod2D%sptr(2:partit%com_nod2D%sPEnum+1) - partit%com_nod2D%sptr(1:partit%com_nod2D%sPEnum)))
 
     allocate(displace(max_nb),     blocklen(max_nb))
     allocate(displace_tmp(max_nb), blocklen_tmp(max_nb))
 
     ! --- Receive types for nodes ---
-    do n=1,com_nod2D%rPEnum
+    do n=1,partit%com_nod2D%rPEnum
         nb = 1
-        nini = com_nod2D%rptr(n)
-        nend = com_nod2D%rptr(n+1) - 1
+        nini = partit%com_nod2D%rptr(n)
+        nend = partit%com_nod2D%rptr(n+1) - 1
         displace(:) = 0
-        displace(1) = com_nod2D%rlist(nini) -1
+        displace(1) = partit%com_nod2D%rlist(nini) -1
         blocklen(:) = 1
         do i=nini+1, nend
-            if (com_nod2D%rlist(i) /= com_nod2D%rlist(i-1) + 1) then
+            if (partit%com_nod2D%rlist(i) /= partit%com_nod2D%rlist(i-1) + 1) then
             nb = nb+1
-            displace(nb) = com_nod2D%rlist(i) -1
+            displace(nb) = partit%com_nod2D%rlist(i) -1
             else
             blocklen(nb) = blocklen(nb)+1
             endif
@@ -706,17 +702,17 @@ subroutine init_mpi_types_fbin(nfbin, partit)
     enddo
 
     ! --- Send types for nodes ---
-    do n=1,com_nod2D%sPEnum
+    do n=1,partit%com_nod2D%sPEnum
         nb = 1
-        nini = com_nod2D%sptr(n)
-        nend = com_nod2D%sptr(n+1) - 1
+        nini = partit%com_nod2D%sptr(n)
+        nend = partit%com_nod2D%sptr(n+1) - 1
         displace(:) = 0
-        displace(1) = com_nod2D%slist(nini) -1
+        displace(1) = partit%com_nod2D%slist(nini) -1
         blocklen(:) = 1
         do i=nini+1, nend
-            if (com_nod2D%slist(i) /= com_nod2D%slist(i-1) + 1) then
+            if (partit%com_nod2D%slist(i) /= partit%com_nod2D%slist(i-1) + 1) then
             nb = nb+1
-            displace(nb) = com_nod2D%slist(i) -1
+            displace(nb) = partit%com_nod2D%slist(i) -1
             else
             blocklen(nb) = blocklen(nb)+1
             endif
@@ -741,53 +737,49 @@ subroutine init_gatherLists(partit)
   type(t_partit), intent(inout), target :: partit    
   integer                               :: n2D, e2D, sum_loc_elem2D
   integer                               :: n, estart, nstart
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
-  if (mype==0) then
+  if (partit%mype==0) then
 
      ! also on a single rank: the I/O gathers index remPtr_nod2D(npes) unconditionally
-     if (npes >= 1) then
+     if (partit%npes >= 1) then
 
-        allocate(partit%remPtr_nod2D(npes))
-        allocate(partit%remPtr_elem2D(npes))
+        allocate(partit%remPtr_nod2D(partit%npes))
+        allocate(partit%remPtr_elem2D(partit%npes))
 !reassociate the pointers to the just allocated arrays
-#include "associate_part_ass.h"
-        remPtr_nod2D(1) = 1
-        remPtr_elem2D(1) = 1
+        partit%remPtr_nod2D(1) = 1
+        partit%remPtr_elem2D(1) = 1
         
-        do n=1, npes-1
-           call MPI_RECV(n2D, 1, MPI_INTEGER, n, 0, MPI_COMM_FESOM, MPI_STATUS_IGNORE, MPIerr )
-           call MPI_RECV(e2D, 1, MPI_INTEGER, n, 1, MPI_COMM_FESOM, MPI_STATUS_IGNORE, MPIerr )
+        do n=1, partit%npes-1
+           call MPI_RECV(n2D, 1, MPI_INTEGER, n, 0, partit%MPI_COMM_FESOM, MPI_STATUS_IGNORE, partit%MPIerr )
+           call MPI_RECV(e2D, 1, MPI_INTEGER, n, 1, partit%MPI_COMM_FESOM, MPI_STATUS_IGNORE, partit%MPIerr )
 
-           remPtr_nod2D(n+1)  = remPtr_nod2D(n)  + n2D
-           remPtr_elem2D(n+1) = remPtr_elem2D(n) + e2D 
+           partit%remPtr_nod2D(n+1)  = partit%remPtr_nod2D(n)  + n2D
+           partit%remPtr_elem2D(n+1) = partit%remPtr_elem2D(n) + e2D 
         enddo
 
-        allocate(partit%remList_nod2D(remPtr_nod2D(npes)))   ! this should be nod2D - myDim_nod2D
-        allocate(partit%remList_elem2D(remPtr_elem2D(npes))) ! this is > elem2D, because the elements overlap.
+        allocate(partit%remList_nod2D(partit%remPtr_nod2D(partit%npes)))   ! this should be nod2D - myDim_nod2D
+        allocate(partit%remList_elem2D(partit%remPtr_elem2D(partit%npes))) ! this is > elem2D, because the elements overlap.
                                                       ! Consider optimization: avoid multiple communication
                                                       ! of the same elem from different PEs.
 !reassociate the pointers to the just allocated arrays
-#include "associate_part_ass.h"
 
-        do n=1, npes-1
-           nstart = remPtr_nod2D(n)
-           n2D    = remPtr_nod2D(n+1) - remPtr_nod2D(n) 
-           call MPI_RECV(remList_nod2D(nstart), n2D, MPI_INTEGER, n, 2, MPI_COMM_FESOM, &
-                                                           MPI_STATUS_IGNORE, MPIerr ) 
-           estart = remPtr_elem2D(n)
-           e2D    = remPtr_elem2D(n+1) - remPtr_elem2D(n)
-           call MPI_RECV(remList_elem2D(estart),e2D, MPI_INTEGER, n, 3, MPI_COMM_FESOM, &
-                                                           MPI_STATUS_IGNORE, MPIerr ) 
+        do n=1, partit%npes-1
+           nstart = partit%remPtr_nod2D(n)
+           n2D    = partit%remPtr_nod2D(n+1) - partit%remPtr_nod2D(n) 
+           call MPI_RECV(partit%remList_nod2D(nstart), n2D, MPI_INTEGER, n, 2, partit%MPI_COMM_FESOM, &
+                                                           MPI_STATUS_IGNORE, partit%MPIerr ) 
+           estart = partit%remPtr_elem2D(n)
+           e2D    = partit%remPtr_elem2D(n+1) - partit%remPtr_elem2D(n)
+           call MPI_RECV(partit%remList_elem2D(estart),e2D, MPI_INTEGER, n, 3, partit%MPI_COMM_FESOM, &
+                                                           MPI_STATUS_IGNORE, partit%MPIerr ) 
 
         enddo
      end if
   else
 
-     call MPI_SEND(myDim_nod2D,   1,            MPI_INTEGER, 0, 0, MPI_COMM_FESOM, MPIerr )
-     call MPI_SEND(myDim_elem2D,  1,            MPI_INTEGER, 0, 1, MPI_COMM_FESOM, MPIerr )
-     call MPI_SEND(myList_nod2D,  myDim_nod2D,  MPI_INTEGER, 0, 2, MPI_COMM_FESOM, MPIerr )
-     call MPI_SEND(myList_elem2D, myDim_elem2D, MPI_INTEGER, 0, 3, MPI_COMM_FESOM, MPIerr )
+     call MPI_SEND(partit%myDim_nod2D,   1,            MPI_INTEGER, 0, 0, partit%MPI_COMM_FESOM, partit%MPIerr )
+     call MPI_SEND(partit%myDim_elem2D,  1,            MPI_INTEGER, 0, 1, partit%MPI_COMM_FESOM, partit%MPIerr )
+     call MPI_SEND(partit%myList_nod2D,  partit%myDim_nod2D,  MPI_INTEGER, 0, 2, partit%MPI_COMM_FESOM, partit%MPIerr )
+     call MPI_SEND(partit%myList_elem2D, partit%myDim_elem2D, MPI_INTEGER, 0, 3, partit%MPI_COMM_FESOM, partit%MPIerr )
 
   endif
 end subroutine init_gatherLists
