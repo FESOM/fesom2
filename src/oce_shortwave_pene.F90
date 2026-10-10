@@ -25,18 +25,14 @@ subroutine cal_shortwave_rad(ice, partit, mesh)
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: a_ice
     real(kind=WP)              , pointer  :: albw
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     a_ice => ice%data(1)%values(:)
     albw  => ice%thermo%albw
     
     !___________________________________________________________________________
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(m, n2, n3, k, nzmax, nzmin, swsurf, aux, c, c2, c3, c4, c5, v1, v2, sc1, sc2)
 !$OMP DO
-  do n2=1, myDim_nod2D+eDim_nod2D 
-     do k=1, nl
+  do n2=1, partit%myDim_nod2D+partit%eDim_nod2D 
+     do k=1, mesh%nl
         sw_3d(k, n2)=0.0_WP
      end do
   end do
@@ -44,10 +40,10 @@ subroutine cal_shortwave_rad(ice, partit, mesh)
 
   !_____________________________________________________________________________
 !$OMP DO
-  do n2=1, myDim_nod2D+eDim_nod2D   
+  do n2=1, partit%myDim_nod2D+partit%eDim_nod2D   
      
      !__________________________________________________________________________
-     if (ulevels_nod2D(n2)>1) cycle ! in case of cavity no shortwave pentration
+     if (mesh%ulevels_nod2D(n2)>1) cycle ! in case of cavity no shortwave pentration
      if (use_ice .and. a_ice(n2)> 0._WP) cycle !assume in ice region no penetration
      
      !__________________________________________________________________________
@@ -79,11 +75,11 @@ subroutine cal_shortwave_rad(ice, partit, mesh)
      ! convert from heat flux [W/m2] to temperature flux [K m/s]
      swsurf=swsurf/vcpw
      ! vis. sw. rad. in the colume
-     nzmax=(nlevels_nod2D(n2))
-     nzmin=(ulevels_nod2D(n2))
+     nzmax=(mesh%nlevels_nod2D(n2))
+     nzmin=(mesh%ulevels_nod2D(n2))
      sw_3d(nzmin, n2)=swsurf
      do k=nzmin+1, nzmax
-        aux=(v1*exp(zbar_3d_n(k,n2)/sc1)+v2*exp(zbar_3d_n(k,n2)/sc2))
+        aux=(v1*exp(mesh%zbar_3d_n(k,n2)/sc1)+v2*exp(mesh%zbar_3d_n(k,n2)/sc2))
         sw_3d(k, n2)=swsurf*aux
         if (aux < 1.e-5_WP .OR. k==nzmax) then 
            sw_3d(k, n2)=0.0_WP
