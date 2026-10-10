@@ -57,10 +57,6 @@ subroutine prepare_icb2fesom(mesh, partit, ib,i_have_element,localelement,depth_
     integer, dimension(3)   :: idx_d
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     ! Also guard localelement: when an iceberg crosses a PE boundary during
     ! iceberg_step1, i_have_element can remain .true. while local_idx_of()
@@ -75,16 +71,16 @@ type(t_partit), intent(inout), target :: partit
         idx_d = 0
 
         do i=1,3
-            iceberg_node=elem2d_nodes(i,localelement)
+            iceberg_node=mesh%elem2d_nodes(i,localelement)
 
             ! LOOP: consider all neighboring pairs (n_up,n_low) of 3D nodes
             ! below n2..
             !innerloop: do k=1, nl+1
-            do k=1, nlevels_nod2D(iceberg_node)
+            do k=1, mesh%nlevels_nod2D(iceberg_node)
                 idx_d(i) = k
                 lev_up  = mesh%zbar_3d_n(k, iceberg_node)
 
-                if( k==nlevels_nod2D(iceberg_node) ) then
+                if( k==mesh%nlevels_nod2D(iceberg_node) ) then
                     lev_low = mesh%zbar_n_bot(iceberg_node)
                 else
                     lev_low = mesh%zbar_3d_n(k+1, iceberg_node)
@@ -100,7 +96,7 @@ type(t_partit), intent(inout), target :: partit
                 end if
             end do
 
-            if (iceberg_node<=mydim_nod2d) then
+            if (iceberg_node<=partit%mydim_nod2d) then
                 ib_nods_in_ib_elem(i)           = iceberg_node
                 num_ib_nods_in_ib_elem          = num_ib_nods_in_ib_elem + 1
                 tot_area_nods_in_ib_elem        = tot_area_nods_in_ib_elem + mesh%area(:,iceberg_node)
@@ -115,7 +111,7 @@ type(t_partit), intent(inout), target :: partit
             ! Fortran does not promise to short-circuit .or. and Intel does not.
             if (iceberg_node <= 0) cycle
             ! Skip nodes with no ocean column; do NOT skip valid cavity nodes
-            if (ulevels_nod2d(iceberg_node) == 0) cycle
+            if (mesh%ulevels_nod2d(iceberg_node) == 0) cycle
 
             if (iceberg_node>0) then
                 ! Guard: tot_area at level 1 is zero when all element nodes are cavity nodes
@@ -138,7 +134,7 @@ type(t_partit), intent(inout), target :: partit
 
                 do j=1,idx_d(i)
                     lev_up  = mesh%zbar_3d_n(j, iceberg_node)
-                    if( j==nlevels_nod2D(iceberg_node) ) then
+                    if( j==mesh%nlevels_nod2D(iceberg_node) ) then
                         lev_low = mesh%zbar_n_bot(iceberg_node)
                     else
                         lev_low = mesh%zbar_3d_n(j+1, iceberg_node)
@@ -171,7 +167,7 @@ type(t_partit), intent(inout), target :: partit
                 ! Cavity nodes (ulevels>1) skip nz=1 in oce_ale_tracer, so setting ibhf_n(1)
                 ! for them wastes the flux and overcounts the heat on the open-ocean node.
                 if( height_ib_single .ne. 0.0 .and. tot_area_nods_in_ib_elem(1) > 0.0 &
-                        .and. ulevels_nod2d(iceberg_node) == 1 ) then
+                        .and. mesh%ulevels_nod2d(iceberg_node) == 1 ) then
                     ibhf_n(1,iceberg_node) = ibhf_n(1,iceberg_node) - hfe_flux_ib(ib) &
                             !* abs(height_ib_single) &
                             !* ((abs(height_ib_single)-abs(depth_ib))/abs(height_ib_single)) &
@@ -200,15 +196,11 @@ subroutine icb2fesom(mesh, partit, ice)
 type(t_ice)   , intent(inout), target :: ice
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
   if (use_cavity) then
 !$OMP PARALLEL DO
-    do n=1, myDim_nod2d+eDim_nod2D
-        if (ulevels_nod2d(n) > 1) cycle
+    do n=1, partit%myDim_nod2d+partit%eDim_nod2D
+        if (mesh%ulevels_nod2d(n) > 1) cycle
         if (.not.turn_off_fw) then
                 water_flux(n)  = water_flux(n) - (ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n)) !* steps_per_ib_step
         end if
@@ -216,7 +208,7 @@ type(t_partit), intent(inout), target :: partit
 !$OMP END PARALLEL DO
   else
 !$OMP PARALLEL DO
-    do n=1, myDim_nod2d+eDim_nod2D
+    do n=1, partit%myDim_nod2d+partit%eDim_nod2D
         if (.not.turn_off_fw) then
                 water_flux(n)  = water_flux(n) - (ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n)) !* steps_per_ib_step
         end if
@@ -238,8 +230,8 @@ type(t_partit), intent(inout), target :: partit
 ! cooling for T_ocean>0, matching the physics of mixing with 0-degC water.
   if (.not. (turn_off_hf .or. turn_off_fw)) then
 !$OMP PARALLEL DO
-    do n=1, myDim_nod2d+eDim_nod2D
-        if (use_cavity .and. ulevels_nod2d(n) > 1) cycle
+    do n=1, partit%myDim_nod2d+partit%eDim_nod2D
+        if (use_cavity .and. mesh%ulevels_nod2d(n) > 1) cycle
         heat_flux(n) = heat_flux(n) + vcpw * is_nonlinfs * Tclim_ib(1, n) &
                        * (ibfwb(n) + ibfwl(n) + ibfwe(n) + ibfwbv(n))
     end do
@@ -249,7 +241,7 @@ type(t_partit), intent(inout), target :: partit
 
 !---wiso-code-begin
     if(lwiso) then
-      do n=1, myDim_nod2D+eDim_nod2D
+      do n=1, partit%myDim_nod2D+partit%eDim_nod2D
       wiso_flux_oce(n,1)=wiso_flux_oce(n,1)+(ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n))*1000.0*wiso_smow(1)*(1-30.0/1000.0)
       wiso_flux_oce(n,2)=wiso_flux_oce(n,2)+(ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n))*1000.0*wiso_smow(2)*(1-240.0/1000.0)
       wiso_flux_oce(n,3)=wiso_flux_oce(n,3)+(ibfwb(n)+ibfwl(n)+ibfwe(n)+ibfwbv(n))*1000.0
@@ -304,10 +296,6 @@ subroutine cap_ibhf_n(tracers, mesh, partit)
     ! Slightly above the freezing point of seawater at S~34, so the cap kicks
     ! in before we reach the freezing point and protects the blow-up check.
     real(kind=WP), parameter :: ibhf_n_t_threshold = -1.85_WP
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     if (turn_off_hf .or. .not. l_cap_ibhf_n) return
 
@@ -316,19 +304,19 @@ subroutine cap_ibhf_n(tracers, mesh, partit)
 
 !$OMP PARALLEL DO PRIVATE(n, nz, nzmin, nzmax, t_now, hloc, ibhf_n_min, dheat_cell) &
 !$OMP             REDUCTION(+: heat_disc_loc, cells_capped_loc)
-    do n = 1, myDim_nod2D + eDim_nod2D
-        nzmin = ulevels_nod2D(n)
-        nzmax = nlevels_nod2D(n)
+    do n = 1, partit%myDim_nod2D + partit%eDim_nod2D
+        nzmin = mesh%ulevels_nod2D(n)
+        nzmax = mesh%nlevels_nod2D(n)
         do nz = nzmin, nzmax - 1
             if (ibhf_n(nz, n) >= 0.0_WP) cycle   ! only cooling (negative) needs capping
-            hloc = hnode(nz, n)
+            hloc = mesh%hnode(nz, n)
             if (hloc <= 0.0_WP) cycle
             t_now = tracers%data(1)%values(nz, n)
             if (t_now <= ibhf_n_t_threshold) then
                 ! Water already at/below the safe threshold; disallow further
                 ! iceberg-driven cooling entirely.
-                if (n <= myDim_nod2D) then
-                    heat_disc_loc    = heat_disc_loc    + (-ibhf_n(nz, n)) * areasvol(nz, n)
+                if (n <= partit%myDim_nod2D) then
+                    heat_disc_loc    = heat_disc_loc    + (-ibhf_n(nz, n)) * mesh%areasvol(nz, n)
                     cells_capped_loc = cells_capped_loc + 1
                 end if
                 ibhf_n(nz, n) = 0.0_WP
@@ -339,8 +327,8 @@ subroutine cap_ibhf_n(tracers, mesh, partit)
                 ! Most negative ibhf_n that keeps T_new >= T_thresh:
                 ibhf_n_min = (ibhf_n_t_threshold - t_now) * vcpw * hloc / dt
                 if (ibhf_n(nz, n) < ibhf_n_min) then
-                    if (n <= myDim_nod2D) then
-                        dheat_cell       = (ibhf_n_min - ibhf_n(nz, n)) * areasvol(nz, n)
+                    if (n <= partit%myDim_nod2D) then
+                        dheat_cell       = (ibhf_n_min - ibhf_n(nz, n)) * mesh%areasvol(nz, n)
                         heat_disc_loc    = heat_disc_loc    + dheat_cell
                         cells_capped_loc = cells_capped_loc + 1
                     end if
@@ -351,10 +339,10 @@ subroutine cap_ibhf_n(tracers, mesh, partit)
     end do
 !$OMP END PARALLEL DO
 
-    call MPI_AllReduce(heat_disc_loc,    heat_disc_glob,    1, MPI_WP, MPI_SUM, MPI_COMM_FESOM, ierr_mpi)
-    call MPI_AllReduce(cells_capped_loc, cells_capped_glob, 1, MPI_INTEGER,          MPI_SUM, MPI_COMM_FESOM, ierr_mpi)
+    call MPI_AllReduce(heat_disc_loc,    heat_disc_glob,    1, MPI_WP, MPI_SUM, partit%MPI_COMM_FESOM, ierr_mpi)
+    call MPI_AllReduce(cells_capped_loc, cells_capped_glob, 1, MPI_INTEGER,          MPI_SUM, partit%MPI_COMM_FESOM, ierr_mpi)
 
-    if (mype == 0 .and. cells_capped_glob > 0) then
+    if (partit%mype == 0 .and. cells_capped_glob > 0) then
         write(*, '(A, I7, A, ES12.4, A)') &
               " * cap_ibhf_n: capped ", cells_capped_glob, &
               " cells; discarded heat = ", heat_disc_glob * dt, " J/step"
