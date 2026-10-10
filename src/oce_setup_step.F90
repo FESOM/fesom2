@@ -324,9 +324,7 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff, AB_order, ltra_diag
     !___________________________________________________________________________
     ! pointer on necessary derived types
-#include "associate_part_def.h"
 #include "associate_mesh_def.h"
-#include "associate_part_ass.h"
 ! #include "associate_mesh_ass.h"
 nl => mesh%nl
     
@@ -334,9 +332,9 @@ nl => mesh%nl
     ! OPEN and read namelist for I/O
     open( unit=nm_unit, file='namelist.tra', form='formatted', access='sequential', status='old', iostat=iost )
     if (iost == 0) then
-        if (mype==0) WRITE(*,*) '     file   : ', 'namelist.tra',' open ok'
+        if (partit%mype==0) WRITE(*,*) '     file   : ', 'namelist.tra',' open ok'
         else
-        if (mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.tra',' ; iostat=',iost
+        if (partit%mype==0) WRITE(*,*) 'ERROR: --> bad opening file   : ', 'namelist.tra',' ; iostat=',iost
         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
         stop
     end if
@@ -350,7 +348,7 @@ nl => mesh%nl
 
     do n=1, num_tracers
     if (nml_tracer_list(n)%id==-1) then
-        if (mype==0) write(*,*) 'number of tracers will be changed from ', num_tracers, ' to ', n-1, '!'
+        if (partit%mype==0) write(*,*) 'number of tracers will be changed from ', num_tracers, ' to ', n-1, '!'
         num_tracers=n-1
         EXIT
     end if
@@ -384,7 +382,7 @@ nl => mesh%nl
 
       n_ic3d = n_ic3d + 3
 
-      if (mype==0) write(*,*) '3 water isotope tracers will be used in FESOM'
+      if (partit%mype==0) write(*,*) '3 water isotope tracers will be used in FESOM'
     END IF
     !---wiso-code-end
 
@@ -396,7 +394,7 @@ nl => mesh%nl
       index_age_tracer = num_tracers+1
       num_tracers = num_tracers + 1
 
-      if (mype==0) write(*,*) '1 water age tracer will be used in FESOM'
+      if (partit%mype==0) write(*,*) '1 water age tracer will be used in FESOM'
     endif
     !---age-code-end
 
@@ -438,17 +436,17 @@ nl => mesh%nl
         num_tracers = num_tracers + 1
       endif
 
-      if (mype==0) write(*,*) 'XXX Transient tracers will be used in FESOM'
+      if (partit%mype==0) write(*,*) 'XXX Transient tracers will be used in FESOM'
     endif
     ! 'use_transit' end
 
 
-    if (mype==0) write(*,*) 'total number of tracers is: ', num_tracers
+    if (partit%mype==0) write(*,*) 'total number of tracers is: ', num_tracers
 
     !___________________________________________________________________________
     ! define local vertice & elem array size + number of tracers
-    elem_size=myDim_elem2D + eDim_elem2D
-    node_size=myDim_nod2D  + eDim_nod2D
+    elem_size=partit%myDim_elem2D + partit%eDim_elem2D
+    node_size=partit%myDim_nod2D  + partit%eDim_nod2D
     tracers%num_tracers=num_tracers
 
     !___________________________________________________________________________
@@ -482,8 +480,8 @@ nl => mesh%nl
     tracers%work%del_ttf_advhoriz = 0.0_WP
     tracers%work%del_ttf_advvert  = 0.0_WP
     if (ldiag_DVD) then
-        allocate(tracers%work%dvd_trflx_hor(nl-1, myDim_edge2D, 2))
-        allocate(tracers%work%dvd_trflx_ver(nl  , myDim_nod2D , 2))
+        allocate(tracers%work%dvd_trflx_hor(nl-1, partit%myDim_edge2D, 2))
+        allocate(tracers%work%dvd_trflx_ver(nl  , partit%myDim_nod2D , 2))
         tracers%work%dvd_trflx_hor = 0.0_WP
         tracers%work%dvd_trflx_ver = 0.0_WP
     end if
@@ -565,9 +563,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
 
     !___________________________________________________________________________
     ! pointer on necessary derived types
-#include "associate_part_def.h"
 #include "associate_mesh_def.h"
-#include "associate_part_ass.h"
 ! #include "associate_mesh_ass.h"   
 nl => mesh%nl
     
@@ -575,9 +571,9 @@ nl => mesh%nl
     ! open and read namelist for I/O
     open(unit=nm_unit, file='namelist.dyn', form='formatted', access='sequential', status='old', iostat=iost )
     if (iost == 0) then
-        if (mype==0) write(*,*) '     file   : ', 'namelist.dyn',' open ok'
+        if (partit%mype==0) write(*,*) '     file   : ', 'namelist.dyn',' open ok'
     else
-        if (mype==0) write(*,*) 'ERROR: --> bad opening file   : ', 'namelist.dyn',' ; iostat=',iost
+        if (partit%mype==0) write(*,*) 'ERROR: --> bad opening file   : ', 'namelist.dyn',' ; iostat=',iost
         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
         stop
     end if
@@ -621,7 +617,7 @@ nl => mesh%nl
         dynamics%se_visc_gamma0  = se_visc_gamma0
         dynamics%se_visc_gamma1  = se_visc_gamma1
         dynamics%se_visc_gamma2  = se_visc_gamma2
-        if (mype==0) then
+        if (partit%mype==0) then
             write(*,*) " ___Split-Explicit barotropic subcycling_________", dynamics%se_BTsteps
             write(*,*) "     se_BTsteps     = ", dynamics%se_BTsteps
             write(*,*) "     se_BTtheta     = ", dynamics%se_BTtheta
@@ -651,7 +647,7 @@ nl => mesh%nl
     ! layout is preserved, and that needs the restart-vs-continuous regression test,
     ! which does not exist yet. Set them on the cold start of an experiment.
     dynamics%solverinfo%soltol = soltol
-    if (mype==0) write(*,*) '     ssh CG soltol  = ', dynamics%solverinfo%soltol
+    if (partit%mype==0) write(*,*) '     ssh CG soltol  = ', dynamics%solverinfo%soltol
 
     ! ssh CG iteration cap, same contract as soltol above. Needed to tell a stall
     ! apart from a truncation when sweeping soltol: raise it and a solver that is
@@ -659,7 +655,7 @@ nl => mesh%nl
     ! plateaus instead.
     ! Same cold-start-only caveat as soltol above; see the note there.
     dynamics%solverinfo%maxiter = maxiter
-    if (mype==0) write(*,*) '     ssh CG maxiter = ', dynamics%solverinfo%maxiter
+    if (partit%mype==0) write(*,*) '     ssh CG maxiter = ', dynamics%solverinfo%maxiter
 
     ! Resolve the auto default. precision(0.0_WP) < precision(0.0d0) is true iff
     ! WP is narrower than double -- a plain runtime test, so both variants stay
@@ -674,7 +670,7 @@ nl => mesh%nl
         precond_auto = .true.
     end if
     dynamics%solverinfo%precond_variant = precond_variant
-    if (mype==0) then
+    if (partit%mype==0) then
         if (precond_auto) then
             write(*,*) '     ssh CG precond = ', dynamics%solverinfo%precond_variant, &
                        ' (auto: ', trim(merge('single', 'double', precision(0.0_WP) < precision(0.0d0))), ' precision)'
@@ -685,8 +681,8 @@ nl => mesh%nl
 
     !___________________________________________________________________________
     ! define local vertice & elem array size
-    elem_size=myDim_elem2D+eDim_elem2D
-    node_size=myDim_nod2D+eDim_nod2D
+    elem_size=partit%myDim_elem2D+partit%eDim_elem2D
+    node_size=partit%myDim_nod2D+partit%eDim_nod2D
     
     !___________________________________________________________________________
     ! allocate/initialise horizontal velocity arrays in derived type
@@ -859,15 +855,13 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     integer                               :: n, nt
     !___________________________________________________________________________
     ! define dynamics namelist parameter
-#include "associate_part_def.h"
 #include "associate_mesh_def.h"
-#include "associate_part_ass.h"
 ! #include "associate_mesh_ass.h"
 nl              => mesh%nl
 
     !___________________________________________________________________________
-    elem_size=myDim_elem2D+eDim_elem2D
-    node_size=myDim_nod2D+eDim_nod2D
+    elem_size=partit%myDim_elem2D+partit%eDim_elem2D
+    node_size=partit%myDim_nod2D+partit%eDim_nod2D
 
     ! ================
     ! Velocities
@@ -904,7 +898,7 @@ nl              => mesh%nl
     ! LA: add iceberg tracers 2023-02-08
     allocate(Tclim_ib(nl-1,node_size), Sclim_ib(nl-1, node_size))
     !---
-    allocate(stress_surf(2,myDim_elem2D))    !!! Attention, it is shorter !!! 
+    allocate(stress_surf(2,partit%myDim_elem2D))    !!! Attention, it is shorter !!! 
     allocate(stress_node_surf(2,node_size))
     allocate(stress_atmoce_x(node_size), stress_atmoce_y(node_size)) 
     allocate(relax2clim(node_size)) 
@@ -954,8 +948,8 @@ nl              => mesh%nl
     end if
 
     ! tracer gradients & RHS  
-    allocate(tr_xy(2,nl-1,myDim_elem2D+eDim_elem2D+eXDim_elem2D))
-    allocate(tr_z(nl,myDim_nod2D+eDim_nod2D))
+    allocate(tr_xy(2,nl-1,partit%myDim_elem2D+partit%eDim_elem2D+partit%eXDim_elem2D))
+    allocate(tr_z(nl,partit%myDim_nod2D+partit%eDim_nod2D))
 
     ! neutral slope etc. to be used in Redi formulation
     allocate(neutral_slope(3, nl-1, node_size))
@@ -1129,17 +1123,13 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
     real(kind=WP)            :: loc, max_temp, min_temp, max_salt, min_salt
     !___________________________________________________________________________
     ! pointer on necessary derived types
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     !___________________________________________________________________________
-    if (mype==0) write(*,*) tracers%num_tracers, ' tracers will be used in FESOM'
-    if (mype==0) write(*,*) 'tracer IDs are: ', tracers%data(1:tracers%num_tracers)%ID
+    if (partit%mype==0) write(*,*) tracers%num_tracers, ' tracers will be used in FESOM'
+    if (partit%mype==0) write(*,*) 'tracer IDs are: ', tracers%data(1:tracers%num_tracers)%ID
     !
 #if defined(__recom)
-    if (mype==0) then
+    if (partit%mype==0) then
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
@@ -1181,11 +1171,11 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 #else
     ! read ocean state
     ! this must be always done! First two tracers with IDs 0 and 1 are the temperature and salinity.
-    if(mype==0) write(*,*) 'read Temperature climatology from:', trim(filelist(1))
-    if(mype==0) write(*,*) 'read Salinity    climatology from:', trim(filelist(2))
+    if(partit%mype==0) write(*,*) 'read Temperature climatology from:', trim(filelist(1))
+    if(partit%mype==0) write(*,*) 'read Salinity    climatology from:', trim(filelist(2))
 #endif
 
-    if(any(idlist == 14) .and. mype==0) write(*,*) 'read radiocarbon climatology from:', trim(filelist(3))
+    if(any(idlist == 14) .and. partit%mype==0) write(*,*) 'read radiocarbon climatology from:', trim(filelist(3))
 
     call do_ic3d(tracers, partit, mesh)
     
@@ -1208,7 +1198,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 #if defined(__usetp)
         if (partit%my_fesom_group==0) then
 #endif
-        if (mype==0) then
+        if (partit%mype==0) then
             write(*,*)
             print *, achar(27)//'[46;1m'//' restore_alkalinity is true --> Set surface field for alkalinity restoring'//achar(27)//'[0m'
             write(*,*)
@@ -1228,7 +1218,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             END SELECT
         end do
         if (alk_check /= 0) then
-            if (mype==0) write(*,*) 'not a single tracer ID = 1003 = alkalinity. this should not happen'
+            if (partit%mype==0) write(*,*) 'not a single tracer ID = 1003 = alkalinity. this should not happen'
             call par_ex(partit%MPI_COMM_FESOM, partit%mype)
             stop
         end if
@@ -1270,7 +1260,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 #if defined(__recom) && defined(__usetp)
     if (partit%my_fesom_group==0) then
 #endif
-            if (mype==0) then
+            if (partit%mype==0) then
                 write (i_string,  "(I4)") i
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
@@ -1283,7 +1273,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 #if defined(__recom) && defined(__usetp)
     if (partit%my_fesom_group==0) then
 #endif
-            if (mype==0) then
+            if (partit%mype==0) then
                 write (i_string,  "(I4)") i
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
@@ -1296,7 +1286,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 #if defined(__recom) && defined(__usetp)
     if (partit%my_fesom_group==0) then
 #endif
-            if (mype==0) then
+            if (partit%mype==0) then
                 write (i_string,  "(I4)") i
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
@@ -1312,7 +1302,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 #if defined(__recom) && defined(__usetp)
     if (partit%my_fesom_group==0) then
 #endif
-            if (mype==0) then
+            if (partit%mype==0) then
                 write (i_string,  "(I4)") i
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
@@ -1325,7 +1315,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 #if defined(__recom) && defined(__usetp)
     if (partit%my_fesom_group==0) then
 #endif
-            if (mype==0) then
+            if (partit%mype==0) then
                 write (i_string,  "(I4)") i
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
@@ -1339,7 +1329,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 #if defined(__recom) && defined(__usetp)
     if (partit%my_fesom_group==0) then
 #endif
-            if (mype==0) then
+            if (partit%mype==0) then
                 write (i_string,  "(I4)") i
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
@@ -1352,7 +1342,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 #if defined(__recom) && defined(__usetp)
     if (partit%my_fesom_group==0) then
 #endif
-            if (mype==0) then
+            if (partit%mype==0) then
                 write (i_string,  "(I4)") i
                 write (id_string, "(I4)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
@@ -1364,7 +1354,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 !_______________________________________________________________________
         CASE (101)       ! initialize tracer ID=101
             tracers%data(i)%values(:,:)=0.0_WP
-            if (mype==0) then
+            if (partit%mype==0) then
                 write (i_string,  "(I3)") i
                 write (id_string, "(I3)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
@@ -1373,7 +1363,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
         !---age-code-begin
         ! FESOM tracers with code id 100 are used as water age
         CASE (100)
-          if (mype==0) then
+          if (partit%mype==0) then
              write (i_string,  "(I3)") i
              write (id_string, "(I3)") id
              write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
@@ -1383,21 +1373,21 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
         !---wiso-code
         ! FESOM tracers with code id 101, 102, 103 are used as water isotopes
         CASE (102)       ! initialize tracer ID=101 H218O
-          if (mype==0) then
+          if (partit%mype==0) then
              write (i_string,  "(I3)") i
              write (id_string, "(I3)") id
              write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
              write (*,*) tracers%data(i)%values(1,1)
           end if
         CASE (103)       ! initialize tracer ID=102 HD16O
-          if (mype==0) then
+          if (partit%mype==0) then
              write (i_string,  "(I3)") i
              write (id_string, "(I3)") id
              write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
              write (*,*) tracers%data(i)%values(1,1)
           end if
         CASE (104)       ! initialize tracer ID=103 H216O
-          if (mype==0) then
+          if (partit%mype==0) then
              write (i_string,  "(I3)") i
              write (id_string, "(I3)") id
              write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
@@ -1408,7 +1398,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
 ! Transient tracers
        CASE (6)         ! initialize tracer ID=6, SF6
          tracers%data(i)%values(:,:) = 0.0_WP
-         if (mype==0) then
+         if (partit%mype==0) then
             write (i_string,  "(I3)") i
             write (id_string, "(I3)") id
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
@@ -1416,7 +1406,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
          end if
        CASE (11)        ! initialize tracer ID=11, CFC-11
          tracers%data(i)%values(:,:) = 0.0_WP
-         if (mype==0) then
+         if (partit%mype==0) then
             write (i_string,  "(I3)") i
             write (id_string, "(I3)") id
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
@@ -1424,7 +1414,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
          end if
        CASE (12)        ! initialize tracer ID=12, CFC-12
          tracers%data(i)%values(:,:) = 0.0_WP
-         if (mype==0) then
+         if (partit%mype==0) then
             write (i_string,  "(I3)") i
             write (id_string, "(I3)") id
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
@@ -1435,7 +1425,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
          if (.not. any(idlist == 14)) then         ! set alternative initial values
          tracers%data(i)%values(:,:) = 0.85
          tracers%data(i)%values(1:10,:) = 0.95
-           if (mype==0) then
+           if (partit%mype==0) then
               write (i_string,  "(I3)") i
               write (id_string, "(I3)") id
               write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
@@ -1444,7 +1434,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
          end if
        CASE (39)        ! initialize tracer ID=39, fractionation-corrected 39Ar/Ar
          tracers%data(i)%values(:,:) = 0.50
-         if (mype==0) then
+         if (partit%mype==0) then
             write (i_string,  "(I3)") i
             write (id_string, "(I3)") id
             write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
@@ -1463,9 +1453,9 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             tracers%data(i)%values(:,:)=0.0_WP
             rcounter3    =rcounter3+1
             counter=0
-            do k=1, myDim_nod2D+eDim_nod2D
-                if     (((geo_coord_nod2D(2,k)>77.5*rad) .and. (geo_coord_nod2D(2,k)<78.*rad))&
-                .and.((geo_coord_nod2D(1,k)>0.  *rad) .and. (geo_coord_nod2D(1,k)<10.*rad))) then
+            do k=1, partit%myDim_nod2D+partit%eDim_nod2D
+                if     (((mesh%geo_coord_nod2D(2,k)>77.5*rad) .and. (mesh%geo_coord_nod2D(2,k)<78.*rad))&
+                .and.((mesh%geo_coord_nod2D(1,k)>0.  *rad) .and. (mesh%geo_coord_nod2D(1,k)<10.*rad))) then
                 counter=counter+1
                 end if
             end do
@@ -1473,15 +1463,15 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             ptracers_restore(rcounter3)%id   =301
             ptracers_restore(rcounter3)%locid=i
             counter=0
-            do k=1, myDim_nod2D+eDim_nod2D
-                if     (((geo_coord_nod2D(2,k)>77.5*rad) .and. (geo_coord_nod2D(2,k)<78.*rad))&
-                .and.((geo_coord_nod2D(1,k)>0.  *rad) .and. (geo_coord_nod2D(1,k)<10.*rad))) then
+            do k=1, partit%myDim_nod2D+partit%eDim_nod2D
+                if     (((mesh%geo_coord_nod2D(2,k)>77.5*rad) .and. (mesh%geo_coord_nod2D(2,k)<78.*rad))&
+                .and.((mesh%geo_coord_nod2D(1,k)>0.  *rad) .and. (mesh%geo_coord_nod2D(1,k)<10.*rad))) then
                 counter=counter+1
                 ptracers_restore(rcounter3)%ind2(counter)=k
                 end if
             end do
             tracers%data(i)%values(:,ptracers_restore(rcounter3)%ind2)=1.
-            if (mype==0) then
+            if (partit%mype==0) then
                 write (i_string,  "(I3)") i
                 write (id_string, "(I3)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
@@ -1494,9 +1484,9 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             tracers%data(i)%values(:,:)=0.0_WP
             rcounter3    =rcounter3+1
             counter=0
-            do k=1, myDim_nod2D+eDim_nod2D
-                if     (((geo_coord_nod2D(2,k)>65.6*rad) .and. (geo_coord_nod2D(2,k)<66.*rad))&
-                .and.((geo_coord_nod2D(1,k)>-172.  *rad) .and. (geo_coord_nod2D(1,k)<-166.*rad))) then
+            do k=1, partit%myDim_nod2D+partit%eDim_nod2D
+                if     (((mesh%geo_coord_nod2D(2,k)>65.6*rad) .and. (mesh%geo_coord_nod2D(2,k)<66.*rad))&
+                .and.((mesh%geo_coord_nod2D(1,k)>-172.  *rad) .and. (mesh%geo_coord_nod2D(1,k)<-166.*rad))) then
                 counter=counter+1
                 end if
             end do
@@ -1504,15 +1494,15 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             ptracers_restore(rcounter3)%id   =302
             ptracers_restore(rcounter3)%locid=i
             counter=0
-            do k=1, myDim_nod2D+eDim_nod2D
-                if     (((geo_coord_nod2D(2,k)>65.6*rad) .and. (geo_coord_nod2D(2,k)<66.*rad))&
-                .and.((geo_coord_nod2D(1,k)>-172.  *rad) .and. (geo_coord_nod2D(1,k)<-166.*rad))) then
+            do k=1, partit%myDim_nod2D+partit%eDim_nod2D
+                if     (((mesh%geo_coord_nod2D(2,k)>65.6*rad) .and. (mesh%geo_coord_nod2D(2,k)<66.*rad))&
+                .and.((mesh%geo_coord_nod2D(1,k)>-172.  *rad) .and. (mesh%geo_coord_nod2D(1,k)<-166.*rad))) then
                 counter=counter+1
                 ptracers_restore(rcounter3)%ind2(counter)=k
                 end if
             end do
             tracers%data(i)%values(:,ptracers_restore(rcounter3)%ind2)=0.0_WP
-            if (mype==0) then
+            if (partit%mype==0) then
                 write (i_string,  "(I3)") i
                 write (id_string, "(I3)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
@@ -1526,9 +1516,9 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             tracers%data(i)%values(:,:)=0.0_WP
             rcounter3    =rcounter3+1
             counter=0
-            do k=1, myDim_nod2D+eDim_nod2D
-                if     (((geo_coord_nod2D(2,k)>69.5*rad) .and. (geo_coord_nod2D(2,k)<74.5*rad))&
-                .and.((geo_coord_nod2D(1,k)>19.  *rad) .and. (geo_coord_nod2D(1,k)<20.*rad))) then
+            do k=1, partit%myDim_nod2D+partit%eDim_nod2D
+                if     (((mesh%geo_coord_nod2D(2,k)>69.5*rad) .and. (mesh%geo_coord_nod2D(2,k)<74.5*rad))&
+                .and.((mesh%geo_coord_nod2D(1,k)>19.  *rad) .and. (mesh%geo_coord_nod2D(1,k)<20.*rad))) then
                 counter=counter+1
                 end if
             end do
@@ -1536,15 +1526,15 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             ptracers_restore(rcounter3)%id   =303
             ptracers_restore(rcounter3)%locid=i
             counter=0
-            do k=1, myDim_nod2D+eDim_nod2D
-                if     (((geo_coord_nod2D(2,k)>69.5*rad) .and. (geo_coord_nod2D(2,k)<74.5*rad))&
-                .and.((geo_coord_nod2D(1,k)>19.  *rad) .and. (geo_coord_nod2D(1,k)<20.*rad))) then
+            do k=1, partit%myDim_nod2D+partit%eDim_nod2D
+                if     (((mesh%geo_coord_nod2D(2,k)>69.5*rad) .and. (mesh%geo_coord_nod2D(2,k)<74.5*rad))&
+                .and.((mesh%geo_coord_nod2D(1,k)>19.  *rad) .and. (mesh%geo_coord_nod2D(1,k)<20.*rad))) then
                 counter=counter+1
                 ptracers_restore(rcounter3)%ind2(counter)=k
                 end if
             end do
             tracers%data(i)%values(:,ptracers_restore(rcounter3)%ind2)=0.0_WP
-            if (mype==0) then
+            if (partit%mype==0) then
                 write (i_string,  "(I3)") i
                 write (id_string, "(I3)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
@@ -1553,7 +1543,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
         !_______________________________________________________________________
         CASE (304) ! passive tracer for water hosing experiment
             tracers%data(i)%values(:,:)=0.0_WP
-            if (mype==0) then
+            if (partit%mype==0) then
                 write (i_string,  "(I3)") i
                 write (id_string, "(I3)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
@@ -1562,7 +1552,7 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
         !_______________________________________________________________________
         CASE (501) ! ice-shelf water due to basal melting
             tracers%data(i)%values(:,:)=0.0_WP
-            if (mype==0) then
+            if (partit%mype==0) then
                 write (i_string,  "(I3)") i
                 write (id_string, "(I3)") id
                 write(*,*) 'initializing '//trim(i_string)//'th tracer with ID='//trim(id_string)
@@ -1570,11 +1560,11 @@ SUBROUTINE oce_initial_state(tracers, partit, mesh)
             
         !_______________________________________________________________________
         CASE DEFAULT
-            if (mype==0) then
+            if (partit%mype==0) then
                 write (i_string,  "(I3)") i
                 write (id_string, "(I3)") id
-                if (mype==0) write(*,*) 'invalid ID '//trim(id_string)//' specified for '//trim(i_string)//' th tracer!!!'
-                if (mype==0) write(*,*) 'the model will stop!'
+                if (partit%mype==0) write(*,*) 'invalid ID '//trim(id_string)//' specified for '//trim(i_string)//' th tracer!!!'
+                if (partit%mype==0) write(*,*) 'the model will stop!'
             end if
             call par_ex(partit%MPI_COMM_FESOM, partit%mype)
             stop
@@ -1596,10 +1586,6 @@ SUBROUTINE before_oce_step(dynamics, tracers, partit, mesh)
     character(len=10)        :: i_string, id_string
     !___________________________________________________________________________
     ! pointer on necessary derived types
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     
     !___________________________________________________________________________
     if (toy_ocean) then
