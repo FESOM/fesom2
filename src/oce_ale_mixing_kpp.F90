@@ -129,26 +129,22 @@ contains
 
      type(t_mesh),   intent(in),    target :: mesh
      type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
-     allocate (    ghats    ( nl-1, myDim_nod2D+eDim_nod2D        ))   ! nonlocal transport (s/m^2)
-     allocate (    hbl      (       myDim_nod2D+eDim_nod2D        ))   ! boundary layer depth
-     allocate (    bfsfc    (       myDim_nod2D+eDim_nod2D        ))   ! surface buoyancy forcing    (m^2/s^3)
-     allocate (    caseA    (       myDim_nod2D+eDim_nod2D        ))   ! = 1 in case A; =0 in case B
-     allocate (    stable   (       myDim_nod2D+eDim_nod2D        ))   ! = 1 in stable forcing; =0 in unstable
-     allocate (    dkm1     (       myDim_nod2D+eDim_nod2D,  3    ))   ! boundary layer diff at kbl-1 level
-     allocate (    blmc     ( nl,   myDim_nod2D+eDim_nod2D,  3    ))   ! boundary layer mixing coefficients
-     allocate (    ustar    (       myDim_nod2D+eDim_nod2D        ))   ! surface friction velocity       (m/s)
-     allocate (    Bo       (       myDim_nod2D+eDim_nod2D        ))   ! surface turb buoy. forcing  (m^2/s^3)
-     allocate (    dVsq     ( nl,   myDim_nod2D+eDim_nod2D        ))   ! (velocity shear re sfc)^2   (m/s)^2
-     allocate (    dbsfc    ( nl,   myDim_nod2D+eDim_nod2D        ))   ! buoyancy re sfc
-     allocate (    kbl      (       myDim_nod2D+eDim_nod2D        ))   ! index of first grid level below hbl
+     allocate (    ghats    ( mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D        ))   ! nonlocal transport (s/m^2)
+     allocate (    hbl      (       partit%myDim_nod2D+partit%eDim_nod2D        ))   ! boundary layer depth
+     allocate (    bfsfc    (       partit%myDim_nod2D+partit%eDim_nod2D        ))   ! surface buoyancy forcing    (m^2/s^3)
+     allocate (    caseA    (       partit%myDim_nod2D+partit%eDim_nod2D        ))   ! = 1 in case A; =0 in case B
+     allocate (    stable   (       partit%myDim_nod2D+partit%eDim_nod2D        ))   ! = 1 in stable forcing; =0 in unstable
+     allocate (    dkm1     (       partit%myDim_nod2D+partit%eDim_nod2D,  3    ))   ! boundary layer diff at kbl-1 level
+     allocate (    blmc     ( mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D,  3    ))   ! boundary layer mixing coefficients
+     allocate (    ustar    (       partit%myDim_nod2D+partit%eDim_nod2D        ))   ! surface friction velocity       (m/s)
+     allocate (    Bo       (       partit%myDim_nod2D+partit%eDim_nod2D        ))   ! surface turb buoy. forcing  (m^2/s^3)
+     allocate (    dVsq     ( mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D        ))   ! (velocity shear re sfc)^2   (m/s)^2
+     allocate (    dbsfc    ( mesh%nl,   partit%myDim_nod2D+partit%eDim_nod2D        ))   ! buoyancy re sfc
+     allocate (    kbl      (       partit%myDim_nod2D+partit%eDim_nod2D        ))   ! index of first grid level below hbl
 
 !$OMP PARALLEL DO
-     DO n=1, myDim_nod2D+eDim_nod2D
+     DO n=1, partit%myDim_nod2D+partit%eDim_nod2D
         ghats  (:, n    ) = 0.0_WP
         hbl    (   n    ) = 0.0_WP
         bfsfc  (   n    ) = 0.0_WP
@@ -280,21 +276,17 @@ contains
      real(KIND=WP), dimension(mesh%nl, partit%myDim_nod2D +partit%eDim_nod2D)                                     :: viscA !for momentum (nodes)
      real(KIND=WP), dimension(mesh%nl, partit%myDim_nod2D +partit%eDim_nod2D, tracers%num_tracers), intent(inout) :: diffK !for T and S
      real(kind=WP), dimension(:,:,:), pointer :: UVnode
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     UVnode=>dynamics%uvnode(:,:,:)
 
 !$OMP PARALLEL DO
-     DO node=1, myDim_nod2D+eDim_nod2D
+     DO node=1, partit%myDim_nod2D+partit%eDim_nod2D
         ViscA(:, node) = 0.0_WP
      END DO
 !$OMP END PARALLEL DO
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, usurf, vsurf, u_loc, v_loc)
-     DO node=1, myDim_nod2D !+eDim_nod2D
-        nzmin = ulevels_nod2D(node)
-        nzmax = nlevels_nod2D(node)
+     DO node=1, partit%myDim_nod2D !+eDim_nod2D
+        nzmin = mesh%ulevels_nod2D(node)
+        nzmax = mesh%nlevels_nod2D(node)
 
 !      *******************************************************************
 !       Eqn. 21
@@ -348,8 +340,8 @@ contains
 !       bo =  -g * ( Talpha*heat_flux/vcpw + Sbeta * salinity*water_flux ) (m^2/s^3)
 !      *******************************************************************
 
-  DO node=1, myDim_nod2D !+eDim_nod2D
-     nzmin = ulevels_nod2D(node)
+  DO node=1, partit%myDim_nod2D !+eDim_nod2D
+     nzmin = mesh%ulevels_nod2D(node)
 !!PS      ustar(node) = sqrt( sqrt( stress_atmoce_x(node)**2 + stress_atmoce_y(node)**2 )*density_0_r ) ! @ the surface (eqn. 2)
      ustar(node) = sqrt( sqrt( stress_node_surf(1,node)**2 + stress_node_surf(2,node)**2 )*density_0_r ) ! @ the surface (eqn. 2)
     
@@ -391,9 +383,9 @@ contains
 !$OMP BARRIER
 ! then combine blmc and viscA/diffK
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax)
-     DO node=1, myDim_nod2D
-        nzmin = ulevels_nod2D(node)
-        nzmax = nlevels_nod2D(node)
+     DO node=1, partit%myDim_nod2D
+        nzmin = mesh%ulevels_nod2D(node)
+        nzmax = mesh%nlevels_nod2D(node)
         DO nz=nzmin+1,nzmax-1
           IF (nz < kbl(node)) then ! within the bounday layer
              viscA(nz,node  ) = MAX(viscA(nz,node  ), blmc(nz,node,1))
@@ -417,14 +409,14 @@ contains
 !$OMP BARRIER
      minmix=3.0e-3_WP
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(elem, elnodes, nz, nzmin, nzmax)
-     DO elem    = 1, myDim_elem2D
-        elnodes = elem2D_nodes(:,elem)
-        nzmin   = ulevels(elem)
-        nzmax   = nlevels(elem)
+     DO elem    = 1, partit%myDim_elem2D
+        elnodes = mesh%elem2D_nodes(:,elem)
+        nzmin   = mesh%ulevels(elem)
+        nzmax   = mesh%nlevels(elem)
         DO nz=nzmin,nzmax-1
            viscAE(nz, elem) = SUM(viscA(nz, elnodes))/3.0_WP    ! (elementwise)                
         END DO
-        viscAE( nlevels(elem), elem ) = viscAE( nlevels(elem)-1, elem)
+        viscAE( mesh%nlevels(elem), elem ) = viscAE( mesh%nlevels(elem)-1, elem)
         ! Set the mixing coeff. in the first layer above some limiting value
         ! this is very helpful to avoid huge surface velocity when vertical
         ! viscosity is very small derived from the KPP scheme.
@@ -491,27 +483,23 @@ contains
      type(t_mesh),   intent(in),    target :: mesh
      type(t_partit), intent(inout), target :: partit
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
 !$OMP PARALLEL DO
      ! Initialize hbl and kbl to bottomed out values
-     DO node=1, myDim_nod2D !+eDim_nod2D
+     DO node=1, partit%myDim_nod2D !+eDim_nod2D
         ! Index of first grid level below hbl
-        kbl(node) = nlevels_nod2D(node)      
+        kbl(node) = mesh%nlevels_nod2D(node)      
         ! Boundary layer depth
-        hbl(node) = ABS( zbar_3d_n( nlevels_nod2d(node),node ) )
+        hbl(node) = ABS( mesh%zbar_3d_n( mesh%nlevels_nod2d(node),node ) )
      END DO
 !$OMP END PARALLEL DO
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, coeff_sw, Rib_km1, zk, zkm1, sigma, zehat, &
 !$OMP                                  wm, ws, bvsq, Vtsq, Ritop, Rib_k, dzup, hekman, hmonob, hlimit)
 !$OMP DO
-     DO node=1, myDim_nod2D !+eDim_nod2D
-        nzmin = ulevels_nod2D(node)
-        nzmax = nlevels_nod2D(node)
+     DO node=1, partit%myDim_nod2D !+eDim_nod2D
+        nzmin = mesh%ulevels_nod2D(node)
+        nzmax = mesh%nlevels_nod2D(node)
 
         IF (use_sw_pene)  THEN                
            coeff_sw = g * sw_alpha(nzmin,node)  ! @ the surface @ Z (m/s2/K)
@@ -522,8 +510,8 @@ contains
         
         DO nz=nzmin+1,nzmax
 
-           zk   = ABS( zbar_3d_n(nz,  node) )  
-           zkm1 = ABS( zbar_3d_n(nz-1,node) ) 
+           zk   = ABS( mesh%zbar_3d_n(nz,  node) )  
+           zkm1 = ABS( mesh%zbar_3d_n(nz-1,node) ) 
 
           ! bfsfc = Bo + sw contribution
            IF (use_sw_pene)  THEN     
@@ -601,7 +589,7 @@ contains
                 /vonk / (bfsfc(node) + epsln) 
            hlimit = stable(node) * AMIN1( hekman, hmonob )  
            hbl(node) = AMIN1( hbl(node), hlimit )
-           hbl(node) = MAX( hbl(node), ABS(zbar_3d_n(2,node)) ) 
+           hbl(node) = MAX( hbl(node), ABS(mesh%zbar_3d_n(2,node)) ) 
         END IF
   END DO
 !$OMP END DO
@@ -614,9 +602,9 @@ contains
 !$OMP BARRIER
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, dzup, coeff_sw)
-  DO node=1, myDim_nod2D
-       nzmax = nlevels_nod2D(node)
-       nzmin = ulevels_nod2D(node)
+  DO node=1, partit%myDim_nod2D
+       nzmax = mesh%nlevels_nod2D(node)
+       nzmin = mesh%ulevels_nod2D(node)
        !-----------------------------------------------------------------------
        !     find new kbl 
        !-----------------------------------------------------------------------
@@ -624,7 +612,7 @@ contains
         kbl(node) = nzmax
         !!PS DO nz=2,nk
         DO nz=nzmin+1,nzmax
-           IF (ABS(zbar_3d_n(nz,node)) > hbl(node)) THEN
+           IF (ABS(mesh%zbar_3d_n(nz,node)) > hbl(node)) THEN
               kbl(node) = nz
               EXIT
            END IF
@@ -641,8 +629,8 @@ contains
                          ( sw_3d(nzmin,node) - &
                                          ( sw_3d(kbl(node)-1, node) + &
                                                                     ( sw_3d(kbl(node), node) - sw_3d(kbl(node)-1, node) ) &
-                                                                    * ( hbl(node) + zbar_3d_n( kbl(node)-1,node) ) &
-                                                                    / ( zbar_3d_n( kbl(node)-1,node) - zbar_3d_n(kbl(node),node) ) ) )
+                                                                    * ( hbl(node) + mesh%zbar_3d_n( kbl(node)-1,node) ) &
+                                                                    / ( mesh%zbar_3d_n( kbl(node)-1,node) - mesh%zbar_3d_n(kbl(node),node) ) ) )
            stable(node)=0.5_WP + SIGN(0.5_WP, bfsfc(node))
            bfsfc(node) =bfsfc(node) + stable(node) * epsln 
         END IF
@@ -651,8 +639,8 @@ contains
        !     (if hbl is below (deeper than) the mid point of level kbl
        !     then caseA=0  else caseA=1)
        !-----------------------------------------------------------------------
-        dzup         = zbar_3d_n(kbl(node)-1,node) - zbar_3d_n(kbl(node),node)
-        caseA(node)  = 0.5_WP + SIGN( 0.5_WP, ABS( zbar_3d_n(kbl(node),node) ) - 0.5_WP * dzup - hbl(node) )
+        dzup         = mesh%zbar_3d_n(kbl(node)-1,node) - mesh%zbar_3d_n(kbl(node),node)
+        caseA(node)  = 0.5_WP + SIGN( 0.5_WP, ABS( mesh%zbar_3d_n(kbl(node),node) ) - 0.5_WP * dzup - hbl(node) )
   END DO
 !$OMP END PARALLEL DO
   END SUBROUTINE bldepth
@@ -756,20 +744,16 @@ contains
      logical                     :: smooth_richardson_number = .false.
      integer                     :: num_smoothings = 1              ! for vertical smoothing of Richardson number
      real(kind=WP), dimension(:,:,:), pointer :: UVnode
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
      UVnode=>dynamics%uvnode(:,:,:)
 
      ! Compute Richardson number and store it as diffK to save memory
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, dz_inv, shear, mr, ri_prev, tmp)
-     DO node=1, myDim_nod2D! +eDim_nod2D
-        nzmin = ulevels_nod2D(node)
-        nzmax = nlevels_nod2D(node)
+     DO node=1, partit%myDim_nod2D! +eDim_nod2D
+        nzmin = mesh%ulevels_nod2D(node)
+        nzmax = mesh%nlevels_nod2D(node)
         !!PS DO nz=2,nlevels_nod2d(node)-1
         DO nz=nzmin+1,nzmax-1
-           dz_inv = 1.0_WP / (Z_3d_n(nz-1,node)-Z_3d_n(nz,node))  ! > 0
+           dz_inv = 1.0_WP / (mesh%Z_3d_n(nz-1,node)-mesh%Z_3d_n(nz,node))  ! > 0
            shear  = ( UVnode(1, nz-1, node) - UVnode(1, nz, node) )**2 + &
                     ( UVnode(2, nz-1, node) - UVnode(2, nz, node) )**2 
            shear  = shear * dz_inv * dz_inv
@@ -802,9 +786,9 @@ contains
     !___________________________________________________________________________
     ! compute viscA and diffK
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, Rigg, ratio, frit, Kv0_b)
-    do node=1, myDim_nod2D
-       nzmin = ulevels_nod2D(node)
-       nzmax = nlevels_nod2D(node)
+    do node=1, partit%myDim_nod2D
+       nzmin = mesh%ulevels_nod2D(node)
+       nzmax = mesh%nlevels_nod2D(node)
        do nz=nzmin+1, nzmax-1
           !___________________________________________________________________
           ! evaluate function of Ri# for shear instability eqn. (28b&c)
@@ -827,7 +811,7 @@ contains
              ! --> see in oce_ale_mixing_pp.F90 --> there are different 
              ! schemes of the vertical background diffusivity possible strongly
              ! depending on purpos and tuning especially with arctic focus
-             call Kv0_background_qiang(Kv0_b,geo_coord_nod2D(2,node)/rad,abs(zbar_3d_n(nz,node)))
+             call Kv0_background_qiang(Kv0_b,mesh%geo_coord_nod2D(2,node)/rad,abs(mesh%zbar_3d_n(nz,node)))
                   diffK(nz,node,1) =  diff_sh_limit * frit + Kv0_b
            end if 
            diffK(nz,node,2) = diffK(nz,node,1)  
@@ -875,15 +859,11 @@ contains
 
      real(KIND=WP), dimension(mesh%nl, partit%myDim_nod2D+partit%eDim_nod2D, 2), intent(inout)   :: diffK ! for T and S
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(node, nz, nzmin, nzmax, alphaDT, betaDS, Rrho, diffdd, prandtl)
-     DO node=1, myDim_nod2D
-        nzmin = ulevels_nod2D(node)
-        nzmax = nlevels_nod2D(node)
+     DO node=1, partit%myDim_nod2D
+        nzmin = mesh%ulevels_nod2D(node)
+        nzmax = mesh%nlevels_nod2D(node)
         DO nz=nzmin+1,nzmax-1
            alphaDT = sw_alpha(nz-1,node) * (tracers%data(1)%values(nz-1,node) - tracers%data(1)%values(nz,node))
            betaDS  = sw_beta (nz-1,node) * (tracers%data(2)%values(nz-1,node) - tracers%data(2)%values(nz,node))
@@ -973,12 +953,8 @@ contains
      real(KIND=WP), dimension(mesh%nl, partit%myDim_nod2D+partit%eDim_nod2D    ), intent(inout) :: viscA ! for momentum (nodes)
      real(KIND=WP), dimension(mesh%nl, partit%myDim_nod2D+partit%eDim_nod2D, 2 ), intent(inout) :: diffK ! for T and S
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 !$OMP PARALLEL DO
-     DO node=1, myDim_nod2D+eDim_nod2D
+     DO node=1, partit%myDim_nod2D+partit%eDim_nod2D
         blmc   (:, node,  :) = 0.0_WP
      END DO
 !$OMP END PARALLEL DO
@@ -988,16 +964,16 @@ contains
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(node, nz, kn, knm1, knp1, nl1, nu1, delhat, R, dvdzup, dvdzdn, viscp, difsp, diftp, visch, difsh, difth, f1, sig, &
 !$OMP                                            a1, a2, a3, Gm, Gs, Gt, sigma, zehat, wm, ws, gat1m, gat1t, gat1s, dat1m, dat1s, dat1t, dthick, diff_col)
 !$OMP DO
-     DO node=1, myDim_nod2D
-        nl1=nlevels_nod2d(node)
-        nu1=ulevels_nod2d(node)
+     DO node=1, partit%myDim_nod2D
+        nl1=mesh%nlevels_nod2d(node)
+        nu1=mesh%ulevels_nod2d(node)
 
         if(nl1     < 3) cycle  ! a temporary solution
         if(nl1-nu1 < 2) cycle
 
-        dthick(nu1+1:nl1-1)=0.5_WP*(hnode(nu1:nl1-2,node)+hnode(nu1+1:nl1-1,node) )
-        dthick(nu1)=hnode(nu1,node)*0.5_WP
-        dthick(nl1)=hnode(nl1-1,node)*0.5_WP
+        dthick(nu1+1:nl1-1)=0.5_WP*(mesh%hnode(nu1:nl1-2,node)+mesh%hnode(nu1+1:nl1-1,node) )
+        dthick(nu1)=mesh%hnode(nu1,node)*0.5_WP
+        dthick(nl1)=mesh%hnode(nl1-1,node)*0.5_WP
         
         diff_col(nu1:nl1-1,1)=viscA(nu1:nl1-1,node)
         diff_col(nu1:nl1-1,2:3)=diffK(nu1:nl1-1,node,:)
@@ -1021,7 +997,7 @@ contains
 !       Find the interior viscosities and derivatives at hbl(i) 
 !       eqn. (18)
 !      *******************************************************************
-        delhat = ABS(Z_3d_n(kn,node))-hbl(node)
+        delhat = ABS(mesh%Z_3d_n(kn,node))-hbl(node)
         R      = 1.0_WP - delhat / dthick(kn)
 
         dvdzup = (diff_col(knm1,1) - diff_col(kn,1))/dthick(kn)
@@ -1067,7 +1043,7 @@ contains
 !      *******************************************************************
 !       Compute turbulent velocity scales on the interfaces
 !      *******************************************************************
-           sig   = ABS(Z_3d_n(nz,node)) / (hbl(node)+epsln)
+           sig   = ABS(mesh%Z_3d_n(nz,node)) / (hbl(node)+epsln)
            sigma = stable(node) * sig                          &
                 + (1.0_WP - stable(node)) * AMIN1(sig, epsilon_kpp)
            zehat= vonk * sigma * hbl(node) * bfsfc(node)
@@ -1108,7 +1084,7 @@ contains
 !       Find diffusivities at kbl-1 grid level 
 !      *******************************************************************
 
-        sig   =  ABS(zbar_3d_n(kbl(node)-1,node))  / (hbl(node) + epsln)
+        sig   =  ABS(mesh%zbar_3d_n(kbl(node)-1,node))  / (hbl(node) + epsln)
         sigma =  stable(node) * sig                  &
               + (1.0_WP - stable(node)) * MIN(sig, epsilon_kpp)
         zehat= vonk * sigma * hbl(node) * bfsfc(node)
@@ -1156,16 +1132,12 @@ contains
      integer           :: nz, node, k
      real(kind=WP)     :: delta, dkmp5, dstar
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(nz, node, k, delta, dkmp5, dstar)
-     DO node=1, myDim_nod2D
+     DO node=1, partit%myDim_nod2D
 
         k     = kbl(node) - 1
-        delta = (hbl(node) + zbar_3d_n(k,node)) / (zbar_3d_n(k,node) - zbar_3d_n(k+1,node))
+        delta = (hbl(node) + mesh%zbar_3d_n(k,node)) / (mesh%zbar_3d_n(k,node) - mesh%zbar_3d_n(k+1,node))
 
        ! momentum
         dkmp5 = caseA(node) * viscA(k,node)      &
