@@ -36,10 +36,6 @@ subroutine fw_surf_anomaly(hSv, tracers, partit, mesh)  !!!! subroutine to apply
     real(kind=WP), dimension(:,:), pointer :: temp
     real(kind=WP), parameter               :: lhf = 334000. !Latent heat of fusion for sea ice (J/Kg)
     real(kind=WP), parameter               :: rhofwt = 1000. !Fresh water density (Kg/m3)
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
       temp          => tracers%data(1)%values(:,:)
 
       hosing_flux=0._WP
@@ -53,10 +49,10 @@ subroutine fw_surf_anomaly(hSv, tracers, partit, mesh)  !!!! subroutine to apply
 
      !!freshwater anomaly is applied only on surface coastal nodes south of 60S (uncomment the next 6 lines)
      !!the mask is created looping on all the mesh edges and considering only the nodes belonging to non internal edges 
-     do n=1, myDim_edge2D
+     do n=1, partit%myDim_edge2D
         ed=mesh%edges(:, n)
-        if (myList_edge2D(n) <= mesh%edge2D_in) cycle
-        y = sum(geo_coord_nod2D(2,ed))/2._WP/rad
+        if (partit%myList_edge2D(n) <= mesh%edge2D_in) cycle
+        y = sum(mesh%geo_coord_nod2D(2,ed))/2._WP/rad
         if (y<-60._WP) hosing_flux(ed)=1._WP
      end do
 
@@ -115,25 +111,21 @@ subroutine fw_depth_anomaly(tts, ttt, hSv, partit, mesh) !!!! subroutine to appl
     real(kind=WP), parameter              :: lhf = 334000. !Latent heat of fusion for sea ice (J/Kg)
     real(kind=WP), parameter              :: rhofwt = 1000. !Fresh water density (Kg/m3)
     logical, save                         :: lfirst=.true.
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     hosing_flux3D=0._WP
     hosing_heat_flux3D=0._WP
     
     !!generating the 3D mask to apply the anomaly (only for the first iteration)
     if (lfirst) then
-       allocate(mask(myDim_nod2D+eDim_nod2D), mask3D(mesh%nl-1, myDim_nod2D+eDim_nod2D))
+       allocate(mask(partit%myDim_nod2D+partit%eDim_nod2D), mask3D(mesh%nl-1, partit%myDim_nod2D+partit%eDim_nod2D))
        mask =0._WP
        mask3D=0._WP
        spar=0._WP
        !!the 2D mask is created in the same way as for the surface application first selecting nodes belonging to coastal edges
        !!and then using the smoothing function to increase it including 5 rows of adjacent nodes
-       do n=1, myDim_edge2D
+       do n=1, partit%myDim_edge2D
           ed=mesh%edges(:, n)
-          if (myList_edge2D(n) <= mesh%edge2D_in) cycle
-             y = sum(geo_coord_nod2D(2,ed))/2._WP/rad
+          if (partit%myList_edge2D(n) <= mesh%edge2D_in) cycle
+             y = sum(mesh%geo_coord_nod2D(2,ed))/2._WP/rad
           if (y<-60._WP) mask(ed)=1._WP
        end do
        
@@ -143,7 +135,7 @@ subroutine fw_depth_anomaly(tts, ttt, hSv, partit, mesh) !!!! subroutine to appl
        end where
 
        !!create a 3D mask to apply the freshwater anomaly between the chosen levels nzmin and nzmax 
-       do n=1, myDim_edge2D
+       do n=1, partit%myDim_edge2D
           ed = mesh%edges(:, n)
           !!select all the elements adjacent to the edges with both nodes in the 2D mask
           if (any(mask(ed)<1.e-12)) cycle 
@@ -167,7 +159,7 @@ subroutine fw_depth_anomaly(tts, ttt, hSv, partit, mesh) !!!! subroutine to appl
        
        !!collapse the 3D mask back to a 2D mask (a node is kept in mask only if it has at least one active depth level in mask3D)
        !!to compute the area integral and normalize the mask horizontally
-       do row=1,myDim_nod2d+eDim_nod2D
+       do row=1,partit%myDim_nod2d+partit%eDim_nod2D
           if (sum(mask3D(:, row))<1.e-12) mask(row)=0._WP
        end do
        
@@ -177,19 +169,19 @@ subroutine fw_depth_anomaly(tts, ttt, hSv, partit, mesh) !!!! subroutine to appl
        end if
        
        !!Building the 3D distribution
-       do row=1,myDim_nod2d+eDim_nod2D 
+       do row=1,partit%myDim_nod2d+partit%eDim_nod2D 
           spar(:mesh%nl)=0._WP
           !!build a volume-weighted vertical shape inside the chosen levels (to distribute the anomaly proportionally to the volume)
-          do k=ulevels_nod2D(row), nlevels_nod2D(row)-1
-             spar(k)=areasvol(k,row)*hnode(k,row)*mask3D(k, row)                           
+          do k=mesh%ulevels_nod2D(row), mesh%nlevels_nod2D(row)-1
+             spar(k)=mesh%areasvol(k,row)*mesh%hnode(k,row)*mask3D(k, row)                           
           end do
           !!normalize the vertical distribution so it sums to 1
-          spar(:nlevels_nod2D(row)-1)=spar(:nlevels_nod2D(row)-1)/max(sum(spar(:nlevels_nod2D(row)-1)), 1.e-12)
+          spar(:mesh%nlevels_nod2D(row)-1)=spar(:mesh%nlevels_nod2D(row)-1)/max(sum(spar(:mesh%nlevels_nod2D(row)-1)), 1.e-12)
           !!convert the vertically normalized weights so that ts vertical integral at each node matches the horizontal forcing defined by mask(row) 
-          do k=ulevels_nod2D(row), nlevels_nod2D(row)-1
-             spar(k)=spar(k)/areasvol(k,row)/hnode(k,row)*mask(row)*area(1,row)*dt
+          do k=mesh%ulevels_nod2D(row), mesh%nlevels_nod2D(row)-1
+             spar(k)=spar(k)/mesh%areasvol(k,row)/mesh%hnode(k,row)*mask(row)*mesh%area(1,row)*dt
           end do
-          mask3D(:nlevels_nod2D(row)-1,row)=spar(:nlevels_nod2D(row)-1)
+          mask3D(:mesh%nlevels_nod2D(row)-1,row)=spar(:mesh%nlevels_nod2D(row)-1)
        end do
 
        lfirst=.false. !set to false so that the mask generation is not repeated
