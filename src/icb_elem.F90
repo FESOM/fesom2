@@ -38,10 +38,6 @@ real(kind=WP), dimension(:), pointer    :: eta_n_ib
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
 type(t_dyn)   , intent(inout), target :: dynamics
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
  
  nablaeta = 0.
  gradientx= 0.
@@ -49,7 +45,7 @@ type(t_dyn)   , intent(inout), target :: dynamics
  notmynode= .false.
  
  do m = 1, 3
-  node = elem2D_nodes(m,elem)
+  node = mesh%elem2D_nodes(m,elem)
   call nodal_average(mesh, partit, dynamics, node, gradientx(m), gradienty(m), notmynode) 
   if (notmynode) exit
  end do
@@ -63,8 +59,8 @@ type(t_dyn)   , intent(inout), target :: dynamics
 !LA 2023-03-07
 eta_n_ib => dynamics%eta_n_ib(:)
 ! kh 18.03.21 use eta_n_ib buffered values here
-  nablaeta(1) = sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(1:3, elem)) 
-  nablaeta(2) = sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(4:6, elem)) 
+  nablaeta(1) = sum( eta_n_ib(mesh%elem2D_nodes(:,elem)) * mesh%gradient_sca(1:3, elem)) 
+  nablaeta(2) = sum( eta_n_ib(mesh%elem2D_nodes(:,elem)) * mesh%gradient_sca(4:6, elem)) 
  else
   call FEM_3eval(mesh, partit, nablaeta(1),nablaeta(2),lon_rad,lat_rad,gradientx,gradienty,elem)
  end if
@@ -95,10 +91,6 @@ real(kind=WP), dimension(:), pointer    :: eta_n_ib
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
 type(t_dyn)   , intent(inout), target :: dynamics
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
  
  area_ = 0.
  patch = 0.
@@ -106,18 +98,18 @@ type(t_dyn)   , intent(inout), target :: dynamics
  gradienty = 0.
  notmynode = .false.
  
- if(local_idx > myDim_nod2D) then
+ if(local_idx > partit%myDim_nod2D) then
   notmynode = .true.
   return !not my node
  end if 
 
- do k=1, nod_in_elem2D_num(local_idx)
-   elem  = nod_in_elem2D(k,local_idx)
+ do k=1, mesh%nod_in_elem2D_num(local_idx)
+   elem  = mesh%nod_in_elem2D(k,local_idx)
 
    !do idx_elem = 1,  nod_in_elem2D(local_idx)%nmb
    !elem = nod_in_elem2D(local_idx)%addresses(idx_elem)
    !area_ = voltriangle(elem)
-   area_ = elem_area(elem)
+   area_ = mesh%elem_area(elem)
    patch= patch + area_
 
    !gradientx = gradientx + area * sum( ssh(elem2D_nodes(:,elem)) * bafux_2D(:,elem) )
@@ -126,8 +118,8 @@ type(t_dyn)   , intent(inout), target :: dynamics
 ! 2023-03-07
 eta_n_ib => dynamics%eta_n_ib(:)
 !h 18.03.21 use eta_n_ib buffered values here
-   gradientx = gradientx + area_ * sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(1:3, elem))
-   gradienty = gradienty + area_ * sum( eta_n_ib(elem2D_nodes(:,elem)) * gradient_sca(4:6, elem))
+   gradientx = gradientx + area_ * sum( eta_n_ib(mesh%elem2D_nodes(:,elem)) * mesh%gradient_sca(1:3, elem))
+   gradienty = gradienty + area_ * sum( eta_n_ib(mesh%elem2D_nodes(:,elem)) * mesh%gradient_sca(4:6, elem))
  end do
  
  gradientx = gradientx / patch
@@ -164,10 +156,6 @@ type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
   real, dimension(partit%myDim_nod2D+partit%eDim_nod2D), intent(in)  	:: field_u
   real, dimension(partit%myDim_nod2D+partit%eDim_nod2D), intent(in)  	:: field_v
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
   
   !convert to deg
   lon_deg = lon/rad
@@ -178,8 +166,8 @@ type(t_partit), intent(inout), target :: partit
   !position 'coords'
   call locbafu_2D(mesh, partit, phi,elem,coords_tmp)
 
-  values_u = field_u(elem2D_nodes(:,elem))
-  values_v = field_v(elem2D_nodes(:,elem))
+  values_u = field_u(mesh%elem2D_nodes(:,elem))
+  values_v = field_v(mesh%elem2D_nodes(:,elem))
 
   u_at_ib = sum( values_u(:) * phi(:))
   v_at_ib = sum( values_v(:) * phi(:))
@@ -234,10 +222,6 @@ type(t_partit), intent(inout), target :: partit
   real, dimension(partit%myDim_nod2D+partit%eDim_nod2D), intent(in)  	:: field_u
   real, dimension(partit%myDim_nod2D+partit%eDim_nod2D), intent(in)  	:: field_v
 !type(t_ice),    intent(inout), target :: ice
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
   
   !location of iceberg
   x = lon
@@ -245,12 +229,12 @@ type(t_partit), intent(inout), target :: partit
    
   
   !coords of the 3 nodes
-  x1 = coord_nod2D(1,elem2D_nodes(1,elem))
-  y1 = coord_nod2D(2,elem2D_nodes(1,elem))
-  x2 = coord_nod2D(1,elem2D_nodes(2,elem))
-  y2 = coord_nod2D(2,elem2D_nodes(2,elem))  
-  x3 = coord_nod2D(1,elem2D_nodes(3,elem))
-  y3 = coord_nod2D(2,elem2D_nodes(3,elem))
+  x1 = mesh%coord_nod2D(1,mesh%elem2D_nodes(1,elem))
+  y1 = mesh%coord_nod2D(2,mesh%elem2D_nodes(1,elem))
+  x2 = mesh%coord_nod2D(1,mesh%elem2D_nodes(2,elem))
+  y2 = mesh%coord_nod2D(2,mesh%elem2D_nodes(2,elem))  
+  x3 = mesh%coord_nod2D(1,mesh%elem2D_nodes(3,elem))
+  y3 = mesh%coord_nod2D(2,mesh%elem2D_nodes(3,elem))
   
   
   !check whether iceberg position is in the element
@@ -282,12 +266,12 @@ type(t_partit), intent(inout), target :: partit
   y  = y - y1 
   
   !nodal values Ti_u, Ti_v
-  T1_u = field_u(elem2D_nodes(1,elem))
-  T1_v = field_v(elem2D_nodes(1,elem))
-  T2_u = field_u(elem2D_nodes(2,elem))
-  T2_v = field_v(elem2D_nodes(2,elem))  
-  T3_u = field_u(elem2D_nodes(3,elem))
-  T3_v = field_v(elem2D_nodes(3,elem))
+  T1_u = field_u(mesh%elem2D_nodes(1,elem))
+  T1_v = field_v(mesh%elem2D_nodes(1,elem))
+  T2_u = field_u(mesh%elem2D_nodes(2,elem))
+  T2_v = field_v(mesh%elem2D_nodes(2,elem))  
+  T3_u = field_u(mesh%elem2D_nodes(3,elem))
+  T3_v = field_v(mesh%elem2D_nodes(3,elem))
   
   !differences wrt node 1
   T2_u = T2_u - T1_u
@@ -342,10 +326,6 @@ subroutine FEM_3eval(mesh, partit, u_at_ib,v_at_ib,lon,lat,ocean_u,ocean_v,elem)
   
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
   
   !convert to deg
   lon_deg = lon/rad
@@ -386,28 +366,24 @@ subroutine iceberg_elem4all(mesh, partit, elem, lon_deg, lat_deg)
 
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
  
   call point_in_triangle(mesh, partit, elem, (/lon_deg, lat_deg/)) !all PEs search here
   i_have_element= (elem .ne. 0) !up to 3 PEs .true.
   
   if(i_have_element) then
-   i_have_element= elem2D_nodes(1,elem) <= myDim_nod2D !1 PE still .true.
+   i_have_element= mesh%elem2D_nodes(1,elem) <= partit%myDim_nod2D !1 PE still .true.
    if (use_cavity) then 
-      reject_tmp = all( (mesh%cavity_depth(elem2D_nodes(:,elem))/=0.0) .OR. (mesh%bc_index_nod2D(elem2D_nodes(:,elem))==0.0) )
+      reject_tmp = all( (mesh%cavity_depth(mesh%elem2D_nodes(:,elem))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem))==0.0) )
       if(reject_tmp) then
       !if( reject_elem(mesh, partit, elem) ) then
        elem=0 !reject element
        i_have_element=.false.
        !write(*,*) 'elem4all: iceberg found in shelf region: elem = 0'
       else 
-       elem=myList_elem2D(elem) !global now
+       elem=partit%myList_elem2D(elem) !global now
       end if 
    else
-    elem=myList_elem2D(elem) !global now
+    elem=partit%myList_elem2D(elem) !global now
    endif 
   end if
   call com_integer(partit, i_have_element,elem) !max 1 PE sends element here; 
@@ -431,10 +407,6 @@ subroutine find_new_iceberg_elem(mesh, partit, old_iceberg_elem, pt, left_mype)
 
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
   
 
 ibelem_tmp=old_iceberg_elem
@@ -442,16 +414,16 @@ left_mype=0.0
 
 !for each node of the old iceberg element...
 do m=1, 3
- n2=elem2D_nodes(m,old_iceberg_elem)
+ n2=mesh%elem2D_nodes(m,old_iceberg_elem)
  
- if(n2 > myDim_nod2D) cycle !n2 is not my node, so i cannot access all elements around it
+ if(n2 > partit%myDim_nod2D) cycle !n2 is not my node, so i cannot access all elements around it
  
  !...and for each element containing this node (so we get all neighbour elements)...
  !do idx_elem_containing_n2 = 1,  nod_in_elem2D(n2)%nmb
- do idx_elem_containing_n2 = 1,  nod_in_elem2D_num(n2)
+ do idx_elem_containing_n2 = 1,  mesh%nod_in_elem2D_num(n2)
  
   !elem_containing_n2 = nod_in_elem2D(n2)%addresses(idx_elem_containing_n2)
-  elem_containing_n2 = nod_in_elem2D(idx_elem_containing_n2,n2) 
+  elem_containing_n2 = mesh%nod_in_elem2D(idx_elem_containing_n2,n2) 
     
   call locbafu_2D(mesh, partit, werte2D, elem_containing_n2, pt)
    
@@ -459,7 +431,7 @@ do m=1, 3
    old_iceberg_elem=elem_containing_n2
    if (use_cavity) then 
       !if( reject_elem(mesh, partit, old_iceberg_elem) ) then
-      reject_tmp = all( (mesh%cavity_depth(elem2D_nodes(:,elem_containing_n2))/=0.0) .OR. (mesh%bc_index_nod2D(elem2D_nodes(:,elem_containing_n2))==0.0) )
+      reject_tmp = all( (mesh%cavity_depth(mesh%elem2D_nodes(:,elem_containing_n2))/=0.0) .OR. (mesh%bc_index_nod2D(mesh%elem2D_nodes(:,elem_containing_n2))==0.0) )
       if(reject_tmp) then
          left_mype=1.0
          !write(*,*) 'iceberg found in shelf region: left_mype = 1'
@@ -514,10 +486,6 @@ SUBROUTINE point_in_triangle(mesh, partit, el2D, pt)
 
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
   el2D=0
   !DO l=1,elem2D
@@ -563,10 +531,6 @@ SUBROUTINE locbafu_2D(mesh, partit, values, elem, coords)
 
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
  
   x(1)=coords(1)*rad
   x(2)=coords(2)*rad
@@ -645,14 +609,10 @@ subroutine global2local(mesh, partit, aux, tmp)
 
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
  aux = 0
- do n = 1, myDim_elem2D
-  aux(myList_elem2D(n)) = n
+ do n = 1, partit%myDim_elem2D
+  aux(partit%myList_elem2D(n)) = n
  end do
 end subroutine global2local
 
