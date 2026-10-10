@@ -587,7 +587,6 @@ subroutine diag_densMOC(mode, dynamics, tracers, partit, mesh)
      std_dens_DIV =0. !meridional divergence within a density bin (for reconstruction of the diapycnal velocity) !TOP PRIORITY
      if (Fer_GM) std_dens_DIV_fer =0. !meridional divergence of bolus velocity within a density bin (for reconstruction of the diapycnal velocity) !TOP PRIORITY
      std_dens_flux=0. !bouyancy flux for computation of surface bouyancy transformations
-     depth        =0.
      firstcall_s=.false.
      if (mode==0) return
   end if
