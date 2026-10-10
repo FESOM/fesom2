@@ -569,14 +569,10 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
   integer :: tr_num
 #endif
 
-#if defined(__recom) && defined(__usetp)
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
-  num_tracers = tracers%num_tracers
-#else
   integer :: mpierr
+
+#if defined(__recom) && defined(__usetp)
+  num_tracers = tracers%num_tracers
 #endif
 
   ! Build paths for reading using RestartInPath
@@ -691,7 +687,7 @@ subroutine write_initial_conditions(istep, nstart, ntotal, which_readr, ice, dyn
 
 #if defined(__recom) && defined(__usetp)
     if(num_fesom_groups > 1) then
-        tr_arr_slice_count_fix_1 = 1 * (nl - 1) * (myDim_nod2D + eDim_nod2D)
+        tr_arr_slice_count_fix_1 = 1 * (mesh%nl - 1) * (partit%myDim_nod2D + partit%eDim_nod2D)
 
         do group_i = 0, num_fesom_groups - 1
             call calc_slice(num_tracers, num_fesom_groups, group_i, tr_num_start, tr_num_end, tr_num_in_group, has_one_added_tracer)
