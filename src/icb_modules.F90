@@ -139,10 +139,6 @@ save
  integer, intent(in) :: elem
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(in), target :: partit
-#include "associate_mesh_def.h"
-#include "associate_part_def.h"
-#include "associate_mesh_ass.h"
-#include "associate_part_ass.h"
 
 if (use_cavity) then
 ! kh 09.08.21 change index_nod2d -> bc_index_nod2d?
@@ -162,10 +158,6 @@ endif
  integer, intent(in) :: elem
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
-#include "associate_mesh_def.h"
-#include "associate_part_def.h"
-#include "associate_mesh_ass.h"
-#include "associate_part_ass.h"
 
 if (use_cavity) then
 ! kh 09.08.21 change index_nod2d -> bc_index_nod2d?
