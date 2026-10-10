@@ -119,7 +119,7 @@ nl => mesh%nl
     allocate(mesh%hbar_old(myDim_nod2D+eDim_nod2D))
     
     ! helem: layer thickness at elements. It is interpolated from hnode.
-    allocate(mesh%helem(1:nl-1, myDim_elem2D+eDim_nod2D))
+    allocate(mesh%helem(1:nl-1, myDim_elem2D+eDim_elem2D))
     
     ! dhe: The increment of total fluid depth on elements. It is used to update the matrix
     ! of the ssh operator.      
@@ -162,7 +162,7 @@ nl => mesh%nl
     end if
     
     ! bottom_elem_tickness: changed bottom layer thinkness due to partial cells
-    allocate(mesh%bottom_elem_thickness(myDim_elem2D+eDim_nod2D))
+    allocate(mesh%bottom_elem_thickness(myDim_elem2D+eDim_elem2D))
     allocate(mesh%zbar_e_bot(myDim_elem2D+eDim_elem2D)) 
     allocate(mesh%zbar_e_srf(myDim_elem2D+eDim_elem2D)) 
     
