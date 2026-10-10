@@ -1481,8 +1481,6 @@ subroutine init_icebergs
  integer :: i, myunit
  integer :: io_error, io_read
 !type(t_partit), intent(inout), target :: partit
-!#include "associate_part_def.h"
-!#include "associate_part_ass.h"
 
 !buoys_xlon_file > lon_deg
  open(newunit=myunit, file=buoys_xlon_file,status='old',action='read',iostat=io_error)
@@ -1557,8 +1555,6 @@ subroutine init_icebergs_with_icesheet
  integer :: i
  integer :: io_error
 !type(t_partit), intent(inout), target :: partit
-!#include "associate_part_def.h"
-!#include "associate_part_ass.h"
 
 !buoys_xlon_file > lon_deg
  open(unit=97, file=buoys_xlon_file,status='old',action='read',iostat=io_error)

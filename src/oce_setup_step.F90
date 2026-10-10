@@ -324,7 +324,6 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff, AB_order, ltra_diag
     !___________________________________________________________________________
     ! pointer on necessary derived types
-! #include "associate_mesh_ass.h"
     
     !___________________________________________________________________________
     ! OPEN and read namelist for I/O
@@ -561,7 +560,6 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
 
     !___________________________________________________________________________
     ! pointer on necessary derived types
-! #include "associate_mesh_ass.h"   
     
     !___________________________________________________________________________
     ! open and read namelist for I/O
@@ -851,7 +849,6 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     integer                               :: n, nt
     !___________________________________________________________________________
     ! define dynamics namelist parameter
-! #include "associate_mesh_ass.h"
 
     !___________________________________________________________________________
     elem_size=partit%myDim_elem2D+partit%eDim_elem2D

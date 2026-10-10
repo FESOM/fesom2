@@ -154,8 +154,6 @@ subroutine init_mpi_types(partit, mesh)
   integer, allocatable             :: blocklen(:),     displace(:)
   integer, allocatable             :: blocklen_tmp(:), displace_tmp(:)
 
-!#include "associate_mesh_def.h"
-!#include "associate_mesh_ass.h"
 !PS npes            => partit%npes
 !PS com_nod2D       => partit%com_nod2D
 !PS com_elem2D      => partit%com_elem2D
@@ -191,7 +189,6 @@ subroutine init_mpi_types(partit, mesh)
       allocate(partit%s_mpitype_elem3D_full(partit%com_elem2D_full%sPEnum, mesh%nl-1:mesh%nl,4))
 
 !after the allocation we just reassotiate ALL pointers again here
-! #include "associate_part_ass.h"
       ! Upper limit for the length of the local interface between the neighbor PEs 
       max_nb = max(  &
            maxval(partit%com_elem2D%rptr(2:partit%com_elem2D%rPEnum+1) - partit%com_elem2D%rptr(1:partit%com_elem2D%rPEnum)), &
@@ -388,7 +385,6 @@ subroutine init_mpi_types(partit, mesh)
       allocate(partit%s_mpitype_nod3D(partit%com_nod2D%sPEnum,mesh%nl-1:mesh%nl,3))
 
 !after the allocation we just reassotiate ALL pointers again here
-! #include "associate_part_ass.h"
   
       ! Upper limit for the length of the local interface between the neighbor PEs 
       max_nb = max(maxval(partit%com_nod2D%rptr(2:partit%com_nod2D%rPEnum+1) - partit%com_nod2D%rptr(1:partit%com_nod2D%rPEnum)), &

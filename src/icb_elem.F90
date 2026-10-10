@@ -651,8 +651,6 @@ subroutine com_integer(partit, i_have_element, iceberg_element, ib)
  ! over grounded ice under ~2.5 km of ice.
  integer:: zero_send
 type(t_partit), intent(inout), target :: partit
-!#include "associate_part_def.h"
-!#include "associate_part_ass.h"
 
 ! kh 10.02.22
  if(i_have_element) then
@@ -717,8 +715,6 @@ type(t_partit), intent(inout), target :: partit
 ! real   :: arr_r(15)
 ! integer:: i, sender, status(MPI_STATUS_SIZE)
 !!type(t_partit), intent(inout), target :: partit
-!!#include "associate_part_def.h"
-!!#include "associate_part_ass.h"
 !
 ! if (mype==0) then
 !    do i=1, npes-1
@@ -803,10 +799,6 @@ type(t_partit), intent(inout), target :: partit
 !
 !type(t_mesh), intent(in) , target :: mesh
 !type(t_partit), intent(inout), target :: partit
-!#include "associate_part_def.h"
-!#include "associate_mesh_def.h"
-!#include "associate_part_ass.h"
-!#include "associate_mesh_ass.h"
 !  
 !  write(mype_char,*) mype
 !  !left-adjust the string..
@@ -849,8 +841,6 @@ type(t_partit), intent(inout), target :: partit
 !  character			:: mype_char*3
 !  INTEGER			:: m, row
 !type(t_partit), intent(inout), target :: partit
-!#include "associate_part_def.h"
-!#include "associate_part_ass.h"
 !  
 !  write(mype_char,*) mype
 !  !left-adjust the string..
