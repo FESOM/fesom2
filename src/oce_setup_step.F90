@@ -324,9 +324,7 @@ SUBROUTINE tracer_init(tracers, partit, mesh)
     namelist /tracer_general / smooth_bh_tra, gamma0_tra, gamma1_tra, gamma2_tra, i_vert_diff, AB_order, ltra_diag
     !___________________________________________________________________________
     ! pointer on necessary derived types
-#include "associate_mesh_def.h"
 ! #include "associate_mesh_ass.h"
-nl => mesh%nl
     
     !___________________________________________________________________________
     ! OPEN and read namelist for I/O
@@ -454,10 +452,10 @@ nl => mesh%nl
     ! Temperature (index=1), Salinity (index=2), etc.
     allocate(tracers%data(num_tracers))
     do n=1, tracers%num_tracers
-        allocate(tracers%data(n)%values   (                             nl-1, node_size))
-        allocate(tracers%data(n)%valuesAB (                             nl-1, node_size))
+        allocate(tracers%data(n)%values   (                             mesh%nl-1, node_size))
+        allocate(tracers%data(n)%valuesAB (                             mesh%nl-1, node_size))
         tracers%data(n)%AB_order      = AB_order        
-        allocate(tracers%data(n)%valuesold(tracers%data(n)%AB_order-1,  nl-1, node_size))
+        allocate(tracers%data(n)%valuesold(tracers%data(n)%AB_order-1,  mesh%nl-1, node_size))
         tracers%data(n)%ID            = nml_tracer_list(n)%id
         tracers%data(n)%tra_adv_hor   = TRIM(nml_tracer_list(n)%adv_hor)
         tracers%data(n)%tra_adv_ver   = TRIM(nml_tracer_list(n)%adv_ver)
@@ -474,24 +472,24 @@ nl => mesh%nl
         tracers%data(n)%i_vert_diff   = i_vert_diff
         tracers%data(n)%ltra_diag   = ltra_diag
     end do
-    allocate(tracers%work%del_ttf(nl-1,node_size))
-    allocate(tracers%work%del_ttf_advhoriz(nl-1,node_size),tracers%work%del_ttf_advvert(nl-1,node_size))
+    allocate(tracers%work%del_ttf(mesh%nl-1,node_size))
+    allocate(tracers%work%del_ttf_advhoriz(mesh%nl-1,node_size),tracers%work%del_ttf_advvert(mesh%nl-1,node_size))
     tracers%work%del_ttf          = 0.0_WP
     tracers%work%del_ttf_advhoriz = 0.0_WP
     tracers%work%del_ttf_advvert  = 0.0_WP
     if (ldiag_DVD) then
-        allocate(tracers%work%dvd_trflx_hor(nl-1, partit%myDim_edge2D, 2))
-        allocate(tracers%work%dvd_trflx_ver(nl  , partit%myDim_nod2D , 2))
+        allocate(tracers%work%dvd_trflx_hor(mesh%nl-1, partit%myDim_edge2D, 2))
+        allocate(tracers%work%dvd_trflx_ver(mesh%nl  , partit%myDim_nod2D , 2))
         tracers%work%dvd_trflx_hor = 0.0_WP
         tracers%work%dvd_trflx_ver = 0.0_WP
     end if
     if (ltra_diag) then
-        allocate(tracers%work%tra_advhoriz(nl-1,node_size,num_tracers),tracers%work%tra_advvert(nl-1,node_size,num_tracers))
+        allocate(tracers%work%tra_advhoriz(mesh%nl-1,node_size,num_tracers),tracers%work%tra_advvert(mesh%nl-1,node_size,num_tracers))
         tracers%work%tra_advhoriz = 0.0_WP
         tracers%work%tra_advvert  = 0.0_WP
-        allocate(tracers%work%tra_diff_part_hor_redi(nl-1,node_size,num_tracers),tracers%work%tra_diff_part_ver_expl(nl-1,node_size,num_tracers))
-        allocate(tracers%work%tra_diff_part_ver_redi_expl(nl-1,node_size,num_tracers),tracers%work%tra_diff_part_ver_impl(nl-1,node_size,num_tracers))
-        allocate(tracers%work%tra_recom_sms(nl-1,node_size,num_tracers))
+        allocate(tracers%work%tra_diff_part_hor_redi(mesh%nl-1,node_size,num_tracers),tracers%work%tra_diff_part_ver_expl(mesh%nl-1,node_size,num_tracers))
+        allocate(tracers%work%tra_diff_part_ver_redi_expl(mesh%nl-1,node_size,num_tracers),tracers%work%tra_diff_part_ver_impl(mesh%nl-1,node_size,num_tracers))
+        allocate(tracers%work%tra_recom_sms(mesh%nl-1,node_size,num_tracers))
         tracers%work%tra_diff_part_hor_redi = 0.0_WP
         tracers%work%tra_diff_part_ver_expl = 0.0_WP
         tracers%work%tra_diff_part_ver_redi_expl = 0.0_WP
@@ -563,9 +561,7 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
 
     !___________________________________________________________________________
     ! pointer on necessary derived types
-#include "associate_mesh_def.h"
 ! #include "associate_mesh_ass.h"   
-nl => mesh%nl
     
     !___________________________________________________________________________
     ! open and read namelist for I/O
@@ -686,34 +682,34 @@ nl => mesh%nl
     
     !___________________________________________________________________________
     ! allocate/initialise horizontal velocity arrays in derived type
-    allocate(dynamics%uv(        2, nl-1, elem_size))
-    allocate(dynamics%uv_rhs(    2, nl-1, elem_size))
-    allocate(dynamics%uv_rhsAB(  dynamics%AB_order-1, 2, nl-1, elem_size))
-    allocate(dynamics%uvnode(    2, nl-1, node_size))
+    allocate(dynamics%uv(        2, mesh%nl-1, elem_size))
+    allocate(dynamics%uv_rhs(    2, mesh%nl-1, elem_size))
+    allocate(dynamics%uv_rhsAB(  dynamics%AB_order-1, 2, mesh%nl-1, elem_size))
+    allocate(dynamics%uvnode(    2, mesh%nl-1, node_size))
     dynamics%uv              = 0.0_WP
     dynamics%uv_rhs          = 0.0_WP
     dynamics%uv_rhsAB        = 0.0_WP
     dynamics%uvnode          = 0.0_WP
     if (Fer_GM .or. use_mle) then
-        allocate(dynamics%fer_uv(2, nl-1, elem_size))
+        allocate(dynamics%fer_uv(2, mesh%nl-1, elem_size))
         dynamics%fer_uv      = 0.0_WP
     end if 
     
     !___________________________________________________________________________
     ! allocate/initialise vertical velocity arrays in derived type
-    allocate(dynamics%w(              nl, node_size))
+    allocate(dynamics%w(              mesh%nl, node_size))
     if (dynamics%ldiag_ke) then
-       allocate(dynamics%w_old(       nl, node_size))
+       allocate(dynamics%w_old(       mesh%nl, node_size))
     end if
-    allocate(dynamics%w_e(            nl, node_size))
-    allocate(dynamics%w_i(            nl, node_size))
-    allocate(dynamics%cfl_z(          nl, node_size))
+    allocate(dynamics%w_e(            mesh%nl, node_size))
+    allocate(dynamics%w_i(            mesh%nl, node_size))
+    allocate(dynamics%cfl_z(          mesh%nl, node_size))
     dynamics%w               = 0.0_WP
     dynamics%w_e             = 0.0_WP
     dynamics%w_i             = 0.0_WP
     dynamics%cfl_z           = 0.0_WP
     if (Fer_GM .or. use_mle) then
-        allocate(dynamics%fer_w(      nl, node_size))
+        allocate(dynamics%fer_w(      mesh%nl, node_size))
         dynamics%fer_w       = 0.0_WP
     end if 
     
@@ -722,7 +718,7 @@ nl => mesh%nl
     allocate(dynamics%eta_n(      node_size))
     dynamics%eta_n           = 0.0_WP
     if (dynamics%use_ssh_se_subcycl) then
-        allocate(dynamics%se_uvh(       2, nl-1, elem_size))
+        allocate(dynamics%se_uvh(       2, mesh%nl-1, elem_size))
         allocate(dynamics%se_uvBT_rhs(  2,       elem_size))
         allocate(dynamics%se_uvBT_4AB(  4,       elem_size))
         allocate(dynamics%se_uvBT(      2,       elem_size))
@@ -755,50 +751,50 @@ nl => mesh%nl
     
     !___________________________________________________________________________
     ! inititalise working arrays
-    allocate(dynamics%work%uvnode_rhs(2, nl-1, node_size))
-    allocate(dynamics%work%u_c(nl-1, elem_size))
-    allocate(dynamics%work%v_c(nl-1, elem_size))
+    allocate(dynamics%work%uvnode_rhs(2, mesh%nl-1, node_size))
+    allocate(dynamics%work%u_c(mesh%nl-1, elem_size))
+    allocate(dynamics%work%v_c(mesh%nl-1, elem_size))
     dynamics%work%uvnode_rhs = 0.0_WP
     dynamics%work%u_c = 0.0_WP
     dynamics%work%v_c = 0.0_WP
     if (dynamics%opt_visc==5) then
-        allocate(dynamics%work%u_b(nl-1, elem_size))
-        allocate(dynamics%work%v_b(nl-1, elem_size))
+        allocate(dynamics%work%u_b(mesh%nl-1, elem_size))
+        allocate(dynamics%work%v_b(mesh%nl-1, elem_size))
         dynamics%work%u_b = 0.0_WP
         dynamics%work%v_b = 0.0_WP
     end if 
    
     if (dynamics%ldiag_ke) then
-       allocate(dynamics%ke_adv    (2, nl-1, elem_size))
-       allocate(dynamics%ke_cor    (2, nl-1, elem_size))
-       allocate(dynamics%ke_pre    (2, nl-1, elem_size))
-       allocate(dynamics%ke_hvis   (2, nl-1, elem_size))
-       allocate(dynamics%ke_vvis   (2, nl-1, elem_size))
-       allocate(dynamics%ke_umean  (2, nl-1, elem_size))
-       allocate(dynamics%ke_u2mean (2, nl-1, elem_size))
-       allocate(dynamics%ke_du2    (2, nl-1, elem_size))
-       allocate(dynamics%ke_adv_AB (dynamics%AB_order-1, 2, nl-1, elem_size))
-       allocate(dynamics%ke_cor_AB (dynamics%AB_order-1, 2, nl-1, elem_size))
-       allocate(dynamics%ke_rhs_bak(2, nl-1, elem_size))
-       allocate(dynamics%ke_wrho   (nl-1, node_size))
-       allocate(dynamics%ke_dW     (nl-1, node_size))
-       allocate(dynamics%ke_Pfull  (nl-1, node_size))
+       allocate(dynamics%ke_adv    (2, mesh%nl-1, elem_size))
+       allocate(dynamics%ke_cor    (2, mesh%nl-1, elem_size))
+       allocate(dynamics%ke_pre    (2, mesh%nl-1, elem_size))
+       allocate(dynamics%ke_hvis   (2, mesh%nl-1, elem_size))
+       allocate(dynamics%ke_vvis   (2, mesh%nl-1, elem_size))
+       allocate(dynamics%ke_umean  (2, mesh%nl-1, elem_size))
+       allocate(dynamics%ke_u2mean (2, mesh%nl-1, elem_size))
+       allocate(dynamics%ke_du2    (2, mesh%nl-1, elem_size))
+       allocate(dynamics%ke_adv_AB (dynamics%AB_order-1, 2, mesh%nl-1, elem_size))
+       allocate(dynamics%ke_cor_AB (dynamics%AB_order-1, 2, mesh%nl-1, elem_size))
+       allocate(dynamics%ke_rhs_bak(2, mesh%nl-1, elem_size))
+       allocate(dynamics%ke_wrho   (mesh%nl-1, node_size))
+       allocate(dynamics%ke_dW     (mesh%nl-1, node_size))
+       allocate(dynamics%ke_Pfull  (mesh%nl-1, node_size))
        allocate(dynamics%ke_wind   (2, elem_size))
        allocate(dynamics%ke_drag   (2, elem_size))
 
-       allocate(dynamics%ke_pre_xVEL (2, nl-1, elem_size))
-       allocate(dynamics%ke_adv_xVEL (2, nl-1, elem_size))
-       allocate(dynamics%ke_cor_xVEL (2, nl-1, elem_size))
-       allocate(dynamics%ke_hvis_xVEL(2, nl-1, elem_size))
-       allocate(dynamics%ke_vvis_xVEL(2, nl-1, elem_size))
+       allocate(dynamics%ke_pre_xVEL (2, mesh%nl-1, elem_size))
+       allocate(dynamics%ke_adv_xVEL (2, mesh%nl-1, elem_size))
+       allocate(dynamics%ke_cor_xVEL (2, mesh%nl-1, elem_size))
+       allocate(dynamics%ke_hvis_xVEL(2, mesh%nl-1, elem_size))
+       allocate(dynamics%ke_vvis_xVEL(2, mesh%nl-1, elem_size))
        allocate(dynamics%ke_wind_xVEL(2, elem_size))
        allocate(dynamics%ke_drag_xVEL(2, elem_size))
        allocate(dynamics%ke_J(node_size),  dynamics%ke_D(node_size),   dynamics%ke_G(node_size),  &
                 dynamics%ke_D2(node_size), dynamics%ke_JD(node_size), &
                 dynamics%ke_GD(node_size), dynamics%ke_swA(node_size), dynamics%ke_swB(node_size))
-       allocate(dynamics%ke_n0(nl-1, node_size))
-       allocate(dynamics%ke_Dx(nl-1, elem_size), dynamics%ke_Dy(nl-1, elem_size), dynamics%ke_DU(nl-1, elem_size),& 
-         dynamics%ke_DV(nl-1, elem_size), dynamics%ke_elemD(nl-1, elem_size), dynamics%ke_elemD2(nl-1, elem_size))
+       allocate(dynamics%ke_n0(mesh%nl-1, node_size))
+       allocate(dynamics%ke_Dx(mesh%nl-1, elem_size), dynamics%ke_Dy(mesh%nl-1, elem_size), dynamics%ke_DU(mesh%nl-1, elem_size),& 
+         dynamics%ke_DV(mesh%nl-1, elem_size), dynamics%ke_elemD(mesh%nl-1, elem_size), dynamics%ke_elemD2(mesh%nl-1, elem_size))
        dynamics%ke_adv      =0.0_WP
        dynamics%ke_cor      =0.0_WP
        dynamics%ke_pre      =0.0_WP
@@ -855,9 +851,7 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     integer                               :: n, nt
     !___________________________________________________________________________
     ! define dynamics namelist parameter
-#include "associate_mesh_def.h"
 ! #include "associate_mesh_ass.h"
-nl              => mesh%nl
 
     !___________________________________________________________________________
     elem_size=partit%myDim_elem2D+partit%eDim_elem2D
@@ -877,26 +871,26 @@ nl              => mesh%nl
     ! ================
     ! Monin-Obukhov
     ! ================
-    if (use_momix) allocate(mo(nl,node_size),mixlength(node_size))
+    if (use_momix) allocate(mo(mesh%nl,node_size),mixlength(node_size))
     if (use_momix) mixlength=0.
     ! ================
     ! Vertical velocity and pressure
     ! ================
-    allocate( hpressure(nl,node_size))
-    allocate(bvfreq(nl,node_size),mixlay_dep(node_size),bv_ref(node_size))
+    allocate( hpressure(mesh%nl,node_size))
+    allocate(bvfreq(mesh%nl,node_size),mixlay_dep(node_size),bv_ref(node_size))
     ! MLE streamfunction diagnostic, so the MLE bolus can be told apart from the GM one
     if (use_mle) then
-        allocate(mle_psi(nl, node_size), mle_hbar(node_size))
+        allocate(mle_psi(mesh%nl, node_size), mle_hbar(node_size))
         mle_psi  = 0.0_WP
         mle_hbar = 0.0_WP
     end if
     ! ================
     ! Ocean forcing arrays
     ! ================
-    allocate(Tclim(nl-1,node_size), Sclim(nl-1, node_size))
+    allocate(Tclim(mesh%nl-1,node_size), Sclim(mesh%nl-1, node_size))
     !---
     ! LA: add iceberg tracers 2023-02-08
-    allocate(Tclim_ib(nl-1,node_size), Sclim_ib(nl-1, node_size))
+    allocate(Tclim_ib(mesh%nl-1,node_size), Sclim_ib(mesh%nl-1, node_size))
     !---
     allocate(stress_surf(2,partit%myDim_elem2D))    !!! Attention, it is shorter !!! 
     allocate(stress_node_surf(2,node_size))
@@ -905,7 +899,7 @@ nl              => mesh%nl
     allocate(heat_flux(node_size), Tsurf(node_size))
     allocate(water_flux(node_size), Ssurf(node_size))
     allocate(hosing_flux(node_size), hosing_heat_flux(node_size))
-    allocate(hosing_flux3D(nl-1,node_size), hosing_heat_flux3D(nl-1,node_size))
+    allocate(hosing_flux3D(mesh%nl-1,node_size), hosing_heat_flux3D(mesh%nl-1,node_size))
     allocate(fw_ice(node_size), fw_snw(node_size))
     allocate(relax_salt(node_size))
     allocate(virtual_salt(node_size))
@@ -923,9 +917,9 @@ nl              => mesh%nl
     ! REcoM forcing arrays
     ! ================
 #if defined(__recom)
-    allocate(dtr_bf    ( nl-1, node_size ))
-    allocate(str_bf    ( nl-1, node_size ))
-    allocate(vert_sink ( nl-1, node_size ))
+    allocate(dtr_bf    ( mesh%nl-1, node_size ))
+    allocate(str_bf    ( mesh%nl-1, node_size ))
+    allocate(vert_sink ( mesh%nl-1, node_size ))
     allocate(Alk_surf  (       node_size ))
 #if defined(__usetp)
     allocate(tr_arr_requests(num_tracers), tr_arr_old_requests(num_tracers))
@@ -937,24 +931,24 @@ nl              => mesh%nl
     ! Visc and Diff coefs
     ! =================
 
-    allocate(Av(nl,elem_size), Kv(nl,node_size))
+    allocate(Av(mesh%nl,elem_size), Kv(mesh%nl,node_size))
 
     Av=0.0_WP
     Kv=0.0_WP
     if (mix_scheme_nmb==1 .or. mix_scheme_nmb==18) then
-    allocate(Kv_double(nl,node_size, num_tracers))
+    allocate(Kv_double(mesh%nl,node_size, num_tracers))
     Kv_double=0.0_WP
     !!PS call oce_mixing_kpp_init ! Setup constants, allocate arrays and construct look up table
     end if
 
     ! tracer gradients & RHS  
-    allocate(tr_xy(2,nl-1,partit%myDim_elem2D+partit%eDim_elem2D+partit%eXDim_elem2D))
-    allocate(tr_z(nl,partit%myDim_nod2D+partit%eDim_nod2D))
+    allocate(tr_xy(2,mesh%nl-1,partit%myDim_elem2D+partit%eDim_elem2D+partit%eXDim_elem2D))
+    allocate(tr_z(mesh%nl,partit%myDim_nod2D+partit%eDim_nod2D))
 
     ! neutral slope etc. to be used in Redi formulation
-    allocate(neutral_slope(3, nl-1, node_size))
-    allocate(slope_tapered(3, nl-1, node_size))
-    allocate(Ki(nl-1, node_size))
+    allocate(neutral_slope(3, mesh%nl-1, node_size))
+    allocate(slope_tapered(3, mesh%nl-1, node_size))
+    allocate(Ki(mesh%nl-1, node_size))
 
     do n=1, node_size
         !  Ki(n)=K_hor*area(1,n)/scale_area
@@ -972,11 +966,11 @@ nl              => mesh%nl
     ssh_gp=0.
     end if
     ! xy gradient of a neutral surface
-    allocate(sigma_xy(2, nl-1, node_size))
+    allocate(sigma_xy(2, mesh%nl-1, node_size))
     sigma_xy=0.0_WP
 
     ! alpha and beta in the EoS
-    allocate(sw_beta(nl-1, node_size), sw_alpha(nl-1, node_size))
+    allocate(sw_beta(mesh%nl-1, node_size), sw_alpha(mesh%nl-1, node_size))
     allocate(dens_flux(node_size))
     sw_beta  =0.0_WP
     sw_alpha =0.0_WP
@@ -985,7 +979,7 @@ nl              => mesh%nl
     ! MLE writes into fer_gamma and rides the GM plumbing, so these are needed
     ! whenever either scheme is on.
     if (Fer_GM .or. use_mle) then
-    allocate(fer_c(node_size),fer_scal(node_size), fer_gamma(2, nl, node_size), fer_K(nl, node_size), fer_tapfac(nl, node_size))
+    allocate(fer_c(node_size),fer_scal(node_size), fer_gamma(2, mesh%nl, node_size), fer_K(mesh%nl, node_size), fer_tapfac(mesh%nl, node_size))
     fer_gamma = 0.0_WP
     fer_K     = 500._WP
     fer_c     = 1._WP
@@ -1059,15 +1053,15 @@ nl              => mesh%nl
 #endif
     
     ! init field for pressure force 
-    allocate(density_ref(nl-1,node_size))
+    allocate(density_ref(mesh%nl-1,node_size))
     density_ref = density_0
-    allocate(density_m_rho0(nl-1, node_size))
-    allocate(density_sigma0(nl-1, node_size))
-    allocate(density_m_rho0_slev(nl-1, node_size)) !!PS
+    allocate(density_m_rho0(mesh%nl-1, node_size))
+    allocate(density_sigma0(mesh%nl-1, node_size))
+    allocate(density_m_rho0_slev(mesh%nl-1, node_size)) !!PS
     if (ldiag_dMOC) then
-       allocate(density_dMOC       (nl-1, node_size))
+       allocate(density_dMOC       (mesh%nl-1, node_size))
     end if
-    allocate(pgf_x(nl-1, elem_size),pgf_y(nl-1, elem_size)) 
+    allocate(pgf_x(mesh%nl-1, elem_size),pgf_y(mesh%nl-1, elem_size)) 
     density_m_rho0=0.0_WP
     density_sigma0=0.0_WP
     density_m_rho0_slev=0.0_WP !!PS
