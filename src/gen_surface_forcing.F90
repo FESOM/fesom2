@@ -1015,6 +1015,8 @@ CONTAINS
         if (.not. sbcdata2_from_cache) call sbc_box_distribute(fld_idx, t_indx_p1, sbcdata2, partit)
       else
       !read data from file
+      ! profiler sections are entered on every rank (the report reduces them by slot)
+      if (.not. sbcdata1_from_cache) call fesom_profiler_start("sbc_ioread")
       if (mype==rootrank) then
          nf_start(1)=1
          nf_edges(1)=nc_Nlon-2
@@ -1027,6 +1029,7 @@ CONTAINS
          end if
          iost = 0
       end if
+      if (.not. sbcdata1_from_cache) call fesom_profiler_end("sbc_ioread")
 
       if(mype == rootrank) then
         if(.not. sbcdata1_from_cache) then
@@ -1036,10 +1039,13 @@ CONTAINS
       end if
       if(sbcdata1_from_cache) then ! use the cache instead of bcast
       else
+        call fesom_profiler_start("sbc_bcast")
         call MPI_BCast(sbcdata1(1:nc_Nlon,1:nc_Nlat), nc_Nlon*nc_Nlat, MPI_REAL, rootrank, MPI_COMM_FESOM, ierror)
+        call fesom_profiler_end("sbc_bcast")
      end if
 
        ! read next time step in file (check for +1 done before)
+      if (.not. sbcdata2_from_cache) call fesom_profiler_start("sbc_ioread")
       if (mype==rootrank) then
         nf_start(3)=t_indx_p1
         nf_edges(3)=1
@@ -1048,6 +1054,7 @@ CONTAINS
       end if
       iost = 0
       end if
+      if (.not. sbcdata2_from_cache) call fesom_profiler_end("sbc_ioread")
 
       if (mype==rootrank) then
         if(.not. sbcdata2_from_cache) then
@@ -1058,7 +1065,9 @@ CONTAINS
      if(sbcdata2_from_cache) then ! use the cache instead of bcast
       !
      else
+       call fesom_profiler_start("sbc_bcast")
        call MPI_BCast(sbcdata2(1:nc_Nlon,1:nc_Nlat), nc_Nlon*nc_Nlat, MPI_REAL, rootrank, MPI_COMM_FESOM, ierror)
+       call fesom_profiler_end("sbc_bcast")
      end if
 
 !      !flip data in case of lat from -90 to 90
@@ -1070,8 +1079,10 @@ CONTAINS
 
       ! Ocean-only forcing: fill land cells with extrapolated ocean values
       if (use_ocean_only_forcing) then
+         call fesom_profiler_start("sbc_fill_land")
          call fill_land_from_ocean(sbcdata1, forcing_ocean_mask, nc_Nlon, nc_Nlat)
          call fill_land_from_ocean(sbcdata2, forcing_ocean_mask, nc_Nlon, nc_Nlat)
+         call fesom_profiler_end("sbc_fill_land")
       end if
       end if
 
