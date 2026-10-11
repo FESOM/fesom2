@@ -33,24 +33,22 @@ IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 integer,        intent(in)         :: sn, rn, r_mpitype(:), s_mpitype(:), rPE(:), sPE(:)
 integer                            :: n, sdebug, rdebug, status(MPI_STATUS_SIZE), request
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 DO n=1,rn
-   CALL MPI_TYPE_SIZE(r_mpitype(n), rdebug, MPIerr)
-   CALL MPI_ISEND(rdebug, 1, MPI_INTEGER, rPE(n), 10, MPI_COMM_FESOM, request, MPIerr)
+   CALL MPI_TYPE_SIZE(r_mpitype(n), rdebug, partit%MPIerr)
+   CALL MPI_ISEND(rdebug, 1, MPI_INTEGER, rPE(n), 10, partit%MPI_COMM_FESOM, request, partit%MPIerr)
 END DO
 DO n=1, sn
-   call MPI_RECV(sdebug, 1, MPI_INTEGER, sPE(n), 10, MPI_COMM_FESOM,    &
-        status, MPIerr)
-   call MPI_TYPE_SIZE(s_mpitype(n), rdebug, MPIerr)
+   call MPI_RECV(sdebug, 1, MPI_INTEGER, sPE(n), 10, partit%MPI_COMM_FESOM,    &
+        status, partit%MPIerr)
+   call MPI_TYPE_SIZE(s_mpitype(n), rdebug, partit%MPIerr)
    if (sdebug /= rdebug) then
       print *, "Mismatching MPI send/recieve message lengths."
-      print *,"Send/receive process numbers: ", mype, '/', sPE(n)
+      print *,"Send/receive process numbers: ", partit%mype, '/', sPE(n)
       print *,"Number of send/receive bytes: ", sdebug, '/', rdebug
-      call MPI_ABORT( MPI_COMM_FESOM, 1 )
+      call MPI_ABORT( partit%MPI_COMM_FESOM, 1 )
       end if
 END DO
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,partit%MPIerr)
 END SUBROUTINE check_mpi_comm
 #endif
 
@@ -63,9 +61,7 @@ IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 integer,        intent(inout)         :: nod_array2D(:)
 logical,        intent(in),optional   :: luse_g2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
-if (npes > 1) then
+if (partit%npes > 1) then
     call exchange_nod2D_i_begin(nod_array2D, partit, luse_g2g)
     call exchange_nod_end(partit)
 endif
@@ -83,8 +79,6 @@ integer,        intent(inout)         :: nod_array2D(:)
 integer                               :: n, sn, rn
 logical,        intent(in),optional   :: luse_g2g
 logical                               :: lg2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
 if(present(luse_g2g)) then
    lg2g = luse_g2g
@@ -92,15 +86,15 @@ else
    lg2g = .false.
 end if
 
-  if (npes > 1) then
+  if (partit%npes > 1) then
 
-     sn=com_nod2D%sPEnum
-     rn=com_nod2D%rPEnum
+     sn=partit%com_nod2D%sPEnum
+     rn=partit%com_nod2D%rPEnum
 
      ! Check MPI point-to-point communication for consistency
 #ifdef DEBUG
-     call check_mpi_comm(rn, sn, r_mpitype_nod2D_i, s_mpitype_nod2D_i,         &
-          com_nod2D%rPE, com_nod2D%sPE)
+     call check_mpi_comm(rn, sn, partit%r_mpitype_nod2D_i, partit%s_mpitype_nod2D_i,         &
+          partit%com_nod2D%rPE, partit%com_nod2D%sPE)
 #endif
      if (lg2g) then
 
@@ -108,32 +102,32 @@ end if
      !$ACC HOST_DATA USE_DEVICE(nod_array2D)
          DO n=1,rn
 
-            call MPI_IRECV(nod_array2D, 1, r_mpitype_nod2D_i(n), com_nod2D%rPE(n), &
-                 com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr)
+            call MPI_IRECV(nod_array2D, 1, partit%r_mpitype_nod2D_i(n), partit%com_nod2D%rPE(n), &
+                 partit%com_nod2D%rPE(n), partit%MPI_COMM_FESOM, partit%com_nod2D%req(n), partit%MPIerr)
          END DO
 
          DO n=1, sn
 
-            call MPI_ISEND(nod_array2D, 1, s_mpitype_nod2D_i(n), com_nod2D%sPE(n), &
-                 mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
+            call MPI_ISEND(nod_array2D, 1, partit%s_mpitype_nod2D_i(n), partit%com_nod2D%sPE(n), &
+                 partit%mype, partit%MPI_COMM_FESOM, partit%com_nod2D%req(rn+n), partit%MPIerr)
          END DO
          !$ACC END HOST_DATA
      else
 
          DO n=1,rn
     
-            call MPI_IRECV(nod_array2D, 1, r_mpitype_nod2D_i(n), com_nod2D%rPE(n), &
-                 com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr)
+            call MPI_IRECV(nod_array2D, 1, partit%r_mpitype_nod2D_i(n), partit%com_nod2D%rPE(n), &
+                 partit%com_nod2D%rPE(n), partit%MPI_COMM_FESOM, partit%com_nod2D%req(n), partit%MPIerr)
          END DO
     
          DO n=1, sn
     
-            call MPI_ISEND(nod_array2D, 1, s_mpitype_nod2D_i(n), com_nod2D%sPE(n), &
-                 mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
+            call MPI_ISEND(nod_array2D, 1, partit%s_mpitype_nod2D_i(n), partit%com_nod2D%sPE(n), &
+                 partit%mype, partit%MPI_COMM_FESOM, partit%com_nod2D%req(rn+n), partit%MPIerr)
          END DO
 
      endif
-     com_nod2D%nreq = rn+sn
+     partit%com_nod2D%nreq = rn+sn
 
   endif
 END SUBROUTINE exchange_nod2D_i_begin
@@ -148,10 +142,8 @@ IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(kind=WP),   intent(inout)         :: nod_array2D(:)
 logical,        intent(in),optional   :: luse_g2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
- if (npes > 1) then
+ if (partit%npes > 1) then
     call exchange_nod2D_begin(nod_array2D, partit, luse_g2g)
     call exchange_nod_end(partit)
  end if
@@ -170,8 +162,6 @@ real(kind=WP),   intent(inout)         :: nod_array2D(:)
 integer                               :: n, sn, rn
 logical,        intent(in),optional   :: luse_g2g
 logical                               :: lg2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
 if(present(luse_g2g)) then
    lg2g = luse_g2g
@@ -179,42 +169,42 @@ else
    lg2g = .false.
 end if
 
-  if (npes > 1) then
+  if (partit%npes > 1) then
 
-     sn=com_nod2D%sPEnum
-     rn=com_nod2D%rPEnum
+     sn=partit%com_nod2D%sPEnum
+     rn=partit%com_nod2D%rPEnum
 
      ! Check MPI point-to-point communication for consistency
 #ifdef DEBUG
-     call check_mpi_comm(rn, sn, r_mpitype_nod2D, s_mpitype_nod2D,           &
-          com_nod2D%rPE, com_nod2D%sPE)
+     call check_mpi_comm(rn, sn, partit%r_mpitype_nod2D, partit%s_mpitype_nod2D,           &
+          partit%com_nod2D%rPE, partit%com_nod2D%sPE)
 #endif
 
      if(lg2g) then
          !$ACC HOST_DATA USE_DEVICE(nod_array2D)
 
          DO n=1,rn
-            call MPI_IRECV(nod_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
-                 com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr)
+            call MPI_IRECV(nod_array2D, 1, partit%r_mpitype_nod2D(n), partit%com_nod2D%rPE(n), &
+                 partit%com_nod2D%rPE(n), partit%MPI_COMM_FESOM, partit%com_nod2D%req(n), partit%MPIerr)
          END DO
          DO n=1, sn
-            call MPI_ISEND(nod_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
-                 mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
+            call MPI_ISEND(nod_array2D, 1, partit%s_mpitype_nod2D(n), partit%com_nod2D%sPE(n), &
+                 partit%mype, partit%MPI_COMM_FESOM, partit%com_nod2D%req(rn+n), partit%MPIerr)
          END DO
 
         !$ACC END HOST_DATA
 
      else 
          DO n=1,rn
-            call MPI_IRECV(nod_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
-                 com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr)
+            call MPI_IRECV(nod_array2D, 1, partit%r_mpitype_nod2D(n), partit%com_nod2D%rPE(n), &
+                 partit%com_nod2D%rPE(n), partit%MPI_COMM_FESOM, partit%com_nod2D%req(n), partit%MPIerr)
          END DO
          DO n=1, sn
-            call MPI_ISEND(nod_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
-                 mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
+            call MPI_ISEND(nod_array2D, 1, partit%s_mpitype_nod2D(n), partit%com_nod2D%sPE(n), &
+                 partit%mype, partit%MPI_COMM_FESOM, partit%com_nod2D%req(rn+n), partit%MPIerr)
          END DO
      endif
-     com_nod2D%nreq = rn+sn
+     partit%com_nod2D%nreq = rn+sn
 
   end if
 
@@ -230,10 +220,8 @@ type(t_partit), intent(inout), target :: partit
 real(kind=WP),   intent(inout)         :: nod1_array2D(:)
 real(kind=WP),   intent(inout)         :: nod2_array2D(:)
 logical,        intent(in),optional   :: luse_g2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
- if (npes > 1) then
+ if (partit%npes > 1) then
     call exchange_nod2D_2fields_begin(nod1_array2D, nod2_array2D, partit, luse_g2g)
     call exchange_nod_end(partit)
  end if
@@ -253,8 +241,6 @@ real(kind=WP),   intent(inout)         :: nod2_array2D(:)
 integer                               :: n, sn, rn
 logical,        intent(in),optional   :: luse_g2g
 logical                               :: lg2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
 if(present(luse_g2g)) then
    lg2g = luse_g2g
@@ -262,52 +248,52 @@ else
    lg2g = .false.
 end if
 
-if (npes > 1) then
+if (partit%npes > 1) then
 
-  sn=com_nod2D%sPEnum
-  rn=com_nod2D%rPEnum
+  sn=partit%com_nod2D%sPEnum
+  rn=partit%com_nod2D%rPEnum
 
      ! Check MPI point-to-point communication for consistency
 #ifdef DEBUG
-     call check_mpi_comm(rn, sn, r_mpitype_nod2D, s_mpitype_nod2D,           &
-          com_nod2D%rPE, com_nod2D%sPE)
+     call check_mpi_comm(rn, sn, partit%r_mpitype_nod2D, partit%s_mpitype_nod2D,           &
+          partit%com_nod2D%rPE, partit%com_nod2D%sPE)
 #endif
   if (lg2g) then 
     !$ACC HOST_DATA USE_DEVICE(nod1_array2D, nod2_array2D) 
   
     DO n=1,rn
-       call MPI_IRECV(nod1_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
-                 com_nod2D%rPE(n),      MPI_COMM_FESOM, com_nod2D%req(2*n-1), MPIerr)
+       call MPI_IRECV(nod1_array2D, 1, partit%r_mpitype_nod2D(n), partit%com_nod2D%rPE(n), &
+                 partit%com_nod2D%rPE(n),      partit%MPI_COMM_FESOM, partit%com_nod2D%req(2*n-1), partit%MPIerr)
   
-       call MPI_IRECV(nod2_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
-                 com_nod2D%rPE(n)+npes, MPI_COMM_FESOM, com_nod2D%req(2*n),   MPIerr)
+       call MPI_IRECV(nod2_array2D, 1, partit%r_mpitype_nod2D(n), partit%com_nod2D%rPE(n), &
+                 partit%com_nod2D%rPE(n)+partit%npes, partit%MPI_COMM_FESOM, partit%com_nod2D%req(2*n),   partit%MPIerr)
     END DO
     DO n=1, sn
-       call MPI_ISEND(nod1_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
-                      mype,      MPI_COMM_FESOM, com_nod2D%req(2*rn+2*n-1), MPIerr)
+       call MPI_ISEND(nod1_array2D, 1, partit%s_mpitype_nod2D(n), partit%com_nod2D%sPE(n), &
+                      partit%mype,      partit%MPI_COMM_FESOM, partit%com_nod2D%req(2*rn+2*n-1), partit%MPIerr)
   
-       call MPI_ISEND(nod2_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
-                      mype+npes, MPI_COMM_FESOM, com_nod2D%req(2*rn+2*n),   MPIerr)
+       call MPI_ISEND(nod2_array2D, 1, partit%s_mpitype_nod2D(n), partit%com_nod2D%sPE(n), &
+                      partit%mype+partit%npes, partit%MPI_COMM_FESOM, partit%com_nod2D%req(2*rn+2*n),   partit%MPIerr)
     END DO
   
     !$ACC END HOST_DATA
   else  
     DO n=1,rn
-       call MPI_IRECV(nod1_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
-                 com_nod2D%rPE(n),      MPI_COMM_FESOM, com_nod2D%req(2*n-1), MPIerr)
+       call MPI_IRECV(nod1_array2D, 1, partit%r_mpitype_nod2D(n), partit%com_nod2D%rPE(n), &
+                 partit%com_nod2D%rPE(n),      partit%MPI_COMM_FESOM, partit%com_nod2D%req(2*n-1), partit%MPIerr)
   
-       call MPI_IRECV(nod2_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
-                 com_nod2D%rPE(n)+npes, MPI_COMM_FESOM, com_nod2D%req(2*n),   MPIerr)
+       call MPI_IRECV(nod2_array2D, 1, partit%r_mpitype_nod2D(n), partit%com_nod2D%rPE(n), &
+                 partit%com_nod2D%rPE(n)+partit%npes, partit%MPI_COMM_FESOM, partit%com_nod2D%req(2*n),   partit%MPIerr)
     END DO
     DO n=1, sn
-       call MPI_ISEND(nod1_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
-                      mype,      MPI_COMM_FESOM, com_nod2D%req(2*rn+2*n-1), MPIerr)
+       call MPI_ISEND(nod1_array2D, 1, partit%s_mpitype_nod2D(n), partit%com_nod2D%sPE(n), &
+                      partit%mype,      partit%MPI_COMM_FESOM, partit%com_nod2D%req(2*rn+2*n-1), partit%MPIerr)
   
-       call MPI_ISEND(nod2_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
-                      mype+npes, MPI_COMM_FESOM, com_nod2D%req(2*rn+2*n),   MPIerr)
+       call MPI_ISEND(nod2_array2D, 1, partit%s_mpitype_nod2D(n), partit%com_nod2D%sPE(n), &
+                      partit%mype+partit%npes, partit%MPI_COMM_FESOM, partit%com_nod2D%req(2*rn+2*n),   partit%MPIerr)
     END DO
   endif
-  com_nod2D%nreq = 2*(rn+sn)
+  partit%com_nod2D%nreq = 2*(rn+sn)
 
 
 end if
@@ -326,11 +312,9 @@ real(kind=WP),   intent(inout)         :: nod1_array2D(:)
 real(kind=WP),   intent(inout)         :: nod2_array2D(:)
 real(kind=WP),   intent(inout)         :: nod3_array2D(:)
 logical,        intent(in),optional   :: luse_g2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
 
- if (npes > 1) then
+ if (partit%npes > 1) then
     call exchange_nod2D_3fields_begin(nod1_array2D, nod2_array2D, nod3_array2D, partit, luse_g2g)
     call exchange_nod_end(partit)
  end if
@@ -351,8 +335,6 @@ real(kind=WP),   intent(inout)         :: nod3_array2D(:)
 integer                               :: n, sn, rn
 logical,        intent(in),optional   :: luse_g2g
 logical                               :: lg2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
 if(present(luse_g2g)) then
    lg2g = luse_g2g
@@ -360,15 +342,15 @@ else
    lg2g = .false.
 end if
 
- if (npes > 1) then
+ if (partit%npes > 1) then
 
-  sn=com_nod2D%sPEnum
-  rn=com_nod2D%rPEnum
+  sn=partit%com_nod2D%sPEnum
+  rn=partit%com_nod2D%rPEnum
 
      ! Check MPI point-to-point communication for consistency
 #ifdef DEBUG
-     call check_mpi_comm(rn, sn, r_mpitype_nod2D, s_mpitype_nod2D,           &
-          com_nod2D%rPE, com_nod2D%sPE)
+     call check_mpi_comm(rn, sn, partit%r_mpitype_nod2D, partit%s_mpitype_nod2D,           &
+          partit%com_nod2D%rPE, partit%com_nod2D%sPE)
 #endif
 
   if (lg2g) then
@@ -376,51 +358,51 @@ end if
    !$ACC HOST_DATA USE_DEVICE(nod1_array2D, nod2_array2D, nod3_array2D)
 
     DO n=1,rn
-       call MPI_IRECV(nod1_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
-                 com_nod2D%rPE(n),        MPI_COMM_FESOM, com_nod2D%req(3*n-2), MPIerr)
+       call MPI_IRECV(nod1_array2D, 1, partit%r_mpitype_nod2D(n), partit%com_nod2D%rPE(n), &
+                 partit%com_nod2D%rPE(n),        partit%MPI_COMM_FESOM, partit%com_nod2D%req(3*n-2), partit%MPIerr)
   
-       call MPI_IRECV(nod2_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
-                 com_nod2D%rPE(n)+npes,   MPI_COMM_FESOM, com_nod2D%req(3*n-1), MPIerr)
+       call MPI_IRECV(nod2_array2D, 1, partit%r_mpitype_nod2D(n), partit%com_nod2D%rPE(n), &
+                 partit%com_nod2D%rPE(n)+partit%npes,   partit%MPI_COMM_FESOM, partit%com_nod2D%req(3*n-1), partit%MPIerr)
   
-       call MPI_IRECV(nod3_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
-                 com_nod2D%rPE(n)+2*npes, MPI_COMM_FESOM, com_nod2D%req(3*n),   MPIerr)
+       call MPI_IRECV(nod3_array2D, 1, partit%r_mpitype_nod2D(n), partit%com_nod2D%rPE(n), &
+                 partit%com_nod2D%rPE(n)+2*partit%npes, partit%MPI_COMM_FESOM, partit%com_nod2D%req(3*n),   partit%MPIerr)
     END DO
     DO n=1, sn
-       call MPI_ISEND(nod1_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
-                      mype,        MPI_COMM_FESOM, com_nod2D%req(3*rn+3*n-2), MPIerr)
+       call MPI_ISEND(nod1_array2D, 1, partit%s_mpitype_nod2D(n), partit%com_nod2D%sPE(n), &
+                      partit%mype,        partit%MPI_COMM_FESOM, partit%com_nod2D%req(3*rn+3*n-2), partit%MPIerr)
   
-       call MPI_ISEND(nod2_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
-                      mype+npes,   MPI_COMM_FESOM, com_nod2D%req(3*rn+3*n-1), MPIerr)
+       call MPI_ISEND(nod2_array2D, 1, partit%s_mpitype_nod2D(n), partit%com_nod2D%sPE(n), &
+                      partit%mype+partit%npes,   partit%MPI_COMM_FESOM, partit%com_nod2D%req(3*rn+3*n-1), partit%MPIerr)
   
-       call MPI_ISEND(nod3_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
-                      mype+2*npes, MPI_COMM_FESOM, com_nod2D%req(3*rn+3*n),   MPIerr)
+       call MPI_ISEND(nod3_array2D, 1, partit%s_mpitype_nod2D(n), partit%com_nod2D%sPE(n), &
+                      partit%mype+2*partit%npes, partit%MPI_COMM_FESOM, partit%com_nod2D%req(3*rn+3*n),   partit%MPIerr)
     END DO
   
    !$ACC END HOST_DATA
   else
     DO n=1,rn
-       call MPI_IRECV(nod1_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
-                 com_nod2D%rPE(n),        MPI_COMM_FESOM, com_nod2D%req(3*n-2), MPIerr)
+       call MPI_IRECV(nod1_array2D, 1, partit%r_mpitype_nod2D(n), partit%com_nod2D%rPE(n), &
+                 partit%com_nod2D%rPE(n),        partit%MPI_COMM_FESOM, partit%com_nod2D%req(3*n-2), partit%MPIerr)
   
-       call MPI_IRECV(nod2_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
-                 com_nod2D%rPE(n)+npes,   MPI_COMM_FESOM, com_nod2D%req(3*n-1), MPIerr)
+       call MPI_IRECV(nod2_array2D, 1, partit%r_mpitype_nod2D(n), partit%com_nod2D%rPE(n), &
+                 partit%com_nod2D%rPE(n)+partit%npes,   partit%MPI_COMM_FESOM, partit%com_nod2D%req(3*n-1), partit%MPIerr)
   
-       call MPI_IRECV(nod3_array2D, 1, r_mpitype_nod2D(n), com_nod2D%rPE(n), &
-                 com_nod2D%rPE(n)+2*npes, MPI_COMM_FESOM, com_nod2D%req(3*n),   MPIerr)
+       call MPI_IRECV(nod3_array2D, 1, partit%r_mpitype_nod2D(n), partit%com_nod2D%rPE(n), &
+                 partit%com_nod2D%rPE(n)+2*partit%npes, partit%MPI_COMM_FESOM, partit%com_nod2D%req(3*n),   partit%MPIerr)
     END DO
     DO n=1, sn
-       call MPI_ISEND(nod1_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
-                      mype,        MPI_COMM_FESOM, com_nod2D%req(3*rn+3*n-2), MPIerr)
+       call MPI_ISEND(nod1_array2D, 1, partit%s_mpitype_nod2D(n), partit%com_nod2D%sPE(n), &
+                      partit%mype,        partit%MPI_COMM_FESOM, partit%com_nod2D%req(3*rn+3*n-2), partit%MPIerr)
   
-       call MPI_ISEND(nod2_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
-                      mype+npes,   MPI_COMM_FESOM, com_nod2D%req(3*rn+3*n-1), MPIerr)
+       call MPI_ISEND(nod2_array2D, 1, partit%s_mpitype_nod2D(n), partit%com_nod2D%sPE(n), &
+                      partit%mype+partit%npes,   partit%MPI_COMM_FESOM, partit%com_nod2D%req(3*rn+3*n-1), partit%MPIerr)
   
-       call MPI_ISEND(nod3_array2D, 1, s_mpitype_nod2D(n), com_nod2D%sPE(n), &
-                      mype+2*npes, MPI_COMM_FESOM, com_nod2D%req(3*rn+3*n),   MPIerr)
+       call MPI_ISEND(nod3_array2D, 1, partit%s_mpitype_nod2D(n), partit%com_nod2D%sPE(n), &
+                      partit%mype+2*partit%npes, partit%MPI_COMM_FESOM, partit%com_nod2D%req(3*rn+3*n),   partit%MPIerr)
     END DO
   
   endif
-  com_nod2D%nreq = 3*(rn+sn)
+  partit%com_nod2D%nreq = 3*(rn+sn)
 
 end if
 
@@ -459,8 +441,6 @@ integer                               :: n, sn, rn
 integer                               :: nz, nl1
 logical,        intent(in),optional   :: luse_g2g
 logical                               :: lg2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
 if(present(luse_g2g)) then
    lg2g = luse_g2g
@@ -468,14 +448,14 @@ else
    lg2g = .false.
 end if
 
- if (npes > 1) then
-    sn=com_nod2D%sPEnum
-    rn=com_nod2D%rPEnum
+ if (partit%npes > 1) then
+    sn=partit%com_nod2D%sPEnum
+    rn=partit%com_nod2D%rPEnum
 
     nl1=ubound(nod_array3D,1)
 
-    if ((nl1<ubound(r_mpitype_nod3D, 2)-1) .or. (nl1>ubound(r_mpitype_nod3D, 2))) then
-       if (mype==0) then
+    if ((nl1<ubound(partit%r_mpitype_nod3D, 2)-1) .or. (nl1>ubound(partit%r_mpitype_nod3D, 2))) then
+       if (partit%mype==0) then
           print *,'Subroutine exchange_nod3D not implemented for',nl1,'layers.'
           print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
        endif
@@ -484,34 +464,34 @@ end if
 
     ! Check MPI point-to-point communication for consistency
 #ifdef DEBUG
-    call check_mpi_comm(rn, sn, r_mpitype_nod3D(:,nl1,1), s_mpitype_nod3D(:,nl1,1), &
-         com_nod2D%rPE, com_nod2D%sPE)
+    call check_mpi_comm(rn, sn, partit%r_mpitype_nod3D(:,nl1,1), partit%s_mpitype_nod3D(:,nl1,1), &
+         partit%com_nod2D%rPE, partit%com_nod2D%sPE)
 #endif
     if(lg2g) then
       !$ACC HOST_DATA USE_DEVICE(nod_array3D) 
 
       DO n=1,rn
-         call MPI_IRECV(nod_array3D, 1, r_mpitype_nod3D(n,nl1,1), com_nod2D%rPE(n), &
-              com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr)
+         call MPI_IRECV(nod_array3D, 1, partit%r_mpitype_nod3D(n,nl1,1), partit%com_nod2D%rPE(n), &
+              partit%com_nod2D%rPE(n), partit%MPI_COMM_FESOM, partit%com_nod2D%req(n), partit%MPIerr)
       END DO
       DO n=1, sn
-         call MPI_ISEND(nod_array3D, 1, s_mpitype_nod3D(n,nl1,1), com_nod2D%sPE(n), &
-              mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
+         call MPI_ISEND(nod_array3D, 1, partit%s_mpitype_nod3D(n,nl1,1), partit%com_nod2D%sPE(n), &
+              partit%mype, partit%MPI_COMM_FESOM, partit%com_nod2D%req(rn+n), partit%MPIerr)
       END DO
 
   
       !$ACC END HOST_DATA
     else
       DO n=1,rn
-         call MPI_IRECV(nod_array3D, 1, r_mpitype_nod3D(n,nl1,1), com_nod2D%rPE(n), &
-              com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr)
+         call MPI_IRECV(nod_array3D, 1, partit%r_mpitype_nod3D(n,nl1,1), partit%com_nod2D%rPE(n), &
+              partit%com_nod2D%rPE(n), partit%MPI_COMM_FESOM, partit%com_nod2D%req(n), partit%MPIerr)
       END DO
       DO n=1, sn
-         call MPI_ISEND(nod_array3D, 1, s_mpitype_nod3D(n,nl1,1), com_nod2D%sPE(n), &
-              mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
+         call MPI_ISEND(nod_array3D, 1, partit%s_mpitype_nod3D(n,nl1,1), partit%com_nod2D%sPE(n), &
+              partit%mype, partit%MPI_COMM_FESOM, partit%com_nod2D%req(rn+n), partit%MPIerr)
       END DO
     endif
-    com_nod2D%nreq = rn+sn
+    partit%com_nod2D%nreq = rn+sn
 
  endif
 END SUBROUTINE exchange_nod3D_begin
@@ -528,10 +508,8 @@ type(t_partit), intent(inout), target :: partit
 real(kind=WP),   intent(inout)         :: nod1_array3D(:,:)
 real(kind=WP),   intent(inout)         :: nod2_array3D(:,:)
 logical,        intent(in),optional   :: luse_g2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-if (npes > 1) then
+if (partit%npes > 1) then
    call exchange_nod3D_2fields_begin(nod1_array3D,nod2_array3D, partit, luse_g2g)
    call exchange_nod_end(partit)
 endif
@@ -552,8 +530,6 @@ integer                               :: n, sn, rn
 integer                               :: nz, nl1, nl2
 logical,        intent(in),optional   :: luse_g2g
 logical                               :: lg2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
 if(present(luse_g2g)) then
    lg2g = luse_g2g
@@ -561,14 +537,14 @@ else
    lg2g = .false.
 end if
 
- if (npes > 1) then
-    sn=com_nod2D%sPEnum
-    rn=com_nod2D%rPEnum
+ if (partit%npes > 1) then
+    sn=partit%com_nod2D%sPEnum
+    rn=partit%com_nod2D%rPEnum
 
     nl1 = ubound(nod1_array3D,1)
 
-    if ((nl1<ubound(r_mpitype_nod3D, 2)-1) .or. (nl1>ubound(r_mpitype_nod3D, 2))) then
-       if (mype==0) then
+    if ((nl1<ubound(partit%r_mpitype_nod3D, 2)-1) .or. (nl1>ubound(partit%r_mpitype_nod3D, 2))) then
+       if (partit%mype==0) then
           print *,'Subroutine exchange_nod3D not implemented for',nl1,'layers.'
           print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
        endif
@@ -576,8 +552,8 @@ end if
     endif
 
     nl2 = ubound(nod2_array3D,1)
-    if ((nl2<ubound(r_mpitype_nod3D, 2)-1) .or. (nl2>ubound(r_mpitype_nod3D, 2))) then
-       if (mype==0) then
+    if ((nl2<ubound(partit%r_mpitype_nod3D, 2)-1) .or. (nl2>ubound(partit%r_mpitype_nod3D, 2))) then
+       if (partit%mype==0) then
           print *,'Subroutine exchange_nod3D not implemented for',nl2,'layers.'
           print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
        endif
@@ -585,49 +561,49 @@ end if
     endif
 
 #ifdef DEBUG
-    call check_mpi_comm(rn, sn, r_mpitype_nod3D(:,nl1,1), s_mpitype_nod3D(:,nl1,1), &
-         com_nod2D%rPE, com_nod2D%sPE)
+    call check_mpi_comm(rn, sn, partit%r_mpitype_nod3D(:,nl1,1), partit%s_mpitype_nod3D(:,nl1,1), &
+         partit%com_nod2D%rPE, partit%com_nod2D%sPE)
 #endif
 
   if(lg2g) then 
      !$ACC HOST_DATA USE_DEVICE(nod1_array3D, nod2_array3D) 
 
     DO n=1,rn
-       call MPI_IRECV(nod1_array3D, 1, r_mpitype_nod3D(n,nl1,1), com_nod2D%rPE(n), &
-            com_nod2D%rPE(n),      MPI_COMM_FESOM, com_nod2D%req(2*n-1), MPIerr)
+       call MPI_IRECV(nod1_array3D, 1, partit%r_mpitype_nod3D(n,nl1,1), partit%com_nod2D%rPE(n), &
+            partit%com_nod2D%rPE(n),      partit%MPI_COMM_FESOM, partit%com_nod2D%req(2*n-1), partit%MPIerr)
 
-       call MPI_IRECV(nod2_array3D, 1, r_mpitype_nod3D(n,nl2,1), com_nod2D%rPE(n), &
-            com_nod2D%rPE(n)+npes, MPI_COMM_FESOM, com_nod2D%req(2*n  ), MPIerr)
+       call MPI_IRECV(nod2_array3D, 1, partit%r_mpitype_nod3D(n,nl2,1), partit%com_nod2D%rPE(n), &
+            partit%com_nod2D%rPE(n)+partit%npes, partit%MPI_COMM_FESOM, partit%com_nod2D%req(2*n  ), partit%MPIerr)
     END DO
 
     DO n=1, sn
-       call MPI_ISEND(nod1_array3D, 1, s_mpitype_nod3D(n,nl1,1), com_nod2D%sPE(n), &
-            mype,      MPI_COMM_FESOM, com_nod2D%req(2*rn+2*n-1), MPIerr)
+       call MPI_ISEND(nod1_array3D, 1, partit%s_mpitype_nod3D(n,nl1,1), partit%com_nod2D%sPE(n), &
+            partit%mype,      partit%MPI_COMM_FESOM, partit%com_nod2D%req(2*rn+2*n-1), partit%MPIerr)
 
-       call MPI_ISEND(nod2_array3D, 1, s_mpitype_nod3D(n,nl2,1), com_nod2D%sPE(n), &
-            mype+npes, MPI_COMM_FESOM, com_nod2D%req(2*rn+2*n), MPIerr)
+       call MPI_ISEND(nod2_array3D, 1, partit%s_mpitype_nod3D(n,nl2,1), partit%com_nod2D%sPE(n), &
+            partit%mype+partit%npes, partit%MPI_COMM_FESOM, partit%com_nod2D%req(2*rn+2*n), partit%MPIerr)
     END DO
 
      !$ACC END HOST_DATA
   else
     DO n=1,rn
-       call MPI_IRECV(nod1_array3D, 1, r_mpitype_nod3D(n,nl1,1), com_nod2D%rPE(n), &
-            com_nod2D%rPE(n),      MPI_COMM_FESOM, com_nod2D%req(2*n-1), MPIerr)
+       call MPI_IRECV(nod1_array3D, 1, partit%r_mpitype_nod3D(n,nl1,1), partit%com_nod2D%rPE(n), &
+            partit%com_nod2D%rPE(n),      partit%MPI_COMM_FESOM, partit%com_nod2D%req(2*n-1), partit%MPIerr)
 
-       call MPI_IRECV(nod2_array3D, 1, r_mpitype_nod3D(n,nl2,1), com_nod2D%rPE(n), &
-            com_nod2D%rPE(n)+npes, MPI_COMM_FESOM, com_nod2D%req(2*n  ), MPIerr)
+       call MPI_IRECV(nod2_array3D, 1, partit%r_mpitype_nod3D(n,nl2,1), partit%com_nod2D%rPE(n), &
+            partit%com_nod2D%rPE(n)+partit%npes, partit%MPI_COMM_FESOM, partit%com_nod2D%req(2*n  ), partit%MPIerr)
     END DO
 
     DO n=1, sn
-       call MPI_ISEND(nod1_array3D, 1, s_mpitype_nod3D(n,nl1,1), com_nod2D%sPE(n), &
-            mype,      MPI_COMM_FESOM, com_nod2D%req(2*rn+2*n-1), MPIerr)
+       call MPI_ISEND(nod1_array3D, 1, partit%s_mpitype_nod3D(n,nl1,1), partit%com_nod2D%sPE(n), &
+            partit%mype,      partit%MPI_COMM_FESOM, partit%com_nod2D%req(2*rn+2*n-1), partit%MPIerr)
 
-       call MPI_ISEND(nod2_array3D, 1, s_mpitype_nod3D(n,nl2,1), com_nod2D%sPE(n), &
-            mype+npes, MPI_COMM_FESOM, com_nod2D%req(2*rn+2*n), MPIerr)
+       call MPI_ISEND(nod2_array3D, 1, partit%s_mpitype_nod3D(n,nl2,1), partit%com_nod2D%sPE(n), &
+            partit%mype+partit%npes, partit%MPI_COMM_FESOM, partit%com_nod2D%req(2*rn+2*n), partit%MPIerr)
     END DO
 
   endif
-  com_nod2D%nreq = 2*(rn+sn)
+  partit%com_nod2D%nreq = 2*(rn+sn)
 
  endif
 END SUBROUTINE exchange_nod3D_2fields_begin
@@ -661,8 +637,6 @@ integer                                :: n, sn, rn
 integer                                :: nz, nl1, n_val
 logical,        intent(in),optional    :: luse_g2g
 logical                                :: lg2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
 if(present(luse_g2g)) then
    lg2g = luse_g2g
@@ -670,17 +644,17 @@ else
    lg2g = .false.
 end if
 
-if (npes>1) then
+if (partit%npes>1) then
  ! nod_array3D(n_val,nl1,nod2D_size)
   nl1   = ubound(nod_array3D,2)
   n_val = ubound(nod_array3D,1)
-  if ((nl1<ubound(r_mpitype_nod3D, 2)-1) .or. (nl1>ubound(r_mpitype_nod3D, 2)) .or. (n_val > 3)) then
+  if ((nl1<ubound(partit%r_mpitype_nod3D, 2)-1) .or. (nl1>ubound(partit%r_mpitype_nod3D, 2)) .or. (n_val > 3)) then
      ! This routine also works for swapped dimensions nod_array3D(nl1,n_val, nod2D_size)
      nl1   = ubound(nod_array3D,1)
      n_val = ubound(nod_array3D,2)
 
-     if ((nl1<ubound(r_mpitype_nod3D, 2)-1) .or. (nl1>ubound(r_mpitype_nod3D, 2)) .or. (n_val > 3)) then
-        if (mype==0) then
+     if ((nl1<ubound(partit%r_mpitype_nod3D, 2)-1) .or. (nl1>ubound(partit%r_mpitype_nod3D, 2)) .or. (n_val > 3)) then
+        if (partit%mype==0) then
            print *,'Subroutine exchange_nod3D_n not implemented for'
            print *,nl1,'layers and / or ',n_val,'values per element.'
            print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
@@ -688,42 +662,42 @@ if (npes>1) then
         call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
      endif
   endif
-  sn=com_nod2D%sPEnum
-  rn=com_nod2D%rPEnum
+  sn=partit%com_nod2D%sPEnum
+  rn=partit%com_nod2D%rPEnum
 
   ! Check MPI point-to-point communication for consistency
 #ifdef DEBUG
-  call check_mpi_comm(rn, sn, r_mpitype_nod3D(:,nl1,n_val),                 &
-       s_mpitype_nod3D(:,nl1,n_val), com_nod2D%rPE, com_nod2D%sPE)
+  call check_mpi_comm(rn, sn, partit%r_mpitype_nod3D(:,nl1,n_val),                 &
+       partit%s_mpitype_nod3D(:,nl1,n_val), partit%com_nod2D%rPE, partit%com_nod2D%sPE)
 #endif
 
   if(lg2g) then
     !$ACC HOST_DATA USE_DEVICE(nod_array3D)
   
     DO n=1,rn
-       call MPI_IRECV(nod_array3D, 1, r_mpitype_nod3D(n,nl1,n_val), com_nod2D%rPE(n), &
-            com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr)
+       call MPI_IRECV(nod_array3D, 1, partit%r_mpitype_nod3D(n,nl1,n_val), partit%com_nod2D%rPE(n), &
+            partit%com_nod2D%rPE(n), partit%MPI_COMM_FESOM, partit%com_nod2D%req(n), partit%MPIerr)
     END DO
   
     DO n=1, sn
-       call MPI_ISEND(nod_array3D, 1, s_mpitype_nod3D(n,nl1,n_val), com_nod2D%sPE(n), &
-            mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
+       call MPI_ISEND(nod_array3D, 1, partit%s_mpitype_nod3D(n,nl1,n_val), partit%com_nod2D%sPE(n), &
+            partit%mype, partit%MPI_COMM_FESOM, partit%com_nod2D%req(rn+n), partit%MPIerr)
     END DO
   
   !$ACC END HOST_DATA
 
   else
     DO n=1,rn
-       call MPI_IRECV(nod_array3D, 1, r_mpitype_nod3D(n,nl1,n_val), com_nod2D%rPE(n), &
-            com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr)
+       call MPI_IRECV(nod_array3D, 1, partit%r_mpitype_nod3D(n,nl1,n_val), partit%com_nod2D%rPE(n), &
+            partit%com_nod2D%rPE(n), partit%MPI_COMM_FESOM, partit%com_nod2D%req(n), partit%MPIerr)
     END DO
   
     DO n=1, sn
-       call MPI_ISEND(nod_array3D, 1, s_mpitype_nod3D(n,nl1,n_val), com_nod2D%sPE(n), &
-            mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
+       call MPI_ISEND(nod_array3D, 1, partit%s_mpitype_nod3D(n,nl1,n_val), partit%com_nod2D%sPE(n), &
+            partit%mype, partit%MPI_COMM_FESOM, partit%com_nod2D%req(rn+n), partit%MPIerr)
     END DO
   endif
-  com_nod2D%nreq = rn+sn
+  partit%com_nod2D%nreq = rn+sn
 
  endif
 
@@ -752,16 +726,14 @@ USE MOD_PARTIT
 use par_support_module, only: par_ex
 IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-  if (npes > 1) then
-     if (elem_full_flag) then
-        call MPI_WAITALL(com_elem2D_full%nreq, &
-             com_elem2D_full%req, MPI_STATUSES_IGNORE, MPIerr)
+  if (partit%npes > 1) then
+     if (partit%elem_full_flag) then
+        call MPI_WAITALL(partit%com_elem2D_full%nreq, &
+             partit%com_elem2D_full%req, MPI_STATUSES_IGNORE, partit%MPIerr)
      else
-        call MPI_WAITALL(com_elem2D%nreq, &
-             com_elem2D%req, MPI_STATUSES_IGNORE, MPIerr)
+        call MPI_WAITALL(partit%com_elem2D%nreq, &
+             partit%com_elem2D%req, MPI_STATUSES_IGNORE, partit%MPIerr)
      endif
   end if
 END SUBROUTINE exchange_elem_end
@@ -774,8 +746,6 @@ IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(kind=WP),   intent(inout)          :: elem_array3D(:,:)
 logical,        intent(in),optional    :: luse_g2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
 call exchange_elem3D_begin(elem_array3D, partit, luse_g2g)
 call exchange_elem_end(partit)
@@ -794,8 +764,6 @@ real(kind=WP),   intent(inout)       :: elem_array3D(:,:)
 integer                             :: n, sn, rn, nl1
 logical                                :: lg2g
 logical,        intent(in),optional    :: luse_g2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
 if(present(luse_g2g)) then
    lg2g = luse_g2g
@@ -803,48 +771,48 @@ else
    lg2g = .false.
 end if
 
-if (npes> 1) then
+if (partit%npes> 1) then
 
    nl1=ubound(elem_array3D,1)
 
-   if (ubound(elem_array3D,2)<=myDim_elem2D+eDim_elem2D) then
+   if (ubound(elem_array3D,2)<=partit%myDim_elem2D+partit%eDim_elem2D) then
 
-      elem_full_flag = .false.
+      partit%elem_full_flag = .false.
 
-      sn=com_elem2D%sPEnum
-      rn=com_elem2D%rPEnum
+      sn=partit%com_elem2D%sPEnum
+      rn=partit%com_elem2D%rPEnum
 
-      if (nl1==ubound(r_mpitype_elem3D, 2) .or. nl1==ubound(r_mpitype_elem3D, 2)-1) then
+      if (nl1==ubound(partit%r_mpitype_elem3D, 2) .or. nl1==ubound(partit%r_mpitype_elem3D, 2)-1) then
 
          ! Check MPI point-to-point communication for consistency
 #ifdef DEBUG
-         call check_mpi_comm(rn, sn, r_mpitype_elem3D(:,nl1,1), s_mpitype_elem3D(:,nl1,1), &
-              com_elem2D%rPE, com_elem2D%sPE)
+         call check_mpi_comm(rn, sn, partit%r_mpitype_elem3D(:,nl1,1), partit%s_mpitype_elem3D(:,nl1,1), &
+              partit%com_elem2D%rPE, partit%com_elem2D%sPE)
 #endif
 
         if(lg2g) then
          !$ACC HOST_DATA USE_DEVICE(elem_array3D)
            DO n=1,rn
-              call MPI_IRECV(elem_array3D, 1, r_mpitype_elem3D(n,nl1,1), com_elem2D%rPE(n), &
-                   com_elem2D%rPE(n), MPI_COMM_FESOM, &
-                   com_elem2D%req(n), MPIerr)
+              call MPI_IRECV(elem_array3D, 1, partit%r_mpitype_elem3D(n,nl1,1), partit%com_elem2D%rPE(n), &
+                   partit%com_elem2D%rPE(n), partit%MPI_COMM_FESOM, &
+                   partit%com_elem2D%req(n), partit%MPIerr)
            END DO
            DO n=1, sn
-              call MPI_ISEND(elem_array3D, 1, s_mpitype_elem3D(n,nl1,1), com_elem2D%sPE(n), &
-                   mype,    MPI_COMM_FESOM, &
-                   com_elem2D%req(rn+n), MPIerr)
+              call MPI_ISEND(elem_array3D, 1, partit%s_mpitype_elem3D(n,nl1,1), partit%com_elem2D%sPE(n), &
+                   partit%mype,    partit%MPI_COMM_FESOM, &
+                   partit%com_elem2D%req(rn+n), partit%MPIerr)
            END DO
          !$ACC END HOST_DATA
         else 
            DO n=1,rn
-              call MPI_IRECV(elem_array3D, 1, r_mpitype_elem3D(n,nl1,1), com_elem2D%rPE(n), &
-                   com_elem2D%rPE(n), MPI_COMM_FESOM, &
-                   com_elem2D%req(n), MPIerr)
+              call MPI_IRECV(elem_array3D, 1, partit%r_mpitype_elem3D(n,nl1,1), partit%com_elem2D%rPE(n), &
+                   partit%com_elem2D%rPE(n), partit%MPI_COMM_FESOM, &
+                   partit%com_elem2D%req(n), partit%MPIerr)
            END DO
            DO n=1, sn
-              call MPI_ISEND(elem_array3D, 1, s_mpitype_elem3D(n,nl1,1), com_elem2D%sPE(n), &
-                   mype,    MPI_COMM_FESOM, &
-                   com_elem2D%req(rn+n), MPIerr)
+              call MPI_ISEND(elem_array3D, 1, partit%s_mpitype_elem3D(n,nl1,1), partit%com_elem2D%sPE(n), &
+                   partit%mype,    partit%MPI_COMM_FESOM, &
+                   partit%com_elem2D%req(rn+n), partit%MPIerr)
            END DO
         endif 
       elseif (nl1 <= 4) then
@@ -852,129 +820,129 @@ if (npes> 1) then
 
          ! Check MPI point-to-point communication for consistency
 #ifdef DEBUG
-         call check_mpi_comm(rn, sn, r_mpitype_elem2D(:,nl1), s_mpitype_elem2D(:,nl1), &
-              com_elem2D%rPE, com_elem2D%sPE)
+         call check_mpi_comm(rn, sn, partit%r_mpitype_elem2D(:,nl1), partit%s_mpitype_elem2D(:,nl1), &
+              partit%com_elem2D%rPE, partit%com_elem2D%sPE)
 #endif
         if(lg2g) then
           !$ACC HOST_DATA USE_DEVICE(elem_array3D)
            DO n=1,rn
-              call MPI_IRECV(elem_array3D, 1, r_mpitype_elem2D(n,nl1), com_elem2D%rPE(n), &
-                   com_elem2D%rPE(n), MPI_COMM_FESOM, &
-                   com_elem2D%req(n), MPIerr)
+              call MPI_IRECV(elem_array3D, 1, partit%r_mpitype_elem2D(n,nl1), partit%com_elem2D%rPE(n), &
+                   partit%com_elem2D%rPE(n), partit%MPI_COMM_FESOM, &
+                   partit%com_elem2D%req(n), partit%MPIerr)
            END DO
            DO n=1, sn
-              call MPI_ISEND(elem_array3D, 1, s_mpitype_elem2D(n,nl1), com_elem2D%sPE(n), &
-                   mype,    MPI_COMM_FESOM, &
-                   com_elem2D%req(rn+n), MPIerr)
+              call MPI_ISEND(elem_array3D, 1, partit%s_mpitype_elem2D(n,nl1), partit%com_elem2D%sPE(n), &
+                   partit%mype,    partit%MPI_COMM_FESOM, &
+                   partit%com_elem2D%req(rn+n), partit%MPIerr)
            END DO
          !$ACC END HOST_DATA
   
         else 
            DO n=1,rn
-              call MPI_IRECV(elem_array3D, 1, r_mpitype_elem2D(n,nl1), com_elem2D%rPE(n), &
-                   com_elem2D%rPE(n), MPI_COMM_FESOM, &
-                   com_elem2D%req(n), MPIerr)
+              call MPI_IRECV(elem_array3D, 1, partit%r_mpitype_elem2D(n,nl1), partit%com_elem2D%rPE(n), &
+                   partit%com_elem2D%rPE(n), partit%MPI_COMM_FESOM, &
+                   partit%com_elem2D%req(n), partit%MPIerr)
            END DO
            DO n=1, sn
-              call MPI_ISEND(elem_array3D, 1, s_mpitype_elem2D(n,nl1), com_elem2D%sPE(n), &
-                   mype,    MPI_COMM_FESOM, &
-                   com_elem2D%req(rn+n), MPIerr)
+              call MPI_ISEND(elem_array3D, 1, partit%s_mpitype_elem2D(n,nl1), partit%com_elem2D%sPE(n), &
+                   partit%mype,    partit%MPI_COMM_FESOM, &
+                   partit%com_elem2D%req(rn+n), partit%MPIerr)
            END DO
 
         endif
       else
-         if (mype==0) print *,'Sorry, no MPI datatype prepared for',nl1,'values per element (exchange_elem3D)'
+         if (partit%mype==0) print *,'Sorry, no MPI datatype prepared for',nl1,'values per element (exchange_elem3D)'
          call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
       endif
 
-      com_elem2D%nreq = rn+sn
+      partit%com_elem2D%nreq = rn+sn
 
    else
 
-      elem_full_flag = .true.
+      partit%elem_full_flag = .true.
 
-      sn=com_elem2D_full%sPEnum
-      rn=com_elem2D_full%rPEnum
+      sn=partit%com_elem2D_full%sPEnum
+      rn=partit%com_elem2D_full%rPEnum
 
-      if (nl1==ubound(r_mpitype_elem3D_full, 2) .or. nl1==ubound(r_mpitype_elem3D_full, 2)-1) then
+      if (nl1==ubound(partit%r_mpitype_elem3D_full, 2) .or. nl1==ubound(partit%r_mpitype_elem3D_full, 2)-1) then
          ! Check MPI point-to-point communication for consistency
 #ifdef DEBUG
-         call check_mpi_comm(rn, sn, r_mpitype_elem3D_full(:,nl1,1), &
-              s_mpitype_elem3D_full(:,nl1,1), com_elem2D_full%rPE, com_elem2D_full%sPE)
+         call check_mpi_comm(rn, sn, partit%r_mpitype_elem3D_full(:,nl1,1), &
+              partit%s_mpitype_elem3D_full(:,nl1,1), partit%com_elem2D_full%rPE, partit%com_elem2D_full%sPE)
 #endif
 
          if(lg2g) then
            !$ACC HOST_DATA USE_DEVICE(elem_array3D)
            DO n=1,rn
-              call MPI_IRECV(elem_array3D, 1, r_mpitype_elem3D_full(n,nl1,1), &
-                   com_elem2D_full%rPE(n), &
-                   com_elem2D_full%rPE(n), MPI_COMM_FESOM, &
-                   com_elem2D_full%req(n), MPIerr)
+              call MPI_IRECV(elem_array3D, 1, partit%r_mpitype_elem3D_full(n,nl1,1), &
+                   partit%com_elem2D_full%rPE(n), &
+                   partit%com_elem2D_full%rPE(n), partit%MPI_COMM_FESOM, &
+                   partit%com_elem2D_full%req(n), partit%MPIerr)
            END DO
            DO n=1, sn
-              call MPI_ISEND(elem_array3D, 1, s_mpitype_elem3D_full(n,nl1,1), &
-                   com_elem2D_full%sPE(n), &
-                   mype,    MPI_COMM_FESOM, &
-                   com_elem2D_full%req(rn+n), MPIerr)
+              call MPI_ISEND(elem_array3D, 1, partit%s_mpitype_elem3D_full(n,nl1,1), &
+                   partit%com_elem2D_full%sPE(n), &
+                   partit%mype,    partit%MPI_COMM_FESOM, &
+                   partit%com_elem2D_full%req(rn+n), partit%MPIerr)
            END DO
            !$ACC END HOST_DATA
          else
            DO n=1,rn
-              call MPI_IRECV(elem_array3D, 1, r_mpitype_elem3D_full(n,nl1,1), &
-                   com_elem2D_full%rPE(n), &
-                   com_elem2D_full%rPE(n), MPI_COMM_FESOM, &
-                   com_elem2D_full%req(n), MPIerr)
+              call MPI_IRECV(elem_array3D, 1, partit%r_mpitype_elem3D_full(n,nl1,1), &
+                   partit%com_elem2D_full%rPE(n), &
+                   partit%com_elem2D_full%rPE(n), partit%MPI_COMM_FESOM, &
+                   partit%com_elem2D_full%req(n), partit%MPIerr)
            END DO
            DO n=1, sn
-              call MPI_ISEND(elem_array3D, 1, s_mpitype_elem3D_full(n,nl1,1), &
-                   com_elem2D_full%sPE(n), &
-                   mype,    MPI_COMM_FESOM, &
-                   com_elem2D_full%req(rn+n), MPIerr)
+              call MPI_ISEND(elem_array3D, 1, partit%s_mpitype_elem3D_full(n,nl1,1), &
+                   partit%com_elem2D_full%sPE(n), &
+                   partit%mype,    partit%MPI_COMM_FESOM, &
+                   partit%com_elem2D_full%req(rn+n), partit%MPIerr)
            END DO
          endif
       elseif (nl1 <= 4) then
          ! Check MPI point-to-point communication for consistency
 #ifdef DEBUG
-         call check_mpi_comm(rn, sn, r_mpitype_elem2D_full(:,nl1), &
-              s_mpitype_elem2D_full(:,nl1), com_elem2D_full%rPE, com_elem2D_full%sPE)
+         call check_mpi_comm(rn, sn, partit%r_mpitype_elem2D_full(:,nl1), &
+              partit%s_mpitype_elem2D_full(:,nl1), partit%com_elem2D_full%rPE, partit%com_elem2D_full%sPE)
 #endif
 
          ! In fact, this is a 2D-array with up to 4 values, e.g. derivatives
          if(lg2g) then
            !$ACC HOST_DATA USE_DEVICE(elem_array3D)
            DO n=1,rn
-              call MPI_IRECV(elem_array3D, 1, r_mpitype_elem2D_full(n,nl1), &
-                   com_elem2D_full%rPE(n), &
-                   com_elem2D_full%rPE(n), MPI_COMM_FESOM, &
-                   com_elem2D_full%req(n), MPIerr)
+              call MPI_IRECV(elem_array3D, 1, partit%r_mpitype_elem2D_full(n,nl1), &
+                   partit%com_elem2D_full%rPE(n), &
+                   partit%com_elem2D_full%rPE(n), partit%MPI_COMM_FESOM, &
+                   partit%com_elem2D_full%req(n), partit%MPIerr)
            END DO
            DO n=1, sn
-              call MPI_ISEND(elem_array3D, 1, s_mpitype_elem2D_full(n,nl1), &
-                   com_elem2D_full%sPE(n), &
-                   mype,    MPI_COMM_FESOM, &
-                   com_elem2D_full%req(rn+n), MPIerr)
+              call MPI_ISEND(elem_array3D, 1, partit%s_mpitype_elem2D_full(n,nl1), &
+                   partit%com_elem2D_full%sPE(n), &
+                   partit%mype,    partit%MPI_COMM_FESOM, &
+                   partit%com_elem2D_full%req(rn+n), partit%MPIerr)
            END DO
            !$ACC END HOST_DATA
          else
            DO n=1,rn
-              call MPI_IRECV(elem_array3D, 1, r_mpitype_elem2D_full(n,nl1), &
-                   com_elem2D_full%rPE(n), &
-                   com_elem2D_full%rPE(n), MPI_COMM_FESOM, &
-                   com_elem2D_full%req(n), MPIerr)
+              call MPI_IRECV(elem_array3D, 1, partit%r_mpitype_elem2D_full(n,nl1), &
+                   partit%com_elem2D_full%rPE(n), &
+                   partit%com_elem2D_full%rPE(n), partit%MPI_COMM_FESOM, &
+                   partit%com_elem2D_full%req(n), partit%MPIerr)
            END DO
            DO n=1, sn
-              call MPI_ISEND(elem_array3D, 1, s_mpitype_elem2D_full(n,nl1), &
-                   com_elem2D_full%sPE(n), &
-                   mype,    MPI_COMM_FESOM, &
-                   com_elem2D_full%req(rn+n), MPIerr)
+              call MPI_ISEND(elem_array3D, 1, partit%s_mpitype_elem2D_full(n,nl1), &
+                   partit%com_elem2D_full%sPE(n), &
+                   partit%mype,    partit%MPI_COMM_FESOM, &
+                   partit%com_elem2D_full%req(rn+n), partit%MPIerr)
            END DO
          endif
       else
-         if (mype==0) print *,'Sorry, no MPI datatype prepared for',nl1,'values per element (exchange_elem3D)'
+         if (partit%mype==0) print *,'Sorry, no MPI datatype prepared for',nl1,'values per element (exchange_elem3D)'
          call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
       endif
 
-      com_elem2D_full%nreq = rn+sn
+      partit%com_elem2D_full%nreq = rn+sn
 
    endif
 
@@ -993,10 +961,8 @@ IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(kind=WP),   intent(inout)       :: elem_array3D(:,:,:)
 logical,        intent(in),optional    :: luse_g2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
- if (npes> 1) then
+ if (partit%npes> 1) then
     call exchange_elem3D_n_begin(elem_array3D, partit, luse_g2g)
     call exchange_elem_end(partit)
  endif
@@ -1014,8 +980,6 @@ real(kind=WP),   intent(inout)       :: elem_array3D(:,:,:)
 integer                             :: n, sn, rn, n_val, nl1
 logical                                :: lg2g
 logical,        intent(in),optional    :: luse_g2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
 if(present(luse_g2g)) then
    lg2g = luse_g2g
@@ -1023,18 +987,18 @@ else
    lg2g = .false.
 end if
 
- if (npes> 1) then
+ if (partit%npes> 1) then
  nl1   = ubound(elem_array3D,2)
  n_val = ubound(elem_array3D,1)
 
-  if ((nl1<ubound(r_mpitype_elem3D, 2)-1) .or. (nl1>ubound(r_mpitype_elem3D, 2)) .or. (n_val > 4)) then
+  if ((nl1<ubound(partit%r_mpitype_elem3D, 2)-1) .or. (nl1>ubound(partit%r_mpitype_elem3D, 2)) .or. (n_val > 4)) then
 
      ! This routine also works for swapped dimensions elem_array3D(nl1,n_val, elem2D_size)
      nl1= ubound(elem_array3D,1)
      n_val = ubound(elem_array3D,2)
 
-     if ((nl1<ubound(r_mpitype_elem3D, 2)-1) .or. (nl1>ubound(r_mpitype_elem3D, 2)) .or. (n_val > 4)) then
-        if (mype==0) then
+     if ((nl1<ubound(partit%r_mpitype_elem3D, 2)-1) .or. (nl1>ubound(partit%r_mpitype_elem3D, 2)) .or. (n_val > 4)) then
+        if (partit%mype==0) then
            print *,'Subroutine exchange_elem3D_n not implemented for'
            print *,nl1,'layers and / or ',n_val,'values per element.'
            print *,'Adding the MPI datatypes is easy, see oce_modules.F90.'
@@ -1043,77 +1007,77 @@ end if
      endif
   endif
 
- if (ubound(elem_array3D,3)<=myDim_elem2D+eDim_elem2D) then
+ if (ubound(elem_array3D,3)<=partit%myDim_elem2D+partit%eDim_elem2D) then
 
-    elem_full_flag = .false.
+    partit%elem_full_flag = .false.
 
-     sn=com_elem2D%sPEnum
-     rn=com_elem2D%rPEnum
+     sn=partit%com_elem2D%sPEnum
+     rn=partit%com_elem2D%rPEnum
 
      ! Check MPI point-to-point communication for consistency
 #ifdef DEBUG
-     call check_mpi_comm(rn, sn, r_mpitype_elem3D(:,nl1,n_val), &
-          s_mpitype_elem3D(:,nl1,n_val), com_elem2D%rPE, com_elem2D%sPE)
+     call check_mpi_comm(rn, sn, partit%r_mpitype_elem3D(:,nl1,n_val), &
+          partit%s_mpitype_elem3D(:,nl1,n_val), partit%com_elem2D%rPE, partit%com_elem2D%sPE)
 #endif
      if(lg2g) then
        !$ACC HOST_DATA USE_DEVICE(elem_array3D)
        DO n=1,rn
-          call MPI_IRECV(elem_array3D, 1, r_mpitype_elem3D(n,nl1,n_val), com_elem2D%rPE(n), &
-                         com_elem2D%rPE(n), MPI_COMM_FESOM, com_elem2D%req(n), MPIerr)
+          call MPI_IRECV(elem_array3D, 1, partit%r_mpitype_elem3D(n,nl1,n_val), partit%com_elem2D%rPE(n), &
+                         partit%com_elem2D%rPE(n), partit%MPI_COMM_FESOM, partit%com_elem2D%req(n), partit%MPIerr)
        END DO
        DO n=1, sn
-          call MPI_ISEND(elem_array3D, 1, s_mpitype_elem3D(n,nl1,n_val), com_elem2D%sPE(n), &
-                         mype, MPI_COMM_FESOM, com_elem2D%req(rn+n), MPIerr)
+          call MPI_ISEND(elem_array3D, 1, partit%s_mpitype_elem3D(n,nl1,n_val), partit%com_elem2D%sPE(n), &
+                         partit%mype, partit%MPI_COMM_FESOM, partit%com_elem2D%req(rn+n), partit%MPIerr)
        END DO
        !$ACC END HOST_DATA
      else
        DO n=1,rn
-          call MPI_IRECV(elem_array3D, 1, r_mpitype_elem3D(n,nl1,n_val), com_elem2D%rPE(n), &
-                         com_elem2D%rPE(n), MPI_COMM_FESOM, com_elem2D%req(n), MPIerr)
+          call MPI_IRECV(elem_array3D, 1, partit%r_mpitype_elem3D(n,nl1,n_val), partit%com_elem2D%rPE(n), &
+                         partit%com_elem2D%rPE(n), partit%MPI_COMM_FESOM, partit%com_elem2D%req(n), partit%MPIerr)
        END DO
        DO n=1, sn
-          call MPI_ISEND(elem_array3D, 1, s_mpitype_elem3D(n,nl1,n_val), com_elem2D%sPE(n), &
-                         mype, MPI_COMM_FESOM, com_elem2D%req(rn+n), MPIerr)
+          call MPI_ISEND(elem_array3D, 1, partit%s_mpitype_elem3D(n,nl1,n_val), partit%com_elem2D%sPE(n), &
+                         partit%mype, partit%MPI_COMM_FESOM, partit%com_elem2D%req(rn+n), partit%MPIerr)
        END DO
      endif
-     com_elem2D%nreq = rn+sn
+     partit%com_elem2D%nreq = rn+sn
 
   else
 
-     elem_full_flag = .true.
+     partit%elem_full_flag = .true.
 
-     sn=com_elem2D_full%sPEnum
-     rn=com_elem2D_full%rPEnum
+     sn=partit%com_elem2D_full%sPEnum
+     rn=partit%com_elem2D_full%rPEnum
 
      ! Check MPI point-to-point communication for consistency
 #ifdef DEBUG
-     call check_mpi_comm(rn, sn, r_mpitype_elem3D_full(:,nl1,n_val), &
-          s_mpitype_elem3D_full(:,nl1,n_val), com_elem2D_full%rPE, com_elem2D_full%sPE)
+     call check_mpi_comm(rn, sn, partit%r_mpitype_elem3D_full(:,nl1,n_val), &
+          partit%s_mpitype_elem3D_full(:,nl1,n_val), partit%com_elem2D_full%rPE, partit%com_elem2D_full%sPE)
 #endif
      if(lg2g) then
        !$ACC HOST_DATA USE_DEVICE(elem_array3D)
 
        DO n=1,rn
-          call MPI_IRECV(elem_array3D, 1, r_mpitype_elem3D_full(n,nl1,n_val), com_elem2D_full%rPE(n), &
-                         com_elem2D_full%rPE(n), MPI_COMM_FESOM, com_elem2D_full%req(n), MPIerr)
+          call MPI_IRECV(elem_array3D, 1, partit%r_mpitype_elem3D_full(n,nl1,n_val), partit%com_elem2D_full%rPE(n), &
+                         partit%com_elem2D_full%rPE(n), partit%MPI_COMM_FESOM, partit%com_elem2D_full%req(n), partit%MPIerr)
        END DO
        DO n=1, sn
-          call MPI_ISEND(elem_array3D, 1, s_mpitype_elem3D_full(n,nl1,n_val), com_elem2D_full%sPE(n), &
-                         mype, MPI_COMM_FESOM, com_elem2D_full%req(rn+n), MPIerr)
+          call MPI_ISEND(elem_array3D, 1, partit%s_mpitype_elem3D_full(n,nl1,n_val), partit%com_elem2D_full%sPE(n), &
+                         partit%mype, partit%MPI_COMM_FESOM, partit%com_elem2D_full%req(rn+n), partit%MPIerr)
        END DO
        !$ACC END HOST_DATA
      else
        DO n=1,rn
-          call MPI_IRECV(elem_array3D, 1, r_mpitype_elem3D_full(n,nl1,n_val), com_elem2D_full%rPE(n), &
-                         com_elem2D_full%rPE(n), MPI_COMM_FESOM, com_elem2D_full%req(n), MPIerr)
+          call MPI_IRECV(elem_array3D, 1, partit%r_mpitype_elem3D_full(n,nl1,n_val), partit%com_elem2D_full%rPE(n), &
+                         partit%com_elem2D_full%rPE(n), partit%MPI_COMM_FESOM, partit%com_elem2D_full%req(n), partit%MPIerr)
        END DO
        DO n=1, sn
-          call MPI_ISEND(elem_array3D, 1, s_mpitype_elem3D_full(n,nl1,n_val), com_elem2D_full%sPE(n), &
-                         mype, MPI_COMM_FESOM, com_elem2D_full%req(rn+n), MPIerr)
+          call MPI_ISEND(elem_array3D, 1, partit%s_mpitype_elem3D_full(n,nl1,n_val), partit%com_elem2D_full%sPE(n), &
+                         partit%mype, partit%MPI_COMM_FESOM, partit%com_elem2D_full%req(rn+n), partit%MPIerr)
        END DO
      endif
 
-     com_elem2D_full%nreq = rn+sn
+     partit%com_elem2D_full%nreq = rn+sn
 
   end if
 
@@ -1131,10 +1095,8 @@ IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(kind=WP),   intent(inout)       :: elem_array2D(:)
 logical,        intent(in),optional    :: luse_g2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
- if (npes> 1) then
+ if (partit%npes> 1) then
     call exchange_elem2D_begin(elem_array2D, partit, luse_g2g)
     call exchange_elem_end(partit)
  end if
@@ -1153,8 +1115,6 @@ real(kind=WP),   intent(inout)       :: elem_array2D(:)
 integer                             :: n, sn, rn
 logical                                :: lg2g
 logical,        intent(in),optional    :: luse_g2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
 if(present(luse_g2g)) then
    lg2g = luse_g2g
@@ -1162,79 +1122,79 @@ else
    lg2g = .false.
 end if
 
-if (npes> 1) then
+if (partit%npes> 1) then
 
-  if (ubound(elem_array2D,1)<=myDim_elem2D+eDim_elem2D) then
+  if (ubound(elem_array2D,1)<=partit%myDim_elem2D+partit%eDim_elem2D) then
 
-     elem_full_flag = .false.
+     partit%elem_full_flag = .false.
 
-     sn=com_elem2D%sPEnum
-     rn=com_elem2D%rPEnum
+     sn=partit%com_elem2D%sPEnum
+     rn=partit%com_elem2D%rPEnum
 
      ! Check MPI point-to-point communication for consistency
 #ifdef DEBUG
-     call check_mpi_comm(rn, sn, r_mpitype_elem2D(:,1), s_mpitype_elem2D(:,1), &
-          com_elem2D%rPE, com_elem2D%sPE)
+     call check_mpi_comm(rn, sn, partit%r_mpitype_elem2D(:,1), partit%s_mpitype_elem2D(:,1), &
+          partit%com_elem2D%rPE, partit%com_elem2D%sPE)
 #endif
 
      if(lg2g) then
        !$ACC HOST_DATA USE_DEVICE(elem_array2D)
        DO n=1,rn
-          call MPI_IRECV(elem_array2D, 1, r_mpitype_elem2D(n,1), com_elem2D%rPE(n), &
-                         com_elem2D%rPE(n), MPI_COMM_FESOM, com_elem2D%req(n), MPIerr)
+          call MPI_IRECV(elem_array2D, 1, partit%r_mpitype_elem2D(n,1), partit%com_elem2D%rPE(n), &
+                         partit%com_elem2D%rPE(n), partit%MPI_COMM_FESOM, partit%com_elem2D%req(n), partit%MPIerr)
        END DO
        DO n=1, sn
-          call MPI_ISEND(elem_array2D, 1, s_mpitype_elem2D(n,1), com_elem2D%sPE(n), &
-                         mype, MPI_COMM_FESOM, com_elem2D%req(rn+n), MPIerr)
+          call MPI_ISEND(elem_array2D, 1, partit%s_mpitype_elem2D(n,1), partit%com_elem2D%sPE(n), &
+                         partit%mype, partit%MPI_COMM_FESOM, partit%com_elem2D%req(rn+n), partit%MPIerr)
        END DO
        !$ACC END HOST_DATA
      else
        DO n=1,rn
-          call MPI_IRECV(elem_array2D, 1, r_mpitype_elem2D(n,1), com_elem2D%rPE(n), &
-                         com_elem2D%rPE(n), MPI_COMM_FESOM, com_elem2D%req(n), MPIerr)
+          call MPI_IRECV(elem_array2D, 1, partit%r_mpitype_elem2D(n,1), partit%com_elem2D%rPE(n), &
+                         partit%com_elem2D%rPE(n), partit%MPI_COMM_FESOM, partit%com_elem2D%req(n), partit%MPIerr)
        END DO
        DO n=1, sn
-          call MPI_ISEND(elem_array2D, 1, s_mpitype_elem2D(n,1), com_elem2D%sPE(n), &
-                         mype, MPI_COMM_FESOM, com_elem2D%req(rn+n), MPIerr)
+          call MPI_ISEND(elem_array2D, 1, partit%s_mpitype_elem2D(n,1), partit%com_elem2D%sPE(n), &
+                         partit%mype, partit%MPI_COMM_FESOM, partit%com_elem2D%req(rn+n), partit%MPIerr)
        END DO
      endif
-     com_elem2D%nreq = rn+sn
+     partit%com_elem2D%nreq = rn+sn
 
   else
-     elem_full_flag = .true.
+     partit%elem_full_flag = .true.
 
-     sn=com_elem2D_full%sPEnum
-     rn=com_elem2D_full%rPEnum
+     sn=partit%com_elem2D_full%sPEnum
+     rn=partit%com_elem2D_full%rPEnum
 
      ! Check MPI point-to-point communication for consistency
 #ifdef DEBUG
-     call check_mpi_comm(rn, sn, r_mpitype_elem2D_full(:,1), s_mpitype_elem2D_full(:,1), &
-          com_elem2D_full%rPE, com_elem2D_full%sPE)
+     call check_mpi_comm(rn, sn, partit%r_mpitype_elem2D_full(:,1), partit%s_mpitype_elem2D_full(:,1), &
+          partit%com_elem2D_full%rPE, partit%com_elem2D_full%sPE)
 #endif
 
      if(lg2g) then
        !$ACC HOST_DATA USE_DEVICE(elem_array2D)
        DO n=1,rn
-          call MPI_IRECV(elem_array2D, 1, r_mpitype_elem2D_full(n,1), com_elem2D_full%rPE(n), &
-                         com_elem2D_full%rPE(n), MPI_COMM_FESOM, com_elem2D_full%req(n), MPIerr)
+          call MPI_IRECV(elem_array2D, 1, partit%r_mpitype_elem2D_full(n,1), partit%com_elem2D_full%rPE(n), &
+                         partit%com_elem2D_full%rPE(n), partit%MPI_COMM_FESOM, partit%com_elem2D_full%req(n), partit%MPIerr)
        END DO
        DO n=1, sn
-          call MPI_ISEND(elem_array2D, 1, s_mpitype_elem2D_full(n,1), com_elem2D_full%sPE(n), &
-                         mype, MPI_COMM_FESOM, com_elem2D_full%req(rn+n), MPIerr)
+          call MPI_ISEND(elem_array2D, 1, partit%s_mpitype_elem2D_full(n,1), partit%com_elem2D_full%sPE(n), &
+                         partit%mype, partit%MPI_COMM_FESOM, partit%com_elem2D_full%req(rn+n), partit%MPIerr)
        END DO
        !$ACC END HOST_DATA
      else
        DO n=1,rn
-          call MPI_IRECV(elem_array2D, 1, r_mpitype_elem2D_full(n,1), com_elem2D_full%rPE(n), &
-                         com_elem2D_full%rPE(n), MPI_COMM_FESOM, com_elem2D_full%req(n), MPIerr)
+          call MPI_IRECV(elem_array2D, 1, partit%r_mpitype_elem2D_full(n,1), partit%com_elem2D_full%rPE(n), &
+                         partit%com_elem2D_full%rPE(n), partit%MPI_COMM_FESOM, partit%com_elem2D_full%req(n), partit%MPIerr)
        END DO
        DO n=1, sn
-          call MPI_ISEND(elem_array2D, 1, s_mpitype_elem2D_full(n,1), com_elem2D_full%sPE(n), &
-                         mype, MPI_COMM_FESOM, com_elem2D_full%req(rn+n), MPIerr)
+          call MPI_ISEND(elem_array2D, 1, partit%s_mpitype_elem2D_full(n,1), partit%com_elem2D_full%sPE(n), &
+                         partit%mype, partit%MPI_COMM_FESOM, partit%com_elem2D_full%req(rn+n), partit%MPIerr)
        END DO
      endif
 
-     com_elem2D_full%nreq = rn+sn
+     partit%com_elem2D_full%nreq = rn+sn
 
   end if
 
@@ -1252,10 +1212,8 @@ type(t_partit), intent(inout), target  :: partit
 integer,        intent(inout)       :: elem_array2D(:)
 integer                             :: n, sn, rn
 logical,        intent(in),optional    :: luse_g2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
- if (npes> 1) then
+ if (partit%npes> 1) then
     call exchange_elem2D_i_begin(elem_array2D, partit, luse_g2g)
     call exchange_elem_end(partit)
 end if
@@ -1273,8 +1231,6 @@ integer,        intent(inout)       :: elem_array2D(:)
 integer                             :: n, sn, rn
 logical                                :: lg2g
 logical,        intent(in),optional    :: luse_g2g
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
 if(present(luse_g2g)) then
    lg2g = luse_g2g
@@ -1282,45 +1238,45 @@ else
    lg2g = .false.
 end if
 
- if (npes> 1) then
+ if (partit%npes> 1) then
 
-    elem_full_flag = .true.
+    partit%elem_full_flag = .true.
 
-    sn=com_elem2D_full%sPEnum
-    rn=com_elem2D_full%rPEnum
+    sn=partit%com_elem2D_full%sPEnum
+    rn=partit%com_elem2D_full%rPEnum
 
      ! Check MPI point-to-point communication for consistency
 #ifdef DEBUG
-    call check_mpi_comm(rn, sn, r_mpitype_elem2D_full_i, s_mpitype_elem2D_full_i,        &
-          com_elem2D_full%rPE, com_elem2D_full%sPE)
+    call check_mpi_comm(rn, sn, partit%r_mpitype_elem2D_full_i, partit%s_mpitype_elem2D_full_i,        &
+          partit%com_elem2D_full%rPE, partit%com_elem2D_full%sPE)
 #endif
     if(lg2g) then
       !$ACC HOST_DATA USE_DEVICE(elem_array2D)
       DO n=1,rn
-         call MPI_IRECV(elem_array2D, 1, r_mpitype_elem2D_full_i(n), com_elem2D_full%rPE(n), &
-              com_elem2D_full%rPE(n), MPI_COMM_FESOM, com_elem2D_full%req(n), MPIerr)
+         call MPI_IRECV(elem_array2D, 1, partit%r_mpitype_elem2D_full_i(n), partit%com_elem2D_full%rPE(n), &
+              partit%com_elem2D_full%rPE(n), partit%MPI_COMM_FESOM, partit%com_elem2D_full%req(n), partit%MPIerr)
       END DO
   
       DO n=1, sn
   
-         call MPI_ISEND(elem_array2D, 1, s_mpitype_elem2D_full_i(n), com_elem2D_full%sPE(n), &
-              mype, MPI_COMM_FESOM, com_elem2D_full%req(rn+n), MPIerr)
+         call MPI_ISEND(elem_array2D, 1, partit%s_mpitype_elem2D_full_i(n), partit%com_elem2D_full%sPE(n), &
+              partit%mype, partit%MPI_COMM_FESOM, partit%com_elem2D_full%req(rn+n), partit%MPIerr)
       END DO
       !$ACC END HOST_DATA
     else
       DO n=1,rn
-         call MPI_IRECV(elem_array2D, 1, r_mpitype_elem2D_full_i(n), com_elem2D_full%rPE(n), &
-              com_elem2D_full%rPE(n), MPI_COMM_FESOM, com_elem2D_full%req(n), MPIerr)
+         call MPI_IRECV(elem_array2D, 1, partit%r_mpitype_elem2D_full_i(n), partit%com_elem2D_full%rPE(n), &
+              partit%com_elem2D_full%rPE(n), partit%MPI_COMM_FESOM, partit%com_elem2D_full%req(n), partit%MPIerr)
       END DO
   
       DO n=1, sn
   
-         call MPI_ISEND(elem_array2D, 1, s_mpitype_elem2D_full_i(n), com_elem2D_full%sPE(n), &
-              mype, MPI_COMM_FESOM, com_elem2D_full%req(rn+n), MPIerr)
+         call MPI_ISEND(elem_array2D, 1, partit%s_mpitype_elem2D_full_i(n), partit%com_elem2D_full%sPE(n), &
+              partit%mype, partit%MPI_COMM_FESOM, partit%com_elem2D_full%req(rn+n), partit%MPIerr)
       END DO
     endif
 
-    com_elem2D_full%nreq = rn+sn
+    partit%com_elem2D_full%nreq = rn+sn
 
 end if
 
@@ -1343,23 +1299,21 @@ real(kind=WP)                        ::  arr3Dglobal(:,:)
 integer                             :: node_size
 INTEGER,      ALLOCATABLE, DIMENSION(:) ::  irecvbuf
 real(kind=WP), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-node_size=myDim_nod2D+eDim_nod2D
+node_size=partit%myDim_nod2D+partit%eDim_nod2D
 nl1=ubound(arr3D,1)
-IF ( mype == 0 ) THEN
-    if (npes>1) then
-    arr3D(:,1:node_size)=arr3Dglobal(:,myList_nod2D(1:node_size))
+IF ( partit%mype == 0 ) THEN
+    if (partit%npes>1) then
+    arr3D(:,1:node_size)=arr3Dglobal(:,partit%myList_nod2D(1:node_size))
     end if
-    DO  n = 1, npes-1
+    DO  n = 1, partit%npes-1
        CALL MPI_RECV( nTS, 1, MPI_INTEGER, MPI_ANY_SOURCE, &
-                     0, MPI_COMM_FESOM, status, MPIerr )
+                     0, partit%MPI_COMM_FESOM, status, partit%MPIerr )
        sender = status(MPI_SOURCE)
        ALLOCATE(sendbuf(nTS*nl1), irecvbuf(nTS))
 
        CALL MPI_RECV(irecvbuf(1), nTS, MPI_INTEGER, sender, &
-                      1, MPI_COMM_FESOM, status, MPIerr )
+                      1, partit%MPI_COMM_FESOM, status, partit%MPIerr )
        counter=0
        DO i = 1, nTS
           DO nz=1, nl1
@@ -1369,18 +1323,18 @@ IF ( mype == 0 ) THEN
        ENDDO
 
        CALL MPI_SEND(sendbuf(1), nTS*nl1, MPI_WP, &
-                   sender, 2, MPI_COMM_FESOM, MPIerr )
+                   sender, 2, partit%MPI_COMM_FESOM, partit%MPIerr )
 
        DEALLOCATE(irecvbuf, sendbuf)
     ENDDO
 ELSE
-    CALL MPI_SEND( node_size, 1, MPI_INTEGER, 0, 0, MPI_COMM_FESOM, MPIerr )
-    CALL MPI_SEND( myList_nod2D(1), node_size, MPI_INTEGER, 0, 1, &
-                   MPI_COMM_FESOM, MPIerr )
+    CALL MPI_SEND( node_size, 1, MPI_INTEGER, 0, 0, partit%MPI_COMM_FESOM, partit%MPIerr )
+    CALL MPI_SEND( partit%myList_nod2D(1), node_size, MPI_INTEGER, 0, 1, &
+                   partit%MPI_COMM_FESOM, partit%MPIerr )
 
     ALLOCATE(recvbuf(node_size*nl1))
     CALL MPI_RECV( recvbuf(1), node_size*nl1, MPI_WP, 0, &
-                      2, MPI_COMM_FESOM, status, MPIerr )
+                      2, partit%MPI_COMM_FESOM, status, partit%MPIerr )
     counter=0
     DO n = 1, node_size
        DO nz=1, nl1
@@ -1391,7 +1345,7 @@ ELSE
 
     DEALLOCATE(recvbuf)
 ENDIF
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,partit%MPIerr)
 end subroutine broadcast_nod3D
 !
 !============================================================================
@@ -1403,46 +1357,45 @@ USE MOD_PARTIT
 use par_support_module, only: par_ex
 IMPLICIT NONE
 type(t_partit), intent(in), target       :: partit
+integer :: MPIerr
 real(kind=WP)                             :: arr2D(:)
 real(kind=WP)                             :: arr2Dglobal(:)
 integer                                  :: i, n, nTS, sender, status(MPI_STATUS_SIZE)
 INTEGER,      ALLOCATABLE, DIMENSION(:)  :: irecvbuf
 real(kind=WP), ALLOCATABLE, DIMENSION(:)  :: sendbuf
 integer                                  :: node_size
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-node_size=myDim_nod2D+eDim_nod2D
+node_size=partit%myDim_nod2D+partit%eDim_nod2D
 
-IF ( mype == 0 ) THEN
-    if (npes>1) then
-    arr2D(1:node_size)=arr2Dglobal(myList_nod2D(1:node_size))
+IF ( partit%mype == 0 ) THEN
+    if (partit%npes>1) then
+    arr2D(1:node_size)=arr2Dglobal(partit%myList_nod2D(1:node_size))
     end if
-    DO  n = 1, npes-1
+    DO  n = 1, partit%npes-1
        CALL MPI_RECV( nTS, 1, MPI_INTEGER, MPI_ANY_SOURCE, &
-                     0, MPI_COMM_FESOM, status, MPIerr )
+                     0, partit%MPI_COMM_FESOM, status, MPIerr )
        sender = status(MPI_SOURCE)
        ALLOCATE(sendbuf(nTS), irecvbuf(nTS))
 
        CALL MPI_RECV(irecvbuf(1), nTS, MPI_INTEGER, sender, &
-                      1, MPI_COMM_FESOM, status, MPIerr )
+                      1, partit%MPI_COMM_FESOM, status, MPIerr )
        DO i = 1, nTS
              sendbuf(i) = arr2Dglobal(irecvbuf(i))
        ENDDO
 
        CALL MPI_SEND(sendbuf(1), nTS, MPI_WP, &
-                   sender, 2, MPI_COMM_FESOM, MPIerr )
+                   sender, 2, partit%MPI_COMM_FESOM, MPIerr )
 
        DEALLOCATE(irecvbuf, sendbuf)
     ENDDO
 ELSE
-    CALL MPI_SEND( node_size, 1, MPI_INTEGER, 0, 0, MPI_COMM_FESOM, MPIerr )
-    CALL MPI_SEND( myList_nod2D(1), node_size, MPI_INTEGER, 0, 1, &
-                   MPI_COMM_FESOM, MPIerr )
+    CALL MPI_SEND( node_size, 1, MPI_INTEGER, 0, 0, partit%MPI_COMM_FESOM, MPIerr )
+    CALL MPI_SEND( partit%myList_nod2D(1), node_size, MPI_INTEGER, 0, 1, &
+                   partit%MPI_COMM_FESOM, MPIerr )
     CALL MPI_RECV( arr2D(1), node_size, MPI_WP, 0, &
-                      2, MPI_COMM_FESOM, status, MPIerr )
+                      2, partit%MPI_COMM_FESOM, status, MPIerr )
 ENDIF
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,MPIerr)
 end subroutine broadcast_nod2D
 !
 !============================================================================
@@ -1454,6 +1407,7 @@ USE MOD_PARTIT
 use par_support_module, only: par_ex
 IMPLICIT NONE
 type(t_partit), intent(in), target      :: partit
+integer :: MPIerr
 INTEGER                                 :: nz, counter,nl1
 integer                                 :: i, n, nTS, sender, status(MPI_STATUS_SIZE)
 real(kind=WP)                            :: arr3D(:,:)
@@ -1462,24 +1416,22 @@ integer                                 :: elem_size
 
 INTEGER,      ALLOCATABLE, DIMENSION(:) ::  irecvbuf
 real(kind=WP), ALLOCATABLE, DIMENSION(:) ::  sendbuf, recvbuf
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-elem_size=myDim_elem2D+eDim_elem2D
+elem_size=partit%myDim_elem2D+partit%eDim_elem2D
 
 nl1=ubound(arr3D,1)
-IF ( mype == 0 ) THEN
-    if (npes>1) then
-    arr3D(:,1:elem_size)=arr3Dglobal(:,myList_elem2D(1:elem_size))
+IF ( partit%mype == 0 ) THEN
+    if (partit%npes>1) then
+    arr3D(:,1:elem_size)=arr3Dglobal(:,partit%myList_elem2D(1:elem_size))
     end if
-    DO  n = 1, npes-1
+    DO  n = 1, partit%npes-1
        CALL MPI_RECV( nTS, 1, MPI_INTEGER, MPI_ANY_SOURCE, &
-                     0, MPI_COMM_FESOM, status, MPIerr )
+                     0, partit%MPI_COMM_FESOM, status, MPIerr )
        sender = status(MPI_SOURCE)
        ALLOCATE(sendbuf(nTS*nl1), irecvbuf(nTS))
 
        CALL MPI_RECV(irecvbuf(1), nTS, MPI_INTEGER, sender, &
-                      1, MPI_COMM_FESOM, status, MPIerr )
+                      1, partit%MPI_COMM_FESOM, status, MPIerr )
        counter=0
        DO i = 1, nTS
           DO nz=1, nl1
@@ -1489,18 +1441,18 @@ IF ( mype == 0 ) THEN
        ENDDO
 
        CALL MPI_SEND(sendbuf(1), nTS*nl1, MPI_WP, &
-                   sender, 2, MPI_COMM_FESOM, MPIerr )
+                   sender, 2, partit%MPI_COMM_FESOM, MPIerr )
 
        DEALLOCATE(irecvbuf, sendbuf)
     ENDDO
 ELSE
-    CALL MPI_SEND( elem_size, 1, MPI_INTEGER, 0, 0, MPI_COMM_FESOM, MPIerr )
-    CALL MPI_SEND( myList_elem2D(1), elem_size, MPI_INTEGER, 0, 1, &
-                   MPI_COMM_FESOM, MPIerr )
+    CALL MPI_SEND( elem_size, 1, MPI_INTEGER, 0, 0, partit%MPI_COMM_FESOM, MPIerr )
+    CALL MPI_SEND( partit%myList_elem2D(1), elem_size, MPI_INTEGER, 0, 1, &
+                   partit%MPI_COMM_FESOM, MPIerr )
 
     ALLOCATE(recvbuf(elem_size*nl1))
     CALL MPI_RECV( recvbuf(1), elem_size*nl1, MPI_WP, 0, &
-                      2, MPI_COMM_FESOM, status, MPIerr )
+                      2, partit%MPI_COMM_FESOM, status, MPIerr )
     counter=0
     DO n = 1, elem_size
        DO nz=1, nl1
@@ -1511,7 +1463,7 @@ ELSE
 
     DEALLOCATE(recvbuf)
 ENDIF
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,MPIerr)
 end subroutine broadcast_elem3D
 !
 !============================================================================
@@ -1523,46 +1475,45 @@ USE MOD_PARTIT
 use par_support_module, only: par_ex
 IMPLICIT NONE
 type(t_partit), intent(in), target      :: partit
+integer :: MPIerr
 integer                                 :: i, n, nTS, sender, status(MPI_STATUS_SIZE)
 real(kind=WP)                            :: arr2D(:)
 real(kind=WP)                            :: arr2Dglobal(:)
 integer                                 :: elem_size
 INTEGER,      ALLOCATABLE, DIMENSION(:) :: irecvbuf
 real(kind=WP), ALLOCATABLE, DIMENSION(:) :: sendbuf
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-elem_size=myDim_elem2D+eDim_elem2D
+elem_size=partit%myDim_elem2D+partit%eDim_elem2D
 
-IF ( mype == 0 ) THEN
-    if (npes>1) then
-    arr2D(1:elem_size)=arr2Dglobal(myList_elem2D(1:elem_size))
+IF ( partit%mype == 0 ) THEN
+    if (partit%npes>1) then
+    arr2D(1:elem_size)=arr2Dglobal(partit%myList_elem2D(1:elem_size))
     end if
-    DO  n = 1, npes-1
+    DO  n = 1, partit%npes-1
        CALL MPI_RECV( nTS, 1, MPI_INTEGER, MPI_ANY_SOURCE, &
-                     0, MPI_COMM_FESOM, status, MPIerr )
+                     0, partit%MPI_COMM_FESOM, status, MPIerr )
        sender = status(MPI_SOURCE)
        ALLOCATE(sendbuf(1:nTS), irecvbuf(nTS))
 
        CALL MPI_RECV(irecvbuf(1), nTS, MPI_INTEGER, sender, &
-                      1, MPI_COMM_FESOM, status, MPIerr )
+                      1, partit%MPI_COMM_FESOM, status, MPIerr )
        DO i = 1, nTS
              sendbuf(i) = arr2Dglobal(irecvbuf(i))
        ENDDO
 
        CALL MPI_SEND(sendbuf(1), nTS, MPI_WP, &
-                   sender, 2, MPI_COMM_FESOM, MPIerr )
+                   sender, 2, partit%MPI_COMM_FESOM, MPIerr )
 
        DEALLOCATE(irecvbuf, sendbuf)
     ENDDO
 ELSE
-    CALL MPI_SEND( elem_size, 1, MPI_INTEGER, 0, 0, MPI_COMM_FESOM, MPIerr )
-    CALL MPI_SEND( myList_elem2D(1), elem_size, MPI_INTEGER, 0, 1, &
-                   MPI_COMM_FESOM, MPIerr )
+    CALL MPI_SEND( elem_size, 1, MPI_INTEGER, 0, 0, partit%MPI_COMM_FESOM, MPIerr )
+    CALL MPI_SEND( partit%myList_elem2D(1), elem_size, MPI_INTEGER, 0, 1, &
+                   partit%MPI_COMM_FESOM, MPIerr )
     CALL MPI_RECV( arr2D(1), elem_size, MPI_WP, 0, &
-                      2, MPI_COMM_FESOM, status, MPIerr )
+                      2, partit%MPI_COMM_FESOM, status, MPIerr )
 ENDIF
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,MPIerr)
 end subroutine broadcast_elem2D
 !
 !============================================================================
@@ -1581,33 +1532,31 @@ real(real64)                           :: arr3D_global(:,:)
 real(real64), allocatable              :: recvbuf(:,:)
 integer                                :: req(partit%npes-1)
 integer                                :: start, n3D
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-if (npes> 1) then
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+if (partit%npes> 1) then
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,partit%MPIerr)
 
 nl1=ubound(arr3D,1)
 
 ! Consider MPI-datatypes to recv directly into arr3D_global!
 
-IF ( mype == 0 ) THEN
+IF ( partit%mype == 0 ) THEN
 
-   if (npes>1) then
+   if (partit%npes>1) then
       allocate(recvbuf(nl1,ubound(arr3D_global,2)))
 
-      do  n = 1, npes-1
-         n3D = (remPtr_nod2D(n+1) - remPtr_nod2D(n))*nl1
-         start = remPtr_nod2D(n)
-         call MPI_IRECV(recvbuf(1,start), n3D, MPI_DOUBLE_PRECISION, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      do  n = 1, partit%npes-1
+         n3D = (partit%remPtr_nod2D(n+1) - partit%remPtr_nod2D(n))*nl1
+         start = partit%remPtr_nod2D(n)
+         call MPI_IRECV(recvbuf(1,start), n3D, MPI_DOUBLE_PRECISION, n, 2, partit%MPI_COMM_FESOM, req(n), partit%MPIerr)
       enddo
 
-      arr3D_global(1:nl1,myList_nod2D(1:myDim_nod2D)) = arr3D(1:nl1,1:myDim_nod2D)
+      arr3D_global(1:nl1,partit%myList_nod2D(1:partit%myDim_nod2D)) = arr3D(1:nl1,1:partit%myDim_nod2D)
 
-      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+      call MPI_WAITALL(partit%npes-1, req, MPI_STATUSES_IGNORE, partit%MPIerr)
 
-      arr3D_global(1:nl1, remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
-                       = recvbuf(1:nl1, 1 : remPtr_nod2D(npes)-1)
+      arr3D_global(1:nl1, partit%remList_nod2D(1 : partit%remPtr_nod2D(partit%npes)-1)) &
+                       = recvbuf(1:nl1, 1 : partit%remPtr_nod2D(partit%npes)-1)
 
       deallocate(recvbuf)
 
@@ -1617,7 +1566,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   call MPI_SEND( arr3D, myDim_nod2D*nl1, MPI_DOUBLE_PRECISION, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND( arr3D, partit%myDim_nod2D*nl1, MPI_DOUBLE_PRECISION, 0, 2, partit%MPI_COMM_FESOM, partit%MPIerr )
 
 ENDIF
 
@@ -1643,33 +1592,31 @@ real(real32)                        :: arr3D_global(:,:)
 real(real32), allocatable           :: recvbuf(:,:)
 integer                             :: req(partit%npes-1)
 integer                             :: start, n3D
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-if (npes> 1) then
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+if (partit%npes> 1) then
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,partit%MPIerr)
 
 nl1=ubound(arr3D,1)
 
 ! Consider MPI-datatypes to recv directly into arr3D_global!
 
-IF ( mype == 0 ) THEN
+IF ( partit%mype == 0 ) THEN
 
-   if (npes>1) then
+   if (partit%npes>1) then
       allocate(recvbuf(nl1,ubound(arr3D_global,2)))
 
-      do  n = 1, npes-1
-         n3D = (remPtr_nod2D(n+1) - remPtr_nod2D(n))*nl1
-         start = remPtr_nod2D(n)
-         call MPI_IRECV(recvbuf(1,start), n3D, MPI_REAL, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      do  n = 1, partit%npes-1
+         n3D = (partit%remPtr_nod2D(n+1) - partit%remPtr_nod2D(n))*nl1
+         start = partit%remPtr_nod2D(n)
+         call MPI_IRECV(recvbuf(1,start), n3D, MPI_REAL, n, 2, partit%MPI_COMM_FESOM, req(n), partit%MPIerr)
       enddo
 
-      arr3D_global(1:nl1,myList_nod2D(1:myDim_nod2D)) = arr3D(1:nl1,1:myDim_nod2D)
+      arr3D_global(1:nl1,partit%myList_nod2D(1:partit%myDim_nod2D)) = arr3D(1:nl1,1:partit%myDim_nod2D)
 
-      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+      call MPI_WAITALL(partit%npes-1, req, MPI_STATUSES_IGNORE, partit%MPIerr)
 
-      arr3D_global(1:nl1, remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
-                       = recvbuf(1:nl1, 1 : remPtr_nod2D(npes)-1)
+      arr3D_global(1:nl1, partit%remList_nod2D(1 : partit%remPtr_nod2D(partit%npes)-1)) &
+                       = recvbuf(1:nl1, 1 : partit%remPtr_nod2D(partit%npes)-1)
 
       deallocate(recvbuf)
 
@@ -1679,7 +1626,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   call MPI_SEND( arr3D, myDim_nod2D*nl1, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND( arr3D, partit%myDim_nod2D*nl1, MPI_REAL, 0, 2, partit%MPI_COMM_FESOM, partit%MPIerr )
 
 ENDIF
 
@@ -1704,34 +1651,32 @@ integer(int16)                      :: arr3D_global(:,:)
 integer(int16), allocatable         :: recvbuf(:,:)
 integer                             :: req(partit%npes-1)
 integer                             :: start, n3D
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
 
-if (npes> 1) then
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+if (partit%npes> 1) then
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,partit%MPIerr)
 
 nl1=ubound(arr3D,1)
 
 ! Consider MPI-datatypes to recv directly into arr3D_global!
 
-IF ( mype == 0 ) THEN
+IF ( partit%mype == 0 ) THEN
 
-   if (npes>1) then
+   if (partit%npes>1) then
       allocate(recvbuf(nl1,ubound(arr3D_global,2)))
 
-      do  n = 1, npes-1
-         n3D = (remPtr_nod2D(n+1) - remPtr_nod2D(n))*nl1
-         start = remPtr_nod2D(n)
-         call MPI_IRECV(recvbuf(1,start), n3D, MPI_SHORT, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      do  n = 1, partit%npes-1
+         n3D = (partit%remPtr_nod2D(n+1) - partit%remPtr_nod2D(n))*nl1
+         start = partit%remPtr_nod2D(n)
+         call MPI_IRECV(recvbuf(1,start), n3D, MPI_SHORT, n, 2, partit%MPI_COMM_FESOM, req(n), partit%MPIerr)
       enddo
 
-      arr3D_global(1:nl1,myList_nod2D(1:myDim_nod2D)) = arr3D(1:nl1,1:myDim_nod2D)
+      arr3D_global(1:nl1,partit%myList_nod2D(1:partit%myDim_nod2D)) = arr3D(1:nl1,1:partit%myDim_nod2D)
 
-      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+      call MPI_WAITALL(partit%npes-1, req, MPI_STATUSES_IGNORE, partit%MPIerr)
 
-      arr3D_global(1:nl1, remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
-                       = recvbuf(1:nl1, 1 : remPtr_nod2D(npes)-1)
+      arr3D_global(1:nl1, partit%remList_nod2D(1 : partit%remPtr_nod2D(partit%npes)-1)) &
+                       = recvbuf(1:nl1, 1 : partit%remPtr_nod2D(partit%npes)-1)
 
       deallocate(recvbuf)
 
@@ -1741,7 +1686,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   call MPI_SEND( arr3D, myDim_nod2D*nl1, MPI_SHORT, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND( arr3D, partit%myDim_nod2D*nl1, MPI_SHORT, 0, 2, partit%MPI_COMM_FESOM, partit%MPIerr )
 
 ENDIF
 
@@ -1761,31 +1706,29 @@ real(real64)                        :: arr2D_global(:)
 real(real64), allocatable           :: recvbuf(:)
 integer                             :: req(partit%npes-1)
 integer                             :: start, n2D
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-if (npes> 1) then
+if (partit%npes> 1) then
 
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,partit%MPIerr)
 
 ! Consider MPI-datatypes to recv directly into arr2D_global!
 
-IF ( mype == 0 ) THEN
+IF ( partit%mype == 0 ) THEN
 
-   if (npes>1) then
+   if (partit%npes>1) then
       allocate(recvbuf(ubound(arr2D_global,1)))
-      do  n = 1, npes-1
-         n2D   = remPtr_nod2D(n+1) - remPtr_nod2D(n)
-         start = remPtr_nod2D(n)
-         call MPI_IRECV(recvbuf(start), n2D, MPI_DOUBLE_PRECISION, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      do  n = 1, partit%npes-1
+         n2D   = partit%remPtr_nod2D(n+1) - partit%remPtr_nod2D(n)
+         start = partit%remPtr_nod2D(n)
+         call MPI_IRECV(recvbuf(start), n2D, MPI_DOUBLE_PRECISION, n, 2, partit%MPI_COMM_FESOM, req(n), partit%MPIerr)
       enddo
 
-      arr2D_global(myList_nod2D(1:myDim_nod2D)) = arr2D(1:myDim_nod2D)
+      arr2D_global(partit%myList_nod2D(1:partit%myDim_nod2D)) = arr2D(1:partit%myDim_nod2D)
 
-      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+      call MPI_WAITALL(partit%npes-1, req, MPI_STATUSES_IGNORE, partit%MPIerr)
 
-      arr2D_global(remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
-                       = recvbuf(1 : remPtr_nod2D(npes)-1)
+      arr2D_global(partit%remList_nod2D(1 : partit%remPtr_nod2D(partit%npes)-1)) &
+                       = recvbuf(1 : partit%remPtr_nod2D(partit%npes)-1)
       deallocate(recvbuf)
    else
 
@@ -1795,7 +1738,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   call MPI_SEND( arr2D(1:myDim_nod2D), myDim_nod2D, MPI_DOUBLE_PRECISION, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND( arr2D(1:partit%myDim_nod2D), partit%myDim_nod2D, MPI_DOUBLE_PRECISION, 0, 2, partit%MPI_COMM_FESOM, partit%MPIerr )
 
 ENDIF
 
@@ -1815,31 +1758,29 @@ real(real32)                        :: arr2D_global(:)
 real(real32),   allocatable         :: recvbuf(:)
 integer                             :: req(partit%npes-1)
 integer                             :: start, n2D
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-if (npes> 1) then
+if (partit%npes> 1) then
 
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,partit%MPIerr)
 
 ! Consider MPI-datatypes to recv directly into arr2D_global!
 
-IF ( mype == 0 ) THEN
+IF ( partit%mype == 0 ) THEN
 
-   if (npes>1) then
+   if (partit%npes>1) then
       allocate(recvbuf(ubound(arr2D_global,1)))
-      do  n = 1, npes-1
-         n2D   = remPtr_nod2D(n+1) - remPtr_nod2D(n)
-         start = remPtr_nod2D(n)
-         call MPI_IRECV(recvbuf(start), n2D, MPI_REAL, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      do  n = 1, partit%npes-1
+         n2D   = partit%remPtr_nod2D(n+1) - partit%remPtr_nod2D(n)
+         start = partit%remPtr_nod2D(n)
+         call MPI_IRECV(recvbuf(start), n2D, MPI_REAL, n, 2, partit%MPI_COMM_FESOM, req(n), partit%MPIerr)
       enddo
 
-      arr2D_global(myList_nod2D(1:myDim_nod2D)) = arr2D(1:myDim_nod2D)
+      arr2D_global(partit%myList_nod2D(1:partit%myDim_nod2D)) = arr2D(1:partit%myDim_nod2D)
 
-      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+      call MPI_WAITALL(partit%npes-1, req, MPI_STATUSES_IGNORE, partit%MPIerr)
 
-      arr2D_global(remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
-                       = recvbuf(1 : remPtr_nod2D(npes)-1)
+      arr2D_global(partit%remList_nod2D(1 : partit%remPtr_nod2D(partit%npes)-1)) &
+                       = recvbuf(1 : partit%remPtr_nod2D(partit%npes)-1)
       deallocate(recvbuf)
    else
 
@@ -1849,7 +1790,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   call MPI_SEND( arr2D(1:myDim_nod2D), myDim_nod2D, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND( arr2D(1:partit%myDim_nod2D), partit%myDim_nod2D, MPI_REAL, 0, 2, partit%MPI_COMM_FESOM, partit%MPIerr )
 
 ENDIF
 
@@ -1870,31 +1811,29 @@ integer(int16)                      :: arr2D_global(:)
 integer(int16), allocatable         :: recvbuf(:)
 integer                             :: req(partit%npes-1)
 integer                             :: start, n2D
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-if (npes> 1) then
+if (partit%npes> 1) then
 
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,partit%MPIerr)
 
 ! Consider MPI-datatypes to recv directly into arr2D_global!
 
-IF ( mype == 0 ) THEN
+IF ( partit%mype == 0 ) THEN
 
-   if (npes>1) then
+   if (partit%npes>1) then
       allocate(recvbuf(ubound(arr2D_global,1)))
-      do  n = 1, npes-1
-         n2D   = remPtr_nod2D(n+1) - remPtr_nod2D(n)
-         start = remPtr_nod2D(n)
-         call MPI_IRECV(recvbuf(start), n2D, MPI_SHORT, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      do  n = 1, partit%npes-1
+         n2D   = partit%remPtr_nod2D(n+1) - partit%remPtr_nod2D(n)
+         start = partit%remPtr_nod2D(n)
+         call MPI_IRECV(recvbuf(start), n2D, MPI_SHORT, n, 2, partit%MPI_COMM_FESOM, req(n), partit%MPIerr)
       enddo
 
-      arr2D_global(myList_nod2D(1:myDim_nod2D)) = arr2D(1:myDim_nod2D)
+      arr2D_global(partit%myList_nod2D(1:partit%myDim_nod2D)) = arr2D(1:partit%myDim_nod2D)
 
-      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+      call MPI_WAITALL(partit%npes-1, req, MPI_STATUSES_IGNORE, partit%MPIerr)
 
-      arr2D_global(remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
-                       = recvbuf(1 : remPtr_nod2D(npes)-1)
+      arr2D_global(partit%remList_nod2D(1 : partit%remPtr_nod2D(partit%npes)-1)) &
+                       = recvbuf(1 : partit%remPtr_nod2D(partit%npes)-1)
       deallocate(recvbuf)
    else
 
@@ -1904,7 +1843,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   call MPI_SEND( arr2D(1:myDim_nod2D), myDim_nod2D, MPI_SHORT, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND( arr2D(1:partit%myDim_nod2D), partit%myDim_nod2D, MPI_SHORT, 0, 2, partit%MPI_COMM_FESOM, partit%MPIerr )
 
 ENDIF
 
@@ -1929,11 +1868,9 @@ real(real64),   allocatable         :: recvbuf(:,:)
 integer                             :: req(partit%npes-1)
 integer                             :: start, e3D, ende, err_alloc
 integer                             :: max_loc_Dim, i, status(MPI_STATUS_SIZE)
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-if (npes> 1) then
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+if (partit%npes> 1) then
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,partit%MPIerr)
 
 nl1=ubound(arr3D,1)
 
@@ -1941,25 +1878,25 @@ nl1=ubound(arr3D,1)
 ! (Carefull with duplicate interface elements, coming from two
 !  PEs at once!)
 
-IF ( mype == 0 ) THEN
+IF ( partit%mype == 0 ) THEN
 
-   if (npes>1) then
+   if (partit%npes>1) then
 !
-      allocate(recvbuf(nl1,remPtr_elem2D(npes)))
+      allocate(recvbuf(nl1,partit%remPtr_elem2D(partit%npes)))
 
-      do  n = 1, npes-1
-         e3D = (remPtr_elem2D(n+1) - remPtr_elem2D(n))*nl1
-         start = remPtr_elem2D(n)
-         call MPI_IRECV(recvbuf(1,start), e3D, MPI_DOUBLE_PRECISION, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      do  n = 1, partit%npes-1
+         e3D = (partit%remPtr_elem2D(n+1) - partit%remPtr_elem2D(n))*nl1
+         start = partit%remPtr_elem2D(n)
+         call MPI_IRECV(recvbuf(1,start), e3D, MPI_DOUBLE_PRECISION, n, 2, partit%MPI_COMM_FESOM, req(n), partit%MPIerr)
       enddo
 
-      arr3D_global(1:nl1,myList_elem2D(1:myDim_elem2D)) = arr3D(1:nl1,1:myDim_elem2D)
+      arr3D_global(1:nl1,partit%myList_elem2D(1:partit%myDim_elem2D)) = arr3D(1:nl1,1:partit%myDim_elem2D)
 
 
-      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+      call MPI_WAITALL(partit%npes-1, req, MPI_STATUSES_IGNORE, partit%MPIerr)
 
-      arr3D_global(1:nl1, remList_elem2D(1 : remPtr_elem2D(npes)-1)) &
-                        = recvbuf(1:nl1, 1 : remPtr_elem2D(npes)-1)
+      arr3D_global(1:nl1, partit%remList_elem2D(1 : partit%remPtr_elem2D(partit%npes)-1)) &
+                        = recvbuf(1:nl1, 1 : partit%remPtr_elem2D(partit%npes)-1)
 
       deallocate(recvbuf)
 
@@ -1969,7 +1906,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   call MPI_SEND( arr3D, myDim_elem2D*nl1, MPI_DOUBLE_PRECISION, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND( arr3D, partit%myDim_elem2D*nl1, MPI_DOUBLE_PRECISION, 0, 2, partit%MPI_COMM_FESOM, partit%MPIerr )
 
 ENDIF
 
@@ -1993,11 +1930,9 @@ real(real32),   allocatable            :: recvbuf(:,:)
 integer                                :: req(partit%npes-1)
 integer                                :: start, e3D, ende, err_alloc
 integer                                :: max_loc_Dim, i, status(MPI_STATUS_SIZE)
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-if (npes> 1) then
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+if (partit%npes> 1) then
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,partit%MPIerr)
 
 nl1=ubound(arr3D,1)
 
@@ -2005,25 +1940,25 @@ nl1=ubound(arr3D,1)
 ! (Carefull with duplicate interface elements, coming from two
 !  PEs at once!)
 
-IF ( mype == 0 ) THEN
+IF ( partit%mype == 0 ) THEN
 
-   if (npes>1) then
+   if (partit%npes>1) then
 !
-      allocate(recvbuf(nl1,remPtr_elem2D(npes)))
+      allocate(recvbuf(nl1,partit%remPtr_elem2D(partit%npes)))
 
-      do  n = 1, npes-1
-         e3D = (remPtr_elem2D(n+1) - remPtr_elem2D(n))*nl1
-         start = remPtr_elem2D(n)
-         call MPI_IRECV(recvbuf(1,start), e3D, MPI_REAL, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      do  n = 1, partit%npes-1
+         e3D = (partit%remPtr_elem2D(n+1) - partit%remPtr_elem2D(n))*nl1
+         start = partit%remPtr_elem2D(n)
+         call MPI_IRECV(recvbuf(1,start), e3D, MPI_REAL, n, 2, partit%MPI_COMM_FESOM, req(n), partit%MPIerr)
       enddo
 
-      arr3D_global(1:nl1,myList_elem2D(1:myDim_elem2D)) = arr3D(1:nl1,1:myDim_elem2D)
+      arr3D_global(1:nl1,partit%myList_elem2D(1:partit%myDim_elem2D)) = arr3D(1:nl1,1:partit%myDim_elem2D)
 
 
-      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+      call MPI_WAITALL(partit%npes-1, req, MPI_STATUSES_IGNORE, partit%MPIerr)
 
-      arr3D_global(1:nl1, remList_elem2D(1 : remPtr_elem2D(npes)-1)) &
-                        = recvbuf(1:nl1, 1 : remPtr_elem2D(npes)-1)
+      arr3D_global(1:nl1, partit%remList_elem2D(1 : partit%remPtr_elem2D(partit%npes)-1)) &
+                        = recvbuf(1:nl1, 1 : partit%remPtr_elem2D(partit%npes)-1)
 
       deallocate(recvbuf)
 
@@ -2033,7 +1968,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   call MPI_SEND( arr3D, myDim_elem2D*nl1, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND( arr3D, partit%myDim_elem2D*nl1, MPI_REAL, 0, 2, partit%MPI_COMM_FESOM, partit%MPIerr )
 
 ENDIF
 
@@ -2058,11 +1993,9 @@ integer(int16), allocatable         :: recvbuf(:,:)
 integer                             :: req(partit%npes-1)
 integer                             :: start, e3D, ende, err_alloc
 integer                             :: max_loc_Dim, i, status(MPI_STATUS_SIZE)
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-if (npes> 1) then
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+if (partit%npes> 1) then
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,partit%MPIerr)
 
 nl1=ubound(arr3D,1)
 
@@ -2070,25 +2003,25 @@ nl1=ubound(arr3D,1)
 ! (Carefull with duplicate interface elements, coming from two
 !  PEs at once!)
 
-IF ( mype == 0 ) THEN
+IF ( partit%mype == 0 ) THEN
 
-   if (npes>1) then
+   if (partit%npes>1) then
 !
-      allocate(recvbuf(nl1,remPtr_elem2D(npes)))
+      allocate(recvbuf(nl1,partit%remPtr_elem2D(partit%npes)))
 
-      do  n = 1, npes-1
-         e3D = (remPtr_elem2D(n+1) - remPtr_elem2D(n))*nl1
-         start = remPtr_elem2D(n)
-         call MPI_IRECV(recvbuf(1,start), e3D, MPI_SHORT, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      do  n = 1, partit%npes-1
+         e3D = (partit%remPtr_elem2D(n+1) - partit%remPtr_elem2D(n))*nl1
+         start = partit%remPtr_elem2D(n)
+         call MPI_IRECV(recvbuf(1,start), e3D, MPI_SHORT, n, 2, partit%MPI_COMM_FESOM, req(n), partit%MPIerr)
       enddo
 
-      arr3D_global(1:nl1,myList_elem2D(1:myDim_elem2D)) = arr3D(1:nl1,1:myDim_elem2D)
+      arr3D_global(1:nl1,partit%myList_elem2D(1:partit%myDim_elem2D)) = arr3D(1:nl1,1:partit%myDim_elem2D)
 
 
-      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+      call MPI_WAITALL(partit%npes-1, req, MPI_STATUSES_IGNORE, partit%MPIerr)
 
-      arr3D_global(1:nl1, remList_elem2D(1 : remPtr_elem2D(npes)-1)) &
-                        = recvbuf(1:nl1, 1 : remPtr_elem2D(npes)-1)
+      arr3D_global(1:nl1, partit%remList_elem2D(1 : partit%remPtr_elem2D(partit%npes)-1)) &
+                        = recvbuf(1:nl1, 1 : partit%remPtr_elem2D(partit%npes)-1)
 
       deallocate(recvbuf)
 
@@ -2098,7 +2031,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   call MPI_SEND( arr3D, myDim_elem2D*nl1, MPI_SHORT, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND( arr3D, partit%myDim_elem2D*nl1, MPI_SHORT, 0, 2, partit%MPI_COMM_FESOM, partit%MPIerr )
 
 ENDIF
 
@@ -2120,32 +2053,30 @@ real(real64)                        :: arr2D_global(:)
 real(real64), allocatable           :: recvbuf(:)
 integer                             :: req(partit%npes-1)
 integer                             :: start, e2D
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-if (npes> 1) then
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+if (partit%npes> 1) then
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,partit%MPIerr)
 
 ! Consider MPI-datatypes to recv directly into arr2D_global!
 
-IF ( mype == 0 ) THEN
+IF ( partit%mype == 0 ) THEN
 
-   if (npes>1) then
+   if (partit%npes>1) then
 
-      allocate(recvbuf(remPtr_elem2D(npes)))
+      allocate(recvbuf(partit%remPtr_elem2D(partit%npes)))
 
-      do  n = 1, npes-1
-         e2D   = remPtr_elem2D(n+1) - remPtr_elem2D(n)
-         start = remPtr_elem2D(n)
-         call MPI_IRECV(recvbuf(start), e2D, MPI_DOUBLE_PRECISION, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      do  n = 1, partit%npes-1
+         e2D   = partit%remPtr_elem2D(n+1) - partit%remPtr_elem2D(n)
+         start = partit%remPtr_elem2D(n)
+         call MPI_IRECV(recvbuf(start), e2D, MPI_DOUBLE_PRECISION, n, 2, partit%MPI_COMM_FESOM, req(n), partit%MPIerr)
       enddo
 
-      arr2D_global(myList_elem2D(1:myDim_elem2D)) = arr2D(1:myDim_elem2D)
+      arr2D_global(partit%myList_elem2D(1:partit%myDim_elem2D)) = arr2D(1:partit%myDim_elem2D)
 
-      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+      call MPI_WAITALL(partit%npes-1, req, MPI_STATUSES_IGNORE, partit%MPIerr)
 
-      arr2D_global(remList_elem2D(1 : remPtr_elem2D(npes)-1)) &
-                       = recvbuf(1 : remPtr_elem2D(npes)-1)
+      arr2D_global(partit%remList_elem2D(1 : partit%remPtr_elem2D(partit%npes)-1)) &
+                       = recvbuf(1 : partit%remPtr_elem2D(partit%npes)-1)
 
       deallocate(recvbuf)
 
@@ -2157,7 +2088,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   call MPI_SEND( arr2D(1:myDim_elem2D), myDim_elem2D, MPI_DOUBLE_PRECISION, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND( arr2D(1:partit%myDim_elem2D), partit%myDim_elem2D, MPI_DOUBLE_PRECISION, 0, 2, partit%MPI_COMM_FESOM, partit%MPIerr )
 
 ENDIF
 end if
@@ -2178,33 +2109,31 @@ real(real32)                        :: arr2D_global(:)
 real(real32), allocatable           :: recvbuf(:)
 integer                             :: req(partit%npes-1)
 integer                             :: start, e2D
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
 
-if (npes> 1) then
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+if (partit%npes> 1) then
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,partit%MPIerr)
 
 ! Consider MPI-datatypes to recv directly into arr2D_global!
 
-IF ( mype == 0 ) THEN
+IF ( partit%mype == 0 ) THEN
 
-   if (npes>1) then
+   if (partit%npes>1) then
 
-      allocate(recvbuf(remPtr_elem2D(npes)))
+      allocate(recvbuf(partit%remPtr_elem2D(partit%npes)))
 
-      do  n = 1, npes-1
-         e2D   = remPtr_elem2D(n+1) - remPtr_elem2D(n)
-         start = remPtr_elem2D(n)
-         call MPI_IRECV(recvbuf(start), e2D, MPI_REAL, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      do  n = 1, partit%npes-1
+         e2D   = partit%remPtr_elem2D(n+1) - partit%remPtr_elem2D(n)
+         start = partit%remPtr_elem2D(n)
+         call MPI_IRECV(recvbuf(start), e2D, MPI_REAL, n, 2, partit%MPI_COMM_FESOM, req(n), partit%MPIerr)
       enddo
 
-      arr2D_global(myList_elem2D(1:myDim_elem2D)) = arr2D(1:myDim_elem2D)
+      arr2D_global(partit%myList_elem2D(1:partit%myDim_elem2D)) = arr2D(1:partit%myDim_elem2D)
 
-      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+      call MPI_WAITALL(partit%npes-1, req, MPI_STATUSES_IGNORE, partit%MPIerr)
 
-      arr2D_global(remList_elem2D(1 : remPtr_elem2D(npes)-1)) &
-                       = recvbuf(1 : remPtr_elem2D(npes)-1)
+      arr2D_global(partit%remList_elem2D(1 : partit%remPtr_elem2D(partit%npes)-1)) &
+                       = recvbuf(1 : partit%remPtr_elem2D(partit%npes)-1)
 
       deallocate(recvbuf)
 
@@ -2216,7 +2145,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   call MPI_SEND( arr2D(1:myDim_elem2D), myDim_elem2D, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND( arr2D(1:partit%myDim_elem2D), partit%myDim_elem2D, MPI_REAL, 0, 2, partit%MPI_COMM_FESOM, partit%MPIerr )
 
 ENDIF
 end if
@@ -2237,32 +2166,30 @@ integer(int16)                         :: arr2D_global(:)
 integer(int16), allocatable            :: recvbuf(:)
 integer                                :: req(partit%npes-1)
 integer                                :: start, e2D
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-if (npes> 1) then
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+if (partit%npes> 1) then
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,partit%MPIerr)
 
 ! Consider MPI-datatypes to recv directly into arr2D_global!
 
-IF ( mype == 0 ) THEN
+IF ( partit%mype == 0 ) THEN
 
-   if (npes>1) then
+   if (partit%npes>1) then
 
-      allocate(recvbuf(remPtr_elem2D(npes)))
+      allocate(recvbuf(partit%remPtr_elem2D(partit%npes)))
 
-      do  n = 1, npes-1
-         e2D   = remPtr_elem2D(n+1) - remPtr_elem2D(n)
-         start = remPtr_elem2D(n)
-         call MPI_IRECV(recvbuf(start), e2D, MPI_SHORT, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      do  n = 1, partit%npes-1
+         e2D   = partit%remPtr_elem2D(n+1) - partit%remPtr_elem2D(n)
+         start = partit%remPtr_elem2D(n)
+         call MPI_IRECV(recvbuf(start), e2D, MPI_SHORT, n, 2, partit%MPI_COMM_FESOM, req(n), partit%MPIerr)
       enddo
 
-      arr2D_global(myList_elem2D(1:myDim_elem2D)) = arr2D(1:myDim_elem2D)
+      arr2D_global(partit%myList_elem2D(1:partit%myDim_elem2D)) = arr2D(1:partit%myDim_elem2D)
 
-      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+      call MPI_WAITALL(partit%npes-1, req, MPI_STATUSES_IGNORE, partit%MPIerr)
 
-      arr2D_global(remList_elem2D(1 : remPtr_elem2D(npes)-1)) &
-                       = recvbuf(1 : remPtr_elem2D(npes)-1)
+      arr2D_global(partit%remList_elem2D(1 : partit%remPtr_elem2D(partit%npes)-1)) &
+                       = recvbuf(1 : partit%remPtr_elem2D(partit%npes)-1)
 
       deallocate(recvbuf)
 
@@ -2274,7 +2201,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   call MPI_SEND( arr2D(1:myDim_elem2D), myDim_elem2D, MPI_SHORT, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND( arr2D(1:partit%myDim_elem2D), partit%myDim_elem2D, MPI_SHORT, 0, 2, partit%MPI_COMM_FESOM, partit%MPIerr )
 
 ENDIF
 end if
@@ -2299,33 +2226,31 @@ integer                             :: req(partit%npes-1)
 integer                             :: start, n3D, ierr
 real(real32), allocatable           :: recvbuf(:,:)
 real(real32), allocatable           :: sendbuf(:,:)
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-if (npes> 1) then
+if (partit%npes> 1) then
 
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,partit%MPIerr)
 nl1=ubound(arr3D,1)
 
 ! Consider MPI-datatypes to recv directly into arr3D_global!
 
-IF ( mype == 0 ) THEN
+IF ( partit%mype == 0 ) THEN
 
-   if (npes>1) then
+   if (partit%npes>1) then
       allocate(recvbuf(nl1, ubound(arr3D_global,2)))
 
-      do  n = 1, npes-1
-         n3D = (remPtr_nod2D(n+1) - remPtr_nod2D(n))*nl1
-         start = remPtr_nod2D(n)
-         call MPI_IRECV(recvbuf(1,start), n3D, MPI_REAL, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      do  n = 1, partit%npes-1
+         n3D = (partit%remPtr_nod2D(n+1) - partit%remPtr_nod2D(n))*nl1
+         start = partit%remPtr_nod2D(n)
+         call MPI_IRECV(recvbuf(1,start), n3D, MPI_REAL, n, 2, partit%MPI_COMM_FESOM, req(n), partit%MPIerr)
       enddo
 
-      arr3D_global(1:nl1,myList_nod2D(1:myDim_nod2D)) = arr3D(1:nl1,1:myDim_nod2D)
+      arr3D_global(1:nl1,partit%myList_nod2D(1:partit%myDim_nod2D)) = arr3D(1:nl1,1:partit%myDim_nod2D)
 
-      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+      call MPI_WAITALL(partit%npes-1, req, MPI_STATUSES_IGNORE, partit%MPIerr)
 
-      arr3D_global(1:nl1, remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
-                     = recvbuf(1:nl1, 1 : remPtr_nod2D(npes)-1)
+      arr3D_global(1:nl1, partit%remList_nod2D(1 : partit%remPtr_nod2D(partit%npes)-1)) &
+                     = recvbuf(1:nl1, 1 : partit%remPtr_nod2D(partit%npes)-1)
 
       deallocate(recvbuf)
 
@@ -2335,10 +2260,10 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   allocate(sendbuf(nl1,myDim_nod2D))
-   sendbuf(1:nl1,1:myDim_nod2D) = arr3D(1:nl1,1:myDim_nod2D)
+   allocate(sendbuf(nl1,partit%myDim_nod2D))
+   sendbuf(1:nl1,1:partit%myDim_nod2D) = arr3D(1:nl1,1:partit%myDim_nod2D)
 
-   call MPI_SEND(sendbuf, myDim_nod2D*nl1, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND(sendbuf, partit%myDim_nod2D*nl1, MPI_REAL, 0, 2, partit%MPI_COMM_FESOM, partit%MPIerr )
    deallocate(sendbuf)
 
 ENDIF
@@ -2361,29 +2286,27 @@ real(real32)                        :: sendbuf(partit%myDim_nod2D)
 real(real64), allocatable           :: recvbuf(:)
 integer                             :: req(partit%npes-1)
 integer                             :: start, n2D
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
 ! Consider MPI-datatypes to recv directly into arr2D_global!
 
- if (npes> 1) then
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
-IF ( mype == 0 ) THEN
+ if (partit%npes> 1) then
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,partit%MPIerr)
+IF ( partit%mype == 0 ) THEN
 
-   if (npes>1) then
+   if (partit%npes>1) then
       allocate(recvbuf(ubound(arr2D_global,1)))
-      do  n = 1, npes-1
-         n2D   = remPtr_nod2D(n+1) - remPtr_nod2D(n)
-         start = remPtr_nod2D(n)
-         call MPI_IRECV(recvbuf(start), n2D, MPI_REAL, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      do  n = 1, partit%npes-1
+         n2D   = partit%remPtr_nod2D(n+1) - partit%remPtr_nod2D(n)
+         start = partit%remPtr_nod2D(n)
+         call MPI_IRECV(recvbuf(start), n2D, MPI_REAL, n, 2, partit%MPI_COMM_FESOM, req(n), partit%MPIerr)
       enddo
 
-      arr2D_global(myList_nod2D(1:myDim_nod2D)) = arr2D(1:myDim_nod2D)
+      arr2D_global(partit%myList_nod2D(1:partit%myDim_nod2D)) = arr2D(1:partit%myDim_nod2D)
 
-      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+      call MPI_WAITALL(partit%npes-1, req, MPI_STATUSES_IGNORE, partit%MPIerr)
 
-      arr2D_global(remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
-                       = recvbuf(1 : remPtr_nod2D(npes)-1)
+      arr2D_global(partit%remList_nod2D(1 : partit%remPtr_nod2D(partit%npes)-1)) &
+                       = recvbuf(1 : partit%remPtr_nod2D(partit%npes)-1)
       deallocate(recvbuf)
    else
 
@@ -2392,9 +2315,9 @@ IF ( mype == 0 ) THEN
    endif
 
 ELSE
-   sendbuf(1:myDim_nod2D) = real(arr2D(1:myDim_nod2D),real32)
+   sendbuf(1:partit%myDim_nod2D) = real(arr2D(1:partit%myDim_nod2D),real32)
 
-   call MPI_SEND(sendbuf, myDim_nod2D, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND(sendbuf, partit%myDim_nod2D, MPI_REAL, 0, 2, partit%MPI_COMM_FESOM, partit%MPIerr )
 
 ENDIF
 
@@ -2417,33 +2340,31 @@ integer                             :: req(partit%npes-1)
 integer                             :: start, e3D
 real(real32), allocatable           :: recvbuf(:,:)
 real(real32), allocatable           :: sendbuf(:,:)
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
 
-if (npes> 1) then
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+if (partit%npes> 1) then
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,partit%MPIerr)
 nl1=ubound(arr3D,1)
 
 ! Consider MPI-datatypes to recv directly into arr3D_global!
 
-IF ( mype == 0 ) THEN
+IF ( partit%mype == 0 ) THEN
 
-   if (npes>1) then
-      allocate(recvbuf(nl1,remPtr_elem2D(npes)))
+   if (partit%npes>1) then
+      allocate(recvbuf(nl1,partit%remPtr_elem2D(partit%npes)))
 
-      do  n = 1, npes-1
-         e3D = (remPtr_elem2D(n+1) - remPtr_elem2D(n))*nl1
-         start = remPtr_elem2D(n)
-         call MPI_IRECV(recvbuf(1,start), e3D, MPI_REAL, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      do  n = 1, partit%npes-1
+         e3D = (partit%remPtr_elem2D(n+1) - partit%remPtr_elem2D(n))*nl1
+         start = partit%remPtr_elem2D(n)
+         call MPI_IRECV(recvbuf(1,start), e3D, MPI_REAL, n, 2, partit%MPI_COMM_FESOM, req(n), partit%MPIerr)
       enddo
 
-      arr3D_global(1:nl1,myList_elem2D(1:myDim_elem2D)) = arr3D(1:nl1,1:myDim_elem2D)
+      arr3D_global(1:nl1,partit%myList_elem2D(1:partit%myDim_elem2D)) = arr3D(1:nl1,1:partit%myDim_elem2D)
 
-      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+      call MPI_WAITALL(partit%npes-1, req, MPI_STATUSES_IGNORE, partit%MPIerr)
 
-      arr3D_global(1:nl1, remList_elem2D(1 : remPtr_elem2D(npes)-1)) &
-                     = recvbuf(1:nl1, 1 : remPtr_elem2D(npes)-1)
+      arr3D_global(1:nl1, partit%remList_elem2D(1 : partit%remPtr_elem2D(partit%npes)-1)) &
+                     = recvbuf(1:nl1, 1 : partit%remPtr_elem2D(partit%npes)-1)
 
       deallocate(recvbuf)
 
@@ -2452,10 +2373,10 @@ IF ( mype == 0 ) THEN
    endif
 
 ELSE
-   allocate(sendbuf(nl1,myDim_elem2D))
-   sendbuf(1:nl1,1:myDim_elem2D) = arr3D(1:nl1,1:myDim_elem2D)
+   allocate(sendbuf(nl1,partit%myDim_elem2D))
+   sendbuf(1:nl1,1:partit%myDim_elem2D) = arr3D(1:nl1,1:partit%myDim_elem2D)
 
-   call MPI_SEND(sendbuf, myDim_elem2D*nl1, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND(sendbuf, partit%myDim_elem2D*nl1, MPI_REAL, 0, 2, partit%MPI_COMM_FESOM, partit%MPIerr )
    deallocate(sendbuf)
 ENDIF
 
@@ -2476,31 +2397,29 @@ real(real32), allocatable           :: recvbuf(:)
 real(real32)                        :: sendbuf(partit%myDim_elem2D)
 integer                             :: req(partit%npes-1)
 integer                             :: start, e2D
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-if (npes> 1) then
+if (partit%npes> 1) then
 
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,partit%MPIerr)
 ! Consider MPI-datatypes to recv directly into arr2D_global!
 
-IF ( mype == 0 ) THEN
+IF ( partit%mype == 0 ) THEN
 
-   if (npes>1) then
-      allocate(recvbuf(remPtr_elem2D(npes)))
+   if (partit%npes>1) then
+      allocate(recvbuf(partit%remPtr_elem2D(partit%npes)))
 
-      do  n = 1, npes-1
-         e2D   = remPtr_elem2D(n+1) - remPtr_elem2D(n)
-         start = remPtr_elem2D(n)
-         call MPI_IRECV(recvbuf(start), e2D, MPI_REAL, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      do  n = 1, partit%npes-1
+         e2D   = partit%remPtr_elem2D(n+1) - partit%remPtr_elem2D(n)
+         start = partit%remPtr_elem2D(n)
+         call MPI_IRECV(recvbuf(start), e2D, MPI_REAL, n, 2, partit%MPI_COMM_FESOM, req(n), partit%MPIerr)
       enddo
 
-      arr2D_global(myList_elem2D(1:myDim_elem2D)) = arr2D(1:myDim_elem2D)
+      arr2D_global(partit%myList_elem2D(1:partit%myDim_elem2D)) = arr2D(1:partit%myDim_elem2D)
 
-      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+      call MPI_WAITALL(partit%npes-1, req, MPI_STATUSES_IGNORE, partit%MPIerr)
 
-      arr2D_global(remList_elem2D(1 : remPtr_elem2D(npes)-1)) &
-                       = recvbuf(1 : remPtr_elem2D(npes)-1)
+      arr2D_global(partit%remList_elem2D(1 : partit%remPtr_elem2D(partit%npes)-1)) &
+                       = recvbuf(1 : partit%remPtr_elem2D(partit%npes)-1)
 
       deallocate(recvbuf)
 
@@ -2512,8 +2431,8 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   sendbuf(1:myDim_elem2D) = real(arr2D(1:myDim_elem2D),real32)
-   call MPI_SEND(sendbuf, myDim_elem2D, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
+   sendbuf(1:partit%myDim_elem2D) = real(arr2D(1:partit%myDim_elem2D),real32)
+   call MPI_SEND(sendbuf, partit%myDim_elem2D, MPI_REAL, 0, 2, partit%MPI_COMM_FESOM, partit%MPIerr )
 
 ENDIF
 
@@ -2533,31 +2452,29 @@ integer                       :: arr2D_global(:)
 integer, allocatable          :: recvbuf(:)
 integer                       :: req(partit%npes-1)
 integer                       :: start, e2D
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
 
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,partit%MPIerr)
   ! Consider MPI-datatypes to recv directly into arr2D_global!
-  IF ( mype == 0 ) THEN
-     if (npes > 1) then
-        allocate(recvbuf(remPtr_elem2D(npes)))
-        do  n = 1, npes-1
-            e2D   = remPtr_elem2D(n+1) - remPtr_elem2D(n)
-            start = remPtr_elem2D(n)
-            call MPI_IRECV(recvbuf(start), e2D, MPI_INTEGER, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+  IF ( partit%mype == 0 ) THEN
+     if (partit%npes > 1) then
+        allocate(recvbuf(partit%remPtr_elem2D(partit%npes)))
+        do  n = 1, partit%npes-1
+            e2D   = partit%remPtr_elem2D(n+1) - partit%remPtr_elem2D(n)
+            start = partit%remPtr_elem2D(n)
+            call MPI_IRECV(recvbuf(start), e2D, MPI_INTEGER, n, 2, partit%MPI_COMM_FESOM, req(n), partit%MPIerr)
         enddo
-        arr2D_global(myList_elem2D(1:myDim_elem2D)) = arr2D(1:myDim_elem2D)
-        call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
-        arr2D_global(remList_elem2D(1 : remPtr_elem2D(npes)-1)) &
-                          = recvbuf(1 : remPtr_elem2D(npes)-1)
+        arr2D_global(partit%myList_elem2D(1:partit%myDim_elem2D)) = arr2D(1:partit%myDim_elem2D)
+        call MPI_WAITALL(partit%npes-1, req, MPI_STATUSES_IGNORE, partit%MPIerr)
+        arr2D_global(partit%remList_elem2D(1 : partit%remPtr_elem2D(partit%npes)-1)) &
+                          = recvbuf(1 : partit%remPtr_elem2D(partit%npes)-1)
         deallocate(recvbuf)
      else
         arr2D_global(:) = arr2D(:)
      endif
   ELSE
      ! Modify arr2D to be an explicitly contiguous array with arr2D --> arr2D(1:myDim_elem2D)
-     call MPI_SEND(arr2D(1:myDim_elem2D), myDim_elem2D, MPI_INTEGER, 0, 2, MPI_COMM_FESOM, MPIerr )
+     call MPI_SEND(arr2D(1:partit%myDim_elem2D), partit%myDim_elem2D, MPI_INTEGER, 0, 2, partit%MPI_COMM_FESOM, partit%MPIerr )
   ENDIF
 end subroutine gather_elem2D_i
 !==============================================
@@ -2574,31 +2491,29 @@ integer              :: arr2D_global(:)
 integer, allocatable :: recvbuf(:)
 integer              :: req(partit%npes-1)
 integer              :: start, n2D
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-if (npes> 1) then
+if (partit%npes> 1) then
 
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,partit%MPIerr)
 
 ! Consider MPI-datatypes to recv directly into arr2D_global!
 
-IF ( mype == 0 ) THEN
+IF ( partit%mype == 0 ) THEN
 
-   if (npes>1) then
+   if (partit%npes>1) then
       allocate(recvbuf(ubound(arr2D_global, 1)))
-      do  n = 1, npes-1
-         n2D   = remPtr_nod2D(n+1) - remPtr_nod2D(n)
-         start = remPtr_nod2D(n)
-         call MPI_IRECV(recvbuf(start), n2D, MPI_INTEGER, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      do  n = 1, partit%npes-1
+         n2D   = partit%remPtr_nod2D(n+1) - partit%remPtr_nod2D(n)
+         start = partit%remPtr_nod2D(n)
+         call MPI_IRECV(recvbuf(start), n2D, MPI_INTEGER, n, 2, partit%MPI_COMM_FESOM, req(n), partit%MPIerr)
       enddo
 
-      arr2D_global(myList_nod2D(1:myDim_nod2D)) = arr2D(1:myDim_nod2D)
+      arr2D_global(partit%myList_nod2D(1:partit%myDim_nod2D)) = arr2D(1:partit%myDim_nod2D)
 
-      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+      call MPI_WAITALL(partit%npes-1, req, MPI_STATUSES_IGNORE, partit%MPIerr)
 
-      arr2D_global(remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
-                       = recvbuf(1 : remPtr_nod2D(npes)-1)
+      arr2D_global(partit%remList_nod2D(1 : partit%remPtr_nod2D(partit%npes)-1)) &
+                       = recvbuf(1 : partit%remPtr_nod2D(partit%npes)-1)
       deallocate(recvbuf)
    else
 
@@ -2608,7 +2523,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   call MPI_SEND( arr2D(1:myDim_nod2D), myDim_nod2D, MPI_INTEGER, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND( arr2D(1:partit%myDim_nod2D), partit%myDim_nod2D, MPI_INTEGER, 0, 2, partit%MPI_COMM_FESOM, partit%MPIerr )
 
 ENDIF
 
@@ -2622,19 +2537,18 @@ USE MOD_PARTIT
 use par_support_module, only: par_ex
 IMPLICIT NONE
 type(t_partit), intent(in), target      :: partit
+integer :: MPIerr
 real(kind=WP)                            :: arr2D(:)
 real(kind=WP)                            :: arr2Dglobal(:)
 integer                                 ::  i, n, buf_size, sender, status(MPI_STATUS_SIZE)
 INTEGER, ALLOCATABLE, DIMENSION(:)      ::  ibuf
 real(kind=WP), ALLOCATABLE, DIMENSION(:) ::  rbuf
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-IF ( mype == 0 ) THEN
-    arr2Dglobal(myList_edge2D(1:myDim_edge2D))=arr2D(1:myDim_edge2D)
-    DO  n = 1, npes-1
+IF ( partit%mype == 0 ) THEN
+    arr2Dglobal(partit%myList_edge2D(1:partit%myDim_edge2D))=arr2D(1:partit%myDim_edge2D)
+    DO  n = 1, partit%npes-1
        CALL MPI_RECV( buf_size, 1, MPI_INTEGER, MPI_ANY_SOURCE, &
-                      0, MPI_COMM_FESOM, status, MPIerr )
+                      0, partit%MPI_COMM_FESOM, status, MPIerr )
        sender = status(MPI_SOURCE)
        ALLOCATE(rbuf(buf_size), ibuf(buf_size))
 
@@ -2644,9 +2558,9 @@ IF ( mype == 0 ) THEN
 !PS                       2, MPI_COMM_FESOM, status, MPIerr )
                       
        CALL MPI_RECV(ibuf, buf_size, MPI_INTEGER, sender, &
-                      1, MPI_COMM_FESOM, status, MPIerr )
+                      1, partit%MPI_COMM_FESOM, status, MPIerr )
        CALL MPI_RECV(rbuf, buf_size, MPI_WP, sender, &
-                      2, MPI_COMM_FESOM, status, MPIerr )               
+                      2, partit%MPI_COMM_FESOM, status, MPIerr )               
        arr2Dglobal(ibuf)=rbuf
        DEALLOCATE(ibuf, rbuf)
     ENDDO
@@ -2657,14 +2571,14 @@ ELSE
 !PS     CALL MPI_SEND( arr2D(1), myDim_edge2D, MPI_WP, 0, 2,&
 !PS                    MPI_COMM_FESOM, MPIerr )
                    
-    CALL MPI_SEND( myDim_edge2D, 1, MPI_INTEGER, 0, 0, MPI_COMM_FESOM, MPIerr )
-    CALL MPI_SEND( myList_edge2D(1:myDim_edge2D), myDim_edge2D, MPI_INTEGER, 0, 1, &
-                   MPI_COMM_FESOM, MPIerr )
-    CALL MPI_SEND( arr2D(1:myDim_edge2D), myDim_edge2D, MPI_WP, 0, 2,&
-                   MPI_COMM_FESOM, MPIerr )
+    CALL MPI_SEND( partit%myDim_edge2D, 1, MPI_INTEGER, 0, 0, partit%MPI_COMM_FESOM, MPIerr )
+    CALL MPI_SEND( partit%myList_edge2D(1:partit%myDim_edge2D), partit%myDim_edge2D, MPI_INTEGER, 0, 1, &
+                   partit%MPI_COMM_FESOM, MPIerr )
+    CALL MPI_SEND( arr2D(1:partit%myDim_edge2D), partit%myDim_edge2D, MPI_WP, 0, 2,&
+                   partit%MPI_COMM_FESOM, MPIerr )
                    
 ENDIF
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,MPIerr)
 end subroutine gather_edg2D
 !
 !============================================================================
@@ -2679,14 +2593,12 @@ integer                                :: arr2D(:)
 integer                                :: arr2Dglobal(:)
 integer                                :: i, n, buf_size, sender, status(MPI_STATUS_SIZE)
 INTEGER, ALLOCATABLE, DIMENSION(:)     :: ibuf, vbuf
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-IF ( mype == 0 ) THEN
-    arr2Dglobal(myList_edge2D(1:myDim_edge2D))=arr2D(1:myDim_edge2D)
-    DO  n = 1, npes-1
+IF ( partit%mype == 0 ) THEN
+    arr2Dglobal(partit%myList_edge2D(1:partit%myDim_edge2D))=arr2D(1:partit%myDim_edge2D)
+    DO  n = 1, partit%npes-1
        CALL MPI_RECV( buf_size, 1, MPI_INTEGER, MPI_ANY_SOURCE, &
-                      0, MPI_COMM_FESOM, status, MPIerr )
+                      0, partit%MPI_COMM_FESOM, status, partit%MPIerr )
        sender = status(MPI_SOURCE)
        ALLOCATE(ibuf(buf_size), vbuf(buf_size))
 
@@ -2696,9 +2608,9 @@ IF ( mype == 0 ) THEN
 !PS                       2, MPI_COMM_FESOM, status, MPIerr )
 
        CALL MPI_RECV(ibuf, buf_size, MPI_INTEGER, sender, &
-                      1, MPI_COMM_FESOM, status, MPIerr )
+                      1, partit%MPI_COMM_FESOM, status, partit%MPIerr )
        CALL MPI_RECV(vbuf, buf_size, MPI_INTEGER, sender, &
-                      2, MPI_COMM_FESOM, status, MPIerr )               
+                      2, partit%MPI_COMM_FESOM, status, partit%MPIerr )               
        arr2Dglobal(ibuf)=vbuf
        DEALLOCATE(ibuf, vbuf)
     ENDDO
@@ -2709,15 +2621,15 @@ ELSE
 !PS     CALL MPI_SEND( arr2D(1), myDim_edge2D, MPI_INTEGER, 0, 2,&
 !PS                    MPI_COMM_FESOM, MPIerr )
                    
-    CALL MPI_SEND( myDim_edge2D, 1, MPI_INTEGER, 0, 0, MPI_COMM_FESOM, MPIerr )
-    CALL MPI_SEND( myList_edge2D(1:myDim_edge2D), myDim_edge2D, MPI_INTEGER, 0, 1, &
-                   MPI_COMM_FESOM, MPIerr )
-    CALL MPI_SEND( arr2D(1:myDim_edge2D), myDim_edge2D, MPI_INTEGER, 0, 2,&
-                   MPI_COMM_FESOM, MPIerr )
+    CALL MPI_SEND( partit%myDim_edge2D, 1, MPI_INTEGER, 0, 0, partit%MPI_COMM_FESOM, partit%MPIerr )
+    CALL MPI_SEND( partit%myList_edge2D(1:partit%myDim_edge2D), partit%myDim_edge2D, MPI_INTEGER, 0, 1, &
+                   partit%MPI_COMM_FESOM, partit%MPIerr )
+    CALL MPI_SEND( arr2D(1:partit%myDim_edge2D), partit%myDim_edge2D, MPI_INTEGER, 0, 2,&
+                   partit%MPI_COMM_FESOM, partit%MPIerr )
                    
                    
 ENDIF
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,partit%MPIerr)
 end subroutine gather_edg2D_i
 !==============================================
 
@@ -2742,31 +2654,29 @@ real(real64)                           :: arr2D_global(:,:)
 real(real64), allocatable              :: recvbuf(:,:)
 integer                                :: req(partit%npes-1)
 integer                                :: start, n2D
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-if (npes> 1) then
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+if (partit%npes> 1) then
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,partit%MPIerr)
 
 nfbin=ubound(arr2D,1)
 
-IF ( mype == 0 ) THEN
+IF ( partit%mype == 0 ) THEN
 
-   if (npes>1) then
+   if (partit%npes>1) then
       allocate(recvbuf(nfbin,ubound(arr2D_global,2)))
 
-      do  n = 1, npes-1
-         n2D = (remPtr_nod2D(n+1) - remPtr_nod2D(n))*nfbin
-         start = remPtr_nod2D(n)
-         call MPI_IRECV(recvbuf(1,start), n2D, MPI_DOUBLE_PRECISION, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      do  n = 1, partit%npes-1
+         n2D = (partit%remPtr_nod2D(n+1) - partit%remPtr_nod2D(n))*nfbin
+         start = partit%remPtr_nod2D(n)
+         call MPI_IRECV(recvbuf(1,start), n2D, MPI_DOUBLE_PRECISION, n, 2, partit%MPI_COMM_FESOM, req(n), partit%MPIerr)
       enddo
 
-      arr2D_global(1:nfbin,myList_nod2D(1:myDim_nod2D)) = arr2D(1:nfbin,1:myDim_nod2D)
+      arr2D_global(1:nfbin,partit%myList_nod2D(1:partit%myDim_nod2D)) = arr2D(1:nfbin,1:partit%myDim_nod2D)
 
-      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+      call MPI_WAITALL(partit%npes-1, req, MPI_STATUSES_IGNORE, partit%MPIerr)
 
-      arr2D_global(1:nfbin, remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
-                       = recvbuf(1:nfbin, 1 : remPtr_nod2D(npes)-1)
+      arr2D_global(1:nfbin, partit%remList_nod2D(1 : partit%remPtr_nod2D(partit%npes)-1)) &
+                       = recvbuf(1:nfbin, 1 : partit%remPtr_nod2D(partit%npes)-1)
 
       deallocate(recvbuf)
 
@@ -2776,7 +2686,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   call MPI_SEND( arr2D, myDim_nod2D*nfbin, MPI_DOUBLE_PRECISION, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND( arr2D, partit%myDim_nod2D*nfbin, MPI_DOUBLE_PRECISION, 0, 2, partit%MPI_COMM_FESOM, partit%MPIerr )
 
 ENDIF
 
@@ -2799,31 +2709,29 @@ real(real64)                           :: arr2D_global(:,:)
 real(real64), allocatable              :: recvbuf(:,:)
 integer                                :: req(partit%npes-1)
 integer                                :: start, n2D
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-if (npes> 1) then
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+if (partit%npes> 1) then
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,partit%MPIerr)
 
 nfbin=ubound(arr2D,1)
 
-IF ( mype == 0 ) THEN
+IF ( partit%mype == 0 ) THEN
 
-   if (npes>1) then
+   if (partit%npes>1) then
       allocate(recvbuf(nfbin,ubound(arr2D_global,2)))
 
-      do  n = 1, npes-1
-         n2D = (remPtr_elem2D(n+1) - remPtr_elem2D(n))*nfbin
-         start = remPtr_elem2D(n)
-         call MPI_IRECV(recvbuf(1,start), n2D, MPI_DOUBLE_PRECISION, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      do  n = 1, partit%npes-1
+         n2D = (partit%remPtr_elem2D(n+1) - partit%remPtr_elem2D(n))*nfbin
+         start = partit%remPtr_elem2D(n)
+         call MPI_IRECV(recvbuf(1,start), n2D, MPI_DOUBLE_PRECISION, n, 2, partit%MPI_COMM_FESOM, req(n), partit%MPIerr)
       enddo
 
-      arr2D_global(1:nfbin,myList_elem2D(1:myDim_elem2D)) = arr2D(1:nfbin,1:myDim_elem2D)
+      arr2D_global(1:nfbin,partit%myList_elem2D(1:partit%myDim_elem2D)) = arr2D(1:nfbin,1:partit%myDim_elem2D)
 
-      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+      call MPI_WAITALL(partit%npes-1, req, MPI_STATUSES_IGNORE, partit%MPIerr)
 
-      arr2D_global(1:nfbin, remList_elem2D(1 : remPtr_elem2D(npes)-1)) &
-                       = recvbuf(1:nfbin, 1 : remPtr_elem2D(npes)-1)
+      arr2D_global(1:nfbin, partit%remList_elem2D(1 : partit%remPtr_elem2D(partit%npes)-1)) &
+                       = recvbuf(1:nfbin, 1 : partit%remPtr_elem2D(partit%npes)-1)
 
       deallocate(recvbuf)
 
@@ -2833,7 +2741,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   call MPI_SEND( arr2D, myDim_elem2D*nfbin, MPI_DOUBLE_PRECISION, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND( arr2D, partit%myDim_elem2D*nfbin, MPI_DOUBLE_PRECISION, 0, 2, partit%MPI_COMM_FESOM, partit%MPIerr )
 
 ENDIF
 
@@ -2856,31 +2764,29 @@ real(real32)                           :: arr2D_global(:,:)
 real(real32), allocatable              :: recvbuf(:,:)
 integer                                :: req(partit%npes-1)
 integer                                :: start, n2D
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-if (npes> 1) then
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+if (partit%npes> 1) then
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,partit%MPIerr)
 
 nfbin=ubound(arr2D,1)
 
-IF ( mype == 0 ) THEN
+IF ( partit%mype == 0 ) THEN
 
-   if (npes>1) then
+   if (partit%npes>1) then
       allocate(recvbuf(nfbin,ubound(arr2D_global,2)))
 
-      do  n = 1, npes-1
-         n2D = (remPtr_nod2D(n+1) - remPtr_nod2D(n))*nfbin
-         start = remPtr_nod2D(n)
-         call MPI_IRECV(recvbuf(1,start), n2D, MPI_REAL, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      do  n = 1, partit%npes-1
+         n2D = (partit%remPtr_nod2D(n+1) - partit%remPtr_nod2D(n))*nfbin
+         start = partit%remPtr_nod2D(n)
+         call MPI_IRECV(recvbuf(1,start), n2D, MPI_REAL, n, 2, partit%MPI_COMM_FESOM, req(n), partit%MPIerr)
       enddo
 
-      arr2D_global(1:nfbin,myList_nod2D(1:myDim_nod2D)) = arr2D(1:nfbin,1:myDim_nod2D)
+      arr2D_global(1:nfbin,partit%myList_nod2D(1:partit%myDim_nod2D)) = arr2D(1:nfbin,1:partit%myDim_nod2D)
 
-      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+      call MPI_WAITALL(partit%npes-1, req, MPI_STATUSES_IGNORE, partit%MPIerr)
 
-      arr2D_global(1:nfbin, remList_nod2D(1 : remPtr_nod2D(npes)-1)) &
-                       = recvbuf(1:nfbin, 1 : remPtr_nod2D(npes)-1)
+      arr2D_global(1:nfbin, partit%remList_nod2D(1 : partit%remPtr_nod2D(partit%npes)-1)) &
+                       = recvbuf(1:nfbin, 1 : partit%remPtr_nod2D(partit%npes)-1)
 
       deallocate(recvbuf)
 
@@ -2890,7 +2796,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   call MPI_SEND( arr2D, myDim_nod2D*nfbin, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND( arr2D, partit%myDim_nod2D*nfbin, MPI_REAL, 0, 2, partit%MPI_COMM_FESOM, partit%MPIerr )
 
 ENDIF
 
@@ -2913,31 +2819,29 @@ real(real32)                           :: arr2D_global(:,:)
 real(real32), allocatable              :: recvbuf(:,:)
 integer                                :: req(partit%npes-1)
 integer                                :: start, n2D
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-if (npes> 1) then
-CALL MPI_BARRIER(MPI_COMM_FESOM,MPIerr)
+if (partit%npes> 1) then
+CALL MPI_BARRIER(partit%MPI_COMM_FESOM,partit%MPIerr)
 
 nfbin=ubound(arr2D,1)
 
-IF ( mype == 0 ) THEN
+IF ( partit%mype == 0 ) THEN
 
-   if (npes>1) then
+   if (partit%npes>1) then
       allocate(recvbuf(nfbin,ubound(arr2D_global,2)))
 
-      do  n = 1, npes-1
-         n2D = (remPtr_elem2D(n+1) - remPtr_elem2D(n))*nfbin
-         start = remPtr_elem2D(n)
-         call MPI_IRECV(recvbuf(1,start), n2D, MPI_REAL, n, 2, MPI_COMM_FESOM, req(n), MPIerr)
+      do  n = 1, partit%npes-1
+         n2D = (partit%remPtr_elem2D(n+1) - partit%remPtr_elem2D(n))*nfbin
+         start = partit%remPtr_elem2D(n)
+         call MPI_IRECV(recvbuf(1,start), n2D, MPI_REAL, n, 2, partit%MPI_COMM_FESOM, req(n), partit%MPIerr)
       enddo
 
-      arr2D_global(1:nfbin,myList_elem2D(1:myDim_elem2D)) = arr2D(1:nfbin,1:myDim_elem2D)
+      arr2D_global(1:nfbin,partit%myList_elem2D(1:partit%myDim_elem2D)) = arr2D(1:nfbin,1:partit%myDim_elem2D)
 
-      call MPI_WAITALL(npes-1, req, MPI_STATUSES_IGNORE, MPIerr)
+      call MPI_WAITALL(partit%npes-1, req, MPI_STATUSES_IGNORE, partit%MPIerr)
 
-      arr2D_global(1:nfbin, remList_elem2D(1 : remPtr_elem2D(npes)-1)) &
-                       = recvbuf(1:nfbin, 1 : remPtr_elem2D(npes)-1)
+      arr2D_global(1:nfbin, partit%remList_elem2D(1 : partit%remPtr_elem2D(partit%npes)-1)) &
+                       = recvbuf(1:nfbin, 1 : partit%remPtr_elem2D(partit%npes)-1)
 
       deallocate(recvbuf)
 
@@ -2947,7 +2851,7 @@ IF ( mype == 0 ) THEN
 
 ELSE
 
-   call MPI_SEND( arr2D, myDim_elem2D*nfbin, MPI_REAL, 0, 2, MPI_COMM_FESOM, MPIerr )
+   call MPI_SEND( arr2D, partit%myDim_elem2D*nfbin, MPI_REAL, 0, 2, partit%MPI_COMM_FESOM, partit%MPIerr )
 
 ENDIF
 
@@ -2991,29 +2895,27 @@ IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(kind=WP),   intent(inout)         :: nod_array(:,:)
 integer                               :: n, sn, rn
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-if (npes > 1) then
-   if (nfbin_mpi == 0) then
-      if (mype==0) print *,'ERROR: exchange_nod2D_fbin called but init_mpi_types_fbin was not called.'
+if (partit%npes > 1) then
+   if (partit%nfbin_mpi == 0) then
+      if (partit%mype==0) print *,'ERROR: exchange_nod2D_fbin called but init_mpi_types_fbin was not called.'
       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
    endif
 
-   sn=com_nod2D%sPEnum
-   rn=com_nod2D%rPEnum
+   sn=partit%com_nod2D%sPEnum
+   rn=partit%com_nod2D%rPEnum
 
    ! Exchange full spectral column at once (n_val=1 for 2D array)
    DO n=1,rn
-      call MPI_IRECV(nod_array, 1, r_mpitype_nod3D_fbin(n,nfbin_mpi,1), com_nod2D%rPE(n), &
-           com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr)
+      call MPI_IRECV(nod_array, 1, partit%r_mpitype_nod3D_fbin(n,partit%nfbin_mpi,1), partit%com_nod2D%rPE(n), &
+           partit%com_nod2D%rPE(n), partit%MPI_COMM_FESOM, partit%com_nod2D%req(n), partit%MPIerr)
    END DO
    DO n=1, sn
-      call MPI_ISEND(nod_array, 1, s_mpitype_nod3D_fbin(n,nfbin_mpi,1), com_nod2D%sPE(n), &
-           mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
+      call MPI_ISEND(nod_array, 1, partit%s_mpitype_nod3D_fbin(n,partit%nfbin_mpi,1), partit%com_nod2D%sPE(n), &
+           partit%mype, partit%MPI_COMM_FESOM, partit%com_nod2D%req(rn+n), partit%MPIerr)
    END DO
-   com_nod2D%nreq = rn+sn
-   call MPI_WAITALL(com_nod2D%nreq, com_nod2D%req, MPI_STATUSES_IGNORE, MPIerr)
+   partit%com_nod2D%nreq = rn+sn
+   call MPI_WAITALL(partit%com_nod2D%nreq, partit%com_nod2D%req, MPI_STATUSES_IGNORE, partit%MPIerr)
 endif
 END SUBROUTINE exchange_nod2D_fbin_begin
 
@@ -3041,36 +2943,34 @@ IMPLICIT NONE
 type(t_partit), intent(inout), target :: partit
 real(kind=WP),   intent(inout)         :: nod_array(:,:,:)
 integer                               :: n, sn, rn, n_val
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-if (npes > 1) then
-   if (nfbin_mpi == 0) then
-      if (mype==0) print *,'ERROR: exchange_nod3D_fbin called but init_mpi_types_fbin was not called.'
+if (partit%npes > 1) then
+   if (partit%nfbin_mpi == 0) then
+      if (partit%mype==0) print *,'ERROR: exchange_nod3D_fbin called but init_mpi_types_fbin was not called.'
       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
    endif
 
    ! nod_array(n_val, nfbin, nod2D)
    n_val = ubound(nod_array,1)
    if (n_val < 1 .or. n_val > 3) then
-      if (mype==0) print *,'exchange_nod3D_fbin: n_val must be 1..3, got', n_val
+      if (partit%mype==0) print *,'exchange_nod3D_fbin: n_val must be 1..3, got', n_val
       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
    endif
 
-   sn=com_nod2D%sPEnum
-   rn=com_nod2D%rPEnum
+   sn=partit%com_nod2D%sPEnum
+   rn=partit%com_nod2D%rPEnum
 
    ! Exchange full spectral column at once
    DO n=1,rn
-      call MPI_IRECV(nod_array, 1, r_mpitype_nod3D_fbin(n,nfbin_mpi,n_val), com_nod2D%rPE(n), &
-           com_nod2D%rPE(n), MPI_COMM_FESOM, com_nod2D%req(n), MPIerr)
+      call MPI_IRECV(nod_array, 1, partit%r_mpitype_nod3D_fbin(n,partit%nfbin_mpi,n_val), partit%com_nod2D%rPE(n), &
+           partit%com_nod2D%rPE(n), partit%MPI_COMM_FESOM, partit%com_nod2D%req(n), partit%MPIerr)
    END DO
    DO n=1, sn
-      call MPI_ISEND(nod_array, 1, s_mpitype_nod3D_fbin(n,nfbin_mpi,n_val), com_nod2D%sPE(n), &
-           mype, MPI_COMM_FESOM, com_nod2D%req(rn+n), MPIerr)
+      call MPI_ISEND(nod_array, 1, partit%s_mpitype_nod3D_fbin(n,partit%nfbin_mpi,n_val), partit%com_nod2D%sPE(n), &
+           partit%mype, partit%MPI_COMM_FESOM, partit%com_nod2D%req(rn+n), partit%MPIerr)
    END DO
-   com_nod2D%nreq = rn+sn
-   call MPI_WAITALL(com_nod2D%nreq, com_nod2D%req, MPI_STATUSES_IGNORE, MPIerr)
+   partit%com_nod2D%nreq = rn+sn
+   call MPI_WAITALL(partit%com_nod2D%nreq, partit%com_nod2D%req, MPI_STATUSES_IGNORE, partit%MPIerr)
 endif
 END SUBROUTINE exchange_nod3D_fbin_begin
 
@@ -3084,10 +2984,8 @@ use par_support_module, only: par_ex
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(kind=WP),   intent(inout)          :: elem_array(:,:)
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-if (npes > 1) then
+if (partit%npes > 1) then
    call exchange_elem2D_fbin_begin(elem_array, partit)
    call exchange_elem_end(partit)
 endif
@@ -3101,49 +2999,47 @@ IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(kind=WP),   intent(inout)          :: elem_array(:,:)
 integer                                :: n, sn, rn
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-if (npes > 1) then
-   if (nfbin_mpi == 0) then
-      if (mype==0) print *,'ERROR: exchange_elem2D_fbin called but init_mpi_types_fbin was not called.'
+if (partit%npes > 1) then
+   if (partit%nfbin_mpi == 0) then
+      if (partit%mype==0) print *,'ERROR: exchange_elem2D_fbin called but init_mpi_types_fbin was not called.'
       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
    endif
 
-   if (ubound(elem_array,2)<=myDim_elem2D+eDim_elem2D) then
+   if (ubound(elem_array,2)<=partit%myDim_elem2D+partit%eDim_elem2D) then
       ! small halo
-      elem_full_flag = .false.
-      sn=com_elem2D%sPEnum
-      rn=com_elem2D%rPEnum
+      partit%elem_full_flag = .false.
+      sn=partit%com_elem2D%sPEnum
+      rn=partit%com_elem2D%rPEnum
 
       ! Exchange full spectral column at once
       DO n=1,rn
-         call MPI_IRECV(elem_array, 1, r_mpitype_elem2D_fbin(n,nfbin_mpi), com_elem2D%rPE(n), &
-              com_elem2D%rPE(n), MPI_COMM_FESOM, com_elem2D%req(n), MPIerr)
+         call MPI_IRECV(elem_array, 1, partit%r_mpitype_elem2D_fbin(n,partit%nfbin_mpi), partit%com_elem2D%rPE(n), &
+              partit%com_elem2D%rPE(n), partit%MPI_COMM_FESOM, partit%com_elem2D%req(n), partit%MPIerr)
       END DO
       DO n=1, sn
-         call MPI_ISEND(elem_array, 1, s_mpitype_elem2D_fbin(n,nfbin_mpi), com_elem2D%sPE(n), &
-              mype, MPI_COMM_FESOM, com_elem2D%req(rn+n), MPIerr)
+         call MPI_ISEND(elem_array, 1, partit%s_mpitype_elem2D_fbin(n,partit%nfbin_mpi), partit%com_elem2D%sPE(n), &
+              partit%mype, partit%MPI_COMM_FESOM, partit%com_elem2D%req(rn+n), partit%MPIerr)
       END DO
-      com_elem2D%nreq = rn+sn
-      call MPI_WAITALL(com_elem2D%nreq, com_elem2D%req, MPI_STATUSES_IGNORE, MPIerr)
+      partit%com_elem2D%nreq = rn+sn
+      call MPI_WAITALL(partit%com_elem2D%nreq, partit%com_elem2D%req, MPI_STATUSES_IGNORE, partit%MPIerr)
    else
       ! full halo
-      elem_full_flag = .true.
-      sn=com_elem2D_full%sPEnum
-      rn=com_elem2D_full%rPEnum
+      partit%elem_full_flag = .true.
+      sn=partit%com_elem2D_full%sPEnum
+      rn=partit%com_elem2D_full%rPEnum
 
       ! Exchange full spectral column at once
       DO n=1,rn
-         call MPI_IRECV(elem_array, 1, r_mpitype_elem2D_full_fbin(n,nfbin_mpi), com_elem2D_full%rPE(n), &
-              com_elem2D_full%rPE(n), MPI_COMM_FESOM, com_elem2D_full%req(n), MPIerr)
+         call MPI_IRECV(elem_array, 1, partit%r_mpitype_elem2D_full_fbin(n,partit%nfbin_mpi), partit%com_elem2D_full%rPE(n), &
+              partit%com_elem2D_full%rPE(n), partit%MPI_COMM_FESOM, partit%com_elem2D_full%req(n), partit%MPIerr)
       END DO
       DO n=1, sn
-         call MPI_ISEND(elem_array, 1, s_mpitype_elem2D_full_fbin(n,nfbin_mpi), com_elem2D_full%sPE(n), &
-              mype, MPI_COMM_FESOM, com_elem2D_full%req(rn+n), MPIerr)
+         call MPI_ISEND(elem_array, 1, partit%s_mpitype_elem2D_full_fbin(n,partit%nfbin_mpi), partit%com_elem2D_full%sPE(n), &
+              partit%mype, partit%MPI_COMM_FESOM, partit%com_elem2D_full%req(rn+n), partit%MPIerr)
       END DO
-      com_elem2D_full%nreq = rn+sn
-      call MPI_WAITALL(com_elem2D_full%nreq, com_elem2D_full%req, MPI_STATUSES_IGNORE, MPIerr)
+      partit%com_elem2D_full%nreq = rn+sn
+      call MPI_WAITALL(partit%com_elem2D_full%nreq, partit%com_elem2D_full%req, MPI_STATUSES_IGNORE, partit%MPIerr)
    endif
 endif
 END SUBROUTINE exchange_elem2D_fbin_begin
@@ -3158,10 +3054,8 @@ use par_support_module, only: par_ex
 IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(kind=WP),   intent(inout)          :: elem_array(:,:,:)
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-if (npes > 1) then
+if (partit%npes > 1) then
    call exchange_elem3D_fbin_begin(elem_array, partit)
    call exchange_elem_end(partit)
 endif
@@ -3175,56 +3069,54 @@ IMPLICIT NONE
 type(t_partit), intent(inout), target  :: partit
 real(kind=WP),   intent(inout)          :: elem_array(:,:,:)
 integer                                :: n, sn, rn, n_val
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
-if (npes > 1) then
-   if (nfbin_mpi == 0) then
-      if (mype==0) print *,'ERROR: exchange_elem3D_fbin called but init_mpi_types_fbin was not called.'
+if (partit%npes > 1) then
+   if (partit%nfbin_mpi == 0) then
+      if (partit%mype==0) print *,'ERROR: exchange_elem3D_fbin called but init_mpi_types_fbin was not called.'
       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
    endif
 
    ! elem_array(n_val, nfbin, elem2D)
    n_val = ubound(elem_array,1)
    if (n_val < 1 .or. n_val > 4) then
-      if (mype==0) print *,'exchange_elem3D_fbin: n_val must be 1..4, got', n_val
+      if (partit%mype==0) print *,'exchange_elem3D_fbin: n_val must be 1..4, got', n_val
       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
    endif
 
-   if (ubound(elem_array,3)<=myDim_elem2D+eDim_elem2D) then
+   if (ubound(elem_array,3)<=partit%myDim_elem2D+partit%eDim_elem2D) then
       ! small halo
-      elem_full_flag = .false.
-      sn=com_elem2D%sPEnum
-      rn=com_elem2D%rPEnum
+      partit%elem_full_flag = .false.
+      sn=partit%com_elem2D%sPEnum
+      rn=partit%com_elem2D%rPEnum
 
       ! Exchange full spectral column at once
       DO n=1,rn
-         call MPI_IRECV(elem_array, 1, r_mpitype_elem3D_fbin(n,nfbin_mpi,n_val), com_elem2D%rPE(n), &
-              com_elem2D%rPE(n), MPI_COMM_FESOM, com_elem2D%req(n), MPIerr)
+         call MPI_IRECV(elem_array, 1, partit%r_mpitype_elem3D_fbin(n,partit%nfbin_mpi,n_val), partit%com_elem2D%rPE(n), &
+              partit%com_elem2D%rPE(n), partit%MPI_COMM_FESOM, partit%com_elem2D%req(n), partit%MPIerr)
       END DO
       DO n=1, sn
-         call MPI_ISEND(elem_array, 1, s_mpitype_elem3D_fbin(n,nfbin_mpi,n_val), com_elem2D%sPE(n), &
-              mype, MPI_COMM_FESOM, com_elem2D%req(rn+n), MPIerr)
+         call MPI_ISEND(elem_array, 1, partit%s_mpitype_elem3D_fbin(n,partit%nfbin_mpi,n_val), partit%com_elem2D%sPE(n), &
+              partit%mype, partit%MPI_COMM_FESOM, partit%com_elem2D%req(rn+n), partit%MPIerr)
       END DO
-      com_elem2D%nreq = rn+sn
-      call MPI_WAITALL(com_elem2D%nreq, com_elem2D%req, MPI_STATUSES_IGNORE, MPIerr)
+      partit%com_elem2D%nreq = rn+sn
+      call MPI_WAITALL(partit%com_elem2D%nreq, partit%com_elem2D%req, MPI_STATUSES_IGNORE, partit%MPIerr)
    else
       ! full halo
-      elem_full_flag = .true.
-      sn=com_elem2D_full%sPEnum
-      rn=com_elem2D_full%rPEnum
+      partit%elem_full_flag = .true.
+      sn=partit%com_elem2D_full%sPEnum
+      rn=partit%com_elem2D_full%rPEnum
 
       ! Exchange full spectral column at once
       DO n=1,rn
-         call MPI_IRECV(elem_array, 1, r_mpitype_elem3D_full_fbin(n,nfbin_mpi,n_val), com_elem2D_full%rPE(n), &
-              com_elem2D_full%rPE(n), MPI_COMM_FESOM, com_elem2D_full%req(n), MPIerr)
+         call MPI_IRECV(elem_array, 1, partit%r_mpitype_elem3D_full_fbin(n,partit%nfbin_mpi,n_val), partit%com_elem2D_full%rPE(n), &
+              partit%com_elem2D_full%rPE(n), partit%MPI_COMM_FESOM, partit%com_elem2D_full%req(n), partit%MPIerr)
       END DO
       DO n=1, sn
-         call MPI_ISEND(elem_array, 1, s_mpitype_elem3D_full_fbin(n,nfbin_mpi,n_val), com_elem2D_full%sPE(n), &
-              mype, MPI_COMM_FESOM, com_elem2D_full%req(rn+n), MPIerr)
+         call MPI_ISEND(elem_array, 1, partit%s_mpitype_elem3D_full_fbin(n,partit%nfbin_mpi,n_val), partit%com_elem2D_full%sPE(n), &
+              partit%mype, partit%MPI_COMM_FESOM, partit%com_elem2D_full%req(rn+n), partit%MPIerr)
       END DO
-      com_elem2D_full%nreq = rn+sn
-      call MPI_WAITALL(com_elem2D_full%nreq, com_elem2D_full%req, MPI_STATUSES_IGNORE, MPIerr)
+      partit%com_elem2D_full%nreq = rn+sn
+      call MPI_WAITALL(partit%com_elem2D_full%nreq, partit%com_elem2D_full%req, MPI_STATUSES_IGNORE, partit%MPIerr)
    endif
 endif
 END SUBROUTINE exchange_elem3D_fbin_begin
