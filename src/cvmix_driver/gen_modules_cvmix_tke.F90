@@ -141,13 +141,9 @@ module g_cvmix_tke
         integer                               :: node_size
         integer fileunit
 
-#include "../associate_part_def.h"
-#include "../associate_mesh_def.h"
-#include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h"
 
         !_______________________________________________________________________
-        if(mype==0) then
+        if(partit%mype==0) then
             write(*,*) '____________________________________________________________'
             write(*,*) ' --> initialise CVMIX_TKE'
             write(*,*)
@@ -155,9 +151,9 @@ module g_cvmix_tke
         
         !_______________________________________________________________________
         ! allocate + initialse tke arrays --> with size myDim_nod2D+eDim_nod2D
-        node_size=myDim_nod2D+eDim_nod2D
+        node_size=partit%myDim_nod2D+partit%eDim_nod2D
         ! initialise TKE viscosities and diffusivities
-        allocate(tke_Av(nl,node_size),tke_Kv(nl,node_size))
+        allocate(tke_Av(mesh%nl,node_size),tke_Kv(mesh%nl,node_size))
         tke_Av        = 0.0_WP
         tke_Kv        = 0.0_WP
         
@@ -170,38 +166,38 @@ module g_cvmix_tke
         tke_forc2d_rhosurf   = 0.0_WP ! --> Nils B.: has yet no function is for later extension
         
         ! initialize 2D TKE input fields that come from IDEMIX
-        allocate(tke_in3d_iwe(nl, node_size))
-        allocate(tke_in3d_iwdis(nl, node_size))
-        allocate(tke_in3d_iwealphac(nl, node_size))
+        allocate(tke_in3d_iwe(mesh%nl, node_size))
+        allocate(tke_in3d_iwdis(mesh%nl, node_size))
+        allocate(tke_in3d_iwealphac(mesh%nl, node_size))
         tke_in3d_iwe       = 0.0_WP
         tke_in3d_iwdis     = 0.0_WP
         tke_in3d_iwealphac = 0.0_WP
         
         ! initialise dummy values for debugging
-        allocate(cvmix_dummy_1(nl,node_size))
-        allocate(cvmix_dummy_2(nl,node_size))
-        allocate(cvmix_dummy_3(nl,node_size))
+        allocate(cvmix_dummy_1(mesh%nl,node_size))
+        allocate(cvmix_dummy_2(mesh%nl,node_size))
+        allocate(cvmix_dummy_3(mesh%nl,node_size))
         cvmix_dummy_1  = 0.0_WP
         cvmix_dummy_2  = 0.0_WP
         cvmix_dummy_3  = 0.0_WP
         
         ! initialise TKE diagnostic
-        allocate(tke(nl,node_size))
+        allocate(tke(mesh%nl,node_size))
         tke            = 0.0_WP
         
-        allocate(tke_Pr(nl,node_size))
-        allocate(tke_Lmix(nl,node_size))
+        allocate(tke_Pr(mesh%nl,node_size))
+        allocate(tke_Lmix(mesh%nl,node_size))
         tke_Pr         = 0.0_WP
         tke_Lmix       = 0.0_WP
         
-        allocate(tke_Tbpr(nl,node_size))
-        allocate(tke_Tspr(nl,node_size))
-        allocate(tke_Tdif(nl,node_size))
-        allocate(tke_Tdis(nl,node_size))
-        allocate(tke_Tiwf(nl,node_size))
-        allocate(tke_Twin(nl,node_size))
-        allocate(tke_Tbck(nl,node_size))
-        allocate(tke_Ttot(nl,node_size))
+        allocate(tke_Tbpr(mesh%nl,node_size))
+        allocate(tke_Tspr(mesh%nl,node_size))
+        allocate(tke_Tdif(mesh%nl,node_size))
+        allocate(tke_Tdis(mesh%nl,node_size))
+        allocate(tke_Tiwf(mesh%nl,node_size))
+        allocate(tke_Twin(mesh%nl,node_size))
+        allocate(tke_Tbck(mesh%nl,node_size))
+        allocate(tke_Ttot(mesh%nl,node_size))
         tke_Tbpr       = 0.0_WP
         tke_Tspr       = 0.0_WP
         tke_Tdif       = 0.0_WP
@@ -230,7 +226,7 @@ module g_cvmix_tke
         !_______________________________________________________________________
         if(mix_scheme_nmb==56 .or. mix_scheme_nmb==57) tke_only=.False.
         
-        if (mype==0) then
+        if (partit%mype==0) then
             write(*,*) "     tke_only       = ", tke_only
             write(*,*) "     tke_c_k        = ", tke_c_k
             write(*,*) "     tke_c_eps      = ", tke_c_eps
@@ -247,10 +243,10 @@ module g_cvmix_tke
         
         !_______________________________________________________________________
         !langmuir parameterisation
-        allocate(tke_langmuir(nl,node_size))
+        allocate(tke_langmuir(mesh%nl,node_size))
         tke_langmuir    = 0.0_WP
         if (tke_dolangmuir) then
-            allocate(langmuir_wlc(nl,node_size))
+            allocate(langmuir_wlc(mesh%nl,node_size))
             allocate(langmuir_hlc(node_size))
             allocate(langmuir_ustoke(node_size))
             langmuir_wlc    = 0.0_WP
@@ -308,13 +304,9 @@ module g_cvmix_tke
         real(cvmix_r8) :: lmix_r8(mesh%nl), pr_r8(mesh%nl)
         real(cvmix_r8) :: int1_r8(mesh%nl), int2_r8(mesh%nl), int3_r8(mesh%nl)
     
-#include "../associate_part_def.h"
-#include "../associate_mesh_def.h"
-#include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h"
         UVnode=>dynamics%uvnode(:,:,:)
         
-        node_size = myDim_nod2D
+        node_size = partit%myDim_nod2D
         !_______________________________________________________________________
         ! calculate all neccessary forcing for TKE 
         tke_forc2d_normstress = 0.0_WP
@@ -344,8 +336,8 @@ module g_cvmix_tke
         do node = 1,node_size
             !___________________________________________________________________
             ! number of above bottom levels at node
-            nln = nlevels_nod2D(node)-1
-            nun = ulevels_nod2D(node)
+            nln = mesh%nlevels_nod2D(node)-1
+            nun = mesh%ulevels_nod2D(node)
             
             !___________________________________________________________________
             ! calcualte for TKE surface momentum forcing --> norm of nodal 
@@ -369,7 +361,7 @@ module g_cvmix_tke
             do nz=nun+1,nln
                 vshear2(nz)=(( UVnode(1, nz-1, node) - UVnode(1, nz, node))**2 + &
                              ( UVnode(2, nz-1, node) - UVnode(2, nz, node))**2)/ &
-                             ((Z_3d_n(nz-1,node)-Z_3d_n(nz,node))**2)
+                             ((mesh%Z_3d_n(nz-1,node)-mesh%Z_3d_n(nz,node))**2)
             end do 
             
             !___________________________________________________________________
@@ -390,9 +382,9 @@ module g_cvmix_tke
             ! dz_trr distance between tracer points, surface and bottom dz_trr is half 
             ! the layerthickness ...
             dz_trr            = 0.0_WP
-            dz_trr(nun+1:nln) = abs(Z_3d_n(nun:nln-1,node)-Z_3d_n(nun+1:nln,node))
-            dz_trr(nun)       = hnode(nun,node)/2.0_WP
-            dz_trr(nln+1)     = hnode(nln,node)/2.0_WP
+            dz_trr(nun+1:nln) = abs(mesh%Z_3d_n(nun:nln-1,node)-mesh%Z_3d_n(nun+1:nln,node))
+            dz_trr(nun)       = mesh%hnode(nun,node)/2.0_WP
+            dz_trr(nln+1)     = mesh%hnode(nln,node)/2.0_WP
             
             !___________________________________________________________________
             ! calculate Langmuir cell additional term after Axell (2002)
@@ -429,10 +421,10 @@ module g_cvmix_tke
                 langmuir_hlc(node) = 0.0_wp
                 do nz=nun+1,nln
                     !!PS k_hlc = nz
-                    aux = sum( -bvfreq2(2:nz+1)*zbar_3d_n(2:nz+1,node) )
+                    aux = sum( -bvfreq2(2:nz+1)*mesh%zbar_3d_n(2:nz+1,node) )
                     if(aux > 0.5_wp*langmuir_ustoke(node)**2.0_wp) then
                         !!PS k_hlc = nz
-                        langmuir_hlc(node) = -zbar_3d_n(nz,node)
+                        langmuir_hlc(node) = -mesh%zbar_3d_n(nz,node)
                         exit
                     end if 
                 end do
@@ -443,9 +435,9 @@ module g_cvmix_tke
                 ! Axell (2002); results in deeper MLDs and better spatial MLD pattern.
                 langmuir_wlc(:,node) = 0.0_wp
                 do nz=nun+1,nln    
-                    if(-zbar_3d_n(nz,node) <= langmuir_hlc(node)) then
+                    if(-mesh%zbar_3d_n(nz,node) <= langmuir_hlc(node)) then
                         langmuir_wlc(nz,node) = tke_clangmuir * langmuir_ustoke(node) * &
-                        sin(-pi*zbar_3d_n(nz,node)/langmuir_hlc(node))
+                        sin(-pi*mesh%zbar_3d_n(nz,node)/langmuir_hlc(node))
                     !!PS else
                     !!PS     langmuir_wlc(nz,node) = 0.0_wp
                     endif
@@ -468,7 +460,7 @@ module g_cvmix_tke
             tke_old    = tke(:,node)
 
             ! copy-in WP -> cvmix_r8 for the double-precision CVMix TKE call
-            dzw_r8(nun:nln)       = real(hnode(nun:nln,node),                cvmix_r8)
+            dzw_r8(nun:nln)       = real(mesh%hnode(nun:nln,node),                cvmix_r8)
             dzt_r8(nun:nln+1)     = real(dz_trr(nun:nln+1),                  cvmix_r8)
             tke_old_r8(nun:nln+1) = real(tke_old(nun:nln+1),                 cvmix_r8)
             av_old_r8(nun:nln+1)  = real(tke_Av_old(nun:nln+1),             cvmix_r8)
@@ -486,7 +478,7 @@ module g_cvmix_tke
                 dzt          = dzt_r8(nun:nln+1),           & ! distnace between tracer points
 !                 nlev         = nln,                         &
                 nlev         = nln-nun+1,                         &
-                max_nlev     = nl-1,                        &
+                max_nlev     = mesh%nl-1,                        &
                 dtime        = real(dt,        cvmix_r8),   &
                 rho_ref      = real(density_0, cvmix_r8),   &
                 grav         = real(g,         cvmix_r8),   &
@@ -561,9 +553,9 @@ module g_cvmix_tke
         ! write out viscosity -->interpolate therefor from nodes to elements
         call exchange_nod(tke_Av, partit) !Warning: don't forget to communicate before averaging on elements!!!
         Av = 0.0_WP
-        do elem=1, myDim_elem2D
-            elnodes=elem2D_nodes(:,elem)
-            do nz=ulevels(elem)+1,nlevels(elem)-1
+        do elem=1, partit%myDim_elem2D
+            elnodes=mesh%elem2D_nodes(:,elem)
+            do nz=mesh%ulevels(elem)+1,mesh%nlevels(elem)-1
                 Av(nz,elem) = sum(tke_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
             end do
         end do
