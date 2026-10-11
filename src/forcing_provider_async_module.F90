@@ -24,7 +24,7 @@ module forcing_provider_async_module
     character(:), allocatable :: thread_filepath
     integer thread_timeindex
     contains
-    procedure initialize_async_reader
+    procedure initialize_async_reader, swap_readers
   end type forcing_async_reader_type
   type(forcing_async_reader_type), allocatable, save, target :: all_readers(:) ! we can not put this inside of the forcing_provider_type as we must have it as a target to assign the current/next pointers (:sic:)
   
@@ -86,6 +86,19 @@ module forcing_provider_async_module
       all_readers(varindex)%thread_timeindex = -1
     end if
 
+    ! Past the current block: the prefetched block in reader_next starts at the record
+    ! the prefetch was issued for, so it covers this one. Finish that prefetch and swap,
+    ! instead of letting reader_current read the same records again.
+    if(.not. all_readers(varindex)%reader_current%timeindex_in_cache_bounds(time_index)) then
+      if(all_readers(varindex)%thread_timeindex /= -1) then
+        call all_readers(varindex)%thread%join()
+        all_readers(varindex)%thread_timeindex = -1
+      end if
+      if(all_readers(varindex)%reader_next%timeindex_in_cache_bounds(time_index)) then
+        call all_readers(varindex)%swap_readers()
+      end if
+    end if
+
     call all_readers(varindex)%reader_current%yield_data(time_index, forcingdata)
 
     ! todo: kick off the thread before we fill the forcingdata array
@@ -132,6 +145,16 @@ module forcing_provider_async_module
   end subroutine initialize_async_reader
 
   
+  subroutine swap_readers(this)
+    class(forcing_async_reader_type), target, intent(inout) :: this
+    ! EO args
+    type(forcing_lookahead_reader_type), pointer :: tmp
+    tmp => this%reader_current
+    this%reader_current => this%reader_next
+    this%reader_next => tmp
+  end subroutine swap_readers
+
+
   subroutine assert(val, line)
     logical, intent(in) :: val
     integer, intent(in) :: line

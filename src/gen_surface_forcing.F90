@@ -248,6 +248,13 @@ MODULE g_sbf
    type(flfi_type), allocatable, save, target :: sbc_flfi(:)  !array for information about flux files
    integer,  allocatable, dimension(:,:)     :: bilin_indx_i ! indexs i for interpolation
    integer,  allocatable, dimension(:,:)     :: bilin_indx_j ! indexs j for interpolation
+   ! the bilinear stencil of each node, fixed once the indices are known (sbc_geom_setup)
+   integer,  allocatable, dimension(:,:)     :: bilin_i0, bilin_i1, bilin_j0, bilin_j1, bilin_extrp
+   real(wp), allocatable, dimension(:,:)     :: bilin_x, bilin_y
+   ! second record of the last refresh, interpolated to the nodes, and its record index.
+   ! When the next refresh starts from that record it is reused instead of interpolated again.
+   real(wp), allocatable, dimension(:,:)     :: data2_node
+   integer,  allocatable, dimension(:)       :: data2_node_t_index
    ! Ocean-only forcing mask on the forcing grid (1=ocean, 0=land)
    integer,  allocatable, save, dimension(:,:) :: forcing_ocean_mask
    !flip latitude from infiles (for example  NCEP-DOE Reanalysis 2 standart)
@@ -767,6 +774,7 @@ CONTAINS
 !$OMP END DO
 !$OMP END PARALLEL
          call sbc_box_setup(fld_idx, partit)
+         call sbc_geom_setup(fld_idx, partit, mesh)
       end do
       lfirst=.false.
       end if
@@ -863,6 +871,7 @@ CONTAINS
       real(wp),  pointer   :: nc_lon(:), nc_lat(:)
       real(4), dimension(:,:), pointer :: sbcdata1, sbcdata2
       logical sbcdata1_from_cache, sbcdata2_from_cache
+      logical data1_from_node    ! first record already interpolated by the previous refresh
       integer rootrank
 #include "associate_part_def.h"
 #include "associate_mesh_def.h"
@@ -1002,6 +1011,8 @@ CONTAINS
           sbc_flfi(fld_idx)%sbcdata_b_t_index = t_indx_p1
       end if
       sbcdata2_from_cache = .false.         
+      ! the cached grid is the previous refresh's second record: its node values are known
+      data1_from_node = sbcdata1_from_cache .and. data2_node_t_index(fld_idx) == t_indx
 
       iost = 0
       !open file sbc_flfi
@@ -1079,9 +1090,12 @@ CONTAINS
 
       ! Ocean-only forcing: fill land cells with extrapolated ocean values
       if (use_ocean_only_forcing) then
+         ! only records that were just read: a cached grid is already filled, and the fill
+         ! is not idempotent (cells filled earlier in a sweep feed later ones with the raw
+         ! value), so filling it again would change it
          call fesom_profiler_start("sbc_fill_land")
-         call fill_land_from_ocean(sbcdata1, forcing_ocean_mask, nc_Nlon, nc_Nlat)
-         call fill_land_from_ocean(sbcdata2, forcing_ocean_mask, nc_Nlon, nc_Nlat)
+         if (.not. sbcdata1_from_cache) call fill_land_from_ocean(sbcdata1, forcing_ocean_mask, nc_Nlon, nc_Nlat)
+         if (.not. sbcdata2_from_cache) call fill_land_from_ocean(sbcdata2, forcing_ocean_mask, nc_Nlon, nc_Nlat)
          call fesom_profiler_end("sbc_fill_land")
       end if
       end if
@@ -1092,57 +1106,42 @@ CONTAINS
       ! data is assumed to be sampled on a regular grid
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ii, i, j, ip1, jp1, x, y, extrp, x1, x2, y1, y2, denom, data1, data2)
       do ii = 1, myDim_nod2D+eDim_nod2D
-         i = bilin_indx_i(fld_idx, ii)
-         j = bilin_indx_j(fld_idx, ii)
-         ip1 = i + 1
-         jp1 = j + 1
-         x  = geo_coord_nod2D(1,ii)/rad
-         if (x < 0.0_WP) x=x+360._WP
-         y  = geo_coord_nod2D(2,ii)/rad
-         extrp = 0
-         if ( i == 0 ) then
-            i   = nc_Nlon
-            ip1 = i
-            extrp = extrp + 1
-         end if
-         if ( i == -1 ) then
-            i   = 1
-            ip1 = i
-            extrp = extrp + 1
-         end if
-         if ( j == 0 ) then
-            j   = nc_Nlat
-            jp1 = j
-            extrp = extrp + 2
-         end if
-         if ( j == -1 ) then
-            j   = 1
-            jp1 = j
-            extrp = extrp + 2
-         end if
+         i     = bilin_i0(fld_idx, ii)
+         ip1   = bilin_i1(fld_idx, ii)
+         j     = bilin_j0(fld_idx, ii)
+         jp1   = bilin_j1(fld_idx, ii)
+         extrp = bilin_extrp(fld_idx, ii)
+         x     = bilin_x(fld_idx, ii)
+         y     = bilin_y(fld_idx, ii)
          x1 = nc_lon(i)
          x2 = nc_lon(ip1)
          y1 = nc_lat(j)
          y2 = nc_lat(jp1)
+         if (data1_from_node) data1 = data2_node(fld_idx, ii)
          if ( extrp == 0 ) then
          ! if point inside forcing domain
             denom = (x2 - x1)*(y2 - y1)
+            if (.not. data1_from_node) &
             data1 = ( sbcdata1(i,j)   * (x2-x)*(y2-y)   + sbcdata1(ip1,j)    * (x-x1)*(y2-y) + &
                     sbcdata1(i,jp1) * (x2-x)*(y-y1)   + sbcdata1(ip1, jp1) * (x-x1)*(y-y1)     ) / denom
             data2 = ( sbcdata2(i,j)   * (x2-x)*(y2-y)   + sbcdata2(ip1,j)    * (x-x1)*(y2-y) + &
                     sbcdata2(i,jp1) * (x2-x)*(y-y1)   + sbcdata2(ip1, jp1) * (x-x1)*(y-y1)     ) / denom
          else if ( extrp == 1 ) then !  "extrapolation" in x direction
             denom = (y2 - y1)
+            if (.not. data1_from_node) &
             data1 = ( sbcdata1(i,j)   * (y2-y)   + sbcdata1(ip1, jp1) * (y-y1) ) / denom
             data2 = ( sbcdata2(i,j)   * (y2-y)   + sbcdata2(ip1, jp1) * (y-y1) ) / denom
          else if ( extrp == 2 ) then !  "extrapolation" in y direction
             denom = (x2 - x1)
+            if (.not. data1_from_node) &
             data1 = ( sbcdata1(i,j)   * (x2-x)   + sbcdata1(ip1, jp1) * (x-x1) ) / denom
             data2 = ( sbcdata2(i,j)   * (x2-x)   + sbcdata2(ip1, jp1) * (x-x1) ) / denom
          else if ( extrp == 3 ) then !  "extrapolation" in x and y direction
+            if (.not. data1_from_node) &
             data1 = sbcdata1(i,j)
             data2 = sbcdata2(i,j)
          end if
+         data2_node(fld_idx, ii) = data2
          ! calculate new coefficients for interpolations
          ! Point-slope (offset) form: store the slope and the base VALUE data1, and
          ! evaluate later as coef_b + (rdate - time_t0)*coef_a. This keeps the huge
@@ -1153,6 +1152,7 @@ CONTAINS
 
       end do
 !$OMP END PARALLEL DO
+      data2_node_t_index(fld_idx) = t_indx_p1
       call fesom_profiler_end("sbc_interp")
    END SUBROUTINE getcoeffld
 
@@ -1173,7 +1173,7 @@ CONTAINS
 
      ! assign data from interpolation to taux and tauy
       integer            :: fld_idx, i,j,ii
-      real(wp)           :: dt_elapsed   ! elapsed time since bracket start [days], WP
+      real(wp)           :: dt_elapsed(i_totfl) ! elapsed time since bracket start [days], WP
 
       ! Accumulated over the whole run (start/end sums into the named section on
       ! every call), so the report shows total time-interpolation cost, not one step.
@@ -1187,14 +1187,18 @@ CONTAINS
          ! is tiny and exact in WP. Hoisting it out of the node loop keeps the inner
          ! loop a single fused multiply-add (coef_b + dt_elapsed*coef_a), identical in
          ! cost to the previous rdate*coef_a + coef_b.
-         dt_elapsed = real(rdate - time_t0(fld_idx), WP)
-!$OMP PARALLEL DO
-         do i = 1, partit%myDim_nod2D+partit%eDim_nod2D
-            ! store processed forcing data for fesom computation (point-slope form)
-            atmdata(fld_idx,i) = coef_b(fld_idx,i) + dt_elapsed * coef_a(fld_idx,i)
-         end do !nod2D
-!$OMP END PARALLEL DO
+         dt_elapsed(fld_idx) = real(rdate - time_t0(fld_idx), WP)
       end do
+      ! one parallel region for all fields (this runs every step); fields are the
+      ! fast index of atmdata/coef_*, so they form the inner loop
+!$OMP PARALLEL DO PRIVATE(i, fld_idx)
+      do i = 1, partit%myDim_nod2D+partit%eDim_nod2D
+         do fld_idx = 1, i_totfl
+            ! store processed forcing data for fesom computation (point-slope form)
+            atmdata(fld_idx,i) = coef_b(fld_idx,i) + dt_elapsed(fld_idx) * coef_a(fld_idx,i)
+         end do
+      end do !nod2D
+!$OMP END PARALLEL DO
 #ifdef FESOM_PROFILING
       call fesom_profiler_end("sbc_time_interp")
 #endif
@@ -1379,6 +1383,13 @@ CONTAINS
                    &      STAT=sbc_alloc )
       bilin_indx_i = 0.0_WP
       bilin_indx_j = 0.0_WP
+      ALLOCATE( bilin_i0(i_totfl, myDim_nod2D+eDim_nod2D), bilin_i1(i_totfl, myDim_nod2D+eDim_nod2D), &
+              & bilin_j0(i_totfl, myDim_nod2D+eDim_nod2D), bilin_j1(i_totfl, myDim_nod2D+eDim_nod2D), &
+              & bilin_extrp(i_totfl, myDim_nod2D+eDim_nod2D), &
+              & bilin_x(i_totfl, myDim_nod2D+eDim_nod2D), bilin_y(i_totfl, myDim_nod2D+eDim_nod2D), &
+              & data2_node(i_totfl, myDim_nod2D+eDim_nod2D), data2_node_t_index(i_totfl))
+      data2_node         = 0.0_WP
+      data2_node_t_index = -1
       qns          = 0.0_WP
       emp          = 0.0_WP
       qsr          = 0.0_WP
@@ -2636,6 +2647,60 @@ END SUBROUTINE sbc_do_recom
 
       deallocate(sftof)
    END SUBROUTINE read_forcing_ocean_mask
+
+   SUBROUTINE sbc_geom_setup(fld_idx, partit, mesh)
+      ! corner indices, extrapolation case and node position for the bilinear interpolation
+      ! in getcoeffld. They depend only on the mesh and the forcing grid, so they are set
+      ! once here instead of at every refresh. Same arithmetic as before, same values.
+      IMPLICIT NONE
+      integer,        intent(in)            :: fld_idx
+      type(t_partit), intent(inout), target :: partit
+      type(t_mesh),   intent(in),    target :: mesh
+      integer  :: ii, i, j, ip1, jp1, extrp, nlon, nlat
+      real(wp) :: x, y
+#include "associate_part_def.h"
+#include "associate_mesh_def.h"
+#include "associate_part_ass.h"
+#include "associate_mesh_ass.h"
+      nlon = sbc_flfi(fld_idx)%nc_Nlon
+      nlat = sbc_flfi(fld_idx)%nc_Nlat
+!$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(ii, i, j, ip1, jp1, extrp, x, y)
+      do ii = 1, myDim_nod2D+eDim_nod2D
+         i = bilin_indx_i(fld_idx, ii)
+         j = bilin_indx_j(fld_idx, ii)
+         ip1 = i + 1
+         jp1 = j + 1
+         x  = geo_coord_nod2D(1,ii)/rad
+         if (x < 0.0_WP) x=x+360._WP
+         y  = geo_coord_nod2D(2,ii)/rad
+         extrp = 0
+         if ( i == 0 ) then
+            i   = nlon
+            ip1 = i
+            extrp = extrp + 1
+         end if
+         if ( i == -1 ) then
+            i   = 1
+            ip1 = i
+            extrp = extrp + 1
+         end if
+         if ( j == 0 ) then
+            j   = nlat
+            jp1 = j
+            extrp = extrp + 2
+         end if
+         if ( j == -1 ) then
+            j   = 1
+            jp1 = j
+            extrp = extrp + 2
+         end if
+         bilin_i0(fld_idx, ii) = i;   bilin_i1(fld_idx, ii) = ip1
+         bilin_j0(fld_idx, ii) = j;   bilin_j1(fld_idx, ii) = jp1
+         bilin_extrp(fld_idx, ii) = extrp
+         bilin_x(fld_idx, ii) = x;    bilin_y(fld_idx, ii) = y
+      end do
+!$OMP END PARALLEL DO
+   END SUBROUTINE sbc_geom_setup
 
    SUBROUTINE sbc_box_setup(fld_idx, partit)
       ! bounding box of the forcing cells the bilinear interpolation in getcoeffld touches on this rank
