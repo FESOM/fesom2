@@ -11,7 +11,9 @@
 #                          [-m "bcast scatter"] [-s 96] [-d 1] [-f FORCING_DIR] [-F NC_FREQ] [-r REPEAT]
 #
 # -f points at a forcing directory to use instead of the bundled CORE2 one,
-# e.g. a longer series from tools/make_synthetic_forcing.py. FESOM ignores the
+# e.g. a longer series from tools/make_synthetic_forcing.py.
+# A mode may carry a reader count, e.g. -m "bcast redist:1 redist:8" sets
+# n_forcing_readers for forcing_distribution='redist'. FESOM ignores the
 # units attribute of the time axis, so pass -F 24 for an axis in hours (the
 # bundled CORE2 axis, 0 6 12 .., is read as days with the default nm_nc_freq=1).
 set -euo pipefail
@@ -87,7 +89,7 @@ done
 
 # --- runs ---------------------------------------------------------------------
 CSV=$OUT_DIR/bench_forcing.csv
-SECTIONS="update_atm_forcing forc_sbc_do sbc_getcoeff sbc_read_distribute sbc_ioread sbc_bcast sbc_scatterv sbc_fill_land sbc_interp sbc_time_interp forc_wind_drag forc_ncar_fluxes"
+SECTIONS="update_atm_forcing forc_sbc_do sbc_getcoeff sbc_read_distribute sbc_ioread sbc_bcast sbc_scatterv sbc_alltoallv sbc_fill_land sbc_interp sbc_time_interp forc_wind_drag forc_ncar_fluxes"
 if [[ ! -f $CSV ]]; then
   echo "mode,np,threads,rep,steps,wall,read_forc_max,$(echo $SECTIONS | tr ' ' ',')" > "$CSV"
 fi
@@ -95,12 +97,15 @@ fi
 export OMPI_MCA_rmaps_base_oversubscribe=1
 export PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe
 
-for mode in $MODES; do
+for modespec in $MODES; do
+mode=${modespec%%:*}
+readers=
+[[ $modespec == *:* ]] && readers=${modespec#*:}
 for np in $NPS; do
 for nt in $THREADS; do
   (( np * nt <= MAX_CORES )) || continue
   for rep in $(seq 1 "$REPEAT"); do
-    run=$OUT_DIR/run_${mode}_np${np}_t${nt}_r${rep}
+    run=$OUT_DIR/run_${modespec/:/_}_np${np}_t${nt}_r${rep}
     rm -rf "$run"; mkdir -p "$run/results"
     cp "$TEMPLATE"/namelist.* "$run/"
     setnml "$run/namelist.config" MeshPath "'$MESH/'"
@@ -117,6 +122,9 @@ for nt in $THREADS; do
     else
       sed -i -E "s|^([[:space:]]*)&nam_sbc|&\n   forcing_distribution='$mode'|" "$run/namelist.forcing"
     fi
+    if [[ -n $readers ]]; then
+      sed -i -E "s|^([[:space:]]*)&nam_sbc|&\n   n_forcing_readers=$readers|" "$run/namelist.forcing"
+    fi
     # a fresh clock: the template's may have advanced past the start
     printf '0.0 1 1948\n0.0 1 1948\n' > "$run/results/fesom.clock"
 
@@ -128,7 +136,7 @@ for nt in $THREADS; do
     t1=$(date +%s.%N)
     wall=$(echo "$t1 - $t0" | bc)
     readforc=$(awk -F: '/runtime ice read forc/ {split($2,a," "); print a[3]}' "$run/fesom.out" | tail -1)
-    row="$mode,$np,$nt,$rep,$((STEPS*DAYS)),$wall,${readforc:-}"
+    row="$modespec,$np,$nt,$rep,$((STEPS*DAYS)),$wall,${readforc:-}"
     for s in $SECTIONS; do
       # columns: name mean min max calls ...; Max over ranks is the critical path
       v=$(awk -v s=">$s" '$1==s {print $4; exit}' "$run/results/fesom.stats")

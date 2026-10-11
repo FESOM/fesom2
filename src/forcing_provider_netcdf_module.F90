@@ -13,7 +13,7 @@ module forcing_provider_netcdf_module
     integer varid
     integer, allocatable :: varshape(:)
     contains
-    procedure, public :: initialize, finalize, read_netcdf_timesteps, read_netcdf_timestep_2d, timestep_size
+    procedure, public :: initialize, finalize, read_netcdf_timesteps, read_netcdf_timestep_2d, read_netcdf_rows, timestep_size, is_open
     procedure open_netcdf_variable
   end type netcdf_reader_handle
     
@@ -117,6 +117,34 @@ module forcing_provider_netcdf_module
     call assert_nc(nf_get_vara_real(this%fileid, this%varid, starts, sizes, values), __LINE__)  
   end subroutine read_netcdf_timestep_2d
     
+
+  ! rows row_first .. row_first+nrows-1 of one record, all columns, as one flat array
+  ! (columns fastest, i.e. file order)
+  subroutine read_netcdf_rows(this, timeindex, row_first, nrows, values)
+    class(netcdf_reader_handle), intent(in) :: this
+    integer, intent(in) :: timeindex, row_first, nrows
+    real(4), intent(out) :: values(:)
+    ! EO args
+    include "netcdf.inc" ! old netcdf fortran interface required?
+    integer starts(3), sizes(3)
+
+    call assert(allocated(this%varshape), __LINE__)
+    call assert(size(this%varshape) == 3, __LINE__)
+    call assert(0 < timeindex .and. timeindex <= this%varshape(TIMEDIM_INDEX), __LINE__)
+    call assert(0 < row_first .and. row_first+nrows-1 <= this%varshape(2), __LINE__)
+    call assert(size(values) >= this%varshape(1)*nrows, __LINE__)
+    starts = [1, row_first, timeindex]
+    sizes  = [this%varshape(1), nrows, 1]
+    call assert_nc(nf_get_vara_real(this%fileid, this%varid, starts, sizes, values), __LINE__)
+  end subroutine read_netcdf_rows
+
+
+  pure function is_open(this) result(x)
+    class(netcdf_reader_handle), intent(in) :: this
+    logical x
+    x = allocated(this%varshape)
+  end function is_open
+
 
   subroutine open_netcdf_variable(this) !, fileid, varid, varshape)
     class(netcdf_reader_handle), intent(inout) :: this

@@ -48,7 +48,7 @@ module io_redistribute
   public :: redist_build, redist_free, redist_check
   public :: redist_exchange
   public :: redist_scatter_type
-  public :: redist_build_scatter, redist_scatter, redist_scatter_free
+  public :: redist_build_scatter, redist_scatter, redist_scatter_r4, redist_scatter_free
   public :: REDIST_MIN_BLOCK
 
   !> Move a field from the model decomposition into block order.
@@ -61,6 +61,11 @@ module io_redistribute
      module procedure redist_exchange_r4
      module procedure redist_exchange_r8
   end interface redist_exchange
+
+  interface redist_scatter
+     module procedure redist_scatter_r4
+     module procedure redist_scatter_r8
+  end interface redist_scatter
 
   !> Smallest number of entries per writer block. Guards against pathological
   !> chunk sizes: core2 (nod2D = 126858) with 1024 writers would otherwise give
@@ -149,13 +154,19 @@ contains
   !>
   !> This clamp is why a node/element schedule pair must share one count: it
   !> depends on n_global, which differs between the two. See the module header.
-  pure function redist_effective_writers(n_global, n_writers_req, npes) result(nw)
+  !>
+  !> min_block replaces REDIST_MIN_BLOCK. Readers of a small input grid pass one
+  !> grid row: they read whole rows anyway, and chunk metadata is no concern there.
+  pure function redist_effective_writers(n_global, n_writers_req, npes, min_block) result(nw)
     integer, intent(in) :: n_global, n_writers_req, npes
-    integer :: nw
+    integer, intent(in), optional :: min_block
+    integer :: nw, mb
+    mb = REDIST_MIN_BLOCK
+    if (present(min_block)) mb = max(1, min_block)
     nw = n_writers_req
     if (nw <= 0)    nw = npes           ! 0 or negative means "all ranks"
     if (nw > npes)  nw = npes
-    nw = min(nw, max(1, n_global / REDIST_MIN_BLOCK))
+    nw = min(nw, max(1, n_global / mb))
     if (nw < 1) nw = 1
   end function redist_effective_writers
 
@@ -360,12 +371,13 @@ contains
   !> side gets away with the grouping shortcut because myList_nod2D(1:myDim) is
   !> sorted; append the halo tail and it is not, so the destination-sorted order
   !> is built explicitly and qperm remembers the way back.
-  subroutine redist_build_scatter(this, want, nwant, n_global, n_readers_req, comm, verbose, ierr)
+  subroutine redist_build_scatter(this, want, nwant, n_global, n_readers_req, comm, verbose, ierr, min_block)
     type(redist_scatter_type), intent(out) :: this
     integer, intent(in)  :: nwant, n_global, n_readers_req, comm
     integer, intent(in)  :: want(nwant)
     logical, intent(in)  :: verbose
     integer, intent(out) :: ierr
+    integer, intent(in), optional :: min_block   !< see redist_effective_writers
 
     integer :: i, w, r, mpierr, slot
     integer, allocatable :: fill(:), qglob(:), sglob(:)
@@ -375,7 +387,7 @@ contains
     call MPI_Comm_rank(comm, this%mype, mpierr)
 
     this%n_global  = n_global
-    this%n_readers = redist_effective_writers(n_global, n_readers_req, this%npes)
+    this%n_readers = redist_effective_writers(n_global, n_readers_req, this%npes, min_block)
     this%block     = redist_block_size(n_global, this%n_readers)
     this%nwant     = nwant
 
@@ -474,7 +486,7 @@ contains
   !>
   !> Mirror image of redist_exchange: gather into the send buffer through sloc,
   !> one Alltoallv, then scatter through qperm.
-  subroutine redist_scatter(this, nlev, blk, out, comm, ierr)
+  subroutine redist_scatter_r8(this, nlev, blk, out, comm, ierr)
     type(redist_scatter_type), intent(in) :: this
     integer, intent(in)  :: nlev, comm
     real(kind=8), intent(in)  :: blk(nlev, *)
@@ -503,7 +515,39 @@ contains
     end do
 
     deallocate(sbuf, rbuf, sc, sd, rc, rd)
-  end subroutine redist_scatter
+  end subroutine redist_scatter_r8
+
+  !> real(4) twin of redist_scatter_r8, for single-precision input such as forcing.
+  subroutine redist_scatter_r4(this, nlev, blk, out, comm, ierr)
+    type(redist_scatter_type), intent(in) :: this
+    integer, intent(in)  :: nlev, comm
+    real(kind=4), intent(in)  :: blk(nlev, *)
+    real(kind=4), intent(out) :: out(nlev, *)
+    integer, intent(out) :: ierr
+    real(kind=4), allocatable :: sbuf(:,:), rbuf(:,:)
+    integer, allocatable :: sc(:), sd(:), rc(:), rd(:)
+    integer :: i, mpierr
+
+    ierr = 0
+    allocate(sc(0:this%npes-1), sd(0:this%npes-1), rc(0:this%npes-1), rd(0:this%npes-1))
+    sc = this%scnt * nlev ; sd = this%sdsp * nlev
+    rc = this%qcnt * nlev ; rd = this%qdsp * nlev
+
+    allocate(sbuf(nlev, max(1, this%nserve)))
+    do i = 1, this%nserve
+       sbuf(1:nlev, i) = blk(1:nlev, this%sloc(i))
+    end do
+
+    allocate(rbuf(nlev, max(1, this%nwant)))
+    call MPI_Alltoallv(sbuf, sc, sd, MPI_REAL4, rbuf, rc, rd, MPI_REAL4, comm, mpierr)
+    if (mpierr /= MPI_SUCCESS) ierr = mpierr
+
+    do i = 1, this%nwant
+       out(1:nlev, this%qperm(i)) = rbuf(1:nlev, i)
+    end do
+
+    deallocate(sbuf, rbuf, sc, sd, rc, rd)
+  end subroutine redist_scatter_r4
 
 
   subroutine redist_scatter_free(this)
