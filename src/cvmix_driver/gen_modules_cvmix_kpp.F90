@@ -282,12 +282,8 @@ module g_cvmix_kpp
         logical            :: nmlfile_exist=.False.
         integer            :: node_size
         integer fileunit
-#include "../associate_part_def.h"
-#include "../associate_mesh_def.h"
-#include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h"
         !_______________________________________________________________________
-        if(mype==0) then
+        if(partit%mype==0) then
             write(*,*) '____________________________________________________________'
             write(*,*) ' --> initialise CVMIX_KPP'
             write(*,*)
@@ -295,14 +291,14 @@ module g_cvmix_kpp
         
         !_______________________________________________________________________
         ! allocate + initialse kpp arrays --> with size myDim_nod2D+eDim_nod2D
-        node_size=myDim_nod2D+eDim_nod2D
+        node_size=partit%myDim_nod2D+partit%eDim_nod2D
         
         ! allocate 1D depth variable 
-        allocate(kpp_bulkRi(nl))
-        allocate(kpp_shearRi(nl))
-        allocate(kpp_dvsurf2(nl-1))
-        allocate(kpp_dbsurf(nl-1))
-        allocate(kpp_ws_cntr(nl-1))
+        allocate(kpp_bulkRi(mesh%nl))
+        allocate(kpp_shearRi(mesh%nl))
+        allocate(kpp_dvsurf2(mesh%nl-1))
+        allocate(kpp_dbsurf(mesh%nl-1))
+        allocate(kpp_ws_cntr(mesh%nl-1))
         kpp_bulkRi        = 0.0_WP
         kpp_shearRi       = 0.0_WP
         kpp_dvsurf2       = 0.0_WP
@@ -316,23 +312,23 @@ module g_cvmix_kpp
         kpp_nzobldepth    = 0.0_WP
         kpp_sbuoyflx      = 0.0_WP          ! total surface buoyancy flux (includes solar + non-solar)
         
-        allocate(kpp_buoyflx_nl(nl))
+        allocate(kpp_buoyflx_nl(mesh%nl))
         kpp_buoyflx_nl    = 0.0_WP
                 
         ! allocate 3D variable 
-        allocate(kpp_Av(nl,node_size),kpp_Kv(nl,node_size))
-        allocate(kpp_nonlcltranspT(nl,node_size),kpp_nonlcltranspS(nl,node_size))
+        allocate(kpp_Av(mesh%nl,node_size),kpp_Kv(mesh%nl,node_size))
+        allocate(kpp_nonlcltranspT(mesh%nl,node_size),kpp_nonlcltranspS(mesh%nl,node_size))
         kpp_Av            = 0.0_WP
         kpp_Kv            = 0.0_WP
         kpp_nonlcltranspT = 0.0_WP
         kpp_nonlcltranspS = 0.0_WP
         
-        allocate(kpp_oblmixc(nl,node_size,3))
+        allocate(kpp_oblmixc(mesh%nl,node_size,3))
         kpp_oblmixc       = 0.0_WP
         
-        allocate(kpp_uS_t(nl-1), kpp_vS_t(nl-1)) ! top
-        allocate(kpp_uS_c(nl-1), kpp_vS_c(nl-1)) ! center   
-        allocate(kpp_uS_m(nl-1), kpp_vS_m(nl-1)) ! mean
+        allocate(kpp_uS_t(mesh%nl-1), kpp_vS_t(mesh%nl-1)) ! top
+        allocate(kpp_uS_c(mesh%nl-1), kpp_vS_c(mesh%nl-1)) ! center   
+        allocate(kpp_uS_m(mesh%nl-1), kpp_vS_m(mesh%nl-1)) ! mean
         kpp_uS_t          = 0.0_WP
         kpp_vS_t          = 0.0_WP
         kpp_uS_c          = 0.0_WP
@@ -340,8 +336,8 @@ module g_cvmix_kpp
         kpp_uS_m          = 0.0_WP
         kpp_vS_m          = 0.0_WP
 
-        allocate(kpp_stokesXi_z(nl-1))
-        allocate(kpp_stokesVt_z(nl-1))
+        allocate(kpp_stokesXi_z(mesh%nl-1))
+        allocate(kpp_stokesVt_z(mesh%nl-1))
         kpp_stokesXi_z    = 0.0_WP
         kpp_stokesVt_z    = 0.0_WP
         
@@ -368,7 +364,7 @@ module g_cvmix_kpp
         
         !_______________________________________________________________________
         ! write info to log file 
-        if (mype==0) then
+        if (partit%mype==0) then
             write(*,*) "     kpp_Rib_crit        = ", kpp_Rib_crit
             write(*,*) "     kpp_minOBLdepth     = ", kpp_minOBLdepth
             write(*,*) "     kpp_deepOBLoffset   = ", kpp_deepOBLoffset
@@ -483,10 +479,6 @@ module g_cvmix_kpp
         real(cvmix_r8) :: md_r8(mesh%nl), td_r8(mesh%nl), sd_r8(mesh%nl) ! coeffs_kpp M/T/S diff (in+out)
         real(cvmix_r8) :: tnl_r8(mesh%nl), snl_r8(mesh%nl)               ! coeffs_kpp nonlocal T/S (in+out)
         real(cvmix_r8) :: stokesXi_r8, obldep_r8, kobl_r8                ! scalar outputs
-#include "../associate_part_def.h"
-#include "../associate_mesh_def.h"
-#include "../associate_part_ass.h"
-#include "../associate_mesh_ass.h"
         temp=>tracers%data(1)%values(:,:)
         salt=>tracers%data(2)%values(:,:)
         UVnode=>dynamics%uvnode(:,:,:)
@@ -495,10 +487,10 @@ module g_cvmix_kpp
         !_______________________________________________________________________
         kpp_Av = 0.0_WP
         kpp_Kv = 0.0_WP
-        do node= 1, myDim_nod2D
+        do node= 1, partit%myDim_nod2D
             !___________________________________________________________________
-            nln = nlevels_nod2D(node)-1
-            nun = ulevels_nod2D(node)
+            nln = mesh%nlevels_nod2D(node)-1
+            nun = mesh%ulevels_nod2D(node)
             
             !___________________________________________________________________
             ! initialide 1d arrays
@@ -589,7 +581,7 @@ module g_cvmix_kpp
                                       ((UVnode(2,nz-1,node)+UVnode(2,nz,node))*0.5 - UVnode( 2,nun,node) )**2
                     !___________________________________________________________
                     ! calculate shear Richardson number Ri = N^2/(du/dz)^2
-                    dz2     = (Z_3d_n( nz-1,node)-Z_3d_n( nz,node))**2
+                    dz2     = (mesh%Z_3d_n( nz-1,node)-mesh%Z_3d_n( nz,node))**2
                     vshear2 = (UVnode(1,nz-1,node)-UVnode(1,nz,node))**2 + &
                               (UVnode(2,nz-1,node)-UVnode(2,nz,node))**2 
                     vshear2 = vshear2/dz2
@@ -602,10 +594,10 @@ module g_cvmix_kpp
                     !!PS call densityJM_components(temp(1,node), salt(1,node), sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot)
                     call densityJM_components(temp(nun,node), salt(nun,node), sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot)
                     call densityJM_components(temp(nz, node), salt(nz, node), bulk_0, bulk_pz, bulk_pz2, rhopot)                    
-                    rho_nz  = bulk_0   + Z_3d_n(nz,node)*(bulk_pz   + Z_3d_n(nz,node)*bulk_pz2)
-                    rho_nz  = rho_nz*rhopot/(rho_nz+0.1_WP*Z_3d_n(nz,node))-density_0
-                    rho_sfc = sfc_bulk_0   + Z_3d_n(nz,node)*(sfc_bulk_pz   + Z_3d_n(nz,node)*sfc_bulk_pz2)
-                    rho_sfc = rho_sfc*sfc_rhopot/(rho_sfc+0.1_WP*Z_3d_n(nz,node))-density_0
+                    rho_nz  = bulk_0   + mesh%Z_3d_n(nz,node)*(bulk_pz   + mesh%Z_3d_n(nz,node)*bulk_pz2)
+                    rho_nz  = rho_nz*rhopot/(rho_nz+0.1_WP*mesh%Z_3d_n(nz,node))-density_0
+                    rho_sfc = sfc_bulk_0   + mesh%Z_3d_n(nz,node)*(sfc_bulk_pz   + mesh%Z_3d_n(nz,node)*sfc_bulk_pz2)
+                    rho_sfc = rho_sfc*sfc_rhopot/(rho_sfc+0.1_WP*mesh%Z_3d_n(nz,node))-density_0
                     kpp_dbsurf(nz) = -g * density_0_r *(rho_sfc-rho_nz)
                 end do 
                 
@@ -615,10 +607,10 @@ module g_cvmix_kpp
                     !___________________________________________________________
                     ! Calculate the surface layer depth, averaged surface layer 
                     ! quantities
-                    sldepth = kpp_surf_layer_ext*max( max(-Z_3d_n(nz,node),-zbar_3d_n(nun+1,node)),kpp_minOBLdepth )
+                    sldepth = kpp_surf_layer_ext*max( max(-mesh%Z_3d_n(nz,node),-mesh%zbar_3d_n(nun+1,node)),kpp_minOBLdepth )
                     nzsfc = nz
                     do nztmp = nun, nz
-                        if (-zbar_3d_n(nztmp+1,node)>=sldepth) then
+                        if (-mesh%zbar_3d_n(nztmp+1,node)>=sldepth) then
                             nzsfc = nztmp
                             exit
                         end if                        
@@ -626,8 +618,8 @@ module g_cvmix_kpp
                     
                     if (kpp_use_StokesMOST) then
                         call compute_stokes_velocities_MOM6style( &
-                            zbar_3d_n(nz,node),          &
-                            zbar_3d_n(nz+1,node),        &
+                            mesh%zbar_3d_n(nz,node),          &
+                            mesh%zbar_3d_n(nz+1,node),        &
                             kpp_A_stokes,                &
                             u_wind_eff, v_wind_eff ,     &
                             kpp_uS_t(nz), kpp_vS_t(nz) , &
@@ -635,7 +627,7 @@ module g_cvmix_kpp
                             kpp_uS_m(nz), kpp_vS_m(nz))
 
                         call compute_stokes_velocities_MOM6style(&
-                            zbar_3d_n(nzsfc,node),       &
+                            mesh%zbar_3d_n(nzsfc,node),       &
                             sldepth,                     &
                             kpp_A_stokes,                &
                             u_wind_eff, v_wind_eff,      &
@@ -645,8 +637,8 @@ module g_cvmix_kpp
                         
                         
                         ! --- CVMix boundary: copy WP actuals into cvmix_r8 buffers (no-op when WP==cvmix_r8)
-                        zbar_r8(nun:nln+1) = real(zbar_3d_n(nun:nln+1,node), cvmix_r8)
-                        zcntr_r8(nun:nln)  = real(Z_3d_n(   nun:nln,  node), cvmix_r8)
+                        zbar_r8(nun:nln+1) = real(mesh%zbar_3d_n(nun:nln+1,node), cvmix_r8)
+                        zcntr_r8(nun:nln)  = real(mesh%Z_3d_n(   nun:nln,  node), cvmix_r8)
                         uE_r8(nun:nln)     = real(UVnode(1, nun:nln,  node), cvmix_r8)
                         vE_r8(nun:nln)     = real(UVnode(2, nun:nln,  node), cvmix_r8)
                         uS_r8(nun:nln)     = real(kpp_uS_t( nun:nln),        cvmix_r8) ! inout
@@ -705,7 +697,7 @@ module g_cvmix_kpp
                         sfc_v    = 0.0_WP
                         htot     = 0.0_WP
                         do nztmp = nun, nzsfc
-                            delh     = min( max(0.0_WP,sldepth-htot), hnode(nztmp,node) )
+                            delh     = min( max(0.0_WP,sldepth-htot), mesh%hnode(nztmp,node) )
                             htot     = htot+delh
                             sfc_temp = sfc_temp + temp(nztmp,node)*delh
                             sfc_salt = sfc_salt + salt(nztmp,node)*delh
@@ -735,7 +727,7 @@ module g_cvmix_kpp
                         sfc_v    = 0.0_WP
                         htot     = 0.0_WP
                         do nztmp = nun, nzsfc
-                            delh     = min( max(0.0_WP,sldepth-htot), hnode(nztmp,node) )
+                            delh     = min( max(0.0_WP,sldepth-htot), mesh%hnode(nztmp,node) )
                             htot     = htot+delh
                             sfc_temp = sfc_temp + temp(nztmp,node)*delh
                             sfc_salt = sfc_salt + salt(nztmp,node)*delh
@@ -763,10 +755,10 @@ module g_cvmix_kpp
                     !     difference
                     call densityJM_components(sfc_temp, sfc_salt, sfc_bulk_0, sfc_bulk_pz, sfc_bulk_pz2, sfc_rhopot)
                     call densityJM_components(temp(nz,node), salt(nz,node), bulk_0, bulk_pz, bulk_pz2, rhopot)                    
-                    rho_nz  = bulk_0   + Z_3d_n(nz,node)*(bulk_pz   + Z_3d_n(nz,node)*bulk_pz2)
-                    rho_nz  = rho_nz*rhopot/(rho_nz+0.1_WP*Z_3d_n(nz,node))-density_0
-                    rho_sfc = sfc_bulk_0   + Z_3d_n(nz,node)*(sfc_bulk_pz   + Z_3d_n(nz,node)*sfc_bulk_pz2)
-                    rho_sfc = rho_sfc*sfc_rhopot/(rho_sfc+0.1_WP*Z_3d_n(nz,node))-density_0
+                    rho_nz  = bulk_0   + mesh%Z_3d_n(nz,node)*(bulk_pz   + mesh%Z_3d_n(nz,node)*bulk_pz2)
+                    rho_nz  = rho_nz*rhopot/(rho_nz+0.1_WP*mesh%Z_3d_n(nz,node))-density_0
+                    rho_sfc = sfc_bulk_0   + mesh%Z_3d_n(nz,node)*(sfc_bulk_pz   + mesh%Z_3d_n(nz,node)*sfc_bulk_pz2)
+                    rho_sfc = rho_sfc*sfc_rhopot/(rho_sfc+0.1_WP*mesh%Z_3d_n(nz,node))-density_0
                     kpp_dbsurf(nz) = -g * density_0_r *(rho_sfc-rho_nz)
                 end do ! --> do nz=1, nln   
                 
@@ -774,7 +766,7 @@ module g_cvmix_kpp
                     !___________________________________________________________
                     ! calculate shear Richardson number Ri = N^2/(du/dz)^2 for 
                     ! mixing parameterisation below ocean boundary layer 
-                    dz2     = (Z_3d_n( nz-1,node)-Z_3d_n( nz,node))**2
+                    dz2     = (mesh%Z_3d_n( nz-1,node)-mesh%Z_3d_n( nz,node))**2
                     vshear2 = (UVnode(1,nz-1,node)-UVnode(1,nz,node))**2 + &
                               (UVnode(2,nz-1,node)-UVnode(2,nz,node))**2 
                     vshear2 = vshear2/dz2
@@ -833,7 +825,7 @@ module g_cvmix_kpp
             if (kpp_use_nonconstKvb) then
                 do nz = nun+1, nln
                     call Kv0_background_qiang( &
-                        aux,geo_coord_nod2D(2,node)/rad,abs(zbar_3d_n(nz,node))&
+                        aux,mesh%geo_coord_nod2D(2,node)/rad,abs(mesh%zbar_3d_n(nz,node))&
                         )
                     kpp_Kv(nz,node) = kpp_Kv(nz,node) + aux
                 end do 
@@ -851,7 +843,7 @@ module g_cvmix_kpp
             !     StokesXi when CVmix_kpp_params_in%lStokesMOST = .True.
             ! --> sigma_coord must be here 1.0!!! --> see MOM6 --> parameterizations/vertical/MOM_CVMix_KPP.F90:1343
             ! --- CVMix boundary: copy WP actuals into cvmix_r8 buffers (no-op when WP==cvmix_r8)
-            obl_r8(nun:nln)  = real(abs(Z_3d_n(nun:nln,node)), cvmix_r8)
+            obl_r8(nun:nln)  = real(abs(mesh%Z_3d_n(nun:nln,node)), cvmix_r8)
             buoy_r8(nun:nln) = real(kpp_buoyflx_nl(nun:nln),   cvmix_r8)
             xi_r8(nun:nln)   = real(kpp_stokesVt_z(nun:nln),   cvmix_r8)
             ws_r8(nun:nln)   = real(kpp_ws_cntr(nun:nln),      cvmix_r8) ! inout
@@ -909,7 +901,7 @@ module g_cvmix_kpp
             !     --> v_t = z * ws * N * v_tc
             !                             |-> v_tc = Cv * sqrt(0.2/Cs/epsilon) / kpp_vonKarman^2 / kpp_Rib_crit
             ! --- CVMix boundary: copy WP actuals into cvmix_r8 buffers (no-op when WP==cvmix_r8)
-            zcntr_r8(nun:nln)  = real(Z_3d_n(    nun:nln  ,node), cvmix_r8)
+            zcntr_r8(nun:nln)  = real(mesh%Z_3d_n(    nun:nln  ,node), cvmix_r8)
             dbuoy_r8(nun:nln)  = real(kpp_dbsurf( nun:nln),       cvmix_r8)
             dvsqr_r8(nun:nln)  = real(kpp_dvsurf2(nun:nln),       cvmix_r8)
             ws_r8(nun:nln)     = real(kpp_ws_cntr(nun:nln),       cvmix_r8)
@@ -959,8 +951,8 @@ module g_cvmix_kpp
             ! --> check if its still the case
             ! --- CVMix boundary: copy WP actuals into cvmix_r8 buffers (no-op when WP==cvmix_r8)
             ribulk_r8(nun:nln+1) = real(kpp_bulkRi(nun:nln+1),       cvmix_r8)
-            zbar_r8(nun:nln+1)   = real(zbar_3d_n(nun:nln+1,node),   cvmix_r8)
-            zcntr_r8(nun:nln)    = real(Z_3d_n(   nun:nln,  node),   cvmix_r8)
+            zbar_r8(nun:nln+1)   = real(mesh%zbar_3d_n(nun:nln+1,node),   cvmix_r8)
+            zcntr_r8(nun:nln)    = real(mesh%Z_3d_n(   nun:nln,  node),   cvmix_r8)
             surfbuoy_r8(nun:nln) = real(aux_surfbuoyflx_nl(nun:nln), cvmix_r8)
             xi_r8(nun:nln)       = real(kpp_stokesXi_z(nun:nln),     cvmix_r8)
             call cvmix_kpp_compute_OBL_depth(            &
@@ -984,15 +976,15 @@ module g_cvmix_kpp
             ! near the bottom
             if (kpp_deepOBLoffset > 0.0) then
                 ! aux ... zBottomMinusOffset
-                aux = zbar_3d_n(nln+1,node) + min(kpp_deepOBLoffset,-0.1_WP*zbar_3d_n(nln+1,node))
+                aux = mesh%zbar_3d_n(nln+1,node) + min(kpp_deepOBLoffset,-0.1_WP*mesh%zbar_3d_n(nln+1,node))
                 kpp_obldepth(node) = min( kpp_obldepth(node), -aux )
             end if 
             
             ! no shallower than top layer
-            kpp_obldepth(node)  = max( kpp_obldepth(node), abs(zbar_3d_n(nun+1, node)) )
+            kpp_obldepth(node)  = max( kpp_obldepth(node), abs(mesh%zbar_3d_n(nun+1, node)) )
             
             ! no deeper than bottom layer 
-            kpp_obldepth(node)  = min( kpp_obldepth(node), abs(zbar_3d_n(nln+1,node)) )
+            kpp_obldepth(node)  = min( kpp_obldepth(node), abs(mesh%zbar_3d_n(nln+1,node)) )
             
             ! safety for kOBL
             if (kpp_nzobldepth(node) > nln+1) then
@@ -1025,14 +1017,14 @@ module g_cvmix_kpp
                 sldepth = kpp_surf_layer_ext*max(kpp_obldepth(node), kpp_minOBLdepth)
                 nzsfc = int(kpp_nzobldepth(node))
                 do nztmp = nun, int(kpp_nzobldepth(node))
-                    if (-zbar_3d_n(nztmp+1,node)>=sldepth) then
+                    if (-mesh%zbar_3d_n(nztmp+1,node)>=sldepth) then
                         nzsfc = nztmp
                         exit
                     end if                        
                 end do
                 
                 call compute_stokes_velocities_MOM6style(&
-                    zbar_3d_n(nzsfc,node),       &
+                    mesh%zbar_3d_n(nzsfc,node),       &
                     sldepth,                     &
                     kpp_A_stokes,                &
                     u_wind_eff, v_wind_eff,      &
@@ -1044,8 +1036,8 @@ module g_cvmix_kpp
                 nz_buoyflx_idx = kpp_nzobldepth(node)
                         
                 ! --- CVMix boundary: copy WP actuals into cvmix_r8 buffers (no-op when WP==cvmix_r8)
-                zbar_r8(nun:nln+1) = real(zbar_3d_n(nun:nln+1,node), cvmix_r8)
-                zcntr_r8(nun:nln)  = real(Z_3d_n(   nun:nln,  node), cvmix_r8)
+                zbar_r8(nun:nln+1) = real(mesh%zbar_3d_n(nun:nln+1,node), cvmix_r8)
+                zcntr_r8(nun:nln)  = real(mesh%Z_3d_n(   nun:nln,  node), cvmix_r8)
                 uE_r8(nun:nln)     = real(UVnode(1, nun:nln,  node), cvmix_r8)
                 vE_r8(nun:nln)     = real(UVnode(2, nun:nln,  node), cvmix_r8)
                 uS_r8(nun:nln)     = real(kpp_uS_t( nun:nln),        cvmix_r8) ! inout
@@ -1114,8 +1106,8 @@ module g_cvmix_kpp
                                         ( sw_3d(nun,node) - &
                                             ( sw_3d(aux_nz-1, node) + &
                                                 ( sw_3d(aux_nz, node) - sw_3d(aux_nz-1, node) ) &
-                                                * ( kpp_obldepth(node) + zbar_3d_n( aux_nz-1,node) ) &
-                                                / ( zbar_3d_n(aux_nz-1,node) - zbar_3d_n(aux_nz,node) ) ) )
+                                                * ( kpp_obldepth(node) + mesh%zbar_3d_n( aux_nz-1,node) ) &
+                                                / ( mesh%zbar_3d_n(aux_nz-1,node) - mesh%zbar_3d_n(aux_nz,node) ) ) )
                                                 
             ! MOM6 provides different option how buoyancy flux is influenced by 
             ! short wave penetration flux
@@ -1134,8 +1126,8 @@ module g_cvmix_kpp
                                         ( sw_3d(nun,node) - &
                                             ( sw_3d(aux_nz-1, node) + &
                                                 ( sw_3d(aux_nz, node) - sw_3d(aux_nz-1, node) ) &
-                                                * ( kpp_obldepth(node) + zbar_3d_n( aux_nz-1,node) ) &
-                                                / ( zbar_3d_n(aux_nz-1,node) - zbar_3d_n(aux_nz,node) ) ) )
+                                                * ( kpp_obldepth(node) + mesh%zbar_3d_n( aux_nz-1,node) ) &
+                                                / ( mesh%zbar_3d_n(aux_nz-1,node) - mesh%zbar_3d_n(aux_nz,node) ) ) )
                 end if
             end if 
             
@@ -1167,8 +1159,8 @@ module g_cvmix_kpp
             md_r8(:)    = real(kpp_oblmixc(:,node,1),     cvmix_r8) ! Mdiff_out (inout) & old_Mdiff (in)
             td_r8(:)    = real(kpp_oblmixc(:,node,2),     cvmix_r8) ! Tdiff_out (inout) & old_Tdiff (in)
             sd_r8(:)    = real(kpp_oblmixc(:,node,3),     cvmix_r8) ! Sdiff_out (inout) & old_Sdiff (in)
-            zbar_r8(:)  = real(zbar_3d_n(:,node),         cvmix_r8) ! zw (in)
-            zcntr_r8(:) = real(Z_3d_n(:,node),            cvmix_r8) ! zt (in)
+            zbar_r8(:)  = real(mesh%zbar_3d_n(:,node),         cvmix_r8) ! zw (in)
+            zcntr_r8(:) = real(mesh%Z_3d_n(:,node),            cvmix_r8) ! zt (in)
             tnl_r8(:)   = real(kpp_nonlcltranspT(:,node), cvmix_r8) ! Tnonlocal (inout)
             snl_r8(:)   = real(kpp_nonlcltranspS(:,node), cvmix_r8) ! Snonlocal (inout)
             call cvmix_coeffs_kpp(                     &
@@ -1186,8 +1178,8 @@ module g_cvmix_kpp
                 Snonlocal = snl_r8,                    & ! (out)   kkp_Snonlocal_iface: Non-local salt transport (non-dimensional)
                 surf_fric = real(ustar, cvmix_r8),     & ! (in)    SurfaceFriction:Turbulent friction velocity at surface (m/s)
                 surf_buoy = real(aux_surfbuoyflx_nl(1), cvmix_r8), & ! (in)    SurfaceBuoynacyForcing: Buoyancy flux at surface (m2/s3)
-                nlev      = nlevels_nod2D(node)-1,     & ! (in)    nlev: Number of levels to compute coeffs for
-                max_nlev  = nl-1,                      & ! (in)    max_lev: maximum vertical levels
+                nlev      = mesh%nlevels_nod2D(node)-1,     & ! (in)    nlev: Number of levels to compute coeffs for
+                max_nlev  = mesh%nl-1,                      & ! (in)    max_lev: maximum vertical levels
                 Langmuir_EFactor = real(kpp_EFactor(node), cvmix_r8), & ! (in)    Langmuir enhancement factor
                 StokesXI         = real(kpp_stokesXI(node), cvmix_r8)  & !
                 )
@@ -1225,28 +1217,28 @@ module g_cvmix_kpp
                 if (kpp_nlt_shape == "cubic") then
                     !!PS do nz = 2,nln+1
                     do nz = nun+1,nln+1
-                        sigma = min(1.0_wp,-zbar_3d_n(nz,node)/kpp_obldepth(node))
+                        sigma = min(1.0_wp,-mesh%zbar_3d_n(nz,node)/kpp_obldepth(node))
                         kpp_nonlcltranspT(nz,node) = (1.0_wp - sigma)**2 * (1.0_wp + 2.0_wp*sigma)!*cs2
                         kpp_nonlcltranspS(nz,node) = kpp_nonlcltranspT(nz,node)
                     end do
                 elseif (kpp_nlt_shape == "parabolic") then
                     !!PS do nz = 2,nln+1
                     do nz = nun+1,nln+1
-                        sigma = min(1.0_wp,-zbar_3d_n(nz,node)/kpp_obldepth(node))
+                        sigma = min(1.0_wp,-mesh%zbar_3d_n(nz,node)/kpp_obldepth(node))
                         kpp_nonlcltranspT(nz,node) = (1.0_wp - sigma)**2 !*cs2
                         kpp_nonlcltranspS(nz,node) = kpp_nonlcltranspT(nz,node)
                     end do
                 elseif (kpp_nlt_shape == "linear") then
                     !!PS do nz = 2,nln+1
                     do nz = nun+1,nln+1
-                        sigma = min(1.0_wp,-zbar_3d_n(nz,node)/kpp_obldepth(node))
+                        sigma = min(1.0_wp,-mesh%zbar_3d_n(nz,node)/kpp_obldepth(node))
                         kpp_nonlcltranspT(nz,node) = (1.0_wp - sigma)!*cs2
                         kpp_nonlcltranspS(nz,node) = kpp_nonlcltranspT(nz,node)
                     end do
                 elseif (kpp_nlt_shape == "cubic_LMD") then
                     !!PS do nz = 2,nln+1
                     do nz = nun+1,nln+1
-                        sigma = min(1.0_wp,-zbar_3d_n(nz,node)/kpp_obldepth(node))
+                        sigma = min(1.0_wp,-mesh%zbar_3d_n(nz,node)/kpp_obldepth(node))
                         kpp_nonlcltranspT(nz,node) = kpp_cs2 * sigma*(1.0_wp -sigma)**2
                         kpp_nonlcltranspS(nz,node) = kpp_nonlcltranspT(nz,node)
                     end do 
@@ -1281,18 +1273,18 @@ module g_cvmix_kpp
         ! 14) combine KPP OBL mixing coefficents with internal mixing coefficients
         ! --> ...min(kpp_oblmixc(nz,node,2),kpp_oblmixc(nz,node,3))... comes from MOM6
         !!PS if (flag_debug .and. mype==0)  print *, achar(27)//'[35m'//'         --> calc combine OBL & internal mixing'//achar(27)//'[0m'    
-        do node= 1, myDim_nod2D
+        do node= 1, partit%myDim_nod2D
             ! FESOM14 approach
             if (kpp_use_fesomkpp) then
                 !!PS do nz = 2,int(kpp_nzobldepth(node))
-                do nz = ulevels_nod2D(node)+1,int(kpp_nzobldepth(node))
+                do nz = mesh%ulevels_nod2D(node)+1,int(kpp_nzobldepth(node))
                     kpp_Av(nz,node) = max(kpp_Av(nz,node),kpp_oblmixc(nz,node,1))
                     kpp_Kv(nz,node) = max(kpp_Kv(nz,node),kpp_oblmixc(nz,node,2))
                 end do
             ! MOM6/MPIOM approach
             else
                 !!PS do nz = 2,nlevels_nod2D(node)-1
-                do nz = ulevels_nod2D(node)+1,nlevels_nod2D(node)-1
+                do nz = mesh%ulevels_nod2D(node)+1,mesh%nlevels_nod2D(node)-1
                     kpp_Av(nz,node) = kpp_oblmixc(nz,node,1)
                     kpp_Kv(nz,node) = min(kpp_oblmixc(nz,node,2),kpp_oblmixc(nz,node,3))
                 end do
@@ -1311,10 +1303,10 @@ module g_cvmix_kpp
         ! defined on elements --> interpolate therefor from nodes to elements
         call exchange_nod(kpp_Av, partit)
         Av = 0.0_WP
-        do elem=1, myDim_elem2D
-            elnodes=elem2D_nodes(:,elem)
+        do elem=1, partit%myDim_elem2D
+            elnodes=mesh%elem2D_nodes(:,elem)
             !!PS do nz=2,nlevels(elem)-1
-            do nz=ulevels(elem),nlevels(elem)-1
+            do nz=mesh%ulevels(elem),mesh%nlevels(elem)-1
                 Av(nz,elem) = sum(kpp_Av(nz,elnodes))/3.0_WP    ! (elementwise)                
             end do
         end do
