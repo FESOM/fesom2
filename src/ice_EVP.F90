@@ -187,11 +187,14 @@ subroutine stress2rhs(ice, partit, mesh)
     !___________________________________________________________________________
     val3=1/3.0_WP
 
-#ifndef ENABLE_OPENACC
     ! Node-owned gather: each owned node sums the stress divergence of its incident
     ! elements in nod_in_elem2D order and writes only its own entry. No locks are
     ! needed and the sum does not depend on the number of threads.
+#ifndef ENABLE_OPENACC
 !$OMP DO PRIVATE(n, el, k, j, elnodes, su, sv)
+#else
+    !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(el, k, j, elnodes, su, sv) DEFAULT(PRESENT)
+#endif
     DO n=1, partit%myDim_nod2D
         su = 0.0_WP
         sv = 0.0_WP
@@ -217,63 +220,9 @@ subroutine stress2rhs(ice, partit, mesh)
         U_rhs_ice(n) = su
         V_rhs_ice(n) = sv
     END DO
+#ifndef ENABLE_OPENACC
 !$OMP END DO
 #else
-    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
-    DO  n=1, partit%myDim_nod2D
-        U_rhs_ice(n)=0.0_WP
-        V_rhs_ice(n)=0.0_WP
-    END DO
-
-    !$ACC END PARALLEL LOOP
-
-    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
-#if !defined(DISABLE_OPENACC_ATOMICS)
-       !$ACC ATOMIC UPDAATE
-#else
-    !$ACC UPDATE SELF(u_rhs_ice, v_rhs_ice, sigma11, sigma12, sigma22)
-#endif
-    do el=1,partit%myDim_elem2D
-        ! ===== Skip if ice is absent
-        !   if (any(m_ice(elnodes)<= 0.) .or. any(a_ice(elnodes) <=0.)) CYCLE
-        !_______________________________________________________________________
-        ! if element contains cavity node skip it
-        if (mesh%ulevels(el) > 1) cycle
-
-        !_______________________________________________________________________
-        elnodes = mesh%elem2D_nodes(:,el)
-        if (any(m_ice(elnodes) <= 0._WP) .or. any(a_ice(elnodes) <= 0._WP)) cycle
-
-        DO k=1,3
-
-#ifdef ENABLE_OPENACC
-#if !defined(DISABLE_OPENACC_ATOMICS)
-                !$ACC ATOMIC UPDATE
-#endif
-#endif
-                U_rhs_ice(mesh%elem2D_nodes(k,el)) = U_rhs_ice(mesh%elem2D_nodes(k,el)) &
-                - mesh%elem_area(el) * &
-                    (sigma11(el)*mesh%gradient_sca(k,el) + sigma12(el)*mesh%gradient_sca(k+3,el) &
-                    +sigma12(el)*val3*mesh%metric_factor(el))            !metrics
-
-#ifdef ENABLE_OPENACC
-#if !defined(DISABLE_OPENACC_ATOMICS)
-                !$ACC ATOMIC UPDATE
-#endif
-#endif
-                V_rhs_ice(mesh%elem2D_nodes(k,el)) = V_rhs_ice(mesh%elem2D_nodes(k,el)) &
-                    - mesh%elem_area(el) * &
-                    (sigma12(el)*mesh%gradient_sca(k,el) + sigma22(el)*mesh%gradient_sca(k+3,el) &
-                    -sigma11(el)*val3*mesh%metric_factor(el))
-
-        END DO
-    end do
-#ifdef ENABLE_OPENACC
-#if !defined(DISABLE_OPENACC_ATOMICS)
-    !$ACC UPDATE DEVICE(u_rhs_ice, v_rhs_ice)
-#endif
-#endif
-
     !$ACC END PARALLEL LOOP
 #endif
 

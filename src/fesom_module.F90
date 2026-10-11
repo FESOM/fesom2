@@ -862,6 +862,7 @@ contains
     !$ACC ENTER DATA COPYIN (f%mesh%nlevels_nod2D, f%mesh%nod_in_elem2D, f%mesh%nod_in_elem2D_num) 
     !$ACC ENTER DATA COPYIN (f%mesh%edge_dxdy, f%mesh%nlevels, f%mesh%ulevels_nod2D_max) 
     !$ACC ENTER DATA COPYIN (f%mesh%areasvol, f%mesh%nlevels_nod2D_min) 
+    !$ACC ENTER DATA COPYIN (f%mesh%nod_in_edge2D_num, f%mesh%nod_in_edge2D, f%mesh%nod_in_edge2D_sgn)
     !$ACC ENTER DATA CREATE (f%mesh%helem, f%mesh%hnode, f%mesh%hnode_new, f%mesh%zbar_3d_n, f%mesh%z_3d_n)
     !do n=f%from_nstep, f%from_nstep-1+current_nsteps
     !$ACC ENTER DATA COPYIN  (f%ice)
@@ -1535,6 +1536,7 @@ contains
     !$ACC EXIT DATA DELETE (f%mesh%nlevels_nod2D, f%mesh%nod_in_elem2D, f%mesh%nod_in_elem2D_num) 
     !$ACC EXIT DATA DELETE (f%mesh%edge_dxdy, f%mesh%nlevels, f%mesh%hnode, f%mesh%hnode_new, f%mesh%ulevels_nod2D_max) 
     !$ACC EXIT DATA DELETE (f%mesh%zbar_3d_n, f%mesh%z_3d_n, f%mesh%areasvol, f%mesh%nlevels_nod2D_min) 
+    !$ACC EXIT DATA DELETE (f%mesh%nod_in_edge2D_num, f%mesh%nod_in_edge2D, f%mesh%nod_in_edge2D_sgn)
     !$ACC EXIT DATA DELETE (f%partit%eDim_nod2D, f%partit%myDim_edge2D) 
     !$ACC EXIT DATA DELETE (f%partit%myDim_elem2D, f%partit%myDim_nod2D, f%partit%myList_edge2D) 
     !$ACC EXIT DATA DELETE (f%mesh, f%partit, f)
