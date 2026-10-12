@@ -238,9 +238,6 @@ subroutine setup_model(partit)
   read (fileunit, NML=pasinking, iostat=istat)
   if (istat /= 0) call check_namelist_read(fileunit, 'pasinking', nmlfile, partit)
 
-  read (fileunit, NML=painitialization_N, iostat=istat)
-  if (istat /= 0) call check_namelist_read(fileunit, 'painitialization_N', nmlfile, partit)
-
   read (fileunit, NML=paArrhenius, iostat=istat)
   if (istat /= 0) call check_namelist_read(fileunit, 'paArrhenius', nmlfile, partit)
 

@@ -32,62 +32,52 @@ num_tracers = 100         ! number of tracers to allocate (must be ≥ actual nu
 !101 , 'UPW1'  , 'UPW1'    , 'NON ' , 0.      , 0.            ! example passive tracer
 &tracer_list
 nml_tracer_list =
-1   , 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-2   , 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1001, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1002, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1003, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1004, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1005, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1006, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1007, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1008, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1009, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1010, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1011, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1012, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1013, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1014, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1015, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1016, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1017, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1018, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1019, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1020, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1021, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1022, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1023, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1024, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1025, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1026, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1027, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1028, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1029, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1030, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
-1037, 'MFCT', 'QR4C', 'FCT ', 0., 1.,
+1  ,   'MFCT',       'QR4C',       'FCT ',        0.,          1., 
+2  ,   'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1001,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1002,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1003,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1004,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1005,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1006,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1007,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1008,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1009,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1010,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1011,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1012,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1013,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1014,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1015,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1016,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1017,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1018,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1019,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1020,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1021,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1022,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1023,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1024,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1025,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1026,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1027,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1028,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1029,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1030,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
+1037,  'MFCT',       'QR4C',       'FCT ',        0.,          1.,
 /
 
 ! ============================================================================
 ! 3D TRACER INITIAL CONDITIONS (OCEAN)
 ! ============================================================================
 &tracer_init3d
-! IDs: 1=temperature, 2=salinity, 1001=nitrate, 1002=DIC, 1003=alkalinity,
-!      1018=silicate, 1019=iron, 1022=oxygen
-! DIC (1002) ships the preindustrial GLODAP field; for present-day runs use
-!      GLODAPv2.2016b.TCO2_fesom2_mmol_fix_z_Fillvalue.nc with varlist TCO2_mmol
-! NOTE: no inline "!" comments inside the value lists below - gfortran aborts
-!      the namelist read on them, silently leaving the remaining entries empty.
-n_ic3d   = 8  ! number of 3D tracers to initialize from files
-idlist   = 1, 2, 1001, 1002, 1003, 1018, 1019, 1022 ! tracer IDs to initialize (1=temperature, 2=salinity)
-filelist = 'phc3.0_winter.nc', 'phc3.0_winter.nc',
-           'woa13_all_n00_01_fesom2.nc',
-           'GLODAPv2.2016b.PI_TCO2_fesom2_mmol_fix_z_Fillvalue.nc',
-           'GLODAPv2.2016b.TAlk_fesom2_mmol_fix_z_Fillvalue.nc',
-           'woa13_all_i00_01_fesom2.nc',
-           'fe_pisces_opa_eq_init_3D_changed_name.nc',
-           'woa18_all_o00_01_mmol_fesom2.nc'
-varlist  = 'temp', 'salt', 'n_an', 'PI_TCO2_mmol', 'TAlk_mmol', 'i_an', 'Fe', 'oxygen_mmol' ! variable names in the netCDF files
+n_ic3d   = 9                                       ! number of 3D tracers to initialize from files
+idlist   = 1019, 1022, 1018, 1003, 1002, 1001, 2, 1, 1037 ! their IDs (0 is temperature, 1 is salinity, etc.). The reading order is defined here!
+filelist = 'fe_pisces_opa_eq_init_3D_changed_name.nc', 'woa18_all_o00_01_mmol_fesom2.nc', 'woa13_all_i00_01_fesom2.nc', 'GLODAPv2.2016b.TAlk_fesom2_mmol_fix_z_Fillvalue.nc', 'GLODAPv2.2016b.PI_TCO2_fesom2_mmol_fix_z_Fillvalue.nc', 'woa13_all_n00_01_fesom2.nc', 'phc3.0_winter.nc', 'phc3.0_winter.nc', 'dicremin_fromAnnualAOU_WOA2023_noneg.nc' ! list of files in ClimateDataPath to read (one file per tracer), same order as idlist
+varlist  = 'Fe', 'oxygen_mmol', 'i_an', 'TAlk_mmol', 'PI_TCO2_mmol', 'n_an', 'salt', 'temp', 'DICremin'                 ! variable names in the netCDF files
 t_insitu = .true.                                  ! if true, convert in-situ temperature to potential temperature
+ic_extrap_det = .false.                            ! deterministic decomposition-independent hole filling (default: historical fill, bit-for-bit)
+ic_extrap_tol = 1.e-3                              ! relaxation tolerance of the deterministic fill (used only with ic_extrap_det=.true.)
 /
 
 ! ============================================================================
