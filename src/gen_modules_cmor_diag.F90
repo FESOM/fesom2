@@ -317,7 +317,8 @@ contains
     sivols = 0.0_WP
     
     do n2 = 1, partit%myDim_nod2D
-        if (mesh%coord_nod2D(2, n2) > 0.0_WP) then
+        ! geographical latitude; coord_nod2D is on the rotated grid
+        if (mesh%geo_coord_nod2D(2, n2) > 0.0_WP) then
             ! Northern hemisphere
             siarean = siarean + ice%data(1)%values(n2) * mesh%area(1, n2)
             if (ice%data(1)%values(n2) >= 0.15_WP) then
