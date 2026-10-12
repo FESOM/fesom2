@@ -90,6 +90,9 @@ subroutine ice_TG_rhs(ice, partit, mesh)
     ! does not own, and the sums do not depend on the number of threads.
 #ifndef ENABLE_OPENACC
 !$OMP DO
+#else
+    !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(j, n, q, elem, elnodes, diff, entries, um, vm, vol, dx, dy) DEFAULT(PRESENT)
+#endif
     do row=1, partit%myDim_nod2D
         do j=1, mesh%nod_in_elem2D_num(row)
             elem=mesh%nod_in_elem2D(j,row)
@@ -129,51 +132,10 @@ subroutine ice_TG_rhs(ice, partit, mesh)
 #endif
         end do ! --> do j=1, nod_in_elem2D_num(row)
     end do ! --> do row=1, myDim_nod2D
+#ifndef ENABLE_OPENACC
 !$OMP END DO
 !$OMP END PARALLEL
 #else
-    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) private(n, q, row, elem, elnodes, diff, entries,  um, vm, vol, dx, dy)
-    do elem=1,partit%myDim_elem2D          !assembling rhs over elements
-        elnodes=mesh%elem2D_nodes(:,elem)
-        !_______________________________________________________________________
-        ! if cavity element skip it
-        if (mesh%ulevels(elem)>1) cycle
-
-        !derivatives
-        dx=mesh%gradient_sca(1:3,elem)
-        dy=mesh%gradient_sca(4:6,elem)
-        vol=mesh%elem_area(elem)
-        !um=sum(U_ice(elnodes))/3.0_WP
-        !vm=sum(V_ice(elnodes))/3.0_WP
-        um=sum(U_ice(elnodes))
-        vm=sum(V_ice(elnodes))
-
-        !diffusivity
-        diff=ice%ice_diff*sqrt(mesh%elem_area(elem)/scale_area)
-        !$ACC LOOP SEQ
-        DO n=1,3
-            row=elnodes(n)
-	    !$ACC LOOP SEQ
-            DO q = 1,3
-                !entries(q)= vol*dt*((dx(n)*um+dy(n)*vm)/3.0_WP - &
-                !            diff*(dx(n)*dx(q)+ dy(n)*dy(q))- &
-                !	       0.5*dt*(um*dx(n)+vm*dy(n))*(um*dx(q)+vm*dy(q)))
-                entries(q)= vol*ice%ice_dt*((dx(n)*(um+u_ice(elnodes(q)))+ &
-                            dy(n)*(vm+v_ice(elnodes(q))))/12.0_WP - &
-                            diff*(dx(n)*dx(q)+ dy(n)*dy(q))- &
-                            0.5_WP*ice%ice_dt*(um*dx(n)+vm*dy(n))*(um*dx(q)+vm*dy(q))/9.0_WP)
-            END DO
-	    !$ACC END LOOP
-            rhs_m(row)=rhs_m(row)+sum(entries*m_ice(elnodes))
-            rhs_a(row)=rhs_a(row)+sum(entries*a_ice(elnodes))
-            rhs_ms(row)=rhs_ms(row)+sum(entries*m_snow(elnodes))
-#if defined (__oifs) || defined (__ifsinterface)
-            rhs_temp(row)=rhs_temp(row)+sum(entries*ice_temp(elnodes))
-#endif
-        END DO
-	!$ACC END LOOP
-    end do
-
     !$ACC END PARALLEL LOOP
 #endif
 end subroutine ice_TG_rhs
@@ -504,18 +466,13 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #endif
     ! Auxiliary elemental operator (mass matrix- lumped mass matrix)
 
-    ! do we need to make the entire array of icoef equal to 1 ?
-    ! if so, we have to write another loop for that. For now, I am running it on cpu.
     icoef = 1
-#ifdef ENABLE_OPENACC
-    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
-#endif
     do n=1,3   ! three upper nodes
         ! Cycle over rows  row=elnodes(n)
         icoef(n,n)=-2
     end do
 #ifdef ENABLE_OPENACC
-    !$ACC END PARALLEL LOOP
+    !$ACC UPDATE DEVICE(icoef)
 #endif
 
 
@@ -692,12 +649,15 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     !$ACC END PARALLEL LOOP
 #endif
 
-#ifndef ENABLE_OPENACC
     ! Each owned node gathers the fluxes of its elements (nod_in_elem2D).
     ! No thread writes a node it does not own, and the sums do not depend on the
     ! number of threads.
     ! Halo nodes are filled by the exchange that follows.
+#ifndef ENABLE_OPENACC
 !$OMP DO
+#else
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
+#endif
     do n=1, partit%myDim_nod2D
         do k=1, mesh%nod_in_elem2D_num(n)
             elem=mesh%nod_in_elem2D(k,n)
@@ -713,40 +673,10 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
             end if
         end do
     end do
+#ifndef ENABLE_OPENACC
 !$OMP END DO
 #else
-#if !defined(DISABLE_OPENACC_ATOMICS)
-    !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(elnodes) DEFAULT(PRESENT)
-#else
-    !$ACC UPDATE SELF(icefluxes, icepplus, icepminus)
-#endif
-    do elem=1, partit%myDim_elem2D
-        ! if cavity cycle over
-        if(mesh%ulevels(elem)>1) cycle !LK89140
-
-        !_______________________________________________________________________
-        elnodes=mesh%elem2D_nodes(:,elem)
-        do q=1,3
-            n=elnodes(q)
-            flux=icefluxes(elem,q)
-            if (flux>0) then
-#if !defined(DISABLE_OPENACC_ATOMICS)
-                !$ACC ATOMIC UPDATE
-#endif
-                icepplus(n)=icepplus(n)+flux
-            else
-#if !defined(DISABLE_OPENACC_ATOMICS)
-                !$ACC ATOMIC UPDATE
-#endif
-                icepminus(n)=icepminus(n)+flux
-            end if
-        end do
-    end do
-#if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC END PARALLEL LOOP
-#else
-    !$ACC UPDATE DEVICE(icepplus, icepminus)
-#endif
 #endif
 
 
@@ -836,9 +766,12 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         !$ACC END PARALLEL LOOP
 #endif
 
-#ifndef ENABLE_OPENACC
         ! node-owned gather over nod_in_elem2D, as above
+#ifndef ENABLE_OPENACC
 !$OMP DO
+#else
+        !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
+#endif
         do n=1, partit%myDim_nod2D
             do k=1, mesh%nod_in_elem2D_num(n)
                 elem=mesh%nod_in_elem2D(k,n)
@@ -849,31 +782,10 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
                 m_ice(n)=m_ice(n)+icefluxes(elem,q)
             end do
         end do
+#ifndef ENABLE_OPENACC
 !$OMP END DO
 #else
-#if !defined(DISABLE_OPENACC_ATOMICS)
-        !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(elnodes) DEFAULT(PRESENT)
-#else
-        !$ACC UPDATE SELF(m_ice, icefluxes)
-#endif
-        do elem=1, partit%myDim_elem2D
-            ! if cavity cycle over
-            if(mesh%ulevels(elem)>1) cycle !LK89140
-
-            elnodes=mesh%elem2D_nodes(:,elem)
-            do q=1,3
-                n=elnodes(q)
-#if !defined(DISABLE_OPENACC_ATOMICS)
-                !$ACC ATOMIC UPDATE
-#endif
-                m_ice(n)=m_ice(n)+icefluxes(elem,q)
-            end do
-        end do
-#if !defined(DISABLE_OPENACC_ATOMICS)
         !$ACC END PARALLEL LOOP
-#else
-        !$ACC UPDATE DEVICE(m_ice)
-#endif
 #endif
     end if
 
@@ -1212,12 +1124,15 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
     !$ACC END PARALLEL LOOP
 #endif
 
-#ifndef ENABLE_OPENACC
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(diff, entries, um, vm, vol, dx, dy, n, q, row, elem, elnodes, c1, c2, c3, c4, cx1, cx2, cx3, cx4, entries2, j, tmp_sum)
     ! Each owned row gathers the contributions of its elements (nod_in_elem2D);
     ! n is the corner of the element that the row is. No thread writes a row it
     ! does not own, and the sums do not depend on the number of threads.
+#ifndef ENABLE_OPENACC
 !$OMP DO
+#else
+    !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
+#endif
     do row=1, partit%myDim_nod2D
         do j=1, mesh%nod_in_elem2D_num(row)
             elem=mesh%nod_in_elem2D(j,row)
@@ -1278,107 +1193,12 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
 #endif /* (__oifs) */
         end do ! --> do j=1, nod_in_elem2D_num(row)
     end do ! --> do row=1, myDim_nod2D
+#ifndef ENABLE_OPENACC
 !$OMP END DO
-!$OMP END PARALLEL
 #else
-#if !defined(DISABLE_OPENACC_ATOMICS)
-    !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(elnodes, dx, dy, entries, entries2) DEFAULT(PRESENT)
-#else
-    !$ACC UPDATE SELF(rhs_a, rhs_m, rhs_ms, rhs_adiv, rhs_mdiv, rhs_msdiv, u_ice, v_ice, m_ice, a_ice, m_snow)
-#endif
-    do elem=1,partit%myDim_elem2D          !assembling rhs over elements
-        elnodes=mesh%elem2D_nodes(:,elem)
-
-        ! if cavity element skip it
-        if (mesh%ulevels(elem)>1) cycle
-
-        !derivatives
-        dx=mesh%gradient_sca(1:3,elem)
-        dy=mesh%gradient_sca(4:6,elem)
-        vol=mesh%elem_area(elem)
-        um=sum(u_ice(elnodes))
-        vm=sum(v_ice(elnodes))
-        ! this is exact computation (no assumption of u=const on elements used
-        ! in the standard version)
-        c1=(um*um+sum(u_ice(elnodes)*u_ice(elnodes)))/12.0_WP
-        c2=(vm*vm+sum(v_ice(elnodes)*v_ice(elnodes)))/12.0_WP
-        c3=(um*vm+sum(v_ice(elnodes)*u_ice(elnodes)))/12.0_WP
-        c4=sum(dx*u_ice(elnodes)+dy*v_ice(elnodes))
-        do n=1,3
-            row=elnodes(n)
-                !!PS         if(ulevels_nod2D(row)>1) cycle !LK89140
-            do q = 1,3
-                entries(q)= vol*ice%ice_dt*((1.0_WP-0.5_WP*ice%ice_dt*c4)*(dx(n)*(um+u_ice(elnodes(q)))+ &
-                            dy(n)*(vm+v_ice(elnodes(q))))/12.0_WP - &
-                            0.5_WP*ice%ice_dt*(c1*dx(n)*dx(q)+c2*dy(n)*dy(q)+c3*(dx(n)*dy(q)+dx(q)*dy(n))))
-                        !um*dx(n)+vm*dy(n))*(um*dx(q)+vm*dy(q))/9.0)
-                entries2(q)=0.5_WP*ice%ice_dt*(dx(n)*(um+u_ice(elnodes(q)))+ &
-                            dy(n)*(vm+v_ice(elnodes(q)))-dx(q)*(um+u_ice(row))- &
-                            dy(q)*(vm+v_ice(row)))
-            end do
-
-            !___________________________________________________________________
-            cx1=vol*ice%ice_dt*c4*(sum(m_ice(elnodes))+m_ice(elnodes(n))+sum(entries2*m_ice(elnodes)))/12.0_WP
-            cx2=vol*ice%ice_dt*c4*(sum(a_ice(elnodes))+a_ice(elnodes(n))+sum(entries2*a_ice(elnodes)))/12.0_WP
-            cx3=vol*ice%ice_dt*c4*(sum(m_snow(elnodes))+m_snow(elnodes(n))+sum(entries2*m_snow(elnodes)))/12.0_WP
-#if defined (__oifs) || defined (__ifsinterface)
-            cx4=vol*ice%ice_dt*c4*(sum(ice_temp(elnodes))+ice_temp(elnodes(n))+sum(entries2*ice_temp(elnodes)))/12.0_WP
-#endif
-
-            !___________________________________________________________________
-            tmp_sum = sum(entries*m_ice(elnodes))
-#if !defined(DISABLE_OPENACC_ATOMICS)
-            !$ACC ATOMIC WRITE
-#endif
-            rhs_m(row)=rhs_m(row)+tmp_sum+cx1
-
-            tmp_sum = sum(entries*a_ice(elnodes))
-#if !defined(DISABLE_OPENACC_ATOMICS)
-            !$ACC ATOMIC WRITE
-#endif
-            rhs_a(row)=rhs_a(row)+tmp_sum+cx2
-
-            tmp_sum = sum(entries*m_snow(elnodes))
-#if !defined(DISABLE_OPENACC_ATOMICS)
-            !$ACC ATOMIC WRITE
-#endif
-            rhs_ms(row)=rhs_ms(row)+tmp_sum+cx3
-
-#if defined (__oifs) || defined (__ifsinterface)
-            tmp_sum = sum(entries*ice_temp(elnodes))
-#if !defined(DISABLE_OPENACC_ATOMICS)
-            !$ACC ATOMIC UPDATE
-#endif
-            rhs_temp(row)=rhs_temp(row)+tmp_sum+cx4
-#endif
-
-            !___________________________________________________________________
-#if !defined(DISABLE_OPENACC_ATOMICS)
-            !$ACC ATOMIC UPDATE
-#endif
-            rhs_mdiv(row)=rhs_mdiv(row)-cx1
-#if !defined(DISABLE_OPENACC_ATOMICS)
-            !$ACC ATOMIC UPDATE
-#endif
-            rhs_adiv(row)=rhs_adiv(row)-cx2
-#if !defined(DISABLE_OPENACC_ATOMICS)
-            !$ACC ATOMIC UPDATE
-#endif
-            rhs_msdiv(row)=rhs_msdiv(row)-cx3
-#if defined (__oifs) || defined (__ifsinterface)
-#if !defined(DISABLE_OPENACC_ATOMICS)
-            !$ACC ATOMIC UPDATE
-#endif
-            rhs_tempdiv(row)=rhs_tempdiv(row)-cx4
-#endif /* (__oifs) */
-        end do
-    end do
-#if !defined(DISABLE_OPENACC_ATOMICS)
     !$ACC END PARALLEL LOOP
-#else
-    !$ACC UPDATE DEVICE(rhs_a, rhs_m, rhs_ms, rhs_adiv, rhs_mdiv, rhs_msdiv)
 #endif
-#endif
+!$OMP END PARALLEL
 end subroutine ice_TG_rhs_div
 !
 !

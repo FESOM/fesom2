@@ -58,7 +58,7 @@ real(kind=WP)                 :: K_ver=0.00001_WP
 real(kind=WP)                 :: scale_area=2.0e8_WP
 real(kind=WP)                 :: surf_relax_T= 0.0_WP
 real(kind=WP)                 :: surf_relax_S= 10.0_WP/(60*3600.0_WP*24)
-logical                       :: balance_salt_water =.true.
+logical                       :: balance_salt_water =.true. ! currently not used
 real(kind=WP)                 :: clim_relax= 1.0_WP/(10*3600.0_WP*24)
 real(kind=WP)                 :: clim_decay, clim_growth
                                  ! set to 0.0 if no relaxation

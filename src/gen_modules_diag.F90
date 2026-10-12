@@ -857,8 +857,9 @@ subroutine compute_ice_diag(mode, ice, partit, mesh)
     end if
 !$OMP PARALLEL DO
 DO n=1, partit%myDim_nod2D
-   vol_ice(n) =ice%data(1)%values(n)*ice%data(2)%values(n)
-   vol_snow(n)=ice%data(1)%values(n)*ice%data(3)%values(n)
+   ! m_ice and m_snow are already volume per unit grid-cell area
+   vol_ice(n) =ice%data(2)%values(n)
+   vol_snow(n)=ice%data(3)%values(n)
 END DO
 !$OMP END PARALLEL DO
 
@@ -3070,7 +3071,7 @@ subroutine dvd_add_difflux_sbc(do_SDdvd, tr_num, dvd_tot, tr, trstar, partit, me
             
             ! --> if Sergey diagonsitc is used Dflx correspond from here on to 
             !     Xchi at full depth level interface
-            nz = 1 
+            nz = nu1
 !PS             Dflx(nz) = Dflx(nz) * -2.0_WP*( trstar(nz, node) )
             Dflx(nz) = Dflx(nz) * (-2.0_WP) * ( trstar(nz+1, node)-trstar(nz, node) )
             do nz=nu1+1, nl1-1
