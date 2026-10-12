@@ -593,6 +593,7 @@ elseif(${CMAKE_Fortran_COMPILER_ID} STREQUAL NVHPC )
       set(_FESOM_NVHPC_RKIND -Mr8)
    endif()
    if(${ENABLE_OPENACC})
+      target_compile_definitions(${PROJECT_NAME} PRIVATE ENABLE_OPENACC)
       target_compile_options(${PROJECT_NAME} PRIVATE
       $<$<CONFIG:DEBUG>:-Mallocatable=95 ${_FESOM_NVHPC_RKIND} -pgf90libs -Mnofma -Minfo=all -acc=verystrict -gpu=math_uniform,cuda12.2,cc80>
       $<$<CONFIG:RELEASE>:-Mallocatable=95 ${_FESOM_NVHPC_RKIND} -pgf90libs -Minfo=all -acc=verystrict -gpu=cc80>)

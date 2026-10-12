@@ -2675,11 +2675,14 @@ module g_cvmix_idemix2
         !
         !_______________________________________________________________________
         ! Horizontal part
-#ifndef ENABLE_OPENACC
         ! Each owned node gathers the fluxes of its incident edges in ascending
         ! edge order (mesh%nod_in_edge2D): + where it is the first edge node,
         ! - where it is the second.
+#ifndef ENABLE_OPENACC
        !$OMP DO
+#else
+       !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(k, edge, fbini) DEFAULT(PRESENT)
+#endif
         do node=1, partit%myDim_nod2d
             do k=1, mesh%nod_in_edge2D_num(node)
                 edge = mesh%nod_in_edge2D(k,node)
@@ -2695,47 +2698,11 @@ module g_cvmix_idemix2
                 end if
             end do
         end do
+#ifndef ENABLE_OPENACC
        !$OMP END DO
        !$OMP END PARALLEL
 #else
-#   if !defined(DISABLE_OPENACC_ATOMICS)
-       !$ACC PARALLEL LOOP GANG PRIVATE(enodes, el) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
-#   else
-       !$ACC UPDATE SELF(dttf_h, flux_h)
-#   endif
-        do edge=1, partit%myDim_edge2D 
-            ednodes  = mesh%edges(:,edge)
-#   if !defined(DISABLE_OPENACC_ATOMICS)
-           !$ACC LOOP VECTOR
-#   endif
-            !
-            !___________________________________________________________________
-            ! horizontal flux contribution to ednode_1
-            do fbini=2, nfbin-1
-#if !defined(DISABLE_OPENACC_ATOMICS)
-               !$ACC ATOMIC UPDATE
-#endif
-                ! Horizontal divergence: flux/area (NO inv_dphi - that's only for cross-spectral!)
-                div_h(fbini, ednodes(1))=div_h(fbini, ednodes(1))+flx_h(fbini, edge)
-                
-                
-#   if !defined(DISABLE_OPENACC_ATOMICS)
-                !$ACC ATOMIC UPDATE
-#   endif                
-                ! Horizontal divergence: flux/area (NO inv_dphi - that's only for cross-spectral!)
-                div_h(fbini,ednodes(2))=div_h(fbini,ednodes(2))-flx_h(fbini,edge)
-            end do
-            
-#   if !defined(DISABLE_OPENACC_ATOMICS)
-            !$ACC END LOOP
-#   endif
-        end do
-
-#   if !defined(DISABLE_OPENACC_ATOMICS)
-   !$ACC END PARALLEL LOOP
-#   else
-   !$ACC UPDATE DEVICE(dttf_h)
-#   endif
+       !$ACC END PARALLEL LOOP
 #endif
         !_______________________________________________________________________
         ! normalize with total volume of scalar cell from top to bottom
