@@ -264,14 +264,17 @@ contains
     ! sw_3d is temperature flux at level interfaces [K*m/s]
     ! Absorption in layer k = (sw_3d(k) - sw_3d(k+1)) * vcpw [W/m^2]
     !=================================================================
+    ! sw_3d is only allocated with shortwave penetration (use_sw_pene)
     rsdoabsorb = 0.0_WP
-    do n2 = 1, partit%myDim_nod2D
-        ku = mesh%ulevels_nod2D(n2)
-        kl = mesh%nlevels_nod2D(n2)
-        do k = ku, kl-1
-            rsdoabsorb(k, n2) = (sw_3d(k, n2) - sw_3d(k+1, n2)) * vcpw
+    if (allocated(sw_3d)) then
+        do n2 = 1, partit%myDim_nod2D
+            ku = mesh%ulevels_nod2D(n2)
+            kl = mesh%nlevels_nod2D(n2)
+            do k = ku, kl-1
+                rsdoabsorb(k, n2) = (sw_3d(k, n2) - sw_3d(k+1, n2)) * vcpw
+            end do
         end do
-    end do
+    end if
     
     !=================================================================
     ! Compute global mean salinity and temperature
