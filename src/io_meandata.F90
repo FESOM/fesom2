@@ -2401,7 +2401,7 @@ END DO ! --> DO i=1, io_listsize
     !___________________________________________________________________________
     ! Tracers flux diagnostics. Default monthly output, but honor io_list
     ! entries if the user requested a different frequency.
-    if (ldiag_trflx .and. sel_trgrd_xyz==0) then
+    if (ldiag_trflx) then
         block
             integer :: k, tf_freq
             character :: tf_unit
