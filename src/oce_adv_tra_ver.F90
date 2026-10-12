@@ -32,17 +32,13 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh, tend)
     real(kind=WP)                      :: m, zinv, dt_inv, dz
     real(kind=WP)                      :: c1, v_adv
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     dt_inv=1.0_WP/dt
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(a, b, c, tr, cp, tp, n, nz, nzmax, nzmin, m, zinv, dz, c1, v_adv, zbar_n, z_n)
 !$OMP DO
     !___________________________________________________________________________
     ! loop over local nodes
-    do n=1,myDim_nod2D
+    do n=1,partit%myDim_nod2D
 
         ! initialise
         a  = 0.0_WP
@@ -53,10 +49,10 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh, tend)
         cp = 0.0_WP
 
         ! max. number of levels at node n
-        nzmax=nlevels_nod2D(n)
+        nzmax=mesh%nlevels_nod2D(n)
 
         ! upper surface index, in case of cavity !=1
-        nzmin=ulevels_nod2D(n)
+        nzmin=mesh%ulevels_nod2D(n)
 
         !___________________________________________________________________________
         ! Here can not exchange zbar_n & Z_n with zbar_3d_n & Z_3d_n because
@@ -66,13 +62,13 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh, tend)
         ! Be carefull here vertical operation have to be done on NEW vertical mesh !!!
         zbar_n=0.0_WP
         Z_n=0.0_WP
-        zbar_n(nzmax)=zbar_n_bot(n)
-        Z_n(nzmax-1) =zbar_n(nzmax) + hnode_new(nzmax-1,n)/2.0_WP
+        zbar_n(nzmax)=mesh%zbar_n_bot(n)
+        Z_n(nzmax-1) =zbar_n(nzmax) + mesh%hnode_new(nzmax-1,n)/2.0_WP
         do nz=nzmax-1,nzmin+1,-1
-            zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)
-            Z_n(nz-1)  = zbar_n(nz)   + hnode_new(nz-1,n)/2.0_WP
+            zbar_n(nz) = zbar_n(nz+1) + mesh%hnode_new(nz,n)
+            Z_n(nz-1)  = zbar_n(nz)   + mesh%hnode_new(nz-1,n)/2.0_WP
         end do
-        zbar_n(nzmin) = zbar_n(nzmin+1) + hnode_new(nzmin,n)
+        zbar_n(nzmin) = zbar_n(nzmin+1) + mesh%hnode_new(nzmin,n)
 
         !_______________________________________________________________________
         ! Regular part of coefficients: --> surface layer
@@ -87,10 +83,10 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh, tend)
         !!PS c(nz)=-max(0._WP, W(nz+1, n))*v_adv
 
         a(nz)=0.0_WP
-        v_adv=zinv*area(nz  ,n)/areasvol(nz,n)
-        b(nz)= hnode_new(nz,n)+W(nz, n)*v_adv
+        v_adv=zinv*mesh%area(nz  ,n)/mesh%areasvol(nz,n)
+        b(nz)= mesh%hnode_new(nz,n)+W(nz, n)*v_adv
 
-        v_adv=zinv*area(nz+1,n)/areasvol(nz,n)
+        v_adv=zinv*mesh%area(nz+1,n)/mesh%areasvol(nz,n)
         b(nz)= b(nz)-min(0._WP, W(nz+1, n))*v_adv
         c(nz)=-max(0._WP, W(nz+1, n))*v_adv
 
@@ -98,11 +94,11 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh, tend)
         ! Regular part of coefficients: --> 2nd...nl-2 layer
         do nz=nzmin+1, nzmax-2
             ! update from the vertical advection
-            v_adv=zinv*area(nz  ,n)/areasvol(nz,n)
+            v_adv=zinv*mesh%area(nz  ,n)/mesh%areasvol(nz,n)
             a(nz)=min(0._WP, W(nz, n))*v_adv
-            b(nz)=hnode_new(nz,n)+max(0._WP, W(nz, n))*v_adv
+            b(nz)=mesh%hnode_new(nz,n)+max(0._WP, W(nz, n))*v_adv
 
-            v_adv=zinv*area(nz+1,n)/areasvol(nz,n)
+            v_adv=zinv*mesh%area(nz+1,n)/mesh%areasvol(nz,n)
             b(nz)=b(nz)-min(0._WP, W(nz+1, n))*v_adv
             c(nz)=     -max(0._WP, W(nz+1, n))*v_adv
         end do ! --> do nz=2, nzmax-2
@@ -114,22 +110,22 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh, tend)
         !!PS a(nz)=                min(0._WP, W(nz, n))*zinv
         !!PS b(nz)=hnode_new(nz,n)+max(0._WP, W(nz, n))*zinv
         !!PS c(nz)=0.0_WP
-        v_adv=zinv*area(nz  ,n)/areasvol(nz,n)
+        v_adv=zinv*mesh%area(nz  ,n)/mesh%areasvol(nz,n)
         a(nz)=                min(0._WP, W(nz, n))*v_adv
-        b(nz)=hnode_new(nz,n)+max(0._WP, W(nz, n))*v_adv
+        b(nz)=mesh%hnode_new(nz,n)+max(0._WP, W(nz, n))*v_adv
         c(nz)=0.0_WP
 
         !_______________________________________________________________________
         nz=nzmin
-        dz=hnode_new(nz,n) ! It would be (zbar(nz)-zbar(nz+1)) if not ALE
+        dz=mesh%hnode_new(nz,n) ! It would be (zbar(nz)-zbar(nz+1)) if not ALE
         tr(nz)=-(b(nz)-dz)*ttf(nz,n)-c(nz)*ttf(nz+1,n)
 
         do nz=nzmin+1,nzmax-2
-            dz=hnode_new(nz,n)
+            dz=mesh%hnode_new(nz,n)
             tr(nz)=-a(nz)*ttf(nz-1,n)-(b(nz)-dz)*ttf(nz,n)-c(nz)*ttf(nz+1,n)
         end do
         nz=nzmax-1
-        dz=hnode_new(nz,n)
+        dz=mesh%hnode_new(nz,n)
         tr(nz)=-a(nz)*ttf(nz-1,n)-(b(nz)-dz)*ttf(nz,n)
 
         !_______________________________________________________________________
@@ -157,7 +153,7 @@ subroutine adv_tra_vert_impl(dt, w, ttf, partit, mesh, tend)
         ! update tracer
         do nz=nzmin,nzmax-1
             ttf(nz,n)=ttf(nz,n)+tr(nz)
-            tend(nz,n)=tend(nz,n)+tr(nz)*hnode_new(nz,n)
+            tend(nz,n)=tend(nz,n)+tr(nz)*mesh%hnode_new(nz,n)
         end do
     end do ! --> do n=1,myDim_nod2D
 !$OMP END DO
@@ -179,10 +175,6 @@ subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, o_init_zero)
     real(kind=WP), intent(inout)      :: flux(mesh%nl,  partit%myDim_nod2D)
     logical, optional                 :: o_init_zero
     logical                           :: l_init_zero
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     l_init_zero=.true.
     if (present(o_init_zero)) then
@@ -194,7 +186,7 @@ subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, o_init_zero)
 #else
         !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #endif
-        do n=1, myDim_nod2D
+        do n=1, partit%myDim_nod2D
           do nz=1,mesh%nl
             flux(nz, n)=0.0_WP
           end do
@@ -211,15 +203,15 @@ subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, o_init_zero)
 #else
     !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #endif
-    do n=1, myDim_nod2D
+    do n=1, partit%myDim_nod2D
        !_______________________________________________________________________
-       nzmax=nlevels_nod2D(n)
-       nzmin=ulevels_nod2D(n)
+       nzmax=mesh%nlevels_nod2D(n)
+       nzmin=mesh%ulevels_nod2D(n)
 
        !_______________________________________________________________________
        ! vert. flux at surface layer
        nz=nzmin
-       flux(nz,n)=-W(nz,n)*ttf(nz,n)*area(nz,n)-flux(nz,n)
+       flux(nz,n)=-W(nz,n)*ttf(nz,n)*mesh%area(nz,n)-flux(nz,n)
 
        !_______________________________________________________________________
        ! vert. flux at bottom layer --> zero bottom flux
@@ -236,7 +228,7 @@ subroutine adv_tra_ver_upw1(w, ttf, partit, mesh, flux, o_init_zero)
        do nz=nzmin+1,nzmax-1
           flux(nz,n)=-0.5*(                                                        &
                       ttf(nz  ,n)*(W(nz,n)+abs(W(nz,n)))+ &
-                      ttf(nz-1,n)*(W(nz,n)-abs(W(nz,n))))*area(nz,n)-flux(nz,n)
+                      ttf(nz-1,n)*(W(nz,n)-abs(W(nz,n))))*mesh%area(nz,n)-flux(nz,n)
        end do
        !$ACC END LOOP
     end do
@@ -265,10 +257,6 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
     real(kind=WP)                :: Tmean, Tmean1, Tmean2
     real(kind=WP)                :: qc, qu, qd
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     l_init_zero=.true.
     if (present(o_init_zero)) then
@@ -280,7 +268,7 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
 #else
        !$ACC PARALLEL LOOP GANG VECTOR COLLAPSE(2) DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #endif
-       do n=1, myDim_nod2D
+       do n=1, partit%myDim_nod2D
           do nz=1, mesh%nl
              flux(nz, n)=0.0_WP
           end do
@@ -297,24 +285,24 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
 #else
     !$ACC PARALLEL LOOP GANG DEFAULT(PRESENT) VECTOR_LENGTH(acc_vl)
 #endif
-    do n=1, myDim_nod2D
+    do n=1, partit%myDim_nod2D
        !_______________________________________________________________________
-       nzmax=nlevels_nod2D(n)
-       nzmin=ulevels_nod2D(n)
+       nzmax=mesh%nlevels_nod2D(n)
+       nzmin=mesh%ulevels_nod2D(n)
        !_______________________________________________________________________
        ! vert. flux at surface layer
        nz=nzmin
-       flux(nz,n)=-ttf(nz,n)*W(nz,n)*area(nz,n)-flux(nz,n)
+       flux(nz,n)=-ttf(nz,n)*W(nz,n)*mesh%area(nz,n)-flux(nz,n)
 
        !_______________________________________________________________________
        ! vert. flux 2nd layer --> centered differences
        nz=nzmin+1
-       flux(nz,n)=-0.5_WP*(ttf(nz-1,n)+ttf(nz,n))*W(nz,n)*area(nz,n)-flux(nz,n)
+       flux(nz,n)=-0.5_WP*(ttf(nz-1,n)+ttf(nz,n))*W(nz,n)*mesh%area(nz,n)-flux(nz,n)
 
        !_______________________________________________________________________
        ! vert. flux at bottom - 1 layer --> centered differences
        nz=nzmax-1
-       flux(nz,n)=-0.5_WP*(ttf(nz-1,n)+ttf(nz,n))*W(nz,n)*area(nz,n)-flux(nz,n)
+       flux(nz,n)=-0.5_WP*(ttf(nz-1,n)+ttf(nz,n))*W(nz,n)*mesh%area(nz,n)-flux(nz,n)
 
        !_______________________________________________________________________
        ! vert. flux at bottom layer --> zero bottom flux
@@ -330,14 +318,14 @@ subroutine adv_tra_ver_qr4c(w, ttf, partit, mesh, num_ord, flux, o_init_zero)
        !$ACC LOOP VECTOR
        do nz=nzmin+2,nzmax-2
             !centered (4th order)
-            qc=(ttf(nz-1,n)-ttf(nz  ,n))/(Z_3d_n(nz-1,n)-Z_3d_n(nz  ,n))
-            qu=(ttf(nz  ,n)-ttf(nz+1,n))/(Z_3d_n(nz  ,n)-Z_3d_n(nz+1,n))
-            qd=(ttf(nz-2,n)-ttf(nz-1,n))/(Z_3d_n(nz-2,n)-Z_3d_n(nz-1,n))
+            qc=(ttf(nz-1,n)-ttf(nz  ,n))/(mesh%Z_3d_n(nz-1,n)-mesh%Z_3d_n(nz  ,n))
+            qu=(ttf(nz  ,n)-ttf(nz+1,n))/(mesh%Z_3d_n(nz  ,n)-mesh%Z_3d_n(nz+1,n))
+            qd=(ttf(nz-2,n)-ttf(nz-1,n))/(mesh%Z_3d_n(nz-2,n)-mesh%Z_3d_n(nz-1,n))
 
-            Tmean1=ttf(nz  ,n)+(2*qc+qu)*(zbar_3d_n(nz,n)-Z_3d_n(nz  ,n))/3.0_WP
-            Tmean2=ttf(nz-1,n)+(2*qc+qd)*(zbar_3d_n(nz,n)-Z_3d_n(nz-1,n))/3.0_WP
+            Tmean1=ttf(nz  ,n)+(2*qc+qu)*(mesh%zbar_3d_n(nz,n)-mesh%Z_3d_n(nz  ,n))/3.0_WP
+            Tmean2=ttf(nz-1,n)+(2*qc+qd)*(mesh%zbar_3d_n(nz,n)-mesh%Z_3d_n(nz-1,n))/3.0_WP
             Tmean =(W(nz,n)+abs(W(nz,n)))*Tmean1+(W(nz,n)-abs(W(nz,n)))*Tmean2
-            flux(nz,n)=(-0.5_WP*(1.0_WP-num_ord)*Tmean - num_ord*(0.5_WP*(Tmean1+Tmean2))*W(nz,n))*area(nz,n)-flux(nz,n)
+            flux(nz,n)=(-0.5_WP*(1.0_WP-num_ord)*Tmean - num_ord*(0.5_WP*(Tmean1+Tmean2))*W(nz,n))*mesh%area(nz,n)-flux(nz,n)
        end do
        !$ACC END LOOP
     end do
@@ -366,10 +354,6 @@ subroutine adv_tra_ver_ppm(dt, w, ttf, partit, mesh, flux, o_init_zero)
     integer                            :: n, nz, nzmax, nzmin
 !   integer                            :: overshoot_counter, counter
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     l_init_zero=.true.
     if (present(o_init_zero)) then
@@ -377,7 +361,7 @@ subroutine adv_tra_ver_ppm(dt, w, ttf, partit, mesh, flux, o_init_zero)
     end if
     if (l_init_zero) then
 !$OMP PARALLEL DO
-       do n=1, myDim_nod2D
+       do n=1, partit%myDim_nod2D
           flux(:, n)=0.0_WP
        end do
 !$OMP END PARALLEL DO
@@ -395,13 +379,13 @@ subroutine adv_tra_ver_ppm(dt, w, ttf, partit, mesh, flux, o_init_zero)
 !   counter          =0
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(tvert, tv, aL, aR, aj, x, dzjm1, dzj, dzjp1, dzjp2, deltaj, deltajp1, n, nz, nzmax, nzmin)
 !$OMP DO
-    do n=1, myDim_nod2D
+    do n=1, partit%myDim_nod2D
         !_______________________________________________________________________
         !Interpolate to zbar...depth levels --> all quantities (tracer ...) are
         ! calculated on mid depth levels
         ! nzmax ... number of depth levels at node n
-        nzmax=nlevels_nod2D(n)
-        nzmin=ulevels_nod2D(n)
+        nzmax=mesh%nlevels_nod2D(n)
+        nzmin=mesh%ulevels_nod2D(n)
 
         ! tracer at surface level
         tv(nzmin)=ttf(nzmin,n)
@@ -432,10 +416,10 @@ subroutine adv_tra_ver_ppm(dt, w, ttf, partit, mesh, flux, o_init_zero)
             ! for non-uniformity spaced vertical grids --> piecewise parabolic
             ! method (ppm) see see Colella and Woodward, JCP, 1984, 174-201
             ! --> full equation (1.6), (1.7) and (1.8)
-            dzjm1    = hnode_new(nz-1,n)
-            dzj      = hnode_new(nz  ,n)
-            dzjp1    = hnode_new(nz+1,n)
-            dzjp2    = hnode_new(nz+2,n)
+            dzjm1    = mesh%hnode_new(nz-1,n)
+            dzj      = mesh%hnode_new(nz  ,n)
+            dzjp1    = mesh%hnode_new(nz+1,n)
+            dzjp2    = mesh%hnode_new(nz+2,n)
             ! Be carefull here vertical operation have to be done on NEW vertical mesh !!!
 
             !___________________________________________________________________
@@ -511,27 +495,27 @@ subroutine adv_tra_ver_ppm(dt, w, ttf, partit, mesh, flux, o_init_zero)
                 aR =3._WP*ttf(nz, n)-2._WP*aL
             end if
 
-            dzj   = hnode(nz,n)
+            dzj   = mesh%hnode(nz,n)
             aj=6.0_WP*(ttf(nz, n)-0.5_WP*(aL+aR))
 
             if (W(nz,n)>0._WP) then
                 x=min(W(nz,n)*dt/dzj, 1._WP)
                 tvert(nz  )=(-aL-0.5_WP*x*(aR-aL+(1._WP-2._WP/3._WP*x)*aj))
                 tvert(nz  )=tvert(nz) ! compute 2nd moment for DVD
-                tvert(nz  )=tvert(nz)*area(nz,n)*W(nz,n)
+                tvert(nz  )=tvert(nz)*mesh%area(nz,n)*W(nz,n)
             end if
 
             if (W(nz+1,n)<0._WP) then
                 x=min(-W(nz+1,n)*dt/dzj, 1._WP)
                 tvert(nz+1)=(-aR+0.5_WP*x*(aR-aL-(1._WP-2._WP/3._WP*x)*aj))
                 tvert(nz+1)=tvert(nz+1) ! compute 2nd moment for DVD
-                tvert(nz+1)=tvert(nz+1)*area(nz+1,n)*W(nz+1,n)
+                tvert(nz+1)=tvert(nz+1)*mesh%area(nz+1,n)*W(nz+1,n)
             end if
         end do
 
         !_______________________________________________________________________
         ! Surface flux
-        tvert(nzmin)= -tv(nzmin)*W(nzmin,n)*area(nzmin,n)
+        tvert(nzmin)= -tv(nzmin)*W(nzmin,n)*mesh%area(nzmin,n)
         ! Zero bottom flux
         tvert(nzmax)=0.0_WP
         flux(nzmin:nzmax, n)=tvert(nzmin:nzmax)-flux(nzmin:nzmax, n)
@@ -554,10 +538,6 @@ subroutine adv_tra_ver_cdiff(w, ttf, partit, mesh, flux, o_init_zero)
     logical                           :: l_init_zero
     integer                           :: n, nz, nzmax, nzmin
     real(kind=WP)                     :: tvert(mesh%nl), tv
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     l_init_zero=.true.
     if (present(o_init_zero)) then
@@ -565,7 +545,7 @@ subroutine adv_tra_ver_cdiff(w, ttf, partit, mesh, flux, o_init_zero)
     end if
     if (l_init_zero) then
 !$OMP PARALLEL DO
-       do n=1, myDim_nod2D
+       do n=1, partit%myDim_nod2D
           flux(:, n)=0.0_WP
        end do
 !$OMP END PARALLEL DO
@@ -573,14 +553,14 @@ subroutine adv_tra_ver_cdiff(w, ttf, partit, mesh, flux, o_init_zero)
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmax, nzmin, tv, tvert)
 !$OMP DO
-    do n=1, myDim_nod2D
+    do n=1, partit%myDim_nod2D
         !_______________________________________________________________________
-        nzmax=nlevels_nod2D(n)-1
-        nzmin=ulevels_nod2D(n)
+        nzmax=mesh%nlevels_nod2D(n)-1
+        nzmin=mesh%ulevels_nod2D(n)
 
         !_______________________________________________________________________
         ! Surface flux
-        tvert(nzmin)= -W(nzmin,n)*ttf(nzmin,n)*area(nzmin,n)
+        tvert(nzmin)= -W(nzmin,n)*ttf(nzmin,n)*mesh%area(nzmin,n)
 
         !_______________________________________________________________________
         ! Zero bottom flux
@@ -590,7 +570,7 @@ subroutine adv_tra_ver_cdiff(w, ttf, partit, mesh, flux, o_init_zero)
         ! Other levels
         do nz=nzmin+1, nzmax
             tv=0.5_WP*(ttf(nz-1,n)+ttf(nz,n))
-            tvert(nz)= -tv*W(nz,n)*area(nz,n)
+            tvert(nz)= -tv*W(nz,n)*mesh%area(nz,n)
         end do
 
         !_______________________________________________________________________
@@ -632,10 +612,6 @@ subroutine adv_tra_ver_spbee(                 &
     integer                              :: node, nz, nzmin, nzmax
     real(kind=WP)                        :: R, ttf0, ttfp1, dttf0p1, Tmean1, Tmean2, Cr, vflux, vfabs
     real(kind=WP)                        :: cfl
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     !___________________________________________________________________________
     l_init_zero=.true.
@@ -644,7 +620,7 @@ subroutine adv_tra_ver_spbee(                 &
     end if
     if (l_init_zero) then
 !$OMP PARALLEL DO
-       do node=1, myDim_nod2D
+       do node=1, partit%myDim_nod2D
           flux(:, node)=0.0_WP
        end do
 !$OMP END PARALLEL DO
@@ -661,19 +637,19 @@ subroutine adv_tra_ver_spbee(                 &
     !___________________________________________________________________________
     ! this advection does !!! NOT !!! go over the vertical dimension it goes 
     ! over the domain of the spectral bins 
-    do node = 1, myDim_nod2D
-        nzmax=nlevels_nod2D(node)
-        nzmin=ulevels_nod2D(node)
+    do node = 1, partit%myDim_nod2D
+        nzmax=mesh%nlevels_nod2D(node)
+        nzmin=mesh%ulevels_nod2D(node)
         
         !_______________________________________________________________________
         ! vert. flux at surface layer
         nz=nzmin
-        flux(nz,node)=-W(nz,node)*ttf(nz,node)*area(nz,node)-flux(nz,node)
+        flux(nz,node)=-W(nz,node)*ttf(nz,node)*mesh%area(nz,node)-flux(nz,node)
         
         !_______________________________________________________________________
         ! vert. flux at bottom - 1 layer --> centered differences
         nz=nzmax-1
-        flux(nz,node)=-0.5_WP*(ttf(nz-1,node)+ttf(nz,node))*W(nz,node)*area(nz,node)-flux(nz,node)
+        flux(nz,node)=-0.5_WP*(ttf(nz-1,node)+ttf(nz,node))*W(nz,node)*mesh%area(nz,node)-flux(nz,node)
 
         !_______________________________________________________________________
         ! vert. flux at bottom layer --> zero bottom flux
@@ -685,7 +661,7 @@ subroutine adv_tra_ver_spbee(                 &
 !$ACC LOOP VECTOR               
         do nz = nzmin+1, nzmax-2
             !___________________________________________________________________
-            cfl     = abs(W(nz, node)) * dt * 2.0_WP / (hnode(nz-1,node)+hnode(nz,node))
+            cfl     = abs(W(nz, node)) * dt * 2.0_WP / (mesh%hnode(nz-1,node)+mesh%hnode(nz,node))
             
             !___________________________________________________________________
             ! compute tracer difference 
@@ -739,7 +715,7 @@ subroutine adv_tra_ver_spbee(                 &
             vflux = W(nz, node)
             vfabs = abs(vflux)
             flux(nz, node)=-0.5_WP*((vflux+vfabs)*Tmean1 + (vflux-vfabs)*Tmean2  &
-                                    )*area(nz,node) - flux(nz, node)
+                                    )*mesh%area(nz,node) - flux(nz, node)
             
             end do !--> do nz = nzmin+1, nzmax-2
 !$ACC END LOOP

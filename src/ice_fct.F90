@@ -48,10 +48,6 @@ subroutine ice_TG_rhs(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     real(kind=WP), dimension(:), pointer  :: ice_temp, rhs_temp
 #endif
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     u_ice    => ice%uice(:)
     v_ice    => ice%vice(:)
     a_ice    => ice%data(1)%values(:)
@@ -72,7 +68,7 @@ subroutine ice_TG_rhs(ice, partit, mesh)
 #else
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
-    DO row=1, myDim_nod2D
+    DO row=1, partit%myDim_nod2D
         rhs_m(row)=0._WP
         rhs_a(row)=0._WP
         rhs_ms(row)=0._WP
@@ -94,25 +90,25 @@ subroutine ice_TG_rhs(ice, partit, mesh)
     ! does not own, and the sums do not depend on the number of threads.
 #ifndef ENABLE_OPENACC
 !$OMP DO
-    do row=1, myDim_nod2D
-        do j=1, nod_in_elem2D_num(row)
-            elem=nod_in_elem2D(j,row)
-            elnodes=elem2D_nodes(:,elem)
+    do row=1, partit%myDim_nod2D
+        do j=1, mesh%nod_in_elem2D_num(row)
+            elem=mesh%nod_in_elem2D(j,row)
+            elnodes=mesh%elem2D_nodes(:,elem)
             !_______________________________________________________________________
             ! if cavity element skip it
-            if (ulevels(elem)>1) cycle
+            if (mesh%ulevels(elem)>1) cycle
 
             !derivatives
-            dx=gradient_sca(1:3,elem)
-            dy=gradient_sca(4:6,elem)
-            vol=elem_area(elem)
+            dx=mesh%gradient_sca(1:3,elem)
+            dy=mesh%gradient_sca(4:6,elem)
+            vol=mesh%elem_area(elem)
             !um=sum(U_ice(elnodes))/3.0_WP
             !vm=sum(V_ice(elnodes))/3.0_WP
             um=sum(U_ice(elnodes))
             vm=sum(V_ice(elnodes))
 
             !diffusivity
-            diff=ice%ice_diff*sqrt(elem_area(elem)/scale_area)
+            diff=ice%ice_diff*sqrt(mesh%elem_area(elem)/scale_area)
             n=1
             if (elnodes(2)==row) n=2
             if (elnodes(3)==row) n=3
@@ -137,23 +133,23 @@ subroutine ice_TG_rhs(ice, partit, mesh)
 !$OMP END PARALLEL
 #else
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) private(n, q, row, elem, elnodes, diff, entries,  um, vm, vol, dx, dy)
-    do elem=1,myDim_elem2D          !assembling rhs over elements
-        elnodes=elem2D_nodes(:,elem)
+    do elem=1,partit%myDim_elem2D          !assembling rhs over elements
+        elnodes=mesh%elem2D_nodes(:,elem)
         !_______________________________________________________________________
         ! if cavity element skip it
-        if (ulevels(elem)>1) cycle
+        if (mesh%ulevels(elem)>1) cycle
 
         !derivatives
-        dx=gradient_sca(1:3,elem)
-        dy=gradient_sca(4:6,elem)
-        vol=elem_area(elem)
+        dx=mesh%gradient_sca(1:3,elem)
+        dy=mesh%gradient_sca(4:6,elem)
+        vol=mesh%elem_area(elem)
         !um=sum(U_ice(elnodes))/3.0_WP
         !vm=sum(V_ice(elnodes))/3.0_WP
         um=sum(U_ice(elnodes))
         vm=sum(V_ice(elnodes))
 
         !diffusivity
-        diff=ice%ice_diff*sqrt(elem_area(elem)/scale_area)
+        diff=ice%ice_diff*sqrt(mesh%elem_area(elem)/scale_area)
         !$ACC LOOP SEQ
         DO n=1,3
             row=elnodes(n)
@@ -189,10 +185,6 @@ subroutine ice_fct_solve(ice, partit, mesh)
   type(t_ice),    intent(inout), target :: ice
   type(t_partit), intent(inout), target :: partit
   type(t_mesh),   intent(in),    target :: mesh
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
   !_____________________________________________________________________________
   ! Driving routine
   call ice_solve_high_order(ice, partit, mesh)   ! uses arrays of low-order solutions as temp
@@ -240,10 +232,6 @@ subroutine ice_solve_low_order(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     real(kind=WP), dimension(:), pointer  :: ice_temp, rhs_temp, m_templ
 #endif
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     a_ice        => ice%data(1)%values(:)
     m_ice        => ice%data(2)%values(:)
     m_snow       => ice%data(3)%values(:)
@@ -266,30 +254,30 @@ subroutine ice_solve_low_order(ice, partit, mesh)
 #ifndef ENABLE_OPENACC
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(row, clo, clo2, cn, location)
 #else
-    !$ACC PARALLEL LOOP GANG VECTOR PRESENT(ssh_stiff, ssh_stiff%rowptr) PRIVATE(location) DEFAULT(PRESENT)
+    !$ACC PARALLEL LOOP GANG VECTOR PRESENT(mesh%ssh_stiff, mesh%ssh_stiff%rowptr) PRIVATE(location) DEFAULT(PRESENT)
 #endif
-    do row=1,myDim_nod2D
+    do row=1,partit%myDim_nod2D
         !_______________________________________________________________________
         ! if there is cavity no ice fxt low order
-        if (ulevels_nod2D(row)>1) cycle
+        if (mesh%ulevels_nod2D(row)>1) cycle
 
         !_______________________________________________________________________
-        clo=ssh_stiff%rowptr(row)-ssh_stiff%rowptr(1)+1
-        clo2=ssh_stiff%rowptr(row+1)-ssh_stiff%rowptr(1)
+        clo=mesh%ssh_stiff%rowptr(row)-mesh%ssh_stiff%rowptr(1)+1
+        clo2=mesh%ssh_stiff%rowptr(row+1)-mesh%ssh_stiff%rowptr(1)
         cn=clo2-clo+1
-        location(1:cn)=nn_pos(1:cn, row)
+        location(1:cn)=mesh%nn_pos(1:cn, row)
         m_icel(row)=(rhs_m(row)+gamma*sum(mass_matrix(clo:clo2)* &
-                    m_ice(location(1:cn))))/area(1,row) + &
+                    m_ice(location(1:cn))))/mesh%area(1,row) + &
                     (1.0_WP-gamma)*m_ice(row)
         a_icel(row)=(rhs_a(row)+gamma*sum(mass_matrix(clo:clo2)* &
-                    a_ice(location(1:cn))))/area(1,row) + &
+                    a_ice(location(1:cn))))/mesh%area(1,row) + &
                     (1.0_WP-gamma)*a_ice(row)
         m_snowl(row)=(rhs_ms(row)+gamma*sum(mass_matrix(clo:clo2)* &
-                    m_snow(location(1:cn))))/area(1,row) + &
+                    m_snow(location(1:cn))))/mesh%area(1,row) + &
                     (1.0_WP-gamma)*m_snow(row)
 #if defined (__oifs) || defined (__ifsinterface)
         m_templ(row)=(rhs_temp(row)+gamma*sum(mass_matrix(clo:clo2)* &
-                  ice_temp(location(1:cn))))/area(1,row) + &
+                  ice_temp(location(1:cn))))/mesh%area(1,row) + &
                   (1.0_WP-gamma)*ice_temp(row)
 #endif
     end do
@@ -329,10 +317,6 @@ subroutine ice_solve_high_order(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     real(kind=WP), dimension(:), pointer  :: rhs_temp, m_templ, dm_temp
 #endif
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     rhs_a        => ice%data(1)%values_rhs(:)
     rhs_m        => ice%data(2)%values_rhs(:)
     rhs_ms       => ice%data(3)%values_rhs(:)
@@ -357,15 +341,15 @@ subroutine ice_solve_high_order(ice, partit, mesh)
 #else
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
-    do row=1,myDim_nod2D
+    do row=1,partit%myDim_nod2D
         ! if cavity node skip it
-        if (ulevels_nod2d(row)>1) cycle
+        if (mesh%ulevels_nod2d(row)>1) cycle
 
-        dm_ice(row)=rhs_m(row)/area(1,row)
-        da_ice(row)=rhs_a(row)/area(1,row)
-        dm_snow(row)=rhs_ms(row)/area(1,row)
+        dm_ice(row)=rhs_m(row)/mesh%area(1,row)
+        da_ice(row)=rhs_a(row)/mesh%area(1,row)
+        dm_snow(row)=rhs_ms(row)/mesh%area(1,row)
 #if defined (__oifs) || defined (__ifsinterface)
-        dm_temp(row)=rhs_temp(row)/area(1,row)
+        dm_temp(row)=rhs_temp(row)/mesh%area(1,row)
 #endif
     end do
 #ifndef ENABLE_OPENACC
@@ -388,26 +372,26 @@ subroutine ice_solve_high_order(ice, partit, mesh)
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, clo, clo2, cn, location, row, rhs_new)
 !$OMP DO
 #else
-        !$ACC PARALLEL LOOP GANG VECTOR PRESENT(ssh_stiff, ssh_stiff%rowptr) PRIVATE(location) DEFAULT(PRESENT)
+        !$ACC PARALLEL LOOP GANG VECTOR PRESENT(mesh%ssh_stiff, mesh%ssh_stiff%rowptr) PRIVATE(location) DEFAULT(PRESENT)
 #endif
-        do row=1,myDim_nod2D
+        do row=1,partit%myDim_nod2D
             ! if cavity node skip it
-            if (ulevels_nod2d(row)>1) cycle
+            if (mesh%ulevels_nod2d(row)>1) cycle
             !___________________________________________________________________
-            clo  = ssh_stiff%rowptr(row)-ssh_stiff%rowptr(1)+1
-            clo2 = ssh_stiff%rowptr(row+1)-ssh_stiff%rowptr(1)
+            clo  = mesh%ssh_stiff%rowptr(row)-mesh%ssh_stiff%rowptr(1)+1
+            clo2 = mesh%ssh_stiff%rowptr(row+1)-mesh%ssh_stiff%rowptr(1)
             cn   = clo2-clo+1
-            location(1:cn)=nn_pos(1:cn,row)
+            location(1:cn)=mesh%nn_pos(1:cn,row)
             !___________________________________________________________________
             rhs_new     = rhs_m(row) - sum(mass_matrix(clo:clo2)*dm_ice(location(1:cn)))
-            m_icel(row) = dm_ice(row)+rhs_new/area(1,row)
+            m_icel(row) = dm_ice(row)+rhs_new/mesh%area(1,row)
             rhs_new     = rhs_a(row) - sum(mass_matrix(clo:clo2)*da_ice(location(1:cn)))
-            a_icel(row) = da_ice(row)+rhs_new/area(1,row)
+            a_icel(row) = da_ice(row)+rhs_new/mesh%area(1,row)
             rhs_new     = rhs_ms(row) - sum(mass_matrix(clo:clo2)*dm_snow(location(1:cn)))
-            m_snowl(row)= dm_snow(row)+rhs_new/area(1,row)
+            m_snowl(row)= dm_snow(row)+rhs_new/mesh%area(1,row)
 #if defined (__oifs) || defined (__ifsinterface)
             rhs_new     = rhs_temp(row) - sum(mass_matrix(clo:clo2)*dm_temp(location(1:cn)))
-            m_templ(row)= dm_temp(row)+rhs_new/area(1,row)
+            m_templ(row)= dm_temp(row)+rhs_new/mesh%area(1,row)
 #endif
         end do
 #ifndef ENABLE_OPENACC
@@ -421,9 +405,9 @@ subroutine ice_solve_high_order(ice, partit, mesh)
 #else
         !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
-        do row=1,myDim_nod2D
+        do row=1,partit%myDim_nod2D
             ! if cavity node skip it
-            if (ulevels_nod2d(row)>1) cycle
+            if (mesh%ulevels_nod2d(row)>1) cycle
             dm_ice(row)=m_icel(row)
             da_ice(row)=a_icel(row)
             dm_snow(row)=m_snowl(row)
@@ -474,10 +458,6 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     real(kind=WP), dimension(:)  , pointer  :: ice_temp, m_templ, dm_temp
 #endif
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     a_ice     => ice%data(1)%values(:)
     m_ice     => ice%data(2)%values(:)
     m_snow    => ice%data(3)%values(:)
@@ -513,7 +493,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     !$ACC DATA CREATE(icoef, elnodes)
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
-    do n = 1, myDim_nod2D + eDim_nod2D
+    do n = 1, partit%myDim_nod2D + partit%eDim_nod2D
         tmax(n) = 0.0_WP
         tmin(n) = 0.0_WP
     end do
@@ -545,34 +525,34 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #else
     !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(elnodes) DEFAULT(PRESENT)
 #endif
-    do elem=1, myDim_elem2D
+    do elem=1, partit%myDim_elem2D
         !_______________________________________________________________________
-        elnodes=elem2D_nodes(:,elem)
+        elnodes=mesh%elem2D_nodes(:,elem)
 
         !_______________________________________________________________________
         ! if cavity cycle over
-        if(ulevels(elem)>1) cycle !LK89140
+        if(mesh%ulevels(elem)>1) cycle !LK89140
 
         !_______________________________________________________________________
-        vol=elem_area(elem)
+        vol=mesh%elem_area(elem)
         if (tr_array_id==1) then
             do q=1,3
                 icefluxes(elem,q)=-sum(icoef(:,q)*(gamma*m_ice(elnodes) + &
-                            dm_ice(elnodes)))*(vol/area(1,elnodes(q)))/12.0_WP
+                            dm_ice(elnodes)))*(vol/mesh%area(1,elnodes(q)))/12.0_WP
             end do
         end if
 
         if (tr_array_id==2) then
             do q=1,3
                 icefluxes(elem,q)=-sum(icoef(:,q)*(gamma*a_ice(elnodes) + &
-                            da_ice(elnodes)))*(vol/area(1,elnodes(q)))/12.0_WP
+                            da_ice(elnodes)))*(vol/mesh%area(1,elnodes(q)))/12.0_WP
             end do
         end if
 
         if (tr_array_id==3) then
             do q=1,3
                 icefluxes(elem,q)=-sum(icoef(:,q)*(gamma*m_snow(elnodes) + &
-                            dm_snow(elnodes)))*(vol/area(1,elnodes(q)))/12.0_WP
+                            dm_snow(elnodes)))*(vol/mesh%area(1,elnodes(q)))/12.0_WP
             end do
         end if
 
@@ -580,7 +560,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
         if (tr_array_id==4) then
             do q=1,3
                 icefluxes(elem,q)=-sum(icoef(:,q)*(gamma*ice_temp(elnodes) + &
-                            dm_temp(elnodes)))*(vol/area(1,elnodes(q)))/12.0_WP
+                            dm_temp(elnodes)))*(vol/mesh%area(1,elnodes(q)))/12.0_WP
             end do
         end if
 #endif
@@ -605,11 +585,11 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #else
         !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
-        do row=1, myDim_nod2D
-            if (ulevels_nod2d(row)>1) cycle
-            n=nn_num(row)
-            tmax(row)=max(maxval(m_icel(nn_pos(1:n,row))), maxval(m_ice(nn_pos(1:n,row))))
-            tmin(row)=min(minval(m_icel(nn_pos(1:n,row))), minval(m_ice(nn_pos(1:n,row))))
+        do row=1, partit%myDim_nod2D
+            if (mesh%ulevels_nod2d(row)>1) cycle
+            n=mesh%nn_num(row)
+            tmax(row)=max(maxval(m_icel(mesh%nn_pos(1:n,row))), maxval(m_ice(mesh%nn_pos(1:n,row))))
+            tmin(row)=min(minval(m_icel(mesh%nn_pos(1:n,row))), minval(m_ice(mesh%nn_pos(1:n,row))))
             ! tmax(row)=maxval(m_icel(nn_pos(1:n,row)))
             ! tmin(row)=minval(m_icel(nn_pos(1:n,row)))
             ! Admissible increments
@@ -629,11 +609,11 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #else
         !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
-        do row=1, myDim_nod2D
-            if (ulevels_nod2d(row)>1) cycle
-            n=nn_num(row)
-            tmax(row)=max(maxval(a_icel(nn_pos(1:n,row))), maxval(a_ice(nn_pos(1:n,row))))
-            tmin(row)=min(minval(a_icel(nn_pos(1:n,row))), minval(a_ice(nn_pos(1:n,row))))
+        do row=1, partit%myDim_nod2D
+            if (mesh%ulevels_nod2d(row)>1) cycle
+            n=mesh%nn_num(row)
+            tmax(row)=max(maxval(a_icel(mesh%nn_pos(1:n,row))), maxval(a_ice(mesh%nn_pos(1:n,row))))
+            tmin(row)=min(minval(a_icel(mesh%nn_pos(1:n,row))), minval(a_ice(mesh%nn_pos(1:n,row))))
             !tmax(row)=maxval(a_icel(nn_pos(1:n,row)))
             !tmin(row)=minval(a_icel(nn_pos(1:n,row)))
             ! Admissible increments
@@ -653,11 +633,11 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #else
         !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
-        do row=1, myDim_nod2D
-            if (ulevels_nod2d(row)>1) cycle
-            n=nn_num(row)
-            tmax(row)=max(maxval(m_snowl(nn_pos(1:n,row))), maxval(m_snow(nn_pos(1:n,row))))
-            tmin(row)=min(minval(m_snowl(nn_pos(1:n,row))), minval(m_snow(nn_pos(1:n,row))))
+        do row=1, partit%myDim_nod2D
+            if (mesh%ulevels_nod2d(row)>1) cycle
+            n=mesh%nn_num(row)
+            tmax(row)=max(maxval(m_snowl(mesh%nn_pos(1:n,row))), maxval(m_snow(mesh%nn_pos(1:n,row))))
+            tmin(row)=min(minval(m_snowl(mesh%nn_pos(1:n,row))), minval(m_snow(mesh%nn_pos(1:n,row))))
             !tmax(row)=maxval(m_snowl(nn_pos(1:n,row)))
             !tmin(row)=minval(m_snowl(nn_pos(1:n,row)))
             ! Admissible increments
@@ -678,11 +658,11 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #else
         !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
-        do row=1, myDim_nod2D
-            if (ulevels_nod2d(row)>1) cycle
-            n=nn_num(row)
-            tmax(row)=max(maxval(m_templ(nn_pos(1:n,row))), maxval(ice_temp(nn_pos(1:n,row))))
-            tmin(row)=min(minval(m_templ(nn_pos(1:n,row))), minval(ice_temp(nn_pos(1:n,row))))
+        do row=1, partit%myDim_nod2D
+            if (mesh%ulevels_nod2d(row)>1) cycle
+            n=mesh%nn_num(row)
+            tmax(row)=max(maxval(m_templ(mesh%nn_pos(1:n,row))), maxval(ice_temp(mesh%nn_pos(1:n,row))))
+            tmin(row)=min(minval(m_templ(mesh%nn_pos(1:n,row))), minval(ice_temp(mesh%nn_pos(1:n,row))))
             ! Admissible increments
             tmax(row)=tmax(row)-m_templ(row)
             tmin(row)=tmin(row)-m_templ(row)
@@ -702,7 +682,7 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #else
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
-    do n=1, myDim_nod2D+eDim_nod2D
+    do n=1, partit%myDim_nod2D+partit%eDim_nod2D
        icepplus (n)=0._WP
        icepminus(n)=0._WP
     end do
@@ -718,13 +698,13 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
     ! number of threads.
     ! Halo nodes are filled by the exchange that follows.
 !$OMP DO
-    do n=1, myDim_nod2D
-        do k=1, nod_in_elem2D_num(n)
-            elem=nod_in_elem2D(k,n)
-            if(ulevels(elem)>1) cycle !LK89140
+    do n=1, partit%myDim_nod2D
+        do k=1, mesh%nod_in_elem2D_num(n)
+            elem=mesh%nod_in_elem2D(k,n)
+            if(mesh%ulevels(elem)>1) cycle !LK89140
             q=1
-            if (elem2D_nodes(2,elem)==n) q=2
-            if (elem2D_nodes(3,elem)==n) q=3
+            if (mesh%elem2D_nodes(2,elem)==n) q=2
+            if (mesh%elem2D_nodes(3,elem)==n) q=3
             flux=icefluxes(elem,q)
             if (flux>0) then
             icepplus(n)=icepplus(n)+flux
@@ -740,12 +720,12 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #else
     !$ACC UPDATE SELF(icefluxes, icepplus, icepminus)
 #endif
-    do elem=1, myDim_elem2D
+    do elem=1, partit%myDim_elem2D
         ! if cavity cycle over
-        if(ulevels(elem)>1) cycle !LK89140
+        if(mesh%ulevels(elem)>1) cycle !LK89140
 
         !_______________________________________________________________________
-        elnodes=elem2D_nodes(:,elem)
+        elnodes=mesh%elem2D_nodes(:,elem)
         do q=1,3
             n=elnodes(q)
             flux=icefluxes(elem,q)
@@ -777,9 +757,9 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #else
     !$ACC PARALLEL LOOP GANG VECTOR PRESENT(icepplus, icepminus) DEFAULT(PRESENT)
 #endif
-    do n=1,myDim_nod2D
+    do n=1,partit%myDim_nod2D
         ! if cavity cycle over
-        if(ulevels_nod2D(n)>1) cycle !LK89140
+        if(mesh%ulevels_nod2D(n)>1) cycle !LK89140
 
         flux=icepplus(n)
         if (abs(flux)>0) then
@@ -818,12 +798,12 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #else
     !$ACC PARALLEL LOOP GANG VECTOR PRESENT(icepplus, icepminus) PRIVATE(elnodes) DEFAULT(PRESENT)
 #endif
-    do elem=1, myDim_elem2D
+    do elem=1, partit%myDim_elem2D
         ! if cavity cycle over
-        if(ulevels(elem)>1) cycle !LK89140
+        if(mesh%ulevels(elem)>1) cycle !LK89140
 
         !_______________________________________________________________________
-        elnodes=elem2D_nodes(:,elem)
+        elnodes=mesh%elem2D_nodes(:,elem)
         ae=1.0_WP
         do q=1,3
             n=elnodes(q)
@@ -846,8 +826,8 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #else
         !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
-        do n=1,myDim_nod2D
-            if(ulevels_nod2D(n)>1) cycle !LK89140
+        do n=1,partit%myDim_nod2D
+            if(mesh%ulevels_nod2D(n)>1) cycle !LK89140
             m_ice(n)=m_icel(n)
         end do
 #ifndef ENABLE_OPENACC
@@ -859,13 +839,13 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #ifndef ENABLE_OPENACC
         ! node-owned gather over nod_in_elem2D, as above
 !$OMP DO
-        do n=1, myDim_nod2D
-            do k=1, nod_in_elem2D_num(n)
-                elem=nod_in_elem2D(k,n)
-                if(ulevels(elem)>1) cycle !LK89140
+        do n=1, partit%myDim_nod2D
+            do k=1, mesh%nod_in_elem2D_num(n)
+                elem=mesh%nod_in_elem2D(k,n)
+                if(mesh%ulevels(elem)>1) cycle !LK89140
                 q=1
-                if (elem2D_nodes(2,elem)==n) q=2
-                if (elem2D_nodes(3,elem)==n) q=3
+                if (mesh%elem2D_nodes(2,elem)==n) q=2
+                if (mesh%elem2D_nodes(3,elem)==n) q=3
                 m_ice(n)=m_ice(n)+icefluxes(elem,q)
             end do
         end do
@@ -876,11 +856,11 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #else
         !$ACC UPDATE SELF(m_ice, icefluxes)
 #endif
-        do elem=1, myDim_elem2D
+        do elem=1, partit%myDim_elem2D
             ! if cavity cycle over
-            if(ulevels(elem)>1) cycle !LK89140
+            if(mesh%ulevels(elem)>1) cycle !LK89140
 
-            elnodes=elem2D_nodes(:,elem)
+            elnodes=mesh%elem2D_nodes(:,elem)
             do q=1,3
                 n=elnodes(q)
 #if !defined(DISABLE_OPENACC_ATOMICS)
@@ -903,21 +883,21 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #else
         !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
-        do n=1,myDim_nod2D
-            if(ulevels_nod2D(n)>1) cycle !LK89140
+        do n=1,partit%myDim_nod2D
+            if(mesh%ulevels_nod2D(n)>1) cycle !LK89140
             a_ice(n)=a_icel(n)
         end do
 #ifndef ENABLE_OPENACC
 !$OMP END DO
         ! node-owned gather over nod_in_elem2D, as above
 !$OMP DO
-        do n=1, myDim_nod2D
-            do k=1, nod_in_elem2D_num(n)
-                elem=nod_in_elem2D(k,n)
-                if(ulevels(elem)>1) cycle !LK89140
+        do n=1, partit%myDim_nod2D
+            do k=1, mesh%nod_in_elem2D_num(n)
+                elem=mesh%nod_in_elem2D(k,n)
+                if(mesh%ulevels(elem)>1) cycle !LK89140
                 q=1
-                if (elem2D_nodes(2,elem)==n) q=2
-                if (elem2D_nodes(3,elem)==n) q=3
+                if (mesh%elem2D_nodes(2,elem)==n) q=2
+                if (mesh%elem2D_nodes(3,elem)==n) q=3
                 a_ice(n)=a_ice(n)+icefluxes(elem,q)
             end do
         end do
@@ -929,11 +909,11 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #else
         !$ACC UPDATE SELF(a_ice, icefluxes)
 #endif
-        do elem=1, myDim_elem2D
+        do elem=1, partit%myDim_elem2D
             ! if cavity cycle over
-            if(ulevels(elem)>1) cycle !LK89140
+            if(mesh%ulevels(elem)>1) cycle !LK89140
 
-            elnodes=elem2D_nodes(:,elem)
+            elnodes=mesh%elem2D_nodes(:,elem)
             do q=1,3
                 n=elnodes(q)
 #if !defined(DISABLE_OPENACC_ATOMICS)
@@ -956,21 +936,21 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #else
         !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
-        do n=1,myDim_nod2D
-            if(ulevels_nod2D(n)>1) cycle !LK89140
+        do n=1,partit%myDim_nod2D
+            if(mesh%ulevels_nod2D(n)>1) cycle !LK89140
             m_snow(n)=m_snowl(n)
         end do
 #ifndef ENABLE_OPENACC
 !$OMP END DO
         ! node-owned gather over nod_in_elem2D, as above
 !$OMP DO
-        do n=1, myDim_nod2D
-            do k=1, nod_in_elem2D_num(n)
-                elem=nod_in_elem2D(k,n)
-                if(ulevels(elem)>1) cycle !LK89140
+        do n=1, partit%myDim_nod2D
+            do k=1, mesh%nod_in_elem2D_num(n)
+                elem=mesh%nod_in_elem2D(k,n)
+                if(mesh%ulevels(elem)>1) cycle !LK89140
                 q=1
-                if (elem2D_nodes(2,elem)==n) q=2
-                if (elem2D_nodes(3,elem)==n) q=3
+                if (mesh%elem2D_nodes(2,elem)==n) q=2
+                if (mesh%elem2D_nodes(3,elem)==n) q=3
                 m_snow(n)=m_snow(n)+icefluxes(elem,q)
             end do
         end do
@@ -982,11 +962,11 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #else
         !$ACC UPDATE SELF(m_snow, icefluxes)
 #endif
-        do elem=1, myDim_elem2D
+        do elem=1, partit%myDim_elem2D
             ! if cavity cycle over
-            if(ulevels(elem)>1) cycle !LK89140
+            if(mesh%ulevels(elem)>1) cycle !LK89140
 
-            elnodes=elem2D_nodes(:,elem)
+            elnodes=mesh%elem2D_nodes(:,elem)
             do q=1,3
                 n=elnodes(q)
 #if !defined(DISABLE_OPENACC_ATOMICS)
@@ -1010,21 +990,21 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #else
         !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
-        do n=1,myDim_nod2D
-            if(ulevels_nod2D(n)>1) cycle !LK89140
+        do n=1,partit%myDim_nod2D
+            if(mesh%ulevels_nod2D(n)>1) cycle !LK89140
             ice_temp(n)=m_templ(n)
         end do
 #ifndef ENABLE_OPENACC
 !$OMP END DO
         ! node-owned gather over nod_in_elem2D, as above
 !$OMP DO
-        do n=1, myDim_nod2D
-            do k=1, nod_in_elem2D_num(n)
-                elem=nod_in_elem2D(k,n)
-                if(ulevels(elem)>1) cycle !LK89140
+        do n=1, partit%myDim_nod2D
+            do k=1, mesh%nod_in_elem2D_num(n)
+                elem=mesh%nod_in_elem2D(k,n)
+                if(mesh%ulevels(elem)>1) cycle !LK89140
                 q=1
-                if (elem2D_nodes(2,elem)==n) q=2
-                if (elem2D_nodes(3,elem)==n) q=3
+                if (mesh%elem2D_nodes(2,elem)==n) q=2
+                if (mesh%elem2D_nodes(3,elem)==n) q=3
                 ice_temp(n)=ice_temp(n)+icefluxes(elem,q)
             end do
         end do
@@ -1036,11 +1016,11 @@ subroutine ice_fem_fct(tr_array_id, ice, partit, mesh)
 #else
         !$ACC UPDATE SELF(ice_temp, icefluxes)
 #endif
-        do elem=1, myDim_elem2D
+        do elem=1, partit%myDim_elem2D
             ! if cavity cycle over
-            if(ulevels(elem)>1) cycle !LK89140
+            if(mesh%ulevels(elem)>1) cycle !LK89140
 
-            elnodes=elem2D_nodes(:,elem)
+            elnodes=mesh%elem2D_nodes(:,elem)
             do q=1,3
                 n=elnodes(q)
 #if !defined(DISABLE_OPENACC_ATOMICS)
@@ -1092,10 +1072,6 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
     !___________________________________________________________________________
     ! pointer on necessary derived types
     real(kind=WP), dimension(:), pointer  :: mass_matrix
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     mass_matrix => ice%work%fct_massmatrix(:)
     mass_matrix_rtol=100.0_WP*spacing(1.0_WP)
     !
@@ -1105,28 +1081,28 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
     ! n is the corner of the element that the row is. No thread writes a row it
     ! does not own, and the sums do not depend on the number of threads.
 !$OMP DO
-    DO row=1, myDim_nod2D
-        offset=ssh_stiff%rowptr(row)-ssh_stiff%rowptr(1)
-        do j=1, nod_in_elem2D_num(row)
-            elem=nod_in_elem2D(j,row)
-            elnodes=elem2D_nodes(:,elem)
+    DO row=1, partit%myDim_nod2D
+        offset=mesh%ssh_stiff%rowptr(row)-mesh%ssh_stiff%rowptr(1)
+        do j=1, mesh%nod_in_elem2D_num(row)
+            elem=mesh%nod_in_elem2D(j,row)
+            elnodes=mesh%elem2D_nodes(:,elem)
             n=1
             if (elnodes(2)==row) n=2
             if (elnodes(3)==row) n=3
             do q=1, 3
                !_______________________________________________________________
                ! if element is cavity cycle over
-               if(ulevels(elem)>1) cycle
-               do k=1, nn_num(row)
-                  if (nn_pos(k,row)==elnodes(q)) then
+               if(mesh%ulevels(elem)>1) cycle
+               do k=1, mesh%nn_num(row)
+                  if (mesh%nn_pos(k,row)==elnodes(q)) then
                      ipos=offset+k
                      exit
                   end if
-                  if (k==nn_num(row)) write(*,*) 'FATAL ERROR'
+                  if (k==mesh%nn_num(row)) write(*,*) 'FATAL ERROR'
                end do
-               mass_matrix(ipos)=mass_matrix(ipos)+elem_area(elem)/12.0_WP
+               mass_matrix(ipos)=mass_matrix(ipos)+mesh%elem_area(elem)/12.0_WP
                if(q==n) then
-                   mass_matrix(ipos)=mass_matrix(ipos)+elem_area(elem)/12.0_WP
+                   mass_matrix(ipos)=mass_matrix(ipos)+mesh%elem_area(elem)/12.0_WP
                end if
            END DO
         end do ! --> do j=1, nod_in_elem2D_num(row)
@@ -1134,15 +1110,15 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
 !$OMP END DO
     ! TEST: area==sum of row entries in mass_matrix:
 !$OMP DO
-    DO q=1,myDim_nod2D
+    DO q=1,partit%myDim_nod2D
         ! if cavity cycle over
-        if(ulevels_nod2d(q)>1) cycle
+        if(mesh%ulevels_nod2d(q)>1) cycle
 
         !_______________________________________________________________________
-        offset=ssh_stiff%rowptr(q)-ssh_stiff%rowptr(1)+1
-        n=ssh_stiff%rowptr(q+1)-ssh_stiff%rowptr(1)
+        offset=mesh%ssh_stiff%rowptr(q)-mesh%ssh_stiff%rowptr(1)+1
+        n=mesh%ssh_stiff%rowptr(q+1)-mesh%ssh_stiff%rowptr(1)
         aa=sum(mass_matrix(offset:n))
-        if(abs(area(ulevels_nod2d(q),q)-aa)>mass_matrix_rtol*area(ulevels_nod2d(q),q)) then
+        if(abs(mesh%area(mesh%ulevels_nod2d(q),q)-aa)>mass_matrix_rtol*mesh%area(mesh%ulevels_nod2d(q),q)) then
 !$OMP CRITICAL
             iflag=q
             flag=1
@@ -1152,8 +1128,8 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
 !$OMP END DO
 !$OMP END PARALLEL
     if(flag>0) then
-        offset=ssh_stiff%rowptr(iflag)-ssh_stiff%rowptr(1)+1
-        n=ssh_stiff%rowptr(iflag+1)-ssh_stiff%rowptr(1)
+        offset=mesh%ssh_stiff%rowptr(iflag)-mesh%ssh_stiff%rowptr(1)+1
+        n=mesh%ssh_stiff%rowptr(iflag+1)-mesh%ssh_stiff%rowptr(1)
 #if !defined(__openmp_reproducible)
         aa=0
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(row) REDUCTION(+:aa)
@@ -1166,7 +1142,7 @@ SUBROUTINE ice_mass_matrix_fill(ice, partit, mesh)
 #else
      aa = sum(mass_matrix(offset:n))
 #endif
-        write(*,*) '#### MASS MATRIX PROBLEM', mype, iflag, aa, area(1,iflag), ulevels_nod2D(iflag)
+        write(*,*) '#### MASS MATRIX PROBLEM', partit%mype, iflag, aa, mesh%area(1,iflag), mesh%ulevels_nod2D(iflag)
     endif
 END SUBROUTINE ice_mass_matrix_fill
 !
@@ -1190,10 +1166,6 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     real(kind=WP), dimension(:), pointer  :: ice_temp, rhs_temp, rhs_tempdiv
 #endif
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     u_ice       => ice%uice(:)
     v_ice       => ice%vice(:)
     a_ice       => ice%data(1)%values(:)
@@ -1219,7 +1191,7 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
 #else
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
-    do row=1, myDim_nod2D
+    do row=1, partit%myDim_nod2D
                     !! row=myList_nod2D(m)
         rhs_m(row)=0.0_WP
         rhs_a(row)=0.0_WP
@@ -1246,18 +1218,18 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
     ! n is the corner of the element that the row is. No thread writes a row it
     ! does not own, and the sums do not depend on the number of threads.
 !$OMP DO
-    do row=1, myDim_nod2D
-        do j=1, nod_in_elem2D_num(row)
-            elem=nod_in_elem2D(j,row)
-            elnodes=elem2D_nodes(:,elem)
+    do row=1, partit%myDim_nod2D
+        do j=1, mesh%nod_in_elem2D_num(row)
+            elem=mesh%nod_in_elem2D(j,row)
+            elnodes=mesh%elem2D_nodes(:,elem)
 
             ! if cavity element skip it
-            if (ulevels(elem)>1) cycle
+            if (mesh%ulevels(elem)>1) cycle
 
             !derivatives
-            dx=gradient_sca(1:3,elem)
-            dy=gradient_sca(4:6,elem)
-            vol=elem_area(elem)
+            dx=mesh%gradient_sca(1:3,elem)
+            dy=mesh%gradient_sca(4:6,elem)
+            vol=mesh%elem_area(elem)
             um=sum(u_ice(elnodes))
             vm=sum(v_ice(elnodes))
             ! this is exact computation (no assumption of u=const on elements used
@@ -1314,16 +1286,16 @@ subroutine ice_TG_rhs_div(ice, partit, mesh)
 #else
     !$ACC UPDATE SELF(rhs_a, rhs_m, rhs_ms, rhs_adiv, rhs_mdiv, rhs_msdiv, u_ice, v_ice, m_ice, a_ice, m_snow)
 #endif
-    do elem=1,myDim_elem2D          !assembling rhs over elements
-        elnodes=elem2D_nodes(:,elem)
+    do elem=1,partit%myDim_elem2D          !assembling rhs over elements
+        elnodes=mesh%elem2D_nodes(:,elem)
 
         ! if cavity element skip it
-        if (ulevels(elem)>1) cycle
+        if (mesh%ulevels(elem)>1) cycle
 
         !derivatives
-        dx=gradient_sca(1:3,elem)
-        dy=gradient_sca(4:6,elem)
-        vol=elem_area(elem)
+        dx=mesh%gradient_sca(1:3,elem)
+        dy=mesh%gradient_sca(4:6,elem)
+        vol=mesh%elem_area(elem)
         um=sum(u_ice(elnodes))
         vm=sum(v_ice(elnodes))
         ! this is exact computation (no assumption of u=const on elements used
@@ -1430,10 +1402,6 @@ subroutine ice_update_for_div(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     real(kind=WP), dimension(:), pointer  :: ice_temp, m_templ, dm_temp, rhs_tempdiv
 #endif
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     a_ice        => ice%data(1)%values(:)
     m_ice        => ice%data(2)%values(:)
     m_snow       => ice%data(3)%values(:)
@@ -1461,16 +1429,16 @@ subroutine ice_update_for_div(ice, partit, mesh)
 #else
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
-    do row=1,myDim_nod2D
+    do row=1,partit%myDim_nod2D
         !! row=myList_nod2D(m)
         ! if cavity node skip it
-        if (ulevels_nod2d(row)>1) cycle
+        if (mesh%ulevels_nod2d(row)>1) cycle
 
-        dm_ice(row) =rhs_mdiv(row) /area(1,row)
-        da_ice(row) =rhs_adiv(row) /area(1,row)
-        dm_snow(row)=rhs_msdiv(row)/area(1,row)
+        dm_ice(row) =rhs_mdiv(row) /mesh%area(1,row)
+        da_ice(row) =rhs_adiv(row) /mesh%area(1,row)
+        dm_snow(row)=rhs_msdiv(row)/mesh%area(1,row)
 #if defined (__oifs) || defined (__ifsinterface)
-        dm_temp(row)=rhs_tempdiv(row)/area(1,row)
+        dm_temp(row)=rhs_tempdiv(row)/mesh%area(1,row)
 #endif
     end do
 #ifndef ENABLE_OPENACC
@@ -1496,28 +1464,28 @@ subroutine ice_update_for_div(ice, partit, mesh)
 #else
         !$ACC PARALLEL LOOP GANG VECTOR PRIVATE(location) DEFAULT(PRESENT)
 #endif
-        do row=1,myDim_nod2D
+        do row=1,partit%myDim_nod2D
             ! if cavity node skip it
-            if (ulevels_nod2d(row)>1) cycle
+            if (mesh%ulevels_nod2d(row)>1) cycle
                   !! row=myList_nod2D(m)
             !___________________________________________________________________
-            clo=ssh_stiff%rowptr(row)-ssh_stiff%rowptr(1)+1
-            clo2=ssh_stiff%rowptr(row+1)-ssh_stiff%rowptr(1)
+            clo=mesh%ssh_stiff%rowptr(row)-mesh%ssh_stiff%rowptr(1)+1
+            clo2=mesh%ssh_stiff%rowptr(row+1)-mesh%ssh_stiff%rowptr(1)
             cn=clo2-clo+1
             do tmp_it = 1, cn
-                location(tmp_it)=nn_pos(tmp_it, row)
+                location(tmp_it)=mesh%nn_pos(tmp_it, row)
             end do
 
             !___________________________________________________________________
             rhs_new     = rhs_mdiv(row) - sum(mass_matrix(clo:clo2)*dm_ice(location(1:cn)))
-            m_icel(row) = dm_ice(row)+rhs_new/area(1,row)
+            m_icel(row) = dm_ice(row)+rhs_new/mesh%area(1,row)
             rhs_new     = rhs_adiv(row) - sum(mass_matrix(clo:clo2)*da_ice(location(1:cn)))
-            a_icel(row) = da_ice(row)+rhs_new/area(1,row)
+            a_icel(row) = da_ice(row)+rhs_new/mesh%area(1,row)
             rhs_new     = rhs_msdiv(row) - sum(mass_matrix(clo:clo2)*dm_snow(location(1:cn)))
-            m_snowl(row)= dm_snow(row)+rhs_new/area(1,row)
+            m_snowl(row)= dm_snow(row)+rhs_new/mesh%area(1,row)
 #if defined (__oifs) || defined (__ifsinterface)
             rhs_new     = rhs_tempdiv(row) - sum(mass_matrix(clo:clo2)*dm_temp(location(1:cn)))
-            m_templ(row)= dm_temp(row)+rhs_new/area(1,row)
+            m_templ(row)= dm_temp(row)+rhs_new/mesh%area(1,row)
 #endif
         end do
 #ifndef ENABLE_OPENACC
@@ -1531,9 +1499,9 @@ subroutine ice_update_for_div(ice, partit, mesh)
 #else
         !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
-        do row=1,myDim_nod2D
+        do row=1,partit%myDim_nod2D
             ! if cavity node skip it
-            if (ulevels_nod2d(row)>1) cycle
+            if (mesh%ulevels_nod2d(row)>1) cycle
             dm_ice(row)  = m_icel(row)
             da_ice(row)  = a_icel(row)
             dm_snow(row) = m_snowl(row)
@@ -1563,7 +1531,7 @@ subroutine ice_update_for_div(ice, partit, mesh)
 #else
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
-    do row=1, myDim_nod2D+eDim_nod2D
+    do row=1, partit%myDim_nod2D+partit%eDim_nod2D
        m_ice(row)   = m_ice (row)+dm_ice (row)
        a_ice(row)   = a_ice (row)+da_ice (row)
        m_snow(row)  = m_snow(row)+dm_snow(row)
