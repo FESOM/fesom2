@@ -96,6 +96,7 @@ subroutine ice_init(ice, partit, mesh)
     alb_tramp        = ice%thermo%alb_tramp
     snowdist         = ice%thermo%snowdist
     new_iclasses     = ice%thermo%new_iclasses
+    use_meltponds    = ice%thermo%use_meltponds
     open_water_albedo= ice%thermo%open_water_albedo
     c_melt           = ice%thermo%c_melt
     h_cutoff         = ice%thermo%h_cutoff

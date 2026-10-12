@@ -268,7 +268,7 @@ module g_cvmix_idemix
         ! read idemix bottom near tidal forcing from cesm data set --> file 
         ! from N. Brüggemann interpoalted to regular grid
         file_exist=.False.
-        inquire(file=trim(idemix_surforc_file),exist=file_exist) 
+        inquire(file=trim(idemix_botforc_file),exist=file_exist) 
         if (file_exist) then
             if (partit%mype==0) write(*,*) ' --> read IDEMIX near tidal bottom forcing'
             call read_other_NetCDF(idemix_botforc_file, idemix_botforc_vname, 1, iwe_fbot, .true., .false., partit, mesh)
