@@ -178,6 +178,7 @@ subroutine ssh_solve_cg(x, rhs, solverinfo, partit, mesh)
   ! Iterations
   ! ===============
   converged = .false.
+  sprod     = 0.0_WP_full ! defined also if the loop is left before the first residual
   Do iter=1, solverinfo%maxiter
      ! ============
      ! Compute Ap
