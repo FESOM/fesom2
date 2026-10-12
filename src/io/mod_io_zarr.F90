@@ -25,7 +25,7 @@ module mod_io_zarr
     ! Style mirrors src/io/mod_io_netcdf.F90 (zarr_check(ok,ctx) -> error stop) and the project
     ! conventions (WP data, explicit public list, lazy/typed handles).
     use, intrinsic :: iso_fortran_env, only: real32, real64, int32, int8, error_unit
-    use, intrinsic :: iso_c_binding,   only: c_ptr, c_loc, c_int, c_char, c_null_char
+    use, intrinsic :: iso_c_binding,   only: c_ptr, c_loc, c_f_pointer, c_int, c_char, c_null_char
     use, intrinsic :: ieee_arithmetic, only: ieee_is_nan, ieee_is_finite
     use mod_precision, only: WP
     implicit none
@@ -490,27 +490,30 @@ contains
 
     ! Typed buffer -> raw little-endian bytes (bit-copy; x86-64 native = LE) -> chunk file.
     ! Byte widths are fixed by the explicit kinds (real64=8, real32=4, int32=4), independent of WP.
+    ! The bytes are a pointer VIEW of buf (c_f_pointer), not a copy: transfer() built two
+    ! chunk-size temporaries that ifort places on the STACK (2 x 184 MB for a 46 x 500000 <f8
+    ! restart chunk of ORCA025 -> SIGSEGV under the job's ulimit -s 204800).
     subroutine emit_r8(path, buf, codec)
         character(len=*), intent(in) :: path, codec
-        real(real64),     intent(in) :: buf(:)
-        integer(int8), allocatable, target :: raw(:)
-        raw = transfer(buf, 0_int8, 8 * size(buf))
+        real(real64),     intent(in), target, contiguous :: buf(:)
+        integer(int8), pointer, contiguous :: raw(:)
+        call c_f_pointer(c_loc(buf(1)), raw, [8 * size(buf)])
         call write_chunk_bytes(path, raw, codec)
     end subroutine emit_r8
 
     subroutine emit_r4(path, buf, codec)
         character(len=*), intent(in) :: path, codec
-        real(real32),     intent(in) :: buf(:)
-        integer(int8), allocatable, target :: raw(:)
-        raw = transfer(buf, 0_int8, 4 * size(buf))
+        real(real32),     intent(in), target, contiguous :: buf(:)
+        integer(int8), pointer, contiguous :: raw(:)
+        call c_f_pointer(c_loc(buf(1)), raw, [4 * size(buf)])
         call write_chunk_bytes(path, raw, codec)
     end subroutine emit_r4
 
     subroutine emit_i4(path, buf, codec)
         character(len=*), intent(in) :: path, codec
-        integer(int32),   intent(in) :: buf(:)
-        integer(int8), allocatable, target :: raw(:)
-        raw = transfer(buf, 0_int8, 4 * size(buf))
+        integer(int32),   intent(in), target, contiguous :: buf(:)
+        integer(int8), pointer, contiguous :: raw(:)
+        call c_f_pointer(c_loc(buf(1)), raw, [4 * size(buf)])
         call write_chunk_bytes(path, raw, codec)
     end subroutine emit_i4
 
@@ -671,7 +674,7 @@ contains
         select case (trim(codec))
         case ('none')
             call zarr_check(fsz == nbytes, 'read_chunk(none) size mismatch '//trim(path))
-            raw = filebytes(1:nbytes)
+            call move_alloc(filebytes, raw)
         case ('lz4')
 #ifdef HAVE_LZ4
             block
@@ -694,14 +697,15 @@ contains
     end subroutine read_chunk_bytes
 
     ! 1-D real chunk -> out(1:c0) (WP). Missing file => out = fill. Used for the time coord.
+    ! The readers view raw as typed values (c_f_pointer), no transfer() copy (see emit_r8).
     subroutine zarr_read_chunk_1d_real(store, arr, cidx, out)
         type(t_zarr_store), intent(in)  :: store
         type(t_zarr_array), intent(in)  :: arr
         integer,            intent(in)  :: cidx(:)
         real(WP),           intent(out) :: out(:)
         integer(int8), allocatable, target :: raw(:)
-        real(real64), allocatable :: b8(:)
-        real(real32), allocatable :: b4(:)
+        real(real64), pointer, contiguous :: b8(:)
+        real(real32), pointer, contiguous :: b4(:)
         logical :: exist
         integer :: c0, nb
         c0 = arr%chunks(1)
@@ -709,9 +713,9 @@ contains
         call read_chunk_bytes(chunk_path(store, arr, cidx), nb, raw, exist, trim(arr%codec))
         if (.not. exist) then; out(1:c0) = real(arr%fill, WP); return; end if
         if (trim(arr%dtype) == '<f8') then
-            b8 = transfer(raw, 0.0_real64, c0); out(1:c0) = real(b8, WP)
+            call c_f_pointer(c_loc(raw(1)), b8, [c0]); out(1:c0) = real(b8, WP)
         else
-            b4 = transfer(raw, 0.0_real32, c0); out(1:c0) = real(b4, WP)
+            call c_f_pointer(c_loc(raw(1)), b4, [c0]); out(1:c0) = real(b4, WP)
         end if
     end subroutine zarr_read_chunk_1d_real
 
@@ -722,8 +726,8 @@ contains
         integer,            intent(in)  :: cidx(:)
         real(WP),           intent(out) :: out(:,:)
         integer(int8), allocatable, target :: raw(:)
-        real(real64), allocatable :: b8(:)
-        real(real32), allocatable :: b4(:)
+        real(real64), pointer, contiguous :: b8(:)
+        real(real32), pointer, contiguous :: b4(:)
         logical :: exist
         integer :: c0, c1, nb, i0, i1
         c0 = arr%chunks(1); c1 = arr%chunks(2)
@@ -731,10 +735,10 @@ contains
         call read_chunk_bytes(chunk_path(store, arr, cidx), nb, raw, exist, trim(arr%codec))
         if (.not. exist) then; out(1:c0,1:c1) = real(arr%fill, WP); return; end if
         if (trim(arr%dtype) == '<f8') then
-            b8 = transfer(raw, 0.0_real64, c0*c1)
+            call c_f_pointer(c_loc(raw(1)), b8, [c0*c1])
             do i0 = 1, c0; do i1 = 1, c1; out(i0,i1) = real(b8((i0-1)*c1 + i1), WP); end do; end do
         else
-            b4 = transfer(raw, 0.0_real32, c0*c1)
+            call c_f_pointer(c_loc(raw(1)), b4, [c0*c1])
             do i0 = 1, c0; do i1 = 1, c1; out(i0,i1) = real(b4((i0-1)*c1 + i1), WP); end do; end do
         end if
     end subroutine zarr_read_chunk_2d_real
@@ -746,8 +750,8 @@ contains
         integer,            intent(in)  :: cidx(:)
         real(WP),           intent(out) :: out(:,:,:)
         integer(int8), allocatable, target :: raw(:)
-        real(real64), allocatable :: b8(:)
-        real(real32), allocatable :: b4(:)
+        real(real64), pointer, contiguous :: b8(:)
+        real(real32), pointer, contiguous :: b4(:)
         logical :: exist
         integer :: c0, c1, c2, nb, i0, i1, i2
         c0 = arr%chunks(1); c1 = arr%chunks(2); c2 = arr%chunks(3)
@@ -755,12 +759,12 @@ contains
         call read_chunk_bytes(chunk_path(store, arr, cidx), nb, raw, exist, trim(arr%codec))
         if (.not. exist) then; out(1:c0,1:c1,1:c2) = real(arr%fill, WP); return; end if
         if (trim(arr%dtype) == '<f8') then
-            b8 = transfer(raw, 0.0_real64, c0*c1*c2)
+            call c_f_pointer(c_loc(raw(1)), b8, [c0*c1*c2])
             do i0 = 1, c0; do i1 = 1, c1; do i2 = 1, c2
                 out(i0,i1,i2) = real(b8((i0-1)*c1*c2 + (i1-1)*c2 + i2), WP)
             end do; end do; end do
         else
-            b4 = transfer(raw, 0.0_real32, c0*c1*c2)
+            call c_f_pointer(c_loc(raw(1)), b4, [c0*c1*c2])
             do i0 = 1, c0; do i1 = 1, c1; do i2 = 1, c2
                 out(i0,i1,i2) = real(b4((i0-1)*c1*c2 + (i1-1)*c2 + i2), WP)
             end do; end do; end do
