@@ -46,10 +46,6 @@ subroutine stress_tensor(elist, ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: m_ice, a_ice
     integer       :: elnodes(3)
     real(kind=WP) :: m_el, a_el, pelem
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     u_ice       => ice%uice(:)
     v_ice       => ice%vice(:)
     eps11       => ice%work%eps11(:)
@@ -72,13 +68,13 @@ subroutine stress_tensor(elist, ice, partit, mesh)
         el = elist(i)
 #else
 !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT) PRIVATE(elnodes)
-    do el=1,myDim_elem2D
+    do el=1,partit%myDim_elem2D
 #endif
         !_______________________________________________________________________
         ! if element contains cavity node skip it
-        if (ulevels(el) > 1) cycle
+        if (mesh%ulevels(el) > 1) cycle
 
-        elnodes = elem2D_nodes(:,el)
+        elnodes = mesh%elem2D_nodes(:,el)
         ! ===== Check if there is ice on elem
         if (any(m_ice(elnodes) <= 0._WP) .or. any(a_ice(elnodes) <= 0._WP)) cycle
 
@@ -92,14 +88,14 @@ subroutine stress_tensor(elist, ice, partit, mesh)
             ! =====
             ! ===== Deformation rate tensor on element elem:
                 !du/dx
-            eps11(el) = sum(gradient_sca(1:3,el)*U_ice(elem2D_nodes(1:3,el))) &
-                - metric_factor(el) * sum(V_ice(elem2D_nodes(1:3,el)))/3.0_WP
+            eps11(el) = sum(mesh%gradient_sca(1:3,el)*U_ice(mesh%elem2D_nodes(1:3,el))) &
+                - mesh%metric_factor(el) * sum(V_ice(mesh%elem2D_nodes(1:3,el)))/3.0_WP
 
-            eps22(el) = sum(gradient_sca(4:6, el)*V_ice(elem2D_nodes(1:3,el)))
+            eps22(el) = sum(mesh%gradient_sca(4:6, el)*V_ice(mesh%elem2D_nodes(1:3,el)))
 
-            eps12(el) = 0.5_WP*(sum(gradient_sca(4:6,el)*U_ice(elem2D_nodes(1:3,el))) &
-                        + sum(gradient_sca(1:3,el)*V_ice(elem2D_nodes(1:3,el))) &
-                        + metric_factor(el) * sum(U_ice(elem2D_nodes(1:3,el)))/3.0_WP)
+            eps12(el) = 0.5_WP*(sum(mesh%gradient_sca(4:6,el)*U_ice(mesh%elem2D_nodes(1:3,el))) &
+                        + sum(mesh%gradient_sca(1:3,el)*V_ice(mesh%elem2D_nodes(1:3,el))) &
+                        + mesh%metric_factor(el) * sum(U_ice(mesh%elem2D_nodes(1:3,el)))/3.0_WP)
             ! ===== moduli:
             delta = sqrt((eps11(el)*eps11(el) + eps22(el)*eps22(el))*(1.0_WP+vale) + 4.0_WP*vale*eps12(el)*eps12(el) + &
                                 2.0_WP*eps11(el)*eps22(el)*(1.0_WP-vale))
@@ -177,10 +173,6 @@ subroutine stress2rhs(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: inv_areamass
     real(kind=WP), dimension(:), pointer  :: m_ice, a_ice
     integer       :: elnodes(3)
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     sigma11      => ice%work%sigma11(:)
     sigma12      => ice%work%sigma12(:)
     sigma22      => ice%work%sigma22(:)
@@ -200,27 +192,27 @@ subroutine stress2rhs(ice, partit, mesh)
     ! elements in nod_in_elem2D order and writes only its own entry. No locks are
     ! needed and the sum does not depend on the number of threads.
 !$OMP DO PRIVATE(n, el, k, j, elnodes, su, sv)
-    DO n=1, myDim_nod2D
+    DO n=1, partit%myDim_nod2D
         su = 0.0_WP
         sv = 0.0_WP
-        do k=1, nod_in_elem2D_num(n)
-            el = nod_in_elem2D(k,n)
+        do k=1, mesh%nod_in_elem2D_num(n)
+            el = mesh%nod_in_elem2D(k,n)
             !___________________________________________________________________
             ! if element contains cavity node skip it
-            if (ulevels(el) > 1) cycle
-            elnodes = elem2D_nodes(:,el)
+            if (mesh%ulevels(el) > 1) cycle
+            elnodes = mesh%elem2D_nodes(:,el)
             if (any(m_ice(elnodes) <= 0._WP) .or. any(a_ice(elnodes) <= 0._WP)) cycle
             !___________________________________________________________________
             ! corner of element el that is node n
             j = 3
             if (elnodes(1) == n) j = 1
             if (elnodes(2) == n) j = 2
-            su = su - elem_area(el) * &
-                 (sigma11(el)*gradient_sca(j,el) + sigma12(el)*gradient_sca(j+3,el) &
-                 +sigma12(el)*val3*metric_factor(el))            !metrics
-            sv = sv - elem_area(el) * &
-                 (sigma12(el)*gradient_sca(j,el) + sigma22(el)*gradient_sca(j+3,el) &
-                 -sigma11(el)*val3*metric_factor(el))
+            su = su - mesh%elem_area(el) * &
+                 (sigma11(el)*mesh%gradient_sca(j,el) + sigma12(el)*mesh%gradient_sca(j+3,el) &
+                 +sigma12(el)*val3*mesh%metric_factor(el))            !metrics
+            sv = sv - mesh%elem_area(el) * &
+                 (sigma12(el)*mesh%gradient_sca(j,el) + sigma22(el)*mesh%gradient_sca(j+3,el) &
+                 -sigma11(el)*val3*mesh%metric_factor(el))
         end do
         U_rhs_ice(n) = su
         V_rhs_ice(n) = sv
@@ -228,7 +220,7 @@ subroutine stress2rhs(ice, partit, mesh)
 !$OMP END DO
 #else
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
-    DO  n=1, myDim_nod2D
+    DO  n=1, partit%myDim_nod2D
         U_rhs_ice(n)=0.0_WP
         V_rhs_ice(n)=0.0_WP
     END DO
@@ -241,15 +233,15 @@ subroutine stress2rhs(ice, partit, mesh)
 #else
     !$ACC UPDATE SELF(u_rhs_ice, v_rhs_ice, sigma11, sigma12, sigma22)
 #endif
-    do el=1,myDim_elem2D
+    do el=1,partit%myDim_elem2D
         ! ===== Skip if ice is absent
         !   if (any(m_ice(elnodes)<= 0.) .or. any(a_ice(elnodes) <=0.)) CYCLE
         !_______________________________________________________________________
         ! if element contains cavity node skip it
-        if (ulevels(el) > 1) cycle
+        if (mesh%ulevels(el) > 1) cycle
 
         !_______________________________________________________________________
-        elnodes = elem2D_nodes(:,el)
+        elnodes = mesh%elem2D_nodes(:,el)
         if (any(m_ice(elnodes) <= 0._WP) .or. any(a_ice(elnodes) <= 0._WP)) cycle
 
         DO k=1,3
@@ -259,20 +251,20 @@ subroutine stress2rhs(ice, partit, mesh)
                 !$ACC ATOMIC UPDATE
 #endif
 #endif
-                U_rhs_ice(elem2D_nodes(k,el)) = U_rhs_ice(elem2D_nodes(k,el)) &
-                - elem_area(el) * &
-                    (sigma11(el)*gradient_sca(k,el) + sigma12(el)*gradient_sca(k+3,el) &
-                    +sigma12(el)*val3*metric_factor(el))            !metrics
+                U_rhs_ice(mesh%elem2D_nodes(k,el)) = U_rhs_ice(mesh%elem2D_nodes(k,el)) &
+                - mesh%elem_area(el) * &
+                    (sigma11(el)*mesh%gradient_sca(k,el) + sigma12(el)*mesh%gradient_sca(k+3,el) &
+                    +sigma12(el)*val3*mesh%metric_factor(el))            !metrics
 
 #ifdef ENABLE_OPENACC
 #if !defined(DISABLE_OPENACC_ATOMICS)
                 !$ACC ATOMIC UPDATE
 #endif
 #endif
-                V_rhs_ice(elem2D_nodes(k,el)) = V_rhs_ice(elem2D_nodes(k,el)) &
-                    - elem_area(el) * &
-                    (sigma12(el)*gradient_sca(k,el) + sigma22(el)*gradient_sca(k+3,el) &
-                    -sigma11(el)*val3*metric_factor(el))
+                V_rhs_ice(mesh%elem2D_nodes(k,el)) = V_rhs_ice(mesh%elem2D_nodes(k,el)) &
+                    - mesh%elem_area(el) * &
+                    (sigma12(el)*mesh%gradient_sca(k,el) + sigma22(el)*mesh%gradient_sca(k+3,el) &
+                    -sigma11(el)*val3*mesh%metric_factor(el))
 
         END DO
     end do
@@ -290,10 +282,10 @@ subroutine stress2rhs(ice, partit, mesh)
 #else
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
-    DO n=1, myDim_nod2D
+    DO n=1, partit%myDim_nod2D
         !_______________________________________________________________________
         ! if cavity node skip it
-        if (ulevels_nod2d(n)>1) cycle
+        if (mesh%ulevels_nod2d(n)>1) cycle
 
         !_______________________________________________________________________
         if (inv_areamass(n) > 0._WP) then
@@ -352,10 +344,6 @@ subroutine EVPdynamics(ice, partit, mesh)
     real(kind=WP), dimension(:), pointer  :: a_ice_old, m_ice_old, m_snow_old
 #endif
     real(kind=WP)              , pointer  :: inv_rhowat, rhosno, rhoice
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     u_ice           => ice%uice(:)
     v_ice           => ice%vice(:)
     a_ice           => ice%data(1)%values(:)
@@ -391,7 +379,7 @@ subroutine EVPdynamics(ice, partit, mesh)
     a_ice_old(:)  = a_ice(:)
     m_ice_old(:)  = a_ice(:)
     m_snow_old(:) = m_snow(:)
-    call icepack_to_fesom (nx_in=(myDim_nod2D+eDim_nod2D), &
+    call icepack_to_fesom (nx_in=(partit%myDim_nod2D+partit%eDim_nod2D), &
                             aice_out=a_ice,                 &
                             vice_out=m_ice,                 &
                             vsno_out=m_snow)
@@ -406,9 +394,9 @@ subroutine EVPdynamics(ice, partit, mesh)
     ! element-mean m_ice / a_ice in stress_tensor, so this nodal field is
     ! not consumed by the solver.
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
-    do n = 1, myDim_nod2D
+    do n = 1, partit%myDim_nod2D
         ice_strength(n) = 0.0_WP
-        if (ulevels_nod2D(n) > 1) cycle
+        if (mesh%ulevels_nod2D(n) > 1) cycle
         if (m_ice(n) <= 0._WP .or. a_ice(n) <= 0._WP) cycle
         ice_strength(n) = ice%pstar*m_ice(n)*exp(-ice%c_pressure*(1.0_WP-a_ice(n)))
     end do
@@ -426,7 +414,7 @@ subroutine EVPdynamics(ice, partit, mesh)
 #else
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
-    do n=1, myDim_nod2D+eDim_nod2D
+    do n=1, partit%myDim_nod2D+partit%eDim_nod2D
        inv_areamass(n) =0.0_WP
        inv_mass(n)     =0.0_WP
        rhs_a(n)        =0.0_WP
@@ -443,14 +431,14 @@ subroutine EVPdynamics(ice, partit, mesh)
 #else
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
-    do n=1,myDim_nod2D
+    do n=1,partit%myDim_nod2D
         !_______________________________________________________________________
         ! if cavity node skip it
-        if (ulevels_nod2d(n)>1) cycle
+        if (mesh%ulevels_nod2d(n)>1) cycle
 
         !_______________________________________________________________________
         if ((rhoice*m_ice(n)+rhosno*m_snow(n)) > 1.e-3_WP) then
-            inv_areamass(n) = 1._WP/(area(1,n)*(rhoice*m_ice(n)+rhosno*m_snow(n)))
+            inv_areamass(n) = 1._WP/(mesh%area(1,n)*(rhoice*m_ice(n)+rhosno*m_snow(n)))
         else
             inv_areamass(n) = 0._WP
         endif
@@ -483,18 +471,18 @@ subroutine EVPdynamics(ice, partit, mesh)
         ! the number of threads. Halo entries of rhs_a/rhs_m stay zero; only owned nodes
         ! are read (stress2rhs).
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, k, j, el, elnodes, aa, p_ice, elevation_elem, elevation_dx, elevation_dy)
-        do n = 1, myDim_nod2D
-            do k = 1, nod_in_elem2D_num(n)
-                el = nod_in_elem2D(k,n)
+        do n = 1, partit%myDim_nod2D
+            do k = 1, mesh%nod_in_elem2D_num(n)
+                el = mesh%nod_in_elem2D(k,n)
                 !_______________________________________________________________
                 ! if element has any cavity node skip it
-                if (ulevels(el) > 1) cycle
-                elnodes = elem2D_nodes(:,el)
+                if (mesh%ulevels(el) > 1) cycle
+                elnodes = mesh%elem2D_nodes(:,el)
                 !_______________________________________________________________
                 ! skip if any node is ice-free
                 if (any(m_ice(elnodes) <= 0._WP) .or. &
                     any(a_ice(elnodes) <= 0._WP)) cycle
-                aa = 9.81_WP*elem_area(el)/3.0_WP
+                aa = 9.81_WP*mesh%elem_area(el)/3.0_WP
                 !_______________________________________________________________
                 ! add and limit pressure from ice weight in case of floating ice
                 p_ice=(rhoice*m_ice(elnodes)+rhosno*m_snow(elnodes))*inv_rhowat
@@ -502,8 +490,8 @@ subroutine EVPdynamics(ice, partit, mesh)
                     p_ice(j)=min(p_ice(j),max_ice_loading)
                 end do
                 elevation_elem = elevation(elnodes)
-                elevation_dx   = sum(gradient_sca(1:3,el)*(elevation_elem+p_ice*use_pice))
-                elevation_dy   = sum(gradient_sca(4:6,el)*(elevation_elem+p_ice*use_pice))
+                elevation_dx   = sum(mesh%gradient_sca(1:3,el)*(elevation_elem+p_ice*use_pice))
+                elevation_dy   = sum(mesh%gradient_sca(4:6,el)*(elevation_elem+p_ice*use_pice))
                 rhs_a(n) = rhs_a(n)-aa*elevation_dx
                 rhs_m(n) = rhs_m(n)-aa*elevation_dy
             end do
@@ -515,12 +503,12 @@ subroutine EVPdynamics(ice, partit, mesh)
 #else
         !$ACC UPDATE SELF(rhs_a, rhs_m, m_ice, a_ice)
 #endif
-        do el = 1,myDim_elem2D
+        do el = 1,partit%myDim_elem2D
             !___________________________________________________________________
             ! if element has any cavity node skip it
-            if (ulevels(el) > 1) cycle
+            if (mesh%ulevels(el) > 1) cycle
 
-            elnodes = elem2D_nodes(:,el)
+            elnodes = mesh%elem2D_nodes(:,el)
             !___________________________________________________________________
             ! skip if any node is ice-free; rhs_a / rhs_m contributions only
             ! make sense where there is ice on all three element nodes.
@@ -529,7 +517,7 @@ subroutine EVPdynamics(ice, partit, mesh)
 
             !___________________________________________________________________
             ! use rhs_m and rhs_a for storing the contribution from elevation:
-            aa = 9.81_WP*elem_area(el)/3.0_WP
+            aa = 9.81_WP*mesh%elem_area(el)/3.0_WP
 
             !___________________________________________________________________
             ! add and limit pressure from ice weight in case of floating ice
@@ -542,8 +530,8 @@ subroutine EVPdynamics(ice, partit, mesh)
 
             !___________________________________________________________________
             elevation_elem = elevation(elnodes)
-            elevation_dx   = sum(gradient_sca(1:3,el)*(elevation_elem+p_ice*use_pice))
-            elevation_dy   = sum(gradient_sca(4:6,el)*(elevation_elem+p_ice*use_pice))
+            elevation_dx   = sum(mesh%gradient_sca(1:3,el)*(elevation_elem+p_ice*use_pice))
+            elevation_dy   = sum(mesh%gradient_sca(4:6,el)*(elevation_elem+p_ice*use_pice))
 
             !___________________________________________________________________
             do k = 1, 3
@@ -568,16 +556,16 @@ subroutine EVPdynamics(ice, partit, mesh)
 #ifndef ENABLE_OPENACC
         ! Same gather as above, without the floating-ice loading.
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, k, el, elnodes, aa, elevation_dx, elevation_dy)
-        do n = 1, myDim_nod2D
-            do k = 1, nod_in_elem2D_num(n)
-                el = nod_in_elem2D(k,n)
-                if (ulevels(el) > 1) cycle
-                elnodes = elem2D_nodes(:,el)
+        do n = 1, partit%myDim_nod2D
+            do k = 1, mesh%nod_in_elem2D_num(n)
+                el = mesh%nod_in_elem2D(k,n)
+                if (mesh%ulevels(el) > 1) cycle
+                elnodes = mesh%elem2D_nodes(:,el)
                 if (any(m_ice(elnodes) <= 0._WP) .or. &
                     any(a_ice(elnodes) <= 0._WP)) cycle
-                aa = 9.81_WP*elem_area(el)/3.0_WP
-                elevation_dx = sum(gradient_sca(1:3,el)*elevation(elnodes))
-                elevation_dy = sum(gradient_sca(4:6,el)*elevation(elnodes))
+                aa = 9.81_WP*mesh%elem_area(el)/3.0_WP
+                elevation_dx = sum(mesh%gradient_sca(1:3,el)*elevation(elnodes))
+                elevation_dy = sum(mesh%gradient_sca(4:6,el)*elevation(elnodes))
                 rhs_a(n) = rhs_a(n)-aa*elevation_dx
                 rhs_m(n) = rhs_m(n)-aa*elevation_dy
             end do
@@ -589,22 +577,22 @@ subroutine EVPdynamics(ice, partit, mesh)
 #else
             !$ACC UPDATE SELF(rhs_a, rhs_m, m_ice, a_ice)
 #endif
-        do el = 1,myDim_elem2D
+        do el = 1,partit%myDim_elem2D
             !___________________________________________________________________
             ! if element has any cavity node skip it
-            if (ulevels(el) > 1) cycle
+            if (mesh%ulevels(el) > 1) cycle
 
-            elnodes = elem2D_nodes(:,el)
+            elnodes = mesh%elem2D_nodes(:,el)
             !___________________________________________________________________
             ! skip if any node is ice-free
             if (any(m_ice(elnodes) <= 0._WP) .or. &
                 any(a_ice(elnodes) <= 0._WP)) cycle
 
             ! use rhs_m and rhs_a for storing the contribution from elevation:
-            aa = 9.81_WP*elem_area(el)/3.0_WP
+            aa = 9.81_WP*mesh%elem_area(el)/3.0_WP
 
-            elevation_dx = sum(gradient_sca(1:3,el)*elevation(elnodes))
-            elevation_dy = sum(gradient_sca(4:6,el)*elevation(elnodes))
+            elevation_dx = sum(mesh%gradient_sca(1:3,el)*elevation(elnodes))
+            elevation_dy = sum(mesh%gradient_sca(4:6,el)*elevation(elnodes))
 
             do k = 1, 3
 #if !defined(DISABLE_OPENACC_ATOMICS)
@@ -631,10 +619,10 @@ subroutine EVPdynamics(ice, partit, mesh)
     !___________________________________________________________________________
     !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
-    do n=1,myDim_nod2D
-        if (ulevels_nod2d(n)>1) cycle
-        rhs_a(n) = rhs_a(n)/area(1,n)
-        rhs_m(n) = rhs_m(n)/area(1,n)
+    do n=1,partit%myDim_nod2D
+        if (mesh%ulevels_nod2d(n)>1) cycle
+        rhs_a(n) = rhs_a(n)/mesh%area(1,n)
+        rhs_m(n) = rhs_m(n)/mesh%area(1,n)
     enddo
 #ifndef ENABLE_OPENACC
 !$OMP END PARALLEL DO
@@ -651,11 +639,11 @@ subroutine EVPdynamics(ice, partit, mesh)
     ! Elements whose three nodes are all owned by this rank do not read halo
     ! values of U_ice/V_ice; their stress is computed while the halo exchange
     ! of the previous subcycle is in flight. The remaining elements wait for it.
-    allocate(elem_inner(myDim_elem2D), elem_halo(myDim_elem2D))
+    allocate(elem_inner(partit%myDim_elem2D), elem_halo(partit%myDim_elem2D))
     n_inner = 0
     n_halo  = 0
-    do el=1, myDim_elem2D
-        if (all(elem2D_nodes(:,el) <= myDim_nod2D)) then
+    do el=1, partit%myDim_elem2D
+        if (all(mesh%elem2D_nodes(:,el) <= partit%myDim_nod2D)) then
             n_inner = n_inner+1
             elem_inner(n_inner) = el
         else
@@ -696,7 +684,7 @@ subroutine EVPdynamics(ice, partit, mesh)
 #else
         !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
-        do n=1,myDim_nod2D+eDim_nod2D
+        do n=1,partit%myDim_nod2D+partit%eDim_nod2D
            U_ice_old(n) = U_ice(n) !PS
            V_ice_old(n) = V_ice(n) !PS
         end do
@@ -710,10 +698,10 @@ subroutine EVPdynamics(ice, partit, mesh)
 #else
         !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
-        do n=1,myDim_nod2D
+        do n=1,partit%myDim_nod2D
             !___________________________________________________________________
             ! if cavity node skip it
-            if ( ulevels_nod2d(n)>1 ) cycle
+            if ( mesh%ulevels_nod2d(n)>1 ) cycle
 
             !___________________________________________________________________
             if (a_ice(n) >= 0.01_WP) then               ! Skip if ice is absent
@@ -750,23 +738,23 @@ subroutine EVPdynamics(ice, partit, mesh)
 #else
         !$ACC PARALLEL LOOP GANG VECTOR DEFAULT(PRESENT)
 #endif
-        DO n=1, myDim_nod2D+eDim_nod2D
+        DO n=1, partit%myDim_nod2D+partit%eDim_nod2D
             DO k=1, mesh%nod_in_edge2D_num(n)
                 ed=mesh%nod_in_edge2D(k,n)
                 !_______________________________________________________________
                 ! apply coastal sea ice velocity boundary conditions
-                if(myList_edge2D(ed) > edge2D_in) then
+                if(partit%myList_edge2D(ed) > mesh%edge2D_in) then
                     U_ice(n)=0.0_WP
                     V_ice(n)=0.0_WP
                 endif
                 !_______________________________________________________________
                 ! apply sea ice velocity boundary conditions at cavity-ocean edge
                 if (use_cavity) then
-                    if (ulevels(edge_tri(1,ed))>1) then
+                    if (mesh%ulevels(mesh%edge_tri(1,ed))>1) then
                         U_ice(n)=0.0_WP
                         V_ice(n)=0.0_WP
-                    elseif ( edge_tri(2,ed)>0) then
-                        if (ulevels(edge_tri(2,ed))>1) then
+                    elseif ( mesh%edge_tri(2,ed)>0) then
+                        if (mesh%ulevels(mesh%edge_tri(2,ed))>1) then
                             U_ice(n)=0.0_WP
                             V_ice(n)=0.0_WP
                         end if
