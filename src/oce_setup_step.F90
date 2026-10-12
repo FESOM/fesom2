@@ -997,11 +997,15 @@ SUBROUTINE arrays_init(num_tracers, partit, mesh)
     ! MLE writes into fer_gamma and rides the GM plumbing, so these are needed
     ! whenever either scheme is on.
     if (Fer_GM .or. use_mle) then
-    allocate(fer_c(node_size),fer_scal(node_size), fer_gamma(2, mesh%nl, node_size), fer_K(mesh%nl, node_size), fer_tapfac(mesh%nl, node_size))
+    allocate(fer_c(node_size),fer_scal(node_size), fer_gamma(2, mesh%nl, node_size), fer_K(mesh%nl, node_size))
     fer_gamma = 0.0_WP
     fer_K     = 500._WP
     fer_c     = 1._WP
     fer_scal  = 0.0_WP
+    end if
+    ! the taper factor is also read by Redi (Redi_Ktaper) when GM is off
+    if (Fer_GM .or. use_mle .or. Redi) then
+    allocate(fer_tapfac(mesh%nl, node_size))
     fer_tapfac= 1._WP
     end if
 
