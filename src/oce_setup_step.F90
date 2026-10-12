@@ -624,6 +624,25 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
     dynamics%AB_order            = AB_order
     dynamics%use_ssh_se_subcycl  = use_ssh_se_subcycl
     if (dynamics%use_ssh_se_subcycl) then
+        ! combinations the split-explicit solver does not support
+        if (use_cavity) then
+            ! the barotropic steps divide by the surface area areasvol(1,:), which
+            ! is zero under an ice shelf
+            if (partit%mype==0) write(*,*) 'ERROR: use_ssh_se_subcycl=.true. is not supported with use_cavity=.true.'
+            ! let rank 0 finish writing before any rank aborts
+            flush(6)
+            call MPI_Barrier(partit%MPI_COMM_FESOM, partit%MPIerr)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        end if
+        if (trim(which_ALE)=='zlevel') then
+            ! only the zstar thickness update is implemented, with zlevel the layer
+            ! thicknesses would not follow the sea surface
+            if (partit%mype==0) write(*,*) "ERROR: use_ssh_se_subcycl=.true. is not supported with which_ALE='zlevel', use 'zstar' or 'linfs'"
+            ! let rank 0 finish writing before any rank aborts
+            flush(6)
+            call MPI_Barrier(partit%MPI_COMM_FESOM, partit%MPIerr)
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        end if
         dynamics%se_BTsteps      = se_BTsteps
         dynamics%se_BTtheta      = se_BTtheta
         dynamics%se_bottdrag     = se_bottdrag
