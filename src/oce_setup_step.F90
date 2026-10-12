@@ -133,7 +133,7 @@ subroutine ocean_setup(dynamics, tracers, partit, mesh)
         case ('cvmix_TKE+cvmix_IDEMIX' ) ; mix_scheme_nmb = 56
         case ('cvmix_TKE+cvmix_IDEMIX2') ; mix_scheme_nmb = 57
 #endif        
-        case ('TOY'                   ) ; mix_scheme_nmb = 8
+        case ('TOY'                   ) ; mix_scheme_nmb = 9
         case default 
             stop "!not existing mixing scheme!"
             call par_ex(partit%MPI_COMM_FESOM, partit%mype)

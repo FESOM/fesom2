@@ -3138,8 +3138,8 @@ subroutine oce_timestep_ale(n, ice, dynamics, tracers, partit, mesh)
         call calc_cvmix_tke(dynamics, partit, mesh)
         call mo_convect(ice, partit, mesh)
 #endif  
-    else if(mix_scheme_nmb==8) then
-        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_TOY'//achar(27)//'[0m' 
+    else if(mix_scheme_nmb==9) then
+        if (flag_debug .and. partit%mype==0)  print *, achar(27)//'[36m'//'     --> call oce_mixing_TOY'//achar(27)//'[0m'
         call oce_mixing_TOY(partit, mesh)
     end if   
 
