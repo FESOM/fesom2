@@ -571,8 +571,29 @@ SUBROUTINE dynamics_init(dynamics, partit, mesh)
         call par_ex(partit%MPI_COMM_FESOM, partit%mype)
         stop
     end if
+    ! parameters without an initial value here take the default of the derived
+    ! type, so that a parameter missing in the namelist is well defined
+    opt_visc          = dynamics%opt_visc
+    visc_gamma0       = dynamics%visc_gamma0
+    visc_gamma1       = dynamics%visc_gamma1
+    visc_gamma2       = dynamics%visc_gamma2
+    visc_gamma0_h     = dynamics%visc_gamma0_h
+    visc_gamma1_h     = dynamics%visc_gamma1_h
+    visc_easybsreturn = dynamics%visc_easybsreturn
+    momadv_opt        = dynamics%momadv_opt
+    wsplit_maxcfl     = dynamics%wsplit_maxcfl
+    se_BTsteps        = dynamics%se_BTsteps
+    se_BTtheta        = dynamics%se_BTtheta
+    se_bottdrag       = dynamics%se_bottdrag
+    se_bdrag_si       = dynamics%se_bdrag_si
+    se_visc           = dynamics%se_visc
+    se_visc_gamma0    = dynamics%se_visc_gamma0
+    se_visc_gamma1    = dynamics%se_visc_gamma1
+    se_visc_gamma2    = dynamics%se_visc_gamma2
     read(nm_unit, nml=dynamics_visc,    iostat=iost)
+    if (iost /= 0) call check_namelist_read(nm_unit, 'dynamics_visc', 'namelist.dyn', partit)
     read(nm_unit, nml=dynamics_general, iostat=iost)
+    if (iost /= 0) call check_namelist_read(nm_unit, 'dynamics_general', 'namelist.dyn', partit)
     close(nm_unit)
 
     !___________________________________________________________________________
