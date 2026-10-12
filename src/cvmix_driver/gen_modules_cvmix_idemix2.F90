@@ -3737,10 +3737,6 @@ module g_cvmix_idemix2
 !         integer        :: edge, fbini, nfbin, node, el(2), el2, ednodes(2)
 !         real(kind=WP)  :: dx1, dy1, dx2, dy2, u1, v1, u2, v2, vflux
 !         
-! #include "../associate_part_def.h"
-! #include "../associate_mesh_def.h"
-! #include "../associate_part_ass.h"
-! #include "../associate_mesh_ass.h"
 !         
 !         nfbin = idemix2_nfbin
 !         div_vel = 0.0_WP
