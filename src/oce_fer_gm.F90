@@ -322,11 +322,9 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
     if (Redi .and. Fer_GM) then
 !$OMP DO
         do n=1, partit%myDim_nod2D
-            ! same first level as in the loop above, nzmin is not carried over
-            nzmin=1
-            do k=1, mesh%nod_in_elem2D_num(n)
-               nzmin=max(nzmin, mesh%ulevels(mesh%nod_in_elem2D(k, n)))
-            end do
+            ! the level the vertical scaling below reads as surface template;
+            ! nzmin is not carried over from the loop above
+            nzmin=mesh%ulevels_nod2D(n)
             !PS Ki(nzmin, n)=fer_k(nzmin, n)
             Ki(nzmin, n)=max(fer_scal(n)*Redi_Kmax, K_GM_min)
 !PS             Ki(nzmin, n)=fer_scal(n)*K_Redi_max
