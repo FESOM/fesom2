@@ -607,7 +607,7 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
     end do
     
     ! -->see equation (14) FESOM2:from finite elements to finie volume
-    eta_n=alpha*mesh%hbar_old+(1.0_WP-alpha)*mesh%hbar   
+    eta_n=alpha*mesh%hbar+(1.0_WP-alpha)*mesh%hbar_old
     
     if     (trim(which_ale)=='linfs') then
         !_______________________________________________________________________
@@ -787,7 +787,7 @@ subroutine init_thickness_ale(dynamics, partit, mesh)
                 mesh%dhe(elem)=sum(mesh%hbar(elnodes))/3.0_WP
                 mesh%helem(nzmin,elem)=sum(mesh%hnode(nzmin,elnodes))/3.0_WP
             else
-                mesh%dhe = 0.0_WP
+                mesh%dhe(elem) = 0.0_WP
                 mesh%helem(nzmin,elem)=mesh%zbar_e_srf(elem)-mesh%zbar(nzmin+1)
             end if 
             
@@ -2155,7 +2155,9 @@ subroutine vert_vel_ale(dynamics, partit, mesh)
                     !     be distributed per layer. Than search index where this
                     !     cumulativ sum is larger than dhbar_total
                     cumsum_maxdhbar(1)            =  max_dhbar2distr(1)
-                    cumsum_maxdhbar(2:lzstar_lev) = (/(max_dhbar2distr(nz)+max_dhbar2distr(nz-1),nz=2,lzstar_lev,1)/)
+                    do nz=2, lzstar_lev
+                        cumsum_maxdhbar(nz) = cumsum_maxdhbar(nz-1)+max_dhbar2distr(nz)
+                    end do
                     nz = minval(pack(idx,cumsum_maxdhbar<dhbar_total))
                     nz = min(nz,lzstar_lev)
                     

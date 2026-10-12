@@ -18,12 +18,12 @@
 ! Setting these to .true. enables additional output fields (see catalog below).
 ! ============================================================================
 &diag_list
-ldiag_solver      = .false.  ! enables solver diagnostics (convergence, iterations)
+ldiag_solver      = .false.  ! computes the solver diagnostic rhs_diag (currently not written to output)
 lcurt_stress_surf = .false.  ! enables 'curl_surf' output (vorticity of surface stress)
 ldiag_curl_vel3   = .false.  ! enables 'curl_u' output (relative vorticity from 3D velocity)
 ldiag_Ri          = .false.  ! enables Richardson number diagnostics ('shear', 'Ri')
 ldiag_turbflux    = .false.  ! enables turbulent flux diagnostics ('KvdTdz', 'KvdSdz')
-ldiag_salt3D      = .false.  ! enables 3D salinity diagnostics
+ldiag_salt3D      = .false.  ! prints the global salinity integral to the log
 ldiag_dMOC        = .false.  ! enables 'dMOC' output (density MOC diagnostics)
 ldiag_diapmix     = .false.  ! adds 'w_diap_diff', 'dV_diap_dT' to the 'dMOC' output: diapycnal velocity
                              ! and density class uplift induced by the parameterized vertical mixing,
