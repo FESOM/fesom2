@@ -432,7 +432,7 @@ module g_backscatter
                     vol=vol+mesh%elem_area(elem)
                 END DO
                 U_work(nz,node)=U_work(nz,node)/vol
-                V_work(nz,node)=U_work(nz,node)/vol
+                V_work(nz,node)=V_work(nz,node)/vol
             END DO
             work_uv=U_work(nz,:)
             call exchange_nod(work_uv, partit)

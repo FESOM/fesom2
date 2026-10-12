@@ -27,6 +27,7 @@ contains
 ! Than compute for all cavity points (ulevels_nod2D>1), which is the closest
 ! cavity line point to that point --> use their coordinates and depth
 subroutine compute_nrst_pnt2cavline(partit, mesh)
+    use par_support_module, only: par_ex
     implicit none
 
     type(t_partit), intent(inout), target :: partit
@@ -104,6 +105,7 @@ subroutine compute_nrst_pnt2cavline(partit, mesh)
         aux_x=mesh%geo_coord_nod2D(1,node)
         aux_y=mesh%geo_coord_nod2D(2,node)
         aux_dmin = 3000.0e3_WP
+        aux_idx  = 0
         do gnode=1,mesh%nod2d
             if (cavl_idx(gnode)/=1) cycle
             call dist_on_earth(aux_x, aux_y, cavl_lon(gnode), cavl_lat(gnode), aux_d)
@@ -116,6 +118,10 @@ subroutine compute_nrst_pnt2cavline(partit, mesh)
         !_______________________________________________________________________
         ! write out coordinates and bottom depth for that closest cavity
         ! line point
+        if (aux_idx==0) then
+            write(*,*) 'ERROR: no cavity line point found within 3000km of cavity node at lon/lat=', aux_x/rad, aux_y/rad
+            call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
+        end if
         mesh%cavity_nrst_cavlpnt_xyz(1,node)=cavl_lon(aux_idx)
         mesh%cavity_nrst_cavlpnt_xyz(2,node)=cavl_lat(aux_idx)
         mesh%cavity_nrst_cavlpnt_xyz(3,node)=cavl_dep(aux_idx)
@@ -496,7 +502,7 @@ subroutine potit(salz,pt,pres,rfpres,tin)
     enddo
     write(6,*) ' WARNING!'
     write(6,*) ' in-situ temperature calculation has not converged.'
-    stop
+    error stop 'potit: in-situ temperature calculation has not converged'
     return
 end subroutine potit
 !

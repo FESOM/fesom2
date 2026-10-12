@@ -539,7 +539,7 @@ subroutine compute_BT_rhs_SE_vtransp(dynamics, partit, mesh)
     !___________________________________________________________________________
     real(kind=WP)       :: vert_sum_u, vert_sum_v, Fx, Fy, ab1, ab2, hh
     integer             :: elem, nz, nzmin, nzmax, elnodes(3), ed, el(2)
-    logical, save       :: sfirst
+    logical, save       :: sfirst=.true.
     real(kind=WP)       :: update_ubt, update_vbt, vi, len
     
     !___________________________________________________________________________
