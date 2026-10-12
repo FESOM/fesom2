@@ -1036,7 +1036,7 @@ program fesom_lifecycle_native_mr
         dstat(4) = maxval(ice%data(2)%values(1:nNodO))            ! m_ice  (effective thickness, >=0)
         dstat(5) = maxval(tracers%data(1)%values(:,1:nNodO))      ! T max  (tropical SST ceiling)
         dstat(6) = maxval(tracers%data(2)%values(:,1:nNodO))      ! S max  (evaporative-basin salinity)
-        ! Shared elements (docs/plans/20261012-shared-element-sync.md): the copy spreads
+        ! Shared elements (docs/plans/completed/20261012-shared-element-sync.md): the copy spreads
         ! max|copy - designated owner's copy| of uv (0 with FESOM3_SHARED_SYNC=1; the drift
         ! without it), uv_rhsAB and sigma (0 by construction, guarded by test_vinv V13 and
         ! test_ice_dyn_mixed D6), and the divergence-sum ratio |sum ssh_rhs_old| /

@@ -40,7 +40,7 @@
 #       EVERY config (the line before the drift), which is why every tail below is one
 #       line longer than the drift block alone.
 #
-#   linfs + sea ice, np 2 and 8 -> SHARED-ELEMENT gate (docs/plans/20261012-shared-element-sync.md).
+#   linfs + sea ice, np 2 and 8 -> SHARED-ELEMENT gate (docs/plans/completed/20261012-shared-element-sync.md).
 #       A border element is owned by every rank that owns one of its vertices; update_vel syncs
 #       uv to the designated owner's copy. FESOM3_DIVSUM_TOL=1e-12 makes the driver stop unless
 #       the divergence-sum ratio |sum ssh_rhs_old| / sum|ssh_rhs_old| stays below 1e-12 in every

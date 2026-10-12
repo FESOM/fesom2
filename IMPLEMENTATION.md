@@ -174,12 +174,27 @@ generic interface in `src/infra/mod_halo.F90`:
 
 ```fortran
 public :: exchange_nod, exchange_elem, exchange_elem_full, allreduce_sum, allreduce_max
+public :: exchange_elem_shared, shared_copy_max_elem      ! shared elements, see below
 ```
 
 `exchange_nod`/`exchange_elem` are generic over 2-D, 3-D, integer, and block field shapes; the
 implementation is one pattern — pack owned values, `Isend`/`Irecv`, unpack into halo cells — driven
 by the `com_struct` communication lists in `t_partit`. The halo is **broadcast-only**: each halo
 entry is overwritten with its owner's value, never accumulated.
+
+**Shared elements.** FESOM2's partition rule gives an element to every rank that owns one of its
+vertices, so an element on a partition border has two or three *owned* copies (24,798 of 244,659
+elements at CORE2 `dist_512`). Each owner updates its own copy, and order-dependent sums make the
+copies differ; the ranks then compute different fluxes across their common edges, and with the linear
+free surface the global volume leaks (LESSONS L70). `partit%com_elem2D_shared`, built at the end of
+`read_mesh_local` by `src/infra/mod_shared_elem.F90` from data every rank already has, names one
+designated owner per shared element: the highest rank among its vertex owners, whose copy the restart
+and output writers keep. `exchange_elem_shared` sends that copy to the other owners, and `update_vel`
+calls it on `uv` every step before `exchange_elem(UV)` (`FESOM3_SHARED_SYNC`, default 1; timer
+"(of which) shared sync"). The other per-element fields (`uv_rhsAB`, the EVP stresses) are computed
+from equal inputs and stay equal without a sync; `shared_copy_max_elem` (exchange-and-compare, like
+the stale-halo probe) measures the spread of any element field, and the step diagnostic and the
+guard tests use it.
 
 For the free-surface solver, `allreduce_sum` wraps the conjugate-gradient dot-products. Its
 determinism is load-bearing: it issues the same `MPI_Allreduce(MPI_IN_PLACE, …, MPI_SUM, …)` over

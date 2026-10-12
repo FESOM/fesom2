@@ -5,6 +5,13 @@ Full pre-M2.12 milestone detail + the per-gate recipes live in [`HANDOFF-archive
 
 ## Where we are
 
+- **Shared-element velocity sync ✅ DONE (2026-10-12, plan `plans/completed/20261012-shared-element-sync.md`,
+  on `bottom-at-vertices`):** a border element is owned by every rank that owns one of its vertices;
+  `update_vel` now gives every such element one owner for `uv` (the highest vertex-owner rank, whose copy
+  the restart writer keeps), every step (`FESOM3_SHARED_SYNC`, default 1). Fixes the linfs volume and
+  salt leak of the CORE2 runs results7/11/17/21 and makes np>1 restarts exact. np 1 is bit-identical,
+  np>1 changes at roundoff. Next for the user: rebuild the production binary and resume results17 or
+  results21 with `FESOM3_STEP_DIAG=1` → section "Shared elements: one owner for `uv`" → "Production check".
 - **Hybrid (mixed triangle + quad) meshes ✅ DONE (2026-10-09, plan `plans/completed/2026-10-08-hybrid-meshes.md`,
   commits `d4c6f8d`…`d07f44f` + the docs commit, on `bottom-at-vertices`, unpushed):** model, `fesom_ini`
   (FESOM2's `mesh_part`, ported) and the Python mesh tools run triangle, quad and mixed meshes (NEMO
@@ -329,6 +336,87 @@ The live "Oracle" section above + the "M2.12 entry notes" below cover what the c
 The hybrid-mesh gate migration (which FESOM2-oracle gates are retired, the roundoff gate
 `tools/run_tri_regression.sh` that replaces them) is in "Hybrid (mixed triangle + quad) meshes" →
 "Gate migration for hybrid meshes" below.
+
+## Shared elements: one owner for `uv` (plan `plans/completed/20261012-shared-element-sync.md`, 2026-10-12)
+
+**Ownership rule (FESOM2's, unchanged).** A rank owns every element that has at least one vertex it
+owns, so an element on a partition border is owned by two or three ranks (CORE2: 562 at dist_2, 24,798
+of 244,659 at dist_512). Each owner updates its own copy of the element fields.
+
+**The CORE2 leak (9–12 Oct 2026).**
+- Leaking: results7, results11, results17 from July 1965, results21. Global salt +1.4e-5 to +2.3e-5
+  psu/yr, global-mean SSH drifting. Clean: results_orig, results, results2, results3, results5,
+  results17 up to June 1965 (salt −1.6e-6 to −2.1e-6 psu/yr, mean SSH flat).
+- Volume rules differ by code: f2 runs (results_orig, results_2.0) `nod_area(k,n) × hnode`, f3 runs
+  `area(n) × hnode` (`src/mesh/mod_mesh_areas.F90:515`). Report: artifact `Gdj6DMQ4n2BQVZ4Si6cAUD` v2,
+  figures and scripts in `/work/ab0995/a270029/fesom3_hybrid/runs_report/core2/`.
+- Mechanism: the viscosity filter adds edge contributions in each rank's own edge order, so the `uv`
+  copies of a shared element differed by roundoff; the `rvo_upwind` blend (results7 on, results5 before
+  it) can turn that into O(1); the two ranks then computed different fluxes across their common edges and
+  `ssh_rhs_old` no longer summed to zero. Evidence: in the leaking checkpoints the stored u, v disagree
+  with the stored `ssh_rhs_old` at 86–107 nodes, all on dist_512 borders next to shared elements (clean
+  checkpoints agree to 4e-11 everywhere); a restart re-synced the copies and paused the leak for about
+  six months. LESSONS L70.
+
+**The fix.**
+- `partit%com_elem2D_shared` (`src/types/mod_partit.F90`), built by `build_com_elem2D_shared`
+  (`src/infra/mod_shared_elem.F90`) at the end of `read_mesh_local` from the owned elements and the
+  vertex owners in `com_nod2D` (no file format change, no MPI for the lists). The **designated owner**
+  is the highest rank among the vertex owners: `decomp_redistribute_2d_r`
+  (`src/io/mod_io_decomp.F90:220-237`) writes in rank order, so this is the copy restart and output keep.
+  Blocks are sorted by global id with partners ascending. One-time checks: an `MPI_Alltoall` of the
+  pairwise counts, a global-id self-check through the exchange, and the rule itself (an owned element
+  without an owned vertex stops). Every stop goes through `die` (`MPI_Abort`).
+- Startup log on rank 0: `shared-element sync: ON, <n> shared elements, <c> extra copies, max per rank:
+  recv <r>, send <s>`. Production dist_512 (checked offline): `24798 shared elements, 25512 extra
+  copies, max per rank: recv 139, send 136`.
+- `update_vel` (`src/oce/oce_ale.F90`) calls `exchange_elem_shared(UV)` right after the owned update and
+  before `exchange_elem(UV)`, every step, under the subset timer "(of which) shared sync" of
+  "dynamics ssh". `FESOM3_SHARED_SYNC`: unset or `1` = on, `0` = off (the old unsynced copies, for A/B
+  comparisons; the list is still built), any other value stops.
+- Only `uv` is synced. `uv_rhsAB` and the EVP/mEVP stresses are computed from equal inputs (nodal fields
+  their owners compute and exchange, per-element geometry from the same global coordinates) and stay
+  bitwise equal; guards `test_vinv` V13 and `test_ice_dyn_mixed` D6. If a guard ever fails, the plan's
+  "Fields" fallback says where to sync that field.
+
+**Diagnostics.**
+- `FESOM3_STEP_DIAG=1` (production driver): the step line gets, after `Smax`, `divsum=` (the ratio
+  `|Σ ssh_rhs_old| / Σ|ssh_rhs_old|` over owned nodes; a linfs leak shows above ~1e-12; zstar adds the
+  freshwater term, so there it is only a report), `dUV=`, `dAB=`, `dsig=` (max|copy − designated copy|
+  of `uv`, `uv_rhsAB`, sigma; all 0 with the sync). `tools/run_cutout_short.sh` keeps its field numbers.
+- `fesom_conserve`: one end-of-run line `shared elements (sync ON|OFF): max divsum= … dUV= … dAB= …
+  dsig= …`; `FESOM3_DIVSUM_TOL` (unset = report only) stops the run if the max ratio exceeds it or, with
+  the sync on, any spread is nonzero.
+
+**Tests and gates.**
+- `test_shared_elem`: S1 the list against an allgather oracle, S2 the exchange and the probes, S3 the
+  mechanism through `update_vel` + `compute_hbar_ale` (ratio 9e-20 to 2e-17 with the sync, 7e-6 to
+  4e-4 without, on pi np 1/2/8, pi_w np 2/4, the NEMO cut-outs np 2, core2_w np 8), plus the error cases
+  (corrupt owner map, `FESOM3_SHARED_SYNC=2`) and the OFF log. `fesom_conserve_linfs_vinv_shsync_np2`
+  (linfs, vinv, `rvo_upwind` 1, sea ice, `FESOM3_DIVSUM_TOL=1e-12`). ctest 167/167.
+- `tools/run_conserve_pi.sh` SHARED block (linfs + ice, np 2 and 8): max ratio 1.6e-16 to 3.1e-16,
+  spreads 0. Sync off: `uv` spread 6.9e-18 after 20 steps, already amplified to 5.8e-11 in `uv_rhsAB`.
+- Bitwise against the frozen pre-change build (`run_tri_regression.sh` with all `TOL_*=0`): np 1 pi and
+  CORE2, and np 2 pi with `FESOM3_SHARED_SYNC=0`, every printed d = 0. The default
+  `run_tri_regression.sh` cases pass 7/7; the np>1 differences stay at their earlier levels.
+- Restart: `tools/run_restart_gate_core2.sh` is strict at every np now (floor 1e-12 only with
+  `FESOM3_SHARED_SYNC=0`): CORE2 np 1 and np 2, mid-run and month-boundary splits, checkpoint (full
+  state incl. ice, sigma, velocity, AB) and live dumps all `max|Δ| = 0`, with the default physics and
+  with `FESOM3_MOMADV_OPT=1 FESOM3_RVO_UPWIND=1.0`. Before the sync the np 2 boundary case needed the
+  floor (temp 2.2e-16). `run_restart_gate_multirank.sh` (np 2 → np 8): `max|Δ| = 0`.
+- Cost (CORE2 np 8, 48 steps, production physics of `tools/prod_env.sh`, no output, login node): "(of
+  which) shared sync" 0.51 ms/step (max 0.66) of a 974 ms loop, 0.05 %; with `FESOM3_SHARED_SYNC=0` the
+  loop took 960 ms (login-node noise is larger than the sync). The same runs: sync on, `divsum` <= 1.4e-15
+  and `dUV = dAB = dsig = 0` in all 48 steps; sync off, `dUV` grows to 3.9e-16 and `dAB` to 5.8e-11 (the
+  ratio is still at roundoff after one day).
+
+**Production check (the user's runs).** Rebuild the production binary when you decide. Resume
+results17 from `fesom.1967.001.00000` (or results21 from `fesom.1959.001.00000`) with the same settings,
+at least into autumn 1967 (the leak paused for about six months after each restart). With
+`FESOM3_STEP_DIAG=1` expect `divsum` around 1e-15 to 1e-13 and `dUV = dAB = dsig = 0`; the global-mean
+SSH should stay at its restart value (0.0888 m for results17) and the salt trend return to about −2e-6
+psu/yr. Optional A/B from the same restart: `FESOM3_SHARED_SYNC=0` (`dUV` > 0, the leak returns) and
+`FESOM3_RVO_UPWIND=0` (the trigger).
 
 ## Hybrid (mixed triangle + quad) meshes (plan `plans/completed/2026-10-08-hybrid-meshes.md`, 2026-10-08/09)
 
@@ -866,7 +954,7 @@ marked **decide** need a design decision.
 ## Next task
 
 ### ✅ RESTART / CHECKPOINT — **COMPLETE & tagged `m10` (2026-06-29).** Partition-independent Zarr checkpoints (full prognostic state incl. sea ice + EVP sigma), written periodically + at end-of-run, read at startup on `r_restart`, resuming byte-exactly. Built on the M9 Zarr stack (`mod_io_zarr` + `mod_io_decomp` + new `decomp_gather` inverse); new `src/io/mod_io_restart.F90` (writer+reader, atomic tmp→rename finalize + `restart.latest` + keep-N prune), `mod_io_posix.F90` (bind(C) rename/unlink/fsync/rmtree — no `execute_command_line`), `mod_io_coords.F90` (shared coord helper). Lifecycle wiring in `fesom_lifecycle_native_mr` (detect/read/AB-guard/write/cadence + `clock_finish`).
-- **Gate (6.1) split-vs-straight self-consistency:** np=1 mid+boundary **exactly `max|Δ|=0`** over the WHOLE state (ice+sigma+velocity+AB+tracers); np=2 mid exact; np=2 boundary **≤1 ULP** (temp 2.2e-16) — a **FESOM2-inherent** limit (any-node element ownership → 562 redundantly-owned boundary elements not halo-synced; FESOM2's own nc restart dedups identically; a live sync would break M0–M9 byte-identity → user-accepted caveat; `tools/run_restart_gate_core2.sh`, `--rel-floor` 0 at np=1 / 1e-12 at np>1). Found+fixed 2 missing carried fields the gate caught: `ice%thermo%t_skin` + `dyn%d_eta`.
+- **Gate (6.1) split-vs-straight self-consistency:** np=1 mid+boundary **exactly `max|Δ|=0`** over the WHOLE state (ice+sigma+velocity+AB+tracers); np=2 mid exact; np=2 boundary **≤1 ULP** (temp 2.2e-16) — a **FESOM2-inherent** limit (any-node element ownership → 562 redundantly-owned boundary elements not halo-synced; FESOM2's own nc restart dedups identically; a live sync would break M0–M9 byte-identity → user-accepted caveat; `tools/run_restart_gate_core2.sh`, `--rel-floor` 0 at np=1 / 1e-12 at np>1). **Resolved 2026-10-12:** the same unsynced copies leaked volume in CORE2 runs; the shared-element sync (section "Shared elements: one owner for `uv`") keeps them equal, np>1 restarts are now exact and the gate's floor is 0 (1e-12 only with `FESOM3_SHARED_SYNC=0`). Found+fixed 2 missing carried fields the gate caught: `ice%thermo%t_skin` + `dyn%d_eta`.
 - **Gate (6.2) cross-partition storage+restore:** `C2(np2) ≡ C8(np8)` **strict `max|Δ|=0`** all 27 stores (`tools/run_restart_gate_multirank.sh`, np8 reads C2, zero steps, re-writes C8).
 - **No-regression (6.3):** ctest **Intel 21/21 + GNU 21/21** (sweep caught & fixed a GNU-only cpp `/*`-in-comment build break); M9 zarrsmoke/meshdiag/output gates GREEN; production MR lifecycle byte-gate np2 **195 records `max|Δ|=0`**.
 - **Plan:** `docs/plans/completed/2026-06-28-restart-checkpoint.md` (all boxes ticked; Claim-scope refinement documents the np>1 ULP). Memory: `restart-tskin-carried-ice-state`, `restart-np-element-1ulp-inherent`.

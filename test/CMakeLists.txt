@@ -435,7 +435,7 @@ set_tests_properties(test_minlayers_np1 PROPERTIES
     PASS_REGULAR_EXPRESSION "fewer than 2 layers"
     FAIL_REGULAR_EXPRESSION "did NOT stop")
 
-# Shared-element sync (docs/plans/20261012-shared-element-sync.md): test_shared_elem checks
+# Shared-element sync (docs/plans/completed/20261012-shared-element-sync.md): test_shared_elem checks
 # the list com_elem2D_shared against an independent oracle (S1), its exchange and the
 # copy-spread probe (S2), and the mechanism through update_vel + compute_hbar_ale with the
 # sync on and off (S3). pi has the FESOM2 dist layout of production dist_512; pi_w, core2_w

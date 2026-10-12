@@ -55,11 +55,14 @@ physically meaningless or inherited from FESOM2:
   zero; matching the mode (FTZ on) restored equality (LESSONS L51).
 - **Reduction order.** Global sums are bit-identical only because FESOM_F mirrors FESOM2's exact MPI
   reduction; this is engineered, not assumed (LESSONS L6).
-- **Redundantly-owned elements at multiple ranks.** FESOM2 assigns an element to a rank if *any* of
-  its nodes is owned, so on CORE2/dist_2 about **562 elements** are "owned" by more than one rank and
-  their copies can differ by ~1 ULP from order-dependent sums. This is inherent to FESOM2 (its own
-  netCDF restart deduplicates them); FESOM_F's partition-independent stores deduplicate too. It is
-  the one place the multi-rank bar is a tiny ε rather than exactly zero — see §7–8.
+- **Shared (multiply-owned) elements at multiple ranks — resolved 2026-10-12.** FESOM2 assigns an
+  element to a rank if *any* of its nodes is owned, so on CORE2/dist_2 **562 elements** are "owned" by
+  more than one rank (24,798 at dist_512). Their `uv` copies used to differ by ~1 ULP from
+  order-dependent sums: the restart gate admitted that as a 1e-12 floor, and in long CORE2 runs the
+  `rvo_upwind` blend amplified it into a volume and salt leak (LESSONS L70). Since the shared-element
+  sync (`FESOM3_SHARED_SYNC=1`, the default) every owner takes the designated owner's copy each step —
+  the copy the partition-independent stores keep — so np>1 restarts are exact. The floor applies only
+  with `FESOM3_SHARED_SYNC=0` — see §7–8.
 
 ### 2. The FESOM2 oracle
 
@@ -107,7 +110,7 @@ assembled step — data flow and dispatch — is byte-faithful, not just the ker
 
 ### 5. The `ctest` self-test suite
 
-`test/CMakeLists.txt` registers **153 ctest cases**, run on the Intel and GNU builds. The core
+`test/CMakeLists.txt` registers **167 ctest cases**, run on the Intel and GNU builds. The core
 infrastructure cases:
 
 | Test | Ranks | Checks |
@@ -126,6 +129,8 @@ infrastructure cases:
 | `test_io_means` | 1 | output writer lifecycle + per-field cadence |
 | `dump_diff_selftest` | — | the comparison tool itself (synthetic perturbation detection) |
 | `fesom_analytic` | 1, 2 | end-to-end analytic driver runs clean |
+| `test_shared_elem` (+ `_corrupt`, `_badknob`, `_off`) | pi 1/2/8, pi_w 2/4, cut-outs 2, core2_w 8 | shared elements: the list `com_elem2D_shared` vs an allgather oracle (S1), its exchange and the copy-spread probe (S2), the mechanism through `update_vel` + `compute_hbar_ale` with the sync on and off (S3: divergence-sum ratio ~1e-17 vs 1e-5..4e-4); the error stops and `FESOM3_SHARED_SYNC=0` |
+| `fesom_conserve_linfs_vinv_shsync` | 2 | linfs, vector invariant with `rvo_upwind` 1, sea ice: divergence-sum ratio < 1e-12 and zero shared-copy spreads in every step (`FESOM3_DIVSUM_TOL`) |
 
 Kernel tests from the bottom-at-vertices and momentum work (`test_vert_spline`, `test_vinv`,
 `test_muscl_onthefly`, `test_ivertvisc`, `test_wsplit`, `test_wimpl_tra`, `test_minlayers`, the
@@ -151,7 +156,9 @@ The mesh-dependent hybrid cases read meshes from the hard-coded root `/work/ab09
 (`test/CMakeLists.txt`). Whether a mesh exists is decided at configure time
 (`if(EXISTS <meshes>/<mesh>/nod2d.out)`): a case whose mesh is absent is registered as DISABLED
 (ctest prints "Not Run (Disabled)"); a missing `dist_N`/`com_info` file in an existing mesh
-directory FAILS. "153/153 passed" therefore holds on a filesystem that has these meshes.
+directory FAILS. "167/167 passed" therefore holds on a filesystem that has these meshes. The
+shared-element guards live in existing tests: `test_vinv` V13 (`uv_rhsAB` copies bitwise equal with
+the upwind blend on) and `test_ice_dyn_mixed` D6 (EVP/mEVP sigma copies bitwise equal), at np>1.
 
 These run in under a minute on a login node (`ctest -j 8`):
 
@@ -185,8 +192,9 @@ Beyond the self-tests, byte-gates cover each subsystem as it was built. They liv
 | Output | `run_output_gate.sh`, `run_meshdiag_gate.sh` | pi, 1/2/8 | Zarr stores round-trip; mesh diagnostics match FESOM2 |
 | Restart | `run_restart_gate_core2.sh`, `run_restart_gate_multirank.sh`, `run_restartroundtrip.sh` | CORE2, 1/2/8 | resume reproduces the straight-through trajectory |
 
-Each gate is `max|Δ| = 0` at its stated anchor (the multi-rank element floor of §1/§7 aside). The
-HANDOFF log lists the exact field/record counts per gate.
+Each gate is `max|Δ| = 0` at its stated anchor. As built, the np>1 restart gate admitted the
+multi-rank element floor of §1/§7; since the shared-element sync it is strict at every np (the floor
+only with `FESOM3_SHARED_SYNC=0`). The HANDOFF log lists the exact field/record counts per gate.
 
 ### 6a. The bottom-at-vertices gates
 
@@ -275,12 +283,14 @@ Correctness across ranks is tested in two complementary ways:
   restart path adds a cross-rank check: a checkpoint written at one rank count restores exactly at
   another (`C2 ≡ C8`).
 
-The single exception is the ~1-ULP redundantly-owned element floor (§1): at np>1 with active forcing,
-element-derived fields can differ by ≤1 ULP (e.g. temperature `2.22e-16`). The multi-rank gate
-therefore asserts strict `max|Δ| = 0` at np=1 and admits a relative ε floor (`1e-12`, far above the
-~`2e-16` residual and far below any real regression) at np>1. Fixing it would require per-rank
-element storage and would *break* the partition-independence guarantee, so it is deliberately left as
-FESOM2 leaves it.
+Shared (multiply-owned) border elements (§1) are kept equal by the shared-element sync: every step,
+`update_vel` gives each of them the designated owner's `uv`, the copy the stores keep, and guards pin
+the other per-element fields (`test_vinv` V13, `test_ice_dyn_mixed` D6). The multi-rank restart gate
+therefore asserts strict `max|Δ| = 0` at every np. Before the sync (and still with
+`FESOM3_SHARED_SYNC=0`) the copies differed by ≤1 ULP and the gate admitted a relative ε floor of
+`1e-12` at np>1. The global divergence sum is tested at np>1 too: `|Σ ssh_rhs_old| / Σ|ssh_rhs_old|`
+stays at roundoff (`test_shared_elem` S3, `fesom_conserve` with `FESOM3_DIVSUM_TOL`,
+`tools/run_conserve_pi.sh`, and the `divsum=` field of `FESOM3_STEP_DIAG`).
 
 ### 8. Output and restart validation
 
@@ -296,10 +306,11 @@ steps, checkpoints, starts a *fresh process*, reads the checkpoint, and runs the
 — then compares the full state (including sea ice and the EVP stress tensor `sigma`) with
 `dump_diff.py --ignore-step`. Results:
 
-- **Same rank count:** byte-exact resume — `max|Δ| = 0` at np=1 for the entire state (FESOM_F
-  serializes `sigma`, which FESOM2's own restart omits, so even the ice stress matches), and for the
-  whole state at np>1 in the quiet case; with active forcing, the ≤1-ULP element floor of §1/§7
-  applies.
+- **Same rank count:** byte-exact resume — `max|Δ| = 0` for the entire state (FESOM_F serializes
+  `sigma`, which FESOM2's own restart omits, so even the ice stress matches), at np=1 and, since the
+  shared-element sync, at np>1 (CORE2 np 2, mid-run and month-boundary splits, default and
+  vector-invariant physics). Only with `FESOM3_SHARED_SYNC=0` does the ≤1-ULP element floor of §1/§7
+  apply at np>1.
 - **Different rank count:** the state is *restored* exactly (partition-independent storage,
   `C2 ≡ C8`), after which the run continues on a physically valid — but, because element ownership
   differs, not bit-identical — trajectory.

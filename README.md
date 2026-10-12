@@ -133,7 +133,8 @@ srun -l -n 864 ./build_intel_dp/bin/fesom_lifecycle_native_mr > run.log 2>&1
 
 **Where the knobs are defined.** The authoritative, always-current list of run variables is the
 environment block at the top of **`src/drivers/fesom_lifecycle_native_mr.F90`** (each is read with
-`get_environment_variable`); the SSH solver knobs in the table below are read by the solver itself. The `tools/*.sbatch` and `tools/run_lifecycle_*.sh` scripts are working
+`get_environment_variable`); the SSH solver knobs and `FESOM3_SHARED_SYNC` in the table below are read
+where they act (the solver, `src/infra/mod_shared_elem.F90`). The `tools/*.sbatch` and `tools/run_lifecycle_*.sh` scripts are working
 examples. The most common variables:
 
 | Variable | Meaning |
@@ -151,6 +152,8 @@ examples. The most common variables:
 | `FESOM3_MIX_KPP`, `FESOM3_MIX_TKE`, `FESOM3_SW_PENE` | vertical mixing and shortwave penetration |
 | `FESOM3_OUTPUT`, `FESOM3_OUTPUT_EVERY` | output directory (enables output) and step cadence |
 | `FESOM3_RESTART`, `FESOM3_RESTART_LENGTH`, `FESOM3_RESTART_UNIT` | checkpoint directory and cadence |
+| `FESOM3_SHARED_SYNC` | shared border elements: `1` (default) = every step the other owners take the designated owner's `uv` (no volume leak, exact np>1 restarts); `0` = off, the old unsynced copies (A/B comparisons only). Read in `src/infra/mod_shared_elem.F90` |
+| `FESOM3_STEP_DIAG` | per-step global diagnostic line (max\|eta\|, max\|uv\|, ice, Tmax, Smax, and the shared-element numbers `divsum=`, `dUV=`, `dAB=`, `dsig=`); two extra collectives per step, off by default |
 | `FESOM3_SSH_SOLTOL`, `FESOM3_SSH_MAXITER` | SSH solver tolerance and iteration cap — test/diagnostic only, read in `src/oce/oce_ssh_solve.F90` (defaults `1e-5`, `2000`) |
 
 > **Configuration today vs. intent.** The production drivers are configured by these `FESOM3_*`

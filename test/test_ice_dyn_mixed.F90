@@ -26,7 +26,7 @@ program test_ice_dyn_mixed
     !   D5 ocean2ice: a uniform surface velocity gives the same node velocity (owned + halo);
     !      triangles: the kite-share gather == the former area-weighted mean at all-triangle
     !      nodes
-    !   D6 (np > 1) shared elements (docs/plans/20261012-shared-element-sync.md): a border
+    !   D6 (np > 1) shared elements (docs/plans/completed/20261012-shared-element-sync.md): a border
     !      element is owned by every rank that owns one of its vertices and only the ocean uv
     !      is synced between the copies; the sigma copies must stay bitwise equal by
     !      themselves after EVP and after mEVP (3 subcycles, hashed ice velocity, a, m and

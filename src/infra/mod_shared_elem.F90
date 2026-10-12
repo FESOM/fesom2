@@ -1,5 +1,5 @@
 module mod_shared_elem
-    ! Shared elements (docs/plans/20261012-shared-element-sync.md). FESOM2's partition rule
+    ! Shared elements (docs/plans/completed/20261012-shared-element-sync.md). FESOM2's partition rule
     ! gives an element to every rank that owns one of its vertices, so an element on a
     ! partition border has two or three OWNED copies. Each owner updates its own copy of a
     ! prognostic element field (uv); an order-dependent sum (the viscosity filter) makes the

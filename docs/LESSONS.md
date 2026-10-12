@@ -2840,3 +2840,36 @@ is a > 1 deg jump at a few % of elements and < 1e-10 deg elsewhere before callin
 **How to apply.** After producing a mesh or partition, run `check_mesh.py`, `check_dist.py` AND the
 model's own reader on it (ctest `test_mesh_read`); count neighbours against the reader's fixed limits
 before using very high part counts; do not trust exit codes of ported Fortran setup tools.
+
+
+## L70 — A shared element is a duplicated prognostic variable: an order-dependent sum makes the copies differ by roundoff, a branchy operator makes it O(1), and the duplicated border fluxes turn it into a mass leak -- test the global divergence sum at np>1
+
+**Context.** CORE2 runs results7/11/17/21 (2-12 Oct 2026); plan
+`docs/plans/completed/20261012-shared-element-sync.md`.
+
+**What happened.**
+- FESOM2's partition rule gives an element to every rank that owns one of its vertices; dist_512 has
+  24,798 such shared elements out of 244,659. Each owner updated its own copy of `uv` in `update_vel`,
+  and nothing made the copies equal again: `exchange_elem(UV)` refreshes only the eDim halo.
+- The viscosity filter adds each edge's contribution in the rank's own local edge order, so the copies
+  differed by roundoff every step. The `rvo_upwind` blend of the vector-invariant scheme switches when
+  the inflow `u.n` through an edge changes sign, which can turn a roundoff difference into O(1).
+- The two ranks then computed different fluxes across their common edges, `ssh_rhs_old` no longer
+  summed to zero over the globe, and the linear free surface created water: the global-mean SSH
+  drifted and the salt trend was +1.4e-5 to +2.3e-5 psu/yr instead of about -2e-6. results5 (before
+  `rvo_upwind`) was clean, results7 (with it) leaked; each restart re-synced the copies (every owner
+  reads the one written value) and paused the leak for about six months.
+- No gate saw it. The conservation gates ran at np 1 (no shared elements) or at np 2 with zstar and
+  without the blend for 20 steps, where the roundoff never got amplified. The restart gate's np>1
+  "FESOM2-inherent 1-ULP floor" was the same defect seen from the other side and had been accepted as
+  a caveat.
+- Fix: one designated owner per shared element (the highest vertex-owner rank, whose copy the restart
+  writer keeps); `update_vel` syncs `uv` every step. The `uv_rhsAB` and sigma copies then stay bitwise
+  equal by themselves (guards `test_vinv` V13, `test_ice_dyn_mixed` D6). `test_shared_elem` S3: the
+  divergence-sum ratio is ~1e-17 with the sync and 7e-6 to 4e-4 without it; np>1 restarts are exact.
+
+**How to apply.** Treat every field stored on multiply-owned entities as duplicated state: compute it
+once and send it, or test that the copies stay bitwise equal. At np>1, test the global divergence sum
+`|sum ssh_rhs_old| / sum|ssh_rhs_old|` and the copy spreads (`FESOM3_STEP_DIAG`, `fesom_conserve`
+`FESOM3_DIVSUM_TOL`), not only conservation at np 1. When a gate needs a "harmless ULP floor" at
+np>1, find the duplicated state behind it before accepting it.

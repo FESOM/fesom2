@@ -43,7 +43,7 @@ program fesom_conserve
     !   FESOM3_WHICHEVP    0=EVP / 1=mEVP (with FESOM3_CONSERVE_ICE)    default: 0
     !   FESOM3_DIVSUM_TOL  shared-element gate (below); unset/0 = report only
     !
-    ! SHARED ELEMENTS (docs/plans/20261012-shared-element-sync.md). A border element is owned by
+    ! SHARED ELEMENTS (docs/plans/completed/20261012-shared-element-sync.md). A border element is owned by
     ! every rank that owns one of its vertices; update_vel syncs uv to the designated owner's
     ! copy (FESOM3_SHARED_SYNC, src/infra/mod_shared_elem.F90). Every step the driver takes the
     ! divergence-sum ratio |sum ssh_rhs_old| / sum|ssh_rhs_old| over the owned nodes (a leak of

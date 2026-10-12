@@ -1,5 +1,5 @@
 program test_shared_elem
-    ! Shared-element sync (docs/plans/20261012-shared-element-sync.md): the list
+    ! Shared-element sync (docs/plans/completed/20261012-shared-element-sync.md): the list
     ! partit%com_elem2D_shared built at the end of read_mesh_local (src/infra/mod_shared_elem.F90).
     !
     !   S1  the list against an independent oracle: a global owner map from an allgather of

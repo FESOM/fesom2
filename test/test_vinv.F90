@@ -669,7 +669,7 @@ contains
     subroutine shared_copy_guard()
         ! V13: a shared (border) element is owned by every rank that owns one of its
         ! vertices, and only uv is synced to the designated owner's copy (update_vel,
-        ! docs/plans/20261012-shared-element-sync.md). With equal uv copies the uv_rhsAB
+        ! docs/plans/completed/20261012-shared-element-sync.md). With equal uv copies the uv_rhsAB
         ! copies must stay BITWISE equal by themselves: every input of momentum_adv_vinv is
         ! per element from the same global geometry, or a nodal field (vorticity, KE, w_e)
         ! that its owner computes and exchanges. V11's field (u = CU*lat^2 on the owned

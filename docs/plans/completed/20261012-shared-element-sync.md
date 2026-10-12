@@ -339,43 +339,47 @@
 - Modify: `tools/run_restart_gate_multirank.sh` (comment only)
 - Modify: `tools/zarr_diff.py`, `tools/dump_diff.py` (help text only)
 
-- [ ] In `run_restart_gate_core2.sh`, make the np>1 floor (`:85`) 0 unless `FESOM3_SHARED_SYNC=0`. Update the comment at `:82-84` and the GREEN message at `:151`.
-- [ ] Update the "562 redundantly-owned" comments in `run_restart_gate_multirank.sh:8-10`, `zarr_diff.py:573, 612, 637-639` and `dump_diff.py:105, 254`.
-- [ ] Run `F3=/home/a/a270029/fesom3.0 BUILD=$S/build tools/run_restart_gate_core2.sh $S/rg_core2 1 2`: np 1 and np 2 must be exact (max|Δ| = 0) in both the mid-run and the boundary case.
-- [ ] Run the same again with `FESOM3_MOMADV_OPT=1 FESOM3_RVO_UPWIND=1.0` exported and the run dir `$S/rg_core2_vinv`: it must be exact too.
-- [ ] If np 2 is not exact: locate the differing store and elements first, and do not set the floor to 0 before the cause is understood. ⚠️ Record it here.
-- [ ] Run `F3=/home/a/a270029/fesom3.0 BUILD=$S/build tools/run_restart_gate_multirank.sh $S/rg_mr`. **Never run it without a run dir**: the default is another user's scratch dir, which the script deletes.
-- [ ] Run `NEW_BIN=$S/build/bin ROOT=$S/tri tools/run_tri_regression.sh` (default cases and tolerances). Both gates must be green. Record the np>1 differences.
-- [ ] Cost, reported and not gated:
+- [x] In `run_restart_gate_core2.sh`, make the np>1 floor (`:85`) 0 unless `FESOM3_SHARED_SYNC=0`. Update the comment at `:82-84` and the GREEN message at `:151`.
+- [x] Update the "562 redundantly-owned" comments in `run_restart_gate_multirank.sh:8-10`, `zarr_diff.py:573, 612, 637-639` and `dump_diff.py:105, 254`.
+- [x] Run `F3=/home/a/a270029/fesom3.0 BUILD=$S/build tools/run_restart_gate_core2.sh $S/rg_core2 1 2`: np 1 and np 2 must be exact (max|Δ| = 0) in both the mid-run and the boundary case.
+- [x] Run the same again with `FESOM3_MOMADV_OPT=1 FESOM3_RVO_UPWIND=1.0` exported and the run dir `$S/rg_core2_vinv`: it must be exact too.
+- [x] (not needed: np 2 exact) If np 2 is not exact: locate the differing store and elements first, and do not set the floor to 0 before the cause is understood. ⚠️ Record it here.
+- [x] Run `F3=/home/a/a270029/fesom3.0 BUILD=$S/build tools/run_restart_gate_multirank.sh $S/rg_mr`. **Never run it without a run dir**: the default is another user's scratch dir, which the script deletes.
+- [x] Run `NEW_BIN=$S/build/bin ROOT=$S/tri tools/run_tri_regression.sh` (default cases and tolerances). Both gates must be green. Record the np>1 differences.
+- [x] Cost, reported and not gated:
   - Run `fesom_lifecycle_native_mr` on CORE2 at np 8 for 48 steps, with the production physics from `tools/prod_env.sh` and no output or restart.
   - Record the share of "(of which) shared sync" in the FINAL timer report (expected well below 1 %).
   - As a cross-check, record the step time with `FESOM3_SHARED_SYNC=0`.
+- Measured (12 Oct): CORE2 restart gate np 1 and np 2, mid-run and boundary, checkpoint and live dumps `max|Δ| = 0` with the floor at 0, default physics and vinv + `rvo_upwind` 1. Multirank gate np 2 → 8 `max|Δ| = 0`. Cost: "(of which) shared sync" 0.51 ms/step (max 0.66) of a 974 ms loop on CORE2 np 8, 0.05 %; the sync-off run took 960 ms per step (login-node noise exceeds the sync). Same runs: sync on `divsum` <= 1.4e-15, spreads 0 in all 48 steps; sync off `dUV` up to 3.9e-16, `dAB` up to 5.8e-11.
+- Triangle regression (default cases and tolerances, vs `frozen_task6_soltol`): 7/7 pass. np>1 differences at the levels measured before the sync: pi np 2 OCEAN 9.7e-8, ICE 3.9e-7; CORE2 np 8 EARLY 2.2e-8, OCEAN 3.1e-5, ICE 9.7e-5, MIX 7.8e-4; decomp pi_w np 2 / 8 OCEAN 2.2e-11 / 8.8e-10; conserve np 2 final salt 3.5e-16.
 
 ### Task 7: Verify acceptance criteria
-- [ ] At np>1 with the sync on, the `uv` copies are equal after every `update_vel` (S3, and `dUV = 0` in the conserve configs).
-- [ ] The `uv_rhsAB` and sigma copies stay bitwise equal (Task 4 guards, `dAB = dsig = 0` in the conserve configs). If not, the fallback sync is in place and recorded.
-- [ ] At np>1 with the sync on, the divergence-sum ratio is below 1e-12, including after a deliberate perturbation. With the sync off it is clearly nonzero (S3).
-- [ ] Rerun the np 1 bit-identity and OFF bit-identity commands from Task 3, now that Task 5 has edited the drivers: every printed d is 0.
-- [ ] The restart gate is exact at np 2, with the default and with the vector-invariant settings (Task 6).
-- [ ] The sync's share of the step is recorded (Task 6).
-- [ ] Full ctest passes: `cd $S/build && bash -c 'ulimit -s unlimited; ctest -j 8'`.
+- [x] At np>1 with the sync on, the `uv` copies are equal after every `update_vel` (S3, and `dUV = 0` in the conserve configs).
+- [x] The `uv_rhsAB` and sigma copies stay bitwise equal (Task 4 guards, `dAB = dsig = 0` in the conserve configs). If not, the fallback sync is in place and recorded.
+- [x] At np>1 with the sync on, the divergence-sum ratio is below 1e-12, including after a deliberate perturbation. With the sync off it is clearly nonzero (S3).
+- [x] Rerun the np 1 bit-identity and OFF bit-identity commands from Task 3, now that Task 5 has edited the drivers: every printed d is 0.
+- [x] The restart gate is exact at np 2, with the default and with the vector-invariant settings (Task 6).
+- [x] The sync's share of the step is recorded (Task 6).
+- [x] Full ctest passes: `cd $S/build && bash -c 'ulimit -s unlimited; ctest -j 8'`.
+- Measured (12 Oct): np 1 rerun after Task 5, pi and CORE2: 98 printed d, all 0; OFF rerun pi np 2: 49 printed d, all 0. CORE2 np 8 production physics, 48 steps: `divsum` <= 1.4e-15, `dUV = dAB = dsig = 0`. Offline check of production dist_512: the ownership rule holds (no owned element without an owned vertex, every vertex owner owns the element), 24,798 shared elements, 25,512 extra copies, max per rank recv 139 / send 136.
 
 ### Task 8: [Final] Update documentation
-- [ ] `docs/HANDOFF.md`:
+- [x] `docs/HANDOFF.md`:
   - Add a shared-element section: the ownership rule, the designated owner (highest rank = the writer's copy), the sync point, the knob, the diagnostics and the guards.
   - Add the CORE2 leak history (results7/11/17/21).
   - Correct the M10 restart note (`:869`): the "user-accepted caveat" is resolved, and np>1 restarts are exact.
-- [ ] `docs/LESSONS.md`, new lesson L70:
+- [x] `docs/LESSONS.md`, new lesson L70:
   - A shared element is a duplicated prognostic variable.
   - An order-dependent sum makes the copies differ by roundoff; a branchy operator makes the difference O(1); duplicated border fluxes then turn it into a mass leak.
   - Test the global divergence sum at np>1, not only conservation at np 1.
-- [ ] `TESTING.md` §1, §7 and §8:
+- [x] `TESTING.md` §1, §7 and §8:
   - The redundant-element floor is gone with the sync; it applies only with `FESOM3_SHARED_SYNC=0`.
   - Add the new ctests and the strict np>1 restart gate.
-- [ ] `IMPLEMENTATION.md`: add `com_elem2D_shared`, `exchange_elem_shared` and `shared_copy_max_elem` to the parallel-layer description.
-- [ ] `README.md`: add `FESOM3_SHARED_SYNC` to the run-variables table. Note that it is read in `mod_shared_elem`, the way the SSH solver reads its own knobs.
-- [ ] `docs/HANDOFF-next-session.md`: replace the "implement the plan" item with the result.
-- [ ] Move this plan to `docs/plans/completed/`.
+- [x] `IMPLEMENTATION.md`: add `com_elem2D_shared`, `exchange_elem_shared` and `shared_copy_max_elem` to the parallel-layer description.
+- [x] `README.md`: add `FESOM3_SHARED_SYNC` to the run-variables table. Note that it is read in `mod_shared_elem`, the way the SSH solver reads its own knobs.
+- [x] `docs/HANDOFF-next-session.md`: replace the "implement the plan" item with the result.
+- [x] Move this plan to `docs/plans/completed/`.
+- Notes: `docs/HANDOFF-next-session.md` stays untracked, as before. Code comments, tests and tools cite the plan at its `completed/` path. `TESTING.md` §5 and §6 were updated too (ctest count 167, the strict restart gate).
 
 ## Post-Completion
 *For the user: runs and run settings are the user's.*
