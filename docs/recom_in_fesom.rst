@@ -42,7 +42,7 @@ All REcoM settings are collected in ``namelist.recom``, which must be present in
 
 - **&nam_rsbc** paths to the surface boundary condition files (dust, aeolian nitrogen, riverine and erosion input, atmospheric CO2), see `Input files`_ below.
 - **&parecomsetup** the two switches ``enable_3zoo2det`` and ``enable_coccos`` that select the ecosystem complexity, and thereby the number of biogeochemical tracers.
-- **&pavariables** the main control group: tracer counts (``bgc_num``), sinking velocities, process switches such as ``O2dep_remin`` or ``use_ballasting``, the input path ``REcoMDataPath``, and the handling of atmospheric CO2 over forcing cycles.
+- **&pavariables** the main control group: tracer counts (``bgc_num``), sinking velocities, process switches such as ``O2dep_remin`` or ``use_ballasting``, and the handling of atmospheric CO2 over forcing cycles.
 - Process parameter groups, one per topic, for photosynthesis, nutrient assimilation and limitation, the zooplankton groups and their grazing preferences, aggregation, iron chemistry, calcification and dissolution, ballasting, benthos decay rates, air-sea gas exchange and alkalinity restoring.
 - **&paciso** the carbon isotope settings, only relevant when compiled with ``CISO_COUPLED``.
 
@@ -65,7 +65,7 @@ Here dissolved inorganic carbon and alkalinity come from a GLODAP climatology, w
 Ready-made setups
 =================
 
-The directory ``config`` contains four complete namelist sets for the supported ecosystem configurations, in the folders ``bin_2p1z1d``, ``bin_2p3z2d``, ``bin_3p3z2d`` and ``bin_4p3z2d``. The naming encodes the number of phytoplankton, zooplankton and detritus groups: ``2p1z1d`` runs small phytoplankton and diatoms with one zooplankton and one detritus class, ``2p3z2d`` extends this to three zooplankton groups (mesozooplankton, macrozooplankton and microzooplankton) and two detritus classes, ``3p3z2d`` adds coccolithophores as a third phytoplankton group, and ``4p3z2d`` additionally activates phaeocystis. Each folder holds a matching ``namelist.recom`` together with the other namelists, so the easiest way to start is to copy one of these folders and adapt the paths.
+The directory ``config`` contains four complete namelist sets for the supported ecosystem configurations, in the folders ``bin_2p1z1d``, ``bin_2p3z2d`` and ``bin_4p3z2d``. The naming encodes the number of phytoplankton, zooplankton and detritus groups: ``2p1z1d`` runs small phytoplankton and diatoms with one zooplankton and one detritus class, ``2p3z2d`` extends this to three zooplankton groups (mesozooplankton, macrozooplankton and microzooplankton) and two detritus classes, and ``4p3z2d`` additionally activates phaeocystis. Each folder holds a matching ``namelist.recom`` together with the other namelists, so the easiest way to start is to copy one of these folders and adapt the paths.
 
 .. note::
    When switching between the setups, ``namelist.recom`` and ``namelist.tra`` have to be changed consistently, since every additional functional group brings its own tracers.
@@ -73,7 +73,7 @@ The directory ``config`` contains four complete namelist sets for the supported 
 Input files
 ===========
 
-Beyond the standard FESOM2 input, REcoM needs a small set of additional files. The paths are set in ``&nam_rsbc`` and via ``REcoMDataPath`` in ``namelist.recom``:
+Beyond the standard FESOM2 input, REcoM needs a small set of additional files. The paths are set in ``&nam_rsbc`` in ``namelist.recom``:
 
 - Initial condition climatologies for the dissolved tracers, read through ``namelist.tra`` as shown above.
 - A monthly dust deposition climatology providing the iron input at the surface (fields based on Albani or Mahowald, selected with ``fe_data_source`` and the ``UseDustClim*`` switches).
