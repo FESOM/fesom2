@@ -248,6 +248,9 @@ subroutine compute_vel_rhs(ice, dynamics, partit, mesh)
         else
             call momentum_adv_scalar_transpv(dynamics, partit, mesh)
         end if     
+    else
+       if (partit%mype==0) write(*,*) 'ERROR: unknown momadv_opt=', dynamics%momadv_opt, ', check your namelist.dyn'
+       call par_ex(partit%MPI_COMM_FESOM, partit%mype, 1)
     end if
     
     !___________________________________________________________________________
