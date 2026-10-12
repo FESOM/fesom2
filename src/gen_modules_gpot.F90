@@ -48,17 +48,20 @@ MODULE mo_tidal
 
       mmccdt = 0; jcc = 0; moph = 0
       CALL eph(lyear,lmonth,jcc,moph)
-      mmccdt = (jcc + moph - 0.5_WP) * NINT(86400._WP / dt)
+      ! eph gives the days up to the first day of the month; add the day of the
+      ! month and the time of day from the model clock, so that a run which does
+      ! not start on the first of a month at 00:00 (e.g. a restart) has the right phase
+      mmccdt = (jcc + moph + (day_in_month-1) - 0.5_WP) * NINT(86400._WP / dt) + NINT(timenew / dt)
       ! mmccdt is the number of timesteps since 01.01.2000 00:00:00
       ! bugfix by M.Mueller : substracting 0.5_WP shifts the reference time by -12h to 01.01.2000 12:00:00
       ! This is needed to get the correct sideral time (sbr sidt2)
       ! and calculate the correct hour angle for the tidal potential (->sbr aufb2)
-      ! FIXME : mmccdt = ldtmon-1 + int(jcc + moph - 0.5_WP) * NINT(86400._WP / dt)
       ! FIXME : replace eph by a some to code that directly calculates julian days and
       ! centuries as needed by siderial time and ephemerides
 
       if (partit%mype==0) WRITE(*,*)'tidal: phase relative to 2000 :'    &
-      ,'year= ',lyear, 'month= ',lmonth, 'yearoff= ',jcc,' monoff= ',moph ,'mmccdt= ',mmccdt
+      ,'year= ',lyear, 'month= ',lmonth, 'day= ',day_in_month, 'time= ',timenew, &
+       'yearoff= ',jcc,' monoff= ',moph ,'mmccdt= ',mmccdt
 
       END SUBROUTINE foreph_ini
 
