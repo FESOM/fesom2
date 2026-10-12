@@ -2380,8 +2380,8 @@ END DO ! --> DO i=1, io_listsize
         call def_stream((/nlev_upper+1, mesh%nod2D/),  (/nlev_upper+1, partit%myDim_nod2D/),  'w_upper',     'vertical velocity',  'm/s', dynamics%w(:nlev_upper+1,:),            3, 'h', 4, partit, mesh)
     end if
     if (ldiag_ice) then
-        call def_stream(mesh%nod2D,  partit%myDim_nod2D,  'vol_ice',   'ice volume',   'm',  vol_ice(:),   1, 'd', 8, partit, mesh)
-        call def_stream(mesh%nod2D,  partit%myDim_nod2D,  'vol_snow',  'snow volume',  'm',  vol_snow(:),  1, 'd', 8, partit, mesh)
+        call def_stream(mesh%nod2D,  partit%myDim_nod2D,  'vol_ice',   'ice volume per unit area',   'm',  vol_ice(:),   1, 'd', 8, partit, mesh)
+        call def_stream(mesh%nod2D,  partit%myDim_nod2D,  'vol_snow',  'snow volume per unit area',  'm',  vol_snow(:),  1, 'd', 8, partit, mesh)
     end if
 
     !___________________________________________________________________________
