@@ -5,9 +5,11 @@
 # np=8 process and IMMEDIATELY re-written (ZERO model steps) — the re-written C8 must equal C2 exactly
 # (max|Δ|=0), canonically. This is STORAGE+RESTORE, NOT cross-np EVOLUTION (which is physically non-
 # bit-identical in FESOM — SSH-CG allreduce reduces in comm-size-dependent order; every project
-# byte-gate is same-np). With zero steps there is NO order-dependent RHS, so even the 562 redundantly-
-# owned boundary elements round-trip EXACTLY: np=8 reads the canonical value into every owner, then
+# byte-gate is same-np). With zero steps there is NO order-dependent RHS, so even the 562 shared
+# (multiply-owned) boundary elements round-trip EXACTLY: np=8 reads the canonical value into every owner, then
 # re-dedups to the same canonical value => strict max|Δ|=0 (rel-floor 0), no element-ownership floor.
+# (Since the shared-element sync, docs/plans/completed/20261012-shared-element-sync.md, the stepping runs keep
+# the owners' copies equal too; this gate needs no step and is unchanged by it.)
 #
 #   tools/run_restart_gate_multirank.sh [run_dir] [NP_WRITE] [NP_READ]    # default 2 -> 8
 set -uo pipefail

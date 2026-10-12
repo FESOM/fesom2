@@ -102,8 +102,9 @@ def compare(a, b, threshold, rel_floor=0.0):
             diffs.append((k[0], k[1], k[2], k[3], max_abs_diff(a[k], b[k])))
             eff[k] = max(threshold, rel_floor * max_abs(a[k])) if rel_floor > 0.0 else threshold
     # first diverging (step, substep) above the (possibly relative) effective threshold.
-    # rel_floor>0 (np>1 restart) admits the FESOM2-inherent redundant-element ~1-ULP roundoff
-    # (see zarr_diff.output_cmp doc) while still catching any real regression (>= ~1e-4).
+    # rel_floor>0 (np>1 restart with FESOM3_SHARED_SYNC=0 only) admits the redundant-element ~1-ULP
+    # roundoff of unsynced shared-element copies (see zarr_diff.output_cmp doc) while still catching
+    # any real regression (>= ~1e-4). With the sync (the default) np>1 restarts are exact: floor 0.
     first = None
     for step, substep, gid, name, d in sorted(diffs):
         if d > eff[(step, substep, gid, name)]:
@@ -251,7 +252,7 @@ def main(argv):
         b = collapse_step(b, args[1])
         print("ignoring step field (single-step alignment; compare same state, different step count)")
     if rel_floor > 0.0:
-        print(f"np>1 rel-eps floor = {rel_floor:.0e} (FESOM2-inherent redundant-element ~1-ULP roundoff)")
+        print(f"np>1 rel-eps floor = {rel_floor:.0e} (redundant-element ~1-ULP roundoff, FESOM3_SHARED_SYNC=0)")
     return report(*compare(a, b, threshold, rel_floor), threshold)
 
 

@@ -79,10 +79,15 @@ run_seg() {
 # straight + split + the two comparisons for one (label, start_clock) case at one np.
 do_case() {
     local np="$1" label="$2" sclk="$3" want_boundary="$4"
-    # np=1 => strict max|Δ|=0 (exact). np>1 => admit the FESOM2-inherent redundant-element ~1-ULP
-    # roundoff floor (562 boundary elems owned by both ranks, NOT halo-synced — see zarr_diff doc).
-    # 1e-12 is far below any real regression (the t_skin/d_eta seeds were ~1e-4).
-    local floor=0; [ "$np" -gt 1 ] && floor=1e-12
+    # Strict max|Δ|=0 at every np. A border element is owned by every rank that owns one of its
+    # vertices (562 such elements at CORE2 dist_2); update_vel syncs uv to the designated owner's
+    # copy (FESOM3_SHARED_SYNC=1, the default; docs/plans/completed/20261012-shared-element-sync.md), which is
+    # the copy the restart writer keeps, so a resumed np>1 run continues from exactly the state of
+    # the straight run. Only with FESOM3_SHARED_SYNC=0 (the unsynced copies, A/B only) is the old
+    # ~1-ULP redundant-element floor admitted: the straight run keeps every owner's own copy while
+    # the resumed one starts all owners from the written copy. 1e-12 is far below any real
+    # regression (the t_skin/d_eta seeds were ~1e-4).
+    local floor=0; [ "$np" -gt 1 ] && [ "${FESOM3_SHARED_SYNC:-1}" = 0 ] && floor=1e-12
     local base="$RUN/np$np/$label"
     local strt="$base/straight" splt="$base/split"
     rm -rf "$base"; mkdir -p "$strt" "$splt"
@@ -148,6 +153,6 @@ done
 
 echo "==================================================================================="
 [ "$rc" = 0 ] \
-    && echo "run_restart_gate_core2: PRIMARY GATE GREEN — split == straight-through (np: $NPS; mid-run + boundary; ice+sigma). np=1 max|Δ|=0 exact; np>1 <=1-ULP FESOM2-inherent redundant-element floor (1e-12)" \
+    && echo "run_restart_gate_core2: PRIMARY GATE GREEN — split == straight-through (np: $NPS; mid-run + boundary; ice+sigma). max|Δ|=0 exact at every np$([ "${FESOM3_SHARED_SYNC:-1}" = 0 ] && echo '; np>1 with FESOM3_SHARED_SYNC=0: <=1-ULP redundant-element floor (1e-12)')" \
     || echo "run_restart_gate_core2: PRIMARY GATE FAILED (np: $NPS) — see FAIL lines above"
 exit "$rc"

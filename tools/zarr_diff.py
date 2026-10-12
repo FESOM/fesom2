@@ -569,14 +569,16 @@ def output_cmp(d1, d2, rel_floor=0.0):
     """Partition-independence / restart self-consistency: two output dirs hold value-identical
     stores. Default rel_floor=0.0 => strict max|Δ|=0 (np=1, and the exact-by-construction cases).
 
-    rel_floor>0 admits a per-store RELATIVE machine-epsilon floor for the np>1 restart gate ONLY:
-    at np>1, FESOM2's any-node element ownership makes 562 boundary elements redundantly owned and
-    NOT halo-synced (UV has no eXDim halo — oce_setup_step.F90:655); they diverge by ~1 ULP from
-    order-dependent RHS sums, and the partition-INDEPENDENT checkpoint must dedup them to one value,
-    so a same-np resume perturbs the other rank by ~1 ULP and propagates ~2e-16 into temp/w. This is
-    FESOM2-faithful (its nc restart dedups identically). The floor is set far below any real
-    regression (the t_skin/d_eta seeds were ~1e-4 >> 1e-12) so the gate stays meaningful. Stores are
-    classified =0 (exact) / ~eps (<=floor) / BAD (>floor); a BAD at >floor still FAILS."""
+    rel_floor>0 admits a per-store RELATIVE machine-epsilon floor for the np>1 restart gate with
+    FESOM3_SHARED_SYNC=0 ONLY: at np>1, FESOM2's any-node element ownership makes 562 boundary
+    elements (CORE2 dist_2) redundantly owned; without the sync their uv copies diverge by ~1 ULP
+    from order-dependent RHS sums, and the partition-INDEPENDENT checkpoint must dedup them to one
+    value, so a same-np resume perturbs the other rank by ~1 ULP and propagates ~2e-16 into temp/w
+    (FESOM2 behaves the same). With the sync (the default; docs/plans/completed/20261012-shared-element-sync.md)
+    every owner takes the designated owner's copy, the one the writer keeps, and np>1 restarts are
+    exact (floor 0). The floor is set far below any real regression (the t_skin/d_eta seeds were
+    ~1e-4 >> 1e-12) so the gate stays meaningful. Stores are classified =0 (exact) / ~eps
+    (<=floor) / BAD (>floor); a BAD at >floor still FAILS."""
     print(f"[output-cmp] {d1}  vs  {d2}" + (f"  (np>1 rel-eps floor={rel_floor:.0e})" if rel_floor else ""))
     stores = sorted(s for s in os.listdir(d1) if s.endswith(".zarr"))
     if not stores:
@@ -608,8 +610,8 @@ def output_cmp(d1, d2, rel_floor=0.0):
     if nfail:
         _fail(f"output-cmp: {nfail} mismatch(es)" + (f" (+{neps} at <=eps floor)" if neps else ""))
     if neps:
-        print(f"OUTPUT-CMP PASS ({neps} store(s) at <=rel-eps floor {rel_floor:.0e} — FESOM2-inherent "
-              f"np>1 redundant-element roundoff; rest max|Δ|=0)")
+        print(f"OUTPUT-CMP PASS ({neps} store(s) at <=rel-eps floor {rel_floor:.0e} — np>1 "
+              f"redundant-element roundoff without the shared-element sync; rest max|Δ|=0)")
     else:
         print("OUTPUT-CMP PASS (max|Δ|=0, partition-independent)")
 
@@ -635,8 +637,9 @@ def main():
                     help="vector frame for --output's fld_u/fld_v check (default geographic)")
     ap.add_argument("--ftol", type=float, default=0.0, help="float tolerance for --meshdiag (default 0)")
     ap.add_argument("--rel-floor", type=float, default=0.0, dest="rel_floor",
-                    help="per-store RELATIVE eps floor for --output-cmp (default 0=strict; np>1 restart "
-                         "uses ~1e-12 for the FESOM2-inherent redundant-element roundoff)")
+                    help="per-store RELATIVE eps floor for --output-cmp (default 0=strict; the np>1 "
+                         "restart gate uses ~1e-12 only with FESOM3_SHARED_SYNC=0, for the "
+                         "redundant-element roundoff of unsynced copies)")
     args = ap.parse_args()
 
     if args.roundtrip:
