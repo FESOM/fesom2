@@ -42,10 +42,6 @@ subroutine cut_off(ice, partit, mesh)
 #if defined (__oifs) || defined (__ifsinterface)
     real(kind=WP), dimension(:), pointer  :: ice_temp
 #endif /* (__oifs) */
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     a_ice    => ice%data(1)%values(:)
     m_ice    => ice%data(2)%values(:)
     m_snow   => ice%data(3)%values(:)
@@ -64,7 +60,7 @@ subroutine cut_off(ice, partit, mesh)
 #else
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n)
 #endif
-DO n=1, myDim_nod2D+eDim_nod2D
+DO n=1, partit%myDim_nod2D+partit%eDim_nod2D
    if (a_ice(n) > 1.0_WP)   a_ice(n)=1.0_WP
     ! lower cutoff: a_ice
    if (a_ice(n) < .1e-8_WP) then
@@ -112,7 +108,7 @@ END DO
         n_coldwarn = n_coldwarn + 1
         if (n_coldwarn <= 5 .or. mod(n_coldwarn, 100) == 0) then
             write(*,*) 'WARNING: ice_temp below 173.15 K on ', n_coldice, &
-                       ' node(s), rank ', mype, ', occurrence ', n_coldwarn
+                       ' node(s), rank ', partit%mype, ', occurrence ', n_coldwarn
         end if
     end if
 #endif /* (__oifs) */

@@ -148,10 +148,6 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
     ! afresh and nothing ever deallocated it, so the second node to blow up
     ! aborted here and took the blowup diagnostic with it.
     integer, dimension(:), save, allocatable :: local_idx_of
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h" 
     UV          => dynamics%uv(:,:,:)
     Wvel        => dynamics%w(:,:)
     CFL_z       => dynamics%cfl_z(:,:)
@@ -170,8 +166,8 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
         ssh_rhs     => dynamics%ssh_rhs(:)
         ssh_rhs_old => dynamics%ssh_rhs_old(:)
     else
-        allocate(dhbar(myDim_nod2D+eDim_nod2D))
-        dhbar = hbar-hbar_old
+        allocate(dhbar(partit%myDim_nod2D+partit%eDim_nod2D))
+        dhbar = mesh%hbar-mesh%hbar_old
         d_eta => dhbar
     end if 
     
@@ -195,38 +191,38 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
     !___________________________________________________________________________
     ! Report every offending node.
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz)
-    do n=1, myDim_nod2d       
+    do n=1, partit%myDim_nod2d       
        !___________________________________________________________________
        ! check ssh
        if ( ((eta_n(n) /= eta_n(n)) .or. eta_n(n)<-10.0 .or. eta_n(n)>10.0 .or. (d_eta(n) /= d_eta(n)) ) ) then
 !$OMP CRITICAL
           write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
           write(*,*) ' --STOP--> found eta_n become NaN or <-10.0, >10.0'
-          write(*,*) 'mype     = ',mype
+          write(*,*) 'mype     = ',partit%mype
           write(*,*) 'mstep    = ',istep
           write(*,*) 'node     = ',n
-          write(*,*) 'uln, nln    = ',ulevels_nod2D(n), nlevels_nod2D(n)
-          write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,n)/rad
+          write(*,*) 'uln, nln    = ',mesh%ulevels_nod2D(n), mesh%nlevels_nod2D(n)
+          write(*,*) 'glon,glat   = ',mesh%geo_coord_nod2D(:,n)/rad
           write(*,*)
           write(*,*) 'eta_n(n)    = ',eta_n(n)
           write(*,*) 'd_eta(n)    = ',d_eta(n)
           write(*,*)
-          write(*,*) 'zbar_3d_n   = ',zbar_3d_n(:,n)
-          write(*,*) 'Z_3d_n      = ',Z_3d_n(:,n)
+          write(*,*) 'zbar_3d_n   = ',mesh%zbar_3d_n(:,n)
+          write(*,*) 'Z_3d_n      = ',mesh%Z_3d_n(:,n)
           write(*,*)
           if ( .not. dynamics%use_ssh_se_subcycl) then 
             write(*,*) 'ssh_rhs = ',ssh_rhs(n),', ssh_rhs_old = ',ssh_rhs_old(n)
           end if
           write(*,*)
-          write(*,*) 'hbar = ',hbar(n),', hbar_old = ',hbar_old(n)
+          write(*,*) 'hbar = ',mesh%hbar(n),', hbar_old = ',mesh%hbar_old(n)
           write(*,*)
           write(*,*) 'wflux = ',water_flux(n)
           write(*,*)
           if (.not. toy_ocean) then
             write(*,*) 'u_wind = ',u_wind(n),', v_wind = ',v_wind(n)
             write(*,*)
-            do nz=1,nod_in_elem2D_num(n)
-                    write(*,*) 'stress_surf(1:2,',nz,') = ',stress_surf(:,nod_in_elem2D(nz,n))
+            do nz=1,mesh%nod_in_elem2D_num(n)
+                    write(*,*) 'stress_surf(1:2,',nz,') = ',stress_surf(:,mesh%nod_in_elem2D(nz,n))
             end do
           end if
           if (use_ice) then
@@ -235,18 +231,18 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
           write(*,*) 'a_ice = ',a_ice(n),', a_ice_old = ',a_ice_old(n)
           end if 
           write(*,*)
-          write(*,*) 'Wvel(:, n)  = ',Wvel(ulevels_nod2D(n):nlevels_nod2D(n),n)
+          write(*,*) 'Wvel(:, n)  = ',Wvel(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n),n)
           write(*,*)
-          write(*,*) 'CFL_z(:,n)  = ',CFL_z(ulevels_nod2D(n):nlevels_nod2D(n),n)
+          write(*,*) 'CFL_z(:,n)  = ',CFL_z(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n),n)
           write(*,*)
-          write(*,*) 'hnode(:, n)  = ',hnode(ulevels_nod2D(n):nlevels_nod2D(n),n)
+          write(*,*) 'hnode(:, n)  = ',mesh%hnode(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n),n)
           write(*,*)
           if (use_icebergs) then
             if (.not. allocated(local_idx_of)) then
-              allocate(local_idx_of(elem2D))
-              call global2local(mesh, partit, local_idx_of, elem2D)
+              allocate(local_idx_of(mesh%elem2D))
+              call global2local(mesh, partit, local_idx_of, mesh%elem2D)
             end if
-            write(*,*) 'ibhf_n(:, n) = ',ibhf_n(ulevels_nod2D(n):nlevels_nod2D(n),n)
+            write(*,*) 'ibhf_n(:, n) = ',ibhf_n(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n),n)
             write(*,*) 'ibfwb(n) = ',ibfwb(n)
             write(*,*) 'ibfwl(n) = ',ibfwl(n)
             write(*,*) 'ibfwe(n) = ',ibfwe(n)
@@ -255,7 +251,7 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
                 ! global2local zeroes every element this rank does not own, so an
                 ! iceberg living on another rank maps to 0 and indexing elem2d_nodes
                 ! with it runs off the array.
-                if (iceberg_elem(ib) < 1 .or. iceberg_elem(ib) > elem2D) cycle
+                if (iceberg_elem(ib) < 1 .or. iceberg_elem(ib) > mesh%elem2D) cycle
                 if (local_idx_of(iceberg_elem(ib)) == 0) cycle
                 if (mesh%elem2d_nodes(1, local_idx_of(iceberg_elem(ib))) == n) then
                     write(*,*) 'ib = ',ib, ', length = ',length_ib(ib), ', height = ', height_ib(ib), ', scaling = ', scaling(ib) 
@@ -278,24 +274,24 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
 !$OMP CRITICAL
           write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
           write(*,*) ' --STOP--> found surface layer vertical velocity becomes NaN or >1e-12'
-          write(*,*) 'mype     = ',mype
+          write(*,*) 'mype     = ',partit%mype
           write(*,*) 'mstep    = ',istep
           write(*,*) 'node     = ',n
-          write(*,*) 'uln, nln    = ',ulevels_nod2D(n), nlevels_nod2D(n)
-          write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,n)/rad
+          write(*,*) 'uln, nln    = ',mesh%ulevels_nod2D(n), mesh%nlevels_nod2D(n)
+          write(*,*) 'glon,glat   = ',mesh%geo_coord_nod2D(:,n)/rad
           write(*,*)
           write(*,*) 'Wvel(1, n)  = ',Wvel(1,n)
           write(*,*) 'Wvel(:, n)  = ',Wvel(:,n)
           write(*,*)
-          write(*,*) 'hnode(1, n) = ',hnode(1,n)
-          write(*,*) 'hnode(:, n) = ',hnode(:,n)
+          write(*,*) 'hnode(1, n) = ',mesh%hnode(1,n)
+          write(*,*) 'hnode(:, n) = ',mesh%hnode(:,n)
           write(*,*) 'hflux    = ',heat_flux(n)
           write(*,*) 'wflux    = ',water_flux(n)
           write(*,*)
           write(*,*) 'eta_n    = ',eta_n(n)
           write(*,*) 'd_eta(n)    = ',d_eta(n)
-          write(*,*) 'hbar     = ',hbar(n)
-          write(*,*) 'hbar_old    = ',hbar_old(n)
+          write(*,*) 'hbar     = ',mesh%hbar(n)
+          write(*,*) 'hbar_old    = ',mesh%hbar_old(n)
           if ( .not. dynamics%use_ssh_se_subcycl) then 
             write(*,*) 'ssh_rhs     = ',ssh_rhs(n)
             write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(n)
@@ -305,10 +301,10 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
           write(*,*)
           if (use_icebergs) then
             if (.not. allocated(local_idx_of)) then
-              allocate(local_idx_of(elem2D))
-              call global2local(mesh, partit, local_idx_of, elem2D)
+              allocate(local_idx_of(mesh%elem2D))
+              call global2local(mesh, partit, local_idx_of, mesh%elem2D)
             end if
-            write(*,*) 'ibhf_n(:, n) = ',ibhf_n(ulevels_nod2D(n):nlevels_nod2D(n),n)
+            write(*,*) 'ibhf_n(:, n) = ',ibhf_n(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n),n)
             write(*,*) 'ibfwb(n) = ',ibfwb(n)
             write(*,*) 'ibfwl(n) = ',ibfwl(n)
             write(*,*) 'ibfwe(n) = ',ibfwe(n)
@@ -317,7 +313,7 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
                 ! global2local zeroes every element this rank does not own, so an
                 ! iceberg living on another rank maps to 0 and indexing elem2d_nodes
                 ! with it runs off the array.
-                if (iceberg_elem(ib) < 1 .or. iceberg_elem(ib) > elem2D) cycle
+                if (iceberg_elem(ib) < 1 .or. iceberg_elem(ib) > mesh%elem2D) cycle
                 if (local_idx_of(iceberg_elem(ib)) == 0) cycle
                 if (mesh%elem2d_nodes(1, local_idx_of(iceberg_elem(ib))) == n) then
                     write(*,*) 'ib = ',ib, ', length = ',length_ib(ib), ', height = ', height_ib(ib), ', scaling = ', scaling(ib) 
@@ -334,33 +330,33 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
           
        !___________________________________________________________________
        ! check surface layer thinknesss
-       if ( .not. trim(which_ALE)=='linfs' .and. ( hnode(1, n) /= hnode(1, n)  .or. hnode(1,n)< 0 )) then
+       if ( .not. trim(which_ALE)=='linfs' .and. ( mesh%hnode(1, n) /= mesh%hnode(1, n)  .or. mesh%hnode(1,n)< 0 )) then
 !$OMP CRITICAL
           write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
           write(*,*) ' --STOP--> found surface layer thickness becomes NaN or <0'
-          write(*,*) 'mype     = ',mype
+          write(*,*) 'mype     = ',partit%mype
           write(*,*) 'mstep    = ',istep
           write(*,*) 'node     = ',n
           write(*,*)
-          write(*,*) 'hnode(1, n)  = ',hnode(1,n)
-          write(*,*) 'hnode(:, n)  = ',hnode(:,n)
+          write(*,*) 'hnode(1, n)  = ',mesh%hnode(1,n)
+          write(*,*) 'hnode(:, n)  = ',mesh%hnode(:,n)
           write(*,*)
           write(*,*) 'eta_n    = ',eta_n(n)
           write(*,*) 'd_eta(n)    = ',d_eta(n)
-          write(*,*) 'hbar     = ',hbar(n)
-          write(*,*) 'hbar_old    = ',hbar_old(n)
+          write(*,*) 'hbar     = ',mesh%hbar(n)
+          write(*,*) 'hbar_old    = ',mesh%hbar_old(n)
           if ( .not. dynamics%use_ssh_se_subcycl) then 
             write(*,*) 'ssh_rhs     = ',ssh_rhs(n)
             write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(n)
           end if
-          write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,n)/rad
+          write(*,*) 'glon,glat   = ',mesh%geo_coord_nod2D(:,n)/rad
           write(*,*)
           if (use_icebergs) then
             if (.not. allocated(local_idx_of)) then
-              allocate(local_idx_of(elem2D))
-              call global2local(mesh, partit, local_idx_of, elem2D)
+              allocate(local_idx_of(mesh%elem2D))
+              call global2local(mesh, partit, local_idx_of, mesh%elem2D)
             end if
-            write(*,*) 'ibhf_n(:, n) = ',ibhf_n(ulevels_nod2D(n):nlevels_nod2D(n),n)
+            write(*,*) 'ibhf_n(:, n) = ',ibhf_n(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n),n)
             write(*,*) 'ibfwb(n) = ',ibfwb(n)
             write(*,*) 'ibfwl(n) = ',ibfwl(n)
             write(*,*) 'ibfwe(n) = ',ibfwe(n)
@@ -369,7 +365,7 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
                 ! global2local zeroes every element this rank does not own, so an
                 ! iceberg living on another rank maps to 0 and indexing elem2d_nodes
                 ! with it runs off the array.
-                if (iceberg_elem(ib) < 1 .or. iceberg_elem(ib) > elem2D) cycle
+                if (iceberg_elem(ib) < 1 .or. iceberg_elem(ib) > mesh%elem2D) cycle
                 if (local_idx_of(iceberg_elem(ib)) == 0) cycle
                 if (mesh%elem2d_nodes(1, local_idx_of(iceberg_elem(ib))) == n) then
                     write(*,*) 'ib = ',ib, ', length = ',length_ib(ib), ', height = ', height_ib(ib), ', scaling = ', scaling(ib) 
@@ -385,7 +381,7 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
        end if ! --> if ( .not. trim(which_ALE)=='linfs' .and. ...
           
        
-       do nz=ulevels_nod2D(n),nlevels_nod2D(n)-1
+       do nz=mesh%ulevels_nod2D(n),mesh%nlevels_nod2D(n)-1
           !_______________________________________________________________
           ! check temp
           if ( (tracers%data(1)%values(nz, n) /= tracers%data(1)%values(nz, n)) .or. &
@@ -393,13 +389,13 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
 !$OMP CRITICAL
              write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
              write(*,*) ' --STOP--> found temperture becomes NaN or <-5.0, >60'
-             write(*,*) 'mype     = ',mype
+             write(*,*) 'mype     = ',partit%mype
              write(*,*) 'mstep    = ',istep
              write(*,*) 'node     = ',n
-             write(*,*) 'lon,lat     = ',geo_coord_nod2D(:,n)/rad
+             write(*,*) 'lon,lat     = ',mesh%geo_coord_nod2D(:,n)/rad
              write(*,*) 'nz       = ',nz
-             write(*,*) 'nzmin, nzmax= ',ulevels_nod2D(n),nlevels_nod2D(n)
-             write(*,*) 'x=', geo_coord_nod2D(1,n)/rad, ' ; ', 'y=', geo_coord_nod2D(2,n)/rad
+             write(*,*) 'nzmin, nzmax= ',mesh%ulevels_nod2D(n),mesh%nlevels_nod2D(n)
+             write(*,*) 'x=', mesh%geo_coord_nod2D(1,n)/rad, ' ; ', 'y=', mesh%geo_coord_nod2D(2,n)/rad
              write(*,*) 'temp(nz, n) = ',tracers%data(1)%values(nz, n)
              write(*,*) 'temp(: , n) = ',tracers%data(1)%values(:, n)
              write(*,*) 'temp_old(nz,n)= ',tracers%data(1)%valuesAB(nz, n)
@@ -410,8 +406,8 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
              write(*,*)
              write(*,*) 'eta_n    = ',eta_n(n)
              write(*,*) 'd_eta(n)    = ',d_eta(n)
-             write(*,*) 'hbar     = ',hbar(n)
-             write(*,*) 'hbar_old    = ',hbar_old(n)
+             write(*,*) 'hbar     = ',mesh%hbar(n)
+             write(*,*) 'hbar_old    = ',mesh%hbar_old(n)
              if ( .not. dynamics%use_ssh_se_subcycl) then 
                 write(*,*) 'ssh_rhs     = ',ssh_rhs(n)
                 write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(n)
@@ -424,8 +420,8 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
                 write(*,*) 'm_snow_old  = ',m_snow_old(n)
                 write(*,*)
              end if 
-             write(*,*) 'hnode    = ',hnode(:,n)
-             write(*,*) 'hnode_new   = ',hnode_new(:,n)
+             write(*,*) 'hnode    = ',mesh%hnode(:,n)
+             write(*,*) 'hnode_new   = ',mesh%hnode_new(:,n)
              write(*,*)
              write(*,*) 'Kv       = ',Kv(:,n)
              write(*,*)
@@ -435,10 +431,10 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
              write(*,*)
           if (use_icebergs) then
             if (.not. allocated(local_idx_of)) then
-              allocate(local_idx_of(elem2D))
-              call global2local(mesh, partit, local_idx_of, elem2D)
+              allocate(local_idx_of(mesh%elem2D))
+              call global2local(mesh, partit, local_idx_of, mesh%elem2D)
             end if
-            write(*,*) 'ibhf_n(:, n) = ',ibhf_n(ulevels_nod2D(n):nlevels_nod2D(n),n)
+            write(*,*) 'ibhf_n(:, n) = ',ibhf_n(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n),n)
             write(*,*) 'ibfwb(n) = ',ibfwb(n)
             write(*,*) 'ibfwl(n) = ',ibfwl(n)
             write(*,*) 'ibfwe(n) = ',ibfwe(n)
@@ -447,7 +443,7 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
                 ! global2local zeroes every element this rank does not own, so an
                 ! iceberg living on another rank maps to 0 and indexing elem2d_nodes
                 ! with it runs off the array.
-                if (iceberg_elem(ib) < 1 .or. iceberg_elem(ib) > elem2D) cycle
+                if (iceberg_elem(ib) < 1 .or. iceberg_elem(ib) > mesh%elem2D) cycle
                 if (local_idx_of(iceberg_elem(ib)) == 0) cycle
                 if (mesh%elem2d_nodes(1, local_idx_of(iceberg_elem(ib))) == n) then
                     write(*,*) 'ib = ',ib, ', length = ',length_ib(ib), ', height = ', height_ib(ib), ', scaling = ', scaling(ib) 
@@ -472,12 +468,12 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
 !$OMP CRITICAL
              write(*,*) '___CHECK FOR BLOW UP___________ --> mstep=',istep
              write(*,*) ' --STOP--> found salinity becomes NaN or <=3.0, >=45.0'
-             write(*,*) 'mype     = ',mype
+             write(*,*) 'mype     = ',partit%mype
              write(*,*) 'mstep    = ',istep
              write(*,*) 'node     = ',n
              write(*,*) 'nz       = ',nz
-             write(*,*) 'nzmin, nzmax= ',ulevels_nod2D(n),nlevels_nod2D(n)
-             write(*,*) 'x=', geo_coord_nod2D(1,n)/rad, ' ; ', 'y=', geo_coord_nod2D(2,n)/rad
+             write(*,*) 'nzmin, nzmax= ',mesh%ulevels_nod2D(n),mesh%nlevels_nod2D(n)
+             write(*,*) 'x=', mesh%geo_coord_nod2D(1,n)/rad, ' ; ', 'y=', mesh%geo_coord_nod2D(2,n)/rad
              write(*,*) 'salt(nz, n) = ',tracers%data(2)%values(nz, n)
              write(*,*) 'salt(: , n) = ',tracers%data(2)%values(:, n)
              write(*,*)
@@ -489,23 +485,23 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
              write(*,*) 'wflux    = ',water_flux(n)
              write(*,*) 'eta_n    = ',eta_n(n)
              write(*,*) 'd_eta(n)    = ',d_eta(n)
-             write(*,*) 'hbar     = ',hbar(n)
-             write(*,*) 'hbar_old    = ',hbar_old(n)
+             write(*,*) 'hbar     = ',mesh%hbar(n)
+             write(*,*) 'hbar_old    = ',mesh%hbar_old(n)
              if ( .not. dynamics%use_ssh_se_subcycl) then 
                 write(*,*) 'ssh_rhs     = ',ssh_rhs(n)
                 write(*,*) 'ssh_rhs_old = ',ssh_rhs_old(n)
              end if 
              write(*,*)
-             write(*,*) 'hnode    = ',hnode(:,n)
-             write(*,*) 'hnode_new   = ',hnode_new(:,n)
+             write(*,*) 'hnode    = ',mesh%hnode(:,n)
+             write(*,*) 'hnode_new   = ',mesh%hnode_new(:,n)
              write(*,*)
-             write(*,*) 'zbar_3d_n   = ',zbar_3d_n(:,n)
-             write(*,*) 'Z_3d_n      = ',Z_3d_n(:,n)
+             write(*,*) 'zbar_3d_n   = ',mesh%zbar_3d_n(:,n)
+             write(*,*) 'Z_3d_n      = ',mesh%Z_3d_n(:,n)
              write(*,*)
              write(*,*) 'Kv       = ',Kv(:,n)
              write(*,*)
-             do el=1,nod_in_elem2d_num(n)
-                elidx = nod_in_elem2D(el,n)
+             do el=1,mesh%nod_in_elem2d_num(n)
+                elidx = mesh%nod_in_elem2D(el,n)
                  write(*,*) ' elem#=',el,', elemidx=',elidx
                  write(*,*) '    Av =',Av(:,elidx)
              enddo
@@ -513,14 +509,14 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
              write(*,*)
              write(*,*) 'CFL_z(:,n)  = ',CFL_z(:,n)
              write(*,*)
-             write(*,*) 'glon,glat   = ',geo_coord_nod2D(:,n)/rad
+             write(*,*) 'glon,glat   = ',mesh%geo_coord_nod2D(:,n)/rad
              write(*,*)
           if (use_icebergs) then
             if (.not. allocated(local_idx_of)) then
-              allocate(local_idx_of(elem2D))
-              call global2local(mesh, partit, local_idx_of, elem2D)
+              allocate(local_idx_of(mesh%elem2D))
+              call global2local(mesh, partit, local_idx_of, mesh%elem2D)
             end if
-            write(*,*) 'ibhf_n(:, n) = ',ibhf_n(ulevels_nod2D(n):nlevels_nod2D(n),n)
+            write(*,*) 'ibhf_n(:, n) = ',ibhf_n(mesh%ulevels_nod2D(n):mesh%nlevels_nod2D(n),n)
             write(*,*) 'ibfwb(n) = ',ibfwb(n)
             write(*,*) 'ibfwl(n) = ',ibfwl(n)
             write(*,*) 'ibfwe(n) = ',ibfwe(n)
@@ -529,7 +525,7 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
                 ! global2local zeroes every element this rank does not own, so an
                 ! iceberg living on another rank maps to 0 and indexing elem2d_nodes
                 ! with it runs off the array.
-                if (iceberg_elem(ib) < 1 .or. iceberg_elem(ib) > elem2D) cycle
+                if (iceberg_elem(ib) < 1 .or. iceberg_elem(ib) > mesh%elem2D) cycle
                 if (local_idx_of(iceberg_elem(ib)) == 0) cycle
                 if (mesh%elem2d_nodes(1, local_idx_of(iceberg_elem(ib))) == n) then
                     write(*,*) 'ib = ',ib, ', length = ',length_ib(ib), ', height = ', height_ib(ib), ', scaling = ', scaling(ib) 
@@ -549,14 +545,14 @@ subroutine check_blowup(istep, mon, ice, dynamics, tracers, partit, mesh)
     !_______________________________________________________________________
     call monitor_fill_ocean(mon, istep, .true., ice, dynamics, tracers, partit, mesh)
     call write_step_info(istep, 1, mon, dynamics, partit)
-    if (mype==0) then
+    if (partit%mype==0) then
         call sleep(1)
         call plot_fesomlogo_expl()
         call plot_fesomlogo_lildevil()
 
     end if
     call blowup(istep, ice, dynamics, tracers, partit, mesh)
-    if (mype==0) write(*,*) ' --> finished writing blow up file'
+    if (partit%mype==0) write(*,*) ' --> finished writing blow up file'
     call par_ex(partit%MPI_COMM_FESOM, partit%mype, abort=1)
 end subroutine check_blowup
 !===============================================================================

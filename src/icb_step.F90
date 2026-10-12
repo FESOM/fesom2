@@ -76,10 +76,6 @@ type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
 type(t_dyn)   , intent(inout), target :: dynamics
 !==================== MODULES & DECLARATIONS ==========================!= 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
 ! kh 16.03.21 (asynchronous) iceberg computation starts with the content in common arrays at istep and will merge its results at istep_end_synced
  istep_end_synced = istep + steps_per_ib_step - 1
@@ -282,7 +278,7 @@ end do
 
  if (mod(istep_end_synced,icb_outfreq)==0 .AND. .not.ascii_out) then
 
-   if (mype==0 .AND. ib_num > 0) call write_buoy_props_netcdf(partit)
+   if (partit%mype==0 .AND. ib_num > 0) call write_buoy_props_netcdf(partit)
        
    ! all PEs: set back to zero for next round
    bvl_mean=0.0
@@ -294,7 +290,7 @@ end do
 
  t4=MPI_Wtime() 
  
- if (mod(istep,logfile_outfreq)==0 .and. mype==0) then 
+ if (mod(istep,logfile_outfreq)==0 .and. partit%mype==0) then 
    write(*,*) 'icebergs took', t4-t0 
    write(*,*) 'iceberg step1 took', t1-t0
    write(*,*) 'NEW comvalues took', t2-t1
@@ -392,13 +388,8 @@ type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
 type(t_dyn)   , intent(inout), target :: dynamics
 !========================= MODULES & DECLARATIONS =====================================!=
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
 
- mype          =>partit%mype
 
  istep_end_synced = istep + steps_per_ib_step - 1
 
@@ -412,7 +403,7 @@ type(t_dyn)   , intent(inout), target :: dynamics
  if(melted_local) then
   melted(ib) = .true.
 
-  if (mod(istep_end_synced,logfile_outfreq)==0 .and. mype==0 .and. lastsubstep) then
+  if (mod(istep_end_synced,logfile_outfreq)==0 .and. partit%mype==0 .and. lastsubstep) then
    write(*,*) 'iceberg ', ib,' melted'
   end if
 
@@ -420,12 +411,12 @@ type(t_dyn)   , intent(inout), target :: dynamics
  end if 
  
  if (firstcall) then
-  if(mype==0) write(*,*) 'Preparing local_idx_of array...'
-  allocate(local_idx_of(elem2D))
+  if(partit%mype==0) write(*,*) 'Preparing local_idx_of array...'
+  allocate(local_idx_of(mesh%elem2D))
   !creates mapping
-  call global2local(mesh, partit, local_idx_of, elem2D)
+  call global2local(mesh, partit, local_idx_of, mesh%elem2D)
   firstcall=.false.
-  if(mype==0) write(*,*) 'Preparing local_idx_of done.'
+  if(partit%mype==0) write(*,*) 'Preparing local_idx_of done.'
  end if
 
  
@@ -494,10 +485,10 @@ type(t_dyn)   , intent(inout), target :: dynamics
   endif
  end if
  
- melted_local = (iceberg_elem < 1 .or. iceberg_elem > elem2D)
+ melted_local = (iceberg_elem < 1 .or. iceberg_elem > mesh%elem2D)
  if (melted_local) then
-  if (mype==0) write(*,*) 'WARNING: iceberg ', ib, ' has invalid iceberg_elem = ', &
-       iceberg_elem, ' (valid range 1..', elem2D, '). Marking as melted to avoid crash.'
+  if (partit%mype==0) write(*,*) 'WARNING: iceberg ', ib, ' has invalid iceberg_elem = ', &
+       iceberg_elem, ' (valid range 1..', mesh%elem2D, '). Marking as melted to avoid crash.'
   melted(ib) = .true.
   return
  end if
@@ -511,7 +502,7 @@ type(t_dyn)   , intent(inout), target :: dynamics
  !if the first node belongs to this processor.. (just one processor enters here!)
  !if( local_idx_of(iceberg_elem) > 0 .and. elem2D_nodes(1,local_idx_of(iceberg_elem)) <= myDim_nod2D ) then
 if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDim_elem2D) ) then 
-  if( elem2D_nodes(1,local_idx_of(iceberg_elem)) <= partit%myDim_nod2D ) then
+  if( mesh%elem2D_nodes(1,local_idx_of(iceberg_elem)) <= partit%myDim_nod2D ) then
 
   i_have_element=.true. 
 
@@ -674,7 +665,7 @@ if((local_idx_of(iceberg_elem)>0) .and. (local_idx_of(iceberg_elem)<=partit%myDi
   !save in larger array	  
   arr_block((ib-1)*16+1 : ib*16)=arr
   elem_block(ib)=iceberg_elem
-  pe_block(ib)=mype
+  pe_block(ib)=partit%mype
 
   volume_ib=height_ib_single*length_ib_single*width_ib_single
   call prepare_icb2fesom(mesh,partit,ib,i_have_element,local_idx_of(iceberg_elem),depth_ib_premelt,height_ib_premelt)
@@ -781,10 +772,6 @@ use iceberg_params, only: length_ib, width_ib, scaling !, smallestvol_icb, arr_b
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
  !========================= MODULES & DECLARATIONS =====================================!=
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
  
  !all PEs enter here with identical array arr
   
@@ -835,9 +822,9 @@ type(t_partit), intent(inout), target :: partit
   !!if(local_idx_of(iceberg_elem) > 0 .and. iceberg_elem .ne. old_element) then !IB left model domain
   !if(iceberg_elem .ne. old_element) then
     if (firstcall) then
-      allocate(local_idx_of(elem2D))
+      allocate(local_idx_of(mesh%elem2D))
       !creates mapping
-      call global2local(mesh, partit, local_idx_of, elem2D)
+      call global2local(mesh, partit, local_idx_of, mesh%elem2D)
       firstcall=.false.
     end if 
 
@@ -853,7 +840,7 @@ type(t_partit), intent(inout), target :: partit
            u_ib    = 0.
            v_ib    = 0.
    else if((cell_saturation>0) .and. (iceberg_elem.ne.old_element)) then
-     if (mype==0) write(*,*) 'iceberg ',ib, ' changed PE or was very fast'
+     if (partit%mype==0) write(*,*) 'iceberg ',ib, ' changed PE or was very fast'
      elem_area_tmp = elem_area_glob(iceberg_elem)
      select case(cell_saturation) !num of coastal points
       case(1) 
@@ -870,7 +857,7 @@ type(t_partit), intent(inout), target :: partit
      end do
 !$OMP END PARALLEL DO
      if((area_ib_tot > elem_area_tmp) .and. (elem_area_tmp > 0.0) .and. (old_element.ne.0)) then
-         if(mype==pe_block_red(ib) .and. lverbose_icb) then
+         if(partit%mype==pe_block_red(ib) .and. lverbose_icb) then
             write(*,*) " *******************************************************"
             write(*,*) " * iceberg changed PE and saturation"
             write(*,*) " * set iceberg ", ib, " back to elem ", old_element, " from elem ", iceberg_elem
@@ -892,7 +879,7 @@ type(t_partit), intent(inout), target :: partit
          end if
      end if
    else 
-     if (mype==0) write(*,*) 'iceberg ',ib, ' changed PE or was very fast'
+     if (partit%mype==0) write(*,*) 'iceberg ',ib, ' changed PE or was very fast'
    end if
  end if
  
@@ -904,7 +891,7 @@ type(t_partit), intent(inout), target :: partit
 
 ! kh 16.03.21 (asynchronous) iceberg calculation starts with the content in common arrays at istep and will merge its results at istep_end_synced
 ! if(mype==0 .and. lastsubstep .and. mod(istep,icb_outfreq)==0) then
- if(mype==0 .and. lastsubstep .and. mod(istep_end_synced,icb_outfreq)==0) then
+ if(partit%mype==0 .and. lastsubstep .and. mod(istep_end_synced,icb_outfreq)==0) then
 
    !output in 1. unrotated or 2. rotated coordinates      
    u_ib_out = u_ib
@@ -989,10 +976,6 @@ implicit none
 type(t_mesh), intent(in) , target :: mesh
 type(t_dyn), intent(in) , target :: dynamics
 type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
 
 
@@ -1100,10 +1083,6 @@ subroutine depth_bathy(mesh, partit,Zdepth3, elem)
   
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
   
   Zdepth3=0.0
   
@@ -1148,10 +1127,6 @@ subroutine parallel2coast(mesh, partit,u, v, lon,lat, elem)
  
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
   
   if( use_cavity ) then
     !fld_tmp = coastal_nodes(mesh, partit, elem)
@@ -1221,7 +1196,7 @@ type(t_partit), intent(inout), target :: partit
     ! rejected by find_new_iceberg_elem / iceberg_elem4all before reaching
     ! here.  Velocity is not modified; step2's iceberg_elem4all will stop
     ! the iceberg by reverting it to the previous element with zero velocity.
-    if (mype==0) write(*,*) 'WARNING: parallel2coast called with fully-cavity element', elem
+    if (partit%mype==0) write(*,*) 'WARNING: parallel2coast called with fully-cavity element', elem
     return
 
  END SELECT
@@ -1247,14 +1222,10 @@ implicit none
 
 type(t_mesh), intent(in) , target :: mesh
 type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
  ! direction: node1 - node2 (pointing from 2 to 1)
- direction(1) = coord_nod2D(1, n1) - coord_nod2D(1, n2)
- direction(2) = coord_nod2D(2, n1) - coord_nod2D(2, n2)
+ direction(1) = mesh%coord_nod2D(1, n1) - mesh%coord_nod2D(1, n2)
+ direction(2) = mesh%coord_nod2D(2, n1) - mesh%coord_nod2D(2, n2)
  length = sqrt( direction(1)**2 + direction(2)**2 )
  direction(1) = direction(1)/length
  direction(2) = direction(2)/length
@@ -1277,10 +1248,8 @@ subroutine iceberg_restart(partit)
  integer :: icbID, ib
  LOGICAL :: file_exists
 type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
  INQUIRE(FILE=IcebergRestartPath, EXIST=file_exists) 
- icbID = mype+10
+ icbID = partit%mype+10
  
  !call allocate_icb
  
@@ -1302,9 +1271,9 @@ type(t_partit), intent(inout), target :: partit
 
   ! LA 2026 -- Fe concentration is a persistent per-iceberg property and lives
   ! in a side-car file, so that iceberg.restart itself stays format-compatible.
-  if (use_icb_iron) call read_icb_iron_restart(IcebergRestartPath_iron, ib_num, mype)
+  if (use_icb_iron) call read_icb_iron_restart(IcebergRestartPath_iron, ib_num, partit%mype)
 
-  if(mype==0) then
+  if(partit%mype==0) then
   write(*,*) 'read iceberg restart file'
 
   !if(.NOT.ascii_out) call determine_save_count ! computed from existing records in netcdf file
@@ -1315,7 +1284,7 @@ type(t_partit), intent(inout), target :: partit
   end if
  else
 
-  if(mype==0) then
+  if(partit%mype==0) then
   write(*,*) 'no iceberg restart'
 
   if(.NOT.ascii_out .AND. ib_num > 0) call init_buoy_output(partit)
@@ -1344,13 +1313,11 @@ subroutine iceberg_restart_with_icesheet(partit)
  integer :: icbID_ISM, icbID_non_melted_icb, ib, st
  LOGICAL :: file_exists, file_exists_non_melted
 type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
  
  INQUIRE(FILE=num_non_melted_icb_file, EXIST=file_exists_non_melted) 
  INQUIRE(FILE=IcebergRestartPath_ISM, EXIST=file_exists) 
- icbID_ISM = mype+10
- icbID_non_melted_icb = mype+11
+ icbID_ISM = partit%mype+10
+ icbID_non_melted_icb = partit%mype+11
 
  !call allocate_icb
  
@@ -1373,9 +1340,9 @@ type(t_partit), intent(inout), target :: partit
 
   ! LA 2026 -- survivors keep their Fe concentration; the newly seeded icebergs
   ! get theirs from icb_iron.dat (or icb_iron_const) further below.
-  if (use_icb_iron) call read_icb_iron_restart(IcebergRestartPath_iron_ISM, num_non_melted_icb, mype)
+  if (use_icb_iron) call read_icb_iron_restart(IcebergRestartPath_iron_ISM, num_non_melted_icb, partit%mype)
 
-  if(mype==0) then
+  if(partit%mype==0) then
   write(*,*) 'read iceberg restart file'
 
   !if(.NOT.ascii_out) call determine_save_count ! computed from existing records in netcdf file
@@ -1386,7 +1353,7 @@ type(t_partit), intent(inout), target :: partit
   !write(*,*) '*************************************************************'
  else
 
-  if(mype==0) then
+  if(partit%mype==0) then
   write(*,*) 'no iceberg restart'
 
   if(.NOT.ascii_out .AND. ib_num > 0) call init_buoy_output(partit)
@@ -1414,8 +1381,6 @@ subroutine iceberg_out(partit)
  implicit none
  integer :: icbID, icbID_ISM, ib, istep
 type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
  
  icbID = 42
  icbID_ISM = 43
@@ -1431,7 +1396,7 @@ type(t_partit), intent(inout), target :: partit
  calving_day = 0.0	!to avoid negative calving_days
  end where
 
- if(mype==0) then
+ if(partit%mype==0) then
   open(unit=icbID,file=IcebergRestartPath,position='append', status='replace', form='formatted')
   open(unit=icbID_ISM,file=IcebergRestartPath_ISM,position='append', status='replace', form='formatted')
   
@@ -1516,8 +1481,6 @@ subroutine init_icebergs
  integer :: i, myunit
  integer :: io_error, io_read
 !type(t_partit), intent(inout), target :: partit
-!#include "associate_part_def.h"
-!#include "associate_part_ass.h"
 
 !buoys_xlon_file > lon_deg
  open(newunit=myunit, file=buoys_xlon_file,status='old',action='read',iostat=io_error)
@@ -1592,8 +1555,6 @@ subroutine init_icebergs_with_icesheet
  integer :: i
  integer :: io_error
 !type(t_partit), intent(inout), target :: partit
-!#include "associate_part_def.h"
-!#include "associate_part_ass.h"
 
 !buoys_xlon_file > lon_deg
  open(unit=97, file=buoys_xlon_file,status='old',action='read',iostat=io_error)
@@ -1675,10 +1636,8 @@ subroutine determine_save_count(partit)
   integer                   :: dimid_rec
   integer                   :: time_varid
 type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
- if (mype==0) then
+ if (partit%mype==0) then
 
   ! open file
   status = nf_open(file_icb_netcdf, nf_nowrite, ncid)
@@ -1736,10 +1695,8 @@ subroutine init_buoy_output(partit)
   integer                   :: bvl_id, lvlv_id, lvle_id, lvlb_id, felem_id, grounded_id
   character(100)            :: longname, att_text, description
 type(t_partit), intent(inout), target :: partit
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
- if (mype==0) then
+ if (partit%mype==0) then
   write(*,*) 'initialize new buoy/iceberg output file'
  
 
@@ -2089,12 +2046,10 @@ subroutine write_buoy_props_netcdf(partit)
   real(kind=WP)              :: sec_in_year
 type(t_partit), intent(inout), target :: partit
 !type(t_ice),    intent(inout), target :: ice
-#include "associate_part_def.h"
-#include "associate_part_ass.h"
 
 !   /gfs1/work/hbkkim15/output/slabt/buoys_track.nc
   
-  if (mype==0) then 
+  if (partit%mype==0) then 
 
 ! kh 16.03.21 ?! istep is not initialized, intitialize to 0 here
      istep = 0

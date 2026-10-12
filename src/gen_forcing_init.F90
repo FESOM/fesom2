@@ -54,15 +54,11 @@ subroutine forcing_array_setup_dbgyre(partit, mesh)
   type(t_partit), intent(inout), target :: partit
   integer    :: n2
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
-  n2=myDim_nod2D+eDim_nod2D 
+  n2=partit%myDim_nod2D+partit%eDim_nod2D 
 
   allocate(chl(n2))
-  allocate(sw_3d(nl,n2))
+  allocate(sw_3d(mesh%nl,n2))
   chl=0.1_WP
 
 end subroutine forcing_array_setup_dbgyre
@@ -78,11 +74,7 @@ subroutine forcing_array_setup(partit, mesh)
 ! kh 19.02.21  
   integer    :: i
    
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
-  n2=myDim_nod2D+eDim_nod2D      
+  n2=partit%myDim_nod2D+partit%eDim_nod2D      
   ! Allocate memory for atmospheric forcing 
   allocate(shortwave(n2), longwave(n2))
   shortwave=0.0_WP
@@ -212,7 +204,7 @@ subroutine forcing_array_setup(partit, mesh)
   ! shortwave penetration
   if(use_sw_pene) then
     allocate(chl(n2))
-    allocate(sw_3d(nl,n2))
+    allocate(sw_3d(mesh%nl,n2))
     chl=0.1_WP
   endif
 
@@ -240,7 +232,7 @@ subroutine forcing_array_setup(partit, mesh)
     allocate(Cd_atm_ice_arr(n2)) 
     Cd_atm_ice_arr=Cd_atm_ice   
   endif
-  if(mype==0) write(*,*) 'forcing arrays have been set up'  
+  if(partit%mype==0) write(*,*) 'forcing arrays have been set up'  
 end subroutine forcing_array_setup
 !
 !----------------------------------------------------------------------

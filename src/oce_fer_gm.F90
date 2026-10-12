@@ -37,41 +37,37 @@ subroutine fer_solve_Gamma(partit, mesh)
 
     real(kind=WP), dimension(:,:), pointer :: tr
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, nz, nzmax, nzmin, zinv1,zinv2, zinv, m, r, a, b, c, cp, tp, tr, zbar_n, Z_n)
 !$OMP DO
-    DO n=1,myDim_nod2D
+    DO n=1,partit%myDim_nod2D
         tr=>fer_gamma(:,:,n)
 !       !_____________________________________________________________________
 !       ! minimum number of levels below elements containing node n
 !       nzmax=minval(nlevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
-        nzmax=nlevels_nod2D(n)
-        nzmin=ulevels_nod2D(n)
+        nzmax=mesh%nlevels_nod2D(n)
+        nzmin=mesh%ulevels_nod2D(n)
         
         !_______________________________________________________________________
         ! compute Z_n(:) and zbar_n(:) for the current ALE step
         zbar_n=0.0_WP
         Z_n   =0.0_WP
-        zbar_n(nzmax)=zbar_n_bot(n)                                ! depth of the deepest level with respect to partial cell
-        Z_n(nzmax-1) =zbar_n(nzmax) + hnode_new(nzmax-1,n)/2.0_WP  ! depth of the deepest layer
+        zbar_n(nzmax)=mesh%zbar_n_bot(n)                                ! depth of the deepest level with respect to partial cell
+        Z_n(nzmax-1) =zbar_n(nzmax) + mesh%hnode_new(nzmax-1,n)/2.0_WP  ! depth of the deepest layer
         !!PS do nz=nzmax-1,2,-1
         do nz=nzmax-1,nzmin+1,-1
-            zbar_n(nz) = zbar_n(nz+1) + hnode_new(nz,n)            ! depth of the nz level
-            Z_n(nz-1)  = zbar_n(nz)   + hnode_new(nz-1,n)/2.0_WP   ! depth of the nz layer
+            zbar_n(nz) = zbar_n(nz+1) + mesh%hnode_new(nz,n)            ! depth of the nz level
+            Z_n(nz-1)  = zbar_n(nz)   + mesh%hnode_new(nz-1,n)/2.0_WP   ! depth of the nz layer
         end do
         !!PS zbar_n(1) = zbar_n(2) + hnode_new(1,n)                ! surface level height (/depth)
-        zbar_n(nzmin) = zbar_n(nzmin+1) + hnode_new(nzmin,n)       ! surface level height (/depth)
+        zbar_n(nzmin) = zbar_n(nzmin+1) + mesh%hnode_new(nzmin,n)       ! surface level height (/depth)
         
         !_____________________________________________________________________
         ! minimum number of levels below elements containing node n
         !!PS nzmax=minval(nlevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
         !!PS nzmin=maxval(ulevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
-        nzmax=nlevels_nod2D_min(n)
-        nzmin=ulevels_nod2D_max(n)
+        nzmax=mesh%nlevels_nod2D_min(n)
+        nzmin=mesh%ulevels_nod2D_max(n)
 
         ! No interior range to solve on: the sweeps below would run zero times
         ! and tr(:,nzmax)=tp(:,nzmax) would publish an unassigned tp element.
@@ -164,22 +160,18 @@ subroutine fer_gamma2vel(dynamics, partit, mesh)
     type(t_mesh)  , intent(in),    target  :: mesh
     real(kind=WP), dimension(:,:,:), pointer :: fer_UV
     real(kind=WP), dimension(:,:)  , pointer :: fer_Wvel
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     fer_UV    =>dynamics%fer_uv(:,:,:)
     fer_Wvel  =>dynamics%fer_w(:,:)
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(el, elnod, nz, nzmin, nzmax, zinv)
-    DO el=1, myDim_elem2D
-        elnod=elem2D_nodes(:,el)
+    DO el=1, partit%myDim_elem2D
+        elnod=mesh%elem2D_nodes(:,el)
         ! max. number of levels at element el
-        nzmax=nlevels(el)
-        nzmin=ulevels(el)
+        nzmax=mesh%nlevels(el)
+        nzmin=mesh%ulevels(el)
         !!PS DO nz=1, nzmax-1
         DO nz=nzmin, nzmax-1
-            zinv=onethird/helem(nz,el)
+            zinv=onethird/mesh%helem(nz,el)
             fer_uv(1,nz,el)=sum(fer_gamma(1,nz,elnod)-fer_gamma(1,nz+1,elnod))*zinv
             fer_uv(2,nz,el)=sum(fer_gamma(2,nz,elnod)-fer_gamma(2,nz+1,elnod))*zinv
         END DO
@@ -205,10 +197,6 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
     real(kind=WP)            :: kmax_n, wnh, latd
     real(kind=WP)            :: refscalresol = 100000._WP ! 100km 
 
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
     ! automatically synchronise Redi and GM coefficient when Redi_Kmax<=0
     if (Redi .and. Redi_Kmax<=0) then 
@@ -219,17 +207,17 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
     !******************************* F1(x,y) ***********************************
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(n, k, nz, nzmax, nzmin, reso, c1, cm, rosb, scaling, rr_ratio, aux, aux_zz, zscaling, bvref, kmax_n, wnh, latd)
 !$OMP DO
-    do n=1, myDim_nod2D
+    do n=1, partit%myDim_nod2D
        !nzmax=minval(nlevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
        !nzmin=maxval(ulevels(nod_in_elem2D(1:nod_in_elem2D_num(n), n)), 1)
        !Intel vectorisation did something strange in the above lines hence we had to code it more explicitely
         nzmax=mesh%nl
         nzmin=1
-        do k=1, nod_in_elem2D_num(n)
-           nzmax=min(nzmax, nlevels(nod_in_elem2D(k, n)))
-           nzmin=max(nzmin, ulevels(nod_in_elem2D(k, n)))
+        do k=1, mesh%nod_in_elem2D_num(n)
+           nzmax=min(nzmax, mesh%nlevels(mesh%nod_in_elem2D(k, n)))
+           nzmin=max(nzmin, mesh%ulevels(mesh%nod_in_elem2D(k, n)))
         end do
-        reso=mesh_resolution(n)
+        reso=mesh%mesh_resolution(n)
         if (Fer_GM) then
             !___________________________________________________________________
             ! compute baroklionic gravity wave speed
@@ -237,7 +225,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
             cm=0._wp
             do nz=nzmin, nzmax-1
                 !!PS c1=c1+hnode_new(nz,n)*(sqrt(max(bvfreq(nz,n), 0._WP))+sqrt(max(bvfreq(nz+1,n), 0._WP)))/2._WP
-                cm=cm+hnode_new(nz,n)*(sqrt(abs(max(bvfreq(nz,n), 0._WP)))+sqrt(abs(max(bvfreq(nz+1,n), 0._WP))))/2._WP ! add abs() for -0 case, cray
+                cm=cm+mesh%hnode_new(nz,n)*(sqrt(abs(max(bvfreq(nz,n), 0._WP)))+sqrt(abs(max(bvfreq(nz+1,n), 0._WP))))/2._WP ! add abs() for -0 case, cray
             end do
             c1=max(K_GM_cmin, cm/pi)         !ca. first baroclinic gravity wave speed limited from below by c_min --> need for rosbyradius
             cm=max(K_GM_cmin, cm/pi/K_GM_cm) !ca. mth baroclinic gravity wave speed limited from below by c_min   --> needed for ferrari GM
@@ -257,7 +245,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
                 scaling=scaling*(reso/refscalresol)**K_GM_resscalorder 
                 
             elseif (scaling_resolution .and. K_GM_resscalorder==2) then    
-                scaling=scaling*(area(1,n)/(refscalresol**2)*2)**(1/K_GM_resscalorder) 
+                scaling=scaling*(mesh%area(1,n)/(refscalresol**2)*2)**(1/K_GM_resscalorder) 
                 !                           |--> scalvolume: for 100km resolution: (100km^2)*0.5
                 !
             end if
@@ -303,7 +291,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
             ! north of it, linear in latitude across K_GM_hemi_trans degrees centred on the equator.
             kmax_n = K_GM_max
             if (K_GM_max_NH >= 0.0_WP) then
-                latd   = geo_coord_nod2D(2, n)/rad
+                latd   = mesh%geo_coord_nod2D(2, n)/rad
                 wnh    = (latd + 0.5_WP*K_GM_hemi_trans)/max(K_GM_hemi_trans, 1.e-6_WP)
                 wnh    = min(max(wnh, 0.0_WP), 1.0_WP)
                 kmax_n = (1.0_WP-wnh)*K_GM_max + wnh*K_GM_max_NH
@@ -323,7 +311,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
             if     (K_GM_resscalorder==1) then
                 Ki(nzmin,n)=K_hor*(reso/refscalresol)**K_GM_resscalorder 
             elseif (K_GM_resscalorder==2) then
-                Ki(nzmin,n)=K_hor**(area(1,n)/(refscalresol**2)*2)**(1/K_GM_resscalorder) 
+                Ki(nzmin,n)=K_hor**(mesh%area(1,n)/(refscalresol**2)*2)**(1/K_GM_resscalorder) 
             end if 
 
         end if
@@ -333,7 +321,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
     !Like in FESOM 1.4 we make Redi equal GM
     if (Redi .and. Fer_GM) then
 !$OMP DO
-        do n=1, myDim_nod2D
+        do n=1, partit%myDim_nod2D
             !PS Ki(nzmin, n)=fer_k(nzmin, n)
             Ki(nzmin, n)=max(fer_scal(n)*Redi_Kmax, K_GM_min)
 !PS             Ki(nzmin, n)=fer_scal(n)*K_Redi_max
@@ -346,15 +334,15 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
 !Residual-Mean Ocean Circulation Model and Its Adjoint, Journal of Physical Oceanography, 35(10), 1891–
 !1910, doi:10.1175/jpo2785.1, 2005.
 !$OMP DO
-    do n=1,myDim_nod2D
+    do n=1,partit%myDim_nod2D
         !_______________________________________________________________________
         if (Redi .or. Fer_GM) then
-            nzmax=nlevels_nod2D(n)
-            nzmin=ulevels_nod2D(n)
+            nzmax=mesh%nlevels_nod2D(n)
+            nzmin=mesh%ulevels_nod2D(n)
             zscaling=1.0_WP
             !___________________________________________________________________
             if (scaling_Ferreira .and. scaling_GMzexp) then 
-                if (mype==0) then 
+                if (partit%mype==0) then 
                 print *, achar(27)//'[33m'
                 write(*,*) 
                 write(*,*) '____________________________________________________________________'
@@ -386,7 +374,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
                     aux_zz=0.0_WP
                     !!PS aux_zz(1:MLD1_ind(n)-1) = Z_3d_n(2:MLD1_ind(n),n)-Z_3d_n(1:MLD1_ind(n)-1,n)
                     !!PS bvref=max(sum(bvfreq(2:MLD1_ind(n),n)*aux_zz(1:MLD1_ind(n)-1))/sum(aux_zz(1:MLD1_ind(n)-1)), 1.e-6_WP)
-                    aux_zz(nzmin:MLD1_ind(n)-1) = Z_3d_n(nzmin+1:MLD1_ind(n),n)-Z_3d_n(nzmin:MLD1_ind(n)-1,n)
+                    aux_zz(nzmin:MLD1_ind(n)-1) = mesh%Z_3d_n(nzmin+1:MLD1_ind(n),n)-mesh%Z_3d_n(nzmin:MLD1_ind(n)-1,n)
                     bvref=max(sum(bvfreq(nzmin+1:MLD1_ind(n),n)*aux_zz(nzmin:MLD1_ind(n)-1))/sum(aux_zz(nzmin:MLD1_ind(n)-1)), 1.e-6_WP)    
                 end if 
                 
@@ -419,7 +407,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
                 ! --> if smin=0.0 model tends to be unstable an prone to blowups!!!
                 !  
                 do nz=nzmin, nzmax
-                    zscaling(nz)=GMzexp_smin + (1.0-GMzexp_smin)*exp(-abs(zbar_3d_n(nz, n)/GMzexp_zref))
+                    zscaling(nz)=GMzexp_smin + (1.0-GMzexp_smin)*exp(-abs(mesh%zbar_3d_n(nz, n)/GMzexp_zref))
                     zscaling(nz)=max(min(zscaling(nz), 1.0_WP), GMzexp_smin)
                 end do
             end if 
@@ -429,7 +417,7 @@ subroutine init_Redi_GM(partit, mesh) !fer_compute_C_K_Redi
             if (scaling_FESOM14) then
                 !zscaling(1:MLD1_ind(n)+1)=0.0_WP
                 do nz=nzmin, nzmax
-                    if (neutral_slope(3, min(nz, nl-1), n) > 5.e-3_WP) zscaling(nz)=0.0_WP
+                    if (neutral_slope(3, min(nz, mesh%nl-1), n) > 5.e-3_WP) zscaling(nz)=0.0_WP
                 end do
             end if
         end if ! --> if (Redi .or. Fer_GM) then
@@ -500,10 +488,6 @@ subroutine init_RediGM_GINsea_mask(partit, mesh)
     integer                               :: node, npts
     real(kind=WP)                         :: lon, lat
     real(kind=WP), allocatable            :: poly_lon(:), poly_lat(:)
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     
     ! define GINsea Polygon: 
     npts=9
@@ -516,9 +500,9 @@ subroutine init_RediGM_GINsea_mask(partit, mesh)
     fer_GINsea_mask = 0.0
     
     ! decide which point is in/out of the polygon
-    do node=1, myDim_nod2D+eDim_nod2D
-        lon = geo_coord_nod2D(1, node)/rad
-        lat = geo_coord_nod2D(2, node)/rad
+    do node=1, partit%myDim_nod2D+partit%eDim_nod2D
+        lon = mesh%geo_coord_nod2D(1, node)/rad
+        lat = mesh%geo_coord_nod2D(2, node)/rad
         fer_GINsea_mask(node) = point_in_polygon(lon, lat, poly_lon, poly_lat)
     end do
     

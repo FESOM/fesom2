@@ -119,10 +119,6 @@ MODULE mo_tidal
       REAL(WP) :: rkosp,codm,codmq,sids,sidsq,cods,codsq,sidm2
       REAL(WP) :: sids2,hamp,hasp
       INTEGER :: i,j
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
 
       mmccdt = mmccdt + 1
 
@@ -156,21 +152,21 @@ MODULE mo_tidal
       sids2=Sin(dekls2)
 
 
-      DO i=1, myDim_nod2D+eDim_nod2D
+      DO i=1, partit%myDim_nod2D+partit%eDim_nod2D
 
-         hamp = rektm + geo_coord_nod2D(1,i)
-         hasp = rekts + geo_coord_nod2D(1,i)
+         hamp = rektm + mesh%geo_coord_nod2D(1,i)
+         hasp = rekts + mesh%geo_coord_nod2D(1,i)
 
          ! attention : mpiom uses a negative tidal potential due to negative factor rkomp
          ssh_gp(i) = eef * (erdrad * rkomp * crim3 &
-              * (3._WP * (SIN(geo_coord_nod2D(2,i))**2 - 1._WP/3._WP) * (sidmq - 1._WP/3._WP)&
-              &  + SIN(2._WP * geo_coord_nod2D(2,i)) * sidm2 * COS(hamp) &
-              &  + COS(geo_coord_nod2D(2,i))**2 * codmq * COS(2._WP * hamp))        &
+              * (3._WP * (SIN(mesh%geo_coord_nod2D(2,i))**2 - 1._WP/3._WP) * (sidmq - 1._WP/3._WP)&
+              &  + SIN(2._WP * mesh%geo_coord_nod2D(2,i)) * sidm2 * COS(hamp) &
+              &  + COS(mesh%geo_coord_nod2D(2,i))**2 * codmq * COS(2._WP * hamp))        &
               &  + erdrad * rkosp * cris3 &
-              &    * (3._WP * (SIN(geo_coord_nod2D(2,i))**2 - 1._WP/3._WP) &
+              &    * (3._WP * (SIN(mesh%geo_coord_nod2D(2,i))**2 - 1._WP/3._WP) &
               &       * (sidsq - 1._WP/3._WP) &
-              &       + SIN(2._WP * geo_coord_nod2D(2,i)) * sids2 * COS(hasp) &
-              &       + COS(geo_coord_nod2D(2,i))**2 * codsq * COS(2._WP * hasp)))
+              &       + SIN(2._WP * mesh%geo_coord_nod2D(2,i)) * sids2 * COS(hasp) &
+              &       + COS(mesh%geo_coord_nod2D(2,i))**2 * codsq * COS(2._WP * hasp)))
 
       END DO
 

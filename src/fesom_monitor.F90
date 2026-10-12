@@ -172,10 +172,6 @@ subroutine monitor_fill_ocean(mon, istep, full, ice, dynamics, tracers, partit, 
     real(kind=WP), dimension(:,:,:), pointer :: UVnode
     real(kind=WP), dimension(:,:)  , pointer :: Wvel, CFL_z
     real(kind=WP), dimension(:)    , pointer :: eta_n, d_eta, m_ice
-#include "associate_part_def.h"
-#include "associate_mesh_def.h"
-#include "associate_part_ass.h"
-#include "associate_mesh_ass.h"
     UVnode => dynamics%uvnode(:,:,:)
     Wvel   => dynamics%w(:,:)
     CFL_z  => dynamics%cfl_z(:,:)
@@ -195,7 +191,7 @@ subroutine monitor_fill_ocean(mon, istep, full, ice, dynamics, tracers, partit, 
     smax = -huge(smax)
     snf  = 0
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, x) REDUCTION(min:smin) REDUCTION(max:smax) REDUCTION(+:snf)
-    do n=1, myDim_nod2D
+    do n=1, partit%myDim_nod2D
         x = eta_n(n)
         if (ieee_is_finite(x)) then
             smin(1) = min(smin(1), x); smax(1) = max(smax(1), x)
@@ -205,7 +201,7 @@ subroutine monitor_fill_ocean(mon, istep, full, ice, dynamics, tracers, partit, 
         if ( .not. dynamics%use_ssh_se_subcycl) then
             x = d_eta(n)
         else
-            x = hbar(n)-hbar_old(n)
+            x = mesh%hbar(n)-mesh%hbar_old(n)
         end if
         if (ieee_is_finite(x)) then
             smin(2) = min(smin(2), x); smax(2) = max(smax(2), x)
@@ -218,13 +214,13 @@ subroutine monitor_fill_ocean(mon, istep, full, ice, dynamics, tracers, partit, 
         else
             snf(3) = snf(3) + 1
         end if
-        x = hnode(1,n)
+        x = mesh%hnode(1,n)
         if (ieee_is_finite(x)) then
             smin(4) = min(smin(4), x); smax(4) = max(smax(4), x)
         else
             snf(4) = snf(4) + 1
         end if
-        do nz=ulevels_nod2D(n), nlevels_nod2D(n)-1
+        do nz=mesh%ulevels_nod2D(n), mesh%nlevels_nod2D(n)-1
             x = temp(nz,n)
             if (ieee_is_finite(x)) then
                 smin(5) = min(smin(5), x); smax(5) = max(smax(5), x)
@@ -246,9 +242,9 @@ subroutine monitor_fill_ocean(mon, istep, full, ice, dynamics, tracers, partit, 
     sbuf(1:NS)        = -real(smin, WP_full)
     sbuf(NS+1:2*NS)   =  real(smax, WP_full)
     sbuf(2*NS+1:3*NS) =  real(snf,  WP_full)
-    call MPI_AllREDUCE(sbuf, gbuf, 3*NS, MPI_WP_FULL, MPI_MAX, MPI_COMM_FESOM, MPIerr)
+    call MPI_AllREDUCE(sbuf, gbuf, 3*NS, MPI_WP_FULL, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
     if (any(gbuf(2*NS+1:3*NS) > 0.0_WP_full)) then
-        call MPI_AllREDUCE(snf, gnf, NS, MPI_INTEGER8, MPI_SUM, MPI_COMM_FESOM, MPIerr)
+        call MPI_AllREDUCE(snf, gnf, NS, MPI_INTEGER8, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
     else
         gnf = 0
     end if
@@ -268,8 +264,8 @@ subroutine monitor_fill_ocean(mon, istep, full, ice, dynamics, tracers, partit, 
     lmin = huge(lmin)
     lmax = -huge(lmax)
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz, x) REDUCTION(min:lmin) REDUCTION(max:lmax)
-    do n=1, myDim_nod2D
-        lmin(1) = min(lmin(1), hbar(n));          lmax(1) = max(lmax(1), hbar(n))
+    do n=1, partit%myDim_nod2D
+        lmin(1) = min(lmin(1), mesh%hbar(n));          lmax(1) = max(lmax(1), mesh%hbar(n))
         lmin(2) = min(lmin(2), water_flux(n));    lmax(2) = max(lmax(2), water_flux(n))
         lmin(3) = min(lmin(3), heat_flux(n));     lmax(3) = max(lmax(3), heat_flux(n))
         lmin(4) = min(lmin(4), Wvel(2,n));        lmax(4) = max(lmax(4), Wvel(2,n))
@@ -277,18 +273,18 @@ subroutine monitor_fill_ocean(mon, istep, full, ice, dynamics, tracers, partit, 
         lmin(6) = min(lmin(6), UVnode(1,2,n));    lmax(6) = max(lmax(6), UVnode(1,2,n))
         lmin(7) = min(lmin(7), UVnode(2,1,n));    lmax(7) = max(lmax(7), UVnode(2,1,n))
         lmin(8) = min(lmin(8), UVnode(2,2,n));    lmax(8) = max(lmax(8), UVnode(2,2,n))
-        lmin(9) = min(lmin(9), hnode(2,n));       lmax(9) = max(lmax(9), hnode(2,n))
+        lmin(9) = min(lmin(9), mesh%hnode(2,n));       lmax(9) = max(lmax(9), mesh%hnode(2,n))
         if (use_ice) lmax(10) = max(lmax(10), m_ice(n))
-        do nz=1, nl-1
+        do nz=1, mesh%nl-1
             lmax(11) = max(lmax(11), CFL_z(nz,n))
             lmax(12) = max(lmax(12), pgf_x(nz,n))
             lmax(13) = max(lmax(13), pgf_y(nz,n))
         end do
-        do nz=1, nl
+        do nz=1, mesh%nl
             lmax(14) = max(lmax(14), Kv(nz,n))
         end do
         if (ldiag_dMOC) then
-            do nz=1, nl-1
+            do nz=1, mesh%nl-1
                 x = density_dmoc(nz,n)
                 if (x /= 0.0_WP) then
                     lmin(16) = min(lmin(16), x); lmax(16) = max(lmax(16), x)
@@ -298,8 +294,8 @@ subroutine monitor_fill_ocean(mon, istep, full, ice, dynamics, tracers, partit, 
     end do
 !$OMP END PARALLEL DO
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(n, nz) REDUCTION(max:lmax)
-    do n=1, myDim_elem2D
-        do nz=1, nl
+    do n=1, partit%myDim_elem2D
+        do nz=1, mesh%nl
             lmax(15) = max(lmax(15), Av(nz,n))
         end do
     end do
@@ -309,11 +305,11 @@ subroutine monitor_fill_ocean(mon, istep, full, ice, dynamics, tracers, partit, 
     ! area integrals of the surface fields: in WP_full and in node order, so
     ! they neither degrade with WP nor depend on the number of threads
     lsum = 0.0_WP_full
-    do n=1, myDim_nod2D
-       wgt     = real(areasvol(ulevels_nod2D(n), n), WP_full)
+    do n=1, partit%myDim_nod2D
+       wgt     = real(mesh%areasvol(mesh%ulevels_nod2D(n), n), WP_full)
        lsum(1) = lsum(1) + wgt*real(eta_n(n), WP_full)
-       lsum(2) = lsum(2) + wgt*real(hbar(n), WP_full)
-       lsum(3) = lsum(3) + wgt*(real(hbar(n), WP_full)-real(hbar_old(n), WP_full))
+       lsum(2) = lsum(2) + wgt*real(mesh%hbar(n), WP_full)
+       lsum(3) = lsum(3) + wgt*(real(mesh%hbar(n), WP_full)-real(mesh%hbar_old(n), WP_full))
        lsum(4) = lsum(4) + wgt*real(water_flux(n), WP_full)
     end do
 
@@ -321,9 +317,9 @@ subroutine monitor_fill_ocean(mon, istep, full, ice, dynamics, tracers, partit, 
     ! two reductions: all min/max (min as max of the negated value) and the sums
     lbuf(1:NLOG)        = -real(lmin, WP_full)
     lbuf(NLOG+1:2*NLOG) =  real(lmax, WP_full)
-    call MPI_AllREDUCE(lbuf, gbuf_l, 2*NLOG, MPI_WP_FULL, MPI_MAX, MPI_COMM_FESOM, MPIerr)
-    call MPI_AllREDUCE(lsum, gsum, 4, MPI_WP_FULL, MPI_SUM, MPI_COMM_FESOM, MPIerr)
-    gsum = gsum/real(ocean_areawithcav, WP_full)
+    call MPI_AllREDUCE(lbuf, gbuf_l, 2*NLOG, MPI_WP_FULL, MPI_MAX, partit%MPI_COMM_FESOM, partit%MPIerr)
+    call MPI_AllREDUCE(lsum, gsum, 4, MPI_WP_FULL, MPI_SUM, partit%MPI_COMM_FESOM, partit%MPIerr)
+    gsum = gsum/real(mesh%ocean_areawithcav, WP_full)
 
     call set_entry(mon, 'eta',    integral=gsum(1))
     call set_entry(mon, 'hbar',   gsum(2), lv(1, 'min'), lv(1, 'max'))
