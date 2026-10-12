@@ -11,12 +11,12 @@ Sections of the namelist
 Section &diag_list
 """"""""""""""""""
 
-- **ldiag_solver** write solver convergence diagnostics (``ssh_rhs``, iteration counts).
+- **ldiag_solver** compute the solver diagnostic ``rhs_diag``. It is currently not written to any output stream.
 - **lcurt_stress_surf** enable curl of the surface stress field (activates ``curl_surf`` output).
 - **ldiag_curl_vel3** compute 3-D relative vorticity from velocity (``curl_u``).
 - **ldiag_Ri** compute and output bulk Richardson number diagnostics (``shear``, ``Ri``).
 - **ldiag_TurbFlux** turbulent flux diagnostics (``KvdTdz``, ``KvdSdz``).
-- **ldiag_salt3D** extra 3-D salinity diagnostics.
+- **ldiag_salt3D** print the global integral of salinity to the log file every ``logfile_outfreq`` steps. No output stream is written.
 - **ldiag_dMOC** density-space MOC diagnostics: divergence of the horizontal transports within the density bins (``std_dens_DIV``, plus ``std_dens_DIVbolus`` with ``Fer_GM``) and the surface buoyancy fluxes per density class, from which the full velocities and the density MOC are reconstructed in postprocessing.
 - **ldiag_diapmix** adds ``w_diap_diff`` and ``dV_diap_dT`` to the ``dMOC`` stream: the diapycnal velocity and the density-class uplift velocity induced by the parameterized vertical mixing. Combined with the full velocities from ``ldiag_dMOC`` this gives the numerically induced diapycnal velocity ``w_full - w_diap - w_uplift`` and the corresponding spurious MOC. Requires ``ldiag_dMOC`` (switched on automatically if left unset). Evaluated every ``diap_call_freq`` units of ``diap_call_freq_unit`` (``'s'``, ``'h'``, ``'d'`` or ``'m'``); the diagnostic averages over the interval between calls.
 - **ldiag_DVD** Discrete Variance Decay diagnostics for numerical mixing estimates.
